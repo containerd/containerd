@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"syscall"
 	"text/tabwriter"
+	"time"
 
 	"github.com/codegangsta/cli"
 	"github.com/docker/containerd/api/grpc/types"
@@ -16,8 +18,14 @@ import (
 )
 
 // TODO: parse flags and pass opts
-func getClient() types.APIClient {
-	conn, err := grpc.Dial("localhost:8888", grpc.WithInsecure())
+func getClient(ctx *cli.Context) types.APIClient {
+	dialOpts := []grpc.DialOption{grpc.WithInsecure()}
+	dialOpts = append(dialOpts,
+		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
+			return net.DialTimeout("unix", addr, timeout)
+		},
+		))
+	conn, err := grpc.Dial(ctx.GlobalString("address"), dialOpts...)
 	if err != nil {
 		fatal(err.Error(), 1)
 	}
@@ -44,7 +52,7 @@ var ListCommand = cli.Command{
 }
 
 func listContainers(context *cli.Context) {
-	c := getClient()
+	c := getClient(context)
 	resp, err := c.State(netcontext.Background(), &types.StateRequest{})
 	if err != nil {
 		fatal(err.Error(), 1)
@@ -94,7 +102,7 @@ var StartCommand = cli.Command{
 				fatal(err.Error(), 1)
 			}
 		}
-		c := getClient()
+		c := getClient(context)
 		if _, err := c.CreateContainer(netcontext.Background(), r); err != nil {
 			fatal(err.Error(), 1)
 		}
@@ -172,7 +180,7 @@ var KillCommand = cli.Command{
 		if id == "" {
 			fatal("container id cannot be empty", 1)
 		}
-		c := getClient()
+		c := getClient(context)
 		if _, err := c.Signal(netcontext.Background(), &types.SignalRequest{
 			Id:     id,
 			Pid:    uint32(context.Int("pid")),
@@ -225,7 +233,7 @@ var ExecCommand = cli.Command{
 				Gid: uint32(context.Int("gid")),
 			},
 		}
-		c := getClient()
+		c := getClient(context)
 		if _, err := c.AddProcess(netcontext.Background(), p); err != nil {
 			fatal(err.Error(), 1)
 		}
