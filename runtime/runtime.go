@@ -13,7 +13,7 @@ var (
 	ErrCheckpointExists      = errors.New("containerd: checkpoint already exists")
 	ErrContainerExited       = errors.New("containerd: container has exited")
 	ErrTerminalsNotSupported = errors.New("containerd: terminals are not supported for runtime")
-	ErrConsoleUnavialable    = errors.New("containerd: container console unavailable")
+	ErrConsoleUnavailable    = errors.New("containerd: console unavailable")
 )
 
 // Runtime handles containers, containers handle their own actions

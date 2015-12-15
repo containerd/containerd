@@ -13,6 +13,11 @@ type Process interface {
 	Pid() (int, error)
 	Spec() specs.Process
 	Signal(os.Signal) error
+
+	// TODO(stevvooe): Most packages have an API consisting of StdinPipe,
+	// StdoutPipe, etc. It may be better to match that API rather than use IO.
+	// Simple methods can be created around mapping these correctly in our ssh
+	// framework.
 	IO() *IO
 }
 

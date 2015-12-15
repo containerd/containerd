@@ -1,11 +1,18 @@
 package ssh
 
+import (
+	"io"
+	"log"
+	"net"
+	"strings"
+
+	"golang.org/x/crypto/ssh"
+)
+
 // Server implements a simple ssh server for use with serving attach sessions.
 type Server struct {
 	Config  *ssh.ServerConfig
 	Handler ChannelHandler
-
-	log Logger
 }
 
 func NewServer(config *ssh.ServerConfig, handler ChannelHandler) *Server {

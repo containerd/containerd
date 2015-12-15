@@ -1,5 +1,11 @@
 package ssh
 
+import "golang.org/x/crypto/ssh"
+
+// TODO(stevvooe): This provides a small attempt at a handler framework. There
+// is likely common things we've missed here that may be necessary to
+// correctly handle a session.
+
 // ChannelHandler handles a new channel request for a connection. Using a
 // Server, these handles are run in a separate goroutine.
 type ChannelHandler interface {

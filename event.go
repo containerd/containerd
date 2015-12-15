@@ -50,7 +50,7 @@ type Event struct {
 	State      *runtime.State
 	Containers []runtime.Container
 	Checkpoint *runtime.Checkpoint
-	Console    runtime.Console
+	IO         *runtime.IO
 	Err        chan error
 	Stats      chan interface{}
 }
