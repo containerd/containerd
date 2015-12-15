@@ -13,6 +13,12 @@ type Process interface {
 	Pid() (int, error)
 	Spec() specs.Process
 	Signal(os.Signal) error
+
+	// TODO(stevvooe): Most packages have an API consisting of StdinPipe,
+	// StdoutPipe, etc. It may be better to match that API rather than use IO.
+	// Simple methods can be created around mapping these correctly in our ssh
+	// framework.
+	IO() *IO
 }
 
 type Status string
@@ -26,15 +32,36 @@ type State struct {
 	Status Status
 }
 
+// Console represents a pseudo TTY.
 type Console interface {
 	io.ReadWriter
 	io.Closer
+
+	// Path returns the filesystem path to the slave side of the pty.
+	Path() string
+
+	// Fd returns the fd for the master of the pty.
+	Fd() uintptr
 }
 
 type IO struct {
+
+	// TODO(stevvooe): Consider matching StdinPipe, etc. methods from os/exec
+	// and ssh.Session.
+
 	Stdin  io.WriteCloser
 	Stdout io.ReadCloser
 	Stderr io.ReadCloser
+
+	console Console // present, if available
+}
+
+func (i *IO) Console() (Console, error) {
+	if i.console == nil {
+		return nil, ErrConsoleUnavailable
+	}
+
+	return i.console, nil
 }
 
 func (i *IO) Close() error {

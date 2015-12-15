@@ -185,6 +185,16 @@ func (p *libcontainerProcess) Signal(s os.Signal) error {
 	return p.process.Signal(s)
 }
 
+func (p *libcontainerProcess) IO() *runtime.IO {
+	// TODO(stevvooe): Grab the console here, if possible.
+
+	return &runtime.IO{
+		Stdin:  p.process.Stdin,
+		Stdout: p.process.Stout,
+		Stderr: p.process.Stderr,
+	}
+}
+
 func (p *libcontainerProcess) Close() error {
 	// in close we always need to call wait to close/flush any pipes
 	p.process.Wait()
@@ -404,6 +414,7 @@ func (r *libcontainerRuntime) Create(id, bundlePath, consolePath string) (runtim
 	if err != nil {
 		return nil, nil, err
 	}
+
 	var rio runtime.IO
 	if spec.Process.Terminal {
 		if err := process.ConsoleFromPath(consolePath); err != nil {
@@ -414,10 +425,13 @@ func (r *libcontainerRuntime) Create(id, bundlePath, consolePath string) (runtim
 		if err != nil {
 			return nil, nil, err
 		}
+
+		// NOTE(stevvooe): Do these need to be set?
 		rio.Stdin = i.Stdin
 		rio.Stderr = i.Stderr
 		rio.Stdout = i.Stdout
 	}
+
 	c := &libcontainerContainer{
 		c:                   container,
 		additionalProcesses: make(map[int]*libcontainerProcess),

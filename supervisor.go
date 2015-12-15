@@ -55,6 +55,7 @@ func NewSupervisor(id, stateDir string, tasks chan *StartTask) (*Supervisor, err
 		DeleteCheckpointEventType: &DeleteCheckpointEvent{s},
 		StatsEventType:            &StatsEvent{s},
 		UnsubscribeStatsEventType: &UnsubscribeStatsEvent{s},
+		AttachEventType:           &AttachEvent{s},
 	}
 	// start the container workers for concurrent container starts
 	return s, nil
@@ -223,6 +224,13 @@ func (s *Supervisor) getContainerForPid(pid int) (runtime.Container, error) {
 	}
 	return nil, errNoContainerForPid
 }
+
+// TODO(stevvooe): The SendEvent API is slightly awkward. We get nice reuse
+// but it is hard to tell what are input and output arguments. I'd recommend
+// making the function call feel synchronous but manage the event dispatch and
+// channel communication. Coupled with net/context, this can provide a nice
+// way to handle timeouts without have selects all over the code base to
+// handle channels blocking.
 
 // SendEvent sends the provided event the the supervisors main event loop
 func (s *Supervisor) SendEvent(evt *Event) {

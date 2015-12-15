@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/docker/containerd/ssh"
 	"google.golang.org/grpc"
-
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	"github.com/docker/containerd"
@@ -172,6 +172,19 @@ func daemon(id, address, stateDir string, concurrency int) error {
 	if err := supervisor.Start(); err != nil {
 		return err
 	}
+
+	go func() {
+		server:= ssh.NewServer(ssh.NewSimpleServerConfig(), ssh.SupervisorCommands(supervisor))
+		listener, err := net.Listen("tcp", ":2222")
+		if err != nil {
+			logrus.Panicln(err)
+		}
+
+		if err := server.Serve(listener); err != nil {
+			log.Fatalln(err)
+		}
+	}()
+
 	if err := os.RemoveAll(address); err != nil {
 		return err
 	}
