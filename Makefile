@@ -1,18 +1,16 @@
 
 BUILDTAGS=libcontainer
 
-all:
-	mkdir -p bin/
-	cd containerd && go build -tags "$(BUILDTAGS)" -o ../bin/containerd
-	cd ctr && go build -o ../bin/ctr
+all: mkbin client daemon
 
-client:
+mkbin:
 	mkdir -p bin/
-	cd ctr && go build -o ../bin/ctr
 
-daemon:
-	mkdir -p bin/
-	cd containerd && go build -tags "$(BUILDTAGS)" -o ../bin/containerd
+client: mkbin
+	cd cmd/ctr && go build -i -o ../bin/ctr
+
+daemon: mkbin
+	cd cmd/containerd && go build -i -tags "$(BUILDTAGS)" -o ../bin/containerd
 
 install:
 	cp bin/* /usr/local/bin/
