@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/runtime"
 )
 
@@ -23,7 +24,7 @@ func (h *DeleteEvent) Handle(e *Event) error {
 			}
 		}
 		h.s.notifySubscribers(&Event{
-			Type:   ExitEventType,
+			Type:   types.EventType_EVENT_TYPE_EXIT,
 			ID:     e.ID,
 			Status: e.Status,
 			Pid:    e.Pid,

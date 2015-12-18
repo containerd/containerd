@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/supervisor"
 	"github.com/docker/containerd/util"
 	"github.com/opencontainers/runc/libcontainer/utils"
@@ -55,7 +56,7 @@ func reap() (exits []*supervisor.Event, err error) {
 		if pid <= 0 {
 			return exits, nil
 		}
-		e := supervisor.NewEvent(supervisor.ExitEventType)
+		e := supervisor.NewEvent(types.EventType_EVENT_TYPE_EXIT)
 		e.Pid = pid
 		e.Status = utils.ExitStatus(ws)
 		exits = append(exits, e)

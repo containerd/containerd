@@ -4,30 +4,12 @@ import (
 	"os"
 	"time"
 
+	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/runtime"
 	"github.com/opencontainers/specs"
 )
 
-type EventType string
-
-const (
-	ExecExitEventType         EventType = "execExit"
-	ExitEventType             EventType = "exit"
-	StartContainerEventType   EventType = "startContainer"
-	DeleteEventType           EventType = "deleteContainerEvent"
-	GetContainerEventType     EventType = "getContainer"
-	SignalEventType           EventType = "signal"
-	AddProcessEventType       EventType = "addProcess"
-	UpdateContainerEventType  EventType = "updateContainer"
-	CreateCheckpointEventType EventType = "createCheckpoint"
-	DeleteCheckpointEventType EventType = "deleteCheckpoint"
-	StatsEventType            EventType = "events"
-	UnsubscribeStatsEventType EventType = "unsubscribeStats"
-	StopStatsEventType        EventType = "stopStats"
-	OOMEventType              EventType = "oom"
-)
-
-func NewEvent(t EventType) *Event {
+func NewEvent(t types.EventType) *Event {
 	return &Event{
 		Type:      t,
 		Timestamp: time.Now(),
@@ -40,7 +22,7 @@ type StartResponse struct {
 }
 
 type Event struct {
-	Type          EventType
+	Type          types.EventType
 	Timestamp     time.Time
 	ID            string
 	BundlePath    string

@@ -30,7 +30,7 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 	if c.BundlePath == "" {
 		return nil, errors.New("empty bundle path")
 	}
-	e := supervisor.NewEvent(supervisor.StartContainerEventType)
+	e := supervisor.NewEvent(types.EventType_EVENT_TYPE_START_CONTAINER)
 	e.ID = c.Id
 	e.BundlePath = c.BundlePath
 	e.Stdout = c.Stdout
@@ -54,7 +54,7 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 }
 
 func (s *apiServer) Signal(ctx context.Context, r *types.SignalRequest) (*types.SignalResponse, error) {
-	e := supervisor.NewEvent(supervisor.SignalEventType)
+	e := supervisor.NewEvent(types.EventType_EVENT_TYPE_SIGNAL)
 	e.ID = r.Id
 	e.Pid = int(r.Pid)
 	e.Signal = syscall.Signal(int(r.Signal))
@@ -77,7 +77,7 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 			AdditionalGids: r.User.AdditionalGids,
 		},
 	}
-	e := supervisor.NewEvent(supervisor.AddProcessEventType)
+	e := supervisor.NewEvent(types.EventType_EVENT_TYPE_ADD_PROCESS)
 	e.ID = r.Id
 	e.Process = process
 	e.Console = r.Console
@@ -92,7 +92,7 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 }
 
 func (s *apiServer) CreateCheckpoint(ctx context.Context, r *types.CreateCheckpointRequest) (*types.CreateCheckpointResponse, error) {
-	e := supervisor.NewEvent(supervisor.CreateCheckpointEventType)
+	e := supervisor.NewEvent(types.EventType_EVENT_TYPE_CREATE_CHECKPOINT)
 	e.ID = r.Id
 	e.Checkpoint = &runtime.Checkpoint{
 		Name:        r.Checkpoint.Name,
@@ -112,7 +112,7 @@ func (s *apiServer) DeleteCheckpoint(ctx context.Context, r *types.DeleteCheckpo
 	if r.Name == "" {
 		return nil, errors.New("checkpoint name cannot be empty")
 	}
-	e := supervisor.NewEvent(supervisor.DeleteCheckpointEventType)
+	e := supervisor.NewEvent(types.EventType_EVENT_TYPE_DELETE_CHECKPOINT)
 	e.ID = r.Id
 	e.Checkpoint = &runtime.Checkpoint{
 		Name: r.Name,
@@ -125,7 +125,7 @@ func (s *apiServer) DeleteCheckpoint(ctx context.Context, r *types.DeleteCheckpo
 }
 
 func (s *apiServer) ListCheckpoint(ctx context.Context, r *types.ListCheckpointRequest) (*types.ListCheckpointResponse, error) {
-	e := supervisor.NewEvent(supervisor.GetContainerEventType)
+	e := supervisor.NewEvent(types.EventType_EVENT_TYPE_GET_CONTAINER)
 	s.sv.SendEvent(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
@@ -159,7 +159,7 @@ func (s *apiServer) ListCheckpoint(ctx context.Context, r *types.ListCheckpointR
 }
 
 func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.StateResponse, error) {
-	e := supervisor.NewEvent(supervisor.GetContainerEventType)
+	e := supervisor.NewEvent(types.EventType_EVENT_TYPE_GET_CONTAINER)
 	s.sv.SendEvent(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
@@ -208,7 +208,7 @@ func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.St
 }
 
 func (s *apiServer) UpdateContainer(ctx context.Context, r *types.UpdateContainerRequest) (*types.UpdateContainerResponse, error) {
-	e := supervisor.NewEvent(supervisor.UpdateContainerEventType)
+	e := supervisor.NewEvent(types.EventType_EVENT_TYPE_UPDATE_CONTAINER)
 	e.ID = r.Id
 	if r.Signal != 0 {
 		e.Signal = syscall.Signal(r.Signal)
@@ -229,14 +229,14 @@ func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer
 	for evt := range events {
 		var ev *types.Event
 		switch evt.Type {
-		case supervisor.ExitEventType, supervisor.ExecExitEventType:
+		case types.EventType_EVENT_TYPE_EXIT, types.EventType_EVENT_TYPE_EXEC_EXIT:
 			ev = &types.Event{
 				Type:   "exit",
 				Id:     evt.ID,
 				Pid:    uint32(evt.Pid),
 				Status: uint32(evt.Status),
 			}
-		case supervisor.OOMEventType:
+		case types.EventType_EVENT_TYPE_OOM:
 			ev = &types.Event{
 				Type: "oom",
 				Id:   evt.ID,
@@ -253,7 +253,7 @@ func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer
 }
 
 func (s *apiServer) GetStats(r *types.StatsRequest, stream types.API_GetStatsServer) error {
-	e := supervisor.NewEvent(supervisor.StatsEventType)
+	e := supervisor.NewEvent(types.EventType_EVENT_TYPE_STATS)
 	e.ID = r.Id
 	s.sv.SendEvent(e)
 	if err := <-e.Err; err != nil {
@@ -263,7 +263,7 @@ func (s *apiServer) GetStats(r *types.StatsRequest, stream types.API_GetStatsSer
 		return err
 	}
 	defer func() {
-		ue := supervisor.NewEvent(supervisor.UnsubscribeStatsEventType)
+		ue := supervisor.NewEvent(types.EventType_EVENT_TYPE_UNSUBSCRIBE_STATS)
 		ue.ID = e.ID
 		ue.Stats = e.Stats
 		s.sv.SendEvent(ue)
