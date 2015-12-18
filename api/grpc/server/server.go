@@ -231,14 +231,14 @@ func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer
 		switch evt.Type {
 		case types.EventType_EVENT_TYPE_EXIT, types.EventType_EVENT_TYPE_EXEC_EXIT:
 			ev = &types.Event{
-				Type:   "exit",
+				Type:   evt.Type,
 				Id:     evt.ID,
 				Pid:    uint32(evt.Pid),
 				Status: uint32(evt.Status),
 			}
 		case types.EventType_EVENT_TYPE_OOM:
 			ev = &types.Event{
-				Type: "oom",
+				Type: evt.Type,
 				Id:   evt.ID,
 			}
 		}

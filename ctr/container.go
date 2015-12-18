@@ -142,7 +142,7 @@ var StartCommand = cli.Command{
 				if err != nil {
 					fatal(err.Error(), 1)
 				}
-				if e.Id == id && e.Type == "exit" {
+				if e.Id == id && e.Type == types.EventType_EVENT_TYPE_EXIT {
 					os.Exit(int(e.Status))
 				}
 			}
@@ -347,7 +347,7 @@ var ExecCommand = cli.Command{
 				if err != nil {
 					fatal(err.Error(), 1)
 				}
-				if e.Pid == r.Pid && e.Type == "exit" {
+				if e.Pid == r.Pid && e.Type == types.EventType_EVENT_TYPE_EXIT {
 					os.Exit(int(e.Status))
 				}
 			}

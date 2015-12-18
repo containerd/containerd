@@ -161,7 +161,7 @@ enum EventType {
 }
 
 message Event {
-	string type = 1;
+	EventType type = 1;
 	string id = 2;
 	uint32 status = 3;
 	string bundlePath = 4;
