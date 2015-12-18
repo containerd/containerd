@@ -59,6 +59,5 @@ func (h *ExecExitEvent) Handle(e *Event) error {
 		logrus.WithField("error", err).Error("containerd: close process IO")
 	}
 	delete(h.s.processes, e.Pid)
-	h.s.notifySubscribers(e)
 	return nil
 }
