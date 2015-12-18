@@ -3,137 +3,138 @@ syntax = "proto3";
 package types;
 
 service API {
-	rpc CreateContainer(CreateContainerRequest) returns (CreateContainerResponse) {}
-	rpc UpdateContainer(UpdateContainerRequest) returns (UpdateContainerResponse) {}
-	rpc Signal(SignalRequest) returns (SignalResponse) {}
-	rpc AddProcess(AddProcessRequest) returns (AddProcessResponse) {}
-	rpc CreateCheckpoint(CreateCheckpointRequest) returns (CreateCheckpointResponse) {}
-	rpc DeleteCheckpoint(DeleteCheckpointRequest) returns (DeleteCheckpointResponse) {}
-	rpc ListCheckpoint(ListCheckpointRequest) returns (ListCheckpointResponse) {}
-	rpc State(StateRequest) returns (StateResponse) {}
-	rpc Events(EventsRequest) returns (stream Event) {}
-	rpc GetStats(StatsRequest) returns (stream Stats) {}
+  rpc CreateContainer(CreateContainerRequest) returns (CreateContainerResponse) {}
+  rpc UpdateContainer(UpdateContainerRequest) returns (UpdateContainerResponse) {}
+  rpc Signal(SignalRequest) returns (SignalResponse) {}
+  rpc AddProcess(AddProcessRequest) returns (AddProcessResponse) {}
+  rpc CreateCheckpoint(CreateCheckpointRequest) returns (CreateCheckpointResponse) {}
+  rpc DeleteCheckpoint(DeleteCheckpointRequest) returns (DeleteCheckpointResponse) {}
+  rpc ListCheckpoint(ListCheckpointRequest) returns (ListCheckpointResponse) {}
+  rpc State(StateRequest) returns (StateResponse) {}
+  rpc Events(EventsRequest) returns (stream Event) {}
+  rpc GetStats(StatsRequest) returns (stream Stats) {}
+}
+
+message IO {
+  string stdin = 1; // path to the file where stdin will be read (optional)
+  string stdout = 2; // path to file where stdout will be written (optional)
+  string stderr = 3; // path to file where stderr will be written (optional)
+  string console = 4; // path to the console for a container (optional)
 }
 
 message CreateContainerRequest {
-	string id = 1; // ID of container
-	string bundlePath = 2; // path to OCI bundle
-	string stdin = 3; // path to the file where stdin will be read (optional)
-	string stdout = 4; // path to file where stdout will be written (optional)
-	string stderr = 5; // path to file where stderr will be written (optional)
-    string console = 6; // path to the console for a container (optional)
-	string checkpoint = 7; // checkpoint name if you want to create immediate checkpoint (optional)
+  string id = 1; // ID of container
+  string bundle_path = 2; // path to OCI bundle
+  string checkpoint = 3; // checkpoint name if you want to create immediate checkpoint (optional)
+  IO io = 4;
 }
 
 message CreateContainerResponse {
-    uint32 pid = 1; // PID of the containers main process
+  uint32 pid = 1; // PID of the containers main process
 }
 
 message SignalRequest {
-	string id = 1; // ID of container
-	uint32 pid = 2; // PID of process inside container
-	uint32 signal = 3; // Signal which will be sent, you can find value in "man 7 signal"
+  string id = 1; // ID of container
+  uint32 pid = 2; // PID of process inside container
+  uint32 signal = 3; // Signal which will be sent, you can find value in "man 7 signal"
 }
 
 message SignalResponse {
 }
 
+message ProcessInfo {
+  bool terminal = 1; // Use tty for container stdio
+  User user = 2; // User under which process will be run
+  repeated string arg = 3; // Arguments for process, first is binary path itself
+  repeated string env = 4; // List of environment variables for process
+  string cwd = 5; // Workind directory of process
+}
+
 message AddProcessRequest {
-	string id = 1; // ID of container
-	bool terminal = 2; // Use tty for container stdio
-	User user = 3; // User under which process will be run
-	repeated string args = 4; // Arguments for process, first is binary path itself
-	repeated string env = 5; // List of environment variables for process
-	string cwd = 6; // Workind directory of process
-    string stdin = 7; // path to the file where stdin will be read (optional)
-	string stdout = 8; // path to file where stdout will be written (optional)
-	string stderr = 9; // path to file where stderr will be written (optional)
-    string console = 10; // path to the console for a container (optional)
-};
+  string id = 1; // ID of container
+  ProcessInfo process_info = 2;
+  IO io = 3;
+}
 
 message User {
-	uint32 uid = 1; // UID of user
-	uint32 gid = 2; // GID of user
-	repeated uint32 additionalGids = 3; // Additional groups to which user will be added
+  uint32 uid = 1; // UID of user
+  uint32 gid = 2; // GID of user
+  repeated uint32 additional_gid = 3; // Additional groups to which user will be added
 }
 
 message AddProcessResponse {
-	uint32 pid = 1; // PID of process is returned in case of success
+  uint32 pid = 1; // PID of process is returned in case of success
 }
 
 message CreateCheckpointRequest {
-	string id = 1; // ID of container
-	Checkpoint checkpoint = 2; // Checkpoint configuration
+  string id = 1; // ID of container
+  Checkpoint checkpoint = 2; // Checkpoint configuration
 }
 
 message CreateCheckpointResponse {
 }
 
 message DeleteCheckpointRequest {
-	string id = 1; // ID of container
-	string name = 2; // Name of checkpoint
+  string id = 1; // ID of container
+  string name = 2; // Name of checkpoint
 }
 
 message DeleteCheckpointResponse {
 }
 
 message ListCheckpointRequest {
-	string id = 1; // ID of container
+  string id = 1; // ID of container
 }
 
 message Checkpoint {
-	string name = 1; // Name of checkpoint
-	bool exit = 2; // checkpoint configuration: should container exit on checkpoint or not
-	bool tcp = 3; // allow open tcp connections
-	bool unixSockets = 4; // allow external unix sockets
-	bool shell = 5; // allow shell-jobs
+  string name = 1; // Name of checkpoint
+  bool exit = 2; // checkpoint configuration: should container exit on checkpoint or not
+  bool tcp = 3; // allow open tcp connections
+  bool unix_sockets = 4; // allow external unix sockets
+  bool shell = 5; // allow shell-jobs
 }
 
 message ListCheckpointResponse {
-	repeated Checkpoint checkpoints = 1; // List of checkpoints
+  repeated Checkpoint checkpoint = 1; // List of checkpoints
 }
 
 message StateRequest {
 }
 
 message ContainerState {
-	string status = 1;
+  string status = 1;
 }
 
 message Process {
-	uint32 pid = 1;
-	bool terminal = 2; // Use tty for container stdio
-	User user = 3; // User under which process will be run
-	repeated string args = 4; // Arguments for process, first is binary path itself
-	repeated string env = 5; // List of environment variables for process
-	string cwd = 6; // Workind directory of process
+  uint32 pid = 1;
+  ProcessInfo process_info = 2;
 }
 
 message Container {
-	string id = 1; // ID of container
-	string name = 2; // Name of container (???)
-	string bundlePath = 3; // Path to OCI bundle
-	repeated Process processes = 4; // List of processes which run in container
-	string status = 5; // Container status ("running", "paused", etc.)
+  string id = 1; // ID of container
+  string name = 2; // Name of container (???)
+  string bundle_path = 3; // Path to OCI bundle
+  repeated Process process = 4; // List of processes which run in container
+  string status = 5; // Container status ("running", "paused", etc.)
 }
 
 // Machine is information about machine on which containerd is run
 message Machine {
-	string id = 1; // ID of machine
-	uint32 cpus = 2; // number of cpus
-	uint64 memory = 3; // amount of memory
+  string id = 1; // ID of machine
+  uint32 cpus = 2; // number of cpus
+  uint64 memory = 3; // amount of memory
 }
 
 // StateResponse is information about containerd daemon
 message StateResponse {
-	repeated Container containers = 1;
-	Machine machine = 2;
+  repeated Container container = 1;
+  Machine machine = 2;
 }
 
 message UpdateContainerRequest {
-	string id = 1; // ID of container
-	uint32 signal = 2; // Signal
-	string status = 3; // Status to whcih containerd will try to change
+  string id = 1; // ID of container
+  uint32 signal = 2; // Signal
+  string status = 3; // Status to whcih containerd will try to change
 }
 
 message UpdateContainerResponse {
@@ -143,98 +144,98 @@ message EventsRequest {
 }
 
 message Event {
-	string type = 1;
-	string id = 2;
-	uint32 status = 3;
-	string bundlePath = 4;
-	uint32 pid = 5;
-	uint32 signal = 7;
-	Process process = 8;
-	repeated Container containers = 9;
-	Checkpoint checkpoint = 10;
+  string type = 1;
+  string id = 2;
+  uint32 status = 3;
+  string bundle_path = 4;
+  uint32 pid = 5;
+  uint32 signal = 7;
+  Process process = 8;
+  repeated Container container = 9;
+  Checkpoint checkpoint = 10;
 }
 
 message NetworkStats {
-	string name = 1; // name of network interface
-	uint64 rx_bytes  = 2;
-	uint64 rx_Packets = 3;
-	uint64 Rx_errors  = 4;
-	uint64 Rx_dropped = 5;
-	uint64 Tx_bytes   = 6;
-	uint64 Tx_packets = 7;
-	uint64 Tx_errors  = 8;
-	uint64 Tx_dropped = 9;
+  string name = 1; // name of network interface
+  uint64 rx_bytes  = 2;
+  uint64 rx_Packets = 3;
+  uint64 Rx_errors  = 4;
+  uint64 Rx_dropped = 5;
+  uint64 Tx_bytes   = 6;
+  uint64 Tx_packets = 7;
+  uint64 Tx_errors  = 8;
+  uint64 Tx_dropped = 9;
 }
 
 message CpuUsage {
-	uint64 total_usage = 1;
-	repeated uint64 percpu_usage = 2;
-	uint64 usage_in_kernelmode = 3;
-	uint64 usage_in_usermode = 4;
+  uint64 total_usage = 1;
+  repeated uint64 percpu_usage = 2;
+  uint64 usage_in_kernelmode = 3;
+  uint64 usage_in_usermode = 4;
 }
 
 message ThrottlingData {
-	uint64 periods = 1;
-	uint64 throttled_periods = 2;
-	uint64 throttled_time = 3;
+  uint64 periods = 1;
+  uint64 throttled_periods = 2;
+  uint64 throttled_time = 3;
 }
 
 message CpuStats {
-	CpuUsage cpu_usage = 1;
-	ThrottlingData throttling_data = 2;
+  CpuUsage cpu_usage = 1;
+  ThrottlingData throttling_data = 2;
 }
 
 message MemoryData {
-	uint64 usage = 1;
-	uint64 max_usage = 2;
-	uint64 failcnt = 3;
+  uint64 usage = 1;
+  uint64 max_usage = 2;
+  uint64 failcnt = 3;
 }
 
 message MemoryStats {
-	uint64 cache = 1;
-	MemoryData usage = 2;
-	MemoryData swap_usage = 3;
-	MemoryData kernel_usage = 4;
-	map<string, uint64> stats = 5;
+  uint64 cache = 1;
+  MemoryData usage = 2;
+  MemoryData swap_usage = 3;
+  MemoryData kernel_usage = 4;
+  map<string, uint64> stats = 5;
 }
 
 message BlkioStatsEntry {
-	uint64 major = 1;
-	uint64 minor = 2;
-	string op = 3;
-	uint64 value = 4;
+  uint64 major = 1;
+  uint64 minor = 2;
+  string op = 3;
+  uint64 value = 4;
 }
 
 message BlkioStats {
-	repeated BlkioStatsEntry io_service_bytes_recursive = 1; // number of bytes tranferred to and from the block device
-	repeated BlkioStatsEntry io_serviced_recursive = 2;
-	repeated BlkioStatsEntry io_queued_recursive = 3;
-	repeated BlkioStatsEntry io_service_time_recursive = 4;
-	repeated BlkioStatsEntry io_wait_time_recursive = 5;
-	repeated BlkioStatsEntry io_merged_recursive = 6;
-	repeated BlkioStatsEntry io_time_recursive = 7;
-	repeated BlkioStatsEntry sectors_recursive = 8;
+  repeated BlkioStatsEntry io_service_bytes_recursive = 1; // number of bytes tranferred to and from the block device
+  repeated BlkioStatsEntry io_serviced_recursive = 2;
+  repeated BlkioStatsEntry io_queued_recursive = 3;
+  repeated BlkioStatsEntry io_service_time_recursive = 4;
+  repeated BlkioStatsEntry io_wait_time_recursive = 5;
+  repeated BlkioStatsEntry io_merged_recursive = 6;
+  repeated BlkioStatsEntry io_time_recursive = 7;
+  repeated BlkioStatsEntry sectors_recursive = 8;
 }
 
 message HugetlbStats {
-	uint64 usage = 1;
-	uint64 max_usage = 2;
-	uint64 failcnt = 3;
+  uint64 usage = 1;
+  uint64 max_usage = 2;
+  uint64 failcnt = 3;
 }
 
 message CgroupStats {
-	CpuStats cpu_stats = 1;
-	MemoryStats memory_stats  = 2;
-	BlkioStats blkio_stats = 3;
-	map<string, HugetlbStats> hugetlb_stats = 4; // the map is in the format "size of hugepage: stats of the hugepage"
+  CpuStats cpu_stats = 1;
+  MemoryStats memory_stats  = 2;
+  BlkioStats blkio_stats = 3;
+  map<string, HugetlbStats> hugetlb_stats = 4; // the map is in the format "size of hugepage: stats of the hugepage"
 }
 
 message Stats {
-	repeated NetworkStats network_stats = 1;
-	CgroupStats cgroup_stats = 2;
-	uint64 timestamp = 3;
+  repeated NetworkStats network_stats = 1;
+  CgroupStats cgroup_stats = 2;
+  uint64 timestamp = 3;
 };
 
 message StatsRequest {
-	string id = 1;
+  string id = 1;
 }

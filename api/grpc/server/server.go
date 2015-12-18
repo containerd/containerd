@@ -33,10 +33,12 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 	e := supervisor.NewEvent(supervisor.StartContainerEventType)
 	e.ID = c.Id
 	e.BundlePath = c.BundlePath
-	e.Stdout = c.Stdout
-	e.Stderr = c.Stderr
-	e.Stdin = c.Stdin
-	e.Console = c.Console
+	if c.Io != nil {
+		e.Stdout = c.Io.Stdout
+		e.Stderr = c.Io.Stderr
+		e.Stdin = c.Io.Stdin
+		e.Console = c.Io.Console
+	}
 	e.StartResponse = make(chan supervisor.StartResponse, 1)
 	if c.Checkpoint != "" {
 		e.Checkpoint = &runtime.Checkpoint{
@@ -66,24 +68,29 @@ func (s *apiServer) Signal(ctx context.Context, r *types.SignalRequest) (*types.
 }
 
 func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) (*types.AddProcessResponse, error) {
-	process := &specs.Process{
-		Terminal: r.Terminal,
-		Args:     r.Args,
-		Env:      r.Env,
-		Cwd:      r.Cwd,
-		User: specs.User{
-			UID:            r.User.Uid,
-			GID:            r.User.Gid,
-			AdditionalGids: r.User.AdditionalGids,
-		},
+	process := &specs.Process{}
+	if r.ProcessInfo != nil {
+		process.Terminal = r.ProcessInfo.Terminal
+		process.Args = r.ProcessInfo.Arg
+		process.Env = r.ProcessInfo.Env
+		process.Cwd = r.ProcessInfo.Cwd
+		if r.ProcessInfo.User != nil {
+			process.User = specs.User{
+				UID:            r.ProcessInfo.User.Uid,
+				GID:            r.ProcessInfo.User.Gid,
+				AdditionalGids: r.ProcessInfo.User.AdditionalGid,
+			}
+		}
 	}
 	e := supervisor.NewEvent(supervisor.AddProcessEventType)
 	e.ID = r.Id
 	e.Process = process
-	e.Console = r.Console
-	e.Stdin = r.Stdin
-	e.Stdout = r.Stdout
-	e.Stderr = r.Stderr
+	if r.Io != nil {
+		e.Console = r.Io.Console
+		e.Stdin = r.Io.Stdin
+		e.Stdout = r.Io.Stdout
+		e.Stderr = r.Io.Stderr
+	}
 	s.sv.SendEvent(e)
 	if err := <-e.Err; err != nil {
 		return nil, err
@@ -155,7 +162,7 @@ func (s *apiServer) ListCheckpoint(ctx context.Context, r *types.ListCheckpointR
 			//Timestamp:   c.Timestamp,
 		})
 	}
-	return &types.ListCheckpointResponse{Checkpoints: out}, nil
+	return &types.ListCheckpointResponse{Checkpoint: out}, nil
 }
 
 func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.StateResponse, error) {
@@ -185,22 +192,24 @@ func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.St
 			}
 			oldProc := p.Spec()
 			procs = append(procs, &types.Process{
-				Pid:      uint32(pid),
-				Terminal: oldProc.Terminal,
-				Args:     oldProc.Args,
-				Env:      oldProc.Env,
-				Cwd:      oldProc.Cwd,
-				User: &types.User{
-					Uid:            oldProc.User.UID,
-					Gid:            oldProc.User.GID,
-					AdditionalGids: oldProc.User.AdditionalGids,
+				Pid: uint32(pid),
+				ProcessInfo: &types.ProcessInfo{
+					Terminal: oldProc.Terminal,
+					Arg:      oldProc.Args,
+					Env:      oldProc.Env,
+					Cwd:      oldProc.Cwd,
+					User: &types.User{
+						Uid:           oldProc.User.UID,
+						Gid:           oldProc.User.GID,
+						AdditionalGid: oldProc.User.AdditionalGids,
+					},
 				},
 			})
 		}
-		state.Containers = append(state.Containers, &types.Container{
+		state.Container = append(state.Container, &types.Container{
 			Id:         c.ID(),
 			BundlePath: c.Path(),
-			Processes:  procs,
+			Process:    procs,
 			Status:     string(c.State().Status),
 		})
 	}
