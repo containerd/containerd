@@ -35,8 +35,14 @@ dtest: dbuild
 install:
 	cp bin/* /usr/local/bin/
 
+# to compile without installing protoc:
+#   docker pull quay.io/pedge/protoeasy
+#   docker run -d -p 6789:6789 quay.io/pedge/protoeasy
+#   export PROTOEASY_ADDRESS=0.0.0.0:6789 # or whatever your docker host address is
+
 protoc:
-	protoc -I ./api/grpc/types ./api/grpc/types/api.proto --go_out=plugins=grpc:api/grpc/types
+	go get -v go.pedge.io/protoeasy/cmd/protoeasy
+	protoeasy --go --go-import-path github.com/docker/containerd --grpc .
 
 fmt:
 	@gofmt -s -l . | grep -v vendor | grep -v .pb. | tee /dev/stderr
