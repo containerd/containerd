@@ -227,25 +227,14 @@ func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer
 	events := s.sv.Events()
 	defer s.sv.Unsubscribe(events)
 	for evt := range events {
-		var ev *types.Event
-		switch evt.Type {
-		case supervisor.ExitEventType, supervisor.ExecExitEventType:
-			ev = &types.Event{
-				Type:   "exit",
-				Id:     evt.ID,
-				Pid:    uint32(evt.Pid),
-				Status: uint32(evt.Status),
-			}
-		case supervisor.OOMEventType:
-			ev = &types.Event{
-				Type: "oom",
-				Id:   evt.ID,
-			}
+		ev := &types.Event{
+			Type:   string(evt.Type),
+			Id:     evt.ID,
+			Pid:    uint32(evt.Pid),
+			Status: uint32(evt.Status),
 		}
-		if ev != nil {
-			if err := stream.Send(ev); err != nil {
-				return err
-			}
+		if err := stream.Send(ev); err != nil {
+			return err
 		}
 
 	}

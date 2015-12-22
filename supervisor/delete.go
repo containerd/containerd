@@ -22,12 +22,6 @@ func (h *DeleteEvent) Handle(e *Event) error {
 				logrus.WithField("error", err).Error("containerd: close container copier")
 			}
 		}
-		h.s.notifySubscribers(&Event{
-			Type:   ExitEventType,
-			ID:     e.ID,
-			Status: e.Status,
-			Pid:    e.Pid,
-		})
 		ContainersCounter.Dec(1)
 		h.s.containerGroup.Done()
 		ContainerDeleteTimer.UpdateSince(start)
