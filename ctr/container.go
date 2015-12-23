@@ -356,19 +356,13 @@ var StatsCommand = cli.Command{
 	Usage: "get stats for running container",
 	Action: func(context *cli.Context) {
 		req := &types.StatsRequest{
-			Id: context.Args().First(),
+			Ids: []string{context.Args().First()},
 		}
 		c := getClient(context)
-		stream, err := c.GetStats(netcontext.Background(), req)
+		stats, err := c.Stats(netcontext.Background(), req)
 		if err != nil {
 			fatal(err.Error(), 1)
 		}
-		for {
-			stats, err := stream.Recv()
-			if err != nil {
-				fatal(err.Error(), 1)
-			}
-			fmt.Println(stats)
-		}
+		fmt.Println(stats)
 	},
 }

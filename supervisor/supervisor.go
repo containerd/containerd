@@ -35,15 +35,14 @@ func New(id, stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, err
 		return nil, err
 	}
 	s := &Supervisor{
-		stateDir:       stateDir,
-		containers:     make(map[string]*containerInfo),
-		processes:      make(map[int]*containerInfo),
-		runtime:        r,
-		tasks:          tasks,
-		machine:        machine,
-		subscribers:    make(map[chan *Event]struct{}),
-		statsCollector: newStatsCollector(statsInterval),
-		el:             eventloop.NewChanLoop(defaultBufferSize),
+		stateDir:    stateDir,
+		containers:  make(map[string]*containerInfo),
+		processes:   make(map[int]*containerInfo),
+		runtime:     r,
+		tasks:       tasks,
+		machine:     machine,
+		subscribers: make(map[chan *Event]struct{}),
+		el:          eventloop.NewChanLoop(defaultBufferSize),
 	}
 	if oom {
 		s.notifier = chanotify.New()
@@ -68,8 +67,6 @@ func New(id, stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, err
 		CreateCheckpointEventType: &CreateCheckpointEvent{s},
 		DeleteCheckpointEventType: &DeleteCheckpointEvent{s},
 		StatsEventType:            &StatsEvent{s},
-		UnsubscribeStatsEventType: &UnsubscribeStatsEvent{s},
-		StopStatsEventType:        &StopStatsEvent{s},
 	}
 	// start the container workers for concurrent container starts
 	return s, nil
@@ -95,7 +92,6 @@ type Supervisor struct {
 	subscribers    map[chan *Event]struct{}
 	machine        Machine
 	containerGroup sync.WaitGroup
-	statsCollector *statsCollector
 	notifier       *chanotify.Notifier
 	el             eventloop.EventLoop
 }
