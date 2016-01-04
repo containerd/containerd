@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/runtime"
 )
 
@@ -41,7 +42,7 @@ func (w *worker) Start() {
 		started := time.Now()
 		l, err := w.s.copyIO(t.Stdin, t.Stdout, t.Stderr, t.IO)
 		if err != nil {
-			evt := NewEvent(DeleteEventType)
+			evt := NewEvent(types.EventType_EVENT_TYPE_DELETE)
 			evt.ID = t.Container.ID()
 			w.s.SendEvent(evt)
 			t.Err <- err
@@ -50,7 +51,7 @@ func (w *worker) Start() {
 		w.s.containers[t.Container.ID()].copier = l
 		if t.Checkpoint != "" {
 			if err := t.Container.Restore(t.Checkpoint); err != nil {
-				evt := NewEvent(DeleteEventType)
+				evt := NewEvent(types.EventType_EVENT_TYPE_DELETE)
 				evt.ID = t.Container.ID()
 				w.s.SendEvent(evt)
 				t.Err <- err
@@ -58,7 +59,7 @@ func (w *worker) Start() {
 			}
 		} else {
 			if err := t.Container.Start(); err != nil {
-				evt := NewEvent(DeleteEventType)
+				evt := NewEvent(types.EventType_EVENT_TYPE_DELETE)
 				evt.ID = t.Container.ID()
 				w.s.SendEvent(evt)
 				t.Err <- err

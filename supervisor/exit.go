@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/containerd/api/grpc/types"
 )
 
 type ExitEvent struct {
@@ -16,7 +17,7 @@ func (h *ExitEvent) Handle(e *Event) error {
 		Debug("containerd: process exited")
 	// is it the child process of a container
 	if info, ok := h.s.processes[e.Pid]; ok {
-		ne := NewEvent(ExecExitEventType)
+		ne := NewEvent(types.EventType_EVENT_TYPE_EXEC_EXIT)
 		ne.ID = info.container.ID()
 		ne.Pid = e.Pid
 		ne.Status = e.Status
@@ -32,13 +33,13 @@ func (h *ExitEvent) Handle(e *Event) error {
 		return nil
 	}
 	container.SetExited(e.Status)
-	ne := NewEvent(DeleteEventType)
+	ne := NewEvent(types.EventType_EVENT_TYPE_DELETE)
 	ne.ID = container.ID()
 	ne.Pid = e.Pid
 	ne.Status = e.Status
 	h.s.SendEvent(ne)
 
-	stopCollect := NewEvent(StopStatsEventType)
+	stopCollect := NewEvent(types.EventType_EVENT_TYPE_STOP_STATS)
 	stopCollect.ID = container.ID()
 	h.s.SendEvent(stopCollect)
 	ExitProcessTimer.UpdateSince(start)

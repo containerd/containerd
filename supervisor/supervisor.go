@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/chanotify"
 	"github.com/docker/containerd/eventloop"
 	"github.com/docker/containerd/runtime"
@@ -49,27 +50,27 @@ func New(id, stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, err
 		s.notifier = chanotify.New()
 		go func() {
 			for id := range s.notifier.Chan() {
-				e := NewEvent(OOMEventType)
+				e := NewEvent(types.EventType_EVENT_TYPE_OOM)
 				e.ID = id
 				s.SendEvent(e)
 			}
 		}()
 	}
 	// register default event handlers
-	s.handlers = map[EventType]Handler{
-		ExecExitEventType:         &ExecExitEvent{s},
-		ExitEventType:             &ExitEvent{s},
-		StartContainerEventType:   &StartEvent{s},
-		DeleteEventType:           &DeleteEvent{s},
-		GetContainerEventType:     &GetContainersEvent{s},
-		SignalEventType:           &SignalEvent{s},
-		AddProcessEventType:       &AddProcessEvent{s},
-		UpdateContainerEventType:  &UpdateEvent{s},
-		CreateCheckpointEventType: &CreateCheckpointEvent{s},
-		DeleteCheckpointEventType: &DeleteCheckpointEvent{s},
-		StatsEventType:            &StatsEvent{s},
-		UnsubscribeStatsEventType: &UnsubscribeStatsEvent{s},
-		StopStatsEventType:        &StopStatsEvent{s},
+	s.handlers = map[types.EventType]Handler{
+		types.EventType_EVENT_TYPE_EXEC_EXIT:         &ExecExitEvent{s},
+		types.EventType_EVENT_TYPE_EXIT:              &ExitEvent{s},
+		types.EventType_EVENT_TYPE_START_CONTAINER:   &StartEvent{s},
+		types.EventType_EVENT_TYPE_DELETE:            &DeleteEvent{s},
+		types.EventType_EVENT_TYPE_GET_CONTAINER:     &GetContainersEvent{s},
+		types.EventType_EVENT_TYPE_SIGNAL:            &SignalEvent{s},
+		types.EventType_EVENT_TYPE_ADD_PROCESS:       &AddProcessEvent{s},
+		types.EventType_EVENT_TYPE_UPDATE_CONTAINER:  &UpdateEvent{s},
+		types.EventType_EVENT_TYPE_CREATE_CHECKPOINT: &CreateCheckpointEvent{s},
+		types.EventType_EVENT_TYPE_DELETE_CHECKPOINT: &DeleteCheckpointEvent{s},
+		types.EventType_EVENT_TYPE_STATS:             &StatsEvent{s},
+		types.EventType_EVENT_TYPE_UNSUBSCRIBE_STATS: &UnsubscribeStatsEvent{s},
+		types.EventType_EVENT_TYPE_STOP_STATS:        &StopStatsEvent{s},
 	}
 	// start the container workers for concurrent container starts
 	return s, nil
@@ -85,7 +86,7 @@ type Supervisor struct {
 	stateDir   string
 	containers map[string]*containerInfo
 	processes  map[int]*containerInfo
-	handlers   map[EventType]Handler
+	handlers   map[types.EventType]Handler
 	runtime    runtime.Runtime
 	events     chan *Event
 	tasks      chan *StartTask

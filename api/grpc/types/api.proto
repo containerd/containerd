@@ -142,8 +142,26 @@ message UpdateContainerResponse {
 message EventsRequest {
 }
 
+enum EventType {
+  EVENT_TYPE_NONE = 0;
+  EVENT_TYPE_EXEC_EXIT = 1;
+  EVENT_TYPE_EXIT = 2;
+  EVENT_TYPE_START_CONTAINER = 3;
+  EVENT_TYPE_DELETE = 4;
+  EVENT_TYPE_GET_CONTAINER = 5;
+  EVENT_TYPE_SIGNAL = 6;
+  EVENT_TYPE_ADD_PROCESS = 7;
+  EVENT_TYPE_UPDATE_CONTAINER = 8;
+  EVENT_TYPE_CREATE_CHECKPOINT = 9;
+  EVENT_TYPE_DELETE_CHECKPOINT = 10;
+  EVENT_TYPE_STATS = 11;
+  EVENT_TYPE_UNSUBSCRIBE_STATS = 12;
+  EVENT_TYPE_STOP_STATS = 14;
+  EVENT_TYPE_OOM = 15;
+}
+
 message Event {
-	string type = 1;
+	EventType type = 1;
 	string id = 2;
 	uint32 status = 3;
 	string bundlePath = 4;
