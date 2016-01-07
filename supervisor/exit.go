@@ -10,17 +10,17 @@ type ExitEvent struct {
 	s *Supervisor
 }
 
-func (h *ExitEvent) Handle(e *Event) error {
+func (h *ExitEvent) Handle(e *Task) error {
 	start := time.Now()
 	logrus.WithFields(logrus.Fields{"pid": e.Pid, "status": e.Status}).
 		Debug("containerd: process exited")
 	// is it the child process of a container
 	if info, ok := h.s.processes[e.Pid]; ok {
-		ne := NewEvent(ExecExitEventType)
+		ne := NewTask(ExecExitTask)
 		ne.ID = info.container.ID()
 		ne.Pid = e.Pid
 		ne.Status = e.Status
-		h.s.SendEvent(ne)
+		h.s.SendTask(ne)
 		return nil
 	}
 	// is it the main container's process
@@ -32,15 +32,15 @@ func (h *ExitEvent) Handle(e *Event) error {
 		return nil
 	}
 	container.SetExited(e.Status)
-	ne := NewEvent(DeleteEventType)
+	ne := NewTask(DeleteTask)
 	ne.ID = container.ID()
 	ne.Pid = e.Pid
 	ne.Status = e.Status
-	h.s.SendEvent(ne)
+	h.s.SendTask(ne)
 
-	stopCollect := NewEvent(StopStatsEventType)
+	stopCollect := NewTask(StopStatsTask)
 	stopCollect.ID = container.ID()
-	h.s.SendEvent(stopCollect)
+	h.s.SendTask(stopCollect)
 	ExitProcessTimer.UpdateSince(start)
 	return nil
 }
@@ -49,7 +49,7 @@ type ExecExitEvent struct {
 	s *Supervisor
 }
 
-func (h *ExecExitEvent) Handle(e *Event) error {
+func (h *ExecExitEvent) Handle(e *Task) error {
 	// exec process: we remove this process without notifying the main event loop
 	info := h.s.processes[e.Pid]
 	if err := info.container.RemoveProcess(e.Pid); err != nil {

@@ -12,7 +12,7 @@ type AddProcessEvent struct {
 
 // TODO: add this to worker for concurrent starts???  maybe not because of races where the container
 // could be stopped and removed...
-func (h *AddProcessEvent) Handle(e *Event) error {
+func (h *AddProcessEvent) Handle(e *Task) error {
 	start := time.Now()
 	ci, ok := h.s.containers[e.ID]
 	if !ok {

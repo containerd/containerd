@@ -41,7 +41,7 @@ func New(id, stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, err
 		runtime:        r,
 		tasks:          tasks,
 		machine:        machine,
-		subscribers:    make(map[chan *Event]struct{}),
+		subscribers:    make(map[chan *Task]struct{}),
 		statsCollector: newStatsCollector(statsInterval),
 		el:             eventloop.NewChanLoop(defaultBufferSize),
 	}
@@ -49,27 +49,27 @@ func New(id, stateDir string, tasks chan *StartTask, oom bool) (*Supervisor, err
 		s.notifier = chanotify.New()
 		go func() {
 			for id := range s.notifier.Chan() {
-				e := NewEvent(OOMEventType)
+				e := NewTask(OOMTask)
 				e.ID = id.(string)
-				s.SendEvent(e)
+				s.SendTask(e)
 			}
 		}()
 	}
 	// register default event handlers
-	s.handlers = map[EventType]Handler{
-		ExecExitEventType:         &ExecExitEvent{s},
-		ExitEventType:             &ExitEvent{s},
-		StartContainerEventType:   &StartEvent{s},
-		DeleteEventType:           &DeleteEvent{s},
-		GetContainerEventType:     &GetContainersEvent{s},
-		SignalEventType:           &SignalEvent{s},
-		AddProcessEventType:       &AddProcessEvent{s},
-		UpdateContainerEventType:  &UpdateEvent{s},
-		CreateCheckpointEventType: &CreateCheckpointEvent{s},
-		DeleteCheckpointEventType: &DeleteCheckpointEvent{s},
-		StatsEventType:            &StatsEvent{s},
-		UnsubscribeStatsEventType: &UnsubscribeStatsEvent{s},
-		StopStatsEventType:        &StopStatsEvent{s},
+	s.handlers = map[TaskType]Handler{
+		ExecExitTask:         &ExecExitEvent{s},
+		ExitTask:             &ExitEvent{s},
+		StartContainerTask:   &StartEvent{s},
+		DeleteTask:           &DeleteEvent{s},
+		GetContainerTask:     &GetContainersEvent{s},
+		SignalTask:           &SignalEvent{s},
+		AddProcessTask:       &AddProcessEvent{s},
+		UpdateContainerTask:  &UpdateEvent{s},
+		CreateCheckpointTask: &CreateCheckpointEvent{s},
+		DeleteCheckpointTask: &DeleteCheckpointEvent{s},
+		StatsTask:            &StatsEvent{s},
+		UnsubscribeStatsTask: &UnsubscribeStatsEvent{s},
+		StopStatsTask:        &StopStatsEvent{s},
 	}
 	// start the container workers for concurrent container starts
 	return s, nil
@@ -85,14 +85,14 @@ type Supervisor struct {
 	stateDir   string
 	containers map[string]*containerInfo
 	processes  map[int]*containerInfo
-	handlers   map[EventType]Handler
+	handlers   map[TaskType]Handler
 	runtime    runtime.Runtime
-	events     chan *Event
+	events     chan *Task
 	tasks      chan *StartTask
 	// we need a lock around the subscribers map only because additions and deletions from
 	// the map are via the API so we cannot really control the concurrency
 	subscriberLock sync.RWMutex
-	subscribers    map[chan *Event]struct{}
+	subscribers    map[chan *Task]struct{}
 	machine        Machine
 	containerGroup sync.WaitGroup
 	statsCollector *statsCollector
@@ -149,17 +149,17 @@ func (s *Supervisor) Close() error {
 
 // Events returns an event channel that external consumers can use to receive updates
 // on container events
-func (s *Supervisor) Events() chan *Event {
+func (s *Supervisor) Events() chan *Task {
 	s.subscriberLock.Lock()
 	defer s.subscriberLock.Unlock()
-	c := make(chan *Event, defaultBufferSize)
+	c := make(chan *Task, defaultBufferSize)
 	EventSubscriberCounter.Inc(1)
 	s.subscribers[c] = struct{}{}
 	return c
 }
 
 // Unsubscribe removes the provided channel from receiving any more events
-func (s *Supervisor) Unsubscribe(sub chan *Event) {
+func (s *Supervisor) Unsubscribe(sub chan *Task) {
 	s.subscriberLock.Lock()
 	defer s.subscriberLock.Unlock()
 	delete(s.subscribers, sub)
@@ -169,7 +169,7 @@ func (s *Supervisor) Unsubscribe(sub chan *Event) {
 
 // notifySubscribers will send the provided event to the external subscribers
 // of the events channel
-func (s *Supervisor) notifySubscribers(e *Event) {
+func (s *Supervisor) notifySubscribers(e *Task) {
 	s.subscriberLock.RLock()
 	defer s.subscriberLock.RUnlock()
 	for sub := range s.subscribers {
@@ -223,10 +223,10 @@ func (s *Supervisor) getContainerForPid(pid int) (runtime.Container, error) {
 	return nil, errNoContainerForPid
 }
 
-// SendEvent sends the provided event the the supervisors main event loop
-func (s *Supervisor) SendEvent(evt *Event) {
-	EventsCounter.Inc(1)
-	s.el.Send(&commonEvent{data: evt, sv: s})
+// SendTask sends the provided task the the supervisors main event loop
+func (s *Supervisor) SendTask(evt *Task) {
+	TaskCounter.Inc(1)
+	s.el.Send(&commonTaskEvent{data: evt, sv: s})
 }
 
 func (s *Supervisor) copyIO(stdin, stdout, stderr string, i *runtime.IO) (*copier, error) {

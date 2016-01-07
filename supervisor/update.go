@@ -6,7 +6,7 @@ type UpdateEvent struct {
 	s *Supervisor
 }
 
-func (h *UpdateEvent) Handle(e *Event) error {
+func (h *UpdateEvent) Handle(e *Task) error {
 	i, ok := h.s.containers[e.ID]
 	if !ok {
 		return ErrContainerNotFound

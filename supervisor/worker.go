@@ -41,26 +41,26 @@ func (w *worker) Start() {
 		started := time.Now()
 		l, err := w.s.copyIO(t.Stdin, t.Stdout, t.Stderr, t.IO)
 		if err != nil {
-			evt := NewEvent(DeleteEventType)
+			evt := NewTask(DeleteTask)
 			evt.ID = t.Container.ID()
-			w.s.SendEvent(evt)
+			w.s.SendTask(evt)
 			t.Err <- err
 			continue
 		}
 		w.s.containers[t.Container.ID()].copier = l
 		if t.Checkpoint != "" {
 			if err := t.Container.Restore(t.Checkpoint); err != nil {
-				evt := NewEvent(DeleteEventType)
+				evt := NewTask(DeleteTask)
 				evt.ID = t.Container.ID()
-				w.s.SendEvent(evt)
+				w.s.SendTask(evt)
 				t.Err <- err
 				continue
 			}
 		} else {
 			if err := t.Container.Start(); err != nil {
-				evt := NewEvent(DeleteEventType)
+				evt := NewTask(DeleteTask)
 				evt.ID = t.Container.ID()
-				w.s.SendEvent(evt)
+				w.s.SendTask(evt)
 				t.Err <- err
 				continue
 			}

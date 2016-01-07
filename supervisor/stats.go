@@ -12,7 +12,7 @@ type StopStatsEvent struct {
 	s *Supervisor
 }
 
-func (h *StatsEvent) Handle(e *Event) error {
+func (h *StatsEvent) Handle(e *Task) error {
 	i, ok := h.s.containers[e.ID]
 	if !ok {
 		return ErrContainerNotFound
@@ -21,7 +21,7 @@ func (h *StatsEvent) Handle(e *Event) error {
 	return nil
 }
 
-func (h *UnsubscribeStatsEvent) Handle(e *Event) error {
+func (h *UnsubscribeStatsEvent) Handle(e *Task) error {
 	i, ok := h.s.containers[e.ID]
 	if !ok {
 		return ErrContainerNotFound
@@ -30,7 +30,7 @@ func (h *UnsubscribeStatsEvent) Handle(e *Event) error {
 	return nil
 }
 
-func (h *StopStatsEvent) Handle(e *Event) error {
+func (h *StopStatsEvent) Handle(e *Task) error {
 	i, ok := h.s.containers[e.ID]
 	if !ok {
 		return ErrContainerNotFound

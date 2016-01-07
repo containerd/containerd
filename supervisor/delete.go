@@ -11,7 +11,7 @@ type DeleteEvent struct {
 	s *Supervisor
 }
 
-func (h *DeleteEvent) Handle(e *Event) error {
+func (h *DeleteEvent) Handle(e *Task) error {
 	if i, ok := h.s.containers[e.ID]; ok {
 		start := time.Now()
 		if err := h.deleteContainer(i.container); err != nil {
@@ -22,8 +22,8 @@ func (h *DeleteEvent) Handle(e *Event) error {
 				logrus.WithField("error", err).Error("containerd: close container copier")
 			}
 		}
-		h.s.notifySubscribers(&Event{
-			Type:   ExitEventType,
+		h.s.notifySubscribers(&Task{
+			Type:   ExitTask,
 			ID:     e.ID,
 			Status: e.Status,
 			Pid:    e.Pid,
