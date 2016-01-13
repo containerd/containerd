@@ -1,4 +1,4 @@
-BUILDTAGS=libcontainer
+BUILDTAGS=runc
 
 # if this session isn't interactive, then we don't want to allocate a
 # TTY, which would fail, but if it is interactive, we do want to attach
