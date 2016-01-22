@@ -702,7 +702,7 @@ func (rt *libcontainerRuntime) createCgroupConfig(name string, spec *specs.Linux
 	}
 	c.OomKillDisable = r.DisableOOMKiller != nil && *r.DisableOOMKiller
 	if r.Network != nil {
-		c.NetClsClassid = r.Network.ClassID
+		c.NetClsClassid = string(*r.Network.ClassID)
 		for _, m := range r.Network.Priorities {
 			c.NetPrioIfpriomap = append(c.NetPrioIfpriomap, &configs.IfPrioMap{
 				Interface: m.Name,
