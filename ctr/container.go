@@ -63,8 +63,10 @@ func listContainers(context *cli.Context) {
 	}
 	w := tabwriter.NewWriter(os.Stdout, 20, 1, 3, ' ', 0)
 	fmt.Fprint(w, "ID\tPATH\tSTATUS\tPID1\n")
-	for _, c := range resp.Containers {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%d\n", c.Id, c.BundlePath, c.Status, c.Processes[0].Pid)
+	for _, c := range resp.Container {
+		if len(c.Process) > 0 {
+			fmt.Fprintf(w, "%s\t%s\t%s\t%d\n", c.Id, c.BundlePath, c.Status, c.Process[0].Pid)
+		}
 	}
 	if err := w.Flush(); err != nil {
 		fatal(err.Error(), 1)
@@ -105,6 +107,7 @@ var StartCommand = cli.Command{
 			Id:         id,
 			BundlePath: path,
 			Checkpoint: context.String("checkpoint"),
+			Io:         &types.IO{},
 		}
 		if context.Bool("attach") {
 			mkterm, err := readTermSetting(path)
@@ -112,11 +115,11 @@ var StartCommand = cli.Command{
 				fatal(err.Error(), 1)
 			}
 			if mkterm {
-				if err := attachTty(&r.Console); err != nil {
+				if err := attachTty(&r.Io.Console); err != nil {
 					fatal(err.Error(), 1)
 				}
 			} else {
-				if err := attachStdio(&r.Stdin, &r.Stdout, &r.Stderr); err != nil {
+				if err := attachStdio(&r.Io.Stdin, &r.Io.Stdout, &r.Io.Stderr); err != nil {
 					fatal(err.Error(), 1)
 				}
 			}
@@ -305,15 +308,18 @@ var ExecCommand = cli.Command{
 	},
 	Action: func(context *cli.Context) {
 		p := &types.AddProcessRequest{
-			Args:     context.Args(),
-			Cwd:      context.String("cwd"),
-			Terminal: context.Bool("tty"),
-			Id:       context.String("id"),
-			Env:      context.StringSlice("env"),
-			User: &types.User{
-				Uid: uint32(context.Int("uid")),
-				Gid: uint32(context.Int("gid")),
+			Id: context.String("id"),
+			ProcessInfo: &types.ProcessInfo{
+				Terminal: context.Bool("tty"),
+				User: &types.User{
+					Uid: uint32(context.Int("uid")),
+					Gid: uint32(context.Int("gid")),
+				},
+				Arg: context.Args(),
+				Env: context.StringSlice("env"),
+				Cwd: context.String("cwd"),
 			},
+			Io: &types.IO{},
 		}
 		c := getClient(context)
 		events, err := c.Events(netcontext.Background(), &types.EventsRequest{})
@@ -321,12 +327,12 @@ var ExecCommand = cli.Command{
 			fatal(err.Error(), 1)
 		}
 		if context.Bool("attach") {
-			if p.Terminal {
-				if err := attachTty(&p.Console); err != nil {
+			if p.ProcessInfo.Terminal {
+				if err := attachTty(&p.Io.Console); err != nil {
 					fatal(err.Error(), 1)
 				}
 			} else {
-				if err := attachStdio(&p.Stdin, &p.Stdout, &p.Stderr); err != nil {
+				if err := attachStdio(&p.Io.Stdin, &p.Io.Stdout, &p.Io.Stderr); err != nil {
 					fatal(err.Error(), 1)
 				}
 			}

@@ -42,7 +42,7 @@ func listCheckpoints(context *cli.Context) {
 	}
 	w := tabwriter.NewWriter(os.Stdout, 20, 1, 3, ' ', 0)
 	fmt.Fprint(w, "NAME\tTCP\tUNIX SOCKETS\tSHELL\n")
-	for _, c := range resp.Checkpoints {
+	for _, c := range resp.Checkpoint {
 		fmt.Fprintf(w, "%s\t%v\t%v\t%v\n", c.Name, c.Tcp, c.UnixSockets, c.Shell)
 	}
 	if err := w.Flush(); err != nil {
