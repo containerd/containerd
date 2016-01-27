@@ -31,7 +31,7 @@ func startSignalHandler(supervisor *supervisor.Supervisor) {
 				logrus.WithField("error", err).Error("containerd: reaping child processes")
 			}
 			for _, e := range exits {
-				supervisor.SendEvent(e)
+				supervisor.SendTask(e)
 			}
 		}
 	}
@@ -39,7 +39,7 @@ func startSignalHandler(supervisor *supervisor.Supervisor) {
 	os.Exit(0)
 }
 
-func reap() (exits []*supervisor.Event, err error) {
+func reap() (exits []*supervisor.Task, err error) {
 	var (
 		ws  syscall.WaitStatus
 		rus syscall.Rusage
@@ -55,7 +55,7 @@ func reap() (exits []*supervisor.Event, err error) {
 		if pid <= 0 {
 			return exits, nil
 		}
-		e := supervisor.NewEvent(supervisor.ExitEventType)
+		e := supervisor.NewTask(supervisor.ExitTask)
 		e.Pid = pid
 		e.Status = utils.ExitStatus(ws)
 		exits = append(exits, e)

@@ -4,7 +4,7 @@ type SignalEvent struct {
 	s *Supervisor
 }
 
-func (h *SignalEvent) Handle(e *Event) error {
+func (h *SignalEvent) Handle(e *Task) error {
 	i, ok := h.s.containers[e.ID]
 	if !ok {
 		return ErrContainerNotFound

@@ -8,7 +8,7 @@ var (
 	ContainerStartTimer    = metrics.NewTimer()
 	ContainersCounter      = metrics.NewCounter()
 	EventSubscriberCounter = metrics.NewCounter()
-	EventsCounter          = metrics.NewCounter()
+	TaskCounter            = metrics.NewCounter()
 	ExecProcessTimer       = metrics.NewTimer()
 	ExitProcessTimer       = metrics.NewTimer()
 )
@@ -20,7 +20,7 @@ func Metrics() map[string]interface{} {
 		"container-start-time":  ContainerStartTimer,
 		"containers":            ContainersCounter,
 		"event-subscribers":     EventSubscriberCounter,
-		"events":                EventsCounter,
+		"events":                TaskCounter,
 		"exec-process-time":     ExecProcessTimer,
 		"exit-process-time":     ExitProcessTimer,
 	}

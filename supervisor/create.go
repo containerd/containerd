@@ -6,7 +6,7 @@ type StartEvent struct {
 	s *Supervisor
 }
 
-func (h *StartEvent) Handle(e *Event) error {
+func (h *StartEvent) Handle(e *Task) error {
 	start := time.Now()
 	container, io, err := h.s.runtime.Create(e.ID, e.BundlePath, e.Console)
 	if err != nil {
