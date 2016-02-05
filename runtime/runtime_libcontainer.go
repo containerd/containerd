@@ -1,6 +1,6 @@
 // +build libcontainer
 
-package linux
+package runtime
 
 import (
 	"encoding/json"
@@ -15,7 +15,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/containerd/runtime"
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	_ "github.com/opencontainers/runc/libcontainer/nsenter"
@@ -212,8 +211,8 @@ type libcontainerContainer struct {
 	path                string
 }
 
-func (c *libcontainerContainer) Checkpoints() ([]runtime.Checkpoint, error) {
-	out := []runtime.Checkpoint{}
+func (c *libcontainerContainer) Checkpoints() ([]Checkpoint, error) {
+	out := []Checkpoint{}
 	files, err := ioutil.ReadDir(c.getCheckpointPath(""))
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -222,7 +221,7 @@ func (c *libcontainerContainer) Checkpoints() ([]runtime.Checkpoint, error) {
 		return nil, err
 	}
 	for _, fi := range files {
-		out = append(out, runtime.Checkpoint{
+		out = append(out, Checkpoint{
 			Name:      fi.Name(),
 			Timestamp: fi.ModTime(),
 		})
@@ -234,7 +233,7 @@ func (c *libcontainerContainer) DeleteCheckpoint(name string) error {
 	path := c.getCheckpointPath(name)
 	if err := os.RemoveAll(path); err != nil {
 		if os.IsNotExist(err) {
-			return runtime.ErrCheckpointNotExists
+			return ErrCheckpointNotExists
 		}
 		return err
 	}
@@ -245,7 +244,7 @@ func (c *libcontainerContainer) getCheckpointPath(name string) string {
 	return filepath.Join(c.path, "checkpoints", name)
 }
 
-func (c *libcontainerContainer) Checkpoint(cp runtime.Checkpoint) error {
+func (c *libcontainerContainer) Checkpoint(cp Checkpoint) error {
 	opts := c.createCheckpointOpts(cp)
 	if err := os.MkdirAll(filepath.Dir(opts.ImagesDirectory), 0755); err != nil {
 		return err
@@ -253,7 +252,7 @@ func (c *libcontainerContainer) Checkpoint(cp runtime.Checkpoint) error {
 	// mkdir is atomic so if it already exists we can fail
 	if err := os.Mkdir(opts.ImagesDirectory, 0755); err != nil {
 		if os.IsExist(err) {
-			return runtime.ErrCheckpointExists
+			return ErrCheckpointExists
 		}
 		return err
 	}
@@ -263,7 +262,7 @@ func (c *libcontainerContainer) Checkpoint(cp runtime.Checkpoint) error {
 	return nil
 }
 
-func (c *libcontainerContainer) createCheckpointOpts(cp runtime.Checkpoint) *libcontainer.CriuOpts {
+func (c *libcontainerContainer) createCheckpointOpts(cp Checkpoint) *libcontainer.CriuOpts {
 	opts := libcontainer.CriuOpts{}
 	opts.LeaveRunning = !cp.Exit
 	opts.ShellJob = cp.Shell
@@ -288,17 +287,17 @@ func (c *libcontainerContainer) Pause() error {
 	return c.c.Pause()
 }
 
-func (c *libcontainerContainer) State() runtime.State {
+func (c *libcontainerContainer) State() State {
 	// TODO: what to do with error
 	state, err := c.c.Status()
 	if err != nil {
-		return runtime.State("")
+		return State("")
 	}
 	switch state {
 	case libcontainer.Paused, libcontainer.Pausing:
-		return runtime.Paused
+		return Paused
 	}
-	return runtime.State("")
+	return State("")
 }
 
 func (c *libcontainerContainer) ID() string {
@@ -324,13 +323,13 @@ func (c *libcontainerContainer) SetExited(status int) {
 	c.initProcess.Close()
 }
 
-func (c *libcontainerContainer) Stats() (*runtime.Stat, error) {
+func (c *libcontainerContainer) Stats() (*Stat, error) {
 	now := time.Now()
 	stats, err := c.c.Stats()
 	if err != nil {
 		return nil, err
 	}
-	return &runtime.Stat{
+	return &Stat{
 		Timestamp: now,
 		Data:      stats,
 	}, nil
@@ -340,8 +339,8 @@ func (c *libcontainerContainer) Delete() error {
 	return c.c.Destroy()
 }
 
-func (c *libcontainerContainer) Processes() ([]runtime.Process, error) {
-	procs := []runtime.Process{
+func (c *libcontainerContainer) Processes() ([]Process, error) {
+	procs := []Process{
 		c.initProcess,
 	}
 	for _, p := range c.additionalProcesses {
@@ -353,7 +352,7 @@ func (c *libcontainerContainer) Processes() ([]runtime.Process, error) {
 func (c *libcontainerContainer) RemoveProcess(pid int) error {
 	proc, ok := c.additionalProcesses[pid]
 	if !ok {
-		return runtime.ErrNotChildProcess
+		return ErrNotChildProcess
 	}
 	err := proc.Close()
 	delete(c.additionalProcesses, pid)
@@ -364,7 +363,7 @@ func (c *libcontainerContainer) OOM() (<-chan struct{}, error) {
 	return c.c.NotifyOOM()
 }
 
-func NewRuntime(stateDir string) (runtime.Runtime, error) {
+func NewRuntime(stateDir string) (Runtime, error) {
 	f, err := libcontainer.New(stateDir, libcontainer.Cgroupfs, func(l *libcontainer.LinuxFactory) error {
 		//l.CriuPath = context.GlobalString("criu")
 		return nil
@@ -385,7 +384,7 @@ func (r *libcontainerRuntime) Type() string {
 	return "libcontainer"
 }
 
-func (r *libcontainerRuntime) Create(id, bundlePath, consolePath string) (runtime.Container, *runtime.IO, error) {
+func (r *libcontainerRuntime) Create(id, bundlePath, consolePath string) (Container, *IO, error) {
 	spec, rspec, err := r.loadSpec(
 		filepath.Join(bundlePath, "config.json"),
 		filepath.Join(bundlePath, "runtime.json"),
@@ -405,7 +404,7 @@ func (r *libcontainerRuntime) Create(id, bundlePath, consolePath string) (runtim
 	if err != nil {
 		return nil, nil, err
 	}
-	var rio runtime.IO
+	var rio IO
 	if spec.Process.Terminal {
 		if err := process.ConsoleFromPath(consolePath); err != nil {
 			return nil, nil, err
@@ -435,16 +434,16 @@ func (r *libcontainerRuntime) Create(id, bundlePath, consolePath string) (runtim
 	return c, &rio, nil
 }
 
-func (r *libcontainerRuntime) StartProcess(ci runtime.Container, p specs.Process, consolePath string) (runtime.Process, *runtime.IO, error) {
+func (r *libcontainerRuntime) StartProcess(ci Container, p specs.Process, consolePath string) (Process, *IO, error) {
 	c, ok := ci.(*libcontainerContainer)
 	if !ok {
-		return nil, nil, runtime.ErrInvalidContainerType
+		return nil, nil, ErrInvalidContainerType
 	}
 	process, err := r.newProcess(p)
 	if err != nil {
 		return nil, nil, err
 	}
-	var rio runtime.IO
+	var rio IO
 	if p.Terminal {
 		if err := process.ConsoleFromPath(consolePath); err != nil {
 			return nil, nil, err
