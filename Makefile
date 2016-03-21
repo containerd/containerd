@@ -2,7 +2,7 @@ BUILDTAGS=
 
 GIT_COMMIT := $(shell git rev-parse HEAD 2> /dev/null || true)
 
-LDFLAGS := "-X github.com/docker/containerd.GitCommit=${GIT_COMMIT} ${LDFLAGS}"
+LDFLAGS := "${LDFLAGS} -X github.com/docker/containerd.GitCommit=${GIT_COMMIT}"
 
 # if this session isn't interactive, then we don't want to allocate a
 # TTY, which would fail, but if it is interactive, we do want to attach
