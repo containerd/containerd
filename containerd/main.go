@@ -76,7 +76,7 @@ var daemonFlags = []cli.Flag{
 	},
 	cli.DurationFlag{
 		Name:  "start-timeout",
-		Value: 15 * time.Second,
+		Value: 30 * time.Second,
 		Usage: "timeout duration for waiting on a container to start before it is killed",
 	},
 	cli.IntFlag{

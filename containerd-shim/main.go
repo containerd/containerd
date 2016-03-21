@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"syscall"
 
 	"github.com/docker/containerd/osutils"
@@ -100,6 +101,9 @@ func start(log *os.File) error {
 			msgC <- m
 		}
 	}()
+	if runtime.GOOS == "solaris" {
+		return nil
+	}
 	var exitShim bool
 	for {
 		select {

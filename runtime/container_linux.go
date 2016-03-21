@@ -92,6 +92,20 @@ func (c *container) OOM() (OOM, error) {
 	return c.getMemoryEventFD(filepath.Join(mountpoint, root))
 }
 
+func (c *container) Pids() ([]int, error) {
+	var pids []int
+	args := c.runtimeArgs
+	args = append(args, "ps", "--format=json", c.id)
+	out, err := exec.Command(c.runtime, args...).CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("%s: %q", err.Error(), out)
+	}
+	if err := json.Unmarshal(out, &pids); err != nil {
+		return nil, err
+	}
+	return pids, nil
+}
+
 func u64Ptr(i uint64) *uint64 { return &i }
 
 func (c *container) UpdateResources(r *Resource) error {

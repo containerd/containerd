@@ -24,9 +24,10 @@ var (
 	// exits before completing
 	ErrShimExited = errors.New("containerd: shim exited before container process was started")
 
-	errNoPidFile      = errors.New("containerd: no process pid file found")
-	errInvalidPidInt  = errors.New("containerd: process pid is invalid")
-	errNotImplemented = errors.New("containerd: not implemented")
+	errNoPidFile         = errors.New("containerd: no process pid file found")
+	errInvalidPidInt     = errors.New("containerd: process pid is invalid")
+	errContainerNotFound = errors.New("containerd: container not found")
+	errNotImplemented    = errors.New("containerd: not implemented")
 )
 
 const (

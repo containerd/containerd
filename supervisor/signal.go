@@ -1,6 +1,8 @@
 package supervisor
 
-import "os"
+import (
+	"os"
+)
 
 // SignalTask holds needed parameters to signal a container
 type SignalTask struct {

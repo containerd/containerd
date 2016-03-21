@@ -15,6 +15,7 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"golang.org/x/net/context"
+	"golang.org/x/sys/unix"
 )
 
 func (cs *ContainerdSuite) GetLogs() string {
@@ -203,7 +204,7 @@ func NewContainerProcess(cs *ContainerdSuite, bundle *Bundle, cid, pid string) (
 		"stderr": &c.io.stderr,
 	} {
 		*path = filepath.Join(bundle.Path, "io", cid+"-"+pid+"-"+name)
-		if err = syscall.Mkfifo(*path, 0755); err != nil && !os.IsExist(err) {
+		if err = unix.Mkfifo(*path, 0755); err != nil && !os.IsExist(err) {
 			return nil, err
 		}
 	}

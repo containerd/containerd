@@ -22,6 +22,7 @@ import (
 	"github.com/docker/docker/pkg/term"
 	"github.com/golang/protobuf/ptypes"
 	netcontext "golang.org/x/net/context"
+	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/transport"
@@ -681,4 +682,24 @@ type stdio struct {
 	stdin  string
 	stdout string
 	stderr string
+}
+
+func createStdio() (s stdio, err error) {
+	tmp, err := ioutil.TempDir("", "ctr-")
+	if err != nil {
+		return s, err
+	}
+	// create fifo's for the process
+	for name, fd := range map[string]*string{
+		"stdin":  &s.stdin,
+		"stdout": &s.stdout,
+		"stderr": &s.stderr,
+	} {
+		path := filepath.Join(tmp, name)
+		if err := unix.Mkfifo(path, 0755); err != nil && !os.IsExist(err) {
+			return s, err
+		}
+		*fd = path
+	}
+	return s, nil
 }
