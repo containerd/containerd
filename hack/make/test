@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -e
+
+(
+go test -v $(go list ./... | grep -v /vendor)
+) 2>&1 | tee "${DEST}/test.log"

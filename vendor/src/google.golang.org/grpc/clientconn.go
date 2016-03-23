@@ -52,10 +52,10 @@ var (
 	// ErrUnspecTarget indicates that the target address is unspecified.
 	ErrUnspecTarget = errors.New("grpc: target is unspecified")
 	// ErrNoTransportSecurity indicates that there is no transport security
-	// being set for ClientConn. Users should either set one or explicityly
+	// being set for ClientConn. Users should either set one or explicitly
 	// call WithInsecure DialOption to disable security.
 	ErrNoTransportSecurity = errors.New("grpc: no transport security set (use grpc.WithInsecure() explicitly or set credentials)")
-	// ErrCredentialsMisuse indicates that users want to transmit security infomation
+	// ErrCredentialsMisuse indicates that users want to transmit security information
 	// (e.g., oauth2 token) which requires secure connection on an insecure
 	// connection.
 	ErrCredentialsMisuse = errors.New("grpc: the credentials require transport level security (use grpc.WithTransportAuthenticator() to set)")
@@ -73,6 +73,8 @@ var (
 // values passed to Dial.
 type dialOptions struct {
 	codec    Codec
+	cp       Compressor
+	dc       Decompressor
 	picker   Picker
 	block    bool
 	insecure bool
@@ -89,6 +91,23 @@ func WithCodec(c Codec) DialOption {
 	}
 }
 
+// WithCompressor returns a DialOption which sets a CompressorGenerator for generating message
+// compressor.
+func WithCompressor(cp Compressor) DialOption {
+	return func(o *dialOptions) {
+		o.cp = cp
+	}
+}
+
+// WithDecompressor returns a DialOption which sets a DecompressorGenerator for generating
+// message decompressor.
+func WithDecompressor(dc Decompressor) DialOption {
+	return func(o *dialOptions) {
+		o.dc = dc
+	}
+}
+
+// WithPicker returns a DialOption which sets a picker for connection selection.
 func WithPicker(p Picker) DialOption {
 	return func(o *dialOptions) {
 		o.picker = p
@@ -104,6 +123,8 @@ func WithBlock() DialOption {
 	}
 }
 
+// WithInsecure returns a DialOption which disables transport security for this ClientConn.
+// Note that transport security is required unless WithInsecure is set.
 func WithInsecure() DialOption {
 	return func(o *dialOptions) {
 		o.insecure = true
@@ -518,8 +539,9 @@ func (cc *Conn) Wait(ctx context.Context) (transport.ClientTransport, error) {
 			cc.mu.Unlock()
 			return nil, ErrClientConnClosing
 		case cc.state == Ready:
+			ct := cc.transport
 			cc.mu.Unlock()
-			return cc.transport, nil
+			return ct, nil
 		default:
 			ready := cc.ready
 			if ready == nil {
