@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -e
+
+(
+gofmt -s -l . | grep -v vendor | grep -v .pb. || exit 0
+) 2>&1 | tee "${DEST}/validate.log"

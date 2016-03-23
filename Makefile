@@ -13,64 +13,64 @@ ifeq ($(INTERACTIVE), 1)
 	DOCKER_FLAGS += -t
 endif
 
+DOCKER_ENVS := -e BUILDFLAGS \
+	-e LDFLAGS
+
+# to allow `make BIND_DIR=. shell` or `make BIND_DIR= test`
+# (default to no bind mount if DOCKER_HOST is set)
+# note: BINDDIR is supported for backwards-compatibility here
+BIND_DIR := $(if $(BIND_DIR),$(BIND_DIR),bin)
+DOCKER_MOUNT := $(if $(BIND_DIR),-v "$(CURDIR)/$(BIND_DIR):/go/src/github.com/docker/containerd/$(BIND_DIR)")
+
 DOCKER_IMAGE := containerd-dev$(if $(GIT_BRANCH),:$(GIT_BRANCH))
-DOCKER_RUN := docker run --rm -i $(DOCKER_FLAGS) "$(DOCKER_IMAGE)"
+DOCKER_RUN := docker run --rm -i $(DOCKER_FLAGS) $(DOCKER_ENVS) $(DOCKER_MOUNT) "$(DOCKER_IMAGE)"
 
-export GOPATH:=$(CURDIR)/vendor:$(GOPATH)
+default: binary
+static: client-static daemon-static shim-static
 
-all: client daemon shim
+all: build
+	$(DOCKER_RUN) hack/make.sh
+
+binary: build
+	$(DOCKER_RUN) hack/make.sh ctr containerd containerd-shim
 
 static: client-static daemon-static shim-static
 
 bin:
 	mkdir -p bin/
 
-clean:
-	rm -rf bin
+client: build
+	$(DOCKER_RUN) hack/make.sh ctr
 
-client: bin
-	cd ctr && go build -ldflags "${LDFLAGS}" -o ../bin/ctr
+daemon: build
+	$(DOCKER_RUN) hack/make.sh containerd
 
-client-static:
-	cd ctr && go build -ldflags "-w -extldflags -static ${LDFLAGS}" -tags "$(BUILDTAGS)" -o ../bin/ctr
+shim: build
+	$(DOCKER_RUN) hack/make.sh containerd-shim
 
-daemon: bin
-	cd containerd && go build -ldflags "${LDFLAGS}"  -tags "$(BUILDTAGS)" -o ../bin/containerd
+client-static: build
+	LDFLAGS="$(LDFLAGS) -w -extldflags -static" $(DOCKER_RUN) hack/make.sh ctr
 
-daemon-static:
-	cd containerd && go build -ldflags "-w -extldflags -static ${LDFLAGS}" -tags "$(BUILDTAGS)" -o ../bin/containerd
+daemon-static: build
+	LDFLAGS="$(LDFLAGS) -w -extldflags -static" $(DOCKER_RUN) hack/make.sh containerd
 
-shim: bin
-	cd containerd-shim && go build -tags "$(BUILDTAGS)" -o ../bin/containerd-shim
+shim-static: build
+	LDFLAGS="$(LDFLAGS) -w -extldflags -static" $(DOCKER_RUN) hack/make.sh containerd-shim
 
-shim-static:
-	cd containerd-shim && go build -ldflags "-w -extldflags -static ${LDFLAGS}" -tags "$(BUILDTAGS)" -o ../bin/containerd-shim
+build: bin
+	@docker build -t "$(DOCKER_IMAGE)" .
 
-dbuild:
-	@docker build --rm --force-rm -t "$(DOCKER_IMAGE)" .
+validate: build
+	$(DOCKER_RUN) hack/make.sh validate
 
-dtest: dbuild
-	$(DOCKER_RUN) make test
+vet: build
+	$(DOCKER_RUN) hack/make.sh vet
+
+test: build
+	$(DOCKER_RUN) hack/make.sh test
+
+lint: build
+	$(DOCKER_RUN) hack/make.sh lint
 
 install:
 	cp bin/* /usr/local/bin/
-
-protoc:
-	protoc -I ./api/grpc/types ./api/grpc/types/api.proto --go_out=plugins=grpc:api/grpc/types
-
-fmt:
-	@gofmt -s -l . | grep -v vendor | grep -v .pb. | tee /dev/stderr
-
-lint:
-	@golint ./... | grep -v vendor | grep -v .pb. | tee /dev/stderr
-
-shell: dbuild
-	$(DOCKER_RUN) bash
-
-test: all validate
-	go test -v $(shell go list ./... | grep -v /vendor)
-
-validate: fmt
-
-vet:
-	go vet $(shell go list ./... | grep -v vendor)

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -e
+
+(
+golint ./... | grep -v vendor | grep -v .pb.
+) 2>&1 | tee "${DEST}/lint.log"

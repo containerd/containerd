@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -e
+
+BINARY_NAME="containerd-shim-${VERSION}"
+BINARY_EXTENSION="$(binary_extension)"
+BINARY_FULLNAME="${BINARY_NAME}${BINARY_EXTENSION}"
+
+(
+if [[ -e "${DEST}/${BINARY_FULLNAME}" ]]; then
+	echo "${DEST}/${BINARY_FULLNAME} already exists. Removing."
+	rm -fr "${DEST}/${BINARY_FULLNAME}" || exit 1
+	echo
+fi
+echo "Building: ${DEST}/${BINARY_FULLNAME}"
+protoc -I ./api/grpc/types ./api/grpc/types/api.proto --go_out=plugins=grpc:api/grpc/types
+go build \
+	"${BUILDFLAGS[@]}" \
+	-o "${DEST}/${BINARY_FULLNAME}" \
+	./containerd-shim
+)
+
+echo "Created binary: ${DEST}/${BINARY_FULLNAME}"
+ln -sf "${BINARY_FULLNAME}" "${DEST}/containerd-shim${BINARY_EXTENSION}"
+
+hash_files "${DEST}/${BINARY_FULLNAME}"

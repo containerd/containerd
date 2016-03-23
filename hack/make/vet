@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -e
+
+(
+go vet $(go list ./... | grep -v vendor)
+) 2>&1 | tee "${DEST}/vet.log"

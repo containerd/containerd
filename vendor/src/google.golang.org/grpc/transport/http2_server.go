@@ -49,6 +49,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/peer"
 )
 
 // ErrIllegalHeaderWrite indicates that setting header is illegal because of
@@ -61,8 +62,8 @@ type http2Server struct {
 	maxStreamID uint32               // max stream ID ever seen
 	authInfo    credentials.AuthInfo // auth info about the connection
 	// writableChan synchronizes write access to the transport.
-	// A writer acquires the write lock by sending a value on writableChan
-	// and releases it by receiving from writableChan.
+	// A writer acquires the write lock by receiving a value on writableChan
+	// and releases it by sending on writableChan.
 	writableChan chan int
 	// shutdownChan is closed when Close is called.
 	// Blocking operations should select on shutdownChan to avoid
@@ -135,66 +136,73 @@ func newHTTP2Server(conn net.Conn, maxStreams uint32, authInfo credentials.AuthI
 	return t, nil
 }
 
-// operateHeader takes action on the decoded headers. It returns the current
-// stream if there are remaining headers on the wire (in the following
-// Continuation frame).
-func (t *http2Server) operateHeaders(hDec *hpackDecoder, s *Stream, frame headerFrame, endStream bool, handle func(*Stream)) (pendingStream *Stream) {
-	defer func() {
-		if pendingStream == nil {
-			hDec.state = decodeState{}
-		}
-	}()
-	endHeaders, err := hDec.decodeServerHTTP2Headers(frame)
-	if s == nil {
-		// s has been closed.
-		return nil
+// operateHeader takes action on the decoded headers.
+func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(*Stream)) {
+	buf := newRecvBuffer()
+	fc := &inFlow{
+		limit: initialWindowSize,
+		conn:  t.fc,
 	}
-	if err != nil {
-		grpclog.Printf("transport: http2Server.operateHeader found %v", err)
+	s := &Stream{
+		id:  frame.Header().StreamID,
+		st:  t,
+		buf: buf,
+		fc:  fc,
+	}
+
+	var state decodeState
+	for _, hf := range frame.Fields {
+		state.processHeaderField(hf)
+	}
+	if err := state.err; err != nil {
 		if se, ok := err.(StreamError); ok {
 			t.controlBuf.put(&resetStream{s.id, statusCodeConvTab[se.Code]})
 		}
-		return nil
+		return
 	}
-	if endStream {
+
+	if frame.StreamEnded() {
 		// s is just created by the caller. No lock needed.
 		s.state = streamReadDone
 	}
-	if !endHeaders {
-		return s
-	}
-	if hDec.state.timeoutSet {
-		s.ctx, s.cancel = context.WithTimeout(context.TODO(), hDec.state.timeout)
+	s.recvCompress = state.encoding
+	if state.timeoutSet {
+		s.ctx, s.cancel = context.WithTimeout(context.TODO(), state.timeout)
 	} else {
 		s.ctx, s.cancel = context.WithCancel(context.TODO())
 	}
+	pr := &peer.Peer{
+		Addr: t.conn.RemoteAddr(),
+	}
 	// Attach Auth info if there is any.
 	if t.authInfo != nil {
-		s.ctx = credentials.NewContext(s.ctx, t.authInfo)
+		pr.AuthInfo = t.authInfo
 	}
+	s.ctx = peer.NewContext(s.ctx, pr)
 	// Cache the current stream to the context so that the server application
 	// can find out. Required when the server wants to send some metadata
 	// back to the client (unary call only).
 	s.ctx = newContextWithStream(s.ctx, s)
 	// Attach the received metadata to the context.
-	if len(hDec.state.mdata) > 0 {
-		s.ctx = metadata.NewContext(s.ctx, hDec.state.mdata)
+	if len(state.mdata) > 0 {
+		s.ctx = metadata.NewContext(s.ctx, state.mdata)
 	}
 
 	s.dec = &recvBufferReader{
 		ctx:  s.ctx,
 		recv: s.buf,
 	}
-	s.method = hDec.state.method
+	s.recvCompress = state.encoding
+	s.method = state.method
 	t.mu.Lock()
 	if t.state != reachable {
 		t.mu.Unlock()
-		return nil
+		return
 	}
 	if uint32(len(t.activeStreams)) >= t.maxStreams {
 		t.mu.Unlock()
 		t.controlBuf.put(&resetStream{s.id, http2.ErrCodeRefusedStream})
-		return nil
+		return
 	}
 	s.sendQuotaPool = newQuotaPool(int(t.streamSendQuota))
 	t.activeStreams[s.id] = s
@@ -203,7 +211,6 @@ func (t *http2Server) operateHeaders(hDec *hpackDecoder, s *Stream, frame header
 		t.updateWindow(s, uint32(n))
 	}
 	handle(s)
-	return nil
 }
 
 // HandleStreams receives incoming streams using the given handler. This is
@@ -236,8 +243,6 @@ func (t *http2Server) HandleStreams(handle func(*Stream)) {
 	}
 	t.handleSettings(sf)
 
-	hDec := newHPACKDecoder()
-	var curStream *Stream
 	for {
 		frame, err := t.framer.readFrame()
 		if err != nil {
@@ -245,7 +250,7 @@ func (t *http2Server) HandleStreams(handle func(*Stream)) {
 			return
 		}
 		switch frame := frame.(type) {
-		case *http2.HeadersFrame:
+		case *http2.MetaHeadersFrame:
 			id := frame.Header().StreamID
 			if id%2 != 1 || id <= t.maxStreamID {
 				// illegal gRPC stream id.
@@ -254,21 +259,7 @@ func (t *http2Server) HandleStreams(handle func(*Stream)) {
 				break
 			}
 			t.maxStreamID = id
-			buf := newRecvBuffer()
-			fc := &inFlow{
-				limit: initialWindowSize,
-				conn:  t.fc,
-			}
-			curStream = &Stream{
-				id:  frame.Header().StreamID,
-				st:  t,
-				buf: buf,
-				fc:  fc,
-			}
-			endStream := frame.Header().Flags.Has(http2.FlagHeadersEndStream)
-			curStream = t.operateHeaders(hDec, curStream, frame, endStream, handle)
-		case *http2.ContinuationFrame:
-			curStream = t.operateHeaders(hDec, curStream, frame, frame.HeadersEnded(), handle)
+			t.operateHeaders(frame, handle)
 		case *http2.DataFrame:
 			t.handleData(frame)
 		case *http2.RSTStreamFrame:
@@ -441,6 +432,9 @@ func (t *http2Server) WriteHeader(s *Stream, md metadata.MD) error {
 	t.hBuf.Reset()
 	t.hEnc.WriteField(hpack.HeaderField{Name: ":status", Value: "200"})
 	t.hEnc.WriteField(hpack.HeaderField{Name: "content-type", Value: "application/grpc"})
+	if s.sendCompress != "" {
+		t.hEnc.WriteField(hpack.HeaderField{Name: "grpc-encoding", Value: s.sendCompress})
+	}
 	for k, v := range md {
 		for _, entry := range v {
 			t.hEnc.WriteField(hpack.HeaderField{Name: k, Value: entry})
@@ -515,6 +509,9 @@ func (t *http2Server) Write(s *Stream, data []byte, opts *Options) error {
 		t.hBuf.Reset()
 		t.hEnc.WriteField(hpack.HeaderField{Name: ":status", Value: "200"})
 		t.hEnc.WriteField(hpack.HeaderField{Name: "content-type", Value: "application/grpc"})
+		if s.sendCompress != "" {
+			t.hEnc.WriteField(hpack.HeaderField{Name: "grpc-encoding", Value: s.sendCompress})
+		}
 		p := http2.HeadersFrameParam{
 			StreamID:      s.id,
 			BlockFragment: t.hBuf.Bytes(),
