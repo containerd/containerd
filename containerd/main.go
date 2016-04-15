@@ -137,9 +137,6 @@ func daemon(address, stateDir string, concurrency int, runtimeName string, runti
 }
 
 func startServer(address string, sv *supervisor.Supervisor) (*grpc.Server, error) {
-	if err := os.RemoveAll(address); err != nil {
-		return nil, err
-	}
 	l, err := net.Listen(defaultListenType, address)
 	if err != nil {
 		return nil, err
