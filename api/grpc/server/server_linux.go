@@ -142,6 +142,7 @@ func convertToPb(st *runtime.Stat) *types.StatsResponse {
 			Failcnt:  memSt.KernelUsage.Failcnt,
 			Limit:    memSt.KernelUsage.Limit,
 		},
+		Stats: memSt.Stats,
 	}
 	blkSt := lcSt.CgroupStats.BlkioStats
 	pbSt.CgroupStats.BlkioStats = &types.BlkioStats{
