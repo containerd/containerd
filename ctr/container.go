@@ -604,8 +604,11 @@ func waitForExit(c types.APIClient, events types.API_EventsClient, id, pid strin
 	for {
 		e, err := events.Recv()
 		if err != nil {
+		reconnect:
 			time.Sleep(1 * time.Second)
-			events, _ = c.Events(netcontext.Background(), &types.EventsRequest{Timestamp: timestamp})
+			if events, err = c.Events(netcontext.Background(), &types.EventsRequest{Timestamp: timestamp}); err != nil {
+				goto reconnect
+			}
 			continue
 		}
 		timestamp = e.Timestamp
