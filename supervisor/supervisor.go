@@ -274,7 +274,6 @@ func (s *Supervisor) SendTask(evt Task) {
 
 func (s *Supervisor) exitHandler() {
 	for p := range s.monitor.Exits() {
-		p.Wait()
 		e := &ExitTask{
 			Process: p,
 		}

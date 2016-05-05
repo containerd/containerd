@@ -131,7 +131,10 @@ func daemon(context *cli.Context) error {
 	// setup a standard reaper so that we don't leave any zombies if we are still alive
 	// this is just good practice because we are spawning new processes
 	s := make(chan os.Signal, 2048)
-	signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
+	signal.Notify(s, syscall.SIGCHLD, syscall.SIGTERM, syscall.SIGINT)
+	if err := osutils.SetSubreaper(1); err != nil {
+		logrus.WithField("error", err).Error("containerd: set subpreaper")
+	}
 	sv, err := supervisor.New(
 		context.String("state-dir"),
 		context.String("runtime"),
@@ -163,6 +166,10 @@ func daemon(context *cli.Context) error {
 	}
 	for ss := range s {
 		switch ss {
+		case syscall.SIGCHLD:
+			if _, err := osutils.Reap(); err != nil {
+				logrus.WithField("error", err).Warn("containerd: reap child processes")
+			}
 		default:
 			logrus.Infof("stopping containerd after receiving %s", ss)
 			server.Stop()

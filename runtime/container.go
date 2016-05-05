@@ -452,7 +452,6 @@ func (c *container) Exec(pid string, pspec specs.ProcessSpec, s Stdio) (pp Proce
 }
 
 func (c *container) startCmd(pid string, cmd *exec.Cmd, p *process) error {
-	p.cmd = cmd
 	if err := cmd.Start(); err != nil {
 		if exErr, ok := err.(*exec.Error); ok {
 			if exErr.Err == exec.ErrNotFound || exErr.Err == os.ErrNotExist {
@@ -613,9 +612,6 @@ func (c *container) waitForStart(p *process, cmd *exec.Cmd) error {
 
 // isAlive checks if the shim that launched the container is still alive
 func isAlive(cmd *exec.Cmd) (bool, error) {
-	if _, err := syscall.Wait4(cmd.Process.Pid, nil, syscall.WNOHANG, nil); err == nil {
-		return true, nil
-	}
 	if err := syscall.Kill(cmd.Process.Pid, 0); err != nil {
 		if err == syscall.ESRCH {
 			return false, nil
