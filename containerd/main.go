@@ -20,6 +20,7 @@ import (
 	"github.com/docker/containerd/api/grpc/server"
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/api/http/pprof"
+	"github.com/docker/containerd/subreaper"
 	"github.com/docker/containerd/supervisor"
 	"github.com/docker/docker/pkg/listeners"
 	"github.com/rcrowley/go-metrics"
@@ -131,8 +132,8 @@ func daemon(context *cli.Context) error {
 	// setup a standard reaper so that we don't leave any zombies if we are still alive
 	// this is just good practice because we are spawning new processes
 	s := make(chan os.Signal, 2048)
-	signal.Notify(s, syscall.SIGCHLD, syscall.SIGTERM, syscall.SIGINT)
-	if err := osutils.SetSubreaper(1); err != nil {
+	signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
+	if err := subreaper.Start(); err != nil {
 		logrus.WithField("error", err).Error("containerd: set subpreaper")
 	}
 	sv, err := supervisor.New(
@@ -165,16 +166,9 @@ func daemon(context *cli.Context) error {
 		return err
 	}
 	for ss := range s {
-		switch ss {
-		case syscall.SIGCHLD:
-			if _, err := osutils.Reap(); err != nil {
-				logrus.WithField("error", err).Warn("containerd: reap child processes")
-			}
-		default:
-			logrus.Infof("stopping containerd after receiving %s", ss)
-			server.Stop()
-			os.Exit(0)
-		}
+		logrus.Infof("stopping containerd after receiving %s", ss)
+		server.Stop()
+		os.Exit(0)
 	}
 	return nil
 }

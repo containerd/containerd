@@ -6,13 +6,13 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/specs"
+	"github.com/docker/containerd/subreaper/exec"
 	ocs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
