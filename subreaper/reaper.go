@@ -31,6 +31,7 @@ func (s *Subscription) SetPid(pid int) {
 				s.exit = exit
 				s.wg.Done()
 				Unsubscribe(s)
+				break
 			}
 		}
 	}()
@@ -61,7 +62,10 @@ func Unsubscribe(sub *Subscription) {
 	subLock.Lock()
 	defer subLock.Unlock()
 
-	delete(subscriptions, sub.id)
+	if _, ok := subscriptions[sub.id]; ok {
+		close(sub.c)
+		delete(subscriptions, sub.id)
+	}
 }
 
 func Start() error {
