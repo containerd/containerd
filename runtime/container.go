@@ -394,7 +394,7 @@ func (c *container) Start(checkpointPath string, s Stdio) (Process, error) {
 		spec:        spec,
 		processSpec: specs.ProcessSpec(spec.Process),
 	}
-	p, err := newProcess(config)
+	p, err := c.newProcess(config)
 	if err != nil {
 		return nil, err
 	}
@@ -428,7 +428,7 @@ func (c *container) Exec(pid string, pspec specs.ProcessSpec, s Stdio) (pp Proce
 		spec:        spec,
 		stdio:       s,
 	}
-	p, err := newProcess(config)
+	p, err := c.newProcess(config)
 	if err != nil {
 		return nil, err
 	}
@@ -508,6 +508,13 @@ func (c *container) writeEventFD(root string, cfd, efd int) error {
 	defer f.Close()
 	_, err = f.WriteString(fmt.Sprintf("%d %d", efd, cfd))
 	return err
+}
+
+func (c *container) newProcess(config *processConfig) (Process, error) {
+	if c.shim == "" {
+		return newDirectProcess(config)
+	}
+	return newProcess(config)
 }
 
 type waitArgs struct {

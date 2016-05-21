@@ -89,7 +89,8 @@ test: validate install bundles-rootfs
 	go test -bench=. -v $(shell go list ./... | grep -v /vendor | grep -v /integration-test)
 ifneq ($(wildcard /.dockerenv), )
 	cd integration-test ; \
-	go test -check.v -check.timeout=$(TEST_TIMEOUT) timeout=$(TEST_SUITE_TIMEOUT) $(TESTFLAGS) github.com/docker/containerd/integration-test
+	go test -check.v -check.timeout=$(TEST_TIMEOUT) -timeout=$(TEST_SUITE_TIMEOUT) $(TESTFLAGS) github.com/docker/containerd/integration-test && \
+	go test -containerd.shim="" -check.v -check.timeout=$(TEST_TIMEOUT) -timeout=$(TEST_SUITE_TIMEOUT) $(TESTFLAGS) github.com/docker/containerd/integration-test
 endif
 
 bench: shim validate install bundles-rootfs

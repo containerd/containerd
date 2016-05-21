@@ -315,6 +315,10 @@ func (cs *ContainerdSuite) TestStartBusyboxTopPauseResume(t *check.C) {
 }
 
 func (cs *ContainerdSuite) TestRestart(t *check.C) {
+	if *ShimFlag == "" {
+		return
+	}
+
 	bundleName := "busybox-top"
 	if err := CreateBusyboxBundle(bundleName, []string{"top"}); err != nil {
 		t.Fatal(err)
