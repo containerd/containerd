@@ -18,6 +18,20 @@ RUN curl -sSL  "https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd6
 ENV PATH /go/bin:/usr/local/go/bin:$PATH
 ENV GOPATH /go:/go/src/github.com/docker/containerd/vendor
 
+ENV GO_TOOLS_COMMIT 823804e1ae08dbb14eb807afc7db9993bc9e3cc3
+# Grab Go's cover tool for dead-simple code coverage testing
+# Grab Go's vet tool for examining go code to find suspicious constructs
+# and help prevent errors that the compiler might not catch
+RUN git clone https://github.com/golang/tools.git /go/src/golang.org/x/tools \
+	&& (cd /go/src/golang.org/x/tools && git checkout -q $GO_TOOLS_COMMIT) \
+	&& go install -v golang.org/x/tools/cmd/cover \
+	&& go install -v golang.org/x/tools/cmd/vet
+# Grab Go's lint tool
+ENV GO_LINT_COMMIT 32a87160691b3c96046c0c678fe57c5bef761456
+RUN git clone https://github.com/golang/lint.git /go/src/github.com/golang/lint \
+	&& (cd /go/src/github.com/golang/lint && git checkout -q $GO_LINT_COMMIT) \
+	&& go install -v github.com/golang/lint/golint
+
 WORKDIR /go/src/github.com/docker/containerd
 
 # install seccomp: the version shipped in trusty is too old
