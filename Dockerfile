@@ -1,5 +1,9 @@
 FROM debian:jessie
 
+# allow replacing httpredir mirror
+ARG APT_MIRROR=httpredir.debian.org
+RUN sed -i s/httpredir.debian.org/$APT_MIRROR/g /etc/apt/sources.list
+
 RUN apt-get update && apt-get install -y \
 	build-essential \
 	ca-certificates \
