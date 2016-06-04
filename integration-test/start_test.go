@@ -229,7 +229,7 @@ func (cs *ContainerdSuite) TestStartBusyboxTopSignalSigterm(t *check.C) {
 }
 
 func (cs *ContainerdSuite) TestStartBusyboxTrapUSR1(t *check.C) {
-	if err := CreateBusyboxBundle("busybox-trap-usr1", []string{"sh", "-c", "trap 'echo -n booh!' SIGUSR1 ; sleep 100  &  wait"}); err != nil {
+	if err := CreateBusyboxBundle("busybox-trap-usr1", []string{"sh", "-c", "trap 'echo -n booh!' SIGUSR1 ; sleep 60  &  wait"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -238,6 +238,8 @@ func (cs *ContainerdSuite) TestStartBusyboxTrapUSR1(t *check.C) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	<-time.After(1 * time.Second)
 
 	if err := cs.SignalContainer(containerID, uint32(syscall.SIGUSR1)); err != nil {
 		t.Fatal(err)
