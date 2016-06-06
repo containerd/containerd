@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -125,6 +126,7 @@ func start(log *os.File) error {
 		}
 		// runtime has exited so the shim can also exit
 		if exitShim {
+			ioutil.WriteFile(fmt.Sprintf("/tmp/shim-delete-%d", p.pid()), []byte("deleting"), 0600)
 			p.delete()
 			p.Wait()
 			return nil
