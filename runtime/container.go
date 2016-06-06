@@ -351,6 +351,7 @@ func (c *container) Checkpoint(cpt Checkpoint, checkpointDir string) error {
 	args := []string{
 		"checkpoint",
 		"--image-path", path,
+		"--empty-ns", "network",
 	}
 	add := func(flags ...string) {
 		args = append(args, flags...)

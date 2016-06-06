@@ -133,6 +133,7 @@ func (p *process) start() error {
 	} else if p.checkpoint != nil {
 		args = append(args, "restore",
 			"--image-path", filepath.Join(p.checkpointPath),
+			"--empty-ns", "network",
 		)
 		add := func(flags ...string) {
 			args = append(args, flags...)
