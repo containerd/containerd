@@ -6,12 +6,13 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/docker/containerd/specs"
+	"github.com/docker/containerd/subreaper/exec"
 	"golang.org/x/sys/unix"
 )
 
@@ -42,8 +43,8 @@ type Process interface {
 	SystemPid() int
 	// State returns if the process is running or not
 	State() State
-	// Wait reaps the shim process if avaliable
-	Wait()
+	// Start executes the process
+	Start() error
 }
 
 type processConfig struct {
@@ -106,6 +107,18 @@ func newProcess(config *processConfig) (*process, error) {
 	return p, nil
 }
 
+func (p *process) Start() error {
+	cmd := exec.Command(p.container.shim,
+		p.container.id, p.container.bundle, p.container.runtime,
+	)
+	cmd.Dir = p.root
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+	}
+
+	return p.startCmd(cmd)
+}
+
 func loadProcess(root, id string, c *container, s *ProcessState) (*process, error) {
 	p := &process{
 		root:      root,
@@ -144,7 +157,6 @@ type process struct {
 	container   *container
 	spec        specs.ProcessSpec
 	stdio       Stdio
-	cmd         *exec.Cmd
 }
 
 func (p *process) ID() string {
@@ -225,13 +237,6 @@ func (p *process) getPidFromFile() (int, error) {
 	return i, nil
 }
 
-// Wait will reap the shim process
-func (p *process) Wait() {
-	if p.cmd != nil {
-		p.cmd.Wait()
-	}
-}
-
 func getExitPipe(path string) (*os.File, error) {
 	if err := unix.Mkfifo(path, 0755); err != nil && !os.IsExist(err) {
 		return nil, err
@@ -251,4 +256,86 @@ func getControlPipe(path string) (*os.File, error) {
 // Signal sends the provided signal to the process
 func (p *process) Signal(s os.Signal) error {
 	return syscall.Kill(p.pid, s.(syscall.Signal))
+}
+
+func (p *process) startCmd(cmd *exec.Cmd) error {
+	if err := cmd.Start(); err != nil {
+		if exErr, ok := err.(*exec.Error); ok {
+			if exErr.Err == exec.ErrNotFound || exErr.Err == os.ErrNotExist {
+				return fmt.Errorf("%s not installed on system", p.container.shim)
+			}
+		}
+		return err
+	}
+	if err := p.waitForStart(cmd); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *process) waitForStart(cmd *exec.Cmd) error {
+	wc := make(chan error, 1)
+	go func() {
+		for {
+			if _, err := p.getPidFromFile(); err != nil {
+				if os.IsNotExist(err) || err == errInvalidPidInt {
+					alive, err := isAlive(cmd)
+					if err != nil {
+						wc <- err
+						return
+					}
+					if !alive {
+						// runc could have failed to run the container so lets get the error
+						// out of the logs or the shim could have encountered an error
+						messages, err := readLogMessages(filepath.Join(p.root, "shim-log.json"))
+						if err != nil && !os.IsNotExist(err) {
+							wc <- err
+							return
+						}
+						for _, m := range messages {
+							if m.Level == "error" {
+								wc <- fmt.Errorf("shim error: %v", m.Msg)
+								return
+							}
+						}
+						// no errors reported back from shim, check for runc/runtime errors
+						messages, err = readLogMessages(filepath.Join(p.root, "log.json"))
+						if err != nil {
+							if os.IsNotExist(err) {
+								err = ErrContainerNotStarted
+							}
+							wc <- err
+							return
+						}
+						for _, m := range messages {
+							if m.Level == "error" {
+								wc <- fmt.Errorf("oci runtime error: %v", m.Msg)
+								return
+							}
+						}
+						wc <- ErrContainerNotStarted
+						return
+					}
+					time.Sleep(15 * time.Millisecond)
+					continue
+				}
+				wc <- err
+				return
+			}
+			// the pid file was read successfully
+			wc <- nil
+			return
+		}
+	}()
+	select {
+	case err := <-wc:
+		if err != nil {
+			return err
+		}
+		return nil
+	case <-time.After(p.container.timeout):
+		cmd.Process.Kill()
+		cmd.Wait()
+		return ErrContainerStartTimeout
+	}
 }

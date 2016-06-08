@@ -6,13 +6,13 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/specs"
+	"github.com/docker/containerd/subreaper/exec"
 	ocs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -114,7 +114,7 @@ func New(opts ContainerOpts) (Container, error) {
 		id:          opts.ID,
 		bundle:      opts.Bundle,
 		labels:      opts.Labels,
-		processes:   make(map[string]*process),
+		processes:   make(map[string]Process),
 		runtime:     opts.Runtime,
 		runtimeArgs: opts.RuntimeArgs,
 		shim:        opts.Shim,
@@ -162,7 +162,7 @@ func Load(root, id string, timeout time.Duration) (Container, error) {
 		runtimeArgs: s.RuntimeArgs,
 		shim:        s.Shim,
 		noPivotRoot: s.NoPivotRoot,
-		processes:   make(map[string]*process),
+		processes:   make(map[string]Process),
 		timeout:     timeout,
 	}
 	dirs, err := ioutil.ReadDir(filepath.Join(root, id))
@@ -209,7 +209,7 @@ type container struct {
 	runtime     string
 	runtimeArgs []string
 	shim        string
-	processes   map[string]*process
+	processes   map[string]Process
 	labels      []string
 	oomFds      []int
 	noPivotRoot bool
@@ -389,13 +389,6 @@ func (c *container) Start(checkpointPath string, s Stdio) (Process, error) {
 	if err := os.Mkdir(processRoot, 0755); err != nil {
 		return nil, err
 	}
-	cmd := exec.Command(c.shim,
-		c.id, c.bundle, c.runtime,
-	)
-	cmd.Dir = processRoot
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
-	}
 	spec, err := c.readSpec()
 	if err != nil {
 		return nil, err
@@ -409,13 +402,14 @@ func (c *container) Start(checkpointPath string, s Stdio) (Process, error) {
 		spec:        spec,
 		processSpec: specs.ProcessSpec(spec.Process),
 	}
-	p, err := newProcess(config)
+	p, err := c.newProcess(config)
 	if err != nil {
 		return nil, err
 	}
-	if err := c.startCmd(InitProcessID, cmd, p); err != nil {
+	if err := p.Start(); err != nil {
 		return nil, err
 	}
+	c.processes[InitProcessID] = p
 	return p, nil
 }
 
@@ -429,13 +423,6 @@ func (c *container) Exec(pid string, pspec specs.ProcessSpec, s Stdio) (pp Proce
 			c.RemoveProcess(pid)
 		}
 	}()
-	cmd := exec.Command(c.shim,
-		c.id, c.bundle, c.runtime,
-	)
-	cmd.Dir = processRoot
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
-	}
 	spec, err := c.readSpec()
 	if err != nil {
 		return nil, err
@@ -449,31 +436,15 @@ func (c *container) Exec(pid string, pspec specs.ProcessSpec, s Stdio) (pp Proce
 		spec:        spec,
 		stdio:       s,
 	}
-	p, err := newProcess(config)
+	p, err := c.newProcess(config)
 	if err != nil {
 		return nil, err
 	}
-	if err := c.startCmd(pid, cmd, p); err != nil {
+	if err := p.Start(); err != nil {
 		return nil, err
 	}
-	return p, nil
-}
-
-func (c *container) startCmd(pid string, cmd *exec.Cmd, p *process) error {
-	p.cmd = cmd
-	if err := cmd.Start(); err != nil {
-		if exErr, ok := err.(*exec.Error); ok {
-			if exErr.Err == exec.ErrNotFound || exErr.Err == os.ErrNotExist {
-				return fmt.Errorf("%s not installed on system", c.shim)
-			}
-		}
-		return err
-	}
-	if err := c.waitForStart(p, cmd); err != nil {
-		return err
-	}
 	c.processes[pid] = p
-	return nil
+	return p, nil
 }
 
 func hostIDFromMap(id uint32, mp []ocs.IDMapping) int {
@@ -547,83 +518,20 @@ func (c *container) writeEventFD(root string, cfd, efd int) error {
 	return err
 }
 
+func (c *container) newProcess(config *processConfig) (Process, error) {
+	if c.shim == "" {
+		return newDirectProcess(config)
+	}
+	return newProcess(config)
+}
+
 type waitArgs struct {
 	pid int
 	err error
 }
 
-func (c *container) waitForStart(p *process, cmd *exec.Cmd) error {
-	wc := make(chan error, 1)
-	go func() {
-		for {
-			if _, err := p.getPidFromFile(); err != nil {
-				if os.IsNotExist(err) || err == errInvalidPidInt {
-					alive, err := isAlive(cmd)
-					if err != nil {
-						wc <- err
-						return
-					}
-					if !alive {
-						// runc could have failed to run the container so lets get the error
-						// out of the logs or the shim could have encountered an error
-						messages, err := readLogMessages(filepath.Join(p.root, "shim-log.json"))
-						if err != nil {
-							wc <- err
-							return
-						}
-						for _, m := range messages {
-							if m.Level == "error" {
-								wc <- fmt.Errorf("shim error: %v", m.Msg)
-								return
-							}
-						}
-						// no errors reported back from shim, check for runc/runtime errors
-						messages, err = readLogMessages(filepath.Join(p.root, "log.json"))
-						if err != nil {
-							if os.IsNotExist(err) {
-								err = ErrContainerNotStarted
-							}
-							wc <- err
-							return
-						}
-						for _, m := range messages {
-							if m.Level == "error" {
-								wc <- fmt.Errorf("oci runtime error: %v", m.Msg)
-								return
-							}
-						}
-						wc <- ErrContainerNotStarted
-						return
-					}
-					time.Sleep(15 * time.Millisecond)
-					continue
-				}
-				wc <- err
-				return
-			}
-			// the pid file was read successfully
-			wc <- nil
-			return
-		}
-	}()
-	select {
-	case err := <-wc:
-		if err != nil {
-			return err
-		}
-		return nil
-	case <-time.After(c.timeout):
-		cmd.Process.Kill()
-		cmd.Wait()
-		return ErrContainerStartTimeout
-	}
-}
-
 // isAlive checks if the shim that launched the container is still alive
 func isAlive(cmd *exec.Cmd) (bool, error) {
-	if _, err := syscall.Wait4(cmd.Process.Pid, nil, syscall.WNOHANG, nil); err == nil {
-		return true, nil
-	}
 	if err := syscall.Kill(cmd.Process.Pid, 0); err != nil {
 		if err == syscall.ESRCH {
 			return false, nil

@@ -61,8 +61,8 @@ func (p *testProcess) State() runtime.State {
 	return runtime.Running
 }
 
-func (p *testProcess) Wait() {
-
+func (p *testProcess) Start() error {
+	return nil
 }
 
 func TestSortProcesses(t *testing.T) {

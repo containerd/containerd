@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -21,6 +22,10 @@ import (
 	"github.com/docker/containerd/api/grpc/types"
 	utils "github.com/docker/containerd/testutils"
 	"github.com/go-check/check"
+)
+
+var (
+	ShimFlag = flag.String("containerd.shim", "containerd-shim", "containerd shim to use")
 )
 
 func Test(t *testing.T) {
@@ -131,6 +136,7 @@ func (cs *ContainerdSuite) RestartDaemon(kill bool) error {
 	cs.StopDaemon(kill)
 
 	cd := exec.Command("containerd", "--debug",
+		"--shim", *ShimFlag,
 		"--state-dir", cs.stateDir,
 		"--listen", cs.grpcSocket,
 		"--metrics-interval", "0m0s",
