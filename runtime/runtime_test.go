@@ -165,7 +165,7 @@ func benchmarkStartContainer(b *testing.B, c Container, s Stdio, bundleName stri
 		b.Fatalf("Error starting container %v", err)
 	}
 
-	kill := exec.Command("runc", "kill", bundleName, "KILL")
+	kill := exec.Command(c.Runtime(), "kill", bundleName, "KILL")
 	kill.Run()
 
 	// wait for kill to finish. selected wait time is arbitrary
