@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"testing"
 	"time"
+	"flag"
 
 	utils "github.com/docker/containerd/testutils"
 )
@@ -16,6 +17,7 @@ import (
 var (
 	devNull = "/dev/null"
 	stdin   io.WriteCloser
+	runtimeTool = flag.String("runtime", "runc", "Runtime to use for this test")
 )
 
 // Create containerd state and oci bundles directory
@@ -145,7 +147,7 @@ func BenchmarkBusyboxSh(b *testing.B) {
 			Root:    utils.StateDir,
 			ID:      bundleName,
 			Bundle:  filepath.Join(wd, bundlePath),
-			Runtime: "runc",
+			Runtime: *runtimeTool,
 			Shim:    "containerd-shim",
 			Timeout: 15 * time.Second,
 		})
