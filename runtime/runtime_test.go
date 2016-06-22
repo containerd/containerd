@@ -32,9 +32,9 @@ func setup() error {
 	return nil
 }
 
-// Creates the bundleDir with rootfs, io fifo dir and a default spec.
+// Creates the bundleDir with rootfs, io fifo dir and a spec file.
 // On success, returns the bundlePath
-func setupBundle(bundleName string) (string, error) {
+func setupBundle(bundleName string, processArgs []string) (string, error) {
 	bundlePath := filepath.Join(utils.BundlesRoot, bundleName)
 	if err := os.MkdirAll(bundlePath, 0755); err != nil {
 		fmt.Println("Unable to create bundlePath due to ", err)
@@ -47,7 +47,7 @@ func setupBundle(bundleName string) (string, error) {
 		return "", err
 	}
 
-	if err := utils.GenerateReferenceSpecs(bundlePath); err != nil {
+	if err := utils.GenerateReferenceSpecs(bundlePath, processArgs); err != nil {
 		fmt.Println("Unable to generate OCI reference spec: ", err)
 		return "", err
 	}
@@ -133,7 +133,7 @@ func BenchmarkBusyboxSh(b *testing.B) {
 	defer teardown()
 
 	for n := 0; n < b.N; n++ {
-		bundlePath, err := setupBundle(bundleName)
+		bundlePath, err := setupBundle(bundleName, []string{"sh"})
 		if err != nil {
 			return
 		}
