@@ -1,6 +1,7 @@
 package supervisor
 
 import (
+	"os"
 	"sync"
 	"time"
 
@@ -39,20 +40,27 @@ type worker struct {
 // Start runs a loop in charge of starting new containers
 func (w *worker) Start() {
 	defer w.wg.Done()
+	sendDeleteEvent := func(id string, p runtime.Process, errCh chan error, err error) {
+		if p != nil {
+			p.Signal(os.Kill)
+			p.Wait()
+		}
+		logrus.WithFields(logrus.Fields{
+			"error": err,
+			"id":    id,
+		}).Error("containerd: start container")
+		errCh <- err
+		evt := &DeleteTask{
+			ID:      id,
+			NoEvent: true,
+		}
+		w.s.SendTask(evt)
+	}
 	for t := range w.s.startTasks {
 		started := time.Now()
 		process, err := t.Container.Start(t.CheckpointPath, runtime.NewStdio(t.Stdin, t.Stdout, t.Stderr))
 		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"error": err,
-				"id":    t.Container.ID(),
-			}).Error("containerd: start container")
-			t.Err <- err
-			evt := &DeleteTask{
-				ID:      t.Container.ID(),
-				NoEvent: true,
-			}
-			w.s.SendTask(evt)
+			sendDeleteEvent(t.Container.ID(), process, t.Err, err)
 			continue
 		}
 		if err := w.s.monitor.MonitorOOM(t.Container); err != nil && err != runtime.ErrContainerExited {
@@ -62,9 +70,13 @@ func (w *worker) Start() {
 		}
 		if err := w.s.monitorProcess(process); err != nil {
 			logrus.WithField("error", err).Error("containerd: add process to monitor")
+			sendDeleteEvent(t.Container.ID(), process, t.Err, err)
+			continue
 		}
 		if err := process.Start(); err != nil {
 			logrus.WithField("error", err).Error("containerd: start init process")
+			sendDeleteEvent(t.Container.ID(), process, t.Err, err)
+			continue
 		}
 		ContainerStartTimer.UpdateSince(started)
 		t.Err <- nil

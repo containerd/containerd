@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -15,12 +14,6 @@ import (
 
 func writeMessage(f *os.File, level string, err error) {
 	fmt.Fprintf(f, `{"level": "%s","msg": "%s"}`, level, err)
-}
-
-type controlMessage struct {
-	Type   int
-	Width  int
-	Height int
 }
 
 // containerd-shim is a small shim that sits in front of a runtime implementation
@@ -88,14 +81,54 @@ func start(log *os.File) error {
 		p.delete()
 		return err
 	}
-	msgC := make(chan controlMessage, 32)
+	msgE := make(chan error, 1)
 	go func() {
 		for {
-			var m controlMessage
-			if _, err := fmt.Fscanf(control, "%d %d %d\n", &m.Type, &m.Width, &m.Height); err != nil {
+			var c int
+			if _, err := fmt.Fscanf(control, "%d\n", &c); err != nil {
 				continue
 			}
-			msgC <- m
+			switch c {
+			case 0:
+				// close stdin
+				if p.stdinCloser != nil {
+					p.stdinCloser.Close()
+				}
+			case 1:
+				var w, h int
+				fmt.Fscanf(control, "%d %d\n", &w, &h)
+				if p.console == nil {
+					continue
+				}
+				ws := term.Winsize{
+					Width:  uint16(w),
+					Height: uint16(h),
+				}
+				term.SetWinsize(p.console.Fd(), &ws)
+			case 2:
+				var path string
+				_, err := fmt.Fscanf(control, "%s\n", &path)
+				if err != nil {
+					msgE <- err
+					return
+				}
+
+				s, err := os.OpenFile(path, syscall.O_WRONLY, 0)
+				if err != nil {
+					msgE <- err
+					return
+				}
+
+				// tell runtime to execute the init process
+				if err := p.start(); err != nil {
+					p.delete()
+					p.Wait()
+					s.Close()
+					msgE <- err
+					return
+				}
+				s.Close()
+			}
 		}
 	}()
 	var exitShim bool
@@ -115,35 +148,12 @@ func start(log *os.File) error {
 			}
 			// runtime has exited so the shim can also exit
 			if exitShim {
-				ioutil.WriteFile(fmt.Sprintf("/tmp/shim-delete-%d", p.pid()), []byte("deleting"), 0600)
 				p.delete()
 				p.Wait()
 				return nil
 			}
-		case msg := <-msgC:
-			switch msg.Type {
-			case 0:
-				// close stdin
-				if p.stdinCloser != nil {
-					p.stdinCloser.Close()
-				}
-			case 1:
-				if p.console == nil {
-					continue
-				}
-				ws := term.Winsize{
-					Width:  uint16(msg.Width),
-					Height: uint16(msg.Height),
-				}
-				term.SetWinsize(p.console.Fd(), &ws)
-			case 2:
-				// tell runtime to execute the init process
-				if err := p.start(); err != nil {
-					p.delete()
-					p.Wait()
-					return err
-				}
-			}
+		case err := <-msgE:
+			return err
 		}
 	}
 	return nil
