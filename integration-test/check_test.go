@@ -192,7 +192,7 @@ func (cs *ContainerdSuite) SetUpSuite(c *check.C) {
 	// Create our output directory
 	cs.outputDir = fmt.Sprintf(utils.OutputDirFormat, time.Now().Format("2006-01-02_150405.000000"))
 
-	cs.stateDir = filepath.Join(cs.outputDir, "containerd-master")
+	cs.stateDir = filepath.Join(cs.cwd, cs.outputDir, "containerd-master")
 	if err := os.MkdirAll(cs.stateDir, 0755); err != nil {
 		c.Fatalf("Unable to created output directory '%s': %v", cs.stateDir, err)
 	}

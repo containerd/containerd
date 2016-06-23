@@ -38,6 +38,8 @@ const (
 	StateFile = "state.json"
 	// ControlFile holds the name of the pipe used to control the shim
 	ControlFile = "control"
+	// StartSyncFile holds the name of the pipe used to sync with the `start` oci command
+	StartSyncFile = "startSync"
 	// InitProcessID holds the special ID used for the very first
 	// container's process
 	InitProcessID = "init"

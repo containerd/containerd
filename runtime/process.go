@@ -67,6 +67,7 @@ func newProcess(config *processConfig) (*process, error) {
 		container: config.c,
 		spec:      config.processSpec,
 		stdio:     config.stdio,
+		exitCh:    make(chan struct{}, 2),
 	}
 	uid, gid, err := getRootIDs(config.spec)
 	if err != nil {
@@ -148,6 +149,7 @@ type process struct {
 	spec        specs.ProcessSpec
 	stdio       Stdio
 	cmd         *exec.Cmd
+	exitCh      chan struct{}
 }
 
 func (p *process) ID() string {
@@ -168,12 +170,12 @@ func (p *process) ExitFD() int {
 }
 
 func (p *process) CloseStdin() error {
-	_, err := fmt.Fprintf(p.controlPipe, "%d %d %d\n", 0, 0, 0)
+	_, err := fmt.Fprintf(p.controlPipe, "%d\n", 0)
 	return err
 }
 
 func (p *process) Resize(w, h int) error {
-	_, err := fmt.Fprintf(p.controlPipe, "%d %d %d\n", 1, w, h)
+	_, err := fmt.Fprintf(p.controlPipe, "%d\n%d %d\n", 1, w, h)
 	return err
 }
 
@@ -232,6 +234,8 @@ func (p *process) getPidFromFile() (int, error) {
 func (p *process) Wait() {
 	if p.cmd != nil {
 		p.cmd.Wait()
+		p.exitCh <- struct{}{}
+		p.cmd = nil
 	}
 }
 
@@ -260,8 +264,36 @@ func (p *process) Signal(s os.Signal) error {
 // This should only be called on the process with ID "init"
 func (p *process) Start() error {
 	if p.ID() == InitProcessID {
-		_, err := fmt.Fprintf(p.controlPipe, "%d %d %d\n", 2, 0, 0)
-		return err
+		pipe := filepath.Join(p.root, StartSyncFile)
+		if err := unix.Mkfifo(pipe, 0755); err != nil && !os.IsExist(err) {
+			return err
+		}
+		_, err := fmt.Fprintf(p.controlPipe, "%d\n%s\n", 2, pipe)
+		if err != nil {
+			return err
+		}
+		c := make(chan error)
+		go func() {
+			f, err := os.OpenFile(pipe, syscall.O_RDONLY, 0)
+			if err != nil {
+				c <- fmt.Errorf("start sync pipe: %s", err.Error())
+			}
+			b := make([]byte, 1)
+			f.Read(b)
+			f.Close()
+			os.Remove(pipe)
+			c <- nil
+		}()
+		select {
+		case err = <-c:
+			return err
+		case <-p.exitCh:
+			if f, err := os.OpenFile(pipe, syscall.O_RDWR, 0); err == nil {
+				f.Close()
+			}
+			es, _ := p.ExitStatus()
+			return fmt.Errorf("start sync: process died with exit code %d", es)
+		}
 	}
 	return nil
 }
