@@ -119,6 +119,61 @@ func teardown() {
 	os.RemoveAll(utils.BundlesRoot)
 }
 
+func BenchmarkBusyboxCpu(b *testing.B) {
+	bundleName := "busybox-cpu"
+
+	wd := utils.GetTestOutDir()
+	if err := os.Chdir(wd); err != nil {
+		b.Fatalf("Could not change working directory: %v", err)
+	}
+
+	if err := setup(); err != nil {
+		b.Fatalf("Error setting up test: %v", err)
+	}
+	defer teardown()
+
+	bundlePath, err := setupBundle(bundleName,
+		[]string{"sh", "-c", "dd if=/dev/urandom bs=1M count=256 | md5sum"})
+	if err != nil {
+		return
+	}
+
+	s, err := setupStdio(wd, bundlePath, bundleName)
+	if err != nil {
+		return
+	}
+
+	c, err := New(ContainerOpts{
+		Root:    utils.StateDir,
+		ID:      bundleName,
+		Bundle:  filepath.Join(wd, bundlePath),
+		Runtime: *runtimeTool,
+		Shim:    "containerd-shim",
+		Timeout: 15 * time.Second,
+	})
+
+	if err != nil {
+		b.Fatalf("Error creating a New container: ", err)
+	}
+
+	p, err := c.Start("", s);
+	if err != nil {
+		b.Fatalf("Error starting container %v", err)
+	}
+
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		err = p.Start()
+		if err != nil {
+			b.Fatalf("Error starting process %v", err)
+		}
+		p.Wait()
+	}
+
+	teardownBundle(bundleName)
+}
+
 func BenchmarkBusyboxSh(b *testing.B) {
 	bundleName := "busybox-sh"
 
