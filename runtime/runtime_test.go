@@ -32,9 +32,9 @@ func setup() error {
 	return nil
 }
 
-// Creates the bundleDir with rootfs, io fifo dir and a default spec.
+// Creates the bundleDir with rootfs, io fifo dir and a spec file.
 // On success, returns the bundlePath
-func setupBundle(bundleName string) (string, error) {
+func setupBundle(bundleName string, processArgs []string) (string, error) {
 	bundlePath := filepath.Join(utils.BundlesRoot, bundleName)
 	if err := os.MkdirAll(bundlePath, 0755); err != nil {
 		fmt.Println("Unable to create bundlePath due to ", err)
@@ -47,7 +47,7 @@ func setupBundle(bundleName string) (string, error) {
 		return "", err
 	}
 
-	if err := utils.GenerateReferenceSpecs(bundlePath); err != nil {
+	if err := utils.GenerateReferenceSpecs(bundlePath, processArgs); err != nil {
 		fmt.Println("Unable to generate OCI reference spec: ", err)
 		return "", err
 	}
@@ -119,6 +119,61 @@ func teardown() {
 	os.RemoveAll(utils.BundlesRoot)
 }
 
+func BenchmarkBusyboxCpu(b *testing.B) {
+	bundleName := "busybox-cpu"
+
+	wd := utils.GetTestOutDir()
+	if err := os.Chdir(wd); err != nil {
+		b.Fatalf("Could not change working directory: %v", err)
+	}
+
+	if err := setup(); err != nil {
+		b.Fatalf("Error setting up test: %v", err)
+	}
+	defer teardown()
+
+	bundlePath, err := setupBundle(bundleName,
+		[]string{"sh", "-c", "dd if=/dev/urandom bs=1M count=256 | md5sum"})
+	if err != nil {
+		return
+	}
+
+	s, err := setupStdio(wd, bundlePath, bundleName)
+	if err != nil {
+		return
+	}
+
+	c, err := New(ContainerOpts{
+		Root:    utils.StateDir,
+		ID:      bundleName,
+		Bundle:  filepath.Join(wd, bundlePath),
+		Runtime: *runtimeTool,
+		Shim:    "containerd-shim",
+		Timeout: 15 * time.Second,
+	})
+
+	if err != nil {
+		b.Fatalf("Error creating a New container: ", err)
+	}
+
+	p, err := c.Start("", s);
+	if err != nil {
+		b.Fatalf("Error starting container %v", err)
+	}
+
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		err = p.Start()
+		if err != nil {
+			b.Fatalf("Error starting process %v", err)
+		}
+		p.Wait()
+	}
+
+	teardownBundle(bundleName)
+}
+
 func BenchmarkBusyboxSh(b *testing.B) {
 	bundleName := "busybox-sh"
 
@@ -133,7 +188,7 @@ func BenchmarkBusyboxSh(b *testing.B) {
 	defer teardown()
 
 	for n := 0; n < b.N; n++ {
-		bundlePath, err := setupBundle(bundleName)
+		bundlePath, err := setupBundle(bundleName, []string{"sh"})
 		if err != nil {
 			return
 		}
