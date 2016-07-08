@@ -30,6 +30,8 @@ func (s *Supervisor) start(t *StartTask) error {
 	rtArgs := s.runtimeArgs
 	if t.Runtime != "" {
 		rt = t.Runtime
+	}
+	if len(t.RuntimeArgs) != 0 {
 		rtArgs = t.RuntimeArgs
 	}
 	container, err := runtime.New(runtime.ContainerOpts{
