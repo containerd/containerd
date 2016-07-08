@@ -364,8 +364,6 @@ func (s *Supervisor) handleTask(i Task) {
 		err = s.delete(t)
 	case *ExitTask:
 		err = s.exit(t)
-	case *ExecExitTask:
-		err = s.execExit(t)
 	case *GetContainersTask:
 		err = s.getContainers(t)
 	case *SignalTask:
