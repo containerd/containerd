@@ -318,21 +318,26 @@ func (s *apiServer) Events(r *types.EventsRequest, stream types.API_EventsServer
 		}
 		t = from
 	}
-	events := s.sv.Events(t)
+	if r.StoredOnly && t.IsZero() {
+		return fmt.Errorf("invalid parameter: StoredOnly cannot be specified without setting a valid Timestamp")
+	}
+	events := s.sv.Events(t, r.StoredOnly, r.Id)
 	defer s.sv.Unsubscribe(events)
 	for e := range events {
 		tsp, err := ptypes.TimestampProto(e.Timestamp)
 		if err != nil {
 			return err
 		}
-		if err := stream.Send(&types.Event{
-			Id:        e.ID,
-			Type:      e.Type,
-			Timestamp: tsp,
-			Pid:       e.PID,
-			Status:    uint32(e.Status),
-		}); err != nil {
-			return err
+		if r.Id == "" || e.ID == r.Id {
+			if err := stream.Send(&types.Event{
+				Id:        e.ID,
+				Type:      e.Type,
+				Timestamp: tsp,
+				Pid:       e.PID,
+				Status:    uint32(e.Status),
+			}); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
