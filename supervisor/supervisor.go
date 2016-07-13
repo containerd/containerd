@@ -193,11 +193,6 @@ type Event struct {
 // on container events
 func (s *Supervisor) Events(from time.Time, storedOnly bool, id string) chan Event {
 	c := make(chan Event, defaultBufferSize)
-	if storedOnly {
-		defer s.Unsubscribe(c)
-	}
-	s.subscriberLock.Lock()
-	defer s.subscriberLock.Unlock()
 	if !from.IsZero() {
 		// replay old event
 		s.eventLock.Lock()
@@ -214,8 +209,10 @@ func (s *Supervisor) Events(from time.Time, storedOnly bool, id string) chan Eve
 	if storedOnly {
 		close(c)
 	} else {
+		s.subscriberLock.Lock()
 		EventSubscriberCounter.Inc(1)
 		s.subscribers[c] = struct{}{}
+		s.subscriberLock.Unlock()
 	}
 	return c
 }
