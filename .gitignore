@@ -5,3 +5,4 @@ ctr/ctr
 hack/benchmark
 *.exe
 integration-test/test-artifacts
+vendor/src/github.com/docker/containerd
