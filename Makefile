@@ -25,11 +25,14 @@ TESTBENCH_BUNDLE_DIR := $(TESTBENCH_ARTIFACTS_DIR)/archives
 
 DOCKER_IMAGE := containerd-dev$(if $(GIT_BRANCH),:$(GIT_BRANCH))
 DOCKER_RUN := docker run --privileged --rm -i $(DOCKER_FLAGS) "$(DOCKER_IMAGE)"
+CONTAINERD_LINK := vendor/src/github.com/docker/containerd
 
-
-export GOPATH:=$(CURDIR)/vendor:$(GOPATH)
+export GOPATH:=$(CURDIR)/vendor
 
 all: client daemon shim
+
+$(CONTAINERD_LINK):
+	ln -sf $(CURDIR) $(CONTAINERD_LINK)
 
 static: client-static daemon-static shim-static
 
@@ -38,23 +41,24 @@ bin:
 
 clean:
 	rm -rf bin && rm -rf output
+	rm -rf $(CONTAINERD_LINK)
 
-client: bin
+client: $(CONTAINERD_LINK) bin
 	cd ctr && go build -ldflags "${LDFLAGS}" -o ../bin/ctr
 
-client-static:
+client-static: $(CONTAINERD_LINK) 
 	cd ctr && go build -ldflags "-w -extldflags -static ${LDFLAGS}" -tags "$(BUILDTAGS)" -o ../bin/ctr
 
-daemon: bin
+daemon: $(CONTAINERD_LINK)  bin
 	cd containerd && go build -ldflags "${LDFLAGS}"  -tags "$(BUILDTAGS)" -o ../bin/containerd
 
-daemon-static:
+daemon-static: $(CONTAINERD_LINK) 
 	cd containerd && go build -ldflags "-w -extldflags -static ${LDFLAGS}" -tags "$(BUILDTAGS)" -o ../bin/containerd
 
-shim: bin
+shim: $(CONTAINERD_LINK) bin
 	cd containerd-shim && go build -tags "$(BUILDTAGS)" -ldflags "-w" -o ../bin/containerd-shim
 
-shim-static:
+shim-static: $(CONTAINERD_LINK) 
 	cd containerd-shim && go build -ldflags "-w -extldflags -static ${LDFLAGS}" -tags "$(BUILDTAGS)" -o ../bin/containerd-shim
 
 $(TESTBENCH_BUNDLE_DIR)/busybox.tar:
