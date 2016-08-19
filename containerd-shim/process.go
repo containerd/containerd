@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/docker/containerd/osutils"
 	"github.com/docker/containerd/specs"
 )
 
@@ -76,6 +77,12 @@ func newProcess(id, bundle, runtimeName string) (*process, error) {
 	if err != nil {
 		return nil, err
 	}
+	if !s.Exec {
+		// set the shim as the subreaper for all orphaned processes created by the container
+		if err := osutils.SetSubreaper(1); err != nil {
+			return nil, err
+		}
+	}
 	p.state = s
 	if s.CheckpointPath != "" {
 		cpt, err := loadCheckpoint(s.CheckpointPath)
@@ -129,7 +136,7 @@ func (p *process) create() error {
 	}, p.state.RuntimeArgs...)
 	if p.state.Exec {
 		args = append(args, "exec",
-			"-d",
+			"--no-subreaper",
 			"--process", filepath.Join(cwd, "process.json"),
 			"--console", p.consolePath,
 		)
@@ -185,6 +192,10 @@ func (p *process) create() error {
 			}
 		}
 		return err
+	}
+	if p.state.Exec {
+		p.containerPid = cmd.Process.Pid
+		return nil
 	}
 	p.stdio.stdout.Close()
 	p.stdio.stderr.Close()
@@ -347,6 +358,9 @@ func (p *process) initializeIO(rootuid int) (i *IO, err error) {
 	return i, nil
 }
 func (p *process) Close() error {
+	if c := p.stdinCloser; c != nil {
+		c.Close()
+	}
 	return p.stdio.Close()
 }
 

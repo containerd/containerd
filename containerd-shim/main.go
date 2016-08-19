@@ -59,10 +59,6 @@ func start(log *os.File) error {
 	// or if runtime exits before we hit the handler
 	signals := make(chan os.Signal, 2048)
 	signal.Notify(signals)
-	// set the shim as the subreaper for all orphaned processes created by the container
-	if err := osutils.SetSubreaper(1); err != nil {
-		return err
-	}
 	// open the exit pipe
 	f, err := os.OpenFile("exit", syscall.O_WRONLY, 0)
 	if err != nil {
@@ -115,7 +111,7 @@ func start(log *os.File) error {
 			// runtime has exited so the shim can also exit
 			if exitShim {
 				// Let containerd take care of calling the runtime delete
-				f.Close()
+				p.Close()
 				p.Wait()
 				return nil
 			}
