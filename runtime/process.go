@@ -48,6 +48,8 @@ type Process interface {
 	State() State
 	// Wait reaps the shim process if avaliable
 	Wait()
+	SetExited()
+	WaitExit()
 }
 
 type processConfig struct {
@@ -71,6 +73,7 @@ func newProcess(config *processConfig) (*process, error) {
 		cmdDoneCh: make(chan struct{}),
 		state:     Running,
 	}
+	p.wg.Add(1)
 	uid, gid, err := getRootIDs(config.spec)
 	if err != nil {
 		return nil, err
@@ -143,6 +146,7 @@ func loadProcess(root, id string, c *container, s *ProcessState) (*process, erro
 			p.controlPipe = control
 
 			p.state = Running
+			p.wg.Add(1)
 			return p, nil
 		}
 		return nil, err
@@ -164,6 +168,7 @@ type process struct {
 	cmdDoneCh   chan struct{}
 	state       State
 	stateLock   sync.Mutex
+	wg          sync.WaitGroup
 }
 
 func (p *process) ID() string {
@@ -251,6 +256,14 @@ func (p *process) Wait() {
 	if p.cmdDoneCh != nil {
 		<-p.cmdDoneCh
 	}
+}
+
+func (p *process) WaitExit() {
+	p.wg.Wait()
+}
+
+func (p *process) SetExited() {
+	p.wg.Done()
 }
 
 func getExitPipe(path string) (*os.File, error) {

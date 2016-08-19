@@ -113,6 +113,9 @@ func start(log *os.File) error {
 				// Let containerd take care of calling the runtime delete
 				p.Close()
 				p.Wait()
+
+				p.cmd.Wait()
+				f.Close()
 				return nil
 			}
 		case msg := <-msgC:

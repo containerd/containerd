@@ -10,11 +10,12 @@ import (
 // DeleteTask holds needed parameters to remove a container
 type DeleteTask struct {
 	baseTask
-	ID      string
-	Status  int
-	PID     string
-	NoEvent bool
-	Process runtime.Process
+	ID        string
+	Status    int
+	PID       string
+	NoEvent   bool
+	Process   runtime.Process
+	Container runtime.Container
 }
 
 func (s *Supervisor) delete(t *DeleteTask) error {

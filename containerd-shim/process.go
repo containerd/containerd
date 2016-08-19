@@ -65,6 +65,7 @@ type process struct {
 	consolePath    string
 	state          *processState
 	runtime        string
+	cmd            *exec.Cmd
 }
 
 func newProcess(id, bundle, runtimeName string) (*process, error) {
@@ -184,6 +185,7 @@ func (p *process) create() error {
 	cmd.Stderr = p.stdio.stderr
 	// Call out to setPDeathSig to set SysProcAttr as elements are platform specific
 	cmd.SysProcAttr = setPDeathSig()
+	p.cmd = cmd
 
 	if err := cmd.Start(); err != nil {
 		if exErr, ok := err.(*exec.Error); ok {
