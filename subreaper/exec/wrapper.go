@@ -59,6 +59,9 @@ func (c *Cmd) Start() error {
 }
 
 func (c *Cmd) Wait() error {
+	// c.Cmd.Wait() will always error because there is no child process anymore
+	// This is called to ensure that the streams are closed and cleaned up properly
+	defer c.Cmd.Wait()
 	if c.sub == nil {
 		return c.err
 	}
