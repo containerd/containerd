@@ -111,11 +111,12 @@ func start(log *os.File) error {
 			// runtime has exited so the shim can also exit
 			if exitShim {
 				// Let containerd take care of calling the runtime delete
-				p.Close()
-				p.Wait()
-
-				p.cmd.Wait()
 				f.Close()
+				p.Close()
+
+				p.Wait()
+				p.cmd.Wait()
+				p.delete()
 				return nil
 			}
 		case msg := <-msgC:
