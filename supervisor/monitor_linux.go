@@ -116,6 +116,7 @@ func (m *Monitor) start() {
 						logrus.WithField("error", err).Error("containerd: close process IO")
 					}
 					EpollFdCounter.Dec(1)
+					t.SetExited()
 					m.exits <- t
 				}
 			case runtime.OOM:

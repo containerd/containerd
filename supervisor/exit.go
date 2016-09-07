@@ -46,16 +46,31 @@ func (s *Supervisor) exit(t *ExitTask) error {
 	}
 	container := proc.Container()
 	ne := &DeleteTask{
-		ID:      container.ID(),
-		Status:  status,
-		PID:     proc.ID(),
-		Process: proc,
+		ID:        container.ID(),
+		Status:    status,
+		PID:       proc.ID(),
+		Process:   proc,
+		Container: container,
 	}
-	s.delete(ne)
+	go s.waitExecProcesses(ne)
 
 	ExitProcessTimer.UpdateSince(start)
 
 	return nil
+}
+
+func (s *Supervisor) waitExecProcesses(ne *DeleteTask) {
+	// wait for all exec processes to stop before deleting the container
+	procs, err := ne.Container.Processes()
+	if err != nil {
+		logrus.WithField("error", err).Error("containerd: list container processes")
+	}
+	for _, p := range procs {
+		if p.ID() != runtime.InitProcessID {
+			p.WaitExit()
+		}
+	}
+	s.SendTask(ne)
 }
 
 // ExecExitTask holds needed parameters to execute the exec exit task

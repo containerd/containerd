@@ -66,6 +66,13 @@ func (p *testProcess) Close() error {
 	return nil
 }
 
+func (p *testProcess) WaitExit() {
+
+}
+
+func (p *testProcess) SetExited() {
+}
+
 func (p *testProcess) State() runtime.State {
 	return runtime.Running
 }
