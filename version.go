@@ -9,7 +9,7 @@ const VersionMajor = 0
 const VersionMinor = 2
 
 // VersionPatch holds the release patch number
-const VersionPatch = 3
+const VersionPatch = 4
 
 // Version holds the combination of major minor and patch as a string
 // of format Major.Minor.Patch

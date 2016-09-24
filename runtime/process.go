@@ -36,7 +36,7 @@ type Process interface {
 	ExitFD() int
 	// ExitStatus returns the exit status of the process or an error if it
 	// has not exited
-	ExitStatus() (int, error)
+	ExitStatus() (uint32, error)
 	// Spec returns the process spec that created the process
 	Spec() specs.ProcessSpec
 	// Signal sends the provided signal to the process
@@ -228,24 +228,31 @@ func (p *process) Resize(w, h int) error {
 	return err
 }
 
-func (p *process) handleSigkilledShim(rst int, rerr error) (int, error) {
+func (p *process) updateExitStatusFile(status uint32) (uint32, error) {
+	p.stateLock.Lock()
+	p.state = Stopped
+	p.stateLock.Unlock()
+	err := ioutil.WriteFile(filepath.Join(p.root, ExitStatusFile), []byte(fmt.Sprintf("%u", status)), 0644)
+	return status, err
+}
+
+func (p *process) handleSigkilledShim(rst uint32, rerr error) (uint32, error) {
 	if p.cmd == nil || p.cmd.Process == nil {
 		e := unix.Kill(p.pid, 0)
 		if e == syscall.ESRCH {
-			return rst, rerr
+			logrus.Warnf("containerd: %s:%s (pid %d) does not exist", p.container.id, p.id, p.pid)
+			// The process died while containerd was down (probably of
+			// SIGKILL, but no way to be sure)
+			return p.updateExitStatusFile(UnknownStatus)
 		}
 
 		// If it's not the same process, just mark it stopped and set
-		// the status to 255
+		// the status to the UnknownStatus value (i.e. 255)
 		if same, err := p.isSameProcess(); !same {
 			logrus.Warnf("containerd: %s:%s (pid %d) is not the same process anymore (%v)", p.container.id, p.id, p.pid, err)
-			p.stateLock.Lock()
-			p.state = Stopped
-			p.stateLock.Unlock()
 			// Create the file so we get the exit event generated once monitor kicks in
-			// without going to this all process again
-			rerr = ioutil.WriteFile(filepath.Join(p.root, ExitStatusFile), []byte("255"), 0644)
-			return 255, nil
+			// without having to go through all this process again
+			return p.updateExitStatusFile(UnknownStatus)
 		}
 
 		ppid, err := readProcStatField(p.pid, 4)
@@ -255,19 +262,21 @@ func (p *process) handleSigkilledShim(rst int, rerr error) (int, error) {
 		if ppid == "1" {
 			logrus.Warnf("containerd: %s:%s shim died, killing associated process", p.container.id, p.id)
 			unix.Kill(p.pid, syscall.SIGKILL)
+			if err != nil && err != syscall.ESRCH {
+				return UnknownStatus, fmt.Errorf("containerd: unable to SIGKILL %s:%s (pid %v): %v", p.container.id, p.id, p.pid, err)
+			}
+
 			// wait for the process to die
 			for {
 				e := unix.Kill(p.pid, 0)
 				if e == syscall.ESRCH {
 					break
 				}
-				time.Sleep(10 * time.Millisecond)
+				time.Sleep(5 * time.Millisecond)
 			}
-
-			rst = 128 + int(syscall.SIGKILL)
 			// Create the file so we get the exit event generated once monitor kicks in
-			// without going to this all process again
-			rerr = ioutil.WriteFile(filepath.Join(p.root, ExitStatusFile), []byte(fmt.Sprintf("%d", rst)), 0644)
+			// without having to go through all this process again
+			return p.updateExitStatusFile(128 + uint32(syscall.SIGKILL))
 		}
 
 		return rst, rerr
@@ -286,29 +295,8 @@ func (p *process) handleSigkilledShim(rst int, rerr error) (int, error) {
 	if shimStatus.Signaled() && shimStatus.Signal() == syscall.SIGKILL {
 		logrus.Debugf("containerd: ExitStatus(container: %s, process: %s): shim was SIGKILL'ed reaping its child with pid %d", p.container.id, p.id, p.pid)
 
-		var (
-			status unix.WaitStatus
-			rusage unix.Rusage
-			wpid   int
-		)
-
-		// Some processes change their PR_SET_PDEATHSIG, so force kill them
-		unix.Kill(p.pid, syscall.SIGKILL)
-
-		for wpid == 0 {
-			wpid, e = unix.Wait4(p.pid, &status, unix.WNOHANG, &rusage)
-			if e != nil {
-				logrus.Debugf("containerd: ExitStatus(container: %s, process: %s): Wait4(%d): %v", p.container.id, p.id, p.pid, rerr)
-				return rst, rerr
-			}
-		}
-
-		if wpid == p.pid {
-			rerr = nil
-			rst = 128 + int(shimStatus.Signal())
-		} else {
-			logrus.Errorf("containerd: ExitStatus(container: %s, process: %s): unexpected returned pid from wait4 %v (expected %v)", p.container.id, p.id, wpid, p.pid)
-		}
+		rerr = nil
+		rst = 128 + uint32(shimStatus.Signal())
 
 		p.stateLock.Lock()
 		p.state = Stopped
@@ -318,7 +306,7 @@ func (p *process) handleSigkilledShim(rst int, rerr error) (int, error) {
 	return rst, rerr
 }
 
-func (p *process) ExitStatus() (rst int, rerr error) {
+func (p *process) ExitStatus() (rst uint32, rerr error) {
 	data, err := ioutil.ReadFile(filepath.Join(p.root, ExitStatusFile))
 	defer func() {
 		if rerr != nil {
@@ -327,17 +315,19 @@ func (p *process) ExitStatus() (rst int, rerr error) {
 	}()
 	if err != nil {
 		if os.IsNotExist(err) {
-			return -1, ErrProcessNotExited
+			return UnknownStatus, ErrProcessNotExited
 		}
-		return -1, err
+		return UnknownStatus, err
 	}
 	if len(data) == 0 {
-		return -1, ErrProcessNotExited
+		return UnknownStatus, ErrProcessNotExited
 	}
 	p.stateLock.Lock()
 	p.state = Stopped
 	p.stateLock.Unlock()
-	return strconv.Atoi(string(data))
+
+	i, err := strconv.ParseUint(string(data), 10, 32)
+	return uint32(i), err
 }
 
 func (p *process) Spec() specs.ProcessSpec {
