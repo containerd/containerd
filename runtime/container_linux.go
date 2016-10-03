@@ -89,7 +89,7 @@ func (c *container) OOM() (OOM, error) {
 	// ourself
 	root = strings.TrimPrefix(root, hostRoot)
 
-	return c.getMemeoryEventFD(filepath.Join(mountpoint, root))
+	return c.getMemoryEventFD(filepath.Join(mountpoint, root))
 }
 
 func u64Ptr(i uint64) *uint64 { return &i }
@@ -150,7 +150,7 @@ func getRootIDs(s *specs.Spec) (int, int, error) {
 	return uid, gid, nil
 }
 
-func (c *container) getMemeoryEventFD(root string) (*oom, error) {
+func (c *container) getMemoryEventFD(root string) (*oom, error) {
 	f, err := os.Open(filepath.Join(root, "memory.oom_control"))
 	if err != nil {
 		return nil, err
