@@ -680,7 +680,6 @@ func isAlive(cmd *exec.Cmd) (bool, error) {
 type oom struct {
 	id      string
 	root    string
-	control *os.File
 	eventfd int
 }
 
@@ -703,11 +702,7 @@ func (o *oom) Removed() bool {
 }
 
 func (o *oom) Close() error {
-	err := syscall.Close(o.eventfd)
-	if cerr := o.control.Close(); err == nil {
-		err = cerr
-	}
-	return err
+	return syscall.Close(o.eventfd)
 }
 
 type message struct {
