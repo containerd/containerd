@@ -124,10 +124,6 @@ func start(log *os.File) error {
 				// children of the container have died if init was not
 				// started in its own PID namespace.
 				f.Close()
-				// Wait for all the childs this process may have
-				// created (needed for exec and init processes when
-				// they join another pid namespace)
-				osutils.Reap(true)
 				p.Wait()
 				return nil
 			}
