@@ -3,6 +3,7 @@ package main
 import (
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/docker/pkg/integration/checker"
@@ -184,4 +185,124 @@ func (cs *ContainerdSuite) TestBusyboxTopExecTopKillInit(t *check.C) {
 		}
 	}
 
+}
+
+func (cs *ContainerdSuite) TestBusyboxExecCreateDetachedChild(t *check.C) {
+	bundleName := "busybox-top"
+	if err := CreateBusyboxBundle(bundleName, []string{"top"}); err != nil {
+		t.Fatal(err)
+	}
+
+	var (
+		err   error
+		initp *ContainerProcess
+	)
+
+	containerID := "top"
+	initp, err = cs.StartContainer(containerID, bundleName)
+	t.Assert(err, checker.Equals, nil)
+
+	ch := initp.GetEventsChannel()
+	for _, evt := range []types.Event{
+		{
+			Type:   "start-container",
+			Id:     containerID,
+			Status: 0,
+			Pid:    "",
+		},
+	} {
+		e := <-ch
+		evt.Timestamp = e.Timestamp
+		t.Assert(*e, checker.Equals, evt)
+	}
+
+	execID := "sh-sleep"
+	_, err = cs.AddProcessToContainer(initp, execID, "/", []string{"PATH=/bin"}, []string{"sh", "-c", "sleep 1000 2>&- 1>&- 0<&- &"}, 0, 0)
+	t.Assert(err, checker.Equals, nil)
+	for _, evt := range []types.Event{
+		{
+			Type:   "start-process",
+			Id:     containerID,
+			Status: 0,
+			Pid:    execID,
+		},
+		{
+			Type:   "exit",
+			Id:     containerID,
+			Status: 0,
+			Pid:    execID,
+		},
+	} {
+		e := <-ch
+		evt.Timestamp = e.Timestamp
+		t.Assert(*e, checker.Equals, evt)
+	}
+
+	// Check that sleep is still running
+	execOutput, err := cs.AddProcessToContainer(initp, "ps", "/", []string{"PATH=/bin"}, []string{"ps", "aux"}, 0, 0)
+	t.Assert(err, checker.Equals, nil)
+	t.Assert(execOutput.io.stdoutBuffer.String(), checker.Contains, "sleep 1000")
+}
+
+func (cs *ContainerdSuite) TestBusyboxExecCreateAttachedChild(t *check.C) {
+	bundleName := "busybox-top"
+	if err := CreateBusyboxBundle(bundleName, []string{"top"}); err != nil {
+		t.Fatal(err)
+	}
+
+	var (
+		err   error
+		initp *ContainerProcess
+	)
+
+	containerID := "top"
+	initp, err = cs.StartContainer(containerID, bundleName)
+	t.Assert(err, checker.Equals, nil)
+
+	ch := initp.GetEventsChannel()
+	for _, evt := range []types.Event{
+		{
+			Type:   "start-container",
+			Id:     containerID,
+			Status: 0,
+			Pid:    "",
+		},
+	} {
+		e := <-ch
+		evt.Timestamp = e.Timestamp
+		t.Assert(*e, checker.Equals, evt)
+	}
+
+	doneCh := make(chan struct{})
+	go func() {
+		execID := "sh-sleep"
+		_, err = cs.AddProcessToContainer(initp, execID, "/", []string{"PATH=/bin"}, []string{"sh", "-c", "sleep 5 &"}, 0, 0)
+		t.Assert(err, checker.Equals, nil)
+		for _, evt := range []types.Event{
+			{
+				Type:   "start-process",
+				Id:     containerID,
+				Status: 0,
+				Pid:    execID,
+			},
+			{
+				Type:   "exit",
+				Id:     containerID,
+				Status: 0,
+				Pid:    execID,
+			},
+		} {
+			e := <-ch
+			evt.Timestamp = e.Timestamp
+			t.Assert(*e, checker.Equals, evt)
+		}
+		close(doneCh)
+	}()
+
+	select {
+	case <-doneCh:
+		break
+	case <-time.After(8 * time.Second):
+		t.Fatal("exec did not exit within 5 seconds")
+	}
 }
