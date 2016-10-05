@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y \
 	&& rm -rf /var/lib/apt/lists/*
 
 # Install Go
-ENV GO_VERSION 1.6.2
+ENV GO_VERSION 1.7.1
 RUN curl -sSL  "https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz" | tar -v -C /usr/local -xz
 ENV PATH /go/bin:/usr/local/go/bin:$PATH
 ENV GOPATH /go:/go/src/github.com/docker/containerd/vendor
@@ -40,7 +40,7 @@ RUN git clone https://github.com/golang/lint.git /go/src/github.com/golang/lint 
 WORKDIR /go/src/github.com/docker/containerd
 
 # install seccomp: the version shipped in trusty is too old
-ENV SECCOMP_VERSION 2.3.0
+ENV SECCOMP_VERSION 2.3.1
 RUN set -x \
 	&& export SECCOMP_PATH="$(mktemp -d)" \
 	&& curl -fsSL "https://github.com/seccomp/libseccomp/releases/download/v${SECCOMP_VERSION}/libseccomp-${SECCOMP_VERSION}.tar.gz" \
@@ -55,7 +55,7 @@ RUN set -x \
 	&& rm -rf "$SECCOMP_PATH"
 
 # Install runc
-ENV RUNC_COMMIT cc29e3dded8e27ba8f65738f40d251c885030a28
+ENV RUNC_COMMIT 02f8fa7863dd3f82909a73e2061897828460d52f
 RUN set -x \
 	&& export GOPATH="$(mktemp -d)" \
     && git clone git://github.com/opencontainers/runc.git "$GOPATH/src/github.com/opencontainers/runc" \
