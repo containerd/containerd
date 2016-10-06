@@ -48,7 +48,7 @@ var
 }
 
 func (cs *ContainerdSuite) TestStartBusyboxNoSuchFile(t *check.C) {
-	expectedOutput := `oci runtime error: exec: "NoSuchFile": executable file not found in $PATH`
+	expectedOutput := `exec: \\\"NoSuchFile\\\": executable file not found in $PATH`
 
 	if err := CreateBusyboxBundle("busybox-no-such-file", []string{"NoSuchFile"}); err != nil {
 		t.Fatal(err)
