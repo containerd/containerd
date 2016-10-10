@@ -155,20 +155,18 @@ func (c *container) getMemoryEventFD(root string) (*oom, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 	fd, _, serr := syscall.RawSyscall(syscall.SYS_EVENTFD2, 0, syscall.FD_CLOEXEC, 0)
 	if serr != 0 {
-		f.Close()
 		return nil, serr
 	}
 	if err := c.writeEventFD(root, int(f.Fd()), int(fd)); err != nil {
 		syscall.Close(int(fd))
-		f.Close()
 		return nil, err
 	}
 	return &oom{
 		root:    root,
 		id:      c.id,
 		eventfd: int(fd),
-		control: f,
 	}, nil
 }
