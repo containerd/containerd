@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/docker/containerd/specs"
+	"github.com/tonistiigi/fifo"
 )
 
 var errRuntime = errors.New("shim: runtime execution error")
@@ -231,11 +233,14 @@ func (p *process) openIO() error {
 		uid = p.state.RootUID
 		gid = p.state.RootGID
 	)
-	go func() {
-		if stdinCloser, err := os.OpenFile(p.state.Stdin, syscall.O_WRONLY, 0); err == nil {
-			p.stdinCloser = stdinCloser
-		}
-	}()
+
+	ctx, _ := context.WithTimeout(context.Background(), 15*time.Second)
+
+	stdinCloser, err := fifo.OpenFifo(ctx, p.state.Stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
+	if err != nil {
+		return err
+	}
+	p.stdinCloser = stdinCloser
 
 	if p.state.Terminal {
 		master, console, err := newConsole(uid, gid)
@@ -244,19 +249,25 @@ func (p *process) openIO() error {
 		}
 		p.console = master
 		p.consolePath = console
-		stdin, err := os.OpenFile(p.state.Stdin, syscall.O_RDONLY, 0)
+		stdin, err := fifo.OpenFifo(ctx, p.state.Stdin, syscall.O_RDONLY, 0)
 		if err != nil {
 			return err
 		}
 		go io.Copy(master, stdin)
-		stdout, err := os.OpenFile(p.state.Stdout, syscall.O_RDWR, 0)
+		stdoutw, err := fifo.OpenFifo(ctx, p.state.Stdout, syscall.O_WRONLY, 0)
+		if err != nil {
+			return err
+		}
+		stdoutr, err := fifo.OpenFifo(ctx, p.state.Stdout, syscall.O_RDONLY, 0)
 		if err != nil {
 			return err
 		}
 		p.Add(1)
 		go func() {
-			io.Copy(stdout, master)
+			io.Copy(stdoutw, master)
 			master.Close()
+			stdoutr.Close()
+			stdoutw.Close()
 			p.Done()
 		}()
 		return nil
@@ -267,36 +278,45 @@ func (p *process) openIO() error {
 	}
 	p.shimIO = i
 	// non-tty
-	for name, dest := range map[string]func(f *os.File){
-		p.state.Stdout: func(f *os.File) {
+	for name, dest := range map[string]func(wc io.WriteCloser, rc io.Closer){
+		p.state.Stdout: func(wc io.WriteCloser, rc io.Closer) {
 			p.Add(1)
 			go func() {
-				io.Copy(f, i.Stdout)
+				io.Copy(wc, i.Stdout)
 				p.Done()
+				wc.Close()
+				rc.Close()
 			}()
 		},
-		p.state.Stderr: func(f *os.File) {
+		p.state.Stderr: func(wc io.WriteCloser, rc io.Closer) {
 			p.Add(1)
 			go func() {
-				io.Copy(f, i.Stderr)
+				io.Copy(wc, i.Stderr)
 				p.Done()
+				wc.Close()
+				rc.Close()
 			}()
 		},
 	} {
-		f, err := os.OpenFile(name, syscall.O_RDWR, 0)
+		fw, err := fifo.OpenFifo(ctx, name, syscall.O_WRONLY, 0)
 		if err != nil {
 			return err
 		}
-		dest(f)
+		fr, err := fifo.OpenFifo(ctx, name, syscall.O_RDONLY, 0)
+		if err != nil {
+			return err
+		}
+		dest(fw, fr)
 	}
 
-	f, err := os.OpenFile(p.state.Stdin, syscall.O_RDONLY, 0)
+	f, err := fifo.OpenFifo(ctx, p.state.Stdin, syscall.O_RDONLY, 0)
 	if err != nil {
 		return err
 	}
 	go func() {
 		io.Copy(i.Stdin, f)
 		i.Stdin.Close()
+		f.Close()
 	}()
 
 	return nil
