@@ -34,7 +34,7 @@ func (s *Supervisor) addProcess(t *AddProcessTask) error {
 		return err
 	}
 	ExecProcessTimer.UpdateSince(start)
-	t.StartResponse <- StartResponse{}
+	t.StartResponse <- StartResponse{ExecPid: process.SystemPid()}
 	s.notifySubscribers(Event{
 		Timestamp: time.Now(),
 		Type:      StateStartProcess,

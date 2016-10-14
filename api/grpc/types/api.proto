@@ -98,6 +98,7 @@ message User {
 }
 
 message AddProcessResponse {
+	uint32 systemPid = 1;
 }
 
 message CreateCheckpointRequest {

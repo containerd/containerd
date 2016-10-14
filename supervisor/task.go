@@ -8,6 +8,7 @@ import (
 
 // StartResponse is the response containing a started container
 type StartResponse struct {
+	ExecPid   int
 	Container runtime.Container
 }
 
