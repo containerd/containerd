@@ -52,6 +52,7 @@ clean() {
 	local packages=(
 		"${PROJECT}/containerd" # package main
 		"${PROJECT}/ctr" # package main
+		"${PROJECT}/containerd-shim" # package main
 		"${PROJECT}/integration-test" # package main
 	)
 	local platforms=( linux/amd64 linux/386 windows/amd64 windows/386 darwin/amd64 )
