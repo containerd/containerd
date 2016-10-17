@@ -54,6 +54,6 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 	if err := <-e.ErrorCh(); err != nil {
 		return nil, err
 	}
-	<-e.StartResponse
-	return &types.AddProcessResponse{}, nil
+	sr := <-e.StartResponse
+	return &types.AddProcessResponse{SystemPid: uint32(sr.ExecPid)}, nil
 }
