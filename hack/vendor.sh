@@ -25,6 +25,8 @@ clone git golang.org/x/net 991d3e32f76f19ee6d9caadb3a22eae8d23315f7 https://gith
 clone git golang.org/x/sys d4feaf1a7e61e1d9e79e6c4e76c6349e9cab0a03 https://github.com/golang/sys.git
 clone git google.golang.org/grpc v1.0.1-GA https://github.com/grpc/grpc-go.git
 clone git github.com/seccomp/libseccomp-golang 1b506fc7c24eec5a3693cdcbed40d9c226cfc6a1
+clone git github.com/tonistiigi/fifo b45391ebcd3d282404092c04a2b015b37df12383
+clone git github.com/pkg/errors 839d9e913e063e28dfd0e6c7b7512793e0a48be9
 
 clone git github.com/vdemeester/shakers 24d7f1d6a71aa5d9cbe7390e4afb66b7eef9e1b3
 clone git github.com/go-check/check a625211d932a2a643d0d17352095f03fb7774663 https://github.com/cpuguy83/check.git
