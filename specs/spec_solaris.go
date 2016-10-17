@@ -1,8 +1,10 @@
 package specs
 
-import ocs "github.com/opencontainers/specs/specs-go"
+import ocs "github.com/opencontainers/runtime-spec/specs-go"
 
 type (
+	// ProcessSpec aliases the platform process specs
 	ProcessSpec ocs.Process
-	Spec        ocs.Spec
+	// Spec aliases the platform oci spec
+	Spec ocs.Spec
 )

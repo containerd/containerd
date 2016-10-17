@@ -249,7 +249,6 @@ func (c *container) readSpec() (*specs.Spec, error) {
 
 func (c *container) Delete() error {
 	err := os.RemoveAll(filepath.Join(c.root, c.id))
-
 	args := c.runtimeArgs
 	args = append(args, "delete", c.id)
 	if b, derr := exec.Command(c.runtime, args...).CombinedOutput(); err != nil {
@@ -525,20 +524,6 @@ func hostIDFromMap(id uint32, mp []ocs.IDMapping) int {
 	return 0
 }
 
-func (c *container) Pids() ([]int, error) {
-	args := c.runtimeArgs
-	args = append(args, "ps", "--format=json", c.id)
-	out, err := exec.Command(c.runtime, args...).CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("%s: %q", err.Error(), out)
-	}
-	var pids []int
-	if err := json.Unmarshal(out, &pids); err != nil {
-		return nil, err
-	}
-	return pids, nil
-}
-
 func (c *container) Stats() (*Stat, error) {
 	now := time.Now()
 	args := c.runtimeArgs
@@ -597,7 +582,7 @@ func (c *container) waitForCreate(p *process, cmd *exec.Cmd) error {
 	go func() {
 		for {
 			if _, err := p.getPidFromFile(); err != nil {
-				if os.IsNotExist(err) || err == errInvalidPidInt {
+				if os.IsNotExist(err) || err == errInvalidPidInt || err == errContainerNotFound {
 					alive, err := isAlive(cmd)
 					if err != nil {
 						wc <- err

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,13 +9,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/docker/containerd/specs"
-	"github.com/tonistiigi/fifo"
 )
 
 var errRuntime = errors.New("shim: runtime execution error")
@@ -189,8 +188,13 @@ func (p *process) create() error {
 		}
 		return err
 	}
-	p.stdio.stdout.Close()
-	p.stdio.stderr.Close()
+	if runtime.GOOS != "solaris" {
+		// Since current logic dictates that we need a pid at the end of p.create
+		// we need to call runtime start as well on Solaris hence we need the
+		// pipes to stay open.
+		p.stdio.stdout.Close()
+		p.stdio.stderr.Close()
+	}
 	if err := cmd.Wait(); err != nil {
 		if _, ok := err.(*exec.ExitError); ok {
 			return errRuntime
@@ -222,103 +226,6 @@ func (p *process) delete() error {
 			return fmt.Errorf("%s: %v", out, err)
 		}
 	}
-	return nil
-}
-
-// openIO opens the pre-created fifo's for use with the container
-// in RDWR so that they remain open if the other side stops listening
-func (p *process) openIO() error {
-	p.stdio = &stdio{}
-	var (
-		uid = p.state.RootUID
-		gid = p.state.RootGID
-	)
-
-	ctx, _ := context.WithTimeout(context.Background(), 15*time.Second)
-
-	stdinCloser, err := fifo.OpenFifo(ctx, p.state.Stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
-	if err != nil {
-		return err
-	}
-	p.stdinCloser = stdinCloser
-
-	if p.state.Terminal {
-		master, console, err := newConsole(uid, gid)
-		if err != nil {
-			return err
-		}
-		p.console = master
-		p.consolePath = console
-		stdin, err := fifo.OpenFifo(ctx, p.state.Stdin, syscall.O_RDONLY, 0)
-		if err != nil {
-			return err
-		}
-		go io.Copy(master, stdin)
-		stdoutw, err := fifo.OpenFifo(ctx, p.state.Stdout, syscall.O_WRONLY, 0)
-		if err != nil {
-			return err
-		}
-		stdoutr, err := fifo.OpenFifo(ctx, p.state.Stdout, syscall.O_RDONLY, 0)
-		if err != nil {
-			return err
-		}
-		p.Add(1)
-		go func() {
-			io.Copy(stdoutw, master)
-			master.Close()
-			stdoutr.Close()
-			stdoutw.Close()
-			p.Done()
-		}()
-		return nil
-	}
-	i, err := p.initializeIO(uid)
-	if err != nil {
-		return err
-	}
-	p.shimIO = i
-	// non-tty
-	for name, dest := range map[string]func(wc io.WriteCloser, rc io.Closer){
-		p.state.Stdout: func(wc io.WriteCloser, rc io.Closer) {
-			p.Add(1)
-			go func() {
-				io.Copy(wc, i.Stdout)
-				p.Done()
-				wc.Close()
-				rc.Close()
-			}()
-		},
-		p.state.Stderr: func(wc io.WriteCloser, rc io.Closer) {
-			p.Add(1)
-			go func() {
-				io.Copy(wc, i.Stderr)
-				p.Done()
-				wc.Close()
-				rc.Close()
-			}()
-		},
-	} {
-		fw, err := fifo.OpenFifo(ctx, name, syscall.O_WRONLY, 0)
-		if err != nil {
-			return err
-		}
-		fr, err := fifo.OpenFifo(ctx, name, syscall.O_RDONLY, 0)
-		if err != nil {
-			return err
-		}
-		dest(fw, fr)
-	}
-
-	f, err := fifo.OpenFifo(ctx, p.state.Stdin, syscall.O_RDONLY, 0)
-	if err != nil {
-		return err
-	}
-	go func() {
-		io.Copy(i.Stdin, f)
-		i.Stdin.Close()
-		f.Close()
-	}()
-
 	return nil
 }
 

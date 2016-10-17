@@ -15,5 +15,5 @@ func GetSubreaper() (int, error) {
 
 // SetSubreaper sets the value i as the subreaper setting for the calling process
 func SetSubreaper(i int) error {
-	return errors.New("osutils SetSubreaper not implemented on Solaris")
+	return nil
 }
