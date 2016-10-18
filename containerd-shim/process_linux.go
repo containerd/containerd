@@ -5,8 +5,8 @@ package main
 import (
 	"context"
 	"io"
-	"os"
 	"syscall"
+	"time"
 
 	"github.com/tonistiigi/fifo"
 )
