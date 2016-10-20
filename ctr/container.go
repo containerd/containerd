@@ -579,13 +579,27 @@ var statsCommand = cli.Command{
 	},
 }
 
-func getUpdateCommandInt64Flag(context *cli.Context, name string) uint64 {
+func getUpdateCommandUInt64Flag(context *cli.Context, name string) uint64 {
 	str := context.String(name)
 	if str == "" {
 		return 0
 	}
 
 	val, err := strconv.ParseUint(str, 0, 64)
+	if err != nil {
+		fatal(err.Error(), 1)
+	}
+
+	return val
+}
+
+func getUpdateCommandInt64Flag(context *cli.Context, name string) int64 {
+	str := context.String(name)
+	if str == "" {
+		return 0
+	}
+
+	val, err := strconv.ParseInt(str, 0, 64)
 	if err != nil {
 		fatal(err.Error(), 1)
 	}
@@ -636,10 +650,10 @@ var updateCommand = cli.Command{
 		req.Resources.MemoryLimit = getUpdateCommandInt64Flag(context, "memory-limit")
 		req.Resources.MemoryReservation = getUpdateCommandInt64Flag(context, "memory-reservation")
 		req.Resources.MemorySwap = getUpdateCommandInt64Flag(context, "memory-swap")
-		req.Resources.BlkioWeight = getUpdateCommandInt64Flag(context, "blkio-weight")
-		req.Resources.CpuPeriod = getUpdateCommandInt64Flag(context, "cpu-period")
-		req.Resources.CpuQuota = getUpdateCommandInt64Flag(context, "cpu-quota")
-		req.Resources.CpuShares = getUpdateCommandInt64Flag(context, "cpu-shares")
+		req.Resources.BlkioWeight = getUpdateCommandUInt64Flag(context, "blkio-weight")
+		req.Resources.CpuPeriod = getUpdateCommandUInt64Flag(context, "cpu-period")
+		req.Resources.CpuQuota = getUpdateCommandUInt64Flag(context, "cpu-quota")
+		req.Resources.CpuShares = getUpdateCommandUInt64Flag(context, "cpu-shares")
 		req.Resources.CpusetCpus = context.String("cpuset-cpus")
 		req.Resources.CpusetMems = context.String("cpuset-mems")
 		req.Resources.KernelMemoryLimit = getUpdateCommandInt64Flag(context, "kernel-limit")
