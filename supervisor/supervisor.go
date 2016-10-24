@@ -132,14 +132,21 @@ func readEventLog(s *Supervisor) error {
 	defer f.Close()
 	dec := json.NewDecoder(f)
 	for {
-		var e Event
+		var e eventV1
 		if err := dec.Decode(&e); err != nil {
 			if err == io.EOF {
 				break
 			}
 			return err
 		}
-		s.eventLog = append(s.eventLog, e)
+
+		// We need to take care of -1 Status for backward compatibility
+		ev := e.Event
+		ev.Status = uint32(e.Status)
+		if ev.Status > runtime.UnknownStatus {
+			ev.Status = runtime.UnknownStatus
+		}
+		s.eventLog = append(s.eventLog, ev)
 	}
 	return nil
 }
@@ -187,6 +194,11 @@ type Event struct {
 	Timestamp time.Time `json:"timestamp"`
 	PID       string    `json:"pid,omitempty"`
 	Status    uint32    `json:"status,omitempty"`
+}
+
+type eventV1 struct {
+	Event
+	Status int `json:"status,omitempty"`
 }
 
 // Events returns an event channel that external consumers can use to receive updates
