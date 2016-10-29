@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/docker/containerd/runtime"
+	"golang.org/x/net/context"
 )
 
 // StartTask holds needed parameters to create a new container
@@ -22,6 +23,7 @@ type StartTask struct {
 	CheckpointDir string
 	Runtime       string
 	RuntimeArgs   []string
+	Ctx           context.Context
 }
 
 func (s *Supervisor) start(t *StartTask) error {
@@ -57,6 +59,7 @@ func (s *Supervisor) start(t *StartTask) error {
 		Stdin:         t.Stdin,
 		Stdout:        t.Stdout,
 		Stderr:        t.Stderr,
+		Ctx:           t.Ctx,
 	}
 	if t.Checkpoint != nil {
 		task.CheckpointPath = filepath.Join(t.CheckpointDir, t.Checkpoint.Name)

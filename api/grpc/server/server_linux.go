@@ -50,6 +50,7 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 	e.Stdout = r.Stdout
 	e.Stderr = r.Stderr
 	e.StartResponse = make(chan supervisor.StartResponse, 1)
+	e.Ctx = ctx
 	s.sv.SendTask(e)
 	if err := <-e.ErrorCh(); err != nil {
 		return nil, err

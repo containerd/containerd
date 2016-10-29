@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -163,7 +164,7 @@ func BenchmarkBusyboxSh(b *testing.B) {
 }
 
 func benchmarkStartContainer(b *testing.B, c Container, s Stdio, bundleName string) {
-	p, err := c.Start("", s)
+	p, err := c.Start(context.Background(), "", s)
 	if err != nil {
 		b.Fatalf("Error starting container %v", err)
 	}

@@ -56,6 +56,7 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 	e.Runtime = c.Runtime
 	e.RuntimeArgs = c.RuntimeArgs
 	e.StartResponse = make(chan supervisor.StartResponse, 1)
+	e.Ctx = ctx
 	if c.Checkpoint != "" {
 		e.CheckpointDir = c.CheckpointDir
 		e.Checkpoint = &runtime.Checkpoint{
