@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/docker/containerd/specs"
 	"github.com/tonistiigi/fifo"
+	"golang.org/x/net/context"
 )
 
 var errRuntime = errors.New("shim: runtime execution error")
