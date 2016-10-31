@@ -14,6 +14,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/specs"
 	ocs "github.com/opencontainers/runtime-spec/specs-go"
+	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 )
 
@@ -24,9 +25,9 @@ type Container interface {
 	// Path returns the path to the bundle
 	Path() string
 	// Start starts the init process of the container
-	Start(checkpointPath string, s Stdio) (Process, error)
+	Start(ctx context.Context, checkpointPath string, s Stdio) (Process, error)
 	// Exec starts another process in an existing container
-	Exec(string, specs.ProcessSpec, Stdio) (Process, error)
+	Exec(context.Context, string, specs.ProcessSpec, Stdio) (Process, error)
 	// Delete removes the container's state and any resources
 	Delete() error
 	// Processes returns all the containers processes that have been added
@@ -186,7 +187,7 @@ func Load(root, id, shimName string, timeout time.Duration) (Container, error) {
 		}
 		p, err := loadProcess(filepath.Join(root, id, pid), pid, c, s)
 		if err != nil {
-			logrus.WithField("id", id).WithField("pid", pid).Debug("containerd: error loading process %s", err)
+			logrus.WithField("id", id).WithField("pid", pid).Debugf("containerd: error loading process %s", err)
 			continue
 		}
 		c.processes[pid] = p
@@ -394,7 +395,7 @@ func (c *container) DeleteCheckpoint(name string, checkpointDir string) error {
 	return os.RemoveAll(filepath.Join(checkpointDir, name))
 }
 
-func (c *container) Start(checkpointPath string, s Stdio) (Process, error) {
+func (c *container) Start(ctx context.Context, checkpointPath string, s Stdio) (Process, error) {
 	processRoot := filepath.Join(c.root, c.id, InitProcessID)
 	if err := os.Mkdir(processRoot, 0755); err != nil {
 		return nil, err
@@ -423,13 +424,13 @@ func (c *container) Start(checkpointPath string, s Stdio) (Process, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := c.createCmd(InitProcessID, cmd, p); err != nil {
+	if err := c.createCmd(ctx, InitProcessID, cmd, p); err != nil {
 		return nil, err
 	}
 	return p, nil
 }
 
-func (c *container) Exec(pid string, pspec specs.ProcessSpec, s Stdio) (pp Process, err error) {
+func (c *container) Exec(ctx context.Context, pid string, pspec specs.ProcessSpec, s Stdio) (pp Process, err error) {
 	processRoot := filepath.Join(c.root, c.id, pid)
 	if err := os.Mkdir(processRoot, 0755); err != nil {
 		return nil, err
@@ -463,13 +464,13 @@ func (c *container) Exec(pid string, pspec specs.ProcessSpec, s Stdio) (pp Proce
 	if err != nil {
 		return nil, err
 	}
-	if err := c.createCmd(pid, cmd, p); err != nil {
+	if err := c.createCmd(ctx, pid, cmd, p); err != nil {
 		return nil, err
 	}
 	return p, nil
 }
 
-func (c *container) createCmd(pid string, cmd *exec.Cmd, p *process) error {
+func (c *container) createCmd(ctx context.Context, pid string, cmd *exec.Cmd, p *process) error {
 	p.cmd = cmd
 	if err := cmd.Start(); err != nil {
 		close(p.cmdDoneCh)
@@ -508,10 +509,25 @@ func (c *container) createCmd(pid string, cmd *exec.Cmd, p *process) error {
 			close(p.cmdDoneCh)
 		}()
 	}()
-	if err := c.waitForCreate(p, cmd); err != nil {
+
+	ch := make(chan error)
+	go func() {
+		if err := c.waitForCreate(p, cmd); err != nil {
+			ch <- err
+			return
+		}
+		c.processes[pid] = p
+		ch <- nil
+	}()
+	select {
+	case <-ctx.Done():
+		cmd.Process.Kill()
+		cmd.Wait()
+		<-ch
+		return ctx.Err()
+	case err := <-ch:
 		return err
 	}
-	c.processes[pid] = p
 	return nil
 }
 

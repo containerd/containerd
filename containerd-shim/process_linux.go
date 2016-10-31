@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"syscall"
 	"time"
@@ -94,18 +95,18 @@ func (p *process) openIO() error {
 	} {
 		fw, err := fifo.OpenFifo(ctx, name, syscall.O_WRONLY, 0)
 		if err != nil {
-			return err
+			return fmt.Errorf("containerd-shim: opening %s failed: %s", name, err)
 		}
 		fr, err := fifo.OpenFifo(ctx, name, syscall.O_RDONLY, 0)
 		if err != nil {
-			return err
+			return fmt.Errorf("containerd-shim: opening %s failed: %s", name, err)
 		}
 		dest(fw, fr)
 	}
 
 	f, err := fifo.OpenFifo(ctx, p.state.Stdin, syscall.O_RDONLY, 0)
 	if err != nil {
-		return err
+		return fmt.Errorf("containerd-shim: opening %s failed: %s", p.state.Stdin, err)
 	}
 	go func() {
 		io.Copy(i.Stdin, f)

@@ -6,6 +6,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/runtime"
+	"golang.org/x/net/context"
 )
 
 // Worker interface
@@ -21,6 +22,7 @@ type startTask struct {
 	Stderr         string
 	Err            chan error
 	StartResponse  chan StartResponse
+	Ctx            context.Context
 }
 
 // NewWorker return a new initialized worker
@@ -41,7 +43,7 @@ func (w *worker) Start() {
 	defer w.wg.Done()
 	for t := range w.s.startTasks {
 		started := time.Now()
-		process, err := t.Container.Start(t.CheckpointPath, runtime.NewStdio(t.Stdin, t.Stdout, t.Stderr))
+		process, err := t.Container.Start(t.Ctx, t.CheckpointPath, runtime.NewStdio(t.Stdin, t.Stdout, t.Stderr))
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
 				"error": err,
