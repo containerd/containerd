@@ -3,12 +3,12 @@
 package main
 
 import (
-	"context"
 	"io"
 	"syscall"
 	"time"
 
 	"github.com/tonistiigi/fifo"
+	"golang.org/x/net/context"
 )
 
 // setPDeathSig sets the parent death signal to SIGKILL so that if the
