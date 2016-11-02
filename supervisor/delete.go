@@ -27,13 +27,21 @@ func (s *Supervisor) delete(t *DeleteTask) error {
 			t.Process.Wait()
 		}
 		if !t.NoEvent {
-			s.notifySubscribers(Event{
-				Type:      StateExit,
-				Timestamp: time.Now(),
-				ID:        t.ID,
-				Status:    t.Status,
-				PID:       t.PID,
-			})
+			execMap := s.getDeleteExecSyncMap(t.ID)
+			go func() {
+				// Wait for all exec processe events to be sent (we seem
+				// to sometimes receive them after the init event)
+				for _, ch := range execMap {
+					<-ch
+				}
+				s.notifySubscribers(Event{
+					Type:      StateExit,
+					Timestamp: time.Now(),
+					ID:        t.ID,
+					Status:    t.Status,
+					PID:       t.PID,
+				})
+			}()
 		}
 		ContainersCounter.Dec(1)
 		ContainerDeleteTimer.UpdateSince(start)
