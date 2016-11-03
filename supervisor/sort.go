@@ -23,5 +23,5 @@ func (s *processSorter) Swap(i, j int) {
 }
 
 func (s *processSorter) Less(i, j int) bool {
-	return s.processes[j].ID() == "init"
+	return s.processes[j].ID() == runtime.InitProcessID
 }

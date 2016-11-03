@@ -36,6 +36,7 @@ func (s *Supervisor) addProcess(t *AddProcessTask) error {
 		return err
 	}
 	ExecProcessTimer.UpdateSince(start)
+	s.newExecSyncChannel(t.ID, t.PID)
 	t.StartResponse <- StartResponse{ExecPid: process.SystemPid()}
 	s.notifySubscribers(Event{
 		Timestamp: time.Now(),

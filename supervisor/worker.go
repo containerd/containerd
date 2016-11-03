@@ -90,6 +90,7 @@ func (w *worker) Start() {
 			}
 		}
 		ContainerStartTimer.UpdateSince(started)
+		w.s.newExecSyncMap(t.Container.ID())
 		t.Err <- nil
 		t.StartResponse <- StartResponse{
 			Container: t.Container,

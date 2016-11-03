@@ -249,13 +249,20 @@ func (c *container) readSpec() (*specs.Spec, error) {
 }
 
 func (c *container) Delete() error {
-	err := os.RemoveAll(filepath.Join(c.root, c.id))
+	var err error
 	args := c.runtimeArgs
 	args = append(args, "delete", c.id)
 	if b, derr := exec.Command(c.runtime, args...).CombinedOutput(); err != nil {
 		err = fmt.Errorf("%s: %q", derr, string(b))
 	} else if len(b) > 0 {
 		logrus.Debugf("%v %v: %q", c.runtime, args, string(b))
+	}
+	if rerr := os.RemoveAll(filepath.Join(c.root, c.id)); rerr != nil {
+		if err != nil {
+			err = fmt.Errorf("%s; failed to remove %s: %s", err, filepath.Join(c.root, c.id), rerr)
+		} else {
+			err = rerr
+		}
 	}
 	return err
 }
@@ -274,7 +281,7 @@ func (c *container) RemoveProcess(pid string) error {
 }
 
 func (c *container) State() State {
-	proc := c.processes["init"]
+	proc := c.processes[InitProcessID]
 	if proc == nil {
 		return Stopped
 	}

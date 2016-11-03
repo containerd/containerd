@@ -32,17 +32,18 @@ func New(stateDir string, runtimeName, shimName string, runtimeArgs []string, ti
 		return nil, err
 	}
 	s := &Supervisor{
-		stateDir:    stateDir,
-		containers:  make(map[string]*containerInfo),
-		startTasks:  startTasks,
-		machine:     machine,
-		subscribers: make(map[chan Event]struct{}),
-		tasks:       make(chan Task, defaultBufferSize),
-		monitor:     monitor,
-		runtime:     runtimeName,
-		runtimeArgs: runtimeArgs,
-		shim:        shimName,
-		timeout:     timeout,
+		stateDir:          stateDir,
+		containers:        make(map[string]*containerInfo),
+		startTasks:        startTasks,
+		machine:           machine,
+		subscribers:       make(map[chan Event]struct{}),
+		tasks:             make(chan Task, defaultBufferSize),
+		monitor:           monitor,
+		runtime:           runtimeName,
+		runtimeArgs:       runtimeArgs,
+		shim:              shimName,
+		timeout:           timeout,
+		containerExecSync: make(map[string]map[string]chan struct{}),
 	}
 	if err := setupEventLog(s, retainCount); err != nil {
 		return nil, err
@@ -171,6 +172,10 @@ type Supervisor struct {
 	eventLog       []Event
 	eventLock      sync.Mutex
 	timeout        time.Duration
+	// This is used to ensure that exec process death events are sent
+	// before the init process death
+	containerExecSyncLock sync.Mutex
+	containerExecSync     map[string]map[string]chan struct{}
 }
 
 // Stop closes all startTasks and sends a SIGTERM to each container's pid1 then waits for they to
@@ -400,4 +405,31 @@ func (s *Supervisor) handleTask(i Task) {
 		i.ErrorCh() <- err
 		close(i.ErrorCh())
 	}
+}
+
+func (s *Supervisor) newExecSyncMap(containerID string) {
+	s.containerExecSyncLock.Lock()
+	s.containerExecSync[containerID] = make(map[string]chan struct{})
+	s.containerExecSyncLock.Unlock()
+}
+
+func (s *Supervisor) newExecSyncChannel(containerID, pid string) {
+	s.containerExecSyncLock.Lock()
+	s.containerExecSync[containerID][pid] = make(chan struct{})
+	s.containerExecSyncLock.Unlock()
+}
+
+func (s *Supervisor) getExecSyncChannel(containerID, pid string) chan struct{} {
+	s.containerExecSyncLock.Lock()
+	ch := s.containerExecSync[containerID][pid]
+	s.containerExecSyncLock.Unlock()
+	return ch
+}
+
+func (s *Supervisor) getDeleteExecSyncMap(containerID string) map[string]chan struct{} {
+	s.containerExecSyncLock.Lock()
+	chs := s.containerExecSync[containerID]
+	delete(s.containerExecSync, containerID)
+	s.containerExecSyncLock.Unlock()
+	return chs
 }
