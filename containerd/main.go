@@ -224,15 +224,6 @@ func startServer(protocol, address string, sv *supervisor.Supervisor) (*grpc.Ser
 	return s, nil
 }
 
-// getDefaultID returns the hostname for the instance host
-func getDefaultID() string {
-	hostname, err := os.Hostname()
-	if err != nil {
-		panic(err)
-	}
-	return hostname
-}
-
 func checkLimits() error {
 	var l syscall.Rlimit
 	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &l); err != nil {
