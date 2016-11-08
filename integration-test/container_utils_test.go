@@ -198,13 +198,16 @@ func NewContainerProcess(cs *ContainerdSuite, bundle *Bundle, cid, pid string) (
 		hasExited:   false,
 	}
 
-	for name, path := range map[string]*string{
-		"stdin":  &c.io.stdin,
-		"stdout": &c.io.stdout,
-		"stderr": &c.io.stderr,
+	for _, pair := range []struct {
+		name string
+		path *string
+	}{
+		{"stdin", &c.io.stdin},
+		{"stdout", &c.io.stdout},
+		{"stderr", &c.io.stderr},
 	} {
-		*path = filepath.Join(bundle.Path, "io", cid+"-"+pid+"-"+name)
-		if err = unix.Mkfifo(*path, 0755); err != nil && !os.IsExist(err) {
+		*pair.path = filepath.Join(bundle.Path, "io", cid+"-"+pid+"-"+pair.name)
+		if err = unix.Mkfifo(*pair.path, 0755); err != nil && !os.IsExist(err) {
 			return nil, err
 		}
 	}
