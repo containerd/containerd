@@ -252,7 +252,7 @@ func (c *container) Delete() error {
 	var err error
 	args := c.runtimeArgs
 	args = append(args, "delete", c.id)
-	if b, derr := exec.Command(c.runtime, args...).CombinedOutput(); err != nil {
+	if b, derr := exec.Command(c.runtime, args...).CombinedOutput(); derr != nil {
 		err = fmt.Errorf("%s: %q", derr, string(b))
 	} else if len(b) > 0 {
 		logrus.Debugf("%v %v: %q", c.runtime, args, string(b))
