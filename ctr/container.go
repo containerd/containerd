@@ -690,16 +690,19 @@ func createStdio() (s stdio, err error) {
 		return s, err
 	}
 	// create fifo's for the process
-	for name, fd := range map[string]*string{
-		"stdin":  &s.stdin,
-		"stdout": &s.stdout,
-		"stderr": &s.stderr,
+	for _, pair := range []struct {
+		name string
+		fd   *string
+	}{
+		{"stdin", &s.stdin},
+		{"stdout", &s.stdout},
+		{"stderr", &s.stderr},
 	} {
-		path := filepath.Join(tmp, name)
+		path := filepath.Join(tmp, pair.name)
 		if err := unix.Mkfifo(path, 0755); err != nil && !os.IsExist(err) {
 			return s, err
 		}
-		*fd = path
+		*pair.fd = path
 	}
 	return s, nil
 }

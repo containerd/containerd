@@ -73,35 +73,44 @@ func (p *process) openIO() error {
 	}
 	p.shimIO = i
 	// non-tty
-	for name, dest := range map[string]func(wc io.WriteCloser, rc io.Closer){
-		p.state.Stdout: func(wc io.WriteCloser, rc io.Closer) {
-			p.Add(1)
-			go func() {
-				io.Copy(wc, i.Stdout)
-				p.Done()
-				wc.Close()
-				rc.Close()
-			}()
+	for _, pair := range []struct {
+		name string
+		dest func(wc io.WriteCloser, rc io.Closer)
+	}{
+		{
+			p.state.Stdout,
+			func(wc io.WriteCloser, rc io.Closer) {
+				p.Add(1)
+				go func() {
+					io.Copy(wc, i.Stdout)
+					p.Done()
+					wc.Close()
+					rc.Close()
+				}()
+			},
 		},
-		p.state.Stderr: func(wc io.WriteCloser, rc io.Closer) {
-			p.Add(1)
-			go func() {
-				io.Copy(wc, i.Stderr)
-				p.Done()
-				wc.Close()
-				rc.Close()
-			}()
+		{
+			p.state.Stderr,
+			func(wc io.WriteCloser, rc io.Closer) {
+				p.Add(1)
+				go func() {
+					io.Copy(wc, i.Stderr)
+					p.Done()
+					wc.Close()
+					rc.Close()
+				}()
+			},
 		},
 	} {
-		fw, err := fifo.OpenFifo(ctx, name, syscall.O_WRONLY, 0)
+		fw, err := fifo.OpenFifo(ctx, pair.name, syscall.O_WRONLY, 0)
 		if err != nil {
-			return fmt.Errorf("containerd-shim: opening %s failed: %s", name, err)
+			return fmt.Errorf("containerd-shim: opening %s failed: %s", pair.name, err)
 		}
-		fr, err := fifo.OpenFifo(ctx, name, syscall.O_RDONLY, 0)
+		fr, err := fifo.OpenFifo(ctx, pair.name, syscall.O_RDONLY, 0)
 		if err != nil {
-			return fmt.Errorf("containerd-shim: opening %s failed: %s", name, err)
+			return fmt.Errorf("containerd-shim: opening %s failed: %s", pair.name, err)
 		}
-		dest(fw, fr)
+		pair.dest(fw, fr)
 	}
 
 	f, err := fifo.OpenFifo(ctx, p.state.Stdin, syscall.O_RDONLY, 0)

@@ -30,27 +30,36 @@ func (p *process) openIO() error {
 	p.shimIO = i
 	// Both tty and non-tty mode are handled by the runtime using
 	// the following pipes
-	for name, dest := range map[string]func(f *os.File){
-		p.state.Stdout: func(f *os.File) {
-			p.Add(1)
-			go func() {
-				io.Copy(f, i.Stdout)
-				p.Done()
-			}()
+	for _, pair := range []struct {
+		name string
+		dest func(f *os.File)
+	}{
+		{
+			p.state.Stdout,
+			func(f *os.File) {
+				p.Add(1)
+				go func() {
+					io.Copy(f, i.Stdout)
+					p.Done()
+				}()
+			},
 		},
-		p.state.Stderr: func(f *os.File) {
-			p.Add(1)
-			go func() {
-				io.Copy(f, i.Stderr)
-				p.Done()
-			}()
+		{
+			p.state.Stderr,
+			func(f *os.File) {
+				p.Add(1)
+				go func() {
+					io.Copy(f, i.Stderr)
+					p.Done()
+				}()
+			},
 		},
 	} {
-		f, err := os.OpenFile(name, syscall.O_RDWR, 0)
+		f, err := os.OpenFile(pair.name, syscall.O_RDWR, 0)
 		if err != nil {
 			return err
 		}
-		dest(f)
+		pair.dest(f)
 	}
 
 	f, err := os.OpenFile(p.state.Stdin, syscall.O_RDONLY, 0)
