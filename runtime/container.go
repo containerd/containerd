@@ -250,12 +250,9 @@ func (c *container) readSpec() (*specs.Spec, error) {
 
 func (c *container) Delete() error {
 	var err error
-	args := c.runtimeArgs
-	args = append(args, "delete", c.id)
+	args := append(c.runtimeArgs, "delete", c.id)
 	if b, derr := exec.Command(c.runtime, args...).CombinedOutput(); err != nil {
 		err = fmt.Errorf("%s: %q", derr, string(b))
-	} else if len(b) > 0 {
-		logrus.Debugf("%v %v: %q", c.runtime, args, string(b))
 	}
 	if rerr := os.RemoveAll(filepath.Join(c.root, c.id)); rerr != nil {
 		if err != nil {
