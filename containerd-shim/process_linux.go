@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"os/exec"
 	"syscall"
 	"time"
 
@@ -114,5 +115,17 @@ func (p *process) openIO() error {
 		f.Close()
 	}()
 
+	return nil
+}
+
+func (p *process) killAll() error {
+	if !p.state.Exec {
+		cmd := exec.Command(p.runtime, append(p.state.RuntimeArgs, "kill", "--all", p.id, "SIGKILL")...)
+		cmd.SysProcAttr = setPDeathSig()
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("%s: %v", out, err)
+		}
+	}
 	return nil
 }

@@ -217,18 +217,6 @@ func (p *process) pid() int {
 	return p.containerPid
 }
 
-func (p *process) killAll() error {
-	if !p.state.Exec {
-		cmd := exec.Command(p.runtime, append(p.state.RuntimeArgs, "kill", "--all", p.id, "SIGKILL")...)
-		cmd.SysProcAttr = setPDeathSig()
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("%s: %v", out, err)
-		}
-	}
-	return nil
-}
-
 func (p *process) delete() error {
 	if !p.state.Exec {
 		cmd := exec.Command(p.runtime, append(p.state.RuntimeArgs, "delete", p.id)...)
