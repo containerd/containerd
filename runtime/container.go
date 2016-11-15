@@ -660,7 +660,7 @@ func (c *container) waitForCreate(p *process, cmd *exec.Cmd) error {
 			return err
 		}
 		err = p.saveStartTime()
-		if err != nil {
+		if err != nil && !os.IsNotExist(err) {
 			logrus.Warnf("containerd: unable to save %s:%s starttime: %v", p.container.id, p.id, err)
 		}
 		return nil
