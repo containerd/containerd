@@ -379,6 +379,7 @@ func (cs *ContainerdSuite) TestRestart(t *check.C) {
 	}
 
 	totalCtr := 10
+	ctrs := make([]*ContainerProcess, totalCtr)
 
 	for i := 0; i < totalCtr; i++ {
 		containerID := fmt.Sprintf("top%d", i)
@@ -396,6 +397,7 @@ func (cs *ContainerdSuite) TestRestart(t *check.C) {
 			Pid:       "",
 			Timestamp: e.Timestamp,
 		})
+		ctrs[i] = c
 	}
 
 	// restart daemon gracefully (SIGINT)
@@ -413,10 +415,36 @@ func (cs *ContainerdSuite) TestRestart(t *check.C) {
 		t.Assert(containers[i].Status, checker.Equals, "running")
 	}
 
+	// Check that we can exec see docker/docker#
+	execTarget := "top1"
+	echop, err := cs.AddProcessToContainer(ctrs[1], "echo", "/", []string{"PATH=/bin"}, []string{"sh", "-c", "echo -n Success!"}, 0, 0)
+	t.Assert(err, checker.Equals, nil)
+	for _, evt := range []types.Event{
+		{
+			Type:   "start-process",
+			Id:     execTarget,
+			Status: 0,
+			Pid:    "echo",
+		},
+		{
+			Type:   "exit",
+			Id:     execTarget,
+			Status: 0,
+			Pid:    "echo",
+		},
+	} {
+		ch := ctrs[1].GetEventsChannel()
+		e := <-ch
+		evt.Timestamp = e.Timestamp
+
+		t.Assert(*e, checker.Equals, evt)
+	}
+	t.Assert(echop.io.stdoutBuffer.String(), checker.Equals, "Success!")
+
 	// Now kill daemon (SIGKILL)
 	cs.StopDaemon(true)
 
-	// Sleep a second to allow thevent e timestamp to change since
+	// Sleep a second to allow the timestamp to change since
 	// it's second based
 	<-time.After(3 * time.Second)
 
