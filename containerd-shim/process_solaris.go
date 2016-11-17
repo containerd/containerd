@@ -64,3 +64,7 @@ func (p *process) openIO() error {
 
 	return nil
 }
+
+func (p *process) killAll() error {
+	return nil
+}
