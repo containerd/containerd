@@ -17,6 +17,11 @@ func writeMessage(f *os.File, level string, err error) {
 	fmt.Fprintf(f, `{"level": "%s","msg": "%s"}`, level, err)
 }
 
+// alertMessage prints alert to stdout
+func alertMessage(level string, msg string) {
+	fmt.Printf(`{"level": "%s","msg": "%s"}`, level, msg)
+}
+
 type controlMessage struct {
 	Type   int
 	Width  int
@@ -54,6 +59,7 @@ func main() {
 		// init and will not have anyone to read from it
 		writeMessage(f, "error", err)
 		f.Close()
+		alertMessage("warning", "May be you are using containerd-shim in wrong way? See ./shim-log.json")
 		os.Exit(1)
 	}
 }
