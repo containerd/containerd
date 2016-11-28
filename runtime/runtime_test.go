@@ -65,13 +65,16 @@ func setupStdio(cwd string, bundlePath string, bundleName string) (Stdio, error)
 	s := NewStdio(devNull, devNull, devNull)
 
 	pid := "init"
-	for stdName, stdPath := range map[string]*string{
-		"stdin":  &s.Stdin,
-		"stdout": &s.Stdout,
-		"stderr": &s.Stderr,
+	for _, pair := range []struct {
+		stdName string
+		stdPath *string
+	}{
+		{"stdin", &s.Stdin},
+		{"stdout", &s.Stdout},
+		{"stderr", &s.Stderr},
 	} {
-		*stdPath = filepath.Join(cwd, bundlePath, "io", bundleName+"-"+pid+"-"+stdName)
-		if err := syscall.Mkfifo(*stdPath, 0755); err != nil && !os.IsExist(err) {
+		*pair.stdPath = filepath.Join(cwd, bundlePath, "io", bundleName+"-"+pid+"-"+pair.stdName)
+		if err := syscall.Mkfifo(*pair.stdPath, 0755); err != nil && !os.IsExist(err) {
 			fmt.Println("Mkfifo error: ", err)
 			return s, err
 		}
