@@ -182,10 +182,10 @@ var startCommand = cli.Command{
 		if err != nil {
 			fatal(fmt.Sprintf("cannot get the absolute path of the bundle: %v", err), 1)
 		}
-		s, err := createStdio()
+		s, tmpDir, err := createStdio()
 		defer func() {
-			if s.stdin != "" {
-				os.RemoveAll(filepath.Dir(s.stdin))
+			if tmpDir != "" {
+				os.RemoveAll(tmpDir)
 			}
 		}()
 		if err != nil {
@@ -489,10 +489,10 @@ var execCommand = cli.Command{
 				Gid: uint32(context.Int("gid")),
 			},
 		}
-		s, err := createStdio()
+		s, tmpDir, err := createStdio()
 		defer func() {
-			if s.stdin != "" {
-				os.RemoveAll(filepath.Dir(s.stdin))
+			if tmpDir != "" {
+				os.RemoveAll(tmpDir)
 			}
 		}()
 		if err != nil {
@@ -684,10 +684,10 @@ type stdio struct {
 	stderr string
 }
 
-func createStdio() (s stdio, err error) {
-	tmp, err := ioutil.TempDir("", "ctr-")
+func createStdio() (s stdio, tmp string, err error) {
+	tmp, err = ioutil.TempDir("", "ctr-")
 	if err != nil {
-		return s, err
+		return s, tmp, err
 	}
 	// create fifo's for the process
 	for name, fd := range map[string]*string{
@@ -697,9 +697,9 @@ func createStdio() (s stdio, err error) {
 	} {
 		path := filepath.Join(tmp, name)
 		if err := unix.Mkfifo(path, 0755); err != nil && !os.IsExist(err) {
-			return s, err
+			return s, tmp, err
 		}
 		*fd = path
 	}
-	return s, nil
+	return s, tmp, nil
 }
