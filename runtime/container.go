@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -251,7 +252,7 @@ func (c *container) readSpec() (*specs.Spec, error) {
 func (c *container) Delete() error {
 	var err error
 	args := append(c.runtimeArgs, "delete", c.id)
-	if b, derr := exec.Command(c.runtime, args...).CombinedOutput(); derr != nil {
+	if b, derr := exec.Command(c.runtime, args...).CombinedOutput(); derr != nil && !strings.Contains(string(b), "does not exist") {
 		err = fmt.Errorf("%s: %q", derr, string(b))
 	}
 	if rerr := os.RemoveAll(filepath.Join(c.root, c.id)); rerr != nil {
