@@ -229,10 +229,17 @@ func (p *process) Resize(w, h int) error {
 }
 
 func (p *process) updateExitStatusFile(status uint32) (uint32, error) {
+	fmt.Println("ALALALALALA update exit status file")
+	logrus.Error("ALALALALA udpate exit status")
 	p.stateLock.Lock()
 	p.state = Stopped
 	p.stateLock.Unlock()
-	err := ioutil.WriteFile(filepath.Join(p.root, ExitStatusFile), []byte(fmt.Sprintf("%u", status)), 0644)
+	f, err := os.Create(filepath.Join(p.root, ExitStatusFile))
+	if err != nil {
+		return status, err
+	}
+	_, err = fmt.Fprintf(f, fmt.Sprintf("%u", status))
+	//	f.Sync()
 	return status, err
 }
 

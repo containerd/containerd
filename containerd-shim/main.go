@@ -68,11 +68,9 @@ func start(log *os.File) error {
 		return err
 	}
 	// open the exit pipe
-	f, err := os.OpenFile("exit", syscall.O_WRONLY, 0)
-	if err != nil {
+	if _, err := os.OpenFile("exit", syscall.O_WRONLY, 0); err != nil {
 		return err
 	}
-	defer f.Close()
 	control, err := os.OpenFile("control", syscall.O_RDWR, 0)
 	if err != nil {
 		return err
@@ -160,5 +158,6 @@ func writeInt(path string, i int) error {
 	}
 	defer f.Close()
 	_, err = fmt.Fprintf(f, "%d", i)
+	f.Sync()
 	return err
 }
