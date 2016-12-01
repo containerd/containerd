@@ -106,6 +106,8 @@ func eventLogger(s *Supervisor, path string, events chan Event, retainCount int)
 					for _, le := range s.eventLog {
 						if err := enc.Encode(le); err != nil {
 							logrus.WithField("error", err).Error("containerd: write event to journal")
+						} else {
+							count++
 						}
 					}
 				}
