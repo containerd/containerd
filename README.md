@@ -7,6 +7,15 @@ as checkpoint and restore for cloning and live migration of containers.
 ## Getting started
 
 The easiest way to start using containerd is to download binaries from the [releases page](https://github.com/docker/containerd/releases).
+If a build of the version you need is unavailable, you can clone the repository and run the following steps:
+
+```bash
+$ git checkout v0.2.4 # `git tag` to show versions
+$ make
+$ sudo make install
+```
+
+Binaries will be available in `/usr/local/bin`.
 
 The included `ctr` command-line tool allows you interact with the containerd daemon:
 
