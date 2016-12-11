@@ -7,6 +7,8 @@ GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD 2> /dev/null)
 
 LDFLAGS := -X github.com/docker/containerd.GitCommit=${GIT_COMMIT} ${LDFLAGS}
 
+TARGET ?= /usr/local/bin
+
 TEST_TIMEOUT ?= 5m
 TEST_SUITE_TIMEOUT ?= 10m
 
@@ -73,7 +75,7 @@ dbench: dbuild
 	$(DOCKER_RUN) make bench
 
 install:
-	cp bin/* /usr/local/bin/
+	cp bin/* $(TARGET)
 
 protoc:
 	protoc -I ./api/grpc/types ./api/grpc/types/api.proto --go_out=plugins=grpc:api/grpc/types
