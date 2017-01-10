@@ -331,11 +331,15 @@ func (s *Supervisor) restore() error {
 		id := d.Name()
 		container, err := runtime.Load(s.stateDir, id, s.shim, s.timeout)
 		if err != nil {
-			return err
+			logrus.WithFields(logrus.Fields{"error": err, "id": id}).
+				Warnf("containerd: failed to load container")
+			continue
 		}
 		processes, err := container.Processes()
 		if err != nil {
-			return err
+			logrus.WithFields(logrus.Fields{"error": err, "id": id}).
+				Warnf("containerd: failed to load container processes")
+			continue
 		}
 
 		ContainersCounter.Inc(1)
