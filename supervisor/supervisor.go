@@ -331,7 +331,9 @@ func (s *Supervisor) restore() error {
 		id := d.Name()
 		container, err := runtime.Load(s.stateDir, id, s.shim, s.timeout)
 		if err != nil {
-			return err
+			logrus.WithFields(logrus.Fields{"error": err, "id": id}).Warnf("containerd: failed to load container,removing state diretory.")
+			os.RemoveAll(filepath.Join(s.stateDir, id))
+			continue
 		}
 		processes, err := container.Processes()
 		if err != nil {
