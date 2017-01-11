@@ -23,3 +23,6 @@ script:
   - make binaries
   - make coverage
   - sudo PATH=$PATH GOPATH=$GOPATH make root-coverage
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
