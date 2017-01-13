@@ -108,8 +108,10 @@ clean: ## clean up binaries
 	@echo "🐳 $@"
 	@rm -f $(BINARIES)
 
-install: $(BINARIES) ## install binaries
-	@echo "🐳 $@"
+install: ## install binaries
+	@ls $(BINARIES) > /dev/null 2>&1 || \
+		(echo "👹 Please run \`make\` before running \`make install\`." && false)
+	@echo "🐳 $@ $(BINARIES)"
 	@mkdir -p $(DESTDIR)/bin
 	@install $(BINARIES) $(DESTDIR)/bin
 
