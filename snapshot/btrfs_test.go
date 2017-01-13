@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/docker/containerd"
+	"github.com/docker/containerd/testutil"
 	btrfs "github.com/stevvooe/go-btrfs"
 )
 
@@ -18,6 +19,7 @@ const (
 )
 
 func TestBtrfs(t *testing.T) {
+	testutil.Requires(t, testutil.Privileged)
 	device := setupBtrfsLoopbackDevice(t)
 	defer removeBtrfsLoopbackDevice(t, device)
 	root, err := ioutil.TempDir(device.mountPoint, "TestBtrfsPrepare-")
