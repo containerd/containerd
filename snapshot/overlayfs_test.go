@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/docker/containerd"
+	"github.com/docker/containerd/testutil"
 )
 
 func TestOverlayfs(t *testing.T) {
@@ -126,9 +127,7 @@ func TestOverlayfsOverlayMount(t *testing.T) {
 }
 
 func TestOverlayfsOverlayRead(t *testing.T) {
-	if os.Getuid() != 0 {
-		t.Skip("not running as root")
-	}
+	testutil.Requires(t, testutil.Privileged)
 	root, err := ioutil.TempDir("", "overlay")
 	if err != nil {
 		t.Fatal(err)

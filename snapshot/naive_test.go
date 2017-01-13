@@ -8,9 +8,11 @@ import (
 	"testing"
 
 	"github.com/docker/containerd"
+	"github.com/docker/containerd/testutil"
 )
 
 func TestSnapshotNaiveBasic(t *testing.T) {
+	testutil.Requires(t, testutil.Privileged)
 	tmpDir, err := ioutil.TempDir("", "test-layman-")
 	if err != nil {
 		t.Fatal(err)

@@ -8,12 +8,14 @@ import (
 	"testing"
 
 	"github.com/docker/containerd"
+	"github.com/docker/containerd/testutil"
 )
 
 // TestSnapshotManagerBasic implements something similar to the conceptual
 // examples we've discussed thus far. It does perform mounts, so you must run
 // as root.
 func TestSnapshotManagerBasic(t *testing.T) {
+	testutil.Requires(t, testutil.Privileged)
 	tmpDir, err := ioutil.TempDir("", "test-layman-")
 	if err != nil {
 		t.Fatal(err)
