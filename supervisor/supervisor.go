@@ -375,6 +375,8 @@ func (s *Supervisor) restore() error {
 }
 
 func (s *Supervisor) handleTask(i Task) {
+	s.eventLock.Lock()
+	defer s.eventLock.Unlock()
 	var err error
 	switch t := i.(type) {
 	case *AddProcessTask:
