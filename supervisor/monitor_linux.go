@@ -87,6 +87,48 @@ func (m *Monitor) Close() error {
 	return syscall.Close(m.epollFd)
 }
 
+func (m *Monitor) processEvent(fd int, event uint32) {
+	m.m.Lock()
+	r := m.receivers[fd]
+	switch t := r.(type) {
+	case runtime.Process:
+		if event == syscall.EPOLLHUP {
+			delete(m.receivers, fd)
+			if err := syscall.EpollCtl(m.epollFd, syscall.EPOLL_CTL_DEL, fd, &syscall.EpollEvent{
+				Events: syscall.EPOLLHUP,
+				Fd:     int32(fd),
+			}); err != nil {
+				logrus.WithField("error", err).Error("containerd: epoll remove fd")
+			}
+			if err := t.Close(); err != nil {
+				logrus.WithField("error", err).Error("containerd: close process IO")
+			}
+			EpollFdCounter.Dec(1)
+			// defer until lock is released
+			defer func() {
+				m.exits <- t
+			}()
+		}
+	case runtime.OOM:
+		// always flush the event fd
+		t.Flush()
+		if t.Removed() {
+			delete(m.receivers, fd)
+			// epoll will remove the fd from its set after it has been closed
+			t.Close()
+			EpollFdCounter.Dec(1)
+		} else {
+			// defer until lock is released
+			defer func() {
+				m.ooms <- t.ContainerID()
+			}()
+		}
+	}
+	// This cannot be a defer to avoid a deadlock in case the channels
+	// above get full
+	m.m.Unlock()
+}
+
 func (m *Monitor) start() {
 	var events [128]syscall.EpollEvent
 	for {
@@ -99,38 +141,7 @@ func (m *Monitor) start() {
 		}
 		// process events
 		for i := 0; i < n; i++ {
-			fd := int(events[i].Fd)
-			m.m.Lock()
-			r := m.receivers[fd]
-			switch t := r.(type) {
-			case runtime.Process:
-				if events[i].Events == syscall.EPOLLHUP {
-					delete(m.receivers, fd)
-					if err = syscall.EpollCtl(m.epollFd, syscall.EPOLL_CTL_DEL, fd, &syscall.EpollEvent{
-						Events: syscall.EPOLLHUP,
-						Fd:     int32(fd),
-					}); err != nil {
-						logrus.WithField("error", err).Error("containerd: epoll remove fd")
-					}
-					if err := t.Close(); err != nil {
-						logrus.WithField("error", err).Error("containerd: close process IO")
-					}
-					EpollFdCounter.Dec(1)
-					m.exits <- t
-				}
-			case runtime.OOM:
-				// always flush the event fd
-				t.Flush()
-				if t.Removed() {
-					delete(m.receivers, fd)
-					// epoll will remove the fd from its set after it has been closed
-					t.Close()
-					EpollFdCounter.Dec(1)
-				} else {
-					m.ooms <- t.ContainerID()
-				}
-			}
-			m.m.Unlock()
+			m.processEvent(int(events[i].Fd), events[i].Events)
 		}
 	}
 }
