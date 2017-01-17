@@ -28,11 +28,11 @@ func TestBtrfs(t *testing.T) {
 	defer os.RemoveAll(root)
 
 	target := filepath.Join(root, "test")
-	sm, err := NewBtrfs(device.deviceName, root)
+	b, err := NewBtrfs(device.deviceName, root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mounts, err := sm.Prepare(target, "")
+	mounts, err := b.Prepare(target, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestBtrfs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := sm.Commit(filepath.Join(root, "snapshots/committed"), filepath.Join(root, "test")); err != nil {
+	if err := b.Commit(filepath.Join(root, "snapshots/committed"), filepath.Join(root, "test")); err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
@@ -80,7 +80,7 @@ func TestBtrfs(t *testing.T) {
 	}()
 
 	target = filepath.Join(root, "test2")
-	mounts, err = sm.Prepare(target, filepath.Join(root, "snapshots/committed"))
+	mounts, err = b.Prepare(target, filepath.Join(root, "snapshots/committed"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestBtrfs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := sm.Commit(filepath.Join(root, "snapshots/committed2"), target); err != nil {
+	if err := b.Commit(filepath.Join(root, "snapshots/committed2"), target); err != nil {
 		t.Fatal(err)
 	}
 	defer func() {

@@ -21,7 +21,7 @@ minimal API simplifies behavior without sacrificing power. This makes the
 surface area for driver implementations smaller, ensuring that behavior is more
 consistent between implementations.
 
-These differ from the concept of the graphdriver in that the LayerManipulator
+These differ from the concept of the graphdriver in that the _Snapshot Manager_
 has no knowledge of images or containers. Users simply prepare and commit
 directories. We also avoid the integration between graph drivers and the tar
 format used to represent the changesets.
@@ -125,8 +125,8 @@ Per the terminology above, `tmpLocation` is known as the `target`. `layerPath`
 is simply a tar file, representing a changset. We start by using
 `SnapshotManager` to prepare the temporary location as a snapshot point:
 
-	lm := SnapshotManager()
-	mounts, err := lm.Prepare(tmpLocation, "")
+	sm := SnapshotManager()
+	mounts, err := sm.Prepare(tmpLocation, "")
 	if err != nil { ... }
 
 Note that we provide "" as the `parent`, since we are applying the diff to an
@@ -142,6 +142,8 @@ that applies the contents of the layer to target location and calculates the
 DiffID of the unpacked layer (this is a requirement for docker
 implementation):
 
+	layer, err := os.Open(layerPath)
+	if err != nil { ... }
 	digest, err := unpackLayer(tmpLocation, layer) // unpack into layer location
 	if err != nil { ... }
 
@@ -156,7 +158,7 @@ the actual diff. For this example, we are just going to use the layer `digest`,
 but in practice, this will probably be the `ChainID`:
 
 	diffPath := filepath.Join("/layers", digest) // name location for the uncompressed layer digest
-	if err := lm.Commit(diffPath, tmpLocation); err != nil { ... }
+	if err := sm.Commit(diffPath, tmpLocation); err != nil { ... }
 
 The new layer has been imported as a _snapshot_ into the `SnapshotManager`
 under the name `diffPath`. `diffPath`, which is a user opaque directory
@@ -166,9 +168,9 @@ location, can then be used as a parent in later snapshots.
 
 Making a layer depend on the above is identical to the process described
 above except that the parent is provided as diffPath when calling
-`Snapshot.Prepare`:
+`SnapshotManager.Prepare`:
 
-	mounts, err := lm.Prepare(tmpLocation, parentDiffPath)
+	mounts, err := sm.Prepare(tmpLocation, parentDiffPath)
 
 Because have a provided a `parent`, the resulting `tmpLocation`, after
 mounting, will have the changes from above. Any new changes will be isolated to
@@ -182,13 +184,13 @@ To run a container, we simply provide `SnapshotManager.Prepare` the `diff` of
 the image we want to start the container from. After mounting, the prepared
 path can be used directly as the container's filesystem:
 
-	mounts, err := lm.Prepare(containerRootFS, imageDiffPath)
+	mounts, err := sm.Prepare(containerRootFS, imageDiffPath)
 
 The returned mounts can then be passed directly to the container runtime. If
 one would like to create a new image from the filesystem,
-SnapshotManipulator.Commit is called:
+`SnapshotManager.Commit` is called:
 
-	if err := lm.Commit(newImageDiff, containerRootFS); err != nil { ... }
+	if err := sm.Commit(newImageDiff, containerRootFS); err != nil { ... }
 
-Alternatively, for most container runs, Snapshot.Rollback will be
+Alternatively, for most container runs, `SnapshotManager.Rollback` will be
 called to signal `SnapshotManager` to abandon the changes.

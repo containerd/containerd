@@ -43,8 +43,8 @@ func NewNaive(root string) (*Naive, error) {
 //
 // For the naive driver, the data is checked out directly into dst and no
 // mounts are returned.
-func (lm *Naive) Prepare(dst, parent string) ([]containerd.Mount, error) {
-	metadataRoot, err := ioutil.TempDir(lm.root, "active-")
+func (n *Naive) Prepare(dst, parent string) ([]containerd.Mount, error) {
+	metadataRoot, err := ioutil.TempDir(n.root, "active-")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to created transaction dir")
 	}
@@ -57,7 +57,7 @@ func (lm *Naive) Prepare(dst, parent string) ([]containerd.Mount, error) {
 	}
 
 	if parent != "" {
-		if _, ok := lm.parents[parent]; !ok {
+		if _, ok := n.parents[parent]; !ok {
 			return nil, errors.Wrap(err, "specified parent does not exist")
 		}
 
@@ -71,7 +71,7 @@ func (lm *Naive) Prepare(dst, parent string) ([]containerd.Mount, error) {
 		}
 	}
 
-	lm.active[dst] = activeNaiveSnapshot{
+	n.active[dst] = activeNaiveSnapshot{
 		parent:   parent,
 		metadata: metadataRoot,
 	}
@@ -80,8 +80,8 @@ func (lm *Naive) Prepare(dst, parent string) ([]containerd.Mount, error) {
 }
 
 // Commit just moves the metadata directory to the diff location.
-func (lm *Naive) Commit(diff, dst string) error {
-	active, ok := lm.active[dst]
+func (n *Naive) Commit(diff, dst string) error {
+	active, ok := n.active[dst]
 	if !ok {
 		return errors.Errorf("%v is not an active transaction", dst)
 	}
@@ -96,22 +96,22 @@ func (lm *Naive) Commit(diff, dst string) error {
 		return errors.Wrap(err, "failed to rename metadata into diff")
 	}
 
-	lm.parents[diff] = active.parent
-	delete(lm.active, dst)
+	n.parents[diff] = active.parent
+	delete(n.active, dst)
 
 	return nil
 }
 
-func (lm *Naive) Rollback(dst string) error {
-	active, ok := lm.active[dst]
+func (n *Naive) Rollback(dst string) error {
+	active, ok := n.active[dst]
 	if !ok {
 		return fmt.Errorf("%q must be an active snapshot", dst)
 	}
 
-	delete(lm.active, dst)
+	delete(n.active, dst)
 	return os.RemoveAll(active.metadata)
 }
 
-func (lm *Naive) Parent(diff string) string {
-	return lm.parents[diff]
+func (n *Naive) Parent(diff string) string {
+	return n.parents[diff]
 }

@@ -10,13 +10,13 @@ import (
 	"github.com/docker/containerd"
 )
 
-func TestOverlayfs(t *testing.T) {
+func TestOverlay(t *testing.T) {
 	root, err := ioutil.TempDir("", "overlay")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(root)
-	o, err := NewOverlayfs(root)
+	o, err := NewOverlay(root)
 	if err != nil {
 		t.Error(err)
 		return
@@ -45,13 +45,13 @@ func TestOverlayfs(t *testing.T) {
 	}
 }
 
-func TestOverlayfsCommit(t *testing.T) {
+func TestOverlayCommit(t *testing.T) {
 	root, err := ioutil.TempDir("", "overlay")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(root)
-	o, err := NewOverlayfs(root)
+	o, err := NewOverlay(root)
 	if err != nil {
 		t.Error(err)
 		return
@@ -73,13 +73,13 @@ func TestOverlayfsCommit(t *testing.T) {
 	}
 }
 
-func TestOverlayfsOverlayMount(t *testing.T) {
+func TestOverlayOverlayMount(t *testing.T) {
 	root, err := ioutil.TempDir("", "overlay")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(root)
-	o, err := NewOverlayfs(root)
+	o, err := NewOverlay(root)
 	if err != nil {
 		t.Error(err)
 		return
@@ -125,7 +125,7 @@ func TestOverlayfsOverlayMount(t *testing.T) {
 	}
 }
 
-func TestOverlayfsOverlayRead(t *testing.T) {
+func TestOverlayOverlayRead(t *testing.T) {
 	if os.Getuid() != 0 {
 		t.Skip("not running as root")
 	}
@@ -134,7 +134,7 @@ func TestOverlayfsOverlayRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(root)
-	o, err := NewOverlayfs(root)
+	o, err := NewOverlay(root)
 	if err != nil {
 		t.Error(err)
 		return

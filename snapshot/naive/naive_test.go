@@ -10,7 +10,7 @@ import (
 )
 
 func TestSnapshotNaiveBasic(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "test-layman-")
+	tmpDir, err := ioutil.TempDir("", "test-naive-")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -19,7 +19,7 @@ func TestSnapshotNaiveBasic(t *testing.T) {
 	t.Log(tmpDir)
 	root := filepath.Join(tmpDir, "root")
 
-	lm, err := NewNaive(root)
+	n, err := NewNaive(root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +29,7 @@ func TestSnapshotNaiveBasic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mounts, err := lm.Prepare(preparing, "")
+	mounts, err := n.Prepare(preparing, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,14 +46,14 @@ func TestSnapshotNaiveBasic(t *testing.T) {
 
 	// defer os.Remove(filepath.Join(tmpDir, "foo"))
 
-	committed := filepath.Join(lm.root, "committed")
+	committed := filepath.Join(n.root, "committed")
 
-	if err := lm.Commit(committed, preparing); err != nil {
+	if err := n.Commit(committed, preparing); err != nil {
 		t.Fatal(err)
 	}
 
-	if lm.Parent(preparing) != "" {
-		t.Fatalf("parent of new layer should be empty, got lm.Parent(%q) == %q", preparing, lm.Parent(preparing))
+	if n.Parent(preparing) != "" {
+		t.Fatalf("parent of new layer should be empty, got n.Parent(%q) == %q", preparing, n.Parent(preparing))
 	}
 
 	next := filepath.Join(tmpDir, "nextlayer")
@@ -61,7 +61,7 @@ func TestSnapshotNaiveBasic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mounts, err = lm.Prepare(next, committed)
+	mounts, err = n.Prepare(next, committed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,12 +79,12 @@ func TestSnapshotNaiveBasic(t *testing.T) {
 	}
 
 	os.RemoveAll(next + "/a/b")
-	nextCommitted := filepath.Join(lm.root, "committed-next")
-	if err := lm.Commit(nextCommitted, next); err != nil {
+	nextCommitted := filepath.Join(n.root, "committed-next")
+	if err := n.Commit(nextCommitted, next); err != nil {
 		t.Fatal(err)
 	}
 
-	if lm.Parent(nextCommitted) != committed {
-		t.Fatalf("parent of new layer should be %q, got lm.Parent(%q) == %q (%#v)", committed, next, lm.Parent(next), lm.parents)
+	if n.Parent(nextCommitted) != committed {
+		t.Fatalf("parent of new layer should be %q, got n.Parent(%q) == %q (%#v)", committed, next, n.Parent(next), n.parents)
 	}
 }

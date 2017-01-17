@@ -31,8 +31,8 @@ import (
 // We then use a Manager to prepare the temporary location as a
 // snapshot point:
 //
-// 	lm := NewManager()
-//	mounts, err := lm.Prepare(tmpLocation, "")
+// 	sm := NewManager()
+//	mounts, err := sm.Prepare(tmpLocation, "")
 // 	if err != nil { ... }
 //
 // Note that we provide "" as the parent, since we are applying the diff to an
@@ -48,6 +48,8 @@ import (
 // DiffID of the unpacked layer (this is a requirement for docker
 // implementation):
 //
+//	layer, err := os.Open(layerPath)
+//	if err != nil { ... }
 // 	digest, err := unpackLayer(tmpLocation, layer) // unpack into layer location
 // 	if err != nil { ... }
 //
@@ -62,7 +64,7 @@ import (
 // digest, but in practice, this will probably be the ChainID:
 //
 // 	diffPath := filepath.Join("/layers", digest) // name location for the uncompressed layer digest
-//	if err := lm.Commit(diffPath, tmpLocation); err != nil { ... }
+//	if err := sm.Commit(diffPath, tmpLocation); err != nil { ... }
 //
 // Now, we have a layer in the Manager that can be accessed with the
 // opaque diffPath provided during commit.
@@ -73,7 +75,7 @@ import (
 // above except that the parent is provided as diffPath when calling
 // Manager.Prepare:
 //
-// 	mounts, err := lm.Prepare(tmpLocation, parentDiffPath)
+// 	mounts, err := sm.Prepare(tmpLocation, parentDiffPath)
 //
 // The diff will be captured at tmpLocation, as the layer is applied.
 //
@@ -83,13 +85,13 @@ import (
 // of the image we want to start the container from. After mounting, the
 // prepared path can be used directly as the container's filesystem:
 //
-// 	mounts, err := lm.Prepare(containerRootFS, imageDiffPath)
+// 	mounts, err := sm.Prepare(containerRootFS, imageDiffPath)
 //
 // The returned mounts can then be passed directly to the container runtime. If
 // one would like to create a new image from the filesystem,
 // Manager.Commit is called:
 //
-// 	if err := lm.Commit(newImageDiff, containerRootFS); err != nil { ... }
+// 	if err := sm.Commit(newImageDiff, containerRootFS); err != nil { ... }
 //
 // Alternatively, for most container runs, Manager.Rollback will be
 // called to signal Manager to abandon the changes.
@@ -97,7 +99,7 @@ import (
 // TODO(stevvooe): Consider an alternate API that provides an active object to
 // represent the lifecycle:
 //
-// 	work, err := lm.Prepare(dst, parent)
+// 	work, err := sm.Prepare(dst, parent)
 //  mountAll(work.Mounts())
 // 	work.Commit() || work.Rollback()
 //
@@ -144,7 +146,7 @@ func NewManager(root string) (*Manager, error) {
 //
 // Once the writes have completed, Manager.Commit or
 // Manager.Rollback should be called on dst.
-func (lm *Manager) Prepare(dst, parent string) ([]containerd.Mount, error) {
+func (sm *Manager) Prepare(dst, parent string) ([]containerd.Mount, error) {
 	// we want to build up lowerdir, upperdir and workdir options for the
 	// overlay mount.
 	//
@@ -157,25 +159,25 @@ func (lm *Manager) Prepare(dst, parent string) ([]containerd.Mount, error) {
 	// workdir needs to be there but it is not really clear why.
 	var opts []string
 
-	upperdir, err := ioutil.TempDir(lm.root, "diff-")
+	upperdir, err := ioutil.TempDir(sm.root, "diff-")
 	if err != nil {
 		return nil, err
 	}
 	opts = append(opts, "upperdir="+upperdir)
 
-	workdir, err := ioutil.TempDir(lm.root, "work-")
+	workdir, err := ioutil.TempDir(sm.root, "work-")
 	if err != nil {
 		return nil, err
 	}
 	opts = append(opts, "workdir="+workdir)
 
-	empty := filepath.Join(lm.root, "empty")
+	empty := filepath.Join(sm.root, "empty")
 	if err := os.MkdirAll(empty, 0777); err != nil {
 		return nil, err
 	}
 
 	// TODO(stevvooe): Write this metadata to disk to make it useful.
-	lm.active[dst] = activeLayer{
+	sm.active[dst] = activeLayer{
 		parent:   parent,
 		upperdir: upperdir,
 		workdir:  workdir,
@@ -184,7 +186,7 @@ func (lm *Manager) Prepare(dst, parent string) ([]containerd.Mount, error) {
 	var parents []string
 	for parent != "" {
 		parents = append(parents, parent)
-		parent = lm.Parent(parent)
+		parent = sm.Parent(parent)
 	}
 
 	if len(parents) == 0 {
@@ -210,18 +212,18 @@ func (lm *Manager) Prepare(dst, parent string) ([]containerd.Mount, error) {
 //
 // Calling Commit on dst will result in an error. Calling Rollback on dst
 // should be done to cleanup resources.
-func (lm *Manager) View(dst, parent string) ([]containerd.Mount, error) {
+func (sm *Manager) View(dst, parent string) ([]containerd.Mount, error) {
 	panic("not implemented")
 }
 
 // Commit captures the changes between dst and its parent into the path
-// provided by diff. The path diff can then be used with the layer
-// manipulator's other methods to access the diff content.
+// provided by diff. The path diff can then be used with the snapshot
+// manager's other methods to access the diff content.
 //
 // The contents of diff are opaque to the caller and may be specific to the
 // implementation of the layer backend.
-func (lm *Manager) Commit(diff, dst string) error {
-	active, ok := lm.active[dst]
+func (sm *Manager) Commit(diff, dst string) error {
+	active, ok := sm.active[dst]
 	if !ok {
 		return fmt.Errorf("%q must be an active layer", dst)
 	}
@@ -237,8 +239,8 @@ func (lm *Manager) Commit(diff, dst string) error {
 		return err
 	}
 
-	lm.parents[diff] = active.parent
-	delete(lm.active, dst) // remove from active, again, consider not doing this to support multiple commits.
+	sm.parents[diff] = active.parent
+	delete(sm.active, dst) // remove from active, again, consider not doing this to support multiple commits.
 	// note that allowing multiple commits would require copy for overlay.
 
 	return nil
@@ -246,8 +248,8 @@ func (lm *Manager) Commit(diff, dst string) error {
 
 // Rollback can be called after prepare if the caller would like to abandon the
 // changeset.
-func (lm *Manager) Rollback(dst string) error {
-	active, ok := lm.active[dst]
+func (sm *Manager) Rollback(dst string) error {
+	active, ok := sm.active[dst]
 	if !ok {
 		return fmt.Errorf("%q must be an active layer", dst)
 	}
@@ -256,13 +258,13 @@ func (lm *Manager) Rollback(dst string) error {
 	err = os.RemoveAll(active.upperdir)
 	err = os.RemoveAll(active.workdir)
 
-	delete(lm.active, dst)
+	delete(sm.active, dst)
 	return err
 }
 
 // Parent returns the parent of the layer at diff.
-func (lm *Manager) Parent(diff string) string {
-	return lm.parents[diff]
+func (sm *Manager) Parent(diff string) string {
+	return sm.parents[diff]
 }
 
 type ChangeKind int
@@ -301,6 +303,6 @@ type Change struct {
 // see this patten used in several tar'ing methods in pkg/archive.
 
 // Changes returns the list of changes from the diff's parent.
-func (lm *Manager) Changes(diff string) ([]Change, error) {
+func (sm *Manager) Changes(diff string) ([]Change, error) {
 	panic("not implemented")
 }

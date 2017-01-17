@@ -19,8 +19,8 @@ func NewBtrfs(device, root string) (*Btrfs, error) {
 	return &Btrfs{device: device, root: root}, nil
 }
 
-func (lm *Btrfs) Prepare(key, parent string) ([]containerd.Mount, error) {
-	active := filepath.Join(lm.root, "active")
+func (b *Btrfs) Prepare(key, parent string) ([]containerd.Mount, error) {
+	active := filepath.Join(b.root, "active")
 	if err := os.MkdirAll(active, 0755); err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func (lm *Btrfs) Prepare(key, parent string) ([]containerd.Mount, error) {
 	return []containerd.Mount{
 		{
 			Type:   "btrfs",
-			Source: lm.device, // device?
+			Source: b.device, // device?
 			// NOTE(stevvooe): While it would be nice to use to uuids for
 			// mounts, they don't work reliably if the uuids are missing.
 			Options: []string{fmt.Sprintf("subvolid=%d", info.ID)},
@@ -57,8 +57,8 @@ func (lm *Btrfs) Prepare(key, parent string) ([]containerd.Mount, error) {
 	}, nil
 }
 
-func (lm *Btrfs) Commit(name, key string) error {
-	dir := filepath.Join(lm.root, "active", hash(key))
+func (b *Btrfs) Commit(name, key string) error {
+	dir := filepath.Join(b.root, "active", hash(key))
 
 	fmt.Println("commit to", name)
 	if err := btrfs.SubvolSnapshot(name, dir, true); err != nil {
