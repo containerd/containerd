@@ -15,23 +15,6 @@ import (
 	"github.com/urfave/cli"
 )
 
-type runConfig struct {
-	Image   string `toml:"image"`
-	Process struct {
-		Args []string `toml:"args"`
-		Env  []string `toml:"env"`
-		Cwd  string   `toml:"cwd"`
-		Uid  int      `toml:"uid"`
-		Gid  int      `toml:"gid"`
-		Tty  bool     `toml:"tty"`
-	} `toml:"process"`
-	Network struct {
-		Type    string `toml:"type"`
-		IP      string `toml:"ip"`
-		Gateway string `toml:"gateway"`
-	} `toml:"network"`
-}
-
 var runCommand = cli.Command{
 	Name:  "run",
 	Usage: "run a container",
@@ -46,10 +29,6 @@ var runCommand = cli.Command{
 		},
 	},
 	Action: func(context *cli.Context) error {
-		// var config runConfig
-		// if _, err := toml.DecodeFile(context.Args().First(), &config); err != nil {
-		// 	return err
-		// }
 		id := context.Args().First()
 		if id == "" {
 			return fmt.Errorf("container id must be provided")
