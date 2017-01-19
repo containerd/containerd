@@ -6,10 +6,38 @@ import "google/protobuf/empty.proto";
 import "gogoproto/gogo.proto";
 
 service ShimService {
-	rpc Create(CreateRequest) returns (google.protobuf.Empty);
-	rpc Exec(ExecRequest) returns (google.protobuf.Empty);
-	rpc State(StateRequest) returns (StateResponse);
-	rpc Pty(PtyRequest) returns (google.protobuf.Empty);
+    rpc Create(CreateRequest) returns (CreateResponse);
+    rpc Start(StartRequest) returns (google.protobuf.Empty);
+    rpc Delete(DeleteRequest) returns (DeleteResponse);
+    rpc Exec(ExecRequest) returns (ExecResponse);
+    rpc Pty(PtyRequest) returns (google.protobuf.Empty);
+}
+
+message CreateRequest {
+
+}
+
+message CreateResponse {
+    uint32 pid = 1;
+}
+
+message StartRequest {
+}
+
+message DeleteRequest {
+
+}
+
+message DeleteResponse {
+    uint32 exit_status = 1;
+}
+
+message ExecRequest {
+
+}
+
+message ExecResponse {
+    uint32 pid = 1;
 }
 
 message PtyRequest {
