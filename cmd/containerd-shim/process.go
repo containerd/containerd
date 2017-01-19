@@ -64,6 +64,7 @@ type process struct {
 	consolePath    string
 	state          *processState
 	runtime        string
+	exitStatus     int
 }
 
 func newProcess(id, bundle, runtimeName string) (*process, error) {
@@ -273,8 +274,23 @@ func (p *process) initializeIO(rootuid int) (i *IO, err error) {
 	}
 	return i, nil
 }
+
 func (p *process) Close() error {
 	return p.stdio.Close()
+}
+
+func (p *process) start() error {
+	cmd := exec.Command(p.runtime, append(p.state.RuntimeArgs, "start", p.id)...)
+	cmd.SysProcAttr = setPDeathSig()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s: %v", out, err)
+	}
+	return nil
+}
+
+func (p *process) setExited(status int) {
+	p.exitStatus = status
 }
 
 type stdio struct {

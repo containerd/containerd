@@ -14,7 +14,9 @@ service ShimService {
 }
 
 message CreateRequest {
-
+	string id = 1 [(gogoproto.customname) = "ID"];
+    string bundle = 2;
+    string runtime = 3;
 }
 
 message CreateResponse {
