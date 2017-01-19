@@ -23,7 +23,7 @@ import (
 	"github.com/docker/containerd/execution/executors/shim"
 	"github.com/docker/containerd/log"
 	metrics "github.com/docker/go-metrics"
-	"github.com/sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/urfave/cli"
 
 	"github.com/nats-io/go-nats"

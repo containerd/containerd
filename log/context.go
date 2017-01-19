@@ -4,7 +4,7 @@ import (
 	"context"
 	"path"
 
-	"github.com/sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 )
 
 var (

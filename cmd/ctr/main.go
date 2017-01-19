@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/docker/containerd"
-	"github.com/sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 

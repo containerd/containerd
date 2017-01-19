@@ -14,7 +14,7 @@ import (
 	"github.com/docker/containerd/execution"
 	"github.com/docker/containerd/log"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"golang.org/x/sys/unix"
 
 	runc "github.com/crosbymichael/go-runc"
