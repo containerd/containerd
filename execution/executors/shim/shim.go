@@ -11,11 +11,11 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/execution"
 	"github.com/docker/containerd/log"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
-	"github.com/Sirupsen/logrus"
 )
 
 const (

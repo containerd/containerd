@@ -11,10 +11,10 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/execution"
 	"github.com/docker/containerd/log"
 	"github.com/pkg/errors"
-	"github.com/Sirupsen/logrus"
 	"golang.org/x/sys/unix"
 
 	runc "github.com/crosbymichael/go-runc"
