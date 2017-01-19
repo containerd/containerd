@@ -120,6 +120,7 @@ func (s *ShimRuntime) Create(ctx context.Context, id string, o execution.CreateO
 	}
 
 	processOpts := newProcessOpts{
+		ctx:         log.WithModule(log.WithModule(s.ctx, "container"), id),
 		shimBinary:  s.binaryName,
 		runtime:     s.runtime,
 		runtimeArgs: s.runtimeArgs,
@@ -139,7 +140,6 @@ func (s *ShimRuntime) Create(ctx context.Context, id string, o execution.CreateO
 	if err != nil {
 		return nil, err
 	}
-	process.ctx = log.WithModule(log.WithModule(s.ctx, "container"), id)
 
 	s.monitorProcess(process)
 	container.AddProcess(process, true)
@@ -225,6 +225,7 @@ func (s *ShimRuntime) StartProcess(ctx context.Context, c *execution.Container, 
 	log.G(s.ctx).WithFields(logrus.Fields{"container": c, "options": o}).Debug("StartProcess()")
 
 	processOpts := newProcessOpts{
+		ctx:              log.WithModule(log.WithModule(s.ctx, "container"), c.ID()),
 		shimBinary:       s.binaryName,
 		runtime:          s.runtime,
 		runtimeArgs:      s.runtimeArgs,
@@ -266,10 +267,6 @@ func (s *ShimRuntime) DeleteProcess(ctx context.Context, c *execution.Container,
 	c.RemoveProcess(id)
 	return c.StateDir().DeleteProcess(id)
 }
-
-//
-//
-//
 
 func (s *ShimRuntime) monitor() {
 	var events [128]syscall.EpollEvent
@@ -402,7 +399,9 @@ func (s *ShimRuntime) loadContainers() {
 
 		for _, procStateRoot := range processDirs {
 			id := filepath.Base(procStateRoot)
-			proc, err := loadProcess(procStateRoot, id)
+			proc, err := loadProcess(
+				log.WithModule(log.WithModule(s.ctx, "container"), container.ID()),
+				procStateRoot, id)
 			if err != nil {
 				log.G(s.ctx).WithFields(logrus.Fields{"container": c.Name(), "process": id}).
 					Warn("failed to load process:", err)
@@ -412,7 +411,6 @@ func (s *ShimRuntime) loadContainers() {
 				}
 				break
 			}
-			proc.ctx = log.WithModule(log.WithModule(s.ctx, "container"), container.ID())
 			container.AddProcess(proc, proc.ID() == initProcessID)
 			s.monitorProcess(proc)
 		}

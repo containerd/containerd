@@ -22,6 +22,7 @@ import (
 )
 
 type newProcessOpts struct {
+	ctx         context.Context
 	shimBinary  string
 	runtime     string
 	runtimeArgs []string
@@ -31,6 +32,9 @@ type newProcessOpts struct {
 }
 
 func newProcess(ctx context.Context, o newProcessOpts) (*process, error) {
+	if o.ctx == nil {
+		return nil, errors.New(execution.ErrContextIsNil.Error())
+	}
 	procStateDir, err := o.container.StateDir().NewProcess(o.ID)
 	if err != nil {
 		return nil, err
@@ -76,6 +80,7 @@ func newProcess(ctx context.Context, o newProcessOpts) (*process, error) {
 	}()
 
 	process := &process{
+		ctx:         o.ctx,
 		root:        procStateDir,
 		id:          o.ID,
 		exitChan:    make(chan struct{}),
@@ -94,7 +99,9 @@ func newProcess(ctx context.Context, o newProcessOpts) (*process, error) {
 	return process, nil
 }
 
-func loadProcess(root, id string) (*process, error) {
+// loadProcess returns a process.
+// pCtx is set to process.ctx
+func loadProcess(pCtx context.Context, root, id string) (*process, error) {
 	pid, err := runc.ReadPidFile(filepath.Join(root, pidFilename))
 	if err != nil {
 		return nil, err
@@ -128,6 +135,7 @@ func loadProcess(root, id string) (*process, error) {
 	}()
 
 	p := &process{
+		ctx:         pCtx,
 		root:        root,
 		id:          id,
 		pid:         int64(pid),
