@@ -1,6 +1,7 @@
 package shim
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io/ioutil"
@@ -24,7 +25,6 @@ const (
 	startTimeFilename   = "starttime"
 	exitPipeFilename    = "exit"
 	controlPipeFilename = "control"
-	initProcessID       = "init"
 	exitStatusFilename  = "exitStatus"
 )
 
@@ -93,20 +93,16 @@ func (s *ShimRuntime) Create(ctx context.Context, id string, o execution.CreateO
 		return nil, execution.ErrContainerExists
 	}
 
-	container, err := execution.NewContainer(s.root, id, o.Bundle)
+	containerCtx := log.WithModule(log.WithModule(ctx, "container"), id)
+	container, err := execution.NewContainer(containerCtx, filepath.Join(s.root, id), id, o.Bundle)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
 		if err != nil {
-			container.StateDir().Delete()
+			container.Cleanup()
 		}
 	}()
-
-	err = ioutil.WriteFile(filepath.Join(string(container.StateDir()), "bundle"), []byte(o.Bundle), 0600)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to save bundle path to disk")
-	}
 
 	// extract Process spec from bundle's config.json
 	var spec specs.Spec
@@ -125,8 +121,9 @@ func (s *ShimRuntime) Create(ctx context.Context, id string, o execution.CreateO
 		runtimeArgs: s.runtimeArgs,
 		container:   container,
 		exec:        false,
+		stateDir:    container.ProcessStateDir(execution.InitProcessID),
 		StartProcessOpts: execution.StartProcessOpts{
-			ID:      initProcessID,
+			ID:      execution.InitProcessID,
 			Spec:    spec.Process,
 			Console: o.Console,
 			Stdin:   o.Stdin,
@@ -135,14 +132,14 @@ func (s *ShimRuntime) Create(ctx context.Context, id string, o execution.CreateO
 		},
 	}
 
-	process, err := newProcess(ctx, processOpts)
+	processCtx := log.WithModule(log.WithModule(containerCtx, "process"), execution.InitProcessID)
+	process, err := newProcess(processCtx, processOpts)
 	if err != nil {
 		return nil, err
 	}
-	process.ctx = log.WithModule(log.WithModule(s.ctx, "container"), id)
 
 	s.monitorProcess(process)
-	container.AddProcess(process, true)
+	container.AddProcess(process)
 
 	s.addContainer(container)
 
@@ -194,7 +191,7 @@ func (s *ShimRuntime) Delete(ctx context.Context, c *execution.Container) error 
 		return errors.Errorf("cannot delete a container in the '%s' state", c.Status())
 	}
 
-	c.StateDir().Delete()
+	c.Cleanup()
 	s.removeContainer(c)
 	return nil
 }
@@ -232,7 +229,9 @@ func (s *ShimRuntime) StartProcess(ctx context.Context, c *execution.Container, 
 		exec:             true,
 		StartProcessOpts: o,
 	}
-	process, err := newProcess(ctx, processOpts)
+
+	processCtx := log.WithModule(log.WithModule(c.Context(), "process"), execution.InitProcessID)
+	process, err := newProcess(processCtx, processOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +239,7 @@ func (s *ShimRuntime) StartProcess(ctx context.Context, c *execution.Container, 
 	process.status = execution.Running
 	s.monitorProcess(process)
 
-	c.AddProcess(process, false)
+	c.AddProcess(process)
 	return process, nil
 }
 
@@ -250,11 +249,11 @@ func (s *ShimRuntime) SignalProcess(ctx context.Context, c *execution.Container,
 
 	process := c.GetProcess(id)
 	if process == nil {
-		return errors.Errorf("no such process %s", id)
+		return errors.Errorf("container %s has no process named %s", c.ID(), id)
 	}
 	err := syscall.Kill(int(process.Pid()), sig.(syscall.Signal))
 	if err != nil {
-		return errors.Wrapf(err, "failed to send %v signal to process %v", sig, process.Pid())
+		return errors.Wrapf(err, "failed to send %v signal to container %s process %v", sig, c.ID(), process.Pid())
 	}
 	return err
 }
@@ -263,13 +262,14 @@ func (s *ShimRuntime) DeleteProcess(ctx context.Context, c *execution.Container,
 	log.G(s.ctx).WithFields(logrus.Fields{"container": c, "process-id": id}).
 		Debug("DeleteProcess()")
 
-	c.RemoveProcess(id)
-	return c.StateDir().DeleteProcess(id)
-}
+	if p := c.GetProcess(id); p != nil {
+		p.(*process).cleanup()
 
-//
-//
-//
+		return c.RemoveProcess(id)
+	}
+
+	return errors.Errorf("container %s has no process named %s", c.ID(), id)
+}
 
 func (s *ShimRuntime) monitor() {
 	var events [128]syscall.EpollEvent
@@ -375,46 +375,56 @@ func (s *ShimRuntime) loadContainers() {
 			continue
 		}
 
-		stateDir, err := execution.LoadStateDir(s.root, c.Name())
+		stateDir := filepath.Join(s.root, c.Name())
+		containerCtx := log.WithModule(log.WithModule(s.ctx, "container"), c.Name())
+		container, err := execution.LoadContainer(containerCtx, stateDir, c.Name())
 		if err != nil {
-			// We should never fail the above call unless someone
-			// delete the directory while we're loading
-			log.G(s.ctx).WithFields(logrus.Fields{"container": c.Name(), "statedir": s.root}).
-				Warn("failed to load container statedir:", err)
-			continue
-		}
-		bundle, err := ioutil.ReadFile(filepath.Join(string(stateDir), "bundle"))
-		if err != nil {
-			log.G(s.ctx).WithField("container", c.Name()).
-				Warn("failed to load container bundle path:", err)
+			log.G(s.ctx).WithField("container-id", c.Name()).Warn(err)
 			continue
 		}
 
-		container := execution.LoadContainer(stateDir, c.Name(), string(bundle), execution.Unknown)
-		s.addContainer(container)
-
-		processDirs, err := stateDir.Processes()
+		processDirs, err := container.ProcessesStateDir()
 		if err != nil {
-			log.G(s.ctx).WithField("container", c.Name()).
-				Warn("failed to retrieve container processes:", err)
+			log.G(s.ctx).WithField("container-id", c.Name()).Warn(err)
 			continue
 		}
 
-		for _, procStateRoot := range processDirs {
-			id := filepath.Base(procStateRoot)
-			proc, err := loadProcess(procStateRoot, id)
+		for processID, processStateDir := range processDirs {
+			processCtx := log.WithModule(log.WithModule(containerCtx, "process"), processID)
+			var p *process
+			p, err = loadProcess(processCtx, processStateDir, processID)
 			if err != nil {
-				log.G(s.ctx).WithFields(logrus.Fields{"container": c.Name(), "process": id}).
-					Warn("failed to load process:", err)
-				s.removeContainer(container)
-				for _, p := range container.Processes() {
-					s.unmonitorProcess(p.(*process))
-				}
+				log.G(s.ctx).WithFields(logrus.Fields{"container-id": c.Name(), "process": processID}).Warn(err)
 				break
 			}
-			proc.ctx = log.WithModule(log.WithModule(s.ctx, "container"), container.ID())
-			container.AddProcess(proc, proc.ID() == initProcessID)
-			s.monitorProcess(proc)
+			if processID == execution.InitProcessID && p.status == execution.Running {
+				p.status = s.loadContainerStatus(container.ID())
+			}
+			container.AddProcess(p)
+		}
+
+		// if successfull, add the container to our list
+		if err == nil {
+			for _, p := range container.Processes() {
+				s.monitorProcess(p.(*process))
+			}
+			s.addContainer(container)
+			log.G(s.ctx).Infof("restored container %s", container.ID())
 		}
 	}
+}
+
+func (s *ShimRuntime) loadContainerStatus(id string) execution.Status {
+	cmd := exec.Command(s.runtime, append(s.runtimeArgs, "state", id)...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return execution.Unknown
+	}
+
+	var st struct{ Status string }
+	if err := json.NewDecoder(bytes.NewReader(out)).Decode(&st); err != nil {
+		return execution.Unknown
+	}
+
+	return execution.Status(st.Status)
 }

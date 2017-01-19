@@ -27,34 +27,37 @@ type newProcessOpts struct {
 	runtimeArgs []string
 	container   *execution.Container
 	exec        bool
+	stateDir    string
 	execution.StartProcessOpts
 }
 
-func newProcess(ctx context.Context, o newProcessOpts) (*process, error) {
-	procStateDir, err := o.container.StateDir().NewProcess(o.ID)
-	if err != nil {
-		return nil, err
+func newProcess(ctx context.Context, o newProcessOpts) (p *process, err error) {
+	p = &process{
+		id:       o.ID,
+		stateDir: o.stateDir,
+		exitChan: make(chan struct{}),
+		ctx:      ctx,
 	}
 	defer func() {
 		if err != nil {
-			o.container.StateDir().DeleteProcess(o.ID)
+			p.cleanup()
+			p = nil
 		}
 	}()
 
-	exitPipe, controlPipe, err := getControlPipes(procStateDir)
-	if err != nil {
-		return nil, err
+	if err = os.Mkdir(o.stateDir, 0700); err != nil {
+		err = errors.Wrap(err, "failed to create process state dir")
+		return
 	}
-	defer func() {
-		if err != nil {
-			exitPipe.Close()
-			controlPipe.Close()
-		}
-	}()
 
-	cmd, err := newShim(o, procStateDir)
+	p.exitPipe, p.controlPipe, err = getControlPipes(o.stateDir)
 	if err != nil {
-		return nil, err
+		return
+	}
+
+	cmd, err := newShimProcess(o)
+	if err != nil {
+		return
 	}
 	defer func() {
 		if err != nil {
@@ -75,70 +78,52 @@ func newProcess(ctx context.Context, o newProcessOpts) (*process, error) {
 		close(abortCh)
 	}()
 
-	process := &process{
-		root:        procStateDir,
-		id:          o.ID,
-		exitChan:    make(chan struct{}),
-		exitPipe:    exitPipe,
-		controlPipe: controlPipe,
-	}
-
-	pid, stime, status, err := waitForPid(ctx, abortCh, procStateDir)
+	p.pid, p.startTime, p.status, err = waitUntilReady(ctx, abortCh, o.stateDir)
 	if err != nil {
-		return nil, err
+		return
 	}
-	process.pid = int64(pid)
-	process.status = status
-	process.startTime = stime
 
-	return process, nil
+	return
 }
 
-func loadProcess(root, id string) (*process, error) {
-	pid, err := runc.ReadPidFile(filepath.Join(root, pidFilename))
-	if err != nil {
-		return nil, err
-	}
-
-	stime, err := ioutil.ReadFile(filepath.Join(root, startTimeFilename))
-	if err != nil {
-		return nil, err
-	}
-
-	path := filepath.Join(root, exitPipeFilename)
-	exitPipe, err := os.OpenFile(path, syscall.O_RDONLY|syscall.O_NONBLOCK, 0)
-	if err != nil {
-		return nil, err
+func loadProcess(ctx context.Context, stateDir, id string) (p *process, err error) {
+	p = &process{
+		id:       id,
+		stateDir: stateDir,
+		exitChan: make(chan struct{}),
+		status:   execution.Running,
+		ctx:      ctx,
 	}
 	defer func() {
 		if err != nil {
-			exitPipe.Close()
+			p.cleanup()
+			p = nil
 		}
 	}()
 
-	path = filepath.Join(root, controlPipeFilename)
-	controlPipe, err := os.OpenFile(path, syscall.O_RDWR|syscall.O_NONBLOCK, 0)
+	p.pid, err = getPidFromFile(filepath.Join(stateDir, pidFilename))
 	if err != nil {
-		return nil, err
+		err = errors.Wrap(err, "failed to read pid")
+		return
 	}
-	defer func() {
-		if err != nil {
-			controlPipe.Close()
-		}
-	}()
 
-	p := &process{
-		root:        root,
-		id:          id,
-		pid:         int64(pid),
-		exitChan:    make(chan struct{}),
-		exitPipe:    exitPipe,
-		controlPipe: controlPipe,
-		startTime:   string(stime),
-		// TODO: status may need to be stored on disk to handle
-		// Created state for init (i.e. a Start is needed to run the
-		// container)
-		status: execution.Running,
+	p.startTime, err = getStartTimeFromFile(filepath.Join(stateDir, startTimeFilename))
+	if err != nil {
+		return
+	}
+
+	path := filepath.Join(stateDir, exitPipeFilename)
+	p.exitPipe, err = os.OpenFile(path, syscall.O_RDONLY|syscall.O_NONBLOCK, 0)
+	if err != nil {
+		err = errors.Wrapf(err, "failed to open exit pipe")
+		return
+	}
+
+	path = filepath.Join(stateDir, controlPipeFilename)
+	p.controlPipe, err = os.OpenFile(path, syscall.O_RDWR|syscall.O_NONBLOCK, 0)
+	if err != nil {
+		err = errors.Wrapf(err, "failed to open control pipe")
+		return
 	}
 
 	markAsStopped := func(p *process) (*process, error) {
@@ -146,30 +131,32 @@ func loadProcess(root, id string) (*process, error) {
 		return p, nil
 	}
 
-	if err = syscall.Kill(pid, 0); err != nil {
+	if err = syscall.Kill(int(p.pid), 0); err != nil {
 		if err == syscall.ESRCH {
 			return markAsStopped(p)
 		}
-		return nil, err
+		err = errors.Wrapf(err, "failed to check if process is still alive")
+		return
 	}
 
-	cstime, err := starttime.GetProcessStartTime(pid)
+	cstime, err := starttime.GetProcessStartTime(int(p.pid))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return markAsStopped(p)
 		}
-		return nil, err
+		err = errors.Wrapf(err, "failed retrieve current process start time")
+		return
 	}
 
 	if p.startTime != cstime {
 		return markAsStopped(p)
 	}
 
-	return p, nil
+	return
 }
 
 type process struct {
-	root        string
+	stateDir    string
 	id          string
 	pid         int64
 	exitChan    chan struct{}
@@ -211,7 +198,7 @@ func (p *process) Wait() (uint32, error) {
 		return uint32(128 + int(syscall.SIGKILL)), nil
 	}
 
-	data, err := ioutil.ReadFile(filepath.Join(p.root, exitStatusFilename))
+	data, err := ioutil.ReadFile(filepath.Join(p.stateDir, exitStatusFilename))
 	if err != nil {
 		return execution.UnknownStatusCode, errors.Wrap(err, "failed to read process exit status")
 	}
@@ -278,7 +265,19 @@ func (p *process) isAlive() bool {
 	return true
 }
 
-func waitForPid(ctx context.Context, abortCh chan syscall.WaitStatus, root string) (pid int, stime string, status execution.Status, err error) {
+func (p *process) cleanup() {
+	for _, f := range []*os.File{p.exitPipe, p.controlPipe} {
+		if f != nil {
+			f.Close()
+		}
+	}
+
+	if err := os.RemoveAll(p.stateDir); err != nil {
+		log.G(p.ctx).Warnf("failed to remove process state dir: %v", err)
+	}
+}
+
+func waitUntilReady(ctx context.Context, abortCh chan syscall.WaitStatus, root string) (pid int64, stime string, status execution.Status, err error) {
 	status = execution.Unknown
 	for {
 		select {
@@ -293,7 +292,7 @@ func waitForPid(ctx context.Context, abortCh chan syscall.WaitStatus, root strin
 			return
 		default:
 		}
-		pid, err = runc.ReadPidFile(filepath.Join(root, pidFilename))
+		pid, err = getPidFromFile(filepath.Join(root, pidFilename))
 		if err == nil {
 			break
 		} else if !os.IsNotExist(err) {
@@ -301,7 +300,7 @@ func waitForPid(ctx context.Context, abortCh chan syscall.WaitStatus, root strin
 		}
 	}
 	status = execution.Created
-	stime, err = starttime.GetProcessStartTime(pid)
+	stime, err = starttime.GetProcessStartTime(int(pid))
 	switch {
 	case os.IsNotExist(err):
 		status = execution.Stopped
@@ -328,9 +327,9 @@ func waitForPid(ctx context.Context, abortCh chan syscall.WaitStatus, root strin
 	return pid, stime, status, nil
 }
 
-func newShim(o newProcessOpts, workDir string) (*exec.Cmd, error) {
+func newShimProcess(o newProcessOpts) (*exec.Cmd, error) {
 	cmd := exec.Command(o.shimBinary, o.container.ID(), o.container.Bundle(), o.runtime)
-	cmd.Dir = workDir
+	cmd.Dir = o.stateDir
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
@@ -348,12 +347,11 @@ func newShim(o newProcessOpts, workDir string) (*exec.Cmd, error) {
 		RootGID:        int(o.Spec.User.GID),
 	}
 
-	f, err := os.Create(filepath.Join(workDir, "process.json"))
+	f, err := os.Create(filepath.Join(o.stateDir, "process.json"))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create shim's process.json for container %s", o.container.ID())
 	}
 	defer f.Close()
-
 	if err := json.NewEncoder(f).Encode(state); err != nil {
 		return nil, errors.Wrapf(err, "failed to create shim's processState for container %s", o.container.ID())
 	}
@@ -368,19 +366,39 @@ func newShim(o newProcessOpts, workDir string) (*exec.Cmd, error) {
 func getControlPipes(root string) (exitPipe *os.File, controlPipe *os.File, err error) {
 	path := filepath.Join(root, exitPipeFilename)
 	if err = unix.Mkfifo(path, 0700); err != nil {
-		return exitPipe, controlPipe, errors.Wrap(err, "failed to create shim exit fifo")
+		err = errors.Wrap(err, "failed to create shim exit fifo")
+		return
 	}
 	if exitPipe, err = os.OpenFile(path, syscall.O_RDONLY|syscall.O_NONBLOCK, 0); err != nil {
-		return exitPipe, controlPipe, errors.Wrap(err, "failed to open shim exit fifo")
+		err = errors.Wrap(err, "failed to open shim exit fifo")
+		return
 	}
 
 	path = filepath.Join(root, controlPipeFilename)
 	if err = unix.Mkfifo(path, 0700); err != nil {
-		return exitPipe, controlPipe, errors.Wrap(err, "failed to create shim control fifo")
+		err = errors.Wrap(err, "failed to create shim control fifo")
+		return
 	}
 	if controlPipe, err = os.OpenFile(path, syscall.O_RDWR|syscall.O_NONBLOCK, 0); err != nil {
-		return exitPipe, controlPipe, errors.Wrap(err, "failed to open shim control fifo")
+		err = errors.Wrap(err, "failed to open shim control fifo")
+		return
 	}
 
-	return exitPipe, controlPipe, nil
+	return
+}
+
+func getPidFromFile(path string) (int64, error) {
+	pid, err := runc.ReadPidFile(path)
+	if err != nil {
+		return -1, err
+	}
+	return int64(pid), nil
+}
+
+func getStartTimeFromFile(path string) (string, error) {
+	stime, err := ioutil.ReadFile(path)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to read start time")
+	}
+	return string(stime), nil
 }
