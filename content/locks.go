@@ -11,7 +11,7 @@ import (
 // define a global in process lock to prevent two goroutines writing to the
 // same file.
 //
-// This is prety unsophisticated for now. In the future, we'd probably like to
+// This is pretty unsophisticated for now. In the future, we'd probably like to
 // have more information about who is holding which locks, as well as better
 // error reporting.
 
