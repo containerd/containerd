@@ -20,7 +20,6 @@ import (
 	api "github.com/docker/containerd/api/execution"
 	"github.com/docker/containerd/events"
 	"github.com/docker/containerd/execution"
-	"github.com/docker/containerd/execution/executors/oci"
 	"github.com/docker/containerd/execution/executors/shim"
 	"github.com/docker/containerd/log"
 	metrics "github.com/docker/go-metrics"
@@ -57,7 +56,7 @@ high performance container runtime
 		cli.StringFlag{
 			Name:  "runtime",
 			Usage: "runtime for execution",
-			Value: "runc",
+			Value: "shim",
 		},
 		cli.StringFlag{
 			Name:  "socket, s",
@@ -119,11 +118,6 @@ high performance container runtime
 			runtime  = context.GlobalString("runtime")
 		)
 		switch runtime {
-		case "runc":
-			executor, err = oci.New(context.GlobalString("root"))
-			if err != nil {
-				return err
-			}
 		case "shim":
 			root := filepath.Join(context.GlobalString("root"), "shim")
 			err = os.Mkdir(root, 0700)
