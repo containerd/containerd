@@ -8,6 +8,8 @@ import (
 	"golang.org/x/net/context"
 )
 
+var emptyResponse = &google_protobuf.Empty{}
+
 type service struct {
 	init *process
 }
@@ -18,7 +20,7 @@ func (s *service) Create(ctx context.Context, r *shim.CreateRequest) (*shim.Crea
 		return nil, err
 	}
 	s.init = process
-	if err := process.create(); err != nil {
+	if err := process.create(false); err != nil {
 		return nil, err
 	}
 	return &shim.CreateResponse{
@@ -27,8 +29,10 @@ func (s *service) Create(ctx context.Context, r *shim.CreateRequest) (*shim.Crea
 }
 
 func (s *service) Start(ctx context.Context, r *shim.StartRequest) (*google_protobuf.Empty, error) {
-	err := s.init.start()
-	return nil, err
+	if err := s.init.start(); err != nil {
+		return nil, err
+	}
+	return emptyResponse, nil
 }
 
 func (s *service) Delete(ctx context.Context, r *shim.DeleteRequest) (*shim.DeleteResponse, error) {
@@ -52,7 +56,7 @@ func (s *service) Exec(ctx context.Context, r *shim.ExecRequest) (*shim.ExecResp
 
 func (s *service) Pty(ctx context.Context, r *shim.PtyRequest) (*google_protobuf.Empty, error) {
 	if s.init.console == nil {
-		return nil, nil
+		return emptyResponse, nil
 	}
 	ws := term.Winsize{
 		Width:  uint16(r.Width),
@@ -61,7 +65,7 @@ func (s *service) Pty(ctx context.Context, r *shim.PtyRequest) (*google_protobuf
 	if err := term.SetWinsize(s.init.console.Fd(), &ws); err != nil {
 		return nil, err
 	}
-	return nil, nil
+	return emptyResponse, nil
 }
 
 func (s *service) processExited(e utils.Exit) error {

@@ -67,6 +67,7 @@ func main() {
 			}
 		}()
 		for s := range signals {
+			logrus.WithField("signal", s).Debug("received signal")
 			switch s {
 			case syscall.SIGCHLD:
 				exits, err := utils.Reap(false)

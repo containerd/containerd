@@ -40,6 +40,7 @@ containerd client
 		deleteCommand,
 		listCommand,
 		inspectCommand,
+		shimCommand,
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
@@ -48,7 +49,7 @@ containerd client
 		return nil
 	}
 	if err := app.Run(os.Args); err != nil {
-		fmt.Fprintf(os.Stderr, "containerd: %s\n", err)
+		fmt.Fprintf(os.Stderr, "ctr: %s\n", err)
 		os.Exit(1)
 	}
 }

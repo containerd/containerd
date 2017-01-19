@@ -35,6 +35,7 @@ type checkpoint struct {
 	EmptyNS []string `json:"emptyNS,omitempty"`
 }
 
+/*
 type processState struct {
 	Terminal    bool     `json:"terminal"`
 	Exec        bool     `json:"exec"`
@@ -48,6 +49,7 @@ type processState struct {
 	RootUID        int    `json:"rootUID"`
 	RootGID        int    `json:"rootGID"`
 }
+*/
 
 type process struct {
 	sync.WaitGroup
@@ -62,9 +64,14 @@ type process struct {
 	stdinCloser    io.Closer
 	console        *os.File
 	consolePath    string
-	state          *processState
 	runtime        string
 	exitStatus     int
+	Stdin          string `json:"containerdStdin"`
+	Stdout         string `json:"containerdStdout"`
+	Stderr         string `json:"containerdStderr"`
+	Terminal       bool   `json:"terminal"`
+	RootUID        int    `json:"rootUID"`
+	RootGID        int    `json:"rootGID"`
 }
 
 func newProcess(id, bundle, runtimeName string) (*process, error) {
@@ -73,36 +80,10 @@ func newProcess(id, bundle, runtimeName string) (*process, error) {
 		bundle:  bundle,
 		runtime: runtimeName,
 	}
-	s, err := loadProcess()
-	if err != nil {
-		return nil, err
-	}
-	p.state = s
-	if s.CheckpointPath != "" {
-		cpt, err := loadCheckpoint(s.CheckpointPath)
-		if err != nil {
-			return nil, err
-		}
-		p.checkpoint = cpt
-		p.checkpointPath = s.CheckpointPath
-	}
 	if err := p.openIO(); err != nil {
 		return nil, err
 	}
 	return p, nil
-}
-
-func loadProcess() (*processState, error) {
-	f, err := os.Open("process.json")
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	var s processState
-	if err := json.NewDecoder(f).Decode(&s); err != nil {
-		return nil, err
-	}
-	return &s, nil
 }
 
 func loadCheckpoint(checkpointPath string) (*checkpoint, error) {
@@ -118,21 +99,21 @@ func loadCheckpoint(checkpointPath string) (*checkpoint, error) {
 	return &cpt, nil
 }
 
-func (p *process) create() error {
+func (p *process) create(isExec bool) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
 	logPath := filepath.Join(cwd, "log.json")
-	args := append([]string{
+	args := []string{
 		"--log", logPath,
 		"--log-format", "json",
-	}, p.state.RuntimeArgs...)
-	if p.state.Exec {
+	}
+	if isExec {
 		args = append(args, "exec",
 			"-d",
 			"--process", filepath.Join(cwd, "process.json"),
-			"--console", p.consolePath,
+			"--console-socket", p.consolePath,
 		)
 	} else if p.checkpoint != nil {
 		args = append(args, "restore",
@@ -152,9 +133,11 @@ func (p *process) create() error {
 		if p.checkpoint.UnixSockets {
 			add("--ext-unix-sk")
 		}
-		if p.state.NoPivotRoot {
-			add("--no-pivot")
-		}
+		/*
+			if p.state.NoPivotRoot {
+				add("--no-pivot")
+			}
+		*/
 		for _, ns := range p.checkpoint.EmptyNS {
 			add("--empty-ns", ns)
 		}
@@ -162,11 +145,13 @@ func (p *process) create() error {
 	} else {
 		args = append(args, "create",
 			"--bundle", p.bundle,
-			"--console", p.consolePath,
+			"--console-socket", p.consolePath,
 		)
-		if p.state.NoPivotRoot {
-			args = append(args, "--no-pivot")
-		}
+		/*
+			if p.state.NoPivotRoot {
+				args = append(args, "--no-pivot")
+			}
+		*/
 	}
 	args = append(args,
 		"--pid-file", filepath.Join(cwd, "pid"),
@@ -174,9 +159,11 @@ func (p *process) create() error {
 	)
 	cmd := exec.Command(p.runtime, args...)
 	cmd.Dir = p.bundle
-	cmd.Stdin = p.stdio.stdin
-	cmd.Stdout = p.stdio.stdout
-	cmd.Stderr = p.stdio.stderr
+	if p.stdio != nil {
+		cmd.Stdin = p.stdio.stdin
+		cmd.Stdout = p.stdio.stdout
+		cmd.Stderr = p.stdio.stderr
+	}
 	// Call out to setPDeathSig to set SysProcAttr as elements are platform specific
 	cmd.SysProcAttr = setPDeathSig()
 
@@ -192,8 +179,10 @@ func (p *process) create() error {
 		// Since current logic dictates that we need a pid at the end of p.create
 		// we need to call runtime start as well on Solaris hence we need the
 		// pipes to stay open.
-		p.stdio.stdout.Close()
-		p.stdio.stderr.Close()
+		if p.stdio != nil {
+			p.stdio.stdout.Close()
+			p.stdio.stderr.Close()
+		}
 	}
 	if err := cmd.Wait(); err != nil {
 		if _, ok := err.(*exec.ExitError); ok {
@@ -218,13 +207,11 @@ func (p *process) pid() int {
 }
 
 func (p *process) delete() error {
-	if !p.state.Exec {
-		cmd := exec.Command(p.runtime, append(p.state.RuntimeArgs, "delete", p.id)...)
-		cmd.SysProcAttr = setPDeathSig()
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("%s: %v", out, err)
-		}
+	cmd := exec.Command(p.runtime, "delete", p.id)
+	cmd.SysProcAttr = setPDeathSig()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s: %v", out, err)
 	}
 	return nil
 }
@@ -276,11 +263,14 @@ func (p *process) initializeIO(rootuid int) (i *IO, err error) {
 }
 
 func (p *process) Close() error {
+	if p.stdio == nil {
+		return nil
+	}
 	return p.stdio.Close()
 }
 
 func (p *process) start() error {
-	cmd := exec.Command(p.runtime, append(p.state.RuntimeArgs, "start", p.id)...)
+	cmd := exec.Command(p.runtime, "start", p.id)
 	cmd.SysProcAttr = setPDeathSig()
 	out, err := cmd.CombinedOutput()
 	if err != nil {
