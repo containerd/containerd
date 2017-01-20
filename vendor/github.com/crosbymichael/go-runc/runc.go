@@ -13,7 +13,6 @@ import (
 	"time"
 
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/sirupsen/logrus"
 )
 
 // Format is the type of log formatting options avaliable
@@ -23,14 +22,19 @@ const (
 	none Format = ""
 	JSON Format = "json"
 	Text Format = "text"
+	// DefaultCommand is the default command for Runc
+	DefaultCommand string = "runc"
 )
 
 // Runc is the client to the runc cli
 type Runc struct {
-	Root      string
-	Debug     bool
-	Log       string
-	LogFormat Format
+	//If command is empty, DefaultCommand is used
+	Command      string
+	Root         string
+	Debug        bool
+	Log          string
+	LogFormat    Format
+	PdeathSignal syscall.Signal
 }
 
 // List returns all containers created inside the provided runc root directory
@@ -62,11 +66,11 @@ func (r *Runc) State(context context.Context, id string) (*Container, error) {
 type CreateOpts struct {
 	IO
 	// PidFile is a path to where a pid file should be created
-	PidFile      string
-	Console      string
-	Detach       bool
-	NoPivot      bool
-	NoNewKeyring bool
+	PidFile       string
+	ConsoleSocket string
+	Detach        bool
+	NoPivot       bool
+	NoNewKeyring  bool
 }
 
 type IO struct {
@@ -103,8 +107,8 @@ func (o *CreateOpts) args() (out []string) {
 	if o.PidFile != "" {
 		out = append(out, "--pid-file", o.PidFile)
 	}
-	if o.Console != "" {
-		out = append(out, "--console", o.Console)
+	if o.ConsoleSocket != "" {
+		out = append(out, "--console-socket", o.ConsoleSocket)
 	}
 	if o.NoPivot {
 		out = append(out, "--no-pivot")
@@ -138,13 +142,13 @@ func (r *Runc) Start(context context.Context, id string) error {
 
 type ExecOpts struct {
 	IO
-	PidFile string
-	Uid     int
-	Gid     int
-	Cwd     string
-	Tty     bool
-	Console string
-	Detach  bool
+	PidFile       string
+	Uid           int
+	Gid           int
+	Cwd           string
+	Tty           bool
+	ConsoleSocket string
+	Detach        bool
 }
 
 func (o *ExecOpts) args() (out []string) {
@@ -152,8 +156,8 @@ func (o *ExecOpts) args() (out []string) {
 	if o.Tty {
 		out = append(out, "--tty")
 	}
-	if o.Console != "" {
-		out = append(out, "--console", o.Console)
+	if o.ConsoleSocket != "" {
+		out = append(out, "--console-socket", o.ConsoleSocket)
 	}
 	if o.Cwd != "" {
 		out = append(out, "--cwd", o.Cwd)
@@ -217,9 +221,27 @@ func (r *Runc) Delete(context context.Context, id string) error {
 	return runOrError(r.command(context, "delete", id))
 }
 
+// KillOpts specifies options for killing a container and its processes
+type KillOpts struct {
+	All bool
+}
+
+func (o *KillOpts) args() (out []string) {
+	if o.All {
+		out = append(out, "--all")
+	}
+	return out
+}
+
 // Kill sends the specified signal to the container
-func (r *Runc) Kill(context context.Context, id string, sig int) error {
-	return runOrError(r.command(context, "kill", id, strconv.Itoa(sig)))
+func (r *Runc) Kill(context context.Context, id string, sig int, opts *KillOpts) error {
+	args := []string{
+		"kill",
+	}
+	if opts != nil {
+		args = append(args, opts.args()...)
+	}
+	return runOrError(r.command(context, append(args, id, strconv.Itoa(sig))...))
 }
 
 // Stats return the stats for a container like cpu, memory, and io
@@ -270,8 +292,10 @@ func (r *Runc) Events(context context.Context, id string, interval time.Duration
 				if err == io.EOF {
 					return
 				}
-				logrus.WithError(err).Error("runc: decode event")
-				continue
+				e = Event{
+					Type: "error",
+					Err:  err,
+				}
 			}
 			c <- &e
 		}
@@ -319,6 +343,15 @@ func (r *Runc) args() (out []string) {
 }
 
 func (r *Runc) command(context context.Context, args ...string) *exec.Cmd {
-	return exec.CommandContext(context,
-		"runc", append(r.args(), args...)...)
+	command := r.Command
+	if command == "" {
+		command = DefaultCommand
+	}
+	cmd := exec.CommandContext(context, command, append(r.args(), args...)...)
+	if r.PdeathSignal != 0 {
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Pdeathsig: r.PdeathSignal,
+		}
+	}
+	return cmd
 }
