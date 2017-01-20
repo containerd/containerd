@@ -14,7 +14,7 @@ import (
 // examples we've discussed thus far. It does perform mounts, so you must run
 // as root.
 func TestSnapshotManagerBasic(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "test-layman-")
+	tmpDir, err := ioutil.TempDir("", "test-sm-")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +28,7 @@ func TestSnapshotManagerBasic(t *testing.T) {
 
 	root := filepath.Join(tmpDir, "root")
 
-	lm, err := NewManager(root)
+	sm, err := NewManager(root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestSnapshotManagerBasic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mounts, err := lm.Prepare(preparing, "")
+	mounts, err := sm.Prepare(preparing, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,14 +58,14 @@ func TestSnapshotManagerBasic(t *testing.T) {
 
 	os.MkdirAll(preparing+"/a/b/c", 0755)
 
-	committed := filepath.Join(lm.root, "committed")
+	committed := filepath.Join(sm.root, "committed")
 
-	if err := lm.Commit(committed, preparing); err != nil {
+	if err := sm.Commit(committed, preparing); err != nil {
 		t.Fatal(err)
 	}
 
-	if lm.Parent(preparing) != "" {
-		t.Fatalf("parent of new layer should be empty, got lm.Parent(%q) == %q", preparing, lm.Parent(preparing))
+	if sm.Parent(preparing) != "" {
+		t.Fatalf("parent of new layer should be empty, got sm.Parent(%q) == %q", preparing, sm.Parent(preparing))
 	}
 
 	next := filepath.Join(tmpDir, "nextlayer")
@@ -73,7 +73,7 @@ func TestSnapshotManagerBasic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mounts, err = lm.Prepare(next, committed)
+	mounts, err = sm.Prepare(next, committed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,12 +92,12 @@ func TestSnapshotManagerBasic(t *testing.T) {
 	}
 
 	os.RemoveAll(next + "/a/b")
-	nextCommitted := filepath.Join(lm.root, "committed-next")
-	if err := lm.Commit(nextCommitted, next); err != nil {
+	nextCommitted := filepath.Join(sm.root, "committed-next")
+	if err := sm.Commit(nextCommitted, next); err != nil {
 		t.Fatal(err)
 	}
 
-	if lm.Parent(nextCommitted) != committed {
-		t.Fatalf("parent of new layer should be %q, got lm.Parent(%q) == %q (%#v)", committed, next, lm.Parent(next), lm.parents)
+	if sm.Parent(nextCommitted) != committed {
+		t.Fatalf("parent of new layer should be %q, got sm.Parent(%q) == %q (%#v)", committed, next, sm.Parent(next), sm.parents)
 	}
 }

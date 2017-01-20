@@ -12,7 +12,7 @@ import (
 	"github.com/docker/containerd"
 )
 
-func NewOverlayfs(root string) (*Overlayfs, error) {
+func NewOverlay(root string) (*Overlay, error) {
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
 	}
@@ -24,18 +24,18 @@ func NewOverlayfs(root string) (*Overlayfs, error) {
 			return nil, err
 		}
 	}
-	return &Overlayfs{
+	return &Overlay{
 		root:  root,
 		cache: newCache(),
 	}, nil
 }
 
-type Overlayfs struct {
+type Overlay struct {
 	root  string
 	cache *cache
 }
 
-func (o *Overlayfs) Prepare(key string, parentName string) ([]containerd.Mount, error) {
+func (o *Overlay) Prepare(key string, parentName string) ([]containerd.Mount, error) {
 	if err := validKey(key); err != nil {
 		return nil, err
 	}
@@ -51,12 +51,12 @@ func (o *Overlayfs) Prepare(key string, parentName string) ([]containerd.Mount, 
 	return active.mounts(o.cache)
 }
 
-func (o *Overlayfs) Commit(name, key string) error {
+func (o *Overlay) Commit(name, key string) error {
 	active := o.getActive(key)
 	return active.commit(name)
 }
 
-func (o *Overlayfs) newActiveDir(key string) (*activeDir, error) {
+func (o *Overlay) newActiveDir(key string) (*activeDir, error) {
 	var (
 		hash = hash(key)
 		path = filepath.Join(o.root, "active", hash)
@@ -77,7 +77,7 @@ func (o *Overlayfs) newActiveDir(key string) (*activeDir, error) {
 	return a, nil
 }
 
-func (o *Overlayfs) getActive(key string) *activeDir {
+func (o *Overlay) getActive(key string) *activeDir {
 	return &activeDir{
 		path:         filepath.Join(o.root, "active", hash(key)),
 		snapshotsDir: filepath.Join(o.root, "snapshots"),
