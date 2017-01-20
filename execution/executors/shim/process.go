@@ -31,7 +31,32 @@ type newProcessOpts struct {
 	execution.StartProcessOpts
 }
 
+func validateNewProcessOpts(o newProcessOpts) error {
+	if o.shimBinary == "" {
+		return errors.New("shim binary not specified")
+	}
+	if o.runtime == "" {
+		return errors.New("runtime not specified")
+	}
+	if o.container == nil {
+		return errors.New("container not specified")
+	}
+	if o.container.ID() == "" {
+		return errors.New("container id not specified")
+	}
+	if o.container.Bundle() == "" {
+		return errors.New("bundle not specified")
+	}
+	if o.stateDir == "" {
+		return errors.New("state dir not specified")
+	}
+	return nil
+}
+
 func newProcess(ctx context.Context, o newProcessOpts) (p *process, err error) {
+	if err = validateNewProcessOpts(o); err != nil {
+		return
+	}
 	p = &process{
 		id:       o.ID,
 		stateDir: o.stateDir,

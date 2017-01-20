@@ -227,6 +227,7 @@ func (s *ShimRuntime) StartProcess(ctx context.Context, c *execution.Container, 
 		runtimeArgs:      s.runtimeArgs,
 		container:        c,
 		exec:             true,
+		stateDir:         c.ProcessStateDir(o.ID),
 		StartProcessOpts: o,
 	}
 
