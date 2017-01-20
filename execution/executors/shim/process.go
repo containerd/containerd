@@ -277,6 +277,17 @@ func (p *process) cleanup() {
 	}
 }
 
+func getShimLogIfAny(root string) string {
+	// FIXME: should not read the whole file if large
+	// TODO: decode json?
+	b, err := ioutil.ReadFile(filepath.Join(root, shimLogFileName))
+	if err != nil {
+		// we can safely discard err here
+		return ""
+	}
+	return string(b)
+}
+
 func waitUntilReady(ctx context.Context, abortCh chan syscall.WaitStatus, root string) (pid int64, stime string, status execution.Status, err error) {
 	status = execution.Unknown
 	for {
@@ -285,10 +296,10 @@ func waitUntilReady(ctx context.Context, abortCh chan syscall.WaitStatus, root s
 			return
 		case wait := <-abortCh:
 			if wait.Signaled() {
-				err = errors.Errorf("shim died prematurely: %v", wait.Signal())
+				err = errors.Errorf("shim died prematurely: %v (log: %q)", wait.Signal(), getShimLogIfAny(root))
 				return
 			}
-			err = errors.Errorf("shim exited prematurely with exit code %v", wait.ExitStatus())
+			err = errors.Errorf("shim exited prematurely with exit code %v (log: %q)", wait.ExitStatus(), getShimLogIfAny(root))
 			return
 		default:
 		}

@@ -26,6 +26,7 @@ const (
 	exitPipeFilename    = "exit"
 	controlPipeFilename = "control"
 	exitStatusFilename  = "exitStatus"
+	shimLogFileName     = "shim-log.json"
 )
 
 func New(ctx context.Context, root, shim, runtime string, runtimeArgs []string) (*ShimRuntime, error) {
