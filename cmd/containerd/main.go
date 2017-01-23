@@ -16,6 +16,7 @@ import (
 	gocontext "golang.org/x/net/context"
 	"google.golang.org/grpc"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd"
 	api "github.com/docker/containerd/api/execution"
 	"github.com/docker/containerd/events"
@@ -23,7 +24,6 @@ import (
 	"github.com/docker/containerd/execution/executors/shim"
 	"github.com/docker/containerd/log"
 	metrics "github.com/docker/go-metrics"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
 	"github.com/nats-io/go-nats"

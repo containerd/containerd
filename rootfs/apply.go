@@ -8,6 +8,7 @@ import (
 	"github.com/docker/containerd/log"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
@@ -32,14 +33,14 @@ type Mounter interface {
 // The returned digest is the diffID for the applied layer.
 func ApplyLayer(snapshots Snapshotter, mounter Mounter, rd io.Reader, parent digest.Digest) (digest.Digest, error) {
 	digester := digest.Canonical.Digester() // used to calculate diffID.
-	rd = io.TeeReader(rd, digester)
+	rd = io.TeeReader(rd, digester.Hash())
 
 	// create a temporary directory to work from, needs to be on same
 	// filesystem. Probably better if this shared but we'll use a tempdir, for
 	// now.
 	dir, err := ioutil.TempDir("", "unpack-")
 	if err != nil {
-		return errors.Wrapf(err, "creating temporary directory failed")
+		return "", errors.Wrapf(err, "creating temporary directory failed")
 	}
 
 	// TODO(stevvooe): Choose this key WAY more carefully. We should be able to
@@ -61,11 +62,11 @@ func ApplyLayer(snapshots Snapshotter, mounter Mounter, rd io.Reader, parent dig
 	}
 	defer mounter.Unmount(mounts...)
 
-	if err := archive.ApplyLayer(key, rd); err != nil {
+	if _, err := archive.ApplyLayer(key, rd); err != nil {
 		return "", err
 	}
 
-	diffID := digest.Digest()
+	diffID := digester.Digest()
 
 	chainID := diffID
 	if parent != "" {
@@ -81,13 +82,13 @@ func ApplyLayer(snapshots Snapshotter, mounter Mounter, rd io.Reader, parent dig
 //
 // If successful, the chainID for the top-level layer is returned. That
 // identifier can be used to check out a snapshot.
-func Prepare(snapshots Snaphotter, mounter Mounter, layers []ocispec.Descriptor,
+func Prepare(snapshots Snapshotter, mounter Mounter, layers []ocispec.Descriptor,
 	// TODO(stevvooe): The following functions are candidate for internal
 	// object functions. We can use these to formulate the beginnings of a
 	// rootfs Controller.
 	//
 	// Just pass them in for now.
-	openBlob func(digest.Digest) (digest.Digest, error),
+	openBlob func(digest.Digest) (io.ReadCloser, error),
 	resolveDiffID func(digest.Digest) digest.Digest,
 	registerDiffID func(diffID, dgst digest.Digest) error) (digest.Digest, error) {
 	var (
@@ -96,11 +97,14 @@ func Prepare(snapshots Snaphotter, mounter Mounter, layers []ocispec.Descriptor,
 	)
 
 	for _, layer := range layers {
+		// TODO: layer.Digest should not be string
+		// (https://github.com/opencontainers/image-spec/pull/514)
+		layerDigest := digest.Digest(layer.Digest)
 		// This will convert a possibly compressed layer hash to the
 		// uncompressed hash, if we know about it. If we don't, we unpack and
 		// calculate it. If we do have it, we then calculate the chain id for
 		// the application and see if the snapshot is there.
-		diffID := resolveDiffID(layer.Digest)
+		diffID := resolveDiffID(layerDigest)
 		if diffID != "" {
 			chainLocal := append(chain, diffID)
 			chainID := identity.ChainID(chainLocal)
@@ -110,7 +114,7 @@ func Prepare(snapshots Snaphotter, mounter Mounter, layers []ocispec.Descriptor,
 			}
 		}
 
-		rc, err := openBlob(layer.Digest)
+		rc, err := openBlob(layerDigest)
 		if err != nil {
 			return "", err
 		}
@@ -125,8 +129,8 @@ func Prepare(snapshots Snaphotter, mounter Mounter, layers []ocispec.Descriptor,
 		// For uncompressed layers, this will be the same. For compressed
 		// layers, we can look up the diffID from the digest if we've already
 		// unpacked it.
-		if err := registerDiffID(diffID, layer.Digest); err != nil {
-			return nil, err
+		if err := registerDiffID(diffID, layerDigest); err != nil {
+			return "", err
 		}
 
 		chain = append(chain, diffID)

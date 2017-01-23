@@ -3,8 +3,8 @@ package events
 import (
 	"context"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/log"
-	"github.com/sirupsen/logrus"
 )
 
 var (
