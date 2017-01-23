@@ -73,36 +73,6 @@ type CreateOpts struct {
 	NoNewKeyring  bool
 }
 
-type IO struct {
-	Stdin  io.Reader
-	Stdout io.Writer
-	Stderr io.Writer
-}
-
-func (i *IO) Close() error {
-	var err error
-	for _, v := range []interface{}{
-		i.Stdin,
-		i.Stderr,
-		i.Stdout,
-	} {
-		if v != nil {
-			if c, ok := v.(io.Closer); ok {
-				if cerr := c.Close(); err == nil {
-					err = cerr
-				}
-			}
-		}
-	}
-	return err
-}
-
-func (o IO) setSTDIO(cmd *exec.Cmd) {
-	cmd.Stdin = o.Stdin
-	cmd.Stdout = o.Stdout
-	cmd.Stderr = o.Stderr
-}
-
 func (o *CreateOpts) args() (out []string) {
 	if o.PidFile != "" {
 		out = append(out, "--pid-file", o.PidFile)
@@ -130,7 +100,7 @@ func (r *Runc) Create(context context.Context, id, bundle string, opts *CreateOp
 	}
 	cmd := r.command(context, append(args, id)...)
 	if opts != nil {
-		opts.setSTDIO(cmd)
+		opts.Set(cmd)
 	}
 	return runOrError(cmd)
 }
@@ -190,7 +160,7 @@ func (r *Runc) Exec(context context.Context, id string, spec specs.Process, opts
 	}
 	cmd := r.command(context, append(args, id)...)
 	if opts != nil {
-		opts.setSTDIO(cmd)
+		opts.Set(cmd)
 	}
 	return runOrError(cmd)
 }
@@ -204,7 +174,7 @@ func (r *Runc) Run(context context.Context, id, bundle string, opts *CreateOpts)
 	}
 	cmd := r.command(context, append(args, id)...)
 	if opts != nil {
-		opts.setSTDIO(cmd)
+		opts.Set(cmd)
 	}
 	if err := cmd.Start(); err != nil {
 		return -1, err
