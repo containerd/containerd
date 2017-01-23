@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
 )
 
 const configName = "config.json"
@@ -36,7 +37,14 @@ func New(path string, s *specs.Spec) (*Bundle, error) {
 }
 
 func Load(path string) (*Bundle, error) {
-	// TODO: do validation
+	fi, err := os.Stat(path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to access %q", path)
+	}
+	if !fi.IsDir() {
+		return nil, errors.Errorf("%q is not a directory", path)
+	}
+
 	return &Bundle{
 		Path: path,
 	}, nil
