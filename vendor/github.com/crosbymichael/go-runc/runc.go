@@ -67,7 +67,7 @@ type CreateOpts struct {
 	IO
 	// PidFile is a path to where a pid file should be created
 	PidFile       string
-	ConsoleSocket string
+	ConsoleSocket *ConsoleSocket
 	Detach        bool
 	NoPivot       bool
 	NoNewKeyring  bool
@@ -107,8 +107,8 @@ func (o *CreateOpts) args() (out []string) {
 	if o.PidFile != "" {
 		out = append(out, "--pid-file", o.PidFile)
 	}
-	if o.ConsoleSocket != "" {
-		out = append(out, "--console-socket", o.ConsoleSocket)
+	if o.ConsoleSocket != nil {
+		out = append(out, "--console-socket", o.ConsoleSocket.Path())
 	}
 	if o.NoPivot {
 		out = append(out, "--no-pivot")
@@ -147,7 +147,7 @@ type ExecOpts struct {
 	Gid           int
 	Cwd           string
 	Tty           bool
-	ConsoleSocket string
+	ConsoleSocket *ConsoleSocket
 	Detach        bool
 }
 
@@ -156,8 +156,8 @@ func (o *ExecOpts) args() (out []string) {
 	if o.Tty {
 		out = append(out, "--tty")
 	}
-	if o.ConsoleSocket != "" {
-		out = append(out, "--console-socket", o.ConsoleSocket)
+	if o.ConsoleSocket != nil {
+		out = append(out, "--console-socket", o.ConsoleSocket.Path())
 	}
 	if o.Cwd != "" {
 		out = append(out, "--cwd", o.Cwd)
