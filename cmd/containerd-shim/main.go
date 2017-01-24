@@ -8,11 +8,11 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/api/shim"
 	"github.com/docker/containerd/sys"
 	"github.com/docker/containerd/utils"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
