@@ -1,95 +1,57 @@
-// +build !solaris
-
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
-	"os/exec"
+	"sync"
 	"syscall"
-	"time"
 
+	runc "github.com/crosbymichael/go-runc"
 	"github.com/tonistiigi/fifo"
-	"golang.org/x/net/context"
 )
 
-// setPDeathSig sets the parent death signal to SIGKILL so that if the
-// shim dies the container process also dies.
-func setPDeathSig() *syscall.SysProcAttr {
-	return &syscall.SysProcAttr{
-		Pdeathsig: syscall.SIGKILL,
+func copyConsole(ctx context.Context, console *runc.Console, stdin, stdout, stderr string, wg *sync.WaitGroup) error {
+	in, err := fifo.OpenFifo(ctx, stdin, syscall.O_RDONLY, 0)
+	if err != nil {
+		return err
 	}
+	go io.Copy(console, in)
+	outw, err := fifo.OpenFifo(ctx, stdout, syscall.O_WRONLY, 0)
+	if err != nil {
+		return err
+	}
+	outr, err := fifo.OpenFifo(ctx, stdout, syscall.O_RDONLY, 0)
+	if err != nil {
+		return err
+	}
+	wg.Add(1)
+	go func() {
+		io.Copy(outw, console)
+		console.Close()
+		outr.Close()
+		outw.Close()
+		wg.Done()
+	}()
+	return nil
 }
 
-// openIO opens the pre-created fifo's for use with the container
-// in RDWR so that they remain open if the other side stops listening
-func (p *process) openIO() error {
-	return nil
-	p.stdio = &stdio{}
-	var (
-		uid = p.RootUID
-		gid = p.RootGID
-	)
-
-	ctx, _ := context.WithTimeout(context.Background(), 15*time.Second)
-
-	stdinCloser, err := fifo.OpenFifo(ctx, p.Stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
-	if err != nil {
-		return err
-	}
-	p.stdinCloser = stdinCloser
-
-	if p.Terminal {
-		master, console, err := newConsole(uid, gid)
-		if err != nil {
-			return err
-		}
-		p.console = master
-		p.consolePath = console
-		stdin, err := fifo.OpenFifo(ctx, p.Stdin, syscall.O_RDONLY, 0)
-		if err != nil {
-			return err
-		}
-		go io.Copy(master, stdin)
-		stdoutw, err := fifo.OpenFifo(ctx, p.Stdout, syscall.O_WRONLY, 0)
-		if err != nil {
-			return err
-		}
-		stdoutr, err := fifo.OpenFifo(ctx, p.Stdout, syscall.O_RDONLY, 0)
-		if err != nil {
-			return err
-		}
-		p.Add(1)
-		go func() {
-			io.Copy(stdoutw, master)
-			master.Close()
-			stdoutr.Close()
-			stdoutw.Close()
-			p.Done()
-		}()
-		return nil
-	}
-	i, err := p.initializeIO(uid)
-	if err != nil {
-		return err
-	}
-	p.shimIO = i
-	// non-tty
+func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, wg *sync.WaitGroup) error {
 	for name, dest := range map[string]func(wc io.WriteCloser, rc io.Closer){
-		p.Stdout: func(wc io.WriteCloser, rc io.Closer) {
-			p.Add(1)
+		stdout: func(wc io.WriteCloser, rc io.Closer) {
+			wg.Add(1)
 			go func() {
-				io.Copy(wc, i.Stdout)
-				p.Done()
+				io.Copy(wc, rio.Stdout())
+				wg.Done()
 				wc.Close()
 				rc.Close()
 			}()
 		},
-		p.Stderr: func(wc io.WriteCloser, rc io.Closer) {
-			p.Add(1)
+		stderr: func(wc io.WriteCloser, rc io.Closer) {
+			wg.Add(1)
 			go func() {
-				io.Copy(wc, i.Stderr)
-				p.Done()
+				io.Copy(wc, rio.Stderr())
+				wg.Done()
 				wc.Close()
 				rc.Close()
 			}()
@@ -106,25 +68,14 @@ func (p *process) openIO() error {
 		dest(fw, fr)
 	}
 
-	f, err := fifo.OpenFifo(ctx, p.Stdin, syscall.O_RDONLY, 0)
+	f, err := fifo.OpenFifo(ctx, stdin, syscall.O_RDONLY, 0)
 	if err != nil {
-		return fmt.Errorf("containerd-shim: opening %s failed: %s", p.Stdin, err)
+		return fmt.Errorf("containerd-shim: opening %s failed: %s", stdin, err)
 	}
 	go func() {
-		io.Copy(i.Stdin, f)
-		i.Stdin.Close()
+		io.Copy(rio.Stdin(), f)
+		rio.Stdin().Close()
 		f.Close()
 	}()
-
-	return nil
-}
-
-func (p *process) killAll() error {
-	cmd := exec.Command(p.runtime, "kill", "--all", p.id, "SIGKILL")
-	cmd.SysProcAttr = setPDeathSig()
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%s: %v", out, err)
-	}
 	return nil
 }

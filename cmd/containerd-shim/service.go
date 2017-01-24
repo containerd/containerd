@@ -1,9 +1,12 @@
 package main
 
 import (
+	"fmt"
+	"sync"
+
+	runc "github.com/crosbymichael/go-runc"
 	"github.com/docker/containerd/api/shim"
 	"github.com/docker/containerd/utils"
-	"github.com/docker/docker/pkg/term"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 )
@@ -11,43 +14,51 @@ import (
 var emptyResponse = &google_protobuf.Empty{}
 
 type service struct {
-	init *process
+	initPid   int
+	mu        sync.Mutex
+	processes map[int]process
 }
 
 func (s *service) Create(ctx context.Context, r *shim.CreateRequest) (*shim.CreateResponse, error) {
-	process, err := newProcess(r.ID, r.Bundle, r.Runtime)
+	process, err := newInitProcess(ctx, r)
 	if err != nil {
 		return nil, err
 	}
-	s.init = process
-	if err := process.create(false); err != nil {
-		return nil, err
-	}
+	s.mu.Lock()
+	pid := process.Pid()
+	s.initPid, s.processes[pid] = pid, process
+	s.mu.Unlock()
 	return &shim.CreateResponse{
-		Pid: uint32(process.pid()),
+		Pid: uint32(pid),
 	}, nil
 }
 
 func (s *service) Start(ctx context.Context, r *shim.StartRequest) (*google_protobuf.Empty, error) {
-	if err := s.init.start(); err != nil {
+	s.mu.Lock()
+	p := s.processes[s.initPid]
+	s.mu.Unlock()
+	if err := p.Start(ctx); err != nil {
 		return nil, err
 	}
 	return emptyResponse, nil
 }
 
 func (s *service) Delete(ctx context.Context, r *shim.DeleteRequest) (*shim.DeleteResponse, error) {
-	// TODO: error when container has not stopped
-	err := s.init.killAll()
-	s.init.Wait()
-	if derr := s.init.delete(); err == nil {
-		err = derr
+	s.mu.Lock()
+	p, ok := s.processes[int(r.Pid)]
+	s.mu.Unlock()
+	if !ok {
+		return nil, fmt.Errorf("process does not exist %d", r.Pid)
 	}
-	if cerr := s.init.Close(); err == nil {
-		err = cerr
+	if err := p.Delete(ctx); err != nil {
+		return nil, err
 	}
+	s.mu.Lock()
+	delete(s.processes, int(r.Pid))
+	s.mu.Unlock()
 	return &shim.DeleteResponse{
-		ExitStatus: uint32(s.init.exitStatus),
-	}, err
+		ExitStatus: uint32(p.Status()),
+	}, nil
 }
 
 func (s *service) Exec(ctx context.Context, r *shim.ExecRequest) (*shim.ExecResponse, error) {
@@ -55,22 +66,27 @@ func (s *service) Exec(ctx context.Context, r *shim.ExecRequest) (*shim.ExecResp
 }
 
 func (s *service) Pty(ctx context.Context, r *shim.PtyRequest) (*google_protobuf.Empty, error) {
-	if s.init.console == nil {
-		return emptyResponse, nil
-	}
-	ws := term.Winsize{
+	ws := runc.WinSize{
 		Width:  uint16(r.Width),
 		Height: uint16(r.Height),
 	}
-	if err := term.SetWinsize(s.init.console.Fd(), &ws); err != nil {
+	s.mu.Lock()
+	p, ok := s.processes[int(r.Pid)]
+	s.mu.Unlock()
+	if !ok {
+		return nil, fmt.Errorf("process does not exist %d", r.Pid)
+	}
+	if err := p.Resize(ws); err != nil {
 		return nil, err
 	}
 	return emptyResponse, nil
 }
 
 func (s *service) processExited(e utils.Exit) error {
-	if s.init.pid() == e.Pid {
-		s.init.setExited(e.Status)
+	s.mu.Lock()
+	if p, ok := s.processes[e.Pid]; ok {
+		p.Exited(e.Status)
 	}
+	s.mu.Unlock()
 	return nil
 }

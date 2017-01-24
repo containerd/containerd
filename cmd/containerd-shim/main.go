@@ -52,7 +52,9 @@ func main() {
 		}
 		var (
 			server = grpc.NewServer()
-			sv     = &service{}
+			sv     = &service{
+				processes: make(map[int]process),
+			}
 		)
 		shim.RegisterShimServiceServer(server, sv)
 		l, err := utils.CreateUnixSocket("shim.sock")

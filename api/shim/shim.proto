@@ -17,6 +17,11 @@ message CreateRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
     string bundle = 2;
     string runtime = 3;
+    bool no_pivot = 4;
+    bool terminal = 5;
+    string stdin = 6;
+    string stdout = 7;
+    string stderr = 8;
 }
 
 message CreateResponse {
@@ -27,7 +32,7 @@ message StartRequest {
 }
 
 message DeleteRequest {
-
+    uint32 pid = 1;
 }
 
 message DeleteResponse {
@@ -43,7 +48,7 @@ message ExecResponse {
 }
 
 message PtyRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
+    uint32 pid = 1;
 	uint32 width = 2;
 	uint32 height = 3;
 }
