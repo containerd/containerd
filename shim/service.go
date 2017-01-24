@@ -1,11 +1,11 @@
-package main
+package shim
 
 import (
 	"fmt"
 	"sync"
 
 	runc "github.com/crosbymichael/go-runc"
-	"github.com/docker/containerd/api/shim"
+	apishim "github.com/docker/containerd/api/shim"
 	"github.com/docker/containerd/utils"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
@@ -13,13 +13,19 @@ import (
 
 var emptyResponse = &google_protobuf.Empty{}
 
-type service struct {
+func NewService() *Service {
+	return &Service{
+		processes: make(map[int]process),
+	}
+}
+
+type Service struct {
 	initPid   int
 	mu        sync.Mutex
 	processes map[int]process
 }
 
-func (s *service) Create(ctx context.Context, r *shim.CreateRequest) (*shim.CreateResponse, error) {
+func (s *Service) Create(ctx context.Context, r *apishim.CreateRequest) (*apishim.CreateResponse, error) {
 	process, err := newInitProcess(ctx, r)
 	if err != nil {
 		return nil, err
@@ -28,12 +34,12 @@ func (s *service) Create(ctx context.Context, r *shim.CreateRequest) (*shim.Crea
 	pid := process.Pid()
 	s.initPid, s.processes[pid] = pid, process
 	s.mu.Unlock()
-	return &shim.CreateResponse{
+	return &apishim.CreateResponse{
 		Pid: uint32(pid),
 	}, nil
 }
 
-func (s *service) Start(ctx context.Context, r *shim.StartRequest) (*google_protobuf.Empty, error) {
+func (s *Service) Start(ctx context.Context, r *apishim.StartRequest) (*google_protobuf.Empty, error) {
 	s.mu.Lock()
 	p := s.processes[s.initPid]
 	s.mu.Unlock()
@@ -43,7 +49,7 @@ func (s *service) Start(ctx context.Context, r *shim.StartRequest) (*google_prot
 	return emptyResponse, nil
 }
 
-func (s *service) Delete(ctx context.Context, r *shim.DeleteRequest) (*shim.DeleteResponse, error) {
+func (s *Service) Delete(ctx context.Context, r *apishim.DeleteRequest) (*apishim.DeleteResponse, error) {
 	s.mu.Lock()
 	p, ok := s.processes[int(r.Pid)]
 	s.mu.Unlock()
@@ -56,12 +62,12 @@ func (s *service) Delete(ctx context.Context, r *shim.DeleteRequest) (*shim.Dele
 	s.mu.Lock()
 	delete(s.processes, int(r.Pid))
 	s.mu.Unlock()
-	return &shim.DeleteResponse{
+	return &apishim.DeleteResponse{
 		ExitStatus: uint32(p.Status()),
 	}, nil
 }
 
-func (s *service) Exec(ctx context.Context, r *shim.ExecRequest) (*shim.ExecResponse, error) {
+func (s *Service) Exec(ctx context.Context, r *apishim.ExecRequest) (*apishim.ExecResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	process, err := newExecProcess(ctx, r, s.processes[s.initPid].(*initProcess))
@@ -70,12 +76,12 @@ func (s *service) Exec(ctx context.Context, r *shim.ExecRequest) (*shim.ExecResp
 	}
 	pid := process.Pid()
 	s.processes[pid] = process
-	return &shim.ExecResponse{
+	return &apishim.ExecResponse{
 		Pid: uint32(pid),
 	}, nil
 }
 
-func (s *service) Pty(ctx context.Context, r *shim.PtyRequest) (*google_protobuf.Empty, error) {
+func (s *Service) Pty(ctx context.Context, r *apishim.PtyRequest) (*google_protobuf.Empty, error) {
 	ws := runc.WinSize{
 		Width:  uint16(r.Width),
 		Height: uint16(r.Height),
@@ -92,7 +98,7 @@ func (s *service) Pty(ctx context.Context, r *shim.PtyRequest) (*google_protobuf
 	return emptyResponse, nil
 }
 
-func (s *service) processExited(e utils.Exit) error {
+func (s *Service) ProcessExit(e utils.Exit) error {
 	s.mu.Lock()
 	if p, ok := s.processes[e.Pid]; ok {
 		p.Exited(e.Status)

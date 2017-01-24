@@ -1,13 +1,10 @@
-package main
+package shim
 
 import (
 	"context"
-	"errors"
 
 	runc "github.com/crosbymichael/go-runc"
 )
-
-var errRuntime = errors.New("shim: runtime execution error")
 
 type process interface {
 	// Pid returns the pid for the process

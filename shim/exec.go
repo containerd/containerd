@@ -1,4 +1,4 @@
-package main
+package shim
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	runc "github.com/crosbymichael/go-runc"
-	"github.com/docker/containerd/api/shim"
+	apishim "github.com/docker/containerd/api/shim"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -24,7 +24,7 @@ type execProcess struct {
 	parent *initProcess
 }
 
-func newExecProcess(context context.Context, r *shim.ExecRequest, parent *initProcess) (process, error) {
+func newExecProcess(context context.Context, r *apishim.ExecRequest, parent *initProcess) (process, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func newExecProcess(context context.Context, r *shim.ExecRequest, parent *initPr
 	return e, nil
 }
 
-func processFromRequest(r *shim.ExecRequest) specs.Process {
+func processFromRequest(r *apishim.ExecRequest) specs.Process {
 	return specs.Process{
 		Terminal: r.Terminal,
 		User: specs.User{
@@ -86,7 +86,7 @@ func processFromRequest(r *shim.ExecRequest) specs.Process {
 	}
 }
 
-func rlimits(rr []*shim.Rlimit) (o []specs.LinuxRlimit) {
+func rlimits(rr []*apishim.Rlimit) (o []specs.LinuxRlimit) {
 	for _, r := range rr {
 		o = append(o, specs.LinuxRlimit{
 			Type: r.Type,

@@ -1,4 +1,4 @@
-package main
+package shim
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"syscall"
 
 	runc "github.com/crosbymichael/go-runc"
-	"github.com/docker/containerd/api/shim"
+	apishim "github.com/docker/containerd/api/shim"
 )
 
 type initProcess struct {
@@ -23,7 +23,7 @@ type initProcess struct {
 	pid     int
 }
 
-func newInitProcess(context context.Context, r *shim.CreateRequest) (process, error) {
+func newInitProcess(context context.Context, r *apishim.CreateRequest) (process, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err

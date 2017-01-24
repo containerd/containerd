@@ -10,7 +10,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd"
-	"github.com/docker/containerd/api/shim"
+	apishim "github.com/docker/containerd/api/shim"
+	"github.com/docker/containerd/shim"
 	"github.com/docker/containerd/sys"
 	"github.com/docker/containerd/utils"
 	"github.com/urfave/cli"
@@ -52,11 +53,9 @@ func main() {
 		}
 		var (
 			server = grpc.NewServer()
-			sv     = &service{
-				processes: make(map[int]process),
-			}
+			sv     = shim.NewService()
 		)
-		shim.RegisterShimServer(server, sv)
+		apishim.RegisterShimServer(server, sv)
 		l, err := utils.CreateUnixSocket("shim.sock")
 		if err != nil {
 			return err
@@ -77,7 +76,7 @@ func main() {
 					logrus.WithError(err).Error("reap exit status")
 				}
 				for _, e := range exits {
-					if err := sv.processExited(e); err != nil {
+					if err := sv.ProcessExit(e); err != nil {
 						return err
 					}
 				}
