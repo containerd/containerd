@@ -104,7 +104,7 @@ var shimDeleteCommand = cli.Command{
 	},
 }
 
-func getShimService() (shim.ShimServiceClient, error) {
+func getShimService() (shim.ShimClient, error) {
 	bindSocket := "shim.sock"
 
 	// reset the logger for grpc to log to dev/null so that it does not mess with our stdio
@@ -119,6 +119,6 @@ func getShimService() (shim.ShimServiceClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return shim.NewShimServiceClient(conn), nil
+	return shim.NewShimClient(conn), nil
 
 }

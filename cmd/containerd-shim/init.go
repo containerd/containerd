@@ -52,9 +52,10 @@ func newInitProcess(context context.Context, r *shim.CreateRequest) (process, er
 		if io, err = runc.NewPipeIO(0, 0); err != nil {
 			return nil, err
 		}
+		p.io = io
 	}
 	opts := &runc.CreateOpts{
-		PidFile:       filepath.Join(cwd, "pid"),
+		PidFile:       filepath.Join(cwd, "init.pid"),
 		ConsoleSocket: socket,
 		IO:            io,
 		NoPivot:       r.NoPivot,

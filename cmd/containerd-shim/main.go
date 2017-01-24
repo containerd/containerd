@@ -56,7 +56,7 @@ func main() {
 				processes: make(map[int]process),
 			}
 		)
-		shim.RegisterShimServiceServer(server, sv)
+		shim.RegisterShimServer(server, sv)
 		l, err := utils.CreateUnixSocket("shim.sock")
 		if err != nil {
 			return err

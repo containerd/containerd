@@ -62,7 +62,17 @@ func (s *service) Delete(ctx context.Context, r *shim.DeleteRequest) (*shim.Dele
 }
 
 func (s *service) Exec(ctx context.Context, r *shim.ExecRequest) (*shim.ExecResponse, error) {
-	return nil, nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	process, err := newExecProcess(ctx, r, s.processes[s.initPid].(*initProcess))
+	if err != nil {
+		return nil, err
+	}
+	pid := process.Pid()
+	s.processes[pid] = process
+	return &shim.ExecResponse{
+		Pid: uint32(pid),
+	}, nil
 }
 
 func (s *service) Pty(ctx context.Context, r *shim.PtyRequest) (*google_protobuf.Empty, error) {

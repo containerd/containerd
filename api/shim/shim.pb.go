@@ -15,6 +15,8 @@
 		DeleteRequest
 		DeleteResponse
 		ExecRequest
+		User
+		Rlimit
 		ExecResponse
 		PtyRequest
 */
@@ -97,11 +99,45 @@ func (*DeleteResponse) ProtoMessage()               {}
 func (*DeleteResponse) Descriptor() ([]byte, []int) { return fileDescriptorShim, []int{4} }
 
 type ExecRequest struct {
+	ID              string    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Terminal        bool      `protobuf:"varint,2,opt,name=terminal,proto3" json:"terminal,omitempty"`
+	Stdin           string    `protobuf:"bytes,3,opt,name=stdin,proto3" json:"stdin,omitempty"`
+	Stdout          string    `protobuf:"bytes,4,opt,name=stdout,proto3" json:"stdout,omitempty"`
+	Stderr          string    `protobuf:"bytes,5,opt,name=stderr,proto3" json:"stderr,omitempty"`
+	User            *User     `protobuf:"bytes,6,opt,name=user" json:"user,omitempty"`
+	Args            []string  `protobuf:"bytes,7,rep,name=args" json:"args,omitempty"`
+	Env             []string  `protobuf:"bytes,8,rep,name=env" json:"env,omitempty"`
+	Cwd             string    `protobuf:"bytes,9,opt,name=cwd,proto3" json:"cwd,omitempty"`
+	Capabilities    []string  `protobuf:"bytes,10,rep,name=capabilities" json:"capabilities,omitempty"`
+	Rlimits         []*Rlimit `protobuf:"bytes,11,rep,name=rlimits" json:"rlimits,omitempty"`
+	NoNewPrivileges bool      `protobuf:"varint,12,opt,name=no_new_privileges,json=noNewPrivileges,proto3" json:"no_new_privileges,omitempty"`
+	ApparmorProfile string    `protobuf:"bytes,13,opt,name=apparmor_profile,json=apparmorProfile,proto3" json:"apparmor_profile,omitempty"`
+	SelinuxLabel    string    `protobuf:"bytes,14,opt,name=selinux_label,json=selinuxLabel,proto3" json:"selinux_label,omitempty"`
 }
 
 func (m *ExecRequest) Reset()                    { *m = ExecRequest{} }
 func (*ExecRequest) ProtoMessage()               {}
 func (*ExecRequest) Descriptor() ([]byte, []int) { return fileDescriptorShim, []int{5} }
+
+type User struct {
+	Uid            uint32   `protobuf:"varint,1,opt,name=uid,proto3" json:"uid,omitempty"`
+	Gid            uint32   `protobuf:"varint,2,opt,name=gid,proto3" json:"gid,omitempty"`
+	AdditionalGids []uint32 `protobuf:"varint,3,rep,packed,name=additional_gids,json=additionalGids" json:"additional_gids,omitempty"`
+}
+
+func (m *User) Reset()                    { *m = User{} }
+func (*User) ProtoMessage()               {}
+func (*User) Descriptor() ([]byte, []int) { return fileDescriptorShim, []int{6} }
+
+type Rlimit struct {
+	Type string `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	Hard uint64 `protobuf:"varint,2,opt,name=hard,proto3" json:"hard,omitempty"`
+	Soft uint64 `protobuf:"varint,3,opt,name=soft,proto3" json:"soft,omitempty"`
+}
+
+func (m *Rlimit) Reset()                    { *m = Rlimit{} }
+func (*Rlimit) ProtoMessage()               {}
+func (*Rlimit) Descriptor() ([]byte, []int) { return fileDescriptorShim, []int{7} }
 
 type ExecResponse struct {
 	Pid uint32 `protobuf:"varint,1,opt,name=pid,proto3" json:"pid,omitempty"`
@@ -109,7 +145,7 @@ type ExecResponse struct {
 
 func (m *ExecResponse) Reset()                    { *m = ExecResponse{} }
 func (*ExecResponse) ProtoMessage()               {}
-func (*ExecResponse) Descriptor() ([]byte, []int) { return fileDescriptorShim, []int{6} }
+func (*ExecResponse) Descriptor() ([]byte, []int) { return fileDescriptorShim, []int{8} }
 
 type PtyRequest struct {
 	Pid    uint32 `protobuf:"varint,1,opt,name=pid,proto3" json:"pid,omitempty"`
@@ -119,7 +155,7 @@ type PtyRequest struct {
 
 func (m *PtyRequest) Reset()                    { *m = PtyRequest{} }
 func (*PtyRequest) ProtoMessage()               {}
-func (*PtyRequest) Descriptor() ([]byte, []int) { return fileDescriptorShim, []int{7} }
+func (*PtyRequest) Descriptor() ([]byte, []int) { return fileDescriptorShim, []int{9} }
 
 func init() {
 	proto.RegisterType((*CreateRequest)(nil), "containerd.v1.CreateRequest")
@@ -128,6 +164,8 @@ func init() {
 	proto.RegisterType((*DeleteRequest)(nil), "containerd.v1.DeleteRequest")
 	proto.RegisterType((*DeleteResponse)(nil), "containerd.v1.DeleteResponse")
 	proto.RegisterType((*ExecRequest)(nil), "containerd.v1.ExecRequest")
+	proto.RegisterType((*User)(nil), "containerd.v1.User")
+	proto.RegisterType((*Rlimit)(nil), "containerd.v1.Rlimit")
 	proto.RegisterType((*ExecResponse)(nil), "containerd.v1.ExecResponse")
 	proto.RegisterType((*PtyRequest)(nil), "containerd.v1.PtyRequest")
 }
@@ -191,8 +229,50 @@ func (this *ExecRequest) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 4)
+	s := make([]string, 0, 18)
 	s = append(s, "&shim.ExecRequest{")
+	s = append(s, "ID: "+fmt.Sprintf("%#v", this.ID)+",\n")
+	s = append(s, "Terminal: "+fmt.Sprintf("%#v", this.Terminal)+",\n")
+	s = append(s, "Stdin: "+fmt.Sprintf("%#v", this.Stdin)+",\n")
+	s = append(s, "Stdout: "+fmt.Sprintf("%#v", this.Stdout)+",\n")
+	s = append(s, "Stderr: "+fmt.Sprintf("%#v", this.Stderr)+",\n")
+	if this.User != nil {
+		s = append(s, "User: "+fmt.Sprintf("%#v", this.User)+",\n")
+	}
+	s = append(s, "Args: "+fmt.Sprintf("%#v", this.Args)+",\n")
+	s = append(s, "Env: "+fmt.Sprintf("%#v", this.Env)+",\n")
+	s = append(s, "Cwd: "+fmt.Sprintf("%#v", this.Cwd)+",\n")
+	s = append(s, "Capabilities: "+fmt.Sprintf("%#v", this.Capabilities)+",\n")
+	if this.Rlimits != nil {
+		s = append(s, "Rlimits: "+fmt.Sprintf("%#v", this.Rlimits)+",\n")
+	}
+	s = append(s, "NoNewPrivileges: "+fmt.Sprintf("%#v", this.NoNewPrivileges)+",\n")
+	s = append(s, "ApparmorProfile: "+fmt.Sprintf("%#v", this.ApparmorProfile)+",\n")
+	s = append(s, "SelinuxLabel: "+fmt.Sprintf("%#v", this.SelinuxLabel)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *User) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 7)
+	s = append(s, "&shim.User{")
+	s = append(s, "Uid: "+fmt.Sprintf("%#v", this.Uid)+",\n")
+	s = append(s, "Gid: "+fmt.Sprintf("%#v", this.Gid)+",\n")
+	s = append(s, "AdditionalGids: "+fmt.Sprintf("%#v", this.AdditionalGids)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *Rlimit) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 7)
+	s = append(s, "&shim.Rlimit{")
+	s = append(s, "Type: "+fmt.Sprintf("%#v", this.Type)+",\n")
+	s = append(s, "Hard: "+fmt.Sprintf("%#v", this.Hard)+",\n")
+	s = append(s, "Soft: "+fmt.Sprintf("%#v", this.Soft)+",\n")
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
@@ -253,9 +333,9 @@ var _ grpc.ClientConn
 // is compatible with the grpc package it is being compiled against.
 const _ = grpc.SupportPackageIsVersion4
 
-// Client API for ShimService service
+// Client API for Shim service
 
-type ShimServiceClient interface {
+type ShimClient interface {
 	Create(ctx context.Context, in *CreateRequest, opts ...grpc.CallOption) (*CreateResponse, error)
 	Start(ctx context.Context, in *StartRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error)
 	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
@@ -263,62 +343,62 @@ type ShimServiceClient interface {
 	Pty(ctx context.Context, in *PtyRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error)
 }
 
-type shimServiceClient struct {
+type shimClient struct {
 	cc *grpc.ClientConn
 }
 
-func NewShimServiceClient(cc *grpc.ClientConn) ShimServiceClient {
-	return &shimServiceClient{cc}
+func NewShimClient(cc *grpc.ClientConn) ShimClient {
+	return &shimClient{cc}
 }
 
-func (c *shimServiceClient) Create(ctx context.Context, in *CreateRequest, opts ...grpc.CallOption) (*CreateResponse, error) {
+func (c *shimClient) Create(ctx context.Context, in *CreateRequest, opts ...grpc.CallOption) (*CreateResponse, error) {
 	out := new(CreateResponse)
-	err := grpc.Invoke(ctx, "/containerd.v1.ShimService/Create", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/containerd.v1.Shim/Create", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *shimServiceClient) Start(ctx context.Context, in *StartRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+func (c *shimClient) Start(ctx context.Context, in *StartRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
 	out := new(google_protobuf.Empty)
-	err := grpc.Invoke(ctx, "/containerd.v1.ShimService/Start", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/containerd.v1.Shim/Start", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *shimServiceClient) Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error) {
+func (c *shimClient) Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error) {
 	out := new(DeleteResponse)
-	err := grpc.Invoke(ctx, "/containerd.v1.ShimService/Delete", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/containerd.v1.Shim/Delete", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *shimServiceClient) Exec(ctx context.Context, in *ExecRequest, opts ...grpc.CallOption) (*ExecResponse, error) {
+func (c *shimClient) Exec(ctx context.Context, in *ExecRequest, opts ...grpc.CallOption) (*ExecResponse, error) {
 	out := new(ExecResponse)
-	err := grpc.Invoke(ctx, "/containerd.v1.ShimService/Exec", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/containerd.v1.Shim/Exec", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *shimServiceClient) Pty(ctx context.Context, in *PtyRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+func (c *shimClient) Pty(ctx context.Context, in *PtyRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
 	out := new(google_protobuf.Empty)
-	err := grpc.Invoke(ctx, "/containerd.v1.ShimService/Pty", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/containerd.v1.Shim/Pty", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// Server API for ShimService service
+// Server API for Shim service
 
-type ShimServiceServer interface {
+type ShimServer interface {
 	Create(context.Context, *CreateRequest) (*CreateResponse, error)
 	Start(context.Context, *StartRequest) (*google_protobuf.Empty, error)
 	Delete(context.Context, *DeleteRequest) (*DeleteResponse, error)
@@ -326,123 +406,123 @@ type ShimServiceServer interface {
 	Pty(context.Context, *PtyRequest) (*google_protobuf.Empty, error)
 }
 
-func RegisterShimServiceServer(s *grpc.Server, srv ShimServiceServer) {
-	s.RegisterService(&_ShimService_serviceDesc, srv)
+func RegisterShimServer(s *grpc.Server, srv ShimServer) {
+	s.RegisterService(&_Shim_serviceDesc, srv)
 }
 
-func _ShimService_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Shim_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ShimServiceServer).Create(ctx, in)
+		return srv.(ShimServer).Create(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.ShimService/Create",
+		FullMethod: "/containerd.v1.Shim/Create",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServiceServer).Create(ctx, req.(*CreateRequest))
+		return srv.(ShimServer).Create(ctx, req.(*CreateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ShimService_Start_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Shim_Start_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StartRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ShimServiceServer).Start(ctx, in)
+		return srv.(ShimServer).Start(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.ShimService/Start",
+		FullMethod: "/containerd.v1.Shim/Start",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServiceServer).Start(ctx, req.(*StartRequest))
+		return srv.(ShimServer).Start(ctx, req.(*StartRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ShimService_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Shim_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ShimServiceServer).Delete(ctx, in)
+		return srv.(ShimServer).Delete(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.ShimService/Delete",
+		FullMethod: "/containerd.v1.Shim/Delete",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServiceServer).Delete(ctx, req.(*DeleteRequest))
+		return srv.(ShimServer).Delete(ctx, req.(*DeleteRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ShimService_Exec_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Shim_Exec_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ExecRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ShimServiceServer).Exec(ctx, in)
+		return srv.(ShimServer).Exec(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.ShimService/Exec",
+		FullMethod: "/containerd.v1.Shim/Exec",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServiceServer).Exec(ctx, req.(*ExecRequest))
+		return srv.(ShimServer).Exec(ctx, req.(*ExecRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ShimService_Pty_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Shim_Pty_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PtyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ShimServiceServer).Pty(ctx, in)
+		return srv.(ShimServer).Pty(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.ShimService/Pty",
+		FullMethod: "/containerd.v1.Shim/Pty",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServiceServer).Pty(ctx, req.(*PtyRequest))
+		return srv.(ShimServer).Pty(ctx, req.(*PtyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-var _ShimService_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "containerd.v1.ShimService",
-	HandlerType: (*ShimServiceServer)(nil),
+var _Shim_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "containerd.v1.Shim",
+	HandlerType: (*ShimServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "Create",
-			Handler:    _ShimService_Create_Handler,
+			Handler:    _Shim_Create_Handler,
 		},
 		{
 			MethodName: "Start",
-			Handler:    _ShimService_Start_Handler,
+			Handler:    _Shim_Start_Handler,
 		},
 		{
 			MethodName: "Delete",
-			Handler:    _ShimService_Delete_Handler,
+			Handler:    _Shim_Delete_Handler,
 		},
 		{
 			MethodName: "Exec",
-			Handler:    _ShimService_Exec_Handler,
+			Handler:    _Shim_Exec_Handler,
 		},
 		{
 			MethodName: "Pty",
-			Handler:    _ShimService_Pty_Handler,
+			Handler:    _Shim_Pty_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -625,6 +705,214 @@ func (m *ExecRequest) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.ID) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintShim(dAtA, i, uint64(len(m.ID)))
+		i += copy(dAtA[i:], m.ID)
+	}
+	if m.Terminal {
+		dAtA[i] = 0x10
+		i++
+		if m.Terminal {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i++
+	}
+	if len(m.Stdin) > 0 {
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintShim(dAtA, i, uint64(len(m.Stdin)))
+		i += copy(dAtA[i:], m.Stdin)
+	}
+	if len(m.Stdout) > 0 {
+		dAtA[i] = 0x22
+		i++
+		i = encodeVarintShim(dAtA, i, uint64(len(m.Stdout)))
+		i += copy(dAtA[i:], m.Stdout)
+	}
+	if len(m.Stderr) > 0 {
+		dAtA[i] = 0x2a
+		i++
+		i = encodeVarintShim(dAtA, i, uint64(len(m.Stderr)))
+		i += copy(dAtA[i:], m.Stderr)
+	}
+	if m.User != nil {
+		dAtA[i] = 0x32
+		i++
+		i = encodeVarintShim(dAtA, i, uint64(m.User.Size()))
+		n1, err := m.User.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n1
+	}
+	if len(m.Args) > 0 {
+		for _, s := range m.Args {
+			dAtA[i] = 0x3a
+			i++
+			l = len(s)
+			for l >= 1<<7 {
+				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
+				l >>= 7
+				i++
+			}
+			dAtA[i] = uint8(l)
+			i++
+			i += copy(dAtA[i:], s)
+		}
+	}
+	if len(m.Env) > 0 {
+		for _, s := range m.Env {
+			dAtA[i] = 0x42
+			i++
+			l = len(s)
+			for l >= 1<<7 {
+				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
+				l >>= 7
+				i++
+			}
+			dAtA[i] = uint8(l)
+			i++
+			i += copy(dAtA[i:], s)
+		}
+	}
+	if len(m.Cwd) > 0 {
+		dAtA[i] = 0x4a
+		i++
+		i = encodeVarintShim(dAtA, i, uint64(len(m.Cwd)))
+		i += copy(dAtA[i:], m.Cwd)
+	}
+	if len(m.Capabilities) > 0 {
+		for _, s := range m.Capabilities {
+			dAtA[i] = 0x52
+			i++
+			l = len(s)
+			for l >= 1<<7 {
+				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
+				l >>= 7
+				i++
+			}
+			dAtA[i] = uint8(l)
+			i++
+			i += copy(dAtA[i:], s)
+		}
+	}
+	if len(m.Rlimits) > 0 {
+		for _, msg := range m.Rlimits {
+			dAtA[i] = 0x5a
+			i++
+			i = encodeVarintShim(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.NoNewPrivileges {
+		dAtA[i] = 0x60
+		i++
+		if m.NoNewPrivileges {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i++
+	}
+	if len(m.ApparmorProfile) > 0 {
+		dAtA[i] = 0x6a
+		i++
+		i = encodeVarintShim(dAtA, i, uint64(len(m.ApparmorProfile)))
+		i += copy(dAtA[i:], m.ApparmorProfile)
+	}
+	if len(m.SelinuxLabel) > 0 {
+		dAtA[i] = 0x72
+		i++
+		i = encodeVarintShim(dAtA, i, uint64(len(m.SelinuxLabel)))
+		i += copy(dAtA[i:], m.SelinuxLabel)
+	}
+	return i, nil
+}
+
+func (m *User) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *User) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Uid != 0 {
+		dAtA[i] = 0x8
+		i++
+		i = encodeVarintShim(dAtA, i, uint64(m.Uid))
+	}
+	if m.Gid != 0 {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintShim(dAtA, i, uint64(m.Gid))
+	}
+	if len(m.AdditionalGids) > 0 {
+		dAtA3 := make([]byte, len(m.AdditionalGids)*10)
+		var j2 int
+		for _, num := range m.AdditionalGids {
+			for num >= 1<<7 {
+				dAtA3[j2] = uint8(uint64(num)&0x7f | 0x80)
+				num >>= 7
+				j2++
+			}
+			dAtA3[j2] = uint8(num)
+			j2++
+		}
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintShim(dAtA, i, uint64(j2))
+		i += copy(dAtA[i:], dAtA3[:j2])
+	}
+	return i, nil
+}
+
+func (m *Rlimit) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *Rlimit) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Type) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintShim(dAtA, i, uint64(len(m.Type)))
+		i += copy(dAtA[i:], m.Type)
+	}
+	if m.Hard != 0 {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintShim(dAtA, i, uint64(m.Hard))
+	}
+	if m.Soft != 0 {
+		dAtA[i] = 0x18
+		i++
+		i = encodeVarintShim(dAtA, i, uint64(m.Soft))
+	}
 	return i, nil
 }
 
@@ -783,6 +1071,103 @@ func (m *DeleteResponse) Size() (n int) {
 func (m *ExecRequest) Size() (n int) {
 	var l int
 	_ = l
+	l = len(m.ID)
+	if l > 0 {
+		n += 1 + l + sovShim(uint64(l))
+	}
+	if m.Terminal {
+		n += 2
+	}
+	l = len(m.Stdin)
+	if l > 0 {
+		n += 1 + l + sovShim(uint64(l))
+	}
+	l = len(m.Stdout)
+	if l > 0 {
+		n += 1 + l + sovShim(uint64(l))
+	}
+	l = len(m.Stderr)
+	if l > 0 {
+		n += 1 + l + sovShim(uint64(l))
+	}
+	if m.User != nil {
+		l = m.User.Size()
+		n += 1 + l + sovShim(uint64(l))
+	}
+	if len(m.Args) > 0 {
+		for _, s := range m.Args {
+			l = len(s)
+			n += 1 + l + sovShim(uint64(l))
+		}
+	}
+	if len(m.Env) > 0 {
+		for _, s := range m.Env {
+			l = len(s)
+			n += 1 + l + sovShim(uint64(l))
+		}
+	}
+	l = len(m.Cwd)
+	if l > 0 {
+		n += 1 + l + sovShim(uint64(l))
+	}
+	if len(m.Capabilities) > 0 {
+		for _, s := range m.Capabilities {
+			l = len(s)
+			n += 1 + l + sovShim(uint64(l))
+		}
+	}
+	if len(m.Rlimits) > 0 {
+		for _, e := range m.Rlimits {
+			l = e.Size()
+			n += 1 + l + sovShim(uint64(l))
+		}
+	}
+	if m.NoNewPrivileges {
+		n += 2
+	}
+	l = len(m.ApparmorProfile)
+	if l > 0 {
+		n += 1 + l + sovShim(uint64(l))
+	}
+	l = len(m.SelinuxLabel)
+	if l > 0 {
+		n += 1 + l + sovShim(uint64(l))
+	}
+	return n
+}
+
+func (m *User) Size() (n int) {
+	var l int
+	_ = l
+	if m.Uid != 0 {
+		n += 1 + sovShim(uint64(m.Uid))
+	}
+	if m.Gid != 0 {
+		n += 1 + sovShim(uint64(m.Gid))
+	}
+	if len(m.AdditionalGids) > 0 {
+		l = 0
+		for _, e := range m.AdditionalGids {
+			l += sovShim(uint64(e))
+		}
+		n += 1 + sovShim(uint64(l)) + l
+	}
+	return n
+}
+
+func (m *Rlimit) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Type)
+	if l > 0 {
+		n += 1 + l + sovShim(uint64(l))
+	}
+	if m.Hard != 0 {
+		n += 1 + sovShim(uint64(m.Hard))
+	}
+	if m.Soft != 0 {
+		n += 1 + sovShim(uint64(m.Soft))
+	}
 	return n
 }
 
@@ -884,6 +1269,44 @@ func (this *ExecRequest) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&ExecRequest{`,
+		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
+		`Terminal:` + fmt.Sprintf("%v", this.Terminal) + `,`,
+		`Stdin:` + fmt.Sprintf("%v", this.Stdin) + `,`,
+		`Stdout:` + fmt.Sprintf("%v", this.Stdout) + `,`,
+		`Stderr:` + fmt.Sprintf("%v", this.Stderr) + `,`,
+		`User:` + strings.Replace(fmt.Sprintf("%v", this.User), "User", "User", 1) + `,`,
+		`Args:` + fmt.Sprintf("%v", this.Args) + `,`,
+		`Env:` + fmt.Sprintf("%v", this.Env) + `,`,
+		`Cwd:` + fmt.Sprintf("%v", this.Cwd) + `,`,
+		`Capabilities:` + fmt.Sprintf("%v", this.Capabilities) + `,`,
+		`Rlimits:` + strings.Replace(fmt.Sprintf("%v", this.Rlimits), "Rlimit", "Rlimit", 1) + `,`,
+		`NoNewPrivileges:` + fmt.Sprintf("%v", this.NoNewPrivileges) + `,`,
+		`ApparmorProfile:` + fmt.Sprintf("%v", this.ApparmorProfile) + `,`,
+		`SelinuxLabel:` + fmt.Sprintf("%v", this.SelinuxLabel) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *User) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&User{`,
+		`Uid:` + fmt.Sprintf("%v", this.Uid) + `,`,
+		`Gid:` + fmt.Sprintf("%v", this.Gid) + `,`,
+		`AdditionalGids:` + fmt.Sprintf("%v", this.AdditionalGids) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Rlimit) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Rlimit{`,
+		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
+		`Hard:` + fmt.Sprintf("%v", this.Hard) + `,`,
+		`Soft:` + fmt.Sprintf("%v", this.Soft) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1468,6 +1891,667 @@ func (m *ExecRequest) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: ExecRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthShim
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Terminal", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Terminal = bool(v != 0)
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Stdin", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthShim
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Stdin = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Stdout", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthShim
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Stdout = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Stderr", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthShim
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Stderr = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field User", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthShim
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.User == nil {
+				m.User = &User{}
+			}
+			if err := m.User.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Args", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthShim
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Args = append(m.Args, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Env", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthShim
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Env = append(m.Env, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Cwd", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthShim
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Cwd = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 10:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Capabilities", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthShim
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Capabilities = append(m.Capabilities, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 11:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Rlimits", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthShim
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Rlimits = append(m.Rlimits, &Rlimit{})
+			if err := m.Rlimits[len(m.Rlimits)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 12:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NoNewPrivileges", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.NoNewPrivileges = bool(v != 0)
+		case 13:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ApparmorProfile", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthShim
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ApparmorProfile = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 14:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SelinuxLabel", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthShim
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SelinuxLabel = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipShim(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthShim
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *User) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowShim
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: User: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: User: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Uid", wireType)
+			}
+			m.Uid = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Uid |= (uint32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Gid", wireType)
+			}
+			m.Gid = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Gid |= (uint32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType == 2 {
+				var packedLen int
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowShim
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					packedLen |= (int(b) & 0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				if packedLen < 0 {
+					return ErrInvalidLengthShim
+				}
+				postIndex := iNdEx + packedLen
+				if postIndex > l {
+					return io.ErrUnexpectedEOF
+				}
+				for iNdEx < postIndex {
+					var v uint32
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowShim
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						v |= (uint32(b) & 0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					m.AdditionalGids = append(m.AdditionalGids, v)
+				}
+			} else if wireType == 0 {
+				var v uint32
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowShim
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					v |= (uint32(b) & 0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				m.AdditionalGids = append(m.AdditionalGids, v)
+			} else {
+				return fmt.Errorf("proto: wrong wireType = %d for field AdditionalGids", wireType)
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipShim(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthShim
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *Rlimit) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowShim
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Rlimit: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Rlimit: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthShim
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Type = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Hard", wireType)
+			}
+			m.Hard = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Hard |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Soft", wireType)
+			}
+			m.Soft = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Soft |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipShim(dAtA[iNdEx:])
@@ -1773,36 +2857,52 @@ var (
 func init() { proto.RegisterFile("shim.proto", fileDescriptorShim) }
 
 var fileDescriptorShim = []byte{
-	// 487 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x74, 0x52, 0x4d, 0x6f, 0xda, 0x40,
-	0x10, 0x8d, 0x21, 0x7c, 0x74, 0x88, 0x51, 0xb5, 0x8a, 0x90, 0x63, 0x52, 0x87, 0xfa, 0x94, 0x93,
-	0x51, 0xda, 0x4b, 0x0f, 0x95, 0x2a, 0xa5, 0xe1, 0x50, 0xa9, 0x07, 0x64, 0x7e, 0x40, 0x04, 0x78,
-	0x0a, 0x2b, 0x81, 0xd7, 0x5d, 0x8f, 0x69, 0xb8, 0xf5, 0xe7, 0xe5, 0xd8, 0x43, 0x55, 0xf5, 0x54,
-	0x15, 0xff, 0x82, 0xfe, 0x84, 0x6a, 0x77, 0xed, 0x24, 0x40, 0xb8, 0xed, 0x9b, 0xf7, 0x76, 0xf7,
-	0xcd, 0x9b, 0x01, 0x48, 0xe7, 0x7c, 0x19, 0x24, 0x52, 0x90, 0x60, 0xf6, 0x54, 0xc4, 0x34, 0xe6,
-	0x31, 0xca, 0x28, 0x58, 0x5d, 0xb9, 0xdd, 0x99, 0x10, 0xb3, 0x05, 0xf6, 0x35, 0x39, 0xc9, 0xbe,
-	0xf4, 0x71, 0x99, 0xd0, 0xda, 0x68, 0xdd, 0xd3, 0x99, 0x98, 0x09, 0x7d, 0xec, 0xab, 0x93, 0xa9,
-	0xfa, 0xbf, 0x2c, 0xb0, 0x3f, 0x4a, 0x1c, 0x13, 0x86, 0xf8, 0x35, 0xc3, 0x94, 0x58, 0x07, 0x2a,
-	0x3c, 0x72, 0xac, 0x9e, 0x75, 0xf9, 0xe2, 0xba, 0x9e, 0xff, 0xb9, 0xa8, 0x7c, 0xba, 0x09, 0x2b,
-	0x3c, 0x62, 0x1d, 0xa8, 0x4f, 0xb2, 0x38, 0x5a, 0xa0, 0x53, 0x51, 0x5c, 0x58, 0x20, 0xe6, 0x40,
-	0x43, 0x66, 0x31, 0xf1, 0x25, 0x3a, 0x55, 0x4d, 0x94, 0x90, 0x9d, 0x41, 0x33, 0x16, 0xb7, 0x09,
-	0x5f, 0x09, 0x72, 0x8e, 0x7b, 0xd6, 0x65, 0x33, 0x6c, 0xc4, 0x62, 0xa8, 0x20, 0x73, 0xa1, 0x49,
-	0x28, 0x97, 0x3c, 0x1e, 0x2f, 0x9c, 0x9a, 0xa6, 0x1e, 0x30, 0x3b, 0x85, 0x5a, 0x4a, 0x11, 0x8f,
-	0x9d, 0xba, 0x7e, 0xce, 0x00, 0xf5, 0x7d, 0x4a, 0x91, 0xc8, 0xc8, 0x69, 0x98, 0xef, 0x0d, 0x2a,
-	0xea, 0x28, 0xa5, 0xd3, 0x7c, 0xa8, 0xa3, 0x94, 0xbe, 0x0f, 0xed, 0xb2, 0xaf, 0x34, 0x11, 0x71,
-	0x8a, 0xec, 0x25, 0x54, 0x93, 0xa2, 0x33, 0x3b, 0x54, 0x47, 0xbf, 0x0d, 0x27, 0x23, 0x1a, 0x4b,
-	0x2a, 0x5a, 0xf7, 0x5f, 0x83, 0x7d, 0x83, 0x0b, 0x7c, 0xcc, 0x62, 0xff, 0xca, 0x15, 0xb4, 0x4b,
-	0x49, 0xf1, 0xec, 0x05, 0xb4, 0xf0, 0x8e, 0xd3, 0x6d, 0x4a, 0x63, 0xca, 0xd2, 0x42, 0x0b, 0xaa,
-	0x34, 0xd2, 0x15, 0xdf, 0x86, 0xd6, 0xe0, 0x0e, 0xa7, 0xe5, 0x27, 0x3d, 0x38, 0x31, 0xf0, 0xa0,
-	0xad, 0xcf, 0x00, 0x43, 0x5a, 0x1f, 0xf4, 0xa0, 0x02, 0xfa, 0xc6, 0x23, 0x9a, 0xeb, 0x41, 0xd8,
-	0xa1, 0x01, 0x2a, 0x88, 0x39, 0xf2, 0xd9, 0x9c, 0xf4, 0x18, 0xec, 0xb0, 0x40, 0x6f, 0x7e, 0x56,
-	0xa0, 0x35, 0x9a, 0xf3, 0xe5, 0x08, 0xe5, 0x8a, 0x4f, 0x91, 0x0d, 0xa0, 0x6e, 0x82, 0x61, 0xe7,
-	0xc1, 0xd6, 0xfa, 0x04, 0x5b, 0x7b, 0xe0, 0xbe, 0x3a, 0xc0, 0x16, 0xb6, 0xdf, 0x43, 0x4d, 0x67,
-	0xc7, 0xba, 0x3b, 0xba, 0xa7, 0x89, 0xba, 0x9d, 0xc0, 0xac, 0x64, 0x50, 0xae, 0x64, 0x30, 0x50,
-	0x2b, 0xa9, 0x4c, 0x98, 0x18, 0xf7, 0x4c, 0x6c, 0x0d, 0x60, 0xcf, 0xc4, 0x4e, 0xf6, 0x1f, 0xe0,
-	0x58, 0x65, 0xc9, 0xdc, 0x1d, 0xd9, 0x93, 0xbc, 0xdd, 0xee, 0xb3, 0x5c, 0xf1, 0xc0, 0x3b, 0xa8,
-	0x0e, 0x69, 0xcd, 0xce, 0x76, 0x34, 0x8f, 0xf1, 0x1f, 0xea, 0xe0, 0xfa, 0xfc, 0x7e, 0xe3, 0x1d,
-	0xfd, 0xde, 0x78, 0x47, 0xff, 0x36, 0x9e, 0xf5, 0x3d, 0xf7, 0xac, 0xfb, 0xdc, 0xb3, 0x7e, 0xe4,
-	0x9e, 0xf5, 0x37, 0xf7, 0xac, 0x49, 0x5d, 0xab, 0xdf, 0xfe, 0x0f, 0x00, 0x00, 0xff, 0xff, 0xff,
-	0xb1, 0x72, 0x31, 0xad, 0x03, 0x00, 0x00,
+	// 747 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x84, 0x54, 0xcd, 0x6e, 0xd3, 0x4c,
+	0x14, 0xad, 0x63, 0xe7, 0xa7, 0x37, 0x71, 0xda, 0x6f, 0xbe, 0x52, 0x4d, 0xd3, 0x92, 0x06, 0xb3,
+	0x68, 0x60, 0x91, 0xa8, 0x65, 0xc3, 0x02, 0x09, 0xa9, 0xb4, 0x42, 0x48, 0x15, 0x8a, 0x1c, 0xb1,
+	0x8e, 0x9c, 0x78, 0xea, 0x8c, 0xe4, 0x78, 0xcc, 0xcc, 0x38, 0x69, 0x76, 0xbc, 0x16, 0x6f, 0xd0,
+	0x0d, 0x12, 0x2b, 0xc4, 0x0a, 0xd1, 0x3c, 0x01, 0x8f, 0x80, 0x66, 0xec, 0x34, 0x3f, 0x6d, 0xc4,
+	0xee, 0xdc, 0x73, 0x8f, 0x67, 0xee, 0x3d, 0xbe, 0x77, 0x00, 0xc4, 0x90, 0x8e, 0x5a, 0x31, 0x67,
+	0x92, 0x21, 0x7b, 0xc0, 0x22, 0xe9, 0xd1, 0x88, 0x70, 0xbf, 0x35, 0x3e, 0xad, 0x1d, 0x06, 0x8c,
+	0x05, 0x21, 0x69, 0xeb, 0x64, 0x3f, 0xb9, 0x6e, 0x93, 0x51, 0x2c, 0xa7, 0xa9, 0xb6, 0xb6, 0x17,
+	0xb0, 0x80, 0x69, 0xd8, 0x56, 0x28, 0x65, 0x9d, 0x1f, 0x06, 0xd8, 0xef, 0x38, 0xf1, 0x24, 0x71,
+	0xc9, 0xe7, 0x84, 0x08, 0x89, 0xf6, 0x21, 0x47, 0x7d, 0x6c, 0x34, 0x8c, 0xe6, 0xf6, 0x79, 0x61,
+	0xf6, 0xeb, 0x38, 0xf7, 0xe1, 0xc2, 0xcd, 0x51, 0x1f, 0xed, 0x43, 0xa1, 0x9f, 0x44, 0x7e, 0x48,
+	0x70, 0x4e, 0xe5, 0xdc, 0x2c, 0x42, 0x18, 0x8a, 0x3c, 0x89, 0x24, 0x1d, 0x11, 0x6c, 0xea, 0xc4,
+	0x3c, 0x44, 0x07, 0x50, 0x8a, 0x58, 0x2f, 0xa6, 0x63, 0x26, 0xb1, 0xd5, 0x30, 0x9a, 0x25, 0xb7,
+	0x18, 0xb1, 0x8e, 0x0a, 0x51, 0x0d, 0x4a, 0x92, 0xf0, 0x11, 0x8d, 0xbc, 0x10, 0xe7, 0x75, 0xea,
+	0x3e, 0x46, 0x7b, 0x90, 0x17, 0xd2, 0xa7, 0x11, 0x2e, 0xe8, 0xe3, 0xd2, 0x40, 0x5d, 0x2f, 0xa4,
+	0xcf, 0x12, 0x89, 0x8b, 0xe9, 0xf5, 0x69, 0x94, 0xf1, 0x84, 0x73, 0x5c, 0xba, 0xe7, 0x09, 0xe7,
+	0x8e, 0x03, 0xd5, 0x79, 0x5f, 0x22, 0x66, 0x91, 0x20, 0x68, 0x17, 0xcc, 0x38, 0xeb, 0xcc, 0x76,
+	0x15, 0x74, 0xaa, 0x50, 0xe9, 0x4a, 0x8f, 0xcb, 0xac, 0x75, 0xe7, 0x19, 0xd8, 0x17, 0x24, 0x24,
+	0x0b, 0x2f, 0x1e, 0x7e, 0x72, 0x0a, 0xd5, 0xb9, 0x24, 0x3b, 0xf6, 0x18, 0xca, 0xe4, 0x86, 0xca,
+	0x9e, 0x90, 0x9e, 0x4c, 0x44, 0xa6, 0x05, 0x45, 0x75, 0x35, 0xe3, 0x7c, 0x35, 0xa1, 0x7c, 0x79,
+	0x43, 0x06, 0xff, 0x32, 0x78, 0xd9, 0x93, 0xdc, 0x26, 0x4f, 0xcc, 0xc7, 0x3d, 0xb1, 0x36, 0x78,
+	0x92, 0x5f, 0xf6, 0x04, 0x9d, 0x80, 0x95, 0x08, 0xc2, 0xb5, 0xb1, 0xe5, 0xb3, 0xff, 0x5b, 0x2b,
+	0xd3, 0xd3, 0xfa, 0x24, 0x08, 0x77, 0xb5, 0x00, 0x21, 0xb0, 0x3c, 0x1e, 0x08, 0x5c, 0x6c, 0x98,
+	0xcd, 0x6d, 0x57, 0x63, 0xe5, 0x05, 0x89, 0xc6, 0xb8, 0xa4, 0x29, 0x05, 0x15, 0x33, 0x98, 0xf8,
+	0x78, 0x5b, 0xdf, 0xa1, 0x20, 0x72, 0xa0, 0x32, 0xf0, 0x62, 0xaf, 0x4f, 0x43, 0x2a, 0x29, 0x11,
+	0x18, 0xb4, 0x78, 0x85, 0x43, 0x6d, 0x28, 0xf2, 0x90, 0x8e, 0xa8, 0x14, 0xb8, 0xdc, 0x30, 0x9b,
+	0xe5, 0xb3, 0x27, 0x6b, 0x75, 0xb8, 0x3a, 0xeb, 0xce, 0x55, 0xe8, 0x25, 0xfc, 0x17, 0xb1, 0x5e,
+	0x44, 0x26, 0xbd, 0x98, 0xd3, 0x31, 0x0d, 0x49, 0x40, 0x04, 0xae, 0x68, 0x83, 0x76, 0x22, 0xf6,
+	0x91, 0x4c, 0x3a, 0xf7, 0x34, 0x7a, 0x01, 0xbb, 0x5e, 0x1c, 0x7b, 0x7c, 0xc4, 0x78, 0x2f, 0xe6,
+	0xec, 0x9a, 0x86, 0x04, 0xdb, 0xba, 0xbe, 0x9d, 0x39, 0xdf, 0x49, 0x69, 0xf4, 0x1c, 0x6c, 0x41,
+	0x42, 0x1a, 0x25, 0x37, 0xbd, 0xd0, 0xeb, 0x93, 0x10, 0x57, 0xb5, 0xae, 0x92, 0x91, 0x57, 0x8a,
+	0x73, 0xba, 0x60, 0x29, 0x5b, 0x54, 0xab, 0xc9, 0x62, 0x10, 0x12, 0xea, 0x2b, 0x26, 0xa0, 0xbe,
+	0xfe, 0x51, 0xb6, 0xab, 0x20, 0x3a, 0x81, 0x1d, 0xcf, 0xf7, 0xa9, 0xa4, 0x2c, 0xf2, 0xc2, 0x5e,
+	0x40, 0x7d, 0x81, 0xcd, 0x86, 0xd9, 0xb4, 0xdd, 0xea, 0x82, 0x7e, 0x4f, 0x7d, 0xe1, 0x5c, 0x40,
+	0x21, 0xed, 0x51, 0xf9, 0x2c, 0xa7, 0x31, 0x49, 0x87, 0xc1, 0xd5, 0x58, 0x71, 0x43, 0x8f, 0xa7,
+	0x27, 0x5b, 0xae, 0xc6, 0x8a, 0x13, 0xec, 0x5a, 0xea, 0xbf, 0x6f, 0xb9, 0x1a, 0x3b, 0x0d, 0xa8,
+	0xa4, 0x53, 0xb5, 0x71, 0xbc, 0xaf, 0x00, 0x3a, 0x72, 0xba, 0x71, 0x96, 0xd5, 0x50, 0x4d, 0xa8,
+	0x2f, 0x87, 0x59, 0x13, 0x69, 0xa0, 0x86, 0x67, 0x48, 0x68, 0x30, 0x4c, 0x6f, 0xb3, 0xdd, 0x2c,
+	0x3a, 0xfb, 0x96, 0x03, 0xab, 0x3b, 0xa4, 0x23, 0x74, 0x09, 0x85, 0x74, 0xb3, 0xd0, 0xd1, 0xda,
+	0x9f, 0x5b, 0x79, 0x48, 0x6a, 0x4f, 0x37, 0x64, 0xb3, 0x7a, 0xdf, 0x40, 0x5e, 0x2f, 0x1f, 0x3a,
+	0x5c, 0xd3, 0x2d, 0xaf, 0x64, 0x6d, 0xbf, 0x95, 0xbe, 0x69, 0xad, 0xf9, 0x9b, 0xd6, 0xba, 0x54,
+	0x6f, 0x9a, 0x2a, 0x22, 0xdd, 0xc3, 0x07, 0x45, 0xac, 0x6c, 0xf0, 0x83, 0x22, 0xd6, 0x96, 0xf7,
+	0x2d, 0x58, 0xca, 0x44, 0x54, 0x5b, 0x93, 0x2d, 0xed, 0x6b, 0xed, 0xf0, 0xd1, 0x5c, 0x76, 0xc0,
+	0x6b, 0x30, 0x3b, 0x72, 0x8a, 0x0e, 0xd6, 0x34, 0x0b, 0xdf, 0x37, 0x75, 0x70, 0x7e, 0x74, 0x7b,
+	0x57, 0xdf, 0xfa, 0x79, 0x57, 0xdf, 0xfa, 0x73, 0x57, 0x37, 0xbe, 0xcc, 0xea, 0xc6, 0xed, 0xac,
+	0x6e, 0x7c, 0x9f, 0xd5, 0x8d, 0xdf, 0xb3, 0xba, 0xd1, 0x2f, 0x68, 0xf5, 0xab, 0xbf, 0x01, 0x00,
+	0x00, 0xff, 0xff, 0x73, 0x2c, 0x79, 0x5f, 0xee, 0x05, 0x00, 0x00,
 }
