@@ -14,7 +14,7 @@ PACKAGES=$(shell go list ./... | grep -v /vendor/)
 INTEGRATION_PACKAGE=${PROJECT_ROOT}/integration
 
 # Project binaries.
-COMMANDS=ctr containerd containerd-shim protoc-gen-gogoctrd
+COMMANDS=ctr containerd containerd-shim protoc-gen-gogoctrd dist
 BINARIES=$(addprefix bin/,$(COMMANDS))
 
 # TODO(stevvooe): This will set version from git tag, but overrides major,
