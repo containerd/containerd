@@ -2,9 +2,9 @@ package content
 
 import (
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/docker/containerd/log"
@@ -23,21 +23,21 @@ var (
 	}
 )
 
-// ContentStore is digest-keyed store for content. All data written into the
-// store is stored under a verifiable digest.
+// Store is digest-keyed store for content. All data written into the store is
+// stored under a verifiable digest.
 //
-// ContentStore can generally support multi-reader, single-writer ingest of
-// data, including resumable ingest.
-type ContentStore struct {
+// Store can generally support multi-reader, single-writer ingest of data,
+// including resumable ingest.
+type Store struct {
 	root string
 }
 
-func OpenContentStore(root string) (*ContentStore, error) {
+func Open(root string) (*Store, error) {
 	if err := os.MkdirAll(filepath.Join(root, "ingest"), 0777); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
 
-	return &ContentStore{
+	return &Store{
 		root: root,
 	}, nil
 }
@@ -48,8 +48,20 @@ type Status struct {
 	Meta interface{}
 }
 
-func (cs *ContentStore) Stat(ref string) (Status, error) {
-	dfi, err := os.Stat(filepath.Join(cs.root, "ingest", ref, "data"))
+func (cs *Store) Stat(ref string) (Status, error) {
+	dp := filepath.Join(cs.ingestRoot(ref), "data")
+	return cs.stat(dp)
+}
+
+// stat works like stat above except uses the path to the ingest.
+func (cs *Store) stat(ingestPath string) (Status, error) {
+	dp := filepath.Join(ingestPath, "data")
+	dfi, err := os.Stat(dp)
+	if err != nil {
+		return Status{}, err
+	}
+
+	ref, err := readFileString(filepath.Join(ingestPath, "ref"))
 	if err != nil {
 		return Status{}, err
 	}
@@ -58,9 +70,10 @@ func (cs *ContentStore) Stat(ref string) (Status, error) {
 		Ref:  ref,
 		Size: dfi.Size(),
 	}, nil
+
 }
 
-func (cs *ContentStore) Active() ([]Status, error) {
+func (cs *Store) Active() ([]Status, error) {
 	ip := filepath.Join(cs.root, "ingest")
 
 	fp, err := os.Open(ip)
@@ -75,7 +88,8 @@ func (cs *ContentStore) Active() ([]Status, error) {
 
 	var active []Status
 	for _, fi := range fis {
-		stat, err := cs.Stat(fi.Name())
+		p := filepath.Join(ip, fi.Name())
+		stat, err := cs.stat(p)
 		if err != nil {
 			if !os.IsNotExist(err) {
 				return nil, err
@@ -100,7 +114,7 @@ func (cs *ContentStore) Active() ([]Status, error) {
 
 // TODO(stevvooe): Allow querying the set of blobs in the blob store.
 
-func (cs *ContentStore) Walk(fn func(path string, dgst digest.Digest) error) error {
+func (cs *Store) Walk(fn func(path string, dgst digest.Digest) error) error {
 	root := filepath.Join(cs.root, "blobs")
 	var alg digest.Algorithm
 	return filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
@@ -138,7 +152,7 @@ func (cs *ContentStore) Walk(fn func(path string, dgst digest.Digest) error) err
 	})
 }
 
-func (cs *ContentStore) GetPath(dgst digest.Digest) (string, error) {
+func (cs *Store) GetPath(dgst digest.Digest) (string, error) {
 	p := filepath.Join(cs.root, "blobs", dgst.Algorithm().String(), dgst.Hex())
 	if _, err := os.Stat(p); err != nil {
 		if os.IsNotExist(err) {
@@ -156,10 +170,8 @@ func (cs *ContentStore) GetPath(dgst digest.Digest) (string, error) {
 // The argument `ref` is used to identify the transaction. It must be a valid
 // path component, meaning it has no `/` characters and no `:` (we'll ban
 // others fs characters, as needed).
-//
-// TODO(stevvooe): Figure out minimum common set of characters, basically common
-func (cs *ContentStore) Begin(ref string) (*ContentWriter, error) {
-	path, data, lock, err := cs.ingestPaths(ref)
+func (cs *Store) Begin(ref string) (*Writer, error) {
+	path, refp, data, lock, err := cs.ingestPaths(ref)
 	if err != nil {
 		return nil, err
 	}
@@ -171,6 +183,11 @@ func (cs *ContentStore) Begin(ref string) (*ContentWriter, error) {
 	}
 
 	if err := tryLock(lock); err != nil {
+		return nil, err
+	}
+
+	// write the ref to a file for later use
+	if err := ioutil.WriteFile(refp, []byte(ref), 0666); err != nil {
 		return nil, err
 	}
 
@@ -186,7 +203,7 @@ func (cs *ContentStore) Begin(ref string) (*ContentWriter, error) {
 		return nil, errors.Wrap(err, "error opening for append")
 	}
 
-	return &ContentWriter{
+	return &Writer{
 		cs:       cs,
 		fp:       fp,
 		lock:     lock,
@@ -195,14 +212,25 @@ func (cs *ContentStore) Begin(ref string) (*ContentWriter, error) {
 	}, nil
 }
 
-func (cs *ContentStore) Resume(ref string) (*ContentWriter, error) {
-	path, data, lock, err := cs.ingestPaths(ref)
+func (cs *Store) Resume(ref string) (*Writer, error) {
+	path, refp, data, lock, err := cs.ingestPaths(ref)
 	if err != nil {
 		return nil, err
 	}
 
 	if err := tryLock(lock); err != nil {
 		return nil, err
+	}
+
+	refraw, err := readFileString(refp)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not read ref")
+	}
+
+	if ref != refraw {
+		// NOTE(stevvooe): This is fairly catastrophic. Either we have some
+		// layout corruption or a hash collision for the ref key.
+		return nil, errors.Wrapf(err, "ref key does not match: %v != %v", ref, refraw)
 	}
 
 	digester := digest.Canonical.Digester()
@@ -228,39 +256,46 @@ func (cs *ContentStore) Resume(ref string) (*ContentWriter, error) {
 		return nil, errors.Wrap(err, "error opening for append")
 	}
 
-	return &ContentWriter{
+	return &Writer{
 		cs:       cs,
 		fp:       fp1,
 		lock:     lock,
+		ref:      ref,
 		path:     path,
 		offset:   offset,
 		digester: digester,
 	}, nil
 }
 
-func (cs *ContentStore) ingestPaths(ref string) (string, string, lockfile.Lockfile, error) {
-	cref := filepath.Clean(ref)
-	if cref != ref {
-		return "", "", "", errors.Errorf("invalid path after clean")
-	}
+func (cs *Store) ingestRoot(ref string) string {
+	dgst := digest.FromString(ref)
+	return filepath.Join(cs.root, "ingest", dgst.Hex())
+}
 
-	fp := filepath.Join(cs.root, "ingest", ref)
+// ingestPaths are returned, including the lockfile. The paths are the following:
+//
+// - root: entire ingest directory
+// - ref: name of the starting ref, must be unique
+// - data: file where data is written
+// - lock: lock file location
+//
+func (cs *Store) ingestPaths(ref string) (string, string, string, lockfile.Lockfile, error) {
+	var (
+		fp = cs.ingestRoot(ref)
+		rp = filepath.Join(fp, "ref")
+		lp = filepath.Join(fp, "lock")
+		dp = filepath.Join(fp, "data")
+	)
 
-	// ensure we don't escape root
-	if !strings.HasPrefix(fp, cs.root) {
-		return "", "", "", errors.Errorf("path %q escapes root", ref)
-	}
-
-	// ensure we are just a single path component
-	if ref != filepath.Base(fp) {
-		return "", "", "", errors.Errorf("ref must be a single path component")
-	}
-
-	lockfilePath := filepath.Join(fp, "lock")
-	lock, err := lockfile.New(lockfilePath)
+	lock, err := lockfile.New(lp)
 	if err != nil {
-		return "", "", "", errors.Wrapf(err, "error creating lockfile %v", lockfilePath)
+		return "", "", "", "", errors.Wrapf(err, "error creating lockfile %v", lp)
 	}
 
-	return fp, filepath.Join(fp, "data"), lock, nil
+	return fp, rp, dp, lock, nil
+}
+
+func readFileString(path string) (string, error) {
+	p, err := ioutil.ReadFile(path)
+	return string(p), err
 }

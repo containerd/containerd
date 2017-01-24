@@ -10,29 +10,32 @@ import (
 	"github.com/pkg/errors"
 )
 
-// ContentWriter represents a write transaction against the blob store.
-//
-//
-type ContentWriter struct {
-	cs       *ContentStore
+// Writer represents a write transaction against the blob store.
+type Writer struct {
+	cs       *Store
 	fp       *os.File // opened data file
 	lock     lockfile.Lockfile
 	path     string // path to writer dir
+	ref      string // ref key
 	offset   int64
 	digester digest.Digester
+}
+
+func (cw *Writer) Ref() string {
+	return cw.ref
 }
 
 // Write p to the transaction.
 //
 // Note that writes are unbuffered to the backing file. When writing, it is
 // recommended to wrap in a bufio.Writer or, preferably, use io.CopyBuffer.
-func (cw *ContentWriter) Write(p []byte) (n int, err error) {
+func (cw *Writer) Write(p []byte) (n int, err error) {
 	n, err = cw.fp.Write(p)
 	cw.digester.Hash().Write(p[:n])
 	return n, err
 }
 
-func (cw *ContentWriter) Commit(size int64, expected digest.Digest) error {
+func (cw *Writer) Commit(size int64, expected digest.Digest) error {
 	if err := cw.fp.Sync(); err != nil {
 		return errors.Wrap(err, "sync failed")
 	}
@@ -97,7 +100,7 @@ func (cw *ContentWriter) Commit(size int64, expected digest.Digest) error {
 // If one needs to resume the transaction, a new writer can be obtained from
 // `ContentStore.Resume` using the same key. The write can then be continued
 // from it was left off.
-func (cw *ContentWriter) Close() (err error) {
+func (cw *Writer) Close() (err error) {
 	if err := unlock(cw.lock); err != nil {
 		log.Printf("unlock failed: %v", err)
 	}
