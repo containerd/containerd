@@ -120,20 +120,12 @@ func TestWalkBlobs(t *testing.T) {
 	)
 
 	var (
-		blobs    = map[digest.Digest][]byte{}
+		blobs    = populateBlobStore(t, cs, nblobs, maxsize)
 		expected = map[digest.Digest]struct{}{}
 		found    = map[digest.Digest]struct{}{}
 	)
 
-	for i := 0; i < nblobs; i++ {
-		p := make([]byte, mrand.Intn(maxsize))
-
-		if _, err := rand.Read(p); err != nil {
-			t.Fatal(err)
-		}
-
-		dgst := checkWrite(t, cs, p)
-		blobs[dgst] = p
+	for dgst := range blobs {
 		expected[dgst] = struct{}{}
 	}
 
@@ -152,9 +144,73 @@ func TestWalkBlobs(t *testing.T) {
 	}
 }
 
-func contentStoreEnv(t interface {
+// BenchmarkIngests checks the insertion time over varying blob sizes.
+//
+// Note that at the time of writing there is roughly a 4ms insertion overhead
+// for blobs. This seems to be due to the number of syscalls and file io we do
+// coordinating the ingestion.
+func BenchmarkIngests(b *testing.B) {
+	_, cs, cleanup := contentStoreEnv(b)
+	defer cleanup()
+
+	for _, size := range []int64{
+		1 << 10,
+		4 << 10,
+		512 << 10,
+		1 << 20,
+	} {
+		size := size
+		b.Run(fmt.Sprint(size), func(b *testing.B) {
+			b.StopTimer()
+			blobs := generateBlobs(b, int64(b.N), size)
+
+			var bytes int64
+			for _, blob := range blobs {
+				bytes += int64(len(blob))
+			}
+			b.SetBytes(bytes)
+
+			b.StartTimer()
+
+			for dgst, p := range blobs {
+				checkWrite(b, cs, dgst, p)
+			}
+		})
+	}
+}
+
+type checker interface {
 	Fatal(args ...interface{})
-}) (string, *ContentStore, func()) {
+}
+
+func generateBlobs(t checker, nblobs, maxsize int64) map[digest.Digest][]byte {
+	blobs := map[digest.Digest][]byte{}
+
+	for i := int64(0); i < nblobs; i++ {
+		p := make([]byte, mrand.Int63n(maxsize))
+
+		if _, err := rand.Read(p); err != nil {
+			t.Fatal(err)
+		}
+
+		dgst := digest.FromBytes(p)
+		blobs[dgst] = p
+	}
+
+	return blobs
+}
+
+func populateBlobStore(t checker, cs *Store, nblobs, maxsize int64) map[digest.Digest][]byte {
+	blobs := generateBlobs(t, nblobs, maxsize)
+
+	for dgst, p := range blobs {
+		checkWrite(t, cs, dgst, p)
+	}
+
+	return blobs
+}
+
+func contentStoreEnv(t checker) (string, *Store, func()) {
 	pc, _, _, ok := runtime.Caller(1)
 	if !ok {
 		t.Fatal("failed to resolve caller")
@@ -166,7 +222,7 @@ func contentStoreEnv(t interface {
 		t.Fatal(err)
 	}
 
-	cs, err := OpenContentStore(tmpdir)
+	cs, err := Open(tmpdir)
 	if err != nil {
 		os.RemoveAll(tmpdir)
 		t.Fatal(err)
@@ -177,9 +233,7 @@ func contentStoreEnv(t interface {
 	}
 }
 
-func checkCopy(t interface {
-	Fatal(args ...interface{})
-}, size int64, dst io.Writer, src io.Reader) {
+func checkCopy(t checker, size int64, dst io.Writer, src io.Reader) {
 	nn, err := io.Copy(dst, src)
 	if err != nil {
 		t.Fatal(err)
@@ -190,7 +244,7 @@ func checkCopy(t interface {
 	}
 }
 
-func checkBlobPath(t *testing.T, cs *ContentStore, dgst digest.Digest) string {
+func checkBlobPath(t *testing.T, cs *Store, dgst digest.Digest) string {
 	path, err := cs.GetPath(dgst)
 	if err != nil {
 		t.Fatal(err, dgst)
@@ -211,8 +265,7 @@ func checkBlobPath(t *testing.T, cs *ContentStore, dgst digest.Digest) string {
 	return path
 }
 
-func checkWrite(t *testing.T, cs *ContentStore, p []byte) digest.Digest {
-	dgst := digest.FromBytes(p)
+func checkWrite(t checker, cs *Store, dgst digest.Digest, p []byte) digest.Digest {
 	if err := WriteBlob(cs, bytes.NewReader(p), int64(len(p)), dgst); err != nil {
 		t.Fatal(err)
 	}

@@ -8,17 +8,28 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Provider gives access to blob content by paths.
+//
+// Typically, this is implemented by `*Store`.
+type Provider interface {
+	GetPath(dgst digest.Digest) (string, error)
+}
+
 // OpenBlob opens the blob for reading identified by dgst.
 //
 // The opened blob may also implement seek. Callers can detect with io.Seeker.
-func OpenBlob(cs *ContentStore, dgst digest.Digest) (io.ReadCloser, error) {
-	path, err := cs.GetPath(dgst)
+func OpenBlob(provider Provider, dgst digest.Digest) (io.ReadCloser, error) {
+	path, err := provider.GetPath(dgst)
 	if err != nil {
 		return nil, err
 	}
 
 	fp, err := os.Open(path)
 	return fp, err
+}
+
+type Ingester interface {
+	Begin(key string) (*Writer, error)
 }
 
 // WriteBlob writes data with the expected digest into the content store. If
@@ -28,7 +39,7 @@ func OpenBlob(cs *ContentStore, dgst digest.Digest) (io.ReadCloser, error) {
 // This is useful when the digest and size are known beforehand.
 //
 // Copy is buffered, so no need to wrap reader in buffered io.
-func WriteBlob(cs *ContentStore, r io.Reader, size int64, expected digest.Digest) error {
+func WriteBlob(cs Ingester, r io.Reader, size int64, expected digest.Digest) error {
 	cw, err := cs.Begin(expected.Hex())
 	if err != nil {
 		return err
