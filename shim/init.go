@@ -23,7 +23,7 @@ type initProcess struct {
 	pid     int
 }
 
-func newInitProcess(context context.Context, r *apishim.CreateRequest) (process, error) {
+func newInitProcess(context context.Context, r *apishim.CreateRequest) (*initProcess, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err

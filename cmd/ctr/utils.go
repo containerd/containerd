@@ -115,7 +115,6 @@ func getTempDir(id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	tmpDir, err := ioutil.TempDir(filepath.Join(os.TempDir(), "ctr"), fmt.Sprintf("%s-", id))
 	if err != nil {
 		return "", err

@@ -55,37 +55,12 @@ func main() {
 			server = grpc.NewServer()
 			sv     = shim.NewService()
 		)
+		logrus.Debug("registering grpc server")
 		apishim.RegisterShimServer(server, sv)
-		l, err := utils.CreateUnixSocket("shim.sock")
-		if err != nil {
+		if err := serve(server, "shim.sock"); err != nil {
 			return err
 		}
-		go func() {
-			defer l.Close()
-			if err := server.Serve(l); err != nil {
-				l.Close()
-				logrus.WithError(err).Fatal("containerd-shim: GRPC server failure")
-			}
-		}()
-		for s := range signals {
-			logrus.WithField("signal", s).Debug("received signal")
-			switch s {
-			case syscall.SIGCHLD:
-				exits, err := utils.Reap(false)
-				if err != nil {
-					logrus.WithError(err).Error("reap exit status")
-				}
-				for _, e := range exits {
-					if err := sv.ProcessExit(e); err != nil {
-						return err
-					}
-				}
-			case syscall.SIGTERM, syscall.SIGINT:
-				server.GracefulStop()
-				return nil
-			}
-		}
-		return nil
+		return handleSignals(signals, server, sv)
 	}
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "containerd-shim: %s\n", err)
@@ -103,4 +78,50 @@ func setupSignals() (chan os.Signal, error) {
 		return nil, err
 	}
 	return signals, nil
+}
+
+// serve serves the grpc API over a unix socket at the provided path
+// this function does not block
+func serve(server *grpc.Server, path string) error {
+	l, err := utils.CreateUnixSocket(path)
+	if err != nil {
+		return err
+	}
+	logrus.WithField("socket", path).Debug("serving api on unix socket")
+	go func() {
+		defer l.Close()
+		if err := server.Serve(l); err != nil {
+			l.Close()
+			logrus.WithError(err).Fatal("containerd-shim: GRPC server failure")
+		}
+	}()
+	return nil
+}
+
+func handleSignals(signals chan os.Signal, server *grpc.Server, service *shim.Service) error {
+	for s := range signals {
+		logrus.WithField("signal", s).Debug("received signal")
+		switch s {
+		case syscall.SIGCHLD:
+			exits, err := utils.Reap(false)
+			if err != nil {
+				logrus.WithError(err).Error("reap exit status")
+			}
+			for _, e := range exits {
+				logrus.WithFields(logrus.Fields{
+					"status": e.Status,
+					"pid":    e.Pid,
+				}).Debug("process exited")
+				if err := service.ProcessExit(e); err != nil {
+					return err
+				}
+			}
+		case syscall.SIGTERM, syscall.SIGINT:
+			// TODO: should we forward signals to the processes if they are still running?
+			// i.e. machine reboot
+			server.GracefulStop()
+			return nil
+		}
+	}
+	return nil
 }

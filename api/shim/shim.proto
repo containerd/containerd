@@ -1,79 +1,94 @@
 syntax = "proto3";
 
-package containerd.v1;
+package containerd.shim.v1;
 
 import "google/protobuf/empty.proto";
 import "gogoproto/gogo.proto";
 
 service Shim {
-    rpc Create(CreateRequest) returns (CreateResponse);
-    rpc Start(StartRequest) returns (google.protobuf.Empty);
-    rpc Delete(DeleteRequest) returns (DeleteResponse);
-    rpc Exec(ExecRequest) returns (ExecResponse);
-    rpc Pty(PtyRequest) returns (google.protobuf.Empty);
+	rpc Create(CreateRequest) returns (CreateResponse);
+	rpc Start(StartRequest) returns (google.protobuf.Empty);
+	rpc Delete(DeleteRequest) returns (DeleteResponse);
+	rpc Exec(ExecRequest) returns (ExecResponse);
+	rpc Pty(PtyRequest) returns (google.protobuf.Empty);
+	rpc Events(EventsRequest) returns (stream Event);
 }
 
 message CreateRequest {
-    string id = 1 [(gogoproto.customname) = "ID"];
-    string bundle = 2;
-    string runtime = 3;
-    bool no_pivot = 4;
-    bool terminal = 5;
-    string stdin = 6;
-    string stdout = 7;
-    string stderr = 8;
+	string id = 1 [(gogoproto.customname) = "ID"];
+	string bundle = 2;
+	string runtime = 3;
+	bool no_pivot = 4;
+	bool terminal = 5;
+	string stdin = 6;
+	string stdout = 7;
+	string stderr = 8;
 }
 
 message CreateResponse {
-    uint32 pid = 1;
+	uint32 pid = 1;
 }
 
 message StartRequest {
 }
 
 message DeleteRequest {
-    uint32 pid = 1;
 }
 
 message DeleteResponse {
-    uint32 exit_status = 1;
+	uint32 exit_status = 1;
 }
 
 message ExecRequest {
-    string id = 1 [(gogoproto.customname) = "ID"];
-    bool terminal = 2;
-    string stdin = 3;
-    string stdout = 4;
-    string stderr = 5;
-    User user = 6;
-    repeated string args = 7;
-    repeated string env = 8;
-    string cwd = 9;
-    repeated string capabilities = 10;
-    repeated Rlimit rlimits = 11;
-    bool no_new_privileges = 12;
-    string apparmor_profile = 13;
-    string selinux_label = 14;
+	string id = 1 [(gogoproto.customname) = "ID"];
+	bool terminal = 2;
+	string stdin = 3;
+	string stdout = 4;
+	string stderr = 5;
+	User user = 6;
+	repeated string args = 7;
+	repeated string env = 8;
+	string cwd = 9;
+	repeated string capabilities = 10;
+	repeated Rlimit rlimits = 11;
+	bool no_new_privileges = 12;
+	string apparmor_profile = 13;
+	string selinux_label = 14;
 }
 
 message User {
-    uint32 uid = 1;
-    uint32 gid = 2;
-    repeated uint32 additional_gids = 3;
+	uint32 uid = 1;
+	uint32 gid = 2;
+	repeated uint32 additional_gids = 3;
 }
 
 message Rlimit {
-    string type = 1;
-    uint64 hard = 2;
-    uint64 soft = 3;
+	string type = 1;
+	uint64 hard = 2;
+	uint64 soft = 3;
 }
 
 message ExecResponse {
-    uint32 pid = 1;
+	uint32 pid = 1;
 }
 
 message PtyRequest {
-    uint32 pid = 1;
-    uint32 width = 2;
-    uint32 height = 3;
+	uint32 pid = 1;
+	uint32 width = 2;
+	uint32 height = 3;
+}
+
+message EventsRequest {
+}
+
+enum EventType {
+	EXIT = 0;
+	OOM = 1;
+}
+
+message Event {
+	string id = 1 [(gogoproto.customname) = "ID"];
+	EventType type = 2;
+	uint32 pid = 3;
+	uint32 exit_status = 4;
 }

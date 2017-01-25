@@ -107,16 +107,8 @@ func (e *execProcess) Status() int {
 
 func (e *execProcess) Exited(status int) {
 	e.status = status
-}
-
-func (e *execProcess) Start(_ context.Context) error {
-	return nil
-}
-
-func (e *execProcess) Delete(context context.Context) error {
 	e.Wait()
 	e.io.Close()
-	return nil
 }
 
 func (e *execProcess) Resize(ws runc.WinSize) error {

@@ -18,6 +18,21 @@ import (
 	"github.com/urfave/cli"
 )
 
+var fifoFlags = []cli.Flag{
+	cli.StringFlag{
+		Name:  "stdin",
+		Usage: "specify the path to the stdin fifo",
+	},
+	cli.StringFlag{
+		Name:  "stdout",
+		Usage: "specify the path to the stdout fifo",
+	},
+	cli.StringFlag{
+		Name:  "stderr",
+		Usage: "specify the path to the stderr fifo",
+	},
+}
+
 var shimCommand = cli.Command{
 	Name:  "shim",
 	Usage: "interact with a shim directly",
@@ -41,7 +56,7 @@ var shimCommand = cli.Command{
 var shimCreateCommand = cli.Command{
 	Name:  "create",
 	Usage: "create a container with a shim",
-	Flags: []cli.Flag{
+	Flags: append(fifoFlags,
 		cli.StringFlag{
 			Name:  "bundle",
 			Usage: "bundle path for the container",
@@ -51,7 +66,11 @@ var shimCreateCommand = cli.Command{
 			Value: "runc",
 			Usage: "runtime to use for the container",
 		},
-	},
+		cli.BoolFlag{
+			Name:  "attach,a",
+			Usage: "stay attached to the container and open the fifos",
+		},
+	),
 	Action: func(context *cli.Context) error {
 		id := context.Args().First()
 		if id == "" {
@@ -61,15 +80,25 @@ var shimCreateCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		wg, err := prepareStdio(context.String("stdin"), context.String("stdout"), context.String("stderr"), false)
+		if err != nil {
+			return err
+		}
 		r, err := service.Create(gocontext.Background(), &shim.CreateRequest{
 			ID:      id,
 			Bundle:  context.String("bundle"),
 			Runtime: context.String("runtime"),
+			Stdin:   context.String("stdin"),
+			Stdout:  context.String("stdout"),
+			Stderr:  context.String("stderr"),
 		})
 		if err != nil {
 			return err
 		}
 		fmt.Printf("container created with id %s and pid %d\n", id, r.Pid)
+		if context.Bool("attach") {
+			wg.Wait()
+		}
 		return nil
 	},
 }
@@ -99,7 +128,7 @@ var shimDeleteCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Printf("container deleted and returned exit status %d", r.ExitStatus)
+		fmt.Printf("container deleted and returned exit status %d\n", r.ExitStatus)
 		return nil
 	},
 }
