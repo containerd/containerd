@@ -6,12 +6,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/signal"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 
 	gocontext "golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -21,7 +18,6 @@ import (
 	api "github.com/docker/containerd/api/execution"
 	"github.com/docker/containerd/events"
 	"github.com/docker/containerd/execution"
-	"github.com/docker/containerd/execution/executors/shim"
 	"github.com/docker/containerd/log"
 	metrics "github.com/docker/go-metrics"
 	"github.com/urfave/cli"
@@ -59,11 +55,6 @@ high performance container runtime
 			Value: "shim",
 		},
 		cli.StringFlag{
-			Name:  "socket, s",
-			Usage: "socket path for containerd's GRPC server",
-			Value: "/run/containerd/containerd.sock",
-		},
-		cli.StringFlag{
 			Name:  "metrics-address, m",
 			Usage: "tcp address to serve metrics on",
 			Value: "127.0.0.1:7897",
@@ -74,6 +65,8 @@ high performance container runtime
 			Value: nats.DefaultURL,
 		},
 	}
+	app.Flags = appendPlatformFlags(app.Flags)
+
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
@@ -82,7 +75,7 @@ high performance container runtime
 	}
 	app.Action = func(context *cli.Context) error {
 		signals := make(chan os.Signal, 2048)
-		signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1)
+		setupSignals(signals)
 
 		if address := context.GlobalString("metrics-address"); address != "" {
 			go serveMetrics(address)
@@ -95,10 +88,7 @@ high performance container runtime
 		defer s.Shutdown()
 
 		path := context.GlobalString("socket")
-		if path == "" {
-			return fmt.Errorf("--socket path cannot be empty")
-		}
-		l, err := createUnixSocket(path)
+		l, err := createListener(path)
 		if err != nil {
 			return err
 		}
@@ -117,19 +107,9 @@ high performance container runtime
 			executor execution.Executor
 			runtime  = context.GlobalString("runtime")
 		)
-		switch runtime {
-		case "shim":
-			root := filepath.Join(context.GlobalString("root"), "shim")
-			err = os.Mkdir(root, 0700)
-			if err != nil && !os.IsExist(err) {
-				return err
-			}
-			executor, err = shim.New(log.WithModule(ctx, "shim"), root, "containerd-shim", "runc", nil)
-			if err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("oci: runtime %q not implemented", runtime)
+		executor, err = processRuntime(ctx, runtime, context.GlobalString("root"))
+		if err != nil {
+			return err
 		}
 
 		execService, err := execution.New(ctx, executor)
@@ -153,32 +133,13 @@ high performance container runtime
 		api.RegisterExecutionServiceServer(server, execService)
 		go serveGRPC(server, l)
 
-		for s := range signals {
-			switch s {
-			case syscall.SIGUSR1:
-				dumpStacks()
-			default:
-				logrus.WithField("signal", s).Info("containerd: stopping GRPC server")
-				server.Stop()
-				return nil
-			}
-		}
+		handleSignals(signals, server)
 		return nil
 	}
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "containerd: %s\n", err)
 		os.Exit(1)
 	}
-}
-
-func createUnixSocket(path string) (net.Listener, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0660); err != nil {
-		return nil, err
-	}
-	if err := syscall.Unlink(path); err != nil && !os.IsNotExist(err) {
-		return nil, err
-	}
-	return net.Listen("unix", path)
 }
 
 func serveMetrics(address string) {

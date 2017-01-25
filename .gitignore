@@ -1,2 +1,4 @@
 /bin/
 */coverage.txt
+*.exe
+*.exe~
