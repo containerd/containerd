@@ -13,8 +13,6 @@ import (
 	"github.com/docker/docker/pkg/term"
 )
 
-var logFile *os.File
-
 func writeMessage(f *os.File, level string, err error) {
 	fmt.Fprintf(f, `{"level": "%s","msg": "%s"}`, level, err)
 	f.Sync()
