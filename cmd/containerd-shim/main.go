@@ -11,12 +11,17 @@ import (
 
 	"github.com/docker/containerd/sys"
 	"github.com/docker/docker/pkg/term"
+	"strings"
 )
 
 var logFile *os.File
 
 func writeMessage(f *os.File, level string, err error) {
-	fmt.Fprintf(f, `{"level": "%s","msg": "%s"}`, level, err)
+	var errStr string
+	if err != nil {
+		errStr = strings.Replace(err.Error(), "\"", "\\\"", -1)
+	}
+	fmt.Fprintf(f, `{"level": "%s","msg": "%s"}%s`, level, errStr, "\n")
 	f.Sync()
 }
 
