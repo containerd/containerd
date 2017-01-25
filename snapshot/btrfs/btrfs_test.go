@@ -19,6 +19,7 @@ const (
 )
 
 func TestBtrfs(t *testing.T) {
+	testutil.RequiresRoot(t)
 	device := setupBtrfsLoopbackDevice(t)
 	defer removeBtrfsLoopbackDevice(t, device)
 	root, err := ioutil.TempDir(device.mountPoint, "TestBtrfsPrepare-")

@@ -12,6 +12,7 @@ PROJECT_ROOT=github.com/docker/containerd
 # Project packages.
 PACKAGES=$(shell go list ./... | grep -v /vendor/)
 INTEGRATION_PACKAGE=${PROJECT_ROOT}/integration
+SNAPSHOT_PACKAGES=$(shell go list ./snapshot/...)
 
 # Project binaries.
 COMMANDS=ctr containerd containerd-shim protoc-gen-gogoctrd dist
@@ -87,9 +88,13 @@ build: ## build the go packages
 	@echo "🐳 $@"
 	@go build -i -v ${GO_LDFLAGS} ${GO_GCFLAGS} ${PACKAGES}
 
-test: ## run tests, except integration tests
+test: ## run tests, except integration tests and tests that require root
 	@echo "🐳 $@"
 	@go test ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES})
+
+root-test: ## run tests, except integration tests
+	@echo "🐳 $@"
+	@go test ${TESTFLAGS} ${SNAPSHOT_PACKAGES} -test.root
 
 integration: ## run integration tests
 	@echo "🐳 $@"
@@ -120,11 +125,19 @@ uninstall:
 	@echo "🐳 $@"
 	@rm -f $(addprefix $(DESTDIR)/bin/,$(notdir $(BINARIES)))
 
-coverage: ## generate coverprofiles from the unit tests
+
+coverage: ## generate coverprofiles from the unit tests, except tests that require root
 	@echo "🐳 $@"
 	@( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES}); do \
 		go test -i ${TESTFLAGS} -test.short -coverprofile="../../../$$pkg/coverage.txt" -covermode=atomic $$pkg || exit; \
 		go test ${TESTFLAGS} -test.short -coverprofile="../../../$$pkg/coverage.txt" -covermode=atomic $$pkg || exit; \
+	done )
+
+root-coverage: ## generae coverage profiles for the unit tests
+	@echo "🐳 $@"
+	@( for pkg in ${SNAPSHOT_PACKAGES}; do \
+		go test -i ${TESTFLAGS} -test.short -coverprofile="../../../$$pkg/coverage.txt" -covermode=atomic $$pkg -test.root || exit; \
+		go test ${TESTFLAGS} -test.short -coverprofile="../../../$$pkg/coverage.txt" -covermode=atomic $$pkg -test.root || exit; \
 	done )
 
 coverage-integration: ## generate coverprofiles from the integration tests

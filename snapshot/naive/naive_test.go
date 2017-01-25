@@ -7,9 +7,11 @@ import (
 	"testing"
 
 	"github.com/docker/containerd"
+	"github.com/docker/containerd/snapshot/testutil"
 )
 
 func TestSnapshotNaiveBasic(t *testing.T) {
+	testutil.RequiresRoot(t)
 	tmpDir, err := ioutil.TempDir("", "test-naive-")
 	if err != nil {
 		t.Fatal(err)

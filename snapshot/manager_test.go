@@ -14,6 +14,7 @@ import (
 // examples we've discussed thus far. It does perform mounts, so you must run
 // as root.
 func TestSnapshotManagerBasic(t *testing.T) {
+	testutil.RequiresRoot(t)
 	tmpDir, err := ioutil.TempDir("", "test-sm-")
 	if err != nil {
 		t.Fatal(err)

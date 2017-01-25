@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/docker/containerd"
+	"github.com/docker/containerd/snapshot/testutil"
 )
 
 func TestOverlay(t *testing.T) {
@@ -126,9 +127,7 @@ func TestOverlayOverlayMount(t *testing.T) {
 }
 
 func TestOverlayOverlayRead(t *testing.T) {
-	if os.Getuid() != 0 {
-		t.Skip("not running as root")
-	}
+	testutil.RequiresRoot(t)
 	root, err := ioutil.TempDir("", "overlay")
 	if err != nil {
 		t.Fatal(err)
