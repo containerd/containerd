@@ -1,6 +1,10 @@
 package shim
 
-import "github.com/crosbymichael/console"
+import (
+	"context"
+
+	"github.com/crosbymichael/console"
+)
 
 type process interface {
 	// Pid returns the pid for the process
@@ -11,4 +15,5 @@ type process interface {
 	Exited(status int)
 	// Status returns the exit status
 	Status() int
+	Delete(context.Context) error
 }

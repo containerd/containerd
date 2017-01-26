@@ -12,6 +12,7 @@ service Shim {
 	rpc Exec(ExecRequest) returns (ExecResponse);
 	rpc Pty(PtyRequest) returns (google.protobuf.Empty);
 	rpc Events(EventsRequest) returns (stream Event);
+	rpc State(StateRequest) returns (StateResponse);
 }
 
 message CreateRequest {
@@ -33,6 +34,7 @@ message StartRequest {
 }
 
 message DeleteRequest {
+	uint32 pid = 1;
 }
 
 message DeleteResponse {
@@ -40,11 +42,11 @@ message DeleteResponse {
 }
 
 message ExecRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
-	bool terminal = 2;
-	string stdin = 3;
-	string stdout = 4;
-	string stderr = 5;
+	bool terminal = 1;
+	string stdin = 2;
+	string stdout = 3;
+	string stderr = 4;
+	string selinux_label = 5;
 	User user = 6;
 	repeated string args = 7;
 	repeated string env = 8;
@@ -53,7 +55,6 @@ message ExecRequest {
 	repeated Rlimit rlimits = 11;
 	bool no_new_privileges = 12;
 	string apparmor_profile = 13;
-	string selinux_label = 14;
 }
 
 message User {
@@ -94,4 +95,22 @@ message Event {
 	EventType type = 2;
 	uint32 pid = 3;
 	uint32 exit_status = 4;
+}
+
+message StateRequest {
+}
+
+message StateResponse {
+	string id = 1 [(gogoproto.customname) = "ID"];
+	repeated Process processes = 2;
+}
+
+enum State {
+	STOPPED = 0;
+	RUNNING = 1;
+}
+
+message Process {
+	uint32 pid = 1;
+	State state = 2;
 }

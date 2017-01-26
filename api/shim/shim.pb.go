@@ -21,6 +21,9 @@
 		PtyRequest
 		EventsRequest
 		Event
+		StateRequest
+		StateResponse
+		Process
 */
 package shim
 
@@ -84,6 +87,27 @@ func (x EventType) String() string {
 }
 func (EventType) EnumDescriptor() ([]byte, []int) { return fileDescriptorShim, []int{0} }
 
+type State int32
+
+const (
+	State_STOPPED State = 0
+	State_RUNNING State = 1
+)
+
+var State_name = map[int32]string{
+	0: "STOPPED",
+	1: "RUNNING",
+}
+var State_value = map[string]int32{
+	"STOPPED": 0,
+	"RUNNING": 1,
+}
+
+func (x State) String() string {
+	return proto.EnumName(State_name, int32(x))
+}
+func (State) EnumDescriptor() ([]byte, []int) { return fileDescriptorShim, []int{1} }
+
 type CreateRequest struct {
 	ID       string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Bundle   string `protobuf:"bytes,2,opt,name=bundle,proto3" json:"bundle,omitempty"`
@@ -115,6 +139,7 @@ func (*StartRequest) ProtoMessage()               {}
 func (*StartRequest) Descriptor() ([]byte, []int) { return fileDescriptorShim, []int{2} }
 
 type DeleteRequest struct {
+	Pid uint32 `protobuf:"varint,1,opt,name=pid,proto3" json:"pid,omitempty"`
 }
 
 func (m *DeleteRequest) Reset()                    { *m = DeleteRequest{} }
@@ -130,11 +155,11 @@ func (*DeleteResponse) ProtoMessage()               {}
 func (*DeleteResponse) Descriptor() ([]byte, []int) { return fileDescriptorShim, []int{4} }
 
 type ExecRequest struct {
-	ID              string    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Terminal        bool      `protobuf:"varint,2,opt,name=terminal,proto3" json:"terminal,omitempty"`
-	Stdin           string    `protobuf:"bytes,3,opt,name=stdin,proto3" json:"stdin,omitempty"`
-	Stdout          string    `protobuf:"bytes,4,opt,name=stdout,proto3" json:"stdout,omitempty"`
-	Stderr          string    `protobuf:"bytes,5,opt,name=stderr,proto3" json:"stderr,omitempty"`
+	Terminal        bool      `protobuf:"varint,1,opt,name=terminal,proto3" json:"terminal,omitempty"`
+	Stdin           string    `protobuf:"bytes,2,opt,name=stdin,proto3" json:"stdin,omitempty"`
+	Stdout          string    `protobuf:"bytes,3,opt,name=stdout,proto3" json:"stdout,omitempty"`
+	Stderr          string    `protobuf:"bytes,4,opt,name=stderr,proto3" json:"stderr,omitempty"`
+	SelinuxLabel    string    `protobuf:"bytes,5,opt,name=selinux_label,json=selinuxLabel,proto3" json:"selinux_label,omitempty"`
 	User            *User     `protobuf:"bytes,6,opt,name=user" json:"user,omitempty"`
 	Args            []string  `protobuf:"bytes,7,rep,name=args" json:"args,omitempty"`
 	Env             []string  `protobuf:"bytes,8,rep,name=env" json:"env,omitempty"`
@@ -143,7 +168,6 @@ type ExecRequest struct {
 	Rlimits         []*Rlimit `protobuf:"bytes,11,rep,name=rlimits" json:"rlimits,omitempty"`
 	NoNewPrivileges bool      `protobuf:"varint,12,opt,name=no_new_privileges,json=noNewPrivileges,proto3" json:"no_new_privileges,omitempty"`
 	ApparmorProfile string    `protobuf:"bytes,13,opt,name=apparmor_profile,json=apparmorProfile,proto3" json:"apparmor_profile,omitempty"`
-	SelinuxLabel    string    `protobuf:"bytes,14,opt,name=selinux_label,json=selinuxLabel,proto3" json:"selinux_label,omitempty"`
 }
 
 func (m *ExecRequest) Reset()                    { *m = ExecRequest{} }
@@ -206,6 +230,31 @@ func (m *Event) Reset()                    { *m = Event{} }
 func (*Event) ProtoMessage()               {}
 func (*Event) Descriptor() ([]byte, []int) { return fileDescriptorShim, []int{11} }
 
+type StateRequest struct {
+}
+
+func (m *StateRequest) Reset()                    { *m = StateRequest{} }
+func (*StateRequest) ProtoMessage()               {}
+func (*StateRequest) Descriptor() ([]byte, []int) { return fileDescriptorShim, []int{12} }
+
+type StateResponse struct {
+	ID        string     `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Processes []*Process `protobuf:"bytes,2,rep,name=processes" json:"processes,omitempty"`
+}
+
+func (m *StateResponse) Reset()                    { *m = StateResponse{} }
+func (*StateResponse) ProtoMessage()               {}
+func (*StateResponse) Descriptor() ([]byte, []int) { return fileDescriptorShim, []int{13} }
+
+type Process struct {
+	Pid   uint32 `protobuf:"varint,1,opt,name=pid,proto3" json:"pid,omitempty"`
+	State State  `protobuf:"varint,2,opt,name=state,proto3,enum=containerd.shim.v1.State" json:"state,omitempty"`
+}
+
+func (m *Process) Reset()                    { *m = Process{} }
+func (*Process) ProtoMessage()               {}
+func (*Process) Descriptor() ([]byte, []int) { return fileDescriptorShim, []int{14} }
+
 func init() {
 	proto.RegisterType((*CreateRequest)(nil), "containerd.shim.v1.CreateRequest")
 	proto.RegisterType((*CreateResponse)(nil), "containerd.shim.v1.CreateResponse")
@@ -219,7 +268,11 @@ func init() {
 	proto.RegisterType((*PtyRequest)(nil), "containerd.shim.v1.PtyRequest")
 	proto.RegisterType((*EventsRequest)(nil), "containerd.shim.v1.EventsRequest")
 	proto.RegisterType((*Event)(nil), "containerd.shim.v1.Event")
+	proto.RegisterType((*StateRequest)(nil), "containerd.shim.v1.StateRequest")
+	proto.RegisterType((*StateResponse)(nil), "containerd.shim.v1.StateResponse")
+	proto.RegisterType((*Process)(nil), "containerd.shim.v1.Process")
 	proto.RegisterEnum("containerd.shim.v1.EventType", EventType_name, EventType_value)
+	proto.RegisterEnum("containerd.shim.v1.State", State_name, State_value)
 }
 func (this *CreateRequest) GoString() string {
 	if this == nil {
@@ -261,8 +314,9 @@ func (this *DeleteRequest) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 4)
+	s := make([]string, 0, 5)
 	s = append(s, "&shim.DeleteRequest{")
+	s = append(s, "Pid: "+fmt.Sprintf("%#v", this.Pid)+",\n")
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
@@ -280,13 +334,13 @@ func (this *ExecRequest) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 18)
+	s := make([]string, 0, 17)
 	s = append(s, "&shim.ExecRequest{")
-	s = append(s, "ID: "+fmt.Sprintf("%#v", this.ID)+",\n")
 	s = append(s, "Terminal: "+fmt.Sprintf("%#v", this.Terminal)+",\n")
 	s = append(s, "Stdin: "+fmt.Sprintf("%#v", this.Stdin)+",\n")
 	s = append(s, "Stdout: "+fmt.Sprintf("%#v", this.Stdout)+",\n")
 	s = append(s, "Stderr: "+fmt.Sprintf("%#v", this.Stderr)+",\n")
+	s = append(s, "SelinuxLabel: "+fmt.Sprintf("%#v", this.SelinuxLabel)+",\n")
 	if this.User != nil {
 		s = append(s, "User: "+fmt.Sprintf("%#v", this.User)+",\n")
 	}
@@ -299,7 +353,6 @@ func (this *ExecRequest) GoString() string {
 	}
 	s = append(s, "NoNewPrivileges: "+fmt.Sprintf("%#v", this.NoNewPrivileges)+",\n")
 	s = append(s, "ApparmorProfile: "+fmt.Sprintf("%#v", this.ApparmorProfile)+",\n")
-	s = append(s, "SelinuxLabel: "+fmt.Sprintf("%#v", this.SelinuxLabel)+",\n")
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
@@ -371,6 +424,39 @@ func (this *Event) GoString() string {
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
+func (this *StateRequest) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 4)
+	s = append(s, "&shim.StateRequest{")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *StateResponse) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&shim.StateResponse{")
+	s = append(s, "ID: "+fmt.Sprintf("%#v", this.ID)+",\n")
+	if this.Processes != nil {
+		s = append(s, "Processes: "+fmt.Sprintf("%#v", this.Processes)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *Process) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&shim.Process{")
+	s = append(s, "Pid: "+fmt.Sprintf("%#v", this.Pid)+",\n")
+	s = append(s, "State: "+fmt.Sprintf("%#v", this.State)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
 func valueToGoStringShim(v interface{}, typ string) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -415,6 +501,7 @@ type ShimClient interface {
 	Exec(ctx context.Context, in *ExecRequest, opts ...grpc.CallOption) (*ExecResponse, error)
 	Pty(ctx context.Context, in *PtyRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error)
 	Events(ctx context.Context, in *EventsRequest, opts ...grpc.CallOption) (Shim_EventsClient, error)
+	State(ctx context.Context, in *StateRequest, opts ...grpc.CallOption) (*StateResponse, error)
 }
 
 type shimClient struct {
@@ -502,6 +589,15 @@ func (x *shimEventsClient) Recv() (*Event, error) {
 	return m, nil
 }
 
+func (c *shimClient) State(ctx context.Context, in *StateRequest, opts ...grpc.CallOption) (*StateResponse, error) {
+	out := new(StateResponse)
+	err := grpc.Invoke(ctx, "/containerd.shim.v1.Shim/State", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Server API for Shim service
 
 type ShimServer interface {
@@ -511,6 +607,7 @@ type ShimServer interface {
 	Exec(context.Context, *ExecRequest) (*ExecResponse, error)
 	Pty(context.Context, *PtyRequest) (*google_protobuf.Empty, error)
 	Events(*EventsRequest, Shim_EventsServer) error
+	State(context.Context, *StateRequest) (*StateResponse, error)
 }
 
 func RegisterShimServer(s *grpc.Server, srv ShimServer) {
@@ -628,6 +725,24 @@ func (x *shimEventsServer) Send(m *Event) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _Shim_State_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ShimServer).State(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.shim.v1.Shim/State",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ShimServer).State(ctx, req.(*StateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _Shim_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "containerd.shim.v1.Shim",
 	HandlerType: (*ShimServer)(nil),
@@ -651,6 +766,10 @@ var _Shim_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Pty",
 			Handler:    _Shim_Pty_Handler,
+		},
+		{
+			MethodName: "State",
+			Handler:    _Shim_State_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
@@ -793,6 +912,11 @@ func (m *DeleteRequest) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Pid != 0 {
+		dAtA[i] = 0x8
+		i++
+		i = encodeVarintShim(dAtA, i, uint64(m.Pid))
+	}
 	return i, nil
 }
 
@@ -834,14 +958,8 @@ func (m *ExecRequest) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.ID) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintShim(dAtA, i, uint64(len(m.ID)))
-		i += copy(dAtA[i:], m.ID)
-	}
 	if m.Terminal {
-		dAtA[i] = 0x10
+		dAtA[i] = 0x8
 		i++
 		if m.Terminal {
 			dAtA[i] = 1
@@ -851,22 +969,28 @@ func (m *ExecRequest) MarshalTo(dAtA []byte) (int, error) {
 		i++
 	}
 	if len(m.Stdin) > 0 {
-		dAtA[i] = 0x1a
+		dAtA[i] = 0x12
 		i++
 		i = encodeVarintShim(dAtA, i, uint64(len(m.Stdin)))
 		i += copy(dAtA[i:], m.Stdin)
 	}
 	if len(m.Stdout) > 0 {
-		dAtA[i] = 0x22
+		dAtA[i] = 0x1a
 		i++
 		i = encodeVarintShim(dAtA, i, uint64(len(m.Stdout)))
 		i += copy(dAtA[i:], m.Stdout)
 	}
 	if len(m.Stderr) > 0 {
-		dAtA[i] = 0x2a
+		dAtA[i] = 0x22
 		i++
 		i = encodeVarintShim(dAtA, i, uint64(len(m.Stderr)))
 		i += copy(dAtA[i:], m.Stderr)
+	}
+	if len(m.SelinuxLabel) > 0 {
+		dAtA[i] = 0x2a
+		i++
+		i = encodeVarintShim(dAtA, i, uint64(len(m.SelinuxLabel)))
+		i += copy(dAtA[i:], m.SelinuxLabel)
 	}
 	if m.User != nil {
 		dAtA[i] = 0x32
@@ -956,12 +1080,6 @@ func (m *ExecRequest) MarshalTo(dAtA []byte) (int, error) {
 		i++
 		i = encodeVarintShim(dAtA, i, uint64(len(m.ApparmorProfile)))
 		i += copy(dAtA[i:], m.ApparmorProfile)
-	}
-	if len(m.SelinuxLabel) > 0 {
-		dAtA[i] = 0x72
-		i++
-		i = encodeVarintShim(dAtA, i, uint64(len(m.SelinuxLabel)))
-		i += copy(dAtA[i:], m.SelinuxLabel)
 	}
 	return i, nil
 }
@@ -1158,6 +1276,88 @@ func (m *Event) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
+func (m *StateRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *StateRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	return i, nil
+}
+
+func (m *StateResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *StateResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.ID) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintShim(dAtA, i, uint64(len(m.ID)))
+		i += copy(dAtA[i:], m.ID)
+	}
+	if len(m.Processes) > 0 {
+		for _, msg := range m.Processes {
+			dAtA[i] = 0x12
+			i++
+			i = encodeVarintShim(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
+func (m *Process) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *Process) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Pid != 0 {
+		dAtA[i] = 0x8
+		i++
+		i = encodeVarintShim(dAtA, i, uint64(m.Pid))
+	}
+	if m.State != 0 {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintShim(dAtA, i, uint64(m.State))
+	}
+	return i, nil
+}
+
 func encodeFixed64Shim(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	dAtA[offset+1] = uint8(v >> 8)
@@ -1239,6 +1439,9 @@ func (m *StartRequest) Size() (n int) {
 func (m *DeleteRequest) Size() (n int) {
 	var l int
 	_ = l
+	if m.Pid != 0 {
+		n += 1 + sovShim(uint64(m.Pid))
+	}
 	return n
 }
 
@@ -1254,10 +1457,6 @@ func (m *DeleteResponse) Size() (n int) {
 func (m *ExecRequest) Size() (n int) {
 	var l int
 	_ = l
-	l = len(m.ID)
-	if l > 0 {
-		n += 1 + l + sovShim(uint64(l))
-	}
 	if m.Terminal {
 		n += 2
 	}
@@ -1270,6 +1469,10 @@ func (m *ExecRequest) Size() (n int) {
 		n += 1 + l + sovShim(uint64(l))
 	}
 	l = len(m.Stderr)
+	if l > 0 {
+		n += 1 + l + sovShim(uint64(l))
+	}
+	l = len(m.SelinuxLabel)
 	if l > 0 {
 		n += 1 + l + sovShim(uint64(l))
 	}
@@ -1309,10 +1512,6 @@ func (m *ExecRequest) Size() (n int) {
 		n += 2
 	}
 	l = len(m.ApparmorProfile)
-	if l > 0 {
-		n += 1 + l + sovShim(uint64(l))
-	}
-	l = len(m.SelinuxLabel)
 	if l > 0 {
 		n += 1 + l + sovShim(uint64(l))
 	}
@@ -1403,6 +1602,40 @@ func (m *Event) Size() (n int) {
 	return n
 }
 
+func (m *StateRequest) Size() (n int) {
+	var l int
+	_ = l
+	return n
+}
+
+func (m *StateResponse) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.ID)
+	if l > 0 {
+		n += 1 + l + sovShim(uint64(l))
+	}
+	if len(m.Processes) > 0 {
+		for _, e := range m.Processes {
+			l = e.Size()
+			n += 1 + l + sovShim(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *Process) Size() (n int) {
+	var l int
+	_ = l
+	if m.Pid != 0 {
+		n += 1 + sovShim(uint64(m.Pid))
+	}
+	if m.State != 0 {
+		n += 1 + sovShim(uint64(m.State))
+	}
+	return n
+}
+
 func sovShim(x uint64) (n int) {
 	for {
 		n++
@@ -1457,6 +1690,7 @@ func (this *DeleteRequest) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&DeleteRequest{`,
+		`Pid:` + fmt.Sprintf("%v", this.Pid) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1476,11 +1710,11 @@ func (this *ExecRequest) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&ExecRequest{`,
-		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
 		`Terminal:` + fmt.Sprintf("%v", this.Terminal) + `,`,
 		`Stdin:` + fmt.Sprintf("%v", this.Stdin) + `,`,
 		`Stdout:` + fmt.Sprintf("%v", this.Stdout) + `,`,
 		`Stderr:` + fmt.Sprintf("%v", this.Stderr) + `,`,
+		`SelinuxLabel:` + fmt.Sprintf("%v", this.SelinuxLabel) + `,`,
 		`User:` + strings.Replace(fmt.Sprintf("%v", this.User), "User", "User", 1) + `,`,
 		`Args:` + fmt.Sprintf("%v", this.Args) + `,`,
 		`Env:` + fmt.Sprintf("%v", this.Env) + `,`,
@@ -1489,7 +1723,6 @@ func (this *ExecRequest) String() string {
 		`Rlimits:` + strings.Replace(fmt.Sprintf("%v", this.Rlimits), "Rlimit", "Rlimit", 1) + `,`,
 		`NoNewPrivileges:` + fmt.Sprintf("%v", this.NoNewPrivileges) + `,`,
 		`ApparmorProfile:` + fmt.Sprintf("%v", this.ApparmorProfile) + `,`,
-		`SelinuxLabel:` + fmt.Sprintf("%v", this.SelinuxLabel) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1558,6 +1791,37 @@ func (this *Event) String() string {
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`Pid:` + fmt.Sprintf("%v", this.Pid) + `,`,
 		`ExitStatus:` + fmt.Sprintf("%v", this.ExitStatus) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *StateRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&StateRequest{`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *StateResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&StateResponse{`,
+		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
+		`Processes:` + strings.Replace(fmt.Sprintf("%v", this.Processes), "Process", "Process", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Process) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Process{`,
+		`Pid:` + fmt.Sprintf("%v", this.Pid) + `,`,
+		`State:` + fmt.Sprintf("%v", this.State) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1982,6 +2246,25 @@ func (m *DeleteRequest) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: DeleteRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Pid", wireType)
+			}
+			m.Pid = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Pid |= (uint32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipShim(dAtA[iNdEx:])
@@ -2102,35 +2385,6 @@ func (m *ExecRequest) Unmarshal(dAtA []byte) error {
 		}
 		switch fieldNum {
 		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowShim
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthShim
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.ID = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 2:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Terminal", wireType)
 			}
@@ -2150,7 +2404,7 @@ func (m *ExecRequest) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.Terminal = bool(v != 0)
-		case 3:
+		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Stdin", wireType)
 			}
@@ -2179,7 +2433,7 @@ func (m *ExecRequest) Unmarshal(dAtA []byte) error {
 			}
 			m.Stdin = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 4:
+		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Stdout", wireType)
 			}
@@ -2208,7 +2462,7 @@ func (m *ExecRequest) Unmarshal(dAtA []byte) error {
 			}
 			m.Stdout = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 5:
+		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Stderr", wireType)
 			}
@@ -2236,6 +2490,35 @@ func (m *ExecRequest) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Stderr = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SelinuxLabel", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthShim
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SelinuxLabel = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 6:
 			if wireType != 2 {
@@ -2465,35 +2748,6 @@ func (m *ExecRequest) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.ApparmorProfile = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 14:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field SelinuxLabel", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowShim
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthShim
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.SelinuxLabel = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -3145,6 +3399,254 @@ func (m *Event) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *StateRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowShim
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: StateRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: StateRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipShim(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthShim
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *StateResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowShim
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: StateResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: StateResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthShim
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Processes", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthShim
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Processes = append(m.Processes, &Process{})
+			if err := m.Processes[len(m.Processes)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipShim(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthShim
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *Process) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowShim
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Process: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Process: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Pid", wireType)
+			}
+			m.Pid = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Pid |= (uint32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field State", wireType)
+			}
+			m.State = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowShim
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.State |= (State(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipShim(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthShim
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func skipShim(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3253,60 +3755,66 @@ var (
 func init() { proto.RegisterFile("shim.proto", fileDescriptorShim) }
 
 var fileDescriptorShim = []byte{
-	// 868 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x84, 0x54, 0x4d, 0x6f, 0xeb, 0x44,
-	0x14, 0xad, 0x63, 0xe7, 0xa3, 0x37, 0x1f, 0x0d, 0xa3, 0xa7, 0x6a, 0x5e, 0x80, 0x34, 0x98, 0x05,
-	0xe1, 0x09, 0xa5, 0xb4, 0xb0, 0x65, 0xd1, 0xd7, 0x58, 0xbc, 0x4a, 0x0f, 0x1a, 0x4d, 0x8a, 0xf4,
-	0x76, 0x91, 0x53, 0x4f, 0x9d, 0x91, 0x1c, 0x8f, 0x99, 0x19, 0xa7, 0xcd, 0x8e, 0x0d, 0xbf, 0x8b,
-	0x05, 0x9b, 0xb7, 0x64, 0x85, 0x58, 0x21, 0x9a, 0x5f, 0xc0, 0x4f, 0x40, 0x33, 0x76, 0x92, 0x7e,
-	0x38, 0xbc, 0xdd, 0xbd, 0xc7, 0xd7, 0x77, 0xee, 0x3d, 0x73, 0xe6, 0x00, 0xc8, 0x19, 0x9b, 0x0f,
-	0x12, 0xc1, 0x15, 0x47, 0xe8, 0x9a, 0xc7, 0xca, 0x67, 0x31, 0x15, 0xc1, 0xc0, 0xc0, 0x8b, 0x93,
-	0xce, 0xc7, 0x21, 0xe7, 0x61, 0x44, 0x8f, 0x4d, 0xc5, 0x34, 0xbd, 0x39, 0xa6, 0xf3, 0x44, 0x2d,
-	0xb3, 0x1f, 0x3a, 0x2f, 0x42, 0x1e, 0x72, 0x13, 0x1e, 0xeb, 0x28, 0x43, 0xdd, 0x3f, 0x2d, 0x68,
-	0x9e, 0x0b, 0xea, 0x2b, 0x4a, 0xe8, 0xcf, 0x29, 0x95, 0x0a, 0x1d, 0x42, 0x89, 0x05, 0xd8, 0xea,
-	0x59, 0xfd, 0xfd, 0xd7, 0x95, 0xd5, 0xdf, 0x47, 0xa5, 0x8b, 0x21, 0x29, 0xb1, 0x00, 0x1d, 0x42,
-	0x65, 0x9a, 0xc6, 0x41, 0x44, 0x71, 0x49, 0x7f, 0x23, 0x79, 0x86, 0x30, 0x54, 0x45, 0x1a, 0x2b,
-	0x36, 0xa7, 0xd8, 0x36, 0x1f, 0xd6, 0x29, 0x7a, 0x09, 0xb5, 0x98, 0x4f, 0x12, 0xb6, 0xe0, 0x0a,
-	0x3b, 0x3d, 0xab, 0x5f, 0x23, 0xd5, 0x98, 0x8f, 0x74, 0x8a, 0x3a, 0x50, 0x53, 0x54, 0xcc, 0x59,
-	0xec, 0x47, 0xb8, 0x6c, 0x3e, 0x6d, 0x72, 0xf4, 0x02, 0xca, 0x52, 0x05, 0x2c, 0xc6, 0x15, 0xd3,
-	0x2e, 0x4b, 0xf4, 0xf1, 0x52, 0x05, 0x3c, 0x55, 0xb8, 0x9a, 0x1d, 0x9f, 0x65, 0x39, 0x4e, 0x85,
-	0xc0, 0xb5, 0x0d, 0x4e, 0x85, 0x70, 0x5d, 0x68, 0xad, 0xf7, 0x92, 0x09, 0x8f, 0x25, 0x45, 0x6d,
-	0xb0, 0x93, 0x7c, 0xb3, 0x26, 0xd1, 0xa1, 0xdb, 0x82, 0xc6, 0x58, 0xf9, 0x42, 0xe5, 0xab, 0xbb,
-	0x07, 0xd0, 0x1c, 0xd2, 0x88, 0x6e, 0xb8, 0x70, 0x4f, 0xa0, 0xb5, 0x06, 0xf2, 0x26, 0x47, 0x50,
-	0xa7, 0x77, 0x4c, 0x4d, 0xa4, 0xf2, 0x55, 0x2a, 0xf3, 0x66, 0xa0, 0xa1, 0xb1, 0x41, 0xdc, 0xdf,
-	0x6d, 0xa8, 0x7b, 0x77, 0xf4, 0xfa, 0x43, 0x74, 0x3e, 0x64, 0xa0, 0xb4, 0x8b, 0x01, 0xbb, 0x98,
-	0x01, 0x67, 0x07, 0x03, 0xe5, 0x87, 0x0c, 0xa0, 0xaf, 0xc0, 0x49, 0x25, 0x15, 0x86, 0xc6, 0xfa,
-	0x29, 0x1e, 0x3c, 0x17, 0xcc, 0xe0, 0x27, 0x49, 0x05, 0x31, 0x55, 0x08, 0x81, 0xe3, 0x8b, 0x50,
-	0xe2, 0x6a, 0xcf, 0xee, 0xef, 0x13, 0x13, 0x6b, 0xc6, 0x68, 0xbc, 0xc0, 0x35, 0x03, 0xe9, 0x50,
-	0x23, 0xd7, 0xb7, 0x01, 0xde, 0x37, 0x07, 0xe9, 0x10, 0xb9, 0xd0, 0xb8, 0xf6, 0x13, 0x7f, 0xca,
-	0x22, 0xa6, 0x18, 0x95, 0x18, 0x4c, 0xf1, 0x23, 0x0c, 0x7d, 0x0b, 0x55, 0x11, 0xb1, 0x39, 0x53,
-	0x12, 0xd7, 0x7b, 0x76, 0xbf, 0x7e, 0xda, 0x29, 0x1a, 0x86, 0x98, 0x12, 0xb2, 0x2e, 0x45, 0xaf,
-	0xe0, 0xa3, 0x98, 0x4f, 0x62, 0x7a, 0x3b, 0x49, 0x04, 0x5b, 0xb0, 0x88, 0x86, 0x54, 0xe2, 0x86,
-	0xa1, 0xea, 0x20, 0xe6, 0x3f, 0xd2, 0xdb, 0xd1, 0x06, 0x46, 0x5f, 0x42, 0xdb, 0x4f, 0x12, 0x5f,
-	0xcc, 0xb9, 0x98, 0x24, 0x82, 0xdf, 0xb0, 0x88, 0xe2, 0xa6, 0x19, 0xf2, 0x60, 0x8d, 0x8f, 0x32,
-	0x18, 0x7d, 0x0e, 0x4d, 0x49, 0x23, 0x16, 0xa7, 0x77, 0x93, 0xc8, 0x9f, 0xd2, 0x08, 0xb7, 0x4c,
-	0x5d, 0x23, 0x07, 0xdf, 0x6a, 0xcc, 0x1d, 0x83, 0xa3, 0xb9, 0xd1, 0xfb, 0xa6, 0x5b, 0xcd, 0xa4,
-	0x2c, 0xd0, 0x48, 0xc8, 0x02, 0x73, 0x65, 0x4d, 0xa2, 0x43, 0xf4, 0x05, 0x1c, 0xf8, 0x41, 0xc0,
-	0x14, 0xe3, 0xb1, 0x1f, 0x4d, 0x42, 0x16, 0x48, 0x6c, 0xf7, 0xec, 0x7e, 0x93, 0xb4, 0xb6, 0xf0,
-	0xf7, 0x2c, 0x90, 0xee, 0x10, 0x2a, 0xd9, 0x8e, 0x9a, 0x6c, 0xb5, 0x4c, 0x68, 0x26, 0x0b, 0x62,
-	0x62, 0x8d, 0xcd, 0x7c, 0x91, 0x75, 0x76, 0x88, 0x89, 0x35, 0x26, 0xf9, 0x8d, 0x32, 0x3a, 0x70,
-	0x88, 0x89, 0xdd, 0x1e, 0x34, 0x32, 0x7d, 0xed, 0x94, 0xf5, 0x5b, 0x80, 0x91, 0x5a, 0xae, 0x05,
-	0xf8, 0xec, 0xbb, 0x96, 0xd7, 0x2d, 0x0b, 0xd4, 0x2c, 0x5f, 0x22, 0x4b, 0xb4, 0x8c, 0x66, 0x94,
-	0x85, 0xb3, 0xec, 0xb4, 0x26, 0xc9, 0x33, 0xfd, 0x28, 0xbc, 0x05, 0x8d, 0x95, 0x5c, 0x3f, 0x8a,
-	0x5f, 0x2d, 0x28, 0x1b, 0x64, 0xa7, 0xb6, 0x4f, 0xf2, 0xf5, 0x74, 0xff, 0xd6, 0xe9, 0xa7, 0x45,
-	0x97, 0x6d, 0x1a, 0x5c, 0x2d, 0x13, 0x9a, 0x6f, 0x9f, 0x4f, 0x69, 0x6f, 0xa7, 0x7c, 0xf2, 0xd2,
-	0x9c, 0xa7, 0x2f, 0xed, 0xd5, 0x1b, 0xd8, 0xdf, 0x74, 0x41, 0x35, 0x70, 0xbc, 0x77, 0x17, 0x57,
-	0xed, 0x3d, 0x54, 0x05, 0xfb, 0xf2, 0xf2, 0x87, 0xb6, 0x85, 0xea, 0x50, 0x3d, 0x27, 0xde, 0xd9,
-	0x95, 0x37, 0x6c, 0x97, 0x74, 0x32, 0xbe, 0x3a, 0x23, 0x3a, 0xb1, 0x51, 0x0b, 0xc0, 0x7b, 0xe7,
-	0x9d, 0x4f, 0xce, 0x86, 0x43, 0x6f, 0xd8, 0x76, 0x4e, 0x7f, 0xb3, 0xc1, 0x19, 0xcf, 0xd8, 0x1c,
-	0x5d, 0x42, 0x25, 0x33, 0x0d, 0xf4, 0x59, 0xd1, 0xd0, 0x8f, 0x8c, 0xb2, 0xe3, 0xfe, 0x5f, 0x49,
-	0x7e, 0x39, 0x67, 0x50, 0x36, 0x0e, 0x83, 0x7a, 0x45, 0xc5, 0x0f, 0xcd, 0xa7, 0x73, 0x38, 0xc8,
-	0xdc, 0x7b, 0xb0, 0x76, 0xef, 0x81, 0xa7, 0xdd, 0x5b, 0xcf, 0x94, 0x79, 0x50, 0xf1, 0x4c, 0x8f,
-	0x0c, 0xab, 0x78, 0xa6, 0x27, 0x16, 0x76, 0x01, 0x8e, 0x16, 0x10, 0x3a, 0x2a, 0xbc, 0x97, 0xad,
-	0x75, 0x75, 0x7a, 0xbb, 0x0b, 0xf2, 0x56, 0xdf, 0x81, 0x3d, 0x52, 0x4b, 0xd4, 0x2d, 0x2a, 0xdc,
-	0x4a, 0x70, 0xe7, 0x6a, 0x6f, 0xa0, 0x92, 0x49, 0xab, 0x78, 0xb5, 0x47, 0xb2, 0xeb, 0xbc, 0xdc,
-	0x59, 0xf2, 0xb5, 0xf5, 0xfa, 0x93, 0xf7, 0xf7, 0xdd, 0xbd, 0xbf, 0xee, 0xbb, 0x7b, 0xff, 0xde,
-	0x77, 0xad, 0x5f, 0x56, 0x5d, 0xeb, 0xfd, 0xaa, 0x6b, 0xfd, 0xb1, 0xea, 0x5a, 0xff, 0xac, 0xba,
-	0xd6, 0xb4, 0x62, 0xce, 0xfd, 0xe6, 0xbf, 0x00, 0x00, 0x00, 0xff, 0xff, 0x58, 0x7a, 0x4f, 0x1d,
-	0x40, 0x07, 0x00, 0x00,
+	// 962 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x7c, 0x55, 0xcd, 0x6e, 0xe3, 0x36,
+	0x10, 0x8e, 0x2c, 0xc5, 0x3f, 0xe3, 0xc8, 0x71, 0x89, 0x45, 0xa0, 0x78, 0x5b, 0xc7, 0x51, 0x0f,
+	0x4d, 0x83, 0xc2, 0x69, 0xd2, 0x5e, 0x7a, 0xe8, 0x21, 0x1b, 0x0b, 0xbb, 0x01, 0xd2, 0xc4, 0x60,
+	0xb2, 0xc0, 0xde, 0x0c, 0x39, 0x62, 0x6c, 0x02, 0xb2, 0xa4, 0x92, 0x94, 0x13, 0xdf, 0x7a, 0xe9,
+	0xb1, 0x4f, 0xd2, 0x17, 0xd9, 0x63, 0x4f, 0x45, 0x4f, 0x45, 0xe3, 0x27, 0xe8, 0x23, 0x2c, 0x48,
+	0x4a, 0xf6, 0x66, 0x23, 0xed, 0x6d, 0xe6, 0xd3, 0xa7, 0xe1, 0x7c, 0xc3, 0x99, 0x21, 0x00, 0x9f,
+	0xd2, 0x59, 0x3f, 0x61, 0xb1, 0x88, 0x11, 0xba, 0x8d, 0x23, 0xe1, 0xd3, 0x88, 0xb0, 0xa0, 0xaf,
+	0xe0, 0xf9, 0x71, 0xe7, 0xe5, 0x24, 0x8e, 0x27, 0x21, 0x39, 0x52, 0x8c, 0x71, 0x7a, 0x77, 0x44,
+	0x66, 0x89, 0x58, 0xe8, 0x1f, 0x3a, 0x2f, 0x26, 0xf1, 0x24, 0x56, 0xe6, 0x91, 0xb4, 0x34, 0xea,
+	0xfe, 0x6d, 0x80, 0x7d, 0xc6, 0x88, 0x2f, 0x08, 0x26, 0xbf, 0xa6, 0x84, 0x0b, 0xb4, 0x03, 0x15,
+	0x1a, 0x38, 0x46, 0xcf, 0x38, 0x68, 0xbc, 0xaa, 0x2e, 0xff, 0xdd, 0xab, 0x9c, 0x0f, 0x70, 0x85,
+	0x06, 0x68, 0x07, 0xaa, 0xe3, 0x34, 0x0a, 0x42, 0xe2, 0x54, 0xe4, 0x37, 0x9c, 0x79, 0xc8, 0x81,
+	0x1a, 0x4b, 0x23, 0x41, 0x67, 0xc4, 0x31, 0xd5, 0x87, 0xdc, 0x45, 0xbb, 0x50, 0x8f, 0xe2, 0x51,
+	0x42, 0xe7, 0xb1, 0x70, 0xac, 0x9e, 0x71, 0x50, 0xc7, 0xb5, 0x28, 0x1e, 0x4a, 0x17, 0x75, 0xa0,
+	0x2e, 0x08, 0x9b, 0xd1, 0xc8, 0x0f, 0x9d, 0x4d, 0xf5, 0x69, 0xe5, 0xa3, 0x17, 0xb0, 0xc9, 0x45,
+	0x40, 0x23, 0xa7, 0xaa, 0xc2, 0x69, 0x47, 0x1e, 0xcf, 0x45, 0x10, 0xa7, 0xc2, 0xa9, 0xe9, 0xe3,
+	0xb5, 0x97, 0xe1, 0x84, 0x31, 0xa7, 0xbe, 0xc2, 0x09, 0x63, 0xae, 0x0b, 0xad, 0x5c, 0x17, 0x4f,
+	0xe2, 0x88, 0x13, 0xd4, 0x06, 0x33, 0xc9, 0x94, 0xd9, 0x58, 0x9a, 0x6e, 0x0b, 0xb6, 0xae, 0x85,
+	0xcf, 0x44, 0x26, 0xdd, 0xdd, 0x07, 0x7b, 0x40, 0x42, 0xb2, 0xae, 0xc5, 0xf3, 0x5f, 0x8e, 0xa1,
+	0x95, 0x53, 0xb2, 0xb0, 0x7b, 0xd0, 0x24, 0x0f, 0x54, 0x8c, 0xb8, 0xf0, 0x45, 0xca, 0x33, 0x2e,
+	0x48, 0xe8, 0x5a, 0x21, 0xee, 0x9f, 0x26, 0x34, 0xbd, 0x07, 0x72, 0x9b, 0x07, 0xfd, 0x58, 0xbb,
+	0x51, 0xa6, 0xbd, 0x52, 0xac, 0xdd, 0x2c, 0xd1, 0x6e, 0x7d, 0xac, 0x1d, 0x7d, 0x0d, 0x36, 0x27,
+	0x21, 0x8d, 0xd2, 0x87, 0x51, 0xe8, 0x8f, 0x89, 0x2e, 0x71, 0x03, 0x6f, 0x65, 0xe0, 0x85, 0xc4,
+	0xd0, 0x77, 0x60, 0xa5, 0x9c, 0x30, 0x55, 0xe5, 0xe6, 0x89, 0xd3, 0x7f, 0xde, 0x4f, 0xfd, 0xb7,
+	0x9c, 0x30, 0xac, 0x58, 0x08, 0x81, 0xe5, 0xb3, 0x09, 0x77, 0x6a, 0x3d, 0xf3, 0xa0, 0x81, 0x95,
+	0x2d, 0xab, 0x43, 0xa2, 0xb9, 0x53, 0x57, 0x90, 0x34, 0x25, 0x72, 0x7b, 0x1f, 0x38, 0x0d, 0x75,
+	0x9c, 0x34, 0x91, 0x0b, 0x5b, 0xb7, 0x7e, 0xe2, 0x8f, 0x69, 0x48, 0x05, 0x25, 0xdc, 0x01, 0x45,
+	0x7e, 0x82, 0xa1, 0x1f, 0xa1, 0xc6, 0x42, 0x3a, 0xa3, 0x82, 0x3b, 0xcd, 0x9e, 0x79, 0xd0, 0x3c,
+	0xe9, 0x14, 0x25, 0x83, 0x15, 0x05, 0xe7, 0x54, 0x74, 0x08, 0x5f, 0x44, 0xf1, 0x28, 0x22, 0xf7,
+	0xa3, 0x84, 0xd1, 0x39, 0x0d, 0xc9, 0x84, 0x70, 0x67, 0x4b, 0xd5, 0x73, 0x3b, 0x8a, 0x2f, 0xc9,
+	0xfd, 0x70, 0x05, 0xa3, 0x6f, 0xa1, 0xed, 0x27, 0x89, 0xcf, 0x66, 0x31, 0x1b, 0x25, 0x2c, 0xbe,
+	0xa3, 0x21, 0x71, 0x6c, 0x95, 0xe4, 0x76, 0x8e, 0x0f, 0x35, 0xec, 0x5e, 0x83, 0x25, 0x65, 0x4b,
+	0x29, 0xe9, 0xfa, 0xea, 0x53, 0x1a, 0x48, 0x64, 0x42, 0x03, 0x75, 0x33, 0x36, 0x96, 0x26, 0xfa,
+	0x06, 0xb6, 0xfd, 0x20, 0xa0, 0x82, 0xc6, 0x91, 0x1f, 0x8e, 0x26, 0x34, 0xe0, 0x8e, 0xd9, 0x33,
+	0x0f, 0x6c, 0xdc, 0x5a, 0xc3, 0xaf, 0x69, 0xc0, 0xdd, 0x01, 0x54, 0x75, 0xfa, 0xb2, 0x8e, 0x62,
+	0x91, 0x10, 0x3d, 0x5f, 0x58, 0xd9, 0x12, 0x9b, 0xfa, 0x4c, 0x47, 0xb6, 0xb0, 0xb2, 0x25, 0xc6,
+	0xe3, 0x3b, 0x7d, 0xe1, 0x16, 0x56, 0xb6, 0xdb, 0x83, 0x2d, 0xdd, 0x47, 0xa5, 0x0d, 0x7d, 0x01,
+	0x30, 0x14, 0x8b, 0xd2, 0xee, 0x95, 0xed, 0x75, 0x4f, 0x03, 0x31, 0xcd, 0x44, 0x68, 0x47, 0xb6,
+	0xd1, 0x94, 0xd0, 0xc9, 0x54, 0x9f, 0x66, 0xe3, 0xcc, 0x73, 0xb7, 0xc1, 0xf6, 0xe6, 0x24, 0x12,
+	0x3c, 0x9f, 0x8f, 0xdf, 0x0d, 0xd8, 0x54, 0x48, 0xe9, 0x92, 0x38, 0xce, 0xe4, 0xc9, 0xf8, 0xad,
+	0x93, 0xaf, 0x8a, 0xee, 0x51, 0x05, 0xb8, 0x59, 0x24, 0x24, 0x53, 0x9f, 0x65, 0x69, 0xae, 0xb3,
+	0xfc, 0x64, 0xa2, 0xac, 0x67, 0x13, 0xa5, 0xe7, 0x76, 0x35, 0xa6, 0xee, 0x18, 0xec, 0xcc, 0xcf,
+	0x2a, 0x53, 0x96, 0xde, 0x4f, 0xd0, 0x48, 0x58, 0x7c, 0x4b, 0x38, 0x27, 0xdc, 0xa9, 0xa8, 0x5e,
+	0x7b, 0x59, 0x94, 0xe3, 0x50, 0x93, 0xf0, 0x9a, 0xed, 0x5e, 0x40, 0x2d, 0x43, 0x0b, 0xea, 0x7a,
+	0x24, 0xc7, 0xd6, 0x17, 0xb9, 0xee, 0xdd, 0xa2, 0x98, 0x3a, 0x43, 0xcd, 0x3b, 0x7c, 0x03, 0x8d,
+	0x55, 0x1d, 0x50, 0x1d, 0x2c, 0xef, 0xdd, 0xf9, 0x4d, 0x7b, 0x03, 0xd5, 0xc0, 0xbc, 0xba, 0xfa,
+	0xa5, 0x6d, 0xa0, 0x26, 0xd4, 0xce, 0xb0, 0x77, 0x7a, 0xe3, 0x0d, 0xda, 0x15, 0xe9, 0x5c, 0xdf,
+	0x9c, 0x62, 0xe9, 0x98, 0xa8, 0x05, 0xe0, 0xbd, 0xf3, 0xce, 0x46, 0xa7, 0x83, 0x81, 0x37, 0x68,
+	0x5b, 0x87, 0xfb, 0xb0, 0xa9, 0x22, 0x6b, 0xd6, 0xd5, 0x70, 0xe8, 0x0d, 0xda, 0x1b, 0xd2, 0xc1,
+	0x6f, 0x2f, 0x2f, 0xcf, 0x2f, 0x5f, 0xb7, 0x8d, 0x93, 0x3f, 0x2c, 0xb0, 0xae, 0xa7, 0x74, 0x86,
+	0xae, 0xa0, 0xaa, 0x77, 0x22, 0xda, 0x2f, 0xca, 0xf0, 0xc9, 0x3b, 0xd0, 0x71, 0x3f, 0x47, 0xc9,
+	0xea, 0x7c, 0xaa, 0x0e, 0x67, 0x02, 0xf5, 0x4a, 0x14, 0xaf, 0x76, 0x6b, 0x67, 0xa7, 0xaf, 0x1f,
+	0xa7, 0x7e, 0xfe, 0x38, 0xf5, 0x3d, 0xf9, 0x38, 0xc9, 0x9c, 0xf4, 0x42, 0x2d, 0xce, 0xe9, 0xc9,
+	0x3e, 0x2e, 0xce, 0xe9, 0x93, 0x7d, 0x7c, 0x0e, 0x96, 0x9c, 0x12, 0xb4, 0x57, 0xd8, 0x7c, 0xeb,
+	0x3d, 0xdc, 0xe9, 0x95, 0x13, 0xb2, 0x50, 0x3f, 0x83, 0x39, 0x14, 0x0b, 0xd4, 0x2d, 0x6c, 0x91,
+	0xd5, 0x9c, 0x95, 0x4a, 0x7b, 0x03, 0x55, 0x3d, 0x3f, 0xc5, 0xd2, 0x9e, 0xcc, 0x56, 0x67, 0xb7,
+	0x94, 0xf2, 0xbd, 0x81, 0x2e, 0xf2, 0x4b, 0xee, 0x95, 0x77, 0x56, 0x16, 0x67, 0xff, 0x33, 0x0c,
+	0x2d, 0xeb, 0xd5, 0x97, 0xef, 0x1f, 0xbb, 0x1b, 0xff, 0x3c, 0x76, 0x37, 0xfe, 0x7f, 0xec, 0x1a,
+	0xbf, 0x2d, 0xbb, 0xc6, 0xfb, 0x65, 0xd7, 0xf8, 0x6b, 0xd9, 0x35, 0xfe, 0x5b, 0x76, 0x8d, 0x71,
+	0x55, 0xa9, 0xf8, 0xe1, 0x43, 0x00, 0x00, 0x00, 0xff, 0xff, 0x0d, 0xe7, 0x6c, 0xde, 0x6d, 0x08,
+	0x00, 0x00,
 }

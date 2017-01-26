@@ -3,6 +3,7 @@ package shim
 import (
 	"fmt"
 	"sync"
+	"syscall"
 
 	"github.com/crosbymichael/console"
 	apishim "github.com/docker/containerd/api/shim"
@@ -27,6 +28,7 @@ type Service struct {
 	mu          sync.Mutex
 	processes   map[int]process
 	events      chan *apishim.Event
+	execID      int
 }
 
 func (s *Service) Create(ctx context.Context, r *apishim.CreateRequest) (*apishim.CreateResponse, error) {
@@ -63,21 +65,28 @@ func (s *Service) Start(ctx context.Context, r *apishim.StartRequest) (*google_p
 }
 
 func (s *Service) Delete(ctx context.Context, r *apishim.DeleteRequest) (*apishim.DeleteResponse, error) {
-	if err := s.initProcess.Delete(ctx); err != nil {
+	s.mu.Lock()
+	p, ok := s.processes[int(r.Pid)]
+	s.mu.Unlock()
+	if !ok {
+		return nil, fmt.Errorf("process does not exist %d", r.Pid)
+	}
+	if err := p.Delete(ctx); err != nil {
 		return nil, err
 	}
 	s.mu.Lock()
-	delete(s.processes, s.initProcess.pid)
+	delete(s.processes, p.Pid())
 	s.mu.Unlock()
 	return &apishim.DeleteResponse{
-		ExitStatus: uint32(s.initProcess.Status()),
+		ExitStatus: uint32(p.Status()),
 	}, nil
 }
 
 func (s *Service) Exec(ctx context.Context, r *apishim.ExecRequest) (*apishim.ExecResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	process, err := newExecProcess(ctx, r, s.initProcess)
+	s.execID++
+	process, err := newExecProcess(ctx, r, s.initProcess, s.execID)
 	if err != nil {
 		return nil, err
 	}
@@ -120,6 +129,29 @@ func (s *Service) Events(r *apishim.EventsRequest, stream apishim.Shim_EventsSer
 		}
 	}
 	return nil
+}
+
+func (s *Service) State(ctx context.Context, r *apishim.StateRequest) (*apishim.StateResponse, error) {
+	o := &apishim.StateResponse{
+		ID:        s.id,
+		Processes: []*apishim.Process{},
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, p := range s.processes {
+		state := apishim.State_RUNNING
+		if err := syscall.Kill(p.Pid(), 0); err != nil {
+			if err != syscall.ESRCH {
+				return nil, err
+			}
+			state = apishim.State_STOPPED
+		}
+		o.Processes = append(o.Processes, &apishim.Process{
+			Pid:   uint32(p.Pid()),
+			State: state,
+		})
+	}
+	return o, nil
 }
 
 func (s *Service) ProcessExit(e utils.Exit) error {

@@ -16,7 +16,7 @@ import (
 type execProcess struct {
 	sync.WaitGroup
 
-	id      string
+	id      int
 	console console.Console
 	io      runc.IO
 	status  int
@@ -25,19 +25,19 @@ type execProcess struct {
 	parent *initProcess
 }
 
-func newExecProcess(context context.Context, r *apishim.ExecRequest, parent *initProcess) (process, error) {
+func newExecProcess(context context.Context, r *apishim.ExecRequest, parent *initProcess, id int) (process, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
 	}
 	e := &execProcess{
-		id:     r.ID,
+		id:     id,
 		parent: parent,
 	}
 	var (
 		socket  *runc.ConsoleSocket
 		io      runc.IO
-		pidfile = filepath.Join(cwd, fmt.Sprintf("%s.pid", r.ID))
+		pidfile = filepath.Join(cwd, fmt.Sprintf("%d.pid", id))
 	)
 	if r.Terminal {
 		if socket, err = runc.NewConsoleSocket(filepath.Join(cwd, "pty.sock")); err != nil {
@@ -56,9 +56,8 @@ func newExecProcess(context context.Context, r *apishim.ExecRequest, parent *ini
 		ConsoleSocket: socket,
 		IO:            io,
 		Detach:        true,
-		Tty:           socket != nil,
 	}
-	if err := parent.runc.Exec(context, r.ID, processFromRequest(r), opts); err != nil {
+	if err := parent.runc.Exec(context, parent.id, processFromRequest(r), opts); err != nil {
 		return nil, err
 	}
 	pid, err := runc.ReadPidFile(opts.PidFile)
@@ -70,13 +69,15 @@ func newExecProcess(context context.Context, r *apishim.ExecRequest, parent *ini
 }
 
 func processFromRequest(r *apishim.ExecRequest) specs.Process {
+	var user specs.User
+	if r.User != nil {
+		user.UID = r.User.Uid
+		user.GID = r.User.Gid
+		user.AdditionalGids = r.User.AdditionalGids
+	}
 	return specs.Process{
-		Terminal: r.Terminal,
-		User: specs.User{
-			UID:            r.User.Uid,
-			GID:            r.User.Gid,
-			AdditionalGids: r.User.AdditionalGids,
-		},
+		Terminal:        r.Terminal,
+		User:            user,
 		Rlimits:         rlimits(r.Rlimits),
 		Args:            r.Args,
 		Env:             r.Env,
@@ -113,6 +114,10 @@ func (e *execProcess) Exited(status int) {
 	if e.io != nil {
 		e.io.Close()
 	}
+}
+
+func (e *execProcess) Delete(ctx context.Context) error {
+	return nil
 }
 
 func (e *execProcess) Resize(ws console.WinSize) error {

@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
-	"os/exec"
-	"syscall"
+	"os"
+	"strconv"
 	"time"
 
 	gocontext "context"
@@ -14,6 +16,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/crosbymichael/console"
 	"github.com/docker/containerd/api/shim"
 	"github.com/urfave/cli"
@@ -46,16 +49,8 @@ var shimCommand = cli.Command{
 		shimStartCommand,
 		shimDeleteCommand,
 		shimEventsCommand,
-	},
-	Action: func(context *cli.Context) error {
-		cmd := exec.Command("containerd-shim", "--debug")
-		cmd.SysProcAttr = &syscall.SysProcAttr{}
-		cmd.SysProcAttr.Setpgid = true
-		if err := cmd.Start(); err != nil {
-			return err
-		}
-		fmt.Println("new shim started @ ./shim.sock")
-		return nil
+		shimStateCommand,
+		shimExecCommand,
 	},
 }
 
@@ -150,11 +145,110 @@ var shimDeleteCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		r, err := service.Delete(gocontext.Background(), &shim.DeleteRequest{})
+		pid, err := strconv.Atoi(context.Args().First())
+		if err != nil {
+			return err
+		}
+		r, err := service.Delete(gocontext.Background(), &shim.DeleteRequest{
+			Pid: uint32(pid),
+		})
 		if err != nil {
 			return err
 		}
 		fmt.Printf("container deleted and returned exit status %d\n", r.ExitStatus)
+		return nil
+	},
+}
+
+var shimStateCommand = cli.Command{
+	Name:  "state",
+	Usage: "get the state of all the processes of the shim",
+	Action: func(context *cli.Context) error {
+		service, err := getShimService()
+		if err != nil {
+			return err
+		}
+		r, err := service.State(gocontext.Background(), &shim.StateRequest{})
+		if err != nil {
+			return err
+		}
+		data, err := json.Marshal(r)
+		if err != nil {
+			return err
+		}
+		buf := bytes.NewBuffer(nil)
+		if err := json.Indent(buf, data, " ", "    "); err != nil {
+			return err
+		}
+		buf.WriteTo(os.Stdout)
+		return nil
+	},
+}
+
+var shimExecCommand = cli.Command{
+	Name:  "exec",
+	Usage: "exec a new process in the shim's container",
+	Flags: append(fifoFlags,
+		cli.BoolFlag{
+			Name:  "attach,a",
+			Usage: "stay attached to the container and open the fifos",
+		},
+		cli.StringSliceFlag{
+			Name:  "env,e",
+			Usage: "add environment vars",
+			Value: &cli.StringSlice{},
+		},
+		cli.StringFlag{
+			Name:  "cwd",
+			Usage: "current working directory",
+		},
+	),
+	Action: func(context *cli.Context) error {
+		service, err := getShimService()
+		if err != nil {
+			return err
+		}
+		tty := context.Bool("tty")
+		wg, err := prepareStdio(context.String("stdin"), context.String("stdout"), context.String("stderr"), tty)
+		if err != nil {
+			return err
+		}
+		rq := &shim.ExecRequest{
+			Args:     []string(context.Args()),
+			Env:      context.StringSlice("env"),
+			Cwd:      context.String("cwd"),
+			Stdin:    context.String("stdin"),
+			Stdout:   context.String("stdout"),
+			Stderr:   context.String("stderr"),
+			Terminal: tty,
+		}
+		r, err := service.Exec(gocontext.Background(), rq)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("exec running with pid %d\n", r.Pid)
+		if context.Bool("attach") {
+			logrus.Info("attaching")
+			if tty {
+				current := console.Current()
+				defer current.Reset()
+				if err := current.SetRaw(); err != nil {
+					return err
+				}
+				size, err := current.Size()
+				if err != nil {
+					return err
+				}
+				if _, err := service.Pty(gocontext.Background(), &shim.PtyRequest{
+					Pid:    r.Pid,
+					Width:  uint32(size.Width),
+					Height: uint32(size.Height),
+				}); err != nil {
+					return err
+				}
+			}
+			wg.Wait()
+		}
 		return nil
 	},
 }

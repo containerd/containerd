@@ -14,6 +14,7 @@ import (
 
 	gocontext "context"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/api/execution"
 	"github.com/tonistiigi/fifo"
 	"github.com/urfave/cli"
@@ -38,6 +39,7 @@ func prepareStdio(stdin, stdout, stderr string, console bool) (*sync.WaitGroup, 
 	}(f)
 	go func(w io.WriteCloser) {
 		io.Copy(w, os.Stdin)
+		logrus.Info("stdin copy finished")
 		w.Close()
 	}(f)
 
@@ -54,6 +56,7 @@ func prepareStdio(stdin, stdout, stderr string, console bool) (*sync.WaitGroup, 
 	go func(r io.ReadCloser) {
 		io.Copy(os.Stdout, r)
 		r.Close()
+		logrus.Info("stdout copy finished")
 		wg.Done()
 	}(f)
 
@@ -71,6 +74,7 @@ func prepareStdio(stdin, stdout, stderr string, console bool) (*sync.WaitGroup, 
 		go func(r io.ReadCloser) {
 			io.Copy(os.Stderr, r)
 			r.Close()
+			logrus.Info("stderr copy finished")
 			wg.Done()
 		}(f)
 	}
