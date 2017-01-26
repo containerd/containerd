@@ -25,6 +25,21 @@ func (cw *Writer) Ref() string {
 	return cw.ref
 }
 
+// Size returns the current size written.
+//
+// Cannot be called concurrently with `Write`. If you need need concurrent
+// status, query it with `Store.Stat`.
+func (cw *Writer) Size() int64 {
+	return cw.offset
+}
+
+// Digest returns the current digest of the content, up to the current write.
+//
+// Cannot be called concurrently with `Write`.
+func (cw *Writer) Digest() digest.Digest {
+	return cw.digester.Digest()
+}
+
 // Write p to the transaction.
 //
 // Note that writes are unbuffered to the backing file. When writing, it is
@@ -32,6 +47,7 @@ func (cw *Writer) Ref() string {
 func (cw *Writer) Write(p []byte) (n int, err error) {
 	n, err = cw.fp.Write(p)
 	cw.digester.Hash().Write(p[:n])
+	cw.offset += int64(len(p))
 	return n, err
 }
 
@@ -54,7 +70,7 @@ func (cw *Writer) Commit(size int64, expected digest.Digest) error {
 		return errors.Wrap(err, "failed to change ingest file permissions")
 	}
 
-	if size != fi.Size() {
+	if size > 0 && size != fi.Size() {
 		return errors.Errorf("failed size validation: %v != %v", fi.Size(), size)
 	}
 
@@ -63,24 +79,23 @@ func (cw *Writer) Commit(size int64, expected digest.Digest) error {
 	}
 
 	dgst := cw.digester.Digest()
-	// TODO(stevvooe): Correctly handle missing expected digest or allow no
-	// expected digest at commit time.
 	if expected != "" && expected != dgst {
 		return errors.Errorf("unexpected digest: %v != %v", dgst, expected)
 	}
 
-	apath := filepath.Join(cw.cs.root, "blobs", dgst.Algorithm().String())
-	if err := os.MkdirAll(apath, 0755); err != nil {
+	var (
+		ingest = filepath.Join(cw.path, "data")
+		target = cw.cs.blobPath(dgst)
+	)
+
+	// make sure parent directories of blob exist
+	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 		return err
 	}
 
-	var (
-		ingest = filepath.Join(cw.path, "data")
-		target = filepath.Join(apath, dgst.Hex())
-	)
-
 	// clean up!!
 	defer os.RemoveAll(cw.path)
+
 	if err := os.Rename(ingest, target); err != nil {
 		if os.IsExist(err) {
 			// collision with the target file!
@@ -100,6 +115,9 @@ func (cw *Writer) Commit(size int64, expected digest.Digest) error {
 // If one needs to resume the transaction, a new writer can be obtained from
 // `ContentStore.Resume` using the same key. The write can then be continued
 // from it was left off.
+//
+// To abandon a transaction completely, first call close then `Store.Remove` to
+// clean up the associated resources.
 func (cw *Writer) Close() (err error) {
 	if err := unlock(cw.lock); err != nil {
 		log.Printf("unlock failed: %v", err)

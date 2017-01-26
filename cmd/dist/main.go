@@ -30,6 +30,11 @@ distribution tool
 	}
 	app.Commands = []cli.Command{
 		fetchCommand,
+		ingestCommand,
+		activeCommand,
+		pathCommand,
+		deleteCommand,
+		listCommand,
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
