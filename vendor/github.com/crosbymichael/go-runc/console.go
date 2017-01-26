@@ -3,22 +3,26 @@ package runc
 import (
 	"fmt"
 	"net"
-	"os"
+	"path/filepath"
 
-	"github.com/docker/docker/pkg/term"
+	"github.com/crosbymichael/console"
 	"github.com/opencontainers/runc/libcontainer/utils"
 )
 
 // NewConsoleSocket creates a new unix socket at the provided path to accept a
 // pty master created by runc for use by the container
 func NewConsoleSocket(path string) (*ConsoleSocket, error) {
-	l, err := net.Listen("unix", path)
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+	l, err := net.Listen("unix", abs)
 	if err != nil {
 		return nil, err
 	}
 	return &ConsoleSocket{
 		l:    l,
-		path: path,
+		path: abs,
 	}, nil
 }
 
@@ -34,7 +38,7 @@ func (c *ConsoleSocket) Path() string {
 }
 
 // ReceiveMaster blocks until the socket receives the pty master
-func (c *ConsoleSocket) ReceiveMaster() (*Console, error) {
+func (c *ConsoleSocket) ReceiveMaster() (console.Console, error) {
 	conn, err := c.l.Accept()
 	if err != nil {
 		return nil, err
@@ -52,9 +56,7 @@ func (c *ConsoleSocket) ReceiveMaster() (*Console, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Console{
-		master: f,
-	}, nil
+	return console.ConsoleFromFile(f)
 }
 
 // Close closes the unix socket
@@ -68,32 +70,4 @@ type WinSize struct {
 	Width uint16
 	// Height of the console
 	Height uint16
-}
-
-// Console is a pty master
-type Console struct {
-	master *os.File
-}
-
-// Read from the console
-func (c *Console) Read(b []byte) (int, error) {
-	return c.master.Read(b)
-}
-
-// Write writes to the console
-func (c *Console) Write(b []byte) (int, error) {
-	return c.master.Write(b)
-}
-
-// Resize the console
-func (c *Console) Resize(ws WinSize) error {
-	return term.SetWinsize(c.master.Fd(), &term.Winsize{
-		Width:  ws.Width,
-		Height: ws.Height,
-	})
-}
-
-// Close the console
-func (c *Console) Close() error {
-	return c.master.Close()
 }

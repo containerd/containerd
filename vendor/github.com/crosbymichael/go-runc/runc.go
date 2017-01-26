@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
@@ -73,9 +74,13 @@ type CreateOpts struct {
 	NoNewKeyring  bool
 }
 
-func (o *CreateOpts) args() (out []string) {
+func (o *CreateOpts) args() (out []string, err error) {
 	if o.PidFile != "" {
-		out = append(out, "--pid-file", o.PidFile)
+		abs, err := filepath.Abs(o.PidFile)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, "--pid-file", abs)
 	}
 	if o.ConsoleSocket != nil {
 		out = append(out, "--console-socket", o.ConsoleSocket.Path())
@@ -89,17 +94,21 @@ func (o *CreateOpts) args() (out []string) {
 	if o.Detach {
 		out = append(out, "--detach")
 	}
-	return out
+	return out, nil
 }
 
 // Create creates a new container and returns its pid if it was created successfully
 func (r *Runc) Create(context context.Context, id, bundle string, opts *CreateOpts) error {
 	args := []string{"create", "--bundle", bundle}
 	if opts != nil {
-		args = append(args, opts.args()...)
+		oargs, err := opts.args()
+		if err != nil {
+			return err
+		}
+		args = append(args, oargs...)
 	}
 	cmd := r.command(context, append(args, id)...)
-	if opts != nil {
+	if opts != nil && opts.IO != nil {
 		opts.Set(cmd)
 	}
 	if cmd.Stdout == nil && cmd.Stderr == nil {
@@ -138,7 +147,7 @@ type ExecOpts struct {
 	Detach        bool
 }
 
-func (o *ExecOpts) args() (out []string) {
+func (o *ExecOpts) args() (out []string, err error) {
 	out = append(out, "--user", fmt.Sprintf("%d:%d", o.Uid, o.Gid))
 	if o.Tty {
 		out = append(out, "--tty")
@@ -153,9 +162,13 @@ func (o *ExecOpts) args() (out []string) {
 		out = append(out, "--detach")
 	}
 	if o.PidFile != "" {
-		out = append(out, "--pid-file", o.PidFile)
+		abs, err := filepath.Abs(o.PidFile)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, "--pid-file", abs)
 	}
-	return out
+	return out, nil
 }
 
 // Exec executres and additional process inside the container based on a full
@@ -173,7 +186,11 @@ func (r *Runc) Exec(context context.Context, id string, spec specs.Process, opts
 	}
 	args := []string{"exec", "--process", f.Name()}
 	if opts != nil {
-		args = append(args, opts.args()...)
+		oargs, err := opts.args()
+		if err != nil {
+			return err
+		}
+		args = append(args, oargs...)
 	}
 	cmd := r.command(context, append(args, id)...)
 	if opts != nil {
@@ -187,7 +204,11 @@ func (r *Runc) Exec(context context.Context, id string, spec specs.Process, opts
 func (r *Runc) Run(context context.Context, id, bundle string, opts *CreateOpts) (int, error) {
 	args := []string{"run", "--bundle", bundle}
 	if opts != nil {
-		args = append(args, opts.args()...)
+		oargs, err := opts.args()
+		if err != nil {
+			return -1, err
+		}
+		args = append(args, oargs...)
 	}
 	cmd := r.command(context, append(args, id)...)
 	if opts != nil {
