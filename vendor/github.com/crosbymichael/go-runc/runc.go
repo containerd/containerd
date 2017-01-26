@@ -193,10 +193,27 @@ func (r *Runc) Exec(context context.Context, id string, spec specs.Process, opts
 		args = append(args, oargs...)
 	}
 	cmd := r.command(context, append(args, id)...)
-	if opts != nil {
+	if opts != nil && opts.IO != nil {
 		opts.Set(cmd)
 	}
-	return runOrError(cmd)
+	if cmd.Stdout == nil && cmd.Stderr == nil {
+		data, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("%s: %s", err, data)
+		}
+		return nil
+	}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	if opts != nil && opts.IO != nil {
+		if c, ok := opts.IO.(StartCloser); ok {
+			if err := c.CloseAfterStart(); err != nil {
+				return err
+			}
+		}
+	}
+	return cmd.Wait()
 }
 
 // Run runs the create, start, delete lifecycle of the container
