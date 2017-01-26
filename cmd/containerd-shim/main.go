@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"google.golang.org/grpc"
@@ -90,7 +91,8 @@ func serve(server *grpc.Server, path string) error {
 	logrus.WithField("socket", path).Debug("serving api on unix socket")
 	go func() {
 		defer l.Close()
-		if err := server.Serve(l); err != nil {
+		if err := server.Serve(l); err != nil &&
+			!strings.Contains(err.Error(), "use of closed network connection") {
 			l.Close()
 			logrus.WithError(err).Fatal("containerd-shim: GRPC server failure")
 		}
@@ -119,7 +121,7 @@ func handleSignals(signals chan os.Signal, server *grpc.Server, service *shim.Se
 		case syscall.SIGTERM, syscall.SIGINT:
 			// TODO: should we forward signals to the processes if they are still running?
 			// i.e. machine reboot
-			server.GracefulStop()
+			server.Stop()
 			return nil
 		}
 	}

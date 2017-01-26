@@ -7,11 +7,12 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/crosbymichael/console"
 	runc "github.com/crosbymichael/go-runc"
 	"github.com/tonistiigi/fifo"
 )
 
-func copyConsole(ctx context.Context, console *runc.Console, stdin, stdout, stderr string, wg *sync.WaitGroup) error {
+func copyConsole(ctx context.Context, console console.Console, stdin, stdout, stderr string, wg *sync.WaitGroup) error {
 	in, err := fifo.OpenFifo(ctx, stdin, syscall.O_RDONLY, 0)
 	if err != nil {
 		return err

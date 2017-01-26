@@ -7,6 +7,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/crosbymichael/console"
 	runc "github.com/crosbymichael/go-runc"
 	apishim "github.com/docker/containerd/api/shim"
 )
@@ -16,7 +17,7 @@ type initProcess struct {
 
 	id      string
 	bundle  string
-	console *runc.Console
+	console console.Console
 	io      runc.IO
 	runc    *runc.Runc
 	status  int
@@ -47,6 +48,7 @@ func newInitProcess(context context.Context, r *apishim.CreateRequest) (*initPro
 		if socket, err = runc.NewConsoleSocket(filepath.Join(cwd, "pty.sock")); err != nil {
 			return nil, err
 		}
+		defer os.Remove(socket.Path())
 	} else {
 		// TODO: get uid/gid
 		if io, err = runc.NewPipeIO(0, 0); err != nil {
@@ -105,11 +107,13 @@ func (p *initProcess) Delete(context context.Context) error {
 	p.killAll(context)
 	p.Wait()
 	err := p.runc.Delete(context, p.id)
-	p.io.Close()
+	if p.io != nil {
+		p.io.Close()
+	}
 	return err
 }
 
-func (p *initProcess) Resize(ws runc.WinSize) error {
+func (p *initProcess) Resize(ws console.WinSize) error {
 	if p.console == nil {
 		return nil
 	}

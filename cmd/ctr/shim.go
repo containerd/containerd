@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
 
+	"github.com/crosbymichael/console"
 	"github.com/docker/containerd/api/shim"
 	"github.com/urfave/cli"
 )
@@ -31,6 +32,10 @@ var fifoFlags = []cli.Flag{
 		Name:  "stderr",
 		Usage: "specify the path to the stderr fifo",
 	},
+	cli.BoolFlag{
+		Name:  "tty,t",
+		Usage: "enable tty support",
+	},
 }
 
 var shimCommand = cli.Command{
@@ -40,6 +45,7 @@ var shimCommand = cli.Command{
 		shimCreateCommand,
 		shimStartCommand,
 		shimDeleteCommand,
+		shimEventsCommand,
 	},
 	Action: func(context *cli.Context) error {
 		cmd := exec.Command("containerd-shim", "--debug")
@@ -80,23 +86,43 @@ var shimCreateCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		wg, err := prepareStdio(context.String("stdin"), context.String("stdout"), context.String("stderr"), false)
+		tty := context.Bool("tty")
+		wg, err := prepareStdio(context.String("stdin"), context.String("stdout"), context.String("stderr"), tty)
 		if err != nil {
 			return err
 		}
 		r, err := service.Create(gocontext.Background(), &shim.CreateRequest{
-			ID:      id,
-			Bundle:  context.String("bundle"),
-			Runtime: context.String("runtime"),
-			Stdin:   context.String("stdin"),
-			Stdout:  context.String("stdout"),
-			Stderr:  context.String("stderr"),
+			ID:       id,
+			Bundle:   context.String("bundle"),
+			Runtime:  context.String("runtime"),
+			Stdin:    context.String("stdin"),
+			Stdout:   context.String("stdout"),
+			Stderr:   context.String("stderr"),
+			Terminal: tty,
 		})
 		if err != nil {
 			return err
 		}
 		fmt.Printf("container created with id %s and pid %d\n", id, r.Pid)
 		if context.Bool("attach") {
+			if tty {
+				current := console.Current()
+				defer current.Reset()
+				if err := current.SetRaw(); err != nil {
+					return err
+				}
+				size, err := current.Size()
+				if err != nil {
+					return err
+				}
+				if _, err := service.Pty(gocontext.Background(), &shim.PtyRequest{
+					Pid:    r.Pid,
+					Width:  uint32(size.Width),
+					Height: uint32(size.Height),
+				}); err != nil {
+					return err
+				}
+			}
 			wg.Wait()
 		}
 		return nil
@@ -129,6 +155,29 @@ var shimDeleteCommand = cli.Command{
 			return err
 		}
 		fmt.Printf("container deleted and returned exit status %d\n", r.ExitStatus)
+		return nil
+	},
+}
+
+var shimEventsCommand = cli.Command{
+	Name:  "events",
+	Usage: "get events for a shim",
+	Action: func(context *cli.Context) error {
+		service, err := getShimService()
+		if err != nil {
+			return err
+		}
+		events, err := service.Events(gocontext.Background(), &shim.EventsRequest{})
+		if err != nil {
+			return err
+		}
+		for {
+			e, err := events.Recv()
+			if err != nil {
+				return err
+			}
+			fmt.Printf("type=%s id=%s pid=%d status=%d\n", e.Type, e.ID, e.Pid, e.ExitStatus)
+		}
 		return nil
 	},
 }

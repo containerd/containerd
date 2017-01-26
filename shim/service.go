@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	runc "github.com/crosbymichael/go-runc"
+	"github.com/crosbymichael/console"
 	apishim "github.com/docker/containerd/api/shim"
 	"github.com/docker/containerd/utils"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
@@ -17,7 +17,7 @@ var emptyResponse = &google_protobuf.Empty{}
 func NewService() *Service {
 	return &Service{
 		processes: make(map[int]process),
-		events:    make(chan *apishim.Event, 2048),
+		events:    make(chan *apishim.Event, 4096),
 	}
 }
 
@@ -40,6 +40,11 @@ func (s *Service) Create(ctx context.Context, r *apishim.CreateRequest) (*apishi
 	s.processes[pid] = process
 	s.id = r.ID
 	s.mu.Unlock()
+	s.events <- &apishim.Event{
+		Type: apishim.EventType_CREATED,
+		ID:   r.ID,
+		Pid:  uint32(pid),
+	}
 	return &apishim.CreateResponse{
 		Pid: uint32(pid),
 	}, nil
@@ -48,6 +53,11 @@ func (s *Service) Create(ctx context.Context, r *apishim.CreateRequest) (*apishi
 func (s *Service) Start(ctx context.Context, r *apishim.StartRequest) (*google_protobuf.Empty, error) {
 	if err := s.initProcess.Start(ctx); err != nil {
 		return nil, err
+	}
+	s.events <- &apishim.Event{
+		Type: apishim.EventType_STARTED,
+		ID:   s.id,
+		Pid:  uint32(s.initProcess.Pid()),
 	}
 	return emptyResponse, nil
 }
@@ -73,13 +83,21 @@ func (s *Service) Exec(ctx context.Context, r *apishim.ExecRequest) (*apishim.Ex
 	}
 	pid := process.Pid()
 	s.processes[pid] = process
+	s.events <- &apishim.Event{
+		Type: apishim.EventType_EXEC_ADDED,
+		ID:   s.id,
+		Pid:  uint32(pid),
+	}
 	return &apishim.ExecResponse{
 		Pid: uint32(pid),
 	}, nil
 }
 
 func (s *Service) Pty(ctx context.Context, r *apishim.PtyRequest) (*google_protobuf.Empty, error) {
-	ws := runc.WinSize{
+	if r.Pid == 0 {
+		return nil, fmt.Errorf("pid not provided in request")
+	}
+	ws := console.WinSize{
 		Width:  uint16(r.Width),
 		Height: uint16(r.Height),
 	}

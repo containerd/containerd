@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/crosbymichael/console"
 	runc "github.com/crosbymichael/go-runc"
 	apishim "github.com/docker/containerd/api/shim"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -16,7 +17,7 @@ type execProcess struct {
 	sync.WaitGroup
 
 	id      string
-	console *runc.Console
+	console console.Console
 	io      runc.IO
 	status  int
 	pid     int
@@ -42,6 +43,7 @@ func newExecProcess(context context.Context, r *apishim.ExecRequest, parent *ini
 		if socket, err = runc.NewConsoleSocket(filepath.Join(cwd, "pty.sock")); err != nil {
 			return nil, err
 		}
+		defer os.Remove(socket.Path())
 	} else {
 		// TODO: get uid/gid
 		if io, err = runc.NewPipeIO(0, 0); err != nil {
@@ -108,10 +110,12 @@ func (e *execProcess) Status() int {
 func (e *execProcess) Exited(status int) {
 	e.status = status
 	e.Wait()
-	e.io.Close()
+	if e.io != nil {
+		e.io.Close()
+	}
 }
 
-func (e *execProcess) Resize(ws runc.WinSize) error {
+func (e *execProcess) Resize(ws console.WinSize) error {
 	if e.console == nil {
 		return nil
 	}

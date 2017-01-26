@@ -84,6 +84,9 @@ message EventsRequest {
 enum EventType {
 	EXIT = 0;
 	OOM = 1;
+	CREATED = 2;
+	STARTED = 3;
+	EXEC_ADDED = 4;
 }
 
 message Event {
