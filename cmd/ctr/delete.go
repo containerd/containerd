@@ -9,12 +9,13 @@ import (
 )
 
 var deleteCommand = cli.Command{
-	Name:  "delete",
-	Usage: "delete a process from containerd store",
+	Name:      "delete",
+	Usage:     "delete a process from containerd store",
+	ArgsUsage: "CONTAINER",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "pid, p",
-			Usage: "new process id",
+			Usage: "process id to be deleted",
 		},
 	},
 	Action: func(context *cli.Context) error {

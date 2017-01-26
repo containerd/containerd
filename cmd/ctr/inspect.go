@@ -10,8 +10,9 @@ import (
 )
 
 var inspectCommand = cli.Command{
-	Name:  "inspect",
-	Usage: "inspect a container",
+	Name:      "inspect",
+	Usage:     "inspect a container",
+	ArgsUsage: "CONTAINER",
 	Action: func(context *cli.Context) error {
 		executionService, err := getExecutionService(context)
 		if err != nil {
