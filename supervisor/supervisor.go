@@ -422,6 +422,12 @@ func (s *Supervisor) newExecSyncChannel(containerID, pid string) {
 	s.containerExecSyncLock.Unlock()
 }
 
+func (s *Supervisor) deleteExecSyncChannel(containerID, pid string) {
+	s.containerExecSyncLock.Lock()
+	delete(s.containerExecSync[containerID], pid)
+	s.containerExecSyncLock.Unlock()
+}
+
 func (s *Supervisor) getExecSyncChannel(containerID, pid string) chan struct{} {
 	s.containerExecSyncLock.Lock()
 	ch := s.containerExecSync[containerID][pid]

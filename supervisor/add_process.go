@@ -1,6 +1,7 @@
 package supervisor
 
 import (
+	"os"
 	"time"
 
 	"github.com/docker/containerd/runtime"
@@ -32,11 +33,15 @@ func (s *Supervisor) addProcess(t *AddProcessTask) error {
 	if err != nil {
 		return err
 	}
+	s.newExecSyncChannel(t.ID, t.PID)
 	if err := s.monitorProcess(process); err != nil {
+		s.deleteExecSyncChannel(t.ID, t.PID)
+		// Kill process
+		process.Signal(os.Kill)
+		ci.container.RemoveProcess(t.PID)
 		return err
 	}
 	ExecProcessTimer.UpdateSince(start)
-	s.newExecSyncChannel(t.ID, t.PID)
 	t.StartResponse <- StartResponse{ExecPid: process.SystemPid()}
 	s.notifySubscribers(Event{
 		Timestamp: time.Now(),
