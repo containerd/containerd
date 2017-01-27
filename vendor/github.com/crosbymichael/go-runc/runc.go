@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
@@ -67,48 +68,22 @@ type CreateOpts struct {
 	IO
 	// PidFile is a path to where a pid file should be created
 	PidFile       string
-	ConsoleSocket string
+	ConsoleSocket *ConsoleSocket
 	Detach        bool
 	NoPivot       bool
 	NoNewKeyring  bool
 }
 
-type IO struct {
-	Stdin  io.Reader
-	Stdout io.Writer
-	Stderr io.Writer
-}
-
-func (i *IO) Close() error {
-	var err error
-	for _, v := range []interface{}{
-		i.Stdin,
-		i.Stderr,
-		i.Stdout,
-	} {
-		if v != nil {
-			if c, ok := v.(io.Closer); ok {
-				if cerr := c.Close(); err == nil {
-					err = cerr
-				}
-			}
-		}
-	}
-	return err
-}
-
-func (o IO) setSTDIO(cmd *exec.Cmd) {
-	cmd.Stdin = o.Stdin
-	cmd.Stdout = o.Stdout
-	cmd.Stderr = o.Stderr
-}
-
-func (o *CreateOpts) args() (out []string) {
+func (o *CreateOpts) args() (out []string, err error) {
 	if o.PidFile != "" {
-		out = append(out, "--pid-file", o.PidFile)
+		abs, err := filepath.Abs(o.PidFile)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, "--pid-file", abs)
 	}
-	if o.ConsoleSocket != "" {
-		out = append(out, "--console-socket", o.ConsoleSocket)
+	if o.ConsoleSocket != nil {
+		out = append(out, "--console-socket", o.ConsoleSocket.Path())
 	}
 	if o.NoPivot {
 		out = append(out, "--no-pivot")
@@ -119,20 +94,41 @@ func (o *CreateOpts) args() (out []string) {
 	if o.Detach {
 		out = append(out, "--detach")
 	}
-	return out
+	return out, nil
 }
 
 // Create creates a new container and returns its pid if it was created successfully
 func (r *Runc) Create(context context.Context, id, bundle string, opts *CreateOpts) error {
 	args := []string{"create", "--bundle", bundle}
 	if opts != nil {
-		args = append(args, opts.args()...)
+		oargs, err := opts.args()
+		if err != nil {
+			return err
+		}
+		args = append(args, oargs...)
 	}
 	cmd := r.command(context, append(args, id)...)
-	if opts != nil {
-		opts.setSTDIO(cmd)
+	if opts != nil && opts.IO != nil {
+		opts.Set(cmd)
 	}
-	return runOrError(cmd)
+	if cmd.Stdout == nil && cmd.Stderr == nil {
+		data, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("%s: %s", err, data)
+		}
+		return nil
+	}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	if opts != nil && opts.IO != nil {
+		if c, ok := opts.IO.(StartCloser); ok {
+			if err := c.CloseAfterStart(); err != nil {
+				return err
+			}
+		}
+	}
+	return cmd.Wait()
 }
 
 // Start will start an already created container
@@ -147,17 +143,17 @@ type ExecOpts struct {
 	Gid           int
 	Cwd           string
 	Tty           bool
-	ConsoleSocket string
+	ConsoleSocket *ConsoleSocket
 	Detach        bool
 }
 
-func (o *ExecOpts) args() (out []string) {
+func (o *ExecOpts) args() (out []string, err error) {
 	out = append(out, "--user", fmt.Sprintf("%d:%d", o.Uid, o.Gid))
 	if o.Tty {
 		out = append(out, "--tty")
 	}
-	if o.ConsoleSocket != "" {
-		out = append(out, "--console-socket", o.ConsoleSocket)
+	if o.ConsoleSocket != nil {
+		out = append(out, "--console-socket", o.ConsoleSocket.Path())
 	}
 	if o.Cwd != "" {
 		out = append(out, "--cwd", o.Cwd)
@@ -166,9 +162,13 @@ func (o *ExecOpts) args() (out []string) {
 		out = append(out, "--detach")
 	}
 	if o.PidFile != "" {
-		out = append(out, "--pid-file", o.PidFile)
+		abs, err := filepath.Abs(o.PidFile)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, "--pid-file", abs)
 	}
-	return out
+	return out, nil
 }
 
 // Exec executres and additional process inside the container based on a full
@@ -186,13 +186,34 @@ func (r *Runc) Exec(context context.Context, id string, spec specs.Process, opts
 	}
 	args := []string{"exec", "--process", f.Name()}
 	if opts != nil {
-		args = append(args, opts.args()...)
+		oargs, err := opts.args()
+		if err != nil {
+			return err
+		}
+		args = append(args, oargs...)
 	}
 	cmd := r.command(context, append(args, id)...)
-	if opts != nil {
-		opts.setSTDIO(cmd)
+	if opts != nil && opts.IO != nil {
+		opts.Set(cmd)
 	}
-	return runOrError(cmd)
+	if cmd.Stdout == nil && cmd.Stderr == nil {
+		data, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("%s: %s", err, data)
+		}
+		return nil
+	}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	if opts != nil && opts.IO != nil {
+		if c, ok := opts.IO.(StartCloser); ok {
+			if err := c.CloseAfterStart(); err != nil {
+				return err
+			}
+		}
+	}
+	return cmd.Wait()
 }
 
 // Run runs the create, start, delete lifecycle of the container
@@ -200,11 +221,15 @@ func (r *Runc) Exec(context context.Context, id string, spec specs.Process, opts
 func (r *Runc) Run(context context.Context, id, bundle string, opts *CreateOpts) (int, error) {
 	args := []string{"run", "--bundle", bundle}
 	if opts != nil {
-		args = append(args, opts.args()...)
+		oargs, err := opts.args()
+		if err != nil {
+			return -1, err
+		}
+		args = append(args, oargs...)
 	}
 	cmd := r.command(context, append(args, id)...)
 	if opts != nil {
-		opts.setSTDIO(cmd)
+		opts.Set(cmd)
 	}
 	if err := cmd.Start(); err != nil {
 		return -1, err

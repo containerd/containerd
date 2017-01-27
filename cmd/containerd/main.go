@@ -23,6 +23,7 @@ import (
 	"github.com/docker/containerd/execution"
 	"github.com/docker/containerd/execution/executors/shim"
 	"github.com/docker/containerd/log"
+	"github.com/docker/containerd/utils"
 	metrics "github.com/docker/go-metrics"
 	"github.com/urfave/cli"
 
@@ -30,11 +31,7 @@ import (
 	stand "github.com/nats-io/nats-streaming-server/server"
 )
 
-func main() {
-	app := cli.NewApp()
-	app.Name = "containerd"
-	app.Version = containerd.Version
-	app.Usage = `
+const usage = `
                     __        _                     __
   _________  ____  / /_____ _(_)___  ___  _________/ /
  / ___/ __ \/ __ \/ __/ __ ` + "`" + `/ / __ \/ _ \/ ___/ __  /
@@ -43,6 +40,12 @@ func main() {
 
 high performance container runtime
 `
+
+func main() {
+	app := cli.NewApp()
+	app.Name = "containerd"
+	app.Version = containerd.Version
+	app.Usage = usage
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
 			Name:  "debug",
@@ -98,7 +101,7 @@ high performance container runtime
 		if path == "" {
 			return fmt.Errorf("--socket path cannot be empty")
 		}
-		l, err := createUnixSocket(path)
+		l, err := utils.CreateUnixSocket(path)
 		if err != nil {
 			return err
 		}
@@ -169,16 +172,6 @@ high performance container runtime
 		fmt.Fprintf(os.Stderr, "containerd: %s\n", err)
 		os.Exit(1)
 	}
-}
-
-func createUnixSocket(path string) (net.Listener, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0660); err != nil {
-		return nil, err
-	}
-	if err := syscall.Unlink(path); err != nil && !os.IsNotExist(err) {
-		return nil, err
-	}
-	return net.Listen("unix", path)
 }
 
 func serveMetrics(address string) {
