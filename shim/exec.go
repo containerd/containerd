@@ -60,6 +60,20 @@ func newExecProcess(context context.Context, r *apishim.ExecRequest, parent *ini
 	if err := parent.runc.Exec(context, parent.id, processFromRequest(r), opts); err != nil {
 		return nil, err
 	}
+	if socket != nil {
+		console, err := socket.ReceiveMaster()
+		if err != nil {
+			return nil, err
+		}
+		e.console = console
+		if err := copyConsole(context, console, r.Stdin, r.Stdout, r.Stderr, &e.WaitGroup); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := copyPipes(context, io, r.Stdin, r.Stdout, r.Stderr, &e.WaitGroup); err != nil {
+			return nil, err
+		}
+	}
 	pid, err := runc.ReadPidFile(opts.PidFile)
 	if err != nil {
 		return nil, err
