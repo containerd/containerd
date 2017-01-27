@@ -35,6 +35,7 @@ distribution tool
 		pathCommand,
 		deleteCommand,
 		listCommand,
+		applyCommand,
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
