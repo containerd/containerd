@@ -232,6 +232,7 @@ example and you'll be fine".
 	people = [
 		"crosbymichael",
 		"dqminh",
+		"dmcgowan",
 		"estesp",
 		"hqhq",
 		"jhowardmsft",
@@ -250,6 +251,11 @@ example and you'll be fine".
 	Name = "Daniel, Dao Quang Minh"
 	Email = "dqminh89@gmail.com"
 	GitHub = "dqminh"
+
+	[people.dmcgowan]
+	Name = "Derek McGowan"
+	Email = "derek@mcgstyle.net"
+	GitHub = "dmcgowan"
 
 	[People.estesp]
 	Name = "Phil Estes"
