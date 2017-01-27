@@ -87,11 +87,15 @@ func main() {
 		signals := make(chan os.Signal, 2048)
 		signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1)
 
+		ctx := log.WithModule(gocontext.Background(), "containerd")
 		if address := context.GlobalString("metrics-address"); address != "" {
-			go serveMetrics(address)
+			log.G(ctx).WithField("metrics-address", address).Info("listening and serving metrics")
+			go serveMetrics(ctx, address)
 		}
 
-		s, err := startNATSServer(context)
+		ea := context.GlobalString("events-address")
+		log.G(ctx).WithField("events-address", ea).Info("starting nats-streaming-server")
+		s, err := startNATSServer(ea)
 		if err != nil {
 			return nil
 		}
@@ -107,19 +111,19 @@ func main() {
 		}
 
 		// Get events publisher
-		nec, err := getNATSPublisher(context)
+		nec, err := getNATSPublisher(ea)
 		if err != nil {
 			return err
 		}
 		defer nec.Close()
-		ctx := log.WithModule(gocontext.Background(), "containerd")
-		ctx = log.WithModule(ctx, "execution")
-		ctx = events.WithPoster(ctx, events.GetNATSPoster(nec))
 
 		var (
 			executor execution.Executor
 			runtime  = context.GlobalString("runtime")
 		)
+		log.G(ctx).WithField("runtime", runtime).Info("run with runtime executor")
+		execCtx := log.WithModule(ctx, "execution")
+		execCtx = events.WithPoster(execCtx, events.GetNATSPoster(nec))
 		switch runtime {
 		case "shim":
 			root := filepath.Join(context.GlobalString("root"), "shim")
@@ -127,7 +131,7 @@ func main() {
 			if err != nil && !os.IsExist(err) {
 				return err
 			}
-			executor, err = shim.New(log.WithModule(ctx, "shim"), root, "containerd-shim", "runc", nil)
+			executor, err = shim.New(log.WithModule(execCtx, "shim"), root, "containerd-shim", "runc", nil)
 			if err != nil {
 				return err
 			}
@@ -135,7 +139,7 @@ func main() {
 			return fmt.Errorf("oci: runtime %q not implemented", runtime)
 		}
 
-		execService, err := execution.New(ctx, executor)
+		execService, err := execution.New(execCtx, executor)
 		if err != nil {
 			return err
 		}
@@ -154,14 +158,15 @@ func main() {
 		}
 		server := grpc.NewServer(grpc.UnaryInterceptor(interceptor))
 		api.RegisterExecutionServiceServer(server, execService)
-		go serveGRPC(server, l)
+		log.G(ctx).WithField("socket", l.Addr()).Info("start serving GRPC API")
+		go serveGRPC(ctx, server, l)
 
 		for s := range signals {
 			switch s {
 			case syscall.SIGUSR1:
-				dumpStacks()
+				dumpStacks(ctx)
 			default:
-				logrus.WithField("signal", s).Info("containerd: stopping GRPC server")
+				log.G(ctx).WithField("signal", s).Info("stopping GRPC server")
 				server.Stop()
 				return nil
 			}
@@ -174,24 +179,23 @@ func main() {
 	}
 }
 
-func serveMetrics(address string) {
+func serveMetrics(ctx gocontext.Context, address string) {
 	m := http.NewServeMux()
 	m.Handle("/metrics", metrics.Handler())
 	if err := http.ListenAndServe(address, m); err != nil {
-		logrus.WithError(err).Fatal("containerd: metrics server failure")
+		log.G(ctx).WithError(err).Fatal("metrics server failure")
 	}
 }
 
-func serveGRPC(server *grpc.Server, l net.Listener) {
+func serveGRPC(ctx gocontext.Context, server *grpc.Server, l net.Listener) {
 	defer l.Close()
 	if err := server.Serve(l); err != nil {
-		l.Close()
-		logrus.WithError(err).Fatal("containerd: GRPC server failure")
+		log.G(ctx).WithError(err).Fatal("GRPC server failure")
 	}
 }
 
 // DumpStacks dumps the runtime stack.
-func dumpStacks() {
+func dumpStacks(ctx gocontext.Context) {
 	var (
 		buf       []byte
 		stackSize int
@@ -203,11 +207,11 @@ func dumpStacks() {
 		bufferLen *= 2
 	}
 	buf = buf[:stackSize]
-	logrus.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
+	log.G(ctx).Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
 }
 
-func startNATSServer(context *cli.Context) (e *stand.StanServer, err error) {
-	eventsURL, err := url.Parse(context.GlobalString("events-address"))
+func startNATSServer(eventsAddress string) (e *stand.StanServer, err error) {
+	eventsURL, err := url.Parse(eventsAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -237,8 +241,8 @@ func startNATSServer(context *cli.Context) (e *stand.StanServer, err error) {
 	return s, nil
 }
 
-func getNATSPublisher(context *cli.Context) (*nats.EncodedConn, error) {
-	nc, err := nats.Connect(context.GlobalString("events-address"))
+func getNATSPublisher(eventsAddress string) (*nats.EncodedConn, error) {
+	nc, err := nats.Connect(eventsAddress)
 	if err != nil {
 		return nil, err
 	}
