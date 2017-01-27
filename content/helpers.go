@@ -39,8 +39,8 @@ type Ingester interface {
 // This is useful when the digest and size are known beforehand.
 //
 // Copy is buffered, so no need to wrap reader in buffered io.
-func WriteBlob(cs Ingester, r io.Reader, size int64, expected digest.Digest) error {
-	cw, err := cs.Begin(expected.Hex())
+func WriteBlob(cs Ingester, r io.Reader, ref string, size int64, expected digest.Digest) error {
+	cw, err := cs.Begin(ref)
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func WriteBlob(cs Ingester, r io.Reader, size int64, expected digest.Digest) err
 		return err
 	}
 
-	if nn != size {
+	if size > 0 && nn != size {
 		return errors.Errorf("failed size verification: %v != %v", nn, size)
 	}
 

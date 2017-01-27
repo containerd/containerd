@@ -14,6 +14,7 @@ import (
 	"reflect"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/opencontainers/go-digest"
 )
@@ -57,6 +58,12 @@ func TestContentWriter(t *testing.T) {
 	ingestions, err := cs.Active()
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// clear out the time and meta cause we don't care for this test
+	for i := range ingestions {
+		ingestions[i].Meta = nil
+		ingestions[i].ModTime = time.Time{}
 	}
 
 	if !reflect.DeepEqual(ingestions, []Status{
@@ -129,7 +136,7 @@ func TestWalkBlobs(t *testing.T) {
 		expected[dgst] = struct{}{}
 	}
 
-	if err := cs.Walk(func(path string, dgst digest.Digest) error {
+	if err := cs.Walk(func(path string, fi os.FileInfo, dgst digest.Digest) error {
 		found[dgst] = struct{}{}
 		if checked := checkBlobPath(t, cs, dgst); checked != path {
 			t.Fatalf("blob path did not match: %v != %v", path, checked)
@@ -266,7 +273,7 @@ func checkBlobPath(t *testing.T, cs *Store, dgst digest.Digest) string {
 }
 
 func checkWrite(t checker, cs *Store, dgst digest.Digest, p []byte) digest.Digest {
-	if err := WriteBlob(cs, bytes.NewReader(p), int64(len(p)), dgst); err != nil {
+	if err := WriteBlob(cs, bytes.NewReader(p), dgst.String(), int64(len(p)), dgst); err != nil {
 		t.Fatal(err)
 	}
 

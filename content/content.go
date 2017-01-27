@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/docker/containerd/log"
 	"github.com/nightlyone/lockfile"
@@ -43,11 +44,58 @@ func Open(root string) (*Store, error) {
 }
 
 type Status struct {
-	Ref  string
-	Size int64
-	Meta interface{}
+	Ref     string
+	Size    int64
+	ModTime time.Time
+	Meta    interface{}
 }
 
+func (cs *Store) Exists(dgst digest.Digest) (bool, error) {
+	if _, err := os.Stat(cs.blobPath(dgst)); err != nil {
+		if !os.IsNotExist(err) {
+			return false, err
+		}
+
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func (cs *Store) GetPath(dgst digest.Digest) (string, error) {
+	p := cs.blobPath(dgst)
+	if _, err := os.Stat(p); err != nil {
+		if os.IsNotExist(err) {
+			return "", ErrBlobNotFound
+		}
+
+		return "", err
+	}
+
+	return p, nil
+}
+
+// Delete removes a blob by its digest.
+//
+// While this is safe to do concurrently, safe exist-removal logic must hold
+// some global lock on the store.
+func (cs *Store) Delete(dgst digest.Digest) error {
+	if err := os.RemoveAll(cs.blobPath(dgst)); err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+
+		return nil
+	}
+
+	return nil
+}
+
+func (cs *Store) blobPath(dgst digest.Digest) string {
+	return filepath.Join(cs.root, "blobs", dgst.Algorithm().String(), dgst.Hex())
+}
+
+// Stat returns the current status of a blob by the ingest ref.
 func (cs *Store) Stat(ref string) (Status, error) {
 	dp := filepath.Join(cs.ingestRoot(ref), "data")
 	return cs.stat(dp)
@@ -67,10 +115,10 @@ func (cs *Store) stat(ingestPath string) (Status, error) {
 	}
 
 	return Status{
-		Ref:  ref,
-		Size: dfi.Size(),
+		Ref:     ref,
+		Size:    dfi.Size(),
+		ModTime: dfi.ModTime(),
 	}, nil
-
 }
 
 func (cs *Store) Active() ([]Status, error) {
@@ -114,7 +162,14 @@ func (cs *Store) Active() ([]Status, error) {
 
 // TODO(stevvooe): Allow querying the set of blobs in the blob store.
 
-func (cs *Store) Walk(fn func(path string, dgst digest.Digest) error) error {
+// WalkFunc defines the callback for a blob walk.
+//
+// TODO(stevvooe): Remove the file info. Just need size and modtime. Perhaps,
+// not a huge deal, considering we have a path, but let's not just let this one
+// go without scrunity.
+type WalkFunc func(path string, fi os.FileInfo, dgst digest.Digest) error
+
+func (cs *Store) Walk(fn WalkFunc) error {
 	root := filepath.Join(cs.root, "blobs")
 	var alg digest.Algorithm
 	return filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
@@ -148,21 +203,8 @@ func (cs *Store) Walk(fn func(path string, dgst digest.Digest) error) error {
 			// store or extra paths not expected previously.
 		}
 
-		return fn(path, dgst)
+		return fn(path, fi, dgst)
 	})
-}
-
-func (cs *Store) GetPath(dgst digest.Digest) (string, error) {
-	p := filepath.Join(cs.root, "blobs", dgst.Algorithm().String(), dgst.Hex())
-	if _, err := os.Stat(p); err != nil {
-		if os.IsNotExist(err) {
-			return "", ErrBlobNotFound
-		}
-
-		return "", err
-	}
-
-	return p, nil
 }
 
 // Begin starts a new write transaction against the blob store.
@@ -265,6 +307,20 @@ func (cs *Store) Resume(ref string) (*Writer, error) {
 		offset:   offset,
 		digester: digester,
 	}, nil
+}
+
+// Remove an active transaction keyed by ref.
+func (cs *Store) Remove(ref string) error {
+	root := cs.ingestRoot(ref)
+	if err := os.RemoveAll(root); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+
+		return err
+	}
+
+	return nil
 }
 
 func (cs *Store) ingestRoot(ref string) string {
