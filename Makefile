@@ -128,9 +128,18 @@ uninstall:
 
 coverage: ## generate coverprofiles from the unit tests, except tests that require root
 	@echo "🐳 $@"
-	@( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES}); do \
-		go test -i ${TESTFLAGS} -test.short -coverprofile="../../../$$pkg/coverage.txt" -covermode=atomic $$pkg || exit; \
-		go test ${TESTFLAGS} -test.short -coverprofile="../../../$$pkg/coverage.txt" -covermode=atomic $$pkg || exit; \
+	@rm -f coverage.txt
+	( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES}); do \
+		go test -i ${TESTFLAGS} -test.short -coverprofile=coverage.out -covermode=atomic $$pkg || exit; \
+		if [ -f profile.out ]; then \
+			cat profile.out >> coverage.txt; \
+			rm profile.out; \
+		fi; \
+		go test ${TESTFLAGS} -test.short -coverprofile=coverage.out -covermode=atomic $$pkg || exit; \
+		if [ -f profile.out ]; then \
+			cat profile.out >> coverage.txt; \
+			rm profile.out; \
+		fi; \
 	done )
 
 root-coverage: ## generae coverage profiles for the unit tests
