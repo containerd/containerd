@@ -88,6 +88,10 @@ var daemonFlags = []cli.Flag{
 		Name:  "graphite-address",
 		Usage: "Address of graphite server",
 	},
+	cli.BoolFlag{
+		Name:  "raw-logs",
+		Usage: "disable logs fancy coloring and formatting",
+	},
 }
 
 // DumpStacks dumps the runtime stack.
@@ -117,7 +121,6 @@ func setupDumpStacksTrap() {
 }
 
 func main() {
-	logrus.SetFormatter(&logrus.TextFormatter{TimestampFormat: time.RFC3339Nano})
 	app := cli.NewApp()
 	app.Name = "containerd"
 	if containerd.GitCommit != "" {
@@ -128,6 +131,10 @@ func main() {
 	app.Usage = usage
 	app.Flags = daemonFlags
 	app.Before = func(context *cli.Context) error {
+		logrus.SetFormatter(&logrus.TextFormatter{
+			TimestampFormat: time.RFC3339Nano,
+			DisableColors:   context.GlobalBool("raw-logs"),
+		})
 		setupDumpStacksTrap()
 		if context.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
