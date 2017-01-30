@@ -127,7 +127,7 @@ func main() {
 		switch runtime {
 		case "shim":
 			root := filepath.Join(context.GlobalString("root"), "shim")
-			err = os.Mkdir(root, 0700)
+			err = os.MkdirAll(root, 0700)
 			if err != nil && !os.IsExist(err) {
 				return err
 			}
