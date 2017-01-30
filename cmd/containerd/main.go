@@ -1,9 +1,11 @@
 package main
 
 import (
+	_ "expvar"
 	"fmt"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
 	"net/url"
 	"os"
 	"os/signal"
@@ -67,6 +69,11 @@ func main() {
 			Value: "/run/containerd/containerd.sock",
 		},
 		cli.StringFlag{
+			Name:  "debug-socket, d",
+			Usage: "socket path for containerd's debug server",
+			Value: "/run/containerd/containerd-debug.sock",
+		},
+		cli.StringFlag{
 			Name:  "metrics-address, m",
 			Usage: "tcp address to serve metrics on",
 			Value: "127.0.0.1:7897",
@@ -100,6 +107,21 @@ func main() {
 			return nil
 		}
 		defer s.Shutdown()
+
+		debugPath := context.GlobalString("debug-socket")
+		if debugPath == "" {
+			return fmt.Errorf("--debug-socket path cannot be empty")
+		}
+		d, err := utils.CreateUnixSocket(debugPath)
+		if err != nil {
+			return err
+		}
+
+		//publish profiling and debug socket.
+		log.G(ctx).WithField("socket", debugPath).Info("starting profiler handlers")
+		log.G(ctx).WithFields(logrus.Fields{"expvars": "/debug/vars", "socket": debugPath}).Debug("serving expvars requests")
+		log.G(ctx).WithFields(logrus.Fields{"pprof": "/debug/pprof", "socket": debugPath}).Debug("serving pprof requests")
+		go serveProfiler(ctx, d)
 
 		path := context.GlobalString("socket")
 		if path == "" {
@@ -191,6 +213,12 @@ func serveGRPC(ctx gocontext.Context, server *grpc.Server, l net.Listener) {
 	defer l.Close()
 	if err := server.Serve(l); err != nil {
 		log.G(ctx).WithError(err).Fatal("GRPC server failure")
+	}
+}
+
+func serveProfiler(ctx gocontext.Context, l net.Listener) {
+	if err := http.Serve(l, nil); err != nil {
+		log.G(ctx).WithError(err).Fatal("profiler server failure")
 	}
 }
 
