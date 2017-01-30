@@ -134,6 +134,7 @@ func main() {
 		logrus.SetFormatter(&logrus.TextFormatter{
 			TimestampFormat: time.RFC3339Nano,
 			DisableColors:   context.GlobalBool("raw-logs"),
+			FullTimestamp:   true,
 		})
 		setupDumpStacksTrap()
 		if context.GlobalBool("debug") {
