@@ -1,0 +1,109 @@
+package fstest
+
+import (
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/stevvooe/continuity/sysx"
+)
+
+// Applier applies single file changes
+type Applier func(root string) error
+
+// NewTestFile returns a file applier which creates a file as the
+// provided name with the given content and permission.
+func NewTestFile(name string, content []byte, perm os.FileMode) Applier {
+	return func(root string) error {
+		fullPath := filepath.Join(root, name)
+		if err := ioutil.WriteFile(fullPath, content, perm); err != nil {
+			return err
+		}
+
+		if err := os.Chmod(fullPath, perm); err != nil {
+			return err
+		}
+
+		return nil
+	}
+}
+
+// RemoveFile returns a file applier which removes the provided file name
+func RemoveFile(name string) Applier {
+	return func(root string) error {
+		return os.RemoveAll(filepath.Join(root, name))
+	}
+}
+
+// CreateDirectory returns a file applier to create the directory with
+// the provided name and permission
+func CreateDirectory(name string, perm os.FileMode) Applier {
+	return func(root string) error {
+		fullPath := filepath.Join(root, name)
+		if err := os.MkdirAll(fullPath, perm); err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
+// Rename returns a file applier which renames a file
+func Rename(old, new string) Applier {
+	return func(root string) error {
+		return os.Rename(filepath.Join(root, old), filepath.Join(root, new))
+	}
+}
+
+// Chown returns a file applier which changes the ownership of a file
+func Chown(name string, uid, gid int) Applier {
+	return func(root string) error {
+		return os.Chown(filepath.Join(root, name), uid, gid)
+	}
+}
+
+// Chtime changes access and mod time of file
+func Chtime(name string, t time.Time) Applier {
+	return func(root string) error {
+		return os.Chtimes(filepath.Join(root, name), t, t)
+	}
+}
+
+// Symlink returns a file applier which creates a symbolic link
+func Symlink(oldname, newname string) Applier {
+	return func(root string) error {
+		return os.Symlink(oldname, filepath.Join(root, newname))
+	}
+}
+
+// Link returns a file applier which creates a hard link
+func Link(oldname, newname string) Applier {
+	return func(root string) error {
+		return os.Link(filepath.Join(root, oldname), filepath.Join(root, newname))
+	}
+}
+
+func SetXAttr(name, key, value string) Applier {
+	return func(root string) error {
+		return sysx.LSetxattr(name, key, []byte(value), 0)
+	}
+}
+
+// TODO: Make platform specific, windows applier is always no-op
+//func Mknod(name string, mode int32, dev int) Applier {
+//	return func(root string) error {
+//		return return syscall.Mknod(path, mode, dev)
+//	}
+//}
+
+// MultiApply returns a new applier from the given appliers
+func MultiApply(appliers ...Applier) Applier {
+	return func(root string) error {
+		for _, a := range appliers {
+			if err := a(root); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
