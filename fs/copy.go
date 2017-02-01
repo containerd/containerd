@@ -24,10 +24,12 @@ func copyDirectory(dst, src string, inodes map[uint64]string) error {
 		return errors.Errorf("source is not directory")
 	}
 
-	if _, err := os.Stat(dst); err != nil {
+	if st, err := os.Stat(dst); err != nil {
 		if err := os.Mkdir(dst, stat.Mode()); err != nil {
 			return errors.Wrapf(err, "failed to mkdir %s", dst)
 		}
+	} else if !st.IsDir() {
+		return errors.Errorf("cannot copy to non-directory: %s", dst)
 	} else {
 		if err := os.Chmod(dst, stat.Mode()); err != nil {
 			return errors.Wrapf(err, "failed to chmod on %s", dst)
@@ -46,12 +48,14 @@ func copyDirectory(dst, src string, inodes map[uint64]string) error {
 	for _, fi := range fis {
 		source := filepath.Join(src, fi.Name())
 		target := filepath.Join(dst, fi.Name())
-		if fi.IsDir() {
+
+		switch {
+		case fi.IsDir():
 			if err := copyDirectory(target, source, inodes); err != nil {
 				return err
 			}
 			continue
-		} else if (fi.Mode() & os.ModeType) == 0 {
+		case (fi.Mode() & os.ModeType) == 0:
 			link, err := GetLinkSource(target, fi, inodes)
 			if err != nil {
 				return errors.Wrap(err, "failed to get hardlink")
@@ -63,7 +67,7 @@ func copyDirectory(dst, src string, inodes map[uint64]string) error {
 			} else if err := copyFile(source, target); err != nil {
 				return errors.Wrap(err, "failed to copy files")
 			}
-		} else if (fi.Mode() & os.ModeSymlink) == os.ModeSymlink {
+		case (fi.Mode() & os.ModeSymlink) == os.ModeSymlink:
 			link, err := os.Readlink(source)
 			if err != nil {
 				return errors.Wrapf(err, "failed to read link: %s", source)
@@ -71,10 +75,11 @@ func copyDirectory(dst, src string, inodes map[uint64]string) error {
 			if err := os.Symlink(link, target); err != nil {
 				return errors.Wrapf(err, "failed to create symlink: %s", target)
 			}
-		} else if (fi.Mode() & os.ModeDevice) == os.ModeDevice {
-			// TODO: support devices
-			return errors.New("devices not supported")
-		} else {
+		case (fi.Mode() & os.ModeDevice) == os.ModeDevice:
+			if err := copyDevice(target, fi); err != nil {
+				return errors.Wrapf(err, "failed to create device")
+			}
+		default:
 			// TODO: Support pipes and sockets
 			return errors.Wrapf(err, "unsupported mode %s", fi.Mode())
 		}

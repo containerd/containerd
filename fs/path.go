@@ -99,6 +99,8 @@ func sameFile(f1, f2 *currentPath) (bool, error) {
 
 const compareChuckSize = 32 * 1024
 
+// compareFileContent compares the content of 2 same sized files
+// by comparing each byte.
 func compareFileContent(p1, p2 string) (bool, error) {
 	f1, err := os.Open(p1)
 	if err != nil {

@@ -100,7 +100,7 @@ func Changes(ctx context.Context, upper, lower string) (context.Context, <-chan 
 			cc.errL.Unlock()
 			cancel()
 		}
-		defer close(changes)
+		close(changes)
 	}()
 
 	return cc, changes

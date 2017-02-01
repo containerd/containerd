@@ -25,3 +25,7 @@ func copyFileContent(dst, src *os.File) error {
 func copyXAttrs(dst, src string) error {
 	return nil
 }
+
+func copyDevice(dst string, fi os.FileInfo) error {
+	return errors.New("device copy not supported")
+}
