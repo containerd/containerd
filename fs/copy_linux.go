@@ -114,5 +114,5 @@ func copyDevice(dst string, fi os.FileInfo) error {
 	if !ok {
 		return errors.New("unsupported stat type")
 	}
-	return syscall.Mknod(dst, uint32(fi.Mode().Perm()), int(st.Rdev))
+	return syscall.Mknod(dst, uint32(fi.Mode()), int(st.Rdev))
 }
