@@ -22,9 +22,8 @@ import (
 	"github.com/docker/containerd"
 	api "github.com/docker/containerd/api/execution"
 	"github.com/docker/containerd/events"
-	"github.com/docker/containerd/execution"
-	"github.com/docker/containerd/execution/executors/shim"
 	"github.com/docker/containerd/log"
+	"github.com/docker/containerd/supervisor"
 	"github.com/docker/containerd/utils"
 	metrics "github.com/docker/go-metrics"
 	"github.com/urfave/cli"
@@ -57,11 +56,6 @@ func main() {
 			Name:  "root",
 			Usage: "containerd state directory",
 			Value: "/run/containerd",
-		},
-		cli.StringFlag{
-			Name:  "runtime",
-			Usage: "runtime for execution",
-			Value: "shim",
 		},
 		cli.StringFlag{
 			Name:  "socket, s",
@@ -139,29 +133,14 @@ func main() {
 		}
 		defer nec.Close()
 
-		var (
-			executor execution.Executor
-			runtime  = context.GlobalString("runtime")
-		)
-		log.G(ctx).WithField("runtime", runtime).Info("run with runtime executor")
 		execCtx := log.WithModule(ctx, "execution")
 		execCtx = events.WithPoster(execCtx, events.GetNATSPoster(nec))
-		switch runtime {
-		case "shim":
-			root := filepath.Join(context.GlobalString("root"), "shim")
-			err = os.MkdirAll(root, 0700)
-			if err != nil && !os.IsExist(err) {
-				return err
-			}
-			executor, err = shim.New(log.WithModule(execCtx, "shim"), root, "containerd-shim", "runc", nil)
-			if err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("oci: runtime %q not implemented", runtime)
+		root := filepath.Join(context.GlobalString("root"), "shim")
+		err = os.Mkdir(root, 0700)
+		if err != nil && !os.IsExist(err) {
+			return err
 		}
-
-		execService, err := execution.New(execCtx, executor)
+		execService, err := supervisor.New(execCtx, context.GlobalString("root"))
 		if err != nil {
 			return err
 		}

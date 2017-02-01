@@ -14,8 +14,8 @@ import (
 
 var emptyResponse = &google_protobuf.Empty{}
 
-// NewService returns a new shim service that can be used via GRPC
-func NewService() *Service {
+// New returns a new shim service that can be used via GRPC
+func New() *Service {
 	return &Service{
 		processes: make(map[int]process),
 		events:    make(chan *apishim.Event, 4096),
@@ -43,7 +43,7 @@ func (s *Service) Create(ctx context.Context, r *apishim.CreateRequest) (*apishi
 	s.id = r.ID
 	s.mu.Unlock()
 	s.events <- &apishim.Event{
-		Type: apishim.EventType_CREATED,
+		Type: apishim.EventType_CREATE,
 		ID:   r.ID,
 		Pid:  uint32(pid),
 	}
@@ -57,7 +57,7 @@ func (s *Service) Start(ctx context.Context, r *apishim.StartRequest) (*google_p
 		return nil, err
 	}
 	s.events <- &apishim.Event{
-		Type: apishim.EventType_STARTED,
+		Type: apishim.EventType_START,
 		ID:   s.id,
 		Pid:  uint32(s.initProcess.Pid()),
 	}
@@ -152,6 +152,20 @@ func (s *Service) State(ctx context.Context, r *apishim.StateRequest) (*apishim.
 		})
 	}
 	return o, nil
+}
+
+func (s *Service) Pause(ctx context.Context, r *apishim.PauseRequest) (*google_protobuf.Empty, error) {
+	if err := s.initProcess.Pause(ctx); err != nil {
+		return nil, err
+	}
+	return emptyResponse, nil
+}
+
+func (s *Service) Resume(ctx context.Context, r *apishim.ResumeRequest) (*google_protobuf.Empty, error) {
+	if err := s.initProcess.Resume(ctx); err != nil {
+		return nil, err
+	}
+	return emptyResponse, nil
 }
 
 func (s *Service) ProcessExit(e utils.Exit) error {
