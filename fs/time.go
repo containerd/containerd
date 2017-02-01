@@ -1,9 +1,6 @@
 package fs
 
-import (
-	"syscall"
-	"time"
-)
+import "time"
 
 // Gnu tar and the go tar writer don't have sub-second mtime
 // precision, which is problematic when we apply changes via tar
@@ -13,9 +10,4 @@ func sameFsTime(a, b time.Time) bool {
 	return a == b ||
 		(a.Unix() == b.Unix() &&
 			(a.Nanosecond() == 0 || b.Nanosecond() == 0))
-}
-
-func sameFsTimeSpec(a, b syscall.Timespec) bool {
-	return a.Sec == b.Sec &&
-		(a.Nsec == b.Nsec || a.Nsec == 0 || b.Nsec == 0)
 }
