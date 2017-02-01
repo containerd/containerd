@@ -404,9 +404,15 @@ func (s *ShimRuntime) loadContainers() {
 			container.AddProcess(p)
 		}
 
-		// if successfull, add the container to our list
+		processes := container.Processes()
+		if len(processes) == 0 {
+			log.G(s.ctx).WithField("container-id", container.ID()).Warning("No processes found")
+			continue
+		}
+
+		// if successful, add the container to our list
 		if err == nil {
-			for _, p := range container.Processes() {
+			for _, p := range processes {
 				s.monitorProcess(p.(*process))
 			}
 			s.addContainer(container)
