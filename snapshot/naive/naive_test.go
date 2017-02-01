@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/docker/containerd"
-	"github.com/docker/containerd/snapshot/testutil"
+	"github.com/docker/containerd/testutil"
 )
 
 func TestSnapshotNaiveBasic(t *testing.T) {

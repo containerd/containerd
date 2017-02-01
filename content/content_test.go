@@ -16,12 +16,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/containerd/testutil"
 	"github.com/opencontainers/go-digest"
 )
 
 func TestContentWriter(t *testing.T) {
 	tmpdir, cs, cleanup := contentStoreEnv(t)
 	defer cleanup()
+	defer testutil.DumpDir(t, tmpdir)
 
 	if _, err := os.Stat(filepath.Join(tmpdir, "ingest")); os.IsNotExist(err) {
 		t.Fatal("ingest dir should be created", err)
@@ -114,7 +116,6 @@ func TestContentWriter(t *testing.T) {
 		t.Fatal("mismatched data written to disk")
 	}
 
-	dumpDir(tmpdir)
 }
 
 func TestWalkBlobs(t *testing.T) {
@@ -278,15 +279,4 @@ func checkWrite(t checker, cs *Store, dgst digest.Digest, p []byte) digest.Diges
 	}
 
 	return dgst
-}
-
-func dumpDir(root string) error {
-	return filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		fmt.Println(fi.Mode(), path)
-		return nil
-	})
 }

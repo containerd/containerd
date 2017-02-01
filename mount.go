@@ -3,6 +3,9 @@ package containerd
 import (
 	"strings"
 	"syscall"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/docker/containerd/log"
 )
 
 // Mount is the lingua franca of containerd. A mount represents a
@@ -20,6 +23,13 @@ type Mount struct {
 
 func (m *Mount) Mount(target string) error {
 	flags, data := parseMountOptions(m.Options)
+
+	lfields := logrus.Fields{"target": target, "source": m.Source}
+	if data != "" {
+		lfields["data"] = data
+	}
+	log.L.WithFields(lfields).Debug("syscall.Mount")
+
 	return syscall.Mount(m.Source, target, m.Type, uintptr(flags), data)
 }
 

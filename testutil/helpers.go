@@ -3,6 +3,7 @@ package testutil
 import (
 	"flag"
 	"os"
+	"path/filepath"
 	"syscall"
 	"testing"
 
@@ -31,4 +32,26 @@ func RequiresRoot(t *testing.T) {
 		return
 	}
 	assert.Equal(t, 0, os.Getuid(), "This test must be run as root.")
+}
+
+// DumpDir will log out all of the contents of the provided directory to
+// testing logger.
+//
+// Use this in a defer statement within tests that may allocate and exercise a
+// temporary directory. Immensely useful for sanity checking and debugging
+// failing tests.
+//
+// One should still test that contents are as expected. This is only a visual
+// tool to assist when things don't go your way.
+func DumpDir(t *testing.T, root string) {
+	if err := filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		t.Log(fi.Mode(), path)
+		return nil
+	}); err != nil {
+		t.Fatalf("error dumping directory: %v", err)
+	}
 }
