@@ -284,7 +284,10 @@ func (cs *Store) Resume(ref string) (*Writer, error) {
 	}
 	defer fp.Close()
 
-	offset, err := io.Copy(digester.Hash(), fp)
+	p := bufPool.Get().([]byte)
+	defer bufPool.Put(p)
+
+	offset, err := io.CopyBuffer(digester.Hash(), fp, p)
 	if err != nil {
 		return nil, err
 	}
