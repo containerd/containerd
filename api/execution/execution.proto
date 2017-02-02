@@ -6,14 +6,14 @@ import "google/protobuf/empty.proto";
 import "gogoproto/gogo.proto";
 
 service ExecutionService {
-	rpc Create(CreateContainerRequest) returns (CreateContainerResponse);
-	rpc Start(StartContainerRequest) returns (google.protobuf.Empty);
-	rpc Update(UpdateContainerRequest) returns (google.protobuf.Empty);
-	rpc Pause(PauseContainerRequest) returns (google.protobuf.Empty);
-	rpc Resume(ResumeContainerRequest) returns (google.protobuf.Empty);
-	rpc Delete(DeleteContainerRequest) returns (google.protobuf.Empty);
-	rpc Get(GetContainerRequest) returns (GetContainerResponse);
-	rpc List(ListContainersRequest) returns (ListContainersResponse);
+	rpc CreateContainer(CreateContainerRequest) returns (CreateContainerResponse);
+	rpc StartContainer(StartContainerRequest) returns (google.protobuf.Empty);
+	rpc UpdateContainer(UpdateContainerRequest) returns (google.protobuf.Empty);
+	rpc PauseContainer(PauseContainerRequest) returns (google.protobuf.Empty);
+	rpc ResumeContainer(ResumeContainerRequest) returns (google.protobuf.Empty);
+	rpc DeleteContainer(DeleteContainerRequest) returns (google.protobuf.Empty);
+	rpc GetContainer(GetContainerRequest) returns (GetContainerResponse);
+	rpc ListContainers(ListContainersRequest) returns (ListContainersResponse);
 
 	rpc StartProcess(StartProcessRequest) returns (StartProcessResponse);
 	rpc GetProcess(GetProcessRequest) returns (GetProcessResponse);

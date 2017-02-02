@@ -98,12 +98,12 @@ var runCommand = cli.Command{
 			return err
 		}
 
-		cr, err := executionService.Create(gocontext.Background(), crOpts)
+		cr, err := executionService.CreateContainer(gocontext.Background(), crOpts)
 		if err != nil {
 			return err
 		}
 
-		if _, err := executionService.Start(gocontext.Background(), &execution.StartContainerRequest{
+		if _, err := executionService.StartContainer(gocontext.Background(), &execution.StartContainerRequest{
 			ID: cr.Container.ID,
 		}); err != nil {
 			return err
@@ -129,7 +129,7 @@ var runCommand = cli.Command{
 			}
 		}
 
-		if _, err := executionService.Delete(gocontext.Background(), &execution.DeleteContainerRequest{
+		if _, err := executionService.DeleteContainer(gocontext.Background(), &execution.DeleteContainerRequest{
 			ID: cr.Container.ID,
 		}); err != nil {
 			return err

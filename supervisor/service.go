@@ -42,7 +42,7 @@ type Service struct {
 	shims map[string]shim.ShimClient
 }
 
-func (s *Service) Create(ctx context.Context, r *api.CreateContainerRequest) (*api.CreateContainerResponse, error) {
+func (s *Service) CreateContainer(ctx context.Context, r *api.CreateContainerRequest) (*api.CreateContainerResponse, error) {
 	s.mu.Lock()
 	if _, ok := s.shims[r.ID]; ok {
 		s.mu.Unlock()
@@ -79,7 +79,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateContainerRequest) (*a
 	}, nil
 }
 
-func (s *Service) Start(ctx context.Context, r *api.StartContainerRequest) (*google_protobuf.Empty, error) {
+func (s *Service) StartContainer(ctx context.Context, r *api.StartContainerRequest) (*google_protobuf.Empty, error) {
 	client, err := s.getShim(r.ID)
 	if err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func (s *Service) Start(ctx context.Context, r *api.StartContainerRequest) (*goo
 	return empty, nil
 }
 
-func (s *Service) Delete(ctx context.Context, r *api.DeleteContainerRequest) (*google_protobuf.Empty, error) {
+func (s *Service) DeleteContainer(ctx context.Context, r *api.DeleteContainerRequest) (*google_protobuf.Empty, error) {
 	client, err := s.getShim(r.ID)
 	if err != nil {
 		return nil, err
@@ -104,7 +104,7 @@ func (s *Service) Delete(ctx context.Context, r *api.DeleteContainerRequest) (*g
 	return empty, nil
 }
 
-func (s *Service) List(ctx context.Context, r *api.ListContainersRequest) (*api.ListContainersResponse, error) {
+func (s *Service) ListContainers(ctx context.Context, r *api.ListContainersRequest) (*api.ListContainersResponse, error) {
 	resp := &api.ListContainersResponse{}
 	for _, client := range s.shims {
 		status, err := client.State(ctx, &shim.StateRequest{})
@@ -118,7 +118,7 @@ func (s *Service) List(ctx context.Context, r *api.ListContainersRequest) (*api.
 	}
 	return resp, nil
 }
-func (s *Service) Get(ctx context.Context, r *api.GetContainerRequest) (*api.GetContainerResponse, error) {
+func (s *Service) GetContainer(ctx context.Context, r *api.GetContainerRequest) (*api.GetContainerResponse, error) {
 	client, err := s.getShim(r.ID)
 	if err != nil {
 		return nil, err
@@ -136,12 +136,12 @@ func (s *Service) Get(ctx context.Context, r *api.GetContainerRequest) (*api.Get
 	}, nil
 }
 
-func (s *Service) Update(ctx context.Context, r *api.UpdateContainerRequest) (*google_protobuf.Empty, error) {
+func (s *Service) UpdateContainer(ctx context.Context, r *api.UpdateContainerRequest) (*google_protobuf.Empty, error) {
 	panic("not implemented")
 	return empty, nil
 }
 
-func (s *Service) Pause(ctx context.Context, r *api.PauseContainerRequest) (*google_protobuf.Empty, error) {
+func (s *Service) PauseContainer(ctx context.Context, r *api.PauseContainerRequest) (*google_protobuf.Empty, error) {
 	client, err := s.getShim(r.ID)
 	if err != nil {
 		return nil, err
@@ -149,7 +149,7 @@ func (s *Service) Pause(ctx context.Context, r *api.PauseContainerRequest) (*goo
 	return client.Pause(ctx, &shim.PauseRequest{})
 }
 
-func (s *Service) Resume(ctx context.Context, r *api.ResumeContainerRequest) (*google_protobuf.Empty, error) {
+func (s *Service) ResumeContainer(ctx context.Context, r *api.ResumeContainerRequest) (*google_protobuf.Empty, error) {
 	client, err := s.getShim(r.ID)
 	if err != nil {
 		return nil, err

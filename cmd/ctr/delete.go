@@ -38,9 +38,10 @@ var deleteCommand = cli.Command{
 			if err != nil {
 				return err
 			}
+			return nil
 		}
 
-		if _, err := executionService.Delete(gocontext.Background(), &execution.DeleteContainerRequest{
+		if _, err := executionService.DeleteContainer(gocontext.Background(), &execution.DeleteContainerRequest{
 			ID: id,
 		}); err != nil {
 			return err
