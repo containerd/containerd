@@ -292,5 +292,4 @@ func getShimService() (shim.ShimClient, error) {
 		return nil, err
 	}
 	return shim.NewShimClient(conn), nil
-
 }

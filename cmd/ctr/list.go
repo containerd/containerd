@@ -33,7 +33,7 @@ var listCommand = cli.Command{
 				c.ID,
 				c.Status,
 				len(listProcResponse.Processes),
-				c.BundlePath,
+				c.Bundle,
 			)
 		}
 		return nil

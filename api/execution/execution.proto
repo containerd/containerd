@@ -43,6 +43,7 @@ message CreateContainerResponse {
 
 message DeleteContainerRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
+	uint32 pid = 2;
 }
 
 message ListContainersRequest {
@@ -68,13 +69,13 @@ message StartProcessResponse {
 
 message Container {
 	string id = 1 [(gogoproto.customname) = "ID"];
-	string bundle_path = 2;
+	string bundle = 2;
 	Status status = 4;
 }
 
 message Process {
 	string id = 1 [(gogoproto.customname) = "ID"];
-	int64 pid = 2;
+	uint32 pid = 2;
 	repeated string args = 3;
 	repeated string env = 4;
 	User user = 5;

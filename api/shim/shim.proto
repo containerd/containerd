@@ -13,6 +13,8 @@ service Shim {
 	rpc Pty(PtyRequest) returns (google.protobuf.Empty);
 	rpc Events(EventsRequest) returns (stream Event);
 	rpc State(StateRequest) returns (StateResponse);
+	rpc Pause(PauseRequest) returns (google.protobuf.Empty);
+	rpc Resume(ResumeRequest) returns (google.protobuf.Empty);
 }
 
 message CreateRequest {
@@ -85,8 +87,8 @@ message EventsRequest {
 enum EventType {
 	EXIT = 0;
 	OOM = 1;
-	CREATED = 2;
-	STARTED = 3;
+	CREATE = 2;
+	START = 3;
 	EXEC_ADDED = 4;
 }
 
@@ -102,15 +104,25 @@ message StateRequest {
 
 message StateResponse {
 	string id = 1 [(gogoproto.customname) = "ID"];
-	repeated Process processes = 2;
+	string bundle = 2;
+	repeated Process processes = 3;
 }
 
+// TODO: share core runtime types between shim and execution rpcs
 enum State {
 	STOPPED = 0;
 	RUNNING = 1;
+	PAUSED = 2;
+	CREATED = 3;
 }
 
 message Process {
 	uint32 pid = 1;
 	State state = 2;
+}
+
+message PauseRequest {
+}
+
+message ResumeRequest {
 }

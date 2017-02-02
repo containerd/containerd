@@ -54,7 +54,7 @@ func main() {
 		}
 		var (
 			server = grpc.NewServer()
-			sv     = shim.NewService()
+			sv     = shim.New()
 		)
 		logrus.Debug("registering grpc server")
 		apishim.RegisterShimServer(server, sv)

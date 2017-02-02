@@ -120,6 +120,14 @@ func (p *initProcess) Resize(ws console.WinSize) error {
 	return p.console.Resize(ws)
 }
 
+func (p *initProcess) Pause(context context.Context) error {
+	return p.runc.Pause(context, p.id)
+}
+
+func (p *initProcess) Resume(context context.Context) error {
+	return p.runc.Resume(context, p.id)
+}
+
 func (p *initProcess) killAll(context context.Context) error {
 	return p.runc.Kill(context, p.id, int(syscall.SIGKILL), &runc.KillOpts{
 		All: true,
