@@ -29,11 +29,11 @@ var deleteCommand = cli.Command{
 			return fmt.Errorf("container id must be provided")
 		}
 
-		pid := context.String("pid")
-		if pid != "" {
+		pid := uint32(context.Int64("pid"))
+		if pid != 0 {
 			_, err = executionService.DeleteProcess(gocontext.Background(), &execution.DeleteProcessRequest{
 				ContainerID: id,
-				ProcessID:   pid,
+				Pid:         pid,
 			})
 			if err != nil {
 				return err

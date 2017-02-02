@@ -28,7 +28,7 @@ var inspectCommand = cli.Command{
 			return err
 		}
 		listProcResponse, err := executionService.ListProcesses(gocontext.Background(),
-			&execution.ListProcessesRequest{ID: id})
+			&execution.ListProcessesRequest{ContainerID: id})
 		if err != nil {
 			return err
 		}

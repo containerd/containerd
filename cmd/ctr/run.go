@@ -118,7 +118,7 @@ var runCommand = cli.Command{
 					break eventLoop
 				}
 
-				if e.ID == cr.Container.ID && e.PID == cr.InitProcess.ID {
+				if e.ID == cr.Container.ID && e.PID == cr.InitProcess.Pid {
 					ec = e.StatusCode
 					break eventLoop
 				}

@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"time"
 
 	gocontext "context"
 
@@ -17,10 +18,6 @@ var execCommand = cli.Command{
 		cli.StringFlag{
 			Name:  "id, i",
 			Usage: "target container id",
-		},
-		cli.StringFlag{
-			Name:  "pid, p",
-			Usage: "new process id",
 		},
 		cli.StringFlag{
 			Name:  "cwd, c",
@@ -42,7 +39,7 @@ var execCommand = cli.Command{
 			return err
 		}
 
-		id := context.String("id")
+		id := time.Now().Format("2006-_2-01_15:04:05")
 		tmpDir, err := getTempDir(id)
 		if err != nil {
 			return err
@@ -52,7 +49,6 @@ var execCommand = cli.Command{
 		sOpts := &execution.StartProcessRequest{
 			ContainerID: id,
 			Process: &execution.Process{
-				ID:       context.String("pid"),
 				Cwd:      context.String("cwd"),
 				Terminal: context.Bool("tty"),
 				Args:     context.Args(),
@@ -76,7 +72,7 @@ var execCommand = cli.Command{
 
 		_, err = executionService.DeleteProcess(gocontext.Background(), &execution.DeleteProcessRequest{
 			ContainerID: id,
-			ProcessID:   sr.Process.ID,
+			Pid:         sr.Process.Pid,
 		})
 		if err != nil {
 			return err

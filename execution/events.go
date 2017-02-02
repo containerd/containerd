@@ -10,7 +10,7 @@ type ContainerEvent struct {
 
 type ContainerExitEvent struct {
 	ContainerEvent
-	PID        string
+	PID        uint32
 	StatusCode uint32
 }
 

@@ -25,7 +25,7 @@ var listCommand = cli.Command{
 		fmt.Printf("ID\tSTATUS\tPROCS\tBUNDLE\n")
 		for _, c := range listResponse.Containers {
 			listProcResponse, err := executionService.ListProcesses(gocontext.Background(),
-				&execution.ListProcessesRequest{ID: c.ID})
+				&execution.ListProcessesRequest{ContainerID: c.ID})
 			if err != nil {
 				return err
 			}

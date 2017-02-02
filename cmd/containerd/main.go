@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -135,11 +134,6 @@ func main() {
 
 		execCtx := log.WithModule(ctx, "execution")
 		execCtx = events.WithPoster(execCtx, events.GetNATSPoster(nec))
-		root := filepath.Join(context.GlobalString("root"), "shim")
-		err = os.Mkdir(root, 0700)
-		if err != nil && !os.IsExist(err) {
-			return err
-		}
 		execService, err := supervisor.New(execCtx, context.GlobalString("root"))
 		if err != nil {
 			return err
