@@ -4,8 +4,17 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/pkg/errors"
+)
+
+var (
+	bufferPool = &sync.Pool{
+		New: func() interface{} {
+			return make([]byte, 32*1024)
+		},
+	}
 )
 
 // CopyDirectory copies the directory from src to dst.
