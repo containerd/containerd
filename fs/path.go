@@ -15,42 +15,27 @@ type currentPath struct {
 	fullPath string
 }
 
-func pathChange(lower, upper *currentPath) Change {
+func pathChange(lower, upper *currentPath) (ChangeKind, string) {
 	if lower == nil {
 		if upper == nil {
 			panic("cannot compare nil paths")
 		}
-		return Change{
-			Kind: ChangeKindAdd,
-			Path: upper.path,
-		}
+		return ChangeKindAdd, upper.path
 	}
 	if upper == nil {
-		return Change{
-			Kind: ChangeKindDelete,
-			Path: lower.path,
-		}
+		return ChangeKindDelete, lower.path
 	}
 	// TODO: compare by directory
 
 	switch i := strings.Compare(lower.path, upper.path); {
 	case i < 0:
 		// File in lower that is not in upper
-		return Change{
-			Kind: ChangeKindDelete,
-			Path: lower.path,
-		}
+		return ChangeKindDelete, lower.path
 	case i > 0:
 		// File in upper that is not in lower
-		return Change{
-			Kind: ChangeKindAdd,
-			Path: upper.path,
-		}
+		return ChangeKindAdd, upper.path
 	default:
-		return Change{
-			Kind: ChangeKindModify,
-			Path: upper.path,
-		}
+		return ChangeKindModify, upper.path
 	}
 }
 

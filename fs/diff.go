@@ -48,12 +48,17 @@ type Change struct {
 	Path string
 }
 
-// Changes computes changes between lower and upper calling the
-// given change function for each computed change. Callbacks
-// will be done serialially and order by path name.
+// ChangeFunc is the type of function called for each change
+// computed during a directory changes calculation.
+type ChangeFunc func(ChangeKind, string, os.FileInfo, error) error
+
+// Changes computes changes between two directories calling the
+// given change function for each computed change. The first
+// directory is intended to the base directory and second
+// directory the changed directory.
 //
-// Changes are ordered by name and should be appliable in the
-// order in which they received.
+// The change callback is called by the order of path names and
+// should be appliable in that order.
 //  Due to this apply ordering, the following is true
 //  - Removed directory trees only create a single change for the root
 //    directory removed. Remaining changes are implied.
@@ -62,7 +67,7 @@ type Change struct {
 //    by the removal of the parent directory.
 //
 // Opaque directories will not be treated specially and each file
-// removed from the lower will show up as a removal
+// removed from the base directory will show up as a removal.
 //
 // File content comparisons will be done on files which have timestamps
 // which may have been truncated. If either of the files being compared
@@ -71,22 +76,20 @@ type Change struct {
 // nanosecond values where one of those values is zero, the files will
 // be considered unchanged if the content is the same. This behavior
 // is to account for timestamp truncation during archiving.
-func Changes(ctx context.Context, upper, lower string, ch func(Change, os.FileInfo) error) error {
-	if lower == "" {
-		logrus.Debugf("Using single walk diff for %s", upper)
-		return addDirChanges(ctx, ch, upper)
-	} else if diffOptions := detectDirDiff(upper, lower); diffOptions != nil {
-		logrus.Debugf("Using single walk diff for %s from %s", diffOptions.diffDir, lower)
-		return diffDirChanges(ctx, ch, lower, diffOptions)
+func Changes(ctx context.Context, a, b string, changeFn ChangeFunc) error {
+	if a == "" {
+		logrus.Debugf("Using single walk diff for %s", b)
+		return addDirChanges(ctx, changeFn, b)
+	} else if diffOptions := detectDirDiff(b, a); diffOptions != nil {
+		logrus.Debugf("Using single walk diff for %s from %s", diffOptions.diffDir, a)
+		return diffDirChanges(ctx, changeFn, a, diffOptions)
 	}
 
-	logrus.Debugf("Using double walk diff for %s from %s", upper, lower)
-	return doubleWalkDiff(ctx, ch, upper, lower)
+	logrus.Debugf("Using double walk diff for %s from %s", b, a)
+	return doubleWalkDiff(ctx, changeFn, a, b)
 }
 
-type changeFn func(Change, os.FileInfo) error
-
-func addDirChanges(ctx context.Context, changes changeFn, root string) error {
+func addDirChanges(ctx context.Context, changeFn ChangeFunc, root string) error {
 	return filepath.Walk(root, func(path string, f os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -105,25 +108,20 @@ func addDirChanges(ctx context.Context, changes changeFn, root string) error {
 			return nil
 		}
 
-		change := Change{
-			Path: path,
-			Kind: ChangeKindAdd,
-		}
-
-		return changes(change, f)
+		return changeFn(ChangeKindAdd, path, f, nil)
 	})
 }
 
 // diffDirOptions is used when the diff can be directly calculated from
-// a diff directory to its lower, without walking both trees.
+// a diff directory to its base, without walking both trees.
 type diffDirOptions struct {
 	diffDir      string
 	skipChange   func(string) (bool, error)
 	deleteChange func(string, string, os.FileInfo) (string, error)
 }
 
-// diffDirChanges walks the diff directory and compares changes against the lower.
-func diffDirChanges(ctx context.Context, changes changeFn, lower string, o *diffDirOptions) error {
+// diffDirChanges walks the diff directory and compares changes against the base.
+func diffDirChanges(ctx context.Context, changeFn ChangeFunc, base string, o *diffDirOptions) error {
 	changedDirs := make(map[string]struct{})
 	return filepath.Walk(o.diffDir, func(path string, f os.FileInfo, err error) error {
 		if err != nil {
@@ -152,9 +150,7 @@ func diffDirChanges(ctx context.Context, changes changeFn, lower string, o *diff
 			}
 		}
 
-		change := Change{
-			Path: path,
-		}
+		var kind ChangeKind
 
 		deletedFile, err := o.deleteChange(o.diffDir, path, f)
 		if err != nil {
@@ -163,20 +159,20 @@ func diffDirChanges(ctx context.Context, changes changeFn, lower string, o *diff
 
 		// Find out what kind of modification happened
 		if deletedFile != "" {
-			change.Path = deletedFile
-			change.Kind = ChangeKindDelete
+			path = deletedFile
+			kind = ChangeKindDelete
 			f = nil
 		} else {
 			// Otherwise, the file was added
-			change.Kind = ChangeKindAdd
+			kind = ChangeKindAdd
 
-			// ...Unless it already existed in a lower, in which case, it's a modification
-			stat, err := os.Stat(filepath.Join(lower, path))
+			// ...Unless it already existed in a base, in which case, it's a modification
+			stat, err := os.Stat(filepath.Join(base, path))
 			if err != nil && !os.IsNotExist(err) {
 				return err
 			}
 			if err == nil {
-				// The file existed in the lower, so that's a modification
+				// The file existed in the base, so that's a modification
 
 				// However, if it's a directory, maybe it wasn't actually modified.
 				// If you modify /foo/bar/baz, then /foo will be part of the changed files only because it's the parent of bar
@@ -186,7 +182,7 @@ func diffDirChanges(ctx context.Context, changes changeFn, lower string, o *diff
 						return nil
 					}
 				}
-				change.Kind = ChangeKindModify
+				kind = ChangeKindModify
 			}
 		}
 
@@ -197,30 +193,23 @@ func diffDirChanges(ctx context.Context, changes changeFn, lower string, o *diff
 		if f.IsDir() {
 			changedDirs[path] = struct{}{}
 		}
-		if change.Kind == ChangeKindAdd || change.Kind == ChangeKindDelete {
+		if kind == ChangeKindAdd || kind == ChangeKindDelete {
 			parent := filepath.Dir(path)
 			if _, ok := changedDirs[parent]; !ok && parent != "/" {
 				pi, err := os.Stat(filepath.Join(o.diffDir, parent))
-				if err != nil {
-					return err
-				}
-				dirChange := Change{
-					Path: parent,
-					Kind: ChangeKindModify,
-				}
-				if err := changes(dirChange, pi); err != nil {
+				if err := changeFn(ChangeKindModify, parent, pi, err); err != nil {
 					return err
 				}
 				changedDirs[parent] = struct{}{}
 			}
 		}
 
-		return changes(change, f)
+		return changeFn(kind, path, f, nil)
 	})
 }
 
 // doubleWalkDiff walks both directories to create a diff
-func doubleWalkDiff(ctx context.Context, changes changeFn, upper, lower string) (err error) {
+func doubleWalkDiff(ctx context.Context, changeFn ChangeFunc, a, b string) (err error) {
 	g, ctx := errgroup.WithContext(ctx)
 
 	var (
@@ -232,11 +221,11 @@ func doubleWalkDiff(ctx context.Context, changes changeFn, upper, lower string) 
 	)
 	g.Go(func() error {
 		defer close(c1)
-		return pathWalk(ctx, lower, c1)
+		return pathWalk(ctx, a, c1)
 	})
 	g.Go(func() error {
 		defer close(c2)
-		return pathWalk(ctx, upper, c2)
+		return pathWalk(ctx, b, c2)
 	})
 	g.Go(func() error {
 		for c1 != nil || c2 != nil {
@@ -264,8 +253,8 @@ func doubleWalkDiff(ctx context.Context, changes changeFn, upper, lower string) 
 			}
 
 			var f os.FileInfo
-			c := pathChange(f1, f2)
-			switch c.Kind {
+			k, p := pathChange(f1, f2)
+			switch k {
 			case ChangeKindAdd:
 				if rmdir != "" {
 					rmdir = ""
@@ -301,7 +290,7 @@ func doubleWalkDiff(ctx context.Context, changes changeFn, upper, lower string) 
 					continue
 				}
 			}
-			if err := changes(c, f); err != nil {
+			if err := changeFn(k, p, f, nil); err != nil {
 				return err
 			}
 		}

@@ -21,21 +21,21 @@ import (
 // - hardlink test
 
 func TestSimpleDiff(t *testing.T) {
-	l1 := fstest.MultiApply(
-		fstest.CreateDirectory("/etc", 0755),
-		fstest.NewTestFile("/etc/hosts", []byte("mydomain 10.0.0.1"), 0644),
-		fstest.NewTestFile("/etc/profile", []byte("PATH=/usr/bin"), 0644),
-		fstest.NewTestFile("/etc/unchanged", []byte("PATH=/usr/bin"), 0644),
-		fstest.NewTestFile("/etc/unexpected", []byte("#!/bin/sh"), 0644),
+	l1 := fstest.Apply(
+		fstest.CreateDir("/etc", 0755),
+		fstest.CreateFile("/etc/hosts", []byte("mydomain 10.0.0.1"), 0644),
+		fstest.CreateFile("/etc/profile", []byte("PATH=/usr/bin"), 0644),
+		fstest.CreateFile("/etc/unchanged", []byte("PATH=/usr/bin"), 0644),
+		fstest.CreateFile("/etc/unexpected", []byte("#!/bin/sh"), 0644),
 	)
-	l2 := fstest.MultiApply(
-		fstest.NewTestFile("/etc/hosts", []byte("mydomain 10.0.0.120"), 0644),
-		fstest.NewTestFile("/etc/profile", []byte("PATH=/usr/bin"), 0666),
-		fstest.CreateDirectory("/root", 0700),
-		fstest.NewTestFile("/root/.bashrc", []byte("PATH=/usr/sbin:/usr/bin"), 0644),
+	l2 := fstest.Apply(
+		fstest.CreateFile("/etc/hosts", []byte("mydomain 10.0.0.120"), 0644),
+		fstest.CreateFile("/etc/profile", []byte("PATH=/usr/bin"), 0666),
+		fstest.CreateDir("/root", 0700),
+		fstest.CreateFile("/root/.bashrc", []byte("PATH=/usr/sbin:/usr/bin"), 0644),
 		fstest.RemoveFile("/etc/unexpected"),
 	)
-	diff := []Change{
+	diff := []testChange{
 		Modify("/etc/hosts"),
 		Modify("/etc/profile"),
 		Delete("/etc/unexpected"),
@@ -49,18 +49,18 @@ func TestSimpleDiff(t *testing.T) {
 }
 
 func TestDirectoryReplace(t *testing.T) {
-	l1 := fstest.MultiApply(
-		fstest.CreateDirectory("/dir1", 0755),
-		fstest.NewTestFile("/dir1/f1", []byte("#####"), 0644),
-		fstest.CreateDirectory("/dir1/f2", 0755),
-		fstest.NewTestFile("/dir1/f2/f3", []byte("#!/bin/sh"), 0644),
+	l1 := fstest.Apply(
+		fstest.CreateDir("/dir1", 0755),
+		fstest.CreateFile("/dir1/f1", []byte("#####"), 0644),
+		fstest.CreateDir("/dir1/f2", 0755),
+		fstest.CreateFile("/dir1/f2/f3", []byte("#!/bin/sh"), 0644),
 	)
-	l2 := fstest.MultiApply(
-		fstest.NewTestFile("/dir1/f11", []byte("#New file here"), 0644),
+	l2 := fstest.Apply(
+		fstest.CreateFile("/dir1/f11", []byte("#New file here"), 0644),
 		fstest.RemoveFile("/dir1/f2"),
-		fstest.NewTestFile("/dir1/f2", []byte("Now file"), 0666),
+		fstest.CreateFile("/dir1/f2", []byte("Now file"), 0666),
 	)
-	diff := []Change{
+	diff := []testChange{
 		Add("/dir1/f11"),
 		Modify("/dir1/f2"),
 	}
@@ -71,15 +71,15 @@ func TestDirectoryReplace(t *testing.T) {
 }
 
 func TestRemoveDirectoryTree(t *testing.T) {
-	l1 := fstest.MultiApply(
-		fstest.CreateDirectory("/dir1/dir2/dir3", 0755),
-		fstest.NewTestFile("/dir1/f1", []byte("f1"), 0644),
-		fstest.NewTestFile("/dir1/dir2/f2", []byte("f2"), 0644),
+	l1 := fstest.Apply(
+		fstest.CreateDir("/dir1/dir2/dir3", 0755),
+		fstest.CreateFile("/dir1/f1", []byte("f1"), 0644),
+		fstest.CreateFile("/dir1/dir2/f2", []byte("f2"), 0644),
 	)
-	l2 := fstest.MultiApply(
+	l2 := fstest.Apply(
 		fstest.RemoveFile("/dir1"),
 	)
-	diff := []Change{
+	diff := []testChange{
 		Delete("/dir1"),
 	}
 
@@ -89,15 +89,15 @@ func TestRemoveDirectoryTree(t *testing.T) {
 }
 
 func TestFileReplace(t *testing.T) {
-	l1 := fstest.MultiApply(
-		fstest.NewTestFile("/dir1", []byte("a file, not a directory"), 0644),
+	l1 := fstest.Apply(
+		fstest.CreateFile("/dir1", []byte("a file, not a directory"), 0644),
 	)
-	l2 := fstest.MultiApply(
+	l2 := fstest.Apply(
 		fstest.RemoveFile("/dir1"),
-		fstest.CreateDirectory("/dir1/dir2", 0755),
-		fstest.NewTestFile("/dir1/dir2/f1", []byte("also a file"), 0644),
+		fstest.CreateDir("/dir1/dir2", 0755),
+		fstest.CreateFile("/dir1/dir2/f1", []byte("also a file"), 0644),
 	)
-	diff := []Change{
+	diff := []testChange{
 		Modify("/dir1"),
 		Add("/dir1/dir2"),
 		Add("/dir1/dir2/f1"),
@@ -112,31 +112,31 @@ func TestUpdateWithSameTime(t *testing.T) {
 	tt := time.Now().Truncate(time.Second)
 	t1 := tt.Add(5 * time.Nanosecond)
 	t2 := tt.Add(6 * time.Nanosecond)
-	l1 := fstest.MultiApply(
-		fstest.NewTestFile("/file-modified-time", []byte("1"), 0644),
+	l1 := fstest.Apply(
+		fstest.CreateFile("/file-modified-time", []byte("1"), 0644),
 		fstest.Chtime("/file-modified-time", t1),
-		fstest.NewTestFile("/file-no-change", []byte("1"), 0644),
+		fstest.CreateFile("/file-no-change", []byte("1"), 0644),
 		fstest.Chtime("/file-no-change", t1),
-		fstest.NewTestFile("/file-same-time", []byte("1"), 0644),
+		fstest.CreateFile("/file-same-time", []byte("1"), 0644),
 		fstest.Chtime("/file-same-time", t1),
-		fstest.NewTestFile("/file-truncated-time-1", []byte("1"), 0644),
+		fstest.CreateFile("/file-truncated-time-1", []byte("1"), 0644),
 		fstest.Chtime("/file-truncated-time-1", t1),
-		fstest.NewTestFile("/file-truncated-time-2", []byte("1"), 0644),
+		fstest.CreateFile("/file-truncated-time-2", []byte("1"), 0644),
 		fstest.Chtime("/file-truncated-time-2", tt),
 	)
-	l2 := fstest.MultiApply(
-		fstest.NewTestFile("/file-modified-time", []byte("2"), 0644),
+	l2 := fstest.Apply(
+		fstest.CreateFile("/file-modified-time", []byte("2"), 0644),
 		fstest.Chtime("/file-modified-time", t2),
-		fstest.NewTestFile("/file-no-change", []byte("1"), 0644),
+		fstest.CreateFile("/file-no-change", []byte("1"), 0644),
 		fstest.Chtime("/file-no-change", tt), // use truncated time, should be regarded as no change
-		fstest.NewTestFile("/file-same-time", []byte("2"), 0644),
+		fstest.CreateFile("/file-same-time", []byte("2"), 0644),
 		fstest.Chtime("/file-same-time", t1),
-		fstest.NewTestFile("/file-truncated-time-1", []byte("2"), 0644),
+		fstest.CreateFile("/file-truncated-time-1", []byte("2"), 0644),
 		fstest.Chtime("/file-truncated-time-1", tt),
-		fstest.NewTestFile("/file-truncated-time-2", []byte("2"), 0644),
+		fstest.CreateFile("/file-truncated-time-2", []byte("2"), 0644),
 		fstest.Chtime("/file-truncated-time-2", tt),
 	)
-	diff := []Change{
+	diff := []testChange{
 		// "/file-same-time" excluded because matching non-zero nanosecond values
 		Modify("/file-modified-time"),
 		Modify("/file-truncated-time-1"),
@@ -148,7 +148,7 @@ func TestUpdateWithSameTime(t *testing.T) {
 	}
 }
 
-func testDiffWithBase(base, diff fstest.Applier, expected []Change) error {
+func testDiffWithBase(base, diff fstest.Applier, expected []testChange) error {
 	t1, err := ioutil.TempDir("", "diff-with-base-lower-")
 	if err != nil {
 		return errors.Wrap(err, "failed to create temp dir")
@@ -160,7 +160,7 @@ func testDiffWithBase(base, diff fstest.Applier, expected []Change) error {
 	}
 	defer os.RemoveAll(t2)
 
-	if err := base(t1); err != nil {
+	if err := base.Apply(t1); err != nil {
 		return errors.Wrap(err, "failed to apply base filesytem")
 	}
 
@@ -168,11 +168,11 @@ func testDiffWithBase(base, diff fstest.Applier, expected []Change) error {
 		return errors.Wrap(err, "failed to copy base directory")
 	}
 
-	if err := diff(t2); err != nil {
+	if err := diff.Apply(t2); err != nil {
 		return errors.Wrap(err, "failed to apply diff filesystem")
 	}
 
-	changes, err := collectChanges(t2, t1)
+	changes, err := collectChanges(t1, t2)
 	if err != nil {
 		return errors.Wrap(err, "failed to collect changes")
 	}
@@ -181,14 +181,14 @@ func testDiffWithBase(base, diff fstest.Applier, expected []Change) error {
 }
 
 func TestBaseDirectoryChanges(t *testing.T) {
-	apply := fstest.MultiApply(
-		fstest.CreateDirectory("/etc", 0755),
-		fstest.NewTestFile("/etc/hosts", []byte("mydomain 10.0.0.1"), 0644),
-		fstest.NewTestFile("/etc/profile", []byte("PATH=/usr/bin"), 0644),
-		fstest.CreateDirectory("/root", 0700),
-		fstest.NewTestFile("/root/.bashrc", []byte("PATH=/usr/sbin:/usr/bin"), 0644),
+	apply := fstest.Apply(
+		fstest.CreateDir("/etc", 0755),
+		fstest.CreateFile("/etc/hosts", []byte("mydomain 10.0.0.1"), 0644),
+		fstest.CreateFile("/etc/profile", []byte("PATH=/usr/bin"), 0644),
+		fstest.CreateDir("/root", 0700),
+		fstest.CreateFile("/root/.bashrc", []byte("PATH=/usr/sbin:/usr/bin"), 0644),
 	)
-	changes := []Change{
+	changes := []testChange{
 		Add("/etc"),
 		Add("/etc/hosts"),
 		Add("/etc/profile"),
@@ -201,18 +201,18 @@ func TestBaseDirectoryChanges(t *testing.T) {
 	}
 }
 
-func testDiffWithoutBase(apply fstest.Applier, expected []Change) error {
+func testDiffWithoutBase(apply fstest.Applier, expected []testChange) error {
 	tmp, err := ioutil.TempDir("", "diff-without-base-")
 	if err != nil {
 		return errors.Wrap(err, "failed to create temp dir")
 	}
 	defer os.RemoveAll(tmp)
 
-	if err := apply(tmp); err != nil {
+	if err := apply.Apply(tmp); err != nil {
 		return errors.Wrap(err, "failed to apply filesytem changes")
 	}
 
-	changes, err := collectChanges(tmp, "")
+	changes, err := collectChanges("", tmp)
 	if err != nil {
 		return errors.Wrap(err, "failed to collect changes")
 	}
@@ -220,13 +220,13 @@ func testDiffWithoutBase(apply fstest.Applier, expected []Change) error {
 	return checkChanges(tmp, changes, expected)
 }
 
-func checkChanges(root string, changes []testChange, expected []Change) error {
+func checkChanges(root string, changes, expected []testChange) error {
 	if len(changes) != len(expected) {
-		return errors.Errorf("Unexpected number of changes:\n%s", diffString(convertTestChanges(changes), expected))
+		return errors.Errorf("Unexpected number of changes:\n%s", diffString(changes, expected))
 	}
 	for i := range changes {
 		if changes[i].Path != expected[i].Path || changes[i].Kind != expected[i].Kind {
-			return errors.Errorf("Unexpected change at %d:\n%s", i, diffString(convertTestChanges(changes), expected))
+			return errors.Errorf("Unexpected change at %d:\n%s", i, diffString(changes, expected))
 		}
 		if changes[i].Kind != ChangeKindDelete {
 			filename := filepath.Join(root, changes[i].Path)
@@ -254,18 +254,23 @@ func checkChanges(root string, changes []testChange, expected []Change) error {
 }
 
 type testChange struct {
-	Change
+	Kind     ChangeKind
+	Path     string
 	FileInfo os.FileInfo
 	Source   string
 }
 
-func collectChanges(upper, lower string) ([]testChange, error) {
+func collectChanges(a, b string) ([]testChange, error) {
 	changes := []testChange{}
-	err := Changes(context.Background(), upper, lower, func(c Change, f os.FileInfo) error {
+	err := Changes(context.Background(), a, b, func(k ChangeKind, p string, f os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 		changes = append(changes, testChange{
-			Change:   c,
+			Kind:     k,
+			Path:     p,
 			FileInfo: f,
-			Source:   filepath.Join(upper, c.Path),
+			Source:   filepath.Join(b, p),
 		})
 		return nil
 	})
@@ -276,20 +281,12 @@ func collectChanges(upper, lower string) ([]testChange, error) {
 	return changes, nil
 }
 
-func convertTestChanges(c []testChange) []Change {
-	nc := make([]Change, len(c))
-	for i := range c {
-		nc[i] = c[i].Change
-	}
-	return nc
-}
-
-func diffString(c1, c2 []Change) string {
+func diffString(c1, c2 []testChange) string {
 	return fmt.Sprintf("got(%d):\n%s\nexpected(%d):\n%s", len(c1), changesString(c1), len(c2), changesString(c2))
 
 }
 
-func changesString(c []Change) string {
+func changesString(c []testChange) string {
 	strs := make([]string, len(c))
 	for i := range c {
 		strs[i] = fmt.Sprintf("\t%s\t%s", c[i].Kind, c[i].Path)
@@ -297,22 +294,22 @@ func changesString(c []Change) string {
 	return strings.Join(strs, "\n")
 }
 
-func Add(p string) Change {
-	return Change{
+func Add(p string) testChange {
+	return testChange{
 		Kind: ChangeKindAdd,
 		Path: p,
 	}
 }
 
-func Delete(p string) Change {
-	return Change{
+func Delete(p string) testChange {
+	return testChange{
 		Kind: ChangeKindDelete,
 		Path: p,
 	}
 }
 
-func Modify(p string) Change {
-	return Change{
+func Modify(p string) testChange {
+	return testChange{
 		Kind: ChangeKindModify,
 		Path: p,
 	}
