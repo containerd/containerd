@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/docker/containerd"
-	"github.com/docker/docker/pkg/archive"
+	"github.com/docker/containerd/fs"
 	"github.com/pkg/errors"
 )
 
@@ -66,7 +66,7 @@ func (n *Naive) Prepare(dst, parent string) ([]containerd.Mount, error) {
 		}
 
 		// Now, we copy the parent filesystem, just a directory, into dst.
-		if err := archive.CopyWithTar(filepath.Join(parent, "data"), dst); err != nil { // note: src, dst args, ick!
+		if err := fs.CopyDir(dst, filepath.Join(parent, "data")); err != nil {
 			return nil, errors.Wrap(err, "copying of parent failed")
 		}
 	}
@@ -88,7 +88,7 @@ func (n *Naive) Commit(diff, dst string) error {
 
 	// Move the data into our metadata directory, we could probably save disk
 	// space if we just saved the diff, but let's get something working.
-	if err := archive.CopyWithTar(dst, filepath.Join(active.metadata, "data")); err != nil { // note: src, dst args, ick!
+	if err := fs.CopyDir(filepath.Join(active.metadata, "data"), dst); err != nil {
 		return errors.Wrap(err, "copying of parent failed")
 	}
 
