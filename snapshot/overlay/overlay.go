@@ -12,7 +12,12 @@ import (
 	digest "github.com/opencontainers/go-digest"
 )
 
-func NewDriver(root string) (*Overlay, error) {
+type Driver struct {
+	root  string
+	cache *cache
+}
+
+func NewDriver(root string) (*Driver, error) {
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
 	}
@@ -24,18 +29,13 @@ func NewDriver(root string) (*Overlay, error) {
 			return nil, err
 		}
 	}
-	return &Overlay{
+	return &Driver{
 		root:  root,
 		cache: newCache(),
 	}, nil
 }
 
-type Overlay struct {
-	root  string
-	cache *cache
-}
-
-func (o *Overlay) Prepare(key, parent string) ([]containerd.Mount, error) {
+func (o *Driver) Prepare(key, parent string) ([]containerd.Mount, error) {
 	active, err := o.newActiveDir(key)
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func (o *Overlay) Prepare(key, parent string) ([]containerd.Mount, error) {
 	return o.Mounts(key)
 }
 
-func (o *Overlay) View(key, parent string) ([]containerd.Mount, error) {
+func (o *Driver) View(key, parent string) ([]containerd.Mount, error) {
 	panic("not implemented")
 }
 
@@ -56,24 +56,24 @@ func (o *Overlay) View(key, parent string) ([]containerd.Mount, error) {
 // called on an read-write or readonly transaction.
 //
 // This can be used to recover mounts after calling View or Prepare.
-func (o *Overlay) Mounts(key string) ([]containerd.Mount, error) {
+func (o *Driver) Mounts(key string) ([]containerd.Mount, error) {
 	active := o.getActive(key)
 	return active.mounts(o.cache)
 }
 
-func (o *Overlay) Commit(name, key string) error {
+func (o *Driver) Commit(name, key string) error {
 	active := o.getActive(key)
 	return active.commit(name, o.cache)
 }
 
 // Remove abandons the transaction identified by key. All resources
 // associated with the key will be removed.
-func (o *Overlay) Remove(key string) error {
+func (o *Driver) Remove(key string) error {
 	panic("not implemented")
 }
 
 // Parent returns the parent of snapshot identified by name.
-func (o *Overlay) Parent(name string) (string, error) {
+func (o *Driver) Parent(name string) (string, error) {
 	ppath, err := o.cache.get(filepath.Join(o.root, "snapshots", hash(name)))
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -92,28 +92,28 @@ func (o *Overlay) Parent(name string) (string, error) {
 }
 
 // Exists returns true if the snapshot with name exists.
-func (o *Overlay) Exists(name string) bool {
+func (o *Driver) Exists(name string) bool {
 	panic("not implemented")
 }
 
 // Delete the snapshot idenfitied by name.
 //
 // If name has children, the operation will fail.
-func (o *Overlay) Delete(name string) error {
+func (o *Driver) Delete(name string) error {
 	panic("not implemented")
 }
 
 // Walk the committed snapshots.
-func (o *Overlay) Walk(fn func(name string) error) error {
+func (o *Driver) Walk(fn func(name string) error) error {
 	panic("not implemented")
 }
 
 // Active will call fn for each active transaction.
-func (o *Overlay) Active(fn func(key string) error) error {
+func (o *Driver) Active(fn func(key string) error) error {
 	panic("not implemented")
 }
 
-func (o *Overlay) newActiveDir(key string) (*activeDir, error) {
+func (o *Driver) newActiveDir(key string) (*activeDir, error) {
 	var (
 		path = filepath.Join(o.root, "active", hash(key))
 	)
@@ -133,7 +133,7 @@ func (o *Overlay) newActiveDir(key string) (*activeDir, error) {
 	return a, nil
 }
 
-func (o *Overlay) getActive(key string) *activeDir {
+func (o *Driver) getActive(key string) *activeDir {
 	return &activeDir{
 		path:         filepath.Join(o.root, "active", hash(key)),
 		snapshotsDir: filepath.Join(o.root, "snapshots"),

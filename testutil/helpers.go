@@ -2,8 +2,10 @@ package testutil
 
 import (
 	"flag"
+	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"testing"
 
@@ -55,6 +57,18 @@ func DumpDir(t *testing.T, root string) {
 				return err
 			}
 			t.Log(fi.Mode(), path, "->", target)
+		} else if fi.Mode().IsRegular() {
+			p, err := ioutil.ReadFile(path)
+			if err != nil {
+				t.Log("error reading file: %v", err)
+				return nil
+			}
+
+			if len(p) > 64 { // just display a little bit.
+				p = p[:64]
+			}
+
+			t.Log(fi.Mode(), path, "[", strconv.Quote(string(p)), "...]")
 		} else {
 			t.Log(fi.Mode(), path)
 		}

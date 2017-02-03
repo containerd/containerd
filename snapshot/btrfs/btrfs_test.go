@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/docker/containerd"
+	"github.com/docker/containerd/snapshot"
 	"github.com/docker/containerd/testutil"
-	btrfs "github.com/stevvooe/go-btrfs"
 )
 
 const (
@@ -20,8 +20,32 @@ const (
 
 func TestBtrfs(t *testing.T) {
 	testutil.RequiresRoot(t)
-	device := setupBtrfsLoopbackDevice(t)
-	defer removeBtrfsLoopbackDevice(t, device)
+	snapshot.DriverSuite(t, "Btrfs", func(root string) (snapshot.Driver, func(), error) {
+		device := setupBtrfsLoopbackDevice(t, root)
+		driver, err := NewDriver(device.deviceName, root)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		return driver, func() {
+			device.remove(t)
+		}, nil
+	})
+}
+
+func TestBtrfsMounts(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	// create temporary directory for mount point
+	mountPoint, err := ioutil.TempDir("", "containerd-btrfs-test")
+	if err != nil {
+		t.Fatal("could not create mount point for btrfs test", err)
+	}
+	t.Log("temporary mount point created", mountPoint)
+
+	device := setupBtrfsLoopbackDevice(t, mountPoint)
+	defer device.remove(t)
+
 	root, err := ioutil.TempDir(device.mountPoint, "TestBtrfsPrepare-")
 	if err != nil {
 		t.Fatal(err)
@@ -29,7 +53,7 @@ func TestBtrfs(t *testing.T) {
 	defer os.RemoveAll(root)
 
 	target := filepath.Join(root, "test")
-	b, err := NewBtrfs(device.deviceName, root)
+	b, err := NewDriver(device.deviceName, root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,13 +96,6 @@ func TestBtrfs(t *testing.T) {
 	if err := b.Commit(filepath.Join(root, "snapshots/committed"), filepath.Join(root, "test")); err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		t.Log("Delete snapshot 1")
-		err := btrfs.SubvolDelete(filepath.Join(root, "snapshots/committed"))
-		if err != nil {
-			t.Error("snapshot delete failed", err)
-		}
-	}()
 
 	target = filepath.Join(root, "test2")
 	mounts, err = b.Prepare(target, filepath.Join(root, "snapshots/committed"))
@@ -103,13 +120,6 @@ func TestBtrfs(t *testing.T) {
 	if err := b.Commit(filepath.Join(root, "snapshots/committed2"), target); err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		t.Log("Delete snapshot 2")
-		err := btrfs.SubvolDelete(filepath.Join(root, "snapshots/committed2"))
-		if err != nil {
-			t.Error("snapshot delete failed", err)
-		}
-	}()
 }
 
 type testDevice struct {
@@ -121,13 +131,7 @@ type testDevice struct {
 // setupBtrfsLoopbackDevice creates a file, mounts it as a loopback device, and
 // formats it as btrfs.  The device should be cleaned up by calling
 // removeBtrfsLoopbackDevice.
-func setupBtrfsLoopbackDevice(t *testing.T) *testDevice {
-	// create temporary directory for mount point
-	mountPoint, err := ioutil.TempDir("", "containerd-btrfs-test")
-	if err != nil {
-		t.Fatal("Could not create mount point for btrfs test", err)
-	}
-	t.Log("Temporary mount point created", mountPoint)
+func setupBtrfsLoopbackDevice(t *testing.T, mountPoint string) *testDevice {
 
 	// create temporary file for the disk image
 	file, err := ioutil.TempFile("", "containerd-btrfs-test")
@@ -182,9 +186,9 @@ func setupBtrfsLoopbackDevice(t *testing.T) *testDevice {
 	}
 }
 
-// removeBtrfsLoopbackDevice unmounts the loopback device and deletes the
-// file holding the disk image.
-func removeBtrfsLoopbackDevice(t *testing.T, device *testDevice) {
+// remove cleans up the test device, unmounting the loopback and disk image
+// file.
+func (device *testDevice) remove(t *testing.T) {
 	// unmount
 	testutil.Unmount(t, device.mountPoint)
 
