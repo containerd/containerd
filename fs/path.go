@@ -133,67 +133,45 @@ func compareFileContent(p1, p2 string) (bool, error) {
 	}
 }
 
-type walker struct {
-	pathC <-chan *currentPath
-	errC  <-chan error
-}
-
-func pathWalker(ctx context.Context, root string) *walker {
-	var (
-		pathC = make(chan *currentPath)
-		errC  = make(chan error, 1)
-	)
-	go func() {
-		defer close(pathC)
-		err := filepath.Walk(root, func(path string, f os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-
-			// Rebase path
-			path, err = filepath.Rel(root, path)
-			if err != nil {
-				return err
-			}
-
-			path = filepath.Join(string(os.PathSeparator), path)
-
-			// Skip root
-			if path == string(os.PathSeparator) {
-				return nil
-			}
-
-			return sendPath(ctx, pathC, &currentPath{
-				path:     path,
-				f:        f,
-				fullPath: filepath.Join(root, path),
-			})
-		})
+func pathWalk(ctx context.Context, root string, pathC chan<- *currentPath) error {
+	return filepath.Walk(root, func(path string, f os.FileInfo, err error) error {
 		if err != nil {
-			errC <- err
+			return err
 		}
-	}()
 
-	return &walker{
-		pathC: pathC,
-		errC:  errC,
-	}
+		// Rebase path
+		path, err = filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+
+		path = filepath.Join(string(os.PathSeparator), path)
+
+		// Skip root
+		if path == string(os.PathSeparator) {
+			return nil
+		}
+
+		p := &currentPath{
+			path:     path,
+			f:        f,
+			fullPath: filepath.Join(root, path),
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case pathC <- p:
+			return nil
+		}
+	})
 }
 
-func sendPath(ctx context.Context, pc chan<- *currentPath, p *currentPath) error {
+func nextPath(ctx context.Context, pathC <-chan *currentPath) (*currentPath, error) {
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
-	case pc <- p:
-		return nil
-	}
-}
-
-func nextPath(w *walker) (*currentPath, error) {
-	select {
-	case err := <-w.errC:
-		return nil, err
-	case p := <-w.pathC:
+		return nil, ctx.Err()
+	case p := <-pathC:
 		return p, nil
 	}
 }

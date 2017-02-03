@@ -220,13 +220,13 @@ func testDiffWithoutBase(apply fstest.Applier, expected []Change) error {
 	return checkChanges(tmp, changes, expected)
 }
 
-func checkChanges(root string, changes, expected []Change) error {
+func checkChanges(root string, changes []testChange, expected []Change) error {
 	if len(changes) != len(expected) {
-		return errors.Errorf("Unexpected number of changes:\n%s", diffString(changes, expected))
+		return errors.Errorf("Unexpected number of changes:\n%s", diffString(convertTestChanges(changes), expected))
 	}
 	for i := range changes {
 		if changes[i].Path != expected[i].Path || changes[i].Kind != expected[i].Kind {
-			return errors.Errorf("Unexpected change at %d:\n%s", i, diffString(changes, expected))
+			return errors.Errorf("Unexpected change at %d:\n%s", i, diffString(convertTestChanges(changes), expected))
 		}
 		if changes[i].Kind != ChangeKindDelete {
 			filename := filepath.Join(root, changes[i].Path)
@@ -253,20 +253,35 @@ func checkChanges(root string, changes, expected []Change) error {
 	return nil
 }
 
-func collectChanges(upper, lower string) ([]Change, error) {
-	ctx, changeC := Changes(context.Background(), upper, lower)
-	changes := []Change{}
-	for {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case c, ok := <-changeC:
-			if !ok {
-				return changes, nil
-			}
-			changes = append(changes, c)
-		}
+type testChange struct {
+	Change
+	FileInfo os.FileInfo
+	Source   string
+}
+
+func collectChanges(upper, lower string) ([]testChange, error) {
+	changes := []testChange{}
+	err := Changes(context.Background(), upper, lower, func(c Change, f os.FileInfo) error {
+		changes = append(changes, testChange{
+			Change:   c,
+			FileInfo: f,
+			Source:   filepath.Join(upper, c.Path),
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to compute changes")
 	}
+
+	return changes, nil
+}
+
+func convertTestChanges(c []testChange) []Change {
+	nc := make([]Change, len(c))
+	for i := range c {
+		nc[i] = c[i].Change
+	}
+	return nc
 }
 
 func diffString(c1, c2 []Change) string {
