@@ -17,9 +17,9 @@ var (
 	}
 )
 
-// CopyDirectory copies the directory from src to dst.
+// CopyDir copies the directory from src to dst.
 // Most efficient copy of files is attempted.
-func CopyDirectory(dst, src string) error {
+func CopyDir(dst, src string) error {
 	inodes := map[uint64]string{}
 	return copyDirectory(dst, src, inodes)
 }

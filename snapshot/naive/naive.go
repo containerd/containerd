@@ -66,7 +66,7 @@ func (n *Naive) Prepare(dst, parent string) ([]containerd.Mount, error) {
 		}
 
 		// Now, we copy the parent filesystem, just a directory, into dst.
-		if err := fs.CopyDirectory(dst, filepath.Join(parent, "data")); err != nil {
+		if err := fs.CopyDir(dst, filepath.Join(parent, "data")); err != nil {
 			return nil, errors.Wrap(err, "copying of parent failed")
 		}
 	}
@@ -88,7 +88,7 @@ func (n *Naive) Commit(diff, dst string) error {
 
 	// Move the data into our metadata directory, we could probably save disk
 	// space if we just saved the diff, but let's get something working.
-	if err := fs.CopyDirectory(filepath.Join(active.metadata, "data"), dst); err != nil {
+	if err := fs.CopyDir(filepath.Join(active.metadata, "data"), dst); err != nil {
 		return errors.Wrap(err, "copying of parent failed")
 	}
 

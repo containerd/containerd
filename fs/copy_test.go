@@ -45,7 +45,7 @@ func testCopy(apply fstest.Applier) error {
 		return errors.Wrap(err, "failed to apply changes")
 	}
 
-	if err := CopyDirectory(t2, t1); err != nil {
+	if err := CopyDir(t2, t1); err != nil {
 		return errors.Wrap(err, "failed to copy")
 	}
 
