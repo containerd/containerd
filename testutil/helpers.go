@@ -49,7 +49,16 @@ func DumpDir(t *testing.T, root string) {
 			return err
 		}
 
-		t.Log(fi.Mode(), path)
+		if fi.Mode()&os.ModeSymlink != 0 {
+			target, err := os.Readlink(path)
+			if err != nil {
+				return err
+			}
+			t.Log(fi.Mode(), path, "->", target)
+		} else {
+			t.Log(fi.Mode(), path)
+		}
+
 		return nil
 	}); err != nil {
 		t.Fatalf("error dumping directory: %v", err)
