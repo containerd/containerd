@@ -328,11 +328,11 @@ func SubvolDelete(path string) error {
 		}
 
 		if err := isFileInfoSubvol(fi); err != nil {
-			return err
+			return nil
 		}
 
 		if err := SubvolDelete(p); err != nil {
-			return err
+			return errors.Wrapf(err, "recursive delete of %v failed", p)
 		}
 
 		return filepath.SkipDir // children get walked by call above.

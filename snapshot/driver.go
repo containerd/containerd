@@ -8,6 +8,7 @@ import (
 
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/testutil"
+	"github.com/stretchr/testify/assert"
 )
 
 // Driver defines the methods required to implement a snapshot driver for
@@ -258,9 +259,7 @@ func checkDriverBasic(t *testing.T, driver Driver, work string) {
 		t.Fatal(err)
 	}
 
-	if parent != "" {
-		t.Fatalf("parent of new layer should be empty, got driver.Parent(%q) == %q", committed, parent)
-	}
+	assert.Equal(t, parent, "")
 
 	next := filepath.Join(work, "nextlayer")
 	if err := os.MkdirAll(next, 0777); err != nil {
@@ -295,7 +294,9 @@ func checkDriverBasic(t *testing.T, driver Driver, work string) {
 	}
 
 	parent, err = driver.Parent(nextCommitted)
-	if parent != committed {
-		t.Fatalf("parent of new layer should be %q, got driver.Parent(%q) == %q", committed, next, parent)
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	assert.Equal(t, parent, committed)
 }
