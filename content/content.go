@@ -173,6 +173,9 @@ func (cs *Store) Walk(fn WalkFunc) error {
 	root := filepath.Join(cs.root, "blobs")
 	var alg digest.Algorithm
 	return filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 		if !fi.IsDir() && !alg.Available() {
 			return nil
 		}
