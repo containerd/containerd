@@ -43,7 +43,6 @@ message CreateContainerResponse {
 
 message DeleteContainerRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
-	uint32 pid = 2;
 }
 
 message ListContainersRequest {

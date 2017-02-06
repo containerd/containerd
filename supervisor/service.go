@@ -3,12 +3,19 @@ package supervisor
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
+	"strings"
 	"sync"
+	"time"
 
 	api "github.com/docker/containerd/api/execution"
 	"github.com/docker/containerd/api/shim"
+	"github.com/docker/containerd/events"
+	"github.com/docker/containerd/execution"
+	"github.com/docker/containerd/log"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
@@ -19,16 +26,22 @@ var (
 
 // New creates a new GRPC services for execution
 func New(ctx context.Context, root string) (*Service, error) {
-	clients, err := loadClients(root)
+	ctx = log.WithModule(ctx, "supervisor")
+	log.G(ctx).WithField("root", root).Debugf("New()")
+	if err := os.MkdirAll(root, 0700); err != nil {
+		return nil, errors.Wrapf(err, "unable to create root directory %q", root)
+	}
+	clients, err := loadClients(ctx, root)
 	if err != nil {
 		return nil, err
 	}
 	s := &Service{
 		root:  root,
 		shims: clients,
+		ctx:   ctx,
 	}
 	for _, c := range clients {
-		if err := s.monitor(c); err != nil {
+		if err := s.monitor(events.GetPoster(ctx), c); err != nil {
 			return nil, err
 		}
 	}
@@ -38,24 +51,23 @@ func New(ctx context.Context, root string) (*Service, error) {
 type Service struct {
 	mu sync.Mutex
 
+	ctx   context.Context
 	root  string
-	shims map[string]shim.ShimClient
+	shims map[string]*shimClient
 }
 
 func (s *Service) CreateContainer(ctx context.Context, r *api.CreateContainerRequest) (*api.CreateContainerResponse, error) {
-	s.mu.Lock()
-	if _, ok := s.shims[r.ID]; ok {
-		s.mu.Unlock()
-		return nil, fmt.Errorf("container already exists %q", r.ID)
-	}
-	client, err := newShimClient(filepath.Join(s.root, r.ID))
+	client, err := s.newShim(r.ID)
 	if err != nil {
-		s.mu.Unlock()
 		return nil, err
 	}
-	s.shims[r.ID] = client
-	s.mu.Unlock()
-	if err := s.monitor(client); err != nil {
+	defer func() {
+		if err != nil {
+			s.removeShim(r.ID)
+		}
+	}()
+
+	if err := s.monitor(events.GetPoster(ctx), client); err != nil {
 		return nil, err
 	}
 	createResponse, err := client.Create(ctx, &shim.CreateRequest{
@@ -67,8 +79,9 @@ func (s *Service) CreateContainer(ctx context.Context, r *api.CreateContainerReq
 		Stderr:   r.Stderr,
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "shim create request failed")
 	}
+	client.initPid = createResponse.Pid
 	return &api.CreateContainerResponse{
 		Container: &api.Container{
 			ID: r.ID,
@@ -96,11 +109,12 @@ func (s *Service) DeleteContainer(ctx context.Context, r *api.DeleteContainerReq
 		return nil, err
 	}
 	_, err = client.Delete(ctx, &shim.DeleteRequest{
-		Pid: r.Pid,
+		Pid: client.initPid,
 	})
 	if err != nil {
 		return nil, err
 	}
+	s.removeShim(r.ID)
 	return empty, nil
 }
 
@@ -180,13 +194,65 @@ func (s *Service) ListProcesses(ctx context.Context, r *api.ListProcessesRequest
 
 // monitor monitors the shim's event rpc and forwards container and process
 // events to callers
-func (s *Service) monitor(client shim.ShimClient) error {
+func (s *Service) monitor(poster events.Poster, client *shimClient) error {
+	// we use the service context here because we don't want to be
+	// tied to the Create rpc call
+	stream, err := client.Events(s.ctx, &shim.EventsRequest{})
+	if err != nil {
+		return errors.Wrapf(err, "failed to get events stream for client at %q", client.root)
+	}
+
+	go func() {
+		for {
+			e, err := stream.Recv()
+			if err != nil {
+				if err.Error() == "EOF" || strings.Contains(err.Error(), "transport is closing") {
+					break
+				}
+				log.G(s.ctx).WithError(err).WithField("container", client.id).
+					Warnf("event stream for client at %q got terminated", client.root)
+				break
+			}
+
+			var topic string
+			if e.Type == shim.EventType_CREATE {
+				topic = "containers"
+			} else {
+				topic = fmt.Sprintf("containers.%s", e.ID)
+			}
+
+			ctx := events.WithTopic(s.ctx, topic)
+			poster.Post(ctx, execution.ContainerEvent{
+				Timestamp:  time.Now(),
+				ID:         e.ID,
+				Type:       toExecutionEventType(e.Type),
+				Pid:        e.Pid,
+				ExitStatus: e.ExitStatus,
+			})
+		}
+	}()
 	return nil
 }
 
-func (s *Service) getShim(id string) (shim.ShimClient, error) {
+func (s *Service) newShim(id string) (*shimClient, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if _, ok := s.shims[id]; ok {
+		return nil, errors.Errorf("container %q already exists", id)
+	}
+	client, err := newShimClient(filepath.Join(s.root, id), id)
+	if err != nil {
+		return nil, err
+	}
+	s.shims[id] = client
+	return client, nil
+}
+
+func (s *Service) getShim(id string) (*shimClient, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	client, ok := s.shims[id]
 	if !ok {
 		return nil, fmt.Errorf("container does not exist %q", id)
@@ -194,22 +260,40 @@ func (s *Service) getShim(id string) (shim.ShimClient, error) {
 	return client, nil
 }
 
-func loadClients(root string) (map[string]shim.ShimClient, error) {
+func (s *Service) removeShim(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	client, ok := s.shims[id]
+	if ok {
+		client.stop()
+		delete(s.shims, id)
+	}
+}
+
+func loadClients(ctx context.Context, root string) (map[string]*shimClient, error) {
 	files, err := ioutil.ReadDir(root)
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[string]shim.ShimClient)
+	out := make(map[string]*shimClient)
 	for _, f := range files {
 		if !f.IsDir() {
 			continue
 		}
-		socket := filepath.Join(root, f.Name(), "shim.sock")
-		client, err := connectToShim(socket)
+		//
+		id := f.Name()
+		client, err := loadShimClient(filepath.Join(root, id), id)
 		if err != nil {
-			return nil, err
+			log.G(ctx).WithError(err).WithField("id", id).Warn("failed to load container")
+			// TODO: send an exit event with 255 as exit status
+			continue
 		}
 		out[f.Name()] = client
 	}
 	return out, nil
+}
+
+func toExecutionEventType(et shim.EventType) string {
+	return strings.Replace(strings.ToLower(et.String()), "_", "-", -1)
 }

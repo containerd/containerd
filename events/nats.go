@@ -2,30 +2,48 @@ package events
 
 import (
 	"context"
-	"strings"
+	"encoding/json"
+	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/log"
-	nats "github.com/nats-io/go-nats"
+	"github.com/nats-io/go-nats-streaming"
+	"github.com/pkg/errors"
 )
 
 type natsPoster struct {
-	nec *nats.EncodedConn
+	sc stan.Conn
 }
 
-func GetNATSPoster(nec *nats.EncodedConn) Poster {
-	return &natsPoster{nec}
+func NewNATSPoster(clusterID, clientID string) (Poster, error) {
+	sc, err := stan.Connect(clusterID, clientID, stan.ConnectWait(5*time.Second))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to connect to nats streaming server")
+	}
+	return &natsPoster{sc}, nil
+
 }
 
 func (p *natsPoster) Post(ctx context.Context, e Event) {
-	subject := strings.Replace(log.GetModulePath(ctx), "/", ".", -1)
 	topic := getTopic(ctx)
-	if topic != "" {
-		subject = strings.Join([]string{subject, topic}, ".")
+	if topic == "" {
+		log.G(ctx).WithField("event", e).Warn("unable to post event, topic is empty")
+		return
 	}
 
-	if subject == "" {
-		log.GetLogger(ctx).WithField("event", e).Warn("unable to post event, subject is empty")
+	data, err := json.Marshal(e)
+	if err != nil {
+		log.G(ctx).WithError(err).WithFields(logrus.Fields{"event": e, "topic": topic}).
+			Warn("unable to marshal event")
+		return
 	}
 
-	p.nec.Publish(subject, e)
+	err = p.sc.Publish(topic, data)
+	if err != nil {
+		log.G(ctx).WithError(err).WithFields(logrus.Fields{"event": e, "topic": topic}).
+			Warn("unable to post event")
+	}
+
+	log.G(ctx).WithFields(logrus.Fields{"event": e, "topic": topic}).
+		Debug("Posted event")
 }

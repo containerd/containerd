@@ -105,7 +105,8 @@ message StateRequest {
 message StateResponse {
 	string id = 1 [(gogoproto.customname) = "ID"];
 	string bundle = 2;
-	repeated Process processes = 3;
+	uint32 initPid = 3;
+	repeated Process processes = 4;
 }
 
 // TODO: share core runtime types between shim and execution rpcs
