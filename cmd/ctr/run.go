@@ -50,8 +50,8 @@ var runCommand = cli.Command{
 		}
 		defer nec.Close()
 
-		evCh := make(chan *execEvents.ContainerExitEvent, 64)
-		sub, err := nec.Subscribe(execEvents.ContainersEventsSubjectSubscriber, func(e *execEvents.ContainerExitEvent) {
+		evCh := make(chan *execEvents.ContainerEvent, 64)
+		sub, err := nec.Subscribe(execEvents.ContainersEventsSubjectSubscriber, func(e *execEvents.ContainerEvent) {
 			evCh <- e
 		})
 		if err != nil {
@@ -118,8 +118,8 @@ var runCommand = cli.Command{
 					break eventLoop
 				}
 
-				if e.ID == cr.Container.ID && e.PID == cr.InitProcess.Pid {
-					ec = e.StatusCode
+				if e.ID == cr.Container.ID && e.Pid == cr.InitProcess.Pid {
+					ec = e.ExitStatus
 					break eventLoop
 				}
 			case <-time.After(1 * time.Second):

@@ -2,16 +2,20 @@ package execution
 
 import "time"
 
-type ContainerEvent struct {
-	Timestamp time.Time
-	ID        string
-	Action    string
-}
+const (
+	ExitEvent   = "exit"
+	OOMEvent    = "oom"
+	CreateEvent = "create"
+	StartEvent  = "start"
+	ExecEvent   = "exec-added9"
+)
 
-type ContainerExitEvent struct {
-	ContainerEvent
-	PID        uint32
-	StatusCode uint32
+type ContainerEvent struct {
+	Timestamp  time.Time
+	ID         string
+	Type       string
+	Pid        uint32
+	ExitStatus uint32
 }
 
 const (
