@@ -3,7 +3,6 @@ package main
 import (
 	_ "expvar"
 	"fmt"
-	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"net/url"
@@ -106,23 +105,7 @@ func main() {
 		if debugPath == "" {
 			return fmt.Errorf("--debug-socket path cannot be empty")
 		}
-		d, err := utils.CreateUnixSocket(debugPath)
-		if err != nil {
-			return err
-		}
-
-		//publish profiling and debug socket.
-		log.G(ctx).WithField("socket", debugPath).Info("starting profiler handlers")
-		log.G(ctx).WithFields(logrus.Fields{"expvars": "/debug/vars", "socket": debugPath}).Debug("serving expvars requests")
-		log.G(ctx).WithFields(logrus.Fields{"pprof": "/debug/pprof", "socket": debugPath}).Debug("serving pprof requests")
-		go serveProfiler(ctx, d)
-
-		path := context.GlobalString("socket")
-		if path == "" {
-			return fmt.Errorf("--socket path cannot be empty")
-		}
-		l, err := utils.CreateUnixSocket(path)
-		if err != nil {
+		if err := serveProfiler(ctx, debugPath); err != nil {
 			return err
 		}
 
@@ -159,8 +142,14 @@ func main() {
 		}
 		server := grpc.NewServer(grpc.UnaryInterceptor(interceptor))
 		api.RegisterExecutionServiceServer(server, execService)
-		log.G(ctx).WithField("socket", l.Addr()).Info("start serving GRPC API")
-		go serveGRPC(ctx, server, l)
+
+		path := context.GlobalString("socket")
+		if path == "" {
+			return fmt.Errorf("--socket path cannot be empty")
+		}
+		if err := serveGRPC(ctx, server, path); err != nil {
+			return err
+		}
 
 		for s := range signals {
 			switch s {
@@ -188,17 +177,36 @@ func serveMetrics(ctx gocontext.Context, address string) {
 	}
 }
 
-func serveGRPC(ctx gocontext.Context, server *grpc.Server, l net.Listener) {
-	defer l.Close()
-	if err := server.Serve(l); err != nil {
-		log.G(ctx).WithError(err).Fatal("GRPC server failure")
+func serveGRPC(ctx gocontext.Context, server *grpc.Server, path string) error {
+	l, err := utils.CreateUnixSocket(path)
+	if err != nil {
+		return err
 	}
+	log.G(ctx).WithField("socket", path).Info("start serving GRPC API")
+	go func() {
+		defer l.Close()
+		if err := server.Serve(l); err != nil {
+			log.G(ctx).WithError(err).Fatal("GRPC server failure")
+		}
+	}()
+	return nil
 }
 
-func serveProfiler(ctx gocontext.Context, l net.Listener) {
-	if err := http.Serve(l, nil); err != nil {
-		log.G(ctx).WithError(err).Fatal("profiler server failure")
+func serveProfiler(ctx gocontext.Context, path string) error {
+	l, err := utils.CreateUnixSocket(path)
+	if err != nil {
+		return err
 	}
+
+	// publish profiling and debug socket.
+	log.G(ctx).WithField("socket", path).Info("starting profiler handlers")
+	go func() {
+		defer l.Close()
+		if err := http.Serve(l, nil); err != nil {
+			log.G(ctx).WithError(err).Fatal("profiler server failure")
+		}
+	}()
+	return nil
 }
 
 // DumpStacks dumps the runtime stack.
