@@ -13,12 +13,24 @@ import (
 )
 
 func TestOverlay(t *testing.T) {
+	testutil.RequiresRoot(t)
+	snapshot.SnapshotterSuite(t, "Overlay", func(root string) (snapshot.Snapshotter, func(), error) {
+		snapshotter, err := NewSnapshotter(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		return snapshotter, func() {}, nil
+	})
+}
+
+func TestOverlayMounts(t *testing.T) {
 	root, err := ioutil.TempDir("", "overlay")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(root)
-	o, err := NewDriver(root)
+	o, err := NewSnapshotter(root)
 	if err != nil {
 		t.Error(err)
 		return
@@ -53,7 +65,7 @@ func TestOverlayCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(root)
-	o, err := NewDriver(root)
+	o, err := NewSnapshotter(root)
 	if err != nil {
 		t.Error(err)
 		return
@@ -81,7 +93,7 @@ func TestOverlayOverlayMount(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(root)
-	o, err := NewDriver(root)
+	o, err := NewSnapshotter(root)
 	if err != nil {
 		t.Error(err)
 		return
@@ -115,7 +127,7 @@ func TestOverlayOverlayMount(t *testing.T) {
 		sh    = hash("base")
 		work  = "workdir=" + filepath.Join(root, "active", ah, "work")
 		upper = "upperdir=" + filepath.Join(root, "active", ah, "fs")
-		lower = "lowerdir=" + filepath.Join(root, "snapshots", sh, "fs")
+		lower = "lowerdir=" + filepath.Join(root, "committed", sh, "fs")
 	)
 	for i, v := range []string{
 		work,
@@ -135,7 +147,7 @@ func TestOverlayOverlayRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(root)
-	o, err := NewDriver(root)
+	o, err := NewSnapshotter(root)
 	if err != nil {
 		t.Error(err)
 		return
@@ -178,16 +190,4 @@ func TestOverlayOverlayRead(t *testing.T) {
 		t.Errorf("expected file contents hi but got %q", e)
 		return
 	}
-}
-
-func TestOverlayDriverSuite(t *testing.T) {
-	testutil.RequiresRoot(t)
-	snapshot.DriverSuite(t, "Overlay", func(root string) (snapshot.Driver, func(), error) {
-		driver, err := NewDriver(root)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		return driver, func() {}, nil
-	})
 }
