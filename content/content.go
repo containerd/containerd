@@ -166,7 +166,7 @@ func (cs *Store) Active() ([]Status, error) {
 //
 // TODO(stevvooe): Remove the file info. Just need size and modtime. Perhaps,
 // not a huge deal, considering we have a path, but let's not just let this one
-// go without scrunity.
+// go without scrutiny.
 type WalkFunc func(path string, fi os.FileInfo, dgst digest.Digest) error
 
 func (cs *Store) Walk(fn WalkFunc) error {
