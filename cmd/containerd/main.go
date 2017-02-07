@@ -196,6 +196,7 @@ func serveGRPC(ctx gocontext.Context, server *grpc.Server, l net.Listener) {
 }
 
 func serveProfiler(ctx gocontext.Context, l net.Listener) {
+	defer l.Close()
 	if err := http.Serve(l, nil); err != nil {
 		log.G(ctx).WithError(err).Fatal("profiler server failure")
 	}
