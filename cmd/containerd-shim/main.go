@@ -93,7 +93,6 @@ func serve(server *grpc.Server, path string) error {
 		defer l.Close()
 		if err := server.Serve(l); err != nil &&
 			!strings.Contains(err.Error(), "use of closed network connection") {
-			l.Close()
 			logrus.WithError(err).Fatal("containerd-shim: GRPC server failure")
 		}
 	}()
