@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,10 +9,12 @@ import (
 
 	gocontext "context"
 
+	"github.com/crosbymichael/console"
 	"github.com/docker/containerd/api/execution"
 	execEvents "github.com/docker/containerd/execution"
-	"github.com/docker/docker/pkg/term"
 	"github.com/nats-io/go-nats"
+	"github.com/nats-io/go-nats-streaming"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
@@ -39,20 +42,23 @@ var runCommand = cli.Command{
 		}
 
 		// setup our event subscriber
-		nc, err := nats.Connect(nats.DefaultURL)
+		sc, err := stan.Connect("containerd", "ctr", stan.ConnectWait(5*time.Second))
 		if err != nil {
 			return err
 		}
-		nec, err := nats.NewEncodedConn(nc, nats.JSON_ENCODER)
-		if err != nil {
-			nc.Close()
-			return err
-		}
-		defer nec.Close()
+		defer sc.Close()
 
-		evCh := make(chan *execEvents.ContainerExitEvent, 64)
-		sub, err := nec.Subscribe(execEvents.ContainersEventsSubjectSubscriber, func(e *execEvents.ContainerExitEvent) {
-			evCh <- e
+		evCh := make(chan *execEvents.ContainerEvent, 64)
+		sub, err := sc.Subscribe(fmt.Sprintf("containers.%s", id), func(m *stan.Msg) {
+			var e execEvents.ContainerEvent
+
+			err := json.Unmarshal(m.Data, &e)
+			if err != nil {
+				fmt.Printf("failed to unmarshal event: %v", err)
+				return
+			}
+
+			evCh <- &e
 		})
 		if err != nil {
 			return err
@@ -78,19 +84,12 @@ var runCommand = cli.Command{
 			Stderr:     filepath.Join(tmpDir, "stderr"),
 		}
 
-		var oldState *term.State
-		restoreTerm := func() {
-			if oldState != nil {
-				term.RestoreTerminal(os.Stdin.Fd(), oldState)
-			}
-		}
-
 		if crOpts.Console {
-			oldState, err = term.SetRawTerminal(os.Stdin.Fd())
-			if err != nil {
+			con := console.Current()
+			defer con.Reset()
+			if err := con.SetRaw(); err != nil {
 				return err
 			}
-			defer restoreTerm()
 		}
 
 		fwg, err := prepareStdio(crOpts.Stdin, crOpts.Stdout, crOpts.Stderr, crOpts.Console)
@@ -98,15 +97,15 @@ var runCommand = cli.Command{
 			return err
 		}
 
-		cr, err := executionService.Create(gocontext.Background(), crOpts)
+		cr, err := executionService.CreateContainer(gocontext.Background(), crOpts)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "CreateContainer RPC failed")
 		}
 
-		if _, err := executionService.Start(gocontext.Background(), &execution.StartContainerRequest{
+		if _, err := executionService.StartContainer(gocontext.Background(), &execution.StartContainerRequest{
 			ID: cr.Container.ID,
 		}); err != nil {
-			return err
+			return errors.Wrap(err, "StartContainer RPC failed")
 		}
 
 		var ec uint32
@@ -118,28 +117,33 @@ var runCommand = cli.Command{
 					break eventLoop
 				}
 
-				if e.ID == cr.Container.ID && e.PID == cr.InitProcess.ID {
-					ec = e.StatusCode
+				if e.Type != "exit" {
+					continue
+				}
+
+				if e.ID == cr.Container.ID && e.Pid == cr.InitProcess.Pid {
+					ec = e.ExitStatus
 					break eventLoop
 				}
 			case <-time.After(1 * time.Second):
-				if nec.Conn.Status() != nats.CONNECTED {
+				if sc.NatsConn().Status() != nats.CONNECTED {
 					break eventLoop
 				}
 			}
 		}
 
-		if _, err := executionService.Delete(gocontext.Background(), &execution.DeleteContainerRequest{
+		if _, err := executionService.DeleteContainer(gocontext.Background(), &execution.DeleteContainerRequest{
 			ID: cr.Container.ID,
 		}); err != nil {
-			return err
+			return errors.Wrap(err, "DeleteContainer RPC failed")
 		}
 
 		// Ensure we read all io
 		fwg.Wait()
 
-		restoreTerm()
-		os.Exit(int(ec))
+		if ec != 0 {
+			return cli.NewExitError("", int(ec))
+		}
 
 		return nil
 	},

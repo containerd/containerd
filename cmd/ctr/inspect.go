@@ -22,13 +22,13 @@ var inspectCommand = cli.Command{
 		if id == "" {
 			return fmt.Errorf("container id must be provided")
 		}
-		getResponse, err := executionService.Get(gocontext.Background(),
+		getResponse, err := executionService.GetContainer(gocontext.Background(),
 			&execution.GetContainerRequest{ID: id})
 		if err != nil {
 			return err
 		}
 		listProcResponse, err := executionService.ListProcesses(gocontext.Background(),
-			&execution.ListProcessesRequest{ID: id})
+			&execution.ListProcessesRequest{ContainerID: id})
 		if err != nil {
 			return err
 		}

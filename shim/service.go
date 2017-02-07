@@ -1,7 +1,6 @@
 package shim
 
 import (
-	"fmt"
 	"sync"
 	"syscall"
 
@@ -9,6 +8,7 @@ import (
 	apishim "github.com/docker/containerd/api/shim"
 	"github.com/docker/containerd/utils"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
@@ -25,6 +25,7 @@ func New() *Service {
 type Service struct {
 	initProcess *initProcess
 	id          string
+	bundle      string
 	mu          sync.Mutex
 	processes   map[int]process
 	events      chan *apishim.Event
@@ -37,10 +38,11 @@ func (s *Service) Create(ctx context.Context, r *apishim.CreateRequest) (*apishi
 		return nil, err
 	}
 	s.mu.Lock()
+	s.id = r.ID
+	s.bundle = r.Bundle
 	s.initProcess = process
 	pid := process.Pid()
 	s.processes[pid] = process
-	s.id = r.ID
 	s.mu.Unlock()
 	s.events <- &apishim.Event{
 		Type: apishim.EventType_CREATE,
@@ -69,7 +71,7 @@ func (s *Service) Delete(ctx context.Context, r *apishim.DeleteRequest) (*apishi
 	p, ok := s.processes[int(r.Pid)]
 	s.mu.Unlock()
 	if !ok {
-		return nil, fmt.Errorf("process does not exist %d", r.Pid)
+		return nil, errors.Errorf("process does not exist %d", r.Pid)
 	}
 	if err := p.Delete(ctx); err != nil {
 		return nil, err
@@ -104,7 +106,7 @@ func (s *Service) Exec(ctx context.Context, r *apishim.ExecRequest) (*apishim.Ex
 
 func (s *Service) Pty(ctx context.Context, r *apishim.PtyRequest) (*google_protobuf.Empty, error) {
 	if r.Pid == 0 {
-		return nil, fmt.Errorf("pid not provided in request")
+		return nil, errors.Errorf("pid not provided in request")
 	}
 	ws := console.WinSize{
 		Width:  uint16(r.Width),
@@ -114,7 +116,7 @@ func (s *Service) Pty(ctx context.Context, r *apishim.PtyRequest) (*google_proto
 	p, ok := s.processes[int(r.Pid)]
 	s.mu.Unlock()
 	if !ok {
-		return nil, fmt.Errorf("process does not exist %d", r.Pid)
+		return nil, errors.Errorf("process does not exist %d", r.Pid)
 	}
 	if err := p.Resize(ws); err != nil {
 		return nil, err
@@ -134,6 +136,8 @@ func (s *Service) Events(r *apishim.EventsRequest, stream apishim.Shim_EventsSer
 func (s *Service) State(ctx context.Context, r *apishim.StateRequest) (*apishim.StateResponse, error) {
 	o := &apishim.StateResponse{
 		ID:        s.id,
+		Bundle:    s.bundle,
+		InitPid:   uint32(s.initProcess.Pid()),
 		Processes: []*apishim.Process{},
 	}
 	s.mu.Lock()

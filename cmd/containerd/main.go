@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -26,8 +25,10 @@ import (
 	"github.com/docker/containerd/supervisor"
 	"github.com/docker/containerd/utils"
 	metrics "github.com/docker/go-metrics"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 
+	natsd "github.com/nats-io/gnatsd/server"
 	"github.com/nats-io/go-nats"
 	stand "github.com/nats-io/nats-streaming-server/server"
 )
@@ -41,6 +42,11 @@ const usage = `
 
 high performance container runtime
 `
+
+const (
+	StanClusterID = "containerd"
+	stanClientID  = "containerd"
+)
 
 func main() {
 	app := cli.NewApp()
@@ -127,19 +133,12 @@ func main() {
 		}
 
 		// Get events publisher
-		nec, err := getNATSPublisher(ea)
+		natsPoster, err := events.NewNATSPoster(StanClusterID, stanClientID)
 		if err != nil {
 			return err
 		}
-		defer nec.Close()
-
 		execCtx := log.WithModule(ctx, "execution")
-		execCtx = events.WithPoster(execCtx, events.GetNATSPoster(nec))
-		root := filepath.Join(context.GlobalString("root"), "shim")
-		err = os.Mkdir(root, 0700)
-		if err != nil && !os.IsExist(err) {
-			return err
-		}
+		execCtx = events.WithPoster(execCtx, natsPoster)
 		execService, err := supervisor.New(execCtx, context.GlobalString("root"))
 		if err != nil {
 			return err
@@ -151,7 +150,7 @@ func main() {
 			switch info.Server.(type) {
 			case api.ExecutionServiceServer:
 				ctx = log.WithModule(ctx, "execution")
-				ctx = events.WithPoster(ctx, events.GetNATSPoster(nec))
+				ctx = events.WithPoster(ctx, natsPoster)
 			default:
 				fmt.Printf("Unknown type: %#v\n", info.Server)
 			}
@@ -218,25 +217,10 @@ func dumpStacks(ctx gocontext.Context) {
 	log.G(ctx).Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
 }
 
-func startNATSServer(eventsAddress string) (e *stand.StanServer, err error) {
-	eventsURL, err := url.Parse(eventsAddress)
-	if err != nil {
-		return nil, err
-	}
-
-	no := stand.DefaultNatsServerOptions
-	nOpts := &no
-	nOpts.NoSigs = true
-	parts := strings.Split(eventsURL.Host, ":")
-	nOpts.Host = parts[0]
-	if len(parts) == 2 {
-		nOpts.Port, err = strconv.Atoi(parts[1])
-	} else {
-		nOpts.Port = nats.DefaultPort
-	}
+func startNATSServer(address string) (s *stand.StanServer, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			e = nil
+			s = nil
 			if _, ok := r.(error); !ok {
 				err = fmt.Errorf("failed to start NATS server: %v", r)
 			} else {
@@ -244,21 +228,32 @@ func startNATSServer(eventsAddress string) (e *stand.StanServer, err error) {
 			}
 		}
 	}()
-	s := stand.RunServerWithOpts(nil, nOpts)
+	so, no, err := getServerOptions(address)
+	if err != nil {
+		return nil, err
+	}
+	s = stand.RunServerWithOpts(so, no)
 
-	return s, nil
+	return s, err
 }
 
-func getNATSPublisher(eventsAddress string) (*nats.EncodedConn, error) {
-	nc, err := nats.Connect(eventsAddress)
+func getServerOptions(address string) (*stand.Options, *natsd.Options, error) {
+	url, err := url.Parse(address)
 	if err != nil {
-		return nil, err
-	}
-	nec, err := nats.NewEncodedConn(nc, nats.JSON_ENCODER)
-	if err != nil {
-		nc.Close()
-		return nil, err
+		return nil, nil, errors.Wrapf(err, "failed to parse address url %q", address)
 	}
 
-	return nec, nil
+	no := stand.DefaultNatsServerOptions
+	parts := strings.Split(url.Host, ":")
+	if len(parts) == 2 {
+		no.Port, err = strconv.Atoi(parts[1])
+	} else {
+		no.Port = nats.DefaultPort
+	}
+	no.Host = parts[0]
+
+	so := stand.GetDefaultOptions()
+	so.ID = StanClusterID
+
+	return so, &no, nil
 }
