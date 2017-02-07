@@ -39,13 +39,13 @@ var execCommand = cli.Command{
 			return err
 		}
 
-		id := time.Now().Format("2006-_2-01_15:04:05")
-		tmpDir, err := getTempDir(id)
+		tmpDir, err := getTempDir(time.Now().Format("2006-02-01_15:04:05"))
 		if err != nil {
 			return err
 		}
 		defer os.RemoveAll(tmpDir)
 
+		id := context.String("id")
 		sOpts := &execution.StartProcessRequest{
 			ContainerID: id,
 			Process: &execution.Process{

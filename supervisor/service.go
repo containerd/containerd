@@ -172,7 +172,35 @@ func (s *Service) ResumeContainer(ctx context.Context, r *api.ResumeContainerReq
 }
 
 func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) (*api.StartProcessResponse, error) {
-	panic("not implemented")
+	client, err := s.getShim(r.ContainerID)
+	if err != nil {
+		return nil, err
+	}
+
+	er := &shim.ExecRequest{
+		Terminal: r.Console,
+		Stdin:    r.Stdin,
+		Stdout:   r.Stdout,
+		Stderr:   r.Stderr,
+		Args:     r.Process.Args,
+		Env:      r.Process.Env,
+		Cwd:      r.Process.Cwd,
+	}
+
+	if r.Process.User != nil {
+		er.User.Uid = r.Process.User.Uid
+		er.User.Gid = r.Process.User.Gid
+		er.User.AdditionalGids = r.Process.User.AdditionalGids
+	}
+
+	resp, err := client.Exec(ctx, er)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to exec into container %q", r.ContainerID)
+	}
+	r.Process.Pid = resp.Pid
+	return &api.StartProcessResponse{
+		Process: r.Process,
+	}, nil
 }
 
 // containerd managed execs + system pids forked in container
@@ -185,7 +213,20 @@ func (s *Service) SignalProcess(ctx context.Context, r *api.SignalProcessRequest
 }
 
 func (s *Service) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest) (*google_protobuf.Empty, error) {
-	panic("not implemented")
+	client, err := s.getShim(r.ContainerID)
+	if err != nil {
+		return nil, err
+	}
+	_, err = client.Delete(ctx, &shim.DeleteRequest{
+		Pid: r.Pid,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if r.Pid == client.initPid {
+		s.removeShim(r.ContainerID)
+	}
+	return empty, nil
 }
 
 func (s *Service) ListProcesses(ctx context.Context, r *api.ListProcessesRequest) (*api.ListProcessesResponse, error) {

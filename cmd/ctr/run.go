@@ -117,6 +117,10 @@ var runCommand = cli.Command{
 					break eventLoop
 				}
 
+				if e.Type != "exit" {
+					continue
+				}
+
 				if e.ID == cr.Container.ID && e.Pid == cr.InitProcess.Pid {
 					ec = e.ExitStatus
 					break eventLoop
