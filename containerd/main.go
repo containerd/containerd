@@ -41,6 +41,11 @@ var daemonFlags = []cli.Flag{
 		Usage: "enable debug output in the logs",
 	},
 	cli.StringFlag{
+		Name:  "log-level",
+		Usage: "Set the logging level [debug, info, warn, error, fatal, panic]",
+		Value: "info",
+	},
+	cli.StringFlag{
 		Name:  "state-dir",
 		Value: defaultStateDir,
 		Usage: "runtime state directory",
@@ -136,6 +141,14 @@ func main() {
 					return err
 				}
 			}
+		}
+		if logLevel := context.GlobalString("log-level"); logLevel != "" {
+			lvl, err := logrus.ParseLevel(logLevel)
+			if err != nil {
+				lvl = logrus.InfoLevel
+				fmt.Fprintf(os.Stderr, "Unable to parse logging level: %s\n, and being defaulted to info", logLevel)
+			} 
+			logrus.SetLevel(lvl)
 		}
 		if p := context.GlobalString("pprof-address"); len(p) > 0 {
 			pprof.Enable(p)
