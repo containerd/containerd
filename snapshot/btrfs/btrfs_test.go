@@ -20,14 +20,14 @@ const (
 
 func TestBtrfs(t *testing.T) {
 	testutil.RequiresRoot(t)
-	snapshot.DriverSuite(t, "Btrfs", func(root string) (snapshot.Driver, func(), error) {
+	snapshot.SnapshotterSuite(t, "Btrfs", func(root string) (snapshot.Snapshotter, func(), error) {
 		device := setupBtrfsLoopbackDevice(t, root)
-		driver, err := NewDriver(device.deviceName, root)
+		snapshotter, err := NewSnapshotter(device.deviceName, root)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		return driver, func() {
+		return snapshotter, func() {
 			device.remove(t)
 		}, nil
 	})
@@ -53,7 +53,7 @@ func TestBtrfsMounts(t *testing.T) {
 	defer os.RemoveAll(root)
 
 	target := filepath.Join(root, "test")
-	b, err := NewDriver(device.deviceName, root)
+	b, err := NewSnapshotter(device.deviceName, root)
 	if err != nil {
 		t.Fatal(err)
 	}
