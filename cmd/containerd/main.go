@@ -59,6 +59,11 @@ func main() {
 			Usage: "enable debug output in logs",
 		},
 		cli.StringFlag{
+			Name:  "log-level",
+			Usage: "Set the logging level (\"debug\", \"info\", \"warn\", \"error\", \"fatal\"",
+			Value: "info",
+		},
+		cli.StringFlag{
 			Name:  "root",
 			Usage: "containerd state directory",
 			Value: "/run/containerd",
@@ -87,6 +92,13 @@ func main() {
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
+		}
+		if logLevel := context.GlobalString("log-level"); logLevel != "" {
+			lvl, err := logrus.ParseLevel(logLevel)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Unable to parse logging level: %s\n", logLevel)
+			}
+			logrus.SetLevel(lvl)
 		}
 		return nil
 	}
