@@ -14,7 +14,7 @@ import (
 
 	gocontext "context"
 
-	"github.com/docker/containerd/api/execution"
+	"github.com/docker/containerd/api/services/execution"
 	"github.com/pkg/errors"
 	"github.com/tonistiigi/fifo"
 	"github.com/urfave/cli"

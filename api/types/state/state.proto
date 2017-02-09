@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package containerd.v1.types;
+
+// At the moment we have same State type for Container and Process
+enum State {
+	UNKNOWN = 0;
+	CREATED = 1;
+	RUNNING = 2;
+	STOPPED = 3;
+	PAUSED = 4;
+}

@@ -19,7 +19,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd"
-	api "github.com/docker/containerd/api/execution"
+	api "github.com/docker/containerd/api/services/execution"
 	"github.com/docker/containerd/events"
 	"github.com/docker/containerd/log"
 	"github.com/docker/containerd/supervisor"

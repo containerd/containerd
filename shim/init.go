@@ -9,7 +9,7 @@ import (
 
 	"github.com/crosbymichael/console"
 	runc "github.com/crosbymichael/go-runc"
-	apishim "github.com/docker/containerd/api/shim"
+	shimapi "github.com/docker/containerd/api/services/shim"
 )
 
 type initProcess struct {
@@ -24,7 +24,7 @@ type initProcess struct {
 	pid     int
 }
 
-func newInitProcess(context context.Context, r *apishim.CreateRequest) (*initProcess, error) {
+func newInitProcess(context context.Context, r *shimapi.CreateRequest) (*initProcess, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err

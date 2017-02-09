@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package containerd.v1.types;
+
+message User {
+	uint32 uid = 1;
+	uint32 gid = 2;
+	repeated uint32 additional_gids = 3;
+}

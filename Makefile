@@ -47,6 +47,7 @@ setup: ## install dependencies
 
 generate: bin/protoc-gen-gogoctrd ## generate protobuf
 	@echo "🐳 $@"
+	@tools/gen-gen-go.sh
 	@PATH=${ROOTDIR}/bin:${PATH} go generate -x ${PACKAGES}
 
 checkprotos: generate ## check if protobufs needs to be generated again

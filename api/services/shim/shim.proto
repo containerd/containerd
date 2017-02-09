@@ -1,9 +1,11 @@
 syntax = "proto3";
 
-package containerd.shim.v1;
+package containerd.v1.services;
 
 import "google/protobuf/empty.proto";
 import "gogoproto/gogo.proto";
+import "github.com/docker/containerd/api/types/process/process.proto";
+import "github.com/docker/containerd/api/types/user/user.proto";
 
 service Shim {
 	rpc Create(CreateRequest) returns (CreateResponse);
@@ -49,7 +51,7 @@ message ExecRequest {
 	string stdout = 3;
 	string stderr = 4;
 	string selinux_label = 5;
-	User user = 6;
+	types.User user = 6;
 	repeated string args = 7;
 	repeated string env = 8;
 	string cwd = 9;
@@ -57,12 +59,6 @@ message ExecRequest {
 	repeated Rlimit rlimits = 11;
 	bool no_new_privileges = 12;
 	string apparmor_profile = 13;
-}
-
-message User {
-	uint32 uid = 1;
-	uint32 gid = 2;
-	repeated uint32 additional_gids = 3;
 }
 
 message Rlimit {
@@ -92,6 +88,7 @@ enum EventType {
 	EXEC_ADDED = 4;
 }
 
+// should be moved to api/types/event maybe
 message Event {
 	string id = 1 [(gogoproto.customname) = "ID"];
 	EventType type = 2;
@@ -106,20 +103,7 @@ message StateResponse {
 	string id = 1 [(gogoproto.customname) = "ID"];
 	string bundle = 2;
 	uint32 initPid = 3;
-	repeated Process processes = 4;
-}
-
-// TODO: share core runtime types between shim and execution rpcs
-enum State {
-	STOPPED = 0;
-	RUNNING = 1;
-	PAUSED = 2;
-	CREATED = 3;
-}
-
-message Process {
-	uint32 pid = 1;
-	State state = 2;
+	repeated types.Process processes = 4;
 }
 
 message PauseRequest {

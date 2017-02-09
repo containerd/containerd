@@ -1,9 +1,11 @@
 syntax = "proto3";
 
-package containerd.v1;
+package containerd.v1.services;
 
 import "google/protobuf/empty.proto";
 import "gogoproto/gogo.proto";
+import "github.com/docker/containerd/api/types/container/container.proto";
+import "github.com/docker/containerd/api/types/process/process.proto";
 
 service ExecutionService {
 	rpc CreateContainer(CreateContainerRequest) returns (CreateContainerResponse);
@@ -37,8 +39,8 @@ message CreateContainerRequest {
 }
 
 message CreateContainerResponse {
-	Container container = 1;
-	Process initProcess = 2;
+	types.Container container = 1;
+	types.Process initProcess = 2;
 }
 
 message DeleteContainerRequest {
@@ -50,12 +52,12 @@ message ListContainersRequest {
 }
 
 message ListContainersResponse {
-	repeated Container containers = 1;
+	repeated types.Container containers = 1;
 }
 
 message StartProcessRequest {
 	string container_id = 1 [(gogoproto.customname) = "ContainerID"];
-	Process process = 2;
+	types.Process process = 2;
 	bool console = 3;
 	string stdin = 4;
 	string stdout = 5;
@@ -63,36 +65,7 @@ message StartProcessRequest {
 }
 
 message StartProcessResponse {
-	Process process = 1;
-}
-
-message Container {
-	string id = 1 [(gogoproto.customname) = "ID"];
-	string bundle = 2;
-	Status status = 4;
-}
-
-message Process {
-	uint32 pid = 1;
-	repeated string args = 2;
-	repeated string env = 3;
-	User user = 4;
-	string cwd = 5;
-	bool terminal = 6;
-	uint32 exit_status = 7;
-}
-
-enum Status {
-	CREATED = 0;
-	RUNNING = 1;
-	STOPPED = 2;
-	PAUSED = 3;
-}
-
-message User {
-	uint32 uid = 1;
-	uint32 gid = 2;
-	repeated uint32 additionalGids = 3;
+	types.Process process = 1;
 }
 
 message GetContainerRequest {
@@ -100,7 +73,7 @@ message GetContainerRequest {
 }
 
 message GetContainerResponse {
-	Container container = 1;
+	types.Container container = 1;
 }
 
 message UpdateContainerRequest {
@@ -122,7 +95,7 @@ message GetProcessRequest {
 }
 
 message GetProcessResponse {
-	Process process = 1;
+	types.Process process = 1;
 }
 
 message SignalProcessRequest {
@@ -141,5 +114,5 @@ message ListProcessesRequest {
 }
 
 message ListProcessesResponse {
-	repeated Process processes = 1;
+	repeated types.Process processes = 1;
 }

@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package containerd.v1.types;
+
+import "github.com/docker/containerd/api/types/user/user.proto";
+import "github.com/docker/containerd/api/types/state/state.proto";
+
+message Process {
+	uint32 pid = 1;
+	repeated string args = 2;
+	repeated string env = 3;
+	User user = 4;
+	string cwd = 5;
+	bool terminal = 6;
+	State state = 7; // only used by shim at the moment
+	uint32 exit_status = 8;
+}

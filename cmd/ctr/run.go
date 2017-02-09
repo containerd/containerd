@@ -10,7 +10,7 @@ import (
 	gocontext "context"
 
 	"github.com/crosbymichael/console"
-	"github.com/docker/containerd/api/execution"
+	"github.com/docker/containerd/api/services/execution"
 	execEvents "github.com/docker/containerd/execution"
 	"github.com/nats-io/go-nats"
 	"github.com/nats-io/go-nats-streaming"

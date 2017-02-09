@@ -11,7 +11,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd"
-	apishim "github.com/docker/containerd/api/shim"
+	shimapi "github.com/docker/containerd/api/services/shim"
 	"github.com/docker/containerd/shim"
 	"github.com/docker/containerd/sys"
 	"github.com/docker/containerd/utils"
@@ -57,7 +57,7 @@ func main() {
 			sv     = shim.New()
 		)
 		logrus.Debug("registering grpc server")
-		apishim.RegisterShimServer(server, sv)
+		shimapi.RegisterShimServer(server, sv)
 		if err := serve(server, "shim.sock"); err != nil {
 			return err
 		}

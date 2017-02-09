@@ -7,7 +7,8 @@ import (
 
 	gocontext "context"
 
-	"github.com/docker/containerd/api/execution"
+	"github.com/docker/containerd/api/services/execution"
+	"github.com/docker/containerd/api/types/process"
 	"github.com/urfave/cli"
 )
 
@@ -48,7 +49,7 @@ var execCommand = cli.Command{
 		id := context.String("id")
 		sOpts := &execution.StartProcessRequest{
 			ContainerID: id,
-			Process: &execution.Process{
+			Process: &process.Process{
 				Cwd:      context.String("cwd"),
 				Terminal: context.Bool("tty"),
 				Args:     context.Args(),

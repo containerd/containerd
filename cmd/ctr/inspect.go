@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/docker/containerd/api/execution"
+	"github.com/docker/containerd/api/services/execution"
 	"github.com/urfave/cli"
 )
 
