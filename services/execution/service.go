@@ -67,6 +67,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 			Stderr:   r.Stderr,
 			Terminal: r.Terminal,
 		},
+		ExtraFds: r.ExtraFds,
 	}
 	for _, m := range r.Rootfs {
 		opts.Rootfs = append(opts.Rootfs, containerd.Mount{

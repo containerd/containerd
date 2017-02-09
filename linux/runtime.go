@@ -57,7 +57,13 @@ func (r *Runtime) Create(ctx context.Context, id string, opts containerd.CreateO
 	if err != nil {
 		return nil, err
 	}
-	s, err := newShim(path)
+
+	extraFiles, err := openExtraFiles(opts.ExtraFds)
+	if err != nil {
+		return nil, err
+	}
+
+	s, err := newShim(path, extraFiles)
 	if err != nil {
 		os.RemoveAll(path)
 		return nil, err
@@ -67,13 +73,14 @@ func (r *Runtime) Create(ctx context.Context, id string, opts containerd.CreateO
 		return nil, err
 	}
 	sopts := &shim.CreateRequest{
-		ID:       id,
-		Bundle:   path,
-		Runtime:  "runc",
-		Stdin:    opts.IO.Stdin,
-		Stdout:   opts.IO.Stdout,
-		Stderr:   opts.IO.Stderr,
-		Terminal: opts.IO.Terminal,
+		ID:          id,
+		Bundle:      path,
+		Runtime:     "runc",
+		Stdin:       opts.IO.Stdin,
+		Stdout:      opts.IO.Stdout,
+		Stderr:      opts.IO.Stderr,
+		Terminal:    opts.IO.Terminal,
+		PreserveFds: uint32(len(extraFiles)),
 	}
 	for _, m := range opts.Rootfs {
 		sopts.Rootfs = append(sopts.Rootfs, &mount.Mount{

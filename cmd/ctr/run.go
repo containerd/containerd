@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 
 	gocontext "context"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/crosbymichael/console"
 	"github.com/docker/containerd/api/services/execution"
+	"github.com/docker/containerd/api/types/container"
 	"github.com/docker/containerd/api/types/mount"
 	protobuf "github.com/gogo/protobuf/types"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -168,6 +170,10 @@ var runCommand = cli.Command{
 			Usage: "path to the container's root filesystem",
 		},
 		cli.StringFlag{
+			Name:  "tap-device",
+			Usage: "tap device to pass as an fd NAME=MAC (MAC in xx:xx:xx:xx:xx:xx syntax)",
+		},
+		cli.StringFlag{
 			Name:  "runtime-config",
 			Usage: "custom runtime config (config.json)",
 		},
@@ -186,6 +192,19 @@ var runCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+
+		var ExtraFds []*container.ExtraFd
+		if tap := context.String("tap-device"); tap != "" {
+			spl := strings.SplitN(tap, "=", 2)
+			if len(spl) != 2 {
+				return errors.New("Invalid syntax for --tap-device option")
+			}
+			ExtraFds = append(ExtraFds, &container.ExtraFd{
+				Kind: container.ExtraFd_TAP,
+				Args: []string{spl[0], spl[1]},
+			})
+		}
+
 		events, err := containers.Events(gocontext.Background(), &execution.EventsRequest{})
 		if err != nil {
 			return err
@@ -227,6 +246,7 @@ var runCommand = cli.Command{
 			Stdin:    filepath.Join(tmpDir, "stdin"),
 			Stdout:   filepath.Join(tmpDir, "stdout"),
 			Stderr:   filepath.Join(tmpDir, "stderr"),
+			ExtraFds: ExtraFds,
 		}
 		if create.Terminal {
 			con := console.Current()

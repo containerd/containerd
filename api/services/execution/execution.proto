@@ -26,6 +26,7 @@ message CreateRequest {
 	string stdout = 6;
 	string stderr = 7;
 	bool terminal = 8;
+	repeated containerd.v1.types.ExtraFd extraFds = 9;
 }
 
 message CreateResponse {

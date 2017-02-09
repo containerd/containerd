@@ -5,8 +5,11 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
+
+	"github.com/pkg/errors"
 
 	"google.golang.org/grpc"
 
@@ -88,7 +91,17 @@ func setupSignals() (chan os.Signal, error) {
 // serve serves the grpc API over a unix socket at the provided path
 // this function does not block
 func serve(server *grpc.Server, path string) error {
-	l, err := net.FileListener(os.NewFile(3, "socket"))
+	fdstr := os.Getenv("CONTAINERD_SHIM_GRPC_FD")
+	if fdstr == "" {
+		return errors.New("Missing CONTAINERD_SHIM_GRPC_FD environment variable")
+	}
+
+	fd, err := strconv.Atoi(fdstr)
+	if err != nil {
+		return err
+	}
+
+	l, err := net.FileListener(os.NewFile(uintptr(fd), "socket"))
 	if err != nil {
 		return err
 	}
