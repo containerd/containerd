@@ -86,7 +86,7 @@ func parseMountOptions(options []string) (int, string) {
 		// then it is a data value for a specific fs type
 		if f, exists := flags[o]; exists && f.flag != 0 {
 			if f.clear {
-				flag &= ^f.flag
+				flag &^= f.flag
 			} else {
 				flag |= f.flag
 			}

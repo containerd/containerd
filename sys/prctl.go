@@ -26,7 +26,7 @@ const prSetChildSubreaper = 36
 
 // PR_GET_CHILD_SUBREAPER allows retrieving the current child
 // subreaper.
-// Return the "child subreaper" setting of the caller, in the
+// Returns the "child subreaper" setting of the caller, in the
 // location pointed to by (int *) arg2.
 const prGetChildSubreaper = 37
 
