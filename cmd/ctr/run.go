@@ -103,7 +103,7 @@ var runCommand = cli.Command{
 		}
 
 		if _, err := executionService.StartContainer(gocontext.Background(), &execution.StartContainerRequest{
-			ID: cr.Container.ID,
+			ID: id,
 		}); err != nil {
 			return errors.Wrap(err, "StartContainer RPC failed")
 		}
@@ -121,7 +121,7 @@ var runCommand = cli.Command{
 					continue
 				}
 
-				if e.ID == cr.Container.ID && e.Pid == cr.InitProcess.Pid {
+				if e.ID == id && e.Pid == cr.InitPid {
 					ec = e.ExitStatus
 					break eventLoop
 				}
@@ -133,7 +133,7 @@ var runCommand = cli.Command{
 		}
 
 		if _, err := executionService.DeleteContainer(gocontext.Background(), &execution.DeleteContainerRequest{
-			ID: cr.Container.ID,
+			ID: id,
 		}); err != nil {
 			return errors.Wrap(err, "DeleteContainer RPC failed")
 		}

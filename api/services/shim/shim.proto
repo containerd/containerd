@@ -103,7 +103,7 @@ message StateResponse {
 	string id = 1 [(gogoproto.customname) = "ID"];
 	string bundle = 2;
 	uint32 initPid = 3;
-	repeated types.Process processes = 4;
+	repeated types.ProcessState processes = 4;
 }
 
 message PauseRequest {

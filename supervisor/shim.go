@@ -32,6 +32,7 @@ func newShimClient(root, id string) (*shimClient, error) {
 		Setpgid: true,
 	}
 	if err := cmd.Start(); err != nil {
+		os.RemoveAll(root)
 		return nil, errors.Wrapf(err, "failed to start shim")
 	}
 
@@ -40,6 +41,7 @@ func newShimClient(root, id string) (*shimClient, error) {
 	if err != nil {
 		syscall.Kill(cmd.Process.Pid, syscall.SIGKILL)
 		cmd.Wait()
+		os.RemoveAll(root)
 		return nil, err
 	}
 
@@ -68,7 +70,7 @@ func loadShimClient(root, id string) (*shimClient, error) {
 		return nil, err
 	}
 
-	resp, err := client.State(context.Background(), &shim.StateRequest{})
+	resp, err := client.State(context.Background(), &shim.StateRequest{}, grpc.FailFast(false))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to fetch state for container %s", id)
 	}
@@ -149,8 +151,6 @@ func connectToShim(socket string) (shim.ShimClient, error) {
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
 			return net.DialTimeout("unix", socket, timeout)
 		}),
-		grpc.WithBlock(),
-		grpc.WithTimeout(2*time.Second),
 	)
 	conn, err := grpc.Dial(fmt.Sprintf("unix://%s", socket), dialOpts...)
 	if err != nil {

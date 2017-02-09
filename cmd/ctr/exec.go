@@ -8,7 +8,6 @@ import (
 	gocontext "context"
 
 	"github.com/docker/containerd/api/services/execution"
-	"github.com/docker/containerd/api/types/process"
 	"github.com/urfave/cli"
 )
 
@@ -49,7 +48,7 @@ var execCommand = cli.Command{
 		id := context.String("id")
 		sOpts := &execution.StartProcessRequest{
 			ContainerID: id,
-			Process: &process.Process{
+			Process: &execution.Process{
 				Cwd:      context.String("cwd"),
 				Terminal: context.Bool("tty"),
 				Args:     context.Args(),
@@ -73,7 +72,7 @@ var execCommand = cli.Command{
 
 		_, err = executionService.DeleteProcess(gocontext.Background(), &execution.DeleteProcessRequest{
 			ContainerID: id,
-			Pid:         sr.Process.Pid,
+			Pid:         sr.Pid,
 		})
 		if err != nil {
 			return err

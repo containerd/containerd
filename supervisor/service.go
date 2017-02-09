@@ -7,12 +7,16 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
+
+	"google.golang.org/grpc"
 
 	executionapi "github.com/docker/containerd/api/services/execution"
 	"github.com/docker/containerd/api/services/shim"
 	"github.com/docker/containerd/api/types/container"
 	"github.com/docker/containerd/api/types/process"
+	"github.com/docker/containerd/api/types/state"
 	"github.com/docker/containerd/events"
 	"github.com/docker/containerd/execution"
 	"github.com/docker/containerd/log"
@@ -81,9 +85,6 @@ func (s *Service) CreateContainer(ctx context.Context, r *executionapi.CreateCon
 		}
 	}()
 
-	if err := s.monitor(events.GetPoster(ctx), client); err != nil {
-		return nil, err
-	}
 	createResponse, err := client.Create(ctx, &shim.CreateRequest{
 		ID:       r.ID,
 		Bundle:   r.BundlePath,
@@ -91,18 +92,16 @@ func (s *Service) CreateContainer(ctx context.Context, r *executionapi.CreateCon
 		Stdin:    r.Stdin,
 		Stdout:   r.Stdout,
 		Stderr:   r.Stderr,
-	})
+	}, grpc.FailFast(false))
 	if err != nil {
 		return nil, errors.Wrapf(err, "shim create request failed")
 	}
+	if err = s.monitor(events.GetPoster(ctx), client); err != nil {
+		return nil, err
+	}
 	client.initPid = createResponse.Pid
 	return &executionapi.CreateContainerResponse{
-		Container: &container.Container{
-			ID: r.ID,
-		},
-		InitProcess: &process.Process{
-			Pid: createResponse.Pid,
-		},
+		InitPid: createResponse.Pid,
 	}, nil
 }
 
@@ -151,15 +150,22 @@ func (s *Service) GetContainer(ctx context.Context, r *executionapi.GetContainer
 	if err != nil {
 		return nil, err
 	}
-	state, err := client.State(ctx, &shim.StateRequest{})
+	sr, err := client.State(ctx, &shim.StateRequest{})
 	if err != nil {
 		return nil, err
 	}
+	var initState state.State
+	for _, p := range sr.Processes {
+		if p.Pid == sr.InitPid {
+			initState = state.State(p.State)
+			break
+		}
+	}
 	return &executionapi.GetContainerResponse{
 		Container: &container.Container{
-			ID:     state.ID,
-			Bundle: state.Bundle,
-			// TODO: add processes
+			ID:     sr.ID,
+			Bundle: sr.Bundle,
+			State:  initState,
 		},
 	}, nil
 }
@@ -213,17 +219,57 @@ func (s *Service) StartProcess(ctx context.Context, r *executionapi.StartProcess
 	}
 	r.Process.Pid = resp.Pid
 	return &executionapi.StartProcessResponse{
-		Process: r.Process,
+		Pid: resp.Pid,
 	}, nil
 }
 
 // containerd managed execs + system pids forked in container
 func (s *Service) GetProcess(ctx context.Context, r *executionapi.GetProcessRequest) (*executionapi.GetProcessResponse, error) {
-	panic("not implemented")
+	client, err := s.getShim(r.ContainerID)
+	if err != nil {
+		return nil, err
+	}
+	sr, err := client.State(ctx, &shim.StateRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, p := range sr.Processes {
+		if p.Pid == r.Pid {
+			return &executionapi.GetProcessResponse{
+				State: state.State(p.State),
+			}, nil
+		}
+	}
+
+	return nil, errors.Errorf("no such process %s:%u", r.ContainerID, r.Pid)
 }
 
 func (s *Service) SignalProcess(ctx context.Context, r *executionapi.SignalProcessRequest) (*google_protobuf.Empty, error) {
-	panic("not implemented")
+	client, err := s.getShim(r.ContainerID)
+	if err != nil {
+		return nil, err
+	}
+	sr, err := client.State(ctx, &shim.StateRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, p := range sr.Processes {
+		if p.Pid == r.Pid {
+			if p.State == state.State_STOPPED {
+				return nil, errors.Errorf("process %u is stopped", p.Pid)
+			}
+
+			err := syscall.Kill(int(r.Pid), syscall.Signal(int(r.Signal)))
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to signal process %u with %v", r.Pid, r.Signal)
+			}
+			return empty, nil
+		}
+	}
+
+	return nil, errors.Errorf("no such process %s:%u", r.ContainerID, r.Pid)
 }
 
 func (s *Service) DeleteProcess(ctx context.Context, r *executionapi.DeleteProcessRequest) (*google_protobuf.Empty, error) {
@@ -244,7 +290,29 @@ func (s *Service) DeleteProcess(ctx context.Context, r *executionapi.DeleteProce
 }
 
 func (s *Service) ListProcesses(ctx context.Context, r *executionapi.ListProcessesRequest) (*executionapi.ListProcessesResponse, error) {
-	panic("not implemented")
+	client, err := s.getShim(r.ContainerID)
+	if err != nil {
+		return nil, err
+	}
+	sr, err := client.State(ctx, &shim.StateRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	states := make([]*process.ProcessState, 0, len(sr.Processes))
+	for _, p := range sr.Processes {
+		// TODO: revisit once we move to 1.8 we should be able to directly use that type
+		s := process.ProcessState{
+			Pid:   p.Pid,
+			State: state.State(p.State),
+		}
+		states = append(states, &s)
+	}
+
+	return &executionapi.ListProcessesResponse{
+		InitPid:   sr.InitPid,
+		Processes: states,
+	}, nil
 }
 
 // monitor monitors the shim's event rpc and forwards container and process
