@@ -51,6 +51,7 @@ var shimCommand = cli.Command{
 		shimEventsCommand,
 		shimStateCommand,
 		shimExecCommand,
+		shimLogsCommand,
 	},
 }
 
@@ -272,6 +273,23 @@ var shimEventsCommand = cli.Command{
 			}
 			fmt.Printf("type=%s id=%s pid=%d status=%d\n", e.Type, e.ID, e.Pid, e.ExitStatus)
 		}
+		return nil
+	},
+}
+
+var shimLogsCommand = cli.Command{
+	Name:  "logs",
+	Usage: "get logs for a shim",
+	Action: func(context *cli.Context) error {
+		service, err := getShimService()
+		if err != nil {
+			return err
+		}
+		logs, err := service.GetLog(gocontext.Background(), &shim.GetLogRequest{})
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%s\n", string(logs.Log))
 		return nil
 	},
 }

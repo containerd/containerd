@@ -186,3 +186,14 @@ func (s *Service) ProcessExit(e utils.Exit) error {
 	s.mu.Unlock()
 	return nil
 }
+
+func (s *Service) GetLog(ctx context.Context, r *apishim.GetLogRequest) (*apishim.GetLogResponse, error) {
+	log, _, err := readInitProcessLog()
+	if err != nil {
+		return nil, err
+	}
+	o := &apishim.GetLogResponse{
+		Log: log,
+	}
+	return o, nil
+}

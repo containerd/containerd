@@ -15,6 +15,7 @@ service Shim {
 	rpc State(StateRequest) returns (StateResponse);
 	rpc Pause(PauseRequest) returns (google.protobuf.Empty);
 	rpc Resume(ResumeRequest) returns (google.protobuf.Empty);
+	rpc GetLog(GetLogRequest) returns (GetLogResponse);
 }
 
 message CreateRequest {
@@ -126,4 +127,12 @@ message PauseRequest {
 }
 
 message ResumeRequest {
+}
+
+message GetLogRequest {
+}
+
+message GetLogResponse {
+// TODO: add format type? (JSON|Text)
+	bytes log = 1;
 }
