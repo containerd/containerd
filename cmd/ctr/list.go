@@ -22,7 +22,7 @@ var listCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Printf("ID\tSTATUS\tPROCS\tBUNDLE\n")
+		fmt.Println("ID\tSTATUS\tPROCS\tBUNDLE")
 		for _, c := range listResponse.Containers {
 			listProcResponse, err := executionService.ListProcesses(gocontext.Background(),
 				&execution.ListProcessesRequest{ContainerID: c.ID})

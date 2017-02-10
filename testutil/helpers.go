@@ -60,7 +60,7 @@ func DumpDir(t *testing.T, root string) {
 		} else if fi.Mode().IsRegular() {
 			p, err := ioutil.ReadFile(path)
 			if err != nil {
-				t.Log("error reading file: %v", err)
+				t.Logf("error reading file: %v", err)
 				return nil
 			}
 

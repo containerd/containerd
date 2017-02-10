@@ -110,7 +110,7 @@ func main() {
 
 		debugPath := context.GlobalString("debug-socket")
 		if debugPath == "" {
-			return fmt.Errorf("--debug-socket path cannot be empty")
+			return errors.New("--debug-socket path cannot be empty")
 		}
 		d, err := utils.CreateUnixSocket(debugPath)
 		if err != nil {
@@ -125,7 +125,7 @@ func main() {
 
 		path := context.GlobalString("socket")
 		if path == "" {
-			return fmt.Errorf("--socket path cannot be empty")
+			return errors.New("--socket path cannot be empty")
 		}
 		l, err := utils.CreateUnixSocket(path)
 		if err != nil {

@@ -20,6 +20,7 @@ import (
 	"github.com/crosbymichael/console"
 	"github.com/docker/containerd/api/shim"
 	"github.com/urfave/cli"
+	"github.com/pkg/errors"
 )
 
 var fifoFlags = []cli.Flag{
@@ -75,7 +76,7 @@ var shimCreateCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		id := context.Args().First()
 		if id == "" {
-			return fmt.Errorf("container id must be provided")
+			return errors.New("container id must be provided")
 		}
 		service, err := getShimService()
 		if err != nil {
