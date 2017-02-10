@@ -52,11 +52,11 @@ var fetchCommand = cli.Command{
 		}
 
 		if locator == "" {
-			return fmt.Errorf("containerd: remote required")
+			return errors.New("containerd: remote required")
 		}
 
 		if len(args) < 1 {
-			return fmt.Errorf("containerd: object required")
+			return errors.New("containerd: object required")
 		}
 
 		object := args[0]
