@@ -5,7 +5,7 @@ While containerd is a daemon that provides API to manage multiple containers, th
 
 ## containerd
 
-The daemon provides an API to manage multiple containers.  It can handle locking in process where needed to cordinate tasks between subsystems.  While the daemon does fork off the needed processes to run containers, the shim and runc, these are re-parented to the system's init.
+The daemon provides an API to manage multiple containers.  It can handle locking in process where needed to coordinate tasks between subsystems.  While the daemon does fork off the needed processes to run containers, the shim and runc, these are re-parented to the system's init.
 
 ## shim
 

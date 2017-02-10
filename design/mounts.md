@@ -13,7 +13,7 @@ unit and unmounted as a unit.
 From an architecture perspective, components produce mounts and runtime
 executors consume them.
 
-More imaginitive use cases include the ability to virtualize a series of mounts
+More imaginative use cases include the ability to virtualize a series of mounts
 from various components without ever having to create a runtime. This will aid
 in testing and implementation of satellite components.
 
