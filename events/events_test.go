@@ -22,7 +22,7 @@ func TestBasicEvent(t *testing.T) {
 
 		ctx = WithTopic(ctx, "content")
 		// simulate sub-operations with a separate topic, on the content store
-		G(ctx).Post(ctx, fmt.Sprintf("received sha:256"))
+		G(ctx).Post(ctx, fmt.Sprint("received sha:256"))
 
 		G(ctx).Post(ctx, fmt.Sprintf("unpack layer %v", layer))
 
