@@ -6,47 +6,33 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/docker/containerd"
-	"github.com/docker/containerd/log"
+	"github.com/docker/containerd/snapshot"
 	"github.com/pkg/errors"
 	"github.com/stevvooe/go-btrfs"
 )
 
-type Driver struct {
+type Snapshotter struct {
 	device string // maybe we can resolve it with path?
 	root   string // root provides paths for internal storage.
 }
 
-func NewDriver(device, root string) (*Driver, error) {
-	return &Driver{device: device, root: root}, nil
-}
-
-func (b *Driver) Prepare(key, parent string) ([]containerd.Mount, error) {
-	return b.makeActive(key, parent, false)
-}
-
-func (b *Driver) View(key, parent string) ([]containerd.Mount, error) {
-	return b.makeActive(key, parent, true)
-}
-
-func (b *Driver) makeActive(key, parent string, readonly bool) ([]containerd.Mount, error) {
+func NewSnapshotter(device, root string) (*Snapshotter, error) {
 	var (
-		active     = filepath.Join(b.root, "active")
-		parents    = filepath.Join(b.root, "parents")
-		snapshots  = filepath.Join(b.root, "snapshots")
-		names      = filepath.Join(b.root, "names")
-		keyh       = hash(key)
-		parenth    = hash(parent)
-		dir        = filepath.Join(active, keyh)
-		namep      = filepath.Join(names, keyh)
-		parentlink = filepath.Join(parents, keyh)
-		parentp    = filepath.Join(snapshots, parenth)
+		active    = filepath.Join(root, "active")
+		snapshots = filepath.Join(root, "snapshots")
+		parents   = filepath.Join(root, "parents")
+		index     = filepath.Join(root, "index")
+		names     = filepath.Join(root, "names")
 	)
 
 	for _, path := range []string{
 		active,
+		snapshots,
 		parents,
+		index,
 		names,
 	} {
 		if err := os.MkdirAll(path, 0755); err != nil {
@@ -54,15 +40,118 @@ func (b *Driver) makeActive(key, parent string, readonly bool) ([]containerd.Mou
 		}
 	}
 
+	return &Snapshotter{device: device, root: root}, nil
+}
+
+// Stat returns the info for an active or committed snapshot by name or
+// key.
+//
+// Should be used for parent resolution, existence checks and to discern
+// the kind of snapshot.
+func (b *Snapshotter) Stat(key string) (snapshot.Info, error) {
+	// resolve the snapshot out of the index.
+	target, err := os.Readlink(filepath.Join(b.root, "index", hash(key)))
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return snapshot.Info{}, err
+		}
+
+		return snapshot.Info{}, errors.Errorf("snapshot %v not found", key)
+	}
+
+	return b.stat(target)
+}
+
+func (b *Snapshotter) stat(target string) (snapshot.Info, error) {
+	var (
+		parents    = filepath.Join(b.root, "parents")
+		names      = filepath.Join(b.root, "names")
+		namep      = filepath.Join(names, filepath.Base(target))
+		parentlink = filepath.Join(parents, filepath.Base(target))
+	)
+
+	// grab information about the subvolume
+	info, err := btrfs.SubvolInfo(target)
+	if err != nil {
+		return snapshot.Info{}, err
+	}
+
+	// read the name out of the names!
+	nameraw, err := ioutil.ReadFile(namep)
+	if err != nil {
+		return snapshot.Info{}, err
+	}
+
+	// resolve the parents path.
+	parentp, err := os.Readlink(parentlink)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return snapshot.Info{}, err
+		}
+
+		// no parent!
+	}
+
+	var parent string
+	if parentp != "" {
+		// okay, grab the basename of the parent and look up its name!
+		parentnamep := filepath.Join(names, filepath.Base(parentp))
+
+		p, err := ioutil.ReadFile(parentnamep)
+		if err != nil {
+			return snapshot.Info{}, err
+		}
+
+		parent = string(p)
+	}
+
+	kind := snapshot.KindCommitted
+	if strings.HasPrefix(target, filepath.Join(b.root, "active")) {
+		kind = snapshot.KindActive
+	}
+
+	return snapshot.Info{
+		Name:     string(nameraw),
+		Parent:   parent,
+		Readonly: info.Readonly,
+		Kind:     kind,
+	}, nil
+
+}
+
+func (b *Snapshotter) Prepare(key, parent string) ([]containerd.Mount, error) {
+	return b.makeActive(key, parent, false)
+}
+
+func (b *Snapshotter) View(key, parent string) ([]containerd.Mount, error) {
+	return b.makeActive(key, parent, true)
+}
+
+func (b *Snapshotter) makeActive(key, parent string, readonly bool) ([]containerd.Mount, error) {
+	var (
+		active     = filepath.Join(b.root, "active")
+		snapshots  = filepath.Join(b.root, "snapshots")
+		parents    = filepath.Join(b.root, "parents")
+		index      = filepath.Join(b.root, "index")
+		names      = filepath.Join(b.root, "names")
+		keyh       = hash(key)
+		parenth    = hash(parent)
+		target     = filepath.Join(active, keyh)
+		namep      = filepath.Join(names, keyh)
+		indexlink  = filepath.Join(index, keyh)
+		parentlink = filepath.Join(parents, keyh)
+		parentp    = filepath.Join(snapshots, parenth) // parent must be restricted to snaps
+	)
+
 	if parent == "" {
 		// create new subvolume
 		// btrfs subvolume create /dir
-		if err := btrfs.SubvolCreate(dir); err != nil {
+		if err := btrfs.SubvolCreate(target); err != nil {
 			return nil, err
 		}
 	} else {
 		// btrfs subvolume snapshot /parent /subvol
-		if err := btrfs.SubvolSnapshot(dir, parentp, readonly); err != nil {
+		if err := btrfs.SubvolSnapshot(target, parentp, readonly); err != nil {
 			return nil, err
 		}
 
@@ -71,14 +160,19 @@ func (b *Driver) makeActive(key, parent string, readonly bool) ([]containerd.Mou
 		}
 	}
 
+	// write in the name
 	if err := ioutil.WriteFile(namep, []byte(key), 0644); err != nil {
 		return nil, err
 	}
 
-	return b.mounts(dir)
+	if err := os.Symlink(target, indexlink); err != nil {
+		return nil, err
+	}
+
+	return b.mounts(target)
 }
 
-func (b *Driver) mounts(dir string) ([]containerd.Mount, error) {
+func (b *Snapshotter) mounts(dir string) ([]containerd.Mount, error) {
 	var options []string
 
 	// get the subvolume id back out for the mount
@@ -104,12 +198,13 @@ func (b *Driver) mounts(dir string) ([]containerd.Mount, error) {
 	}, nil
 }
 
-func (b *Driver) Commit(name, key string) error {
+func (b *Snapshotter) Commit(name, key string) error {
 	var (
 		active        = filepath.Join(b.root, "active")
 		snapshots     = filepath.Join(b.root, "snapshots")
-		names         = filepath.Join(b.root, "names")
+		index         = filepath.Join(b.root, "index")
 		parents       = filepath.Join(b.root, "parents")
+		names         = filepath.Join(b.root, "names")
 		keyh          = hash(key)
 		nameh         = hash(name)
 		dir           = filepath.Join(active, keyh)
@@ -118,6 +213,8 @@ func (b *Driver) Commit(name, key string) error {
 		namep         = filepath.Join(names, nameh)
 		keyparentlink = filepath.Join(parents, keyh)
 		parentlink    = filepath.Join(parents, nameh)
+		keyindexlink  = filepath.Join(index, keyh)
+		indexlink     = filepath.Join(index, nameh)
 	)
 
 	info, err := btrfs.SubvolInfo(dir)
@@ -143,14 +240,16 @@ func (b *Driver) Commit(name, key string) error {
 		return err
 	}
 
-	fmt.Println("commit snapshot", target)
 	if err := btrfs.SubvolSnapshot(target, dir, true); err != nil {
-		fmt.Println("snapshot error")
 		return err
 	}
 
 	// remove the key name path as we no longer need it.
 	if err := os.Remove(keynamep); err != nil {
+		return err
+	}
+
+	if err := os.Remove(keyindexlink); err != nil {
 		return err
 	}
 
@@ -169,6 +268,10 @@ func (b *Driver) Commit(name, key string) error {
 		// into common storage, so let's not fret over it for now.
 	}
 
+	if err := os.Symlink(target, indexlink); err != nil {
+		return err
+	}
+
 	if err := btrfs.SubvolDelete(dir); err != nil {
 		return errors.Wrapf(err, "delete subvol failed on %v", dir)
 	}
@@ -180,82 +283,54 @@ func (b *Driver) Commit(name, key string) error {
 // called on an read-write or readonly transaction.
 //
 // This can be used to recover mounts after calling View or Prepare.
-func (b *Driver) Mounts(key string) ([]containerd.Mount, error) {
+func (b *Snapshotter) Mounts(key string) ([]containerd.Mount, error) {
 	dir := filepath.Join(b.root, "active", hash(key))
 	return b.mounts(dir)
 }
 
 // Remove abandons the transaction identified by key. All resources
 // associated with the key will be removed.
-func (b *Driver) Remove(key string) error {
+func (b *Snapshotter) Remove(key string) error {
 	panic("not implemented")
 }
-
-// Parent returns the parent of snapshot identified by name.
-func (b *Driver) Parent(name string) (string, error) {
-	var (
-		parents    = filepath.Join(b.root, "parents")
-		names      = filepath.Join(b.root, "names")
-		parentlink = filepath.Join(parents, hash(name))
-	)
-
-	parentp, err := os.Readlink(parentlink)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return "", err
-		}
-
-		return "", nil // no parent!
-	}
-
-	// okay, grab the basename of the parent and look up its name!
-	parentnamep := filepath.Join(names, filepath.Base(parentp))
-
-	p, err := ioutil.ReadFile(parentnamep)
-	if err != nil {
-		return "", err
-	}
-
-	return string(p), nil
-}
-
-// Exists returns true if the snapshot with name exists.
-func (b *Driver) Exists(name string) bool {
-	target := filepath.Join(b.root, "snapshots", hash(name))
-
-	if _, err := os.Stat(target); err != nil {
-		if !os.IsNotExist(err) {
-			// TODO(stevvooe): Very rare condition when this fails horribly,
-			// such as an access error. Ideally, Exists is simple, but we may
-			// consider returning an error.
-			log.L.WithError(err).Fatal("error encountered checking for snapshot existence")
-		}
-
-		return false
-	}
-
-	return true
-}
-
-// Delete the snapshot idenfitied by name.
-//
-// If name has children, the operation will fail.
-func (b *Driver) Delete(name string) error {
-	panic("not implemented")
-}
-
-// TODO(stevvooe): The methods below are still in flux. We'll need to work
-// out the roles of active and committed snapshots for this to become more
-// clear.
 
 // Walk the committed snapshots.
-func (b *Driver) Walk(fn func(name string) error) error {
-	panic("not implemented")
-}
+func (b *Snapshotter) Walk(fn func(snapshot.Info) error) error {
+	// TODO(stevvooe): Copy-pasted almost verbatim from overlay. Really need to
+	// unify the metadata for snapshot implementations.
+	root := filepath.Join(b.root, "index")
+	return filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 
-// Active will call fn for each active transaction.
-func (b *Driver) Active(fn func(key string) error) error {
-	panic("not implemented")
+		if path == root {
+			return nil
+		}
+
+		if fi.Mode()&os.ModeSymlink == 0 {
+			// only follow links
+			return filepath.SkipDir
+		}
+
+		target, err := os.Readlink(path)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				return err
+			}
+		}
+
+		si, err := b.stat(target)
+		if err != nil {
+			return err
+		}
+
+		if err := fn(si); err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 func hash(k string) string {

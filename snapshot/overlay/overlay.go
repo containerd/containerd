@@ -9,33 +9,98 @@ import (
 	"sync"
 
 	"github.com/docker/containerd"
+	"github.com/docker/containerd/snapshot"
 	digest "github.com/opencontainers/go-digest"
+	"github.com/pkg/errors"
 )
 
-type Driver struct {
+type Snapshotter struct {
 	root  string
-	cache *cache
+	links *cache
 }
 
-func NewDriver(root string) (*Driver, error) {
+func NewSnapshotter(root string) (*Snapshotter, error) {
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
 	}
 	for _, p := range []string{
-		"snapshots",
-		"active",
+		"committed", // committed snapshots
+		"active",    // active snapshots
+		"index",     // snapshots by hashed name
 	} {
 		if err := os.MkdirAll(filepath.Join(root, p), 0700); err != nil {
 			return nil, err
 		}
 	}
-	return &Driver{
+	return &Snapshotter{
 		root:  root,
-		cache: newCache(),
+		links: newCache(),
 	}, nil
 }
 
-func (o *Driver) Prepare(key, parent string) ([]containerd.Mount, error) {
+// Stat returns the info for an active or committed snapshot by name or
+// key.
+//
+// Should be used for parent resolution, existence checks and to discern
+// the kind of snapshot.
+func (o *Snapshotter) Stat(key string) (snapshot.Info, error) {
+	path, err := o.links.get(filepath.Join(o.root, "index", hash(key)))
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return snapshot.Info{}, err
+		}
+
+		return snapshot.Info{}, errors.Errorf("snapshot %v not found", key)
+	}
+
+	// TODO(stevvooe): We don't confirm the name to avoid the lookup cost.
+	return o.stat(path)
+}
+
+func (o *Snapshotter) stat(path string) (snapshot.Info, error) {
+	ppath, err := o.links.get(filepath.Join(path, "parent"))
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return snapshot.Info{}, err
+		}
+
+		// no parent
+	}
+
+	kp, err := ioutil.ReadFile(filepath.Join(path, "name"))
+	if err != nil {
+		return snapshot.Info{}, err
+	}
+
+	var parent string
+	if ppath != "" {
+		p, err := ioutil.ReadFile(filepath.Join(ppath, "name"))
+		if err != nil {
+			return snapshot.Info{}, err
+		}
+		parent = string(p)
+	}
+
+	ro := true
+	kind := snapshot.KindCommitted
+	if strings.HasPrefix(path, filepath.Join(o.root, "active")) {
+		// TODO(stevvooe): Maybe there is a better way?
+		kind = snapshot.KindActive
+
+		// TODO(stevvooe): We haven't introduced this to overlay yet.
+		// We'll add it when we add tests for it.
+		ro = false
+	}
+
+	return snapshot.Info{
+		Name:     string(kp),
+		Parent:   parent,
+		Kind:     kind,
+		Readonly: ro,
+	}, nil
+}
+
+func (o *Snapshotter) Prepare(key, parent string) ([]containerd.Mount, error) {
 	active, err := o.newActiveDir(key)
 	if err != nil {
 		return nil, err
@@ -45,10 +110,10 @@ func (o *Driver) Prepare(key, parent string) ([]containerd.Mount, error) {
 			return nil, err
 		}
 	}
-	return o.Mounts(key)
+	return active.mounts(o.links)
 }
 
-func (o *Driver) View(key, parent string) ([]containerd.Mount, error) {
+func (o *Snapshotter) View(key, parent string) ([]containerd.Mount, error) {
 	panic("not implemented")
 }
 
@@ -56,70 +121,69 @@ func (o *Driver) View(key, parent string) ([]containerd.Mount, error) {
 // called on an read-write or readonly transaction.
 //
 // This can be used to recover mounts after calling View or Prepare.
-func (o *Driver) Mounts(key string) ([]containerd.Mount, error) {
+func (o *Snapshotter) Mounts(key string) ([]containerd.Mount, error) {
 	active := o.getActive(key)
-	return active.mounts(o.cache)
+	return active.mounts(o.links)
 }
 
-func (o *Driver) Commit(name, key string) error {
+func (o *Snapshotter) Commit(name, key string) error {
 	active := o.getActive(key)
-	return active.commit(name, o.cache)
+	return active.commit(name, o.links)
 }
 
 // Remove abandons the transaction identified by key. All resources
 // associated with the key will be removed.
-func (o *Driver) Remove(key string) error {
-	panic("not implemented")
-}
-
-// Parent returns the parent of snapshot identified by name.
-func (o *Driver) Parent(name string) (string, error) {
-	ppath, err := o.cache.get(filepath.Join(o.root, "snapshots", hash(name)))
-	if err != nil {
-		if os.IsNotExist(err) {
-			return "", nil // no parent
-		}
-
-		return "", err
-	}
-
-	p, err := ioutil.ReadFile(filepath.Join(ppath, "name"))
-	if err != nil {
-		return "", err
-	}
-
-	return string(p), nil
-}
-
-// Exists returns true if the snapshot with name exists.
-func (o *Driver) Exists(name string) bool {
-	panic("not implemented")
-}
-
-// Delete the snapshot idenfitied by name.
-//
-// If name has children, the operation will fail.
-func (o *Driver) Delete(name string) error {
+func (o *Snapshotter) Remove(key string) error {
 	panic("not implemented")
 }
 
 // Walk the committed snapshots.
-func (o *Driver) Walk(fn func(name string) error) error {
-	panic("not implemented")
+func (o *Snapshotter) Walk(fn func(snapshot.Info) error) error {
+	root := filepath.Join(o.root, "index")
+	return filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if path == root {
+			return nil
+		}
+
+		if fi.Mode()&os.ModeSymlink == 0 {
+			// only follow links
+			return filepath.SkipDir
+		}
+
+		target, err := o.links.get(path)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				return err
+			}
+		}
+
+		si, err := o.stat(target)
+		if err != nil {
+			return err
+		}
+
+		if err := fn(si); err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
-// Active will call fn for each active transaction.
-func (o *Driver) Active(fn func(key string) error) error {
-	panic("not implemented")
-}
-
-func (o *Driver) newActiveDir(key string) (*activeDir, error) {
+func (o *Snapshotter) newActiveDir(key string) (*activeDir, error) {
 	var (
-		path = filepath.Join(o.root, "active", hash(key))
+		path      = filepath.Join(o.root, "active", hash(key))
+		name      = filepath.Join(path, "name")
+		indexlink = filepath.Join(o.root, "index", hash(key))
 	)
 	a := &activeDir{
 		path:         path,
-		snapshotsDir: filepath.Join(o.root, "snapshots"),
+		committedDir: filepath.Join(o.root, "committed"),
+		indexlink:    indexlink,
 	}
 	for _, p := range []string{
 		"work",
@@ -130,13 +194,26 @@ func (o *Driver) newActiveDir(key string) (*activeDir, error) {
 			return nil, err
 		}
 	}
+
+	if err := ioutil.WriteFile(name, []byte(key), 0644); err != nil {
+		a.delete()
+		return nil, err
+	}
+
+	// link from namespace
+	if err := os.Symlink(path, indexlink); err != nil {
+		a.delete()
+		return nil, err
+	}
+
 	return a, nil
 }
 
-func (o *Driver) getActive(key string) *activeDir {
+func (o *Snapshotter) getActive(key string) *activeDir {
 	return &activeDir{
 		path:         filepath.Join(o.root, "active", hash(key)),
-		snapshotsDir: filepath.Join(o.root, "snapshots"),
+		committedDir: filepath.Join(o.root, "committed"),
+		indexlink:    filepath.Join(o.root, "index", hash(key)),
 	}
 }
 
@@ -145,8 +222,9 @@ func hash(k string) string {
 }
 
 type activeDir struct {
-	snapshotsDir string
+	committedDir string
 	path         string
+	indexlink    string
 }
 
 func (a *activeDir) delete() error {
@@ -154,7 +232,7 @@ func (a *activeDir) delete() error {
 }
 
 func (a *activeDir) setParent(name string) error {
-	return os.Symlink(filepath.Join(a.snapshotsDir, hash(name)), filepath.Join(a.path, "parent"))
+	return os.Symlink(filepath.Join(a.committedDir, hash(name)), filepath.Join(a.path, "parent"))
 }
 
 func (a *activeDir) commit(name string, c *cache) error {
@@ -173,7 +251,20 @@ func (a *activeDir) commit(name string, c *cache) error {
 	}
 
 	c.invalidate(a.path) // clears parent cache, since we end up moving.
-	return os.Rename(a.path, filepath.Join(a.snapshotsDir, hash(name)))
+	c.invalidate(filepath.Join(a.path, "parent"))
+	c.invalidate(a.indexlink)
+
+	committed := filepath.Join(a.committedDir, hash(name))
+	if err := os.Rename(a.path, committed); err != nil {
+		return err
+	}
+
+	if err := os.Remove(a.indexlink); err != nil {
+		return err
+	}
+
+	indexlink := filepath.Join(filepath.Dir(a.indexlink), hash(name))
+	return os.Symlink(committed, indexlink)
 }
 
 func (a *activeDir) mounts(c *cache) ([]containerd.Mount, error) {
@@ -183,10 +274,11 @@ func (a *activeDir) mounts(c *cache) ([]containerd.Mount, error) {
 		current = a.path
 	)
 	for {
-		if current, err = c.get(current); err != nil {
+		if current, err = c.get(filepath.Join(current, "parent")); err != nil {
 			if os.IsNotExist(err) {
 				break
 			}
+
 			return nil, err
 		}
 		parents = append(parents, filepath.Join(current, "fs"))
@@ -221,32 +313,32 @@ func (a *activeDir) mounts(c *cache) ([]containerd.Mount, error) {
 
 func newCache() *cache {
 	return &cache{
-		parents: make(map[string]string),
+		links: make(map[string]string),
 	}
 }
 
 type cache struct {
-	mu      sync.Mutex
-	parents map[string]string
+	mu    sync.Mutex
+	links map[string]string
 }
 
 func (c *cache) get(path string) (string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	parentRoot, ok := c.parents[path]
+	target, ok := c.links[path]
 	if !ok {
-		link, err := os.Readlink(filepath.Join(path, "parent"))
+		link, err := os.Readlink(path)
 		if err != nil {
 			return "", err
 		}
-		c.parents[path], parentRoot = link, link
+		c.links[path], target = link, link
 	}
-	return parentRoot, nil
+	return target, nil
 }
 
 func (c *cache) invalidate(path string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	delete(c.parents, path)
+	delete(c.links, path)
 }
