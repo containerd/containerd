@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/system"
 )
 
@@ -78,7 +77,6 @@ func skipFile(hdr *tar.Header) bool {
 	// to cater for the situation where someone does manage to upload a Linux
 	// image but have it tagged as Windows inadvertently.
 	if strings.Contains(hdr.Name, ":") {
-		logrus.Warnf("Windows: Ignoring %s (is this a Linux image?)", hdr.Name)
 		return true
 	}
 

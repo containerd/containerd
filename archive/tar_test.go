@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"os/user"
 	"testing"
 	"time"
 
@@ -16,7 +15,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-const tarCmd = "/usr/bin/tar"
+const tarCmd = "tar"
 
 // baseApplier creates a basic filesystem layout
 // with multiple types of files for basic tests.
@@ -113,7 +112,7 @@ func testApply(a fstest.Applier) error {
 		return errors.Wrap(err, "failed to start command")
 	}
 
-	if _, err := ApplyDiffTar(context.Background(), dest, arch); err != nil {
+	if _, err := Apply(context.Background(), dest, arch); err != nil {
 		return errors.Wrap(err, "failed to apply tar stream")
 	}
 
@@ -136,7 +135,7 @@ func testBaseDiff(a fstest.Applier) error {
 		return errors.Wrap(err, "failed to apply filesystem changes")
 	}
 
-	arch := DiffTarStream(context.Background(), "", td)
+	arch := Diff(context.Background(), "", td)
 
 	cmd := exec.Command(tarCmd, "x", "-C", dest)
 	cmd.Stdin = arch
@@ -184,7 +183,7 @@ func diffApply(ctx context.Context, a fstest.Applier, base, dest string) error {
 		return errors.Wrap(err, "failed to apply changes to base")
 	}
 
-	if _, err := ApplyDiffTar(ctx, dest, DiffTarStream(ctx, baseCopy, base)); err != nil {
+	if _, err := Apply(ctx, dest, Diff(ctx, baseCopy, base)); err != nil {
 		return errors.Wrap(err, "failed to apply tar stream")
 	}
 
@@ -204,21 +203,7 @@ func readDirNames(p string) ([]string, error) {
 }
 
 func requireTar(t *testing.T) {
-	if _, err := os.Stat(tarCmd); err != nil {
-		if os.IsNotExist(err) {
-			t.Skipf("%s not found, skipping", tarCmd)
-		} else {
-			t.Fatalf("Unable to stat %s: %v", tarCmd, err)
-		}
-	}
-}
-
-func requireRoot(t *testing.T) {
-	u, err := user.Current()
-	if err != nil {
-		t.Fatalf("Unable to get current user: %v", err)
-	}
-	if u.Uid != "0" {
-		t.Skipf("test requires root, skipping")
+	if _, err := exec.LookPath(tarCmd); err != nil {
+		t.Skipf("%s not found, skipping", tarCmd)
 	}
 }

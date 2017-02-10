@@ -63,7 +63,7 @@ func ApplyLayer(snapshots snapshot.Snapshotter, mounter Mounter, rd io.Reader, p
 		return "", err
 	}
 
-	if _, err := archive.ApplyDiffTar(context.Background(), key, rd); err != nil {
+	if _, err := archive.Apply(context.Background(), key, rd); err != nil {
 		return "", err
 	}
 

@@ -14,8 +14,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/fs"
+	"github.com/docker/containerd/log"
 	"github.com/pkg/errors"
 )
 
@@ -29,14 +29,14 @@ var (
 	breakoutError = errors.New("file name outside of root")
 )
 
-// TarFromChanges returns a tar stream of the computed filesystem
+// Diff returns a tar stream of the computed filesystem
 // difference between the provided directories.
 //
 // Produces a tar using OCI style file markers for deletions. Deleted
 // files will be prepended with the prefix ".wh.". This style is
 // based off AUFS whiteouts.
 // See https://github.com/opencontainers/image-spec/blob/master/layer.md
-func DiffTarStream(ctx context.Context, a, b string) io.ReadCloser {
+func Diff(ctx context.Context, a, b string) io.ReadCloser {
 	r, w := io.Pipe()
 
 	go func() {
@@ -48,7 +48,7 @@ func DiffTarStream(ctx context.Context, a, b string) io.ReadCloser {
 			err = cw.Close()
 		}
 		if err = w.CloseWithError(err); err != nil {
-			logrus.Errorf("Error closing tar pipe: %v", err)
+			log.G(ctx).WithError(err).Debugf("closing tar pipe failed")
 		}
 	}()
 
@@ -76,9 +76,9 @@ const (
 	whiteoutOpaqueDir = whiteoutMetaPrefix + ".opq"
 )
 
-// ApplyDiffTar applies a tar stream of an OCI style diff tar.
+// Apply applies a tar stream of an OCI style diff tar.
 // See https://github.com/opencontainers/image-spec/blob/master/layer.md#applying-changesets
-func ApplyDiffTar(ctx context.Context, root string, r io.Reader) (int64, error) {
+func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 	root = filepath.Clean(root)
 	fn := prepareApply()
 	defer fn()
@@ -114,6 +114,7 @@ func ApplyDiffTar(ctx context.Context, root string, r io.Reader) (int64, error) 
 		hdr.Name = filepath.Clean(hdr.Name)
 
 		if skipFile(hdr) {
+			log.G(ctx).Warnf("file %q ignored: archive may not be supported on system", hdr.Name)
 			continue
 		}
 
@@ -147,7 +148,7 @@ func ApplyDiffTar(ctx context.Context, root string, r io.Reader) (int64, error) 
 					}
 					defer os.RemoveAll(aufsTempdir)
 				}
-				if err := createTarFile(filepath.Join(aufsTempdir, basename), root, hdr, tr); err != nil {
+				if err := createTarFile(ctx, filepath.Join(aufsTempdir, basename), root, hdr, tr); err != nil {
 					return 0, err
 				}
 			}
@@ -236,7 +237,7 @@ func ApplyDiffTar(ctx context.Context, root string, r io.Reader) (int64, error) 
 			srcData = tmpFile
 		}
 
-		if err := createTarFile(path, root, srcHdr, srcData); err != nil {
+		if err := createTarFile(ctx, path, root, srcHdr, srcData); err != nil {
 			return 0, err
 		}
 
@@ -384,7 +385,7 @@ func (cw *changeWriter) Close() error {
 	return nil
 }
 
-func createTarFile(path, extractDir string, hdr *tar.Header, reader io.Reader) error {
+func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header, reader io.Reader) error {
 	// hdr.Mode is in linux format, which we can use for sycalls,
 	// but for os.Foo() calls we need the mode converted to os.FileMode,
 	// so use hdrInfo.Mode() (they differ for e.g. setuid bits)
@@ -451,7 +452,7 @@ func createTarFile(path, extractDir string, hdr *tar.Header, reader io.Reader) e
 		}
 
 	case tar.TypeXGlobalHeader:
-		logrus.Debug("PAX Global Extended Headers found and ignored")
+		log.G(ctx).Debug("PAX Global Extended Headers found and ignored")
 		return nil
 
 	default:
@@ -465,22 +466,14 @@ func createTarFile(path, extractDir string, hdr *tar.Header, reader io.Reader) e
 		}
 	}
 
-	var warnErrors []string
 	for key, value := range hdr.Xattrs {
 		if err := setxattr(path, key, value); err != nil {
 			if errors.Cause(err) == syscall.ENOTSUP {
-				// Collect errors only for filesystem warning
-				warnErrors = append(warnErrors, err.Error())
+				log.G(ctx).WithError(err).Warnf("ignored xattr %s in archive", key)
 				continue
 			}
 			return err
 		}
-	}
-
-	if len(warnErrors) > 0 {
-		logrus.WithFields(logrus.Fields{
-			"errors": warnErrors,
-		}).Warn("ignored xattrs in archive: underlying filesystem doesn't support them")
 	}
 
 	// There is no LChmod, so ignore mode for symlink. Also, this

@@ -28,7 +28,7 @@ var applyCommand = cli.Command{
 			return err
 		}
 
-		if _, err := archive.ApplyDiffTar(ctx, dir, rd); err != nil {
+		if _, err := archive.Apply(ctx, dir, rd); err != nil {
 			return err
 		}
 
