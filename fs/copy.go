@@ -107,12 +107,12 @@ func copyDirectory(dst, src string, inodes map[uint64]string) error {
 func copyFile(source, target string) error {
 	src, err := os.Open(source)
 	if err != nil {
-		return errors.Wrapf(err, "failed to open source %s", err)
+		return errors.Wrapf(err, "failed to open source %s", source)
 	}
 	defer src.Close()
 	tgt, err := os.Create(target)
 	if err != nil {
-		return errors.Wrapf(err, "failed to open target %s", err)
+		return errors.Wrapf(err, "failed to open target %s", target)
 	}
 	defer tgt.Close()
 
