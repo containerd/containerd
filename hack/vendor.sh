@@ -4,7 +4,7 @@ set -e
 rm -rf vendor/
 source 'hack/.vendor-helpers.sh'
 
-clone git github.com/Sirupsen/logrus 4b6ea7319e214d98c938f12692336f7ca9348d6b
+clone git github.com/Sirupsen/logrus v0.11.2
 clone git github.com/cloudfoundry/gosigar 3ed7c74352dae6dc00bdc8c74045375352e3ec05
 clone git github.com/codegangsta/cli 9fec0fad02befc9209347cc6d620e68e1b45f74d
 clone git github.com/coreos/go-systemd 7b2428fec40033549c68f54e26e89e7ca9a9ce31
