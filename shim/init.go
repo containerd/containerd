@@ -2,6 +2,8 @@ package shim
 
 import (
 	"context"
+	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -24,14 +26,30 @@ type initProcess struct {
 	pid     int
 }
 
+func logPath(format runc.Format) (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	switch format {
+	case runc.JSON:
+		return filepath.Join(cwd, "log.json"), nil
+	}
+	return "", fmt.Errorf("%s is not supported", format)
+}
+
 func newInitProcess(context context.Context, r *apishim.CreateRequest) (*initProcess, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
 	}
+	logJSONPath, err := logPath(runc.JSON)
+	if err != nil {
+		return nil, err
+	}
 	runtime := &runc.Runc{
 		Command:      r.Runtime,
-		Log:          filepath.Join(cwd, "log.json"),
+		Log:          logJSONPath,
 		LogFormat:    runc.JSON,
 		PdeathSignal: syscall.SIGKILL,
 	}
@@ -132,4 +150,16 @@ func (p *initProcess) killAll(context context.Context) error {
 	return p.runc.Kill(context, p.id, int(syscall.SIGKILL), &runc.KillOpts{
 		All: true,
 	})
+}
+
+// readInitProcessLog reads the log.
+// this function doesn't have a *initProcess receiver so that it works even
+// when *initProcess is nil
+func readInitProcessLog() ([]byte, runc.Format, error) {
+	logJSONPath, err := logPath(runc.JSON)
+	if err != nil {
+		return nil, runc.JSON, err
+	}
+	logBytes, err := ioutil.ReadFile(logJSONPath)
+	return logBytes, runc.JSON, err
 }

@@ -63,6 +63,14 @@ func (s *Service) CreateContainer(ctx context.Context, r *api.CreateContainerReq
 	}
 	defer func() {
 		if err != nil {
+			clientLog, clientLogErr := client.GetLog(ctx, &shim.GetLogRequest{})
+			if clientLogErr != nil {
+				log.G(s.ctx).WithError(clientLogErr).WithField("container", client.id).
+					Warnf("failed to get shim log")
+			} else {
+				log.G(s.ctx).WithField("container", client.id).
+					Debugf("shim log: %s", string(clientLog.Log))
+			}
 			s.removeShim(r.ID)
 		}
 	}()
