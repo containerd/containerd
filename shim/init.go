@@ -9,6 +9,7 @@ import (
 
 	"github.com/crosbymichael/console"
 	runc "github.com/crosbymichael/go-runc"
+	"github.com/docker/containerd"
 	shimapi "github.com/docker/containerd/api/services/shim"
 )
 
@@ -28,6 +29,16 @@ func newInitProcess(context context.Context, r *shimapi.CreateRequest) (*initPro
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
+	}
+	for _, rm := range r.Rootfs {
+		m := &containerd.Mount{
+			Type:    rm.Type,
+			Source:  rm.Source,
+			Options: rm.Options,
+		}
+		if err := m.Mount(filepath.Join(cwd, "rootfs")); err != nil {
+			return nil, err
+		}
 	}
 	runtime := &runc.Runc{
 		Command:      r.Runtime,

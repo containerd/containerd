@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package containerd.v1.types;
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "gogoproto/gogo.proto";
 
 // Mount describes mounts for a container.
 //

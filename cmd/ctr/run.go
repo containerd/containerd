@@ -3,148 +3,232 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
-	"time"
 
 	gocontext "context"
 
+	"runtime"
+
 	"github.com/crosbymichael/console"
 	"github.com/docker/containerd/api/services/execution"
-	execEvents "github.com/docker/containerd/execution"
-	"github.com/nats-io/go-nats"
-	"github.com/nats-io/go-nats-streaming"
-	"github.com/pkg/errors"
+	"github.com/docker/containerd/api/types/mount"
+	protobuf "github.com/gogo/protobuf/types"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
 )
+
+var rwm = "rwm"
+
+func spec(id string, args []string, tty bool) *specs.Spec {
+	return &specs.Spec{
+		Version: specs.Version,
+		Platform: specs.Platform{
+			OS:   runtime.GOOS,
+			Arch: runtime.GOARCH,
+		},
+		Root: specs.Root{
+			Path:     "rootfs",
+			Readonly: true,
+		},
+		Process: specs.Process{
+			Args: args,
+			Env: []string{
+				"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+			},
+			Terminal:        tty,
+			Cwd:             "/",
+			NoNewPrivileges: true,
+		},
+		Mounts: []specs.Mount{
+			{
+				Destination: "/proc",
+				Type:        "proc",
+				Source:      "proc",
+			},
+			{
+				Destination: "/dev",
+				Type:        "tmpfs",
+				Source:      "tmpfs",
+				Options:     []string{"nosuid", "strictatime", "mode=755", "size=65536k"},
+			},
+			{
+				Destination: "/dev/pts",
+				Type:        "devpts",
+				Source:      "devpts",
+				Options:     []string{"nosuid", "noexec", "newinstance", "ptmxmode=0666", "mode=0620", "gid=5"},
+			},
+			{
+				Destination: "/dev/shm",
+				Type:        "tmpfs",
+				Source:      "shm",
+				Options:     []string{"nosuid", "noexec", "nodev", "mode=1777", "size=65536k"},
+			},
+			{
+				Destination: "/dev/mqueue",
+				Type:        "mqueue",
+				Source:      "mqueue",
+				Options:     []string{"nosuid", "noexec", "nodev"},
+			},
+			{
+				Destination: "/sys",
+				Type:        "sysfs",
+				Source:      "sysfs",
+				Options:     []string{"nosuid", "noexec", "nodev"},
+			},
+			{
+				Destination: "/run",
+				Type:        "tmpfs",
+				Source:      "tmpfs",
+				Options:     []string{"nosuid", "strictatime", "mode=755", "size=65536k"},
+			},
+			{
+				Destination: "/etc/resolv.conf",
+				Type:        "bind",
+				Source:      "/etc/resolv.conf",
+				Options:     []string{"rbind", "ro"},
+			},
+			{
+				Destination: "/etc/hosts",
+				Type:        "bind",
+				Source:      "/etc/hosts",
+				Options:     []string{"rbind", "ro"},
+			},
+			{
+				Destination: "/etc/localtime",
+				Type:        "bind",
+				Source:      "/etc/localtime",
+				Options:     []string{"rbind", "ro"},
+			},
+		},
+		Hostname: id,
+		Linux: &specs.Linux{
+			Resources: &specs.LinuxResources{
+				Devices: []specs.LinuxDeviceCgroup{
+					{
+						Allow:  false,
+						Access: &rwm,
+					},
+				},
+			},
+			Namespaces: []specs.LinuxNamespace{
+				{
+					Type: "pid",
+				},
+				{
+					Type: "ipc",
+				},
+				{
+					Type: "uts",
+				},
+				{
+					Type: "mount",
+				},
+				{
+					Type: "network",
+				},
+			},
+		},
+	}
+}
 
 var runCommand = cli.Command{
 	Name:  "run",
 	Usage: "run a container",
 	Flags: []cli.Flag{
 		cli.StringFlag{
-			Name:  "bundle, b",
-			Usage: "path to the container's bundle",
+			Name:  "id",
+			Usage: "id of the container",
 		},
 		cli.BoolFlag{
-			Name:  "tty, t",
+			Name:  "tty,t",
 			Usage: "allocate a TTY for the container",
+		},
+		cli.StringFlag{
+			Name:  "rootfs,r",
+			Usage: "path to the container's root filesystem",
 		},
 	},
 	Action: func(context *cli.Context) error {
-		id := context.Args().First()
+		id := context.String("id")
 		if id == "" {
 			return fmt.Errorf("container id must be provided")
 		}
-		executionService, err := getExecutionService(context)
+
+		containers, err := getExecutionService(context)
 		if err != nil {
 			return err
 		}
-
-		// setup our event subscriber
-		sc, err := stan.Connect("containerd", "ctr", stan.ConnectWait(5*time.Second))
-		if err != nil {
-			return err
-		}
-		defer sc.Close()
-
-		evCh := make(chan *execEvents.ContainerEvent, 64)
-		sub, err := sc.Subscribe(fmt.Sprintf("containers.%s", id), func(m *stan.Msg) {
-			var e execEvents.ContainerEvent
-
-			err := json.Unmarshal(m.Data, &e)
-			if err != nil {
-				fmt.Printf("failed to unmarshal event: %v", err)
-				return
-			}
-
-			evCh <- &e
-		})
-		if err != nil {
-			return err
-		}
-		defer sub.Unsubscribe()
-
 		tmpDir, err := getTempDir(id)
 		if err != nil {
 			return err
 		}
-		defer os.RemoveAll(tmpDir)
-
-		bundle, err := filepath.Abs(context.String("bundle"))
+		events, err := containers.Events(gocontext.Background(), &execution.EventsRequest{})
 		if err != nil {
 			return err
 		}
-		crOpts := &execution.CreateContainerRequest{
-			ID:         id,
-			BundlePath: bundle,
-			Console:    context.Bool("tty"),
-			Stdin:      filepath.Join(tmpDir, "stdin"),
-			Stdout:     filepath.Join(tmpDir, "stdout"),
-			Stderr:     filepath.Join(tmpDir, "stderr"),
+		// for ctr right now just do a bind mount
+		rootfs := []*mount.Mount{
+			{
+				Type:   "bind",
+				Source: context.String("rootfs"),
+				Options: []string{
+					"rw",
+					"rbind",
+				},
+			},
 		}
-
-		if crOpts.Console {
+		s := spec(id, []string(context.Args()), context.Bool("tty"))
+		data, err := json.Marshal(s)
+		if err != nil {
+			return err
+		}
+		create := &execution.CreateRequest{
+			ID: id,
+			Spec: &protobuf.Any{
+				TypeUrl: specs.Version,
+				Value:   data,
+			},
+			Rootfs:   rootfs,
+			Runtime:  "linux",
+			Terminal: context.Bool("tty"),
+			Stdin:    filepath.Join(tmpDir, "stdin"),
+			Stdout:   filepath.Join(tmpDir, "stdout"),
+			Stderr:   filepath.Join(tmpDir, "stderr"),
+		}
+		if create.Terminal {
 			con := console.Current()
 			defer con.Reset()
 			if err := con.SetRaw(); err != nil {
 				return err
 			}
 		}
-
-		fwg, err := prepareStdio(crOpts.Stdin, crOpts.Stdout, crOpts.Stderr, crOpts.Console)
+		fwg, err := prepareStdio(create.Stdin, create.Stdout, create.Stderr, create.Terminal)
 		if err != nil {
 			return err
 		}
-
-		cr, err := executionService.CreateContainer(gocontext.Background(), crOpts)
+		response, err := containers.Create(gocontext.Background(), create)
 		if err != nil {
-			return errors.Wrap(err, "CreateContainer RPC failed")
+			return err
 		}
-
-		if _, err := executionService.StartContainer(gocontext.Background(), &execution.StartContainerRequest{
-			ID: cr.Container.ID,
+		if _, err := containers.Start(gocontext.Background(), &execution.StartRequest{
+			ID: response.ID,
 		}); err != nil {
-			return errors.Wrap(err, "StartContainer RPC failed")
+			return err
 		}
-
-		var ec uint32
-	eventLoop:
-		for {
-			select {
-			case e, more := <-evCh:
-				if !more {
-					break eventLoop
-				}
-
-				if e.Type != "exit" {
-					continue
-				}
-
-				if e.ID == cr.Container.ID && e.Pid == cr.InitProcess.Pid {
-					ec = e.ExitStatus
-					break eventLoop
-				}
-			case <-time.After(1 * time.Second):
-				if sc.NatsConn().Status() != nats.CONNECTED {
-					break eventLoop
-				}
-			}
+		status, err := waitContainer(events, response)
+		if err != nil {
+			return err
 		}
-
-		if _, err := executionService.DeleteContainer(gocontext.Background(), &execution.DeleteContainerRequest{
-			ID: cr.Container.ID,
+		if _, err := containers.Delete(gocontext.Background(), &execution.DeleteRequest{
+			ID: response.ID,
 		}); err != nil {
-			return errors.Wrap(err, "DeleteContainer RPC failed")
+			return err
 		}
-
 		// Ensure we read all io
 		fwg.Wait()
-
-		if ec != 0 {
-			return cli.NewExitError("", int(ec))
+		if status != 0 {
+			return cli.NewExitError("", int(status))
 		}
-
 		return nil
 	},
 }

@@ -3,16 +3,12 @@ package main
 import (
 	_ "expvar"
 	"fmt"
-	"net"
 	"net/http"
 	_ "net/http/pprof"
-	"net/url"
 	"os"
 	"os/signal"
-	"runtime"
-	"strconv"
-	"strings"
 	"syscall"
+	"time"
 
 	gocontext "golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -20,17 +16,13 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd"
 	api "github.com/docker/containerd/api/services/execution"
-	"github.com/docker/containerd/events"
+	_ "github.com/docker/containerd/linux"
 	"github.com/docker/containerd/log"
-	"github.com/docker/containerd/supervisor"
+	"github.com/docker/containerd/services/execution"
 	"github.com/docker/containerd/utils"
 	metrics "github.com/docker/go-metrics"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
-
-	natsd "github.com/nats-io/gnatsd/server"
-	"github.com/nats-io/go-nats"
-	stand "github.com/nats-io/nats-streaming-server/server"
 )
 
 const usage = `
@@ -43,10 +35,7 @@ const usage = `
 high performance container runtime
 `
 
-const (
-	StanClusterID = "containerd"
-	stanClientID  = "containerd"
-)
+var global = log.WithModule(gocontext.Background(), "containerd")
 
 func main() {
 	app := cli.NewApp()
@@ -83,108 +72,36 @@ func main() {
 			Usage: "tcp address to serve metrics on",
 			Value: "127.0.0.1:7897",
 		},
-		cli.StringFlag{
-			Name:  "events-address, e",
-			Usage: "nats address to serve events on",
-			Value: nats.DefaultURL,
-		},
 	}
-	app.Before = func(context *cli.Context) error {
-		if context.GlobalBool("debug") {
-			logrus.SetLevel(logrus.DebugLevel)
-		}
-		if logLevel := context.GlobalString("log-level"); logLevel != "" {
-			lvl, err := logrus.ParseLevel(logLevel)
-			if err != nil {
-				lvl = logrus.InfoLevel
-				fmt.Fprintf(os.Stderr, "Unable to parse logging level: %s\n, and being defaulted to info", logLevel)
-			}
-			logrus.SetLevel(lvl)
-		}
-		return nil
-	}
+	app.Before = before
 	app.Action = func(context *cli.Context) error {
+		start := time.Now()
+		// start the signal handler as soon as we can to make sure that
+		// we don't miss any signals during boot
 		signals := make(chan os.Signal, 2048)
 		signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1)
 
-		ctx := log.WithModule(gocontext.Background(), "containerd")
-		if address := context.GlobalString("metrics-address"); address != "" {
-			log.G(ctx).WithField("metrics-address", address).Info("listening and serving metrics")
-			go serveMetrics(ctx, address)
-		}
-
-		ea := context.GlobalString("events-address")
-		log.G(ctx).WithField("events-address", ea).Info("starting nats-streaming-server")
-		s, err := startNATSServer(ea)
-		if err != nil {
-			return nil
-		}
-		defer s.Shutdown()
-
-		debugPath := context.GlobalString("debug-socket")
-		if debugPath == "" {
-			return errors.New("--debug-socket path cannot be empty")
-		}
-		d, err := utils.CreateUnixSocket(debugPath)
+		log.G(global).Info("starting containerd boot...")
+		runtimes, err := loadRuntimes(context)
 		if err != nil {
 			return err
 		}
-
-		//publish profiling and debug socket.
-		log.G(ctx).WithField("socket", debugPath).Info("starting profiler handlers")
-		log.G(ctx).WithFields(logrus.Fields{"expvars": "/debug/vars", "socket": debugPath}).Debug("serving expvars requests")
-		log.G(ctx).WithFields(logrus.Fields{"pprof": "/debug/pprof", "socket": debugPath}).Debug("serving pprof requests")
-		go serveProfiler(ctx, d)
-
-		path := context.GlobalString("socket")
-		if path == "" {
-			return errors.New("--socket path cannot be empty")
-		}
-		l, err := utils.CreateUnixSocket(path)
+		supervisor, err := containerd.NewSupervisor(log.WithModule(global, "execution"), runtimes)
 		if err != nil {
 			return err
 		}
-
-		// Get events publisher
-		natsPoster, err := events.NewNATSPoster(StanClusterID, stanClientID)
-		if err != nil {
+		// start debug and metrics APIs
+		if err := serveDebugAPI(context); err != nil {
 			return err
 		}
-		execCtx := log.WithModule(ctx, "execution")
-		execCtx = events.WithPoster(execCtx, natsPoster)
-		execService, err := supervisor.New(execCtx, context.GlobalString("root"))
-		if err != nil {
+		serveMetricsAPI(context)
+		// start the GRPC api with the execution service registered
+		server := newGRPCServer(execution.New(supervisor))
+		if err := serveGRPC(context, server); err != nil {
 			return err
 		}
-
-		// Intercept the GRPC call in order to populate the correct module path
-		interceptor := func(ctx gocontext.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-			ctx = log.WithModule(ctx, "containerd")
-			switch info.Server.(type) {
-			case api.ExecutionServiceServer:
-				ctx = log.WithModule(ctx, "execution")
-				ctx = events.WithPoster(ctx, natsPoster)
-			default:
-				fmt.Printf("Unknown type: %#v\n", info.Server)
-			}
-			return handler(ctx, req)
-		}
-		server := grpc.NewServer(grpc.UnaryInterceptor(interceptor))
-		api.RegisterExecutionServiceServer(server, execService)
-		log.G(ctx).WithField("socket", l.Addr()).Info("start serving GRPC API")
-		go serveGRPC(ctx, server, l)
-
-		for s := range signals {
-			switch s {
-			case syscall.SIGUSR1:
-				dumpStacks(ctx)
-			default:
-				log.G(ctx).WithField("signal", s).Info("stopping GRPC server")
-				server.Stop()
-				return nil
-			}
-		}
-		return nil
+		log.G(global).Infof("containerd successfully booted in %fs", time.Now().Sub(start).Seconds())
+		return handleSignals(signals, server)
 	}
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "containerd: %s\n", err)
@@ -192,81 +109,123 @@ func main() {
 	}
 }
 
-func serveMetrics(ctx gocontext.Context, address string) {
+func before(context *cli.Context) error {
+	if context.GlobalBool("debug") {
+		logrus.SetLevel(logrus.DebugLevel)
+	}
+	if l := context.GlobalString("log-level"); l != "" {
+		lvl, err := logrus.ParseLevel(l)
+		if err != nil {
+			lvl = logrus.InfoLevel
+			fmt.Fprintf(os.Stderr, "Unable to parse logging level: %s\n, and being defaulted to info", l)
+		}
+		logrus.SetLevel(lvl)
+	}
+	return nil
+}
+
+func serveMetricsAPI(context *cli.Context) {
+	if addr := context.GlobalString("metrics-address"); addr != "" {
+		log.G(global).WithField("metrics", addr).Info("starting metrics API...")
+		h := newMetricsHandler()
+		go func() {
+			if err := http.ListenAndServe(addr, h); err != nil {
+				log.G(global).WithError(err).Fatal("serve metrics API")
+			}
+		}()
+	}
+}
+
+func newMetricsHandler() http.Handler {
 	m := http.NewServeMux()
 	m.Handle("/metrics", metrics.Handler())
-	if err := http.ListenAndServe(address, m); err != nil {
-		log.G(ctx).WithError(err).Fatal("metrics server failure")
-	}
+	return m
 }
 
-func serveGRPC(ctx gocontext.Context, server *grpc.Server, l net.Listener) {
-	defer l.Close()
-	if err := server.Serve(l); err != nil {
-		log.G(ctx).WithError(err).Fatal("GRPC server failure")
+func serveDebugAPI(context *cli.Context) error {
+	path := context.GlobalString("debug-socket")
+	if path == "" {
+		return errors.New("--debug-socket path cannot be empty")
 	}
-}
-
-func serveProfiler(ctx gocontext.Context, l net.Listener) {
-	defer l.Close()
-	if err := http.Serve(l, nil); err != nil {
-		log.G(ctx).WithError(err).Fatal("profiler server failure")
+	l, err := utils.CreateUnixSocket(path)
+	if err != nil {
+		return err
 	}
-}
-
-// DumpStacks dumps the runtime stack.
-func dumpStacks(ctx gocontext.Context) {
-	var (
-		buf       []byte
-		stackSize int
-	)
-	bufferLen := 16384
-	for stackSize == len(buf) {
-		buf = make([]byte, bufferLen)
-		stackSize = runtime.Stack(buf, true)
-		bufferLen *= 2
-	}
-	buf = buf[:stackSize]
-	log.G(ctx).Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
-}
-
-func startNATSServer(address string) (s *stand.StanServer, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			s = nil
-			if _, ok := r.(error); !ok {
-				err = fmt.Errorf("failed to start NATS server: %v", r)
-			} else {
-				err = r.(error)
-			}
+	log.G(global).WithField("debug", path).Info("starting debug API...")
+	go func() {
+		defer l.Close()
+		// pprof and expvars are imported and automatically register their endpoints
+		// under /debug
+		if err := http.Serve(l, nil); err != nil {
+			log.G(global).WithError(err).Fatal("serve debug API")
 		}
 	}()
-	so, no, err := getServerOptions(address)
-	if err != nil {
-		return nil, err
-	}
-	s = stand.RunServerWithOpts(so, no)
-
-	return s, err
+	return nil
 }
 
-func getServerOptions(address string) (*stand.Options, *natsd.Options, error) {
-	url, err := url.Parse(address)
+func loadRuntimes(context *cli.Context) (map[string]containerd.Runtime, error) {
+	var (
+		root = context.GlobalString("root")
+		o    = make(map[string]containerd.Runtime)
+	)
+	for _, name := range containerd.Runtimes() {
+		r, err := containerd.NewRuntime(name, root)
+		if err != nil {
+			return nil, err
+		}
+		o[name] = r
+		log.G(global).WithField("runtime", name).Info("load runtime")
+	}
+	return o, nil
+}
+
+func newGRPCServer(service api.ContainerServiceServer) *grpc.Server {
+	s := grpc.NewServer(grpc.UnaryInterceptor(interceptor))
+	api.RegisterContainerServiceServer(s, service)
+	return s
+}
+
+func serveGRPC(context *cli.Context, server *grpc.Server) error {
+	path := context.GlobalString("socket")
+	if path == "" {
+		return errors.New("--socket path cannot be empty")
+	}
+	l, err := utils.CreateUnixSocket(path)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "failed to parse address url %q", address)
+		return err
 	}
+	go func() {
+		defer l.Close()
+		if err := server.Serve(l); err != nil {
+			log.G(global).WithError(err).Fatal("serve GRPC")
+		}
+	}()
+	return nil
+}
 
-	no := stand.DefaultNatsServerOptions
-	parts := strings.Split(url.Host, ":")
-	if len(parts) == 2 {
-		no.Port, err = strconv.Atoi(parts[1])
-	} else {
-		no.Port = nats.DefaultPort
+func interceptor(ctx gocontext.Context,
+	req interface{},
+	info *grpc.UnaryServerInfo,
+	handler grpc.UnaryHandler,
+) (interface{}, error) {
+	ctx = log.WithModule(ctx, "containerd")
+	switch info.Server.(type) {
+	case api.ContainerServiceServer:
+		ctx = log.WithModule(global, "execution")
+	default:
+		fmt.Printf("unknown GRPC server type: %#v\n", info.Server)
 	}
-	no.Host = parts[0]
+	return handler(global, req)
+}
 
-	so := stand.GetDefaultOptions()
-	so.ID = StanClusterID
-
-	return so, &no, nil
+func handleSignals(signals chan os.Signal, server *grpc.Server) error {
+	for s := range signals {
+		log.G(global).WithField("signal", s).Debug("received signal")
+		switch s {
+		default:
+			server.Stop()
+			return nil
+		}
+	}
+	return nil
 }

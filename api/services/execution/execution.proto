@@ -3,116 +3,54 @@ syntax = "proto3";
 package containerd.v1.services;
 
 import "google/protobuf/empty.proto";
+import "google/protobuf/any.proto";
 import "gogoproto/gogo.proto";
+import "github.com/docker/containerd/api/types/mount/mount.proto";
 import "github.com/docker/containerd/api/types/container/container.proto";
-import "github.com/docker/containerd/api/types/process/process.proto";
 
-service ExecutionService {
-	rpc CreateContainer(CreateContainerRequest) returns (CreateContainerResponse);
-	rpc StartContainer(StartContainerRequest) returns (google.protobuf.Empty);
-	rpc UpdateContainer(UpdateContainerRequest) returns (google.protobuf.Empty);
-	rpc PauseContainer(PauseContainerRequest) returns (google.protobuf.Empty);
-	rpc ResumeContainer(ResumeContainerRequest) returns (google.protobuf.Empty);
-	rpc DeleteContainer(DeleteContainerRequest) returns (google.protobuf.Empty);
-	rpc GetContainer(GetContainerRequest) returns (GetContainerResponse);
-	rpc ListContainers(ListContainersRequest) returns (ListContainersResponse);
-
-	rpc StartProcess(StartProcessRequest) returns (StartProcessResponse);
-	rpc GetProcess(GetProcessRequest) returns (GetProcessResponse);
-	rpc SignalProcess(SignalProcessRequest) returns (google.protobuf.Empty);
-	rpc DeleteProcess(DeleteProcessRequest) returns (google.protobuf.Empty);
-	rpc ListProcesses(ListProcessesRequest) returns (ListProcessesResponse);
+service ContainerService {
+	rpc Create(CreateRequest) returns (CreateResponse);
+	rpc Start(StartRequest) returns (google.protobuf.Empty);
+	rpc Delete(DeleteRequest) returns (google.protobuf.Empty);
+	rpc List(ListRequest) returns (ListResponse);
+	rpc Events(EventsRequest) returns (stream containerd.v1.types.Event);
 }
 
-message StartContainerRequest {
+message CreateRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
+	google.protobuf.Any spec = 2;	
+	repeated containerd.v1.types.Mount rootfs = 3;
+	string runtime = 4;
+	string stdin = 5;
+	string stdout = 6;
+	string stderr = 7;
+	bool terminal = 8;
 }
 
-
-message CreateContainerRequest {
+message CreateResponse {
 	string id = 1 [(gogoproto.customname) = "ID"];
-	string bundle_path = 2;
-	bool console = 3;
-	string stdin = 4;
-	string stdout = 5;
-	string stderr = 6;
-}
-
-message CreateContainerResponse {
-	types.Container container = 1;
-	types.Process initProcess = 2;
-}
-
-message DeleteContainerRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
-}
-
-message ListContainersRequest {
-	repeated string owner = 1;
-}
-
-message ListContainersResponse {
-	repeated types.Container containers = 1;
-}
-
-message StartProcessRequest {
-	string container_id = 1 [(gogoproto.customname) = "ContainerID"];
-	types.Process process = 2;
-	bool console = 3;
-	string stdin = 4;
-	string stdout = 5;
-	string stderr = 6;
-}
-
-message StartProcessResponse {
-	types.Process process = 1;
-}
-
-message GetContainerRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
-}
-
-message GetContainerResponse {
-	types.Container container = 1;
-}
-
-message UpdateContainerRequest {
-	string container_id = 1 [(gogoproto.customname) = "ContainerID"];
-	string bundle_path = 2;
-}
-
-message PauseContainerRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
-}
-
-message ResumeContainerRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
-}
-
-message GetProcessRequest {
-	string container_id = 1 [(gogoproto.customname) = "ContainerID"];
 	uint32 pid = 2;
 }
 
-message GetProcessResponse {
-	types.Process process = 1;
+message StartRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];
 }
 
-message SignalProcessRequest {
-	string container_id = 1 [(gogoproto.customname) = "ContainerID"];
-	uint32 pid = 2;
-	uint32 signal = 3;
+message DeleteRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];
 }
 
-message DeleteProcessRequest {
-	string container_id = 1 [(gogoproto.customname) = "ContainerID"];
-	uint32 pid = 2;
+message DeleteResponse {
+	string id = 1 [(gogoproto.customname) = "ID"];
+	uint32 exit_status = 2;
 }
 
-message ListProcessesRequest {
-	string container_id = 1 [(gogoproto.customname) = "ContainerID"];
+message ListRequest {
 }
 
-message ListProcessesResponse {
-	repeated types.Process processes = 1;
+message ListResponse {
+	repeated containerd.v1.types.Container containers = 1;
+}
+
+message EventsRequest {
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"strings"
@@ -52,6 +53,9 @@ func main() {
 		if err != nil {
 			return err
 		}
+		if err := setupRoot(); err != nil {
+			return err
+		}
 		var (
 			server = grpc.NewServer()
 			sv     = shim.New()
@@ -84,7 +88,7 @@ func setupSignals() (chan os.Signal, error) {
 // serve serves the grpc API over a unix socket at the provided path
 // this function does not block
 func serve(server *grpc.Server, path string) error {
-	l, err := utils.CreateUnixSocket(path)
+	l, err := net.FileListener(os.NewFile(3, "socket"))
 	if err != nil {
 		return err
 	}
@@ -125,4 +129,9 @@ func handleSignals(signals chan os.Signal, server *grpc.Server, service *shim.Se
 		}
 	}
 	return nil
+}
+
+// setupRoot sets up the root as the shim is started in its own mount namespace
+func setupRoot() error {
+	return syscall.Mount("", "/", "", syscall.MS_SLAVE|syscall.MS_REC, "")
 }

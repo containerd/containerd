@@ -1,61 +1,47 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
+	gocontext "context"
 	"fmt"
+	"os"
+	"text/tabwriter"
 
-	"github.com/nats-io/go-nats"
+	"github.com/docker/containerd/api/services/execution"
 	"github.com/urfave/cli"
 )
 
 var eventsCommand = cli.Command{
 	Name:  "events",
 	Usage: "display containerd events",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "subject, s",
-			Usage: "subjects filter",
-			Value: "containerd.>",
-		},
-	},
 	Action: func(context *cli.Context) error {
-		nc, err := nats.Connect(nats.DefaultURL)
+		containers, err := getExecutionService(context)
 		if err != nil {
 			return err
 		}
-		nec, err := nats.NewEncodedConn(nc, nats.JSON_ENCODER)
-		if err != nil {
-			nc.Close()
-			return err
-		}
-		defer nec.Close()
-
-		evCh := make(chan *nats.Msg, 64)
-		sub, err := nec.Subscribe(context.String("subject"), func(e *nats.Msg) {
-			evCh <- e
-		})
+		events, err := containers.Events(gocontext.Background(), &execution.EventsRequest{})
 		if err != nil {
 			return err
 		}
-		defer sub.Unsubscribe()
-
+		w := tabwriter.NewWriter(os.Stdout, 10, 1, 3, ' ', 0)
+		fmt.Fprintln(w, "TYPE\tID\tPID\tEXIT_STATUS")
 		for {
-			e, more := <-evCh
-			if !more {
-				break
-			}
-
-			var prettyJSON bytes.Buffer
-
-			err := json.Indent(&prettyJSON, e.Data, "", "\t")
+			e, err := events.Recv()
 			if err != nil {
-				fmt.Println(string(e.Data))
-			} else {
-				fmt.Println(prettyJSON.String())
+				return err
+			}
+			if _, err := fmt.Fprintf(w,
+				"%s\t%s\t%d\t%d\n",
+				e.Type.String(),
+				e.ID,
+				e.Pid,
+				e.ExitStatus,
+			); err != nil {
+				return err
+			}
+			if err := w.Flush(); err != nil {
+				return err
 			}
 		}
-
 		return nil
 	},
 }

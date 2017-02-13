@@ -15,6 +15,7 @@ import (
 	gocontext "context"
 
 	"github.com/docker/containerd/api/services/execution"
+	"github.com/docker/containerd/api/types/container"
 	"github.com/pkg/errors"
 	"github.com/tonistiigi/fifo"
 	"github.com/urfave/cli"
@@ -103,12 +104,12 @@ func getGRPCConnection(context *cli.Context) (*grpc.ClientConn, error) {
 	return grpcConn, nil
 }
 
-func getExecutionService(context *cli.Context) (execution.ExecutionServiceClient, error) {
+func getExecutionService(context *cli.Context) (execution.ContainerServiceClient, error) {
 	conn, err := getGRPCConnection(context)
 	if err != nil {
 		return nil, err
 	}
-	return execution.NewExecutionServiceClient(conn), nil
+	return execution.NewContainerServiceClient(conn), nil
 }
 
 func getTempDir(id string) (string, error) {
@@ -121,4 +122,20 @@ func getTempDir(id string) (string, error) {
 		return "", err
 	}
 	return tmpDir, nil
+}
+
+func waitContainer(events execution.ContainerService_EventsClient, respose *execution.CreateResponse) (uint32, error) {
+	for {
+		e, err := events.Recv()
+		if err != nil {
+			return 255, err
+		}
+		if e.Type != container.Event_EXIT {
+			continue
+		}
+		if e.ID == respose.ID &&
+			e.Pid == respose.Pid {
+			return e.ExitStatus, nil
+		}
+	}
 }
