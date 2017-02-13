@@ -58,6 +58,17 @@ type Service struct {
 	shims map[string]*shimClient
 }
 
+func (s *Service) propagateRuntimeLog(client *shimClient, entries int) {
+	logs, err := client.readRuntimeLogEntries(entries)
+	if err != nil {
+		log.G(s.ctx).WithError(err).WithField("container", client.id).
+			Warnf("failed to read shim log")
+		return
+	}
+	log.G(s.ctx).WithField("container", client.id).
+		Warnf("shim log (last %d entry): %v", entries, logs)
+}
+
 func (s *Service) CreateContainer(ctx context.Context, r *executionapi.CreateContainerRequest) (*executionapi.CreateContainerResponse, error) {
 	client, err := s.newShim(r.ID)
 	if err != nil {
@@ -65,6 +76,7 @@ func (s *Service) CreateContainer(ctx context.Context, r *executionapi.CreateCon
 	}
 	defer func() {
 		if err != nil {
+			s.propagateRuntimeLog(client, 1)
 			s.removeShim(r.ID)
 		}
 	}()

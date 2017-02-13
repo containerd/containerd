@@ -2,13 +2,16 @@ package supervisor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -101,6 +104,41 @@ func (s *shimClient) stop() {
 		}
 	}
 	os.RemoveAll(s.root)
+}
+
+func (s *shimClient) readRuntimeLogEntries(lastEntries int) ([]map[string]interface{}, error) {
+	f, err := os.Open(filepath.Join(s.root, "log.json"))
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return parseRuntimeLog(f, lastEntries)
+}
+
+// parseRuntimeLog parses log.json.
+// If lastEntries is greater than 0, only some last entries are returned.
+func parseRuntimeLog(r io.Reader, lastEntries int) ([]map[string]interface{}, error) {
+	b, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(string(b), "\n")
+	if lastEntries > 0 {
+		lines = lines[len(lines)-lastEntries-1 : len(lines)]
+	}
+	var entries []map[string]interface{}
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var entry map[string]interface{}
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			return nil, errors.Wrapf(err, "cannot unmarshal JSON string %q", line)
+		}
+		entries = append(entries, entry)
+	}
+	return entries, nil
 }
 
 func connectToShim(socket string) (shim.ShimClient, error) {
