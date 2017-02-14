@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package containerd.v1.types;
+
+import "gogoproto/gogo.proto";
+import "github.com/docker/containerd/api/types/state/state.proto";
+
+message Container {
+	string id = 1 [(gogoproto.customname) = "ID"];
+	string bundle = 2;
+	State state = 4;
+}

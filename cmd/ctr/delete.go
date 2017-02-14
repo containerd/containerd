@@ -4,7 +4,7 @@ import (
 	gocontext "context"
 	"errors"
 
-	"github.com/docker/containerd/api/execution"
+	"github.com/docker/containerd/api/services/execution"
 	"github.com/urfave/cli"
 )
 

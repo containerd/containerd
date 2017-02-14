@@ -9,8 +9,10 @@ import (
 	"sync"
 	"time"
 
-	api "github.com/docker/containerd/api/execution"
-	"github.com/docker/containerd/api/shim"
+	executionapi "github.com/docker/containerd/api/services/execution"
+	"github.com/docker/containerd/api/services/shim"
+	"github.com/docker/containerd/api/types/container"
+	"github.com/docker/containerd/api/types/process"
 	"github.com/docker/containerd/events"
 	"github.com/docker/containerd/execution"
 	"github.com/docker/containerd/log"
@@ -20,7 +22,7 @@ import (
 )
 
 var (
-	_     = (api.ExecutionServiceServer)(&Service{})
+	_     = (executionapi.ExecutionServiceServer)(&Service{})
 	empty = &google_protobuf.Empty{}
 )
 
@@ -56,7 +58,7 @@ type Service struct {
 	shims map[string]*shimClient
 }
 
-func (s *Service) CreateContainer(ctx context.Context, r *api.CreateContainerRequest) (*api.CreateContainerResponse, error) {
+func (s *Service) CreateContainer(ctx context.Context, r *executionapi.CreateContainerRequest) (*executionapi.CreateContainerResponse, error) {
 	client, err := s.newShim(r.ID)
 	if err != nil {
 		return nil, err
@@ -82,17 +84,17 @@ func (s *Service) CreateContainer(ctx context.Context, r *api.CreateContainerReq
 		return nil, errors.Wrapf(err, "shim create request failed")
 	}
 	client.initPid = createResponse.Pid
-	return &api.CreateContainerResponse{
-		Container: &api.Container{
+	return &executionapi.CreateContainerResponse{
+		Container: &container.Container{
 			ID: r.ID,
 		},
-		InitProcess: &api.Process{
+		InitProcess: &process.Process{
 			Pid: createResponse.Pid,
 		},
 	}, nil
 }
 
-func (s *Service) StartContainer(ctx context.Context, r *api.StartContainerRequest) (*google_protobuf.Empty, error) {
+func (s *Service) StartContainer(ctx context.Context, r *executionapi.StartContainerRequest) (*google_protobuf.Empty, error) {
 	client, err := s.getShim(r.ID)
 	if err != nil {
 		return nil, err
@@ -103,7 +105,7 @@ func (s *Service) StartContainer(ctx context.Context, r *api.StartContainerReque
 	return empty, nil
 }
 
-func (s *Service) DeleteContainer(ctx context.Context, r *api.DeleteContainerRequest) (*google_protobuf.Empty, error) {
+func (s *Service) DeleteContainer(ctx context.Context, r *executionapi.DeleteContainerRequest) (*google_protobuf.Empty, error) {
 	client, err := s.getShim(r.ID)
 	if err != nil {
 		return nil, err
@@ -118,21 +120,21 @@ func (s *Service) DeleteContainer(ctx context.Context, r *api.DeleteContainerReq
 	return empty, nil
 }
 
-func (s *Service) ListContainers(ctx context.Context, r *api.ListContainersRequest) (*api.ListContainersResponse, error) {
-	resp := &api.ListContainersResponse{}
+func (s *Service) ListContainers(ctx context.Context, r *executionapi.ListContainersRequest) (*executionapi.ListContainersResponse, error) {
+	resp := &executionapi.ListContainersResponse{}
 	for _, client := range s.shims {
 		status, err := client.State(ctx, &shim.StateRequest{})
 		if err != nil {
 			return nil, err
 		}
-		resp.Containers = append(resp.Containers, &api.Container{
+		resp.Containers = append(resp.Containers, &container.Container{
 			ID:     status.ID,
 			Bundle: status.Bundle,
 		})
 	}
 	return resp, nil
 }
-func (s *Service) GetContainer(ctx context.Context, r *api.GetContainerRequest) (*api.GetContainerResponse, error) {
+func (s *Service) GetContainer(ctx context.Context, r *executionapi.GetContainerRequest) (*executionapi.GetContainerResponse, error) {
 	client, err := s.getShim(r.ID)
 	if err != nil {
 		return nil, err
@@ -141,8 +143,8 @@ func (s *Service) GetContainer(ctx context.Context, r *api.GetContainerRequest) 
 	if err != nil {
 		return nil, err
 	}
-	return &api.GetContainerResponse{
-		Container: &api.Container{
+	return &executionapi.GetContainerResponse{
+		Container: &container.Container{
 			ID:     state.ID,
 			Bundle: state.Bundle,
 			// TODO: add processes
@@ -150,12 +152,12 @@ func (s *Service) GetContainer(ctx context.Context, r *api.GetContainerRequest) 
 	}, nil
 }
 
-func (s *Service) UpdateContainer(ctx context.Context, r *api.UpdateContainerRequest) (*google_protobuf.Empty, error) {
+func (s *Service) UpdateContainer(ctx context.Context, r *executionapi.UpdateContainerRequest) (*google_protobuf.Empty, error) {
 	panic("not implemented")
 	return empty, nil
 }
 
-func (s *Service) PauseContainer(ctx context.Context, r *api.PauseContainerRequest) (*google_protobuf.Empty, error) {
+func (s *Service) PauseContainer(ctx context.Context, r *executionapi.PauseContainerRequest) (*google_protobuf.Empty, error) {
 	client, err := s.getShim(r.ID)
 	if err != nil {
 		return nil, err
@@ -163,7 +165,7 @@ func (s *Service) PauseContainer(ctx context.Context, r *api.PauseContainerReque
 	return client.Pause(ctx, &shim.PauseRequest{})
 }
 
-func (s *Service) ResumeContainer(ctx context.Context, r *api.ResumeContainerRequest) (*google_protobuf.Empty, error) {
+func (s *Service) ResumeContainer(ctx context.Context, r *executionapi.ResumeContainerRequest) (*google_protobuf.Empty, error) {
 	client, err := s.getShim(r.ID)
 	if err != nil {
 		return nil, err
@@ -171,7 +173,7 @@ func (s *Service) ResumeContainer(ctx context.Context, r *api.ResumeContainerReq
 	return client.Resume(ctx, &shim.ResumeRequest{})
 }
 
-func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) (*api.StartProcessResponse, error) {
+func (s *Service) StartProcess(ctx context.Context, r *executionapi.StartProcessRequest) (*executionapi.StartProcessResponse, error) {
 	client, err := s.getShim(r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -198,21 +200,21 @@ func (s *Service) StartProcess(ctx context.Context, r *api.StartProcessRequest) 
 		return nil, errors.Wrapf(err, "failed to exec into container %q", r.ContainerID)
 	}
 	r.Process.Pid = resp.Pid
-	return &api.StartProcessResponse{
+	return &executionapi.StartProcessResponse{
 		Process: r.Process,
 	}, nil
 }
 
 // containerd managed execs + system pids forked in container
-func (s *Service) GetProcess(ctx context.Context, r *api.GetProcessRequest) (*api.GetProcessResponse, error) {
+func (s *Service) GetProcess(ctx context.Context, r *executionapi.GetProcessRequest) (*executionapi.GetProcessResponse, error) {
 	panic("not implemented")
 }
 
-func (s *Service) SignalProcess(ctx context.Context, r *api.SignalProcessRequest) (*google_protobuf.Empty, error) {
+func (s *Service) SignalProcess(ctx context.Context, r *executionapi.SignalProcessRequest) (*google_protobuf.Empty, error) {
 	panic("not implemented")
 }
 
-func (s *Service) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest) (*google_protobuf.Empty, error) {
+func (s *Service) DeleteProcess(ctx context.Context, r *executionapi.DeleteProcessRequest) (*google_protobuf.Empty, error) {
 	client, err := s.getShim(r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -229,7 +231,7 @@ func (s *Service) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest
 	return empty, nil
 }
 
-func (s *Service) ListProcesses(ctx context.Context, r *api.ListProcessesRequest) (*api.ListProcessesResponse, error) {
+func (s *Service) ListProcesses(ctx context.Context, r *executionapi.ListProcessesRequest) (*executionapi.ListProcessesResponse, error) {
 	panic("not implemented")
 }
 

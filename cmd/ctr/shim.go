@@ -18,7 +18,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/crosbymichael/console"
-	"github.com/docker/containerd/api/shim"
+	"github.com/docker/containerd/api/services/shim"
 	"github.com/urfave/cli"
 	"github.com/pkg/errors"
 )

@@ -4,7 +4,7 @@ import (
 	gocontext "context"
 	"fmt"
 
-	"github.com/docker/containerd/api/execution"
+	"github.com/docker/containerd/api/services/execution"
 	"github.com/urfave/cli"
 )
 
@@ -31,7 +31,7 @@ var listCommand = cli.Command{
 			}
 			fmt.Printf("%s\t%s\t%d\t%s\n",
 				c.ID,
-				c.Status,
+				c.State,
 				len(listProcResponse.Processes),
 				c.Bundle,
 			)

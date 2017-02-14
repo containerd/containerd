@@ -9,7 +9,7 @@ import (
 
 	"github.com/crosbymichael/console"
 	runc "github.com/crosbymichael/go-runc"
-	apishim "github.com/docker/containerd/api/shim"
+	shimapi "github.com/docker/containerd/api/services/shim"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -25,7 +25,7 @@ type execProcess struct {
 	parent *initProcess
 }
 
-func newExecProcess(context context.Context, r *apishim.ExecRequest, parent *initProcess, id int) (process, error) {
+func newExecProcess(context context.Context, r *shimapi.ExecRequest, parent *initProcess, id int) (process, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
@@ -82,7 +82,7 @@ func newExecProcess(context context.Context, r *apishim.ExecRequest, parent *ini
 	return e, nil
 }
 
-func processFromRequest(r *apishim.ExecRequest) specs.Process {
+func processFromRequest(r *shimapi.ExecRequest) specs.Process {
 	var user specs.User
 	if r.User != nil {
 		user.UID = r.User.Uid
@@ -103,7 +103,7 @@ func processFromRequest(r *apishim.ExecRequest) specs.Process {
 	}
 }
 
-func rlimits(rr []*apishim.Rlimit) (o []specs.LinuxRlimit) {
+func rlimits(rr []*shimapi.Rlimit) (o []specs.LinuxRlimit) {
 	for _, r := range rr {
 		o = append(o, specs.LinuxRlimit{
 			Type: r.Type,

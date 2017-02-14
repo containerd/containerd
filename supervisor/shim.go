@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/containerd/api/shim"
+	"github.com/docker/containerd/api/services/shim"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
