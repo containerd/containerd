@@ -42,6 +42,7 @@ containerd client
 		inspectCommand,
 		shimCommand,
 		pprofCommand,
+		killCommand,
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {

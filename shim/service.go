@@ -140,7 +140,7 @@ func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.
 		ID:        s.id,
 		Bundle:    s.bundle,
 		InitPid:   uint32(s.initProcess.Pid()),
-		Processes: []*processapi.Process{},
+		Processes: []*processapi.ProcessState{},
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -152,7 +152,7 @@ func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.
 			}
 			state = stateapi.State_STOPPED
 		}
-		o.Processes = append(o.Processes, &processapi.Process{
+		o.Processes = append(o.Processes, &processapi.ProcessState{
 			Pid:   uint32(p.Pid()),
 			State: state,
 		})
