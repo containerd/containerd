@@ -15,7 +15,7 @@ INTEGRATION_PACKAGE=${PROJECT_ROOT}/integration
 SNAPSHOT_PACKAGES=$(shell go list ./snapshot/...)
 
 # Project binaries.
-COMMANDS=ctr containerd containerd-shim protoc-gen-gogoctrd dist
+COMMANDS=ctr containerd containerd-shim protoc-gen-gogoctrd dist ctrd-protobuild
 BINARIES=$(addprefix bin/,$(COMMANDS))
 
 # TODO(stevvooe): This will set version from git tag, but overrides major,
@@ -26,7 +26,7 @@ GO_LDFLAGS=-ldflags "-X `go list`.Version=$(VERSION)"
 # Flags passed to `go test`
 TESTFLAGS ?=-parallel 8 -race
 
-.PHONY: clean all AUTHORS fmt vet lint build binaries test integration setup generate checkprotos coverage ci check help install uninstall vendor
+.PHONY: clean all AUTHORS fmt vet lint build binaries test integration setup generate protos checkprotos coverage ci check help install uninstall vendor
 .DEFAULT: default
 
 all: binaries
@@ -45,12 +45,15 @@ setup: ## install dependencies
 	#@go get -u github.com/kisielk/errcheck
 	@go get -u github.com/gordonklaus/ineffassign
 
-generate: bin/protoc-gen-gogoctrd ## generate protobuf
+generate: protos
 	@echo "🐳 $@"
-	@tools/gen-gen-go.sh
 	@PATH=${ROOTDIR}/bin:${PATH} go generate -x ${PACKAGES}
 
-checkprotos: generate ## check if protobufs needs to be generated again
+protos: bin/protoc-gen-gogoctrd bin/ctrd-protobuild ## generate protobuf
+	@echo "🐳 $@"
+	@PATH=${ROOTDIR}/bin:${PATH} ctrd-protobuild ${PACKAGES}
+
+checkprotos: protos ## check if protobufs needs to be generated again
 	@echo "🐳 $@"
 	@test -z "$$(git status --short | grep ".pb.go" | tee /dev/stderr)" || \
 		((git diff | cat) && \
