@@ -33,7 +33,7 @@ func TestSimpleDiff(t *testing.T) {
 		fstest.CreateFile("/etc/profile", []byte("PATH=/usr/bin"), 0666),
 		fstest.CreateDir("/root", 0700),
 		fstest.CreateFile("/root/.bashrc", []byte("PATH=/usr/sbin:/usr/bin"), 0644),
-		fstest.RemoveFile("/etc/unexpected"),
+		fstest.Remove("/etc/unexpected"),
 	)
 	diff := []testChange{
 		Modify("/etc/hosts"),
@@ -57,7 +57,7 @@ func TestDirectoryReplace(t *testing.T) {
 	)
 	l2 := fstest.Apply(
 		fstest.CreateFile("/dir1/f11", []byte("#New file here"), 0644),
-		fstest.RemoveFile("/dir1/f2"),
+		fstest.RemoveAll("/dir1/f2"),
 		fstest.CreateFile("/dir1/f2", []byte("Now file"), 0666),
 	)
 	diff := []testChange{
@@ -77,7 +77,7 @@ func TestRemoveDirectoryTree(t *testing.T) {
 		fstest.CreateFile("/dir1/dir2/f2", []byte("f2"), 0644),
 	)
 	l2 := fstest.Apply(
-		fstest.RemoveFile("/dir1"),
+		fstest.RemoveAll("/dir1"),
 	)
 	diff := []testChange{
 		Delete("/dir1"),
@@ -93,7 +93,7 @@ func TestFileReplace(t *testing.T) {
 		fstest.CreateFile("/dir1", []byte("a file, not a directory"), 0644),
 	)
 	l2 := fstest.Apply(
-		fstest.RemoveFile("/dir1"),
+		fstest.Remove("/dir1"),
 		fstest.CreateDir("/dir1/dir2", 0755),
 		fstest.CreateFile("/dir1/dir2/f1", []byte("also a file"), 0644),
 	)

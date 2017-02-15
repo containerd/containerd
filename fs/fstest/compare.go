@@ -1,6 +1,9 @@
 package fstest
 
 import (
+	"io/ioutil"
+	"os"
+
 	"github.com/pkg/errors"
 	"github.com/stevvooe/continuity"
 )
@@ -34,4 +37,17 @@ func CheckDirectoryEqual(d1, d2 string) error {
 	}
 
 	return nil
+}
+
+// CheckDirectoryEqualWithApplier compares directory against applier
+func CheckDirectoryEqualWithApplier(root string, a Applier) error {
+	applied, err := ioutil.TempDir("", "fstest")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(applied)
+	if err := a.Apply(applied); err != nil {
+		return err
+	}
+	return CheckDirectoryEqual(applied, root)
 }

@@ -37,8 +37,16 @@ func CreateFile(name string, content []byte, perm os.FileMode) Applier {
 	})
 }
 
-// RemoveFile returns a file applier which removes the provided file name
-func RemoveFile(name string) Applier {
+// Remove returns a file applier which removes the provided file name
+func Remove(name string) Applier {
+	return applyFn(func(root string) error {
+		return os.Remove(filepath.Join(root, name))
+	})
+}
+
+// RemoveAll returns a file applier which removes the provided file name
+// as in os.RemoveAll
+func RemoveAll(name string) Applier {
 	return applyFn(func(root string) error {
 		return os.RemoveAll(filepath.Join(root, name))
 	})
