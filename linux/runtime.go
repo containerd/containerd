@@ -13,7 +13,7 @@ import (
 	"github.com/docker/containerd/api/services/shim"
 	"github.com/docker/containerd/api/types/container"
 	"github.com/docker/containerd/api/types/mount"
-	"github.com/docker/swarmkit/log"
+	"github.com/docker/containerd/log"
 
 	"golang.org/x/net/context"
 )
