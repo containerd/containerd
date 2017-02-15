@@ -194,7 +194,6 @@ func (p *plugin) getFuncName(goTypName string) string {
 	case "time.NewPopulatedTime":
 		funcName = p.typesPkg.Use() + ".NewPopulatedStdTime"
 	case "time.NewPopulatedDuration":
-		p.typesPkg.Use()
 		funcName = p.typesPkg.Use() + ".NewPopulatedStdDuration"
 	}
 	return funcName
@@ -305,6 +304,23 @@ func (p *plugin) GenerateField(file *generator.FileDescriptor, message *generato
 		}
 		p.Out()
 		p.P(`}`)
+	} else if gogoproto.IsCustomType(field) {
+		funcCall := p.getCustomFuncCall(goTypName)
+		if field.IsRepeated() {
+			p.P(p.varGen.Next(), ` := r.Intn(10)`)
+			p.P(`this.`, fieldname, ` = make(`, goTyp, `, `, p.varGen.Current(), `)`)
+			p.P(`for i := 0; i < `, p.varGen.Current(), `; i++ {`)
+			p.In()
+			p.P(p.varGen.Next(), `:= `, funcCall)
+			p.P(`this.`, fieldname, `[i] = *`, p.varGen.Current())
+			p.Out()
+			p.P(`}`)
+		} else if gogoproto.IsNullable(field) {
+			p.P(`this.`, fieldname, ` = `, funcCall)
+		} else {
+			p.P(p.varGen.Next(), `:= `, funcCall)
+			p.P(`this.`, fieldname, ` = *`, p.varGen.Current())
+		}
 	} else if field.IsMessage() || p.IsGroup(field) {
 		funcCall := p.getFuncCall(goTypName)
 		if field.IsRepeated() {
@@ -344,23 +360,6 @@ func (p *plugin) GenerateField(file *generator.FileDescriptor, message *generato
 			} else {
 				p.P(p.varGen.Next(), ` := `, val)
 				p.P(`this.`, fieldname, ` = &`, p.varGen.Current())
-			}
-		} else if gogoproto.IsCustomType(field) {
-			funcCall := p.getCustomFuncCall(goTypName)
-			if field.IsRepeated() {
-				p.P(p.varGen.Next(), ` := r.Intn(10)`)
-				p.P(`this.`, fieldname, ` = make(`, goTyp, `, `, p.varGen.Current(), `)`)
-				p.P(`for i := 0; i < `, p.varGen.Current(), `; i++ {`)
-				p.In()
-				p.P(p.varGen.Next(), `:= `, funcCall)
-				p.P(`this.`, fieldname, `[i] = *`, p.varGen.Current())
-				p.Out()
-				p.P(`}`)
-			} else if gogoproto.IsNullable(field) {
-				p.P(`this.`, fieldname, ` = `, funcCall)
-			} else {
-				p.P(p.varGen.Next(), `:= `, funcCall)
-				p.P(`this.`, fieldname, ` = *`, p.varGen.Current())
 			}
 		} else if field.IsBytes() {
 			if field.IsRepeated() {

@@ -97,8 +97,10 @@ not print their values, while the generated GoString method will always print al
 package gostring
 
 import (
+	"fmt"
 	"github.com/gogo/protobuf/gogoproto"
 	"github.com/gogo/protobuf/protoc-gen-gogo/generator"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -145,6 +147,7 @@ func (p *gostring) Generate(file *generator.FileDescriptor) {
 	reflectPkg := p.NewImport("reflect")
 	sortKeysPkg := p.NewImport("github.com/gogo/protobuf/sortkeys")
 
+	extensionToGoStringUsed := false
 	for _, message := range file.Messages() {
 		if !p.overwrite && !gogoproto.HasGoString(file.FileDescriptorProto, message.DescriptorProto) {
 			continue
@@ -221,7 +224,7 @@ func (p *gostring) Generate(file *generator.FileDescriptor) {
 				p.P(`s = append(s, "`, fieldname, `: " + `, mapName, `+ ",\n")`)
 				p.Out()
 				p.P(`}`)
-			} else if field.IsMessage() || p.IsGroup(field) {
+			} else if (field.IsMessage() && !gogoproto.IsCustomType(field) && !gogoproto.IsStdTime(field) && !gogoproto.IsStdDuration(field)) || p.IsGroup(field) {
 				if nullable || repeated {
 					p.P(`if this.`, fieldname, ` != nil {`)
 					p.In()
@@ -264,6 +267,7 @@ func (p *gostring) Generate(file *generator.FileDescriptor) {
 		if message.DescriptorProto.HasExtension() {
 			if gogoproto.HasExtensionsMap(file.FileDescriptorProto, message.DescriptorProto) {
 				p.P(`s = append(s, "XXX_InternalExtensions: " + extensionToGoString`, p.localName, `(this) + ",\n")`)
+				extensionToGoStringUsed = true
 			} else {
 				p.P(`if this.XXX_extensions != nil {`)
 				p.In()
@@ -338,29 +342,34 @@ func (p *gostring) Generate(file *generator.FileDescriptor) {
 	p.Out()
 	p.P(`}`)
 
-	p.P(`func extensionToGoString`, p.localName, `(m `, protoPkg.Use(), `.Message) string {`)
-	p.In()
-	p.P(`e := `, protoPkg.Use(), `.GetUnsafeExtensionsMap(m)`)
-	p.P(`if e == nil { return "nil" }`)
-	p.P(`s := "proto.NewUnsafeXXX_InternalExtensions(map[int32]proto.Extension{"`)
-	p.P(`keys := make([]int, 0, len(e))`)
-	p.P(`for k := range e {`)
-	p.In()
-	p.P(`keys = append(keys, int(k))`)
-	p.Out()
-	p.P(`}`)
-	p.P(sortPkg.Use(), `.Ints(keys)`)
-	p.P(`ss := []string{}`)
-	p.P(`for _, k := range keys {`)
-	p.In()
-	p.P(`ss = append(ss, `, strconvPkg.Use(), `.Itoa(k) + ": " + e[int32(k)].GoString())`)
-	p.Out()
-	p.P(`}`)
-	p.P(`s+=`, stringsPkg.Use(), `.Join(ss, ",") + "})"`)
-	p.P(`return s`)
-	p.Out()
-	p.P(`}`)
-
+	if extensionToGoStringUsed {
+		if !gogoproto.ImportsGoGoProto(file.FileDescriptorProto) {
+			fmt.Fprintf(os.Stderr, "The GoString plugin for messages with extensions requires importing gogoprotobuf. Please see file %s", file.GetName())
+			os.Exit(1)
+		}
+		p.P(`func extensionToGoString`, p.localName, `(m `, protoPkg.Use(), `.Message) string {`)
+		p.In()
+		p.P(`e := `, protoPkg.Use(), `.GetUnsafeExtensionsMap(m)`)
+		p.P(`if e == nil { return "nil" }`)
+		p.P(`s := "proto.NewUnsafeXXX_InternalExtensions(map[int32]proto.Extension{"`)
+		p.P(`keys := make([]int, 0, len(e))`)
+		p.P(`for k := range e {`)
+		p.In()
+		p.P(`keys = append(keys, int(k))`)
+		p.Out()
+		p.P(`}`)
+		p.P(sortPkg.Use(), `.Ints(keys)`)
+		p.P(`ss := []string{}`)
+		p.P(`for _, k := range keys {`)
+		p.In()
+		p.P(`ss = append(ss, `, strconvPkg.Use(), `.Itoa(k) + ": " + e[int32(k)].GoString())`)
+		p.Out()
+		p.P(`}`)
+		p.P(`s+=`, stringsPkg.Use(), `.Join(ss, ",") + "})"`)
+		p.P(`return s`)
+		p.Out()
+		p.P(`}`)
+	}
 }
 
 func init() {
