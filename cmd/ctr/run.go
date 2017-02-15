@@ -24,7 +24,7 @@ var runCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "bundle, b",
-			Usage: "path to the container's bundle",
+			Usage: "path to the container's bundle (default: the current directory)",
 		},
 		cli.BoolFlag{
 			Name:  "tty, t",
@@ -36,6 +36,12 @@ var runCommand = cli.Command{
 		if id == "" {
 			return fmt.Errorf("container id must be provided")
 		}
+
+		bundle, err := getBundlePath(context.String("bundle"))
+		if err != nil {
+			return err
+		}
+
 		executionService, err := getExecutionService(context)
 		if err != nil {
 			return err
@@ -71,10 +77,6 @@ var runCommand = cli.Command{
 		}
 		defer os.RemoveAll(tmpDir)
 
-		bundle, err := filepath.Abs(context.String("bundle"))
-		if err != nil {
-			return err
-		}
 		crOpts := &execution.CreateContainerRequest{
 			ID:         id,
 			BundlePath: bundle,
@@ -147,4 +149,16 @@ var runCommand = cli.Command{
 
 		return nil
 	},
+}
+
+func getBundlePath(s string) (string, error) {
+	bundlePath, err := filepath.Abs(s)
+	if err != nil {
+		return "", errors.Wrapf(err, "%s is not a valid bundle path", s)
+	}
+	_, err = os.Stat(filepath.Join(bundlePath, "config.json"))
+	if err != nil {
+		return "", errors.Wrapf(err, "%s is not a valid bundle path", bundlePath)
+	}
+	return s, nil
 }
