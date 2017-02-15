@@ -186,7 +186,8 @@ func (cs *Store) Walk(fn WalkFunc) error {
 
 		if path == root {
 			return nil
-		} else if filepath.Dir(path) == root {
+		}
+		if filepath.Dir(path) == root {
 			alg = digest.Algorithm(filepath.Base(path))
 
 			if !alg.Available() {
