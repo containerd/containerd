@@ -308,3 +308,89 @@ func (cs *ContainerdSuite) TestBusyboxExecCreateAttachedChild(t *check.C) {
 		t.Fatal("exec did not exit within 5 seconds")
 	}
 }
+
+func (cs *ContainerdSuite) TestBusyboxRestoreDeadExec(t *check.C) {
+	bundleName := "busybox-top"
+	if err := CreateBusyboxBundle(bundleName, []string{"top"}); err != nil {
+		t.Fatal(err)
+	}
+
+	var (
+		err   error
+		initp *ContainerProcess
+	)
+
+	containerID := "top"
+	initp, err = cs.StartContainer(containerID, bundleName)
+	t.Assert(err, checker.Equals, nil)
+
+	ch := initp.GetEventsChannel()
+	for _, evt := range []types.Event{
+		{
+			Type:   "start-container",
+			Id:     containerID,
+			Status: 0,
+			Pid:    "",
+		},
+	} {
+		e := <-ch
+		evt.Timestamp = e.Timestamp
+		t.Assert(*e, checker.Equals, evt)
+	}
+
+	createCh := make(chan struct{})
+	killCh := make(chan struct{})
+	doneCh := make(chan struct{})
+	restartCh := make(chan struct{})
+	go func() {
+		execID := "sleep"
+		p, err := cs.AddProcessToContainer(initp, execID, "/", []string{"PATH=/bin"}, []string{"sleep", "10"}, 0, 0)
+		t.Assert(err, checker.Equals, nil)
+		for idx, evt := range []types.Event{
+			{
+				Type:   "start-process",
+				Id:     containerID,
+				Status: 0,
+				Pid:    execID,
+			},
+			{
+				Type:   "exit",
+				Id:     containerID,
+				Status: 137,
+				Pid:    execID,
+			},
+		} {
+			e := <-ch
+			evt.Timestamp = e.Timestamp
+			t.Assert(*e, checker.Equals, evt)
+			if idx == 0 {
+				close(createCh)
+				<-killCh
+				syscall.Kill(int(p.systemPid), syscall.SIGKILL)
+				close(restartCh)
+			}
+		}
+		close(doneCh)
+	}()
+
+	// wait for sleep to be created
+	<-createCh
+	// stop containerd
+	cs.StopDaemon(false)
+	// notify go routine to go ahead and kill the sleep exec
+	close(killCh)
+	// wait for the kill signal to have been sent
+	<-restartCh
+	if err := cs.StartDaemon(); err != nil {
+		t.Fatal(err)
+	}
+	// wait a tiny bit more just in case
+	time.Sleep(100 * time.Millisecond)
+
+	select {
+	case <-doneCh:
+		break
+	case <-time.After(8 * time.Second):
+		t.Fatal("exec did not exit within 5 seconds")
+	}
+}

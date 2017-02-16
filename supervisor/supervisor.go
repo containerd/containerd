@@ -358,6 +358,9 @@ func (s *Supervisor) restore() error {
 			} else {
 				exitedProcesses = append(exitedProcesses, p)
 			}
+			if p.ID() != runtime.InitProcessID {
+				s.newExecSyncChannel(container.ID(), p.ID())
+			}
 		}
 		if len(exitedProcesses) > 0 {
 			// sort processes so that init is fired last because that is how the kernel sends the

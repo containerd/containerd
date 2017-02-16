@@ -117,6 +117,7 @@ type ContainerProcess struct {
 	eventsCh    chan *types.Event
 	cs          *ContainerdSuite
 	hasExited   bool
+	systemPid   uint32
 }
 
 func (c *ContainerProcess) openIo() (err error) {
@@ -292,11 +293,13 @@ func (cs *ContainerdSuite) AddProcessToContainer(init *ContainerProcess, pid, cw
 		Stderr: filepath.Join(cs.cwd, c.io.stderr),
 	}
 
-	_, err = cs.grpcClient.AddProcess(context.Background(), pr)
+	apr, err := cs.grpcClient.AddProcess(context.Background(), pr)
 	if err != nil {
 		c.Cleanup()
 		return nil, err
 	}
+
+	c.systemPid = apr.SystemPid
 
 	return c, nil
 }
