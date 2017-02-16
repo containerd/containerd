@@ -42,6 +42,7 @@ var (
 	// becomes the M declarations at the end of the declaration.
 	packageMap = map[string]string{
 		"google/protobuf/timestamp.proto":  "github.com/gogo/protobuf/types",
+		"google/protobuf/any.proto":        "github.com/gogo/protobuf/types",
 		"google/protobuf/descriptor.proto": "github.com/gogo/protobuf/protoc-gen-gogo/descriptor",
 		"gogoproto/gogo.proto":             "github.com/gogo/protobuf/gogoproto",
 	}
@@ -148,8 +149,9 @@ func main() {
 		// pass to sh -c so we don't need to re-split here.
 		args := []string{"-c", arg}
 		cmd := exec.Command("sh", args...)
-		if err := cmd.Run(); err != nil {
-			log.Fatalln(err)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Fatalf("%s %s\n", out, err)
 		}
 	}
 }

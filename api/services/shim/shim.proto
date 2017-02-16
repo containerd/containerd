@@ -4,8 +4,8 @@ package containerd.v1.services;
 
 import "google/protobuf/empty.proto";
 import "gogoproto/gogo.proto";
-import "github.com/docker/containerd/api/types/process/process.proto";
-import "github.com/docker/containerd/api/types/user/user.proto";
+import "github.com/docker/containerd/api/types/mount/mount.proto";
+import "github.com/docker/containerd/api/types/container/container.proto";
 
 service Shim {
 	rpc Create(CreateRequest) returns (CreateResponse);
@@ -13,10 +13,11 @@ service Shim {
 	rpc Delete(DeleteRequest) returns (DeleteResponse);
 	rpc Exec(ExecRequest) returns (ExecResponse);
 	rpc Pty(PtyRequest) returns (google.protobuf.Empty);
-	rpc Events(EventsRequest) returns (stream Event);
+	rpc Events(EventsRequest) returns (stream containerd.v1.types.Event);
 	rpc State(StateRequest) returns (StateResponse);
 	rpc Pause(PauseRequest) returns (google.protobuf.Empty);
 	rpc Resume(ResumeRequest) returns (google.protobuf.Empty);
+	rpc Exit(ExitRequest) returns (google.protobuf.Empty);
 }
 
 message CreateRequest {
@@ -28,6 +29,7 @@ message CreateRequest {
 	string stdin = 6;
 	string stdout = 7;
 	string stderr = 8;
+	repeated containerd.v1.types.Mount rootfs = 9;
 }
 
 message CreateResponse {
@@ -51,7 +53,7 @@ message ExecRequest {
 	string stdout = 3;
 	string stderr = 4;
 	string selinux_label = 5;
-	types.User user = 6;
+	containerd.v1.types.User user = 6;
 	repeated string args = 7;
 	repeated string env = 8;
 	string cwd = 9;
@@ -80,34 +82,22 @@ message PtyRequest {
 message EventsRequest {
 }
 
-enum EventType {
-	EXIT = 0;
-	OOM = 1;
-	CREATE = 2;
-	START = 3;
-	EXEC_ADDED = 4;
-}
-
-// should be moved to api/types/event maybe
-message Event {
-	string id = 1 [(gogoproto.customname) = "ID"];
-	EventType type = 2;
-	uint32 pid = 3;
-	uint32 exit_status = 4;
-}
-
 message StateRequest {
 }
 
 message StateResponse {
 	string id = 1 [(gogoproto.customname) = "ID"];
 	string bundle = 2;
-	uint32 initPid = 3;
-	repeated types.Process processes = 4;
+	uint32 pid = 3;
+	repeated containerd.v1.types.Process processes = 4;
 }
+
 
 message PauseRequest {
 }
 
 message ResumeRequest {
+}
+
+message ExitRequest {
 }
