@@ -72,7 +72,7 @@ type Runtime interface {
 	Create(ctx context.Context, id string, opts CreateOpts) (Container, error)
 	// Containers returns all the current containers for the runtime
 	Containers() ([]Container, error)
-	// Delete returns the container in the runtime
+	// Delete removes the container in the runtime
 	Delete(ctx context.Context, c Container) error
 	// Events returns events for the runtime and all containers created by the runtime
 	Events(context.Context) <-chan *Event

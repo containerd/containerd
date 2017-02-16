@@ -2,11 +2,14 @@ package containerd
 
 import "golang.org/x/net/context"
 
+type ContainerInfo struct {
+	ID      string
+	Runtime string
+}
+
 type Container interface {
-	// ID of the container
-	ID() string
-	// Runtime returns the runtime name that the container was created with
-	Runtime() string
+	// Information of the container
+	Info() ContainerInfo
 	// Start the container's user defined process
 	Start(context.Context) error
 	// State returns the container's state

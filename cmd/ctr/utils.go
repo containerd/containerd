@@ -124,7 +124,7 @@ func getTempDir(id string) (string, error) {
 	return tmpDir, nil
 }
 
-func waitContainer(events execution.ContainerService_EventsClient, respose *execution.CreateResponse) (uint32, error) {
+func waitContainer(events execution.ContainerService_EventsClient, response *execution.CreateResponse) (uint32, error) {
 	for {
 		e, err := events.Recv()
 		if err != nil {
@@ -133,8 +133,8 @@ func waitContainer(events execution.ContainerService_EventsClient, respose *exec
 		if e.Type != container.Event_EXIT {
 			continue
 		}
-		if e.ID == respose.ID &&
-			e.Pid == respose.Pid {
+		if e.ID == response.ID &&
+			e.Pid == response.Pid {
 			return e.ExitStatus, nil
 		}
 	}

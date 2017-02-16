@@ -22,7 +22,7 @@ func NewSupervisor(ctx context.Context, runtimes map[string]Runtime) (*Superviso
 			return nil, err
 		}
 		for _, c := range containers {
-			s.containers[c.ID()] = c
+			s.containers[c.Info().ID] = c
 		}
 	}
 	return s, nil
@@ -59,7 +59,7 @@ func (s *Supervisor) Create(ctx context.Context, id, runtime string, opts Create
 	if err != nil {
 		return nil, err
 	}
-	s.containers[c.ID()] = c
+	s.containers[c.Info().ID] = c
 	return c, nil
 }
 
@@ -71,7 +71,7 @@ func (s *Supervisor) Delete(ctx context.Context, id string) error {
 	if !ok {
 		return ErrContainerNotExist
 	}
-	err := s.runtimes[c.Runtime()].Delete(ctx, c)
+	err := s.runtimes[c.Info().Runtime].Delete(ctx, c)
 	if err != nil {
 		return err
 	}

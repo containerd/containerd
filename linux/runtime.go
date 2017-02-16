@@ -51,7 +51,6 @@ type Runtime struct {
 func (r *Runtime) Create(ctx context.Context, id string, opts containerd.CreateOpts) (containerd.Container, error) {
 	path, err := r.newBundle(id, opts.Spec)
 	if err != nil {
-		os.RemoveAll(path)
 		return nil, err
 	}
 	s, err := newShim(path)

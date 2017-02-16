@@ -25,12 +25,11 @@ type Container struct {
 	shim shim.ShimClient
 }
 
-func (c *Container) ID() string {
-	return c.id
-}
-
-func (Container) Runtime() string {
-	return runtimeName
+func (c *Container) Info() containerd.ContainerInfo {
+	return containerd.ContainerInfo{
+		ID:      c.id,
+		Runtime: runtimeName,
+	}
 }
 
 func (c *Container) Start(ctx context.Context) error {

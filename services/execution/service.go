@@ -47,6 +47,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 	}
 	state, err := c.State(ctx)
 	if err != nil {
+		s.s.Delete(ctx, r.ID)
 		return nil, err
 	}
 	return &api.CreateResponse{
@@ -92,7 +93,7 @@ func (s *Service) List(ctx context.Context, r *api.ListRequest) (*api.ListRespon
 			status = container.Status_PAUSED
 		}
 		resp.Containers = append(resp.Containers, &container.Container{
-			ID:     c.ID(),
+			ID:     c.Info().ID,
 			Pid:    state.Pid(),
 			Status: status,
 		})

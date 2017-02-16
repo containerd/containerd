@@ -56,7 +56,7 @@ func (c *collector) collect(r Runtime) error {
 // It forwards events until the channels are closed or the EventWriter
 // returns an error
 // This is a blocking call
-func (c *collector) forward(w EventWriter) (err error) {
+func (c *collector) forward(w EventWriter) error {
 	client := &eventClient{
 		w:   w,
 		eCh: make(chan error, 1),
@@ -64,9 +64,7 @@ func (c *collector) forward(w EventWriter) (err error) {
 	c.mu.Lock()
 	c.eventClients[client] = struct{}{}
 	c.mu.Unlock()
-	if serr := <-client.eCh; serr != nil {
-		err = serr
-	}
+	err := <-client.eCh
 	c.mu.Lock()
 	delete(c.eventClients, client)
 	c.mu.Unlock()
