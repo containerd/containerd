@@ -18,10 +18,11 @@ func defaultConfig() *config {
 
 // loadConfig loads the config from the provided path
 func loadConfig(path string) error {
-	_, err := toml.DecodeFile(path, conf)
+	md, err := toml.DecodeFile(path, conf)
 	if err != nil {
 		return err
 	}
+	conf.md = md
 	return nil
 }
 
@@ -38,6 +39,18 @@ type config struct {
 	Debug debug `toml:"debug"`
 	// Metrics and monitoring settings
 	Metrics metricsConfig `toml:"metrics"`
+	// Plugins provides plugin specific configuration for the initialization of a plugin
+	Plugins map[string]toml.Primitive `toml:"plugins"`
+
+	md toml.MetaData
+}
+
+func (c *config) decodePlugin(name string, v interface{}) error {
+	p, ok := c.Plugins[name]
+	if !ok {
+		return nil
+	}
+	return c.md.PrimitiveDecode(p, v)
 }
 
 type grpcConfig struct {

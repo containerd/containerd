@@ -221,8 +221,8 @@ func (s *Store) Writer(ctx context.Context, ref string) (Writer, error) {
 		}
 		defer fp.Close()
 
-		p := bufPool.Get().([]byte)
-		defer bufPool.Put(p)
+		p := BufPool.Get().([]byte)
+		defer BufPool.Put(p)
 
 		offset, err = io.CopyBuffer(digester.Hash(), fp, p)
 		if err != nil {

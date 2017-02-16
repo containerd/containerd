@@ -13,7 +13,7 @@ import (
 var (
 	errNotFound = errors.New("content: not found")
 
-	bufPool = sync.Pool{
+	BufPool = sync.Pool{
 		New: func() interface{} {
 			return make([]byte, 1<<20)
 		},

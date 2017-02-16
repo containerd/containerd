@@ -1,4 +1,4 @@
-package linux
+package main
 
 import (
 	"bytes"
@@ -24,16 +24,19 @@ const (
 )
 
 func init() {
-	containerd.RegisterRuntime(runtimeName, New)
+	containerd.Register(runtimeName, &containerd.Registration{
+		Type: containerd.RuntimePlugin,
+		Init: New,
+	})
 }
 
-func New(root string) (containerd.Runtime, error) {
-	if err := os.MkdirAll(root, 0700); err != nil {
+func New(ic *containerd.InitContext) (interface{}, error) {
+	if err := os.MkdirAll(ic.State, 0700); err != nil {
 		return nil, err
 	}
-	c, cancel := context.WithCancel(context.Background())
+	c, cancel := context.WithCancel(ic.Context)
 	return &Runtime{
-		root:          root,
+		root:          ic.State,
 		events:        make(chan *containerd.Event, 2048),
 		eventsContext: c,
 		eventsCancel:  cancel,
@@ -110,7 +113,7 @@ func (r *Runtime) Containers() ([]containerd.Container, error) {
 		if !fi.IsDir() {
 			continue
 		}
-		c, err := r.loadContainer(fi.Name())
+		c, err := r.loadContainer(filepath.Join(r.root, fi.Name()))
 		if err != nil {
 			return nil, err
 		}

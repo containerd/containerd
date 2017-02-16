@@ -4,23 +4,39 @@ import (
 	"errors"
 	"io"
 
-	contentapi "github.com/docker/containerd/api/services/content"
+	"github.com/docker/containerd"
+	api "github.com/docker/containerd/api/services/content"
+	"github.com/docker/containerd/content"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 )
 
 type Service struct {
-	store *Store
+	store *content.Store
 }
 
-var _ contentapi.ContentServer = &Service{}
+var _ api.ContentServer = &Service{}
 
-func NewService(store *Store) contentapi.ContentServer {
-	return &Service{store: store}
+func init() {
+	containerd.Register("content-grpc", &containerd.Registration{
+		Type: containerd.GRPCPlugin,
+		Init: NewService,
+	})
 }
 
-func (s *Service) Info(ctx context.Context, req *contentapi.InfoRequest) (*contentapi.InfoResponse, error) {
+func NewService(ic *containerd.InitContext) (interface{}, error) {
+	return &Service{
+		store: ic.Store,
+	}, nil
+}
+
+func (s *Service) Register(server *grpc.Server) error {
+	api.RegisterContentServer(server, s)
+	return nil
+}
+
+func (s *Service) Info(ctx context.Context, req *api.InfoRequest) (*api.InfoResponse, error) {
 	if err := req.Digest.Validate(); err != nil {
 		return nil, grpc.Errorf(codes.InvalidArgument, "%q failed validation", req.Digest)
 	}
@@ -30,14 +46,14 @@ func (s *Service) Info(ctx context.Context, req *contentapi.InfoRequest) (*conte
 		return nil, maybeNotFoundGRPC(err, req.Digest.String())
 	}
 
-	return &contentapi.InfoResponse{
+	return &api.InfoResponse{
 		Digest:      req.Digest,
 		Size_:       bi.Size,
 		CommittedAt: bi.CommittedAt,
 	}, nil
 }
 
-func (s *Service) Read(req *contentapi.ReadRequest, session contentapi.Content_ReadServer) error {
+func (s *Service) Read(req *api.ReadRequest, session api.Content_ReadServer) error {
 	if err := req.Digest.Validate(); err != nil {
 		return grpc.Errorf(codes.InvalidArgument, "%v: %v", req.Digest, err)
 	}
@@ -68,9 +84,9 @@ func (s *Service) Read(req *contentapi.ReadRequest, session contentapi.Content_R
 
 		// TODO(stevvooe): Using the global buffer pool. At 32KB, it is probably
 		// little inefficient for work over a fast network. We can tune this later.
-		p = bufPool.Get().([]byte)
+		p = content.BufPool.Get().([]byte)
 	)
-	defer bufPool.Put(p)
+	defer content.BufPool.Put(p)
 
 	if offset < 0 {
 		offset = 0
@@ -95,11 +111,11 @@ func (s *Service) Read(req *contentapi.ReadRequest, session contentapi.Content_R
 
 type readResponseWriter struct {
 	offset  int64
-	session contentapi.Content_ReadServer
+	session api.Content_ReadServer
 }
 
 func (rw *readResponseWriter) Write(p []byte) (n int, err error) {
-	if err := rw.session.Send(&contentapi.ReadResponse{
+	if err := rw.session.Send(&api.ReadResponse{
 		Offset: rw.offset,
 		Data:   p,
 	}); err != nil {
@@ -110,14 +126,14 @@ func (rw *readResponseWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func (s *Service) Write(session contentapi.Content_WriteServer) (err error) {
+func (s *Service) Write(session api.Content_WriteServer) (err error) {
 	var (
 		ref string
-		msg contentapi.WriteResponse
-		req *contentapi.WriteRequest
+		msg api.WriteResponse
+		req *api.WriteRequest
 	)
 
-	defer func(msg *contentapi.WriteResponse) {
+	defer func(msg *api.WriteResponse) {
 		// pump through the last message if no error was encountered
 		if err != nil {
 			return
@@ -153,7 +169,7 @@ func (s *Service) Write(session contentapi.Content_WriteServer) (err error) {
 		// cost of the move when they collide.
 		if req.ExpectedDigest != "" {
 			if _, err := s.store.Info(req.ExpectedDigest); err != nil {
-				if !IsNotFound(err) {
+				if !content.IsNotFound(err) {
 					return err
 				}
 
@@ -172,9 +188,9 @@ func (s *Service) Write(session contentapi.Content_WriteServer) (err error) {
 		msg.UpdatedAt = ws.UpdatedAt
 
 		switch req.Action {
-		case contentapi.WriteActionStat:
+		case api.WriteActionStat:
 			msg.Digest = wr.Digest()
-		case contentapi.WriteActionWrite, contentapi.WriteActionCommit:
+		case api.WriteActionWrite, api.WriteActionCommit:
 			if req.Offset > 0 {
 				// validate the offset if provided
 				if req.Offset != ws.Offset {
@@ -200,10 +216,10 @@ func (s *Service) Write(session contentapi.Content_WriteServer) (err error) {
 				msg.Offset += int64(n)
 			}
 
-			if req.Action == contentapi.WriteActionCommit {
+			if req.Action == api.WriteActionCommit {
 				return wr.Commit(req.ExpectedSize, req.ExpectedDigest)
 			}
-		case contentapi.WriteActionAbort:
+		case api.WriteActionAbort:
 			return s.store.Abort(ref)
 		}
 
@@ -220,12 +236,12 @@ func (s *Service) Write(session contentapi.Content_WriteServer) (err error) {
 	return nil
 }
 
-func (s *Service) Status(*contentapi.StatusRequest, contentapi.Content_StatusServer) error {
+func (s *Service) Status(*api.StatusRequest, api.Content_StatusServer) error {
 	return grpc.Errorf(codes.Unimplemented, "not implemented")
 }
 
 func maybeNotFoundGRPC(err error, id string) error {
-	if IsNotFound(err) {
+	if content.IsNotFound(err) {
 		return grpc.Errorf(codes.NotFound, "%v: not found", id)
 	}
 

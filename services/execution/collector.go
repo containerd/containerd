@@ -1,15 +1,17 @@
-package containerd
+package execution
 
 import (
 	"sync"
 
+	"github.com/docker/containerd"
+
 	"golang.org/x/net/context"
 )
 
-func newCollector(ctx context.Context, runtimes map[string]Runtime) (*collector, error) {
+func newCollector(ctx context.Context, runtimes map[string]containerd.Runtime) (*collector, error) {
 	c := &collector{
 		context:      ctx,
-		ch:           make(chan *Event, 2048),
+		ch:           make(chan *containerd.Event, 2048),
 		eventClients: make(map[*eventClient]struct{}),
 	}
 	for _, r := range runtimes {
@@ -27,7 +29,7 @@ func newCollector(ctx context.Context, runtimes map[string]Runtime) (*collector,
 
 type eventClient struct {
 	eCh chan error
-	w   EventWriter
+	w   *grpcEventWriter
 }
 
 type collector struct {
@@ -35,12 +37,12 @@ type collector struct {
 	wg sync.WaitGroup
 
 	context      context.Context
-	ch           chan *Event
+	ch           chan *containerd.Event
 	eventClients map[*eventClient]struct{}
 }
 
 // collect collects events from the provided runtime
-func (c *collector) collect(r Runtime) error {
+func (c *collector) collect(r containerd.Runtime) error {
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
@@ -51,12 +53,7 @@ func (c *collector) collect(r Runtime) error {
 	return nil
 }
 
-// Forward forwards all events from the collector to the EventWriters
-//
-// It forwards events until the channels are closed or the EventWriter
-// returns an error
-// This is a blocking call
-func (c *collector) forward(w EventWriter) error {
+func (c *collector) forward(w *grpcEventWriter) error {
 	client := &eventClient{
 		w:   w,
 		eCh: make(chan error, 1),

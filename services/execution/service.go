@@ -1,11 +1,14 @@
 package execution
 
 import (
+	"sync"
+
 	"github.com/docker/containerd"
 	api "github.com/docker/containerd/api/services/execution"
 	"github.com/docker/containerd/api/types/container"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -13,15 +16,46 @@ var (
 	empty = &google_protobuf.Empty{}
 )
 
-// New creates a new GRPC service for the ContainerService
-func New(s *containerd.Supervisor) *Service {
-	return &Service{
-		s: s,
+func init() {
+	containerd.Register("runtime-grpc", &containerd.Registration{
+		Type: containerd.GRPCPlugin,
+		Init: New,
+	})
+}
+
+func New(ic *containerd.InitContext) (interface{}, error) {
+	c, err := newCollector(ic.Context, ic.Runtimes)
+	if err != nil {
+		return nil, err
 	}
+	return &Service{
+		runtimes:   ic.Runtimes,
+		containers: make(map[string]containerd.Container),
+		collector:  c,
+	}, nil
 }
 
 type Service struct {
-	s *containerd.Supervisor
+	mu sync.Mutex
+
+	runtimes   map[string]containerd.Runtime
+	containers map[string]containerd.Container
+	collector  *collector
+}
+
+func (s *Service) Register(server *grpc.Server) error {
+	api.RegisterContainerServiceServer(server, s)
+	// load all containers
+	for _, r := range s.runtimes {
+		containers, err := r.Containers()
+		if err != nil {
+			return err
+		}
+		for _, c := range containers {
+			s.containers[c.Info().ID] = c
+		}
+	}
+	return nil
 }
 
 func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.CreateResponse, error) {
@@ -41,13 +75,28 @@ func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 			Options: m.Options,
 		})
 	}
-	c, err := s.s.Create(ctx, r.ID, r.Runtime, opts)
+	runtime, err := s.getRuntime(r.Runtime)
 	if err != nil {
 		return nil, err
 	}
+	s.mu.Lock()
+	if _, ok := s.containers[r.ID]; ok {
+		s.mu.Unlock()
+		return nil, containerd.ErrContainerExists
+	}
+	c, err := runtime.Create(ctx, r.ID, opts)
+	if err != nil {
+		s.mu.Unlock()
+		return nil, err
+	}
+	s.containers[r.ID] = c
+	s.mu.Unlock()
 	state, err := c.State(ctx)
 	if err != nil {
-		s.s.Delete(ctx, r.ID)
+		s.mu.Lock()
+		delete(s.containers, r.ID)
+		runtime.Delete(ctx, c)
+		s.mu.Unlock()
 		return nil, err
 	}
 	return &api.CreateResponse{
@@ -57,7 +106,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 }
 
 func (s *Service) Start(ctx context.Context, r *api.StartRequest) (*google_protobuf.Empty, error) {
-	c, err := s.s.Get(r.ID)
+	c, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +117,15 @@ func (s *Service) Start(ctx context.Context, r *api.StartRequest) (*google_proto
 }
 
 func (s *Service) Delete(ctx context.Context, r *api.DeleteRequest) (*google_protobuf.Empty, error) {
-	if err := s.s.Delete(ctx, r.ID); err != nil {
+	c, err := s.getContainer(r.ID)
+	if err != nil {
+		return nil, err
+	}
+	runtime, err := s.getRuntime(c.Info().Runtime)
+	if err != nil {
+		return nil, err
+	}
+	if err := runtime.Delete(ctx, c); err != nil {
 		return nil, err
 	}
 	return empty, nil
@@ -76,7 +133,7 @@ func (s *Service) Delete(ctx context.Context, r *api.DeleteRequest) (*google_pro
 
 func (s *Service) List(ctx context.Context, r *api.ListRequest) (*api.ListResponse, error) {
 	resp := &api.ListResponse{}
-	for _, c := range s.s.Containers() {
+	for _, c := range s.containers {
 		state, err := c.State(ctx)
 		if err != nil {
 			return nil, err
@@ -105,7 +162,25 @@ func (s *Service) Events(r *api.EventsRequest, server api.ContainerService_Event
 	w := &grpcEventWriter{
 		server: server,
 	}
-	return s.s.ForwardEvents(w)
+	return s.collector.forward(w)
+}
+
+func (s *Service) getContainer(id string) (containerd.Container, error) {
+	s.mu.Lock()
+	c, ok := s.containers[id]
+	s.mu.Unlock()
+	if !ok {
+		return nil, containerd.ErrContainerNotExist
+	}
+	return c, nil
+}
+
+func (s *Service) getRuntime(name string) (containerd.Runtime, error) {
+	runtime, ok := s.runtimes[name]
+	if !ok {
+		return nil, containerd.ErrUnknownRuntime
+	}
+	return runtime, nil
 }
 
 type grpcEventWriter struct {
