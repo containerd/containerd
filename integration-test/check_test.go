@@ -114,7 +114,6 @@ func (cs *ContainerdSuite) StopDaemon(kill bool) {
 	if kill {
 		cs.cd.Process.Kill()
 		<-cs.syncChild
-		cs.cd = nil
 	} else {
 		// Terminate gently if possible
 		cs.cd.Process.Signal(os.Interrupt)
@@ -133,11 +132,10 @@ func (cs *ContainerdSuite) StopDaemon(kill bool) {
 			}
 		}
 	}
+	cs.cd = nil
 }
 
-func (cs *ContainerdSuite) RestartDaemon(kill bool) error {
-	cs.StopDaemon(kill)
-
+func (cs *ContainerdSuite) StartDaemon() error {
 	cd := exec.Command("containerd", "--debug",
 		"--state-dir", cs.stateDir,
 		"--listen", cs.grpcSocket,
@@ -171,6 +169,11 @@ func (cs *ContainerdSuite) RestartDaemon(kill bool) error {
 	}()
 
 	return nil
+}
+
+func (cs *ContainerdSuite) RestartDaemon(kill bool) error {
+	cs.StopDaemon(kill)
+	return cs.StartDaemon()
 }
 
 func (cs *ContainerdSuite) SetUpSuite(c *check.C) {
