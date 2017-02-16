@@ -647,16 +647,16 @@ var updateCommand = cli.Command{
 			Id: context.Args().First(),
 		}
 		req.Resources = &types.UpdateResource{}
-		req.Resources.MemoryLimit = getUpdateCommandInt64Flag(context, "memory-limit")
-		req.Resources.MemoryReservation = getUpdateCommandInt64Flag(context, "memory-reservation")
-		req.Resources.MemorySwap = getUpdateCommandInt64Flag(context, "memory-swap")
+		req.Resources.MemoryLimit = getUpdateCommandUInt64Flag(context, "memory-limit")
+		req.Resources.MemoryReservation = getUpdateCommandUInt64Flag(context, "memory-reservation")
+		req.Resources.MemorySwap = getUpdateCommandUInt64Flag(context, "memory-swap")
 		req.Resources.BlkioWeight = getUpdateCommandUInt64Flag(context, "blkio-weight")
 		req.Resources.CpuPeriod = getUpdateCommandUInt64Flag(context, "cpu-period")
 		req.Resources.CpuQuota = getUpdateCommandUInt64Flag(context, "cpu-quota")
 		req.Resources.CpuShares = getUpdateCommandUInt64Flag(context, "cpu-shares")
 		req.Resources.CpusetCpus = context.String("cpuset-cpus")
 		req.Resources.CpusetMems = context.String("cpuset-mems")
-		req.Resources.KernelMemoryLimit = getUpdateCommandInt64Flag(context, "kernel-limit")
+		req.Resources.KernelMemoryLimit = getUpdateCommandUInt64Flag(context, "kernel-limit")
 		req.Resources.KernelTCPMemoryLimit = getUpdateCommandInt64Flag(context, "kernel-tcp-limit")
 		c := getClient(context)
 		if _, err := c.UpdateContainer(netcontext.Background(), req); err != nil {

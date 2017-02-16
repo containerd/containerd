@@ -1040,10 +1040,10 @@ type UpdateResource struct {
 	CpuQuota                     uint64            `protobuf:"varint,4,opt,name=cpuQuota" json:"cpuQuota,omitempty"`
 	CpusetCpus                   string            `protobuf:"bytes,5,opt,name=cpusetCpus" json:"cpusetCpus,omitempty"`
 	CpusetMems                   string            `protobuf:"bytes,6,opt,name=cpusetMems" json:"cpusetMems,omitempty"`
-	MemoryLimit                  int64             `protobuf:"varint,7,opt,name=memoryLimit" json:"memoryLimit,omitempty"`
-	MemorySwap                   int64             `protobuf:"varint,8,opt,name=memorySwap" json:"memorySwap,omitempty"`
-	MemoryReservation            int64             `protobuf:"varint,9,opt,name=memoryReservation" json:"memoryReservation,omitempty"`
-	KernelMemoryLimit            int64             `protobuf:"varint,10,opt,name=kernelMemoryLimit" json:"kernelMemoryLimit,omitempty"`
+	MemoryLimit                  uint64            `protobuf:"varint,7,opt,name=memoryLimit" json:"memoryLimit,omitempty"`
+	MemorySwap                   uint64            `protobuf:"varint,8,opt,name=memorySwap" json:"memorySwap,omitempty"`
+	MemoryReservation            uint64            `protobuf:"varint,9,opt,name=memoryReservation" json:"memoryReservation,omitempty"`
+	KernelMemoryLimit            uint64            `protobuf:"varint,10,opt,name=kernelMemoryLimit" json:"kernelMemoryLimit,omitempty"`
 	KernelTCPMemoryLimit         int64             `protobuf:"varint,11,opt,name=kernelTCPMemoryLimit" json:"kernelTCPMemoryLimit,omitempty"`
 	BlkioLeafWeight              uint64            `protobuf:"varint,12,opt,name=blkioLeafWeight" json:"blkioLeafWeight,omitempty"`
 	BlkioWeightDevice            []*WeightDevice   `protobuf:"bytes,13,rep,name=blkioWeightDevice" json:"blkioWeightDevice,omitempty"`
@@ -1128,7 +1128,7 @@ func (m *UpdateResource) GetKernelMemoryLimit() uint64 {
 	return 0
 }
 
-func (m *UpdateResource) GetKernelTCPMemoryLimit() uint64 {
+func (m *UpdateResource) GetKernelTCPMemoryLimit() int64 {
 	if m != nil {
 		return m.KernelTCPMemoryLimit
 	}

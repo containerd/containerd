@@ -276,19 +276,19 @@ func (s *apiServer) UpdateContainer(ctx context.Context, r *types.UpdateContaine
 			e.Resources.CpusetMems = rs.CpusetMems
 		}
 		if rs.KernelMemoryLimit != 0 {
-			e.Resources.KernelMemory = int64(rs.KernelMemoryLimit)
+			e.Resources.KernelMemory = rs.KernelMemoryLimit
 		}
 		if rs.KernelTCPMemoryLimit != 0 {
 			e.Resources.KernelTCPMemory = int64(rs.KernelTCPMemoryLimit)
 		}
 		if rs.MemoryLimit != 0 {
-			e.Resources.Memory = int64(rs.MemoryLimit)
+			e.Resources.Memory = rs.MemoryLimit
 		}
 		if rs.MemoryReservation != 0 {
-			e.Resources.MemoryReservation = int64(rs.MemoryReservation)
+			e.Resources.MemoryReservation = rs.MemoryReservation
 		}
 		if rs.MemorySwap != 0 {
-			e.Resources.MemorySwap = int64(rs.MemorySwap)
+			e.Resources.MemorySwap = rs.MemorySwap
 		}
 	}
 	s.sv.SendTask(e)

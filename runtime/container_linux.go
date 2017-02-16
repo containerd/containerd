@@ -107,6 +107,7 @@ func (c *container) Pids() ([]int, error) {
 }
 
 func u64Ptr(i uint64) *uint64 { return &i }
+func i64Ptr(i int64) *int64   { return &i }
 
 func (c *container) UpdateResources(r *Resource) error {
 	sr := ocs.Resources{
