@@ -6,19 +6,13 @@ import (
 
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/log"
+	"github.com/docker/containerd/snapshot"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
-
-type Snapshotter interface {
-	Prepare(key, parent string) ([]containerd.Mount, error)
-	Commit(name, key string) error
-	Rollback(key string) error
-	Exists(name string) bool
-}
 
 type Mounter interface {
 	Mount(mounts ...containerd.Mount) error
@@ -31,7 +25,7 @@ type Mounter interface {
 // The parent *must* be the chainID of the parent layer.
 //
 // The returned digest is the diffID for the applied layer.
-func ApplyLayer(snapshots Snapshotter, mounter Mounter, rd io.Reader, parent digest.Digest) (digest.Digest, error) {
+func ApplyLayer(snapshots snapshot.Snapshotter, mounter Mounter, rd io.Reader, parent digest.Digest) (digest.Digest, error) {
 	digester := digest.Canonical.Digester() // used to calculate diffID.
 	rd = io.TeeReader(rd, digester.Hash())
 
@@ -55,7 +49,7 @@ func ApplyLayer(snapshots Snapshotter, mounter Mounter, rd io.Reader, parent dig
 	}
 
 	if err := mounter.Mount(mounts...); err != nil {
-		if err := snapshots.Rollback(key); err != nil {
+		if err := snapshots.Remove(key); err != nil {
 			log.L.WithError(err).Error("snapshot rollback failed")
 		}
 		return "", err
@@ -82,7 +76,7 @@ func ApplyLayer(snapshots Snapshotter, mounter Mounter, rd io.Reader, parent dig
 //
 // If successful, the chainID for the top-level layer is returned. That
 // identifier can be used to check out a snapshot.
-func Prepare(snapshots Snapshotter, mounter Mounter, layers []ocispec.Descriptor,
+func Prepare(snapshots snapshot.Snapshotter, mounter Mounter, layers []ocispec.Descriptor,
 	// TODO(stevvooe): The following functions are candidate for internal
 	// object functions. We can use these to formulate the beginnings of a
 	// rootfs Controller.
@@ -109,7 +103,7 @@ func Prepare(snapshots Snapshotter, mounter Mounter, layers []ocispec.Descriptor
 			chainLocal := append(chain, diffID)
 			chainID := identity.ChainID(chainLocal)
 
-			if snapshots.Exists(chainID.String()) {
+			if _, err := snapshots.Stat(chainID.String()); err == nil {
 				continue
 			}
 		}
