@@ -4,8 +4,9 @@ import (
 	contextpkg "context"
 	"os"
 
+	"github.com/docker/containerd/archive"
 	"github.com/docker/containerd/log"
-	"github.com/docker/docker/pkg/archive"
+	dockerarchive "github.com/docker/docker/pkg/archive"
 	"github.com/urfave/cli"
 )
 
@@ -21,7 +22,13 @@ var applyCommand = cli.Command{
 		)
 
 		log.G(ctx).Info("applying layer from stdin")
-		if _, err := archive.ApplyLayer(dir, os.Stdin); err != nil {
+
+		rd, err := dockerarchive.DecompressStream(os.Stdin)
+		if err != nil {
+			return err
+		}
+
+		if _, err := archive.Apply(ctx, dir, rd); err != nil {
 			return err
 		}
 
