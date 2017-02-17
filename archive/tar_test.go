@@ -78,6 +78,37 @@ func TestDiffApply(t *testing.T) {
 	}
 }
 
+// TestDiffApplyDeletion checks various deletion scenarios to ensure
+// deletions are properly picked up and applied
+func TestDiffApplyDeletion(t *testing.T) {
+	as := []fstest.Applier{
+		fstest.Apply(
+			fstest.CreateDir("/test/somedir", 0755),
+			fstest.CreateDir("/lib", 0700),
+			fstest.CreateFile("/lib/hidden", []byte{}, 0644),
+		),
+		fstest.Apply(
+			fstest.CreateFile("/test/a", []byte{}, 0644),
+			fstest.CreateFile("/test/b", []byte{}, 0644),
+			fstest.CreateDir("/test/otherdir", 0755),
+			fstest.CreateFile("/test/otherdir/.empty", []byte{}, 0644),
+			fstest.RemoveFile("/lib"),
+			fstest.CreateDir("/lib", 0700),
+			fstest.CreateFile("/lib/not-hidden", []byte{}, 0644),
+		),
+		fstest.Apply(
+			fstest.RemoveFile("/test/a"),
+			fstest.RemoveFile("/test/b"),
+			fstest.RemoveFile("/test/otherdir"),
+			fstest.CreateFile("/lib/newfile", []byte{}, 0644),
+		),
+	}
+
+	if err := testDiffApply(as...); err != nil {
+		t.Fatalf("Test diff apply failed: %+v", err)
+	}
+}
+
 func testApply(a fstest.Applier) error {
 	td, err := ioutil.TempDir("", "test-apply-")
 	if err != nil {
