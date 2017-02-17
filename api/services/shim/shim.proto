@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package containerd.v1.services;
+package containerd.v1.services.shim;
 
 import "google/protobuf/empty.proto";
 import "gogoproto/gogo.proto";
