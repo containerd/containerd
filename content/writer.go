@@ -4,54 +4,55 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/nightlyone/lockfile"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
 
-// Writer represents a write transaction against the blob store.
-type Writer struct {
-	cs       *Store
-	fp       *os.File // opened data file
-	lock     lockfile.Lockfile
-	path     string // path to writer dir
-	ref      string // ref key
-	offset   int64
-	digester digest.Digester
+// writer represents a write transaction against the blob store.
+type writer struct {
+	s         *Store
+	fp        *os.File // opened data file
+	lock      lockfile.Lockfile
+	path      string // path to writer dir
+	ref       string // ref key
+	offset    int64
+	digester  digest.Digester
+	startedAt time.Time
+	updatedAt time.Time
 }
 
-func (cw *Writer) Ref() string {
-	return cw.ref
-}
-
-// Size returns the current size written.
-//
-// Cannot be called concurrently with `Write`. If you need need concurrent
-// status, query it with `Store.Stat`.
-func (cw *Writer) Size() int64 {
-	return cw.offset
+func (w *writer) Status() (Status, error) {
+	return Status{
+		Ref:       w.ref,
+		Offset:    w.offset,
+		StartedAt: w.startedAt,
+		UpdatedAt: w.updatedAt,
+	}, nil
 }
 
 // Digest returns the current digest of the content, up to the current write.
 //
 // Cannot be called concurrently with `Write`.
-func (cw *Writer) Digest() digest.Digest {
-	return cw.digester.Digest()
+func (w *writer) Digest() digest.Digest {
+	return w.digester.Digest()
 }
 
 // Write p to the transaction.
 //
 // Note that writes are unbuffered to the backing file. When writing, it is
 // recommended to wrap in a bufio.Writer or, preferably, use io.CopyBuffer.
-func (cw *Writer) Write(p []byte) (n int, err error) {
-	n, err = cw.fp.Write(p)
-	cw.digester.Hash().Write(p[:n])
-	cw.offset += int64(len(p))
+func (w *writer) Write(p []byte) (n int, err error) {
+	n, err = w.fp.Write(p)
+	w.digester.Hash().Write(p[:n])
+	w.offset += int64(len(p))
+	w.updatedAt = time.Now()
 	return n, err
 }
 
-func (cw *Writer) Commit(size int64, expected digest.Digest) error {
+func (cw *writer) Commit(size int64, expected digest.Digest) error {
 	if err := cw.fp.Sync(); err != nil {
 		return errors.Wrap(err, "sync failed")
 	}
@@ -85,7 +86,7 @@ func (cw *Writer) Commit(size int64, expected digest.Digest) error {
 
 	var (
 		ingest = filepath.Join(cw.path, "data")
-		target = cw.cs.blobPath(dgst)
+		target = cw.s.blobPath(dgst)
 	)
 
 	// make sure parent directories of blob exist
@@ -118,7 +119,7 @@ func (cw *Writer) Commit(size int64, expected digest.Digest) error {
 //
 // To abandon a transaction completely, first call close then `Store.Remove` to
 // clean up the associated resources.
-func (cw *Writer) Close() (err error) {
+func (cw *writer) Close() (err error) {
 	if err := unlock(cw.lock); err != nil {
 		log.Printf("unlock failed: %v", err)
 	}

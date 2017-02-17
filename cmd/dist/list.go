@@ -4,7 +4,6 @@ import (
 	contextpkg "context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"text/tabwriter"
 	"time"
 
@@ -22,11 +21,6 @@ var listCommand = cli.Command{
 	ArgsUsage:   "[flags] [<prefix>, ...]",
 	Description: `List blobs in the content store.`,
 	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "root",
-			Usage: "path to content store root",
-			Value: ".content", // TODO(stevvooe): for now, just use the PWD/.content
-		},
 		cli.BoolFlag{
 			Name:  "quiet, q",
 			Usage: "print only the blob digest",
@@ -35,20 +29,11 @@ var listCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		var (
 			ctx   = contextpkg.Background()
-			root  = context.String("root")
 			quiet = context.Bool("quiet")
 			args  = []string(context.Args())
 		)
 
-		if !filepath.IsAbs(root) {
-			var err error
-			root, err = filepath.Abs(root)
-			if err != nil {
-				return err
-			}
-		}
-
-		cs, err := content.Open(root)
+		cs, err := resolveContentStore(context)
 		if err != nil {
 			return err
 		}
