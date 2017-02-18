@@ -1,7 +1,6 @@
 package btrfs
 
 import (
-	"bytes"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -141,26 +140,19 @@ func setupBtrfsLoopbackDevice(t *testing.T, mountPoint string) *testDevice {
 	t.Log("Temporary file created", file.Name())
 
 	// initialize file with 100 MiB
-	zero := [mib]byte{}
-	for i := 0; i < 100; i++ {
-		_, err = file.Write(zero[:])
-		if err != nil {
-			t.Fatal("Could not write to btrfs file", err)
-		}
+	if err := file.Truncate(100 << 20); err != nil {
+		t.Fatal(err)
 	}
 	file.Close()
 
 	// create device
 	losetup := exec.Command("losetup", "--find", "--show", file.Name())
-	var stdout, stderr bytes.Buffer
-	losetup.Stdout = &stdout
-	losetup.Stderr = &stderr
-	err = losetup.Run()
+	p, err := losetup.Output()
 	if err != nil {
-		t.Log(stderr.String())
-		t.Fatal("Could not run losetup", err)
+		t.Fatal(err)
 	}
-	deviceName := strings.TrimSpace(stdout.String())
+
+	deviceName := strings.TrimSpace(string(p))
 	t.Log("Created loop device", deviceName)
 
 	// format
