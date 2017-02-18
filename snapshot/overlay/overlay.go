@@ -102,7 +102,7 @@ func (o *Snapshotter) stat(path string) (snapshot.Info, error) {
 }
 
 func (o *Snapshotter) Prepare(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
-	active, err := o.newActiveDir(key)
+	active, err := o.newActiveDir(key, false)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,16 @@ func (o *Snapshotter) Prepare(ctx context.Context, key, parent string) ([]contai
 }
 
 func (o *Snapshotter) View(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
-	panic("not implemented")
+	active, err := o.newActiveDir(key, true)
+	if err != nil {
+		return nil, err
+	}
+	if parent != "" {
+		if err := active.setParent(parent); err != nil {
+			return nil, err
+		}
+	}
+	return active.mounts(o.links)
 }
 
 // Mounts returns the mounts for the transaction identified by key. Can be
@@ -175,7 +184,7 @@ func (o *Snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 	})
 }
 
-func (o *Snapshotter) newActiveDir(key string) (*activeDir, error) {
+func (o *Snapshotter) newActiveDir(key string, readonly bool) (*activeDir, error) {
 	var (
 		path      = filepath.Join(o.root, "active", hash(key))
 		name      = filepath.Join(path, "name")
@@ -186,11 +195,18 @@ func (o *Snapshotter) newActiveDir(key string) (*activeDir, error) {
 		committedDir: filepath.Join(o.root, "committed"),
 		indexlink:    indexlink,
 	}
-	for _, p := range []string{
-		"work",
-		"fs",
-	} {
-		if err := os.MkdirAll(filepath.Join(path, p), 0700); err != nil {
+	if !readonly {
+		for _, p := range []string{
+			"work",
+			"fs",
+		} {
+			if err := os.MkdirAll(filepath.Join(path, p), 0700); err != nil {
+				a.delete()
+				return nil, err
+			}
+		}
+	} else {
+		if err := os.MkdirAll(path, 0700); err != nil {
 			a.delete()
 			return nil, err
 		}
@@ -286,7 +302,7 @@ func (a *activeDir) mounts(c *cache) ([]containerd.Mount, error) {
 	}
 	if len(parents) == 0 {
 		// if we only have one layer/no parents then just return a bind mount as overlay
-		// will not work
+		// will not work, readonly always has parent
 		return []containerd.Mount{
 			{
 				Source: filepath.Join(a.path, "fs"),
@@ -298,11 +314,18 @@ func (a *activeDir) mounts(c *cache) ([]containerd.Mount, error) {
 			},
 		}, nil
 	}
-	options := []string{
-		fmt.Sprintf("workdir=%s", filepath.Join(a.path, "work")),
-		fmt.Sprintf("upperdir=%s", filepath.Join(a.path, "fs")),
-		fmt.Sprintf("lowerdir=%s", strings.Join(parents, ":")),
+	var options []string
+
+	if _, err := os.Stat(filepath.Join(a.path, "fs")); err == nil {
+		options = append(options,
+			fmt.Sprintf("workdir=%s", filepath.Join(a.path, "work")),
+			fmt.Sprintf("upperdir=%s", filepath.Join(a.path, "fs")),
+		)
+	} else if !os.IsNotExist(err) {
+		return nil, err
 	}
+
+	options = append(options, fmt.Sprintf("lowerdir=%s", strings.Join(parents, ":")))
 	return []containerd.Mount{
 		{
 			Type:    "overlay",
