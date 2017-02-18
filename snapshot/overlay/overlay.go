@@ -253,6 +253,13 @@ func (a *activeDir) setParent(name string) error {
 }
 
 func (a *activeDir) commit(name string, c *cache) error {
+	if _, err := os.Stat(filepath.Join(a.path, "fs")); err != nil {
+		if os.IsNotExist(err) {
+			return errors.New("cannot commit view")
+		}
+		return err
+	}
+
 	// TODO(stevvooe): This doesn't quite meet the current model. The new model
 	// is to copy all of this out and let the transaction continue. We don't
 	// really have tests for it yet, but this will be the spot to fix it.
