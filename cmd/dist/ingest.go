@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	contentapi "github.com/docker/containerd/api/services/content"
 	"github.com/docker/containerd/content"
 	"github.com/opencontainers/go-digest"
 	"github.com/urfave/cli"
@@ -41,7 +42,7 @@ var ingestCommand = cli.Command{
 			return err
 		}
 
-		cs, err := resolveContentStore(context)
+		conn, err := connectGRPC(context)
 		if err != nil {
 			return err
 		}
@@ -50,9 +51,11 @@ var ingestCommand = cli.Command{
 			return fmt.Errorf("must specify a transaction reference")
 		}
 
+		ingester := content.NewIngesterFromClient(contentapi.NewContentClient(conn))
+
 		// TODO(stevvooe): Allow ingest to be reentrant. Currently, we expect
 		// all data to be written in a single invocation. Allow multiple writes
 		// to the same transaction key followed by a commit.
-		return content.WriteBlob(ctx, cs, os.Stdin, ref, expectedSize, expectedDigest)
+		return content.WriteBlob(ctx, ingester, os.Stdin, ref, expectedSize, expectedDigest)
 	},
 }

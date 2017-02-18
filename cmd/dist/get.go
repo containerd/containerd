@@ -4,6 +4,8 @@ import (
 	"io"
 	"os"
 
+	contentapi "github.com/docker/containerd/api/services/content"
+	"github.com/docker/containerd/content"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/urfave/cli"
 )
@@ -17,17 +19,23 @@ var getCommand = cli.Command{
 Output paths can be used to directly access blobs on disk.`,
 	Flags: []cli.Flag{},
 	Action: func(context *cli.Context) error {
-		cs, err := resolveContentStore(context)
-		if err != nil {
-			return err
-		}
+		var (
+			ctx = background
+		)
 
 		dgst, err := digest.Parse(context.Args().First())
 		if err != nil {
 			return err
 		}
 
-		rc, err := cs.Open(dgst)
+		conn, err := connectGRPC(context)
+		if err != nil {
+			return err
+		}
+
+		cs := content.NewProviderFromClient(contentapi.NewContentClient(conn))
+
+		rc, err := cs.Reader(ctx, dgst)
 		if err != nil {
 			return err
 		}

@@ -42,6 +42,11 @@ distribution tool
 			Usage: "path to content store root",
 			Value: "/tmp/content", // TODO(stevvooe): for now, just use the PWD/.content
 		},
+		cli.StringFlag{
+			Name:  "socket, s",
+			Usage: "socket path for containerd's GRPC server",
+			Value: "/run/containerd/containerd.sock",
+		},
 	}
 	app.Commands = []cli.Command{
 		fetchCommand,
