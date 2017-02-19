@@ -43,10 +43,6 @@ func main() {
 	app.Version = containerd.Version
 	app.Usage = usage
 	app.Flags = []cli.Flag{
-		cli.BoolFlag{
-			Name:  "debug",
-			Usage: "enable debug output in logs",
-		},
 		cli.StringFlag{
 			Name:  "log-level",
 			Usage: "Set the logging level [debug, info, warn, error, fatal, panic]",
@@ -110,9 +106,6 @@ func main() {
 }
 
 func before(context *cli.Context) error {
-	if context.GlobalBool("debug") {
-		logrus.SetLevel(logrus.DebugLevel)
-	}
 	if l := context.GlobalString("log-level"); l != "" {
 		lvl, err := logrus.ParseLevel(l)
 		if err != nil {
