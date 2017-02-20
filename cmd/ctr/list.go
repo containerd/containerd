@@ -25,7 +25,7 @@ var listCommand = cli.Command{
 		w := tabwriter.NewWriter(os.Stdout, 10, 1, 3, ' ', 0)
 		fmt.Fprintln(w, "ID\tPID\tSTATUS")
 		for _, c := range response.Containers {
-			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n",
+			if _, err := fmt.Fprintf(w, "%s\t%d\t%s\n",
 				c.ID,
 				c.Pid,
 				c.Status.String(),
