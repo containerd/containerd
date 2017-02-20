@@ -5,6 +5,7 @@ language: go
 
 go:
   - 1.7
+  - 1.8
   - tip
 
 go_import_path: github.com/docker/containerd
