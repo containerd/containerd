@@ -37,7 +37,7 @@ func (tx *transaction) begin(ctx context.Context, poster Poster) *transaction {
 	}
 
 	// post the transaction started event
-	poster.Post(ctx, child.makeTransactionEvent("begin")) // tranactions are really just events
+	poster.Post(ctx, child.makeTransactionEvent("begin")) // transactions are really just events
 
 	return child
 }
