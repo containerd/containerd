@@ -2,11 +2,11 @@ package main
 
 import (
 	gocontext "context"
-	"fmt"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/containerd/api/execution"
 	"github.com/urfave/cli"
+	"github.com/pkg/errors"
 )
 
 var inspectCommand = cli.Command{
@@ -20,7 +20,7 @@ var inspectCommand = cli.Command{
 		}
 		id := context.Args().First()
 		if id == "" {
-			return fmt.Errorf("container id must be provided")
+			return errors.New("container id must be provided")
 		}
 		getResponse, err := executionService.GetContainer(gocontext.Background(),
 			&execution.GetContainerRequest{ID: id})

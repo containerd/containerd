@@ -2,10 +2,10 @@ package main
 
 import (
 	gocontext "context"
-	"fmt"
 
 	"github.com/docker/containerd/api/execution"
 	"github.com/urfave/cli"
+	"github.com/pkg/errors"
 )
 
 var deleteCommand = cli.Command{
@@ -26,7 +26,7 @@ var deleteCommand = cli.Command{
 
 		id := context.Args().First()
 		if id == "" {
-			return fmt.Errorf("container id must be provided")
+			return errors.New("container id must be provided")
 		}
 
 		pid := uint32(context.Int64("pid"))

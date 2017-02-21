@@ -54,7 +54,7 @@ var activeCommand = cli.Command{
 		}
 
 		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, '\t', 0)
-		fmt.Fprintf(tw, "REF\tSIZE\tAGE\n")
+		fmt.Fprintln(tw, "REF\tSIZE\tAGE")
 		for _, active := range active {
 			fmt.Fprintf(tw, "%s\t%s\t%s\n",
 				active.Ref,

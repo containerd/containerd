@@ -1,10 +1,10 @@
 package execution
 
-import "fmt"
+import "errors"
 
 var (
-	ErrProcessNotFound   = fmt.Errorf("process not found")
-	ErrProcessNotExited  = fmt.Errorf("process has not exited")
-	ErrContainerNotFound = fmt.Errorf("container not found")
-	ErrContainerExists   = fmt.Errorf("container already exists")
+	ErrProcessNotFound   = errors.New("process not found")
+	ErrProcessNotExited  = errors.New("process has not exited")
+	ErrContainerNotFound = errors.New("container not found")
+	ErrContainerExists   = errors.New("container already exists")
 )

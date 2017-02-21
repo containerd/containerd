@@ -10,6 +10,7 @@ import (
 	"github.com/docker/containerd/content"
 	"github.com/opencontainers/go-digest"
 	"github.com/urfave/cli"
+	"github.com/pkg/errors"
 )
 
 var ingestCommand = cli.Command{
@@ -82,7 +83,7 @@ var ingestCommand = cli.Command{
 
 		if ref == "" {
 			if expectedDigest == "" {
-				return fmt.Errorf("must specify a transaction reference or expected digest")
+				return errors.New("must specify a transaction reference or expected digest")
 			}
 
 			ref = strings.Replace(expectedDigest.String(), ":", "-", -1)

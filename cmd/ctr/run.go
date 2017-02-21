@@ -34,7 +34,7 @@ var runCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		id := context.Args().First()
 		if id == "" {
-			return fmt.Errorf("container id must be provided")
+			return errors.New("container id must be provided")
 		}
 		executionService, err := getExecutionService(context)
 		if err != nil {
