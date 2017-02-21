@@ -35,7 +35,10 @@ const usage = `
 high performance container runtime
 `
 
-var global = log.WithModule(gocontext.Background(), "containerd")
+var (
+	conf   = defaultConfig()
+	global = log.WithModule(gocontext.Background(), "containerd")
+)
 
 func main() {
 	app := cli.NewApp()
@@ -44,29 +47,25 @@ func main() {
 	app.Usage = usage
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name:  "log-level",
-			Usage: "Set the logging level [debug, info, warn, error, fatal, panic]",
-			Value: "info",
+			Name:  "config,c",
+			Usage: "path to the configuration file",
+			Value: "/etc/containerd/config.toml",
 		},
 		cli.StringFlag{
-			Name:  "root",
+			Name:  "log-level,l",
+			Usage: "set the logging level [debug, info, warn, error, fatal, panic]",
+		},
+		cli.StringFlag{
+			Name:  "root,r",
+			Usage: "containerd root directory",
+		},
+		cli.StringFlag{
+			Name:  "state",
 			Usage: "containerd state directory",
-			Value: "/run/containerd",
 		},
 		cli.StringFlag{
-			Name:  "socket, s",
+			Name:  "socket,s",
 			Usage: "socket path for containerd's GRPC server",
-			Value: "/run/containerd/containerd.sock",
-		},
-		cli.StringFlag{
-			Name:  "debug-socket, d",
-			Usage: "socket path for containerd's debug server",
-			Value: "/run/containerd/containerd-debug.sock",
-		},
-		cli.StringFlag{
-			Name:  "metrics-address, m",
-			Usage: "tcp address to serve metrics on",
-			Value: "127.0.0.1:7897",
 		},
 	}
 	app.Before = before
@@ -78,7 +77,7 @@ func main() {
 		signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1)
 
 		log.G(global).Info("starting containerd boot...")
-		runtimes, err := loadRuntimes(context)
+		runtimes, err := loadRuntimes()
 		if err != nil {
 			return err
 		}
@@ -87,13 +86,13 @@ func main() {
 			return err
 		}
 		// start debug and metrics APIs
-		if err := serveDebugAPI(context); err != nil {
+		if err := serveDebugAPI(); err != nil {
 			return err
 		}
-		serveMetricsAPI(context)
+		serveMetricsAPI()
 		// start the GRPC api with the execution service registered
 		server := newGRPCServer(execution.New(supervisor))
-		if err := serveGRPC(context, server); err != nil {
+		if err := serveGRPC(server); err != nil {
 			return err
 		}
 		log.G(global).Infof("containerd successfully booted in %fs", time.Now().Sub(start).Seconds())
@@ -106,23 +105,60 @@ func main() {
 }
 
 func before(context *cli.Context) error {
-	if l := context.GlobalString("log-level"); l != "" {
+	if err := loadConfig(context.GlobalString("config")); err != nil &&
+		!os.IsNotExist(err) {
+		return err
+	}
+	// the order for config vs flag values is that flags will always override
+	// the config values if they are set
+	if err := setLevel(context); err != nil {
+		return err
+	}
+	for _, v := range []struct {
+		name string
+		d    *string
+	}{
+		{
+			name: "root",
+			d:    &conf.Root,
+		},
+		{
+			name: "state",
+			d:    &conf.State,
+		},
+		{
+			name: "socket",
+			d:    &conf.GRPC.Socket,
+		},
+	} {
+		if s := context.GlobalString(v.name); s != "" {
+			*v.d = s
+		}
+	}
+	return nil
+}
+
+func setLevel(context *cli.Context) error {
+	l := context.GlobalString("log-level")
+	if l == "" {
+		l = conf.Debug.Level
+	}
+	if l != "" {
 		lvl, err := logrus.ParseLevel(l)
 		if err != nil {
-			lvl = logrus.InfoLevel
-			fmt.Fprintf(os.Stderr, "Unable to parse logging level: %s\n, and being defaulted to info", l)
+			return err
 		}
 		logrus.SetLevel(lvl)
 	}
 	return nil
 }
 
-func serveMetricsAPI(context *cli.Context) {
-	if addr := context.GlobalString("metrics-address"); addr != "" {
-		log.G(global).WithField("metrics", addr).Info("starting metrics API...")
+func serveMetricsAPI() {
+	if conf.Metrics.Address != "" {
+		log.G(global).WithField("metrics", conf.Metrics.Address).Info("starting metrics API...")
 		h := newMetricsHandler()
 		go func() {
-			if err := http.ListenAndServe(addr, h); err != nil {
+			if err := http.ListenAndServe(conf.Metrics.Address, h); err != nil {
 				log.G(global).WithError(err).Fatal("serve metrics API")
 			}
 		}()
@@ -135,10 +171,10 @@ func newMetricsHandler() http.Handler {
 	return m
 }
 
-func serveDebugAPI(context *cli.Context) error {
-	path := context.GlobalString("debug-socket")
+func serveDebugAPI() error {
+	path := conf.Debug.Socket
 	if path == "" {
-		return errors.New("--debug-socket path cannot be empty")
+		return errors.New("debug socket path cannot be empty")
 	}
 	l, err := utils.CreateUnixSocket(path)
 	if err != nil {
@@ -156,13 +192,10 @@ func serveDebugAPI(context *cli.Context) error {
 	return nil
 }
 
-func loadRuntimes(context *cli.Context) (map[string]containerd.Runtime, error) {
-	var (
-		root = context.GlobalString("root")
-		o    = make(map[string]containerd.Runtime)
-	)
+func loadRuntimes() (map[string]containerd.Runtime, error) {
+	o := make(map[string]containerd.Runtime)
 	for _, name := range containerd.Runtimes() {
-		r, err := containerd.NewRuntime(name, root)
+		r, err := containerd.NewRuntime(name, conf.State)
 		if err != nil {
 			return nil, err
 		}
@@ -178,8 +211,8 @@ func newGRPCServer(service api.ContainerServiceServer) *grpc.Server {
 	return s
 }
 
-func serveGRPC(context *cli.Context, server *grpc.Server) error {
-	path := context.GlobalString("socket")
+func serveGRPC(server *grpc.Server) error {
+	path := conf.GRPC.Socket
 	if path == "" {
 		return errors.New("--socket path cannot be empty")
 	}
