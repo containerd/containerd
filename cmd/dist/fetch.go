@@ -15,6 +15,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/log"
 	"github.com/docker/containerd/remotes"
+	"github.com/docker/distribution/registry/client/auth/challenge"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -93,6 +94,26 @@ var fetchCommand = cli.Command{
 	},
 }
 
+func parseLocator(locator string) (url.URL, string, error) {
+	var (
+		base   url.URL
+		prefix string
+	)
+	split := strings.Split(locator, "/")
+	if len(split) < 3 {
+		return base, prefix, errors.Errorf("unexpected locator: %q", locator)
+	}
+	base = url.URL{
+		Scheme: "https",
+		Host:   split[0],
+	}
+	if base.Host == "docker.io" {
+		base.Host = "registry-1.docker.io"
+	}
+	prefix = path.Join(split[1:]...)
+	return base, prefix, nil
+}
+
 // NOTE(stevvooe): Most of the code below this point is prototype code to
 // demonstrate a very simplified docker.io fetcher. We have a lot of hard coded
 // values but we leave many of the details down to the fetcher, creating a lot
@@ -101,23 +122,10 @@ var fetchCommand = cli.Command{
 // getResolver prepares the resolver from the environment and options.
 func getResolver(ctx contextpkg.Context) (remotes.Resolver, error) {
 	return remotes.ResolverFunc(func(ctx contextpkg.Context, locator string) (remotes.Remote, error) {
-		if !strings.HasPrefix(locator, "docker.io") {
-			return nil, errors.Errorf("unsupported locator: %q", locator)
-		}
-
-		var (
-			base = url.URL{
-				Scheme: "https",
-				Host:   "registry-1.docker.io",
-			}
-			prefix = strings.TrimPrefix(locator, "docker.io/")
-		)
-
-		token, err := getToken(ctx, "repository:"+prefix+":pull")
+		base, prefix, err := parseLocator(locator)
 		if err != nil {
 			return nil, err
 		}
-
 		return remotes.RemoteFunc(func(ctx contextpkg.Context, object string, hints ...string) (io.ReadCloser, error) {
 			ctx = log.WithLogger(ctx, log.G(ctx).WithFields(
 				logrus.Fields{
@@ -142,12 +150,11 @@ func getResolver(ctx contextpkg.Context) (remotes.Resolver, error) {
 					return nil, err
 				}
 
-				req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 				for _, mediatype := range remotes.HintValues("mediatype", hints...) {
 					req.Header.Set("Accept", mediatype)
 				}
 
-				resp, err := ctxhttp.Do(ctx, http.DefaultClient, req)
+				resp, err := doChallenge(ctx, http.DefaultClient, req)
 				if err != nil {
 					return nil, err
 				}
@@ -168,21 +175,55 @@ func getResolver(ctx contextpkg.Context) (remotes.Resolver, error) {
 	}), nil
 }
 
-func getToken(ctx contextpkg.Context, scopes ...string) (string, error) {
-	var (
-		u = url.URL{
-			Scheme: "https",
-			Host:   "auth.docker.io",
-			Path:   "/token",
-		}
+func doChallenge(ctx contextpkg.Context, client *http.Client, req *http.Request) (*http.Response, error) {
+	resp, err := ctxhttp.Do(ctx, client, req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusUnauthorized {
+		return resp, err
+	}
+	challenges := challenge.ResponseChallenges(resp)
+	if len(challenges) == 0 {
+		return resp, errors.Errorf("response does not contain WWW-Authenticate: %+v", resp)
+	}
+	if len(challenges) > 1 {
+		log.G(ctx).WithField("challenges", challenges).Warn("extra challenges")
+	}
+	token, err := getToken(ctx, &challenges[0])
+	if err != nil {
+		return resp, err
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	return ctxhttp.Do(ctx, client, req)
+}
 
-		q = url.Values{
-			"scope":   scopes,
-			"service": []string{"registry.docker.io"}, // usually comes from auth challenge
-		}
-	)
+func getToken(ctx contextpkg.Context, chal *challenge.Challenge) (string, error) {
+	// example challenge: `Www-Authenticate: Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:samalba/my-app:pull,push"`
+	if chal == nil {
+		return "", errors.New("challenge is nil")
+	}
+	realm, ok := chal.Parameters["realm"]
+	if !ok {
+		return "", errors.New("realm unset")
+	}
+	service, ok := chal.Parameters["service"]
+	if !ok {
+		return "", errors.New("service unset")
+	}
+	scope, ok := chal.Parameters["scope"]
+	if !ok {
+		return "", errors.New("scope unset")
+	}
 
-	u.RawQuery = q.Encode()
+	u, err := url.Parse(realm)
+	if err != nil {
+		return "", err
+	}
+	u.RawQuery = url.Values{
+		"scope":   []string{scope},
+		"service": []string{service},
+	}.Encode()
 
 	log.G(ctx).WithField("token.url", u.String()).Debug("requesting token")
 	resp, err := ctxhttp.Get(ctx, http.DefaultClient, u.String())
