@@ -18,7 +18,7 @@ This will be the best place to discuss design and implementation.
 
 For sync communication we have a community slack with a #containerd channel that everyone is welcome to join and chat about development.
 
-**Slack:** http://dockr.ly/community
+**Slack:** https://dockr.ly/community
 
 ### Developer Quick-Start
 
