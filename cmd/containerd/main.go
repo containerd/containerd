@@ -90,17 +90,16 @@ func main() {
 		}
 		serveMetricsAPI()
 
-		contentStore, err := resolveContentStore(context)
+		contentStore, err := resolveContentStore()
 		if err != nil {
 			return err
 		}
-		contentService := content.NewService(contentStore)
 
 		// start the GRPC api with the execution service registered
 		server := newGRPCServer()
 
 		api.RegisterContainerServiceServer(server, execution.New(supervisor))
-		contentapi.RegisterContentServer(server, contentService)
+		contentapi.RegisterContentServer(server, content.NewService(contentStore))
 
 		// start the GRPC api with registered services
 		if err := serveGRPC(server); err != nil {
@@ -204,7 +203,7 @@ func serveDebugAPI() error {
 	return nil
 }
 
-func resolveContentStore(context *cli.Context) (*content.Store, error) {
+func resolveContentStore() (*content.Store, error) {
 	cp := filepath.Join(conf.Root, "content")
 	return content.NewStore(cp)
 }
