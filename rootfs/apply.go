@@ -7,9 +7,9 @@ import (
 
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/archive"
+	"github.com/docker/containerd/archive/compression"
 	"github.com/docker/containerd/log"
 	"github.com/docker/containerd/snapshot"
-	dockerarchive "github.com/docker/docker/pkg/archive"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -63,7 +63,7 @@ func ApplyLayer(snapshots snapshot.Snapshotter, mounter Mounter, rd io.Reader, p
 	}
 	defer mounter.Unmount(dir)
 
-	rd, err = dockerarchive.DecompressStream(rd)
+	rd, err = compression.DecompressStream(rd)
 	if err != nil {
 		return "", err
 	}

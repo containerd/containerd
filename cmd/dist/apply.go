@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"github.com/docker/containerd/archive"
+	"github.com/docker/containerd/archive/compression"
 	"github.com/docker/containerd/log"
-	dockerarchive "github.com/docker/docker/pkg/archive"
 	"github.com/urfave/cli"
 )
 
@@ -23,7 +23,7 @@ var applyCommand = cli.Command{
 
 		log.G(ctx).Info("applying layer from stdin")
 
-		rd, err := dockerarchive.DecompressStream(os.Stdin)
+		rd, err := compression.DecompressStream(os.Stdin)
 		if err != nil {
 			return err
 		}
