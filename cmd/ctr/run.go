@@ -3,12 +3,14 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"path/filepath"
 
 	gocontext "context"
 
 	"runtime"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/crosbymichael/console"
 	"github.com/docker/containerd/api/services/execution"
 	"github.com/docker/containerd/api/types/mount"
@@ -19,6 +21,8 @@ import (
 
 var rwm = "rwm"
 
+const rootfsPath = "rootfs"
+
 func spec(id string, args []string, tty bool) *specs.Spec {
 	return &specs.Spec{
 		Version: specs.Version,
@@ -27,7 +31,7 @@ func spec(id string, args []string, tty bool) *specs.Spec {
 			Arch: runtime.GOARCH,
 		},
 		Root: specs.Root{
-			Path:     "rootfs",
+			Path:     rootfsPath,
 			Readonly: true,
 		},
 		Process: specs.Process{
@@ -131,6 +135,22 @@ func spec(id string, args []string, tty bool) *specs.Spec {
 	}
 }
 
+func customSpec(configPath string) (*specs.Spec, error) {
+	b, err := ioutil.ReadFile(configPath)
+	if err != nil {
+		return nil, err
+	}
+	var s specs.Spec
+	if err := json.Unmarshal(b, &s); err != nil {
+		return nil, err
+	}
+	if s.Root.Path != rootfsPath {
+		logrus.Warnf("ignoring Root.Path %q, setting %q forcibly", s.Root.Path, rootfsPath)
+		s.Root.Path = rootfsPath
+	}
+	return &s, nil
+}
+
 var runCommand = cli.Command{
 	Name:  "run",
 	Usage: "run a container",
@@ -146,6 +166,10 @@ var runCommand = cli.Command{
 		cli.StringFlag{
 			Name:  "rootfs,r",
 			Usage: "path to the container's root filesystem",
+		},
+		cli.StringFlag{
+			Name:  "runtime-config",
+			Usage: "custom runtime config (config.json)",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -177,7 +201,16 @@ var runCommand = cli.Command{
 				},
 			},
 		}
-		s := spec(id, []string(context.Args()), context.Bool("tty"))
+
+		var s *specs.Spec
+		if config := context.String("runtime-config"); config == "" {
+			s = spec(id, []string(context.Args()), context.Bool("tty"))
+		} else {
+			s, err = customSpec(config)
+			if err != nil {
+				return err
+			}
+		}
 		data, err := json.Marshal(s)
 		if err != nil {
 			return err
