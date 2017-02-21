@@ -211,7 +211,7 @@ func getToken(ctx contextpkg.Context, scopes ...string) (string, error) {
 	return tokenResponse.Token, nil
 }
 
-// getV2URLPaths generates the canidate urls paths for the object based on the
+// getV2URLPaths generates the candidate urls paths for the object based on the
 // set of hints and the provided object id. URLs are returned in the order of
 // most to least likely succeed.
 func getV2URLPaths(prefix, object string, hints ...string) ([]string, error) {
