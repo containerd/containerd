@@ -5,7 +5,7 @@ images, hiding many details and complexity. This document intends to shed light
 on that complexity and detail how a "pull" operation will look from the
 perspective of a containerd user. We use the _bundle_ as the target object in
 this workflow, and walk back from there to describe the full process. In this
-context, we describe bothing pulling an image and creating a bundle from that
+context, we describe both pulling an image and creating a bundle from that
 image.
 
 With containerd, we redefine the "pull" to comprise the same set of steps

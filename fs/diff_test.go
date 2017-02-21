@@ -161,7 +161,7 @@ func testDiffWithBase(base, diff fstest.Applier, expected []testChange) error {
 	defer os.RemoveAll(t2)
 
 	if err := base.Apply(t1); err != nil {
-		return errors.Wrap(err, "failed to apply base filesytem")
+		return errors.Wrap(err, "failed to apply base filesystem")
 	}
 
 	if err := CopyDir(t2, t1); err != nil {
