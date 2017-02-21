@@ -30,6 +30,9 @@ func newShim(path string) (shim.ShimClient, error) {
 	if err != nil {
 		return nil, err
 	}
+	// close our side of the socket, do not close the listener as it will
+	// remove the socket from disk
+	defer f.Close()
 	cmd.ExtraFiles = append(cmd.ExtraFiles, f)
 	// make sure the shim can be re-parented to system init
 	// and is cloned in a new mount namespace because the overlay/filesystems
@@ -41,9 +44,6 @@ func newShim(path string) (shim.ShimClient, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, errors.Wrapf(err, "failed to start shim")
 	}
-	// close our side of the socket, do not close the listener as it will
-	// remove the socket from disk
-	f.Close()
 	// since we are currently the parent go ahead and make sure we wait on the shim
 	go cmd.Wait()
 	return connectShim(socket)
