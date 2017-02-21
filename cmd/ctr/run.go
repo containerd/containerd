@@ -239,6 +239,9 @@ var runCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		// Ensure we read all io
+		defer fwg.Wait()
+
 		response, err := containers.Create(gocontext.Background(), create)
 		if err != nil {
 			return err
@@ -257,8 +260,6 @@ var runCommand = cli.Command{
 		}); err != nil {
 			return err
 		}
-		// Ensure we read all io
-		fwg.Wait()
 		if status != 0 {
 			return cli.NewExitError("", int(status))
 		}
