@@ -11,4 +11,4 @@ The daemon provides an API to manage multiple containers.  It can handle locking
 
 Each container has its own shim that acts as the direct parent of the container's processes.  The shim is responsible for keeping the IO and/or pty master of the container open, writing the container's exit status for containerd, and reaping the container's processes when they exit.  Since the shim owns the container's pty master, it provides an API for resizing.
 
-Overall, a container's lifecycle is not tied to the containerd daemon.  The daemon is a management API for multiple container whoms lifecycle is tied to one shim per container.
+Overall, a container's lifecycle is not tied to the containerd daemon.  The daemon is a management API for multiple container whose lifecycle is tied to one shim per container.
