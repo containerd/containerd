@@ -208,7 +208,7 @@ func interceptor(ctx gocontext.Context,
 	default:
 		fmt.Printf("unknown GRPC server type: %#v\n", info.Server)
 	}
-	return handler(global, req)
+	return handler(ctx, req)
 }
 
 func handleSignals(signals chan os.Signal, server *grpc.Server) error {
