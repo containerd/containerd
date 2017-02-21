@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"path/filepath"
 
@@ -17,6 +16,7 @@ import (
 	protobuf "github.com/gogo/protobuf/types"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
+	"github.com/pkg/errors"
 )
 
 var rwm = "rwm"
@@ -175,7 +175,7 @@ var runCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		id := context.String("id")
 		if id == "" {
-			return fmt.Errorf("container id must be provided")
+			return errors.New("container id must be provided")
 		}
 
 		containers, err := getExecutionService(context)

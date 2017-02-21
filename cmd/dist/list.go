@@ -54,7 +54,7 @@ var listCommand = cli.Command{
 			tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, '\t', 0)
 			defer tw.Flush()
 
-			fmt.Fprintf(tw, "DIGEST\tSIZE\tAGE\n")
+			fmt.Fprintln(tw, "DIGEST\tSIZE\tAGE")
 			walkFn = func(path string, fi os.FileInfo, dgst digest.Digest) error {
 				fmt.Fprintf(tw, "%s\t%s\t%s\n",
 					dgst,

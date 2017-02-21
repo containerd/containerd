@@ -2,13 +2,13 @@ package main
 
 import (
 	contextpkg "context"
-	"fmt"
 	"os"
 
 	contentapi "github.com/docker/containerd/api/services/content"
 	"github.com/docker/containerd/content"
 	"github.com/opencontainers/go-digest"
 	"github.com/urfave/cli"
+	"github.com/pkg/errors"
 )
 
 var ingestCommand = cli.Command{
@@ -48,7 +48,7 @@ var ingestCommand = cli.Command{
 		}
 
 		if ref == "" {
-			return fmt.Errorf("must specify a transaction reference")
+			return errors.New("must specify a transaction reference")
 		}
 
 		ingester := content.NewIngesterFromClient(contentapi.NewContentClient(conn))
