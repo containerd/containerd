@@ -23,7 +23,7 @@ var pprofCommand = cli.Command{
 		cli.StringFlag{
 			Name:  "debug-socket, d",
 			Usage: "socket path for containerd's debug server",
-			Value: "/run/containerd/containerd-debug.sock",
+			Value: "/run/containerd/debug.sock",
 		},
 	},
 	Subcommands: []cli.Command{
