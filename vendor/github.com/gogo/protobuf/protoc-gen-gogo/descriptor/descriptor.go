@@ -90,3 +90,29 @@ func ForMessage(msg Message) (fd *FileDescriptorProto, md *DescriptorProto) {
 	}
 	return fd, md
 }
+
+// Is this field a scalar numeric type?
+func (field *FieldDescriptorProto) IsScalar() bool {
+	if field.Type == nil {
+		return false
+	}
+	switch *field.Type {
+	case FieldDescriptorProto_TYPE_DOUBLE,
+		FieldDescriptorProto_TYPE_FLOAT,
+		FieldDescriptorProto_TYPE_INT64,
+		FieldDescriptorProto_TYPE_UINT64,
+		FieldDescriptorProto_TYPE_INT32,
+		FieldDescriptorProto_TYPE_FIXED64,
+		FieldDescriptorProto_TYPE_FIXED32,
+		FieldDescriptorProto_TYPE_BOOL,
+		FieldDescriptorProto_TYPE_UINT32,
+		FieldDescriptorProto_TYPE_ENUM,
+		FieldDescriptorProto_TYPE_SFIXED32,
+		FieldDescriptorProto_TYPE_SFIXED64,
+		FieldDescriptorProto_TYPE_SINT32,
+		FieldDescriptorProto_TYPE_SINT64:
+		return true
+	default:
+		return false
+	}
+}

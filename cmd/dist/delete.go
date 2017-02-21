@@ -3,9 +3,7 @@ package main
 import (
 	contextpkg "context"
 	"fmt"
-	"path/filepath"
 
-	"github.com/docker/containerd/content"
 	"github.com/docker/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/urfave/cli"
@@ -18,30 +16,15 @@ var deleteCommand = cli.Command{
 	ArgsUsage: "[flags] [<digest>, ...]",
 	Description: `Delete one or more blobs permanently. Successfully deleted
 	blobs are printed to stdout.`,
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "root",
-			Usage: "path to content store root",
-			Value: ".content", // TODO(stevvooe): for now, just use the PWD/.content
-		},
-	},
+	Flags: []cli.Flag{},
 	Action: func(context *cli.Context) error {
 		var (
 			ctx       = contextpkg.Background()
-			root      = context.String("root")
 			args      = []string(context.Args())
 			exitError error
 		)
 
-		if !filepath.IsAbs(root) {
-			var err error
-			root, err = filepath.Abs(root)
-			if err != nil {
-				return err
-			}
-		}
-
-		cs, err := content.Open(root)
+		cs, err := resolveContentStore(context)
 		if err != nil {
 			return err
 		}

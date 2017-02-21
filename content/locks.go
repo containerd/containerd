@@ -1,10 +1,10 @@
 package content
 
 import (
-	"errors"
 	"sync"
 
 	"github.com/nightlyone/lockfile"
+	"github.com/pkg/errors"
 )
 
 // In addition to providing inter-process locks for content ingest, we also
@@ -16,6 +16,8 @@ import (
 // error reporting.
 
 var (
+	errLocked = errors.New("key is locked")
+
 	// locks lets us lock in process, as well as output of process.
 	locks   = map[lockfile.Lockfile]struct{}{}
 	locksMu sync.Mutex
@@ -26,11 +28,15 @@ func tryLock(lock lockfile.Lockfile) error {
 	defer locksMu.Unlock()
 
 	if _, ok := locks[lock]; ok {
-		return errors.New("file in use")
+		return errLocked
 	}
 
 	if err := lock.TryLock(); err != nil {
-		return err
+		if errors.Cause(err) == lockfile.ErrBusy {
+			return errLocked
+		}
+
+		return errors.Wrapf(err, "lock.TryLock() encountered an error")
 	}
 
 	locks[lock] = struct{}{}

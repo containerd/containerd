@@ -3,6 +3,7 @@ package content
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/rand"
 	_ "crypto/sha256" // required for digest package
 	"fmt"
@@ -21,7 +22,7 @@ import (
 )
 
 func TestContentWriter(t *testing.T) {
-	tmpdir, cs, cleanup := contentStoreEnv(t)
+	ctx, tmpdir, cs, cleanup := contentStoreEnv(t)
 	defer cleanup()
 	defer testutil.DumpDir(t, tmpdir)
 
@@ -29,7 +30,7 @@ func TestContentWriter(t *testing.T) {
 		t.Fatal("ingest dir should be created", err)
 	}
 
-	cw, err := cs.Begin("myref")
+	cw, err := cs.Writer(ctx, "myref")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,20 +38,14 @@ func TestContentWriter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// try to begin again with same ref, should fail
-	cw, err = cs.Begin("myref")
-	if err == nil {
-		t.Fatal("expected error on repeated begin")
-	}
-
 	// reopen, so we can test things
-	cw, err = cs.Resume("myref")
+	cw, err = cs.Writer(ctx, "myref")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// make sure that second resume also fails
-	if _, err = cs.Resume("myref"); err == nil {
+	if _, err = cs.Writer(ctx, "myref"); err == nil {
 		// TODO(stevvooe): This also works across processes. Need to find a way
 		// to test that, as well.
 		t.Fatal("no error on second resume")
@@ -64,14 +59,14 @@ func TestContentWriter(t *testing.T) {
 
 	// clear out the time and meta cause we don't care for this test
 	for i := range ingestions {
-		ingestions[i].Meta = nil
-		ingestions[i].ModTime = time.Time{}
+		ingestions[i].UpdatedAt = time.Time{}
+		ingestions[i].StartedAt = time.Time{}
 	}
 
 	if !reflect.DeepEqual(ingestions, []Status{
 		{
-			Ref:  "myref",
-			Size: 0,
+			Ref:    "myref",
+			Offset: 0,
 		},
 	}) {
 		t.Fatalf("unexpected ingestion set: %v", ingestions)
@@ -93,7 +88,7 @@ func TestContentWriter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cw, err = cs.Begin("aref")
+	cw, err = cs.Writer(ctx, "aref")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +114,7 @@ func TestContentWriter(t *testing.T) {
 }
 
 func TestWalkBlobs(t *testing.T) {
-	_, cs, cleanup := contentStoreEnv(t)
+	ctx, _, cs, cleanup := contentStoreEnv(t)
 	defer cleanup()
 
 	const (
@@ -128,7 +123,7 @@ func TestWalkBlobs(t *testing.T) {
 	)
 
 	var (
-		blobs    = populateBlobStore(t, cs, nblobs, maxsize)
+		blobs    = populateBlobStore(t, ctx, cs, nblobs, maxsize)
 		expected = map[digest.Digest]struct{}{}
 		found    = map[digest.Digest]struct{}{}
 	)
@@ -158,7 +153,7 @@ func TestWalkBlobs(t *testing.T) {
 // for blobs. This seems to be due to the number of syscalls and file io we do
 // coordinating the ingestion.
 func BenchmarkIngests(b *testing.B) {
-	_, cs, cleanup := contentStoreEnv(b)
+	ctx, _, cs, cleanup := contentStoreEnv(b)
 	defer cleanup()
 
 	for _, size := range []int64{
@@ -181,7 +176,7 @@ func BenchmarkIngests(b *testing.B) {
 			b.StartTimer()
 
 			for dgst, p := range blobs {
-				checkWrite(b, cs, dgst, p)
+				checkWrite(b, ctx, cs, dgst, p)
 			}
 		})
 	}
@@ -208,17 +203,17 @@ func generateBlobs(t checker, nblobs, maxsize int64) map[digest.Digest][]byte {
 	return blobs
 }
 
-func populateBlobStore(t checker, cs *Store, nblobs, maxsize int64) map[digest.Digest][]byte {
+func populateBlobStore(t checker, ctx context.Context, cs *Store, nblobs, maxsize int64) map[digest.Digest][]byte {
 	blobs := generateBlobs(t, nblobs, maxsize)
 
 	for dgst, p := range blobs {
-		checkWrite(t, cs, dgst, p)
+		checkWrite(t, ctx, cs, dgst, p)
 	}
 
 	return blobs
 }
 
-func contentStoreEnv(t checker) (string, *Store, func()) {
+func contentStoreEnv(t checker) (context.Context, string, *Store, func()) {
 	pc, _, _, ok := runtime.Caller(1)
 	if !ok {
 		t.Fatal("failed to resolve caller")
@@ -230,13 +225,15 @@ func contentStoreEnv(t checker) (string, *Store, func()) {
 		t.Fatal(err)
 	}
 
-	cs, err := Open(tmpdir)
+	cs, err := NewStore(tmpdir)
 	if err != nil {
 		os.RemoveAll(tmpdir)
 		t.Fatal(err)
 	}
 
-	return tmpdir, cs, func() {
+	ctx, cancel := context.WithCancel(context.Background())
+	return ctx, tmpdir, cs, func() {
+		cancel()
 		os.RemoveAll(tmpdir)
 	}
 }
@@ -253,10 +250,8 @@ func checkCopy(t checker, size int64, dst io.Writer, src io.Reader) {
 }
 
 func checkBlobPath(t *testing.T, cs *Store, dgst digest.Digest) string {
-	path, err := cs.GetPath(dgst)
-	if err != nil {
-		t.Fatal(err, dgst)
-	}
+	path := cs.blobPath(dgst)
+
 	if path != filepath.Join(cs.root, "blobs", dgst.Algorithm().String(), dgst.Hex()) {
 		t.Fatalf("unexpected path: %q", path)
 	}
@@ -273,8 +268,8 @@ func checkBlobPath(t *testing.T, cs *Store, dgst digest.Digest) string {
 	return path
 }
 
-func checkWrite(t checker, cs *Store, dgst digest.Digest, p []byte) digest.Digest {
-	if err := WriteBlob(cs, bytes.NewReader(p), dgst.String(), int64(len(p)), dgst); err != nil {
+func checkWrite(t checker, ctx context.Context, cs *Store, dgst digest.Digest, p []byte) digest.Digest {
+	if err := WriteBlob(ctx, cs, bytes.NewReader(p), dgst.String(), int64(len(p)), dgst); err != nil {
 		t.Fatal(err)
 	}
 

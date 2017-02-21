@@ -4,9 +4,8 @@ import (
 	contextpkg "context"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
+	contentapi "github.com/docker/containerd/api/services/content"
 	"github.com/docker/containerd/content"
 	"github.com/opencontainers/go-digest"
 	"github.com/urfave/cli"
@@ -18,17 +17,6 @@ var ingestCommand = cli.Command{
 	ArgsUsage:   "[flags] <key>",
 	Description: `Ingest objects into the local content store.`,
 	Flags: []cli.Flag{
-		cli.DurationFlag{
-			Name:   "timeout",
-			Usage:  "total timeout for fetch",
-			EnvVar: "CONTAINERD_FETCH_TIMEOUT",
-		},
-		cli.StringFlag{
-			Name:   "path, p",
-			Usage:  "path to content store",
-			Value:  ".content", // TODO(stevvooe): for now, just use the PWD/.content
-			EnvVar: "CONTAINERD_DIST_CONTENT_STORE",
-		},
 		cli.Int64Flag{
 			Name:  "expected-size",
 			Usage: "validate against provided size",
@@ -40,57 +28,34 @@ var ingestCommand = cli.Command{
 	},
 	Action: func(context *cli.Context) error {
 		var (
-			ctx            = contextpkg.Background()
-			timeout        = context.Duration("timeout")
-			root           = context.String("path")
+			ctx            = background
+			cancel         func()
 			ref            = context.Args().First()
 			expectedSize   = context.Int64("expected-size")
 			expectedDigest = digest.Digest(context.String("expected-digest"))
 		)
 
-		if timeout > 0 {
-			var cancel func()
-			ctx, cancel = contextpkg.WithTimeout(ctx, timeout)
-			defer cancel()
-		}
+		ctx, cancel = contextpkg.WithCancel(ctx)
+		defer cancel()
 
 		if err := expectedDigest.Validate(); expectedDigest != "" && err != nil {
 			return err
 		}
 
-		if !filepath.IsAbs(root) {
-			var err error
-			root, err = filepath.Abs(root)
-			if err != nil {
-				return err
-			}
-		}
-
-		cs, err := content.Open(root)
+		conn, err := connectGRPC(context)
 		if err != nil {
 			return err
 		}
 
-		if expectedDigest != "" {
-			if ok, err := cs.Exists(expectedDigest); err != nil {
-				return err
-			} else if ok {
-				fmt.Fprintf(os.Stderr, "content with digest %v already exists\n", expectedDigest)
-				return nil
-			}
-		}
-
 		if ref == "" {
-			if expectedDigest == "" {
-				return fmt.Errorf("must specify a transaction reference or expected digest")
-			}
-
-			ref = strings.Replace(expectedDigest.String(), ":", "-", -1)
+			return fmt.Errorf("must specify a transaction reference")
 		}
+
+		ingester := content.NewIngesterFromClient(contentapi.NewContentClient(conn))
 
 		// TODO(stevvooe): Allow ingest to be reentrant. Currently, we expect
 		// all data to be written in a single invocation. Allow multiple writes
 		// to the same transaction key followed by a commit.
-		return content.WriteBlob(cs, os.Stdin, ref, expectedSize, expectedDigest)
+		return content.WriteBlob(ctx, ingester, os.Stdin, ref, expectedSize, expectedDigest)
 	},
 }

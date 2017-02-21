@@ -203,7 +203,7 @@ func (p *stringer) Generate(file *generator.FileDescriptor) {
 			} else if p.IsMap(field) {
 				mapName := `mapStringFor` + fieldname
 				p.P("`", fieldname, ":`", ` + `, mapName, " + `,", "`,")
-			} else if field.IsMessage() || p.IsGroup(field) {
+			} else if (field.IsMessage() && !gogoproto.IsCustomType(field)) || p.IsGroup(field) {
 				desc := p.ObjectNamed(field.GetTypeName())
 				msgname := p.TypeName(desc)
 				msgnames := strings.Split(msgname, ".")

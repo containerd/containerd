@@ -7,6 +7,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -15,7 +16,9 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd"
+	contentapi "github.com/docker/containerd/api/services/content"
 	api "github.com/docker/containerd/api/services/execution"
+	"github.com/docker/containerd/content"
 	_ "github.com/docker/containerd/linux"
 	"github.com/docker/containerd/log"
 	"github.com/docker/containerd/services/execution"
@@ -56,10 +59,6 @@ func main() {
 			Usage: "set the logging level [debug, info, warn, error, fatal, panic]",
 		},
 		cli.StringFlag{
-			Name:  "root,r",
-			Usage: "containerd root directory",
-		},
-		cli.StringFlag{
 			Name:  "state",
 			Usage: "containerd state directory",
 		},
@@ -90,14 +89,27 @@ func main() {
 			return err
 		}
 		serveMetricsAPI()
+
+		contentStore, err := resolveContentStore(context)
+		if err != nil {
+			return err
+		}
+		contentService := content.NewService(contentStore)
+
 		// start the GRPC api with the execution service registered
-		server := newGRPCServer(execution.New(supervisor))
+		server := newGRPCServer()
+
+		api.RegisterContainerServiceServer(server, execution.New(supervisor))
+		contentapi.RegisterContentServer(server, contentService)
+
+		// start the GRPC api with registered services
 		if err := serveGRPC(server); err != nil {
 			return err
 		}
 		log.G(global).Infof("containerd successfully booted in %fs", time.Now().Sub(start).Seconds())
 		return handleSignals(signals, server)
 	}
+
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "containerd: %s\n", err)
 		os.Exit(1)
@@ -192,8 +204,13 @@ func serveDebugAPI() error {
 	return nil
 }
 
+func resolveContentStore(context *cli.Context) (*content.Store, error) {
+	cp := filepath.Join(conf.Root, "content")
+	return content.NewStore(cp)
+}
+
 func loadRuntimes() (map[string]containerd.Runtime, error) {
-	o := make(map[string]containerd.Runtime)
+	o := map[string]containerd.Runtime{}
 	for _, name := range containerd.Runtimes() {
 		r, err := containerd.NewRuntime(name, conf.State)
 		if err != nil {
@@ -205,9 +222,8 @@ func loadRuntimes() (map[string]containerd.Runtime, error) {
 	return o, nil
 }
 
-func newGRPCServer(service api.ContainerServiceServer) *grpc.Server {
+func newGRPCServer() *grpc.Server {
 	s := grpc.NewServer(grpc.UnaryInterceptor(interceptor))
-	api.RegisterContainerServiceServer(s, service)
 	return s
 }
 

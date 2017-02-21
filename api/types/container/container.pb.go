@@ -984,7 +984,24 @@ func (m *User) Unmarshal(dAtA []byte) error {
 				}
 			}
 		case 3:
-			if wireType == 2 {
+			if wireType == 0 {
+				var v uint32
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowContainer
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					v |= (uint32(b) & 0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				m.AdditionalGids = append(m.AdditionalGids, v)
+			} else if wireType == 2 {
 				var packedLen int
 				for shift := uint(0); ; shift += 7 {
 					if shift >= 64 {
@@ -1025,23 +1042,6 @@ func (m *User) Unmarshal(dAtA []byte) error {
 					}
 					m.AdditionalGids = append(m.AdditionalGids, v)
 				}
-			} else if wireType == 0 {
-				var v uint32
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return ErrIntOverflowContainer
-					}
-					if iNdEx >= l {
-						return io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					v |= (uint32(b) & 0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				m.AdditionalGids = append(m.AdditionalGids, v)
 			} else {
 				return fmt.Errorf("proto: wrong wireType = %d for field AdditionalGids", wireType)
 			}

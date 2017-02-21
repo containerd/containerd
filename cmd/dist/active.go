@@ -3,11 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"text/tabwriter"
 	"time"
 
-	"github.com/docker/containerd/content"
 	units "github.com/docker/go-units"
 	"github.com/urfave/cli"
 )
@@ -26,24 +24,11 @@ var activeCommand = cli.Command{
 		cli.StringFlag{
 			Name:  "root",
 			Usage: "path to content store root",
-			Value: ".content", // TODO(stevvooe): for now, just use the PWD/.content
+			Value: "/tmp/content", // TODO(stevvooe): for now, just use the PWD/.content
 		},
 	},
 	Action: func(context *cli.Context) error {
-		var (
-			// ctx  = contextpkg.Background()
-			root = context.String("root")
-		)
-
-		if !filepath.IsAbs(root) {
-			var err error
-			root, err = filepath.Abs(root)
-			if err != nil {
-				return err
-			}
-		}
-
-		cs, err := content.Open(root)
+		cs, err := resolveContentStore(context)
 		if err != nil {
 			return err
 		}
@@ -58,8 +43,8 @@ var activeCommand = cli.Command{
 		for _, active := range active {
 			fmt.Fprintf(tw, "%s\t%s\t%s\n",
 				active.Ref,
-				units.HumanSize(float64(active.Size)),
-				units.HumanDuration(time.Since(active.ModTime)))
+				units.HumanSize(float64(active.Offset)),
+				units.HumanDuration(time.Since(active.StartedAt)))
 		}
 		tw.Flush()
 
