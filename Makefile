@@ -7,11 +7,11 @@ DESTDIR=/usr/local
 # Used to populate version variable in main package.
 VERSION=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
 
-PROJECT_ROOT=github.com/docker/containerd
+PKG=github.com/docker/containerd
 
 # Project packages.
 PACKAGES=$(shell go list ./... | grep -v /vendor/)
-INTEGRATION_PACKAGE=${PROJECT_ROOT}/integration
+INTEGRATION_PACKAGE=${PKG}/integration
 SNAPSHOT_PACKAGES=$(shell go list ./snapshot/...)
 
 # Project binaries.
@@ -21,7 +21,7 @@ BINARIES=$(addprefix bin/,$(COMMANDS))
 # TODO(stevvooe): This will set version from git tag, but overrides major,
 # minor, patch in the actual file. We'll have to resolve this before release
 # time.
-GO_LDFLAGS=-ldflags "-X `go list`.Version=$(VERSION)"
+GO_LDFLAGS=-ldflags "-X $(PKG).Version=$(VERSION) -X $(PKG).Package=$(PKG)"
 
 # Flags passed to `go test`
 TESTFLAGS ?=-parallel 8 -race
@@ -108,8 +108,8 @@ FORCE:
 
 # Build a binary from a cmd.
 bin/%: cmd/% FORCE
-	@test $$(go list) = "${PROJECT_ROOT}" || \
-		(echo "👹 Please correctly set up your Go build environment. This project must be located at <GOPATH>/src/${PROJECT_ROOT}" && false)
+	@test $$(go list) = "${PKG}" || \
+		(echo "👹 Please correctly set up your Go build environment. This project must be located at <GOPATH>/src/${PKG}" && false)
 	@echo "🐳 $@"
 	@go build -i -o $@ ${GO_LDFLAGS}  ${GO_GCFLAGS} ./$<
 

@@ -15,6 +15,9 @@ var (
 )
 
 func main() {
+	cli.VersionPrinter = func(c *cli.Context) {
+		fmt.Println(os.Args[0], containerd.Package, containerd.Version)
+	}
 	app := cli.NewApp()
 	app.Name = "dist"
 	app.Version = containerd.Version
