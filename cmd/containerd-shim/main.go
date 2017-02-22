@@ -32,7 +32,7 @@ shim for container lifecycle and reconnection
 func main() {
 	app := cli.NewApp()
 	app.Name = "containerd-shim"
-	app.Version = containerd.Version
+	app.Version = containerd.Version()
 	app.Usage = usage
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{

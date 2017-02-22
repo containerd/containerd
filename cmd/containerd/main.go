@@ -46,7 +46,7 @@ var (
 func main() {
 	app := cli.NewApp()
 	app.Name = "containerd"
-	app.Version = containerd.Version
+	app.Version = containerd.Version()
 	app.Usage = usage
 	app.Flags = []cli.Flag{
 		cli.StringFlag{

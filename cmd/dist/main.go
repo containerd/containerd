@@ -17,7 +17,7 @@ var (
 func main() {
 	app := cli.NewApp()
 	app.Name = "dist"
-	app.Version = containerd.Version
+	app.Version = containerd.Version()
 	app.Usage = `
         ___      __
    ____/ (_)____/ /_
