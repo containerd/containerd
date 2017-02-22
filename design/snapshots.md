@@ -27,7 +27,7 @@ directories. We also avoid the integration between graph drivers and the tar
 format used to represent the changesets.
 
 The best aspect is that we can get to this model by refactoring the existing
-graphdrivers, minimizing the need to new code and sprawling tests.
+graphdrivers, minimizing the need for new code and sprawling tests.
 
 ## Scope
 
@@ -35,11 +35,11 @@ In the past, the `graphdriver` component has provided quite a lot of
 functionality in Docker. This includes serialization, hashing, unpacking,
 packing, mounting.
 
-This _snapshot manager_ will only provide mount-oriented snapshot
+The _Snapshot Manager_ will only provide mount-oriented snapshot
 access with minimal metadata. Serialization, hashing, unpacking, packing and
 mounting are not included in this design, opting for common implementations
 between graphdrivers, rather than specialized ones. This is less of a problem
-for performance, since direct access to changesets is provided in the
+for performance since direct access to changesets is provided in the
 interface.
 
 ## Architecture
@@ -72,20 +72,20 @@ that, if mounted, will have the fully prepared snapshot at the requested path.
 We call this the _prepare_ operation.
 
 Once a path is _prepared_ and mounted, the caller may write new data to the
-snapshot. Depending on application, a user may want to capture these changes or
+snapshot. Depending on the application, a user may want to capture these changes or
 not.
 
-If the user wants to keep the changes, the _commit_ operation is employed.  The
+If the user wants to keep the changes, the _commit_ operation is employed. The
 _commit_ operation takes the `target` directory, which represents an open
-transaction, and a `diff` directory. A successful result will end up with the
-difference between the parent and snapshot in the `diff` directory, which
+transaction, and a `diff` directory. A successful result will provide the
+difference between the parent and the snapshot in the `diff` directory, which
 should be treated as opaque by the caller. This new `diff` directory can then
 be used as the `parent` in calls to future _prepare_ operations.
 
 If the user wants to discard the changes, the _rollback_ operation will release
-any resources associated with the snapshot. While rollback may a rare operation
+any resources associated with the snapshot. While rollback may be a rare operation
 in other transactional systems, this is a common operation for containers.
-After removal, most containers will have _rollback_ called.
+After removal, most containers will utilize the _rollback_ operation.
 
 For both _rollback_ and _commit_ the mounts provided by _prepare_ should be
 unmounted before calling these methods.
@@ -99,7 +99,7 @@ Subsequently, each snapshot ends up representing
 ### Path Management
 
 No path layout for snapshot locations is imposed on the caller. The paths used
-by the snapshot drivers are largely under control of the caller. This provides
+by the snapshot drivers are largely under the control of the caller. This provides
 the most flexibility in using the snapshot system but requires discipline when
 deciding which paths to use and which ones to avoid.
 
@@ -108,18 +108,18 @@ with OCI and docker images.
 
 ## How snapshots work
 
-To bring the terminology of _snapshots_, we are going to demonstrate the use of
-the _snapshot manager_ from perspective of importing layers. We'll use a Go API
+To flesh out the _Snapshots_ terminology, we are going to demonstrate the use of
+the _Snapshot Manager_ from the perspective of importing layers. We'll use a Go API
 to represent the process.
 
 ### Importing a Layer
 
 To import a layer, we simply have the _Snapshot Manager_ provide a list of
-mounts to be applied such that our dst will capture a changeset. We start
+mounts to be applied such that our destination will capture a changeset. We start
 out by getting a path to the layer tar file and creating a temp location to
 unpack it to:
 
-	layerPath, tmpLocation := getLayerPath(), mkTmpDir() // just a path to layer tar file.
+	layerPath, tmpLocation := getLayerPath(), mkTmpDir() // just a path to the layer tar file.
 
 Per the terminology above, `tmpLocation` is known as the `target`. `layerPath`
 is simply a tar file, representing a changset. We start by using
@@ -136,10 +136,10 @@ Before proceeding, we perform all these mounts:
 	if err := MountAll(mounts); err != nil { ... }
 
 Once the mounts are performed, our temporary location is ready to capture
-a diff. In practice, this works similar to a filesystem transaction. The
+a diff. In practice, this works similarly to a filesystem transaction. The
 next step is to unpack the layer. We have a special function, `unpackLayer`
 that applies the contents of the layer to target location and calculates the
-DiffID of the unpacked layer (this is a requirement for docker
+DiffID of the unpacked layer (this is a requirement for the docker
 implementation):
 
 	layer, err := os.Open(layerPath)
@@ -176,7 +176,7 @@ Because have a provided a `parent`, the resulting `tmpLocation`, after
 mounting, will have the changes from above. Any new changes will be isolated to
 the snapshot `target`.
 
-We run the same unpacking process and commit as above to get the new `diff`.
+We run the same unpacking process and commit as before to get the new `diff`.
 
 ### Running a Container
 
@@ -192,5 +192,6 @@ one would like to create a new image from the filesystem,
 
 	if err := sm.Commit(newImageDiff, containerRootFS); err != nil { ... }
 
-Alternatively, for most container runs, `SnapshotManager.Rollback` will be
-called to signal `SnapshotManager` to abandon the changes.
+Alternatively, in the majority of cases, `SnapshotManager.Rollback` will be
+called to signal `SnapshotManager` to abandon the changes after a container
+runtime process has completed.
