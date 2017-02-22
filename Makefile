@@ -21,7 +21,7 @@ BINARIES=$(addprefix bin/,$(COMMANDS))
 # TODO(stevvooe): This will set version from git tag, but overrides major,
 # minor, patch in the actual file. We'll have to resolve this before release
 # time.
-GO_LDFLAGS=-ldflags "-X `go list`.Version=$(VERSION)"
+GO_LDFLAGS=-ldflags "-X `go list`.GitCommit=$(VERSION)"
 
 # Flags passed to `go test`
 TESTFLAGS ?=-parallel 8 -race

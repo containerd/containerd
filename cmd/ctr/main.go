@@ -12,7 +12,7 @@ import (
 func main() {
 	app := cli.NewApp()
 	app.Name = "ctr"
-	app.Version = containerd.Version
+	app.Version = containerd.Version()
 	app.Usage = `
 		__
   _____/ /______
