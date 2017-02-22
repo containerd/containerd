@@ -1,12 +1,15 @@
 package content
 
 import (
-	"errors"
 	"io"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd"
 	api "github.com/docker/containerd/api/services/content"
 	"github.com/docker/containerd/content"
+	"github.com/docker/containerd/log"
+	digest "github.com/opencontainers/go-digest"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -128,14 +131,25 @@ func (rw *readResponseWriter) Write(p []byte) (n int, err error) {
 
 func (s *Service) Write(session api.Content_WriteServer) (err error) {
 	var (
-		ref string
-		msg api.WriteResponse
-		req *api.WriteRequest
+		ctx      = session.Context()
+		msg      api.WriteResponse
+		req      *api.WriteRequest
+		ref      string
+		total    int64
+		expected digest.Digest
 	)
 
 	defer func(msg *api.WriteResponse) {
 		// pump through the last message if no error was encountered
 		if err != nil {
+			// TODO(stevvooe): Really need a log line here to track which
+			// errors are actually causing failure on the server side. May want
+			// to configure the service with an interceptor to make this work
+			// identically across all GRPC methods.
+			//
+			// This is pretty noisy, so we can remove it but leave it for now.
+			log.G(ctx).WithError(err).Error("(*Service).Write failed")
+
 			return
 		}
 
@@ -149,47 +163,88 @@ func (s *Service) Write(session api.Content_WriteServer) (err error) {
 	}
 
 	ref = req.Ref
+
 	if ref == "" {
 		return grpc.Errorf(codes.InvalidArgument, "first message must have a reference")
 	}
 
+	fields := logrus.Fields{
+		"ref": ref,
+	}
+	total = req.Total
+	expected = req.Expected
+	if total > 0 {
+		fields["total"] = total
+	}
+
+	if expected != "" {
+		fields["expected"] = expected
+	}
+
+	ctx = log.WithLogger(ctx, log.G(ctx).WithFields(fields))
 	// this action locks the writer for the session.
-	wr, err := s.store.Writer(session.Context(), ref)
+	wr, err := s.store.Writer(ctx, ref, total, expected)
 	if err != nil {
 		return err
 	}
 	defer wr.Close()
 
 	for {
-		// TODO(stevvooe): We need to study this behavior in containerd a
-		// little better to decide where to put this. We may be able to make
-		// this determination elsewhere and avoid even creating the writer.
-		//
-		// Ideally, we just use the expected digest on commit to abandon the
-		// cost of the move when they collide.
-		if req.ExpectedDigest != "" {
-			if _, err := s.store.Info(req.ExpectedDigest); err != nil {
-				if !content.IsNotFound(err) {
-					return err
-				}
-
-				return grpc.Errorf(codes.AlreadyExists, "blob with expected digest %v exists", req.ExpectedDigest)
-			}
-		}
-
 		msg.Action = req.Action
 		ws, err := wr.Status()
 		if err != nil {
 			return err
 		}
 
-		msg.Offset = ws.Offset
-		msg.StartedAt = ws.StartedAt
-		msg.UpdatedAt = ws.UpdatedAt
+		msg.Offset = ws.Offset // always set the offset.
+
+		// NOTE(stevvooe): In general, there are two cases underwhich a remote
+		// writer is used.
+		//
+		// For pull, we almost always have this before fetching large content,
+		// through descriptors. We allow predeclaration of the expected size
+		// and digest.
+		//
+		// For push, it is more complex. If we want to cut through content into
+		// storage, we may have no expectation until we are done processing the
+		// content. The case here is the following:
+		//
+		// 	1. Start writing content.
+		// 	2. Compress inline.
+		// 	3. Validate digest and size (maybe).
+		//
+		// Supporting these two paths is quite awkward but it let's both API
+		// users use the same writer style for each with a minimum of overhead.
+		if req.Expected != "" {
+			if expected != "" && expected != req.Expected {
+				return grpc.Errorf(codes.InvalidArgument, "inconsistent digest provided: %v != %v", req.Expected, expected)
+			}
+			expected = req.Expected
+
+			if _, err := s.store.Info(req.Expected); err == nil {
+				if err := s.store.Abort(ref); err != nil {
+					log.G(ctx).WithError(err).Error("failed to abort write")
+				}
+
+				return grpc.Errorf(codes.AlreadyExists, "blob with expected digest %v exists", req.Expected)
+			}
+		}
+
+		if req.Total > 0 {
+			// Update the expected total. Typically, this could be seen at
+			// negotiation time or on a commit message.
+			if total > 0 && req.Total != total {
+				return grpc.Errorf(codes.InvalidArgument, "inconsistent total provided: %v != %v", req.Total, total)
+			}
+			total = req.Total
+		}
 
 		switch req.Action {
 		case api.WriteActionStat:
 			msg.Digest = wr.Digest()
+			msg.StartedAt = ws.StartedAt
+			msg.UpdatedAt = ws.UpdatedAt
+			msg.Total = total
 		case api.WriteActionWrite, api.WriteActionCommit:
 			if req.Offset > 0 {
 				// validate the offset if provided
@@ -217,7 +272,11 @@ func (s *Service) Write(session api.Content_WriteServer) (err error) {
 			}
 
 			if req.Action == api.WriteActionCommit {
-				return wr.Commit(req.ExpectedSize, req.ExpectedDigest)
+				if err := wr.Commit(total, expected); err != nil {
+					return err
+				}
+
+				msg.Digest = wr.Digest()
 			}
 		case api.WriteActionAbort:
 			return s.store.Abort(ref)

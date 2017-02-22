@@ -1,11 +1,11 @@
 package content
 
 import (
-	"log"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/docker/containerd/log"
 	"github.com/nightlyone/lockfile"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -19,6 +19,7 @@ type writer struct {
 	path      string // path to writer dir
 	ref       string // ref key
 	offset    int64
+	total     int64
 	digester  digest.Digester
 	startedAt time.Time
 	updatedAt time.Time
@@ -28,6 +29,7 @@ func (w *writer) Status() (Status, error) {
 	return Status{
 		Ref:       w.ref,
 		Offset:    w.offset,
+		Total:     w.total,
 		StartedAt: w.startedAt,
 		UpdatedAt: w.updatedAt,
 	}, nil
@@ -52,12 +54,12 @@ func (w *writer) Write(p []byte) (n int, err error) {
 	return n, err
 }
 
-func (cw *writer) Commit(size int64, expected digest.Digest) error {
-	if err := cw.fp.Sync(); err != nil {
+func (w *writer) Commit(size int64, expected digest.Digest) error {
+	if err := w.fp.Sync(); err != nil {
 		return errors.Wrap(err, "sync failed")
 	}
 
-	fi, err := cw.fp.Stat()
+	fi, err := w.fp.Stat()
 	if err != nil {
 		return errors.Wrap(err, "stat on ingest file failed")
 	}
@@ -67,7 +69,7 @@ func (cw *writer) Commit(size int64, expected digest.Digest) error {
 	// only allowing reads honoring the umask on creation.
 	//
 	// This removes write and exec, only allowing read per the creation umask.
-	if err := cw.fp.Chmod((fi.Mode() & os.ModePerm) &^ 0333); err != nil {
+	if err := w.fp.Chmod((fi.Mode() & os.ModePerm) &^ 0333); err != nil {
 		return errors.Wrap(err, "failed to change ingest file permissions")
 	}
 
@@ -75,18 +77,18 @@ func (cw *writer) Commit(size int64, expected digest.Digest) error {
 		return errors.Errorf("failed size validation: %v != %v", fi.Size(), size)
 	}
 
-	if err := cw.fp.Close(); err != nil {
+	if err := w.fp.Close(); err != nil {
 		return errors.Wrap(err, "failed closing ingest")
 	}
 
-	dgst := cw.digester.Digest()
+	dgst := w.digester.Digest()
 	if expected != "" && expected != dgst {
 		return errors.Errorf("unexpected digest: %v != %v", dgst, expected)
 	}
 
 	var (
-		ingest = filepath.Join(cw.path, "data")
-		target = cw.s.blobPath(dgst)
+		ingest = filepath.Join(w.path, "data")
+		target = w.s.blobPath(dgst)
 	)
 
 	// make sure parent directories of blob exist
@@ -95,18 +97,18 @@ func (cw *writer) Commit(size int64, expected digest.Digest) error {
 	}
 
 	// clean up!!
-	defer os.RemoveAll(cw.path)
+	defer os.RemoveAll(w.path)
 
 	if err := os.Rename(ingest, target); err != nil {
 		if os.IsExist(err) {
 			// collision with the target file!
-			return nil
+			return errExists
 		}
 		return err
 	}
 
-	unlock(cw.lock)
-	cw.fp = nil
+	unlock(w.lock)
+	w.fp = nil
 	return nil
 }
 
@@ -121,7 +123,7 @@ func (cw *writer) Commit(size int64, expected digest.Digest) error {
 // clean up the associated resources.
 func (cw *writer) Close() (err error) {
 	if err := unlock(cw.lock); err != nil {
-		log.Printf("unlock failed: %v", err)
+		log.L.Debug("unlock failed: %v", err)
 	}
 
 	if cw.fp != nil {

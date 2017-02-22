@@ -5,7 +5,7 @@ import (
 	"io"
 )
 
-type Remote interface {
+type Fetcher interface {
 	// Fetch the resource identified by id. The id is opaque to the remote, but
 	// may typically be a tag or a digest.
 	//
@@ -32,8 +32,10 @@ type Remote interface {
 	Fetch(ctx context.Context, id string, hints ...string) (io.ReadCloser, error)
 }
 
-type RemoteFunc func(context.Context, string, ...string) (io.ReadCloser, error)
+// FetcherFunc allows package users to implement a Fetcher with just a
+// function.
+type FetcherFunc func(context.Context, string, ...string) (io.ReadCloser, error)
 
-func (fn RemoteFunc) Fetch(ctx context.Context, object string, hints ...string) (io.ReadCloser, error) {
+func (fn FetcherFunc) Fetch(ctx context.Context, object string, hints ...string) (io.ReadCloser, error) {
 	return fn(ctx, object, hints...)
 }

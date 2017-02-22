@@ -133,26 +133,27 @@ message WriteRequest {
 	// Ref identifies the pre-commit object to write to.
 	string ref = 2;
 
-	// ExpectedSize can be set to have the service validate the total size of
-	// the of committed content.
+	// Total can be set to have the service validate the total size of the
+	// committed content.
 	//
 	// The latest value before or with the commit action message will be use to
-	// validate the content. It is only required on one message for the write.
+	// validate the content. If the offset overflows total, the service may
+	// report an error. It is only required on one message for the write.
 	//
 	// If the value is zero or less, no validation of the final content will be
 	// performed.
-	int64 expected_size = 3;
+	int64 total = 3;
 
-	// ExpectedDigest can be set to have the service validate the final content
-	// against the provided digest.
+	// Expected can be set to have the service validate the final content against
+	// the provided digest.
 	//
-	// If the digest is already present in the object store, an AlreadyPresent
+	// If the digest is already present in the object store, an AlreadyExists
 	// error will be returned.
 	//
 	// Only the latest version will be used to check the content against the
 	// digest. It is only required to include it on a single message, before or
 	// with the commit action message.
-	string expected_digest = 4 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
+	string expected = 4 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
 
 	// Offset specifies the number of bytes from the start at which to begin
 	// the write. If zero or less, the write will be from the start. This uses
@@ -172,20 +173,34 @@ message WriteResponse {
 	// should confirm that they match the intended result.
 	WriteAction action = 1;
 
-	// Offset provides the current "committed" size for the Write.
-	int64 offset = 2;
+	// StartedAt provides the time at which the write began.
+	//
+	// This must be set for stat and commit write actions. All other write
+	// actions may omit this.
+	google.protobuf.Timestamp started_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+
+	// UpdatedAt provides the last time of a successful write.
+	//
+	// This must be set for stat and commit write actions. All other write
+	// actions may omit this.
+	google.protobuf.Timestamp updated_at = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+
+	// Offset is the current committed size for the write.
+	int64 offset = 4;
+
+	// Total provides the current, expected total size of the write.
+	//
+	// We include this to provide consistency with the Status structure on the
+	// client writer.
+	//
+	// This is only valid on the Stat and Commit response.
+	int64 total = 5;
 
 	// Digest, if present, includes the digest up to the currently committed
 	// bytes. If action is commit, this field will be set. It is implementation
 	// defined if this is set for other actions, except abort. On abort, this
 	// will be empty.
-	string digest = 3 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
-
-	// StartedAt is the time at which the write first started.
-	google.protobuf.Timestamp started_at = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-
-	// UpdatedAt is the time the write was last updated.
-	google.protobuf.Timestamp updated_at = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	string digest = 6 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
 }
 
 message StatusRequest {
@@ -194,8 +209,9 @@ message StatusRequest {
 }
 
 message StatusResponse {
-	string ref = 1;
-	int64 offset = 2;
-	google.protobuf.Timestamp started_at = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-	google.protobuf.Timestamp updated_at = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp started_at = 1 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp updated_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	string ref = 3;
+	int64 offset = 4;
+	int64 total = 5;
 }

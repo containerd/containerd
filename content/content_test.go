@@ -30,7 +30,7 @@ func TestContentWriter(t *testing.T) {
 		t.Fatal("ingest dir should be created", err)
 	}
 
-	cw, err := cs.Writer(ctx, "myref")
+	cw, err := cs.Writer(ctx, "myref", 0, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,13 +39,13 @@ func TestContentWriter(t *testing.T) {
 	}
 
 	// reopen, so we can test things
-	cw, err = cs.Writer(ctx, "myref")
+	cw, err = cs.Writer(ctx, "myref", 0, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// make sure that second resume also fails
-	if _, err = cs.Writer(ctx, "myref"); err == nil {
+	if _, err = cs.Writer(ctx, "myref", 0, ""); err == nil {
 		// TODO(stevvooe): This also works across processes. Need to find a way
 		// to test that, as well.
 		t.Fatal("no error on second resume")
@@ -88,7 +88,7 @@ func TestContentWriter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cw, err = cs.Writer(ctx, "aref")
+	cw, err = cs.Writer(ctx, "aref", 0, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,7 +269,7 @@ func checkBlobPath(t *testing.T, cs *Store, dgst digest.Digest) string {
 }
 
 func checkWrite(t checker, ctx context.Context, cs *Store, dgst digest.Digest, p []byte) digest.Digest {
-	if err := WriteBlob(ctx, cs, bytes.NewReader(p), dgst.String(), int64(len(p)), dgst); err != nil {
+	if err := WriteBlob(ctx, cs, dgst.String(), bytes.NewReader(p), int64(len(p)), dgst); err != nil {
 		t.Fatal(err)
 	}
 
