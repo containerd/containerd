@@ -12,6 +12,7 @@ import (
 
 var (
 	errNotFound = errors.New("content: not found")
+	errExists   = errors.New("content: exists")
 
 	BufPool = sync.Pool{
 		New: func() interface{} {
@@ -33,6 +34,7 @@ type Provider interface {
 type Status struct {
 	Ref       string
 	Offset    int64
+	Total     int64
 	StartedAt time.Time
 	UpdatedAt time.Time
 }
@@ -45,9 +47,13 @@ type Writer interface {
 }
 
 type Ingester interface {
-	Writer(ctx context.Context, ref string) (Writer, error)
+	Writer(ctx context.Context, ref string, size int64, expected digest.Digest) (Writer, error)
 }
 
 func IsNotFound(err error) bool {
 	return errors.Cause(err) == errNotFound
+}
+
+func IsExists(err error) bool {
+	return errors.Cause(err) == errExists
 }

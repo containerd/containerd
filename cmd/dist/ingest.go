@@ -56,6 +56,6 @@ var ingestCommand = cli.Command{
 		// TODO(stevvooe): Allow ingest to be reentrant. Currently, we expect
 		// all data to be written in a single invocation. Allow multiple writes
 		// to the same transaction key followed by a commit.
-		return content.WriteBlob(ctx, ingester, os.Stdin, ref, expectedSize, expectedDigest)
+		return content.WriteBlob(ctx, ingester, ref, os.Stdin, expectedSize, expectedDigest)
 	},
 }

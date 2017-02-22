@@ -100,8 +100,8 @@ var fetchCommand = cli.Command{
 
 // getResolver prepares the resolver from the environment and options.
 func getResolver(ctx contextpkg.Context) (remotes.Resolver, error) {
-	return remotes.ResolverFunc(func(ctx contextpkg.Context, locator string) (remotes.Remote, error) {
-		if !strings.HasPrefix(locator, "docker.io") {
+	return remotes.ResolverFunc(func(ctx contextpkg.Context, locator string) (remotes.Fetcher, error) {
+		if !strings.HasPrefix(locator, "docker.io") && !strings.HasPrefix(locator, "localhost:5000") {
 			return nil, errors.Errorf("unsupported locator: %q", locator)
 		}
 
@@ -113,12 +113,18 @@ func getResolver(ctx contextpkg.Context) (remotes.Resolver, error) {
 			prefix = strings.TrimPrefix(locator, "docker.io/")
 		)
 
+		if strings.HasPrefix(locator, "localhost:5000") {
+			base.Scheme = "http"
+			base.Host = "localhost:5000"
+			prefix = strings.TrimPrefix(locator, "localhost:5000/")
+		}
+
 		token, err := getToken(ctx, "repository:"+prefix+":pull")
 		if err != nil {
 			return nil, err
 		}
 
-		return remotes.RemoteFunc(func(ctx contextpkg.Context, object string, hints ...string) (io.ReadCloser, error) {
+		return remotes.FetcherFunc(func(ctx contextpkg.Context, object string, hints ...string) (io.ReadCloser, error) {
 			ctx = log.WithLogger(ctx, log.G(ctx).WithFields(
 				logrus.Fields{
 					"prefix": prefix, // or repo?

@@ -165,25 +165,26 @@ type WriteRequest struct {
 	Action WriteAction `protobuf:"varint,1,opt,name=action,proto3,enum=containerd.v1.WriteAction" json:"action,omitempty"`
 	// Ref identifies the pre-commit object to write to.
 	Ref string `protobuf:"bytes,2,opt,name=ref,proto3" json:"ref,omitempty"`
-	// ExpectedSize can be set to have the service validate the total size of
-	// the of committed content.
+	// Total can be set to have the service validate the total size of the
+	// committed content.
 	//
 	// The latest value before or with the commit action message will be use to
-	// validate the content. It is only required on one message for the write.
+	// validate the content. If the offset overflows total, the service may
+	// report an error. It is only required on one message for the write.
 	//
 	// If the value is zero or less, no validation of the final content will be
 	// performed.
-	ExpectedSize int64 `protobuf:"varint,3,opt,name=expected_size,json=expectedSize,proto3" json:"expected_size,omitempty"`
-	// ExpectedDigest can be set to have the service validate the final content
-	// against the provided digest.
+	Total int64 `protobuf:"varint,3,opt,name=total,proto3" json:"total,omitempty"`
+	// Expected can be set to have the service validate the final content against
+	// the provided digest.
 	//
-	// If the digest is already present in the object store, an AlreadyPresent
+	// If the digest is already present in the object store, an AlreadyExists
 	// error will be returned.
 	//
 	// Only the latest version will be used to check the content against the
 	// digest. It is only required to include it on a single message, before or
 	// with the commit action message.
-	ExpectedDigest github_com_opencontainers_go_digest.Digest `protobuf:"bytes,4,opt,name=expected_digest,json=expectedDigest,proto3,customtype=github.com/opencontainers/go-digest.Digest" json:"expected_digest"`
+	Expected github_com_opencontainers_go_digest.Digest `protobuf:"bytes,4,opt,name=expected,proto3,customtype=github.com/opencontainers/go-digest.Digest" json:"expected"`
 	// Offset specifies the number of bytes from the start at which to begin
 	// the write. If zero or less, the write will be from the start. This uses
 	// standard zero-indexed semantics.
@@ -204,17 +205,30 @@ type WriteResponse struct {
 	// Action contains the action for the final message of the stream. A writer
 	// should confirm that they match the intended result.
 	Action WriteAction `protobuf:"varint,1,opt,name=action,proto3,enum=containerd.v1.WriteAction" json:"action,omitempty"`
-	// Offset provides the current "committed" size for the Write.
-	Offset int64 `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
+	// StartedAt provides the time at which the write began.
+	//
+	// This must be set for stat and commit write actions. All other write
+	// actions may omit this.
+	StartedAt time.Time `protobuf:"bytes,2,opt,name=started_at,json=startedAt,stdtime" json:"started_at"`
+	// UpdatedAt provides the last time of a successful write.
+	//
+	// This must be set for stat and commit write actions. All other write
+	// actions may omit this.
+	UpdatedAt time.Time `protobuf:"bytes,3,opt,name=updated_at,json=updatedAt,stdtime" json:"updated_at"`
+	// Offset is the current committed size for the write.
+	Offset int64 `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`
+	// Total provides the current, expected total size of the write.
+	//
+	// We include this to provide consistency with the Status structure on the
+	// client writer.
+	//
+	// This is only valid on the Stat and Commit response.
+	Total int64 `protobuf:"varint,5,opt,name=total,proto3" json:"total,omitempty"`
 	// Digest, if present, includes the digest up to the currently committed
 	// bytes. If action is commit, this field will be set. It is implementation
 	// defined if this is set for other actions, except abort. On abort, this
 	// will be empty.
-	Digest github_com_opencontainers_go_digest.Digest `protobuf:"bytes,3,opt,name=digest,proto3,customtype=github.com/opencontainers/go-digest.Digest" json:"digest"`
-	// StartedAt is the time at which the write first started.
-	StartedAt time.Time `protobuf:"bytes,4,opt,name=started_at,json=startedAt,stdtime" json:"started_at"`
-	// UpdatedAt is the time the write was last updated.
-	UpdatedAt time.Time `protobuf:"bytes,5,opt,name=updated_at,json=updatedAt,stdtime" json:"updated_at"`
+	Digest github_com_opencontainers_go_digest.Digest `protobuf:"bytes,6,opt,name=digest,proto3,customtype=github.com/opencontainers/go-digest.Digest" json:"digest"`
 }
 
 func (m *WriteResponse) Reset()                    { *m = WriteResponse{} }
@@ -231,10 +245,11 @@ func (*StatusRequest) ProtoMessage()               {}
 func (*StatusRequest) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{6} }
 
 type StatusResponse struct {
-	Ref       string    `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
-	Offset    int64     `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
-	StartedAt time.Time `protobuf:"bytes,3,opt,name=started_at,json=startedAt,stdtime" json:"started_at"`
-	UpdatedAt time.Time `protobuf:"bytes,4,opt,name=updated_at,json=updatedAt,stdtime" json:"updated_at"`
+	StartedAt time.Time `protobuf:"bytes,1,opt,name=started_at,json=startedAt,stdtime" json:"started_at"`
+	UpdatedAt time.Time `protobuf:"bytes,2,opt,name=updated_at,json=updatedAt,stdtime" json:"updated_at"`
+	Ref       string    `protobuf:"bytes,3,opt,name=ref,proto3" json:"ref,omitempty"`
+	Offset    int64     `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`
+	Total     int64     `protobuf:"varint,5,opt,name=total,proto3" json:"total,omitempty"`
 }
 
 func (m *StatusResponse) Reset()                    { *m = StatusResponse{} }
@@ -717,16 +732,16 @@ func (m *WriteRequest) MarshalTo(dAtA []byte) (int, error) {
 		i = encodeVarintContent(dAtA, i, uint64(len(m.Ref)))
 		i += copy(dAtA[i:], m.Ref)
 	}
-	if m.ExpectedSize != 0 {
+	if m.Total != 0 {
 		dAtA[i] = 0x18
 		i++
-		i = encodeVarintContent(dAtA, i, uint64(m.ExpectedSize))
+		i = encodeVarintContent(dAtA, i, uint64(m.Total))
 	}
-	if len(m.ExpectedDigest) > 0 {
+	if len(m.Expected) > 0 {
 		dAtA[i] = 0x22
 		i++
-		i = encodeVarintContent(dAtA, i, uint64(len(m.ExpectedDigest)))
-		i += copy(dAtA[i:], m.ExpectedDigest)
+		i = encodeVarintContent(dAtA, i, uint64(len(m.Expected)))
+		i += copy(dAtA[i:], m.Expected)
 	}
 	if m.Offset != 0 {
 		dAtA[i] = 0x28
@@ -762,18 +777,7 @@ func (m *WriteResponse) MarshalTo(dAtA []byte) (int, error) {
 		i++
 		i = encodeVarintContent(dAtA, i, uint64(m.Action))
 	}
-	if m.Offset != 0 {
-		dAtA[i] = 0x10
-		i++
-		i = encodeVarintContent(dAtA, i, uint64(m.Offset))
-	}
-	if len(m.Digest) > 0 {
-		dAtA[i] = 0x1a
-		i++
-		i = encodeVarintContent(dAtA, i, uint64(len(m.Digest)))
-		i += copy(dAtA[i:], m.Digest)
-	}
-	dAtA[i] = 0x22
+	dAtA[i] = 0x12
 	i++
 	i = encodeVarintContent(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.StartedAt)))
 	n2, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.StartedAt, dAtA[i:])
@@ -781,7 +785,7 @@ func (m *WriteResponse) MarshalTo(dAtA []byte) (int, error) {
 		return 0, err
 	}
 	i += n2
-	dAtA[i] = 0x2a
+	dAtA[i] = 0x1a
 	i++
 	i = encodeVarintContent(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.UpdatedAt)))
 	n3, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.UpdatedAt, dAtA[i:])
@@ -789,6 +793,22 @@ func (m *WriteResponse) MarshalTo(dAtA []byte) (int, error) {
 		return 0, err
 	}
 	i += n3
+	if m.Offset != 0 {
+		dAtA[i] = 0x20
+		i++
+		i = encodeVarintContent(dAtA, i, uint64(m.Offset))
+	}
+	if m.Total != 0 {
+		dAtA[i] = 0x28
+		i++
+		i = encodeVarintContent(dAtA, i, uint64(m.Total))
+	}
+	if len(m.Digest) > 0 {
+		dAtA[i] = 0x32
+		i++
+		i = encodeVarintContent(dAtA, i, uint64(len(m.Digest)))
+		i += copy(dAtA[i:], m.Digest)
+	}
 	return i, nil
 }
 
@@ -855,18 +875,7 @@ func (m *StatusResponse) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.Ref) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintContent(dAtA, i, uint64(len(m.Ref)))
-		i += copy(dAtA[i:], m.Ref)
-	}
-	if m.Offset != 0 {
-		dAtA[i] = 0x10
-		i++
-		i = encodeVarintContent(dAtA, i, uint64(m.Offset))
-	}
-	dAtA[i] = 0x1a
+	dAtA[i] = 0xa
 	i++
 	i = encodeVarintContent(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.StartedAt)))
 	n4, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.StartedAt, dAtA[i:])
@@ -874,7 +883,7 @@ func (m *StatusResponse) MarshalTo(dAtA []byte) (int, error) {
 		return 0, err
 	}
 	i += n4
-	dAtA[i] = 0x22
+	dAtA[i] = 0x12
 	i++
 	i = encodeVarintContent(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.UpdatedAt)))
 	n5, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.UpdatedAt, dAtA[i:])
@@ -882,6 +891,22 @@ func (m *StatusResponse) MarshalTo(dAtA []byte) (int, error) {
 		return 0, err
 	}
 	i += n5
+	if len(m.Ref) > 0 {
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintContent(dAtA, i, uint64(len(m.Ref)))
+		i += copy(dAtA[i:], m.Ref)
+	}
+	if m.Offset != 0 {
+		dAtA[i] = 0x20
+		i++
+		i = encodeVarintContent(dAtA, i, uint64(m.Offset))
+	}
+	if m.Total != 0 {
+		dAtA[i] = 0x28
+		i++
+		i = encodeVarintContent(dAtA, i, uint64(m.Total))
+	}
 	return i, nil
 }
 
@@ -976,10 +1001,10 @@ func (m *WriteRequest) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovContent(uint64(l))
 	}
-	if m.ExpectedSize != 0 {
-		n += 1 + sovContent(uint64(m.ExpectedSize))
+	if m.Total != 0 {
+		n += 1 + sovContent(uint64(m.Total))
 	}
-	l = len(m.ExpectedDigest)
+	l = len(m.Expected)
 	if l > 0 {
 		n += 1 + l + sovContent(uint64(l))
 	}
@@ -999,17 +1024,20 @@ func (m *WriteResponse) Size() (n int) {
 	if m.Action != 0 {
 		n += 1 + sovContent(uint64(m.Action))
 	}
+	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.StartedAt)
+	n += 1 + l + sovContent(uint64(l))
+	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.UpdatedAt)
+	n += 1 + l + sovContent(uint64(l))
 	if m.Offset != 0 {
 		n += 1 + sovContent(uint64(m.Offset))
+	}
+	if m.Total != 0 {
+		n += 1 + sovContent(uint64(m.Total))
 	}
 	l = len(m.Digest)
 	if l > 0 {
 		n += 1 + l + sovContent(uint64(l))
 	}
-	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.StartedAt)
-	n += 1 + l + sovContent(uint64(l))
-	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.UpdatedAt)
-	n += 1 + l + sovContent(uint64(l))
 	return n
 }
 
@@ -1034,6 +1062,10 @@ func (m *StatusRequest) Size() (n int) {
 func (m *StatusResponse) Size() (n int) {
 	var l int
 	_ = l
+	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.StartedAt)
+	n += 1 + l + sovContent(uint64(l))
+	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.UpdatedAt)
+	n += 1 + l + sovContent(uint64(l))
 	l = len(m.Ref)
 	if l > 0 {
 		n += 1 + l + sovContent(uint64(l))
@@ -1041,10 +1073,9 @@ func (m *StatusResponse) Size() (n int) {
 	if m.Offset != 0 {
 		n += 1 + sovContent(uint64(m.Offset))
 	}
-	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.StartedAt)
-	n += 1 + l + sovContent(uint64(l))
-	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.UpdatedAt)
-	n += 1 + l + sovContent(uint64(l))
+	if m.Total != 0 {
+		n += 1 + sovContent(uint64(m.Total))
+	}
 	return n
 }
 
@@ -1113,8 +1144,8 @@ func (this *WriteRequest) String() string {
 	s := strings.Join([]string{`&WriteRequest{`,
 		`Action:` + fmt.Sprintf("%v", this.Action) + `,`,
 		`Ref:` + fmt.Sprintf("%v", this.Ref) + `,`,
-		`ExpectedSize:` + fmt.Sprintf("%v", this.ExpectedSize) + `,`,
-		`ExpectedDigest:` + fmt.Sprintf("%v", this.ExpectedDigest) + `,`,
+		`Total:` + fmt.Sprintf("%v", this.Total) + `,`,
+		`Expected:` + fmt.Sprintf("%v", this.Expected) + `,`,
 		`Offset:` + fmt.Sprintf("%v", this.Offset) + `,`,
 		`Data:` + fmt.Sprintf("%v", this.Data) + `,`,
 		`}`,
@@ -1127,10 +1158,11 @@ func (this *WriteResponse) String() string {
 	}
 	s := strings.Join([]string{`&WriteResponse{`,
 		`Action:` + fmt.Sprintf("%v", this.Action) + `,`,
-		`Offset:` + fmt.Sprintf("%v", this.Offset) + `,`,
-		`Digest:` + fmt.Sprintf("%v", this.Digest) + `,`,
 		`StartedAt:` + strings.Replace(strings.Replace(this.StartedAt.String(), "Timestamp", "google_protobuf1.Timestamp", 1), `&`, ``, 1) + `,`,
 		`UpdatedAt:` + strings.Replace(strings.Replace(this.UpdatedAt.String(), "Timestamp", "google_protobuf1.Timestamp", 1), `&`, ``, 1) + `,`,
+		`Offset:` + fmt.Sprintf("%v", this.Offset) + `,`,
+		`Total:` + fmt.Sprintf("%v", this.Total) + `,`,
+		`Digest:` + fmt.Sprintf("%v", this.Digest) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1151,10 +1183,11 @@ func (this *StatusResponse) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&StatusResponse{`,
-		`Ref:` + fmt.Sprintf("%v", this.Ref) + `,`,
-		`Offset:` + fmt.Sprintf("%v", this.Offset) + `,`,
 		`StartedAt:` + strings.Replace(strings.Replace(this.StartedAt.String(), "Timestamp", "google_protobuf1.Timestamp", 1), `&`, ``, 1) + `,`,
 		`UpdatedAt:` + strings.Replace(strings.Replace(this.UpdatedAt.String(), "Timestamp", "google_protobuf1.Timestamp", 1), `&`, ``, 1) + `,`,
+		`Ref:` + fmt.Sprintf("%v", this.Ref) + `,`,
+		`Offset:` + fmt.Sprintf("%v", this.Offset) + `,`,
+		`Total:` + fmt.Sprintf("%v", this.Total) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1670,9 +1703,9 @@ func (m *WriteRequest) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 3:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ExpectedSize", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Total", wireType)
 			}
-			m.ExpectedSize = 0
+			m.Total = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowContent
@@ -1682,14 +1715,14 @@ func (m *WriteRequest) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.ExpectedSize |= (int64(b) & 0x7F) << shift
+				m.Total |= (int64(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 4:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ExpectedDigest", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Expected", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -1714,7 +1747,7 @@ func (m *WriteRequest) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.ExpectedDigest = github_com_opencontainers_go_digest.Digest(dAtA[iNdEx:postIndex])
+			m.Expected = github_com_opencontainers_go_digest.Digest(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 5:
 			if wireType != 0 {
@@ -1836,54 +1869,6 @@ func (m *WriteResponse) Unmarshal(dAtA []byte) error {
 				}
 			}
 		case 2:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Offset", wireType)
-			}
-			m.Offset = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowContent
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.Offset |= (int64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Digest", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowContent
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthContent
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Digest = github_com_opencontainers_go_digest.Digest(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field StartedAt", wireType)
 			}
@@ -1913,7 +1898,7 @@ func (m *WriteResponse) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 5:
+		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field UpdatedAt", wireType)
 			}
@@ -1942,6 +1927,73 @@ func (m *WriteResponse) Unmarshal(dAtA []byte) error {
 			if err := github_com_gogo_protobuf_types.StdTimeUnmarshal(&m.UpdatedAt, dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Offset", wireType)
+			}
+			m.Offset = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowContent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Offset |= (int64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Total", wireType)
+			}
+			m.Total = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowContent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Total |= (int64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Digest", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowContent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthContent
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Digest = github_com_opencontainers_go_digest.Digest(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -2103,54 +2155,6 @@ func (m *StatusResponse) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Ref", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowContent
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthContent
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Ref = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 2:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Offset", wireType)
-			}
-			m.Offset = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowContent
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.Offset |= (int64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 3:
-			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field StartedAt", wireType)
 			}
 			var msglen int
@@ -2179,7 +2183,7 @@ func (m *StatusResponse) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 4:
+		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field UpdatedAt", wireType)
 			}
@@ -2209,6 +2213,73 @@ func (m *StatusResponse) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Ref", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowContent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthContent
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Ref = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Offset", wireType)
+			}
+			m.Offset = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowContent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Offset |= (int64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Total", wireType)
+			}
+			m.Total = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowContent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Total |= (int64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipContent(dAtA[iNdEx:])
@@ -2340,51 +2411,51 @@ func init() {
 }
 
 var fileDescriptorContent = []byte{
-	// 733 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xb4, 0x95, 0xb1, 0x6f, 0xd3, 0x4e,
-	0x14, 0xc7, 0x73, 0x89, 0x93, 0xdf, 0x2f, 0x2f, 0x49, 0x1b, 0xae, 0x05, 0x45, 0x6e, 0xeb, 0x84,
-	0xb0, 0x44, 0x95, 0xb0, 0x4b, 0xd8, 0x60, 0xa8, 0x9c, 0x14, 0xaa, 0x22, 0x55, 0x95, 0xdc, 0x48,
-	0x15, 0x62, 0x40, 0x4e, 0x72, 0x31, 0x16, 0xc4, 0x67, 0xec, 0x4b, 0x55, 0x31, 0x21, 0x24, 0x24,
-	0xd4, 0x89, 0x7f, 0xa0, 0x2c, 0xb0, 0x23, 0x26, 0x24, 0x66, 0x86, 0x8e, 0x8c, 0x88, 0xa1, 0xd0,
-	0xfc, 0x23, 0x20, 0x9f, 0xcf, 0x89, 0x9b, 0xa6, 0x43, 0x4b, 0xc9, 0xe2, 0x67, 0xbf, 0xf7, 0xbe,
-	0x79, 0xf7, 0xf1, 0x37, 0x2f, 0xb0, 0x6a, 0xd9, 0xec, 0xc9, 0xa0, 0xad, 0x76, 0x68, 0x5f, 0xeb,
-	0xd2, 0xce, 0x53, 0xe2, 0x69, 0x1d, 0xea, 0x30, 0xd3, 0x76, 0x88, 0xd7, 0xd5, 0x4c, 0xd7, 0xd6,
-	0x7c, 0xe2, 0xed, 0xda, 0x1d, 0xe2, 0xf3, 0xe7, 0xc4, 0x61, 0xd1, 0x55, 0x75, 0x3d, 0xca, 0x28,
-	0x2e, 0x8c, 0xcb, 0xd5, 0xdd, 0x5b, 0xf2, 0xbc, 0x45, 0x2d, 0xca, 0x33, 0x5a, 0x10, 0x85, 0x45,
-	0x72, 0xd9, 0xa2, 0xd4, 0x7a, 0x46, 0x34, 0x7e, 0xd7, 0x1e, 0xf4, 0x34, 0x66, 0xf7, 0x89, 0xcf,
-	0xcc, 0xbe, 0x1b, 0x16, 0x54, 0x1f, 0x42, 0x6e, 0xc3, 0xe9, 0x51, 0x83, 0x3c, 0x1f, 0x10, 0x9f,
-	0xe1, 0x07, 0x90, 0xe9, 0xda, 0x16, 0xf1, 0x59, 0x09, 0x55, 0x50, 0x2d, 0xdb, 0xa8, 0x1f, 0x1e,
-	0x95, 0x13, 0x3f, 0x8e, 0xca, 0xcb, 0xb1, 0x69, 0xa9, 0x4b, 0x9c, 0xd1, 0x77, 0xfb, 0x9a, 0x45,
-	0x6f, 0x86, 0x2d, 0xea, 0x1a, 0xbf, 0x18, 0x42, 0xa1, 0xfa, 0x19, 0x41, 0x3e, 0xd4, 0xf6, 0x5d,
-	0xea, 0xf8, 0xe4, 0x32, 0xc5, 0x31, 0x06, 0xc9, 0xb7, 0x5f, 0x90, 0x52, 0xb2, 0x82, 0x6a, 0x29,
-	0x83, 0xc7, 0x78, 0x1d, 0xf2, 0x1d, 0xda, 0xef, 0xdb, 0x8c, 0x91, 0xee, 0x63, 0x93, 0x95, 0x52,
-	0x15, 0x54, 0xcb, 0xd5, 0x65, 0x35, 0x64, 0xa0, 0x46, 0x0c, 0xd4, 0x56, 0xc4, 0xa0, 0xf1, 0x7f,
-	0x30, 0xc1, 0xdb, 0x9f, 0x65, 0x64, 0xe4, 0x46, 0x9d, 0x3a, 0xab, 0xbe, 0x46, 0x90, 0x33, 0x88,
-	0xd9, 0xfd, 0x07, 0x54, 0xf0, 0x35, 0xc8, 0xd0, 0x5e, 0xcf, 0x27, 0x4c, 0x8c, 0x2e, 0xee, 0x46,
-	0x07, 0x4a, 0x8d, 0x0f, 0x54, 0xbd, 0x03, 0xf9, 0x70, 0x0c, 0x01, 0x70, 0xdc, 0x8b, 0x26, 0x7b,
-	0xbb, 0x26, 0x33, 0xb9, 0x62, 0xde, 0xe0, 0x71, 0xf5, 0x55, 0x12, 0xf2, 0x3b, 0x9e, 0xcd, 0x48,
-	0x74, 0x88, 0x3a, 0x64, 0xcc, 0x0e, 0xb3, 0xa9, 0xc3, 0x9b, 0x67, 0xea, 0xb2, 0x7a, 0xc2, 0x40,
-	0x2a, 0x2f, 0xd6, 0x79, 0x85, 0x21, 0x2a, 0x71, 0x11, 0x52, 0x1e, 0xe9, 0x71, 0xdd, 0xac, 0x11,
-	0x84, 0xf8, 0x06, 0x14, 0xc8, 0x9e, 0x4b, 0x3a, 0x01, 0xe2, 0xd8, 0xbc, 0xf9, 0xe8, 0xe1, 0x76,
-	0xf0, 0x22, 0x1e, 0xc1, 0xec, 0xa8, 0x48, 0x80, 0x93, 0x2e, 0x0c, 0x6e, 0x26, 0x92, 0x5a, 0x9b,
-	0x04, 0x98, 0x9e, 0x0a, 0x21, 0x13, 0x83, 0xf0, 0x29, 0x09, 0x05, 0x01, 0x41, 0x20, 0xbc, 0x08,
-	0x85, 0xb3, 0x5e, 0xd9, 0xd8, 0x16, 0xa9, 0xbf, 0xb6, 0x45, 0x13, 0xc0, 0x67, 0xa6, 0x27, 0x9c,
-	0x2b, 0x9d, 0xc3, 0xb9, 0x59, 0xd1, 0xa7, 0x73, 0x91, 0x81, 0xdb, 0x35, 0x85, 0x48, 0xfa, 0x3c,
-	0x22, 0xa2, 0x4f, 0x67, 0xd5, 0xbb, 0x50, 0xd8, 0x66, 0x26, 0x1b, 0xf8, 0x91, 0x71, 0x30, 0x48,
-	0x1e, 0xe9, 0xf9, 0x25, 0x54, 0x49, 0xd5, 0xb2, 0x06, 0x8f, 0x03, 0x24, 0xae, 0x47, 0x7a, 0xf6,
-	0x5e, 0x29, 0xc9, 0x9f, 0x8a, 0xbb, 0xea, 0x57, 0x04, 0x33, 0x51, 0xb7, 0x20, 0x2e, 0x3c, 0x84,
-	0xc6, 0x1e, 0x3a, 0x8b, 0xe7, 0x49, 0x06, 0xa9, 0xcb, 0x60, 0x20, 0x5d, 0x88, 0xc1, 0xf2, 0x47,
-	0x04, 0xb9, 0x98, 0x13, 0xf0, 0x12, 0x48, 0xdb, 0x2d, 0xbd, 0x55, 0x4c, 0xc8, 0x73, 0xfb, 0x07,
-	0x95, 0xd9, 0x58, 0x2a, 0x38, 0x2c, 0x2e, 0x43, 0x7a, 0xc7, 0xd8, 0x68, 0xdd, 0x2b, 0x22, 0x79,
-	0x7e, 0xff, 0xa0, 0x52, 0x8c, 0xe5, 0x79, 0x88, 0xaf, 0x43, 0xa6, 0xb9, 0xb5, 0xb9, 0xb9, 0xd1,
-	0x2a, 0x26, 0xe5, 0xab, 0xfb, 0x07, 0x95, 0x2b, 0xb1, 0x8a, 0x26, 0x5f, 0x3c, 0xb8, 0x06, 0x69,
-	0xbd, 0xb1, 0x65, 0xb4, 0x8a, 0xbf, 0xa3, 0xcf, 0x69, 0x31, 0xbd, 0x4d, 0x3d, 0x26, 0xcf, 0xbd,
-	0x79, 0xaf, 0x24, 0xbe, 0x7c, 0x50, 0xe2, 0x13, 0xd6, 0xdf, 0x25, 0xe1, 0xbf, 0x66, 0xf8, 0xff,
-	0x80, 0x57, 0x41, 0x0a, 0xf6, 0x2e, 0x9e, 0xf4, 0x76, 0x6c, 0xd1, 0xcb, 0x0b, 0x53, 0x73, 0xe2,
-	0x95, 0xe9, 0x20, 0x05, 0x7b, 0xe7, 0x94, 0x40, 0x6c, 0x27, 0x9e, 0x12, 0x88, 0x2f, 0xaa, 0x15,
-	0x84, 0xd7, 0x21, 0x13, 0xfa, 0x00, 0x2f, 0x4e, 0x14, 0x9e, 0x30, 0x97, 0xbc, 0x74, 0x46, 0x76,
-	0x24, 0x74, 0x1f, 0xd2, 0x21, 0xc3, 0x85, 0x69, 0xbf, 0xd4, 0x48, 0x66, 0x71, 0x7a, 0x32, 0x54,
-	0xa9, 0xa1, 0x15, 0xd4, 0x28, 0x1d, 0x1e, 0x2b, 0x89, 0xef, 0xc7, 0x4a, 0xe2, 0xe5, 0x50, 0x41,
-	0x87, 0x43, 0x05, 0x7d, 0x1b, 0x2a, 0xe8, 0xd7, 0x50, 0x41, 0xed, 0x0c, 0x77, 0xc5, 0xed, 0x3f,
-	0x01, 0x00, 0x00, 0xff, 0xff, 0x6f, 0xe6, 0x59, 0x92, 0x92, 0x07, 0x00, 0x00,
+	// 734 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xb4, 0x55, 0x4d, 0x6f, 0xd3, 0x4a,
+	0x14, 0xcd, 0xe4, 0xc3, 0xaf, 0xb9, 0x49, 0xfb, 0xf2, 0xa6, 0x7d, 0x4f, 0x91, 0xdb, 0x3a, 0x79,
+	0x59, 0x45, 0x95, 0xb0, 0x4b, 0xd8, 0xc1, 0xa2, 0x72, 0x02, 0x54, 0x45, 0x2a, 0x95, 0xdc, 0x48,
+	0x15, 0x2b, 0xe4, 0xc4, 0x13, 0x63, 0xd1, 0x78, 0x8c, 0x3d, 0xa9, 0x2a, 0x56, 0x6c, 0x90, 0x50,
+	0x57, 0xfc, 0x81, 0xb2, 0x81, 0x3d, 0x4b, 0x24, 0xfe, 0x00, 0x5d, 0xb2, 0x44, 0x5d, 0x14, 0x9a,
+	0x05, 0x7f, 0x03, 0xe4, 0xf1, 0x38, 0x71, 0xda, 0xb0, 0x68, 0x28, 0xdd, 0xf8, 0x8e, 0xef, 0xbd,
+	0xa7, 0xf7, 0x1c, 0x9f, 0xb9, 0x81, 0x0d, 0xdb, 0x61, 0x4f, 0x06, 0x1d, 0xb5, 0x4b, 0xfb, 0x9a,
+	0x45, 0xbb, 0x4f, 0x89, 0xaf, 0x75, 0xa9, 0xcb, 0x4c, 0xc7, 0x25, 0xbe, 0xa5, 0x99, 0x9e, 0xa3,
+	0x05, 0xc4, 0x3f, 0x70, 0xba, 0x24, 0xe0, 0xef, 0x89, 0xcb, 0xe2, 0xa7, 0xea, 0xf9, 0x94, 0x51,
+	0x3c, 0x3f, 0x2e, 0x57, 0x0f, 0x6e, 0xca, 0x4b, 0x36, 0xb5, 0x29, 0xcf, 0x68, 0x61, 0x14, 0x15,
+	0xc9, 0x15, 0x9b, 0x52, 0x7b, 0x9f, 0x68, 0xfc, 0xd4, 0x19, 0xf4, 0x34, 0xe6, 0xf4, 0x49, 0xc0,
+	0xcc, 0xbe, 0x17, 0x15, 0xd4, 0x1e, 0x41, 0x61, 0xcb, 0xed, 0x51, 0x83, 0x3c, 0x1b, 0x90, 0x80,
+	0xe1, 0x07, 0x20, 0x59, 0x8e, 0x4d, 0x02, 0x56, 0x46, 0x55, 0x54, 0xcf, 0x37, 0x1b, 0x27, 0x67,
+	0x95, 0xd4, 0xe9, 0x59, 0x65, 0x2d, 0x31, 0x2d, 0xf5, 0x88, 0x3b, 0xfa, 0xdf, 0x81, 0x66, 0xd3,
+	0x1b, 0x51, 0x8b, 0x7a, 0x97, 0x3f, 0x0c, 0x81, 0x50, 0xfb, 0x80, 0xa0, 0x18, 0x61, 0x07, 0x1e,
+	0x75, 0x03, 0x72, 0x9d, 0xe0, 0x18, 0x43, 0x36, 0x70, 0x9e, 0x93, 0x72, 0xba, 0x8a, 0xea, 0x19,
+	0x83, 0xc7, 0x78, 0x13, 0x8a, 0x5d, 0xda, 0xef, 0x3b, 0x8c, 0x11, 0xeb, 0xb1, 0xc9, 0xca, 0x99,
+	0x2a, 0xaa, 0x17, 0x1a, 0xb2, 0x1a, 0x69, 0xa0, 0xc6, 0x1a, 0xa8, 0xed, 0x58, 0x83, 0xe6, 0x5c,
+	0x38, 0xc1, 0xeb, 0xaf, 0x15, 0x64, 0x14, 0x46, 0x9d, 0x3a, 0xab, 0xbd, 0x44, 0x50, 0x30, 0x88,
+	0x69, 0xfd, 0x01, 0x55, 0xf0, 0x7f, 0x20, 0xd1, 0x5e, 0x2f, 0x20, 0x4c, 0x8c, 0x2e, 0x4e, 0x23,
+	0x42, 0x99, 0x31, 0xa1, 0xda, 0x6d, 0x28, 0x46, 0x63, 0x08, 0x01, 0xc7, 0xbd, 0xe8, 0x62, 0xaf,
+	0x65, 0x32, 0x93, 0x23, 0x16, 0x0d, 0x1e, 0xd7, 0xbe, 0x23, 0x28, 0xee, 0xf9, 0x0e, 0x23, 0x31,
+	0x89, 0x06, 0x48, 0x66, 0x97, 0x39, 0xd4, 0xe5, 0xcd, 0x0b, 0x0d, 0x59, 0x9d, 0x30, 0x90, 0xca,
+	0x8b, 0x75, 0x5e, 0x61, 0x88, 0x4a, 0x5c, 0x82, 0x8c, 0x4f, 0x7a, 0x1c, 0x37, 0x6f, 0x84, 0x21,
+	0x5e, 0x82, 0x1c, 0xa3, 0xcc, 0xdc, 0x17, 0x73, 0x46, 0x07, 0xfc, 0x10, 0xe6, 0xc8, 0xa1, 0x47,
+	0xba, 0x8c, 0x58, 0xe5, 0xec, 0xcc, 0x12, 0x8d, 0x30, 0x12, 0x44, 0x73, 0x53, 0x89, 0x4a, 0x09,
+	0xa2, 0x9f, 0xd2, 0x30, 0x2f, 0x88, 0x0a, 0x99, 0x66, 0x61, 0xda, 0x02, 0x08, 0x98, 0xe9, 0x0b,
+	0xe7, 0xa4, 0xaf, 0xe0, 0x9c, 0xbc, 0xe8, 0xd3, 0x59, 0x08, 0x32, 0xf0, 0x2c, 0x73, 0x06, 0xfb,
+	0xe5, 0x45, 0x9f, 0x9e, 0x34, 0x48, 0x76, 0x82, 0xfb, 0x48, 0xf9, 0x5c, 0x52, 0xf9, 0xb1, 0x35,
+	0xa5, 0xdf, 0xbe, 0xb0, 0x77, 0x60, 0x7e, 0x97, 0x99, 0x6c, 0x10, 0xc4, 0x96, 0xc1, 0x90, 0xf5,
+	0x49, 0x2f, 0x28, 0xa3, 0x6a, 0xa6, 0x9e, 0x37, 0x78, 0x1c, 0x8e, 0xe7, 0xf9, 0xa4, 0xe7, 0x1c,
+	0x96, 0xd3, 0xfc, 0xad, 0x38, 0xd5, 0x4e, 0x11, 0x2c, 0xc4, 0xdd, 0xe2, 0x3b, 0x4c, 0x6a, 0x8a,
+	0xae, 0x43, 0xd3, 0xf4, 0x6c, 0x9a, 0x0a, 0x1f, 0x67, 0xc6, 0x3e, 0xbe, 0x92, 0xca, 0x6b, 0xef,
+	0x11, 0x14, 0x12, 0xae, 0xc1, 0xab, 0x90, 0xdd, 0x6d, 0xeb, 0xed, 0x52, 0x4a, 0x5e, 0x3c, 0x3a,
+	0xae, 0xfe, 0x9d, 0x48, 0x85, 0x12, 0xe0, 0x0a, 0xe4, 0xf6, 0x8c, 0xad, 0xf6, 0xbd, 0x12, 0x92,
+	0x97, 0x8e, 0x8e, 0xab, 0xa5, 0x44, 0x9e, 0x87, 0xf8, 0x7f, 0x90, 0x5a, 0x3b, 0xdb, 0xdb, 0x5b,
+	0xed, 0x52, 0x5a, 0xfe, 0xf7, 0xe8, 0xb8, 0xfa, 0x4f, 0xa2, 0xa2, 0xc5, 0x17, 0x11, 0xae, 0x43,
+	0x4e, 0x6f, 0xee, 0x18, 0xed, 0xd2, 0x8f, 0xf8, 0xef, 0x32, 0x98, 0xde, 0xa1, 0x3e, 0x93, 0x17,
+	0x5f, 0xbd, 0x55, 0x52, 0x1f, 0xdf, 0x29, 0xc9, 0x09, 0x1b, 0x6f, 0xd2, 0xf0, 0x57, 0x2b, 0xfa,
+	0xbd, 0xc0, 0x1b, 0x90, 0x0d, 0xf7, 0x30, 0xbe, 0x78, 0x0f, 0x12, 0x8b, 0x5f, 0x5e, 0x9e, 0x9a,
+	0x13, 0x1f, 0x52, 0x87, 0x6c, 0xb8, 0x87, 0x2e, 0x01, 0x24, 0x76, 0xe4, 0x25, 0x80, 0xe4, 0xe2,
+	0x5a, 0x47, 0x78, 0x13, 0xa4, 0xc8, 0x1d, 0x78, 0xe5, 0x42, 0xe1, 0x84, 0xe5, 0xe4, 0xd5, 0x5f,
+	0x64, 0x47, 0x40, 0xf7, 0x21, 0x17, 0x69, 0xb8, 0x3c, 0xed, 0x56, 0xc7, 0x30, 0x2b, 0xd3, 0x93,
+	0x11, 0x4a, 0x1d, 0xad, 0xa3, 0x66, 0xf9, 0xe4, 0x5c, 0x49, 0x7d, 0x39, 0x57, 0x52, 0x2f, 0x86,
+	0x0a, 0x3a, 0x19, 0x2a, 0xe8, 0xf3, 0x50, 0x41, 0xdf, 0x86, 0x0a, 0xea, 0x48, 0xdc, 0x55, 0xb7,
+	0x7e, 0x06, 0x00, 0x00, 0xff, 0xff, 0x8d, 0x7a, 0xfb, 0xa8, 0xa2, 0x07, 0x00, 0x00,
 }

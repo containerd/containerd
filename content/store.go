@@ -2,10 +2,12 @@ package content
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -165,9 +167,26 @@ func (s *Store) status(ingestPath string) (Status, error) {
 	return Status{
 		Ref:       ref,
 		Offset:    fi.Size(),
+		Total:     s.total(ingestPath),
 		UpdatedAt: fi.ModTime(),
 		StartedAt: startedAt,
 	}, nil
+}
+
+// total attempts to resolve the total expected size for the write.
+func (s *Store) total(ingestPath string) int64 {
+	totalS, err := readFileString(filepath.Join(ingestPath, "total"))
+	if err != nil {
+		return 0
+	}
+
+	total, err := strconv.ParseInt(totalS, 10, 64)
+	if err != nil {
+		// represents a corrupted file, should probably remove.
+		return 0
+	}
+
+	return total
 }
 
 // Writer begins or resumes the active writer identified by ref. If the writer
@@ -175,7 +194,7 @@ func (s *Store) status(ingestPath string) (Status, error) {
 // ref at a time.
 //
 // The argument `ref` is used to uniquely identify a long-lived writer transaction.
-func (s *Store) Writer(ctx context.Context, ref string) (Writer, error) {
+func (s *Store) Writer(ctx context.Context, ref string, total int64, expected digest.Digest) (Writer, error) {
 	path, refp, data, lock, err := s.ingestPaths(ref)
 	if err != nil {
 		return nil, err
@@ -202,16 +221,19 @@ func (s *Store) Writer(ctx context.Context, ref string) (Writer, error) {
 			return nil, err
 		}
 
-		// validate that we have no collision for the ref.
-		refraw, err := readFileString(refp)
+		status, err := s.status(path)
 		if err != nil {
-			return nil, errors.Wrap(err, "could not read ref")
+			return nil, errors.Wrap(err, "failed reading status of resume write")
 		}
 
-		if ref != refraw {
+		if ref != status.Ref {
 			// NOTE(stevvooe): This is fairly catastrophic. Either we have some
 			// layout corruption or a hash collision for the ref key.
-			return nil, errors.Wrapf(err, "ref key does not match: %v != %v", ref, refraw)
+			return nil, errors.Wrapf(err, "ref key does not match: %v != %v", ref, status.Ref)
+		}
+
+		if total > 0 && status.Total > 0 && total != status.Total {
+			return nil, errors.Errorf("provided total differs from status: %v != %v", total, status.Total)
 		}
 
 		// slow slow slow!!, send to goroutine or use resumable hashes
@@ -229,23 +251,20 @@ func (s *Store) Writer(ctx context.Context, ref string) (Writer, error) {
 			return nil, err
 		}
 
-		fi, err := os.Stat(data)
-		if err != nil {
-			return nil, err
-		}
-
-		updatedAt = fi.ModTime()
-
-		if st, ok := fi.Sys().(*syscall.Stat_t); ok {
-			startedAt = time.Unix(st.Ctim.Sec, st.Ctim.Nsec)
-		} else {
-			startedAt = updatedAt
-		}
+		updatedAt = status.UpdatedAt
+		startedAt = status.StartedAt
+		total = status.Total
 	} else {
 		// the ingest is new, we need to setup the target location.
 		// write the ref to a file for later use
 		if err := ioutil.WriteFile(refp, []byte(ref), 0666); err != nil {
 			return nil, err
+		}
+
+		if total > 0 {
+			if err := ioutil.WriteFile(filepath.Join(path, "total"), []byte(fmt.Sprint(total)), 0666); err != nil {
+				return nil, err
+			}
 		}
 
 		startedAt = time.Now()
@@ -264,6 +283,7 @@ func (s *Store) Writer(ctx context.Context, ref string) (Writer, error) {
 		ref:       ref,
 		path:      path,
 		offset:    offset,
+		total:     total,
 		digester:  digester,
 		startedAt: startedAt,
 		updatedAt: updatedAt,

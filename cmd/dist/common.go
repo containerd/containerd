@@ -11,7 +11,7 @@ import (
 )
 
 func resolveContentStore(context *cli.Context) (*content.Store, error) {
-	root := context.GlobalString("root")
+	root := filepath.Join(context.GlobalString("root"), "content")
 	if !filepath.IsAbs(root) {
 		var err error
 		root, err = filepath.Abs(root)

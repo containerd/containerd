@@ -38,9 +38,11 @@ distribution tool
 			EnvVar: "CONTAINERD_FETCH_TIMEOUT",
 		},
 		cli.StringFlag{
+			// TODO(stevvooe): for now, we allow circumventing the GRPC. Once
+			// we have clear separation, this will likely go away.
 			Name:  "root",
 			Usage: "path to content store root",
-			Value: "/tmp/content", // TODO(stevvooe): for now, just use the PWD/.content
+			Value: "/var/lib/containerd",
 		},
 		cli.StringFlag{
 			Name:  "socket, s",

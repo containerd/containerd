@@ -4,6 +4,9 @@ import (
 	"context"
 	"io"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+
 	contentapi "github.com/docker/containerd/api/services/content"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -83,10 +86,10 @@ type remoteIngester struct {
 	client contentapi.ContentClient
 }
 
-func (ri *remoteIngester) Writer(ctx context.Context, ref string) (Writer, error) {
-	wrclient, offset, err := ri.negotiate(ctx, ref)
+func (ri *remoteIngester) Writer(ctx context.Context, ref string, size int64, expected digest.Digest) (Writer, error) {
+	wrclient, offset, err := ri.negotiate(ctx, ref, size, expected)
 	if err != nil {
-		return nil, err
+		return nil, rewriteGRPCError(err)
 	}
 
 	return &remoteWriter{
@@ -95,15 +98,17 @@ func (ri *remoteIngester) Writer(ctx context.Context, ref string) (Writer, error
 	}, nil
 }
 
-func (ri *remoteIngester) negotiate(ctx context.Context, ref string) (contentapi.Content_WriteClient, int64, error) {
+func (ri *remoteIngester) negotiate(ctx context.Context, ref string, size int64, expected digest.Digest) (contentapi.Content_WriteClient, int64, error) {
 	wrclient, err := ri.client.Write(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	if err := wrclient.Send(&contentapi.WriteRequest{
-		Action: contentapi.WriteActionStat,
-		Ref:    ref,
+		Action:   contentapi.WriteActionStat,
+		Ref:      ref,
+		Total:    size,
+		Expected: expected,
 	}); err != nil {
 		return nil, 0, err
 	}
@@ -192,12 +197,12 @@ func (rw *remoteWriter) Write(p []byte) (n int, err error) {
 
 func (rw *remoteWriter) Commit(size int64, expected digest.Digest) error {
 	resp, err := rw.send(&contentapi.WriteRequest{
-		Action:         contentapi.WriteActionCommit,
-		ExpectedSize:   size,
-		ExpectedDigest: expected,
+		Action:   contentapi.WriteActionCommit,
+		Total:    size,
+		Expected: expected,
 	})
 	if err != nil {
-		return err
+		return rewriteGRPCError(err)
 	}
 
 	if size != 0 && resp.Offset != size {
@@ -205,7 +210,7 @@ func (rw *remoteWriter) Commit(size int64, expected digest.Digest) error {
 	}
 
 	if expected != "" && resp.Digest != expected {
-		return errors.New("unexpected digest")
+		return errors.Errorf("unexpected digest: %v != %v", resp.Digest, expected)
 	}
 
 	return nil
@@ -213,4 +218,15 @@ func (rw *remoteWriter) Commit(size int64, expected digest.Digest) error {
 
 func (rw *remoteWriter) Close() error {
 	return rw.client.CloseSend()
+}
+
+func rewriteGRPCError(err error) error {
+	switch grpc.Code(errors.Cause(err)) {
+	case codes.AlreadyExists:
+		return errExists
+	case codes.NotFound:
+		return errNotFound
+	}
+
+	return err
 }
