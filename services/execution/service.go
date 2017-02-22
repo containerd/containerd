@@ -133,6 +133,8 @@ func (s *Service) Delete(ctx context.Context, r *api.DeleteRequest) (*google_pro
 
 func (s *Service) List(ctx context.Context, r *api.ListRequest) (*api.ListResponse, error) {
 	resp := &api.ListResponse{}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for _, c := range s.containers {
 		state, err := c.State(ctx)
 		if err != nil {

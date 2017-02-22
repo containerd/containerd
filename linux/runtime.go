@@ -31,12 +31,13 @@ func init() {
 }
 
 func New(ic *containerd.InitContext) (interface{}, error) {
-	if err := os.MkdirAll(ic.State, 0700); err != nil {
+	path := filepath.Join(ic.State, runtimeName)
+	if err := os.MkdirAll(path, 0700); err != nil {
 		return nil, err
 	}
 	c, cancel := context.WithCancel(ic.Context)
 	return &Runtime{
-		root:          ic.State,
+		root:          path,
 		events:        make(chan *containerd.Event, 2048),
 		eventsContext: c,
 		eventsCancel:  cancel,

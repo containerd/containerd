@@ -46,13 +46,13 @@ var register = struct {
 	r: make(map[string]*Registration),
 }
 
-// Load loads all plugins at the provided that into containerd
+// Load loads all plugins at the provided path into containerd
 func Load(path string) (err error) {
 	defer func() {
 		if v := recover(); v != nil {
 			rerr, ok := v.(error)
 			if !ok {
-				panic(v)
+				rerr = fmt.Errorf("%s", v)
 			}
 			err = rerr
 		}
