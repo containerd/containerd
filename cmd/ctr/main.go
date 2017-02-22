@@ -9,6 +9,12 @@ import (
 	"github.com/urfave/cli"
 )
 
+func init() {
+	cli.VersionPrinter = func(c *cli.Context) {
+		fmt.Println(c.App.Name, containerd.Package, c.App.Version)
+	}
+}
+
 func main() {
 	app := cli.NewApp()
 	app.Name = "ctr"
