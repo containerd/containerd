@@ -18,9 +18,6 @@ SNAPSHOT_PACKAGES=$(shell go list ./snapshot/...)
 COMMANDS=ctr containerd containerd-shim protoc-gen-gogoctrd dist ctrd-protobuild
 BINARIES=$(addprefix bin/,$(COMMANDS))
 
-# TODO(stevvooe): This will set version from git tag, but overrides major,
-# minor, patch in the actual file. We'll have to resolve this before release
-# time.
 GO_LDFLAGS=-ldflags "-X $(PKG).Version=$(VERSION) -X $(PKG).Package=$(PKG)"
 
 # Flags passed to `go test`
