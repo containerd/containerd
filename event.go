@@ -39,32 +39,3 @@ type Event struct {
 	Pid        uint32
 	ExitStatus uint32
 }
-
-type EventWriter interface {
-	Write(*Event) error
-}
-
-type EventFilter func(*Event) bool
-
-// NewFilterEventWriter returns an EventWriter that runs the provided filters on the events.
-// If all the filters pass then the event is written to the wrapped EventWriter
-func NewFilterEventWriter(w EventWriter, filters ...EventFilter) EventWriter {
-	return &filteredEventWriter{
-		w:       w,
-		filters: filters,
-	}
-}
-
-type filteredEventWriter struct {
-	w       EventWriter
-	filters []EventFilter
-}
-
-func (f *filteredEventWriter) Write(e *Event) error {
-	for _, filter := range f.filters {
-		if !filter(e) {
-			return nil
-		}
-	}
-	return f.w.Write(e)
-}

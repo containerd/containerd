@@ -16,12 +16,9 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd"
-	contentapi "github.com/docker/containerd/api/services/content"
 	api "github.com/docker/containerd/api/services/execution"
 	"github.com/docker/containerd/content"
-	_ "github.com/docker/containerd/linux"
 	"github.com/docker/containerd/log"
-	"github.com/docker/containerd/services/execution"
 	"github.com/docker/containerd/utils"
 	metrics "github.com/docker/go-metrics"
 	"github.com/pkg/errors"
@@ -66,6 +63,10 @@ func main() {
 			Name:  "socket,s",
 			Usage: "socket path for containerd's GRPC server",
 		},
+		cli.StringFlag{
+			Name:  "root",
+			Usage: "containerd root directory",
+		},
 	}
 	app.Before = before
 	app.Action = func(context *cli.Context) error {
@@ -74,37 +75,41 @@ func main() {
 		// we don't miss any signals during boot
 		signals := make(chan os.Signal, 2048)
 		signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1)
-
 		log.G(global).Info("starting containerd boot...")
-		runtimes, err := loadRuntimes()
-		if err != nil {
-			return err
-		}
-		supervisor, err := containerd.NewSupervisor(log.WithModule(global, "execution"), runtimes)
-		if err != nil {
+
+		// load all plugins into containerd
+		if err := containerd.Load(filepath.Join(conf.Root, "plugins")); err != nil {
 			return err
 		}
 		// start debug and metrics APIs
 		if err := serveDebugAPI(); err != nil {
 			return err
 		}
-		serveMetricsAPI()
-
-		contentStore, err := resolveContentStore()
+		runtimes, err := loadRuntimes()
 		if err != nil {
 			return err
 		}
-
+		store, err := resolveContentStore()
+		if err != nil {
+			return err
+		}
+		services, err := loadServices(runtimes, store)
+		if err != nil {
+			return err
+		}
 		// start the GRPC api with the execution service registered
 		server := newGRPCServer()
-
-		api.RegisterContainerServiceServer(server, execution.New(supervisor))
-		contentapi.RegisterContentServer(server, content.NewService(contentStore))
-
-		// start the GRPC api with registered services
+		for _, service := range services {
+			if err := service.Register(server); err != nil {
+				return err
+			}
+		}
 		if err := serveGRPC(server); err != nil {
 			return err
 		}
+		// start the prometheus metrics API for containerd
+		serveMetricsAPI()
+
 		log.G(global).Infof("containerd successfully booted in %fs", time.Now().Sub(start).Seconds())
 		return handleSignals(signals, server)
 	}
@@ -209,14 +214,28 @@ func resolveContentStore() (*content.Store, error) {
 }
 
 func loadRuntimes() (map[string]containerd.Runtime, error) {
-	o := map[string]containerd.Runtime{}
-	for _, name := range containerd.Runtimes() {
-		r, err := containerd.NewRuntime(name, conf.State)
+	o := make(map[string]containerd.Runtime)
+	for name, rr := range containerd.Registrations() {
+		if rr.Type != containerd.RuntimePlugin {
+			continue
+		}
+		log.G(global).Infof("loading runtime plugin %q...", name)
+		ic := &containerd.InitContext{
+			Root:    conf.Root,
+			State:   conf.State,
+			Context: log.WithModule(global, fmt.Sprintf("runtime-%s", name)),
+		}
+		if rr.Config != nil {
+			if err := conf.decodePlugin(name, rr.Config); err != nil {
+				return nil, err
+			}
+			ic.Config = rr.Config
+		}
+		vr, err := rr.Init(ic)
 		if err != nil {
 			return nil, err
 		}
-		o[name] = r
-		log.G(global).WithField("runtime", name).Info("load runtime")
+		o[name] = vr.(containerd.Runtime)
 	}
 	return o, nil
 }
@@ -224,6 +243,35 @@ func loadRuntimes() (map[string]containerd.Runtime, error) {
 func newGRPCServer() *grpc.Server {
 	s := grpc.NewServer(grpc.UnaryInterceptor(interceptor))
 	return s
+}
+
+func loadServices(runtimes map[string]containerd.Runtime, store *content.Store) ([]containerd.Service, error) {
+	var o []containerd.Service
+	for name, sr := range containerd.Registrations() {
+		if sr.Type != containerd.GRPCPlugin {
+			continue
+		}
+		log.G(global).Infof("loading grpc service plugin %q...", name)
+		ic := &containerd.InitContext{
+			Root:     conf.Root,
+			State:    conf.State,
+			Context:  log.WithModule(global, fmt.Sprintf("service-%s", name)),
+			Runtimes: runtimes,
+			Store:    store,
+		}
+		if sr.Config != nil {
+			if err := conf.decodePlugin(name, sr.Config); err != nil {
+				return nil, err
+			}
+			ic.Config = sr.Config
+		}
+		vs, err := sr.Init(ic)
+		if err != nil {
+			return nil, err
+		}
+		o = append(o, vs.(containerd.Service))
+	}
+	return o, nil
 }
 
 func serveGRPC(server *grpc.Server) error {

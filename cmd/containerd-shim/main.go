@@ -13,7 +13,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd"
 	shimapi "github.com/docker/containerd/api/services/shim"
-	"github.com/docker/containerd/shim"
+	"github.com/docker/containerd/linux/shim"
 	"github.com/docker/containerd/sys"
 	"github.com/docker/containerd/utils"
 	"github.com/urfave/cli"

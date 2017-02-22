@@ -33,8 +33,8 @@ func WriteBlob(ctx context.Context, cs Ingester, r io.Reader, ref string, size i
 		return errors.Errorf("cannot resume already started write")
 	}
 
-	buf := bufPool.Get().([]byte)
-	defer bufPool.Put(buf)
+	buf := BufPool.Get().([]byte)
+	defer BufPool.Put(buf)
 
 	nn, err := io.CopyBuffer(cw, r, buf)
 	if err != nil {
