@@ -1,6 +1,7 @@
 package btrfs
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -34,6 +35,7 @@ func TestBtrfs(t *testing.T) {
 
 func TestBtrfsMounts(t *testing.T) {
 	testutil.RequiresRoot(t)
+	ctx := context.TODO()
 
 	// create temporary directory for mount point
 	mountPoint, err := ioutil.TempDir("", "containerd-btrfs-test")
@@ -56,7 +58,7 @@ func TestBtrfsMounts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mounts, err := b.Prepare(target, "")
+	mounts, err := b.Prepare(ctx, target, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,12 +94,12 @@ func TestBtrfsMounts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := b.Commit(filepath.Join(root, "snapshots/committed"), filepath.Join(root, "test")); err != nil {
+	if err := b.Commit(ctx, filepath.Join(root, "snapshots/committed"), filepath.Join(root, "test")); err != nil {
 		t.Fatal(err)
 	}
 
 	target = filepath.Join(root, "test2")
-	mounts, err = b.Prepare(target, filepath.Join(root, "snapshots/committed"))
+	mounts, err = b.Prepare(ctx, target, filepath.Join(root, "snapshots/committed"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +118,7 @@ func TestBtrfsMounts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := b.Commit(filepath.Join(root, "snapshots/committed2"), target); err != nil {
+	if err := b.Commit(ctx, filepath.Join(root, "snapshots/committed2"), target); err != nil {
 		t.Fatal(err)
 	}
 }

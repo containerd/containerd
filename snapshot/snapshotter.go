@@ -1,6 +1,7 @@
 package snapshot
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -148,14 +149,14 @@ type Snapshotter interface {
 	//
 	// Should be used for parent resolution, existence checks and to discern
 	// the kind of snapshot.
-	Stat(key string) (Info, error)
+	Stat(ctx context.Context, key string) (Info, error)
 
 	// Mounts returns the mounts for the active snapshot transaction identified
 	// by key. Can be called on an read-write or readonly transaction. This is
 	// available only for active snapshots.
 	//
 	// This can be used to recover mounts after calling View or Prepare.
-	Mounts(key string) ([]containerd.Mount, error)
+	Mounts(ctx context.Context, key string) ([]containerd.Mount, error)
 
 	// Prepare creates an active snapshot identified by key descending from the
 	// provided parent.  The returned mounts can be used to mount the snapshot
@@ -171,7 +172,7 @@ type Snapshotter interface {
 	// one is done with the transaction, Remove should be called on the key.
 	//
 	// Multiple calls to Prepare or View with the same key should fail.
-	Prepare(key, parent string) ([]containerd.Mount, error)
+	Prepare(ctx context.Context, key, parent string) ([]containerd.Mount, error)
 
 	// View behaves identically to Prepare except the result may not be
 	// committed back to the snapshot snapshotter. View returns a readonly view on
@@ -186,7 +187,7 @@ type Snapshotter interface {
 	// Commit may not be called on the provided key and will return an error.
 	// To collect the resources associated with key, Remove must be called with
 	// key as the argument.
-	View(key, parent string) ([]containerd.Mount, error)
+	View(ctx context.Context, key, parent string) ([]containerd.Mount, error)
 
 	// Commit captures the changes between key and its parent into a snapshot
 	// identified by name.  The name can then be used with the snapshotter's other
@@ -198,7 +199,7 @@ type Snapshotter interface {
 	// Commit may be called multiple times on the same key. Snapshots created
 	// in this manner will all reference the parent used to start the
 	// transaction.
-	Commit(name, key string) error
+	Commit(ctx context.Context, name, key string) error
 
 	// Remove the committed or active snapshot by the provided key.
 	//
@@ -206,11 +207,11 @@ type Snapshotter interface {
 	//
 	// If the snapshot is a parent of another snapshot, its children must be
 	// removed before proceeding.
-	Remove(key string) error
+	Remove(ctx context.Context, key string) error
 
 	// Walk the committed snapshots. For each snapshot in the snapshotter, the
 	// function will be called.
-	Walk(fn func(Info) error) error
+	Walk(ctx context.Context, fn func(context.Context, Info) error) error
 }
 
 // SnapshotterSuite runs a test suite on the snapshotter given a factory function.
@@ -255,12 +256,13 @@ func makeTest(t *testing.T, name string, snapshotterFn func(root string) (Snapsh
 
 // checkSnapshotterBasic tests the basic workflow of a snapshot snapshotter.
 func checkSnapshotterBasic(t *testing.T, snapshotter Snapshotter, work string) {
+	ctx := context.TODO()
 	preparing := filepath.Join(work, "preparing")
 	if err := os.MkdirAll(preparing, 0777); err != nil {
 		t.Fatal(err)
 	}
 
-	mounts, err := snapshotter.Prepare(preparing, "")
+	mounts, err := snapshotter.Prepare(ctx, preparing, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,11 +285,11 @@ func checkSnapshotterBasic(t *testing.T, snapshotter Snapshotter, work string) {
 	}
 
 	committed := filepath.Join(work, "committed")
-	if err := snapshotter.Commit(committed, preparing); err != nil {
+	if err := snapshotter.Commit(ctx, committed, preparing); err != nil {
 		t.Fatal(err)
 	}
 
-	si, err := snapshotter.Stat(committed)
+	si, err := snapshotter.Stat(ctx, committed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,7 +301,7 @@ func checkSnapshotterBasic(t *testing.T, snapshotter Snapshotter, work string) {
 		t.Fatal(err)
 	}
 
-	mounts, err = snapshotter.Prepare(next, committed)
+	mounts, err = snapshotter.Prepare(ctx, next, committed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,11 +324,11 @@ func checkSnapshotterBasic(t *testing.T, snapshotter Snapshotter, work string) {
 	}
 
 	nextCommitted := filepath.Join(work, "committed-next")
-	if err := snapshotter.Commit(nextCommitted, next); err != nil {
+	if err := snapshotter.Commit(ctx, nextCommitted, next); err != nil {
 		t.Fatal(err)
 	}
 
-	si2, err := snapshotter.Stat(nextCommitted)
+	si2, err := snapshotter.Stat(ctx, nextCommitted)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,7 +340,7 @@ func checkSnapshotterBasic(t *testing.T, snapshotter Snapshotter, work string) {
 		si2.Name: si2,
 	}
 	walked := map[string]Info{} // walk is not ordered
-	assert.NoError(t, snapshotter.Walk(func(si Info) error {
+	assert.NoError(t, snapshotter.Walk(ctx, func(ctx context.Context, si Info) error {
 		walked[si.Name] = si
 		return nil
 	}))

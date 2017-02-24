@@ -1,6 +1,7 @@
 package btrfs
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"io/ioutil"
@@ -48,7 +49,7 @@ func NewSnapshotter(device, root string) (*Snapshotter, error) {
 //
 // Should be used for parent resolution, existence checks and to discern
 // the kind of snapshot.
-func (b *Snapshotter) Stat(key string) (snapshot.Info, error) {
+func (b *Snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, error) {
 	// resolve the snapshot out of the index.
 	target, err := os.Readlink(filepath.Join(b.root, "index", hash(key)))
 	if err != nil {
@@ -119,11 +120,11 @@ func (b *Snapshotter) stat(target string) (snapshot.Info, error) {
 
 }
 
-func (b *Snapshotter) Prepare(key, parent string) ([]containerd.Mount, error) {
+func (b *Snapshotter) Prepare(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
 	return b.makeActive(key, parent, false)
 }
 
-func (b *Snapshotter) View(key, parent string) ([]containerd.Mount, error) {
+func (b *Snapshotter) View(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
 	return b.makeActive(key, parent, true)
 }
 
@@ -198,7 +199,7 @@ func (b *Snapshotter) mounts(dir string) ([]containerd.Mount, error) {
 	}, nil
 }
 
-func (b *Snapshotter) Commit(name, key string) error {
+func (b *Snapshotter) Commit(ctx context.Context, name, key string) error {
 	var (
 		active        = filepath.Join(b.root, "active")
 		snapshots     = filepath.Join(b.root, "snapshots")
@@ -283,19 +284,19 @@ func (b *Snapshotter) Commit(name, key string) error {
 // called on an read-write or readonly transaction.
 //
 // This can be used to recover mounts after calling View or Prepare.
-func (b *Snapshotter) Mounts(key string) ([]containerd.Mount, error) {
+func (b *Snapshotter) Mounts(ctx context.Context, key string) ([]containerd.Mount, error) {
 	dir := filepath.Join(b.root, "active", hash(key))
 	return b.mounts(dir)
 }
 
 // Remove abandons the transaction identified by key. All resources
 // associated with the key will be removed.
-func (b *Snapshotter) Remove(key string) error {
+func (b *Snapshotter) Remove(ctx context.Context, key string) error {
 	panic("not implemented")
 }
 
 // Walk the committed snapshots.
-func (b *Snapshotter) Walk(fn func(snapshot.Info) error) error {
+func (b *Snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshot.Info) error) error {
 	// TODO(stevvooe): Copy-pasted almost verbatim from overlay. Really need to
 	// unify the metadata for snapshot implementations.
 	root := filepath.Join(b.root, "index")
@@ -325,7 +326,7 @@ func (b *Snapshotter) Walk(fn func(snapshot.Info) error) error {
 			return err
 		}
 
-		if err := fn(si); err != nil {
+		if err := fn(ctx, si); err != nil {
 			return err
 		}
 

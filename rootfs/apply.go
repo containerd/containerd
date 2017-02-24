@@ -30,6 +30,7 @@ type Mounter interface {
 func ApplyLayer(snapshots snapshot.Snapshotter, mounter Mounter, rd io.Reader, parent digest.Digest) (digest.Digest, error) {
 	digester := digest.Canonical.Digester() // used to calculate diffID.
 	rd = io.TeeReader(rd, digester.Hash())
+	ctx := context.TODO()
 
 	// create a temporary directory to work from, needs to be on same
 	// filesystem. Probably better if this shared but we'll use a tempdir, for
@@ -45,13 +46,13 @@ func ApplyLayer(snapshots snapshot.Snapshotter, mounter Mounter, rd io.Reader, p
 	// layerID (since we don't know the diffID until we are done!).
 	key := dir
 
-	mounts, err := snapshots.Prepare(key, parent.String())
+	mounts, err := snapshots.Prepare(ctx, key, parent.String())
 	if err != nil {
 		return "", err
 	}
 
 	if err := mounter.Mount(mounts...); err != nil {
-		if err := snapshots.Remove(key); err != nil {
+		if err := snapshots.Remove(ctx, key); err != nil {
 			log.L.WithError(err).Error("snapshot rollback failed")
 		}
 		return "", err
@@ -74,7 +75,7 @@ func ApplyLayer(snapshots snapshot.Snapshotter, mounter Mounter, rd io.Reader, p
 		chainID = identity.ChainID([]digest.Digest{parent, chainID})
 	}
 
-	return diffID, snapshots.Commit(chainID.String(), key)
+	return diffID, snapshots.Commit(ctx, chainID.String(), key)
 }
 
 // Prepare the root filesystem from the set of layers. Snapshots are created
@@ -96,6 +97,7 @@ func Prepare(snapshots snapshot.Snapshotter, mounter Mounter, layers []ocispec.D
 		parent digest.Digest
 		chain  []digest.Digest
 	)
+	ctx := context.TODO()
 
 	for _, layer := range layers {
 		// TODO: layer.Digest should not be string
@@ -110,7 +112,7 @@ func Prepare(snapshots snapshot.Snapshotter, mounter Mounter, layers []ocispec.D
 			chainLocal := append(chain, diffID)
 			chainID := identity.ChainID(chainLocal)
 
-			if _, err := snapshots.Stat(chainID.String()); err == nil {
+			if _, err := snapshots.Stat(ctx, chainID.String()); err == nil {
 				continue
 			}
 		}
