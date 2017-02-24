@@ -66,7 +66,7 @@ type Info struct {
 //
 // Importing a Layer
 //
-// To import a layer, we simply have the Manager provide a list of
+// To import a layer, we simply have the Snapshotter provide a list of
 // mounts to be applied such that our dst will capture a changeset. We start
 // out by getting a path to the layer tar file and creating a temp location to
 // unpack it to:
@@ -121,7 +121,7 @@ type Info struct {
 // above except that the parent is provided as parent when calling
 // Manager.Prepare, assuming a clean tmpLocation:
 //
-// 	mounts, err := sm.Prepare(tmpLocation, parentDigest)
+// 	mounts, err := snapshotter.Prepare(tmpLocation, parentDigest)
 //
 // We then mount, apply and commit, as we did above. The new snapshot will be
 // based on the content of the previous one.
@@ -132,15 +132,15 @@ type Info struct {
 // snapshot as the parent. After mounting, the prepared path can
 // be used directly as the container's filesystem:
 //
-// 	mounts, err := sm.Prepare(containerKey, imageRootFSChainID)
+// 	mounts, err := snapshotter.Prepare(containerKey, imageRootFSChainID)
 //
 // The returned mounts can then be passed directly to the container runtime. If
 // one would like to create a new image from the filesystem, Manager.Commit is
 // called:
 //
-// 	if err := sm.Commit(newImageSnapshot, containerKey); err != nil { ... }
+// 	if err := snapshotter.Commit(newImageSnapshot, containerKey); err != nil { ... }
 //
-// Alternatively, for most container runs, Manager.Remove will be called to
+// Alternatively, for most container runs, Snapshotter.Remove will be called to
 // signal the Snapshotter to abandon the changes.
 type Snapshotter interface {
 	// Stat returns the info for an active or committed snapshot by name or
