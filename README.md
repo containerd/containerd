@@ -24,7 +24,7 @@ For sync communication we have a community slack with a #containerd channel that
 
 To build the daemon and `ctr` simple test client, the following build system dependencies are required:
 
-* Go 1.7.x or above
+* Go 1.8.x or above (requires 1.8 due to use of golang plugin(s))
 * Protoc 3.x compiler and headers (download at the [Google protobuf releases page](https://github.com/google/protobuf/releases))
 
 For proper results, install the `protoc` release into `/usr/local` on your build system. For example, the following commands will download and install the 3.1.0 release for a 64-bit Linux host:
