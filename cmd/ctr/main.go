@@ -44,6 +44,7 @@ containerd client
 		eventsCommand,
 		deleteCommand,
 		listCommand,
+		infoCommand,
 		shimCommand,
 		pprofCommand,
 	}
