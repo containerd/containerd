@@ -1,4 +1,4 @@
-package main
+package linux
 
 import (
 	"github.com/docker/containerd"
