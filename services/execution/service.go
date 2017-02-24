@@ -131,31 +131,48 @@ func (s *Service) Delete(ctx context.Context, r *api.DeleteRequest) (*google_pro
 	return empty, nil
 }
 
+func containerFromContainerd(ctx context.Context, c containerd.Container) (*container.Container, error) {
+	state, err := c.State(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var status container.Status
+	switch state.Status() {
+	case containerd.CreatedStatus:
+		status = container.Status_CREATED
+	case containerd.RunningStatus:
+		status = container.Status_RUNNING
+	case containerd.StoppedStatus:
+		status = container.Status_STOPPED
+	case containerd.PausedStatus:
+		status = container.Status_PAUSED
+	}
+	return &container.Container{
+		ID:     c.Info().ID,
+		Pid:    state.Pid(),
+		Status: status,
+	}, nil
+}
+
+func (s *Service) Info(ctx context.Context, r *api.InfoRequest) (*container.Container, error) {
+	c, err := s.getContainer(r.ID)
+	if err != nil {
+		return nil, err
+	}
+	return containerFromContainerd(ctx, c)
+}
+
 func (s *Service) List(ctx context.Context, r *api.ListRequest) (*api.ListResponse, error) {
 	resp := &api.ListResponse{}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for _, c := range s.containers {
-		state, err := c.State(ctx)
+	for _, cd := range s.containers {
+		c, err := containerFromContainerd(ctx, cd)
 		if err != nil {
 			return nil, err
 		}
-		var status container.Status
-		switch state.Status() {
-		case containerd.CreatedStatus:
-			status = container.Status_CREATED
-		case containerd.RunningStatus:
-			status = container.Status_RUNNING
-		case containerd.StoppedStatus:
-			status = container.Status_STOPPED
-		case containerd.PausedStatus:
-			status = container.Status_PAUSED
-		}
-		resp.Containers = append(resp.Containers, &container.Container{
-			ID:     c.Info().ID,
-			Pid:    state.Pid(),
-			Status: status,
-		})
+		resp.Containers = append(resp.Containers, c)
 	}
 	return resp, nil
 }
