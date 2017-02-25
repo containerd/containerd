@@ -26,6 +26,7 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, size i
 
 		return nil // all ready present
 	}
+	defer cw.Close()
 
 	ws, err := cw.Status()
 	if err != nil {
