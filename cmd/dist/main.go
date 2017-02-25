@@ -14,10 +14,14 @@ var (
 	background = contextpkg.Background()
 )
 
-func main() {
+func init() {
 	cli.VersionPrinter = func(c *cli.Context) {
-		fmt.Println(os.Args[0], containerd.Package, containerd.Version)
+		fmt.Println(c.App.Name, containerd.Package, c.App.Version)
 	}
+
+}
+
+func main() {
 	app := cli.NewApp()
 	app.Name = "dist"
 	app.Version = containerd.Version
