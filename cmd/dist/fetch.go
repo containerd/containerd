@@ -139,11 +139,11 @@ func getResolver(ctx contextpkg.Context) (remotes.Resolver, error) {
 			}
 
 			for _, path := range paths {
-				base.Path = path
-				url := base.String()
+				url := base
+				url.Path = path
 				log.G(ctx).WithField("url", url).Debug("fetch content")
 
-				req, err := http.NewRequest(http.MethodGet, url, nil)
+				req, err := http.NewRequest(http.MethodGet, url.String(), nil)
 				if err != nil {
 					return nil, err
 				}
