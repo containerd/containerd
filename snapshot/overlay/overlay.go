@@ -206,7 +206,7 @@ func (o *Snapshotter) newActiveDir(key string, readonly bool) (*activeDir, error
 			}
 		}
 	} else {
-		if err := os.MkdirAll(path, 0700); err != nil {
+		if err := os.MkdirAll(filepath.Join(path, "fs"), 0700); err != nil {
 			a.delete()
 			return nil, err
 		}
@@ -309,13 +309,21 @@ func (a *activeDir) mounts(c *cache) ([]containerd.Mount, error) {
 	}
 	if len(parents) == 0 {
 		// if we only have one layer/no parents then just return a bind mount as overlay
-		// will not work, readonly always has parent
+		// will not work
+		roFlag := "rw"
+		if _, err := os.Stat(filepath.Join(a.path, "work")); err != nil {
+			if !os.IsNotExist(err) {
+				return nil, err
+			}
+			roFlag = "ro"
+		}
+
 		return []containerd.Mount{
 			{
 				Source: filepath.Join(a.path, "fs"),
 				Type:   "bind",
 				Options: []string{
-					"rw",
+					roFlag,
 					"rbind",
 				},
 			},
@@ -323,7 +331,7 @@ func (a *activeDir) mounts(c *cache) ([]containerd.Mount, error) {
 	}
 	var options []string
 
-	if _, err := os.Stat(filepath.Join(a.path, "fs")); err == nil {
+	if _, err := os.Stat(filepath.Join(a.path, "work")); err == nil {
 		options = append(options,
 			fmt.Sprintf("workdir=%s", filepath.Join(a.path, "work")),
 			fmt.Sprintf("upperdir=%s", filepath.Join(a.path, "fs")),
