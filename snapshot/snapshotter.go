@@ -217,6 +217,8 @@ type Snapshotter interface {
 // SnapshotterSuite runs a test suite on the snapshotter given a factory function.
 func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(root string) (Snapshotter, func(), error)) {
 	t.Run("Basic", makeTest(t, name, snapshotterFn, checkSnapshotterBasic))
+	t.Run("StatActive", makeTest(t, name, snapshotterFn, checkSnapshotterStatActive))
+	t.Run("StatComitted", makeTest(t, name, snapshotterFn, checkSnapshotterStatCommitted))
 }
 
 func makeTest(t *testing.T, name string, snapshotterFn func(root string) (Snapshotter, func(), error), fn func(t *testing.T, snapshotter Snapshotter, work string)) func(t *testing.T) {
