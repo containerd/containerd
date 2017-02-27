@@ -233,7 +233,7 @@ func makeTest(t *testing.T, name string, snapshotterFn func(root string) (Snapsh
 		defer os.RemoveAll(tmpDir)
 
 		root := filepath.Join(tmpDir, "root")
-		if err := os.MkdirAll(root, 0777); err != nil {
+		if err = os.MkdirAll(root, 0777); err != nil {
 			t.Fatal(err)
 		}
 
@@ -269,21 +269,21 @@ func checkSnapshotterBasic(t *testing.T, snapshotter Snapshotter, work string) {
 		t.Fatal("expected mounts to have entries")
 	}
 
-	if err := containerd.MountAll(mounts, preparing); err != nil {
+	if err = containerd.MountAll(mounts, preparing); err != nil {
 		t.Fatal(err)
 	}
 	defer testutil.Unmount(t, preparing)
 
-	if err := ioutil.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0777); err != nil {
+	if err = ioutil.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0777); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := os.MkdirAll(filepath.Join(preparing, "a", "b", "c"), 0755); err != nil {
+	if err = os.MkdirAll(filepath.Join(preparing, "a", "b", "c"), 0755); err != nil {
 		t.Fatal(err)
 	}
 
 	committed := filepath.Join(work, "committed")
-	if err := snapshotter.Commit(committed, preparing); err != nil {
+	if err = snapshotter.Commit(committed, preparing); err != nil {
 		t.Fatal(err)
 	}
 
@@ -295,7 +295,7 @@ func checkSnapshotterBasic(t *testing.T, snapshotter Snapshotter, work string) {
 	assert.Equal(t, si.Parent, "")
 
 	next := filepath.Join(work, "nextlayer")
-	if err := os.MkdirAll(next, 0777); err != nil {
+	if err = os.MkdirAll(next, 0777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -303,26 +303,26 @@ func checkSnapshotterBasic(t *testing.T, snapshotter Snapshotter, work string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := containerd.MountAll(mounts, next); err != nil {
+	if err = containerd.MountAll(mounts, next); err != nil {
 		t.Fatal(err)
 	}
 	defer testutil.Unmount(t, next)
 
-	if err := ioutil.WriteFile(filepath.Join(next, "bar"), []byte("bar\n"), 0777); err != nil {
+	if err = ioutil.WriteFile(filepath.Join(next, "bar"), []byte("bar\n"), 0777); err != nil {
 		t.Fatal(err)
 	}
 
 	// also, change content of foo to bar
-	if err := ioutil.WriteFile(filepath.Join(next, "foo"), []byte("bar\n"), 0777); err != nil {
+	if err = ioutil.WriteFile(filepath.Join(next, "foo"), []byte("bar\n"), 0777); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := os.RemoveAll(filepath.Join(next, "a", "b")); err != nil {
+	if err = os.RemoveAll(filepath.Join(next, "a", "b")); err != nil {
 		t.Log(err)
 	}
 
 	nextCommitted := filepath.Join(work, "committed-next")
-	if err := snapshotter.Commit(nextCommitted, next); err != nil {
+	if err = snapshotter.Commit(nextCommitted, next); err != nil {
 		t.Fatal(err)
 	}
 

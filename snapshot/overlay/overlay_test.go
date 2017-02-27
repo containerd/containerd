@@ -104,7 +104,7 @@ func TestOverlayOverlayMount(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if err := o.Commit("base", key); err != nil {
+	if err = o.Commit("base", key); err != nil {
 		t.Error(err)
 		return
 	}
@@ -159,11 +159,11 @@ func TestOverlayOverlayRead(t *testing.T) {
 		return
 	}
 	m := mounts[0]
-	if err := ioutil.WriteFile(filepath.Join(m.Source, "foo"), []byte("hi"), 0660); err != nil {
+	if err = ioutil.WriteFile(filepath.Join(m.Source, "foo"), []byte("hi"), 0660); err != nil {
 		t.Error(err)
 		return
 	}
-	if err := o.Commit("base", key); err != nil {
+	if err = o.Commit("base", key); err != nil {
 		t.Error(err)
 		return
 	}
@@ -172,11 +172,11 @@ func TestOverlayOverlayRead(t *testing.T) {
 		return
 	}
 	dest := filepath.Join(root, "dest")
-	if err := os.Mkdir(dest, 0700); err != nil {
+	if err = os.Mkdir(dest, 0700); err != nil {
 		t.Error(err)
 		return
 	}
-	if err := containerd.MountAll(mounts, dest); err != nil {
+	if err = containerd.MountAll(mounts, dest); err != nil {
 		t.Error(err)
 		return
 	}
