@@ -84,7 +84,7 @@ func ApplyLayer(snapshots snapshot.Snapshotter, mounter Mounter, rd io.Reader, p
 //
 // If successful, the chainID for the top-level layer is returned. That
 // identifier can be used to check out a snapshot.
-func Prepare(snapshots snapshot.Snapshotter, mounter Mounter, layers []ocispec.Descriptor,
+func Prepare(ctx context.Context, snapshots snapshot.Snapshotter, mounter Mounter, layers []ocispec.Descriptor,
 	// TODO(stevvooe): The following functions are candidate for internal
 	// object functions. We can use these to formulate the beginnings of a
 	// rootfs Controller.
@@ -97,7 +97,6 @@ func Prepare(snapshots snapshot.Snapshotter, mounter Mounter, layers []ocispec.D
 		parent digest.Digest
 		chain  []digest.Digest
 	)
-	ctx := context.TODO()
 
 	for _, layer := range layers {
 		// TODO: layer.Digest should not be string
