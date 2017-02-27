@@ -27,7 +27,7 @@ func TestSnapshotNaiveBasic(t *testing.T) {
 	}
 
 	preparing := filepath.Join(tmpDir, "preparing")
-	if err := os.MkdirAll(preparing, 0777); err != nil {
+	if err = os.MkdirAll(preparing, 0777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -36,11 +36,11 @@ func TestSnapshotNaiveBasic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := containerd.MountAll(mounts, preparing); err != nil {
+	if err = containerd.MountAll(mounts, preparing); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := ioutil.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0777); err != nil {
+	if err = ioutil.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -50,7 +50,7 @@ func TestSnapshotNaiveBasic(t *testing.T) {
 
 	committed := filepath.Join(n.root, "committed")
 
-	if err := n.Commit(committed, preparing); err != nil {
+	if err = n.Commit(committed, preparing); err != nil {
 		t.Fatal(err)
 	}
 
@@ -59,7 +59,7 @@ func TestSnapshotNaiveBasic(t *testing.T) {
 	}
 
 	next := filepath.Join(tmpDir, "nextlayer")
-	if err := os.MkdirAll(next, 0777); err != nil {
+	if err = os.MkdirAll(next, 0777); err != nil {
 		t.Fatal(err)
 	}
 

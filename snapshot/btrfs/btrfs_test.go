@@ -73,26 +73,26 @@ func TestBtrfsMounts(t *testing.T) {
 		}
 	}
 
-	if err := os.MkdirAll(target, 0755); err != nil {
+	if err = os.MkdirAll(target, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := containerd.MountAll(mounts, target); err != nil {
+	if err = containerd.MountAll(mounts, target); err != nil {
 		t.Fatal(err)
 	}
 	defer testutil.Unmount(t, target)
 
 	// write in some data
-	if err := ioutil.WriteFile(filepath.Join(target, "foo"), []byte("content"), 0777); err != nil {
+	if err = ioutil.WriteFile(filepath.Join(target, "foo"), []byte("content"), 0777); err != nil {
 		t.Fatal(err)
 	}
 
 	// TODO(stevvooe): We don't really make this with the driver, but that
 	// might prove annoying in practice.
-	if err := os.MkdirAll(filepath.Join(root, "snapshots"), 0755); err != nil {
+	if err = os.MkdirAll(filepath.Join(root, "snapshots"), 0755); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := b.Commit(filepath.Join(root, "snapshots/committed"), filepath.Join(root, "test")); err != nil {
+	if err = b.Commit(filepath.Join(root, "snapshots/committed"), filepath.Join(root, "test")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -140,7 +140,7 @@ func setupBtrfsLoopbackDevice(t *testing.T, mountPoint string) *testDevice {
 	t.Log("Temporary file created", file.Name())
 
 	// initialize file with 100 MiB
-	if err := file.Truncate(100 << 20); err != nil {
+	if err = file.Truncate(100 << 20); err != nil {
 		t.Fatal(err)
 	}
 	file.Close()
