@@ -21,7 +21,7 @@ minimal API simplifies behavior without sacrificing power. This makes the
 surface area for driver implementations smaller, ensuring that behavior is more
 consistent between implementations.
 
-These differ from the concept of the graphdriver in that the _Snapshot Manager_
+These differ from the concept of the graphdriver in that the _Snapshotter_
 has no knowledge of images or containers. Users simply prepare and commit
 directories. We also avoid the integration between graph drivers and the tar
 format used to represent the changesets.
@@ -35,7 +35,7 @@ In the past, the `graphdriver` component has provided quite a lot of
 functionality in Docker. This includes serialization, hashing, unpacking,
 packing, mounting.
 
-The _Snapshot Manager_ will only provide mount-oriented snapshot
+The _Snapshotter_ will only provide mount-oriented snapshot
 access with minimal metadata. Serialization, hashing, unpacking, packing and
 mounting are not included in this design, opting for common implementations
 between graphdrivers, rather than specialized ones. This is less of a problem
@@ -44,102 +44,106 @@ interface.
 
 ## Architecture
 
-The _Snapshot Manager_ provides an API for allocating, snapshotting and mounting
+The _Snapshotter_ provides an API for allocating, snapshotting and mounting
 abstract, layer-based filesystems. The model works by building up sets of
 directories with parent-child relationships, known as _Snapshots_.
 
-Every snapshot is represented by an opaque `diff` directory, which acts as a
-handle to the snapshot. It may contain driver specific data, including changeset
-data, parent information and arbitrary metadata.
+A _Snapshot_ represents a filesystem state.  Every snapshot has a parent,
+where the empty parent is represented by the empty string.  A diff can be taken
+between a parent and its snapshot to create a classic layer.
 
-The `diff` directory for a _snapshot_ is created with a transactional
-operation. Each _snapshot_ may have one parent snapshot. When one starts a
-transaction on an existing snapshot, the result may only be used as a parent
-_after_ being committed.  The empty string `diff` directory is a handle to the
-empty snapshot, which is the ancestor of all snapshots.
+Snapshots are best understood by their lifecycle.  _Active_ snapshots are always
+created with `Prepare` or `View` from a _Committed_ snapshot (including the
+empty snapshot).  _Committed_ snapshots are always created with
+`Commit` from an _Active_ snapshot.  Active snapshots never become committed
+snapshots and vice versa. All snapshots may be removed.
 
-The `target` directory represents the active snapshot location. The driver may
-maintain internal metadata associated with the `target` but the contents is
-generally manipulated by the client.
+After mounting an _Active_ snapshot, changes can be made to the snapshot.  The
+act of committing creates a _Committed_ snapshot.  The committed snapshot will
+inherit the parent of the active snapshot.  The committed snapshot can then be
+used as a parent.  Active snapshots can never be used as a parent.
+
+The following diagram demonstrates the relationships of snapshots:
+
+![snapshot model diagram, showing active snapshots on the left and
+committed snapshots on the right](snapshot_model.png)
+
+In this diagram, you can see that the active snapshot _a_ is created by calling
+`Prepare` with the committed snapshot _P<sub>0</sub>_.  After modification, _a_
+becomes _a'_ and a committed snapshot _P<sub>1</sub>_ is created by calling
+`Commit`.  _a'_ can be further modified as _a''_ and a second committed snapshot
+can be created as _P<sub>2</sub>_ by calling `Commit` again.  Note here that
+_P<sub>2</sub>_'s parent is _P<sub>0</sub>_ and not _P<sub>1</sub>_.
 
 ### Operations
 
-The manifestation of _snapshots_ is facilitated by the _mount_ object and
+The manifestation of _snapshots_ is facilitated by the `Mount` object and
 user-defined directories used for opaque data storage. When creating a new
-snapshot, the caller provides a directory where they would like the _snapshot_
-to be mounted, called the _target_. This operation returns a list of mounts
-that, if mounted, will have the fully prepared snapshot at the requested path.
-We call this the _prepare_ operation.
+active snapshot, the caller provides an identifier called the _key_. This
+operation returns a list of mounts that, if mounted, will have the fully
+prepared snapshot at the mounted path. We call this the _prepare_ operation.
 
-Once a path is _prepared_ and mounted, the caller may write new data to the
-snapshot. Depending on the application, a user may want to capture these changes or
-not.
+Once a snapshot is _prepared_ and mounted, the caller may write new data to the
+snapshot. Depending on the application, a user may want to capture these changes
+or not.
+
+For a read-only view of a snapshot, the _view_ operation can be used. Like
+_prepare_, _view_ will return a list of mounts that, if mounted, will have the
+fully prepared snapshot at the mounted path.
 
 If the user wants to keep the changes, the _commit_ operation is employed. The
-_commit_ operation takes the `target` directory, which represents an open
-transaction, and a `diff` directory. A successful result will provide the
-difference between the parent and the snapshot in the `diff` directory, which
-should be treated as opaque by the caller. This new `diff` directory can then
-be used as the `parent` in calls to future _prepare_ operations.
+_commit_ operation takes the _key_ identifier, which represents an active
+snapshot, and a _name_ identifier. A successful result will create a _committed_
+snapshot that can be used as the parent of new _active_ snapshots when
+referenced by the _name_.
 
-If the user wants to discard the changes, the _rollback_ operation will release
-any resources associated with the snapshot. While rollback may be a rare operation
-in other transactional systems, this is a common operation for containers.
-After removal, most containers will utilize the _rollback_ operation.
+If the user wants to discard the changes in an active snapshot, the _remove_
+operation will release any resources associated with the snapshot.  The mounts
+provided by _prepare_ or _view_ should be unmounted before calling this method.
 
-For both _rollback_ and _commit_ the mounts provided by _prepare_ should be
-unmounted before calling these methods.
+If the user wants to discard committed snapshots, the _remove_ operation can
+also be used, but any children must be removed before proceeding.
+
+For detailed usage information, see the
+[GoDoc](https://godoc.org/github.com/docker/containerd/snapshot#Snapshotter).
 
 ### Graph metadata
 
 As snapshots are imported into the container system, a "graph" of snapshots and
 their parents will form. Queries over this graph must be a supported operation.
-Subsequently, each snapshot ends up representing 
-
-### Path Management
-
-No path layout for snapshot locations is imposed on the caller. The paths used
-by the snapshot drivers are largely under the control of the caller. This provides
-the most flexibility in using the snapshot system but requires discipline when
-deciding which paths to use and which ones to avoid.
-
-We may provide a helper component to manage `diff` path layout when working
-with OCI and docker images.
 
 ## How snapshots work
 
 To flesh out the _Snapshots_ terminology, we are going to demonstrate the use of
-the _Snapshot Manager_ from the perspective of importing layers. We'll use a Go API
+the _Snapshotter_ from the perspective of importing layers. We'll use a Go API
 to represent the process.
 
 ### Importing a Layer
 
-To import a layer, we simply have the _Snapshot Manager_ provide a list of
+To import a layer, we simply have the _Snapshotter_ provide a list of
 mounts to be applied such that our destination will capture a changeset. We start
 out by getting a path to the layer tar file and creating a temp location to
 unpack it to:
 
-	layerPath, tmpLocation := getLayerPath(), mkTmpDir() // just a path to the layer tar file.
+	layerPath, tmpDir := getLayerPath(), mkTmpDir() // just a path to layer tar file.
 
-Per the terminology above, `tmpLocation` is known as the `target`. `layerPath`
-is simply a tar file, representing a changset. We start by using
-`SnapshotManager` to prepare the temporary location as a snapshot point:
+We start by using a _Snapshotter_ to _Prepare_ a new snapshot transaction, using
+a _key_ and descending from the empty parent "":
 
-	sm := SnapshotManager()
-	mounts, err := sm.Prepare(tmpLocation, "")
+	mounts, err := snapshotter.Prepare(key, "")
 	if err != nil { ... }
 
-Note that we provide "" as the `parent`, since we are applying the diff to an
-empty directory. We get back a list of mounts from `SnapshotManager.Prepare`.
-Before proceeding, we perform all these mounts:
+We get back a list of mounts from `Snapshotter.Prepare`, with the `key`
+identifying the active snapshot. Mount this to the temporary location with the
+following:
 
-	if err := MountAll(mounts); err != nil { ... }
+	if err := MountAll(mounts, tmpDir); err != nil { ... }
 
 Once the mounts are performed, our temporary location is ready to capture
-a diff. In practice, this works similarly to a filesystem transaction. The
-next step is to unpack the layer. We have a special function, `unpackLayer`
+a diff. In practice, this works similar to a filesystem transaction. The
+next step is to unpack the layer. We have a special function `unpackLayer`
 that applies the contents of the layer to target location and calculates the
-DiffID of the unpacked layer (this is a requirement for the docker
+`DiffID` of the unpacked layer (this is a requirement for docker
 implementation):
 
 	layer, err := os.Open(layerPath)
@@ -149,49 +153,46 @@ implementation):
 
 When the above completes, we should have a filesystem the represents the
 contents of the layer. Careful implementations should verify that digest
-matches the expected DiffID. When completed, we unmount the mounts:
+matches the expected `DiffID`. When completed, we unmount the mounts:
 
 	unmount(mounts) // optional, for now
 
-Now that we've verified and unpacked our layer, we create a location to commit
-the actual diff. For this example, we are just going to use the layer `digest`,
-but in practice, this will probably be the `ChainID`:
+Now that we've verified and unpacked our layer, we commit the active
+snapshot to a _name_. For this example, we are just going to use the layer
+digest, but in practice, this will probably be the `ChainID`:
 
-	diffPath := filepath.Join("/layers", digest) // name location for the uncompressed layer digest
-	if err := sm.Commit(diffPath, tmpLocation); err != nil { ... }
+	if err := snapshotter.Commit(digest.String(), key); err != nil { ... }
 
-The new layer has been imported as a _snapshot_ into the `SnapshotManager`
-under the name `diffPath`. `diffPath`, which is a user opaque directory
-location, can then be used as a parent in later snapshots.
+Now, we have a layer in the _Snapshotter_ that can be accessed with the digest
+provided during commit. Once you have committed the snapshot, the active
+snapshot can be removed with the following:
+
+	snapshotter.Remove(key)
 
 ### Importing the Next Layer
 
 Making a layer depend on the above is identical to the process described
-above except that the parent is provided as diffPath when calling
-`SnapshotManager.Prepare`:
+above except that the parent is provided as `parent` when calling
+`Snapshotter.Prepare`, assuming a clean `tmpLocation`:
 
-	mounts, err := sm.Prepare(tmpLocation, parentDiffPath)
+	mounts, err := snapshotter.Prepare(tmpLocation, parentDigest)
 
-Because have a provided a `parent`, the resulting `tmpLocation`, after
-mounting, will have the changes from above. Any new changes will be isolated to
-the snapshot `target`.
-
-We run the same unpacking process and commit as before to get the new `diff`.
+We then mount, apply and commit, as we did above. The new snapshot will be
+based on the content of the previous one.
 
 ### Running a Container
 
-To run a container, we simply provide `SnapshotManager.Prepare` the `diff` of
-the image we want to start the container from. After mounting, the prepared
-path can be used directly as the container's filesystem:
+To run a container, we simply provide `Snapshotter.Prepare` the committed image
+snapshot as the parent. After mounting, the prepared path can
+be used directly as the container's filesystem:
 
-	mounts, err := sm.Prepare(containerRootFS, imageDiffPath)
+	mounts, err := snapshotter.Prepare(containerKey, imageRootFSChainID)
 
 The returned mounts can then be passed directly to the container runtime. If
-one would like to create a new image from the filesystem,
-`SnapshotManager.Commit` is called:
+one would like to create a new image from the filesystem, `Snapshotter.Commit`
+is called:
 
-	if err := sm.Commit(newImageDiff, containerRootFS); err != nil { ... }
+	if err := snapshotter.Commit(newImageSnapshot, containerKey); err != nil { ... }
 
-Alternatively, in the majority of cases, `SnapshotManager.Rollback` will be
-called to signal `SnapshotManager` to abandon the changes after a container
-runtime process has completed.
+Alternatively, for most container runs, `Snapshotter.Remove` will be called to
+signal the Snapshotter to abandon the changes.
