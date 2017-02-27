@@ -209,7 +209,7 @@ func TestOverlayView(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	key := "/tmp/test"
+	key := "/tmp/base"
 	mounts, err := o.Prepare(ctx, key, "")
 	if err != nil {
 		t.Fatal(err)
@@ -221,7 +221,42 @@ func TestOverlayView(t *testing.T) {
 	if err := o.Commit(ctx, "base", key); err != nil {
 		t.Fatal(err)
 	}
-	mounts, err = o.View(ctx, "/tmp/test2", "base")
+
+	key = "/tmp/top"
+	_, err = o.Prepare(ctx, key, "base")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ioutil.WriteFile(filepath.Join(root, "active", hash(key), "fs", "foo"), []byte("hi, again"), 0660); err != nil {
+		t.Fatal(err)
+	}
+	if err := o.Commit(ctx, "top", key); err != nil {
+		t.Fatal(err)
+	}
+
+	mounts, err = o.View(ctx, "/tmp/view1", "base")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(mounts) != 1 {
+		t.Fatalf("should only have 1 mount but received %d", len(mounts))
+	}
+	m = mounts[0]
+	if m.Type != "bind" {
+		t.Errorf("mount type should be bind but received %q", m.Type)
+	}
+	expected := filepath.Join(root, "committed", hash("base"), "fs")
+	if m.Source != expected {
+		t.Errorf("expected source %q but received %q", expected, m.Source)
+	}
+	if m.Options[0] != "ro" {
+		t.Errorf("expected mount option ro but received %q", m.Options[0])
+	}
+	if m.Options[1] != "rbind" {
+		t.Errorf("expected mount option rbind but received %q", m.Options[1])
+	}
+
+	mounts, err = o.View(ctx, "/tmp/view2", "top")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +273,7 @@ func TestOverlayView(t *testing.T) {
 	if len(m.Options) != 1 {
 		t.Errorf("expected 1 mount option but got %d", len(m.Options))
 	}
-	expected := fmt.Sprintf("lowerdir=%s", filepath.Join(root, "committed", hash("base"), "fs"))
+	expected = fmt.Sprintf("lowerdir=%s:%s", filepath.Join(root, "committed", hash("top"), "fs"), filepath.Join(root, "committed", hash("base"), "fs"))
 	if m.Options[0] != expected {
 		t.Errorf("expected option %q but received %q", expected, m.Options[0])
 	}

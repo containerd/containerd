@@ -330,6 +330,17 @@ func (a *activeDir) mounts(c *cache) ([]containerd.Mount, error) {
 		)
 	} else if !os.IsNotExist(err) {
 		return nil, err
+	} else if len(parents) == 1 {
+		return []containerd.Mount{
+			{
+				Source: parents[0],
+				Type:   "bind",
+				Options: []string{
+					"ro",
+					"rbind",
+				},
+			},
+		}, nil
 	}
 
 	options = append(options, fmt.Sprintf("lowerdir=%s", strings.Join(parents, ":")))
