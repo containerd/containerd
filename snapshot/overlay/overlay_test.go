@@ -1,6 +1,7 @@
 package overlay
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -25,6 +26,7 @@ func TestOverlay(t *testing.T) {
 }
 
 func TestOverlayMounts(t *testing.T) {
+	ctx := context.TODO()
 	root, err := ioutil.TempDir("", "overlay")
 	if err != nil {
 		t.Fatal(err)
@@ -35,7 +37,7 @@ func TestOverlayMounts(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	mounts, err := o.Prepare("/tmp/test", "")
+	mounts, err := o.Prepare(ctx, "/tmp/test", "")
 	if err != nil {
 		t.Error(err)
 		return
@@ -60,6 +62,7 @@ func TestOverlayMounts(t *testing.T) {
 }
 
 func TestOverlayCommit(t *testing.T) {
+	ctx := context.TODO()
 	root, err := ioutil.TempDir("", "overlay")
 	if err != nil {
 		t.Fatal(err)
@@ -71,7 +74,7 @@ func TestOverlayCommit(t *testing.T) {
 		return
 	}
 	key := "/tmp/test"
-	mounts, err := o.Prepare(key, "")
+	mounts, err := o.Prepare(ctx, key, "")
 	if err != nil {
 		t.Error(err)
 		return
@@ -81,13 +84,14 @@ func TestOverlayCommit(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if err := o.Commit("base", key); err != nil {
+	if err := o.Commit(ctx, "base", key); err != nil {
 		t.Error(err)
 		return
 	}
 }
 
 func TestOverlayOverlayMount(t *testing.T) {
+	ctx := context.TODO()
 	root, err := ioutil.TempDir("", "overlay")
 	if err != nil {
 		t.Fatal(err)
@@ -99,16 +103,16 @@ func TestOverlayOverlayMount(t *testing.T) {
 		return
 	}
 	key := "/tmp/test"
-	mounts, err := o.Prepare(key, "")
+	mounts, err := o.Prepare(ctx, key, "")
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	if err := o.Commit("base", key); err != nil {
+	if err := o.Commit(ctx, "base", key); err != nil {
 		t.Error(err)
 		return
 	}
-	if mounts, err = o.Prepare("/tmp/layer2", "base"); err != nil {
+	if mounts, err = o.Prepare(ctx, "/tmp/layer2", "base"); err != nil {
 		t.Error(err)
 		return
 	}
@@ -142,6 +146,7 @@ func TestOverlayOverlayMount(t *testing.T) {
 
 func TestOverlayOverlayRead(t *testing.T) {
 	testutil.RequiresRoot(t)
+	ctx := context.TODO()
 	root, err := ioutil.TempDir("", "overlay")
 	if err != nil {
 		t.Fatal(err)
@@ -153,7 +158,7 @@ func TestOverlayOverlayRead(t *testing.T) {
 		return
 	}
 	key := "/tmp/test"
-	mounts, err := o.Prepare(key, "")
+	mounts, err := o.Prepare(ctx, key, "")
 	if err != nil {
 		t.Error(err)
 		return
@@ -163,11 +168,11 @@ func TestOverlayOverlayRead(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if err := o.Commit("base", key); err != nil {
+	if err := o.Commit(ctx, "base", key); err != nil {
 		t.Error(err)
 		return
 	}
-	if mounts, err = o.Prepare("/tmp/layer2", "base"); err != nil {
+	if mounts, err = o.Prepare(ctx, "/tmp/layer2", "base"); err != nil {
 		t.Error(err)
 		return
 	}

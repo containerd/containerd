@@ -1,6 +1,7 @@
 package overlay
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -43,7 +44,7 @@ func NewSnapshotter(root string) (*Snapshotter, error) {
 //
 // Should be used for parent resolution, existence checks and to discern
 // the kind of snapshot.
-func (o *Snapshotter) Stat(key string) (snapshot.Info, error) {
+func (o *Snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, error) {
 	path, err := o.links.get(filepath.Join(o.root, "index", hash(key)))
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -100,7 +101,7 @@ func (o *Snapshotter) stat(path string) (snapshot.Info, error) {
 	}, nil
 }
 
-func (o *Snapshotter) Prepare(key, parent string) ([]containerd.Mount, error) {
+func (o *Snapshotter) Prepare(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
 	active, err := o.newActiveDir(key)
 	if err != nil {
 		return nil, err
@@ -113,7 +114,7 @@ func (o *Snapshotter) Prepare(key, parent string) ([]containerd.Mount, error) {
 	return active.mounts(o.links)
 }
 
-func (o *Snapshotter) View(key, parent string) ([]containerd.Mount, error) {
+func (o *Snapshotter) View(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
 	panic("not implemented")
 }
 
@@ -121,24 +122,24 @@ func (o *Snapshotter) View(key, parent string) ([]containerd.Mount, error) {
 // called on an read-write or readonly transaction.
 //
 // This can be used to recover mounts after calling View or Prepare.
-func (o *Snapshotter) Mounts(key string) ([]containerd.Mount, error) {
+func (o *Snapshotter) Mounts(ctx context.Context, key string) ([]containerd.Mount, error) {
 	active := o.getActive(key)
 	return active.mounts(o.links)
 }
 
-func (o *Snapshotter) Commit(name, key string) error {
+func (o *Snapshotter) Commit(ctx context.Context, name, key string) error {
 	active := o.getActive(key)
 	return active.commit(name, o.links)
 }
 
 // Remove abandons the transaction identified by key. All resources
 // associated with the key will be removed.
-func (o *Snapshotter) Remove(key string) error {
+func (o *Snapshotter) Remove(ctx context.Context, key string) error {
 	panic("not implemented")
 }
 
 // Walk the committed snapshots.
-func (o *Snapshotter) Walk(fn func(snapshot.Info) error) error {
+func (o *Snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshot.Info) error) error {
 	root := filepath.Join(o.root, "index")
 	return filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
@@ -166,7 +167,7 @@ func (o *Snapshotter) Walk(fn func(snapshot.Info) error) error {
 			return err
 		}
 
-		if err := fn(si); err != nil {
+		if err := fn(ctx, si); err != nil {
 			return err
 		}
 
