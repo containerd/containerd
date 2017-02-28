@@ -4,6 +4,7 @@ package containerd.v1;
 
 import "gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
 
 // Content provides access to a content addressable storage system.
 service Content {
@@ -12,6 +13,9 @@ service Content {
 	// This call can be used for getting the size of content and checking for
 	// existence.
 	rpc Info(InfoRequest) returns (InfoResponse);
+
+	// Delete will delete the referenced object.
+	rpc Delete(DeleteContentRequest) returns (google.protobuf.Empty);
 
 	// Read allows one to read an object based on the offset into the content.
 	//
@@ -57,6 +61,11 @@ message InfoResponse {
 
 	// CommittedAt provides the time at which the blob was committed.
 	google.protobuf.Timestamp committed_at = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}
+
+message DeleteContentRequest {
+	// Digest specifies which content to delete.
+	string digest = 1 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
 }
 
 // ReadRequest defines the fields that make up a request to read a portion of

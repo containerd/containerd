@@ -8,6 +8,7 @@ import (
 	api "github.com/docker/containerd/api/services/content"
 	"github.com/docker/containerd/content"
 	"github.com/docker/containerd/log"
+	"github.com/golang/protobuf/ptypes/empty"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -54,6 +55,18 @@ func (s *Service) Info(ctx context.Context, req *api.InfoRequest) (*api.InfoResp
 		Size_:       bi.Size,
 		CommittedAt: bi.CommittedAt,
 	}, nil
+}
+
+func (s *Service) Delete(ctx context.Context, req *api.DeleteContentRequest) (*empty.Empty, error) {
+	if err := req.Digest.Validate(); err != nil {
+		return nil, grpc.Errorf(codes.InvalidArgument, err.Error())
+	}
+
+	if err := s.store.Delete(req.Digest); err != nil {
+		return nil, maybeNotFoundGRPC(err, req.Digest.String())
+	}
+
+	return &empty.Empty{}, nil
 }
 
 func (s *Service) Read(req *api.ReadRequest, session api.Content_ReadServer) error {
