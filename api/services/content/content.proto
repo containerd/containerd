@@ -86,10 +86,10 @@ message ReadResponse {
 enum WriteAction {
 	option (gogoproto.goproto_enum_prefix) = false;
 	option (gogoproto.enum_customname) = "WriteAction";
-	
+
 	// WriteActionStat instructs the writer to return the current status while
 	// holding the lock on the write.
-	STAT = 0 [(gogoproto.enumvalue_customname)="WriteActionStat"];
+	STAT = 0 [(gogoproto.enumvalue_customname) = "WriteActionStat"];
 
 	// WriteActionWrite sets the action for the write request to write data.
 	//
@@ -97,7 +97,7 @@ enum WriteAction {
 	// transaction will be left open for further writes.
 	//
 	// This is the default.
-	WRITE = 1 [(gogoproto.enumvalue_customname)="WriteActionWrite"];
+	WRITE = 1 [(gogoproto.enumvalue_customname) = "WriteActionWrite"];
 
 	// WriteActionCommit will write any outstanding data in the message and
 	// commit the write, storing it under the digest.
@@ -106,13 +106,13 @@ enum WriteAction {
 	// commit it.
 	//
 	// This action will always terminate the write.
-	COMMIT = 2 [(gogoproto.enumvalue_customname)="WriteActionCommit"];
+	COMMIT = 2 [(gogoproto.enumvalue_customname) = "WriteActionCommit"];
 
 	// WriteActionAbort will release any resources associated with the write
 	// and free up the ref for a completely new set of writes.
 	//
 	// This action will always terminate the write.
-	ABORT = -1 [(gogoproto.enumvalue_customname)="WriteActionAbort"];
+	ABORT = -1 [(gogoproto.enumvalue_customname) = "WriteActionAbort"];
 }
 
 // WriteRequest writes data to the request ref at offset. 
@@ -156,8 +156,14 @@ message WriteRequest {
 	string expected = 4 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
 
 	// Offset specifies the number of bytes from the start at which to begin
-	// the write. If zero or less, the write will be from the start. This uses
-	// standard zero-indexed semantics.
+	// the write. For most implementations, this means from the start of the
+	// file. This uses standard, zero-indexed semantics.
+	//
+	// If the action is write, the remote may remove all previously written
+	// data after the offset. Implementations may support arbitrary offsets but
+	// MUST support reseting this value to zero with a write. If an
+	// implementation does not support a write at a particular offset, an
+	// OutOfRange error must be returned.
 	int64 offset = 5;
 
 	// Data is the actual bytes to be written.

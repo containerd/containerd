@@ -36,7 +36,14 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, size i
 	if ws.Offset > 0 {
 		r, err = seekReader(r, ws.Offset, size)
 		if err != nil {
-			return errors.Wrapf(err, "unabled to resume write to %v", ref)
+			if !isUnseekable(err) {
+				return errors.Wrapf(err, "unabled to resume write to %v", ref)
+			}
+
+			// reader is unseekable, try to move the writer back to the start.
+			if err := cw.Truncate(0); err != nil {
+				return errors.Wrapf(err, "content writer truncate failed")
+			}
 		}
 	}
 
@@ -49,11 +56,17 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, size i
 
 	if err := cw.Commit(size, expected); err != nil {
 		if !IsExists(err) {
-			return err
+			return errors.Wrapf(err, "failed commit on ref %q", ref)
 		}
 	}
 
 	return nil
+}
+
+var errUnseekable = errors.New("seek not supported")
+
+func isUnseekable(err error) bool {
+	return errors.Cause(err) == errUnseekable
 }
 
 // seekReader attempts to seek the reader to the given offset, either by
@@ -81,7 +94,7 @@ func seekReader(r io.Reader, offset, size int64) (io.Reader, error) {
 		return sr, nil
 	}
 
-	return nil, errors.Errorf("cannot seek to offset %v", offset)
+	return r, errors.Wrapf(errUnseekable, "seek to offset %v failed", offset)
 }
 
 func readFileString(path string) (string, error) {

@@ -74,7 +74,7 @@ func (w *writer) Commit(size int64, expected digest.Digest) error {
 	}
 
 	if size > 0 && size != fi.Size() {
-		return errors.Errorf("failed size validation: %v != %v", fi.Size(), size)
+		return errors.Errorf("%q failed size validation: %v != %v", w.ref, fi.Size(), size)
 	}
 
 	if err := w.fp.Close(); err != nil {
@@ -132,4 +132,13 @@ func (cw *writer) Close() (err error) {
 	}
 
 	return nil
+}
+
+func (w *writer) Truncate(size int64) error {
+	if size != 0 {
+		return errors.New("Truncate: unsupported size")
+	}
+	w.offset = 0
+	w.digester.Hash().Reset()
+	return w.fp.Truncate(0)
 }
