@@ -195,6 +195,8 @@ func (s *Service) Write(session api.Content_WriteServer) (err error) {
 	}
 
 	ctx = log.WithLogger(ctx, log.G(ctx).WithFields(fields))
+
+	log.G(ctx).Debug("(*Service).Write started")
 	// this action locks the writer for the session.
 	wr, err := s.store.Writer(ctx, ref, total, expected)
 	if err != nil {
@@ -264,6 +266,13 @@ func (s *Service) Write(session api.Content_WriteServer) (err error) {
 				if req.Offset != ws.Offset {
 					return grpc.Errorf(codes.OutOfRange, "write @%v must occur at current offset %v", req.Offset, ws.Offset)
 				}
+			}
+
+			if req.Offset == 0 && ws.Offset > 0 {
+				if err := wr.Truncate(req.Offset); err != nil {
+					return errors.Wrapf(err, "truncate failed")
+				}
+				msg.Offset = req.Offset
 			}
 
 			// issue the write if we actually have data.

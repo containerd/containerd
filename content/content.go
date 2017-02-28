@@ -44,6 +44,7 @@ type Writer interface {
 	Status() (Status, error)
 	Digest() digest.Digest
 	Commit(size int64, expected digest.Digest) error
+	Truncate(size int64) error
 }
 
 type Ingester interface {

@@ -199,6 +199,7 @@ func (rw *remoteWriter) Commit(size int64, expected digest.Digest) error {
 	resp, err := rw.send(&contentapi.WriteRequest{
 		Action:   contentapi.WriteActionCommit,
 		Total:    size,
+		Offset:   rw.offset,
 		Expected: expected,
 	})
 	if err != nil {
@@ -213,6 +214,12 @@ func (rw *remoteWriter) Commit(size int64, expected digest.Digest) error {
 		return errors.Errorf("unexpected digest: %v != %v", resp.Digest, expected)
 	}
 
+	return nil
+}
+
+func (rw *remoteWriter) Truncate(size int64) error {
+	// This truncation won't actually be validated until a write is issued.
+	rw.offset = size
 	return nil
 }
 

@@ -197,8 +197,14 @@ type WriteRequest struct {
 	// with the commit action message.
 	Expected github_com_opencontainers_go_digest.Digest `protobuf:"bytes,4,opt,name=expected,proto3,customtype=github.com/opencontainers/go-digest.Digest" json:"expected"`
 	// Offset specifies the number of bytes from the start at which to begin
-	// the write. If zero or less, the write will be from the start. This uses
-	// standard zero-indexed semantics.
+	// the write. For most implementations, this means from the start of the
+	// file. This uses standard, zero-indexed semantics.
+	//
+	// If the action is write, the remote may remove all previously written
+	// data up to the offset. Implementations may support arbitrary offsets but
+	// MUST support reseting this value to zero with with a write. If an
+	// implementation does not support a write at a particular offset, an
+	// OutOfRange error must be returned.
 	Offset int64 `protobuf:"varint,5,opt,name=offset,proto3" json:"offset,omitempty"`
 	// Data is the actual bytes to be written.
 	//
