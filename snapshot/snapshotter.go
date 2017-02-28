@@ -294,7 +294,8 @@ func checkSnapshotterBasic(t *testing.T, snapshotter Snapshotter, work string) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, si.Parent, "")
+	assert.Equal(t, "", si.Parent)
+	assert.Equal(t, KindCommitted, si.Kind)
 
 	next := filepath.Join(work, "nextlayer")
 	if err := os.MkdirAll(next, 0777); err != nil {
@@ -323,6 +324,14 @@ func checkSnapshotterBasic(t *testing.T, snapshotter Snapshotter, work string) {
 		t.Log(err)
 	}
 
+	ni, err := snapshotter.Stat(ctx, next)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, committed, ni.Parent)
+	assert.Equal(t, KindActive, ni.Kind)
+
 	nextCommitted := filepath.Join(work, "committed-next")
 	if err := snapshotter.Commit(ctx, nextCommitted, next); err != nil {
 		t.Fatal(err)
@@ -333,7 +342,8 @@ func checkSnapshotterBasic(t *testing.T, snapshotter Snapshotter, work string) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, si2.Parent, committed)
+	assert.Equal(t, committed, si2.Parent)
+	assert.Equal(t, KindCommitted, si2.Kind)
 
 	expected := map[string]Info{
 		si.Name:  si,
