@@ -81,7 +81,7 @@ func (cs *Store) Delete(dgst digest.Digest) error {
 			return err
 		}
 
-		return nil
+		return errNotFound
 	}
 
 	return nil
