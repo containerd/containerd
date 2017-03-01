@@ -30,7 +30,7 @@ func main() {
    ____/ (_)____/ /_
   / __  / / ___/ __/
  / /_/ / (__  ) /_
- \__,_/_/____/\__/  
+ \__,_/_/____/\__/
 
 distribution tool
 `
@@ -73,13 +73,15 @@ distribution tool
 		var (
 			debug   = context.GlobalBool("debug")
 			timeout = context.GlobalDuration("timeout")
+			cancel  contextpkg.CancelFunc
 		)
 		if debug {
 			logrus.SetLevel(logrus.DebugLevel)
 		}
 
 		if timeout > 0 {
-			background, _ = contextpkg.WithTimeout(background, timeout)
+			background, cancel = contextpkg.WithTimeout(background, timeout)
+			defer cancel()
 		}
 		return nil
 	}
