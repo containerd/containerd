@@ -4,79 +4,14 @@ import (
 	"context"
 	"io"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-
 	contentapi "github.com/docker/containerd/api/services/content"
+	"github.com/docker/containerd/content"
+
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
 
-func NewProviderFromClient(client contentapi.ContentClient) Provider {
-	return &remoteProvider{
-		client: client,
-	}
-}
-
-type remoteProvider struct {
-	client contentapi.ContentClient
-}
-
-func (rp *remoteProvider) Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, error) {
-	client, err := rp.client.Read(ctx, &contentapi.ReadRequest{Digest: dgst})
-	if err != nil {
-		return nil, err
-	}
-
-	return &remoteReader{
-		client: client,
-	}, nil
-}
-
-type remoteReader struct {
-	client contentapi.Content_ReadClient
-	extra  []byte
-}
-
-func (rr *remoteReader) Read(p []byte) (n int, err error) {
-	n += copy(p, rr.extra)
-	if n >= len(p) {
-		if n <= len(rr.extra) {
-			rr.extra = rr.extra[n:]
-		} else {
-			rr.extra = rr.extra[:0]
-		}
-		return
-	}
-
-	p = p[n:]
-	for len(p) > 0 {
-		var resp *contentapi.ReadResponse
-		// fill our buffer up until we can fill p.
-		resp, err = rr.client.Recv()
-		if err != nil {
-			return
-		}
-
-		copied := copy(p, resp.Data)
-		n += copied
-		p = p[copied:]
-
-		if copied < len(p) {
-			continue
-		}
-
-		rr.extra = append(rr.extra, resp.Data[copied:]...)
-	}
-
-	return
-}
-
-func (rr *remoteReader) Close() error {
-	return rr.client.CloseSend()
-}
-
-func NewIngesterFromClient(client contentapi.ContentClient) Ingester {
+func NewIngesterFromClient(client contentapi.ContentClient) content.Ingester {
 	return &remoteIngester{
 		client: client,
 	}
@@ -86,7 +21,7 @@ type remoteIngester struct {
 	client contentapi.ContentClient
 }
 
-func (ri *remoteIngester) Writer(ctx context.Context, ref string, size int64, expected digest.Digest) (Writer, error) {
+func (ri *remoteIngester) Writer(ctx context.Context, ref string, size int64, expected digest.Digest) (content.Writer, error) {
 	wrclient, offset, err := ri.negotiate(ctx, ref, size, expected)
 	if err != nil {
 		return nil, rewriteGRPCError(err)
@@ -154,15 +89,15 @@ func (rw *remoteWriter) send(req *contentapi.WriteRequest) (*contentapi.WriteRes
 	return resp, err
 }
 
-func (rw *remoteWriter) Status() (Status, error) {
+func (rw *remoteWriter) Status() (content.Status, error) {
 	resp, err := rw.send(&contentapi.WriteRequest{
 		Action: contentapi.WriteActionStat,
 	})
 	if err != nil {
-		return Status{}, err
+		return content.Status{}, err
 	}
 
-	return Status{
+	return content.Status{
 		Ref:       rw.ref,
 		Offset:    resp.Offset,
 		StartedAt: resp.StartedAt,
@@ -225,15 +160,4 @@ func (rw *remoteWriter) Truncate(size int64) error {
 
 func (rw *remoteWriter) Close() error {
 	return rw.client.CloseSend()
-}
-
-func rewriteGRPCError(err error) error {
-	switch grpc.Code(errors.Cause(err)) {
-	case codes.AlreadyExists:
-		return errExists
-	case codes.NotFound:
-		return errNotFound
-	}
-
-	return err
 }

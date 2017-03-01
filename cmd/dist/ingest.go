@@ -6,9 +6,10 @@ import (
 
 	contentapi "github.com/docker/containerd/api/services/content"
 	"github.com/docker/containerd/content"
+	contentservice "github.com/docker/containerd/services/content"
 	"github.com/opencontainers/go-digest"
-	"github.com/urfave/cli"
 	"github.com/pkg/errors"
+	"github.com/urfave/cli"
 )
 
 var ingestCommand = cli.Command{
@@ -51,7 +52,7 @@ var ingestCommand = cli.Command{
 			return errors.New("must specify a transaction reference")
 		}
 
-		ingester := content.NewIngesterFromClient(contentapi.NewContentClient(conn))
+		ingester := contentservice.NewIngesterFromClient(contentapi.NewContentClient(conn))
 
 		// TODO(stevvooe): Allow ingest to be reentrant. Currently, we expect
 		// all data to be written in a single invocation. Allow multiple writes

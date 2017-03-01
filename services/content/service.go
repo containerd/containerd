@@ -2,6 +2,7 @@ package content
 
 import (
 	"io"
+	"sync"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd"
@@ -18,6 +19,12 @@ import (
 
 type Service struct {
 	store *content.Store
+}
+
+var bufPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 1<<20)
+	},
 }
 
 var _ api.ContentServer = &Service{}
@@ -100,9 +107,9 @@ func (s *Service) Read(req *api.ReadRequest, session api.Content_ReadServer) err
 
 		// TODO(stevvooe): Using the global buffer pool. At 32KB, it is probably
 		// little inefficient for work over a fast network. We can tune this later.
-		p = content.BufPool.Get().([]byte)
+		p = bufPool.Get().([]byte)
 	)
-	defer content.BufPool.Put(p)
+	defer bufPool.Put(p)
 
 	if offset < 0 {
 		offset = 0

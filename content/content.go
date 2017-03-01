@@ -11,10 +11,17 @@ import (
 )
 
 var (
-	errNotFound = errors.New("content: not found")
-	errExists   = errors.New("content: exists")
+	// ErrNotFound is returned when an item is not found.
+	//
+	// Use IsNotFound(err) to detect this condition.
+	ErrNotFound = errors.New("content: not found")
 
-	BufPool = sync.Pool{
+	// ErrExists is returned when something exists when it may not be expected.
+	//
+	// Use IsExists(err) to detect this condition.
+	ErrExists = errors.New("content: exists")
+
+	bufPool = sync.Pool{
 		New: func() interface{} {
 			return make([]byte, 1<<20)
 		},
@@ -52,9 +59,9 @@ type Ingester interface {
 }
 
 func IsNotFound(err error) bool {
-	return errors.Cause(err) == errNotFound
+	return errors.Cause(err) == ErrNotFound
 }
 
 func IsExists(err error) bool {
-	return errors.Cause(err) == errExists
+	return errors.Cause(err) == ErrExists
 }
