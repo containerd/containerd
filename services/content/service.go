@@ -310,6 +310,10 @@ func (s *Service) Write(session api.Content_WriteServer) (err error) {
 
 		req, err = session.Recv()
 		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+
 			return err
 		}
 	}
