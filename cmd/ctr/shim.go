@@ -19,8 +19,8 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/crosbymichael/console"
 	"github.com/docker/containerd/api/services/shim"
-	"github.com/urfave/cli"
 	"github.com/pkg/errors"
+	"github.com/urfave/cli"
 )
 
 var fifoFlags = []cli.Flag{

@@ -7,8 +7,8 @@ import (
 	contentapi "github.com/docker/containerd/api/services/content"
 	"github.com/docker/containerd/content"
 	"github.com/opencontainers/go-digest"
-	"github.com/urfave/cli"
 	"github.com/pkg/errors"
+	"github.com/urfave/cli"
 )
 
 var ingestCommand = cli.Command{

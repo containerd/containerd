@@ -15,8 +15,8 @@ import (
 	"github.com/docker/containerd/api/types/mount"
 	protobuf "github.com/gogo/protobuf/types"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli"
 	"github.com/pkg/errors"
+	"github.com/urfave/cli"
 )
 
 var rwm = "rwm"
