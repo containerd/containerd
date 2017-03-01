@@ -215,7 +215,7 @@ type Snapshotter interface {
 }
 
 // SnapshotterSuite runs a test suite on the snapshotter given a factory function.
-func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(root string) (Snapshotter, func(), error)) {
+func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(ctx context.Context, root string) (Snapshotter, func(), error)) {
 	t.Run("Basic", makeTest(t, name, snapshotterFn, checkSnapshotterBasic))
 	t.Run("StatActive", makeTest(t, name, snapshotterFn, checkSnapshotterStatActive))
 	t.Run("StatComitted", makeTest(t, name, snapshotterFn, checkSnapshotterStatCommitted))
@@ -223,8 +223,9 @@ func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(root string)
 
 }
 
-func makeTest(t *testing.T, name string, snapshotterFn func(root string) (Snapshotter, func(), error), fn func(t *testing.T, snapshotter Snapshotter, work string)) func(t *testing.T) {
+func makeTest(t *testing.T, name string, snapshotterFn func(ctx context.Context, root string) (Snapshotter, func(), error), fn func(ctx context.Context, t *testing.T, snapshotter Snapshotter, work string)) func(t *testing.T) {
 	return func(t *testing.T) {
+		ctx := context.Background()
 		// Make two directories: a snapshotter root and a play area for the tests:
 		//
 		// 	/tmp
@@ -242,7 +243,7 @@ func makeTest(t *testing.T, name string, snapshotterFn func(root string) (Snapsh
 			t.Fatal(err)
 		}
 
-		snapshotter, cleanup, err := snapshotterFn(root)
+		snapshotter, cleanup, err := snapshotterFn(ctx, root)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -254,13 +255,12 @@ func makeTest(t *testing.T, name string, snapshotterFn func(root string) (Snapsh
 		}
 
 		defer testutil.DumpDir(t, tmpDir)
-		fn(t, snapshotter, work)
+		fn(ctx, t, snapshotter, work)
 	}
 }
 
 // checkSnapshotterBasic tests the basic workflow of a snapshot snapshotter.
-func checkSnapshotterBasic(t *testing.T, snapshotter Snapshotter, work string) {
-	ctx := context.TODO()
+func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter Snapshotter, work string) {
 	preparing := filepath.Join(work, "preparing")
 	if err := os.MkdirAll(preparing, 0777); err != nil {
 		t.Fatal(err)
@@ -360,4 +360,8 @@ func checkSnapshotterBasic(t *testing.T, snapshotter Snapshotter, work string) {
 	}))
 
 	assert.Equal(t, expected, walked)
+
+	assert.Error(t, snapshotter.Remove(ctx, committed))
+	assert.NoError(t, snapshotter.Remove(ctx, nextCommitted))
+	assert.NoError(t, snapshotter.Remove(ctx, committed))
 }

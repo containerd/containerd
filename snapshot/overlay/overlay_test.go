@@ -11,19 +11,26 @@ import (
 
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/snapshot"
+	"github.com/docker/containerd/snapshot/storage/ql"
 	"github.com/docker/containerd/testutil"
 )
 
+func qlSnapshotter(ctx context.Context, root string) (snapshot.Snapshotter, func(), error) {
+	store, err := ql.NewMetaStore(ctx, filepath.Join(root, "metadata.db"))
+	if err != nil {
+		return nil, nil, err
+	}
+	snapshotter, err := NewSnapshotter(root, store)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return snapshotter, func() {}, nil
+}
+
 func TestOverlay(t *testing.T) {
 	testutil.RequiresRoot(t)
-	snapshot.SnapshotterSuite(t, "Overlay", func(root string) (snapshot.Snapshotter, func(), error) {
-		snapshotter, err := NewSnapshotter(root)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		return snapshotter, func() {}, nil
-	})
+	snapshot.SnapshotterSuite(t, "Overlay", qlSnapshotter)
 }
 
 func TestOverlayMounts(t *testing.T) {
@@ -33,7 +40,7 @@ func TestOverlayMounts(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(root)
-	o, err := NewSnapshotter(root)
+	o, _, err := qlSnapshotter(ctx, root)
 	if err != nil {
 		t.Error(err)
 		return
@@ -50,7 +57,7 @@ func TestOverlayMounts(t *testing.T) {
 	if m.Type != "bind" {
 		t.Errorf("mount type should be bind but received %q", m.Type)
 	}
-	expected := filepath.Join(root, "active", hash("/tmp/test"), "fs")
+	expected := filepath.Join(root, "snapshots", "16", "fs")
 	if m.Source != expected {
 		t.Errorf("expected source %q but received %q", expected, m.Source)
 	}
@@ -69,7 +76,7 @@ func TestOverlayCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(root)
-	o, err := NewSnapshotter(root)
+	o, _, err := qlSnapshotter(ctx, root)
 	if err != nil {
 		t.Error(err)
 		return
@@ -98,7 +105,7 @@ func TestOverlayOverlayMount(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(root)
-	o, err := NewSnapshotter(root)
+	o, _, err := qlSnapshotter(ctx, root)
 	if err != nil {
 		t.Error(err)
 		return
@@ -128,11 +135,10 @@ func TestOverlayOverlayMount(t *testing.T) {
 		t.Errorf("expected source %q but received %q", "overlay", m.Source)
 	}
 	var (
-		ah    = hash("/tmp/layer2")
-		sh    = hash("base")
-		work  = "workdir=" + filepath.Join(root, "active", ah, "work")
-		upper = "upperdir=" + filepath.Join(root, "active", ah, "fs")
-		lower = "lowerdir=" + filepath.Join(root, "committed", sh, "fs")
+		bp    = getBasePath(ctx, o, root, "/tmp/layer2")
+		work  = "workdir=" + filepath.Join(bp, "work")
+		upper = "upperdir=" + filepath.Join(bp, "fs")
+		lower = "lowerdir=" + getParents(ctx, o, root, "/tmp/layer2")[0]
 	)
 	for i, v := range []string{
 		work,
@@ -145,6 +151,29 @@ func TestOverlayOverlayMount(t *testing.T) {
 	}
 }
 
+func getBasePath(ctx context.Context, sn snapshot.Snapshotter, root, key string) string {
+	o := sn.(*Snapshotter)
+	active, err := o.ms.GetActive(ctx, key)
+	if err != nil {
+		panic(err)
+	}
+
+	return filepath.Join(root, "snapshots", active.ID)
+}
+
+func getParents(ctx context.Context, sn snapshot.Snapshotter, root, key string) []string {
+	o := sn.(*Snapshotter)
+	active, err := o.ms.GetActive(ctx, key)
+	if err != nil {
+		panic(err)
+	}
+	parents := make([]string, len(active.ParentIDs))
+	for i := range active.ParentIDs {
+		parents[i] = filepath.Join(root, "snapshots", active.ParentIDs[i], "fs")
+	}
+	return parents
+}
+
 func TestOverlayOverlayRead(t *testing.T) {
 	testutil.RequiresRoot(t)
 	ctx := context.TODO()
@@ -153,7 +182,7 @@ func TestOverlayOverlayRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(root)
-	o, err := NewSnapshotter(root)
+	o, _, err := qlSnapshotter(ctx, root)
 	if err != nil {
 		t.Error(err)
 		return
@@ -205,7 +234,7 @@ func TestOverlayView(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(root)
-	o, err := NewSnapshotter(root)
+	o, _, err := qlSnapshotter(ctx, root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +256,7 @@ func TestOverlayView(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(filepath.Join(root, "active", hash(key), "fs", "foo"), []byte("hi, again"), 0660); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(getParents(ctx, o, root, "/tmp/top")[0], "foo"), []byte("hi, again"), 0660); err != nil {
 		t.Fatal(err)
 	}
 	if err := o.Commit(ctx, "top", key); err != nil {
@@ -245,7 +274,7 @@ func TestOverlayView(t *testing.T) {
 	if m.Type != "bind" {
 		t.Errorf("mount type should be bind but received %q", m.Type)
 	}
-	expected := filepath.Join(root, "committed", hash("base"), "fs")
+	expected := getParents(ctx, o, root, "/tmp/view1")[0]
 	if m.Source != expected {
 		t.Errorf("expected source %q but received %q", expected, m.Source)
 	}
@@ -273,7 +302,8 @@ func TestOverlayView(t *testing.T) {
 	if len(m.Options) != 1 {
 		t.Errorf("expected 1 mount option but got %d", len(m.Options))
 	}
-	expected = fmt.Sprintf("lowerdir=%s:%s", filepath.Join(root, "committed", hash("top"), "fs"), filepath.Join(root, "committed", hash("base"), "fs"))
+	lowers := getParents(ctx, o, root, "/tmp/view2")
+	expected = fmt.Sprintf("lowerdir=%s:%s", lowers[0], lowers[1])
 	if m.Options[0] != expected {
 		t.Errorf("expected option %q but received %q", expected, m.Options[0])
 	}

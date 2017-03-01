@@ -14,8 +14,7 @@ import (
 )
 
 // Create a New Layer on top of base layer with Prepare, Stat on new layer, should return Active layer.
-func checkSnapshotterStatActive(t *testing.T, snapshotter Snapshotter, work string) {
-	ctx := context.TODO()
+func checkSnapshotterStatActive(ctx context.Context, t *testing.T, snapshotter Snapshotter, work string) {
 	preparing := filepath.Join(work, "preparing")
 	if err := os.MkdirAll(preparing, 0777); err != nil {
 		t.Fatal(err)
@@ -49,8 +48,7 @@ func checkSnapshotterStatActive(t *testing.T, snapshotter Snapshotter, work stri
 }
 
 // Commit a New Layer on top of base layer with Prepare & Commit , Stat on new layer, should return Committed layer.
-func checkSnapshotterStatCommitted(t *testing.T, snapshotter Snapshotter, work string) {
-	ctx := context.TODO()
+func checkSnapshotterStatCommitted(ctx context.Context, t *testing.T, snapshotter Snapshotter, work string) {
 	preparing := filepath.Join(work, "preparing")
 	if err := os.MkdirAll(preparing, 0777); err != nil {
 		t.Fatal(err)
