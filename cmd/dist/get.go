@@ -5,7 +5,7 @@ import (
 	"os"
 
 	contentapi "github.com/docker/containerd/api/services/content"
-	"github.com/docker/containerd/content"
+	contentservice "github.com/docker/containerd/services/content"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/urfave/cli"
 )
@@ -33,7 +33,7 @@ Output paths can be used to directly access blobs on disk.`,
 			return err
 		}
 
-		cs := content.NewProviderFromClient(contentapi.NewContentClient(conn))
+		cs := contentservice.NewProviderFromClient(contentapi.NewContentClient(conn))
 
 		rc, err := cs.Reader(ctx, dgst)
 		if err != nil {

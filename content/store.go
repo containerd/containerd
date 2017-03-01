@@ -41,7 +41,7 @@ func (s *Store) Info(dgst digest.Digest) (Info, error) {
 	fi, err := os.Stat(p)
 	if err != nil {
 		if os.IsNotExist(err) {
-			err = errNotFound
+			err = ErrNotFound
 		}
 
 		return Info{}, err
@@ -63,7 +63,7 @@ func (s *Store) Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, 
 	fp, err := os.Open(s.blobPath(dgst))
 	if err != nil {
 		if os.IsNotExist(err) {
-			err = errNotFound
+			err = ErrNotFound
 		}
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (cs *Store) Delete(dgst digest.Digest) error {
 			return err
 		}
 
-		return errNotFound
+		return ErrNotFound
 	}
 
 	return nil
@@ -243,8 +243,8 @@ func (s *Store) Writer(ctx context.Context, ref string, total int64, expected di
 		}
 		defer fp.Close()
 
-		p := BufPool.Get().([]byte)
-		defer BufPool.Put(p)
+		p := bufPool.Get().([]byte)
+		defer bufPool.Put(p)
 
 		offset, err = io.CopyBuffer(digester.Hash(), fp, p)
 		if err != nil {

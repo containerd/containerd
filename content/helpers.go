@@ -47,8 +47,8 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, size i
 		}
 	}
 
-	buf := BufPool.Get().([]byte)
-	defer BufPool.Put(buf)
+	buf := bufPool.Get().([]byte)
+	defer bufPool.Put(buf)
 
 	if _, err := io.CopyBuffer(cw, r, buf); err != nil {
 		return err
