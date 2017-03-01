@@ -40,9 +40,12 @@ distribution tool
 			Usage: "enable debug output in logs",
 		},
 		cli.DurationFlag{
-			Name:   "timeout",
-			Usage:  "total timeout for fetch",
-			EnvVar: "CONTAINERD_FETCH_TIMEOUT",
+			Name:  "timeout",
+			Usage: "total timeout for dist commands",
+		},
+		cli.DurationFlag{
+			Name:  "connect-timeout",
+			Usage: "timeout for connecting to containerd",
 		},
 		cli.StringFlag{
 			// TODO(stevvooe): for now, we allow circumventing the GRPC. Once
