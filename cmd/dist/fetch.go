@@ -39,7 +39,7 @@ var fetchCommand = cli.Command{
 	},
 	Action: func(context *cli.Context) error {
 		var (
-			ctx     = contextpkg.Background()
+			ctx     = background
 			timeout = context.Duration("timeout")
 			locator = context.Args().First()
 			args    = context.Args().Tail()

@@ -24,7 +24,9 @@ func resolveContentStore(context *cli.Context) (*content.Store, error) {
 
 func connectGRPC(context *cli.Context) (*grpc.ClientConn, error) {
 	socket := context.GlobalString("socket")
+	timeout := context.GlobalDuration("connect-timeout")
 	return grpc.Dial(socket,
+		grpc.WithTimeout(timeout),
 		grpc.WithBlock(),
 		grpc.WithInsecure(),
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
