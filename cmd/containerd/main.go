@@ -16,6 +16,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd"
+	contentapi "github.com/docker/containerd/api/services/content"
 	api "github.com/docker/containerd/api/services/execution"
 	"github.com/docker/containerd/content"
 	"github.com/docker/containerd/log"
@@ -306,7 +307,9 @@ func interceptor(ctx gocontext.Context,
 	ctx = log.WithModule(ctx, "containerd")
 	switch info.Server.(type) {
 	case api.ContainerServiceServer:
-		ctx = log.WithModule(global, "execution")
+		ctx = log.WithModule(ctx, "execution")
+	case contentapi.ContentServer:
+		ctx = log.WithModule(ctx, "content")
 	default:
 		fmt.Printf("unknown GRPC server type: %#v\n", info.Server)
 	}
