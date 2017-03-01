@@ -179,6 +179,7 @@ func (r *Runtime) newBundle(id string, spec []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer f.Close()
 	_, err = io.Copy(f, bytes.NewReader(spec))
 	return path, err
 }
