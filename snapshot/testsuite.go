@@ -109,8 +109,7 @@ func snapshotterPrepareMount(ctx context.Context, snapshotter Snapshotter, diffP
 }
 
 // Given A <- B <- C, B is the parent of C and A is a transitive parent of C (in this case, a "grandparent")
-func checkSnapshotterTransitivity(t *testing.T, snapshotter Snapshotter, work string) {
-	ctx := context.TODO()
+func checkSnapshotterTransitivity(ctx context.Context, t *testing.T, snapshotter Snapshotter, work string) {
 	preparing, err := snapshotterPrepareMount(ctx, snapshotter, "preparing", "", work)
 	if err != nil {
 		t.Fatal(err)
