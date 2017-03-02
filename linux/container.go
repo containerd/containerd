@@ -3,6 +3,7 @@ package linux
 import (
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/api/services/shim"
+	"github.com/docker/containerd/api/types/container"
 	"golang.org/x/net/context"
 )
 
@@ -42,7 +43,20 @@ func (c *Container) State(ctx context.Context) (containerd.State, error) {
 	if err != nil {
 		return nil, err
 	}
+	var status containerd.ContainerStatus
+	switch response.Status {
+	case container.Status_CREATED:
+		status = containerd.CreatedStatus
+	case container.Status_RUNNING:
+		status = containerd.RunningStatus
+	case container.Status_STOPPED:
+		status = containerd.StoppedStatus
+	case container.Status_PAUSED:
+		status = containerd.PausedStatus
+		// TODO: containerd.DeletedStatus
+	}
 	return &State{
-		pid: response.Pid,
+		pid:    response.Pid,
+		status: status,
 	}, nil
 }

@@ -136,10 +136,26 @@ func (s *Service) Events(r *shimapi.EventsRequest, stream shimapi.Shim_EventsSer
 }
 
 func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.StateResponse, error) {
+	st, err := s.initProcess.ContainerStatus(ctx)
+	if err != nil {
+		return nil, err
+	}
+	status := container.Status_UNKNOWN
+	switch st {
+	case "created":
+		status = container.Status_CREATED
+	case "running":
+		status = container.Status_RUNNING
+	case "stopped":
+		status = container.Status_STOPPED
+	case "paused":
+		status = container.Status_PAUSED
+	}
 	o := &shimapi.StateResponse{
 		ID:        s.id,
 		Bundle:    s.bundle,
 		Pid:       uint32(s.initProcess.Pid()),
+		Status:    status,
 		Processes: []*container.Process{},
 	}
 	s.mu.Lock()

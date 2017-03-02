@@ -5,10 +5,11 @@ package containerd.v1.types;
 import "gogoproto/gogo.proto";
 
 enum Status {
-	CREATED = 0;
-	RUNNING = 1;
-	STOPPED = 2;
-	PAUSED = 3;
+	UNKNOWN = 0;
+	CREATED = 1;
+	RUNNING = 2;
+	STOPPED = 3;
+	PAUSED = 4;
 }
 
 message Container {
