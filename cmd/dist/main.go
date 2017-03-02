@@ -68,6 +68,7 @@ distribution tool
 		deleteCommand,
 		listCommand,
 		applyCommand,
+		ociCommand,
 	}
 	app.Before = func(context *cli.Context) error {
 		var (
