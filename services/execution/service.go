@@ -116,7 +116,7 @@ func (s *Service) Start(ctx context.Context, r *api.StartRequest) (*google_proto
 	return empty, nil
 }
 
-func (s *Service) Delete(ctx context.Context, r *api.DeleteRequest) (*google_protobuf.Empty, error) {
+func (s *Service) Delete(ctx context.Context, r *api.DeleteRequest) (*api.DeleteResponse, error) {
 	c, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
@@ -125,10 +125,11 @@ func (s *Service) Delete(ctx context.Context, r *api.DeleteRequest) (*google_pro
 	if err != nil {
 		return nil, err
 	}
-	if err := runtime.Delete(ctx, c); err != nil {
+	status, err := runtime.Delete(ctx, c)
+	if err != nil {
 		return nil, err
 	}
-	return empty, nil
+	return &api.DeleteResponse{ExitStatus: status}, nil
 }
 
 func containerFromContainerd(ctx context.Context, c containerd.Container) (*container.Container, error) {

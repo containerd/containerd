@@ -201,8 +201,8 @@ type WriteRequest struct {
 	// file. This uses standard, zero-indexed semantics.
 	//
 	// If the action is write, the remote may remove all previously written
-	// data up to the offset. Implementations may support arbitrary offsets but
-	// MUST support reseting this value to zero with with a write. If an
+	// data after the offset. Implementations may support arbitrary offsets but
+	// MUST support reseting this value to zero with a write. If an
 	// implementation does not support a write at a particular offset, an
 	// OutOfRange error must be returned.
 	Offset int64 `protobuf:"varint,5,opt,name=offset,proto3" json:"offset,omitempty"`

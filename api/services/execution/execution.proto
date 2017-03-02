@@ -11,7 +11,7 @@ import "github.com/docker/containerd/api/types/container/container.proto";
 service ContainerService {
 	rpc Create(CreateRequest) returns (CreateResponse);
 	rpc Start(StartRequest) returns (google.protobuf.Empty);
-	rpc Delete(DeleteRequest) returns (google.protobuf.Empty);
+	rpc Delete(DeleteRequest) returns (DeleteResponse);
 	rpc Info(InfoRequest) returns (containerd.v1.types.Container);
 	rpc List(ListRequest) returns (ListResponse);
 	rpc Events(EventsRequest) returns (stream containerd.v1.types.Event);

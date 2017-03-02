@@ -92,16 +92,17 @@ func (r *Runtime) Create(ctx context.Context, id string, opts containerd.CreateO
 	}, nil
 }
 
-func (r *Runtime) Delete(ctx context.Context, c containerd.Container) error {
+func (r *Runtime) Delete(ctx context.Context, c containerd.Container) (uint32, error) {
 	lc, ok := c.(*Container)
 	if !ok {
-		return fmt.Errorf("container cannot be cast as *linux.Container")
+		return 0, fmt.Errorf("container cannot be cast as *linux.Container")
 	}
-	if _, err := lc.shim.Delete(ctx, &shim.DeleteRequest{}); err != nil {
-		return err
+	rsp, err := lc.shim.Delete(ctx, &shim.DeleteRequest{})
+	if err != nil {
+		return 0, err
 	}
 	lc.shim.Exit(ctx, &shim.ExitRequest{})
-	return r.deleteBundle(lc.id)
+	return rsp.ExitStatus, r.deleteBundle(lc.id)
 }
 
 func (r *Runtime) Containers() ([]containerd.Container, error) {
