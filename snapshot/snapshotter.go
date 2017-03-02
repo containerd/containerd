@@ -219,6 +219,8 @@ func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(root string)
 	t.Run("Basic", makeTest(t, name, snapshotterFn, checkSnapshotterBasic))
 	t.Run("StatActive", makeTest(t, name, snapshotterFn, checkSnapshotterStatActive))
 	t.Run("StatComitted", makeTest(t, name, snapshotterFn, checkSnapshotterStatCommitted))
+	t.Run("TransitivityTest", makeTest(t, name, snapshotterFn, checkSnapshotterTransitivity))
+
 }
 
 func makeTest(t *testing.T, name string, snapshotterFn func(root string) (Snapshotter, func(), error), fn func(t *testing.T, snapshotter Snapshotter, work string)) func(t *testing.T) {
