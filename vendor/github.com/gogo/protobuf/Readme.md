@@ -38,6 +38,7 @@ These projects use gogoprotobuf:
   - <a href="https://github.com/docker/swarmkit">docker swarmkit</a> - <a href="https://github.com/docker/swarmkit/blob/63600e01af3b8da2a0ed1c9fa6e1ae4299d75edb/api/objects.proto">sample proto file</a>
   - <a href="https://nats.io/">nats.io</a> - <a href="https://github.com/nats-io/go-nats-streaming/blob/master/pb/protocol.proto">go-nats-streaming</a>
   - <a href="https://github.com/pingcap/tidb">tidb</a> - Communication between <a href="https://github.com/pingcap/tipb/blob/master/generate-go.sh#L4">tidb</a> and <a href="https://github.com/pingcap/kvproto/blob/master/generate_go.sh#L3">tikv</a>
+  - <a href="https://github.com/AsynkronIT/protoactor-go">protoactor-go</a> - <a href="https://github.com/AsynkronIT/protoactor-go/blob/dev/protobuf/protoc-gen-protoactor/main.go">vanity command</a> that also generates actors from service definitions
 
 Please lets us know if you are using gogoprotobuf by posting on our <a href="https://groups.google.com/forum/#!topic/gogoprotobuf/Brw76BxmFpQ">GoogleGroup</a>.
 
