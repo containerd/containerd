@@ -129,6 +129,9 @@ func (s *Service) Delete(ctx context.Context, r *api.DeleteRequest) (*api.Delete
 	if err != nil {
 		return nil, err
 	}
+
+	delete(s.containers, r.ID)
+
 	return &api.DeleteResponse{ExitStatus: status}, nil
 }
 
