@@ -25,8 +25,8 @@ import (
 // then receives object/hint lines on stdin, returning content as
 // needed.
 
-var fetchCommand = cli.Command{
-	Name:        "fetch",
+var fetchObjectCommand = cli.Command{
+	Name:        "fetch-object",
 	Usage:       "retrieve objects from a remote",
 	ArgsUsage:   "[flags] <remote> <object> [<hint>, ...]",
 	Description: `Fetch objects by identifier from a remote.`,

@@ -14,7 +14,7 @@ import (
 
 var deleteCommand = cli.Command{
 	Name:      "delete",
-	Aliases:   []string{"delete", "del", "remove", "rm"},
+	Aliases:   []string{"del", "remove", "rm"},
 	Usage:     "permanently delete one or more blobs.",
 	ArgsUsage: "[flags] [<digest>, ...]",
 	Description: `Delete one or more blobs permanently. Successfully deleted
