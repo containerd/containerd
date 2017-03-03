@@ -72,6 +72,7 @@ type CreateOpts struct {
 	Detach        bool
 	NoPivot       bool
 	NoNewKeyring  bool
+	ExtraFiles    []*os.File
 }
 
 func (o *CreateOpts) args() (out []string, err error) {
@@ -94,6 +95,9 @@ func (o *CreateOpts) args() (out []string, err error) {
 	if o.Detach {
 		out = append(out, "--detach")
 	}
+	if o.ExtraFiles != nil {
+		out = append(out, "--preserve-fds", strconv.Itoa(len(o.ExtraFiles)))
+	}
 	return out, nil
 }
 
@@ -111,6 +115,8 @@ func (r *Runc) Create(context context.Context, id, bundle string, opts *CreateOp
 	if opts != nil && opts.IO != nil {
 		opts.Set(cmd)
 	}
+	cmd.ExtraFiles = opts.ExtraFiles
+
 	if cmd.Stdout == nil && cmd.Stderr == nil {
 		data, err := cmd.CombinedOutput()
 		if err != nil {
@@ -139,24 +145,13 @@ func (r *Runc) Start(context context.Context, id string) error {
 type ExecOpts struct {
 	IO
 	PidFile       string
-	Uid           int
-	Gid           int
-	Cwd           string
-	Tty           bool
 	ConsoleSocket *ConsoleSocket
 	Detach        bool
 }
 
 func (o *ExecOpts) args() (out []string, err error) {
-	out = append(out, "--user", fmt.Sprintf("%d:%d", o.Uid, o.Gid))
-	if o.Tty {
-		out = append(out, "--tty")
-	}
 	if o.ConsoleSocket != nil {
 		out = append(out, "--console-socket", o.ConsoleSocket.Path())
-	}
-	if o.Cwd != "" {
-		out = append(out, "--cwd", o.Cwd)
 	}
 	if o.Detach {
 		out = append(out, "--detach")
@@ -174,7 +169,7 @@ func (o *ExecOpts) args() (out []string, err error) {
 // Exec executres and additional process inside the container based on a full
 // OCI Process specification
 func (r *Runc) Exec(context context.Context, id string, spec specs.Process, opts *ExecOpts) error {
-	f, err := ioutil.TempFile("", "-process")
+	f, err := ioutil.TempFile("", "runc-process")
 	if err != nil {
 		return err
 	}

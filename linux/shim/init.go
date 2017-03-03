@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"syscall"
 
@@ -72,6 +73,9 @@ func newInitProcess(context context.Context, r *shimapi.CreateRequest) (*initPro
 		ConsoleSocket: socket,
 		IO:            io,
 		NoPivot:       r.NoPivot,
+	}
+	for i := 3; i < 3+int(r.PreserveFds); i++ {
+		opts.ExtraFiles = append(opts.ExtraFiles, os.NewFile(uintptr(i), "PreserveFD:"+strconv.Itoa(i)))
 	}
 	if err := p.runc.Create(context, r.ID, r.Bundle, opts); err != nil {
 		return nil, err

@@ -1,6 +1,7 @@
 package containerd
 
 import "golang.org/x/net/context"
+import "github.com/docker/containerd/api/types/container"
 
 type IO struct {
 	Stdin    string
@@ -16,6 +17,8 @@ type CreateOpts struct {
 	Rootfs []Mount
 	// IO for the container's main process
 	IO IO
+	// Extra Files to keep open
+	ExtraFds []*container.ExtraFd
 }
 
 // Runtime is responsible for the creation of containers for a certain platform,

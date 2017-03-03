@@ -50,3 +50,12 @@ message Event {
 	uint32 pid = 3;
 	uint32 exit_status = 4;
 }
+
+message ExtraFd {
+	enum Kind {
+		NULL = 0;
+		TAP = 1;
+	}
+	Kind kind = 1;
+	repeated string args = 2;
+}

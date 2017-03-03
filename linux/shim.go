@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"syscall"
@@ -18,7 +19,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func newShim(path string) (shim.ShimClient, error) {
+func newShim(path string, extraFiles []*os.File) (shim.ShimClient, error) {
 	socket := filepath.Join(path, "shim.sock")
 	l, err := utils.CreateUnixSocket(socket)
 	if err != nil {
@@ -26,6 +27,8 @@ func newShim(path string) (shim.ShimClient, error) {
 	}
 	cmd := exec.Command("containerd-shim")
 	cmd.Dir = path
+	cmd.ExtraFiles = append(cmd.ExtraFiles, extraFiles...)
+	cmd.Env = os.Environ()
 	f, err := l.(*net.UnixListener).File()
 	if err != nil {
 		return nil, err
@@ -33,6 +36,7 @@ func newShim(path string) (shim.ShimClient, error) {
 	// close our side of the socket, do not close the listener as it will
 	// remove the socket from disk
 	defer f.Close()
+	cmd.Env = append(cmd.Env, fmt.Sprintf("CONTAINERD_SHIM_GRPC_FD=%d", 3+len(cmd.ExtraFiles)))
 	cmd.ExtraFiles = append(cmd.ExtraFiles, f)
 	// make sure the shim can be re-parented to system init
 	// and is cloned in a new mount namespace because the overlay/filesystems
@@ -44,6 +48,12 @@ func newShim(path string) (shim.ShimClient, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, errors.Wrapf(err, "failed to start shim")
 	}
+
+	// Close the extra files, they've been inhereted by the child now
+	for _, f := range cmd.ExtraFiles {
+		f.Close()
+	}
+
 	// since we are currently the parent go ahead and make sure we wait on the shim
 	go cmd.Wait()
 	return connectShim(socket)

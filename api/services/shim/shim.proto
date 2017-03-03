@@ -30,6 +30,7 @@ message CreateRequest {
 	string stdout = 7;
 	string stderr = 8;
 	repeated containerd.v1.types.Mount rootfs = 9;
+	uint32 preserve_fds = 10;
 }
 
 message CreateResponse {
