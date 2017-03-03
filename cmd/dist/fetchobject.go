@@ -16,9 +16,15 @@ import (
 	"github.com/docker/containerd/log"
 	"github.com/docker/containerd/remotes"
 	digest "github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"golang.org/x/net/context/ctxhttp"
+)
+
+const (
+	MediaTypeDockerSchema2Manifest     = "application/vnd.docker.distribution.manifest.v2+json"
+	MediaTypeDockerSchema2ManifestList = "application/vnd.docker.distribution.manifest.list.v2+json"
 )
 
 // TODO(stevvooe): Create "multi-fetch" mode that just takes a remote
@@ -133,6 +139,14 @@ func getResolver(ctx contextpkg.Context) (remotes.Resolver, error) {
 				},
 			))
 
+			if _, err := digest.Parse(object); err != nil {
+				// in this case, we are seeking a manifest by a tag. Let's add some hints.
+				hints = append(hints, "mediatype:"+MediaTypeDockerSchema2Manifest)
+				hints = append(hints, "mediatype:"+MediaTypeDockerSchema2ManifestList)
+				hints = append(hints, "mediatype:"+ocispec.MediaTypeImageManifest)
+				hints = append(hints, "mediatype:"+ocispec.MediaTypeImageIndex)
+			}
+
 			paths, err := getV2URLPaths(prefix, object, hints...)
 			if err != nil {
 				return nil, err
@@ -149,9 +163,7 @@ func getResolver(ctx contextpkg.Context) (remotes.Resolver, error) {
 				}
 
 				req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-				for _, mediatype := range remotes.HintValues("mediatype", hints...) {
-					req.Header.Set("Accept", mediatype)
-				}
+				req.Header.Set("Accept", strings.Join(remotes.HintValues("mediatype", hints...), ", "))
 
 				resp, err := ctxhttp.Do(ctx, http.DefaultClient, req)
 				if err != nil {
@@ -227,18 +239,18 @@ func getV2URLPaths(prefix, object string, hints ...string) ([]string, error) {
 	// avoid having to do extra round trips to resolve content, as well as
 	// avoid the tedium of providing media types.
 
-	if remotes.HintExists("mediatype", "application/vnd.docker.distribution.manifest.v2+json", hints...) { // TODO(stevvooe): make this handle oci types, as well.
+	if remotes.HintExists("mediatype", MediaTypeDockerSchema2Manifest, hints...) ||
+		remotes.HintExists("mediatype", MediaTypeDockerSchema2ManifestList, hints...) ||
+		remotes.HintExists("mediatype", ocispec.MediaTypeImageManifest, hints...) ||
+		remotes.HintExists("mediatype", ocispec.MediaTypeImageIndex, hints...) {
 		// fast path out if we know we are getting a manifest. Arguably, we
 		// should fallback to blobs, just in case.
 		urls = append(urls, path.Join("/v2", prefix, "manifests", object))
 	}
 
-	_, err := digest.Parse(object)
-	if err == nil {
-		// we have a digest, use blob or manifest path, depending on hints, may
-		// need to try both.
-		urls = append(urls, path.Join("/v2", prefix, "blobs", object))
-	}
+	// we have a digest, use blob or manifest path, depending on hints, may
+	// need to try both.
+	urls = append(urls, path.Join("/v2", prefix, "blobs", object))
 
 	// probably a take, so we go through the manifests endpoint
 	urls = append(urls, path.Join("/v2", prefix, "manifests", object))
