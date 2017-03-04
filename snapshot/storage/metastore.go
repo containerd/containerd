@@ -27,25 +27,24 @@ type MetaStore interface {
 	// with the active snapshots identifier before the metadata is
 	// committed. This callback action should be as short as possible to
 	// avoid blocking the transaction longer than necessary.
-	CreateActive(ctx context.Context, key string, opts CreateActiveOpts) (Active, error)
+	CreateActive(ctx context.Context, key string, opts CreateActiveOpts) error
 
 	// GetActive returns the metadata for the active snapshot transaction
 	// referenced by the given key.
 	GetActive(ctx context.Context, key string) (Active, error)
 
-	// Remove removes a snapshot from the metastore. Cleanup is called
-	// during the transaction to allow the driver to make data unavailable
-	// before committing. Cleanup should run as fast as possible, and if
-	// cleanup cannot be performed quickly, it should record the ids to
-	// cleanup and call after this function returns without error.
-	Remove(ctx context.Context, key string, cleanup func(id string) error) error
+	// Remove removes a snapshot from the metastore. The optional cleanup
+	// callback should be treated as the first part in a multi-phase commit,
+	// meaning data should be marked for removal but restorable if the
+	// database commit does not succeed.
+	Remove(ctx context.Context, key string, opts RemoveOpts) error
 
 	// Commit renames the active snapshot transaction referenced by `key`
-	// as a committed snapshot referenced by `name`. The resulting snapshot
+	// as a committed snapshot referenced by `Name`. The resulting snapshot
 	// will be committed and readonly and the `key` reference will no longer
 	// be available for lookup or removal. The snapshot identifier given
 	// on creation and retrieved from GetActive will not change on commit.
-	Commit(ctx context.Context, name, key string) error
+	Commit(ctx context.Context, key string, opts CommitOpts) error
 }
 
 // CreateActiveOpts are used to configure the creation of a new active snapshot
@@ -54,7 +53,24 @@ type MetaStore interface {
 type CreateActiveOpts struct {
 	Parent   string
 	Readonly bool
-	Create   func(string) error
+	Create   func(Active) error
+}
+
+// CommitOpts are used to configure the commit transaction. The given name will
+// be the name after the active is committed. The Commit function is called
+// during the transaction to allow the caller to rename any resources before
+// the final Commit.
+type CommitOpts struct {
+	Name   string
+	Commit func(id string) error
+}
+
+// RemoveOpts are used to configure the remove transaction. The provided
+// cleanup function will be called during the remove transaction to allow
+// the caller to make any resource unavailable before the commit is
+// finalized.
+type RemoveOpts struct {
+	Cleanup func(id string, k snapshot.Kind) error
 }
 
 // Active hold the metadata for an active snapshot transaction. The ParentIDs

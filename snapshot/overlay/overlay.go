@@ -71,7 +71,7 @@ func (o *Snapshotter) Mounts(ctx context.Context, key string) ([]containerd.Moun
 }
 
 func (o *Snapshotter) Commit(ctx context.Context, name, key string) error {
-	return o.ms.Commit(ctx, name, key)
+	return o.ms.Commit(ctx, key, storage.CommitOpts{Name: name})
 }
 
 // Remove abandons the transaction identified by key. All resources
@@ -80,15 +80,17 @@ func (o *Snapshotter) Remove(ctx context.Context, key string) error {
 	var (
 		path, renamed string
 	)
-	err := o.ms.Remove(ctx, key, func(id string) error {
-		path = filepath.Join(o.root, "snapshots", id)
-		renamed = filepath.Join(o.root, "snapshots", "rm-"+id)
-		if err := os.Rename(path, renamed); err != nil {
-			path = ""
-			renamed = ""
-			return errors.Wrap(err, "failed to rename")
-		}
-		return nil
+	err := o.ms.Remove(ctx, key, storage.RemoveOpts{
+		Cleanup: func(id string, k snapshot.Kind) error {
+			path = filepath.Join(o.root, "snapshots", id)
+			renamed = filepath.Join(o.root, "snapshots", "rm-"+id)
+			if err := os.Rename(path, renamed); err != nil {
+				path = ""
+				renamed = ""
+				return errors.Wrap(err, "failed to rename")
+			}
+			return nil
+		},
 	})
 	if err != nil {
 		err = errors.Wrap(err, "failed to perform remove")
@@ -145,21 +147,22 @@ func (o *Snapshotter) createActive(ctx context.Context, key, parent string, read
 			return nil, err
 		}
 	}
+	var active storage.Active
 	opts := storage.CreateActiveOpts{
 		Parent:   parent,
 		Readonly: readonly,
-		Create: func(id string) error {
-			path = filepath.Join(snapshotDir, id)
+		Create: func(a storage.Active) error {
+			path = filepath.Join(snapshotDir, a.ID)
 			if err := os.Rename(td, path); err != nil {
 				return errors.Wrap(err, "failed to rename")
 			}
 			td = ""
+			active = a
 
 			return nil
 		},
 	}
-	active, err := o.ms.CreateActive(ctx, key, opts)
-	if err != nil {
+	if err := o.ms.CreateActive(ctx, key, opts); err != nil {
 		return nil, err
 	}
 

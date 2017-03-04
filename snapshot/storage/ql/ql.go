@@ -27,6 +27,10 @@ func NewMetaStore(ctx context.Context, dbfile string) (storage.MetaStore, error)
 	ms := &qlMetastore{
 		dbfile: dbfile,
 	}
+
+	// TODO: add timestamps to Snapshots table
+	// TODO: define mechanism for migrating schema
+	// TODO: add field to mark deletion to keep record of removed items
 	schema := []string{
 		`CREATE TABLE IF NOT EXISTS Snapshots (Name string NOT NULL, Parent int, Active bool, Readonly bool);`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS SnapshotsName on Snapshots (Name);`,
@@ -150,9 +154,12 @@ func (ms *qlMetastore) Walk(ctx context.Context, fn func(context.Context, snapsh
 	})
 }
 
-func (ms *qlMetastore) CreateActive(ctx context.Context, key string, opts storage.CreateActiveOpts) (a storage.Active, err error) {
-	err = ms.doTransaction(ctx, func(ctx context.Context, tx *sql.Tx) error {
-		var parentID *int64
+func (ms *qlMetastore) CreateActive(ctx context.Context, key string, opts storage.CreateActiveOpts) error {
+	return ms.doTransaction(ctx, func(ctx context.Context, tx *sql.Tx) error {
+		var (
+			a        storage.Active
+			parentID *int64
+		)
 		if opts.Parent != "" {
 			var (
 				id           int64
@@ -189,25 +196,20 @@ func (ms *qlMetastore) CreateActive(ctx context.Context, key string, opts storag
 		}
 		a.ID = fmt.Sprintf("%d", insertID)
 
-		if opts.Create != nil {
-			if err := opts.Create(a.ID); err != nil {
-				return errors.Wrap(err, "create callback failed")
-			}
-		}
-
 		a.ParentIDs, err = ms.parents(ctx, tx, parentID)
 		if err != nil {
 			return errors.Wrap(err, "failed to get parent chain")
 		}
+		a.Readonly = opts.Readonly
+
+		if opts.Create != nil {
+			if err := opts.Create(a); err != nil {
+				return errors.Wrap(err, "create callback failed")
+			}
+		}
 
 		return nil
 	})
-	if err != nil {
-		return storage.Active{}, err
-	}
-
-	a.Readonly = opts.Readonly
-	return
 }
 
 func (ms *qlMetastore) GetActive(ctx context.Context, key string) (a storage.Active, err error) {
@@ -268,7 +270,7 @@ func (ms *qlMetastore) parents(ctx context.Context, tx *sql.Tx, parent *int64) (
 	return parents, nil
 }
 
-func (ms *qlMetastore) Remove(ctx context.Context, key string, cleanup func(id string) error) error {
+func (ms *qlMetastore) Remove(ctx context.Context, key string, opts storage.RemoveOpts) error {
 	err := ms.doTransaction(ctx, func(ctx context.Context, tx *sql.Tx) error {
 		var (
 			id     int64
@@ -291,8 +293,14 @@ func (ms *qlMetastore) Remove(ctx context.Context, key string, cleanup func(id s
 			}
 		}
 
-		if err := cleanup(fmt.Sprintf("%d", id)); err != nil {
-			return errors.Wrap(err, "failed to cleanup")
+		if opts.Cleanup != nil {
+			k := snapshot.KindCommitted
+			if active {
+				k = snapshot.KindActive
+			}
+			if err := opts.Cleanup(fmt.Sprintf("%d", id), k); err != nil {
+				return errors.Wrap(err, "failed to cleanup")
+			}
 		}
 
 		_, err = tx.ExecContext(ctx, "DELETE FROM Snapshots WHERE id()=$1", id)
@@ -308,17 +316,25 @@ func (ms *qlMetastore) Remove(ctx context.Context, key string, cleanup func(id s
 	return nil
 }
 
-func (ms *qlMetastore) Commit(ctx context.Context, name, key string) error {
+func (ms *qlMetastore) Commit(ctx context.Context, key string, opts storage.CommitOpts) error {
 	return ms.doTransaction(ctx, func(ctx context.Context, tx *sql.Tx) error {
-
-		var id int
-		err := tx.QueryRowContext(ctx, "SELECT id() FROM Snapshots WHERE Name=$1 AND Active=true", key).Scan(&id)
+		var (
+			id                   int
+			isActive, isReadonly bool
+		)
+		err := tx.QueryRowContext(ctx, "SELECT id(), Active, Readonly FROM Snapshots WHERE Name=$1", key).Scan(&id, &isActive, &isReadonly)
 		if err != nil {
 			// TODO: check for no rows
 			return errors.Wrapf(err, "failed to get snapshot: %v", key)
 		}
+		if !isActive {
+			return errors.Errorf("snapshot is already committed")
+		}
+		if isReadonly {
+			return errors.Errorf("active snapshot is read only")
+		}
 
-		res, err := tx.ExecContext(ctx, "UPDATE Snapshots SET Name=$1, Active=false, Readonly=true WHERE id()=$2", name, id)
+		res, err := tx.ExecContext(ctx, "UPDATE Snapshots SET Name=$1, Active=false, Readonly=true WHERE id()=$2", opts.Name, id)
 		if err != nil {
 			return err
 		}
@@ -333,7 +349,11 @@ func (ms *qlMetastore) Commit(ctx context.Context, name, key string) error {
 			return errors.Errorf("name already exists")
 		}
 
-		// TODO: callback to allow making updates to ID during transaction
+		if opts.Commit != nil {
+			if err := opts.Commit(fmt.Sprintf("%d", id)); err != nil {
+				return errors.Wrap(err, "commit callback failed")
+			}
+		}
 
 		return nil
 	})
