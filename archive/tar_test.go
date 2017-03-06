@@ -56,15 +56,15 @@ func TestDiffApply(t *testing.T) {
 			fstest.CreateFile("/home/derek/.zshrc", []byte("#ZSH is just better\n"), 0640),
 		),
 		fstest.Apply(
-			fstest.RemoveFile("/etc/badfile"),
+			fstest.Remove("/etc/badfile"),
 			fstest.Rename("/home/derek", "/home/notderek"),
 		),
 		fstest.Apply(
-			fstest.RemoveFile("/usr"),
-			fstest.RemoveFile("/etc/hosts.allow"),
+			fstest.RemoveAll("/usr"),
+			fstest.Remove("/etc/hosts.allow"),
 		),
 		fstest.Apply(
-			fstest.RemoveFile("/home"),
+			fstest.RemoveAll("/home"),
 			fstest.CreateDir("/home/derek", 0700),
 			fstest.CreateFile("/home/derek/.bashrc", []byte("#not going away\n"), 0640),
 			// "/etc/hosts" must be touched to be hardlinked in same layer
@@ -92,14 +92,14 @@ func TestDiffApplyDeletion(t *testing.T) {
 			fstest.CreateFile("/test/b", []byte{}, 0644),
 			fstest.CreateDir("/test/otherdir", 0755),
 			fstest.CreateFile("/test/otherdir/.empty", []byte{}, 0644),
-			fstest.RemoveFile("/lib"),
+			fstest.RemoveAll("/lib"),
 			fstest.CreateDir("/lib", 0700),
 			fstest.CreateFile("/lib/not-hidden", []byte{}, 0644),
 		),
 		fstest.Apply(
-			fstest.RemoveFile("/test/a"),
-			fstest.RemoveFile("/test/b"),
-			fstest.RemoveFile("/test/otherdir"),
+			fstest.Remove("/test/a"),
+			fstest.Remove("/test/b"),
+			fstest.RemoveAll("/test/otherdir"),
 			fstest.CreateFile("/lib/newfile", []byte{}, 0644),
 		),
 	}
