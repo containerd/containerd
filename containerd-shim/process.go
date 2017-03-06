@@ -55,7 +55,6 @@ type process struct {
 	id             string
 	bundle         string
 	stdio          *stdio
-	exec           bool
 	containerPid   int
 	checkpoint     *checkpoint
 	checkpointPath string
