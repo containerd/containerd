@@ -1,12 +1,10 @@
 package main
 
 import (
+	gocontext "context"
 	"encoding/json"
 	"io/ioutil"
 	"path/filepath"
-
-	gocontext "context"
-
 	"runtime"
 
 	"github.com/Sirupsen/logrus"
@@ -15,8 +13,8 @@ import (
 	"github.com/docker/containerd/api/types/mount"
 	protobuf "github.com/gogo/protobuf/types"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli"
 	"github.com/pkg/errors"
+	"github.com/urfave/cli"
 )
 
 var rwm = "rwm"
@@ -171,6 +169,11 @@ var runCommand = cli.Command{
 			Name:  "runtime-config",
 			Usage: "custom runtime config (config.json)",
 		},
+		cli.StringFlag{
+			Name:  "runtime",
+			Usage: "runtime name (linux, windows, vmware-linux)",
+			Value: "linux",
+		},
 	},
 	Action: func(context *cli.Context) error {
 		id := context.String("id")
@@ -222,7 +225,7 @@ var runCommand = cli.Command{
 				Value:   data,
 			},
 			Rootfs:   rootfs,
-			Runtime:  "linux",
+			Runtime:  context.String("runtime"),
 			Terminal: context.Bool("tty"),
 			Stdin:    filepath.Join(tmpDir, "stdin"),
 			Stdout:   filepath.Join(tmpDir, "stdout"),
