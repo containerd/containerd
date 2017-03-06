@@ -20,7 +20,7 @@ const (
 
 func TestBtrfs(t *testing.T) {
 	testutil.RequiresRoot(t)
-	snapshot.SnapshotterSuite(t, "Btrfs", func(root string) (snapshot.Snapshotter, func(), error) {
+	snapshot.SnapshotterSuite(t, "Btrfs", func(ctx context.Context, root string) (snapshot.Snapshotter, func(), error) {
 		device := setupBtrfsLoopbackDevice(t, root)
 		snapshotter, err := NewSnapshotter(device.deviceName, root)
 		if err != nil {
