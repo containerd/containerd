@@ -6,6 +6,7 @@ import (
 	"github.com/docker/containerd"
 	api "github.com/docker/containerd/api/services/execution"
 	"github.com/docker/containerd/api/types/container"
+	"github.com/docker/containerd/log"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -151,6 +152,8 @@ func containerFromContainerd(ctx context.Context, c containerd.Container) (*cont
 		status = container.Status_STOPPED
 	case containerd.PausedStatus:
 		status = container.Status_PAUSED
+	default:
+		log.G(ctx).WithField("status", state.Status()).Warn("unknown status")
 	}
 	return &container.Container{
 		ID:     c.Info().ID,

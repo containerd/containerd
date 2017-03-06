@@ -89,7 +89,8 @@ message StateResponse {
 	string id = 1 [(gogoproto.customname) = "ID"];
 	string bundle = 2;
 	uint32 pid = 3;
-	repeated containerd.v1.types.Process processes = 4;
+	containerd.v1.types.Status status = 4;
+	repeated containerd.v1.types.Process processes = 5;
 }
 
 

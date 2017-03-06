@@ -106,6 +106,15 @@ func (p *initProcess) Status() int {
 	return p.status
 }
 
+// ContainerStatus return the state of the container (created, running, paused, stopped)
+func (p *initProcess) ContainerStatus(ctx context.Context) (string, error) {
+	c, err := p.runc.State(ctx, p.id)
+	if err != nil {
+		return "", err
+	}
+	return c.Status, nil
+}
+
 func (p *initProcess) Start(context context.Context) error {
 	return p.runc.Start(context, p.id)
 }
