@@ -20,7 +20,7 @@ import (
 	"github.com/codegangsta/cli"
 	"github.com/cyberdelia/go-metrics-graphite"
 	"github.com/docker/containerd"
-	"github.com/docker/containerd/api/grpc/server"
+	grpcserver "github.com/docker/containerd/api/grpc/server"
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/api/http/pprof"
 	"github.com/docker/containerd/supervisor"
@@ -147,7 +147,7 @@ func main() {
 			if err != nil {
 				lvl = logrus.InfoLevel
 				fmt.Fprintf(os.Stderr, "Unable to parse logging level: %s\n, and being defaulted to info", logLevel)
-			} 
+			}
 			logrus.SetLevel(lvl)
 		}
 		if p := context.GlobalString("pprof-address"); len(p) > 0 {
@@ -172,6 +172,17 @@ func main() {
 func daemon(context *cli.Context) error {
 	s := make(chan os.Signal, 2048)
 	signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
+	// Split the listen string of the form proto://addr
+	listenSpec := context.String("listen")
+	listenParts := strings.SplitN(listenSpec, "://", 2)
+	if len(listenParts) != 2 {
+		return fmt.Errorf("bad listen address format %s, expected proto://address", listenSpec)
+	}
+	// Register server early to allow healthcheck to be done
+	server, err := startServer(listenParts[0], listenParts[1])
+	if err != nil {
+		return err
+	}
 	sv, err := supervisor.New(
 		context.String("state-dir"),
 		context.String("runtime"),
@@ -182,6 +193,7 @@ func daemon(context *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	types.RegisterAPIServer(server, grpcserver.NewServer(sv))
 	wg := &sync.WaitGroup{}
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
@@ -189,16 +201,6 @@ func daemon(context *cli.Context) error {
 		go w.Start()
 	}
 	if err := sv.Start(); err != nil {
-		return err
-	}
-	// Split the listen string of the form proto://addr
-	listenSpec := context.String("listen")
-	listenParts := strings.SplitN(listenSpec, "://", 2)
-	if len(listenParts) != 2 {
-		return fmt.Errorf("bad listen address format %s, expected proto://address", listenSpec)
-	}
-	server, err := startServer(listenParts[0], listenParts[1], sv)
-	if err != nil {
 		return err
 	}
 	for ss := range s {
@@ -212,7 +214,7 @@ func daemon(context *cli.Context) error {
 	return nil
 }
 
-func startServer(protocol, address string, sv *supervisor.Supervisor) (*grpc.Server, error) {
+func startServer(protocol, address string) (*grpc.Server, error) {
 	// TODO: We should use TLS.
 	// TODO: Add an option for the SocketGroup.
 	sockets, err := listeners.Init(protocol, address, "", nil)
@@ -224,7 +226,6 @@ func startServer(protocol, address string, sv *supervisor.Supervisor) (*grpc.Ser
 	}
 	l := sockets[0]
 	s := grpc.NewServer()
-	types.RegisterAPIServer(s, server.NewServer(sv))
 	healthServer := health.NewServer()
 	grpc_health_v1.RegisterHealthServer(s, healthServer)
 
