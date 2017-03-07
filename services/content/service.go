@@ -5,10 +5,10 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/containerd"
 	api "github.com/docker/containerd/api/services/content"
 	"github.com/docker/containerd/content"
 	"github.com/docker/containerd/log"
+	"github.com/docker/containerd/plugin"
 	"github.com/golang/protobuf/ptypes/empty"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -30,13 +30,13 @@ var bufPool = sync.Pool{
 var _ api.ContentServer = &Service{}
 
 func init() {
-	containerd.Register("content-grpc", &containerd.Registration{
-		Type: containerd.GRPCPlugin,
+	plugin.Register("content-grpc", &plugin.Registration{
+		Type: plugin.GRPCPlugin,
 		Init: NewService,
 	})
 }
 
-func NewService(ic *containerd.InitContext) (interface{}, error) {
+func NewService(ic *plugin.InitContext) (interface{}, error) {
 	return &Service{
 		store: ic.Store,
 	}, nil

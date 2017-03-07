@@ -20,6 +20,7 @@ import (
 	api "github.com/docker/containerd/api/services/execution"
 	"github.com/docker/containerd/content"
 	"github.com/docker/containerd/log"
+	"github.com/docker/containerd/plugin"
 	"github.com/docker/containerd/utils"
 	metrics "github.com/docker/go-metrics"
 	"github.com/pkg/errors"
@@ -85,7 +86,7 @@ func main() {
 		log.G(global).Info("starting containerd boot...")
 
 		// load all plugins into containerd
-		if err := containerd.Load(filepath.Join(conf.Root, "plugins")); err != nil {
+		if err := plugin.Load(filepath.Join(conf.Root, "plugins")); err != nil {
 			return err
 		}
 		// start debug and metrics APIs
@@ -222,12 +223,12 @@ func resolveContentStore() (*content.Store, error) {
 
 func loadRuntimes() (map[string]containerd.Runtime, error) {
 	o := make(map[string]containerd.Runtime)
-	for name, rr := range containerd.Registrations() {
-		if rr.Type != containerd.RuntimePlugin {
+	for name, rr := range plugin.Registrations() {
+		if rr.Type != plugin.RuntimePlugin {
 			continue
 		}
 		log.G(global).Infof("loading runtime plugin %q...", name)
-		ic := &containerd.InitContext{
+		ic := &plugin.InitContext{
 			Root:    conf.Root,
 			State:   conf.State,
 			Context: log.WithModule(global, fmt.Sprintf("runtime-%s", name)),
@@ -252,14 +253,14 @@ func newGRPCServer() *grpc.Server {
 	return s
 }
 
-func loadServices(runtimes map[string]containerd.Runtime, store *content.Store) ([]containerd.Service, error) {
-	var o []containerd.Service
-	for name, sr := range containerd.Registrations() {
-		if sr.Type != containerd.GRPCPlugin {
+func loadServices(runtimes map[string]containerd.Runtime, store *content.Store) ([]plugin.Service, error) {
+	var o []plugin.Service
+	for name, sr := range plugin.Registrations() {
+		if sr.Type != plugin.GRPCPlugin {
 			continue
 		}
 		log.G(global).Infof("loading grpc service plugin %q...", name)
-		ic := &containerd.InitContext{
+		ic := &plugin.InitContext{
 			Root:     conf.Root,
 			State:    conf.State,
 			Context:  log.WithModule(global, fmt.Sprintf("service-%s", name)),
@@ -276,7 +277,7 @@ func loadServices(runtimes map[string]containerd.Runtime, store *content.Store) 
 		if err != nil {
 			return nil, err
 		}
-		o = append(o, vs.(containerd.Service))
+		o = append(o, vs.(plugin.Service))
 	}
 	return o, nil
 }
