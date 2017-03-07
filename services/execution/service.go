@@ -7,6 +7,7 @@ import (
 	api "github.com/docker/containerd/api/services/execution"
 	"github.com/docker/containerd/api/types/container"
 	"github.com/docker/containerd/log"
+	"github.com/docker/containerd/plugin"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -18,13 +19,13 @@ var (
 )
 
 func init() {
-	containerd.Register("runtime-grpc", &containerd.Registration{
-		Type: containerd.GRPCPlugin,
+	plugin.Register("runtime-grpc", &plugin.Registration{
+		Type: plugin.GRPCPlugin,
 		Init: New,
 	})
 }
 
-func New(ic *containerd.InitContext) (interface{}, error) {
+func New(ic *plugin.InitContext) (interface{}, error) {
 	c, err := newCollector(ic.Context, ic.Runtimes)
 	if err != nil {
 		return nil, err

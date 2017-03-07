@@ -14,6 +14,7 @@ import (
 	"github.com/docker/containerd/api/types/container"
 	"github.com/docker/containerd/api/types/mount"
 	"github.com/docker/containerd/log"
+	"github.com/docker/containerd/plugin"
 
 	"golang.org/x/net/context"
 )
@@ -24,13 +25,13 @@ const (
 )
 
 func init() {
-	containerd.Register(runtimeName, &containerd.Registration{
-		Type: containerd.RuntimePlugin,
+	plugin.Register(runtimeName, &plugin.Registration{
+		Type: plugin.RuntimePlugin,
 		Init: New,
 	})
 }
 
-func New(ic *containerd.InitContext) (interface{}, error) {
+func New(ic *plugin.InitContext) (interface{}, error) {
 	path := filepath.Join(ic.State, runtimeName)
 	if err := os.MkdirAll(path, 0700); err != nil {
 		return nil, err
