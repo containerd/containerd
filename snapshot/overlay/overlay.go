@@ -10,17 +10,27 @@ import (
 	"sync"
 
 	"github.com/docker/containerd"
+	"github.com/docker/containerd/plugin"
 	"github.com/docker/containerd/snapshot"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
+
+func init() {
+	plugin.Register("snapshot-overlay", &plugin.Registration{
+		Type: plugin.SnapshotPlugin,
+		Init: func(ic *plugin.InitContext) (interface{}, error) {
+			return NewSnapshotter(filepath.Join(ic.Root, "snapshot", "overlay"))
+		},
+	})
+}
 
 type Snapshotter struct {
 	root  string
 	links *cache
 }
 
-func NewSnapshotter(root string) (*Snapshotter, error) {
+func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
 	}
