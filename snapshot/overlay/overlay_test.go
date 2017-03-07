@@ -11,6 +11,7 @@ import (
 
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/snapshot"
+	"github.com/docker/containerd/snapshot/storage/boltdb"
 	"github.com/docker/containerd/snapshot/storage/ql"
 	"github.com/docker/containerd/testutil"
 )
@@ -31,6 +32,24 @@ func qlSnapshotter(ctx context.Context, root string) (snapshot.Snapshotter, func
 func TestOverlay(t *testing.T) {
 	testutil.RequiresRoot(t)
 	snapshot.SnapshotterSuite(t, "Overlay", qlSnapshotter)
+}
+
+func boltSnapshotter(ctx context.Context, root string) (snapshot.Snapshotter, func(), error) {
+	store, err := boltdb.NewMetaStore(ctx, filepath.Join(root, "metadata.db"))
+	if err != nil {
+		return nil, nil, err
+	}
+	snapshotter, err := NewSnapshotter(root, store)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return snapshotter, func() {}, nil
+}
+
+func TestOverlayBolt(t *testing.T) {
+	testutil.RequiresRoot(t)
+	snapshot.SnapshotterSuite(t, "Overlay", boltSnapshotter)
 }
 
 func TestOverlayMounts(t *testing.T) {
