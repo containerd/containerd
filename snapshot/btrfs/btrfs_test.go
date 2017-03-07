@@ -11,6 +11,7 @@ import (
 
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/snapshot"
+	"github.com/docker/containerd/snapshot/testsuite"
 	"github.com/docker/containerd/testutil"
 )
 
@@ -20,7 +21,7 @@ const (
 
 func TestBtrfs(t *testing.T) {
 	testutil.RequiresRoot(t)
-	snapshot.SnapshotterSuite(t, "Btrfs", func(root string) (snapshot.Snapshotter, func(), error) {
+	testsuite.SnapshotterSuite(t, "Btrfs", func(root string) (snapshot.Snapshotter, func(), error) {
 		device := setupBtrfsLoopbackDevice(t, root)
 		snapshotter, err := NewSnapshotter(device.deviceName, root)
 		if err != nil {
