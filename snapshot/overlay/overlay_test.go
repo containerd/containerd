@@ -11,12 +11,13 @@ import (
 
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/snapshot"
+	"github.com/docker/containerd/snapshot/testsuite"
 	"github.com/docker/containerd/testutil"
 )
 
 func TestOverlay(t *testing.T) {
 	testutil.RequiresRoot(t)
-	snapshot.SnapshotterSuite(t, "Overlay", func(root string) (snapshot.Snapshotter, func(), error) {
+	testsuite.SnapshotterSuite(t, "Overlay", func(root string) (snapshot.Snapshotter, func(), error) {
 		snapshotter, err := NewSnapshotter(root)
 		if err != nil {
 			t.Fatal(err)
