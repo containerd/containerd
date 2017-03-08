@@ -21,6 +21,7 @@ import (
 	"github.com/docker/containerd/content"
 	"github.com/docker/containerd/log"
 	"github.com/docker/containerd/plugin"
+	"github.com/docker/containerd/snapshot"
 	"github.com/docker/containerd/utils"
 	metrics "github.com/docker/go-metrics"
 	"github.com/pkg/errors"
@@ -101,7 +102,11 @@ func main() {
 		if err != nil {
 			return err
 		}
-		services, err := loadServices(runtimes, store)
+		snapshotter, err := loadSnapshotter(store)
+		if err != nil {
+			return err
+		}
+		services, err := loadServices(runtimes, store, snapshotter)
 		if err != nil {
 			return err
 		}
@@ -248,12 +253,45 @@ func loadRuntimes() (map[string]containerd.Runtime, error) {
 	return o, nil
 }
 
+func loadSnapshotter(store *content.Store) (snapshot.Snapshotter, error) {
+	for name, sr := range plugin.Registrations() {
+		if sr.Type != plugin.SnapshotPlugin {
+			continue
+		}
+		moduleName := fmt.Sprintf("snapshot-%s", conf.Snapshotter)
+		if name != moduleName {
+			continue
+		}
+
+		log.G(global).Infof("loading snapshot plugin %q...", name)
+		ic := &plugin.InitContext{
+			Root:    conf.Root,
+			State:   conf.State,
+			Store:   store,
+			Context: log.WithModule(global, moduleName),
+		}
+		if sr.Config != nil {
+			if err := conf.decodePlugin(name, sr.Config); err != nil {
+				return nil, err
+			}
+			ic.Config = sr.Config
+		}
+		sn, err := sr.Init(ic)
+		if err != nil {
+			return nil, err
+		}
+
+		return sn.(snapshot.Snapshotter), nil
+	}
+	return nil, fmt.Errorf("snapshotter not loaded: %v", conf.Snapshotter)
+}
+
 func newGRPCServer() *grpc.Server {
 	s := grpc.NewServer(grpc.UnaryInterceptor(interceptor))
 	return s
 }
 
-func loadServices(runtimes map[string]containerd.Runtime, store *content.Store) ([]plugin.Service, error) {
+func loadServices(runtimes map[string]containerd.Runtime, store *content.Store, sn snapshot.Snapshotter) ([]plugin.Service, error) {
 	var o []plugin.Service
 	for name, sr := range plugin.Registrations() {
 		if sr.Type != plugin.GRPCPlugin {
@@ -261,11 +299,12 @@ func loadServices(runtimes map[string]containerd.Runtime, store *content.Store) 
 		}
 		log.G(global).Infof("loading grpc service plugin %q...", name)
 		ic := &plugin.InitContext{
-			Root:     conf.Root,
-			State:    conf.State,
-			Context:  log.WithModule(global, fmt.Sprintf("service-%s", name)),
-			Runtimes: runtimes,
-			Store:    store,
+			Root:        conf.Root,
+			State:       conf.State,
+			Context:     log.WithModule(global, fmt.Sprintf("service-%s", name)),
+			Runtimes:    runtimes,
+			Store:       store,
+			Snapshotter: sn,
 		}
 		if sr.Config != nil {
 			if err := conf.decodePlugin(name, sr.Config); err != nil {

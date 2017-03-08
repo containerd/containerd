@@ -6,6 +6,7 @@ import (
 
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/content"
+	"github.com/docker/containerd/snapshot"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -16,6 +17,7 @@ type PluginType int
 const (
 	RuntimePlugin PluginType = iota + 1
 	GRPCPlugin
+	SnapshotPlugin
 )
 
 type Registration struct {
@@ -25,12 +27,13 @@ type Registration struct {
 }
 
 type InitContext struct {
-	Root     string
-	State    string
-	Runtimes map[string]containerd.Runtime
-	Store    *content.Store
-	Config   interface{}
-	Context  context.Context
+	Root        string
+	State       string
+	Runtimes    map[string]containerd.Runtime
+	Store       *content.Store
+	Snapshotter snapshot.Snapshotter
+	Config      interface{}
+	Context     context.Context
 }
 
 type Service interface {

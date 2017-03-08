@@ -10,17 +10,36 @@ import (
 	"strings"
 
 	"github.com/docker/containerd"
+	"github.com/docker/containerd/plugin"
 	"github.com/docker/containerd/snapshot"
 	"github.com/pkg/errors"
 	"github.com/stevvooe/go-btrfs"
 )
+
+type btrfsConfig struct {
+	Device string `toml:"device"`
+}
+
+func init() {
+	plugin.Register("snapshot-btrfs", &plugin.Registration{
+		Type:   plugin.SnapshotPlugin,
+		Config: &btrfsConfig{},
+		Init: func(ic *plugin.InitContext) (interface{}, error) {
+			conf := ic.Config.(*btrfsConfig)
+			if conf.Device == "" {
+				return nil, errors.Errorf("btrfs requires \"device\" configuration")
+			}
+			return NewSnapshotter(conf.Device, filepath.Join(ic.Root, "snapshot", "btrfs"))
+		},
+	})
+}
 
 type Snapshotter struct {
 	device string // maybe we can resolve it with path?
 	root   string // root provides paths for internal storage.
 }
 
-func NewSnapshotter(device, root string) (*Snapshotter, error) {
+func NewSnapshotter(device, root string) (snapshot.Snapshotter, error) {
 	var (
 		active    = filepath.Join(root, "active")
 		snapshots = filepath.Join(root, "snapshots")
