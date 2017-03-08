@@ -330,6 +330,9 @@ func serveGRPC(server *grpc.Server) error {
 	if err != nil {
 		return err
 	}
+	if err := os.Chown(path, conf.GRPC.Uid, conf.GRPC.Gid); err != nil {
+		return err
+	}
 	go func() {
 		defer l.Close()
 		if err := server.Serve(l); err != nil {

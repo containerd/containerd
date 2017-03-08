@@ -58,6 +58,8 @@ func (c *config) decodePlugin(name string, v interface{}) error {
 
 type grpcConfig struct {
 	Socket string `toml:"socket"`
+	Uid    int    `toml:"uid"`
+	Gid    int    `toml:"gid"`
 }
 
 type debug struct {
