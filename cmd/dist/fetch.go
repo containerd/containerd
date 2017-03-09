@@ -45,9 +45,8 @@ Most of this is experimental and there are few leaps to make this work.`,
 	Flags: []cli.Flag{},
 	Action: func(clicontext *cli.Context) error {
 		var (
-			ctx     = background
-			locator = clicontext.Args().First()
-			object  = clicontext.Args().Get(1)
+			ctx = background
+			ref = clicontext.Args().First()
 		)
 
 		conn, err := connectGRPC(clicontext)
@@ -59,11 +58,7 @@ Most of this is experimental and there are few leaps to make this work.`,
 		if err != nil {
 			return err
 		}
-
-		fetcher, err := resolver.Resolve(ctx, locator)
-		if err != nil {
-			return err
-		}
+		ctx = withJobsContext(ctx)
 
 		ingester := contentservice.NewIngesterFromClient(contentapi.NewContentClient(conn))
 		cs, err := resolveContentStore(clicontext)
@@ -73,10 +68,17 @@ Most of this is experimental and there are few leaps to make this work.`,
 
 		eg, ctx := errgroup.WithContext(ctx)
 
-		ctx = withJobsContext(ctx)
-
+		resolved := make(chan struct{})
 		eg.Go(func() error {
-			return fetchManifest(ctx, ingester, fetcher, object)
+			addJob(ctx, ref)
+			name, desc, fetcher, err := resolver.Resolve(ctx, ref)
+			if err != nil {
+				return err
+			}
+			log.G(ctx).WithField("image", name).Debug("fetching")
+			close(resolved)
+
+			return dispatch(ctx, ingester, fetcher, desc)
 		})
 
 		errs := make(chan error)
@@ -96,8 +98,7 @@ Most of this is experimental and there are few leaps to make this work.`,
 			case <-ticker.C:
 				fw.Flush()
 
-				tw := tabwriter.NewWriter(fw, 1, 8, 1, '\t', 0)
-				// fmt.Fprintln(tw, "REF\tSIZE\tAGE")
+				tw := tabwriter.NewWriter(fw, 1, 8, 1, ' ', 0)
 				var total int64
 
 				js := getJobs(ctx)
@@ -137,10 +138,20 @@ Most of this is experimental and there are few leaps to make this work.`,
 					if _, ok := activeSeen[j]; ok {
 						continue
 					}
+					status := "done"
+
+					if j == ref {
+						select {
+						case <-resolved:
+							status = "resolved"
+						default:
+							status = "resolving"
+						}
+					}
 
 					statuses[j] = statusInfo{
 						Ref:    j,
-						Status: "done", // for now!
+						Status: status, // for now!
 					}
 				}
 
@@ -151,21 +162,27 @@ Most of this is experimental and there are few leaps to make this work.`,
 					switch status.Status {
 					case "downloading":
 						bar := progress.Bar(float64(status.Offset) / float64(status.Total))
-						fmt.Fprintf(tw, "%s:\t%s\t%40r\t%8.8s/%s\n",
+						fmt.Fprintf(tw, "%s:\t%s\t%40r\t%8.8s/%s\t\n",
 							status.Ref,
 							status.Status,
 							bar,
 							progress.Bytes(status.Offset), progress.Bytes(status.Total))
-					case "done":
+					case "resolving":
+						bar := progress.Bar(0.0)
+						fmt.Fprintf(tw, "%s:\t%s\t%40r\t\n",
+							status.Ref,
+							status.Status,
+							bar)
+					default:
 						bar := progress.Bar(1.0)
-						fmt.Fprintf(tw, "%s:\t%s\t%40r\n",
+						fmt.Fprintf(tw, "%s:\t%s\t%40r\t\n",
 							status.Ref,
 							status.Status,
 							bar)
 					}
 				}
 
-				fmt.Fprintf(tw, "elapsed: %-4.1fs\ttotal: %7.6v\t(%v)\n",
+				fmt.Fprintf(tw, "elapsed: %-4.1fs\ttotal: %7.6v\t(%v)\t\n",
 					time.Since(start).Seconds(),
 					// TODO(stevvooe): These calculations are actually way off.
 					// Need to account for previously downloaded data. These
@@ -250,14 +267,11 @@ func (j *jobs) jobs() []string {
 	return jobs
 }
 
-func fetchManifest(ctx context.Context, ingester content.Ingester, fetcher remotes.Fetcher, object string, hints ...string) error {
-	const manifestMediaType = "application/vnd.docker.distribution.manifest.v2+json"
-	hints = append(hints, "mediatype:"+manifestMediaType)
-
-	ref := "manifest-" + object
+func fetchManifest(ctx context.Context, ingester content.Ingester, fetcher remotes.Fetcher, desc ocispec.Descriptor) error {
+	ref := "manifest-" + desc.Digest.String()
 	addJob(ctx, ref)
 
-	rc, err := fetcher.Fetch(ctx, object, hints...)
+	rc, err := fetcher.Fetch(ctx, desc)
 	if err != nil {
 		return err
 	}
@@ -291,18 +305,10 @@ func fetchManifest(ctx context.Context, ingester content.Ingester, fetcher remot
 }
 
 func fetch(ctx context.Context, ingester content.Ingester, fetcher remotes.Fetcher, desc ocispec.Descriptor) error {
-	var (
-		hints  []string
-		object = desc.Digest.String()
-	)
-	if desc.MediaType != "" {
-		hints = append(hints, "mediatype:"+desc.MediaType)
-	}
-
-	ref := "fetch-" + object
+	ref := "fetch-" + desc.Digest.String()
 	addJob(ctx, ref)
 	log.G(ctx).Debug("fetch")
-	rc, err := fetcher.Fetch(ctx, object, hints...)
+	rc, err := fetcher.Fetch(ctx, desc)
 	if err != nil {
 		log.G(ctx).WithError(err).Error("fetch error")
 		return err
@@ -328,7 +334,7 @@ func dispatch(ctx context.Context, ingester content.Ingester, fetcher remotes.Fe
 			switch desc.MediaType {
 			case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
 				eg.Go(func() error {
-					return fetchManifest(ctx, ingester, fetcher, desc.Digest.String(), "mediatype:"+desc.MediaType)
+					return fetchManifest(ctx, ingester, fetcher, desc)
 				})
 			case MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
 				return fmt.Errorf("%v not yet supported", desc.MediaType)
