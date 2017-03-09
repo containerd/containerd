@@ -19,6 +19,7 @@ import (
 	"github.com/docker/containerd"
 	contentapi "github.com/docker/containerd/api/services/content"
 	api "github.com/docker/containerd/api/services/execution"
+	rootfsapi "github.com/docker/containerd/api/services/rootfs"
 	"github.com/docker/containerd/content"
 	"github.com/docker/containerd/log"
 	"github.com/docker/containerd/plugin"
@@ -366,6 +367,8 @@ func interceptor(ctx gocontext.Context,
 		ctx = log.WithModule(ctx, "execution")
 	case contentapi.ContentServer:
 		ctx = log.WithModule(ctx, "content")
+	case rootfsapi.RootFSServer:
+		ctx = log.WithModule(ctx, "rootfs")
 	default:
 		fmt.Printf("unknown GRPC server type: %#v\n", info.Server)
 	}

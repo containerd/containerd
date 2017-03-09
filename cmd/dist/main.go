@@ -69,6 +69,7 @@ distribution tool
 		deleteCommand,
 		listCommand,
 		applyCommand,
+		rootfsCommand,
 	}
 	app.Before = func(context *cli.Context) error {
 		var (
