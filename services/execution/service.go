@@ -74,6 +74,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 		opts.Rootfs = append(opts.Rootfs, containerd.Mount{
 			Type:    m.Type,
 			Source:  m.Source,
+			Target:  m.Target,
 			Options: m.Options,
 		})
 	}
