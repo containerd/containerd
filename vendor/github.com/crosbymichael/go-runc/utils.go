@@ -1,9 +1,7 @@
 package runc
 
 import (
-	"fmt"
 	"io/ioutil"
-	"os/exec"
 	"strconv"
 	"syscall"
 )
@@ -16,21 +14,6 @@ func ReadPidFile(path string) (int, error) {
 		return -1, err
 	}
 	return strconv.Atoi(string(data))
-}
-
-// runOrError will run the provided command.  If an error is
-// encountered and neither Stdout or Stderr was set the error and the
-// stderr of the command will be returned in the format of <error>:
-// <stderr>
-func runOrError(cmd *exec.Cmd) error {
-	if cmd.Stdout != nil || cmd.Stderr != nil {
-		return cmd.Run()
-	}
-	data, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%s: %s", err, data)
-	}
-	return nil
 }
 
 const exitSignalOffset = 128
