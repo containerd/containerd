@@ -23,6 +23,7 @@ import (
 	"github.com/docker/containerd/plugin"
 	"github.com/docker/containerd/reaper"
 	"github.com/docker/containerd/snapshot"
+	"github.com/docker/containerd/sys"
 	"github.com/docker/containerd/utils"
 	metrics "github.com/docker/go-metrics"
 	"github.com/pkg/errors"
@@ -85,6 +86,12 @@ func main() {
 		// we don't miss any signals during boot
 		signals := make(chan os.Signal, 2048)
 		signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1, syscall.SIGCHLD)
+		if conf.Subreaper {
+			log.G(global).Info("setting subreaper...")
+			if err := sys.SetSubreaper(1); err != nil {
+				return err
+			}
+		}
 		log.G(global).Info("starting containerd boot...")
 
 		// load all plugins into containerd
