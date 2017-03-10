@@ -44,6 +44,8 @@ type config struct {
 	Snapshotter string `toml:"snapshotter"`
 	// Plugins provides plugin specific configuration for the initialization of a plugin
 	Plugins map[string]toml.Primitive `toml:"plugins"`
+	// Enable containerd as a subreaper
+	Subreaper bool `toml:"subreaper"`
 
 	md toml.MetaData
 }
@@ -58,6 +60,8 @@ func (c *config) decodePlugin(name string, v interface{}) error {
 
 type grpcConfig struct {
 	Socket string `toml:"socket"`
+	Uid    int    `toml:"uid"`
+	Gid    int    `toml:"gid"`
 }
 
 type debug struct {

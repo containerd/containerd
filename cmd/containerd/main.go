@@ -21,7 +21,9 @@ import (
 	"github.com/docker/containerd/content"
 	"github.com/docker/containerd/log"
 	"github.com/docker/containerd/plugin"
+	"github.com/docker/containerd/reaper"
 	"github.com/docker/containerd/snapshot"
+	"github.com/docker/containerd/sys"
 	"github.com/docker/containerd/utils"
 	metrics "github.com/docker/go-metrics"
 	"github.com/pkg/errors"
@@ -83,7 +85,13 @@ func main() {
 		// start the signal handler as soon as we can to make sure that
 		// we don't miss any signals during boot
 		signals := make(chan os.Signal, 2048)
-		signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1)
+		signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1, syscall.SIGCHLD)
+		if conf.Subreaper {
+			log.G(global).Info("setting subreaper...")
+			if err := sys.SetSubreaper(1); err != nil {
+				return err
+			}
+		}
 		log.G(global).Info("starting containerd boot...")
 
 		// load all plugins into containerd
@@ -330,6 +338,9 @@ func serveGRPC(server *grpc.Server) error {
 	if err != nil {
 		return err
 	}
+	if err := os.Chown(path, conf.GRPC.Uid, conf.GRPC.Gid); err != nil {
+		return err
+	}
 	go func() {
 		defer l.Close()
 		if err := server.Serve(l); err != nil {
@@ -360,6 +371,10 @@ func handleSignals(signals chan os.Signal, server *grpc.Server) error {
 	for s := range signals {
 		log.G(global).WithField("signal", s).Debug("received signal")
 		switch s {
+		case syscall.SIGCHLD:
+			if _, err := reaper.Reap(); err != nil {
+				log.G(global).WithError(err).Error("reap containerd processes")
+			}
 		default:
 			server.Stop()
 			return nil

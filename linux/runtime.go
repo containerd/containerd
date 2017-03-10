@@ -22,13 +22,20 @@ import (
 const (
 	runtimeName    = "linux"
 	configFilename = "config.json"
+	defaultRuntime = "runc"
 )
 
 func init() {
 	plugin.Register(runtimeName, &plugin.Registration{
-		Type: plugin.RuntimePlugin,
-		Init: New,
+		Type:   plugin.RuntimePlugin,
+		Init:   New,
+		Config: &Config{},
 	})
+}
+
+type Config struct {
+	// Runtime is a path or name of an OCI runtime used by the shim
+	Runtime string `toml:"runtime"`
 }
 
 func New(ic *plugin.InitContext) (interface{}, error) {
@@ -36,9 +43,14 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	if err := os.MkdirAll(path, 0700); err != nil {
 		return nil, err
 	}
+	cfg := ic.Config.(*Config)
+	if cfg.Runtime == "" {
+		cfg.Runtime = defaultRuntime
+	}
 	c, cancel := context.WithCancel(ic.Context)
 	return &Runtime{
 		root:          path,
+		runtime:       cfg.Runtime,
 		events:        make(chan *containerd.Event, 2048),
 		eventsContext: c,
 		eventsCancel:  cancel,
@@ -46,7 +58,8 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 }
 
 type Runtime struct {
-	root string
+	root    string
+	runtime string
 
 	events        chan *containerd.Event
 	eventsContext context.Context
@@ -70,7 +83,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts containerd.CreateO
 	sopts := &shim.CreateRequest{
 		ID:       id,
 		Bundle:   path,
-		Runtime:  "runc",
+		Runtime:  r.runtime,
 		Stdin:    opts.IO.Stdin,
 		Stdout:   opts.IO.Stdout,
 		Stderr:   opts.IO.Stderr,
