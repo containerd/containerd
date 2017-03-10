@@ -11,7 +11,7 @@ import (
 
 // Reap should be called when the process receives an SIGCHLD.  Reap will reap
 // all exited processes and close their wait channels
-func Reap() error {
+func Reap() ([]utils.Exit, error) {
 	exits, err := utils.Reap(false)
 	for _, e := range exits {
 		Default.mu.Lock()
@@ -28,7 +28,7 @@ func Reap() error {
 		delete(Default.cmds, e.Pid)
 		Default.mu.Unlock()
 	}
-	return err
+	return exits, err
 }
 
 var Default = &Monitor{

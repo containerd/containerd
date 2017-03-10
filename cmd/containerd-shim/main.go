@@ -11,11 +11,12 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/Sirupsen/logrus"
+	runc "github.com/crosbymichael/go-runc"
 	"github.com/docker/containerd"
 	shimapi "github.com/docker/containerd/api/services/shim"
 	"github.com/docker/containerd/linux/shim"
+	"github.com/docker/containerd/reaper"
 	"github.com/docker/containerd/sys"
-	"github.com/docker/containerd/utils"
 	"github.com/urfave/cli"
 )
 
@@ -78,6 +79,9 @@ func main() {
 func setupSignals() (chan os.Signal, error) {
 	signals := make(chan os.Signal, 2048)
 	signal.Notify(signals)
+	// make sure runc is setup to use the monitor
+	// for waiting on processes
+	runc.Monitor = reaper.Default
 	// set the shim as the subreaper for all orphaned processes created by the container
 	if err := sys.SetSubreaper(1); err != nil {
 		return nil, err
@@ -108,7 +112,7 @@ func handleSignals(signals chan os.Signal, server *grpc.Server, service *shim.Se
 		logrus.WithField("signal", s).Debug("received signal")
 		switch s {
 		case syscall.SIGCHLD:
-			exits, err := utils.Reap(false)
+			exits, err := reaper.Reap()
 			if err != nil {
 				logrus.WithError(err).Error("reap exit status")
 			}
