@@ -5,6 +5,7 @@ import (
 
 	"github.com/docker/containerd"
 	rootfsapi "github.com/docker/containerd/api/services/rootfs"
+	containerd_v1_types "github.com/docker/containerd/api/types/mount"
 	"github.com/docker/containerd/content"
 	"github.com/docker/containerd/log"
 	"github.com/docker/containerd/plugin"
@@ -63,6 +64,38 @@ func (s *Service) Prepare(ctx context.Context, pr *rootfsapi.PrepareRequest) (*r
 	}, nil
 }
 
+func (s *Service) InitMounts(ctx context.Context, ir *rootfsapi.InitMountsRequest) (*rootfsapi.MountResponse, error) {
+	mounts, err := rootfs.InitRootFS(ctx, ir.Name, ir.ChainID, ir.Readonly, s.snapshotter, mounter{})
+	if err != nil {
+		return nil, err
+	}
+	return &rootfsapi.MountResponse{
+		Mounts: apiMounts(mounts),
+	}, nil
+}
+
+func (s *Service) Mounts(ctx context.Context, mr *rootfsapi.MountsRequest) (*rootfsapi.MountResponse, error) {
+	mounts, err := rootfs.GetRootFS(ctx, mr.Name, s.snapshotter)
+	if err != nil {
+		return nil, err
+	}
+	return &rootfsapi.MountResponse{
+		Mounts: apiMounts(mounts),
+	}, nil
+}
+
+func apiMounts(mounts []containerd.Mount) []*containerd_v1_types.Mount {
+	am := make([]*containerd_v1_types.Mount, len(mounts))
+	for i, m := range mounts {
+		am[i] = &containerd_v1_types.Mount{
+			Type:    m.Type,
+			Source:  m.Source,
+			Options: m.Options,
+		}
+	}
+	return am
+}
+
 type mounter struct{}
 
 func (mounter) Mount(dir string, mounts ...containerd.Mount) error {
@@ -80,7 +113,3 @@ func emptyResolver(digest.Digest) digest.Digest {
 func noopRegister(digest.Digest, digest.Digest) error {
 	return nil
 }
-
-//func (s *Service) Mounts(ctx context.Context, mr *rootfsapi.MountRequest) (*rootfsapi.MountResponse, error) {
-//
-//}
