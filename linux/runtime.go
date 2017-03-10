@@ -38,7 +38,7 @@ type Config struct {
 	Runtime string `toml:"runtime"`
 }
 
-func New(ic *containerd.InitContext) (interface{}, error) {
+func New(ic *plugin.InitContext) (interface{}, error) {
 	path := filepath.Join(ic.State, runtimeName)
 	if err := os.MkdirAll(path, 0700); err != nil {
 		return nil, err

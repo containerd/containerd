@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc/grpclog"
 
 	"github.com/docker/containerd/api/services/shim"
+	"github.com/docker/containerd/reaper"
 	"github.com/docker/containerd/utils"
 	"github.com/pkg/errors"
 )
@@ -41,11 +42,9 @@ func newShim(path string) (shim.ShimClient, error) {
 		Cloneflags: syscall.CLONE_NEWNS,
 		Setpgid:    true,
 	}
-	if err := cmd.Start(); err != nil {
+	if err := reaper.Default.Start(cmd); err != nil {
 		return nil, errors.Wrapf(err, "failed to start shim")
 	}
-	// since we are currently the parent go ahead and make sure we wait on the shim
-	go cmd.Wait()
 	return connectShim(socket)
 }
 
