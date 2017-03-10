@@ -25,24 +25,20 @@ type initProcess struct {
 	pid     int
 }
 
-func newInitProcess(context context.Context, r *shimapi.CreateRequest) (*initProcess, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
+func newInitProcess(context context.Context, path string, r *shimapi.CreateRequest) (*initProcess, error) {
 	for _, rm := range r.Rootfs {
 		m := &containerd.Mount{
 			Type:    rm.Type,
 			Source:  rm.Source,
 			Options: rm.Options,
 		}
-		if err := m.Mount(filepath.Join(cwd, "rootfs")); err != nil {
+		if err := m.Mount(filepath.Join(path, "rootfs")); err != nil {
 			return nil, err
 		}
 	}
 	runtime := &runc.Runc{
 		Command:      r.Runtime,
-		Log:          filepath.Join(cwd, "log.json"),
+		Log:          filepath.Join(path, "log.json"),
 		LogFormat:    runc.JSON,
 		PdeathSignal: syscall.SIGKILL,
 	}
@@ -52,11 +48,12 @@ func newInitProcess(context context.Context, r *shimapi.CreateRequest) (*initPro
 		runc:   runtime,
 	}
 	var (
+		err    error
 		socket *runc.ConsoleSocket
 		io     runc.IO
 	)
 	if r.Terminal {
-		if socket, err = runc.NewConsoleSocket(filepath.Join(cwd, "pty.sock")); err != nil {
+		if socket, err = runc.NewConsoleSocket(filepath.Join(path, "pty.sock")); err != nil {
 			return nil, err
 		}
 		defer os.Remove(socket.Path())
@@ -68,7 +65,7 @@ func newInitProcess(context context.Context, r *shimapi.CreateRequest) (*initPro
 		p.io = io
 	}
 	opts := &runc.CreateOpts{
-		PidFile:       filepath.Join(cwd, "init.pid"),
+		PidFile:       filepath.Join(path, "init.pid"),
 		ConsoleSocket: socket,
 		IO:            io,
 		NoPivot:       r.NoPivot,

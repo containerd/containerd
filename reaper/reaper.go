@@ -11,33 +11,35 @@ import (
 
 // Reap should be called when the process receives an SIGCHLD.  Reap will reap
 // all exited processes and close their wait channels
-func Reap() ([]utils.Exit, error) {
+func Reap() error {
 	exits, err := utils.Reap(false)
 	for _, e := range exits {
-		Default.mu.Lock()
+		Default.Lock()
 		c, ok := Default.cmds[e.Pid]
-		Default.mu.Unlock()
+		Default.Unlock()
 		if !ok {
 			continue
 		}
-		// after we get an exit, call wait on the go process to make sure all
-		// pipes are closed and finalizers are run on the process
-		c.c.Wait()
-		c.exitCh <- e.Status
-		Default.mu.Lock()
+		if c.c != nil {
+			// after we get an exit, call wait on the go process to make sure all
+			// pipes are closed and finalizers are run on the process
+			c.c.Wait()
+		}
+		c.ExitCh <- e.Status
+		Default.Lock()
 		delete(Default.cmds, e.Pid)
-		Default.mu.Unlock()
+		Default.Unlock()
 	}
-	return exits, err
+	return err
 }
 
 var Default = &Monitor{
-	cmds: make(map[int]*cmd),
+	cmds: make(map[int]*Cmd),
 }
 
 type Monitor struct {
-	mu   sync.Mutex
-	cmds map[int]*cmd
+	sync.Mutex
+	cmds map[int]*Cmd
 }
 
 func (m *Monitor) Output(c *exec.Cmd) ([]byte, error) {
@@ -61,18 +63,18 @@ func (m *Monitor) CombinedOutput(c *exec.Cmd) ([]byte, error) {
 
 // Start starts the command a registers the process with the reaper
 func (m *Monitor) Start(c *exec.Cmd) error {
-	rc := &cmd{
+	rc := &Cmd{
 		c:      c,
-		exitCh: make(chan int, 1),
+		ExitCh: make(chan int, 1),
 	}
-	m.mu.Lock()
+	m.Lock()
 	// start the process
 	if err := rc.c.Start(); err != nil {
-		m.mu.Unlock()
+		m.Unlock()
 		return err
 	}
 	m.cmds[rc.c.Process.Pid] = rc
-	m.mu.Unlock()
+	m.Unlock()
 	return nil
 }
 
@@ -86,16 +88,26 @@ func (m *Monitor) Run(c *exec.Cmd) error {
 }
 
 func (m *Monitor) Wait(c *exec.Cmd) (int, error) {
-	m.mu.Lock()
-	rc, ok := m.cmds[c.Process.Pid]
-	m.mu.Unlock()
+	return m.WaitPid(c.Process.Pid)
+}
+
+func (m *Monitor) Register(pid int, c *Cmd) {
+	m.Lock()
+	m.cmds[pid] = c
+	m.Unlock()
+}
+
+func (m *Monitor) WaitPid(pid int) (int, error) {
+	m.Lock()
+	rc, ok := m.cmds[pid]
+	m.Unlock()
 	if !ok {
 		return 255, fmt.Errorf("process does not exist")
 	}
-	return <-rc.exitCh, nil
+	return <-rc.ExitCh, nil
 }
 
-type cmd struct {
+type Cmd struct {
 	c      *exec.Cmd
-	exitCh chan int
+	ExitCh chan int
 }

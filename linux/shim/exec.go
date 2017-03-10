@@ -25,22 +25,19 @@ type execProcess struct {
 	parent *initProcess
 }
 
-func newExecProcess(context context.Context, r *shimapi.ExecRequest, parent *initProcess, id int) (process, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
+func newExecProcess(context context.Context, path string, r *shimapi.ExecRequest, parent *initProcess, id int) (process, error) {
 	e := &execProcess{
 		id:     id,
 		parent: parent,
 	}
 	var (
+		err     error
 		socket  *runc.ConsoleSocket
 		io      runc.IO
-		pidfile = filepath.Join(cwd, fmt.Sprintf("%d.pid", id))
+		pidfile = filepath.Join(path, fmt.Sprintf("%d.pid", id))
 	)
 	if r.Terminal {
-		if socket, err = runc.NewConsoleSocket(filepath.Join(cwd, "pty.sock")); err != nil {
+		if socket, err = runc.NewConsoleSocket(filepath.Join(path, "pty.sock")); err != nil {
 			return nil, err
 		}
 		defer os.Remove(socket.Path())

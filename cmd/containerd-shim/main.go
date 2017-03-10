@@ -57,16 +57,20 @@ func main() {
 		if err := setupRoot(); err != nil {
 			return err
 		}
+		path, err := os.Getwd()
+		if err != nil {
+			return err
+		}
 		var (
 			server = grpc.NewServer()
-			sv     = shim.New()
+			sv     = shim.New(path)
 		)
 		logrus.Debug("registering grpc server")
 		shimapi.RegisterShimServer(server, sv)
 		if err := serve(server, "shim.sock"); err != nil {
 			return err
 		}
-		return handleSignals(signals, server, sv)
+		return handleSignals(signals, server)
 	}
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "containerd-shim: %s\n", err)
@@ -107,23 +111,13 @@ func serve(server *grpc.Server, path string) error {
 	return nil
 }
 
-func handleSignals(signals chan os.Signal, server *grpc.Server, service *shim.Service) error {
+func handleSignals(signals chan os.Signal, server *grpc.Server) error {
 	for s := range signals {
 		logrus.WithField("signal", s).Debug("received signal")
 		switch s {
 		case syscall.SIGCHLD:
-			exits, err := reaper.Reap()
-			if err != nil {
+			if err := reaper.Reap(); err != nil {
 				logrus.WithError(err).Error("reap exit status")
-			}
-			for _, e := range exits {
-				logrus.WithFields(logrus.Fields{
-					"status": e.Status,
-					"pid":    e.Pid,
-				}).Debug("process exited")
-				if err := service.ProcessExit(e); err != nil {
-					return err
-				}
 			}
 		case syscall.SIGTERM, syscall.SIGINT:
 			// TODO: should we forward signals to the processes if they are still running?
