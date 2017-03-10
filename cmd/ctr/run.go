@@ -193,11 +193,15 @@ var runCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		abs, err := filepath.Abs(context.String("rootfs"))
+		if err != nil {
+			return err
+		}
 		// for ctr right now just do a bind mount
 		rootfs := []*mount.Mount{
 			{
 				Type:   "bind",
-				Source: context.String("rootfs"),
+				Source: abs,
 				Options: []string{
 					"rw",
 					"rbind",
