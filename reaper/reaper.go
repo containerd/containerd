@@ -65,7 +65,6 @@ func (m *Monitor) Start(c *exec.Cmd) error {
 		c:      c,
 		exitCh: make(chan int, 1),
 	}
-	// make sure we register the command first before starting the process
 	m.mu.Lock()
 	// start the process
 	if err := rc.c.Start(); err != nil {
@@ -87,7 +86,9 @@ func (m *Monitor) Run(c *exec.Cmd) error {
 }
 
 func (m *Monitor) Wait(c *exec.Cmd) (int, error) {
+	m.mu.Lock()
 	rc, ok := m.cmds[c.Process.Pid]
+	m.mu.Unlock()
 	if !ok {
 		return 255, fmt.Errorf("process does not exist")
 	}
