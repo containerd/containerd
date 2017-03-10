@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
+	"os"
+	"strings"
 
 	contentapi "github.com/docker/containerd/api/services/content"
 	rootfsapi "github.com/docker/containerd/api/services/rootfs"
@@ -21,6 +24,7 @@ var rootfsCommand = cli.Command{
 	Usage: "rootfs setups a rootfs",
 	Subcommands: []cli.Command{
 		rootfsPrepareCommand,
+		rootfsInitCommand,
 	},
 }
 
@@ -59,6 +63,54 @@ var rootfsPrepareCommand = cli.Command{
 		}
 
 		log.G(ctx).Infof("chain ID: %s", chainID.String())
+
+		return nil
+	},
+}
+
+var rootfsInitCommand = cli.Command{
+	Name:      "init",
+	Usage:     "init gets mount commands for digest",
+	ArgsUsage: "[flags] <digest> <target>",
+	Flags:     []cli.Flag{},
+	Action: func(clicontext *cli.Context) error {
+		var (
+			ctx = background
+		)
+
+		if clicontext.NArg() != 2 {
+			return cli.ShowSubcommandHelp(clicontext)
+		}
+
+		dgst, err := digest.Parse(clicontext.Args().Get(0))
+		if err != nil {
+			return err
+		}
+		target := clicontext.Args().Get(1)
+
+		log.G(ctx).Infof("initializing mounts %s", dgst.String())
+
+		conn, err := connectGRPC(clicontext)
+		if err != nil {
+			return err
+		}
+
+		rclient := rootfsapi.NewRootFSClient(conn)
+
+		ir := &rootfsapi.InitMountsRequest{
+			Name:    target,
+			ChainID: dgst,
+		}
+
+		resp, err := rclient.InitMounts(ctx, ir)
+		if err != nil {
+			return err
+		}
+
+		for _, m := range resp.Mounts {
+			fmt.Fprintf(os.Stdout, "mount -t %s %s %s -o %s\n", m.Type, m.Source, target, strings.Join(m.Options, ","))
+		}
+		log.G(ctx).Infof("Mount response: %#v", resp)
 
 		return nil
 	},
