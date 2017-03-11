@@ -24,7 +24,7 @@ func InitRootFS(ctx context.Context, name string, parent digest.Digest, readonly
 	if err == nil {
 		return nil, errors.Errorf("rootfs already exists")
 	}
-	// TODO: check if should return error
+	// TODO: ensure not exist error once added to snapshot package
 
 	parentS := parent.String()
 
@@ -53,7 +53,7 @@ func createInitLayer(ctx context.Context, parent, initName string, initFn func(s
 	if _, err := snapshotter.Stat(ctx, initS); err == nil {
 		return initS, nil
 	}
-	// TODO: check if should return error
+	// TODO: ensure not exist error once added to snapshot package
 
 	// Create tempdir
 	td, err := ioutil.TempDir("", "create-init-")
