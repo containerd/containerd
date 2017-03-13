@@ -22,6 +22,7 @@ func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(root string)
 	t.Run("StatActive", makeTest(t, name, snapshotterFn, checkSnapshotterStatActive))
 	t.Run("StatComitted", makeTest(t, name, snapshotterFn, checkSnapshotterStatCommitted))
 	t.Run("TransitivityTest", makeTest(t, name, snapshotterFn, checkSnapshotterTransitivity))
+	t.Run("MultiCommitTest", makeTest(t, name, snapshotterFn, checkSnapshotterMultipleCommit))
 
 }
 
@@ -341,4 +342,48 @@ func checkSnapshotterTransitivity(t *testing.T, snapshotter snapshot.Snapshotter
 	assert.Equal(t, snapA, siB.Parent)
 	assert.Equal(t, "", siParentB.Parent)
 
+}
+
+// Multiple commits on same Active layer should be successful
+func checkSnapshotterMultipleCommit(t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+	ctx := context.TODO()
+
+	preparing, err := snapshotterPrepareMount(ctx, snapshotter, "preparing", "", work)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer testutil.Unmount(t, preparing)
+
+	if err = ioutil.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0777); err != nil {
+		t.Fatal(err)
+	}
+
+	snapA := filepath.Join(work, "snapA")
+	if err = snapshotter.Commit(ctx, snapA, preparing); err != nil {
+		t.Fatal(err)
+	}
+
+	//Continue the transaction to modify the file "foo"
+	if err = ioutil.WriteFile(filepath.Join(preparing, "foo"), []byte("foo bar\n"), 0777); err != nil {
+		t.Fatal(err)
+	}
+	snapB := filepath.Join(work, "snapB")
+	if err = snapshotter.Commit(ctx, snapB, preparing); err != nil {
+		t.Fatal(err)
+	}
+
+	siA, err := snapshotter.Stat(ctx, snapA)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	siB, err := snapshotter.Stat(ctx, snapB)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Since snapA and snapB are using same key "preparing"
+	// Both should share same parent ""
+	assert.Equal(t, "", siA.Parent)
+	assert.Equal(t, "", siB.Parent)
 }
