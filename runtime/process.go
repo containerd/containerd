@@ -418,7 +418,12 @@ func getControlPipe(path string) (*os.File, error) {
 
 // Signal sends the provided signal to the process
 func (p *process) Signal(s os.Signal) error {
-	return syscall.Kill(p.pid, s.(syscall.Signal))
+	// use PGID while stop process
+        pid := p.pid
+        if s == syscall.SIGTERM {
+            pid = -p.pid
+        }
+        return syscall.Kill(pid, s.(syscall.Signal))
 }
 
 // Start unblocks the associated container init process.
