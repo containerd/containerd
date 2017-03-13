@@ -43,7 +43,6 @@ var daemonFlags = []cli.Flag{
 	cli.StringFlag{
 		Name:  "log-level",
 		Usage: "Set the logging level [debug, info, warn, error, fatal, panic]",
-		Value: "info",
 	},
 	cli.StringFlag{
 		Name:  "state-dir",
