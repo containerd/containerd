@@ -22,7 +22,7 @@ func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(root string)
 	t.Run("StatActive", makeTest(t, name, snapshotterFn, checkSnapshotterStatActive))
 	t.Run("StatComitted", makeTest(t, name, snapshotterFn, checkSnapshotterStatCommitted))
 	t.Run("TransitivityTest", makeTest(t, name, snapshotterFn, checkSnapshotterTransitivity))
-
+	t.Run("PreareViewFailingtest", makeTest(t, name, snapshotterFn, checkSnapshotterPrepareView))
 }
 
 func makeTest(t *testing.T, name string, snapshotterFn func(root string) (snapshot.Snapshotter, func(), error), fn func(t *testing.T, snapshotter snapshot.Snapshotter, work string)) func(t *testing.T) {
@@ -340,5 +340,68 @@ func checkSnapshotterTransitivity(t *testing.T, snapshotter snapshot.Snapshotter
 	assert.Equal(t, "", siA.Parent)
 	assert.Equal(t, snapA, siB.Parent)
 	assert.Equal(t, "", siParentB.Parent)
+
+}
+
+// Creating two layers with Prepare or View with same key must fail.
+func checkSnapshotterPrepareView(t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+	ctx := context.TODO()
+
+	preparing, err := snapshotterPrepareMount(ctx, snapshotter, "preparing", "", work)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer testutil.Unmount(t, preparing)
+
+	snapA := filepath.Join(work, "snapA")
+	if err = snapshotter.Commit(ctx, snapA, preparing); err != nil {
+		t.Fatal(err)
+	}
+
+	// Prepare & View with same key
+	newLayer := filepath.Join(work, "newlayer")
+	if err = os.MkdirAll(preparing, 0777); err != nil {
+		t.Fatal(err)
+	}
+
+	// Prepare & View with same key
+	_, err = snapshotter.Prepare(ctx, newLayer, snapA)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = snapshotter.View(ctx, newLayer, snapA)
+	//must be err != nil
+	assert.NotNil(t, err)
+
+	// Two Prepare with same key
+	prepLayer := filepath.Join(work, "prepLayer")
+	if err = os.MkdirAll(preparing, 0777); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = snapshotter.Prepare(ctx, prepLayer, snapA)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = snapshotter.Prepare(ctx, prepLayer, snapA)
+	//must be err != nil
+	assert.NotNil(t, err)
+
+	// Two View with same key
+	viewLayer := filepath.Join(work, "viewLayer")
+	if err = os.MkdirAll(preparing, 0777); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = snapshotter.View(ctx, viewLayer, snapA)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = snapshotter.View(ctx, viewLayer, snapA)
+	//must be err != nil
+	assert.NotNil(t, err)
 
 }
