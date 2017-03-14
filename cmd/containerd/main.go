@@ -125,6 +125,7 @@ func main() {
 				return err
 			}
 		}
+		log.G(global).Info("starting GRPC API server...")
 		if err := serveGRPC(server); err != nil {
 			return err
 		}
