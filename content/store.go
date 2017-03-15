@@ -311,6 +311,8 @@ func (s *Store) Active() ([]Status, error) {
 		return nil, err
 	}
 
+	defer fp.Close()
+
 	fis, err := fp.Readdir(-1)
 	if err != nil {
 		return nil, err
