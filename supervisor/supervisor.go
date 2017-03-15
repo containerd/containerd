@@ -20,9 +20,6 @@ const (
 // New returns an initialized Process supervisor.
 func New(stateDir string, runtimeName, shimName string, runtimeArgs []string, timeout time.Duration, retainCount int) (*Supervisor, error) {
 	startTasks := make(chan *startTask, 10)
-	if err := os.MkdirAll(stateDir, 0755); err != nil {
-		return nil, err
-	}
 	machine, err := CollectMachineInformation()
 	if err != nil {
 		return nil, err
