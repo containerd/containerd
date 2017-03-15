@@ -157,6 +157,10 @@ func main() {
 }
 
 func daemon(context *cli.Context) error {
+	stateDir := context.String("state-dir")
+	if err := os.MkdirAll(stateDir, 0755); err != nil {
+		return err
+	}
 	s := make(chan os.Signal, 2048)
 	signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
 	// Split the listen string of the form proto://addr
@@ -171,7 +175,7 @@ func daemon(context *cli.Context) error {
 		return err
 	}
 	sv, err := supervisor.New(
-		context.String("state-dir"),
+		stateDir,
 		context.String("runtime"),
 		context.String("shim"),
 		context.StringSlice("runtime-args"),
