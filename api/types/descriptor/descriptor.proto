@@ -12,5 +12,5 @@ import "gogoproto/gogo.proto";
 message Descriptor {
 	string mediaType = 1;
 	string digest = 2 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
-	int64 mediaSize = 3;
+	int64 size = 3;
 }

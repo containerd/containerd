@@ -9,9 +9,9 @@
 		github.com/docker/containerd/api/services/rootfs/rootfs.proto
 
 	It has these top-level messages:
+		UnpackRequest
+		UnpackResponse
 		PrepareRequest
-		PrepareResponse
-		InitMountsRequest
 		MountsRequest
 		MountResponse
 */
@@ -47,31 +47,31 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
-type PrepareRequest struct {
+type UnpackRequest struct {
 	Layers []*containerd_v1_types1.Descriptor `protobuf:"bytes,1,rep,name=layers" json:"layers,omitempty"`
+}
+
+func (m *UnpackRequest) Reset()                    { *m = UnpackRequest{} }
+func (*UnpackRequest) ProtoMessage()               {}
+func (*UnpackRequest) Descriptor() ([]byte, []int) { return fileDescriptorRootfs, []int{0} }
+
+type UnpackResponse struct {
+	ChainID github_com_opencontainers_go_digest.Digest `protobuf:"bytes,1,opt,name=chainid,proto3,customtype=github.com/opencontainers/go-digest.Digest" json:"chainid"`
+}
+
+func (m *UnpackResponse) Reset()                    { *m = UnpackResponse{} }
+func (*UnpackResponse) ProtoMessage()               {}
+func (*UnpackResponse) Descriptor() ([]byte, []int) { return fileDescriptorRootfs, []int{1} }
+
+type PrepareRequest struct {
+	Name     string                                     `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	ChainID  github_com_opencontainers_go_digest.Digest `protobuf:"bytes,2,opt,name=chain_id,json=chainId,proto3,customtype=github.com/opencontainers/go-digest.Digest" json:"chain_id"`
+	Readonly bool                                       `protobuf:"varint,3,opt,name=readonly,proto3" json:"readonly,omitempty"`
 }
 
 func (m *PrepareRequest) Reset()                    { *m = PrepareRequest{} }
 func (*PrepareRequest) ProtoMessage()               {}
-func (*PrepareRequest) Descriptor() ([]byte, []int) { return fileDescriptorRootfs, []int{0} }
-
-type PrepareResponse struct {
-	ChainID github_com_opencontainers_go_digest.Digest `protobuf:"bytes,1,opt,name=chainid,proto3,customtype=github.com/opencontainers/go-digest.Digest" json:"chainid"`
-}
-
-func (m *PrepareResponse) Reset()                    { *m = PrepareResponse{} }
-func (*PrepareResponse) ProtoMessage()               {}
-func (*PrepareResponse) Descriptor() ([]byte, []int) { return fileDescriptorRootfs, []int{1} }
-
-type InitMountsRequest struct {
-	Name     string                                     `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	ChainID  github_com_opencontainers_go_digest.Digest `protobuf:"bytes,2,opt,name=chainID,proto3,customtype=github.com/opencontainers/go-digest.Digest" json:"chainID"`
-	Readonly bool                                       `protobuf:"varint,3,opt,name=Readonly,proto3" json:"Readonly,omitempty"`
-}
-
-func (m *InitMountsRequest) Reset()                    { *m = InitMountsRequest{} }
-func (*InitMountsRequest) ProtoMessage()               {}
-func (*InitMountsRequest) Descriptor() ([]byte, []int) { return fileDescriptorRootfs, []int{2} }
+func (*PrepareRequest) Descriptor() ([]byte, []int) { return fileDescriptorRootfs, []int{2} }
 
 type MountsRequest struct {
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -90,9 +90,9 @@ func (*MountResponse) ProtoMessage()               {}
 func (*MountResponse) Descriptor() ([]byte, []int) { return fileDescriptorRootfs, []int{4} }
 
 func init() {
+	proto.RegisterType((*UnpackRequest)(nil), "containerd.v1.UnpackRequest")
+	proto.RegisterType((*UnpackResponse)(nil), "containerd.v1.UnpackResponse")
 	proto.RegisterType((*PrepareRequest)(nil), "containerd.v1.PrepareRequest")
-	proto.RegisterType((*PrepareResponse)(nil), "containerd.v1.PrepareResponse")
-	proto.RegisterType((*InitMountsRequest)(nil), "containerd.v1.InitMountsRequest")
 	proto.RegisterType((*MountsRequest)(nil), "containerd.v1.MountsRequest")
 	proto.RegisterType((*MountResponse)(nil), "containerd.v1.MountResponse")
 }
@@ -108,8 +108,8 @@ const _ = grpc.SupportPackageIsVersion4
 // Client API for RootFS service
 
 type RootFSClient interface {
-	Prepare(ctx context.Context, in *PrepareRequest, opts ...grpc.CallOption) (*PrepareResponse, error)
-	InitMounts(ctx context.Context, in *InitMountsRequest, opts ...grpc.CallOption) (*MountResponse, error)
+	Unpack(ctx context.Context, in *UnpackRequest, opts ...grpc.CallOption) (*UnpackResponse, error)
+	Prepare(ctx context.Context, in *PrepareRequest, opts ...grpc.CallOption) (*MountResponse, error)
 	Mounts(ctx context.Context, in *MountsRequest, opts ...grpc.CallOption) (*MountResponse, error)
 }
 
@@ -121,18 +121,18 @@ func NewRootFSClient(cc *grpc.ClientConn) RootFSClient {
 	return &rootFSClient{cc}
 }
 
-func (c *rootFSClient) Prepare(ctx context.Context, in *PrepareRequest, opts ...grpc.CallOption) (*PrepareResponse, error) {
-	out := new(PrepareResponse)
-	err := grpc.Invoke(ctx, "/containerd.v1.RootFS/Prepare", in, out, c.cc, opts...)
+func (c *rootFSClient) Unpack(ctx context.Context, in *UnpackRequest, opts ...grpc.CallOption) (*UnpackResponse, error) {
+	out := new(UnpackResponse)
+	err := grpc.Invoke(ctx, "/containerd.v1.RootFS/Unpack", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *rootFSClient) InitMounts(ctx context.Context, in *InitMountsRequest, opts ...grpc.CallOption) (*MountResponse, error) {
+func (c *rootFSClient) Prepare(ctx context.Context, in *PrepareRequest, opts ...grpc.CallOption) (*MountResponse, error) {
 	out := new(MountResponse)
-	err := grpc.Invoke(ctx, "/containerd.v1.RootFS/InitMounts", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/containerd.v1.RootFS/Prepare", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -151,13 +151,31 @@ func (c *rootFSClient) Mounts(ctx context.Context, in *MountsRequest, opts ...gr
 // Server API for RootFS service
 
 type RootFSServer interface {
-	Prepare(context.Context, *PrepareRequest) (*PrepareResponse, error)
-	InitMounts(context.Context, *InitMountsRequest) (*MountResponse, error)
+	Unpack(context.Context, *UnpackRequest) (*UnpackResponse, error)
+	Prepare(context.Context, *PrepareRequest) (*MountResponse, error)
 	Mounts(context.Context, *MountsRequest) (*MountResponse, error)
 }
 
 func RegisterRootFSServer(s *grpc.Server, srv RootFSServer) {
 	s.RegisterService(&_RootFS_serviceDesc, srv)
+}
+
+func _RootFS_Unpack_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnpackRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RootFSServer).Unpack(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.v1.RootFS/Unpack",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RootFSServer).Unpack(ctx, req.(*UnpackRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _RootFS_Prepare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -174,24 +192,6 @@ func _RootFS_Prepare_Handler(srv interface{}, ctx context.Context, dec func(inte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(RootFSServer).Prepare(ctx, req.(*PrepareRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _RootFS_InitMounts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(InitMountsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RootFSServer).InitMounts(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/containerd.v1.RootFS/InitMounts",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RootFSServer).InitMounts(ctx, req.(*InitMountsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -219,12 +219,12 @@ var _RootFS_serviceDesc = grpc.ServiceDesc{
 	HandlerType: (*RootFSServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "Prepare",
-			Handler:    _RootFS_Prepare_Handler,
+			MethodName: "Unpack",
+			Handler:    _RootFS_Unpack_Handler,
 		},
 		{
-			MethodName: "InitMounts",
-			Handler:    _RootFS_InitMounts_Handler,
+			MethodName: "Prepare",
+			Handler:    _RootFS_Prepare_Handler,
 		},
 		{
 			MethodName: "Mounts",
@@ -235,7 +235,7 @@ var _RootFS_serviceDesc = grpc.ServiceDesc{
 	Metadata: "github.com/docker/containerd/api/services/rootfs/rootfs.proto",
 }
 
-func (m *PrepareRequest) Marshal() (dAtA []byte, err error) {
+func (m *UnpackRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -245,7 +245,7 @@ func (m *PrepareRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *PrepareRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *UnpackRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -265,7 +265,7 @@ func (m *PrepareRequest) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *PrepareResponse) Marshal() (dAtA []byte, err error) {
+func (m *UnpackResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -275,7 +275,7 @@ func (m *PrepareResponse) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *PrepareResponse) MarshalTo(dAtA []byte) (int, error) {
+func (m *UnpackResponse) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -289,7 +289,7 @@ func (m *PrepareResponse) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *InitMountsRequest) Marshal() (dAtA []byte, err error) {
+func (m *PrepareRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -299,7 +299,7 @@ func (m *InitMountsRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *InitMountsRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *PrepareRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -410,7 +410,7 @@ func encodeVarintRootfs(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
-func (m *PrepareRequest) Size() (n int) {
+func (m *UnpackRequest) Size() (n int) {
 	var l int
 	_ = l
 	if len(m.Layers) > 0 {
@@ -422,7 +422,7 @@ func (m *PrepareRequest) Size() (n int) {
 	return n
 }
 
-func (m *PrepareResponse) Size() (n int) {
+func (m *UnpackResponse) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.ChainID)
@@ -432,7 +432,7 @@ func (m *PrepareResponse) Size() (n int) {
 	return n
 }
 
-func (m *InitMountsRequest) Size() (n int) {
+func (m *PrepareRequest) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.Name)
@@ -484,31 +484,31 @@ func sovRootfs(x uint64) (n int) {
 func sozRootfs(x uint64) (n int) {
 	return sovRootfs(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (this *PrepareRequest) String() string {
+func (this *UnpackRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&PrepareRequest{`,
+	s := strings.Join([]string{`&UnpackRequest{`,
 		`Layers:` + strings.Replace(fmt.Sprintf("%v", this.Layers), "Descriptor", "containerd_v1_types1.Descriptor", 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *PrepareResponse) String() string {
+func (this *UnpackResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&PrepareResponse{`,
+	s := strings.Join([]string{`&UnpackResponse{`,
 		`ChainID:` + fmt.Sprintf("%v", this.ChainID) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *InitMountsRequest) String() string {
+func (this *PrepareRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&InitMountsRequest{`,
+	s := strings.Join([]string{`&PrepareRequest{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`ChainID:` + fmt.Sprintf("%v", this.ChainID) + `,`,
 		`Readonly:` + fmt.Sprintf("%v", this.Readonly) + `,`,
@@ -544,7 +544,7 @@ func valueToStringRootfs(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
-func (m *PrepareRequest) Unmarshal(dAtA []byte) error {
+func (m *UnpackRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -567,10 +567,10 @@ func (m *PrepareRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: PrepareRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: UnpackRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: PrepareRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: UnpackRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -625,7 +625,7 @@ func (m *PrepareRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *PrepareResponse) Unmarshal(dAtA []byte) error {
+func (m *UnpackResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -648,10 +648,10 @@ func (m *PrepareResponse) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: PrepareResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: UnpackResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: PrepareResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: UnpackResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -704,7 +704,7 @@ func (m *PrepareResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *InitMountsRequest) Unmarshal(dAtA []byte) error {
+func (m *PrepareRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -727,10 +727,10 @@ func (m *InitMountsRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: InitMountsRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: PrepareRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: InitMountsRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: PrepareRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -1102,32 +1102,33 @@ func init() {
 }
 
 var fileDescriptorRootfs = []byte{
-	// 428 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x92, 0x3f, 0x8f, 0xd3, 0x30,
-	0x18, 0xc6, 0x6b, 0x0e, 0xa5, 0x87, 0xd1, 0x81, 0xb0, 0x18, 0xa2, 0x08, 0x92, 0x28, 0x2c, 0x15,
-	0x12, 0xb1, 0x28, 0x03, 0x2c, 0xb7, 0xf4, 0x22, 0x44, 0x24, 0x90, 0x50, 0x18, 0x98, 0x73, 0xc9,
-	0x4b, 0xce, 0x70, 0xf5, 0x1b, 0x6c, 0xf7, 0xa4, 0x6e, 0x7c, 0x10, 0x3e, 0x50, 0x47, 0x46, 0xc4,
-	0x50, 0x71, 0x19, 0xf8, 0x1c, 0xa8, 0xf9, 0x77, 0xd7, 0x52, 0xd4, 0x0e, 0xb7, 0xc4, 0x6f, 0xe4,
-	0xe7, 0xfd, 0xbd, 0x8f, 0x1f, 0x9b, 0x1e, 0x17, 0xc2, 0x9c, 0xcd, 0x4e, 0xc3, 0x0c, 0xa7, 0x3c,
-	0xc7, 0xec, 0x0b, 0x28, 0x9e, 0xa1, 0x34, 0xa9, 0x90, 0xa0, 0x72, 0x9e, 0x96, 0x82, 0x6b, 0x50,
-	0x17, 0x22, 0x03, 0xcd, 0x15, 0xa2, 0xf9, 0xd4, 0x2d, 0x61, 0xa9, 0xd0, 0x20, 0x3b, 0xba, 0x12,
-	0x87, 0x17, 0xcf, 0x9d, 0x87, 0x05, 0x16, 0x58, 0xef, 0xf0, 0x55, 0xd5, 0x88, 0x9c, 0x57, 0x3b,
-	0x67, 0x98, 0x79, 0x09, 0x9a, 0x4f, 0x71, 0x26, 0x4d, 0xf3, 0x6d, 0x3b, 0x27, 0x7b, 0x76, 0xe6,
-	0xa0, 0x33, 0x25, 0x4a, 0x83, 0xea, 0x5a, 0xd9, 0x30, 0x82, 0x98, 0xde, 0x7b, 0xaf, 0xa0, 0x4c,
-	0x15, 0x24, 0xf0, 0x75, 0x06, 0xda, 0xb0, 0x97, 0xd4, 0x3a, 0x4f, 0xe7, 0xa0, 0xb4, 0x4d, 0xfc,
-	0x83, 0xd1, 0xdd, 0xb1, 0x17, 0xae, 0x9d, 0x22, 0xac, 0x99, 0x61, 0xd4, 0x83, 0x92, 0x56, 0x1e,
-	0x7c, 0xa6, 0xf7, 0x7b, 0x94, 0x2e, 0x51, 0x6a, 0x60, 0x1f, 0xe9, 0x30, 0x3b, 0x4b, 0x85, 0x14,
-	0xb9, 0x4d, 0x7c, 0x32, 0xba, 0x33, 0x39, 0x5e, 0x2c, 0xbd, 0xc1, 0xaf, 0xa5, 0xf7, 0xf4, 0x9a,
-	0x75, 0x2c, 0x41, 0xf6, 0x23, 0x34, 0x2f, 0xf0, 0x59, 0x2e, 0x0a, 0xd0, 0x26, 0x8c, 0xea, 0xa5,
-	0x5a, 0x7a, 0xc3, 0x93, 0x15, 0x24, 0x8e, 0x92, 0x8e, 0x16, 0x7c, 0x27, 0xf4, 0x41, 0x2c, 0x85,
-	0x79, 0xb7, 0x8a, 0x43, 0x77, 0xd6, 0x19, 0xbd, 0x2d, 0xd3, 0x29, 0x34, 0xb3, 0x92, 0xba, 0xee,
-	0x2d, 0xc4, 0x91, 0x7d, 0xeb, 0xe6, 0x2c, 0xc4, 0x11, 0x73, 0xe8, 0x61, 0x02, 0x69, 0x8e, 0xf2,
-	0x7c, 0x6e, 0x1f, 0xf8, 0x64, 0x74, 0x98, 0xf4, 0xff, 0xc1, 0x13, 0x7a, 0xb4, 0xd3, 0x59, 0x70,
-	0xd2, 0x8a, 0xfa, 0xb4, 0xc6, 0xd4, 0xaa, 0xaf, 0xb7, 0x4b, 0xde, 0xd9, 0x9a, 0x7c, 0xd3, 0xd3,
-	0x2a, 0xc7, 0x7f, 0x08, 0xb5, 0x12, 0x44, 0xf3, 0xfa, 0x03, 0x7b, 0x43, 0x87, 0x6d, 0xfe, 0xec,
-	0xf1, 0x46, 0xe7, 0xfa, 0x15, 0x3b, 0xee, 0xff, 0xb6, 0x5b, 0x23, 0x6f, 0x29, 0xbd, 0x0a, 0x97,
-	0xf9, 0x1b, 0xea, 0x7f, 0x72, 0x77, 0x1e, 0x6d, 0x28, 0xd6, 0x8f, 0x15, 0x51, 0xab, 0x25, 0x6d,
-	0xd5, 0xed, 0x47, 0x99, 0xd8, 0x8b, 0x4b, 0x77, 0xf0, 0xf3, 0xd2, 0x1d, 0x7c, 0xab, 0x5c, 0xb2,
-	0xa8, 0x5c, 0xf2, 0xa3, 0x72, 0xc9, 0xef, 0xca, 0x25, 0xa7, 0x56, 0xfd, 0x92, 0x5f, 0xfc, 0x0d,
-	0x00, 0x00, 0xff, 0xff, 0xca, 0x73, 0x7a, 0x14, 0xad, 0x03, 0x00, 0x00,
+	// 433 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x52, 0x4d, 0x6f, 0x13, 0x31,
+	0x10, 0x8d, 0x29, 0xda, 0x04, 0xa3, 0xf4, 0x60, 0x71, 0x58, 0xad, 0x60, 0x13, 0x2d, 0x97, 0x08,
+	0x89, 0xb5, 0x08, 0x07, 0xb8, 0xf4, 0x92, 0x86, 0x8a, 0x1e, 0x90, 0xd0, 0x22, 0x04, 0x37, 0xe4,
+	0xae, 0x87, 0xad, 0xd5, 0xc6, 0x63, 0x6c, 0xa7, 0x52, 0x6e, 0xfc, 0x0e, 0x7e, 0x51, 0x8e, 0x1c,
+	0x11, 0x12, 0x11, 0xdd, 0x5f, 0x82, 0xb2, 0x1f, 0xa1, 0x89, 0x0a, 0xf4, 0xc0, 0x65, 0x3d, 0x2b,
+	0xbf, 0xf7, 0xe6, 0xcd, 0x1b, 0xd3, 0x83, 0x42, 0xf9, 0xd3, 0xf9, 0x49, 0x9a, 0xe3, 0x8c, 0x4b,
+	0xcc, 0xcf, 0xc0, 0xf2, 0x1c, 0xb5, 0x17, 0x4a, 0x83, 0x95, 0x5c, 0x18, 0xc5, 0x1d, 0xd8, 0x0b,
+	0x95, 0x83, 0xe3, 0x16, 0xd1, 0x7f, 0x6c, 0x8f, 0xd4, 0x58, 0xf4, 0xc8, 0xfa, 0xbf, 0xc1, 0xe9,
+	0xc5, 0x93, 0xe8, 0x5e, 0x81, 0x05, 0x56, 0x37, 0x7c, 0x5d, 0xd5, 0xa0, 0xe8, 0xf9, 0x3f, 0x7b,
+	0xf8, 0x85, 0x01, 0xc7, 0x67, 0x38, 0xd7, 0xbe, 0xfe, 0x36, 0xcc, 0xc9, 0x0d, 0x99, 0x12, 0x5c,
+	0x6e, 0x95, 0xf1, 0x68, 0xaf, 0x94, 0xb5, 0x46, 0xf2, 0x92, 0xf6, 0xdf, 0x6a, 0x23, 0xf2, 0xb3,
+	0x0c, 0x3e, 0xcd, 0xc1, 0x79, 0xf6, 0x8c, 0x06, 0xe7, 0x62, 0x01, 0xd6, 0x85, 0x64, 0xb8, 0x37,
+	0xba, 0x3b, 0x1e, 0xa4, 0x5b, 0x43, 0xa4, 0x95, 0x64, 0x3a, 0xdd, 0xe8, 0x64, 0x0d, 0x3c, 0x51,
+	0x74, 0xbf, 0x55, 0x72, 0x06, 0xb5, 0x03, 0xf6, 0x8e, 0x76, 0xf3, 0x53, 0xa1, 0xb4, 0x92, 0x21,
+	0x19, 0x92, 0xd1, 0x9d, 0xc9, 0xc1, 0x72, 0x35, 0xe8, 0x7c, 0x5f, 0x0d, 0x1e, 0x5d, 0x31, 0x8e,
+	0x06, 0xf4, 0xa6, 0x83, 0xe3, 0x05, 0x3e, 0x96, 0xaa, 0x00, 0xe7, 0xd3, 0x69, 0x75, 0x94, 0xab,
+	0x41, 0xf7, 0x70, 0x2d, 0x72, 0x3c, 0xcd, 0x5a, 0xb5, 0xe4, 0x0b, 0xa1, 0xfb, 0xaf, 0x2d, 0x18,
+	0x61, 0xa1, 0xb5, 0xcd, 0xe8, 0x6d, 0x2d, 0x66, 0x50, 0x37, 0xca, 0xaa, 0x9a, 0xbd, 0xa7, 0xbd,
+	0x8a, 0xf1, 0x41, 0xc9, 0xf0, 0xd6, 0xff, 0x33, 0x70, 0x2c, 0x59, 0x44, 0x7b, 0x16, 0x84, 0x44,
+	0x7d, 0xbe, 0x08, 0xf7, 0x86, 0x64, 0xd4, 0xcb, 0x36, 0xff, 0xc9, 0x43, 0xda, 0x7f, 0xb5, 0x5e,
+	0x92, 0xfb, 0x8b, 0xb5, 0xe4, 0xb0, 0x01, 0x6d, 0xb2, 0x1a, 0xd3, 0xa0, 0x5a, 0x6d, 0x1b, 0x7b,
+	0x74, 0x6d, 0xec, 0x35, 0xa7, 0x41, 0x8e, 0x7f, 0x10, 0x1a, 0x64, 0x88, 0xfe, 0xe8, 0x0d, 0x7b,
+	0x41, 0x83, 0x3a, 0x7c, 0x76, 0x7f, 0x87, 0xb8, 0xb5, 0xdd, 0xe8, 0xc1, 0x1f, 0x6e, 0x1b, 0x17,
+	0x47, 0xb4, 0xdb, 0xe4, 0xca, 0x76, 0x91, 0xdb, 0x79, 0x47, 0xbb, 0x6d, 0xb6, 0xa7, 0x99, 0xd2,
+	0xa0, 0xce, 0x80, 0x5d, 0x8b, 0x73, 0x37, 0x52, 0x99, 0x84, 0xcb, 0xcb, 0xb8, 0xf3, 0xed, 0x32,
+	0xee, 0x7c, 0x2e, 0x63, 0xb2, 0x2c, 0x63, 0xf2, 0xb5, 0x8c, 0xc9, 0xcf, 0x32, 0x26, 0x27, 0x41,
+	0xf5, 0x78, 0x9f, 0xfe, 0x0a, 0x00, 0x00, 0xff, 0xff, 0x52, 0xeb, 0x01, 0xe0, 0xa0, 0x03, 0x00,
+	0x00,
 }

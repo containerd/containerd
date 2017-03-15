@@ -7,23 +7,23 @@ import "github.com/docker/containerd/api/types/mount/mount.proto";
 import "github.com/docker/containerd/api/types/descriptor/descriptor.proto";
 
 service RootFS {
-	rpc Prepare(PrepareRequest) returns (PrepareResponse);
-	rpc InitMounts(InitMountsRequest) returns (MountResponse);
+	rpc Unpack(UnpackRequest) returns (UnpackResponse);
+	rpc Prepare(PrepareRequest) returns (MountResponse);
 	rpc Mounts(MountsRequest) returns (MountResponse);
 }
 
-message PrepareRequest {
+message UnpackRequest {
 	repeated containerd.v1.types.Descriptor layers = 1;
 }
 
-message PrepareResponse {
+message UnpackResponse {
 	string chainid = 1 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false, (gogoproto.customname) = "ChainID"];
 }
 
-message InitMountsRequest {
+message PrepareRequest {
 	string name = 1;
-	string chainID = 2 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false, (gogoproto.customname) = "ChainID"];
-	bool Readonly = 3;
+	string chain_id = 2 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false, (gogoproto.customname) = "ChainID"];
+	bool readonly = 3;
 }
 
 message MountsRequest {

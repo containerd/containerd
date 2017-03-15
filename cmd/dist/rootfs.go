@@ -29,8 +29,8 @@ var rootfsCommand = cli.Command{
 }
 
 var rootfsPrepareCommand = cli.Command{
-	Name:      "prepare",
-	Usage:     "prepare applies layers from a manifest to a snapshot",
+	Name:      "unpack",
+	Usage:     "unpack applies layers from a manifest to a snapshot",
 	ArgsUsage: "[flags] <digest>",
 	Flags:     []cli.Flag{},
 	Action: func(clicontext *cli.Context) error {
@@ -43,7 +43,7 @@ var rootfsPrepareCommand = cli.Command{
 			return err
 		}
 
-		log.G(ctx).Infof("preparing manifest %s", dgst.String())
+		log.G(ctx).Infof("unpacking layers from manifest %s", dgst.String())
 
 		conn, err := connectGRPC(clicontext)
 		if err != nil {
@@ -56,8 +56,8 @@ var rootfsPrepareCommand = cli.Command{
 			return err
 		}
 
-		preparer := rootfsservice.NewPreparerFromClient(rootfsapi.NewRootFSClient(conn))
-		chainID, err := preparer.Prepare(ctx, m.Layers)
+		unpacker := rootfsservice.NewUnpackerFromClient(rootfsapi.NewRootFSClient(conn))
+		chainID, err := unpacker.Unpack(ctx, m.Layers)
 		if err != nil {
 			return err
 		}
@@ -69,8 +69,8 @@ var rootfsPrepareCommand = cli.Command{
 }
 
 var rootfsInitCommand = cli.Command{
-	Name:      "init",
-	Usage:     "init gets mount commands for digest",
+	Name:      "prepare",
+	Usage:     "prepare gets mount commands for digest",
 	ArgsUsage: "[flags] <digest> <target>",
 	Flags:     []cli.Flag{},
 	Action: func(clicontext *cli.Context) error {
@@ -88,7 +88,7 @@ var rootfsInitCommand = cli.Command{
 		}
 		target := clicontext.Args().Get(1)
 
-		log.G(ctx).Infof("initializing mounts %s", dgst.String())
+		log.G(ctx).Infof("preparing mounts %s", dgst.String())
 
 		conn, err := connectGRPC(clicontext)
 		if err != nil {
@@ -97,12 +97,12 @@ var rootfsInitCommand = cli.Command{
 
 		rclient := rootfsapi.NewRootFSClient(conn)
 
-		ir := &rootfsapi.InitMountsRequest{
+		ir := &rootfsapi.PrepareRequest{
 			Name:    target,
 			ChainID: dgst,
 		}
 
-		resp, err := rclient.InitMounts(ctx, ir)
+		resp, err := rclient.Prepare(ctx, ir)
 		if err != nil {
 			return err
 		}

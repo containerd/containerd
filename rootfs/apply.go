@@ -16,8 +16,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-type Preparer interface {
-	Prepare(ctx context.Context, layers []ocispec.Descriptor) (digest.Digest, error)
+type Unpacker interface {
+	Unpack(ctx context.Context, layers []ocispec.Descriptor) (digest.Digest, error)
 }
 
 type Mounter interface {

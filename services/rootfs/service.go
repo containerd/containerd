@@ -43,13 +43,13 @@ func (s *Service) Register(gs *grpc.Server) error {
 	return nil
 }
 
-func (s *Service) Prepare(ctx context.Context, pr *rootfsapi.PrepareRequest) (*rootfsapi.PrepareResponse, error) {
+func (s *Service) Unpack(ctx context.Context, pr *rootfsapi.UnpackRequest) (*rootfsapi.UnpackResponse, error) {
 	layers := make([]ocispec.Descriptor, len(pr.Layers))
 	for i, l := range pr.Layers {
 		layers[i] = ocispec.Descriptor{
 			MediaType: l.MediaType,
 			Digest:    l.Digest,
-			Size:      l.MediaSize,
+			Size:      l.Size_,
 		}
 	}
 	log.G(ctx).Infof("Preparing %#v", layers)
@@ -59,12 +59,12 @@ func (s *Service) Prepare(ctx context.Context, pr *rootfsapi.PrepareRequest) (*r
 		return nil, err
 	}
 	log.G(ctx).Infof("ChainID %#v", chainID)
-	return &rootfsapi.PrepareResponse{
+	return &rootfsapi.UnpackResponse{
 		ChainID: chainID,
 	}, nil
 }
 
-func (s *Service) InitMounts(ctx context.Context, ir *rootfsapi.InitMountsRequest) (*rootfsapi.MountResponse, error) {
+func (s *Service) Prepare(ctx context.Context, ir *rootfsapi.PrepareRequest) (*rootfsapi.MountResponse, error) {
 	mounts, err := rootfs.InitRootFS(ctx, ir.Name, ir.ChainID, ir.Readonly, s.snapshotter, mounter{})
 	if err != nil {
 		return nil, err
