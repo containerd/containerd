@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	gocontext "golang.org/x/net/context"
 	"google.golang.org/grpc"
 
@@ -296,7 +297,10 @@ func loadSnapshotter(store *content.Store) (snapshot.Snapshotter, error) {
 }
 
 func newGRPCServer() *grpc.Server {
-	s := grpc.NewServer(grpc.UnaryInterceptor(interceptor))
+	s := grpc.NewServer(
+		grpc.UnaryInterceptor(interceptor),
+		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
+	)
 	return s
 }
 
@@ -365,7 +369,7 @@ func interceptor(ctx gocontext.Context,
 	default:
 		fmt.Printf("unknown GRPC server type: %#v\n", info.Server)
 	}
-	return handler(ctx, req)
+	return grpc_prometheus.UnaryServerInterceptor(ctx, req, info, handler)
 }
 
 func handleSignals(signals chan os.Signal, server *grpc.Server) error {
