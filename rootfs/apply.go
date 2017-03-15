@@ -16,9 +16,13 @@ import (
 	"github.com/pkg/errors"
 )
 
+type Unpacker interface {
+	Unpack(ctx context.Context, layers []ocispec.Descriptor) (digest.Digest, error)
+}
+
 type Mounter interface {
-	Mount(mounts ...containerd.Mount) error
-	Unmount(mounts ...containerd.Mount) error
+	Mount(target string, mounts ...containerd.Mount) error
+	Unmount(target string) error
 }
 
 // ApplyLayer applies the layer to the provided parent. The resulting snapshot
@@ -51,13 +55,13 @@ func ApplyLayer(snapshots snapshot.Snapshotter, mounter Mounter, rd io.Reader, p
 		return "", err
 	}
 
-	if err := mounter.Mount(mounts...); err != nil {
+	if err := mounter.Mount(dir, mounts...); err != nil {
 		if err := snapshots.Remove(ctx, key); err != nil {
 			log.L.WithError(err).Error("snapshot rollback failed")
 		}
 		return "", err
 	}
-	defer mounter.Unmount(mounts...)
+	defer mounter.Unmount(dir)
 
 	rd, err = dockerarchive.DecompressStream(rd)
 	if err != nil {
@@ -73,6 +77,9 @@ func ApplyLayer(snapshots snapshot.Snapshotter, mounter Mounter, rd io.Reader, p
 	chainID := diffID
 	if parent != "" {
 		chainID = identity.ChainID([]digest.Digest{parent, chainID})
+	}
+	if _, err := snapshots.Stat(ctx, chainID.String()); err == nil {
+		return diffID, nil //TODO: call snapshots.Remove(ctx, key) once implemented
 	}
 
 	return diffID, snapshots.Commit(ctx, chainID.String(), key)
@@ -90,7 +97,7 @@ func Prepare(ctx context.Context, snapshots snapshot.Snapshotter, mounter Mounte
 	// rootfs Controller.
 	//
 	// Just pass them in for now.
-	openBlob func(digest.Digest) (io.ReadCloser, error),
+	openBlob func(context.Context, digest.Digest) (io.ReadCloser, error),
 	resolveDiffID func(digest.Digest) digest.Digest,
 	registerDiffID func(diffID, dgst digest.Digest) error) (digest.Digest, error) {
 	var (
@@ -116,7 +123,7 @@ func Prepare(ctx context.Context, snapshots snapshot.Snapshotter, mounter Mounte
 			}
 		}
 
-		rc, err := openBlob(layerDigest)
+		rc, err := openBlob(ctx, layerDigest)
 		if err != nil {
 			return "", err
 		}
