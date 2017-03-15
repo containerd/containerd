@@ -44,10 +44,6 @@ func InitRootFS(ctx context.Context, name string, parent digest.Digest, readonly
 	return snapshotter.Prepare(ctx, name, parentS)
 }
 
-func GetRootFS(ctx context.Context, name string, snapshotter snapshot.Snapshotter) ([]containerd.Mount, error) {
-	return snapshotter.Mounts(ctx, name)
-}
-
 func createInitLayer(ctx context.Context, parent, initName string, initFn func(string) error, snapshotter snapshot.Snapshotter, mounter Mounter) (string, error) {
 	initS := fmt.Sprintf("%s %s", parent, initName)
 	if _, err := snapshotter.Stat(ctx, initS); err == nil {

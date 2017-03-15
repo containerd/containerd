@@ -110,7 +110,6 @@ var rootfsInitCommand = cli.Command{
 		for _, m := range resp.Mounts {
 			fmt.Fprintf(os.Stdout, "mount -t %s %s %s -o %s\n", m.Type, m.Source, target, strings.Join(m.Options, ","))
 		}
-		log.G(ctx).Infof("Mount response: %#v", resp)
 
 		return nil
 	},

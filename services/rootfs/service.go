@@ -75,7 +75,7 @@ func (s *Service) Prepare(ctx context.Context, ir *rootfsapi.PrepareRequest) (*r
 }
 
 func (s *Service) Mounts(ctx context.Context, mr *rootfsapi.MountsRequest) (*rootfsapi.MountResponse, error) {
-	mounts, err := rootfs.GetRootFS(ctx, mr.Name, s.snapshotter)
+	mounts, err := s.snapshotter.Mounts(ctx, mr.Name)
 	if err != nil {
 		return nil, err
 	}
