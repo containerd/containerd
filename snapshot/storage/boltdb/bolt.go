@@ -273,7 +273,7 @@ func (ms *boltMetastore) parents(bkt *bolt.Bucket, parent *Snapshot) (parents []
 	return
 }
 
-func (ms *boltMetastore) Remove(ctx context.Context, key string) (id string, err error) {
+func (ms *boltMetastore) Remove(ctx context.Context, key string) (id string, k snapshot.Kind, err error) {
 	err = ms.withBucket(ctx, func(ctx context.Context, bkt *bolt.Bucket) error {
 		var ss Snapshot
 		b := bkt.Get([]byte(key))
@@ -309,12 +309,10 @@ func (ms *boltMetastore) Remove(ctx context.Context, key string) (id string, err
 		}
 
 		id = fmt.Sprintf("%d", ss.ID)
+		k = fromProtoActive(ss.Active)
 
 		return nil
 	})
-	if err != nil {
-		return "", err
-	}
 
 	return
 }

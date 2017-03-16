@@ -152,7 +152,7 @@ func createActiveBenchmark(ctx context.Context, b *testing.B, ms storage.MetaSto
 			b.Fatal(err)
 		}
 		b.StopTimer()
-		if _, err := ms.Remove(ctx, "active"); err != nil {
+		if _, _, err := ms.Remove(ctx, "active"); err != nil {
 			b.Fatal(err)
 		}
 		b.StartTimer()
@@ -166,7 +166,7 @@ func removeBenchmark(ctx context.Context, b *testing.B, ms storage.MetaStore) {
 			b.Fatal(err)
 		}
 		b.StartTimer()
-		if _, err := ms.Remove(ctx, "active"); err != nil {
+		if _, _, err := ms.Remove(ctx, "active"); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -183,7 +183,7 @@ func commitBenchmark(ctx context.Context, b *testing.B, ms storage.MetaStore) {
 			b.Fatal(err)
 		}
 		b.StopTimer()
-		if _, err := ms.Remove(ctx, "committed"); err != nil {
+		if _, _, err := ms.Remove(ctx, "committed"); err != nil {
 			b.Fatal(err)
 		}
 	}

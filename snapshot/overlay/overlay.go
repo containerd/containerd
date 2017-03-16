@@ -126,7 +126,7 @@ func (o *Snapshotter) Remove(ctx context.Context, key string) (err error) {
 		}
 	}()
 
-	id, err := o.ms.Remove(ctx, key)
+	id, _, err := o.ms.Remove(ctx, key)
 	if err != nil {
 		return errors.Wrap(err, "failed to remove")
 	}
@@ -206,7 +206,7 @@ func (o *Snapshotter) createActive(ctx context.Context, key, parent string, read
 	active, err := o.ms.CreateActive(ctx, key, parent, readonly)
 	if err != nil {
 		if rerr := t.Rollback(); rerr != nil {
-			// TODO: log rollback error
+			log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
 		}
 		return nil, errors.Wrap(err, "failed to create active")
 	}
@@ -214,7 +214,7 @@ func (o *Snapshotter) createActive(ctx context.Context, key, parent string, read
 	path = filepath.Join(snapshotDir, active.ID)
 	if err := os.Rename(td, path); err != nil {
 		if rerr := t.Rollback(); rerr != nil {
-			// TODO: log rollback error
+			log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
 		}
 		return nil, errors.Wrap(err, "failed to rename")
 	}

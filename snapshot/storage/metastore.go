@@ -36,8 +36,8 @@ type MetaStore interface {
 
 	// Remove removes a snapshot from the metastore. The provided context
 	// must contain a writable transaction. The string identifier for the
-	// snapshot is returned.
-	Remove(ctx context.Context, key string) (string, error)
+	// snapshot is returned as well as the kind.
+	Remove(ctx context.Context, key string) (string, snapshot.Kind, error)
 
 	// Commit renames the active snapshot transaction referenced by `key`
 	// as a committed snapshot referenced by `Name`. The resulting snapshot

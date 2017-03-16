@@ -189,10 +189,10 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 		t.Fatalf("failure reason: %+v", err)
 	}
 
-	// TODO: check after remove implemented
-	//assert.Error(t, snapshotter.Remove(ctx, committed))
-	//assert.NoError(t, snapshotter.Remove(ctx, nextCommitted))
-	//assert.NoError(t, snapshotter.Remove(ctx, committed))
+	assert.NoError(t, snapshotter.Remove(ctx, nextnext))
+	assert.Error(t, snapshotter.Remove(ctx, committed))
+	assert.NoError(t, snapshotter.Remove(ctx, nextCommitted))
+	assert.NoError(t, snapshotter.Remove(ctx, committed))
 }
 
 // Create a New Layer on top of base layer with Prepare, Stat on new layer, should return Active layer.

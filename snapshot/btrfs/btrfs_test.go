@@ -11,6 +11,7 @@ import (
 
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/snapshot"
+	"github.com/docker/containerd/snapshot/storage/boltdb"
 	"github.com/docker/containerd/snapshot/testsuite"
 	"github.com/docker/containerd/testutil"
 )
@@ -19,11 +20,14 @@ const (
 	mib = 1024 * 1024
 )
 
-func TestBtrfs(t *testing.T) {
-	testutil.RequiresRoot(t)
-	testsuite.SnapshotterSuite(t, "Btrfs", func(ctx context.Context, root string) (snapshot.Snapshotter, func(), error) {
+func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshot.Snapshotter, func(), error) {
+	return func(ctx context.Context, root string) (snapshot.Snapshotter, func(), error) {
 		device := setupBtrfsLoopbackDevice(t, root)
-		snapshotter, err := NewSnapshotter(device.deviceName, root)
+		store, err := boltdb.NewMetaStore(ctx, filepath.Join(root, "metadata.db"))
+		if err != nil {
+			return nil, nil, err
+		}
+		snapshotter, err := NewSnapshotter(device.deviceName, root, store)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -31,34 +35,39 @@ func TestBtrfs(t *testing.T) {
 		return snapshotter, func() {
 			device.remove(t)
 		}, nil
-	})
+	}
+}
+
+func TestBtrfs(t *testing.T) {
+	testutil.RequiresRoot(t)
+	testsuite.SnapshotterSuite(t, "Btrfs", boltSnapshotter(t))
 }
 
 func TestBtrfsMounts(t *testing.T) {
 	testutil.RequiresRoot(t)
-	ctx := context.TODO()
+	ctx := context.Background()
 
 	// create temporary directory for mount point
 	mountPoint, err := ioutil.TempDir("", "containerd-btrfs-test")
 	if err != nil {
 		t.Fatal("could not create mount point for btrfs test", err)
 	}
+	defer os.RemoveAll(mountPoint)
 	t.Log("temporary mount point created", mountPoint)
 
-	device := setupBtrfsLoopbackDevice(t, mountPoint)
-	defer device.remove(t)
-
-	root, err := ioutil.TempDir(device.mountPoint, "TestBtrfsPrepare-")
+	root, err := ioutil.TempDir(mountPoint, "TestBtrfsPrepare-")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(root)
 
-	target := filepath.Join(root, "test")
-	b, err := NewSnapshotter(device.deviceName, root)
+	b, c, err := boltSnapshotter(t)(ctx, root)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer c()
+
+	target := filepath.Join(root, "test")
 	mounts, err := b.Prepare(ctx, target, "")
 	if err != nil {
 		t.Fatal(err)
