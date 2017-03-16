@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/docker/docker/pkg/system"
+	"github.com/docker/containerd/sys"
 )
 
 // tarName returns platform-specific filepath
@@ -41,19 +41,19 @@ func setHeaderForSpecialDevice(*tar.Header, string, os.FileInfo) error {
 }
 
 func open(p string) (*os.File, error) {
-	// We use system.OpenSequential to ensure we use sequential file
+	// We use sys.OpenSequential to ensure we use sequential file
 	// access on Windows to avoid depleting the standby list.
-	return system.OpenSequential(p)
+	return sys.OpenSequential(p)
 }
 
 func openFile(name string, flag int, perm os.FileMode) (*os.File, error) {
-	// Source is regular file. We use system.OpenFileSequential to use sequential
+	// Source is regular file. We use sys.OpenFileSequential to use sequential
 	// file access to avoid depleting the standby list on Windows.
-	return system.OpenFileSequential(name, flag, perm)
+	return sys.OpenFileSequential(name, flag, perm)
 }
 
 func mkdirAll(path string, perm os.FileMode) error {
-	return system.MkdirAll(path, perm)
+	return sys.MkdirAll(path, perm)
 }
 
 func prepareApply() func() {
