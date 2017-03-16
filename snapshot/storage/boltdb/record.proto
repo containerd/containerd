@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package containerd.v1;
+
+import "gogoproto/gogo.proto";
+
+message Snapshot {
+	uint64 id = 1 [(gogoproto.customname) = "ID"];
+	string parent = 2;
+	bool active = 4;
+	bool readonly = 5;
+}
