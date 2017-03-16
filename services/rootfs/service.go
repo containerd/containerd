@@ -15,6 +15,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 )
 
 func init() {
@@ -67,7 +68,7 @@ func (s *Service) Unpack(ctx context.Context, pr *rootfsapi.UnpackRequest) (*roo
 func (s *Service) Prepare(ctx context.Context, ir *rootfsapi.PrepareRequest) (*rootfsapi.MountResponse, error) {
 	mounts, err := rootfs.InitRootFS(ctx, ir.Name, ir.ChainID, ir.Readonly, s.snapshotter, mounter{})
 	if err != nil {
-		return nil, err
+		return nil, grpc.Errorf(codes.AlreadyExists, "%v", err)
 	}
 	return &rootfsapi.MountResponse{
 		Mounts: apiMounts(mounts),
