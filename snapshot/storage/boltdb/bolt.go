@@ -96,11 +96,22 @@ func (ms *boltMetastore) createBucketIfNotExists(ctx context.Context, fn func(ct
 	return fn(ctx, bkt)
 }
 
-func fromProtoActive(active bool) snapshot.Kind {
-	if active {
+func fromProtoKind(k Kind) snapshot.Kind {
+	if k == KindActive {
 		return snapshot.KindActive
 	}
 	return snapshot.KindCommitted
+}
+
+func toProtoKind(k snapshot.Kind) Kind {
+	switch k {
+	case snapshot.KindActive:
+		return KindActive
+	case snapshot.KindCommitted:
+		return KindCommitted
+	default:
+		panic("unknown kind")
+	}
 }
 
 func parentKey(parent, child uint64) []byte {
@@ -127,7 +138,7 @@ func (ms *boltMetastore) Stat(ctx context.Context, key string) (snapshot.Info, e
 	return snapshot.Info{
 		Name:     key,
 		Parent:   ss.Parent,
-		Kind:     fromProtoActive(ss.Active),
+		Kind:     fromProtoKind(ss.Kind),
 		Readonly: ss.Readonly,
 	}, nil
 }
@@ -147,7 +158,7 @@ func (ms *boltMetastore) Walk(ctx context.Context, fn func(context.Context, snap
 			info := snapshot.Info{
 				Name:     string(k),
 				Parent:   ss.Parent,
-				Kind:     fromProtoActive(ss.Active),
+				Kind:     fromProtoKind(ss.Kind),
 				Readonly: ss.Readonly,
 			}
 			return fn(ctx, info)
@@ -166,7 +177,7 @@ func (ms *boltMetastore) CreateActive(ctx context.Context, key, parent string, r
 				return errors.Wrap(err, "failed to get parent snapshot")
 			}
 
-			if parentS.Active {
+			if parentS.Kind == KindActive {
 				return errors.Errorf("cannot create active from active")
 			}
 		}
@@ -183,7 +194,7 @@ func (ms *boltMetastore) CreateActive(ctx context.Context, key, parent string, r
 		ss := Snapshot{
 			ID:       id,
 			Parent:   parent,
-			Active:   true,
+			Kind:     KindActive,
 			Readonly: readonly,
 		}
 		if err := putSnapshot(bkt, key, &ss); err != nil {
@@ -228,7 +239,7 @@ func (ms *boltMetastore) GetActive(ctx context.Context, key string) (a storage.A
 		if err := proto.Unmarshal(b, &ss); err != nil {
 			return errors.Wrap(err, "failed to unmarshal snapshot")
 		}
-		if !ss.Active {
+		if ss.Kind != KindActive {
 			return errors.Errorf("active not found")
 		}
 
@@ -309,7 +320,7 @@ func (ms *boltMetastore) Remove(ctx context.Context, key string) (id string, k s
 		}
 
 		id = fmt.Sprintf("%d", ss.ID)
-		k = fromProtoActive(ss.Active)
+		k = fromProtoKind(ss.Kind)
 
 		return nil
 	})
@@ -328,14 +339,14 @@ func (ms *boltMetastore) Commit(ctx context.Context, key, name string) (id strin
 		if err := getSnapshot(bkt, key, &ss); err != nil {
 			return errors.Wrap(err, "failed to get active snapshot")
 		}
-		if !ss.Active {
+		if ss.Kind != KindActive {
 			return errors.Errorf("key is not active snapshot")
 		}
 		if ss.Readonly {
 			return errors.Errorf("active snapshot is readonly")
 		}
 
-		ss.Active = false
+		ss.Kind = KindCommitted
 		ss.Readonly = true
 
 		if err := putSnapshot(bkt, name, &ss); err != nil {
