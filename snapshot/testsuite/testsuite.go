@@ -17,7 +17,7 @@ import (
 )
 
 // SnapshotterSuite runs a test suite on the snapshotter given a factory function.
-func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(root string) (snapshot.Snapshotter, func(), error)) {
+func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(ctx context.Context, root string) (snapshot.Snapshotter, func(), error)) {
 	t.Run("Basic", makeTest(t, name, snapshotterFn, checkSnapshotterBasic))
 	t.Run("StatActive", makeTest(t, name, snapshotterFn, checkSnapshotterStatActive))
 	t.Run("StatComitted", makeTest(t, name, snapshotterFn, checkSnapshotterStatCommitted))
@@ -25,8 +25,9 @@ func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(root string)
 	t.Run("PreareViewFailingtest", makeTest(t, name, snapshotterFn, checkSnapshotterPrepareView))
 }
 
-func makeTest(t *testing.T, name string, snapshotterFn func(root string) (snapshot.Snapshotter, func(), error), fn func(t *testing.T, snapshotter snapshot.Snapshotter, work string)) func(t *testing.T) {
+func makeTest(t *testing.T, name string, snapshotterFn func(ctx context.Context, root string) (snapshot.Snapshotter, func(), error), fn func(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string)) func(t *testing.T) {
 	return func(t *testing.T) {
+		ctx := context.Background()
 		oldumask := syscall.Umask(0)
 		defer syscall.Umask(oldumask)
 		// Make two directories: a snapshotter root and a play area for the tests:
@@ -46,7 +47,7 @@ func makeTest(t *testing.T, name string, snapshotterFn func(root string) (snapsh
 			t.Fatal(err)
 		}
 
-		snapshotter, cleanup, err := snapshotterFn(root)
+		snapshotter, cleanup, err := snapshotterFn(ctx, root)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -58,14 +59,12 @@ func makeTest(t *testing.T, name string, snapshotterFn func(root string) (snapsh
 		}
 
 		defer testutil.DumpDir(t, tmpDir)
-		fn(t, snapshotter, work)
+		fn(ctx, t, snapshotter, work)
 	}
 }
 
 // checkSnapshotterBasic tests the basic workflow of a snapshot snapshotter.
-func checkSnapshotterBasic(t *testing.T, snapshotter snapshot.Snapshotter, work string) {
-	ctx := context.TODO()
-
+func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
 	initialApplier := fstest.Apply(
 		fstest.CreateFile("/foo", []byte("foo\n"), 0777),
 		fstest.CreateDir("/a", 0755),
@@ -189,11 +188,15 @@ func checkSnapshotterBasic(t *testing.T, snapshotter snapshot.Snapshotter, work 
 		fstest.Apply(initialApplier, diffApplier)); err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
+
+	// TODO: check after remove implemented
+	//assert.Error(t, snapshotter.Remove(ctx, committed))
+	//assert.NoError(t, snapshotter.Remove(ctx, nextCommitted))
+	//assert.NoError(t, snapshotter.Remove(ctx, committed))
 }
 
 // Create a New Layer on top of base layer with Prepare, Stat on new layer, should return Active layer.
-func checkSnapshotterStatActive(t *testing.T, snapshotter snapshot.Snapshotter, work string) {
-	ctx := context.TODO()
+func checkSnapshotterStatActive(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
 	preparing := filepath.Join(work, "preparing")
 	if err := os.MkdirAll(preparing, 0777); err != nil {
 		t.Fatal(err)
@@ -227,8 +230,7 @@ func checkSnapshotterStatActive(t *testing.T, snapshotter snapshot.Snapshotter, 
 }
 
 // Commit a New Layer on top of base layer with Prepare & Commit , Stat on new layer, should return Committed layer.
-func checkSnapshotterStatCommitted(t *testing.T, snapshotter snapshot.Snapshotter, work string) {
-	ctx := context.TODO()
+func checkSnapshotterStatCommitted(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
 	preparing := filepath.Join(work, "preparing")
 	if err := os.MkdirAll(preparing, 0777); err != nil {
 		t.Fatal(err)
@@ -289,8 +291,7 @@ func snapshotterPrepareMount(ctx context.Context, snapshotter snapshot.Snapshott
 }
 
 // Given A <- B <- C, B is the parent of C and A is a transitive parent of C (in this case, a "grandparent")
-func checkSnapshotterTransitivity(t *testing.T, snapshotter snapshot.Snapshotter, work string) {
-	ctx := context.TODO()
+func checkSnapshotterTransitivity(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
 	preparing, err := snapshotterPrepareMount(ctx, snapshotter, "preparing", "", work)
 	if err != nil {
 		t.Fatal(err)
@@ -344,9 +345,7 @@ func checkSnapshotterTransitivity(t *testing.T, snapshotter snapshot.Snapshotter
 }
 
 // Creating two layers with Prepare or View with same key must fail.
-func checkSnapshotterPrepareView(t *testing.T, snapshotter snapshot.Snapshotter, work string) {
-	ctx := context.TODO()
-
+func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
 	preparing, err := snapshotterPrepareMount(ctx, snapshotter, "preparing", "", work)
 	if err != nil {
 		t.Fatal(err)
