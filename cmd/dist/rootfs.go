@@ -23,12 +23,12 @@ var rootfsCommand = cli.Command{
 	Name:  "rootfs",
 	Usage: "rootfs setups a rootfs",
 	Subcommands: []cli.Command{
+		rootfsUnpackCommand,
 		rootfsPrepareCommand,
-		rootfsInitCommand,
 	},
 }
 
-var rootfsPrepareCommand = cli.Command{
+var rootfsUnpackCommand = cli.Command{
 	Name:      "unpack",
 	Usage:     "unpack applies layers from a manifest to a snapshot",
 	ArgsUsage: "[flags] <digest>",
@@ -68,7 +68,7 @@ var rootfsPrepareCommand = cli.Command{
 	},
 }
 
-var rootfsInitCommand = cli.Command{
+var rootfsPrepareCommand = cli.Command{
 	Name:      "prepare",
 	Usage:     "prepare gets mount commands for digest",
 	ArgsUsage: "[flags] <digest> <target>",

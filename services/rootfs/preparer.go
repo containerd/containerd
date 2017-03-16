@@ -33,7 +33,7 @@ func (rp remoteUnpacker) Unpack(ctx context.Context, layers []ocispec.Descriptor
 	}
 	resp, err := rp.client.Unpack(ctx, &pr)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 	return resp.ChainID, nil
 }

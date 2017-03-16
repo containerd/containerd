@@ -32,8 +32,6 @@ type Mounter interface {
 //
 // The returned digest is the diffID for the applied layer.
 func ApplyLayer(snapshots snapshot.Snapshotter, mounter Mounter, rd io.Reader, parent digest.Digest) (digest.Digest, error) {
-	digester := digest.Canonical.Digester() // used to calculate diffID.
-	rd = io.TeeReader(rd, digester.Hash())
 	ctx := context.TODO()
 
 	// create a temporary directory to work from, needs to be on same
@@ -67,6 +65,9 @@ func ApplyLayer(snapshots snapshot.Snapshotter, mounter Mounter, rd io.Reader, p
 	if err != nil {
 		return "", err
 	}
+
+	digester := digest.Canonical.Digester() // used to calculate diffID.
+	rd = io.TeeReader(rd, digester.Hash())
 
 	if _, err := archive.Apply(context.Background(), key, rd); err != nil {
 		return "", err
