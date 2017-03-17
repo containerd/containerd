@@ -291,7 +291,7 @@ func (s *Store) Writer(ctx context.Context, ref string, total int64, expected di
 }
 
 // Abort an active transaction keyed by ref. If the ingest is active, it will
-// be cancelled. Any resoures associated with the ingest will be cleaned.
+// be cancelled. Any resources associated with the ingest will be cleaned.
 func (s *Store) Abort(ref string) error {
 	root := s.ingestRoot(ref)
 	if err := os.RemoveAll(root); err != nil {
