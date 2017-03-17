@@ -1,8 +1,6 @@
 package rootfs
 
 import (
-	"syscall"
-
 	"github.com/containerd/containerd"
 	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
 	containerd_v1_types "github.com/containerd/containerd/api/types/mount"
@@ -104,7 +102,7 @@ func (mounter) Mount(dir string, mounts ...containerd.Mount) error {
 }
 
 func (mounter) Unmount(dir string) error {
-	return syscall.Unmount(dir, 0)
+	return containerd.Unmount(dir, 0)
 }
 
 func emptyResolver(digest.Digest) digest.Digest {

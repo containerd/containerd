@@ -1,3 +1,5 @@
+// +build !windows
+
 package sys
 
 import (
@@ -16,4 +18,19 @@ func CreateUnixSocket(path string) (net.Listener, error) {
 		return nil, err
 	}
 	return net.Listen("unix", path)
+}
+
+// GetLocalListener returns a listerner out of a unix socket.
+func GetLocalListener(path string, uid, gid int) (net.Listener, error) {
+	l, err := CreateUnixSocket(path)
+	if err != nil {
+		return l, err
+	}
+
+	if err := os.Chown(path, uid, gid); err != nil {
+		l.Close()
+		return nil, err
+	}
+
+	return l, nil
 }

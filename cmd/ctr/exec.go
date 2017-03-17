@@ -2,14 +2,10 @@ package main
 
 import (
 	gocontext "context"
-	"encoding/json"
 	"os"
-	"path/filepath"
 
 	"github.com/containerd/containerd/api/services/execution"
 	"github.com/crosbymichael/console"
-	protobuf "github.com/gogo/protobuf/types"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
 )
 
@@ -20,6 +16,10 @@ var execCommand = cli.Command{
 		cli.StringFlag{
 			Name:  "id",
 			Usage: "id of the container",
+		},
+		cli.StringFlag{
+			Name:  "cwd",
+			Usage: "working directory of the new process",
 		},
 		cli.BoolFlag{
 			Name:  "tty,t",
@@ -32,11 +32,6 @@ var execCommand = cli.Command{
 			ctx = gocontext.Background()
 		)
 
-		process := createProcess(context.Args(), "", context.Bool("tty"))
-		data, err := json.Marshal(process)
-		if err != nil {
-			return err
-		}
 		containers, err := getExecutionService(context)
 		if err != nil {
 			return err
@@ -50,16 +45,9 @@ var execCommand = cli.Command{
 			return err
 		}
 		defer os.RemoveAll(tmpDir)
-		request := &execution.ExecRequest{
-			ID: id,
-			Spec: &protobuf.Any{
-				TypeUrl: specs.Version,
-				Value:   data,
-			},
-			Terminal: context.Bool("tty"),
-			Stdin:    filepath.Join(tmpDir, "stdin"),
-			Stdout:   filepath.Join(tmpDir, "stdout"),
-			Stderr:   filepath.Join(tmpDir, "stderr"),
+		request, err := newExecRequest(context, tmpDir, id)
+		if err != nil {
+			return err
 		}
 		if request.Terminal {
 			con := console.Current()
@@ -88,41 +76,4 @@ var execCommand = cli.Command{
 		}
 		return nil
 	},
-}
-
-func createProcess(args []string, cwd string, tty bool) specs.Process {
-	env := []string{
-		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-	}
-	if tty {
-		env = append(env, "TERM=xterm")
-	}
-	if cwd == "" {
-		cwd = "/"
-	}
-	return specs.Process{
-		Args:            args,
-		Env:             env,
-		Terminal:        tty,
-		Cwd:             cwd,
-		NoNewPrivileges: true,
-		User: specs.User{
-			UID: 0,
-			GID: 0,
-		},
-		Capabilities: &specs.LinuxCapabilities{
-			Bounding:    capabilities,
-			Permitted:   capabilities,
-			Inheritable: capabilities,
-			Effective:   capabilities,
-			Ambient:     capabilities,
-		},
-		Rlimits: []specs.LinuxRlimit{
-			{
-				Type: "RLIMIT_NOFILE",
-				Hard: uint64(1024),
-				Soft: uint64(1024),
-			},
-		},
-	}
 }

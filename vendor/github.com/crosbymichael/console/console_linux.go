@@ -103,3 +103,9 @@ func checkConsole(f *os.File) error {
 	}
 	return nil
 }
+
+func newMaster(f *os.File) Console {
+	return &master{
+		f: f,
+	}
+}

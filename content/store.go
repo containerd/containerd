@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/containerd/containerd/log"
@@ -156,19 +155,12 @@ func (s *Store) status(ingestPath string) (Status, error) {
 		return Status{}, err
 	}
 
-	var startedAt time.Time
-	if st, ok := fi.Sys().(*syscall.Stat_t); ok {
-		startedAt = time.Unix(int64(st.Ctim.Sec), int64(st.Ctim.Nsec))
-	} else {
-		startedAt = fi.ModTime()
-	}
-
 	return Status{
 		Ref:       ref,
 		Offset:    fi.Size(),
 		Total:     s.total(ingestPath),
 		UpdatedAt: fi.ModTime(),
-		StartedAt: startedAt,
+		StartedAt: getStartTime(fi),
 	}, nil
 }
 

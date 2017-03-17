@@ -38,9 +38,7 @@ type WinSize struct {
 
 // Current returns the current processes console
 func Current() Console {
-	return &master{
-		f: os.Stdin,
-	}
+	return newMaster(os.Stdin)
 }
 
 // ConsoleFromFile returns a console using the provided file
@@ -48,7 +46,5 @@ func ConsoleFromFile(f *os.File) (Console, error) {
 	if err := checkConsole(f); err != nil {
 		return nil, err
 	}
-	return &master{
-		f: f,
-	}, nil
+	return newMaster(f), nil
 }

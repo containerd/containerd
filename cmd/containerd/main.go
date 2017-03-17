@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -27,7 +26,6 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/sys"
 	metrics "github.com/docker/go-metrics"
@@ -65,7 +63,7 @@ func main() {
 		cli.StringFlag{
 			Name:  "config,c",
 			Usage: "path to the configuration file (Use 'default' to output the default toml)",
-			Value: "/etc/containerd/config.toml",
+			Value: defaultConfigPath,
 		},
 		cli.StringFlag{
 			Name:  "log-level,l",
@@ -76,8 +74,8 @@ func main() {
 			Usage: "containerd state directory",
 		},
 		cli.StringFlag{
-			Name:  "socket,s",
-			Usage: "socket path for containerd's GRPC server",
+			Name:  "address,a",
+			Usage: "address for containerd's GRPC server",
 		},
 		cli.StringFlag{
 			Name:  "root",
@@ -90,12 +88,9 @@ func main() {
 		// start the signal handler as soon as we can to make sure that
 		// we don't miss any signals during boot
 		signals := make(chan os.Signal, 2048)
-		signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1, syscall.SIGCHLD)
-		if conf.Subreaper {
-			log.G(global).Info("setting subreaper...")
-			if err := sys.SetSubreaper(1); err != nil {
-				return err
-			}
+		signal.Notify(signals, handledSignals...)
+		if err := platformInit(context); err != nil {
+			return err
 		}
 		log.G(global).Info("starting containerd boot...")
 
@@ -204,8 +199,8 @@ func before(context *cli.Context) error {
 			d:    &conf.State,
 		},
 		{
-			name: "socket",
-			d:    &conf.GRPC.Socket,
+			name: "address",
+			d:    &conf.GRPC.Address,
 		},
 	} {
 		if s := context.GlobalString(v.name); s != "" {
@@ -249,11 +244,11 @@ func newMetricsHandler() http.Handler {
 }
 
 func serveDebugAPI() error {
-	path := conf.Debug.Socket
+	path := conf.Debug.Address
 	if path == "" {
 		return errors.New("debug socket path cannot be empty")
 	}
-	l, err := sys.CreateUnixSocket(path)
+	l, err := sys.GetLocalListener(path, conf.GRPC.Uid, conf.GRPC.Gid)
 	if err != nil {
 		return err
 	}
@@ -415,15 +410,12 @@ func loadServices(runtimes map[string]containerd.Runtime, store *content.Store, 
 }
 
 func serveGRPC(server *grpc.Server) error {
-	path := conf.GRPC.Socket
+	path := conf.GRPC.Address
 	if path == "" {
 		return errors.New("--socket path cannot be empty")
 	}
-	l, err := sys.CreateUnixSocket(path)
+	l, err := sys.GetLocalListener(path, conf.GRPC.Uid, conf.GRPC.Gid)
 	if err != nil {
-		return err
-	}
-	if err := os.Chown(path, conf.GRPC.Uid, conf.GRPC.Gid); err != nil {
 		return err
 	}
 	go func() {
@@ -454,20 +446,4 @@ func interceptor(ctx gocontext.Context,
 		fmt.Printf("unknown GRPC server type: %#v\n", info.Server)
 	}
 	return grpc_prometheus.UnaryServerInterceptor(ctx, req, info, handler)
-}
-
-func handleSignals(signals chan os.Signal, server *grpc.Server) error {
-	for s := range signals {
-		log.G(global).WithField("signal", s).Debug("received signal")
-		switch s {
-		case syscall.SIGCHLD:
-			if err := reaper.Reap(); err != nil {
-				log.G(global).WithError(err).Error("reap containerd processes")
-			}
-		default:
-			server.Stop()
-			return nil
-		}
-	}
-	return nil
 }
