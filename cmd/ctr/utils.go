@@ -14,8 +14,14 @@ import (
 
 	gocontext "context"
 
+	"github.com/boltdb/bolt"
+	contentapi "github.com/docker/containerd/api/services/content"
 	"github.com/docker/containerd/api/services/execution"
+	rootfsapi "github.com/docker/containerd/api/services/rootfs"
 	"github.com/docker/containerd/api/types/container"
+	"github.com/docker/containerd/content"
+	"github.com/docker/containerd/image"
+	contentservice "github.com/docker/containerd/services/content"
 	"github.com/pkg/errors"
 	"github.com/tonistiigi/fifo"
 	"github.com/urfave/cli"
@@ -110,6 +116,43 @@ func getExecutionService(context *cli.Context) (execution.ContainerServiceClient
 		return nil, err
 	}
 	return execution.NewContainerServiceClient(conn), nil
+}
+
+func getContentProvider(context *cli.Context) (content.Provider, error) {
+	conn, err := getGRPCConnection(context)
+	if err != nil {
+		return nil, err
+	}
+	return contentservice.NewProviderFromClient(contentapi.NewContentClient(conn)), nil
+}
+
+func getRootFSService(context *cli.Context) (rootfsapi.RootFSClient, error) {
+	conn, err := getGRPCConnection(context)
+	if err != nil {
+		return nil, err
+	}
+	return rootfsapi.NewRootFSClient(conn), nil
+}
+
+func getDB(ctx *cli.Context, readonly bool) (*bolt.DB, error) {
+	// TODO(stevvooe): For now, we operate directly on the database. We will
+	// replace this with a GRPC service when the details are more concrete.
+	path := filepath.Join(ctx.GlobalString("root"), "meta.db")
+
+	db, err := bolt.Open(path, 0644, &bolt.Options{
+		ReadOnly: readonly,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if !readonly {
+		if err := image.InitDB(db); err != nil {
+			return nil, err
+		}
+	}
+
+	return db, nil
 }
 
 func getTempDir(id string) (string, error) {

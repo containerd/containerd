@@ -7,11 +7,16 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/crosbymichael/console"
 	"github.com/docker/containerd/api/services/execution"
-	"github.com/docker/containerd/api/types/mount"
+	rootfsapi "github.com/docker/containerd/api/services/rootfs"
+	"github.com/docker/containerd/image"
 	protobuf "github.com/gogo/protobuf/types"
+	"github.com/opencontainers/image-spec/identity"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -176,6 +181,7 @@ var runCommand = cli.Command{
 		},
 	},
 	Action: func(context *cli.Context) error {
+		ctx := gocontext.Background()
 		id := context.String("id")
 		if id == "" {
 			return errors.New("container id must be provided")
@@ -189,29 +195,69 @@ var runCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		events, err := containers.Events(gocontext.Background(), &execution.EventsRequest{})
+		events, err := containers.Events(ctx, &execution.EventsRequest{})
 		if err != nil {
 			return err
 		}
-		abs, err := filepath.Abs(context.String("rootfs"))
+
+		provider, err := getContentProvider(context)
 		if err != nil {
 			return err
 		}
-		// for ctr right now just do a bind mount
-		rootfs := []*mount.Mount{
-			{
-				Type:   "bind",
-				Source: abs,
-				Options: []string{
-					"rw",
-					"rbind",
-				},
-			},
+
+		rootfsClient, err := getRootFSService(context)
+		if err != nil {
+			return err
 		}
+
+		db, err := getDB(context, false)
+		if err != nil {
+			return errors.Wrap(err, "failed opening database")
+		}
+		defer db.Close()
+
+		tx, err := db.Begin(false)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+
+		ref := context.Args().First()
+
+		im, err := image.Get(tx, ref)
+		if err != nil {
+			return errors.Wrapf(err, "could not resolve %q", ref)
+		}
+		// let's close out our db and tx so we don't hold the lock whilst running.
+		tx.Rollback()
+		db.Close()
+
+		diffIDs, err := im.RootFS(ctx, provider)
+		if err != nil {
+			return err
+		}
+
+		if _, err := rootfsClient.Prepare(gocontext.TODO(), &rootfsapi.PrepareRequest{
+			Name:    id,
+			ChainID: identity.ChainID(diffIDs),
+		}); err != nil {
+			if grpc.Code(err) != codes.AlreadyExists {
+				return err
+			}
+		}
+
+		resp, err := rootfsClient.Mounts(gocontext.TODO(), &rootfsapi.MountsRequest{
+			Name: id,
+		})
+		if err != nil {
+			return err
+		}
+
+		rootfs := resp.Mounts
 
 		var s *specs.Spec
 		if config := context.String("runtime-config"); config == "" {
-			s = spec(id, []string(context.Args()), context.Bool("tty"))
+			s = spec(id, []string(context.Args().Tail()), context.Bool("tty"))
 		} else {
 			s, err = customSpec(config)
 			if err != nil {
@@ -251,6 +297,7 @@ var runCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+
 		if _, err := containers.Start(gocontext.Background(), &execution.StartRequest{
 			ID: response.ID,
 		}); err != nil {

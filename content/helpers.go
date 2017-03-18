@@ -10,6 +10,19 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ReadBlob retrieves the entire contents of the blob from the provider.
+//
+// Avoid using this for large blobs, such as layers.
+func ReadBlob(ctx context.Context, provider Provider, dgst digest.Digest) ([]byte, error) {
+	rc, err := provider.Reader(ctx, dgst)
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+
+	return ioutil.ReadAll(rc)
+}
+
 // WriteBlob writes data with the expected digest into the content store. If
 // expected already exists, the method returns immediately and the reader will
 // not be consumed.

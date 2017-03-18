@@ -61,6 +61,8 @@ distribution tool
 		},
 	}
 	app.Commands = []cli.Command{
+		imagesCommand,
+		pullCommand,
 		fetchCommand,
 		fetchObjectCommand,
 		ingestCommand,

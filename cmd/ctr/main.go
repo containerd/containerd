@@ -38,6 +38,13 @@ containerd client
 			Usage: "socket path for containerd's GRPC server",
 			Value: "/run/containerd/containerd.sock",
 		},
+		cli.StringFlag{
+			// TODO(stevvooe): for now, we allow circumventing the GRPC. Once
+			// we have clear separation, this will likely go away.
+			Name:  "root",
+			Usage: "path to content store root",
+			Value: "/var/lib/containerd",
+		},
 	}
 	app.Commands = []cli.Command{
 		runCommand,

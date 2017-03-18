@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 
 	"github.com/docker/containerd/content"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -131,13 +130,7 @@ func ChildrenHandler(provider content.Provider) HandlerFunc {
 			return nil, fmt.Errorf("%v not yet supported", desc.MediaType)
 		}
 
-		rc, err := provider.Reader(ctx, desc.Digest)
-		if err != nil {
-			return nil, err
-		}
-		defer rc.Close()
-
-		p, err := ioutil.ReadAll(rc)
+		p, err := content.ReadBlob(ctx, provider, desc.Digest)
 		if err != nil {
 			return nil, err
 		}
