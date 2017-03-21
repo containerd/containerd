@@ -16,6 +16,13 @@ type Container interface {
 	State(context.Context) (State, error)
 }
 
+type LinuxContainer interface {
+	Container
+
+	Pause(context.Context) error
+	Resume(context.Context) error
+}
+
 type ContainerStatus int
 
 const (

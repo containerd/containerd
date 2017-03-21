@@ -52,13 +52,13 @@ func (n *Namespace) WithConstLabels(labels Labels) *Namespace {
 
 func (n *Namespace) NewCounter(name, help string) Counter {
 	c := &counter{pc: prometheus.NewCounter(n.newCounterOpts(name, help))}
-	n.addMetric(c)
+	n.Add(c)
 	return c
 }
 
 func (n *Namespace) NewLabeledCounter(name, help string, labels ...string) LabeledCounter {
 	c := &labeledCounter{pc: prometheus.NewCounterVec(n.newCounterOpts(name, help), labels)}
-	n.addMetric(c)
+	n.Add(c)
 	return c
 }
 
@@ -76,7 +76,7 @@ func (n *Namespace) NewTimer(name, help string) Timer {
 	t := &timer{
 		m: prometheus.NewHistogram(n.newTimerOpts(name, help)),
 	}
-	n.addMetric(t)
+	n.Add(t)
 	return t
 }
 
@@ -84,7 +84,7 @@ func (n *Namespace) NewLabeledTimer(name, help string, labels ...string) Labeled
 	t := &labeledTimer{
 		m: prometheus.NewHistogramVec(n.newTimerOpts(name, help), labels),
 	}
-	n.addMetric(t)
+	n.Add(t)
 	return t
 }
 
@@ -102,7 +102,7 @@ func (n *Namespace) NewGauge(name, help string, unit Unit) Gauge {
 	g := &gauge{
 		pg: prometheus.NewGauge(n.newGaugeOpts(name, help, unit)),
 	}
-	n.addMetric(g)
+	n.Add(g)
 	return g
 }
 
@@ -110,7 +110,7 @@ func (n *Namespace) NewLabeledGauge(name, help string, unit Unit, labels ...stri
 	g := &labeledGauge{
 		pg: prometheus.NewGaugeVec(n.newGaugeOpts(name, help, unit), labels),
 	}
-	n.addMetric(g)
+	n.Add(g)
 	return g
 }
 
@@ -142,10 +142,18 @@ func (n *Namespace) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (n *Namespace) addMetric(collector prometheus.Collector) {
+func (n *Namespace) Add(collector prometheus.Collector) {
 	n.mu.Lock()
 	n.metrics = append(n.metrics, collector)
 	n.mu.Unlock()
+}
+
+func (n *Namespace) NewDesc(name, help string, unit Unit, labels ...string) *prometheus.Desc {
+	if string(unit) != "" {
+		name = fmt.Sprintf("%s_%s", name, unit)
+	}
+	name = fmt.Sprintf("%s_%s_%s", n.name, n.subsystem, name)
+	return prometheus.NewDesc(name, help, labels, prometheus.Labels(n.labels))
 }
 
 // mergeLabels merges two or more labels objects into a single map, favoring
