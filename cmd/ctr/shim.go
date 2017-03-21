@@ -19,8 +19,8 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/crosbymichael/console"
 	"github.com/docker/containerd/api/services/shim"
-	"github.com/urfave/cli"
 	"github.com/pkg/errors"
+	"github.com/urfave/cli"
 )
 
 var fifoFlags = []cli.Flag{
@@ -272,8 +272,8 @@ var shimEventsCommand = cli.Command{
 				return err
 			}
 			fmt.Printf("type=%s id=%s pid=%d status=%d\n", e.Type, e.ID, e.Pid, e.ExitStatus)
+			return nil
 		}
-		return nil
 	},
 }
 

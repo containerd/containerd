@@ -41,7 +41,7 @@ var eventsCommand = cli.Command{
 			if err := w.Flush(); err != nil {
 				return err
 			}
+			return nil
 		}
-		return nil
 	},
 }

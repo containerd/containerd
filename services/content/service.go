@@ -323,9 +323,8 @@ func (s *Service) Write(session api.Content_WriteServer) (err error) {
 
 			return err
 		}
+		return nil
 	}
-
-	return nil
 }
 
 func (s *Service) Status(*api.StatusRequest, api.Content_StatusServer) error {
