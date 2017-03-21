@@ -18,6 +18,7 @@ const (
 	RuntimePlugin PluginType = iota + 1
 	GRPCPlugin
 	SnapshotPlugin
+	ContainerMonitorPlugin
 )
 
 type Registration struct {
@@ -26,6 +27,7 @@ type Registration struct {
 	Init   func(*InitContext) (interface{}, error)
 }
 
+// TODO(@crosbymichael): how to we keep this struct from growing but support dependency injection for loaded plugins?
 type InitContext struct {
 	Root        string
 	State       string
@@ -34,6 +36,7 @@ type InitContext struct {
 	Snapshotter snapshot.Snapshotter
 	Config      interface{}
 	Context     context.Context
+	Monitor     ContainerMonitor
 }
 
 type Service interface {

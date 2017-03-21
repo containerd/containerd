@@ -32,7 +32,3 @@ type State interface {
 	// Pid is the main process id for the container
 	Pid() uint32
 }
-
-type ContainerMonitor interface {
-	Monitor(context.Context, Container) error
-}

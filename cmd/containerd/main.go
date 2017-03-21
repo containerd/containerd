@@ -104,7 +104,11 @@ func main() {
 		if err := serveDebugAPI(); err != nil {
 			return err
 		}
-		runtimes, err := loadRuntimes()
+		monitor, err := loadMonitor()
+		if err != nil {
+			return err
+		}
+		runtimes, err := loadRuntimes(monitor)
 		if err != nil {
 			return err
 		}
@@ -237,7 +241,7 @@ func resolveContentStore() (*content.Store, error) {
 	return content.NewStore(cp)
 }
 
-func loadRuntimes() (map[string]containerd.Runtime, error) {
+func loadRuntimes(monitor plugin.ContainerMonitor) (map[string]containerd.Runtime, error) {
 	o := make(map[string]containerd.Runtime)
 	for name, rr := range plugin.Registrations() {
 		if rr.Type != plugin.RuntimePlugin {
@@ -248,6 +252,7 @@ func loadRuntimes() (map[string]containerd.Runtime, error) {
 			Root:    conf.Root,
 			State:   conf.State,
 			Context: log.WithModule(global, fmt.Sprintf("runtime-%s", name)),
+			Monitor: monitor,
 		}
 		if rr.Config != nil {
 			if err := conf.decodePlugin(name, rr.Config); err != nil {
@@ -262,6 +267,30 @@ func loadRuntimes() (map[string]containerd.Runtime, error) {
 		o[name] = vr.(containerd.Runtime)
 	}
 	return o, nil
+}
+
+func loadMonitor() (plugin.ContainerMonitor, error) {
+	var monitors []plugin.ContainerMonitor
+	for name, m := range plugin.Registrations() {
+		if m.Type != plugin.ContainerMonitorPlugin {
+			continue
+		}
+		log.G(global).Infof("loading monitor plugin %q...", name)
+		ic := &plugin.InitContext{
+			Root:    conf.Root,
+			State:   conf.State,
+			Context: log.WithModule(global, fmt.Sprintf("monitor-%s", name)),
+		}
+		mm, err := m.Init(ic)
+		if err != nil {
+			return nil, err
+		}
+		monitors = append(monitors, mm.(plugin.ContainerMonitor))
+	}
+	if len(monitors) == 0 {
+		return plugin.NewNoopMonitor(), nil
+	}
+	return plugin.NewMultiContainerMonitor(monitors...), nil
 }
 
 func loadSnapshotter(store *content.Store) (snapshot.Snapshotter, error) {
