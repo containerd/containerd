@@ -101,8 +101,9 @@ type BlkioStat struct {
 }
 
 type BlkioEntry struct {
-	Op    string
-	Major uint64
-	Minor uint64
-	Value uint64
+	Op     string
+	Device string
+	Major  uint64
+	Minor  uint64
+	Value  uint64
 }

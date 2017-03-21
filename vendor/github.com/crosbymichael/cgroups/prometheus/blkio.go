@@ -12,7 +12,7 @@ var blkioMetrics = []*metric{
 		help:   "The blkio io merged recursive",
 		unit:   metrics.Total,
 		vt:     prometheus.GaugeValue,
-		labels: []string{"op", "major", "minor"},
+		labels: []string{"op", "device", "major", "minor"},
 		getValues: func(stats *cgroups.Stats) []value {
 			if stats.Blkio == nil {
 				return nil
@@ -25,7 +25,7 @@ var blkioMetrics = []*metric{
 		help:   "The blkio io queued recursive",
 		unit:   metrics.Total,
 		vt:     prometheus.GaugeValue,
-		labels: []string{"op", "major", "minor"},
+		labels: []string{"op", "device", "major", "minor"},
 		getValues: func(stats *cgroups.Stats) []value {
 			if stats.Blkio == nil {
 				return nil
@@ -38,7 +38,7 @@ var blkioMetrics = []*metric{
 		help:   "The blkio io service bytes recursive",
 		unit:   metrics.Bytes,
 		vt:     prometheus.GaugeValue,
-		labels: []string{"op", "major", "minor"},
+		labels: []string{"op", "device", "major", "minor"},
 		getValues: func(stats *cgroups.Stats) []value {
 			if stats.Blkio == nil {
 				return nil
@@ -51,7 +51,7 @@ var blkioMetrics = []*metric{
 		help:   "The blkio io servie time recursive",
 		unit:   metrics.Total,
 		vt:     prometheus.GaugeValue,
-		labels: []string{"op", "major", "minor"},
+		labels: []string{"op", "device", "major", "minor"},
 		getValues: func(stats *cgroups.Stats) []value {
 			if stats.Blkio == nil {
 				return nil
@@ -64,7 +64,7 @@ var blkioMetrics = []*metric{
 		help:   "The blkio io servied recursive",
 		unit:   metrics.Total,
 		vt:     prometheus.GaugeValue,
-		labels: []string{"op", "major", "minor"},
+		labels: []string{"op", "device", "major", "minor"},
 		getValues: func(stats *cgroups.Stats) []value {
 			if stats.Blkio == nil {
 				return nil
@@ -77,7 +77,7 @@ var blkioMetrics = []*metric{
 		help:   "The blkio io time recursive",
 		unit:   metrics.Total,
 		vt:     prometheus.GaugeValue,
-		labels: []string{"op", "major", "minor"},
+		labels: []string{"op", "device", "major", "minor"},
 		getValues: func(stats *cgroups.Stats) []value {
 			if stats.Blkio == nil {
 				return nil
@@ -90,7 +90,7 @@ var blkioMetrics = []*metric{
 		help:   "The blkio sectors recursive",
 		unit:   metrics.Total,
 		vt:     prometheus.GaugeValue,
-		labels: []string{"op", "major", "minor"},
+		labels: []string{"op", "device", "major", "minor"},
 		getValues: func(stats *cgroups.Stats) []value {
 			if stats.Blkio == nil {
 				return nil

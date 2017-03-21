@@ -59,7 +59,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 
 func (c *Collector) collect(id string, cg cgroups.Cgroup, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
 	defer wg.Done()
-	stats, err := cg.Stat()
+	stats, err := cg.Stat(cgroups.IgnoreNotExist)
 	if err != nil {
 		logrus.WithError(err).Errorf("stat cgroup %s", id)
 		return
@@ -92,7 +92,7 @@ func blkioValues(l []cgroups.BlkioEntry) []value {
 	for _, e := range l {
 		out = append(out, value{
 			v: float64(e.Value),
-			l: []string{e.Op, strconv.FormatUint(e.Major, 10), strconv.FormatUint(e.Minor, 10)},
+			l: []string{e.Op, e.Device, strconv.FormatUint(e.Major, 10), strconv.FormatUint(e.Minor, 10)},
 		})
 	}
 	return out

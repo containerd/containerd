@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -104,15 +105,21 @@ func (b *blkioController) Stat(path string, stats *Stats) error {
 			},
 		)
 	}
+
+	devices, err := getDevices("/dev")
+	if err != nil {
+		return err
+	}
+
 	for _, t := range settings {
-		if err := b.readEntry(path, t.name, t.entry); err != nil {
+		if err := b.readEntry(devices, path, t.name, t.entry); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (b *blkioController) readEntry(path, name string, entry *[]BlkioEntry) error {
+func (b *blkioController) readEntry(devices map[deviceKey]string, path, name string, entry *[]BlkioEntry) error {
 	f, err := os.Open(filepath.Join(b.Path(path), fmt.Sprintf("blkio.%s", name)))
 	if err != nil {
 		return err
@@ -152,14 +159,16 @@ func (b *blkioController) readEntry(path, name string, entry *[]BlkioEntry) erro
 			return err
 		}
 		*entry = append(*entry, BlkioEntry{
-			Major: major,
-			Minor: minor,
-			Op:    op,
-			Value: v,
+			Device: devices[deviceKey{major, minor}],
+			Major:  major,
+			Minor:  minor,
+			Op:     op,
+			Value:  v,
 		})
 	}
 	return nil
 }
+
 func createBlkioSettings(blkio *specs.LinuxBlockIO) []blkioSettings {
 	settings := []blkioSettings{
 		{
@@ -250,4 +259,65 @@ func throttleddev(v interface{}) []byte {
 
 func splitBlkioStatLine(r rune) bool {
 	return r == ' ' || r == ':'
+}
+
+type deviceKey struct {
+	major, minor uint64
+}
+
+// getDevices makes a best effort attempt to read all the devices into a map
+// keyed by major and minor number. Since devices may be mapped multiple times,
+// we err on taking the first occurrence.
+func getDevices(path string) (map[deviceKey]string, error) {
+	// TODO(stevvooe): We are ignoring lots of errors. It might be kind of
+	// challenging to debug this if we aren't mapping devices correctly.
+	// Consider logging these errors.
+	devices := map[deviceKey]string{}
+	if err := filepath.Walk(path, func(p string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		switch {
+		case fi.IsDir():
+			switch fi.Name() {
+			case "pts", "shm", "fd", "mqueue", ".lxc", ".lxd-mounts":
+				return filepath.SkipDir
+			default:
+				return nil
+			}
+		case fi.Name() == "console":
+			return nil
+		default:
+			if fi.Mode()&os.ModeDevice == 0 {
+				// skip non-devices
+				return nil
+			}
+
+			st, ok := fi.Sys().(*syscall.Stat_t)
+			if !ok {
+				return fmt.Errorf("%s: unable to convert to system stat", p)
+			}
+
+			key := deviceKey{major(st.Rdev), minor(st.Rdev)}
+			if _, ok := devices[key]; ok {
+				return nil // skip it if we have already populated the path.
+			}
+
+			devices[key] = p
+		}
+
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return devices, nil
+}
+
+func major(devNumber uint64) uint64 {
+	return (devNumber >> 8) & 0xfff
+}
+
+func minor(devNumber uint64) uint64 {
+	return (devNumber & 0xff) | ((devNumber >> 12) & 0xfff00)
 }
