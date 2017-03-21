@@ -5,7 +5,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/boltdb/bolt"
 	"github.com/docker/containerd/content"
+	"github.com/docker/containerd/image"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 )
@@ -33,4 +35,25 @@ func connectGRPC(context *cli.Context) (*grpc.ClientConn, error) {
 			return net.DialTimeout("unix", socket, timeout)
 		}),
 	)
+}
+
+func getDB(ctx *cli.Context, readonly bool) (*bolt.DB, error) {
+	// TODO(stevvooe): For now, we operate directly on the database. We will
+	// replace this with a GRPC service when the details are more concrete.
+	path := filepath.Join(ctx.GlobalString("root"), "meta.db")
+
+	db, err := bolt.Open(path, 0644, &bolt.Options{
+		ReadOnly: readonly,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if !readonly {
+		if err := image.InitDB(db); err != nil {
+			return nil, err
+		}
+	}
+
+	return db, nil
 }
