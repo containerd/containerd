@@ -11,14 +11,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const (
-	MediaTypeDockerSchema2Layer        = "application/vnd.docker.image.rootfs.diff.tar"
-	MediaTypeDockerSchema2LayerGzip    = "application/vnd.docker.image.rootfs.diff.tar.gzip"
-	MediaTypeDockerSchema2Config       = "application/vnd.docker.container.image.v1+json"
-	MediaTypeDockerSchema2Manifest     = "application/vnd.docker.distribution.manifest.v2+json"
-	MediaTypeDockerSchema2ManifestList = "application/vnd.docker.distribution.manifest.list.v2+json"
-)
-
 var SkipDesc = fmt.Errorf("skip descriptor")
 
 type Handler interface {
