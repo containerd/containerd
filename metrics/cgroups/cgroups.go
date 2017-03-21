@@ -20,7 +20,7 @@ func init() {
 
 func New(ic *plugin.InitContext) (interface{}, error) {
 	var (
-		ns        = metrics.NewNamespace("containerd", "container", nil)
+		ns        = metrics.NewNamespace("container", "", nil)
 		collector = prometheus.New(ns)
 	)
 	oom, err := prometheus.NewOOMCollector(ns)
