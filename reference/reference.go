@@ -31,9 +31,11 @@ var (
 // to map to a physical resource, but it must parse as a hostname. We refer to
 // this as the namespace.
 //
-// The other component is the digest, which may be a part of the object
-// identifier, always prefixed with an '@'. If present, the remote may use the
-// digest portion directly or resolve it against a prefix. If the object
+// The other component made accessible by helper method is the digest. This is
+// part of the object identifier, always prefixed with an '@'. If present, the
+// remote may use the digest portion directly or resolve it against a prefix.
+// If the object does not include the `@` symbol, the return value for `Digest`
+// will be empty.
 type Spec struct {
 	// Locator is the host and path portion of the specification. The host
 	// portion may refer to an actual host or just a namespace of related
