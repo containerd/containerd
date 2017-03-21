@@ -152,7 +152,11 @@ func (n *Namespace) NewDesc(name, help string, unit Unit, labels ...string) *pro
 	if string(unit) != "" {
 		name = fmt.Sprintf("%s_%s", name, unit)
 	}
-	name = fmt.Sprintf("%s_%s_%s", n.name, n.subsystem, name)
+	namespace := n.name
+	if n.subsystem != "" {
+		namespace = fmt.Sprintf("%s_%s", namespace, n.subsystem)
+	}
+	name = fmt.Sprintf("%s_%s", namespace, name)
 	return prometheus.NewDesc(name, help, labels, prometheus.Labels(n.labels))
 }
 
