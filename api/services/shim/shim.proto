@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package containerd.v1.services.shim;
 
+import "google/protobuf/any.proto";
 import "google/protobuf/empty.proto";
 import "gogoproto/gogo.proto";
 import "github.com/docker/containerd/api/types/mount/mount.proto";
@@ -52,15 +53,7 @@ message ExecRequest {
 	string stdin = 2;
 	string stdout = 3;
 	string stderr = 4;
-	string selinux_label = 5;
-	containerd.v1.types.User user = 6;
-	repeated string args = 7;
-	repeated string env = 8;
-	string cwd = 9;
-	repeated string capabilities = 10;
-	repeated Rlimit rlimits = 11;
-	bool no_new_privileges = 12;
-	string apparmor_profile = 13;
+	google.protobuf.Any spec = 5;
 }
 
 message Rlimit {
