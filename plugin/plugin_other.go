@@ -1,4 +1,4 @@
-// +build !go1.8 windows
+// +build !go1.8 windows !amd64
 
 package plugin
 
