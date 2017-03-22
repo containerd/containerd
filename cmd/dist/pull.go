@@ -10,7 +10,7 @@ import (
 	contentapi "github.com/docker/containerd/api/services/content"
 	rootfsapi "github.com/docker/containerd/api/services/rootfs"
 	"github.com/docker/containerd/content"
-	"github.com/docker/containerd/image"
+	"github.com/docker/containerd/images"
 	"github.com/docker/containerd/log"
 	"github.com/docker/containerd/progress"
 	"github.com/docker/containerd/remotes"
@@ -87,7 +87,7 @@ command. As part of this process, we do the following:
 			close(resolved)
 
 			eg.Go(func() error {
-				return image.Register(tx, name, desc)
+				return images.Register(tx, name, desc)
 			})
 			defer func() {
 				if err := tx.Commit(); err != nil {
@@ -95,13 +95,13 @@ command. As part of this process, we do the following:
 				}
 			}()
 
-			return image.Dispatch(ctx,
-				image.Handlers(image.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+			return images.Dispatch(ctx,
+				images.Handlers(images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 					ongoing.add(remotes.MakeRefKey(ctx, desc))
 					return nil, nil
 				}),
 					remotes.FetchHandler(ingester, fetcher),
-					image.ChildrenHandler(provider)),
+					images.ChildrenHandler(provider)),
 				desc)
 
 		})
@@ -123,7 +123,7 @@ command. As part of this process, we do the following:
 			// root filesystem chainid for the image. For now, we just print
 			// it, but we should keep track of this in the metadata storage.
 
-			image, err := image.Get(tx, resolvedImageName)
+			image, err := images.Get(tx, resolvedImageName)
 			if err != nil {
 				log.G(ctx).Fatal(err)
 			}

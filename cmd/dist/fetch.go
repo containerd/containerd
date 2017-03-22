@@ -10,7 +10,7 @@ import (
 	"time"
 
 	contentapi "github.com/docker/containerd/api/services/content"
-	"github.com/docker/containerd/image"
+	"github.com/docker/containerd/images"
 	"github.com/docker/containerd/log"
 	"github.com/docker/containerd/progress"
 	"github.com/docker/containerd/remotes"
@@ -79,13 +79,13 @@ Most of this is experimental and there are few leaps to make this work.`,
 			log.G(ctx).WithField("image", name).Debug("fetching")
 			close(resolved)
 
-			return image.Dispatch(ctx,
-				image.Handlers(image.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+			return images.Dispatch(ctx,
+				images.Handlers(images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 					ongoing.add(remotes.MakeRefKey(ctx, desc))
 					return nil, nil
 				}),
 					remotes.FetchHandler(ingester, fetcher),
-					image.ChildrenHandler(provider),
+					images.ChildrenHandler(provider),
 				),
 				desc)
 		})

@@ -6,7 +6,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd/content"
-	"github.com/docker/containerd/image"
+	"github.com/docker/containerd/images"
 	"github.com/docker/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -19,10 +19,10 @@ func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
 	// product of the context, which may include information about the ongoing
 	// fetch process.
 	switch desc.MediaType {
-	case image.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest,
-		image.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+	case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest,
+		images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
 		return "manifest-" + desc.Digest.String()
-	case image.MediaTypeDockerSchema2Layer, image.MediaTypeDockerSchema2LayerGzip:
+	case images.MediaTypeDockerSchema2Layer, images.MediaTypeDockerSchema2LayerGzip:
 		return "layer-" + desc.Digest.String()
 	case "application/vnd.docker.container.image.v1+json":
 		return "config-" + desc.Digest.String()
@@ -35,7 +35,7 @@ func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
 // FetchHandler returns a handler that will fetch all content into the ingester
 // discovered in a call to Dispatch. Use with ChildrenHandler to do a full
 // recursive fetch.
-func FetchHandler(ingester content.Ingester, fetcher Fetcher) image.HandlerFunc {
+func FetchHandler(ingester content.Ingester, fetcher Fetcher) images.HandlerFunc {
 	return func(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error) {
 		ctx = log.WithLogger(ctx, log.G(ctx).WithFields(logrus.Fields{
 			"digest":    desc.Digest,
@@ -44,7 +44,7 @@ func FetchHandler(ingester content.Ingester, fetcher Fetcher) image.HandlerFunc 
 		}))
 
 		switch desc.MediaType {
-		case image.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+		case images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
 			return nil, fmt.Errorf("%v not yet supported", desc.MediaType)
 		default:
 			err := fetch(ctx, ingester, fetcher, desc)

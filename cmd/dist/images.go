@@ -5,7 +5,7 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/docker/containerd/image"
+	"github.com/docker/containerd/images"
 	"github.com/docker/containerd/progress"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -29,7 +29,7 @@ var imagesCommand = cli.Command{
 		}
 		defer tx.Rollback()
 
-		images, err := image.List(tx)
+		images, err := images.List(tx)
 		if err != nil {
 			return errors.Wrap(err, "failed to list images")
 		}
