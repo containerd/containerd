@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/containerd"
 	"github.com/docker/containerd/log"
 	"github.com/docker/containerd/plugin"
@@ -138,6 +139,9 @@ func (b *Snapshotter) makeActive(ctx context.Context, key, parent string, readon
 	err = t.Commit()
 	t = nil
 	if err != nil {
+		if derr := btrfs.SubvolDelete(target); derr != nil {
+			log.G(ctx).WithError(derr).WithField("subvolume", target).Error("Failed to delete subvolume")
+		}
 		return nil, err
 	}
 
@@ -199,13 +203,14 @@ func (b *Snapshotter) Commit(ctx context.Context, name, key string) (err error) 
 	t = nil
 	if err != nil {
 		if derr := btrfs.SubvolDelete(target); derr != nil {
-			log.G(ctx).WithError(derr).Error("Failed to clean up new snapshot: %v", target)
+			log.G(ctx).WithError(derr).WithField("subvolume", target).Error("Failed to delete subvolume")
 		}
 		return err
 	}
 
 	if derr := btrfs.SubvolDelete(source); derr != nil {
-		log.G(ctx).WithError(derr).Warn("Failed to clean up active snapshot: %v", source)
+		// Log as warning, only needed for cleanup, will not cause name collision
+		log.G(ctx).WithError(derr).WithField("subvolume", source).Warn("Failed to delete subvolume")
 	}
 
 	return nil
@@ -250,7 +255,7 @@ func (b *Snapshotter) Remove(ctx context.Context, key string) (err error) {
 
 		if removed != "" {
 			if derr := btrfs.SubvolDelete(removed); derr != nil {
-				log.G(ctx).WithError(derr).Warn("Failed to clean up removed snapshot: %v", removed)
+				log.G(ctx).WithError(derr).WithField("subvolume", removed).Warn("Failed to delete subvolume")
 			}
 		}
 	}()
@@ -291,9 +296,13 @@ func (b *Snapshotter) Remove(ctx context.Context, key string) (err error) {
 	if err != nil {
 		// Attempt to restore source
 		if err1 := btrfs.SubvolSnapshot(source, removed, readonly); err1 != nil {
+			log.G(ctx).WithFields(logrus.Fields{
+				logrus.ErrorKey: err1,
+				"subvolume":     source,
+				"renamed":       removed,
+			}).Error("Failed to restore subvolume from renamed")
 			// Keep removed to allow for manual restore
 			removed = ""
-			log.G(ctx).WithError(err1).Error("Failed to restore source snapshot %v from %v", source, removed)
 		}
 		return err
 	}
