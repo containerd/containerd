@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net"
 	"path/filepath"
 	"time"
@@ -8,6 +9,8 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/docker/containerd/content"
 	"github.com/docker/containerd/images"
+	"github.com/docker/containerd/remotes"
+	"github.com/docker/containerd/remotes/docker"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 )
@@ -56,4 +59,9 @@ func getDB(ctx *cli.Context, readonly bool) (*bolt.DB, error) {
 	}
 
 	return db, nil
+}
+
+// getResolver prepares the resolver from the environment and options.
+func getResolver(ctx context.Context) (remotes.Resolver, error) {
+	return docker.NewResolver(), nil
 }
