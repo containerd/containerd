@@ -12,8 +12,14 @@ import (
 	_ "github.com/docker/containerd/testutil"
 )
 
+func TestBoltDB(t *testing.T) {
+	testsuite.MetaStoreSuite(t, "BoltDB", func(ctx context.Context, root string) (storage.MetaStore, error) {
+		return NewMetaStore(ctx, filepath.Join(root, "metadata.db"))
+	})
+}
+
 func BenchmarkSuite(b *testing.B) {
-	testsuite.Benchmarks(b, "BoltDB", func(ctx context.Context, root string) (storage.MetaStore, error) {
+	testsuite.Benchmarks(b, "BoltDBBench", func(ctx context.Context, root string) (storage.MetaStore, error) {
 		return NewMetaStore(ctx, filepath.Join(root, "metadata.db"))
 	})
 }

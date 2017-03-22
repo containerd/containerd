@@ -10,6 +10,8 @@ import (
 	"github.com/docker/containerd/snapshot/storage"
 )
 
+// Benchmarks returns a benchmark suite using the provided metadata store
+// creation method
 func Benchmarks(b *testing.B, name string, metaFn func(context.Context, string) (storage.MetaStore, error)) {
 	b.Run("StatActive", makeBench(b, name, metaFn, statActiveBenchmark))
 	b.Run("StatCommitted", makeBench(b, name, metaFn, statCommittedBenchmark))

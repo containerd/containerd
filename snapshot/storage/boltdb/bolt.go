@@ -76,6 +76,9 @@ func (ms *boltMetastore) withBucket(ctx context.Context, fn func(context.Context
 		return errors.Errorf("no transaction in context")
 	}
 	bkt := t.tx.Bucket(bucketKeyStorageVersion)
+	if bkt == nil {
+		return errors.Wrap(snapshot.ErrSnapshotNotExist, "bucket does not exist")
+	}
 	return fn(ctx, bkt.Bucket(bucketKeySnapshot), bkt.Bucket(bucketKeyParents))
 }
 
@@ -105,17 +108,6 @@ func fromProtoKind(k Kind) snapshot.Kind {
 		return snapshot.KindActive
 	}
 	return snapshot.KindCommitted
-}
-
-func toProtoKind(k snapshot.Kind) Kind {
-	switch k {
-	case snapshot.KindActive:
-		return KindActive
-	case snapshot.KindCommitted:
-		return KindCommitted
-	default:
-		panic("unknown kind")
-	}
 }
 
 // parentKey returns a composite key of the parent and child identifiers. The
@@ -193,13 +185,13 @@ func (ms *boltMetastore) CreateActive(ctx context.Context, key, parent string, r
 				return errors.Wrap(err, "failed to get parent snapshot")
 			}
 
-			if parentS.Kind == KindActive {
-				return errors.Errorf("cannot create active from active")
+			if parentS.Kind != KindCommitted {
+				return errors.Wrap(snapshot.ErrSnapshotNotCommitted, "parent is not committed snapshot")
 			}
 		}
 		b := bkt.Get([]byte(key))
 		if len(b) != 0 {
-			return errors.Errorf("key already exists")
+			return snapshot.ErrSnapshotExist
 		}
 
 		id, err := bkt.NextSequence()
@@ -246,7 +238,7 @@ func (ms *boltMetastore) GetActive(ctx context.Context, key string) (a storage.A
 	err = ms.withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
 		b := bkt.Get([]byte(key))
 		if len(b) == 0 {
-			return errors.Errorf("active not found")
+			return snapshot.ErrSnapshotNotExist
 		}
 
 		var ss Snapshot
@@ -254,7 +246,7 @@ func (ms *boltMetastore) GetActive(ctx context.Context, key string) (a storage.A
 			return errors.Wrap(err, "failed to unmarshal snapshot")
 		}
 		if ss.Kind != KindActive {
-			return errors.Errorf("active not found")
+			return snapshot.ErrSnapshotNotActive
 		}
 
 		a.ID = fmt.Sprintf("%d", ss.ID)
@@ -303,7 +295,7 @@ func (ms *boltMetastore) Remove(ctx context.Context, key string) (id string, k s
 		var ss Snapshot
 		b := bkt.Get([]byte(key))
 		if len(b) == 0 {
-			return errors.Errorf("key does not exist")
+			return snapshot.ErrSnapshotNotExist
 		}
 
 		if err := proto.Unmarshal(b, &ss); err != nil {
@@ -345,7 +337,7 @@ func (ms *boltMetastore) Commit(ctx context.Context, key, name string) (id strin
 	err = ms.withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
 		b := bkt.Get([]byte(name))
 		if len(b) != 0 {
-			return errors.Errorf("key already exists")
+			return errors.Wrap(snapshot.ErrSnapshotExist, "committed name already exists")
 		}
 
 		var ss Snapshot
@@ -353,7 +345,7 @@ func (ms *boltMetastore) Commit(ctx context.Context, key, name string) (id strin
 			return errors.Wrap(err, "failed to get active snapshot")
 		}
 		if ss.Kind != KindActive {
-			return errors.Errorf("key is not active snapshot")
+			return snapshot.ErrSnapshotNotActive
 		}
 		if ss.Readonly {
 			return errors.Errorf("active snapshot is readonly")
@@ -383,7 +375,7 @@ func (ms *boltMetastore) Commit(ctx context.Context, key, name string) (id strin
 func getSnapshot(bkt *bolt.Bucket, key string, ss *Snapshot) error {
 	b := bkt.Get([]byte(key))
 	if len(b) == 0 {
-		return errors.Errorf("snapshot not found")
+		return snapshot.ErrSnapshotNotExist
 	}
 	if err := proto.Unmarshal(b, ss); err != nil {
 		return errors.Wrap(err, "failed to unmarshal snapshot")
@@ -401,17 +393,4 @@ func putSnapshot(bkt *bolt.Bucket, key string, ss *Snapshot) error {
 		return errors.Wrap(err, "failed to save snapshot")
 	}
 	return nil
-}
-
-func getBucket(tx *bolt.Tx, keys ...[]byte) *bolt.Bucket {
-	bkt := tx.Bucket(keys[0])
-
-	for _, key := range keys[1:] {
-		if bkt == nil {
-			break
-		}
-		bkt = bkt.Bucket(key)
-	}
-
-	return bkt
 }
