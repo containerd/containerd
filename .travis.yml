@@ -21,6 +21,7 @@ install:
   - export PATH=$PATH:/tmp/protobuf/bin/
 
 script:
+  - make fmt
   - make binaries
   - make coverage
   - sudo PATH=$PATH GOPATH=$GOPATH make root-coverage
