@@ -12,7 +12,6 @@ import (
 
 var (
 	errImageUnknown = fmt.Errorf("image: unknown")
-	errNoTx         = fmt.Errorf("no transaction available")
 )
 
 var (

@@ -86,3 +86,40 @@ func (image *Image) RootFS(ctx context.Context, provider content.Provider) ([]di
 
 	return diffIDs, nil
 }
+
+// Size returns the total size of an image's packed resources.
+func (image *Image) Size(ctx context.Context, provider content.Provider) (int64, error) {
+	var size int64
+	return size, Walk(ctx, HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		switch image.Descriptor.MediaType {
+		case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+			size += desc.Size
+			rc, err := provider.Reader(ctx, image.Descriptor.Digest)
+			if err != nil {
+				return nil, err
+			}
+			defer rc.Close()
+
+			p, err := ioutil.ReadAll(rc)
+			if err != nil {
+				return nil, err
+			}
+
+			var manifest ocispec.Manifest
+			if err := json.Unmarshal(p, &manifest); err != nil {
+				return nil, err
+			}
+
+			size += manifest.Config.Size
+
+			for _, layer := range manifest.Layers {
+				size += layer.Size
+			}
+
+			return nil, nil
+		default:
+			return nil, errors.New("unsupported type")
+		}
+
+	}), image.Descriptor)
+}
