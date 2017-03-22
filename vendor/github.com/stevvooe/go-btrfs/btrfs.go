@@ -365,7 +365,7 @@ func openSubvolDir(path string) (*os.File, error) {
 }
 
 func isStatfsSubvol(statfs *syscall.Statfs_t) error {
-	if statfs.Type != C.BTRFS_SUPER_MAGIC {
+	if int64(statfs.Type) != int64(C.BTRFS_SUPER_MAGIC) {
 		return errors.Errorf("not a btrfs filesystem")
 	}
 

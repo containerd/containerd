@@ -159,7 +159,7 @@ func (s *Store) status(ingestPath string) (Status, error) {
 
 	var startedAt time.Time
 	if st, ok := fi.Sys().(*syscall.Stat_t); ok {
-		startedAt = time.Unix(st.Ctim.Sec, st.Ctim.Nsec)
+		startedAt = time.Unix(int64(st.Ctim.Sec), int64(st.Ctim.Nsec))
 	} else {
 		startedAt = fi.ModTime()
 	}
