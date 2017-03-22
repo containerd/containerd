@@ -113,7 +113,7 @@ func spec(id string, args []string, tty bool) *specs.Spec {
 				Devices: []specs.LinuxDeviceCgroup{
 					{
 						Allow:  false,
-						Access: &rwm,
+						Access: rwm,
 					},
 				},
 			},

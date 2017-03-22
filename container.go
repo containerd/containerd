@@ -16,6 +16,13 @@ type Container interface {
 	State(context.Context) (State, error)
 }
 
+type LinuxContainer interface {
+	Container
+
+	Pause(context.Context) error
+	Resume(context.Context) error
+}
+
 type ContainerStatus int
 
 const (
@@ -31,8 +38,4 @@ type State interface {
 	Status() ContainerStatus
 	// Pid is the main process id for the container
 	Pid() uint32
-}
-
-type ContainerMonitor interface {
-	Monitor(context.Context, Container) error
 }

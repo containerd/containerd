@@ -60,3 +60,13 @@ func (c *Container) State(ctx context.Context) (containerd.State, error) {
 		status: status,
 	}, nil
 }
+
+func (c *Container) Pause(ctx context.Context) error {
+	_, err := c.shim.Pause(ctx, &shim.PauseRequest{})
+	return err
+}
+
+func (c *Container) Resume(ctx context.Context) error {
+	_, err := c.shim.Resume(ctx, &shim.ResumeRequest{})
+	return err
+}

@@ -54,6 +54,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		events:        make(chan *containerd.Event, 2048),
 		eventsContext: c,
 		eventsCancel:  cancel,
+		monitor:       ic.Monitor,
 	}, nil
 }
 
@@ -64,6 +65,7 @@ type Runtime struct {
 	events        chan *containerd.Event
 	eventsContext context.Context
 	eventsCancel  func()
+	monitor       plugin.ContainerMonitor
 }
 
 func (r *Runtime) Create(ctx context.Context, id string, opts containerd.CreateOpts) (containerd.Container, error) {
@@ -100,16 +102,26 @@ func (r *Runtime) Create(ctx context.Context, id string, opts containerd.CreateO
 		os.RemoveAll(path)
 		return nil, err
 	}
-	return &Container{
+	c := &Container{
 		id:   id,
 		shim: s,
-	}, nil
+	}
+	// after the container is create add it to the monitor
+	if err := r.monitor.Monitor(c); err != nil {
+		return nil, err
+	}
+	return c, nil
 }
 
 func (r *Runtime) Delete(ctx context.Context, c containerd.Container) (uint32, error) {
 	lc, ok := c.(*Container)
 	if !ok {
 		return 0, fmt.Errorf("container cannot be cast as *linux.Container")
+	}
+	// remove the container from the monitor
+	if err := r.monitor.Stop(lc); err != nil {
+		// TODO: log error here
+		return 0, err
 	}
 	rsp, err := lc.shim.Delete(ctx, &shim.DeleteRequest{})
 	if err != nil {
