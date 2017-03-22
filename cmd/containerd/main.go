@@ -409,7 +409,7 @@ func handleSignals(signals chan os.Signal, server *grpc.Server) error {
 		log.G(global).WithField("signal", s).Debug("received signal")
 		switch s {
 		case syscall.SIGCHLD:
-			if _, err := reaper.Reap(); err != nil {
+			if err := reaper.Reap(); err != nil {
 				log.G(global).WithError(err).Error("reap containerd processes")
 			}
 		default:

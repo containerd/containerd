@@ -5,10 +5,11 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/crosbymichael/console"
 	shimapi "github.com/docker/containerd/api/services/shim"
 	"github.com/docker/containerd/api/types/container"
-	"github.com/docker/containerd/utils"
+	"github.com/docker/containerd/reaper"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -17,8 +18,9 @@ import (
 var empty = &google_protobuf.Empty{}
 
 // New returns a new shim service that can be used via GRPC
-func New() *Service {
+func New(path string) *Service {
 	return &Service{
+		path:      path,
 		processes: make(map[int]process),
 		events:    make(chan *container.Event, 4096),
 	}
@@ -26,6 +28,7 @@ func New() *Service {
 
 type Service struct {
 	initProcess *initProcess
+	path        string
 	id          string
 	bundle      string
 	mu          sync.Mutex
@@ -35,7 +38,7 @@ type Service struct {
 }
 
 func (s *Service) Create(ctx context.Context, r *shimapi.CreateRequest) (*shimapi.CreateResponse, error) {
-	process, err := newInitProcess(ctx, r)
+	process, err := newInitProcess(ctx, s.path, r)
 	if err != nil {
 		return nil, err
 	}
@@ -46,6 +49,23 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateRequest) (*shimap
 	pid := process.Pid()
 	s.processes[pid] = process
 	s.mu.Unlock()
+	cmd := &reaper.Cmd{
+		ExitCh: make(chan int, 1),
+	}
+	reaper.Default.Register(pid, cmd)
+	go func() {
+		status, err := reaper.Default.WaitPid(pid)
+		if err != nil {
+			logrus.WithError(err).Error("waitpid")
+		}
+		process.Exited(status)
+		s.events <- &container.Event{
+			Type:       container.Event_EXIT,
+			ID:         s.id,
+			Pid:        uint32(pid),
+			ExitStatus: uint32(status),
+		}
+	}()
 	s.events <- &container.Event{
 		Type: container.Event_CREATE,
 		ID:   r.ID,
@@ -90,7 +110,7 @@ func (s *Service) Exec(ctx context.Context, r *shimapi.ExecRequest) (*shimapi.Ex
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.execID++
-	process, err := newExecProcess(ctx, r, s.initProcess, s.execID)
+	process, err := newExecProcess(ctx, s.path, r, s.initProcess, s.execID)
 	if err != nil {
 		return nil, err
 	}
@@ -196,19 +216,4 @@ func (s *Service) Exit(ctx context.Context, r *shimapi.ExitRequest) (*google_pro
 		return nil, err
 	}
 	return empty, nil
-}
-
-func (s *Service) ProcessExit(e utils.Exit) error {
-	s.mu.Lock()
-	if p, ok := s.processes[e.Pid]; ok {
-		p.Exited(e.Status)
-		s.events <- &container.Event{
-			Type:       container.Event_EXIT,
-			ID:         s.id,
-			Pid:        uint32(p.Pid()),
-			ExitStatus: uint32(e.Status),
-		}
-	}
-	s.mu.Unlock()
-	return nil
 }

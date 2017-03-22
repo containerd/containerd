@@ -14,12 +14,16 @@ import (
 	"google.golang.org/grpc/grpclog"
 
 	"github.com/docker/containerd/api/services/shim"
+	localShim "github.com/docker/containerd/linux/shim"
 	"github.com/docker/containerd/reaper"
 	"github.com/docker/containerd/utils"
 	"github.com/pkg/errors"
 )
 
-func newShim(path string) (shim.ShimClient, error) {
+func newShim(path string, remote bool) (shim.ShimClient, error) {
+	if !remote {
+		return localShim.Client(path), nil
+	}
 	socket := filepath.Join(path, "shim.sock")
 	l, err := utils.CreateUnixSocket(socket)
 	if err != nil {
@@ -48,7 +52,10 @@ func newShim(path string) (shim.ShimClient, error) {
 	return connectShim(socket)
 }
 
-func loadShim(path string) (shim.ShimClient, error) {
+func loadShim(path string, remote bool) (shim.ShimClient, error) {
+	if !remote {
+		return localShim.Client(path), nil
+	}
 	socket := filepath.Join(path, "shim.sock")
 	return connectShim(socket)
 	// TODO: failed to connect to the shim, check if it's alive

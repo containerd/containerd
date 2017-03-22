@@ -36,6 +36,8 @@ func init() {
 type Config struct {
 	// Runtime is a path or name of an OCI runtime used by the shim
 	Runtime string `toml:"runtime"`
+	// NoShim calls runc directly from within the pkg
+	NoShim bool `toml:"no_shim"`
 }
 
 func New(ic *plugin.InitContext) (interface{}, error) {
@@ -50,6 +52,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	c, cancel := context.WithCancel(ic.Context)
 	return &Runtime{
 		root:          path,
+		remote:        !cfg.NoShim,
 		runtime:       cfg.Runtime,
 		events:        make(chan *containerd.Event, 2048),
 		eventsContext: c,
@@ -61,6 +64,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 type Runtime struct {
 	root    string
 	runtime string
+	remote  bool
 
 	events        chan *containerd.Event
 	eventsContext context.Context
@@ -73,7 +77,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts containerd.CreateO
 	if err != nil {
 		return nil, err
 	}
-	s, err := newShim(path)
+	s, err := newShim(path, r.remote)
 	if err != nil {
 		os.RemoveAll(path)
 		return nil, err
@@ -217,7 +221,7 @@ func (r *Runtime) deleteBundle(id string) error {
 
 func (r *Runtime) loadContainer(path string) (*Container, error) {
 	id := filepath.Base(path)
-	s, err := loadShim(path)
+	s, err := loadShim(path, r.remote)
 	if err != nil {
 		return nil, err
 	}
