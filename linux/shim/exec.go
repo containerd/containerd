@@ -2,6 +2,7 @@ package shim
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -57,7 +58,15 @@ func newExecProcess(context context.Context, r *shimapi.ExecRequest, parent *ini
 		IO:            io,
 		Detach:        true,
 	}
-	if err := parent.runc.Exec(context, parent.id, processFromRequest(r), opts); err != nil {
+
+	// process exec request
+	var spec specs.Process
+	if err := json.Unmarshal(r.Spec.Value, &spec); err != nil {
+		return nil, err
+	}
+	spec.Terminal = r.Terminal
+
+	if err := parent.runc.Exec(context, parent.id, spec, opts); err != nil {
 		return nil, err
 	}
 	if socket != nil {
@@ -80,27 +89,6 @@ func newExecProcess(context context.Context, r *shimapi.ExecRequest, parent *ini
 	}
 	e.pid = pid
 	return e, nil
-}
-
-func processFromRequest(r *shimapi.ExecRequest) specs.Process {
-	var user specs.User
-	if r.User != nil {
-		user.UID = r.User.Uid
-		user.GID = r.User.Gid
-		user.AdditionalGids = r.User.AdditionalGids
-	}
-	return specs.Process{
-		Terminal:        r.Terminal,
-		User:            user,
-		Rlimits:         rlimits(r.Rlimits),
-		Args:            r.Args,
-		Env:             r.Env,
-		Cwd:             r.Cwd,
-		Capabilities:    r.Capabilities,
-		NoNewPrivileges: r.NoNewPrivileges,
-		ApparmorProfile: r.ApparmorProfile,
-		SelinuxLabel:    r.SelinuxLabel,
-	}
 }
 
 func rlimits(rr []*shimapi.Rlimit) (o []specs.LinuxRlimit) {

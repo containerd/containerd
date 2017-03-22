@@ -19,8 +19,10 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/crosbymichael/console"
 	"github.com/docker/containerd/api/services/shim"
-	"github.com/urfave/cli"
+	protobuf "github.com/gogo/protobuf/types"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
+	"github.com/urfave/cli"
 )
 
 var fifoFlags = []cli.Flag{
@@ -214,10 +216,18 @@ var shimExecCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+
+		// read spec file and extract Any object
+		spec, err := ioutil.ReadFile(context.String("spec"))
+		if err != nil {
+			return err
+		}
+
 		rq := &shim.ExecRequest{
-			Args:     []string(context.Args()),
-			Env:      context.StringSlice("env"),
-			Cwd:      context.String("cwd"),
+			Spec: &protobuf.Any{
+				TypeUrl: specs.Version,
+				Value:   spec,
+			},
 			Stdin:    context.String("stdin"),
 			Stdout:   context.String("stdout"),
 			Stderr:   context.String("stderr"),
