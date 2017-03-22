@@ -14,7 +14,7 @@ import (
 	"github.com/crosbymichael/console"
 	"github.com/docker/containerd/api/services/execution"
 	rootfsapi "github.com/docker/containerd/api/services/rootfs"
-	"github.com/docker/containerd/image"
+	"github.com/docker/containerd/images"
 	protobuf "github.com/gogo/protobuf/types"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -224,7 +224,7 @@ var runCommand = cli.Command{
 
 		ref := context.Args().First()
 
-		im, err := image.Get(tx, ref)
+		image, err := images.Get(tx, ref)
 		if err != nil {
 			return errors.Wrapf(err, "could not resolve %q", ref)
 		}
@@ -232,7 +232,7 @@ var runCommand = cli.Command{
 		tx.Rollback()
 		db.Close()
 
-		diffIDs, err := im.RootFS(ctx, provider)
+		diffIDs, err := image.RootFS(ctx, provider)
 		if err != nil {
 			return err
 		}

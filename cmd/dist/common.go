@@ -7,7 +7,7 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/docker/containerd/content"
-	"github.com/docker/containerd/image"
+	"github.com/docker/containerd/images"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 )
@@ -50,7 +50,7 @@ func getDB(ctx *cli.Context, readonly bool) (*bolt.DB, error) {
 	}
 
 	if !readonly {
-		if err := image.InitDB(db); err != nil {
+		if err := images.InitDB(db); err != nil {
 			return nil, err
 		}
 	}

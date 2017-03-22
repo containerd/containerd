@@ -20,7 +20,7 @@ import (
 	rootfsapi "github.com/docker/containerd/api/services/rootfs"
 	"github.com/docker/containerd/api/types/container"
 	"github.com/docker/containerd/content"
-	"github.com/docker/containerd/image"
+	"github.com/docker/containerd/images"
 	contentservice "github.com/docker/containerd/services/content"
 	"github.com/pkg/errors"
 	"github.com/tonistiigi/fifo"
@@ -147,7 +147,7 @@ func getDB(ctx *cli.Context, readonly bool) (*bolt.DB, error) {
 	}
 
 	if !readonly {
-		if err := image.InitDB(db); err != nil {
+		if err := images.InitDB(db); err != nil {
 			return nil, err
 		}
 	}
