@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package containerd.v1;
+
+import "gogoproto/gogo.proto";
+
+// Kind defines the kind of snapshot.
+enum Kind {
+	option (gogoproto.goproto_enum_prefix) = false;
+	option (gogoproto.enum_customname) = "Kind";
+
+	// KindActive represents an active snapshot
+	ACTIVE = 0 [(gogoproto.enumvalue_customname) = "KindActive"];
+
+	// KindCommitted represents a committed immutable snapshot
+	COMMITTED = 1 [(gogoproto.enumvalue_customname) = "KindCommitted"];
+}
+
+message Snapshot {
+	uint64 id = 1 [(gogoproto.customname) = "ID"];
+	string parent = 2;
+	Kind kind = 4;
+	bool readonly = 5;
+}
