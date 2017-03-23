@@ -39,6 +39,15 @@ func main() {
 	app.Version = containerd.Version
 	app.Usage = usage
 	app.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:  "log",
+			Usage: "set the log file path where internal debug information is written (default: stderr)",
+		},
+		cli.StringFlag{
+			Name:  "log-format",
+			Usage: "set the format used by logs ('text' (default), or 'json')",
+			Value: "text",
+		},
 		cli.BoolFlag{
 			Name:  "debug",
 			Usage: "enable debug output in logs",
@@ -47,6 +56,23 @@ func main() {
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
+		}
+		switch s := context.GlobalString("log-format"); s {
+		case "text":
+			// no fallthough
+		case "json":
+			logrus.SetFormatter(&logrus.JSONFormatter{})
+		default:
+			logrus.Warnf("ignoring unknown format %q", s)
+		}
+		if s := context.GlobalString("log"); s != "" {
+			w, err := os.OpenFile(s, os.O_CREATE|os.O_WRONLY, 0600)
+			if err != nil {
+				logrus.Warnf("error while opening %q: %v", s, err)
+				// not critical
+				return nil
+			}
+			logrus.SetOutput(w)
 		}
 		return nil
 	}
