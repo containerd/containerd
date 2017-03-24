@@ -3,30 +3,89 @@ package main
 import (
 	gocontext "context"
 	"encoding/json"
-	"io/ioutil"
+	"fmt"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/crosbymichael/console"
 	"github.com/docker/containerd/api/services/execution"
 	rootfsapi "github.com/docker/containerd/api/services/rootfs"
 	"github.com/docker/containerd/images"
 	protobuf "github.com/gogo/protobuf/types"
 	"github.com/opencontainers/image-spec/identity"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
-var rwm = "rwm"
+const (
+	rwm        = "rwm"
+	rootfsPath = "rootfs"
+)
 
-const rootfsPath = "rootfs"
+var capabilities = []string{
+	"CAP_CHOWN",
+	"CAP_DAC_OVERRIDE",
+	"CAP_FSETID",
+	"CAP_FOWNER",
+	"CAP_MKNOD",
+	"CAP_NET_RAW",
+	"CAP_SETGID",
+	"CAP_SETUID",
+	"CAP_SETFCAP",
+	"CAP_SETPCAP",
+	"CAP_NET_BIND_SERVICE",
+	"CAP_SYS_CHROOT",
+	"CAP_KILL",
+	"CAP_AUDIT_WRITE",
+}
 
-func spec(id string, args []string, tty bool) *specs.Spec {
+func spec(id string, config *ocispec.ImageConfig, context *cli.Context) (*specs.Spec, error) {
+	env := []string{
+		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+	}
+	env = append(env, config.Env...)
+	var (
+		args     = append(config.Entrypoint, config.Cmd...)
+		tty      = context.Bool("tty")
+		uid, gid uint32
+	)
+	if config.User != "" {
+		parts := strings.Split(config.User, ":")
+		switch len(parts) {
+		case 1:
+			v, err := strconv.ParseUint(parts[0], 0, 10)
+			if err != nil {
+				return nil, err
+			}
+			uid, gid = uint32(v), uint32(v)
+		case 2:
+			v, err := strconv.ParseUint(parts[0], 0, 10)
+			if err != nil {
+				return nil, err
+			}
+			uid = uint32(v)
+			if v, err = strconv.ParseUint(parts[1], 0, 10); err != nil {
+				return nil, err
+			}
+			gid = uint32(v)
+		default:
+			return nil, fmt.Errorf("invalid USER value %s", config.User)
+		}
+	}
+	if tty {
+		env = append(env, "TERM=xterm")
+	}
+	cwd := config.WorkingDir
+	if cwd == "" {
+		cwd = "/"
+	}
 	return &specs.Spec{
 		Version: specs.Version,
 		Platform: specs.Platform{
@@ -35,16 +94,32 @@ func spec(id string, args []string, tty bool) *specs.Spec {
 		},
 		Root: specs.Root{
 			Path:     rootfsPath,
-			Readonly: true,
+			Readonly: context.Bool("readonly"),
 		},
 		Process: specs.Process{
-			Args: args,
-			Env: []string{
-				"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-			},
+			Args:            args,
+			Env:             env,
 			Terminal:        tty,
-			Cwd:             "/",
+			Cwd:             cwd,
 			NoNewPrivileges: true,
+			User: specs.User{
+				UID: uid,
+				GID: gid,
+			},
+			Capabilities: &specs.LinuxCapabilities{
+				Bounding:    capabilities,
+				Permitted:   capabilities,
+				Inheritable: capabilities,
+				Effective:   capabilities,
+				Ambient:     capabilities,
+			},
+			Rlimits: []specs.LinuxRlimit{
+				{
+					Type: "RLIMIT_NOFILE",
+					Hard: uint64(1024),
+					Soft: uint64(1024),
+				},
+			},
 		},
 		Mounts: []specs.Mount{
 			{
@@ -80,7 +155,7 @@ func spec(id string, args []string, tty bool) *specs.Spec {
 				Destination: "/sys",
 				Type:        "sysfs",
 				Source:      "sysfs",
-				Options:     []string{"nosuid", "noexec", "nodev"},
+				Options:     []string{"nosuid", "noexec", "nodev", "ro"},
 			},
 			{
 				Destination: "/run",
@@ -135,23 +210,7 @@ func spec(id string, args []string, tty bool) *specs.Spec {
 				},
 			},
 		},
-	}
-}
-
-func customSpec(configPath string) (*specs.Spec, error) {
-	b, err := ioutil.ReadFile(configPath)
-	if err != nil {
-		return nil, err
-	}
-	var s specs.Spec
-	if err := json.Unmarshal(b, &s); err != nil {
-		return nil, err
-	}
-	if s.Root.Path != rootfsPath {
-		logrus.Warnf("ignoring Root.Path %q, setting %q forcibly", s.Root.Path, rootfsPath)
-		s.Root.Path = rootfsPath
-	}
-	return &s, nil
+	}, nil
 }
 
 var runCommand = cli.Command{
@@ -171,13 +230,13 @@ var runCommand = cli.Command{
 			Usage: "path to the container's root filesystem",
 		},
 		cli.StringFlag{
-			Name:  "runtime-config",
-			Usage: "custom runtime config (config.json)",
-		},
-		cli.StringFlag{
 			Name:  "runtime",
 			Usage: "runtime name (linux, windows, vmware-linux)",
 			Value: "linux",
+		},
+		cli.BoolFlag{
+			Name:  "readonly",
+			Usage: "set the containers filesystem as readonly",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -253,16 +312,30 @@ var runCommand = cli.Command{
 			return err
 		}
 
-		rootfs := resp.Mounts
-
-		var s *specs.Spec
-		if config := context.String("runtime-config"); config == "" {
-			s = spec(id, []string(context.Args().Tail()), context.Bool("tty"))
-		} else {
-			s, err = customSpec(config)
+		ic, err := image.Config(ctx, provider)
+		if err != nil {
+			return err
+		}
+		var imageConfig ocispec.Image
+		switch ic.MediaType {
+		case ocispec.MediaTypeImageConfig, images.MediaTypeDockerSchema2Config:
+			r, err := provider.Reader(ctx, ic.Digest)
 			if err != nil {
 				return err
 			}
+			if err := json.NewDecoder(r).Decode(&imageConfig); err != nil {
+				r.Close()
+				return err
+			}
+			r.Close()
+		default:
+			return fmt.Errorf("unknown image config media type %s", ic.MediaType)
+		}
+		rootfs := resp.Mounts
+		// generate the spec based on the image config
+		s, err := spec(id, &imageConfig.Config, context)
+		if err != nil {
+			return err
 		}
 		data, err := json.Marshal(s)
 		if err != nil {
@@ -292,12 +365,10 @@ var runCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-
 		response, err := containers.Create(gocontext.Background(), create)
 		if err != nil {
 			return err
 		}
-
 		if _, err := containers.Start(gocontext.Background(), &execution.StartRequest{
 			ID: response.ID,
 		}); err != nil {
