@@ -20,7 +20,7 @@ func main() {
 	app.Name = "ctr"
 	app.Version = containerd.Version
 	app.Usage = `
-		__
+        __
   _____/ /______
  / ___/ __/ ___/
 / /__/ /_/ /
