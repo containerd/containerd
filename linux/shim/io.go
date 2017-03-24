@@ -68,6 +68,9 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 		}
 		dest(fw, fr)
 	}
+	if stdin == "" {
+		return nil
+	}
 	f, err := fifo.OpenFifo(ctx, stdin, syscall.O_RDONLY, 0)
 	if err != nil {
 		return fmt.Errorf("containerd-shim: opening %s failed: %s", stdin, err)

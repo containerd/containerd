@@ -4,14 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
+	"syscall"
 
 	"github.com/crosbymichael/console"
 	runc "github.com/crosbymichael/go-runc"
 	shimapi "github.com/docker/containerd/api/services/shim"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/tonistiigi/fifo"
 )
 
 type execProcess struct {
@@ -22,6 +25,7 @@ type execProcess struct {
 	io      runc.IO
 	status  int
 	pid     int
+	closers []io.Closer
 
 	parent *initProcess
 }
@@ -65,6 +69,13 @@ func newExecProcess(context context.Context, path string, r *shimapi.ExecRequest
 
 	if err := parent.runc.Exec(context, parent.id, spec, opts); err != nil {
 		return nil, err
+	}
+	if r.Stdin != "" {
+		sc, err := fifo.OpenFifo(context, r.Stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
+		if err != nil {
+			return nil, err
+		}
+		e.closers = append(e.closers, sc)
 	}
 	if socket != nil {
 		console, err := socket.ReceiveMaster()
@@ -111,6 +122,9 @@ func (e *execProcess) Exited(status int) {
 	e.status = status
 	e.Wait()
 	if e.io != nil {
+		for _, c := range e.closers {
+			c.Close()
+		}
 		e.io.Close()
 	}
 }
