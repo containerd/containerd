@@ -120,6 +120,11 @@ The scope of this project is a whitelist.
 If it's not mentioned as being in scope, it is out of scope.  
 For the scope of this project to change it requires a 100% vote from all maintainers of the project.
 
+### Development reports.
+
+Weekly summary on the progress and what is being worked on.
+https://github.com/docker/containerd/tree/master/reports
+
 ## Copyright and license
 
 Copyright © 2016 Docker, Inc. All rights reserved, except as follows. Code
