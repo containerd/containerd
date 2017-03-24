@@ -47,7 +47,6 @@ func NewSnapshotter(root string, ms storage.MetaStore) (snapshot.Snapshotter, er
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
 	}
-
 	if err := os.MkdirAll(filepath.Join(root, "snapshots"), 0700); err != nil {
 		return nil, err
 	}
@@ -189,7 +188,7 @@ func (o *Snapshotter) createActive(ctx context.Context, key, parent string, read
 		}
 	}()
 
-	if err = os.MkdirAll(filepath.Join(td, "fs"), 0700); err != nil {
+	if err = os.MkdirAll(filepath.Join(td, "fs"), 0711); err != nil {
 		return nil, err
 	}
 	if !readonly {

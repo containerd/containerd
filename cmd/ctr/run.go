@@ -113,6 +113,13 @@ func spec(id string, config *ocispec.ImageConfig, context *cli.Context) (*specs.
 				Effective:   capabilities,
 				Ambient:     capabilities,
 			},
+			Rlimits: []specs.LinuxRlimit{
+				{
+					Type: "RLIMIT_NOFILE",
+					Hard: uint64(1024),
+					Soft: uint64(1024),
+				},
+			},
 		},
 		Mounts: []specs.Mount{
 			{
@@ -311,7 +318,7 @@ var runCommand = cli.Command{
 		}
 		var imageConfig ocispec.Image
 		switch ic.MediaType {
-		case ocispec.MediaTypeImageConfig, "application/vnd.docker.container.image.v1+json":
+		case ocispec.MediaTypeImageConfig, images.MediaTypeDockerSchema2Config:
 			r, err := provider.Reader(ctx, ic.Digest)
 			if err != nil {
 				return err

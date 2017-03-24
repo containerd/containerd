@@ -41,7 +41,7 @@ type Config struct {
 }
 
 func New(ic *plugin.InitContext) (interface{}, error) {
-	path := filepath.Join(ic.Root, runtimeName)
+	path := filepath.Join(ic.State, runtimeName)
 	if err := os.MkdirAll(path, 0700); err != nil {
 		return nil, err
 	}
