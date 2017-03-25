@@ -1,4 +1,4 @@
-package boltdb
+package storage
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/snapshot"
-	"github.com/containerd/containerd/snapshot/storage"
+	db "github.com/containerd/containerd/snapshot/storage/proto"
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 )
@@ -23,91 +23,14 @@ type boltFileTransactor struct {
 	tx *bolt.Tx
 }
 
-type boltMetastore struct {
-	dbfile string
+func (bft *boltFileTransactor) Rollback() error {
+	defer bft.db.Close()
+	return bft.tx.Rollback()
 }
 
-// NewMetaStore returns a snapshot MetaStore for storage of metadata related to
-// a snapshot driver backed by a bolt file database. This implementation is
-// strongly consistent and does all metadata changes in a transaction to prevent
-// against process crashes causing inconsistent metadata state.
-func NewMetaStore(ctx context.Context, dbfile string) (storage.MetaStore, error) {
-	return &boltMetastore{
-		dbfile: dbfile,
-	}, nil
-}
-
-func (ms *boltFileTransactor) Rollback() error {
-	defer ms.db.Close()
-	return ms.tx.Rollback()
-}
-
-func (ms *boltFileTransactor) Commit() error {
-	defer ms.db.Close()
-	return ms.tx.Commit()
-}
-
-type transactionKey struct{}
-
-func (ms *boltMetastore) TransactionContext(ctx context.Context, writable bool) (context.Context, storage.Transactor, error) {
-	db, err := bolt.Open(ms.dbfile, 0600, nil)
-	if err != nil {
-		return ctx, nil, errors.Wrap(err, "failed to open database file")
-	}
-
-	tx, err := db.Begin(writable)
-	if err != nil {
-		return ctx, nil, errors.Wrap(err, "failed to start transaction")
-	}
-
-	t := &boltFileTransactor{
-		db: db,
-		tx: tx,
-	}
-
-	ctx = context.WithValue(ctx, transactionKey{}, t)
-
-	return ctx, t, nil
-}
-
-func (ms *boltMetastore) withBucket(ctx context.Context, fn func(context.Context, *bolt.Bucket, *bolt.Bucket) error) error {
-	t, ok := ctx.Value(transactionKey{}).(*boltFileTransactor)
-	if !ok {
-		return errors.Errorf("no transaction in context")
-	}
-	bkt := t.tx.Bucket(bucketKeyStorageVersion)
-	if bkt == nil {
-		return errors.Wrap(snapshot.ErrSnapshotNotExist, "bucket does not exist")
-	}
-	return fn(ctx, bkt.Bucket(bucketKeySnapshot), bkt.Bucket(bucketKeyParents))
-}
-
-func (ms *boltMetastore) createBucketIfNotExists(ctx context.Context, fn func(context.Context, *bolt.Bucket, *bolt.Bucket) error) error {
-	t, ok := ctx.Value(transactionKey{}).(*boltFileTransactor)
-	if !ok {
-		return errors.Errorf("no transaction in context")
-	}
-
-	bkt, err := t.tx.CreateBucketIfNotExists(bucketKeyStorageVersion)
-	if err != nil {
-		return errors.Wrap(err, "failed to create version bucket")
-	}
-	sbkt, err := bkt.CreateBucketIfNotExists(bucketKeySnapshot)
-	if err != nil {
-		return errors.Wrap(err, "failed to create snapshots bucket")
-	}
-	pbkt, err := bkt.CreateBucketIfNotExists(bucketKeyParents)
-	if err != nil {
-		return errors.Wrap(err, "failed to create snapshots bucket")
-	}
-	return fn(ctx, sbkt, pbkt)
-}
-
-func fromProtoKind(k Kind) snapshot.Kind {
-	if k == KindActive {
-		return snapshot.KindActive
-	}
-	return snapshot.KindCommitted
+func (bft *boltFileTransactor) Commit() error {
+	defer bft.db.Close()
+	return bft.tx.Commit()
 }
 
 // parentKey returns a composite key of the parent and child identifiers. The
@@ -134,9 +57,11 @@ func getParentPrefix(b []byte) uint64 {
 	return parent
 }
 
-func (ms *boltMetastore) Stat(ctx context.Context, key string) (snapshot.Info, error) {
-	var ss Snapshot
-	err := ms.withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
+// GetInfo returns the snapshot Info directly from the metadata. Requires a
+// context with a storage transaction.
+func GetInfo(ctx context.Context, key string) (snapshot.Info, error) {
+	var ss db.Snapshot
+	err := withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
 		return getSnapshot(bkt, key, &ss)
 	})
 	if err != nil {
@@ -151,14 +76,17 @@ func (ms *boltMetastore) Stat(ctx context.Context, key string) (snapshot.Info, e
 	}, nil
 }
 
-func (ms *boltMetastore) Walk(ctx context.Context, fn func(context.Context, snapshot.Info) error) error {
-	return ms.withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
+// WalkInfo iterates through all metadata Info for the stored snapshots and
+// calls the provided function for each. Requires a context with a storage
+// transaction.
+func WalkInfo(ctx context.Context, fn func(context.Context, snapshot.Info) error) error {
+	return withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
 		return bkt.ForEach(func(k, v []byte) error {
 			// skip nested buckets
 			if v == nil {
 				return nil
 			}
-			var ss Snapshot
+			var ss db.Snapshot
 			if err := proto.Unmarshal(v, &ss); err != nil {
 				return errors.Wrap(err, "failed to unmarshal snapshot")
 			}
@@ -174,18 +102,23 @@ func (ms *boltMetastore) Walk(ctx context.Context, fn func(context.Context, snap
 	})
 }
 
-func (ms *boltMetastore) CreateActive(ctx context.Context, key, parent string, readonly bool) (a storage.Active, err error) {
-	err = ms.createBucketIfNotExists(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
+// CreateActive creates a new active snapshot transaction referenced by
+// the provided key. The new active snapshot will have the provided
+// parent. If the readonly option is given, the active snapshot will be
+// marked as readonly and can only be removed, and not committed. The
+// provided context must contain a writable transaction.
+func CreateActive(ctx context.Context, key, parent string, readonly bool) (a Active, err error) {
+	err = createBucketIfNotExists(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
 		var (
-			parentS *Snapshot
+			parentS *db.Snapshot
 		)
 		if parent != "" {
-			parentS = new(Snapshot)
+			parentS = new(db.Snapshot)
 			if err := getSnapshot(bkt, parent, parentS); err != nil {
 				return errors.Wrap(err, "failed to get parent snapshot")
 			}
 
-			if parentS.Kind != KindCommitted {
+			if parentS.Kind != db.KindCommitted {
 				return errors.Wrap(snapshot.ErrSnapshotNotCommitted, "parent is not committed snapshot")
 			}
 		}
@@ -199,10 +132,10 @@ func (ms *boltMetastore) CreateActive(ctx context.Context, key, parent string, r
 			return errors.Wrap(err, "unable to get identifier")
 		}
 
-		ss := Snapshot{
+		ss := db.Snapshot{
 			ID:       id,
 			Parent:   parent,
-			Kind:     KindActive,
+			Kind:     db.KindActive,
 			Readonly: readonly,
 		}
 		if err := putSnapshot(bkt, key, &ss); err != nil {
@@ -216,7 +149,7 @@ func (ms *boltMetastore) CreateActive(ctx context.Context, key, parent string, r
 				return errors.Wrap(err, "failed to write parent link")
 			}
 
-			a.ParentIDs, err = ms.parents(bkt, parentS)
+			a.ParentIDs, err = parents(bkt, parentS)
 			if err != nil {
 				return errors.Wrap(err, "failed to get parent chain")
 			}
@@ -228,24 +161,26 @@ func (ms *boltMetastore) CreateActive(ctx context.Context, key, parent string, r
 		return nil
 	})
 	if err != nil {
-		return storage.Active{}, err
+		return Active{}, err
 	}
 
 	return
 }
 
-func (ms *boltMetastore) GetActive(ctx context.Context, key string) (a storage.Active, err error) {
-	err = ms.withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
+// GetActive returns the metadata for the active snapshot transaction referenced
+// by the given key. Requires a context with a storage transaction.
+func GetActive(ctx context.Context, key string) (a Active, err error) {
+	err = withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
 		b := bkt.Get([]byte(key))
 		if len(b) == 0 {
 			return snapshot.ErrSnapshotNotExist
 		}
 
-		var ss Snapshot
+		var ss db.Snapshot
 		if err := proto.Unmarshal(b, &ss); err != nil {
 			return errors.Wrap(err, "failed to unmarshal snapshot")
 		}
-		if ss.Kind != KindActive {
+		if ss.Kind != db.KindActive {
 			return snapshot.ErrSnapshotNotActive
 		}
 
@@ -253,12 +188,12 @@ func (ms *boltMetastore) GetActive(ctx context.Context, key string) (a storage.A
 		a.Readonly = ss.Readonly
 
 		if ss.Parent != "" {
-			var parent Snapshot
+			var parent db.Snapshot
 			if err := getSnapshot(bkt, ss.Parent, &parent); err != nil {
 				return errors.Wrap(err, "failed to get parent snapshot")
 			}
 
-			a.ParentIDs, err = ms.parents(bkt, &parent)
+			a.ParentIDs, err = parents(bkt, &parent)
 			if err != nil {
 				return errors.Wrap(err, "failed to get parent chain")
 			}
@@ -266,33 +201,18 @@ func (ms *boltMetastore) GetActive(ctx context.Context, key string) (a storage.A
 		return nil
 	})
 	if err != nil {
-		return storage.Active{}, err
+		return Active{}, err
 	}
 
 	return
 }
 
-func (ms *boltMetastore) parents(bkt *bolt.Bucket, parent *Snapshot) (parents []string, err error) {
-	for {
-		parents = append(parents, fmt.Sprintf("%d", parent.ID))
-
-		if parent.Parent == "" {
-			return
-		}
-
-		var ps Snapshot
-		if err := getSnapshot(bkt, parent.Parent, &ps); err != nil {
-			return nil, errors.Wrap(err, "failed to get parent snapshot")
-		}
-		parent = &ps
-	}
-
-	return
-}
-
-func (ms *boltMetastore) Remove(ctx context.Context, key string) (id string, k snapshot.Kind, err error) {
-	err = ms.withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
-		var ss Snapshot
+// Remove removes a snapshot from the metastore. The string identifier for the
+// snapshot is returned as well as the kind. The provided context must contain a
+// writable transaction.
+func Remove(ctx context.Context, key string) (id string, k snapshot.Kind, err error) {
+	err = withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
+		var ss db.Snapshot
 		b := bkt.Get([]byte(key))
 		if len(b) == 0 {
 			return snapshot.ErrSnapshotNotExist
@@ -309,7 +229,7 @@ func (ms *boltMetastore) Remove(ctx context.Context, key string) (id string, k s
 			}
 
 			if ss.Parent != "" {
-				var ps Snapshot
+				var ps db.Snapshot
 				if err := getSnapshot(bkt, ss.Parent, &ps); err != nil {
 					return errors.Wrap(err, "failed to get parent snapshot")
 				}
@@ -333,25 +253,31 @@ func (ms *boltMetastore) Remove(ctx context.Context, key string) (id string, k s
 	return
 }
 
-func (ms *boltMetastore) Commit(ctx context.Context, key, name string) (id string, err error) {
-	err = ms.withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
+// CommitActive renames the active snapshot transaction referenced by `key`
+// as a committed snapshot referenced by `Name`. The resulting snapshot  will be
+// committed and readonly. The `key` reference will no longer be available for
+// lookup or removal. The returned string identifier for the committed snapshot
+// is the same identifier of the original active snapshot. The provided context
+// must contain a writable transaction.
+func CommitActive(ctx context.Context, key, name string) (id string, err error) {
+	err = withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
 		b := bkt.Get([]byte(name))
 		if len(b) != 0 {
 			return errors.Wrap(snapshot.ErrSnapshotExist, "committed name already exists")
 		}
 
-		var ss Snapshot
+		var ss db.Snapshot
 		if err := getSnapshot(bkt, key, &ss); err != nil {
 			return errors.Wrap(err, "failed to get active snapshot")
 		}
-		if ss.Kind != KindActive {
+		if ss.Kind != db.KindActive {
 			return snapshot.ErrSnapshotNotActive
 		}
 		if ss.Readonly {
 			return errors.Errorf("active snapshot is readonly")
 		}
 
-		ss.Kind = KindCommitted
+		ss.Kind = db.KindCommitted
 		ss.Readonly = true
 
 		if err := putSnapshot(bkt, name, &ss); err != nil {
@@ -372,7 +298,65 @@ func (ms *boltMetastore) Commit(ctx context.Context, key, name string) (id strin
 	return
 }
 
-func getSnapshot(bkt *bolt.Bucket, key string, ss *Snapshot) error {
+func withBucket(ctx context.Context, fn func(context.Context, *bolt.Bucket, *bolt.Bucket) error) error {
+	t, ok := ctx.Value(transactionKey{}).(*boltFileTransactor)
+	if !ok {
+		return errors.Errorf("no transaction in context")
+	}
+	bkt := t.tx.Bucket(bucketKeyStorageVersion)
+	if bkt == nil {
+		return errors.Wrap(snapshot.ErrSnapshotNotExist, "bucket does not exist")
+	}
+	return fn(ctx, bkt.Bucket(bucketKeySnapshot), bkt.Bucket(bucketKeyParents))
+}
+
+func createBucketIfNotExists(ctx context.Context, fn func(context.Context, *bolt.Bucket, *bolt.Bucket) error) error {
+	t, ok := ctx.Value(transactionKey{}).(*boltFileTransactor)
+	if !ok {
+		return errors.Errorf("no transaction in context")
+	}
+
+	bkt, err := t.tx.CreateBucketIfNotExists(bucketKeyStorageVersion)
+	if err != nil {
+		return errors.Wrap(err, "failed to create version bucket")
+	}
+	sbkt, err := bkt.CreateBucketIfNotExists(bucketKeySnapshot)
+	if err != nil {
+		return errors.Wrap(err, "failed to create snapshots bucket")
+	}
+	pbkt, err := bkt.CreateBucketIfNotExists(bucketKeyParents)
+	if err != nil {
+		return errors.Wrap(err, "failed to create snapshots bucket")
+	}
+	return fn(ctx, sbkt, pbkt)
+}
+
+func fromProtoKind(k db.Kind) snapshot.Kind {
+	if k == db.KindActive {
+		return snapshot.KindActive
+	}
+	return snapshot.KindCommitted
+}
+
+func parents(bkt *bolt.Bucket, parent *db.Snapshot) (parents []string, err error) {
+	for {
+		parents = append(parents, fmt.Sprintf("%d", parent.ID))
+
+		if parent.Parent == "" {
+			return
+		}
+
+		var ps db.Snapshot
+		if err := getSnapshot(bkt, parent.Parent, &ps); err != nil {
+			return nil, errors.Wrap(err, "failed to get parent snapshot")
+		}
+		parent = &ps
+	}
+
+	return
+}
+
+func getSnapshot(bkt *bolt.Bucket, key string, ss *db.Snapshot) error {
 	b := bkt.Get([]byte(key))
 	if len(b) == 0 {
 		return snapshot.ErrSnapshotNotExist
@@ -383,7 +367,7 @@ func getSnapshot(bkt *bolt.Bucket, key string, ss *Snapshot) error {
 	return nil
 }
 
-func putSnapshot(bkt *bolt.Bucket, key string, ss *Snapshot) error {
+func putSnapshot(bkt *bolt.Bucket, key string, ss *db.Snapshot) error {
 	b, err := proto.Marshal(ss)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal snapshot")

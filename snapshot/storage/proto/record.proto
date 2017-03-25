@@ -16,6 +16,8 @@ enum Kind {
 	COMMITTED = 1 [(gogoproto.enumvalue_customname) = "KindCommitted"];
 }
 
+// Snapshot defines the storage type for a snapshot in the
+// metadata store.
 message Snapshot {
 	uint64 id = 1 [(gogoproto.customname) = "ID"];
 	string parent = 2;

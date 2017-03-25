@@ -11,7 +11,6 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/snapshot"
-	"github.com/containerd/containerd/snapshot/storage/boltdb"
 	"github.com/containerd/containerd/snapshot/testsuite"
 	"github.com/containerd/containerd/testutil"
 )
@@ -23,11 +22,7 @@ const (
 func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshot.Snapshotter, func(), error) {
 	return func(ctx context.Context, root string) (snapshot.Snapshotter, func(), error) {
 		device := setupBtrfsLoopbackDevice(t, root)
-		store, err := boltdb.NewMetaStore(ctx, filepath.Join(root, "metadata.db"))
-		if err != nil {
-			return nil, nil, err
-		}
-		snapshotter, err := NewSnapshotter(device.deviceName, root, store)
+		snapshotter, err := NewSnapshotter(device.deviceName, root)
 		if err != nil {
 			t.Fatal(err)
 		}

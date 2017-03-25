@@ -13,7 +13,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/snapshot/storage"
-	"github.com/containerd/containerd/snapshot/storage/boltdb"
 	"github.com/pkg/errors"
 )
 
@@ -21,19 +20,14 @@ func init() {
 	plugin.Register("snapshot-overlay", &plugin.Registration{
 		Type: plugin.SnapshotPlugin,
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			root := filepath.Join(ic.Root, "snapshot", "overlay")
-			ms, err := boltdb.NewMetaStore(ic.Context, filepath.Join(root, "metadata.db"))
-			if err != nil {
-				return nil, err
-			}
-			return NewSnapshotter(root, ms)
+			return NewSnapshotter(filepath.Join(ic.Root, "snapshot", "overlay"))
 		},
 	})
 }
 
 type Snapshotter struct {
 	root string
-	ms   storage.MetaStore
+	ms   *storage.MetaStore
 }
 
 type activeSnapshot struct {
@@ -43,11 +37,16 @@ type activeSnapshot struct {
 	readonly bool
 }
 
-func NewSnapshotter(root string, ms storage.MetaStore) (snapshot.Snapshotter, error) {
+func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(filepath.Join(root, "snapshots"), 0700); err != nil {
+	ms, err := storage.NewMetaStore(filepath.Join(root, "metadata.db"))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := os.Mkdir(filepath.Join(root, "snapshots"), 0700); err != nil {
 		return nil, err
 	}
 
@@ -68,7 +67,7 @@ func (o *Snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, erro
 		return snapshot.Info{}, err
 	}
 	defer t.Rollback()
-	return o.ms.Stat(ctx, key)
+	return storage.GetInfo(ctx, key)
 }
 
 func (o *Snapshotter) Prepare(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
@@ -88,7 +87,7 @@ func (o *Snapshotter) Mounts(ctx context.Context, key string) ([]containerd.Moun
 	if err != nil {
 		return nil, err
 	}
-	active, err := o.ms.GetActive(ctx, key)
+	active, err := storage.GetActive(ctx, key)
 	t.Rollback()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get active mount")
@@ -101,7 +100,7 @@ func (o *Snapshotter) Commit(ctx context.Context, name, key string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := o.ms.Commit(ctx, key, name); err != nil {
+	if _, err := storage.CommitActive(ctx, key, name); err != nil {
 		if rerr := t.Rollback(); rerr != nil {
 			log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
 		}
@@ -125,7 +124,7 @@ func (o *Snapshotter) Remove(ctx context.Context, key string) (err error) {
 		}
 	}()
 
-	id, _, err := o.ms.Remove(ctx, key)
+	id, _, err := storage.Remove(ctx, key)
 	if err != nil {
 		return errors.Wrap(err, "failed to remove")
 	}
@@ -160,7 +159,7 @@ func (o *Snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 		return err
 	}
 	defer t.Rollback()
-	return o.ms.Walk(ctx, fn)
+	return storage.WalkInfo(ctx, fn)
 }
 
 func (o *Snapshotter) createActive(ctx context.Context, key, parent string, readonly bool) ([]containerd.Mount, error) {
@@ -202,7 +201,7 @@ func (o *Snapshotter) createActive(ctx context.Context, key, parent string, read
 		return nil, err
 	}
 
-	active, err := o.ms.CreateActive(ctx, key, parent, readonly)
+	active, err := storage.CreateActive(ctx, key, parent, readonly)
 	if err != nil {
 		if rerr := t.Rollback(); rerr != nil {
 			log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
@@ -211,7 +210,7 @@ func (o *Snapshotter) createActive(ctx context.Context, key, parent string, read
 	}
 
 	path = filepath.Join(snapshotDir, active.ID)
-	if err := os.Rename(td, path); err != nil {
+	if err = os.Rename(td, path); err != nil {
 		if rerr := t.Rollback(); rerr != nil {
 			log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
 		}
@@ -219,7 +218,7 @@ func (o *Snapshotter) createActive(ctx context.Context, key, parent string, read
 	}
 	td = ""
 
-	if err := t.Commit(); err != nil {
+	if err = t.Commit(); err != nil {
 		return nil, errors.Wrap(err, "commit failed")
 	}
 

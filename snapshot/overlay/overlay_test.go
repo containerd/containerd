@@ -11,17 +11,13 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/snapshot"
-	"github.com/containerd/containerd/snapshot/storage/boltdb"
+	"github.com/containerd/containerd/snapshot/storage"
 	"github.com/containerd/containerd/snapshot/testsuite"
 	"github.com/containerd/containerd/testutil"
 )
 
-func boltSnapshotter(ctx context.Context, root string) (snapshot.Snapshotter, func(), error) {
-	store, err := boltdb.NewMetaStore(ctx, filepath.Join(root, "metadata.db"))
-	if err != nil {
-		return nil, nil, err
-	}
-	snapshotter, err := NewSnapshotter(root, store)
+func newSnapshotter(ctx context.Context, root string) (snapshot.Snapshotter, func(), error) {
+	snapshotter, err := NewSnapshotter(root)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -31,7 +27,7 @@ func boltSnapshotter(ctx context.Context, root string) (snapshot.Snapshotter, fu
 
 func TestOverlay(t *testing.T) {
 	testutil.RequiresRoot(t)
-	testsuite.SnapshotterSuite(t, "Overlay", boltSnapshotter)
+	testsuite.SnapshotterSuite(t, "Overlay", newSnapshotter)
 }
 
 func TestOverlayMounts(t *testing.T) {
@@ -41,7 +37,7 @@ func TestOverlayMounts(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(root)
-	o, _, err := boltSnapshotter(ctx, root)
+	o, _, err := newSnapshotter(ctx, root)
 	if err != nil {
 		t.Error(err)
 		return
@@ -77,7 +73,7 @@ func TestOverlayCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(root)
-	o, _, err := boltSnapshotter(ctx, root)
+	o, _, err := newSnapshotter(ctx, root)
 	if err != nil {
 		t.Error(err)
 		return
@@ -106,7 +102,7 @@ func TestOverlayOverlayMount(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(root)
-	o, _, err := boltSnapshotter(ctx, root)
+	o, _, err := newSnapshotter(ctx, root)
 	if err != nil {
 		t.Error(err)
 		return
@@ -160,7 +156,7 @@ func getBasePath(ctx context.Context, sn snapshot.Snapshotter, root, key string)
 	}
 	defer t.Rollback()
 
-	active, err := o.ms.GetActive(ctx, key)
+	active, err := storage.GetActive(ctx, key)
 	if err != nil {
 		panic(err)
 	}
@@ -175,7 +171,7 @@ func getParents(ctx context.Context, sn snapshot.Snapshotter, root, key string) 
 		panic(err)
 	}
 	defer t.Rollback()
-	active, err := o.ms.GetActive(ctx, key)
+	active, err := storage.GetActive(ctx, key)
 	if err != nil {
 		panic(err)
 	}
@@ -194,7 +190,7 @@ func TestOverlayOverlayRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(root)
-	o, _, err := boltSnapshotter(ctx, root)
+	o, _, err := newSnapshotter(ctx, root)
 	if err != nil {
 		t.Error(err)
 		return
@@ -246,7 +242,7 @@ func TestOverlayView(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(root)
-	o, _, err := boltSnapshotter(ctx, root)
+	o, _, err := newSnapshotter(ctx, root)
 	if err != nil {
 		t.Fatal(err)
 	}

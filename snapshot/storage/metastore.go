@@ -3,50 +3,9 @@ package storage
 import (
 	"context"
 
-	"github.com/containerd/containerd/snapshot"
+	"github.com/boltdb/bolt"
+	"github.com/pkg/errors"
 )
-
-// MetaStore is used to store metadata related to a snapshot driver. The
-// MetaStore is intended to store metadata related to name, state and
-// parentage. Using the MetaStore is not required to implement a snapshot
-// driver but can be used to handle the persistence and transactional
-// complexities of a driver implementation.
-type MetaStore interface {
-	// TransactionContext creates a new transaction context.
-	TransactionContext(ctx context.Context, writable bool) (context.Context, Transactor, error)
-
-	// Stat returns the snapshot stat Info directly from
-	// the metadata.
-	Stat(ctx context.Context, key string) (snapshot.Info, error)
-
-	// Walk iterates through all metadata for the stored
-	// snapshots and calls the provided function for each.
-	Walk(ctx context.Context, fn func(context.Context, snapshot.Info) error) error
-
-	// CreateActive creates a new active snapshot transaction referenced by
-	// the provided key. The new active snapshot will have the provided
-	// parent. If the readonly option is given, the active snapshot will be
-	// marked as readonly and can only be removed, and not committed. The
-	// provided context must contain a writable transaction.
-	CreateActive(ctx context.Context, key, parent string, readonly bool) (Active, error)
-
-	// GetActive returns the metadata for the active snapshot transaction
-	// referenced by the given key.
-	GetActive(ctx context.Context, key string) (Active, error)
-
-	// Remove removes a snapshot from the metastore. The provided context
-	// must contain a writable transaction. The string identifier for the
-	// snapshot is returned as well as the kind.
-	Remove(ctx context.Context, key string) (string, snapshot.Kind, error)
-
-	// Commit renames the active snapshot transaction referenced by `key`
-	// as a committed snapshot referenced by `Name`. The resulting snapshot
-	// will be committed and readonly. The `key` reference will no longer
-	// be available for lookup or removal. The returned string identifier
-	// for the committed snapshot is the same identifier of the original
-	// active snapshot.
-	Commit(ctx context.Context, key, name string) (string, error)
-}
 
 // Transactor is used to finalize an active transaction.
 type Transactor interface {
@@ -66,4 +25,47 @@ type Active struct {
 	ID        string
 	ParentIDs []string
 	Readonly  bool
+}
+
+// MetaStore is used to store metadata related to a snapshot driver. The
+// MetaStore is intended to store metadata related to name, state and
+// parentage. Using the MetaStore is not required to implement a snapshot
+// driver but can be used to handle the persistence and transactional
+// complexities of a driver implementation.
+type MetaStore struct {
+	dbfile string
+}
+
+// NewMetaStore returns a snapshot MetaStore for storage of metadata related to
+// a snapshot driver backed by a bolt file database. This implementation is
+// strongly consistent and does all metadata changes in a transaction to prevent
+// against process crashes causing inconsistent metadata state.
+func NewMetaStore(dbfile string) (*MetaStore, error) {
+	return &MetaStore{
+		dbfile: dbfile,
+	}, nil
+}
+
+type transactionKey struct{}
+
+// TransactionContext creates a new transaction context.
+func (ms *MetaStore) TransactionContext(ctx context.Context, writable bool) (context.Context, Transactor, error) {
+	db, err := bolt.Open(ms.dbfile, 0600, nil)
+	if err != nil {
+		return ctx, nil, errors.Wrap(err, "failed to open database file")
+	}
+
+	tx, err := db.Begin(writable)
+	if err != nil {
+		return ctx, nil, errors.Wrap(err, "failed to start transaction")
+	}
+
+	t := &boltFileTransactor{
+		db: db,
+		tx: tx,
+	}
+
+	ctx = context.WithValue(ctx, transactionKey{}, t)
+
+	return ctx, t, nil
 }

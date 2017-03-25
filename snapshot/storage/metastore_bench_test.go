@@ -1,4 +1,4 @@
-package testsuite
+package storage
 
 import (
 	"context"
@@ -6,13 +6,11 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
-
-	"github.com/containerd/containerd/snapshot/storage"
 )
 
 // Benchmarks returns a benchmark suite using the provided metadata store
 // creation method
-func Benchmarks(b *testing.B, name string, metaFn func(context.Context, string) (storage.MetaStore, error)) {
+func Benchmarks(b *testing.B, name string, metaFn metaFactory) {
 	b.Run("StatActive", makeBench(b, name, metaFn, statActiveBenchmark))
 	b.Run("StatCommitted", makeBench(b, name, metaFn, statCommittedBenchmark))
 	b.Run("CreateActive", makeBench(b, name, metaFn, createActiveBenchmark))
@@ -24,7 +22,7 @@ func Benchmarks(b *testing.B, name string, metaFn func(context.Context, string) 
 }
 
 // makeBench creates a benchmark with a writable transaction
-func makeBench(b *testing.B, name string, metaFn func(context.Context, string) (storage.MetaStore, error), fn func(context.Context, *testing.B, storage.MetaStore)) func(b *testing.B) {
+func makeBench(b *testing.B, name string, metaFn metaFactory, fn func(context.Context, *testing.B, *MetaStore)) func(b *testing.B) {
 	return func(b *testing.B) {
 		ctx := context.Background()
 		tmpDir, err := ioutil.TempDir("", "metastore-bench-"+name+"-")
@@ -33,7 +31,7 @@ func makeBench(b *testing.B, name string, metaFn func(context.Context, string) (
 		}
 		defer os.RemoveAll(tmpDir)
 
-		ms, err := metaFn(ctx, tmpDir)
+		ms, err := metaFn(tmpDir)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -49,7 +47,7 @@ func makeBench(b *testing.B, name string, metaFn func(context.Context, string) (
 	}
 }
 
-func openCloseWritable(b *testing.B, name string, metaFn func(context.Context, string) (storage.MetaStore, error)) func(b *testing.B) {
+func openCloseWritable(b *testing.B, name string, metaFn metaFactory) func(b *testing.B) {
 	return func(b *testing.B) {
 		ctx := context.Background()
 		tmpDir, err := ioutil.TempDir("", "metastore-bench-"+name+"-")
@@ -58,7 +56,7 @@ func openCloseWritable(b *testing.B, name string, metaFn func(context.Context, s
 		}
 		defer os.RemoveAll(tmpDir)
 
-		ms, err := metaFn(ctx, tmpDir)
+		ms, err := metaFn(tmpDir)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -77,7 +75,7 @@ func openCloseWritable(b *testing.B, name string, metaFn func(context.Context, s
 	}
 }
 
-func openCloseReadonly(b *testing.B, name string, metaFn func(context.Context, string) (storage.MetaStore, error)) func(b *testing.B) {
+func openCloseReadonly(b *testing.B, name string, metaFn metaFactory) func(b *testing.B) {
 	return func(b *testing.B) {
 		ctx := context.Background()
 		tmpDir, err := ioutil.TempDir("", "metastore-bench-"+name+"-")
@@ -86,7 +84,7 @@ func openCloseReadonly(b *testing.B, name string, metaFn func(context.Context, s
 		}
 		defer os.RemoveAll(tmpDir)
 
-		ms, err := metaFn(ctx, tmpDir)
+		ms, err := metaFn(tmpDir)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -105,112 +103,112 @@ func openCloseReadonly(b *testing.B, name string, metaFn func(context.Context, s
 	}
 }
 
-func createActiveFromBase(ctx context.Context, ms storage.MetaStore, active, base string) error {
-	if _, err := ms.CreateActive(ctx, "bottom", "", false); err != nil {
+func createActiveFromBase(ctx context.Context, ms *MetaStore, active, base string) error {
+	if _, err := CreateActive(ctx, "bottom", "", false); err != nil {
 		return err
 	}
-	if _, err := ms.Commit(ctx, "bottom", base); err != nil {
+	if _, err := CommitActive(ctx, "bottom", base); err != nil {
 		return err
 	}
 
-	_, err := ms.CreateActive(ctx, active, base, false)
+	_, err := CreateActive(ctx, active, base, false)
 	return err
 }
 
-func statActiveBenchmark(ctx context.Context, b *testing.B, ms storage.MetaStore) {
+func statActiveBenchmark(ctx context.Context, b *testing.B, ms *MetaStore) {
 	if err := createActiveFromBase(ctx, ms, "active", "base"); err != nil {
 		b.Fatal(err)
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := ms.Stat(ctx, "active")
+		_, err := GetInfo(ctx, "active")
 		if err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
-func statCommittedBenchmark(ctx context.Context, b *testing.B, ms storage.MetaStore) {
+func statCommittedBenchmark(ctx context.Context, b *testing.B, ms *MetaStore) {
 	if err := createActiveFromBase(ctx, ms, "active", "base"); err != nil {
 		b.Fatal(err)
 	}
-	if _, err := ms.Commit(ctx, "active", "committed"); err != nil {
+	if _, err := CommitActive(ctx, "active", "committed"); err != nil {
 		b.Fatal(err)
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := ms.Stat(ctx, "committed")
+		_, err := GetInfo(ctx, "committed")
 		if err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
-func createActiveBenchmark(ctx context.Context, b *testing.B, ms storage.MetaStore) {
+func createActiveBenchmark(ctx context.Context, b *testing.B, ms *MetaStore) {
 	for i := 0; i < b.N; i++ {
-		if _, err := ms.CreateActive(ctx, "active", "", false); err != nil {
+		if _, err := CreateActive(ctx, "active", "", false); err != nil {
 			b.Fatal(err)
 		}
 		b.StopTimer()
-		if _, _, err := ms.Remove(ctx, "active"); err != nil {
+		if _, _, err := Remove(ctx, "active"); err != nil {
 			b.Fatal(err)
 		}
 		b.StartTimer()
 	}
 }
 
-func removeBenchmark(ctx context.Context, b *testing.B, ms storage.MetaStore) {
+func removeBenchmark(ctx context.Context, b *testing.B, ms *MetaStore) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		if _, err := ms.CreateActive(ctx, "active", "", false); err != nil {
+		if _, err := CreateActive(ctx, "active", "", false); err != nil {
 			b.Fatal(err)
 		}
 		b.StartTimer()
-		if _, _, err := ms.Remove(ctx, "active"); err != nil {
+		if _, _, err := Remove(ctx, "active"); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
-func commitBenchmark(ctx context.Context, b *testing.B, ms storage.MetaStore) {
+func commitBenchmark(ctx context.Context, b *testing.B, ms *MetaStore) {
 	b.StopTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := ms.CreateActive(ctx, "active", "", false); err != nil {
+		if _, err := CreateActive(ctx, "active", "", false); err != nil {
 			b.Fatal(err)
 		}
 		b.StartTimer()
-		if _, err := ms.Commit(ctx, "active", "committed"); err != nil {
+		if _, err := CommitActive(ctx, "active", "committed"); err != nil {
 			b.Fatal(err)
 		}
 		b.StopTimer()
-		if _, _, err := ms.Remove(ctx, "committed"); err != nil {
+		if _, _, err := Remove(ctx, "committed"); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
-func getActiveBenchmark(ctx context.Context, b *testing.B, ms storage.MetaStore) {
+func getActiveBenchmark(ctx context.Context, b *testing.B, ms *MetaStore) {
 	var base string
 	for i := 1; i <= 10; i++ {
-		if _, err := ms.CreateActive(ctx, "tmp", base, false); err != nil {
+		if _, err := CreateActive(ctx, "tmp", base, false); err != nil {
 			b.Fatalf("create active failed: %+v", err)
 		}
 		base = fmt.Sprintf("base-%d", i)
-		if _, err := ms.Commit(ctx, "tmp", base); err != nil {
+		if _, err := CommitActive(ctx, "tmp", base); err != nil {
 			b.Fatalf("commit failed: %+v", err)
 		}
 
 	}
 
-	if _, err := ms.CreateActive(ctx, "active", base, false); err != nil {
+	if _, err := CreateActive(ctx, "active", base, false); err != nil {
 		b.Fatalf("create active failed: %+v", err)
 	}
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		if _, err := ms.GetActive(ctx, "active"); err != nil {
+		if _, err := GetActive(ctx, "active"); err != nil {
 			b.Fatal(err)
 		}
 	}
