@@ -25,7 +25,7 @@ func init() {
 	})
 }
 
-type Snapshotter struct {
+type snapshotter struct {
 	root string
 	ms   *storage.MetaStore
 }
@@ -37,6 +37,9 @@ type activeSnapshot struct {
 	readonly bool
 }
 
+// NewSnapshotter returns a Snapshotter which uses overlayfs. The overlayfs
+// diffs are stored under the provided root. A metadata file is stored under
+// the root.
 func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
@@ -50,7 +53,7 @@ func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
 		return nil, err
 	}
 
-	return &Snapshotter{
+	return &snapshotter{
 		root: root,
 		ms:   ms,
 	}, nil
@@ -61,7 +64,7 @@ func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
 //
 // Should be used for parent resolution, existence checks and to discern
 // the kind of snapshot.
-func (o *Snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, error) {
+func (o *snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, error) {
 	ctx, t, err := o.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return snapshot.Info{}, err
@@ -70,11 +73,11 @@ func (o *Snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, erro
 	return storage.GetInfo(ctx, key)
 }
 
-func (o *Snapshotter) Prepare(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
+func (o *snapshotter) Prepare(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
 	return o.createActive(ctx, key, parent, false)
 }
 
-func (o *Snapshotter) View(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
+func (o *snapshotter) View(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
 	return o.createActive(ctx, key, parent, true)
 }
 
@@ -82,7 +85,7 @@ func (o *Snapshotter) View(ctx context.Context, key, parent string) ([]container
 // called on an read-write or readonly transaction.
 //
 // This can be used to recover mounts after calling View or Prepare.
-func (o *Snapshotter) Mounts(ctx context.Context, key string) ([]containerd.Mount, error) {
+func (o *snapshotter) Mounts(ctx context.Context, key string) ([]containerd.Mount, error) {
 	ctx, t, err := o.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return nil, err
@@ -95,7 +98,7 @@ func (o *Snapshotter) Mounts(ctx context.Context, key string) ([]containerd.Moun
 	return o.mounts(active), nil
 }
 
-func (o *Snapshotter) Commit(ctx context.Context, name, key string) error {
+func (o *snapshotter) Commit(ctx context.Context, name, key string) error {
 	ctx, t, err := o.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return err
@@ -111,7 +114,7 @@ func (o *Snapshotter) Commit(ctx context.Context, name, key string) error {
 
 // Remove abandons the transaction identified by key. All resources
 // associated with the key will be removed.
-func (o *Snapshotter) Remove(ctx context.Context, key string) (err error) {
+func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 	ctx, t, err := o.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return err
@@ -153,7 +156,7 @@ func (o *Snapshotter) Remove(ctx context.Context, key string) (err error) {
 }
 
 // Walk the committed snapshots.
-func (o *Snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshot.Info) error) error {
+func (o *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshot.Info) error) error {
 	ctx, t, err := o.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return err
@@ -162,7 +165,7 @@ func (o *Snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 	return storage.WalkInfo(ctx, fn)
 }
 
-func (o *Snapshotter) createActive(ctx context.Context, key, parent string, readonly bool) ([]containerd.Mount, error) {
+func (o *snapshotter) createActive(ctx context.Context, key, parent string, readonly bool) ([]containerd.Mount, error) {
 	var (
 		path        string
 		snapshotDir = filepath.Join(o.root, "snapshots")
@@ -225,7 +228,7 @@ func (o *Snapshotter) createActive(ctx context.Context, key, parent string, read
 	return o.mounts(active), nil
 }
 
-func (o *Snapshotter) mounts(active storage.Active) []containerd.Mount {
+func (o *snapshotter) mounts(active storage.Active) []containerd.Mount {
 	if len(active.ParentIDs) == 0 {
 		// if we only have one layer/no parents then just return a bind mount as overlay
 		// will not work
@@ -281,10 +284,10 @@ func (o *Snapshotter) mounts(active storage.Active) []containerd.Mount {
 
 }
 
-func (o *Snapshotter) upperPath(id string) string {
+func (o *snapshotter) upperPath(id string) string {
 	return filepath.Join(o.root, "snapshots", id, "fs")
 }
 
-func (o *Snapshotter) workPath(id string) string {
+func (o *snapshotter) workPath(id string) string {
 	return filepath.Join(o.root, "snapshots", id, "work")
 }

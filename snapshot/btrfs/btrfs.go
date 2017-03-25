@@ -36,12 +36,15 @@ func init() {
 	})
 }
 
-type Snapshotter struct {
+type snapshotter struct {
 	device string // maybe we can resolve it with path?
 	root   string // root provides paths for internal storage.
 	ms     *storage.MetaStore
 }
 
+// NewSnapshotter returns a Snapshotter using btrfs. Uses the provided
+// device and root directory for snapshots and stores the metadata in
+// a file in the provided root.
 func NewSnapshotter(device, root string) (snapshot.Snapshotter, error) {
 	var (
 		active    = filepath.Join(root, "active")
@@ -61,7 +64,7 @@ func NewSnapshotter(device, root string) (snapshot.Snapshotter, error) {
 		return nil, err
 	}
 
-	return &Snapshotter{
+	return &snapshotter{
 		device: device,
 		root:   root,
 		ms:     ms,
@@ -73,7 +76,7 @@ func NewSnapshotter(device, root string) (snapshot.Snapshotter, error) {
 //
 // Should be used for parent resolution, existence checks and to discern
 // the kind of snapshot.
-func (b *Snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, error) {
+func (b *snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, error) {
 	ctx, t, err := b.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return snapshot.Info{}, err
@@ -83,7 +86,7 @@ func (b *Snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, erro
 }
 
 // Walk the committed snapshots.
-func (b *Snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshot.Info) error) error {
+func (b *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshot.Info) error) error {
 	ctx, t, err := b.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return err
@@ -92,15 +95,15 @@ func (b *Snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 	return storage.WalkInfo(ctx, fn)
 }
 
-func (b *Snapshotter) Prepare(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
+func (b *snapshotter) Prepare(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
 	return b.makeActive(ctx, key, parent, false)
 }
 
-func (b *Snapshotter) View(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
+func (b *snapshotter) View(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
 	return b.makeActive(ctx, key, parent, true)
 }
 
-func (b *Snapshotter) makeActive(ctx context.Context, key, parent string, readonly bool) ([]containerd.Mount, error) {
+func (b *snapshotter) makeActive(ctx context.Context, key, parent string, readonly bool) ([]containerd.Mount, error) {
 	ctx, t, err := b.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return nil, err
@@ -145,7 +148,7 @@ func (b *Snapshotter) makeActive(ctx context.Context, key, parent string, readon
 	return b.mounts(target)
 }
 
-func (b *Snapshotter) mounts(dir string) ([]containerd.Mount, error) {
+func (b *snapshotter) mounts(dir string) ([]containerd.Mount, error) {
 	var options []string
 
 	// get the subvolume id back out for the mount
@@ -171,7 +174,7 @@ func (b *Snapshotter) mounts(dir string) ([]containerd.Mount, error) {
 	}, nil
 }
 
-func (b *Snapshotter) Commit(ctx context.Context, name, key string) (err error) {
+func (b *snapshotter) Commit(ctx context.Context, name, key string) (err error) {
 	ctx, t, err := b.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return err
@@ -217,7 +220,7 @@ func (b *Snapshotter) Commit(ctx context.Context, name, key string) (err error) 
 // called on an read-write or readonly transaction.
 //
 // This can be used to recover mounts after calling View or Prepare.
-func (b *Snapshotter) Mounts(ctx context.Context, key string) ([]containerd.Mount, error) {
+func (b *snapshotter) Mounts(ctx context.Context, key string) ([]containerd.Mount, error) {
 	ctx, t, err := b.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return nil, err
@@ -233,7 +236,7 @@ func (b *Snapshotter) Mounts(ctx context.Context, key string) ([]containerd.Moun
 
 // Remove abandons the transaction identified by key. All resources
 // associated with the key will be removed.
-func (b *Snapshotter) Remove(ctx context.Context, key string) (err error) {
+func (b *snapshotter) Remove(ctx context.Context, key string) (err error) {
 	var (
 		source, removed string
 		readonly        bool
