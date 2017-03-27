@@ -1,6 +1,7 @@
 package archive
 
 import (
+	"bytes"
 	"context"
 	"io/ioutil"
 	"os"
@@ -46,64 +47,7 @@ func TestBaseDiff(t *testing.T) {
 }
 
 func TestDiffApply(t *testing.T) {
-	as := []fstest.Applier{
-		baseApplier,
-		fstest.Apply(
-			fstest.CreateFile("/etc/hosts", []byte("127.0.0.1 localhost.localdomain"), 0644),
-			fstest.CreateFile("/etc/fstab", []byte("/dev/sda1\t/\text4\tdefaults 1 1\n"), 0600),
-			fstest.CreateFile("/etc/badfile", []byte(""), 0666),
-			fstest.CreateFile("/home/derek/.zshrc", []byte("#ZSH is just better\n"), 0640),
-		),
-		fstest.Apply(
-			fstest.Remove("/etc/badfile"),
-			fstest.Rename("/home/derek", "/home/notderek"),
-		),
-		fstest.Apply(
-			fstest.RemoveAll("/usr"),
-			fstest.Remove("/etc/hosts.allow"),
-		),
-		fstest.Apply(
-			fstest.RemoveAll("/home"),
-			fstest.CreateDir("/home/derek", 0700),
-			fstest.CreateFile("/home/derek/.bashrc", []byte("#not going away\n"), 0640),
-			fstest.Link("/etc/hosts", "/etc/hosts.allow"),
-		),
-	}
-
-	if err := testDiffApply(as...); err != nil {
-		t.Fatalf("Test diff apply failed: %+v", err)
-	}
-}
-
-// TestDiffApplyDeletion checks various deletion scenarios to ensure
-// deletions are properly picked up and applied
-func TestDiffApplyDeletion(t *testing.T) {
-	as := []fstest.Applier{
-		fstest.Apply(
-			fstest.CreateDir("/test/somedir", 0755),
-			fstest.CreateDir("/lib", 0700),
-			fstest.CreateFile("/lib/hidden", []byte{}, 0644),
-		),
-		fstest.Apply(
-			fstest.CreateFile("/test/a", []byte{}, 0644),
-			fstest.CreateFile("/test/b", []byte{}, 0644),
-			fstest.CreateDir("/test/otherdir", 0755),
-			fstest.CreateFile("/test/otherdir/.empty", []byte{}, 0644),
-			fstest.RemoveAll("/lib"),
-			fstest.CreateDir("/lib", 0700),
-			fstest.CreateFile("/lib/not-hidden", []byte{}, 0644),
-		),
-		fstest.Apply(
-			fstest.Remove("/test/a"),
-			fstest.Remove("/test/b"),
-			fstest.RemoveAll("/test/otherdir"),
-			fstest.CreateFile("/lib/newfile", []byte{}, 0644),
-		),
-	}
-
-	if err := testDiffApply(as...); err != nil {
-		t.Fatalf("Test diff apply failed: %+v", err)
-	}
+	fstest.FSSuite(t, diffApplier{})
 }
 
 func testApply(a fstest.Applier) error {
@@ -174,48 +118,43 @@ func testBaseDiff(a fstest.Applier) error {
 	return fstest.CheckDirectoryEqual(td, dest)
 }
 
-func testDiffApply(as ...fstest.Applier) error {
-	base, err := ioutil.TempDir("", "test-diff-apply-base-")
-	if err != nil {
-		return errors.Wrap(err, "failed to create temp dir")
-	}
-	defer os.RemoveAll(base)
-	dest, err := ioutil.TempDir("", "test-diff-apply-dest-")
-	if err != nil {
-		return errors.Wrap(err, "failed to create temp dir")
-	}
-	defer os.RemoveAll(dest)
+type diffApplier struct{}
 
-	ctx := context.Background()
-	for i, a := range as {
-		if err := diffApply(ctx, a, base, dest); err != nil {
-			return errors.Wrapf(err, "diff apply failed at layer %d", i)
-		}
+func (d diffApplier) TestContext(ctx context.Context) (context.Context, func(), error) {
+	base, err := ioutil.TempDir("", "test-diff-apply-")
+	if err != nil {
+		return ctx, nil, errors.Wrap(err, "failed to create temp dir")
 	}
-	return nil
+	return context.WithValue(ctx, d, base), func() {
+		os.RemoveAll(base)
+	}, nil
 }
 
-// diffApply applies the given changes on the base and
-// computes the diff and applies to the dest.
-func diffApply(ctx context.Context, a fstest.Applier, base, dest string) error {
-	baseCopy, err := ioutil.TempDir("", "test-diff-apply-copy-")
+func (d diffApplier) Apply(ctx context.Context, a fstest.Applier) (string, func(), error) {
+	base := ctx.Value(d).(string)
+
+	applyCopy, err := ioutil.TempDir("", "test-diffapply-apply-copy-")
 	if err != nil {
-		return errors.Wrap(err, "failed to create temp dir")
+		return "", nil, errors.Wrap(err, "failed to create temp dir")
 	}
-	defer os.RemoveAll(baseCopy)
-	if err := fs.CopyDir(baseCopy, base); err != nil {
-		return errors.Wrap(err, "failed to copy base")
+	defer os.RemoveAll(applyCopy)
+	if err = fs.CopyDir(applyCopy, base); err != nil {
+		return "", nil, errors.Wrap(err, "failed to copy base")
 	}
-
-	if err := a.Apply(base); err != nil {
-		return errors.Wrap(err, "failed to apply changes to base")
-	}
-
-	if _, err := Apply(ctx, dest, Diff(ctx, baseCopy, base)); err != nil {
-		return errors.Wrap(err, "failed to apply tar stream")
+	if err := a.Apply(applyCopy); err != nil {
+		return "", nil, errors.Wrap(err, "failed to apply changes to copy of base")
 	}
 
-	return fstest.CheckDirectoryEqual(base, dest)
+	diffBytes, err := ioutil.ReadAll(Diff(ctx, base, applyCopy))
+	if err != nil {
+		return "", nil, errors.Wrap(err, "failed to create diff")
+	}
+
+	if _, err = Apply(ctx, base, bytes.NewReader(diffBytes)); err != nil {
+		return "", nil, errors.Wrap(err, "failed to apply tar stream")
+	}
+
+	return base, nil, nil
 }
 
 func readDirNames(p string) ([]string, error) {
