@@ -137,7 +137,7 @@ func (p *process) create() error {
 		args = append(args, "restore",
 			"-d",
 			"--image-path", p.checkpointPath,
-			"--work-path", filepath.Join(p.checkpointPath, "criu.work", "restore-"+time.Now().Format(time.RFC3339)),
+			"--work-path", filepath.Join(p.checkpointPath, "criu.work", "restore-"+time.Now().Format(time.RFC3339Nano)),
 		)
 		add := func(flags ...string) {
 			args = append(args, flags...)
