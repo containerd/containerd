@@ -16,7 +16,7 @@ import (
 	"github.com/docker/containerd/api/services/shim"
 	localShim "github.com/docker/containerd/linux/shim"
 	"github.com/docker/containerd/reaper"
-	"github.com/docker/containerd/utils"
+	"github.com/docker/containerd/sys"
 	"github.com/pkg/errors"
 )
 
@@ -25,7 +25,7 @@ func newShim(path string, remote bool) (shim.ShimClient, error) {
 		return localShim.Client(path), nil
 	}
 	socket := filepath.Join(path, "shim.sock")
-	l, err := utils.CreateUnixSocket(socket)
+	l, err := sys.CreateUnixSocket(socket)
 	if err != nil {
 		return nil, err
 	}
