@@ -51,8 +51,13 @@ func spec(id string, config *ocispec.ImageConfig, context *cli.Context) (*specs.
 		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 	}
 	env = append(env, config.Env...)
+	cmd := config.Cmd
+	if v := context.Args().Tail(); len(v) > 0 {
+		cmd = v
+	}
 	var (
-		args     = append(config.Entrypoint, config.Cmd...)
+		// TODO: support overriding entrypoint
+		args     = append(config.Entrypoint, cmd...)
 		tty      = context.Bool("tty")
 		uid, gid uint32
 	)
@@ -214,8 +219,9 @@ func spec(id string, config *ocispec.ImageConfig, context *cli.Context) (*specs.
 }
 
 var runCommand = cli.Command{
-	Name:  "run",
-	Usage: "run a container",
+	Name:      "run",
+	Usage:     "run a container",
+	ArgsUsage: "IMAGE [COMMAND] [ARG...]",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "id",
