@@ -138,13 +138,12 @@ func (cs *Store) Walk(fn WalkFunc) error {
 	})
 }
 
-// Stat returns the current status of a blob by the ingest ref.
+// Status returns the current status of a blob by the ingest ref.
 func (s *Store) Status(ref string) (Status, error) {
-	dp := filepath.Join(s.ingestRoot(ref), "data")
-	return s.status(dp)
+	return s.status(s.ingestRoot(ref))
 }
 
-// stat works like stat above except uses the path to the ingest.
+// status works like stat above except uses the path to the ingest.
 func (s *Store) status(ingestPath string) (Status, error) {
 	dp := filepath.Join(ingestPath, "data")
 	fi, err := os.Stat(dp)
