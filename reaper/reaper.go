@@ -6,13 +6,13 @@ import (
 	"os/exec"
 	"sync"
 
-	"github.com/docker/containerd/utils"
+	"github.com/docker/containerd/sys"
 )
 
 // Reap should be called when the process receives an SIGCHLD.  Reap will reap
 // all exited processes and close their wait channels
 func Reap() error {
-	exits, err := utils.Reap(false)
+	exits, err := sys.Reap(false)
 	for _, e := range exits {
 		Default.Lock()
 		c, ok := Default.cmds[e.Pid]

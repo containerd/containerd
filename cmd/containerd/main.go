@@ -26,7 +26,6 @@ import (
 	"github.com/docker/containerd/reaper"
 	"github.com/docker/containerd/snapshot"
 	"github.com/docker/containerd/sys"
-	"github.com/docker/containerd/utils"
 	metrics "github.com/docker/go-metrics"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -220,7 +219,7 @@ func serveDebugAPI() error {
 	if path == "" {
 		return errors.New("debug socket path cannot be empty")
 	}
-	l, err := utils.CreateUnixSocket(path)
+	l, err := sys.CreateUnixSocket(path)
 	if err != nil {
 		return err
 	}
@@ -369,7 +368,7 @@ func serveGRPC(server *grpc.Server) error {
 	if path == "" {
 		return errors.New("--socket path cannot be empty")
 	}
-	l, err := utils.CreateUnixSocket(path)
+	l, err := sys.CreateUnixSocket(path)
 	if err != nil {
 		return err
 	}
