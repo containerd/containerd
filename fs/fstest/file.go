@@ -57,10 +57,7 @@ func RemoveAll(name string) Applier {
 func CreateDir(name string, perm os.FileMode) Applier {
 	return applyFn(func(root string) error {
 		fullPath := filepath.Join(root, name)
-		if err := os.MkdirAll(fullPath, perm); err != nil {
-			return err
-		}
-		return nil
+		return os.MkdirAll(fullPath, perm)
 	})
 }
 

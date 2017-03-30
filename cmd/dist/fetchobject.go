@@ -58,10 +58,7 @@ var fetchObjectCommand = cli.Command{
 		}
 		defer rc.Close()
 
-		if _, err := io.Copy(os.Stdout, rc); err != nil {
-			return err
-		}
-
-		return nil
+		_, err = io.Copy(os.Stdout, rc)
+		return err
 	},
 }

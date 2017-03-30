@@ -49,10 +49,8 @@ var pprofGoroutinesCommand = cli.Command{
 			return err
 		}
 		defer output.Close()
-		if _, err := io.Copy(os.Stdout, output); err != nil {
-			return err
-		}
-		return nil
+		_, err = io.Copy(os.Stdout, output)
+		return err
 	},
 }
 
@@ -67,10 +65,8 @@ var pprofHeapCommand = cli.Command{
 			return err
 		}
 		defer output.Close()
-		if _, err := io.Copy(os.Stdout, output); err != nil {
-			return err
-		}
-		return nil
+		_, err = io.Copy(os.Stdout, output)
+		return err
 	},
 }
 
@@ -85,10 +81,8 @@ var pprofProfileCommand = cli.Command{
 			return err
 		}
 		defer output.Close()
-		if _, err := io.Copy(os.Stdout, output); err != nil {
-			return err
-		}
-		return nil
+		_, err = io.Copy(os.Stdout, output)
+		return err
 	},
 }
 
@@ -112,11 +106,8 @@ var pprofTraceCommand = cli.Command{
 			return err
 		}
 		defer output.Close()
-		if _, err := io.Copy(os.Stdout, output); err != nil {
-			return err
-		}
-		return nil
-
+		_, err = io.Copy(os.Stdout, output)
+		return err
 	},
 }
 
@@ -131,10 +122,8 @@ var pprofBlockCommand = cli.Command{
 			return err
 		}
 		defer output.Close()
-		if _, err := io.Copy(os.Stdout, output); err != nil {
-			return err
-		}
-		return nil
+		_, err = io.Copy(os.Stdout, output)
+		return err
 	},
 }
 
@@ -149,10 +138,8 @@ var pprofThreadcreateCommand = cli.Command{
 			return err
 		}
 		defer output.Close()
-		if _, err := io.Copy(os.Stdout, output); err != nil {
-			return err
-		}
-		return nil
+		_, err = io.Copy(os.Stdout, output)
+		return err
 	},
 }
 
