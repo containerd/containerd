@@ -137,7 +137,7 @@ func main() {
 		// start the prometheus metrics API for containerd
 		serveMetricsAPI()
 
-		log.G(global).Infof("containerd successfully booted in %fs", time.Now().Sub(start).Seconds())
+		log.G(global).Infof("containerd successfully booted in %fs", time.Since(start).Seconds())
 		return handleSignals(signals, server)
 	}
 

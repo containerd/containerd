@@ -53,7 +53,7 @@ func testCompressDecompress(t *testing.T, size int, compression Compression) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(orig, decompressed) != 0 {
+	if !bytes.Equal(orig, decompressed) {
 		t.Fatal("strange decompressed data")
 	}
 }
