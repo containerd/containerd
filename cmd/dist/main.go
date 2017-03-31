@@ -62,6 +62,7 @@ distribution tool
 	}
 	app.Commands = []cli.Command{
 		imagesCommand,
+		rmiCommand,
 		pullCommand,
 		fetchCommand,
 		fetchObjectCommand,
