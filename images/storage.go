@@ -103,6 +103,12 @@ func List(tx *bolt.Tx) ([]Image, error) {
 	return images, nil
 }
 
+func Delete(tx *bolt.Tx, name string) error {
+	return withImagesBucket(tx, func(bkt *bolt.Bucket) error {
+		return bkt.DeleteBucket([]byte(name))
+	})
+}
+
 func readImage(image *Image, bkt *bolt.Bucket) error {
 	return bkt.ForEach(func(k, v []byte) error {
 		if v == nil {
