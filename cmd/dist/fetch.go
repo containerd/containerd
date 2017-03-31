@@ -212,11 +212,7 @@ func (j *jobs) jobs() []string {
 	defer j.mu.Unlock()
 
 	var jobs []string
-	for _, j := range j.refs {
-		jobs = append(jobs, j)
-	}
-
-	return jobs
+	return append(jobs, j.refs...)
 }
 
 type statusInfo struct {

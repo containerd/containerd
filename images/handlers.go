@@ -137,9 +137,7 @@ func ChildrenHandler(provider content.Provider) HandlerFunc {
 		var descs []ocispec.Descriptor
 
 		descs = append(descs, manifest.Config)
-		for _, desc := range manifest.Layers {
-			descs = append(descs, desc)
-		}
+		descs = append(descs, manifest.Layers...)
 
 		return descs, nil
 	}
