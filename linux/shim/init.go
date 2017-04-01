@@ -3,14 +3,17 @@ package shim
 import (
 	"context"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/crosbymichael/console"
 	runc "github.com/crosbymichael/go-runc"
 	"github.com/docker/containerd"
 	shimapi "github.com/docker/containerd/api/services/shim"
+	"github.com/pkg/errors"
 )
 
 type initProcess struct {
@@ -70,11 +73,14 @@ func newInitProcess(context context.Context, path string, r *shimapi.CreateReque
 		IO:            io,
 		NoPivot:       r.NoPivot,
 	}
+	sigchld := make(chan os.Signal, 2048)
+	// main.go calls Notify as well, but it does not hurt
+	signal.Notify(sigchld, syscall.SIGCHLD)
 	if err := p.runc.Create(context, r.ID, r.Bundle, opts); err != nil {
 		return nil, err
 	}
 	if socket != nil {
-		console, err := socket.ReceiveMaster()
+		console, err := receiveConsoleSocketMaster(socket, sigchld, 5*time.Second)
 		if err != nil {
 			return nil, err
 		}
@@ -87,12 +93,31 @@ func newInitProcess(context context.Context, path string, r *shimapi.CreateReque
 			return nil, err
 		}
 	}
+	signal.Stop(sigchld)
 	pid, err := runc.ReadPidFile(opts.PidFile)
 	if err != nil {
 		return nil, err
 	}
 	p.pid = pid
 	return p, nil
+}
+
+func receiveConsoleSocketMaster(socket *runc.ConsoleSocket, sigchld chan os.Signal, deadline time.Duration) (console.Console, error) {
+	var cons console.Console
+	var err error
+	done := make(chan struct{}, 1)
+	go func() {
+		cons, err = socket.ReceiveMaster()
+		done <- struct{}{}
+	}()
+	select {
+	case s := <-sigchld:
+		err = errors.Errorf("got signal while receiving pty master: %v", s)
+	case <-time.After(deadline):
+		err = errors.Errorf("exceeded deadline %v while receiving pty master", deadline)
+	case <-done:
+	}
+	return cons, err
 }
 
 func (p *initProcess) Pid() int {
