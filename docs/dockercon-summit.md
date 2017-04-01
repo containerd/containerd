@@ -17,4 +17,5 @@ If you have not signed up to attend the summit you can do so in this [form](http
 
 The following are proposed discussion points for the containerd summit at Dockercon US 2017:
 
-* Since containerd is one of the bottom bricks in the stack, how can we setup automated integration tests for consumers of containerd? 
+* Since containerd is one of the bottom bricks in the stack, how can we setup automated integration tests for consumers of containerd?
+* Should containerd provide image filesystem metrics? If yes, what metrics should be included? How to implement that?
