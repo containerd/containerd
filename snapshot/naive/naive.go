@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/docker/containerd"
-	"github.com/docker/containerd/fs"
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/fs"
 	"github.com/pkg/errors"
 )
 

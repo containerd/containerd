@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"sync"
 
-	"github.com/docker/containerd/sys"
+	"github.com/containerd/containerd/sys"
 )
 
 // Reap should be called when the process receives an SIGCHLD.  Reap will reap

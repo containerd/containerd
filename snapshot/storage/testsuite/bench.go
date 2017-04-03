@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/docker/containerd/snapshot/storage"
+	"github.com/containerd/containerd/snapshot/storage"
 )
 
 // Benchmarks returns a benchmark suite using the provided metadata store

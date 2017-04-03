@@ -4,9 +4,9 @@ import (
 	contextpkg "context"
 	"os"
 
-	"github.com/docker/containerd/archive"
-	"github.com/docker/containerd/archive/compression"
-	"github.com/docker/containerd/log"
+	"github.com/containerd/containerd/archive"
+	"github.com/containerd/containerd/archive/compression"
+	"github.com/containerd/containerd/log"
 	"github.com/urfave/cli"
 )
 

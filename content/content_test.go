@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/containerd/testutil"
+	"github.com/containerd/containerd/testutil"
 	"github.com/opencontainers/go-digest"
 )
 

@@ -1,6 +1,6 @@
 ![banner](/docs/images/containerd-dark.png?raw=true)
 
-[![Build Status](https://travis-ci.org/docker/containerd.svg?branch=master)](https://travis-ci.org/docker/containerd)
+[![Build Status](https://travis-ci.org/containerd/containerd.svg?branch=master)](https://travis-ci.org/containerd/containerd)
 
 containerd is an industry-standard container runtime with an emphasis on simplicity, robustness and portability. It is available as a daemon for Linux and Windows, which can manage the complete container lifecycle of its host system: image transfer and storage, container execution and supervision, low-level storage and network attachments, etc..
 
@@ -9,7 +9,7 @@ containerd is designed to be embedded into a larger system, rather than being us
 ### State of the Project
 
 containerd currently has two active branches.
-There is a [v0.2.x](https://github.com/docker/containerd/tree/v0.2.x) branch for the current release of containerd that is being consumed by Docker and others and the master branch is the development branch for the 1.0 roadmap and feature set.
+There is a [v0.2.x](https://github.com/containerd/containerd/tree/v0.2.x) branch for the current release of containerd that is being consumed by Docker and others and the master branch is the development branch for the 1.0 roadmap and feature set.
 Any PR or issue that is intended for the current v0.2.x release should be tagged with the same `v0.2.x` tag.
 
 ### Communication
@@ -124,7 +124,7 @@ For the scope of this project to change it requires a 100% vote from all maintai
 ### Development reports.
 
 Weekly summary on the progress and what is being worked on.
-https://github.com/docker/containerd/tree/master/reports
+https://github.com/containerd/containerd/tree/master/reports
 
 ## Copyright and license
 

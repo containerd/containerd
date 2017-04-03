@@ -10,9 +10,9 @@ import (
 	"sync"
 	"syscall"
 
+	shimapi "github.com/containerd/containerd/api/services/shim"
 	"github.com/crosbymichael/console"
 	runc "github.com/crosbymichael/go-runc"
-	shimapi "github.com/docker/containerd/api/services/shim"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/tonistiigi/fifo"
 )

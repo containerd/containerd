@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/docker/containerd/log"
+	"github.com/containerd/containerd/log"
 	"github.com/urfave/cli"
 )
 

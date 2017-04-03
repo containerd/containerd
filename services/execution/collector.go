@@ -3,7 +3,7 @@ package execution
 import (
 	"sync"
 
-	"github.com/docker/containerd"
+	"github.com/containerd/containerd"
 
 	"golang.org/x/net/context"
 )

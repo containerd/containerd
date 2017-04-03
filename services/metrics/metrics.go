@@ -1,7 +1,7 @@
 package metrics
 
 import (
-	"github.com/docker/containerd/plugin"
+	"github.com/containerd/containerd/plugin"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"google.golang.org/grpc"
 )

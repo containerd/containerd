@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/docker/containerd"
-	"github.com/docker/containerd/content"
-	"github.com/docker/containerd/snapshot"
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/snapshot"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"

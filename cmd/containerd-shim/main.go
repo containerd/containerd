@@ -11,12 +11,12 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/containerd/containerd"
+	shimapi "github.com/containerd/containerd/api/services/shim"
+	"github.com/containerd/containerd/linux/shim"
+	"github.com/containerd/containerd/reaper"
+	"github.com/containerd/containerd/sys"
 	runc "github.com/crosbymichael/go-runc"
-	"github.com/docker/containerd"
-	shimapi "github.com/docker/containerd/api/services/shim"
-	"github.com/docker/containerd/linux/shim"
-	"github.com/docker/containerd/reaper"
-	"github.com/docker/containerd/sys"
 	"github.com/urfave/cli"
 )
 

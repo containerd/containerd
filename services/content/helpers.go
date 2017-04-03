@@ -1,7 +1,7 @@
 package content
 
 import (
-	"github.com/docker/containerd/content"
+	"github.com/containerd/containerd/content"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"

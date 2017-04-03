@@ -6,10 +6,10 @@ import (
 	"syscall"
 
 	"github.com/Sirupsen/logrus"
+	shimapi "github.com/containerd/containerd/api/services/shim"
+	"github.com/containerd/containerd/api/types/container"
+	"github.com/containerd/containerd/reaper"
 	"github.com/crosbymichael/console"
-	shimapi "github.com/docker/containerd/api/services/shim"
-	"github.com/docker/containerd/api/types/container"
-	"github.com/docker/containerd/reaper"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"

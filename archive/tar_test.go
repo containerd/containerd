@@ -10,8 +10,8 @@ import (
 
 	_ "crypto/sha256"
 
-	"github.com/docker/containerd/fs"
-	"github.com/docker/containerd/fs/fstest"
+	"github.com/containerd/containerd/fs"
+	"github.com/containerd/containerd/fs/fstest"
 	"github.com/pkg/errors"
 )
 

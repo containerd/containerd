@@ -5,11 +5,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/docker/containerd/snapshot/storage"
-	"github.com/docker/containerd/snapshot/storage/testsuite"
+	"github.com/containerd/containerd/snapshot/storage"
+	"github.com/containerd/containerd/snapshot/storage/testsuite"
 
 	// Does not require root but flag must be defined for snapshot tests
-	_ "github.com/docker/containerd/testutil"
+	_ "github.com/containerd/containerd/testutil"
 )
 
 func TestBoltDB(t *testing.T) {

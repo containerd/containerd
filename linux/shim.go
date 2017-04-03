@@ -13,10 +13,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
 
-	"github.com/docker/containerd/api/services/shim"
-	localShim "github.com/docker/containerd/linux/shim"
-	"github.com/docker/containerd/reaper"
-	"github.com/docker/containerd/sys"
+	"github.com/containerd/containerd/api/services/shim"
+	localShim "github.com/containerd/containerd/linux/shim"
+	"github.com/containerd/containerd/reaper"
+	"github.com/containerd/containerd/sys"
 	"github.com/pkg/errors"
 )
 

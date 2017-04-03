@@ -1,10 +1,10 @@
 package cgroups
 
 import (
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/plugin"
 	"github.com/crosbymichael/cgroups"
 	"github.com/crosbymichael/cgroups/prometheus"
-	"github.com/docker/containerd"
-	"github.com/docker/containerd/plugin"
 	metrics "github.com/docker/go-metrics"
 	"golang.org/x/net/context"
 )

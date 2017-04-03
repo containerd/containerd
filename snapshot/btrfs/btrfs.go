@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/containerd"
-	"github.com/docker/containerd/log"
-	"github.com/docker/containerd/plugin"
-	"github.com/docker/containerd/snapshot"
-	"github.com/docker/containerd/snapshot/storage"
-	"github.com/docker/containerd/snapshot/storage/boltdb"
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/snapshot/storage"
+	"github.com/containerd/containerd/snapshot/storage/boltdb"
 	"github.com/pkg/errors"
 	"github.com/stevvooe/go-btrfs"
 )

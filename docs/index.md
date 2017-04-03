@@ -16,7 +16,7 @@ containerd is an industry-standard core container runtime with an emphasis on si
 
 containerd is designed to be embedded into a larger system, rather than being used directly by developers or end-users.
 
-containerd includes a daemon exposing gRPC API over a local UNIX socket. The API is a low-level one designed for higher layers to wrap and extend. It also includes a barebone CLI (`ctr`) designed specifically for development and debugging purpose. It uses [runC](https://github.com/opencontainers/runc) to run containers according to the [OCI specification](https://www.opencontainers.org/about). The code can be found on [GitHub](https://github.com/docker/containerd), and here are the [contribution guidelines](https://github.com/docker/containerd/blob/master/CONTRIBUTING.md).
+containerd includes a daemon exposing gRPC API over a local UNIX socket. The API is a low-level one designed for higher layers to wrap and extend. It also includes a barebone CLI (`ctr`) designed specifically for development and debugging purpose. It uses [runC](https://github.com/opencontainers/runc) to run containers according to the [OCI specification](https://www.opencontainers.org/about). The code can be found on [GitHub](https://github.com/containerd/containerd), and here are the [contribution guidelines](https://github.com/containerd/containerd/blob/master/CONTRIBUTING.md).
 
 containerd is based on the Docker Engine’s core container runtime to benefit from its maturity and existing contributors.
 
@@ -32,13 +32,13 @@ containerd is based on the Docker Engine’s core container runtime to benefit f
 * Management of network namespaces containers to join existing namespaces
 * Multi-tenant supported with CAS storage for global images
 
-containerd, currently in [version 0.2.4](https://github.com/docker/containerd/releases/tag/v0.2.4), is a daemon born from extracting the container execution subset of the Docker Engine, and is [used internally by Docker since the 1.11 release](https://blog.docker.com/2016/04/docker-engine-1-11-runc/). containerd will graduate to version 1.0 once its feature scope matches the requirements above, from which it will commit to API stability as well as committing to a 1-year LTS release. Docker Engine commits to upgrading to containerd 1.0 as part of its regular release cycle.
+containerd, currently in [version 0.2.4](https://github.com/containerd/containerd/releases/tag/v0.2.4), is a daemon born from extracting the container execution subset of the Docker Engine, and is [used internally by Docker since the 1.11 release](https://blog.docker.com/2016/04/docker-engine-1-11-runc/). containerd will graduate to version 1.0 once its feature scope matches the requirements above, from which it will commit to API stability as well as committing to a 1-year LTS release. Docker Engine commits to upgrading to containerd 1.0 as part of its regular release cycle.
 
-[containerd roadmap](https://github.com/docker/containerd/blob/master/ROADMAP.md) to implement these features is described in the containerd Github repository.
+[containerd roadmap](https://github.com/containerd/containerd/blob/master/ROADMAP.md) to implement these features is described in the containerd Github repository.
 
 ## Architecture
 
-Containerd [architecture](https://github.com/docker/containerd/blob/master/design/architecture.md) and [API](https://github.com/docker/containerd/tree/master/api/) are described in the Github repository.
+Containerd [architecture](https://github.com/containerd/containerd/blob/master/design/architecture.md) and [API](https://github.com/containerd/containerd/tree/master/api/) are described in the Github repository.
 
 ![Containerd Architecture](/images/chart-b.png "Containerd High Level Architecture")
 

@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/boltdb/bolt"
-	"github.com/docker/containerd/snapshot"
-	"github.com/docker/containerd/snapshot/storage"
+	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/snapshot/storage"
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 )

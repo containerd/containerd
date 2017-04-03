@@ -4,9 +4,9 @@ import (
 	contextpkg "context"
 	"os"
 
-	contentapi "github.com/docker/containerd/api/services/content"
-	"github.com/docker/containerd/content"
-	contentservice "github.com/docker/containerd/services/content"
+	contentapi "github.com/containerd/containerd/api/services/content"
+	"github.com/containerd/containerd/content"
+	contentservice "github.com/containerd/containerd/services/content"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"

@@ -6,7 +6,7 @@ import (
 	gocontext "context"
 	"fmt"
 
-	"github.com/docker/containerd/api/services/execution"
+	"github.com/containerd/containerd/api/services/execution"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )

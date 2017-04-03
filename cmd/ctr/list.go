@@ -6,7 +6,7 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/docker/containerd/api/services/execution"
+	"github.com/containerd/containerd/api/services/execution"
 	"github.com/urfave/cli"
 )
 

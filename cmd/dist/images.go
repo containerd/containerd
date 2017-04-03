@@ -5,11 +5,11 @@ import (
 	"os"
 	"text/tabwriter"
 
-	contentapi "github.com/docker/containerd/api/services/content"
-	"github.com/docker/containerd/images"
-	"github.com/docker/containerd/log"
-	"github.com/docker/containerd/progress"
-	contentservice "github.com/docker/containerd/services/content"
+	contentapi "github.com/containerd/containerd/api/services/content"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/progress"
+	contentservice "github.com/containerd/containerd/services/content"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )

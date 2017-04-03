@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/containerd/log"
+	"github.com/containerd/containerd/log"
 )
 
 var (

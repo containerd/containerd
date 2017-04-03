@@ -4,8 +4,8 @@ import (
 	"context"
 	"io"
 
-	contentapi "github.com/docker/containerd/api/services/content"
-	"github.com/docker/containerd/content"
+	contentapi "github.com/containerd/containerd/api/services/content"
+	"github.com/containerd/containerd/content"
 
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"

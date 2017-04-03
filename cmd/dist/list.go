@@ -7,8 +7,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/docker/containerd/content"
-	"github.com/docker/containerd/log"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/log"
 	units "github.com/docker/go-units"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/urfave/cli"

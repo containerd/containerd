@@ -9,11 +9,11 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/docker/containerd"
-	"github.com/docker/containerd/snapshot"
-	"github.com/docker/containerd/snapshot/storage/boltdb"
-	"github.com/docker/containerd/snapshot/testsuite"
-	"github.com/docker/containerd/testutil"
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/snapshot/storage/boltdb"
+	"github.com/containerd/containerd/snapshot/testsuite"
+	"github.com/containerd/containerd/testutil"
 )
 
 func boltSnapshotter(ctx context.Context, root string) (snapshot.Snapshotter, func(), error) {

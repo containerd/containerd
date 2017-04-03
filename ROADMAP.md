@@ -2,7 +2,7 @@
 
 This is a high level roadmap for the project that outlines what is currently being worked on, what comes next, and where you can help.
 
-For a more up to date look please review the milestones on [github](https://github.com/docker/containerd/milestones).
+For a more up to date look please review the milestones on [github](https://github.com/containerd/containerd/milestones).
 
 The following are the different status the various phases of development can be in:
 * Not Started - no work or thinking has been done towards the goal
@@ -52,7 +52,7 @@ The runtime layer is responsible for the creation of containers and their manage
 
 ### Storage
 
-**Documents:** https://github.com/docker/containerd/blob/master/design/snapshots.md
+**Documents:** https://github.com/containerd/containerd/blob/master/design/snapshots.md
 
 The current graph drivers were built when we only had overlay filesystems like aufs.
 We forced the model to be designed around overlay filesystems and this introduced a lot of complexity for snapshotting graph drivers like btrfs and devicemapper thin-p.

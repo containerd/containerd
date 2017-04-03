@@ -3,7 +3,7 @@ package snapshot
 import (
 	"context"
 
-	"github.com/docker/containerd"
+	"github.com/containerd/containerd"
 )
 
 // Kind identifies the kind of snapshot.

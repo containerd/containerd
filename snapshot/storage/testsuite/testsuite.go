@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/docker/containerd/snapshot"
-	"github.com/docker/containerd/snapshot/storage"
+	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/snapshot/storage"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
