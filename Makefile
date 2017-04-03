@@ -23,7 +23,7 @@ GO_LDFLAGS=-ldflags "-X $(PKG).Version=$(VERSION) -X $(PKG).Package=$(PKG)"
 # Flags passed to `go test`
 TESTFLAGS ?=-parallel 8 -race
 
-.PHONY: clean all AUTHORS fmt vet lint build binaries test integration setup generate protos checkprotos coverage ci check help install uninstall vendor
+.PHONY: clean all AUTHORS fmt vet lint dco build binaries test integration setup generate protos checkprotos coverage ci check help install uninstall vendor
 .DEFAULT: default
 
 all: binaries
@@ -76,6 +76,14 @@ fmt: ## run go fmt
 lint: ## run go lint
 	@echo "🐳 $@"
 	@test -z "$$(golint ./... | grep -v vendor/ | grep -v ".pb.go:" | tee /dev/stderr)"
+
+dco: ## dco check
+	@which git-validation > /dev/null 2>/dev/null || (echo "ERROR: git-validation not found" && false)
+ifdef TRAVIS_COMMIT_RANGE
+	git-validation -q -run DCO,short-subject,dangling-whitespace
+else
+	git-validation -v -run DCO,short-subject,dangling-whitespace -range $(EPOCH_TEST_COMMIT)..HEAD
+endif
 
 ineffassign: ## run ineffassign
 	@echo "🐳 $@"
