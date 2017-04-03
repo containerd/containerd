@@ -61,3 +61,41 @@ var imagesCommand = cli.Command{
 		return nil
 	},
 }
+
+var rmiCommand = cli.Command{
+	Name:        "rmi",
+	Usage:       "Delete one or more images by reference.",
+	ArgsUsage:   "[flags] <ref> [<ref>, ...]",
+	Description: `Delete one or more images by reference.`,
+	Flags:       []cli.Flag{},
+	Action: func(clicontext *cli.Context) error {
+		var (
+			ctx     = background
+			exitErr error
+		)
+
+		db, err := getDB(clicontext, false)
+		if err != nil {
+			return errors.Wrap(err, "failed to open database")
+		}
+
+		tx, err := db.Begin(true)
+		if err != nil {
+			return errors.Wrap(err, "could not start transaction")
+		}
+		defer tx.Rollback()
+
+		for _, target := range clicontext.Args() {
+			if err := images.Delete(tx, target); err != nil {
+				if exitErr == nil {
+					exitErr = errors.Wrapf(err, "unable to delete %v", target)
+				}
+				log.G(ctx).WithError(err).Errorf("unable to delete %v", target)
+			}
+
+			fmt.Println(target)
+		}
+
+		return exitErr
+	},
+}

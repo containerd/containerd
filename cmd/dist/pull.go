@@ -67,6 +67,7 @@ command. As part of this process, we do the following:
 
 		ingester := contentservice.NewIngesterFromClient(contentapi.NewContentClient(conn))
 		provider := contentservice.NewProviderFromClient(contentapi.NewContentClient(conn))
+
 		cs, err := resolveContentStore(clicontext)
 		if err != nil {
 			return err

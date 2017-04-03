@@ -2,6 +2,7 @@ package shim
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -11,6 +12,7 @@ import (
 	runc "github.com/crosbymichael/go-runc"
 	"github.com/docker/containerd"
 	shimapi "github.com/docker/containerd/api/services/shim"
+	"github.com/tonistiigi/fifo"
 )
 
 type initProcess struct {
@@ -23,6 +25,7 @@ type initProcess struct {
 	runc    *runc.Runc
 	status  int
 	pid     int
+	closers []io.Closer
 }
 
 func newInitProcess(context context.Context, path string, r *shimapi.CreateRequest) (*initProcess, error) {
@@ -72,6 +75,13 @@ func newInitProcess(context context.Context, path string, r *shimapi.CreateReque
 	}
 	if err := p.runc.Create(context, r.ID, r.Bundle, opts); err != nil {
 		return nil, err
+	}
+	if r.Stdin != "" {
+		sc, err := fifo.OpenFifo(context, r.Stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
+		if err != nil {
+			return nil, err
+		}
+		p.closers = append(p.closers, sc)
 	}
 	if socket != nil {
 		console, err := socket.ReceiveMaster()
@@ -125,6 +135,9 @@ func (p *initProcess) Delete(context context.Context) error {
 	p.Wait()
 	err := p.runc.Delete(context, p.id)
 	if p.io != nil {
+		for _, c := range p.closers {
+			c.Close()
+		}
 		p.io.Close()
 	}
 	return err

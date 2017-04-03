@@ -17,5 +17,7 @@ If you have not signed up to attend the summit you can do so in this [form](http
 
 The following are proposed discussion points for the containerd summit at Dockercon US 2017:
 
+
 * Since containerd is one of the bottom bricks in the stack, how can we setup automated integration tests for consumers of containerd? 
 * We'd like to propose an Authorization plugin to containerd that would allow an external component to police events like container start & stop (and have a discussion about the best way to go about it)
+* Should containerd provide image filesystem metrics? If yes, what metrics should be included? How to implement that?
