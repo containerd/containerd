@@ -4,6 +4,7 @@ import (
 	gocontext "context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -260,6 +261,7 @@ var runCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		defer os.RemoveAll(tmpDir)
 		events, err := containers.Events(ctx, &execution.EventsRequest{})
 		if err != nil {
 			return err
