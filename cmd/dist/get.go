@@ -4,8 +4,8 @@ import (
 	"io"
 	"os"
 
-	contentapi "github.com/docker/containerd/api/services/content"
-	contentservice "github.com/docker/containerd/services/content"
+	contentapi "github.com/containerd/containerd/api/services/content"
+	contentservice "github.com/containerd/containerd/services/content"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/urfave/cli"
 )

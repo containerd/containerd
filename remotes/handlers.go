@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/containerd/content"
-	"github.com/docker/containerd/images"
-	"github.com/docker/containerd/log"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 

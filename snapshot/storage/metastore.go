@@ -3,7 +3,7 @@ package storage
 import (
 	"context"
 
-	"github.com/docker/containerd/snapshot"
+	"github.com/containerd/containerd/snapshot"
 )
 
 // MetaStore is used to store metadata related to a snapshot driver. The

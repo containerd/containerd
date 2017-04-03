@@ -7,7 +7,7 @@ DESTDIR=/usr/local
 # Used to populate version variable in main package.
 VERSION=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
 
-PKG=github.com/docker/containerd
+PKG=github.com/containerd/containerd
 
 # Project packages.
 PACKAGES=$(shell go list ./... | grep -v /vendor/)

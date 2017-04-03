@@ -6,9 +6,9 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/docker/containerd"
-	"github.com/docker/containerd/log"
-	"github.com/docker/containerd/snapshot"
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/snapshot"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )

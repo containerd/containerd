@@ -8,7 +8,7 @@ go:
   - 1.8.x
   - tip
 
-go_import_path: github.com/docker/containerd
+go_import_path: github.com/containerd/containerd
 
 addons:
   apt:

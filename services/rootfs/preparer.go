@@ -3,9 +3,9 @@ package rootfs
 import (
 	"context"
 
-	rootfsapi "github.com/docker/containerd/api/services/rootfs"
-	containerd_v1_types "github.com/docker/containerd/api/types/descriptor"
-	"github.com/docker/containerd/rootfs"
+	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
+	containerd_v1_types "github.com/containerd/containerd/api/types/descriptor"
+	"github.com/containerd/containerd/rootfs"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )

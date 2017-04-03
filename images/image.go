@@ -6,8 +6,8 @@ import (
 	"errors"
 	"io/ioutil"
 
-	"github.com/docker/containerd/content"
-	"github.com/docker/containerd/log"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )

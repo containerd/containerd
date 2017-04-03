@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/docker/containerd/log"
+	"github.com/containerd/containerd/log"
 	"github.com/nightlyone/lockfile"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"

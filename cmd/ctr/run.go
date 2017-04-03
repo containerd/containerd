@@ -13,10 +13,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
+	"github.com/containerd/containerd/api/services/execution"
+	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
+	"github.com/containerd/containerd/images"
 	"github.com/crosbymichael/console"
-	"github.com/docker/containerd/api/services/execution"
-	rootfsapi "github.com/docker/containerd/api/services/rootfs"
-	"github.com/docker/containerd/images"
 	protobuf "github.com/gogo/protobuf/types"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"

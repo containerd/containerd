@@ -9,10 +9,10 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/docker/containerd"
-	"github.com/docker/containerd/fs/fstest"
-	"github.com/docker/containerd/snapshot"
-	"github.com/docker/containerd/testutil"
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/fs/fstest"
+	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/testutil"
 	"github.com/stretchr/testify/assert"
 )
 

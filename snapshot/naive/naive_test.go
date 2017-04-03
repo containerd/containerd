@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/docker/containerd"
-	"github.com/docker/containerd/testutil"
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/testutil"
 )
 
 func TestSnapshotNaiveBasic(t *testing.T) {

@@ -1,9 +1,9 @@
 package linux
 
 import (
-	"github.com/docker/containerd"
-	"github.com/docker/containerd/api/services/shim"
-	"github.com/docker/containerd/api/types/container"
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/api/services/shim"
+	"github.com/containerd/containerd/api/types/container"
 	"golang.org/x/net/context"
 )
 

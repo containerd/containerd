@@ -8,10 +8,10 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/containerd/containerd"
+	shimapi "github.com/containerd/containerd/api/services/shim"
 	"github.com/crosbymichael/console"
 	runc "github.com/crosbymichael/go-runc"
-	"github.com/docker/containerd"
-	shimapi "github.com/docker/containerd/api/services/shim"
 	"github.com/tonistiigi/fifo"
 )
 

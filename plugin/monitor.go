@@ -1,6 +1,6 @@
 package plugin
 
-import "github.com/docker/containerd"
+import "github.com/containerd/containerd"
 
 // ContainerMonitor provides an interface for monitoring of containers within containerd
 type ContainerMonitor interface {

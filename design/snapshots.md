@@ -105,7 +105,7 @@ If the user wants to discard committed snapshots, the _remove_ operation can
 also be used, but any children must be removed before proceeding.
 
 For detailed usage information, see the
-[GoDoc](https://godoc.org/github.com/docker/containerd/snapshot#Snapshotter).
+[GoDoc](https://godoc.org/github.com/containerd/containerd/snapshot#Snapshotter).
 
 ### Graph metadata
 

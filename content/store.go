@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/containerd/log"
+	"github.com/containerd/containerd/log"
 	"github.com/nightlyone/lockfile"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"

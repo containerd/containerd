@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/docker/containerd/sys"
+	"github.com/containerd/containerd/sys"
 )
 
 // tarName returns platform-specific filepath

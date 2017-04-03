@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/docker/containerd/content"
-	"github.com/docker/containerd/images"
-	"github.com/docker/containerd/remotes"
-	"github.com/docker/containerd/remotes/docker"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/containerd/remotes/docker"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 )

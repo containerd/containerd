@@ -6,8 +6,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
-	contentapi "github.com/docker/containerd/api/services/content"
-	"github.com/docker/containerd/log"
+	contentapi "github.com/containerd/containerd/api/services/content"
+	"github.com/containerd/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/urfave/cli"
 )

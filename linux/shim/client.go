@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"syscall"
 
-	shimapi "github.com/docker/containerd/api/services/shim"
-	"github.com/docker/containerd/api/types/container"
+	shimapi "github.com/containerd/containerd/api/services/shim"
+	"github.com/containerd/containerd/api/types/container"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"

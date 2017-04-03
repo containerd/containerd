@@ -3,11 +3,11 @@ package execution
 import (
 	"sync"
 
-	"github.com/docker/containerd"
-	api "github.com/docker/containerd/api/services/execution"
-	"github.com/docker/containerd/api/types/container"
-	"github.com/docker/containerd/log"
-	"github.com/docker/containerd/plugin"
+	"github.com/containerd/containerd"
+	api "github.com/containerd/containerd/api/services/execution"
+	"github.com/containerd/containerd/api/types/container"
+	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/plugin"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
