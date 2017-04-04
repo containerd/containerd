@@ -1,6 +1,7 @@
 package images
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 
@@ -8,11 +9,29 @@ import (
 	"github.com/containerd/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 )
 
 var (
-	errImageUnknown = fmt.Errorf("image: unknown")
+	ErrExists   = errors.New("images: exists")
+	ErrNotFound = errors.New("images: not found")
 )
+
+type Store interface {
+	Put(ctx context.Context, name string, desc ocispec.Descriptor) error
+	Get(ctx context.Context, name string) (Image, error)
+	List(ctx context.Context) ([]Image, error)
+	Delete(ctx context.Context, name string) error
+}
+
+// IsNotFound returns true if the error is due to a missing image.
+func IsNotFound(err error) bool {
+	return errors.Cause(err) == ErrNotFound
+}
+
+func IsExists(err error) bool {
+	return errors.Cause(err) == ErrExists
+}
 
 var (
 	bucketKeyStorageVersion = []byte("v1")
@@ -26,6 +45,8 @@ var (
 // "metadata" store. For now, it is bound tightly to the local machine and bolt
 // but we can take this and use it to define a service interface.
 
+// InitDB will initialize the database for use. The database must be opened for
+// write and the caller must not be holding an open transaction.
 func InitDB(db *bolt.DB) error {
 	log.L.Debug("init db")
 	return db.Update(func(tx *bolt.Tx) error {
@@ -34,8 +55,28 @@ func InitDB(db *bolt.DB) error {
 	})
 }
 
-func Register(tx *bolt.Tx, name string, desc ocispec.Descriptor) error {
-	return withImagesBucket(tx, func(bkt *bolt.Bucket) error {
+func NewImageStore(tx *bolt.Tx) Store {
+	return &storage{tx: tx}
+}
+
+type storage struct {
+	tx *bolt.Tx
+}
+
+func (s *storage) Get(ctx context.Context, name string) (Image, error) {
+	var image Image
+	if err := withImageBucket(s.tx, name, func(bkt *bolt.Bucket) error {
+		image.Name = name
+		return readImage(&image, bkt)
+	}); err != nil {
+		return Image{}, err
+	}
+
+	return image, nil
+}
+
+func (s *storage) Put(ctx context.Context, name string, desc ocispec.Descriptor) error {
+	return withImagesBucket(s.tx, func(bkt *bolt.Bucket) error {
 		ibkt, err := bkt.CreateBucketIfNotExists([]byte(name))
 		if err != nil {
 			return err
@@ -65,22 +106,10 @@ func Register(tx *bolt.Tx, name string, desc ocispec.Descriptor) error {
 	})
 }
 
-func Get(tx *bolt.Tx, name string) (Image, error) {
-	var image Image
-	if err := withImageBucket(tx, name, func(bkt *bolt.Bucket) error {
-		image.Name = name
-		return readImage(&image, bkt)
-	}); err != nil {
-		return Image{}, err
-	}
-
-	return image, nil
-}
-
-func List(tx *bolt.Tx) ([]Image, error) {
+func (s *storage) List(ctx context.Context) ([]Image, error) {
 	var images []Image
 
-	if err := withImagesBucket(tx, func(bkt *bolt.Bucket) error {
+	if err := withImagesBucket(s.tx, func(bkt *bolt.Bucket) error {
 		return bkt.ForEach(func(k, v []byte) error {
 			var (
 				image = Image{
@@ -103,8 +132,8 @@ func List(tx *bolt.Tx) ([]Image, error) {
 	return images, nil
 }
 
-func Delete(tx *bolt.Tx, name string) error {
-	return withImagesBucket(tx, func(bkt *bolt.Bucket) error {
+func (s *storage) Delete(ctx context.Context, name string) error {
+	return withImagesBucket(s.tx, func(bkt *bolt.Bucket) error {
 		return bkt.DeleteBucket([]byte(name))
 	})
 }
@@ -119,11 +148,11 @@ func readImage(image *Image, bkt *bolt.Bucket) error {
 		// keys, rather than full arrays.
 		switch string(k) {
 		case string(bucketKeyDigest):
-			image.Descriptor.Digest = digest.Digest(v)
+			image.Target.Digest = digest.Digest(v)
 		case string(bucketKeyMediaType):
-			image.Descriptor.MediaType = string(v)
+			image.Target.MediaType = string(v)
 		case string(bucketKeySize):
-			image.Descriptor.Size, _ = binary.Varint(v)
+			image.Target.Size, _ = binary.Varint(v)
 		}
 
 		return nil
@@ -149,7 +178,7 @@ func createBucketIfNotExists(tx *bolt.Tx, keys ...[]byte) (*bolt.Bucket, error) 
 func withImagesBucket(tx *bolt.Tx, fn func(bkt *bolt.Bucket) error) error {
 	bkt := getImagesBucket(tx)
 	if bkt == nil {
-		return errImageUnknown
+		return ErrNotFound
 	}
 
 	return fn(bkt)
@@ -158,7 +187,7 @@ func withImagesBucket(tx *bolt.Tx, fn func(bkt *bolt.Bucket) error) error {
 func withImageBucket(tx *bolt.Tx, name string, fn func(bkt *bolt.Bucket) error) error {
 	bkt := getImageBucket(tx, name)
 	if bkt == nil {
-		return errImageUnknown
+		return ErrNotFound
 	}
 
 	return fn(bkt)

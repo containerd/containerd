@@ -1,32 +1,91 @@
 package images
 
 import (
-	imagesapi "github.com/docker/containerd/api/services/images"
-	"github.com/docker/containerd/images"
+	"github.com/boltdb/bolt"
+	imagesapi "github.com/containerd/containerd/api/services/images"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/plugin"
 	"github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
 
+func init() {
+	plugin.Register("images-grpc", &plugin.Registration{
+		Type: plugin.GRPCPlugin,
+		Init: func(ic *plugin.InitContext) (interface{}, error) {
+			return NewService(ic.Meta), nil
+		},
+	})
+}
+
 type Service struct {
-	store images.Store
+	db *bolt.DB
 }
 
-func NewService(store images.Store) imagesapi.ImagesServer {
-	return &Service{store: store}
+func NewService(db *bolt.DB) imagesapi.ImagesServer {
+	return &Service{db: db}
 }
 
-func (s *Service) Get(context.Context, *imagesapi.GetRequest) (*imagesapi.GetResponse, error) {
-	panic("not implemented")
+func (s *Service) Register(server *grpc.Server) error {
+	imagesapi.RegisterImagesServer(server, s)
+	return nil
 }
 
-func (s *Service) Register(context.Context, *imagesapi.RegisterRequest) (*imagesapi.RegisterRequest, error) {
-	panic("not implemented")
+func (s *Service) Get(ctx context.Context, req *imagesapi.GetRequest) (*imagesapi.GetResponse, error) {
+	var resp imagesapi.GetResponse
+
+	return &resp, s.withStoreTx(ctx, req.Name, false, func(ctx context.Context, store images.Store) error {
+		image, err := store.Get(ctx, req.Name)
+		if err != nil {
+			return mapGRPCError(err, req.Name)
+		}
+		imagepb := imageToProto(&image)
+		resp.Image = &imagepb
+		return nil
+	})
 }
 
-func (s *Service) List(context.Context, *imagesapi.ListRequest) (*imagesapi.ListResponse, error) {
-	panic("not implemented")
+func (s *Service) Put(ctx context.Context, req *imagesapi.PutRequest) (*empty.Empty, error) {
+	return &empty.Empty{}, s.withStoreTx(ctx, req.Image.Name, true, func(ctx context.Context, store images.Store) error {
+		return mapGRPCError(store.Put(ctx, req.Image.Name, descFromProto(&req.Image.Target)), req.Image.Name)
+	})
 }
 
-func (s *Service) Delete(context.Context, *imagesapi.DeleteRequest) (*empty.Empty, error) {
-	panic("not implemented")
+func (s *Service) List(ctx context.Context, _ *imagesapi.ListRequest) (*imagesapi.ListResponse, error) {
+	var resp imagesapi.ListResponse
+
+	return &resp, s.withStoreTx(ctx, "", false, func(ctx context.Context, store images.Store) error {
+		images, err := store.List(ctx)
+		if err != nil {
+			return mapGRPCError(err, "")
+		}
+
+		resp.Images = imagesToProto(images)
+		return nil
+	})
+}
+
+func (s *Service) Delete(ctx context.Context, req *imagesapi.DeleteRequest) (*empty.Empty, error) {
+	return &empty.Empty{}, s.withStoreTx(ctx, req.Name, true, func(ctx context.Context, store images.Store) error {
+		return mapGRPCError(store.Delete(ctx, req.Name), req.Name)
+	})
+}
+
+func (s *Service) withStoreTx(ctx context.Context, id string, writable bool, fn func(ctx context.Context, store images.Store) error) error {
+	tx, err := s.db.Begin(writable)
+	if err != nil {
+		return mapGRPCError(err, id)
+	}
+	defer tx.Rollback()
+
+	if err := fn(ctx, images.NewImageStore(tx)); err != nil {
+		return err
+	}
+
+	if writable {
+		return tx.Commit()
+	}
+
+	return nil
 }
