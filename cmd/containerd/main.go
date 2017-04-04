@@ -3,6 +3,7 @@ package main
 import (
 	_ "expvar"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -60,7 +61,7 @@ func main() {
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:  "config,c",
-			Usage: "path to the configuration file",
+			Usage: "path to the configuration file (Use 'default' to output the default toml)",
 			Value: "/etc/containerd/config.toml",
 		},
 		cli.StringFlag{
@@ -148,6 +149,19 @@ func main() {
 }
 
 func before(context *cli.Context) error {
+	if context.GlobalString("config") == "default" {
+		fh, err := ioutil.TempFile("", "containerd-config.toml.")
+		if err != nil {
+			return err
+		}
+		if _, err := conf.WriteTo(fh); err != nil {
+			fh.Close()
+			return err
+		}
+		fh.Close()
+		log.G(global).Infof("containerd default config written to %q", fh.Name())
+		os.Exit(0)
+	}
 	if err := loadConfig(context.GlobalString("config")); err != nil &&
 		!os.IsNotExist(err) {
 		return err
