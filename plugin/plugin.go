@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/snapshot"
@@ -32,7 +33,8 @@ type InitContext struct {
 	Root        string
 	State       string
 	Runtimes    map[string]containerd.Runtime
-	Store       *content.Store
+	Content     *content.Store
+	Meta        *bolt.DB
 	Snapshotter snapshot.Snapshotter
 	Config      interface{}
 	Context     context.Context

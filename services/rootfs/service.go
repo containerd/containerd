@@ -22,7 +22,7 @@ func init() {
 	plugin.Register("rootfs-grpc", &plugin.Registration{
 		Type: plugin.GRPCPlugin,
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			return NewService(ic.Store, ic.Snapshotter)
+			return NewService(ic.Content, ic.Snapshotter)
 		},
 	})
 }

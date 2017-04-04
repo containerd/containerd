@@ -6,11 +6,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/boltdb/bolt"
+	imagesapi "github.com/containerd/containerd/api/services/images"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
+	imagesservice "github.com/containerd/containerd/services/images"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 )
@@ -27,6 +28,14 @@ func resolveContentStore(context *cli.Context) (*content.Store, error) {
 	return content.NewStore(root)
 }
 
+func resolveImageStore(clicontext *cli.Context) (images.Store, error) {
+	conn, err := connectGRPC(clicontext)
+	if err != nil {
+		return nil, err
+	}
+	return imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)), nil
+}
+
 func connectGRPC(context *cli.Context) (*grpc.ClientConn, error) {
 	socket := context.GlobalString("socket")
 	timeout := context.GlobalDuration("connect-timeout")
@@ -38,27 +47,6 @@ func connectGRPC(context *cli.Context) (*grpc.ClientConn, error) {
 			return net.DialTimeout("unix", socket, timeout)
 		}),
 	)
-}
-
-func getDB(ctx *cli.Context, readonly bool) (*bolt.DB, error) {
-	// TODO(stevvooe): For now, we operate directly on the database. We will
-	// replace this with a GRPC service when the details are more concrete.
-	path := filepath.Join(ctx.GlobalString("root"), "meta.db")
-
-	db, err := bolt.Open(path, 0644, &bolt.Options{
-		ReadOnly: readonly,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if !readonly {
-		if err := images.InitDB(db); err != nil {
-			return nil, err
-		}
-	}
-
-	return db, nil
 }
 
 // getResolver prepares the resolver from the environment and options.

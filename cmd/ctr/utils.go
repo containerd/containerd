@@ -14,14 +14,15 @@ import (
 
 	gocontext "context"
 
-	"github.com/boltdb/bolt"
 	contentapi "github.com/containerd/containerd/api/services/content"
 	"github.com/containerd/containerd/api/services/execution"
+	imagesapi "github.com/containerd/containerd/api/services/images"
 	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
 	"github.com/containerd/containerd/api/types/container"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	contentservice "github.com/containerd/containerd/services/content"
+	imagesservice "github.com/containerd/containerd/services/images"
 	"github.com/pkg/errors"
 	"github.com/tonistiigi/fifo"
 	"github.com/urfave/cli"
@@ -134,25 +135,12 @@ func getRootFSService(context *cli.Context) (rootfsapi.RootFSClient, error) {
 	return rootfsapi.NewRootFSClient(conn), nil
 }
 
-func getDB(ctx *cli.Context, readonly bool) (*bolt.DB, error) {
-	// TODO(stevvooe): For now, we operate directly on the database. We will
-	// replace this with a GRPC service when the details are more concrete.
-	path := filepath.Join(ctx.GlobalString("root"), "meta.db")
-
-	db, err := bolt.Open(path, 0644, &bolt.Options{
-		ReadOnly: readonly,
-	})
+func getImageStore(clicontext *cli.Context) (images.Store, error) {
+	conn, err := getGRPCConnection(clicontext)
 	if err != nil {
 		return nil, err
 	}
-
-	if !readonly {
-		if err := images.InitDB(db); err != nil {
-			return nil, err
-		}
-	}
-
-	return db, nil
+	return imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)), nil
 }
 
 func getTempDir(id string) (string, error) {
