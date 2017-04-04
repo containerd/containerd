@@ -38,7 +38,7 @@ func init() {
 
 func NewService(ic *plugin.InitContext) (interface{}, error) {
 	return &Service{
-		store: ic.Store,
+		store: ic.Content,
 	}, nil
 }
 

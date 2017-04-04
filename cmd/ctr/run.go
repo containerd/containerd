@@ -277,27 +277,18 @@ var runCommand = cli.Command{
 			return err
 		}
 
-		db, err := getDB(context, false)
+		imageStore, err := getImageStore(context)
 		if err != nil {
-			return errors.Wrap(err, "failed opening database")
+			return errors.Wrap(err, "failed resolving image store")
 		}
-		defer db.Close()
-
-		tx, err := db.Begin(false)
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback()
 
 		ref := context.Args().First()
 
-		image, err := images.Get(tx, ref)
+		image, err := imageStore.Get(ctx, ref)
 		if err != nil {
 			return errors.Wrapf(err, "could not resolve %q", ref)
 		}
 		// let's close out our db and tx so we don't hold the lock whilst running.
-		tx.Rollback()
-		db.Close()
 
 		diffIDs, err := image.RootFS(ctx, provider)
 		if err != nil {

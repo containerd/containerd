@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/boltdb/bolt"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	gocontext "golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -20,8 +21,10 @@ import (
 	"github.com/containerd/containerd"
 	contentapi "github.com/containerd/containerd/api/services/content"
 	api "github.com/containerd/containerd/api/services/execution"
+	imagesapi "github.com/containerd/containerd/api/services/images"
 	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/reaper"
@@ -116,11 +119,16 @@ func main() {
 		if err != nil {
 			return err
 		}
+		meta, err := resolveMetaDB(context)
+		if err != nil {
+			return err
+		}
+		defer meta.Close()
 		snapshotter, err := loadSnapshotter(store)
 		if err != nil {
 			return err
 		}
-		services, err := loadServices(runtimes, store, snapshotter)
+		services, err := loadServices(runtimes, store, snapshotter, meta)
 		if err != nil {
 			return err
 		}
@@ -266,6 +274,22 @@ func resolveContentStore() (*content.Store, error) {
 	return content.NewStore(cp)
 }
 
+func resolveMetaDB(ctx *cli.Context) (*bolt.DB, error) {
+	path := filepath.Join(conf.Root, "meta.db")
+
+	db, err := bolt.Open(path, 0644, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO(stevvooe): Break these down into components to be initialized.
+	if err := images.InitDB(db); err != nil {
+		return nil, err
+	}
+
+	return db, nil
+}
+
 func loadRuntimes(monitor plugin.ContainerMonitor) (map[string]containerd.Runtime, error) {
 	o := make(map[string]containerd.Runtime)
 	for name, rr := range plugin.Registrations() {
@@ -332,7 +356,7 @@ func loadSnapshotter(store *content.Store) (snapshot.Snapshotter, error) {
 		ic := &plugin.InitContext{
 			Root:    conf.Root,
 			State:   conf.State,
-			Store:   store,
+			Content: store,
 			Context: log.WithModule(global, moduleName),
 		}
 		if sr.Config != nil {
@@ -359,7 +383,7 @@ func newGRPCServer() *grpc.Server {
 	return s
 }
 
-func loadServices(runtimes map[string]containerd.Runtime, store *content.Store, sn snapshot.Snapshotter) ([]plugin.Service, error) {
+func loadServices(runtimes map[string]containerd.Runtime, store *content.Store, sn snapshot.Snapshotter, meta *bolt.DB) ([]plugin.Service, error) {
 	var o []plugin.Service
 	for name, sr := range plugin.Registrations() {
 		if sr.Type != plugin.GRPCPlugin {
@@ -371,7 +395,8 @@ func loadServices(runtimes map[string]containerd.Runtime, store *content.Store, 
 			State:       conf.State,
 			Context:     log.WithModule(global, fmt.Sprintf("service-%s", name)),
 			Runtimes:    runtimes,
-			Store:       store,
+			Content:     store,
+			Meta:        meta,
 			Snapshotter: sn,
 		}
 		if sr.Config != nil {
@@ -423,6 +448,8 @@ func interceptor(ctx gocontext.Context,
 		ctx = log.WithModule(ctx, "content")
 	case rootfsapi.RootFSServer:
 		ctx = log.WithModule(ctx, "rootfs")
+	case imagesapi.ImagesServer:
+		ctx = log.WithModule(ctx, "images")
 	default:
 		fmt.Printf("unknown GRPC server type: %#v\n", info.Server)
 	}

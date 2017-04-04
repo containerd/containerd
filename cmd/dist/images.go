@@ -6,7 +6,6 @@ import (
 	"text/tabwriter"
 
 	contentapi "github.com/containerd/containerd/api/services/content"
-	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/progress"
 	contentservice "github.com/containerd/containerd/services/content"
@@ -25,23 +24,19 @@ var imagesCommand = cli.Command{
 			ctx = background
 		)
 
-		db, err := getDB(clicontext, true)
+		imageStore, err := resolveImageStore(clicontext)
 		if err != nil {
-			return errors.Wrap(err, "failed to open database")
+			return err
 		}
-		tx, err := db.Begin(false)
-		if err != nil {
-			return errors.Wrap(err, "could not start transaction")
-		}
-		defer tx.Rollback()
 
 		conn, err := connectGRPC(clicontext)
 		if err != nil {
 			return err
 		}
+
 		provider := contentservice.NewProviderFromClient(contentapi.NewContentClient(conn))
 
-		images, err := images.List(tx)
+		images, err := imageStore.List(ctx)
 		if err != nil {
 			return errors.Wrap(err, "failed to list images")
 		}
@@ -54,7 +49,7 @@ var imagesCommand = cli.Command{
 				log.G(ctx).WithError(err).Errorf("failed calculating size for image %s", image.Name)
 			}
 
-			fmt.Fprintf(tw, "%v\t%v\t%v\t%v\t\n", image.Name, image.Descriptor.MediaType, image.Descriptor.Digest, progress.Bytes(size))
+			fmt.Fprintf(tw, "%v\t%v\t%v\t%v\t\n", image.Name, image.Target.MediaType, image.Target.Digest, progress.Bytes(size))
 		}
 		tw.Flush()
 
@@ -74,19 +69,13 @@ var rmiCommand = cli.Command{
 			exitErr error
 		)
 
-		db, err := getDB(clicontext, false)
+		imageStore, err := resolveImageStore(clicontext)
 		if err != nil {
-			return errors.Wrap(err, "failed to open database")
+			return err
 		}
-
-		tx, err := db.Begin(true)
-		if err != nil {
-			return errors.Wrap(err, "could not start transaction")
-		}
-		defer tx.Rollback()
 
 		for _, target := range clicontext.Args() {
-			if err := images.Delete(tx, target); err != nil {
+			if err := imageStore.Delete(ctx, target); err != nil {
 				if exitErr == nil {
 					exitErr = errors.Wrapf(err, "unable to delete %v", target)
 				}

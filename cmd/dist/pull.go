@@ -47,17 +47,10 @@ command. As part of this process, we do the following:
 			return err
 		}
 
-		db, err := getDB(clicontext, false)
+		imageStore, err := resolveImageStore(clicontext)
 		if err != nil {
 			return err
 		}
-		defer db.Close()
-
-		tx, err := db.Begin(true)
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback()
 
 		resolver, err := getResolver(ctx)
 		if err != nil {
@@ -65,6 +58,7 @@ command. As part of this process, we do the following:
 		}
 		ongoing := newJobs()
 
+		// TODO(stevvooe): Must unify this type.
 		ingester := contentservice.NewIngesterFromClient(contentapi.NewContentClient(conn))
 		provider := contentservice.NewProviderFromClient(contentapi.NewContentClient(conn))
 
@@ -88,13 +82,8 @@ command. As part of this process, we do the following:
 			close(resolved)
 
 			eg.Go(func() error {
-				return images.Register(tx, name, desc)
+				return imageStore.Put(ctx, name, desc)
 			})
-			defer func() {
-				if err := tx.Commit(); err != nil {
-					log.G(ctx).WithError(err).Error("commit failed")
-				}
-			}()
 
 			return images.Dispatch(ctx,
 				images.Handlers(images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
@@ -114,24 +103,20 @@ command. As part of this process, we do the following:
 		}()
 
 		defer func() {
-			ctx := context.Background()
-			tx, err := db.Begin(false)
-			if err != nil {
-				log.G(ctx).Fatal(err)
-			}
+			ctx := background
 
 			// TODO(stevvooe): This section unpacks the layers and resolves the
 			// root filesystem chainid for the image. For now, we just print
 			// it, but we should keep track of this in the metadata storage.
 
-			image, err := images.Get(tx, resolvedImageName)
+			image, err := imageStore.Get(ctx, resolvedImageName)
 			if err != nil {
 				log.G(ctx).Fatal(err)
 			}
 
 			provider := contentservice.NewProviderFromClient(contentapi.NewContentClient(conn))
 
-			p, err := content.ReadBlob(ctx, provider, image.Descriptor.Digest)
+			p, err := content.ReadBlob(ctx, provider, image.Target.Digest)
 			if err != nil {
 				log.G(ctx).Fatal(err)
 			}

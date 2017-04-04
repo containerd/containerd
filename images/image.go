@@ -14,8 +14,8 @@ import (
 
 // Image provides the model for how containerd views container images.
 type Image struct {
-	Name       string
-	Descriptor ocispec.Descriptor
+	Name   string
+	Target ocispec.Descriptor
 }
 
 // TODO(stevvooe): Many of these functions make strong platform assumptions,
@@ -29,9 +29,9 @@ type Image struct {
 func (image *Image) Config(ctx context.Context, provider content.Provider) (ocispec.Descriptor, error) {
 	var configDesc ocispec.Descriptor
 	return configDesc, Walk(ctx, HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		switch image.Descriptor.MediaType {
+		switch image.Target.MediaType {
 		case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
-			rc, err := provider.Reader(ctx, image.Descriptor.Digest)
+			rc, err := provider.Reader(ctx, image.Target.Digest)
 			if err != nil {
 				return nil, err
 			}
@@ -54,7 +54,7 @@ func (image *Image) Config(ctx context.Context, provider content.Provider) (ocis
 			return nil, errors.New("could not resolve config")
 		}
 
-	}), image.Descriptor)
+	}), image.Target)
 }
 
 // RootFS returns the unpacked diffids that make up and images rootfs.
@@ -91,10 +91,10 @@ func (image *Image) RootFS(ctx context.Context, provider content.Provider) ([]di
 func (image *Image) Size(ctx context.Context, provider content.Provider) (int64, error) {
 	var size int64
 	return size, Walk(ctx, HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		switch image.Descriptor.MediaType {
+		switch image.Target.MediaType {
 		case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
 			size += desc.Size
-			rc, err := provider.Reader(ctx, image.Descriptor.Digest)
+			rc, err := provider.Reader(ctx, image.Target.Digest)
 			if err != nil {
 				return nil, err
 			}
@@ -121,5 +121,5 @@ func (image *Image) Size(ctx context.Context, provider content.Provider) (int64,
 			return nil, errors.New("unsupported type")
 		}
 
-	}), image.Descriptor)
+	}), image.Target)
 }
