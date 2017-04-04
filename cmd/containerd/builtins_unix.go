@@ -1,3 +1,5 @@
+// +build !windows
+
 package main
 
 // register containerd builtins here

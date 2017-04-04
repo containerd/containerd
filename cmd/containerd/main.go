@@ -7,9 +7,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"os/signal"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -27,7 +25,6 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/sys"
 	metrics "github.com/docker/go-metrics"
@@ -90,13 +87,11 @@ func main() {
 		// start the signal handler as soon as we can to make sure that
 		// we don't miss any signals during boot
 		signals := make(chan os.Signal, 2048)
-		signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1, syscall.SIGCHLD)
-		if conf.Subreaper {
-			log.G(global).Info("setting subreaper...")
-			if err := sys.SetSubreaper(1); err != nil {
-				return err
-			}
+		notifySignals(signals)
+		if err := configureReaper(); err != nil {
+			return err
 		}
+
 		log.G(global).Info("starting containerd boot...")
 
 		// load all plugins into containerd
@@ -454,20 +449,4 @@ func interceptor(ctx gocontext.Context,
 		fmt.Printf("unknown GRPC server type: %#v\n", info.Server)
 	}
 	return grpc_prometheus.UnaryServerInterceptor(ctx, req, info, handler)
-}
-
-func handleSignals(signals chan os.Signal, server *grpc.Server) error {
-	for s := range signals {
-		log.G(global).WithField("signal", s).Debug("received signal")
-		switch s {
-		case syscall.SIGCHLD:
-			if err := reaper.Reap(); err != nil {
-				log.G(global).WithError(err).Error("reap containerd processes")
-			}
-		default:
-			server.Stop()
-			return nil
-		}
-	}
-	return nil
 }
