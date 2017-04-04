@@ -16,9 +16,13 @@ import (
 type ChangeKind int
 
 const (
+	// ChangeKindUnmodified represents an unmodified
+	// file
+	ChangeKindUnmodified = iota
+
 	// ChangeKindAdd represents an addition of
 	// a file
-	ChangeKindAdd = iota
+	ChangeKindAdd
 
 	// ChangeKindModify represents a change to
 	// an existing file
@@ -31,6 +35,8 @@ const (
 
 func (k ChangeKind) String() string {
 	switch k {
+	case ChangeKindUnmodified:
+		return "unmodified"
 	case ChangeKindAdd:
 		return "add"
 	case ChangeKindModify:
@@ -287,7 +293,10 @@ func doubleWalkDiff(ctx context.Context, changeFn ChangeFunc, a, b string) (err 
 				f1 = nil
 				f2 = nil
 				if same {
-					continue
+					if !isLinked(f) {
+						continue
+					}
+					k = ChangeKindUnmodified
 				}
 			}
 			if err := changeFn(k, p, f, nil); err != nil {

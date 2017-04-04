@@ -90,3 +90,11 @@ func compareCapabilities(p1, p2 string) (bool, error) {
 	}
 	return bytes.Equal(c1, c2), nil
 }
+
+func isLinked(f os.FileInfo) bool {
+	s, ok := f.Sys().(*syscall.Stat_t)
+	if !ok {
+		return false
+	}
+	return !f.IsDir() && s.Nlink > 1
+}
