@@ -12,7 +12,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/snapshot/storage"
-	"github.com/containerd/containerd/snapshot/storage/boltdb"
 	"github.com/pkg/errors"
 	"github.com/stevvooe/go-btrfs"
 )
@@ -32,24 +31,21 @@ func init() {
 				// TODO: check device for root
 				return nil, errors.Errorf("btrfs requires \"device\" configuration")
 			}
-
-			ms, err := boltdb.NewMetaStore(ic.Context, filepath.Join(root, "metadata.db"))
-			if err != nil {
-				return nil, err
-			}
-
-			return NewSnapshotter(conf.Device, root, ms)
+			return NewSnapshotter(conf.Device, root)
 		},
 	})
 }
 
-type Snapshotter struct {
+type snapshotter struct {
 	device string // maybe we can resolve it with path?
 	root   string // root provides paths for internal storage.
-	ms     storage.MetaStore
+	ms     *storage.MetaStore
 }
 
-func NewSnapshotter(device, root string, ms storage.MetaStore) (snapshot.Snapshotter, error) {
+// NewSnapshotter returns a Snapshotter using btrfs. Uses the provided
+// device and root directory for snapshots and stores the metadata in
+// a file in the provided root.
+func NewSnapshotter(device, root string) (snapshot.Snapshotter, error) {
 	var (
 		active    = filepath.Join(root, "active")
 		snapshots = filepath.Join(root, "snapshots")
@@ -63,8 +59,12 @@ func NewSnapshotter(device, root string, ms storage.MetaStore) (snapshot.Snapsho
 			return nil, err
 		}
 	}
+	ms, err := storage.NewMetaStore(filepath.Join(root, "metadata.db"))
+	if err != nil {
+		return nil, err
+	}
 
-	return &Snapshotter{
+	return &snapshotter{
 		device: device,
 		root:   root,
 		ms:     ms,
@@ -76,34 +76,34 @@ func NewSnapshotter(device, root string, ms storage.MetaStore) (snapshot.Snapsho
 //
 // Should be used for parent resolution, existence checks and to discern
 // the kind of snapshot.
-func (b *Snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, error) {
+func (b *snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, error) {
 	ctx, t, err := b.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return snapshot.Info{}, err
 	}
 	defer t.Rollback()
-	return b.ms.Stat(ctx, key)
+	return storage.GetInfo(ctx, key)
 }
 
 // Walk the committed snapshots.
-func (b *Snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshot.Info) error) error {
+func (b *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshot.Info) error) error {
 	ctx, t, err := b.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return err
 	}
 	defer t.Rollback()
-	return b.ms.Walk(ctx, fn)
+	return storage.WalkInfo(ctx, fn)
 }
 
-func (b *Snapshotter) Prepare(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
+func (b *snapshotter) Prepare(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
 	return b.makeActive(ctx, key, parent, false)
 }
 
-func (b *Snapshotter) View(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
+func (b *snapshotter) View(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
 	return b.makeActive(ctx, key, parent, true)
 }
 
-func (b *Snapshotter) makeActive(ctx context.Context, key, parent string, readonly bool) ([]containerd.Mount, error) {
+func (b *snapshotter) makeActive(ctx context.Context, key, parent string, readonly bool) ([]containerd.Mount, error) {
 	ctx, t, err := b.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return nil, err
@@ -116,7 +116,7 @@ func (b *Snapshotter) makeActive(ctx context.Context, key, parent string, readon
 		}
 	}()
 
-	a, err := b.ms.CreateActive(ctx, key, parent, readonly)
+	a, err := storage.CreateActive(ctx, key, parent, readonly)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func (b *Snapshotter) makeActive(ctx context.Context, key, parent string, readon
 	return b.mounts(target)
 }
 
-func (b *Snapshotter) mounts(dir string) ([]containerd.Mount, error) {
+func (b *snapshotter) mounts(dir string) ([]containerd.Mount, error) {
 	var options []string
 
 	// get the subvolume id back out for the mount
@@ -174,7 +174,7 @@ func (b *Snapshotter) mounts(dir string) ([]containerd.Mount, error) {
 	}, nil
 }
 
-func (b *Snapshotter) Commit(ctx context.Context, name, key string) (err error) {
+func (b *snapshotter) Commit(ctx context.Context, name, key string) (err error) {
 	ctx, t, err := b.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return err
@@ -187,7 +187,7 @@ func (b *Snapshotter) Commit(ctx context.Context, name, key string) (err error) 
 		}
 	}()
 
-	id, err := b.ms.Commit(ctx, key, name)
+	id, err := storage.CommitActive(ctx, key, name)
 	if err != nil {
 		return errors.Wrap(err, "failed to commit")
 	}
@@ -220,12 +220,12 @@ func (b *Snapshotter) Commit(ctx context.Context, name, key string) (err error) 
 // called on an read-write or readonly transaction.
 //
 // This can be used to recover mounts after calling View or Prepare.
-func (b *Snapshotter) Mounts(ctx context.Context, key string) ([]containerd.Mount, error) {
+func (b *snapshotter) Mounts(ctx context.Context, key string) ([]containerd.Mount, error) {
 	ctx, t, err := b.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return nil, err
 	}
-	a, err := b.ms.GetActive(ctx, key)
+	a, err := storage.GetActive(ctx, key)
 	t.Rollback()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get active snapshot")
@@ -236,7 +236,7 @@ func (b *Snapshotter) Mounts(ctx context.Context, key string) ([]containerd.Moun
 
 // Remove abandons the transaction identified by key. All resources
 // associated with the key will be removed.
-func (b *Snapshotter) Remove(ctx context.Context, key string) (err error) {
+func (b *snapshotter) Remove(ctx context.Context, key string) (err error) {
 	var (
 		source, removed string
 		readonly        bool
@@ -260,7 +260,7 @@ func (b *Snapshotter) Remove(ctx context.Context, key string) (err error) {
 		}
 	}()
 
-	id, k, err := b.ms.Remove(ctx, key)
+	id, k, err := storage.Remove(ctx, key)
 	if err != nil {
 		return errors.Wrap(err, "failed to remove snapshot")
 	}

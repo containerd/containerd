@@ -1,4 +1,4 @@
-package testsuite
+package storage
 
 import (
 	"context"
@@ -7,22 +7,21 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/snapshot"
-	"github.com/containerd/containerd/snapshot/storage"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 
-type testFunc func(context.Context, *testing.T, storage.MetaStore)
+type testFunc func(context.Context, *testing.T, *MetaStore)
 
-type metaFactory func(context.Context, string) (storage.MetaStore, error)
+type metaFactory func(string) (*MetaStore, error)
 
-type populateFunc func(context.Context, storage.MetaStore) error
+type populateFunc func(context.Context, *MetaStore) error
 
 // MetaStoreSuite runs a test suite on the metastore given a factory function.
-func MetaStoreSuite(t *testing.T, name string, meta func(ctx context.Context, root string) (storage.MetaStore, error)) {
-	t.Run("Stat", makeTest(t, name, meta, inReadTransaction(testStat, basePopulate)))
-	t.Run("StatNotExist", makeTest(t, name, meta, inReadTransaction(testStatNotExist, basePopulate)))
-	t.Run("StatEmptyDB", makeTest(t, name, meta, inReadTransaction(testStatNotExist, nil)))
+func MetaStoreSuite(t *testing.T, name string, meta func(root string) (*MetaStore, error)) {
+	t.Run("GetInfo", makeTest(t, name, meta, inReadTransaction(testGetInfo, basePopulate)))
+	t.Run("GetInfoNotExist", makeTest(t, name, meta, inReadTransaction(testGetInfoNotExist, basePopulate)))
+	t.Run("GetInfoEmptyDB", makeTest(t, name, meta, inReadTransaction(testGetInfoNotExist, nil)))
 	t.Run("Walk", makeTest(t, name, meta, inReadTransaction(testWalk, basePopulate)))
 	t.Run("GetActive", makeTest(t, name, meta, testGetActive))
 	t.Run("GetActiveNotExist", makeTest(t, name, meta, inReadTransaction(testGetActiveNotExist, basePopulate)))
@@ -52,7 +51,7 @@ func makeTest(t *testing.T, name string, metaFn metaFactory, fn testFunc) func(t
 		}
 		defer os.RemoveAll(tmpDir)
 
-		ms, err := metaFn(ctx, tmpDir)
+		ms, err := metaFn(tmpDir)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -62,7 +61,7 @@ func makeTest(t *testing.T, name string, metaFn metaFactory, fn testFunc) func(t
 }
 
 func inReadTransaction(fn testFunc, pf populateFunc) testFunc {
-	return func(ctx context.Context, t *testing.T, ms storage.MetaStore) {
+	return func(ctx context.Context, t *testing.T, ms *MetaStore) {
 		if pf != nil {
 			ctx, tx, err := ms.TransactionContext(ctx, true)
 			if err != nil {
@@ -97,7 +96,7 @@ func inReadTransaction(fn testFunc, pf populateFunc) testFunc {
 }
 
 func inWriteTransaction(fn testFunc) testFunc {
-	return func(ctx context.Context, t *testing.T, ms storage.MetaStore) {
+	return func(ctx context.Context, t *testing.T, ms *MetaStore) {
 		ctx, tx, err := ms.TransactionContext(ctx, true)
 		if err != nil {
 			t.Fatal("Failed to start transaction: %+v", err)
@@ -125,32 +124,32 @@ func inWriteTransaction(fn testFunc) testFunc {
 // - "active-3": active with parent "committed-2"
 // - "active-4": readonly active without parent"
 // - "active-5": readonly active with parent "committed-2"
-func basePopulate(ctx context.Context, ms storage.MetaStore) error {
-	if _, err := ms.CreateActive(ctx, "committed-tmp-1", "", false); err != nil {
+func basePopulate(ctx context.Context, ms *MetaStore) error {
+	if _, err := CreateActive(ctx, "committed-tmp-1", "", false); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
-	if _, err := ms.Commit(ctx, "committed-tmp-1", "committed-1"); err != nil {
+	if _, err := CommitActive(ctx, "committed-tmp-1", "committed-1"); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
-	if _, err := ms.CreateActive(ctx, "committed-tmp-2", "committed-1", false); err != nil {
+	if _, err := CreateActive(ctx, "committed-tmp-2", "committed-1", false); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
-	if _, err := ms.Commit(ctx, "committed-tmp-2", "committed-2"); err != nil {
+	if _, err := CommitActive(ctx, "committed-tmp-2", "committed-2"); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
-	if _, err := ms.CreateActive(ctx, "active-1", "", false); err != nil {
+	if _, err := CreateActive(ctx, "active-1", "", false); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
-	if _, err := ms.CreateActive(ctx, "active-2", "committed-1", false); err != nil {
+	if _, err := CreateActive(ctx, "active-2", "committed-1", false); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
-	if _, err := ms.CreateActive(ctx, "active-3", "committed-2", false); err != nil {
+	if _, err := CreateActive(ctx, "active-3", "committed-2", false); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
-	if _, err := ms.CreateActive(ctx, "active-4", "", true); err != nil {
+	if _, err := CreateActive(ctx, "active-4", "", true); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
-	if _, err := ms.CreateActive(ctx, "active-5", "committed-2", true); err != nil {
+	if _, err := CreateActive(ctx, "active-5", "committed-2", true); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
 	return nil
@@ -237,24 +236,24 @@ func assertExist(t *testing.T, err error) {
 	}
 }
 
-func testStat(ctx context.Context, t *testing.T, ms storage.MetaStore) {
+func testGetInfo(ctx context.Context, t *testing.T, ms *MetaStore) {
 	for key, expected := range baseInfo {
-		info, err := ms.Stat(ctx, key)
+		info, err := GetInfo(ctx, key)
 		if err != nil {
-			t.Fatalf("Stat on %v failed: %+v", key, err)
+			t.Fatalf("GetInfo on %v failed: %+v", key, err)
 		}
 		assert.Equal(t, expected, info)
 	}
 }
 
-func testStatNotExist(ctx context.Context, t *testing.T, ms storage.MetaStore) {
-	_, err := ms.Stat(ctx, "active-not-exist")
+func testGetInfoNotExist(ctx context.Context, t *testing.T, ms *MetaStore) {
+	_, err := GetInfo(ctx, "active-not-exist")
 	assertNotExist(t, err)
 }
 
-func testWalk(ctx context.Context, t *testing.T, ms storage.MetaStore) {
+func testWalk(ctx context.Context, t *testing.T, ms *MetaStore) {
 	found := map[string]snapshot.Info{}
-	err := ms.Walk(ctx, func(ctx context.Context, info snapshot.Info) error {
+	err := WalkInfo(ctx, func(ctx context.Context, info snapshot.Info) error {
 		if _, ok := found[info.Name]; ok {
 			return errors.Errorf("entry already encountered")
 		}
@@ -267,13 +266,13 @@ func testWalk(ctx context.Context, t *testing.T, ms storage.MetaStore) {
 	assert.Equal(t, baseInfo, found)
 }
 
-func testGetActive(ctx context.Context, t *testing.T, ms storage.MetaStore) {
-	activeMap := map[string]storage.Active{}
-	populate := func(ctx context.Context, ms storage.MetaStore) error {
-		if _, err := ms.CreateActive(ctx, "committed-tmp-1", "", false); err != nil {
+func testGetActive(ctx context.Context, t *testing.T, ms *MetaStore) {
+	activeMap := map[string]Active{}
+	populate := func(ctx context.Context, ms *MetaStore) error {
+		if _, err := CreateActive(ctx, "committed-tmp-1", "", false); err != nil {
 			return errors.Wrap(err, "failed to create active")
 		}
-		if _, err := ms.Commit(ctx, "committed-tmp-1", "committed-1"); err != nil {
+		if _, err := CommitActive(ctx, "committed-tmp-1", "committed-1"); err != nil {
 			return errors.Wrap(err, "failed to create active")
 		}
 
@@ -299,7 +298,7 @@ func testGetActive(ctx context.Context, t *testing.T, ms storage.MetaStore) {
 				Readonly: true,
 			},
 		} {
-			active, err := ms.CreateActive(ctx, opts.Name, opts.Parent, opts.Readonly)
+			active, err := CreateActive(ctx, opts.Name, opts.Parent, opts.Readonly)
 			if err != nil {
 				return errors.Wrap(err, "failed to create active")
 			}
@@ -308,9 +307,9 @@ func testGetActive(ctx context.Context, t *testing.T, ms storage.MetaStore) {
 		return nil
 	}
 
-	test := func(ctx context.Context, t *testing.T, ms storage.MetaStore) {
+	test := func(ctx context.Context, t *testing.T, ms *MetaStore) {
 		for key, expected := range activeMap {
-			active, err := ms.GetActive(ctx, key)
+			active, err := GetActive(ctx, key)
 			if err != nil {
 				t.Fatal("Failed to get active: %+v", err)
 			}
@@ -321,18 +320,18 @@ func testGetActive(ctx context.Context, t *testing.T, ms storage.MetaStore) {
 	inReadTransaction(test, populate)(ctx, t, ms)
 }
 
-func testGetActiveCommitted(ctx context.Context, t *testing.T, ms storage.MetaStore) {
-	_, err := ms.GetActive(ctx, "committed-1")
+func testGetActiveCommitted(ctx context.Context, t *testing.T, ms *MetaStore) {
+	_, err := GetActive(ctx, "committed-1")
 	assertNotActive(t, err)
 }
 
-func testGetActiveNotExist(ctx context.Context, t *testing.T, ms storage.MetaStore) {
-	_, err := ms.GetActive(ctx, "active-not-exist")
+func testGetActiveNotExist(ctx context.Context, t *testing.T, ms *MetaStore) {
+	_, err := GetActive(ctx, "active-not-exist")
 	assertNotExist(t, err)
 }
 
-func testCreateActive(ctx context.Context, t *testing.T, ms storage.MetaStore) {
-	a1, err := ms.CreateActive(ctx, "active-1", "", false)
+func testCreateActive(ctx context.Context, t *testing.T, ms *MetaStore) {
+	a1, err := CreateActive(ctx, "active-1", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -340,7 +339,7 @@ func testCreateActive(ctx context.Context, t *testing.T, ms storage.MetaStore) {
 		t.Fatal("Expected writable active")
 	}
 
-	a2, err := ms.CreateActive(ctx, "active-2", "", true)
+	a2, err := CreateActive(ctx, "active-2", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -351,7 +350,7 @@ func testCreateActive(ctx context.Context, t *testing.T, ms storage.MetaStore) {
 		t.Fatal("Expected readonly active")
 	}
 
-	commitID, err := ms.Commit(ctx, "active-1", "committed-1")
+	commitID, err := CommitActive(ctx, "active-1", "committed-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -359,7 +358,7 @@ func testCreateActive(ctx context.Context, t *testing.T, ms storage.MetaStore) {
 		t.Fatal("Snapshot identifier must not change on commit")
 	}
 
-	a3, err := ms.CreateActive(ctx, "active-3", "committed-1", false)
+	a3, err := CreateActive(ctx, "active-3", "committed-1", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -376,7 +375,7 @@ func testCreateActive(ctx context.Context, t *testing.T, ms storage.MetaStore) {
 		t.Fatal("Expected writable active")
 	}
 
-	a4, err := ms.CreateActive(ctx, "active-4", "committed-1", true)
+	a4, err := CreateActive(ctx, "active-4", "committed-1", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -394,31 +393,31 @@ func testCreateActive(ctx context.Context, t *testing.T, ms storage.MetaStore) {
 	}
 }
 
-func testCreateActiveExist(ctx context.Context, t *testing.T, ms storage.MetaStore) {
+func testCreateActiveExist(ctx context.Context, t *testing.T, ms *MetaStore) {
 	if err := basePopulate(ctx, ms); err != nil {
 		t.Fatalf("Populate failed: %+v", err)
 	}
-	_, err := ms.CreateActive(ctx, "active-1", "", false)
+	_, err := CreateActive(ctx, "active-1", "", false)
 	assertExist(t, err)
-	_, err = ms.CreateActive(ctx, "committed-1", "", false)
+	_, err = CreateActive(ctx, "committed-1", "", false)
 	assertExist(t, err)
 }
 
-func testCreateActiveNotExist(ctx context.Context, t *testing.T, ms storage.MetaStore) {
-	_, err := ms.CreateActive(ctx, "active-1", "does-not-exist", false)
+func testCreateActiveNotExist(ctx context.Context, t *testing.T, ms *MetaStore) {
+	_, err := CreateActive(ctx, "active-1", "does-not-exist", false)
 	assertNotExist(t, err)
 }
 
-func testCreateActiveFromActive(ctx context.Context, t *testing.T, ms storage.MetaStore) {
+func testCreateActiveFromActive(ctx context.Context, t *testing.T, ms *MetaStore) {
 	if err := basePopulate(ctx, ms); err != nil {
 		t.Fatalf("Populate failed: %+v", err)
 	}
-	_, err := ms.CreateActive(ctx, "active-new", "active-1", false)
+	_, err := CreateActive(ctx, "active-new", "active-1", false)
 	assertNotCommitted(t, err)
 }
 
-func testCommit(ctx context.Context, t *testing.T, ms storage.MetaStore) {
-	a1, err := ms.CreateActive(ctx, "active-1", "", false)
+func testCommit(ctx context.Context, t *testing.T, ms *MetaStore) {
+	a1, err := CreateActive(ctx, "active-1", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -426,7 +425,7 @@ func testCommit(ctx context.Context, t *testing.T, ms storage.MetaStore) {
 		t.Fatal("Expected writable active")
 	}
 
-	commitID, err := ms.Commit(ctx, "active-1", "committed-1")
+	commitID, err := CommitActive(ctx, "active-1", "committed-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -434,50 +433,50 @@ func testCommit(ctx context.Context, t *testing.T, ms storage.MetaStore) {
 		t.Fatal("Snapshot identifier must not change on commit")
 	}
 
-	_, err = ms.GetActive(ctx, "active-1")
+	_, err = GetActive(ctx, "active-1")
 	assertNotExist(t, err)
-	_, err = ms.GetActive(ctx, "committed-1")
+	_, err = GetActive(ctx, "committed-1")
 	assertNotActive(t, err)
 }
 
-func testCommitNotExist(ctx context.Context, t *testing.T, ms storage.MetaStore) {
-	_, err := ms.Commit(ctx, "active-not-exist", "committed-1")
+func testCommitNotExist(ctx context.Context, t *testing.T, ms *MetaStore) {
+	_, err := CommitActive(ctx, "active-not-exist", "committed-1")
 	assertNotExist(t, err)
 }
 
-func testCommitExist(ctx context.Context, t *testing.T, ms storage.MetaStore) {
+func testCommitExist(ctx context.Context, t *testing.T, ms *MetaStore) {
 	if err := basePopulate(ctx, ms); err != nil {
 		t.Fatalf("Populate failed: %+v", err)
 	}
-	_, err := ms.Commit(ctx, "active-1", "committed-1")
+	_, err := CommitActive(ctx, "active-1", "committed-1")
 	assertExist(t, err)
 }
 
-func testCommitCommitted(ctx context.Context, t *testing.T, ms storage.MetaStore) {
+func testCommitCommitted(ctx context.Context, t *testing.T, ms *MetaStore) {
 	if err := basePopulate(ctx, ms); err != nil {
 		t.Fatalf("Populate failed: %+v", err)
 	}
-	_, err := ms.Commit(ctx, "committed-1", "committed-3")
+	_, err := CommitActive(ctx, "committed-1", "committed-3")
 	assertNotActive(t, err)
 }
 
-func testCommitReadonly(ctx context.Context, t *testing.T, ms storage.MetaStore) {
+func testCommitReadonly(ctx context.Context, t *testing.T, ms *MetaStore) {
 	if err := basePopulate(ctx, ms); err != nil {
 		t.Fatalf("Populate failed: %+v", err)
 	}
-	_, err := ms.Commit(ctx, "active-5", "committed-3")
+	_, err := CommitActive(ctx, "active-5", "committed-3")
 	if err == nil {
 		t.Fatal("Expected error committing readonly active")
 	}
 }
 
-func testRemove(ctx context.Context, t *testing.T, ms storage.MetaStore) {
-	a1, err := ms.CreateActive(ctx, "active-1", "", false)
+func testRemove(ctx context.Context, t *testing.T, ms *MetaStore) {
+	a1, err := CreateActive(ctx, "active-1", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	commitID, err := ms.Commit(ctx, "active-1", "committed-1")
+	commitID, err := CommitActive(ctx, "active-1", "committed-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -485,20 +484,20 @@ func testRemove(ctx context.Context, t *testing.T, ms storage.MetaStore) {
 		t.Fatal("Snapshot identifier must not change on commit")
 	}
 
-	a2, err := ms.CreateActive(ctx, "active-2", "committed-1", true)
+	a2, err := CreateActive(ctx, "active-2", "committed-1", true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	a3, err := ms.CreateActive(ctx, "active-3", "committed-1", true)
+	a3, err := CreateActive(ctx, "active-3", "committed-1", true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, _, err = ms.Remove(ctx, "active-1")
+	_, _, err = Remove(ctx, "active-1")
 	assertNotExist(t, err)
 
-	r3, k3, err := ms.Remove(ctx, "active-3")
+	r3, k3, err := Remove(ctx, "active-3")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -509,7 +508,7 @@ func testRemove(ctx context.Context, t *testing.T, ms storage.MetaStore) {
 		t.Fatal("Expected active kind, got %v", k3)
 	}
 
-	r2, k2, err := ms.Remove(ctx, "active-2")
+	r2, k2, err := Remove(ctx, "active-2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -520,7 +519,7 @@ func testRemove(ctx context.Context, t *testing.T, ms storage.MetaStore) {
 		t.Fatal("Expected active kind, got %v", k2)
 	}
 
-	r1, k1, err := ms.Remove(ctx, "committed-1")
+	r1, k1, err := Remove(ctx, "committed-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -532,21 +531,21 @@ func testRemove(ctx context.Context, t *testing.T, ms storage.MetaStore) {
 	}
 }
 
-func testRemoveWithChildren(ctx context.Context, t *testing.T, ms storage.MetaStore) {
+func testRemoveWithChildren(ctx context.Context, t *testing.T, ms *MetaStore) {
 	if err := basePopulate(ctx, ms); err != nil {
 		t.Fatalf("Populate failed: %+v", err)
 	}
-	_, _, err := ms.Remove(ctx, "committed-1")
+	_, _, err := Remove(ctx, "committed-1")
 	if err == nil {
 		t.Fatalf("Expected removal of snapshot with children to error")
 	}
-	_, _, err = ms.Remove(ctx, "committed-1")
+	_, _, err = Remove(ctx, "committed-1")
 	if err == nil {
 		t.Fatalf("Expected removal of snapshot with children to error")
 	}
 }
 
-func testRemoveNotExist(ctx context.Context, t *testing.T, ms storage.MetaStore) {
-	_, _, err := ms.Remove(ctx, "does-not-exist")
+func testRemoveNotExist(ctx context.Context, t *testing.T, ms *MetaStore) {
+	_, _, err := Remove(ctx, "does-not-exist")
 	assertNotExist(t, err)
 }
