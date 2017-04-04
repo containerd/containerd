@@ -1,3 +1,8 @@
+// Package storage provides a metadata storage implementation for snapshot
+// drivers. Drive implementations are responsible for starting and managing
+// transactions using the defined context creator. This storage package uses
+// BoltDB for storing metadata. Access to the raw boltdb transaction is not
+// provided, but the stored object is provided by the proto subpackage.
 package storage
 
 import (
@@ -9,10 +14,15 @@ import (
 
 // Transactor is used to finalize an active transaction.
 type Transactor interface {
-	// Commit commits any changes made during the transaction.
+	// Commit commits any changes made during the transaction. On error a
+	// caller is expected to clean up any resources which would have relied
+	// on data mutated as part of this transaction. Only writable
+	// transactions can commit, non-writable must call Rollback.
 	Commit() error
 
-	// Rollback rolls back any changes made during the transaction.
+	// Rollback rolls back any changes made during the transaction. This
+	// must be called on all non-writable transactions and aborted writable
+	// transaction.
 	Rollback() error
 }
 
@@ -48,7 +58,8 @@ func NewMetaStore(dbfile string) (*MetaStore, error) {
 
 type transactionKey struct{}
 
-// TransactionContext creates a new transaction context.
+// TransactionContext creates a new transaction context. The writable value
+// should be set to true for transactions which are expected to mutate data.
 func (ms *MetaStore) TransactionContext(ctx context.Context, writable bool) (context.Context, Transactor, error) {
 	db, err := bolt.Open(ms.dbfile, 0600, nil)
 	if err != nil {

@@ -16,6 +16,10 @@ var (
 	bucketKeyStorageVersion = []byte("v1")
 	bucketKeySnapshot       = []byte("snapshots")
 	bucketKeyParents        = []byte("parents")
+
+	// ErrNoTransaction is returned when an operation is attempted with
+	// a context which is not inside of a transaction.
+	ErrNoTransaction = errors.New("no transaction in context")
 )
 
 type boltFileTransactor struct {
@@ -301,7 +305,7 @@ func CommitActive(ctx context.Context, key, name string) (id string, err error) 
 func withBucket(ctx context.Context, fn func(context.Context, *bolt.Bucket, *bolt.Bucket) error) error {
 	t, ok := ctx.Value(transactionKey{}).(*boltFileTransactor)
 	if !ok {
-		return errors.Errorf("no transaction in context")
+		return ErrNoTransaction
 	}
 	bkt := t.tx.Bucket(bucketKeyStorageVersion)
 	if bkt == nil {
@@ -313,7 +317,7 @@ func withBucket(ctx context.Context, fn func(context.Context, *bolt.Bucket, *bol
 func createBucketIfNotExists(ctx context.Context, fn func(context.Context, *bolt.Bucket, *bolt.Bucket) error) error {
 	t, ok := ctx.Value(transactionKey{}).(*boltFileTransactor)
 	if !ok {
-		return errors.Errorf("no transaction in context")
+		return ErrNoTransaction
 	}
 
 	bkt, err := t.tx.CreateBucketIfNotExists(bucketKeyStorageVersion)
