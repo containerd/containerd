@@ -1,6 +1,7 @@
 package containerd
 
 import (
+	"path/filepath"
 	"strings"
 	"syscall"
 )
@@ -13,20 +14,47 @@ type Mount struct {
 	// Source specifies where to mount from. Depending on the host system, this
 	// can be a source path or device.
 	Source string
+	// Target is a relative path to where a mount is expected to be
+	// mounted given a mount root. When applied to a mount root, the mount
+	// point becomes the concatenation of the provided mount root with
+	// this relative target path. An empty target means the mount point
+	// will be the mount root.
+	Target string
 	// Options contains zero or more fstab-style mount options. Typically,
 	// these are platform specific.
 	Options []string
 }
 
-func (m *Mount) Mount(target string) error {
+// Mount mounts to the provided root. The mount point will use the mount's
+// target as the relative path from the provided root.
+func (m *Mount) Mount(root string) error {
 	flags, data := parseMountOptions(m.Options)
-	return syscall.Mount(m.Source, target, m.Type, uintptr(flags), data)
+	return syscall.Mount(m.Source, filepath.Join(root, m.Target), m.Type, uintptr(flags), data)
 }
 
-// MountAll mounts all the provided mounts to the provided target
-func MountAll(mounts []Mount, target string) error {
+// Unmount unmounts at the provided root.
+func (m *Mount) Unmount(root string) error {
+	return syscall.Unmount(filepath.Join(root, m.Target), 0)
+}
+
+// MountAll mounts all the provided mounts to the provided root
+func MountAll(mounts []Mount, root string) error {
+	// TODO: ensure mounts are sorted from less specific
+	// to more specific
 	for _, m := range mounts {
-		if err := m.Mount(target); err != nil {
+		if err := m.Mount(root); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// UnmountAll unmounts all the provided mounts at the provided root
+func UnmountAll(mounts []Mount, root string) error {
+	// TODO: ensure mounts are sorted from more specific
+	// to less specific
+	for _, m := range mounts {
+		if err := m.Unmount(root); err != nil {
 			return err
 		}
 	}

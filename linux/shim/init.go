@@ -33,6 +33,7 @@ func newInitProcess(context context.Context, path string, r *shimapi.CreateReque
 		m := &containerd.Mount{
 			Type:    rm.Type,
 			Source:  rm.Source,
+			Target:  rm.Target,
 			Options: rm.Options,
 		}
 		if err := m.Mount(filepath.Join(path, "rootfs")); err != nil {

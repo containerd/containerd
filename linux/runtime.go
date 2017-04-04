@@ -99,6 +99,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts containerd.CreateO
 		sopts.Rootfs = append(sopts.Rootfs, &mount.Mount{
 			Type:    m.Type,
 			Source:  m.Source,
+			Target:  m.Target,
 			Options: m.Options,
 		})
 	}
