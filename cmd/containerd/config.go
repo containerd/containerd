@@ -1,6 +1,11 @@
 package main
 
-import "github.com/BurntSushi/toml"
+import (
+	"bytes"
+	"io"
+
+	"github.com/BurntSushi/toml"
+)
 
 func defaultConfig() *config {
 	return &config{
@@ -56,6 +61,15 @@ func (c *config) decodePlugin(name string, v interface{}) error {
 		return nil
 	}
 	return c.md.PrimitiveDecode(p, v)
+}
+
+func (c *config) WriteTo(w io.Writer) (int64, error) {
+	buf := bytes.NewBuffer(nil)
+	e := toml.NewEncoder(buf)
+	if err := e.Encode(c); err != nil {
+		return 0, err
+	}
+	return io.Copy(w, buf)
 }
 
 type grpcConfig struct {
