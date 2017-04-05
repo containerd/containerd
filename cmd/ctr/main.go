@@ -52,6 +52,7 @@ containerd client
 		deleteCommand,
 		listCommand,
 		infoCommand,
+		killCommand,
 		shimCommand,
 		pprofCommand,
 	}
