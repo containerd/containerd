@@ -364,11 +364,11 @@ var runCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		response, err := containers.Create(gocontext.Background(), create)
+		response, err := containers.Create(ctx, create)
 		if err != nil {
 			return err
 		}
-		if _, err := containers.Start(gocontext.Background(), &execution.StartRequest{
+		if _, err := containers.Start(ctx, &execution.StartRequest{
 			ID: response.ID,
 		}); err != nil {
 			return err
@@ -381,7 +381,7 @@ var runCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		if _, err := containers.Delete(gocontext.Background(), &execution.DeleteRequest{
+		if _, err := containers.Delete(ctx, &execution.DeleteRequest{
 			ID: response.ID,
 		}); err != nil {
 			return err
