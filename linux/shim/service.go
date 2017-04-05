@@ -6,7 +6,6 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/Sirupsen/logrus"
 	shimapi "github.com/containerd/containerd/api/services/shim"
 	"github.com/containerd/containerd/api/types/container"
 	"github.com/containerd/containerd/reaper"
@@ -54,19 +53,7 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateRequest) (*shimap
 		ExitCh: make(chan int, 1),
 	}
 	reaper.Default.Register(pid, cmd)
-	go func() {
-		status, err := reaper.Default.WaitPid(pid)
-		if err != nil {
-			logrus.WithError(err).Error("waitpid")
-		}
-		process.Exited(status)
-		s.events <- &container.Event{
-			Type:       container.Event_EXIT,
-			ID:         s.id,
-			Pid:        uint32(pid),
-			ExitStatus: uint32(status),
-		}
-	}()
+	go s.waitExit(process, pid, cmd)
 	s.events <- &container.Event{
 		Type: container.Event_CREATE,
 		ID:   r.ID,
@@ -111,12 +98,20 @@ func (s *Service) Exec(ctx context.Context, r *shimapi.ExecRequest) (*shimapi.Ex
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.execID++
+	reaper.Default.Lock()
 	process, err := newExecProcess(ctx, s.path, r, s.initProcess, s.execID)
 	if err != nil {
+		reaper.Default.Unlock()
 		return nil, err
 	}
 	pid := process.Pid()
 	s.processes[pid] = process
+	cmd := &reaper.Cmd{
+		ExitCh: make(chan int, 1),
+	}
+	reaper.Default.RegisterNL(pid, cmd)
+	reaper.Default.Unlock()
+	go s.waitExit(process, pid, cmd)
 	s.events <- &container.Event{
 		Type: container.Event_EXEC_ADDED,
 		ID:   s.id,
@@ -234,4 +229,15 @@ func (s *Service) Kill(ctx context.Context, r *shimapi.KillRequest) (*google_pro
 		return nil, err
 	}
 	return empty, nil
+}
+
+func (s *Service) waitExit(p process, pid int, cmd *reaper.Cmd) {
+	status := <-cmd.ExitCh
+	p.Exited(status)
+	s.events <- &container.Event{
+		Type:       container.Event_EXIT,
+		ID:         s.id,
+		Pid:        uint32(pid),
+		ExitStatus: uint32(status),
+	}
 }

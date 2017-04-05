@@ -97,6 +97,12 @@ func (m *Monitor) Register(pid int, c *Cmd) {
 	m.Unlock()
 }
 
+// RegisterNL does not grab the lock internally
+// the caller is responsible for locking the monitor
+func (m *Monitor) RegisterNL(pid int, c *Cmd) {
+	m.cmds[pid] = c
+}
+
 func (m *Monitor) WaitPid(pid int) (int, error) {
 	m.Lock()
 	rc, ok := m.cmds[pid]
