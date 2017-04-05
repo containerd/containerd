@@ -49,7 +49,7 @@ func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
 		return nil, err
 	}
 
-	if err := os.Mkdir(filepath.Join(root, "snapshots"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "snapshots"), 0700); err != nil {
 		return nil, err
 	}
 
