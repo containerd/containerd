@@ -158,6 +158,12 @@ func (p *initProcess) Resume(context context.Context) error {
 	return p.runc.Resume(context, p.id)
 }
 
+func (p *initProcess) Kill(context context.Context, signal uint32, all bool) error {
+	return p.runc.Kill(context, p.id, int(signal), &runc.KillOpts{
+		All: all,
+	})
+}
+
 func (p *initProcess) killAll(context context.Context) error {
 	return p.runc.Kill(context, p.id, int(syscall.SIGKILL), &runc.KillOpts{
 		All: true,

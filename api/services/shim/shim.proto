@@ -19,6 +19,7 @@ service Shim {
 	rpc Pause(PauseRequest) returns (google.protobuf.Empty);
 	rpc Resume(ResumeRequest) returns (google.protobuf.Empty);
 	rpc Exit(ExitRequest) returns (google.protobuf.Empty);
+	rpc Kill(KillRequest) returns (google.protobuf.Empty);
 }
 
 message CreateRequest {
@@ -94,4 +95,9 @@ message ResumeRequest {
 }
 
 message ExitRequest {
+}
+
+message KillRequest {
+	uint32 signal = 1;
+	bool all = 2;
 }

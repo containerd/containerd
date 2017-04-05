@@ -217,3 +217,10 @@ func (s *Service) Exit(ctx context.Context, r *shimapi.ExitRequest) (*google_pro
 	}
 	return empty, nil
 }
+
+func (s *Service) Kill(ctx context.Context, r *shimapi.KillRequest) (*google_protobuf.Empty, error) {
+	if err := s.initProcess.Kill(ctx, r.Signal, r.All); err != nil {
+		return nil, err
+	}
+	return empty, nil
+}

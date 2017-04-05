@@ -125,9 +125,14 @@ const _ = grpc.SupportPackageIsVersion4
 // Client API for Images service
 
 type ImagesClient interface {
+	// Get returns an image by name.
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
+	// Put assigns the name to a given target image based on the provided
+	// image.
 	Put(ctx context.Context, in *PutRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error)
+	// List returns a list of all images known to containerd.
 	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
+	// Delete deletes the image by name.
 	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error)
 }
 
@@ -178,9 +183,14 @@ func (c *imagesClient) Delete(ctx context.Context, in *DeleteRequest, opts ...gr
 // Server API for Images service
 
 type ImagesServer interface {
+	// Get returns an image by name.
 	Get(context.Context, *GetRequest) (*GetResponse, error)
+	// Put assigns the name to a given target image based on the provided
+	// image.
 	Put(context.Context, *PutRequest) (*google_protobuf1.Empty, error)
+	// List returns a list of all images known to containerd.
 	List(context.Context, *ListRequest) (*ListResponse, error)
+	// Delete deletes the image by name.
 	Delete(context.Context, *DeleteRequest) (*google_protobuf1.Empty, error)
 }
 
@@ -1325,7 +1335,7 @@ func init() {
 
 var fileDescriptorImages = []byte{
 	// 419 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x52, 0x4d, 0x6f, 0xd3, 0x40,
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x94, 0x52, 0x4d, 0x6f, 0xd3, 0x40,
 	0x10, 0xcd, 0x36, 0xa9, 0x25, 0xc6, 0xe4, 0xb2, 0xaa, 0x90, 0x71, 0x91, 0x6b, 0x99, 0x4b, 0xc5,
 	0x61, 0x0d, 0xe6, 0x02, 0x52, 0x29, 0x22, 0x2a, 0x54, 0x48, 0x1c, 0x2a, 0x1f, 0xb9, 0x39, 0xee,
 	0x60, 0x2c, 0xd5, 0x5e, 0xe3, 0x5d, 0x57, 0xca, 0x0d, 0xfe, 0x5d, 0x8e, 0x1c, 0x39, 0x21, 0xe2,
