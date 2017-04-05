@@ -185,6 +185,17 @@ func (s *Service) List(ctx context.Context, r *api.ListRequest) (*api.ListRespon
 	return resp, nil
 }
 
+func (s *Service) Kill(ctx context.Context, r *api.KillRequest) (*google_protobuf.Empty, error) {
+	c, err := s.getContainer(r.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.Kill(ctx, r.Signal, r.All); err != nil {
+		return nil, err
+	}
+	return empty, nil
+}
+
 func (s *Service) Events(r *api.EventsRequest, server api.ContainerService_EventsServer) error {
 	w := &grpcEventWriter{
 		server: server,
