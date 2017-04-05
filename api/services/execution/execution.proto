@@ -14,6 +14,7 @@ service ContainerService {
 	rpc Delete(DeleteRequest) returns (DeleteResponse);
 	rpc Info(InfoRequest) returns (containerd.v1.types.Container);
 	rpc List(ListRequest) returns (ListResponse);
+	rpc Kill(KillRequest) returns (google.protobuf.Empty);
 	rpc Events(EventsRequest) returns (stream containerd.v1.types.Event);
 }
 
@@ -55,6 +56,12 @@ message ListRequest {
 
 message ListResponse {
 	repeated containerd.v1.types.Container containers = 1;
+}
+
+message KillRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];
+	uint32 signal = 2;
+	bool all = 3;
 }
 
 message EventsRequest {

@@ -14,6 +14,8 @@ type Container interface {
 	Start(context.Context) error
 	// State returns the container's state
 	State(context.Context) (State, error)
+	// Kill signals a container
+	Kill(context.Context, uint32, bool) error
 }
 
 type LinuxContainer interface {

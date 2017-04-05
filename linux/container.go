@@ -70,3 +70,11 @@ func (c *Container) Resume(ctx context.Context) error {
 	_, err := c.shim.Resume(ctx, &shim.ResumeRequest{})
 	return err
 }
+
+func (c *Container) Kill(ctx context.Context, signal uint32, all bool) error {
+	_, err := c.shim.Kill(ctx, &shim.KillRequest{
+		Signal: signal,
+		All:    all,
+	})
+	return err
+}
