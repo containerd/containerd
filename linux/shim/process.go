@@ -15,5 +15,8 @@ type process interface {
 	Exited(status int)
 	// Status returns the exit status
 	Status() int
+	// Delete delets the process and its resourcess
 	Delete(context.Context) error
+	// Signal directly signals the process
+	Signal(int) error
 }

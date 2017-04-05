@@ -16,6 +16,7 @@ service ContainerService {
 	rpc List(ListRequest) returns (ListResponse);
 	rpc Kill(KillRequest) returns (google.protobuf.Empty);
 	rpc Events(EventsRequest) returns (stream containerd.v1.types.Event);
+	rpc Exec(ExecRequest) returns (ExecResponse);
 }
 
 message CreateRequest {
@@ -65,4 +66,17 @@ message KillRequest {
 }
 
 message EventsRequest {
+}
+
+message ExecRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];
+	bool terminal = 2;
+	string stdin = 3;
+	string stdout = 4;
+	string stderr = 5;
+	google.protobuf.Any spec = 6;
+}
+
+message ExecResponse {
+	uint32 pid = 1;
 }

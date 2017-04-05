@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/containerd/containerd"
@@ -201,6 +202,33 @@ func (s *Service) Events(r *api.EventsRequest, server api.ContainerService_Event
 		server: server,
 	}
 	return s.collector.forward(w)
+}
+
+func (s *Service) Exec(ctx context.Context, r *api.ExecRequest) (*api.ExecResponse, error) {
+	c, err := s.getContainer(r.ID)
+	if err != nil {
+		return nil, err
+	}
+	l, ok := c.(containerd.LinuxContainer)
+	if !ok {
+		return nil, fmt.Errorf("cannot exec into a non linux container")
+	}
+	process, err := l.Exec(ctx, containerd.ExecOpts{
+		Spec: r.Spec.Value,
+		IO: containerd.IO{
+			Stdin:    r.Stdin,
+			Stdout:   r.Stdout,
+			Stderr:   r.Stderr,
+			Terminal: r.Terminal,
+		},
+	})
+	state, err := process.State(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &api.ExecResponse{
+		Pid: state.Pid(),
+	}, nil
 }
 
 func (s *Service) getContainer(id string) (containerd.Container, error) {

@@ -139,3 +139,7 @@ func (e *execProcess) Resize(ws console.WinSize) error {
 	}
 	return e.console.Resize(ws)
 }
+
+func (e *execProcess) Signal(sig int) error {
+	return syscall.Kill(e.pid, syscall.Signal(sig))
+}

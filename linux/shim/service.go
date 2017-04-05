@@ -1,6 +1,7 @@
 package shim
 
 import (
+	"fmt"
 	"os"
 	"sync"
 	"syscall"
@@ -219,7 +220,17 @@ func (s *Service) Exit(ctx context.Context, r *shimapi.ExitRequest) (*google_pro
 }
 
 func (s *Service) Kill(ctx context.Context, r *shimapi.KillRequest) (*google_protobuf.Empty, error) {
-	if err := s.initProcess.Kill(ctx, r.Signal, r.All); err != nil {
+	if r.Pid == 0 {
+		if err := s.initProcess.Kill(ctx, r.Signal, r.All); err != nil {
+			return nil, err
+		}
+		return empty, nil
+	}
+	proc, ok := s.processes[int(r.Pid)]
+	if !ok {
+		return nil, fmt.Errorf("process does not exist %d", r.Pid)
+	}
+	if err := proc.Signal(int(r.Signal)); err != nil {
 		return nil, err
 	}
 	return empty, nil
