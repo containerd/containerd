@@ -46,6 +46,10 @@ type snapshotter struct {
 // device and root directory for snapshots and stores the metadata in
 // a file in the provided root.
 func NewSnapshotter(device, root string) (snapshot.Snapshotter, error) {
+	if err := os.MkdirAll(root, 0700); err != nil {
+		return nil, err
+	}
+
 	var (
 		active    = filepath.Join(root, "active")
 		snapshots = filepath.Join(root, "snapshots")
@@ -55,7 +59,7 @@ func NewSnapshotter(device, root string) (snapshot.Snapshotter, error) {
 		active,
 		snapshots,
 	} {
-		if err := os.MkdirAll(path, 0755); err != nil {
+		if err := os.Mkdir(path, 0755); err != nil && !os.IsExist(err) {
 			return nil, err
 		}
 	}
