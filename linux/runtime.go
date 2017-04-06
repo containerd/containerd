@@ -108,10 +108,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts containerd.CreateO
 		os.RemoveAll(path)
 		return nil, err
 	}
-	c := &Container{
-		id:   id,
-		shim: s,
-	}
+	c := newContainer(id, s)
 	// after the container is create add it to the monitor
 	if err := r.monitor.Monitor(c); err != nil {
 		return nil, err

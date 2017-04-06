@@ -18,6 +18,10 @@ type Container interface {
 	Kill(context.Context, uint32, bool) error
 	// Exec adds a process into the container
 	Exec(context.Context, ExecOpts) (Process, error)
+	// Pty resizes the processes pty/console
+	Pty(context.Context, uint32, ConsoleSize) error
+	// CloseStdin closes the processes stdin
+	CloseStdin(context.Context, uint32) error
 }
 
 type LinuxContainer interface {
@@ -37,6 +41,11 @@ type Process interface {
 	State(context.Context) (State, error)
 	// Kill signals a container
 	Kill(context.Context, uint32, bool) error
+}
+
+type ConsoleSize struct {
+	Width  uint32
+	Height uint32
 }
 
 type Status int

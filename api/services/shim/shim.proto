@@ -8,18 +8,24 @@ import "gogoproto/gogo.proto";
 import "github.com/containerd/containerd/api/types/mount/mount.proto";
 import "github.com/containerd/containerd/api/types/container/container.proto";
 
+// Shim service is launched for each container and is responsible for owning the IO
+// for the container and its additional processes.  The shim is also the parent of
+// each container and allows reattaching to the IO and receiving the exit status
+// for the container processes.
 service Shim {
 	rpc Create(CreateRequest) returns (CreateResponse);
 	rpc Start(StartRequest) returns (google.protobuf.Empty);
 	rpc Delete(DeleteRequest) returns (DeleteResponse);
-	rpc Exec(ExecRequest) returns (ExecResponse);
-	rpc Pty(PtyRequest) returns (google.protobuf.Empty);
-	rpc Events(EventsRequest) returns (stream containerd.v1.types.Event);
 	rpc State(StateRequest) returns (StateResponse);
 	rpc Pause(PauseRequest) returns (google.protobuf.Empty);
 	rpc Resume(ResumeRequest) returns (google.protobuf.Empty);
+
 	rpc Exit(ExitRequest) returns (google.protobuf.Empty);
+	rpc Events(EventsRequest) returns (stream containerd.v1.types.Event);
 	rpc Kill(KillRequest) returns (google.protobuf.Empty);
+	rpc Exec(ExecRequest) returns (ExecResponse);
+	rpc Pty(PtyRequest) returns (google.protobuf.Empty);
+	rpc CloseStdin(CloseStdinRequest) returns (google.protobuf.Empty);
 }
 
 message CreateRequest {
@@ -87,7 +93,6 @@ message StateResponse {
 	repeated containerd.v1.types.Process processes = 5;
 }
 
-
 message PauseRequest {
 }
 
@@ -101,4 +106,8 @@ message KillRequest {
 	uint32 signal = 1;
 	bool all = 2;
 	uint32 pid = 3;
+}
+
+message CloseStdinRequest {
+	uint32 pid = 1;
 }

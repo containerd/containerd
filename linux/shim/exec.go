@@ -28,6 +28,7 @@ type execProcess struct {
 	status  int
 	pid     int
 	closers []io.Closer
+	stdin   io.Closer
 
 	parent *initProcess
 }
@@ -78,6 +79,7 @@ func newExecProcess(context context.Context, path string, r *shimapi.ExecRequest
 			return nil, err
 		}
 		e.closers = append(e.closers, sc)
+		e.stdin = sc
 	}
 	if socket != nil {
 		console, err := socket.ReceiveMaster()
@@ -144,4 +146,8 @@ func (e *execProcess) Resize(ws console.WinSize) error {
 
 func (e *execProcess) Signal(sig int) error {
 	return syscall.Kill(e.pid, syscall.Signal(sig))
+}
+
+func (e *execProcess) Stdin() io.Closer {
+	return e.stdin
 }

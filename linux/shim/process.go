@@ -4,6 +4,7 @@ package shim
 
 import (
 	"context"
+	"io"
 
 	"github.com/crosbymichael/console"
 )
@@ -21,4 +22,6 @@ type process interface {
 	Delete(context.Context) error
 	// Signal directly signals the process
 	Signal(int) error
+	// Stdin returns the process STDIN
+	Stdin() io.Closer
 }
