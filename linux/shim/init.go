@@ -169,3 +169,7 @@ func (p *initProcess) killAll(context context.Context) error {
 		All: true,
 	})
 }
+
+func (p *initProcess) Signal(sig int) error {
+	return syscall.Kill(p.pid, syscall.Signal(sig))
+}

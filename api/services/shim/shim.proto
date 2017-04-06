@@ -100,4 +100,5 @@ message ExitRequest {
 message KillRequest {
 	uint32 signal = 1;
 	bool all = 2;
+	uint32 pid = 3;
 }

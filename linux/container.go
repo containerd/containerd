@@ -4,19 +4,21 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/shim"
 	"github.com/containerd/containerd/api/types/container"
+	protobuf "github.com/gogo/protobuf/types"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/net/context"
 )
 
 type State struct {
 	pid    uint32
-	status containerd.ContainerStatus
+	status containerd.Status
 }
 
 func (s State) Pid() uint32 {
 	return s.pid
 }
 
-func (s State) Status() containerd.ContainerStatus {
+func (s State) Status() containerd.Status {
 	return s.status
 }
 
@@ -43,7 +45,7 @@ func (c *Container) State(ctx context.Context) (containerd.State, error) {
 	if err != nil {
 		return nil, err
 	}
-	var status containerd.ContainerStatus
+	var status containerd.Status
 	switch response.Status {
 	case container.Status_CREATED:
 		status = containerd.CreatedStatus
@@ -77,4 +79,48 @@ func (c *Container) Kill(ctx context.Context, signal uint32, all bool) error {
 		All:    all,
 	})
 	return err
+}
+
+func (c *Container) Exec(ctx context.Context, opts containerd.ExecOpts) (containerd.Process, error) {
+	request := &shim.ExecRequest{
+		Stdin:    opts.IO.Stdin,
+		Stdout:   opts.IO.Stdout,
+		Stderr:   opts.IO.Stderr,
+		Terminal: opts.IO.Terminal,
+		Spec: &protobuf.Any{
+			TypeUrl: specs.Version,
+			Value:   opts.Spec,
+		},
+	}
+	resp, err := c.shim.Exec(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	return &Process{
+		pid: int(resp.Pid),
+		c:   c,
+	}, nil
+}
+
+type Process struct {
+	pid int
+	c   *Container
+}
+
+func (p *Process) Kill(ctx context.Context, signal uint32, _ bool) error {
+	_, err := p.c.shim.Kill(ctx, &shim.KillRequest{
+		Signal: signal,
+		Pid:    uint32(p.pid),
+	})
+	return err
+}
+
+func (p *Process) State(ctx context.Context) (containerd.State, error) {
+	// use the container status for the status of the process
+	state, err := p.c.State(ctx)
+	if err != nil {
+		return nil, err
+	}
+	state.(*State).pid = uint32(p.pid)
+	return state, nil
 }

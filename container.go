@@ -23,12 +23,25 @@ type LinuxContainer interface {
 
 	Pause(context.Context) error
 	Resume(context.Context) error
+	Exec(context.Context, ExecOpts) (Process, error)
 }
 
-type ContainerStatus int
+type ExecOpts struct {
+	Spec []byte
+	IO   IO
+}
+
+type Process interface {
+	// State returns the process state
+	State(context.Context) (State, error)
+	// Kill signals a container
+	Kill(context.Context, uint32, bool) error
+}
+
+type Status int
 
 const (
-	CreatedStatus ContainerStatus = iota + 1
+	CreatedStatus Status = iota + 1
 	RunningStatus
 	StoppedStatus
 	DeletedStatus
@@ -37,7 +50,7 @@ const (
 
 type State interface {
 	// Status is the current status of the container
-	Status() ContainerStatus
+	Status() Status
 	// Pid is the main process id for the container
 	Pid() uint32
 }

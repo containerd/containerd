@@ -377,7 +377,7 @@ var runCommand = cli.Command{
 		// Ensure we read all io only if container started successfully.
 		defer fwg.Wait()
 
-		status, err := waitContainer(events, response)
+		status, err := waitContainer(events, response.ID, response.Pid)
 		if err != nil {
 			return err
 		}
