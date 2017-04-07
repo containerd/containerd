@@ -35,7 +35,7 @@ func (s *Service) Register(server *grpc.Server) error {
 func (s *Service) Get(ctx context.Context, req *imagesapi.GetRequest) (*imagesapi.GetResponse, error) {
 	var resp imagesapi.GetResponse
 
-	return &resp, s.withStoreTx(ctx, req.Name, false, func(ctx context.Context, store images.Store) error {
+	return &resp, s.withStoreView(ctx, func(ctx context.Context, store images.Store) error {
 		image, err := store.Get(ctx, req.Name)
 		if err != nil {
 			return mapGRPCError(err, req.Name)
@@ -47,7 +47,7 @@ func (s *Service) Get(ctx context.Context, req *imagesapi.GetRequest) (*imagesap
 }
 
 func (s *Service) Put(ctx context.Context, req *imagesapi.PutRequest) (*empty.Empty, error) {
-	return &empty.Empty{}, s.withStoreTx(ctx, req.Image.Name, true, func(ctx context.Context, store images.Store) error {
+	return &empty.Empty{}, s.withStoreUpdate(ctx, func(ctx context.Context, store images.Store) error {
 		return mapGRPCError(store.Put(ctx, req.Image.Name, descFromProto(&req.Image.Target)), req.Image.Name)
 	})
 }
@@ -55,7 +55,7 @@ func (s *Service) Put(ctx context.Context, req *imagesapi.PutRequest) (*empty.Em
 func (s *Service) List(ctx context.Context, _ *imagesapi.ListRequest) (*imagesapi.ListResponse, error) {
 	var resp imagesapi.ListResponse
 
-	return &resp, s.withStoreTx(ctx, "", false, func(ctx context.Context, store images.Store) error {
+	return &resp, s.withStoreView(ctx, func(ctx context.Context, store images.Store) error {
 		images, err := store.List(ctx)
 		if err != nil {
 			return mapGRPCError(err, "")
@@ -67,25 +67,19 @@ func (s *Service) List(ctx context.Context, _ *imagesapi.ListRequest) (*imagesap
 }
 
 func (s *Service) Delete(ctx context.Context, req *imagesapi.DeleteRequest) (*empty.Empty, error) {
-	return &empty.Empty{}, s.withStoreTx(ctx, req.Name, true, func(ctx context.Context, store images.Store) error {
+	return &empty.Empty{}, s.withStoreUpdate(ctx, func(ctx context.Context, store images.Store) error {
 		return mapGRPCError(store.Delete(ctx, req.Name), req.Name)
 	})
 }
 
-func (s *Service) withStoreTx(ctx context.Context, id string, writable bool, fn func(ctx context.Context, store images.Store) error) error {
-	tx, err := s.db.Begin(writable)
-	if err != nil {
-		return mapGRPCError(err, id)
-	}
-	defer tx.Rollback()
+func (s *Service) withStore(ctx context.Context, fn func(ctx context.Context, store images.Store) error) func(tx *bolt.Tx) error {
+	return func(tx *bolt.Tx) error { return fn(ctx, images.NewImageStore(tx)) }
+}
 
-	if err := fn(ctx, images.NewImageStore(tx)); err != nil {
-		return err
-	}
+func (s *Service) withStoreView(ctx context.Context, fn func(ctx context.Context, store images.Store) error) error {
+	return s.db.View(s.withStore(ctx, fn))
+}
 
-	if writable {
-		return tx.Commit()
-	}
-
-	return nil
+func (s *Service) withStoreUpdate(ctx context.Context, fn func(ctx context.Context, store images.Store) error) error {
+	return s.db.Update(s.withStore(ctx, fn))
 }
