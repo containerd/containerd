@@ -156,7 +156,6 @@ func start(log *os.File) error {
 			}
 		}
 	}
-	return nil
 }
 
 func writeInt(path string, i int) error {

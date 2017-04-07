@@ -36,7 +36,7 @@ func untarRootfs(source string, destination string) error {
 	rootfs := filepath.Join(destination, "rootfs")
 
 	if err := os.MkdirAll(rootfs, 0755); err != nil {
-		fmt.Println("untarRootfs os.MkdirAll failed with err %v", err)
+		fmt.Printf("untarRootfs os.MkdirAll failed with err %v", err)
 		return nil
 	}
 	tar := exec.Command("tar", "-C", rootfs, "-xf", source)

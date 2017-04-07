@@ -157,7 +157,7 @@ func BenchmarkBusyboxSh(b *testing.B) {
 		})
 
 		if err != nil {
-			b.Fatalf("Error creating a New container: ", err)
+			b.Fatalf("Error creating a New container: %v", err)
 		}
 
 		benchmarkStartContainer(b, c, s, bundleName)
