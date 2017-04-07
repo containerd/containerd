@@ -24,7 +24,7 @@ type Runtime interface {
 	// Create creates a container with the provided id and options
 	Create(ctx context.Context, id string, opts CreateOpts) (Container, error)
 	// Containers returns all the current containers for the runtime
-	Containers() ([]Container, error)
+	Containers(context.Context) ([]Container, error)
 	// Delete removes the container in the runtime
 	Delete(context.Context, Container) (uint32, error)
 	// Events returns events for the runtime and all containers created by the runtime

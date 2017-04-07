@@ -60,9 +60,6 @@ func loadShim(path string, remote bool) (shim.ShimClient, error) {
 	}
 	socket := filepath.Join(path, "shim.sock")
 	return connectShim(socket)
-	// TODO: failed to connect to the shim, check if it's alive
-	//   - if it is kill it
-	//   - in both case call runc killall and runc delete on the id
 }
 
 func connectShim(socket string) (shim.ShimClient, error) {
