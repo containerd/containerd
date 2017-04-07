@@ -49,7 +49,7 @@ func (s *Service) Register(server *grpc.Server) error {
 	api.RegisterContainerServiceServer(server, s)
 	// load all containers
 	for _, r := range s.runtimes {
-		containers, err := r.Containers()
+		containers, err := r.Containers(context.Background())
 		if err != nil {
 			return err
 		}

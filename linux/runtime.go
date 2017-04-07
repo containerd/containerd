@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -17,6 +18,7 @@ import (
 	"github.com/containerd/containerd/api/types/mount"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
+	runc "github.com/crosbymichael/go-runc"
 
 	"golang.org/x/net/context"
 )
@@ -34,6 +36,8 @@ func init() {
 		Config: &Config{},
 	})
 }
+
+var _ = (containerd.Runtime)(&Runtime{})
 
 type Config struct {
 	// Runtime is a path or name of an OCI runtime used by the shim
@@ -137,7 +141,7 @@ func (r *Runtime) Delete(ctx context.Context, c containerd.Container) (uint32, e
 	return rsp.ExitStatus, r.deleteBundle(lc.id)
 }
 
-func (r *Runtime) Containers() ([]containerd.Container, error) {
+func (r *Runtime) Containers(ctx context.Context) ([]containerd.Container, error) {
 	dir, err := ioutil.ReadDir(r.root)
 	if err != nil {
 		return nil, err
@@ -147,9 +151,16 @@ func (r *Runtime) Containers() ([]containerd.Container, error) {
 		if !fi.IsDir() {
 			continue
 		}
-		c, err := r.loadContainer(filepath.Join(r.root, fi.Name()))
+		id := fi.Name()
+		// TODO: optimize this if it is call frequently to list all containers
+		// i.e. dont' reconnect to the the shim's ever time
+		c, err := r.loadContainer(filepath.Join(r.root, id))
 		if err != nil {
-			return nil, err
+			log.G(ctx).WithError(err).Warnf("failed to load container %s", id)
+			// if we fail to load the container, connect to the shim, make sure if the shim has
+			// been killed and cleanup the resources still being held by the container
+			r.killContainer(ctx, id)
+			continue
 		}
 		o = append(o, c)
 	}
@@ -231,4 +242,41 @@ func (r *Runtime) loadContainer(path string) (*Container, error) {
 		id:   id,
 		shim: s,
 	}, nil
+}
+
+// killContainer is used whenever the runtime fails to connect to a shim (it died)
+// and needs to cleanup the container resources in the underlying runtime (runc, etc...)
+func (r *Runtime) killContainer(ctx context.Context, id string) {
+	log.G(ctx).Debug("terminating container after failed load")
+	runtime := &runc.Runc{
+		// TODO: get Command provided for initial container creation
+		//	Command:      r.Runtime,
+		LogFormat:    runc.JSON,
+		PdeathSignal: syscall.SIGKILL,
+	}
+	if err := runtime.Kill(ctx, id, int(syscall.SIGKILL), &runc.KillOpts{
+		All: true,
+	}); err != nil {
+		log.G(ctx).WithError(err).Warnf("kill all processes for %s", id)
+	}
+	// it can take a while for the container to be killed so poll for the container's status
+	// until it is in a stopped state
+	status := "running"
+	for status != "stopped" {
+		c, err := runtime.State(ctx, id)
+		if err != nil {
+			break
+		}
+		status = c.Status
+		time.Sleep(10 * time.Millisecond)
+	}
+	if err := runtime.Delete(ctx, id); err != nil {
+		log.G(ctx).WithError(err).Warnf("delete container %s", id)
+	}
+	// try to unmount the rootfs is it was not held by an external shim
+	syscall.Unmount(filepath.Join(r.root, id, "rootfs"), 0)
+	// remove container bundle
+	if err := r.deleteBundle(id); err != nil {
+		log.G(ctx).WithError(err).Warnf("delete container bundle %s", id)
+	}
 }
