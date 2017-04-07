@@ -7,21 +7,6 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-func defaultConfig() *config {
-	return &config{
-		Root:  "/var/lib/containerd",
-		State: "/run/containerd",
-		GRPC: grpcConfig{
-			Socket: "/run/containerd/containerd.sock",
-		},
-		Debug: debug{
-			Level:  "info",
-			Socket: "/run/containerd/debug.sock",
-		},
-		Snapshotter: "overlay",
-	}
-}
-
 // loadConfig loads the config from the provided path
 func loadConfig(path string) error {
 	md, err := toml.DecodeFile(path, conf)
@@ -73,14 +58,14 @@ func (c *config) WriteTo(w io.Writer) (int64, error) {
 }
 
 type grpcConfig struct {
-	Socket string `toml:"socket"`
-	Uid    int    `toml:"uid"`
-	Gid    int    `toml:"gid"`
+	Address string `toml:"address"`
+	Uid     int    `toml:"uid"`
+	Gid     int    `toml:"gid"`
 }
 
 type debug struct {
-	Socket string `toml:"socket"`
-	Level  string `toml:"level"`
+	Address string `toml:"address"`
+	Level   string `toml:"level"`
 }
 
 type metricsConfig struct {

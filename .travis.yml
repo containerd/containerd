@@ -15,6 +15,10 @@ addons:
     packages:
       - btrfs-tools
 
+env:
+  - GOOS=windows
+  - GOOS=linux
+
 install:
   - wget https://github.com/google/protobuf/releases/download/v3.1.0/protoc-3.1.0-linux-x86_64.zip -O /tmp/protoc-3.1.0-linux-x86_64.zip
   - unzip -o -d /tmp/protobuf /tmp/protoc-3.1.0-linux-x86_64.zip

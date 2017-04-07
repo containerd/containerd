@@ -16,6 +16,8 @@ type Container interface {
 	State(context.Context) (State, error)
 	// Kill signals a container
 	Kill(context.Context, uint32, bool) error
+	// Exec adds a process into the container
+	Exec(context.Context, ExecOpts) (Process, error)
 }
 
 type LinuxContainer interface {
@@ -23,7 +25,6 @@ type LinuxContainer interface {
 
 	Pause(context.Context) error
 	Resume(context.Context) error
-	Exec(context.Context, ExecOpts) (Process, error)
 }
 
 type ExecOpts struct {

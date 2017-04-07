@@ -1,7 +1,6 @@
 package execution
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/containerd/containerd"
@@ -209,11 +208,7 @@ func (s *Service) Exec(ctx context.Context, r *api.ExecRequest) (*api.ExecRespon
 	if err != nil {
 		return nil, err
 	}
-	l, ok := c.(containerd.LinuxContainer)
-	if !ok {
-		return nil, fmt.Errorf("cannot exec into a non linux container")
-	}
-	process, err := l.Exec(ctx, containerd.ExecOpts{
+	process, err := c.Exec(ctx, containerd.ExecOpts{
 		Spec: r.Spec.Value,
 		IO: containerd.IO{
 			Stdin:    r.Stdin,

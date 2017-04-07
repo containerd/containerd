@@ -1,4 +1,4 @@
-// +build !windows
+// +build linux
 
 package containerd
 
@@ -10,6 +10,10 @@ import (
 func (m *Mount) Mount(target string) error {
 	flags, data := parseMountOptions(m.Options)
 	return syscall.Mount(m.Source, target, m.Type, uintptr(flags), data)
+}
+
+func Unmount(mount string, flags int) error {
+	return syscall.Unmount(mount, flags)
 }
 
 // parseMountOptions takes fstab style mount options and parses them for

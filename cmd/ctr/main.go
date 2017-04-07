@@ -9,6 +9,10 @@ import (
 	"github.com/urfave/cli"
 )
 
+var (
+	extraCmds = []cli.Command{}
+)
+
 func init() {
 	cli.VersionPrinter = func(c *cli.Context) {
 		fmt.Println(c.App.Name, containerd.Package, c.App.Version)
@@ -34,8 +38,8 @@ containerd client
 			Usage: "enable debug output in logs",
 		},
 		cli.StringFlag{
-			Name:  "socket, s",
-			Usage: "socket path for containerd's GRPC server",
+			Name:  "address, s",
+			Usage: "address for containerd's GRPC server",
 			Value: "/run/containerd/containerd.sock",
 		},
 		cli.StringFlag{
@@ -53,10 +57,10 @@ containerd client
 		listCommand,
 		infoCommand,
 		killCommand,
-		shimCommand,
 		pprofCommand,
 		execCommand,
 	}
+	app.Commands = append(app.Commands, extraCmds...)
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
