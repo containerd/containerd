@@ -16,8 +16,13 @@ addons:
       - btrfs-tools
 
 env:
-  - GOOS=windows
-  - GOOS=linux
+  - TRAVIS_GOOS=windows
+  - TRAVIS_GOOS=linux
+
+before_install:
+  - export GOOS=$TRAVIS_GOOS
+  - go env
+
 
 install:
   - wget https://github.com/google/protobuf/releases/download/v3.1.0/protoc-3.1.0-linux-x86_64.zip -O /tmp/protoc-3.1.0-linux-x86_64.zip
