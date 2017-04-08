@@ -12,20 +12,21 @@ import (
 	"syscall"
 	"time"
 
+	graphite "github.com/cyberdelia/go-metrics-graphite"
+	metrics "github.com/rcrowley/go-metrics"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
-	"github.com/cyberdelia/go-metrics-graphite"
 	"github.com/docker/containerd"
 	grpcserver "github.com/docker/containerd/api/grpc/server"
 	"github.com/docker/containerd/api/grpc/types"
 	"github.com/docker/containerd/api/http/pprof"
 	"github.com/docker/containerd/supervisor"
 	"github.com/docker/docker/pkg/listeners"
-	"github.com/rcrowley/go-metrics"
 )
 
 const (
