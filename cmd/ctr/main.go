@@ -38,7 +38,7 @@ containerd client
 			Usage: "enable debug output in logs",
 		},
 		cli.StringFlag{
-			Name:  "address, s",
+			Name:  "address, a",
 			Usage: "address for containerd's GRPC server",
 			Value: "/run/containerd/containerd.sock",
 		},
