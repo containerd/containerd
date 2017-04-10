@@ -12,6 +12,8 @@ import (
 	"sync"
 	"syscall"
 
+	"golang.org/x/sys/unix"
+
 	shimapi "github.com/containerd/containerd/api/services/shim"
 	"github.com/crosbymichael/console"
 	runc "github.com/crosbymichael/go-runc"
@@ -145,7 +147,7 @@ func (e *execProcess) Resize(ws console.WinSize) error {
 }
 
 func (e *execProcess) Signal(sig int) error {
-	return syscall.Kill(e.pid, syscall.Signal(sig))
+	return unix.Kill(e.pid, syscall.Signal(sig))
 }
 
 func (e *execProcess) Stdin() io.Closer {

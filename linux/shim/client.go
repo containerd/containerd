@@ -2,12 +2,12 @@ package shim
 
 import (
 	"path/filepath"
-	"syscall"
 
 	shimapi "github.com/containerd/containerd/api/services/shim"
 	"github.com/containerd/containerd/api/types/container"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
+	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
@@ -68,7 +68,7 @@ func (c *client) Kill(ctx context.Context, in *shimapi.KillRequest, opts ...grpc
 func (c *client) Exit(ctx context.Context, in *shimapi.ExitRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
 	// don't exit the calling process for the client
 	// but make sure we unmount the containers rootfs for this client
-	if err := syscall.Unmount(filepath.Join(c.s.path, "rootfs"), 0); err != nil {
+	if err := unix.Unmount(filepath.Join(c.s.path, "rootfs"), 0); err != nil {
 		return nil, err
 	}
 	return empty, nil
