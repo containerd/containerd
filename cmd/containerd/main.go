@@ -3,7 +3,6 @@ package main
 import (
 	_ "expvar"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -82,6 +81,9 @@ func main() {
 			Usage: "containerd root directory",
 		},
 	}
+	app.Commands = []cli.Command{
+		configCommand,
+	}
 	app.Before = before
 	app.Action = func(context *cli.Context) error {
 		start := time.Now()
@@ -152,35 +154,10 @@ func main() {
 }
 
 func before(context *cli.Context) error {
-	if context.GlobalString("config") == "default" {
-		fh, err := ioutil.TempFile("", "containerd-config.toml.")
-		if err != nil {
-			return err
-		}
-		if _, err := conf.WriteTo(fh); err != nil {
-			fh.Close()
-			return err
-		}
-		fh.Close()
-		log.G(global).Infof("containerd default config written to %q", fh.Name())
-		os.Exit(0)
-	}
 	err := loadConfig(context.GlobalString("config"))
 	if err != nil && !os.IsNotExist(err) {
 		return err
-	} else if err != nil && os.IsNotExist(err) {
-		log.G(global).Infof("config %q does not exist. Creating it.", context.GlobalString("config"))
-		fh, err := os.Create(context.GlobalString("config"))
-		if err != nil {
-			return err
-		}
-		if _, err := conf.WriteTo(fh); err != nil {
-			fh.Close()
-			return err
-		}
-		fh.Close()
 	}
-
 	// the order for config vs flag values is that flags will always override
 	// the config values if they are set
 	if err := setLevel(context); err != nil {
