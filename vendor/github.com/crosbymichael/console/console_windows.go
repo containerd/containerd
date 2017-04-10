@@ -105,7 +105,7 @@ func (m *master) Reset() error {
 }
 
 func (m *master) Size() (WinSize, error) {
-	info, err := winterm.GetConsoleScreenBufferInfo(m.in)
+	info, err := winterm.GetConsoleScreenBufferInfo(m.out)
 	if err != nil {
 		return WinSize{}, errors.Wrap(err, "unable to get console info")
 	}

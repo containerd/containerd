@@ -15,6 +15,7 @@ import (
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/Sirupsen/logrus"
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/windows/pid"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -192,6 +193,40 @@ func (c *Container) Stop(ctx context.Context) error {
 		return c.getDeathErr(c.Terminate())
 	}
 	return nil
+}
+
+func (c *Container) CloseStdin(ctx context.Context, pid uint32) error {
+	var proc *Process
+	c.Lock()
+	for _, p := range c.processes {
+		if p.Pid() == pid {
+			proc = p
+			break
+		}
+	}
+	c.Unlock()
+	if proc == nil {
+		return errors.Errorf("no such process %v", pid)
+	}
+
+	return proc.CloseStdin()
+}
+
+func (c *Container) Pty(ctx context.Context, pid uint32, size containerd.ConsoleSize) error {
+	var proc *Process
+	c.Lock()
+	for _, p := range c.processes {
+		if p.Pid() == pid {
+			proc = p
+			break
+		}
+	}
+	c.Unlock()
+	if proc == nil {
+		return errors.Errorf("no such process %v", pid)
+	}
+
+	return proc.ResizeConsole(uint16(size.Width), uint16(size.Height))
 }
 
 func (c *Container) Delete(ctx context.Context) {

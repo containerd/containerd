@@ -3,16 +3,22 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd/api/services/execution"
+	"github.com/crosbymichael/console"
 	protobuf "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -261,4 +267,40 @@ func newCreateRequest(context *cli.Context, imageConfig *ocispec.ImageConfig, id
 	}
 
 	return create, nil
+}
+
+func handleConsoleResize(ctx context.Context, service execution.ContainerServiceClient, id string, pid uint32, con console.Console) error {
+	// do an initial resize of the console
+	size, err := con.Size()
+	if err != nil {
+		return err
+	}
+	if _, err := service.Pty(ctx, &execution.PtyRequest{
+		ID:     id,
+		Pid:    pid,
+		Width:  uint32(size.Width),
+		Height: uint32(size.Height),
+	}); err != nil {
+		return err
+	}
+	s := make(chan os.Signal, 16)
+	signal.Notify(s, unix.SIGWINCH)
+	go func() {
+		for range s {
+			size, err := con.Size()
+			if err != nil {
+				logrus.WithError(err).Error("get pty size")
+				continue
+			}
+			if _, err := service.Pty(ctx, &execution.PtyRequest{
+				ID:     id,
+				Pid:    pid,
+				Width:  uint32(size.Width),
+				Height: uint32(size.Height),
+			}); err != nil {
+				logrus.WithError(err).Error("resize pty")
+			}
+		}
+	}()
+	return nil
 }

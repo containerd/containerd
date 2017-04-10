@@ -142,6 +142,14 @@ func (c *container) Exec(ctx context.Context, opts containerd.ExecOpts) (contain
 	return &process{p}, nil
 }
 
+func (c *container) CloseStdin(ctx context.Context, pid uint32) error {
+	return c.ctr.CloseStdin(ctx, pid)
+}
+
+func (c *container) Pty(ctx context.Context, pid uint32, size containerd.ConsoleSize) error {
+	return c.ctr.Pty(ctx, pid, size)
+}
+
 func (c *container) Status() containerd.Status {
 	return c.getStatus()
 }

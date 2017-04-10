@@ -1,15 +1,19 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"runtime"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd/api/services/execution"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/windows"
 	"github.com/containerd/containerd/windows/hcs"
+	"github.com/crosbymichael/console"
 	protobuf "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -147,4 +151,37 @@ func newCreateRequest(context *cli.Context, imageConfig *ocispec.ImageConfig, id
 	}
 
 	return create, nil
+}
+
+func handleConsoleResize(ctx context.Context, service execution.ContainerServiceClient, id string, pid uint32, con console.Console) error {
+	// do an initial resize of the console
+	size, err := con.Size()
+	if err != nil {
+		return err
+	}
+	go func() {
+		prevSize := size
+		for {
+			time.Sleep(time.Millisecond * 250)
+
+			size, err := con.Size()
+			if err != nil {
+				log.G(ctx).WithError(err).Error("get pty size")
+				continue
+			}
+
+			if size.Width != prevSize.Width || size.Height != prevSize.Height {
+				if _, err := service.Pty(ctx, &execution.PtyRequest{
+					ID:     id,
+					Pid:    pid,
+					Width:  uint32(size.Width),
+					Height: uint32(size.Height),
+				}); err != nil {
+					log.G(ctx).WithError(err).Error("resize pty")
+				}
+				prevSize = size
+			}
+		}
+	}()
+	return nil
 }

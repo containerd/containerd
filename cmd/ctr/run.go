@@ -5,10 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/signal"
 	"runtime"
-
-	"golang.org/x/sys/unix"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -191,40 +188,4 @@ var runCommand = cli.Command{
 		}
 		return nil
 	},
-}
-
-func handleConsoleResize(ctx gocontext.Context, service execution.ContainerServiceClient, id string, pid uint32, con console.Console) error {
-	// do an initial resize of the console
-	size, err := con.Size()
-	if err != nil {
-		return err
-	}
-	if _, err := service.Pty(ctx, &execution.PtyRequest{
-		ID:     id,
-		Pid:    pid,
-		Width:  uint32(size.Width),
-		Height: uint32(size.Height),
-	}); err != nil {
-		return err
-	}
-	s := make(chan os.Signal, 16)
-	signal.Notify(s, unix.SIGWINCH)
-	go func() {
-		for range s {
-			size, err := con.Size()
-			if err != nil {
-				logrus.WithError(err).Error("get pty size")
-				continue
-			}
-			if _, err := service.Pty(ctx, &execution.PtyRequest{
-				ID:     id,
-				Pid:    pid,
-				Width:  uint32(size.Width),
-				Height: uint32(size.Height),
-			}); err != nil {
-				logrus.WithError(err).Error("resize pty")
-			}
-		}
-	}()
-	return nil
 }
