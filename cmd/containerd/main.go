@@ -170,6 +170,9 @@ func before(context *cli.Context) error {
 		return err
 	} else if err != nil && os.IsNotExist(err) {
 		log.G(global).Infof("config %q does not exist. Creating it.", context.GlobalString("config"))
+		if err := os.MkdirAll(filepath.Dir(context.GlobalString("config")), 0600); err != nil {
+			return err
+		}
 		fh, err := os.Create(context.GlobalString("config"))
 		if err != nil {
 			return err
