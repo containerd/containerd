@@ -2,21 +2,19 @@
 
 package sys
 
-import (
-	"syscall"
-)
+import "golang.org/x/sys/unix"
 
-// EpollCreate1 directly calls syscall.EpollCreate1
+// EpollCreate1 directly calls unix.EpollCreate1
 func EpollCreate1(flag int) (int, error) {
-	return syscall.EpollCreate1(flag)
+	return unix.EpollCreate1(flag)
 }
 
-// EpollCtl directly calls syscall.EpollCtl
-func EpollCtl(epfd int, op int, fd int, event *syscall.EpollEvent) error {
-	return syscall.EpollCtl(epfd, op, fd, event)
+// EpollCtl directly calls unix.EpollCtl
+func EpollCtl(epfd int, op int, fd int, event *unix.EpollEvent) error {
+	return unix.EpollCtl(epfd, op, fd, event)
 }
 
-// EpollWait directly calls syscall.EpollWait
-func EpollWait(epfd int, events []syscall.EpollEvent, msec int) (int, error) {
-	return syscall.EpollWait(epfd, events, msec)
+// EpollWait directly calls unix.EpollWait
+func EpollWait(epfd int, events []unix.EpollEvent, msec int) (int, error) {
+	return unix.EpollWait(epfd, events, msec)
 }

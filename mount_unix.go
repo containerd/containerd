@@ -4,16 +4,17 @@ package containerd
 
 import (
 	"strings"
-	"syscall"
+
+	"golang.org/x/sys/unix"
 )
 
 func (m *Mount) Mount(target string) error {
 	flags, data := parseMountOptions(m.Options)
-	return syscall.Mount(m.Source, target, m.Type, uintptr(flags), data)
+	return unix.Mount(m.Source, target, m.Type, uintptr(flags), data)
 }
 
 func Unmount(mount string, flags int) error {
-	return syscall.Unmount(mount, flags)
+	return unix.Unmount(mount, flags)
 }
 
 // parseMountOptions takes fstab style mount options and parses them for
@@ -27,31 +28,31 @@ func parseMountOptions(options []string) (int, string) {
 		clear bool
 		flag  int
 	}{
-		"async":         {true, syscall.MS_SYNCHRONOUS},
-		"atime":         {true, syscall.MS_NOATIME},
-		"bind":          {false, syscall.MS_BIND},
+		"async":         {true, unix.MS_SYNCHRONOUS},
+		"atime":         {true, unix.MS_NOATIME},
+		"bind":          {false, unix.MS_BIND},
 		"defaults":      {false, 0},
-		"dev":           {true, syscall.MS_NODEV},
-		"diratime":      {true, syscall.MS_NODIRATIME},
-		"dirsync":       {false, syscall.MS_DIRSYNC},
-		"exec":          {true, syscall.MS_NOEXEC},
-		"mand":          {false, syscall.MS_MANDLOCK},
-		"noatime":       {false, syscall.MS_NOATIME},
-		"nodev":         {false, syscall.MS_NODEV},
-		"nodiratime":    {false, syscall.MS_NODIRATIME},
-		"noexec":        {false, syscall.MS_NOEXEC},
-		"nomand":        {true, syscall.MS_MANDLOCK},
-		"norelatime":    {true, syscall.MS_RELATIME},
-		"nostrictatime": {true, syscall.MS_STRICTATIME},
-		"nosuid":        {false, syscall.MS_NOSUID},
-		"rbind":         {false, syscall.MS_BIND | syscall.MS_REC},
-		"relatime":      {false, syscall.MS_RELATIME},
-		"remount":       {false, syscall.MS_REMOUNT},
-		"ro":            {false, syscall.MS_RDONLY},
-		"rw":            {true, syscall.MS_RDONLY},
-		"strictatime":   {false, syscall.MS_STRICTATIME},
-		"suid":          {true, syscall.MS_NOSUID},
-		"sync":          {false, syscall.MS_SYNCHRONOUS},
+		"dev":           {true, unix.MS_NODEV},
+		"diratime":      {true, unix.MS_NODIRATIME},
+		"dirsync":       {false, unix.MS_DIRSYNC},
+		"exec":          {true, unix.MS_NOEXEC},
+		"mand":          {false, unix.MS_MANDLOCK},
+		"noatime":       {false, unix.MS_NOATIME},
+		"nodev":         {false, unix.MS_NODEV},
+		"nodiratime":    {false, unix.MS_NODIRATIME},
+		"noexec":        {false, unix.MS_NOEXEC},
+		"nomand":        {true, unix.MS_MANDLOCK},
+		"norelatime":    {true, unix.MS_RELATIME},
+		"nostrictatime": {true, unix.MS_STRICTATIME},
+		"nosuid":        {false, unix.MS_NOSUID},
+		"rbind":         {false, unix.MS_BIND | unix.MS_REC},
+		"relatime":      {false, unix.MS_RELATIME},
+		"remount":       {false, unix.MS_REMOUNT},
+		"ro":            {false, unix.MS_RDONLY},
+		"rw":            {true, unix.MS_RDONLY},
+		"strictatime":   {false, unix.MS_STRICTATIME},
+		"suid":          {true, unix.MS_NOSUID},
+		"sync":          {false, unix.MS_SYNCHRONOUS},
 	}
 	for _, o := range options {
 		// If the option does not exist in the flags table or the flag

@@ -24,7 +24,7 @@ const (
 	JSON Format = "json"
 	Text Format = "text"
 	// DefaultCommand is the default command for Runc
-	DefaultCommand string = "runc"
+	DefaultCommand = "runc"
 )
 
 // Runc is the client to the runc cli
@@ -64,11 +64,15 @@ func (r *Runc) State(context context.Context, id string) (*Container, error) {
 	return &c, nil
 }
 
+type ConsoleSocket interface {
+	Path() string
+}
+
 type CreateOpts struct {
 	IO
 	// PidFile is a path to where a pid file should be created
 	PidFile       string
-	ConsoleSocket *ConsoleSocket
+	ConsoleSocket ConsoleSocket
 	Detach        bool
 	NoPivot       bool
 	NoNewKeyring  bool
@@ -146,7 +150,7 @@ func (r *Runc) Start(context context.Context, id string) error {
 type ExecOpts struct {
 	IO
 	PidFile       string
-	ConsoleSocket *ConsoleSocket
+	ConsoleSocket ConsoleSocket
 	Detach        bool
 }
 

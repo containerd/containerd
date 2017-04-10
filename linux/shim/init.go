@@ -10,6 +10,8 @@ import (
 	"sync"
 	"syscall"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/containerd/containerd"
 	shimapi "github.com/containerd/containerd/api/services/shim"
 	"github.com/crosbymichael/console"
@@ -55,7 +57,7 @@ func newInitProcess(context context.Context, path string, r *shimapi.CreateReque
 	}
 	var (
 		err    error
-		socket *runc.ConsoleSocket
+		socket *runc.Socket
 		io     runc.IO
 	)
 	if r.Terminal {
@@ -175,7 +177,7 @@ func (p *initProcess) killAll(context context.Context) error {
 }
 
 func (p *initProcess) Signal(sig int) error {
-	return syscall.Kill(p.pid, syscall.Signal(sig))
+	return unix.Kill(p.pid, syscall.Signal(sig))
 }
 
 func (p *initProcess) Stdin() io.Closer {

@@ -36,8 +36,9 @@ import "C"
 
 import (
 	"fmt"
-	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 // EpollCreate1 calls a C implementation
@@ -50,8 +51,8 @@ func EpollCreate1(flag int) (int, error) {
 }
 
 // EpollCtl calls a C implementation
-func EpollCtl(epfd int, op int, fd int, event *syscall.EpollEvent) error {
-	errno := C.EpollCtl(C.int(epfd), C.int(syscall.EPOLL_CTL_ADD), C.int(fd), C.int(event.Events), C.int(event.Fd))
+func EpollCtl(epfd int, op int, fd int, event *unix.EpollEvent) error {
+	errno := C.EpollCtl(C.int(epfd), C.int(unix.EPOLL_CTL_ADD), C.int(fd), C.int(event.Events), C.int(event.Fd))
 	if errno < 0 {
 		return fmt.Errorf("Failed to ctl epoll")
 	}
@@ -59,7 +60,7 @@ func EpollCtl(epfd int, op int, fd int, event *syscall.EpollEvent) error {
 }
 
 // EpollWait calls a C implementation
-func EpollWait(epfd int, events []syscall.EpollEvent, msec int) (int, error) {
+func EpollWait(epfd int, events []unix.EpollEvent, msec int) (int, error) {
 	var c_events [128]C.struct_event_t
 	n := int(C.run_epoll_wait(C.int(epfd), (*C.struct_event_t)(unsafe.Pointer(&c_events))))
 	if n < 0 {

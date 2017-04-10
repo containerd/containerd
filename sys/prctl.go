@@ -6,8 +6,9 @@
 package sys
 
 import (
-	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 // PR_SET_CHILD_SUBREAPER allows setting the child subreaper.
@@ -33,7 +34,7 @@ const prGetChildSubreaper = 37
 // GetSubreaper returns the subreaper setting for the calling process
 func GetSubreaper() (int, error) {
 	var i uintptr
-	if _, _, err := syscall.RawSyscall(syscall.SYS_PRCTL, prGetChildSubreaper, uintptr(unsafe.Pointer(&i)), 0); err != 0 {
+	if _, _, err := unix.RawSyscall(unix.SYS_PRCTL, prGetChildSubreaper, uintptr(unsafe.Pointer(&i)), 0); err != 0 {
 		return -1, err
 	}
 	return int(i), nil
@@ -41,7 +42,7 @@ func GetSubreaper() (int, error) {
 
 // SetSubreaper sets the value i as the subreaper setting for the calling process
 func SetSubreaper(i int) error {
-	if _, _, err := syscall.RawSyscall(syscall.SYS_PRCTL, prSetChildSubreaper, uintptr(i), 0); err != 0 {
+	if _, _, err := unix.RawSyscall(unix.SYS_PRCTL, prSetChildSubreaper, uintptr(i), 0); err != 0 {
 		return err
 	}
 	return nil

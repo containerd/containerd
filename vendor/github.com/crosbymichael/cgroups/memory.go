@@ -11,6 +11,8 @@ import (
 	"strings"
 	"syscall"
 
+	"golang.org/x/sys/unix"
+
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -153,12 +155,12 @@ func (m *memoryController) OOMEventFD(path string) (uintptr, error) {
 		return 0, err
 	}
 	defer f.Close()
-	fd, _, serr := syscall.RawSyscall(syscall.SYS_EVENTFD2, 0, syscall.FD_CLOEXEC, 0)
+	fd, _, serr := unix.RawSyscall(unix.SYS_EVENTFD2, 0, unix.FD_CLOEXEC, 0)
 	if serr != 0 {
 		return 0, serr
 	}
 	if err := writeEventFD(root, f.Fd(), fd); err != nil {
-		syscall.Close(int(fd))
+		unix.Close(int(fd))
 		return 0, err
 	}
 	return fd, nil
@@ -284,7 +286,7 @@ func getMemorySettings(resources *specs.LinuxResources) []memorySettings {
 func checkEBUSY(err error) error {
 	if pathErr, ok := err.(*os.PathError); ok {
 		if errNo, ok := pathErr.Err.(syscall.Errno); ok {
-			if errNo == syscall.EBUSY {
+			if errNo == unix.EBUSY {
 				return fmt.Errorf(
 					"failed to set memory.kmem.limit_in_bytes, because either tasks have already joined this cgroup or it has children")
 			}

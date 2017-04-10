@@ -12,6 +12,8 @@ import (
 	"sync"
 	"syscall"
 
+	"golang.org/x/sys/unix"
+
 	shimapi "github.com/containerd/containerd/api/services/shim"
 	"github.com/crosbymichael/console"
 	runc "github.com/crosbymichael/go-runc"
@@ -40,7 +42,7 @@ func newExecProcess(context context.Context, path string, r *shimapi.ExecRequest
 	}
 	var (
 		err     error
-		socket  *runc.ConsoleSocket
+		socket  *runc.Socket
 		io      runc.IO
 		pidfile = filepath.Join(path, fmt.Sprintf("%d.pid", id))
 	)
@@ -145,7 +147,7 @@ func (e *execProcess) Resize(ws console.WinSize) error {
 }
 
 func (e *execProcess) Signal(sig int) error {
-	return syscall.Kill(e.pid, syscall.Signal(sig))
+	return unix.Kill(e.pid, syscall.Signal(sig))
 }
 
 func (e *execProcess) Stdin() io.Closer {

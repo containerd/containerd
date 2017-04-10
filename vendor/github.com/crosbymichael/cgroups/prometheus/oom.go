@@ -2,7 +2,8 @@ package prometheus
 
 import (
 	"sync"
-	"syscall"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/crosbymichael/cgroups"
@@ -10,7 +11,7 @@ import (
 )
 
 func NewOOMCollector(ns *metrics.Namespace) (*OOMCollector, error) {
-	fd, err := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
+	fd, err := unix.EpollCreate1(unix.EPOLL_CLOEXEC)
 	if err != nil {
 		return nil, err
 	}
@@ -49,11 +50,11 @@ func (o *OOMCollector) Add(id string, cg cgroups.Cgroup) error {
 	}
 	// set the gauge's default value
 	o.memoryOOM.WithValues(id).Set(0)
-	event := syscall.EpollEvent{
+	event := unix.EpollEvent{
 		Fd:     int32(fd),
-		Events: syscall.EPOLLHUP | syscall.EPOLLIN | syscall.EPOLLERR,
+		Events: unix.EPOLLHUP | unix.EPOLLIN | unix.EPOLLERR,
 	}
-	if err := syscall.EpollCtl(o.fd, syscall.EPOLL_CTL_ADD, int(fd), &event); err != nil {
+	if err := unix.EpollCtl(o.fd, unix.EPOLL_CTL_ADD, int(fd), &event); err != nil {
 		return err
 	}
 	return nil
@@ -61,15 +62,15 @@ func (o *OOMCollector) Add(id string, cg cgroups.Cgroup) error {
 
 // Close closes the epoll fd
 func (o *OOMCollector) Close() error {
-	return syscall.Close(int(o.fd))
+	return unix.Close(int(o.fd))
 }
 
 func (o *OOMCollector) start() {
-	var events [128]syscall.EpollEvent
+	var events [128]unix.EpollEvent
 	for {
-		n, err := syscall.EpollWait(o.fd, events[:], -1)
+		n, err := unix.EpollWait(o.fd, events[:], -1)
 		if err != nil {
-			if err == syscall.EINTR {
+			if err == unix.EINTR {
 				continue
 			}
 			logrus.WithField("error", err).Fatal("cgroups: epoll wait")
@@ -97,7 +98,7 @@ func (o *OOMCollector) process(fd uintptr, event uint32) {
 		o.mu.Lock()
 		delete(o.set, fd)
 		o.mu.Unlock()
-		syscall.Close(int(fd))
+		unix.Close(int(fd))
 		return
 	}
 	o.memoryOOM.WithValues(info.id).Inc(1)
@@ -105,6 +106,6 @@ func (o *OOMCollector) process(fd uintptr, event uint32) {
 
 func flush(fd uintptr) error {
 	buf := make([]byte, 8)
-	_, err := syscall.Read(int(fd), buf)
+	_, err := unix.Read(int(fd), buf)
 	return err
 }
