@@ -42,6 +42,19 @@ func spec(id string, config *ocispec.ImageConfig, context *cli.Context) *specs.S
 		cwd = `C:\`
 	}
 
+	// Some sane defaults for console
+	w := 80
+	h := 20
+
+	if tty {
+		con := console.Current()
+		size, err := con.Size()
+		if err == nil {
+			w = int(size.Width)
+			h = int(size.Height)
+		}
+	}
+
 	return &specs.Spec{
 		Version: specs.Version,
 		Platform: specs.Platform{
@@ -60,8 +73,8 @@ func spec(id string, config *ocispec.ImageConfig, context *cli.Context) *specs.S
 				Username: config.User,
 			},
 			ConsoleSize: specs.Box{
-				Height: 20,
-				Width:  80,
+				Height: uint(w),
+				Width:  uint(h),
 			},
 		},
 		Hostname: id,
