@@ -7,7 +7,8 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
-	"syscall"
+
+	"golang.org/x/sys/unix"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -207,7 +208,7 @@ func handleConsoleResize(ctx gocontext.Context, service execution.ContainerServi
 		return err
 	}
 	s := make(chan os.Signal, 16)
-	signal.Notify(s, syscall.SIGWINCH)
+	signal.Notify(s, unix.SIGWINCH)
 	go func() {
 		for range s {
 			size, err := con.Size()

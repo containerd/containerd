@@ -8,7 +8,8 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"syscall"
+
+	"golang.org/x/sys/unix"
 
 	"google.golang.org/grpc"
 
@@ -117,11 +118,11 @@ func handleSignals(signals chan os.Signal, server *grpc.Server) error {
 	for s := range signals {
 		logrus.WithField("signal", s).Debug("received signal")
 		switch s {
-		case syscall.SIGCHLD:
+		case unix.SIGCHLD:
 			if err := reaper.Reap(); err != nil {
 				logrus.WithError(err).Error("reap exit status")
 			}
-		case syscall.SIGTERM, syscall.SIGINT:
+		case unix.SIGTERM, unix.SIGINT:
 			// TODO: should we forward signals to the processes if they are still running?
 			// i.e. machine reboot
 			server.Stop()
@@ -133,5 +134,5 @@ func handleSignals(signals chan os.Signal, server *grpc.Server) error {
 
 // setupRoot sets up the root as the shim is started in its own mount namespace
 func setupRoot() error {
-	return syscall.Mount("", "/", "", syscall.MS_SLAVE|syscall.MS_REC, "")
+	return unix.Mount("", "/", "", unix.MS_SLAVE|unix.MS_REC, "")
 }

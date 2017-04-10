@@ -4,7 +4,8 @@ package main
 
 import (
 	"os"
-	"syscall"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/reaper"
@@ -18,7 +19,7 @@ const (
 )
 
 var (
-	handledSignals = []os.Signal{syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1, syscall.SIGCHLD}
+	handledSignals = []os.Signal{unix.SIGTERM, unix.SIGINT, unix.SIGUSR1, unix.SIGCHLD}
 )
 
 func platformInit(context *cli.Context) error {
@@ -35,7 +36,7 @@ func handleSignals(signals chan os.Signal, server *grpc.Server) error {
 	for s := range signals {
 		log.G(global).WithField("signal", s).Debug("received signal")
 		switch s {
-		case syscall.SIGCHLD:
+		case unix.SIGCHLD:
 			if err := reaper.Reap(); err != nil {
 				log.G(global).WithError(err).Error("reap containerd processes")
 			}
