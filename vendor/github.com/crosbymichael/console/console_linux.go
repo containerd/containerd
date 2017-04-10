@@ -5,15 +5,16 @@ import "C"
 
 import (
 	"os"
-	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 // NewPty creates a new pty pair
 // The master is returned as the first console and a string
 // with the path to the pty slave is returned as the second
 func NewPty() (Console, string, error) {
-	f, err := os.OpenFile("/dev/ptmx", syscall.O_RDWR|syscall.O_NOCTTY|syscall.O_CLOEXEC, 0)
+	f, err := os.OpenFile("/dev/ptmx", unix.O_RDWR|unix.O_NOCTTY|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return nil, "", err
 	}
@@ -34,7 +35,7 @@ func NewPty() (Console, string, error) {
 
 type master struct {
 	f       *os.File
-	termios *syscall.Termios
+	termios *unix.Termios
 }
 
 func (m *master) Read(b []byte) (int, error) {
@@ -52,7 +53,7 @@ func (m *master) Close() error {
 func (m *master) Resize(ws WinSize) error {
 	return ioctl(
 		m.f.Fd(),
-		uintptr(syscall.TIOCSWINSZ),
+		uintptr(unix.TIOCSWINSZ),
 		uintptr(unsafe.Pointer(&ws)),
 	)
 }
@@ -73,7 +74,7 @@ func (m *master) Reset() error {
 }
 
 func (m *master) SetRaw() error {
-	m.termios = &syscall.Termios{}
+	m.termios = &unix.Termios{}
 	if err := tcget(m.f.Fd(), m.termios); err != nil {
 		return err
 	}
@@ -87,7 +88,7 @@ func (m *master) Size() (WinSize, error) {
 	var ws WinSize
 	if err := ioctl(
 		m.f.Fd(),
-		uintptr(syscall.TIOCGWINSZ),
+		uintptr(unix.TIOCGWINSZ),
 		uintptr(unsafe.Pointer(&ws)),
 	); err != nil {
 		return ws, err
@@ -97,7 +98,7 @@ func (m *master) Size() (WinSize, error) {
 
 // checkConsole checks if the provided file is a console
 func checkConsole(f *os.File) error {
-	var termios syscall.Termios
+	var termios unix.Termios
 	if tcget(f.Fd(), &termios) != nil {
 		return ErrNotAConsole
 	}

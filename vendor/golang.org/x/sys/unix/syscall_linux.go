@@ -452,6 +452,127 @@ func (sa *SockaddrCAN) sockaddr() (unsafe.Pointer, _Socklen, error) {
 	return unsafe.Pointer(&sa.raw), SizeofSockaddrCAN, nil
 }
 
+// SockaddrALG implements the Sockaddr interface for AF_ALG type sockets.
+// SockaddrALG enables userspace access to the Linux kernel's cryptography
+// subsystem. The Type and Name fields specify which type of hash or cipher
+// should be used with a given socket.
+//
+// To create a file descriptor that provides access to a hash or cipher, both
+// Bind and Accept must be used. Once the setup process is complete, input
+// data can be written to the socket, processed by the kernel, and then read
+// back as hash output or ciphertext.
+//
+// Here is an example of using an AF_ALG socket with SHA1 hashing.
+// The initial socket setup process is as follows:
+//
+//      // Open a socket to perform SHA1 hashing.
+//      fd, _ := unix.Socket(unix.AF_ALG, unix.SOCK_SEQPACKET, 0)
+//      addr := &unix.SockaddrALG{Type: "hash", Name: "sha1"}
+//      unix.Bind(fd, addr)
+//      // Note: unix.Accept does not work at this time; must invoke accept()
+//      // manually using unix.Syscall.
+//      hashfd, _, _ := unix.Syscall(unix.SYS_ACCEPT, uintptr(fd), 0, 0)
+//
+// Once a file descriptor has been returned from Accept, it may be used to
+// perform SHA1 hashing. The descriptor is not safe for concurrent use, but
+// may be re-used repeatedly with subsequent Write and Read operations.
+//
+// When hashing a small byte slice or string, a single Write and Read may
+// be used:
+//
+//      // Assume hashfd is already configured using the setup process.
+//      hash := os.NewFile(hashfd, "sha1")
+//      // Hash an input string and read the results. Each Write discards
+//      // previous hash state. Read always reads the current state.
+//      b := make([]byte, 20)
+//      for i := 0; i < 2; i++ {
+//          io.WriteString(hash, "Hello, world.")
+//          hash.Read(b)
+//          fmt.Println(hex.EncodeToString(b))
+//      }
+//      // Output:
+//      // 2ae01472317d1935a84797ec1983ae243fc6aa28
+//      // 2ae01472317d1935a84797ec1983ae243fc6aa28
+//
+// For hashing larger byte slices, or byte streams such as those read from
+// a file or socket, use Sendto with MSG_MORE to instruct the kernel to update
+// the hash digest instead of creating a new one for a given chunk and finalizing it.
+//
+//      // Assume hashfd and addr are already configured using the setup process.
+//      hash := os.NewFile(hashfd, "sha1")
+//      // Hash the contents of a file.
+//      f, _ := os.Open("/tmp/linux-4.10-rc7.tar.xz")
+//      b := make([]byte, 4096)
+//      for {
+//          n, err := f.Read(b)
+//          if err == io.EOF {
+//              break
+//          }
+//          unix.Sendto(hashfd, b[:n], unix.MSG_MORE, addr)
+//      }
+//      hash.Read(b)
+//      fmt.Println(hex.EncodeToString(b))
+//      // Output: 85cdcad0c06eef66f805ecce353bec9accbeecc5
+//
+// For more information, see: http://www.chronox.de/crypto-API/crypto/userspace-if.html.
+type SockaddrALG struct {
+	Type    string
+	Name    string
+	Feature uint32
+	Mask    uint32
+	raw     RawSockaddrALG
+}
+
+func (sa *SockaddrALG) sockaddr() (unsafe.Pointer, _Socklen, error) {
+	// Leave room for NUL byte terminator.
+	if len(sa.Type) > 13 {
+		return nil, 0, EINVAL
+	}
+	if len(sa.Name) > 63 {
+		return nil, 0, EINVAL
+	}
+
+	sa.raw.Family = AF_ALG
+	sa.raw.Feat = sa.Feature
+	sa.raw.Mask = sa.Mask
+
+	typ, err := ByteSliceFromString(sa.Type)
+	if err != nil {
+		return nil, 0, err
+	}
+	name, err := ByteSliceFromString(sa.Name)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	copy(sa.raw.Type[:], typ)
+	copy(sa.raw.Name[:], name)
+
+	return unsafe.Pointer(&sa.raw), SizeofSockaddrALG, nil
+}
+
+// SockaddrVM implements the Sockaddr interface for AF_VSOCK type sockets.
+// SockaddrVM provides access to Linux VM sockets: a mechanism that enables
+// bidirectional communication between a hypervisor and its guest virtual
+// machines.
+type SockaddrVM struct {
+	// CID and Port specify a context ID and port address for a VM socket.
+	// Guests have a unique CID, and hosts may have a well-known CID of:
+	//  - VMADDR_CID_HYPERVISOR: refers to the hypervisor process.
+	//  - VMADDR_CID_HOST: refers to other processes on the host.
+	CID  uint32
+	Port uint32
+	raw  RawSockaddrVM
+}
+
+func (sa *SockaddrVM) sockaddr() (unsafe.Pointer, _Socklen, error) {
+	sa.raw.Family = AF_VSOCK
+	sa.raw.Port = sa.Port
+	sa.raw.Cid = sa.CID
+
+	return unsafe.Pointer(&sa.raw), SizeofSockaddrVM, nil
+}
+
 func anyToSockaddr(rsa *RawSockaddrAny) (Sockaddr, error) {
 	switch rsa.Addr.Family {
 	case AF_NETLINK:
@@ -519,6 +640,14 @@ func anyToSockaddr(rsa *RawSockaddrAny) (Sockaddr, error) {
 		sa.ZoneId = pp.Scope_id
 		for i := 0; i < len(sa.Addr); i++ {
 			sa.Addr[i] = pp.Addr[i]
+		}
+		return sa, nil
+
+	case AF_VSOCK:
+		pp := (*RawSockaddrVM)(unsafe.Pointer(rsa))
+		sa := &SockaddrVM{
+			CID:  pp.Cid,
+			Port: pp.Port,
 		}
 		return sa, nil
 	}
@@ -611,6 +740,13 @@ func GetsockoptICMPv6Filter(fd, level, opt int) (*ICMPv6Filter, error) {
 func GetsockoptUcred(fd, level, opt int) (*Ucred, error) {
 	var value Ucred
 	vallen := _Socklen(SizeofUcred)
+	err := getsockopt(fd, level, opt, unsafe.Pointer(&value), &vallen)
+	return &value, err
+}
+
+func GetsockoptTCPInfo(fd, level, opt int) (*TCPInfo, error) {
+	var value TCPInfo
+	vallen := _Socklen(SizeofTCPInfo)
 	err := getsockopt(fd, level, opt, unsafe.Pointer(&value), &vallen)
 	return &value, err
 }
@@ -752,6 +888,10 @@ func PtracePeekData(pid int, addr uintptr, out []byte) (count int, err error) {
 	return ptracePeek(PTRACE_PEEKDATA, pid, addr, out)
 }
 
+func PtracePeekUser(pid int, addr uintptr, out []byte) (count int, err error) {
+	return ptracePeek(PTRACE_PEEKUSR, pid, addr, out)
+}
+
 func ptracePoke(pokeReq int, peekReq int, pid int, addr uintptr, data []byte) (count int, err error) {
 	// As for ptracePeek, we need to align our accesses to deal
 	// with the possibility of straddling an invalid page.
@@ -850,38 +990,24 @@ func Reboot(cmd int) (err error) {
 	return reboot(LINUX_REBOOT_MAGIC1, LINUX_REBOOT_MAGIC2, cmd, "")
 }
 
-func clen(n []byte) int {
-	for i := 0; i < len(n); i++ {
-		if n[i] == 0 {
-			return i
-		}
-	}
-	return len(n)
-}
-
 func ReadDirent(fd int, buf []byte) (n int, err error) {
 	return Getdents(fd, buf)
 }
 
-func ParseDirent(buf []byte, max int, names []string) (consumed int, count int, newnames []string) {
-	origlen := len(buf)
-	count = 0
-	for max != 0 && len(buf) > 0 {
-		dirent := (*Dirent)(unsafe.Pointer(&buf[0]))
-		buf = buf[dirent.Reclen:]
-		if dirent.Ino == 0 { // File absent in directory.
-			continue
-		}
-		bytes := (*[10000]byte)(unsafe.Pointer(&dirent.Name[0]))
-		var name = string(bytes[0:clen(bytes[:])])
-		if name == "." || name == ".." { // Useless names
-			continue
-		}
-		max--
-		count++
-		names = append(names, name)
+func direntIno(buf []byte) (uint64, bool) {
+	return readInt(buf, unsafe.Offsetof(Dirent{}.Ino), unsafe.Sizeof(Dirent{}.Ino))
+}
+
+func direntReclen(buf []byte) (uint64, bool) {
+	return readInt(buf, unsafe.Offsetof(Dirent{}.Reclen), unsafe.Sizeof(Dirent{}.Reclen))
+}
+
+func direntNamlen(buf []byte) (uint64, bool) {
+	reclen, ok := direntReclen(buf)
+	if !ok {
+		return 0, false
 	}
-	return origlen - len(buf), count, names
+	return reclen - uint64(unsafe.Offsetof(Dirent{}.Name)), true
 }
 
 //sys	mount(source string, target string, fstype string, flags uintptr, data *byte) (err error)
@@ -939,6 +1065,7 @@ func Getpgrp() (pid int) {
 //sysnb	Getpid() (pid int)
 //sysnb	Getppid() (ppid int)
 //sys	Getpriority(which int, who int) (prio int, err error)
+//sys	Getrandom(buf []byte, flags int) (n int, err error)
 //sysnb	Getrusage(who int, rusage *Rusage) (err error)
 //sysnb	Getsid(pid int) (sid int, err error)
 //sysnb	Gettid() (tid int)
@@ -1018,6 +1145,25 @@ func Munmap(b []byte) (err error) {
 //sys	Munlock(b []byte) (err error)
 //sys	Mlockall(flags int) (err error)
 //sys	Munlockall() (err error)
+
+// Vmsplice splices user pages from a slice of Iovecs into a pipe specified by fd,
+// using the specified flags.
+func Vmsplice(fd int, iovs []Iovec, flags int) (int, error) {
+	n, _, errno := Syscall6(
+		SYS_VMSPLICE,
+		uintptr(fd),
+		uintptr(unsafe.Pointer(&iovs[0])),
+		uintptr(len(iovs)),
+		uintptr(flags),
+		0,
+		0,
+	)
+	if errno != 0 {
+		return 0, syscall.Errno(errno)
+	}
+
+	return int(n), nil
+}
 
 /*
  * Unimplemented
@@ -1146,7 +1292,6 @@ func Munmap(b []byte) (err error) {
 // Utimensat
 // Vfork
 // Vhangup
-// Vmsplice
 // Vserver
 // Waitid
 // _Sysctl

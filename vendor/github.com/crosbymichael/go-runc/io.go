@@ -4,7 +4,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"syscall"
+
+	"golang.org/x/sys/unix"
 )
 
 type IO interface {
@@ -60,10 +61,10 @@ func newPipe(uid, gid int) (*pipe, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := syscall.Fchown(int(r.Fd()), uid, gid); err != nil {
+	if err := unix.Fchown(int(r.Fd()), uid, gid); err != nil {
 		return nil, err
 	}
-	if err := syscall.Fchown(int(w.Fd()), uid, gid); err != nil {
+	if err := unix.Fchown(int(w.Fd()), uid, gid); err != nil {
 		return nil, err
 	}
 	return &pipe{

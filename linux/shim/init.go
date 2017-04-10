@@ -57,7 +57,7 @@ func newInitProcess(context context.Context, path string, r *shimapi.CreateReque
 	}
 	var (
 		err    error
-		socket *runc.ConsoleSocket
+		socket *runc.Socket
 		io     runc.IO
 	)
 	if r.Terminal {

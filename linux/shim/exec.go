@@ -42,7 +42,7 @@ func newExecProcess(context context.Context, path string, r *shimapi.ExecRequest
 	}
 	var (
 		err     error
-		socket  *runc.ConsoleSocket
+		socket  *runc.Socket
 		io      runc.IO
 		pidfile = filepath.Join(path, fmt.Sprintf("%d.pid", id))
 	)

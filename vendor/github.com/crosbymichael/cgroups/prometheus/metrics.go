@@ -11,7 +11,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var ErrAlreadyCollected = errors.New("cgroup is already being collected")
+var (
+	ErrAlreadyCollected = errors.New("cgroup is already being collected")
+	ErrCgroupNotExists  = errors.New("cgroup does not exist in the collector")
+)
 
 // New registers the Collector with the provided namespace and returns it so
 // that cgroups can be added for collection
@@ -78,6 +81,18 @@ func (c *Collector) Add(id string, cg cgroups.Cgroup) error {
 	}
 	c.cgroups[id] = cg
 	return nil
+}
+
+// Get returns the cgroup that is being collected under the provided id
+// returns ErrCgroupNotExists if the id is not being collected
+func (c *Collector) Get(id string) (cgroups.Cgroup, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	cg, ok := c.cgroups[id]
+	if !ok {
+		return nil, ErrCgroupNotExists
+	}
+	return cg, nil
 }
 
 // Remove removes the provided cgroup by id from the collector
