@@ -17,6 +17,8 @@ service ContainerService {
 	rpc Kill(KillRequest) returns (google.protobuf.Empty);
 	rpc Events(EventsRequest) returns (stream containerd.v1.types.Event);
 	rpc Exec(ExecRequest) returns (ExecResponse);
+	rpc Pty(PtyRequest) returns (google.protobuf.Empty);
+	rpc CloseStdin(CloseStdinRequest) returns (google.protobuf.Empty);
 }
 
 message CreateRequest {
@@ -79,4 +81,16 @@ message ExecRequest {
 
 message ExecResponse {
 	uint32 pid = 1;
+}
+
+message PtyRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];
+	uint32 pid = 2;
+	uint32 width = 3;
+	uint32 height = 4;
+}
+
+message CloseStdinRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];
+	uint32 pid = 2;
 }

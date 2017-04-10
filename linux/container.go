@@ -24,6 +24,13 @@ func (s State) Status() containerd.Status {
 	return s.status
 }
 
+func newContainer(id string, shim shim.ShimClient) *Container {
+	return &Container{
+		id:   id,
+		shim: shim,
+	}
+}
+
 type Container struct {
 	id string
 
@@ -102,6 +109,21 @@ func (c *Container) Exec(ctx context.Context, opts containerd.ExecOpts) (contain
 		pid: int(resp.Pid),
 		c:   c,
 	}, nil
+}
+func (c *Container) Pty(ctx context.Context, pid uint32, size containerd.ConsoleSize) error {
+	_, err := c.shim.Pty(ctx, &shim.PtyRequest{
+		Pid:    pid,
+		Width:  size.Width,
+		Height: size.Height,
+	})
+	return err
+}
+
+func (c *Container) CloseStdin(ctx context.Context, pid uint32) error {
+	_, err := c.shim.CloseStdin(ctx, &shim.CloseStdinRequest{
+		Pid: pid,
+	})
+	return err
 }
 
 type Process struct {

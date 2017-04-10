@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
 	"runtime"
+	"syscall"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd/api/services/execution"
 	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
 	"github.com/containerd/containerd/images"
@@ -143,8 +146,9 @@ var runCommand = cli.Command{
 		if resp != nil {
 			create.Rootfs = resp.Mounts
 		}
+		var con console.Console
 		if create.Terminal {
-			con := console.Current()
+			con = console.Current()
 			defer con.Reset()
 			if err := con.SetRaw(); err != nil {
 				return err
@@ -159,12 +163,16 @@ var runCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		if create.Terminal {
+			if err := handleConsoleResize(ctx, containers, response.ID, response.Pid, con); err != nil {
+				logrus.WithError(err).Error("console resize")
+			}
+		}
 		if _, err := containers.Start(ctx, &execution.StartRequest{
 			ID: response.ID,
 		}); err != nil {
 			return err
 		}
-
 		// Ensure we read all io only if container started successfully.
 		defer fwg.Wait()
 
@@ -182,4 +190,40 @@ var runCommand = cli.Command{
 		}
 		return nil
 	},
+}
+
+func handleConsoleResize(ctx gocontext.Context, service execution.ContainerServiceClient, id string, pid uint32, con console.Console) error {
+	// do an initial resize of the console
+	size, err := con.Size()
+	if err != nil {
+		return err
+	}
+	if _, err := service.Pty(ctx, &execution.PtyRequest{
+		ID:     id,
+		Pid:    pid,
+		Width:  uint32(size.Width),
+		Height: uint32(size.Height),
+	}); err != nil {
+		return err
+	}
+	s := make(chan os.Signal, 16)
+	signal.Notify(s, syscall.SIGWINCH)
+	go func() {
+		for range s {
+			size, err := con.Size()
+			if err != nil {
+				logrus.WithError(err).Error("get pty size")
+				continue
+			}
+			if _, err := service.Pty(ctx, &execution.PtyRequest{
+				ID:     id,
+				Pid:    pid,
+				Width:  uint32(size.Width),
+				Height: uint32(size.Height),
+			}); err != nil {
+				logrus.WithError(err).Error("resize pty")
+			}
+		}
+	}()
+	return nil
 }

@@ -226,6 +226,31 @@ func (s *Service) Exec(ctx context.Context, r *api.ExecRequest) (*api.ExecRespon
 	}, nil
 }
 
+func (s *Service) Pty(ctx context.Context, r *api.PtyRequest) (*google_protobuf.Empty, error) {
+	c, err := s.getContainer(r.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.Pty(ctx, r.Pid, containerd.ConsoleSize{
+		Width:  r.Width,
+		Height: r.Height,
+	}); err != nil {
+		return nil, err
+	}
+	return empty, nil
+}
+
+func (s *Service) CloseStdin(ctx context.Context, r *api.CloseStdinRequest) (*google_protobuf.Empty, error) {
+	c, err := s.getContainer(r.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.CloseStdin(ctx, r.Pid); err != nil {
+		return nil, err
+	}
+	return empty, nil
+}
+
 func (s *Service) getContainer(id string) (containerd.Container, error) {
 	s.mu.Lock()
 	c, ok := s.containers[id]

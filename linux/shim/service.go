@@ -233,6 +233,17 @@ func (s *Service) Kill(ctx context.Context, r *shimapi.KillRequest) (*google_pro
 	return empty, nil
 }
 
+func (s *Service) CloseStdin(ctx context.Context, r *shimapi.CloseStdinRequest) (*google_protobuf.Empty, error) {
+	p, ok := s.processes[int(r.Pid)]
+	if !ok {
+		return nil, fmt.Errorf("process does not exist %d", r.Pid)
+	}
+	if err := p.Stdin().Close(); err != nil {
+		return nil, err
+	}
+	return empty, nil
+}
+
 func (s *Service) waitExit(p process, pid int, cmd *reaper.Cmd) {
 	status := <-cmd.ExitCh
 	p.Exited(status)

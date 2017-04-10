@@ -74,6 +74,10 @@ func (c *client) Exit(ctx context.Context, in *shimapi.ExitRequest, opts ...grpc
 	return empty, nil
 }
 
+func (c *client) CloseStdin(ctx context.Context, in *shimapi.CloseStdinRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+	return c.s.CloseStdin(ctx, in)
+}
+
 type events struct {
 	c   chan *container.Event
 	ctx context.Context

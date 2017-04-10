@@ -4,6 +4,7 @@ import (
 	gocontext "context"
 	"os"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd/api/services/execution"
 	"github.com/crosbymichael/console"
 	"github.com/urfave/cli"
@@ -49,8 +50,9 @@ var execCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		var con console.Console
 		if request.Terminal {
-			con := console.Current()
+			con = console.Current()
 			defer con.Reset()
 			if err := con.SetRaw(); err != nil {
 				return err
@@ -64,6 +66,12 @@ var execCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		if request.Terminal {
+			if err := handleConsoleResize(ctx, containers, id, response.Pid, con); err != nil {
+				logrus.WithError(err).Error("console resize")
+			}
+		}
+
 		// Ensure we read all io only if container started successfully.
 		defer fwg.Wait()
 
