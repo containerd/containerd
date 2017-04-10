@@ -30,7 +30,7 @@ func main() {
    ____/ (_)____/ /_
   / __  / / ___/ __/
  / /_/ / (__  ) /_
- \__,_/_/____/\__/  
+ \__,_/_/____/\__/
 
 distribution tool
 `
@@ -55,8 +55,8 @@ distribution tool
 			Value: "/var/lib/containerd",
 		},
 		cli.StringFlag{
-			Name:  "socket, s",
-			Usage: "socket path for containerd's GRPC server",
+			Name:  "address, a",
+			Usage: "address for containerd's GRPC server",
 			Value: "/run/containerd/containerd.sock",
 		},
 	}
