@@ -3,7 +3,6 @@ package main
 import (
 	_ "expvar"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -82,6 +81,9 @@ func main() {
 			Usage: "containerd root directory",
 		},
 	}
+	app.Commands = []cli.Command{
+		configCommand,
+	}
 	app.Before = before
 	app.Action = func(context *cli.Context) error {
 		start := time.Now()
@@ -152,19 +154,6 @@ func main() {
 }
 
 func before(context *cli.Context) error {
-	if context.GlobalString("config") == "default" {
-		fh, err := ioutil.TempFile("", "containerd-config.toml.")
-		if err != nil {
-			return err
-		}
-		if _, err := conf.WriteTo(fh); err != nil {
-			fh.Close()
-			return err
-		}
-		fh.Close()
-		log.G(global).Infof("containerd default config written to %q", fh.Name())
-		os.Exit(0)
-	}
 	err := loadConfig(context.GlobalString("config"))
 	if err != nil && !os.IsNotExist(err) {
 		return err
