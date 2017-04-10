@@ -152,7 +152,8 @@ func main() {
 }
 
 func before(context *cli.Context) error {
-	if context.GlobalString("config") == "default" {
+	config := context.GlobalString("config")
+	if config == "default" {
 		fh, err := ioutil.TempFile("", "containerd-config.toml.")
 		if err != nil {
 			return err
@@ -165,12 +166,16 @@ func before(context *cli.Context) error {
 		log.G(global).Infof("containerd default config written to %q", fh.Name())
 		os.Exit(0)
 	}
-	err := loadConfig(context.GlobalString("config"))
+
+	err := loadConfig(config)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	} else if err != nil && os.IsNotExist(err) {
-		log.G(global).Infof("config %q does not exist. Creating it.", context.GlobalString("config"))
-		fh, err := os.Create(context.GlobalString("config"))
+		log.G(global).Infof("config %q does not exist. Creating it.", config)
+		if err := os.MkdirAll(filepath.Dir(config), 0700); err != nil {
+			return err
+		}
+		fh, err := os.Create(config)
 		if err != nil {
 			return err
 		}
