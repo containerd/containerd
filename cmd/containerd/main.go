@@ -157,19 +157,7 @@ func before(context *cli.Context) error {
 	err := loadConfig(context.GlobalString("config"))
 	if err != nil && !os.IsNotExist(err) {
 		return err
-	} else if err != nil && os.IsNotExist(err) {
-		log.G(global).Infof("config %q does not exist. Creating it.", context.GlobalString("config"))
-		fh, err := os.Create(context.GlobalString("config"))
-		if err != nil {
-			return err
-		}
-		if _, err := conf.WriteTo(fh); err != nil {
-			fh.Close()
-			return err
-		}
-		fh.Close()
 	}
-
 	// the order for config vs flag values is that flags will always override
 	// the config values if they are set
 	if err := setLevel(context); err != nil {
