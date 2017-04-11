@@ -42,6 +42,10 @@ var runCommand = cli.Command{
 			Usage: "runtime name (linux, windows, vmware-linux)",
 			Value: "linux",
 		},
+		cli.StringFlag{
+			Name:  "runtime-config",
+			Usage: "set the OCI config file for the container",
+		},
 		cli.BoolFlag{
 			Name:  "readonly",
 			Usage: "set the containers filesystem as readonly",
