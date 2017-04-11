@@ -95,9 +95,10 @@ var runCommand = cli.Command{
 			if err != nil {
 				return errors.Wrapf(err, "could not resolve %q", ref)
 			}
+			image.Provider = provider
 			// let's close out our db and tx so we don't hold the lock whilst running.
 
-			diffIDs, err := image.RootFS(ctx, provider)
+			diffIDs, err := image.RootFS(ctx)
 			if err != nil {
 				return err
 			}
@@ -118,7 +119,7 @@ var runCommand = cli.Command{
 				return err
 			}
 
-			ic, err := image.Config(ctx, provider)
+			ic, err := image.Config(ctx)
 			if err != nil {
 				return err
 			}
