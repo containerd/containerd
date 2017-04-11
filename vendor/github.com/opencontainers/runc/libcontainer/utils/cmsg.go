@@ -3,7 +3,7 @@
 package utils
 
 /*
- * Copyright 2016 SUSE LLC
+ * Copyright 2016, 2017 SUSE LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,28 +18,66 @@ package utils
  * limitations under the License.
  */
 
-/*
-#include <errno.h>
-#include <stdlib.h>
-#include "cmsg.h"
-*/
-import "C"
-
 import (
+	"fmt"
 	"os"
-	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
+
+// MaxSendfdLen is the maximum length of the name of a file descriptor being
+// sent using SendFd. The name of the file handle returned by RecvFd will never
+// be larger than this value.
+const MaxNameLen = 4096
+
+// oobSpace is the size of the oob slice required to store a single FD. Note
+// that unix.UnixRights appears to make the assumption that fd is always int32,
+// so sizeof(fd) = 4.
+var oobSpace = unix.CmsgSpace(4)
 
 // RecvFd waits for a file descriptor to be sent over the given AF_UNIX
 // socket. The file name of the remote file descriptor will be recreated
 // locally (it is sent as non-auxiliary data in the same payload).
 func RecvFd(socket *os.File) (*os.File, error) {
-	file, err := C.recvfd(C.int(socket.Fd()))
+	// For some reason, unix.Recvmsg uses the length rather than the capacity
+	// when passing the msg_controllen and other attributes to recvmsg.  So we
+	// have to actually set the length.
+	name := make([]byte, MaxNameLen)
+	oob := make([]byte, oobSpace)
+
+	sockfd := socket.Fd()
+	n, oobn, _, _, err := unix.Recvmsg(int(sockfd), name, oob, 0)
 	if err != nil {
 		return nil, err
 	}
-	defer C.free(unsafe.Pointer(file.name))
-	return os.NewFile(uintptr(file.fd), C.GoString(file.name)), nil
+
+	if n >= MaxNameLen || oobn != oobSpace {
+		return nil, fmt.Errorf("recvfd: incorrect number of bytes read (n=%d oobn=%d)", n, oobn)
+	}
+
+	// Truncate.
+	name = name[:n]
+	oob = oob[:oobn]
+
+	scms, err := unix.ParseSocketControlMessage(oob)
+	if err != nil {
+		return nil, err
+	}
+	if len(scms) != 1 {
+		return nil, fmt.Errorf("recvfd: number of SCMs is not 1: %d", len(scms))
+	}
+	scm := scms[0]
+
+	fds, err := unix.ParseUnixRights(&scm)
+	if err != nil {
+		return nil, err
+	}
+	if len(fds) != 1 {
+		return nil, fmt.Errorf("recvfd: number of fds is not 1: %d", len(fds))
+	}
+	fd := uintptr(fds[0])
+
+	return os.NewFile(fd, string(name)), nil
 }
 
 // SendFd sends a file descriptor over the given AF_UNIX socket. In
@@ -47,11 +85,11 @@ func RecvFd(socket *os.File) (*os.File, error) {
 // non-auxiliary data in the same payload (allowing to send contextual
 // information for a file descriptor).
 func SendFd(socket, file *os.File) error {
-	var cfile C.struct_file_t
-	cfile.fd = C.int(file.Fd())
-	cfile.name = C.CString(file.Name())
-	defer C.free(unsafe.Pointer(cfile.name))
+	name := []byte(file.Name())
+	if len(name) >= MaxNameLen {
+		return fmt.Errorf("sendfd: filename too long: %s", file.Name())
+	}
+	oob := unix.UnixRights(int(file.Fd()))
 
-	_, err := C.sendfd(C.int(socket.Fd()), cfile)
-	return err
+	return unix.Sendmsg(int(socket.Fd()), name, oob, nil, 0)
 }
