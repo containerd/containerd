@@ -53,6 +53,8 @@ type config struct {
 	Plugins map[string]toml.Primitive `toml:"plugins"`
 	// Enable containerd as a subreaper
 	Subreaper bool `toml:"subreaper"`
+	// OOMScore adjust the containerd's oom score
+	OOMScore int `toml:"oom_score"`
 
 	md toml.MetaData
 }

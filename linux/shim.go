@@ -51,6 +51,9 @@ func newShim(path string, remote bool) (shim.ShimClient, error) {
 	if err := reaper.Default.Start(cmd); err != nil {
 		return nil, errors.Wrapf(err, "failed to start shim")
 	}
+	if err := sys.SetOOMScore(cmd.Process.Pid, sys.OOMScoreMaxKillable); err != nil {
+		return nil, err
+	}
 	return connectShim(socket)
 }
 
