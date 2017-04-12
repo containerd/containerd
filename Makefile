@@ -9,7 +9,11 @@ VERSION=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
 
 PKG=github.com/containerd/containerd
 
+ifneq "$(strip $(shell command -v go 2>/dev/null))" ""
 GOOS ?= $(shell go env GOOS)
+else
+GOOS ?= $$GOOS
+endif
 WHALE = "🐳"
 ONI = "👹"
 ifeq ("$(OS)", "Windows_NT")
