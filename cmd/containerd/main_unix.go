@@ -29,6 +29,12 @@ func platformInit(context *cli.Context) error {
 			return err
 		}
 	}
+	if conf.OOMScore != 0 {
+		log.G(global).Infof("changing OOM score to %d", conf.OOMScore)
+		if err := sys.SetOOMScore(os.Getpid(), conf.OOMScore); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
