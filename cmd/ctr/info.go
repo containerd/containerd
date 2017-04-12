@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 
 	gocontext "context"
+	"errors"
 	"fmt"
 
 	"github.com/containerd/containerd/api/services/execution"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 

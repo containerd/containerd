@@ -5,6 +5,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -23,7 +24,6 @@ import (
 	"github.com/crosbymichael/console"
 	protobuf "github.com/gogo/protobuf/types"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
