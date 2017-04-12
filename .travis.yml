@@ -16,21 +16,24 @@ addons:
       - btrfs-tools
 
 env:
-  - GOOS=windows
-  - GOOS=linux
+  - TRAVIS_GOOS=windows TRAVIS_CGO_ENABLED=1
+  - TRAVIS_GOOS=linux TRAVIS_CGO_ENABLED=1
 
 install:
+  - if [ "$TRAVIS_GOOS" = "windows" ] ; then sudo apt-get install -y gcc-multilib gcc-mingw-w64; export CC=x86_64-w64-mingw32-gcc ; export CXX=x86_64-w64-mingw32-g++ ; fi
   - wget https://github.com/google/protobuf/releases/download/v3.1.0/protoc-3.1.0-linux-x86_64.zip -O /tmp/protoc-3.1.0-linux-x86_64.zip
   - unzip -o -d /tmp/protobuf /tmp/protoc-3.1.0-linux-x86_64.zip
   - export PATH=$PATH:/tmp/protobuf/bin/
   - go get -u github.com/vbatts/git-validation
 
 script:
+  - export GOOS=$TRAVIS_GOOS
+  - export CGO_ENABLED=$TRAVIS_CGO_ENABLED
   - make fmt
   - make binaries
-  - make coverage
   - TRAVIS_COMMIT_RANGE="${TRAVIS_COMMIT_RANGE/.../..}" make dco
-  - sudo PATH=$PATH GOPATH=$GOPATH make root-coverage
+  - if [ "$GOOS" != "windows" ]; then make coverage ; fi
+  - if [ "$GOOS" != "windows" ]; then sudo PATH=$PATH GOPATH=$GOPATH make root-coverage ; fi
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)

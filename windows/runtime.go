@@ -8,13 +8,13 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/windows/hcs"
+	"github.com/containerd/containerd/windows/pid"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 
@@ -22,20 +22,11 @@ import (
 )
 
 const (
-	runtimeName    = "windows"
-	owner          = "containerd"
-	configFilename = "config.json"
+	runtimeName = "windows"
+	owner       = "containerd"
 )
 
-// Win32 error codes that are used for various workarounds
-// These really should be ALL_CAPS to match golangs syscall library and standard
-// Win32 error conventions, but golint insists on CamelCase.
-const (
-	CoEClassstring     = syscall.Errno(0x800401F3) // Invalid class string
-	ErrorNoNetwork     = syscall.Errno(1222)       // The network is not present or not started
-	ErrorBadPathname   = syscall.Errno(161)        // The specified path is invalid
-	ErrorInvalidObject = syscall.Errno(0x800710D8) // The object identifier does not represent a valid object
-)
+var _ = (containerd.Runtime)(&Runtime{})
 
 func init() {
 	plugin.Register(runtimeName, &plugin.Registration{
@@ -52,16 +43,30 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		return nil, errors.Wrapf(err, "could not create state directory at %s", rootDir)
 	}
 
+	r := &Runtime{
+		pidPool:       pid.NewPool(),
+		containers:    make(map[string]*container),
+		events:        make(chan *containerd.Event, 2048),
+		eventsContext: c,
+		eventsCancel:  cancel,
+		rootDir:       rootDir,
+		hcs:           hcs.New(owner, rootDir),
+	}
+
+	sendEvent := func(id string, evType containerd.EventType, pid, exitStatus uint32) {
+		r.sendEvent(id, evType, pid, exitStatus)
+	}
+
 	// Terminate all previous container that we may have started. We don't
 	// support restoring containers
-
-	ctrs, err := loadContainers(ic.Context, rootDir)
+	ctrs, err := loadContainers(ic.Context, r.hcs, sendEvent)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, c := range ctrs {
-		c.remove(ic.Context)
+		c.ctr.Delete(ic.Context)
+		r.sendEvent(c.ctr.ID(), containerd.ExitEvent, c.ctr.Pid(), 255)
 	}
 
 	// Try to delete the old state dir and recreate it
@@ -72,16 +77,9 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		return nil, errors.Wrapf(err, "could not create state directory at %s", stateDir)
 	}
+	r.stateDir = stateDir
 
-	return &Runtime{
-		containers:    make(map[string]*container),
-		containersPid: make(map[uint32]struct{}),
-		events:        make(chan *containerd.Event, 2048),
-		eventsContext: c,
-		eventsCancel:  cancel,
-		stateDir:      stateDir,
-		rootDir:       rootDir,
-	}, nil
+	return r, nil
 }
 
 type Runtime struct {
@@ -89,10 +87,11 @@ type Runtime struct {
 
 	rootDir  string
 	stateDir string
+	pidPool  *pid.Pool
 
-	containers    map[string]*container
-	containersPid map[uint32]struct{}
-	currentPid    uint32
+	hcs *hcs.HCS
+
+	containers map[string]*container
 
 	events        chan *containerd.Event
 	eventsContext context.Context
@@ -113,25 +112,18 @@ func (r *Runtime) Create(ctx context.Context, id string, opts containerd.CreateO
 		return nil, errors.Wrap(err, "failed to unmarshal oci spec")
 	}
 
-	pid, err := r.getPid()
-	if err != nil {
-		return nil, err
+	sendEvent := func(id string, evType containerd.EventType, pid, exitStatus uint32) {
+		r.sendEvent(id, evType, pid, exitStatus)
 	}
 
-	ctr, err := newContainer(id, r.rootDir, pid, rtSpec, opts.IO, func(id string, evType containerd.EventType, pid, exitStatus uint32) {
-		r.sendEvent(id, evType, pid, exitStatus)
-	})
+	ctr, err := newContainer(ctx, r.hcs, id, rtSpec, opts.IO, sendEvent)
 	if err != nil {
-		r.putPid(pid)
 		return nil, err
 	}
 
 	r.Lock()
 	r.containers[id] = ctr
-	r.containersPid[pid] = struct{}{}
 	r.Unlock()
-
-	r.sendEvent(id, containerd.CreateEvent, pid, 0)
 
 	return ctr, nil
 }
@@ -141,30 +133,32 @@ func (r *Runtime) Delete(ctx context.Context, c containerd.Container) (uint32, e
 	if !ok {
 		return 0, fmt.Errorf("container cannot be cast as *windows.container")
 	}
-	ec, err := wc.exitCode(ctx)
+	ec, err := wc.ctr.ExitCode()
 	if err != nil {
-		ec = 255
-		log.G(ctx).WithError(err).Errorf("failed to retrieve exit code for container %s", c.Info().ID)
+		log.G(ctx).WithError(err).Errorf("failed to retrieve exit code for container %s", wc.ctr.ID())
 	}
 
-	if err = wc.remove(ctx); err == nil {
-		r.Lock()
-		delete(r.containers, c.Info().ID)
-		r.Unlock()
-	}
+	wc.ctr.Delete(ctx)
 
-	r.putPid(wc.getRuntimePid())
+	r.Lock()
+	delete(r.containers, wc.ctr.ID())
+	r.Unlock()
 
 	return ec, err
 }
 
-func (r *Runtime) Containers() ([]containerd.Container, error) {
+func (r *Runtime) Containers(ctx context.Context) ([]containerd.Container, error) {
 	r.Lock()
+	defer r.Unlock()
 	list := make([]containerd.Container, len(r.containers))
 	for _, c := range r.containers {
-		list = append(list, c)
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			list = append(list, c)
+		}
 	}
-	r.Unlock()
 
 	return list, nil
 }
@@ -182,30 +176,4 @@ func (r *Runtime) sendEvent(id string, evType containerd.EventType, pid, exitSta
 		ID:         id,
 		ExitStatus: exitStatus,
 	}
-}
-
-func (r *Runtime) getPid() (uint32, error) {
-	r.Lock()
-	defer r.Unlock()
-
-	pid := r.currentPid + 1
-	for pid != r.currentPid {
-		// 0 is reserved and invalid
-		if pid == 0 {
-			pid = 1
-		}
-		if _, ok := r.containersPid[pid]; !ok {
-			r.currentPid = pid
-			return pid, nil
-		}
-		pid++
-	}
-
-	return 0, errors.New("pid pool exhausted")
-}
-
-func (r *Runtime) putPid(pid uint32) {
-	r.Lock()
-	delete(r.containersPid, pid)
-	r.Unlock()
 }

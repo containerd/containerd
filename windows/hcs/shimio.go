@@ -7,28 +7,27 @@ import (
 	"time"
 
 	"github.com/Microsoft/go-winio"
-	"github.com/containerd/containerd"
 	"github.com/pkg/errors"
 )
 
-type shimIO struct {
+type IO struct {
 	stdin    net.Conn
 	stdout   net.Conn
 	stderr   net.Conn
 	terminal bool
 }
 
-// newSIO connects to the provided pipes
-func newSIO(io containerd.IO) (*shimIO, error) {
+// NewIO connects to the provided pipe addresses
+func NewIO(stdin, stdout, stderr string, terminal bool) (*IO, error) {
 	var (
 		c   net.Conn
 		err error
-		sio shimIO
+		io  IO
 	)
 
 	defer func() {
 		if err != nil {
-			sio.Close()
+			io.Close()
 		}
 	}()
 
@@ -38,19 +37,19 @@ func newSIO(io containerd.IO) (*shimIO, error) {
 		conn *net.Conn
 	}{
 		{
-			name: io.Stdin,
-			open: io.Stdin != "",
-			conn: &sio.stdin,
+			name: stdin,
+			open: stdin != "",
+			conn: &io.stdin,
 		},
 		{
-			name: io.Stdout,
-			open: io.Stdout != "",
-			conn: &sio.stdout,
+			name: stdout,
+			open: stdout != "",
+			conn: &io.stdout,
 		},
 		{
-			name: io.Stderr,
-			open: !io.Terminal && io.Stderr != "",
-			conn: &sio.stderr,
+			name: stderr,
+			open: !terminal && stderr != "",
+			conn: &io.stderr,
 		},
 	} {
 		if p.open {
@@ -63,12 +62,12 @@ func newSIO(io containerd.IO) (*shimIO, error) {
 		}
 	}
 
-	return &sio, nil
+	return &io, nil
 }
 
 // Close terminates all successfully dialed IO connections
-func (s *shimIO) Close() {
-	for _, cn := range []net.Conn{s.stdin, s.stdout, s.stderr} {
+func (i *IO) Close() {
+	for _, cn := range []net.Conn{i.stdin, i.stdout, i.stderr} {
 		if cn != nil {
 			cn.Close()
 			cn = nil

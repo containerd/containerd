@@ -11,40 +11,55 @@ import (
 )
 
 type Process struct {
-	containerID string
-	p           hcsshim.Process
-	status      containerd.Status
+	hcsshim.Process
+
+	pid    uint32
+	io     *IO
+	ec     uint32
+	ecErr  error
+	ecSync chan struct{}
 }
 
-func (h *Process) Pid() uint32 {
-	return uint32(h.p.Pid())
+func (p *Process) Pid() uint32 {
+	return p.pid
 }
 
-func (h *Process) Kill() error {
-	return h.p.Kill()
+func (p *Process) ExitCode() (uint32, error) {
+	<-p.ecSync
+	return p.ec, p.ecErr
 }
 
-func (h *Process) ExitCode() (uint32, error) {
-	if err := h.p.Wait(); err != nil {
-		if herr, ok := err.(*hcsshim.ProcessError); ok && herr.Err != syscall.ERROR_BROKEN_PIPE {
-			return 255, errors.Wrapf(err, "failed to wait for container '%s' process %d", h.containerID, h.p.Pid())
-		}
-		// container is probably dead, let's try to get its exit code
+func (p *Process) Status() containerd.Status {
+	select {
+	case <-p.ecSync:
+		return containerd.StoppedStatus
+	default:
 	}
-	h.status = containerd.StoppedStatus
 
-	ec, err := h.p.ExitCode()
+	return containerd.RunningStatus
+}
+
+func (p *Process) Delete() error {
+	p.io.Close()
+	return p.Close()
+}
+
+func processExitCode(containerID string, p *Process) (uint32, error) {
+	if err := p.Wait(); err != nil {
+		if herr, ok := err.(*hcsshim.ProcessError); ok && herr.Err != syscall.ERROR_BROKEN_PIPE {
+			return 255, errors.Wrapf(err, "failed to wait for container '%s' process %u", containerID, p.pid)
+		}
+		// process is probably dead, let's try to get its exit code
+	}
+
+	ec, err := p.Process.ExitCode()
 	if err != nil {
 		if herr, ok := err.(*hcsshim.ProcessError); ok && herr.Err != syscall.ERROR_BROKEN_PIPE {
-			return 255, errors.Wrapf(err, "failed to get container '%s' process %d exit code", h.containerID, h.p.Pid())
+			return 255, errors.Wrapf(err, "failed to get container '%s' process %d exit code", containerID, p.pid)
 		}
 		// Well, unknown exit code it is
 		ec = 255
 	}
 
 	return uint32(ec), err
-}
-
-func (h *Process) Status() containerd.Status {
-	return h.status
 }
