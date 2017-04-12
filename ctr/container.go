@@ -627,6 +627,9 @@ var updateCommand = cli.Command{
 		cli.StringFlag{
 			Name: "cpuset-mems",
 		},
+		cli.StringFlag{
+			Name: "pids-limit",
+		},
 	},
 	Action: func(context *cli.Context) {
 		req := &types.UpdateContainerRequest{
@@ -644,6 +647,7 @@ var updateCommand = cli.Command{
 		req.Resources.CpusetMems = context.String("cpuset-mems")
 		req.Resources.KernelMemoryLimit = getUpdateCommandInt64Flag(context, "kernel-limit")
 		req.Resources.KernelTCPMemoryLimit = getUpdateCommandInt64Flag(context, "kernel-tcp-limit")
+		req.Resources.PidsLimit = getUpdateCommandInt64Flag(context, "pids-limit")
 		c := getClient(context)
 		if _, err := c.UpdateContainer(netcontext.Background(), req); err != nil {
 			fatal(err.Error(), 1)

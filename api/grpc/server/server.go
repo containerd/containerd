@@ -290,6 +290,9 @@ func (s *apiServer) UpdateContainer(ctx context.Context, r *types.UpdateContaine
 		if rs.MemorySwap != 0 {
 			e.Resources.MemorySwap = int64(rs.MemorySwap)
 		}
+		if rs.PidsLimit != 0 {
+			e.Resources.PidsLimit = int64(rs.PidsLimit)
+		}
 	}
 	s.sv.SendTask(e)
 	if err := <-e.ErrorCh(); err != nil {

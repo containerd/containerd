@@ -95,6 +95,7 @@ type Resource struct {
 	Memory            int64
 	MemoryReservation int64
 	MemorySwap        int64
+	PidsLimit         int64
 }
 
 // Possible container states
