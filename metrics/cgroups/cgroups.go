@@ -1,6 +1,8 @@
 package cgroups
 
 import (
+	"time"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/plugin"
 	"github.com/crosbymichael/cgroups"
@@ -39,6 +41,7 @@ type cgroupsMonitor struct {
 	collector *prometheus.Collector
 	oom       *prometheus.OOMCollector
 	context   context.Context
+	events    chan<- *containerd.Event
 }
 
 func (m *cgroupsMonitor) Monitor(c containerd.Container) error {
@@ -58,7 +61,7 @@ func (m *cgroupsMonitor) Monitor(c containerd.Container) error {
 	if err := m.collector.Add(id, cg); err != nil {
 		return err
 	}
-	return m.oom.Add(id, cg)
+	return m.oom.Add(id, cg, m.trigger)
 }
 
 func (m *cgroupsMonitor) Stop(c containerd.Container) error {
@@ -67,4 +70,16 @@ func (m *cgroupsMonitor) Stop(c containerd.Container) error {
 	}
 	m.collector.Remove(c.Info().ID)
 	return nil
+}
+
+func (m *cgroupsMonitor) Events(events chan<- *containerd.Event) {
+	m.events = events
+}
+
+func (m *cgroupsMonitor) trigger(id string, cg cgroups.Cgroup) {
+	m.events <- &containerd.Event{
+		Timestamp: time.Now(),
+		Type:      containerd.OOMEvent,
+		ID:        id,
+	}
 }
