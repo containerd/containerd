@@ -90,11 +90,11 @@ type Resource struct {
 	CPUQuota          int64
 	CpusetCpus        string
 	CpusetMems        string
-	KernelMemory      int64
 	KernelTCPMemory   int64
-	Memory            int64
-	MemoryReservation int64
-	MemorySwap        int64
+	KernelMemory      uint64
+	Memory            uint64
+	MemoryReservation uint64
+	MemorySwap        uint64
 }
 
 // Possible container states

@@ -1044,7 +1044,7 @@ type UpdateResource struct {
 	MemorySwap                   uint64            `protobuf:"varint,8,opt,name=memorySwap" json:"memorySwap,omitempty"`
 	MemoryReservation            uint64            `protobuf:"varint,9,opt,name=memoryReservation" json:"memoryReservation,omitempty"`
 	KernelMemoryLimit            uint64            `protobuf:"varint,10,opt,name=kernelMemoryLimit" json:"kernelMemoryLimit,omitempty"`
-	KernelTCPMemoryLimit         uint64            `protobuf:"varint,11,opt,name=kernelTCPMemoryLimit" json:"kernelTCPMemoryLimit,omitempty"`
+	KernelTCPMemoryLimit         int64             `protobuf:"varint,11,opt,name=kernelTCPMemoryLimit" json:"kernelTCPMemoryLimit,omitempty"`
 	BlkioLeafWeight              uint64            `protobuf:"varint,12,opt,name=blkioLeafWeight" json:"blkioLeafWeight,omitempty"`
 	BlkioWeightDevice            []*WeightDevice   `protobuf:"bytes,13,rep,name=blkioWeightDevice" json:"blkioWeightDevice,omitempty"`
 	BlkioThrottleReadBpsDevice   []*ThrottleDevice `protobuf:"bytes,14,rep,name=blkioThrottleReadBpsDevice" json:"blkioThrottleReadBpsDevice,omitempty"`
@@ -1128,7 +1128,7 @@ func (m *UpdateResource) GetKernelMemoryLimit() uint64 {
 	return 0
 }
 
-func (m *UpdateResource) GetKernelTCPMemoryLimit() uint64 {
+func (m *UpdateResource) GetKernelTCPMemoryLimit() int64 {
 	if m != nil {
 		return m.KernelTCPMemoryLimit
 	}
