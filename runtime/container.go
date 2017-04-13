@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/containerd/specs"
+	"github.com/containerd/containerd/specs"
 	ocs "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/docker/containerd/specs"
+	"github.com/containerd/containerd/specs"
 )
 
 var (

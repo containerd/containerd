@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/docker/containerd/runtime"
+	"github.com/containerd/containerd/runtime"
 	"golang.org/x/net/context"
 )
 

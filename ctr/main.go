@@ -9,8 +9,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
-	"github.com/docker/containerd"
-	"github.com/docker/containerd/api/grpc/types"
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/api/grpc/types"
 )
 
 const usage = `High performance container daemon cli`

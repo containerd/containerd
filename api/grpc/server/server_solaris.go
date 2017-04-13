@@ -3,9 +3,9 @@ package server
 import (
 	"fmt"
 
-	"github.com/docker/containerd/api/grpc/types"
-	"github.com/docker/containerd/specs"
-	"github.com/docker/containerd/supervisor"
+	"github.com/containerd/containerd/api/grpc/types"
+	"github.com/containerd/containerd/specs"
+	"github.com/containerd/containerd/supervisor"
 	"golang.org/x/net/context"
 )
 

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/codegangsta/cli"
-	"github.com/docker/containerd/api/grpc/types"
+	"github.com/containerd/containerd/api/grpc/types"
 	"github.com/golang/protobuf/ptypes"
 	netcontext "golang.org/x/net/context"
 )

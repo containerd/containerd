@@ -1,11 +1,11 @@
 BUILDTAGS=
 
-PROJECT=github.com/docker/containerd
+PROJECT=github.com/containerd/containerd
 
 GIT_COMMIT := $(shell git rev-parse HEAD 2> /dev/null || true)
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD 2> /dev/null)
 
-LDFLAGS := -X github.com/docker/containerd.GitCommit=${GIT_COMMIT} ${LDFLAGS}
+LDFLAGS := -X github.com/containerd/containerd.GitCommit=${GIT_COMMIT} ${LDFLAGS}
 
 TEST_TIMEOUT ?= 5m
 TEST_SUITE_TIMEOUT ?= 10m
@@ -91,7 +91,7 @@ test: validate install bundles-rootfs
 	go test -bench=. -v $(shell go list ./... | grep -v /vendor | grep -v /integration-test ) -runtime=$(RUNTIME)
 ifneq ($(wildcard /.dockerenv), )
 	cd integration-test ; \
-go test -check.v -check.timeout=$(TEST_TIMEOUT) $(TESTFLAGS) timeout=$(TEST_SUITE_TIMEOUT) github.com/docker/containerd/integration-test
+go test -check.v -check.timeout=$(TEST_TIMEOUT) $(TESTFLAGS) timeout=$(TEST_SUITE_TIMEOUT) github.com/containerd/containerd/integration-test
 endif
 
 bench: shim validate install bundles-rootfs

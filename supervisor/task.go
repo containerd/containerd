@@ -3,7 +3,7 @@ package supervisor
 import (
 	"sync"
 
-	"github.com/docker/containerd/runtime"
+	"github.com/containerd/containerd/runtime"
 )
 
 // StartResponse is the response containing a started container

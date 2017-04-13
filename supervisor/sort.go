@@ -3,7 +3,7 @@ package supervisor
 import (
 	"sort"
 
-	"github.com/docker/containerd/runtime"
+	"github.com/containerd/containerd/runtime"
 )
 
 func sortProcesses(p []runtime.Process) {

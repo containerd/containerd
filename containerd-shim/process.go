@@ -15,7 +15,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/containerd/specs"
+	"github.com/containerd/containerd/specs"
 )
 
 var errRuntime = errors.New("shim: runtime execution error")

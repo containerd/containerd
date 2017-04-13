@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-PROJECT=github.com/docker/containerd
+PROJECT=github.com/containerd/containerd
 
 # Downloads dependencies into vendor/ directory
 mkdir -p vendor

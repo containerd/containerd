@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/containerd/specs"
+	"github.com/containerd/containerd/specs"
 	"golang.org/x/sys/unix"
 )
 
