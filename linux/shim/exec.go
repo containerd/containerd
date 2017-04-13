@@ -59,12 +59,13 @@ func newExecProcess(context context.Context, path string, r *shimapi.ExecRequest
 		e.io = io
 	}
 	opts := &runc.ExecOpts{
-		PidFile:       pidfile,
-		ConsoleSocket: socket,
-		IO:            io,
-		Detach:        true,
+		PidFile: pidfile,
+		IO:      io,
+		Detach:  true,
 	}
-
+	if socket != nil {
+		opts.ConsoleSocket = socket
+	}
 	// process exec request
 	var spec specs.Process
 	if err := json.Unmarshal(r.Spec.Value, &spec); err != nil {
