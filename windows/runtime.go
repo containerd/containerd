@@ -53,20 +53,16 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		hcs:           hcs.New(owner, rootDir),
 	}
 
-	sendEvent := func(id string, evType containerd.EventType, pid, exitStatus uint32) {
-		r.sendEvent(id, evType, pid, exitStatus)
-	}
-
 	// Terminate all previous container that we may have started. We don't
 	// support restoring containers
-	ctrs, err := loadContainers(ic.Context, r.hcs, sendEvent)
+	ctrs, err := loadContainers(ic.Context, r.hcs, r.sendEvent)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, c := range ctrs {
 		c.ctr.Delete(ic.Context)
-		r.sendEvent(c.ctr.ID(), containerd.ExitEvent, c.ctr.Pid(), 255)
+		r.sendEvent(c.ctr.ID(), containerd.ExitEvent, c.ctr.Pid(), 255, time.Time{})
 	}
 
 	// Try to delete the old state dir and recreate it
@@ -112,11 +108,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts containerd.CreateO
 		return nil, errors.Wrap(err, "failed to unmarshal oci spec")
 	}
 
-	sendEvent := func(id string, evType containerd.EventType, pid, exitStatus uint32) {
-		r.sendEvent(id, evType, pid, exitStatus)
-	}
-
-	ctr, err := newContainer(ctx, r.hcs, id, rtSpec, opts.IO, sendEvent)
+	ctr, err := newContainer(ctx, r.hcs, id, rtSpec, opts.IO, r.sendEvent)
 	if err != nil {
 		return nil, err
 	}
@@ -128,10 +120,10 @@ func (r *Runtime) Create(ctx context.Context, id string, opts containerd.CreateO
 	return ctr, nil
 }
 
-func (r *Runtime) Delete(ctx context.Context, c containerd.Container) (uint32, error) {
+func (r *Runtime) Delete(ctx context.Context, c containerd.Container) (*containerd.Exit, error) {
 	wc, ok := c.(*container)
 	if !ok {
-		return 0, fmt.Errorf("container cannot be cast as *windows.container")
+		return nil, fmt.Errorf("container cannot be cast as *windows.container")
 	}
 	ec, err := wc.ctr.ExitCode()
 	if err != nil {
@@ -144,7 +136,10 @@ func (r *Runtime) Delete(ctx context.Context, c containerd.Container) (uint32, e
 	delete(r.containers, wc.ctr.ID())
 	r.Unlock()
 
-	return ec, err
+	return &containerd.Exit{
+		Status:    ec,
+		Timestamp: wc.ctr.Processes()[0].ExitedAt(),
+	}, nil
 }
 
 func (r *Runtime) Containers(ctx context.Context) ([]containerd.Container, error) {
@@ -167,7 +162,7 @@ func (r *Runtime) Events(ctx context.Context) <-chan *containerd.Event {
 	return r.events
 }
 
-func (r *Runtime) sendEvent(id string, evType containerd.EventType, pid, exitStatus uint32) {
+func (r *Runtime) sendEvent(id string, evType containerd.EventType, pid, exitStatus uint32, exitedAt time.Time) {
 	r.events <- &containerd.Event{
 		Timestamp:  time.Now(),
 		Runtime:    runtimeName,
@@ -175,5 +170,6 @@ func (r *Runtime) sendEvent(id string, evType containerd.EventType, pid, exitSta
 		Pid:        pid,
 		ID:         id,
 		ExitStatus: exitStatus,
+		ExitedAt:   exitedAt,
 	}
 }
