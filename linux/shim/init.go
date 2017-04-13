@@ -73,10 +73,12 @@ func newInitProcess(context context.Context, path string, r *shimapi.CreateReque
 		p.io = io
 	}
 	opts := &runc.CreateOpts{
-		PidFile:       filepath.Join(path, "init.pid"),
-		ConsoleSocket: socket,
-		IO:            io,
-		NoPivot:       r.NoPivot,
+		PidFile: filepath.Join(path, "init.pid"),
+		IO:      io,
+		NoPivot: r.NoPivot,
+	}
+	if socket != nil {
+		opts.ConsoleSocket = socket
 	}
 	if err := p.runc.Create(context, r.ID, r.Bundle, opts); err != nil {
 		return nil, err
