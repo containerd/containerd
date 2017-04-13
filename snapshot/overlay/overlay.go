@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/fs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
@@ -72,7 +73,44 @@ func (o *snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, erro
 		return snapshot.Info{}, err
 	}
 	defer t.Rollback()
-	return storage.GetInfo(ctx, key)
+	_, info, _, err := storage.GetInfo(ctx, key)
+	if err != nil {
+		return snapshot.Info{}, err
+	}
+
+	return info, nil
+}
+
+// Usage returns the resources taken by the snapshot identified by key.
+//
+// For active snapshots, this will scan the usage of the overlay "diff" (aka
+// "upper") directory and may take some time.
+//
+// For committed snapshots, the value is returned from the metadata database.
+func (o *snapshotter) Usage(ctx context.Context, key string) (snapshot.Usage, error) {
+	ctx, t, err := o.ms.TransactionContext(ctx, false)
+	if err != nil {
+		return snapshot.Usage{}, err
+	}
+	id, info, usage, err := storage.GetInfo(ctx, key)
+	if err != nil {
+		return snapshot.Usage{}, err
+	}
+
+	upperPath := o.upperPath(id)
+	t.Rollback() // transaction no longer needed at this point.
+
+	if info.Kind == snapshot.KindActive {
+		du, err := fs.DiskUsage(upperPath)
+		if err != nil {
+			// TODO(stevvooe): Consider not reporting an error in this case.
+			return snapshot.Usage{}, err
+		}
+
+		usage = snapshot.Usage(du)
+	}
+
+	return usage, nil
 }
 
 func (o *snapshotter) Prepare(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
@@ -105,7 +143,19 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := storage.CommitActive(ctx, key, name); err != nil {
+
+	// grab the existing id
+	id, _, _, err := storage.GetInfo(ctx, key)
+	if err != nil {
+		return err
+	}
+
+	usage, err := fs.DiskUsage(o.upperPath(id))
+	if err != nil {
+		return err
+	}
+
+	if _, err := storage.CommitActive(ctx, key, name, snapshot.Usage(usage)); err != nil {
 		if rerr := t.Rollback(); rerr != nil {
 			log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
 		}

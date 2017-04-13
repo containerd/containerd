@@ -44,6 +44,10 @@ func (o *Snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, erro
 	panic("not implemented")
 }
 
+func (o *Snapshotter) Usage(ctx context.Context, key string) (snapshot.Usage, error) {
+	panic("not implemented")
+}
+
 func (o *Snapshotter) Prepare(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
 	panic("not implemented")
 }

@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+
+	"github.com/containerd/containerd/snapshot"
 )
 
 // Benchmarks returns a benchmark suite using the provided metadata store
@@ -107,7 +109,7 @@ func createActiveFromBase(ctx context.Context, ms *MetaStore, active, base strin
 	if _, err := CreateActive(ctx, "bottom", "", false); err != nil {
 		return err
 	}
-	if _, err := CommitActive(ctx, "bottom", base); err != nil {
+	if _, err := CommitActive(ctx, "bottom", base, snapshot.Usage{}); err != nil {
 		return err
 	}
 
@@ -122,7 +124,7 @@ func statActiveBenchmark(ctx context.Context, b *testing.B, ms *MetaStore) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := GetInfo(ctx, "active")
+		_, _, _, err := GetInfo(ctx, "active")
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -133,13 +135,13 @@ func statCommittedBenchmark(ctx context.Context, b *testing.B, ms *MetaStore) {
 	if err := createActiveFromBase(ctx, ms, "active", "base"); err != nil {
 		b.Fatal(err)
 	}
-	if _, err := CommitActive(ctx, "active", "committed"); err != nil {
+	if _, err := CommitActive(ctx, "active", "committed", snapshot.Usage{}); err != nil {
 		b.Fatal(err)
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := GetInfo(ctx, "committed")
+		_, _, _, err := GetInfo(ctx, "committed")
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -179,7 +181,7 @@ func commitBenchmark(ctx context.Context, b *testing.B, ms *MetaStore) {
 			b.Fatal(err)
 		}
 		b.StartTimer()
-		if _, err := CommitActive(ctx, "active", "committed"); err != nil {
+		if _, err := CommitActive(ctx, "active", "committed", snapshot.Usage{}); err != nil {
 			b.Fatal(err)
 		}
 		b.StopTimer()
@@ -196,7 +198,7 @@ func getActiveBenchmark(ctx context.Context, b *testing.B, ms *MetaStore) {
 			b.Fatalf("create active failed: %+v", err)
 		}
 		base = fmt.Sprintf("base-%d", i)
-		if _, err := CommitActive(ctx, "tmp", base); err != nil {
+		if _, err := CommitActive(ctx, "tmp", base, snapshot.Usage{}); err != nil {
 			b.Fatalf("commit failed: %+v", err)
 		}
 

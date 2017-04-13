@@ -88,7 +88,28 @@ func (b *snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, erro
 		return snapshot.Info{}, err
 	}
 	defer t.Rollback()
-	return storage.GetInfo(ctx, key)
+	_, info, _, err := storage.GetInfo(ctx, key)
+	if err != nil {
+		return snapshot.Info{}, err
+	}
+
+	return info, nil
+}
+
+// Usage retrieves the disk usage of the top-level snapshot.
+func (b *snapshotter) Usage(ctx context.Context, key string) (snapshot.Usage, error) {
+	panic("not implemented")
+
+	// TODO(stevvooe): Btrfs has a quota model where data can be exclusive to a
+	// snapshot or shared among other resources. We may find that this is the
+	// correct value to reoprt but the stability of the implementation is under
+	// question.
+	//
+	// In general, this has impact on the model we choose for reporting usage.
+	// Ideally, the value should allow aggregration. For overlay, this is
+	// simple since we can scan the diff directory to get a unique value. This
+	// breaks down when start looking the behavior when data is shared between
+	// snapshots, such as that for btrfs.
 }
 
 // Walk the committed snapshots.
@@ -193,7 +214,7 @@ func (b *snapshotter) Commit(ctx context.Context, name, key string) (err error) 
 		}
 	}()
 
-	id, err := storage.CommitActive(ctx, key, name)
+	id, err := storage.CommitActive(ctx, key, name, snapshot.Usage{}) // TODO(stevvooe): Resolve a usage value for btrfs
 	if err != nil {
 		return errors.Wrap(err, "failed to commit")
 	}
