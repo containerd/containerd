@@ -11,13 +11,11 @@ import (
 )
 
 var getCommand = cli.Command{
-	Name:      "get",
-	Usage:     "get the data for an object",
-	ArgsUsage: "[flags] [<digest>, ...]",
-	Description: `Display the paths to one or more blobs.
-	
-Output paths can be used to directly access blobs on disk.`,
-	Flags: []cli.Flag{},
+	Name:        "get",
+	Usage:       "get the data for an object",
+	ArgsUsage:   "[flags] [<digest>, ...]",
+	Description: "Display the image object.",
+	Flags:       []cli.Flag{},
 	Action: func(context *cli.Context) error {
 		var (
 			ctx = background
