@@ -8,7 +8,6 @@ RUN apt-get update && apt-get install -y \
 	build-essential \
 	ca-certificates \
 	curl \
-	git \
 	make \
 	jq \
 	pkg-config \
@@ -17,6 +16,11 @@ RUN apt-get update && apt-get install -y \
 	--no-install-recommends \
 	&& rm -rf /var/lib/apt/lists/*
 
+# add git repo
+RUN apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys E1DD270288B4E6030699E45FA1715D88E1DF1F24
+RUN echo deb http://ppa.launchpad.net/git-core/ppa/ubuntu trusty main > /etc/apt/sources.list.d/git.list
+
+RUN apt-get update && apt-get install -y git
 # Install Go
 ENV GO_VERSION 1.8.1
 RUN curl -sSL  "https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz" | tar -v -C /usr/local -xz
