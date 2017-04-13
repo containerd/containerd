@@ -40,7 +40,7 @@ endif
 GO_LDFLAGS=-ldflags "-X $(PKG).Version=$(VERSION) -X $(PKG).Package=$(PKG)"
 
 # Flags passed to `go test`
-TESTFLAGS ?=-parallel 8 -race
+TESTFLAGS ?=-parallel 8 -race -cover
 
 .PHONY: clean all AUTHORS fmt vet lint dco build binaries test integration setup generate protos checkprotos coverage ci check help install uninstall vendor
 .DEFAULT: default
