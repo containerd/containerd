@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/containerd/api/grpc/types"
+	"github.com/containerd/containerd/api/grpc/types"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"golang.org/x/net/context"

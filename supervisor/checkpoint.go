@@ -2,7 +2,7 @@
 
 package supervisor
 
-import "github.com/docker/containerd/runtime"
+import "github.com/containerd/containerd/runtime"
 
 // CreateCheckpointTask holds needed parameters to create a new checkpoint
 type CreateCheckpointTask struct {

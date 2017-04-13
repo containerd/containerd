@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	utils "github.com/docker/containerd/testutils"
+	utils "github.com/containerd/containerd/testutils"
 )
 
 var (

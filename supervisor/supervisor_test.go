@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/containerd/runtime"
+	"github.com/containerd/containerd/runtime"
 )
 
 func TestEventLogCompat(t *testing.T) {

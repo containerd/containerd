@@ -5,8 +5,8 @@ import (
 	"syscall"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/containerd/archutils"
-	"github.com/docker/containerd/runtime"
+	"github.com/containerd/containerd/archutils"
+	"github.com/containerd/containerd/runtime"
 )
 
 // NewMonitor starts a new process monitor and returns it

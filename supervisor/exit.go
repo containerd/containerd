@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/containerd/runtime"
+	"github.com/containerd/containerd/runtime"
 )
 
 // ExitTask holds needed parameters to execute the exit task

@@ -3,7 +3,7 @@ package supervisor
 import (
 	"time"
 
-	"github.com/docker/containerd/runtime"
+	"github.com/containerd/containerd/runtime"
 )
 
 // UpdateTask holds needed parameters to update a container resource constraints

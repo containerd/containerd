@@ -3,7 +3,7 @@ package main
 import (
 	"sort"
 
-	"github.com/docker/containerd/api/grpc/types"
+	"github.com/containerd/containerd/api/grpc/types"
 )
 
 func sortContainers(c []*types.Container) {

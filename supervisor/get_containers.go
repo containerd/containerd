@@ -1,6 +1,6 @@
 package supervisor
 
-import "github.com/docker/containerd/runtime"
+import "github.com/containerd/containerd/runtime"
 
 // GetContainersTask holds needed parameters to retrieve a list of
 // containers

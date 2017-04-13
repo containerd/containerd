@@ -13,10 +13,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
-	"github.com/docker/containerd"
-	"github.com/docker/containerd/api/grpc/types"
-	"github.com/docker/containerd/runtime"
-	"github.com/docker/containerd/supervisor"
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/api/grpc/types"
+	"github.com/containerd/containerd/runtime"
+	"github.com/containerd/containerd/supervisor"
 	"github.com/golang/protobuf/ptypes"
 	"golang.org/x/net/context"
 )

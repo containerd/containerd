@@ -38,7 +38,7 @@ import (
 	"unsafe"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/containerd/runtime"
+	"github.com/containerd/containerd/runtime"
 )
 
 // NewMonitor starts a new process monitor and returns it

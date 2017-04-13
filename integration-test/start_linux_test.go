@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/containerd/api/grpc/types"
+	"github.com/containerd/containerd/api/grpc/types"
 	"github.com/docker/docker/pkg/integration/checker"
 	"github.com/go-check/check"
 	ocs "github.com/opencontainers/runtime-spec/specs-go"
