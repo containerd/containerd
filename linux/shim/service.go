@@ -94,6 +94,7 @@ func (s *Service) Delete(ctx context.Context, r *shimapi.DeleteRequest) (*shimap
 	s.mu.Unlock()
 	return &shimapi.DeleteResponse{
 		ExitStatus: uint32(p.Status()),
+		ExitedAt:   p.ExitedAt(),
 	}, nil
 }
 
@@ -253,5 +254,6 @@ func (s *Service) waitExit(p process, pid int, cmd *reaper.Cmd) {
 		ID:         s.id,
 		Pid:        uint32(pid),
 		ExitStatus: uint32(status),
+		ExitedAt:   p.ExitedAt(),
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sync"
 	"syscall"
+	"time"
 
 	"golang.org/x/sys/unix"
 
@@ -28,6 +29,7 @@ type initProcess struct {
 	io      runc.IO
 	runc    *runc.Runc
 	status  int
+	exited  time.Time
 	pid     int
 	closers []io.Closer
 	stdin   io.Closer
@@ -121,6 +123,10 @@ func (p *initProcess) Status() int {
 	return p.status
 }
 
+func (p *initProcess) ExitedAt() time.Time {
+	return p.exited
+}
+
 // ContainerStatus return the state of the container (created, running, paused, stopped)
 func (p *initProcess) ContainerStatus(ctx context.Context) (string, error) {
 	c, err := p.runc.State(ctx, p.id)
@@ -136,6 +142,7 @@ func (p *initProcess) Start(context context.Context) error {
 
 func (p *initProcess) Exited(status int) {
 	p.status = status
+	p.exited = time.Now()
 }
 
 func (p *initProcess) Delete(context context.Context) error {

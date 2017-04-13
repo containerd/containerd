@@ -127,14 +127,17 @@ func (s *Service) Delete(ctx context.Context, r *api.DeleteRequest) (*api.Delete
 	if err != nil {
 		return nil, err
 	}
-	status, err := runtime.Delete(ctx, c)
+	exit, err := runtime.Delete(ctx, c)
 	if err != nil {
 		return nil, err
 	}
 
 	delete(s.containers, r.ID)
 
-	return &api.DeleteResponse{ExitStatus: status}, nil
+	return &api.DeleteResponse{
+		ExitStatus: exit.Status,
+		ExitedAt:   exit.Timestamp,
+	}, nil
 }
 
 func containerFromContainerd(ctx context.Context, c containerd.Container) (*container.Container, error) {

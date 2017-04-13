@@ -7,6 +7,7 @@ import "google/protobuf/any.proto";
 import "gogoproto/gogo.proto";
 import "github.com/containerd/containerd/api/types/mount/mount.proto";
 import "github.com/containerd/containerd/api/types/container/container.proto";
+import "google/protobuf/timestamp.proto";
 
 service ContainerService {
 	rpc Create(CreateRequest) returns (CreateResponse);
@@ -48,6 +49,7 @@ message DeleteRequest {
 message DeleteResponse {
 	string id = 1 [(gogoproto.customname) = "ID"];
 	uint32 exit_status = 2;
+	google.protobuf.Timestamp exited_at = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message InfoRequest {

@@ -38,4 +38,5 @@ type Event struct {
 	ID         string
 	Pid        uint32
 	ExitStatus uint32
+	ExitedAt   time.Time
 }
