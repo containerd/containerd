@@ -16,6 +16,10 @@ var (
 	ErrCgroupNotExists  = errors.New("cgroup does not exist in the collector")
 )
 
+// Trigger will be called when an event happens and provides the cgroup
+// where the event originated from
+type Trigger func(string, cgroups.Cgroup)
+
 // New registers the Collector with the provided namespace and returns it so
 // that cgroups can be added for collection
 func New(ns *metrics.Namespace) *Collector {
