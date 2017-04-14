@@ -7,12 +7,14 @@ import (
 	"net"
 	"os"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/Microsoft/go-winio"
 	clog "github.com/containerd/containerd/log"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
+	"golang.org/x/sys/windows"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
 )
@@ -118,4 +120,20 @@ func prepareStdio(stdin, stdout, stderr string, console bool) (*sync.WaitGroup, 
 	}
 
 	return &wg, nil
+}
+
+var signalMap = map[string]syscall.Signal{
+	"HUP":    syscall.Signal(windows.SIGHUP),
+	"INT":    syscall.Signal(windows.SIGINT),
+	"QUIT":   syscall.Signal(windows.SIGQUIT),
+	"SIGILL": syscall.Signal(windows.SIGILL),
+	"TRAP":   syscall.Signal(windows.SIGTRAP),
+	"ABRT":   syscall.Signal(windows.SIGABRT),
+	"BUS":    syscall.Signal(windows.SIGBUS),
+	"FPE":    syscall.Signal(windows.SIGFPE),
+	"KILL":   syscall.Signal(windows.SIGKILL),
+	"SEGV":   syscall.Signal(windows.SIGSEGV),
+	"PIPE":   syscall.Signal(windows.SIGPIPE),
+	"ALRM":   syscall.Signal(windows.SIGALRM),
+	"TERM":   syscall.Signal(windows.SIGTERM),
 }

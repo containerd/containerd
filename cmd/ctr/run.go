@@ -169,6 +169,9 @@ var runCommand = cli.Command{
 			if err := handleConsoleResize(ctx, containers, response.ID, response.Pid, con); err != nil {
 				logrus.WithError(err).Error("console resize")
 			}
+		} else {
+			sigc := forwardAllSignals(containers, id)
+			defer stopCatch(sigc)
 		}
 		if _, err := containers.Start(ctx, &execution.StartRequest{
 			ID: response.ID,
