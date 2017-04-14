@@ -35,6 +35,10 @@ var runCommand = cli.Command{
 			Usage: "allocate a TTY for the container",
 		},
 		cli.StringFlag{
+			Name:  "rootfs",
+			Usage: "path to rootfs",
+		},
+		cli.StringFlag{
 			Name:  "runtime",
 			Usage: "runtime name (linux, windows, vmware-linux)",
 			Value: "linux",
@@ -89,7 +93,7 @@ var runCommand = cli.Command{
 			return errors.Wrap(err, "failed resolving image store")
 		}
 
-		if runtime.GOOS != "windows" {
+		if runtime.GOOS != "windows" && context.String("rootfs") == "" {
 			ref := context.Args().First()
 
 			image, err := imageStore.Get(ctx, ref)
@@ -141,7 +145,7 @@ var runCommand = cli.Command{
 			// TODO: get the image / rootfs through the API once windows has a snapshotter
 		}
 
-		create, err := newCreateRequest(context, &imageConfig.Config, id, tmpDir)
+		create, err := newCreateRequest(context, &imageConfig.Config, id, tmpDir, context.String("rootfs"))
 		if err != nil {
 			return err
 		}

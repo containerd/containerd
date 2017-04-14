@@ -85,7 +85,7 @@ func spec(id string, config *ocispec.ImageConfig, context *cli.Context) *specs.S
 	}
 }
 
-func customSpec(context *cli.Context, configPath string) (*specs.Spec, error) {
+func customSpec(context *cli.Context, configPath, rootfs string) (*specs.Spec, error) {
 	b, err := ioutil.ReadFile(configPath)
 	if err != nil {
 		return nil, err
@@ -96,7 +96,6 @@ func customSpec(context *cli.Context, configPath string) (*specs.Spec, error) {
 		return nil, err
 	}
 
-	rootfs := context.String("rootfs")
 	if rootfs != "" && s.Root.Path != rootfs {
 		logrus.Warnf("ignoring config Root.Path %q, setting %q forcibly", s.Root.Path, rootfs)
 		s.Root.Path = rootfs
@@ -104,21 +103,21 @@ func customSpec(context *cli.Context, configPath string) (*specs.Spec, error) {
 	return &s, nil
 }
 
-func getConfig(context *cli.Context, imageConfig *ocispec.ImageConfig) (*specs.Spec, error) {
+func getConfig(context *cli.Context, imageConfig *ocispec.ImageConfig, rootfs string) (*specs.Spec, error) {
 	if config := context.String("runtime-config"); config != "" {
-		return customSpec(context, config)
+		return customSpec(context, config, rootfs)
 	}
 
 	s := spec(context.String("id"), imageConfig, context)
-	if rootfs := context.String("rootfs"); rootfs != "" {
+	if rootfs != "" {
 		s.Root.Path = rootfs
 	}
 
 	return s, nil
 }
 
-func newCreateRequest(context *cli.Context, imageConfig *ocispec.ImageConfig, id, tmpDir string) (*execution.CreateRequest, error) {
-	spec, err := getConfig(context, imageConfig)
+func newCreateRequest(context *cli.Context, imageConfig *ocispec.ImageConfig, id, tmpDir, rootfs string) (*execution.CreateRequest, error) {
+	spec, err := getConfig(context, imageConfig, rootfs)
 	if err != nil {
 		return nil, err
 	}
