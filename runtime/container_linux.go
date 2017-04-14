@@ -127,6 +127,9 @@ func (c *container) UpdateResources(r *Resource) error {
 		BlockIO: &ocs.BlockIO{
 			Weight: &r.BlkioWeight,
 		},
+		Pids: &ocs.Pids{
+			Limit: &r.PidsLimit,
+		},
 	}
 
 	srStr := bytes.NewBuffer(nil)
