@@ -5,6 +5,7 @@ package windows
 import (
 	"encoding/json"
 	"sync"
+	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
@@ -19,7 +20,7 @@ var (
 	ErrLoadedContainer = errors.New("loaded container can only be terminated")
 )
 
-type eventCallback func(id string, evType containerd.EventType, pid, exitStatus uint32)
+type eventCallback func(id string, evType containerd.EventType, pid, exitStatus uint32, exitedAt time.Time)
 
 func loadContainers(ctx context.Context, h *hcs.HCS, sendEvent eventCallback) ([]*container, error) {
 	hCtr, err := h.LoadContainers(ctx)
@@ -49,7 +50,7 @@ func newContainer(ctx context.Context, h *hcs.HCS, id string, spec RuntimeSpec, 
 	if err != nil {
 		return nil, err
 	}
-	sendEvent(id, containerd.CreateEvent, hcsCtr.Pid(), 0)
+	sendEvent(id, containerd.CreateEvent, hcsCtr.Pid(), 0, time.Time{})
 
 	return &container{
 		ctr:       hcsCtr,
@@ -85,7 +86,7 @@ func (c *container) Start(ctx context.Context) error {
 	}
 
 	c.setStatus(containerd.RunningStatus)
-	c.sendEvent(c.ctr.ID(), containerd.StartEvent, c.ctr.Pid(), 0)
+	c.sendEvent(c.ctr.ID(), containerd.StartEvent, c.ctr.Pid(), 0, time.Time{})
 
 	// Wait for our process to terminate
 	go func() {
@@ -94,7 +95,7 @@ func (c *container) Start(ctx context.Context) error {
 			log.G(ctx).Debug(err)
 		}
 		c.setStatus(containerd.StoppedStatus)
-		c.sendEvent(c.ctr.ID(), containerd.ExitEvent, c.ctr.Pid(), ec)
+		c.sendEvent(c.ctr.ID(), containerd.ExitEvent, c.ctr.Pid(), ec, c.ctr.Processes()[0].ExitedAt())
 	}()
 
 	return nil
@@ -136,7 +137,7 @@ func (c *container) Exec(ctx context.Context, opts containerd.ExecOpts) (contain
 		if err != nil {
 			log.G(ctx).Debug(err)
 		}
-		c.sendEvent(c.ctr.ID(), containerd.ExitEvent, p.Pid(), ec)
+		c.sendEvent(c.ctr.ID(), containerd.ExitEvent, p.Pid(), ec, p.ExitedAt())
 	}()
 
 	return &process{p}, nil

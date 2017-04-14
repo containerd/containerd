@@ -1,6 +1,10 @@
 package containerd
 
-import "golang.org/x/net/context"
+import (
+	"time"
+
+	"golang.org/x/net/context"
+)
 
 type IO struct {
 	Stdin    string
@@ -18,6 +22,11 @@ type CreateOpts struct {
 	IO IO
 }
 
+type Exit struct {
+	Status    uint32
+	Timestamp time.Time
+}
+
 // Runtime is responsible for the creation of containers for a certain platform,
 // arch, or custom usage.
 type Runtime interface {
@@ -26,7 +35,7 @@ type Runtime interface {
 	// Containers returns all the current containers for the runtime
 	Containers(context.Context) ([]Container, error)
 	// Delete removes the container in the runtime
-	Delete(context.Context, Container) (uint32, error)
+	Delete(context.Context, Container) (*Exit, error)
 	// Events returns events for the runtime and all containers created by the runtime
 	Events(context.Context) <-chan *Event
 }

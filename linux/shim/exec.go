@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sync"
 	"syscall"
+	"time"
 
 	"golang.org/x/sys/unix"
 
@@ -28,6 +29,7 @@ type execProcess struct {
 	console console.Console
 	io      runc.IO
 	status  int
+	exited  time.Time
 	pid     int
 	closers []io.Closer
 	stdin   io.Closer
@@ -125,8 +127,13 @@ func (e *execProcess) Status() int {
 	return e.status
 }
 
+func (e *execProcess) ExitedAt() time.Time {
+	return e.exited
+}
+
 func (e *execProcess) Exited(status int) {
 	e.status = status
+	e.exited = time.Now()
 	e.Wait()
 	if e.io != nil {
 		for _, c := range e.closers {

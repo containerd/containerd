@@ -120,22 +120,25 @@ func (r *Runtime) Create(ctx context.Context, id string, opts containerd.CreateO
 	return c, nil
 }
 
-func (r *Runtime) Delete(ctx context.Context, c containerd.Container) (uint32, error) {
+func (r *Runtime) Delete(ctx context.Context, c containerd.Container) (*containerd.Exit, error) {
 	lc, ok := c.(*Container)
 	if !ok {
-		return 0, fmt.Errorf("container cannot be cast as *linux.Container")
+		return nil, fmt.Errorf("container cannot be cast as *linux.Container")
 	}
 	// remove the container from the monitor
 	if err := r.monitor.Stop(lc); err != nil {
 		// TODO: log error here
-		return 0, err
+		return nil, err
 	}
 	rsp, err := lc.shim.Delete(ctx, &shim.DeleteRequest{})
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	lc.shim.Exit(ctx, &shim.ExitRequest{})
-	return rsp.ExitStatus, r.deleteBundle(lc.id)
+	return &containerd.Exit{
+		Status:    rsp.ExitStatus,
+		Timestamp: rsp.ExitedAt,
+	}, r.deleteBundle(lc.id)
 }
 
 func (r *Runtime) Containers(ctx context.Context) ([]containerd.Container, error) {
@@ -204,6 +207,7 @@ func (r *Runtime) forward(events shim.Shim_EventsClient) {
 			Pid:        e.Pid,
 			ID:         e.ID,
 			ExitStatus: e.ExitStatus,
+			ExitedAt:   e.ExitedAt,
 		}
 	}
 }

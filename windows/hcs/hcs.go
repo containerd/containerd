@@ -167,6 +167,10 @@ func (c *Container) Pid() uint32 {
 	return c.pid
 }
 
+func (c *Container) Processes() []*Process {
+	return c.processes
+}
+
 func (c *Container) Start(ctx context.Context) error {
 	_, err := c.addProcess(ctx, c.spec.Process, c.io)
 	return err

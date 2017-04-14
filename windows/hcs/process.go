@@ -4,6 +4,7 @@ package hcs
 
 import (
 	"syscall"
+	"time"
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/containerd/containerd"
@@ -13,11 +14,12 @@ import (
 type Process struct {
 	hcsshim.Process
 
-	pid    uint32
-	io     *IO
-	ec     uint32
-	ecErr  error
-	ecSync chan struct{}
+	pid      uint32
+	io       *IO
+	ec       uint32
+	exitedAt time.Time
+	ecErr    error
+	ecSync   chan struct{}
 }
 
 func (p *Process) Pid() uint32 {
@@ -27,6 +29,10 @@ func (p *Process) Pid() uint32 {
 func (p *Process) ExitCode() (uint32, error) {
 	<-p.ecSync
 	return p.ec, p.ecErr
+}
+
+func (p *Process) ExitedAt() time.Time {
+	return p.exitedAt
 }
 
 func (p *Process) Status() containerd.Status {
@@ -60,6 +66,6 @@ func processExitCode(containerID string, p *Process) (uint32, error) {
 		// Well, unknown exit code it is
 		ec = 255
 	}
-
+	p.exitedAt = time.Now()
 	return uint32(ec), err
 }

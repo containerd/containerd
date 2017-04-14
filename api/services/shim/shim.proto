@@ -7,6 +7,7 @@ import "google/protobuf/empty.proto";
 import "gogoproto/gogo.proto";
 import "github.com/containerd/containerd/api/types/mount/mount.proto";
 import "github.com/containerd/containerd/api/types/container/container.proto";
+import "google/protobuf/timestamp.proto";
 
 // Shim service is launched for each container and is responsible for owning the IO
 // for the container and its additional processes.  The shim is also the parent of
@@ -53,6 +54,7 @@ message DeleteRequest {
 
 message DeleteResponse {
 	uint32 exit_status = 1;
+	google.protobuf.Timestamp exited_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message ExecRequest {
