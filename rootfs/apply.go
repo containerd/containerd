@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"io/ioutil"
+	"os"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/archive"
@@ -41,6 +42,7 @@ func ApplyLayer(snapshots snapshot.Snapshotter, mounter Mounter, rd io.Reader, p
 	if err != nil {
 		return "", errors.Wrapf(err, "creating temporary directory failed")
 	}
+	defer os.RemoveAll(dir)
 
 	// TODO(stevvooe): Choose this key WAY more carefully. We should be able to
 	// create collisions for concurrent, conflicting unpack processes but we
