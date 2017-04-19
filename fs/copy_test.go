@@ -2,6 +2,7 @@ package fs
 
 import (
 	"io/ioutil"
+	"os"
 	"testing"
 
 	_ "crypto/sha256"
@@ -36,10 +37,13 @@ func testCopy(apply fstest.Applier) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to create temporary directory")
 	}
+	defer os.RemoveAll(t1)
+
 	t2, err := ioutil.TempDir("", "test-copy-dst-")
 	if err != nil {
 		return errors.Wrap(err, "failed to create temporary directory")
 	}
+	defer os.RemoveAll(t2)
 
 	if err := apply.Apply(t1); err != nil {
 		return errors.Wrap(err, "failed to apply changes")
