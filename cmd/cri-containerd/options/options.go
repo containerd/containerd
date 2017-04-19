@@ -33,6 +33,7 @@ type CRIContainerdOptions struct {
 	ContainerdConnectionTimeout time.Duration
 }
 
+// NewCRIContainerdOptions returns a reference to CRIContainerdOptions
 func NewCRIContainerdOptions() *CRIContainerdOptions {
 	return &CRIContainerdOptions{}
 }
@@ -47,6 +48,10 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		2*time.Minute, "Connection timeout for containerd client.")
 }
 
+// InitFlags must be called after adding all cli options flags are defined and
+// before flags are accessed by the program. Ths fuction adds flag.CommandLine
+// (the default set of command-line flags, parsed from os.Args) and then calls
+// pflag.Parse().
 func InitFlags() {
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()

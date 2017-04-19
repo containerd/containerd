@@ -21,6 +21,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
+	// TODO remove the underscores from the following imports as the services are
+	// implemented. "_" is being used to hold the reference to keep autocomplete
+	// from deleting them until referenced below.
 	_ "github.com/containerd/containerd/api/services/content"
 	_ "github.com/containerd/containerd/api/services/execution"
 	_ "github.com/containerd/containerd/api/services/images"
@@ -41,6 +44,7 @@ type CRIContainerdService interface {
 // criContainerdService implements CRIContainerdService.
 type criContainerdService struct{}
 
+// NewCRIContainerdService returns a new instance of CRIContainerdService
 func NewCRIContainerdService(conn *grpc.ClientConn) CRIContainerdService {
 	// TODO: Initialize different containerd clients.
 	return &criContainerdService{}
