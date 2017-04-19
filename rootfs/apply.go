@@ -107,14 +107,11 @@ func Prepare(ctx context.Context, snapshots snapshot.Snapshotter, mounter Mounte
 	)
 
 	for _, layer := range layers {
-		// TODO: layer.Digest should not be string
-		// (https://github.com/opencontainers/image-spec/pull/514)
-		layerDigest := digest.Digest(layer.Digest)
 		// This will convert a possibly compressed layer hash to the
 		// uncompressed hash, if we know about it. If we don't, we unpack and
 		// calculate it. If we do have it, we then calculate the chain id for
 		// the application and see if the snapshot is there.
-		diffID := resolveDiffID(layerDigest)
+		diffID := resolveDiffID(layer.Digest)
 		if diffID != "" {
 			chainLocal := append(chain, diffID)
 			chainID := identity.ChainID(chainLocal)
@@ -124,7 +121,7 @@ func Prepare(ctx context.Context, snapshots snapshot.Snapshotter, mounter Mounte
 			}
 		}
 
-		rc, err := openBlob(ctx, layerDigest)
+		rc, err := openBlob(ctx, layer.Digest)
 		if err != nil {
 			return "", err
 		}
@@ -139,7 +136,7 @@ func Prepare(ctx context.Context, snapshots snapshot.Snapshotter, mounter Mounte
 		// For uncompressed layers, this will be the same. For compressed
 		// layers, we can look up the diffID from the digest if we've already
 		// unpacked it.
-		if err := registerDiffID(diffID, layerDigest); err != nil {
+		if err := registerDiffID(diffID, layer.Digest); err != nil {
 			return "", err
 		}
 
