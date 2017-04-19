@@ -22,3 +22,4 @@ The following are proposed discussion points for the containerd summit at Docker
 * We'd like to propose an Authorization plugin to containerd that would allow an external component to police events like container start & stop (and have a discussion about the best way to go about it)
 * Should containerd provide image filesystem metrics? If yes, what metrics should be included? How to implement that?
 * Support for disk quotas: How? What is the role of containerd? How is it going to be integrated with volume managers that want to be in the same quota group?
+* Checkpoint/Restore: how can we support more use cases? One of the big issues here is the large number of options that can be passed to CRIU.
