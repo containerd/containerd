@@ -13,7 +13,14 @@ import (
 var listCommand = cli.Command{
 	Name:  "list",
 	Usage: "list containers",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "quiet, q",
+			Usage: "print only the container id",
+		},
+	},
 	Action: func(context *cli.Context) error {
+		quiet := context.Bool("quiet")
 		containers, err := getExecutionService(context)
 		if err != nil {
 			return err
@@ -22,20 +29,28 @@ var listCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		w := tabwriter.NewWriter(os.Stdout, 10, 1, 3, ' ', 0)
-		fmt.Fprintln(w, "ID\tPID\tSTATUS")
-		for _, c := range response.Containers {
-			if _, err := fmt.Fprintf(w, "%s\t%d\t%s\n",
-				c.ID,
-				c.Pid,
-				c.Status.String(),
-			); err != nil {
-				return err
+
+		if quiet {
+			for _, c := range response.Containers {
+				fmt.Println(c.ID)
 			}
-			if err := w.Flush(); err != nil {
-				return err
+		} else {
+			w := tabwriter.NewWriter(os.Stdout, 10, 1, 3, ' ', 0)
+			fmt.Fprintln(w, "ID\tPID\tSTATUS")
+			for _, c := range response.Containers {
+				if _, err := fmt.Fprintf(w, "%s\t%d\t%s\n",
+					c.ID,
+					c.Pid,
+					c.Status.String(),
+				); err != nil {
+					return err
+				}
+				if err := w.Flush(); err != nil {
+					return err
+				}
 			}
 		}
+
 		return nil
 	},
 }
