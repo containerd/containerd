@@ -61,7 +61,7 @@ func main() {
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:  "config,c",
-			Usage: "path to the configuration file (Use 'default' to output the default toml)",
+			Usage: "path to the configuration file",
 			Value: defaultConfigPath,
 		},
 		cli.StringFlag{
