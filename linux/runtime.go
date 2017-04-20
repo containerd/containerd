@@ -56,7 +56,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		cfg.Runtime = defaultRuntime
 	}
 	c, cancel := context.WithCancel(ic.Context)
-	return &Runtime{
+	r := &Runtime{
 		root:          path,
 		remote:        !cfg.NoShim,
 		runtime:       cfg.Runtime,
@@ -64,7 +64,10 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		eventsContext: c,
 		eventsCancel:  cancel,
 		monitor:       ic.Monitor,
-	}, nil
+	}
+	// set the events output for a monitor if it generates events
+	ic.Monitor.Events(r.events)
+	return r, nil
 }
 
 type Runtime struct {
