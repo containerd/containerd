@@ -20,7 +20,7 @@ containerd includes a daemon exposing gRPC API over a local UNIX socket. The API
 
 containerd is based on the Docker Engine’s core container runtime to benefit from its maturity and existing contributors.
 
-![Containerd High Level Architecture](/images/chart-a.png "Containerd High Level Architecture")
+![Containerd High Level Architecture](/docs/images/chart-a.png "Containerd High Level Architecture")
 
 ## Features and roadmap
 
@@ -40,7 +40,7 @@ containerd, currently in [version 0.2.4](https://github.com/containerd/container
 
 Containerd [architecture](https://github.com/containerd/containerd/blob/master/design/architecture.md) and [API](https://github.com/containerd/containerd/tree/master/api/) are described in the Github repository.
 
-![Containerd Architecture](/images/chart-b.png "Containerd High Level Architecture")
+![Containerd Architecture](/docs/images/chart-b.png "Containerd High Level Architecture")
 
 ## Principles and Releases
 
@@ -88,27 +88,27 @@ Each major version will be supported for 1 year with bug fixes and security patc
 
 Docker is a complete platform and programming environment for containerized applications. containerd is one of dozens of specialized components integrated into Docker. Developers and IT professionals looking to build, ship and run containerized applications should continue to use Docker. Operators and integrators looking for specialized components to swap into their platform should consider containerd.
 
-![Containerd and Docker](/images/chart-c.png "Containerd and Docker")
+![Containerd and Docker](/docs/images/chart-c.png "Containerd and Docker")
 
 containerd 0.2.4 used in Docker 1.12 covers only container execution and process management.
 
-![Containerd in Docker today](/images/chart-g.png "Containerd in Docker today")
+![Containerd in Docker today](/docs/images/chart-g.png "Containerd in Docker today")
 
 containerd's roadmap is to refactor the Docker Engine codebase to extract more of its logic for distribution, networking and storage on a single host into a reusable component that Docker will use, and that can be used by other container orchestration projects or hosted container services.
 
-![Containerd in Docker tomorrow](/images/chart-d.png "Containerd in Docker tomorrow")
+![Containerd in Docker tomorrow](/docs/images/chart-d.png "Containerd in Docker tomorrow")
 
 2. What is the relationship between containerd, OCI and runc?
 
 Docker [donated the OCI specification to the Linux Foundation in 2015](https://blog.docker.com/2015/06/open-container-project-foundation/), along with a reference implementation called `runc`. containerd integrates [OCI](https://www.opencontainers.org/)/[runc](https://runc.io/) into a feature-complete, production-ready core container runtime. runc is a component of containerd, the executor for containers. containerd has a wider scope than just executing containers: downloading container images, managing storage and network interfaces, calling runc with the right parameters to run containers. containerd fully leverages the Open Container Initiative’s (OCI) runtime, image format specifications and OCI reference implementation (runc) and will pursue OCI certification when it is available. Because of its massive adoption, containerd is the industry standard for implementing OCI. 
 
-![Containerd, runc and OCI](/images/chart-a.png "Containerd, runc and OCI")
+![Containerd, runc and OCI](/docs/images/chart-a.png "Containerd, runc and OCI")
 
 3. What is the relationship between containerd and container orchestration systems like Kubernetes and Mesos?
 
 Kubernetes today uses Docker directly. In a future version Kubernetes can implement container support in the Kubelet by implementing it's [Container Runtime Interface](https://github.com/kubernetes/kubernetes/blob/release-1.5/docs/devel/container-runtime-interface.md) using containerd. Mesos and other orchestration engines can leverage containerd for core container runtime functionality as well.
 
-![Containerd in the container ecosystem](/images/chart-f.png "Containerd in the container ecosystem")
+![Containerd in the container ecosystem](/docs/images/chart-f.png "Containerd in the container ecosystem")
 
 4. What is the relationship between containerd and cloud managed container services?
 
