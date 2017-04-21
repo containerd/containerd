@@ -1,3 +1,17 @@
+# Copyright 2017 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 GO ?= go
 EPOCH_TEST_COMMIT ?= 022b25259e31784d68192cdcd87a82d6c357a1bb
 PROJECT := github.com/kubernetes-incubator/cri-containerd
@@ -25,7 +39,7 @@ ifndef GOPATH
 	$(error GOPATH is not set)
 endif
 
-verify: lint gofmt
+verify: lint gofmt boiler
 
 lint: check-gopath
 	@echo "checking lint"
@@ -34,6 +48,10 @@ lint: check-gopath
 gofmt:
 	@echo "checking gofmt"
 	@./hack/verify-gofmt.sh
+
+boiler:
+	@echo "checking boilerplate"
+	@./hack/repo-infra/verify/verify-boilerplate.sh
 
 cri-containerd: check-gopath
 	$(GO) build -o $(BUILD_DIR)/$@ \
@@ -72,6 +90,7 @@ install.tools: .install.gitvalidation .install.gometalinter
 
 .PHONY: \
 	binaries \
+	boiler \
 	clean \
 	default \
 	gofmt \
