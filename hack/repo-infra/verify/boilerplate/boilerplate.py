@@ -32,13 +32,13 @@ parser.add_argument(
     help="list of files to check, all files if unspecified",
     nargs='*')
 
-# Rootdir defaults to the directory **above** the repo-infra dir.
-rootdir = os.path.dirname(__file__) + "/../../../"
+# Rootdir defaults to the directory **above** the hack/repo-infra dir.
+rootdir = os.path.dirname(__file__) + "/../../../../"
 rootdir = os.path.abspath(rootdir)
 parser.add_argument(
     "--rootdir", default=rootdir, help="root directory to examine")
 
-default_boilerplate_dir = os.path.join(rootdir, "repo-infra/verify/boilerplate")
+default_boilerplate_dir = os.path.join(rootdir, "hack/repo-infra/verify/boilerplate")
 parser.add_argument(
     "--boilerplate-dir", default=default_boilerplate_dir)
 
@@ -131,9 +131,9 @@ def file_passes(filename, refs, regexs):
 def file_extension(filename):
     return os.path.splitext(filename)[1].split(".")[-1].lower()
 
-skipped_dirs = ['Godeps', 'third_party', '_gopath', '_output', '.git', 
+skipped_dirs = ['Godeps', 'third_party', '_gopath', '_output', '.git',
                 'cluster/env.sh', 'vendor', 'test/e2e/generated/bindata.go',
-                'repo-infra/verify/boilerplate/test', '.glide']
+                'hack/repo-infra/verify/boilerplate/test', '.glide']
 
 def normalize_files(files):
     newfiles = []
