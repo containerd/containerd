@@ -1,0 +1,19 @@
+language: go
+go:
+    - 1.6.x
+    - 1.7.x
+    - 1.8.x
+    - tip
+
+sudo: required
+
+install:
+    - make install.tools
+
+before_script:
+    - export PATH=$HOME/gopath/bin:$PATH
+
+script:
+    - make .gitvalidation
+    - make verify
+    - make binaries

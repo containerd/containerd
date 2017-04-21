@@ -1,5 +1,5 @@
 GO ?= go
-EPOCH_TEST_COMMIT ?= f2925f58acc259c4b894353f5fc404bdeb40028e
+EPOCH_TEST_COMMIT ?= 022b25259e31784d68192cdcd87a82d6c357a1bb
 PROJECT := github.com/kubernetes-incubator/cri-containerd
 BINDIR ?= ${DESTDIR}/usr/local/bin
 BUILD_DIR ?= _output
