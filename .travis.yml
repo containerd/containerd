@@ -1,0 +1,17 @@
+language: go
+
+go:
+  - master
+
+before_install:
+ - go get -u github.com/alecthomas/gometalinter
+
+install:
+  - gometalinter --install
+
+build:
+  - true
+
+script:
+  - verify/verify-boilerplate.sh --rootdir="${TRAVIS_BUILD_DIR}" -v
+  - verify/verify-go-src.sh --rootdir "${TRAVIS_BUILD_DIR}" -v
