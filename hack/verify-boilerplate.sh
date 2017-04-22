@@ -23,9 +23,9 @@ set -o pipefail
 #  repo-infra/
 #    verify/
 
-REPO_ROOT=$(dirname "${BASH_SOURCE}")/../../..
+REPO_ROOT=$(dirname "${BASH_SOURCE}")/..
 
-boilerDir="${REPO_ROOT}/hack/repo-infra/verify/boilerplate"
+boilerDir="${REPO_ROOT}/hack/boilerplate"
 boiler="${boilerDir}/boilerplate.py"
 
 files_need_boilerplate=($(${boiler} "$@"))

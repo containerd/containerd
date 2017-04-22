@@ -13,7 +13,7 @@
 # limitations under the License.
 
 GO ?= go
-EPOCH_TEST_COMMIT ?= 022b25259e31784d68192cdcd87a82d6c357a1bb
+EPOCH_TEST_COMMIT ?= f9e02affccd51702191e5312665a16045ffef8ab
 PROJECT := github.com/kubernetes-incubator/cri-containerd
 BINDIR ?= ${DESTDIR}/usr/local/bin
 BUILD_DIR ?= _output
@@ -51,7 +51,7 @@ gofmt:
 
 boiler:
 	@echo "checking boilerplate"
-	@./hack/repo-infra/verify/verify-boilerplate.sh
+	@./hack/verify-boilerplate.sh
 
 cri-containerd: check-gopath
 	$(GO) build -o $(BUILD_DIR)/$@ \
