@@ -1,4 +1,7 @@
 # cri-containerd
+[![Build Status](https://api.travis-ci.org/kubernetes-incubator/cri-containerd.svg?style=flat-square)](https://travis-ci.org/kubernetes-incubator/cri-containerd)
+[![Go Report Card](https://goreportcard.com/badge/github.com/kubernetes-incubator/cri-containerd?style=flat-square)](https://goreportcard.com/report/github.com/kubernetes-incubator/cri-containerd)
+
 cri-containerd is a [containerd](https://containerd.io/) based implementation of Kubernetes [container runtime interface (CRI)](https://github.com/kubernetes/kubernetes/blob/v1.6.0/pkg/kubelet/api/v1alpha1/runtime/api.proto).
 ![cri-containerd](./docs/cri-containerd.png)
 ## Current Status
