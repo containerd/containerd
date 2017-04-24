@@ -59,11 +59,13 @@ func (p *process) openIO() error {
 			return err
 		}
 		p.Add(1)
-		go func() {
-			io.Copy(stdoutw, master)
+		p.ioCleanupFn = func() {
 			master.Close()
 			stdoutr.Close()
 			stdoutw.Close()
+		}
+		go func() {
+			io.Copy(stdoutw, master)
 			p.Done()
 		}()
 		return nil
@@ -74,6 +76,7 @@ func (p *process) openIO() error {
 	}
 	p.shimIO = i
 	// non-tty
+	ioClosers := make([]io.Closer, 0)
 	for _, pair := range []struct {
 		name string
 		dest func(wc io.WriteCloser, rc io.Closer)
@@ -85,8 +88,6 @@ func (p *process) openIO() error {
 				go func() {
 					io.Copy(wc, i.Stdout)
 					p.Done()
-					wc.Close()
-					rc.Close()
 				}()
 			},
 		},
@@ -97,8 +98,6 @@ func (p *process) openIO() error {
 				go func() {
 					io.Copy(wc, i.Stderr)
 					p.Done()
-					wc.Close()
-					rc.Close()
 				}()
 			},
 		},
@@ -112,19 +111,31 @@ func (p *process) openIO() error {
 			return fmt.Errorf("containerd-shim: opening %s failed: %s", pair.name, err)
 		}
 		pair.dest(fw, fr)
+		ioClosers = append(ioClosers, fw, fr)
 	}
 
 	f, err := fifo.OpenFifo(ctx, p.state.Stdin, syscall.O_RDONLY, 0)
 	if err != nil {
 		return fmt.Errorf("containerd-shim: opening %s failed: %s", p.state.Stdin, err)
 	}
+	ioClosers = append(ioClosers, i.Stdin, f)
+	p.ioCleanupFn = func() {
+		for _, c := range ioClosers {
+			c.Close()
+		}
+	}
 	go func() {
 		io.Copy(i.Stdin, f)
-		i.Stdin.Close()
-		f.Close()
 	}()
 
 	return nil
+}
+
+func (p *process) Wait() {
+	p.WaitGroup.Wait()
+	if p.ioCleanupFn != nil {
+		p.ioCleanupFn()
+	}
 }
 
 func (p *process) killAll() error {

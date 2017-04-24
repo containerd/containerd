@@ -64,6 +64,7 @@ type process struct {
 	consolePath    string
 	state          *processState
 	runtime        string
+	ioCleanupFn    func()
 }
 
 func newProcess(id, bundle, runtimeName string) (*process, error) {
