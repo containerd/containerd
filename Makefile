@@ -29,6 +29,8 @@ DOCKER_RUN := docker run --privileged --rm -i $(DOCKER_FLAGS) "$(DOCKER_IMAGE)"
 
 export GOPATH:=$(CURDIR)/vendor:$(GOPATH)
 
+.PHONY: integration-test
+
 all: client daemon shim
 
 static: client-static daemon-static shim-static
@@ -93,6 +95,10 @@ ifneq ($(wildcard /.dockerenv), )
 	cd integration-test ; \
 go test -check.v -check.timeout=$(TEST_TIMEOUT) $(TESTFLAGS) timeout=$(TEST_SUITE_TIMEOUT) github.com/containerd/containerd/integration-test
 endif
+
+integration-test:
+	cd integration-test ; \
+go test -check.v -check.timeout=$(TEST_TIMEOUT) $(TESTFLAGS) timeout=$(TEST_SUITE_TIMEOUT) github.com/containerd/containerd/integration-test
 
 bench: shim validate install bundles-rootfs
 	go test -bench=. -v $(shell go list ./... | grep -v /vendor | grep -v /integration-test) -runtime=$(RUNTIME)
