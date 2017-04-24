@@ -61,16 +61,11 @@ distribution tool
 		},
 	}
 	app.Commands = []cli.Command{
-		imagesCommand,
-		rmiCommand,
+		imageCommand,
+		contentCommand,
 		pullCommand,
 		fetchCommand,
 		fetchObjectCommand,
-		ingestCommand,
-		activeCommand,
-		getCommand,
-		deleteCommand,
-		listCommand,
 		applyCommand,
 		rootfsCommand,
 	}
@@ -92,4 +87,25 @@ distribution tool
 		fmt.Fprintf(os.Stderr, "dist: %s\n", err)
 		os.Exit(1)
 	}
+}
+
+var imageCommand = cli.Command{
+	Name:  "image",
+	Usage: "image management",
+	Subcommands: cli.Commands{
+		imagesListCommand,
+		rmiCommand,
+	},
+}
+
+var contentCommand = cli.Command{
+	Name:  "content",
+	Usage: "content management",
+	Subcommands: cli.Commands{
+		listCommand,
+		ingestCommand,
+		activeCommand,
+		getCommand,
+		deleteCommand,
+	},
 }

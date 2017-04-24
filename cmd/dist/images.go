@@ -13,8 +13,9 @@ import (
 	"github.com/urfave/cli"
 )
 
-var imagesCommand = cli.Command{
-	Name:        "images",
+var imagesListCommand = cli.Command{
+	Name:        "list",
+	Aliases:     []string{"images"},
 	Usage:       "list images known to containerd",
 	ArgsUsage:   "[flags] <ref>",
 	Description: `List images registered with containerd.`,
