@@ -11,8 +11,9 @@ import (
 )
 
 var listCommand = cli.Command{
-	Name:  "list",
-	Usage: "list containers",
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "list containers",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "quiet, q",
