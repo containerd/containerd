@@ -45,6 +45,7 @@ type Info struct {
 // For consistency, we define the following terms to be used throughout this
 // interface for snapshotter implementations:
 //
+// 	`ctx` - refers to a context.Context
 // 	`key` - refers to an active snapshot
 // 	`name` - refers to a committed snapshot
 // 	`parent` - refers to the parent in relation
@@ -71,14 +72,14 @@ type Info struct {
 // We start by using a Snapshotter to Prepare a new snapshot transaction, using a
 // key and descending from the empty parent "":
 //
-//	mounts, err := snapshotter.Prepare(key, "")
+//	mounts, err := snapshotter.Prepare(ctx, key, "")
 // 	if err != nil { ... }
 //
 // We get back a list of mounts from Snapshotter.Prepare, with the key identifying
 // the active snapshot. Mount this to the temporary location with the
 // following:
 //
-//	if err := MountAll(mounts, tmpDir); err != nil { ... }
+//	if err := containerd.MountAll(mounts, tmpDir); err != nil { ... }
 //
 // Once the mounts are performed, our temporary location is ready to capture
 // a diff. In practice, this works similar to a filesystem transaction. The
@@ -102,21 +103,21 @@ type Info struct {
 // snapshot to a name. For this example, we are just going to use the layer
 // digest, but in practice, this will probably be the ChainID:
 //
-//	if err := snapshotter.Commit(digest.String(), key); err != nil { ... }
+//	if err := snapshotter.Commit(ctx, digest.String(), key); err != nil { ... }
 //
 // Now, we have a layer in the Snapshotter that can be accessed with the digest
 // provided during commit. Once you have committed the snapshot, the active
 // snapshot can be removed with the following:
 //
-// 	snapshotter.Remove(key)
+// 	snapshotter.Remove(ctx, key)
 //
 // Importing the Next Layer
 //
 // Making a layer depend on the above is identical to the process described
 // above except that the parent is provided as parent when calling
-// Manager.Prepare, assuming a clean tmpLocation:
+// Manager.Prepare, assuming a clean, unique key identifier:
 //
-// 	mounts, err := snapshotter.Prepare(tmpLocation, parentDigest)
+// 	mounts, err := snapshotter.Prepare(ctx, key, parentDigest)
 //
 // We then mount, apply and commit, as we did above. The new snapshot will be
 // based on the content of the previous one.
@@ -127,13 +128,13 @@ type Info struct {
 // snapshot as the parent. After mounting, the prepared path can
 // be used directly as the container's filesystem:
 //
-// 	mounts, err := snapshotter.Prepare(containerKey, imageRootFSChainID)
+// 	mounts, err := snapshotter.Prepare(ctx, containerKey, imageRootFSChainID)
 //
 // The returned mounts can then be passed directly to the container runtime. If
 // one would like to create a new image from the filesystem, Manager.Commit is
 // called:
 //
-// 	if err := snapshotter.Commit(newImageSnapshot, containerKey); err != nil { ... }
+// 	if err := snapshotter.Commit(ctx, newImageSnapshot, containerKey); err != nil { ... }
 //
 // Alternatively, for most container runs, Snapshotter.Remove will be called to
 // signal the Snapshotter to abandon the changes.
