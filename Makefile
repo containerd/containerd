@@ -17,7 +17,9 @@ EPOCH_TEST_COMMIT ?= f9e02affccd51702191e5312665a16045ffef8ab
 PROJECT := github.com/kubernetes-incubator/cri-containerd
 BINDIR ?= ${DESTDIR}/usr/local/bin
 BUILD_DIR ?= _output
-# VERSION is the version of the binary.
+# VERSION is derived from the current tag for HEAD plus amends. Version is used
+# to set/overide the criContainerdVersion variable in the verison package for
+# cri-containerd.
 VERSION:=$(shell git describe --tags --dirty)
 BUILD_TAGS:= -ldflags '-X $(PROJECT)/pkg/version.criContainerdVersion=$(VERSION)'
 
@@ -30,7 +32,7 @@ help:
 	@echo
 	@echo " * 'install'       - Install binaries to system locations"
 	@echo " * 'binaries'      - Build cri-containerd"
-	@echo " * 'test'          - Test cri-containerd" 
+	@echo " * 'test'          - Test cri-containerd"
 	@echo " * 'clean'         - Clean artifacts"
 	@echo " * 'verify'        - Execute the source code verification tools"
 	@echo " * 'install.tools' - Installs tools used by verify"
@@ -63,10 +65,10 @@ boiler:
 
 cri-containerd: check-gopath
 	$(GO) build -o $(BUILD_DIR)/$@ \
-        $(BUILD_TAGS) \
-	$(PROJECT)/cmd/cri-containerd
+	   $(BUILD_TAGS) \
+	   $(PROJECT)/cmd/cri-containerd
 
-test: 
+test:
 	go test -timeout=1m -v -race ./pkg/... $(BUILD_TAGS)
 
 clean:
@@ -81,7 +83,8 @@ uninstall:
 	rm -f $(BINDIR)/cri-containerd
 
 .PHONY: .gitvalidation
-# When this is running in travis, it will only check the travis commit range
+# When this is running in travis, it will only check the travis commit range.
+# When running outside travis, it will check from $(EPOCH_TEST_COMMIT)..HEAD.
 .gitvalidation: check-gopath
 ifeq ($(TRAVIS),true)
 	git-validation -q -run DCO,short-subject
@@ -103,12 +106,12 @@ install.tools: .install.gitvalidation .install.gometalinter
 .PHONY: \
 	binaries \
 	boiler \
-	test \
 	clean \
 	default \
 	gofmt \
 	help \
 	install \
 	lint \
+	test \
 	uninstall \
 	version
