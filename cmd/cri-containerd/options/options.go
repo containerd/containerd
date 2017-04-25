@@ -27,6 +27,8 @@ import (
 type CRIContainerdOptions struct {
 	// CRIContainerdSocketPath is the path to the socket which cri-containerd serves on.
 	CRIContainerdSocketPath string
+	// CRIContainerdVersion is the git release version of cri-containerd
+	CRIContainerdVersion bool
 	// ContainerdSocketPath is the path to the containerd socket.
 	ContainerdSocketPath string
 	// ContainerdConnectionTimeout is the connection timeout for containerd client.
@@ -46,6 +48,8 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		"/run/containerd/containerd.sock", "Path to the containerd socket.")
 	fs.DurationVar(&c.ContainerdConnectionTimeout, "containerd-connection-timeout",
 		2*time.Minute, "Connection timeout for containerd client.")
+	fs.BoolVar(&c.CRIContainerdVersion, "version",
+		false, "Print cri-containerd version information and quit.")
 }
 
 // InitFlags must be called after adding all cli options flags are defined and

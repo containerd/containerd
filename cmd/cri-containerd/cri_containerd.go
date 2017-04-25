@@ -17,17 +17,25 @@ limitations under the License.
 package main
 
 import (
+	"os"
+
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
 	"github.com/kubernetes-incubator/cri-containerd/cmd/cri-containerd/options"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/server"
+	"github.com/kubernetes-incubator/cri-containerd/pkg/version"
 )
 
 func main() {
 	o := options.NewCRIContainerdOptions()
 	o.AddFlags(pflag.CommandLine)
 	options.InitFlags()
+
+	if o.CRIContainerdVersion {
+		version.PrintVersion()
+		os.Exit(0)
+	}
 
 	glog.V(2).Infof("Connect to containerd socket %q with timeout %v", o.ContainerdSocketPath, o.ContainerdConnectionTimeout)
 	conn, err := server.ConnectToContainerd(o.ContainerdSocketPath, o.ContainerdConnectionTimeout)

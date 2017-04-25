@@ -1,11 +1,16 @@
 {
 	"ImportPath": "github.com/kubernetes-incubator/cri-containerd",
 	"GoVersion": "go1.7",
-	"GodepVersion": "v74",
+	"GodepVersion": "v79",
 	"Packages": [
 		"./..."
 	],
 	"Deps": [
+		{
+			"ImportPath": "github.com/blang/semver",
+			"Comment": "v3.0.1",
+			"Rev": "31b736133b98f26d5e078ec9eb591666edfd091f"
+		},
 		{
 			"ImportPath": "github.com/containerd/containerd/api/services/content",
 			"Comment": "v0.2.3-745-gbbeaab5",
@@ -40,6 +45,11 @@
 			"ImportPath": "github.com/containerd/containerd/api/types/mount",
 			"Comment": "v0.2.3-745-gbbeaab5",
 			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
+		},
+		{
+			"ImportPath": "github.com/davecgh/go-spew/spew",
+			"Comment": "v1.1.0",
+			"Rev": "346938d642f2ec3594ed81d874461961cd0faa76"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/gogoproto",
@@ -93,8 +103,18 @@
 			"Rev": "035da1dca3dfbb00d752eb58b0b158d6129f3776"
 		},
 		{
+			"ImportPath": "github.com/pmezard/go-difflib/difflib",
+			"Comment": "v1.0.0",
+			"Rev": "792786c7400a136282c1664665ae0a8db921c6c2"
+		},
+		{
 			"ImportPath": "github.com/spf13/pflag",
 			"Rev": "9ff6c6923cfffbcd502984b8e0c80539a94968b7"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/assert",
+			"Comment": "v1.1.4-6-g18a02ba",
+			"Rev": "18a02ba4a312f95da08ff4cfc0055750ce50ae9e"
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",

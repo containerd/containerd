@@ -17,6 +17,9 @@ EPOCH_TEST_COMMIT ?= f9e02affccd51702191e5312665a16045ffef8ab
 PROJECT := github.com/kubernetes-incubator/cri-containerd
 BINDIR ?= ${DESTDIR}/usr/local/bin
 BUILD_DIR ?= _output
+# VERSION is the version of the binary.
+VERSION:=$(shell git describe --tags --dirty)
+BUILD_TAGS:= -ldflags '-X $(PROJECT)/pkg/version.criContainerdVersion=$(VERSION)'
 
 all: binaries
 
@@ -27,10 +30,12 @@ help:
 	@echo
 	@echo " * 'install'       - Install binaries to system locations"
 	@echo " * 'binaries'      - Build cri-containerd"
+	@echo " * 'test'          - Test cri-containerd" 
 	@echo " * 'clean'         - Clean artifacts"
 	@echo " * 'verify'        - Execute the source code verification tools"
 	@echo " * 'install.tools' - Installs tools used by verify"
 	@echo " * 'uninstall'     - Remove installed binaries from system locations"
+	@echo " * 'version'       - Print current cri-containerd release version"
 
 .PHONY: check-gopath
 
@@ -40,6 +45,9 @@ ifndef GOPATH
 endif
 
 verify: lint gofmt boiler
+
+version:
+	@echo $(VERSION)
 
 lint: check-gopath
 	@echo "checking lint"
@@ -55,7 +63,11 @@ boiler:
 
 cri-containerd: check-gopath
 	$(GO) build -o $(BUILD_DIR)/$@ \
-		$(PROJECT)/cmd/cri-containerd
+        $(BUILD_TAGS) \
+	$(PROJECT)/cmd/cri-containerd
+
+test: 
+	go test -timeout=1m -v -race ./pkg/... $(BUILD_TAGS)
 
 clean:
 	rm -f $(BUILD_DIR)/cri-containerd
@@ -91,10 +103,12 @@ install.tools: .install.gitvalidation .install.gometalinter
 .PHONY: \
 	binaries \
 	boiler \
+	test \
 	clean \
 	default \
 	gofmt \
 	help \
 	install \
 	lint \
-	uninstall
+	uninstall \
+	version
