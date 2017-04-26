@@ -53,7 +53,7 @@ version:
 
 lint: check-gopath
 	@echo "checking lint"
-	@./hack/lint.sh
+	@./hack/verify-lint.sh
 
 gofmt:
 	@echo "checking gofmt"
