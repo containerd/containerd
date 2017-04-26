@@ -35,6 +35,12 @@ func platformInit(context *cli.Context) error {
 			return err
 		}
 	}
+	if err := os.MkdirAll(conf.State, 0750); err != nil {
+		return err
+	}
+	if err := os.Chown(conf.State, conf.GRPC.Uid, conf.GRPC.Gid); err != nil {
+		return err
+	}
 	return nil
 }
 
