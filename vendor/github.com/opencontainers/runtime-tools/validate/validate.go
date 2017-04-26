@@ -259,7 +259,7 @@ func (v *Validator) CheckProcess() (msgs []string) {
 		}
 	}
 
-	msgs = append(msgs, v.CheckCapablities()...)
+	msgs = append(msgs, v.CheckCapabilities()...)
 	msgs = append(msgs, v.CheckRlimits()...)
 
 	if v.spec.Platform.OS == "linux" {
@@ -276,7 +276,8 @@ func (v *Validator) CheckProcess() (msgs []string) {
 	return
 }
 
-func (v *Validator) CheckCapablities() (msgs []string) {
+// CheckCapabilities checks v.spec.Process.Capabilities
+func (v *Validator) CheckCapabilities() (msgs []string) {
 	process := v.spec.Process
 	if v.spec.Platform.OS == "linux" {
 		var caps []string
@@ -309,6 +310,7 @@ func (v *Validator) CheckCapablities() (msgs []string) {
 	return
 }
 
+// CheckRlimits checks v.spec.Process.Rlimits
 func (v *Validator) CheckRlimits() (msgs []string) {
 	process := v.spec.Process
 	for index, rlimit := range process.Rlimits {

@@ -912,35 +912,30 @@ func (g *Generator) DropProcessCapability(c string) error {
 	for i, cap := range g.spec.Process.Capabilities.Bounding {
 		if strings.ToUpper(cap) == cp {
 			g.spec.Process.Capabilities.Bounding = append(g.spec.Process.Capabilities.Bounding[:i], g.spec.Process.Capabilities.Bounding[i+1:]...)
-			return nil
 		}
 	}
 
 	for i, cap := range g.spec.Process.Capabilities.Effective {
 		if strings.ToUpper(cap) == cp {
 			g.spec.Process.Capabilities.Effective = append(g.spec.Process.Capabilities.Effective[:i], g.spec.Process.Capabilities.Effective[i+1:]...)
-			return nil
 		}
 	}
 
 	for i, cap := range g.spec.Process.Capabilities.Inheritable {
 		if strings.ToUpper(cap) == cp {
 			g.spec.Process.Capabilities.Inheritable = append(g.spec.Process.Capabilities.Inheritable[:i], g.spec.Process.Capabilities.Inheritable[i+1:]...)
-			return nil
 		}
 	}
 
 	for i, cap := range g.spec.Process.Capabilities.Permitted {
 		if strings.ToUpper(cap) == cp {
 			g.spec.Process.Capabilities.Permitted = append(g.spec.Process.Capabilities.Permitted[:i], g.spec.Process.Capabilities.Permitted[i+1:]...)
-			return nil
 		}
 	}
 
 	for i, cap := range g.spec.Process.Capabilities.Ambient {
 		if strings.ToUpper(cap) == cp {
 			g.spec.Process.Capabilities.Ambient = append(g.spec.Process.Capabilities.Ambient[:i], g.spec.Process.Capabilities.Ambient[i+1:]...)
-			return nil
 		}
 	}
 
@@ -1031,7 +1026,7 @@ func (g *Generator) AddDevice(device rspec.LinuxDevice) {
 	g.spec.Linux.Devices = append(g.spec.Linux.Devices, device)
 }
 
-//RemoveDevice remove a device from g.spec.Linux.Devices
+// RemoveDevice remove a device from g.spec.Linux.Devices
 func (g *Generator) RemoveDevice(path string) error {
 	if g.spec == nil || g.spec.Linux == nil || g.spec.Linux.Devices == nil {
 		return nil
@@ -1046,6 +1041,7 @@ func (g *Generator) RemoveDevice(path string) error {
 	return nil
 }
 
+// ClearLinuxDevices clears g.spec.Linux.Devices
 func (g *Generator) ClearLinuxDevices() {
 	if g.spec == nil || g.spec.Linux == nil || g.spec.Linux.Devices == nil {
 		return
