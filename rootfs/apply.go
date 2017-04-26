@@ -71,7 +71,7 @@ func ApplyLayer(snapshots snapshot.Snapshotter, mounter Mounter, rd io.Reader, p
 	digester := digest.Canonical.Digester() // used to calculate diffID.
 	rd = io.TeeReader(rd, digester.Hash())
 
-	if _, err := archive.Apply(context.Background(), key, rd); err != nil {
+	if _, err := archive.Apply(context.Background(), dir, rd); err != nil {
 		return "", err
 	}
 
@@ -82,7 +82,7 @@ func ApplyLayer(snapshots snapshot.Snapshotter, mounter Mounter, rd io.Reader, p
 		chainID = identity.ChainID([]digest.Digest{parent, chainID})
 	}
 	if _, err := snapshots.Stat(ctx, chainID.String()); err == nil {
-		return diffID, nil //TODO: call snapshots.Remove(ctx, key) once implemented
+		return diffID, snapshots.Remove(ctx, key)
 	}
 
 	return diffID, snapshots.Commit(ctx, chainID.String(), key)
