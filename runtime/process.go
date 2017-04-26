@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/containerd/containerd/osutils"
 	"github.com/containerd/containerd/specs"
 	"golang.org/x/sys/unix"
 )
@@ -455,6 +456,21 @@ func (p *process) Start() error {
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+// Delete delete any resources held by the container
+func (p *process) Delete() error {
+	var (
+		args = append(p.container.runtimeArgs, "delete", "-f", p.container.id)
+		cmd  = exec.Command(p.container.runtime, args...)
+	)
+
+	cmd.SysProcAttr = osutils.SetPDeathSig()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s: %v", out, err)
 	}
 	return nil
 }

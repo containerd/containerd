@@ -8,11 +8,6 @@ import (
 	"syscall"
 )
 
-// setPDeathSig is a no-op on Solaris as Pdeathsig is not defined.
-func setPDeathSig() *syscall.SysProcAttr {
-	return nil
-}
-
 // TODO: Update to using fifo's package in openIO. Need to
 // 1. Merge and vendor changes in the package to use sys/unix.
 // 2. Figure out why context.Background is timing out.
