@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"testing"
-	"time"
 
 	_ "crypto/sha256"
 
@@ -67,8 +66,6 @@ func TestDiffApply(t *testing.T) {
 			fstest.RemoveAll("/home"),
 			fstest.CreateDir("/home/derek", 0700),
 			fstest.CreateFile("/home/derek/.bashrc", []byte("#not going away\n"), 0640),
-			// "/etc/hosts" must be touched to be hardlinked in same layer
-			fstest.Chtime("/etc/hosts", time.Now()),
 			fstest.Link("/etc/hosts", "/etc/hosts.allow"),
 		),
 	}

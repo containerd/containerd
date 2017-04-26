@@ -65,7 +65,7 @@ func copyDirectory(dst, src string, inodes map[uint64]string) error {
 			}
 			continue
 		case (fi.Mode() & os.ModeType) == 0:
-			link, err := GetLinkSource(target, fi, inodes)
+			link, err := getLinkSource(target, fi, inodes)
 			if err != nil {
 				return errors.Wrap(err, "failed to get hardlink")
 			}
