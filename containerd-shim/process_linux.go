@@ -9,17 +9,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containerd/containerd/osutils"
 	"github.com/tonistiigi/fifo"
 	"golang.org/x/net/context"
 )
-
-// setPDeathSig sets the parent death signal to SIGKILL so that if the
-// shim dies the container process also dies.
-func setPDeathSig() *syscall.SysProcAttr {
-	return &syscall.SysProcAttr{
-		Pdeathsig: syscall.SIGKILL,
-	}
-}
 
 // openIO opens the pre-created fifo's for use with the container
 // in RDWR so that they remain open if the other side stops listening
@@ -141,7 +134,7 @@ func (p *process) Wait() {
 func (p *process) killAll() error {
 	if !p.state.Exec {
 		cmd := exec.Command(p.runtime, append(p.state.RuntimeArgs, "kill", "--all", p.id, "SIGKILL")...)
-		cmd.SysProcAttr = setPDeathSig()
+		cmd.SysProcAttr = osutils.SetPDeathSig()
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("%s: %v", out, err)

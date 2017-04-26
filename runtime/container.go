@@ -193,6 +193,17 @@ func Load(root, id, shimName string, timeout time.Duration) (Container, error) {
 		}
 		c.processes[pid] = p
 	}
+
+	_, err = os.Stat(c.bundle)
+	if err != nil && !os.IsExist(err) {
+		for key, p := range c.processes {
+			if key == InitProcessID {
+				p.Delete()
+				break
+			}
+		}
+		return nil, fmt.Errorf("bundle dir %s don't exist", c.bundle)
+	}
 	return c, nil
 }
 

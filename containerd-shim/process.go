@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containerd/containerd/osutils"
 	"github.com/containerd/containerd/specs"
 )
 
@@ -177,8 +178,8 @@ func (p *process) create() error {
 	cmd.Stdin = p.stdio.stdin
 	cmd.Stdout = p.stdio.stdout
 	cmd.Stderr = p.stdio.stderr
-	// Call out to setPDeathSig to set SysProcAttr as elements are platform specific
-	cmd.SysProcAttr = setPDeathSig()
+	// Call out to SetPDeathSig to set SysProcAttr as elements are platform specific
+	cmd.SysProcAttr = osutils.SetPDeathSig()
 
 	if err := cmd.Start(); err != nil {
 		if exErr, ok := err.(*exec.Error); ok {
@@ -220,7 +221,7 @@ func (p *process) pid() int {
 func (p *process) delete() error {
 	if !p.state.Exec {
 		cmd := exec.Command(p.runtime, append(p.state.RuntimeArgs, "delete", p.id)...)
-		cmd.SysProcAttr = setPDeathSig()
+		cmd.SysProcAttr = osutils.SetPDeathSig()
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("%s: %v", out, err)
