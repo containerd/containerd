@@ -14,11 +14,11 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/containerd/containerd"
 	shimapi "github.com/containerd/containerd/api/services/shim"
 	"github.com/containerd/containerd/linux/shim"
 	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/sys"
+	"github.com/containerd/containerd/version"
 	runc "github.com/containerd/go-runc"
 	"github.com/urfave/cli"
 )
@@ -36,7 +36,7 @@ shim for container lifecycle and reconnection
 func main() {
 	app := cli.NewApp()
 	app.Name = "containerd-shim"
-	app.Version = containerd.Version
+	app.Version = version.Version
 	app.Usage = usage
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{

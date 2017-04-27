@@ -16,6 +16,7 @@ import (
 	"github.com/containerd/containerd/api/services/execution"
 	imagesapi "github.com/containerd/containerd/api/services/images"
 	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
+	versionservice "github.com/containerd/containerd/api/services/version"
 	"github.com/containerd/containerd/api/types/container"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
@@ -57,6 +58,14 @@ func getImageStore(clicontext *cli.Context) (images.Store, error) {
 		return nil, err
 	}
 	return imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)), nil
+}
+
+func getVersionService(context *cli.Context) (versionservice.VersionClient, error) {
+	conn, err := getGRPCConnection(context)
+	if err != nil {
+		return nil, err
+	}
+	return versionservice.NewVersionClient(conn), nil
 }
 
 func getTempDir(id string) (string, error) {
