@@ -6,7 +6,7 @@ source 'hack/.vendor-helpers.sh'
 
 clone git github.com/Sirupsen/logrus v0.11.2
 clone git github.com/cloudfoundry/gosigar 3ed7c74352dae6dc00bdc8c74045375352e3ec05
-clone git github.com/codegangsta/cli 9fec0fad02befc9209347cc6d620e68e1b45f74d
+clone git github.com/urfave/cli 8ba6f23b6e36d03666a14bd9421f5e3efcb59aca
 clone git github.com/coreos/go-systemd 7b2428fec40033549c68f54e26e89e7ca9a9ce31
 clone git github.com/cyberdelia/go-metrics-graphite 7e54b5c2aa6eaff4286c44129c3def899dff528c
 clone git github.com/docker/docker 2f6e3b0ba027b558adabd41344fee59db4441011
