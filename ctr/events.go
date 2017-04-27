@@ -6,7 +6,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/codegangsta/cli"
+	"github.com/urfave/cli"
 	"github.com/containerd/containerd/api/grpc/types"
 	"github.com/golang/protobuf/ptypes"
 	netcontext "golang.org/x/net/context"
