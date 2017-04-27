@@ -220,6 +220,9 @@ func (s *Service) Exec(ctx context.Context, r *api.ExecRequest) (*api.ExecRespon
 			Terminal: r.Terminal,
 		},
 	})
+	if err != nil {
+		return nil, err
+	}
 	state, err := process.State(ctx)
 	if err != nil {
 		return nil, err
