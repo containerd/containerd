@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	"github.com/containerd/containerd/osutils"
-	"github.com/docker/docker/pkg/term"
+	"github.com/crosbymichael/console"
 )
 
 func writeMessage(f *os.File, level string, err error) {
@@ -142,11 +142,10 @@ func start(log *os.File) error {
 				if p.console == nil {
 					continue
 				}
-				ws := term.Winsize{
+				p.console.Resize(console.WinSize{
 					Width:  uint16(msg.Width),
 					Height: uint16(msg.Height),
-				}
-				term.SetWinsize(p.console.Fd(), &ws)
+				})
 			}
 		}
 	}

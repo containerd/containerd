@@ -547,7 +547,7 @@ func (c *container) createCmd(ctx context.Context, pid string, cmd *exec.Cmd, p 
 	return nil
 }
 
-func hostIDFromMap(id uint32, mp []ocs.IDMapping) int {
+func hostIDFromMap(id uint32, mp []ocs.LinuxIDMapping) int {
 	for _, m := range mp {
 		if (id >= m.ContainerID) && (id <= (m.ContainerID + m.Size - 1)) {
 			return int(m.HostID + (id - m.ContainerID))

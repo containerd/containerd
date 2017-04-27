@@ -25,12 +25,18 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 		GID:            r.User.Gid,
 		AdditionalGids: r.User.AdditionalGids,
 	}
-	process.Capabilities = r.Capabilities
+	// for backwards compat in the API set eibp
+	process.Capabilities = &ocs.LinuxCapabilities{
+		Bounding:    r.Capabilities,
+		Effective:   r.Capabilities,
+		Inheritable: r.Capabilities,
+		Permitted:   r.Capabilities,
+	}
 	process.ApparmorProfile = r.ApparmorProfile
 	process.SelinuxLabel = r.SelinuxLabel
 	process.NoNewPrivileges = r.NoNewPrivileges
 	for _, rl := range r.Rlimits {
-		process.Rlimits = append(process.Rlimits, ocs.Rlimit{
+		process.Rlimits = append(process.Rlimits, ocs.LinuxRlimit{
 			Type: rl.Type,
 			Soft: rl.Soft,
 			Hard: rl.Hard,

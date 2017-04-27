@@ -211,7 +211,8 @@ func createAPIContainer(c runtime.Container, getPids bool) (*types.Container, er
 			Gid:            oldProc.User.GID,
 			AdditionalGids: oldProc.User.AdditionalGids,
 		}
-		proc.Capabilities = oldProc.Capabilities
+		// FIXME: trying to mimic api compat with only using one field
+		proc.Capabilities = oldProc.Capabilities.Effective
 		proc.ApparmorProfile = oldProc.ApparmorProfile
 		proc.SelinuxLabel = oldProc.SelinuxLabel
 		proc.NoNewPrivileges = oldProc.NoNewPrivileges

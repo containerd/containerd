@@ -5,11 +5,14 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/containerd/containerd/osutils"
+	runc "github.com/crosbymichael/go-runc"
 	"github.com/tonistiigi/fifo"
 	"golang.org/x/net/context"
 )
@@ -32,38 +35,50 @@ func (p *process) openIO() error {
 	p.stdinCloser = stdinCloser
 
 	if p.state.Terminal {
-		master, console, err := newConsole(uid, gid)
+		cwd, err := os.Getwd()
 		if err != nil {
 			return err
 		}
-		p.console = master
-		p.consolePath = console
-		stdin, err := fifo.OpenFifo(ctx, p.state.Stdin, syscall.O_RDONLY, 0)
+		socket, err := runc.NewConsoleSocket(filepath.Join(cwd, "pty.sock"))
 		if err != nil {
 			return err
 		}
-		go io.Copy(master, stdin)
-		stdoutw, err := fifo.OpenFifo(ctx, p.state.Stdout, syscall.O_WRONLY, 0)
-		if err != nil {
-			return err
-		}
-		stdoutr, err := fifo.OpenFifo(ctx, p.state.Stdout, syscall.O_RDONLY, 0)
-		if err != nil {
-			return err
-		}
-		p.Add(1)
-		p.ioCleanupFn = func() {
-			master.Close()
-			stdoutr.Close()
-			stdoutw.Close()
-		}
-		go func() {
-			io.Copy(stdoutw, master)
-			p.Done()
+		p.socket = socket
+
+		go func() error {
+			master, err := socket.ReceiveMaster()
+			if err != nil {
+				return err
+			}
+			p.console = master
+			stdin, err := fifo.OpenFifo(ctx, p.state.Stdin, syscall.O_RDONLY, 0)
+			if err != nil {
+				return err
+			}
+			go io.Copy(master, stdin)
+			stdoutw, err := fifo.OpenFifo(ctx, p.state.Stdout, syscall.O_WRONLY, 0)
+			if err != nil {
+				return err
+			}
+			stdoutr, err := fifo.OpenFifo(ctx, p.state.Stdout, syscall.O_RDONLY, 0)
+			if err != nil {
+				return err
+			}
+			p.Add(1)
+			p.ioCleanupFn = func() {
+				master.Close()
+				stdoutr.Close()
+				stdoutw.Close()
+			}
+			go func() {
+				io.Copy(stdoutw, master)
+				p.Done()
+			}()
+			return nil
 		}()
 		return nil
 	}
-	i, err := p.initializeIO(uid)
+	i, err := p.initializeIO(uid, gid)
 	if err != nil {
 		return err
 	}
