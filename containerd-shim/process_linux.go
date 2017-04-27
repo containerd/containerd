@@ -84,7 +84,7 @@ func (p *process) openIO() error {
 	}
 	p.shimIO = i
 	// non-tty
-	ioClosers := make([]io.Closer, 0)
+	var ioClosers []io.Closer
 	for _, pair := range []struct {
 		name string
 		dest func(wc io.WriteCloser, rc io.Closer)
