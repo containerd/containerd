@@ -20,6 +20,8 @@ type Console interface {
 	ResizeFrom(Console) error
 	// SetRaw sets the console in raw mode
 	SetRaw() error
+	// DisableEcho disables echo on the console
+	DisableEcho() error
 	// Reset restores the console to its orignal state
 	Reset() error
 	// Size returns the window size of the console

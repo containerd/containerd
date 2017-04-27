@@ -126,6 +126,18 @@ func (m *master) ResizeFrom(c Console) error {
 	return ErrNotImplemented
 }
 
+func (m *master) DisableEcho() error {
+	mode := m.inMode &^ winterm.ENABLE_ECHO_INPUT
+	mode |= winterm.ENABLE_PROCESSED_INPUT
+	mode |= winterm.ENABLE_LINE_INPUT
+
+	if err := winterm.SetConsoleMode(m.in, mode); err != nil {
+		return errors.Wrap(err, "unable to set console to disable echo")
+	}
+
+	return nil
+}
+
 func (m *master) Close() error {
 	return nil
 }
