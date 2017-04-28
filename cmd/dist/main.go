@@ -106,6 +106,7 @@ var contentCommand = cli.Command{
 		ingestCommand,
 		activeCommand,
 		getCommand,
+		editCommand,
 		deleteCommand,
 	},
 }
