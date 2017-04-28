@@ -17,6 +17,7 @@ service API {
 	rpc State(StateRequest) returns (StateResponse) {}
 	rpc Events(EventsRequest) returns (stream Event) {}
 	rpc Stats(StatsRequest) returns (StatsResponse) {}
+	rpc PostMortemStats(PostMortemRequest) returns (PostMortemResponse) {}
 }
 
 message GetServerVersionRequest {
@@ -332,6 +333,34 @@ message CgroupStats {
 	PidsStats pids_stats = 5;
 }
 
+message Timeval {
+	uint64 sec = 1;
+	uint64 usec = 2;
+}
+
+message UsageStats {
+	Timeval utime = 1;
+	Timeval stime = 2;
+	uint64 maxrss = 3;
+	uint64 ixrss = 4;
+	uint64 idrss = 5;
+	uint64 isrss = 6;
+	uint64 minflt = 7;
+	uint64 majflt = 8;
+	uint64 nswap = 9;
+	uint64 inblock = 10;
+	uint64 oublock = 11;
+	uint64 msgsnd = 12;
+	uint64 msgrcv = 13;
+	uint64 nsignals = 14;
+	uint64 nvcsw = 15;
+	uint64 nivcsw = 16;
+}
+
+message PostMortemResponse {
+	UsageStats stats = 1;
+}
+
 message StatsResponse {
 	repeated NetworkStats network_stats = 1;
 	CgroupStats cgroup_stats = 2;
@@ -341,4 +370,8 @@ message StatsResponse {
 
 message StatsRequest {
 	string id = 1;
+}
+
+message PostMortemRequest {
+    string containerid = 1;
 }
