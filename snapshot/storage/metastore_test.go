@@ -128,13 +128,13 @@ func basePopulate(ctx context.Context, ms *MetaStore) error {
 	if _, err := CreateActive(ctx, "committed-tmp-1", "", false); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
-	if _, err := CommitActive(ctx, "committed-tmp-1", "committed-1"); err != nil {
+	if _, err := CommitActive(ctx, "committed-tmp-1", "committed-1", snapshot.Usage{Size: 1}); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
 	if _, err := CreateActive(ctx, "committed-tmp-2", "committed-1", false); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
-	if _, err := CommitActive(ctx, "committed-tmp-2", "committed-2"); err != nil {
+	if _, err := CommitActive(ctx, "committed-tmp-2", "committed-2", snapshot.Usage{Size: 2}); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
 	if _, err := CreateActive(ctx, "active-1", "", false); err != nil {
@@ -238,7 +238,7 @@ func assertExist(t *testing.T, err error) {
 
 func testGetInfo(ctx context.Context, t *testing.T, ms *MetaStore) {
 	for key, expected := range baseInfo {
-		info, err := GetInfo(ctx, key)
+		_, info, _, err := GetInfo(ctx, key)
 		if err != nil {
 			t.Fatalf("GetInfo on %v failed: %+v", key, err)
 		}
@@ -247,7 +247,7 @@ func testGetInfo(ctx context.Context, t *testing.T, ms *MetaStore) {
 }
 
 func testGetInfoNotExist(ctx context.Context, t *testing.T, ms *MetaStore) {
-	_, err := GetInfo(ctx, "active-not-exist")
+	_, _, _, err := GetInfo(ctx, "active-not-exist")
 	assertNotExist(t, err)
 }
 
@@ -272,7 +272,7 @@ func testGetActive(ctx context.Context, t *testing.T, ms *MetaStore) {
 		if _, err := CreateActive(ctx, "committed-tmp-1", "", false); err != nil {
 			return errors.Wrap(err, "failed to create active")
 		}
-		if _, err := CommitActive(ctx, "committed-tmp-1", "committed-1"); err != nil {
+		if _, err := CommitActive(ctx, "committed-tmp-1", "committed-1", snapshot.Usage{}); err != nil {
 			return errors.Wrap(err, "failed to create active")
 		}
 
@@ -350,7 +350,7 @@ func testCreateActive(ctx context.Context, t *testing.T, ms *MetaStore) {
 		t.Fatal("Expected readonly active")
 	}
 
-	commitID, err := CommitActive(ctx, "active-1", "committed-1")
+	commitID, err := CommitActive(ctx, "active-1", "committed-1", snapshot.Usage{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -425,7 +425,7 @@ func testCommit(ctx context.Context, t *testing.T, ms *MetaStore) {
 		t.Fatal("Expected writable active")
 	}
 
-	commitID, err := CommitActive(ctx, "active-1", "committed-1")
+	commitID, err := CommitActive(ctx, "active-1", "committed-1", snapshot.Usage{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -440,7 +440,7 @@ func testCommit(ctx context.Context, t *testing.T, ms *MetaStore) {
 }
 
 func testCommitNotExist(ctx context.Context, t *testing.T, ms *MetaStore) {
-	_, err := CommitActive(ctx, "active-not-exist", "committed-1")
+	_, err := CommitActive(ctx, "active-not-exist", "committed-1", snapshot.Usage{})
 	assertNotExist(t, err)
 }
 
@@ -448,7 +448,7 @@ func testCommitExist(ctx context.Context, t *testing.T, ms *MetaStore) {
 	if err := basePopulate(ctx, ms); err != nil {
 		t.Fatalf("Populate failed: %+v", err)
 	}
-	_, err := CommitActive(ctx, "active-1", "committed-1")
+	_, err := CommitActive(ctx, "active-1", "committed-1", snapshot.Usage{})
 	assertExist(t, err)
 }
 
@@ -456,7 +456,7 @@ func testCommitCommitted(ctx context.Context, t *testing.T, ms *MetaStore) {
 	if err := basePopulate(ctx, ms); err != nil {
 		t.Fatalf("Populate failed: %+v", err)
 	}
-	_, err := CommitActive(ctx, "committed-1", "committed-3")
+	_, err := CommitActive(ctx, "committed-1", "committed-3", snapshot.Usage{})
 	assertNotActive(t, err)
 }
 
@@ -464,7 +464,7 @@ func testCommitReadonly(ctx context.Context, t *testing.T, ms *MetaStore) {
 	if err := basePopulate(ctx, ms); err != nil {
 		t.Fatalf("Populate failed: %+v", err)
 	}
-	_, err := CommitActive(ctx, "active-5", "committed-3")
+	_, err := CommitActive(ctx, "active-5", "committed-3", snapshot.Usage{})
 	if err == nil {
 		t.Fatal("Expected error committing readonly active")
 	}
@@ -476,7 +476,7 @@ func testRemove(ctx context.Context, t *testing.T, ms *MetaStore) {
 		t.Fatal(err)
 	}
 
-	commitID, err := CommitActive(ctx, "active-1", "committed-1")
+	commitID, err := CommitActive(ctx, "active-1", "committed-1", snapshot.Usage{})
 	if err != nil {
 		t.Fatal(err)
 	}

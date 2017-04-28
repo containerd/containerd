@@ -23,6 +23,24 @@ type Info struct {
 	Readonly bool   // true if readonly, only valid for active
 }
 
+// Usage defines statistics for disk resources consumed by the snapshot.
+//
+// These resources only include the resources consumed by the snapshot itself
+// and does not include resources usage by the parent.
+type Usage struct {
+	Inodes int64 // number of inodes in use.
+	Size   int64 // provides usage, in bytes, of snapshot
+}
+
+func (u *Usage) Add(other Usage) {
+	u.Size += other.Size
+
+	// TODO(stevvooe): assumes independent inodes, but provides and upper
+	// bound. This should be pretty close, assumming the inodes for a
+	// snapshot are roughly unique to it. Don't trust this assumption.
+	u.Inodes += other.Inodes
+}
+
 // Snapshotter defines the methods required to implement a snapshot snapshotter for
 // allocating, snapshotting and mounting filesystem changesets. The model works
 // by building up sets of changes with parent-child relationships.
@@ -146,6 +164,16 @@ type Snapshotter interface {
 	// the kind of snapshot.
 	Stat(ctx context.Context, key string) (Info, error)
 
+	// Usage returns the resource usage of an active or committed snapshot
+	// excluding the usage of parent snapshots.
+	//
+	// The running time of this call for active snapshots is dependent on
+	// implementation, but may be proportional to the size of the resource.
+	// Callers should take this into consideration. Implementations should
+	// attempt to honer context cancellation and avoid taking locks when making
+	// the calculation.
+	Usage(ctx context.Context, key string) (Usage, error)
+
 	// Mounts returns the mounts for the active snapshot transaction identified
 	// by key. Can be called on an read-write or readonly transaction. This is
 	// available only for active snapshots.
@@ -204,7 +232,7 @@ type Snapshotter interface {
 	// removed before proceeding.
 	Remove(ctx context.Context, key string) error
 
-	// Walk the committed snapshots. For each snapshot in the snapshotter, the
-	// function will be called.
+	// Walk all snapshots in the snapshotter. For each snapshot in the
+	// snapshotter, the function will be called.
 	Walk(ctx context.Context, fn func(context.Context, Info) error) error
 }

@@ -61,7 +61,35 @@ func (o *snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, erro
 		return snapshot.Info{}, err
 	}
 	defer t.Rollback()
-	return storage.GetInfo(ctx, key)
+	_, info, _, err := storage.GetInfo(ctx, key)
+	if err != nil {
+		return snapshot.Info{}, err
+	}
+
+	return info, nil
+}
+
+func (o *snapshotter) Usage(ctx context.Context, key string) (snapshot.Usage, error) {
+	ctx, t, err := o.ms.TransactionContext(ctx, false)
+	if err != nil {
+		return snapshot.Usage{}, err
+	}
+	defer t.Rollback()
+
+	id, info, usage, err := storage.GetInfo(ctx, key)
+	if err != nil {
+		return snapshot.Usage{}, err
+	}
+
+	if info.Kind == snapshot.KindActive {
+		du, err := fs.DiskUsage(o.getSnapshotDir(id))
+		if err != nil {
+			return snapshot.Usage{}, err
+		}
+		usage = snapshot.Usage(du)
+	}
+
+	return usage, nil
 }
 
 func (o *snapshotter) Prepare(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
@@ -94,7 +122,18 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := storage.CommitActive(ctx, key, name); err != nil {
+
+	id, _, _, err := storage.GetInfo(ctx, key)
+	if err != nil {
+		return err
+	}
+
+	usage, err := fs.DiskUsage(o.getSnapshotDir(id))
+	if err != nil {
+		return err
+	}
+
+	if _, err := storage.CommitActive(ctx, key, name, snapshot.Usage(usage)); err != nil {
 		if rerr := t.Rollback(); rerr != nil {
 			log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
 		}

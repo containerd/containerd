@@ -63,21 +63,26 @@ func getParentPrefix(b []byte) uint64 {
 
 // GetInfo returns the snapshot Info directly from the metadata. Requires a
 // context with a storage transaction.
-func GetInfo(ctx context.Context, key string) (snapshot.Info, error) {
+func GetInfo(ctx context.Context, key string) (string, snapshot.Info, snapshot.Usage, error) {
 	var ss db.Snapshot
 	err := withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
 		return getSnapshot(bkt, key, &ss)
 	})
 	if err != nil {
-		return snapshot.Info{}, err
+		return "", snapshot.Info{}, snapshot.Usage{}, err
 	}
 
-	return snapshot.Info{
+	usage := snapshot.Usage{
+		Inodes: ss.Inodes,
+		Size:   ss.Size_,
+	}
+
+	return fmt.Sprint(ss.ID), snapshot.Info{
 		Name:     key,
 		Parent:   ss.Parent,
 		Kind:     fromProtoKind(ss.Kind),
 		Readonly: ss.Readonly,
-	}, nil
+	}, usage, nil
 }
 
 // WalkInfo iterates through all metadata Info for the stored snapshots and
@@ -263,7 +268,7 @@ func Remove(ctx context.Context, key string) (id string, k snapshot.Kind, err er
 // lookup or removal. The returned string identifier for the committed snapshot
 // is the same identifier of the original active snapshot. The provided context
 // must contain a writable transaction.
-func CommitActive(ctx context.Context, key, name string) (id string, err error) {
+func CommitActive(ctx context.Context, key, name string, usage snapshot.Usage) (id string, err error) {
 	err = withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
 		b := bkt.Get([]byte(name))
 		if len(b) != 0 {
@@ -283,6 +288,8 @@ func CommitActive(ctx context.Context, key, name string) (id string, err error) 
 
 		ss.Kind = db.KindCommitted
 		ss.Readonly = true
+		ss.Inodes = usage.Inodes
+		ss.Size_ = usage.Size
 
 		if err := putSnapshot(bkt, name, &ss); err != nil {
 			return err
