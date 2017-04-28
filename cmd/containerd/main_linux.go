@@ -1,5 +1,3 @@
-// +build darwin freebsd
-
 package main
 
 import (
@@ -9,6 +7,7 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/reaper"
+	"github.com/containerd/containerd/sys"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 )
@@ -22,6 +21,18 @@ var (
 )
 
 func platformInit(context *cli.Context) error {
+	if conf.Subreaper {
+		log.G(global).Info("setting subreaper...")
+		if err := sys.SetSubreaper(1); err != nil {
+			return err
+		}
+	}
+	if conf.OOMScore != 0 {
+		log.G(global).Infof("changing OOM score to %d", conf.OOMScore)
+		if err := sys.SetOOMScore(os.Getpid(), conf.OOMScore); err != nil {
+			return err
+		}
+	}
 	if err := os.MkdirAll(conf.State, 0750); err != nil {
 		return err
 	}
