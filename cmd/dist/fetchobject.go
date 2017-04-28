@@ -18,13 +18,13 @@ var fetchObjectCommand = cli.Command{
 	Usage:       "retrieve objects from a remote",
 	ArgsUsage:   "[flags] <remote> <object> [<hint>, ...]",
 	Description: `Fetch objects by identifier from a remote.`,
-	Flags: []cli.Flag{
+	Flags: append([]cli.Flag{
 		cli.DurationFlag{
 			Name:   "timeout",
 			Usage:  "total timeout for fetch",
 			EnvVar: "CONTAINERD_FETCH_TIMEOUT",
 		},
-	},
+	}, registryFlags...),
 	Action: func(context *cli.Context) error {
 		var (
 			ctx     = background
@@ -38,7 +38,7 @@ var fetchObjectCommand = cli.Command{
 			defer cancel()
 		}
 
-		resolver, err := getResolver(ctx)
+		resolver, err := getResolver(ctx, context)
 		if err != nil {
 			return err
 		}

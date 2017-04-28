@@ -39,7 +39,7 @@ not use this implementation as a guide. The end goal should be having metadata,
 content and snapshots ready for a direct use via the 'ctr run'.
 
 Most of this is experimental and there are few leaps to make this work.`,
-	Flags: []cli.Flag{},
+	Flags: registryFlags,
 	Action: func(clicontext *cli.Context) error {
 		var (
 			ctx = background
@@ -51,7 +51,7 @@ Most of this is experimental and there are few leaps to make this work.`,
 			return err
 		}
 
-		resolver, err := getResolver(ctx)
+		resolver, err := getResolver(ctx, clicontext)
 		if err != nil {
 			return err
 		}
