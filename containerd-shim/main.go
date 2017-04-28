@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -78,7 +80,8 @@ func start(log *os.File) error {
 		return err
 	}
 	defer control.Close()
-	p, err := newProcess(flag.Arg(0), flag.Arg(1), flag.Arg(2))
+	containerID := flag.Arg(0)
+	p, err := newProcess(containerID, flag.Arg(1), flag.Arg(2))
 	if err != nil {
 		return err
 	}
@@ -110,12 +113,19 @@ func start(log *os.File) error {
 		case s := <-signals:
 			switch s {
 			case syscall.SIGCHLD:
-				exits, _ := osutils.Reap(false)
+				exits, rusage, _ := osutils.Reap(false)
 				for _, e := range exits {
 					// check to see if runtime is one of the processes that has exited
 					if e.Pid == p.pid() {
 						exitShim = true
 						writeInt("exitStatus", e.Status)
+						j, err := json.Marshal(rusage)
+						if err == nil {
+							cwd, err := os.Getwd()
+							if err == nil {
+								ioutil.WriteFile(filepath.Join(filepath.Dir(filepath.Dir(cwd)), fmt.Sprintf("%s-stats.json", containerID)), j, 0440)
+							}
+						}
 					}
 				}
 			}
