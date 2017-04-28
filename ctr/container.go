@@ -128,6 +128,30 @@ func listContainers(context *cli.Context) {
 	}
 }
 
+var postmortemCommand = cli.Command{
+	Name:      "postmortem",
+	Usage:     "Get accumulated container stats after exit",
+	ArgsUsage: "ID",
+	Action: func(context *cli.Context) {
+		id := context.Args().First()
+		if id == "" {
+			fatal("Container ID cannot be empty", ExitStatusMissingArg)
+		}
+		c := getClient(context)
+		resp, err := c.PostMortemStats(netcontext.Background(), &types.PostMortemRequest{
+			Containerid: id,
+		})
+		if err != nil {
+			fatal(err.Error(), 1)
+		}
+		m, err := json.Marshal(resp.Stats)
+		if err != nil {
+			fatal(err.Error(), 1)
+		}
+		fmt.Println(string(m))
+	},
+}
+
 var startCommand = cli.Command{
 	Name:      "start",
 	Usage:     "start a container",
