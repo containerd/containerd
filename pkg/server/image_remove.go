@@ -17,14 +17,17 @@ limitations under the License.
 package server
 
 import (
-	"errors"
-
 	"golang.org/x/net/context"
 
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
 // RemoveImage removes the image.
+// TODO(mikebrow): harden api
 func (c *criContainerdService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequest) (*runtime.RemoveImageResponse, error) {
-	return nil, errors.New("not implemented")
+	// Only remove image from the internal metadata store for now.
+	// Note that the image must be digest here in current implementation.
+	// TODO(mikebrow): remove the image via containerd
+	err := c.imageMetadataStore.Delete(r.GetImage().GetImage())
+	return &runtime.RemoveImageResponse{}, err
 }

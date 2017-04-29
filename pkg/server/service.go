@@ -19,15 +19,23 @@ package server
 import (
 	"google.golang.org/grpc"
 
+	contentapi "github.com/containerd/containerd/api/services/content"
+	"github.com/containerd/containerd/api/services/execution"
+	imagesapi "github.com/containerd/containerd/api/services/images"
+	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/rootfs"
+	contentservice "github.com/containerd/containerd/services/content"
+	imagesservice "github.com/containerd/containerd/services/images"
+	rootfsservice "github.com/containerd/containerd/services/rootfs"
+	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
+	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
 	// TODO remove the underscores from the following imports as the services are
 	// implemented. "_" is being used to hold the reference to keep autocomplete
 	// from deleting them until referenced below.
-	_ "github.com/containerd/containerd/api/services/content"
-	_ "github.com/containerd/containerd/api/services/execution"
-	_ "github.com/containerd/containerd/api/services/images"
-	_ "github.com/containerd/containerd/api/services/rootfs"
 	_ "github.com/containerd/containerd/api/types/container"
 	_ "github.com/containerd/containerd/api/types/descriptor"
 	_ "github.com/containerd/containerd/api/types/mount"
@@ -42,10 +50,24 @@ type CRIContainerdService interface {
 }
 
 // criContainerdService implements CRIContainerdService.
-type criContainerdService struct{}
+type criContainerdService struct {
+	containerService   execution.ContainerServiceClient
+	imageStore         images.Store
+	contentIngester    content.Ingester
+	contentProvider    content.Provider
+	rootfsUnpacker     rootfs.Unpacker
+	imageMetadataStore metadata.ImageMetadataStore
+}
 
 // NewCRIContainerdService returns a new instance of CRIContainerdService
 func NewCRIContainerdService(conn *grpc.ClientConn) CRIContainerdService {
 	// TODO: Initialize different containerd clients.
-	return &criContainerdService{}
+	return &criContainerdService{
+		containerService:   execution.NewContainerServiceClient(conn),
+		imageStore:         imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)),
+		contentIngester:    contentservice.NewIngesterFromClient(contentapi.NewContentClient(conn)),
+		contentProvider:    contentservice.NewProviderFromClient(contentapi.NewContentClient(conn)),
+		rootfsUnpacker:     rootfsservice.NewUnpackerFromClient(rootfsapi.NewRootFSClient(conn)),
+		imageMetadataStore: metadata.NewImageMetadataStore(store.NewMetadataStore()),
+	}
 }
