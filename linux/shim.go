@@ -24,7 +24,7 @@ import (
 
 func newShim(path string, remote bool) (shim.ShimClient, error) {
 	if !remote {
-		return localShim.Client(path), nil
+		return localShim.Client(path)
 	}
 	socket := filepath.Join(path, "shim.sock")
 	l, err := sys.CreateUnixSocket(socket)
@@ -59,7 +59,7 @@ func newShim(path string, remote bool) (shim.ShimClient, error) {
 
 func loadShim(path string, remote bool) (shim.ShimClient, error) {
 	if !remote {
-		return localShim.Client(path), nil
+		return localShim.Client(path)
 	}
 	socket := filepath.Join(path, "shim.sock")
 	return connectShim(socket)
