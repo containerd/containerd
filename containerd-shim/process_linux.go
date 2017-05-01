@@ -5,9 +5,7 @@ package main
 import (
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"syscall"
 	"time"
 
@@ -35,11 +33,7 @@ func (p *process) openIO() error {
 	p.stdinCloser = stdinCloser
 
 	if p.state.Terminal {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		socket, err := runc.NewConsoleSocket(filepath.Join(cwd, "pty.sock"))
+		socket, err := runc.NewTempConsoleSocket()
 		if err != nil {
 			return err
 		}

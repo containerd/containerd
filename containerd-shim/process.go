@@ -284,7 +284,11 @@ func (p *process) initializeIO(rootuid, rootgid int) (i *IO, err error) {
 	return i, nil
 }
 func (p *process) Close() error {
-	return p.stdio.Close()
+	err := p.stdio.Close()
+	if p.socket != nil {
+		p.socket.Close()
+	}
+	return err
 }
 
 type stdio struct {

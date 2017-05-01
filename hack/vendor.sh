@@ -32,7 +32,7 @@ clone git github.com/vdemeester/shakers 24d7f1d6a71aa5d9cbe7390e4afb66b7eef9e1b3
 clone git github.com/go-check/check a625211d932a2a643d0d17352095f03fb7774663 https://github.com/cpuguy83/check.git
 
 clone git github.com/crosbymichael/console 8ea0f623ee22736eec36b4ec87664b1d82cf9d15
-clone git github.com/crosbymichael/go-runc cfdb00928e8216dc80be58981368f56e8ba01f8e
+clone git github.com/crosbymichael/go-runc 980b32fc0fe2280022206962a536657010d9e072
 
 # dependencies of docker/pkg/listeners
 clone git github.com/docker/go-connections v0.2.0
