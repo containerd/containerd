@@ -5,6 +5,7 @@ import (
 
 	shimapi "github.com/containerd/containerd/api/services/shim"
 	"github.com/containerd/containerd/api/types/container"
+	runc "github.com/crosbymichael/go-runc"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
@@ -12,10 +13,26 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-func Client(path string) shimapi.ShimClient {
-	return &client{
+func Client(path string) (shimapi.ShimClient, error) {
+	pid, err := runc.ReadPidFile(filepath.Join(path, "init.pid"))
+	if err != nil {
+		return nil, err
+	}
+
+	cl := &client{
 		s: New(path),
 	}
+
+	// used when quering  container status and info
+	cl.s.initProcess = &initProcess{
+		id:  filepath.Base(path),
+		pid: pid,
+		runc: &runc.Runc{
+			Log:       filepath.Join(path, "log.json"),
+			LogFormat: runc.JSON,
+		},
+	}
+	return cl, nil
 }
 
 type client struct {
