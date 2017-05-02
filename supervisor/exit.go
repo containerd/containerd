@@ -87,7 +87,10 @@ func (s *Supervisor) execExit(t *ExecExitTask) error {
 			PID:       t.PID,
 			Status:    t.Status,
 		})
-		close(synCh)
+		if synCh != nil {
+			// avoid close nil channel
+			close(synCh)
+		}
 	}()
 	return nil
 }
