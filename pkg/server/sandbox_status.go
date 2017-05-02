@@ -35,7 +35,7 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 	glog.V(4).Infof("PodSandboxStatus for sandbox %q", r.GetPodSandboxId())
 	defer func() {
 		if retErr == nil {
-			glog.V(4).Infof("PodSandboxStatus returns status %+v", retRes.GetStatus())
+			glog.V(4).Infof("PodSandboxStatus for %q returns status %+v", r.GetPodSandboxId(), retRes.GetStatus())
 		}
 	}()
 
