@@ -16,11 +16,11 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/urfave/cli"
 	"github.com/containerd/containerd/api/grpc/types"
 	"github.com/containerd/containerd/specs"
 	"github.com/crosbymichael/console"
 	"github.com/golang/protobuf/ptypes"
+	"github.com/urfave/cli"
 	netcontext "golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
@@ -260,6 +260,16 @@ var startCommand = cli.Command{
 					}
 				}()
 			}
+			time.Sleep(2 * time.Second)
+			log.Println("closing stdin now")
+			if _, err := c.UpdateProcess(netcontext.Background(), &types.UpdateProcessRequest{
+				Id:         id,
+				Pid:        "init",
+				CloseStdin: true,
+			}); err != nil {
+				fatal(err.Error(), 1)
+			}
+
 			waitForExit(c, events, id, "init", con)
 		}
 		return nil

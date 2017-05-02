@@ -33,11 +33,13 @@ type controlMessage struct {
 // Arg2: runtime binary
 func main() {
 	flag.Parse()
-	cwd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-	f, err := os.OpenFile(filepath.Join(cwd, "shim-log.json"), os.O_CREATE|os.O_WRONLY|os.O_APPEND|os.O_SYNC, 0666)
+	/*
+		cwd, err := os.Getwd()
+		if err != nil {
+			panic(err)
+		}
+	*/
+	f, err := os.OpenFile(filepath.Join("/tmp", "shim-log.json"), os.O_CREATE|os.O_WRONLY|os.O_APPEND|os.O_SYNC, 0666)
 	if err != nil {
 		panic(err)
 	}
@@ -82,12 +84,19 @@ func start(log *os.File) error {
 	if err != nil {
 		return err
 	}
+	if err := p.openIO(); err != nil {
+		return err
+	}
 	defer func() {
 		if err := p.Close(); err != nil {
 			writeMessage(log, "warn", err)
 		}
 	}()
 	if err := p.create(); err != nil {
+		p.delete()
+		return err
+	}
+	if err := <-p.consoleErrCh; err != nil {
 		p.delete()
 		return err
 	}

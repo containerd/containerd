@@ -67,15 +67,17 @@ type process struct {
 	runtime        string
 	ioCleanupFn    func()
 
-	console console.Console
-	socket  *runc.Socket
+	socket       *runc.Socket
+	console      console.Console
+	consoleErrCh chan error
 }
 
 func newProcess(id, bundle, runtimeName string) (*process, error) {
 	p := &process{
-		id:      id,
-		bundle:  bundle,
-		runtime: runtimeName,
+		id:           id,
+		bundle:       bundle,
+		runtime:      runtimeName,
+		consoleErrCh: make(chan error, 1),
 	}
 	s, err := loadProcess()
 	if err != nil {
@@ -89,9 +91,6 @@ func newProcess(id, bundle, runtimeName string) (*process, error) {
 		}
 		p.checkpoint = cpt
 		p.checkpointPath = s.CheckpointPath
-	}
-	if err := p.openIO(); err != nil {
-		return nil, err
 	}
 	return p, nil
 }
