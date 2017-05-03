@@ -14,7 +14,7 @@ clone git github.com/docker/go-units 5d2041e26a699eaca682e2ea41c8f891e1060444
 clone git github.com/godbus/dbus e2cf28118e66a6a63db46cf6088a35d2054d3bb0
 clone git github.com/golang/glog 23def4e6c14b4da8ac2ed8007337bc5eb5007998
 clone git github.com/golang/protobuf 8ee79997227bf9b34611aee7946ae64735e6fd93
-clone git github.com/opencontainers/runc b6b70e53451794e8333e9b602cc096b47a20bd0f
+clone git github.com/opencontainers/runc 992a5be178a62e026f4069f443c6164912adbf09
 clone git github.com/opencontainers/runtime-spec v1.0.0-rc5
 clone git github.com/rcrowley/go-metrics eeba7bd0dd01ace6e690fa833b3f22aaec29af43
 clone git github.com/satori/go.uuid f9ab0dce87d815821e221626b772e3475a0d2749
