@@ -113,7 +113,6 @@ func (p *process) openIO() error {
 	if err != nil {
 		return fmt.Errorf("containerd-shim: opening %s failed: %s", p.state.Stdin, err)
 	}
-	ioClosers = append(ioClosers, i.Stdin, f)
 	p.ioCleanupFn = func() {
 		for _, c := range ioClosers {
 			c.Close()
@@ -121,6 +120,8 @@ func (p *process) openIO() error {
 	}
 	go func() {
 		io.Copy(i.Stdin, f)
+		i.Stdin.Close()
+		f.Close()
 	}()
 
 	return nil
