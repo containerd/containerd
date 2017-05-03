@@ -19,7 +19,7 @@ var deleteCommand = cli.Command{
 		}
 		id := context.Args().First()
 		if id == "" {
-			return errors.New(" id must be provided")
+			return errors.New("container id must be provided")
 		}
 		_, err = containers.Delete(gocontext.Background(), &execution.DeleteRequest{
 			ID: id,

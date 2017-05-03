@@ -10,7 +10,7 @@ import (
 
 var killCommand = cli.Command{
 	Name:  "kill",
-	Usage: "signal a container",
+	Usage: "signal a container (default: SIGTERM)",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "id",
