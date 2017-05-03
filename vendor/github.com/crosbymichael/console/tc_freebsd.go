@@ -1,5 +1,3 @@
-// +build linux
-
 package console
 
 import (
@@ -11,11 +9,11 @@ import (
 )
 
 func tcget(fd uintptr, p *unix.Termios) error {
-	return ioctl(fd, unix.TCGETS, uintptr(unsafe.Pointer(p)))
+	return ioctl(fd, unix.TIOCGETA, uintptr(unsafe.Pointer(p)))
 }
 
 func tcset(fd uintptr, p *unix.Termios) error {
-	return ioctl(fd, unix.TCSETS, uintptr(unsafe.Pointer(p)))
+	return ioctl(fd, unix.TIOCSETA, uintptr(unsafe.Pointer(p)))
 }
 
 func ioctl(fd, flag, data uintptr) error {
@@ -27,9 +25,9 @@ func ioctl(fd, flag, data uintptr) error {
 
 // unlockpt unlocks the slave pseudoterminal device corresponding to the master pseudoterminal referred to by f.
 // unlockpt should be called before opening the slave side of a pty.
+// This does not exist on FreeBSD, it does not allocate controlling terminals on open
 func unlockpt(f *os.File) error {
-	var u int32
-	return ioctl(f.Fd(), unix.TIOCSPTLCK, uintptr(unsafe.Pointer(&u)))
+	return nil
 }
 
 // ptsname retrieves the name of the first available pts for the given master.

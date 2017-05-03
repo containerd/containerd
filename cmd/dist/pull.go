@@ -35,7 +35,7 @@ command. As part of this process, we do the following:
 2. Prepare the snapshot filesystem with the pulled resources.
 3. Register metadata for the image.
 `,
-	Flags: []cli.Flag{},
+	Flags: registryFlags,
 	Action: func(clicontext *cli.Context) error {
 		var (
 			ctx = background
@@ -52,7 +52,7 @@ command. As part of this process, we do the following:
 			return err
 		}
 
-		resolver, err := getResolver(ctx)
+		resolver, err := getResolver(ctx, clicontext)
 		if err != nil {
 			return err
 		}
@@ -75,6 +75,7 @@ command. As part of this process, we do the following:
 			ongoing.add(ref)
 			name, desc, fetcher, err := resolver.Resolve(ctx, ref)
 			if err != nil {
+				log.G(ctx).WithError(err).Error("failed to resolve")
 				return err
 			}
 			log.G(ctx).WithField("image", name).Debug("fetching")

@@ -1,3 +1,5 @@
+// +build darwin freebsd linux
+
 package console
 
 // #include <termios.h>
@@ -34,8 +36,8 @@ func NewPty() (Console, string, error) {
 }
 
 type master struct {
-	f       *os.File
-	termios *unix.Termios
+	f        *os.File
+	original *unix.Termios
 }
 
 func (m *master) Read(b []byte) (int, error) {
@@ -67,20 +69,39 @@ func (m *master) ResizeFrom(c Console) error {
 }
 
 func (m *master) Reset() error {
-	if m.termios == nil {
+	if m.original == nil {
 		return nil
 	}
-	return tcset(m.f.Fd(), m.termios)
+	return tcset(m.f.Fd(), m.original)
+}
+
+func (m *master) getCurrent() (unix.Termios, error) {
+	var termios unix.Termios
+	if err := tcget(m.f.Fd(), &termios); err != nil {
+		return unix.Termios{}, err
+	}
+	if m.original == nil {
+		m.original = &termios
+	}
+	return termios, nil
 }
 
 func (m *master) SetRaw() error {
-	m.termios = &unix.Termios{}
-	if err := tcget(m.f.Fd(), m.termios); err != nil {
+	rawState, err := m.getCurrent()
+	if err != nil {
 		return err
 	}
-	rawState := *m.termios
 	C.cfmakeraw((*C.struct_termios)(unsafe.Pointer(&rawState)))
 	rawState.Oflag = rawState.Oflag | C.OPOST
+	return tcset(m.f.Fd(), &rawState)
+}
+
+func (m *master) DisableEcho() error {
+	rawState, err := m.getCurrent()
+	if err != nil {
+		return err
+	}
+	rawState.Lflag = rawState.Lflag &^ unix.ECHO
 	return tcset(m.f.Fd(), &rawState)
 }
 
