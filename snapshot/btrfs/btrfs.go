@@ -9,13 +9,13 @@ import (
 	"path/filepath"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/containerd/btrfs"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/snapshot/storage"
 	"github.com/pkg/errors"
-	"github.com/stevvooe/go-btrfs"
 )
 
 type btrfsConfig struct {
