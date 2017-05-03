@@ -33,13 +33,11 @@ type controlMessage struct {
 // Arg2: runtime binary
 func main() {
 	flag.Parse()
-	/*
-		cwd, err := os.Getwd()
-		if err != nil {
-			panic(err)
-		}
-	*/
-	f, err := os.OpenFile(filepath.Join("/tmp", "shim-log.json"), os.O_CREATE|os.O_WRONLY|os.O_APPEND|os.O_SYNC, 0666)
+	cwd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	f, err := os.OpenFile(filepath.Join(cwd, "shim-log.json"), os.O_CREATE|os.O_WRONLY|os.O_APPEND|os.O_SYNC, 0666)
 	if err != nil {
 		panic(err)
 	}

@@ -154,9 +154,8 @@ func (p *process) setConsole(c <-chan *consoleR, stdin io.Reader, stdout io.Writ
 	if r.err != nil {
 		p.consoleErrCh <- r.err
 		return
-	} else {
-		close(p.consoleErrCh)
 	}
+	close(p.consoleErrCh)
 	p.console = r.c
 	// copy from the console into the provided fifos
 	go io.Copy(r.c, stdin)
