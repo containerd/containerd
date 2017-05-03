@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/stevvooe/continuity"
+	"github.com/containerd/continuity"
 )
 
 type resourceUpdate struct {

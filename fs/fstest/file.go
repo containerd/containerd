@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/stevvooe/continuity/sysx"
+	"github.com/containerd/continuity/sysx"
 )
 
 // Applier applies single file changes

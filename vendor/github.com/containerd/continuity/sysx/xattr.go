@@ -2,10 +2,13 @@ package sysx
 
 import (
 	"bytes"
+	"fmt"
 	"syscall"
 )
 
 const defaultXattrBufferSize = 5
+
+var ErrNotSupported = fmt.Errorf("not supported")
 
 type listxattrFunc func(path string, dest []byte) (int, error)
 

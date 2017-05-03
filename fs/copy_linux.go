@@ -5,8 +5,8 @@ import (
 	"os"
 	"syscall"
 
+	"github.com/containerd/continuity/sysx"
 	"github.com/pkg/errors"
-	"github.com/stevvooe/continuity/sysx"
 )
 
 func copyFileInfo(fi os.FileInfo, name string) error {

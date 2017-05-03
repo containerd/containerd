@@ -7,8 +7,8 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/containerd/continuity/sysx"
 	"github.com/pkg/errors"
-	"github.com/stevvooe/continuity/sysx"
 )
 
 // whiteouts are files with a special meaning for the layered filesystem.
