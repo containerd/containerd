@@ -1,5 +1,5 @@
 # go-btrfs
-[![GoDoc](https://godoc.org/github.com/stevvooe/go-btrfs?status.svg)](https://godoc.org/github.com/stevvooe/go-btrfs) [![Build Status](https://travis-ci.org/stevvooe/go-btrfs.svg?branch=master)](https://travis-ci.org/stevvooe/go-btrfs)
+[![GoDoc](https://godoc.org/github.com/containerd/btrfs?status.svg)](https://godoc.org/github.com/containerd/btrfs) [![Build Status](https://travis-ci.org/stevvooe/go-btrfs.svg?branch=master)](https://travis-ci.org/stevvooe/go-btrfs)
 
 Native Go bindings for btrfs.
 
