@@ -17,6 +17,8 @@ import (
 
 	"github.com/containerd/containerd/osutils"
 	"github.com/containerd/containerd/specs"
+	"github.com/crosbymichael/console"
+	runc "github.com/crosbymichael/go-runc"
 )
 
 var errRuntime = errors.New("shim: runtime execution error")
@@ -61,18 +63,21 @@ type process struct {
 	checkpointPath string
 	shimIO         *IO
 	stdinCloser    io.Closer
-	console        *os.File
-	consolePath    string
 	state          *processState
 	runtime        string
 	ioCleanupFn    func()
+
+	socket       *runc.Socket
+	console      console.Console
+	consoleErrCh chan error
 }
 
 func newProcess(id, bundle, runtimeName string) (*process, error) {
 	p := &process{
-		id:      id,
-		bundle:  bundle,
-		runtime: runtimeName,
+		id:           id,
+		bundle:       bundle,
+		runtime:      runtimeName,
+		consoleErrCh: make(chan error, 1),
 	}
 	s, err := loadProcess()
 	if err != nil {
@@ -86,9 +91,6 @@ func newProcess(id, bundle, runtimeName string) (*process, error) {
 		}
 		p.checkpoint = cpt
 		p.checkpointPath = s.CheckpointPath
-	}
-	if err := p.openIO(); err != nil {
-		return nil, err
 	}
 	return p, nil
 }
@@ -133,8 +135,11 @@ func (p *process) create() error {
 		args = append(args, "exec",
 			"-d",
 			"--process", filepath.Join(cwd, "process.json"),
-			"--console", p.consolePath,
 		)
+		if p.socket != nil {
+			args = append(args, "--console-socket", p.socket.Path())
+		}
+
 	} else if p.checkpoint != nil {
 		args = append(args, "restore",
 			"-d",
@@ -163,8 +168,10 @@ func (p *process) create() error {
 	} else {
 		args = append(args, "create",
 			"--bundle", p.bundle,
-			"--console", p.consolePath,
 		)
+		if p.socket != nil {
+			args = append(args, "--console-socket", p.socket.Path())
+		}
 		if p.state.NoPivotRoot {
 			args = append(args, "--no-pivot")
 		}
@@ -237,7 +244,7 @@ type IO struct {
 	Stderr io.ReadCloser
 }
 
-func (p *process) initializeIO(rootuid int) (i *IO, err error) {
+func (p *process) initializeIO(rootuid, rootgid int) (i *IO, err error) {
 	var fds []uintptr
 	i = &IO{}
 	// cleanup in case of an error
@@ -269,14 +276,18 @@ func (p *process) initializeIO(rootuid int) (i *IO, err error) {
 	p.stdio.stderr, i.Stderr = w, r
 	// change ownership of the pipes in case we are in a user namespace
 	for _, fd := range fds {
-		if err := syscall.Fchown(int(fd), rootuid, rootuid); err != nil {
+		if err := syscall.Fchown(int(fd), rootuid, rootgid); err != nil {
 			return nil, err
 		}
 	}
 	return i, nil
 }
 func (p *process) Close() error {
-	return p.stdio.Close()
+	err := p.stdio.Close()
+	if p.socket != nil {
+		p.socket.Close()
+	}
+	return err
 }
 
 type stdio struct {

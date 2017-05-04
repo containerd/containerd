@@ -17,7 +17,7 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/codegangsta/cli"
+	"github.com/urfave/cli"
 	"github.com/cyberdelia/go-metrics-graphite"
 	"github.com/containerd/containerd"
 	grpcserver "github.com/containerd/containerd/api/grpc/server"

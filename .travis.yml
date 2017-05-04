@@ -17,7 +17,8 @@ addons:
       - curl
 
 env:
-  - SECCOMP_VERSION=2.3.1 RUNC_COMMIT=51371867a01c467f08af739783b8beafc154c4d7
+  - SECCOMP_VERSION=2.3.1 RUNC_COMMIT=992a5be178a62e026f4069f443c6164912adbf09
+
 
 install:
   - hack/install-seccomp.sh

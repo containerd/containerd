@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	"github.com/containerd/containerd/osutils"
-	"github.com/docker/docker/pkg/term"
+	"github.com/crosbymichael/console"
 )
 
 func writeMessage(f *os.File, level string, err error) {
@@ -82,12 +82,19 @@ func start(log *os.File) error {
 	if err != nil {
 		return err
 	}
+	if err := p.openIO(); err != nil {
+		return err
+	}
 	defer func() {
 		if err := p.Close(); err != nil {
 			writeMessage(log, "warn", err)
 		}
 	}()
 	if err := p.create(); err != nil {
+		p.delete()
+		return err
+	}
+	if err := <-p.consoleErrCh; err != nil {
 		p.delete()
 		return err
 	}
@@ -142,11 +149,10 @@ func start(log *os.File) error {
 				if p.console == nil {
 					continue
 				}
-				ws := term.Winsize{
+				p.console.Resize(console.WinSize{
 					Width:  uint16(msg.Width),
 					Height: uint16(msg.Height),
-				}
-				term.SetWinsize(p.console.Fd(), &ws)
+				})
 			}
 		}
 	}

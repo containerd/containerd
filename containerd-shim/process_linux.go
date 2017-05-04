@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/osutils"
+	"github.com/crosbymichael/console"
+	runc "github.com/crosbymichael/go-runc"
 	"github.com/tonistiigi/fifo"
 	"golang.org/x/net/context"
 )
@@ -32,17 +34,17 @@ func (p *process) openIO() error {
 	p.stdinCloser = stdinCloser
 
 	if p.state.Terminal {
-		master, console, err := newConsole(uid, gid)
+		socket, err := runc.NewTempConsoleSocket()
 		if err != nil {
 			return err
 		}
-		p.console = master
-		p.consolePath = console
+		p.socket = socket
+		consoleCh := p.waitConsole(socket)
+
 		stdin, err := fifo.OpenFifo(ctx, p.state.Stdin, syscall.O_RDONLY, 0)
 		if err != nil {
 			return err
 		}
-		go io.Copy(master, stdin)
 		stdoutw, err := fifo.OpenFifo(ctx, p.state.Stdout, syscall.O_WRONLY, 0)
 		if err != nil {
 			return err
@@ -51,25 +53,25 @@ func (p *process) openIO() error {
 		if err != nil {
 			return err
 		}
+		// open the fifos but wait until we receive the console before we start
+		// copying data back and forth between the two
+		go p.setConsole(consoleCh, stdin, stdoutw)
+
 		p.Add(1)
 		p.ioCleanupFn = func() {
-			master.Close()
 			stdoutr.Close()
 			stdoutw.Close()
 		}
-		go func() {
-			io.Copy(stdoutw, master)
-			p.Done()
-		}()
 		return nil
 	}
-	i, err := p.initializeIO(uid)
+	close(p.consoleErrCh)
+	i, err := p.initializeIO(uid, gid)
 	if err != nil {
 		return err
 	}
 	p.shimIO = i
 	// non-tty
-	ioClosers := make([]io.Closer, 0)
+	ioClosers := []io.Closer{}
 	for _, pair := range []struct {
 		name string
 		dest func(wc io.WriteCloser, rc io.Closer)
@@ -111,7 +113,6 @@ func (p *process) openIO() error {
 	if err != nil {
 		return fmt.Errorf("containerd-shim: opening %s failed: %s", p.state.Stdin, err)
 	}
-	ioClosers = append(ioClosers, i.Stdin, f)
 	p.ioCleanupFn = func() {
 		for _, c := range ioClosers {
 			c.Close()
@@ -119,6 +120,8 @@ func (p *process) openIO() error {
 	}
 	go func() {
 		io.Copy(i.Stdin, f)
+		i.Stdin.Close()
+		f.Close()
 	}()
 
 	return nil
@@ -128,6 +131,9 @@ func (p *process) Wait() {
 	p.WaitGroup.Wait()
 	if p.ioCleanupFn != nil {
 		p.ioCleanupFn()
+	}
+	if p.console != nil {
+		p.console.Close()
 	}
 }
 
@@ -141,4 +147,44 @@ func (p *process) killAll() error {
 		}
 	}
 	return nil
+}
+
+func (p *process) setConsole(c <-chan *consoleR, stdin io.Reader, stdout io.Writer) {
+	r := <-c
+	if r.err != nil {
+		p.consoleErrCh <- r.err
+		return
+	}
+	close(p.consoleErrCh)
+	p.console = r.c
+	// copy from the console into the provided fifos
+	go io.Copy(r.c, stdin)
+	go func() {
+		io.Copy(stdout, r.c)
+		p.Done()
+	}()
+}
+
+type consoleR struct {
+	c   console.Console
+	err error
+}
+
+func (p *process) waitConsole(socket *runc.Socket) <-chan *consoleR {
+	c := make(chan *consoleR, 1)
+	go func() {
+		master, err := socket.ReceiveMaster()
+		socket.Close()
+		if err != nil {
+			c <- &consoleR{
+				err: err,
+			}
+			return
+		}
+		c <- &consoleR{
+			c: master,
+		}
+	}()
+	return c
+
 }

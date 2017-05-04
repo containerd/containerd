@@ -107,28 +107,29 @@ func (c *container) Pids() ([]int, error) {
 }
 
 func u64Ptr(i uint64) *uint64 { return &i }
+func i64Ptr(i int64) *int64   { return &i }
 
 func (c *container) UpdateResources(r *Resource) error {
-	sr := ocs.Resources{
-		Memory: &ocs.Memory{
+	sr := ocs.LinuxResources{
+		Memory: &ocs.LinuxMemory{
 			Limit:       u64Ptr(uint64(r.Memory)),
 			Reservation: u64Ptr(uint64(r.MemoryReservation)),
 			Swap:        u64Ptr(uint64(r.MemorySwap)),
 			Kernel:      u64Ptr(uint64(r.KernelMemory)),
 			KernelTCP:   u64Ptr(uint64(r.KernelTCPMemory)),
 		},
-		CPU: &ocs.CPU{
+		CPU: &ocs.LinuxCPU{
 			Shares: u64Ptr(uint64(r.CPUShares)),
-			Quota:  u64Ptr(uint64(r.CPUQuota)),
+			Quota:  i64Ptr(int64(r.CPUQuota)),
 			Period: u64Ptr(uint64(r.CPUPeriod)),
-			Cpus:   &r.CpusetCpus,
-			Mems:   &r.CpusetMems,
+			Cpus:   r.CpusetCpus,
+			Mems:   r.CpusetMems,
 		},
-		BlockIO: &ocs.BlockIO{
+		BlockIO: &ocs.LinuxBlockIO{
 			Weight: &r.BlkioWeight,
 		},
-		Pids: &ocs.Pids{
-			Limit: &r.PidsLimit,
+		Pids: &ocs.LinuxPids{
+			Limit: r.PidsLimit,
 		},
 	}
 
