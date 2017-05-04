@@ -1,5 +1,3 @@
-// +build darwin freebsd
-
 package main
 
 func defaultConfig() *config {
@@ -13,6 +11,6 @@ func defaultConfig() *config {
 			Level:   "info",
 			Address: "/run/containerd/debug.sock",
 		},
-		Snapshotter: "naive",
+		Snapshotter: "overlay",
 	}
 }
