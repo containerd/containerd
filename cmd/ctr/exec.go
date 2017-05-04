@@ -7,6 +7,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd/api/services/execution"
 	"github.com/crosbymichael/console"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
@@ -32,6 +33,9 @@ var execCommand = cli.Command{
 			id  = context.String("id")
 			ctx = gocontext.Background()
 		)
+		if id == "" {
+			return errors.New("container id must be provided")
+		}
 
 		containers, err := getExecutionService(context)
 		if err != nil {
