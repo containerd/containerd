@@ -12,6 +12,11 @@
 			"Rev": "31b736133b98f26d5e078ec9eb591666edfd091f"
 		},
 		{
+			"ImportPath": "github.com/containerd/containerd",
+			"Comment": "v0.2.3-745-gbbeaab5",
+			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
+		},
+		{
 			"ImportPath": "github.com/containerd/containerd/api/services/content",
 			"Comment": "v0.2.3-745-gbbeaab5",
 			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
@@ -103,6 +108,11 @@
 			"Rev": "035da1dca3dfbb00d752eb58b0b158d6129f3776"
 		},
 		{
+			"ImportPath": "github.com/pkg/errors",
+			"Comment": "v0.8.0",
+			"Rev": "645ef00459ed84a119197bfb8d8205042c6df63d"
+		},
+		{
 			"ImportPath": "github.com/pmezard/go-difflib/difflib",
 			"Comment": "v1.0.0",
 			"Rev": "792786c7400a136282c1664665ae0a8db921c6c2"
@@ -143,6 +153,10 @@
 		{
 			"ImportPath": "golang.org/x/net/trace",
 			"Rev": "e90d6d0afc4c315a0d87a568ae68577cc15149a0"
+		},
+		{
+			"ImportPath": "golang.org/x/sys/unix",
+			"Rev": "f3918c30c5c2cb527c0b071a27c35120a6c0719a"
 		},
 		{
 			"ImportPath": "google.golang.org/grpc",
