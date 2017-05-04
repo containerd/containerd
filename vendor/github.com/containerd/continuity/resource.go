@@ -8,7 +8,7 @@ import (
 	"sort"
 
 	"github.com/opencontainers/go-digest"
-	pb "github.com/stevvooe/continuity/proto"
+	pb "github.com/containerd/continuity/proto"
 )
 
 // TODO(stevvooe): A record based model, somewhat sketched out at the bottom
@@ -111,7 +111,7 @@ func Merge(fs ...Resource) (Resource, error) {
 		if xattrer, ok := f.(XAttrer); ok {
 			fxattrs := xattrer.XAttrs()
 			if !reflect.DeepEqual(fxattrs, xattrs) {
-				return nil, fmt.Errorf("resource %q xattrs do not match: %v != %v", fxattrs, xattrs)
+				return nil, fmt.Errorf("resource %q xattrs do not match: %v != %v", f, fxattrs, xattrs)
 			}
 		}
 
@@ -245,22 +245,6 @@ type resource struct {
 }
 
 var _ Resource = &resource{}
-
-// newBaseResource returns a *resource, populated with data from p and fi,
-// where p will be populated directly.
-func newBaseResource(p string, mode os.FileMode, uid, gid string) (*resource, error) {
-	return &resource{
-		paths: []string{p},
-		mode:  mode,
-
-		uid: uid,
-		gid: gid,
-
-		// NOTE(stevvooe): Population of shared xattrs field is deferred to
-		// the resource types that populate it. Since they are a property of
-		// the context, they must set there.
-	}, nil
-}
 
 func (r *resource) Path() string {
 	if len(r.paths) < 1 {
@@ -482,7 +466,17 @@ func toProto(resource Resource) *pb.Resource {
 	}
 
 	if xattrer, ok := resource.(XAttrer); ok {
-		b.Xattr = xattrer.XAttrs()
+		// Sorts the XAttrs by name for consistent ordering.
+		keys := []string{}
+		xattrs := xattrer.XAttrs()
+		for k := range xattrs {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, k := range keys {
+			b.Xattr = append(b.Xattr, &pb.XAttr{Name: k, Data: xattrs[k]})
+		}
 	}
 
 	switch r := resource.(type) {
@@ -511,15 +505,17 @@ func toProto(resource Resource) *pb.Resource {
 
 // fromProto converts from a protobuf Resource to a Resource interface.
 func fromProto(b *pb.Resource) (Resource, error) {
-	base, err := newBaseResource(b.Path[0], os.FileMode(b.Mode), b.Uid, b.Gid)
-	if err != nil {
-		return nil, err
+	base := &resource{
+		paths: b.Path,
+		mode:  os.FileMode(b.Mode),
+		uid:   b.Uid,
+		gid:   b.Gid,
 	}
 
 	base.xattrs = make(map[string][]byte, len(b.Xattr))
 
-	for attr, value := range b.Xattr {
-		base.xattrs[attr] = append(base.xattrs[attr], value...)
+	for _, attr := range b.Xattr {
+		base.xattrs[attr.Name] = attr.Data
 	}
 
 	switch {

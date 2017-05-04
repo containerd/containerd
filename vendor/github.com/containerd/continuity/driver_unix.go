@@ -3,13 +3,27 @@
 package continuity
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 
-	"github.com/stevvooe/continuity/sysx"
+	"github.com/containerd/continuity/sysx"
 )
+
+func (d *driver) Mknod(path string, mode os.FileMode, major, minor int) error {
+	return mknod(path, mode, major, minor)
+}
+
+func (d *driver) Mkfifo(path string, mode os.FileMode) error {
+	if mode&os.ModeNamedPipe == 0 {
+		return errors.New("mode passed to Mkfifo does not have the named pipe bit set")
+	}
+	// mknod with a mode that has ModeNamedPipe set creates a fifo, not a
+	// device.
+	return mknod(path, mode, 0, 0)
+}
 
 // Lchmod changes the mode of an file not following symlinks.
 func (d *driver) Lchmod(path string, mode os.FileMode) (err error) {

@@ -4,8 +4,8 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/containerd/continuity"
 	"github.com/pkg/errors"
-	"github.com/stevvooe/continuity"
 )
 
 // CheckDirectoryEqual compares two directory paths to make sure that

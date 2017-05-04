@@ -8,7 +8,7 @@ import (
 	"sort"
 
 	"github.com/golang/protobuf/proto"
-	pb "github.com/stevvooe/continuity/proto"
+	pb "github.com/containerd/continuity/proto"
 )
 
 // Manifest provides the contents of a manifest. Users of this struct should
