@@ -100,7 +100,7 @@ func forwardAllSignals(containers execution.ContainerServiceClient, id string) c
 			}
 			_, err := containers.Kill(gocontext.Background(), killRequest)
 			if err != nil {
-				logrus.WithError(err).Error("grpc event from kill")
+				logrus.Fatalln(err)
 			}
 		}
 	}()
