@@ -67,7 +67,7 @@ func setupEventLog(s *Supervisor, retainCount int) error {
 }
 
 func eventLogger(s *Supervisor, path string, events chan Event, retainCount int) error {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND|os.O_TRUNC, 0755)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0755)
 	if err != nil {
 		return err
 	}
@@ -77,6 +77,16 @@ func eventLogger(s *Supervisor, path string, events chan Event, retainCount int)
 			enc   = json.NewEncoder(f)
 		)
 		for e := range events {
+			s.eventLock.Lock()
+			s.eventLog = append(s.eventLog, e)
+			s.eventLock.Unlock()
+			count++
+			if f != nil {
+				if err := enc.Encode(e); err != nil {
+					logrus.WithField("error", err).Error("containerd: write event to journal")
+				}
+			}
+
 			// if we have a specified retain count make sure the truncate the event
 			// log if it grows past the specified number of events to keep.
 			if retainCount > 0 {
@@ -91,28 +101,40 @@ func eventLogger(s *Supervisor, path string, events chan Event, retainCount int)
 					if slice >= l {
 						slice = l
 					}
+
+					tmpPath := path + ".tmp"
+					fTmp, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND|os.O_TRUNC, 0755)
+					if err != nil {
+						logrus.WithField("error", err).Error("containerd: open event.tmp to journal")
+						continue
+					}
+					encTmp := json.NewEncoder(fTmp)
+
 					s.eventLock.Lock()
 					s.eventLog = s.eventLog[len(s.eventLog)-slice:]
 					s.eventLock.Unlock()
-					if f, err = os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND|os.O_TRUNC, 0755); err != nil {
+					for _, le := range s.eventLog {
+						if err := encTmp.Encode(le); err != nil {
+							logrus.WithField("error", err).Error("containerd: write event to tmp journal")
+						}
+					}
+					fTmp.Close()
+
+					// rename here
+					if err = os.Rename(tmpPath, path); err != nil {
+						os.Remove(tmpPath)
+						logrus.WithField("error", err).Error("containerd: update event file")
+						continue
+					}
+
+					// XXX: what if openFile failed here, writing in next loop would fail
+					if f, err = os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0755); err != nil {
 						logrus.WithField("error", err).Error("containerd: open event to journal")
 						continue
 					}
-					enc = json.NewEncoder(f)
 					count = 0
-					for _, le := range s.eventLog {
-						if err := enc.Encode(le); err != nil {
-							logrus.WithField("error", err).Error("containerd: write event to journal")
-						}
-					}
+					enc = json.NewEncoder(f)
 				}
-			}
-			s.eventLock.Lock()
-			s.eventLog = append(s.eventLog, e)
-			s.eventLock.Unlock()
-			count++
-			if err := enc.Encode(e); err != nil {
-				logrus.WithField("error", err).Error("containerd: write event to journal")
 			}
 		}
 	}()
