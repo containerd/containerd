@@ -15,11 +15,13 @@ import (
 )
 
 func copyConsole(ctx context.Context, console console.Console, stdin, stdout, stderr string, wg *sync.WaitGroup) error {
-	in, err := fifo.OpenFifo(ctx, stdin, syscall.O_RDONLY, 0)
-	if err != nil {
-		return err
+	if stdin != "" {
+		in, err := fifo.OpenFifo(ctx, stdin, syscall.O_RDONLY, 0)
+		if err != nil {
+			return err
+		}
+		go io.Copy(console, in)
 	}
-	go io.Copy(console, in)
 	outw, err := fifo.OpenFifo(ctx, stdout, syscall.O_WRONLY, 0)
 	if err != nil {
 		return err
