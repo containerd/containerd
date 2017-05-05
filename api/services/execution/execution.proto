@@ -20,6 +20,8 @@ service ContainerService {
 	rpc Exec(ExecRequest) returns (ExecResponse);
 	rpc Pty(PtyRequest) returns (google.protobuf.Empty);
 	rpc CloseStdin(CloseStdinRequest) returns (google.protobuf.Empty);
+	rpc Pause(PauseRequest) returns (google.protobuf.Empty);
+	rpc Resume(ResumeRequest) returns (google.protobuf.Empty);
 }
 
 message CreateRequest {
@@ -95,4 +97,12 @@ message PtyRequest {
 message CloseStdinRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
 	uint32 pid = 2;
+}
+
+message PauseRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];
+}
+
+message ResumeRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];
 }

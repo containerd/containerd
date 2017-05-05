@@ -188,6 +188,30 @@ func (s *Service) List(ctx context.Context, r *api.ListRequest) (*api.ListRespon
 	return resp, nil
 }
 
+func (s *Service) Pause(ctx context.Context, r *api.PauseRequest) (*google_protobuf.Empty, error) {
+	c, err := s.getContainer(r.ID)
+	if err != nil {
+		return nil, err
+	}
+	err = c.Pause(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return empty, nil
+}
+
+func (s *Service) Resume(ctx context.Context, r *api.ResumeRequest) (*google_protobuf.Empty, error) {
+	c, err := s.getContainer(r.ID)
+	if err != nil {
+		return nil, err
+	}
+	err = c.Resume(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return empty, nil
+}
+
 func (s *Service) Kill(ctx context.Context, r *api.KillRequest) (*google_protobuf.Empty, error) {
 	c, err := s.getContainer(r.ID)
 	if err != nil {

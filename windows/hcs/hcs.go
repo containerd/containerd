@@ -299,6 +299,10 @@ func (c *Container) ExitCode() (uint32, error) {
 	return c.processes[0].ExitCode()
 }
 
+func (c *Container) GetConfiguration() Configuration {
+	return c.conf
+}
+
 func (c *Container) AddProcess(ctx context.Context, spec specs.Process, io *IO) (*Process, error) {
 	if len(c.processes) == 0 {
 		return nil, errors.New("container not started")
