@@ -1,6 +1,6 @@
 // +build !windows,!linux,!freebsd,!solaris freebsd,!cgo solaris,!cgo
 
-package mount
+package mountinfo
 
 import (
 	"fmt"

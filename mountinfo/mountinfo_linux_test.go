@@ -1,6 +1,6 @@
 // +build linux
 
-package mount
+package mountinfo
 
 import (
 	"bytes"

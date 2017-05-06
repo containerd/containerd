@@ -1,4 +1,4 @@
-package mount
+package mountinfo
 
 /*
 #include <sys/param.h>

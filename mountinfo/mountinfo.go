@@ -1,4 +1,4 @@
-package mount
+package mountinfo
 
 // Info reveals information about a particular mounted filesystem. This
 // struct is populated from the content in the /proc/<pid>/mountinfo file.
@@ -37,4 +37,9 @@ type Info struct {
 
 	// VfsOpts represents per super block options.
 	VfsOpts string
+}
+
+// GetMounts retrieves a list of mounts for the current running process.
+func GetMounts() ([]*Info, error) {
+	return parseMountTable()
 }
