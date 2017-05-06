@@ -70,13 +70,12 @@ func (m *Monitor) Start(c *exec.Cmd) error {
 		ExitCh: make(chan int, 1),
 	}
 	m.Lock()
+	defer m.Unlock()
 	// start the process
 	if err := rc.c.Start(); err != nil {
-		m.Unlock()
 		return err
 	}
 	m.cmds[rc.c.Process.Pid] = rc
-	m.Unlock()
 	return nil
 }
 
