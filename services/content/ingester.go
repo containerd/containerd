@@ -127,6 +127,9 @@ func (rw *remoteWriter) Write(p []byte) (n int, err error) {
 	}
 
 	rw.offset += int64(n)
+	if resp.Digest != "" {
+		rw.digest = resp.Digest
+	}
 	return
 }
 
@@ -149,6 +152,8 @@ func (rw *remoteWriter) Commit(size int64, expected digest.Digest) error {
 		return errors.Errorf("unexpected digest: %v != %v", resp.Digest, expected)
 	}
 
+	rw.digest = resp.Digest
+	rw.offset = resp.Offset
 	return nil
 }
 

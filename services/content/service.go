@@ -304,9 +304,9 @@ func (s *Service) Write(session api.Content_WriteServer) (err error) {
 				if err := wr.Commit(total, expected); err != nil {
 					return err
 				}
-
-				msg.Digest = wr.Digest()
 			}
+
+			msg.Digest = wr.Digest()
 		case api.WriteActionAbort:
 			return s.store.Abort(ref)
 		}
