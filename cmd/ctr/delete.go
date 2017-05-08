@@ -2,9 +2,9 @@ package main
 
 import (
 	gocontext "context"
-	"errors"
 
 	"github.com/containerd/containerd/api/services/execution"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
