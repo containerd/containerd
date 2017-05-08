@@ -5,6 +5,7 @@ package shim
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"syscall"
 
@@ -212,6 +213,7 @@ func (s *Service) Resume(ctx context.Context, r *shimapi.ResumeRequest) (*google
 }
 
 func (s *Service) Exit(ctx context.Context, r *shimapi.ExitRequest) (*google_protobuf.Empty, error) {
+	unix.Unmount(filepath.Join(s.path, "rootfs"), 0)
 	// signal ourself to exit
 	if err := unix.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
 		return nil, err
