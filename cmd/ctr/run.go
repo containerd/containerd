@@ -7,14 +7,13 @@ import (
 	"os"
 	"runtime"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/console"
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/execution"
-	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
+	mounttypes "github.com/containerd/containerd/api/types/mount"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/snapshot"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -59,7 +58,7 @@ var runCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		var (
 			err         error
-			resp        *rootfsapi.MountResponse
+			mounts      []containerd.Mount
 			imageConfig ocispec.Image
 
 			ctx = gocontext.Background()
@@ -87,7 +86,7 @@ var runCommand = cli.Command{
 			return err
 		}
 
-		rootfsClient, err := getRootFSService(context)
+		snapshotter, err := getSnapshotter(context)
 		if err != nil {
 			return err
 		}
@@ -111,20 +110,15 @@ var runCommand = cli.Command{
 				return err
 			}
 
-			if _, err := rootfsClient.Prepare(gocontext.TODO(), &rootfsapi.PrepareRequest{
-				Name:    id,
-				ChainID: identity.ChainID(diffIDs),
-			}); err != nil {
-				if grpc.Code(err) != codes.AlreadyExists {
+			mounts, err = snapshotter.Prepare(ctx, id, identity.ChainID(diffIDs).String())
+			if err != nil {
+				if !snapshot.IsExist(err) {
 					return err
 				}
-			}
-
-			resp, err = rootfsClient.Mounts(gocontext.TODO(), &rootfsapi.MountsRequest{
-				Name: id,
-			})
-			if err != nil {
-				return err
+				mounts, err = snapshotter.Mounts(ctx, id)
+				if err != nil {
+					return err
+				}
 			}
 
 			ic, err := image.Config(ctx, content)
@@ -153,8 +147,13 @@ var runCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		if resp != nil {
-			create.Rootfs = resp.Mounts
+		for _, m := range mounts {
+			create.Rootfs = append(create.Rootfs, &mounttypes.Mount{
+				Type:    m.Type,
+				Source:  m.Source,
+				Options: m.Options,
+			})
+
 		}
 		var con console.Console
 		if create.Terminal {

@@ -19,6 +19,11 @@ var (
 
 type initializerFunc func(string) error
 
+type Mounter interface {
+	Mount(target string, mounts ...containerd.Mount) error
+	Unmount(target string) error
+}
+
 func InitRootFS(ctx context.Context, name string, parent digest.Digest, readonly bool, snapshotter snapshot.Snapshotter, mounter Mounter) ([]containerd.Mount, error) {
 	_, err := snapshotter.Stat(ctx, name)
 	if err == nil {

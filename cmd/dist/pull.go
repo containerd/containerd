@@ -2,19 +2,19 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"text/tabwriter"
 	"time"
 
-	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
-	"github.com/containerd/containerd/content"
+	diffapi "github.com/containerd/containerd/api/services/diff"
+	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/progress"
 	"github.com/containerd/containerd/remotes"
-	rootfsservice "github.com/containerd/containerd/services/rootfs"
-	"github.com/opencontainers/image-spec/identity"
+	"github.com/containerd/containerd/rootfs"
+	diffservice "github.com/containerd/containerd/services/diff"
+	snapshotservice "github.com/containerd/containerd/services/snapshot"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
 	"golang.org/x/sync/errgroup"
@@ -101,43 +101,31 @@ command. As part of this process, we do the following:
 			// TODO(stevvooe): This section unpacks the layers and resolves the
 			// root filesystem chainid for the image. For now, we just print
 			// it, but we should keep track of this in the metadata storage.
-
 			image, err := imageStore.Get(ctx, resolvedImageName)
 			if err != nil {
-				log.G(ctx).Fatal(err)
+				log.G(ctx).WithError(err).Fatal("Failed to get image")
 			}
 
-			p, err := content.ReadBlob(ctx, cs, image.Target.Digest)
+			layers, err := getImageLayers(ctx, image, cs)
 			if err != nil {
-				log.G(ctx).Fatal(err)
-			}
-
-			var manifest ocispec.Manifest
-			if err := json.Unmarshal(p, &manifest); err != nil {
-				log.G(ctx).Fatal(err)
+				log.G(ctx).WithError(err).Fatal("Failed to get rootfs layers")
 			}
 
 			conn, err := connectGRPC(clicontext)
 			if err != nil {
 				log.G(ctx).Fatal(err)
 			}
-			rootfs := rootfsservice.NewUnpackerFromClient(rootfsapi.NewRootFSClient(conn))
+			snapshotter := snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotClient(conn))
+			applier := diffservice.NewApplierFromClient(diffapi.NewDiffClient(conn))
 
 			log.G(ctx).Info("unpacking rootfs")
-			chainID, err := rootfs.Unpack(ctx, manifest.Layers)
+
+			chainID, err := rootfs.ApplyLayers(ctx, layers, snapshotter, applier)
 			if err != nil {
 				log.G(ctx).Fatal(err)
 			}
 
-			diffIDs, err := image.RootFS(ctx, cs)
-			if err != nil {
-				log.G(ctx).WithError(err).Fatal("failed resolving rootfs")
-			}
-
-			expectedChainID := identity.ChainID(diffIDs)
-			if expectedChainID != chainID {
-				log.G(ctx).Fatal("rootfs service did not match chainid")
-			}
+			log.G(ctx).Infof("Unpacked chain id: %s", chainID)
 		}()
 
 		var (
