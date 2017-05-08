@@ -12,6 +12,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/fs"
+	"github.com/containerd/containerd/fs/fsutils"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
@@ -46,6 +47,13 @@ type activeSnapshot struct {
 func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
+	}
+	supportsDType, err := fsutils.SupportsDType(root)
+	if err != nil {
+		return nil, err
+	}
+	if !supportsDType {
+		return nil, fmt.Errorf("%s does not support d_type. If the backing filesystem is xfs, please reformat with ftype=1 to enable d_type support.", root)
 	}
 	ms, err := storage.NewMetaStore(filepath.Join(root, "metadata.db"))
 	if err != nil {
