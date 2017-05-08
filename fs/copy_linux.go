@@ -7,6 +7,7 @@ import (
 
 	"github.com/containerd/continuity/sysx"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 )
 
 func copyFileInfo(fi os.FileInfo, name string) error {
@@ -21,7 +22,8 @@ func copyFileInfo(fi os.FileInfo, name string) error {
 		}
 	}
 
-	if err := syscall.UtimesNano(name, []syscall.Timespec{st.Atim, st.Mtim}); err != nil {
+	timespec := []unix.Timespec{unix.Timespec(st.Atim), unix.Timespec(st.Mtim)}
+	if err := unix.UtimesNanoAt(unix.AT_FDCWD, name, timespec, unix.AT_SYMLINK_NOFOLLOW); err != nil {
 		return errors.Wrapf(err, "failed to utime %s", name)
 	}
 

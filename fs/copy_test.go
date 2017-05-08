@@ -32,6 +32,20 @@ func TestCopyDirectory(t *testing.T) {
 	}
 }
 
+// This test used to fail because link-no-nothing.txt would be copied first,
+// then file operations in dst during the CopyDir would follow the symlink and
+// fail.
+func TestCopyDirectoryWithLocalSymlink(t *testing.T) {
+	apply := fstest.Apply(
+		fstest.CreateFile("nothing.txt", []byte{0x00, 0x00}, 0755),
+		fstest.Symlink("nothing.txt", "link-no-nothing.txt"),
+	)
+
+	if err := testCopy(apply); err != nil {
+		t.Fatalf("Copy test failed: %+v", err)
+	}
+}
+
 func testCopy(apply fstest.Applier) error {
 	t1, err := ioutil.TempDir("", "test-copy-src-")
 	if err != nil {
