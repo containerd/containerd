@@ -59,6 +59,8 @@ containerd client
 		killCommand,
 		pprofCommand,
 		execCommand,
+		pauseCommand,
+		resumeCommand,
 	}
 	app.Commands = append(app.Commands, extraCmds...)
 	app.Before = func(context *cli.Context) error {

@@ -4,6 +4,7 @@ package windows
 
 import (
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -99,6 +100,20 @@ func (c *container) Start(ctx context.Context) error {
 	}()
 
 	return nil
+}
+
+func (c *container) Pause(ctx context.Context) error {
+	if c.ctr.GetConfiguration().UseHyperV == false {
+		return fmt.Errorf("Windows non-HyperV containers do not support pause")
+	}
+	return c.ctr.Pause()
+}
+
+func (c *container) Resume(ctx context.Context) error {
+	if c.ctr.GetConfiguration().UseHyperV == false {
+		return fmt.Errorf("Windows non-HyperV containers do not support resume")
+	}
+	return c.ctr.Resume()
 }
 
 func (c *container) State(ctx context.Context) (containerd.State, error) {
