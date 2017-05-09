@@ -27,10 +27,11 @@ var editCommand = cli.Command{
 	},
 	Action: func(context *cli.Context) error {
 		var (
-			ctx      = background
 			validate = context.String("validate")
 			object   = context.Args().First()
 		)
+		ctx, cancel := appContext()
+		defer cancel()
 
 		if validate != "" {
 			return errors.New("validating the edit result not supported")

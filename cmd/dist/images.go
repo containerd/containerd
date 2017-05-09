@@ -21,9 +21,8 @@ var imagesListCommand = cli.Command{
 	Description: `List images registered with containerd.`,
 	Flags:       []cli.Flag{},
 	Action: func(clicontext *cli.Context) error {
-		var (
-			ctx = background
-		)
+		ctx, cancel := appContext()
+		defer cancel()
 
 		imageStore, err := resolveImageStore(clicontext)
 		if err != nil {
@@ -66,9 +65,10 @@ var rmiCommand = cli.Command{
 	Flags:       []cli.Flag{},
 	Action: func(clicontext *cli.Context) error {
 		var (
-			ctx     = background
 			exitErr error
 		)
+		ctx, cancel := appContext()
+		defer cancel()
 
 		imageStore, err := resolveImageStore(clicontext)
 		if err != nil {

@@ -31,6 +31,7 @@ script:
   - export CGO_ENABLED=$TRAVIS_CGO_ENABLED
   - GIT_CHECK_EXCLUDE="./vendor" TRAVIS_COMMIT_RANGE="${TRAVIS_COMMIT_RANGE/.../..}" make dco
   - make fmt
+  - make vet
   - make binaries
   - if [ "$GOOS" != "windows" ]; then make coverage ; fi
   - if [ "$GOOS" != "windows" ]; then sudo PATH=$PATH GOPATH=$GOPATH make root-coverage ; fi

@@ -38,9 +38,11 @@ command. As part of this process, we do the following:
 	Flags: registryFlags,
 	Action: func(clicontext *cli.Context) error {
 		var (
-			ctx = background
 			ref = clicontext.Args().First()
 		)
+
+		ctx, cancel := appContext()
+		defer cancel()
 
 		conn, err := connectGRPC(clicontext)
 		if err != nil {
@@ -104,8 +106,9 @@ command. As part of this process, we do the following:
 		}()
 
 		defer func() {
-			ctx := background
-
+			// we need new ctx here
+			ctx, cancel := appContext()
+			defer cancel()
 			// TODO(stevvooe): This section unpacks the layers and resolves the
 			// root filesystem chainid for the image. For now, we just print
 			// it, but we should keep track of this in the metadata storage.

@@ -42,9 +42,10 @@ Most of this is experimental and there are few leaps to make this work.`,
 	Flags: registryFlags,
 	Action: func(clicontext *cli.Context) error {
 		var (
-			ctx = background
 			ref = clicontext.Args().First()
 		)
+		ctx, cancel := appContext()
+		defer cancel()
 
 		conn, err := connectGRPC(clicontext)
 		if err != nil {
@@ -176,8 +177,6 @@ Most of this is experimental and there are few leaps to make this work.`,
 				done = true // allow ui to update once more
 			}
 		}
-
-		return nil
 	},
 }
 
