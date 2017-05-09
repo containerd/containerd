@@ -5,10 +5,8 @@ import (
 	"os"
 	"text/tabwriter"
 
-	contentapi "github.com/containerd/containerd/api/services/content"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/progress"
-	contentservice "github.com/containerd/containerd/services/content"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -29,12 +27,10 @@ var imagesListCommand = cli.Command{
 			return err
 		}
 
-		conn, err := connectGRPC(clicontext)
+		cs, err := resolveContentStore(clicontext)
 		if err != nil {
 			return err
 		}
-
-		provider := contentservice.NewProviderFromClient(contentapi.NewContentClient(conn))
 
 		images, err := imageStore.List(ctx)
 		if err != nil {
@@ -44,7 +40,7 @@ var imagesListCommand = cli.Command{
 		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
 		fmt.Fprintln(tw, "REF\tTYPE\tDIGEST\tSIZE\t")
 		for _, image := range images {
-			size, err := image.Size(ctx, provider)
+			size, err := image.Size(ctx, cs)
 			if err != nil {
 				log.G(ctx).WithError(err).Errorf("failed calculating size for image %s", image.Name)
 			}

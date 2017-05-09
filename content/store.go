@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -21,21 +22,21 @@ import (
 //
 // Store can generally support multi-reader, single-writer ingest of data,
 // including resumable ingest.
-type Store struct {
+type store struct {
 	root string
 }
 
-func NewStore(root string) (*Store, error) {
+func NewStore(root string) (Store, error) {
 	if err := os.MkdirAll(filepath.Join(root, "ingest"), 0777); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
 
-	return &Store{
+	return &store{
 		root: root,
 	}, nil
 }
 
-func (s *Store) Info(dgst digest.Digest) (Info, error) {
+func (s *store) Info(ctx context.Context, dgst digest.Digest) (Info, error) {
 	p := s.blobPath(dgst)
 	fi, err := os.Stat(p)
 	if err != nil {
@@ -46,11 +47,15 @@ func (s *Store) Info(dgst digest.Digest) (Info, error) {
 		return Info{}, err
 	}
 
+	return s.info(dgst, fi), nil
+}
+
+func (s *store) info(dgst digest.Digest, fi os.FileInfo) Info {
 	return Info{
 		Digest:      dgst,
 		Size:        fi.Size(),
 		CommittedAt: fi.ModTime(),
-	}, nil
+	}
 }
 
 // Open returns an io.ReadCloser for the blob.
@@ -58,7 +63,7 @@ func (s *Store) Info(dgst digest.Digest) (Info, error) {
 // TODO(stevvooe): This would work much better as an io.ReaderAt in practice.
 // Right now, we are doing type assertion to tease that out, but it won't scale
 // well.
-func (s *Store) Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, error) {
+func (s *store) Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, error) {
 	fp, err := os.Open(s.blobPath(dgst))
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -74,7 +79,7 @@ func (s *Store) Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, 
 //
 // While this is safe to do concurrently, safe exist-removal logic must hold
 // some global lock on the store.
-func (cs *Store) Delete(dgst digest.Digest) error {
+func (cs *store) Delete(ctx context.Context, dgst digest.Digest) error {
 	if err := os.RemoveAll(cs.blobPath(dgst)); err != nil {
 		if !os.IsNotExist(err) {
 			return err
@@ -88,14 +93,7 @@ func (cs *Store) Delete(dgst digest.Digest) error {
 
 // TODO(stevvooe): Allow querying the set of blobs in the blob store.
 
-// WalkFunc defines the callback for a blob walk.
-//
-// TODO(stevvooe): Remove the file info. Just need size and modtime. Perhaps,
-// not a huge deal, considering we have a path, but let's not just let this one
-// go without scrutiny.
-type WalkFunc func(path string, fi os.FileInfo, dgst digest.Digest) error
-
-func (cs *Store) Walk(fn WalkFunc) error {
+func (cs *store) Walk(ctx context.Context, fn WalkFunc) error {
 	root := filepath.Join(cs.root, "blobs")
 	var alg digest.Algorithm
 	return filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
@@ -133,17 +131,60 @@ func (cs *Store) Walk(fn WalkFunc) error {
 			// store or extra paths not expected previously.
 		}
 
-		return fn(path, fi, dgst)
+		return fn(cs.info(dgst, fi))
 	})
 }
 
-// Status returns the current status of a blob by the ingest ref.
-func (s *Store) Status(ref string) (Status, error) {
-	return s.status(s.ingestRoot(ref))
+func (s *store) Status(ctx context.Context, re string) ([]Status, error) {
+	fp, err := os.Open(filepath.Join(s.root, "ingest"))
+	if err != nil {
+		return nil, err
+	}
+
+	defer fp.Close()
+
+	fis, err := fp.Readdir(-1)
+	if err != nil {
+		return nil, err
+	}
+
+	rec, err := regexp.Compile(re)
+	if err != nil {
+		return nil, err
+	}
+
+	var active []Status
+	for _, fi := range fis {
+		p := filepath.Join(s.root, "ingest", fi.Name())
+		stat, err := s.status(p)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				return nil, err
+			}
+
+			// TODO(stevvooe): This is a common error if uploads are being
+			// completed while making this listing. Need to consider taking a
+			// lock on the whole store to coordinate this aspect.
+			//
+			// Another option is to cleanup downloads asynchronously and
+			// coordinate this method with the cleanup process.
+			//
+			// For now, we just skip them, as they really don't exist.
+			continue
+		}
+
+		if !rec.MatchString(stat.Ref) {
+			continue
+		}
+
+		active = append(active, stat)
+	}
+
+	return active, nil
 }
 
 // status works like stat above except uses the path to the ingest.
-func (s *Store) status(ingestPath string) (Status, error) {
+func (s *store) status(ingestPath string) (Status, error) {
 	dp := filepath.Join(ingestPath, "data")
 	fi, err := os.Stat(dp)
 	if err != nil {
@@ -165,7 +206,7 @@ func (s *Store) status(ingestPath string) (Status, error) {
 }
 
 // total attempts to resolve the total expected size for the write.
-func (s *Store) total(ingestPath string) int64 {
+func (s *store) total(ingestPath string) int64 {
 	totalS, err := readFileString(filepath.Join(ingestPath, "total"))
 	if err != nil {
 		return 0
@@ -185,7 +226,10 @@ func (s *Store) total(ingestPath string) int64 {
 // ref at a time.
 //
 // The argument `ref` is used to uniquely identify a long-lived writer transaction.
-func (s *Store) Writer(ctx context.Context, ref string, total int64, expected digest.Digest) (Writer, error) {
+func (s *store) Writer(ctx context.Context, ref string, total int64, expected digest.Digest) (Writer, error) {
+	// TODO(stevvooe): Need to actually store and handle expected here. We have
+	// code in the service that shouldn't be dealing with this.
+
 	path, refp, data, lock, err := s.ingestPaths(ref)
 	if err != nil {
 		return nil, err
@@ -283,11 +327,11 @@ func (s *Store) Writer(ctx context.Context, ref string, total int64, expected di
 
 // Abort an active transaction keyed by ref. If the ingest is active, it will
 // be cancelled. Any resources associated with the ingest will be cleaned.
-func (s *Store) Abort(ref string) error {
+func (s *store) Abort(ctx context.Context, ref string) error {
 	root := s.ingestRoot(ref)
 	if err := os.RemoveAll(root); err != nil {
 		if os.IsNotExist(err) {
-			return nil
+			return ErrNotFound
 		}
 
 		return err
@@ -296,50 +340,11 @@ func (s *Store) Abort(ref string) error {
 	return nil
 }
 
-func (s *Store) Active() ([]Status, error) {
-	fp, err := os.Open(filepath.Join(s.root, "ingest"))
-	if err != nil {
-		return nil, err
-	}
-
-	defer fp.Close()
-
-	fis, err := fp.Readdir(-1)
-	if err != nil {
-		return nil, err
-	}
-
-	var active []Status
-	for _, fi := range fis {
-		p := filepath.Join(s.root, "ingest", fi.Name())
-		stat, err := s.status(p)
-		if err != nil {
-			if !os.IsNotExist(err) {
-				return nil, err
-			}
-
-			// TODO(stevvooe): This is a common error if uploads are being
-			// completed while making this listing. Need to consider taking a
-			// lock on the whole store to coordinate this aspect.
-			//
-			// Another option is to cleanup downloads asynchronously and
-			// coordinate this method with the cleanup process.
-			//
-			// For now, we just skip them, as they really don't exist.
-			continue
-		}
-
-		active = append(active, stat)
-	}
-
-	return active, nil
-}
-
-func (cs *Store) blobPath(dgst digest.Digest) string {
+func (cs *store) blobPath(dgst digest.Digest) string {
 	return filepath.Join(cs.root, "blobs", dgst.Algorithm().String(), dgst.Hex())
 }
 
-func (s *Store) ingestRoot(ref string) string {
+func (s *store) ingestRoot(ref string) string {
 	dgst := digest.FromString(ref)
 	return filepath.Join(s.root, "ingest", dgst.Hex())
 }
@@ -351,7 +356,7 @@ func (s *Store) ingestRoot(ref string) string {
 // - data: file where data is written
 // - lock: lock file location
 //
-func (s *Store) ingestPaths(ref string) (string, string, string, lockfile.Lockfile, error) {
+func (s *store) ingestPaths(ref string) (string, string, string, lockfile.Lockfile, error) {
 	var (
 		fp = s.ingestRoot(ref)
 		rp = filepath.Join(fp, "ref")

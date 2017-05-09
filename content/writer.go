@@ -13,7 +13,7 @@ import (
 
 // writer represents a write transaction against the blob store.
 type writer struct {
-	s         *Store
+	s         *store
 	fp        *os.File // opened data file
 	lock      lockfile.Lockfile
 	path      string // path to writer dir

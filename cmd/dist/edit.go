@@ -9,7 +9,7 @@ import (
 	"os/exec"
 
 	contentapi "github.com/containerd/containerd/api/services/content"
-	contentservice "github.com/containerd/containerd/services/content"
+	"github.com/containerd/containerd/services/content"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/urfave/cli"
 )
@@ -50,10 +50,9 @@ var editCommand = cli.Command{
 			return err
 		}
 
-		provider := contentservice.NewProviderFromClient(contentapi.NewContentClient(conn))
-		ingester := contentservice.NewIngesterFromClient(contentapi.NewContentClient(conn))
+		content := content.NewStoreFromClient(contentapi.NewContentClient(conn))
 
-		rc, err := provider.Reader(ctx, dgst)
+		rc, err := content.Reader(ctx, dgst)
 		if err != nil {
 			return err
 		}
@@ -65,7 +64,7 @@ var editCommand = cli.Command{
 		}
 		defer nrc.Close()
 
-		wr, err := ingester.Writer(ctx, "edit-"+object, 0, "") // TODO(stevvooe): Choose a better key?
+		wr, err := content.Writer(ctx, "edit-"+object, 0, "") // TODO(stevvooe): Choose a better key?
 		if err != nil {
 			return err
 		}

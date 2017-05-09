@@ -13,7 +13,7 @@ import (
 var activeCommand = cli.Command{
 	Name:        "active",
 	Usage:       "display active transfers.",
-	ArgsUsage:   "[flags] [<key>, ...]",
+	ArgsUsage:   "[flags] [<regexp>]",
 	Description: `Display the ongoing transfers.`,
 	Flags: []cli.Flag{
 		cli.DurationFlag{
@@ -28,12 +28,19 @@ var activeCommand = cli.Command{
 		},
 	},
 	Action: func(context *cli.Context) error {
+		var (
+			match = context.Args().First()
+		)
+
+		ctx, cancel := appContext()
+		defer cancel()
+
 		cs, err := resolveContentStore(context)
 		if err != nil {
 			return err
 		}
 
-		active, err := cs.Active()
+		active, err := cs.Status(ctx, match)
 		if err != nil {
 			return err
 		}

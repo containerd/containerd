@@ -7,14 +7,12 @@ import (
 	"text/tabwriter"
 	"time"
 
-	contentapi "github.com/containerd/containerd/api/services/content"
 	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/progress"
 	"github.com/containerd/containerd/remotes"
-	contentservice "github.com/containerd/containerd/services/content"
 	rootfsservice "github.com/containerd/containerd/services/rootfs"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -44,7 +42,7 @@ command. As part of this process, we do the following:
 		ctx, cancel := appContext()
 		defer cancel()
 
-		conn, err := connectGRPC(clicontext)
+		cs, err := resolveContentStore(clicontext)
 		if err != nil {
 			return err
 		}
@@ -59,15 +57,6 @@ command. As part of this process, we do the following:
 			return err
 		}
 		ongoing := newJobs()
-
-		// TODO(stevvooe): Must unify this type.
-		ingester := contentservice.NewIngesterFromClient(contentapi.NewContentClient(conn))
-		provider := contentservice.NewProviderFromClient(contentapi.NewContentClient(conn))
-
-		cs, err := resolveContentStore(clicontext)
-		if err != nil {
-			return err
-		}
 
 		eg, ctx := errgroup.WithContext(ctx)
 
@@ -93,8 +82,8 @@ command. As part of this process, we do the following:
 					ongoing.add(remotes.MakeRefKey(ctx, desc))
 					return nil, nil
 				}),
-					remotes.FetchHandler(ingester, fetcher),
-					images.ChildrenHandler(provider)),
+					remotes.FetchHandler(cs, fetcher),
+					images.ChildrenHandler(cs)),
 				desc)
 
 		})
@@ -118,9 +107,7 @@ command. As part of this process, we do the following:
 				log.G(ctx).Fatal(err)
 			}
 
-			provider := contentservice.NewProviderFromClient(contentapi.NewContentClient(conn))
-
-			p, err := content.ReadBlob(ctx, provider, image.Target.Digest)
+			p, err := content.ReadBlob(ctx, cs, image.Target.Digest)
 			if err != nil {
 				log.G(ctx).Fatal(err)
 			}
@@ -130,6 +117,10 @@ command. As part of this process, we do the following:
 				log.G(ctx).Fatal(err)
 			}
 
+			conn, err := connectGRPC(clicontext)
+			if err != nil {
+				log.G(ctx).Fatal(err)
+			}
 			rootfs := rootfsservice.NewUnpackerFromClient(rootfsapi.NewRootFSClient(conn))
 
 			log.G(ctx).Info("unpacking rootfs")
@@ -138,7 +129,7 @@ command. As part of this process, we do the following:
 				log.G(ctx).Fatal(err)
 			}
 
-			diffIDs, err := image.RootFS(ctx, provider)
+			diffIDs, err := image.RootFS(ctx, cs)
 			if err != nil {
 				log.G(ctx).WithError(err).Fatal("failed resolving rootfs")
 			}
@@ -168,7 +159,7 @@ command. As part of this process, we do the following:
 
 				activeSeen := map[string]struct{}{}
 				if !done {
-					active, err := cs.Active()
+					active, err := cs.Status(ctx, "")
 					if err != nil {
 						log.G(ctx).WithError(err).Error("active check failed")
 						continue

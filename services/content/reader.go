@@ -1,34 +1,8 @@
 package content
 
 import (
-	"context"
-	"io"
-
 	contentapi "github.com/containerd/containerd/api/services/content"
-	"github.com/containerd/containerd/content"
-	digest "github.com/opencontainers/go-digest"
 )
-
-func NewProviderFromClient(client contentapi.ContentClient) content.Provider {
-	return &remoteProvider{
-		client: client,
-	}
-}
-
-type remoteProvider struct {
-	client contentapi.ContentClient
-}
-
-func (rp *remoteProvider) Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, error) {
-	client, err := rp.client.Read(ctx, &contentapi.ReadRequest{Digest: dgst})
-	if err != nil {
-		return nil, err
-	}
-
-	return &remoteReader{
-		client: client,
-	}, nil
-}
 
 type remoteReader struct {
 	client contentapi.Content_ReadClient

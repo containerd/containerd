@@ -9,15 +9,20 @@
 		github.com/containerd/containerd/api/services/content/content.proto
 
 	It has these top-level messages:
+		Info
 		InfoRequest
 		InfoResponse
+		ListContentRequest
+		ListContentResponse
 		DeleteContentRequest
 		ReadRequest
 		ReadResponse
+		StatusRequest
+		Status
+		StatusResponse
 		WriteRequest
 		WriteResponse
-		StatusRequest
-		StatusResponse
+		AbortRequest
 */
 package content
 
@@ -77,24 +82,17 @@ const (
 	//
 	// This action will always terminate the write.
 	WriteActionCommit WriteAction = 2
-	// WriteActionAbort will release any resources associated with the write
-	// and free up the ref for a completely new set of writes.
-	//
-	// This action will always terminate the write.
-	WriteActionAbort WriteAction = -1
 )
 
 var WriteAction_name = map[int32]string{
-	0:  "STAT",
-	1:  "WRITE",
-	2:  "COMMIT",
-	-1: "ABORT",
+	0: "STAT",
+	1: "WRITE",
+	2: "COMMIT",
 }
 var WriteAction_value = map[string]int32{
 	"STAT":   0,
 	"WRITE":  1,
 	"COMMIT": 2,
-	"ABORT":  -1,
 }
 
 func (x WriteAction) String() string {
@@ -102,15 +100,7 @@ func (x WriteAction) String() string {
 }
 func (WriteAction) EnumDescriptor() ([]byte, []int) { return fileDescriptorContent, []int{0} }
 
-type InfoRequest struct {
-	Digest github_com_opencontainers_go_digest.Digest `protobuf:"bytes,1,opt,name=digest,proto3,customtype=github.com/opencontainers/go-digest.Digest" json:"digest"`
-}
-
-func (m *InfoRequest) Reset()                    { *m = InfoRequest{} }
-func (*InfoRequest) ProtoMessage()               {}
-func (*InfoRequest) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{0} }
-
-type InfoResponse struct {
+type Info struct {
 	// Digest is the hash identity of the blob.
 	Digest github_com_opencontainers_go_digest.Digest `protobuf:"bytes,1,opt,name=digest,proto3,customtype=github.com/opencontainers/go-digest.Digest" json:"digest"`
 	// Size is the total number of bytes in the blob.
@@ -119,9 +109,40 @@ type InfoResponse struct {
 	CommittedAt time.Time `protobuf:"bytes,3,opt,name=committed_at,json=committedAt,stdtime" json:"committed_at"`
 }
 
+func (m *Info) Reset()                    { *m = Info{} }
+func (*Info) ProtoMessage()               {}
+func (*Info) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{0} }
+
+type InfoRequest struct {
+	Digest github_com_opencontainers_go_digest.Digest `protobuf:"bytes,1,opt,name=digest,proto3,customtype=github.com/opencontainers/go-digest.Digest" json:"digest"`
+}
+
+func (m *InfoRequest) Reset()                    { *m = InfoRequest{} }
+func (*InfoRequest) ProtoMessage()               {}
+func (*InfoRequest) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{1} }
+
+type InfoResponse struct {
+	Info Info `protobuf:"bytes,1,opt,name=info" json:"info"`
+}
+
 func (m *InfoResponse) Reset()                    { *m = InfoResponse{} }
 func (*InfoResponse) ProtoMessage()               {}
-func (*InfoResponse) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{1} }
+func (*InfoResponse) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{2} }
+
+type ListContentRequest struct {
+}
+
+func (m *ListContentRequest) Reset()                    { *m = ListContentRequest{} }
+func (*ListContentRequest) ProtoMessage()               {}
+func (*ListContentRequest) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{3} }
+
+type ListContentResponse struct {
+	Info []Info `protobuf:"bytes,1,rep,name=info" json:"info"`
+}
+
+func (m *ListContentResponse) Reset()                    { *m = ListContentResponse{} }
+func (*ListContentResponse) ProtoMessage()               {}
+func (*ListContentResponse) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{4} }
 
 type DeleteContentRequest struct {
 	// Digest specifies which content to delete.
@@ -130,7 +151,7 @@ type DeleteContentRequest struct {
 
 func (m *DeleteContentRequest) Reset()                    { *m = DeleteContentRequest{} }
 func (*DeleteContentRequest) ProtoMessage()               {}
-func (*DeleteContentRequest) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{2} }
+func (*DeleteContentRequest) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{5} }
 
 // ReadRequest defines the fields that make up a request to read a portion of
 // data from a stored object.
@@ -148,7 +169,7 @@ type ReadRequest struct {
 
 func (m *ReadRequest) Reset()                    { *m = ReadRequest{} }
 func (*ReadRequest) ProtoMessage()               {}
-func (*ReadRequest) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{3} }
+func (*ReadRequest) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{6} }
 
 // ReadResponse carries byte data for a read request.
 type ReadResponse struct {
@@ -158,7 +179,36 @@ type ReadResponse struct {
 
 func (m *ReadResponse) Reset()                    { *m = ReadResponse{} }
 func (*ReadResponse) ProtoMessage()               {}
-func (*ReadResponse) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{4} }
+func (*ReadResponse) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{7} }
+
+type StatusRequest struct {
+	Regexp string `protobuf:"bytes,1,opt,name=regexp,proto3" json:"regexp,omitempty"`
+}
+
+func (m *StatusRequest) Reset()                    { *m = StatusRequest{} }
+func (*StatusRequest) ProtoMessage()               {}
+func (*StatusRequest) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{8} }
+
+type Status struct {
+	StartedAt time.Time                                  `protobuf:"bytes,1,opt,name=started_at,json=startedAt,stdtime" json:"started_at"`
+	UpdatedAt time.Time                                  `protobuf:"bytes,2,opt,name=updated_at,json=updatedAt,stdtime" json:"updated_at"`
+	Ref       string                                     `protobuf:"bytes,3,opt,name=ref,proto3" json:"ref,omitempty"`
+	Offset    int64                                      `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`
+	Total     int64                                      `protobuf:"varint,5,opt,name=total,proto3" json:"total,omitempty"`
+	Expected  github_com_opencontainers_go_digest.Digest `protobuf:"bytes,6,opt,name=expected,proto3,customtype=github.com/opencontainers/go-digest.Digest" json:"expected"`
+}
+
+func (m *Status) Reset()                    { *m = Status{} }
+func (*Status) ProtoMessage()               {}
+func (*Status) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{9} }
+
+type StatusResponse struct {
+	Statuses []Status `protobuf:"bytes,1,rep,name=statuses" json:"statuses"`
+}
+
+func (m *StatusResponse) Reset()                    { *m = StatusResponse{} }
+func (*StatusResponse) ProtoMessage()               {}
+func (*StatusResponse) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{10} }
 
 // WriteRequest writes data to the request ref at offset.
 type WriteRequest struct {
@@ -215,7 +265,7 @@ type WriteRequest struct {
 
 func (m *WriteRequest) Reset()                    { *m = WriteRequest{} }
 func (*WriteRequest) ProtoMessage()               {}
-func (*WriteRequest) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{5} }
+func (*WriteRequest) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{11} }
 
 // WriteResponse is returned on the culmination of a write call.
 type WriteResponse struct {
@@ -243,46 +293,37 @@ type WriteResponse struct {
 	Total int64 `protobuf:"varint,5,opt,name=total,proto3" json:"total,omitempty"`
 	// Digest, if present, includes the digest up to the currently committed
 	// bytes. If action is commit, this field will be set. It is implementation
-	// defined if this is set for other actions, except abort. On abort, this
-	// will be empty.
+	// defined if this is set for other actions.
 	Digest github_com_opencontainers_go_digest.Digest `protobuf:"bytes,6,opt,name=digest,proto3,customtype=github.com/opencontainers/go-digest.Digest" json:"digest"`
 }
 
 func (m *WriteResponse) Reset()                    { *m = WriteResponse{} }
 func (*WriteResponse) ProtoMessage()               {}
-func (*WriteResponse) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{6} }
+func (*WriteResponse) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{12} }
 
-type StatusRequest struct {
-	Refs   []string `protobuf:"bytes,1,rep,name=refs" json:"refs,omitempty"`
-	Prefix []string `protobuf:"bytes,2,rep,name=prefix" json:"prefix,omitempty"`
+type AbortRequest struct {
+	Ref string `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
 }
 
-func (m *StatusRequest) Reset()                    { *m = StatusRequest{} }
-func (*StatusRequest) ProtoMessage()               {}
-func (*StatusRequest) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{7} }
-
-type StatusResponse struct {
-	StartedAt time.Time `protobuf:"bytes,1,opt,name=started_at,json=startedAt,stdtime" json:"started_at"`
-	UpdatedAt time.Time `protobuf:"bytes,2,opt,name=updated_at,json=updatedAt,stdtime" json:"updated_at"`
-	Ref       string    `protobuf:"bytes,3,opt,name=ref,proto3" json:"ref,omitempty"`
-	Offset    int64     `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`
-	Total     int64     `protobuf:"varint,5,opt,name=total,proto3" json:"total,omitempty"`
-}
-
-func (m *StatusResponse) Reset()                    { *m = StatusResponse{} }
-func (*StatusResponse) ProtoMessage()               {}
-func (*StatusResponse) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{8} }
+func (m *AbortRequest) Reset()                    { *m = AbortRequest{} }
+func (*AbortRequest) ProtoMessage()               {}
+func (*AbortRequest) Descriptor() ([]byte, []int) { return fileDescriptorContent, []int{13} }
 
 func init() {
+	proto.RegisterType((*Info)(nil), "containerd.v1.Info")
 	proto.RegisterType((*InfoRequest)(nil), "containerd.v1.InfoRequest")
 	proto.RegisterType((*InfoResponse)(nil), "containerd.v1.InfoResponse")
+	proto.RegisterType((*ListContentRequest)(nil), "containerd.v1.ListContentRequest")
+	proto.RegisterType((*ListContentResponse)(nil), "containerd.v1.ListContentResponse")
 	proto.RegisterType((*DeleteContentRequest)(nil), "containerd.v1.DeleteContentRequest")
 	proto.RegisterType((*ReadRequest)(nil), "containerd.v1.ReadRequest")
 	proto.RegisterType((*ReadResponse)(nil), "containerd.v1.ReadResponse")
+	proto.RegisterType((*StatusRequest)(nil), "containerd.v1.StatusRequest")
+	proto.RegisterType((*Status)(nil), "containerd.v1.Status")
+	proto.RegisterType((*StatusResponse)(nil), "containerd.v1.StatusResponse")
 	proto.RegisterType((*WriteRequest)(nil), "containerd.v1.WriteRequest")
 	proto.RegisterType((*WriteResponse)(nil), "containerd.v1.WriteResponse")
-	proto.RegisterType((*StatusRequest)(nil), "containerd.v1.StatusRequest")
-	proto.RegisterType((*StatusResponse)(nil), "containerd.v1.StatusResponse")
+	proto.RegisterType((*AbortRequest)(nil), "containerd.v1.AbortRequest")
 	proto.RegisterEnum("containerd.v1.WriteAction", WriteAction_name, WriteAction_value)
 }
 
@@ -302,6 +343,13 @@ type ContentClient interface {
 	// This call can be used for getting the size of content and checking for
 	// existence.
 	Info(ctx context.Context, in *InfoRequest, opts ...grpc.CallOption) (*InfoResponse, error)
+	// List streams the entire set of content as Info objects and closes the
+	// stream.
+	//
+	// Typically, this will yield a large response, chunked into messages.
+	// Clients should make provisions to ensure they can't handle the entire
+	// data set.
+	List(ctx context.Context, in *ListContentRequest, opts ...grpc.CallOption) (Content_ListClient, error)
 	// Delete will delete the referenced object.
 	Delete(ctx context.Context, in *DeleteContentRequest, opts ...grpc.CallOption) (*google_protobuf2.Empty, error)
 	// Read allows one to read an object based on the offset into the content.
@@ -311,9 +359,10 @@ type ContentClient interface {
 	// Status returns the status of ongoing object ingestions, started via
 	// Write.
 	//
-	// For active ingestions, the status will be streamed until the client
-	// closes the connection or all matched ingestions are committed.
-	Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (Content_StatusClient, error)
+	// Only those matching the regular expression will be provided in the
+	// response. If the provided regular expression is empty, all ingestions
+	// will be provided.
+	Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 	// Write begins or resumes writes to a resource identified by a unique ref.
 	// Only one active stream may exist at a time for each ref.
 	//
@@ -331,6 +380,9 @@ type ContentClient interface {
 	// When completed, the commit flag should be set to true. If expected size
 	// or digest is set, the content will be validated against those values.
 	Write(ctx context.Context, opts ...grpc.CallOption) (Content_WriteClient, error)
+	// Abort cancels the ongoing write named in the request. Any resources
+	// associated with the write will be collected.
+	Abort(ctx context.Context, in *AbortRequest, opts ...grpc.CallOption) (*google_protobuf2.Empty, error)
 }
 
 type contentClient struct {
@@ -350,6 +402,38 @@ func (c *contentClient) Info(ctx context.Context, in *InfoRequest, opts ...grpc.
 	return out, nil
 }
 
+func (c *contentClient) List(ctx context.Context, in *ListContentRequest, opts ...grpc.CallOption) (Content_ListClient, error) {
+	stream, err := grpc.NewClientStream(ctx, &_Content_serviceDesc.Streams[0], c.cc, "/containerd.v1.Content/List", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &contentListClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Content_ListClient interface {
+	Recv() (*ListContentResponse, error)
+	grpc.ClientStream
+}
+
+type contentListClient struct {
+	grpc.ClientStream
+}
+
+func (x *contentListClient) Recv() (*ListContentResponse, error) {
+	m := new(ListContentResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func (c *contentClient) Delete(ctx context.Context, in *DeleteContentRequest, opts ...grpc.CallOption) (*google_protobuf2.Empty, error) {
 	out := new(google_protobuf2.Empty)
 	err := grpc.Invoke(ctx, "/containerd.v1.Content/Delete", in, out, c.cc, opts...)
@@ -360,7 +444,7 @@ func (c *contentClient) Delete(ctx context.Context, in *DeleteContentRequest, op
 }
 
 func (c *contentClient) Read(ctx context.Context, in *ReadRequest, opts ...grpc.CallOption) (Content_ReadClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_Content_serviceDesc.Streams[0], c.cc, "/containerd.v1.Content/Read", opts...)
+	stream, err := grpc.NewClientStream(ctx, &_Content_serviceDesc.Streams[1], c.cc, "/containerd.v1.Content/Read", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -391,36 +475,13 @@ func (x *contentReadClient) Recv() (*ReadResponse, error) {
 	return m, nil
 }
 
-func (c *contentClient) Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (Content_StatusClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_Content_serviceDesc.Streams[1], c.cc, "/containerd.v1.Content/Status", opts...)
+func (c *contentClient) Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
+	out := new(StatusResponse)
+	err := grpc.Invoke(ctx, "/containerd.v1.Content/Status", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &contentStatusClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-type Content_StatusClient interface {
-	Recv() (*StatusResponse, error)
-	grpc.ClientStream
-}
-
-type contentStatusClient struct {
-	grpc.ClientStream
-}
-
-func (x *contentStatusClient) Recv() (*StatusResponse, error) {
-	m := new(StatusResponse)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
+	return out, nil
 }
 
 func (c *contentClient) Write(ctx context.Context, opts ...grpc.CallOption) (Content_WriteClient, error) {
@@ -454,6 +515,15 @@ func (x *contentWriteClient) Recv() (*WriteResponse, error) {
 	return m, nil
 }
 
+func (c *contentClient) Abort(ctx context.Context, in *AbortRequest, opts ...grpc.CallOption) (*google_protobuf2.Empty, error) {
+	out := new(google_protobuf2.Empty)
+	err := grpc.Invoke(ctx, "/containerd.v1.Content/Abort", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Server API for Content service
 
 type ContentServer interface {
@@ -462,6 +532,13 @@ type ContentServer interface {
 	// This call can be used for getting the size of content and checking for
 	// existence.
 	Info(context.Context, *InfoRequest) (*InfoResponse, error)
+	// List streams the entire set of content as Info objects and closes the
+	// stream.
+	//
+	// Typically, this will yield a large response, chunked into messages.
+	// Clients should make provisions to ensure they can't handle the entire
+	// data set.
+	List(*ListContentRequest, Content_ListServer) error
 	// Delete will delete the referenced object.
 	Delete(context.Context, *DeleteContentRequest) (*google_protobuf2.Empty, error)
 	// Read allows one to read an object based on the offset into the content.
@@ -471,9 +548,10 @@ type ContentServer interface {
 	// Status returns the status of ongoing object ingestions, started via
 	// Write.
 	//
-	// For active ingestions, the status will be streamed until the client
-	// closes the connection or all matched ingestions are committed.
-	Status(*StatusRequest, Content_StatusServer) error
+	// Only those matching the regular expression will be provided in the
+	// response. If the provided regular expression is empty, all ingestions
+	// will be provided.
+	Status(context.Context, *StatusRequest) (*StatusResponse, error)
 	// Write begins or resumes writes to a resource identified by a unique ref.
 	// Only one active stream may exist at a time for each ref.
 	//
@@ -491,6 +569,9 @@ type ContentServer interface {
 	// When completed, the commit flag should be set to true. If expected size
 	// or digest is set, the content will be validated against those values.
 	Write(Content_WriteServer) error
+	// Abort cancels the ongoing write named in the request. Any resources
+	// associated with the write will be collected.
+	Abort(context.Context, *AbortRequest) (*google_protobuf2.Empty, error)
 }
 
 func RegisterContentServer(s *grpc.Server, srv ContentServer) {
@@ -513,6 +594,27 @@ func _Content_Info_Handler(srv interface{}, ctx context.Context, dec func(interf
 		return srv.(ContentServer).Info(ctx, req.(*InfoRequest))
 	}
 	return interceptor(ctx, in, info, handler)
+}
+
+func _Content_List_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ListContentRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ContentServer).List(m, &contentListServer{stream})
+}
+
+type Content_ListServer interface {
+	Send(*ListContentResponse) error
+	grpc.ServerStream
+}
+
+type contentListServer struct {
+	grpc.ServerStream
+}
+
+func (x *contentListServer) Send(m *ListContentResponse) error {
+	return x.ServerStream.SendMsg(m)
 }
 
 func _Content_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -554,25 +656,22 @@ func (x *contentReadServer) Send(m *ReadResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func _Content_Status_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(StatusRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
+func _Content_Status_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
 	}
-	return srv.(ContentServer).Status(m, &contentStatusServer{stream})
-}
-
-type Content_StatusServer interface {
-	Send(*StatusResponse) error
-	grpc.ServerStream
-}
-
-type contentStatusServer struct {
-	grpc.ServerStream
-}
-
-func (x *contentStatusServer) Send(m *StatusResponse) error {
-	return x.ServerStream.SendMsg(m)
+	if interceptor == nil {
+		return srv.(ContentServer).Status(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.v1.Content/Status",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ContentServer).Status(ctx, req.(*StatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Content_Write_Handler(srv interface{}, stream grpc.ServerStream) error {
@@ -601,6 +700,24 @@ func (x *contentWriteServer) Recv() (*WriteRequest, error) {
 	return m, nil
 }
 
+func _Content_Abort_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AbortRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ContentServer).Abort(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.v1.Content/Abort",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ContentServer).Abort(ctx, req.(*AbortRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _Content_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "containerd.v1.Content",
 	HandlerType: (*ContentServer)(nil),
@@ -613,16 +730,24 @@ var _Content_serviceDesc = grpc.ServiceDesc{
 			MethodName: "Delete",
 			Handler:    _Content_Delete_Handler,
 		},
+		{
+			MethodName: "Status",
+			Handler:    _Content_Status_Handler,
+		},
+		{
+			MethodName: "Abort",
+			Handler:    _Content_Abort_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "Read",
-			Handler:       _Content_Read_Handler,
+			StreamName:    "List",
+			Handler:       _Content_List_Handler,
 			ServerStreams: true,
 		},
 		{
-			StreamName:    "Status",
-			Handler:       _Content_Status_Handler,
+			StreamName:    "Read",
+			Handler:       _Content_Read_Handler,
 			ServerStreams: true,
 		},
 		{
@@ -633,6 +758,43 @@ var _Content_serviceDesc = grpc.ServiceDesc{
 		},
 	},
 	Metadata: "github.com/containerd/containerd/api/services/content/content.proto",
+}
+
+func (m *Info) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *Info) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Digest) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintContent(dAtA, i, uint64(len(m.Digest)))
+		i += copy(dAtA[i:], m.Digest)
+	}
+	if m.Size_ != 0 {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintContent(dAtA, i, uint64(m.Size_))
+	}
+	dAtA[i] = 0x1a
+	i++
+	i = encodeVarintContent(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.CommittedAt)))
+	n1, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.CommittedAt, dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n1
+	return i, nil
 }
 
 func (m *InfoRequest) Marshal() (dAtA []byte, err error) {
@@ -674,25 +836,62 @@ func (m *InfoResponse) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.Digest) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintContent(dAtA, i, uint64(len(m.Digest)))
-		i += copy(dAtA[i:], m.Digest)
-	}
-	if m.Size_ != 0 {
-		dAtA[i] = 0x10
-		i++
-		i = encodeVarintContent(dAtA, i, uint64(m.Size_))
-	}
-	dAtA[i] = 0x1a
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintContent(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.CommittedAt)))
-	n1, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.CommittedAt, dAtA[i:])
+	i = encodeVarintContent(dAtA, i, uint64(m.Info.Size()))
+	n2, err := m.Info.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n1
+	i += n2
+	return i, nil
+}
+
+func (m *ListContentRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ListContentRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	return i, nil
+}
+
+func (m *ListContentResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ListContentResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Info) > 0 {
+		for _, msg := range m.Info {
+			dAtA[i] = 0xa
+			i++
+			i = encodeVarintContent(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
 	return i, nil
 }
 
@@ -783,6 +982,116 @@ func (m *ReadResponse) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
+func (m *StatusRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *StatusRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Regexp) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintContent(dAtA, i, uint64(len(m.Regexp)))
+		i += copy(dAtA[i:], m.Regexp)
+	}
+	return i, nil
+}
+
+func (m *Status) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *Status) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintContent(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.StartedAt)))
+	n3, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.StartedAt, dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n3
+	dAtA[i] = 0x12
+	i++
+	i = encodeVarintContent(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.UpdatedAt)))
+	n4, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.UpdatedAt, dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n4
+	if len(m.Ref) > 0 {
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintContent(dAtA, i, uint64(len(m.Ref)))
+		i += copy(dAtA[i:], m.Ref)
+	}
+	if m.Offset != 0 {
+		dAtA[i] = 0x20
+		i++
+		i = encodeVarintContent(dAtA, i, uint64(m.Offset))
+	}
+	if m.Total != 0 {
+		dAtA[i] = 0x28
+		i++
+		i = encodeVarintContent(dAtA, i, uint64(m.Total))
+	}
+	if len(m.Expected) > 0 {
+		dAtA[i] = 0x32
+		i++
+		i = encodeVarintContent(dAtA, i, uint64(len(m.Expected)))
+		i += copy(dAtA[i:], m.Expected)
+	}
+	return i, nil
+}
+
+func (m *StatusResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *StatusResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Statuses) > 0 {
+		for _, msg := range m.Statuses {
+			dAtA[i] = 0xa
+			i++
+			i = encodeVarintContent(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
 func (m *WriteRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -857,19 +1166,19 @@ func (m *WriteResponse) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0x12
 	i++
 	i = encodeVarintContent(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.StartedAt)))
-	n2, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.StartedAt, dAtA[i:])
+	n5, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.StartedAt, dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n2
+	i += n5
 	dAtA[i] = 0x1a
 	i++
 	i = encodeVarintContent(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.UpdatedAt)))
-	n3, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.UpdatedAt, dAtA[i:])
+	n6, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.UpdatedAt, dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n3
+	i += n6
 	if m.Offset != 0 {
 		dAtA[i] = 0x20
 		i++
@@ -889,7 +1198,7 @@ func (m *WriteResponse) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *StatusRequest) Marshal() (dAtA []byte, err error) {
+func (m *AbortRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -899,90 +1208,16 @@ func (m *StatusRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *StatusRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *AbortRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	if len(m.Refs) > 0 {
-		for _, s := range m.Refs {
-			dAtA[i] = 0xa
-			i++
-			l = len(s)
-			for l >= 1<<7 {
-				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
-				l >>= 7
-				i++
-			}
-			dAtA[i] = uint8(l)
-			i++
-			i += copy(dAtA[i:], s)
-		}
-	}
-	if len(m.Prefix) > 0 {
-		for _, s := range m.Prefix {
-			dAtA[i] = 0x12
-			i++
-			l = len(s)
-			for l >= 1<<7 {
-				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
-				l >>= 7
-				i++
-			}
-			dAtA[i] = uint8(l)
-			i++
-			i += copy(dAtA[i:], s)
-		}
-	}
-	return i, nil
-}
-
-func (m *StatusResponse) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *StatusResponse) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	dAtA[i] = 0xa
-	i++
-	i = encodeVarintContent(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.StartedAt)))
-	n4, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.StartedAt, dAtA[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n4
-	dAtA[i] = 0x12
-	i++
-	i = encodeVarintContent(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.UpdatedAt)))
-	n5, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.UpdatedAt, dAtA[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n5
 	if len(m.Ref) > 0 {
-		dAtA[i] = 0x1a
+		dAtA[i] = 0xa
 		i++
 		i = encodeVarintContent(dAtA, i, uint64(len(m.Ref)))
 		i += copy(dAtA[i:], m.Ref)
-	}
-	if m.Offset != 0 {
-		dAtA[i] = 0x20
-		i++
-		i = encodeVarintContent(dAtA, i, uint64(m.Offset))
-	}
-	if m.Total != 0 {
-		dAtA[i] = 0x28
-		i++
-		i = encodeVarintContent(dAtA, i, uint64(m.Total))
 	}
 	return i, nil
 }
@@ -1014,6 +1249,21 @@ func encodeVarintContent(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
+func (m *Info) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Digest)
+	if l > 0 {
+		n += 1 + l + sovContent(uint64(l))
+	}
+	if m.Size_ != 0 {
+		n += 1 + sovContent(uint64(m.Size_))
+	}
+	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.CommittedAt)
+	n += 1 + l + sovContent(uint64(l))
+	return n
+}
+
 func (m *InfoRequest) Size() (n int) {
 	var l int
 	_ = l
@@ -1027,15 +1277,26 @@ func (m *InfoRequest) Size() (n int) {
 func (m *InfoResponse) Size() (n int) {
 	var l int
 	_ = l
-	l = len(m.Digest)
-	if l > 0 {
-		n += 1 + l + sovContent(uint64(l))
-	}
-	if m.Size_ != 0 {
-		n += 1 + sovContent(uint64(m.Size_))
-	}
-	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.CommittedAt)
+	l = m.Info.Size()
 	n += 1 + l + sovContent(uint64(l))
+	return n
+}
+
+func (m *ListContentRequest) Size() (n int) {
+	var l int
+	_ = l
+	return n
+}
+
+func (m *ListContentResponse) Size() (n int) {
+	var l int
+	_ = l
+	if len(m.Info) > 0 {
+		for _, e := range m.Info {
+			l = e.Size()
+			n += 1 + l + sovContent(uint64(l))
+		}
+	}
 	return n
 }
 
@@ -1074,6 +1335,52 @@ func (m *ReadResponse) Size() (n int) {
 	l = len(m.Data)
 	if l > 0 {
 		n += 1 + l + sovContent(uint64(l))
+	}
+	return n
+}
+
+func (m *StatusRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Regexp)
+	if l > 0 {
+		n += 1 + l + sovContent(uint64(l))
+	}
+	return n
+}
+
+func (m *Status) Size() (n int) {
+	var l int
+	_ = l
+	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.StartedAt)
+	n += 1 + l + sovContent(uint64(l))
+	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.UpdatedAt)
+	n += 1 + l + sovContent(uint64(l))
+	l = len(m.Ref)
+	if l > 0 {
+		n += 1 + l + sovContent(uint64(l))
+	}
+	if m.Offset != 0 {
+		n += 1 + sovContent(uint64(m.Offset))
+	}
+	if m.Total != 0 {
+		n += 1 + sovContent(uint64(m.Total))
+	}
+	l = len(m.Expected)
+	if l > 0 {
+		n += 1 + l + sovContent(uint64(l))
+	}
+	return n
+}
+
+func (m *StatusResponse) Size() (n int) {
+	var l int
+	_ = l
+	if len(m.Statuses) > 0 {
+		for _, e := range m.Statuses {
+			l = e.Size()
+			n += 1 + l + sovContent(uint64(l))
+		}
 	}
 	return n
 }
@@ -1128,40 +1435,12 @@ func (m *WriteResponse) Size() (n int) {
 	return n
 }
 
-func (m *StatusRequest) Size() (n int) {
+func (m *AbortRequest) Size() (n int) {
 	var l int
 	_ = l
-	if len(m.Refs) > 0 {
-		for _, s := range m.Refs {
-			l = len(s)
-			n += 1 + l + sovContent(uint64(l))
-		}
-	}
-	if len(m.Prefix) > 0 {
-		for _, s := range m.Prefix {
-			l = len(s)
-			n += 1 + l + sovContent(uint64(l))
-		}
-	}
-	return n
-}
-
-func (m *StatusResponse) Size() (n int) {
-	var l int
-	_ = l
-	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.StartedAt)
-	n += 1 + l + sovContent(uint64(l))
-	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.UpdatedAt)
-	n += 1 + l + sovContent(uint64(l))
 	l = len(m.Ref)
 	if l > 0 {
 		n += 1 + l + sovContent(uint64(l))
-	}
-	if m.Offset != 0 {
-		n += 1 + sovContent(uint64(m.Offset))
-	}
-	if m.Total != 0 {
-		n += 1 + sovContent(uint64(m.Total))
 	}
 	return n
 }
@@ -1179,6 +1458,18 @@ func sovContent(x uint64) (n int) {
 func sozContent(x uint64) (n int) {
 	return sovContent(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+func (this *Info) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Info{`,
+		`Digest:` + fmt.Sprintf("%v", this.Digest) + `,`,
+		`Size_:` + fmt.Sprintf("%v", this.Size_) + `,`,
+		`CommittedAt:` + strings.Replace(strings.Replace(this.CommittedAt.String(), "Timestamp", "google_protobuf1.Timestamp", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *InfoRequest) String() string {
 	if this == nil {
 		return "nil"
@@ -1194,9 +1485,26 @@ func (this *InfoResponse) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&InfoResponse{`,
-		`Digest:` + fmt.Sprintf("%v", this.Digest) + `,`,
-		`Size_:` + fmt.Sprintf("%v", this.Size_) + `,`,
-		`CommittedAt:` + strings.Replace(strings.Replace(this.CommittedAt.String(), "Timestamp", "google_protobuf1.Timestamp", 1), `&`, ``, 1) + `,`,
+		`Info:` + strings.Replace(strings.Replace(this.Info.String(), "Info", "Info", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ListContentRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ListContentRequest{`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ListContentResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ListContentResponse{`,
+		`Info:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Info), "Info", "Info", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1234,6 +1542,41 @@ func (this *ReadResponse) String() string {
 	}, "")
 	return s
 }
+func (this *StatusRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&StatusRequest{`,
+		`Regexp:` + fmt.Sprintf("%v", this.Regexp) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Status) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Status{`,
+		`StartedAt:` + strings.Replace(strings.Replace(this.StartedAt.String(), "Timestamp", "google_protobuf1.Timestamp", 1), `&`, ``, 1) + `,`,
+		`UpdatedAt:` + strings.Replace(strings.Replace(this.UpdatedAt.String(), "Timestamp", "google_protobuf1.Timestamp", 1), `&`, ``, 1) + `,`,
+		`Ref:` + fmt.Sprintf("%v", this.Ref) + `,`,
+		`Offset:` + fmt.Sprintf("%v", this.Offset) + `,`,
+		`Total:` + fmt.Sprintf("%v", this.Total) + `,`,
+		`Expected:` + fmt.Sprintf("%v", this.Expected) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *StatusResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&StatusResponse{`,
+		`Statuses:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Statuses), "Status", "Status", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *WriteRequest) String() string {
 	if this == nil {
 		return "nil"
@@ -1264,27 +1607,12 @@ func (this *WriteResponse) String() string {
 	}, "")
 	return s
 }
-func (this *StatusRequest) String() string {
+func (this *AbortRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&StatusRequest{`,
-		`Refs:` + fmt.Sprintf("%v", this.Refs) + `,`,
-		`Prefix:` + fmt.Sprintf("%v", this.Prefix) + `,`,
-		`}`,
-	}, "")
-	return s
-}
-func (this *StatusResponse) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&StatusResponse{`,
-		`StartedAt:` + strings.Replace(strings.Replace(this.StartedAt.String(), "Timestamp", "google_protobuf1.Timestamp", 1), `&`, ``, 1) + `,`,
-		`UpdatedAt:` + strings.Replace(strings.Replace(this.UpdatedAt.String(), "Timestamp", "google_protobuf1.Timestamp", 1), `&`, ``, 1) + `,`,
+	s := strings.Join([]string{`&AbortRequest{`,
 		`Ref:` + fmt.Sprintf("%v", this.Ref) + `,`,
-		`Offset:` + fmt.Sprintf("%v", this.Offset) + `,`,
-		`Total:` + fmt.Sprintf("%v", this.Total) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1296,6 +1624,134 @@ func valueToStringContent(v interface{}) string {
 	}
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
+}
+func (m *Info) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowContent
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Info: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Info: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Digest", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowContent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthContent
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Digest = github_com_opencontainers_go_digest.Digest(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Size_", wireType)
+			}
+			m.Size_ = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowContent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Size_ |= (int64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CommittedAt", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowContent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthContent
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := github_com_gogo_protobuf_types.StdTimeUnmarshal(&m.CommittedAt, dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipContent(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthContent
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 func (m *InfoRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
@@ -1407,55 +1863,7 @@ func (m *InfoResponse) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Digest", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowContent
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthContent
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Digest = github_com_opencontainers_go_digest.Digest(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 2:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Size_", wireType)
-			}
-			m.Size_ = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowContent
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.Size_ |= (int64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field CommittedAt", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Info", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -1479,7 +1887,138 @@ func (m *InfoResponse) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := github_com_gogo_protobuf_types.StdTimeUnmarshal(&m.CommittedAt, dAtA[iNdEx:postIndex]); err != nil {
+			if err := m.Info.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipContent(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthContent
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ListContentRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowContent
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ListContentRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ListContentRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipContent(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthContent
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ListContentResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowContent
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ListContentResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ListContentResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Info", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowContent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthContent
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Info = append(m.Info, Info{})
+			if err := m.Info[len(m.Info)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1777,6 +2316,372 @@ func (m *ReadResponse) Unmarshal(dAtA []byte) error {
 			m.Data = append(m.Data[:0], dAtA[iNdEx:postIndex]...)
 			if m.Data == nil {
 				m.Data = []byte{}
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipContent(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthContent
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *StatusRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowContent
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: StatusRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: StatusRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Regexp", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowContent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthContent
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Regexp = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipContent(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthContent
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *Status) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowContent
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Status: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Status: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StartedAt", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowContent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthContent
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := github_com_gogo_protobuf_types.StdTimeUnmarshal(&m.StartedAt, dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field UpdatedAt", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowContent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthContent
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := github_com_gogo_protobuf_types.StdTimeUnmarshal(&m.UpdatedAt, dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Ref", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowContent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthContent
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Ref = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Offset", wireType)
+			}
+			m.Offset = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowContent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Offset |= (int64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Total", wireType)
+			}
+			m.Total = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowContent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Total |= (int64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Expected", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowContent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthContent
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Expected = github_com_opencontainers_go_digest.Digest(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipContent(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthContent
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *StatusResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowContent
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: StatusResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: StatusResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Statuses", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowContent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthContent
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Statuses = append(m.Statuses, Status{})
+			if err := m.Statuses[len(m.Statuses)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
 			}
 			iNdEx = postIndex
 		default:
@@ -2192,7 +3097,7 @@ func (m *WriteResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *StatusRequest) Unmarshal(dAtA []byte) error {
+func (m *AbortRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -2215,181 +3120,13 @@ func (m *StatusRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: StatusRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: AbortRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: StatusRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: AbortRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Refs", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowContent
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthContent
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Refs = append(m.Refs, string(dAtA[iNdEx:postIndex]))
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Prefix", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowContent
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthContent
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Prefix = append(m.Prefix, string(dAtA[iNdEx:postIndex]))
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipContent(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthContent
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *StatusResponse) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowContent
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: StatusResponse: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: StatusResponse: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field StartedAt", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowContent
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthContent
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if err := github_com_gogo_protobuf_types.StdTimeUnmarshal(&m.StartedAt, dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field UpdatedAt", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowContent
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthContent
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if err := github_com_gogo_protobuf_types.StdTimeUnmarshal(&m.UpdatedAt, dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Ref", wireType)
 			}
@@ -2418,44 +3155,6 @@ func (m *StatusResponse) Unmarshal(dAtA []byte) error {
 			}
 			m.Ref = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 4:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Offset", wireType)
-			}
-			m.Offset = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowContent
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.Offset |= (int64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 5:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Total", wireType)
-			}
-			m.Total = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowContent
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.Total |= (int64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipContent(dAtA[iNdEx:])
@@ -2587,53 +3286,59 @@ func init() {
 }
 
 var fileDescriptorContent = []byte{
-	// 768 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xb4, 0x55, 0x4f, 0x6f, 0xd3, 0x4e,
-	0x10, 0xcd, 0xe6, 0x8f, 0x7f, 0xcd, 0x24, 0xed, 0x2f, 0x6c, 0x43, 0x15, 0xb9, 0xad, 0x13, 0xc2,
-	0x25, 0xaa, 0x84, 0x53, 0xc2, 0x0d, 0x0e, 0xc8, 0x49, 0x4b, 0x55, 0xa4, 0x52, 0xc9, 0x8d, 0x54,
-	0x71, 0x42, 0x4e, 0xb2, 0x09, 0x96, 0x1a, 0xaf, 0xb1, 0x37, 0x55, 0xe1, 0xc4, 0x05, 0x09, 0xf5,
-	0xc4, 0x17, 0xe8, 0x09, 0xee, 0x1c, 0x91, 0xf8, 0x02, 0xf4, 0xc8, 0x11, 0xf5, 0x50, 0x68, 0x24,
-	0xf8, 0x1a, 0x20, 0xaf, 0xd7, 0x89, 0xf3, 0x87, 0x43, 0x43, 0x9b, 0x8b, 0x67, 0x3d, 0x33, 0x4f,
-	0xf3, 0xde, 0xbe, 0x8c, 0xa1, 0xd6, 0x31, 0xd9, 0xf3, 0x5e, 0x43, 0x6d, 0xd2, 0x6e, 0xb9, 0x49,
-	0x2d, 0x66, 0x98, 0x16, 0x71, 0x5a, 0xe1, 0xd0, 0xb0, 0xcd, 0xb2, 0x4b, 0x9c, 0x43, 0xb3, 0x49,
-	0x5c, 0xfe, 0x9e, 0x58, 0x2c, 0x78, 0xaa, 0xb6, 0x43, 0x19, 0xc5, 0xf3, 0xc3, 0x72, 0xf5, 0xf0,
-	0xae, 0x9c, 0xed, 0xd0, 0x0e, 0xe5, 0x99, 0xb2, 0x17, 0xf9, 0x45, 0x72, 0xbe, 0x43, 0x69, 0xe7,
-	0x80, 0x94, 0xf9, 0xa9, 0xd1, 0x6b, 0x97, 0x99, 0xd9, 0x25, 0x2e, 0x33, 0xba, 0xb6, 0x28, 0x58,
-	0x1e, 0x2f, 0x20, 0x5d, 0x9b, 0xbd, 0xf4, 0x93, 0xc5, 0xa7, 0x90, 0xda, 0xb6, 0xda, 0x54, 0x27,
-	0x2f, 0x7a, 0xc4, 0x65, 0xf8, 0x31, 0x48, 0x2d, 0xb3, 0x43, 0x5c, 0x96, 0x43, 0x05, 0x54, 0x4a,
-	0x56, 0x2b, 0xa7, 0xe7, 0xf9, 0xc8, 0xd9, 0x79, 0x7e, 0x2d, 0x44, 0x87, 0xda, 0xc4, 0x1a, 0x0c,
-	0xe6, 0x96, 0x3b, 0xf4, 0x8e, 0xdf, 0xa2, 0x6e, 0xf0, 0x87, 0x2e, 0x10, 0x8a, 0x9f, 0x10, 0xa4,
-	0x7d, 0x6c, 0xd7, 0xa6, 0x96, 0x4b, 0xae, 0x12, 0x1c, 0x63, 0x88, 0xbb, 0xe6, 0x2b, 0x92, 0x8b,
-	0x16, 0x50, 0x29, 0xa6, 0xf3, 0x18, 0x6f, 0x41, 0xba, 0x49, 0xbb, 0x5d, 0x93, 0x31, 0xd2, 0x7a,
-	0x66, 0xb0, 0x5c, 0xac, 0x80, 0x4a, 0xa9, 0x8a, 0xac, 0xfa, 0xfc, 0xd5, 0x80, 0xbf, 0x5a, 0x0f,
-	0x04, 0xaa, 0xce, 0x79, 0x13, 0xbc, 0xfb, 0x9e, 0x47, 0x7a, 0x6a, 0xd0, 0xa9, 0xb1, 0x62, 0x03,
-	0xb2, 0x1b, 0xe4, 0x80, 0x30, 0x52, 0xf3, 0xaf, 0xe3, 0x3a, 0xd4, 0x79, 0x83, 0x20, 0xa5, 0x13,
-	0xa3, 0x75, 0x0d, 0xd8, 0x78, 0x09, 0x24, 0xda, 0x6e, 0xbb, 0x84, 0x09, 0x79, 0xc4, 0x69, 0x20,
-	0x5a, 0x6c, 0x28, 0x5a, 0xf1, 0x3e, 0xa4, 0xfd, 0x31, 0xc4, 0x25, 0x0d, 0x7b, 0xd1, 0x78, 0x6f,
-	0xcb, 0x60, 0x06, 0x47, 0x4c, 0xeb, 0x3c, 0x2e, 0xfe, 0x42, 0x90, 0xde, 0x77, 0x4c, 0x46, 0x02,
-	0x12, 0x15, 0x90, 0x8c, 0x26, 0x33, 0xa9, 0xc5, 0x9b, 0x17, 0x2a, 0xb2, 0x3a, 0xe2, 0x60, 0x95,
-	0x17, 0x6b, 0xbc, 0x42, 0x17, 0x95, 0x38, 0x03, 0x31, 0x87, 0xb4, 0x39, 0x6e, 0x52, 0xf7, 0x42,
-	0x9c, 0x85, 0x04, 0xa3, 0xcc, 0x38, 0x10, 0x73, 0xfa, 0x07, 0xfc, 0x04, 0xe6, 0xc8, 0x91, 0x4d,
-	0x9a, 0x8c, 0xb4, 0x72, 0xf1, 0x99, 0x25, 0x1a, 0x60, 0x84, 0x88, 0x26, 0xa6, 0x12, 0x95, 0x42,
-	0x44, 0xbf, 0x44, 0x61, 0x5e, 0x10, 0x15, 0x32, 0xcd, 0xc2, 0xb4, 0x06, 0xe0, 0x32, 0xc3, 0x11,
-	0xee, 0x8c, 0x5e, 0xc2, 0x9d, 0x49, 0xd1, 0xa7, 0x31, 0x0f, 0xa4, 0x67, 0xb7, 0x8c, 0x19, 0x2c,
-	0x9e, 0x14, 0x7d, 0x5a, 0xd8, 0x20, 0xf1, 0x11, 0xee, 0x03, 0xe5, 0x13, 0x61, 0xe5, 0x87, 0xd6,
-	0x94, 0xfe, 0xd9, 0xf6, 0x0f, 0x60, 0x7e, 0x8f, 0x19, 0xac, 0xe7, 0x06, 0x96, 0xc1, 0x10, 0x77,
-	0x48, 0xdb, 0xcd, 0xa1, 0x42, 0xac, 0x94, 0xd4, 0x79, 0xec, 0x8d, 0x67, 0x3b, 0xa4, 0x6d, 0x1e,
-	0xe5, 0xa2, 0xfc, 0xad, 0x38, 0x15, 0xcf, 0x10, 0x2c, 0x04, 0xdd, 0xe2, 0x1e, 0x46, 0x35, 0x45,
-	0x57, 0xa1, 0x69, 0x74, 0x36, 0x4d, 0x85, 0x8f, 0x63, 0x43, 0x1f, 0x5f, 0x4a, 0xe5, 0xb5, 0x8f,
-	0x08, 0x52, 0x21, 0xd7, 0xe0, 0x55, 0x88, 0xef, 0xd5, 0xb5, 0x7a, 0x26, 0x22, 0x2f, 0x1e, 0x9f,
-	0x14, 0xfe, 0x0f, 0xa5, 0x3c, 0x09, 0x70, 0x1e, 0x12, 0xfb, 0xfa, 0x76, 0x7d, 0x33, 0x83, 0xe4,
-	0xec, 0xf1, 0x49, 0x21, 0x13, 0xca, 0xf3, 0x10, 0xdf, 0x02, 0xa9, 0xb6, 0xbb, 0xb3, 0xb3, 0x5d,
-	0xcf, 0x44, 0xe5, 0x9b, 0xc7, 0x27, 0x85, 0x1b, 0xa1, 0x8a, 0x1a, 0x5f, 0x76, 0xb8, 0x04, 0x09,
-	0xad, 0xba, 0xab, 0xd7, 0x33, 0xbf, 0x83, 0xdf, 0x24, 0x98, 0xd6, 0xa0, 0x0e, 0x93, 0x17, 0xdf,
-	0xbe, 0x57, 0x22, 0x9f, 0x3f, 0x28, 0xe1, 0x09, 0x2b, 0x3f, 0xa3, 0xf0, 0x9f, 0xd8, 0x90, 0xf8,
-	0x21, 0xc4, 0xbd, 0x5d, 0x8f, 0xc7, 0xff, 0x07, 0xa1, 0x8f, 0x8b, 0xbc, 0x3c, 0x35, 0x27, 0x2e,
-	0x72, 0x13, 0x24, 0x7f, 0xe7, 0xe2, 0xdb, 0x63, 0x65, 0xd3, 0x56, 0xb1, 0xbc, 0x34, 0x71, 0x3d,
-	0x9b, 0xde, 0x57, 0x0d, 0x6b, 0x10, 0xf7, 0xd6, 0xd9, 0xc4, 0x1c, 0xa1, 0x55, 0x3b, 0x31, 0x47,
-	0x78, 0xff, 0xad, 0x23, 0xbc, 0x05, 0x92, 0x6f, 0x32, 0xbc, 0x32, 0x56, 0x38, 0xe2, 0x5c, 0x79,
-	0xf5, 0x2f, 0xd9, 0x01, 0xd0, 0x23, 0x48, 0xf8, 0x57, 0xb1, 0x3c, 0x6d, 0x39, 0x04, 0x30, 0x2b,
-	0xd3, 0x93, 0x3e, 0x4a, 0x09, 0xad, 0xa3, 0x6a, 0xee, 0xf4, 0x42, 0x89, 0x7c, 0xbb, 0x50, 0x22,
-	0xaf, 0xfb, 0x0a, 0x3a, 0xed, 0x2b, 0xe8, 0x6b, 0x5f, 0x41, 0x3f, 0xfa, 0x0a, 0x6a, 0x48, 0x9c,
-	0xfd, 0xbd, 0x3f, 0x01, 0x00, 0x00, 0xff, 0xff, 0x71, 0x48, 0x92, 0x10, 0x6e, 0x08, 0x00, 0x00,
+	// 860 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xb4, 0x56, 0x4f, 0x6f, 0xe3, 0x44,
+	0x14, 0xcf, 0xc4, 0x8e, 0x69, 0x5f, 0xd2, 0x25, 0x4c, 0xb2, 0x55, 0xe4, 0xee, 0x3a, 0x59, 0x73,
+	0x20, 0x5a, 0x69, 0x9d, 0x25, 0x1c, 0x90, 0x10, 0x08, 0x25, 0x69, 0x41, 0x41, 0x2c, 0x2b, 0xb9,
+	0x91, 0x2a, 0x4e, 0xc8, 0x49, 0x26, 0xc6, 0x52, 0xe3, 0x31, 0xf6, 0xa4, 0x2a, 0x9c, 0xb8, 0x20,
+	0xa1, 0x9e, 0xf8, 0x02, 0xbd, 0x00, 0x77, 0xee, 0x7c, 0x01, 0x7a, 0xe4, 0x88, 0x38, 0x14, 0x9a,
+	0x03, 0x1f, 0x80, 0x4f, 0x80, 0x3c, 0x33, 0x76, 0x9c, 0x3f, 0x45, 0xf4, 0x0f, 0xa7, 0xcc, 0xcc,
+	0xfb, 0xbd, 0x9f, 0xdf, 0x9f, 0x5f, 0xdf, 0x2b, 0xf4, 0x5c, 0x8f, 0x7d, 0x3e, 0x1b, 0x5a, 0x23,
+	0x3a, 0x6d, 0x8d, 0xa8, 0xcf, 0x1c, 0xcf, 0x27, 0xe1, 0x38, 0x7b, 0x74, 0x02, 0xaf, 0x15, 0x91,
+	0xf0, 0xc4, 0x1b, 0x91, 0x88, 0xbf, 0x13, 0x9f, 0x25, 0xbf, 0x56, 0x10, 0x52, 0x46, 0xf1, 0xce,
+	0x02, 0x6e, 0x9d, 0xbc, 0xa9, 0x57, 0x5d, 0xea, 0x52, 0x6e, 0x69, 0xc5, 0x27, 0x01, 0xd2, 0xeb,
+	0x2e, 0xa5, 0xee, 0x31, 0x69, 0xf1, 0xdb, 0x70, 0x36, 0x69, 0x31, 0x6f, 0x4a, 0x22, 0xe6, 0x4c,
+	0x03, 0x09, 0xd8, 0x5b, 0x05, 0x90, 0x69, 0xc0, 0xbe, 0x14, 0x46, 0xf3, 0x27, 0x04, 0x6a, 0xdf,
+	0x9f, 0x50, 0xfc, 0x11, 0x68, 0x63, 0xcf, 0x25, 0x11, 0xab, 0xa1, 0x06, 0x6a, 0x6e, 0x77, 0xdb,
+	0x17, 0x97, 0xf5, 0xdc, 0xef, 0x97, 0xf5, 0xa7, 0x99, 0x44, 0x68, 0x40, 0xfc, 0x34, 0xa4, 0xa8,
+	0xe5, 0xd2, 0x67, 0xc2, 0xc5, 0xda, 0xe7, 0x3f, 0xb6, 0x64, 0xc0, 0x18, 0xd4, 0xc8, 0xfb, 0x8a,
+	0xd4, 0xf2, 0x0d, 0xd4, 0x54, 0x6c, 0x7e, 0xc6, 0x1f, 0x42, 0x69, 0x44, 0xa7, 0x53, 0x8f, 0x31,
+	0x32, 0xfe, 0xcc, 0x61, 0x35, 0xa5, 0x81, 0x9a, 0xc5, 0xb6, 0x6e, 0x89, 0xe0, 0xac, 0x24, 0x38,
+	0x6b, 0x90, 0x44, 0xdf, 0xdd, 0x8a, 0x23, 0xf8, 0xee, 0x8f, 0x3a, 0xb2, 0x8b, 0xa9, 0x67, 0x87,
+	0x99, 0x9f, 0x42, 0x31, 0x0e, 0xd8, 0x26, 0x5f, 0xcc, 0xe2, 0x6f, 0xdd, 0x63, 0xdc, 0xe6, 0x7b,
+	0x50, 0x12, 0xd4, 0x51, 0x40, 0xfd, 0x88, 0xe0, 0x67, 0xa0, 0x7a, 0xfe, 0x84, 0x72, 0xe6, 0x62,
+	0xbb, 0x62, 0x2d, 0xb5, 0xc3, 0x8a, 0xa1, 0x5d, 0x35, 0xfe, 0x9c, 0xcd, 0x61, 0x66, 0x15, 0xf0,
+	0xc7, 0x5e, 0xc4, 0x7a, 0xa2, 0x87, 0x32, 0x40, 0x73, 0x1f, 0x2a, 0x4b, 0xaf, 0x6b, 0xdc, 0xca,
+	0x7f, 0xe1, 0x1e, 0x42, 0x75, 0x9f, 0x1c, 0x13, 0x46, 0x96, 0xd9, 0xef, 0x35, 0xfd, 0x6f, 0x10,
+	0x14, 0x6d, 0xe2, 0x8c, 0xff, 0x07, 0x6e, 0xbc, 0x0b, 0x1a, 0x9d, 0x4c, 0x22, 0xc2, 0xa4, 0x28,
+	0xe4, 0x2d, 0x95, 0x8a, 0xb2, 0x90, 0x8a, 0xf9, 0x0e, 0x94, 0x44, 0x18, 0xb2, 0x54, 0x0b, 0x5f,
+	0xb4, 0xea, 0x3b, 0x76, 0x98, 0xc3, 0x19, 0x4b, 0x36, 0x3f, 0x9b, 0x6f, 0xc0, 0xce, 0x21, 0x73,
+	0xd8, 0x2c, 0x4a, 0x92, 0xd8, 0x05, 0x2d, 0x24, 0x2e, 0x39, 0x0d, 0x44, 0x12, 0xb6, 0xbc, 0x99,
+	0xdf, 0xe7, 0x41, 0x13, 0x48, 0xdc, 0x03, 0x88, 0x98, 0x13, 0x4a, 0x61, 0xa2, 0x1b, 0x08, 0x73,
+	0x5b, 0xfa, 0x75, 0x58, 0x4c, 0x32, 0x0b, 0xc6, 0x8e, 0x24, 0xc9, 0xdf, 0x84, 0x44, 0xfa, 0x75,
+	0x18, 0x2e, 0x83, 0x12, 0x92, 0x09, 0x2f, 0xc6, 0xb6, 0x1d, 0x1f, 0x33, 0xb9, 0xab, 0x4b, 0xb9,
+	0x57, 0xa1, 0xc0, 0x28, 0x73, 0x8e, 0x6b, 0x05, 0xfe, 0x2c, 0x2e, 0xf8, 0x13, 0xd8, 0x22, 0xa7,
+	0x01, 0x19, 0x31, 0x32, 0xae, 0x69, 0xb7, 0xee, 0x59, 0xca, 0x61, 0xf6, 0xe1, 0x41, 0x52, 0x4d,
+	0xd9, 0x8b, 0xb7, 0x61, 0x2b, 0xe2, 0x2f, 0x24, 0x92, 0xd2, 0x7d, 0xb8, 0x22, 0x5d, 0xe1, 0x20,
+	0xc5, 0x9b, 0x82, 0xcd, 0xbf, 0x10, 0x94, 0x8e, 0x42, 0x8f, 0x91, 0xa4, 0x31, 0x6d, 0xd0, 0x9c,
+	0x11, 0xf3, 0xa8, 0xcf, 0x2b, 0xfe, 0xa0, 0xad, 0xaf, 0xf0, 0x70, 0x70, 0x87, 0x23, 0x6c, 0x89,
+	0x4c, 0xea, 0x93, 0x5f, 0xd4, 0x27, 0xad, 0x83, 0x72, 0x5d, 0x1d, 0xd4, 0xbb, 0xd7, 0x21, 0xd3,
+	0x85, 0xc2, 0x46, 0x05, 0x6a, 0x19, 0x05, 0xfe, 0x92, 0x87, 0x1d, 0x99, 0xa8, 0xac, 0xd9, 0x6d,
+	0x32, 0x5d, 0xd6, 0x64, 0xfe, 0x3e, 0x34, 0xa9, 0xdc, 0x4e, 0x93, 0x37, 0x53, 0xe0, 0x62, 0x66,
+	0x68, 0x77, 0x9e, 0x47, 0x0d, 0x28, 0x75, 0x86, 0x34, 0x4c, 0x67, 0x9d, 0xec, 0x3e, 0x4a, 0xbb,
+	0xff, 0x34, 0x9e, 0x58, 0x99, 0xea, 0xe1, 0xc7, 0xa0, 0x1e, 0x0e, 0x3a, 0x83, 0x72, 0x4e, 0xaf,
+	0x9c, 0x9d, 0x37, 0x5e, 0xcd, 0x98, 0x62, 0x55, 0xe2, 0x3a, 0x14, 0x8e, 0xec, 0xfe, 0xe0, 0xa0,
+	0x8c, 0xf4, 0xea, 0xd9, 0x79, 0xa3, 0x9c, 0xb1, 0xf3, 0x23, 0x7e, 0x02, 0x5a, 0xef, 0xe5, 0x8b,
+	0x17, 0xfd, 0x41, 0x39, 0xaf, 0x3f, 0x3c, 0x3b, 0x6f, 0xbc, 0x96, 0x41, 0xf4, 0xf8, 0x0e, 0xd2,
+	0x2b, 0xdf, 0xfe, 0x60, 0xe4, 0x7e, 0xfe, 0xd1, 0xc8, 0x7e, 0xb7, 0xfd, 0xb7, 0x02, 0xaf, 0xc8,
+	0xc1, 0x8c, 0xdf, 0x97, 0x0b, 0x55, 0xdf, 0x30, 0xd2, 0x65, 0x26, 0xfa, 0xde, 0x46, 0x9b, 0x94,
+	0xcb, 0x4b, 0x50, 0xe3, 0x85, 0x81, 0x9f, 0xac, 0x80, 0xd6, 0x77, 0x8b, 0x6e, 0xfe, 0x1b, 0x44,
+	0xd0, 0x3d, 0x47, 0xf8, 0x00, 0x34, 0xb1, 0x3b, 0xf0, 0xeb, 0x2b, 0xf8, 0x4d, 0x2b, 0x45, 0xdf,
+	0x5d, 0x53, 0xc8, 0x41, 0xfc, 0x0f, 0x03, 0xee, 0x80, 0x1a, 0x8f, 0xe5, 0xb5, 0xc4, 0x32, 0x2b,
+	0x63, 0x2d, 0xb1, 0xec, 0x1c, 0x17, 0x91, 0xc8, 0x99, 0xfb, 0x68, 0xe3, 0xd4, 0x48, 0x68, 0x1e,
+	0x5f, 0x63, 0x95, 0x15, 0xfa, 0x00, 0x0a, 0xa2, 0x5f, 0x7b, 0x9b, 0xfe, 0x92, 0x12, 0x92, 0x47,
+	0x9b, 0x8d, 0x82, 0xa3, 0x89, 0x9e, 0x23, 0xfc, 0x2e, 0x14, 0xb8, 0xc0, 0xd6, 0x78, 0xb2, 0xb2,
+	0xbb, 0xae, 0x1e, 0xdd, 0xda, 0xc5, 0x95, 0x91, 0xfb, 0xed, 0xca, 0xc8, 0x7d, 0x3d, 0x37, 0xd0,
+	0xc5, 0xdc, 0x40, 0xbf, 0xce, 0x0d, 0xf4, 0xe7, 0xdc, 0x40, 0x43, 0x8d, 0x23, 0xdf, 0xfa, 0x27,
+	0x00, 0x00, 0xff, 0xff, 0xbc, 0x66, 0xb9, 0xa0, 0x05, 0x0a, 0x00, 0x00,
 }

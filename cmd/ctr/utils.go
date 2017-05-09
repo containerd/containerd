@@ -35,12 +35,12 @@ func getExecutionService(context *cli.Context) (execution.ContainerServiceClient
 	return execution.NewContainerServiceClient(conn), nil
 }
 
-func getContentProvider(context *cli.Context) (content.Provider, error) {
+func getContentStore(context *cli.Context) (content.Store, error) {
 	conn, err := getGRPCConnection(context)
 	if err != nil {
 		return nil, err
 	}
-	return contentservice.NewProviderFromClient(contentapi.NewContentClient(conn)), nil
+	return contentservice.NewStoreFromClient(contentapi.NewContentClient(conn)), nil
 }
 
 func getRootFSService(context *cli.Context) (rootfsapi.RootFSClient, error) {
