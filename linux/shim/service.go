@@ -225,14 +225,49 @@ func (s *Service) Kill(ctx context.Context, r *shimapi.KillRequest) (*google_pro
 		}
 		return empty, nil
 	}
-	proc, ok := s.processes[int(r.Pid)]
-	if !ok {
-		return nil, fmt.Errorf("process does not exist %d", r.Pid)
-	}
-	if err := proc.Signal(int(r.Signal)); err != nil {
+
+	pids, err := s.getContainerPids(ctx, s.initProcess.id)
+	if err != nil {
 		return nil, err
 	}
+
+	valid := false
+	for _, p := range pids {
+		if r.Pid == p {
+			valid = true
+			break
+		}
+	}
+
+	if !valid {
+		return nil, errors.Errorf("process %d does not exist in container", r.Pid)
+	}
+
+	if err := unix.Kill(int(r.Pid), syscall.Signal(r.Signal)); err != nil {
+		return nil, err
+	}
+
 	return empty, nil
+}
+
+func (s *Service) Ps(ctx context.Context, r *shimapi.PsRequest) (*shimapi.PsResponse, error) {
+	pids, err := s.getContainerPids(ctx, r.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	ps := []*shimapi.Ps{}
+	for _, pid := range pids {
+		ps = append(ps, &shimapi.Ps{
+			Pid: pid,
+		})
+	}
+	resp := &shimapi.PsResponse{
+		Ps: ps,
+	}
+
+	return resp, nil
+
 }
 
 func (s *Service) CloseStdin(ctx context.Context, r *shimapi.CloseStdinRequest) (*google_protobuf.Empty, error) {
@@ -256,4 +291,18 @@ func (s *Service) waitExit(p process, pid int, cmd *reaper.Cmd) {
 		ExitStatus: uint32(status),
 		ExitedAt:   p.ExitedAt(),
 	}
+}
+
+func (s *Service) getContainerPids(ctx context.Context, id string) ([]uint32, error) {
+	p, err := s.initProcess.runc.Ps(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	pids := make([]uint32, 0, len(p))
+	for _, pid := range p {
+		pids = append(pids, uint32(pid))
+	}
+
+	return pids, nil
 }

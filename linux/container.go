@@ -83,9 +83,10 @@ func (c *Container) Resume(ctx context.Context) error {
 	return err
 }
 
-func (c *Container) Kill(ctx context.Context, signal uint32, all bool) error {
+func (c *Container) Kill(ctx context.Context, signal uint32, pid uint32, all bool) error {
 	_, err := c.shim.Kill(ctx, &shim.KillRequest{
 		Signal: signal,
+		Pid:    pid,
 		All:    all,
 	})
 	return err
@@ -105,12 +106,32 @@ func (c *Container) Exec(ctx context.Context, opts plugin.ExecOpts) (plugin.Proc
 	resp, err := c.shim.Exec(ctx, request)
 	if err != nil {
 		return nil, err
+
 	}
 	return &Process{
 		pid: int(resp.Pid),
 		c:   c,
 	}, nil
 }
+
+func (c *Container) Ps(ctx context.Context) ([]uint32, error) {
+	resp, err := c.shim.Ps(ctx, &shim.PsRequest{
+		ID: c.id,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	pids := make([]uint32, 0, len(resp.Ps))
+
+	for _, ps := range resp.Ps {
+		pids = append(pids, ps.Pid)
+	}
+
+	return pids, nil
+}
+
 func (c *Container) Pty(ctx context.Context, pid uint32, size plugin.ConsoleSize) error {
 	_, err := c.shim.Pty(ctx, &shim.PtyRequest{
 		Pid:    pid,

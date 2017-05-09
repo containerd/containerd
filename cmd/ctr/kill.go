@@ -16,6 +16,11 @@ var killCommand = cli.Command{
 			Name:  "id",
 			Usage: "id of the container",
 		},
+		cli.IntFlag{
+			Name:  "pid",
+			Usage: "pid to kill",
+			Value: 0,
+		},
 		cli.BoolFlag{
 			Name:  "all, a",
 			Usage: "send signal to all processes inside the container",
@@ -37,14 +42,29 @@ var killCommand = cli.Command{
 			return err
 		}
 
-		containers, err := getExecutionService(context)
-		if err != nil {
-			return err
+		pid := context.Int("pid")
+		all := context.Bool("all")
+		if pid > 0 && all {
+			return errors.New("enter a pid or all; not both")
 		}
+
 		killRequest := &execution.KillRequest{
 			ID:     id,
 			Signal: uint32(signal),
-			All:    context.Bool("all"),
+			PidOrAll: &execution.KillRequest_Pid{
+				Pid: uint32(pid),
+			},
+		}
+
+		if all {
+			killRequest.PidOrAll = &execution.KillRequest_All{
+				All: true,
+			}
+		}
+
+		containers, err := getExecutionService(context)
+		if err != nil {
+			return err
 		}
 		_, err = containers.Kill(gocontext.Background(), killRequest)
 		if err != nil {

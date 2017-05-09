@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/containerd/containerd"
@@ -217,10 +218,45 @@ func (s *Service) Kill(ctx context.Context, r *api.KillRequest) (*google_protobu
 	if err != nil {
 		return nil, err
 	}
-	if err := c.Kill(ctx, r.Signal, r.All); err != nil {
-		return nil, err
+
+	switch v := r.PidOrAll.(type) {
+	case *api.KillRequest_All:
+		if err := c.Kill(ctx, r.Signal, 0, true); err != nil {
+			return nil, err
+		}
+	case *api.KillRequest_Pid:
+		if err := c.Kill(ctx, r.Signal, v.Pid, false); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("invalid option specified; expected pid or all")
 	}
 	return empty, nil
+}
+
+func (s *Service) Ps(ctx context.Context, r *api.PsRequest) (*api.PsResponse, error) {
+	c, err := s.getContainer(r.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	pids, err := c.Ps(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	ps := []*api.Ps{}
+	for _, pid := range pids {
+		ps = append(ps, &api.Ps{
+			Pid: pid,
+		})
+	}
+
+	resp := &api.PsResponse{
+		Ps: ps,
+	}
+
+	return resp, nil
 }
 
 func (s *Service) Events(r *api.EventsRequest, server api.ContainerService_EventsServer) error {
