@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/osutils"
-	"github.com/crosbymichael/console"
-	runc "github.com/crosbymichael/go-runc"
+	"github.com/containerd/console"
+	runc "github.com/containerd/go-runc"
 	"github.com/tonistiigi/fifo"
 	"golang.org/x/net/context"
 )

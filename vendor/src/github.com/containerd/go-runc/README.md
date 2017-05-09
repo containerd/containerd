@@ -1,6 +1,6 @@
 # go-runc
 
-[![Build Status](https://travis-ci.org/crosbymichael/go-runc.svg?branch=master)](https://travis-ci.org/crosbymichael/go-runc)
+[![Build Status](https://travis-ci.org/containerd/go-runc.svg?branch=master)](https://travis-ci.org/containerd/go-runc)
 
 
 This is a package for consuming the [runc](https://github.com/opencontainers/runc) binary in your Go applications.
@@ -11,7 +11,7 @@ or greater.
 
 ## Docs
 
-Docs can be found at [godoc.org](https://godoc.org/github.com/crosbymichael/go-runc).
+Docs can be found at [godoc.org](https://godoc.org/github.com/containerd/go-runc).
 
 
 ## LICENSE - MIT
