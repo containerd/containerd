@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/crosbymichael/console"
+	"github.com/containerd/console"
 	"github.com/opencontainers/runc/libcontainer/utils"
 )
 

@@ -18,7 +18,7 @@ import (
 
 	"github.com/containerd/containerd/api/grpc/types"
 	"github.com/containerd/containerd/specs"
-	"github.com/crosbymichael/console"
+	"github.com/containerd/console"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/urfave/cli"
 	netcontext "golang.org/x/net/context"

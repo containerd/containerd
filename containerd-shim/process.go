@@ -17,8 +17,8 @@ import (
 
 	"github.com/containerd/containerd/osutils"
 	"github.com/containerd/containerd/specs"
-	"github.com/crosbymichael/console"
-	runc "github.com/crosbymichael/go-runc"
+	"github.com/containerd/console"
+	runc "github.com/containerd/go-runc"
 )
 
 var errRuntime = errors.New("shim: runtime execution error")
