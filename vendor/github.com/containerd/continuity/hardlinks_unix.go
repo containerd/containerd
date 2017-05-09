@@ -1,4 +1,4 @@
-// +build linux darwin
+// +build linux darwin freebsd
 
 package continuity
 
@@ -32,5 +32,5 @@ func newHardlinkKey(fi os.FileInfo) (hardlinkKey, error) {
 		return hardlinkKey{}, errNotAHardLink
 	}
 
-	return hardlinkKey{dev: uint64(sys.Dev), inode: sys.Ino}, nil
+	return hardlinkKey{dev: uint64(sys.Dev), inode: uint64(sys.Ino)}, nil
 }

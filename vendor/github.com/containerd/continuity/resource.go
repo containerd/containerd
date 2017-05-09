@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/opencontainers/go-digest"
 	pb "github.com/containerd/continuity/proto"
+	"github.com/opencontainers/go-digest"
 )
 
 // TODO(stevvooe): A record based model, somewhat sketched out at the bottom

@@ -122,7 +122,7 @@ func handleLChmod(hdr *tar.Header, path string, hdrInfo os.FileInfo) error {
 
 func getxattr(path, attr string) ([]byte, error) {
 	b, err := sysx.LGetxattr(path, attr)
-	if err == syscall.ENOTSUP || err == syscall.ENODATA {
+	if err == syscall.ENOTSUP || err == sysx.ENODATA {
 		return nil, nil
 	}
 	return b, err
