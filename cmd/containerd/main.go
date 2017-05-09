@@ -14,6 +14,7 @@ import (
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	gocontext "golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd"
@@ -419,8 +420,10 @@ func interceptor(ctx gocontext.Context,
 		ctx = log.WithModule(ctx, "rootfs")
 	case imagesapi.ImagesServer:
 		ctx = log.WithModule(ctx, "images")
+	case grpc_health_v1.HealthServer:
+		// No need to change the context
 	default:
-		fmt.Printf("unknown GRPC server type: %#v\n", info.Server)
+		log.G(ctx).Warnf("unknown GRPC server type: %#v\n", info.Server)
 	}
 	return grpc_prometheus.UnaryServerInterceptor(ctx, req, info, handler)
 }
