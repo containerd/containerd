@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/crosbymichael/console"
+	"github.com/containerd/console"
 )
 
 type process interface {

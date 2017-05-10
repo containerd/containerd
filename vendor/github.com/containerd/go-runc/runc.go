@@ -1,6 +1,7 @@
 package runc
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -36,6 +37,7 @@ type Runc struct {
 	Log          string
 	LogFormat    Format
 	PdeathSignal syscall.Signal
+	Criu         string
 }
 
 // List returns all containers created inside the provided runc root directory
@@ -348,6 +350,160 @@ func (r *Runc) Ps(context context.Context, id string) ([]int, error) {
 	return pids, nil
 }
 
+type CheckpointOpts struct {
+	// ImagePath is the path for saving the criu image file
+	ImagePath string
+	// WorkDir is the working directory for criu
+	WorkDir string
+	// ParentPath is the path for previous image files from a pre-dump
+	ParentPath string
+	// AllowOpenTCP allows open tcp connections to be checkpointed
+	AllowOpenTCP bool
+	// AllowExternalUnixSockets allows external unix sockets to be checkpointed
+	AllowExternalUnixSockets bool
+	// AllowTerminal allows the terminal(pty) to be checkpointed with a container
+	AllowTerminal bool
+	// CriuPageServer is the address:port for the criu page server
+	CriuPageServer string
+	// FileLocks handle file locks held by the container
+	FileLocks bool
+	// Cgroups is the cgroup mode for how to handle the checkpoint of a container's cgroups
+	Cgroups CgroupMode
+	// EmptyNamespaces creates a namespace for the container but does not save its properties
+	// Provide the namespaces you wish to be checkpointed without their settings on restore
+	EmptyNamespaces []string
+}
+
+type CgroupMode string
+
+const (
+	Soft   CgroupMode = "soft"
+	Full   CgroupMode = "full"
+	Strict CgroupMode = "strict"
+)
+
+func (o *CheckpointOpts) args() (out []string) {
+	if o.ImagePath != "" {
+		out = append(out, "--image-path", o.ImagePath)
+	}
+	if o.WorkDir != "" {
+		out = append(out, "--work-path", o.WorkDir)
+	}
+	if o.ParentPath != "" {
+		out = append(out, "--parent-path", o.ParentPath)
+	}
+	if o.AllowOpenTCP {
+		out = append(out, "--tcp-established")
+	}
+	if o.AllowExternalUnixSockets {
+		out = append(out, "--ext-unix-sk")
+	}
+	if o.AllowTerminal {
+		out = append(out, "--shell-job")
+	}
+	if o.CriuPageServer != "" {
+		out = append(out, "--page-server", o.CriuPageServer)
+	}
+	if o.FileLocks {
+		out = append(out, "--file-locks")
+	}
+	if string(o.Cgroups) != "" {
+		out = append(out, "--manage-cgroups-mode", string(o.Cgroups))
+	}
+	for _, ns := range o.EmptyNamespaces {
+		out = append(out, "--empty-ns", ns)
+	}
+	return out
+}
+
+type CheckpointAction func([]string) []string
+
+// LeaveRunning keeps the container running after the checkpoint has been completed
+func LeaveRunning(args []string) []string {
+	return append(args, "--leave-running")
+}
+
+// PreDump allows a pre-dump of the checkpoint to be made and completed later
+func PreDump(args []string) []string {
+	return append(args, "--pre-dump")
+}
+
+// Checkpoint allows you to checkpoint a container using criu
+func (r *Runc) Checkpoint(context context.Context, id string, opts *CheckpointOpts, actions ...CheckpointAction) error {
+	args := []string{"checkpoint"}
+	if opts != nil {
+		args = append(args, opts.args()...)
+	}
+	for _, a := range actions {
+		args = a(args)
+	}
+	return r.runOrError(r.command(context, append(args, id)...))
+}
+
+type RestoreOpts struct {
+	CheckpointOpts
+	IO
+
+	Detach      bool
+	PidFile     string
+	NoSubreaper bool
+	NoPivot     bool
+}
+
+func (o *RestoreOpts) args() ([]string, error) {
+	out := o.CheckpointOpts.args()
+	if o.Detach {
+		out = append(out, "--detach")
+	}
+	if o.PidFile != "" {
+		abs, err := filepath.Abs(o.PidFile)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, "--pid-file", abs)
+	}
+	if o.NoPivot {
+		out = append(out, "--no-pivot")
+	}
+	if o.NoSubreaper {
+		out = append(out, "-no-subreaper")
+	}
+	return out, nil
+}
+
+// Restore restores a container with the provide id from an existing checkpoint
+func (r *Runc) Restore(context context.Context, id, bundle string, opts *RestoreOpts) (int, error) {
+	args := []string{"restore"}
+	if opts != nil {
+		oargs, err := opts.args()
+		if err != nil {
+			return -1, err
+		}
+		args = append(args, oargs...)
+	}
+	args = append(args, "--bundle", bundle)
+	cmd := r.command(context, append(args, id)...)
+	if opts != nil {
+		opts.Set(cmd)
+	}
+	if err := Monitor.Start(cmd); err != nil {
+		return -1, err
+	}
+	return Monitor.Wait(cmd)
+}
+
+// Update updates the current container with the provided resource spec
+func (r *Runc) Update(context context.Context, id string, resources *specs.LinuxResources) error {
+	buf := bytes.NewBuffer(nil)
+	if err := json.NewEncoder(buf).Encode(resources); err != nil {
+		return err
+	}
+	args := []string{"update", "--resources", "-", id}
+	cmd := r.command(context, args...)
+	cmd.Stdin = buf
+	return r.runOrError(cmd)
+}
+
 func (r *Runc) args() (out []string) {
 	if r.Root != "" {
 		out = append(out, "--root", r.Root)
@@ -360,6 +516,9 @@ func (r *Runc) args() (out []string) {
 	}
 	if r.LogFormat != none {
 		out = append(out, "--log-format", string(r.LogFormat))
+	}
+	if r.Criu != "" {
+		out = append(out, "--criu", r.Criu)
 	}
 	return out
 }

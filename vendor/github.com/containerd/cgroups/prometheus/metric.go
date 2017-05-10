@@ -1,7 +1,7 @@
 package prometheus
 
 import (
-	"github.com/crosbymichael/cgroups"
+	"github.com/containerd/cgroups"
 	metrics "github.com/docker/go-metrics"
 	"github.com/prometheus/client_golang/prometheus"
 )

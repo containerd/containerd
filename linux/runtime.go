@@ -17,7 +17,7 @@ import (
 	"github.com/containerd/containerd/api/types/mount"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
-	runc "github.com/crosbymichael/go-runc"
+	runc "github.com/containerd/go-runc"
 
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"

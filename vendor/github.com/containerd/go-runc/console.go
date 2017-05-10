@@ -4,10 +4,12 @@ package runc
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
 	"path/filepath"
 
-	"github.com/crosbymichael/console"
+	"github.com/containerd/console"
 	"github.com/opencontainers/runc/libcontainer/utils"
 )
 
@@ -28,10 +30,33 @@ func NewConsoleSocket(path string) (*Socket, error) {
 	}, nil
 }
 
+// NewTempConsoleSocket returns a temp console socket for use with a container
+// On Close(), the socket is deleted
+func NewTempConsoleSocket() (*Socket, error) {
+	dir, err := ioutil.TempDir("", "pty")
+	if err != nil {
+		return nil, err
+	}
+	abs, err := filepath.Abs(filepath.Join(dir, "pty.sock"))
+	if err != nil {
+		return nil, err
+	}
+	l, err := net.Listen("unix", abs)
+	if err != nil {
+		return nil, err
+	}
+	return &Socket{
+		l:     l,
+		rmdir: true,
+		path:  abs,
+	}, nil
+}
+
 // Socket is a unix socket that accepts the pty master created by runc
 type Socket struct {
-	path string
-	l    net.Listener
+	path  string
+	rmdir bool
+	l     net.Listener
 }
 
 // Path returns the path to the unix socket on disk
@@ -63,5 +88,11 @@ func (c *Socket) ReceiveMaster() (console.Console, error) {
 
 // Close closes the unix socket
 func (c *Socket) Close() error {
-	return c.l.Close()
+	err := c.l.Close()
+	if c.rmdir {
+		if rerr := os.RemoveAll(filepath.Dir(c.path)); err == nil {
+			err = rerr
+		}
+	}
+	return err
 }

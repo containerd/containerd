@@ -19,8 +19,8 @@ import (
 	"google.golang.org/grpc/grpclog"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/containerd/console"
 	"github.com/containerd/containerd/api/services/shim"
-	"github.com/crosbymichael/console"
 	protobuf "github.com/gogo/protobuf/types"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"

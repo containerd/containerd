@@ -9,9 +9,9 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/crosbymichael/console"
-	runc "github.com/crosbymichael/go-runc"
-	"github.com/tonistiigi/fifo"
+	"github.com/containerd/console"
+	"github.com/containerd/fifo"
+	runc "github.com/containerd/go-runc"
 )
 
 func copyConsole(ctx context.Context, console console.Console, stdin, stdout, stderr string, wg, cwg *sync.WaitGroup) error {

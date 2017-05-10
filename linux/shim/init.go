@@ -13,11 +13,11 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/containerd/console"
 	"github.com/containerd/containerd"
 	shimapi "github.com/containerd/containerd/api/services/shim"
-	"github.com/crosbymichael/console"
-	runc "github.com/crosbymichael/go-runc"
-	"github.com/tonistiigi/fifo"
+	"github.com/containerd/fifo"
+	runc "github.com/containerd/go-runc"
 )
 
 type initProcess struct {

@@ -8,10 +8,10 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/containerd/console"
 	shimapi "github.com/containerd/containerd/api/services/shim"
 	"github.com/containerd/containerd/api/types/container"
 	"github.com/containerd/containerd/reaper"
-	"github.com/crosbymichael/console"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"

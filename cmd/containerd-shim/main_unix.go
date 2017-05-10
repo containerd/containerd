@@ -19,7 +19,7 @@ import (
 	"github.com/containerd/containerd/linux/shim"
 	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/sys"
-	runc "github.com/crosbymichael/go-runc"
+	runc "github.com/containerd/go-runc"
 	"github.com/urfave/cli"
 )
 

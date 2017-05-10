@@ -3,10 +3,10 @@ package cgroups
 import (
 	"time"
 
+	"github.com/containerd/cgroups"
+	"github.com/containerd/cgroups/prometheus"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/plugin"
-	"github.com/crosbymichael/cgroups"
-	"github.com/crosbymichael/cgroups/prometheus"
 	metrics "github.com/docker/go-metrics"
 	"golang.org/x/net/context"
 )
