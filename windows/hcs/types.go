@@ -9,7 +9,7 @@ type Configuration struct {
 
 	Layers []string `json:"layers"`
 
-	TerminateDuration time.Duration `json:"terminateDuration",omitempty`
+	TerminateDuration time.Duration `json:"terminateDuration,omitempty"`
 
 	IgnoreFlushesDuringBoot bool `json:"ignoreFlushesDuringBoot,omitempty"`
 

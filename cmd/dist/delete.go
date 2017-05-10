@@ -22,10 +22,11 @@ var deleteCommand = cli.Command{
 	Flags: []cli.Flag{},
 	Action: func(context *cli.Context) error {
 		var (
-			ctx       = background
 			args      = []string(context.Args())
 			exitError error
 		)
+		ctx, cancel := appContext()
+		defer cancel()
 
 		conn, err := connectGRPC(context)
 		if err != nil {

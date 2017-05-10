@@ -80,7 +80,7 @@ func inReadTransaction(fn testFunc, pf populateFunc) testFunc {
 
 		ctx, tx, err := ms.TransactionContext(ctx, false)
 		if err != nil {
-			t.Fatal("Failed start transaction: %+v", err)
+			t.Fatalf("Failed start transaction: %+v", err)
 		}
 		defer func() {
 			if err := tx.Rollback(); err != nil {
@@ -99,7 +99,7 @@ func inWriteTransaction(fn testFunc) testFunc {
 	return func(ctx context.Context, t *testing.T, ms *MetaStore) {
 		ctx, tx, err := ms.TransactionContext(ctx, true)
 		if err != nil {
-			t.Fatal("Failed to start transaction: %+v", err)
+			t.Fatalf("Failed to start transaction: %+v", err)
 		}
 		defer func() {
 			if t.Failed() {
@@ -108,7 +108,7 @@ func inWriteTransaction(fn testFunc) testFunc {
 				}
 			} else {
 				if err := tx.Commit(); err != nil {
-					t.Fatal("Commit failed: %+v", err)
+					t.Fatalf("Commit failed: %+v", err)
 				}
 			}
 		}()
@@ -311,7 +311,7 @@ func testGetActive(ctx context.Context, t *testing.T, ms *MetaStore) {
 		for key, expected := range activeMap {
 			active, err := GetActive(ctx, key)
 			if err != nil {
-				t.Fatal("Failed to get active: %+v", err)
+				t.Fatalf("Failed to get active: %+v", err)
 			}
 			assert.Equal(t, expected, active)
 		}
@@ -366,7 +366,7 @@ func testCreateActive(ctx context.Context, t *testing.T, ms *MetaStore) {
 		t.Fatal("Returned active identifiers must be unique")
 	}
 	if len(a3.ParentIDs) != 1 {
-		t.Fatal("Expected 1 parent, got %d", len(a3.ParentIDs))
+		t.Fatalf("Expected 1 parent, got %d", len(a3.ParentIDs))
 	}
 	if a3.ParentIDs[0] != commitID {
 		t.Fatal("Expected active parent to be same as commit ID")
@@ -383,7 +383,7 @@ func testCreateActive(ctx context.Context, t *testing.T, ms *MetaStore) {
 		t.Fatal("Returned active identifiers must be unique")
 	}
 	if len(a3.ParentIDs) != 1 {
-		t.Fatal("Expected 1 parent, got %d", len(a3.ParentIDs))
+		t.Fatalf("Expected 1 parent, got %d", len(a3.ParentIDs))
 	}
 	if a3.ParentIDs[0] != commitID {
 		t.Fatal("Expected active parent to be same as commit ID")
@@ -505,7 +505,7 @@ func testRemove(ctx context.Context, t *testing.T, ms *MetaStore) {
 		t.Fatal("Expected remove ID to match create ID")
 	}
 	if k3 != snapshot.KindActive {
-		t.Fatal("Expected active kind, got %v", k3)
+		t.Fatalf("Expected active kind, got %v", k3)
 	}
 
 	r2, k2, err := Remove(ctx, "active-2")
@@ -516,7 +516,7 @@ func testRemove(ctx context.Context, t *testing.T, ms *MetaStore) {
 		t.Fatal("Expected remove ID to match create ID")
 	}
 	if k2 != snapshot.KindActive {
-		t.Fatal("Expected active kind, got %v", k2)
+		t.Fatalf("Expected active kind, got %v", k2)
 	}
 
 	r1, k1, err := Remove(ctx, "committed-1")
@@ -527,7 +527,7 @@ func testRemove(ctx context.Context, t *testing.T, ms *MetaStore) {
 		t.Fatal("Expected remove ID to match commit ID")
 	}
 	if k1 != snapshot.KindCommitted {
-		t.Fatal("Expected committed kind, got %v", k1)
+		t.Fatalf("Expected committed kind, got %v", k1)
 	}
 }
 

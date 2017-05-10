@@ -34,9 +34,8 @@ var rootfsUnpackCommand = cli.Command{
 	ArgsUsage: "[flags] <digest>",
 	Flags:     []cli.Flag{},
 	Action: func(clicontext *cli.Context) error {
-		var (
-			ctx = background
-		)
+		ctx, cancel := appContext()
+		defer cancel()
 
 		dgst, err := digest.Parse(clicontext.Args().First())
 		if err != nil {
@@ -74,9 +73,8 @@ var rootfsPrepareCommand = cli.Command{
 	ArgsUsage: "[flags] <digest> <target>",
 	Flags:     []cli.Flag{},
 	Action: func(clicontext *cli.Context) error {
-		var (
-			ctx = background
-		)
+		ctx, cancel := appContext()
+		defer cancel()
 
 		if clicontext.NArg() != 2 {
 			return cli.ShowSubcommandHelp(clicontext)

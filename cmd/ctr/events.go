@@ -42,6 +42,5 @@ var eventsCommand = cli.Command{
 				return err
 			}
 		}
-		return nil
 	},
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	contextpkg "context"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -28,10 +27,11 @@ var listCommand = cli.Command{
 	},
 	Action: func(context *cli.Context) error {
 		var (
-			ctx   = contextpkg.Background()
 			quiet = context.Bool("quiet")
 			args  = []string(context.Args())
 		)
+		ctx, cancel := appContext()
+		defer cancel()
 
 		cs, err := resolveContentStore(context)
 		if err != nil {

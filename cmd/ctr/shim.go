@@ -285,7 +285,6 @@ var shimEventsCommand = cli.Command{
 			}
 			fmt.Printf("type=%s id=%s pid=%d status=%d\n", e.Type, e.ID, e.Pid, e.ExitStatus)
 		}
-		return nil
 	},
 }
 

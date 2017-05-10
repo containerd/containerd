@@ -1,7 +1,6 @@
 package main
 
 import (
-	contextpkg "context"
 	"io"
 	"os"
 
@@ -18,25 +17,13 @@ var fetchObjectCommand = cli.Command{
 	Usage:       "retrieve objects from a remote",
 	ArgsUsage:   "[flags] <remote> <object> [<hint>, ...]",
 	Description: `Fetch objects by identifier from a remote.`,
-	Flags: append([]cli.Flag{
-		cli.DurationFlag{
-			Name:   "timeout",
-			Usage:  "total timeout for fetch",
-			EnvVar: "CONTAINERD_FETCH_TIMEOUT",
-		},
-	}, registryFlags...),
+	Flags:       registryFlags,
 	Action: func(context *cli.Context) error {
 		var (
-			ctx     = background
-			timeout = context.Duration("timeout")
-			ref     = context.Args().First()
+			ref = context.Args().First()
 		)
-
-		if timeout > 0 {
-			var cancel func()
-			ctx, cancel = contextpkg.WithTimeout(ctx, timeout)
-			defer cancel()
-		}
+		ctx, cancel := appContext()
+		defer cancel()
 
 		resolver, err := getResolver(ctx, context)
 		if err != nil {

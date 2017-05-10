@@ -363,8 +363,6 @@ func parents(bkt *bolt.Bucket, parent *db.Snapshot) (parents []string, err error
 		}
 		parent = &ps
 	}
-
-	return
 }
 
 func getSnapshot(bkt *bolt.Bucket, key string, ss *db.Snapshot) error {

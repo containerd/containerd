@@ -4,6 +4,7 @@ import (
 	contextpkg "context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd"
@@ -11,7 +12,7 @@ import (
 )
 
 var (
-	background = contextpkg.Background()
+	timeout time.Duration
 )
 
 func init() {
@@ -19,6 +20,14 @@ func init() {
 		fmt.Println(c.App.Name, containerd.Package, c.App.Version)
 	}
 
+}
+
+func appContext() (contextpkg.Context, contextpkg.CancelFunc) {
+	background := contextpkg.Background()
+	if timeout > 0 {
+		return contextpkg.WithTimeout(background, timeout)
+	}
+	return contextpkg.WithCancel(background)
 }
 
 func main() {
@@ -70,16 +79,9 @@ distribution tool
 		rootfsCommand,
 	}
 	app.Before = func(context *cli.Context) error {
-		var (
-			debug   = context.GlobalBool("debug")
-			timeout = context.GlobalDuration("timeout")
-		)
-		if debug {
+		timeout = context.GlobalDuration("timeout")
+		if context.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
-		}
-
-		if timeout > 0 {
-			background, _ = contextpkg.WithTimeout(background, timeout)
 		}
 		return nil
 	}

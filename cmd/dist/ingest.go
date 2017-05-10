@@ -1,7 +1,6 @@
 package main
 
 import (
-	contextpkg "context"
 	"os"
 
 	contentapi "github.com/containerd/containerd/api/services/content"
@@ -29,14 +28,12 @@ var ingestCommand = cli.Command{
 	},
 	Action: func(context *cli.Context) error {
 		var (
-			ctx            = background
-			cancel         func()
 			ref            = context.Args().First()
 			expectedSize   = context.Int64("expected-size")
 			expectedDigest = digest.Digest(context.String("expected-digest"))
 		)
 
-		ctx, cancel = contextpkg.WithCancel(ctx)
+		ctx, cancel := appContext()
 		defer cancel()
 
 		if err := expectedDigest.Validate(); expectedDigest != "" && err != nil {

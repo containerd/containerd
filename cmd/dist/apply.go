@@ -1,7 +1,6 @@
 package main
 
 import (
-	contextpkg "context"
 	"os"
 
 	"github.com/containerd/containerd/archive"
@@ -17,9 +16,10 @@ var applyCommand = cli.Command{
 	Flags:     []cli.Flag{},
 	Action: func(context *cli.Context) error {
 		var (
-			ctx = contextpkg.Background()
 			dir = context.Args().First()
 		)
+		ctx, cancel := appContext()
+		defer cancel()
 
 		log.G(ctx).Info("applying layer from stdin")
 

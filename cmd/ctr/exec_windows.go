@@ -29,11 +29,11 @@ func newExecRequest(context *cli.Context, tmpDir, id string) (*execution.ExecReq
 			Value:   data,
 		},
 		Terminal: context.Bool("tty"),
-		Stdin:    fmt.Sprintf(`%s\ctr-%s-stdin-`, pipeRoot, id, now),
-		Stdout:   fmt.Sprintf(`%s\ctr-%s-stdout-`, pipeRoot, id, now),
+		Stdin:    fmt.Sprintf(`%s\ctr-%s-stdin-%d`, pipeRoot, id, now),
+		Stdout:   fmt.Sprintf(`%s\ctr-%s-stdout-%d`, pipeRoot, id, now),
 	}
 	if !request.Terminal {
-		request.Stderr = fmt.Sprintf(`%s\ctr-%s-stderr-`, pipeRoot, id, now)
+		request.Stderr = fmt.Sprintf(`%s\ctr-%s-stderr-%d`, pipeRoot, id, now)
 	}
 
 	return request, nil
