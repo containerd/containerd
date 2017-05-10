@@ -7,51 +7,69 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/btrfs"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/mountinfo"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/snapshot/storage"
 	"github.com/pkg/errors"
 )
 
-type btrfsConfig struct {
-	Device string `toml:"device"`
-}
-
 func init() {
 	plugin.Register("snapshot-btrfs", &plugin.Registration{
-		Type:   plugin.SnapshotPlugin,
-		Config: &btrfsConfig{},
+		Type: plugin.SnapshotPlugin,
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
 			root := filepath.Join(ic.Root, "snapshot", "btrfs")
-			conf := ic.Config.(*btrfsConfig)
-			if conf.Device == "" {
-				// TODO: check device for root
-				return nil, errors.Errorf("btrfs requires \"device\" configuration")
-			}
-			return NewSnapshotter(conf.Device, root)
+			return NewSnapshotter(root)
 		},
 	})
 }
 
 type snapshotter struct {
-	device string // maybe we can resolve it with path?
+	device string // device of the root
 	root   string // root provides paths for internal storage.
 	ms     *storage.MetaStore
 }
 
+func getBtrfsDevice(root string, mounts []mountinfo.Info) (string, error) {
+	device := ""
+	deviceMountpoint := ""
+	for _, info := range mounts {
+		if (info.Root == "/" || info.Root == "") && strings.HasPrefix(root, info.Mountpoint) {
+			if info.FSType == "btrfs" && len(info.Mountpoint) > len(deviceMountpoint) {
+				device = info.Source
+				deviceMountpoint = info.Mountpoint
+			}
+			if root == info.Mountpoint && info.FSType != "btrfs" {
+				return "", fmt.Errorf("%s needs to be btrfs, but seems %s", root, info.FSType)
+			}
+		}
+	}
+	if device == "" {
+		// TODO: automatically mount loopback device here?
+		return "", fmt.Errorf("%s is not mounted as btrfs", root)
+	}
+	return device, nil
+}
+
 // NewSnapshotter returns a Snapshotter using btrfs. Uses the provided
-// device and root directory for snapshots and stores the metadata in
+// root directory for snapshots and stores the metadata in
 // a file in the provided root.
-func NewSnapshotter(device, root string) (snapshot.Snapshotter, error) {
-	if err := os.MkdirAll(root, 0700); err != nil {
+// root needs to be a mount point of btrfs.
+func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
+	mounts, err := mountinfo.Self()
+	if err != nil {
 		return nil, err
 	}
-
+	device, err := getBtrfsDevice(root, mounts)
+	if err != nil {
+		return nil, err
+	}
 	var (
 		active    = filepath.Join(root, "active")
 		snapshots = filepath.Join(root, "snapshots")
@@ -193,7 +211,7 @@ func (b *snapshotter) mounts(dir string) ([]containerd.Mount, error) {
 	return []containerd.Mount{
 		{
 			Type:   "btrfs",
-			Source: b.device, // device?
+			Source: b.device,
 			// NOTE(stevvooe): While it would be nice to use to uuids for
 			// mounts, they don't work reliably if the uuids are missing.
 			Options: options,
