@@ -86,20 +86,22 @@ func newExecProcess(context context.Context, path string, r *shimapi.ExecRequest
 		e.closers = append(e.closers, sc)
 		e.stdin = sc
 	}
+	var copyWaitGroup sync.WaitGroup
 	if socket != nil {
 		console, err := socket.ReceiveMaster()
 		if err != nil {
 			return nil, err
 		}
 		e.console = console
-		if err := copyConsole(context, console, r.Stdin, r.Stdout, r.Stderr, &e.WaitGroup); err != nil {
+		if err := copyConsole(context, console, r.Stdin, r.Stdout, r.Stderr, &e.WaitGroup, &copyWaitGroup); err != nil {
 			return nil, err
 		}
 	} else {
-		if err := copyPipes(context, io, r.Stdin, r.Stdout, r.Stderr, &e.WaitGroup); err != nil {
+		if err := copyPipes(context, io, r.Stdin, r.Stdout, r.Stderr, &e.WaitGroup, &copyWaitGroup); err != nil {
 			return nil, err
 		}
 	}
+	copyWaitGroup.Wait()
 	pid, err := runc.ReadPidFile(opts.PidFile)
 	if err != nil {
 		return nil, err
