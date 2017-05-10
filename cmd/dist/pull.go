@@ -116,6 +116,7 @@ command. As part of this process, we do the following:
 			}
 
 			provider := contentservice.NewProviderFromClient(contentapi.NewContentClient(conn))
+			image.Provider = provider
 
 			p, err := content.ReadBlob(ctx, provider, image.Target.Digest)
 			if err != nil {
@@ -135,7 +136,7 @@ command. As part of this process, we do the following:
 				log.G(ctx).Fatal(err)
 			}
 
-			diffIDs, err := image.RootFS(ctx, provider)
+			diffIDs, err := image.RootFS(ctx)
 			if err != nil {
 				log.G(ctx).WithError(err).Fatal("failed resolving rootfs")
 			}

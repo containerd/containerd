@@ -16,6 +16,7 @@ import (
 type Image struct {
 	Name   string
 	Target ocispec.Descriptor
+	content.Provider
 }
 
 // TODO(stevvooe): Many of these functions make strong platform assumptions,
@@ -26,12 +27,12 @@ type Image struct {
 //
 // The caller can then use the descriptor to resolve and process the
 // configuration of the image.
-func (image *Image) Config(ctx context.Context, provider content.Provider) (ocispec.Descriptor, error) {
+func (image *Image) Config(ctx context.Context) (ocispec.Descriptor, error) {
 	var configDesc ocispec.Descriptor
 	return configDesc, Walk(ctx, HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		switch image.Target.MediaType {
 		case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
-			rc, err := provider.Reader(ctx, image.Target.Digest)
+			rc, err := image.Provider.Reader(ctx, image.Target.Digest)
 			if err != nil {
 				return nil, err
 			}
@@ -61,13 +62,13 @@ func (image *Image) Config(ctx context.Context, provider content.Provider) (ocis
 //
 // These are used to verify that a set of layers unpacked to the expected
 // values.
-func (image *Image) RootFS(ctx context.Context, provider content.Provider) ([]digest.Digest, error) {
-	desc, err := image.Config(ctx, provider)
+func (image *Image) RootFS(ctx context.Context) ([]digest.Digest, error) {
+	desc, err := image.Config(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	p, err := content.ReadBlob(ctx, provider, desc.Digest)
+	p, err := content.ReadBlob(ctx, image.Provider, desc.Digest)
 	if err != nil {
 		log.G(ctx).Fatal(err)
 	}
@@ -88,13 +89,13 @@ func (image *Image) RootFS(ctx context.Context, provider content.Provider) ([]di
 }
 
 // Size returns the total size of an image's packed resources.
-func (image *Image) Size(ctx context.Context, provider content.Provider) (int64, error) {
+func (image *Image) Size(ctx context.Context) (int64, error) {
 	var size int64
 	return size, Walk(ctx, HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		switch image.Target.MediaType {
 		case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
 			size += desc.Size
-			rc, err := provider.Reader(ctx, image.Target.Digest)
+			rc, err := image.Provider.Reader(ctx, image.Target.Digest)
 			if err != nil {
 				return nil, err
 			}

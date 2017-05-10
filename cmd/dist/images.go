@@ -45,7 +45,8 @@ var imagesListCommand = cli.Command{
 		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
 		fmt.Fprintln(tw, "REF\tTYPE\tDIGEST\tSIZE\t")
 		for _, image := range images {
-			size, err := image.Size(ctx, provider)
+			image.Provider = provider
+			size, err := image.Size(ctx)
 			if err != nil {
 				log.G(ctx).WithError(err).Errorf("failed calculating size for image %s", image.Name)
 			}
