@@ -62,6 +62,7 @@ var editCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		defer nrc.Close()
 
 		wr, err := ingester.Writer(ctx, "edit-"+object, 0, "") // TODO(stevvooe): Choose a better key?
 		if err != nil {
@@ -109,5 +110,28 @@ func edit(rd io.Reader) (io.ReadCloser, error) {
 		return nil, err
 	}
 
-	return tmp, nil
+	return onCloser{ReadCloser: tmp, onClose: func() error {
+		return os.RemoveAll(tmp.Name())
+	}}, nil
+}
+
+type onCloser struct {
+	io.ReadCloser
+	onClose func() error
+}
+
+func (oc onCloser) Close() error {
+	var err error
+	if err1 := oc.ReadCloser.Close(); err1 != nil {
+		err = err1
+	}
+
+	if oc.onClose != nil {
+		err1 := oc.onClose()
+		if err == nil {
+			err = err1
+		}
+	}
+
+	return err
 }
