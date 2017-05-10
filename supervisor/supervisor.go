@@ -333,8 +333,10 @@ func (s *Supervisor) restore() error {
 			continue
 		}
 		processes, err := container.Processes()
-		if err != nil {
-			return err
+		if err != nil || len(processes) == 0 {
+			logrus.WithFields(logrus.Fields{"error": err, "id": id}).Warnf("containerd: container has no process running,removing state directory.")
+			os.RemoveAll(filepath.Join(s.stateDir, id))
+			continue
 		}
 
 		ContainersCounter.Inc(1)
