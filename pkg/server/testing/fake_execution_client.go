@@ -28,11 +28,17 @@ import (
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 )
 
-type calledDetail struct {
-	name     string
-	argument interface{}
+var containerNotExistError = grpc.Errorf(codes.Unknown, containerd.ErrContainerNotExist.Error())
+
+// CalledDetail is the struct contains called function name and arguments.
+type CalledDetail struct {
+	// Name of the function called.
+	Name string
+	// Argument of the function called.
+	Argument interface{}
 }
 
 var _ execution.ContainerService_EventsClient = &EventClient{}
@@ -53,7 +59,7 @@ func (cli *EventClient) Recv() (*container.Event, error) {
 // can be run for testing without requiring a real containerd setup.
 type FakeExecutionClient struct {
 	sync.Mutex
-	called        []calledDetail
+	called        []CalledDetail
 	errors        map[string]error
 	ContainerList map[string]container.Container
 	eventsQueue   chan *container.Event
@@ -133,7 +139,7 @@ func (f *FakeExecutionClient) sendEvent(event *container.Event) {
 }
 
 func (f *FakeExecutionClient) appendCalled(name string, argument interface{}) {
-	call := calledDetail{name: name, argument: argument}
+	call := CalledDetail{Name: name, Argument: argument}
 	f.called = append(f.called, call)
 }
 
@@ -143,9 +149,26 @@ func (f *FakeExecutionClient) GetCalledNames() []string {
 	defer f.Unlock()
 	names := []string{}
 	for _, detail := range f.called {
-		names = append(names, detail.name)
+		names = append(names, detail.Name)
 	}
 	return names
+}
+
+// GetCalledDetails get detail of each call.
+func (f *FakeExecutionClient) GetCalledDetails() []CalledDetail {
+	f.Lock()
+	defer f.Unlock()
+	// Copy the list and return.
+	return append([]CalledDetail{}, f.called...)
+}
+
+// SetFakeContainers injects fake containers.
+func (f *FakeExecutionClient) SetFakeContainers(containers []container.Container) {
+	f.Lock()
+	defer f.Unlock()
+	for _, c := range containers {
+		f.ContainerList[c.ID] = c
+	}
 }
 
 // Create is a test implementation of execution.Create.
@@ -187,7 +210,7 @@ func (f *FakeExecutionClient) Start(ctx context.Context, startOpts *execution.St
 	}
 	c, ok := f.ContainerList[startOpts.ID]
 	if !ok {
-		return nil, containerd.ErrContainerNotExist
+		return nil, containerNotExistError
 	}
 	f.sendEvent(&container.Event{
 		ID:   c.ID,
@@ -197,6 +220,7 @@ func (f *FakeExecutionClient) Start(ctx context.Context, startOpts *execution.St
 	switch c.Status {
 	case container.Status_CREATED:
 		c.Status = container.Status_RUNNING
+		f.ContainerList[startOpts.ID] = c
 		return &google_protobuf.Empty{}, nil
 	case container.Status_STOPPED:
 		return &google_protobuf.Empty{}, fmt.Errorf("cannot start a container that has stopped")
@@ -217,7 +241,7 @@ func (f *FakeExecutionClient) Delete(ctx context.Context, deleteOpts *execution.
 	}
 	c, ok := f.ContainerList[deleteOpts.ID]
 	if !ok {
-		return nil, containerd.ErrContainerNotExist
+		return nil, containerNotExistError
 	}
 	delete(f.ContainerList, deleteOpts.ID)
 	f.sendEvent(&container.Event{
@@ -238,7 +262,7 @@ func (f *FakeExecutionClient) Info(ctx context.Context, infoOpts *execution.Info
 	}
 	c, ok := f.ContainerList[infoOpts.ID]
 	if !ok {
-		return nil, containerd.ErrContainerNotExist
+		return nil, containerNotExistError
 	}
 	return &c, nil
 }
@@ -272,9 +296,10 @@ func (f *FakeExecutionClient) Kill(ctx context.Context, killOpts *execution.Kill
 	}
 	c, ok := f.ContainerList[killOpts.ID]
 	if !ok {
-		return nil, containerd.ErrContainerNotExist
+		return nil, containerNotExistError
 	}
 	c.Status = container.Status_STOPPED
+	f.ContainerList[killOpts.ID] = c
 	f.sendEvent(&container.Event{
 		ID:   c.ID,
 		Type: container.Event_EXIT,
