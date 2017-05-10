@@ -26,8 +26,8 @@ import (
 )
 
 const (
-	rwm        = "rwm"
-	rootfsPath = "rootfs"
+	rwm               = "rwm"
+	defaultRootfsPath = "rootfs"
 )
 
 var capabilities = []string{
@@ -47,7 +47,7 @@ var capabilities = []string{
 	"CAP_AUDIT_WRITE",
 }
 
-func spec(id string, config *ocispec.ImageConfig, context *cli.Context) (*specs.Spec, error) {
+func spec(id string, config *ocispec.ImageConfig, context *cli.Context, rootfs string) (*specs.Spec, error) {
 	env := []string{
 		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 	}
@@ -92,6 +92,9 @@ func spec(id string, config *ocispec.ImageConfig, context *cli.Context) (*specs.
 	if cwd == "" {
 		cwd = "/"
 	}
+	if rootfs == "" {
+		rootfs = defaultRootfsPath
+	}
 	s := &specs.Spec{
 		Version: specs.Version,
 		Platform: specs.Platform{
@@ -99,7 +102,7 @@ func spec(id string, config *ocispec.ImageConfig, context *cli.Context) (*specs.
 			Arch: runtime.GOARCH,
 		},
 		Root: specs.Root{
-			Path:     rootfsPath,
+			Path:     rootfs,
 			Readonly: context.Bool("readonly"),
 		},
 		Process: specs.Process{
@@ -232,9 +235,9 @@ func customSpec(configPath string, rootfs string) (*specs.Spec, error) {
 		return nil, err
 	}
 	if rootfs == "" {
-		if s.Root.Path != rootfsPath {
-			logrus.Warnf("ignoring Root.Path %q, setting %q forcibly", s.Root.Path, rootfsPath)
-			s.Root.Path = rootfsPath
+		if s.Root.Path != defaultRootfsPath {
+			logrus.Warnf("ignoring Root.Path %q, setting %q forcibly", s.Root.Path, defaultRootfsPath)
+			s.Root.Path = defaultRootfsPath
 		}
 	} else {
 		s.Root.Path = rootfs
@@ -245,7 +248,7 @@ func customSpec(configPath string, rootfs string) (*specs.Spec, error) {
 func getConfig(context *cli.Context, imageConfig *ocispec.ImageConfig, rootfs string) (*specs.Spec, error) {
 	config := context.String("runtime-config")
 	if config == "" {
-		return spec(context.String("id"), imageConfig, context)
+		return spec(context.String("id"), imageConfig, context, rootfs)
 	}
 
 	return customSpec(config, rootfs)
