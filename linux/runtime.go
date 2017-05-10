@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -192,7 +193,9 @@ func (r *Runtime) forward(events shim.Shim_EventsClient) {
 	for {
 		e, err := events.Recv()
 		if err != nil {
-			log.G(r.eventsContext).WithError(err).Error("get event from shim")
+			if !strings.HasSuffix(err.Error(), "transport is closing") {
+				log.G(r.eventsContext).WithError(err).Error("get event from shim")
+			}
 			return
 		}
 		var et containerd.EventType
