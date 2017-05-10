@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd/sys"
+	"github.com/pkg/errors"
 )
 
 // Reap should be called when the process receives an SIGCHLD.  Reap will reap
@@ -57,10 +58,8 @@ func (m *Monitor) CombinedOutput(c *exec.Cmd) ([]byte, error) {
 	var b bytes.Buffer
 	c.Stdout = &b
 	c.Stderr = &b
-	if err := m.Run(c); err != nil {
-		return nil, err
-	}
-	return b.Bytes(), nil
+	err := m.Run(c)
+	return b.Bytes(), err
 }
 
 // Start starts the command a registers the process with the reaper
@@ -111,7 +110,11 @@ func (m *Monitor) WaitPid(pid int) (int, error) {
 	if !ok {
 		return 255, fmt.Errorf("process does not exist")
 	}
-	return <-rc.ExitCh, nil
+	ec := <-rc.ExitCh
+	if ec != 0 {
+		return ec, errors.Errorf("exit status %d", ec)
+	}
+	return ec, nil
 }
 
 type Cmd struct {
