@@ -49,7 +49,7 @@ func testSupportsDType(t *testing.T, expected bool, mkfsCommand string, mkfsArg 
 		t.Log(string(out))
 	}
 	if err != nil {
-		t.Fatal(err)
+		t.Skip("skipping the test because %s failed. This is probably your %s is an unsupported version.", mkfsCommand, mkfsCommand)
 	}
 
 	// loopback-mount the image.
@@ -87,5 +87,5 @@ func TestSupportsDTypeWithFType1XFS(t *testing.T) {
 }
 
 func TestSupportsDTypeWithExt4(t *testing.T) {
-	testSupportsDType(t, true, "mkfs.ext4")
+	testSupportsDType(t, true, "mkfs.ext4", "-F")
 }
