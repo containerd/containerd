@@ -36,17 +36,17 @@ type snapshotter struct {
 	ms     *storage.MetaStore
 }
 
-func getBtrfsDevice(root string, mounts []*mountinfo.Info) (string, error) {
+func getBtrfsDevice(root string, mounts []mountinfo.Info) (string, error) {
 	device := ""
 	deviceMountpoint := ""
 	for _, info := range mounts {
 		if (info.Root == "/" || info.Root == "") && strings.HasPrefix(root, info.Mountpoint) {
-			if info.Fstype == "btrfs" && len(info.Mountpoint) > len(deviceMountpoint) {
+			if info.FSType == "btrfs" && len(info.Mountpoint) > len(deviceMountpoint) {
 				device = info.Source
 				deviceMountpoint = info.Mountpoint
 			}
-			if root == info.Mountpoint && info.Fstype != "btrfs" {
-				return "", fmt.Errorf("%s needs to be btrfs, but seems %s", root, info.Fstype)
+			if root == info.Mountpoint && info.FSType != "btrfs" {
+				return "", fmt.Errorf("%s needs to be btrfs, but seems %s", root, info.FSType)
 			}
 		}
 	}
@@ -62,7 +62,7 @@ func getBtrfsDevice(root string, mounts []*mountinfo.Info) (string, error) {
 // a file in the provided root.
 // root needs to be a mount point of btrfs.
 func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
-	mounts, err := mountinfo.GetMounts()
+	mounts, err := mountinfo.Self()
 	if err != nil {
 		return nil, err
 	}

@@ -463,14 +463,14 @@ func TestParseFedoraMountinfoFields(t *testing.T) {
 		Minor:      3,
 		Root:       "/",
 		Mountpoint: "/proc",
-		Opts:       "rw,nosuid,nodev,noexec,relatime",
+		Options:    "rw,nosuid,nodev,noexec,relatime",
 		Optional:   "shared:5",
-		Fstype:     "proc",
+		FSType:     "proc",
 		Source:     "proc",
-		VfsOpts:    "rw",
+		VFSOptions: "rw",
 	}
 
-	if *infos[0] != mi {
+	if infos[0] != mi {
 		t.Fatalf("expected %#v, got %#v", mi, infos[0])
 	}
 }

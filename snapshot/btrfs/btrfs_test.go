@@ -222,45 +222,45 @@ func TestGetBtrfsDevice(t *testing.T) {
 		expectedDevice string
 		expectedError  string
 		root           string
-		mounts         []*mountinfo.Info
+		mounts         []mountinfo.Info
 	}{
 		{
 			expectedDevice: "/dev/loop0",
 			root:           "/var/lib/containerd/snapshot/btrfs",
-			mounts: []*mountinfo.Info{
-				{Root: "/", Mountpoint: "/", Fstype: "ext4", Source: "/dev/sda1"},
-				{Root: "/", Mountpoint: "/var/lib/containerd/snapshot/btrfs", Fstype: "btrfs", Source: "/dev/loop0"},
+			mounts: []mountinfo.Info{
+				{Root: "/", Mountpoint: "/", FSType: "ext4", Source: "/dev/sda1"},
+				{Root: "/", Mountpoint: "/var/lib/containerd/snapshot/btrfs", FSType: "btrfs", Source: "/dev/loop0"},
 			},
 		},
 		{
 			expectedError: "/var/lib/containerd/snapshot/btrfs is not mounted as btrfs",
 			root:          "/var/lib/containerd/snapshot/btrfs",
-			mounts: []*mountinfo.Info{
-				{Root: "/", Mountpoint: "/", Fstype: "ext4", Source: "/dev/sda1"},
+			mounts: []mountinfo.Info{
+				{Root: "/", Mountpoint: "/", FSType: "ext4", Source: "/dev/sda1"},
 			},
 		},
 		{
 			expectedDevice: "/dev/sda1",
 			root:           "/var/lib/containerd/snapshot/btrfs",
-			mounts: []*mountinfo.Info{
-				{Root: "/", Mountpoint: "/", Fstype: "btrfs", Source: "/dev/sda1"},
+			mounts: []mountinfo.Info{
+				{Root: "/", Mountpoint: "/", FSType: "btrfs", Source: "/dev/sda1"},
 			},
 		},
 		{
 			expectedDevice: "/dev/sda2",
 			root:           "/var/lib/containerd/snapshot/btrfs",
-			mounts: []*mountinfo.Info{
-				{Root: "/", Mountpoint: "/", Fstype: "btrfs", Source: "/dev/sda1"},
-				{Root: "/", Mountpoint: "/var/lib/containerd/snapshot/btrfs", Fstype: "btrfs", Source: "/dev/sda2"},
+			mounts: []mountinfo.Info{
+				{Root: "/", Mountpoint: "/", FSType: "btrfs", Source: "/dev/sda1"},
+				{Root: "/", Mountpoint: "/var/lib/containerd/snapshot/btrfs", FSType: "btrfs", Source: "/dev/sda2"},
 			},
 		},
 		{
 			expectedDevice: "/dev/sda2",
 			root:           "/var/lib/containerd/snapshot/btrfs",
-			mounts: []*mountinfo.Info{
-				{Root: "/", Mountpoint: "/var/lib/containerd/snapshot/btrfs", Fstype: "btrfs", Source: "/dev/sda2"},
-				{Root: "/", Mountpoint: "/var/lib/foooooooooooooooooooo/baaaaaaaaaaaaaaaaaaaar", Fstype: "btrfs", Source: "/dev/sda3"}, // mountpoint length longer than /var/lib/containerd/snapshot/btrfs
-				{Root: "/", Mountpoint: "/", Fstype: "btrfs", Source: "/dev/sda1"},
+			mounts: []mountinfo.Info{
+				{Root: "/", Mountpoint: "/var/lib/containerd/snapshot/btrfs", FSType: "btrfs", Source: "/dev/sda2"},
+				{Root: "/", Mountpoint: "/var/lib/foooooooooooooooooooo/baaaaaaaaaaaaaaaaaaaar", FSType: "btrfs", Source: "/dev/sda3"}, // mountpoint length longer than /var/lib/containerd/snapshot/btrfs
+				{Root: "/", Mountpoint: "/", FSType: "btrfs", Source: "/dev/sda1"},
 			},
 		},
 	}

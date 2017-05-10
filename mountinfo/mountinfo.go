@@ -23,23 +23,18 @@ type Info struct {
 	// Mountpoint indicates the mount point relative to the process's root.
 	Mountpoint string
 
-	// Opts represents mount-specific options.
-	Opts string
+	// Options represents mount-specific options.
+	Options string
 
 	// Optional represents optional fields.
 	Optional string
 
-	// Fstype indicates the type of filesystem, such as EXT3.
-	Fstype string
+	// FSType indicates the type of filesystem, such as EXT3.
+	FSType string
 
 	// Source indicates filesystem specific information or "none".
 	Source string
 
-	// VfsOpts represents per super block options.
-	VfsOpts string
-}
-
-// GetMounts retrieves a list of mounts for the current running process.
-func GetMounts() ([]*Info, error) {
-	return parseMountTable()
+	// VFSOptions represents per super block options.
+	VFSOptions string
 }

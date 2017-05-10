@@ -28,9 +28,8 @@ const (
 	mountinfoFormat = "%d %d %d:%d %s %s %s %s"
 )
 
-// Parse /proc/self/mountinfo because comparing Dev and ino does not work from
-// bind mounts
-func parseMountTable() ([]*Info, error) {
+// Self retrieves a list of mounts for the current running process.
+func Self() ([]Info, error) {
 	f, err := os.Open("/proc/self/mountinfo")
 	if err != nil {
 		return nil, err
@@ -40,10 +39,10 @@ func parseMountTable() ([]*Info, error) {
 	return parseInfoFile(f)
 }
 
-func parseInfoFile(r io.Reader) ([]*Info, error) {
+func parseInfoFile(r io.Reader) ([]Info, error) {
 	var (
 		s   = bufio.NewScanner(r)
-		out = []*Info{}
+		out = []Info{}
 	)
 
 	for s.Scan() {
@@ -52,14 +51,14 @@ func parseInfoFile(r io.Reader) ([]*Info, error) {
 		}
 
 		var (
-			p              = &Info{}
+			p              = Info{}
 			text           = s.Text()
 			optionalFields string
 		)
 
 		if _, err := fmt.Sscanf(text, mountinfoFormat,
 			&p.ID, &p.Parent, &p.Major, &p.Minor,
-			&p.Root, &p.Mountpoint, &p.Opts, &optionalFields); err != nil {
+			&p.Root, &p.Mountpoint, &p.Options, &optionalFields); err != nil {
 			return nil, fmt.Errorf("Scanning '%s' failed: %s", text, err)
 		}
 		// Safe as mountinfo encodes mountpoints with spaces as \040.
@@ -73,18 +72,18 @@ func parseInfoFile(r io.Reader) ([]*Info, error) {
 			p.Optional = optionalFields
 		}
 
-		p.Fstype = postSeparatorFields[0]
+		p.FSType = postSeparatorFields[0]
 		p.Source = postSeparatorFields[1]
-		p.VfsOpts = strings.Join(postSeparatorFields[2:], " ")
+		p.VFSOptions = strings.Join(postSeparatorFields[2:], " ")
 		out = append(out, p)
 	}
 	return out, nil
 }
 
-// PidMountInfo collects the mounts for a specific process ID. If the process
-// ID is unknown, it is better to use `GetMounts` which will inspect
+// PID collects the mounts for a specific process ID. If the process
+// ID is unknown, it is better to use `Self` which will inspect
 // "/proc/self/mountinfo" instead.
-func PidMountInfo(pid int) ([]*Info, error) {
+func PID(pid int) ([]Info, error) {
 	f, err := os.Open(fmt.Sprintf("/proc/%d/mountinfo", pid))
 	if err != nil {
 		return nil, err
