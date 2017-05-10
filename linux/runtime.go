@@ -27,23 +27,29 @@ const (
 	runtimeName    = "linux"
 	configFilename = "config.json"
 	defaultRuntime = "runc"
+	defaultShim    = "containerd-shim"
 )
 
 func init() {
 	plugin.Register(runtimeName, &plugin.Registration{
-		Type:   plugin.RuntimePlugin,
-		Init:   New,
-		Config: &Config{},
+		Type: plugin.RuntimePlugin,
+		Init: New,
+		Config: &Config{
+			Shim:    defaultShim,
+			Runtime: defaultRuntime,
+		},
 	})
 }
 
 var _ = (plugin.Runtime)(&Runtime{})
 
 type Config struct {
+	// Shim is a path or name of binary implementing the Shim GRPC API
+	Shim string `toml:"shim,omitempty"`
 	// Runtime is a path or name of an OCI runtime used by the shim
-	Runtime string `toml:"runtime"`
+	Runtime string `toml:"runtime,omitempty"`
 	// NoShim calls runc directly from within the pkg
-	NoShim bool `toml:"no_shim"`
+	NoShim bool `toml:"no_shim,omitempty"`
 }
 
 func New(ic *plugin.InitContext) (interface{}, error) {
@@ -52,13 +58,11 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		return nil, err
 	}
 	cfg := ic.Config.(*Config)
-	if cfg.Runtime == "" {
-		cfg.Runtime = defaultRuntime
-	}
 	c, cancel := context.WithCancel(ic.Context)
 	r := &Runtime{
 		root:          path,
 		remote:        !cfg.NoShim,
+		shim:          cfg.Shim,
 		runtime:       cfg.Runtime,
 		events:        make(chan *containerd.Event, 2048),
 		eventsContext: c,
@@ -72,6 +76,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 
 type Runtime struct {
 	root    string
+	shim    string
 	runtime string
 	remote  bool
 
@@ -86,7 +91,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts)
 	if err != nil {
 		return nil, err
 	}
-	s, err := newShim(path, r.remote)
+	s, err := newShim(r.shim, path, r.remote)
 	if err != nil {
 		os.RemoveAll(path)
 		return nil, err
