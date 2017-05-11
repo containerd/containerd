@@ -45,10 +45,6 @@ type cgroupsMonitor struct {
 }
 
 func (m *cgroupsMonitor) Monitor(c plugin.Container) error {
-	// skip non-linux containers
-	if _, ok := c.(plugin.LinuxContainer); !ok {
-		return nil
-	}
 	id := c.Info().ID
 	state, err := c.State(m.context)
 	if err != nil {
@@ -65,9 +61,6 @@ func (m *cgroupsMonitor) Monitor(c plugin.Container) error {
 }
 
 func (m *cgroupsMonitor) Stop(c plugin.Container) error {
-	if _, ok := c.(plugin.LinuxContainer); !ok {
-		return nil
-	}
 	m.collector.Remove(c.Info().ID)
 	return nil
 }

@@ -28,10 +28,6 @@ type Container interface {
 	CloseStdin(context.Context, uint32) error
 }
 
-type LinuxContainer interface {
-	Container
-}
-
 type ExecOpts struct {
 	Spec []byte
 	IO   IO
