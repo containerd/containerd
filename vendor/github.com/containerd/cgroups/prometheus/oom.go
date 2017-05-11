@@ -6,7 +6,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/crosbymichael/cgroups"
+	"github.com/containerd/cgroups"
 	metrics "github.com/docker/go-metrics"
 )
 

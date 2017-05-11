@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/containerd/console"
 	"github.com/containerd/containerd/api/services/execution"
-	"github.com/crosbymichael/console"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )

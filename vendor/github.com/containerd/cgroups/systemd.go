@@ -1,5 +1,3 @@
-// +build systemd
-
 package cgroups
 
 import (
@@ -19,7 +17,7 @@ const (
 )
 
 func Systemd() ([]Subsystem, error) {
-	root, err := unifiedMountPoint()
+	root, err := v1MountPoint()
 	if err != nil {
 		return nil, err
 	}
@@ -39,8 +37,8 @@ func Slice(slice, name string) Path {
 	if slice == "" {
 		slice = defaultSlice
 	}
-	return func(subsystem Name) string {
-		return filepath.Join(slice, unitName(name))
+	return func(subsystem Name) (string, error) {
+		return filepath.Join(slice, unitName(name)), nil
 	}
 }
 

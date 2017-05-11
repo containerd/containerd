@@ -5,7 +5,7 @@ import (
 
 	shimapi "github.com/containerd/containerd/api/services/shim"
 	"github.com/containerd/containerd/api/types/container"
-	runc "github.com/crosbymichael/go-runc"
+	runc "github.com/containerd/go-runc"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"

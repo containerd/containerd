@@ -30,12 +30,12 @@ type Console interface {
 
 // WinSize specifies the window size of the console
 type WinSize struct {
-	// Width of the console
-	Width uint16
 	// Height of the console
 	Height uint16
-	x      uint16
-	y      uint16
+	// Width of the console
+	Width uint16
+	x     uint16
+	y     uint16
 }
 
 // Current returns the current processes console

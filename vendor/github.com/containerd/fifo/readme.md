@@ -1,5 +1,7 @@
 ### fifo
 
+[![Build Status](https://travis-ci.org/containerd/fifo.svg?branch=master)](https://travis-ci.org/containerd/fifo)
+
 Go package for handling fifos in a sane way.
 
 ```

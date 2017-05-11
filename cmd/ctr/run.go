@@ -11,10 +11,10 @@ import (
 	"google.golang.org/grpc/codes"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/containerd/console"
 	"github.com/containerd/containerd/api/services/execution"
 	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
 	"github.com/containerd/containerd/images"
-	"github.com/crosbymichael/console"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"

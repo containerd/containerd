@@ -14,8 +14,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containerd/fifo"
 	"github.com/pkg/errors"
-	"github.com/tonistiigi/fifo"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"

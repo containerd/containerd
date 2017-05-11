@@ -1,6 +1,6 @@
 # console
 
-[![Build Status](https://travis-ci.org/crosbymichael/console.svg?branch=master)](https://travis-ci.org/crosbymichael/console)
+[![Build Status](https://travis-ci.org/containerd/console.svg?branch=master)](https://travis-ci.org/containerd/console)
 
 Golang package for dealing with consoles.  Light on deps and a simple API.
 
