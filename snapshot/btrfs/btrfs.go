@@ -7,13 +7,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/btrfs"
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/fs/fsutils"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/mountinfo"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/snapshot/storage"
@@ -36,37 +35,15 @@ type snapshotter struct {
 	ms     *storage.MetaStore
 }
 
-func getBtrfsDevice(root string, mounts []mountinfo.Info) (string, error) {
-	device := ""
-	deviceMountpoint := ""
-	for _, info := range mounts {
-		if (info.Root == "/" || info.Root == "") && strings.HasPrefix(root, info.Mountpoint) {
-			if info.FSType == "btrfs" && len(info.Mountpoint) > len(deviceMountpoint) {
-				device = info.Source
-				deviceMountpoint = info.Mountpoint
-			}
-			if root == info.Mountpoint && info.FSType != "btrfs" {
-				return "", fmt.Errorf("%s needs to be btrfs, but seems %s", root, info.FSType)
-			}
-		}
-	}
-	if device == "" {
-		// TODO: automatically mount loopback device here?
-		return "", fmt.Errorf("%s is not mounted as btrfs", root)
-	}
-	return device, nil
-}
-
 // NewSnapshotter returns a Snapshotter using btrfs. Uses the provided
 // root directory for snapshots and stores the metadata in
 // a file in the provided root.
 // root needs to be a mount point of btrfs.
 func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
-	mounts, err := mountinfo.Self()
-	if err != nil {
-		return nil, err
+	mount, err := fsutils.LookupMount(root)
+	if mount.FSType != "btrfs" {
+		return nil, fmt.Errorf("expected btrfs, got %s", mount.FSType)
 	}
-	device, err := getBtrfsDevice(root, mounts)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +66,7 @@ func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
 	}
 
 	return &snapshotter{
-		device: device,
+		device: mount.Source,
 		root:   root,
 		ms:     ms,
 	}, nil

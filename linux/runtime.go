@@ -111,6 +111,10 @@ func (r *Runtime) Create(ctx context.Context, id string, opts containerd.CreateO
 			Options: m.Options,
 		})
 	}
+	log.G(ctx).Debugf("shim.CreateRequest.Rootfs=%+v", sopts.Rootfs)
+	if len(sopts.Rootfs) == 0 {
+		return nil, fmt.Errorf("rootfs empty for id %s", id)
+	}
 	if _, err := s.Create(ctx, sopts); err != nil {
 		os.RemoveAll(path)
 		return nil, err

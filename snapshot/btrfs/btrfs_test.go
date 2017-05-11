@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/mountinfo"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/snapshot/testsuite"
 	"github.com/containerd/containerd/testutil"
@@ -214,66 +213,5 @@ func (device *testDevice) remove(t *testing.T) {
 	err = os.RemoveAll(device.mountPoint)
 	if err != nil {
 		t.Error(err)
-	}
-}
-
-func TestGetBtrfsDevice(t *testing.T) {
-	testCases := []struct {
-		expectedDevice string
-		expectedError  string
-		root           string
-		mounts         []mountinfo.Info
-	}{
-		{
-			expectedDevice: "/dev/loop0",
-			root:           "/var/lib/containerd/snapshot/btrfs",
-			mounts: []mountinfo.Info{
-				{Root: "/", Mountpoint: "/", FSType: "ext4", Source: "/dev/sda1"},
-				{Root: "/", Mountpoint: "/var/lib/containerd/snapshot/btrfs", FSType: "btrfs", Source: "/dev/loop0"},
-			},
-		},
-		{
-			expectedError: "/var/lib/containerd/snapshot/btrfs is not mounted as btrfs",
-			root:          "/var/lib/containerd/snapshot/btrfs",
-			mounts: []mountinfo.Info{
-				{Root: "/", Mountpoint: "/", FSType: "ext4", Source: "/dev/sda1"},
-			},
-		},
-		{
-			expectedDevice: "/dev/sda1",
-			root:           "/var/lib/containerd/snapshot/btrfs",
-			mounts: []mountinfo.Info{
-				{Root: "/", Mountpoint: "/", FSType: "btrfs", Source: "/dev/sda1"},
-			},
-		},
-		{
-			expectedDevice: "/dev/sda2",
-			root:           "/var/lib/containerd/snapshot/btrfs",
-			mounts: []mountinfo.Info{
-				{Root: "/", Mountpoint: "/", FSType: "btrfs", Source: "/dev/sda1"},
-				{Root: "/", Mountpoint: "/var/lib/containerd/snapshot/btrfs", FSType: "btrfs", Source: "/dev/sda2"},
-			},
-		},
-		{
-			expectedDevice: "/dev/sda2",
-			root:           "/var/lib/containerd/snapshot/btrfs",
-			mounts: []mountinfo.Info{
-				{Root: "/", Mountpoint: "/var/lib/containerd/snapshot/btrfs", FSType: "btrfs", Source: "/dev/sda2"},
-				{Root: "/", Mountpoint: "/var/lib/foooooooooooooooooooo/baaaaaaaaaaaaaaaaaaaar", FSType: "btrfs", Source: "/dev/sda3"}, // mountpoint length longer than /var/lib/containerd/snapshot/btrfs
-				{Root: "/", Mountpoint: "/", FSType: "btrfs", Source: "/dev/sda1"},
-			},
-		},
-	}
-	for i, tc := range testCases {
-		device, err := getBtrfsDevice(tc.root, tc.mounts)
-		if err != nil && tc.expectedError == "" {
-			t.Fatalf("%d: expected nil, got %v", i, err)
-		}
-		if err != nil && !strings.Contains(err.Error(), tc.expectedError) {
-			t.Fatalf("%d: expected %s, got %v", i, tc.expectedError, err)
-		}
-		if err == nil && device != tc.expectedDevice {
-			t.Fatalf("%d: expected %s, got %s", i, tc.expectedDevice, device)
-		}
 	}
 }
