@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/version"
 	"github.com/urfave/cli"
 )
 
@@ -17,7 +17,7 @@ var (
 
 func init() {
 	cli.VersionPrinter = func(c *cli.Context) {
-		fmt.Println(c.App.Name, containerd.Package, c.App.Version)
+		fmt.Println(c.App.Name, version.Package, c.App.Version)
 	}
 
 }
@@ -33,7 +33,7 @@ func appContext() (contextpkg.Context, contextpkg.CancelFunc) {
 func main() {
 	app := cli.NewApp()
 	app.Name = "dist"
-	app.Version = containerd.Version
+	app.Version = version.Version
 	app.Usage = `
         ___      __
    ____/ (_)____/ /_

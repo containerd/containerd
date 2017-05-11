@@ -8,4 +8,5 @@ import (
 	_ "github.com/containerd/containerd/services/images"
 	_ "github.com/containerd/containerd/services/metrics"
 	_ "github.com/containerd/containerd/services/rootfs"
+	_ "github.com/containerd/containerd/services/version"
 )
