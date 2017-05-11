@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/Microsoft/hcsshim"
-	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/plugin"
 	"github.com/pkg/errors"
 )
 
@@ -35,14 +35,14 @@ func (p *Process) ExitedAt() time.Time {
 	return p.exitedAt
 }
 
-func (p *Process) Status() containerd.Status {
+func (p *Process) Status() plugin.Status {
 	select {
 	case <-p.ecSync:
-		return containerd.StoppedStatus
+		return plugin.StoppedStatus
 	default:
 	}
 
-	return containerd.RunningStatus
+	return plugin.RunningStatus
 }
 
 func (p *Process) Delete() error {

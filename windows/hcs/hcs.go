@@ -15,8 +15,8 @@ import (
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/Sirupsen/logrus"
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/windows/pid"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -216,7 +216,7 @@ func (c *Container) CloseStdin(ctx context.Context, pid uint32) error {
 	return proc.CloseStdin()
 }
 
-func (c *Container) Pty(ctx context.Context, pid uint32, size containerd.ConsoleSize) error {
+func (c *Container) Pty(ctx context.Context, pid uint32, size plugin.ConsoleSize) error {
 	var proc *Process
 	c.Lock()
 	for _, p := range c.processes {
