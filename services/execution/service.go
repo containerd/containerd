@@ -84,7 +84,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 	s.mu.Lock()
 	if _, ok := s.containers[r.ID]; ok {
 		s.mu.Unlock()
-		return nil, containerd.ErrContainerExists
+		return nil, plugin.ErrContainerExists
 	}
 	c, err := runtime.Create(ctx, r.ID, opts)
 	if err != nil {
@@ -286,7 +286,7 @@ func (s *Service) getContainer(id string) (plugin.Container, error) {
 	c, ok := s.containers[id]
 	s.mu.Unlock()
 	if !ok {
-		return nil, containerd.ErrContainerNotExist
+		return nil, plugin.ErrContainerNotExist
 	}
 	return c, nil
 }
@@ -294,7 +294,7 @@ func (s *Service) getContainer(id string) (plugin.Container, error) {
 func (s *Service) getRuntime(name string) (plugin.Runtime, error) {
 	runtime, ok := s.runtimes[name]
 	if !ok {
-		return nil, containerd.ErrUnknownRuntime
+		return nil, plugin.ErrUnknownRuntime
 	}
 	return runtime, nil
 }
