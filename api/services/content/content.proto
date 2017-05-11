@@ -14,6 +14,14 @@ service Content {
 	// existence.
 	rpc Info(InfoRequest) returns (InfoResponse);
 
+	// List streams the entire set of content as Info objects and closes the
+	// stream.
+	//
+	// Typically, this will yield a large response, chunked into messages.
+	// Clients should make provisions to ensure they can handle the entire data
+	// set.
+	rpc List(ListContentRequest) returns (stream ListContentResponse);
+
 	// Delete will delete the referenced object.
 	rpc Delete(DeleteContentRequest) returns (google.protobuf.Empty);
 
@@ -25,9 +33,10 @@ service Content {
 	// Status returns the status of ongoing object ingestions, started via
 	// Write.
 	//
-	// For active ingestions, the status will be streamed until the client
-	// closes the connection or all matched ingestions are committed.
-	rpc Status(StatusRequest) returns (stream StatusResponse);
+	// Only those matching the regular expression will be provided in the
+	// response. If the provided regular expression is empty, all ingestions
+	// will be provided.
+	rpc Status(StatusRequest) returns (StatusResponse);
 
 	// Write begins or resumes writes to a resource identified by a unique ref.
 	// Only one active stream may exist at a time for each ref.
@@ -46,13 +55,13 @@ service Content {
 	// When completed, the commit flag should be set to true. If expected size
 	// or digest is set, the content will be validated against those values.
 	rpc Write(stream WriteRequest) returns (stream WriteResponse);
+
+	// Abort cancels the ongoing write named in the request. Any resources
+	// associated with the write will be collected.
+	rpc Abort(AbortRequest) returns (google.protobuf.Empty);
 }
 
-message InfoRequest {
-	string digest = 1 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
-}
-
-message InfoResponse {
+message Info {
 	// Digest is the hash identity of the blob.
 	string digest = 1 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
 
@@ -61,6 +70,20 @@ message InfoResponse {
 
 	// CommittedAt provides the time at which the blob was committed.
 	google.protobuf.Timestamp committed_at = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}
+
+message InfoRequest {
+	string digest = 1 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
+}
+
+message InfoResponse {
+	Info info = 1 [(gogoproto.nullable) = false];
+}
+
+message ListContentRequest {}
+
+message ListContentResponse {
+	repeated Info info = 1 [(gogoproto.nullable) = false];
 }
 
 message DeleteContentRequest {
@@ -90,6 +113,22 @@ message ReadResponse {
 	bytes data = 2; // actual data
 }
 
+message StatusRequest {
+	string regexp = 1;
+}
+
+message Status {
+	google.protobuf.Timestamp started_at = 1 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp updated_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	string ref = 3;
+	int64 offset = 4;
+	int64 total = 5;
+	string expected = 6 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
+}
+
+message StatusResponse {
+	repeated Status statuses = 1 [(gogoproto.nullable) = false];
+}
 
 // WriteAction defines the behavior of a WriteRequest.
 enum WriteAction {
@@ -116,12 +155,6 @@ enum WriteAction {
 	//
 	// This action will always terminate the write.
 	COMMIT = 2 [(gogoproto.enumvalue_customname) = "WriteActionCommit"];
-
-	// WriteActionAbort will release any resources associated with the write
-	// and free up the ref for a completely new set of writes.
-	//
-	// This action will always terminate the write.
-	ABORT = -1 [(gogoproto.enumvalue_customname) = "WriteActionAbort"];
 }
 
 // WriteRequest writes data to the request ref at offset. 
@@ -213,20 +246,10 @@ message WriteResponse {
 
 	// Digest, if present, includes the digest up to the currently committed
 	// bytes. If action is commit, this field will be set. It is implementation
-	// defined if this is set for other actions, except abort. On abort, this
-	// will be empty.
+	// defined if this is set for other actions.
 	string digest = 6 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
 }
 
-message StatusRequest {
-	repeated string refs = 1;
-	repeated string prefix = 2;
-}
-
-message StatusResponse {
-	google.protobuf.Timestamp started_at = 1 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-	google.protobuf.Timestamp updated_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-	string ref = 3;
-	int64 offset = 4;
-	int64 total = 5;
+message AbortRequest {
+	string ref = 1;
 }

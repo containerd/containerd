@@ -9,7 +9,6 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/log"
 	units "github.com/docker/go-units"
-	digest "github.com/opencontainers/go-digest"
 	"github.com/urfave/cli"
 )
 
@@ -46,8 +45,8 @@ var listCommand = cli.Command{
 
 		var walkFn content.WalkFunc
 		if quiet {
-			walkFn = func(path string, fi os.FileInfo, dgst digest.Digest) error {
-				fmt.Println(dgst)
+			walkFn = func(info content.Info) error {
+				fmt.Println(info.Digest)
 				return nil
 			}
 		} else {
@@ -55,16 +54,16 @@ var listCommand = cli.Command{
 			defer tw.Flush()
 
 			fmt.Fprintln(tw, "DIGEST\tSIZE\tAGE")
-			walkFn = func(path string, fi os.FileInfo, dgst digest.Digest) error {
+			walkFn = func(info content.Info) error {
 				fmt.Fprintf(tw, "%s\t%s\t%s\n",
-					dgst,
-					units.HumanSize(float64(fi.Size())),
-					units.HumanDuration(time.Since(fi.ModTime())))
+					info.Digest,
+					units.HumanSize(float64(info.Size)),
+					units.HumanDuration(time.Since(info.CommittedAt)))
 				return nil
 			}
 
 		}
 
-		return cs.Walk(walkFn)
+		return cs.Walk(ctx, walkFn)
 	},
 }

@@ -12,11 +12,13 @@ import (
 	"time"
 
 	"github.com/containerd/console"
+	contentapi "github.com/containerd/containerd/api/services/content"
 	imagesapi "github.com/containerd/containerd/api/services/images"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
+	contentservice "github.com/containerd/containerd/services/content"
 	imagesservice "github.com/containerd/containerd/services/images"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -42,7 +44,7 @@ var registryFlags = []cli.Flag{
 	},
 }
 
-func resolveContentStore(context *cli.Context) (*content.Store, error) {
+func resolveContentStore(context *cli.Context) (content.Store, error) {
 	root := filepath.Join(context.GlobalString("root"), "content")
 	if !filepath.IsAbs(root) {
 		var err error
@@ -51,7 +53,12 @@ func resolveContentStore(context *cli.Context) (*content.Store, error) {
 			return nil, err
 		}
 	}
-	return content.NewStore(root)
+	conn, err := connectGRPC(context)
+	if err != nil {
+		return nil, err
+	}
+
+	return contentservice.NewStoreFromClient(contentapi.NewContentClient(conn)), nil
 }
 
 func resolveImageStore(clicontext *cli.Context) (images.Store, error) {

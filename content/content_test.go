@@ -52,7 +52,7 @@ func TestContentWriter(t *testing.T) {
 	}
 
 	// we should also see this as an active ingestion
-	ingestions, err := cs.Active()
+	ingestions, err := cs.Status(ctx, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,11 +132,9 @@ func TestWalkBlobs(t *testing.T) {
 		expected[dgst] = struct{}{}
 	}
 
-	if err := cs.Walk(func(path string, fi os.FileInfo, dgst digest.Digest) error {
-		found[dgst] = struct{}{}
-		if checked := checkBlobPath(t, cs, dgst); checked != path {
-			t.Fatalf("blob path did not match: %v != %v", path, checked)
-		}
+	if err := cs.Walk(ctx, func(bi Info) error {
+		found[bi.Digest] = struct{}{}
+		checkBlobPath(t, cs, bi.Digest)
 		return nil
 	}); err != nil {
 		t.Fatal(err)
@@ -203,7 +201,7 @@ func generateBlobs(t checker, nblobs, maxsize int64) map[digest.Digest][]byte {
 	return blobs
 }
 
-func populateBlobStore(t checker, ctx context.Context, cs *Store, nblobs, maxsize int64) map[digest.Digest][]byte {
+func populateBlobStore(t checker, ctx context.Context, cs Store, nblobs, maxsize int64) map[digest.Digest][]byte {
 	blobs := generateBlobs(t, nblobs, maxsize)
 
 	for dgst, p := range blobs {
@@ -213,7 +211,7 @@ func populateBlobStore(t checker, ctx context.Context, cs *Store, nblobs, maxsiz
 	return blobs
 }
 
-func contentStoreEnv(t checker) (context.Context, string, *Store, func()) {
+func contentStoreEnv(t checker) (context.Context, string, Store, func()) {
 	pc, _, _, ok := runtime.Caller(1)
 	if !ok {
 		t.Fatal("failed to resolve caller")
@@ -249,10 +247,10 @@ func checkCopy(t checker, size int64, dst io.Writer, src io.Reader) {
 	}
 }
 
-func checkBlobPath(t *testing.T, cs *Store, dgst digest.Digest) string {
-	path := cs.blobPath(dgst)
+func checkBlobPath(t *testing.T, cs Store, dgst digest.Digest) string {
+	path := cs.(*store).blobPath(dgst)
 
-	if path != filepath.Join(cs.root, "blobs", dgst.Algorithm().String(), dgst.Hex()) {
+	if path != filepath.Join(cs.(*store).root, "blobs", dgst.Algorithm().String(), dgst.Hex()) {
 		t.Fatalf("unexpected path: %q", path)
 	}
 	fi, err := os.Stat(path)
@@ -268,7 +266,7 @@ func checkBlobPath(t *testing.T, cs *Store, dgst digest.Digest) string {
 	return path
 }
 
-func checkWrite(t checker, ctx context.Context, cs *Store, dgst digest.Digest, p []byte) digest.Digest {
+func checkWrite(t checker, ctx context.Context, cs Store, dgst digest.Digest, p []byte) digest.Digest {
 	if err := WriteBlob(ctx, cs, dgst.String(), bytes.NewReader(p), int64(len(p)), dgst); err != nil {
 		t.Fatal(err)
 	}

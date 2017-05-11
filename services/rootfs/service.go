@@ -26,11 +26,11 @@ func init() {
 }
 
 type Service struct {
-	store       *content.Store
+	store       content.Store
 	snapshotter snapshot.Snapshotter
 }
 
-func NewService(store *content.Store, snapshotter snapshot.Snapshotter) (*Service, error) {
+func NewService(store content.Store, snapshotter snapshot.Snapshotter) (*Service, error) {
 	return &Service{
 		store:       store,
 		snapshotter: snapshotter,

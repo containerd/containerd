@@ -78,7 +78,7 @@ var runCommand = cli.Command{
 			return err
 		}
 
-		provider, err := getContentProvider(context)
+		content, err := getContentStore(context)
 		if err != nil {
 			return err
 		}
@@ -102,7 +102,7 @@ var runCommand = cli.Command{
 			}
 			// let's close out our db and tx so we don't hold the lock whilst running.
 
-			diffIDs, err := image.RootFS(ctx, provider)
+			diffIDs, err := image.RootFS(ctx, content)
 			if err != nil {
 				return err
 			}
@@ -123,13 +123,13 @@ var runCommand = cli.Command{
 				return err
 			}
 
-			ic, err := image.Config(ctx, provider)
+			ic, err := image.Config(ctx, content)
 			if err != nil {
 				return err
 			}
 			switch ic.MediaType {
 			case ocispec.MediaTypeImageConfig, images.MediaTypeDockerSchema2Config:
-				r, err := provider.Reader(ctx, ic.Digest)
+				r, err := content.Reader(ctx, ic.Digest)
 				if err != nil {
 					return err
 				}

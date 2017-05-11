@@ -242,7 +242,7 @@ func serveDebugAPI() error {
 	return nil
 }
 
-func resolveContentStore() (*content.Store, error) {
+func resolveContentStore() (content.Store, error) {
 	cp := filepath.Join(conf.Root, "content")
 	return content.NewStore(cp)
 }
@@ -315,7 +315,7 @@ func loadMonitor() (plugin.ContainerMonitor, error) {
 	return plugin.NewMultiContainerMonitor(monitors...), nil
 }
 
-func loadSnapshotter(store *content.Store) (snapshot.Snapshotter, error) {
+func loadSnapshotter(store content.Store) (snapshot.Snapshotter, error) {
 	for name, sr := range plugin.Registrations() {
 		if sr.Type != plugin.SnapshotPlugin {
 			continue
@@ -356,7 +356,7 @@ func newGRPCServer() *grpc.Server {
 	return s
 }
 
-func loadServices(runtimes map[string]containerd.Runtime, store *content.Store, sn snapshot.Snapshotter, meta *bolt.DB) ([]plugin.Service, error) {
+func loadServices(runtimes map[string]containerd.Runtime, store content.Store, sn snapshot.Snapshotter, meta *bolt.DB) ([]plugin.Service, error) {
 	var o []plugin.Service
 	for name, sr := range plugin.Registrations() {
 		if sr.Type != plugin.GRPCPlugin {
