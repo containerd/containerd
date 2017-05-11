@@ -4,11 +4,12 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/plugin"
 
 	"golang.org/x/net/context"
 )
 
-func newCollector(ctx context.Context, runtimes map[string]containerd.Runtime) (*collector, error) {
+func newCollector(ctx context.Context, runtimes map[string]plugin.Runtime) (*collector, error) {
 	c := &collector{
 		context:      ctx,
 		ch:           make(chan *containerd.Event, 2048),
@@ -42,7 +43,7 @@ type collector struct {
 }
 
 // collect collects events from the provided runtime
-func (c *collector) collect(r containerd.Runtime) error {
+func (c *collector) collect(r plugin.Runtime) error {
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()

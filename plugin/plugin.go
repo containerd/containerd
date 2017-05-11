@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/boltdb/bolt"
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/snapshot"
 
@@ -32,7 +31,7 @@ type Registration struct {
 type InitContext struct {
 	Root        string
 	State       string
-	Runtimes    map[string]containerd.Runtime
+	Runtimes    map[string]Runtime
 	Content     content.Store
 	Meta        *bolt.DB
 	Snapshotter snapshot.Snapshotter
