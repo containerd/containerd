@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 
 	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -66,25 +65,7 @@ func (image *Image) RootFS(ctx context.Context, provider content.Provider) ([]di
 	if err != nil {
 		return nil, err
 	}
-
-	p, err := content.ReadBlob(ctx, provider, desc.Digest)
-	if err != nil {
-		log.G(ctx).Fatal(err)
-	}
-
-	var config ocispec.Image
-	if err := json.Unmarshal(p, &config); err != nil {
-		log.G(ctx).Fatal(err)
-	}
-
-	// TODO(stevvooe): Remove this bit when OCI structure uses correct type for
-	// rootfs.DiffIDs.
-	var diffIDs []digest.Digest
-	for _, diffID := range config.RootFS.DiffIDs {
-		diffIDs = append(diffIDs, digest.Digest(diffID))
-	}
-
-	return diffIDs, nil
+	return RootFS(ctx, provider, desc)
 }
 
 // Size returns the total size of an image's packed resources.
@@ -122,4 +103,29 @@ func (image *Image) Size(ctx context.Context, provider content.Provider) (int64,
 		}
 
 	}), image.Target)
+}
+
+// RootFS returns the unpacked diffids that make up and images rootfs.
+//
+// These are used to verify that a set of layers unpacked to the expected
+// values.
+func RootFS(ctx context.Context, provider content.Provider, desc ocispec.Descriptor) ([]digest.Digest, error) {
+	p, err := content.ReadBlob(ctx, provider, desc.Digest)
+	if err != nil {
+		return nil, err
+	}
+
+	var config ocispec.Image
+	if err := json.Unmarshal(p, &config); err != nil {
+		return nil, err
+	}
+
+	// TODO(stevvooe): Remove this bit when OCI structure uses correct type for
+	// rootfs.DiffIDs.
+	var diffIDs []digest.Digest
+	for _, diffID := range config.RootFS.DiffIDs {
+		diffIDs = append(diffIDs, digest.Digest(diffID))
+	}
+
+	return diffIDs, nil
 }

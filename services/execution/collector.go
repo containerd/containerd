@@ -3,7 +3,6 @@ package execution
 import (
 	"sync"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/plugin"
 
 	"golang.org/x/net/context"
@@ -12,7 +11,7 @@ import (
 func newCollector(ctx context.Context, runtimes map[string]plugin.Runtime) (*collector, error) {
 	c := &collector{
 		context:      ctx,
-		ch:           make(chan *containerd.Event, 2048),
+		ch:           make(chan *plugin.Event, 2048),
 		eventClients: make(map[*eventClient]struct{}),
 	}
 	for _, r := range runtimes {
@@ -38,7 +37,7 @@ type collector struct {
 	wg sync.WaitGroup
 
 	context      context.Context
-	ch           chan *containerd.Event
+	ch           chan *plugin.Event
 	eventClients map[*eventClient]struct{}
 }
 

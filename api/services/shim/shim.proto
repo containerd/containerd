@@ -21,6 +21,7 @@ service Shim {
 	rpc Processes(ProcessesRequest) returns (ProcessesResponse);
 	rpc Pause(PauseRequest) returns (google.protobuf.Empty);
 	rpc Resume(ResumeRequest) returns (google.protobuf.Empty);
+	rpc Checkpoint(CheckpointRequest) returns (google.protobuf.Empty);
 
 	rpc Exit(ExitRequest) returns (google.protobuf.Empty);
 	rpc Events(EventsRequest) returns (stream containerd.v1.types.Event);
@@ -40,6 +41,8 @@ message CreateRequest {
 	string stdout = 7;
 	string stderr = 8;
 	repeated containerd.v1.types.Mount rootfs = 9;
+	string checkpoint = 10;
+	string parent_checkpoint = 11;
 }
 
 message CreateResponse {
@@ -121,4 +124,14 @@ message ProcessesRequest {
 
 message ProcessesResponse{
 	repeated containerd.v1.types.Process processes = 1;
+}
+
+message CheckpointRequest {
+	bool exit = 1;
+	bool allow_tcp = 2;
+	bool allow_unix_sockets = 3;
+	bool allow_terminal = 4;
+	bool file_locks = 5;
+	repeated string empty_namespaces = 6;
+	string image = 7;
 }

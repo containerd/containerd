@@ -51,6 +51,7 @@ containerd client
 		},
 	}
 	app.Commands = []cli.Command{
+		checkpointCommand,
 		runCommand,
 		eventsCommand,
 		deleteCommand,

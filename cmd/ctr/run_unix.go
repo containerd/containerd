@@ -18,7 +18,10 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/console"
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/execution"
+	"github.com/containerd/containerd/api/types/descriptor"
+	"github.com/containerd/containerd/api/types/mount"
 	protobuf "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -254,20 +257,24 @@ func getConfig(context *cli.Context, imageConfig *ocispec.ImageConfig, rootfs st
 	return customSpec(config, rootfs)
 }
 
-func newCreateRequest(context *cli.Context, imageConfig *ocispec.ImageConfig, id, tmpDir string, rootfs string) (*execution.CreateRequest, error) {
-	s, err := getConfig(context, imageConfig, rootfs)
+func newSpec(context *cli.Context, config *ocispec.ImageConfig, imageRef string) ([]byte, error) {
+	s, err := getConfig(context, config, context.String("rootfs"))
 	if err != nil {
 		return nil, err
 	}
-	data, err := json.Marshal(s)
-	if err != nil {
-		return nil, err
+	if s.Annotations == nil {
+		s.Annotations = make(map[string]string)
 	}
+	s.Annotations["image"] = imageRef
+	return json.Marshal(s)
+}
+
+func newCreateRequest(context *cli.Context, id, tmpDir string, checkpoint *ocispec.Descriptor, mounts []containerd.Mount, spec []byte) (*execution.CreateRequest, error) {
 	create := &execution.CreateRequest{
 		ID: id,
 		Spec: &protobuf.Any{
 			TypeUrl: specs.Version,
-			Value:   data,
+			Value:   spec,
 		},
 		Runtime:  context.String("runtime"),
 		Terminal: context.Bool("tty"),
@@ -275,7 +282,20 @@ func newCreateRequest(context *cli.Context, imageConfig *ocispec.ImageConfig, id
 		Stdout:   filepath.Join(tmpDir, "stdout"),
 		Stderr:   filepath.Join(tmpDir, "stderr"),
 	}
-
+	if checkpoint != nil {
+		create.Checkpoint = &descriptor.Descriptor{
+			MediaType: checkpoint.MediaType,
+			Size_:     checkpoint.Size,
+			Digest:    checkpoint.Digest,
+		}
+	}
+	for _, m := range mounts {
+		create.Rootfs = append(create.Rootfs, &mount.Mount{
+			Type:    m.Type,
+			Source:  m.Source,
+			Options: m.Options,
+		})
+	}
 	return create, nil
 }
 

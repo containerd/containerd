@@ -1,15 +1,26 @@
 package execution
 
 import (
+	"bytes"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/containerd/containerd"
 	api "github.com/containerd/containerd/api/services/execution"
 	"github.com/containerd/containerd/api/types/container"
+	"github.com/containerd/containerd/api/types/descriptor"
+	"github.com/containerd/containerd/archive"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
+	protobuf "github.com/gogo/protobuf/types"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	specs "github.com/opencontainers/image-spec/specs-go"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -35,6 +46,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		runtimes:   ic.Runtimes,
 		containers: make(map[string]plugin.Container),
 		collector:  c,
+		store:      ic.Content,
 	}, nil
 }
 
@@ -44,6 +56,7 @@ type Service struct {
 	runtimes   map[string]plugin.Runtime
 	containers map[string]plugin.Container
 	collector  *collector
+	store      content.Store
 }
 
 func (s *Service) Register(server *grpc.Server) error {
@@ -62,6 +75,28 @@ func (s *Service) Register(server *grpc.Server) error {
 }
 
 func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.CreateResponse, error) {
+	var (
+		checkpointPath string
+		err            error
+	)
+	if r.Checkpoint != nil {
+		checkpointPath, err = ioutil.TempDir("", "ctd-checkpoint")
+		if err != nil {
+			return nil, err
+		}
+		if r.Checkpoint.MediaType != images.MediaTypeContainerd1Checkpoint {
+			return nil, fmt.Errorf("unsupported checkpoint type %q", r.Checkpoint.MediaType)
+		}
+		reader, err := s.store.Reader(ctx, r.Checkpoint.Digest)
+		if err != nil {
+			return nil, err
+		}
+		_, err = archive.Apply(ctx, checkpointPath, reader)
+		reader.Close()
+		if err != nil {
+			return nil, err
+		}
+	}
 	opts := plugin.CreateOpts{
 		Spec: r.Spec.Value,
 		IO: plugin.IO{
@@ -70,6 +105,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 			Stderr:   r.Stderr,
 			Terminal: r.Terminal,
 		},
+		Checkpoint: checkpointPath,
 	}
 	for _, m := range r.Rootfs {
 		opts.Rootfs = append(opts.Rootfs, containerd.Mount{
@@ -164,6 +200,10 @@ func containerFromContainerd(ctx context.Context, c plugin.Container) (*containe
 		ID:     c.Info().ID,
 		Pid:    state.Pid(),
 		Status: status,
+		Spec: &protobuf.Any{
+			TypeUrl: specs.Version,
+			Value:   c.Info().Spec,
+		},
 	}, nil
 }
 
@@ -317,6 +357,72 @@ func (s *Service) CloseStdin(ctx context.Context, r *api.CloseStdinRequest) (*go
 	return empty, nil
 }
 
+func (s *Service) Checkpoint(ctx context.Context, r *api.CheckpointRequest) (*api.CheckpointResponse, error) {
+	c, err := s.getContainer(r.ID)
+	if err != nil {
+		return nil, err
+	}
+	image, err := ioutil.TempDir("", "ctd-checkpoint")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(image)
+	if err := c.Checkpoint(ctx, plugin.CheckpointOpts{
+		Exit:             r.Exit,
+		AllowTCP:         r.AllowTcp,
+		AllowTerminal:    r.AllowTerminal,
+		AllowUnixSockets: r.AllowUnixSockets,
+		FileLocks:        r.FileLocks,
+		// ParentImage: r.ParentImage,
+		EmptyNamespaces: r.EmptyNamespaces,
+		Path:            image,
+	}); err != nil {
+		return nil, err
+	}
+	// write checkpoint to the content store
+	tar := archive.Diff(ctx, "", image)
+	cp, err := s.writeContent(ctx, images.MediaTypeContainerd1Checkpoint, image, tar)
+	// close tar first after write
+	if err := tar.Close(); err != nil {
+		return nil, err
+	}
+	if err != nil {
+		return nil, err
+	}
+	// write the config to the content store
+	spec := bytes.NewReader(c.Info().Spec)
+	specD, err := s.writeContent(ctx, images.MediaTypeContainerd1CheckpointConfig, filepath.Join(image, "spec"), spec)
+	if err != nil {
+		return nil, err
+	}
+	return &api.CheckpointResponse{
+		Descriptors: []*descriptor.Descriptor{
+			cp,
+			specD,
+		},
+	}, nil
+}
+
+func (s *Service) writeContent(ctx context.Context, mediaType, ref string, r io.Reader) (*descriptor.Descriptor, error) {
+	writer, err := s.store.Writer(ctx, ref, 0, "")
+	if err != nil {
+		return nil, err
+	}
+	defer writer.Close()
+	size, err := io.Copy(writer, r)
+	if err != nil {
+		return nil, err
+	}
+	if err := writer.Commit(0, ""); err != nil {
+		return nil, err
+	}
+	return &descriptor.Descriptor{
+		MediaType: mediaType,
+		Digest:    writer.Digest(),
+		Size_:     size,
+	}, nil
+}
+
 func (s *Service) getContainer(id string) (plugin.Container, error) {
 	s.mu.Lock()
 	c, ok := s.containers[id]
@@ -339,20 +445,20 @@ type grpcEventWriter struct {
 	server api.ContainerService_EventsServer
 }
 
-func (g *grpcEventWriter) Write(e *containerd.Event) error {
+func (g *grpcEventWriter) Write(e *plugin.Event) error {
 	var t container.Event_EventType
 	switch e.Type {
-	case containerd.ExitEvent:
+	case plugin.ExitEvent:
 		t = container.Event_EXIT
-	case containerd.ExecAddEvent:
+	case plugin.ExecAddEvent:
 		t = container.Event_EXEC_ADDED
-	case containerd.PausedEvent:
+	case plugin.PausedEvent:
 		t = container.Event_PAUSED
-	case containerd.CreateEvent:
+	case plugin.CreateEvent:
 		t = container.Event_CREATE
-	case containerd.StartEvent:
+	case plugin.StartEvent:
 		t = container.Event_START
-	case containerd.OOMEvent:
+	case plugin.OOMEvent:
 		t = container.Event_OOM
 	}
 	return g.server.Send(&container.Event{

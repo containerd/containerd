@@ -117,8 +117,8 @@ Assuming you have an OCI bundle from the previous step you can execute the conta
 The first way is to use the convenience command `run` that will handle creating, starting, and deleting the container after it exits.
 
 ```bash
+# run as root
 cd /mycontainer
-
 runc run mycontainerid
 ```
 
@@ -165,8 +165,8 @@ Now we can go though the lifecycle operations in your shell.
 
 
 ```bash
+# run as root
 cd /mycontainer
-
 runc create mycontainerid
 
 # view the container is created and in the "created" state
@@ -184,6 +184,22 @@ runc delete mycontainerid
 
 This adds more complexity but allows higher level systems to manage runc and provides points in the containers creation to setup various settings after the container has created and/or before it is deleted.
 This is commonly used to setup the container's network stack after `create` but before `start` where the user's defined process will be running.
+
+#### Rootless containers
+`runc` has the ability to run containers without root privileges. This is called `rootless`. You need to pass some parameters to `runc` in order to run rootless containers. See below and compare with the previous version. Run the following commands as an ordinary user:
+```bash
+# Same as the first example
+mkdir ~/mycontainer
+cd ~/mycontainer
+mkdir rootfs
+docker export $(docker create busybox) | tar -C rootfs -xvf -
+
+# The --rootless parameter instructs runc spec to generate a configuration for a rootless container, which will allow you to run the container as a non-root user.
+runc spec --rootless
+
+# The --root parameter tells runc where to store the container state. It must be writable by the user.
+runc --root /tmp/runc run mycontainerid
+```
 
 #### Supervisors
 

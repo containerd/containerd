@@ -4,6 +4,7 @@ import (
 	gocontext "context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"runtime"
 
@@ -11,9 +12,9 @@ import (
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/execution"
-	mounttypes "github.com/containerd/containerd/api/types/mount"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/snapshot"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -55,8 +56,12 @@ var runCommand = cli.Command{
 			Usage: "enable host networking for the container",
 		},
 		cli.BoolFlag{
-			Name:  "keep",
-			Usage: "keep container after running",
+			Name:  "rm",
+			Usage: "remove the container after running",
+		},
+		cli.StringFlag{
+			Name:  "checkpoint",
+			Usage: "provide the checkpoint digest to restore the container",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -94,82 +99,137 @@ var runCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-
 		imageStore, err := getImageStore(context)
 		if err != nil {
 			return errors.Wrap(err, "failed resolving image store")
 		}
-
-		if runtime.GOOS != "windows" && context.String("rootfs") == "" {
-			ref := context.Args().First()
-
-			image, err := imageStore.Get(ctx, ref)
-			if err != nil {
-				return errors.Wrapf(err, "could not resolve %q", ref)
+		differ, err := getDiffService(context)
+		if err != nil {
+			return err
+		}
+		var (
+			checkpoint      *ocispec.Descriptor
+			checkpointIndex digest.Digest
+			ref             = context.Args().First()
+		)
+		if raw := context.String("checkpoint"); raw != "" {
+			if checkpointIndex, err = digest.Parse(raw); err != nil {
+				return err
 			}
-			// let's close out our db and tx so we don't hold the lock whilst running.
-
-			diffIDs, err := image.RootFS(ctx, content)
+		}
+		var spec []byte
+		if checkpointIndex != "" {
+			var index ocispec.ImageIndex
+			r, err := content.Reader(ctx, checkpointIndex)
 			if err != nil {
 				return err
 			}
-
-			if context.Bool("readonly") {
-				mounts, err = snapshotter.View(ctx, id, identity.ChainID(diffIDs).String())
-			} else {
-				mounts, err = snapshotter.Prepare(ctx, id, identity.ChainID(diffIDs).String())
-			}
+			err = json.NewDecoder(r).Decode(&index)
+			r.Close()
 			if err != nil {
-				if !snapshot.IsExist(err) {
-					return err
+				return err
+			}
+			var rw ocispec.Descriptor
+			for _, m := range index.Manifests {
+				switch m.MediaType {
+				case images.MediaTypeContainerd1Checkpoint:
+					fkingo := m.Descriptor
+					checkpoint = &fkingo
+				case images.MediaTypeContainerd1CheckpointConfig:
+					if r, err = content.Reader(ctx, m.Digest); err != nil {
+						return err
+					}
+					spec, err = ioutil.ReadAll(r)
+					r.Close()
+					if err != nil {
+						return err
+					}
+				case images.MediaTypeDockerSchema2Manifest:
+					// make sure we have the original image that was used during checkpoint
+					diffIDs, err := images.RootFS(ctx, content, m.Descriptor)
+					if err != nil {
+						return err
+					}
+					if _, err := snapshotter.Prepare(ctx, id, identity.ChainID(diffIDs).String()); err != nil {
+						if !snapshot.IsExist(err) {
+							return err
+						}
+					}
+				case ocispec.MediaTypeImageLayer:
+					rw = m.Descriptor
 				}
-				mounts, err = snapshotter.Mounts(ctx, id)
+			}
+			if mounts, err = snapshotter.Mounts(ctx, id); err != nil {
+				return err
+			}
+			if _, err := differ.Apply(ctx, rw, mounts); err != nil {
+				return err
+			}
+		} else {
+			if runtime.GOOS != "windows" && context.String("rootfs") == "" {
+				image, err := imageStore.Get(ctx, ref)
+				if err != nil {
+					return errors.Wrapf(err, "could not resolve %q", ref)
+				}
+				// let's close out our db and tx so we don't hold the lock whilst running.
+				diffIDs, err := image.RootFS(ctx, content)
 				if err != nil {
 					return err
 				}
-			} else {
+				if context.Bool("readonly") {
+					mounts, err = snapshotter.View(ctx, id, identity.ChainID(diffIDs).String())
+				} else {
+					mounts, err = snapshotter.Prepare(ctx, id, identity.ChainID(diffIDs).String())
+				}
 				defer func() {
-					if id != "" {
+					if err != nil || context.Bool("rm") {
 						if err := snapshotter.Remove(ctx, id); err != nil {
 							logrus.WithError(err).Errorf("failed to remove snapshot %q", id)
 						}
 					}
 				}()
-			}
-
-			ic, err := image.Config(ctx, content)
-			if err != nil {
-				return err
-			}
-			switch ic.MediaType {
-			case ocispec.MediaTypeImageConfig, images.MediaTypeDockerSchema2Config:
-				r, err := content.Reader(ctx, ic.Digest)
+				if err != nil {
+					if !snapshot.IsExist(err) {
+						return err
+					}
+					mounts, err = snapshotter.Mounts(ctx, id)
+					if err != nil {
+						return err
+					}
+				}
+				ic, err := image.Config(ctx, content)
 				if err != nil {
 					return err
 				}
-				if err := json.NewDecoder(r).Decode(&imageConfig); err != nil {
+				switch ic.MediaType {
+				case ocispec.MediaTypeImageConfig, images.MediaTypeDockerSchema2Config:
+					r, err := content.Reader(ctx, ic.Digest)
+					if err != nil {
+						return err
+					}
+					if err := json.NewDecoder(r).Decode(&imageConfig); err != nil {
+						r.Close()
+						return err
+					}
 					r.Close()
-					return err
+				default:
+					return fmt.Errorf("unknown image config media type %s", ic.MediaType)
 				}
-				r.Close()
-			default:
-				return fmt.Errorf("unknown image config media type %s", ic.MediaType)
+			} else {
+				// TODO: get the image / rootfs through the API once windows has a snapshotter
 			}
-		} else {
-			// TODO: get the image / rootfs through the API once windows has a snapshotter
 		}
-
-		create, err := newCreateRequest(context, &imageConfig.Config, id, tmpDir, context.String("rootfs"))
 		if err != nil {
 			return err
 		}
-		for _, m := range mounts {
-			create.Rootfs = append(create.Rootfs, &mounttypes.Mount{
-				Type:    m.Type,
-				Source:  m.Source,
-				Options: m.Options,
-			})
-
+		if len(spec) == 0 {
+			if spec, err = newSpec(context, &imageConfig.Config, ref); err != nil {
+				return err
+			}
+		}
+		create, err := newCreateRequest(context, id, tmpDir, checkpoint, mounts, spec)
+		if err != nil {
+			return err
 		}
 		var con console.Console
 		if create.Terminal {
@@ -179,7 +239,6 @@ var runCommand = cli.Command{
 				return err
 			}
 		}
-
 		fwg, err := prepareStdio(create.Stdin, create.Stdout, create.Stderr, create.Terminal)
 		if err != nil {
 			return err
@@ -188,35 +247,33 @@ var runCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		pid := response.Pid
 		if create.Terminal {
-			if err := handleConsoleResize(ctx, containers, response.ID, response.Pid, con); err != nil {
+			if err := handleConsoleResize(ctx, containers, id, pid, con); err != nil {
 				logrus.WithError(err).Error("console resize")
 			}
 		} else {
 			sigc := forwardAllSignals(containers, id)
 			defer stopCatch(sigc)
 		}
-		if _, err := containers.Start(ctx, &execution.StartRequest{
-			ID: response.ID,
-		}); err != nil {
-			return err
+		if checkpoint == nil {
+			if _, err := containers.Start(ctx, &execution.StartRequest{
+				ID: id,
+			}); err != nil {
+				return err
+			}
 		}
 		// Ensure we read all io only if container started successfully.
 		defer fwg.Wait()
 
-		status, err := waitContainer(events, response.ID, response.Pid)
+		status, err := waitContainer(events, id, pid)
 		if err != nil {
 			return err
 		}
-		if !context.Bool("keep") {
-			if _, err := containers.Delete(ctx, &execution.DeleteRequest{
-				ID: response.ID,
-			}); err != nil {
-				return err
-			}
-		} else {
-			// Don't remove snapshot
-			id = ""
+		if _, err := containers.Delete(ctx, &execution.DeleteRequest{
+			ID: response.ID,
+		}); err != nil {
+			return err
 		}
 		if status != 0 {
 			return cli.NewExitError("", int(status))

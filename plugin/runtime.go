@@ -20,7 +20,8 @@ type CreateOpts struct {
 	// Rootfs mounts to perform to gain access to the container's filesystem
 	Rootfs []containerd.Mount
 	// IO for the container's main process
-	IO IO
+	IO         IO
+	Checkpoint string
 }
 
 type Exit struct {
@@ -38,5 +39,5 @@ type Runtime interface {
 	// Delete removes the container in the runtime
 	Delete(context.Context, Container) (*Exit, error)
 	// Events returns events for the runtime and all containers created by the runtime
-	Events(context.Context) <-chan *containerd.Event
+	Events(context.Context) <-chan *Event
 }

@@ -7,6 +7,7 @@ import "google/protobuf/any.proto";
 import "gogoproto/gogo.proto";
 import "github.com/containerd/containerd/api/types/mount/mount.proto";
 import "github.com/containerd/containerd/api/types/container/container.proto";
+import "github.com/containerd/containerd/api/types/descriptor/descriptor.proto";
 import "google/protobuf/timestamp.proto";
 
 service ContainerService {
@@ -23,6 +24,7 @@ service ContainerService {
 	rpc Pause(PauseRequest) returns (google.protobuf.Empty);
 	rpc Resume(ResumeRequest) returns (google.protobuf.Empty);
 	rpc Processes(ProcessesRequest) returns (ProcessesResponse);
+	rpc Checkpoint(CheckpointRequest) returns (CheckpointResponse);
 }
 
 message CreateRequest {
@@ -34,6 +36,7 @@ message CreateRequest {
 	string stdout = 6;
 	string stderr = 7;
 	bool terminal = 8;
+	types.Descriptor checkpoint = 9;
 }
 
 message CreateResponse {
@@ -117,4 +120,19 @@ message ProcessesRequest {
 
 message ProcessesResponse{
 	repeated containerd.v1.types.Process processes = 1;
+}
+
+message CheckpointRequest {
+	string id = 1;
+	bool allow_tcp = 2;
+	bool allow_unix_sockets = 3;
+	bool allow_terminal = 4;
+	bool file_locks = 5;
+	repeated string empty_namespaces = 6;
+	string parent_checkpoint = 7 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
+	bool exit = 8;
+}
+
+message CheckpointResponse {
+	repeated types.Descriptor descriptors = 1;
 }

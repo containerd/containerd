@@ -25,15 +25,17 @@ func (s State) Status() plugin.Status {
 	return s.status
 }
 
-func newContainer(id string, shim shim.ShimClient) *Container {
+func newContainer(id string, spec []byte, shim shim.ShimClient) *Container {
 	return &Container{
 		id:   id,
 		shim: shim,
+		spec: spec,
 	}
 }
 
 type Container struct {
-	id string
+	id   string
+	spec []byte
 
 	shim shim.ShimClient
 }
@@ -42,6 +44,7 @@ func (c *Container) Info() plugin.ContainerInfo {
 	return plugin.ContainerInfo{
 		ID:      c.id,
 		Runtime: runtimeName,
+		Spec:    c.spec,
 	}
 }
 
@@ -144,6 +147,19 @@ func (c *Container) Pty(ctx context.Context, pid uint32, size plugin.ConsoleSize
 func (c *Container) CloseStdin(ctx context.Context, pid uint32) error {
 	_, err := c.shim.CloseStdin(ctx, &shim.CloseStdinRequest{
 		Pid: pid,
+	})
+	return err
+}
+
+func (c *Container) Checkpoint(ctx context.Context, opts plugin.CheckpointOpts) error {
+	_, err := c.shim.Checkpoint(ctx, &shim.CheckpointRequest{
+		Exit:             opts.Exit,
+		AllowTcp:         opts.AllowTCP,
+		AllowUnixSockets: opts.AllowUnixSockets,
+		AllowTerminal:    opts.AllowTerminal,
+		FileLocks:        opts.FileLocks,
+		EmptyNamespaces:  opts.EmptyNamespaces,
+		Image:            opts.Path,
 	})
 	return err
 }

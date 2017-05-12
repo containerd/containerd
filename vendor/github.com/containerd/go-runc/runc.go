@@ -489,6 +489,13 @@ func (r *Runc) Restore(context context.Context, id, bundle string, opts *Restore
 	if err := Monitor.Start(cmd); err != nil {
 		return -1, err
 	}
+	if opts != nil && opts.IO != nil {
+		if c, ok := opts.IO.(StartCloser); ok {
+			if err := c.CloseAfterStart(); err != nil {
+				return -1, err
+			}
+		}
+	}
 	return Monitor.Wait(cmd)
 }
 
