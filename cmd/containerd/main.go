@@ -17,7 +17,6 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/containerd/containerd"
 	contentapi "github.com/containerd/containerd/api/services/content"
 	api "github.com/containerd/containerd/api/services/execution"
 	imagesapi "github.com/containerd/containerd/api/services/images"
