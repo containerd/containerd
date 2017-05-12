@@ -17,15 +17,15 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/urfave/cli"
-	"github.com/cyberdelia/go-metrics-graphite"
 	"github.com/containerd/containerd"
 	grpcserver "github.com/containerd/containerd/api/grpc/server"
 	"github.com/containerd/containerd/api/grpc/types"
 	"github.com/containerd/containerd/api/http/pprof"
 	"github.com/containerd/containerd/supervisor"
+	"github.com/cyberdelia/go-metrics-graphite"
 	"github.com/docker/docker/pkg/listeners"
 	"github.com/rcrowley/go-metrics"
+	"github.com/urfave/cli"
 )
 
 const (
@@ -198,7 +198,7 @@ func daemon(context *cli.Context) error {
 	}
 	types.RegisterAPIServer(server, grpcserver.NewServer(sv))
 	wg := &sync.WaitGroup{}
-	for i := 0; i < 10; i++ {
+	for i := 0; i < supervisor.GetDefaultWorkersNum(); i++ {
 		wg.Add(1)
 		w := supervisor.NewWorker(sv, wg)
 		go w.Start()
