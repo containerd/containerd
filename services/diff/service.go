@@ -102,8 +102,73 @@ func (s *service) Apply(ctx context.Context, er *diffapi.ApplyRequest) (*diffapi
 	return resp, nil
 }
 
-func (s *service) Diff(context.Context, *diffapi.DiffRequest) (*diffapi.DiffResponse, error) {
-	return nil, errors.New("not implemented")
+func (s *service) Diff(ctx context.Context, dr *diffapi.DiffRequest) (*diffapi.DiffResponse, error) {
+	aMounts := toMounts(dr.Left)
+	bMounts := toMounts(dr.Right)
+
+	aDir, err := ioutil.TempDir("", "left-")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create temporary directory")
+	}
+	defer os.RemoveAll(aDir)
+
+	bDir, err := ioutil.TempDir("", "right-")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create temporary directory")
+	}
+	defer os.RemoveAll(bDir)
+
+	if err := containerd.MountAll(aMounts, aDir); err != nil {
+		return nil, errors.Wrap(err, "failed to mount")
+	}
+	defer containerd.Unmount(aDir, 0)
+
+	if err := containerd.MountAll(bMounts, bDir); err != nil {
+		return nil, errors.Wrap(err, "failed to mount")
+	}
+	defer containerd.Unmount(bDir, 0)
+
+	cw, err := s.store.Writer(ctx, dr.Ref, 0, "")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to open writer")
+	}
+
+	// TODO: Validate media type
+
+	// TODO: Support compressed media types (link compressed to uncompressed)
+	//dgstr := digest.SHA256.Digester()
+	//wc := &writeCounter{}
+	//compressed, err := compression.CompressStream(cw, compression.Gzip)
+	//if err != nil {
+	//	return nil, errors.Wrap(err, "failed to get compressed stream")
+	//}
+	//err = archive.WriteDiff(ctx, io.MultiWriter(compressed, dgstr.Hash(), wc), lowerDir, upperDir)
+	//compressed.Close()
+
+	err = archive.WriteDiff(ctx, cw, aDir, bDir)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to write diff")
+	}
+
+	dgst := cw.Digest()
+	if err := cw.Commit(0, dgst); err != nil {
+		return nil, errors.Wrap(err, "failed to commit")
+	}
+
+	info, err := s.store.Info(ctx, dgst)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get info from content store")
+	}
+
+	desc := ocispec.Descriptor{
+		MediaType: dr.MediaType,
+		Digest:    info.Digest,
+		Size:      info.Size,
+	}
+
+	return &diffapi.DiffResponse{
+		Diff: fromDescriptor(desc),
+	}, nil
 }
 
 type readCounter struct {

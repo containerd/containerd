@@ -116,7 +116,7 @@ command. As part of this process, we do the following:
 				log.G(ctx).Fatal(err)
 			}
 			snapshotter := snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotClient(conn))
-			applier := diffservice.NewApplierFromClient(diffapi.NewDiffClient(conn))
+			applier := diffservice.NewDiffServiceFromClient(diffapi.NewDiffClient(conn))
 
 			log.G(ctx).Info("unpacking rootfs")
 

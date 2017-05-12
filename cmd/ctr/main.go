@@ -61,6 +61,7 @@ containerd client
 		execCommand,
 		pauseCommand,
 		resumeCommand,
+		snapshotCommand,
 		versionCommand,
 	}
 	app.Commands = append(app.Commands, extraCmds...)
