@@ -32,20 +32,20 @@ func main() {
 	o.AddFlags(pflag.CommandLine)
 	options.InitFlags()
 
-	if o.CRIContainerdVersion {
+	if o.PrintVersion {
 		version.PrintVersion()
 		os.Exit(0)
 	}
 
-	glog.V(2).Infof("Connect to containerd socket %q with timeout %v", o.ContainerdSocketPath, o.ContainerdConnectionTimeout)
-	conn, err := server.ConnectToContainerd(o.ContainerdSocketPath, o.ContainerdConnectionTimeout)
+	glog.V(2).Infof("Connect to containerd endpoint %q with timeout %v", o.ContainerdEndpoint, o.ContainerdConnectionTimeout)
+	conn, err := server.ConnectToContainerd(o.ContainerdEndpoint, o.ContainerdConnectionTimeout)
 	if err != nil {
-		glog.Exitf("Failed to connect containerd socket %q: %v", o.ContainerdSocketPath, err)
+		glog.Exitf("Failed to connect containerd endpoint %q: %v", o.ContainerdEndpoint, err)
 	}
 
-	glog.V(2).Infof("Run cri-containerd grpc server on socket %q", o.CRIContainerdSocketPath)
-	service := server.NewCRIContainerdService(conn)
-	s := server.NewCRIContainerdServer(o.CRIContainerdSocketPath, service, service)
+	glog.V(2).Infof("Run cri-containerd grpc server on socket %q", o.SocketPath)
+	service := server.NewCRIContainerdService(conn, o.RootDir)
+	s := server.NewCRIContainerdServer(o.SocketPath, service, service)
 	if err := s.Run(); err != nil {
 		glog.Exitf("Failed to run cri-containerd grpc server: %v", err)
 	}

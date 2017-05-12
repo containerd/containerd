@@ -25,12 +25,15 @@ import (
 
 // CRIContainerdOptions contains cri-containerd command line options.
 type CRIContainerdOptions struct {
-	// CRIContainerdSocketPath is the path to the socket which cri-containerd serves on.
-	CRIContainerdSocketPath string
-	// CRIContainerdVersion is the git release version of cri-containerd
-	CRIContainerdVersion bool
-	// ContainerdSocketPath is the path to the containerd socket.
-	ContainerdSocketPath string
+	// SocketPath is the path to the socket which cri-containerd serves on.
+	SocketPath string
+	// RootDir is the root directory path for managing cri-containerd files
+	// (metadata checkpoint etc.)
+	RootDir string
+	// PrintVersion indicates to print version information of cri-containerd.
+	PrintVersion bool
+	// ContainerdEndpoint is the containerd endpoint path.
+	ContainerdEndpoint string
 	// ContainerdConnectionTimeout is the connection timeout for containerd client.
 	ContainerdConnectionTimeout time.Duration
 }
@@ -42,13 +45,15 @@ func NewCRIContainerdOptions() *CRIContainerdOptions {
 
 // AddFlags adds cri-containerd command line options to pflag.
 func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&c.CRIContainerdSocketPath, "cri-containerd-socket",
+	fs.StringVar(&c.SocketPath, "socket-path",
 		"/var/run/cri-containerd.sock", "Path to the socket which cri-containerd serves on.")
-	fs.StringVar(&c.ContainerdSocketPath, "containerd-socket",
-		"/run/containerd/containerd.sock", "Path to the containerd socket.")
+	fs.StringVar(&c.RootDir, "root-dir",
+		"/var/lib/cri-containerd", "Root directory path for cri-containerd managed files (metadata checkpoint etc).")
+	fs.StringVar(&c.ContainerdEndpoint, "containerd-endpoint",
+		"/run/containerd/containerd.sock", "Path to the containerd endpoint.")
 	fs.DurationVar(&c.ContainerdConnectionTimeout, "containerd-connection-timeout",
 		2*time.Minute, "Connection timeout for containerd client.")
-	fs.BoolVar(&c.CRIContainerdVersion, "version",
+	fs.BoolVar(&c.PrintVersion, "version",
 		false, "Print cri-containerd version information and quit.")
 }
 

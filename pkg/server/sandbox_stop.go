@@ -17,15 +17,44 @@ limitations under the License.
 package server
 
 import (
-	"errors"
+	"fmt"
 
+	"github.com/golang/glog"
 	"golang.org/x/net/context"
+
+	"github.com/containerd/containerd/api/services/execution"
 
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
 // StopPodSandbox stops the sandbox. If there are any running containers in the
 // sandbox, they should be forcibly terminated.
-func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandboxRequest) (*runtime.StopPodSandboxResponse, error) {
-	return nil, errors.New("not implemented")
+func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandboxRequest) (retRes *runtime.StopPodSandboxResponse, retErr error) {
+	glog.V(2).Infof("StopPodSandbox for sandbox %q", r.GetPodSandboxId())
+	defer func() {
+		if retErr == nil {
+			glog.V(2).Info("StopPodSandbox returns successfully")
+		}
+	}()
+
+	sandbox, err := c.getSandbox(r.GetPodSandboxId())
+	if err != nil {
+		return nil, fmt.Errorf("failed to find sandbox %q: %v", r.GetPodSandboxId(), err)
+	}
+	if sandbox == nil {
+		return nil, fmt.Errorf("sandbox %q does not exist", r.GetPodSandboxId())
+	}
+	// Use the full sandbox id.
+	id := sandbox.ID
+
+	// TODO(random-liu): [P1] Handle sandbox container graceful deletion.
+	// Delete the sandbox container from containerd.
+	_, err = c.containerService.Delete(ctx, &execution.DeleteRequest{ID: id})
+	if err != nil && !isContainerdContainerNotExistError(err) {
+		return nil, fmt.Errorf("failed to delete sandbox container %q: %v", id, err)
+	}
+
+	// TODO(random-liu): [P0] Call network plugin to teardown network.
+	// TODO(random-liu): [P2] Stop all containers inside the sandbox.
+	return &runtime.StopPodSandboxResponse{}, nil
 }
