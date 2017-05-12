@@ -152,6 +152,14 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string) error {
 		return err
 	}
 
+	defer func() {
+		if err != nil {
+			if rerr := t.Rollback(); rerr != nil {
+				log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
+			}
+		}
+	}()
+
 	// grab the existing id
 	id, _, _, err := storage.GetInfo(ctx, key)
 	if err != nil {
@@ -163,10 +171,7 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string) error {
 		return err
 	}
 
-	if _, err := storage.CommitActive(ctx, key, name, snapshot.Usage(usage)); err != nil {
-		if rerr := t.Rollback(); rerr != nil {
-			log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
-		}
+	if _, err = storage.CommitActive(ctx, key, name, snapshot.Usage(usage)); err != nil {
 		return errors.Wrap(err, "failed to commit snapshot")
 	}
 	return t.Commit()
