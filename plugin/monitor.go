@@ -5,9 +5,9 @@ import "github.com/containerd/containerd"
 // ContainerMonitor provides an interface for monitoring of containers within containerd
 type ContainerMonitor interface {
 	// Monitor adds the provided container to the monitor
-	Monitor(containerd.Container) error
+	Monitor(Container) error
 	// Stop stops and removes the provided container from the monitor
-	Stop(containerd.Container) error
+	Stop(Container) error
 	// Events emits events from the monitor
 	Events(chan<- *containerd.Event)
 }
@@ -25,11 +25,11 @@ func NewNoopMonitor() ContainerMonitor {
 type noopContainerMonitor struct {
 }
 
-func (mm *noopContainerMonitor) Monitor(c containerd.Container) error {
+func (mm *noopContainerMonitor) Monitor(c Container) error {
 	return nil
 }
 
-func (mm *noopContainerMonitor) Stop(c containerd.Container) error {
+func (mm *noopContainerMonitor) Stop(c Container) error {
 	return nil
 }
 
@@ -40,7 +40,7 @@ type multiContainerMonitor struct {
 	monitors []ContainerMonitor
 }
 
-func (mm *multiContainerMonitor) Monitor(c containerd.Container) error {
+func (mm *multiContainerMonitor) Monitor(c Container) error {
 	for _, m := range mm.monitors {
 		if err := m.Monitor(c); err != nil {
 			return err
@@ -49,7 +49,7 @@ func (mm *multiContainerMonitor) Monitor(c containerd.Container) error {
 	return nil
 }
 
-func (mm *multiContainerMonitor) Stop(c containerd.Container) error {
+func (mm *multiContainerMonitor) Stop(c Container) error {
 	for _, m := range mm.monitors {
 		if err := m.Stop(c); err != nil {
 			return err

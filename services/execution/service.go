@@ -32,7 +32,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	}
 	return &Service{
 		runtimes:   ic.Runtimes,
-		containers: make(map[string]containerd.Container),
+		containers: make(map[string]plugin.Container),
 		collector:  c,
 	}, nil
 }
@@ -40,8 +40,8 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 type Service struct {
 	mu sync.Mutex
 
-	runtimes   map[string]containerd.Runtime
-	containers map[string]containerd.Container
+	runtimes   map[string]plugin.Runtime
+	containers map[string]plugin.Container
 	collector  *collector
 }
 
@@ -61,9 +61,9 @@ func (s *Service) Register(server *grpc.Server) error {
 }
 
 func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.CreateResponse, error) {
-	opts := containerd.CreateOpts{
+	opts := plugin.CreateOpts{
 		Spec: r.Spec.Value,
-		IO: containerd.IO{
+		IO: plugin.IO{
 			Stdin:    r.Stdin,
 			Stdout:   r.Stdout,
 			Stderr:   r.Stderr,
@@ -84,7 +84,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 	s.mu.Lock()
 	if _, ok := s.containers[r.ID]; ok {
 		s.mu.Unlock()
-		return nil, containerd.ErrContainerExists
+		return nil, plugin.ErrContainerExists
 	}
 	c, err := runtime.Create(ctx, r.ID, opts)
 	if err != nil {
@@ -140,7 +140,7 @@ func (s *Service) Delete(ctx context.Context, r *api.DeleteRequest) (*api.Delete
 	}, nil
 }
 
-func containerFromContainerd(ctx context.Context, c containerd.Container) (*container.Container, error) {
+func containerFromContainerd(ctx context.Context, c plugin.Container) (*container.Container, error) {
 	state, err := c.State(ctx)
 	if err != nil {
 		return nil, err
@@ -148,13 +148,13 @@ func containerFromContainerd(ctx context.Context, c containerd.Container) (*cont
 
 	var status container.Status
 	switch state.Status() {
-	case containerd.CreatedStatus:
+	case plugin.CreatedStatus:
 		status = container.Status_CREATED
-	case containerd.RunningStatus:
+	case plugin.RunningStatus:
 		status = container.Status_RUNNING
-	case containerd.StoppedStatus:
+	case plugin.StoppedStatus:
 		status = container.Status_STOPPED
-	case containerd.PausedStatus:
+	case plugin.PausedStatus:
 		status = container.Status_PAUSED
 	default:
 		log.G(ctx).WithField("status", state.Status()).Warn("unknown status")
@@ -235,9 +235,9 @@ func (s *Service) Exec(ctx context.Context, r *api.ExecRequest) (*api.ExecRespon
 	if err != nil {
 		return nil, err
 	}
-	process, err := c.Exec(ctx, containerd.ExecOpts{
+	process, err := c.Exec(ctx, plugin.ExecOpts{
 		Spec: r.Spec.Value,
-		IO: containerd.IO{
+		IO: plugin.IO{
 			Stdin:    r.Stdin,
 			Stdout:   r.Stdout,
 			Stderr:   r.Stderr,
@@ -261,7 +261,7 @@ func (s *Service) Pty(ctx context.Context, r *api.PtyRequest) (*google_protobuf.
 	if err != nil {
 		return nil, err
 	}
-	if err := c.Pty(ctx, r.Pid, containerd.ConsoleSize{
+	if err := c.Pty(ctx, r.Pid, plugin.ConsoleSize{
 		Width:  r.Width,
 		Height: r.Height,
 	}); err != nil {
@@ -281,20 +281,20 @@ func (s *Service) CloseStdin(ctx context.Context, r *api.CloseStdinRequest) (*go
 	return empty, nil
 }
 
-func (s *Service) getContainer(id string) (containerd.Container, error) {
+func (s *Service) getContainer(id string) (plugin.Container, error) {
 	s.mu.Lock()
 	c, ok := s.containers[id]
 	s.mu.Unlock()
 	if !ok {
-		return nil, containerd.ErrContainerNotExist
+		return nil, plugin.ErrContainerNotExist
 	}
 	return c, nil
 }
 
-func (s *Service) getRuntime(name string) (containerd.Runtime, error) {
+func (s *Service) getRuntime(name string) (plugin.Runtime, error) {
 	runtime, ok := s.runtimes[name]
 	if !ok {
-		return nil, containerd.ErrUnknownRuntime
+		return nil, plugin.ErrUnknownRuntime
 	}
 	return runtime, nil
 }

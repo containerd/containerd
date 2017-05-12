@@ -265,8 +265,8 @@ func resolveMetaDB(ctx *cli.Context) (*bolt.DB, error) {
 	return db, nil
 }
 
-func loadRuntimes(monitor plugin.ContainerMonitor) (map[string]containerd.Runtime, error) {
-	o := make(map[string]containerd.Runtime)
+func loadRuntimes(monitor plugin.ContainerMonitor) (map[string]plugin.Runtime, error) {
+	o := make(map[string]plugin.Runtime)
 	for name, rr := range plugin.Registrations() {
 		if rr.Type != plugin.RuntimePlugin {
 			continue
@@ -288,7 +288,7 @@ func loadRuntimes(monitor plugin.ContainerMonitor) (map[string]containerd.Runtim
 		if err != nil {
 			return nil, err
 		}
-		o[name] = vr.(containerd.Runtime)
+		o[name] = vr.(plugin.Runtime)
 	}
 	return o, nil
 }
@@ -358,7 +358,7 @@ func newGRPCServer() *grpc.Server {
 	return s
 }
 
-func loadServices(runtimes map[string]containerd.Runtime, store content.Store, sn snapshot.Snapshotter, meta *bolt.DB) ([]plugin.Service, error) {
+func loadServices(runtimes map[string]plugin.Runtime, store content.Store, sn snapshot.Snapshotter, meta *bolt.DB) ([]plugin.Service, error) {
 	var o []plugin.Service
 	for name, sr := range plugin.Registrations() {
 		if sr.Type != plugin.GRPCPlugin {

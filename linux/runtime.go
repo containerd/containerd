@@ -4,6 +4,7 @@ package linux
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -19,7 +20,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	runc "github.com/containerd/go-runc"
 
-	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 )
 
@@ -37,7 +37,7 @@ func init() {
 	})
 }
 
-var _ = (containerd.Runtime)(&Runtime{})
+var _ = (plugin.Runtime)(&Runtime{})
 
 type Config struct {
 	// Runtime is a path or name of an OCI runtime used by the shim
@@ -81,7 +81,7 @@ type Runtime struct {
 	monitor       plugin.ContainerMonitor
 }
 
-func (r *Runtime) Create(ctx context.Context, id string, opts containerd.CreateOpts) (containerd.Container, error) {
+func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts) (plugin.Container, error) {
 	path, err := r.newBundle(id, opts.Spec)
 	if err != nil {
 		return nil, err
@@ -123,7 +123,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts containerd.CreateO
 	return c, nil
 }
 
-func (r *Runtime) Delete(ctx context.Context, c containerd.Container) (*containerd.Exit, error) {
+func (r *Runtime) Delete(ctx context.Context, c plugin.Container) (*plugin.Exit, error) {
 	lc, ok := c.(*Container)
 	if !ok {
 		return nil, fmt.Errorf("container cannot be cast as *linux.Container")
@@ -138,18 +138,18 @@ func (r *Runtime) Delete(ctx context.Context, c containerd.Container) (*containe
 		return nil, err
 	}
 	lc.shim.Exit(ctx, &shim.ExitRequest{})
-	return &containerd.Exit{
+	return &plugin.Exit{
 		Status:    rsp.ExitStatus,
 		Timestamp: rsp.ExitedAt,
 	}, r.deleteBundle(lc.id)
 }
 
-func (r *Runtime) Containers(ctx context.Context) ([]containerd.Container, error) {
+func (r *Runtime) Containers(ctx context.Context) ([]plugin.Container, error) {
 	dir, err := ioutil.ReadDir(r.root)
 	if err != nil {
 		return nil, err
 	}
-	var o []containerd.Container
+	var o []plugin.Container
 	for _, fi := range dir {
 		if !fi.IsDir() {
 			continue

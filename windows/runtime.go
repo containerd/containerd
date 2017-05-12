@@ -3,6 +3,7 @@
 package windows
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -17,8 +18,6 @@ import (
 	"github.com/containerd/containerd/windows/pid"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
-
-	"golang.org/x/net/context"
 )
 
 const (
@@ -26,7 +25,7 @@ const (
 	owner       = "containerd"
 )
 
-var _ = (containerd.Runtime)(&Runtime{})
+var _ = (plugin.Runtime)(&Runtime{})
 
 func init() {
 	plugin.Register(runtimeName, &plugin.Registration{
@@ -36,13 +35,13 @@ func init() {
 }
 
 func New(ic *plugin.InitContext) (interface{}, error) {
-	c, cancel := context.WithCancel(ic.Context)
 
 	rootDir := filepath.Join(ic.Root, runtimeName)
 	if err := os.MkdirAll(rootDir, 0755); err != nil {
 		return nil, errors.Wrapf(err, "could not create state directory at %s", rootDir)
 	}
 
+	c, cancel := context.WithCancel(ic.Context)
 	r := &Runtime{
 		pidPool:       pid.NewPool(),
 		containers:    make(map[string]*container),
@@ -102,7 +101,7 @@ type RuntimeSpec struct {
 	hcs.Configuration
 }
 
-func (r *Runtime) Create(ctx context.Context, id string, opts containerd.CreateOpts) (containerd.Container, error) {
+func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts) (plugin.Container, error) {
 	var rtSpec RuntimeSpec
 	if err := json.Unmarshal(opts.Spec, &rtSpec); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal oci spec")
@@ -120,7 +119,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts containerd.CreateO
 	return ctr, nil
 }
 
-func (r *Runtime) Delete(ctx context.Context, c containerd.Container) (*containerd.Exit, error) {
+func (r *Runtime) Delete(ctx context.Context, c plugin.Container) (*plugin.Exit, error) {
 	wc, ok := c.(*container)
 	if !ok {
 		return nil, fmt.Errorf("container cannot be cast as *windows.container")
@@ -136,16 +135,16 @@ func (r *Runtime) Delete(ctx context.Context, c containerd.Container) (*containe
 	delete(r.containers, wc.ctr.ID())
 	r.Unlock()
 
-	return &containerd.Exit{
+	return &plugin.Exit{
 		Status:    ec,
 		Timestamp: wc.ctr.Processes()[0].ExitedAt(),
 	}, nil
 }
 
-func (r *Runtime) Containers(ctx context.Context) ([]containerd.Container, error) {
+func (r *Runtime) Containers(ctx context.Context) ([]plugin.Container, error) {
 	r.Lock()
 	defer r.Unlock()
-	list := make([]containerd.Container, len(r.containers))
+	list := make([]plugin.Container, len(r.containers))
 	for _, c := range r.containers {
 		select {
 		case <-ctx.Done():

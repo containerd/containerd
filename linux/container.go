@@ -3,24 +3,25 @@
 package linux
 
 import (
-	"github.com/containerd/containerd"
+	"context"
+
 	"github.com/containerd/containerd/api/services/shim"
 	"github.com/containerd/containerd/api/types/container"
+	"github.com/containerd/containerd/plugin"
 	protobuf "github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"golang.org/x/net/context"
 )
 
 type State struct {
 	pid    uint32
-	status containerd.Status
+	status plugin.Status
 }
 
 func (s State) Pid() uint32 {
 	return s.pid
 }
 
-func (s State) Status() containerd.Status {
+func (s State) Status() plugin.Status {
 	return s.status
 }
 
@@ -37,8 +38,8 @@ type Container struct {
 	shim shim.ShimClient
 }
 
-func (c *Container) Info() containerd.ContainerInfo {
-	return containerd.ContainerInfo{
+func (c *Container) Info() plugin.ContainerInfo {
+	return plugin.ContainerInfo{
 		ID:      c.id,
 		Runtime: runtimeName,
 	}
@@ -49,21 +50,21 @@ func (c *Container) Start(ctx context.Context) error {
 	return err
 }
 
-func (c *Container) State(ctx context.Context) (containerd.State, error) {
+func (c *Container) State(ctx context.Context) (plugin.State, error) {
 	response, err := c.shim.State(ctx, &shim.StateRequest{})
 	if err != nil {
 		return nil, err
 	}
-	var status containerd.Status
+	var status plugin.Status
 	switch response.Status {
 	case container.Status_CREATED:
-		status = containerd.CreatedStatus
+		status = plugin.CreatedStatus
 	case container.Status_RUNNING:
-		status = containerd.RunningStatus
+		status = plugin.RunningStatus
 	case container.Status_STOPPED:
-		status = containerd.StoppedStatus
+		status = plugin.StoppedStatus
 	case container.Status_PAUSED:
-		status = containerd.PausedStatus
+		status = plugin.PausedStatus
 		// TODO: containerd.DeletedStatus
 	}
 	return &State{
@@ -90,7 +91,7 @@ func (c *Container) Kill(ctx context.Context, signal uint32, all bool) error {
 	return err
 }
 
-func (c *Container) Exec(ctx context.Context, opts containerd.ExecOpts) (containerd.Process, error) {
+func (c *Container) Exec(ctx context.Context, opts plugin.ExecOpts) (plugin.Process, error) {
 	request := &shim.ExecRequest{
 		Stdin:    opts.IO.Stdin,
 		Stdout:   opts.IO.Stdout,
@@ -110,7 +111,7 @@ func (c *Container) Exec(ctx context.Context, opts containerd.ExecOpts) (contain
 		c:   c,
 	}, nil
 }
-func (c *Container) Pty(ctx context.Context, pid uint32, size containerd.ConsoleSize) error {
+func (c *Container) Pty(ctx context.Context, pid uint32, size plugin.ConsoleSize) error {
 	_, err := c.shim.Pty(ctx, &shim.PtyRequest{
 		Pid:    pid,
 		Width:  size.Width,
@@ -139,7 +140,7 @@ func (p *Process) Kill(ctx context.Context, signal uint32, _ bool) error {
 	return err
 }
 
-func (p *Process) State(ctx context.Context) (containerd.State, error) {
+func (p *Process) State(ctx context.Context) (plugin.State, error) {
 	// use the container status for the status of the process
 	state, err := p.c.State(ctx)
 	if err != nil {

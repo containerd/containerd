@@ -1,6 +1,6 @@
-package containerd
+package plugin
 
-import "golang.org/x/net/context"
+import "context"
 
 type ContainerInfo struct {
 	ID      string
@@ -26,10 +26,6 @@ type Container interface {
 	Pty(context.Context, uint32, ConsoleSize) error
 	// CloseStdin closes the processes stdin
 	CloseStdin(context.Context, uint32) error
-}
-
-type LinuxContainer interface {
-	Container
 }
 
 type ExecOpts struct {

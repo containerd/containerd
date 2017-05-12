@@ -1,9 +1,10 @@
-package containerd
+package plugin
 
 import (
+	"context"
 	"time"
 
-	"golang.org/x/net/context"
+	"github.com/containerd/containerd"
 )
 
 type IO struct {
@@ -17,7 +18,7 @@ type CreateOpts struct {
 	// Spec is the OCI runtime spec
 	Spec []byte
 	// Rootfs mounts to perform to gain access to the container's filesystem
-	Rootfs []Mount
+	Rootfs []containerd.Mount
 	// IO for the container's main process
 	IO IO
 }
@@ -37,5 +38,5 @@ type Runtime interface {
 	// Delete removes the container in the runtime
 	Delete(context.Context, Container) (*Exit, error)
 	// Events returns events for the runtime and all containers created by the runtime
-	Events(context.Context) <-chan *Event
+	Events(context.Context) <-chan *containerd.Event
 }

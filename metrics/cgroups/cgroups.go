@@ -44,11 +44,7 @@ type cgroupsMonitor struct {
 	events    chan<- *containerd.Event
 }
 
-func (m *cgroupsMonitor) Monitor(c containerd.Container) error {
-	// skip non-linux containers
-	if _, ok := c.(containerd.LinuxContainer); !ok {
-		return nil
-	}
+func (m *cgroupsMonitor) Monitor(c plugin.Container) error {
 	id := c.Info().ID
 	state, err := c.State(m.context)
 	if err != nil {
@@ -64,10 +60,7 @@ func (m *cgroupsMonitor) Monitor(c containerd.Container) error {
 	return m.oom.Add(id, cg, m.trigger)
 }
 
-func (m *cgroupsMonitor) Stop(c containerd.Container) error {
-	if _, ok := c.(containerd.LinuxContainer); !ok {
-		return nil
-	}
+func (m *cgroupsMonitor) Stop(c plugin.Container) error {
 	m.collector.Remove(c.Info().ID)
 	return nil
 }
