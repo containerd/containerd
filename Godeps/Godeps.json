@@ -7,9 +7,24 @@
 	],
 	"Deps": [
 		{
+			"ImportPath": "github.com/Microsoft/go-winio",
+			"Comment": "v0.3.8",
+			"Rev": "fff283ad5116362ca252298cfc9b95828956d85d"
+		},
+		{
+			"ImportPath": "github.com/Sirupsen/logrus",
+			"Comment": "v0.11.0",
+			"Rev": "d26492970760ca5d33129d2d799e34be5c4782eb"
+		},
+		{
 			"ImportPath": "github.com/blang/semver",
 			"Comment": "v3.0.1",
 			"Rev": "31b736133b98f26d5e078ec9eb591666edfd091f"
+		},
+		{
+			"ImportPath": "github.com/boltdb/bolt",
+			"Comment": "v1.3.0-58-ge9cf4fa",
+			"Rev": "e9cf4fae01b5a8ff89d0ec6b32f0d9c9f79aefdd"
 		},
 		{
 			"ImportPath": "github.com/containerd/containerd",
@@ -52,9 +67,99 @@
 			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
 		},
 		{
+			"ImportPath": "github.com/containerd/containerd/archive",
+			"Comment": "v0.2.3-745-gbbeaab5",
+			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
+		},
+		{
+			"ImportPath": "github.com/containerd/containerd/archive/compression",
+			"Comment": "v0.2.3-745-gbbeaab5",
+			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
+		},
+		{
+			"ImportPath": "github.com/containerd/containerd/content",
+			"Comment": "v0.2.3-745-gbbeaab5",
+			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
+		},
+		{
+			"ImportPath": "github.com/containerd/containerd/fs",
+			"Comment": "v0.2.3-745-gbbeaab5",
+			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
+		},
+		{
+			"ImportPath": "github.com/containerd/containerd/images",
+			"Comment": "v0.2.3-745-gbbeaab5",
+			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
+		},
+		{
+			"ImportPath": "github.com/containerd/containerd/log",
+			"Comment": "v0.2.3-745-gbbeaab5",
+			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
+		},
+		{
+			"ImportPath": "github.com/containerd/containerd/plugin",
+			"Comment": "v0.2.3-745-gbbeaab5",
+			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
+		},
+		{
+			"ImportPath": "github.com/containerd/containerd/progress",
+			"Comment": "v0.2.3-745-gbbeaab5",
+			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
+		},
+		{
+			"ImportPath": "github.com/containerd/containerd/reference",
+			"Comment": "v0.2.3-745-gbbeaab5",
+			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
+		},
+		{
+			"ImportPath": "github.com/containerd/containerd/remotes",
+			"Comment": "v0.2.3-745-gbbeaab5",
+			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
+		},
+		{
+			"ImportPath": "github.com/containerd/containerd/remotes/docker",
+			"Comment": "v0.2.3-745-gbbeaab5",
+			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
+		},
+		{
+			"ImportPath": "github.com/containerd/containerd/rootfs",
+			"Comment": "v0.2.3-745-gbbeaab5",
+			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
+		},
+		{
+			"ImportPath": "github.com/containerd/containerd/services/content",
+			"Comment": "v0.2.3-745-gbbeaab5",
+			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
+		},
+		{
+			"ImportPath": "github.com/containerd/containerd/services/images",
+			"Comment": "v0.2.3-745-gbbeaab5",
+			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
+		},
+		{
+			"ImportPath": "github.com/containerd/containerd/services/rootfs",
+			"Comment": "v0.2.3-745-gbbeaab5",
+			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
+		},
+		{
+			"ImportPath": "github.com/containerd/containerd/snapshot",
+			"Comment": "v0.2.3-745-gbbeaab5",
+			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
+		},
+		{
+			"ImportPath": "github.com/containerd/containerd/sys",
+			"Comment": "v0.2.3-745-gbbeaab5",
+			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
+		},
+		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
 			"Comment": "v1.1.0",
 			"Rev": "346938d642f2ec3594ed81d874461961cd0faa76"
+		},
+		{
+			"ImportPath": "github.com/docker/go-units",
+			"Comment": "v0.3.1",
+			"Rev": "f2d77a61e3c169b43402a0a1e84f06daf29b8190"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/gogoproto",
@@ -94,13 +199,32 @@
 			"Rev": "8ee79997227bf9b34611aee7946ae64735e6fd93"
 		},
 		{
+			"ImportPath": "github.com/nightlyone/lockfile",
+			"Rev": "1d49c987357a327b5b03aa84cbddd582c328615d"
+		},
+		{
 			"ImportPath": "github.com/opencontainers/go-digest",
 			"Rev": "21dfd564fd89c944783d00d069f33e3e7123c448"
+		},
+		{
+			"ImportPath": "github.com/opencontainers/image-spec/identity",
+			"Comment": "v1.0.0-rc4-51-ga431dbc",
+			"Rev": "a431dbcf6a74fca2e0e040b819a836dbe3fb23ca"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/image-spec/specs-go",
 			"Comment": "v1.0.0-rc4-51-ga431dbc",
 			"Rev": "a431dbcf6a74fca2e0e040b819a836dbe3fb23ca"
+		},
+		{
+			"ImportPath": "github.com/opencontainers/image-spec/specs-go/v1",
+			"Comment": "v1.0.0-rc4-51-ga431dbc",
+			"Rev": "a431dbcf6a74fca2e0e040b819a836dbe3fb23ca"
+		},
+		{
+			"ImportPath": "github.com/opencontainers/runc/libcontainer/system",
+			"Comment": "v1.0.0-rc3-21-g50401b5",
+			"Rev": "50401b5b4c2e01e4f1372b73a021742deeaf4e2d"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runtime-spec/specs-go",
@@ -122,12 +246,25 @@
 			"Rev": "9ff6c6923cfffbcd502984b8e0c80539a94968b7"
 		},
 		{
+			"ImportPath": "github.com/stevvooe/continuity/sysx",
+			"Rev": "2abd81dfcc64c06e1eb16a081fd187798f4c2919"
+		},
+		{
 			"ImportPath": "github.com/stretchr/testify/assert",
 			"Comment": "v1.1.4-6-g18a02ba",
 			"Rev": "18a02ba4a312f95da08ff4cfc0055750ce50ae9e"
 		},
 		{
+			"ImportPath": "github.com/stretchr/testify/require",
+			"Comment": "v1.1.4-6-g18a02ba",
+			"Rev": "18a02ba4a312f95da08ff4cfc0055750ce50ae9e"
+		},
+		{
 			"ImportPath": "golang.org/x/net/context",
+			"Rev": "e90d6d0afc4c315a0d87a568ae68577cc15149a0"
+		},
+		{
+			"ImportPath": "golang.org/x/net/context/ctxhttp",
 			"Rev": "e90d6d0afc4c315a0d87a568ae68577cc15149a0"
 		},
 		{
@@ -153,6 +290,10 @@
 		{
 			"ImportPath": "golang.org/x/net/trace",
 			"Rev": "e90d6d0afc4c315a0d87a568ae68577cc15149a0"
+		},
+		{
+			"ImportPath": "golang.org/x/sync/errgroup",
+			"Rev": "450f422ab23cf9881c94e2db30cac0eb1b7cf80c"
 		},
 		{
 			"ImportPath": "golang.org/x/sys/unix",

@@ -17,14 +17,34 @@ limitations under the License.
 package server
 
 import (
-	"errors"
-
+	"fmt"
 	"golang.org/x/net/context"
 
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
 // ListImages lists existing images.
+// TODO(mikebrow): add filters
+// TODO(mikebrow): harden api
 func (c *criContainerdService) ListImages(ctx context.Context, r *runtime.ListImagesRequest) (*runtime.ListImagesResponse, error) {
-	return nil, errors.New("not implemented")
+	imageMetadataA, err := c.imageMetadataStore.List()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list image metadata from store %v", err)
+	}
+	// TODO(mikebrow): Get the id->tags, and id->digest mapping from our checkpoint;
+	// Get other information from containerd image/content store
+
+	var images []*runtime.Image
+	for _, image := range imageMetadataA { // TODO(mikebrow): write a ImageMetadata to runtime.Image converter
+		ri := &runtime.Image{
+			Id:          image.ID,
+			RepoTags:    image.RepoTags,
+			RepoDigests: image.RepoDigests,
+			Size_:       image.Size,
+			// TODO(mikebrow): Uid and Username?
+		}
+		images = append(images, ri)
+	}
+
+	return &runtime.ListImagesResponse{Images: images}, nil
 }

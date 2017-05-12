@@ -7,6 +7,11 @@
 _obj
 _test
 
+# popular temporaries
+.err
+.out
+.diff
+
 # Architecture specific extensions/prefixes
 *.[568vq]
 [568vq].out
@@ -20,5 +25,3 @@ _cgo_export.*
 _testmain.go
 
 *.exe
-*.test
-*.prof

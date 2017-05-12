@@ -69,7 +69,7 @@ cri-containerd: check-gopath
 	   $(PROJECT)/cmd/cri-containerd
 
 test:
-	go test -timeout=1m -v -race ./pkg/... $(BUILD_TAGS)
+	go test -timeout=10m -v -race ./pkg/... $(BUILD_TAGS)
 
 clean:
 	rm -f $(BUILD_DIR)/cri-containerd

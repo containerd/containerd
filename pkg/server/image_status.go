@@ -17,14 +17,48 @@ limitations under the License.
 package server
 
 import (
-	"errors"
-
 	"golang.org/x/net/context"
 
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
-// ImageStatus returns the status of the image, returns nil if the image doesn't present.
+// ImageStatus returns the status of the image, returns nil if the image isn't present.
 func (c *criContainerdService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequest) (*runtime.ImageStatusResponse, error) {
-	return nil, errors.New("not implemented")
+	ref := r.GetImage().GetImage()
+	// TODO(mikebrow): Get the id->tags, and id->digest mapping from our checkpoint;
+	// Get other information from containerd image/content store
+
+	// if the passed ref is a digest.. and is stored the following get should work
+	// note: get returns nil with no err
+	meta, _ := c.imageMetadataStore.Get(ref)
+	if meta != nil {
+		return &runtime.ImageStatusResponse{Image: &runtime.Image{ // TODO(mikebrow): write a ImageMetadata to runtim.Image converter
+			Id:          meta.ID,
+			RepoTags:    meta.RepoTags,
+			RepoDigests: meta.RepoDigests,
+			Size_:       meta.Size,
+			// TODO(mikebrow): Uid and Username?
+		}}, nil
+	}
+
+	// Search for image by ref in repo tags if found the ID matching ref
+	// is our digest.
+	imageMetadataA, err := c.imageMetadataStore.List()
+	if err == nil {
+		for _, meta := range imageMetadataA {
+			for _, tag := range meta.RepoTags {
+				if ref == tag {
+					return &runtime.ImageStatusResponse{Image: &runtime.Image{ // TODO(mikebrow): write a ImageMetadata to runtim.Image converter
+						Id:          meta.ID,
+						RepoTags:    meta.RepoTags,
+						RepoDigests: meta.RepoDigests,
+						Size_:       meta.Size,
+						// TODO(mikebrow): Uid and Username?
+					}}, nil
+				}
+			}
+		}
+	}
+
+	return nil, nil
 }
