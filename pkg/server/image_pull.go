@@ -94,7 +94,7 @@ func (c *criContainerdService) imageReferenceResolver(ctx context.Context, ref s
 		return resolvedImageName, manifest, compressedSize, fmt.Errorf("failed to resolve ref %q: err: %v", ref, err)
 	}
 
-	err = c.imageStore.Put(ctx, resolvedImageName, desc)
+	err = c.imageStoreService.Put(ctx, resolvedImageName, desc)
 	if err != nil {
 		return resolvedImageName, manifest, compressedSize, fmt.Errorf("failed to put %q: desc: %v err: %v", resolvedImageName, desc, err)
 	}
@@ -107,7 +107,7 @@ func (c *criContainerdService) imageReferenceResolver(ctx context.Context, ref s
 		return resolvedImageName, manifest, compressedSize, fmt.Errorf("failed to fetch %q: desc: %v err: %v", resolvedImageName, desc, err)
 	}
 
-	image, err := c.imageStore.Get(ctx, resolvedImageName)
+	image, err := c.imageStoreService.Get(ctx, resolvedImageName)
 	if err != nil {
 		return resolvedImageName, manifest, compressedSize,
 			fmt.Errorf("get failed for image:%q err: %v", resolvedImageName, err)
@@ -150,7 +150,7 @@ func (c *criContainerdService) pullImage(ctx context.Context, ref string) (image
 		return desc, size, fmt.Errorf("failed to resolve ref %q: err: %v", ref, err)
 	}
 
-	err = c.imageStore.Put(ctx, resolvedImageName, desc)
+	err = c.imageStoreService.Put(ctx, resolvedImageName, desc)
 	if err != nil {
 		return desc, size, fmt.Errorf("failed to put %q: desc: %v err: %v", resolvedImageName, desc, err)
 	}
@@ -165,7 +165,7 @@ func (c *criContainerdService) pullImage(ctx context.Context, ref string) (image
 		return desc, size, fmt.Errorf("failed to fetch %q: desc: %v err: %v", resolvedImageName, desc, err)
 	}
 
-	image, err := c.imageStore.Get(ctx, resolvedImageName)
+	image, err := c.imageStoreService.Get(ctx, resolvedImageName)
 	if err != nil {
 		return desc, size,
 			fmt.Errorf("get failed for image:%q err: %v", resolvedImageName, err)

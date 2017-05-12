@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"github.com/docker/docker/pkg/truncindex"
 	"google.golang.org/grpc"
 
 	contentapi "github.com/containerd/containerd/api/services/content"
@@ -29,13 +30,20 @@ import (
 	contentservice "github.com/containerd/containerd/services/content"
 	imagesservice "github.com/containerd/containerd/services/images"
 	rootfsservice "github.com/containerd/containerd/services/rootfs"
+
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
-	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	osinterface "github.com/kubernetes-incubator/cri-containerd/pkg/os"
+	"github.com/kubernetes-incubator/cri-containerd/pkg/registrar"
 
-	// TODO remove the underscores from the following imports as the services are
-	// implemented. "_" is being used to hold the reference to keep autocomplete
-	// from deleting them until referenced below.
+	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+)
+
+// TODO remove the underscores from the following imports as the services are
+// implemented. "_" is being used to hold the reference to keep autocomplete
+// from deleting them until referenced below.
+// nolint: golint
+import (
 	_ "github.com/containerd/containerd/api/types/container"
 	_ "github.com/containerd/containerd/api/types/descriptor"
 	_ "github.com/containerd/containerd/api/types/mount"
@@ -51,23 +59,53 @@ type CRIContainerdService interface {
 
 // criContainerdService implements CRIContainerdService.
 type criContainerdService struct {
-	containerService   execution.ContainerServiceClient
-	imageStore         images.Store
-	contentIngester    content.Ingester
-	contentProvider    content.Provider
-	rootfsUnpacker     rootfs.Unpacker
+	// os is an interface for all required os operations.
+	os osinterface.OS
+	// rootDir is the directory for managing cri-containerd files.
+	rootDir string
+	// sandboxStore stores all sandbox metadata.
+	sandboxStore metadata.SandboxStore
+	// imageMetadataStore stores all image metadata.
 	imageMetadataStore metadata.ImageMetadataStore
+	// sandboxNameIndex stores all sandbox names and make sure each name
+	// is unique.
+	sandboxNameIndex *registrar.Registrar
+	// sandboxIDIndex is trie tree for truncated id indexing, e.g. after an
+	// id "abcdefg" is added, we could use "abcd" to identify the same thing
+	// as long as there is no ambiguity.
+	sandboxIDIndex *truncindex.TruncIndex
+	// containerService is containerd container service client.
+	containerService execution.ContainerServiceClient
+	// contentIngester is the containerd service to ingest content into
+	// content store.
+	contentIngester content.Ingester
+	// contentProvider is the containerd service to get content from
+	// content store.
+	contentProvider content.Provider
+	// rootfsUnpacker is the containerd service to unpack image content
+	// into snapshots.
+	rootfsUnpacker rootfs.Unpacker
+	// imageStoreService is the containerd service to store and track
+	// image metadata.
+	imageStoreService images.Store
 }
 
 // NewCRIContainerdService returns a new instance of CRIContainerdService
-func NewCRIContainerdService(conn *grpc.ClientConn) CRIContainerdService {
+func NewCRIContainerdService(conn *grpc.ClientConn, rootDir string) CRIContainerdService {
 	// TODO: Initialize different containerd clients.
+	// TODO(random-liu): [P2] Recover from runtime state and metadata store.
 	return &criContainerdService{
-		containerService:   execution.NewContainerServiceClient(conn),
-		imageStore:         imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)),
-		contentIngester:    contentservice.NewIngesterFromClient(contentapi.NewContentClient(conn)),
-		contentProvider:    contentservice.NewProviderFromClient(contentapi.NewContentClient(conn)),
-		rootfsUnpacker:     rootfsservice.NewUnpackerFromClient(rootfsapi.NewRootFSClient(conn)),
+		os:                 osinterface.RealOS{},
+		rootDir:            rootDir,
+		sandboxStore:       metadata.NewSandboxStore(store.NewMetadataStore()),
 		imageMetadataStore: metadata.NewImageMetadataStore(store.NewMetadataStore()),
+		// TODO(random-liu): Register sandbox id/name for recovered sandbox.
+		sandboxNameIndex:  registrar.NewRegistrar(),
+		sandboxIDIndex:    truncindex.NewTruncIndex(nil),
+		containerService:  execution.NewContainerServiceClient(conn),
+		imageStoreService: imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)),
+		contentIngester:   contentservice.NewIngesterFromClient(contentapi.NewContentClient(conn)),
+		contentProvider:   contentservice.NewProviderFromClient(contentapi.NewContentClient(conn)),
+		rootfsUnpacker:    rootfsservice.NewUnpackerFromClient(rootfsapi.NewRootFSClient(conn)),
 	}
 }

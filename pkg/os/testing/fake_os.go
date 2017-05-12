@@ -17,7 +17,10 @@ limitations under the License.
 package testing
 
 import (
+	"io"
 	"os"
+
+	"golang.org/x/net/context"
 
 	osInterface "github.com/kubernetes-incubator/cri-containerd/pkg/os"
 )
@@ -28,6 +31,7 @@ import (
 type FakeOS struct {
 	MkdirAllFn  func(string, os.FileMode) error
 	RemoveAllFn func(string) error
+	OpenFifoFn  func(context.Context, string, int, os.FileMode) (io.ReadWriteCloser, error)
 }
 
 var _ osInterface.OS = &FakeOS{}
@@ -51,4 +55,12 @@ func (f *FakeOS) RemoveAll(path string) error {
 		return f.RemoveAllFn(path)
 	}
 	return nil
+}
+
+// OpenFifo is a fake call that invokes OpenFifoFn or just returns nil.
+func (f *FakeOS) OpenFifo(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
+	if f.OpenFifoFn != nil {
+		return f.OpenFifoFn(ctx, fn, flag, perm)
+	}
+	return nil, nil
 }

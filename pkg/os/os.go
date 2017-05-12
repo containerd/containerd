@@ -17,7 +17,12 @@ limitations under the License.
 package os
 
 import (
+	"io"
 	"os"
+
+	"golang.org/x/net/context"
+
+	"github.com/tonistiigi/fifo"
 )
 
 // OS collects system level operations that need to be mocked out
@@ -25,6 +30,7 @@ import (
 type OS interface {
 	MkdirAll(path string, perm os.FileMode) error
 	RemoveAll(path string) error
+	OpenFifo(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error)
 }
 
 // RealOS is used to dispatch the real system level operations.
@@ -38,4 +44,9 @@ func (RealOS) MkdirAll(path string, perm os.FileMode) error {
 // RemoveAll will call os.RemoveAll to remove the path and its children.
 func (RealOS) RemoveAll(path string) error {
 	return os.RemoveAll(path)
+}
+
+// OpenFifo will call fifo.OpenFifo to open a fifo.
+func (RealOS) OpenFifo(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
+	return fifo.OpenFifo(ctx, fn, flag, perm)
 }
