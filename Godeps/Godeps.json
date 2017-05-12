@@ -102,11 +102,6 @@
 			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
 		},
 		{
-			"ImportPath": "github.com/containerd/containerd/progress",
-			"Comment": "v0.2.3-745-gbbeaab5",
-			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
-		},
-		{
 			"ImportPath": "github.com/containerd/containerd/reference",
 			"Comment": "v0.2.3-745-gbbeaab5",
 			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
@@ -155,11 +150,6 @@
 			"ImportPath": "github.com/davecgh/go-spew/spew",
 			"Comment": "v1.1.0",
 			"Rev": "346938d642f2ec3594ed81d874461961cd0faa76"
-		},
-		{
-			"ImportPath": "github.com/docker/go-units",
-			"Comment": "v0.3.1",
-			"Rev": "f2d77a61e3c169b43402a0a1e84f06daf29b8190"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/gogoproto",
@@ -223,7 +213,7 @@
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/system",
-			"Comment": "v1.0.0-rc3-21-g50401b5",
+			"Comment": "v1.0.0-rc3-21-g50401b5b",
 			"Rev": "50401b5b4c2e01e4f1372b73a021742deeaf4e2d"
 		},
 		{
@@ -238,7 +228,6 @@
 		},
 		{
 			"ImportPath": "github.com/pmezard/go-difflib/difflib",
-			"Comment": "v1.0.0",
 			"Rev": "792786c7400a136282c1664665ae0a8db921c6c2"
 		},
 		{
@@ -251,11 +240,6 @@
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",
-			"Comment": "v1.1.4-6-g18a02ba",
-			"Rev": "18a02ba4a312f95da08ff4cfc0055750ce50ae9e"
-		},
-		{
-			"ImportPath": "github.com/stretchr/testify/require",
 			"Comment": "v1.1.4-6-g18a02ba",
 			"Rev": "18a02ba4a312f95da08ff4cfc0055750ce50ae9e"
 		},
@@ -297,6 +281,10 @@
 		},
 		{
 			"ImportPath": "golang.org/x/sys/unix",
+			"Rev": "f3918c30c5c2cb527c0b071a27c35120a6c0719a"
+		},
+		{
+			"ImportPath": "golang.org/x/sys/windows",
 			"Rev": "f3918c30c5c2cb527c0b071a27c35120a6c0719a"
 		},
 		{
