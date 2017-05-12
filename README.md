@@ -28,6 +28,7 @@ To build the daemon and `ctr` simple test client, the following build system dep
 
 * Go 1.8.x or above (requires 1.8 due to use of golang plugin(s))
 * Protoc 3.x compiler and headers (download at the [Google protobuf releases page](https://github.com/google/protobuf/releases))
+* Btrfs headers and libraries for your distribution. Note that building the btrfs driver can be disabled via build tag removing this dependency.
 
 For proper results, install the `protoc` release into `/usr/local` on your build system. For example, the following commands will download and install the 3.1.0 release for a 64-bit Linux host:
 
@@ -37,6 +38,10 @@ $ sudo unzip protoc-3.1.0-linux-x86_64.zip -d /usr/local
 ```
 
 With the required dependencies installed, the `Makefile` target named **binaries** will compile the `ctr` and `containerd` binaries and place them in the `bin/` directory. Using `sudo make install` will place the binaries in `/usr/local/bin`. When making any changes to the gRPC API, `make generate` will use the installed `protoc` compiler to regenerate the API generated code packages.
+
+> *Note*: A build tag is currently available to disable building the btrfs snapshot driver.
+> Adding `BUILDTAGS=no_btrfs` to your environment before calling the **binaries**
+> Makefile target will disable the btrfs driver within the containerd Go build.
 
 Vendoring of external imports uses the [`vndr` tool](https://github.com/LK4D4/vndr) which uses a simple config file, `vendor.conf`, to provide the URL and version or hash details for each vendored import. After modifying `vendor.conf` run the `vndr` tool to update the `vendor/` directory contents. Combining the `vendor.conf` update with the changeset in `vendor/` after running `vndr` should become a single commit for a PR which relies on vendored updates.
 

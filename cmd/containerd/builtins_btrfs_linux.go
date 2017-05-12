@@ -1,4 +1,4 @@
-// +build !containerd_no_btrfs
+// +build !no_btrfs
 
 package main
 

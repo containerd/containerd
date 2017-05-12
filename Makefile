@@ -37,7 +37,7 @@ ifeq ("$(GOOS)", "windows")
 	BINARY_SUFFIX=".exe"
 endif
 
-
+GO_TAGS=$(if $(BUILDTAGS),-tags "$(BUILDTAGS)",)
 GO_LDFLAGS=-ldflags "-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG)"
 
 # Flags passed to `go test`
@@ -136,7 +136,7 @@ bin/%: cmd/% FORCE
 	@test $$(go list) = "${PKG}" || \
 		(echo "$(ONI) Please correctly set up your Go build environment. This project must be located at <GOPATH>/src/${PKG}" && false)
 	@echo "$(WHALE) $@${BINARY_SUFFIX}"
-	@go build -i -o $@${BINARY_SUFFIX} ${GO_LDFLAGS}  ${GO_GCFLAGS} ./$<
+	@go build -i -o $@${BINARY_SUFFIX} ${GO_LDFLAGS} ${GO_TAGS} ${GO_GCFLAGS} ./$<
 
 binaries: $(BINARIES) ## build binaries
 	@echo "$(WHALE) $@"
