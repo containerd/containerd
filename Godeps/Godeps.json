@@ -152,6 +152,16 @@
 			"Rev": "346938d642f2ec3594ed81d874461961cd0faa76"
 		},
 		{
+			"ImportPath": "github.com/docker/distribution/digestset",
+			"Comment": "v2.6.0-rc.1-130-gb38e5838",
+			"Rev": "b38e5838b7b2f2ad48e06ec4b500011976080621"
+		},
+		{
+			"ImportPath": "github.com/docker/distribution/reference",
+			"Comment": "v2.6.0-rc.1-130-gb38e5838",
+			"Rev": "b38e5838b7b2f2ad48e06ec4b500011976080621"
+		},
+		{
 			"ImportPath": "github.com/docker/docker/pkg/random",
 			"Comment": "v1.13.1",
 			"Rev": "092cba3727bb9b4a2f0e922cd6c0f93ea270e363"

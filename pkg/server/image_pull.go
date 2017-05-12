@@ -20,28 +20,42 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
-
 	"github.com/containerd/containerd/content"
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
+	"github.com/docker/distribution/reference"
+	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+
+	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 )
 
 // PullImage pulls an image with authentication config.
 // TODO(mikebrow): add authentication
 // TODO(mikebrow): harden api (including figuring out at what layer we should be blocking on duplicate requests.)
-func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (*runtime.PullImageResponse, error) {
+func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (retRes *runtime.PullImageResponse, retErr error) {
+	glog.V(2).Infof("PullImage %q with auth config %+v", r.GetImage().GetImage(), r.GetAuth())
+	defer func() {
+		if retErr == nil {
+			glog.V(2).Infof("PullImage returns image reference %q", retRes.GetImageRef())
+		}
+	}()
+
 	var (
-		err  error
 		size int64
 		desc imagespec.Descriptor
 	)
 
-	image := r.GetImage().Image
+	image, err := normalizeImageRef(r.GetImage().GetImage())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse image reference %q: %v", r.GetImage().GetImage(), err)
+	}
+	if r.GetImage().GetImage() != image {
+		glog.V(4).Info("PullImage using normalized image ref: %q", image)
+	}
 
 	if desc, size, err = c.pullImage(ctx, image); err != nil {
 		return nil, fmt.Errorf("failed to pull image %q: %v", image, err)
@@ -64,6 +78,17 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 
 	// Return the image digest
 	return &runtime.PullImageResponse{ImageRef: digest}, err
+}
+
+// normalizeImageRef normalizes the image reference following the docker convention. This is added
+// mainly for backward compatibility.
+func normalizeImageRef(ref string) (string, error) {
+	named, err := reference.ParseNormalizedNamed(ref)
+	if err != nil {
+		return "", err
+	}
+	named = reference.TagNameOnly(named)
+	return named.String(), nil
 }
 
 // imageReferenceResolver attempts to resolve the image reference into a name
