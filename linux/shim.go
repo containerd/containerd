@@ -22,16 +22,24 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	shimSocketFilename  = "shim.sock"
+	shimLogJSONFilename = "shim-log.json"
+)
+
 func newShim(path string, remote bool) (shim.ShimClient, error) {
 	if !remote {
 		return localShim.Client(path)
 	}
-	socket := filepath.Join(path, "shim.sock")
+	socket := filepath.Join(path, shimSocketFilename)
 	l, err := sys.CreateUnixSocket(socket)
 	if err != nil {
 		return nil, err
 	}
-	cmd := exec.Command("containerd-shim")
+	cmd := exec.Command("containerd-shim",
+		"-debug",
+		"-log-format", "json",
+		"-log", shimLogJSONFilename)
 	cmd.Dir = path
 	f, err := l.(*net.UnixListener).File()
 	if err != nil {
@@ -61,7 +69,7 @@ func loadShim(path string, remote bool) (shim.ShimClient, error) {
 	if !remote {
 		return localShim.Client(path)
 	}
-	socket := filepath.Join(path, "shim.sock")
+	socket := filepath.Join(path, shimSocketFilename)
 	return connectShim(socket)
 }
 
