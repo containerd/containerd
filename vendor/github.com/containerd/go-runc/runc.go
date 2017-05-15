@@ -523,20 +523,6 @@ func (r *Runc) args() (out []string) {
 	return out
 }
 
-func (r *Runc) command(context context.Context, args ...string) *exec.Cmd {
-	command := r.Command
-	if command == "" {
-		command = DefaultCommand
-	}
-	cmd := exec.CommandContext(context, command, append(r.args(), args...)...)
-	if r.PdeathSignal != 0 {
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			Pdeathsig: r.PdeathSignal,
-		}
-	}
-	return cmd
-}
-
 // runOrError will run the provided command.  If an error is
 // encountered and neither Stdout or Stderr was set the error and the
 // stderr of the command will be returned in the format of <error>:
