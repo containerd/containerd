@@ -1,6 +1,7 @@
 package supervisor
 
 import (
+	"strings"
 	"time"
 
 	"github.com/containerd/containerd/runtime"
@@ -23,22 +24,38 @@ func (s *Supervisor) updateContainer(t *UpdateTask) error {
 	if t.State != "" {
 		switch t.State {
 		case runtime.Running:
+			now := time.Now()
+			transaction, err := s.transactionFactory.OpenTransaction(t.ID, ResumeTransaction, WithTransactionTimestamp(now))
+			if err != nil {
+				return err
+			}
+
 			if err := container.Resume(); err != nil {
+				transaction.Close()
 				return err
 			}
 			s.notifySubscribers(Event{
-				ID:        t.ID,
-				Type:      StateResume,
-				Timestamp: time.Now(),
+				ID:            t.ID,
+				Type:          StateResume,
+				Timestamp:     time.Now(),
+				TransactionID: transaction.TransactionID(),
 			})
 		case runtime.Paused:
+			now := time.Now()
+			transaction, err := s.transactionFactory.OpenTransaction(t.ID, PauseTransaction, WithTransactionTimestamp(now))
+			if err != nil {
+				return err
+			}
+
 			if err := container.Pause(); err != nil {
+				transaction.Close()
 				return err
 			}
 			s.notifySubscribers(Event{
-				ID:        t.ID,
-				Type:      StatePause,
-				Timestamp: time.Now(),
+				ID:            t.ID,
+				Type:          StatePause,
+				Timestamp:     now,
+				TransactionID: transaction.TransactionID(),
 			})
 		default:
 			return ErrUnknownContainerStatus
@@ -48,6 +65,44 @@ func (s *Supervisor) updateContainer(t *UpdateTask) error {
 	if t.Resources != nil {
 		return container.UpdateResources(t.Resources)
 	}
+	return nil
+}
+
+// HandlePauseTransaction handles the container pause transaction
+func (s *Supervisor) HandlePauseTransaction(transaction Transaction) error {
+	c, ok := s.containers[transaction.ContainerID()]
+	if !ok {
+		return ErrContainerNotFound
+	}
+
+	if err := c.container.Pause(); err != nil && !strings.Contains(err.Error(), "container not running or created: paused") {
+		return err
+	}
+
+	s.notifySubscribers(Event{
+		ID:        transaction.ContainerID(),
+		Type:      StatePause,
+		Timestamp: transaction.TimeStamp(),
+	})
+
+	return nil
+}
+
+// HandleResumeTransaction handles the container resume transaction
+func (s *Supervisor) HandleResumeTransaction(transaction Transaction) error {
+	c, ok := s.containers[transaction.ContainerID()]
+	if !ok {
+		return ErrContainerNotFound
+	}
+	if err := c.container.Resume(); err != nil && !strings.Contains(err.Error(), "container not paused") {
+		return err
+	}
+	s.notifySubscribers(Event{
+		ID:        transaction.ContainerID(),
+		Type:      StateResume,
+		Timestamp: transaction.TimeStamp(),
+	})
+
 	return nil
 }
 
