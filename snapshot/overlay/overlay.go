@@ -12,7 +12,6 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/fs"
-	"github.com/containerd/containerd/fs/fsutils"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
@@ -48,7 +47,7 @@ func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
 	}
-	supportsDType, err := fsutils.SupportsDType(root)
+	supportsDType, err := fs.SupportsDType(root)
 	if err != nil {
 		return nil, err
 	}

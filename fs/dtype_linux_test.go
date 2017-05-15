@@ -1,6 +1,6 @@
 // +build linux
 
-package fsutils
+package fs
 
 import (
 	"io/ioutil"
