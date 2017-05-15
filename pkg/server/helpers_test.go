@@ -35,25 +35,34 @@ func TestGetSandbox(t *testing.T) {
 	assert.NoError(t, c.sandboxIDIndex.Add(testID))
 
 	for desc, test := range map[string]struct {
-		id       string
-		expected *metadata.SandboxMetadata
+		id        string
+		expected  *metadata.SandboxMetadata
+		expectErr bool
 	}{
 		"full id": {
-			id:       testID,
-			expected: &testSandbox,
+			id:        testID,
+			expected:  &testSandbox,
+			expectErr: false,
 		},
 		"partial id": {
-			id:       testID[:3],
-			expected: &testSandbox,
+			id:        testID[:3],
+			expected:  &testSandbox,
+			expectErr: false,
 		},
 		"non-exist id": {
-			id:       "gfedcba",
-			expected: nil,
+			id:        "gfedcba",
+			expected:  nil,
+			expectErr: true,
 		},
 	} {
 		t.Logf("TestCase %q", desc)
 		sb, err := c.getSandbox(test.id)
-		assert.NoError(t, err)
+		if test.expectErr {
+			assert.Error(t, err)
+			assert.True(t, metadata.IsNotExistError(err))
+		} else {
+			assert.NoError(t, err)
+		}
 		assert.Equal(t, test.expected, sb)
 	}
 }

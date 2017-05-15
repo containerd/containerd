@@ -111,7 +111,8 @@ func TestRemovePodSandbox(t *testing.T) {
 		_, err = c.sandboxIDIndex.Get(testID)
 		assert.Error(t, err, "sandbox id should be removed")
 		meta, err := c.sandboxStore.Get(testID)
-		assert.NoError(t, err)
+		assert.Error(t, err)
+		assert.True(t, metadata.IsNotExistError(err))
 		assert.Nil(t, meta, "sandbox metadata should be removed")
 		res, err = c.RemovePodSandbox(context.Background(), &runtime.RemovePodSandboxRequest{
 			PodSandboxId: testID,

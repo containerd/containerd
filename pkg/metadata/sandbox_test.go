@@ -113,8 +113,8 @@ func TestSandboxStore(t *testing.T) {
 	assert.NoError(err)
 	assert.Len(sbs, 2)
 
-	t.Logf("get should return nil without error after deletion")
+	t.Logf("get should return nil with not exist error after deletion")
 	meta, err := s.Get(testID)
-	assert.NoError(err)
+	assert.Error(store.ErrNotExist, err)
 	assert.Nil(meta)
 }

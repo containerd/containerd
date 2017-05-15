@@ -108,11 +108,6 @@ func (s *imageMetadataStore) Get(digest string) (*ImageMetadata, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Return nil without error if the corresponding metadata
-	// does not exist.
-	if data == nil {
-		return nil, nil
-	}
 	imageMetadata := &ImageMetadata{}
 	if err := json.Unmarshal(data, imageMetadata); err != nil {
 		return nil, err

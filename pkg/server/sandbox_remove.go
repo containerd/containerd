@@ -25,6 +25,8 @@ import (
 	"github.com/containerd/containerd/api/services/execution"
 
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+
+	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 )
 
 // RemovePodSandbox removes the sandbox. If there are running containers in the
@@ -39,9 +41,10 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 
 	sandbox, err := c.getSandbox(r.GetPodSandboxId())
 	if err != nil {
-		return nil, fmt.Errorf("failed to find sandbox %q: %v", r.GetPodSandboxId(), err)
-	}
-	if sandbox == nil {
+		if !metadata.IsNotExistError(err) {
+			return nil, fmt.Errorf("an error occurred when try to find sandbox %q: %v",
+				r.GetPodSandboxId(), err)
+		}
 		// Do not return error if the id doesn't exist.
 		glog.V(5).Infof("RemovePodSandbox called for sandbox %q that does not exist",
 			r.GetPodSandboxId())

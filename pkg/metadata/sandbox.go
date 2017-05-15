@@ -115,11 +115,6 @@ func (s *sandboxStore) Get(sandboxID string) (*SandboxMetadata, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Return nil without error if the corresponding metadata
-	// does not exist.
-	if data == nil {
-		return nil, nil
-	}
 	sandbox := &SandboxMetadata{}
 	if err := json.Unmarshal(data, sandbox); err != nil {
 		return nil, err
