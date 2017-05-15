@@ -30,7 +30,7 @@ func copyConsole(ctx context.Context, console console.Console, stdin, stdout, st
 	if err != nil {
 		return err
 	}
-	outr, err := fifo.OpenFifo(ctx, stdout, syscall.O_RDONLY, 0)
+	outr, err := fifo.OpenFifo(ctx, stderr, syscall.O_RDONLY, 0)
 	if err != nil {
 		return err
 	}
