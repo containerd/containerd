@@ -16,7 +16,7 @@ func NewMonitor() (*Monitor, error) {
 		exits:     make(chan runtime.Process, 1024),
 		ooms:      make(chan string, 1024),
 	}
-	fd, err := archutils.EpollCreate1(0)
+	fd, err := archutils.EpollCreate1(syscall.EPOLL_CLOEXEC)
 	if err != nil {
 		return nil, err
 	}
