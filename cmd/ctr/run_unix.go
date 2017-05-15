@@ -92,7 +92,7 @@ func spec(id string, config *ocispec.ImageConfig, context *cli.Context) (*specs.
 	if cwd == "" {
 		cwd = "/"
 	}
-	return &specs.Spec{
+	s := &specs.Spec{
 		Version: specs.Version,
 		Platform: specs.Platform{
 			OS:   runtime.GOOS,
@@ -211,12 +211,15 @@ func spec(id string, config *ocispec.ImageConfig, context *cli.Context) (*specs.
 				{
 					Type: "mount",
 				},
-				{
-					Type: "network",
-				},
 			},
 		},
-	}, nil
+	}
+	if !context.Bool("net-host") {
+		s.Linux.Namespaces = append(s.Linux.Namespaces, specs.LinuxNamespace{
+			Type: "network",
+		})
+	}
+	return s, nil
 }
 
 func customSpec(configPath string, rootfs string) (*specs.Spec, error) {

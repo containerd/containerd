@@ -51,6 +51,10 @@ var runCommand = cli.Command{
 			Name:  "readonly",
 			Usage: "set the containers filesystem as readonly",
 		},
+		cli.BoolFlag{
+			Name:  "net-host",
+			Usage: "enable host networking for the container",
+		},
 	},
 	Action: func(context *cli.Context) error {
 		var (
