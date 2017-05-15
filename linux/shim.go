@@ -22,7 +22,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func newShim(path string, remote bool) (shim.ShimClient, error) {
+func newShim(shimName string, path string, remote bool) (shim.ShimClient, error) {
 	if !remote {
 		return localShim.Client(path)
 	}
@@ -31,7 +31,7 @@ func newShim(path string, remote bool) (shim.ShimClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	cmd := exec.Command("containerd-shim")
+	cmd := exec.Command(shimName)
 	cmd.Dir = path
 	f, err := l.(*net.UnixListener).File()
 	if err != nil {
