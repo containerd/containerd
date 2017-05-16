@@ -127,6 +127,14 @@ var runCommand = cli.Command{
 				if err != nil {
 					return err
 				}
+			} else {
+				defer func() {
+					if id != "" {
+						if err := snapshotter.Remove(ctx, id); err != nil {
+							logrus.WithError(err).Errorf("failed to remove snapshot %q", id)
+						}
+					}
+				}()
 			}
 
 			ic, err := image.Config(ctx, content)
@@ -206,6 +214,9 @@ var runCommand = cli.Command{
 			}); err != nil {
 				return err
 			}
+		} else {
+			// Don't remove snapshot
+			id = ""
 		}
 		if status != 0 {
 			return cli.NewExitError("", int(status))
