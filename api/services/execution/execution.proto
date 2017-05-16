@@ -22,7 +22,7 @@ service ContainerService {
 	rpc CloseStdin(CloseStdinRequest) returns (google.protobuf.Empty);
 	rpc Pause(PauseRequest) returns (google.protobuf.Empty);
 	rpc Resume(ResumeRequest) returns (google.protobuf.Empty);
-	rpc Ps(PsRequest) returns (PsResponse);
+	rpc Processes(ProcessesRequest) returns (ProcessesResponse);
 }
 
 message CreateRequest {
@@ -111,15 +111,10 @@ message ResumeRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
 }
 
-message PsRequest {
+message ProcessesRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
 }
 
-message Ps {
-	uint32 pid = 1;
-	google.protobuf.Any runtime_data = 2;
-}
-
-message PsResponse{
-	repeated Ps ps = 1;
+message ProcessesResponse{
+	repeated containerd.v1.types.Process processes = 1;
 }

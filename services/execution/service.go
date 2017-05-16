@@ -234,7 +234,7 @@ func (s *Service) Kill(ctx context.Context, r *api.KillRequest) (*google_protobu
 	return empty, nil
 }
 
-func (s *Service) Ps(ctx context.Context, r *api.PsRequest) (*api.PsResponse, error) {
+func (s *Service) Processes(ctx context.Context, r *api.ProcessesRequest) (*api.ProcessesResponse, error) {
 	c, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
@@ -245,15 +245,15 @@ func (s *Service) Ps(ctx context.Context, r *api.PsRequest) (*api.PsResponse, er
 		return nil, err
 	}
 
-	ps := []*api.Ps{}
+	ps := []*container.Process{}
 	for _, pid := range pids {
-		ps = append(ps, &api.Ps{
+		ps = append(ps, &container.Process{
 			Pid: pid,
 		})
 	}
 
-	resp := &api.PsResponse{
-		Ps: ps,
+	resp := &api.ProcessesResponse{
+		Processes: ps,
 	}
 
 	return resp, nil

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package containerd.v1.types;
 
+import "google/protobuf/any.proto";
 import "gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -28,6 +29,7 @@ message Process {
 	bool terminal = 6;
 	uint32 exit_status = 7;
 	Status status = 8;
+	google.protobuf.Any runtime_data = 9;
 }
 
 message User {

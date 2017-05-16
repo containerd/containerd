@@ -26,7 +26,7 @@ var psCommand = cli.Command{
 			return errors.New("container id must be provided")
 		}
 
-		psRequest := &execution.PsRequest{
+		pr := &execution.ProcessesRequest{
 			ID: id,
 		}
 
@@ -35,14 +35,14 @@ var psCommand = cli.Command{
 			return err
 		}
 
-		resp, err := containers.Ps(gocontext.Background(), psRequest)
+		resp, err := containers.Processes(gocontext.Background(), pr)
 		if err != nil {
 			return err
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 10, 1, 3, ' ', 0)
 		fmt.Fprintln(w, "PID")
-		for _, ps := range resp.Ps {
+		for _, ps := range resp.Processes {
 			if _, err := fmt.Fprintf(w, "%d\n",
 				ps.Pid,
 			); err != nil {
