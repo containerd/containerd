@@ -97,7 +97,13 @@ func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts)
 		os.RemoveAll(path)
 		return nil, err
 	}
-	if err := r.handleEvents(s); err != nil {
+	// Exit the shim on error
+	defer func() {
+		if err != nil {
+			s.Exit(context.Background(), &shim.ExitRequest{})
+		}
+	}()
+	if err = r.handleEvents(s); err != nil {
 		os.RemoveAll(path)
 		return nil, err
 	}
@@ -120,13 +126,13 @@ func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts)
 	if len(sopts.Rootfs) == 0 {
 		return nil, fmt.Errorf("no rootfs was specified for id %s", id)
 	}
-	if _, err := s.Create(ctx, sopts); err != nil {
+	if _, err = s.Create(ctx, sopts); err != nil {
 		os.RemoveAll(path)
 		return nil, err
 	}
 	c := newContainer(id, s)
 	// after the container is create add it to the monitor
-	if err := r.monitor.Monitor(c); err != nil {
+	if err = r.monitor.Monitor(c); err != nil {
 		return nil, err
 	}
 	return c, nil
