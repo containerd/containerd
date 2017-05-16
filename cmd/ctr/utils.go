@@ -15,13 +15,15 @@ import (
 	contentapi "github.com/containerd/containerd/api/services/content"
 	"github.com/containerd/containerd/api/services/execution"
 	imagesapi "github.com/containerd/containerd/api/services/images"
-	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
+	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	versionservice "github.com/containerd/containerd/api/services/version"
 	"github.com/containerd/containerd/api/types/container"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	contentservice "github.com/containerd/containerd/services/content"
 	imagesservice "github.com/containerd/containerd/services/images"
+	snapshotservice "github.com/containerd/containerd/services/snapshot"
+	"github.com/containerd/containerd/snapshot"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 )
@@ -44,12 +46,12 @@ func getContentStore(context *cli.Context) (content.Store, error) {
 	return contentservice.NewStoreFromClient(contentapi.NewContentClient(conn)), nil
 }
 
-func getRootFSService(context *cli.Context) (rootfsapi.RootFSClient, error) {
+func getSnapshotter(context *cli.Context) (snapshot.Snapshotter, error) {
 	conn, err := getGRPCConnection(context)
 	if err != nil {
 		return nil, err
 	}
-	return rootfsapi.NewRootFSClient(conn), nil
+	return snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotClient(conn)), nil
 }
 
 func getImageStore(clicontext *cli.Context) (images.Store, error) {

@@ -1,17 +1,17 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
-	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
-	"github.com/containerd/containerd/content"
+	diffapi "github.com/containerd/containerd/api/services/diff"
+	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
+	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
-	rootfsservice "github.com/containerd/containerd/services/rootfs"
+	"github.com/containerd/containerd/rootfs"
+	diffservice "github.com/containerd/containerd/services/diff"
+	snapshotservice "github.com/containerd/containerd/services/snapshot"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
@@ -42,23 +42,32 @@ var rootfsUnpackCommand = cli.Command{
 
 		log.G(ctx).Infof("unpacking layers from manifest %s", dgst.String())
 
-		conn, err := connectGRPC(clicontext)
-		if err != nil {
-			return err
-		}
-
 		cs, err := resolveContentStore(clicontext)
 		if err != nil {
 			return err
 		}
 
-		m, err := resolveManifest(ctx, cs, dgst)
-		if err != nil {
-			return err
+		image := images.Image{
+			Target: ocispec.Descriptor{
+				MediaType: ocispec.MediaTypeImageManifest,
+				Digest:    dgst,
+			},
 		}
 
-		unpacker := rootfsservice.NewUnpackerFromClient(rootfsapi.NewRootFSClient(conn))
-		chainID, err := unpacker.Unpack(ctx, m.Layers)
+		layers, err := getImageLayers(ctx, image, cs)
+		if err != nil {
+			log.G(ctx).WithError(err).Fatal("Failed to get rootfs layers")
+		}
+
+		conn, err := connectGRPC(clicontext)
+		if err != nil {
+			log.G(ctx).Fatal(err)
+		}
+
+		snapshotter := snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotClient(conn))
+		applier := diffservice.NewApplierFromClient(diffapi.NewDiffClient(conn))
+
+		chainID, err := rootfs.ApplyLayers(ctx, layers, snapshotter, applier)
 		if err != nil {
 			return err
 		}
@@ -95,48 +104,17 @@ var rootfsPrepareCommand = cli.Command{
 			return err
 		}
 
-		rclient := rootfsapi.NewRootFSClient(conn)
+		snapshotter := snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotClient(conn))
 
-		ir := &rootfsapi.PrepareRequest{
-			Name:    target,
-			ChainID: dgst,
-		}
-
-		resp, err := rclient.Prepare(ctx, ir)
+		mounts, err := snapshotter.Prepare(ctx, target, dgst.String())
 		if err != nil {
 			return err
 		}
 
-		for _, m := range resp.Mounts {
+		for _, m := range mounts {
 			fmt.Fprintf(os.Stdout, "mount -t %s %s %s -o %s\n", m.Type, m.Source, target, strings.Join(m.Options, ","))
 		}
 
 		return nil
 	},
-}
-
-func resolveManifest(ctx context.Context, provider content.Provider, dgst digest.Digest) (ocispec.Manifest, error) {
-	p, err := readAll(ctx, provider, dgst)
-	if err != nil {
-		return ocispec.Manifest{}, err
-	}
-
-	// TODO(stevvooe): This assumption that we get a manifest is unfortunate.
-	// Need to provide way to resolve what the type of the target is.
-	var manifest ocispec.Manifest
-	if err := json.Unmarshal(p, &manifest); err != nil {
-		return ocispec.Manifest{}, err
-	}
-
-	return manifest, nil
-}
-
-func readAll(ctx context.Context, provider content.Provider, dgst digest.Digest) ([]byte, error) {
-	rc, err := provider.Reader(ctx, dgst)
-	if err != nil {
-		return nil, err
-	}
-	defer rc.Close()
-
-	return ioutil.ReadAll(rc)
 }

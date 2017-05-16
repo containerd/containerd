@@ -18,9 +18,10 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	contentapi "github.com/containerd/containerd/api/services/content"
+	diffapi "github.com/containerd/containerd/api/services/diff"
 	api "github.com/containerd/containerd/api/services/execution"
 	imagesapi "github.com/containerd/containerd/api/services/images"
-	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
+	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	versionapi "github.com/containerd/containerd/api/services/version"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
@@ -417,14 +418,16 @@ func interceptor(ctx gocontext.Context,
 		ctx = log.WithModule(ctx, "execution")
 	case contentapi.ContentServer:
 		ctx = log.WithModule(ctx, "content")
-	case rootfsapi.RootFSServer:
-		ctx = log.WithModule(ctx, "rootfs")
 	case imagesapi.ImagesServer:
 		ctx = log.WithModule(ctx, "images")
 	case grpc_health_v1.HealthServer:
 		// No need to change the context
 	case versionapi.VersionServer:
 		ctx = log.WithModule(ctx, "version")
+	case snapshotapi.SnapshotServer:
+		ctx = log.WithModule(ctx, "snapshot")
+	case diffapi.DiffServer:
+		ctx = log.WithModule(ctx, "diff")
 	default:
 		log.G(ctx).Warnf("unknown GRPC server type: %#v\n", info.Server)
 	}
