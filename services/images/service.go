@@ -73,7 +73,7 @@ func (s *Service) Delete(ctx context.Context, req *imagesapi.DeleteRequest) (*em
 }
 
 func (s *Service) withStore(ctx context.Context, fn func(ctx context.Context, store images.Store) error) func(tx *bolt.Tx) error {
-	return func(tx *bolt.Tx) error { return fn(ctx, images.NewImageStore(tx)) }
+	return func(tx *bolt.Tx) error { return fn(ctx, images.NewStore(tx)) }
 }
 
 func (s *Service) withStoreView(ctx context.Context, fn func(ctx context.Context, store images.Store) error) error {

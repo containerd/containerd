@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 
 	shimapi "github.com/containerd/containerd/api/services/shim"
-	"github.com/containerd/containerd/api/types/container"
+	"github.com/containerd/containerd/api/types/task"
 	runc "github.com/containerd/go-runc"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
@@ -104,11 +104,11 @@ func (c *client) Checkpoint(ctx context.Context, in *shimapi.CheckpointRequest, 
 }
 
 type events struct {
-	c   chan *container.Event
+	c   chan *task.Event
 	ctx context.Context
 }
 
-func (e *events) Recv() (*container.Event, error) {
+func (e *events) Recv() (*task.Event, error) {
 	ev := <-e.c
 	return ev, nil
 }

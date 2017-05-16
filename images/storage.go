@@ -55,7 +55,7 @@ func InitDB(db *bolt.DB) error {
 	})
 }
 
-func NewImageStore(tx *bolt.Tx) Store {
+func NewStore(tx *bolt.Tx) Store {
 	return &storage{tx: tx}
 }
 

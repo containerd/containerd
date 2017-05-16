@@ -80,7 +80,11 @@ var runCommand = cli.Command{
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		containers, err := getExecutionService(context)
+		containers, err := getContainersService(context)
+		if err != nil {
+			return err
+		}
+		tasks, err := getTasksService(context)
 		if err != nil {
 			return err
 		}
@@ -89,7 +93,7 @@ var runCommand = cli.Command{
 			return err
 		}
 		defer os.RemoveAll(tmpDir)
-		events, err := containers.Events(ctx, &execution.EventsRequest{})
+		events, err := tasks.Events(ctx, &execution.EventsRequest{})
 		if err != nil {
 			return err
 		}
@@ -227,11 +231,22 @@ var runCommand = cli.Command{
 			return err
 		}
 		if len(spec) == 0 {
-			if spec, err = newSpec(context, &imageConfig.Config, ref); err != nil {
+			if spec, err = newContainerSpec(context, &imageConfig.Config, ref); err != nil {
 				return err
 			}
 		}
-		create, err := newCreateRequest(context, id, tmpDir, checkpoint, mounts, spec)
+
+		createContainer, err := newCreateContainerRequest(context, id, id, spec)
+		if err != nil {
+			return err
+		}
+
+		_, err = containers.Create(ctx, createContainer)
+		if err != nil {
+			return err
+		}
+
+		create, err := newCreateTaskRequest(context, id, tmpDir, checkpoint, mounts)
 		if err != nil {
 			return err
 		}
@@ -247,22 +262,22 @@ var runCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		response, err := containers.Create(ctx, create)
+		response, err := tasks.Create(ctx, create)
 		if err != nil {
 			return err
 		}
 		pid := response.Pid
 		if create.Terminal {
-			if err := handleConsoleResize(ctx, containers, id, pid, con); err != nil {
+			if err := handleConsoleResize(ctx, tasks, id, pid, con); err != nil {
 				logrus.WithError(err).Error("console resize")
 			}
 		} else {
-			sigc := forwardAllSignals(containers, id)
+			sigc := forwardAllSignals(tasks, id)
 			defer stopCatch(sigc)
 		}
 		if checkpoint == nil {
-			if _, err := containers.Start(ctx, &execution.StartRequest{
-				ID: id,
+			if _, err := tasks.Start(ctx, &execution.StartRequest{
+				ContainerID: id,
 			}); err != nil {
 				return err
 			}
@@ -274,8 +289,8 @@ var runCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		if _, err := containers.Delete(ctx, &execution.DeleteRequest{
-			ID: response.ID,
+		if _, err := tasks.Delete(ctx, &execution.DeleteRequest{
+			ContainerID: response.ContainerID,
 		}); err != nil {
 			return err
 		}

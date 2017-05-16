@@ -10,7 +10,7 @@ import (
 
 	"github.com/containerd/console"
 	shimapi "github.com/containerd/containerd/api/services/shim"
-	"github.com/containerd/containerd/api/types/container"
+	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/reaper"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
@@ -25,7 +25,7 @@ func New(path string) *Service {
 	return &Service{
 		path:      path,
 		processes: make(map[int]process),
-		events:    make(chan *container.Event, 4096),
+		events:    make(chan *task.Event, 4096),
 	}
 }
 
@@ -36,7 +36,7 @@ type Service struct {
 	bundle      string
 	mu          sync.Mutex
 	processes   map[int]process
-	events      chan *container.Event
+	events      chan *task.Event
 	execID      int
 }
 
@@ -56,8 +56,9 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateRequest) (*shimap
 		ExitCh: make(chan int, 1),
 	}
 	reaper.Default.Register(pid, cmd)
-	s.events <- &container.Event{
-		Type: container.Event_CREATE,
+	go s.waitExit(process, pid, cmd)
+	s.events <- &task.Event{
+		Type: task.Event_CREATE,
 		ID:   r.ID,
 		Pid:  uint32(pid),
 	}
@@ -71,8 +72,8 @@ func (s *Service) Start(ctx context.Context, r *shimapi.StartRequest) (*google_p
 	if err := s.initProcess.Start(ctx); err != nil {
 		return nil, err
 	}
-	s.events <- &container.Event{
-		Type: container.Event_START,
+	s.events <- &task.Event{
+		Type: task.Event_START,
 		ID:   s.id,
 		Pid:  uint32(s.initProcess.Pid()),
 	}
@@ -114,8 +115,9 @@ func (s *Service) Exec(ctx context.Context, r *shimapi.ExecRequest) (*shimapi.Ex
 	}
 	reaper.Default.RegisterNL(pid, cmd)
 	reaper.Default.Unlock()
-	s.events <- &container.Event{
-		Type: container.Event_EXEC_ADDED,
+	go s.waitExit(process, pid, cmd)
+	s.events <- &task.Event{
+		Type: task.Event_EXEC_ADDED,
 		ID:   s.id,
 		Pid:  uint32(pid),
 	}
@@ -159,35 +161,35 @@ func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.
 	if err != nil {
 		return nil, err
 	}
-	status := container.StatusUnknown
+	status := task.StatusUnknown
 	switch st {
 	case "created":
-		status = container.StatusCreated
+		status = task.StatusCreated
 	case "running":
-		status = container.StatusRunning
+		status = task.StatusRunning
 	case "stopped":
-		status = container.StatusStopped
+		status = task.StatusStopped
 	case "paused":
-		status = container.StatusPaused
+		status = task.StatusPaused
 	}
 	o := &shimapi.StateResponse{
 		ID:        s.id,
 		Bundle:    s.bundle,
 		Pid:       uint32(s.initProcess.Pid()),
 		Status:    status,
-		Processes: []*container.Process{},
+		Processes: []*task.Process{},
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, p := range s.processes {
-		status := container.StatusRunning
+		status := task.StatusRunning
 		if err := unix.Kill(p.Pid(), 0); err != nil {
 			if err != syscall.ESRCH {
 				return nil, err
 			}
-			status = container.StatusStopped
+			status = task.StatusStopped
 		}
-		o.Processes = append(o.Processes, &container.Process{
+		o.Processes = append(o.Processes, &task.Process{
 			Pid:    uint32(p.Pid()),
 			Status: status,
 		})
@@ -255,9 +257,9 @@ func (s *Service) Processes(ctx context.Context, r *shimapi.ProcessesRequest) (*
 		return nil, err
 	}
 
-	ps := []*container.Process{}
+	ps := []*task.Process{}
 	for _, pid := range pids {
-		ps = append(ps, &container.Process{
+		ps = append(ps, &task.Process{
 			Pid: pid,
 		})
 	}
@@ -290,8 +292,8 @@ func (s *Service) Checkpoint(ctx context.Context, r *shimapi.CheckpointRequest) 
 func (s *Service) waitExit(p process, pid int, cmd *reaper.Cmd) {
 	status := <-cmd.ExitCh
 	p.Exited(status)
-	s.events <- &container.Event{
-		Type:       container.Event_EXIT,
+	s.events <- &task.Event{
+		Type:       task.Event_EXIT,
 		ID:         s.id,
 		Pid:        uint32(pid),
 		ExitStatus: uint32(status),

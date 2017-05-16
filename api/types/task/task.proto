@@ -17,11 +17,12 @@ enum Status {
 	PAUSED = 4 [(gogoproto.enumvalue_customname) = "StatusPaused"];
 }
 
-message Container {
-	string id = 1;
-	uint32 pid = 2;
-	Status status = 3;
-	google.protobuf.Any spec = 4;
+message Task {
+	string id = 1; // TODO(stevvooe): For now, this is just the container id.
+	string container_id = 2;
+	uint32 pid = 3;
+	Status status = 4;
+	google.protobuf.Any spec = 5;
 }
 
 message Process {

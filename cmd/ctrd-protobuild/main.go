@@ -43,6 +43,7 @@ var (
 	packageMap = map[string]string{
 		"google/protobuf/timestamp.proto":  "github.com/gogo/protobuf/types",
 		"google/protobuf/any.proto":        "github.com/gogo/protobuf/types",
+		"google/protobuf/field_mask.proto": "github.com/gogo/protobuf/types",
 		"google/protobuf/descriptor.proto": "github.com/gogo/protobuf/protoc-gen-gogo/descriptor",
 		"gogoproto/gogo.proto":             "github.com/gogo/protobuf/gogoproto",
 	}

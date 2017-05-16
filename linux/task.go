@@ -6,7 +6,7 @@ import (
 	"context"
 
 	"github.com/containerd/containerd/api/services/shim"
-	"github.com/containerd/containerd/api/types/container"
+	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/plugin"
 	protobuf "github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -25,48 +25,47 @@ func (s State) Status() plugin.Status {
 	return s.status
 }
 
-func newContainer(id string, spec []byte, shim shim.ShimClient) *Container {
-	return &Container{
-		id:   id,
-		shim: shim,
-		spec: spec,
+type Task struct {
+	containerID string
+	spec        []byte
+	shim        shim.ShimClient
+}
+
+func newTask(id string, spec []byte, shim shim.ShimClient) *Task {
+	return &Task{
+		containerID: id,
+		shim:        shim,
+		spec:        spec,
 	}
 }
 
-type Container struct {
-	id   string
-	spec []byte
-
-	shim shim.ShimClient
-}
-
-func (c *Container) Info() plugin.ContainerInfo {
-	return plugin.ContainerInfo{
-		ID:      c.id,
-		Runtime: runtimeName,
-		Spec:    c.spec,
+func (c *Task) Info() plugin.TaskInfo {
+	return plugin.TaskInfo{
+		ContainerID: c.containerID,
+		Runtime:     runtimeName,
+		Spec:        c.spec,
 	}
 }
 
-func (c *Container) Start(ctx context.Context) error {
+func (c *Task) Start(ctx context.Context) error {
 	_, err := c.shim.Start(ctx, &shim.StartRequest{})
 	return err
 }
 
-func (c *Container) State(ctx context.Context) (plugin.State, error) {
+func (c *Task) State(ctx context.Context) (plugin.State, error) {
 	response, err := c.shim.State(ctx, &shim.StateRequest{})
 	if err != nil {
 		return nil, err
 	}
 	var status plugin.Status
 	switch response.Status {
-	case container.StatusCreated:
+	case task.StatusCreated:
 		status = plugin.CreatedStatus
-	case container.StatusRunning:
+	case task.StatusRunning:
 		status = plugin.RunningStatus
-	case container.StatusStopped:
+	case task.StatusStopped:
 		status = plugin.StoppedStatus
-	case container.StatusPaused:
+	case task.StatusPaused:
 		status = plugin.PausedStatus
 		// TODO: containerd.DeletedStatus
 	}
@@ -76,17 +75,17 @@ func (c *Container) State(ctx context.Context) (plugin.State, error) {
 	}, nil
 }
 
-func (c *Container) Pause(ctx context.Context) error {
+func (c *Task) Pause(ctx context.Context) error {
 	_, err := c.shim.Pause(ctx, &shim.PauseRequest{})
 	return err
 }
 
-func (c *Container) Resume(ctx context.Context) error {
+func (c *Task) Resume(ctx context.Context) error {
 	_, err := c.shim.Resume(ctx, &shim.ResumeRequest{})
 	return err
 }
 
-func (c *Container) Kill(ctx context.Context, signal uint32, pid uint32, all bool) error {
+func (c *Task) Kill(ctx context.Context, signal uint32, pid uint32, all bool) error {
 	_, err := c.shim.Kill(ctx, &shim.KillRequest{
 		Signal: signal,
 		Pid:    pid,
@@ -95,7 +94,7 @@ func (c *Container) Kill(ctx context.Context, signal uint32, pid uint32, all boo
 	return err
 }
 
-func (c *Container) Exec(ctx context.Context, opts plugin.ExecOpts) (plugin.Process, error) {
+func (c *Task) Exec(ctx context.Context, opts plugin.ExecOpts) (plugin.Process, error) {
 	request := &shim.ExecRequest{
 		Stdin:    opts.IO.Stdin,
 		Stdout:   opts.IO.Stdout,
@@ -117,9 +116,9 @@ func (c *Container) Exec(ctx context.Context, opts plugin.ExecOpts) (plugin.Proc
 	}, nil
 }
 
-func (c *Container) Processes(ctx context.Context) ([]uint32, error) {
+func (c *Task) Processes(ctx context.Context) ([]uint32, error) {
 	resp, err := c.shim.Processes(ctx, &shim.ProcessesRequest{
-		ID: c.id,
+		ID: c.containerID,
 	})
 
 	if err != nil {
@@ -135,7 +134,7 @@ func (c *Container) Processes(ctx context.Context) ([]uint32, error) {
 	return pids, nil
 }
 
-func (c *Container) Pty(ctx context.Context, pid uint32, size plugin.ConsoleSize) error {
+func (c *Task) Pty(ctx context.Context, pid uint32, size plugin.ConsoleSize) error {
 	_, err := c.shim.Pty(ctx, &shim.PtyRequest{
 		Pid:    pid,
 		Width:  size.Width,
@@ -144,14 +143,14 @@ func (c *Container) Pty(ctx context.Context, pid uint32, size plugin.ConsoleSize
 	return err
 }
 
-func (c *Container) CloseStdin(ctx context.Context, pid uint32) error {
+func (c *Task) CloseStdin(ctx context.Context, pid uint32) error {
 	_, err := c.shim.CloseStdin(ctx, &shim.CloseStdinRequest{
 		Pid: pid,
 	})
 	return err
 }
 
-func (c *Container) Checkpoint(ctx context.Context, opts plugin.CheckpointOpts) error {
+func (c *Task) Checkpoint(ctx context.Context, opts plugin.CheckpointOpts) error {
 	_, err := c.shim.Checkpoint(ctx, &shim.CheckpointRequest{
 		Exit:             opts.Exit,
 		AllowTcp:         opts.AllowTCP,
@@ -166,7 +165,7 @@ func (c *Container) Checkpoint(ctx context.Context, opts plugin.CheckpointOpts) 
 
 type Process struct {
 	pid int
-	c   *Container
+	c   *Task
 }
 
 func (p *Process) Kill(ctx context.Context, signal uint32, _ bool) error {

@@ -100,7 +100,7 @@ type RuntimeSpec struct {
 	hcs.Configuration
 }
 
-func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts) (plugin.Container, error) {
+func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts) (plugin.Task, error) {
 	var rtSpec RuntimeSpec
 	if err := json.Unmarshal(opts.Spec, &rtSpec); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal oci spec")
@@ -118,7 +118,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts)
 	return ctr, nil
 }
 
-func (r *Runtime) Delete(ctx context.Context, c plugin.Container) (*plugin.Exit, error) {
+func (r *Runtime) Delete(ctx context.Context, c plugin.Task) (*plugin.Exit, error) {
 	wc, ok := c.(*container)
 	if !ok {
 		return nil, fmt.Errorf("container cannot be cast as *windows.container")
@@ -140,10 +140,10 @@ func (r *Runtime) Delete(ctx context.Context, c plugin.Container) (*plugin.Exit,
 	}, nil
 }
 
-func (r *Runtime) Containers(ctx context.Context) ([]plugin.Container, error) {
+func (r *Runtime) Tasks(ctx context.Context) ([]plugin.Task, error) {
 	r.Lock()
 	defer r.Unlock()
-	list := make([]plugin.Container, len(r.containers))
+	list := make([]plugin.Task, len(r.containers))
 	for _, c := range r.containers {
 		select {
 		case <-ctx.Done():

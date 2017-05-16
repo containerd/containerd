@@ -22,12 +22,12 @@ service Images {
 	// Get returns an image by name.
 	rpc Get(GetRequest) returns (GetResponse);
 
+	// List returns a list of all images known to containerd.
+	rpc List(ListRequest) returns (ListResponse);
+
 	// Put assigns the name to a given target image based on the provided
 	// image.
 	rpc Put(PutRequest) returns (google.protobuf.Empty);
-
-	// List returns a list of all images known to containerd.
-	rpc List(ListRequest) returns (ListResponse);
 
 	// Delete deletes the image by name.
 	rpc Delete(DeleteRequest) returns (google.protobuf.Empty);
@@ -35,7 +35,8 @@ service Images {
 
 message Image {
 	string name = 1;
-	types.Descriptor target = 2 [(gogoproto.nullable) = false];
+	string labels = 2;
+	types.Descriptor target = 3 [(gogoproto.nullable) = false];
 }
 
 message GetRequest {

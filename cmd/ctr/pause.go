@@ -13,7 +13,7 @@ var pauseCommand = cli.Command{
 	Usage:     "pause an existing container",
 	ArgsUsage: "CONTAINER",
 	Action: func(context *cli.Context) error {
-		containers, err := getExecutionService(context)
+		tasks, err := getTasksService(context)
 		if err != nil {
 			return err
 		}
@@ -21,8 +21,8 @@ var pauseCommand = cli.Command{
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		_, err = containers.Pause(gocontext.Background(), &execution.PauseRequest{
-			ID: id,
+		_, err = tasks.Pause(gocontext.Background(), &execution.PauseRequest{
+			ContainerID: id,
 		})
 		return err
 	},

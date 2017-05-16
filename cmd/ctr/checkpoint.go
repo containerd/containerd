@@ -46,7 +46,8 @@ var checkpointCommand = cli.Command{
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		containers, err := getExecutionService(context)
+
+		tasks, err := getTasksService(context)
 		if err != nil {
 			return err
 		}
@@ -59,13 +60,13 @@ var checkpointCommand = cli.Command{
 			return errors.Wrap(err, "failed resolving image store")
 		}
 		var spec specs.Spec
-		info, err := containers.Info(ctx, &execution.InfoRequest{
-			ID: id,
+		info, err := tasks.Info(ctx, &execution.InfoRequest{
+			ContainerID: id,
 		})
 		if err != nil {
 			return err
 		}
-		if err := json.Unmarshal(info.Spec.Value, &spec); err != nil {
+		if err := json.Unmarshal(info.Task.Spec.Value, &spec); err != nil {
 			return err
 		}
 		stopped := context.Bool("exit")
@@ -73,22 +74,22 @@ var checkpointCommand = cli.Command{
 		// we pause the container and give us time to checkpoint the filesystem before
 		// it resumes execution
 		if !stopped {
-			if _, err := containers.Pause(ctx, &execution.PauseRequest{
-				ID: id,
+			if _, err := tasks.Pause(ctx, &execution.PauseRequest{
+				ContainerID: id,
 			}); err != nil {
 				return err
 			}
 			defer func() {
-				if _, err := containers.Resume(ctx, &execution.ResumeRequest{
-					ID: id,
+				if _, err := tasks.Resume(ctx, &execution.ResumeRequest{
+					ContainerID: id,
 				}); err != nil {
 					logrus.WithError(err).Error("ctr: unable to resume container")
 				}
 			}()
 		}
-		checkpoint, err := containers.Checkpoint(ctx, &execution.CheckpointRequest{
-			ID:   id,
-			Exit: context.Bool("exit"),
+		checkpoint, err := tasks.Checkpoint(ctx, &execution.CheckpointRequest{
+			ContainerID: id,
+			Exit:        context.Bool("exit"),
 		})
 		if err != nil {
 			return err

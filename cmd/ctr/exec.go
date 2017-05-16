@@ -37,11 +37,11 @@ var execCommand = cli.Command{
 			return errors.New("container id must be provided")
 		}
 
-		containers, err := getExecutionService(context)
+		tasks, err := getTasksService(context)
 		if err != nil {
 			return err
 		}
-		events, err := containers.Events(ctx, &execution.EventsRequest{})
+		events, err := tasks.Events(ctx, &execution.EventsRequest{})
 		if err != nil {
 			return err
 		}
@@ -66,12 +66,12 @@ var execCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		response, err := containers.Exec(ctx, request)
+		response, err := tasks.Exec(ctx, request)
 		if err != nil {
 			return err
 		}
 		if request.Terminal {
-			if err := handleConsoleResize(ctx, containers, id, response.Pid, con); err != nil {
+			if err := handleConsoleResize(ctx, tasks, id, response.Pid, con); err != nil {
 				logrus.WithError(err).Error("console resize")
 			}
 		}
