@@ -39,10 +39,8 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 
 	sandbox, err := c.getSandbox(r.GetPodSandboxId())
 	if err != nil {
-		return nil, fmt.Errorf("failed to find sandbox %q: %v", r.GetPodSandboxId(), err)
-	}
-	if sandbox == nil {
-		return nil, fmt.Errorf("sandbox %q does not exist", r.GetPodSandboxId())
+		return nil, fmt.Errorf("an error occurred when try to find sandbox %q: %v",
+			r.GetPodSandboxId(), err)
 	}
 	// Use the full sandbox id.
 	id := sandbox.ID

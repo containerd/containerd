@@ -17,10 +17,19 @@ limitations under the License.
 package store
 
 import (
-	"fmt"
+	"errors"
 	"sync"
 
 	"github.com/golang/glog"
+)
+
+var (
+	// ErrNotExist is the error returned when specified id does
+	// not exist.
+	ErrNotExist = errors.New("does not exist")
+	// ErrAlreadyExist is the error returned when specified id already
+	// exists.
+	ErrAlreadyExist = errors.New("already exists")
 )
 
 // All byte arrays are expected to be read-only. User MUST NOT modify byte
@@ -46,11 +55,12 @@ type MetadataStore interface {
 	// * The id and data MUST be added in one transaction to the store.
 	Create(string, []byte) error
 	// Get the data by id.
-	// Note that Get MUST return nil without error if the id
-	// doesn't exist.
+	// Note that Get MUST return ErrNotExist if the id doesn't exist.
 	Get(string) ([]byte, error)
-	// Update the data by id. Note that the update MUST be applied in
-	// one transaction.
+	// Update the data by id.
+	// Note:
+	// * Update MUST return ErrNotExist is the id doesn't exist.
+	// * The update MUST be applied in one transaction.
 	Update(string, UpdateFunc) error
 	// List returns entire array of data from the store.
 	List() ([][]byte, error)
@@ -135,7 +145,7 @@ func (m *metadataStore) createMetadata(id string, meta *metadata) error {
 	m.Lock()
 	defer m.Unlock()
 	if _, found := m.metas[id]; found {
-		return fmt.Errorf("id %q already exists", id)
+		return ErrAlreadyExist
 	}
 	m.metas[id] = meta
 	return nil
@@ -172,7 +182,7 @@ func (m *metadataStore) getMetadata(id string) (*metadata, bool) {
 func (m *metadataStore) Get(id string) ([]byte, error) {
 	meta, found := m.getMetadata(id)
 	if !found {
-		return nil, nil
+		return nil, ErrNotExist
 	}
 	return meta.get(), nil
 }
@@ -181,7 +191,7 @@ func (m *metadataStore) Get(id string) ([]byte, error) {
 func (m *metadataStore) Update(id string, u UpdateFunc) error {
 	meta, found := m.getMetadata(id)
 	if !found {
-		return fmt.Errorf("id %q doesn't exist", id)
+		return ErrNotExist
 	}
 	return meta.update(u)
 }

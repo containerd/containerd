@@ -97,9 +97,10 @@ func TestMetadataStore(t *testing.T) {
 	assert.Equal(testMeta[testIds[1]], meta)
 
 	t.Logf("update should take effect")
-	m.Update(testIds[1], func(in []byte) ([]byte, error) {
+	err = m.Update(testIds[1], func(in []byte) ([]byte, error) {
 		return []byte("updated-metadata-1"), nil
 	})
+	assert.NoError(err)
 	newMeta, err := m.Get(testIds[1])
 	assert.NoError(err)
 	assert.Equal([]byte("updated-metadata-1"), newMeta)
@@ -111,8 +112,14 @@ func TestMetadataStore(t *testing.T) {
 	assert.Len(metas, 1)
 	assert.Equal(testMeta[testIds[0]], metas[0])
 	meta, err = m.Get(testIds[1])
-	assert.NoError(err)
+	assert.Equal(ErrNotExist, err)
 	assert.Nil(meta)
+
+	t.Logf("update should return not exist error after metadata got deleted")
+	err = m.Update(testIds[1], func(in []byte) ([]byte, error) {
+		return in, nil
+	})
+	assert.Equal(ErrNotExist, err)
 
 	t.Logf("existing reference should not be affected by delete")
 	assert.Equal([]byte("updated-metadata-1"), newMeta)
@@ -181,8 +188,13 @@ func TestMultithreadAccess(t *testing.T) {
 			assert.NoError(err)
 
 			got, err = m.Get(id)
-			assert.NoError(err)
+			assert.Equal(ErrNotExist, err)
 			assert.Nil(got)
+
+			err = m.Update(id, func(in []byte) ([]byte, error) {
+				return in, nil
+			})
+			assert.Equal(ErrNotExist, err)
 
 			gotList, err = m.List()
 			assert.NoError(err)

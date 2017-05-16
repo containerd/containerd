@@ -107,17 +107,18 @@ func isContainerdContainerNotExistError(grpcError error) bool {
 // retry if the sandbox metadata is not found with the initial id.
 func (c *criContainerdService) getSandbox(id string) (*metadata.SandboxMetadata, error) {
 	sandbox, err := c.sandboxStore.Get(id)
-	if err != nil {
+	if err != nil && !metadata.IsNotExistError(err) {
 		return nil, fmt.Errorf("sandbox metadata not found: %v", err)
 	}
-	if sandbox != nil {
+	if err == nil {
 		return sandbox, nil
 	}
 	// sandbox is not found in metadata store, try to extract full id.
-	id, err = c.sandboxIDIndex.Get(id)
-	if err != nil {
-		if err == truncindex.ErrNotExist {
-			return nil, nil
+	id, indexErr := c.sandboxIDIndex.Get(id)
+	if indexErr != nil {
+		if indexErr == truncindex.ErrNotExist {
+			// Return the original error if sandbox id is not found.
+			return nil, err
 		}
 		return nil, fmt.Errorf("sandbox id not found: %v", err)
 	}
