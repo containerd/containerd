@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
@@ -36,6 +37,9 @@ type initProcess struct {
 }
 
 func newInitProcess(context context.Context, path string, r *shimapi.CreateRequest) (*initProcess, error) {
+	if len(r.Rootfs) == 0 {
+		return nil, errors.New("no rootfs was specified")
+	}
 	for _, rm := range r.Rootfs {
 		m := &containerd.Mount{
 			Type:    rm.Type,
