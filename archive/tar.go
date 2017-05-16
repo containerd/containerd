@@ -40,19 +40,29 @@ func Diff(ctx context.Context, a, b string) io.ReadCloser {
 	r, w := io.Pipe()
 
 	go func() {
-		var err error
-		cw := newChangeWriter(w, b)
-		if err = fs.Changes(ctx, a, b, cw.HandleChange); err != nil {
-			err = errors.Wrap(err, "failed to create diff tar stream")
-		} else {
-			err = cw.Close()
-		}
+		err := WriteDiff(ctx, w, a, b)
 		if err = w.CloseWithError(err); err != nil {
 			log.G(ctx).WithError(err).Debugf("closing tar pipe failed")
 		}
 	}()
 
 	return r
+}
+
+// WriteDiff writes a tar stream of the computed difference between the
+// provided directories.
+//
+// Produces a tar using OCI style file markers for deletions. Deleted
+// files will be prepended with the prefix ".wh.". This style is
+// based off AUFS whiteouts.
+// See https://github.com/opencontainers/image-spec/blob/master/layer.md
+func WriteDiff(ctx context.Context, w io.Writer, a, b string) error {
+	cw := newChangeWriter(w, b)
+	err := fs.Changes(ctx, a, b, cw.HandleChange)
+	if err != nil {
+		return errors.Wrap(err, "failed to create diff tar stream")
+	}
+	return cw.Close()
 }
 
 const (

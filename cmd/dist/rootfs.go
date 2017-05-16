@@ -65,7 +65,7 @@ var rootfsUnpackCommand = cli.Command{
 		}
 
 		snapshotter := snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotClient(conn))
-		applier := diffservice.NewApplierFromClient(diffapi.NewDiffClient(conn))
+		applier := diffservice.NewDiffServiceFromClient(diffapi.NewDiffClient(conn))
 
 		chainID, err := rootfs.ApplyLayers(ctx, layers, snapshotter, applier)
 		if err != nil {

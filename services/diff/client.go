@@ -11,19 +11,24 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+type DiffService interface {
+	rootfs.Applier
+	rootfs.MountDiffer
+}
+
 // NewApplierFromClient returns a new Applier which communicates
 // over a GRPC connection.
-func NewApplierFromClient(client diffapi.DiffClient) rootfs.Applier {
-	return &remoteApplier{
+func NewDiffServiceFromClient(client diffapi.DiffClient) DiffService {
+	return &remote{
 		client: client,
 	}
 }
 
-type remoteApplier struct {
+type remote struct {
 	client diffapi.DiffClient
 }
 
-func (r *remoteApplier) Apply(ctx context.Context, diff ocispec.Descriptor, mounts []containerd.Mount) (ocispec.Descriptor, error) {
+func (r *remote) Apply(ctx context.Context, diff ocispec.Descriptor, mounts []containerd.Mount) (ocispec.Descriptor, error) {
 	req := &diffapi.ApplyRequest{
 		Diff:   fromDescriptor(diff),
 		Mounts: fromMounts(mounts),
@@ -33,6 +38,20 @@ func (r *remoteApplier) Apply(ctx context.Context, diff ocispec.Descriptor, moun
 		return ocispec.Descriptor{}, err
 	}
 	return toDescriptor(resp.Applied), nil
+}
+
+func (r *remote) DiffMounts(ctx context.Context, a, b []containerd.Mount, media, ref string) (ocispec.Descriptor, error) {
+	req := &diffapi.DiffRequest{
+		Left:      fromMounts(a),
+		Right:     fromMounts(b),
+		MediaType: media,
+		Ref:       ref,
+	}
+	resp, err := r.client.Diff(ctx, req)
+	if err != nil {
+		return ocispec.Descriptor{}, err
+	}
+	return toDescriptor(resp.Diff), nil
 }
 
 func fromDescriptor(d ocispec.Descriptor) *descriptor.Descriptor {

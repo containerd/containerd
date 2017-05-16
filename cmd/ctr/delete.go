@@ -17,13 +17,26 @@ var deleteCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		snapshotter, err := getSnapshotter(context)
+		if err != nil {
+			return err
+		}
 		id := context.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		_, err = containers.Delete(gocontext.Background(), &execution.DeleteRequest{
+		ctx := gocontext.TODO()
+		_, err = containers.Delete(ctx, &execution.DeleteRequest{
 			ID: id,
 		})
-		return err
+		if err != nil {
+			return errors.Wrap(err, "failed to delete container")
+		}
+
+		if err := snapshotter.Remove(ctx, id); err != nil {
+			return errors.Wrapf(err, "failed to remove snapshot %q", id)
+		}
+
+		return nil
 	},
 }

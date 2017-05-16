@@ -54,6 +54,10 @@ var runCommand = cli.Command{
 			Name:  "net-host",
 			Usage: "enable host networking for the container",
 		},
+		cli.BoolFlag{
+			Name:  "keep",
+			Usage: "keep container after running",
+		},
 	},
 	Action: func(context *cli.Context) error {
 		var (
@@ -110,7 +114,11 @@ var runCommand = cli.Command{
 				return err
 			}
 
-			mounts, err = snapshotter.Prepare(ctx, id, identity.ChainID(diffIDs).String())
+			if context.Bool("readonly") {
+				mounts, err = snapshotter.View(ctx, id, identity.ChainID(diffIDs).String())
+			} else {
+				mounts, err = snapshotter.Prepare(ctx, id, identity.ChainID(diffIDs).String())
+			}
 			if err != nil {
 				if !snapshot.IsExist(err) {
 					return err
@@ -119,6 +127,14 @@ var runCommand = cli.Command{
 				if err != nil {
 					return err
 				}
+			} else {
+				defer func() {
+					if id != "" {
+						if err := snapshotter.Remove(ctx, id); err != nil {
+							logrus.WithError(err).Errorf("failed to remove snapshot %q", id)
+						}
+					}
+				}()
 			}
 
 			ic, err := image.Config(ctx, content)
@@ -192,10 +208,15 @@ var runCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		if _, err := containers.Delete(ctx, &execution.DeleteRequest{
-			ID: response.ID,
-		}); err != nil {
-			return err
+		if !context.Bool("keep") {
+			if _, err := containers.Delete(ctx, &execution.DeleteRequest{
+				ID: response.ID,
+			}); err != nil {
+				return err
+			}
+		} else {
+			// Don't remove snapshot
+			id = ""
 		}
 		if status != 0 {
 			return cli.NewExitError("", int(status))

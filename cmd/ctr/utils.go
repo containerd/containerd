@@ -13,6 +13,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	contentapi "github.com/containerd/containerd/api/services/content"
+	diffapi "github.com/containerd/containerd/api/services/diff"
 	"github.com/containerd/containerd/api/services/execution"
 	imagesapi "github.com/containerd/containerd/api/services/images"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
@@ -21,6 +22,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	contentservice "github.com/containerd/containerd/services/content"
+	"github.com/containerd/containerd/services/diff"
 	imagesservice "github.com/containerd/containerd/services/images"
 	snapshotservice "github.com/containerd/containerd/services/snapshot"
 	"github.com/containerd/containerd/snapshot"
@@ -60,6 +62,14 @@ func getImageStore(clicontext *cli.Context) (images.Store, error) {
 		return nil, err
 	}
 	return imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)), nil
+}
+
+func getDiffService(context *cli.Context) (diff.DiffService, error) {
+	conn, err := getGRPCConnection(context)
+	if err != nil {
+		return nil, err
+	}
+	return diff.NewDiffServiceFromClient(diffapi.NewDiffClient(conn)), nil
 }
 
 func getVersionService(context *cli.Context) (versionservice.VersionClient, error) {
