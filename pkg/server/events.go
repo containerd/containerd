@@ -28,6 +28,10 @@ import (
 
 // startEventMonitor starts an event monitor which monitors and handles all
 // container events.
+// TODO(random-liu): [P1] Figure out:
+// 1) Is it possible to drop event during containerd is running?
+// 2) How to deal with containerd down? We should restart event monitor, and
+// we should recover all container state.
 func (c *criContainerdService) startEventMonitor() error {
 	events, err := c.containerService.Events(context.Background(), &execution.EventsRequest{})
 	if err != nil {
@@ -35,25 +39,33 @@ func (c *criContainerdService) startEventMonitor() error {
 	}
 	go func() {
 		for {
-			c.handleEvent(events)
+			c.handleEventStream(events)
 		}
 	}()
 	return nil
 }
 
-// handleEvent receives an event from contaienrd and handles the event.
-func (c *criContainerdService) handleEvent(events execution.ContainerService_EventsClient) {
+// handleEventStream receives an event from containerd and handles the event.
+func (c *criContainerdService) handleEventStream(events execution.ContainerService_EventsClient) {
+	// TODO(random-liu): [P1] Should backoff on this error, or else this will
+	// cause a busy loop.
 	e, err := events.Recv()
 	if err != nil {
 		glog.Errorf("Failed to receive event: %v", err)
 		return
 	}
 	glog.V(2).Infof("Received container event: %+v", e)
+	c.handleEvent(e)
+	return
+}
+
+// handleEvent handles a containerd event.
+func (c *criContainerdService) handleEvent(e *container.Event) {
 	switch e.Type {
 	// If containerd-shim exits unexpectedly, there will be no corresponding event.
 	// However, containerd could not retrieve container state in that case, so it's
 	// fine to leave out that case for now.
-	// TODO(random-liu): [P2] Handle container-shim exit.
+	// TODO(random-liu): [P2] Handle containerd-shim exit.
 	case container.Event_EXIT:
 		meta, err := c.containerStore.Get(e.ID)
 		if err != nil {
@@ -61,7 +73,7 @@ func (c *criContainerdService) handleEvent(events execution.ContainerService_Eve
 			return
 		}
 		if e.Pid != meta.Pid {
-			// Not init process dies, ignore the event.
+			// Non-init process died, ignore the event.
 			return
 		}
 		// Delete the container from containerd.
@@ -90,5 +102,4 @@ func (c *criContainerdService) handleEvent(events execution.ContainerService_Eve
 	case container.Event_OOM:
 		// TODO(random-liu): [P1] Handle OOM event.
 	}
-	return
 }

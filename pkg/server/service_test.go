@@ -39,8 +39,9 @@ import (
 
 type nopReadWriteCloser struct{}
 
-func (nopReadWriteCloser) Read(p []byte) (n int, err error)  { return len(p), nil }
-func (nopReadWriteCloser) Write(p []byte) (n int, err error) { return len(p), nil }
+// Return error directly to avoid read/write.
+func (nopReadWriteCloser) Read(p []byte) (n int, err error)  { return 0, io.EOF }
+func (nopReadWriteCloser) Write(p []byte) (n int, err error) { return 0, io.ErrShortWrite }
 func (nopReadWriteCloser) Close() error                      { return nil }
 
 const testRootDir = "/test/rootfs"
@@ -48,12 +49,14 @@ const testRootDir = "/test/rootfs"
 // newTestCRIContainerdService creates a fake criContainerdService for test.
 func newTestCRIContainerdService() *criContainerdService {
 	return &criContainerdService{
-		os:               ostesting.NewFakeOS(),
-		rootDir:          testRootDir,
-		containerService: servertesting.NewFakeExecutionClient(),
-		sandboxStore:     metadata.NewSandboxStore(store.NewMetadataStore()),
-		sandboxNameIndex: registrar.NewRegistrar(),
-		sandboxIDIndex:   truncindex.NewTruncIndex(nil),
+		os:                 ostesting.NewFakeOS(),
+		rootDir:            testRootDir,
+		containerService:   servertesting.NewFakeExecutionClient(),
+		sandboxStore:       metadata.NewSandboxStore(store.NewMetadataStore()),
+		sandboxNameIndex:   registrar.NewRegistrar(),
+		sandboxIDIndex:     truncindex.NewTruncIndex(nil),
+		containerStore:     metadata.NewContainerStore(store.NewMetadataStore()),
+		containerNameIndex: registrar.NewRegistrar(),
 	}
 }
 
