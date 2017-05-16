@@ -78,9 +78,14 @@ func TestReferenceParser(t *testing.T) {
 			Err:   ErrHostnameRequired,
 		},
 		{
-			Name:  "ErrObjectRequired",
-			Input: "docker.io/library/redis?fooo=asdf",
-			Err:   ErrObjectRequired,
+			Name:       "ErrObjectRequired",
+			Input:      "docker.io/library/redis?fooo=asdf",
+			Hostname:   "docker.io",
+			Normalized: "docker.io/library/redis",
+			Expected: Spec{
+				Locator: "docker.io/library/redis",
+				Object:  "",
+			},
 		},
 		{
 			Name:     "Subdomain",

@@ -77,6 +77,7 @@ distribution tool
 		fetchObjectCommand,
 		applyCommand,
 		rootfsCommand,
+		pushObjectCommand,
 	}
 	app.Before = func(context *cli.Context) error {
 		timeout = context.GlobalDuration("timeout")

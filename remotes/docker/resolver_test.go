@@ -166,7 +166,7 @@ func TestBadTokenResolver(t *testing.T) {
 	resolver := NewResolver(ro)
 	image := fmt.Sprintf("%s/doesntmatter:sometatg", base)
 
-	_, _, _, err := resolver.Resolve(ctx, image)
+	_, _, err := resolver.Resolve(ctx, image)
 	if err == nil {
 		t.Fatal("Expected error getting token with inssufficient scope")
 	}
@@ -261,7 +261,11 @@ func runBasicTest(t *testing.T, name string, sf func(h http.Handler) (string, Re
 	resolver := NewResolver(ro)
 	image := fmt.Sprintf("%s/%s:%s", base, name, tag)
 
-	_, d, f, err := resolver.Resolve(ctx, image)
+	_, d, err := resolver.Resolve(ctx, image)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := resolver.Fetcher(ctx, image)
 	if err != nil {
 		t.Fatal(err)
 	}

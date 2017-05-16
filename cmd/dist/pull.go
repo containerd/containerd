@@ -64,11 +64,16 @@ command. As part of this process, we do the following:
 		resolved := make(chan struct{})
 		eg.Go(func() error {
 			ongoing.add(ref)
-			name, desc, fetcher, err := resolver.Resolve(ctx, ref)
+			name, desc, err := resolver.Resolve(ctx, ref)
 			if err != nil {
 				log.G(ctx).WithError(err).Error("failed to resolve")
 				return err
 			}
+			fetcher, err := resolver.Fetcher(ctx, name)
+			if err != nil {
+				return err
+			}
+
 			log.G(ctx).WithField("image", name).Debug("fetching")
 			resolvedImageName = name
 			close(resolved)
