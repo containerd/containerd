@@ -123,9 +123,6 @@ func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts)
 			Options: m.Options,
 		})
 	}
-	if len(sopts.Rootfs) == 0 {
-		return nil, fmt.Errorf("no rootfs was specified for id %s", id)
-	}
 	if _, err = s.Create(ctx, sopts); err != nil {
 		os.RemoveAll(path)
 		return nil, err
