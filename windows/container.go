@@ -174,7 +174,7 @@ func (c *container) Pid() uint32 {
 	return c.ctr.Pid()
 }
 
-func (c *container) Ps(ctx context.Context) ([]uint32, error) {
+func (c *container) Processes(ctx context.Context) ([]uint32, error) {
 	// TODO (ehazlett): support finding all processes in windows container
 	p, err := c.ctr.ProcessList()
 	if err != nil {

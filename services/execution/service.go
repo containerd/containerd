@@ -240,7 +240,7 @@ func (s *Service) Processes(ctx context.Context, r *api.ProcessesRequest) (*api.
 		return nil, err
 	}
 
-	pids, err := c.Ps(ctx)
+	pids, err := c.Processes(ctx)
 	if err != nil {
 		return nil, err
 	}

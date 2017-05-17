@@ -114,8 +114,8 @@ func (c *Container) Exec(ctx context.Context, opts plugin.ExecOpts) (plugin.Proc
 	}, nil
 }
 
-func (c *Container) Ps(ctx context.Context) ([]uint32, error) {
-	resp, err := c.shim.Ps(ctx, &shim.PsRequest{
+func (c *Container) Processes(ctx context.Context) ([]uint32, error) {
+	resp, err := c.shim.Processes(ctx, &shim.ProcessesRequest{
 		ID: c.id,
 	})
 
@@ -123,9 +123,9 @@ func (c *Container) Ps(ctx context.Context) ([]uint32, error) {
 		return nil, err
 	}
 
-	pids := make([]uint32, 0, len(resp.Ps))
+	pids := make([]uint32, 0, len(resp.Processes))
 
-	for _, ps := range resp.Ps {
+	for _, ps := range resp.Processes {
 		pids = append(pids, ps.Pid)
 	}
 

@@ -250,20 +250,20 @@ func (s *Service) Kill(ctx context.Context, r *shimapi.KillRequest) (*google_pro
 	return empty, nil
 }
 
-func (s *Service) Ps(ctx context.Context, r *shimapi.PsRequest) (*shimapi.PsResponse, error) {
+func (s *Service) Processes(ctx context.Context, r *shimapi.ProcessesRequest) (*shimapi.ProcessesResponse, error) {
 	pids, err := s.getContainerPids(ctx, r.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	ps := []*shimapi.Ps{}
+	ps := []*container.Process{}
 	for _, pid := range pids {
-		ps = append(ps, &shimapi.Ps{
+		ps = append(ps, &container.Process{
 			Pid: pid,
 		})
 	}
-	resp := &shimapi.PsResponse{
-		Ps: ps,
+	resp := &shimapi.ProcessesResponse{
+		Processes: ps,
 	}
 
 	return resp, nil

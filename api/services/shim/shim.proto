@@ -18,7 +18,7 @@ service Shim {
 	rpc Start(StartRequest) returns (google.protobuf.Empty);
 	rpc Delete(DeleteRequest) returns (DeleteResponse);
 	rpc State(StateRequest) returns (StateResponse);
-	rpc Ps(PsRequest) returns (PsResponse);
+	rpc Processes(ProcessesRequest) returns (ProcessesResponse);
 	rpc Pause(PauseRequest) returns (google.protobuf.Empty);
 	rpc Resume(ResumeRequest) returns (google.protobuf.Empty);
 
@@ -115,15 +115,10 @@ message CloseStdinRequest {
 	uint32 pid = 1;
 }
 
-message PsRequest {
+message ProcessesRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
 }
 
-message Ps {
-	uint32 pid = 1;
-	google.protobuf.Any runtime_data = 2;
-}
-
-message PsResponse{
-	repeated Ps ps = 1;
+message ProcessesResponse{
+	repeated containerd.v1.types.Process processes = 1;
 }

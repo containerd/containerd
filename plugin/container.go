@@ -22,8 +22,8 @@ type Container interface {
 	Kill(context.Context, uint32, uint32, bool) error
 	// Exec adds a process into the container
 	Exec(context.Context, ExecOpts) (Process, error)
-	// Ps returns all pids for the container
-	Ps(context.Context) ([]uint32, error)
+	// Processes returns all pids for the container
+	Processes(context.Context) ([]uint32, error)
 	// Pty resizes the processes pty/console
 	Pty(context.Context, uint32, ConsoleSize) error
 	// CloseStdin closes the processes stdin
