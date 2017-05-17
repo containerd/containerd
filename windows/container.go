@@ -175,13 +175,17 @@ func (c *container) Pid() uint32 {
 }
 
 func (c *container) Processes(ctx context.Context) ([]uint32, error) {
-	// TODO (ehazlett): support finding all processes in windows container
-	p, err := c.ctr.ProcessList()
+	pl, err := c.ctr.ProcessList()
 	if err != nil {
 		return nil, err
 	}
-	log.G(ctx).Debug(p)
-	return []uint32{c.ctr.Pid()}, nil
+
+	pids := make([]uint32, 0, len(pl))
+	for _, p := range pl {
+		pids = append(pids, p.ProcessId)
+	}
+
+	return pids, nil
 }
 
 func (c *container) setStatus(status plugin.Status) {
