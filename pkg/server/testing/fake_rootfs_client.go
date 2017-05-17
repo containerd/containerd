@@ -50,10 +50,7 @@ func NewFakeRootfsClient() *FakeRootfsClient {
 	}
 }
 
-func (f *FakeRootfsClient) popError(op string) error {
-	if f.errors == nil {
-		return nil
-	}
+func (f *FakeRootfsClient) getError(op string) error {
 	err, ok := f.errors[op]
 	if ok {
 		delete(f.errors, op)
@@ -142,7 +139,7 @@ func (f *FakeRootfsClient) Unpack(ctx context.Context, unpackOpts *rootfs.Unpack
 	f.Lock()
 	defer f.Unlock()
 	f.appendCalled("unpack", unpackOpts)
-	if err := f.popError("unpack"); err != nil {
+	if err := f.getError("unpack"); err != nil {
 		return nil, err
 	}
 	chainID := generateChainID(unpackOpts.Layers)
@@ -161,7 +158,7 @@ func (f *FakeRootfsClient) Prepare(ctx context.Context, prepareOpts *rootfs.Prep
 	f.Lock()
 	defer f.Unlock()
 	f.appendCalled("prepare", prepareOpts)
-	if err := f.popError("prepare"); err != nil {
+	if err := f.getError("prepare"); err != nil {
 		return nil, err
 	}
 	_, ok := f.ChainIDList[prepareOpts.ChainID]
@@ -183,7 +180,7 @@ func (f *FakeRootfsClient) Mounts(ctx context.Context, mountsOpts *rootfs.Mounts
 	f.Lock()
 	defer f.Unlock()
 	f.appendCalled("mounts", mountsOpts)
-	if err := f.popError("mounts"); err != nil {
+	if err := f.getError("mounts"); err != nil {
 		return nil, err
 	}
 	mounts, ok := f.MountList[mountsOpts.Name]

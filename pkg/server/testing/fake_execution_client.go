@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/execution"
 	"github.com/containerd/containerd/api/types/container"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -91,10 +91,7 @@ func (f *FakeExecutionClient) WithEvents() *FakeExecutionClient {
 	return f
 }
 
-func (f *FakeExecutionClient) popError(op string) error {
-	if f.errors == nil {
-		return nil
-	}
+func (f *FakeExecutionClient) getError(op string) error {
 	err, ok := f.errors[op]
 	if ok {
 		delete(f.errors, op)
@@ -176,7 +173,7 @@ func (f *FakeExecutionClient) Create(ctx context.Context, createOpts *execution.
 	f.Lock()
 	defer f.Unlock()
 	f.appendCalled("create", createOpts)
-	if err := f.popError("create"); err != nil {
+	if err := f.getError("create"); err != nil {
 		return nil, err
 	}
 	_, ok := f.ContainerList[createOpts.ID]
@@ -201,11 +198,11 @@ func (f *FakeExecutionClient) Create(ctx context.Context, createOpts *execution.
 }
 
 // Start is a test implementation of execution.Start
-func (f *FakeExecutionClient) Start(ctx context.Context, startOpts *execution.StartRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+func (f *FakeExecutionClient) Start(ctx context.Context, startOpts *execution.StartRequest, opts ...grpc.CallOption) (*googleprotobuf.Empty, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.appendCalled("start", startOpts)
-	if err := f.popError("start"); err != nil {
+	if err := f.getError("start"); err != nil {
 		return nil, err
 	}
 	c, ok := f.ContainerList[startOpts.ID]
@@ -221,13 +218,13 @@ func (f *FakeExecutionClient) Start(ctx context.Context, startOpts *execution.St
 	case container.Status_CREATED:
 		c.Status = container.Status_RUNNING
 		f.ContainerList[startOpts.ID] = c
-		return &google_protobuf.Empty{}, nil
+		return &googleprotobuf.Empty{}, nil
 	case container.Status_STOPPED:
-		return &google_protobuf.Empty{}, fmt.Errorf("cannot start a container that has stopped")
+		return &googleprotobuf.Empty{}, fmt.Errorf("cannot start a container that has stopped")
 	case container.Status_RUNNING:
-		return &google_protobuf.Empty{}, fmt.Errorf("cannot start an already running container")
+		return &googleprotobuf.Empty{}, fmt.Errorf("cannot start an already running container")
 	default:
-		return &google_protobuf.Empty{}, fmt.Errorf("cannot start a container in the %s state", c.Status)
+		return &googleprotobuf.Empty{}, fmt.Errorf("cannot start a container in the %s state", c.Status)
 	}
 }
 
@@ -236,7 +233,7 @@ func (f *FakeExecutionClient) Delete(ctx context.Context, deleteOpts *execution.
 	f.Lock()
 	defer f.Unlock()
 	f.appendCalled("delete", deleteOpts)
-	if err := f.popError("delete"); err != nil {
+	if err := f.getError("delete"); err != nil {
 		return nil, err
 	}
 	c, ok := f.ContainerList[deleteOpts.ID]
@@ -257,7 +254,7 @@ func (f *FakeExecutionClient) Info(ctx context.Context, infoOpts *execution.Info
 	f.Lock()
 	defer f.Unlock()
 	f.appendCalled("info", infoOpts)
-	if err := f.popError("info"); err != nil {
+	if err := f.getError("info"); err != nil {
 		return nil, err
 	}
 	c, ok := f.ContainerList[infoOpts.ID]
@@ -272,7 +269,7 @@ func (f *FakeExecutionClient) List(ctx context.Context, listOpts *execution.List
 	f.Lock()
 	defer f.Unlock()
 	f.appendCalled("list", listOpts)
-	if err := f.popError("list"); err != nil {
+	if err := f.getError("list"); err != nil {
 		return nil, err
 	}
 	resp := &execution.ListResponse{}
@@ -287,11 +284,11 @@ func (f *FakeExecutionClient) List(ctx context.Context, listOpts *execution.List
 }
 
 // Kill is a test implementation of execution.Kill
-func (f *FakeExecutionClient) Kill(ctx context.Context, killOpts *execution.KillRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+func (f *FakeExecutionClient) Kill(ctx context.Context, killOpts *execution.KillRequest, opts ...grpc.CallOption) (*googleprotobuf.Empty, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.appendCalled("kill", killOpts)
-	if err := f.popError("kill"); err != nil {
+	if err := f.getError("kill"); err != nil {
 		return nil, err
 	}
 	c, ok := f.ContainerList[killOpts.ID]
@@ -305,7 +302,7 @@ func (f *FakeExecutionClient) Kill(ctx context.Context, killOpts *execution.Kill
 		Type: container.Event_EXIT,
 		Pid:  c.Pid,
 	})
-	return &google_protobuf.Empty{}, nil
+	return &googleprotobuf.Empty{}, nil
 }
 
 // Events is a test implementation of execution.Events
@@ -313,7 +310,7 @@ func (f *FakeExecutionClient) Events(ctx context.Context, eventsOpts *execution.
 	f.Lock()
 	defer f.Unlock()
 	f.appendCalled("events", eventsOpts)
-	if err := f.popError("events"); err != nil {
+	if err := f.getError("events"); err != nil {
 		return nil, err
 	}
 	var client = &EventClient{
@@ -330,13 +327,13 @@ func (f *FakeExecutionClient) Exec(ctx context.Context, execOpts *execution.Exec
 }
 
 // Pty is a test implementation of execution.Pty
-func (f *FakeExecutionClient) Pty(ctx context.Context, ptyOpts *execution.PtyRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+func (f *FakeExecutionClient) Pty(ctx context.Context, ptyOpts *execution.PtyRequest, opts ...grpc.CallOption) (*googleprotobuf.Empty, error) {
 	// TODO: implement Pty()
 	return nil, nil
 }
 
 // CloseStdin is a test implementation of execution.CloseStdin
-func (f *FakeExecutionClient) CloseStdin(ctx context.Context, closeStdinOpts *execution.CloseStdinRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+func (f *FakeExecutionClient) CloseStdin(ctx context.Context, closeStdinOpts *execution.CloseStdinRequest, opts ...grpc.CallOption) (*googleprotobuf.Empty, error) {
 	// TODO: implement CloseStdin()
 	return nil, nil
 }
