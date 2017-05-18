@@ -17,18 +17,25 @@ limitations under the License.
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 
+	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/docker/pkg/truncindex"
+	imagedigest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/identity"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/images"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 
@@ -215,4 +222,131 @@ func (c *criContainerdService) getSandbox(id string) (*metadata.SandboxMetadata,
 // criContainerStateToString formats CRI container state to string.
 func criContainerStateToString(state runtime.ContainerState) string {
 	return runtime.ContainerState_name[int32(state)]
+}
+
+// normalizeImageRef normalizes the image reference following the docker convention. This is added
+// mainly for backward compatibility.
+// The reference returned can only be either tagged or digested. For reference contains both tag
+// and digest, the function returns digested reference, e.g. docker.io/library/busybox:latest@
+// sha256:7cc4b5aefd1d0cadf8d97d4350462ba51c694ebca145b08d7d41b41acc8db5aa will be returned as
+// docker.io/library/busybox@sha256:7cc4b5aefd1d0cadf8d97d4350462ba51c694ebca145b08d7d41b41acc8db5aa.
+func normalizeImageRef(ref string) (reference.Named, error) {
+	named, err := reference.ParseNormalizedNamed(ref)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := named.(reference.NamedTagged); ok {
+		if canonical, ok := named.(reference.Canonical); ok {
+			// The reference is both tagged and digested, only
+			// return digested.
+			newNamed, err := reference.WithName(canonical.Name())
+			if err != nil {
+				return nil, err
+			}
+			newCanonical, err := reference.WithDigest(newNamed, canonical.Digest())
+			if err != nil {
+				return nil, err
+			}
+			return newCanonical, nil
+		}
+	}
+	return reference.TagNameOnly(named), nil
+}
+
+// getImageInfo returns image chainID, compressed size and oci config. Note that getImageInfo
+// assumes that the image has been pulled or it will return an error.
+func (c *criContainerdService) getImageInfo(ctx context.Context, ref string) (
+	imagedigest.Digest, int64, *imagespec.ImageConfig, error) {
+	normalized, err := normalizeImageRef(ref)
+	if err != nil {
+		return "", 0, nil, fmt.Errorf("failed to normalize image reference %q: %v", ref, err)
+	}
+	normalizedRef := normalized.String()
+	image, err := c.imageStoreService.Get(ctx, normalizedRef)
+	if err != nil {
+		return "", 0, nil, fmt.Errorf("failed to get image %q from containerd image store: %v",
+			normalizedRef, err)
+	}
+	// Get image config
+	desc, err := image.Config(ctx, c.contentProvider)
+	if err != nil {
+		return "", 0, nil, fmt.Errorf("failed to get image config descriptor: %v", err)
+	}
+	rc, err := c.contentProvider.Reader(ctx, desc.Digest)
+	if err != nil {
+		return "", 0, nil, fmt.Errorf("failed to get image config reader: %v", err)
+	}
+	defer rc.Close()
+	var imageConfig imagespec.Image
+	if err = json.NewDecoder(rc).Decode(&imageConfig); err != nil {
+		return "", 0, nil, fmt.Errorf("failed to decode image config: %v", err)
+	}
+	// Get image chainID
+	diffIDs, err := image.RootFS(ctx, c.contentProvider)
+	if err != nil {
+		return "", 0, nil, fmt.Errorf("failed to get image diff ids: %v", err)
+	}
+	chainID := identity.ChainID(diffIDs)
+	// Get image size
+	size, err := image.Size(ctx, c.contentProvider)
+	if err != nil {
+		return "", 0, nil, fmt.Errorf("failed to get image size: %v", err)
+	}
+	return chainID, size, &imageConfig.Config, nil
+}
+
+// getRepoDigestAngTag returns image repoDigest and repoTag of the named image reference.
+func getRepoDigestAndTag(namedRef reference.Named, digest imagedigest.Digest) (string, string) {
+	var repoTag string
+	if _, ok := namedRef.(reference.NamedTagged); ok {
+		repoTag = namedRef.String()
+	}
+	repoDigest := namedRef.Name() + "@" + digest.String()
+	return repoDigest, repoTag
+}
+
+// localResolve resolves image reference to image id locally. It returns empty string
+// without error if the reference doesn't exist.
+func (c *criContainerdService) localResolve(ctx context.Context, ref string) (string, error) {
+	_, err := imagedigest.Parse(ref)
+	if err == nil {
+		return ref, nil
+	}
+	// ref is not image id, try to resolve it locally.
+	normalized, err := normalizeImageRef(ref)
+	if err != nil {
+		return "", fmt.Errorf("invalid image reference %q: %v", ref, err)
+	}
+	image, err := c.imageStoreService.Get(ctx, normalized.String())
+	if err != nil {
+		if images.IsNotFound(err) {
+			return "", nil
+		}
+		return "", fmt.Errorf("an error occurred when getting image %q from containerd image store: %v",
+			normalized.String(), err)
+	}
+	desc, err := image.Config(ctx, c.contentProvider)
+	if err != nil {
+		return "", fmt.Errorf("failed to get image config descriptor: %v", err)
+	}
+	return desc.Digest.String(), nil
+}
+
+// getUserFromImage gets uid or user name of the image user.
+// If user is numeric, it will be treated as uid; or else, it is treated as user name.
+func getUserFromImage(user string) (*int64, string) {
+	// return both empty if user is not specified in the image.
+	if user == "" {
+		return nil, ""
+	}
+	// split instances where the id may contain user:group
+	user = strings.Split(user, ":")[0]
+	// user could be either uid or user name. Try to interpret as numeric uid.
+	uid, err := strconv.ParseInt(user, 10, 64)
+	if err != nil {
+		// If user is non numeric, assume it's user name.
+		return nil, user
+	}
+	// If user is a numeric uid.
+	return &uid, ""
 }

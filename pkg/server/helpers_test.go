@@ -23,6 +23,7 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/containerd/containerd/reference"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 
@@ -157,5 +158,65 @@ func TestGetSandbox(t *testing.T) {
 			assert.NoError(t, err)
 		}
 		assert.Equal(t, test.expected, sb)
+	}
+}
+
+func TestNormalizeImageRef(t *testing.T) {
+	for _, ref := range []string{
+		"busybox",        // has nothing
+		"busybox:latest", // only has tag
+		"busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582", // only has digest
+		"library/busybox",                  // only has path
+		"docker.io/busybox",                // only has hostname
+		"docker.io/library/busybox",        // has no tag
+		"docker.io/busybox:latest",         // has no path
+		"library/busybox:latest",           // has no hostname
+		"docker.io/library/busybox:latest", // full reference
+		"gcr.io/library/busybox",           // gcr reference
+	} {
+		t.Logf("TestCase %q", ref)
+		normalized, err := normalizeImageRef(ref)
+		assert.NoError(t, err)
+		_, err = reference.Parse(normalized.String())
+		assert.NoError(t, err, "%q should be containerd supported reference", normalized)
+	}
+}
+
+// TestGetUserFromImageUser tests the logic of getting image uid or user name of image user.
+func TestGetUserFromImageUser(t *testing.T) {
+	newI64 := func(i int64) *int64 { return &i }
+	for c, test := range map[string]struct {
+		user string
+		uid  *int64
+		name string
+	}{
+		"no gid": {
+			user: "0",
+			uid:  newI64(0),
+		},
+		"uid/gid": {
+			user: "0:1",
+			uid:  newI64(0),
+		},
+		"empty user": {
+			user: "",
+		},
+		"multiple spearators": {
+			user: "1:2:3",
+			uid:  newI64(1),
+		},
+		"root username": {
+			user: "root:root",
+			name: "root",
+		},
+		"username": {
+			user: "test:test",
+			name: "test",
+		},
+	} {
+		t.Logf("TestCase - %q", c)
+		actualUID, actualName := getUserFromImageUser(test.user)
+		assert.Equal(t, test.uid, actualUID)
+		assert.Equal(t, test.name, actualName)
 	}
 }

@@ -18,33 +18,51 @@ package server
 
 import (
 	"fmt"
-	"golang.org/x/net/context"
 
+	"github.com/golang/glog"
+	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+
+	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 )
 
 // ListImages lists existing images.
-// TODO(mikebrow): add filters
-// TODO(mikebrow): harden api
-func (c *criContainerdService) ListImages(ctx context.Context, r *runtime.ListImagesRequest) (*runtime.ListImagesResponse, error) {
+// TODO(random-liu): Add image list filters after CRI defines this more clear, and kubelet
+// actually needs it.
+func (c *criContainerdService) ListImages(ctx context.Context, r *runtime.ListImagesRequest) (retRes *runtime.ListImagesResponse, retErr error) {
+	glog.V(4).Infof("ListImages with filter %+v", r.GetFilter())
+	defer func() {
+		if retErr == nil {
+			glog.V(4).Infof("ListImages returns image list %+v", retRes.GetImages())
+		}
+	}()
+
 	imageMetadataA, err := c.imageMetadataStore.List()
 	if err != nil {
-		return nil, fmt.Errorf("failed to list image metadata from store %v", err)
+		return nil, fmt.Errorf("failed to list image metadata from store: %v", err)
 	}
-	// TODO(mikebrow): Get the id->tags, and id->digest mapping from our checkpoint;
-	// Get other information from containerd image/content store
-
 	var images []*runtime.Image
-	for _, image := range imageMetadataA { // TODO(mikebrow): write a ImageMetadata to runtime.Image converter
-		ri := &runtime.Image{
-			Id:          image.ID,
-			RepoTags:    image.RepoTags,
-			RepoDigests: image.RepoDigests,
-			Size_:       image.Size,
-			// TODO(mikebrow): Uid and Username?
-		}
-		images = append(images, ri)
+	for _, image := range imageMetadataA {
+		// TODO(random-liu): [P0] Make sure corresponding snapshot exists. What if snapshot
+		// doesn't exist?
+		images = append(images, toCRIImage(image))
 	}
 
 	return &runtime.ListImagesResponse{Images: images}, nil
+}
+
+// toCRIImage converts image metadata to CRI image type.
+func toCRIImage(image *metadata.ImageMetadata) *runtime.Image {
+	runtimeImage := &runtime.Image{
+		Id:          image.ID,
+		RepoTags:    image.RepoTags,
+		RepoDigests: image.RepoDigests,
+		Size_:       uint64(image.Size),
+	}
+	uid, username := getUserFromImage(image.Config.User)
+	if uid != nil {
+		runtimeImage.Uid = &runtime.Int64Value{Value: *uid}
+	}
+	runtimeImage.Username = username
+	return runtimeImage
 }

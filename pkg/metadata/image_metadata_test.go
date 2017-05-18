@@ -27,7 +27,7 @@ import (
 func TestImageMetadataStore(t *testing.T) {
 	imageMetadataMap := map[string]*ImageMetadata{
 		"1": {
-			ID:   "1", // TODO(mikebrow): fill
+			ID:   "1",
 			Size: 10,
 		},
 		"2": {
@@ -62,7 +62,7 @@ func TestImageMetadataStore(t *testing.T) {
 
 	t.Logf("should be able to update image metadata")
 	testID := "2"
-	newSize := uint64(200)
+	newSize := int64(200)
 	expectMeta := *imageMetadataMap[testID]
 	expectMeta.Size = newSize
 	err = s.Update(testID, func(o ImageMetadata) (ImageMetadata, error) {
