@@ -134,7 +134,11 @@ func (s *storage) List(ctx context.Context) ([]Image, error) {
 
 func (s *storage) Delete(ctx context.Context, name string) error {
 	return withImagesBucket(s.tx, func(bkt *bolt.Bucket) error {
-		return bkt.DeleteBucket([]byte(name))
+		err := bkt.DeleteBucket([]byte(name))
+		if err == bolt.ErrBucketNotFound {
+			return ErrNotFound
+		}
+		return err
 	})
 }
 
