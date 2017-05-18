@@ -38,7 +38,7 @@ ifeq ("$(GOOS)", "windows")
 endif
 
 GO_TAGS=$(if $(BUILDTAGS),-tags "$(BUILDTAGS)",)
-GO_LDFLAGS=-ldflags "-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG)"
+GO_LDFLAGS=-ldflags "-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG) $(EXTRA_LDFLAGS)"
 
 # Flags passed to `go test`
 TESTFLAGS ?=-parallel 8 -race
@@ -115,7 +115,7 @@ ineffassign: ## run ineffassign
 
 build: ## build the go packages
 	@echo "$(WHALE) $@"
-	@go build -i -v ${GO_LDFLAGS} ${GO_GCFLAGS} ${PACKAGES}
+	@go build -i -v ${EXTRA_FLAGS} ${GO_LDFLAGS} ${GO_GCFLAGS} ${PACKAGES}
 
 test: ## run tests, except integration tests and tests that require root
 	@echo "$(WHALE) $@"
