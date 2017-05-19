@@ -45,7 +45,7 @@ With the required dependencies installed, the `Makefile` target named **binaries
 
 Vendoring of external imports uses the [`vndr` tool](https://github.com/LK4D4/vndr) which uses a simple config file, `vendor.conf`, to provide the URL and version or hash details for each vendored import. After modifying `vendor.conf` run the `vndr` tool to update the `vendor/` directory contents. Combining the `vendor.conf` update with the changeset in `vendor/` after running `vndr` should become a single commit for a PR which relies on vendored updates.
 
-Containerd will by default use `runc` found via the $PATH as the OCI-compliant runtime. You can specify the runtime directly with the `runtime` flag when starting containerd. However you specify the runtime, the expectation is that during the pre-release development cycle for containerd, the supported version of `runc` will track the current master branch of [`opencontainers/runc`](https://github.com/opencontainers/runc).
+Please refer to [RUNC.md](/RUNC.md) for the currently supported version of `runc` that is used by containerd.
 
 ## Features
 
