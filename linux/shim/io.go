@@ -15,8 +15,9 @@ import (
 )
 
 func copyConsole(ctx context.Context, console console.Console, stdin, stdout, stderr string, wg, cwg *sync.WaitGroup) error {
+	fctx := context.Background()
 	if stdin != "" {
-		in, err := fifo.OpenFifo(ctx, stdin, syscall.O_RDONLY, 0)
+		in, err := fifo.OpenFifo(fctx, stdin, syscall.O_RDONLY, 0)
 		if err != nil {
 			return err
 		}
@@ -26,11 +27,11 @@ func copyConsole(ctx context.Context, console console.Console, stdin, stdout, st
 			io.Copy(console, in)
 		}()
 	}
-	outw, err := fifo.OpenFifo(ctx, stdout, syscall.O_WRONLY, 0)
+	outw, err := fifo.OpenFifo(fctx, stdout, syscall.O_WRONLY, 0)
 	if err != nil {
 		return err
 	}
-	outr, err := fifo.OpenFifo(ctx, stdout, syscall.O_RDONLY, 0)
+	outr, err := fifo.OpenFifo(fctx, stdout, syscall.O_RDONLY, 0)
 	if err != nil {
 		return err
 	}
@@ -48,6 +49,7 @@ func copyConsole(ctx context.Context, console console.Console, stdin, stdout, st
 }
 
 func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, wg, cwg *sync.WaitGroup) error {
+	fctx := context.Background()
 	for name, dest := range map[string]func(wc io.WriteCloser, rc io.Closer){
 		stdout: func(wc io.WriteCloser, rc io.Closer) {
 			wg.Add(1)
@@ -72,11 +74,11 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 			}()
 		},
 	} {
-		fw, err := fifo.OpenFifo(ctx, name, syscall.O_WRONLY, 0)
+		fw, err := fifo.OpenFifo(fctx, name, syscall.O_WRONLY, 0)
 		if err != nil {
 			return fmt.Errorf("containerd-shim: opening %s failed: %s", name, err)
 		}
-		fr, err := fifo.OpenFifo(ctx, name, syscall.O_RDONLY, 0)
+		fr, err := fifo.OpenFifo(fctx, name, syscall.O_RDONLY, 0)
 		if err != nil {
 			return fmt.Errorf("containerd-shim: opening %s failed: %s", name, err)
 		}
@@ -86,7 +88,7 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 		rio.Stdin().Close()
 		return nil
 	}
-	f, err := fifo.OpenFifo(ctx, stdin, syscall.O_RDONLY, 0)
+	f, err := fifo.OpenFifo(fctx, stdin, syscall.O_RDONLY, 0)
 	if err != nil {
 		return fmt.Errorf("containerd-shim: opening %s failed: %s", stdin, err)
 	}
