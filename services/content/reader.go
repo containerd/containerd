@@ -19,6 +19,7 @@ func (rr *remoteReader) Read(p []byte) (n int, err error) {
 		}
 		return
 	}
+	rr.extra = rr.extra[:0]
 
 	p = p[n:]
 	for len(p) > 0 {
