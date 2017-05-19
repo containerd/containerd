@@ -19,7 +19,7 @@ enum Kind {
 // Snapshot defines the storage type for a snapshot in the
 // metadata store.
 message Snapshot {
-	uint64 id = 1 [(gogoproto.customname) = "ID"];
+	uint64 id = 1;
 	string parent = 2;
 	Kind kind = 4;
 	bool readonly = 5;

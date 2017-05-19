@@ -31,7 +31,7 @@ service Shim {
 }
 
 message CreateRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
+	string id = 1;
 	string bundle = 2;
 	string runtime = 3;
 	bool no_pivot = 4;
@@ -89,7 +89,7 @@ message StateRequest {
 }
 
 message StateResponse {
-	string id = 1 [(gogoproto.customname) = "ID"];
+	string id = 1;
 	string bundle = 2;
 	uint32 pid = 3;
 	containerd.v1.types.Status status = 4;
@@ -116,7 +116,7 @@ message CloseStdinRequest {
 }
 
 message ProcessesRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
+	string id = 1;
 }
 
 message ProcessesResponse{

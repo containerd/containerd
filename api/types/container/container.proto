@@ -15,7 +15,7 @@ enum Status {
 }
 
 message Container {
-	string id = 1 [(gogoproto.customname) = "ID"];
+	string id = 1;
 	uint32 pid = 2;
 	Status status = 3;
 }
@@ -39,7 +39,7 @@ message User {
 }
 
 message Event {
-	string id = 1 [(gogoproto.customname) = "ID"];
+	string id = 1;
 
 	enum EventType {
 		EXIT = 0;

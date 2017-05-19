@@ -17,6 +17,7 @@ func main() {
 		vanity.TurnOnStringerAll,
 		vanity.TurnOnUnmarshalerAll,
 		vanity.TurnOnSizerAll,
+		CustomNameID,
 	} {
 		vanity.ForEachFile(files, opt)
 	}

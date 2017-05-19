@@ -88,8 +88,6 @@ fmt: ## run go fmt
 		(echo "$(ONI) please format Go code with 'gofmt -s -w'" && false)
 	@test -z "$$(find . -path ./vendor -prune -o ! -name timestamp.proto ! -name duration.proto -name '*.proto' -type f -exec grep -Hn -e "^ " {} \; | tee /dev/stderr)" || \
 		(echo "$(ONI) please indent proto files with tabs only" && false)
-	@test -z "$$(find . -path ./vendor -prune -o -name '*.proto' -type f -exec grep -EHn "[_ ]id = " {} \; | grep -v gogoproto.customname | tee /dev/stderr)" || \
-		(echo "$(ONI) id fields in proto files must have a gogoproto.customname set" && false)
 	@test -z "$$(find . -path ./vendor -prune -o -name '*.proto' -type f -exec grep -Hn "Meta meta = " {} \; | grep -v '(gogoproto.nullable) = false' | tee /dev/stderr)" || \
 		(echo "$(ONI) meta fields in proto files must have option (gogoproto.nullable) = false" && false)
 
