@@ -7,11 +7,14 @@ import "gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
 
 enum Status {
-	UNKNOWN = 0;
-	CREATED = 1;
-	RUNNING = 2;
-	STOPPED = 3;
-	PAUSED = 4;
+	option (gogoproto.goproto_enum_prefix) = false;
+	option (gogoproto.enum_customname) = "Status";
+
+	UNKNOWN = 0 [(gogoproto.enumvalue_customname) = "StatusUnknown"];
+	CREATED = 1 [(gogoproto.enumvalue_customname) = "StatusCreated"];
+	RUNNING = 2 [(gogoproto.enumvalue_customname) = "StatusRunning"];
+	STOPPED = 3 [(gogoproto.enumvalue_customname) = "StatusStopped"];
+	PAUSED = 4 [(gogoproto.enumvalue_customname) = "StatusPaused"];
 }
 
 message Container {

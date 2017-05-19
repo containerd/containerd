@@ -150,13 +150,13 @@ func containerFromContainerd(ctx context.Context, c plugin.Container) (*containe
 	var status container.Status
 	switch state.Status() {
 	case plugin.CreatedStatus:
-		status = container.Status_CREATED
+		status = container.StatusCreated
 	case plugin.RunningStatus:
-		status = container.Status_RUNNING
+		status = container.StatusRunning
 	case plugin.StoppedStatus:
-		status = container.Status_STOPPED
+		status = container.StatusStopped
 	case plugin.PausedStatus:
-		status = container.Status_PAUSED
+		status = container.StatusPaused
 	default:
 		log.G(ctx).WithField("status", state.Status()).Warn("unknown status")
 	}
