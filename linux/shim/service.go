@@ -160,16 +160,16 @@ func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.
 	if err != nil {
 		return nil, err
 	}
-	status := container.Status_UNKNOWN
+	status := container.StatusUnknown
 	switch st {
 	case "created":
-		status = container.Status_CREATED
+		status = container.StatusCreated
 	case "running":
-		status = container.Status_RUNNING
+		status = container.StatusRunning
 	case "stopped":
-		status = container.Status_STOPPED
+		status = container.StatusStopped
 	case "paused":
-		status = container.Status_PAUSED
+		status = container.StatusPaused
 	}
 	o := &shimapi.StateResponse{
 		ID:        s.id,
@@ -181,12 +181,12 @@ func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, p := range s.processes {
-		status := container.Status_RUNNING
+		status := container.StatusRunning
 		if err := unix.Kill(p.Pid(), 0); err != nil {
 			if err != syscall.ESRCH {
 				return nil, err
 			}
-			status = container.Status_STOPPED
+			status = container.StatusStopped
 		}
 		o.Processes = append(o.Processes, &container.Process{
 			Pid:    uint32(p.Pid()),

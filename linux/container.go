@@ -57,13 +57,13 @@ func (c *Container) State(ctx context.Context) (plugin.State, error) {
 	}
 	var status plugin.Status
 	switch response.Status {
-	case container.Status_CREATED:
+	case container.StatusCreated:
 		status = plugin.CreatedStatus
-	case container.Status_RUNNING:
+	case container.StatusRunning:
 		status = plugin.RunningStatus
-	case container.Status_STOPPED:
+	case container.StatusStopped:
 		status = plugin.StoppedStatus
-	case container.Status_PAUSED:
+	case container.StatusPaused:
 		status = plugin.PausedStatus
 		// TODO: containerd.DeletedStatus
 	}
