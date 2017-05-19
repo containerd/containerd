@@ -26,7 +26,7 @@ service ContainerService {
 }
 
 message CreateRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
+	string id = 1;
 	google.protobuf.Any spec = 2;
 	repeated containerd.v1.types.Mount rootfs = 3;
 	string runtime = 4;
@@ -37,26 +37,26 @@ message CreateRequest {
 }
 
 message CreateResponse {
-	string id = 1 [(gogoproto.customname) = "ID"];
+	string id = 1;
 	uint32 pid = 2;
 }
 
 message StartRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
+	string id = 1;
 }
 
 message DeleteRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
+	string id = 1;
 }
 
 message DeleteResponse {
-	string id = 1 [(gogoproto.customname) = "ID"];
+	string id = 1;
 	uint32 exit_status = 2;
 	google.protobuf.Timestamp exited_at = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message InfoRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
+	string id = 1;
 }
 
 message ListRequest {
@@ -67,7 +67,7 @@ message ListResponse {
 }
 
 message KillRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
+	string id = 1;
 	uint32 signal = 2;
 	oneof pid_or_all {
 	    bool all = 3;
@@ -79,7 +79,7 @@ message EventsRequest {
 }
 
 message ExecRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
+	string id = 1;
 	bool terminal = 2;
 	string stdin = 3;
 	string stdout = 4;
@@ -92,27 +92,27 @@ message ExecResponse {
 }
 
 message PtyRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
+	string id = 1;
 	uint32 pid = 2;
 	uint32 width = 3;
 	uint32 height = 4;
 }
 
 message CloseStdinRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
+	string id = 1;
 	uint32 pid = 2;
 }
 
 message PauseRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
+	string id = 1;
 }
 
 message ResumeRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
+	string id = 1;
 }
 
 message ProcessesRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];
+	string id = 1;
 }
 
 message ProcessesResponse{
