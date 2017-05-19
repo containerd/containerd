@@ -36,6 +36,12 @@ type Ingester interface {
 	Writer(ctx context.Context, ref string, size int64, expected digest.Digest) (Writer, error)
 }
 
+// InfoProvider will return metadata about content available in the store.
+type InfoProvider interface {
+	// If the content is not present, ErrNotFound will be returned.
+	Info(ctx context.Context, dgst digest.Digest) (Info, error)
+}
+
 // TODO(stevvooe): Consider a very different name for this struct. Info is way
 // to general. It also reads very weird in certain context, like pluralization.
 type Info struct {
@@ -58,11 +64,6 @@ type WalkFunc func(Info) error
 
 // Manager provides methods for inspecting, listing and removing content.
 type Manager interface {
-	// Info will return metadata about content available in the content store.
-	//
-	// If the content is not present, ErrNotFound will be returned.
-	Info(ctx context.Context, dgst digest.Digest) (Info, error)
-
 	// Walk will call fn for each item in the content store.
 	Walk(ctx context.Context, fn WalkFunc) error
 
@@ -98,6 +99,7 @@ type Store interface {
 	Manager
 	Ingester
 	Provider
+	InfoProvider
 }
 
 func IsNotFound(err error) bool {

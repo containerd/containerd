@@ -55,6 +55,11 @@ func FetchHandler(ingester content.Ingester, fetcher Fetcher) images.HandlerFunc
 
 func fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc ocispec.Descriptor) error {
 	log.G(ctx).Debug("fetch")
+	if ip, ok := ingester.(content.InfoProvider); ok {
+		if _, err := ip.Info(ctx, desc.Digest); err == nil {
+			return nil
+		}
+	}
 	ref := MakeRefKey(ctx, desc)
 	rc, err := fetcher.Fetch(ctx, desc)
 	if err != nil {
