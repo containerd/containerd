@@ -19,9 +19,11 @@ type Container interface {
 	// Resume unpauses the container process
 	Resume(context.Context) error
 	// Kill signals a container
-	Kill(context.Context, uint32, bool) error
+	Kill(context.Context, uint32, uint32, bool) error
 	// Exec adds a process into the container
 	Exec(context.Context, ExecOpts) (Process, error)
+	// Processes returns all pids for the container
+	Processes(context.Context) ([]uint32, error)
 	// Pty resizes the processes pty/console
 	Pty(context.Context, uint32, ConsoleSize) error
 	// CloseStdin closes the processes stdin

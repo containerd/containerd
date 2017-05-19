@@ -120,7 +120,7 @@ func (c *container) State(ctx context.Context) (plugin.State, error) {
 	return c, nil
 }
 
-func (c *container) Kill(ctx context.Context, signal uint32, all bool) error {
+func (c *container) Kill(ctx context.Context, signal uint32, pid uint32, all bool) error {
 	if winsys.Signal(signal) == winsys.SIGKILL {
 		return c.ctr.Kill(ctx)
 	}
@@ -172,6 +172,20 @@ func (c *container) Status() plugin.Status {
 
 func (c *container) Pid() uint32 {
 	return c.ctr.Pid()
+}
+
+func (c *container) Processes(ctx context.Context) ([]uint32, error) {
+	pl, err := c.ctr.ProcessList()
+	if err != nil {
+		return nil, err
+	}
+
+	pids := make([]uint32, 0, len(pl))
+	for _, p := range pl {
+		pids = append(pids, p.ProcessId)
+	}
+
+	return pids, nil
 }
 
 func (c *container) setStatus(status plugin.Status) {

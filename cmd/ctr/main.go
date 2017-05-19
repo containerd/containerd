@@ -63,6 +63,7 @@ containerd client
 		resumeCommand,
 		snapshotCommand,
 		versionCommand,
+		psCommand,
 	}
 	app.Commands = append(app.Commands, extraCmds...)
 	app.Before = func(context *cli.Context) error {

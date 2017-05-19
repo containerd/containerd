@@ -82,6 +82,10 @@ func (c *client) Kill(ctx context.Context, in *shimapi.KillRequest, opts ...grpc
 	return c.s.Kill(ctx, in)
 }
 
+func (c *client) Processes(ctx context.Context, in *shimapi.ProcessesRequest, opts ...grpc.CallOption) (*shimapi.ProcessesResponse, error) {
+	return c.s.Processes(ctx, in)
+}
+
 func (c *client) Exit(ctx context.Context, in *shimapi.ExitRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
 	// don't exit the calling process for the client
 	// but make sure we unmount the containers rootfs for this client

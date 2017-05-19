@@ -117,7 +117,9 @@ func forwardAllSignals(containers execution.ContainerServiceClient, id string) c
 			killRequest := &execution.KillRequest{
 				ID:     id,
 				Signal: uint32(s.(syscall.Signal)),
-				All:    false,
+				PidOrAll: &execution.KillRequest_All{
+					All: false,
+				},
 			}
 			_, err := containers.Kill(gocontext.Background(), killRequest)
 			if err != nil {

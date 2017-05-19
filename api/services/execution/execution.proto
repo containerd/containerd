@@ -22,11 +22,12 @@ service ContainerService {
 	rpc CloseStdin(CloseStdinRequest) returns (google.protobuf.Empty);
 	rpc Pause(PauseRequest) returns (google.protobuf.Empty);
 	rpc Resume(ResumeRequest) returns (google.protobuf.Empty);
+	rpc Processes(ProcessesRequest) returns (ProcessesResponse);
 }
 
 message CreateRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
-	google.protobuf.Any spec = 2;	
+	google.protobuf.Any spec = 2;
 	repeated containerd.v1.types.Mount rootfs = 3;
 	string runtime = 4;
 	string stdin = 5;
@@ -68,7 +69,10 @@ message ListResponse {
 message KillRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
 	uint32 signal = 2;
-	bool all = 3;
+	oneof pid_or_all {
+	    bool all = 3;
+	    uint32 pid = 4;
+	}
 }
 
 message EventsRequest {
@@ -105,4 +109,12 @@ message PauseRequest {
 
 message ResumeRequest {
 	string id = 1 [(gogoproto.customname) = "ID"];
+}
+
+message ProcessesRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];
+}
+
+message ProcessesResponse{
+	repeated containerd.v1.types.Process processes = 1;
 }
