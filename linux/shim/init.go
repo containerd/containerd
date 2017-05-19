@@ -23,6 +23,11 @@ import (
 type initProcess struct {
 	sync.WaitGroup
 
+	// mu is used to ensure that `Start()` and `Exited()` calls return in
+	// the right order when invoked in separate go routines.
+	// This is the case within the shim implementation as it makes use of
+	// the reaper interface.
+	mu      sync.Mutex
 	id      string
 	bundle  string
 	console console.Console
@@ -139,12 +144,16 @@ func (p *initProcess) ContainerStatus(ctx context.Context) (string, error) {
 }
 
 func (p *initProcess) Start(context context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	return p.runc.Start(context, p.id)
 }
 
 func (p *initProcess) Exited(status int) {
+	p.mu.Lock()
 	p.status = status
 	p.exited = time.Now()
+	p.mu.Unlock()
 }
 
 func (p *initProcess) Delete(context context.Context) error {

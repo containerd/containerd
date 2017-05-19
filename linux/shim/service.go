@@ -56,12 +56,12 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateRequest) (*shimap
 		ExitCh: make(chan int, 1),
 	}
 	reaper.Default.Register(pid, cmd)
-	go s.waitExit(process, pid, cmd)
 	s.events <- &container.Event{
 		Type: container.Event_CREATE,
 		ID:   r.ID,
 		Pid:  uint32(pid),
 	}
+	go s.waitExit(process, pid, cmd)
 	return &shimapi.CreateResponse{
 		Pid: uint32(pid),
 	}, nil
@@ -115,12 +115,12 @@ func (s *Service) Exec(ctx context.Context, r *shimapi.ExecRequest) (*shimapi.Ex
 	}
 	reaper.Default.RegisterNL(pid, cmd)
 	reaper.Default.Unlock()
-	go s.waitExit(process, pid, cmd)
 	s.events <- &container.Event{
 		Type: container.Event_EXEC_ADDED,
 		ID:   s.id,
 		Pid:  uint32(pid),
 	}
+	go s.waitExit(process, pid, cmd)
 	return &shimapi.ExecResponse{
 		Pid: uint32(pid),
 	}, nil
