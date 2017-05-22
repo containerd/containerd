@@ -6,7 +6,7 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/pkg/errors"
@@ -48,11 +48,11 @@ func (o *Snapshotter) Usage(ctx context.Context, key string) (snapshot.Usage, er
 	panic("not implemented")
 }
 
-func (o *Snapshotter) Prepare(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
+func (o *Snapshotter) Prepare(ctx context.Context, key, parent string) ([]mount.Mount, error) {
 	panic("not implemented")
 }
 
-func (o *Snapshotter) View(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
+func (o *Snapshotter) View(ctx context.Context, key, parent string) ([]mount.Mount, error) {
 	panic("not implemented")
 }
 
@@ -60,7 +60,7 @@ func (o *Snapshotter) View(ctx context.Context, key, parent string) ([]container
 // called on an read-write or readonly transaction.
 //
 // This can be used to recover mounts after calling View or Prepare.
-func (o *Snapshotter) Mounts(ctx context.Context, key string) ([]containerd.Mount, error) {
+func (o *Snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
 	panic("not implemented")
 }
 

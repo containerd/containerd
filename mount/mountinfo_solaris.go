@@ -1,6 +1,6 @@
 // +build solaris,cgo
 
-package mountinfo
+package mount
 
 /*
 #include <stdio.h>

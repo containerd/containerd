@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/mount"
 )
 
 type IO struct {
@@ -18,7 +18,7 @@ type CreateOpts struct {
 	// Spec is the OCI runtime spec
 	Spec []byte
 	// Rootfs mounts to perform to gain access to the container's filesystem
-	Rootfs []containerd.Mount
+	Rootfs []mount.Mount
 	// IO for the container's main process
 	IO         IO
 	Checkpoint string

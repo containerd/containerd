@@ -131,8 +131,6 @@ FORCE:
 
 # Build a binary from a cmd.
 bin/%: cmd/% FORCE
-	@test $$(go list) = "${PKG}" || \
-		(echo "$(ONI) Please correctly set up your Go build environment. This project must be located at <GOPATH>/src/${PKG}" && false)
 	@echo "$(WHALE) $@${BINARY_SUFFIX}"
 	@go build -i -o $@${BINARY_SUFFIX} ${GO_LDFLAGS} ${GO_TAGS} ${GO_GCFLAGS} ./$<
 

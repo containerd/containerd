@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/containerd/containerd"
 	api "github.com/containerd/containerd/api/services/execution"
 	"github.com/containerd/containerd/api/types/container"
 	"github.com/containerd/containerd/api/types/descriptor"
@@ -17,6 +16,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	protobuf "github.com/gogo/protobuf/types"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
@@ -108,7 +108,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 		Checkpoint: checkpointPath,
 	}
 	for _, m := range r.Rootfs {
-		opts.Rootfs = append(opts.Rootfs, containerd.Mount{
+		opts.Rootfs = append(opts.Rootfs, mount.Mount{
 			Type:    m.Type,
 			Source:  m.Source,
 			Options: m.Options,

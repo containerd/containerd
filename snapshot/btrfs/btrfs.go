@@ -11,9 +11,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/btrfs"
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/mountinfo"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/snapshot/storage"
@@ -36,7 +35,7 @@ type snapshotter struct {
 	ms     *storage.MetaStore
 }
 
-func getBtrfsDevice(root string, mounts []mountinfo.Info) (string, error) {
+func getBtrfsDevice(root string, mounts []mount.Info) (string, error) {
 	device := ""
 	deviceMountpoint := ""
 	for _, info := range mounts {
@@ -62,7 +61,7 @@ func getBtrfsDevice(root string, mounts []mountinfo.Info) (string, error) {
 // a file in the provided root.
 // root needs to be a mount point of btrfs.
 func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
-	mounts, err := mountinfo.Self()
+	mounts, err := mount.Self()
 	if err != nil {
 		return nil, err
 	}
@@ -140,15 +139,15 @@ func (b *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 	return storage.WalkInfo(ctx, fn)
 }
 
-func (b *snapshotter) Prepare(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
+func (b *snapshotter) Prepare(ctx context.Context, key, parent string) ([]mount.Mount, error) {
 	return b.makeActive(ctx, key, parent, false)
 }
 
-func (b *snapshotter) View(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
+func (b *snapshotter) View(ctx context.Context, key, parent string) ([]mount.Mount, error) {
 	return b.makeActive(ctx, key, parent, true)
 }
 
-func (b *snapshotter) makeActive(ctx context.Context, key, parent string, readonly bool) ([]containerd.Mount, error) {
+func (b *snapshotter) makeActive(ctx context.Context, key, parent string, readonly bool) ([]mount.Mount, error) {
 	ctx, t, err := b.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return nil, err
@@ -193,7 +192,7 @@ func (b *snapshotter) makeActive(ctx context.Context, key, parent string, readon
 	return b.mounts(target)
 }
 
-func (b *snapshotter) mounts(dir string) ([]containerd.Mount, error) {
+func (b *snapshotter) mounts(dir string) ([]mount.Mount, error) {
 	var options []string
 
 	// get the subvolume id back out for the mount
@@ -208,7 +207,7 @@ func (b *snapshotter) mounts(dir string) ([]containerd.Mount, error) {
 		options = append(options, "ro")
 	}
 
-	return []containerd.Mount{
+	return []mount.Mount{
 		{
 			Type:   "btrfs",
 			Source: b.device,
@@ -265,7 +264,7 @@ func (b *snapshotter) Commit(ctx context.Context, name, key string) (err error) 
 // called on an read-write or readonly transaction.
 //
 // This can be used to recover mounts after calling View or Prepare.
-func (b *snapshotter) Mounts(ctx context.Context, key string) ([]containerd.Mount, error) {
+func (b *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
 	ctx, t, err := b.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return nil, err

@@ -1,6 +1,6 @@
 // +build linux
 
-package mountinfo
+package mount
 
 import (
 	"bufio"

@@ -5,13 +5,13 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/containerd/containerd"
 	diffapi "github.com/containerd/containerd/api/services/diff"
 	"github.com/containerd/containerd/api/types/descriptor"
 	mounttypes "github.com/containerd/containerd/api/types/mount"
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
 	digest "github.com/opencontainers/go-digest"
@@ -59,10 +59,10 @@ func (s *service) Apply(ctx context.Context, er *diffapi.ApplyRequest) (*diffapi
 	}
 	defer os.RemoveAll(dir)
 
-	if err := containerd.MountAll(mounts, dir); err != nil {
+	if err := mount.MountAll(mounts, dir); err != nil {
 		return nil, errors.Wrap(err, "failed to mount")
 	}
-	defer containerd.Unmount(dir, 0)
+	defer mount.Unmount(dir, 0)
 
 	r, err := s.store.Reader(ctx, desc.Digest)
 	if err != nil {
@@ -118,15 +118,15 @@ func (s *service) Diff(ctx context.Context, dr *diffapi.DiffRequest) (*diffapi.D
 	}
 	defer os.RemoveAll(bDir)
 
-	if err := containerd.MountAll(aMounts, aDir); err != nil {
+	if err := mount.MountAll(aMounts, aDir); err != nil {
 		return nil, errors.Wrap(err, "failed to mount")
 	}
-	defer containerd.Unmount(aDir, 0)
+	defer mount.Unmount(aDir, 0)
 
-	if err := containerd.MountAll(bMounts, bDir); err != nil {
+	if err := mount.MountAll(bMounts, bDir); err != nil {
 		return nil, errors.Wrap(err, "failed to mount")
 	}
-	defer containerd.Unmount(bDir, 0)
+	defer mount.Unmount(bDir, 0)
 
 	cw, err := s.store.Writer(ctx, dr.Ref, 0, "")
 	if err != nil {
@@ -190,10 +190,10 @@ func toDescriptor(d *descriptor.Descriptor) ocispec.Descriptor {
 	}
 }
 
-func toMounts(apim []*mounttypes.Mount) []containerd.Mount {
-	mounts := make([]containerd.Mount, len(apim))
+func toMounts(apim []*mounttypes.Mount) []mount.Mount {
+	mounts := make([]mount.Mount, len(apim))
 	for i, m := range apim {
-		mounts[i] = containerd.Mount{
+		mounts[i] = mount.Mount{
 			Type:    m.Type,
 			Source:  m.Source,
 			Options: m.Options,

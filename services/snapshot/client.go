@@ -8,8 +8,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
-	"github.com/containerd/containerd"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/pkg/errors"
 )
@@ -42,7 +42,7 @@ func (r *remoteSnapshotter) Usage(ctx context.Context, key string) (snapshot.Usa
 	return toUsage(resp), nil
 }
 
-func (r *remoteSnapshotter) Mounts(ctx context.Context, key string) ([]containerd.Mount, error) {
+func (r *remoteSnapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
 	resp, err := r.client.Mounts(ctx, &snapshotapi.MountsRequest{Key: key})
 	if err != nil {
 		return nil, rewriteGRPCError(err)
@@ -50,7 +50,7 @@ func (r *remoteSnapshotter) Mounts(ctx context.Context, key string) ([]container
 	return toMounts(resp), nil
 }
 
-func (r *remoteSnapshotter) Prepare(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
+func (r *remoteSnapshotter) Prepare(ctx context.Context, key, parent string) ([]mount.Mount, error) {
 	resp, err := r.client.Prepare(ctx, &snapshotapi.PrepareRequest{Key: key, Parent: parent})
 	if err != nil {
 		return nil, rewriteGRPCError(err)
@@ -58,7 +58,7 @@ func (r *remoteSnapshotter) Prepare(ctx context.Context, key, parent string) ([]
 	return toMounts(resp), nil
 }
 
-func (r *remoteSnapshotter) View(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
+func (r *remoteSnapshotter) View(ctx context.Context, key, parent string) ([]mount.Mount, error) {
 	resp, err := r.client.View(ctx, &snapshotapi.PrepareRequest{Key: key, Parent: parent})
 	if err != nil {
 		return nil, rewriteGRPCError(err)
@@ -145,10 +145,10 @@ func toUsage(resp *snapshotapi.UsageResponse) snapshot.Usage {
 	}
 }
 
-func toMounts(resp *snapshotapi.MountsResponse) []containerd.Mount {
-	mounts := make([]containerd.Mount, len(resp.Mounts))
+func toMounts(resp *snapshotapi.MountsResponse) []mount.Mount {
+	mounts := make([]mount.Mount, len(resp.Mounts))
 	for i, m := range resp.Mounts {
-		mounts[i] = containerd.Mount{
+		mounts[i] = mount.Mount{
 			Type:    m.Type,
 			Source:  m.Source,
 			Options: m.Options,

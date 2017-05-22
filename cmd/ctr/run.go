@@ -10,9 +10,9 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/console"
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/execution"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshot"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
@@ -71,7 +71,7 @@ var runCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		var (
 			err         error
-			mounts      []containerd.Mount
+			mounts      []mount.Mount
 			imageConfig ocispec.Image
 
 			ctx = gocontext.Background()
