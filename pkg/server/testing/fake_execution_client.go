@@ -51,7 +51,10 @@ type EventClient struct {
 
 // Recv is a test implementation of Recv
 func (cli *EventClient) Recv() (*container.Event, error) {
-	event := <-cli.Events
+	event, ok := <-cli.Events
+	if !ok {
+		return nil, fmt.Errorf("event channel closed")
+	}
 	return event, nil
 }
 
@@ -73,6 +76,18 @@ func NewFakeExecutionClient() *FakeExecutionClient {
 	return &FakeExecutionClient{
 		errors:        make(map[string]error),
 		ContainerList: make(map[string]container.Container),
+	}
+}
+
+// Stop the fake execution service. Needed when event is enabled.
+func (f *FakeExecutionClient) Stop() {
+	if f.eventsQueue != nil {
+		close(f.eventsQueue)
+	}
+	f.Lock()
+	defer f.Unlock()
+	for _, client := range f.eventClients {
+		close(client.Events)
 	}
 }
 
@@ -149,6 +164,13 @@ func (f *FakeExecutionClient) GetCalledNames() []string {
 		names = append(names, detail.Name)
 	}
 	return names
+}
+
+// ClearCalls clear all call detail.
+func (f *FakeExecutionClient) ClearCalls() {
+	f.Lock()
+	defer f.Unlock()
+	f.called = []CalledDetail{}
 }
 
 // GetCalledDetails get detail of each call.

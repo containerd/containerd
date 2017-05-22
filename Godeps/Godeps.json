@@ -18,8 +18,8 @@
 		},
 		{
 			"ImportPath": "github.com/blang/semver",
-			"Comment": "v3.0.1",
-			"Rev": "31b736133b98f26d5e078ec9eb591666edfd091f"
+			"Comment": "v3.1.0",
+			"Rev": "aea32c919a18e5ef4537bbd283ff29594b1b0165"
 		},
 		{
 			"ImportPath": "github.com/boltdb/bolt",
@@ -153,12 +153,12 @@
 		},
 		{
 			"ImportPath": "github.com/docker/distribution/digestset",
-			"Comment": "v2.6.0-rc.1-130-gb38e5838",
+			"Comment": "v2.6.0-rc.1-130-gb38e583",
 			"Rev": "b38e5838b7b2f2ad48e06ec4b500011976080621"
 		},
 		{
 			"ImportPath": "github.com/docker/distribution/reference",
-			"Comment": "v2.6.0-rc.1-130-gb38e5838",
+			"Comment": "v2.6.0-rc.1-130-gb38e583",
 			"Rev": "b38e5838b7b2f2ad48e06ec4b500011976080621"
 		},
 		{
@@ -178,27 +178,27 @@
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/gogoproto",
-			"Comment": "v0.3-150-gd2e1ade2",
+			"Comment": "v0.3-150-gd2e1ade",
 			"Rev": "d2e1ade2d719b78fe5b061b4c18a9f7111b5bdc8"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/proto",
-			"Comment": "v0.3-150-gd2e1ade2",
+			"Comment": "v0.3-150-gd2e1ade",
 			"Rev": "d2e1ade2d719b78fe5b061b4c18a9f7111b5bdc8"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/protoc-gen-gogo/descriptor",
-			"Comment": "v0.3-150-gd2e1ade2",
+			"Comment": "v0.3-150-gd2e1ade",
 			"Rev": "d2e1ade2d719b78fe5b061b4c18a9f7111b5bdc8"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/sortkeys",
-			"Comment": "v0.3-150-gd2e1ade2",
+			"Comment": "v0.3-150-gd2e1ade",
 			"Rev": "d2e1ade2d719b78fe5b061b4c18a9f7111b5bdc8"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/types",
-			"Comment": "v0.3-150-gd2e1ade2",
+			"Comment": "v0.3-150-gd2e1ade",
 			"Rev": "d2e1ade2d719b78fe5b061b4c18a9f7111b5bdc8"
 		},
 		{
@@ -238,7 +238,7 @@
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/system",
-			"Comment": "v1.0.0-rc3-21-g50401b5b",
+			"Comment": "v1.0.0-rc3-21-g50401b5",
 			"Rev": "50401b5b4c2e01e4f1372b73a021742deeaf4e2d"
 		},
 		{
@@ -248,15 +248,15 @@
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runtime-tools/generate",
-			"Rev": "8addcc695096a0fc61010af8766952546bba7cd0"
+			"Rev": "68c195c3f2fa04a9a298b839eb2d94f31141271a"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runtime-tools/generate/seccomp",
-			"Rev": "8addcc695096a0fc61010af8766952546bba7cd0"
+			"Rev": "68c195c3f2fa04a9a298b839eb2d94f31141271a"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runtime-tools/validate",
-			"Rev": "8addcc695096a0fc61010af8766952546bba7cd0"
+			"Rev": "68c195c3f2fa04a9a298b839eb2d94f31141271a"
 		},
 		{
 			"ImportPath": "github.com/pkg/errors",
@@ -265,6 +265,7 @@
 		},
 		{
 			"ImportPath": "github.com/pmezard/go-difflib/difflib",
+			"Comment": "v1.0.0",
 			"Rev": "792786c7400a136282c1664665ae0a8db921c6c2"
 		},
 		{
@@ -399,12 +400,12 @@
 		},
 		{
 			"ImportPath": "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime",
-			"Comment": "v1.7.0-alpha.1-493-g32e927f4d8",
+			"Comment": "v1.7.0-alpha.1-493-g32e927f",
 			"Rev": "32e927f4d86cfe7d3a7ad3c231fc445fb01463f5"
 		},
 		{
 			"ImportPath": "k8s.io/kubernetes/pkg/util/interrupt",
-			"Comment": "v1.7.0-alpha.1-493-g32e927f4d8",
+			"Comment": "v1.7.0-alpha.1-493-g32e927f",
 			"Rev": "32e927f4d86cfe7d3a7ad3c231fc445fb01463f5"
 		}
 	]

@@ -35,7 +35,7 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 	glog.V(2).Infof("RemovePodSandbox for sandbox %q", r.GetPodSandboxId())
 	defer func() {
 		if retErr == nil {
-			glog.V(2).Info("RemovePodSandbox returns successfully")
+			glog.V(2).Info("RemovePodSandbox %q returns successfully", r.GetPodSandboxId())
 		}
 	}()
 
@@ -56,6 +56,7 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 	// TODO(random-liu): [P2] Remove all containers in the sandbox.
 
 	// Return error if sandbox container is not fully stopped.
+	// TODO(random-liu): [P0] Make sure network is torn down, may need to introduce a state.
 	_, err = c.containerService.Info(ctx, &execution.InfoRequest{ID: id})
 	if err != nil && !isContainerdContainerNotExistError(err) {
 		return nil, fmt.Errorf("failed to get sandbox container info for %q: %v", id, err)

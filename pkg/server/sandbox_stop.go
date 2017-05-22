@@ -33,7 +33,7 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 	glog.V(2).Infof("StopPodSandbox for sandbox %q", r.GetPodSandboxId())
 	defer func() {
 		if retErr == nil {
-			glog.V(2).Info("StopPodSandbox returns successfully")
+			glog.V(2).Info("StopPodSandbox %q returns successfully", r.GetPodSandboxId())
 		}
 	}()
 

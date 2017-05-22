@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"syscall"
 	"time"
 
 	prototypes "github.com/gogo/protobuf/types"
@@ -109,14 +108,14 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	// TODO(random-liu): [P1] Moving following logging related logic into util functions.
 	// Discard sandbox container output because we don't care about it.
 	_, stdout, stderr := getStreamingPipes(sandboxRootDir)
-	for _, p := range []string{stdout, stderr} {
-		f, err := c.os.OpenFifo(ctx, p, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open named pipe %q: %v", p, err)
-		}
-		defer func(c io.Closer) {
+	_, stdoutPipe, stderrPipe, err := c.prepareStreamingPipes(ctx, "", stdout, stderr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare streaming pipes: %v", err)
+	}
+	for _, f := range []io.ReadCloser{stdoutPipe, stderrPipe} {
+		defer func(cl io.Closer) {
 			if retErr != nil {
-				c.Close()
+				cl.Close()
 			}
 		}(f)
 		go func(r io.ReadCloser) {

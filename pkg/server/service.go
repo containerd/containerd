@@ -53,6 +53,7 @@ import (
 
 // CRIContainerdService is the interface implement CRI remote service server.
 type CRIContainerdService interface {
+	Start() error
 	runtime.RuntimeServiceServer
 	runtime.ImageServiceServer
 }
@@ -74,6 +75,11 @@ type criContainerdService struct {
 	// id "abcdefg" is added, we could use "abcd" to identify the same thing
 	// as long as there is no ambiguity.
 	sandboxIDIndex *truncindex.TruncIndex
+	// containerStore stores all container metadata.
+	containerStore metadata.ContainerStore
+	// containerNameIndex stores all container names and make sure each
+	// name is unique.
+	containerNameIndex *registrar.Registrar
 	// containerService is containerd container service client.
 	containerService execution.ContainerServiceClient
 	// contentIngester is the containerd service to ingest content into
@@ -98,14 +104,22 @@ func NewCRIContainerdService(conn *grpc.ClientConn, rootDir string) CRIContainer
 		os:                 osinterface.RealOS{},
 		rootDir:            rootDir,
 		sandboxStore:       metadata.NewSandboxStore(store.NewMetadataStore()),
+		containerStore:     metadata.NewContainerStore(store.NewMetadataStore()),
 		imageMetadataStore: metadata.NewImageMetadataStore(store.NewMetadataStore()),
-		// TODO(random-liu): Register sandbox id/name for recovered sandbox.
-		sandboxNameIndex:  registrar.NewRegistrar(),
-		sandboxIDIndex:    truncindex.NewTruncIndex(nil),
-		containerService:  execution.NewContainerServiceClient(conn),
-		imageStoreService: imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)),
-		contentIngester:   contentservice.NewIngesterFromClient(contentapi.NewContentClient(conn)),
-		contentProvider:   contentservice.NewProviderFromClient(contentapi.NewContentClient(conn)),
-		rootfsUnpacker:    rootfsservice.NewUnpackerFromClient(rootfsapi.NewRootFSClient(conn)),
+		// TODO(random-liu): Register sandbox/container id/name for recovered sandbox/container.
+		// TODO(random-liu): Use the same name and id index for both container and sandbox.
+		sandboxNameIndex: registrar.NewRegistrar(),
+		sandboxIDIndex:   truncindex.NewTruncIndex(nil),
+		// TODO(random-liu): Add container id index.
+		containerNameIndex: registrar.NewRegistrar(),
+		containerService:   execution.NewContainerServiceClient(conn),
+		imageStoreService:  imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)),
+		contentIngester:    contentservice.NewIngesterFromClient(contentapi.NewContentClient(conn)),
+		contentProvider:    contentservice.NewProviderFromClient(contentapi.NewContentClient(conn)),
+		rootfsUnpacker:     rootfsservice.NewUnpackerFromClient(rootfsapi.NewRootFSClient(conn)),
 	}
+}
+
+func (c *criContainerdService) Start() error {
+	return c.startEventMonitor()
 }

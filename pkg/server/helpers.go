@@ -18,11 +18,14 @@ package server
 
 import (
 	"fmt"
+	"io"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/docker/pkg/truncindex"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
 	"github.com/containerd/containerd"
@@ -30,6 +33,18 @@ import (
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+)
+
+const (
+	// errorStartReason is the exit reason when fails to start container.
+	errorStartReason = "StartError"
+	// errorStartExitCode is the exit code when fails to start container.
+	// 128 is the same with Docker's behavior.
+	errorStartExitCode = 128
+	// completeExitReason is the exit reason when container exits with code 0.
+	completeExitReason = "Completed"
+	// errorExitReason is the exit reason when container exits with code non-zero.
+	errorExitReason = "Error"
 )
 
 const (
@@ -42,6 +57,8 @@ const (
 	// directory of the sandbox, all files created for the sandbox will be
 	// placed under this directory.
 	sandboxesDir = "sandboxes"
+	// containersDir contains all container root.
+	containersDir = "containers"
 	// stdinNamedPipe is the name of stdin named pipe.
 	stdinNamedPipe = "stdin"
 	// stdoutNamedPipe is the name of stdout named pipe.
@@ -52,6 +69,12 @@ const (
 	nameDelimiter = "_"
 	// netNSFormat is the format of network namespace of a process.
 	netNSFormat = "/proc/%v/ns/net"
+	// ipcNSFormat is the format of ipc namespace of a process.
+	ipcNSFormat = "/proc/%v/ns/ipc"
+	// utsNSFormat is the format of uts namespace of a process.
+	utsNSFormat = "/proc/%v/ns/uts"
+	// pidNSFormat is the format of pid namespace of a process.
+	pidNSFormat = "/proc/%v/ns/pid"
 )
 
 // generateID generates a random unique id.
@@ -70,6 +93,19 @@ func makeSandboxName(s *runtime.PodSandboxMetadata) string {
 	}, nameDelimiter)
 }
 
+// makeContainerName generates container name from sandbox and container metadata.
+// The name generated is unique as long as the sandbox container combination is
+// unique.
+func makeContainerName(c *runtime.ContainerMetadata, s *runtime.PodSandboxMetadata) string {
+	return strings.Join([]string{
+		c.Name,      // 0
+		s.Name,      // 1: sandbox name
+		s.Namespace, // 2: sandbox namespace
+		s.Uid,       // 3: sandbox uid
+		fmt.Sprintf("%d", c.Attempt), // 4
+	}, nameDelimiter)
+}
+
 // getCgroupsPath generates container cgroups path.
 func getCgroupsPath(cgroupsParent string, id string) string {
 	// TODO(random-liu): [P0] Handle systemd.
@@ -82,6 +118,11 @@ func getSandboxRootDir(rootDir, id string) string {
 	return filepath.Join(rootDir, sandboxesDir, id)
 }
 
+// getContainerRootDir returns the root directory for managing container files.
+func getContainerRootDir(rootDir, id string) string {
+	return filepath.Join(rootDir, containersDir, id)
+}
+
 // getStreamingPipes returns the stdin/stdout/stderr pipes path in the root.
 func getStreamingPipes(rootDir string) (string, string, string) {
 	stdin := filepath.Join(rootDir, stdinNamedPipe)
@@ -90,9 +131,55 @@ func getStreamingPipes(rootDir string) (string, string, string) {
 	return stdin, stdout, stderr
 }
 
+// prepareStreamingPipes prepares stream named pipe for container. returns nil
+// streaming handler if corresponding stream path is empty.
+func (c *criContainerdService) prepareStreamingPipes(ctx context.Context, stdin, stdout, stderr string) (
+	i io.WriteCloser, o io.ReadCloser, e io.ReadCloser, retErr error) {
+	pipes := map[string]io.ReadWriteCloser{}
+	for t, stream := range map[string]struct {
+		path string
+		flag int
+	}{
+		"stdin":  {stdin, syscall.O_WRONLY | syscall.O_CREAT | syscall.O_NONBLOCK},
+		"stdout": {stdout, syscall.O_RDONLY | syscall.O_CREAT | syscall.O_NONBLOCK},
+		"stderr": {stderr, syscall.O_RDONLY | syscall.O_CREAT | syscall.O_NONBLOCK},
+	} {
+		if stream.path == "" {
+			continue
+		}
+		s, err := c.os.OpenFifo(ctx, stream.path, stream.flag, 0700)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to open named pipe %q: %v",
+				stream.path, err)
+		}
+		defer func(cl io.Closer) {
+			if retErr != nil {
+				cl.Close()
+			}
+		}(s)
+		pipes[t] = s
+	}
+	return pipes["stdin"], pipes["stdout"], pipes["stderr"], nil
+}
+
 // getNetworkNamespace returns the network namespace of a process.
 func getNetworkNamespace(pid uint32) string {
 	return fmt.Sprintf(netNSFormat, pid)
+}
+
+// getIPCNamespace returns the ipc namespace of a process.
+func getIPCNamespace(pid uint32) string {
+	return fmt.Sprintf(ipcNSFormat, pid)
+}
+
+// getUTSNamespace returns the uts namespace of a process.
+func getUTSNamespace(pid uint32) string {
+	return fmt.Sprintf(utsNSFormat, pid)
+}
+
+// getPIDNamespace returns the pid namespace of a process.
+func getPIDNamespace(pid uint32) string {
+	return fmt.Sprintf(pidNSFormat, pid)
 }
 
 // isContainerdContainerNotExistError checks whether a grpc error is containerd
@@ -123,4 +210,9 @@ func (c *criContainerdService) getSandbox(id string) (*metadata.SandboxMetadata,
 		return nil, fmt.Errorf("sandbox id not found: %v", err)
 	}
 	return c.sandboxStore.Get(id)
+}
+
+// criContainerStateToString formats CRI container state to string.
+func criContainerStateToString(state runtime.ContainerState) string {
+	return runtime.ContainerState_name[int32(state)]
 }
