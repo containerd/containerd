@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/docker/docker/pkg/truncindex"
+	"github.com/kubernetes-incubator/cri-o/pkg/ocicni"
 	"google.golang.org/grpc"
 
 	contentapi "github.com/containerd/containerd/api/services/content"
@@ -32,8 +33,6 @@ import (
 	contentservice "github.com/containerd/containerd/services/content"
 	imagesservice "github.com/containerd/containerd/services/images"
 	rootfsservice "github.com/containerd/containerd/services/rootfs"
-
-	"github.com/kubernetes-incubator/cri-o/pkg/ocicni"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"

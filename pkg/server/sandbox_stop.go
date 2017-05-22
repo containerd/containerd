@@ -18,6 +18,7 @@ package server
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
@@ -45,6 +46,18 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 	// Use the full sandbox id.
 	id := sandbox.ID
 
+	// Teardown network for sandbox.
+	_, err = c.os.Stat(sandbox.NetNS)
+	if err == nil {
+		if teardownErr := c.netPlugin.TearDownPod(sandbox.NetNS, sandbox.Config.GetMetadata().GetNamespace(),
+			sandbox.Config.GetMetadata().GetName(), id); teardownErr != nil {
+			return nil, fmt.Errorf("failed to destroy network for sandbox %q: %v", id, teardownErr)
+		}
+	} else if !os.IsNotExist(err) { // It's ok for sandbox.NetNS to *not* exist
+		return nil, fmt.Errorf("failed to stat netns path for sandbox %q before tearing down the network: %v", id, err)
+	}
+	glog.V(2).Info("TearDown network for sandbox %q successfully", id)
+
 	// TODO(random-liu): [P1] Handle sandbox container graceful deletion.
 	// Delete the sandbox container from containerd.
 	_, err = c.containerService.Delete(ctx, &execution.DeleteRequest{ID: id})
@@ -52,7 +65,6 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 		return nil, fmt.Errorf("failed to delete sandbox container %q: %v", id, err)
 	}
 
-	// TODO(random-liu): [P0] Call network plugin to teardown network.
 	// TODO(random-liu): [P2] Stop all containers inside the sandbox.
 	return &runtime.StopPodSandboxResponse{}, nil
 }
