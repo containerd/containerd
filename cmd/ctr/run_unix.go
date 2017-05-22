@@ -222,6 +222,14 @@ func spec(id string, config *ocispec.ImageConfig, context *cli.Context, rootfs s
 			Type: "network",
 		})
 	}
+	for _, mount := range context.StringSlice("mount") {
+		m, err := parseMountFlag(mount)
+		if err != nil {
+			return nil, err
+		}
+
+		s.Mounts = append(s.Mounts, m)
+	}
 	return s, nil
 }
 
