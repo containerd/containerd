@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package containerd.v1.types;
 
-import "google/protobuf/any.proto";
 import "gogoproto/gogo.proto";
+import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
 
 enum Status {
@@ -21,6 +21,7 @@ message Container {
 	string id = 1;
 	uint32 pid = 2;
 	Status status = 3;
+	google.protobuf.Any spec = 4;
 }
 
 message Process {

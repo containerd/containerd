@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/windows/hcs"
@@ -45,7 +44,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	r := &Runtime{
 		pidPool:       pid.NewPool(),
 		containers:    make(map[string]*container),
-		events:        make(chan *containerd.Event, 2048),
+		events:        make(chan *plugin.Event, 2048),
 		eventsContext: c,
 		eventsCancel:  cancel,
 		rootDir:       rootDir,
@@ -61,7 +60,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 
 	for _, c := range ctrs {
 		c.ctr.Delete(ic.Context)
-		r.sendEvent(c.ctr.ID(), containerd.ExitEvent, c.ctr.Pid(), 255, time.Time{})
+		r.sendEvent(c.ctr.ID(), plugin.ExitEvent, c.ctr.Pid(), 255, time.Time{})
 	}
 
 	// Try to delete the old state dir and recreate it
@@ -88,7 +87,7 @@ type Runtime struct {
 
 	containers map[string]*container
 
-	events        chan *containerd.Event
+	events        chan *plugin.Event
 	eventsContext context.Context
 	eventsCancel  func()
 }
@@ -157,12 +156,12 @@ func (r *Runtime) Containers(ctx context.Context) ([]plugin.Container, error) {
 	return list, nil
 }
 
-func (r *Runtime) Events(ctx context.Context) <-chan *containerd.Event {
+func (r *Runtime) Events(ctx context.Context) <-chan *plugin.Event {
 	return r.events
 }
 
-func (r *Runtime) sendEvent(id string, evType containerd.EventType, pid, exitStatus uint32, exitedAt time.Time) {
-	r.events <- &containerd.Event{
+func (r *Runtime) sendEvent(id string, evType plugin.EventType, pid, exitStatus uint32, exitedAt time.Time) {
+	r.events <- &plugin.Event{
 		Timestamp:  time.Now(),
 		Runtime:    runtimeName,
 		Type:       evType,

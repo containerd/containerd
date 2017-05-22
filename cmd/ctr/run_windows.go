@@ -10,6 +10,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/console"
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/execution"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/windows"
@@ -116,12 +117,15 @@ func getConfig(context *cli.Context, imageConfig *ocispec.ImageConfig, rootfs st
 	return s, nil
 }
 
-func newCreateRequest(context *cli.Context, imageConfig *ocispec.ImageConfig, id, tmpDir, rootfs string) (*execution.CreateRequest, error) {
-	spec, err := getConfig(context, imageConfig, rootfs)
+func newSpec(context *cli.Context, config *ocispec.ImageConfig, imageRef string) ([]byte, error) {
+	spec, err := getConfig(context, config, context.String("rootfs"))
 	if err != nil {
 		return nil, err
 	}
-
+	if spec.Annotations == nil {
+		spec.Annotations = make(map[string]string)
+	}
+	spec.Annotations["image"] = imageRef
 	rtSpec := windows.RuntimeSpec{
 		OCISpec: *spec,
 		Configuration: hcs.Configuration{
@@ -129,16 +133,15 @@ func newCreateRequest(context *cli.Context, imageConfig *ocispec.ImageConfig, id
 			IgnoreFlushesDuringBoot:  true,
 			AllowUnqualifiedDNSQuery: true},
 	}
+	return json.Marshal(rtSpec)
+}
 
-	data, err := json.Marshal(rtSpec)
-	if err != nil {
-		return nil, err
-	}
+func newCreateRequest(context *cli.Context, id, tmpDir string, checkpoint *ocispec.Descriptor, mounts []containerd.Mount, spec []byte) (*execution.CreateRequest, error) {
 	create := &execution.CreateRequest{
 		ID: id,
 		Spec: &protobuf.Any{
 			TypeUrl: specs.Version,
-			Value:   data,
+			Value:   spec,
 		},
 		Runtime:  context.String("runtime"),
 		Terminal: context.Bool("tty"),
@@ -148,7 +151,6 @@ func newCreateRequest(context *cli.Context, imageConfig *ocispec.ImageConfig, id
 	if !create.Terminal {
 		create.Stderr = fmt.Sprintf(`%s\ctr-%s-stderr`, pipeRoot, id)
 	}
-
 	return create, nil
 }
 

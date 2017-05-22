@@ -99,6 +99,10 @@ func (c *client) CloseStdin(ctx context.Context, in *shimapi.CloseStdinRequest, 
 	return c.s.CloseStdin(ctx, in)
 }
 
+func (c *client) Checkpoint(ctx context.Context, in *shimapi.CheckpointRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+	return c.s.Checkpoint(ctx, in)
+}
+
 type events struct {
 	c   chan *container.Event
 	ctx context.Context

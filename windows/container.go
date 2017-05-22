@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/windows/hcs"
@@ -22,7 +21,7 @@ var (
 	ErrLoadedContainer = errors.New("loaded container can only be terminated")
 )
 
-type eventCallback func(id string, evType containerd.EventType, pid, exitStatus uint32, exitedAt time.Time)
+type eventCallback func(id string, evType plugin.EventType, pid, exitStatus uint32, exitedAt time.Time)
 
 func loadContainers(ctx context.Context, h *hcs.HCS, sendEvent eventCallback) ([]*container, error) {
 	hCtr, err := h.LoadContainers(ctx)
@@ -52,7 +51,7 @@ func newContainer(ctx context.Context, h *hcs.HCS, id string, spec RuntimeSpec, 
 	if err != nil {
 		return nil, err
 	}
-	sendEvent(id, containerd.CreateEvent, hcsCtr.Pid(), 0, time.Time{})
+	sendEvent(id, plugin.CreateEvent, hcsCtr.Pid(), 0, time.Time{})
 
 	return &container{
 		ctr:       hcsCtr,
@@ -87,7 +86,7 @@ func (c *container) Start(ctx context.Context) error {
 	}
 
 	c.setStatus(plugin.RunningStatus)
-	c.sendEvent(c.ctr.ID(), containerd.StartEvent, c.ctr.Pid(), 0, time.Time{})
+	c.sendEvent(c.ctr.ID(), plugin.StartEvent, c.ctr.Pid(), 0, time.Time{})
 
 	// Wait for our process to terminate
 	go func() {
@@ -96,7 +95,7 @@ func (c *container) Start(ctx context.Context) error {
 			log.G(ctx).Debug(err)
 		}
 		c.setStatus(plugin.StoppedStatus)
-		c.sendEvent(c.ctr.ID(), containerd.ExitEvent, c.ctr.Pid(), ec, c.ctr.Processes()[0].ExitedAt())
+		c.sendEvent(c.ctr.ID(), plugin.ExitEvent, c.ctr.Pid(), ec, c.ctr.Processes()[0].ExitedAt())
 	}()
 
 	return nil
@@ -152,7 +151,7 @@ func (c *container) Exec(ctx context.Context, opts plugin.ExecOpts) (plugin.Proc
 		if err != nil {
 			log.G(ctx).Debug(err)
 		}
-		c.sendEvent(c.ctr.ID(), containerd.ExitEvent, p.Pid(), ec, p.ExitedAt())
+		c.sendEvent(c.ctr.ID(), plugin.ExitEvent, p.Pid(), ec, p.ExitedAt())
 	}()
 
 	return &process{p}, nil
@@ -186,6 +185,10 @@ func (c *container) Processes(ctx context.Context) ([]uint32, error) {
 	}
 
 	return pids, nil
+}
+
+func (c *container) Checkpoint(ctx context.Context, opts plugin.CheckpointOpts) error {
+	return fmt.Errorf("Windows containers do not support checkpoint")
 }
 
 func (c *container) setStatus(status plugin.Status) {

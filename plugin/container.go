@@ -5,6 +5,7 @@ import "context"
 type ContainerInfo struct {
 	ID      string
 	Runtime string
+	Spec    []byte
 }
 
 type Container interface {
@@ -28,6 +29,18 @@ type Container interface {
 	Pty(context.Context, uint32, ConsoleSize) error
 	// CloseStdin closes the processes stdin
 	CloseStdin(context.Context, uint32) error
+	// Checkpoint checkpoints a container to an image with live system data
+	Checkpoint(context.Context, CheckpointOpts) error
+}
+
+type CheckpointOpts struct {
+	Exit             bool
+	AllowTCP         bool
+	AllowUnixSockets bool
+	AllowTerminal    bool
+	FileLocks        bool
+	EmptyNamespaces  []string
+	Path             string
 }
 
 type ExecOpts struct {

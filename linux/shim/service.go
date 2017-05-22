@@ -86,9 +86,8 @@ func (s *Service) Delete(ctx context.Context, r *shimapi.DeleteRequest) (*shimap
 	if !ok {
 		p = s.initProcess
 	}
-	if err := p.Delete(ctx); err != nil {
-		return nil, err
-	}
+	// TODO: how to handle errors here
+	p.Delete(ctx)
 	s.mu.Lock()
 	delete(s.processes, p.Pid())
 	s.mu.Unlock()
@@ -276,6 +275,13 @@ func (s *Service) CloseStdin(ctx context.Context, r *shimapi.CloseStdinRequest) 
 		return nil, fmt.Errorf("process does not exist %d", r.Pid)
 	}
 	if err := p.Stdin().Close(); err != nil {
+		return nil, err
+	}
+	return empty, nil
+}
+
+func (s *Service) Checkpoint(ctx context.Context, r *shimapi.CheckpointRequest) (*google_protobuf.Empty, error) {
+	if err := s.initProcess.Checkpoint(ctx, r); err != nil {
 		return nil, err
 	}
 	return empty, nil

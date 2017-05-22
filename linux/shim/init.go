@@ -4,9 +4,11 @@ package shim
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -16,6 +18,7 @@ import (
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
 	shimapi "github.com/containerd/containerd/api/services/shim"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 )
@@ -79,16 +82,35 @@ func newInitProcess(context context.Context, path string, r *shimapi.CreateReque
 		}
 		p.io = io
 	}
-	opts := &runc.CreateOpts{
-		PidFile: filepath.Join(path, "init.pid"),
-		IO:      io,
-		NoPivot: r.NoPivot,
-	}
-	if socket != nil {
-		opts.ConsoleSocket = socket
-	}
-	if err := p.runc.Create(context, r.ID, r.Bundle, opts); err != nil {
-		return nil, err
+	pidFile := filepath.Join(path, "init.pid")
+	if r.Checkpoint != "" {
+		opts := &runc.RestoreOpts{
+			CheckpointOpts: runc.CheckpointOpts{
+				ImagePath:  r.Checkpoint,
+				WorkDir:    filepath.Join(r.Bundle, "work"),
+				ParentPath: r.ParentCheckpoint,
+			},
+			PidFile:     pidFile,
+			IO:          io,
+			NoPivot:     r.NoPivot,
+			Detach:      true,
+			NoSubreaper: true,
+		}
+		if _, err := p.runc.Restore(context, r.ID, r.Bundle, opts); err != nil {
+			return nil, err
+		}
+	} else {
+		opts := &runc.CreateOpts{
+			PidFile: pidFile,
+			IO:      io,
+			NoPivot: r.NoPivot,
+		}
+		if socket != nil {
+			opts.ConsoleSocket = socket
+		}
+		if err := p.runc.Create(context, r.ID, r.Bundle, opts); err != nil {
+			return nil, err
+		}
 	}
 	if r.Stdin != "" {
 		sc, err := fifo.OpenFifo(context, r.Stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
@@ -114,7 +136,7 @@ func newInitProcess(context context.Context, path string, r *shimapi.CreateReque
 		}
 	}
 	copyWaitGroup.Wait()
-	pid, err := runc.ReadPidFile(opts.PidFile)
+	pid, err := runc.ReadPidFile(pidFile)
 	if err != nil {
 		return nil, err
 	}
@@ -202,4 +224,51 @@ func (p *initProcess) Signal(sig int) error {
 
 func (p *initProcess) Stdin() io.Closer {
 	return p.stdin
+}
+
+func (p *initProcess) Checkpoint(context context.Context, r *shimapi.CheckpointRequest) error {
+	var actions []runc.CheckpointAction
+	if !r.Exit {
+		actions = append(actions, runc.LeaveRunning)
+	}
+	work := filepath.Join(p.bundle, "work")
+	defer os.RemoveAll(work)
+	if err := p.runc.Checkpoint(context, p.id, &runc.CheckpointOpts{
+		WorkDir:                  work,
+		ImagePath:                r.Image,
+		AllowOpenTCP:             r.AllowTcp,
+		AllowExternalUnixSockets: r.AllowUnixSockets,
+		AllowTerminal:            r.AllowTerminal,
+		FileLocks:                r.FileLocks,
+		EmptyNamespaces:          r.EmptyNamespaces,
+	}, actions...); err != nil {
+		dumpLog := filepath.Join(p.bundle, "criu-dump.log")
+		if cerr := copyFile(dumpLog, filepath.Join(work, "dump.log")); cerr != nil {
+			log.G(context).Error(err)
+		}
+		return fmt.Errorf("%s path= %s", criuError(err), dumpLog)
+	}
+	return nil
+}
+
+// criuError returns only the first line of the error message from criu
+// it tries to add an invalid dump log location when returning the message
+func criuError(err error) string {
+	parts := strings.Split(err.Error(), "\n")
+	return parts[0]
+}
+
+func copyFile(to, from string) error {
+	ff, err := os.Open(from)
+	if err != nil {
+		return err
+	}
+	defer ff.Close()
+	tt, err := os.Create(to)
+	if err != nil {
+		return err
+	}
+	defer tt.Close()
+	_, err = io.Copy(tt, ff)
+	return err
 }
