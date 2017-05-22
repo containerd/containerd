@@ -147,6 +147,26 @@
 			"Rev": "bbeaab5ee38568daa84b8c233a8067b524588355"
 		},
 		{
+			"ImportPath": "github.com/containernetworking/cni/libcni",
+			"Comment": "v0.4.0",
+			"Rev": "530dd71e193012895ff7beee42cd64a02e1993da"
+		},
+		{
+			"ImportPath": "github.com/containernetworking/cni/pkg/invoke",
+			"Comment": "v0.4.0",
+			"Rev": "530dd71e193012895ff7beee42cd64a02e1993da"
+		},
+		{
+			"ImportPath": "github.com/containernetworking/cni/pkg/types",
+			"Comment": "v0.4.0",
+			"Rev": "530dd71e193012895ff7beee42cd64a02e1993da"
+		},
+		{
+			"ImportPath": "github.com/containernetworking/cni/pkg/version",
+			"Comment": "v0.4.0",
+			"Rev": "530dd71e193012895ff7beee42cd64a02e1993da"
+		},
+		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
 			"Comment": "v1.1.0",
 			"Rev": "346938d642f2ec3594ed81d874461961cd0faa76"
@@ -175,6 +195,11 @@
 			"ImportPath": "github.com/docker/docker/pkg/truncindex",
 			"Comment": "v1.13.1",
 			"Rev": "092cba3727bb9b4a2f0e922cd6c0f93ea270e363"
+		},
+		{
+			"ImportPath": "github.com/fsnotify/fsnotify",
+			"Comment": "v1.4.2-4-g7d7316e",
+			"Rev": "7d7316ed6e1ed2de075aab8dfc76de5d158d66e1"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/gogoproto",
@@ -212,6 +237,10 @@
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/empty",
 			"Rev": "8ee79997227bf9b34611aee7946ae64735e6fd93"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-incubator/cri-o/pkg/ocicni",
+			"Rev": "f648cd6e60948e4da391040e5c75d8175fea4fb7"
 		},
 		{
 			"ImportPath": "github.com/nightlyone/lockfile",
