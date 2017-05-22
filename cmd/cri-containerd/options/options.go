@@ -36,6 +36,10 @@ type CRIContainerdOptions struct {
 	ContainerdEndpoint string
 	// ContainerdConnectionTimeout is the connection timeout for containerd client.
 	ContainerdConnectionTimeout time.Duration
+	// NetworkPluginBinDir is the directory in which the binaries for the plugin is kept.
+	NetworkPluginBinDir string
+	// NetworkPluginConfDir is the directory in which the admin places a CNI conf.
+	NetworkPluginConfDir string
 }
 
 // NewCRIContainerdOptions returns a reference to CRIContainerdOptions
@@ -55,6 +59,10 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		2*time.Minute, "Connection timeout for containerd client.")
 	fs.BoolVar(&c.PrintVersion, "version",
 		false, "Print cri-containerd version information and quit.")
+	fs.StringVar(&c.NetworkPluginBinDir, "network-bin-dir",
+		"/etc/cni/net.d", "The directory for putting network binaries.")
+	fs.StringVar(&c.NetworkPluginConfDir, "network-conf-dir",
+		"/opt/cni/bin", "The directory for putting network plugin configuration files.")
 }
 
 // InitFlags must be called after adding all cli options flags are defined and

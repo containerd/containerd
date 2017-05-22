@@ -17,6 +17,8 @@ limitations under the License.
 package server
 
 import (
+	"fmt"
+
 	"github.com/docker/docker/pkg/truncindex"
 	"google.golang.org/grpc"
 
@@ -30,6 +32,8 @@ import (
 	contentservice "github.com/containerd/containerd/services/content"
 	imagesservice "github.com/containerd/containerd/services/images"
 	rootfsservice "github.com/containerd/containerd/services/rootfs"
+
+	"github.com/kubernetes-incubator/cri-o/pkg/ocicni"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
@@ -94,13 +98,15 @@ type criContainerdService struct {
 	// imageStoreService is the containerd service to store and track
 	// image metadata.
 	imageStoreService images.Store
+	// netPlugin is used to setup and teardown network when run/stop pod sandbox.
+	netPlugin ocicni.CNIPlugin
 }
 
 // NewCRIContainerdService returns a new instance of CRIContainerdService
-func NewCRIContainerdService(conn *grpc.ClientConn, rootDir string) CRIContainerdService {
+func NewCRIContainerdService(conn *grpc.ClientConn, rootDir, networkPluginBinDir, networkPluginConfDir string) (CRIContainerdService, error) {
 	// TODO: Initialize different containerd clients.
 	// TODO(random-liu): [P2] Recover from runtime state and metadata store.
-	return &criContainerdService{
+	c := &criContainerdService{
 		os:                 osinterface.RealOS{},
 		rootDir:            rootDir,
 		sandboxStore:       metadata.NewSandboxStore(store.NewMetadataStore()),
@@ -118,6 +124,14 @@ func NewCRIContainerdService(conn *grpc.ClientConn, rootDir string) CRIContainer
 		contentProvider:    contentservice.NewProviderFromClient(contentapi.NewContentClient(conn)),
 		rootfsUnpacker:     rootfsservice.NewUnpackerFromClient(rootfsapi.NewRootFSClient(conn)),
 	}
+
+	netPlugin, err := ocicni.InitCNI(networkPluginBinDir, networkPluginConfDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize cni plugin: %v", err)
+	}
+	c.netPlugin = netPlugin
+
+	return c, nil
 }
 
 func (c *criContainerdService) Start() error {
