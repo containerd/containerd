@@ -2,6 +2,7 @@ package main
 
 import (
 	gocontext "context"
+	"encoding/csv"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -26,6 +27,7 @@ import (
 	imagesservice "github.com/containerd/containerd/services/images"
 	snapshotservice "github.com/containerd/containerd/services/snapshot"
 	"github.com/containerd/containerd/snapshot"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 )
@@ -151,4 +153,39 @@ func parseSignal(rawSignal string) (syscall.Signal, error) {
 func stopCatch(sigc chan os.Signal) {
 	signal.Stop(sigc)
 	close(sigc)
+}
+
+// parseMountFlag parses a mount string in the form "type=foo,source=/path,destination=/target,options=rbind:rw"
+func parseMountFlag(m string) (specs.Mount, error) {
+	mount := specs.Mount{}
+	r := csv.NewReader(strings.NewReader(m))
+
+	fields, err := r.Read()
+	if err != nil {
+		return mount, err
+	}
+
+	for _, field := range fields {
+		v := strings.Split(field, "=")
+		if len(v) != 2 {
+			return mount, fmt.Errorf("invalid mount specification: expected key=val")
+		}
+
+		key := v[0]
+		val := v[1]
+		switch key {
+		case "type":
+			mount.Type = val
+		case "source", "src":
+			mount.Source = val
+		case "destination", "dst":
+			mount.Destination = val
+		case "options":
+			mount.Options = strings.Split(val, ":")
+		default:
+			return mount, fmt.Errorf("mount option %q not supported", key)
+		}
+	}
+
+	return mount, nil
 }

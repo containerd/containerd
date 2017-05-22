@@ -54,6 +54,10 @@ var runCommand = cli.Command{
 			Name:  "net-host",
 			Usage: "enable host networking for the container",
 		},
+		cli.StringSliceFlag{
+			Name:  "mount",
+			Usage: "specify additional container mount (ex: type=bind,src=/tmp,dest=/host,options=rbind:ro)",
+		},
 		cli.BoolFlag{
 			Name:  "keep",
 			Usage: "keep container after running",
