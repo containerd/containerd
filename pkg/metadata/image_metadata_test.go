@@ -19,6 +19,7 @@ package metadata
 import (
 	"testing"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	assertlib "github.com/stretchr/testify/assert"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
@@ -27,16 +28,28 @@ import (
 func TestImageMetadataStore(t *testing.T) {
 	imageMetadataMap := map[string]*ImageMetadata{
 		"1": {
-			ID:   "1",
-			Size: 10,
+			ID:          "1",
+			ChainID:     "test-chain-id-1",
+			RepoTags:    []string{"tag-1"},
+			RepoDigests: []string{"digest-1"},
+			Size:        10,
+			Config:      &imagespec.ImageConfig{},
 		},
 		"2": {
-			ID:   "2",
-			Size: 20,
+			ID:          "2",
+			ChainID:     "test-chain-id-2",
+			RepoTags:    []string{"tag-2"},
+			RepoDigests: []string{"digest-2"},
+			Size:        20,
+			Config:      &imagespec.ImageConfig{},
 		},
 		"3": {
-			ID:   "3",
-			Size: 30,
+			ID:          "3",
+			RepoTags:    []string{"tag-3"},
+			RepoDigests: []string{"digest-3"},
+			ChainID:     "test-chain-id-3",
+			Size:        30,
+			Config:      &imagespec.ImageConfig{},
 		},
 	}
 	assert := assertlib.New(t)
