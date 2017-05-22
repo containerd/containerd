@@ -17,6 +17,8 @@ limitations under the License.
 package server
 
 import (
+	"errors"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
+	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
 )
 
@@ -38,6 +41,13 @@ func TestStopPodSandbox(t *testing.T) {
 	testSandbox := metadata.SandboxMetadata{
 		ID:   testID,
 		Name: "test-name",
+		Config: &runtime.PodSandboxConfig{
+			Metadata: &runtime.PodSandboxMetadata{
+				Name:      "test-name",
+				Uid:       "test-uid",
+				Namespace: "test-ns",
+			}},
+		NetNS: "test-netns",
 	}
 	testContainer := container.Container{
 		ID:     testID,
@@ -49,38 +59,71 @@ func TestStopPodSandbox(t *testing.T) {
 		sandboxContainers []container.Container
 		injectSandbox     bool
 		injectErr         error
+		injectStatErr     error
+		injectCNIErr      error
 		expectErr         bool
 		expectCalls       []string
+		expectedCNICalls  []string
 	}{
 		"stop non-existing sandbox": {
-			injectSandbox: false,
-			expectErr:     true,
-			expectCalls:   []string{},
+			injectSandbox:    false,
+			expectErr:        true,
+			expectCalls:      []string{},
+			expectedCNICalls: []string{},
 		},
 		"stop sandbox with sandbox container": {
 			sandboxContainers: []container.Container{testContainer},
 			injectSandbox:     true,
 			expectErr:         false,
 			expectCalls:       []string{"delete"},
+			expectedCNICalls:  []string{"TearDownPod"},
 		},
 		"stop sandbox with sandbox container not exist error": {
 			sandboxContainers: []container.Container{},
 			injectSandbox:     true,
 			// Inject error to make sure fake execution client returns error.
-			injectErr:   grpc.Errorf(codes.Unknown, containerd.ErrContainerNotExist.Error()),
-			expectErr:   false,
-			expectCalls: []string{"delete"},
+			injectErr:        grpc.Errorf(codes.Unknown, containerd.ErrContainerNotExist.Error()),
+			expectErr:        false,
+			expectCalls:      []string{"delete"},
+			expectedCNICalls: []string{"TearDownPod"},
 		},
 		"stop sandbox with with arbitrary error": {
-			injectSandbox: true,
-			injectErr:     grpc.Errorf(codes.Unknown, "arbitrary error"),
-			expectErr:     true,
-			expectCalls:   []string{"delete"},
+			injectSandbox:    true,
+			injectErr:        grpc.Errorf(codes.Unknown, "arbitrary error"),
+			expectErr:        true,
+			expectCalls:      []string{"delete"},
+			expectedCNICalls: []string{"TearDownPod"},
+		},
+		"stop sandbox with Stat returns arbitrary error": {
+			sandboxContainers: []container.Container{testContainer},
+			injectSandbox:     true,
+			expectErr:         true,
+			injectStatErr:     errors.New("arbitrary error"),
+			expectCalls:       []string{},
+			expectedCNICalls:  []string{},
+		},
+		"stop sandbox with Stat returns not exist error": {
+			sandboxContainers: []container.Container{testContainer},
+			injectSandbox:     true,
+			expectErr:         false,
+			expectCalls:       []string{"delete"},
+			injectStatErr:     os.ErrNotExist,
+			expectedCNICalls:  []string{},
+		},
+		"stop sandbox with TearDownPod fails": {
+			sandboxContainers: []container.Container{testContainer},
+			injectSandbox:     true,
+			expectErr:         true,
+			expectedCNICalls:  []string{"TearDownPod"},
+			injectCNIErr:      errors.New("arbitrary error"),
+			expectCalls:       []string{},
 		},
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIContainerdService()
 		fake := c.containerService.(*servertesting.FakeExecutionClient)
+		fakeCNIPlugin := c.netPlugin.(*servertesting.FakeCNIPlugin)
+		fakeOS := c.os.(*ostesting.FakeOS)
 		fake.SetFakeContainers(test.sandboxContainers)
 
 		if test.injectSandbox {
@@ -90,6 +133,14 @@ func TestStopPodSandbox(t *testing.T) {
 		if test.injectErr != nil {
 			fake.InjectError("delete", test.injectErr)
 		}
+		if test.injectCNIErr != nil {
+			fakeCNIPlugin.InjectError("TearDownPod", test.injectCNIErr)
+		}
+		if test.injectStatErr != nil {
+			fakeOS.InjectError("Stat", test.injectStatErr)
+		}
+		fakeCNIPlugin.SetFakePodNetwork(testSandbox.NetNS, testSandbox.Config.GetMetadata().GetNamespace(),
+			testSandbox.Config.GetMetadata().GetName(), testID, sandboxStatusTestIP)
 
 		res, err := c.StopPodSandbox(context.Background(), &runtime.StopPodSandboxRequest{
 			PodSandboxId: testID,
@@ -102,5 +153,6 @@ func TestStopPodSandbox(t *testing.T) {
 			assert.NotNil(t, res)
 		}
 		assert.Equal(t, test.expectCalls, fake.GetCalledNames())
+		assert.Equal(t, test.expectedCNICalls, fakeCNIPlugin.GetCalledNames())
 	}
 }

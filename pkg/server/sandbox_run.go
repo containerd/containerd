@@ -164,7 +164,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	defer func() {
 		if retErr != nil {
 			// Cleanup the sandbox container if an error is returned.
-			if _, err := c.containerService.Delete(ctx, &execution.DeleteRequest{ID: id}); err != nil {
+			if _, err = c.containerService.Delete(ctx, &execution.DeleteRequest{ID: id}); err != nil {
 				glog.Errorf("Failed to delete sandbox container %q: %v",
 					id, err)
 			}

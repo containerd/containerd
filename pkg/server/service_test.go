@@ -57,6 +57,7 @@ func newTestCRIContainerdService() *criContainerdService {
 		sandboxIDIndex:     truncindex.NewTruncIndex(nil),
 		containerStore:     metadata.NewContainerStore(store.NewMetadataStore()),
 		containerNameIndex: registrar.NewRegistrar(),
+		netPlugin:          servertesting.NewFakeCNIPlugin(),
 	}
 }
 
@@ -65,6 +66,7 @@ func TestSandboxOperations(t *testing.T) {
 	c := newTestCRIContainerdService()
 	fake := c.containerService.(*servertesting.FakeExecutionClient)
 	fakeOS := c.os.(*ostesting.FakeOS)
+	fakeCNIPlugin := c.netPlugin.(*servertesting.FakeCNIPlugin)
 	fakeOS.OpenFifoFn = func(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
 		return nopReadWriteCloser{}, nil
 	}
@@ -89,6 +91,7 @@ func TestSandboxOperations(t *testing.T) {
 
 	t.Logf("should be able to get pod sandbox status")
 	info, err := fake.Info(context.Background(), &execution.InfoRequest{ID: id})
+	netns := getNetworkNamespace(info.Pid)
 	assert.NoError(t, err)
 	expectSandboxStatus := &runtime.PodSandboxStatus{
 		Id:       id,
@@ -97,7 +100,7 @@ func TestSandboxOperations(t *testing.T) {
 		Network: &runtime.PodSandboxNetworkStatus{},
 		Linux: &runtime.LinuxPodSandboxStatus{
 			Namespaces: &runtime.Namespace{
-				Network: getNetworkNamespace(info.Pid),
+				Network: netns,
 				Options: &runtime.NamespaceOption{
 					HostNetwork: false,
 					HostPid:     false,
@@ -113,6 +116,9 @@ func TestSandboxOperations(t *testing.T) {
 	require.NotNil(t, statusRes)
 	status := statusRes.GetStatus()
 	expectSandboxStatus.CreatedAt = status.GetCreatedAt()
+	ip, err := fakeCNIPlugin.GetContainerNetworkStatus(netns, config.GetMetadata().GetNamespace(), config.GetMetadata().GetName(), id)
+	assert.NoError(t, err)
+	expectSandboxStatus.Network.Ip = ip
 	assert.Equal(t, expectSandboxStatus, status)
 
 	t.Logf("should be able to list pod sandboxes")
