@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/fs"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/snapshot/storage"
@@ -92,11 +92,11 @@ func (o *snapshotter) Usage(ctx context.Context, key string) (snapshot.Usage, er
 	return usage, nil
 }
 
-func (o *snapshotter) Prepare(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
+func (o *snapshotter) Prepare(ctx context.Context, key, parent string) ([]mount.Mount, error) {
 	return o.createActive(ctx, key, parent, false)
 }
 
-func (o *snapshotter) View(ctx context.Context, key, parent string) ([]containerd.Mount, error) {
+func (o *snapshotter) View(ctx context.Context, key, parent string) ([]mount.Mount, error) {
 	return o.createActive(ctx, key, parent, true)
 }
 
@@ -104,7 +104,7 @@ func (o *snapshotter) View(ctx context.Context, key, parent string) ([]container
 // called on an read-write or readonly transaction.
 //
 // This can be used to recover mounts after calling View or Prepare.
-func (o *snapshotter) Mounts(ctx context.Context, key string) ([]containerd.Mount, error) {
+func (o *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
 	ctx, t, err := o.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return nil, err
@@ -202,7 +202,7 @@ func (o *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 	return storage.WalkInfo(ctx, fn)
 }
 
-func (o *snapshotter) createActive(ctx context.Context, key, parent string, readonly bool) ([]containerd.Mount, error) {
+func (o *snapshotter) createActive(ctx context.Context, key, parent string, readonly bool) ([]mount.Mount, error) {
 	var (
 		err      error
 		path, td string
@@ -271,7 +271,7 @@ func (o *snapshotter) getSnapshotDir(id string) string {
 	return filepath.Join(o.root, "snapshots", id)
 }
 
-func (o *snapshotter) mounts(active storage.Active) []containerd.Mount {
+func (o *snapshotter) mounts(active storage.Active) []mount.Mount {
 	var (
 		roFlag string
 		source string
@@ -289,7 +289,7 @@ func (o *snapshotter) mounts(active storage.Active) []containerd.Mount {
 		source = o.getSnapshotDir(active.ParentIDs[0])
 	}
 
-	return []containerd.Mount{
+	return []mount.Mount{
 		{
 			Source: source,
 			Type:   "bind",

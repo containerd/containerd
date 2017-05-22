@@ -18,10 +18,10 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/console"
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/execution"
 	"github.com/containerd/containerd/api/types/descriptor"
 	"github.com/containerd/containerd/api/types/mount"
+	mountt "github.com/containerd/containerd/mount"
 	protobuf "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -277,7 +277,7 @@ func newSpec(context *cli.Context, config *ocispec.ImageConfig, imageRef string)
 	return json.Marshal(s)
 }
 
-func newCreateRequest(context *cli.Context, id, tmpDir string, checkpoint *ocispec.Descriptor, mounts []containerd.Mount, spec []byte) (*execution.CreateRequest, error) {
+func newCreateRequest(context *cli.Context, id, tmpDir string, checkpoint *ocispec.Descriptor, mounts []mountt.Mount, spec []byte) (*execution.CreateRequest, error) {
 	create := &execution.CreateRequest{
 		ID: id,
 		Spec: &protobuf.Any{

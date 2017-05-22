@@ -1,4 +1,4 @@
-package mountinfo
+package mount
 
 // Info reveals information about a particular mounted filesystem. This
 // struct is populated from the content in the /proc/<pid>/mountinfo file.

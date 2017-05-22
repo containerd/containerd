@@ -1,6 +1,6 @@
 // +build darwin freebsd
 
-package containerd
+package mount
 
 import "github.com/pkg/errors"
 

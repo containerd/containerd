@@ -3,10 +3,10 @@ package diff
 import (
 	"context"
 
-	"github.com/containerd/containerd"
 	diffapi "github.com/containerd/containerd/api/services/diff"
 	"github.com/containerd/containerd/api/types/descriptor"
 	mounttypes "github.com/containerd/containerd/api/types/mount"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/rootfs"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -28,7 +28,7 @@ type remote struct {
 	client diffapi.DiffClient
 }
 
-func (r *remote) Apply(ctx context.Context, diff ocispec.Descriptor, mounts []containerd.Mount) (ocispec.Descriptor, error) {
+func (r *remote) Apply(ctx context.Context, diff ocispec.Descriptor, mounts []mount.Mount) (ocispec.Descriptor, error) {
 	req := &diffapi.ApplyRequest{
 		Diff:   fromDescriptor(diff),
 		Mounts: fromMounts(mounts),
@@ -40,7 +40,7 @@ func (r *remote) Apply(ctx context.Context, diff ocispec.Descriptor, mounts []co
 	return toDescriptor(resp.Applied), nil
 }
 
-func (r *remote) DiffMounts(ctx context.Context, a, b []containerd.Mount, media, ref string) (ocispec.Descriptor, error) {
+func (r *remote) DiffMounts(ctx context.Context, a, b []mount.Mount, media, ref string) (ocispec.Descriptor, error) {
 	req := &diffapi.DiffRequest{
 		Left:      fromMounts(a),
 		Right:     fromMounts(b),
@@ -62,7 +62,7 @@ func fromDescriptor(d ocispec.Descriptor) *descriptor.Descriptor {
 	}
 }
 
-func fromMounts(mounts []containerd.Mount) []*mounttypes.Mount {
+func fromMounts(mounts []mount.Mount) []*mounttypes.Mount {
 	apiMounts := make([]*mounttypes.Mount, len(mounts))
 	for i, m := range mounts {
 		apiMounts[i] = &mounttypes.Mount{

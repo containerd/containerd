@@ -16,9 +16,9 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd"
 	shimapi "github.com/containerd/containerd/api/services/shim"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 )
@@ -45,7 +45,7 @@ type initProcess struct {
 
 func newInitProcess(context context.Context, path string, r *shimapi.CreateRequest) (*initProcess, error) {
 	for _, rm := range r.Rootfs {
-		m := &containerd.Mount{
+		m := &mount.Mount{
 			Type:    rm.Type,
 			Source:  rm.Source,
 			Options: rm.Options,

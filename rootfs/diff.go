@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshot"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type MountDiffer interface {
-	DiffMounts(ctx context.Context, lower, upper []containerd.Mount, media, ref string) (ocispec.Descriptor, error)
+	DiffMounts(ctx context.Context, lower, upper []mount.Mount, media, ref string) (ocispec.Descriptor, error)
 }
 
 type DiffOptions struct {
@@ -33,7 +33,7 @@ func Diff(ctx context.Context, snapshotID, contentRef string, sn snapshot.Snapsh
 	}
 	defer sn.Remove(ctx, lowerKey)
 
-	var upper []containerd.Mount
+	var upper []mount.Mount
 	if info.Kind == snapshot.KindActive {
 		upper, err = sn.Mounts(ctx, snapshotID)
 		if err != nil {

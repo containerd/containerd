@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/snapshot/storage"
 	"github.com/containerd/containerd/snapshot/testsuite"
@@ -221,7 +221,7 @@ func TestOverlayOverlayRead(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if err := containerd.MountAll(mounts, dest); err != nil {
+	if err := mount.MountAll(mounts, dest); err != nil {
 		t.Error(err)
 		return
 	}

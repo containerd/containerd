@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
@@ -14,7 +14,7 @@ import (
 )
 
 type Applier interface {
-	Apply(context.Context, ocispec.Descriptor, []containerd.Mount) (ocispec.Descriptor, error)
+	Apply(context.Context, ocispec.Descriptor, []mount.Mount) (ocispec.Descriptor, error)
 }
 
 type Layer struct {

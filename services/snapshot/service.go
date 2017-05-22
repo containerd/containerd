@@ -3,10 +3,10 @@ package snapshot
 import (
 	gocontext "context"
 
-	"github.com/containerd/containerd"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	mounttypes "github.com/containerd/containerd/api/types/mount"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
 	protoempty "github.com/golang/protobuf/ptypes/empty"
@@ -189,7 +189,7 @@ func fromUsage(usage snapshot.Usage) *snapshotapi.UsageResponse {
 	}
 }
 
-func fromMounts(mounts []containerd.Mount) *snapshotapi.MountsResponse {
+func fromMounts(mounts []mount.Mount) *snapshotapi.MountsResponse {
 	resp := &snapshotapi.MountsResponse{
 		Mounts: make([]*mounttypes.Mount, len(mounts)),
 	}
