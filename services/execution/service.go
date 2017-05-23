@@ -303,7 +303,7 @@ func (s *Service) Events(r *api.EventsRequest, server api.ContainerService_Event
 	w := &grpcEventWriter{
 		server: server,
 	}
-	return s.collector.forward(w)
+	return s.collector.forward(w, r)
 }
 
 func (s *Service) Exec(ctx context.Context, r *api.ExecRequest) (*api.ExecResponse, error) {

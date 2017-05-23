@@ -13,12 +13,20 @@ import (
 var eventsCommand = cli.Command{
 	Name:  "events",
 	Usage: "display containerd events",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "id",
+			Usage: "id of the container",
+		},
+	},
 	Action: func(context *cli.Context) error {
 		containers, err := getExecutionService(context)
 		if err != nil {
 			return err
 		}
-		events, err := containers.Events(gocontext.Background(), &execution.EventsRequest{})
+		events, err := containers.Events(gocontext.Background(), &execution.EventsRequest{
+			ID: context.String("id"),
+		})
 		if err != nil {
 			return err
 		}

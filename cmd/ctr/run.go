@@ -89,7 +89,9 @@ var runCommand = cli.Command{
 			return err
 		}
 		defer os.RemoveAll(tmpDir)
-		events, err := containers.Events(ctx, &execution.EventsRequest{})
+		events, err := containers.Events(ctx, &execution.EventsRequest{
+			ID: id,
+		})
 		if err != nil {
 			return err
 		}

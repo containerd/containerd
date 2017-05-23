@@ -3,6 +3,7 @@ package execution
 import (
 	"sync"
 
+	api "github.com/containerd/containerd/api/services/execution"
 	"github.com/containerd/containerd/plugin"
 
 	"golang.org/x/net/context"
@@ -30,6 +31,7 @@ func newCollector(ctx context.Context, runtimes map[string]plugin.Runtime) (*col
 type eventClient struct {
 	eCh chan error
 	w   *grpcEventWriter
+	id  string
 }
 
 type collector struct {
@@ -53,10 +55,11 @@ func (c *collector) collect(r plugin.Runtime) error {
 	return nil
 }
 
-func (c *collector) forward(w *grpcEventWriter) error {
+func (c *collector) forward(w *grpcEventWriter, r *api.EventsRequest) error {
 	client := &eventClient{
 		w:   w,
 		eCh: make(chan error, 1),
+		id:  r.ID,
 	}
 	c.mu.Lock()
 	c.eventClients[client] = struct{}{}
@@ -72,8 +75,10 @@ func (c *collector) publisher() {
 	for e := range c.ch {
 		c.mu.Lock()
 		for client := range c.eventClients {
-			if err := client.w.Write(e); err != nil {
-				client.eCh <- err
+			if client.id == "" || e.ID == client.id {
+				if err := client.w.Write(e); err != nil {
+					client.eCh <- err
+				}
 			}
 		}
 		c.mu.Unlock()
