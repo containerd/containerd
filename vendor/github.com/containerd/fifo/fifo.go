@@ -75,7 +75,11 @@ func OpenFifo(ctx context.Context, fn string, flag int, perm os.FileMode) (io.Re
 		}
 		select {
 		case <-ctx.Done():
-			f.Close()
+			select {
+			case <-f.opened:
+			default:
+				f.Close()
+			}
 		case <-f.opened:
 		case <-f.closed:
 		}
