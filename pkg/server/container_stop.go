@@ -76,7 +76,7 @@ func (c *criContainerdService) StopContainer(ctx context.Context, r *runtime.Sto
 		return nil, fmt.Errorf("failed to stop container %q: %v", id, err)
 	}
 
-	err = c.waitContainerStop(id, time.Duration(r.GetTimeout())*time.Second)
+	err = c.waitContainerStop(ctx, id, time.Duration(r.GetTimeout())*time.Second)
 	if err == nil {
 		return &runtime.StopContainerResponse{}, nil
 	}
@@ -92,7 +92,7 @@ func (c *criContainerdService) StopContainer(ctx context.Context, r *runtime.Sto
 	}
 
 	// Wait forever until container stop is observed by event monitor.
-	if err := c.waitContainerStop(id, killContainerTimeout); err != nil {
+	if err := c.waitContainerStop(ctx, id, killContainerTimeout); err != nil {
 		return nil, fmt.Errorf("error occurs during waiting for container %q to stop: %v",
 			id, err)
 	}
@@ -100,7 +100,7 @@ func (c *criContainerdService) StopContainer(ctx context.Context, r *runtime.Sto
 }
 
 // waitContainerStop polls container state until timeout exceeds or container is stopped.
-func (c *criContainerdService) waitContainerStop(id string, timeout time.Duration) error {
+func (c *criContainerdService) waitContainerStop(ctx context.Context, id string, timeout time.Duration) error {
 	ticker := time.NewTicker(stopCheckPollInterval)
 	defer ticker.Stop()
 	timeoutTimer := time.NewTimer(timeout)
@@ -122,6 +122,8 @@ func (c *criContainerdService) waitContainerStop(id string, timeout time.Duratio
 			return nil
 		}
 		select {
+		case <-ctx.Done():
+			return fmt.Errorf("wait container %q is cancelled", id)
 		case <-timeoutTimer.C:
 			return fmt.Errorf("wait container %q stop timeout", id)
 		case <-ticker.C:
