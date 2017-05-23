@@ -33,9 +33,10 @@ import (
 
 func TestWaitContainerStop(t *testing.T) {
 	id := "test-id"
-	timeout := 2 * stopCheckPollInterval
 	for desc, test := range map[string]struct {
 		metadata  *metadata.ContainerMetadata
+		cancel    bool
+		timeout   time.Duration
 		expectErr bool
 	}{
 		"should return error if timeout exceeds": {
@@ -44,10 +45,22 @@ func TestWaitContainerStop(t *testing.T) {
 				CreatedAt: time.Now().UnixNano(),
 				StartedAt: time.Now().UnixNano(),
 			},
+			timeout:   2 * stopCheckPollInterval,
+			expectErr: true,
+		},
+		"should return error if context is cancelled": {
+			metadata: &metadata.ContainerMetadata{
+				ID:        id,
+				CreatedAt: time.Now().UnixNano(),
+				StartedAt: time.Now().UnixNano(),
+			},
+			timeout:   time.Hour,
+			cancel:    true,
 			expectErr: true,
 		},
 		"should not return error if container is removed before timeout": {
 			metadata:  nil,
+			timeout:   time.Hour,
 			expectErr: false,
 		},
 		"should not return error if container is stopped before timeout": {
@@ -57,6 +70,7 @@ func TestWaitContainerStop(t *testing.T) {
 				StartedAt:  time.Now().UnixNano(),
 				FinishedAt: time.Now().UnixNano(),
 			},
+			timeout:   time.Hour,
 			expectErr: false,
 		},
 	} {
@@ -64,7 +78,13 @@ func TestWaitContainerStop(t *testing.T) {
 		if test.metadata != nil {
 			assert.NoError(t, c.containerStore.Create(*test.metadata))
 		}
-		err := c.waitContainerStop(id, timeout)
+		ctx := context.Background()
+		if test.cancel {
+			cancelledCtx, cancel := context.WithCancel(ctx)
+			cancel()
+			ctx = cancelledCtx
+		}
+		err := c.waitContainerStop(ctx, id, test.timeout)
 		assert.Equal(t, test.expectErr, err != nil, desc)
 	}
 }
