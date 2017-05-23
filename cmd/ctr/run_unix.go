@@ -277,7 +277,7 @@ func newSpec(context *cli.Context, config *ocispec.ImageConfig, imageRef string)
 	return json.Marshal(s)
 }
 
-func newCreateRequest(context *cli.Context, id, tmpDir string, checkpoint *ocispec.Descriptor, mounts []mountt.Mount, spec []byte) (*execution.CreateRequest, error) {
+func newCreateRequest(context *cli.Context, id, tmpDir string, checkpoint *ocispec.Descriptor, mounts []mount.Mount, spec []byte) (*execution.CreateRequest, error) {
 	create := &execution.CreateRequest{
 		ID: id,
 		Spec: &protobuf.Any{
