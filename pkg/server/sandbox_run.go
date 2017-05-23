@@ -86,8 +86,6 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	// Use fixed rootfs path and sleep command.
 	const rootPath = "/"
 
-	// TODO(random-liu): [P0] Set up sandbox network with network plugin.
-
 	// Create sandbox container root directory.
 	// Prepare streaming named pipe.
 	sandboxRootDir := getSandboxRootDir(c.rootDir, id)
@@ -166,12 +164,30 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	defer func() {
 		if retErr != nil {
 			// Cleanup the sandbox container if an error is returned.
-			if _, err := c.containerService.Delete(ctx, &execution.DeleteRequest{ID: id}); err != nil {
+			if _, err = c.containerService.Delete(ctx, &execution.DeleteRequest{ID: id}); err != nil {
 				glog.Errorf("Failed to delete sandbox container %q: %v",
 					id, err)
 			}
 		}
 	}()
+
+	meta.NetNS = getNetworkNamespace(createResp.Pid)
+	if !config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostNetwork() {
+		// Setup network for sandbox.
+		// TODO(random-liu): [P2] Replace with permanent network namespace.
+		podName := config.GetMetadata().GetName()
+		if err = c.netPlugin.SetUpPod(meta.NetNS, config.GetMetadata().GetNamespace(), podName, id); err != nil {
+			return nil, fmt.Errorf("failed to setup network for sandbox %q: %v", id, err)
+		}
+		defer func() {
+			if retErr != nil {
+				// Teardown network if an error is returned.
+				if err := c.netPlugin.TearDownPod(meta.NetNS, config.GetMetadata().GetNamespace(), podName, id); err != nil {
+					glog.Errorf("failed to destroy network for sandbox %q: %v", id, err)
+				}
+			}
+		}()
+	}
 
 	// Start sandbox container in containerd.
 	if _, err := c.containerService.Start(ctx, &execution.StartRequest{ID: id}); err != nil {
@@ -181,8 +197,6 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 
 	// Add sandbox into sandbox store.
 	meta.CreatedAt = time.Now().UnixNano()
-	// TODO(random-liu): [P2] Replace with permanent network namespace.
-	meta.NetNS = getNetworkNamespace(createResp.Pid)
 	if err := c.sandboxStore.Create(meta); err != nil {
 		return nil, fmt.Errorf("failed to add sandbox metadata %+v into store: %v",
 			meta, err)

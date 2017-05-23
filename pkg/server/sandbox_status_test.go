@@ -35,7 +35,11 @@ import (
 
 // Variables used in the following test.
 
-const sandboxStatusTestID = "test-id"
+const (
+	sandboxStatusTestID    = "test-id"
+	sandboxStatusTestIP    = "10.10.10.10"
+	sandboxStatusTestNetNS = "test-netns"
+)
 
 func getSandboxStatusTestData() (*metadata.SandboxMetadata, *runtime.PodSandboxStatus) {
 	config := &runtime.PodSandboxConfig{
@@ -65,15 +69,17 @@ func getSandboxStatusTestData() (*metadata.SandboxMetadata, *runtime.PodSandboxS
 		Name:      "test-name",
 		Config:    config,
 		CreatedAt: createdAt,
+		NetNS:     sandboxStatusTestNetNS,
 	}
 
 	expectedStatus := &runtime.PodSandboxStatus{
 		Id:        sandboxStatusTestID,
 		Metadata:  config.GetMetadata(),
 		CreatedAt: createdAt,
-		Network:   &runtime.PodSandboxNetworkStatus{},
+		Network:   &runtime.PodSandboxNetworkStatus{Ip: ""},
 		Linux: &runtime.LinuxPodSandboxStatus{
 			Namespaces: &runtime.Namespace{
+				Network: sandboxStatusTestNetNS,
 				Options: &runtime.NamespaceOption{
 					HostNetwork: true,
 					HostPid:     false,
@@ -95,7 +101,7 @@ func TestToCRISandboxStatus(t *testing.T) {
 	}{
 		"ready sandbox should have network namespace": {
 			state:       runtime.PodSandboxState_SANDBOX_READY,
-			expectNetNS: "test-netns",
+			expectNetNS: sandboxStatusTestNetNS,
 		},
 		"not ready sandbox should not have network namespace": {
 			state:       runtime.PodSandboxState_SANDBOX_NOTREADY,
@@ -103,10 +109,10 @@ func TestToCRISandboxStatus(t *testing.T) {
 		},
 	} {
 		metadata, expect := getSandboxStatusTestData()
-		metadata.NetNS = "test-netns"
-		status := toCRISandboxStatus(metadata, test.state)
+		status := toCRISandboxStatus(metadata, test.state, sandboxStatusTestIP)
 		expect.Linux.Namespaces.Network = test.expectNetNS
 		expect.State = test.state
+		expect.Network.Ip = sandboxStatusTestIP
 		assert.Equal(t, expect, status, desc)
 	}
 }
@@ -116,14 +122,18 @@ func TestPodSandboxStatus(t *testing.T) {
 		sandboxContainers []container.Container
 		injectMetadata    bool
 		injectErr         error
+		injectIP          bool
+		injectCNIErr      error
 		expectState       runtime.PodSandboxState
 		expectErr         bool
 		expectCalls       []string
+		expectedCNICalls  []string
 	}{
 		"sandbox status without metadata": {
-			injectMetadata: false,
-			expectErr:      true,
-			expectCalls:    []string{},
+			injectMetadata:   false,
+			expectErr:        true,
+			expectCalls:      []string{},
+			expectedCNICalls: []string{},
 		},
 		"sandbox status with running sandbox container": {
 			sandboxContainers: []container.Container{{
@@ -131,9 +141,10 @@ func TestPodSandboxStatus(t *testing.T) {
 				Pid:    1,
 				Status: container.Status_RUNNING,
 			}},
-			injectMetadata: true,
-			expectState:    runtime.PodSandboxState_SANDBOX_READY,
-			expectCalls:    []string{"info"},
+			injectMetadata:   true,
+			expectState:      runtime.PodSandboxState_SANDBOX_READY,
+			expectCalls:      []string{"info"},
+			expectedCNICalls: []string{"GetContainerNetworkStatus"},
 		},
 		"sandbox status with stopped sandbox container": {
 			sandboxContainers: []container.Container{{
@@ -141,15 +152,17 @@ func TestPodSandboxStatus(t *testing.T) {
 				Pid:    1,
 				Status: container.Status_STOPPED,
 			}},
-			injectMetadata: true,
-			expectState:    runtime.PodSandboxState_SANDBOX_NOTREADY,
-			expectCalls:    []string{"info"},
+			injectMetadata:   true,
+			expectState:      runtime.PodSandboxState_SANDBOX_NOTREADY,
+			expectCalls:      []string{"info"},
+			expectedCNICalls: []string{"GetContainerNetworkStatus"},
 		},
 		"sandbox status with non-existing sandbox container": {
 			sandboxContainers: []container.Container{},
 			injectMetadata:    true,
 			expectState:       runtime.PodSandboxState_SANDBOX_NOTREADY,
 			expectCalls:       []string{"info"},
+			expectedCNICalls:  []string{"GetContainerNetworkStatus"},
 		},
 		"sandbox status with arbitrary error": {
 			sandboxContainers: []container.Container{{
@@ -157,16 +170,44 @@ func TestPodSandboxStatus(t *testing.T) {
 				Pid:    1,
 				Status: container.Status_RUNNING,
 			}},
-			injectMetadata: true,
-			injectErr:      errors.New("arbitrary error"),
-			expectErr:      true,
-			expectCalls:    []string{"info"},
+			injectMetadata:   true,
+			expectState:      runtime.PodSandboxState_SANDBOX_READY,
+			injectErr:        errors.New("arbitrary error"),
+			expectErr:        true,
+			expectCalls:      []string{"info"},
+			expectedCNICalls: []string{},
+		},
+		"sandbox status with IP address": {
+			sandboxContainers: []container.Container{{
+				ID:     sandboxStatusTestID,
+				Pid:    1,
+				Status: container.Status_RUNNING,
+			}},
+			injectMetadata:   true,
+			expectState:      runtime.PodSandboxState_SANDBOX_READY,
+			expectCalls:      []string{"info"},
+			injectIP:         true,
+			expectedCNICalls: []string{"GetContainerNetworkStatus"},
+		},
+		"sandbox status with GetContainerNetworkStatus returns error": {
+			sandboxContainers: []container.Container{{
+				ID:     sandboxStatusTestID,
+				Pid:    1,
+				Status: container.Status_RUNNING,
+			}},
+			injectMetadata:   true,
+			expectState:      runtime.PodSandboxState_SANDBOX_READY,
+			expectCalls:      []string{"info"},
+			expectedCNICalls: []string{"GetContainerNetworkStatus"},
+			injectCNIErr:     errors.New("get container network status error"),
 		},
 	} {
 		t.Logf("TestCase %q", desc)
 		metadata, expect := getSandboxStatusTestData()
+		expect.Network.Ip = ""
 		c := newTestCRIContainerdService()
 		fake := c.containerService.(*servertesting.FakeExecutionClient)
+		fakeCNIPlugin := c.netPlugin.(*servertesting.FakeCNIPlugin)
 		fake.SetFakeContainers(test.sandboxContainers)
 		if test.injectMetadata {
 			assert.NoError(t, c.sandboxIDIndex.Add(metadata.ID))
@@ -175,18 +216,31 @@ func TestPodSandboxStatus(t *testing.T) {
 		if test.injectErr != nil {
 			fake.InjectError("info", test.injectErr)
 		}
+		if test.injectCNIErr != nil {
+			fakeCNIPlugin.InjectError("GetContainerNetworkStatus", test.injectCNIErr)
+		}
+		if test.injectIP {
+			fakeCNIPlugin.SetFakePodNetwork(metadata.NetNS, metadata.Config.GetMetadata().GetNamespace(),
+				metadata.Config.GetMetadata().GetName(), sandboxStatusTestID, sandboxStatusTestIP)
+			expect.Network.Ip = sandboxStatusTestIP
+		}
 		res, err := c.PodSandboxStatus(context.Background(), &runtime.PodSandboxStatusRequest{
 			PodSandboxId: sandboxStatusTestID,
 		})
 		assert.Equal(t, test.expectCalls, fake.GetCalledNames())
+		assert.Equal(t, test.expectedCNICalls, fakeCNIPlugin.GetCalledNames())
 		if test.expectErr {
 			assert.Error(t, err)
 			assert.Nil(t, res)
 			continue
 		}
+
 		assert.NoError(t, err)
 		require.NotNil(t, res)
 		expect.State = test.expectState
+		if expect.State == runtime.PodSandboxState_SANDBOX_NOTREADY {
+			expect.Linux.Namespaces.Network = ""
+		}
 		assert.Equal(t, expect, res.GetStatus())
 	}
 }

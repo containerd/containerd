@@ -59,11 +59,18 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 		state = runtime.PodSandboxState_SANDBOX_READY
 	}
 
-	return &runtime.PodSandboxStatusResponse{Status: toCRISandboxStatus(sandbox, state)}, nil
+	ip, err := c.netPlugin.GetContainerNetworkStatus(sandbox.NetNS, sandbox.Config.GetMetadata().GetNamespace(), sandbox.Config.GetMetadata().GetName(), id)
+	if err != nil {
+		// Ignore the error on network status
+		ip = ""
+		glog.V(4).Infof("GetContainerNetworkStatus returns error: %v", err)
+	}
+
+	return &runtime.PodSandboxStatusResponse{Status: toCRISandboxStatus(sandbox, state, ip)}, nil
 }
 
 // toCRISandboxStatus converts sandbox metadata into CRI pod sandbox status.
-func toCRISandboxStatus(meta *metadata.SandboxMetadata, state runtime.PodSandboxState) *runtime.PodSandboxStatus {
+func toCRISandboxStatus(meta *metadata.SandboxMetadata, state runtime.PodSandboxState, ip string) *runtime.PodSandboxStatus {
 	nsOpts := meta.Config.GetLinux().GetSecurityContext().GetNamespaceOptions()
 	netNS := meta.NetNS
 	if state == runtime.PodSandboxState_SANDBOX_NOTREADY {
@@ -79,8 +86,7 @@ func toCRISandboxStatus(meta *metadata.SandboxMetadata, state runtime.PodSandbox
 		Metadata:  meta.Config.GetMetadata(),
 		State:     state,
 		CreatedAt: meta.CreatedAt,
-		// TODO(random-liu): [P0] Get sandbox ip from network plugin.
-		Network: &runtime.PodSandboxNetworkStatus{},
+		Network:   &runtime.PodSandboxNetworkStatus{Ip: ip},
 		Linux: &runtime.LinuxPodSandboxStatus{
 			Namespaces: &runtime.Namespace{
 				// TODO(random-liu): Revendor new CRI version and get

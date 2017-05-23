@@ -31,6 +31,7 @@ type OS interface {
 	MkdirAll(path string, perm os.FileMode) error
 	RemoveAll(path string) error
 	OpenFifo(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error)
+	Stat(name string) (os.FileInfo, error)
 }
 
 // RealOS is used to dispatch the real system level operations.
@@ -49,4 +50,9 @@ func (RealOS) RemoveAll(path string) error {
 // OpenFifo will call fifo.OpenFifo to open a fifo.
 func (RealOS) OpenFifo(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
 	return fifo.OpenFifo(ctx, fn, flag, perm)
+}
+
+// Stat will call os.Stat to get the status of the given file.
+func (RealOS) Stat(name string) (os.FileInfo, error) {
+	return os.Stat(name)
 }

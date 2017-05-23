@@ -124,7 +124,8 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 func TestRunPodSandbox(t *testing.T) {
 	config, specCheck := getRunPodSandboxTestData()
 	c := newTestCRIContainerdService()
-	fake := c.containerService.(*servertesting.FakeExecutionClient)
+	fakeExecutionClient := c.containerService.(*servertesting.FakeExecutionClient)
+	fakeCNIPlugin := c.netPlugin.(*servertesting.FakeCNIPlugin)
 	fakeOS := c.os.(*ostesting.FakeOS)
 	var dirs []string
 	var pipes []string
@@ -139,7 +140,7 @@ func TestRunPodSandbox(t *testing.T) {
 		assert.Equal(t, os.FileMode(0700), perm)
 		return nopReadWriteCloser{}, nil
 	}
-	expectCalls := []string{"create", "start"}
+	expectExecutionClientCalls := []string{"create", "start"}
 
 	res, err := c.RunPodSandbox(context.Background(), &runtime.RunPodSandboxRequest{Config: config})
 	assert.NoError(t, err)
@@ -154,8 +155,8 @@ func TestRunPodSandbox(t *testing.T) {
 	assert.Contains(t, pipes, stdout, "sandbox stdout pipe should be created")
 	assert.Contains(t, pipes, stderr, "sandbox stderr pipe should be created")
 
-	assert.Equal(t, expectCalls, fake.GetCalledNames(), "expect containerd functions should be called")
-	calls := fake.GetCalledDetails()
+	assert.Equal(t, expectExecutionClientCalls, fakeExecutionClient.GetCalledNames(), "expect containerd functions should be called")
+	calls := fakeExecutionClient.GetCalledDetails()
 	createOpts := calls[0].Argument.(*execution.CreateRequest)
 	assert.Equal(t, id, createOpts.ID, "create id should be correct")
 	// TODO(random-liu): Test rootfs mount when image management part is integrated.
@@ -177,7 +178,7 @@ func TestRunPodSandbox(t *testing.T) {
 	assert.Equal(t, config, meta.Config, "metadata config should be correct")
 	// TODO(random-liu): [P2] Add clock interface and use fake clock.
 	assert.NotZero(t, meta.CreatedAt, "metadata CreatedAt should be set")
-	info, err := fake.Info(context.Background(), &execution.InfoRequest{ID: id})
+	info, err := fakeExecutionClient.Info(context.Background(), &execution.InfoRequest{ID: id})
 	assert.NoError(t, err)
 	pid := info.Pid
 	assert.Equal(t, meta.NetNS, getNetworkNamespace(pid), "metadata network namespace should be correct")
@@ -185,6 +186,13 @@ func TestRunPodSandbox(t *testing.T) {
 	gotID, err := c.sandboxIDIndex.Get(id)
 	assert.NoError(t, err)
 	assert.Equal(t, id, gotID, "sandbox id should be indexed")
+
+	expectedCNICalls := []string{"SetUpPod"}
+	assert.Equal(t, expectedCNICalls, fakeCNIPlugin.GetCalledNames(), "expect SetUpPod should be called")
+	calls = fakeCNIPlugin.GetCalledDetails()
+	pluginArgument := calls[0].Argument.(servertesting.CNIPluginArgument)
+	expectedPluginArgument := servertesting.CNIPluginArgument{meta.NetNS, config.GetMetadata().GetNamespace(), config.GetMetadata().GetName(), id}
+	assert.Equal(t, expectedPluginArgument, pluginArgument, "SetUpPod should be called with correct arguments")
 }
 
 // TODO(random-liu): [P1] Add unit test for different error cases to make sure
