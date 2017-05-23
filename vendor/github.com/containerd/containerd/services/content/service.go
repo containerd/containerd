@@ -18,7 +18,7 @@ import (
 )
 
 type Service struct {
-	store *content.Store
+	store content.Store
 }
 
 var bufPool = sync.Pool{
@@ -52,16 +52,59 @@ func (s *Service) Info(ctx context.Context, req *api.InfoRequest) (*api.InfoResp
 		return nil, grpc.Errorf(codes.InvalidArgument, "%q failed validation", req.Digest)
 	}
 
-	bi, err := s.store.Info(req.Digest)
+	bi, err := s.store.Info(ctx, req.Digest)
 	if err != nil {
-		return nil, maybeNotFoundGRPC(err, req.Digest.String())
+		return nil, serverErrorToGRPC(err, req.Digest.String())
 	}
 
 	return &api.InfoResponse{
-		Digest:      req.Digest,
-		Size_:       bi.Size,
-		CommittedAt: bi.CommittedAt,
+		Info: api.Info{
+			Digest:      bi.Digest,
+			Size_:       bi.Size,
+			CommittedAt: bi.CommittedAt,
+		},
 	}, nil
+}
+
+func (s *Service) List(req *api.ListContentRequest, session api.Content_ListServer) error {
+	var (
+		buffer    []api.Info
+		sendBlock = func(block []api.Info) error {
+			// send last block
+			return session.Send(&api.ListContentResponse{
+				Info: block,
+			})
+		}
+	)
+
+	if err := s.store.Walk(session.Context(), func(info content.Info) error {
+		buffer = append(buffer, api.Info{
+			Digest:      info.Digest,
+			Size_:       info.Size,
+			CommittedAt: info.CommittedAt,
+		})
+
+		if len(buffer) >= 100 {
+			if err := sendBlock(buffer); err != nil {
+				return err
+			}
+
+			buffer = buffer[:0]
+		}
+
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	if len(buffer) > 0 {
+		// send last block
+		if err := sendBlock(buffer); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *Service) Delete(ctx context.Context, req *api.DeleteContentRequest) (*empty.Empty, error) {
@@ -69,8 +112,8 @@ func (s *Service) Delete(ctx context.Context, req *api.DeleteContentRequest) (*e
 		return nil, grpc.Errorf(codes.InvalidArgument, err.Error())
 	}
 
-	if err := s.store.Delete(req.Digest); err != nil {
-		return nil, maybeNotFoundGRPC(err, req.Digest.String())
+	if err := s.store.Delete(ctx, req.Digest); err != nil {
+		return nil, serverErrorToGRPC(err, req.Digest.String())
 	}
 
 	return &empty.Empty{}, nil
@@ -81,14 +124,14 @@ func (s *Service) Read(req *api.ReadRequest, session api.Content_ReadServer) err
 		return grpc.Errorf(codes.InvalidArgument, "%v: %v", req.Digest, err)
 	}
 
-	oi, err := s.store.Info(req.Digest)
+	oi, err := s.store.Info(session.Context(), req.Digest)
 	if err != nil {
-		return maybeNotFoundGRPC(err, req.Digest.String())
+		return serverErrorToGRPC(err, req.Digest.String())
 	}
 
 	rc, err := s.store.Reader(session.Context(), req.Digest)
 	if err != nil {
-		return maybeNotFoundGRPC(err, req.Digest.String())
+		return serverErrorToGRPC(err, req.Digest.String())
 	}
 	defer rc.Close() // TODO(stevvooe): Cache these file descriptors for performance.
 
@@ -132,6 +175,10 @@ func (s *Service) Read(req *api.ReadRequest, session api.Content_ReadServer) err
 	return nil
 }
 
+// readResponseWriter is a writer that places the output into ReadResponse messages.
+//
+// This allows io.CopyBuffer to do the heavy lifting of chunking the responses
+// into the buffer size.
 type readResponseWriter struct {
 	offset  int64
 	session api.Content_ReadServer
@@ -147,6 +194,27 @@ func (rw *readResponseWriter) Write(p []byte) (n int, err error) {
 
 	rw.offset += int64(len(p))
 	return len(p), nil
+}
+
+func (s *Service) Status(ctx context.Context, req *api.StatusRequest) (*api.StatusResponse, error) {
+	statuses, err := s.store.Status(ctx, req.Regexp)
+	if err != nil {
+		return nil, serverErrorToGRPC(err, req.Regexp)
+	}
+
+	var resp api.StatusResponse
+	for _, status := range statuses {
+		resp.Statuses = append(resp.Statuses, api.Status{
+			StartedAt: status.StartedAt,
+			UpdatedAt: status.UpdatedAt,
+			Ref:       status.Ref,
+			Offset:    status.Offset,
+			Total:     status.Total,
+			Expected:  status.Expected,
+		})
+	}
+
+	return &resp, nil
 }
 
 func (s *Service) Write(session api.Content_WriteServer) (err error) {
@@ -243,8 +311,8 @@ func (s *Service) Write(session api.Content_WriteServer) (err error) {
 			}
 			expected = req.Expected
 
-			if _, err := s.store.Info(req.Expected); err == nil {
-				if err := s.store.Abort(ref); err != nil {
+			if _, err := s.store.Info(session.Context(), req.Expected); err == nil {
+				if err := s.store.Abort(session.Context(), ref); err != nil {
 					log.G(ctx).WithError(err).Error("failed to abort write")
 				}
 
@@ -304,11 +372,9 @@ func (s *Service) Write(session api.Content_WriteServer) (err error) {
 				if err := wr.Commit(total, expected); err != nil {
 					return err
 				}
-
-				msg.Digest = wr.Digest()
 			}
-		case api.WriteActionAbort:
-			return s.store.Abort(ref)
+
+			msg.Digest = wr.Digest()
 		}
 
 		if err := session.Send(&msg); err != nil {
@@ -324,18 +390,12 @@ func (s *Service) Write(session api.Content_WriteServer) (err error) {
 			return err
 		}
 	}
-
-	return nil
 }
 
-func (s *Service) Status(*api.StatusRequest, api.Content_StatusServer) error {
-	return grpc.Errorf(codes.Unimplemented, "not implemented")
-}
-
-func maybeNotFoundGRPC(err error, id string) error {
-	if content.IsNotFound(err) {
-		return grpc.Errorf(codes.NotFound, "%v: not found", id)
+func (s *Service) Abort(ctx context.Context, req *api.AbortRequest) (*empty.Empty, error) {
+	if err := s.store.Abort(ctx, req.Ref); err != nil {
+		return nil, serverErrorToGRPC(err, req.Ref)
 	}
 
-	return err
+	return &empty.Empty{}, nil
 }

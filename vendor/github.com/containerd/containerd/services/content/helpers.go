@@ -17,3 +17,14 @@ func rewriteGRPCError(err error) error {
 
 	return err
 }
+
+func serverErrorToGRPC(err error, id string) error {
+	switch {
+	case content.IsNotFound(err):
+		return grpc.Errorf(codes.NotFound, "%v: not found", id)
+	case content.IsExists(err):
+		return grpc.Errorf(codes.AlreadyExists, "%v: exists", id)
+	}
+
+	return err
+}

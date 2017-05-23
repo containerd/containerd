@@ -1,3 +1,5 @@
+// +build !windows
+
 package archive
 
 import (
@@ -6,9 +8,9 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/containerd/continuity/sysx"
 	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/pkg/errors"
-	"github.com/stevvooe/continuity/sysx"
 )
 
 func tarName(p string) (string, error) {

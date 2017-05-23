@@ -85,12 +85,8 @@ type criContainerdService struct {
 	containerNameIndex *registrar.Registrar
 	// containerService is containerd container service client.
 	containerService execution.ContainerServiceClient
-	// contentIngester is the containerd service to ingest content into
-	// content store.
-	contentIngester content.Ingester
-	// contentProvider is the containerd service to get content from
-	// content store.
-	contentProvider content.Provider
+	// contentStoreService is the containerd content service client..
+	contentStoreService content.Store
 	// rootfsUnpacker is the containerd service to unpack image content
 	// into snapshots.
 	rootfsUnpacker rootfs.Unpacker
@@ -116,12 +112,11 @@ func NewCRIContainerdService(conn *grpc.ClientConn, rootDir, networkPluginBinDir
 		sandboxNameIndex: registrar.NewRegistrar(),
 		sandboxIDIndex:   truncindex.NewTruncIndex(nil),
 		// TODO(random-liu): Add container id index.
-		containerNameIndex: registrar.NewRegistrar(),
-		containerService:   execution.NewContainerServiceClient(conn),
-		imageStoreService:  imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)),
-		contentIngester:    contentservice.NewIngesterFromClient(contentapi.NewContentClient(conn)),
-		contentProvider:    contentservice.NewProviderFromClient(contentapi.NewContentClient(conn)),
-		rootfsUnpacker:     rootfsservice.NewUnpackerFromClient(rootfsapi.NewRootFSClient(conn)),
+		containerNameIndex:  registrar.NewRegistrar(),
+		containerService:    execution.NewContainerServiceClient(conn),
+		imageStoreService:   imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)),
+		contentStoreService: contentservice.NewStoreFromClient(contentapi.NewContentClient(conn)),
+		rootfsUnpacker:      rootfsservice.NewUnpackerFromClient(rootfsapi.NewRootFSClient(conn)),
 	}
 
 	netPlugin, err := ocicni.InitCNI(networkPluginBinDir, networkPluginConfDir)

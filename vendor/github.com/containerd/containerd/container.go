@@ -14,6 +14,10 @@ type Container interface {
 	Start(context.Context) error
 	// State returns the container's state
 	State(context.Context) (State, error)
+	// Pause pauses the container process
+	Pause(context.Context) error
+	// Resume unpauses the container process
+	Resume(context.Context) error
 	// Kill signals a container
 	Kill(context.Context, uint32, bool) error
 	// Exec adds a process into the container
@@ -26,9 +30,6 @@ type Container interface {
 
 type LinuxContainer interface {
 	Container
-
-	Pause(context.Context) error
-	Resume(context.Context) error
 }
 
 type ExecOpts struct {

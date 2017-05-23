@@ -359,3 +359,15 @@ func (f *FakeExecutionClient) CloseStdin(ctx context.Context, closeStdinOpts *ex
 	// TODO: implement CloseStdin()
 	return nil, nil
 }
+
+// Pause is a test implementation of execution.Pause
+func (f *FakeExecutionClient) Pause(ctx context.Context, in *execution.PauseRequest, opts ...grpc.CallOption) (*googleprotobuf.Empty, error) {
+	// TODO: implement Pause()
+	return nil, nil
+}
+
+// Resume is a test implementation of execution.Resume
+func (f *FakeExecutionClient) Resume(ctx context.Context, in *execution.ResumeRequest, opts ...grpc.CallOption) (*googleprotobuf.Empty, error) {
+	// TODO: implement Resume()
+	return nil, nil
+}

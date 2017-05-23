@@ -260,18 +260,20 @@ func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 }
 
 type changeWriter struct {
-	tw         *tar.Writer
-	source     string
-	whiteoutT  time.Time
-	inodeCache map[uint64]string
+	tw        *tar.Writer
+	source    string
+	whiteoutT time.Time
+	inodeSrc  map[uint64]string
+	inodeRefs map[uint64][]string
 }
 
 func newChangeWriter(w io.Writer, source string) *changeWriter {
 	return &changeWriter{
-		tw:         tar.NewWriter(w),
-		source:     source,
-		whiteoutT:  time.Now(),
-		inodeCache: map[uint64]string{},
+		tw:        tar.NewWriter(w),
+		source:    source,
+		whiteoutT: time.Now(),
+		inodeSrc:  map[uint64]string{},
+		inodeRefs: map[uint64][]string{},
 	}
 }
 
@@ -334,15 +336,28 @@ func (cw *changeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 			return errors.Wrap(err, "failed to set device headers")
 		}
 
-		linkname, err := fs.GetLinkSource(name, f, cw.inodeCache)
-		if err != nil {
-			return errors.Wrap(err, "failed to get hardlink")
-		}
-
-		if linkname != "" {
-			hdr.Typeflag = tar.TypeLink
-			hdr.Linkname = linkname
-			hdr.Size = 0
+		// additionalLinks stores file names which must be linked to
+		// this file when this file is added
+		var additionalLinks []string
+		inode, isHardlink := fs.GetLinkInfo(f)
+		if isHardlink {
+			// If the inode has a source, always link to it
+			if source, ok := cw.inodeSrc[inode]; ok {
+				hdr.Typeflag = tar.TypeLink
+				hdr.Linkname = source
+				hdr.Size = 0
+			} else {
+				if k == fs.ChangeKindUnmodified {
+					cw.inodeRefs[inode] = append(cw.inodeRefs[inode], name)
+					return nil
+				}
+				cw.inodeSrc[inode] = name
+				additionalLinks = cw.inodeRefs[inode]
+				delete(cw.inodeRefs, inode)
+			}
+		} else if k == fs.ChangeKindUnmodified {
+			// Nothing to write to diff
+			return nil
 		}
 
 		if capability, err := getxattr(source, "security.capability"); err != nil {
@@ -372,6 +387,19 @@ func (cw *changeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 			}
 			if n != hdr.Size {
 				return errors.New("short write copying file")
+			}
+		}
+
+		if additionalLinks != nil {
+			source = hdr.Name
+			for _, extra := range additionalLinks {
+				hdr.Name = extra
+				hdr.Typeflag = tar.TypeLink
+				hdr.Linkname = source
+				hdr.Size = 0
+				if err := cw.tw.WriteHeader(hdr); err != nil {
+					return errors.Wrap(err, "failed to write file header")
+				}
 			}
 		}
 	}

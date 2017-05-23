@@ -8,6 +8,8 @@ type ContainerMonitor interface {
 	Monitor(containerd.Container) error
 	// Stop stops and removes the provided container from the monitor
 	Stop(containerd.Container) error
+	// Events emits events from the monitor
+	Events(chan<- *containerd.Event)
 }
 
 func NewMultiContainerMonitor(monitors ...ContainerMonitor) ContainerMonitor {
@@ -31,6 +33,9 @@ func (mm *noopContainerMonitor) Stop(c containerd.Container) error {
 	return nil
 }
 
+func (mm *noopContainerMonitor) Events(events chan<- *containerd.Event) {
+}
+
 type multiContainerMonitor struct {
 	monitors []ContainerMonitor
 }
@@ -51,4 +56,10 @@ func (mm *multiContainerMonitor) Stop(c containerd.Container) error {
 		}
 	}
 	return nil
+}
+
+func (mm *multiContainerMonitor) Events(events chan<- *containerd.Event) {
+	for _, m := range mm.monitors {
+		m.Events(events)
+	}
 }

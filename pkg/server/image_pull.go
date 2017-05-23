@@ -19,6 +19,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/containerd/containerd/content"
 	containerdimages "github.com/containerd/containerd/images"
@@ -72,7 +73,6 @@ import (
 // contents are missing but snapshots are ready, is the image still "READY"?
 
 // PullImage pulls an image with authentication config.
-// TODO(mikebrow): add authentication
 // TODO(mikebrow): harden api (including figuring out at what layer we should be blocking on duplicate requests.)
 func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (retRes *runtime.PullImageResponse, retErr error) {
 	glog.V(2).Infof("PullImage %q with auth config %+v", r.GetImage().GetImage(), r.GetAuth())
@@ -158,7 +158,12 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
 	imagedigest.Digest, imagedigest.Digest, error) {
 	// Resolve the image reference to get descriptor and fetcher.
-	resolver := docker.NewResolver()
+	resolver := docker.NewResolver(docker.ResolverOptions{
+		// TODO(random-liu): Add authentication by setting credentials.
+		// TODO(random-liu): Handle https.
+		PlainHTTP: true,
+		Client:    http.DefaultClient,
+	})
 	_, desc, fetcher, err := resolver.Resolve(ctx, ref)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to resolve ref %q: %v", ref, err)
@@ -185,8 +190,8 @@ func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
 	err = containerdimages.Dispatch(
 		ctx,
 		containerdimages.Handlers(
-			remotes.FetchHandler(c.contentIngester, fetcher),
-			containerdimages.ChildrenHandler(c.contentProvider)),
+			remotes.FetchHandler(c.contentStoreService, fetcher),
+			containerdimages.ChildrenHandler(c.contentStoreService)),
 		desc)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to fetch image %q desc %+v: %v", ref, desc, err)
@@ -198,7 +203,7 @@ func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
 	}
 	// Read the image manifest from content store.
 	manifestDigest := image.Target.Digest
-	p, err := content.ReadBlob(ctx, c.contentProvider, manifestDigest)
+	p, err := content.ReadBlob(ctx, c.contentStoreService, manifestDigest)
 	if err != nil {
 		return "", "", fmt.Errorf("readblob failed for manifest digest %q: %v", manifestDigest, err)
 	}
@@ -214,7 +219,7 @@ func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
 	}
 	// TODO(random-liu): Considering how to deal with the disk usage of content.
 
-	configDesc, err := image.Config(ctx, c.contentProvider)
+	configDesc, err := image.Config(ctx, c.contentStoreService)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to get config descriptor for image %q: %v", ref, err)
 	}

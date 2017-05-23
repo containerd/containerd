@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"io/ioutil"
+	"os"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/archive"
@@ -41,6 +42,7 @@ func ApplyLayer(snapshots snapshot.Snapshotter, mounter Mounter, rd io.Reader, p
 	if err != nil {
 		return "", errors.Wrapf(err, "creating temporary directory failed")
 	}
+	defer os.RemoveAll(dir)
 
 	// TODO(stevvooe): Choose this key WAY more carefully. We should be able to
 	// create collisions for concurrent, conflicting unpack processes but we
@@ -69,7 +71,7 @@ func ApplyLayer(snapshots snapshot.Snapshotter, mounter Mounter, rd io.Reader, p
 	digester := digest.Canonical.Digester() // used to calculate diffID.
 	rd = io.TeeReader(rd, digester.Hash())
 
-	if _, err := archive.Apply(context.Background(), key, rd); err != nil {
+	if _, err := archive.Apply(context.Background(), dir, rd); err != nil {
 		return "", err
 	}
 
@@ -80,7 +82,7 @@ func ApplyLayer(snapshots snapshot.Snapshotter, mounter Mounter, rd io.Reader, p
 		chainID = identity.ChainID([]digest.Digest{parent, chainID})
 	}
 	if _, err := snapshots.Stat(ctx, chainID.String()); err == nil {
-		return diffID, nil //TODO: call snapshots.Remove(ctx, key) once implemented
+		return diffID, snapshots.Remove(ctx, key)
 	}
 
 	return diffID, snapshots.Commit(ctx, chainID.String(), key)
@@ -107,14 +109,11 @@ func Prepare(ctx context.Context, snapshots snapshot.Snapshotter, mounter Mounte
 	)
 
 	for _, layer := range layers {
-		// TODO: layer.Digest should not be string
-		// (https://github.com/opencontainers/image-spec/pull/514)
-		layerDigest := digest.Digest(layer.Digest)
 		// This will convert a possibly compressed layer hash to the
 		// uncompressed hash, if we know about it. If we don't, we unpack and
 		// calculate it. If we do have it, we then calculate the chain id for
 		// the application and see if the snapshot is there.
-		diffID := resolveDiffID(layerDigest)
+		diffID := resolveDiffID(layer.Digest)
 		if diffID != "" {
 			chainLocal := append(chain, diffID)
 			chainID := identity.ChainID(chainLocal)
@@ -124,7 +123,7 @@ func Prepare(ctx context.Context, snapshots snapshot.Snapshotter, mounter Mounte
 			}
 		}
 
-		rc, err := openBlob(ctx, layerDigest)
+		rc, err := openBlob(ctx, layer.Digest)
 		if err != nil {
 			return "", err
 		}
@@ -139,7 +138,7 @@ func Prepare(ctx context.Context, snapshots snapshot.Snapshotter, mounter Mounte
 		// For uncompressed layers, this will be the same. For compressed
 		// layers, we can look up the diffID from the digest if we've already
 		// unpacked it.
-		if err := registerDiffID(diffID, layerDigest); err != nil {
+		if err := registerDiffID(diffID, layer.Digest); err != nil {
 			return "", err
 		}
 
