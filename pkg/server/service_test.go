@@ -21,6 +21,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/containerd/containerd/api/services/execution"
 	"github.com/docker/docker/pkg/truncindex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,9 +33,7 @@ import (
 	"github.com/kubernetes-incubator/cri-containerd/pkg/registrar"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
 
-	"github.com/containerd/containerd/api/services/execution"
-
-	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 )
 
 type nopReadWriteCloser struct{}
@@ -100,7 +99,6 @@ func TestSandboxOperations(t *testing.T) {
 		Network: &runtime.PodSandboxNetworkStatus{},
 		Linux: &runtime.LinuxPodSandboxStatus{
 			Namespaces: &runtime.Namespace{
-				Network: netns,
 				Options: &runtime.NamespaceOption{
 					HostNetwork: false,
 					HostPid:     false,

@@ -25,7 +25,7 @@ import (
 
 	"github.com/containerd/containerd/api/services/execution"
 
-	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 )
 
 // StopPodSandbox stops the sandbox. If there are any running containers in the
