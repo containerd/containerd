@@ -128,7 +128,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts)
 		return nil, err
 	}
 	c := newTask(id, opts.Spec, s)
-	// after the task is create add it to the monitor
+	// after the task is created, add it to the monitor
 	if err = r.monitor.Monitor(c); err != nil {
 		return nil, err
 	}

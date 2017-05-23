@@ -10,6 +10,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/console"
+	containersapi "github.com/containerd/containerd/api/services/containers"
 	"github.com/containerd/containerd/api/services/execution"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/mount"
@@ -293,6 +294,11 @@ var runCommand = cli.Command{
 			ContainerID: response.ContainerID,
 		}); err != nil {
 			return err
+		}
+		if context.Bool("rm") {
+			if _, err := containers.Delete(ctx, &containersapi.DeleteContainerRequest{ID: id}); err != nil {
+				return err
+			}
 		}
 		if status != 0 {
 			return cli.NewExitError("", int(status))

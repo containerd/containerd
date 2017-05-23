@@ -65,18 +65,23 @@ var listCommand = cli.Command{
 			w := tabwriter.NewWriter(os.Stdout, 10, 1, 3, ' ', 0)
 			fmt.Fprintln(w, "ID\tIMAGE\tPID\tSTATUS")
 			for _, c := range response.Containers {
-				var status string
+				var (
+					status string
+					pid    uint32
+				)
 				task, ok := tasksByContainerID[c.ID]
 				if ok {
 					status = task.Status.String()
+					pid = task.Pid
 				} else {
 					status = "STOPPED" // TODO(stevvooe): Is this assumption correct?
+					pid = 0
 				}
 
 				if _, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s\n",
 					c.ID,
 					c.Image,
-					task.Pid,
+					pid,
 					status,
 				); err != nil {
 					return err

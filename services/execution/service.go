@@ -144,7 +144,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 	s.mu.Lock()
 	if _, ok := s.tasks[r.ContainerID]; ok {
 		s.mu.Unlock()
-		return nil, plugin.ErrContainerExists
+		return nil, grpc.Errorf(codes.AlreadyExists, "task %v already exists", r.ContainerID)
 	}
 	c, err := runtime.Create(ctx, r.ContainerID, opts)
 	if err != nil {
@@ -457,7 +457,7 @@ func (s *Service) getTask(id string) (plugin.Task, error) {
 	c, ok := s.tasks[id]
 	s.mu.Unlock()
 	if !ok {
-		return nil, plugin.ErrContainerNotExist
+		return nil, grpc.Errorf(codes.NotFound, "task %v not found", id)
 	}
 	return c, nil
 }

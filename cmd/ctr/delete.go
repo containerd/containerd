@@ -3,6 +3,9 @@ package main
 import (
 	gocontext "context"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+
 	containersapi "github.com/containerd/containerd/api/services/containers"
 	"github.com/containerd/containerd/api/services/execution"
 	"github.com/pkg/errors"
@@ -43,7 +46,11 @@ var deleteCommand = cli.Command{
 			ContainerID: id,
 		})
 		if err != nil {
-			return errors.Wrap(err, "failed to delete container")
+			// Ignore error if task has already been removed, task is
+			// removed by default after run
+			if grpc.Code(errors.Cause(err)) != codes.NotFound {
+				return errors.Wrap(err, "failed to task container")
+			}
 		}
 
 		if err := snapshotter.Remove(ctx, id); err != nil {
