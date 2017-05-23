@@ -235,7 +235,7 @@ func (p *initProcess) Checkpoint(context context.Context, r *shimapi.CheckpointR
 	defer os.RemoveAll(work)
 	if err := p.runc.Checkpoint(context, p.id, &runc.CheckpointOpts{
 		WorkDir:                  work,
-		ImagePath:                r.Image,
+		ImagePath:                r.CheckpointPath,
 		AllowOpenTCP:             r.AllowTcp,
 		AllowExternalUnixSockets: r.AllowUnixSockets,
 		AllowTerminal:            r.AllowTerminal,
