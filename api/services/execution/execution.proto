@@ -79,6 +79,9 @@ message KillRequest {
 }
 
 message EventsRequest {
+	google.protobuf.Timestamp timestamp = 1;
+	bool storeOnly = 2;
+	string id = 3;
 }
 
 message ExecRequest {
