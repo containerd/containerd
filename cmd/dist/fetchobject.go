@@ -33,7 +33,11 @@ var fetchObjectCommand = cli.Command{
 		ctx = log.WithLogger(ctx, log.G(ctx).WithField("ref", ref))
 
 		log.G(ctx).Infof("resolving")
-		_, desc, fetcher, err := resolver.Resolve(ctx, ref)
+		name, desc, err := resolver.Resolve(ctx, ref)
+		if err != nil {
+			return err
+		}
+		fetcher, err := resolver.Fetcher(ctx, name)
 		if err != nil {
 			return err
 		}

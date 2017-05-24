@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/textproto"
@@ -66,13 +65,169 @@ func NewResolver(options ResolverOptions) remotes.Resolver {
 
 var _ remotes.Resolver = &dockerResolver{}
 
-func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocispec.Descriptor, remotes.Fetcher, error) {
+func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocispec.Descriptor, error) {
 	refspec, err := reference.Parse(ref)
 	if err != nil {
-		return "", ocispec.Descriptor{}, nil, err
+		return "", ocispec.Descriptor{}, err
+	}
+
+	if refspec.Object == "" {
+		return "", ocispec.Descriptor{}, reference.ErrObjectRequired
+	}
+
+	base, err := r.base(refspec)
+	if err != nil {
+		return "", ocispec.Descriptor{}, err
+	}
+
+	fetcher := dockerFetcher{
+		dockerBase: base,
 	}
 
 	var (
+		urls []string
+		dgst = refspec.Digest()
+	)
+
+	if dgst != "" {
+		if err := dgst.Validate(); err != nil {
+			// need to fail here, since we can't actually resolve the invalid
+			// digest.
+			return "", ocispec.Descriptor{}, err
+		}
+
+		// turns out, we have a valid digest, make a url.
+		urls = append(urls, fetcher.url("manifests", dgst.String()))
+	} else {
+		urls = append(urls, fetcher.url("manifests", refspec.Object))
+	}
+
+	// fallback to blobs on not found.
+	urls = append(urls, fetcher.url("blobs", dgst.String()))
+
+	for _, u := range urls {
+		req, err := http.NewRequest(http.MethodHead, u, nil)
+		if err != nil {
+			return "", ocispec.Descriptor{}, err
+		}
+
+		// set headers for all the types we support for resolution.
+		req.Header.Set("Accept", strings.Join([]string{
+			images.MediaTypeDockerSchema2Manifest,
+			images.MediaTypeDockerSchema2ManifestList,
+			ocispec.MediaTypeImageManifest,
+			ocispec.MediaTypeImageIndex, "*"}, ", "))
+
+		log.G(ctx).Debug("resolving")
+		resp, err := fetcher.doRequestWithRetries(ctx, req, nil)
+		if err != nil {
+			return "", ocispec.Descriptor{}, err
+		}
+		resp.Body.Close() // don't care about body contents.
+
+		if resp.StatusCode > 299 {
+			if resp.StatusCode == http.StatusNotFound {
+				continue
+			}
+			return "", ocispec.Descriptor{}, errors.Errorf("unexpected status code %v: %v", u, resp.Status)
+		}
+
+		// this is the only point at which we trust the registry. we use the
+		// content headers to assemble a descriptor for the name. when this becomes
+		// more robust, we mostly get this information from a secure trust store.
+		dgstHeader := digest.Digest(resp.Header.Get("Docker-Content-Digest"))
+
+		if dgstHeader != "" {
+			if err := dgstHeader.Validate(); err != nil {
+				return "", ocispec.Descriptor{}, errors.Wrapf(err, "%q in header not a valid digest", dgstHeader)
+			}
+			dgst = dgstHeader
+		}
+
+		if dgst == "" {
+			return "", ocispec.Descriptor{}, errors.Errorf("could not resolve digest for %v", ref)
+		}
+
+		var (
+			size       int64
+			sizeHeader = resp.Header.Get("Content-Length")
+		)
+
+		size, err = strconv.ParseInt(sizeHeader, 10, 64)
+		if err != nil {
+
+			return "", ocispec.Descriptor{}, errors.Wrapf(err, "invalid size header: %q", sizeHeader)
+		}
+		if size < 0 {
+			return "", ocispec.Descriptor{}, errors.Errorf("%q in header not a valid size", sizeHeader)
+		}
+
+		desc := ocispec.Descriptor{
+			Digest:    dgst,
+			MediaType: resp.Header.Get("Content-Type"), // need to strip disposition?
+			Size:      size,
+		}
+
+		log.G(ctx).WithField("desc.digest", desc.Digest).Debug("resolved")
+		return ref, desc, nil
+	}
+
+	return "", ocispec.Descriptor{}, errors.Errorf("%v not found", ref)
+}
+
+func (r *dockerResolver) Fetcher(ctx context.Context, ref string) (remotes.Fetcher, error) {
+	refspec, err := reference.Parse(ref)
+	if err != nil {
+		return nil, err
+	}
+
+	base, err := r.base(refspec)
+	if err != nil {
+		return nil, err
+	}
+
+	return dockerFetcher{
+		dockerBase: base,
+	}, nil
+}
+
+func (r *dockerResolver) Pusher(ctx context.Context, ref string) (remotes.Pusher, error) {
+	refspec, err := reference.Parse(ref)
+	if err != nil {
+		return nil, err
+	}
+
+	// Manifests can be pushed by digest like any other object, but the passed in
+	// reference cannot take a digest without the associated content. A tag is allowed
+	// and will be used to tag pushed manifests.
+	if refspec.Object != "" && strings.Contains(refspec.Object, "@") {
+		return nil, errors.New("cannot use digest reference for push locator")
+	}
+
+	base, err := r.base(refspec)
+	if err != nil {
+		return nil, err
+	}
+
+	return dockerPusher{
+		dockerBase: base,
+		tag:        refspec.Object,
+	}, nil
+}
+
+type dockerBase struct {
+	base  url.URL
+	token string
+
+	client   *http.Client
+	useBasic bool
+	username string
+	secret   string
+}
+
+func (r *dockerResolver) base(refspec reference.Spec) (*dockerBase, error) {
+	var (
+		err              error
 		base             url.URL
 		username, secret string
 	)
@@ -93,184 +248,55 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 	if r.credentials != nil {
 		username, secret, err = r.credentials(base.Host)
 		if err != nil {
-			return "", ocispec.Descriptor{}, nil, err
+			return nil, err
 		}
 	}
 
 	prefix := strings.TrimPrefix(refspec.Locator, host+"/")
 	base.Path = path.Join("/v2", prefix)
 
-	fetcher := &dockerFetcher{
+	return &dockerBase{
 		base:     base,
 		client:   r.client,
 		username: username,
 		secret:   secret,
-	}
-
-	var (
-		urls []string
-		dgst = refspec.Digest()
-	)
-
-	if dgst != "" {
-		if err := dgst.Validate(); err != nil {
-			// need to fail here, since we can't actually resolve the invalid
-			// digest.
-			return "", ocispec.Descriptor{}, nil, err
-		}
-
-		// turns out, we have a valid digest, make a url.
-		urls = append(urls, fetcher.url("manifests", dgst.String()))
-	} else {
-		urls = append(urls, fetcher.url("manifests", refspec.Object))
-	}
-
-	// fallback to blobs on not found.
-	urls = append(urls, fetcher.url("blobs", dgst.String()))
-
-	for _, u := range urls {
-		req, err := http.NewRequest(http.MethodHead, u, nil)
-		if err != nil {
-			return "", ocispec.Descriptor{}, nil, err
-		}
-
-		// set headers for all the types we support for resolution.
-		req.Header.Set("Accept", strings.Join([]string{
-			images.MediaTypeDockerSchema2Manifest,
-			images.MediaTypeDockerSchema2ManifestList,
-			ocispec.MediaTypeImageManifest,
-			ocispec.MediaTypeImageIndex, "*"}, ", "))
-
-		log.G(ctx).Debug("resolving")
-		resp, err := fetcher.doRequest(ctx, req)
-		if err != nil {
-			return "", ocispec.Descriptor{}, nil, err
-		}
-		resp.Body.Close() // don't care about body contents.
-
-		if resp.StatusCode > 299 {
-			if resp.StatusCode == http.StatusNotFound {
-				continue
-			}
-			return "", ocispec.Descriptor{}, nil, errors.Errorf("unexpected status code %v: %v", u, resp.Status)
-		}
-
-		// this is the only point at which we trust the registry. we use the
-		// content headers to assemble a descriptor for the name. when this becomes
-		// more robust, we mostly get this information from a secure trust store.
-		dgstHeader := digest.Digest(resp.Header.Get("Docker-Content-Digest"))
-
-		if dgstHeader != "" {
-			if err := dgstHeader.Validate(); err != nil {
-				return "", ocispec.Descriptor{}, nil, errors.Wrapf(err, "%q in header not a valid digest", dgstHeader)
-			}
-			dgst = dgstHeader
-		}
-
-		if dgst == "" {
-			return "", ocispec.Descriptor{}, nil, errors.Errorf("could not resolve digest for %v", ref)
-		}
-
-		var (
-			size       int64
-			sizeHeader = resp.Header.Get("Content-Length")
-		)
-
-		size, err = strconv.ParseInt(sizeHeader, 10, 64)
-		if err != nil {
-
-			return "", ocispec.Descriptor{}, nil, errors.Wrapf(err, "invalid size header: %q", sizeHeader)
-		}
-		if size < 0 {
-			return "", ocispec.Descriptor{}, nil, errors.Errorf("%q in header not a valid size", sizeHeader)
-		}
-
-		desc := ocispec.Descriptor{
-			Digest:    dgst,
-			MediaType: resp.Header.Get("Content-Type"), // need to strip disposition?
-			Size:      size,
-		}
-
-		log.G(ctx).WithField("desc.digest", desc.Digest).Debug("resolved")
-		return ref, desc, fetcher, nil
-	}
-
-	return "", ocispec.Descriptor{}, nil, errors.Errorf("%v not found", ref)
+	}, nil
 }
 
-type dockerFetcher struct {
-	base  url.URL
-	token string
-
-	client   *http.Client
-	useBasic bool
-	username string
-	secret   string
-}
-
-func (r *dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.ReadCloser, error) {
-	ctx = log.WithLogger(ctx, log.G(ctx).WithFields(
-		logrus.Fields{
-			"base":   r.base.String(),
-			"digest": desc.Digest,
-		},
-	))
-
-	paths, err := getV2URLPaths(desc)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, path := range paths {
-		u := r.url(path)
-
-		req, err := http.NewRequest(http.MethodGet, u, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("Accept", strings.Join([]string{desc.MediaType, `*`}, ", "))
-		resp, err := r.doRequest(ctx, req)
-		if err != nil {
-			return nil, err
-		}
-
-		if resp.StatusCode > 299 {
-			if resp.StatusCode == http.StatusNotFound {
-				continue // try one of the other urls.
-			}
-			resp.Body.Close()
-			return nil, errors.Errorf("unexpected status code %v: %v", u, resp.Status)
-		}
-
-		return resp.Body, nil
-	}
-
-	return nil, errors.New("not found")
-}
-
-func (r *dockerFetcher) url(ps ...string) string {
+func (r *dockerBase) url(ps ...string) string {
 	url := r.base
 	url.Path = path.Join(url.Path, path.Join(ps...))
 	return url.String()
 }
 
-func (r *dockerFetcher) doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
-	return r.doRequestWithRetries(ctx, req, nil)
+func (r *dockerBase) authorize(req *http.Request) {
+	if r.useBasic {
+		req.SetBasicAuth(r.username, r.secret)
+	} else if r.token != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", r.token))
+	}
 }
 
-func (r *dockerFetcher) doRequestWithRetries(ctx context.Context, req *http.Request, responses []*http.Response) (*http.Response, error) {
+func (r *dockerBase) doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", req.URL.String()))
-	log.G(ctx).WithField("request.headers", req.Header).Debug("fetch content")
+	log.G(ctx).WithField("request.headers", req.Header).WithField("request.method", req.Method).Debug("Do request")
 	r.authorize(req)
 	resp, err := ctxhttp.Do(ctx, r.client, req)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to do request")
 	}
 	log.G(ctx).WithFields(logrus.Fields{
 		"status":           resp.Status,
 		"response.headers": resp.Header,
 	}).Debug("fetch response received")
+	return resp, nil
+}
+
+func (r *dockerBase) doRequestWithRetries(ctx context.Context, req *http.Request, responses []*http.Response) (*http.Response, error) {
+	resp, err := r.doRequest(ctx, req)
+	if err != nil {
+		return nil, err
+	}
 
 	responses = append(responses, resp)
 	req, err = r.retryRequest(ctx, req, responses)
@@ -283,15 +309,7 @@ func (r *dockerFetcher) doRequestWithRetries(ctx context.Context, req *http.Requ
 	return resp, err
 }
 
-func (r *dockerFetcher) authorize(req *http.Request) {
-	if r.useBasic {
-		req.SetBasicAuth(r.username, r.secret)
-	} else if r.token != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", r.token))
-	}
-}
-
-func (r *dockerFetcher) retryRequest(ctx context.Context, req *http.Request, responses []*http.Response) (*http.Request, error) {
+func (r *dockerBase) retryRequest(ctx context.Context, req *http.Request, responses []*http.Response) (*http.Request, error) {
 	if len(responses) > 5 {
 		return nil, nil
 	}
@@ -300,19 +318,19 @@ func (r *dockerFetcher) retryRequest(ctx context.Context, req *http.Request, res
 		log.G(ctx).WithField("header", last.Header.Get("WWW-Authenticate")).Debug("Unauthorized")
 		for _, c := range parseAuthHeader(last.Header) {
 			if c.scheme == bearerAuth {
-				if errStr := c.parameters["error"]; errStr != "" {
-					// TODO: handle expired case
-					return nil, errors.Wrapf(ErrInvalidAuthorization, "server message: %s", errStr)
+				if err := invalidAuthorization(c, responses); err != nil {
+					r.token = ""
+					return nil, err
 				}
 				if err := r.setTokenAuth(ctx, c.parameters); err != nil {
 					return nil, err
 				}
-				return req, nil
+				return copyRequest(req)
 			} else if c.scheme == basicAuth {
 				if r.username != "" && r.secret != "" {
 					r.useBasic = true
 				}
-				return req, nil
+				return copyRequest(req)
 			}
 		}
 		return nil, nil
@@ -322,12 +340,48 @@ func (r *dockerFetcher) retryRequest(ctx context.Context, req *http.Request, res
 		if strings.Contains(req.URL.Path, "/manifests/") {
 			// TODO: copy request?
 			req.Method = http.MethodGet
-			return req, nil
+			return copyRequest(req)
 		}
 	}
 
 	// TODO: Handle 50x errors accounting for attempt history
 	return nil, nil
+}
+
+func invalidAuthorization(c challenge, responses []*http.Response) error {
+	errStr := c.parameters["error"]
+	if errStr == "" {
+		return nil
+	}
+
+	n := len(responses)
+	if n == 1 || (n > 1 && !sameRequest(responses[n-2].Request, responses[n-1].Request)) {
+		return nil
+	}
+
+	return errors.Wrapf(ErrInvalidAuthorization, "server message: %s", errStr)
+}
+
+func sameRequest(r1, r2 *http.Request) bool {
+	if r1.Method != r2.Method {
+		return false
+	}
+	if *r1.URL != *r2.URL {
+		return false
+	}
+	return true
+}
+
+func copyRequest(req *http.Request) (*http.Request, error) {
+	ireq := *req
+	if ireq.GetBody != nil {
+		var err error
+		ireq.Body, err = ireq.GetBody()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &ireq, nil
 }
 
 func isManifestAccept(h http.Header) bool {
@@ -346,7 +400,7 @@ func isManifestAccept(h http.Header) bool {
 	return false
 }
 
-func (r *dockerFetcher) setTokenAuth(ctx context.Context, params map[string]string) error {
+func (r *dockerBase) setTokenAuth(ctx context.Context, params map[string]string) error {
 	realm, ok := params["realm"]
 	if !ok {
 		return errors.New("no realm specified for token auth challenge")
@@ -387,24 +441,6 @@ func (r *dockerFetcher) setTokenAuth(ctx context.Context, params map[string]stri
 	return nil
 }
 
-// getV2URLPaths generates the candidate urls paths for the object based on the
-// set of hints and the provided object id. URLs are returned in the order of
-// most to least likely succeed.
-func getV2URLPaths(desc ocispec.Descriptor) ([]string, error) {
-	var urls []string
-
-	switch desc.MediaType {
-	case images.MediaTypeDockerSchema2Manifest, images.MediaTypeDockerSchema2ManifestList,
-		ocispec.MediaTypeImageManifest, ocispec.MediaTypeImageIndex:
-		urls = append(urls, path.Join("manifests", desc.Digest.String()))
-	}
-
-	// always fallback to attempting to get the object out of the blobs store.
-	urls = append(urls, path.Join("blobs", desc.Digest.String()))
-
-	return urls, nil
-}
-
 type tokenOptions struct {
 	realm   string
 	service string
@@ -419,7 +455,7 @@ type postTokenResponse struct {
 	Scope        string    `json:"scope"`
 }
 
-func (r *dockerFetcher) fetchTokenWithOAuth(ctx context.Context, to tokenOptions) (string, error) {
+func (r *dockerBase) fetchTokenWithOAuth(ctx context.Context, to tokenOptions) (string, error) {
 	form := url.Values{}
 	form.Set("scope", strings.Join(to.scopes, " "))
 	form.Set("service", to.service)
@@ -473,7 +509,7 @@ type getTokenResponse struct {
 }
 
 // getToken fetches a token using a GET request
-func (r *dockerFetcher) getToken(ctx context.Context, to tokenOptions) (string, error) {
+func (r *dockerBase) getToken(ctx context.Context, to tokenOptions) (string, error) {
 	req, err := http.NewRequest("GET", to.realm, nil)
 	if err != nil {
 		return "", err

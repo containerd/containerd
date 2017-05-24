@@ -72,7 +72,11 @@ Most of this is experimental and there are few leaps to make this work.`,
 		resolved := make(chan struct{})
 		eg.Go(func() error {
 			ongoing.add(ref)
-			name, desc, fetcher, err := resolver.Resolve(ctx, ref)
+			name, desc, err := resolver.Resolve(ctx, ref)
+			if err != nil {
+				return err
+			}
+			fetcher, err := resolver.Fetcher(ctx, name)
 			if err != nil {
 				return err
 			}
