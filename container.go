@@ -43,9 +43,13 @@ func (c *Container) Spec() (*specs.Spec, error) {
 func (c *Container) Delete(ctx context.Context) error {
 	// TODO: should the client be the one removing resources attached
 	// to the container at the moment before we have GC?
-	_, err := c.client.containers().Delete(ctx, &containers.DeleteContainerRequest{
+	err := c.client.snapshotter().Remove(ctx, c.c.RootFS)
+
+	if _, cerr := c.client.containers().Delete(ctx, &containers.DeleteContainerRequest{
 		ID: c.c.ID,
-	})
+	}); err == nil {
+		err = cerr
+	}
 	return err
 }
 

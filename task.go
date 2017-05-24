@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/containerd/containerd/api/services/execution"
+	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/fifo"
 )
 
@@ -31,9 +32,9 @@ func (i *IO) Close() error {
 
 type IOCreation func() (*IO, error)
 
-// STDIO returns an IO implementation to be used for a task
-// that outputs the container's IO as the current processes STDIO
-func STDIO() (*IO, error) {
+// Stdio returns an IO implementation to be used for a task
+// that outputs the container's IO as the current processes Stdio
+func Stdio() (*IO, error) {
 	paths, err := fifoPaths()
 	if err != nil {
 		return nil, err
@@ -57,7 +58,11 @@ func STDIO() (*IO, error) {
 }
 
 func fifoPaths() (*fifoSet, error) {
-	dir, err := ioutil.TempDir(filepath.Join(os.TempDir(), "containerd"), "")
+	root := filepath.Join(os.TempDir(), "containerd")
+	if err := os.MkdirAll(root, 0700); err != nil {
+		return nil, err
+	}
+	dir, err := ioutil.TempDir(root, "")
 	if err != nil {
 		return nil, err
 	}
@@ -135,16 +140,21 @@ func copyIO(fifos *fifoSet, ioset *ioSet, tty bool) (closer io.Closer, err error
 		}(f)
 	}
 	return &wgCloser{
-		wg: wg,
+		wg:  wg,
+		dir: fifos.dir,
 	}, nil
 }
 
 type wgCloser struct {
-	wg *sync.WaitGroup
+	wg  *sync.WaitGroup
+	dir string
 }
 
 func (g *wgCloser) Close() error {
 	g.wg.Wait()
+	if g.dir != "" {
+		return os.RemoveAll(g.dir)
+	}
 	return nil
 }
 
@@ -161,14 +171,42 @@ func (t *Task) Pid() uint32 {
 	return t.pid
 }
 
-func (t *Task) Kill(ctx context.Context, s os.Signal) error {
+func (t *Task) Start(ctx context.Context) error {
+	_, err := t.client.tasks().Start(ctx, &execution.StartRequest{
+		ContainerID: t.containerID,
+	})
+	return err
+}
+
+func (t *Task) Kill(ctx context.Context, s syscall.Signal) error {
 	_, err := t.client.tasks().Kill(ctx, &execution.KillRequest{
+		Signal:      uint32(s),
 		ContainerID: t.containerID,
 		PidOrAll: &execution.KillRequest_All{
 			All: true,
 		},
 	})
 	return err
+}
+
+// Wait is a blocking call that will wait for the task to exit and return the exit status
+func (t *Task) Wait(ctx context.Context) (uint32, error) {
+	events, err := t.client.tasks().Events(ctx, &execution.EventsRequest{})
+	if err != nil {
+		return 255, err
+	}
+	for {
+		e, err := events.Recv()
+		if err != nil {
+			return 255, err
+		}
+		if e.Type != task.Event_EXIT {
+			continue
+		}
+		if e.ID == t.containerID && e.Pid == t.pid {
+			return e.ExitStatus, nil
+		}
+	}
 }
 
 // Delete deletes the task and its runtime state

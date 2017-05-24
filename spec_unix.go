@@ -1,11 +1,14 @@
 package containerd
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"runtime"
 	"strconv"
 	"strings"
 
+	"github.com/containerd/containerd/images"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -54,7 +57,7 @@ func defaultNamespaces() []specs.LinuxNamespace {
 	}
 }
 
-func createDefaultSpec() (*specs.Spec, error) {
+func createDefaultSpec(id string) (*specs.Spec, error) {
 	s := &specs.Spec{
 		Version: specs.Version,
 		Platform: specs.Platform{
@@ -64,6 +67,7 @@ func createDefaultSpec() (*specs.Spec, error) {
 		Root: specs.Root{
 			Path: defaultRootfsPath,
 		},
+		Hostname: id,
 		Process: specs.Process{
 			Cwd:             "/",
 			NoNewPrivileges: true,
@@ -180,16 +184,40 @@ func WithHostNamespace(ns specs.LinuxNamespaceType) SpecOpts {
 	}
 }
 
-func WithImage(config *v1.ImageConfig) SpecOpts {
+func WithImage(ctx context.Context, image *Image) SpecOpts {
 	return func(s *specs.Spec) error {
+		store := image.client.content()
+		ic, err := image.i.Config(ctx, store)
+		if err != nil {
+			return err
+		}
+		var (
+			ociimage v1.Image
+			config   v1.ImageConfig
+		)
+		switch ic.MediaType {
+		case v1.MediaTypeImageConfig, images.MediaTypeDockerSchema2Config:
+			r, err := store.Reader(ctx, ic.Digest)
+			if err != nil {
+				return err
+			}
+			if err := json.NewDecoder(r).Decode(&ociimage); err != nil {
+				r.Close()
+				return err
+			}
+			r.Close()
+			config = ociimage.Config
+		default:
+			return fmt.Errorf("unknown image config media type %s", ic.MediaType)
+		}
 		env := []string{
 			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 		}
 		s.Process.Env = append(env, config.Env...)
-		cmd := config.Cmd
 		var (
 			uid, gid uint32
 		)
+		cmd := config.Cmd
 		s.Process.Args = append(config.Entrypoint, cmd...)
 		if config.User != "" {
 			parts := strings.Split(config.User, ":")

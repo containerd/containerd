@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"runtime"
 	"time"
 
 	"github.com/containerd/containerd/api/services/containers"
@@ -34,30 +35,43 @@ import (
 	"google.golang.org/grpc/grpclog"
 )
 
-// New returns a new containerd client that is connected to the containerd
-// instance provided by address
-func New(address string) (*Client, error) {
+func init() {
 	// reset the grpc logger so that it does not output in the STDIO of the calling process
 	grpclog.SetLogger(log.New(ioutil.Discard, "", log.LstdFlags))
+}
 
-	opts := []grpc.DialOption{
+type NewClientOpts func(c *Client) error
+
+// New returns a new containerd client that is connected to the containerd
+// instance provided by address
+func New(address string, opts ...NewClientOpts) (*Client, error) {
+	gopts := []grpc.DialOption{
 		grpc.WithInsecure(),
 		grpc.WithTimeout(100 * time.Second),
 		grpc.WithDialer(dialer),
 	}
-	conn, err := grpc.Dial(dialAddress(address), opts...)
+	conn, err := grpc.Dial(dialAddress(address), gopts...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to dial %q", address)
 	}
-	return &Client{
-		conn: conn,
-	}, nil
+	c := &Client{
+		conn:    conn,
+		Runtime: runtime.GOOS,
+	}
+	for _, o := range opts {
+		if err := o(c); err != nil {
+			return nil, err
+		}
+	}
+	return c, nil
 }
 
 // Client is the client to interact with containerd and its various services
 // using a uniform interface
 type Client struct {
 	conn *grpc.ClientConn
+
+	Runtime string
 }
 
 // Containers returns all containers created in containerd
@@ -97,9 +111,9 @@ func NewContainerWithExistingRootFS(id string) NewContainerOpts {
 
 // NewContainerWithNewRootFS allocates a new snapshot to be used by the container as the
 // root filesystem in read-write mode
-func NewContainerWithNewRootFS(id string, image v1.Descriptor) NewContainerOpts {
+func NewContainerWithNewRootFS(id string, image *Image) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		diffIDs, err := images.RootFS(ctx, client.content(), image)
+		diffIDs, err := image.i.RootFS(ctx, client.content())
 		if err != nil {
 			return err
 		}
@@ -113,9 +127,9 @@ func NewContainerWithNewRootFS(id string, image v1.Descriptor) NewContainerOpts 
 
 // NewContainerWithNewReadonlyRootFS allocates a new snapshot to be used by the container as the
 // root filesystem in read-only mode
-func NewContainerWithNewReadonlyRootFS(id string, image v1.Descriptor) NewContainerOpts {
+func NewContainerWithNewReadonlyRootFS(id string, image *Image) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		diffIDs, err := images.RootFS(ctx, client.content(), image)
+		diffIDs, err := image.i.RootFS(ctx, client.content())
 		if err != nil {
 			return err
 		}
@@ -123,6 +137,13 @@ func NewContainerWithNewReadonlyRootFS(id string, image v1.Descriptor) NewContai
 			return err
 		}
 		c.RootFS = id
+		return nil
+	}
+}
+
+func NewContainerWithRuntime(name string) NewContainerOpts {
+	return func(ctx context.Context, client *Client, c *containers.Container) error {
+		c.Runtime = name
 		return nil
 	}
 }
@@ -135,7 +156,8 @@ func (c *Client) NewContainer(ctx context.Context, id string, spec *specs.Spec, 
 		return nil, err
 	}
 	container := containers.Container{
-		ID: id,
+		ID:      id,
+		Runtime: c.Runtime,
 		Spec: &protobuf.Any{
 			TypeUrl: specs.Version,
 			Value:   data,
@@ -237,7 +259,11 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...PullOpts) (*Image
 	}
 	store := c.content()
 
-	name, desc, fetcher, err := pullCtx.Resolver.Resolve(ctx, ref)
+	name, desc, err := pullCtx.Resolver.Resolve(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	fetcher, err := pullCtx.Resolver.Fetcher(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +289,8 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...PullOpts) (*Image
 		}
 	}
 	return &Image{
-		i: i,
+		client: c,
+		i:      i,
 	}, nil
 }
 

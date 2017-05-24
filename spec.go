@@ -14,13 +14,6 @@ func WithImageRef(ref string) SpecOpts {
 	}
 }
 
-func WithHostname(id string) SpecOpts {
-	return func(s *specs.Spec) error {
-		s.Hostname = id
-		return nil
-	}
-}
-
 func WithArgs(args ...string) SpecOpts {
 	return func(s *specs.Spec) error {
 		s.Process.Args = args
@@ -30,8 +23,8 @@ func WithArgs(args ...string) SpecOpts {
 
 // GenerateSpec will generate a default spec from the provided image
 // for use as a containerd container
-func GenerateSpec(opts ...SpecOpts) (*specs.Spec, error) {
-	s, err := createDefaultSpec()
+func GenerateSpec(id string, opts ...SpecOpts) (*specs.Spec, error) {
+	s, err := createDefaultSpec(id)
 	if err != nil {
 		return nil, err
 	}
