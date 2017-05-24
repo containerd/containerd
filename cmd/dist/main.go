@@ -77,6 +77,7 @@ distribution tool
 		fetchObjectCommand,
 		applyCommand,
 		rootfsCommand,
+		pushCommand,
 		pushObjectCommand,
 	}
 	app.Before = func(context *cli.Context) error {
