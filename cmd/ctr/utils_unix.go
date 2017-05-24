@@ -21,8 +21,8 @@ import (
 	"google.golang.org/grpc/grpclog"
 )
 
-func prepareStdio(stdin, stdout, stderr string, console bool) (*sync.WaitGroup, error) {
-	var wg sync.WaitGroup
+func prepareStdio(stdin, stdout, stderr string, console bool) (wg *sync.WaitGroup, err error) {
+	wg = &sync.WaitGroup{}
 	ctx := gocontext.Background()
 
 	f, err := fifo.OpenFifo(ctx, stdin, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700)
@@ -73,7 +73,7 @@ func prepareStdio(stdin, stdout, stderr string, console bool) (*sync.WaitGroup, 
 		}(f)
 	}
 
-	return &wg, nil
+	return wg, nil
 }
 
 func getGRPCConnection(context *cli.Context) (*grpc.ClientConn, error) {
