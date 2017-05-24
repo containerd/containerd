@@ -15,6 +15,13 @@ const (
 	KindCommitted
 )
 
+func (k Kind) String() string {
+	if k == 0 {
+		return "Active"
+	}
+	return "Committed"
+}
+
 // Info provides information about a particular snapshot.
 type Info struct {
 	Name     string // name or key of snapshot
