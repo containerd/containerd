@@ -17,6 +17,7 @@ addons:
 env:
   - TRAVIS_GOOS=windows TRAVIS_CGO_ENABLED=1
   - TRAVIS_GOOS=linux TRAVIS_CGO_ENABLED=1
+  - TRAVIS_GOOS=darwin TRAVIS_CGO_ENABLED=0
 
 install:
   - if [ "$TRAVIS_GOOS" = "windows" ] ; then sudo apt-get install -y gcc-multilib gcc-mingw-w64; export CC=x86_64-w64-mingw32-gcc ; export CXX=x86_64-w64-mingw32-g++ ; fi
@@ -32,8 +33,8 @@ script:
   - make fmt
   - make vet
   - make binaries
-  - if [ "$GOOS" != "windows" ]; then make coverage ; fi
-  - if [ "$GOOS" != "windows" ]; then sudo PATH=$PATH GOPATH=$GOPATH make root-coverage ; fi
+  - if [ "$GOOS" = "linux" ]; then make coverage ; fi
+  - if [ "$GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH make root-coverage ; fi
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
