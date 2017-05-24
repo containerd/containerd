@@ -292,10 +292,6 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 
 	// TODO(random-liu): [P2] Add apparmor and seccomp.
 
-	// TODO(random-liu): [P1] Bind mount sandbox /dev/shm.
-
-	// TODO(random-liu): [P0] Bind mount sandbox resolv.conf.
-
 	return g.Spec(), nil
 }
 
@@ -307,9 +303,17 @@ func (c *criContainerdService) generateContainerMounts(sandboxRootDir string, co
 	mounts = append(mounts, &runtime.Mount{
 		ContainerPath: etcHosts,
 		HostPath:      getSandboxHosts(sandboxRootDir),
-		Readonly:      securityContext.ReadonlyRootfs,
+		Readonly:      securityContext.GetReadonlyRootfs(),
 	})
-	// TODO(random-liu): [P0] Mount sandbox resolv.config.
+
+	// Mount sandbox resolv.config.
+	// TODO: Need to figure out whether we should always mount it as read-only
+	mounts = append(mounts, &runtime.Mount{
+		ContainerPath: resolvConfPath,
+		HostPath:      getResolvPath(sandboxRootDir),
+		Readonly:      securityContext.GetReadonlyRootfs(),
+	})
+
 	// TODO(random-liu): [P0] Mount sandbox /dev/shm.
 	return mounts
 }

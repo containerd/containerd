@@ -161,6 +161,7 @@ func TestSetupSandboxFiles(t *testing.T) {
 	testRootDir := "test-sandbox-root"
 	expectedCopys := [][]interface{}{
 		{"/etc/hosts", testRootDir + "/hosts", os.FileMode(0666)},
+		{"/etc/resolv.conf", testRootDir + "/resolv.conf", os.FileMode(0644)},
 	}
 	c := newTestCRIContainerdService()
 	var copys [][]interface{}
@@ -169,7 +170,7 @@ func TestSetupSandboxFiles(t *testing.T) {
 		return nil
 	}
 	c.setupSandboxFiles(testRootDir, nil)
-	assert.Equal(t, expectedCopys, copys, "should copy /etc/hosts for sandbox")
+	assert.Equal(t, expectedCopys, copys, "should copy expected files for sandbox")
 }
 
 func TestRunPodSandbox(t *testing.T) {

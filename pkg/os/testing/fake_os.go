@@ -36,6 +36,7 @@ type FakeOS struct {
 	OpenFifoFn  func(context.Context, string, int, os.FileMode) (io.ReadWriteCloser, error)
 	StatFn      func(string) (os.FileInfo, error)
 	CopyFileFn  func(string, string, os.FileMode) error
+	WriteFileFn func(string, []byte, os.FileMode) error
 	errors      map[string]error
 }
 
@@ -139,6 +140,18 @@ func (f *FakeOS) CopyFile(src, dest string, perm os.FileMode) error {
 
 	if f.CopyFileFn != nil {
 		return f.CopyFileFn(src, dest, perm)
+	}
+	return nil
+}
+
+// WriteFile is a fake call that invokes WriteFileFn or just return nil.
+func (f *FakeOS) WriteFile(filename string, data []byte, perm os.FileMode) error {
+	if err := f.getError("WriteFile"); err != nil {
+		return err
+	}
+
+	if f.WriteFileFn != nil {
+		return f.WriteFileFn(filename, data, perm)
 	}
 	return nil
 }

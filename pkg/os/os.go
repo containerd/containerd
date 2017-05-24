@@ -18,6 +18,7 @@ package os
 
 import (
 	"io"
+	"io/ioutil"
 	"os"
 
 	"golang.org/x/net/context"
@@ -33,6 +34,7 @@ type OS interface {
 	OpenFifo(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error)
 	Stat(name string) (os.FileInfo, error)
 	CopyFile(src, dest string, perm os.FileMode) error
+	WriteFile(filename string, data []byte, perm os.FileMode) error
 }
 
 // RealOS is used to dispatch the real system level operations.
@@ -74,4 +76,9 @@ func (RealOS) CopyFile(src, dest string, perm os.FileMode) error {
 
 	_, err = io.Copy(out, in)
 	return err
+}
+
+// WriteFile will call ioutil.WriteFile to write data into a file.
+func (RealOS) WriteFile(filename string, data []byte, perm os.FileMode) error {
+	return ioutil.WriteFile(filename, data, perm)
 }
