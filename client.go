@@ -42,6 +42,13 @@ func init() {
 
 type NewClientOpts func(c *Client) error
 
+func WithNamespace(namespace string) NewClientOpts {
+	return func(c *Client) error {
+		c.Namespace = namespace
+		return nil
+	}
+}
+
 // New returns a new containerd client that is connected to the containerd
 // instance provided by address
 func New(address string, opts ...NewClientOpts) (*Client, error) {
@@ -71,7 +78,8 @@ func New(address string, opts ...NewClientOpts) (*Client, error) {
 type Client struct {
 	conn *grpc.ClientConn
 
-	Runtime string
+	Runtime   string
+	Namespace string
 }
 
 // Containers returns all containers created in containerd
@@ -89,16 +97,16 @@ func (c *Client) Containers(ctx context.Context) ([]*Container, error) {
 
 type NewContainerOpts func(ctx context.Context, client *Client, c *containers.Container) error
 
-// NewContainerWithLables adds the provided labels to the container
-func NewContainerWithLables(labels map[string]string) NewContainerOpts {
+// WithContainerLables adds the provided labels to the container
+func WithContainerLables(labels map[string]string) NewContainerOpts {
 	return func(_ context.Context, _ *Client, c *containers.Container) error {
 		c.Labels = labels
 		return nil
 	}
 }
 
-// NewContainerWithExistingRootFS uses an existing root filesystem for the container
-func NewContainerWithExistingRootFS(id string) NewContainerOpts {
+// WithExistingRootFS uses an existing root filesystem for the container
+func WithExistingRootFS(id string) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		// check that the snapshot exists, if not, fail on creation
 		if _, err := client.snapshotter().Mounts(ctx, id); err != nil {
@@ -109,9 +117,9 @@ func NewContainerWithExistingRootFS(id string) NewContainerOpts {
 	}
 }
 
-// NewContainerWithNewRootFS allocates a new snapshot to be used by the container as the
+// WithNewRootFS allocates a new snapshot to be used by the container as the
 // root filesystem in read-write mode
-func NewContainerWithNewRootFS(id string, image *Image) NewContainerOpts {
+func WithNewRootFS(id string, image *Image) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		diffIDs, err := image.i.RootFS(ctx, client.content())
 		if err != nil {
@@ -125,9 +133,9 @@ func NewContainerWithNewRootFS(id string, image *Image) NewContainerOpts {
 	}
 }
 
-// NewContainerWithNewReadonlyRootFS allocates a new snapshot to be used by the container as the
+// WithNewReadonlyRootFS allocates a new snapshot to be used by the container as the
 // root filesystem in read-only mode
-func NewContainerWithNewReadonlyRootFS(id string, image *Image) NewContainerOpts {
+func WithNewReadonlyRootFS(id string, image *Image) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		diffIDs, err := image.i.RootFS(ctx, client.content())
 		if err != nil {
@@ -141,7 +149,7 @@ func NewContainerWithNewReadonlyRootFS(id string, image *Image) NewContainerOpts
 	}
 }
 
-func NewContainerWithRuntime(name string) NewContainerOpts {
+func WithRuntime(name string) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		c.Runtime = name
 		return nil
