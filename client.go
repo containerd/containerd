@@ -5,15 +5,24 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"time"
 
 	"github.com/containerd/containerd/api/services/containers"
 	contentapi "github.com/containerd/containerd/api/services/content"
+	diffapi "github.com/containerd/containerd/api/services/diff"
 	"github.com/containerd/containerd/api/services/execution"
+	imagesapi "github.com/containerd/containerd/api/services/images"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/containerd/remotes/docker"
+	"github.com/containerd/containerd/rootfs"
 	contentservice "github.com/containerd/containerd/services/content"
+	"github.com/containerd/containerd/services/diff"
+	diffservice "github.com/containerd/containerd/services/diff"
+	imagesservice "github.com/containerd/containerd/services/images"
 	snapshotservice "github.com/containerd/containerd/services/snapshot"
 	"github.com/containerd/containerd/snapshot"
 	protobuf "github.com/gogo/protobuf/types"
@@ -146,6 +155,118 @@ func (c *Client) NewContainer(ctx context.Context, id string, spec *specs.Spec, 
 	return containerFromProto(c, r.Container), nil
 }
 
+type PullOpts func(*Client, *PullContext) error
+
+type PullContext struct {
+	Resolver remotes.Resolver
+	Unpacker Unpacker
+}
+
+func defaultPullContext() *PullContext {
+	return &PullContext{
+		Resolver: docker.NewResolver(docker.ResolverOptions{
+			Client: http.DefaultClient,
+		}),
+	}
+}
+
+func WithPullUnpack(client *Client, c *PullContext) error {
+	c.Unpacker = &snapshotUnpacker{
+		store:       client.content(),
+		diff:        client.diff(),
+		snapshotter: client.snapshotter(),
+	}
+	return nil
+}
+
+type Unpacker interface {
+	Unpack(context.Context, images.Image) error
+}
+
+type snapshotUnpacker struct {
+	snapshotter snapshot.Snapshotter
+	store       content.Store
+	diff        diff.DiffService
+}
+
+func (s *snapshotUnpacker) Unpack(ctx context.Context, image images.Image) error {
+	layers, err := s.getLayers(ctx, image)
+	if err != nil {
+		return err
+	}
+	if _, err := rootfs.ApplyLayers(ctx, layers, s.snapshotter, s.diff); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *snapshotUnpacker) getLayers(ctx context.Context, image images.Image) ([]rootfs.Layer, error) {
+	p, err := content.ReadBlob(ctx, s.store, image.Target.Digest)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read manifest blob")
+	}
+	var manifest v1.Manifest
+	if err := json.Unmarshal(p, &manifest); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal manifest")
+	}
+	diffIDs, err := image.RootFS(ctx, s.store)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to resolve rootfs")
+	}
+	if len(diffIDs) != len(manifest.Layers) {
+		return nil, errors.Errorf("mismatched image rootfs and manifest layers")
+	}
+	layers := make([]rootfs.Layer, len(diffIDs))
+	for i := range diffIDs {
+		layers[i].Diff = v1.Descriptor{
+			// TODO: derive media type from compressed type
+			MediaType: v1.MediaTypeImageLayer,
+			Digest:    diffIDs[i],
+		}
+		layers[i].Blob = manifest.Layers[i]
+	}
+	return layers, nil
+}
+
+func (c *Client) Pull(ctx context.Context, ref string, opts ...PullOpts) (*Image, error) {
+	pullCtx := defaultPullContext()
+	for _, o := range opts {
+		if err := o(c, pullCtx); err != nil {
+			return nil, err
+		}
+	}
+	store := c.content()
+
+	name, desc, fetcher, err := pullCtx.Resolver.Resolve(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+
+	handlers := []images.Handler{
+		remotes.FetchHandler(store, fetcher),
+		images.ChildrenHandler(store),
+	}
+	if err := images.Dispatch(ctx, images.Handlers(handlers...), desc); err != nil {
+		return nil, err
+	}
+	is := c.images()
+	if err := is.Put(ctx, name, desc); err != nil {
+		return nil, err
+	}
+	i, err := is.Get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	if pullCtx.Unpacker != nil {
+		if err := pullCtx.Unpacker.Unpack(ctx, i); err != nil {
+			return nil, err
+		}
+	}
+	return &Image{
+		i: i,
+	}, nil
+}
+
 // Close closes the clients connection to containerd
 func (c *Client) Close() error {
 	return c.conn.Close()
@@ -165,4 +286,12 @@ func (c *Client) snapshotter() snapshot.Snapshotter {
 
 func (c *Client) tasks() execution.TasksClient {
 	return execution.NewTasksClient(c.conn)
+}
+
+func (c *Client) images() images.Store {
+	return imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(c.conn))
+}
+
+func (c *Client) diff() diff.DiffService {
+	return diffservice.NewDiffServiceFromClient(diffapi.NewDiffClient(c.conn))
 }

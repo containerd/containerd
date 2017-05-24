@@ -54,3 +54,18 @@ func TestNewContainer(t *testing.T) {
 		return
 	}
 }
+
+func TestImagePull(t *testing.T) {
+	client, err := New(defaultAddress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	const ref = "docker.io/library/alpine:latest"
+	_, err = client.Pull(context.Background(), ref)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+}
