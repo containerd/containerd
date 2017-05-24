@@ -52,10 +52,10 @@ var capabilities = []string{
 }
 
 func spec(id string, config *ocispec.ImageConfig, context *cli.Context, rootfs string) (*specs.Spec, error) {
-	env := []string{
+	defaultEnv := []string{
 		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 	}
-	env = append(env, config.Env...)
+	defaultEnv = append(defaultEnv, config.Env...)
 	cmd := config.Cmd
 	if v := context.Args().Tail(); len(v) > 0 {
 		cmd = v
@@ -90,8 +90,12 @@ func spec(id string, config *ocispec.ImageConfig, context *cli.Context, rootfs s
 		}
 	}
 	if tty {
-		env = append(env, "TERM=xterm")
+		defaultEnv = append(defaultEnv, "TERM=xterm")
 	}
+
+	// additional environment vars
+	env := replaceOrAppendEnvValues(defaultEnv, context.StringSlice("env"))
+
 	cwd := config.WorkingDir
 	if cwd == "" {
 		cwd = "/"
