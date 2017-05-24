@@ -44,7 +44,7 @@ type NewClientOpts func(c *Client) error
 
 func WithNamespace(namespace string) NewClientOpts {
 	return func(c *Client) error {
-		c.Namespace = namespace
+		c.namespace = namespace
 		return nil
 	}
 }
@@ -63,7 +63,7 @@ func New(address string, opts ...NewClientOpts) (*Client, error) {
 	}
 	c := &Client{
 		conn:    conn,
-		Runtime: runtime.GOOS,
+		runtime: runtime.GOOS,
 	}
 	for _, o := range opts {
 		if err := o(c); err != nil {
@@ -78,8 +78,8 @@ func New(address string, opts ...NewClientOpts) (*Client, error) {
 type Client struct {
 	conn *grpc.ClientConn
 
-	Runtime   string
-	Namespace string
+	runtime   string
+	namespace string
 }
 
 // Containers returns all containers created in containerd
@@ -97,8 +97,8 @@ func (c *Client) Containers(ctx context.Context) ([]*Container, error) {
 
 type NewContainerOpts func(ctx context.Context, client *Client, c *containers.Container) error
 
-// WithContainerLables adds the provided labels to the container
-func WithContainerLables(labels map[string]string) NewContainerOpts {
+// WithContainerLabels adds the provided labels to the container
+func WithContainerLabels(labels map[string]string) NewContainerOpts {
 	return func(_ context.Context, _ *Client, c *containers.Container) error {
 		c.Labels = labels
 		return nil
@@ -165,7 +165,7 @@ func (c *Client) NewContainer(ctx context.Context, id string, spec *specs.Spec, 
 	}
 	container := containers.Container{
 		ID:      id,
-		Runtime: c.Runtime,
+		Runtime: c.runtime,
 		Spec: &protobuf.Any{
 			TypeUrl: specs.Version,
 			Value:   data,
