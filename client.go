@@ -9,6 +9,7 @@ import (
 
 	"github.com/containerd/containerd/api/services/containers"
 	contentapi "github.com/containerd/containerd/api/services/content"
+	"github.com/containerd/containerd/api/services/execution"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
@@ -160,4 +161,8 @@ func (c *Client) content() content.Store {
 
 func (c *Client) snapshotter() snapshot.Snapshotter {
 	return snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotClient(c.conn))
+}
+
+func (c *Client) tasks() execution.TasksClient {
+	return execution.NewTasksClient(c.conn)
 }

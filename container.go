@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 
 	"github.com/containerd/containerd/api/services/containers"
+	"github.com/containerd/containerd/api/services/execution"
+	"github.com/containerd/containerd/api/types/mount"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -18,7 +20,8 @@ func containerFromProto(client *Client, c containers.Container) *Container {
 type Container struct {
 	client *Client
 
-	c containers.Container
+	c    containers.Container
+	task *Task
 }
 
 // ID returns the container's unique id
@@ -44,4 +47,44 @@ func (c *Container) Delete(ctx context.Context) error {
 		ID: c.c.ID,
 	})
 	return err
+}
+
+func (c *Container) Task() *Task {
+	return c.task
+}
+
+func (c *Container) NewTask(ctx context.Context, ioCreate IOCreation) (*Task, error) {
+	i, err := ioCreate()
+	if err != nil {
+		return nil, err
+	}
+	request := &execution.CreateRequest{
+		ContainerID: c.c.ID,
+		Terminal:    i.Terminal,
+		Stdin:       i.Stdin,
+		Stdout:      i.Stdout,
+		Stderr:      i.Stderr,
+	}
+	// get the rootfs from the snapshotter and add it to the request
+	mounts, err := c.client.snapshotter().Mounts(ctx, c.c.RootFS)
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range mounts {
+		request.Rootfs = append(request.Rootfs, &mount.Mount{
+			Type:    m.Type,
+			Source:  m.Source,
+			Options: m.Options,
+		})
+	}
+	response, err := c.client.tasks().Create(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	return &Task{
+		client:      c.client,
+		io:          i,
+		containerID: response.ContainerID,
+		pid:         response.Pid,
+	}, nil
 }
