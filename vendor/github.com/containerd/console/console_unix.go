@@ -2,9 +2,6 @@
 
 package console
 
-// #include <termios.h>
-import "C"
-
 import (
 	"os"
 	"unsafe"
@@ -91,8 +88,8 @@ func (m *master) SetRaw() error {
 	if err != nil {
 		return err
 	}
-	C.cfmakeraw((*C.struct_termios)(unsafe.Pointer(&rawState)))
-	rawState.Oflag = rawState.Oflag | C.OPOST
+	rawState = cfmakeraw(rawState)
+	rawState.Oflag = rawState.Oflag | unix.OPOST
 	return tcset(m.f.Fd(), &rawState)
 }
 

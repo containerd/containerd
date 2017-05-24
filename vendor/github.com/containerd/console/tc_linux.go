@@ -49,3 +49,15 @@ func saneTerminal(f *os.File) error {
 	termios.Oflag &^= unix.ONLCR
 	return tcset(f.Fd(), &termios)
 }
+
+func cfmakeraw(t unix.Termios) unix.Termios {
+	t.Iflag = t.Iflag & ^uint32((unix.IGNBRK | unix.BRKINT | unix.PARMRK | unix.ISTRIP | unix.INLCR | unix.IGNCR | unix.ICRNL | unix.IXON))
+	t.Oflag = t.Oflag & ^uint32(unix.OPOST)
+	t.Lflag = t.Lflag & ^(uint32(unix.ECHO | unix.ECHONL | unix.ICANON | unix.ISIG | unix.IEXTEN))
+	t.Cflag = t.Cflag & ^(uint32(unix.CSIZE | unix.PARENB))
+	t.Cflag = t.Cflag | unix.CS8
+	t.Cc[unix.VMIN] = 1
+	t.Cc[unix.VTIME] = 0
+
+	return t
+}
