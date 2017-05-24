@@ -60,6 +60,10 @@ var runCommand = cli.Command{
 			Name:  "mount",
 			Usage: "specify additional container mount (ex: type=bind,src=/tmp,dest=/host,options=rbind:ro)",
 		},
+		cli.StringSliceFlag{
+			Name:  "env",
+			Usage: "specify additional container environment variables (i.e. FOO=bar)",
+		},
 		cli.BoolFlag{
 			Name:  "rm",
 			Usage: "remove the container after running",

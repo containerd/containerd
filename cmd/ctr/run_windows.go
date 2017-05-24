@@ -61,6 +61,8 @@ func spec(id string, config *ocispec.ImageConfig, context *cli.Context) *specs.S
 		}
 	}
 
+	env := replaceOrAppendEnvValues(config.Env, context.StringSlice("env"))
+
 	return &specs.Spec{
 		Version: specs.Version,
 		Platform: specs.Platform{
@@ -74,7 +76,7 @@ func spec(id string, config *ocispec.ImageConfig, context *cli.Context) *specs.S
 			Args:     args,
 			Terminal: tty,
 			Cwd:      cwd,
-			Env:      config.Env,
+			Env:      env,
 			User: specs.User{
 				Username: config.User,
 			},
