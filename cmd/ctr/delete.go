@@ -2,6 +2,7 @@ package main
 
 import (
 	gocontext "context"
+	"runtime"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -53,8 +54,10 @@ var deleteCommand = cli.Command{
 			}
 		}
 
-		if err := snapshotter.Remove(ctx, id); err != nil {
-			return errors.Wrapf(err, "failed to remove snapshot %q", id)
+		if runtime.GOOS != "windows" {
+			if err := snapshotter.Remove(ctx, id); err != nil {
+				return errors.Wrapf(err, "failed to remove snapshot %q", id)
+			}
 		}
 
 		return nil
