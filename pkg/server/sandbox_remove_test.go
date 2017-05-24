@@ -29,7 +29,7 @@ import (
 	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
 
-	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 )
 
 func TestRemovePodSandbox(t *testing.T) {

@@ -21,7 +21,7 @@ import (
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
 
-	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 )
 
 // The code is very similar with sandbox.go, but there is no template support

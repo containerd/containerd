@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,17 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package server
+package v1alpha1
 
-import (
-	"errors"
+// This file contains all constants defined in CRI.
 
-	"golang.org/x/net/context"
-
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+// Required runtime condition type.
+const (
+	// RuntimeReady means the runtime is up and ready to accept basic containers.
+	RuntimeReady = "RuntimeReady"
+	// NetworkReady means the runtime network is up and ready to accept containers which require network.
+	NetworkReady = "NetworkReady"
 )
-
-// Exec prepares a streaming endpoint to execute a command in the container, and returns the address.
-func (c *criContainerdService) Exec(ctx context.Context, r *runtime.ExecRequest) (*runtime.ExecResponse, error) {
-	return nil, errors.New("not implemented")
-}

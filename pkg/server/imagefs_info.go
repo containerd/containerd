@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,14 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package runtime
+package server
 
-// This file contains all constants defined in CRI.
+import (
+	"errors"
 
-// Required runtime condition type.
-const (
-	// RuntimeReady means the runtime is up and ready to accept basic containers.
-	RuntimeReady = "RuntimeReady"
-	// NetworkReady means the runtime network is up and ready to accept containers which require network.
-	NetworkReady = "NetworkReady"
+	"golang.org/x/net/context"
+
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 )
+
+// ImageFsInfo returns information of the filesystem that is used to store images.
+func (c *criContainerdService) ImageFsInfo(ctx context.Context, r *runtime.ImageFsInfoRequest) (*runtime.ImageFsInfoResponse, error) {
+	return nil, errors.New("not implemented")
+}

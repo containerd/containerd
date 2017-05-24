@@ -27,7 +27,7 @@ import (
 
 	"github.com/containerd/containerd/api/types/container"
 
-	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
@@ -79,7 +79,6 @@ func getSandboxStatusTestData() (*metadata.SandboxMetadata, *runtime.PodSandboxS
 		Network:   &runtime.PodSandboxNetworkStatus{Ip: ""},
 		Linux: &runtime.LinuxPodSandboxStatus{
 			Namespaces: &runtime.Namespace{
-				Network: sandboxStatusTestNetNS,
 				Options: &runtime.NamespaceOption{
 					HostNetwork: true,
 					HostPid:     false,
@@ -92,29 +91,6 @@ func getSandboxStatusTestData() (*metadata.SandboxMetadata, *runtime.PodSandboxS
 	}
 
 	return metadata, expectedStatus
-}
-
-func TestToCRISandboxStatus(t *testing.T) {
-	for desc, test := range map[string]struct {
-		state       runtime.PodSandboxState
-		expectNetNS string
-	}{
-		"ready sandbox should have network namespace": {
-			state:       runtime.PodSandboxState_SANDBOX_READY,
-			expectNetNS: sandboxStatusTestNetNS,
-		},
-		"not ready sandbox should not have network namespace": {
-			state:       runtime.PodSandboxState_SANDBOX_NOTREADY,
-			expectNetNS: "",
-		},
-	} {
-		metadata, expect := getSandboxStatusTestData()
-		status := toCRISandboxStatus(metadata, test.state, sandboxStatusTestIP)
-		expect.Linux.Namespaces.Network = test.expectNetNS
-		expect.State = test.state
-		expect.Network.Ip = sandboxStatusTestIP
-		assert.Equal(t, expect, status, desc)
-	}
 }
 
 func TestPodSandboxStatus(t *testing.T) {
@@ -238,9 +214,6 @@ func TestPodSandboxStatus(t *testing.T) {
 		assert.NoError(t, err)
 		require.NotNil(t, res)
 		expect.State = test.expectState
-		if expect.State == runtime.PodSandboxState_SANDBOX_NOTREADY {
-			expect.Linux.Namespaces.Network = ""
-		}
 		assert.Equal(t, expect, res.GetStatus())
 	}
 }

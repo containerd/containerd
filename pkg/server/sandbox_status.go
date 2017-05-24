@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/api/services/execution"
 	"github.com/containerd/containerd/api/types/container"
 
-	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 )
@@ -72,15 +72,6 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 // toCRISandboxStatus converts sandbox metadata into CRI pod sandbox status.
 func toCRISandboxStatus(meta *metadata.SandboxMetadata, state runtime.PodSandboxState, ip string) *runtime.PodSandboxStatus {
 	nsOpts := meta.Config.GetLinux().GetSecurityContext().GetNamespaceOptions()
-	netNS := meta.NetNS
-	if state == runtime.PodSandboxState_SANDBOX_NOTREADY {
-		// Return empty network namespace when sandbox is not ready.
-		// For kubenet, when sandbox is not running, both empty
-		// network namespace and a valid permanent network namespace
-		// work. Go with the first option here because it's the current
-		// behavior in Kubernetes.
-		netNS = ""
-	}
 	return &runtime.PodSandboxStatus{
 		Id:        meta.ID,
 		Metadata:  meta.Config.GetMetadata(),
@@ -89,9 +80,6 @@ func toCRISandboxStatus(meta *metadata.SandboxMetadata, state runtime.PodSandbox
 		Network:   &runtime.PodSandboxNetworkStatus{Ip: ip},
 		Linux: &runtime.LinuxPodSandboxStatus{
 			Namespaces: &runtime.Namespace{
-				// TODO(random-liu): Revendor new CRI version and get
-				// rid of this field.
-				Network: netNS,
 				Options: &runtime.NamespaceOption{
 					HostNetwork: nsOpts.GetHostNetwork(),
 					HostPid:     nsOpts.GetHostPid(),
