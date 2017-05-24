@@ -50,6 +50,8 @@ func handleSignals(signals chan os.Signal, server *grpc.Server) error {
 			if err := reaper.Reap(); err != nil {
 				log.G(global).WithError(err).Error("reap containerd processes")
 			}
+		case unix.SIGUSR1:
+			dumpStacks()
 		default:
 			server.Stop()
 			return nil
