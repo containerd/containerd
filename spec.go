@@ -23,8 +23,8 @@ func WithArgs(args ...string) SpecOpts {
 
 // GenerateSpec will generate a default spec from the provided image
 // for use as a containerd container
-func GenerateSpec(id string, opts ...SpecOpts) (*specs.Spec, error) {
-	s, err := createDefaultSpec(id)
+func GenerateSpec(opts ...SpecOpts) (*specs.Spec, error) {
+	s, err := createDefaultSpec()
 	if err != nil {
 		return nil, err
 	}

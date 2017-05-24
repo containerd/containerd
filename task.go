@@ -215,7 +215,7 @@ func (t *Task) Wait(ctx context.Context) (uint32, error) {
 func (t *Task) Delete(ctx context.Context) (uint32, error) {
 	cerr := t.io.Close()
 	r, err := t.client.tasks().Delete(ctx, &execution.DeleteRequest{
-		t.containerID,
+		ContainerID: t.containerID,
 	})
 	if err != nil {
 		return 255, err

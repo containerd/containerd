@@ -57,7 +57,7 @@ func defaultNamespaces() []specs.LinuxNamespace {
 	}
 }
 
-func createDefaultSpec(id string) (*specs.Spec, error) {
+func createDefaultSpec() (*specs.Spec, error) {
 	s := &specs.Spec{
 		Version: specs.Version,
 		Platform: specs.Platform{
@@ -67,7 +67,6 @@ func createDefaultSpec(id string) (*specs.Spec, error) {
 		Root: specs.Root{
 			Path: defaultRootfsPath,
 		},
-		Hostname: id,
 		Process: specs.Process{
 			Cwd:             "/",
 			NoNewPrivileges: true,
