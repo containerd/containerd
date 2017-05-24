@@ -14,11 +14,11 @@ var eventsCommand = cli.Command{
 	Name:  "events",
 	Usage: "display containerd events",
 	Action: func(context *cli.Context) error {
-		containers, err := getExecutionService(context)
+		tasks, err := getTasksService(context)
 		if err != nil {
 			return err
 		}
-		events, err := containers.Events(gocontext.Background(), &execution.EventsRequest{})
+		events, err := tasks.Events(gocontext.Background(), &execution.EventsRequest{})
 		if err != nil {
 			return err
 		}

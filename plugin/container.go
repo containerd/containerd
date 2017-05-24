@@ -2,15 +2,16 @@ package plugin
 
 import "context"
 
-type ContainerInfo struct {
-	ID      string
-	Runtime string
-	Spec    []byte
+type TaskInfo struct {
+	ID          string
+	ContainerID string
+	Runtime     string
+	Spec        []byte
 }
 
-type Container interface {
+type Task interface {
 	// Information of the container
-	Info() ContainerInfo
+	Info() TaskInfo
 	// Start the container's user defined process
 	Start(context.Context) error
 	// State returns the container's state

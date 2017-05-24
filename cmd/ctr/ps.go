@@ -27,15 +27,15 @@ var psCommand = cli.Command{
 		}
 
 		pr := &execution.ProcessesRequest{
-			ID: id,
+			ContainerID: id,
 		}
 
-		containers, err := getExecutionService(context)
+		tasks, err := getTasksService(context)
 		if err != nil {
 			return err
 		}
 
-		resp, err := containers.Processes(gocontext.Background(), pr)
+		resp, err := tasks.Processes(gocontext.Background(), pr)
 		if err != nil {
 			return err
 		}

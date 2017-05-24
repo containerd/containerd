@@ -68,8 +68,8 @@ type container struct {
 	sendEvent eventCallback
 }
 
-func (c *container) Info() plugin.ContainerInfo {
-	return plugin.ContainerInfo{
+func (c *container) Info() plugin.TaskInfo {
+	return plugin.TaskInfo{
 		ID:      c.ctr.ID(),
 		Runtime: runtimeName,
 	}

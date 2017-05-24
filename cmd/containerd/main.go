@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/Sirupsen/logrus"
+	containersapi "github.com/containerd/containerd/api/services/containers"
 	contentapi "github.com/containerd/containerd/api/services/content"
 	diffapi "github.com/containerd/containerd/api/services/diff"
 	api "github.com/containerd/containerd/api/services/execution"
@@ -265,7 +266,7 @@ func resolveMetaDB(ctx *cli.Context) (*bolt.DB, error) {
 	return db, nil
 }
 
-func loadRuntimes(monitor plugin.ContainerMonitor) (map[string]plugin.Runtime, error) {
+func loadRuntimes(monitor plugin.TaskMonitor) (map[string]plugin.Runtime, error) {
 	o := make(map[string]plugin.Runtime)
 	for name, rr := range plugin.Registrations() {
 		if rr.Type != plugin.RuntimePlugin {
@@ -293,10 +294,10 @@ func loadRuntimes(monitor plugin.ContainerMonitor) (map[string]plugin.Runtime, e
 	return o, nil
 }
 
-func loadMonitor() (plugin.ContainerMonitor, error) {
-	var monitors []plugin.ContainerMonitor
+func loadMonitor() (plugin.TaskMonitor, error) {
+	var monitors []plugin.TaskMonitor
 	for name, m := range plugin.Registrations() {
-		if m.Type != plugin.ContainerMonitorPlugin {
+		if m.Type != plugin.TaskMonitorPlugin {
 			continue
 		}
 		log.G(global).Infof("loading monitor plugin %q...", name)
@@ -309,12 +310,12 @@ func loadMonitor() (plugin.ContainerMonitor, error) {
 		if err != nil {
 			return nil, err
 		}
-		monitors = append(monitors, mm.(plugin.ContainerMonitor))
+		monitors = append(monitors, mm.(plugin.TaskMonitor))
 	}
 	if len(monitors) == 0 {
 		return plugin.NewNoopMonitor(), nil
 	}
-	return plugin.NewMultiContainerMonitor(monitors...), nil
+	return plugin.NewMultiTaskMonitor(monitors...), nil
 }
 
 func loadSnapshotter(store content.Store) (snapshot.Snapshotter, error) {
@@ -414,8 +415,10 @@ func interceptor(ctx gocontext.Context,
 ) (interface{}, error) {
 	ctx = log.WithModule(ctx, "containerd")
 	switch info.Server.(type) {
-	case api.ContainerServiceServer:
+	case api.TasksServer:
 		ctx = log.WithModule(ctx, "execution")
+	case containersapi.ContainersServer:
+		ctx = log.WithModule(ctx, "containers")
 	case contentapi.ContentServer:
 		ctx = log.WithModule(ctx, "content")
 	case imagesapi.ImagesServer:

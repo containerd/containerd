@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/api/services/shim"
-	"github.com/containerd/containerd/api/types/container"
 	"github.com/containerd/containerd/api/types/mount"
+	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	runc "github.com/containerd/go-runc"
@@ -83,10 +83,10 @@ type Runtime struct {
 	events        chan *plugin.Event
 	eventsContext context.Context
 	eventsCancel  func()
-	monitor       plugin.ContainerMonitor
+	monitor       plugin.TaskMonitor
 }
 
-func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts) (plugin.Container, error) {
+func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts) (plugin.Task, error) {
 	path, err := r.newBundle(id, opts.Spec)
 	if err != nil {
 		return nil, err
@@ -127,16 +127,16 @@ func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts)
 		os.RemoveAll(path)
 		return nil, err
 	}
-	c := newContainer(id, opts.Spec, s)
-	// after the container is created, add it to the monitor
+	c := newTask(id, opts.Spec, s)
+	// after the task is created, add it to the monitor
 	if err = r.monitor.Monitor(c); err != nil {
 		return nil, err
 	}
 	return c, nil
 }
 
-func (r *Runtime) Delete(ctx context.Context, c plugin.Container) (*plugin.Exit, error) {
-	lc, ok := c.(*Container)
+func (r *Runtime) Delete(ctx context.Context, c plugin.Task) (*plugin.Exit, error) {
+	lc, ok := c.(*Task)
 	if !ok {
 		return nil, fmt.Errorf("container cannot be cast as *linux.Container")
 	}
@@ -153,15 +153,15 @@ func (r *Runtime) Delete(ctx context.Context, c plugin.Container) (*plugin.Exit,
 	return &plugin.Exit{
 		Status:    rsp.ExitStatus,
 		Timestamp: rsp.ExitedAt,
-	}, r.deleteBundle(lc.id)
+	}, r.deleteBundle(lc.containerID)
 }
 
-func (r *Runtime) Containers(ctx context.Context) ([]plugin.Container, error) {
+func (r *Runtime) Tasks(ctx context.Context) ([]plugin.Task, error) {
 	dir, err := ioutil.ReadDir(r.root)
 	if err != nil {
 		return nil, err
 	}
-	var o []plugin.Container
+	var o []plugin.Task
 	for _, fi := range dir {
 		if !fi.IsDir() {
 			continue
@@ -206,15 +206,15 @@ func (r *Runtime) forward(events shim.Shim_EventsClient) {
 		}
 		var et plugin.EventType
 		switch e.Type {
-		case container.Event_CREATE:
+		case task.Event_CREATE:
 			et = plugin.CreateEvent
-		case container.Event_EXEC_ADDED:
+		case task.Event_EXEC_ADDED:
 			et = plugin.ExecAddEvent
-		case container.Event_EXIT:
+		case task.Event_EXIT:
 			et = plugin.ExitEvent
-		case container.Event_OOM:
+		case task.Event_OOM:
 			et = plugin.OOMEvent
-		case container.Event_START:
+		case task.Event_START:
 			et = plugin.StartEvent
 		}
 		r.events <- &plugin.Event{
@@ -250,20 +250,22 @@ func (r *Runtime) deleteBundle(id string) error {
 	return os.RemoveAll(filepath.Join(r.root, id))
 }
 
-func (r *Runtime) loadContainer(path string) (*Container, error) {
+func (r *Runtime) loadContainer(path string) (*Task, error) {
 	id := filepath.Base(path)
 	s, err := loadShim(path, r.remote)
 	if err != nil {
 		return nil, err
 	}
+
 	data, err := ioutil.ReadFile(filepath.Join(path, configFilename))
 	if err != nil {
 		return nil, err
 	}
-	return &Container{
-		id:   id,
-		shim: s,
-		spec: data,
+
+	return &Task{
+		containerID: id,
+		shim:        s,
+		spec:        data,
 	}, nil
 }
 

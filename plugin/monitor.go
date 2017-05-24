@@ -1,44 +1,44 @@
 package plugin
 
-// ContainerMonitor provides an interface for monitoring of containers within containerd
-type ContainerMonitor interface {
+// TaskMonitor provides an interface for monitoring of containers within containerd
+type TaskMonitor interface {
 	// Monitor adds the provided container to the monitor
-	Monitor(Container) error
+	Monitor(Task) error
 	// Stop stops and removes the provided container from the monitor
-	Stop(Container) error
+	Stop(Task) error
 	// Events emits events from the monitor
 	Events(chan<- *Event)
 }
 
-func NewMultiContainerMonitor(monitors ...ContainerMonitor) ContainerMonitor {
-	return &multiContainerMonitor{
+func NewMultiTaskMonitor(monitors ...TaskMonitor) TaskMonitor {
+	return &multiTaskMonitor{
 		monitors: monitors,
 	}
 }
 
-func NewNoopMonitor() ContainerMonitor {
-	return &noopContainerMonitor{}
+func NewNoopMonitor() TaskMonitor {
+	return &noopTaskMonitor{}
 }
 
-type noopContainerMonitor struct {
+type noopTaskMonitor struct {
 }
 
-func (mm *noopContainerMonitor) Monitor(c Container) error {
+func (mm *noopTaskMonitor) Monitor(c Task) error {
 	return nil
 }
 
-func (mm *noopContainerMonitor) Stop(c Container) error {
+func (mm *noopTaskMonitor) Stop(c Task) error {
 	return nil
 }
 
-func (mm *noopContainerMonitor) Events(events chan<- *Event) {
+func (mm *noopTaskMonitor) Events(events chan<- *Event) {
 }
 
-type multiContainerMonitor struct {
-	monitors []ContainerMonitor
+type multiTaskMonitor struct {
+	monitors []TaskMonitor
 }
 
-func (mm *multiContainerMonitor) Monitor(c Container) error {
+func (mm *multiTaskMonitor) Monitor(c Task) error {
 	for _, m := range mm.monitors {
 		if err := m.Monitor(c); err != nil {
 			return err
@@ -47,7 +47,7 @@ func (mm *multiContainerMonitor) Monitor(c Container) error {
 	return nil
 }
 
-func (mm *multiContainerMonitor) Stop(c Container) error {
+func (mm *multiTaskMonitor) Stop(c Task) error {
 	for _, m := range mm.monitors {
 		if err := m.Stop(c); err != nil {
 			return err
@@ -56,7 +56,7 @@ func (mm *multiContainerMonitor) Stop(c Container) error {
 	return nil
 }
 
-func (mm *multiContainerMonitor) Events(events chan<- *Event) {
+func (mm *multiTaskMonitor) Events(events chan<- *Event) {
 	for _, m := range mm.monitors {
 		m.Events(events)
 	}

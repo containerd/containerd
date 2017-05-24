@@ -13,13 +13,14 @@ import (
 	"syscall"
 
 	"github.com/Sirupsen/logrus"
+	containersapi "github.com/containerd/containerd/api/services/containers"
 	contentapi "github.com/containerd/containerd/api/services/content"
 	diffapi "github.com/containerd/containerd/api/services/diff"
 	"github.com/containerd/containerd/api/services/execution"
 	imagesapi "github.com/containerd/containerd/api/services/images"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	versionservice "github.com/containerd/containerd/api/services/version"
-	"github.com/containerd/containerd/api/types/container"
+	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	contentservice "github.com/containerd/containerd/services/content"
@@ -34,12 +35,20 @@ import (
 
 var grpcConn *grpc.ClientConn
 
-func getExecutionService(context *cli.Context) (execution.ContainerServiceClient, error) {
+func getContainersService(context *cli.Context) (containersapi.ContainersClient, error) {
 	conn, err := getGRPCConnection(context)
 	if err != nil {
 		return nil, err
 	}
-	return execution.NewContainerServiceClient(conn), nil
+	return containersapi.NewContainersClient(conn), nil
+}
+
+func getTasksService(context *cli.Context) (execution.TasksClient, error) {
+	conn, err := getGRPCConnection(context)
+	if err != nil {
+		return nil, err
+	}
+	return execution.NewTasksClient(conn), nil
 }
 
 func getContentStore(context *cli.Context) (content.Store, error) {
@@ -94,13 +103,13 @@ func getTempDir(id string) (string, error) {
 	return tmpDir, nil
 }
 
-func waitContainer(events execution.ContainerService_EventsClient, id string, pid uint32) (uint32, error) {
+func waitContainer(events execution.Tasks_EventsClient, id string, pid uint32) (uint32, error) {
 	for {
 		e, err := events.Recv()
 		if err != nil {
 			return 255, err
 		}
-		if e.Type != container.Event_EXIT {
+		if e.Type != task.Event_EXIT {
 			continue
 		}
 		if e.ID == id && e.Pid == pid {
@@ -109,7 +118,7 @@ func waitContainer(events execution.ContainerService_EventsClient, id string, pi
 	}
 }
 
-func forwardAllSignals(containers execution.ContainerServiceClient, id string) chan os.Signal {
+func forwardAllSignals(containers execution.TasksClient, id string) chan os.Signal {
 	sigc := make(chan os.Signal, 128)
 	signal.Notify(sigc)
 
@@ -117,8 +126,8 @@ func forwardAllSignals(containers execution.ContainerServiceClient, id string) c
 		for s := range sigc {
 			logrus.Debug("Forwarding signal ", s)
 			killRequest := &execution.KillRequest{
-				ID:     id,
-				Signal: uint32(s.(syscall.Signal)),
+				ContainerID: id,
+				Signal:      uint32(s.(syscall.Signal)),
 				PidOrAll: &execution.KillRequest_All{
 					All: false,
 				},

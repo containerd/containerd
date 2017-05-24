@@ -49,8 +49,8 @@ var killCommand = cli.Command{
 		}
 
 		killRequest := &execution.KillRequest{
-			ID:     id,
-			Signal: uint32(signal),
+			ContainerID: id,
+			Signal:      uint32(signal),
 			PidOrAll: &execution.KillRequest_Pid{
 				Pid: uint32(pid),
 			},
@@ -62,11 +62,11 @@ var killCommand = cli.Command{
 			}
 		}
 
-		containers, err := getExecutionService(context)
+		tasks, err := getTasksService(context)
 		if err != nil {
 			return err
 		}
-		_, err = containers.Kill(gocontext.Background(), killRequest)
+		_, err = tasks.Kill(gocontext.Background(), killRequest)
 		if err != nil {
 			return err
 		}

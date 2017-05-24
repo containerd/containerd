@@ -56,7 +56,7 @@ func newExecRequest(context *cli.Context, tmpDir, id string) (*execution.ExecReq
 		return nil, err
 	}
 	return &execution.ExecRequest{
-		ID: id,
+		ContainerID: id,
 		Spec: &protobuf.Any{
 			TypeUrl: specs.Version,
 			Value:   data,

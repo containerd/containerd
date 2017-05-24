@@ -33,11 +33,11 @@ type Exit struct {
 // arch, or custom usage.
 type Runtime interface {
 	// Create creates a container with the provided id and options
-	Create(ctx context.Context, id string, opts CreateOpts) (Container, error)
+	Create(ctx context.Context, id string, opts CreateOpts) (Task, error)
 	// Containers returns all the current containers for the runtime
-	Containers(context.Context) ([]Container, error)
+	Tasks(context.Context) ([]Task, error)
 	// Delete removes the container in the runtime
-	Delete(context.Context, Container) (*Exit, error)
+	Delete(context.Context, Task) (*Exit, error)
 	// Events returns events for the runtime and all containers created by the runtime
 	Events(context.Context) <-chan *Event
 }

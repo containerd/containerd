@@ -14,7 +14,7 @@ const name = "cgroups"
 
 func init() {
 	plugin.Register(name, &plugin.Registration{
-		Type: plugin.ContainerMonitorPlugin,
+		Type: plugin.TaskMonitorPlugin,
 		Init: New,
 	})
 }
@@ -43,7 +43,7 @@ type cgroupsMonitor struct {
 	events    chan<- *plugin.Event
 }
 
-func (m *cgroupsMonitor) Monitor(c plugin.Container) error {
+func (m *cgroupsMonitor) Monitor(c plugin.Task) error {
 	id := c.Info().ID
 	state, err := c.State(m.context)
 	if err != nil {
@@ -59,7 +59,7 @@ func (m *cgroupsMonitor) Monitor(c plugin.Container) error {
 	return m.oom.Add(id, cg, m.trigger)
 }
 
-func (m *cgroupsMonitor) Stop(c plugin.Container) error {
+func (m *cgroupsMonitor) Stop(c plugin.Task) error {
 	m.collector.Remove(c.Info().ID)
 	return nil
 }

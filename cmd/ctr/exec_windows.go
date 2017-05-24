@@ -23,7 +23,7 @@ func newExecRequest(context *cli.Context, tmpDir, id string) (*execution.ExecReq
 	}
 	now := time.Now().UnixNano()
 	request := &execution.ExecRequest{
-		ID: id,
+		ContainerID: id,
 		Spec: &protobuf.Any{
 			TypeUrl: specs.Version,
 			Value:   data,

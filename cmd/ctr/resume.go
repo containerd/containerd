@@ -13,7 +13,7 @@ var resumeCommand = cli.Command{
 	Usage:     "resume a paused container",
 	ArgsUsage: "CONTAINER",
 	Action: func(context *cli.Context) error {
-		containers, err := getExecutionService(context)
+		tasks, err := getTasksService(context)
 		if err != nil {
 			return err
 		}
@@ -21,8 +21,8 @@ var resumeCommand = cli.Command{
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		_, err = containers.Resume(gocontext.Background(), &execution.ResumeRequest{
-			ID: id,
+		_, err = tasks.Resume(gocontext.Background(), &execution.ResumeRequest{
+			ContainerID: id,
 		})
 		return err
 	},

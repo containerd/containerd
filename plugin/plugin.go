@@ -18,7 +18,7 @@ const (
 	RuntimePlugin PluginType = iota + 1
 	GRPCPlugin
 	SnapshotPlugin
-	ContainerMonitorPlugin
+	TaskMonitorPlugin
 )
 
 type Registration struct {
@@ -37,7 +37,7 @@ type InitContext struct {
 	Snapshotter snapshot.Snapshotter
 	Config      interface{}
 	Context     context.Context
-	Monitor     ContainerMonitor
+	Monitor     TaskMonitor
 }
 
 type Service interface {
