@@ -220,9 +220,10 @@ func taskFromContainerd(ctx context.Context, c plugin.Task) (*task.Task, error) 
 		log.G(ctx).WithField("status", state.Status()).Warn("unknown status")
 	}
 	return &task.Task{
-		ID:     c.Info().ID,
-		Pid:    state.Pid(),
-		Status: status,
+		ID:          c.Info().ID,
+		ContainerID: c.Info().ContainerID,
+		Pid:         state.Pid(),
+		Status:      status,
 		Spec: &protobuf.Any{
 			TypeUrl: specs.Version,
 			Value:   c.Info().Spec,
