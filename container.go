@@ -85,10 +85,12 @@ func (c *Container) NewTask(ctx context.Context, ioCreate IOCreation) (*Task, er
 	if err != nil {
 		return nil, err
 	}
-	return &Task{
+	t := &Task{
 		client:      c.client,
 		io:          i,
 		containerID: response.ContainerID,
 		pid:         response.Pid,
-	}, nil
+	}
+	c.task = t
+	return t, nil
 }

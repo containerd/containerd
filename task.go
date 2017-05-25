@@ -189,6 +189,30 @@ func (t *Task) Kill(ctx context.Context, s syscall.Signal) error {
 	return err
 }
 
+func (t *Task) Pause(ctx context.Context) error {
+	_, err := t.client.tasks().Pause(ctx, &execution.PauseRequest{
+		ContainerID: t.containerID,
+	})
+	return err
+}
+
+func (t *Task) Resume(ctx context.Context) error {
+	_, err := t.client.tasks().Resume(ctx, &execution.ResumeRequest{
+		ContainerID: t.containerID,
+	})
+	return err
+}
+
+func (t *Task) Status(ctx context.Context) (string, error) {
+	r, err := t.client.tasks().Info(ctx, &execution.InfoRequest{
+		ContainerID: t.containerID,
+	})
+	if err != nil {
+		return "", err
+	}
+	return r.Task.Status.String(), nil
+}
+
 // Wait is a blocking call that will wait for the task to exit and return the exit status
 func (t *Task) Wait(ctx context.Context) (uint32, error) {
 	events, err := t.client.tasks().Events(ctx, &execution.EventsRequest{})
