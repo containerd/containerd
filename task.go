@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	"github.com/containerd/containerd/api/services/execution"
-	"github.com/containerd/containerd/api/types/task"
+	taskapi "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/fifo"
 )
 
@@ -158,7 +158,20 @@ func (g *wgCloser) Close() error {
 	return nil
 }
 
-type Task struct {
+type Task interface {
+	Delete(context.Context) (uint32, error)
+	Kill(context.Context, syscall.Signal) error
+	Pause(context.Context) error
+	Resume(context.Context) error
+	Pid() uint32
+	Start(context.Context) error
+	Status(context.Context) (string, error)
+	Wait(context.Context) (uint32, error)
+}
+
+var _ = (Task)(&task{})
+
+type task struct {
 	client *Client
 
 	io          *IO
@@ -167,18 +180,18 @@ type Task struct {
 }
 
 // Pid returns the pid or process id for the task
-func (t *Task) Pid() uint32 {
+func (t *task) Pid() uint32 {
 	return t.pid
 }
 
-func (t *Task) Start(ctx context.Context) error {
+func (t *task) Start(ctx context.Context) error {
 	_, err := t.client.tasks().Start(ctx, &execution.StartRequest{
 		ContainerID: t.containerID,
 	})
 	return err
 }
 
-func (t *Task) Kill(ctx context.Context, s syscall.Signal) error {
+func (t *task) Kill(ctx context.Context, s syscall.Signal) error {
 	_, err := t.client.tasks().Kill(ctx, &execution.KillRequest{
 		Signal:      uint32(s),
 		ContainerID: t.containerID,
@@ -189,21 +202,21 @@ func (t *Task) Kill(ctx context.Context, s syscall.Signal) error {
 	return err
 }
 
-func (t *Task) Pause(ctx context.Context) error {
+func (t *task) Pause(ctx context.Context) error {
 	_, err := t.client.tasks().Pause(ctx, &execution.PauseRequest{
 		ContainerID: t.containerID,
 	})
 	return err
 }
 
-func (t *Task) Resume(ctx context.Context) error {
+func (t *task) Resume(ctx context.Context) error {
 	_, err := t.client.tasks().Resume(ctx, &execution.ResumeRequest{
 		ContainerID: t.containerID,
 	})
 	return err
 }
 
-func (t *Task) Status(ctx context.Context) (string, error) {
+func (t *task) Status(ctx context.Context) (string, error) {
 	r, err := t.client.tasks().Info(ctx, &execution.InfoRequest{
 		ContainerID: t.containerID,
 	})
@@ -214,7 +227,7 @@ func (t *Task) Status(ctx context.Context) (string, error) {
 }
 
 // Wait is a blocking call that will wait for the task to exit and return the exit status
-func (t *Task) Wait(ctx context.Context) (uint32, error) {
+func (t *task) Wait(ctx context.Context) (uint32, error) {
 	events, err := t.client.tasks().Events(ctx, &execution.EventsRequest{})
 	if err != nil {
 		return 255, err
@@ -224,7 +237,7 @@ func (t *Task) Wait(ctx context.Context) (uint32, error) {
 		if err != nil {
 			return 255, err
 		}
-		if e.Type != task.Event_EXIT {
+		if e.Type != taskapi.Event_EXIT {
 			continue
 		}
 		if e.ID == t.containerID && e.Pid == t.pid {
@@ -236,7 +249,7 @@ func (t *Task) Wait(ctx context.Context) (uint32, error) {
 // Delete deletes the task and its runtime state
 // it returns the exit status of the task and any errors that were encountered
 // during cleanup
-func (t *Task) Delete(ctx context.Context) (uint32, error) {
+func (t *task) Delete(ctx context.Context) (uint32, error) {
 	cerr := t.io.Close()
 	r, err := t.client.tasks().Delete(ctx, &execution.DeleteRequest{
 		ContainerID: t.containerID,

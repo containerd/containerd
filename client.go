@@ -83,12 +83,12 @@ type Client struct {
 }
 
 // Containers returns all containers created in containerd
-func (c *Client) Containers(ctx context.Context) ([]*Container, error) {
+func (c *Client) Containers(ctx context.Context) ([]Container, error) {
 	r, err := c.containers().List(ctx, &containers.ListContainersRequest{})
 	if err != nil {
 		return nil, err
 	}
-	var out []*Container
+	var out []Container
 	for _, container := range r.Containers {
 		out = append(out, containerFromProto(c, container))
 	}
@@ -119,9 +119,9 @@ func WithExistingRootFS(id string) NewContainerOpts {
 
 // WithNewRootFS allocates a new snapshot to be used by the container as the
 // root filesystem in read-write mode
-func WithNewRootFS(id string, image *Image) NewContainerOpts {
+func WithNewRootFS(id string, i Image) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		diffIDs, err := image.i.RootFS(ctx, client.content())
+		diffIDs, err := i.(*image).i.RootFS(ctx, client.content())
 		if err != nil {
 			return err
 		}
@@ -135,9 +135,9 @@ func WithNewRootFS(id string, image *Image) NewContainerOpts {
 
 // WithNewReadonlyRootFS allocates a new snapshot to be used by the container as the
 // root filesystem in read-only mode
-func WithNewReadonlyRootFS(id string, image *Image) NewContainerOpts {
+func WithNewReadonlyRootFS(id string, i Image) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		diffIDs, err := image.i.RootFS(ctx, client.content())
+		diffIDs, err := i.(*image).i.RootFS(ctx, client.content())
 		if err != nil {
 			return err
 		}
@@ -158,7 +158,7 @@ func WithRuntime(name string) NewContainerOpts {
 
 // NewContainer will create a new container in container with the provided id
 // the id must be unique within the namespace
-func (c *Client) NewContainer(ctx context.Context, id string, spec *specs.Spec, opts ...NewContainerOpts) (*Container, error) {
+func (c *Client) NewContainer(ctx context.Context, id string, spec *specs.Spec, opts ...NewContainerOpts) (Container, error) {
 	data, err := json.Marshal(spec)
 	if err != nil {
 		return nil, err
@@ -258,7 +258,7 @@ func (s *snapshotUnpacker) getLayers(ctx context.Context, image images.Image) ([
 	return layers, nil
 }
 
-func (c *Client) Pull(ctx context.Context, ref string, opts ...PullOpts) (*Image, error) {
+func (c *Client) Pull(ctx context.Context, ref string, opts ...PullOpts) (Image, error) {
 	pullCtx := defaultPullContext()
 	for _, o := range opts {
 		if err := o(c, pullCtx); err != nil {
@@ -296,7 +296,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...PullOpts) (*Image
 			return nil, err
 		}
 	}
-	return &Image{
+	return &image{
 		client: c,
 		i:      i,
 	}, nil

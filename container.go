@@ -10,27 +10,37 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
-func containerFromProto(client *Client, c containers.Container) *Container {
-	return &Container{
+type Container interface {
+	ID() string
+	Delete(context.Context) error
+	NewTask(context.Context, IOCreation) (Task, error)
+	Spec() (*specs.Spec, error)
+	Task() Task
+}
+
+func containerFromProto(client *Client, c containers.Container) *container {
+	return &container{
 		client: client,
 		c:      c,
 	}
 }
 
-type Container struct {
+var _ = (Container)(&container{})
+
+type container struct {
 	client *Client
 
 	c    containers.Container
-	task *Task
+	task *task
 }
 
 // ID returns the container's unique id
-func (c *Container) ID() string {
+func (c *container) ID() string {
 	return c.c.ID
 }
 
 // Spec returns the current OCI specification for the container
-func (c *Container) Spec() (*specs.Spec, error) {
+func (c *container) Spec() (*specs.Spec, error) {
 	var s specs.Spec
 	if err := json.Unmarshal(c.c.Spec.Value, &s); err != nil {
 		return nil, err
@@ -40,7 +50,7 @@ func (c *Container) Spec() (*specs.Spec, error) {
 
 // Delete deletes an existing container
 // an error is returned if the container has running tasks
-func (c *Container) Delete(ctx context.Context) error {
+func (c *container) Delete(ctx context.Context) error {
 	// TODO: should the client be the one removing resources attached
 	// to the container at the moment before we have GC?
 	err := c.client.snapshotter().Remove(ctx, c.c.RootFS)
@@ -53,11 +63,11 @@ func (c *Container) Delete(ctx context.Context) error {
 	return err
 }
 
-func (c *Container) Task() *Task {
+func (c *container) Task() Task {
 	return c.task
 }
 
-func (c *Container) NewTask(ctx context.Context, ioCreate IOCreation) (*Task, error) {
+func (c *container) NewTask(ctx context.Context, ioCreate IOCreation) (Task, error) {
 	i, err := ioCreate()
 	if err != nil {
 		return nil, err
@@ -85,7 +95,7 @@ func (c *Container) NewTask(ctx context.Context, ioCreate IOCreation) (*Task, er
 	if err != nil {
 		return nil, err
 	}
-	t := &Task{
+	t := &task{
 		client:      c.client,
 		io:          i,
 		containerID: response.ContainerID,
