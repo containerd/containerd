@@ -1,0 +1,5 @@
+{
+	"ImportPath": "github.com/docker/containerd",
+	"GoVersion": "go1.5",
+	"Deps": []
+}
