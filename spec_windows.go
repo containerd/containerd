@@ -31,7 +31,7 @@ func createDefaultSpec() (*specs.Spec, error) {
 	}, nil
 }
 
-func WithImage(ctx context.Context, i Image) SpecOpts {
+func WithImageConfig(ctx context.Context, i Image) SpecOpts {
 	return func(s *specs.Spec) error {
 		var (
 			image = i.(*image)

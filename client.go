@@ -156,9 +156,16 @@ func WithRuntime(name string) NewContainerOpts {
 	}
 }
 
+func WithImage(i Image) NewContainerOpts {
+	return func(ctx context.Context, client *Client, c *containers.Container) error {
+		c.Image = i.Name()
+		return nil
+	}
+}
+
 // NewContainer will create a new container in container with the provided id
 // the id must be unique within the namespace
-func (c *Client) NewContainer(ctx context.Context, id string, image Image, spec *specs.Spec, opts ...NewContainerOpts) (Container, error) {
+func (c *Client) NewContainer(ctx context.Context, id string, spec *specs.Spec, opts ...NewContainerOpts) (Container, error) {
 	data, err := json.Marshal(spec)
 	if err != nil {
 		return nil, err
@@ -170,7 +177,6 @@ func (c *Client) NewContainer(ctx context.Context, id string, image Image, spec 
 			TypeUrl: specs.Version,
 			Value:   data,
 		},
-		Image: image.Name(),
 	}
 	for _, o := range opts {
 		if err := o(ctx, c, &container); err != nil {

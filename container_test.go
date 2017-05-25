@@ -8,9 +8,8 @@ import (
 func TestContainerList(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
-		return
 	}
-	client, err := New(defaultAddress)
+	client, err := New(address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,9 +28,8 @@ func TestContainerList(t *testing.T) {
 func TestNewContainer(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
-		return
 	}
-	client, err := New(defaultAddress)
+	client, err := New(address)
 	if err != nil {
 		t.Fatal(err)
 	}

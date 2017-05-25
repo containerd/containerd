@@ -183,7 +183,7 @@ func WithHostNamespace(ns specs.LinuxNamespaceType) SpecOpts {
 	}
 }
 
-func WithImage(ctx context.Context, i Image) SpecOpts {
+func WithImageConfig(ctx context.Context, i Image) SpecOpts {
 	return func(s *specs.Spec) error {
 		var (
 			image = i.(*image)

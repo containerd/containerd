@@ -160,6 +160,16 @@ func (g *wgCloser) Close() error {
 	return nil
 }
 
+type TaskStatus string
+
+const (
+	Running TaskStatus = "running"
+	Created TaskStatus = "created"
+	Stopped TaskStatus = "stopped"
+	Paused  TaskStatus = "paused"
+	Pausing TaskStatus = "pausing"
+)
+
 type Task interface {
 	Delete(context.Context) (uint32, error)
 	Kill(context.Context, syscall.Signal) error
@@ -167,7 +177,7 @@ type Task interface {
 	Resume(context.Context) error
 	Pid() uint32
 	Start(context.Context) error
-	Status(context.Context) (string, error)
+	Status(context.Context) (TaskStatus, error)
 	Wait(context.Context) (uint32, error)
 }
 
@@ -218,14 +228,14 @@ func (t *task) Resume(ctx context.Context) error {
 	return err
 }
 
-func (t *task) Status(ctx context.Context) (string, error) {
+func (t *task) Status(ctx context.Context) (TaskStatus, error) {
 	r, err := t.client.TaskService().Info(ctx, &execution.InfoRequest{
 		ContainerID: t.containerID,
 	})
 	if err != nil {
 		return "", err
 	}
-	return r.Task.Status.String(), nil
+	return TaskStatus(r.Task.Status.String()), nil
 }
 
 // Wait is a blocking call that will wait for the task to exit and return the exit status
