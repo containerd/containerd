@@ -185,14 +185,14 @@ func (t *task) Pid() uint32 {
 }
 
 func (t *task) Start(ctx context.Context) error {
-	_, err := t.client.tasks().Start(ctx, &execution.StartRequest{
+	_, err := t.client.TaskService().Start(ctx, &execution.StartRequest{
 		ContainerID: t.containerID,
 	})
 	return err
 }
 
 func (t *task) Kill(ctx context.Context, s syscall.Signal) error {
-	_, err := t.client.tasks().Kill(ctx, &execution.KillRequest{
+	_, err := t.client.TaskService().Kill(ctx, &execution.KillRequest{
 		Signal:      uint32(s),
 		ContainerID: t.containerID,
 		PidOrAll: &execution.KillRequest_All{
@@ -203,21 +203,21 @@ func (t *task) Kill(ctx context.Context, s syscall.Signal) error {
 }
 
 func (t *task) Pause(ctx context.Context) error {
-	_, err := t.client.tasks().Pause(ctx, &execution.PauseRequest{
+	_, err := t.client.TaskService().Pause(ctx, &execution.PauseRequest{
 		ContainerID: t.containerID,
 	})
 	return err
 }
 
 func (t *task) Resume(ctx context.Context) error {
-	_, err := t.client.tasks().Resume(ctx, &execution.ResumeRequest{
+	_, err := t.client.TaskService().Resume(ctx, &execution.ResumeRequest{
 		ContainerID: t.containerID,
 	})
 	return err
 }
 
 func (t *task) Status(ctx context.Context) (string, error) {
-	r, err := t.client.tasks().Info(ctx, &execution.InfoRequest{
+	r, err := t.client.TaskService().Info(ctx, &execution.InfoRequest{
 		ContainerID: t.containerID,
 	})
 	if err != nil {
@@ -228,7 +228,7 @@ func (t *task) Status(ctx context.Context) (string, error) {
 
 // Wait is a blocking call that will wait for the task to exit and return the exit status
 func (t *task) Wait(ctx context.Context) (uint32, error) {
-	events, err := t.client.tasks().Events(ctx, &execution.EventsRequest{})
+	events, err := t.client.TaskService().Events(ctx, &execution.EventsRequest{})
 	if err != nil {
 		return 255, err
 	}
@@ -251,7 +251,7 @@ func (t *task) Wait(ctx context.Context) (uint32, error) {
 // during cleanup
 func (t *task) Delete(ctx context.Context) (uint32, error) {
 	cerr := t.io.Close()
-	r, err := t.client.tasks().Delete(ctx, &execution.DeleteRequest{
+	r, err := t.client.TaskService().Delete(ctx, &execution.DeleteRequest{
 		ContainerID: t.containerID,
 	})
 	if err != nil {

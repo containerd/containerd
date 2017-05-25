@@ -53,9 +53,9 @@ func (c *container) Spec() (*specs.Spec, error) {
 func (c *container) Delete(ctx context.Context) error {
 	// TODO: should the client be the one removing resources attached
 	// to the container at the moment before we have GC?
-	err := c.client.snapshotter().Remove(ctx, c.c.RootFS)
+	err := c.client.SnapshotService().Remove(ctx, c.c.RootFS)
 
-	if _, cerr := c.client.containers().Delete(ctx, &containers.DeleteContainerRequest{
+	if _, cerr := c.client.ContainerService().Delete(ctx, &containers.DeleteContainerRequest{
 		ID: c.c.ID,
 	}); err == nil {
 		err = cerr
@@ -80,7 +80,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation) (Task, err
 		Stderr:      i.Stderr,
 	}
 	// get the rootfs from the snapshotter and add it to the request
-	mounts, err := c.client.snapshotter().Mounts(ctx, c.c.RootFS)
+	mounts, err := c.client.SnapshotService().Mounts(ctx, c.c.RootFS)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation) (Task, err
 			Options: m.Options,
 		})
 	}
-	response, err := c.client.tasks().Create(ctx, request)
+	response, err := c.client.TaskService().Create(ctx, request)
 	if err != nil {
 		return nil, err
 	}

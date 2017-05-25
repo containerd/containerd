@@ -186,7 +186,7 @@ func WithHostNamespace(ns specs.LinuxNamespaceType) SpecOpts {
 func WithImage(ctx context.Context, i Image) SpecOpts {
 	return func(s *specs.Spec) error {
 		image := i.(*image)
-		store := image.client.content()
+		store := image.client.ContentStore()
 		ic, err := image.i.Config(ctx, store)
 		if err != nil {
 			return err

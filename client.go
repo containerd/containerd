@@ -84,7 +84,7 @@ type Client struct {
 
 // Containers returns all containers created in containerd
 func (c *Client) Containers(ctx context.Context) ([]Container, error) {
-	r, err := c.containers().List(ctx, &containers.ListContainersRequest{})
+	r, err := c.ContainerService().List(ctx, &containers.ListContainersRequest{})
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func WithContainerLabels(labels map[string]string) NewContainerOpts {
 func WithExistingRootFS(id string) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		// check that the snapshot exists, if not, fail on creation
-		if _, err := client.snapshotter().Mounts(ctx, id); err != nil {
+		if _, err := client.SnapshotService().Mounts(ctx, id); err != nil {
 			return err
 		}
 		c.RootFS = id
@@ -121,11 +121,11 @@ func WithExistingRootFS(id string) NewContainerOpts {
 // root filesystem in read-write mode
 func WithNewRootFS(id string, i Image) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		diffIDs, err := i.(*image).i.RootFS(ctx, client.content())
+		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore())
 		if err != nil {
 			return err
 		}
-		if _, err := client.snapshotter().Prepare(ctx, id, identity.ChainID(diffIDs).String()); err != nil {
+		if _, err := client.SnapshotService().Prepare(ctx, id, identity.ChainID(diffIDs).String()); err != nil {
 			return err
 		}
 		c.RootFS = id
@@ -137,11 +137,11 @@ func WithNewRootFS(id string, i Image) NewContainerOpts {
 // root filesystem in read-only mode
 func WithNewReadonlyRootFS(id string, i Image) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		diffIDs, err := i.(*image).i.RootFS(ctx, client.content())
+		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore())
 		if err != nil {
 			return err
 		}
-		if _, err := client.snapshotter().View(ctx, id, identity.ChainID(diffIDs).String()); err != nil {
+		if _, err := client.SnapshotService().View(ctx, id, identity.ChainID(diffIDs).String()); err != nil {
 			return err
 		}
 		c.RootFS = id
@@ -176,7 +176,7 @@ func (c *Client) NewContainer(ctx context.Context, id string, spec *specs.Spec, 
 			return nil, err
 		}
 	}
-	r, err := c.containers().Create(ctx, &containers.CreateContainerRequest{
+	r, err := c.ContainerService().Create(ctx, &containers.CreateContainerRequest{
 		Container: container,
 	})
 	if err != nil {
@@ -202,9 +202,9 @@ func defaultPullContext() *PullContext {
 
 func WithPullUnpack(client *Client, c *PullContext) error {
 	c.Unpacker = &snapshotUnpacker{
-		store:       client.content(),
-		diff:        client.diff(),
-		snapshotter: client.snapshotter(),
+		store:       client.ContentStore(),
+		diff:        client.DiffService(),
+		snapshotter: client.SnapshotService(),
 	}
 	return nil
 }
@@ -265,7 +265,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...PullOpts) (Image,
 			return nil, err
 		}
 	}
-	store := c.content()
+	store := c.ContentStore()
 
 	name, desc, err := pullCtx.Resolver.Resolve(ctx, ref)
 	if err != nil {
@@ -283,7 +283,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...PullOpts) (Image,
 	if err := images.Dispatch(ctx, images.Handlers(handlers...), desc); err != nil {
 		return nil, err
 	}
-	is := c.images()
+	is := c.ImageService()
 	if err := is.Put(ctx, name, desc); err != nil {
 		return nil, err
 	}
@@ -307,26 +307,26 @@ func (c *Client) Close() error {
 	return c.conn.Close()
 }
 
-func (c *Client) containers() containers.ContainersClient {
+func (c *Client) ContainerService() containers.ContainersClient {
 	return containers.NewContainersClient(c.conn)
 }
 
-func (c *Client) content() content.Store {
+func (c *Client) ContentStore() content.Store {
 	return contentservice.NewStoreFromClient(contentapi.NewContentClient(c.conn))
 }
 
-func (c *Client) snapshotter() snapshot.Snapshotter {
+func (c *Client) SnapshotService() snapshot.Snapshotter {
 	return snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotClient(c.conn))
 }
 
-func (c *Client) tasks() execution.TasksClient {
+func (c *Client) TaskService() execution.TasksClient {
 	return execution.NewTasksClient(c.conn)
 }
 
-func (c *Client) images() images.Store {
+func (c *Client) ImageService() images.Store {
 	return imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(c.conn))
 }
 
-func (c *Client) diff() diff.DiffService {
+func (c *Client) DiffService() diff.DiffService {
 	return diffservice.NewDiffServiceFromClient(diffapi.NewDiffClient(c.conn))
 }
