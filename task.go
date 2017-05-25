@@ -14,6 +14,8 @@ import (
 	"github.com/containerd/fifo"
 )
 
+const UnknownExitStatus = 255
+
 type IO struct {
 	Terminal bool
 	Stdin    string
@@ -230,12 +232,12 @@ func (t *task) Status(ctx context.Context) (string, error) {
 func (t *task) Wait(ctx context.Context) (uint32, error) {
 	events, err := t.client.TaskService().Events(ctx, &execution.EventsRequest{})
 	if err != nil {
-		return 255, err
+		return UnknownExitStatus, err
 	}
 	for {
 		e, err := events.Recv()
 		if err != nil {
-			return 255, err
+			return UnknownExitStatus, err
 		}
 		if e.Type != taskapi.Event_EXIT {
 			continue
@@ -255,7 +257,7 @@ func (t *task) Delete(ctx context.Context) (uint32, error) {
 		ContainerID: t.containerID,
 	})
 	if err != nil {
-		return 255, err
+		return UnknownExitStatus, err
 	}
 	return r.ExitStatus, cerr
 }

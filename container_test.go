@@ -7,6 +7,7 @@ import (
 
 func TestContainerList(t *testing.T) {
 	if testing.Short() {
+		t.Skip()
 		return
 	}
 	client, err := New(defaultAddress)
@@ -27,6 +28,7 @@ func TestContainerList(t *testing.T) {
 
 func TestNewContainer(t *testing.T) {
 	if testing.Short() {
+		t.Skip()
 		return
 	}
 	client, err := New(defaultAddress)

@@ -50,10 +50,12 @@ func (c *container) Spec() (*specs.Spec, error) {
 
 // Delete deletes an existing container
 // an error is returned if the container has running tasks
-func (c *container) Delete(ctx context.Context) error {
+func (c *container) Delete(ctx context.Context) (err error) {
 	// TODO: should the client be the one removing resources attached
 	// to the container at the moment before we have GC?
-	err := c.client.SnapshotService().Remove(ctx, c.c.RootFS)
+	if c.c.RootFS != "" {
+		err = c.client.SnapshotService().Remove(ctx, c.c.RootFS)
+	}
 
 	if _, cerr := c.client.ContainerService().Delete(ctx, &containers.DeleteContainerRequest{
 		ID: c.c.ID,
@@ -79,17 +81,19 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation) (Task, err
 		Stdout:      i.Stdout,
 		Stderr:      i.Stderr,
 	}
-	// get the rootfs from the snapshotter and add it to the request
-	mounts, err := c.client.SnapshotService().Mounts(ctx, c.c.RootFS)
-	if err != nil {
-		return nil, err
-	}
-	for _, m := range mounts {
-		request.Rootfs = append(request.Rootfs, &mount.Mount{
-			Type:    m.Type,
-			Source:  m.Source,
-			Options: m.Options,
-		})
+	if c.c.RootFS != "" {
+		// get the rootfs from the snapshotter and add it to the request
+		mounts, err := c.client.SnapshotService().Mounts(ctx, c.c.RootFS)
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range mounts {
+			request.Rootfs = append(request.Rootfs, &mount.Mount{
+				Type:    m.Type,
+				Source:  m.Source,
+				Options: m.Options,
+			})
+		}
 	}
 	response, err := c.client.TaskService().Create(ctx, request)
 	if err != nil {

@@ -8,7 +8,7 @@ import (
 )
 
 func dialer(address string, timeout time.Duration) (net.Conn, error) {
-	return winio.DialPipe(bindAddress, &timeout)
+	return winio.DialPipe(address, &timeout)
 }
 
 func dialAddress(address string) string {

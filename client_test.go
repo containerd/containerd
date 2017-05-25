@@ -9,6 +9,7 @@ const defaultAddress = "/run/containerd/containerd.sock"
 
 func TestNewClient(t *testing.T) {
 	if testing.Short() {
+		t.Skip()
 		return
 	}
 	client, err := New(defaultAddress)
@@ -25,6 +26,7 @@ func TestNewClient(t *testing.T) {
 
 func TestImagePull(t *testing.T) {
 	if testing.Short() {
+		t.Skip()
 		return
 	}
 	client, err := New(defaultAddress)

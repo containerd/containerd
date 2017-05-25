@@ -4,17 +4,7 @@ import specs "github.com/opencontainers/runtime-spec/specs-go"
 
 type SpecOpts func(s *specs.Spec) error
 
-func WithImageRef(ref string) SpecOpts {
-	return func(s *specs.Spec) error {
-		if s.Annotations == nil {
-			s.Annotations = make(map[string]string)
-		}
-		s.Annotations["image"] = ref
-		return nil
-	}
-}
-
-func WithArgs(args ...string) SpecOpts {
+func WithProcessArgs(args ...string) SpecOpts {
 	return func(s *specs.Spec) error {
 		s.Process.Args = args
 		return nil
