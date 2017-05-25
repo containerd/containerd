@@ -1,3 +1,4 @@
 /bin/
 **/coverage.txt
 **/coverage.out
+containerd.test
