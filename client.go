@@ -33,6 +33,7 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
+	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
 func init() {
@@ -80,6 +81,14 @@ type Client struct {
 
 	runtime   string
 	namespace string
+}
+
+func (c *Client) IsServing(ctx context.Context) (bool, error) {
+	r, err := c.HealthService().Check(ctx, &grpc_health_v1.HealthCheckRequest{})
+	if err != nil {
+		return false, err
+	}
+	return r.Status == grpc_health_v1.HealthCheckResponse_SERVING, nil
 }
 
 // Containers returns all containers created in containerd
@@ -309,6 +318,18 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...PullOpts) (Image,
 	}, nil
 }
 
+// GetImage returns an existing image
+func (c *Client) GetImage(ctx context.Context, ref string) (Image, error) {
+	i, err := c.ImageService().Get(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	return &image{
+		client: c,
+		i:      i,
+	}, nil
+}
+
 // Close closes the clients connection to containerd
 func (c *Client) Close() error {
 	return c.conn.Close()
@@ -336,4 +357,8 @@ func (c *Client) ImageService() images.Store {
 
 func (c *Client) DiffService() diff.DiffService {
 	return diffservice.NewDiffServiceFromClient(diffapi.NewDiffClient(c.conn))
+}
+
+func (c *Client) HealthService() grpc_health_v1.HealthClient {
+	return grpc_health_v1.NewHealthClient(c.conn)
 }
