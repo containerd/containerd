@@ -298,6 +298,24 @@ func CommitActive(ctx context.Context, key, name string, usage snapshot.Usage) (
 			return errors.Wrap(err, "failed to delete active")
 		}
 
+		if pbkt != nil {
+			k, _ := pbkt.Cursor().Seek(parentPrefixKey(ss.ID))
+			if getParentPrefix(k) == ss.ID {
+				return errors.Errorf("cannot remove snapshot with child")
+			}
+
+			if ss.Parent != "" {
+				var ps db.Snapshot
+				if err := getSnapshot(bkt, ss.Parent, &ps); err != nil {
+					return errors.Wrap(err, "failed to get parent snapshot")
+				}
+
+				if err := pbkt.Put(parentKey(ps.ID, ss.ID), []byte(name)); err != nil {
+					return errors.Wrap(err, "failed to update parent link")
+				}
+			}
+		}
+
 		id = fmt.Sprintf("%d", ss.ID)
 
 		return nil
