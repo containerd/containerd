@@ -241,7 +241,7 @@ var runCommand = cli.Command{
 			}
 		}
 
-		createContainer, err := newCreateContainerRequest(context, id, id, spec)
+		createContainer, err := newCreateContainerRequest(context, id, id, ref, spec)
 		if err != nil {
 			return err
 		}
