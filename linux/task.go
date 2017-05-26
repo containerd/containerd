@@ -159,7 +159,7 @@ func (c *Task) Checkpoint(ctx context.Context, opts plugin.CheckpointOpts) error
 		AllowTerminal:    opts.AllowTerminal,
 		FileLocks:        opts.FileLocks,
 		EmptyNamespaces:  opts.EmptyNamespaces,
-		Image:            opts.Path,
+		CheckpointPath:   opts.Path,
 	})
 	return err
 }

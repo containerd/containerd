@@ -133,5 +133,5 @@ message CheckpointRequest {
 	bool allow_terminal = 4;
 	bool file_locks = 5;
 	repeated string empty_namespaces = 6;
-	string image = 7;
+	string checkpoint_path = 7;
 }
