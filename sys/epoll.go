@@ -1,4 +1,4 @@
-// +build linux,!arm64
+// +build linux
 
 package sys
 
