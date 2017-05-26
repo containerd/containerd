@@ -1,90 +1,69 @@
-package containers
+package metadata
 
 import (
 	"context"
 
 	"github.com/boltdb/bolt"
+	"github.com/containerd/containerd/containers"
 	"github.com/pkg/errors"
 )
 
-var (
-	ErrExists   = errors.New("images: exists")
-	ErrNotFound = errors.New("images: not found")
-)
-
-// IsNotFound returns true if the error is due to a missing image.
-func IsNotFound(err error) bool {
-	return errors.Cause(err) == ErrNotFound
-}
-
-func IsExists(err error) bool {
-	return errors.Cause(err) == ErrExists
-}
-
-var (
-	bucketKeyStorageVersion = []byte("v1")
-	bucketKeyContainers     = []byte("containers")
-	bucketKeyLabels         = []byte("labels")
-	bucketKeyImage          = []byte("image")
-	bucketKeyRuntime        = []byte("runtime")
-	bucketKeySpec           = []byte("spec")
-	bucketKeyRootFS         = []byte("rootfs")
-)
-
-type storage struct {
+type containerStore struct {
 	tx *bolt.Tx
 }
 
-func NewStore(tx *bolt.Tx) Store {
-	return &storage{
+func NewContainerStore(tx *bolt.Tx) containers.Store {
+	return &containerStore{
 		tx: tx,
 	}
 }
 
-func (s *storage) Get(ctx context.Context, id string) (Container, error) {
+func (s *containerStore) Get(ctx context.Context, id string) (containers.Container, error) {
 	bkt := getContainerBucket(s.tx, id)
 	if bkt == nil {
-		return Container{}, errors.Wrap(ErrNotFound, "bucket does not exist")
+		return containers.Container{}, errors.Wrap(ErrNotFound, "bucket does not exist")
 	}
 
-	container := Container{ID: id}
+	container := containers.Container{ID: id}
 	if err := readContainer(&container, bkt); err != nil {
-		return Container{}, errors.Wrap(err, "failed to read container")
+		return containers.Container{}, errors.Wrap(err, "failed to read container")
 	}
 
 	return container, nil
 }
 
-func (s *storage) List(ctx context.Context, filter string) ([]Container, error) {
-	containers := []Container{}
-	bkt := getContainersBucket(s.tx)
+func (s *containerStore) List(ctx context.Context, filter string) ([]containers.Container, error) {
+	var (
+		m   = []containers.Container{}
+		bkt = getContainersBucket(s.tx)
+	)
 	if bkt == nil {
-		return containers, nil
+		return m, nil
 	}
 	err := bkt.ForEach(func(k, v []byte) error {
 		cbkt := bkt.Bucket(k)
 		if cbkt == nil {
 			return nil
 		}
-		container := Container{ID: string(k)}
+		container := containers.Container{ID: string(k)}
 
 		if err := readContainer(&container, cbkt); err != nil {
 			return errors.Wrap(err, "failed to read container")
 		}
-		containers = append(containers, container)
+		m = append(m, container)
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return containers, nil
+	return m, nil
 }
 
-func (s *storage) Create(ctx context.Context, container Container) (Container, error) {
+func (s *containerStore) Create(ctx context.Context, container containers.Container) (containers.Container, error) {
 	bkt, err := createContainersBucket(s.tx)
 	if err != nil {
-		return Container{}, err
+		return containers.Container{}, err
 	}
 
 	cbkt, err := bkt.CreateBucket([]byte(container.ID))
@@ -92,35 +71,35 @@ func (s *storage) Create(ctx context.Context, container Container) (Container, e
 		if err == bolt.ErrBucketExists {
 			err = errors.Wrap(ErrExists, "content for id already exists")
 		}
-		return Container{}, err
+		return containers.Container{}, err
 	}
 
 	if err := writeContainer(&container, cbkt); err != nil {
-		return Container{}, errors.Wrap(err, "failed to write container")
+		return containers.Container{}, errors.Wrap(err, "failed to write container")
 	}
 
 	return container, nil
 }
 
-func (s *storage) Update(ctx context.Context, container Container) (Container, error) {
+func (s *containerStore) Update(ctx context.Context, container containers.Container) (containers.Container, error) {
 	bkt := getContainersBucket(s.tx)
 	if bkt == nil {
-		return Container{}, errors.Wrap(ErrNotFound, "no containers")
+		return containers.Container{}, errors.Wrap(ErrNotFound, "no containers")
 	}
 
 	cbkt := bkt.Bucket([]byte(container.ID))
 	if cbkt == nil {
-		return Container{}, errors.Wrap(ErrNotFound, "no content for id")
+		return containers.Container{}, errors.Wrap(ErrNotFound, "no content for id")
 	}
 
 	if err := writeContainer(&container, cbkt); err != nil {
-		return Container{}, errors.Wrap(err, "failed to write container")
+		return containers.Container{}, errors.Wrap(err, "failed to write container")
 	}
 
 	return container, nil
 }
 
-func (s *storage) Delete(ctx context.Context, id string) error {
+func (s *containerStore) Delete(ctx context.Context, id string) error {
 	bkt := getContainersBucket(s.tx)
 	if bkt == nil {
 		return errors.Wrap(ErrNotFound, "no containers")
@@ -133,7 +112,7 @@ func (s *storage) Delete(ctx context.Context, id string) error {
 	return err
 }
 
-func readContainer(container *Container, bkt *bolt.Bucket) error {
+func readContainer(container *containers.Container, bkt *bolt.Bucket) error {
 	return bkt.ForEach(func(k, v []byte) error {
 		switch string(k) {
 		case string(bucketKeyImage):
@@ -162,7 +141,7 @@ func readContainer(container *Container, bkt *bolt.Bucket) error {
 	})
 }
 
-func writeContainer(container *Container, bkt *bolt.Bucket) error {
+func writeContainer(container *containers.Container, bkt *bolt.Bucket) error {
 	for _, v := range [][2][]byte{
 		{bucketKeyImage, []byte(container.Image)},
 		{bucketKeyRuntime, []byte(container.Runtime)},
@@ -189,33 +168,4 @@ func writeContainer(container *Container, bkt *bolt.Bucket) error {
 		}
 	}
 	return nil
-}
-
-func createContainersBucket(tx *bolt.Tx) (*bolt.Bucket, error) {
-	bkt, err := tx.CreateBucketIfNotExists(bucketKeyStorageVersion)
-	if err != nil {
-		return nil, err
-	}
-	return bkt.CreateBucketIfNotExists(bucketKeyContainers)
-}
-
-func getContainersBucket(tx *bolt.Tx) *bolt.Bucket {
-	return getBucket(tx, bucketKeyStorageVersion, bucketKeyContainers)
-}
-
-func getContainerBucket(tx *bolt.Tx, id string) *bolt.Bucket {
-	return getBucket(tx, bucketKeyStorageVersion, bucketKeyContainers, []byte(id))
-}
-
-func getBucket(tx *bolt.Tx, keys ...[]byte) *bolt.Bucket {
-	bkt := tx.Bucket(keys[0])
-
-	for _, key := range keys[1:] {
-		if bkt == nil {
-			break
-		}
-		bkt = bkt.Bucket(key)
-	}
-
-	return bkt
 }

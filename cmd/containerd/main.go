@@ -25,8 +25,8 @@ import (
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	versionapi "github.com/containerd/containerd/api/services/version"
 	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/sys"
@@ -258,8 +258,7 @@ func resolveMetaDB(ctx *cli.Context) (*bolt.DB, error) {
 		return nil, err
 	}
 
-	// TODO(stevvooe): Break these down into components to be initialized.
-	if err := images.InitDB(db); err != nil {
+	if err := metadata.InitDB(db); err != nil {
 		return nil, err
 	}
 

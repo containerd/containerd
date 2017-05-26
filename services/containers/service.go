@@ -4,6 +4,7 @@ import (
 	"github.com/boltdb/bolt"
 	api "github.com/containerd/containerd/api/services/containers"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
 	"github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
@@ -136,7 +137,7 @@ func (s *Service) Delete(ctx context.Context, req *api.DeleteContainerRequest) (
 }
 
 func (s *Service) withStore(ctx context.Context, fn func(ctx context.Context, store containers.Store) error) func(tx *bolt.Tx) error {
-	return func(tx *bolt.Tx) error { return fn(ctx, containers.NewStore(tx)) }
+	return func(tx *bolt.Tx) error { return fn(ctx, metadata.NewContainerStore(tx)) }
 }
 
 func (s *Service) withStoreView(ctx context.Context, fn func(ctx context.Context, store containers.Store) error) error {

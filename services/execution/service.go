@@ -18,6 +18,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	protobuf "github.com/gogo/protobuf/types"
@@ -105,15 +106,15 @@ func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 
 	var container containers.Container
 	if err := s.db.View(func(tx *bolt.Tx) error {
-		store := containers.NewStore(tx)
+		store := metadata.NewContainerStore(tx)
 		var err error
 		container, err = store.Get(ctx, r.ContainerID)
 		return err
 	}); err != nil {
 		switch {
-		case containers.IsNotFound(err):
+		case metadata.IsNotFound(err):
 			return nil, grpc.Errorf(codes.NotFound, "container %v not found", r.ContainerID)
-		case containers.IsExists(err):
+		case metadata.IsExists(err):
 			return nil, grpc.Errorf(codes.AlreadyExists, "container %v already exists", r.ContainerID)
 		}
 

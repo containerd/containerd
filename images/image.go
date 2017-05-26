@@ -17,6 +17,13 @@ type Image struct {
 	Target ocispec.Descriptor
 }
 
+type Store interface {
+	Put(ctx context.Context, name string, desc ocispec.Descriptor) error
+	Get(ctx context.Context, name string) (Image, error)
+	List(ctx context.Context) ([]Image, error)
+	Delete(ctx context.Context, name string) error
+}
+
 // TODO(stevvooe): Many of these functions make strong platform assumptions,
 // which are untrue in a lot of cases. More refactoring must be done here to
 // make this work in all cases.
