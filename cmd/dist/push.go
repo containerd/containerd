@@ -8,7 +8,6 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/progress"
@@ -99,26 +98,7 @@ var pushCommand = cli.Command{
 				return nil, nil
 			})
 
-			pushHandler := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-				ctx = log.WithLogger(ctx, log.G(ctx).WithFields(logrus.Fields{
-					"digest":    desc.Digest,
-					"mediatype": desc.MediaType,
-					"size":      desc.Size,
-				}))
-
-				log.G(ctx).Debug("push")
-				r, err := cs.Reader(ctx, desc.Digest)
-				if err != nil {
-					return nil, err
-				}
-				defer r.Close()
-
-				tracker := ongoing.track(remotes.MakeRefKey(ctx, desc), desc.Size)
-				defer tracker.Close()
-				tr := io.TeeReader(r, tracker)
-
-				return nil, pusher.Push(ctx, desc, tr)
-			})
+			pushHandler := remotes.PushHandler(cs, ongoing.wrapPusher(pusher))
 
 			var m sync.Mutex
 			manifestStack := []ocispec.Descriptor{}
@@ -213,6 +193,17 @@ func (pt *pushTracker) Close() error {
 	return nil
 }
 
+type pushWrapper struct {
+	jobs   *pushjobs
+	pusher remotes.Pusher
+}
+
+func (pw pushWrapper) Push(ctx context.Context, desc ocispec.Descriptor, r io.Reader) error {
+	tr := pw.jobs.track(remotes.MakeRefKey(ctx, desc), desc.Size)
+	defer tr.Close()
+	return pw.pusher.Push(ctx, desc, io.TeeReader(r, tr))
+}
+
 type pushStatus struct {
 	name    string
 	started bool
@@ -228,6 +219,13 @@ type pushjobs struct {
 
 func newPushJobs() *pushjobs {
 	return &pushjobs{jobs: make(map[string]*pushTracker)}
+}
+
+func (j *pushjobs) wrapPusher(p remotes.Pusher) remotes.Pusher {
+	return pushWrapper{
+		jobs:   j,
+		pusher: p,
+	}
 }
 
 func (j *pushjobs) add(ref string) {

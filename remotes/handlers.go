@@ -64,3 +64,22 @@ func fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc
 
 	return content.WriteBlob(ctx, ingester, ref, rc, desc.Size, desc.Digest)
 }
+
+func PushHandler(provider content.Provider, pusher Pusher) images.HandlerFunc {
+	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		ctx = log.WithLogger(ctx, log.G(ctx).WithFields(logrus.Fields{
+			"digest":    desc.Digest,
+			"mediatype": desc.MediaType,
+			"size":      desc.Size,
+		}))
+
+		log.G(ctx).Debug("push")
+		r, err := provider.Reader(ctx, desc.Digest)
+		if err != nil {
+			return nil, err
+		}
+		defer r.Close()
+
+		return nil, pusher.Push(ctx, desc, r)
+	}
+}
