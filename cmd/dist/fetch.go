@@ -231,14 +231,14 @@ func display(w io.Writer, statuses []statusInfo, start time.Time) {
 	for _, status := range statuses {
 		total += status.Offset
 		switch status.Status {
-		case "downloading":
+		case "downloading", "uploading":
 			bar := progress.Bar(float64(status.Offset) / float64(status.Total))
 			fmt.Fprintf(w, "%s:\t%s\t%40r\t%8.8s/%s\t\n",
 				status.Ref,
 				status.Status,
 				bar,
 				progress.Bytes(status.Offset), progress.Bytes(status.Total))
-		case "resolving":
+		case "resolving", "waiting":
 			bar := progress.Bar(0.0)
 			fmt.Fprintf(w, "%s:\t%s\t%40r\t\n",
 				status.Ref,
