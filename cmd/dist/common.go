@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/containerd/console"
+	"github.com/containerd/containerd"
 	contentapi "github.com/containerd/containerd/api/services/content"
 	imagesapi "github.com/containerd/containerd/api/services/images"
 	"github.com/containerd/containerd/content"
@@ -45,6 +46,13 @@ var registryFlags = []cli.Flag{
 		Name:  "refresh",
 		Usage: "Refresh token for authorization server",
 	},
+}
+
+func getClient(context *cli.Context) (*containerd.Client, error) {
+	address := context.GlobalString("address")
+	//timeout := context.GlobalDuration("connect-timeout")
+
+	return containerd.New(address)
 }
 
 func resolveContentStore(context *cli.Context) (content.Store, error) {

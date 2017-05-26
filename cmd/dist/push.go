@@ -8,6 +8,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/progress"
@@ -50,12 +51,7 @@ var pushCommand = cli.Command{
 		ctx, cancel := appContext()
 		defer cancel()
 
-		cs, err := resolveContentStore(clicontext)
-		if err != nil {
-			return err
-		}
-
-		imageStore, err := resolveImageStore(clicontext)
+		client, err := getClient(clicontext)
 		if err != nil {
 			return err
 		}
@@ -70,7 +66,7 @@ var pushCommand = cli.Command{
 			if local == "" {
 				local = ref
 			}
-			img, err := imageStore.Get(ctx, local)
+			img, err := client.ImageService().Get(ctx, local)
 			if err != nil {
 				return errors.Wrap(err, "unable to resolve image to manifest")
 			}
@@ -86,11 +82,6 @@ var pushCommand = cli.Command{
 		eg, ctx := errgroup.WithContext(ctx)
 
 		eg.Go(func() error {
-			pusher, err := resolver.Pusher(ctx, ref)
-			if err != nil {
-				return err
-			}
-
 			log.G(ctx).WithField("image", ref).WithField("digest", desc.Digest).Debug("pushing")
 
 			jobHandler := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
@@ -98,39 +89,11 @@ var pushCommand = cli.Command{
 				return nil, nil
 			})
 
-			pushHandler := remotes.PushHandler(cs, ongoing.wrapPusher(pusher))
-
-			var m sync.Mutex
-			manifestStack := []ocispec.Descriptor{}
-
-			filterHandler := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-				switch desc.MediaType {
-				case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest,
-					images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
-					m.Lock()
-					manifestStack = append(manifestStack, desc)
-					m.Unlock()
-					return nil, images.StopHandler
-				default:
-					return nil, nil
-				}
-			})
-
-			handler := images.Handlers(jobHandler, images.ChildrenHandler(cs), filterHandler, pushHandler)
-
-			if err := images.Dispatch(ctx, handler, desc); err != nil {
-				return err
-			}
-
-			// Iterate in reverse order as seen, parent always uploaded after child
-			for i := len(manifestStack) - 1; i >= 0; i-- {
-				_, err := pushHandler(ctx, manifestStack[i])
-				if err != nil {
-					return err
-				}
-			}
-
-			return nil
+			return client.Push(ctx, ref, desc,
+				containerd.WithResolver(resolver),
+				containerd.WithImageHandler(jobHandler),
+				containerd.WithPushWrapper(ongoing.wrapPusher),
+			)
 		})
 
 		errs := make(chan error)
