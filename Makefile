@@ -125,7 +125,7 @@ root-test: ## run tests, except integration tests
 
 integration: ## run integration tests
 	@echo "$(WHALE) $@"
-	@go test ${TESTFLAGS} ${INTEGRATION_PACKAGE}
+	@go test ${TESTFLAGS}
 
 FORCE:
 
