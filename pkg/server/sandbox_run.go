@@ -219,12 +219,8 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 	g := generate.New()
 
 	// Apply default config from image config.
-	for _, e := range imageConfig.Env {
-		kv := strings.Split(e, "=")
-		if len(kv) != 2 {
-			return nil, fmt.Errorf("invalid environment variable in image config %+v", imageConfig)
-		}
-		g.AddProcessEnv(kv[0], kv[1])
+	if err := addImageEnvs(&g, imageConfig.Env); err != nil {
+		return nil, err
 	}
 
 	if imageConfig.WorkingDir != "" {
@@ -299,4 +295,17 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 	// TODO(random-liu): [P1] Set default sandbox container resource limit.
 
 	return g.Spec(), nil
+}
+
+// addImageEnvs adds environment variables from image config. It returns error if
+// an invalid environment variable is encountered.
+func addImageEnvs(g *generate.Generator, imageEnvs []string) error {
+	for _, e := range imageEnvs {
+		kv := strings.Split(e, "=")
+		if len(kv) != 2 {
+			return fmt.Errorf("invalid environment variable %q", e)
+		}
+		g.AddProcessEnv(kv[0], kv[1])
+	}
+	return nil
 }
