@@ -49,6 +49,7 @@ func (c *criContainerdService) startEventMonitor() error {
 func (c *criContainerdService) handleEventStream(events execution.ContainerService_EventsClient) {
 	// TODO(random-liu): [P1] Should backoff on this error, or else this will
 	// cause a busy loop.
+	// TODO(random-liu): Handle io.EOF.
 	e, err := events.Recv()
 	if err != nil {
 		glog.Errorf("Failed to receive event: %v", err)

@@ -34,7 +34,7 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 	glog.V(2).Infof("StopPodSandbox for sandbox %q", r.GetPodSandboxId())
 	defer func() {
 		if retErr == nil {
-			glog.V(2).Info("StopPodSandbox %q returns successfully", r.GetPodSandboxId())
+			glog.V(2).Infof("StopPodSandbox %q returns successfully", r.GetPodSandboxId())
 		}
 	}()
 
@@ -56,7 +56,7 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 	} else if !os.IsNotExist(err) { // It's ok for sandbox.NetNS to *not* exist
 		return nil, fmt.Errorf("failed to stat netns path for sandbox %q before tearing down the network: %v", id, err)
 	}
-	glog.V(2).Info("TearDown network for sandbox %q successfully", id)
+	glog.V(2).Infof("TearDown network for sandbox %q successfully", id)
 
 	// TODO(random-liu): [P1] Handle sandbox container graceful deletion.
 	// Delete the sandbox container from containerd.
