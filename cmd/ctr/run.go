@@ -3,6 +3,7 @@ package main
 import (
 	gocontext "context"
 	"encoding/json"
+	goerrors "errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -83,7 +84,7 @@ var runCommand = cli.Command{
 			id  = context.String("id")
 		)
 		if id == "" {
-			return errors.New("container id must be provided")
+			return goerrors.New("container id must be provided")
 		}
 		containers, err := getContainersService(context)
 		if err != nil {
