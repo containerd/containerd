@@ -26,7 +26,10 @@ import (
 
 	"github.com/containerd/containerd/api/services/execution"
 	"github.com/containerd/containerd/api/types/container"
+	"github.com/containerd/containerd/api/types/mount"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
@@ -38,7 +41,7 @@ import (
 )
 
 func getStartContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandboxConfig,
-	func(*testing.T, string, uint32, *runtimespec.Spec)) {
+	*imagespec.ImageConfig, func(*testing.T, string, uint32, *runtimespec.Spec)) {
 	config := &runtime.ContainerConfig{
 		Metadata: &runtime.ContainerMetadata{
 			Name:    "test-name",
@@ -92,11 +95,17 @@ func getStartContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandboxC
 			CgroupParent: "/test/cgroup/parent",
 		},
 	}
+	imageConfig := &imagespec.ImageConfig{
+		Env:        []string{"ik1=iv1", "ik2=iv2"},
+		Entrypoint: []string{"/entrypoint"},
+		Cmd:        []string{"cmd"},
+		WorkingDir: "/workspace",
+	}
 	specCheck := func(t *testing.T, id string, sandboxPid uint32, spec *runtimespec.Spec) {
 		assert.Equal(t, relativeRootfsPath, spec.Root.Path)
 		assert.Equal(t, []string{"test", "command", "test", "args"}, spec.Process.Args)
 		assert.Equal(t, "test-cwd", spec.Process.Cwd)
-		assert.Contains(t, spec.Process.Env, "k1=v1", "k2=v2")
+		assert.Contains(t, spec.Process.Env, "k1=v1", "k2=v2", "ik1=iv1", "ik2=iv2")
 
 		t.Logf("Check bind mount")
 		found1, found2 := false, false
@@ -159,15 +168,15 @@ func getStartContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandboxC
 			Path: getPIDNamespace(sandboxPid),
 		})
 	}
-	return config, sandboxConfig, specCheck
+	return config, sandboxConfig, imageConfig, specCheck
 }
 
 func TestGeneralContainerSpec(t *testing.T) {
 	testID := "test-id"
 	testPid := uint32(1234)
-	config, sandboxConfig, specCheck := getStartContainerTestData()
+	config, sandboxConfig, imageConfig, specCheck := getStartContainerTestData()
 	c := newTestCRIContainerdService()
-	spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig)
+	spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig)
 	assert.NoError(t, err)
 	specCheck(t, testID, testPid, spec)
 }
@@ -175,11 +184,11 @@ func TestGeneralContainerSpec(t *testing.T) {
 func TestContainerSpecTty(t *testing.T) {
 	testID := "test-id"
 	testPid := uint32(1234)
-	config, sandboxConfig, specCheck := getStartContainerTestData()
+	config, sandboxConfig, imageConfig, specCheck := getStartContainerTestData()
 	c := newTestCRIContainerdService()
 	for _, tty := range []bool{true, false} {
 		config.Tty = tty
-		spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig)
+		spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig)
 		assert.NoError(t, err)
 		specCheck(t, testID, testPid, spec)
 		assert.Equal(t, tty, spec.Process.Terminal)
@@ -189,14 +198,75 @@ func TestContainerSpecTty(t *testing.T) {
 func TestContainerSpecReadonlyRootfs(t *testing.T) {
 	testID := "test-id"
 	testPid := uint32(1234)
-	config, sandboxConfig, specCheck := getStartContainerTestData()
+	config, sandboxConfig, imageConfig, specCheck := getStartContainerTestData()
 	c := newTestCRIContainerdService()
 	for _, readonly := range []bool{true, false} {
 		config.Linux.SecurityContext.ReadonlyRootfs = readonly
-		spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig)
+		spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig)
 		assert.NoError(t, err)
 		specCheck(t, testID, testPid, spec)
 		assert.Equal(t, readonly, spec.Root.Readonly)
+	}
+}
+
+func TestContainerSpecCommand(t *testing.T) {
+	for desc, test := range map[string]struct {
+		criEntrypoint   []string
+		criArgs         []string
+		imageEntrypoint []string
+		imageArgs       []string
+		expected        []string
+		expectErr       bool
+	}{
+		"should use cri entrypoint if it's specified": {
+			criEntrypoint:   []string{"a", "b"},
+			imageEntrypoint: []string{"c", "d"},
+			imageArgs:       []string{"e", "f"},
+			expected:        []string{"a", "b"},
+		},
+		"should use cri entrypoint if it's specified even if it's empty": {
+			criEntrypoint:   []string{},
+			criArgs:         []string{"a", "b"},
+			imageEntrypoint: []string{"c", "d"},
+			imageArgs:       []string{"e", "f"},
+			expected:        []string{"a", "b"},
+		},
+		"should use cri entrypoint and args if they are specified": {
+			criEntrypoint:   []string{"a", "b"},
+			criArgs:         []string{"c", "d"},
+			imageEntrypoint: []string{"e", "f"},
+			imageArgs:       []string{"g", "h"},
+			expected:        []string{"a", "b", "c", "d"},
+		},
+		"should use image entrypoint if cri entrypoint is not specified": {
+			criArgs:         []string{"a", "b"},
+			imageEntrypoint: []string{"c", "d"},
+			imageArgs:       []string{"e", "f"},
+			expected:        []string{"c", "d", "a", "b"},
+		},
+		"should use image args if both cri entrypoint and args are not specified": {
+			imageEntrypoint: []string{"c", "d"},
+			imageArgs:       []string{"e", "f"},
+			expected:        []string{"c", "d", "e", "f"},
+		},
+		"should return error if both entrypoint and args are empty": {
+			expectErr: true,
+		},
+	} {
+
+		config, _, imageConfig, _ := getStartContainerTestData()
+		g := generate.New()
+		config.Command = test.criEntrypoint
+		config.Args = test.criArgs
+		imageConfig.Entrypoint = test.imageEntrypoint
+		imageConfig.Cmd = test.imageArgs
+		err := setOCIProcessArgs(&g, config, imageConfig)
+		if test.expectErr {
+			assert.Error(t, err)
+			continue
+		}
+		assert.NoError(t, err)
+		assert.Equal(t, test.expected, g.Spec().Process.Args, desc)
 	}
 }
 
@@ -204,12 +274,14 @@ func TestStartContainer(t *testing.T) {
 	testID := "test-id"
 	testSandboxID := "test-sandbox-id"
 	testSandboxPid := uint32(4321)
-	config, sandboxConfig, specCheck := getStartContainerTestData()
+	testImageID := "sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113799"
+	config, sandboxConfig, imageConfig, specCheck := getStartContainerTestData()
 	testMetadata := &metadata.ContainerMetadata{
 		ID:        testID,
 		Name:      "test-name",
 		SandboxID: testSandboxID,
 		Config:    config,
+		ImageRef:  testImageID,
 		CreatedAt: time.Now().UnixNano(),
 	}
 	testSandboxMetadata := &metadata.SandboxMetadata{
@@ -222,10 +294,13 @@ func TestStartContainer(t *testing.T) {
 		Pid:    testSandboxPid,
 		Status: container.Status_RUNNING,
 	}
+	testMounts := []*mount.Mount{{Type: "bind", Source: "test-source"}}
 	for desc, test := range map[string]struct {
 		containerMetadata          *metadata.ContainerMetadata
 		sandboxMetadata            *metadata.SandboxMetadata
 		sandboxContainerdContainer *container.Container
+		imageMetadataErr           bool
+		snapshotMountsErr          bool
 		prepareFIFOErr             error
 		createContainerErr         error
 		startContainerErr          error
@@ -288,6 +363,24 @@ func TestStartContainer(t *testing.T) {
 			expectCalls:       []string{"info"},
 			expectErr:         true,
 		},
+		"should return error when image doesn't exist": {
+			containerMetadata:          testMetadata,
+			sandboxMetadata:            testSandboxMetadata,
+			sandboxContainerdContainer: testSandboxContainer,
+			imageMetadataErr:           true,
+			expectStateChange:          true,
+			expectCalls:                []string{"info"},
+			expectErr:                  true,
+		},
+		"should return error when snapshot mounts fails": {
+			containerMetadata:          testMetadata,
+			sandboxMetadata:            testSandboxMetadata,
+			sandboxContainerdContainer: testSandboxContainer,
+			snapshotMountsErr:          true,
+			expectStateChange:          true,
+			expectCalls:                []string{"info"},
+			expectErr:                  true,
+		},
 		"should return error when fail to open streaming pipes": {
 			containerMetadata:          testMetadata,
 			sandboxMetadata:            testSandboxMetadata,
@@ -329,6 +422,7 @@ func TestStartContainer(t *testing.T) {
 		c := newTestCRIContainerdService()
 		fake := c.containerService.(*servertesting.FakeExecutionClient)
 		fakeOS := c.os.(*ostesting.FakeOS)
+		fakeRootfsClient := c.rootfsService.(*servertesting.FakeRootfsClient)
 		if test.containerMetadata != nil {
 			assert.NoError(t, c.containerStore.Create(*test.containerMetadata))
 		}
@@ -337,6 +431,15 @@ func TestStartContainer(t *testing.T) {
 		}
 		if test.sandboxContainerdContainer != nil {
 			fake.SetFakeContainers([]container.Container{*test.sandboxContainerdContainer})
+		}
+		if !test.imageMetadataErr {
+			assert.NoError(t, c.imageMetadataStore.Create(metadata.ImageMetadata{
+				ID:     testImageID,
+				Config: imageConfig,
+			}))
+		}
+		if !test.snapshotMountsErr {
+			fakeRootfsClient.SetFakeMounts(testID, testMounts)
 		}
 		// TODO(random-liu): Test behavior with different streaming config.
 		fakeOS.OpenFifoFn = func(context.Context, string, int, os.FileMode) (io.ReadWriteCloser, error) {
@@ -394,6 +497,7 @@ func TestStartContainer(t *testing.T) {
 		calls := fake.GetCalledDetails()
 		createOpts, ok := calls[1].Argument.(*execution.CreateRequest)
 		assert.True(t, ok, "2nd call should be create")
+		assert.Equal(t, testMounts, createOpts.Rootfs, "rootfs mounts should be correct")
 		// TODO(random-liu): Test other create options.
 		spec := &runtimespec.Spec{}
 		assert.NoError(t, json.Unmarshal(createOpts.Spec.Value, spec))
