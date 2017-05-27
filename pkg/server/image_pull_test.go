@@ -19,27 +19,56 @@ package server
 import (
 	"testing"
 
-	"github.com/containerd/containerd/reference"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 )
 
-func TestNormalizeImageRef(t *testing.T) {
-	for _, ref := range []string{
-		"busybox",        // has nothing
-		"busybox:latest", // only has tag
-		"busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582", // only has digest
-		"library/busybox",                  // only has path
-		"docker.io/busybox",                // only has hostname
-		"docker.io/library/busybox",        // has no tag
-		"docker.io/busybox:latest",         // has no path
-		"library/busybox:latest",           // has no hostname
-		"docker.io/library/busybox:latest", // full reference
-		"gcr.io/library/busybox",           // gcr reference
+func TestUpdateImageMetadata(t *testing.T) {
+	meta := metadata.ImageMetadata{
+		ID:      "test-id",
+		ChainID: "test-chain-id",
+		Size:    1234,
+	}
+	for desc, test := range map[string]struct {
+		repoTags            []string
+		repoDigests         []string
+		repoTag             string
+		repoDigest          string
+		expectedRepoTags    []string
+		expectedRepoDigests []string
+	}{
+		"Add duplicated repo tag and digest": {
+			repoTags:            []string{"a", "b"},
+			repoDigests:         []string{"c", "d"},
+			repoTag:             "a",
+			repoDigest:          "c",
+			expectedRepoTags:    []string{"a", "b"},
+			expectedRepoDigests: []string{"c", "d"},
+		},
+		"Add new repo tag and digest": {
+			repoTags:            []string{"a", "b"},
+			repoDigests:         []string{"c", "d"},
+			repoTag:             "e",
+			repoDigest:          "f",
+			expectedRepoTags:    []string{"a", "b", "e"},
+			expectedRepoDigests: []string{"c", "d", "f"},
+		},
+		"Add empty repo tag and digest": {
+			repoTags:            []string{"a", "b"},
+			repoDigests:         []string{"c", "d"},
+			repoTag:             "",
+			repoDigest:          "",
+			expectedRepoTags:    []string{"a", "b"},
+			expectedRepoDigests: []string{"c", "d"},
+		},
 	} {
-		t.Logf("TestCase %q", ref)
-		normalized, err := normalizeImageRef(ref)
-		assert.NoError(t, err)
-		_, err = reference.Parse(normalized)
-		assert.NoError(t, err, "%q should be containerd supported reference", normalized)
+		t.Logf("TestCase %q", desc)
+		m := meta
+		m.RepoTags = test.repoTags
+		m.RepoDigests = test.repoDigests
+		updateImageMetadata(&m, test.repoTag, test.repoDigest)
+		assert.Equal(t, test.expectedRepoTags, m.RepoTags)
+		assert.Equal(t, test.expectedRepoDigests, m.RepoDigests)
 	}
 }

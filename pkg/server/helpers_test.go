@@ -23,6 +23,8 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/containerd/containerd/reference"
+	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 
@@ -157,5 +159,130 @@ func TestGetSandbox(t *testing.T) {
 			assert.NoError(t, err)
 		}
 		assert.Equal(t, test.expected, sb)
+	}
+}
+
+func TestNormalizeImageRef(t *testing.T) {
+	for _, test := range []struct {
+		input  string
+		expect string
+	}{
+		{ // has nothing
+			input:  "busybox",
+			expect: "docker.io/library/busybox:latest",
+		},
+		{ // only has tag
+			input:  "busybox:latest",
+			expect: "docker.io/library/busybox:latest",
+		},
+		{ // only has digest
+			input:  "busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+			expect: "docker.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+		},
+		{ // only has path
+			input:  "library/busybox",
+			expect: "docker.io/library/busybox:latest",
+		},
+		{ // only has hostname
+			input:  "docker.io/busybox",
+			expect: "docker.io/library/busybox:latest",
+		},
+		{ // has no tag
+			input:  "docker.io/library/busybox",
+			expect: "docker.io/library/busybox:latest",
+		},
+		{ // has no path
+			input:  "docker.io/busybox:latest",
+			expect: "docker.io/library/busybox:latest",
+		},
+		{ // has no hostname
+			input:  "library/busybox:latest",
+			expect: "docker.io/library/busybox:latest",
+		},
+		{ // full reference
+			input:  "docker.io/library/busybox:latest",
+			expect: "docker.io/library/busybox:latest",
+		},
+		{ // gcr reference
+			input:  "gcr.io/library/busybox",
+			expect: "gcr.io/library/busybox:latest",
+		},
+		{ // both tag and digest
+			input:  "gcr.io/library/busybox:latest@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+			expect: "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+		},
+	} {
+		t.Logf("TestCase %q", test.input)
+		normalized, err := normalizeImageRef(test.input)
+		assert.NoError(t, err)
+		output := normalized.String()
+		assert.Equal(t, test.expect, output)
+		_, err = reference.Parse(output)
+		assert.NoError(t, err, "%q should be containerd supported reference", output)
+	}
+}
+
+// TestGetUserFromImage tests the logic of getting image uid or user name of image user.
+func TestGetUserFromImage(t *testing.T) {
+	newI64 := func(i int64) *int64 { return &i }
+	for c, test := range map[string]struct {
+		user string
+		uid  *int64
+		name string
+	}{
+		"no gid": {
+			user: "0",
+			uid:  newI64(0),
+		},
+		"uid/gid": {
+			user: "0:1",
+			uid:  newI64(0),
+		},
+		"empty user": {
+			user: "",
+		},
+		"multiple spearators": {
+			user: "1:2:3",
+			uid:  newI64(1),
+		},
+		"root username": {
+			user: "root:root",
+			name: "root",
+		},
+		"username": {
+			user: "test:test",
+			name: "test",
+		},
+	} {
+		t.Logf("TestCase - %q", c)
+		actualUID, actualName := getUserFromImage(test.user)
+		assert.Equal(t, test.uid, actualUID)
+		assert.Equal(t, test.name, actualName)
+	}
+}
+
+func TestGetRepoDigestAndTag(t *testing.T) {
+	digest := imagedigest.Digest("sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582")
+	for desc, test := range map[string]struct {
+		ref                string
+		expectedRepoDigest string
+		expectedRepoTag    string
+	}{
+		"repo tag should be empty if original ref has no tag": {
+			ref:                "gcr.io/library/busybox@" + digest.String(),
+			expectedRepoDigest: "gcr.io/library/busybox@" + digest.String(),
+		},
+		"repo tag should not be empty if original ref has tag": {
+			ref:                "gcr.io/library/busybox:latest",
+			expectedRepoDigest: "gcr.io/library/busybox@" + digest.String(),
+			expectedRepoTag:    "gcr.io/library/busybox:latest",
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		named, err := normalizeImageRef(test.ref)
+		assert.NoError(t, err)
+		repoDigest, repoTag := getRepoDigestAndTag(named, digest)
+		assert.Equal(t, test.expectedRepoDigest, repoDigest)
+		assert.Equal(t, test.expectedRepoTag, repoTag)
 	}
 }

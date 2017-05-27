@@ -19,6 +19,8 @@ package metadata
 import (
 	"encoding/json"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
 )
 
@@ -41,14 +43,18 @@ type versionedImageMetadata struct {
 
 // ImageMetadata is the unversioned image metadata.
 type ImageMetadata struct {
-	// Id of the image. Normally the Digest
+	// Id of the image. Normally the digest of image config.
 	ID string `json:"id,omitempty"`
+	// ChainID is the chainID of the image.
+	ChainID string `json:"chain_id,omitempty"`
 	// Other names by which this image is known.
 	RepoTags []string `json:"repo_tags,omitempty"`
 	// Digests by which this image is known.
 	RepoDigests []string `json:"repo_digests,omitempty"`
-	// Size of the image in bytes. Must be > 0.
-	Size uint64 `json:"size,omitempty"`
+	// Size is the compressed size of the image.
+	Size int64 `json:"size,omitempty"`
+	// Config is the oci image config of the image.
+	Config *imagespec.ImageConfig `json:"config,omitempty"`
 }
 
 // ImageMetadataUpdateFunc is the function used to update ImageMetadata.
