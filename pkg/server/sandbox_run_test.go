@@ -23,20 +23,22 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/containerd/containerd/api/services/execution"
+	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
+	imagedigest "github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
-	"github.com/containerd/containerd/api/services/execution"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-
+	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
-
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 )
 
-func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, func(*testing.T, string, *runtimespec.Spec)) {
+func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
 	config := &runtime.PodSandboxConfig{
 		Metadata: &runtime.PodSandboxMetadata{
 			Name:      "test-name",
@@ -52,20 +54,31 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, func(*testing.T, str
 			CgroupParent: "/test/cgroup/parent",
 		},
 	}
+	imageConfig := &imagespec.ImageConfig{
+		Env:        []string{"a=b", "c=d"},
+		Entrypoint: []string{"/pause"},
+		Cmd:        []string{"forever"},
+		WorkingDir: "/workspace",
+	}
 	specCheck := func(t *testing.T, id string, spec *runtimespec.Spec) {
 		assert.Equal(t, "test-hostname", spec.Hostname)
 		assert.Equal(t, getCgroupsPath("/test/cgroup/parent", id), spec.Linux.CgroupsPath)
 		assert.Equal(t, relativeRootfsPath, spec.Root.Path)
 		assert.Equal(t, true, spec.Root.Readonly)
+		assert.Contains(t, spec.Process.Env, "a=b", "c=d")
+		assert.Equal(t, []string{"/pause", "forever"}, spec.Process.Args)
+		assert.Equal(t, "/workspace", spec.Process.Cwd)
 	}
-	return config, specCheck
+	return config, imageConfig, specCheck
 }
 
 func TestGenerateSandboxContainerSpec(t *testing.T) {
 	testID := "test-id"
 	for desc, test := range map[string]struct {
-		configChange func(*runtime.PodSandboxConfig)
-		specCheck    func(*testing.T, *runtimespec.Spec)
+		configChange      func(*runtime.PodSandboxConfig)
+		imageConfigChange func(*imagespec.ImageConfig)
+		specCheck         func(*testing.T, *runtimespec.Spec)
+		expectErr         bool
 	}{
 		"spec should reflect original config": {
 			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
@@ -106,14 +119,36 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 				})
 			},
 		},
+		"should return error when entrypoint is empty": {
+			imageConfigChange: func(c *imagespec.ImageConfig) {
+				c.Entrypoint = nil
+			},
+			expectErr: true,
+		},
+		"should return error when env is invalid ": {
+			imageConfigChange: func(c *imagespec.ImageConfig) {
+				c.Env = []string{"a"}
+			},
+			expectErr: true,
+		},
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIContainerdService()
-		config, specCheck := getRunPodSandboxTestData()
+		config, imageConfig, specCheck := getRunPodSandboxTestData()
 		if test.configChange != nil {
 			test.configChange(config)
 		}
-		spec := c.generateSandboxContainerSpec(testID, config)
+		if test.imageConfigChange != nil {
+			test.imageConfigChange(imageConfig)
+		}
+		spec, err := c.generateSandboxContainerSpec(testID, config, imageConfig)
+		if test.expectErr {
+			assert.Error(t, err)
+			assert.Nil(t, spec)
+			continue
+		}
+		assert.NoError(t, err)
+		assert.NotNil(t, spec)
 		specCheck(t, testID, spec)
 		if test.specCheck != nil {
 			test.specCheck(t, spec)
@@ -122,8 +157,9 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 }
 
 func TestRunPodSandbox(t *testing.T) {
-	config, specCheck := getRunPodSandboxTestData()
+	config, imageConfig, specCheck := getRunPodSandboxTestData()
 	c := newTestCRIContainerdService()
+	fakeRootfsClient := c.rootfsService.(*servertesting.FakeRootfsClient)
 	fakeExecutionClient := c.containerService.(*servertesting.FakeExecutionClient)
 	fakeCNIPlugin := c.netPlugin.(*servertesting.FakeCNIPlugin)
 	fakeOS := c.os.(*ostesting.FakeOS)
@@ -140,6 +176,17 @@ func TestRunPodSandbox(t *testing.T) {
 		assert.Equal(t, os.FileMode(0700), perm)
 		return nopReadWriteCloser{}, nil
 	}
+	testChainID := imagedigest.Digest("test-sandbox-chain-id")
+	imageMetadata := metadata.ImageMetadata{
+		ID:      testSandboxImage,
+		ChainID: testChainID.String(),
+		Config:  imageConfig,
+	}
+	// Insert sandbox image metadata.
+	assert.NoError(t, c.imageMetadataStore.Create(imageMetadata))
+	// Insert fake chainID
+	fakeRootfsClient.SetFakeChainIDs([]imagedigest.Digest{testChainID})
+	expectRootfsClientCalls := []string{"prepare"}
 	expectExecutionClientCalls := []string{"create", "start"}
 
 	res, err := c.RunPodSandbox(context.Background(), &runtime.RunPodSandboxRequest{Config: config})
@@ -155,13 +202,24 @@ func TestRunPodSandbox(t *testing.T) {
 	assert.Contains(t, pipes, stdout, "sandbox stdout pipe should be created")
 	assert.Contains(t, pipes, stderr, "sandbox stderr pipe should be created")
 
+	assert.Equal(t, expectRootfsClientCalls, fakeRootfsClient.GetCalledNames(), "expect rootfs functions should be called")
+	calls := fakeRootfsClient.GetCalledDetails()
+	prepareOpts := calls[0].Argument.(*rootfsapi.PrepareRequest)
+	assert.Equal(t, &rootfsapi.PrepareRequest{
+		Name:     id,
+		ChainID:  testChainID,
+		Readonly: true,
+	}, prepareOpts, "prepare request should be correct")
+
 	assert.Equal(t, expectExecutionClientCalls, fakeExecutionClient.GetCalledNames(), "expect containerd functions should be called")
-	calls := fakeExecutionClient.GetCalledDetails()
+	calls = fakeExecutionClient.GetCalledDetails()
 	createOpts := calls[0].Argument.(*execution.CreateRequest)
 	assert.Equal(t, id, createOpts.ID, "create id should be correct")
-	// TODO(random-liu): Test rootfs mount when image management part is integrated.
 	assert.Equal(t, stdout, createOpts.Stdout, "stdout pipe should be passed to containerd")
 	assert.Equal(t, stderr, createOpts.Stderr, "stderr pipe should be passed to containerd")
+	mountsResp, err := fakeRootfsClient.Mounts(context.Background(), &rootfsapi.MountsRequest{Name: id})
+	assert.NoError(t, err)
+	assert.Equal(t, mountsResp.Mounts, createOpts.Rootfs, "rootfs mount should be correct")
 	spec := &runtimespec.Spec{}
 	assert.NoError(t, json.Unmarshal(createOpts.Spec.Value, spec))
 	t.Logf("oci spec check")

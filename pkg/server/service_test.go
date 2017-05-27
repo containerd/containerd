@@ -32,6 +32,8 @@ import (
 	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/registrar"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
+	imagedigest "github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 )
@@ -43,20 +45,28 @@ func (nopReadWriteCloser) Read(p []byte) (n int, err error)  { return 0, io.EOF 
 func (nopReadWriteCloser) Write(p []byte) (n int, err error) { return 0, io.ErrShortWrite }
 func (nopReadWriteCloser) Close() error                      { return nil }
 
-const testRootDir = "/test/rootfs"
+const (
+	testRootDir = "/test/rootfs"
+	// Use an image id as test sandbox image to avoid image name resolve.
+	// TODO(random-liu): Change this to image name after we have complete image
+	// management unit test framework.
+	testSandboxImage = "sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113798"
+)
 
 // newTestCRIContainerdService creates a fake criContainerdService for test.
 func newTestCRIContainerdService() *criContainerdService {
 	return &criContainerdService{
 		os:                 ostesting.NewFakeOS(),
 		rootDir:            testRootDir,
-		containerService:   servertesting.NewFakeExecutionClient(),
+		sandboxImage:       testSandboxImage,
 		sandboxStore:       metadata.NewSandboxStore(store.NewMetadataStore()),
 		imageMetadataStore: metadata.NewImageMetadataStore(store.NewMetadataStore()),
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		sandboxIDIndex:     truncindex.NewTruncIndex(nil),
 		containerStore:     metadata.NewContainerStore(store.NewMetadataStore()),
 		containerNameIndex: registrar.NewRegistrar(),
+		containerService:   servertesting.NewFakeExecutionClient(),
+		rootfsService:      servertesting.NewFakeRootfsClient(),
 		netPlugin:          servertesting.NewFakeCNIPlugin(),
 	}
 }
@@ -65,11 +75,21 @@ func newTestCRIContainerdService() *criContainerdService {
 func TestSandboxOperations(t *testing.T) {
 	c := newTestCRIContainerdService()
 	fake := c.containerService.(*servertesting.FakeExecutionClient)
+	fakeRootfsClient := c.rootfsService.(*servertesting.FakeRootfsClient)
 	fakeOS := c.os.(*ostesting.FakeOS)
 	fakeCNIPlugin := c.netPlugin.(*servertesting.FakeCNIPlugin)
 	fakeOS.OpenFifoFn = func(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
 		return nopReadWriteCloser{}, nil
 	}
+	// Insert sandbox image metadata.
+	assert.NoError(t, c.imageMetadataStore.Create(metadata.ImageMetadata{
+		ID:      testSandboxImage,
+		ChainID: "test-chain-id",
+		Config:  &imagespec.ImageConfig{Entrypoint: []string{"/pause"}},
+	}))
+	// Insert fake chainID
+	fakeRootfsClient.SetFakeChainIDs([]imagedigest.Digest{imagedigest.Digest("test-chain-id")})
+
 	config := &runtime.PodSandboxConfig{
 		Metadata: &runtime.PodSandboxMetadata{
 			Name:      "test-name",
