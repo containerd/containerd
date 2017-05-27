@@ -129,7 +129,7 @@ var pprofBlockCommand = cli.Command{
 
 var pprofThreadcreateCommand = cli.Command{
 	Name:  "threadcreate",
-	Usage: "goroutine blocking profile",
+	Usage: "goroutine thread creating profile",
 	Action: func(context *cli.Context) error {
 		client := getPProfClient(context)
 
