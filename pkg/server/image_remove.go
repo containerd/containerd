@@ -41,20 +41,13 @@ func (c *criContainerdService) RemoveImage(ctx context.Context, r *runtime.Remov
 			glog.V(2).Infof("RemoveImage %q returns successfully", r.GetImage().GetImage())
 		}
 	}()
-	imageID, err := c.localResolve(ctx, r.GetImage().GetImage())
+	meta, err := c.localResolve(ctx, r.GetImage().GetImage())
 	if err != nil {
 		return nil, fmt.Errorf("can not resolve %q locally: %v", r.GetImage().GetImage(), err)
 	}
-	if imageID == "" {
+	if meta == nil {
 		// return empty without error when image not found.
 		return &runtime.RemoveImageResponse{}, nil
-	}
-	meta, err := c.imageMetadataStore.Get(imageID)
-	if err != nil {
-		if metadata.IsNotExistError(err) {
-			return &runtime.RemoveImageResponse{}, nil
-		}
-		return nil, fmt.Errorf("an error occurred when get image %q metadata: %v", imageID, err)
 	}
 	// Also include repo digest, because if user pull image with digest,
 	// there will also be a corresponding repo digest reference.
@@ -65,14 +58,14 @@ func (c *criContainerdService) RemoveImage(ctx context.Context, r *runtime.Remov
 		if err == nil || images.IsNotFound(err) {
 			continue
 		}
-		return nil, fmt.Errorf("failed to delete image reference %q for image %q: %v", ref, imageID, err)
+		return nil, fmt.Errorf("failed to delete image reference %q for image %q: %v", ref, meta.ID, err)
 	}
-	err = c.imageMetadataStore.Delete(imageID)
+	err = c.imageMetadataStore.Delete(meta.ID)
 	if err != nil {
 		if metadata.IsNotExistError(err) {
 			return &runtime.RemoveImageResponse{}, nil
 		}
-		return nil, fmt.Errorf("an error occurred when delete image %q matadata: %v", imageID, err)
+		return nil, fmt.Errorf("an error occurred when delete image %q matadata: %v", meta.ID, err)
 	}
 	return &runtime.RemoveImageResponse{}, nil
 }
