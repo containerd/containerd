@@ -33,7 +33,7 @@ type InitContext struct {
 	Root        string
 	State       string
 	Runtimes    map[string]containerd.Runtime
-	Content     *content.Store
+	Content     content.Store
 	Meta        *bolt.DB
 	Snapshotter snapshot.Snapshotter
 	Config      interface{}

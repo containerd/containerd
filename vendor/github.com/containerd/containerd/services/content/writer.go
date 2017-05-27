@@ -1,60 +1,13 @@
 package content
 
 import (
-	"context"
 	"io"
 
 	contentapi "github.com/containerd/containerd/api/services/content"
 	"github.com/containerd/containerd/content"
-
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
-
-func NewIngesterFromClient(client contentapi.ContentClient) content.Ingester {
-	return &remoteIngester{
-		client: client,
-	}
-}
-
-type remoteIngester struct {
-	client contentapi.ContentClient
-}
-
-func (ri *remoteIngester) Writer(ctx context.Context, ref string, size int64, expected digest.Digest) (content.Writer, error) {
-	wrclient, offset, err := ri.negotiate(ctx, ref, size, expected)
-	if err != nil {
-		return nil, rewriteGRPCError(err)
-	}
-
-	return &remoteWriter{
-		client: wrclient,
-		offset: offset,
-	}, nil
-}
-
-func (ri *remoteIngester) negotiate(ctx context.Context, ref string, size int64, expected digest.Digest) (contentapi.Content_WriteClient, int64, error) {
-	wrclient, err := ri.client.Write(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	if err := wrclient.Send(&contentapi.WriteRequest{
-		Action:   contentapi.WriteActionStat,
-		Ref:      ref,
-		Total:    size,
-		Expected: expected,
-	}); err != nil {
-		return nil, 0, err
-	}
-
-	resp, err := wrclient.Recv()
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return wrclient, resp.Offset, nil
-}
 
 type remoteWriter struct {
 	ref    string
@@ -127,6 +80,9 @@ func (rw *remoteWriter) Write(p []byte) (n int, err error) {
 	}
 
 	rw.offset += int64(n)
+	if resp.Digest != "" {
+		rw.digest = resp.Digest
+	}
 	return
 }
 
@@ -149,6 +105,8 @@ func (rw *remoteWriter) Commit(size int64, expected digest.Digest) error {
 		return errors.Errorf("unexpected digest: %v != %v", resp.Digest, expected)
 	}
 
+	rw.digest = resp.Digest
+	rw.offset = resp.Offset
 	return nil
 }
 

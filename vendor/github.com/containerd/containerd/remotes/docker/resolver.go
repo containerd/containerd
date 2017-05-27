@@ -7,10 +7,12 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd/images"
@@ -23,15 +25,43 @@ import (
 	"golang.org/x/net/context/ctxhttp"
 )
 
-// NOTE(stevvooe): Most of the code below this point is prototype code to
-// demonstrate a very simplified docker.io fetcher. We have a lot of hard coded
-// values but we leave many of the details down to the fetcher, creating a lot
-// of room for ways to fetch content.
+var (
+	// ErrNoToken is returned if a request is successful but the body does not
+	// contain an authorization token.
+	ErrNoToken = errors.New("authorization server did not include a token in the response")
 
-type dockerResolver struct{}
+	// ErrInvalidAuthorization is used when credentials are passed to a server but
+	// those credentials are rejected.
+	ErrInvalidAuthorization = errors.New("authorization failed")
+)
 
-func NewResolver() remotes.Resolver {
-	return &dockerResolver{}
+type dockerResolver struct {
+	credentials func(string) (string, string, error)
+	plainHTTP   bool
+	client      *http.Client
+}
+
+// ResolverOptions are used to configured a new Docker register resolver
+type ResolverOptions struct {
+	// Credentials provides username and secret given a host.
+	// If username is empty but a secret is given, that secret
+	// is interpretted as a long lived token.
+	Credentials func(string) (string, string, error)
+
+	// PlainHTTP specifies to use plain http and not https
+	PlainHTTP bool
+
+	// Client is the http client to used when making registry requests
+	Client *http.Client
+}
+
+// NewResolver returns a new resolver to a Docker registry
+func NewResolver(options ResolverOptions) remotes.Resolver {
+	return &dockerResolver{
+		credentials: options.Credentials,
+		plainHTTP:   options.PlainHTTP,
+		client:      options.Client,
+	}
 }
 
 var _ remotes.Resolver = &dockerResolver{}
@@ -43,31 +73,38 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 	}
 
 	var (
-		base  url.URL
-		token string
+		base             url.URL
+		username, secret string
 	)
 
-	switch refspec.Hostname() {
-	case "docker.io":
-		base.Scheme = "https"
+	host := refspec.Hostname()
+	base.Scheme = "https"
+
+	if host == "docker.io" {
 		base.Host = "registry-1.docker.io"
-		prefix := strings.TrimPrefix(refspec.Locator, "docker.io/")
-		base.Path = path.Join("/v2", prefix)
-		token, err = getToken(ctx, "repository:"+prefix+":pull")
+	} else {
+		base.Host = host
+
+		if r.plainHTTP || strings.HasPrefix(host, "localhost:") {
+			base.Scheme = "http"
+		}
+	}
+
+	if r.credentials != nil {
+		username, secret, err = r.credentials(base.Host)
 		if err != nil {
 			return "", ocispec.Descriptor{}, nil, err
 		}
-	case "localhost:5000":
-		base.Scheme = "http"
-		base.Host = "localhost:5000"
-		base.Path = path.Join("/v2", strings.TrimPrefix(refspec.Locator, "localhost:5000/"))
-	default:
-		return "", ocispec.Descriptor{}, nil, errors.Errorf("unsupported locator: %q", refspec.Locator)
 	}
 
+	prefix := strings.TrimPrefix(refspec.Locator, host+"/")
+	base.Path = path.Join("/v2", prefix)
+
 	fetcher := &dockerFetcher{
-		base:  base,
-		token: token,
+		base:     base,
+		client:   r.client,
+		username: username,
+		secret:   secret,
 	}
 
 	var (
@@ -125,16 +162,13 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 
 		if dgstHeader != "" {
 			if err := dgstHeader.Validate(); err != nil {
-				if err == nil {
-					return "", ocispec.Descriptor{}, nil, errors.Errorf("%q in header not a valid digest", dgstHeader)
-				}
 				return "", ocispec.Descriptor{}, nil, errors.Wrapf(err, "%q in header not a valid digest", dgstHeader)
 			}
 			dgst = dgstHeader
 		}
 
 		if dgst == "" {
-			return "", ocispec.Descriptor{}, nil, errors.Wrapf(err, "could not resolve digest for %v", ref)
+			return "", ocispec.Descriptor{}, nil, errors.Errorf("could not resolve digest for %v", ref)
 		}
 
 		var (
@@ -143,8 +177,12 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 		)
 
 		size, err = strconv.ParseInt(sizeHeader, 10, 64)
-		if err != nil || size < 0 {
-			return "", ocispec.Descriptor{}, nil, errors.Wrapf(err, "%q in header not a valid size", sizeHeader)
+		if err != nil {
+
+			return "", ocispec.Descriptor{}, nil, errors.Wrapf(err, "invalid size header: %q", sizeHeader)
+		}
+		if size < 0 {
+			return "", ocispec.Descriptor{}, nil, errors.Errorf("%q in header not a valid size", sizeHeader)
 		}
 
 		desc := ocispec.Descriptor{
@@ -163,6 +201,11 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 type dockerFetcher struct {
 	base  url.URL
 	token string
+
+	client   *http.Client
+	useBasic bool
+	username string
+	secret   string
 }
 
 func (r *dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.ReadCloser, error) {
@@ -213,13 +256,14 @@ func (r *dockerFetcher) url(ps ...string) string {
 }
 
 func (r *dockerFetcher) doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
+	return r.doRequestWithRetries(ctx, req, nil)
+}
+
+func (r *dockerFetcher) doRequestWithRetries(ctx context.Context, req *http.Request, responses []*http.Response) (*http.Response, error) {
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", req.URL.String()))
 	log.G(ctx).WithField("request.headers", req.Header).Debug("fetch content")
-	if r.token != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", r.token))
-	}
-
-	resp, err := ctxhttp.Do(ctx, http.DefaultClient, req)
+	r.authorize(req)
+	resp, err := ctxhttp.Do(ctx, r.client, req)
 	if err != nil {
 		return nil, err
 	}
@@ -228,50 +272,119 @@ func (r *dockerFetcher) doRequest(ctx context.Context, req *http.Request) (*http
 		"response.headers": resp.Header,
 	}).Debug("fetch response received")
 
+	responses = append(responses, resp)
+	req, err = r.retryRequest(ctx, req, responses)
+	if err != nil {
+		return nil, err
+	}
+	if req != nil {
+		return r.doRequestWithRetries(ctx, req, responses)
+	}
 	return resp, err
 }
 
-func getToken(ctx context.Context, scopes ...string) (string, error) {
-	var (
-		u = url.URL{
-			Scheme: "https",
-			Host:   "auth.docker.io",
-			Path:   "/token",
+func (r *dockerFetcher) authorize(req *http.Request) {
+	if r.useBasic {
+		req.SetBasicAuth(r.username, r.secret)
+	} else if r.token != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", r.token))
+	}
+}
+
+func (r *dockerFetcher) retryRequest(ctx context.Context, req *http.Request, responses []*http.Response) (*http.Request, error) {
+	if len(responses) > 5 {
+		return nil, nil
+	}
+	last := responses[len(responses)-1]
+	if last.StatusCode == http.StatusUnauthorized {
+		log.G(ctx).WithField("header", last.Header.Get("WWW-Authenticate")).Debug("Unauthorized")
+		for _, c := range parseAuthHeader(last.Header) {
+			if c.scheme == bearerAuth {
+				if errStr := c.parameters["error"]; errStr != "" {
+					// TODO: handle expired case
+					return nil, errors.Wrapf(ErrInvalidAuthorization, "server message: %s", errStr)
+				}
+				if err := r.setTokenAuth(ctx, c.parameters); err != nil {
+					return nil, err
+				}
+				return req, nil
+			} else if c.scheme == basicAuth {
+				if r.username != "" && r.secret != "" {
+					r.useBasic = true
+				}
+				return req, nil
+			}
 		}
-
-		q = url.Values{
-			"scope":   scopes,
-			"service": []string{"registry.docker.io"}, // usually comes from auth challenge
+		return nil, nil
+	} else if last.StatusCode == http.StatusMethodNotAllowed && req.Method == http.MethodHead {
+		// Support registries which have not properly implemented the HEAD method for
+		// manifests endpoint
+		if strings.Contains(req.URL.Path, "/manifests/") {
+			// TODO: copy request?
+			req.Method = http.MethodGet
+			return req, nil
 		}
-	)
+	}
 
-	u.RawQuery = q.Encode()
+	// TODO: Handle 50x errors accounting for attempt history
+	return nil, nil
+}
 
-	log.G(ctx).WithField("token.url", u.String()).Debug("requesting token")
-	resp, err := ctxhttp.Get(ctx, http.DefaultClient, u.String())
+func isManifestAccept(h http.Header) bool {
+	for _, ah := range h[textproto.CanonicalMIMEHeaderKey("Accept")] {
+		switch ah {
+		case images.MediaTypeDockerSchema2Manifest:
+			fallthrough
+		case images.MediaTypeDockerSchema2ManifestList:
+			fallthrough
+		case ocispec.MediaTypeImageManifest:
+			fallthrough
+		case ocispec.MediaTypeImageIndex:
+			return true
+		}
+	}
+	return false
+}
+
+func (r *dockerFetcher) setTokenAuth(ctx context.Context, params map[string]string) error {
+	realm, ok := params["realm"]
+	if !ok {
+		return errors.New("no realm specified for token auth challenge")
+	}
+
+	realmURL, err := url.Parse(realm)
 	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return "", errors.Errorf("unexpected status code: %v %v", resp.StatusCode, resp.Status)
+		return fmt.Errorf("invalid token auth challenge realm: %s", err)
 	}
 
-	p, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
+	to := tokenOptions{
+		realm:   realmURL.String(),
+		service: params["service"],
 	}
 
-	var tokenResponse struct {
-		Token string `json:"token"`
+	scope, ok := params["scope"]
+	if !ok {
+		return errors.Errorf("no scope specified for token auth challenge")
 	}
 
-	if err := json.Unmarshal(p, &tokenResponse); err != nil {
-		return "", err
+	// TODO: Get added scopes from context
+	to.scopes = []string{scope}
+
+	if r.secret != "" {
+		// Credential information is provided, use oauth POST endpoint
+		r.token, err = r.fetchTokenWithOAuth(ctx, to)
+		if err != nil {
+			return errors.Wrap(err, "failed to fetch oauth token")
+		}
+	} else {
+		// Do request anonymously
+		r.token, err = r.getToken(ctx, to)
+		if err != nil {
+			return errors.Wrap(err, "failed to fetch anonymous token")
+		}
 	}
 
-	return tokenResponse.Token, nil
+	return nil
 }
 
 // getV2URLPaths generates the candidate urls paths for the object based on the
@@ -290,4 +403,126 @@ func getV2URLPaths(desc ocispec.Descriptor) ([]string, error) {
 	urls = append(urls, path.Join("blobs", desc.Digest.String()))
 
 	return urls, nil
+}
+
+type tokenOptions struct {
+	realm   string
+	service string
+	scopes  []string
+}
+
+type postTokenResponse struct {
+	AccessToken  string    `json:"access_token"`
+	RefreshToken string    `json:"refresh_token"`
+	ExpiresIn    int       `json:"expires_in"`
+	IssuedAt     time.Time `json:"issued_at"`
+	Scope        string    `json:"scope"`
+}
+
+func (r *dockerFetcher) fetchTokenWithOAuth(ctx context.Context, to tokenOptions) (string, error) {
+	form := url.Values{}
+	form.Set("scope", strings.Join(to.scopes, " "))
+	form.Set("service", to.service)
+	// TODO: Allow setting client_id
+	form.Set("client_id", "containerd-dist-tool")
+
+	if r.username == "" {
+		form.Set("grant_type", "refresh_token")
+		form.Set("refresh_token", r.secret)
+	} else {
+		form.Set("grant_type", "password")
+		form.Set("username", r.username)
+		form.Set("password", r.secret)
+	}
+
+	resp, err := ctxhttp.PostForm(ctx, r.client, to.realm, form)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 405 && r.username != "" {
+		// It would be nice if registries would implement the specifications
+		return r.getToken(ctx, to)
+	} else if resp.StatusCode < 200 || resp.StatusCode >= 400 {
+		b, _ := ioutil.ReadAll(resp.Body)
+		log.G(ctx).WithFields(logrus.Fields{
+			"status": resp.Status,
+			"body":   string(b),
+		}).Debugf("token request failed")
+		// TODO: handle error body and write debug output
+		return "", errors.Errorf("unexpected status: %s", resp.Status)
+	}
+
+	decoder := json.NewDecoder(resp.Body)
+
+	var tr postTokenResponse
+	if err = decoder.Decode(&tr); err != nil {
+		return "", fmt.Errorf("unable to decode token response: %s", err)
+	}
+
+	return tr.AccessToken, nil
+}
+
+type getTokenResponse struct {
+	Token        string    `json:"token"`
+	AccessToken  string    `json:"access_token"`
+	ExpiresIn    int       `json:"expires_in"`
+	IssuedAt     time.Time `json:"issued_at"`
+	RefreshToken string    `json:"refresh_token"`
+}
+
+// getToken fetches a token using a GET request
+func (r *dockerFetcher) getToken(ctx context.Context, to tokenOptions) (string, error) {
+	req, err := http.NewRequest("GET", to.realm, nil)
+	if err != nil {
+		return "", err
+	}
+
+	reqParams := req.URL.Query()
+
+	if to.service != "" {
+		reqParams.Add("service", to.service)
+	}
+
+	for _, scope := range to.scopes {
+		reqParams.Add("scope", scope)
+	}
+
+	if r.secret != "" {
+		req.SetBasicAuth(r.username, r.secret)
+	}
+
+	req.URL.RawQuery = reqParams.Encode()
+
+	resp, err := ctxhttp.Do(ctx, r.client, req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
+		// TODO: handle error body and write debug output
+		return "", errors.Errorf("unexpected status: %s", resp.Status)
+	}
+
+	decoder := json.NewDecoder(resp.Body)
+
+	var tr getTokenResponse
+	if err = decoder.Decode(&tr); err != nil {
+		return "", fmt.Errorf("unable to decode token response: %s", err)
+	}
+
+	// `access_token` is equivalent to `token` and if both are specified
+	// the choice is undefined.  Canonicalize `access_token` by sticking
+	// things in `token`.
+	if tr.AccessToken != "" {
+		tr.Token = tr.AccessToken
+	}
+
+	if tr.Token == "" {
+		return "", ErrNoToken
+	}
+
+	return tr.Token, nil
 }

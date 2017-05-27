@@ -17,13 +17,18 @@ limitations under the License.
 package server
 
 import (
+	gocontext "context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"sync"
+	"time"
 
 	"github.com/containerd/containerd/content"
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
+	rootfsservice "github.com/containerd/containerd/services/rootfs"
 	"github.com/golang/glog"
 	imagedigest "github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -72,7 +77,6 @@ import (
 // contents are missing but snapshots are ready, is the image still "READY"?
 
 // PullImage pulls an image with authentication config.
-// TODO(mikebrow): add authentication
 // TODO(mikebrow): harden api (including figuring out at what layer we should be blocking on duplicate requests.)
 func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (retRes *runtime.PullImageResponse, retErr error) {
 	glog.V(2).Infof("PullImage %q with auth config %+v", r.GetImage().GetImage(), r.GetAuth())
@@ -152,13 +156,46 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 	return &runtime.PullImageResponse{ImageRef: imageID}, err
 }
 
+// resourceSet is the helper struct to help tracking all resources associated
+// with an image.
+type resourceSet struct {
+	sync.Mutex
+	resources map[string]struct{}
+}
+
+func newResourceSet() *resourceSet {
+	return &resourceSet{resources: make(map[string]struct{})}
+}
+
+func (r *resourceSet) add(resource string) {
+	r.Lock()
+	defer r.Unlock()
+	r.resources[resource] = struct{}{}
+}
+
+// all returns an array of all resources added.
+func (r *resourceSet) all() map[string]struct{} {
+	r.Lock()
+	defer r.Unlock()
+	resources := make(map[string]struct{})
+	for resource := range r.resources {
+		resources[resource] = struct{}{}
+	}
+	return resources
+}
+
 // pullImage pulls image and returns image id (config digest) and manifest digest.
 // The ref should be normalized image reference.
 // TODO(random-liu): [P0] Wait for all downloadings to be done before return.
 func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
 	imagedigest.Digest, imagedigest.Digest, error) {
 	// Resolve the image reference to get descriptor and fetcher.
-	resolver := docker.NewResolver()
+	resolver := docker.NewResolver(docker.ResolverOptions{
+		// TODO(random-liu): Add authentication by setting credentials.
+		// TODO(random-liu): Handle https.
+		PlainHTTP: true,
+		Client:    http.DefaultClient,
+	})
 	_, desc, fetcher, err := resolver.Resolve(ctx, ref)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to resolve ref %q: %v", ref, err)
@@ -178,19 +215,37 @@ func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
 	}
 	// TODO(random-liu): What if following operations fail? Do we need to do cleanup?
 
+	resources := newResourceSet()
+
+	glog.V(4).Infof("Start downloading resources for image %q", ref)
 	// Fetch all image resources into content store.
 	// Dispatch a handler which will run a sequence of handlers to:
-	// 1) fetch the object using a FetchHandler;
-	// 2) recurse through any sub-layers via a ChildrenHandler.
+	// 1) track all resources associated using a customized handler;
+	// 2) fetch the object using a FetchHandler;
+	// 3) recurse through any sub-layers via a ChildrenHandler.
 	err = containerdimages.Dispatch(
 		ctx,
 		containerdimages.Handlers(
-			remotes.FetchHandler(c.contentIngester, fetcher),
-			containerdimages.ChildrenHandler(c.contentProvider)),
+			containerdimages.HandlerFunc(func(ctx gocontext.Context, desc imagespec.Descriptor) (
+				[]imagespec.Descriptor, error) {
+				resources.add(remotes.MakeRefKey(ctx, desc))
+				return nil, nil
+			}),
+			remotes.FetchHandler(c.contentStoreService, fetcher),
+			containerdimages.ChildrenHandler(c.contentStoreService)),
 		desc)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to fetch image %q desc %+v: %v", ref, desc, err)
+		// Dispatch returns error when requested resources are locked.
+		// In that case, we should start waiting and checking the pulling
+		// progress.
+		// TODO(random-liu): Check specific resource locked error type.
+		glog.V(5).Infof("Dispatch for %q returns error: %v", ref, err)
 	}
+	// Wait for the image pulling to finish
+	if err := c.waitForResourcesDownloading(ctx, resources.all()); err != nil {
+		return "", "", fmt.Errorf("failed to wait for image %q downloading: %v", ref, err)
+	}
+	glog.V(4).Infof("Finished downloading resources for image %q", ref)
 
 	image, err := c.imageStoreService.Get(ctx, ref)
 	if err != nil {
@@ -198,7 +253,7 @@ func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
 	}
 	// Read the image manifest from content store.
 	manifestDigest := image.Target.Digest
-	p, err := content.ReadBlob(ctx, c.contentProvider, manifestDigest)
+	p, err := content.ReadBlob(ctx, c.contentStoreService, manifestDigest)
 	if err != nil {
 		return "", "", fmt.Errorf("readblob failed for manifest digest %q: %v", manifestDigest, err)
 	}
@@ -209,16 +264,54 @@ func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
 	}
 
 	// Unpack the image layers into snapshots.
-	if _, err = c.rootfsUnpacker.Unpack(ctx, manifest.Layers); err != nil {
+	rootfsUnpacker := rootfsservice.NewUnpackerFromClient(c.rootfsService)
+	if _, err = rootfsUnpacker.Unpack(ctx, manifest.Layers); err != nil {
 		return "", "", fmt.Errorf("unpack failed for manifest layers %+v: %v", manifest.Layers, err)
 	}
 	// TODO(random-liu): Considering how to deal with the disk usage of content.
 
-	configDesc, err := image.Config(ctx, c.contentProvider)
+	configDesc, err := image.Config(ctx, c.contentStoreService)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to get config descriptor for image %q: %v", ref, err)
 	}
 	return configDesc.Digest, manifestDigest, nil
+}
+
+// waitDownloadingPollInterval is the interval to check resource downloading progress.
+const waitDownloadingPollInterval = 200 * time.Millisecond
+
+// waitForResourcesDownloading waits for all resource downloading to finish.
+func (c *criContainerdService) waitForResourcesDownloading(ctx context.Context, resources map[string]struct{}) error {
+	ticker := time.NewTicker(waitDownloadingPollInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			// TODO(random-liu): Use better regexp when containerd `MakeRefKey` contains more
+			// information.
+			statuses, err := c.contentStoreService.Status(ctx, "")
+			if err != nil {
+				return fmt.Errorf("failed to get content status: %v", err)
+			}
+			pulling := false
+			// TODO(random-liu): Move Dispatch into a separate goroutine, so that we could report
+			// image pulling progress concurrently.
+			for _, status := range statuses {
+				_, ok := resources[status.Ref]
+				if ok {
+					glog.V(5).Infof("Pulling resource %q with progress %d/%d",
+						status.Ref, status.Offset, status.Total)
+					pulling = true
+				}
+			}
+			if !pulling {
+				return nil
+			}
+		case <-ctx.Done():
+			// TODO(random-liu): Abort ongoing pulling if cancelled.
+			return fmt.Errorf("image resources pulling is cancelled")
+		}
+	}
 }
 
 // insertToStringSlice is a helper function to insert a string into the string slice

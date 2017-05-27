@@ -268,11 +268,11 @@ func (c *criContainerdService) getImageInfo(ctx context.Context, ref string) (
 			normalizedRef, err)
 	}
 	// Get image config
-	desc, err := image.Config(ctx, c.contentProvider)
+	desc, err := image.Config(ctx, c.contentStoreService)
 	if err != nil {
 		return "", 0, nil, fmt.Errorf("failed to get image config descriptor: %v", err)
 	}
-	rc, err := c.contentProvider.Reader(ctx, desc.Digest)
+	rc, err := c.contentStoreService.Reader(ctx, desc.Digest)
 	if err != nil {
 		return "", 0, nil, fmt.Errorf("failed to get image config reader: %v", err)
 	}
@@ -282,13 +282,13 @@ func (c *criContainerdService) getImageInfo(ctx context.Context, ref string) (
 		return "", 0, nil, fmt.Errorf("failed to decode image config: %v", err)
 	}
 	// Get image chainID
-	diffIDs, err := image.RootFS(ctx, c.contentProvider)
+	diffIDs, err := image.RootFS(ctx, c.contentStoreService)
 	if err != nil {
 		return "", 0, nil, fmt.Errorf("failed to get image diff ids: %v", err)
 	}
 	chainID := identity.ChainID(diffIDs)
 	// Get image size
-	size, err := image.Size(ctx, c.contentProvider)
+	size, err := image.Size(ctx, c.contentStoreService)
 	if err != nil {
 		return "", 0, nil, fmt.Errorf("failed to get image size: %v", err)
 	}
@@ -325,7 +325,7 @@ func (c *criContainerdService) localResolve(ctx context.Context, ref string) (st
 		return "", fmt.Errorf("an error occurred when getting image %q from containerd image store: %v",
 			normalized.String(), err)
 	}
-	desc, err := image.Config(ctx, c.contentProvider)
+	desc, err := image.Config(ctx, c.contentStoreService)
 	if err != nil {
 		return "", fmt.Errorf("failed to get image config descriptor: %v", err)
 	}

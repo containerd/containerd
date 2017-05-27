@@ -61,6 +61,23 @@ MAINTAINERS file. The candidate becomes a maintainer once the pull request is
 merged.
 """
 
+	[Rules.adding-sub-projects]
+
+	title = "How are sub projects added?"
+
+	text = """
+Similar to adding maintainers, new sub projects can be added to containerd
+GitHub organization as long as they adhere to the CNCF
+[charter](https://www.cncf.io/about/charter/) and mission. After a project
+proposal has been announced on a public forum (GitHub issue or mailing list),
+the existing maintainers are  given five business days to discuss the new
+project, raise objections and cast their vote. Projects must be approved by at
+least 66% of the current maintainers by adding their vote.
+
+If a project is approved, a maintainer will add the project to the containerd
+GitHub organization, and make an announcement on a public forum.
+"""
+
 	[Rules.stepping-down-policy]
 
 	title = "Stepping down policy"

@@ -29,10 +29,8 @@ import (
 	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/rootfs"
 	contentservice "github.com/containerd/containerd/services/content"
 	imagesservice "github.com/containerd/containerd/services/images"
-	rootfsservice "github.com/containerd/containerd/services/rootfs"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
@@ -85,15 +83,10 @@ type criContainerdService struct {
 	containerNameIndex *registrar.Registrar
 	// containerService is containerd container service client.
 	containerService execution.ContainerServiceClient
-	// contentIngester is the containerd service to ingest content into
-	// content store.
-	contentIngester content.Ingester
-	// contentProvider is the containerd service to get content from
-	// content store.
-	contentProvider content.Provider
-	// rootfsUnpacker is the containerd service to unpack image content
-	// into snapshots.
-	rootfsUnpacker rootfs.Unpacker
+	// contentStoreService is the containerd content service client..
+	contentStoreService content.Store
+	// rootfsService is the containerd rootfs service client.
+	rootfsService rootfsapi.RootFSClient
 	// imageStoreService is the containerd service to store and track
 	// image metadata.
 	imageStoreService images.Store
@@ -103,7 +96,6 @@ type criContainerdService struct {
 
 // NewCRIContainerdService returns a new instance of CRIContainerdService
 func NewCRIContainerdService(conn *grpc.ClientConn, rootDir, networkPluginBinDir, networkPluginConfDir string) (CRIContainerdService, error) {
-	// TODO: Initialize different containerd clients.
 	// TODO(random-liu): [P2] Recover from runtime state and metadata store.
 	c := &criContainerdService{
 		os:                 osinterface.RealOS{},
@@ -116,12 +108,11 @@ func NewCRIContainerdService(conn *grpc.ClientConn, rootDir, networkPluginBinDir
 		sandboxNameIndex: registrar.NewRegistrar(),
 		sandboxIDIndex:   truncindex.NewTruncIndex(nil),
 		// TODO(random-liu): Add container id index.
-		containerNameIndex: registrar.NewRegistrar(),
-		containerService:   execution.NewContainerServiceClient(conn),
-		imageStoreService:  imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)),
-		contentIngester:    contentservice.NewIngesterFromClient(contentapi.NewContentClient(conn)),
-		contentProvider:    contentservice.NewProviderFromClient(contentapi.NewContentClient(conn)),
-		rootfsUnpacker:     rootfsservice.NewUnpackerFromClient(rootfsapi.NewRootFSClient(conn)),
+		containerNameIndex:  registrar.NewRegistrar(),
+		containerService:    execution.NewContainerServiceClient(conn),
+		imageStoreService:   imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)),
+		contentStoreService: contentservice.NewStoreFromClient(contentapi.NewContentClient(conn)),
+		rootfsService:       rootfsapi.NewRootFSClient(conn),
 	}
 
 	netPlugin, err := ocicni.InitCNI(networkPluginBinDir, networkPluginConfDir)

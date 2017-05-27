@@ -1,3 +1,5 @@
+// +build darwin freebsd
+
 package fs
 
 import (
@@ -7,7 +9,6 @@ import (
 
 	"github.com/containerd/continuity/sysx"
 	"github.com/pkg/errors"
-	"golang.org/x/sys/unix"
 )
 
 func copyFileInfo(fi os.FileInfo, name string) error {
@@ -22,8 +23,7 @@ func copyFileInfo(fi os.FileInfo, name string) error {
 		}
 	}
 
-	timespec := []unix.Timespec{unix.Timespec(st.Atim), unix.Timespec(st.Mtim)}
-	if err := unix.UtimesNanoAt(unix.AT_FDCWD, name, timespec, unix.AT_SYMLINK_NOFOLLOW); err != nil {
+	if err := syscall.UtimesNano(name, []syscall.Timespec{st.Atimespec, st.Mtimespec}); err != nil {
 		return errors.Wrapf(err, "failed to utime %s", name)
 	}
 
@@ -31,28 +31,11 @@ func copyFileInfo(fi os.FileInfo, name string) error {
 }
 
 func copyFileContent(dst, src *os.File) error {
-	st, err := src.Stat()
-	if err != nil {
-		return errors.Wrap(err, "unable to stat source")
-	}
+	buf := bufferPool.Get().([]byte)
+	_, err := io.CopyBuffer(dst, src, buf)
+	bufferPool.Put(buf)
 
-	n, err := sysx.CopyFileRange(src.Fd(), nil, dst.Fd(), nil, int(st.Size()), 0)
-	if err != nil {
-		if err != syscall.ENOSYS && err != syscall.EXDEV {
-			return errors.Wrap(err, "copy file range failed")
-		}
-
-		buf := bufferPool.Get().([]byte)
-		_, err = io.CopyBuffer(dst, src, buf)
-		bufferPool.Put(buf)
-		return err
-	}
-
-	if int64(n) != st.Size() {
-		return errors.Wrapf(err, "short copy: %d of %d", int64(n), st.Size())
-	}
-
-	return nil
+	return err
 }
 
 func copyXAttrs(dst, src string) error {

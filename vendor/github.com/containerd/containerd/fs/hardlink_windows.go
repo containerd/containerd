@@ -2,6 +2,6 @@ package fs
 
 import "os"
 
-func getHardLink(string, os.FileInfo, map[uint64]string) (string, error) {
-	return "", nil
+func getLinkInfo(fi os.FileInfo) (uint64, bool) {
+	return 0, false
 }
