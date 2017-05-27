@@ -101,7 +101,6 @@ func (s *Service) Exec(ctx context.Context, r *shimapi.ExecRequest) (*shimapi.Ex
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.execID++
-	reaper.Default.Lock()
 	process, err := newExecProcess(ctx, s.path, r, s.initProcess, s.execID)
 	if err != nil {
 		reaper.Default.Unlock()
@@ -112,8 +111,9 @@ func (s *Service) Exec(ctx context.Context, r *shimapi.ExecRequest) (*shimapi.Ex
 	cmd := &reaper.Cmd{
 		ExitCh: make(chan int, 1),
 	}
-	reaper.Default.RegisterNL(pid, cmd)
-	reaper.Default.Unlock()
+	// FIXME: this Register() is meaningless if proc exit immediately.
+	// When Reaper() is called, the cmd is not yet registered and task exit event cannot happen
+	reaper.Default.Register(pid, cmd)
 	s.events <- &task.Event{
 		Type: task.Event_EXEC_ADDED,
 		ID:   s.id,
