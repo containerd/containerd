@@ -132,7 +132,7 @@ var runCommand = cli.Command{
 		}
 		var spec []byte
 		if checkpointIndex != "" {
-			var index ocispec.ImageIndex
+			var index ocispec.Index
 			r, err := content.Reader(ctx, checkpointIndex)
 			if err != nil {
 				return err
@@ -146,7 +146,7 @@ var runCommand = cli.Command{
 			for _, m := range index.Manifests {
 				switch m.MediaType {
 				case images.MediaTypeContainerd1Checkpoint:
-					fkingo := m.Descriptor
+					fkingo := m
 					checkpoint = &fkingo
 				case images.MediaTypeContainerd1CheckpointConfig:
 					if r, err = content.Reader(ctx, m.Digest); err != nil {
@@ -159,7 +159,7 @@ var runCommand = cli.Command{
 					}
 				case images.MediaTypeDockerSchema2Manifest:
 					// make sure we have the original image that was used during checkpoint
-					diffIDs, err := images.RootFS(ctx, content, m.Descriptor)
+					diffIDs, err := images.RootFS(ctx, content, m)
 					if err != nil {
 						return err
 					}
@@ -169,7 +169,7 @@ var runCommand = cli.Command{
 						}
 					}
 				case ocispec.MediaTypeImageLayer:
-					rw = m.Descriptor
+					rw = m
 				}
 			}
 			if mounts, err = snapshotter.Mounts(ctx, id); err != nil {
