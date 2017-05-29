@@ -6,6 +6,7 @@ import "gogoproto/gogo.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
 import "github.com/containerd/containerd/api/types/descriptor/descriptor.proto";
 
 // Containers provides metadata storage for containers used in the execution
@@ -65,6 +66,9 @@ message Container {
 	//
 	// This field may be updated.
 	string rootfs = 7 [(gogoproto.customname) = "RootFS"];
+
+	google.protobuf.Timestamp created_at = 8 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp updated_at = 9 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message GetContainerRequest {

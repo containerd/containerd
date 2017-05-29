@@ -1,18 +1,23 @@
 package containers
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // Container represents the set of data pinned by a container. Unless otherwise
 // noted, the resources here are considered in use by the container.
 //
 // The resources specified in this object are used to create tasks from the container.
 type Container struct {
-	ID      string
-	Labels  map[string]string
-	Image   string
-	Runtime string
-	Spec    []byte
-	RootFS  string
+	ID        string
+	Labels    map[string]string
+	Image     string
+	Runtime   string
+	Spec      []byte
+	RootFS    string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type Store interface {
