@@ -104,24 +104,20 @@ var checkpointCommand = cli.Command{
 				return err
 			}
 		}
-		var index ocispec.ImageIndex
+		var index ocispec.Index
 		for _, d := range append(checkpoint.Descriptors, additionalDescriptors...) {
-			index.Manifests = append(index.Manifests, ocispec.ManifestDescriptor{
-				Descriptor: ocispec.Descriptor{
-					MediaType: d.MediaType,
-					Size:      d.Size_,
-					Digest:    d.Digest,
-				},
-				Platform: ocispec.Platform{
+			index.Manifests = append(index.Manifests, ocispec.Descriptor{
+				MediaType: d.MediaType,
+				Size:      d.Size_,
+				Digest:    d.Digest,
+				Platform: &ocispec.Platform{
 					OS:           runtime.GOOS,
 					Architecture: runtime.GOARCH,
 				},
 			})
 		}
 		// add image to the index
-		index.Manifests = append(index.Manifests, ocispec.ManifestDescriptor{
-			Descriptor: image.Target,
-		})
+		index.Manifests = append(index.Manifests, image.Target)
 		// checkpoint rw layer
 		snapshotter, err := getSnapshotter(context)
 		if err != nil {
@@ -135,13 +131,11 @@ var checkpointCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		index.Manifests = append(index.Manifests, ocispec.ManifestDescriptor{
-			Descriptor: rw,
-			Platform: ocispec.Platform{
-				OS:           runtime.GOOS,
-				Architecture: runtime.GOARCH,
-			},
-		})
+		rw.Platform = &ocispec.Platform{
+			OS:           runtime.GOOS,
+			Architecture: runtime.GOARCH,
+		}
+		index.Manifests = append(index.Manifests, rw)
 		data, err := json.Marshal(index)
 		if err != nil {
 			return err
