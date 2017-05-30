@@ -31,6 +31,7 @@ import (
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
 	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/registrar"
+	agentstesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/agents/testing"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
 	imagedigest "github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -68,6 +69,7 @@ func newTestCRIContainerdService() *criContainerdService {
 		containerService:   servertesting.NewFakeExecutionClient(),
 		rootfsService:      servertesting.NewFakeRootfsClient(),
 		netPlugin:          servertesting.NewFakeCNIPlugin(),
+		agentFactory:       agentstesting.NewFakeAgentFactory(),
 	}
 }
 
