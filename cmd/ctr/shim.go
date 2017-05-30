@@ -207,6 +207,10 @@ var shimExecCommand = cli.Command{
 			Name:  "cwd",
 			Usage: "current working directory",
 		},
+		cli.StringFlag{
+			Name:  "spec",
+			Usage: "runtime spec",
+		},
 	),
 	Action: func(context *cli.Context) error {
 		service, err := getShimService()
