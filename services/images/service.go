@@ -4,6 +4,7 @@ import (
 	"github.com/boltdb/bolt"
 	imagesapi "github.com/containerd/containerd/api/services/images"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
 	"github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
@@ -73,7 +74,7 @@ func (s *Service) Delete(ctx context.Context, req *imagesapi.DeleteRequest) (*em
 }
 
 func (s *Service) withStore(ctx context.Context, fn func(ctx context.Context, store images.Store) error) func(tx *bolt.Tx) error {
-	return func(tx *bolt.Tx) error { return fn(ctx, images.NewStore(tx)) }
+	return func(tx *bolt.Tx) error { return fn(ctx, metadata.NewImageStore(tx)) }
 }
 
 func (s *Service) withStoreView(ctx context.Context, fn func(ctx context.Context, store images.Store) error) error {

@@ -4,6 +4,7 @@ import (
 	imagesapi "github.com/containerd/containerd/api/services/images"
 	"github.com/containerd/containerd/api/types/descriptor"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/metadata"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -67,9 +68,9 @@ func rewriteGRPCError(err error) error {
 
 	switch grpc.Code(errors.Cause(err)) {
 	case codes.AlreadyExists:
-		return images.ErrExists
+		return metadata.ErrExists
 	case codes.NotFound:
-		return images.ErrNotFound
+		return metadata.ErrNotFound
 	}
 
 	return err
@@ -77,9 +78,9 @@ func rewriteGRPCError(err error) error {
 
 func mapGRPCError(err error, id string) error {
 	switch {
-	case images.IsNotFound(err):
+	case metadata.IsNotFound(err):
 		return grpc.Errorf(codes.NotFound, "image %v not found", id)
-	case images.IsExists(err):
+	case metadata.IsExists(err):
 		return grpc.Errorf(codes.AlreadyExists, "image %v already exists", id)
 	}
 

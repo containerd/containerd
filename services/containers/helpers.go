@@ -3,6 +3,7 @@ package containers
 import (
 	api "github.com/containerd/containerd/api/services/containers"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/metadata"
 	"github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"google.golang.org/grpc"
@@ -46,9 +47,9 @@ func containerFromProto(containerpb *api.Container) containers.Container {
 
 func mapGRPCError(err error, id string) error {
 	switch {
-	case containers.IsNotFound(err):
+	case metadata.IsNotFound(err):
 		return grpc.Errorf(codes.NotFound, "container %v not found", id)
-	case containers.IsExists(err):
+	case metadata.IsExists(err):
 		return grpc.Errorf(codes.AlreadyExists, "container %v already exists", id)
 	}
 
