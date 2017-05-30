@@ -22,7 +22,6 @@ func createDefaultSpec() (*specs.Spec, error) {
 		},
 		Root: specs.Root{},
 		Process: specs.Process{
-			Env: config.Env,
 			ConsoleSize: specs.Box{
 				Width:  80,
 				Height: 20,
@@ -70,10 +69,10 @@ func WithImageConfig(ctx context.Context, i Image) SpecOpts {
 }
 
 func WithTTY(width, height int) SpecOpts {
-	func(s *specs.Spec) error {
+	return func(s *specs.Spec) error {
 		s.Process.Terminal = true
-		s.Process.ConsoleSize.Width = width
-		s.Process.ConsoleSize.Height = height
+		s.Process.ConsoleSize.Width = uint(width)
+		s.Process.ConsoleSize.Height = uint(height)
 		return nil
 	}
 }
