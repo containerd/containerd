@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/containerd/containerd/api/services/execution"
@@ -35,6 +36,7 @@ import (
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
+	"github.com/kubernetes-incubator/cri-containerd/pkg/server/agents"
 )
 
 // StartContainer starts the container.
@@ -155,16 +157,18 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 			w.Close()
 		}(stdinPipe)
 	}
-	go func(r io.ReadCloser) {
-		io.Copy(os.Stdout, r) // nolint: errcheck
-		r.Close()
-	}(stdoutPipe)
-	// Only redirect stderr when there is no tty.
-	if !config.GetTty() {
-		go func(r io.ReadCloser) {
-			io.Copy(os.Stderr, r) // nolint: errcheck
-			r.Close()
-		}(stderrPipe)
+	if config.GetLogPath() != "" {
+		// Only generate container log when log path is specified.
+		logPath := filepath.Join(sandboxConfig.GetLogDirectory(), config.GetLogPath())
+		if err := c.agentFactory.NewContainerLogger(logPath, agents.Stdout, stdoutPipe).Start(); err != nil {
+			return fmt.Errorf("failed to start container stdout logger: %v", err)
+		}
+		// Only redirect stderr when there is no tty.
+		if !config.GetTty() {
+			if err := c.agentFactory.NewContainerLogger(logPath, agents.Stderr, stderrPipe).Start(); err != nil {
+				return fmt.Errorf("failed to start container stderr logger: %v", err)
+			}
+		}
 	}
 
 	// Get rootfs mounts.

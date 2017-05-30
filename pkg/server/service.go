@@ -38,6 +38,7 @@ import (
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
 	osinterface "github.com/kubernetes-incubator/cri-containerd/pkg/os"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/registrar"
+	"github.com/kubernetes-incubator/cri-containerd/pkg/server/agents"
 )
 
 // CRIContainerdService is the interface implement CRI remote service server.
@@ -87,6 +88,8 @@ type criContainerdService struct {
 	healthService healthapi.HealthClient
 	// netPlugin is used to setup and teardown network when run/stop pod sandbox.
 	netPlugin ocicni.CNIPlugin
+	// agentFactory is the factory to create agent used in the cri containerd service.
+	agentFactory agents.AgentFactory
 }
 
 // NewCRIContainerdService returns a new instance of CRIContainerdService
@@ -111,6 +114,7 @@ func NewCRIContainerdService(conn *grpc.ClientConn, rootDir, networkPluginBinDir
 		rootfsService:       rootfsapi.NewRootFSClient(conn),
 		versionService:      versionapi.NewVersionClient(conn),
 		healthService:       healthapi.NewHealthClient(conn),
+		agentFactory:        agents.NewAgentFactory(),
 	}
 
 	netPlugin, err := ocicni.InitCNI(networkPluginBinDir, networkPluginConfDir)
