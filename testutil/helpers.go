@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"syscall"
 	"testing"
 
+	"github.com/containerd/containerd/mount"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,7 +21,7 @@ func init() {
 // Unmount unmounts a given mountPoint and sets t.Error if it fails
 func Unmount(t *testing.T, mountPoint string) {
 	t.Log("unmount", mountPoint)
-	if err := syscall.Unmount(mountPoint, 0); err != nil {
+	if err := mount.Unmount(mountPoint, 0); err != nil {
 		t.Error("Could not umount", mountPoint, err)
 	}
 }

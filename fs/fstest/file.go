@@ -5,8 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-
-	"github.com/containerd/continuity/sysx"
 )
 
 // Applier applies single file changes
@@ -93,12 +91,6 @@ func Symlink(oldname, newname string) Applier {
 func Link(oldname, newname string) Applier {
 	return applyFn(func(root string) error {
 		return os.Link(filepath.Join(root, oldname), filepath.Join(root, newname))
-	})
-}
-
-func SetXAttr(name, key, value string) Applier {
-	return applyFn(func(root string) error {
-		return sysx.LSetxattr(name, key, []byte(value), 0)
 	})
 }
 

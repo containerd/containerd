@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"syscall"
 	"testing"
 
 	"github.com/containerd/containerd/fs/fstest"
@@ -28,8 +27,8 @@ func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(ctx context.
 func makeTest(t *testing.T, name string, snapshotterFn func(ctx context.Context, root string) (snapshot.Snapshotter, func(), error), fn func(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string)) func(t *testing.T) {
 	return func(t *testing.T) {
 		ctx := context.Background()
-		oldumask := syscall.Umask(0)
-		defer syscall.Umask(oldumask)
+		restoreMask := clearMask()
+		defer restoreMask()
 		// Make two directories: a snapshotter root and a play area for the tests:
 		//
 		// 	/tmp

@@ -38,6 +38,7 @@ script:
   - GIT_CHECK_EXCLUDE="./vendor" TRAVIS_COMMIT_RANGE="${TRAVIS_COMMIT_RANGE/.../..}" make dco
   - make fmt
   - make vet
+  - make build
   - make binaries
   - if [ "$GOOS" = "linux" ]; then sudo make install ; fi
   - if [ "$GOOS" = "linux" ]; then make coverage ; fi
