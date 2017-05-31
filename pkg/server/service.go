@@ -54,7 +54,7 @@ import (
 
 // CRIContainerdService is the interface implement CRI remote service server.
 type CRIContainerdService interface {
-	Start() error
+	Start()
 	runtime.RuntimeServiceServer
 	runtime.ImageServiceServer
 }
@@ -128,6 +128,6 @@ func NewCRIContainerdService(conn *grpc.ClientConn, rootDir, networkPluginBinDir
 	return c, nil
 }
 
-func (c *criContainerdService) Start() error {
-	return c.startEventMonitor()
+func (c *criContainerdService) Start() {
+	c.startEventMonitor()
 }
