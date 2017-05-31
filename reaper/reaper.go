@@ -19,30 +19,32 @@ func Reap() error {
 	for _, e := range exits {
 		Default.Lock()
 		c, ok := Default.cmds[e.Pid]
-		Default.Unlock()
 		if !ok {
+			Default.unknown[e.Pid] = e.Status
+			Default.Unlock()
 			continue
 		}
+		Default.Unlock()
 		if c.c != nil {
 			// after we get an exit, call wait on the go process to make sure all
 			// pipes are closed and finalizers are run on the process
 			c.c.Wait()
 		}
 		c.ExitCh <- e.Status
-		Default.Lock()
-		delete(Default.cmds, e.Pid)
-		Default.Unlock()
 	}
 	return err
 }
 
 var Default = &Monitor{
-	cmds: make(map[int]*Cmd),
+	cmds:    make(map[int]*Cmd),
+	unknown: make(map[int]int),
 }
 
 type Monitor struct {
 	sync.Mutex
-	cmds map[int]*Cmd
+
+	cmds    map[int]*Cmd
+	unknown map[int]int
 }
 
 func (m *Monitor) Output(c *exec.Cmd) ([]byte, error) {
@@ -93,6 +95,13 @@ func (m *Monitor) Wait(c *exec.Cmd) (int, error) {
 
 func (m *Monitor) Register(pid int, c *Cmd) {
 	m.Lock()
+	if status, ok := m.unknown[pid]; ok {
+		delete(m.unknown, pid)
+		m.cmds[pid] = c
+		m.Unlock()
+		c.ExitCh <- status
+		return
+	}
 	m.cmds[pid] = c
 	m.Unlock()
 }
@@ -115,6 +124,19 @@ func (m *Monitor) WaitPid(pid int) (int, error) {
 		return ec, errors.Errorf("exit status %d", ec)
 	}
 	return ec, nil
+}
+
+// Command returns the registered pid for the command created
+func (m *Monitor) Command(pid int) *Cmd {
+	m.Lock()
+	defer m.Unlock()
+	return m.cmds[pid]
+}
+
+func (m *Monitor) Delete(pid int) {
+	m.Lock()
+	delete(m.cmds, pid)
+	m.Unlock()
 }
 
 type Cmd struct {
