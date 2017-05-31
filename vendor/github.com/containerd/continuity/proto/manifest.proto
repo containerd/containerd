@@ -16,13 +16,11 @@ message Resource {
 
     // NOTE(stevvooe): Need to define clear precedence for user/group/uid/gid precedence.
 
-    // Uid specifies the user id for the resource. A string type is used for
-    // compatibility across different OS.
-    string uid = 2;
+    // Uid specifies the user id for the resource. 
+    int64 uid = 2;
 
-    // Gid specifies the group id for the resource. A string type is used for
-    // compatibility across different OS.
-    string gid = 3;
+    // Gid specifies the group id for the resource.
+    int64 gid = 3;
 
     // user and group are not currently used but their field numbers have been
     // reserved for future use. As such, they are marked as deprecated.

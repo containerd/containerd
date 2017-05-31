@@ -26,8 +26,8 @@ type Resource interface {
 	// Mode returns the
 	Mode() os.FileMode
 
-	UID() string
-	GID() string
+	UID() int64
+	GID() int64
 }
 
 // ByPath provides the canonical sort order for a set of resources. Use with
@@ -240,7 +240,7 @@ type Device interface {
 type resource struct {
 	paths    []string
 	mode     os.FileMode
-	uid, gid string
+	uid, gid int64
 	xattrs   map[string][]byte
 }
 
@@ -258,11 +258,11 @@ func (r *resource) Mode() os.FileMode {
 	return r.mode
 }
 
-func (r *resource) UID() string {
+func (r *resource) UID() int64 {
 	return r.uid
 }
 
-func (r *resource) GID() string {
+func (r *resource) GID() int64 {
 	return r.gid
 }
 

@@ -27,8 +27,8 @@ func newBaseResource(p string, fi os.FileInfo) (*resource, error) {
 		paths: []string{p},
 		mode:  fi.Mode(),
 
-		uid: fmt.Sprint(sys.Uid),
-		gid: fmt.Sprint(sys.Gid),
+		uid: int64(sys.Uid),
+		gid: int64(sys.Gid),
 
 		// NOTE(stevvooe): Population of shared xattrs field is deferred to
 		// the resource types that populate it. Since they are a property of
