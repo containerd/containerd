@@ -23,16 +23,15 @@ import (
 	"os"
 	"time"
 
+	"github.com/containerd/containerd/api/services/execution"
+	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
+	"github.com/containerd/containerd/api/types/container"
 	prototypes "github.com/gogo/protobuf/types"
 	"github.com/golang/glog"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
 	"golang.org/x/net/context"
-
-	"github.com/containerd/containerd/api/services/execution"
-	"github.com/containerd/containerd/api/types/container"
-	"github.com/containerd/containerd/api/types/mount"
-
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
@@ -114,12 +113,11 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 	glog.V(2).Infof("Sandbox container %q is running with pid %d", sandboxID, sandboxPid)
 
 	// Generate containerd container create options.
-	// TODO(random-liu): [P0] Create container rootfs with image ref.
-	// TODO(random-liu): [P0] Apply default image config.
-	// Use fixed rootfs path for now.
-	const rootPath = "/"
-
-	spec, err := c.generateContainerSpec(id, sandboxPid, config, sandboxConfig)
+	imageMeta, err := c.imageMetadataStore.Get(meta.ImageRef)
+	if err != nil {
+		return fmt.Errorf("failed to get container image %q: %v", meta.ImageRef, err)
+	}
+	spec, err := c.generateContainerSpec(id, sandboxPid, config, sandboxConfig, imageMeta.Config)
 	if err != nil {
 		return fmt.Errorf("failed to generate container %q spec: %v", id, err)
 	}
@@ -169,6 +167,12 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 		}(stderrPipe)
 	}
 
+	// Get rootfs mounts.
+	mountsResp, err := c.rootfsService.Mounts(ctx, &rootfsapi.MountsRequest{Name: id})
+	if err != nil {
+		return fmt.Errorf("failed to get rootfs mounts %q: %v", id, err)
+	}
+
 	// Create containerd container.
 	createOpts := &execution.CreateRequest{
 		ID: id,
@@ -176,24 +180,14 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 			TypeUrl: runtimespec.Version,
 			Value:   rawSpec,
 		},
-		// TODO(random-liu): [P0] Get rootfs mount from containerd.
-		Rootfs: []*mount.Mount{
-			{
-				Type:   "bind",
-				Source: rootPath,
-				Options: []string{
-					"rw",
-					"rbind",
-				},
-			},
-		},
+		Rootfs:   mountsResp.Mounts,
 		Runtime:  defaultRuntime,
 		Stdin:    stdin,
 		Stdout:   stdout,
 		Stderr:   stderr,
 		Terminal: config.GetTty(),
 	}
-	glog.V(2).Infof("Create containerd container (id=%q, name=%q) with options %+v.",
+	glog.V(5).Infof("Create containerd container (id=%q, name=%q) with options %+v.",
 		id, meta.Name, createOpts)
 	createResp, err := c.containerService.Create(ctx, createOpts)
 	if err != nil {
@@ -219,7 +213,8 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 	return nil
 }
 
-func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint32, config *runtime.ContainerConfig, sandboxConfig *runtime.PodSandboxConfig) (*runtimespec.Spec, error) {
+func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint32, config *runtime.ContainerConfig,
+	sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
 	// TODO(random-liu): [P2] Move container runtime spec generation into a helper function.
 	g := generate.New()
@@ -228,14 +223,21 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 	// pre-defined directory.
 	g.SetRootPath(relativeRootfsPath)
 
-	if len(config.GetCommand()) != 0 || len(config.GetArgs()) != 0 {
-		g.SetProcessArgs(append(config.GetCommand(), config.GetArgs()...))
+	if err := setOCIProcessArgs(&g, config, imageConfig); err != nil {
+		return nil, err
 	}
 
 	if config.GetWorkingDir() != "" {
 		g.SetProcessCwd(config.GetWorkingDir())
+	} else if imageConfig.WorkingDir != "" {
+		g.SetProcessCwd(imageConfig.WorkingDir)
 	}
 
+	// Apply envs from image config first, so that envs from container config
+	// can override them.
+	if err := addImageEnvs(&g, imageConfig.Env); err != nil {
+		return nil, err
+	}
 	for _, e := range config.GetEnvs() {
 		g.AddProcessEnv(e.GetKey(), e.GetValue())
 	}
@@ -286,6 +288,27 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 	// TODO(random-liu): [P0] Bind mount sandbox resolv.conf.
 
 	return g.Spec(), nil
+}
+
+// setOCIProcessArgs sets process args. It returns error if the final arg list
+// is empty.
+func setOCIProcessArgs(g *generate.Generator, config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) error {
+	command, args := config.GetCommand(), config.GetArgs()
+	// The following logic is migrated from https://github.com/moby/moby/blob/master/daemon/commit.go
+	// TODO(random-liu): Clearly define the commands overwrite behavior.
+	if len(command) == 0 {
+		if len(args) == 0 {
+			args = imageConfig.Cmd
+		}
+		if command == nil {
+			command = imageConfig.Entrypoint
+		}
+	}
+	if len(command) == 0 && len(args) == 0 {
+		return fmt.Errorf("no command specified")
+	}
+	g.SetProcessArgs(append(command, args...))
+	return nil
 }
 
 // addOCIBindMounts adds bind mounts.

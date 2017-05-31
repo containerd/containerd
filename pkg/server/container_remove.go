@@ -69,7 +69,7 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 	// kubelet implementation, we'll never start a container once we decide to remove it,
 	// so we don't need the "Dead" state for now.
 
-	// TODO(random-liu): [P0] Cleanup container rootfs.
+	// TODO(random-liu): [P0] Cleanup snapshot after switching to new snapshot api.
 
 	// Cleanup container root directory.
 	containerRootDir := getContainerRootDir(c.rootDir, id)

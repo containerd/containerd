@@ -21,6 +21,9 @@ import (
 	"os"
 	"testing"
 
+	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
+	imagedigest "github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
@@ -28,6 +31,7 @@ import (
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
+	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
 )
 
 func TestCreateContainer(t *testing.T) {
@@ -42,10 +46,20 @@ func TestCreateContainer(t *testing.T) {
 		Namespace: "test-sandbox-namespace",
 		Attempt:   2,
 	}
+	// Use an image id to avoid image name resolution.
+	// TODO(random-liu): Change this to image name after we have complete image
+	// management unit test framework.
+	testImage := "sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113799"
+	testChainID := imagedigest.Digest("test-chain-id")
+	testImageMetadata := metadata.ImageMetadata{
+		ID:      testImage,
+		ChainID: testChainID.String(),
+		Config:  &imagespec.ImageConfig{},
+	}
 	testConfig := &runtime.ContainerConfig{
 		Metadata: testNameMeta,
 		Image: &runtime.ImageSpec{
-			Image: "test-image",
+			Image: testImage,
 		},
 		Labels:      map[string]string{"a": "b"},
 		Annotations: map[string]string{"c": "d"},
@@ -55,12 +69,14 @@ func TestCreateContainer(t *testing.T) {
 	}
 
 	for desc, test := range map[string]struct {
-		sandboxMetadata   *metadata.SandboxMetadata
-		reserveNameErr    bool
-		createRootDirErr  error
-		createMetadataErr bool
-		expectErr         bool
-		expectMeta        *metadata.ContainerMetadata
+		sandboxMetadata    *metadata.SandboxMetadata
+		reserveNameErr     bool
+		imageMetadataErr   bool
+		prepareSnapshotErr error
+		createRootDirErr   error
+		createMetadataErr  bool
+		expectErr          bool
+		expectMeta         *metadata.ContainerMetadata
 	}{
 		"should return error if sandbox does not exist": {
 			sandboxMetadata: nil,
@@ -84,6 +100,24 @@ func TestCreateContainer(t *testing.T) {
 			createRootDirErr: errors.New("random error"),
 			expectErr:        true,
 		},
+		"should return error if image is not pulled": {
+			sandboxMetadata: &metadata.SandboxMetadata{
+				ID:     testSandboxID,
+				Name:   makeSandboxName(testSandboxNameMeta),
+				Config: testSandboxConfig,
+			},
+			imageMetadataErr: true,
+			expectErr:        true,
+		},
+		"should return error if prepare snapshot fails": {
+			sandboxMetadata: &metadata.SandboxMetadata{
+				ID:     testSandboxID,
+				Name:   makeSandboxName(testSandboxNameMeta),
+				Config: testSandboxConfig,
+			},
+			prepareSnapshotErr: errors.New("random error"),
+			expectErr:          true,
+		},
 		"should be able to create container successfully": {
 			sandboxMetadata: &metadata.SandboxMetadata{
 				ID:     testSandboxID,
@@ -94,12 +128,14 @@ func TestCreateContainer(t *testing.T) {
 			expectMeta: &metadata.ContainerMetadata{
 				Name:      makeContainerName(testNameMeta, testSandboxNameMeta),
 				SandboxID: testSandboxID,
+				ImageRef:  testImage,
 				Config:    testConfig,
 			},
 		},
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIContainerdService()
+		fakeRootfsClient := c.rootfsService.(*servertesting.FakeRootfsClient)
 		fakeOS := c.os.(*ostesting.FakeOS)
 		if test.sandboxMetadata != nil {
 			assert.NoError(t, c.sandboxStore.Create(*test.sandboxMetadata))
@@ -108,6 +144,13 @@ func TestCreateContainer(t *testing.T) {
 		if test.reserveNameErr {
 			assert.NoError(t, c.containerNameIndex.Reserve(containerName, "random id"))
 		}
+		if !test.imageMetadataErr {
+			assert.NoError(t, c.imageMetadataStore.Create(testImageMetadata))
+		}
+		if test.prepareSnapshotErr != nil {
+			fakeRootfsClient.InjectError("prepare", test.prepareSnapshotErr)
+		}
+		fakeRootfsClient.SetFakeChainIDs([]imagedigest.Digest{testChainID})
 		rootExists := false
 		rootPath := ""
 		fakeOS.MkdirAllFn = func(path string, perm os.FileMode) error {
@@ -153,5 +196,15 @@ func TestCreateContainer(t *testing.T) {
 		// TODO(random-liu): Use fake clock to test CreatedAt.
 		test.expectMeta.CreatedAt = meta.CreatedAt
 		assert.Equal(t, test.expectMeta, meta, "container metadata should be created")
+
+		assert.Equal(t, []string{"prepare"}, fakeRootfsClient.GetCalledNames(), "prepare should be called")
+		calls := fakeRootfsClient.GetCalledDetails()
+		prepareOpts := calls[0].Argument.(*rootfsapi.PrepareRequest)
+		assert.Equal(t, &rootfsapi.PrepareRequest{
+			Name:    id,
+			ChainID: testChainID,
+			// TODO(random-liu): Test readonly rootfs.
+			Readonly: false,
+		}, prepareOpts, "prepare request should be correct")
 	}
 }

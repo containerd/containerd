@@ -126,6 +126,7 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 			expectErr: true,
 		},
 		"should return error when env is invalid ": {
+			// Also covers addImageEnvs.
 			imageConfigChange: func(c *imagespec.ImageConfig) {
 				c.Env = []string{"a"}
 			},

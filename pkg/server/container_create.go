@@ -20,9 +20,10 @@ import (
 	"fmt"
 	"time"
 
+	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
 	"github.com/golang/glog"
+	imagedigest "github.com/opencontainers/go-digest"
 	"golang.org/x/net/context"
-
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
@@ -68,9 +69,26 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 		Config:    config,
 	}
 
-	// TODO(random-liu): [P0] Prepare container rootfs.
-
-	// TODO(random-liu): [P0] Set ImageRef in ContainerMetadata with image id.
+	// Prepare container image snapshot. For container, the image should have
+	// been pulled before creating the container, so do not ensure the image.
+	image := config.GetImage().GetImage()
+	imageMeta, err := c.localResolve(ctx, image)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve image %q: %v", image, err)
+	}
+	if imageMeta == nil {
+		return nil, fmt.Errorf("image %q not found", image)
+	}
+	if _, err := c.rootfsService.Prepare(ctx, &rootfsapi.PrepareRequest{
+		Name: id,
+		// We are sure that ChainID must be a digest.
+		ChainID:  imagedigest.Digest(imageMeta.ChainID),
+		Readonly: config.GetLinux().GetSecurityContext().GetReadonlyRootfs(),
+	}); err != nil {
+		return nil, fmt.Errorf("failed to prepare container rootfs %q: %v", imageMeta.ChainID, err)
+	}
+	// TODO(random-liu): [P0] Cleanup snapshot on failure after switching to new rootfs api.
+	meta.ImageRef = imageMeta.ID
 
 	// Create container root directory.
 	containerRootDir := getContainerRootDir(c.rootDir, id)
