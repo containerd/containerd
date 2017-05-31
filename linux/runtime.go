@@ -274,8 +274,8 @@ func (r *Runtime) loadContainer(path string) (*Task, error) {
 func (r *Runtime) killContainer(ctx context.Context, id string) {
 	log.G(ctx).Debug("terminating container after failed load")
 	runtime := &runc.Runc{
-		// TODO: get Command provided for initial container creation
-		//	Command:      r.Runtime,
+		// TODO: should we get Command provided for initial container creation?
+		Command:      r.runtime,
 		LogFormat:    runc.JSON,
 		PdeathSignal: unix.SIGKILL,
 	}
