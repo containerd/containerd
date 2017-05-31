@@ -289,3 +289,74 @@ func TestContainerExec(t *testing.T) {
 	}
 	<-finished
 }
+
+func TestContainerProcesses(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	client, err := New(address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		ctx = context.Background()
+		id  = "ContainerProcesses"
+	)
+	image, err := client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	spec, err := GenerateSpec(WithImageConfig(ctx, image), WithProcessArgs("sleep", "100"))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	container, err := client.NewContainer(ctx, id, spec, WithImage(image), WithNewRootFS(id, image))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	statusC := make(chan uint32, 1)
+	go func() {
+		status, err := task.Wait(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+		statusC <- status
+	}()
+
+	pid := task.Pid()
+	if pid <= 0 {
+		t.Errorf("invalid task pid %d", pid)
+	}
+	processes, err := task.Processes(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	if l := len(processes); l != 1 {
+		t.Errorf("expected 1 process but received %d", l)
+	}
+	if len(processes) > 0 {
+		actual := processes[0]
+		if pid != actual {
+			t.Errorf("expected pid %d but received %d", pid, actual)
+		}
+	}
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Error(err)
+	}
+	<-statusC
+}
