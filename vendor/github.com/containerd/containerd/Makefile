@@ -4,8 +4,9 @@ ROOTDIR=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # Base path used to install.
 DESTDIR=/usr/local
 
-# Used to populate version variable in main package.
+# Used to populate variables in version package.
 VERSION=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
+REVISION=$(shell git rev-parse HEAD)$(shell if ! git diff --no-ext-diff --quiet --exit-code; then echo .m; fi)
 
 PKG=github.com/containerd/containerd
 
@@ -37,7 +38,7 @@ ifeq ("$(GOOS)", "windows")
 endif
 
 
-GO_LDFLAGS=-ldflags "-X $(PKG).Version=$(VERSION) -X $(PKG).Package=$(PKG)"
+GO_LDFLAGS=-ldflags "-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG)"
 
 # Flags passed to `go test`
 TESTFLAGS ?=-parallel 8 -race
