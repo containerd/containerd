@@ -32,6 +32,7 @@ type Task interface {
 	Wait(context.Context) (uint32, error)
 	Exec(context.Context, *specs.Process, IOCreation) (Process, error)
 	Processes(context.Context) ([]uint32, error)
+	CloseStdin(context.Context) error
 }
 
 type Process interface {
@@ -157,4 +158,12 @@ func (t *task) Processes(ctx context.Context) ([]uint32, error) {
 		out = append(out, p.Pid)
 	}
 	return out, nil
+}
+
+func (t *task) CloseStdin(ctx context.Context) error {
+	_, err := t.client.TaskService().CloseStdin(ctx, &execution.CloseStdinRequest{
+		ContainerID: t.containerID,
+		Pid:         t.pid,
+	})
+	return err
 }

@@ -54,6 +54,32 @@ func BufferedIO(stdin, stdout, stderr *bytes.Buffer) IOCreation {
 	}
 }
 
+func NewIO(stdin io.Reader, stdout, stderr io.Writer) IOCreation {
+	return func() (*IO, error) {
+		paths, err := fifoPaths()
+		if err != nil {
+			return nil, err
+		}
+		i := &IO{
+			Terminal: false,
+			Stdout:   paths.out,
+			Stderr:   paths.err,
+			Stdin:    paths.in,
+		}
+		set := &ioSet{
+			in:  stdin,
+			out: stdout,
+			err: stderr,
+		}
+		closer, err := copyIO(paths, set, false)
+		if err != nil {
+			return nil, err
+		}
+		i.closer = closer
+		return i, nil
+	}
+}
+
 // Stdio returns an IO implementation to be used for a task
 // that outputs the container's IO as the current processes Stdio
 func Stdio() (*IO, error) {
