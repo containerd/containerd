@@ -48,9 +48,7 @@ func main() {
 	if err != nil {
 		glog.Exitf("Failed to create CRI containerd service %+v: %v", o, err)
 	}
-	if err := service.Start(); err != nil {
-		glog.Exitf("Failed to start CRI containerd service: %v", err)
-	}
+	service.Start()
 
 	s := server.NewCRIContainerdServer(o.SocketPath, service, service)
 	if err := s.Run(); err != nil {

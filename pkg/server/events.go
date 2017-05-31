@@ -17,47 +17,65 @@ limitations under the License.
 package server
 
 import (
-	"github.com/golang/glog"
-	"golang.org/x/net/context"
+	"time"
 
 	"github.com/containerd/containerd/api/services/execution"
 	"github.com/containerd/containerd/api/types/container"
+	"github.com/golang/glog"
+	"github.com/jpillora/backoff"
+	"golang.org/x/net/context"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 )
 
+const (
+	// minRetryInterval is the minimum retry interval when lost connection with containerd.
+	minRetryInterval = 100 * time.Millisecond
+	// maxRetryInterval is the maximum retry interval when lost connection with containerd.
+	maxRetryInterval = 30 * time.Second
+	// exponentialFactor is the exponential backoff factor.
+	exponentialFactor = 2.0
+)
+
 // startEventMonitor starts an event monitor which monitors and handles all
 // container events.
-// TODO(random-liu): [P1] Figure out:
-// 1) Is it possible to drop event during containerd is running?
-// 2) How to deal with containerd down? We should restart event monitor, and
-// we should recover all container state.
-func (c *criContainerdService) startEventMonitor() error {
-	events, err := c.containerService.Events(context.Background(), &execution.EventsRequest{})
-	if err != nil {
-		return err
+// TODO(random-liu): [P1] Is it possible to drop event during containerd is running?
+func (c *criContainerdService) startEventMonitor() {
+	b := backoff.Backoff{
+		Min:    minRetryInterval,
+		Max:    maxRetryInterval,
+		Factor: exponentialFactor,
 	}
 	go func() {
 		for {
-			c.handleEventStream(events)
+			events, err := c.containerService.Events(context.Background(), &execution.EventsRequest{})
+			if err != nil {
+				glog.Errorf("Failed to connect to containerd event stream: %v", err)
+				time.Sleep(b.Duration())
+				continue
+			}
+			// Successfully connect with containerd, reset backoff.
+			b.Reset()
+			// TODO(random-liu): Relist to recover state, should prevent other operations
+			// until state is fully recovered.
+			if err := c.handleEventStream(events); err != nil {
+				glog.Errorf("Failed to handle event stream: %v", err)
+				time.Sleep(b.Duration())
+				continue
+			}
 		}
 	}()
-	return nil
 }
 
 // handleEventStream receives an event from containerd and handles the event.
-func (c *criContainerdService) handleEventStream(events execution.ContainerService_EventsClient) {
-	// TODO(random-liu): [P1] Should backoff on this error, or else this will
-	// cause a busy loop.
-	// TODO(random-liu): Handle io.EOF.
+func (c *criContainerdService) handleEventStream(events execution.ContainerService_EventsClient) error {
 	e, err := events.Recv()
 	if err != nil {
-		glog.Errorf("Failed to receive event: %v", err)
-		return
+		return err
 	}
 	glog.V(2).Infof("Received container event: %+v", e)
 	c.handleEvent(e)
-	return
+	return nil
 }
 
 // handleEvent handles a containerd event.
