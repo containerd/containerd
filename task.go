@@ -40,6 +40,7 @@ type Process interface {
 	Start(context.Context) error
 	Kill(context.Context, syscall.Signal) error
 	Wait(context.Context) (uint32, error)
+	CloseStdin(context.Context) error
 }
 
 var _ = (Task)(&task{})
