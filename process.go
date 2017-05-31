@@ -26,10 +26,13 @@ type process struct {
 	spec *specs.Process
 }
 
+// Pid returns the pid of the process
+// The pid is not set until start is called and returns
 func (p *process) Pid() uint32 {
 	return p.pid
 }
 
+// Start starts the exec process
 func (p *process) Start(ctx context.Context) error {
 	data, err := json.Marshal(p.spec)
 	if err != nil {

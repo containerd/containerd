@@ -31,6 +31,7 @@ type Task interface {
 	Status(context.Context) (TaskStatus, error)
 	Wait(context.Context) (uint32, error)
 	Exec(context.Context, *specs.Process, IOCreation) (Process, error)
+	Processes(context.Context) ([]uint32, error)
 }
 
 type Process interface {
@@ -142,4 +143,18 @@ func (t *task) Exec(ctx context.Context, spec *specs.Process, ioCreate IOCreatio
 		spec:    spec,
 		pidSync: make(chan struct{}),
 	}, nil
+}
+
+func (t *task) Processes(ctx context.Context) ([]uint32, error) {
+	response, err := t.client.TaskService().Processes(ctx, &execution.ProcessesRequest{
+		ContainerID: t.containerID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var out []uint32
+	for _, p := range response.Processes {
+		out = append(out, p.Pid)
+	}
+	return out, nil
 }
