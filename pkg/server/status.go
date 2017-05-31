@@ -17,14 +17,52 @@ limitations under the License.
 package server
 
 import (
-	"errors"
+	"fmt"
 
 	"golang.org/x/net/context"
+	healthapi "google.golang.org/grpc/health/grpc_health_v1"
 
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 )
 
+const (
+	// runtimeNotReadyReason is the reason reported when runtime is not ready.
+	runtimeNotReadyReason = "ContainerdNotReady"
+	// networkNotReadyReason is the reason reported when network is not ready.
+	networkNotReadyReason = "NetworkPluginNotReady"
+)
+
 // Status returns the status of the runtime.
 func (c *criContainerdService) Status(ctx context.Context, r *runtime.StatusRequest) (*runtime.StatusResponse, error) {
-	return nil, errors.New("not implemented")
+	runtimeCondition := &runtime.RuntimeCondition{
+		Type:   runtime.RuntimeReady,
+		Status: true,
+	}
+	// Use containerd grpc server healthcheck service to check its readiness.
+	resp, err := c.healthService.Check(ctx, &healthapi.HealthCheckRequest{})
+	if err != nil || resp.Status != healthapi.HealthCheckResponse_SERVING {
+		runtimeCondition.Status = false
+		runtimeCondition.Reason = runtimeNotReadyReason
+		if err != nil {
+			runtimeCondition.Message = fmt.Sprintf("Containerd healthcheck returns error: %v", err)
+		} else {
+			runtimeCondition.Message = "Containerd grpc server is not serving"
+		}
+	}
+
+	networkCondition := &runtime.RuntimeCondition{
+		Type:   runtime.NetworkReady,
+		Status: true,
+	}
+	if err := c.netPlugin.Status(); err != nil {
+		networkCondition.Status = false
+		networkCondition.Reason = networkNotReadyReason
+		networkCondition.Message = fmt.Sprintf("Network plugin returns error: %v", err)
+	}
+	return &runtime.StatusResponse{
+		Status: &runtime.RuntimeStatus{Conditions: []*runtime.RuntimeCondition{
+			runtimeCondition,
+			networkCondition,
+		}},
+	}, nil
 }

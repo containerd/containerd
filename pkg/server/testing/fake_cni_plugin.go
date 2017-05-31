@@ -168,7 +168,10 @@ func (f *FakeCNIPlugin) GetContainerNetworkStatus(netnsPath string, namespace st
 
 // Status get the status of the plugin.
 func (f *FakeCNIPlugin) Status() error {
-	return nil
+	f.Lock()
+	defer f.Unlock()
+	f.appendCalled("Status", nil)
+	return f.getError("Status")
 }
 
 func generateIP() string {

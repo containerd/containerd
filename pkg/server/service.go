@@ -19,25 +19,25 @@ package server
 import (
 	"fmt"
 
-	"github.com/docker/docker/pkg/truncindex"
-	"github.com/kubernetes-incubator/cri-o/pkg/ocicni"
-	"google.golang.org/grpc"
-
 	contentapi "github.com/containerd/containerd/api/services/content"
 	"github.com/containerd/containerd/api/services/execution"
 	imagesapi "github.com/containerd/containerd/api/services/images"
 	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
+	versionapi "github.com/containerd/containerd/api/services/version"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	contentservice "github.com/containerd/containerd/services/content"
 	imagesservice "github.com/containerd/containerd/services/images"
+	"github.com/docker/docker/pkg/truncindex"
+	"github.com/kubernetes-incubator/cri-o/pkg/ocicni"
+	"google.golang.org/grpc"
+	healthapi "google.golang.org/grpc/health/grpc_health_v1"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
 	osinterface "github.com/kubernetes-incubator/cri-containerd/pkg/os"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/registrar"
-
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 )
 
 // TODO remove the underscores from the following imports as the services are
@@ -86,13 +86,17 @@ type criContainerdService struct {
 	containerNameIndex *registrar.Registrar
 	// containerService is containerd container service client.
 	containerService execution.ContainerServiceClient
-	// contentStoreService is the containerd content service client..
+	// contentStoreService is the containerd content service client.
 	contentStoreService content.Store
 	// rootfsService is the containerd rootfs service client.
 	rootfsService rootfsapi.RootFSClient
 	// imageStoreService is the containerd service to store and track
 	// image metadata.
 	imageStoreService images.Store
+	// versionService is the containerd version service client.
+	versionService versionapi.VersionClient
+	// healthService is the healthcheck service of containerd grpc server.
+	healthService healthapi.HealthClient
 	// netPlugin is used to setup and teardown network when run/stop pod sandbox.
 	netPlugin ocicni.CNIPlugin
 }
@@ -117,6 +121,8 @@ func NewCRIContainerdService(conn *grpc.ClientConn, rootDir, networkPluginBinDir
 		imageStoreService:   imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)),
 		contentStoreService: contentservice.NewStoreFromClient(contentapi.NewContentClient(conn)),
 		rootfsService:       rootfsapi.NewRootFSClient(conn),
+		versionService:      versionapi.NewVersionClient(conn),
+		healthService:       healthapi.NewHealthClient(conn),
 	}
 
 	netPlugin, err := ocicni.InitCNI(networkPluginBinDir, networkPluginConfDir)

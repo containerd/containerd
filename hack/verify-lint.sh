@@ -23,6 +23,7 @@ for d in $(find . -type d -a \( -iwholename './pkg*' -o -iwholename './cmd*' \))
 		 --exclude='error return value not checked.*(Close|Log|Print).*\(errcheck\)$' \
 		 --exclude='.*_test\.go:.*error return value not checked.*\(errcheck\)$' \
 		 --exclude='duplicate of.*_test.go.*\(dupl\)$' \
+		 --exclude='.*/mock_.*\.go:.*\(golint\)$' \
 		 --disable=aligncheck \
 		 --disable=gotype \
 		 --disable=gas \

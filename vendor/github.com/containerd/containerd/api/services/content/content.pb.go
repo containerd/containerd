@@ -347,8 +347,8 @@ type ContentClient interface {
 	// stream.
 	//
 	// Typically, this will yield a large response, chunked into messages.
-	// Clients should make provisions to ensure they can't handle the entire
-	// data set.
+	// Clients should make provisions to ensure they can handle the entire data
+	// set.
 	List(ctx context.Context, in *ListContentRequest, opts ...grpc.CallOption) (Content_ListClient, error)
 	// Delete will delete the referenced object.
 	Delete(ctx context.Context, in *DeleteContentRequest, opts ...grpc.CallOption) (*google_protobuf2.Empty, error)
@@ -536,8 +536,8 @@ type ContentServer interface {
 	// stream.
 	//
 	// Typically, this will yield a large response, chunked into messages.
-	// Clients should make provisions to ensure they can't handle the entire
-	// data set.
+	// Clients should make provisions to ensure they can handle the entire data
+	// set.
 	List(*ListContentRequest, Content_ListServer) error
 	// Delete will delete the referenced object.
 	Delete(context.Context, *DeleteContentRequest) (*google_protobuf2.Empty, error)
