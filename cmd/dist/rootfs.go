@@ -1,19 +1,15 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 
-	diffapi "github.com/containerd/containerd/api/services/diff"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
-	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/rootfs"
-	diffservice "github.com/containerd/containerd/services/diff"
 	snapshotservice "github.com/containerd/containerd/services/snapshot"
 	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
 )
 
@@ -40,39 +36,39 @@ var rootfsUnpackCommand = cli.Command{
 			return err
 		}
 
-		log.G(ctx).Infof("unpacking layers from manifest %s", dgst.String())
+		log.G(ctx).Debugf("unpacking layers from manifest %s", dgst.String())
 
-		cs, err := resolveContentStore(clicontext)
+		client, err := getClient(clicontext)
 		if err != nil {
 			return err
 		}
 
-		image := images.Image{
-			Target: ocispec.Descriptor{
-				MediaType: ocispec.MediaTypeImageManifest,
-				Digest:    dgst,
-			},
-		}
+		// TODO: Support unpack by name
 
-		layers, err := getImageLayers(ctx, image, cs)
-		if err != nil {
-			log.G(ctx).WithError(err).Fatal("Failed to get rootfs layers")
-		}
-
-		conn, err := connectGRPC(clicontext)
-		if err != nil {
-			log.G(ctx).Fatal(err)
-		}
-
-		snapshotter := snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotClient(conn))
-		applier := diffservice.NewDiffServiceFromClient(diffapi.NewDiffClient(conn))
-
-		chainID, err := rootfs.ApplyLayers(ctx, layers, snapshotter, applier)
+		images, err := client.ListImages(ctx)
 		if err != nil {
 			return err
 		}
 
-		log.G(ctx).Infof("chain ID: %s", chainID.String())
+		var unpacked bool
+		for _, image := range images {
+			if image.Target().Digest == dgst {
+				fmt.Printf("unpacking %s (%s)...", dgst, image.Target().MediaType)
+				if err := image.Unpack(ctx); err != nil {
+					fmt.Println()
+					return err
+				}
+				fmt.Println("done")
+				unpacked = true
+				break
+			}
+		}
+		if !unpacked {
+			return errors.New("manifest not found")
+		}
+
+		// TODO: Get rootfs from Image
+		//log.G(ctx).Infof("chain ID: %s", chainID.String())
 
 		return nil
 	},

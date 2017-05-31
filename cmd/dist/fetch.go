@@ -9,15 +9,15 @@ import (
 	"text/tabwriter"
 	"time"
 
-	contentapi "github.com/containerd/containerd/api/services/content"
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/progress"
 	"github.com/containerd/containerd/remotes"
-	contentservice "github.com/containerd/containerd/services/content"
+	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
-	"golang.org/x/sync/errgroup"
 )
 
 var fetchCommand = cli.Command{
@@ -47,140 +47,164 @@ Most of this is experimental and there are few leaps to make this work.`,
 		ctx, cancel := appContext(clicontext)
 		defer cancel()
 
-		conn, err := connectGRPC(clicontext)
-		if err != nil {
-			return err
-		}
-
-		resolver, err := getResolver(ctx, clicontext)
-		if err != nil {
-			return err
-		}
-
-		ongoing := newJobs()
-
-		content := contentservice.NewStoreFromClient(contentapi.NewContentClient(conn))
-
-		// TODO(stevvooe): Need to replace this with content store client.
-		cs, err := resolveContentStore(clicontext)
-		if err != nil {
-			return err
-		}
-
-		eg, ctx := errgroup.WithContext(ctx)
-
-		resolved := make(chan struct{})
-		eg.Go(func() error {
-			ongoing.add(ref)
-			name, desc, err := resolver.Resolve(ctx, ref)
-			if err != nil {
-				return err
-			}
-			fetcher, err := resolver.Fetcher(ctx, name)
-			if err != nil {
-				return err
-			}
-			log.G(ctx).WithField("image", name).Debug("fetching")
-			close(resolved)
-
-			return images.Dispatch(ctx,
-				images.Handlers(images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-					ongoing.add(remotes.MakeRefKey(ctx, desc))
-					return nil, nil
-				}),
-					remotes.FetchHandler(content, fetcher),
-					images.ChildrenHandler(content),
-				),
-				desc)
-		})
-
-		errs := make(chan error)
-		go func() {
-			defer close(errs)
-			errs <- eg.Wait()
-		}()
-
-		ticker := time.NewTicker(100 * time.Millisecond)
-		fw := progress.NewWriter(os.Stdout)
-		start := time.Now()
-		defer ticker.Stop()
-		var done bool
-
-		for {
-			select {
-			case <-ticker.C:
-				fw.Flush()
-
-				tw := tabwriter.NewWriter(fw, 1, 8, 1, ' ', 0)
-
-				statuses := map[string]statusInfo{}
-
-				activeSeen := map[string]struct{}{}
-				if !done {
-					active, err := cs.Status(ctx, "")
-					if err != nil {
-						log.G(ctx).WithError(err).Error("active check failed")
-						continue
-					}
-					// update status of active entries!
-					for _, active := range active {
-						statuses[active.Ref] = statusInfo{
-							Ref:       active.Ref,
-							Status:    "downloading",
-							Offset:    active.Offset,
-							Total:     active.Total,
-							StartedAt: active.StartedAt,
-							UpdatedAt: active.UpdatedAt,
-						}
-						activeSeen[active.Ref] = struct{}{}
-					}
-				}
-
-				js := ongoing.jobs()
-				// now, update the items in jobs that are not in active
-				for _, j := range js {
-					if _, ok := activeSeen[j]; ok {
-						continue
-					}
-					status := "done"
-
-					if j == ref {
-						select {
-						case <-resolved:
-							status = "resolved"
-						default:
-							status = "resolving"
-						}
-					}
-
-					statuses[j] = statusInfo{
-						Ref:    j,
-						Status: status, // for now!
-					}
-				}
-
-				var ordered []statusInfo
-				for _, j := range js {
-					ordered = append(ordered, statuses[j])
-				}
-
-				display(tw, ordered, start)
-				tw.Flush()
-
-				if done {
-					fw.Flush()
-					return nil
-				}
-			case err := <-errs:
-				if err != nil {
-					return err
-				}
-				done = true
-			case <-ctx.Done():
-				done = true // allow ui to update once more
-			}
-		}
+		_, err := fetch(ctx, ref, clicontext)
+		return err
 	},
+}
+
+func fetch(ctx context.Context, ref string, clicontext *cli.Context) (containerd.Image, error) {
+	client, err := getClient(clicontext)
+	if err != nil {
+		return nil, err
+	}
+
+	resolver, err := getResolver(ctx, clicontext)
+	if err != nil {
+		return nil, err
+	}
+
+	ongoing := newJobs(ref)
+
+	pctx, stopProgress := context.WithCancel(ctx)
+	progress := make(chan struct{})
+
+	go func() {
+		showProgress(pctx, ongoing, client.ContentStore(), os.Stdout)
+		close(progress)
+	}()
+
+	h := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		ongoing.add(desc)
+		return nil, nil
+	})
+
+	log.G(pctx).WithField("image", ref).Debug("fetching")
+
+	img, err := client.Pull(pctx, ref, containerd.WithResolver(resolver), containerd.WithImageHandler(h))
+	stopProgress()
+	if err != nil {
+		return nil, err
+	}
+
+	<-progress
+	return img, nil
+}
+
+func showProgress(ctx context.Context, ongoing *jobs, cs content.Store, out io.Writer) {
+	var (
+		ticker   = time.NewTicker(100 * time.Millisecond)
+		fw       = progress.NewWriter(out)
+		start    = time.Now()
+		statuses = map[string]statusInfo{}
+		done     bool
+	)
+	defer ticker.Stop()
+
+outer:
+	for {
+		select {
+		case <-ticker.C:
+			fw.Flush()
+
+			tw := tabwriter.NewWriter(fw, 1, 8, 1, ' ', 0)
+
+			resolved := "resolved"
+			if !ongoing.isResolved() {
+				resolved = "resolving"
+			}
+			statuses[ongoing.name] = statusInfo{
+				Ref:    ongoing.name,
+				Status: resolved,
+			}
+			keys := []string{ongoing.name}
+
+			activeSeen := map[string]struct{}{}
+			if !done {
+				active, err := cs.Status(ctx, "")
+				if err != nil {
+					log.G(ctx).WithError(err).Error("active check failed")
+					continue
+				}
+				// update status of active entries!
+				for _, active := range active {
+					statuses[active.Ref] = statusInfo{
+						Ref:       active.Ref,
+						Status:    "downloading",
+						Offset:    active.Offset,
+						Total:     active.Total,
+						StartedAt: active.StartedAt,
+						UpdatedAt: active.UpdatedAt,
+					}
+					activeSeen[active.Ref] = struct{}{}
+				}
+			}
+
+			// now, update the items in jobs that are not in active
+			for _, j := range ongoing.jobs() {
+				key := remotes.MakeRefKey(ctx, j)
+				keys = append(keys, key)
+				if _, ok := activeSeen[key]; ok {
+					continue
+				}
+
+				status, ok := statuses[key]
+				if !done && (!ok || status.Status == "downloading") {
+					info, err := cs.Info(ctx, j.Digest)
+					if err != nil {
+						if !content.IsNotFound(err) {
+							log.G(ctx).WithError(err).Errorf("failed to get content info")
+							continue outer
+						} else {
+							statuses[key] = statusInfo{
+								Ref:    key,
+								Status: "waiting",
+							}
+						}
+					} else if info.CommittedAt.After(start) {
+						statuses[key] = statusInfo{
+							Ref:       key,
+							Status:    "done",
+							Offset:    info.Size,
+							Total:     info.Size,
+							UpdatedAt: info.CommittedAt,
+						}
+					} else {
+						statuses[key] = statusInfo{
+							Ref:    key,
+							Status: "exists",
+						}
+					}
+				} else if done {
+					if ok {
+						if status.Status != "done" && status.Status != "exists" {
+							status.Status = "done"
+							statuses[key] = status
+						}
+					} else {
+						statuses[key] = statusInfo{
+							Ref:    key,
+							Status: "done",
+						}
+					}
+				}
+			}
+
+			var ordered []statusInfo
+			for _, key := range keys {
+				ordered = append(ordered, statuses[key])
+			}
+
+			display(tw, ordered, start)
+			tw.Flush()
+
+			if done {
+				fw.Flush()
+				return
+			}
+		case <-ctx.Done():
+			done = true // allow ui to update once more
+		}
+	}
 }
 
 // jobs provides a way of identifying the download keys for a particular task
@@ -189,32 +213,44 @@ Most of this is experimental and there are few leaps to make this work.`,
 // This is very minimal and will probably be replaced with something more
 // featured.
 type jobs struct {
-	added map[string]struct{}
-	refs  []string
-	mu    sync.Mutex
+	name     string
+	added    map[digest.Digest]struct{}
+	descs    []ocispec.Descriptor
+	mu       sync.Mutex
+	resolved bool
 }
 
-func newJobs() *jobs {
-	return &jobs{added: make(map[string]struct{})}
+func newJobs(name string) *jobs {
+	return &jobs{
+		name:  name,
+		added: map[digest.Digest]struct{}{},
+	}
 }
 
-func (j *jobs) add(ref string) {
+func (j *jobs) add(desc ocispec.Descriptor) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
+	j.resolved = true
 
-	if _, ok := j.added[ref]; ok {
+	if _, ok := j.added[desc.Digest]; ok {
 		return
 	}
-	j.refs = append(j.refs, ref)
-	j.added[ref] = struct{}{}
+	j.descs = append(j.descs, desc)
+	j.added[desc.Digest] = struct{}{}
 }
 
-func (j *jobs) jobs() []string {
+func (j *jobs) jobs() []ocispec.Descriptor {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 
-	var jobs []string
-	return append(jobs, j.refs...)
+	var descs []ocispec.Descriptor
+	return append(descs, j.descs...)
+}
+
+func (j *jobs) isResolved() bool {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return j.resolved
 }
 
 type statusInfo struct {

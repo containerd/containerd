@@ -2,7 +2,6 @@ package containerd
 
 import (
 	"context"
-	"encoding/json"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -21,7 +20,6 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
-	"github.com/containerd/containerd/rootfs"
 	contentservice "github.com/containerd/containerd/services/content"
 	"github.com/containerd/containerd/services/diff"
 	diffservice "github.com/containerd/containerd/services/diff"
@@ -29,7 +27,6 @@ import (
 	snapshotservice "github.com/containerd/containerd/services/snapshot"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/opencontainers/image-spec/identity"
-	"github.com/opencontainers/image-spec/specs-go/v1"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -205,10 +202,10 @@ type RemoteContext struct {
 	// If no resolver is provided, defaults to Docker registry resolver.
 	Resolver remotes.Resolver
 
-	// Unpacker is used after an image is pulled to extract into a registry.
+	// Unpack is done after an image is pulled to extract into a snapshotter.
 	// If an image is not unpacked on pull, it can be unpacked any time
 	// afterwards. Unpacking is required to run an image.
-	Unpacker Unpacker
+	Unpack bool
 
 	// PushWrapper allows hooking into the push method. This can be used
 	// track content that is being sent to the remote.
@@ -232,11 +229,7 @@ func defaultRemoteContext() *RemoteContext {
 // uses the snapshotter, content store, and diff service
 // configured for the client.
 func WithPullUnpack(client *Client, c *RemoteContext) error {
-	c.Unpacker = &snapshotUnpacker{
-		store:       client.ContentStore(),
-		diff:        client.DiffService(),
-		snapshotter: client.SnapshotService(),
-	}
+	c.Unpack = true
 	return nil
 }
 
@@ -263,55 +256,6 @@ func WithPushWrapper(w func(remotes.Pusher) remotes.Pusher) RemoteOpts {
 		c.PushWrapper = w
 		return nil
 	}
-}
-
-type Unpacker interface {
-	Unpack(context.Context, images.Image) error
-}
-
-type snapshotUnpacker struct {
-	snapshotter snapshot.Snapshotter
-	store       content.Store
-	diff        diff.DiffService
-}
-
-func (s *snapshotUnpacker) Unpack(ctx context.Context, image images.Image) error {
-	layers, err := s.getLayers(ctx, image)
-	if err != nil {
-		return err
-	}
-	if _, err := rootfs.ApplyLayers(ctx, layers, s.snapshotter, s.diff); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *snapshotUnpacker) getLayers(ctx context.Context, image images.Image) ([]rootfs.Layer, error) {
-	p, err := content.ReadBlob(ctx, s.store, image.Target.Digest)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read manifest blob")
-	}
-	var manifest v1.Manifest
-	if err := json.Unmarshal(p, &manifest); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal manifest")
-	}
-	diffIDs, err := image.RootFS(ctx, s.store)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to resolve rootfs")
-	}
-	if len(diffIDs) != len(manifest.Layers) {
-		return nil, errors.Errorf("mismatched image rootfs and manifest layers")
-	}
-	layers := make([]rootfs.Layer, len(diffIDs))
-	for i := range diffIDs {
-		layers[i].Diff = v1.Descriptor{
-			// TODO: derive media type from compressed type
-			MediaType: v1.MediaTypeImageLayer,
-			Digest:    diffIDs[i],
-		}
-		layers[i].Blob = manifest.Layers[i]
-	}
-	return layers, nil
 }
 
 func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpts) (Image, error) {
@@ -347,27 +291,16 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpts) (Imag
 	if err != nil {
 		return nil, err
 	}
-	if pullCtx.Unpacker != nil {
-		if err := pullCtx.Unpacker.Unpack(ctx, i); err != nil {
+	img := &image{
+		client: c,
+		i:      i,
+	}
+	if pullCtx.Unpack {
+		if err := img.Unpack(ctx); err != nil {
 			return nil, err
 		}
 	}
-	return &image{
-		client: c,
-		i:      i,
-	}, nil
-}
-
-// GetImage returns an existing image
-func (c *Client) GetImage(ctx context.Context, ref string) (Image, error) {
-	i, err := c.ImageService().Get(ctx, ref)
-	if err != nil {
-		return nil, err
-	}
-	return &image{
-		client: c,
-		i:      i,
-	}, nil
+	return img, nil
 }
 
 func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, opts ...RemoteOpts) error {
@@ -424,6 +357,34 @@ func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, 
 		}
 	}
 	return nil
+}
+
+// GetImage returns an existing image
+func (c *Client) GetImage(ctx context.Context, ref string) (Image, error) {
+	i, err := c.ImageService().Get(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	return &image{
+		client: c,
+		i:      i,
+	}, nil
+}
+
+// ListImages returns all existing images
+func (c *Client) ListImages(ctx context.Context) ([]Image, error) {
+	imgs, err := c.ImageService().List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	images := make([]Image, len(imgs))
+	for i, img := range imgs {
+		images[i] = &image{
+			client: c,
+			i:      img,
+		}
+	}
+	return images, nil
 }
 
 // Close closes the clients connection to containerd
