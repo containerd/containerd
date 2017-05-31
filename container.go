@@ -16,6 +16,7 @@ type Container interface {
 	NewTask(context.Context, IOCreation) (Task, error)
 	Spec() (*specs.Spec, error)
 	Task() Task
+	LoadTask(context.Context, IOCreation) (Task, error)
 }
 
 func containerFromProto(client *Client, c containers.Container) *container {
@@ -104,6 +105,27 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation) (Task, err
 		io:          i,
 		containerID: response.ContainerID,
 		pid:         response.Pid,
+	}
+	c.task = t
+	return t, nil
+}
+
+func (c *container) LoadTask(ctx context.Context, ioCreate IOCreation) (Task, error) {
+	i, err := ioCreate()
+	if err != nil {
+		return nil, err
+	}
+	response, err := c.client.TaskService().Info(ctx, &execution.InfoRequest{
+		ContainerID: c.c.ID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	t := &task{
+		client:      c.client,
+		io:          i,
+		containerID: response.Task.ContainerID,
+		pid:         response.Task.Pid,
 	}
 	c.task = t
 	return t, nil

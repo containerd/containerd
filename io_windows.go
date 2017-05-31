@@ -10,13 +10,13 @@ import (
 	"github.com/pkg/errors"
 )
 
-func copyIO(fifos *fifoSet, ioset *ioSet, tty bool) (closer io.Closer, err error) {
+func copyIO(fifos *FifoSet, ioset *ioSet, tty bool) (closer io.Closer, err error) {
 	var wg sync.WaitGroup
 
-	if fifos.in != "" {
-		l, err := winio.ListenPipe(fifos.in, nil)
+	if fifos.In != "" {
+		l, err := winio.ListenPipe(fifos.In, nil)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to create stdin pipe %s", fifos.in)
+			return nil, errors.Wrapf(err, "failed to create stdin pipe %s", fifos.In)
 		}
 		defer func(l net.Listener) {
 			if err != nil {
@@ -27,7 +27,7 @@ func copyIO(fifos *fifoSet, ioset *ioSet, tty bool) (closer io.Closer, err error
 		go func() {
 			c, err := l.Accept()
 			if err != nil {
-				log.L.WithError(err).Errorf("failed to accept stdin connection on %s", fifos.in)
+				log.L.WithError(err).Errorf("failed to accept stdin connection on %s", fifos.In)
 				return
 			}
 			io.Copy(c, ioset.in)
@@ -36,10 +36,10 @@ func copyIO(fifos *fifoSet, ioset *ioSet, tty bool) (closer io.Closer, err error
 		}()
 	}
 
-	if fifos.out != "" {
-		l, err := winio.ListenPipe(fifos.out, nil)
+	if fifos.Out != "" {
+		l, err := winio.ListenPipe(fifos.Out, nil)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to create stdin pipe %s", fifos.out)
+			return nil, errors.Wrapf(err, "failed to create stdin pipe %s", fifos.Out)
 		}
 		defer func(l net.Listener) {
 			if err != nil {
@@ -52,7 +52,7 @@ func copyIO(fifos *fifoSet, ioset *ioSet, tty bool) (closer io.Closer, err error
 			defer wg.Done()
 			c, err := l.Accept()
 			if err != nil {
-				log.L.WithError(err).Errorf("failed to accept stdout connection on %s", fifos.out)
+				log.L.WithError(err).Errorf("failed to accept stdout connection on %s", fifos.Out)
 				return
 			}
 			io.Copy(ioset.out, c)
@@ -61,10 +61,10 @@ func copyIO(fifos *fifoSet, ioset *ioSet, tty bool) (closer io.Closer, err error
 		}()
 	}
 
-	if !tty && fifos.err != "" {
-		l, err := winio.ListenPipe(fifos.err, nil)
+	if !tty && fifos.Err != "" {
+		l, err := winio.ListenPipe(fifos.Err, nil)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to create stderr pipe %s", fifos.err)
+			return nil, errors.Wrapf(err, "failed to create stderr pipe %s", fifos.Err)
 		}
 		defer func(l net.Listener) {
 			if err != nil {
@@ -77,7 +77,7 @@ func copyIO(fifos *fifoSet, ioset *ioSet, tty bool) (closer io.Closer, err error
 			defer wg.Done()
 			c, err := l.Accept()
 			if err != nil {
-				log.L.WithError(err).Errorf("failed to accept stderr connection on %s", fifos.err)
+				log.L.WithError(err).Errorf("failed to accept stderr connection on %s", fifos.Err)
 				return
 			}
 			io.Copy(ioset.err, c)
@@ -88,6 +88,6 @@ func copyIO(fifos *fifoSet, ioset *ioSet, tty bool) (closer io.Closer, err error
 
 	return &wgCloser{
 		wg:  &wg,
-		dir: fifos.dir,
+		dir: fifos.Dir,
 	}, nil
 }

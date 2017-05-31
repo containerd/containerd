@@ -11,14 +11,14 @@ import (
 	"github.com/containerd/fifo"
 )
 
-func copyIO(fifos *fifoSet, ioset *ioSet, tty bool) (closer io.Closer, err error) {
+func copyIO(fifos *FifoSet, ioset *ioSet, tty bool) (closer io.Closer, err error) {
 	var (
 		f   io.ReadWriteCloser
 		ctx = context.Background()
 		wg  = &sync.WaitGroup{}
 	)
 
-	if f, err = fifo.OpenFifo(ctx, fifos.in, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
+	if f, err = fifo.OpenFifo(ctx, fifos.In, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
 		return nil, err
 	}
 	defer func(c io.Closer) {
@@ -31,7 +31,7 @@ func copyIO(fifos *fifoSet, ioset *ioSet, tty bool) (closer io.Closer, err error
 		w.Close()
 	}(f)
 
-	if f, err = fifo.OpenFifo(ctx, fifos.out, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
+	if f, err = fifo.OpenFifo(ctx, fifos.Out, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
 		return nil, err
 	}
 	defer func(c io.Closer) {
@@ -46,7 +46,7 @@ func copyIO(fifos *fifoSet, ioset *ioSet, tty bool) (closer io.Closer, err error
 		wg.Done()
 	}(f)
 
-	if f, err = fifo.OpenFifo(ctx, fifos.err, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
+	if f, err = fifo.OpenFifo(ctx, fifos.Err, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
 		return nil, err
 	}
 	defer func(c io.Closer) {
@@ -66,6 +66,6 @@ func copyIO(fifos *fifoSet, ioset *ioSet, tty bool) (closer io.Closer, err error
 
 	return &wgCloser{
 		wg:  wg,
-		dir: fifos.dir,
+		dir: fifos.Dir,
 	}, nil
 }

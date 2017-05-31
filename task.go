@@ -33,6 +33,7 @@ type Task interface {
 	Exec(context.Context, *specs.Process, IOCreation) (Process, error)
 	Processes(context.Context) ([]uint32, error)
 	CloseStdin(context.Context) error
+	IO() *IO
 }
 
 type Process interface {
@@ -167,4 +168,8 @@ func (t *task) CloseStdin(ctx context.Context) error {
 		Pid:         t.pid,
 	})
 	return err
+}
+
+func (t *task) IO() *IO {
+	return t.io
 }
