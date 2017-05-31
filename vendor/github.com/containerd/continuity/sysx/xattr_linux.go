@@ -7,6 +7,9 @@ import "syscall"
 //    $ GOOS=linux GOARCH=amd64 ./generate.sh xattr
 //    $ GOOS=linux GOARCH=arm ./generate.sh xattr
 //    $ GOOS=linux GOARCH=arm64 ./generate.sh xattr
+//    $ GOOS=linux GOARCH=ppc64 ./generate.sh xattr
+//    $ GOOS=linux GOARCH=ppc64le ./generate.sh xattr
+//    $ GOOS=linux GOARCH=s390x ./generate.sh xattr
 
 // Listxattr calls syscall listxattr and reads all content
 // and returns a string array

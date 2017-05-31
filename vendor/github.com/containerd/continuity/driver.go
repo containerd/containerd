@@ -2,7 +2,6 @@ package continuity
 
 import (
 	"os"
-	"strconv"
 )
 
 // Driver provides all of the system-level functions in a common interface.
@@ -25,7 +24,7 @@ type Driver interface {
 
 	Link(oldname, newname string) error
 	Lchmod(path string, mode os.FileMode) error
-	Lchown(path, uid, gid string) error
+	Lchown(path string, uid, gid int64) error
 	Symlink(oldname, newname string) error
 
 	// TODO(aaronl): These methods might move outside the main Driver
@@ -127,16 +126,9 @@ func (d *driver) Link(oldname, newname string) error {
 	return os.Link(oldname, newname)
 }
 
-func (d *driver) Lchown(name, uidStr, gidStr string) error {
-	uid, err := strconv.Atoi(uidStr)
-	if err != nil {
-		return err
-	}
-	gid, err := strconv.Atoi(gidStr)
-	if err != nil {
-		return err
-	}
-	return os.Lchown(name, uid, gid)
+func (d *driver) Lchown(name string, uid, gid int64) error {
+	// TODO: error out if uid excesses int bit width?
+	return os.Lchown(name, int(uid), int(gid))
 }
 
 func (d *driver) Symlink(oldname, newname string) error {
