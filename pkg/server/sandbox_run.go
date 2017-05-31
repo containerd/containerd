@@ -21,17 +21,18 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"strings"
 	"time"
 
+	"github.com/containerd/containerd/api/services/execution"
+	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
 	prototypes "github.com/gogo/protobuf/types"
 	"github.com/golang/glog"
+	imagedigest "github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
 	"golang.org/x/net/context"
-
-	"github.com/containerd/containerd/api/services/execution"
-	"github.com/containerd/containerd/api/types/mount"
-
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
@@ -81,10 +82,22 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		Config: config,
 	}
 
-	// TODO(random-liu): [P0] Ensure pause image snapshot, apply default image config
-	// and get snapshot mounts.
-	// Use fixed rootfs path and sleep command.
-	const rootPath = "/"
+	// Ensure sandbox container image snapshot.
+	imageMeta, err := c.ensureImageExists(ctx, c.sandboxImage)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox image %q: %v", defaultSandboxImage, err)
+	}
+	prepareResp, err := c.rootfsService.Prepare(ctx, &rootfsapi.PrepareRequest{
+		Name: id,
+		// We are sure that ChainID must be a digest.
+		ChainID:  imagedigest.Digest(imageMeta.ChainID),
+		Readonly: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare sandbox rootfs %q: %v", imageMeta.ChainID, err)
+	}
+	// TODO(random-liu): [P0] Cleanup snapshot on failure after switching to new rootfs api.
+	rootfsMounts := prepareResp.Mounts
 
 	// Create sandbox container root directory.
 	// Prepare streaming named pipe.
@@ -124,7 +137,10 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	}
 
 	// Start sandbox container.
-	spec := c.generateSandboxContainerSpec(id, config)
+	spec, err := c.generateSandboxContainerSpec(id, config, imageMeta.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate sandbox container spec: %v", err)
+	}
 	rawSpec, err := json.Marshal(spec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal oci spec %+v: %v", spec, err)
@@ -137,16 +153,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 			Value:   rawSpec,
 		},
 		// TODO(random-liu): [P0] Get rootfs mount from containerd.
-		Rootfs: []*mount.Mount{
-			{
-				Type:   "bind",
-				Source: rootPath,
-				Options: []string{
-					"rw",
-					"rbind",
-				},
-			},
-		},
+		Rootfs:  rootfsMounts,
 		Runtime: defaultRuntime,
 		// No stdin for sandbox container.
 		Stdout: stdout,
@@ -205,19 +212,34 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	return &runtime.RunPodSandboxResponse{PodSandboxId: id}, nil
 }
 
-func (c *criContainerdService) generateSandboxContainerSpec(id string, config *runtime.PodSandboxConfig) *runtimespec.Spec {
-	// TODO(random-liu): [P0] Get command from image config.
-	pauseCommand := []string{"sh", "-c", "while true; do sleep 1000000000; done"}
-
+func (c *criContainerdService) generateSandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
+	imageConfig *imagespec.ImageConfig) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
 	// TODO(random-liu): [P1] Compare the default settings with docker and containerd default.
 	g := generate.New()
 
+	// Apply default config from image config.
+	for _, e := range imageConfig.Env {
+		kv := strings.Split(e, "=")
+		if len(kv) != 2 {
+			return nil, fmt.Errorf("invalid environment variable in image config %+v", imageConfig)
+		}
+		g.AddProcessEnv(kv[0], kv[1])
+	}
+
+	if imageConfig.WorkingDir != "" {
+		g.SetProcessCwd(imageConfig.WorkingDir)
+	}
+
+	if len(imageConfig.Entrypoint) == 0 {
+		// Pause image must have entrypoint.
+		return nil, fmt.Errorf("invalid empty entrypoint in image config %+v", imageConfig)
+	}
+	// Set process commands.
+	g.SetProcessArgs(append(imageConfig.Entrypoint, imageConfig.Cmd...))
+
 	// Set relative root path.
 	g.SetRootPath(relativeRootfsPath)
-
-	// Set process commands.
-	g.SetProcessArgs(pauseCommand)
 
 	// Make root of sandbox container read-only.
 	g.SetRootReadonly(true)
@@ -276,5 +298,5 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 
 	// TODO(random-liu): [P1] Set default sandbox container resource limit.
 
-	return g.Spec()
+	return g.Spec(), nil
 }

@@ -169,7 +169,11 @@ func (f *FakeRootfsClient) Prepare(ctx context.Context, prepareOpts *rootfs.Prep
 	if ok {
 		return nil, fmt.Errorf("mounts already exist")
 	}
-	f.MountList[prepareOpts.Name] = []*mount.Mount{}
+	f.MountList[prepareOpts.Name] = []*mount.Mount{{
+		Type:   "bind",
+		Source: prepareOpts.Name,
+		// TODO(random-liu): Fake options based on Readonly option.
+	}}
 	return &rootfs.MountResponse{
 		Mounts: f.MountList[prepareOpts.Name],
 	}, nil

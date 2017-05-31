@@ -35,7 +35,7 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 	glog.V(2).Infof("RemovePodSandbox for sandbox %q", r.GetPodSandboxId())
 	defer func() {
 		if retErr == nil {
-			glog.V(2).Info("RemovePodSandbox %q returns successfully", r.GetPodSandboxId())
+			glog.V(2).Infof("RemovePodSandbox %q returns successfully", r.GetPodSandboxId())
 		}
 	}()
 
@@ -65,6 +65,7 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 		return nil, fmt.Errorf("sandbox container %q is not fully stopped", id)
 	}
 
+	// TODO(random-liu): [P0] Cleanup snapshot after switching to new snapshot api.
 	// TODO(random-liu): [P0] Cleanup shm created in RunPodSandbox.
 	// TODO(random-liu): [P1] Remove permanent namespace once used.
 

@@ -22,8 +22,6 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
-
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 )
 
 // ImageStatus returns the status of the image, returns nil if the image isn't present.
@@ -37,22 +35,13 @@ func (c *criContainerdService) ImageStatus(ctx context.Context, r *runtime.Image
 				r.GetImage().GetImage(), retRes.GetImage())
 		}
 	}()
-	imageID, err := c.localResolve(ctx, r.GetImage().GetImage())
+	meta, err := c.localResolve(ctx, r.GetImage().GetImage())
 	if err != nil {
 		return nil, fmt.Errorf("can not resolve %q locally: %v", r.GetImage().GetImage(), err)
 	}
-	if imageID == "" {
+	if meta == nil {
 		// return empty without error when image not found.
 		return &runtime.ImageStatusResponse{}, nil
-	}
-
-	meta, err := c.imageMetadataStore.Get(imageID)
-	if err != nil {
-		if metadata.IsNotExistError(err) {
-			return &runtime.ImageStatusResponse{}, nil
-		}
-		return nil, fmt.Errorf("an error occurred during get image %q metadata: %v",
-			imageID, err)
 	}
 	// TODO(random-liu): [P0] Make sure corresponding snapshot exists. What if snapshot
 	// doesn't exist?

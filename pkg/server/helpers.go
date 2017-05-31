@@ -55,6 +55,9 @@ const (
 )
 
 const (
+	// defaultSandboxImage is the image used by sandbox container.
+	// TODO(random-liu): [P1] Build schema 2 pause image and use it here.
+	defaultSandboxImage = "gcr.io/google.com/noogler-kubernetes/pause-amd64:3.0"
 	// relativeRootfsPath is the rootfs path relative to bundle path.
 	relativeRootfsPath = "rootfs"
 	// defaultRuntime is the runtime to use in containerd. We may support
@@ -305,31 +308,39 @@ func getRepoDigestAndTag(namedRef reference.Named, digest imagedigest.Digest) (s
 	return repoDigest, repoTag
 }
 
-// localResolve resolves image reference to image id locally. It returns empty string
-// without error if the reference doesn't exist.
-func (c *criContainerdService) localResolve(ctx context.Context, ref string) (string, error) {
+// localResolve resolves image reference locally and returns corresponding image metadata. It returns
+// nil without error if the reference doesn't exist.
+func (c *criContainerdService) localResolve(ctx context.Context, ref string) (*metadata.ImageMetadata, error) {
 	_, err := imagedigest.Parse(ref)
-	if err == nil {
-		return ref, nil
-	}
-	// ref is not image id, try to resolve it locally.
-	normalized, err := normalizeImageRef(ref)
 	if err != nil {
-		return "", fmt.Errorf("invalid image reference %q: %v", ref, err)
-	}
-	image, err := c.imageStoreService.Get(ctx, normalized.String())
-	if err != nil {
-		if images.IsNotFound(err) {
-			return "", nil
+		// ref is not image id, try to resolve it locally.
+		normalized, err := normalizeImageRef(ref)
+		if err != nil {
+			return nil, fmt.Errorf("invalid image reference %q: %v", ref, err)
 		}
-		return "", fmt.Errorf("an error occurred when getting image %q from containerd image store: %v",
-			normalized.String(), err)
+		image, err := c.imageStoreService.Get(ctx, normalized.String())
+		if err != nil {
+			if images.IsNotFound(err) {
+				return nil, nil
+			}
+			return nil, fmt.Errorf("an error occurred when getting image %q from containerd image store: %v",
+				normalized.String(), err)
+		}
+		desc, err := image.Config(ctx, c.contentStoreService)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get image config descriptor: %v", err)
+		}
+		ref = desc.Digest.String()
 	}
-	desc, err := image.Config(ctx, c.contentStoreService)
+	imageID := ref
+	meta, err := c.imageMetadataStore.Get(imageID)
 	if err != nil {
-		return "", fmt.Errorf("failed to get image config descriptor: %v", err)
+		if metadata.IsNotExistError(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get image %q metadata: %v", imageID, err)
 	}
-	return desc.Digest.String(), nil
+	return meta, nil
 }
 
 // getUserFromImage gets uid or user name of the image user.
@@ -349,4 +360,28 @@ func getUserFromImage(user string) (*int64, string) {
 	}
 	// If user is a numeric uid.
 	return &uid, ""
+}
+
+// ensureImageExists returns corresponding metadata of the image reference, if image is not
+// pulled yet, the function will pull the image.
+func (c *criContainerdService) ensureImageExists(ctx context.Context, ref string) (*metadata.ImageMetadata, error) {
+	meta, err := c.localResolve(ctx, ref)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve image %q: %v", ref, err)
+	}
+	if meta != nil {
+		return meta, nil
+	}
+	// Pull image to ensure the image exists
+	resp, err := c.PullImage(ctx, &runtime.PullImageRequest{Image: &runtime.ImageSpec{Image: ref}})
+	if err != nil {
+		return nil, fmt.Errorf("failed to pull image %q: %v", ref, err)
+	}
+	imageID := resp.GetImageRef()
+	meta, err = c.imageMetadataStore.Get(imageID)
+	if err != nil {
+		// It's still possible that someone removed the image right after it is pulled.
+		return nil, fmt.Errorf("failed to get image %q metadata after pulling: %v", imageID, err)
+	}
+	return meta, nil
 }

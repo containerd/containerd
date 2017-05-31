@@ -65,6 +65,9 @@ type criContainerdService struct {
 	os osinterface.OS
 	// rootDir is the directory for managing cri-containerd files.
 	rootDir string
+	// sandboxImage is the image to use for sandbox container.
+	// TODO(random-liu): Make this configurable via flag.
+	sandboxImage string
 	// sandboxStore stores all sandbox metadata.
 	sandboxStore metadata.SandboxStore
 	// imageMetadataStore stores all image metadata.
@@ -100,6 +103,7 @@ func NewCRIContainerdService(conn *grpc.ClientConn, rootDir, networkPluginBinDir
 	c := &criContainerdService{
 		os:                 osinterface.RealOS{},
 		rootDir:            rootDir,
+		sandboxImage:       defaultSandboxImage,
 		sandboxStore:       metadata.NewSandboxStore(store.NewMetadataStore()),
 		containerStore:     metadata.NewContainerStore(store.NewMetadataStore()),
 		imageMetadataStore: metadata.NewImageMetadataStore(store.NewMetadataStore()),
