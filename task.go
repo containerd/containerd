@@ -33,6 +33,7 @@ type Task interface {
 	Exec(context.Context, *specs.Process, IOCreation) (Process, error)
 	Processes(context.Context) ([]uint32, error)
 	CloseStdin(context.Context) error
+	Resize(ctx context.Context, w, h uint32) error
 	IO() *IO
 }
 
@@ -42,6 +43,8 @@ type Process interface {
 	Kill(context.Context, syscall.Signal) error
 	Wait(context.Context) (uint32, error)
 	CloseStdin(context.Context) error
+	Resize(ctx context.Context, w, h uint32) error
+	IO() *IO
 }
 
 var _ = (Task)(&task{})
@@ -172,4 +175,14 @@ func (t *task) CloseStdin(ctx context.Context) error {
 
 func (t *task) IO() *IO {
 	return t.io
+}
+
+func (t *task) Resize(ctx context.Context, w, h uint32) error {
+	_, err := t.client.TaskService().Pty(ctx, &execution.PtyRequest{
+		ContainerID: t.containerID,
+		Width:       w,
+		Height:      h,
+		Pid:         t.pid,
+	})
+	return err
 }
