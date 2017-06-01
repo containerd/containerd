@@ -1,6 +1,7 @@
 package containerd
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -25,6 +26,8 @@ func (i *IO) Close() error {
 }
 
 type IOCreation func() (*IO, error)
+
+type IOAttach func(*FifoSet) (*IO, error)
 
 func NewIO(stdin io.Reader, stdout, stderr io.Writer) IOCreation {
 	return func() (*IO, error) {
@@ -52,11 +55,10 @@ func NewIO(stdin io.Reader, stdout, stderr io.Writer) IOCreation {
 	}
 }
 
-func WithIO(stdin io.Reader, stdout, stderr io.Writer, dir string) IOCreation {
-	return func() (*IO, error) {
-		paths, err := WithFifos(dir)
-		if err != nil {
-			return nil, err
+func WithAttach(stdin io.Reader, stdout, stderr io.Writer) IOAttach {
+	return func(paths *FifoSet) (*IO, error) {
+		if paths == nil {
+			return nil, fmt.Errorf("cannot attach to existing fifos")
 		}
 		i := &IO{
 			Terminal: false,
@@ -111,19 +113,6 @@ func NewFifos() (*FifoSet, error) {
 	}
 	dir, err := ioutil.TempDir(root, "")
 	if err != nil {
-		return nil, err
-	}
-	return &FifoSet{
-		Dir: dir,
-		In:  filepath.Join(dir, "stdin"),
-		Out: filepath.Join(dir, "stdout"),
-		Err: filepath.Join(dir, "stderr"),
-	}, nil
-}
-
-// WithFifos returns existing or creates new fifos inside an existing dir
-func WithFifos(dir string) (*FifoSet, error) {
-	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, err
 	}
 	return &FifoSet{

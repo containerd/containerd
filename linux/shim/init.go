@@ -30,7 +30,8 @@ type initProcess struct {
 	// the right order when invoked in separate go routines.
 	// This is the case within the shim implementation as it makes use of
 	// the reaper interface.
-	mu      sync.Mutex
+	mu sync.Mutex
+
 	id      string
 	bundle  string
 	console console.Console
@@ -41,6 +42,11 @@ type initProcess struct {
 	pid     int
 	closers []io.Closer
 	stdin   io.Closer
+
+	stdinPath  string
+	stdoutPath string
+	stderrPath string
+	terminal   bool
 }
 
 func newInitProcess(context context.Context, path string, r *shimapi.CreateRequest) (*initProcess, error) {
@@ -61,9 +67,13 @@ func newInitProcess(context context.Context, path string, r *shimapi.CreateReque
 		PdeathSignal: syscall.SIGKILL,
 	}
 	p := &initProcess{
-		id:     r.ID,
-		bundle: r.Bundle,
-		runc:   runtime,
+		id:         r.ID,
+		bundle:     r.Bundle,
+		runc:       runtime,
+		stdinPath:  r.Stdin,
+		stdoutPath: r.Stdout,
+		stderrPath: r.Stderr,
+		terminal:   r.Terminal,
 	}
 	var (
 		err    error

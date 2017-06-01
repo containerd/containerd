@@ -502,13 +502,7 @@ func TestContainerAttach(t *testing.T) {
 		wg.Done()
 	}()
 
-	// TODO: return fifo information from shim based on task/process
-	dir, err := ioutil.TempDir("", "attach")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	task, err := container.NewTask(ctx, WithIO(r, ow, ioutil.Discard, dir))
+	task, err := container.NewTask(ctx, NewIO(r, ow, ioutil.Discard))
 	if err != nil {
 		t.Error(err)
 		return
@@ -546,7 +540,7 @@ func TestContainerAttach(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if task, err = container.LoadTask(ctx, WithIO(r, ow, ioutil.Discard, dir)); err != nil {
+	if task, err = container.LoadTask(ctx, WithAttach(r, ow, ioutil.Discard)); err != nil {
 		t.Error(err)
 		return
 	}

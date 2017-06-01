@@ -71,9 +71,13 @@ const (
 	PausedStatus
 )
 
-type State interface {
+type State struct {
 	// Status is the current status of the container
-	Status() Status
+	Status Status
 	// Pid is the main process id for the container
-	Pid() uint32
+	Pid      uint32
+	Stdin    string
+	Stdout   string
+	Stderr   string
+	Terminal bool
 }

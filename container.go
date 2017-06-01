@@ -3,6 +3,7 @@ package containerd
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 
 	"github.com/containerd/containerd/api/services/containers"
 	"github.com/containerd/containerd/api/services/execution"
@@ -16,7 +17,7 @@ type Container interface {
 	NewTask(context.Context, IOCreation) (Task, error)
 	Spec() (*specs.Spec, error)
 	Task() Task
-	LoadTask(context.Context, IOCreation) (Task, error)
+	LoadTask(context.Context, IOAttach) (Task, error)
 }
 
 func containerFromProto(client *Client, c containers.Container) *container {
@@ -110,14 +111,25 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation) (Task, err
 	return t, nil
 }
 
-func (c *container) LoadTask(ctx context.Context, ioCreate IOCreation) (Task, error) {
-	i, err := ioCreate()
-	if err != nil {
-		return nil, err
-	}
+func (c *container) LoadTask(ctx context.Context, ioAttach IOAttach) (Task, error) {
 	response, err := c.client.TaskService().Info(ctx, &execution.InfoRequest{
 		ContainerID: c.c.ID,
 	})
+	if err != nil {
+		return nil, err
+	}
+	// get the existing fifo paths from the task information stored by the daemon
+	paths := &FifoSet{
+		Dir: getFifoDir([]string{
+			response.Task.Stdin,
+			response.Task.Stdout,
+			response.Task.Stderr,
+		}),
+		In:  response.Task.Stdin,
+		Out: response.Task.Stdout,
+		Err: response.Task.Stderr,
+	}
+	i, err := ioAttach(paths)
 	if err != nil {
 		return nil, err
 	}
@@ -129,4 +141,15 @@ func (c *container) LoadTask(ctx context.Context, ioCreate IOCreation) (Task, er
 	}
 	c.task = t
 	return t, nil
+}
+
+// getFifoDir looks for any non-empty path for a stdio fifo
+// and returns the dir for where it is located
+func getFifoDir(paths []string) string {
+	for _, p := range paths {
+		if p != "" {
+			return filepath.Dir(p)
+		}
+	}
+	return ""
 }
