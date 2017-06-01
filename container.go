@@ -125,9 +125,10 @@ func (c *container) LoadTask(ctx context.Context, ioAttach IOAttach) (Task, erro
 			response.Task.Stdout,
 			response.Task.Stderr,
 		}),
-		In:  response.Task.Stdin,
-		Out: response.Task.Stdout,
-		Err: response.Task.Stderr,
+		In:       response.Task.Stdin,
+		Out:      response.Task.Stdout,
+		Err:      response.Task.Stderr,
+		Terminal: response.Task.Terminal,
 	}
 	i, err := ioAttach(paths)
 	if err != nil {

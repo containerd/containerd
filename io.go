@@ -30,13 +30,17 @@ type IOCreation func() (*IO, error)
 type IOAttach func(*FifoSet) (*IO, error)
 
 func NewIO(stdin io.Reader, stdout, stderr io.Writer) IOCreation {
+	return NewIOWithTerminal(stdin, stdout, stderr, false)
+}
+
+func NewIOWithTerminal(stdin io.Reader, stdout, stderr io.Writer, terminal bool) IOCreation {
 	return func() (*IO, error) {
 		paths, err := NewFifos()
 		if err != nil {
 			return nil, err
 		}
 		i := &IO{
-			Terminal: false,
+			Terminal: terminal,
 			Stdout:   paths.Out,
 			Stderr:   paths.Err,
 			Stdin:    paths.In,
@@ -46,13 +50,14 @@ func NewIO(stdin io.Reader, stdout, stderr io.Writer) IOCreation {
 			out: stdout,
 			err: stderr,
 		}
-		closer, err := copyIO(paths, set, false)
+		closer, err := copyIO(paths, set, i.Terminal)
 		if err != nil {
 			return nil, err
 		}
 		i.closer = closer
 		return i, nil
 	}
+
 }
 
 func WithAttach(stdin io.Reader, stdout, stderr io.Writer) IOAttach {
@@ -61,7 +66,7 @@ func WithAttach(stdin io.Reader, stdout, stderr io.Writer) IOAttach {
 			return nil, fmt.Errorf("cannot attach to existing fifos")
 		}
 		i := &IO{
-			Terminal: false,
+			Terminal: paths.Terminal,
 			Stdout:   paths.Out,
 			Stderr:   paths.Err,
 			Stdin:    paths.In,
@@ -71,7 +76,7 @@ func WithAttach(stdin io.Reader, stdout, stderr io.Writer) IOAttach {
 			out: stdout,
 			err: stderr,
 		}
-		closer, err := copyIO(paths, set, false)
+		closer, err := copyIO(paths, set, i.Terminal)
 		if err != nil {
 			return nil, err
 		}
@@ -83,26 +88,12 @@ func WithAttach(stdin io.Reader, stdout, stderr io.Writer) IOAttach {
 // Stdio returns an IO implementation to be used for a task
 // that outputs the container's IO as the current processes Stdio
 func Stdio() (*IO, error) {
-	paths, err := NewFifos()
-	if err != nil {
-		return nil, err
-	}
-	set := &ioSet{
-		in:  os.Stdin,
-		out: os.Stdout,
-		err: os.Stderr,
-	}
-	closer, err := copyIO(paths, set, false)
-	if err != nil {
-		return nil, err
-	}
-	return &IO{
-		Terminal: false,
-		Stdin:    paths.In,
-		Stdout:   paths.Out,
-		Stderr:   paths.Err,
-		closer:   closer,
-	}, nil
+	return NewIO(os.Stdin, os.Stdout, os.Stderr)()
+}
+
+// StdioTerminal will setup the IO for the task to use a terminal
+func StdioTerminal() (*IO, error) {
+	return NewIOWithTerminal(os.Stdin, os.Stdout, os.Stderr, true)()
 }
 
 // NewFifos returns a new set of fifos for the task
@@ -127,6 +118,7 @@ type FifoSet struct {
 	// Dir is the directory holding the task fifos
 	Dir          string
 	In, Out, Err string
+	Terminal     bool
 }
 
 type ioSet struct {
