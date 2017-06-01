@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -48,14 +47,6 @@ var registryFlags = []cli.Flag{
 }
 
 func resolveContentStore(context *cli.Context) (content.Store, error) {
-	root := filepath.Join(context.GlobalString("root"), "content")
-	if !filepath.IsAbs(root) {
-		var err error
-		root, err = filepath.Abs(root)
-		if err != nil {
-			return nil, err
-		}
-	}
 	conn, err := connectGRPC(context)
 	if err != nil {
 		return nil, err
