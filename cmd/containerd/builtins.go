@@ -2,6 +2,7 @@ package main
 
 // register containerd builtins here
 import (
+	_ "github.com/containerd/containerd/differ"
 	_ "github.com/containerd/containerd/services/containers"
 	_ "github.com/containerd/containerd/services/content"
 	_ "github.com/containerd/containerd/services/diff"

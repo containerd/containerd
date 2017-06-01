@@ -14,5 +14,6 @@ func defaultConfig() *config {
 			Address: "/run/containerd/debug.sock",
 		},
 		Snapshotter: "naive",
+		Differ:      "base",
 	}
 }

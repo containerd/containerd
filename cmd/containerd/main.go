@@ -130,7 +130,13 @@ func main() {
 		if err != nil {
 			return err
 		}
-		services, err := loadServices(runtimes, store, snapshotter, meta)
+
+		differ, err := loadDiffer(snapshotter, store)
+		if err != nil {
+			return err
+		}
+
+		services, err := loadServices(runtimes, store, snapshotter, meta, differ)
 		if err != nil {
 			return err
 		}
@@ -351,6 +357,40 @@ func loadSnapshotter(store content.Store) (snapshot.Snapshotter, error) {
 	return nil, fmt.Errorf("snapshotter not loaded: %v", conf.Snapshotter)
 }
 
+func loadDiffer(snapshotter snapshot.Snapshotter, store content.Store) (plugin.Differ, error) {
+	for name, sr := range plugin.Registrations() {
+		if sr.Type != plugin.DiffPlugin {
+			continue
+		}
+		moduleName := fmt.Sprintf("diff-%s", conf.Differ)
+		if name != moduleName {
+			continue
+		}
+
+		log.G(global).Infof("loading differ plugin %q...", name)
+		ic := &plugin.InitContext{
+			Root:        conf.Root,
+			State:       conf.State,
+			Content:     store,
+			Snapshotter: snapshotter,
+			Context:     log.WithModule(global, moduleName),
+		}
+		if sr.Config != nil {
+			if err := conf.decodePlugin(name, sr.Config); err != nil {
+				return nil, err
+			}
+			ic.Config = sr.Config
+		}
+		sn, err := sr.Init(ic)
+		if err != nil {
+			return nil, err
+		}
+
+		return sn.(plugin.Differ), nil
+	}
+	return nil, fmt.Errorf("differ not loaded: %v", conf.Differ)
+}
+
 func newGRPCServer() *grpc.Server {
 	s := grpc.NewServer(
 		grpc.UnaryInterceptor(interceptor),
@@ -359,7 +399,9 @@ func newGRPCServer() *grpc.Server {
 	return s
 }
 
-func loadServices(runtimes map[string]plugin.Runtime, store content.Store, sn snapshot.Snapshotter, meta *bolt.DB) ([]plugin.Service, error) {
+func loadServices(runtimes map[string]plugin.Runtime,
+	store content.Store, sn snapshot.Snapshotter,
+	meta *bolt.DB, differ plugin.Differ) ([]plugin.Service, error) {
 	var o []plugin.Service
 	for name, sr := range plugin.Registrations() {
 		if sr.Type != plugin.GRPCPlugin {
@@ -374,6 +416,7 @@ func loadServices(runtimes map[string]plugin.Runtime, store content.Store, sn sn
 			Content:     store,
 			Meta:        meta,
 			Snapshotter: sn,
+			Differ:      differ,
 		}
 		if sr.Config != nil {
 			if err := conf.decodePlugin(name, sr.Config); err != nil {
