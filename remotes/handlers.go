@@ -56,13 +56,24 @@ func FetchHandler(ingester content.Ingester, fetcher Fetcher) images.HandlerFunc
 func fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc ocispec.Descriptor) error {
 	log.G(ctx).Debug("fetch")
 	ref := MakeRefKey(ctx, desc)
+
+	cw, err := ingester.Writer(ctx, ref, desc.Size, desc.Digest)
+	if err != nil {
+		if !content.IsExists(err) {
+			return err
+		}
+
+		return nil
+	}
+	defer cw.Close()
+
 	rc, err := fetcher.Fetch(ctx, desc)
 	if err != nil {
 		return err
 	}
 	defer rc.Close()
 
-	return content.WriteBlob(ctx, ingester, ref, rc, desc.Size, desc.Digest)
+	return content.Copy(cw, rc, desc.Size, desc.Digest)
 }
 
 func PushHandler(provider content.Provider, pusher Pusher) images.HandlerFunc {
