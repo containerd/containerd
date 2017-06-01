@@ -78,7 +78,11 @@ var shimCreateCommand = cli.Command{
 		},
 	),
 	Action: func(context *cli.Context) error {
-		id := context.Args().First()
+		var (
+			id  = context.Args().First()
+			ctx = gocontext.Background()
+		)
+
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
@@ -91,7 +95,7 @@ var shimCreateCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		r, err := service.Create(gocontext.Background(), &shim.CreateRequest{
+		r, err := service.Create(ctx, &shim.CreateRequest{
 			ID:       id,
 			Bundle:   context.String("bundle"),
 			Runtime:  context.String("runtime"),
@@ -115,7 +119,7 @@ var shimCreateCommand = cli.Command{
 				if err != nil {
 					return err
 				}
-				if _, err := service.Pty(gocontext.Background(), &shim.PtyRequest{
+				if _, err := service.Pty(ctx, &shim.PtyRequest{
 					Pid:    r.Pid,
 					Width:  uint32(size.Width),
 					Height: uint32(size.Height),
@@ -214,6 +218,7 @@ var shimExecCommand = cli.Command{
 	),
 	Action: func(context *cli.Context) error {
 		service, err := getShimService()
+		ctx := gocontext.Background()
 		if err != nil {
 			return err
 		}
@@ -239,7 +244,7 @@ var shimExecCommand = cli.Command{
 			Stderr:   context.String("stderr"),
 			Terminal: tty,
 		}
-		r, err := service.Exec(gocontext.Background(), rq)
+		r, err := service.Exec(ctx, rq)
 		if err != nil {
 			return err
 		}
@@ -256,7 +261,7 @@ var shimExecCommand = cli.Command{
 				if err != nil {
 					return err
 				}
-				if _, err := service.Pty(gocontext.Background(), &shim.PtyRequest{
+				if _, err := service.Pty(ctx, &shim.PtyRequest{
 					Pid:    r.Pid,
 					Width:  uint32(size.Width),
 					Height: uint32(size.Height),
