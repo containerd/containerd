@@ -6,6 +6,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/progress"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -73,10 +74,13 @@ var rmiCommand = cli.Command{
 
 		for _, target := range clicontext.Args() {
 			if err := imageStore.Delete(ctx, target); err != nil {
-				if exitErr == nil {
-					exitErr = errors.Wrapf(err, "unable to delete %v", target)
+				if !metadata.IsNotFound(err) {
+					if exitErr == nil {
+						exitErr = errors.Wrapf(err, "unable to delete %v", target)
+					}
+					log.G(ctx).WithError(err).Errorf("unable to delete %v", target)
+					continue
 				}
-				log.G(ctx).WithError(err).Errorf("unable to delete %v", target)
 			}
 
 			fmt.Println(target)
