@@ -21,6 +21,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
+	"github.com/containerd/containerd/remotes/docker/schema1"
 	contentservice "github.com/containerd/containerd/services/content"
 	"github.com/containerd/containerd/services/diff"
 	diffservice "github.com/containerd/containerd/services/diff"
@@ -234,6 +235,11 @@ type RemoteContext struct {
 	// These handlers always get called before any operation specific
 	// handlers.
 	BaseHandlers []images.Handler
+
+	// ConvertSchema1 is whether to convert Docker registry schema 1
+	// manifests. If this option is false then any image which resolves
+	// to schema 1 will return an error since schema 1 is not supported.
+	ConvertSchema1 bool
 }
 
 func defaultRemoteContext() *RemoteContext {
@@ -249,6 +255,14 @@ func defaultRemoteContext() *RemoteContext {
 // configured for the client.
 func WithPullUnpack(client *Client, c *RemoteContext) error {
 	c.Unpack = true
+	return nil
+}
+
+// WithSchema1Conversion is used to convert Docker registry schema 1
+// manifests to oci manifests on pull. Without this option schema 1
+// manifests will return a not supported error.
+func WithSchema1Conversion(client *Client, c *RemoteContext) error {
+	c.ConvertSchema1 = true
 	return nil
 }
 
@@ -286,13 +300,30 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpts) (Imag
 		return nil, err
 	}
 
-	handlers := append(pullCtx.BaseHandlers,
-		remotes.FetchHandler(store, fetcher),
-		images.ChildrenHandler(store),
+	var (
+		schema1Converter *schema1.Converter
+		handler          images.Handler
 	)
-	if err := images.Dispatch(ctx, images.Handlers(handlers...), desc); err != nil {
+	if desc.MediaType == images.MediaTypeDockerSchema1Manifest && pullCtx.ConvertSchema1 {
+		schema1Converter = schema1.NewConverter(store, fetcher)
+		handler = images.Handlers(append(pullCtx.BaseHandlers, schema1Converter)...)
+	} else {
+		handler = images.Handlers(append(pullCtx.BaseHandlers,
+			remotes.FetchHandler(store, fetcher),
+			images.ChildrenHandler(store))...,
+		)
+	}
+
+	if err := images.Dispatch(ctx, handler, desc); err != nil {
 		return nil, err
 	}
+	if schema1Converter != nil {
+		desc, err = schema1Converter.Convert(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	is := c.ImageService()
 	if err := is.Put(ctx, name, desc); err != nil {
 		return nil, err

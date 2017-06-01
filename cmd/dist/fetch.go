@@ -74,13 +74,15 @@ func fetch(ctx context.Context, ref string, clicontext *cli.Context) (containerd
 	}()
 
 	h := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		ongoing.add(desc)
+		if desc.MediaType != images.MediaTypeDockerSchema1Manifest {
+			ongoing.add(desc)
+		}
 		return nil, nil
 	})
 
 	log.G(pctx).WithField("image", ref).Debug("fetching")
 
-	img, err := client.Pull(pctx, ref, containerd.WithResolver(resolver), containerd.WithImageHandler(h))
+	img, err := client.Pull(pctx, ref, containerd.WithResolver(resolver), containerd.WithImageHandler(h), containerd.WithSchema1Conversion)
 	stopProgress()
 	if err != nil {
 		return nil, err
@@ -268,7 +270,10 @@ func display(w io.Writer, statuses []statusInfo, start time.Time) {
 		total += status.Offset
 		switch status.Status {
 		case "downloading", "uploading":
-			bar := progress.Bar(float64(status.Offset) / float64(status.Total))
+			var bar progress.Bar
+			if status.Total > 0.0 {
+				bar = progress.Bar(float64(status.Offset) / float64(status.Total))
+			}
 			fmt.Fprintf(w, "%s:\t%s\t%40r\t%8.8s/%s\t\n",
 				status.Ref,
 				status.Status,

@@ -25,7 +25,7 @@ func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
 		return "manifest-" + desc.Digest.String()
 	case images.MediaTypeDockerSchema2Layer, images.MediaTypeDockerSchema2LayerGzip:
 		return "layer-" + desc.Digest.String()
-	case "application/vnd.docker.container.image.v1+json":
+	case images.MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig:
 		return "config-" + desc.Digest.String()
 	default:
 		log.G(ctx).Warnf("reference for unknown type: %s", desc.MediaType)
@@ -47,6 +47,8 @@ func FetchHandler(ingester content.Ingester, fetcher Fetcher) images.HandlerFunc
 		switch desc.MediaType {
 		case images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
 			return nil, fmt.Errorf("%v not yet supported", desc.MediaType)
+		case images.MediaTypeDockerSchema1Manifest:
+			return nil, fmt.Errorf("%v not supported", desc.MediaType)
 		default:
 			err := fetch(ctx, ingester, fetcher, desc)
 			return nil, err
