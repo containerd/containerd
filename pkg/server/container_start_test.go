@@ -176,7 +176,7 @@ func TestGeneralContainerSpec(t *testing.T) {
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, specCheck := getStartContainerTestData()
 	c := newTestCRIContainerdService()
-	spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig)
+	spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
 	assert.NoError(t, err)
 	specCheck(t, testID, testPid, spec)
 }
@@ -188,7 +188,7 @@ func TestContainerSpecTty(t *testing.T) {
 	c := newTestCRIContainerdService()
 	for _, tty := range []bool{true, false} {
 		config.Tty = tty
-		spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig)
+		spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
 		assert.NoError(t, err)
 		specCheck(t, testID, testPid, spec)
 		assert.Equal(t, tty, spec.Process.Terminal)
@@ -202,11 +202,44 @@ func TestContainerSpecReadonlyRootfs(t *testing.T) {
 	c := newTestCRIContainerdService()
 	for _, readonly := range []bool{true, false} {
 		config.Linux.SecurityContext.ReadonlyRootfs = readonly
-		spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig)
+		spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
 		assert.NoError(t, err)
 		specCheck(t, testID, testPid, spec)
 		assert.Equal(t, readonly, spec.Root.Readonly)
 	}
+}
+
+func TestContainerSpecWithExtraMounts(t *testing.T) {
+	testID := "test-id"
+	testPid := uint32(1234)
+	config, sandboxConfig, imageConfig, specCheck := getStartContainerTestData()
+	c := newTestCRIContainerdService()
+	mountInConfig := &runtime.Mount{
+		ContainerPath: "test-container-path",
+		HostPath:      "test-host-path",
+		Readonly:      false,
+	}
+	config.Mounts = append(config.Mounts, mountInConfig)
+	extraMount := &runtime.Mount{
+		ContainerPath: "test-container-path",
+		HostPath:      "test-host-path-extra",
+		Readonly:      true,
+	}
+	spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, []*runtime.Mount{extraMount})
+	assert.NoError(t, err)
+	specCheck(t, testID, testPid, spec)
+	var mounts []runtimespec.Mount
+	for _, m := range spec.Mounts {
+		if m.Destination == "test-container-path" {
+			mounts = append(mounts, m)
+		}
+	}
+	t.Logf("Extra mounts should come first")
+	require.Len(t, mounts, 2)
+	assert.Equal(t, "test-host-path-extra", mounts[0].Source)
+	assert.Contains(t, mounts[0].Options, "ro")
+	assert.Equal(t, "test-host-path", mounts[1].Source)
+	assert.Contains(t, mounts[1].Options, "rw")
 }
 
 func TestContainerSpecCommand(t *testing.T) {
@@ -267,6 +300,46 @@ func TestContainerSpecCommand(t *testing.T) {
 		}
 		assert.NoError(t, err)
 		assert.Equal(t, test.expected, g.Spec().Process.Args, desc)
+	}
+}
+
+func TestGenerateContainerMounts(t *testing.T) {
+	testSandboxRootDir := "test-sandbox-root"
+	for desc, test := range map[string]struct {
+		securityContext *runtime.LinuxContainerSecurityContext
+		expectedMounts  []*runtime.Mount
+	}{
+		"should setup ro /etc/hosts mount when rootfs is read-only": {
+			securityContext: &runtime.LinuxContainerSecurityContext{
+				ReadonlyRootfs: true,
+			},
+			expectedMounts: []*runtime.Mount{{
+				ContainerPath: "/etc/hosts",
+				HostPath:      testSandboxRootDir + "/hosts",
+				Readonly:      true,
+			}},
+		},
+		"should setup rw /etc/hosts mount when rootfs is read-write": {
+			securityContext: &runtime.LinuxContainerSecurityContext{},
+			expectedMounts: []*runtime.Mount{{
+				ContainerPath: "/etc/hosts",
+				HostPath:      testSandboxRootDir + "/hosts",
+				Readonly:      false,
+			}},
+		},
+	} {
+		config := &runtime.ContainerConfig{
+			Metadata: &runtime.ContainerMetadata{
+				Name:    "test-name",
+				Attempt: 1,
+			},
+			Linux: &runtime.LinuxContainerConfig{
+				SecurityContext: test.securityContext,
+			},
+		}
+		c := newTestCRIContainerdService()
+		mounts := c.generateContainerMounts(testSandboxRootDir, config)
+		assert.Equal(t, test.expectedMounts, mounts, desc)
 	}
 }
 
