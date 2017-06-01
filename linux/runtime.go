@@ -257,6 +257,10 @@ func (r *Runtime) loadContainer(path string) (*Task, error) {
 		return nil, err
 	}
 
+	if err = r.handleEvents(s); err != nil {
+		return nil, err
+	}
+
 	data, err := ioutil.ReadFile(filepath.Join(path, configFilename))
 	if err != nil {
 		return nil, err

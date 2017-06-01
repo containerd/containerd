@@ -30,14 +30,16 @@ func New(path string) *Service {
 }
 
 type Service struct {
-	initProcess *initProcess
-	path        string
-	id          string
-	bundle      string
-	mu          sync.Mutex
-	processes   map[int]process
-	events      chan *task.Event
-	execID      int
+	initProcess   *initProcess
+	path          string
+	id            string
+	bundle        string
+	mu            sync.Mutex
+	processes     map[int]process
+	events        chan *task.Event
+	eventsMu      sync.Mutex
+	deferredEvent *task.Event
+	execID        int
 }
 
 func (s *Service) Create(ctx context.Context, r *shimapi.CreateRequest) (*shimapi.CreateResponse, error) {
@@ -145,12 +147,27 @@ func (s *Service) Pty(ctx context.Context, r *shimapi.PtyRequest) (*google_proto
 }
 
 func (s *Service) Events(r *shimapi.EventsRequest, stream shimapi.Shim_EventsServer) error {
-	for e := range s.events {
-		if err := stream.Send(e); err != nil {
+	s.eventsMu.Lock()
+	defer s.eventsMu.Unlock()
+
+	if s.deferredEvent != nil {
+		if err := stream.Send(s.deferredEvent); err != nil {
 			return err
 		}
+		s.deferredEvent = nil
 	}
-	return nil
+
+	for {
+		select {
+		case e := <-s.events:
+			if err := stream.Send(e); err != nil {
+				s.deferredEvent = e
+				return err
+			}
+		case <-stream.Context().Done():
+			return stream.Context().Err()
+		}
+	}
 }
 
 func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.StateResponse, error) {
