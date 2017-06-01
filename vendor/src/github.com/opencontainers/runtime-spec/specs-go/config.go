@@ -9,7 +9,7 @@ type Spec struct {
 	// Platform specifies the configuration's target platform.
 	Platform Platform `json:"platform"`
 	// Process configures the container process.
-	Process Process `json:"process"`
+	Process *Process `json:"process,omitempty"`
 	// Root configures the container's root filesystem.
 	Root Root `json:"root"`
 	// Hostname configures the container's hostname.
@@ -21,11 +21,11 @@ type Spec struct {
 	// Annotations contains arbitrary metadata for the container.
 	Annotations map[string]string `json:"annotations,omitempty"`
 
-	// Linux is platform specific configuration for Linux based containers.
+	// Linux is platform-specific configuration for Linux based containers.
 	Linux *Linux `json:"linux,omitempty" platform:"linux"`
-	// Solaris is platform specific configuration for Solaris containers.
+	// Solaris is platform-specific configuration for Solaris based containers.
 	Solaris *Solaris `json:"solaris,omitempty" platform:"solaris"`
-	// Windows is platform specific configuration for Windows based containers, including Hyper-V containers.
+	// Windows is platform-specific configuration for Windows based containers.
 	Windows *Windows `json:"windows,omitempty" platform:"windows"`
 }
 
@@ -34,7 +34,7 @@ type Process struct {
 	// Terminal creates an interactive terminal for the container.
 	Terminal bool `json:"terminal,omitempty"`
 	// ConsoleSize specifies the size of the console.
-	ConsoleSize Box `json:"consoleSize,omitempty"`
+	ConsoleSize *Box `json:"consoleSize,omitempty"`
 	// User specifies user information for the process.
 	User User `json:"user"`
 	// Args specifies the binary and arguments for the application to execute.
@@ -52,6 +52,8 @@ type Process struct {
 	NoNewPrivileges bool `json:"noNewPrivileges,omitempty" platform:"linux"`
 	// ApparmorProfile specifies the apparmor profile for the container.
 	ApparmorProfile string `json:"apparmorProfile,omitempty" platform:"linux"`
+	// Specify an oom_score_adj for the container.
+	OOMScoreAdj *int `json:"oomScoreAdj,omitempty" platform:"linux"`
 	// SelinuxLabel specifies the selinux context that the container process is run as.
 	SelinuxLabel string `json:"selinuxLabel,omitempty" platform:"linux"`
 }
@@ -94,7 +96,7 @@ type User struct {
 // Root contains information about the container's root filesystem on the host.
 type Root struct {
 	// Path is the absolute path to the container's root filesystem.
-	Path string `json:"path"`
+	Path string `json:"path,omitempty"`
 	// Readonly makes the root filesystem for the container readonly before the process is executed.
 	Readonly bool `json:"readonly,omitempty"`
 }
@@ -140,11 +142,11 @@ type Hooks struct {
 	Poststop []Hook `json:"poststop,omitempty"`
 }
 
-// Linux contains platform specific configuration for Linux based containers.
+// Linux contains platform-specific configuration for Linux based containers.
 type Linux struct {
-	// UIDMapping specifies user mappings for supporting user namespaces on Linux.
+	// UIDMapping specifies user mappings for supporting user namespaces.
 	UIDMappings []LinuxIDMapping `json:"uidMappings,omitempty"`
-	// GIDMapping specifies group mappings for supporting user namespaces on Linux.
+	// GIDMapping specifies group mappings for supporting user namespaces.
 	GIDMappings []LinuxIDMapping `json:"gidMappings,omitempty"`
 	// Sysctl are a set of key value pairs that are set for the container on start
 	Sysctl map[string]string `json:"sysctl,omitempty"`
@@ -169,11 +171,14 @@ type Linux struct {
 	ReadonlyPaths []string `json:"readonlyPaths,omitempty"`
 	// MountLabel specifies the selinux context for the mounts in the container.
 	MountLabel string `json:"mountLabel,omitempty"`
+	// IntelRdt contains Intel Resource Director Technology (RDT) information
+	// for handling resource constraints (e.g., L3 cache) for the container
+	IntelRdt *LinuxIntelRdt `json:"intelRdt,omitempty"`
 }
 
 // LinuxNamespace is the configuration for a Linux namespace
 type LinuxNamespace struct {
-	// Type is the type of Linux namespace
+	// Type is the type of namespace
 	Type LinuxNamespaceType `json:"type"`
 	// Path is a path to an existing namespace persisted on disk that can be joined
 	// and is of the same type
@@ -247,9 +252,9 @@ type linuxBlockIODevice struct {
 // LinuxWeightDevice struct holds a `major:minor weight` pair for blkioWeightDevice
 type LinuxWeightDevice struct {
 	linuxBlockIODevice
-	// Weight is the bandwidth rate for the device, range is from 10 to 1000
+	// Weight is the bandwidth rate for the device.
 	Weight *uint16 `json:"weight,omitempty"`
-	// LeafWeight is the bandwidth rate for the device while competing with the cgroup's child cgroups, range is from 10 to 1000, CFQ scheduler only
+	// LeafWeight is the bandwidth rate for the device while competing with the cgroup's child cgroups, CFQ scheduler only
 	LeafWeight *uint16 `json:"leafWeight,omitempty"`
 }
 
@@ -262,9 +267,9 @@ type LinuxThrottleDevice struct {
 
 // LinuxBlockIO for Linux cgroup 'blkio' resource management
 type LinuxBlockIO struct {
-	// Specifies per cgroup weight, range is from 10 to 1000
+	// Specifies per cgroup weight
 	Weight *uint16 `json:"blkioWeight,omitempty"`
-	// Specifies tasks' weight in the given cgroup while competing with the cgroup's child cgroups, range is from 10 to 1000, CFQ scheduler only
+	// Specifies tasks' weight in the given cgroup while competing with the cgroup's child cgroups, CFQ scheduler only
 	LeafWeight *uint16 `json:"blkioLeafWeight,omitempty"`
 	// Weight per cgroup per device, can override BlkioWeight
 	WeightDevice []LinuxWeightDevice `json:"blkioWeightDevice,omitempty"`
@@ -290,7 +295,7 @@ type LinuxMemory struct {
 	Kernel *uint64 `json:"kernel,omitempty"`
 	// Kernel memory limit for tcp (in bytes)
 	KernelTCP *uint64 `json:"kernelTCP,omitempty"`
-	// How aggressive the kernel will swap memory pages. Range from 0 to 100.
+	// How aggressive the kernel will swap memory pages.
 	Swappiness *uint64 `json:"swappiness,omitempty"`
 }
 
@@ -332,8 +337,6 @@ type LinuxResources struct {
 	Devices []LinuxDeviceCgroup `json:"devices,omitempty"`
 	// DisableOOMKiller disables the OOM killer for out of memory conditions
 	DisableOOMKiller *bool `json:"disableOOMKiller,omitempty"`
-	// Specify an oom_score_adj for the container.
-	OOMScoreAdj *int `json:"oomScoreAdj,omitempty"`
 	// Memory restriction configuration
 	Memory *LinuxMemory `json:"memory,omitempty"`
 	// CPU resource restriction configuration
@@ -380,7 +383,7 @@ type LinuxDeviceCgroup struct {
 	Access string `json:"access,omitempty"`
 }
 
-// Solaris contains platform specific configuration for Solaris application containers.
+// Solaris contains platform-specific configuration for Solaris application containers.
 type Solaris struct {
 	// SMF FMRI which should go "online" before we start the container process.
 	Milestone string `json:"milestone,omitempty"`
@@ -427,8 +430,20 @@ type SolarisAnet struct {
 
 // Windows defines the runtime configuration for Windows based containers, including Hyper-V containers.
 type Windows struct {
+	// LayerFolders contains a list of absolute paths to directories containing image layers.
+	LayerFolders []string `json:"layerFolders"`
 	// Resources contains information for handling resource constraints for the container.
 	Resources *WindowsResources `json:"resources,omitempty"`
+	// CredentialSpec contains a JSON object describing a group Managed Service Account (gMSA) specification.
+	CredentialSpec interface{} `json:"credentialspec,omitempty"`
+	// Servicing indicates if the container is being started in a mode to apply a Windows Update servicing operation.
+	Servicing bool `json:"servicing,omitempty"`
+	// IgnoreFlushesDuringBoot indicates if the container is being started in a mode where disk writes are not flushed during its boot process.
+	IgnoreFlushesDuringBoot bool `json:"ignoreflushesduringboot,omitempty"`
+	// HyperV contains information for running a container with Hyper-V isolation.
+	HyperV *WindowsHyperV `json:"hyperv,omitempty"`
+	// Network restriction configuration.
+	Network *WindowsNetwork `json:"network,omitempty"`
 }
 
 // WindowsResources has container runtime resource constraints for containers running on Windows.
@@ -439,26 +454,22 @@ type WindowsResources struct {
 	CPU *WindowsCPUResources `json:"cpu,omitempty"`
 	// Storage restriction configuration.
 	Storage *WindowsStorageResources `json:"storage,omitempty"`
-	// Network restriction configuration.
-	Network *WindowsNetworkResources `json:"network,omitempty"`
 }
 
 // WindowsMemoryResources contains memory resource management settings.
 type WindowsMemoryResources struct {
 	// Memory limit in bytes.
 	Limit *uint64 `json:"limit,omitempty"`
-	// Memory reservation in bytes.
-	Reservation *uint64 `json:"reservation,omitempty"`
 }
 
 // WindowsCPUResources contains CPU resource management settings.
 type WindowsCPUResources struct {
 	// Number of CPUs available to the container.
 	Count *uint64 `json:"count,omitempty"`
-	// CPU shares (relative weight to other containers with cpu shares). Range is from 1 to 10000.
+	// CPU shares (relative weight to other containers with cpu shares).
 	Shares *uint16 `json:"shares,omitempty"`
-	// Percent of available CPUs usable by the container.
-	Percent *uint8 `json:"percent,omitempty"`
+	// Specifies the portion of processor cycles that this container can use as a percentage times 100.
+	Maximum *uint16 `json:"maximum,omitempty"`
 }
 
 // WindowsStorageResources contains storage resource management settings.
@@ -471,17 +482,29 @@ type WindowsStorageResources struct {
 	SandboxSize *uint64 `json:"sandboxSize,omitempty"`
 }
 
-// WindowsNetworkResources contains network resource management settings.
-type WindowsNetworkResources struct {
-	// EgressBandwidth is the maximum egress bandwidth in bytes per second.
-	EgressBandwidth *uint64 `json:"egressBandwidth,omitempty"`
+// WindowsNetwork contains network settings for Windows containers.
+type WindowsNetwork struct {
+	// List of HNS endpoints that the container should connect to.
+	EndpointList []string `json:"endpointList,omitempty"`
+	// Specifies if unqualified DNS name resolution is allowed.
+	AllowUnqualifiedDNSQuery bool `json:"allowUnqualifiedDNSQuery,omitempty"`
+	// Comma seperated list of DNS suffixes to use for name resolution.
+	DNSSearchList []string `json:"DNSSearchList,omitempty"`
+	// Name (ID) of the container that we will share with the network stack.
+	NetworkSharedContainerName string `json:"networkSharedContainerName,omitempty"`
+}
+
+// WindowsHyperV contains information for configuring a container to run with Hyper-V isolation.
+type WindowsHyperV struct {
+	// UtilityVMPath is an optional path to the image used for the Utility VM.
+	UtilityVMPath string `json:"utilityvmpath,omitempty"`
 }
 
 // LinuxSeccomp represents syscall restrictions
 type LinuxSeccomp struct {
 	DefaultAction LinuxSeccompAction `json:"defaultAction"`
 	Architectures []Arch             `json:"architectures,omitempty"`
-	Syscalls      []LinuxSyscall     `json:"syscalls"`
+	Syscalls      []LinuxSyscall     `json:"syscalls,omitempty"`
 }
 
 // Arch used for additional architectures
@@ -546,8 +569,15 @@ type LinuxSeccompArg struct {
 
 // LinuxSyscall is used to match a syscall in Seccomp
 type LinuxSyscall struct {
-	Names   []string           `json:"names"`
-	Action  LinuxSeccompAction `json:"action"`
-	Args    []LinuxSeccompArg  `json:"args"`
-	Comment string             `json:"comment"`
+	Names  []string           `json:"names"`
+	Action LinuxSeccompAction `json:"action"`
+	Args   []LinuxSeccompArg  `json:"args,omitempty"`
+}
+
+// LinuxIntelRdt has container runtime resource constraints
+// for Intel RDT/CAT which introduced in Linux 4.10 kernel
+type LinuxIntelRdt struct {
+	// The schema for L3 cache id and capacity bitmask (CBM)
+	// Format: "L3:<cache_id0>=<cbm0>;<cache_id1>=<cbm1>;..."
+	L3CacheSchema string `json:"l3CacheSchema,omitempty"`
 }
