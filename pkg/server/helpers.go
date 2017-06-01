@@ -85,6 +85,8 @@ const (
 	utsNSFormat = "/proc/%v/ns/uts"
 	// pidNSFormat is the format of pid namespace of a process.
 	pidNSFormat = "/proc/%v/ns/pid"
+	// etcHosts is the default path of /etc/hosts file.
+	etcHosts = "/etc/hosts"
 )
 
 // generateID generates a random unique id.
@@ -133,12 +135,18 @@ func getContainerRootDir(rootDir, id string) string {
 	return filepath.Join(rootDir, containersDir, id)
 }
 
-// getStreamingPipes returns the stdin/stdout/stderr pipes path in the root.
+// getStreamingPipes returns the stdin/stdout/stderr pipes path in the
+// container/sandbox root.
 func getStreamingPipes(rootDir string) (string, string, string) {
 	stdin := filepath.Join(rootDir, stdinNamedPipe)
 	stdout := filepath.Join(rootDir, stdoutNamedPipe)
 	stderr := filepath.Join(rootDir, stderrNamedPipe)
 	return stdin, stdout, stderr
+}
+
+// getSandboxHosts returns the hosts file path inside the sandbox root directory.
+func getSandboxHosts(sandboxRootDir string) string {
+	return filepath.Join(sandboxRootDir, "hosts")
 }
 
 // prepareStreamingPipes prepares stream named pipe for container. returns nil

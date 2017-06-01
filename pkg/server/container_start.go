@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/containerd/containerd/api/services/execution"
@@ -119,7 +120,10 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 	if err != nil {
 		return fmt.Errorf("failed to get container image %q: %v", meta.ImageRef, err)
 	}
-	spec, err := c.generateContainerSpec(id, sandboxPid, config, sandboxConfig, imageMeta.Config)
+
+	mounts := c.generateContainerMounts(getSandboxRootDir(c.rootDir, sandboxID), config)
+
+	spec, err := c.generateContainerSpec(id, sandboxPid, config, sandboxConfig, imageMeta.Config, mounts)
 	if err != nil {
 		return fmt.Errorf("failed to generate container %q spec: %v", id, err)
 	}
@@ -218,7 +222,7 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 }
 
 func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint32, config *runtime.ContainerConfig,
-	sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig) (*runtimespec.Spec, error) {
+	sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig, extraMounts []*runtime.Mount) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
 	// TODO(random-liu): [P2] Move container runtime spec generation into a helper function.
 	g := generate.New()
@@ -246,7 +250,8 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 		g.AddProcessEnv(e.GetKey(), e.GetValue())
 	}
 
-	addOCIBindMounts(&g, config.GetMounts())
+	// Add extra mounts first so that CRI specified mounts can override.
+	addOCIBindMounts(&g, append(extraMounts, config.GetMounts()...))
 
 	// TODO(random-liu): [P1] Set device mapping.
 	// Ref https://github.com/moby/moby/blob/master/oci/devices_linux.go.
@@ -294,6 +299,21 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 	return g.Spec(), nil
 }
 
+// generateContainerMounts sets up necessary container mounts including /dev/shm, /etc/hosts
+// and /etc/resolv.conf.
+func (c *criContainerdService) generateContainerMounts(sandboxRootDir string, config *runtime.ContainerConfig) []*runtime.Mount {
+	var mounts []*runtime.Mount
+	securityContext := config.GetLinux().GetSecurityContext()
+	mounts = append(mounts, &runtime.Mount{
+		ContainerPath: etcHosts,
+		HostPath:      getSandboxHosts(sandboxRootDir),
+		Readonly:      securityContext.ReadonlyRootfs,
+	})
+	// TODO(random-liu): [P0] Mount sandbox resolv.config.
+	// TODO(random-liu): [P0] Mount sandbox /dev/shm.
+	return mounts
+}
+
 // setOCIProcessArgs sets process args. It returns error if the final arg list
 // is empty.
 func setOCIProcessArgs(g *generate.Generator, config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) error {
@@ -312,6 +332,19 @@ func setOCIProcessArgs(g *generate.Generator, config *runtime.ContainerConfig, i
 		return fmt.Errorf("no command specified")
 	}
 	g.SetProcessArgs(append(command, args...))
+	return nil
+}
+
+// addImageEnvs adds environment variables from image config. It returns error if
+// an invalid environment variable is encountered.
+func addImageEnvs(g *generate.Generator, imageEnvs []string) error {
+	for _, e := range imageEnvs {
+		kv := strings.Split(e, "=")
+		if len(kv) != 2 {
+			return fmt.Errorf("invalid environment variable %q", e)
+		}
+		g.AddProcessEnv(kv[0], kv[1])
+	}
 	return nil
 }
 

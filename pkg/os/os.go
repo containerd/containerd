@@ -32,6 +32,7 @@ type OS interface {
 	RemoveAll(path string) error
 	OpenFifo(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error)
 	Stat(name string) (os.FileInfo, error)
+	CopyFile(src, dest string, perm os.FileMode) error
 }
 
 // RealOS is used to dispatch the real system level operations.
@@ -55,4 +56,22 @@ func (RealOS) OpenFifo(ctx context.Context, fn string, flag int, perm os.FileMod
 // Stat will call os.Stat to get the status of the given file.
 func (RealOS) Stat(name string) (os.FileInfo, error) {
 	return os.Stat(name)
+}
+
+// CopyFile copys src file to dest file
+func (RealOS) CopyFile(src, dest string, perm os.FileMode) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	return err
 }
