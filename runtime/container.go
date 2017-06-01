@@ -434,7 +434,7 @@ func (c *container) Start(ctx context.Context, checkpointPath string, s Stdio) (
 		c:           c,
 		stdio:       s,
 		spec:        spec,
-		processSpec: specs.ProcessSpec(spec.Process),
+		processSpec: specs.ProcessSpec(*spec.Process),
 	}
 	p, err := newProcess(config)
 	if err != nil {
