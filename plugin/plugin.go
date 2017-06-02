@@ -27,7 +27,7 @@ type Registration struct {
 	Init   func(*InitContext) (interface{}, error)
 }
 
-// TODO(@crosbymichael): how to we keep this struct from growing but support dependency injection for loaded plugins?
+// TODO(@crosbymichael): how do we keep this struct from growing but support dependency injection for loaded plugins?
 type InitContext struct {
 	Root        string
 	State       string
