@@ -37,6 +37,8 @@ script:
   - export CGO_ENABLED=$TRAVIS_CGO_ENABLED
   - GIT_CHECK_EXCLUDE="./vendor" TRAVIS_COMMIT_RANGE="${TRAVIS_COMMIT_RANGE/.../..}" make dco
   - make fmt
+  - which go vet
+  - sha256sum /home/travis/.gimme/versions/go1.8.1.linux.amd64/pkg/tool/linux_amd64/vet
   - make vet
   - make build
   - make binaries
