@@ -152,7 +152,6 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 			TypeUrl: runtimespec.Version,
 			Value:   rawSpec,
 		},
-		// TODO(random-liu): [P0] Get rootfs mount from containerd.
 		Rootfs:  rootfsMounts,
 		Runtime: defaultRuntime,
 		// No stdin for sandbox container.
