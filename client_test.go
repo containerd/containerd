@@ -18,10 +18,14 @@ const (
 	testImage    = "docker.io/library/alpine:latest"
 )
 
-var address string
+var (
+	address  string
+	noDaemon bool
+)
 
 func init() {
 	flag.StringVar(&address, "address", "/run/containerd/containerd.sock", "The address to the containerd socket for use in the tests")
+	flag.BoolVar(&noDaemon, "no-daemon", false, "Do not start a dedicated daemon for the tests")
 	flag.Parse()
 }
 
@@ -29,17 +33,23 @@ func TestMain(m *testing.M) {
 	if testing.Short() {
 		os.Exit(m.Run())
 	}
-	// setup a new containerd daemon if !testing.Short
-	cmd := exec.Command("containerd",
-		"--root", defaultRoot,
-		"--state", defaultState,
+	var (
+		cmd *exec.Cmd
+		buf = bytes.NewBuffer(nil)
 	)
-	buf := bytes.NewBuffer(nil)
-	cmd.Stderr = buf
-	if err := cmd.Start(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+	if !noDaemon {
+		// setup a new containerd daemon if !testing.Short
+		cmd = exec.Command("containerd",
+			"--root", defaultRoot,
+			"--state", defaultState,
+		)
+		cmd.Stderr = buf
+		if err := cmd.Start(); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
 	}
+
 	client, err := New(address)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -62,20 +72,22 @@ func TestMain(m *testing.M) {
 	// run the test
 	status := m.Run()
 
-	// tear down the daemon and resources created
-	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-	}
-	if _, err := cmd.Process.Wait(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-	}
-	if err := os.RemoveAll(defaultRoot); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	// only print containerd logs if the test failed
-	if status != 0 {
-		fmt.Fprintln(os.Stderr, buf.String())
+	if !noDaemon {
+		// tear down the daemon and resources created
+		if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		if _, err := cmd.Process.Wait(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		if err := os.RemoveAll(defaultRoot); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		// only print containerd logs if the test failed
+		if status != 0 {
+			fmt.Fprintln(os.Stderr, buf.String())
+		}
 	}
 	os.Exit(status)
 }

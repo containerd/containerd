@@ -156,11 +156,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 	s.mu.Unlock()
 	state, err := c.State(ctx)
 	if err != nil {
-		s.mu.Lock()
-		delete(s.tasks, r.ContainerID)
-		runtime.Delete(ctx, c)
-		s.mu.Unlock()
-		return nil, err
+		log.G(ctx).Error(err)
 	}
 	return &api.CreateResponse{
 		ContainerID: r.ContainerID,

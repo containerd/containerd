@@ -14,7 +14,7 @@ import (
 type Container interface {
 	ID() string
 	Delete(context.Context) error
-	NewTask(context.Context, IOCreation) (Task, error)
+	NewTask(context.Context, IOCreation, ...NewTaskOpts) (Task, error)
 	Spec() (*specs.Spec, error)
 	Task() Task
 	LoadTask(context.Context, IOAttach) (Task, error)
@@ -71,7 +71,9 @@ func (c *container) Task() Task {
 	return c.task
 }
 
-func (c *container) NewTask(ctx context.Context, ioCreate IOCreation) (Task, error) {
+type NewTaskOpts func(context.Context, *Client, *execution.CreateRequest) error
+
+func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...NewTaskOpts) (Task, error) {
 	i, err := ioCreate()
 	if err != nil {
 		return nil, err
@@ -97,15 +99,28 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation) (Task, err
 			})
 		}
 	}
-	response, err := c.client.TaskService().Create(ctx, request)
-	if err != nil {
-		return nil, err
+	for _, o := range opts {
+		if err := o(ctx, c.client, request); err != nil {
+			return nil, err
+		}
 	}
 	t := &task{
 		client:      c.client,
 		io:          i,
-		containerID: response.ContainerID,
-		pid:         response.Pid,
+		containerID: c.ID(),
+		pidSync:     make(chan struct{}),
+	}
+
+	if request.Checkpoint != nil {
+		// we need to defer the create call to start
+		t.deferred = request
+	} else {
+		response, err := c.client.TaskService().Create(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		t.pid = response.Pid
+		close(t.pidSync)
 	}
 	c.task = t
 	return t, nil
