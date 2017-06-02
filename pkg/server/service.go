@@ -40,18 +40,6 @@ import (
 	"github.com/kubernetes-incubator/cri-containerd/pkg/registrar"
 )
 
-// TODO remove the underscores from the following imports as the services are
-// implemented. "_" is being used to hold the reference to keep autocomplete
-// from deleting them until referenced below.
-// nolint: golint
-import (
-	_ "github.com/containerd/containerd/api/types/container"
-	_ "github.com/containerd/containerd/api/types/descriptor"
-	_ "github.com/containerd/containerd/api/types/mount"
-	_ "github.com/opencontainers/image-spec/specs-go"
-	_ "github.com/opencontainers/runtime-spec/specs-go"
-)
-
 // CRIContainerdService is the interface implement CRI remote service server.
 type CRIContainerdService interface {
 	Start()

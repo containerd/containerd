@@ -186,7 +186,6 @@ func (r *resourceSet) all() map[string]struct{} {
 
 // pullImage pulls image and returns image id (config digest) and manifest digest.
 // The ref should be normalized image reference.
-// TODO(random-liu): [P0] Wait for all downloadings to be done before return.
 func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
 	imagedigest.Digest, imagedigest.Digest, error) {
 	// Resolve the image reference to get descriptor and fetcher.
