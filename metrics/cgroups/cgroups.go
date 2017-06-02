@@ -51,7 +51,7 @@ func (m *cgroupsMonitor) Monitor(c plugin.Task) error {
 	if err != nil {
 		return err
 	}
-	cg, err := cgroups.Load(cgroups.V1, cgroups.PidPath(int(state.Pid())))
+	cg, err := cgroups.Load(cgroups.V1, cgroups.PidPath(int(state.Pid)))
 	if err != nil {
 		return err
 	}

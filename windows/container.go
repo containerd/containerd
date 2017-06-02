@@ -116,7 +116,10 @@ func (c *container) Resume(ctx context.Context) error {
 }
 
 func (c *container) State(ctx context.Context) (plugin.State, error) {
-	return c, nil
+	return plugin.State{
+		Pid:    c.Pid(),
+		Status: c.Status(),
+	}, nil
 }
 
 func (c *container) Kill(ctx context.Context, signal uint32, pid uint32, all bool) error {

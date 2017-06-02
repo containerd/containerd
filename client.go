@@ -203,6 +203,16 @@ func (c *Client) NewContainer(ctx context.Context, id string, spec *specs.Spec, 
 	return containerFromProto(c, r.Container), nil
 }
 
+func (c *Client) LoadContainer(ctx context.Context, id string) (Container, error) {
+	response, err := c.ContainerService().Get(ctx, &containers.GetContainerRequest{
+		ID: id,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return containerFromProto(c, response.Container), nil
+}
+
 type RemoteOpts func(*Client, *RemoteContext) error
 
 // RemoteContext is used to configure object resolutions and transfers with

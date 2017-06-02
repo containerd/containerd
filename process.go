@@ -88,3 +88,11 @@ func (p *process) Wait(ctx context.Context) (uint32, error) {
 		}
 	}
 }
+
+func (p *process) CloseStdin(ctx context.Context) error {
+	_, err := p.task.client.TaskService().CloseStdin(ctx, &execution.CloseStdinRequest{
+		ContainerID: p.task.containerID,
+		Pid:         p.pid,
+	})
+	return err
+}

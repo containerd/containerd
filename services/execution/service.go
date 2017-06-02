@@ -164,7 +164,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 	}
 	return &api.CreateResponse{
 		ContainerID: r.ContainerID,
-		Pid:         state.Pid(),
+		Pid:         state.Pid,
 	}, nil
 }
 
@@ -208,7 +208,7 @@ func taskFromContainerd(ctx context.Context, c plugin.Task) (*task.Task, error) 
 	}
 
 	var status task.Status
-	switch state.Status() {
+	switch state.Status {
 	case plugin.CreatedStatus:
 		status = task.StatusCreated
 	case plugin.RunningStatus:
@@ -218,17 +218,21 @@ func taskFromContainerd(ctx context.Context, c plugin.Task) (*task.Task, error) 
 	case plugin.PausedStatus:
 		status = task.StatusPaused
 	default:
-		log.G(ctx).WithField("status", state.Status()).Warn("unknown status")
+		log.G(ctx).WithField("status", state.Status).Warn("unknown status")
 	}
 	return &task.Task{
 		ID:          c.Info().ID,
 		ContainerID: c.Info().ContainerID,
-		Pid:         state.Pid(),
+		Pid:         state.Pid,
 		Status:      status,
 		Spec: &protobuf.Any{
 			TypeUrl: specs.Version,
 			Value:   c.Info().Spec,
 		},
+		Stdin:    state.Stdin,
+		Stdout:   state.Stdout,
+		Stderr:   state.Stderr,
+		Terminal: state.Terminal,
 	}, nil
 }
 
@@ -359,7 +363,7 @@ func (s *Service) Exec(ctx context.Context, r *api.ExecRequest) (*api.ExecRespon
 		return nil, err
 	}
 	return &api.ExecResponse{
-		Pid: state.Pid(),
+		Pid: state.Pid,
 	}, nil
 }
 
