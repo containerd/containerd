@@ -20,7 +20,9 @@ BUILD_DIR ?= _output
 # VERSION is derived from the current tag for HEAD plus amends. Version is used
 # to set/overide the criContainerdVersion variable in the verison package for
 # cri-containerd.
-VERSION:=$(shell git describe --tags --dirty)
+VERSION := $(shell git describe --tags --dirty)
+# strip the first char of the tag if it's a `v`
+VERSION := $(VERSION:v%=%)
 BUILD_TAGS:= -ldflags '-X $(PROJECT)/pkg/version.criContainerdVersion=$(VERSION)'
 
 all: binaries
