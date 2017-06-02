@@ -4,7 +4,9 @@ import (
 	gocontext "context"
 
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
+	"github.com/containerd/containerd/api/types/event"
 	mounttypes "github.com/containerd/containerd/api/types/mount"
+	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
@@ -23,11 +25,12 @@ func init() {
 			plugin.SnapshotPlugin,
 		},
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
+			e := events.GetPoster(ic.Context)
 			s, err := ic.Get(plugin.SnapshotPlugin)
 			if err != nil {
 				return nil, err
 			}
-			return newService(s.(snapshot.Snapshotter))
+			return newService(s.(snapshot.Snapshotter), e)
 		},
 	})
 }
@@ -36,11 +39,13 @@ var empty = &protoempty.Empty{}
 
 type service struct {
 	snapshotter snapshot.Snapshotter
+	emitter     events.Poster
 }
 
-func newService(snapshotter snapshot.Snapshotter) (*service, error) {
+func newService(snapshotter snapshot.Snapshotter, evts events.Poster) (*service, error) {
 	return &service{
 		snapshotter: snapshotter,
+		emitter:     evts,
 	}, nil
 }
 
@@ -57,6 +62,14 @@ func (s *service) Prepare(ctx context.Context, pr *snapshotapi.PrepareRequest) (
 	if err != nil {
 		return nil, grpcError(err)
 	}
+
+	if err := s.emit(ctx, "/snapshot/prepare", event.SnapshotPrepare{
+		Key:    pr.Key,
+		Parent: pr.Parent,
+	}); err != nil {
+		return nil, err
+	}
+
 	return fromMounts(mounts), nil
 }
 
@@ -89,6 +102,13 @@ func (s *service) Commit(ctx context.Context, cr *snapshotapi.CommitRequest) (*p
 	if err := s.snapshotter.Commit(ctx, cr.Name, cr.Key); err != nil {
 		return nil, grpcError(err)
 	}
+
+	if err := s.emit(ctx, "/snapshot/commit", event.SnapshotCommit{
+		Key:  cr.Key,
+		Name: cr.Name,
+	}); err != nil {
+		return nil, err
+	}
 	return empty, nil
 }
 
@@ -98,6 +118,12 @@ func (s *service) Remove(ctx context.Context, rr *snapshotapi.RemoveRequest) (*p
 	// TODO: Lookup snapshot id from metadata store
 	if err := s.snapshotter.Remove(ctx, rr.Key); err != nil {
 		return nil, grpcError(err)
+	}
+
+	if err := s.emit(ctx, "/snapshot/remove", event.SnapshotRemove{
+		Key: rr.Key,
+	}); err != nil {
+		return nil, err
 	}
 	return empty, nil
 }
@@ -209,4 +235,13 @@ func fromMounts(mounts []mount.Mount) *snapshotapi.MountsResponse {
 		}
 	}
 	return resp
+}
+
+func (s *service) emit(ctx context.Context, topic string, evt interface{}) error {
+	emitterCtx := events.WithTopic(ctx, topic)
+	if err := s.emitter.Post(emitterCtx, evt); err != nil {
+		return err
+	}
+
+	return nil
 }

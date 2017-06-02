@@ -5,6 +5,8 @@ import (
 
 	"github.com/boltdb/bolt"
 	api "github.com/containerd/containerd/api/services/namespaces"
+	"github.com/containerd/containerd/api/types/event"
+	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
@@ -22,23 +24,28 @@ func init() {
 			plugin.MetadataPlugin,
 		},
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
+			e := events.GetPoster(ic.Context)
 			m, err := ic.Get(plugin.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}
-			return NewService(m.(*bolt.DB)), nil
+			return NewService(m.(*bolt.DB), e), nil
 		},
 	})
 }
 
 type Service struct {
-	db *bolt.DB
+	db      *bolt.DB
+	emitter events.Poster
 }
 
 var _ api.NamespacesServer = &Service{}
 
-func NewService(db *bolt.DB) api.NamespacesServer {
-	return &Service{db: db}
+func NewService(db *bolt.DB, evts events.Poster) api.NamespacesServer {
+	return &Service{
+		db:      db,
+		emitter: evts,
+	}
 }
 
 func (s *Service) Register(server *grpc.Server) error {
@@ -94,7 +101,7 @@ func (s *Service) List(ctx context.Context, req *api.ListNamespacesRequest) (*ap
 func (s *Service) Create(ctx context.Context, req *api.CreateNamespaceRequest) (*api.CreateNamespaceResponse, error) {
 	var resp api.CreateNamespaceResponse
 
-	return &resp, s.withStoreUpdate(ctx, func(ctx context.Context, store namespaces.Store) error {
+	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store namespaces.Store) error {
 		if err := store.Create(ctx, req.Namespace.Name, req.Namespace.Labels); err != nil {
 			return mapGRPCError(err, req.Namespace.Name)
 		}
@@ -107,13 +114,24 @@ func (s *Service) Create(ctx context.Context, req *api.CreateNamespaceRequest) (
 
 		resp.Namespace = req.Namespace
 		return nil
-	})
+	}); err != nil {
+		return &resp, err
+	}
+
+	if err := s.emit(ctx, "/namespaces/create", event.NamespaceCreate{
+		Name:   req.Namespace.Name,
+		Labels: req.Namespace.Labels,
+	}); err != nil {
+		return &resp, err
+	}
+
+	return &resp, nil
+
 }
 
 func (s *Service) Update(ctx context.Context, req *api.UpdateNamespaceRequest) (*api.UpdateNamespaceResponse, error) {
 	var resp api.UpdateNamespaceResponse
-	return &resp, s.withStoreUpdate(ctx, func(ctx context.Context, store namespaces.Store) error {
-
+	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store namespaces.Store) error {
 		if req.UpdateMask != nil && len(req.UpdateMask.Paths) > 0 {
 			for _, path := range req.UpdateMask.Paths {
 				switch {
@@ -149,14 +167,34 @@ func (s *Service) Update(ctx context.Context, req *api.UpdateNamespaceRequest) (
 		}
 
 		return nil
-	})
+	}); err != nil {
+		return &resp, err
+	}
 
+	if err := s.emit(ctx, "/namespaces/update", event.NamespaceUpdate{
+		Name:   req.Namespace.Name,
+		Labels: req.Namespace.Labels,
+	}); err != nil {
+		return &resp, err
+	}
+
+	return &resp, nil
 }
 
 func (s *Service) Delete(ctx context.Context, req *api.DeleteNamespaceRequest) (*empty.Empty, error) {
-	return &empty.Empty{}, s.withStoreUpdate(ctx, func(ctx context.Context, store namespaces.Store) error {
+	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store namespaces.Store) error {
 		return mapGRPCError(store.Delete(ctx, req.Name), req.Name)
-	})
+	}); err != nil {
+		return &empty.Empty{}, err
+	}
+
+	if err := s.emit(ctx, "/namespaces/delete", event.NamespaceDelete{
+		Name: req.Name,
+	}); err != nil {
+		return &empty.Empty{}, err
+	}
+
+	return &empty.Empty{}, nil
 }
 
 func (s *Service) withStore(ctx context.Context, fn func(ctx context.Context, store namespaces.Store) error) func(tx *bolt.Tx) error {
@@ -169,4 +207,13 @@ func (s *Service) withStoreView(ctx context.Context, fn func(ctx context.Context
 
 func (s *Service) withStoreUpdate(ctx context.Context, fn func(ctx context.Context, store namespaces.Store) error) error {
 	return s.db.Update(s.withStore(ctx, fn))
+}
+
+func (s *Service) emit(ctx context.Context, topic string, evt interface{}) error {
+	emitterCtx := events.WithTopic(ctx, topic)
+	if err := s.emitter.Post(emitterCtx, evt); err != nil {
+		return err
+	}
+
+	return nil
 }

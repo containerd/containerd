@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package containerd.v1.types;
+
+message ImagePut {
+	string name = 1;
+	string labels = 2;
+}
+
+message ImageDelete {
+	string name = 1;
+}

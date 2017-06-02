@@ -5,6 +5,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/namespaces"
 )
 
 var (
@@ -13,7 +14,7 @@ var (
 
 // Poster posts the event.
 type Poster interface {
-	Post(ctx context.Context, event Event)
+	Post(ctx context.Context, evt Event) error
 }
 
 type posterKey struct{}
@@ -24,19 +25,21 @@ func WithPoster(ctx context.Context, poster Poster) context.Context {
 
 func GetPoster(ctx context.Context) Poster {
 	poster := ctx.Value(posterKey{})
+
 	if poster == nil {
-		logger := log.G(ctx)
 		tx, _ := getTx(ctx)
 		topic := getTopic(ctx)
 
 		// likely means we don't have a configured event system. Just return
 		// the default poster, which merely logs events.
-		return posterFunc(func(ctx context.Context, event Event) {
-			fields := logrus.Fields{"event": event}
+		return posterFunc(func(ctx context.Context, evt Event) error {
+			fields := logrus.Fields{"event": evt}
 
 			if topic != "" {
 				fields["topic"] = topic
 			}
+			ns, _ := namespaces.Namespace(ctx)
+			fields["ns"] = ns
 
 			if tx != nil {
 				fields["tx.id"] = tx.id
@@ -45,15 +48,18 @@ func GetPoster(ctx context.Context) Poster {
 				}
 			}
 
-			logger.WithFields(fields).Info("event posted")
+			log.G(ctx).WithFields(fields).Debug("event fired")
+
+			return nil
 		})
 	}
 
 	return poster.(Poster)
 }
 
-type posterFunc func(ctx context.Context, event Event)
+type posterFunc func(ctx context.Context, evt Event) error
 
-func (fn posterFunc) Post(ctx context.Context, event Event) {
-	fn(ctx, event)
+func (fn posterFunc) Post(ctx context.Context, evt Event) error {
+	fn(ctx, evt)
+	return nil
 }

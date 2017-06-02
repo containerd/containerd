@@ -3,7 +3,9 @@ package containers
 import (
 	"github.com/boltdb/bolt"
 	api "github.com/containerd/containerd/api/services/containers"
+	"github.com/containerd/containerd/api/types/event"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
 	"github.com/golang/protobuf/ptypes/empty"
@@ -20,21 +22,23 @@ func init() {
 			plugin.MetadataPlugin,
 		},
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
+			e := events.GetPoster(ic.Context)
 			m, err := ic.Get(plugin.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}
-			return NewService(m.(*bolt.DB)), nil
+			return NewService(m.(*bolt.DB), e), nil
 		},
 	})
 }
 
 type Service struct {
-	db *bolt.DB
+	db      *bolt.DB
+	emitter events.Poster
 }
 
-func NewService(db *bolt.DB) api.ContainersServer {
-	return &Service{db: db}
+func NewService(db *bolt.DB, evts events.Poster) api.ContainersServer {
+	return &Service{db: db, emitter: evts}
 }
 
 func (s *Service) Register(server *grpc.Server) error {
@@ -52,6 +56,7 @@ func (s *Service) Get(ctx context.Context, req *api.GetContainerRequest) (*api.G
 		}
 		containerpb := containerToProto(&container)
 		resp.Container = containerpb
+
 		return nil
 	})
 }
@@ -74,7 +79,7 @@ func (s *Service) List(ctx context.Context, req *api.ListContainersRequest) (*ap
 func (s *Service) Create(ctx context.Context, req *api.CreateContainerRequest) (*api.CreateContainerResponse, error) {
 	var resp api.CreateContainerResponse
 
-	return &resp, s.withStoreUpdate(ctx, func(ctx context.Context, store containers.Store) error {
+	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store containers.Store) error {
 		container := containerFromProto(&req.Container)
 
 		created, err := store.Create(ctx, container)
@@ -83,14 +88,26 @@ func (s *Service) Create(ctx context.Context, req *api.CreateContainerRequest) (
 		}
 
 		resp.Container = containerToProto(&created)
+
 		return nil
-	})
+	}); err != nil {
+		return &resp, err
+	}
+	if err := s.emit(ctx, "/containers/create", event.ContainerCreate{
+		ContainerID: resp.Container.ID,
+		Image:       resp.Container.Image,
+		Runtime:     resp.Container.Runtime,
+	}); err != nil {
+		return &resp, err
+	}
+
+	return &resp, nil
 }
 
 func (s *Service) Update(ctx context.Context, req *api.UpdateContainerRequest) (*api.UpdateContainerResponse, error) {
 	var resp api.UpdateContainerResponse
 
-	return &resp, s.withStoreUpdate(ctx, func(ctx context.Context, store containers.Store) error {
+	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store containers.Store) error {
 		container := containerFromProto(&req.Container)
 
 		current, err := store.Get(ctx, container.ID)
@@ -134,14 +151,38 @@ func (s *Service) Update(ctx context.Context, req *api.UpdateContainerRequest) (
 		}
 
 		resp.Container = containerToProto(&created)
+
 		return nil
-	})
+	}); err != nil {
+		return &resp, err
+	}
+
+	if err := s.emit(ctx, "/containers/update", event.ContainerUpdate{
+		ContainerID: resp.Container.ID,
+		Image:       resp.Container.Image,
+		Labels:      resp.Container.Labels,
+		RootFS:      resp.Container.RootFS,
+	}); err != nil {
+		return &resp, err
+	}
+
+	return &resp, nil
 }
 
 func (s *Service) Delete(ctx context.Context, req *api.DeleteContainerRequest) (*empty.Empty, error) {
-	return &empty.Empty{}, s.withStoreUpdate(ctx, func(ctx context.Context, store containers.Store) error {
+	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store containers.Store) error {
 		return mapGRPCError(store.Delete(ctx, req.ID), req.ID)
-	})
+	}); err != nil {
+		return &empty.Empty{}, mapGRPCError(err, req.ID)
+	}
+
+	if err := s.emit(ctx, "/containers/delete", event.ContainerDelete{
+		ContainerID: req.ID,
+	}); err != nil {
+		return &empty.Empty{}, err
+	}
+
+	return &empty.Empty{}, nil
 }
 
 func (s *Service) withStore(ctx context.Context, fn func(ctx context.Context, store containers.Store) error) func(tx *bolt.Tx) error {
@@ -154,4 +195,13 @@ func (s *Service) withStoreView(ctx context.Context, fn func(ctx context.Context
 
 func (s *Service) withStoreUpdate(ctx context.Context, fn func(ctx context.Context, store containers.Store) error) error {
 	return s.db.Update(s.withStore(ctx, fn))
+}
+
+func (s *Service) emit(ctx context.Context, topic string, evt interface{}) error {
+	emitterCtx := events.WithTopic(ctx, topic)
+	if err := s.emitter.Post(emitterCtx, evt); err != nil {
+		return err
+	}
+
+	return nil
 }

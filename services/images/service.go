@@ -3,6 +3,8 @@ package images
 import (
 	"github.com/boltdb/bolt"
 	imagesapi "github.com/containerd/containerd/api/services/images"
+	"github.com/containerd/containerd/api/types/event"
+	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
@@ -19,21 +21,26 @@ func init() {
 			plugin.MetadataPlugin,
 		},
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
+			e := events.GetPoster(ic.Context)
 			m, err := ic.Get(plugin.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}
-			return NewService(m.(*bolt.DB)), nil
+			return NewService(m.(*bolt.DB), e), nil
 		},
 	})
 }
 
 type Service struct {
-	db *bolt.DB
+	db      *bolt.DB
+	emitter events.Poster
 }
 
-func NewService(db *bolt.DB) imagesapi.ImagesServer {
-	return &Service{db: db}
+func NewService(db *bolt.DB, evts events.Poster) imagesapi.ImagesServer {
+	return &Service{
+		db:      db,
+		emitter: evts,
+	}
 }
 
 func (s *Service) Register(server *grpc.Server) error {
@@ -56,9 +63,20 @@ func (s *Service) Get(ctx context.Context, req *imagesapi.GetRequest) (*imagesap
 }
 
 func (s *Service) Put(ctx context.Context, req *imagesapi.PutRequest) (*empty.Empty, error) {
-	return &empty.Empty{}, s.withStoreUpdate(ctx, func(ctx context.Context, store images.Store) error {
+	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store images.Store) error {
 		return mapGRPCError(store.Put(ctx, req.Image.Name, descFromProto(&req.Image.Target)), req.Image.Name)
-	})
+	}); err != nil {
+		return &empty.Empty{}, err
+	}
+
+	if err := s.emit(ctx, "/images/put", event.ImagePut{
+		Name:   req.Image.Name,
+		Labels: req.Image.Labels,
+	}); err != nil {
+		return &empty.Empty{}, err
+	}
+
+	return &empty.Empty{}, nil
 }
 
 func (s *Service) List(ctx context.Context, _ *imagesapi.ListRequest) (*imagesapi.ListResponse, error) {
@@ -76,9 +94,19 @@ func (s *Service) List(ctx context.Context, _ *imagesapi.ListRequest) (*imagesap
 }
 
 func (s *Service) Delete(ctx context.Context, req *imagesapi.DeleteRequest) (*empty.Empty, error) {
-	return &empty.Empty{}, s.withStoreUpdate(ctx, func(ctx context.Context, store images.Store) error {
+	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store images.Store) error {
 		return mapGRPCError(store.Delete(ctx, req.Name), req.Name)
-	})
+	}); err != nil {
+		return &empty.Empty{}, err
+	}
+
+	if err := s.emit(ctx, "/images/delete", event.ImageDelete{
+		Name: req.Name,
+	}); err != nil {
+		return &empty.Empty{}, err
+	}
+
+	return &empty.Empty{}, nil
 }
 
 func (s *Service) withStore(ctx context.Context, fn func(ctx context.Context, store images.Store) error) func(tx *bolt.Tx) error {
@@ -91,4 +119,13 @@ func (s *Service) withStoreView(ctx context.Context, fn func(ctx context.Context
 
 func (s *Service) withStoreUpdate(ctx context.Context, fn func(ctx context.Context, store images.Store) error) error {
 	return s.db.Update(s.withStore(ctx, fn))
+}
+
+func (s *Service) emit(ctx context.Context, topic string, evt interface{}) error {
+	emitterCtx := events.WithTopic(ctx, topic)
+	if err := s.emitter.Post(emitterCtx, evt); err != nil {
+		return err
+	}
+
+	return nil
 }

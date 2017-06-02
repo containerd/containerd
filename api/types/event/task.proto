@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package containerd.v1.types;
+
+message TaskCreate {
+	string container_id = 1;
+}
+
+message TaskStart {
+	string container_id = 1;
+}
+
+message TaskDelete {
+	string container_id = 1;
+}

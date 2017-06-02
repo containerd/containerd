@@ -15,6 +15,7 @@ import (
 	containersapi "github.com/containerd/containerd/api/services/containers"
 	contentapi "github.com/containerd/containerd/api/services/content"
 	diffapi "github.com/containerd/containerd/api/services/diff"
+	"github.com/containerd/containerd/api/services/events"
 	"github.com/containerd/containerd/api/services/execution"
 	imagesapi "github.com/containerd/containerd/api/services/images"
 	namespacesapi "github.com/containerd/containerd/api/services/namespaces"
@@ -87,6 +88,15 @@ func getTasksService(context *cli.Context) (execution.TasksClient, error) {
 		return nil, err
 	}
 	return execution.NewTasksClient(conn), nil
+}
+
+func getEventsService(context *cli.Context) (events.EventsClient, error) {
+	conn, err := getGRPCConnection(context)
+	if err != nil {
+		return nil, err
+	}
+
+	return events.NewEventsClient(conn), nil
 }
 
 func getContentStore(context *cli.Context) (content.Store, error) {

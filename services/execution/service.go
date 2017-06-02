@@ -11,10 +11,12 @@ import (
 	"github.com/boltdb/bolt"
 	api "github.com/containerd/containerd/api/services/execution"
 	"github.com/containerd/containerd/api/types/descriptor"
+	"github.com/containerd/containerd/api/types/event"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
@@ -69,11 +71,13 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+	e := events.GetPoster(ic.Context)
 	return &Service{
 		runtimes:  runtimes,
 		db:        m.(*bolt.DB),
 		collector: c,
 		store:     ct.(content.Store),
+		emitter:   e,
 	}, nil
 }
 
@@ -82,6 +86,7 @@ type Service struct {
 	db        *bolt.DB
 	collector *collector
 	store     content.Store
+	emitter   events.Poster
 }
 
 func (s *Service) Register(server *grpc.Server) error {
@@ -159,6 +164,13 @@ func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 	if err != nil {
 		log.G(ctx).Error(err)
 	}
+
+	if err := s.emit(ctx, "/tasks/create", event.TaskCreate{
+		ContainerID: r.ContainerID,
+	}); err != nil {
+		return nil, err
+	}
+
 	return &api.CreateResponse{
 		ContainerID: r.ContainerID,
 		Pid:         state.Pid,
@@ -173,6 +185,13 @@ func (s *Service) Start(ctx context.Context, r *api.StartRequest) (*google_proto
 	if err := c.Start(ctx); err != nil {
 		return nil, err
 	}
+
+	if err := s.emit(ctx, "/tasks/start", event.TaskStart{
+		ContainerID: r.ContainerID,
+	}); err != nil {
+		return nil, err
+	}
+
 	return empty, nil
 }
 
@@ -189,6 +208,13 @@ func (s *Service) Delete(ctx context.Context, r *api.DeleteRequest) (*api.Delete
 	if err != nil {
 		return nil, err
 	}
+
+	if err := s.emit(ctx, "/tasks/delete", event.TaskDelete{
+		ContainerID: r.ContainerID,
+	}); err != nil {
+		return nil, err
+	}
+
 	return &api.DeleteResponse{
 		ExitStatus: exit.Status,
 		ExitedAt:   exit.Timestamp,
@@ -487,6 +513,15 @@ func (s *Service) getRuntime(name string) (plugin.Runtime, error) {
 		return nil, fmt.Errorf("unknown runtime %q", name)
 	}
 	return runtime, nil
+}
+
+func (s *Service) emit(ctx context.Context, topic string, evt interface{}) error {
+	emitterCtx := events.WithTopic(ctx, topic)
+	if err := s.emitter.Post(emitterCtx, evt); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type grpcEventWriter struct {
