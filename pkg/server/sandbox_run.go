@@ -19,8 +19,6 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"strings"
 	"time"
 
@@ -116,24 +114,23 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		}
 	}()
 
-	// TODO(random-liu): [P1] Moving following logging related logic into util functions.
 	// Discard sandbox container output because we don't care about it.
 	_, stdout, stderr := getStreamingPipes(sandboxRootDir)
 	_, stdoutPipe, stderrPipe, err := c.prepareStreamingPipes(ctx, "", stdout, stderr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare streaming pipes: %v", err)
 	}
-	for _, f := range []io.ReadCloser{stdoutPipe, stderrPipe} {
-		defer func(cl io.Closer) {
-			if retErr != nil {
-				cl.Close()
-			}
-		}(f)
-		go func(r io.ReadCloser) {
-			// Discard the output for now.
-			io.Copy(ioutil.Discard, r) // nolint: errcheck
-			r.Close()
-		}(f)
+	defer func() {
+		if retErr != nil {
+			stdoutPipe.Close()
+			stderrPipe.Close()
+		}
+	}()
+	if err := c.agentFactory.NewSandboxLogger(stdoutPipe).Start(); err != nil {
+		return nil, fmt.Errorf("failed to start sandbox stdout logger: %v", err)
+	}
+	if err := c.agentFactory.NewSandboxLogger(stderrPipe).Start(); err != nil {
+		return nil, fmt.Errorf("failed to start sandbox stderr logger: %v", err)
 	}
 
 	// Start sandbox container.
