@@ -55,6 +55,7 @@ func (w *worker) Start() {
 				NoEvent: true,
 				Process: process,
 			}
+			evt.WithContext(t.Ctx)
 			w.s.SendTask(evt)
 			continue
 		}
@@ -71,6 +72,7 @@ func (w *worker) Start() {
 				NoEvent: true,
 				Process: process,
 			}
+			evt.WithContext(t.Ctx)
 			w.s.SendTask(evt)
 			continue
 		}
@@ -85,6 +87,7 @@ func (w *worker) Start() {
 					NoEvent: true,
 					Process: process,
 				}
+				evt.WithContext(t.Ctx)
 				w.s.SendTask(evt)
 				continue
 			}

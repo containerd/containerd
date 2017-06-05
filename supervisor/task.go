@@ -1,6 +1,7 @@
 package supervisor
 
 import (
+	"context"
 	"sync"
 
 	"github.com/containerd/containerd/runtime"
@@ -17,11 +18,26 @@ type StartResponse struct {
 type Task interface {
 	// ErrorCh returns a channel used to report and error from an async task
 	ErrorCh() chan error
+	// Ctx carries the context of a task
+	Ctx() context.Context
 }
 
 type baseTask struct {
 	errCh chan error
+	ctx   context.Context
 	mu    sync.Mutex
+}
+
+func (t *baseTask) WithContext(ctx context.Context) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.ctx = ctx
+}
+
+func (t *baseTask) Ctx() context.Context {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.ctx
 }
 
 func (t *baseTask) ErrorCh() chan error {
