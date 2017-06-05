@@ -27,7 +27,6 @@ import (
 	"github.com/containerd/containerd/images"
 	diffservice "github.com/containerd/containerd/services/diff"
 	"github.com/containerd/containerd/snapshot"
-	"github.com/docker/docker/pkg/truncindex"
 	"github.com/kubernetes-incubator/cri-o/pkg/ocicni"
 	healthapi "google.golang.org/grpc/health/grpc_health_v1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -65,10 +64,6 @@ type criContainerdService struct {
 	// sandboxNameIndex stores all sandbox names and make sure each name
 	// is unique.
 	sandboxNameIndex *registrar.Registrar
-	// sandboxIDIndex is trie tree for truncated id indexing, e.g. after an
-	// id "abcdefg" is added, we could use "abcd" to identify the same thing
-	// as long as there is no ambiguity.
-	sandboxIDIndex *truncindex.TruncIndex
 	// containerStore stores all container metadata.
 	containerStore metadata.ContainerStore
 	// containerNameIndex stores all container names and make sure each
@@ -109,17 +104,13 @@ func NewCRIContainerdService(containerdEndpoint, rootDir, networkPluginBinDir, n
 	}
 
 	c := &criContainerdService{
-		os:                 osinterface.RealOS{},
-		rootDir:            rootDir,
-		sandboxImage:       defaultSandboxImage,
-		sandboxStore:       metadata.NewSandboxStore(store.NewMetadataStore()),
-		containerStore:     metadata.NewContainerStore(store.NewMetadataStore()),
-		imageMetadataStore: metadata.NewImageMetadataStore(store.NewMetadataStore()),
-		// TODO(random-liu): Register sandbox/container id/name for recovered sandbox/container.
-		// TODO(random-liu): Use the same name and id index for both container and sandbox.
-		sandboxNameIndex: registrar.NewRegistrar(),
-		sandboxIDIndex:   truncindex.NewTruncIndex(nil),
-		// TODO(random-liu): Add container id index.
+		os:                  osinterface.RealOS{},
+		rootDir:             rootDir,
+		sandboxImage:        defaultSandboxImage,
+		sandboxStore:        metadata.NewSandboxStore(store.NewMetadataStore()),
+		containerStore:      metadata.NewContainerStore(store.NewMetadataStore()),
+		imageMetadataStore:  metadata.NewImageMetadataStore(store.NewMetadataStore()),
+		sandboxNameIndex:    registrar.NewRegistrar(),
 		containerNameIndex:  registrar.NewRegistrar(),
 		containerService:    client.ContainerService(),
 		taskService:         client.TaskService(),

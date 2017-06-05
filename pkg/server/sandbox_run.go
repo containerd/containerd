@@ -64,16 +64,6 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 			c.sandboxNameIndex.ReleaseByName(name)
 		}
 	}()
-	// Register the sandbox id.
-	if err := c.sandboxIDIndex.Add(id); err != nil {
-		return nil, fmt.Errorf("failed to insert sandbox id %q: %v", id, err)
-	}
-	defer func() {
-		// Delete the sandbox id if the function returns with an error.
-		if retErr != nil {
-			c.sandboxIDIndex.Delete(id) // nolint: errcheck
-		}
-	}()
 
 	// Create initial sandbox metadata.
 	meta := metadata.SandboxMetadata{

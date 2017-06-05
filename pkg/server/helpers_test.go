@@ -28,7 +28,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
 )
 
@@ -116,49 +115,6 @@ func TestPrepareStreamingPipesError(t *testing.T) {
 		assert.False(t, openFlags[stdin])
 		assert.False(t, openFlags[stdout])
 		assert.False(t, openFlags[stderr])
-	}
-}
-
-func TestGetSandbox(t *testing.T) {
-	c := newTestCRIContainerdService()
-	testID := "abcdefg"
-	testSandbox := metadata.SandboxMetadata{
-		ID:   testID,
-		Name: "test-name",
-	}
-	assert.NoError(t, c.sandboxStore.Create(testSandbox))
-	assert.NoError(t, c.sandboxIDIndex.Add(testID))
-
-	for desc, test := range map[string]struct {
-		id        string
-		expected  *metadata.SandboxMetadata
-		expectErr bool
-	}{
-		"full id": {
-			id:        testID,
-			expected:  &testSandbox,
-			expectErr: false,
-		},
-		"partial id": {
-			id:        testID[:3],
-			expected:  &testSandbox,
-			expectErr: false,
-		},
-		"non-exist id": {
-			id:        "gfedcba",
-			expected:  nil,
-			expectErr: true,
-		},
-	} {
-		t.Logf("TestCase %q", desc)
-		sb, err := c.getSandbox(test.id)
-		if test.expectErr {
-			assert.Error(t, err)
-			assert.True(t, metadata.IsNotExistError(err))
-		} else {
-			assert.NoError(t, err)
-		}
-		assert.Equal(t, test.expected, sb)
 	}
 }
 

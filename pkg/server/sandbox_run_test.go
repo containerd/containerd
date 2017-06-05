@@ -362,10 +362,6 @@ func TestRunPodSandbox(t *testing.T) {
 	pid := info.Task.Pid
 	assert.Equal(t, meta.NetNS, getNetworkNamespace(pid), "metadata network namespace should be correct")
 
-	gotID, err := c.sandboxIDIndex.Get(id)
-	assert.NoError(t, err)
-	assert.Equal(t, id, gotID, "sandbox id should be indexed")
-
 	expectedCNICalls := []string{"SetUpPod"}
 	assert.Equal(t, expectedCNICalls, fakeCNIPlugin.GetCalledNames(), "expect SetUpPod should be called")
 	calls = fakeCNIPlugin.GetCalledDetails()

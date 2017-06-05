@@ -39,7 +39,7 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 		}
 	}()
 
-	sandbox, err := c.getSandbox(r.GetPodSandboxId())
+	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find sandbox %q: %v",
 			r.GetPodSandboxId(), err)

@@ -47,7 +47,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 
 	config := r.GetConfig()
 	sandboxConfig := r.GetSandboxConfig()
-	sandbox, err := c.getSandbox(r.GetPodSandboxId())
+	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandbox id %q: %v", r.GetPodSandboxId(), err)
 	}

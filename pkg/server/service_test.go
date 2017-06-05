@@ -23,7 +23,6 @@ import (
 
 	"github.com/containerd/containerd/api/services/execution"
 	snapshotservice "github.com/containerd/containerd/services/snapshot"
-	"github.com/docker/docker/pkg/truncindex"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -62,7 +61,6 @@ func newTestCRIContainerdService() *criContainerdService {
 		sandboxStore:       metadata.NewSandboxStore(store.NewMetadataStore()),
 		imageMetadataStore: metadata.NewImageMetadataStore(store.NewMetadataStore()),
 		sandboxNameIndex:   registrar.NewRegistrar(),
-		sandboxIDIndex:     truncindex.NewTruncIndex(nil),
 		containerStore:     metadata.NewContainerStore(store.NewMetadataStore()),
 		containerNameIndex: registrar.NewRegistrar(),
 		taskService:        servertesting.NewFakeExecutionClient(),

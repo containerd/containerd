@@ -93,20 +93,10 @@ func (c *criContainerdService) filterCRISandboxes(sandboxes []*runtime.PodSandbo
 		return sandboxes
 	}
 
-	var filterID string
-	if filter.GetId() != "" {
-		// Handle truncate id. Use original filter if failed to convert.
-		var err error
-		filterID, err = c.sandboxIDIndex.Get(filter.GetId())
-		if err != nil {
-			filterID = filter.GetId()
-		}
-	}
-
 	filtered := []*runtime.PodSandbox{}
 	for _, s := range sandboxes {
 		// Filter by id
-		if filterID != "" && filterID != s.Id {
+		if filter.GetId() != "" && filter.GetId() != s.Id {
 			continue
 		}
 		// Filter by state

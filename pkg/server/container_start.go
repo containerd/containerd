@@ -90,7 +90,7 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 	}()
 
 	// Get sandbox config from sandbox store.
-	sandboxMeta, err := c.getSandbox(meta.SandboxID)
+	sandboxMeta, err := c.sandboxStore.Get(meta.SandboxID)
 	if err != nil {
 		return fmt.Errorf("sandbox %q not found: %v", meta.SandboxID, err)
 	}

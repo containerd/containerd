@@ -116,7 +116,6 @@ func TestRemovePodSandbox(t *testing.T) {
 		fakeExecutionClient.SetFakeTasks(test.sandboxTasks)
 		if test.injectMetadata {
 			c.sandboxNameIndex.Reserve(testName, testID)
-			c.sandboxIDIndex.Add(testID)
 			c.sandboxStore.Create(testMetadata)
 		}
 		if test.removeSnapshotErr == nil {
@@ -158,8 +157,6 @@ func TestRemovePodSandbox(t *testing.T) {
 		assert.NotNil(t, res)
 		assert.NoError(t, c.sandboxNameIndex.Reserve(testName, testID),
 			"sandbox name should be released")
-		_, err = c.sandboxIDIndex.Get(testID)
-		assert.Error(t, err, "sandbox id should be removed")
 		meta, err := c.sandboxStore.Get(testID)
 		assert.Error(t, err)
 		assert.True(t, metadata.IsNotExistError(err))
@@ -209,7 +206,6 @@ func TestRemoveContainersInSandbox(t *testing.T) {
 	c := newTestCRIContainerdService()
 	WithFakeSnapshotClient(c)
 	assert.NoError(t, c.sandboxNameIndex.Reserve(testName, testID))
-	assert.NoError(t, c.sandboxIDIndex.Add(testID))
 	assert.NoError(t, c.sandboxStore.Create(testMetadata))
 	for _, cntr := range testContainersMetadata {
 		assert.NoError(t, c.containerNameIndex.Reserve(cntr.Name, cntr.ID))

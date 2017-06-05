@@ -28,7 +28,6 @@ import (
 	containerdmetadata "github.com/containerd/containerd/metadata"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/pkg/stringid"
-	"github.com/docker/docker/pkg/truncindex"
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -234,29 +233,6 @@ func isContainerdGRPCNotFoundError(grpcError error) bool {
 // TODO(random-liu): Containerd should expose this error in api. (containerd#999)
 func isRuncProcessAlreadyFinishedError(grpcError error) bool {
 	return strings.Contains(grpc.ErrorDesc(grpcError), "os: process already finished")
-}
-
-// getSandbox gets the sandbox metadata from the sandbox store. It returns nil without
-// error if the sandbox metadata is not found. It also tries to get full sandbox id and
-// retry if the sandbox metadata is not found with the initial id.
-func (c *criContainerdService) getSandbox(id string) (*metadata.SandboxMetadata, error) {
-	sandbox, err := c.sandboxStore.Get(id)
-	if err != nil && !metadata.IsNotExistError(err) {
-		return nil, fmt.Errorf("sandbox metadata not found: %v", err)
-	}
-	if err == nil {
-		return sandbox, nil
-	}
-	// sandbox is not found in metadata store, try to extract full id.
-	id, indexErr := c.sandboxIDIndex.Get(id)
-	if indexErr != nil {
-		if indexErr == truncindex.ErrNotExist {
-			// Return the original error if sandbox id is not found.
-			return nil, err
-		}
-		return nil, fmt.Errorf("sandbox id not found: %v", err)
-	}
-	return c.sandboxStore.Get(id)
 }
 
 // criContainerStateToString formats CRI container state to string.

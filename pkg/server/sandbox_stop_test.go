@@ -137,7 +137,6 @@ func TestStopPodSandbox(t *testing.T) {
 
 		if test.injectSandbox {
 			assert.NoError(t, c.sandboxStore.Create(testSandbox))
-			c.sandboxIDIndex.Add(testID)
 		}
 		if test.injectErr != nil {
 			fake.InjectError("delete", test.injectErr)
@@ -234,7 +233,6 @@ func TestStopContainersInSandbox(t *testing.T) {
 	c.taskService = fake
 	fake.SetFakeTasks(testContainerdContainers)
 	assert.NoError(t, c.sandboxStore.Create(testSandbox))
-	assert.NoError(t, c.sandboxIDIndex.Add(testID))
 	for _, cntr := range testContainers {
 		assert.NoError(t, c.containerStore.Create(cntr))
 	}

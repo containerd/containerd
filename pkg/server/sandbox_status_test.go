@@ -186,7 +186,6 @@ func TestPodSandboxStatus(t *testing.T) {
 		fakeCNIPlugin := c.netPlugin.(*servertesting.FakeCNIPlugin)
 		fake.SetFakeTasks(test.sandboxTasks)
 		if test.injectMetadata {
-			assert.NoError(t, c.sandboxIDIndex.Add(metadata.ID))
 			assert.NoError(t, c.sandboxStore.Create(*metadata))
 		}
 		if test.injectErr != nil {

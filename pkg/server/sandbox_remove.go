@@ -39,7 +39,7 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 		}
 	}()
 
-	sandbox, err := c.getSandbox(r.GetPodSandboxId())
+	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		if !metadata.IsNotExistError(err) {
 			return nil, fmt.Errorf("an error occurred when try to find sandbox %q: %v",
@@ -116,9 +116,6 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 	if err := c.sandboxStore.Delete(id); err != nil {
 		return nil, fmt.Errorf("failed to delete sandbox metadata for %q: %v", id, err)
 	}
-
-	// Release the sandbox id from id index.
-	c.sandboxIDIndex.Delete(id) // nolint: errcheck
 
 	// Release the sandbox name reserved for the sandbox.
 	c.sandboxNameIndex.ReleaseByKey(id)
