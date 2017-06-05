@@ -93,15 +93,6 @@ distribution tool
 	}
 }
 
-var imageCommand = cli.Command{
-	Name:  "image",
-	Usage: "image management",
-	Subcommands: cli.Commands{
-		imagesListCommand,
-		rmiCommand,
-	},
-}
-
 var contentCommand = cli.Command{
 	Name:  "content",
 	Usage: "content management",
