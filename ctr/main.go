@@ -59,6 +59,7 @@ func main() {
 		eventsCommand,
 		stateCommand,
 		versionCommand,
+		postmortemCommand,
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {

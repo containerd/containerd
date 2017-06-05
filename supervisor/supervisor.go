@@ -184,6 +184,11 @@ func (s *Supervisor) Stop() {
 	close(s.startTasks)
 }
 
+// StateDir exports the containerd state dir
+func (s *Supervisor) StateDir() string {
+	return s.stateDir
+}
+
 // Close closes any open files in the supervisor but expects that Stop has been
 // callsed so that no more containers are started.
 func (s *Supervisor) Close() error {

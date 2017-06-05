@@ -2,9 +2,12 @@ package server
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -499,4 +502,51 @@ func (s *apiServer) Stats(ctx context.Context, r *types.StatsRequest) (*types.St
 	stats := <-e.Stat
 	t := convertToPb(stats)
 	return t, nil
+}
+
+func convertJSONFloat(val interface{}) uint64 {
+	return uint64(val.(float64))
+}
+
+func jsonConvert(data map[string]interface{}) *types.PostMortemResponse {
+	return &types.PostMortemResponse{
+		Stats: &types.UsageStats{
+			Utime: &types.Timeval{
+				Sec:  convertJSONFloat(data["Utime"].(map[string]interface{})["Sec"]),
+				Usec: convertJSONFloat(data["Utime"].(map[string]interface{})["Usec"]),
+			},
+			Stime: &types.Timeval{
+				Sec:  convertJSONFloat(data["Stime"].(map[string]interface{})["Sec"]),
+				Usec: convertJSONFloat(data["Stime"].(map[string]interface{})["Usec"]),
+			},
+			Maxrss:   convertJSONFloat(data["Maxrss"]),
+			Ixrss:    convertJSONFloat(data["Ixrss"]),
+			Idrss:    convertJSONFloat(data["Idrss"]),
+			Isrss:    convertJSONFloat(data["Isrss"]),
+			Minflt:   convertJSONFloat(data["Minflt"]),
+			Majflt:   convertJSONFloat(data["Majflt"]),
+			Nswap:    convertJSONFloat(data["Nswap"]),
+			Inblock:  convertJSONFloat(data["Inblock"]),
+			Oublock:  convertJSONFloat(data["Oublock"]),
+			Msgsnd:   convertJSONFloat(data["Msgsnd"]),
+			Msgrcv:   convertJSONFloat(data["Msgrcv"]),
+			Nsignals: convertJSONFloat(data["Nsignals"]),
+			Nvcsw:    convertJSONFloat(data["Nvcsw"]),
+			Nivcsw:   convertJSONFloat(data["Nivcsw"]),
+		},
+	}
+}
+
+func (s *apiServer) PostMortemStats(ctx context.Context, r *types.PostMortemRequest) (*types.PostMortemResponse, error) {
+	var jsondata map[string]interface{}
+	fp := filepath.Join(s.sv.StateDir(), fmt.Sprintf("%s-stats.json", r.Containerid))
+	rawdata, err := ioutil.ReadFile(fp)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(rawdata, &jsondata)
+	if err != nil {
+		return nil, err
+	}
+	return jsonConvert(jsondata), nil
 }
