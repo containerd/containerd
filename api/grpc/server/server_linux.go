@@ -49,6 +49,7 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 		return nil, fmt.Errorf("process id cannot be empty")
 	}
 	e := &supervisor.AddProcessTask{}
+	e.WithContext(ctx)
 	e.ID = r.Id
 	e.PID = r.Pid
 	e.ProcessSpec = process
@@ -56,7 +57,6 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 	e.Stdout = r.Stdout
 	e.Stderr = r.Stderr
 	e.StartResponse = make(chan supervisor.StartResponse, 1)
-	e.Ctx = ctx
 	s.sv.SendTask(e)
 	if err := <-e.ErrorCh(); err != nil {
 		return nil, err

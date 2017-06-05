@@ -46,6 +46,7 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 		return nil, errors.New("empty bundle path")
 	}
 	e := &supervisor.StartTask{}
+	e.WithContext(ctx)
 	e.ID = c.Id
 	e.BundlePath = c.BundlePath
 	e.Stdin = c.Stdin
@@ -56,7 +57,6 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 	e.Runtime = c.Runtime
 	e.RuntimeArgs = c.RuntimeArgs
 	e.StartResponse = make(chan supervisor.StartResponse, 1)
-	e.Ctx = ctx
 	if c.Checkpoint != "" {
 		e.CheckpointDir = c.CheckpointDir
 		e.Checkpoint = &runtime.Checkpoint{
@@ -79,6 +79,7 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 
 func (s *apiServer) CreateCheckpoint(ctx context.Context, r *types.CreateCheckpointRequest) (*types.CreateCheckpointResponse, error) {
 	e := &supervisor.CreateCheckpointTask{}
+	e.WithContext(ctx)
 	e.ID = r.Id
 	e.CheckpointDir = r.CheckpointDir
 	e.Checkpoint = &runtime.Checkpoint{
@@ -102,6 +103,7 @@ func (s *apiServer) DeleteCheckpoint(ctx context.Context, r *types.DeleteCheckpo
 		return nil, errors.New("checkpoint name cannot be empty")
 	}
 	e := &supervisor.DeleteCheckpointTask{}
+	e.WithContext(ctx)
 	e.ID = r.Id
 	e.CheckpointDir = r.CheckpointDir
 	e.Checkpoint = &runtime.Checkpoint{
@@ -116,6 +118,7 @@ func (s *apiServer) DeleteCheckpoint(ctx context.Context, r *types.DeleteCheckpo
 
 func (s *apiServer) ListCheckpoint(ctx context.Context, r *types.ListCheckpointRequest) (*types.ListCheckpointResponse, error) {
 	e := &supervisor.GetContainersTask{}
+	e.WithContext(ctx)
 	s.sv.SendTask(e)
 	if err := <-e.ErrorCh(); err != nil {
 		return nil, err
@@ -150,6 +153,7 @@ func (s *apiServer) ListCheckpoint(ctx context.Context, r *types.ListCheckpointR
 
 func (s *apiServer) Signal(ctx context.Context, r *types.SignalRequest) (*types.SignalResponse, error) {
 	e := &supervisor.SignalTask{}
+	e.WithContext(ctx)
 	e.ID = r.Id
 	e.PID = r.Pid
 	e.Signal = syscall.Signal(int(r.Signal))
@@ -167,6 +171,7 @@ func (s *apiServer) State(ctx context.Context, r *types.StateRequest) (*types.St
 	}
 
 	e := &supervisor.GetContainersTask{}
+	e.WithContext(ctx)
 	e.ID = r.Id
 	e.GetState = getState
 	s.sv.SendTask(e)
@@ -253,6 +258,7 @@ func toUint32(its []int) []uint32 {
 
 func (s *apiServer) UpdateContainer(ctx context.Context, r *types.UpdateContainerRequest) (*types.UpdateContainerResponse, error) {
 	e := &supervisor.UpdateTask{}
+	e.WithContext(ctx)
 	e.ID = r.Id
 	e.State = runtime.State(r.Status)
 	if r.Resources != nil {
@@ -304,6 +310,7 @@ func (s *apiServer) UpdateContainer(ctx context.Context, r *types.UpdateContaine
 
 func (s *apiServer) UpdateProcess(ctx context.Context, r *types.UpdateProcessRequest) (*types.UpdateProcessResponse, error) {
 	e := &supervisor.UpdateProcessTask{}
+	e.WithContext(ctx)
 	e.ID = r.Id
 	e.PID = r.Pid
 	e.Height = int(r.Height)
@@ -482,6 +489,7 @@ func getSystemCPUUsage() (uint64, error) {
 
 func (s *apiServer) Stats(ctx context.Context, r *types.StatsRequest) (*types.StatsResponse, error) {
 	e := &supervisor.StatsTask{}
+	e.WithContext(ctx)
 	e.ID = r.Id
 	e.Stat = make(chan *runtime.Stat, 1)
 	s.sv.SendTask(e)

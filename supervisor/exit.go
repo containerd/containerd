@@ -41,6 +41,7 @@ func (s *Supervisor) exit(t *ExitTask) error {
 			Status:  status,
 			Process: proc,
 		}
+		ne.WithContext(t.Ctx())
 		s.execExit(ne)
 		return nil
 	}
@@ -51,6 +52,7 @@ func (s *Supervisor) exit(t *ExitTask) error {
 		PID:     proc.ID(),
 		Process: proc,
 	}
+	ne.WithContext(t.Ctx())
 	s.delete(ne)
 
 	ExitProcessTimer.UpdateSince(start)
