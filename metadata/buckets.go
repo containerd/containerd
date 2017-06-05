@@ -18,6 +18,8 @@ var (
 	bucketKeyRuntime   = []byte("runtime")
 	bucketKeySpec      = []byte("spec")
 	bucketKeyRootFS    = []byte("rootfs")
+	bucketKeyCreatedAt = []byte("createdat")
+	bucketKeyUpdatedAt = []byte("updatedat")
 )
 
 // InitDB will initialize the database for use. The database must be opened for
