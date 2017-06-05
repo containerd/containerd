@@ -54,6 +54,14 @@ func (r *remote) DiffMounts(ctx context.Context, a, b []mount.Mount, media, ref 
 	return toDescriptor(resp.Diff), nil
 }
 
+func toDescriptor(d *descriptor.Descriptor) ocispec.Descriptor {
+	return ocispec.Descriptor{
+		MediaType: d.MediaType,
+		Digest:    d.Digest,
+		Size:      d.Size_,
+	}
+}
+
 func fromDescriptor(d ocispec.Descriptor) *descriptor.Descriptor {
 	return &descriptor.Descriptor{
 		MediaType: d.MediaType,

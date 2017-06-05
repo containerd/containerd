@@ -49,6 +49,9 @@ type config struct {
 	Metrics metricsConfig `toml:"metrics"`
 	// Snapshotter specifies which snapshot driver to use
 	Snapshotter string `toml:"snapshotter"`
+	// Differ specifies which differ to use. Differ is tightly coupled with the snapshotter
+	// so not all combinations may work.
+	Differ string `toml:"differ"`
 	// Plugins provides plugin specific configuration for the initialization of a plugin
 	Plugins map[string]toml.Primitive `toml:"plugins"`
 	// Enable containerd as a subreaper

@@ -17,5 +17,6 @@ func defaultConfig() *config {
 			Address: `\\.\pipe\containerd-debug`,
 		},
 		Snapshotter: "windows",
+		Differ:      "base",
 	}
 }
