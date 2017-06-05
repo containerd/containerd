@@ -9,9 +9,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-var (
-	extraCmds = []cli.Command{}
-)
+var extraCmds = []cli.Command{}
 
 func init() {
 	cli.VersionPrinter = func(c *cli.Context) {
@@ -30,7 +28,7 @@ func main() {
 / /__/ /_/ /
 \___/\__/_/
 
-containerd client
+containerd CLI
 `
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
@@ -53,10 +51,9 @@ containerd client
 			EnvVar: "CONTAINERD_NAMESPACE",
 		},
 	}
-	app.Commands = []cli.Command{
+	app.Commands = append([]cli.Command{
 		checkpointCommand,
 		runCommand,
-		eventsCommand,
 		deleteCommand,
 		namespacesCommand,
 		listCommand,
@@ -69,8 +66,7 @@ containerd client
 		snapshotCommand,
 		versionCommand,
 		psCommand,
-	}
-	app.Commands = append(app.Commands, extraCmds...)
+	}, extraCmds...)
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)

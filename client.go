@@ -17,6 +17,7 @@ import (
 	imagesapi "github.com/containerd/containerd/api/services/images"
 	namespacesapi "github.com/containerd/containerd/api/services/namespaces"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
+	versionservice "github.com/containerd/containerd/api/services/version"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/remotes"
@@ -28,6 +29,7 @@ import (
 	imagesservice "github.com/containerd/containerd/services/images"
 	snapshotservice "github.com/containerd/containerd/services/snapshot"
 	"github.com/containerd/containerd/snapshot"
+	pempty "github.com/golang/protobuf/ptypes/empty"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -461,4 +463,24 @@ func (c *Client) DiffService() diff.DiffService {
 
 func (c *Client) HealthService() grpc_health_v1.HealthClient {
 	return grpc_health_v1.NewHealthClient(c.conn)
+}
+
+func (c *Client) VersionService() versionservice.VersionClient {
+	return versionservice.NewVersionClient(c.conn)
+}
+
+type Version struct {
+	Version  string
+	Revision string
+}
+
+func (c *Client) Version(ctx context.Context) (Version, error) {
+	response, err := c.VersionService().Version(ctx, &pempty.Empty{})
+	if err != nil {
+		return Version{}, err
+	}
+	return Version{
+		Version:  response.Version,
+		Revision: response.Revision,
+	}, nil
 }

@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/containerd/containerd"
 	containersapi "github.com/containerd/containerd/api/services/containers"
 	contentapi "github.com/containerd/containerd/api/services/content"
 	diffapi "github.com/containerd/containerd/api/services/diff"
@@ -68,6 +69,10 @@ func getNamespacesService(clicontext *cli.Context) (namespaces.Store, error) {
 		return nil, err
 	}
 	return namespacesservice.NewStoreFromClient(namespacesapi.NewNamespacesClient(conn)), nil
+}
+
+func newClient(context *cli.Context) (*containerd.Client, error) {
+	return containerd.New(context.GlobalString("address"))
 }
 
 func getContainersService(context *cli.Context) (containersapi.ContainersClient, error) {
@@ -153,23 +158,14 @@ func waitContainer(events execution.Tasks_EventsClient, id string, pid uint32) (
 	}
 }
 
-func forwardAllSignals(containers execution.TasksClient, id string) chan os.Signal {
+func forwardAllSignals(ctx gocontext.Context, task killer) chan os.Signal {
 	sigc := make(chan os.Signal, 128)
 	signal.Notify(sigc)
-
 	go func() {
 		for s := range sigc {
-			logrus.Debug("Forwarding signal ", s)
-			killRequest := &execution.KillRequest{
-				ContainerID: id,
-				Signal:      uint32(s.(syscall.Signal)),
-				PidOrAll: &execution.KillRequest_All{
-					All: false,
-				},
-			}
-			_, err := containers.Kill(gocontext.Background(), killRequest)
-			if err != nil {
-				logrus.Fatalln(err)
+			logrus.Debug("forwarding signal ", s)
+			if err := task.Kill(ctx, s.(syscall.Signal)); err != nil {
+				logrus.WithError(err).Errorf("forward signal %s", s)
 			}
 		}
 	}()

@@ -558,7 +558,7 @@ func TestContainerAttach(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if task, err = container.LoadTask(ctx, WithAttach(r, ow, ioutil.Discard)); err != nil {
+	if task, err = container.Task(ctx, WithAttach(r, ow, ioutil.Discard)); err != nil {
 		t.Error(err)
 		return
 	}

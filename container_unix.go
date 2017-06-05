@@ -1,3 +1,5 @@
+// +build !windows
+
 package containerd
 
 import (
@@ -18,20 +20,6 @@ import (
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
-
-func WithSpec(spec *specs.Spec) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		data, err := json.Marshal(spec)
-		if err != nil {
-			return err
-		}
-		c.Spec = &protobuf.Any{
-			TypeUrl: spec.Version,
-			Value:   data,
-		}
-		return nil
-	}
-}
 
 func WithCheckpoint(desc v1.Descriptor, rootfsID string) NewContainerOpts {
 	// set image and rw, and spec

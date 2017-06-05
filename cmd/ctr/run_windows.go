@@ -1,7 +1,7 @@
 package main
 
 import (
-	"context"
+	gocontext "context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/console"
+	"github.com/containerd/containerd"
 	containersapi "github.com/containerd/containerd/api/services/containers"
 	"github.com/containerd/containerd/api/services/execution"
 	"github.com/containerd/containerd/log"
@@ -17,6 +18,7 @@ import (
 	"github.com/containerd/containerd/windows"
 	"github.com/containerd/containerd/windows/hcs"
 	protobuf "github.com/gogo/protobuf/types"
+	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
@@ -169,7 +171,7 @@ func newCreateTaskRequest(context *cli.Context, id, tmpDir string, checkpoint *o
 	return create, nil
 }
 
-func handleConsoleResize(ctx context.Context, service execution.TasksClient, id string, pid uint32, con console.Console) error {
+func handleConsoleResize(ctx gocontext.Context, task resizer, con console.Console) error {
 	// do an initial resize of the console
 	size, err := con.Size()
 	if err != nil {
@@ -187,17 +189,77 @@ func handleConsoleResize(ctx context.Context, service execution.TasksClient, id 
 			}
 
 			if size.Width != prevSize.Width || size.Height != prevSize.Height {
-				if _, err := service.Pty(ctx, &execution.PtyRequest{
-					ContainerID: id,
-					Pid:         pid,
-					Width:       uint32(size.Width),
-					Height:      uint32(size.Height),
-				}); err != nil {
-					log.G(ctx).WithError(err).Error("resize pty")
+				if err := task.Resize(ctx, uint32(size.Width), uint32(size.Height)); err != nil {
+					logrus.WithError(err).Error("resize pty")
 				}
 				prevSize = size
 			}
 		}
 	}()
 	return nil
+}
+
+func withTTY() containerd.SpecOpts {
+	con := console.Current()
+	size, err := con.Size()
+	if err != nil {
+		logrus.WithError(err).Error("console size")
+	}
+	return containerd.WithTTY(int(size.Width), int(size.Height))
+}
+
+func setHostNetworking() containerd.SpecOpts {
+	return nil
+}
+
+func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli.Context) (containerd.Container, error) {
+	var (
+		err error
+
+		ref  = context.Args().First()
+		id   = context.Args().Get(1)
+		args = context.Args()[2:]
+		tty  = context.Bool("tty")
+	)
+	image, err := client.GetImage(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	opts := []containerd.SpecOpts{
+		containerd.WithImageConfig(ctx, image),
+		withEnv(context),
+		withMounts(context),
+	}
+	if len(args) > 0 {
+		opts = append(opts, containerd.WithProcessArgs(args...))
+	}
+	if tty {
+		opts = append(opts, withTTY())
+	}
+	if context.Bool("net-host") {
+		opts = append(opts, setHostNetworking())
+	}
+	spec, err := containerd.GenerateSpec(opts...)
+	if err != nil {
+		return nil, err
+	}
+	var rootfs containerd.NewContainerOpts
+	if context.Bool("readonly") {
+		rootfs = containerd.WithNewReadonlyRootFS(id, image)
+	} else {
+		rootfs = containerd.WithNewRootFS(id, image)
+	}
+	return client.NewContainer(ctx, id,
+		containerd.WithSpec(spec),
+		containerd.WithImage(image),
+		rootfs,
+	)
+}
+
+func newTask(ctx gocontext.Context, container containerd.Container, _ digest.Digest, tty bool) (containerd.Task, error) {
+	io := containerd.Stdio
+	if tty {
+		io = containerd.StdioTerminal
+	}
+	return container.NewTask(ctx, io)
 }

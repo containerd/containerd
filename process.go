@@ -110,3 +110,7 @@ func (p *process) Resize(ctx context.Context, w, h uint32) error {
 	})
 	return err
 }
+
+func (p *process) Delete() error {
+	return p.io.Close()
+}

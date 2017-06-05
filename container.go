@@ -3,21 +3,30 @@ package containerd
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
+	"sync"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 
 	"github.com/containerd/containerd/api/services/containers"
 	"github.com/containerd/containerd/api/services/execution"
 	"github.com/containerd/containerd/api/types/mount"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
 )
+
+var ErrNoRunningTask = errors.New("no running task")
 
 type Container interface {
 	ID() string
+	Proto() containers.Container
 	Delete(context.Context) error
 	NewTask(context.Context, IOCreation, ...NewTaskOpts) (Task, error)
 	Spec() (*specs.Spec, error)
-	Task() Task
-	LoadTask(context.Context, IOAttach) (Task, error)
+	Task(context.Context, IOAttach) (Task, error)
+	Image(context.Context) (Image, error)
 }
 
 func containerFromProto(client *Client, c containers.Container) *container {
@@ -30,15 +39,20 @@ func containerFromProto(client *Client, c containers.Container) *container {
 var _ = (Container)(&container{})
 
 type container struct {
-	client *Client
+	mu sync.Mutex
 
-	c    containers.Container
-	task *task
+	client *Client
+	c      containers.Container
+	task   *task
 }
 
 // ID returns the container's unique id
 func (c *container) ID() string {
 	return c.c.ID
+}
+
+func (c *container) Proto() containers.Container {
+	return c.c
 }
 
 // Spec returns the current OCI specification for the container
@@ -58,7 +72,6 @@ func (c *container) Delete(ctx context.Context) (err error) {
 	if c.c.RootFS != "" {
 		err = c.client.SnapshotService().Remove(ctx, c.c.RootFS)
 	}
-
 	if _, cerr := c.client.ContainerService().Delete(ctx, &containers.DeleteContainerRequest{
 		ID: c.c.ID,
 	}); err == nil {
@@ -67,13 +80,39 @@ func (c *container) Delete(ctx context.Context) (err error) {
 	return err
 }
 
-func (c *container) Task() Task {
-	return c.task
+func (c *container) Task(ctx context.Context, attach IOAttach) (Task, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.task == nil {
+		t, err := c.loadTask(ctx, attach)
+		if err != nil {
+			return nil, err
+		}
+		c.task = t.(*task)
+	}
+	return c.task, nil
+}
+
+// Image returns the image that the container is based on
+func (c *container) Image(ctx context.Context) (Image, error) {
+	if c.c.Image == "" {
+		return nil, fmt.Errorf("container is not based on an image")
+	}
+	i, err := c.client.ImageService().Get(ctx, c.c.Image)
+	if err != nil {
+		return nil, err
+	}
+	return &image{
+		client: c.client,
+		i:      i,
+	}, nil
 }
 
 type NewTaskOpts func(context.Context, *Client, *execution.CreateRequest) error
 
 func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...NewTaskOpts) (Task, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	i, err := ioCreate()
 	if err != nil {
 		return nil, err
@@ -126,28 +165,33 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...Ne
 	return t, nil
 }
 
-func (c *container) LoadTask(ctx context.Context, ioAttach IOAttach) (Task, error) {
+func (c *container) loadTask(ctx context.Context, ioAttach IOAttach) (Task, error) {
 	response, err := c.client.TaskService().Info(ctx, &execution.InfoRequest{
 		ContainerID: c.c.ID,
 	})
 	if err != nil {
+		if grpc.Code(errors.Cause(err)) == codes.NotFound {
+			return nil, ErrNoRunningTask
+		}
 		return nil, err
 	}
-	// get the existing fifo paths from the task information stored by the daemon
-	paths := &FifoSet{
-		Dir: getFifoDir([]string{
-			response.Task.Stdin,
-			response.Task.Stdout,
-			response.Task.Stderr,
-		}),
-		In:       response.Task.Stdin,
-		Out:      response.Task.Stdout,
-		Err:      response.Task.Stderr,
-		Terminal: response.Task.Terminal,
-	}
-	i, err := ioAttach(paths)
-	if err != nil {
-		return nil, err
+	var i *IO
+	if ioAttach != nil {
+		// get the existing fifo paths from the task information stored by the daemon
+		paths := &FifoSet{
+			Dir: getFifoDir([]string{
+				response.Task.Stdin,
+				response.Task.Stdout,
+				response.Task.Stderr,
+			}),
+			In:       response.Task.Stdin,
+			Out:      response.Task.Stdout,
+			Err:      response.Task.Stderr,
+			Terminal: response.Task.Terminal,
+		}
+		if i, err = ioAttach(paths); err != nil {
+			return nil, err
+		}
 	}
 	t := &task{
 		client:      c.client,
