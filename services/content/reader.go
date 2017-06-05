@@ -34,11 +34,9 @@ func (rr *remoteReader) Read(p []byte) (n int, err error) {
 		n += copied
 		p = p[copied:]
 
-		if copied < len(p) {
-			continue
+		if len(p) == 0 {
+			rr.extra = append(rr.extra, resp.Data[copied:]...)
 		}
-
-		rr.extra = append(rr.extra, resp.Data[copied:]...)
 	}
 
 	return
