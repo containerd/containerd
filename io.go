@@ -1,7 +1,7 @@
 package containerd
 
 import (
-	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -27,25 +27,56 @@ func (i *IO) Close() error {
 
 type IOCreation func() (*IO, error)
 
-// BufferedIO returns IO that will be logged to an in memory buffer
-func BufferedIO(stdin, stdout, stderr *bytes.Buffer) IOCreation {
+type IOAttach func(*FifoSet) (*IO, error)
+
+func NewIO(stdin io.Reader, stdout, stderr io.Writer) IOCreation {
+	return NewIOWithTerminal(stdin, stdout, stderr, false)
+}
+
+func NewIOWithTerminal(stdin io.Reader, stdout, stderr io.Writer, terminal bool) IOCreation {
 	return func() (*IO, error) {
-		paths, err := fifoPaths()
+		paths, err := NewFifos()
 		if err != nil {
 			return nil, err
 		}
 		i := &IO{
-			Terminal: false,
-			Stdout:   paths.out,
-			Stderr:   paths.err,
-			Stdin:    paths.in,
+			Terminal: terminal,
+			Stdout:   paths.Out,
+			Stderr:   paths.Err,
+			Stdin:    paths.In,
 		}
 		set := &ioSet{
 			in:  stdin,
 			out: stdout,
 			err: stderr,
 		}
-		closer, err := copyIO(paths, set, false)
+		closer, err := copyIO(paths, set, i.Terminal)
+		if err != nil {
+			return nil, err
+		}
+		i.closer = closer
+		return i, nil
+	}
+
+}
+
+func WithAttach(stdin io.Reader, stdout, stderr io.Writer) IOAttach {
+	return func(paths *FifoSet) (*IO, error) {
+		if paths == nil {
+			return nil, fmt.Errorf("cannot attach to existing fifos")
+		}
+		i := &IO{
+			Terminal: paths.Terminal,
+			Stdout:   paths.Out,
+			Stderr:   paths.Err,
+			Stdin:    paths.In,
+		}
+		set := &ioSet{
+			in:  stdin,
+			out: stdout,
+			err: stderr,
+		}
+		closer, err := copyIO(paths, set, i.Terminal)
 		if err != nil {
 			return nil, err
 		}
@@ -57,29 +88,16 @@ func BufferedIO(stdin, stdout, stderr *bytes.Buffer) IOCreation {
 // Stdio returns an IO implementation to be used for a task
 // that outputs the container's IO as the current processes Stdio
 func Stdio() (*IO, error) {
-	paths, err := fifoPaths()
-	if err != nil {
-		return nil, err
-	}
-	set := &ioSet{
-		in:  os.Stdin,
-		out: os.Stdout,
-		err: os.Stderr,
-	}
-	closer, err := copyIO(paths, set, false)
-	if err != nil {
-		return nil, err
-	}
-	return &IO{
-		Terminal: false,
-		Stdin:    paths.in,
-		Stdout:   paths.out,
-		Stderr:   paths.err,
-		closer:   closer,
-	}, nil
+	return NewIO(os.Stdin, os.Stdout, os.Stderr)()
 }
 
-func fifoPaths() (*fifoSet, error) {
+// StdioTerminal will setup the IO for the task to use a terminal
+func StdioTerminal() (*IO, error) {
+	return NewIOWithTerminal(os.Stdin, os.Stdout, os.Stderr, true)()
+}
+
+// NewFifos returns a new set of fifos for the task
+func NewFifos() (*FifoSet, error) {
 	root := filepath.Join(os.TempDir(), "containerd")
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
@@ -88,18 +106,19 @@ func fifoPaths() (*fifoSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &fifoSet{
-		dir: dir,
-		in:  filepath.Join(dir, "stdin"),
-		out: filepath.Join(dir, "stdout"),
-		err: filepath.Join(dir, "stderr"),
+	return &FifoSet{
+		Dir: dir,
+		In:  filepath.Join(dir, "stdin"),
+		Out: filepath.Join(dir, "stdout"),
+		Err: filepath.Join(dir, "stderr"),
 	}, nil
 }
 
-type fifoSet struct {
-	// dir is the directory holding the task fifos
-	dir          string
-	in, out, err string
+type FifoSet struct {
+	// Dir is the directory holding the task fifos
+	Dir          string
+	In, Out, Err string
+	Terminal     bool
 }
 
 type ioSet struct {

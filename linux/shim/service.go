@@ -192,6 +192,9 @@ func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.
 		Pid:       uint32(s.initProcess.Pid()),
 		Status:    status,
 		Processes: []*task.Process{},
+		Stdin:     s.initProcess.stdinPath,
+		Stdout:    s.initProcess.stdoutPath,
+		Stderr:    s.initProcess.stderrPath,
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -203,10 +206,16 @@ func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.
 			}
 			status = task.StatusStopped
 		}
-		o.Processes = append(o.Processes, &task.Process{
+		pp := &task.Process{
 			Pid:    uint32(p.Pid()),
 			Status: status,
-		})
+		}
+		if ep, ok := p.(*execProcess); ok {
+			pp.Stdin = ep.stdinPath
+			pp.Stdout = ep.stdoutPath
+			pp.Stderr = ep.stderrPath
+		}
+		o.Processes = append(o.Processes, pp)
 	}
 	return o, nil
 }
@@ -270,7 +279,6 @@ func (s *Service) Processes(ctx context.Context, r *shimapi.ProcessesRequest) (*
 	if err != nil {
 		return nil, err
 	}
-
 	ps := []*task.Process{}
 	for _, pid := range pids {
 		ps = append(ps, &task.Process{
@@ -280,9 +288,7 @@ func (s *Service) Processes(ctx context.Context, r *shimapi.ProcessesRequest) (*
 	resp := &shimapi.ProcessesResponse{
 		Processes: ps,
 	}
-
 	return resp, nil
-
 }
 
 func (s *Service) CloseStdin(ctx context.Context, r *shimapi.CloseStdinRequest) (*google_protobuf.Empty, error) {

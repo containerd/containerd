@@ -15,7 +15,10 @@ type process struct {
 }
 
 func (p *process) State(ctx context.Context) (plugin.State, error) {
-	return p, nil
+	return plugin.State{
+		Pid:    p.Pid(),
+		Status: p.Status(),
+	}, nil
 }
 
 func (p *process) Kill(ctx context.Context, sig uint32, all bool) error {

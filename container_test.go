@@ -3,12 +3,18 @@ package containerd
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"sync"
 	"syscall"
 	"testing"
 )
 
 func empty() IOCreation {
-	return BufferedIO(bytes.NewBuffer(nil), bytes.NewBuffer(nil), bytes.NewBuffer(nil))
+	null := ioutil.Discard
+	return NewIO(bytes.NewBuffer(nil), null, null)
 }
 
 func TestContainerList(t *testing.T) {
@@ -167,7 +173,7 @@ func TestContainerOutput(t *testing.T) {
 	defer container.Delete(ctx)
 
 	stdout := bytes.NewBuffer(nil)
-	task, err := container.NewTask(ctx, BufferedIO(bytes.NewBuffer(nil), stdout, bytes.NewBuffer(nil)))
+	task, err := container.NewTask(ctx, NewIO(bytes.NewBuffer(nil), stdout, bytes.NewBuffer(nil)))
 	if err != nil {
 		t.Error(err)
 		return
@@ -359,4 +365,209 @@ func TestContainerProcesses(t *testing.T) {
 		t.Error(err)
 	}
 	<-statusC
+}
+
+func TestContainerCloseStdin(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	client, err := New(address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		ctx = context.Background()
+		id  = "ContainerCloseStdin"
+	)
+	image, err := client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	spec, err := GenerateSpec(WithImageConfig(ctx, image), WithProcessArgs("cat"))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	container, err := client.NewContainer(ctx, id, spec, WithImage(image), WithNewRootFS(id, image))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx)
+
+	const expected = "hello\n"
+	stdout := bytes.NewBuffer(nil)
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	task, err := container.NewTask(ctx, NewIO(r, stdout, ioutil.Discard))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	statusC := make(chan uint32, 1)
+	go func() {
+		status, err := task.Wait(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+		statusC <- status
+	}()
+
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+
+	if _, err := fmt.Fprint(w, expected); err != nil {
+		t.Error(err)
+	}
+	w.Close()
+	if err := task.CloseStdin(ctx); err != nil {
+		t.Error(err)
+	}
+
+	<-statusC
+
+	if _, err := task.Delete(ctx); err != nil {
+		t.Error(err)
+	}
+
+	output := stdout.String()
+
+	if output != expected {
+		t.Errorf("expected output %q but received %q", expected, output)
+	}
+}
+
+func TestContainerAttach(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	client, err := New(address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		ctx = context.Background()
+		id  = "ContainerAttach"
+	)
+	image, err := client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	spec, err := GenerateSpec(WithImageConfig(ctx, image), WithProcessArgs("cat"))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	container, err := client.NewContainer(ctx, id, spec, WithImage(image), WithNewRootFS(id, image))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx)
+
+	expected := "hello\n"
+	stdout := bytes.NewBuffer(nil)
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	or, ow, err := os.Pipe()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	wg := &sync.WaitGroup{}
+
+	wg.Add(1)
+	go func() {
+		io.Copy(stdout, or)
+		wg.Done()
+	}()
+
+	task, err := container.NewTask(ctx, NewIO(r, ow, ioutil.Discard))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+	originalIO := task.IO()
+
+	statusC := make(chan uint32, 1)
+	go func() {
+		status, err := task.Wait(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+		statusC <- status
+	}()
+
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+
+	if _, err := fmt.Fprint(w, expected); err != nil {
+		t.Error(err)
+	}
+	w.Close()
+
+	// load the container and re-load the task
+	if container, err = client.LoadContainer(ctx, id); err != nil {
+		t.Error(err)
+		return
+	}
+
+	// create new IO for the loaded task
+	if r, w, err = os.Pipe(); err != nil {
+		t.Error(err)
+		return
+	}
+	if task, err = container.LoadTask(ctx, WithAttach(r, ow, ioutil.Discard)); err != nil {
+		t.Error(err)
+		return
+	}
+
+	if _, err := fmt.Fprint(w, expected); err != nil {
+		t.Error(err)
+	}
+	w.Close()
+
+	if err := task.CloseStdin(ctx); err != nil {
+		t.Error(err)
+	}
+
+	<-statusC
+
+	originalIO.Close()
+	if _, err := task.Delete(ctx); err != nil {
+		t.Error(err)
+	}
+	ow.Close()
+
+	wg.Wait()
+	output := stdout.String()
+
+	// we wrote the same thing after attach
+	expected = expected + expected
+	if output != expected {
+		t.Errorf("expected output %q but received %q", expected, output)
+	}
 }

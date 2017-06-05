@@ -88,3 +88,25 @@ func (p *process) Wait(ctx context.Context) (uint32, error) {
 		}
 	}
 }
+
+func (p *process) CloseStdin(ctx context.Context) error {
+	_, err := p.task.client.TaskService().CloseStdin(ctx, &execution.CloseStdinRequest{
+		ContainerID: p.task.containerID,
+		Pid:         p.pid,
+	})
+	return err
+}
+
+func (p *process) IO() *IO {
+	return p.io
+}
+
+func (p *process) Resize(ctx context.Context, w, h uint32) error {
+	_, err := p.task.client.TaskService().Pty(ctx, &execution.PtyRequest{
+		ContainerID: p.task.containerID,
+		Width:       w,
+		Height:      h,
+		Pid:         p.pid,
+	})
+	return err
+}

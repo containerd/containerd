@@ -97,6 +97,10 @@ message StateResponse {
 	uint32 pid = 3;
 	containerd.v1.types.Status status = 4;
 	repeated containerd.v1.types.Process processes = 5;
+	string stdin = 6;
+	string stdout = 7;
+	string stderr = 8;
+	bool terminal = 9;
 }
 
 message PauseRequest {

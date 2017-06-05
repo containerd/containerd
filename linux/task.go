@@ -12,19 +12,6 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
-type State struct {
-	pid    uint32
-	status plugin.Status
-}
-
-func (s State) Pid() uint32 {
-	return s.pid
-}
-
-func (s State) Status() plugin.Status {
-	return s.status
-}
-
 type Task struct {
 	containerID string
 	spec        []byte
@@ -56,7 +43,7 @@ func (c *Task) Start(ctx context.Context) error {
 func (c *Task) State(ctx context.Context) (plugin.State, error) {
 	response, err := c.shim.State(ctx, &shim.StateRequest{})
 	if err != nil {
-		return nil, err
+		return plugin.State{}, err
 	}
 	var status plugin.Status
 	switch response.Status {
@@ -70,9 +57,13 @@ func (c *Task) State(ctx context.Context) (plugin.State, error) {
 		status = plugin.PausedStatus
 		// TODO: containerd.DeletedStatus
 	}
-	return &State{
-		pid:    response.Pid,
-		status: status,
+	return plugin.State{
+		Pid:      response.Pid,
+		Status:   status,
+		Stdin:    response.Stdin,
+		Stdout:   response.Stdout,
+		Stderr:   response.Stderr,
+		Terminal: response.Terminal,
 	}, nil
 }
 
@@ -181,8 +172,8 @@ func (p *Process) State(ctx context.Context) (plugin.State, error) {
 	// use the container status for the status of the process
 	state, err := p.c.State(ctx)
 	if err != nil {
-		return nil, err
+		return state, err
 	}
-	state.(*State).pid = uint32(p.pid)
+	state.Pid = uint32(p.pid)
 	return state, nil
 }

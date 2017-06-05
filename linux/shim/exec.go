@@ -35,12 +35,21 @@ type execProcess struct {
 	stdin   io.Closer
 
 	parent *initProcess
+
+	stdinPath  string
+	stdoutPath string
+	stderrPath string
+	terminal   bool
 }
 
 func newExecProcess(context context.Context, path string, r *shimapi.ExecRequest, parent *initProcess, id int) (process, error) {
 	e := &execProcess{
-		id:     id,
-		parent: parent,
+		id:         id,
+		parent:     parent,
+		stdinPath:  r.Stdin,
+		stdoutPath: r.Stdout,
+		stderrPath: r.Stderr,
+		terminal:   r.Terminal,
 	}
 	var (
 		err     error
