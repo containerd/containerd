@@ -173,24 +173,22 @@ func getStartContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandboxC
 
 func TestGeneralContainerSpec(t *testing.T) {
 	testID := "test-id"
-	testPodID := "test-pod-id"
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, specCheck := getStartContainerTestData()
 	c := newTestCRIContainerdService()
-	spec, err := c.generateContainerSpec(testID, testPodID, testPid, config, sandboxConfig, imageConfig, nil)
+	spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
 	assert.NoError(t, err)
 	specCheck(t, testID, testPid, spec)
 }
 
 func TestContainerSpecTty(t *testing.T) {
 	testID := "test-id"
-	testPodID := "test-pod-id"
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, specCheck := getStartContainerTestData()
 	c := newTestCRIContainerdService()
 	for _, tty := range []bool{true, false} {
 		config.Tty = tty
-		spec, err := c.generateContainerSpec(testID, testPodID, testPid, config, sandboxConfig, imageConfig, nil)
+		spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
 		assert.NoError(t, err)
 		specCheck(t, testID, testPid, spec)
 		assert.Equal(t, tty, spec.Process.Terminal)
@@ -199,13 +197,12 @@ func TestContainerSpecTty(t *testing.T) {
 
 func TestContainerSpecReadonlyRootfs(t *testing.T) {
 	testID := "test-id"
-	testPodID := "test-pod-id"
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, specCheck := getStartContainerTestData()
 	c := newTestCRIContainerdService()
 	for _, readonly := range []bool{true, false} {
 		config.Linux.SecurityContext.ReadonlyRootfs = readonly
-		spec, err := c.generateContainerSpec(testID, testPodID, testPid, config, sandboxConfig, imageConfig, nil)
+		spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
 		assert.NoError(t, err)
 		specCheck(t, testID, testPid, spec)
 		assert.Equal(t, readonly, spec.Root.Readonly)
@@ -214,7 +211,6 @@ func TestContainerSpecReadonlyRootfs(t *testing.T) {
 
 func TestContainerSpecWithExtraMounts(t *testing.T) {
 	testID := "test-id"
-	testPodID := "test-pod-id"
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, specCheck := getStartContainerTestData()
 	c := newTestCRIContainerdService()
@@ -229,7 +225,7 @@ func TestContainerSpecWithExtraMounts(t *testing.T) {
 		HostPath:      "test-host-path-extra",
 		Readonly:      true,
 	}
-	spec, err := c.generateContainerSpec(testID, testPodID, testPid, config, sandboxConfig, imageConfig, []*runtime.Mount{extraMount})
+	spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, []*runtime.Mount{extraMount})
 	assert.NoError(t, err)
 	specCheck(t, testID, testPid, spec)
 	var mounts []runtimespec.Mount
@@ -313,23 +309,37 @@ func TestGenerateContainerMounts(t *testing.T) {
 		securityContext *runtime.LinuxContainerSecurityContext
 		expectedMounts  []*runtime.Mount
 	}{
-		"should setup ro /etc/hosts mount when rootfs is read-only": {
+		"should setup ro mount when rootfs is read-only": {
 			securityContext: &runtime.LinuxContainerSecurityContext{
 				ReadonlyRootfs: true,
 			},
-			expectedMounts: []*runtime.Mount{{
-				ContainerPath: "/etc/hosts",
-				HostPath:      testSandboxRootDir + "/hosts",
-				Readonly:      true,
-			}},
+			expectedMounts: []*runtime.Mount{
+				{
+					ContainerPath: "/etc/hosts",
+					HostPath:      testSandboxRootDir + "/hosts",
+					Readonly:      true,
+				},
+				{
+					ContainerPath: resolvConfPath,
+					HostPath:      testSandboxRootDir + "/resolv.conf",
+					Readonly:      true,
+				},
+			},
 		},
-		"should setup rw /etc/hosts mount when rootfs is read-write": {
+		"should setup rw mount when rootfs is read-write": {
 			securityContext: &runtime.LinuxContainerSecurityContext{},
-			expectedMounts: []*runtime.Mount{{
-				ContainerPath: "/etc/hosts",
-				HostPath:      testSandboxRootDir + "/hosts",
-				Readonly:      false,
-			}},
+			expectedMounts: []*runtime.Mount{
+				{
+					ContainerPath: "/etc/hosts",
+					HostPath:      testSandboxRootDir + "/hosts",
+					Readonly:      false,
+				},
+				{
+					ContainerPath: resolvConfPath,
+					HostPath:      getResolvPath(testSandboxRootDir),
+					Readonly:      false,
+				},
+			},
 		},
 	} {
 		config := &runtime.ContainerConfig{

@@ -270,5 +270,48 @@ func TestRunPodSandbox(t *testing.T) {
 	assert.Equal(t, expectedPluginArgument, pluginArgument, "SetUpPod should be called with correct arguments")
 }
 
+func TestParseDNSOption(t *testing.T) {
+	for desc, test := range map[string]struct {
+		servers         []string
+		searches        []string
+		options         []string
+		expectedContent string
+		expectErr       bool
+	}{
+		"empty dns options should return empty content": {},
+		"non-empty dns options should return correct content": {
+			servers:  []string{"8.8.8.8", "server.google.com"},
+			searches: []string{"114.114.114.114"},
+			options:  []string{"timeout:1"},
+			expectedContent: `search 114.114.114.114
+nameserver 8.8.8.8
+nameserver server.google.com
+options timeout:1
+`,
+		},
+		"should return error if dns search exceeds limit(6)": {
+			searches: []string{
+				"server0.google.com",
+				"server1.google.com",
+				"server2.google.com",
+				"server3.google.com",
+				"server4.google.com",
+				"server5.google.com",
+				"server6.google.com",
+			},
+			expectErr: true,
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		resolvContent, err := parseDNSOptions(test.servers, test.searches, test.options)
+		if test.expectErr {
+			assert.Error(t, err)
+			continue
+		}
+		assert.NoError(t, err)
+		assert.Equal(t, resolvContent, test.expectedContent)
+	}
+}
+
 // TODO(random-liu): [P1] Add unit test for different error cases to make sure
 // the function cleans up on error properly.
