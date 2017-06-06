@@ -36,6 +36,7 @@ func New(stateDir string, runtimeName, shimName string, runtimeArgs []string, ti
 		machine:           machine,
 		subscribers:       make(map[chan Event]struct{}),
 		tasks:             make(chan Task, defaultBufferSize),
+		internalTasks:     make(chan struct{}, defaultBufferSize),
 		monitor:           monitor,
 		runtime:           runtimeName,
 		runtimeArgs:       runtimeArgs,
@@ -166,6 +167,7 @@ type Supervisor struct {
 	subscribers    map[chan Event]struct{}
 	machine        Machine
 	tasks          chan Task
+	internalTasks  chan struct{}
 	monitor        *Monitor
 	eventLog       []Event
 	eventLock      sync.Mutex
@@ -276,8 +278,12 @@ func (s *Supervisor) Start() error {
 		"cpus":        s.machine.Cpus,
 	}).Debug("containerd: supervisor running")
 	go func() {
-		for i := range s.tasks {
-			s.handleTask(i)
+		for {
+			select {
+			case i := <-s.tasks:
+				go s.handleTask(i)
+			case <-s.internalTasks:
+			}
 		}
 	}()
 	return nil
@@ -421,6 +427,7 @@ func (s *Supervisor) handleTask(i Task) {
 		i.ErrorCh() <- err
 		close(i.ErrorCh())
 	}
+	s.internalTasks <- struct{}{}
 }
 
 func (s *Supervisor) newExecSyncMap(containerID string) {
