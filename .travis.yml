@@ -18,6 +18,15 @@ addons:
       - btrfs-tools
       - libseccomp-dev
       - libapparmor-dev
+      - libnl-3-dev
+      - libnet-dev
+      - protobuf-c-compiler
+      - protobuf-compiler
+      - python-minimal
+      - libcap-dev
+      - libaio-dev
+      - libprotobuf-c0-dev
+      - libprotobuf-dev
 
 env:
   - TRAVIS_GOOS=windows TRAVIS_CGO_ENABLED=1
@@ -31,6 +40,10 @@ install:
   - export PATH=$PATH:/tmp/protobuf/bin/
   - go get -u github.com/vbatts/git-validation
   - sudo wget https://github.com/crosbymichael/runc/releases/download/ctd-1/runc -O /bin/runc; sudo chmod +x /bin/runc
+  - wget https://github.com/xemul/criu/archive/v3.0.tar.gz -O /tmp/criu.tar.gz
+  - tar -C /tmp/ -zxf /tmp/criu.tar.gz
+  - cd /tmp/criu-3.0 && sudo make install-criu
+  - cd $TRAVIS_BUILD_DIR
 
 script:
   - export GOOS=$TRAVIS_GOOS

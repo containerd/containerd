@@ -145,6 +145,7 @@ func newInitProcess(context context.Context, path string, r *shimapi.CreateReque
 			return nil, err
 		}
 	}
+
 	copyWaitGroup.Wait()
 	pid, err := runc.ReadPidFile(pidFile)
 	if err != nil {

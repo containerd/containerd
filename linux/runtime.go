@@ -86,7 +86,7 @@ type Runtime struct {
 	monitor       plugin.TaskMonitor
 }
 
-func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts) (plugin.Task, error) {
+func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts) (t plugin.Task, err error) {
 	path, err := r.newBundle(id, opts.Spec)
 	if err != nil {
 		return nil, err

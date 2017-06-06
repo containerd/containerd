@@ -53,7 +53,7 @@ func TestNewContainer(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(context.Background(), id, spec)
+	container, err := client.NewContainer(context.Background(), id, WithSpec(spec))
 	if err != nil {
 		t.Error(err)
 		return
@@ -96,7 +96,7 @@ func TestContainerStart(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, spec, WithImage(image), WithNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithImage(image), WithNewRootFS(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -165,7 +165,7 @@ func TestContainerOutput(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, spec, WithImage(image), WithNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithImage(image), WithNewRootFS(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -235,7 +235,7 @@ func TestContainerExec(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, spec, WithImage(image), WithNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithImage(image), WithNewRootFS(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -320,7 +320,7 @@ func TestContainerProcesses(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, spec, WithImage(image), WithNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithImage(image), WithNewRootFS(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -391,7 +391,7 @@ func TestContainerCloseStdin(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, spec, WithImage(image), WithNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithImage(image), WithNewRootFS(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -473,7 +473,7 @@ func TestContainerAttach(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, spec, WithImage(image), WithNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithImage(image), WithNewRootFS(id, image))
 	if err != nil {
 		t.Error(err)
 		return

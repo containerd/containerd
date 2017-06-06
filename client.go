@@ -27,11 +27,9 @@ import (
 	imagesservice "github.com/containerd/containerd/services/images"
 	snapshotservice "github.com/containerd/containerd/services/snapshot"
 	"github.com/containerd/containerd/snapshot"
-	protobuf "github.com/gogo/protobuf/types"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
@@ -176,18 +174,10 @@ func WithImage(i Image) NewContainerOpts {
 
 // NewContainer will create a new container in container with the provided id
 // the id must be unique within the namespace
-func (c *Client) NewContainer(ctx context.Context, id string, spec *specs.Spec, opts ...NewContainerOpts) (Container, error) {
-	data, err := json.Marshal(spec)
-	if err != nil {
-		return nil, err
-	}
+func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error) {
 	container := containers.Container{
 		ID:      id,
 		Runtime: c.runtime,
-		Spec: &protobuf.Any{
-			TypeUrl: specs.Version,
-			Value:   data,
-		},
 	}
 	for _, o := range opts {
 		if err := o(ctx, c, &container); err != nil {

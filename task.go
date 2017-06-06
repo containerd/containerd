@@ -1,11 +1,20 @@
 package containerd
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"runtime"
 	"syscall"
 
+	"github.com/containerd/containerd/api/services/containers"
 	"github.com/containerd/containerd/api/services/execution"
 	taskapi "github.com/containerd/containerd/api/types/task"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/rootfs"
+	"github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -21,6 +30,8 @@ const (
 	Pausing TaskStatus = "pausing"
 )
 
+type CheckpointOpts func(*execution.CheckpointRequest) error
+
 type Task interface {
 	Pid() uint32
 	Delete(context.Context) (uint32, error)
@@ -35,6 +46,7 @@ type Task interface {
 	CloseStdin(context.Context) error
 	Resize(ctx context.Context, w, h uint32) error
 	IO() *IO
+	Checkpoint(context.Context, ...CheckpointOpts) (v1.Descriptor, error)
 }
 
 type Process interface {
@@ -55,6 +67,9 @@ type task struct {
 	io          *IO
 	containerID string
 	pid         uint32
+
+	deferred *execution.CreateRequest
+	pidSync  chan struct{}
 }
 
 // Pid returns the pid or process id for the task
@@ -63,6 +78,16 @@ func (t *task) Pid() uint32 {
 }
 
 func (t *task) Start(ctx context.Context) error {
+	if t.deferred != nil {
+		response, err := t.client.TaskService().Create(ctx, t.deferred)
+		t.deferred = nil
+		if err != nil {
+			return err
+		}
+		t.pid = response.Pid
+		close(t.pidSync)
+		return nil
+	}
 	_, err := t.client.TaskService().Start(ctx, &execution.StartRequest{
 		ContainerID: t.containerID,
 	})
@@ -110,6 +135,7 @@ func (t *task) Wait(ctx context.Context) (uint32, error) {
 	if err != nil {
 		return UnknownExitStatus, err
 	}
+	<-t.pidSync
 	for {
 		e, err := events.Recv()
 		if err != nil {
@@ -185,4 +211,120 @@ func (t *task) Resize(ctx context.Context, w, h uint32) error {
 		Pid:         t.pid,
 	})
 	return err
+}
+
+func WithExit(r *execution.CheckpointRequest) error {
+	r.Exit = true
+	return nil
+}
+
+func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointOpts) (d v1.Descriptor, err error) {
+	request := &execution.CheckpointRequest{
+		ContainerID: t.containerID,
+	}
+	for _, o := range opts {
+		if err := o(request); err != nil {
+			return d, err
+		}
+	}
+	// if we are not exiting the container after the checkpoint, make sure we pause it and resume after
+	// all other filesystem operations are completed
+	if !request.Exit {
+		if err := t.Pause(ctx); err != nil {
+			return d, err
+		}
+		defer t.Resume(ctx)
+	}
+	cr, err := t.client.ContainerService().Get(ctx, &containers.GetContainerRequest{
+		ID: t.containerID,
+	})
+	if err != nil {
+		return d, err
+	}
+	var index v1.Index
+	if err := t.checkpointTask(ctx, &index, request); err != nil {
+		return d, err
+	}
+	if err := t.checkpointImage(ctx, &index, cr.Container.Image); err != nil {
+		return d, err
+	}
+	if err := t.checkpointRWSnapshot(ctx, &index, cr.Container.RootFS); err != nil {
+		return d, err
+	}
+	index.Annotations = make(map[string]string)
+	index.Annotations["image.name"] = cr.Container.Image
+	return t.writeIndex(ctx, &index)
+}
+
+func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *execution.CheckpointRequest) error {
+	response, err := t.client.TaskService().Checkpoint(ctx, request)
+	if err != nil {
+		return err
+	}
+	// add the checkpoint descriptors to the index
+	for _, d := range response.Descriptors {
+		index.Manifests = append(index.Manifests, v1.Descriptor{
+			MediaType: d.MediaType,
+			Size:      d.Size_,
+			Digest:    d.Digest,
+			Platform: &v1.Platform{
+				OS:           runtime.GOOS,
+				Architecture: runtime.GOARCH,
+			},
+		})
+	}
+	return nil
+}
+
+func (t *task) checkpointRWSnapshot(ctx context.Context, index *v1.Index, id string) error {
+	rw, err := rootfs.Diff(ctx, id, fmt.Sprintf("checkpoint-rw-%s", id), t.client.SnapshotService(), t.client.DiffService())
+	if err != nil {
+		return err
+	}
+	rw.Platform = &v1.Platform{
+		OS:           runtime.GOOS,
+		Architecture: runtime.GOARCH,
+	}
+	index.Manifests = append(index.Manifests, rw)
+	return nil
+}
+
+func (t *task) checkpointImage(ctx context.Context, index *v1.Index, image string) error {
+	if image == "" {
+		return fmt.Errorf("cannot checkpoint image with empty name")
+	}
+	ir, err := t.client.ImageService().Get(ctx, image)
+	if err != nil {
+		return err
+	}
+	index.Manifests = append(index.Manifests, ir.Target)
+	return nil
+}
+
+func (t *task) writeIndex(ctx context.Context, index *v1.Index) (v1.Descriptor, error) {
+	buf := bytes.NewBuffer(nil)
+	if err := json.NewEncoder(buf).Encode(index); err != nil {
+		return v1.Descriptor{}, err
+	}
+	return writeContent(ctx, t.client.ContentStore(), v1.MediaTypeImageIndex, t.containerID, buf)
+}
+
+func writeContent(ctx context.Context, store content.Store, mediaType, ref string, r io.Reader) (d v1.Descriptor, err error) {
+	writer, err := store.Writer(ctx, ref, 0, "")
+	if err != nil {
+		return d, err
+	}
+	defer writer.Close()
+	size, err := io.Copy(writer, r)
+	if err != nil {
+		return d, err
+	}
+	if err := writer.Commit(0, ""); err != nil {
+		return d, err
+	}
+	return v1.Descriptor{
+		MediaType: mediaType,
+		Digest:    writer.Digest(),
+		Size:      size,
+	}, nil
 }
