@@ -10,6 +10,9 @@ func TestCheckpointRestore(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	if !supportsCriu {
+		t.Skip("system does not have criu installed")
+	}
 	client, err := New(address)
 	if err != nil {
 		t.Fatal(err)
@@ -99,6 +102,9 @@ func TestCheckpointRestore(t *testing.T) {
 func TestCheckpointRestoreNewContainer(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
+	}
+	if !supportsCriu {
+		t.Skip("system does not have criu installed")
 	}
 	client, err := New(address)
 	if err != nil {

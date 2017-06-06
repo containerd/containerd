@@ -19,8 +19,9 @@ const (
 )
 
 var (
-	address  string
-	noDaemon bool
+	address      string
+	noDaemon     bool
+	supportsCriu bool
 )
 
 func init() {
@@ -33,6 +34,11 @@ func TestMain(m *testing.M) {
 	if testing.Short() {
 		os.Exit(m.Run())
 	}
+
+	// check if criu is installed on the system
+	_, err := exec.LookPath("criu")
+	supportsCriu = err == nil
+
 	var (
 		cmd *exec.Cmd
 		buf = bytes.NewBuffer(nil)
