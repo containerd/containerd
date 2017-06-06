@@ -30,7 +30,7 @@ var imagesListCommand = cli.Command{
 	Description: `List images registered with containerd.`,
 	Flags:       []cli.Flag{},
 	Action: func(clicontext *cli.Context) error {
-		ctx, cancel := appContext()
+		ctx, cancel := appContext(clicontext)
 		defer cancel()
 
 		imageStore, err := resolveImageStore(clicontext)
@@ -75,7 +75,7 @@ var imageRemoveCommand = cli.Command{
 		var (
 			exitErr error
 		)
-		ctx, cancel := appContext()
+		ctx, cancel := appContext(clicontext)
 		defer cancel()
 
 		imageStore, err := resolveImageStore(clicontext)

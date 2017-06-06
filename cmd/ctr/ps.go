@@ -1,7 +1,6 @@
 package main
 
 import (
-	gocontext "context"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -21,7 +20,12 @@ var psCommand = cli.Command{
 		},
 	},
 	Action: func(context *cli.Context) error {
-		id := context.String("id")
+		var (
+			id          = context.String("id")
+			ctx, cancel = appContext(context)
+		)
+		defer cancel()
+
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
@@ -35,7 +39,7 @@ var psCommand = cli.Command{
 			return err
 		}
 
-		resp, err := tasks.Processes(gocontext.Background(), pr)
+		resp, err := tasks.Processes(ctx, pr)
 		if err != nil {
 			return err
 		}

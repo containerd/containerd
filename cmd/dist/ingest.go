@@ -31,7 +31,7 @@ var ingestCommand = cli.Command{
 			expectedDigest = digest.Digest(context.String("expected-digest"))
 		)
 
-		ctx, cancel := appContext()
+		ctx, cancel := appContext(context)
 		defer cancel()
 
 		if err := expectedDigest.Validate(); expectedDigest != "" && err != nil {

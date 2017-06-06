@@ -1,7 +1,6 @@
 package main
 
 import (
-	gocontext "context"
 	"errors"
 
 	"github.com/containerd/containerd/api/services/execution"
@@ -13,6 +12,9 @@ var pauseCommand = cli.Command{
 	Usage:     "pause an existing container",
 	ArgsUsage: "CONTAINER",
 	Action: func(context *cli.Context) error {
+		ctx, cancel := appContext(context)
+		defer cancel()
+
 		tasks, err := getTasksService(context)
 		if err != nil {
 			return err
@@ -21,7 +23,7 @@ var pauseCommand = cli.Command{
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		_, err = tasks.Pause(gocontext.Background(), &execution.PauseRequest{
+		_, err = tasks.Pause(ctx, &execution.PauseRequest{
 			ContainerID: id,
 		})
 		return err

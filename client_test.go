@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/containerd/containerd/namespaces"
 )
 
 const (
@@ -30,6 +32,12 @@ func init() {
 	flag.Parse()
 }
 
+func testContext() (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(context.Background())
+	ctx = namespaces.WithNamespace(ctx, "testing")
+	return ctx, cancel
+}
+
 func TestMain(m *testing.M) {
 	if testing.Short() {
 		os.Exit(m.Run())
@@ -40,9 +48,12 @@ func TestMain(m *testing.M) {
 	supportsCriu = err == nil
 
 	var (
-		cmd *exec.Cmd
-		buf = bytes.NewBuffer(nil)
+		cmd         *exec.Cmd
+		buf         = bytes.NewBuffer(nil)
+		ctx, cancel = testContext()
 	)
+	defer cancel()
+
 	if !noDaemon {
 		// setup a new containerd daemon if !testing.Short
 		cmd = exec.Command("containerd",
@@ -61,12 +72,13 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := waitForDaemonStart(client); err != nil {
+	if err := waitForDaemonStart(ctx, client); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+
 	// pull a seed image
-	if _, err = client.Pull(context.Background(), testImage, WithPullUnpack); err != nil {
+	if _, err = client.Pull(ctx, testImage, WithPullUnpack); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 
@@ -98,13 +110,14 @@ func TestMain(m *testing.M) {
 	os.Exit(status)
 }
 
-func waitForDaemonStart(client *Client) error {
+func waitForDaemonStart(ctx context.Context, client *Client) error {
 	var (
 		serving bool
 		err     error
 	)
+
 	for i := 0; i < 20; i++ {
-		serving, err = client.IsServing(context.Background())
+		serving, err = client.IsServing(ctx)
 		if serving {
 			return nil
 		}
@@ -133,13 +146,16 @@ func TestImagePull(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ctx, cancel := testContext()
+	defer cancel()
+
 	client, err := New(address)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
 
-	_, err = client.Pull(context.Background(), testImage)
+	_, err = client.Pull(ctx, testImage)
 	if err != nil {
 		t.Error(err)
 		return

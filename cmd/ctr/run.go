@@ -1,7 +1,6 @@
 package main
 
 import (
-	gocontext "context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -79,9 +78,11 @@ var runCommand = cli.Command{
 			mounts      []mount.Mount
 			imageConfig ocispec.Image
 
-			ctx = gocontext.Background()
-			id  = context.String("id")
+			ctx, cancel = appContext(context)
+			id          = context.String("id")
 		)
+		defer cancel()
+
 		if id == "" {
 			return errors.New("container id must be provided")
 		}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	gocontext "context"
 	"runtime"
 
 	"google.golang.org/grpc"
@@ -18,6 +17,9 @@ var deleteCommand = cli.Command{
 	Usage:     "delete an existing container",
 	ArgsUsage: "CONTAINER",
 	Action: func(context *cli.Context) error {
+		ctx, cancel := appContext(context)
+		defer cancel()
+
 		containers, err := getContainersService(context)
 		if err != nil {
 			return err
@@ -35,7 +37,7 @@ var deleteCommand = cli.Command{
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		ctx := gocontext.TODO()
+
 		_, err = containers.Delete(ctx, &containersapi.DeleteContainerRequest{
 			ID: id,
 		})

@@ -32,7 +32,7 @@ var activeCommand = cli.Command{
 			match = context.Args().First()
 		)
 
-		ctx, cancel := appContext()
+		ctx, cancel := appContext(context)
 		defer cancel()
 
 		cs, err := resolveContentStore(context)

@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	contextpkg "context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	imagesapi "github.com/containerd/containerd/api/services/images"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/rootfs"
@@ -52,6 +54,30 @@ func getClient(context *cli.Context) (*containerd.Client, error) {
 	//timeout := context.GlobalDuration("connect-timeout")
 
 	return containerd.New(address)
+}
+
+// appContext returns the context for a command. Should only be called once per
+// command, near the start.
+//
+// This will ensure the namespace is picked up and set the timeout, if one is
+// defined.
+func appContext(clicontext *cli.Context) (contextpkg.Context, contextpkg.CancelFunc) {
+	var (
+		ctx       = contextpkg.Background()
+		timeout   = clicontext.GlobalDuration("timeout")
+		namespace = clicontext.GlobalString("namespace")
+		cancel    = func() {}
+	)
+
+	ctx = namespaces.WithNamespace(ctx, namespace)
+
+	if timeout > 0 {
+		ctx, cancel = contextpkg.WithTimeout(ctx, timeout)
+	} else {
+		ctx, cancel = contextpkg.WithCancel(ctx)
+	}
+
+	return ctx, cancel
 }
 
 func resolveContentStore(context *cli.Context) (content.Store, error) {

@@ -39,7 +39,7 @@ command. As part of this process, we do the following:
 			ref = clicontext.Args().First()
 		)
 
-		ctx, cancel := appContext()
+		ctx, cancel := appContext(clicontext)
 		defer cancel()
 
 		cs, err := resolveContentStore(clicontext)
@@ -100,20 +100,17 @@ command. As part of this process, we do the following:
 		}()
 
 		defer func() {
-			// we need new ctx here
-			ctx, cancel := appContext()
+			// we need new ctx here, since we run on return.
+			ctx, cancel := appContext(clicontext)
 			defer cancel()
-			// TODO(stevvooe): This section unpacks the layers and resolves the
-			// root filesystem chainid for the image. For now, we just print
-			// it, but we should keep track of this in the metadata storage.
 			image, err := imageStore.Get(ctx, resolvedImageName)
 			if err != nil {
-				log.G(ctx).WithError(err).Fatal("Failed to get image")
+				log.G(ctx).WithError(err).Fatal("failed to get image")
 			}
 
 			layers, err := getImageLayers(ctx, image, cs)
 			if err != nil {
-				log.G(ctx).WithError(err).Fatal("Failed to get rootfs layers")
+				log.G(ctx).WithError(err).Fatal("failed to get rootfs layers")
 			}
 
 			conn, err := connectGRPC(clicontext)

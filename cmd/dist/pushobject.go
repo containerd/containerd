@@ -26,7 +26,7 @@ var pushObjectCommand = cli.Command{
 			return err
 		}
 
-		ctx, cancel := appContext()
+		ctx, cancel := appContext(clicontext)
 		defer cancel()
 
 		resolver, err := getResolver(ctx, clicontext)

@@ -44,7 +44,7 @@ Most of this is experimental and there are few leaps to make this work.`,
 		var (
 			ref = clicontext.Args().First()
 		)
-		ctx, cancel := appContext()
+		ctx, cancel := appContext(clicontext)
 		defer cancel()
 
 		conn, err := connectGRPC(clicontext)

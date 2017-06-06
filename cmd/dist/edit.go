@@ -30,7 +30,7 @@ var editCommand = cli.Command{
 			validate = context.String("validate")
 			object   = context.Args().First()
 		)
-		ctx, cancel := appContext()
+		ctx, cancel := appContext(context)
 		defer cancel()
 
 		if validate != "" {

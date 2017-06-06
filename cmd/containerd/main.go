@@ -23,11 +23,11 @@ import (
 	diffapi "github.com/containerd/containerd/api/services/diff"
 	api "github.com/containerd/containerd/api/services/execution"
 	imagesapi "github.com/containerd/containerd/api/services/images"
+	namespacesapi "github.com/containerd/containerd/api/services/namespaces"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	versionapi "github.com/containerd/containerd/api/services/version"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/sys"
@@ -265,10 +265,6 @@ func resolveMetaDB(ctx *cli.Context) (*bolt.DB, error) {
 		return nil, err
 	}
 
-	if err := metadata.InitDB(db); err != nil {
-		return nil, err
-	}
-
 	return db, nil
 }
 
@@ -474,6 +470,8 @@ func interceptor(ctx gocontext.Context,
 		ctx = log.WithModule(ctx, "snapshot")
 	case diffapi.DiffServer:
 		ctx = log.WithModule(ctx, "diff")
+	case namespacesapi.NamespacesServer:
+		ctx = log.WithModule(ctx, "namespaces")
 	default:
 		log.G(ctx).Warnf("unknown GRPC server type: %#v\n", info.Server)
 	}
