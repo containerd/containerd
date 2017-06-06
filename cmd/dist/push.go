@@ -92,7 +92,6 @@ var pushCommand = cli.Command{
 			return client.Push(ctx, ref, desc,
 				containerd.WithResolver(resolver),
 				containerd.WithImageHandler(jobHandler),
-				containerd.WithPushWrapper(ongoing.wrapPusher),
 			)
 		})
 
@@ -156,16 +155,16 @@ func (pt *pushTracker) Close() error {
 	return nil
 }
 
-type pushWrapper struct {
-	jobs   *pushjobs
-	pusher remotes.Pusher
-}
-
-func (pw pushWrapper) Push(ctx context.Context, desc ocispec.Descriptor, r io.Reader) error {
-	tr := pw.jobs.track(remotes.MakeRefKey(ctx, desc), desc.Size)
-	defer tr.Close()
-	return pw.pusher.Push(ctx, desc, io.TeeReader(r, tr))
-}
+//type pushWrapper struct {
+//	jobs   *pushjobs
+//	pusher remotes.Pusher
+//}
+//
+//func (pw pushWrapper) Push(ctx context.Context, desc ocispec.Descriptor, r io.Reader) error {
+//	tr := pw.jobs.track(remotes.MakeRefKey(ctx, desc), desc.Size)
+//	defer tr.Close()
+//	return pw.pusher.Push(ctx, desc, io.TeeReader(r, tr))
+//}
 
 type pushStatus struct {
 	name    string
@@ -184,12 +183,12 @@ func newPushJobs() *pushjobs {
 	return &pushjobs{jobs: make(map[string]*pushTracker)}
 }
 
-func (j *pushjobs) wrapPusher(p remotes.Pusher) remotes.Pusher {
-	return pushWrapper{
-		jobs:   j,
-		pusher: p,
-	}
-}
+//func (j *pushjobs) wrapPusher(p remotes.Pusher) remotes.Pusher {
+//	return pushWrapper{
+//		jobs:   j,
+//		pusher: p,
+//	}
+//}
 
 func (j *pushjobs) add(ref string) {
 	j.mu.Lock()

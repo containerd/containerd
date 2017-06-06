@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/containerd/containerd/content"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -37,9 +38,9 @@ type Fetcher interface {
 }
 
 type Pusher interface {
-	// Push pushes the resource identified by the descriptor using the
-	// passed in reader.
-	Push(ctx context.Context, d ocispec.Descriptor, r io.Reader) error
+	// Push returns a content writer for the given resource identified
+	// by the descriptor.
+	Push(ctx context.Context, d ocispec.Descriptor) (content.Writer, error)
 }
 
 // FetcherFunc allows package users to implement a Fetcher with just a

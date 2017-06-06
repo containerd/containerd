@@ -52,6 +52,8 @@ type ResolverOptions struct {
 
 	// Client is the http client to used when making registry requests
 	Client *http.Client
+
+	// TODO: Add upload status tracker
 }
 
 // NewResolver returns a new resolver to a Docker registry
@@ -216,8 +218,9 @@ func (r *dockerResolver) Pusher(ctx context.Context, ref string) (remotes.Pusher
 }
 
 type dockerBase struct {
-	base  url.URL
-	token string
+	base    url.URL
+	locator string
+	token   string
 
 	client   *http.Client
 	useBasic bool
@@ -257,6 +260,7 @@ func (r *dockerResolver) base(refspec reference.Spec) (*dockerBase, error) {
 
 	return &dockerBase{
 		base:     base,
+		locator:  refspec.Locator,
 		client:   r.client,
 		username: username,
 		secret:   secret,
