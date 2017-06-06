@@ -19,7 +19,6 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/containerd/containerd/api/services/execution"
@@ -133,6 +132,13 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		return nil, fmt.Errorf("failed to start sandbox stderr logger: %v", err)
 	}
 
+	// Setup sandbox /dev/shm, /etc/hosts and /etc/resolv.conf.
+	if err = c.setupSandboxFiles(sandboxRootDir, config); err != nil {
+		return nil, fmt.Errorf("failed to setup sandbox files: %v", err)
+	}
+	// No need to cleanup on error, because the whole sandbox root directory will be removed
+	// on error.
+
 	// Start sandbox container.
 	spec, err := c.generateSandboxContainerSpec(id, config, imageMeta.Config)
 	if err != nil {
@@ -239,8 +245,6 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 	// Set hostname.
 	g.SetHostname(config.GetHostname())
 
-	// TODO(random-liu): [P0] Set DNS options. Maintain a resolv.conf for the sandbox.
-
 	// TODO(random-liu): [P0] Add NamespaceGetter and PortMappingGetter to initialize network plugin.
 
 	// TODO(random-liu): [P0] Add annotation to identify the container is managed by cri-containerd.
@@ -270,8 +274,6 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 		g.RemoveLinuxNamespace(string(runtimespec.PIDNamespace)) // nolint: errcheck
 	}
 
-	// TODO(random-liu): [P0] Deal with /dev/shm. Use host for HostIpc, and create and mount for
-	// non-HostIpc. What about mqueue?
 	if nsOptions.GetHostIpc() {
 		g.RemoveLinuxNamespace(string(runtimespec.IPCNamespace)) // nolint: errcheck
 	}
@@ -293,15 +295,16 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 	return g.Spec(), nil
 }
 
-// addImageEnvs adds environment variables from image config. It returns error if
-// an invalid environment variable is encountered.
-func addImageEnvs(g *generate.Generator, imageEnvs []string) error {
-	for _, e := range imageEnvs {
-		kv := strings.Split(e, "=")
-		if len(kv) != 2 {
-			return fmt.Errorf("invalid environment variable %q", e)
-		}
-		g.AddProcessEnv(kv[0], kv[1])
+// setupSandboxFiles sets up necessary sandbox files including /dev/shm, /etc/hosts
+// and /etc/resolv.conf.
+func (c *criContainerdService) setupSandboxFiles(rootDir string, config *runtime.PodSandboxConfig) error {
+	// TODO(random-liu): Consider whether we should maintain /etc/hosts and /etc/resolv.conf in kubelet.
+	sandboxEtcHosts := getSandboxHosts(rootDir)
+	if err := c.os.CopyFile(etcHosts, sandboxEtcHosts, 0666); err != nil {
+		return fmt.Errorf("failed to generate sandbox hosts file %q: %v", sandboxEtcHosts, err)
 	}
+	// TODO(random-liu): [P0] Set DNS options. Maintain a resolv.conf for the sandbox.
+	// TODO(random-liu): [P0] Deal with /dev/shm. Use host for HostIpc, and create and mount for
+	// non-HostIpc. What about mqueue?
 	return nil
 }

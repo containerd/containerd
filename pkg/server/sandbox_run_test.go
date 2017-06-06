@@ -157,6 +157,21 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 	}
 }
 
+func TestSetupSandboxFiles(t *testing.T) {
+	testRootDir := "test-sandbox-root"
+	expectedCopys := [][]interface{}{
+		{"/etc/hosts", testRootDir + "/hosts", os.FileMode(0666)},
+	}
+	c := newTestCRIContainerdService()
+	var copys [][]interface{}
+	c.os.(*ostesting.FakeOS).CopyFileFn = func(src string, dest string, perm os.FileMode) error {
+		copys = append(copys, []interface{}{src, dest, perm})
+		return nil
+	}
+	c.setupSandboxFiles(testRootDir, nil)
+	assert.Equal(t, expectedCopys, copys, "should copy /etc/hosts for sandbox")
+}
+
 func TestRunPodSandbox(t *testing.T) {
 	config, imageConfig, specCheck := getRunPodSandboxTestData()
 	c := newTestCRIContainerdService()

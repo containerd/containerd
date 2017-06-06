@@ -34,7 +34,8 @@ type FakeOS struct {
 	MkdirAllFn  func(string, os.FileMode) error
 	RemoveAllFn func(string) error
 	OpenFifoFn  func(context.Context, string, int, os.FileMode) (io.ReadWriteCloser, error)
-	StatFn      func(name string) (os.FileInfo, error)
+	StatFn      func(string) (os.FileInfo, error)
+	CopyFileFn  func(string, string, os.FileMode) error
 	errors      map[string]error
 }
 
@@ -118,7 +119,7 @@ func (f *FakeOS) OpenFifo(ctx context.Context, fn string, flag int, perm os.File
 	return nil, nil
 }
 
-// Stat is a fake call that invokes Stat or just return nil.
+// Stat is a fake call that invokes StatFn or just return nil.
 func (f *FakeOS) Stat(name string) (os.FileInfo, error) {
 	if err := f.getError("Stat"); err != nil {
 		return nil, err
@@ -128,4 +129,16 @@ func (f *FakeOS) Stat(name string) (os.FileInfo, error) {
 		return f.StatFn(name)
 	}
 	return nil, nil
+}
+
+// CopyFile is a fake call that invokes CopyFileFn or just return nil.
+func (f *FakeOS) CopyFile(src, dest string, perm os.FileMode) error {
+	if err := f.getError("CopyFile"); err != nil {
+		return err
+	}
+
+	if f.CopyFileFn != nil {
+		return f.CopyFileFn(src, dest, perm)
+	}
+	return nil
 }
