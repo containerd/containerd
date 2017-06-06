@@ -40,6 +40,10 @@ func main() {
 			Name:  "debug",
 			Usage: "enable debug output in logs",
 		},
+		cli.StringFlag{
+			Name:  "namespace,n",
+			Usage: "namespace that owns the task",
+		},
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
@@ -61,10 +65,11 @@ func main() {
 		if err != nil {
 			return err
 		}
-		var (
-			server = grpc.NewServer()
-			sv     = shim.New(path)
-		)
+		server := grpc.NewServer()
+		sv, err := shim.New(path, context.GlobalString("namespace"))
+		if err != nil {
+			return err
+		}
 		logrus.Debug("registering grpc server")
 		shimapi.RegisterShimServer(server, sv)
 		if err := serve(server, "shim.sock"); err != nil {

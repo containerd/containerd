@@ -4,6 +4,7 @@ package shim
 
 import (
 	"path/filepath"
+	"syscall"
 
 	shimapi "github.com/containerd/containerd/api/services/shim"
 	"github.com/containerd/containerd/api/types/task"
@@ -15,23 +16,28 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-func Client(path string) (shimapi.ShimClient, error) {
+func Client(path, namespace string) (shimapi.ShimClient, error) {
 	pid, err := runc.ReadPidFile(filepath.Join(path, "init.pid"))
 	if err != nil {
 		return nil, err
 	}
 
-	cl := &client{
-		s: New(path),
+	s, err := New(path, namespace)
+	if err != nil {
+		return nil, err
 	}
-
-	// used when quering  container status and info
+	cl := &client{
+		s: s,
+	}
+	// used when quering container status and info
 	cl.s.initProcess = &initProcess{
 		id:  filepath.Base(path),
 		pid: pid,
 		runc: &runc.Runc{
-			Log:       filepath.Join(path, "log.json"),
-			LogFormat: runc.JSON,
+			Log:          filepath.Join(path, "log.json"),
+			LogFormat:    runc.JSON,
+			PdeathSignal: syscall.SIGKILL,
+			Root:         filepath.Join(RuncRoot, namespace),
 		},
 	}
 	return cl, nil

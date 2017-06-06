@@ -49,7 +49,7 @@ type initProcess struct {
 	terminal   bool
 }
 
-func newInitProcess(context context.Context, path string, r *shimapi.CreateRequest) (*initProcess, error) {
+func newInitProcess(context context.Context, path, namespace string, r *shimapi.CreateRequest) (*initProcess, error) {
 	for _, rm := range r.Rootfs {
 		m := &mount.Mount{
 			Type:    rm.Type,
@@ -65,6 +65,7 @@ func newInitProcess(context context.Context, path string, r *shimapi.CreateReque
 		Log:          filepath.Join(path, "log.json"),
 		LogFormat:    runc.JSON,
 		PdeathSignal: syscall.SIGKILL,
+		Root:         filepath.Join(RuncRoot, namespace),
 	}
 	p := &initProcess{
 		id:         r.ID,
