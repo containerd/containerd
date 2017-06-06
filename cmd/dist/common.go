@@ -120,6 +120,7 @@ func getResolver(ctx context.Context, clicontext *cli.Context) (remotes.Resolver
 	}
 	options := docker.ResolverOptions{
 		PlainHTTP: clicontext.Bool("plain-http"),
+		Tracker:   pushTracker,
 	}
 	if username != "" {
 		if secret == "" {

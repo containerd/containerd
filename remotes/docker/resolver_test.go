@@ -158,7 +158,7 @@ func TestBadTokenResolver(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	h := content(ocispec.MediaTypeImageManifest, []byte("not anything parse-able"))
+	h := newContent(ocispec.MediaTypeImageManifest, []byte("not anything parse-able"))
 
 	base, ro, close := withTokenServer(th, creds)(logHandler{t, h})
 	defer close()
@@ -247,10 +247,10 @@ func runBasicTest(t *testing.T, name string, sf func(h http.Handler) (string, Re
 	)
 
 	m := newManifest(
-		content(ocispec.MediaTypeImageConfig, []byte("1")),
-		content(ocispec.MediaTypeImageLayerGzip, []byte("2")),
+		newContent(ocispec.MediaTypeImageConfig, []byte("1")),
+		newContent(ocispec.MediaTypeImageLayerGzip, []byte("2")),
 	)
-	mc := content(ocispec.MediaTypeImageManifest, m.OCIManifest())
+	mc := newContent(ocispec.MediaTypeImageManifest, m.OCIManifest())
 	m.RegisterHandler(r, name)
 	r.Handle(fmt.Sprintf("/v2/%s/manifests/%s", name, tag), mc)
 	r.Handle(fmt.Sprintf("/v2/%s/manifests/%s", name, mc.Digest()), mc)
@@ -331,7 +331,7 @@ type testContent struct {
 	content   []byte
 }
 
-func content(mediaType string, b []byte) testContent {
+func newContent(mediaType string, b []byte) testContent {
 	return testContent{
 		mediaType: mediaType,
 		content:   b,

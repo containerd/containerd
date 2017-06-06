@@ -12,7 +12,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/reference"
+	"github.com/containerd/containerd/remotes"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -21,13 +21,24 @@ import (
 type dockerPusher struct {
 	*dockerBase
 	tag string
+
+	// TODO: namespace tracker
+	tracker StatusTracker
 }
 
 func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (content.Writer, error) {
-	// TODO: Check status, return already exists
+	ref := remotes.MakeRefKey(ctx, desc)
+	status, err := p.tracker.GetStatus(ref)
+	if err == nil {
+		if status.Offset == status.Total {
+			return nil, content.ErrExists
+		}
+		// TODO: Handle incomplete status
+	} else if !content.IsNotFound(err) {
+		return nil, errors.Wrap(err, "failed to get status")
+	}
 
 	var (
-		ref        string
 		isManifest bool
 		existCheck string
 	)
@@ -55,8 +66,13 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 		log.G(ctx).WithError(err).Debugf("Unable to check existence, continuing with push")
 	} else {
 		if resp.StatusCode == http.StatusOK {
+			p.tracker.SetStatus(ref, Status{
+				Status: content.Status{
+					Ref: ref,
+					// TODO: Set updated time?
+				},
+			})
 			return nil, content.ErrExists
-			// TODO: Update status with total 0
 		}
 		if resp.StatusCode != http.StatusNotFound {
 			// TODO: log error
@@ -68,15 +84,11 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 
 	if isManifest {
 		var putPath string
-		refspec := reference.Spec{Locator: p.locator}
 		if p.tag != "" {
 			putPath = path.Join("manifests", p.tag)
-			refspec.Object = p.tag
 		} else {
 			putPath = path.Join("manifests", desc.Digest.String())
-			refspec.Object = "@" + desc.Digest.String()
 		}
-		ref = refspec.String()
 
 		req, err = http.NewRequest(http.MethodPut, p.url(putPath), nil)
 		if err != nil {
@@ -100,7 +112,6 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 			// TODO: log error
 			return nil, errors.Errorf("unexpected response: %s", resp.Status)
 		}
-		ref = resp.Header.Get("Docker-Upload-Uuid")
 
 		location := resp.Header.Get("Location")
 		// Support paths without host in location
@@ -119,9 +130,16 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 		req.URL.RawQuery = q.Encode()
 
 	}
-	// TODO: Support chunked upload
+	p.tracker.SetStatus(ref, Status{
+		Status: content.Status{
+			Ref:       ref,
+			Total:     desc.Size,
+			Expected:  desc.Digest,
+			StartedAt: time.Now(),
+		},
+	})
 
-	// TODO: Set status
+	// TODO: Support chunked upload
 
 	pr, pw := io.Pipe()
 	respC := make(chan *http.Response, 1)
@@ -149,14 +167,8 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 		pipe:       pw,
 		responseC:  respC,
 		isManifest: isManifest,
-
-		// TODO: Move this
-		status: content.Status{
-			Ref:       ref,
-			Total:     desc.Size,
-			Expected:  desc.Digest,
-			StartedAt: time.Now(),
-		},
+		expected:   desc.Digest,
+		tracker:    p.tracker,
 	}, nil
 }
 
@@ -168,14 +180,19 @@ type pushWriter struct {
 	responseC  <-chan *http.Response
 	isManifest bool
 
-	// TODO: Move this to lookup from base
-	status content.Status
+	expected digest.Digest
+	tracker  StatusTracker
 }
 
 func (pw *pushWriter) Write(p []byte) (n int, err error) {
+	status, err := pw.tracker.GetStatus(pw.ref)
+	if err != nil {
+		return n, err
+	}
 	n, err = pw.pipe.Write(p)
-	pw.status.Offset += int64(n)
-	pw.status.UpdatedAt = time.Now()
+	status.Offset += int64(n)
+	status.UpdatedAt = time.Now()
+	pw.tracker.SetStatus(pw.ref, status)
 	return
 }
 
@@ -184,14 +201,17 @@ func (pw *pushWriter) Close() error {
 }
 
 func (pw *pushWriter) Status() (content.Status, error) {
-	// TODO: Lookup status from base tracker
-	return pw.status, nil
+	status, err := pw.tracker.GetStatus(pw.ref)
+	if err != nil {
+		return content.Status{}, err
+	}
+	return status.Status, nil
 
 }
 
 func (pw *pushWriter) Digest() digest.Digest {
 	// TODO: Get rid of this function?
-	return pw.status.Expected
+	return pw.expected
 }
 
 func (pw *pushWriter) Commit(size int64, expected digest.Digest) error {
@@ -211,10 +231,17 @@ func (pw *pushWriter) Commit(size int64, expected digest.Digest) error {
 		return errors.New("no response")
 	}
 
-	// TODO: Get status for size check
+	status, err := pw.tracker.GetStatus(pw.ref)
+	if err != nil {
+		return errors.Wrap(err, "failed to get status")
+	}
+
+	if size > 0 && size != status.Offset {
+		return errors.Errorf("unxpected size %d, expected %d", status.Offset, size)
+	}
 
 	if expected == "" {
-		expected = pw.status.Expected
+		expected = status.Expected
 	}
 
 	actual, err := digest.Parse(resp.Header.Get("Docker-Content-Digest"))
