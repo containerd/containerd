@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/containerd/containerd/version"
-	empty "github.com/golang/protobuf/ptypes/empty"
 	"github.com/urfave/cli"
 )
 
@@ -21,14 +20,15 @@ var versionCommand = cli.Command{
 		fmt.Printf("  Version: %s\n", version.Version)
 		fmt.Printf("  Revision: %s\n", version.Revision)
 		fmt.Println("")
-		vs, err := getVersionService(context)
+		client, err := newClient(context)
 		if err != nil {
 			return err
 		}
-		v, err := vs.Version(gocontext.Background(), &empty.Empty{})
+		v, err := client.Version(gocontext.Background())
 		if err != nil {
 			return err
 		}
+
 		fmt.Println("Server:")
 		fmt.Printf("  Version: %s\n", v.Version)
 		fmt.Printf("  Revision: %s\n", v.Revision)

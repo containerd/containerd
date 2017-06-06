@@ -1,14 +1,11 @@
 package main
 
 import (
-	gocontext "context"
 	"fmt"
 	"os"
 	"text/tabwriter"
 
-	containersapi "github.com/containerd/containerd/api/services/containers"
-	"github.com/containerd/containerd/api/services/execution"
-	tasktypes "github.com/containerd/containerd/api/types/task"
+	"github.com/containerd/containerd"
 	"github.com/urfave/cli"
 )
 
@@ -33,69 +30,59 @@ var listCommand = cli.Command{
 		)
 		defer cancel()
 
-		tasks, err := getTasksService(context)
+		client, err := newClient(context)
 		if err != nil {
 			return err
 		}
-
-		containers, err := getContainersService(context)
+		containers, err := client.Containers(ctx)
 		if err != nil {
 			return err
 		}
-
-		response, err := containers.List(gocontext.Background(), &containersapi.ListContainersRequest{})
-		if err != nil {
-			return err
-		}
-
 		if quiet {
-			for _, c := range response.Containers {
-				fmt.Println(c.ID)
+			for _, c := range containers {
+				fmt.Println(c.ID())
 			}
-		} else {
+			return nil
+		}
 
-			tasksResponse, err := tasks.List(ctx, &execution.ListRequest{})
+		w := tabwriter.NewWriter(os.Stdout, 10, 1, 3, ' ', 0)
+		fmt.Fprintln(w, "ID\tIMAGE\tPID\tSTATUS")
+		for _, c := range containers {
+			image, err := c.Image(ctx)
 			if err != nil {
 				return err
 			}
-
-			// Join with tasks to get status.
-			tasksByContainerID := map[string]*tasktypes.Task{}
-			for _, task := range tasksResponse.Tasks {
-				task.Descriptor()
-				tasksByContainerID[task.ContainerID] = task
+			var (
+				status string
+				pid    uint32
+			)
+			task, err := c.Task(ctx, nil)
+			if err == nil {
+				s, err := task.Status(ctx)
+				if err != nil {
+					return err
+				}
+				status = string(s)
+				pid = task.Pid()
+			} else {
+				if err != containerd.ErrNoRunningTask {
+					return err
+				}
+				status = string(containerd.Stopped)
+				pid = 0
 			}
-
-			w := tabwriter.NewWriter(os.Stdout, 10, 1, 3, ' ', 0)
-			fmt.Fprintln(w, "ID\tIMAGE\tPID\tSTATUS")
-			for _, c := range response.Containers {
-				var (
-					status string
-					pid    uint32
-				)
-				task, ok := tasksByContainerID[c.ID]
-				if ok {
-					status = task.Status.String()
-					pid = task.Pid
-				} else {
-					status = "STOPPED" // TODO(stevvooe): Is this assumption correct?
-					pid = 0
-				}
-
-				if _, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s\n",
-					c.ID,
-					c.Image,
-					pid,
-					status,
-				); err != nil {
-					return err
-				}
-				if err := w.Flush(); err != nil {
-					return err
-				}
+			if _, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s\n",
+				c.ID(),
+				image.Name(),
+				pid,
+				status,
+			); err != nil {
+				return err
+			}
+			if err := w.Flush(); err != nil {
+				return err
 			}
 		}
-
 		return nil
 	},
 }

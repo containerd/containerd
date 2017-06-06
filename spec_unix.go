@@ -10,7 +10,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/containerd/containerd/api/services/containers"
 	"github.com/containerd/containerd/images"
+	protobuf "github.com/gogo/protobuf/types"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -252,6 +254,20 @@ func WithImageConfig(ctx context.Context, i Image) SpecOpts {
 			cwd = "/"
 		}
 		s.Process.Cwd = cwd
+		return nil
+	}
+}
+
+func WithSpec(spec *specs.Spec) NewContainerOpts {
+	return func(ctx context.Context, client *Client, c *containers.Container) error {
+		data, err := json.Marshal(spec)
+		if err != nil {
+			return err
+		}
+		c.Spec = &protobuf.Any{
+			TypeUrl: spec.Version,
+			Value:   data,
+		}
 		return nil
 	}
 }

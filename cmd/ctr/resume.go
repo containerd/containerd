@@ -1,11 +1,6 @@
 package main
 
-import (
-	"errors"
-
-	"github.com/containerd/containerd/api/services/execution"
-	"github.com/urfave/cli"
-)
+import "github.com/urfave/cli"
 
 var resumeCommand = cli.Command{
 	Name:      "resume",
@@ -15,17 +10,18 @@ var resumeCommand = cli.Command{
 		ctx, cancel := appContext(context)
 		defer cancel()
 
-		tasks, err := getTasksService(context)
+		client, err := newClient(context)
 		if err != nil {
 			return err
 		}
-		id := context.Args().First()
-		if id == "" {
-			return errors.New("container id must be provided")
+		container, err := client.LoadContainer(ctx, context.Args().First())
+		if err != nil {
+			return err
 		}
-		_, err = tasks.Resume(ctx, &execution.ResumeRequest{
-			ContainerID: id,
-		})
-		return err
+		task, err := container.Task(ctx, nil)
+		if err != nil {
+			return err
+		}
+		return task.Resume(ctx)
 	},
 }

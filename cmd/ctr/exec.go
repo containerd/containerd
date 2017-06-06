@@ -1,12 +1,11 @@
 package main
 
 import (
-	"os"
+	"errors"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/api/services/execution"
-	"github.com/pkg/errors"
+	"github.com/containerd/containerd"
 	"github.com/urfave/cli"
 )
 
@@ -14,10 +13,6 @@ var execCommand = cli.Command{
 	Name:  "exec",
 	Usage: "execute additional processes in an existing container",
 	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "id",
-			Usage: "id of the container",
-		},
 		cli.StringFlag{
 			Name:  "cwd",
 			Usage: "working directory of the new process",
@@ -29,61 +24,75 @@ var execCommand = cli.Command{
 	},
 	Action: func(context *cli.Context) error {
 		var (
-			id          = context.String("id")
 			ctx, cancel = appContext(context)
+			id          = context.Args().First()
+			args        = context.Args().Tail()
+			tty         = context.Bool("tty")
 		)
 		defer cancel()
 
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
+		client, err := newClient(context)
+		if err != nil {
+			return err
+		}
+		container, err := client.LoadContainer(ctx, id)
+		if err != nil {
+			return err
+		}
+		spec, err := container.Spec()
+		if err != nil {
+			return err
+		}
+		task, err := container.Task(ctx, nil)
+		if err != nil {
+			return err
+		}
 
-		tasks, err := getTasksService(context)
+		pspec := &spec.Process
+		pspec.Terminal = tty
+		pspec.Args = args
+
+		io := containerd.Stdio
+		if tty {
+			io = containerd.StdioTerminal
+		}
+		process, err := task.Exec(ctx, pspec, io)
 		if err != nil {
 			return err
 		}
-		events, err := tasks.Events(ctx, &execution.EventsRequest{})
-		if err != nil {
-			return err
-		}
-		tmpDir, err := getTempDir(id)
-		if err != nil {
-			return err
-		}
-		defer os.RemoveAll(tmpDir)
-		request, err := newExecRequest(context, tmpDir, id)
-		if err != nil {
-			return err
-		}
+		defer process.Delete()
+
+		statusC := make(chan uint32, 1)
+		go func() {
+			status, err := process.Wait(ctx)
+			if err != nil {
+				logrus.WithError(err).Error("wait process")
+			}
+			statusC <- status
+		}()
 		var con console.Console
-		if request.Terminal {
+		if tty {
 			con = console.Current()
 			defer con.Reset()
 			if err := con.SetRaw(); err != nil {
 				return err
 			}
 		}
-		fwg, err := prepareStdio(request.Stdin, request.Stdout, request.Stderr, request.Terminal)
-		if err != nil {
+		if err := process.Start(ctx); err != nil {
 			return err
 		}
-		response, err := tasks.Exec(ctx, request)
-		if err != nil {
-			return err
-		}
-		if request.Terminal {
-			if err := handleConsoleResize(ctx, tasks, id, response.Pid, con); err != nil {
+		if tty {
+			if err := handleConsoleResize(ctx, process, con); err != nil {
 				logrus.WithError(err).Error("console resize")
 			}
+		} else {
+			sigc := forwardAllSignals(ctx, process)
+			defer stopCatch(sigc)
 		}
-
-		// Ensure we read all io only if container started successfully.
-		defer fwg.Wait()
-
-		status, err := waitContainer(events, id, response.Pid)
-		if err != nil {
-			return err
-		}
+		status := <-statusC
 		if status != 0 {
 			return cli.NewExitError("", int(status))
 		}
