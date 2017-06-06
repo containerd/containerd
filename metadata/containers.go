@@ -35,13 +35,13 @@ func (s *containerStore) Get(ctx context.Context, id string) (containers.Contain
 
 func (s *containerStore) List(ctx context.Context, filter string) ([]containers.Container, error) {
 	var (
-		m   = []containers.Container{}
+		m   []containers.Container
 		bkt = getContainersBucket(s.tx)
 	)
 	if bkt == nil {
 		return m, nil
 	}
-	err := bkt.ForEach(func(k, v []byte) error {
+	if err := bkt.ForEach(func(k, v []byte) error {
 		cbkt := bkt.Bucket(k)
 		if cbkt == nil {
 			return nil
@@ -53,8 +53,7 @@ func (s *containerStore) List(ctx context.Context, filter string) ([]containers.
 		}
 		m = append(m, container)
 		return nil
-	})
-	if err != nil {
+	}); err != nil {
 		return nil, err
 	}
 

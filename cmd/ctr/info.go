@@ -22,7 +22,12 @@ var infoCommand = cli.Command{
 		},
 	},
 	Action: func(context *cli.Context) error {
-		id := context.String("id")
+		var (
+			id          = context.String("id")
+			ctx, cancel = appContext(context)
+		)
+		defer cancel()
+
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
@@ -36,7 +41,7 @@ var infoCommand = cli.Command{
 			return err
 		}
 
-		containerResponse, err := containers.Get(gocontext.TODO(), &containersapi.GetContainerRequest{ID: id})
+		containerResponse, err := containers.Get(ctx, &containersapi.GetContainerRequest{ID: id})
 		if err != nil {
 			return err
 		}

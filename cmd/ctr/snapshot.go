@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
@@ -20,6 +19,9 @@ var snapshotCommand = cli.Command{
 		},
 	},
 	Action: func(clicontext *cli.Context) error {
+		ctx, cancel := appContext(clicontext)
+		defer cancel()
+
 		id := clicontext.String("id")
 		if id == "" {
 			return errors.New("container id must be provided")
@@ -37,7 +39,7 @@ var snapshotCommand = cli.Command{
 
 		contentRef := fmt.Sprintf("diff-%s", id)
 
-		d, err := rootfs.Diff(context.TODO(), id, contentRef, snapshotter, differ)
+		d, err := rootfs.Diff(ctx, id, contentRef, snapshotter, differ)
 		if err != nil {
 			return err
 		}

@@ -15,7 +15,7 @@ var getCommand = cli.Command{
 	Description: "Display the image object.",
 	Flags:       []cli.Flag{},
 	Action: func(context *cli.Context) error {
-		ctx, cancel := appContext()
+		ctx, cancel := appContext(context)
 		defer cancel()
 
 		dgst, err := digest.Parse(context.Args().First())

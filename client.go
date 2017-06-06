@@ -15,6 +15,7 @@ import (
 	diffapi "github.com/containerd/containerd/api/services/diff"
 	"github.com/containerd/containerd/api/services/execution"
 	imagesapi "github.com/containerd/containerd/api/services/images"
+	namespacesapi "github.com/containerd/containerd/api/services/namespaces"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
@@ -42,13 +43,6 @@ func init() {
 }
 
 type NewClientOpts func(c *Client) error
-
-func WithNamespace(namespace string) NewClientOpts {
-	return func(c *Client) error {
-		c.namespace = namespace
-		return nil
-	}
-}
 
 // New returns a new containerd client that is connected to the containerd
 // instance provided by address
@@ -79,8 +73,7 @@ func New(address string, opts ...NewClientOpts) (*Client, error) {
 type Client struct {
 	conn *grpc.ClientConn
 
-	runtime   string
-	namespace string
+	runtime string
 }
 
 func (c *Client) IsServing(ctx context.Context) (bool, error) {
@@ -436,6 +429,10 @@ func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, 
 // Close closes the clients connection to containerd
 func (c *Client) Close() error {
 	return c.conn.Close()
+}
+
+func (c *Client) NamespaceService() namespacesapi.NamespacesClient {
+	return namespacesapi.NewNamespacesClient(c.conn)
 }
 
 func (c *Client) ContainerService() containers.ContainersClient {

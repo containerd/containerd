@@ -7,6 +7,7 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/namespaces"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -21,10 +22,24 @@ func NewImageStore(tx *bolt.Tx) images.Store {
 
 func (s *imageStore) Get(ctx context.Context, name string) (images.Image, error) {
 	var image images.Image
-	if err := withImageBucket(s.tx, name, func(bkt *bolt.Bucket) error {
-		image.Name = name
-		return readImage(&image, bkt)
-	}); err != nil {
+
+	namespace, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return images.Image{}, err
+	}
+
+	bkt := getImagesBucket(s.tx, namespace)
+	if bkt == nil {
+		return images.Image{}, ErrNotFound
+	}
+
+	ibkt := bkt.Bucket([]byte(name))
+	if ibkt == nil {
+		return images.Image{}, ErrNotFound
+	}
+
+	image.Name = name
+	if err := readImage(&image, ibkt); err != nil {
 		return images.Image{}, err
 	}
 
@@ -32,7 +47,12 @@ func (s *imageStore) Get(ctx context.Context, name string) (images.Image, error)
 }
 
 func (s *imageStore) Put(ctx context.Context, name string, desc ocispec.Descriptor) error {
-	return withImagesBucket(s.tx, func(bkt *bolt.Bucket) error {
+	namespace, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return err
+	}
+
+	return withImagesBucket(s.tx, namespace, func(bkt *bolt.Bucket) error {
 		ibkt, err := bkt.CreateBucketIfNotExists([]byte(name))
 		if err != nil {
 			return err
@@ -64,23 +84,30 @@ func (s *imageStore) Put(ctx context.Context, name string, desc ocispec.Descript
 
 func (s *imageStore) List(ctx context.Context) ([]images.Image, error) {
 	var m []images.Image
+	namespace, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-	if err := withImagesBucket(s.tx, func(bkt *bolt.Bucket) error {
-		return bkt.ForEach(func(k, v []byte) error {
-			var (
-				image = images.Image{
-					Name: string(k),
-				}
-				kbkt = bkt.Bucket(k)
-			)
+	bkt := getImagesBucket(s.tx, namespace)
+	if bkt == nil {
+		return nil, nil // empty store
+	}
 
-			if err := readImage(&image, kbkt); err != nil {
-				return err
+	if err := bkt.ForEach(func(k, v []byte) error {
+		var (
+			image = images.Image{
+				Name: string(k),
 			}
+			kbkt = bkt.Bucket(k)
+		)
 
-			m = append(m, image)
-			return nil
-		})
+		if err := readImage(&image, kbkt); err != nil {
+			return err
+		}
+
+		m = append(m, image)
+		return nil
 	}); err != nil {
 		return nil, err
 	}
@@ -89,7 +116,12 @@ func (s *imageStore) List(ctx context.Context) ([]images.Image, error) {
 }
 
 func (s *imageStore) Delete(ctx context.Context, name string) error {
-	return withImagesBucket(s.tx, func(bkt *bolt.Bucket) error {
+	namespace, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return err
+	}
+
+	return withImagesBucket(s.tx, namespace, func(bkt *bolt.Bucket) error {
 		err := bkt.DeleteBucket([]byte(name))
 		if err == bolt.ErrBucketNotFound {
 			return ErrNotFound

@@ -1,8 +1,6 @@
 package main
 
 import (
-	gocontext "context"
-
 	"github.com/containerd/containerd/api/services/execution"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -27,7 +25,12 @@ var killCommand = cli.Command{
 		},
 	},
 	Action: func(context *cli.Context) error {
-		id := context.String("id")
+		var (
+			id          = context.String("id")
+			ctx, cancel = appContext(context)
+		)
+		defer cancel()
+
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
@@ -66,7 +69,7 @@ var killCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		_, err = tasks.Kill(gocontext.Background(), killRequest)
+		_, err = tasks.Kill(ctx, killRequest)
 		if err != nil {
 			return err
 		}

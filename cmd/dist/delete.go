@@ -25,7 +25,7 @@ var deleteCommand = cli.Command{
 			args      = []string(context.Args())
 			exitError error
 		)
-		ctx, cancel := appContext()
+		ctx, cancel := appContext(context)
 		defer cancel()
 
 		conn, err := connectGRPC(context)

@@ -27,7 +27,11 @@ var listCommand = cli.Command{
 		},
 	},
 	Action: func(context *cli.Context) error {
-		quiet := context.Bool("quiet")
+		var (
+			quiet       = context.Bool("quiet")
+			ctx, cancel = appContext(context)
+		)
+		defer cancel()
 
 		tasks, err := getTasksService(context)
 		if err != nil {
@@ -50,7 +54,7 @@ var listCommand = cli.Command{
 			}
 		} else {
 
-			tasksResponse, err := tasks.List(gocontext.TODO(), &execution.ListRequest{})
+			tasksResponse, err := tasks.List(ctx, &execution.ListRequest{})
 			if err != nil {
 				return err
 			}

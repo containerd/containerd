@@ -18,14 +18,17 @@ import (
 	diffapi "github.com/containerd/containerd/api/services/diff"
 	"github.com/containerd/containerd/api/services/execution"
 	imagesapi "github.com/containerd/containerd/api/services/images"
+	namespacesapi "github.com/containerd/containerd/api/services/namespaces"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	versionservice "github.com/containerd/containerd/api/services/version"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/namespaces"
 	contentservice "github.com/containerd/containerd/services/content"
 	"github.com/containerd/containerd/services/diff"
 	imagesservice "github.com/containerd/containerd/services/images"
+	namespacesservice "github.com/containerd/containerd/services/namespaces"
 	snapshotservice "github.com/containerd/containerd/services/snapshot"
 	"github.com/containerd/containerd/snapshot"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -34,6 +37,38 @@ import (
 )
 
 var grpcConn *grpc.ClientConn
+
+// appContext returns the context for a command. Should only be called once per
+// command, near the start.
+//
+// This will ensure the namespace is picked up and set the timeout, if one is
+// defined.
+func appContext(clicontext *cli.Context) (gocontext.Context, gocontext.CancelFunc) {
+	var (
+		ctx       = gocontext.Background()
+		timeout   = clicontext.GlobalDuration("timeout")
+		namespace = clicontext.GlobalString("namespace")
+		cancel    = func() {}
+	)
+
+	ctx = namespaces.WithNamespace(ctx, namespace)
+
+	if timeout > 0 {
+		ctx, cancel = gocontext.WithTimeout(ctx, timeout)
+	} else {
+		ctx, cancel = gocontext.WithCancel(ctx)
+	}
+
+	return ctx, cancel
+}
+
+func getNamespacesService(clicontext *cli.Context) (namespaces.Store, error) {
+	conn, err := getGRPCConnection(clicontext)
+	if err != nil {
+		return nil, err
+	}
+	return namespacesservice.NewStoreFromClient(namespacesapi.NewNamespacesClient(conn)), nil
+}
 
 func getContainersService(context *cli.Context) (containersapi.ContainersClient, error) {
 	conn, err := getGRPCConnection(context)

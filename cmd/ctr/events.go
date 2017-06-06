@@ -1,7 +1,6 @@
 package main
 
 import (
-	gocontext "context"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -14,11 +13,14 @@ var eventsCommand = cli.Command{
 	Name:  "events",
 	Usage: "display containerd events",
 	Action: func(context *cli.Context) error {
+		ctx, cancel := appContext(context)
+		defer cancel()
+
 		tasks, err := getTasksService(context)
 		if err != nil {
 			return err
 		}
-		events, err := tasks.Events(gocontext.Background(), &execution.EventsRequest{})
+		events, err := tasks.Events(ctx, &execution.EventsRequest{})
 		if err != nil {
 			return err
 		}

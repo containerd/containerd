@@ -29,7 +29,7 @@ var listCommand = cli.Command{
 			quiet = context.Bool("quiet")
 			args  = []string(context.Args())
 		)
-		ctx, cancel := appContext()
+		ctx, cancel := appContext(context)
 		defer cancel()
 
 		cs, err := resolveContentStore(context)

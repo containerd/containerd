@@ -18,7 +18,7 @@ var applyCommand = cli.Command{
 		var (
 			dir = context.Args().First()
 		)
-		ctx, cancel := appContext()
+		ctx, cancel := appContext(context)
 		defer cancel()
 
 		log.G(ctx).Info("applying layer from stdin")

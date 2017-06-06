@@ -26,7 +26,7 @@ service Namespaces {
 }
 
 message Namespace {
-	string namespace = 1;
+	string name = 1;
 
 	// Labels provides an area to include arbitrary data on namespaces.
 	//
@@ -72,6 +72,10 @@ message UpdateNamespaceRequest {
 
 	// UpdateMask specifies which fields to perform the update on. If empty,
 	// the operation applies to all fields.
+	//
+	// For the most part, this applies only to selectively updating labels on
+	// the namespace. While field masks are typically limited to ascii alphas
+	// and digits, we just take everything after the "labels." as the map key.
 	google.protobuf.FieldMask update_mask = 2;
 }
 
@@ -80,5 +84,5 @@ message UpdateNamespaceResponse {
 }
 
 message DeleteNamespaceRequest {
-	string namespace = 1;
+	string name = 1;
 }

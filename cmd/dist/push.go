@@ -48,7 +48,7 @@ var pushCommand = cli.Command{
 			desc  ocispec.Descriptor
 		)
 
-		ctx, cancel := appContext()
+		ctx, cancel := appContext(clicontext)
 		defer cancel()
 
 		client, err := getClient(clicontext)

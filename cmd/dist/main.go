@@ -1,7 +1,6 @@
 package main
 
 import (
-	contextpkg "context"
 	"fmt"
 	"os"
 	"time"
@@ -20,14 +19,6 @@ func init() {
 		fmt.Println(c.App.Name, version.Package, c.App.Version)
 	}
 
-}
-
-func appContext() (contextpkg.Context, contextpkg.CancelFunc) {
-	background := contextpkg.Background()
-	if timeout > 0 {
-		return contextpkg.WithTimeout(background, timeout)
-	}
-	return contextpkg.WithCancel(background)
 }
 
 func main() {
@@ -68,6 +59,12 @@ distribution tool
 			Usage: "address for containerd's GRPC server",
 			Value: "/run/containerd/containerd.sock",
 		},
+		cli.StringFlag{
+			Name:   "namespace, n",
+			Usage:  "namespace to use with commands",
+			Value:  "default",
+			EnvVar: "CONTAINERD_NAMESPACE",
+		},
 	}
 	app.Commands = []cli.Command{
 		imageCommand,
@@ -81,7 +78,6 @@ distribution tool
 		pushObjectCommand,
 	}
 	app.Before = func(context *cli.Context) error {
-		timeout = context.GlobalDuration("timeout")
 		if context.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
 		}

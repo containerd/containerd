@@ -1,7 +1,6 @@
 package containerd
 
 import (
-	"context"
 	"syscall"
 	"testing"
 )
@@ -17,9 +16,11 @@ func TestCheckpointRestore(t *testing.T) {
 	defer client.Close()
 
 	var (
-		ctx = context.Background()
-		id  = "CheckpointRestore"
+		ctx, cancel = testContext()
+		id          = "CheckpointRestore"
 	)
+	defer cancel()
+
 	image, err := client.GetImage(ctx, testImage)
 	if err != nil {
 		t.Error(err)
@@ -107,7 +108,9 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 	defer client.Close()
 
 	const id = "CheckpointRestoreNewContainer"
-	ctx := context.Background()
+	ctx, cancel := testContext()
+	defer cancel()
+
 	image, err := client.GetImage(ctx, testImage)
 	if err != nil {
 		t.Error(err)
