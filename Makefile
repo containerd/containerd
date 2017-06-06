@@ -29,7 +29,7 @@ SNAPSHOT_PACKAGES=$(shell go list ./snapshot/...)
 
 # Project binaries.
 COMMANDS=ctr containerd protoc-gen-gogoctrd dist ctrd-protobuild
-ifneq ("$(GOOS)", "windows")
+ifeq ($(filter-out "linux","$(GOOS)"),)
 	COMMANDS += containerd-shim
 endif
 BINARIES=$(addprefix bin/,$(COMMANDS))
