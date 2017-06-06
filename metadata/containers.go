@@ -124,7 +124,8 @@ func readContainer(container *containers.Container, bkt *bolt.Bucket) error {
 		case string(bucketKeyRuntime):
 			container.Runtime = string(v)
 		case string(bucketKeySpec):
-			container.Spec = v
+			container.Spec = make([]byte, len(v))
+			copy(container.Spec, v)
 		case string(bucketKeyRootFS):
 			container.RootFS = string(v)
 		case string(bucketKeyCreatedAt):
