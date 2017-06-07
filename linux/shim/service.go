@@ -20,13 +20,19 @@ import (
 
 var empty = &google_protobuf.Empty{}
 
+const RuncRoot = "/run/containerd/runc"
+
 // New returns a new shim service that can be used via GRPC
-func New(path string) *Service {
+func New(path, namespace string) (*Service, error) {
+	if namespace == "" {
+		return nil, fmt.Errorf("shim namespace cannot be empty")
+	}
 	return &Service{
 		path:      path,
 		processes: make(map[int]process),
 		events:    make(chan *task.Event, 4096),
-	}
+		namespace: namespace,
+	}, nil
 }
 
 type Service struct {
@@ -40,10 +46,11 @@ type Service struct {
 	eventsMu      sync.Mutex
 	deferredEvent *task.Event
 	execID        int
+	namespace     string
 }
 
 func (s *Service) Create(ctx context.Context, r *shimapi.CreateRequest) (*shimapi.CreateResponse, error) {
-	process, err := newInitProcess(ctx, s.path, r)
+	process, err := newInitProcess(ctx, s.path, s.namespace, r)
 	if err != nil {
 		return nil, err
 	}

@@ -16,7 +16,9 @@ import (
 	"github.com/containerd/containerd/api/services/shim"
 	"github.com/containerd/containerd/api/types/mount"
 	"github.com/containerd/containerd/api/types/task"
+	shimb "github.com/containerd/containerd/linux/shim"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
 	runc "github.com/containerd/go-runc"
 
@@ -87,11 +89,15 @@ type Runtime struct {
 }
 
 func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts) (t plugin.Task, err error) {
-	path, err := r.newBundle(id, opts.Spec)
+	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
 	}
-	s, err := newShim(r.shim, path, r.remote)
+	path, err := r.newBundle(namespace, id, opts.Spec)
+	if err != nil {
+		return nil, err
+	}
+	s, err := newShim(r.shim, path, namespace, r.remote)
 	if err != nil {
 		os.RemoveAll(path)
 		return nil, err
@@ -136,6 +142,10 @@ func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts)
 }
 
 func (r *Runtime) Delete(ctx context.Context, c plugin.Task) (*plugin.Exit, error) {
+	namespace, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return nil, err
+	}
 	lc, ok := c.(*Task)
 	if !ok {
 		return nil, fmt.Errorf("container cannot be cast as *linux.Container")
@@ -153,7 +163,7 @@ func (r *Runtime) Delete(ctx context.Context, c plugin.Task) (*plugin.Exit, erro
 	return &plugin.Exit{
 		Status:    rsp.ExitStatus,
 		Timestamp: rsp.ExitedAt,
-	}, r.deleteBundle(lc.containerID)
+	}, r.deleteBundle(namespace, lc.containerID)
 }
 
 func (r *Runtime) Tasks(ctx context.Context) ([]plugin.Task, error) {
@@ -166,15 +176,34 @@ func (r *Runtime) Tasks(ctx context.Context) ([]plugin.Task, error) {
 		if !fi.IsDir() {
 			continue
 		}
+		tasks, err := r.loadContainers(ctx, fi.Name())
+		if err != nil {
+			return nil, err
+		}
+		o = append(o, tasks...)
+	}
+	return o, nil
+}
+
+func (r *Runtime) loadContainers(ctx context.Context, ns string) ([]plugin.Task, error) {
+	dir, err := ioutil.ReadDir(filepath.Join(r.root, ns))
+	if err != nil {
+		return nil, err
+	}
+	var o []plugin.Task
+	for _, fi := range dir {
+		if !fi.IsDir() {
+			continue
+		}
 		id := fi.Name()
 		// TODO: optimize this if it is call frequently to list all containers
 		// i.e. dont' reconnect to the the shim's ever time
-		c, err := r.loadContainer(filepath.Join(r.root, id))
+		c, err := r.loadContainer(ctx, filepath.Join(r.root, ns, id))
 		if err != nil {
-			log.G(ctx).WithError(err).Warnf("failed to load container %s", id)
+			log.G(ctx).WithError(err).Warnf("failed to load container %s/%s", ns, id)
 			// if we fail to load the container, connect to the shim, make sure if the shim has
 			// been killed and cleanup the resources still being held by the container
-			r.killContainer(ctx, id)
+			r.killContainer(ctx, ns, id)
 			continue
 		}
 		o = append(o, c)
@@ -229,8 +258,12 @@ func (r *Runtime) forward(events shim.Shim_EventsClient) {
 	}
 }
 
-func (r *Runtime) newBundle(id string, spec []byte) (string, error) {
-	path := filepath.Join(r.root, id)
+func (r *Runtime) newBundle(namespace, id string, spec []byte) (string, error) {
+	path := filepath.Join(r.root, namespace)
+	if err := os.MkdirAll(path, 0700); err != nil {
+		return "", err
+	}
+	path = filepath.Join(path, id)
 	if err := os.Mkdir(path, 0700); err != nil {
 		return "", err
 	}
@@ -246,26 +279,27 @@ func (r *Runtime) newBundle(id string, spec []byte) (string, error) {
 	return path, err
 }
 
-func (r *Runtime) deleteBundle(id string) error {
-	return os.RemoveAll(filepath.Join(r.root, id))
+func (r *Runtime) deleteBundle(namespace, id string) error {
+	return os.RemoveAll(filepath.Join(r.root, namespace, id))
 }
 
-func (r *Runtime) loadContainer(path string) (*Task, error) {
-	id := filepath.Base(path)
-	s, err := loadShim(path, r.remote)
+func (r *Runtime) loadContainer(ctx context.Context, path string) (*Task, error) {
+	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
 	}
-
+	id := filepath.Base(path)
+	s, err := loadShim(path, namespace, r.remote)
+	if err != nil {
+		return nil, err
+	}
 	if err = r.handleEvents(s); err != nil {
 		return nil, err
 	}
-
 	data, err := ioutil.ReadFile(filepath.Join(path, configFilename))
 	if err != nil {
 		return nil, err
 	}
-
 	return &Task{
 		containerID: id,
 		shim:        s,
@@ -275,13 +309,14 @@ func (r *Runtime) loadContainer(path string) (*Task, error) {
 
 // killContainer is used whenever the runtime fails to connect to a shim (it died)
 // and needs to cleanup the container resources in the underlying runtime (runc, etc...)
-func (r *Runtime) killContainer(ctx context.Context, id string) {
+func (r *Runtime) killContainer(ctx context.Context, ns, id string) {
 	log.G(ctx).Debug("terminating container after failed load")
 	runtime := &runc.Runc{
 		// TODO: should we get Command provided for initial container creation?
 		Command:      r.runtime,
 		LogFormat:    runc.JSON,
 		PdeathSignal: unix.SIGKILL,
+		Root:         filepath.Join(shimb.RuncRoot, ns),
 	}
 	if err := runtime.Kill(ctx, id, int(unix.SIGKILL), &runc.KillOpts{
 		All: true,
@@ -302,10 +337,10 @@ func (r *Runtime) killContainer(ctx context.Context, id string) {
 	if err := runtime.Delete(ctx, id); err != nil {
 		log.G(ctx).WithError(err).Warnf("delete container %s", id)
 	}
-	// try to unmount the rootfs is it was not held by an external shim
-	unix.Unmount(filepath.Join(r.root, id, "rootfs"), 0)
+	// try to unmount the rootfs in case it was not owned by an external mount namespace
+	unix.Unmount(filepath.Join(r.root, ns, id, "rootfs"), 0)
 	// remove container bundle
-	if err := r.deleteBundle(id); err != nil {
+	if err := r.deleteBundle(ns, id); err != nil {
 		log.G(ctx).WithError(err).Warnf("delete container bundle %s", id)
 	}
 }

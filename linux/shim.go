@@ -22,16 +22,16 @@ import (
 	"github.com/pkg/errors"
 )
 
-func newShim(shimName string, path string, remote bool) (shim.ShimClient, error) {
+func newShim(shimName string, path, namespace string, remote bool) (shim.ShimClient, error) {
 	if !remote {
-		return localShim.Client(path)
+		return localShim.Client(path, namespace)
 	}
 	socket := filepath.Join(path, "shim.sock")
 	l, err := sys.CreateUnixSocket(socket)
 	if err != nil {
 		return nil, err
 	}
-	cmd := exec.Command(shimName)
+	cmd := exec.Command(shimName, "--namespace", namespace)
 	cmd.Dir = path
 	f, err := l.(*net.UnixListener).File()
 	if err != nil {
@@ -57,9 +57,9 @@ func newShim(shimName string, path string, remote bool) (shim.ShimClient, error)
 	return connectShim(socket)
 }
 
-func loadShim(path string, remote bool) (shim.ShimClient, error) {
+func loadShim(path, namespace string, remote bool) (shim.ShimClient, error) {
 	if !remote {
-		return localShim.Client(path)
+		return localShim.Client(path, namespace)
 	}
 	socket := filepath.Join(path, "shim.sock")
 	return connectShim(socket)
