@@ -35,6 +35,7 @@ type Converter struct {
 	fetcher      remotes.Fetcher
 
 	pulledManifest *manifest
+	layers         []ocispec.Descriptor
 
 	mu      sync.Mutex
 	blobMap map[digest.Digest]digest.Digest
@@ -66,21 +67,17 @@ func (c *Converter) Handle(ctx context.Context, desc ocispec.Descriptor) ([]ocis
 			if err := json.Unmarshal([]byte(m.History[i].V1Compatibility), &h); err != nil {
 				return nil, err
 			}
-			if !h.ThrowAway {
-				descs = append(descs, ocispec.Descriptor{
-					MediaType: images.MediaTypeDockerSchema2LayerGzip,
-					Digest:    c.pulledManifest.FSLayers[i].BlobSum,
-				})
+			if !h.EmptyLayer() {
+				descs = append([]ocispec.Descriptor{
+					{
+						MediaType: images.MediaTypeDockerSchema2LayerGzip,
+						Digest:    c.pulledManifest.FSLayers[i].BlobSum,
+					},
+				}, descs...)
 			}
 		}
-		// Reverse
-		for i := 0; i <= len(descs)/2; i++ {
-			j := len(descs) - i - 1
-			if i != j {
-				descs[i], descs[j] = descs[j], descs[i]
-			}
-		}
-		return descs, nil
+		c.layers = descs
+		return c.layers, nil
 	case images.MediaTypeDockerSchema2LayerGzip:
 		if c.pulledManifest == nil {
 			return nil, errors.New("manifest required for schema 1 blob pull")
@@ -95,11 +92,45 @@ func (c *Converter) Convert(ctx context.Context) (ocispec.Descriptor, error) {
 	if c.pulledManifest == nil {
 		return ocispec.Descriptor{}, errors.New("missing schema 1 manifest for conversion")
 	}
+	if len(c.pulledManifest.History) == 0 {
+		return ocispec.Descriptor{}, errors.New("no history")
+	}
+	if len(c.layers) == 0 {
+		return ocispec.Descriptor{}, errors.New("schema 1 manifest has no usable layers")
+	}
 
-	img, err := convertSchema1Manifest(c.pulledManifest, c.blobMap)
+	var img ocispec.Image
+	if err := json.Unmarshal([]byte(c.pulledManifest.History[0].V1Compatibility), &img); err != nil {
+		return ocispec.Descriptor{}, errors.Wrap(err, "failed to unmarshal image from schema 1 history")
+	}
+
+	history, err := schema1ManifestHistory(c.pulledManifest)
 	if err != nil {
 		return ocispec.Descriptor{}, errors.Wrap(err, "schema 1 conversion failed")
 	}
+	img.History = history
+
+	diffIDs := make([]digest.Digest, len(c.layers))
+	for i, layer := range c.layers {
+		info, err := c.contentStore.Info(ctx, layer.Digest)
+		if err != nil {
+			return ocispec.Descriptor{}, errors.Wrap(err, "failed to get blob info")
+		}
+
+		// Fill in size since not given by schema 1 manifest
+		c.layers[i].Size = info.Size
+
+		diffID, ok := c.blobMap[layer.Digest]
+		if !ok {
+			return ocispec.Descriptor{}, errors.New("missing diff id")
+		}
+		diffIDs[i] = diffID
+	}
+	img.RootFS = ocispec.RootFS{
+		Type:    "layers",
+		DiffIDs: diffIDs,
+	}
+
 	b, err := json.Marshal(img)
 	if err != nil {
 		return ocispec.Descriptor{}, errors.Wrap(err, "failed to marshal image")
@@ -116,30 +147,12 @@ func (c *Converter) Convert(ctx context.Context) (ocispec.Descriptor, error) {
 		return ocispec.Descriptor{}, errors.Wrap(err, "failed to write config")
 	}
 
-	layers := make([]ocispec.Descriptor, 0)
-	for _, layer := range c.pulledManifest.FSLayers {
-		// TODO: Use rootfs mapping!
-		info, err := c.contentStore.Info(ctx, layer.BlobSum)
-		if err != nil {
-			if content.IsNotFound(err) {
-				continue
-			}
-			return ocispec.Descriptor{}, errors.Wrap(err, "failed to get blob info")
-		}
-
-		layers = append([]ocispec.Descriptor{{
-			MediaType: ocispec.MediaTypeImageLayerGzip,
-			Digest:    layer.BlobSum,
-			Size:      info.Size,
-		}}, layers...)
-	}
-
 	manifest := ocispec.Manifest{
 		Versioned: specs.Versioned{
 			SchemaVersion: 2,
 		},
 		Config: config,
-		Layers: layers,
+		Layers: c.layers,
 	}
 
 	b, err = json.Marshal(manifest)
@@ -272,62 +285,44 @@ type v1History struct {
 	Author          string    `json:"author,omitempty"`
 	Created         time.Time `json:"created"`
 	Comment         string    `json:"comment,omitempty"`
-	ThrowAway       bool      `json:"throwaway,omitempty"`
+	ThrowAway       *bool     `json:"throwaway,omitempty"`
+	Size            *int      `json:"Size,omitempty"` // used before ThrowAway field
 	ContainerConfig struct {
 		Cmd []string `json:"Cmd,omitempty"`
 	} `json:"container_config,omitempty"`
 }
 
-func convertSchema1Manifest(m *manifest, blobs map[digest.Digest]digest.Digest) (*ocispec.Image, error) {
-	if len(m.History) == 0 {
-		return nil, errors.New("no history")
+func (h *v1History) EmptyLayer() bool {
+	if h.ThrowAway != nil {
+		return !(*h.ThrowAway)
+	}
+	if h.Size != nil {
+		return *h.Size == 0
 	}
 
-	var img ocispec.Image
-	if err := json.Unmarshal([]byte(m.History[0].V1Compatibility), &img); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal image from schema 1 history")
-	}
+	// If no size is given or `ThrowAway` specified, the image is empty
+	return true
+}
 
-	diffIDs := make([]digest.Digest, 0, len(m.History))
-	img.History = make([]ocispec.History, len(m.History))
+func schema1ManifestHistory(m *manifest) ([]ocispec.History, error) {
+	history := make([]ocispec.History, len(m.History))
 	for i := range m.History {
 		var h v1History
 		if err := json.Unmarshal([]byte(m.History[i].V1Compatibility), &h); err != nil {
 			return nil, errors.Wrap(err, "failed to unmarshal history")
 		}
 
-		img.History[len(img.History)-i-1] = ocispec.History{
+		empty := h.EmptyLayer()
+		history[len(history)-i-1] = ocispec.History{
 			Author:     h.Author,
 			Comment:    h.Comment,
 			Created:    &h.Created,
 			CreatedBy:  strings.Join(h.ContainerConfig.Cmd, " "),
-			EmptyLayer: h.ThrowAway,
-		}
-
-		if !h.ThrowAway {
-			diffID, ok := blobs[m.FSLayers[i].BlobSum]
-			if !ok {
-				return nil, errors.Errorf("no diff id for blob %s", m.FSLayers[i].BlobSum.String())
-			}
-
-			diffIDs = append(diffIDs, diffID)
-		}
-
-	}
-
-	for i := 0; i <= len(diffIDs)/2; i++ {
-		j := len(diffIDs) - i - 1
-		if i != j {
-			diffIDs[i], diffIDs[j] = diffIDs[j], diffIDs[i]
+			EmptyLayer: empty,
 		}
 	}
 
-	img.RootFS = ocispec.RootFS{
-		Type:    "layers",
-		DiffIDs: diffIDs,
-	}
-
-	return &img, nil
+	return history, nil
 }
 
 type signature struct {
