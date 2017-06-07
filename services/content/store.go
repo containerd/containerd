@@ -115,6 +115,7 @@ func (rs *remoteStore) Writer(ctx context.Context, ref string, size int64, expec
 	}
 
 	return &remoteWriter{
+		ref:    ref,
 		client: wrclient,
 		offset: offset,
 	}, nil
