@@ -28,23 +28,20 @@ import (
 const (
 	containerName        = "containerd"
 	containerdAPIVersion = "0.0.0"
-	containerdVersion    = "0.0.0"
 	// kubeAPIVersion is the api version of kubernetes.
 	kubeAPIVersion = "0.1.0"
 )
 
 // Version returns the runtime name, runtime version and runtime API version.
 func (c *criContainerdService) Version(ctx context.Context, r *runtime.VersionRequest) (*runtime.VersionResponse, error) {
-	_, err := c.versionService.Version(ctx, &empty.Empty{})
+	resp, err := c.versionService.Version(ctx, &empty.Empty{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get containerd version: %v", err)
 	}
 	return &runtime.VersionResponse{
-		Version:     kubeAPIVersion,
-		RuntimeName: containerName,
-		// Containerd doesn't return semver because of a bug.
-		// TODO(random-liu): Replace this with version from containerd.
-		RuntimeVersion: containerdVersion,
+		Version:        kubeAPIVersion,
+		RuntimeName:    containerName,
+		RuntimeVersion: resp.Version,
 		// Containerd doesn't have an api version now.
 		RuntimeApiVersion: containerdAPIVersion,
 	}, nil
