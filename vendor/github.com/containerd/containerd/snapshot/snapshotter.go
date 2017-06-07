@@ -3,7 +3,7 @@ package snapshot
 import (
 	"context"
 
-	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/mount"
 )
 
 // Kind identifies the kind of snapshot.
@@ -179,7 +179,7 @@ type Snapshotter interface {
 	// available only for active snapshots.
 	//
 	// This can be used to recover mounts after calling View or Prepare.
-	Mounts(ctx context.Context, key string) ([]containerd.Mount, error)
+	Mounts(ctx context.Context, key string) ([]mount.Mount, error)
 
 	// Prepare creates an active snapshot identified by key descending from the
 	// provided parent.  The returned mounts can be used to mount the snapshot
@@ -195,7 +195,7 @@ type Snapshotter interface {
 	// one is done with the transaction, Remove should be called on the key.
 	//
 	// Multiple calls to Prepare or View with the same key should fail.
-	Prepare(ctx context.Context, key, parent string) ([]containerd.Mount, error)
+	Prepare(ctx context.Context, key, parent string) ([]mount.Mount, error)
 
 	// View behaves identically to Prepare except the result may not be
 	// committed back to the snapshot snapshotter. View returns a readonly view on
@@ -210,7 +210,7 @@ type Snapshotter interface {
 	// Commit may not be called on the provided key and will return an error.
 	// To collect the resources associated with key, Remove must be called with
 	// key as the argument.
-	View(ctx context.Context, key, parent string) ([]containerd.Mount, error)
+	View(ctx context.Context, key, parent string) ([]mount.Mount, error)
 
 	// Commit captures the changes between key and its parent into a snapshot
 	// identified by name.  The name can then be used with the snapshotter's other

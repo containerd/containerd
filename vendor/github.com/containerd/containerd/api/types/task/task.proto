@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package containerd.v1.types;
+
+import "gogoproto/gogo.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+enum Status {
+	option (gogoproto.goproto_enum_prefix) = false;
+	option (gogoproto.enum_customname) = "Status";
+
+	UNKNOWN = 0 [(gogoproto.enumvalue_customname) = "StatusUnknown"];
+	CREATED = 1 [(gogoproto.enumvalue_customname) = "StatusCreated"];
+	RUNNING = 2 [(gogoproto.enumvalue_customname) = "StatusRunning"];
+	STOPPED = 3 [(gogoproto.enumvalue_customname) = "StatusStopped"];
+	PAUSED = 4 [(gogoproto.enumvalue_customname) = "StatusPaused"];
+}
+
+message Task {
+	string id = 1; // TODO(stevvooe): For now, this is just the container id.
+	string container_id = 2;
+	uint32 pid = 3;
+	Status status = 4;
+	google.protobuf.Any spec = 5;
+}
+
+message Process {
+	uint32 pid = 1;
+	repeated string args = 2;
+	repeated string env = 3;
+	User user = 4;
+	string cwd = 5;
+	bool terminal = 6;
+	uint32 exit_status = 7;
+	Status status = 8;
+	google.protobuf.Any runtime_data = 9;
+}
+
+message User {
+	uint32 uid = 1;
+	uint32 gid = 2;
+	repeated uint32 additional_gids = 3;
+}
+
+message Event {
+	string id = 1;
+
+	enum EventType {
+		EXIT = 0;
+		OOM = 1;
+		CREATE = 2;
+		START = 3;
+		EXEC_ADDED = 4;
+		PAUSED = 5;
+	}
+
+	EventType type = 2;
+	uint32 pid = 3;
+	uint32 exit_status = 4;
+	google.protobuf.Timestamp exited_at = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}

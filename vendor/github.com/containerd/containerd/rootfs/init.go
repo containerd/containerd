@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshot"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -19,7 +19,12 @@ var (
 
 type initializerFunc func(string) error
 
-func InitRootFS(ctx context.Context, name string, parent digest.Digest, readonly bool, snapshotter snapshot.Snapshotter, mounter Mounter) ([]containerd.Mount, error) {
+type Mounter interface {
+	Mount(target string, mounts ...mount.Mount) error
+	Unmount(target string) error
+}
+
+func InitRootFS(ctx context.Context, name string, parent digest.Digest, readonly bool, snapshotter snapshot.Snapshotter, mounter Mounter) ([]mount.Mount, error) {
 	_, err := snapshotter.Stat(ctx, name)
 	if err == nil {
 		return nil, errors.Errorf("rootfs already exists")

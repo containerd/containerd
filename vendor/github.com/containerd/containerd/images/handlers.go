@@ -11,7 +11,17 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var SkipDesc = fmt.Errorf("skip descriptor")
+var (
+	// SkipDesc is used to skip processing of a descriptor and
+	// its descendants.
+	SkipDesc = fmt.Errorf("skip descriptor")
+
+	// StopHandler is used to signify that the descriptor
+	// has been handled and should not be handled further.
+	// This applies only to a single descriptor in a handler
+	// chain and does not apply to descendant descriptors.
+	StopHandler = fmt.Errorf("stop handler")
+)
 
 type Handler interface {
 	Handle(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error)
@@ -24,12 +34,17 @@ func (fn HandlerFunc) Handle(ctx context.Context, desc ocispec.Descriptor) (subd
 }
 
 // Handlers returns a handler that will run the handlers in sequence.
+//
+// A handler may return `StopHandler` to stop calling additional handlers
 func Handlers(handlers ...Handler) HandlerFunc {
 	return func(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error) {
 		var children []ocispec.Descriptor
 		for _, handler := range handlers {
 			ch, err := handler.Handle(ctx, desc)
 			if err != nil {
+				if errors.Cause(err) == StopHandler {
+					break
+				}
 				return nil, err
 			}
 

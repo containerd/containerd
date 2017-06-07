@@ -41,6 +41,17 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, size i
 	}
 	defer cw.Close()
 
+	return Copy(cw, r, size, expected)
+}
+
+// Copy copies data with the expected digest from the reader into the
+// provided content store writer.
+//
+// This is useful when the digest and size are known beforehand. When
+// the size or digest is unknown, these values may be empty.
+//
+// Copy is buffered, so no need to wrap reader in buffered io.
+func Copy(cw Writer, r io.Reader, size int64, expected digest.Digest) error {
 	ws, err := cw.Status()
 	if err != nil {
 		return err
@@ -50,7 +61,7 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, size i
 		r, err = seekReader(r, ws.Offset, size)
 		if err != nil {
 			if !isUnseekable(err) {
-				return errors.Wrapf(err, "unabled to resume write to %v", ref)
+				return errors.Wrapf(err, "unabled to resume write to %v", ws.Ref)
 			}
 
 			// reader is unseekable, try to move the writer back to the start.
@@ -69,7 +80,7 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, size i
 
 	if err := cw.Commit(size, expected); err != nil {
 		if !IsExists(err) {
-			return errors.Wrapf(err, "failed commit on ref %q", ref)
+			return errors.Wrapf(err, "failed commit on ref %q", ws.Ref)
 		}
 	}
 
