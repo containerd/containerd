@@ -35,9 +35,10 @@ func TestVersion(t *testing.T) {
 	defer ctrl.Finish()
 	// TODO(random-liu): Check containerd version after containerd fixes its version.
 	for desc, test := range map[string]struct {
-		versionRes *versionapi.VersionResponse
-		versionErr error
-		expectErr  bool
+		versionRes      *versionapi.VersionResponse
+		versionErr      error
+		expectErr       bool
+		expectedVersion string
 	}{
 		"should return error if containerd version returns error": {
 			versionErr: errors.New("random error"),
@@ -55,7 +56,11 @@ func TestVersion(t *testing.T) {
 		mock.EXPECT().Version(ctx, &empty.Empty{}).Return(test.versionRes, test.versionErr)
 
 		c.versionService = mock
-		_, err := c.Version(ctx, &runtime.VersionRequest{})
-		assert.Equal(t, test.expectErr, err != nil)
+		v, err := c.Version(ctx, &runtime.VersionRequest{})
+		if test.expectErr {
+			assert.Equal(t, test.expectErr, err != nil)
+		} else {
+			assert.Equal(t, test.versionRes.Version, v.RuntimeVersion)
+		}
 	}
 }
