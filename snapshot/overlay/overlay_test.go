@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/snapshot/storage"
 	"github.com/containerd/containerd/snapshot/testsuite"
@@ -33,7 +34,7 @@ func TestOverlay(t *testing.T) {
 }
 
 func TestOverlayMounts(t *testing.T) {
-	ctx := context.TODO()
+	ctx := namespaces.WithNamespace(context.Background(), "snapshotter-overlay-test")
 	root, err := ioutil.TempDir("", "overlay")
 	if err != nil {
 		t.Fatal(err)
@@ -69,7 +70,7 @@ func TestOverlayMounts(t *testing.T) {
 }
 
 func TestOverlayCommit(t *testing.T) {
-	ctx := context.TODO()
+	ctx := namespaces.WithNamespace(context.Background(), "snapshotter-overlay-test")
 	root, err := ioutil.TempDir("", "overlay")
 	if err != nil {
 		t.Fatal(err)
@@ -98,7 +99,7 @@ func TestOverlayCommit(t *testing.T) {
 }
 
 func TestOverlayOverlayMount(t *testing.T) {
-	ctx := context.TODO()
+	ctx := namespaces.WithNamespace(context.Background(), "snapshotter-overlay-test")
 	root, err := ioutil.TempDir("", "overlay")
 	if err != nil {
 		t.Fatal(err)
@@ -186,7 +187,7 @@ func getParents(ctx context.Context, sn snapshot.Snapshotter, root, key string) 
 
 func TestOverlayOverlayRead(t *testing.T) {
 	testutil.RequiresRoot(t)
-	ctx := context.TODO()
+	ctx := namespaces.WithNamespace(context.Background(), "snapshotter-overlay-test")
 	root, err := ioutil.TempDir("", "overlay")
 	if err != nil {
 		t.Fatal(err)
@@ -238,7 +239,7 @@ func TestOverlayOverlayRead(t *testing.T) {
 }
 
 func TestOverlayView(t *testing.T) {
-	ctx := context.TODO()
+	ctx := namespaces.WithNamespace(context.Background(), "snapshotter-overlay-test")
 	root, err := ioutil.TempDir("", "overlay")
 	if err != nil {
 		t.Fatal(err)

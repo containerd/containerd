@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/snapshot/testsuite"
 	"github.com/containerd/containerd/testutil"
@@ -42,7 +43,7 @@ func TestBtrfs(t *testing.T) {
 
 func TestBtrfsMounts(t *testing.T) {
 	testutil.RequiresRoot(t)
-	ctx := context.Background()
+	ctx := namespaces.WithNamespace(context.Background(), "snapshotter-btrfs-test")
 
 	// create temporary directory for mount point
 	mountPoint, err := ioutil.TempDir("", "containerd-btrfs-test")
