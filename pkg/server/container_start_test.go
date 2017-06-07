@@ -324,6 +324,11 @@ func TestGenerateContainerMounts(t *testing.T) {
 					HostPath:      testSandboxRootDir + "/resolv.conf",
 					Readonly:      true,
 				},
+				{
+					ContainerPath: "/dev/shm",
+					HostPath:      testSandboxRootDir + "/shm",
+					Readonly:      false,
+				},
 			},
 		},
 		"should setup rw mount when rootfs is read-write": {
@@ -336,7 +341,34 @@ func TestGenerateContainerMounts(t *testing.T) {
 				},
 				{
 					ContainerPath: resolvConfPath,
-					HostPath:      getResolvPath(testSandboxRootDir),
+					HostPath:      testSandboxRootDir + "/resolv.conf",
+					Readonly:      false,
+				},
+				{
+					ContainerPath: "/dev/shm",
+					HostPath:      testSandboxRootDir + "/shm",
+					Readonly:      false,
+				},
+			},
+		},
+		"should use host /dev/shm when host ipc is set": {
+			securityContext: &runtime.LinuxContainerSecurityContext{
+				NamespaceOptions: &runtime.NamespaceOption{HostIpc: true},
+			},
+			expectedMounts: []*runtime.Mount{
+				{
+					ContainerPath: "/etc/hosts",
+					HostPath:      testSandboxRootDir + "/hosts",
+					Readonly:      false,
+				},
+				{
+					ContainerPath: resolvConfPath,
+					HostPath:      testSandboxRootDir + "/resolv.conf",
+					Readonly:      false,
+				},
+				{
+					ContainerPath: "/dev/shm",
+					HostPath:      "/dev/shm",
 					Readonly:      false,
 				},
 			},

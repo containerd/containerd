@@ -183,6 +183,7 @@ func (f *FakeOS) WriteFile(filename string, data []byte, perm os.FileMode) error
 	if f.WriteFileFn != nil {
 		return f.WriteFileFn(filename, data, perm)
 	}
+	return nil
 }
 
 // Mount is a fake call that invokes MountFn or just return nil.

@@ -19,6 +19,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -31,6 +32,7 @@ import (
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
 	"golang.org/x/net/context"
+	"golang.org/x/sys/unix"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
@@ -137,8 +139,11 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	if err = c.setupSandboxFiles(sandboxRootDir, config); err != nil {
 		return nil, fmt.Errorf("failed to setup sandbox files: %v", err)
 	}
-	// No need to cleanup on error, because the whole sandbox root directory will be removed
-	// on error.
+	defer func() {
+		if retErr != nil {
+			c.cleanupSandboxFiles(sandboxRootDir, config)
+		}
+	}()
 
 	// Start sandbox container.
 	spec, err := c.generateSandboxContainerSpec(id, config, imageMeta.Config)
@@ -301,7 +306,7 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 func (c *criContainerdService) setupSandboxFiles(rootDir string, config *runtime.PodSandboxConfig) error {
 	// TODO(random-liu): Consider whether we should maintain /etc/hosts and /etc/resolv.conf in kubelet.
 	sandboxEtcHosts := getSandboxHosts(rootDir)
-	if err := c.os.CopyFile(etcHosts, sandboxEtcHosts, 0666); err != nil {
+	if err := c.os.CopyFile(etcHosts, sandboxEtcHosts, 0644); err != nil {
 		return fmt.Errorf("failed to generate sandbox hosts file %q: %v", sandboxEtcHosts, err)
 	}
 
@@ -328,8 +333,22 @@ func (c *criContainerdService) setupSandboxFiles(rootDir string, config *runtime
 		}
 	}
 
-	// TODO(random-liu): [P0] Deal with /dev/shm. Use host for HostIpc, and create and mount for
-	// non-HostIpc. What about mqueue?
+	// Setup sandbox /dev/shm.
+	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostIpc() {
+		if _, err := c.os.Stat(devShm); err != nil {
+			return fmt.Errorf("host %q is not available for host ipc: %v", devShm, err)
+		}
+	} else {
+		sandboxDevShm := getSandboxDevShm(rootDir)
+		if err := c.os.MkdirAll(sandboxDevShm, 0700); err != nil {
+			return fmt.Errorf("failed to create sandbox shm: %v", err)
+		}
+		shmproperty := fmt.Sprintf("mode=1777,size=%d", defaultShmSize)
+		if err := c.os.Mount("shm", sandboxDevShm, "tmpfs", uintptr(unix.MS_NOEXEC|unix.MS_NOSUID|unix.MS_NODEV), shmproperty); err != nil {
+			return fmt.Errorf("failed to mount sandbox shm: %v", err)
+		}
+	}
+
 	return nil
 }
 
@@ -355,4 +374,14 @@ func parseDNSOptions(servers, searches, options []string) (string, error) {
 	}
 
 	return resolvContent, nil
+}
+
+// cleanupSandboxFiles only unmount files, we rely on the removal of sandbox root directory to remove files.
+// Each cleanup task should log error instead of returning, so as to keep on cleanup on error.
+func (c *criContainerdService) cleanupSandboxFiles(rootDir string, config *runtime.PodSandboxConfig) {
+	if !config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostIpc() {
+		if err := c.os.Unmount(getSandboxDevShm(rootDir), unix.MNT_DETACH); err != nil && os.IsNotExist(err) {
+			glog.Errorf("failed to unmount sandbox shm: %v", err)
+		}
+	}
 }
