@@ -24,11 +24,11 @@ import (
 	"sync"
 	"time"
 
+	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	"github.com/containerd/containerd/content"
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
-	rootfsservice "github.com/containerd/containerd/services/rootfs"
 	"github.com/golang/glog"
 	imagedigest "github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -195,9 +195,13 @@ func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
 		PlainHTTP: true,
 		Client:    http.DefaultClient,
 	})
-	_, desc, fetcher, err := resolver.Resolve(ctx, ref)
+	_, desc, err := resolver.Resolve(ctx, ref)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to resolve ref %q: %v", ref, err)
+	}
+	fetcher, err := resolver.Fetcher(ctx, ref)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get fetcher for ref %q: %v", ref, err)
 	}
 	// Currently, the resolved image name is the same with ref in docker resolver,
 	// but they may be different in the future.
@@ -263,10 +267,18 @@ func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
 	}
 
 	// Unpack the image layers into snapshots.
-	rootfsUnpacker := rootfsservice.NewUnpackerFromClient(c.rootfsService)
-	if _, err = rootfsUnpacker.Unpack(ctx, manifest.Layers); err != nil {
+	/* snapshotUnpacker := snapshotservice.NewUnpackerFromClient(c.snapshotService)
+	if _, err = snapshotUnpacker.Unpack(ctx, manifest.Layers); err != nil {
 		return "", "", fmt.Errorf("unpack failed for manifest layers %+v: %v", manifest.Layers, err)
+	} TODO(mikebrow): WIP replacing the commented Unpack with the below Prepare request */
+	_, err = image.RootFS(ctx, c.contentStoreService)
+	if err != nil {
+		return "", "", err
 	}
+	if _, err = c.snapshotService.Prepare(ctx, &snapshotapi.PrepareRequest{Key: ref, Parent: ""}); err != nil {
+		return "", "", err
+	}
+
 	// TODO(random-liu): Considering how to deal with the disk usage of content.
 
 	configDesc, err := image.Config(ctx, c.contentStoreService)

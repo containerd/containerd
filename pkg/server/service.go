@@ -22,7 +22,7 @@ import (
 	contentapi "github.com/containerd/containerd/api/services/content"
 	"github.com/containerd/containerd/api/services/execution"
 	imagesapi "github.com/containerd/containerd/api/services/images"
-	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
+	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	versionapi "github.com/containerd/containerd/api/services/version"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
@@ -73,12 +73,12 @@ type criContainerdService struct {
 	// containerNameIndex stores all container names and make sure each
 	// name is unique.
 	containerNameIndex *registrar.Registrar
-	// containerService is containerd container service client.
-	containerService execution.ContainerServiceClient
+	// containerService is containerd tasks client.
+	containerService execution.TasksClient
 	// contentStoreService is the containerd content service client.
 	contentStoreService content.Store
-	// rootfsService is the containerd rootfs service client.
-	rootfsService rootfsapi.RootFSClient
+	// snapshotService is the containerd snapshot service client.
+	snapshotService snapshotapi.SnapshotClient
 	// imageStoreService is the containerd service to store and track
 	// image metadata.
 	imageStoreService images.Store
@@ -108,10 +108,10 @@ func NewCRIContainerdService(conn *grpc.ClientConn, rootDir, networkPluginBinDir
 		sandboxIDIndex:   truncindex.NewTruncIndex(nil),
 		// TODO(random-liu): Add container id index.
 		containerNameIndex:  registrar.NewRegistrar(),
-		containerService:    execution.NewContainerServiceClient(conn),
+		containerService:    execution.NewTasksClient(conn),
 		imageStoreService:   imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)),
 		contentStoreService: contentservice.NewStoreFromClient(contentapi.NewContentClient(conn)),
-		rootfsService:       rootfsapi.NewRootFSClient(conn),
+		snapshotService:     snapshotapi.NewSnapshotClient(conn),
 		versionService:      versionapi.NewVersionClient(conn),
 		healthService:       healthapi.NewHealthClient(conn),
 		agentFactory:        agents.NewAgentFactory(),

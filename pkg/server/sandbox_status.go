@@ -23,7 +23,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/containerd/containerd/api/services/execution"
-	"github.com/containerd/containerd/api/types/container"
+	"github.com/containerd/containerd/api/types/task"
 
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
@@ -47,7 +47,7 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 	// Use the full sandbox id.
 	id := sandbox.ID
 
-	info, err := c.containerService.Info(ctx, &execution.InfoRequest{ID: id})
+	info, err := c.containerService.Info(ctx, &execution.InfoRequest{ContainerID: id})
 	if err != nil && !isContainerdContainerNotExistError(err) {
 		return nil, fmt.Errorf("failed to get sandbox container info for %q: %v", id, err)
 	}
@@ -55,7 +55,7 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 	// Set sandbox state to NOTREADY by default.
 	state := runtime.PodSandboxState_SANDBOX_NOTREADY
 	// If the sandbox container is running, treat it as READY.
-	if info != nil && info.Status == container.Status_RUNNING {
+	if info != nil && info.Task.Status == task.StatusRunning {
 		state = runtime.PodSandboxState_SANDBOX_READY
 	}
 

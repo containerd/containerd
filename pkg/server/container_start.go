@@ -26,9 +26,8 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/api/services/execution"
-	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
-	"github.com/containerd/containerd/api/types/container"
-	prototypes "github.com/gogo/protobuf/types"
+	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
+	"github.com/containerd/containerd/api/types/task"
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runc/libcontainer/devices"
@@ -104,16 +103,16 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 	sandboxConfig := sandboxMeta.Config
 	sandboxID := meta.SandboxID
 	// Make sure sandbox is running.
-	sandboxInfo, err := c.containerService.Info(ctx, &execution.InfoRequest{ID: sandboxID})
+	sandboxInfo, err := c.containerService.Info(ctx, &execution.InfoRequest{ContainerID: sandboxID})
 	if err != nil {
 		return fmt.Errorf("failed to get sandbox container %q info: %v", sandboxID, err)
 	}
 	// This is only a best effort check, sandbox may still exit after this. If sandbox fails
 	// before starting the container, the start will fail.
-	if sandboxInfo.Status != container.Status_RUNNING {
+	if sandboxInfo.Task.Status != task.StatusRunning {
 		return fmt.Errorf("sandbox container %q is not running", sandboxID)
 	}
-	sandboxPid := sandboxInfo.Pid
+	sandboxPid := sandboxInfo.Task.Pid
 	glog.V(2).Infof("Sandbox container %q is running with pid %d", sandboxID, sandboxPid)
 
 	// Generate containerd container create options.
@@ -128,7 +127,7 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 	if err != nil {
 		return fmt.Errorf("failed to generate container %q spec: %v", id, err)
 	}
-	rawSpec, err := json.Marshal(spec)
+	_, err = json.Marshal(spec)
 	if err != nil {
 		return fmt.Errorf("failed to marshal oci spec %+v: %v", spec, err)
 	}
@@ -177,24 +176,19 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 	}
 
 	// Get rootfs mounts.
-	mountsResp, err := c.rootfsService.Mounts(ctx, &rootfsapi.MountsRequest{Name: id})
+	mountsResp, err := c.snapshotService.Mounts(ctx, &snapshotapi.MountsRequest{Key: id})
 	if err != nil {
 		return fmt.Errorf("failed to get rootfs mounts %q: %v", id, err)
 	}
 
 	// Create containerd container.
 	createOpts := &execution.CreateRequest{
-		ID: id,
-		Spec: &prototypes.Any{
-			TypeUrl: runtimespec.Version,
-			Value:   rawSpec,
-		},
-		Rootfs:   mountsResp.Mounts,
-		Runtime:  defaultRuntime,
-		Stdin:    stdin,
-		Stdout:   stdout,
-		Stderr:   stderr,
-		Terminal: config.GetTty(),
+		ContainerID: id,
+		Rootfs:      mountsResp.Mounts,
+		Stdin:       stdin,
+		Stdout:      stdout,
+		Stderr:      stderr,
+		Terminal:    config.GetTty(),
 	}
 	glog.V(5).Infof("Create containerd container (id=%q, name=%q) with options %+v.",
 		id, meta.Name, createOpts)
@@ -205,14 +199,14 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 	defer func() {
 		if retErr != nil {
 			// Cleanup the containerd container if an error is returned.
-			if _, err := c.containerService.Delete(ctx, &execution.DeleteRequest{ID: id}); err != nil {
+			if _, err := c.containerService.Delete(ctx, &execution.DeleteRequest{ContainerID: id}); err != nil {
 				glog.Errorf("Failed to delete containerd container %q: %v", id, err)
 			}
 		}
 	}()
 
 	// Start containerd container.
-	if _, err := c.containerService.Start(ctx, &execution.StartRequest{ID: id}); err != nil {
+	if _, err := c.containerService.Start(ctx, &execution.StartRequest{ContainerID: id}); err != nil {
 		return fmt.Errorf("failed to start containerd container %q: %v", id, err)
 	}
 

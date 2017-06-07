@@ -34,8 +34,8 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/images"
+	containerdmetadata "github.com/containerd/containerd/metadata"
+	"github.com/containerd/containerd/plugin"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 
@@ -64,7 +64,7 @@ const (
 	relativeRootfsPath = "rootfs"
 	// defaultRuntime is the runtime to use in containerd. We may support
 	// other runtime in the future.
-	defaultRuntime = "linux"
+	// defaultRuntime = "linux" // TODO defaulRuntime is currently unused
 	// sandboxesDir contains all sandbox root. A sandbox root is the running
 	// directory of the sandbox, all files created for the sandbox will be
 	// placed under this directory.
@@ -223,7 +223,7 @@ func getPIDNamespace(pid uint32) string {
 // ErrContainerNotExist error.
 // TODO(random-liu): Containerd should expose error better through api.
 func isContainerdContainerNotExistError(grpcError error) bool {
-	return grpc.ErrorDesc(grpcError) == containerd.ErrContainerNotExist.Error()
+	return grpc.ErrorDesc(grpcError) == plugin.ErrContainerNotExist.Error()
 }
 
 // isRuncProcessAlreadyFinishedError checks whether a grpc error is a process already
@@ -354,7 +354,7 @@ func (c *criContainerdService) localResolve(ctx context.Context, ref string) (*m
 		}
 		image, err := c.imageStoreService.Get(ctx, normalized.String())
 		if err != nil {
-			if images.IsNotFound(err) {
+			if containerdmetadata.IsNotFound(err) {
 				return nil, nil
 			}
 			return nil, fmt.Errorf("an error occurred when getting image %q from containerd image store: %v",

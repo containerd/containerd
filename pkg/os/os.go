@@ -21,7 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/tonistiigi/fifo"
+	"github.com/containerd/fifo"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 )

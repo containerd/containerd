@@ -26,8 +26,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/api/types/container"
+	"github.com/containerd/containerd/api/types/task"
+	"github.com/containerd/containerd/plugin"
 
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
@@ -49,14 +49,14 @@ func TestStopPodSandbox(t *testing.T) {
 			}},
 		NetNS: "test-netns",
 	}
-	testContainer := container.Container{
+	testContainer := task.Task{
 		ID:     testID,
 		Pid:    1,
-		Status: container.Status_RUNNING,
+		Status: task.StatusRunning,
 	}
 
 	for desc, test := range map[string]struct {
-		sandboxContainers []container.Container
+		sandboxContainers []task.Task
 		injectSandbox     bool
 		injectErr         error
 		injectStatErr     error
@@ -72,17 +72,17 @@ func TestStopPodSandbox(t *testing.T) {
 			expectedCNICalls: []string{},
 		},
 		"stop sandbox with sandbox container": {
-			sandboxContainers: []container.Container{testContainer},
+			sandboxContainers: []task.Task{testContainer},
 			injectSandbox:     true,
 			expectErr:         false,
 			expectCalls:       []string{"delete"},
 			expectedCNICalls:  []string{"TearDownPod"},
 		},
 		"stop sandbox with sandbox container not exist error": {
-			sandboxContainers: []container.Container{},
+			sandboxContainers: []task.Task{},
 			injectSandbox:     true,
 			// Inject error to make sure fake execution client returns error.
-			injectErr:        grpc.Errorf(codes.Unknown, containerd.ErrContainerNotExist.Error()),
+			injectErr:        grpc.Errorf(codes.Unknown, plugin.ErrContainerNotExist.Error()),
 			expectErr:        false,
 			expectCalls:      []string{"delete"},
 			expectedCNICalls: []string{"TearDownPod"},
@@ -95,7 +95,7 @@ func TestStopPodSandbox(t *testing.T) {
 			expectedCNICalls: []string{"TearDownPod"},
 		},
 		"stop sandbox with Stat returns arbitrary error": {
-			sandboxContainers: []container.Container{testContainer},
+			sandboxContainers: []task.Task{testContainer},
 			injectSandbox:     true,
 			expectErr:         true,
 			injectStatErr:     errors.New("arbitrary error"),
@@ -103,7 +103,7 @@ func TestStopPodSandbox(t *testing.T) {
 			expectedCNICalls:  []string{},
 		},
 		"stop sandbox with Stat returns not exist error": {
-			sandboxContainers: []container.Container{testContainer},
+			sandboxContainers: []task.Task{testContainer},
 			injectSandbox:     true,
 			expectErr:         false,
 			expectCalls:       []string{"delete"},
@@ -111,7 +111,7 @@ func TestStopPodSandbox(t *testing.T) {
 			expectedCNICalls:  []string{},
 		},
 		"stop sandbox with TearDownPod fails": {
-			sandboxContainers: []container.Container{testContainer},
+			sandboxContainers: []task.Task{testContainer},
 			injectSandbox:     true,
 			expectErr:         true,
 			expectedCNICalls:  []string{"TearDownPod"},

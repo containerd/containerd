@@ -24,7 +24,7 @@ import (
 
 	"github.com/containerd/containerd/api/services/execution"
 
-	"github.com/containerd/containerd/api/types/container"
+	"github.com/containerd/containerd/api/types/task"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
@@ -49,11 +49,11 @@ func (c *criContainerdService) ListPodSandbox(ctx context.Context, r *runtime.Li
 	if err != nil {
 		return nil, fmt.Errorf("failed to list sandbox containers: %v", err)
 	}
-	sandboxesInContainerd := resp.Containers
+	sandboxesInContainerd := resp.Tasks
 
 	var sandboxes []*runtime.PodSandbox
 	for _, sandboxInStore := range sandboxesInStore {
-		var sandboxInContainerd *container.Container
+		var sandboxInContainerd *task.Task
 		for _, s := range sandboxesInContainerd {
 			if s.ID == sandboxInStore.ID {
 				sandboxInContainerd = s
@@ -64,7 +64,7 @@ func (c *criContainerdService) ListPodSandbox(ctx context.Context, r *runtime.Li
 		// Set sandbox state to NOTREADY by default.
 		state := runtime.PodSandboxState_SANDBOX_NOTREADY
 		// If the sandbox container is running, return the sandbox as READY.
-		if sandboxInContainerd != nil && sandboxInContainerd.Status == container.Status_RUNNING {
+		if sandboxInContainerd != nil && sandboxInContainerd.Status == task.StatusRunning {
 			state = runtime.PodSandboxState_SANDBOX_READY
 		}
 

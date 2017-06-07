@@ -21,8 +21,7 @@ import (
 	"os"
 	"testing"
 
-	rootfsapi "github.com/containerd/containerd/api/services/rootfs"
-	imagedigest "github.com/opencontainers/go-digest"
+	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -50,10 +49,10 @@ func TestCreateContainer(t *testing.T) {
 	// TODO(random-liu): Change this to image name after we have complete image
 	// management unit test framework.
 	testImage := "sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113799"
-	testChainID := imagedigest.Digest("test-chain-id")
+	testChainID := "test-chain-id"
 	testImageMetadata := metadata.ImageMetadata{
 		ID:      testImage,
-		ChainID: testChainID.String(),
+		ChainID: testChainID,
 		Config:  &imagespec.ImageConfig{},
 	}
 	testConfig := &runtime.ContainerConfig{
@@ -135,7 +134,7 @@ func TestCreateContainer(t *testing.T) {
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIContainerdService()
-		fakeRootfsClient := c.rootfsService.(*servertesting.FakeRootfsClient)
+		fakeSnapshotClient := c.snapshotService.(*servertesting.FakeSnapshotClient)
 		fakeOS := c.os.(*ostesting.FakeOS)
 		if test.sandboxMetadata != nil {
 			assert.NoError(t, c.sandboxStore.Create(*test.sandboxMetadata))
@@ -148,9 +147,8 @@ func TestCreateContainer(t *testing.T) {
 			assert.NoError(t, c.imageMetadataStore.Create(testImageMetadata))
 		}
 		if test.prepareSnapshotErr != nil {
-			fakeRootfsClient.InjectError("prepare", test.prepareSnapshotErr)
+			fakeSnapshotClient.InjectError("prepare", test.prepareSnapshotErr)
 		}
-		fakeRootfsClient.SetFakeChainIDs([]imagedigest.Digest{testChainID})
 		rootExists := false
 		rootPath := ""
 		fakeOS.MkdirAllFn = func(path string, perm os.FileMode) error {
@@ -197,14 +195,12 @@ func TestCreateContainer(t *testing.T) {
 		test.expectMeta.CreatedAt = meta.CreatedAt
 		assert.Equal(t, test.expectMeta, meta, "container metadata should be created")
 
-		assert.Equal(t, []string{"prepare"}, fakeRootfsClient.GetCalledNames(), "prepare should be called")
-		calls := fakeRootfsClient.GetCalledDetails()
-		prepareOpts := calls[0].Argument.(*rootfsapi.PrepareRequest)
-		assert.Equal(t, &rootfsapi.PrepareRequest{
-			Name:    id,
-			ChainID: testChainID,
-			// TODO(random-liu): Test readonly rootfs.
-			Readonly: false,
+		assert.Equal(t, []string{"prepare"}, fakeSnapshotClient.GetCalledNames(), "prepare should be called")
+		calls := fakeSnapshotClient.GetCalledDetails()
+		prepareOpts := calls[0].Argument.(*snapshotapi.PrepareRequest)
+		assert.Equal(t, &snapshotapi.PrepareRequest{
+			Key:    id,
+			Parent: testChainID,
 		}, prepareOpts, "prepare request should be correct")
 	}
 }

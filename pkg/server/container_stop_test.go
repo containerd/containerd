@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/api/services/execution"
-	"github.com/containerd/containerd/api/types/container"
+	"github.com/containerd/containerd/api/types/task"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
@@ -99,14 +99,14 @@ func TestStopContainer(t *testing.T) {
 		CreatedAt: time.Now().UnixNano(),
 		StartedAt: time.Now().UnixNano(),
 	}
-	testContainer := container.Container{
+	testContainer := task.Task{
 		ID:     testID,
 		Pid:    testPid,
-		Status: container.Status_RUNNING,
+		Status: task.StatusRunning,
 	}
 	for desc, test := range map[string]struct {
 		metadata            *metadata.ContainerMetadata
-		containerdContainer *container.Container
+		containerdContainer *task.Task
 		stopErr             error
 		noTimeout           bool
 		expectErr           bool
@@ -138,15 +138,15 @@ func TestStopContainer(t *testing.T) {
 			expectCalls: []servertesting.CalledDetail{
 				{
 					Name:     "kill",
-					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGTERM)},
+					Argument: &execution.KillRequest{ContainerID: testID, Signal: uint32(unix.SIGTERM)},
 				},
 				{
 					Name:     "kill",
-					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGKILL)},
+					Argument: &execution.KillRequest{ContainerID: testID, Signal: uint32(unix.SIGKILL)},
 				},
 				{
 					Name:     "delete",
-					Argument: &execution.DeleteRequest{ID: testID},
+					Argument: &execution.DeleteRequest{ContainerID: testID},
 				},
 			},
 		},
@@ -158,15 +158,15 @@ func TestStopContainer(t *testing.T) {
 			expectCalls: []servertesting.CalledDetail{
 				{
 					Name:     "kill",
-					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGTERM)},
+					Argument: &execution.KillRequest{ContainerID: testID, Signal: uint32(unix.SIGTERM)},
 				},
 				{
 					Name:     "kill",
-					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGKILL)},
+					Argument: &execution.KillRequest{ContainerID: testID, Signal: uint32(unix.SIGKILL)},
 				},
 				{
 					Name:     "delete",
-					Argument: &execution.DeleteRequest{ID: testID},
+					Argument: &execution.DeleteRequest{ContainerID: testID},
 				},
 			},
 		},
@@ -178,7 +178,7 @@ func TestStopContainer(t *testing.T) {
 			expectCalls: []servertesting.CalledDetail{
 				{
 					Name:     "kill",
-					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGTERM)},
+					Argument: &execution.KillRequest{ContainerID: testID, Signal: uint32(unix.SIGTERM)},
 				},
 			},
 		},
@@ -190,11 +190,11 @@ func TestStopContainer(t *testing.T) {
 			expectCalls: []servertesting.CalledDetail{
 				{
 					Name:     "kill",
-					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGTERM)},
+					Argument: &execution.KillRequest{ContainerID: testID, Signal: uint32(unix.SIGTERM)},
 				},
 				{
 					Name:     "delete",
-					Argument: &execution.DeleteRequest{ID: testID},
+					Argument: &execution.DeleteRequest{ContainerID: testID},
 				},
 			},
 		},
@@ -206,11 +206,11 @@ func TestStopContainer(t *testing.T) {
 			expectCalls: []servertesting.CalledDetail{
 				{
 					Name:     "kill",
-					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGKILL)},
+					Argument: &execution.KillRequest{ContainerID: testID, Signal: uint32(unix.SIGKILL)},
 				},
 				{
 					Name:     "delete",
-					Argument: &execution.DeleteRequest{ID: testID},
+					Argument: &execution.DeleteRequest{ContainerID: testID},
 				},
 			},
 		},
@@ -229,7 +229,7 @@ func TestStopContainer(t *testing.T) {
 		}
 		// Inject containerd container.
 		if test.containerdContainer != nil {
-			fake.SetFakeContainers([]container.Container{*test.containerdContainer})
+			fake.SetFakeContainers([]task.Task{*test.containerdContainer})
 		}
 		if test.stopErr != nil {
 			fake.InjectError("kill", test.stopErr)
@@ -237,7 +237,7 @@ func TestStopContainer(t *testing.T) {
 		eventClient, err := fake.Events(context.Background(), &execution.EventsRequest{})
 		assert.NoError(t, err)
 		// Start a simple test event monitor.
-		go func(e execution.ContainerService_EventsClient) {
+		go func(e execution.Tasks_EventsClient) {
 			for {
 				if err := c.handleEventStream(e); err != nil { // nolint: vetshadow
 					return
