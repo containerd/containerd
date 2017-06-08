@@ -155,6 +155,7 @@ func createDefaultSpec() (*specs.Spec, error) {
 			},
 		},
 		Linux: &specs.Linux{
+			// TODO (@crosbymichael) make sure we don't have have two containers in the same cgroup
 			Resources: &specs.LinuxResources{
 				Devices: []specs.LinuxDeviceCgroup{
 					{
