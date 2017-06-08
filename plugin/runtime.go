@@ -34,6 +34,8 @@ type Exit struct {
 type Runtime interface {
 	// Create creates a container with the provided id and options
 	Create(ctx context.Context, id string, opts CreateOpts) (Task, error)
+	// Get returns a container
+	Get(context.Context, string) (Task, error)
 	// Containers returns all the current containers for the runtime
 	Tasks(context.Context) ([]Task, error)
 	// Delete removes the container in the runtime

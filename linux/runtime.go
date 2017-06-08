@@ -133,7 +133,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts)
 		os.RemoveAll(path)
 		return nil, err
 	}
-	c := newTask(id, opts.Spec, s)
+	c := newTask(id, namespace, opts.Spec, s)
 	// after the task is created, add it to the monitor
 	if err = r.monitor.Monitor(c); err != nil {
 		return nil, err
@@ -176,7 +176,7 @@ func (r *Runtime) Tasks(ctx context.Context) ([]plugin.Task, error) {
 		if !fi.IsDir() {
 			continue
 		}
-		tasks, err := r.loadContainers(ctx, fi.Name())
+		tasks, err := r.loadTasks(ctx, fi.Name())
 		if err != nil {
 			return nil, err
 		}
@@ -185,7 +185,15 @@ func (r *Runtime) Tasks(ctx context.Context) ([]plugin.Task, error) {
 	return o, nil
 }
 
-func (r *Runtime) loadContainers(ctx context.Context, ns string) ([]plugin.Task, error) {
+func (r *Runtime) Get(ctx context.Context, id string) (plugin.Task, error) {
+	namespace, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return r.loadTask(ctx, filepath.Join(r.root, namespace, id))
+}
+
+func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]plugin.Task, error) {
 	dir, err := ioutil.ReadDir(filepath.Join(r.root, ns))
 	if err != nil {
 		return nil, err
@@ -198,7 +206,7 @@ func (r *Runtime) loadContainers(ctx context.Context, ns string) ([]plugin.Task,
 		id := fi.Name()
 		// TODO: optimize this if it is call frequently to list all containers
 		// i.e. dont' reconnect to the the shim's ever time
-		c, err := r.loadContainer(ctx, filepath.Join(r.root, ns, id))
+		c, err := r.loadTask(ctx, filepath.Join(r.root, ns, id))
 		if err != nil {
 			log.G(ctx).WithError(err).Warnf("failed to load container %s/%s", ns, id)
 			// if we fail to load the container, connect to the shim, make sure if the shim has
@@ -283,7 +291,7 @@ func (r *Runtime) deleteBundle(namespace, id string) error {
 	return os.RemoveAll(filepath.Join(r.root, namespace, id))
 }
 
-func (r *Runtime) loadContainer(ctx context.Context, path string) (*Task, error) {
+func (r *Runtime) loadTask(ctx context.Context, path string) (*Task, error) {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -304,6 +312,7 @@ func (r *Runtime) loadContainer(ctx context.Context, path string) (*Task, error)
 		containerID: id,
 		shim:        s,
 		spec:        data,
+		namespace:   namespace,
 	}, nil
 }
 
