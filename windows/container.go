@@ -194,6 +194,28 @@ func (c *container) Checkpoint(ctx context.Context, opts plugin.CheckpointOpts) 
 	return fmt.Errorf("Windows containers do not support checkpoint")
 }
 
+func (c *container) DeleteProcess(ctx context.Context, pid uint32) (*plugin.Exit, error) {
+	var process *hcs.Process
+	for _, p := range c.ctr.Processes() {
+		if p.Pid() == pid {
+			process = p
+			break
+		}
+	}
+	if process == nil {
+		return nil, fmt.Errorf("process %d not found", pid)
+	}
+	ec, err := process.ExitCode()
+	if err != nil {
+		return nil, err
+	}
+	process.Delete()
+	return &plugin.Exit{
+		Status:    ec,
+		Timestamp: process.ExitedAt(),
+	}, nil
+}
+
 func (c *container) setStatus(status plugin.Status) {
 	c.Lock()
 	c.status = status

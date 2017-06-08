@@ -302,6 +302,14 @@ func TestContainerExec(t *testing.T) {
 	if status != 6 {
 		t.Errorf("expected exec exit code 6 but received %d", status)
 	}
+	deleteStatus, err := process.Delete(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	if deleteStatus != 6 {
+		t.Errorf("expected delete exit code e6 but received %d", deleteStatus)
+	}
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
 		t.Error(err)
 	}

@@ -17,6 +17,7 @@ service Shim {
 	rpc Create(CreateRequest) returns (CreateResponse);
 	rpc Start(StartRequest) returns (google.protobuf.Empty);
 	rpc Delete(DeleteRequest) returns (DeleteResponse);
+	rpc DeleteProcess(DeleteProcessRequest) returns (DeleteResponse);
 	rpc State(StateRequest) returns (StateResponse);
 	rpc Processes(ProcessesRequest) returns (ProcessesResponse);
 	rpc Pause(PauseRequest) returns (google.protobuf.Empty);
@@ -53,12 +54,15 @@ message StartRequest {
 }
 
 message DeleteRequest {
-	uint32 pid = 1;
 }
 
 message DeleteResponse {
 	uint32 exit_status = 1;
 	google.protobuf.Timestamp exited_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}
+
+message DeleteProcessRequest {
+	uint32 pid = 1;
 }
 
 message ExecRequest {

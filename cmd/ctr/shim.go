@@ -10,7 +10,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"strconv"
 	"time"
 
 	gocontext "context"
@@ -154,13 +153,7 @@ var shimDeleteCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		pid, err := strconv.Atoi(context.Args().First())
-		if err != nil {
-			return err
-		}
-		r, err := service.Delete(gocontext.Background(), &shim.DeleteRequest{
-			Pid: uint32(pid),
-		})
+		r, err := service.Delete(gocontext.Background(), &shim.DeleteRequest{})
 		if err != nil {
 			return err
 		}

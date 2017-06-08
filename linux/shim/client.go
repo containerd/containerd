@@ -59,6 +59,10 @@ func (c *client) Delete(ctx context.Context, in *shimapi.DeleteRequest, opts ...
 	return c.s.Delete(ctx, in)
 }
 
+func (c *client) DeleteProcess(ctx context.Context, in *shimapi.DeleteProcessRequest, opts ...grpc.CallOption) (*shimapi.DeleteResponse, error) {
+	return c.s.DeleteProcess(ctx, in)
+}
+
 func (c *client) Exec(ctx context.Context, in *shimapi.ExecRequest, opts ...grpc.CallOption) (*shimapi.ExecResponse, error) {
 	return c.s.Exec(ctx, in)
 }

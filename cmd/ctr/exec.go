@@ -63,7 +63,7 @@ var execCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		defer process.Delete()
+		defer process.Delete(ctx)
 
 		statusC := make(chan uint32, 1)
 		go func() {

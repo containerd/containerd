@@ -171,6 +171,21 @@ func (s *Service) Delete(ctx context.Context, r *api.DeleteRequest) (*api.Delete
 	}, nil
 }
 
+func (s *Service) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest) (*api.DeleteResponse, error) {
+	c, err := s.getTask(ctx, r.ContainerID)
+	if err != nil {
+		return nil, err
+	}
+	exit, err := c.DeleteProcess(ctx, r.Pid)
+	if err != nil {
+		return nil, err
+	}
+	return &api.DeleteResponse{
+		ExitStatus: exit.Status,
+		ExitedAt:   exit.Timestamp,
+	}, nil
+}
+
 func taskFromContainerd(ctx context.Context, c plugin.Task) (*task.Task, error) {
 	state, err := c.State(ctx)
 	if err != nil {
