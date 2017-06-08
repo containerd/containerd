@@ -13,9 +13,8 @@ import (
 )
 
 var imageCommand = cli.Command{
-	Name:    "images",
-	Aliases: []string{"images"},
-	Usage:   "image management",
+	Name:  "images",
+	Usage: "image management",
 	Subcommands: cli.Commands{
 		imagesListCommand,
 		imageRemoveCommand,
