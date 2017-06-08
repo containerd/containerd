@@ -13,6 +13,8 @@ func rewriteGRPCError(err error) error {
 		return content.ErrExists
 	case codes.NotFound:
 		return content.ErrNotFound
+	case codes.Unavailable:
+		return content.ErrLocked
 	}
 
 	return err
@@ -24,6 +26,8 @@ func serverErrorToGRPC(err error, id string) error {
 		return grpc.Errorf(codes.NotFound, "%v: not found", id)
 	case content.IsExists(err):
 		return grpc.Errorf(codes.AlreadyExists, "%v: exists", id)
+	case content.IsLocked(err):
+		return grpc.Errorf(codes.Unavailable, "%v: locked", id)
 	}
 
 	return err
