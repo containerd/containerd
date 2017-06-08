@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -44,7 +45,7 @@ func MetaStoreSuite(t *testing.T, name string, meta func(root string) (*MetaStor
 // makeTest creates a testsuite with a writable transaction
 func makeTest(t *testing.T, name string, metaFn metaFactory, fn testFunc) func(t *testing.T) {
 	return func(t *testing.T) {
-		ctx := context.Background()
+		ctx := namespaces.WithNamespace(context.Background(), "testing-snapshot-metadata")
 		tmpDir, err := ioutil.TempDir("", "metastore-test-"+name+"-")
 		if err != nil {
 			t.Fatal(err)

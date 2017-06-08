@@ -10,6 +10,7 @@ import (
 
 	"github.com/containerd/containerd/fs/fstest"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/testutil"
 	"github.com/stretchr/testify/assert"
@@ -26,7 +27,7 @@ func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(ctx context.
 
 func makeTest(t *testing.T, name string, snapshotterFn func(ctx context.Context, root string) (snapshot.Snapshotter, func(), error), fn func(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string)) func(t *testing.T) {
 	return func(t *testing.T) {
-		ctx := context.Background()
+		ctx := namespaces.WithNamespace(context.Background(), "snapshotter-test")
 		restoreMask := clearMask()
 		defer restoreMask()
 		// Make two directories: a snapshotter root and a play area for the tests:
