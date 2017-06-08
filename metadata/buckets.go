@@ -108,18 +108,18 @@ func getImagesBucket(tx *bolt.Tx, namespace string) *bolt.Bucket {
 	return getBucket(tx, imagesBucketPath(namespace)...)
 }
 
-func createContainersBucket(tx *bolt.Tx) (*bolt.Bucket, error) {
-	bkt, err := createBucketIfNotExists(tx, bucketKeyVersion, bucketKeyObjectContainers)
+func createContainersBucket(tx *bolt.Tx, namespace string) (*bolt.Bucket, error) {
+	bkt, err := createBucketIfNotExists(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectContainers)
 	if err != nil {
 		return nil, err
 	}
 	return bkt, nil
 }
 
-func getContainersBucket(tx *bolt.Tx) *bolt.Bucket {
-	return getBucket(tx, bucketKeyVersion, bucketKeyObjectContainers)
+func getContainersBucket(tx *bolt.Tx, namespace string) *bolt.Bucket {
+	return getBucket(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectContainers)
 }
 
-func getContainerBucket(tx *bolt.Tx, id string) *bolt.Bucket {
-	return getBucket(tx, bucketKeyVersion, bucketKeyObjectContainers, []byte(id))
+func getContainerBucket(tx *bolt.Tx, namespace, id string) *bolt.Bucket {
+	return getBucket(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectContainers, []byte(id))
 }

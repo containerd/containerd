@@ -6,6 +6,7 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/pkg/errors"
 )
 
@@ -20,7 +21,12 @@ func NewContainerStore(tx *bolt.Tx) containers.Store {
 }
 
 func (s *containerStore) Get(ctx context.Context, id string) (containers.Container, error) {
-	bkt := getContainerBucket(s.tx, id)
+	namespace, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return containers.Container{}, err
+	}
+
+	bkt := getContainerBucket(s.tx, namespace, id)
 	if bkt == nil {
 		return containers.Container{}, errors.Wrap(ErrNotFound, "bucket does not exist")
 	}
@@ -34,9 +40,14 @@ func (s *containerStore) Get(ctx context.Context, id string) (containers.Contain
 }
 
 func (s *containerStore) List(ctx context.Context, filter string) ([]containers.Container, error) {
+	namespace, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		m   []containers.Container
-		bkt = getContainersBucket(s.tx)
+		bkt = getContainersBucket(s.tx, namespace)
 	)
 	if bkt == nil {
 		return m, nil
@@ -61,7 +72,12 @@ func (s *containerStore) List(ctx context.Context, filter string) ([]containers.
 }
 
 func (s *containerStore) Create(ctx context.Context, container containers.Container) (containers.Container, error) {
-	bkt, err := createContainersBucket(s.tx)
+	namespace, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return containers.Container{}, err
+	}
+
+	bkt, err := createContainersBucket(s.tx, namespace)
 	if err != nil {
 		return containers.Container{}, err
 	}
@@ -84,7 +100,12 @@ func (s *containerStore) Create(ctx context.Context, container containers.Contai
 }
 
 func (s *containerStore) Update(ctx context.Context, container containers.Container) (containers.Container, error) {
-	bkt := getContainersBucket(s.tx)
+	namespace, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return containers.Container{}, err
+	}
+
+	bkt := getContainersBucket(s.tx, namespace)
 	if bkt == nil {
 		return containers.Container{}, errors.Wrap(ErrNotFound, "no containers")
 	}
@@ -103,13 +124,17 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 }
 
 func (s *containerStore) Delete(ctx context.Context, id string) error {
-	bkt := getContainersBucket(s.tx)
+	namespace, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return err
+	}
+
+	bkt := getContainersBucket(s.tx, namespace)
 	if bkt == nil {
 		return errors.Wrap(ErrNotFound, "no containers")
 	}
 
-	err := bkt.DeleteBucket([]byte(id))
-	if err == bolt.ErrBucketNotFound {
+	if err := bkt.DeleteBucket([]byte(id)); err == bolt.ErrBucketNotFound {
 		return errors.Wrap(ErrNotFound, "no content for id")
 	}
 	return err
