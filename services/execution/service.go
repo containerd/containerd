@@ -35,22 +35,45 @@ var (
 )
 
 func init() {
-	plugin.Register("tasks-grpc", &plugin.Registration{
+	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
+		ID:   "tasks",
+		Requires: []plugin.PluginType{
+			plugin.RuntimePlugin,
+			plugin.MetadataPlugin,
+			plugin.ContentPlugin,
+		},
 		Init: New,
 	})
 }
 
 func New(ic *plugin.InitContext) (interface{}, error) {
-	c, err := newCollector(ic.Context, ic.Runtimes)
+	rt, err := ic.GetAll(plugin.RuntimePlugin)
+	if err != nil {
+		return nil, err
+	}
+	m, err := ic.Get(plugin.MetadataPlugin)
+	if err != nil {
+		return nil, err
+	}
+	ct, err := ic.Get(plugin.ContentPlugin)
+	if err != nil {
+		return nil, err
+	}
+	runtimes := make(map[string]plugin.Runtime)
+	for _, rr := range rt {
+		r := rr.(plugin.Runtime)
+		runtimes[r.ID()] = r
+	}
+	c, err := newCollector(ic.Context, runtimes)
 	if err != nil {
 		return nil, err
 	}
 	return &Service{
-		runtimes:  ic.Runtimes,
-		db:        ic.Meta,
+		runtimes:  runtimes,
+		db:        m.(*bolt.DB),
 		collector: c,
-		store:     ic.Content,
+		store:     ct.(content.Store),
 	}, nil
 }
 
@@ -461,7 +484,7 @@ func (s *Service) getTask(ctx context.Context, id string) (plugin.Task, error) {
 func (s *Service) getRuntime(name string) (plugin.Runtime, error) {
 	runtime, ok := s.runtimes[name]
 	if !ok {
-		return nil, plugin.ErrUnknownRuntime
+		return nil, fmt.Errorf("unknown runtime %q", name)
 	}
 	return runtime, nil
 }

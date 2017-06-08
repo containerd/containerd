@@ -13,8 +13,9 @@ type Service struct {
 }
 
 func init() {
-	plugin.Register("healthcheck-grpc", &plugin.Registration{
+	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
+		ID:   "healthcheck",
 		Init: NewService,
 	})
 }

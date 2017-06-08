@@ -35,7 +35,7 @@ func (c *Task) Info() plugin.TaskInfo {
 	return plugin.TaskInfo{
 		ID:          c.containerID,
 		ContainerID: c.containerID,
-		Runtime:     runtimeName,
+		Runtime:     pluginID,
 		Spec:        c.spec,
 		Namespace:   c.namespace,
 	}

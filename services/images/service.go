@@ -12,10 +12,18 @@ import (
 )
 
 func init() {
-	plugin.Register("images-grpc", &plugin.Registration{
+	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
+		ID:   "images",
+		Requires: []plugin.PluginType{
+			plugin.MetadataPlugin,
+		},
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			return NewService(ic.Meta), nil
+			m, err := ic.Get(plugin.MetadataPlugin)
+			if err != nil {
+				return nil, err
+			}
+			return NewService(m.(*bolt.DB)), nil
 		},
 	})
 }

@@ -10,11 +10,19 @@ import (
 )
 
 func init() {
-	plugin.Register("diff-grpc", &plugin.Registration{
+	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
+		ID:   "diff",
+		Requires: []plugin.PluginType{
+			plugin.DiffPlugin,
+		},
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
+			d, err := ic.Get(plugin.DiffPlugin)
+			if err != nil {
+				return nil, err
+			}
 			return &service{
-				diff: ic.Differ,
+				diff: d.(plugin.Differ),
 			}, nil
 		},
 	})

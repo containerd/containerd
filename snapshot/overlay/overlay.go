@@ -20,10 +20,11 @@ import (
 )
 
 func init() {
-	plugin.Register("snapshot-overlay", &plugin.Registration{
+	plugin.Register(&plugin.Registration{
 		Type: plugin.SnapshotPlugin,
+		ID:   "overlayfs",
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			return NewSnapshotter(filepath.Join(ic.Root, "snapshot", "overlay"))
+			return NewSnapshotter(ic.Root)
 		},
 	})
 }

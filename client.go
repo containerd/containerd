@@ -2,6 +2,7 @@ package containerd
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 	versionservice "github.com/containerd/containerd/api/services/version"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	contentservice "github.com/containerd/containerd/services/content"
@@ -83,7 +85,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 	}
 	return &Client{
 		conn:    conn,
-		runtime: runtime.GOOS,
+		runtime: fmt.Sprintf("%s.%s", plugin.RuntimePlugin, runtime.GOOS),
 	}, nil
 }
 

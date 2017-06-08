@@ -16,10 +16,18 @@ import (
 )
 
 func init() {
-	plugin.Register("snapshots-grpc", &plugin.Registration{
+	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
+		ID:   "snapshots",
+		Requires: []plugin.PluginType{
+			plugin.SnapshotPlugin,
+		},
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			return newService(ic.Snapshotter)
+			s, err := ic.Get(plugin.SnapshotPlugin)
+			if err != nil {
+				return nil, err
+			}
+			return newService(s.(snapshot.Snapshotter))
 		},
 	})
 }

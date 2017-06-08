@@ -12,13 +12,14 @@ import (
 	"google.golang.org/grpc"
 )
 
-const (
-	defaultConfigPath = "/etc/containerd/config.toml"
-)
+const defaultConfigPath = "/etc/containerd/config.toml"
 
-var (
-	handledSignals = []os.Signal{unix.SIGTERM, unix.SIGINT, unix.SIGUSR1, unix.SIGCHLD}
-)
+var handledSignals = []os.Signal{
+	unix.SIGTERM,
+	unix.SIGINT,
+	unix.SIGUSR1,
+	unix.SIGCHLD,
+}
 
 func platformInit(context *cli.Context) error {
 	if conf.Subreaper {
@@ -32,12 +33,6 @@ func platformInit(context *cli.Context) error {
 		if err := sys.SetOOMScore(os.Getpid(), conf.OOMScore); err != nil {
 			return err
 		}
-	}
-	if err := os.MkdirAll(conf.State, 0750); err != nil {
-		return err
-	}
-	if err := os.Chown(conf.State, conf.GRPC.Uid, conf.GRPC.Gid); err != nil {
-		return err
 	}
 	return nil
 }
