@@ -102,7 +102,6 @@ func connectGRPC(context *cli.Context) (*grpc.ClientConn, error) {
 	timeout := context.GlobalDuration("connect-timeout")
 	return grpc.Dial(address,
 		grpc.WithTimeout(timeout),
-		grpc.WithBlock(),
 		grpc.WithInsecure(),
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
 			return net.DialTimeout("unix", address, timeout)
