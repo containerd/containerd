@@ -1,13 +1,13 @@
 package rootfs
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshot"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/net/context"
 )
 
 type MountDiffer interface {

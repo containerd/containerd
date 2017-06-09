@@ -1,14 +1,13 @@
 package diff
 
 import (
-	"context"
-
 	diffapi "github.com/containerd/containerd/api/services/diff"
 	"github.com/containerd/containerd/api/types/descriptor"
 	mounttypes "github.com/containerd/containerd/api/types/mount"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/rootfs"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/net/context"
 )
 
 type DiffService interface {
