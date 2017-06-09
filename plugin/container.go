@@ -7,6 +7,7 @@ type TaskInfo struct {
 	ContainerID string
 	Runtime     string
 	Spec        []byte
+	Namespace   string
 }
 
 type Task interface {

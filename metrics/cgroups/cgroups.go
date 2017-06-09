@@ -3,6 +3,7 @@
 package cgroups
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/containerd/cgroups"
@@ -45,8 +46,12 @@ type cgroupsMonitor struct {
 	events    chan<- *plugin.Event
 }
 
+func getID(t plugin.Task) string {
+	return fmt.Sprintf("%s-%s", t.Info().Namespace, t.Info().ID)
+}
+
 func (m *cgroupsMonitor) Monitor(c plugin.Task) error {
-	id := c.Info().ID
+	id := getID(c)
 	state, err := c.State(m.context)
 	if err != nil {
 		return err
@@ -62,7 +67,7 @@ func (m *cgroupsMonitor) Monitor(c plugin.Task) error {
 }
 
 func (m *cgroupsMonitor) Stop(c plugin.Task) error {
-	m.collector.Remove(c.Info().ID)
+	m.collector.Remove(getID(c))
 	return nil
 }
 

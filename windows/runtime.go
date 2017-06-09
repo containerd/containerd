@@ -34,7 +34,6 @@ func init() {
 }
 
 func New(ic *plugin.InitContext) (interface{}, error) {
-
 	rootDir := filepath.Join(ic.Root, runtimeName)
 	if err := os.MkdirAll(rootDir, 0755); err != nil {
 		return nil, errors.Wrapf(err, "could not create state directory at %s", rootDir)
@@ -152,8 +151,17 @@ func (r *Runtime) Tasks(ctx context.Context) ([]plugin.Task, error) {
 			list = append(list, c)
 		}
 	}
-
 	return list, nil
+}
+
+func (r *Runtime) Get(ctx context.Context, id string) (plugin.Task, error) {
+	r.Lock()
+	defer r.Unlock()
+	c, ok := r.containers[id]
+	if !ok {
+		return nil, fmt.Errorf("container %s does not exit", id)
+	}
+	return c, nil
 }
 
 func (r *Runtime) Events(ctx context.Context) <-chan *plugin.Event {
