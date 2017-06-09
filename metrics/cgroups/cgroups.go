@@ -47,7 +47,7 @@ type cgroupsMonitor struct {
 }
 
 func getID(t plugin.Task) string {
-	return fmt.Sprintf("%s-%s", t.Info().ID, t.Info().Namespace)
+	return fmt.Sprintf("%s-%s", t.Info().Namespace, t.Info().ID)
 }
 
 func (m *cgroupsMonitor) Monitor(c plugin.Task) error {

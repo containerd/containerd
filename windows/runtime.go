@@ -159,7 +159,7 @@ func (r *Runtime) Get(ctx context.Context, id string) (plugin.Task, error) {
 	defer r.Unlock()
 	c, ok := r.containers[id]
 	if !ok {
-		return fmt.Errorf("container %s does not exit", id)
+		return nil, fmt.Errorf("container %s does not exit", id)
 	}
 	return c, nil
 }
