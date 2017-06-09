@@ -21,6 +21,12 @@ var (
 	// Use IsExists(err) to detect this condition.
 	ErrExists = errors.New("content: exists")
 
+	// ErrLocked is returned when content is actively being uploaded, this
+	// indicates that another process is attempting to upload the same content.
+	//
+	// Use IsLocked(err) to detect this condition.
+	ErrLocked = errors.New("content: locked")
+
 	bufPool = sync.Pool{
 		New: func() interface{} {
 			return make([]byte, 1<<20)
@@ -106,4 +112,8 @@ func IsNotFound(err error) bool {
 
 func IsExists(err error) bool {
 	return errors.Cause(err) == ErrExists
+}
+
+func IsLocked(err error) bool {
+	return errors.Cause(err) == ErrLocked
 }
