@@ -156,7 +156,10 @@ func (t *task) Wait(ctx context.Context) (uint32, error) {
 // it returns the exit status of the task and any errors that were encountered
 // during cleanup
 func (t *task) Delete(ctx context.Context) (uint32, error) {
-	cerr := t.io.Close()
+	var cerr error
+	if t.io != nil {
+		cerr = t.io.Close()
+	}
 	r, err := t.client.TaskService().Delete(ctx, &execution.DeleteRequest{
 		ContainerID: t.containerID,
 	})
