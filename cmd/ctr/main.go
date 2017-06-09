@@ -52,6 +52,7 @@ containerd CLI
 		},
 	}
 	app.Commands = append([]cli.Command{
+		attachCommand,
 		checkpointCommand,
 		runCommand,
 		deleteCommand,

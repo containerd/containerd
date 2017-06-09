@@ -193,11 +193,16 @@ func (c *container) loadTask(ctx context.Context, ioAttach IOAttach) (Task, erro
 			return nil, err
 		}
 	}
+	// create and close a channel on load as we already have the pid
+	// and don't want to block calls to Wait(), etc...
+	ps := make(chan struct{})
+	close(ps)
 	t := &task{
 		client:      c.client,
 		io:          i,
 		containerID: response.Task.ContainerID,
 		pid:         response.Task.Pid,
+		pidSync:     ps,
 	}
 	c.task = t
 	return t, nil

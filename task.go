@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"runtime"
+	"strings"
 	"syscall"
 
 	"github.com/containerd/containerd/api/services/containers"
@@ -127,7 +128,7 @@ func (t *task) Status(ctx context.Context) (TaskStatus, error) {
 	if err != nil {
 		return "", err
 	}
-	return TaskStatus(r.Task.Status.String()), nil
+	return TaskStatus(strings.ToLower(r.Task.Status.String())), nil
 }
 
 // Wait is a blocking call that will wait for the task to exit and return the exit status

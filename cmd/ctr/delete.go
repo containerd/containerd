@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/containerd/containerd"
 	"github.com/urfave/cli"
 )
 
@@ -21,9 +22,20 @@ var deleteCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		if _, err := container.Task(ctx, nil); err == nil {
-			return fmt.Errorf("cannot delete a container with a running task")
+		task, err := container.Task(ctx, nil)
+		if err != nil {
+			return container.Delete(ctx)
 		}
-		return container.Delete(ctx)
+		status, err := task.Status(ctx)
+		if err != nil {
+			return err
+		}
+		if status == containerd.Stopped {
+			if _, err := task.Delete(ctx); err != nil {
+				return err
+			}
+			return container.Delete(ctx)
+		}
+		return fmt.Errorf("cannot delete a container with an existing task")
 	},
 }
