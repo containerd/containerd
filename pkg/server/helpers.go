@@ -69,6 +69,9 @@ const (
 	sandboxesDir = "sandboxes"
 	// containersDir contains all container root.
 	containersDir = "containers"
+	// According to http://man7.org/linux/man-pages/man5/resolv.conf.5.html:
+	// "The search list is currently limited to six domains with a total of 256 characters."
+	maxDNSSearches = 6
 	// stdinNamedPipe is the name of stdin named pipe.
 	stdinNamedPipe = "stdin"
 	// stdoutNamedPipe is the name of stdout named pipe.
@@ -87,6 +90,8 @@ const (
 	pidNSFormat = "/proc/%v/ns/pid"
 	// etcHosts is the default path of /etc/hosts file.
 	etcHosts = "/etc/hosts"
+	// resolvConfPath is the abs path of resolv.conf on host or container.
+	resolvConfPath = "/etc/resolv.conf"
 )
 
 // generateID generates a random unique id.
@@ -147,6 +152,11 @@ func getStreamingPipes(rootDir string) (string, string, string) {
 // getSandboxHosts returns the hosts file path inside the sandbox root directory.
 func getSandboxHosts(sandboxRootDir string) string {
 	return filepath.Join(sandboxRootDir, "hosts")
+}
+
+// getResolvPath returns resolv.conf filepath for specified sandbox.
+func getResolvPath(sandboxRoot string) string {
+	return filepath.Join(sandboxRoot, "resolv.conf")
 }
 
 // prepareStreamingPipes prepares stream named pipe for container. returns nil

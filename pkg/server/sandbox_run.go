@@ -19,6 +19,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/containerd/containerd/api/services/execution"
@@ -303,8 +304,55 @@ func (c *criContainerdService) setupSandboxFiles(rootDir string, config *runtime
 	if err := c.os.CopyFile(etcHosts, sandboxEtcHosts, 0666); err != nil {
 		return fmt.Errorf("failed to generate sandbox hosts file %q: %v", sandboxEtcHosts, err)
 	}
-	// TODO(random-liu): [P0] Set DNS options. Maintain a resolv.conf for the sandbox.
+
+	// Set DNS options. Maintain a resolv.conf for the sandbox.
+	var err error
+	resolvContent := ""
+	if dnsConfig := config.GetDnsConfig(); dnsConfig != nil {
+		resolvContent, err = parseDNSOptions(dnsConfig.Servers, dnsConfig.Searches, dnsConfig.Options)
+		if err != nil {
+			return fmt.Errorf("failed to parse sandbox DNSConfig %+v: %v", dnsConfig, err)
+		}
+	}
+	resolvPath := getResolvPath(rootDir)
+	if resolvContent == "" {
+		// copy host's resolv.conf to resolvPath
+		err = c.os.CopyFile(resolvConfPath, resolvPath, 0644)
+		if err != nil {
+			return fmt.Errorf("failed to copy host's resolv.conf to %q: %v", resolvPath, err)
+		}
+	} else {
+		err = c.os.WriteFile(resolvPath, []byte(resolvContent), 0644)
+		if err != nil {
+			return fmt.Errorf("failed to write resolv content to %q: %v", resolvPath, err)
+		}
+	}
+
 	// TODO(random-liu): [P0] Deal with /dev/shm. Use host for HostIpc, and create and mount for
 	// non-HostIpc. What about mqueue?
 	return nil
+}
+
+// parseDNSOptions parse DNS options into resolv.conf format content,
+// if none option is specified, will return empty with no error.
+func parseDNSOptions(servers, searches, options []string) (string, error) {
+	resolvContent := ""
+
+	if len(searches) > maxDNSSearches {
+		return "", fmt.Errorf("DNSOption.Searches has more than 6 domains")
+	}
+
+	if len(searches) > 0 {
+		resolvContent += fmt.Sprintf("search %s\n", strings.Join(searches, " "))
+	}
+
+	if len(servers) > 0 {
+		resolvContent += fmt.Sprintf("nameserver %s\n", strings.Join(servers, "\nnameserver "))
+	}
+
+	if len(options) > 0 {
+		resolvContent += fmt.Sprintf("options %s\n", strings.Join(options, " "))
+	}
+
+	return resolvContent, nil
 }

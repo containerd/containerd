@@ -309,23 +309,37 @@ func TestGenerateContainerMounts(t *testing.T) {
 		securityContext *runtime.LinuxContainerSecurityContext
 		expectedMounts  []*runtime.Mount
 	}{
-		"should setup ro /etc/hosts mount when rootfs is read-only": {
+		"should setup ro mount when rootfs is read-only": {
 			securityContext: &runtime.LinuxContainerSecurityContext{
 				ReadonlyRootfs: true,
 			},
-			expectedMounts: []*runtime.Mount{{
-				ContainerPath: "/etc/hosts",
-				HostPath:      testSandboxRootDir + "/hosts",
-				Readonly:      true,
-			}},
+			expectedMounts: []*runtime.Mount{
+				{
+					ContainerPath: "/etc/hosts",
+					HostPath:      testSandboxRootDir + "/hosts",
+					Readonly:      true,
+				},
+				{
+					ContainerPath: resolvConfPath,
+					HostPath:      testSandboxRootDir + "/resolv.conf",
+					Readonly:      true,
+				},
+			},
 		},
-		"should setup rw /etc/hosts mount when rootfs is read-write": {
+		"should setup rw mount when rootfs is read-write": {
 			securityContext: &runtime.LinuxContainerSecurityContext{},
-			expectedMounts: []*runtime.Mount{{
-				ContainerPath: "/etc/hosts",
-				HostPath:      testSandboxRootDir + "/hosts",
-				Readonly:      false,
-			}},
+			expectedMounts: []*runtime.Mount{
+				{
+					ContainerPath: "/etc/hosts",
+					HostPath:      testSandboxRootDir + "/hosts",
+					Readonly:      false,
+				},
+				{
+					ContainerPath: resolvConfPath,
+					HostPath:      getResolvPath(testSandboxRootDir),
+					Readonly:      false,
+				},
+			},
 		},
 	} {
 		config := &runtime.ContainerConfig{
