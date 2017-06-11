@@ -565,13 +565,6 @@ func TestCreateContainer(t *testing.T) {
 		id := resp.GetContainerId()
 		assert.True(t, rootExists)
 		assert.Equal(t, getContainerRootDir(c.rootDir, id), rootPath, "root directory should be created")
-		meta, err := c.containerStore.Get(id)
-		assert.NoError(t, err)
-		require.NotNil(t, meta)
-		test.expectMeta.ID = id
-		// TODO(random-liu): Use fake clock to test CreatedAt.
-		test.expectMeta.CreatedAt = meta.CreatedAt
-		assert.Equal(t, test.expectMeta, meta, "container metadata should be created")
 
 		// Check runtime spec
 		containersCalls := fake.GetCalledDetails()
@@ -593,5 +586,14 @@ func TestCreateContainer(t *testing.T) {
 			Key:    id,
 			Parent: testChainID,
 		}, prepareOpts, "prepare request should be correct")
+
+		meta, err := c.containerStore.Get(id)
+		assert.NoError(t, err)
+		require.NotNil(t, meta)
+		test.expectMeta.ID = id
+		// TODO(random-liu): Use fake clock to test CreatedAt.
+		test.expectMeta.CreatedAt = meta.CreatedAt
+		test.expectMeta.Spec = spec
+		assert.Equal(t, test.expectMeta, meta, "container metadata should be created")
 	}
 }

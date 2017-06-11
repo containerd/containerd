@@ -50,6 +50,8 @@ const (
 	completeExitReason = "Completed"
 	// errorExitReason is the exit reason when container exits with code non-zero.
 	errorExitReason = "Error"
+	// unknownExitCode is the exit code when exit reason is unknown.
+	unknownExitCode = 255
 )
 
 const (
