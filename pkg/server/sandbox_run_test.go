@@ -159,18 +159,112 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 
 func TestSetupSandboxFiles(t *testing.T) {
 	testRootDir := "test-sandbox-root"
-	expectedCopys := [][]interface{}{
-		{"/etc/hosts", testRootDir + "/hosts", os.FileMode(0666)},
-		{"/etc/resolv.conf", testRootDir + "/resolv.conf", os.FileMode(0644)},
+	for desc, test := range map[string]struct {
+		dnsConfig     *runtime.DNSConfig
+		hostIpc       bool
+		expectedCalls []ostesting.CalledDetail
+	}{
+		"should check host /dev/shm existence when hostIpc is true": {
+			hostIpc: true,
+			expectedCalls: []ostesting.CalledDetail{
+				{
+					Name: "CopyFile",
+					Arguments: []interface{}{
+						"/etc/hosts", testRootDir + "/hosts", os.FileMode(0644),
+					},
+				},
+				{
+					Name: "CopyFile",
+					Arguments: []interface{}{
+						"/etc/resolv.conf", testRootDir + "/resolv.conf", os.FileMode(0644),
+					},
+				},
+				{
+					Name:      "Stat",
+					Arguments: []interface{}{"/dev/shm"},
+				},
+			},
+		},
+		"should create new /etc/resolv.conf if DNSOptions is set": {
+			dnsConfig: &runtime.DNSConfig{
+				Servers:  []string{"8.8.8.8"},
+				Searches: []string{"114.114.114.114"},
+				Options:  []string{"timeout:1"},
+			},
+			hostIpc: true,
+			expectedCalls: []ostesting.CalledDetail{
+				{
+					Name: "CopyFile",
+					Arguments: []interface{}{
+						"/etc/hosts", testRootDir + "/hosts", os.FileMode(0644),
+					},
+				},
+				{
+					Name: "WriteFile",
+					Arguments: []interface{}{
+						testRootDir + "/resolv.conf", []byte(`search 114.114.114.114
+nameserver 8.8.8.8
+options timeout:1
+`), os.FileMode(0644),
+					},
+				},
+				{
+					Name:      "Stat",
+					Arguments: []interface{}{"/dev/shm"},
+				},
+			},
+		},
+		"should create sandbox shm when hostIpc is false": {
+			hostIpc: false,
+			expectedCalls: []ostesting.CalledDetail{
+				{
+					Name: "CopyFile",
+					Arguments: []interface{}{
+						"/etc/hosts", testRootDir + "/hosts", os.FileMode(0644),
+					},
+				},
+				{
+					Name: "CopyFile",
+					Arguments: []interface{}{
+						"/etc/resolv.conf", testRootDir + "/resolv.conf", os.FileMode(0644),
+					},
+				},
+				{
+					Name: "MkdirAll",
+					Arguments: []interface{}{
+						testRootDir + "/shm", os.FileMode(0700),
+					},
+				},
+				{
+					Name: "Mount",
+					// Ignore arguments which are too complex to check.
+				},
+			},
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		c := newTestCRIContainerdService()
+		cfg := &runtime.PodSandboxConfig{
+			DnsConfig: test.dnsConfig,
+			Linux: &runtime.LinuxPodSandboxConfig{
+				SecurityContext: &runtime.LinuxSandboxSecurityContext{
+					NamespaceOptions: &runtime.NamespaceOption{
+						HostIpc: test.hostIpc,
+					},
+				},
+			},
+		}
+		c.setupSandboxFiles(testRootDir, cfg)
+		calls := c.os.(*ostesting.FakeOS).GetCalls()
+		assert.Len(t, calls, len(test.expectedCalls))
+		for i, expected := range test.expectedCalls {
+			if expected.Arguments == nil {
+				// Ignore arguments.
+				expected.Arguments = calls[i].Arguments
+			}
+			assert.Equal(t, expected, calls[i])
+		}
 	}
-	c := newTestCRIContainerdService()
-	var copys [][]interface{}
-	c.os.(*ostesting.FakeOS).CopyFileFn = func(src string, dest string, perm os.FileMode) error {
-		copys = append(copys, []interface{}{src, dest, perm})
-		return nil
-	}
-	c.setupSandboxFiles(testRootDir, nil)
-	assert.Equal(t, expectedCopys, copys, "should copy expected files for sandbox")
 }
 
 func TestRunPodSandbox(t *testing.T) {
@@ -184,7 +278,6 @@ func TestRunPodSandbox(t *testing.T) {
 	var pipes []string
 	fakeOS.MkdirAllFn = func(path string, perm os.FileMode) error {
 		dirs = append(dirs, path)
-		assert.Equal(t, os.FileMode(0755), perm)
 		return nil
 	}
 	fakeOS.OpenFifoFn = func(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
@@ -211,11 +304,11 @@ func TestRunPodSandbox(t *testing.T) {
 	require.NotNil(t, res)
 	id := res.GetPodSandboxId()
 
-	assert.Len(t, dirs, 1)
-	assert.Equal(t, getSandboxRootDir(c.rootDir, id), dirs[0], "sandbox root directory should be created")
+	sandboxRootDir := getSandboxRootDir(c.rootDir, id)
+	assert.Contains(t, dirs[0], sandboxRootDir, "sandbox root directory should be created")
 
 	assert.Len(t, pipes, 2)
-	_, stdout, stderr := getStreamingPipes(getSandboxRootDir(c.rootDir, id))
+	_, stdout, stderr := getStreamingPipes(sandboxRootDir)
 	assert.Contains(t, pipes, stdout, "sandbox stdout pipe should be created")
 	assert.Contains(t, pipes, stderr, "sandbox stderr pipe should be created")
 

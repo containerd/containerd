@@ -315,7 +315,15 @@ func (c *criContainerdService) generateContainerMounts(sandboxRootDir string, co
 		Readonly:      securityContext.GetReadonlyRootfs(),
 	})
 
-	// TODO(random-liu): [P0] Mount sandbox /dev/shm.
+	sandboxDevShm := getSandboxDevShm(sandboxRootDir)
+	if securityContext.GetNamespaceOptions().GetHostIpc() {
+		sandboxDevShm = devShm
+	}
+	mounts = append(mounts, &runtime.Mount{
+		ContainerPath: devShm,
+		HostPath:      sandboxDevShm,
+		Readonly:      false,
+	})
 	return mounts
 }
 
@@ -416,6 +424,8 @@ func addOCIDevices(g *generate.Generator, devs []*runtime.Device, privileged boo
 }
 
 // addOCIBindMounts adds bind mounts.
+// TODO(random-liu): Figure out whether we need to change all CRI mounts to readonly when
+// rootfs is readonly. (https://github.com/moby/moby/blob/master/daemon/oci_linux.go)
 func addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount, privileged bool) {
 	for _, mount := range mounts {
 		dst := mount.GetContainerPath()

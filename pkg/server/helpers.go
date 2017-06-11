@@ -58,6 +58,8 @@ const (
 	// defaultSandboxImage is the image used by sandbox container.
 	// TODO(random-liu): [P1] Build schema 2 pause image and use it here.
 	defaultSandboxImage = "gcr.io/google.com/noogler-kubernetes/pause-amd64:3.0"
+	// defaultShmSize is the default size of the sandbox shm.
+	defaultShmSize = int64(1024 * 1024 * 64)
 	// relativeRootfsPath is the rootfs path relative to bundle path.
 	relativeRootfsPath = "rootfs"
 	// defaultRuntime is the runtime to use in containerd. We may support
@@ -88,6 +90,8 @@ const (
 	utsNSFormat = "/proc/%v/ns/uts"
 	// pidNSFormat is the format of pid namespace of a process.
 	pidNSFormat = "/proc/%v/ns/pid"
+	// devShm is the default path of /dev/shm.
+	devShm = "/dev/shm"
 	// etcHosts is the default path of /etc/hosts file.
 	etcHosts = "/etc/hosts"
 	// resolvConfPath is the abs path of resolv.conf on host or container.
@@ -157,6 +161,11 @@ func getSandboxHosts(sandboxRootDir string) string {
 // getResolvPath returns resolv.conf filepath for specified sandbox.
 func getResolvPath(sandboxRoot string) string {
 	return filepath.Join(sandboxRoot, "resolv.conf")
+}
+
+// getSandboxDevShm returns the shm file path inside the sandbox root directory.
+func getSandboxDevShm(sandboxRootDir string) string {
+	return filepath.Join(sandboxRootDir, "shm")
 }
 
 // prepareStreamingPipes prepares stream named pipe for container. returns nil

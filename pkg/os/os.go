@@ -21,9 +21,9 @@ import (
 	"io/ioutil"
 	"os"
 
-	"golang.org/x/net/context"
-
 	"github.com/tonistiigi/fifo"
+	"golang.org/x/net/context"
+	"golang.org/x/sys/unix"
 )
 
 // OS collects system level operations that need to be mocked out
@@ -35,6 +35,8 @@ type OS interface {
 	Stat(name string) (os.FileInfo, error)
 	CopyFile(src, dest string, perm os.FileMode) error
 	WriteFile(filename string, data []byte, perm os.FileMode) error
+	Mount(source string, target string, fstype string, flags uintptr, data string) error
+	Unmount(target string, flags int) error
 }
 
 // RealOS is used to dispatch the real system level operations.
@@ -81,4 +83,14 @@ func (RealOS) CopyFile(src, dest string, perm os.FileMode) error {
 // WriteFile will call ioutil.WriteFile to write data into a file.
 func (RealOS) WriteFile(filename string, data []byte, perm os.FileMode) error {
 	return ioutil.WriteFile(filename, data, perm)
+}
+
+// Mount will call unix.Mount to mount the file.
+func (RealOS) Mount(source string, target string, fstype string, flags uintptr, data string) error {
+	return unix.Mount(source, target, fstype, flags, data)
+}
+
+// Unmount will call unix.Unmount to unmount the file.
+func (RealOS) Unmount(target string, flags int) error {
+	return unix.Unmount(target, flags)
 }
