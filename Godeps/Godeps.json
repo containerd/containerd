@@ -284,6 +284,16 @@
 			"Rev": "a431dbcf6a74fca2e0e040b819a836dbe3fb23ca"
 		},
 		{
+			"ImportPath": "github.com/opencontainers/runc/libcontainer/configs",
+			"Comment": "v1.0.0-rc3-21-g50401b5",
+			"Rev": "50401b5b4c2e01e4f1372b73a021742deeaf4e2d"
+		},
+		{
+			"ImportPath": "github.com/opencontainers/runc/libcontainer/devices",
+			"Comment": "v1.0.0-rc3-21-g50401b5",
+			"Rev": "50401b5b4c2e01e4f1372b73a021742deeaf4e2d"
+		},
+		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/system",
 			"Comment": "v1.0.0-rc3-21-g50401b5",
 			"Rev": "50401b5b4c2e01e4f1372b73a021742deeaf4e2d"

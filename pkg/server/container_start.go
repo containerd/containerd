@@ -31,6 +31,7 @@ import (
 	prototypes "github.com/gogo/protobuf/types"
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/opencontainers/runc/libcontainer/devices"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
 	"golang.org/x/net/context"
@@ -250,11 +251,17 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 		g.AddProcessEnv(e.GetKey(), e.GetValue())
 	}
 
-	// Add extra mounts first so that CRI specified mounts can override.
-	addOCIBindMounts(&g, append(extraMounts, config.GetMounts()...))
+	// TODO: add setOCIPrivileged group all privileged logic together
+	securityContext := config.GetLinux().GetSecurityContext()
 
-	// TODO(random-liu): [P1] Set device mapping.
-	// Ref https://github.com/moby/moby/blob/master/oci/devices_linux.go.
+	// Add extra mounts first so that CRI specified mounts can override.
+	addOCIBindMounts(&g, append(extraMounts, config.GetMounts()...), securityContext.GetPrivileged())
+
+	g.SetRootReadonly(securityContext.GetReadonlyRootfs())
+
+	if err := addOCIDevices(&g, config.GetDevices(), securityContext.GetPrivileged()); err != nil {
+		return nil, fmt.Errorf("failed to set devices mapping %+v: %v", config.GetDevices(), err)
+	}
 
 	// TODO(random-liu): [P1] Handle container logging, decorate and redirect to file.
 
@@ -267,14 +274,10 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 
 	g.SetProcessTerminal(config.GetTty())
 
-	securityContext := config.GetLinux().GetSecurityContext()
-
-	if err := setOCICapabilities(&g, securityContext.GetCapabilities()); err != nil {
+	if err := setOCICapabilities(&g, securityContext.GetCapabilities(), securityContext.GetPrivileged()); err != nil {
 		return nil, fmt.Errorf("failed to set capabilities %+v: %v",
 			securityContext.GetCapabilities(), err)
 	}
-
-	// TODO(random-liu): [P0] Handle privileged.
 
 	// Set namespaces, share namespace with sandbox container.
 	setOCINamespaces(&g, securityContext.GetNamespaceOptions(), sandboxPid)
@@ -287,8 +290,6 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 	for _, group := range supplementalGroups {
 		g.AddProcessAdditionalGid(uint32(group))
 	}
-
-	g.SetRootReadonly(securityContext.GetReadonlyRootfs())
 
 	// TODO(random-liu): [P2] Add apparmor and seccomp.
 
@@ -352,8 +353,70 @@ func addImageEnvs(g *generate.Generator, imageEnvs []string) error {
 	return nil
 }
 
+func clearReadOnly(m *runtimespec.Mount) {
+	var opt []string
+	for _, o := range m.Options {
+		if o != "ro" {
+			opt = append(opt, o)
+		}
+	}
+	m.Options = opt
+}
+
+// addDevices set device mapping.
+func addOCIDevices(g *generate.Generator, devs []*runtime.Device, privileged bool) error {
+	spec := g.Spec()
+	if privileged {
+		hostDevices, err := devices.HostDevices()
+		if err != nil {
+			return err
+		}
+		for _, hostDevice := range hostDevices {
+			rd := runtimespec.LinuxDevice{
+				Path:  hostDevice.Path,
+				Type:  string(hostDevice.Type),
+				Major: hostDevice.Major,
+				Minor: hostDevice.Minor,
+				UID:   &hostDevice.Uid,
+				GID:   &hostDevice.Gid,
+			}
+			g.AddDevice(rd)
+		}
+		spec.Linux.Resources.Devices = []runtimespec.LinuxDeviceCgroup{
+			{
+				Allow:  true,
+				Access: "rwm",
+			},
+		}
+		return nil
+	}
+	for _, device := range devs {
+		dev, err := devices.DeviceFromPath(device.HostPath, device.Permissions)
+		if err != nil {
+			return err
+		}
+		rd := runtimespec.LinuxDevice{
+			Path:  device.ContainerPath,
+			Type:  string(dev.Type),
+			Major: dev.Major,
+			Minor: dev.Minor,
+			UID:   &dev.Uid,
+			GID:   &dev.Gid,
+		}
+		g.AddDevice(rd)
+		spec.Linux.Resources.Devices = append(spec.Linux.Resources.Devices, runtimespec.LinuxDeviceCgroup{
+			Allow:  true,
+			Type:   string(dev.Type),
+			Major:  &dev.Major,
+			Minor:  &dev.Minor,
+			Access: dev.Permissions,
+		})
+	}
+	return nil
+}
+
 // addOCIBindMounts adds bind mounts.
-func addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount) {
+func addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount, privileged bool) {
 	for _, mount := range mounts {
 		dst := mount.GetContainerPath()
 		src := mount.GetHostPath()
@@ -364,6 +427,21 @@ func addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount) {
 		// TODO(random-liu): [P1] Apply selinux label
 		g.AddBindMount(src, dst, options)
 	}
+	if !privileged {
+		return
+	}
+	spec := g.Spec()
+	// clear readonly for /sys and cgroup
+	for i, m := range spec.Mounts {
+		if spec.Mounts[i].Destination == "/sys" && !spec.Root.Readonly {
+			clearReadOnly(&spec.Mounts[i])
+		}
+		if m.Type == "cgroup" {
+			clearReadOnly(&spec.Mounts[i])
+		}
+	}
+	spec.Linux.ReadonlyPaths = nil
+	spec.Linux.MaskedPaths = nil
 }
 
 // setOCILinuxResource set container resource limit.
@@ -379,7 +457,12 @@ func setOCILinuxResource(g *generate.Generator, resources *runtime.LinuxContaine
 }
 
 // setOCICapabilities adds/drops process capabilities.
-func setOCICapabilities(g *generate.Generator, capabilities *runtime.Capability) error {
+func setOCICapabilities(g *generate.Generator, capabilities *runtime.Capability, privileged bool) error {
+	if privileged {
+		// Add all capabilities in privileged mode.
+		g.SetupPrivileged(true)
+		return nil
+	}
 	if capabilities == nil {
 		return nil
 	}
@@ -395,7 +478,6 @@ func setOCICapabilities(g *generate.Generator, capabilities *runtime.Capability)
 			return err
 		}
 	}
-
 	return nil
 }
 
