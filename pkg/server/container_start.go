@@ -467,14 +467,15 @@ func setOCICapabilities(g *generate.Generator, capabilities *runtime.Capability,
 		return nil
 	}
 
+	// Capabilities in CRI doesn't have `CAP_` prefix, so add it.
 	for _, c := range capabilities.GetAddCapabilities() {
-		if err := g.AddProcessCapability(c); err != nil {
+		if err := g.AddProcessCapability("CAP_" + c); err != nil {
 			return err
 		}
 	}
 
 	for _, c := range capabilities.GetDropCapabilities() {
-		if err := g.DropProcessCapability(c); err != nil {
+		if err := g.DropProcessCapability("CAP_" + c); err != nil {
 			return err
 		}
 	}
