@@ -77,8 +77,8 @@ func getStartContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandboxC
 			},
 			SecurityContext: &runtime.LinuxContainerSecurityContext{
 				Capabilities: &runtime.Capability{
-					AddCapabilities:  []string{"CAP_SYS_ADMIN"},
-					DropCapabilities: []string{"CAP_CHOWN"},
+					AddCapabilities:  []string{"SYS_ADMIN"},
+					DropCapabilities: []string{"CHOWN"},
 				},
 				SupplementalGroups: []int64{1111, 2222},
 			},
