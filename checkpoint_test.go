@@ -20,7 +20,7 @@ func TestCheckpointRestore(t *testing.T) {
 
 	var (
 		ctx, cancel = testContext()
-		id          = "CheckpointRestore"
+		id          = t.Name()
 	)
 	defer cancel()
 
@@ -113,7 +113,7 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 	}
 	defer client.Close()
 
-	const id = "CheckpointRestoreNewContainer"
+	id := t.Name()
 	ctx, cancel := testContext()
 	defer cancel()
 
