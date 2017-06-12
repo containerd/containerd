@@ -44,12 +44,14 @@ func newBundle(path, namespace, id string, spec []byte) (b *bundle, err error) {
 	defer f.Close()
 	_, err = io.Copy(f, bytes.NewReader(spec))
 	return &bundle{
+		id:        id,
 		path:      path,
 		namespace: namespace,
 	}, err
 }
 
 type bundle struct {
+	id        string
 	path      string
 	namespace string
 }
@@ -61,7 +63,7 @@ func (b *bundle) NewShim(ctx context.Context, binary string, remote bool) (*clie
 		opt = client.WithLocal
 	}
 	return client.New(ctx, client.Config{
-		Address:   filepath.Join(b.path, "shim.sock"),
+		Address:   b.shimAddress(),
 		Path:      b.path,
 		Namespace: b.namespace,
 	}, opt)
@@ -74,7 +76,7 @@ func (b *bundle) Connect(ctx context.Context, remote bool) (*client.Client, erro
 		opt = client.WithLocal
 	}
 	return client.New(ctx, client.Config{
-		Address:   filepath.Join(b.path, "shim.sock"),
+		Address:   b.shimAddress(),
 		Path:      b.path,
 		Namespace: b.namespace,
 	}, opt)
@@ -88,4 +90,9 @@ func (b *bundle) Spec() ([]byte, error) {
 // Delete deletes the bundle from disk
 func (b *bundle) Delete() error {
 	return os.RemoveAll(b.path)
+}
+
+func (b *bundle) shimAddress() string {
+	return filepath.Join(string(filepath.Separator), "containerd-shim", b.namespace, b.id, "shim.sock")
+
 }
