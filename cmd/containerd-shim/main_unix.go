@@ -47,7 +47,7 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:  "socket,s",
-			Usage: "abstract socket path to server on",
+			Usage: "abstract socket path to serve on",
 		},
 	}
 	app.Before = func(context *cli.Context) error {
