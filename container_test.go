@@ -43,7 +43,7 @@ func TestNewContainer(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
-	id := "NewContainer"
+	id := t.Name()
 	client, err := New(address)
 	if err != nil {
 		t.Fatal(err)
@@ -90,7 +90,7 @@ func TestContainerStart(t *testing.T) {
 
 	var (
 		ctx, cancel = testContext()
-		id          = "ContainerStart"
+		id          = t.Name()
 	)
 	defer cancel()
 
@@ -160,7 +160,7 @@ func TestContainerOutput(t *testing.T) {
 
 	var (
 		ctx, cancel = testContext()
-		id          = "ContainerOutput"
+		id          = t.Name()
 		expected    = "kingkoye"
 	)
 	defer cancel()
@@ -233,7 +233,7 @@ func TestContainerExec(t *testing.T) {
 
 	var (
 		ctx, cancel = testContext()
-		id          = "ContainerExec"
+		id          = t.Name()
 	)
 	defer cancel()
 
@@ -320,7 +320,7 @@ func TestContainerProcesses(t *testing.T) {
 
 	var (
 		ctx, cancel = testContext()
-		id          = "ContainerProcesses"
+		id          = t.Name()
 	)
 	defer cancel()
 
@@ -393,7 +393,7 @@ func TestContainerCloseStdin(t *testing.T) {
 
 	var (
 		ctx, cancel = testContext()
-		id          = "ContainerCloseStdin"
+		id          = t.Name()
 	)
 	defer cancel()
 
@@ -477,7 +477,7 @@ func TestContainerAttach(t *testing.T) {
 
 	var (
 		ctx, cancel = testContext()
-		id          = "ContainerAttach"
+		id          = t.Name()
 	)
 	defer cancel()
 
