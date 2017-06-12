@@ -30,12 +30,12 @@ func (s *imageStore) Get(ctx context.Context, name string) (images.Image, error)
 
 	bkt := getImagesBucket(s.tx, namespace)
 	if bkt == nil {
-		return images.Image{}, ErrNotFound
+		return images.Image{}, ErrNotFound("")
 	}
 
 	ibkt := bkt.Bucket([]byte(name))
 	if ibkt == nil {
-		return images.Image{}, ErrNotFound
+		return images.Image{}, ErrNotFound("")
 	}
 
 	image.Name = name
@@ -124,7 +124,7 @@ func (s *imageStore) Delete(ctx context.Context, name string) error {
 	return withImagesBucket(s.tx, namespace, func(bkt *bolt.Bucket) error {
 		err := bkt.DeleteBucket([]byte(name))
 		if err == bolt.ErrBucketNotFound {
-			return ErrNotFound
+			return ErrNotFound("")
 		}
 		return err
 	})

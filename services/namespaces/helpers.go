@@ -27,9 +27,9 @@ func rewriteGRPCError(err error) error {
 
 	switch grpc.Code(errors.Cause(err)) {
 	case codes.AlreadyExists:
-		return metadata.ErrExists
+		return metadata.ErrExists(grpc.ErrorDesc(err))
 	case codes.NotFound:
-		return metadata.ErrNotFound
+		return metadata.ErrNotFound(grpc.ErrorDesc(err))
 	}
 
 	return err

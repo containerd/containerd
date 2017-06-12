@@ -1,9 +1,8 @@
 package content
 
 import (
+	"fmt"
 	"sync"
-
-	"github.com/pkg/errors"
 )
 
 // Handles locking references
@@ -20,7 +19,7 @@ func tryLock(ref string) error {
 	defer locksMu.Unlock()
 
 	if _, ok := locks[ref]; ok {
-		return errors.Wrapf(ErrLocked, "key %s is locked", ref)
+		return ErrLocked(fmt.Sprintf("key %s is locked", ref))
 	}
 
 	locks[ref] = struct{}{}

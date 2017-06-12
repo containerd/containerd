@@ -25,7 +25,7 @@ func (s *namespaceStore) Create(ctx context.Context, namespace string, labels ma
 	bkt, err := topbkt.CreateBucket([]byte(namespace))
 	if err != nil {
 		if err == bolt.ErrBucketExists {
-			return ErrExists
+			return ErrExists("")
 		}
 
 		return err
@@ -100,12 +100,12 @@ func (s *namespaceStore) Delete(ctx context.Context, namespace string) error {
 	if empty, err := s.namespaceEmpty(ctx, namespace); err != nil {
 		return err
 	} else if !empty {
-		return ErrNotEmpty
+		return ErrNotEmpty("")
 	}
 
 	if err := bkt.DeleteBucket([]byte(namespace)); err != nil {
 		if err == bolt.ErrBucketNotFound {
-			return ErrNotFound
+			return ErrNotFound("")
 		}
 
 		return err
