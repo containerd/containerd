@@ -191,9 +191,16 @@ func (p *initProcess) Exited(status int) {
 }
 
 func (p *initProcess) Delete(context context.Context) error {
+	status, err := p.ContainerStatus(context)
+	if err != nil {
+		return err
+	}
+	if status != "stopped" {
+		return fmt.Errorf("cannot delete a running container")
+	}
 	p.killAll(context)
 	p.Wait()
-	err := p.runc.Delete(context, p.id)
+	err = p.runc.Delete(context, p.id)
 	if p.io != nil {
 		for _, c := range p.closers {
 			c.Close()

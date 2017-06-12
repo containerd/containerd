@@ -158,6 +158,19 @@ func (c *Task) Checkpoint(ctx context.Context, opts plugin.CheckpointOpts) error
 	return err
 }
 
+func (c *Task) DeleteProcess(ctx context.Context, pid uint32) (*plugin.Exit, error) {
+	r, err := c.shim.DeleteProcess(ctx, &shim.DeleteProcessRequest{
+		Pid: pid,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.Exit{
+		Status:    r.ExitStatus,
+		Timestamp: r.ExitedAt,
+	}, nil
+}
+
 type Process struct {
 	pid int
 	c   *Task

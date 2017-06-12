@@ -89,13 +89,29 @@ func (s *Service) Start(ctx context.Context, r *shimapi.StartRequest) (*google_p
 }
 
 func (s *Service) Delete(ctx context.Context, r *shimapi.DeleteRequest) (*shimapi.DeleteResponse, error) {
+	p := s.initProcess
+	// TODO (@crosbymichael): how to handle errors here
+	p.Delete(ctx)
+	s.mu.Lock()
+	delete(s.processes, p.Pid())
+	s.mu.Unlock()
+	return &shimapi.DeleteResponse{
+		ExitStatus: uint32(p.Status()),
+		ExitedAt:   p.ExitedAt(),
+	}, nil
+}
+
+func (s *Service) DeleteProcess(ctx context.Context, r *shimapi.DeleteProcessRequest) (*shimapi.DeleteResponse, error) {
+	if int(r.Pid) == s.initProcess.pid {
+		return nil, fmt.Errorf("cannot delete init process with DeleteProcess")
+	}
 	s.mu.Lock()
 	p, ok := s.processes[int(r.Pid)]
 	s.mu.Unlock()
 	if !ok {
-		p = s.initProcess
+		return nil, fmt.Errorf("process %d not found", r.Pid)
 	}
-	// TODO: how to handle errors here
+	// TODO (@crosbymichael): how to handle errors here
 	p.Delete(ctx)
 	s.mu.Lock()
 	delete(s.processes, p.Pid())

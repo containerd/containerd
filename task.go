@@ -53,7 +53,7 @@ type Task interface {
 type Process interface {
 	Pid() uint32
 	Start(context.Context) error
-	Delete() error
+	Delete(context.Context) (uint32, error)
 	Kill(context.Context, syscall.Signal) error
 	Wait(context.Context) (uint32, error)
 	CloseStdin(context.Context) error

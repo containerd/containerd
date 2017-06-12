@@ -111,6 +111,14 @@ func (p *process) Resize(ctx context.Context, w, h uint32) error {
 	return err
 }
 
-func (p *process) Delete() error {
-	return p.io.Close()
+func (p *process) Delete(ctx context.Context) (uint32, error) {
+	cerr := p.io.Close()
+	r, err := p.task.client.TaskService().DeleteProcess(ctx, &execution.DeleteProcessRequest{
+		ContainerID: p.task.containerID,
+		Pid:         p.pid,
+	})
+	if err != nil {
+		return UnknownExitStatus, err
+	}
+	return r.ExitStatus, cerr
 }
