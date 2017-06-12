@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"io"
 	"os"
 	"sync"
 	"text/tabwriter"
@@ -13,11 +12,16 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/progress"
 	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/containerd/remotes/docker"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"golang.org/x/sync/errgroup"
+)
+
+var (
+	pushTracker = docker.NewInMemoryTracker()
 )
 
 var pushCommand = cli.Command{
@@ -77,7 +81,7 @@ var pushCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		ongoing := newPushJobs()
+		ongoing := newPushJobs(pushTracker)
 
 		eg, ctx := errgroup.WithContext(ctx)
 
@@ -92,7 +96,6 @@ var pushCommand = cli.Command{
 			return client.Push(ctx, ref, desc,
 				containerd.WithResolver(resolver),
 				containerd.WithImageHandler(jobHandler),
-				containerd.WithPushWrapper(ongoing.wrapPusher),
 			)
 		})
 
@@ -136,37 +139,6 @@ var pushCommand = cli.Command{
 	},
 }
 
-type pushTracker struct {
-	closed  bool
-	started time.Time
-	updated time.Time
-	written int64
-	total   int64
-}
-
-func (pt *pushTracker) Write(p []byte) (int, error) {
-	pt.written += int64(len(p))
-	pt.updated = time.Now()
-	return len(p), nil
-}
-
-func (pt *pushTracker) Close() error {
-	pt.closed = true
-	pt.updated = time.Now()
-	return nil
-}
-
-type pushWrapper struct {
-	jobs   *pushjobs
-	pusher remotes.Pusher
-}
-
-func (pw pushWrapper) Push(ctx context.Context, desc ocispec.Descriptor, r io.Reader) error {
-	tr := pw.jobs.track(remotes.MakeRefKey(ctx, desc), desc.Size)
-	defer tr.Close()
-	return pw.pusher.Push(ctx, desc, io.TeeReader(r, tr))
-}
-
 type pushStatus struct {
 	name    string
 	started bool
@@ -175,19 +147,16 @@ type pushStatus struct {
 }
 
 type pushjobs struct {
-	jobs    map[string]*pushTracker
+	jobs    map[string]struct{}
 	ordered []string
+	tracker docker.StatusTracker
 	mu      sync.Mutex
 }
 
-func newPushJobs() *pushjobs {
-	return &pushjobs{jobs: make(map[string]*pushTracker)}
-}
-
-func (j *pushjobs) wrapPusher(p remotes.Pusher) remotes.Pusher {
-	return pushWrapper{
-		jobs:   j,
-		pusher: p,
+func newPushJobs(tracker docker.StatusTracker) *pushjobs {
+	return &pushjobs{
+		jobs:    make(map[string]struct{}),
+		tracker: tracker,
 	}
 }
 
@@ -199,52 +168,39 @@ func (j *pushjobs) add(ref string) {
 		return
 	}
 	j.ordered = append(j.ordered, ref)
-	j.jobs[ref] = nil
-}
-
-func (j *pushjobs) track(ref string, size int64) io.WriteCloser {
-	j.mu.Lock()
-	defer j.mu.Unlock()
-
-	if _, ok := j.jobs[ref]; !ok {
-		j.ordered = append(j.ordered, ref)
-	}
-
-	pt := &pushTracker{
-		started: time.Now(),
-		total:   size,
-	}
-	j.jobs[ref] = pt
-	return pt
+	j.jobs[ref] = struct{}{}
 }
 
 func (j *pushjobs) status() []statusInfo {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 
-	status := make([]statusInfo, 0, len(j.jobs))
+	statuses := make([]statusInfo, 0, len(j.jobs))
 	for _, name := range j.ordered {
-		tracker := j.jobs[name]
 		si := statusInfo{
 			Ref: name,
 		}
-		if tracker != nil {
-			si.Offset = tracker.written
-			si.Total = tracker.total
-			si.StartedAt = tracker.started
-			si.UpdatedAt = tracker.updated
-			if tracker.closed {
-				si.Status = "done"
-			} else if tracker.written >= tracker.total {
-				si.Status = "committing"
+
+		status, err := j.tracker.GetStatus(name)
+		if err != nil {
+			si.Status = "waiting"
+		} else {
+			si.Offset = status.Offset
+			si.Total = status.Total
+			si.StartedAt = status.StartedAt
+			si.UpdatedAt = status.UpdatedAt
+			if status.Offset >= status.Total {
+				if status.UploadUUID == "" {
+					si.Status = "done"
+				} else {
+					si.Status = "committing"
+				}
 			} else {
 				si.Status = "uploading"
 			}
-		} else {
-			si.Status = "waiting"
 		}
-		status = append(status, si)
+		statuses = append(statuses, si)
 	}
 
-	return status
+	return statuses
 }

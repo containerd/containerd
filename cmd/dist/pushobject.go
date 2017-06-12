@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -63,8 +64,13 @@ var pushObjectCommand = cli.Command{
 		}
 		defer rc.Close()
 
+		cw, err := pusher.Push(ctx, desc)
+		if err != nil {
+			return err
+		}
+
 		// TODO: Progress reader
-		if err = pusher.Push(ctx, desc, rc); err != nil {
+		if err := content.Copy(cw, rc, desc.Size, desc.Digest); err != nil {
 			return err
 		}
 

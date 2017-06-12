@@ -36,6 +36,7 @@ var (
 
 type Provider interface {
 	Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, error)
+	ReaderAt(ctx context.Context, dgst digest.Digest) (io.ReaderAt, error)
 }
 
 type Ingester interface {

@@ -57,11 +57,7 @@ func (s *store) info(dgst digest.Digest, fi os.FileInfo) Info {
 	}
 }
 
-// Open returns an io.ReadCloser for the blob.
-//
-// TODO(stevvooe): This would work much better as an io.ReaderAt in practice.
-// Right now, we are doing type assertion to tease that out, but it won't scale
-// well.
+// Reader returns an io.ReadCloser for the blob.
 func (s *store) Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, error) {
 	fp, err := os.Open(s.blobPath(dgst))
 	if err != nil {
@@ -72,6 +68,11 @@ func (s *store) Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, 
 	}
 
 	return fp, nil
+}
+
+// ReaderAt returns an io.ReaderAt for the blob.
+func (s *store) ReaderAt(ctx context.Context, dgst digest.Digest) (io.ReaderAt, error) {
+	return readerAt{f: s.blobPath(dgst)}, nil
 }
 
 // Delete removes a blob by its digest.

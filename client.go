@@ -209,10 +209,6 @@ type RemoteContext struct {
 	// afterwards. Unpacking is required to run an image.
 	Unpack bool
 
-	// PushWrapper allows hooking into the push method. This can be used
-	// track content that is being sent to the remote.
-	PushWrapper func(remotes.Pusher) remotes.Pusher
-
 	// BaseHandlers are a set of handlers which get are called on dispatch.
 	// These handlers always get called before any operation specific
 	// handlers.
@@ -247,15 +243,6 @@ func WithResolver(resolver remotes.Resolver) RemoteOpts {
 func WithImageHandler(h images.Handler) RemoteOpts {
 	return func(client *Client, c *RemoteContext) error {
 		c.BaseHandlers = append(c.BaseHandlers, h)
-		return nil
-	}
-}
-
-// WithPushWrapper is used to wrap a pusher to hook into
-// the push content as it is sent to a remote.
-func WithPushWrapper(w func(remotes.Pusher) remotes.Pusher) RemoteOpts {
-	return func(client *Client, c *RemoteContext) error {
-		c.PushWrapper = w
 		return nil
 	}
 }
@@ -316,10 +303,6 @@ func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, 
 	pusher, err := pushCtx.Resolver.Pusher(ctx, ref)
 	if err != nil {
 		return err
-	}
-
-	if pushCtx.PushWrapper != nil {
-		pusher = pushCtx.PushWrapper(pusher)
 	}
 
 	var m sync.Mutex
