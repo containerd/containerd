@@ -18,6 +18,10 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const (
+	ErrContainerNotCreated = "container hasn't been created yet"
+)
+
 var empty = &google_protobuf.Empty{}
 
 const RuncRoot = "/run/containerd/runc"
@@ -77,6 +81,9 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*sh
 }
 
 func (s *Service) Start(ctx context.Context, r *google_protobuf.Empty) (*google_protobuf.Empty, error) {
+	if s.initProcess == nil {
+		return nil, errors.New(ErrContainerNotCreated)
+	}
 	if err := s.initProcess.Start(ctx); err != nil {
 		return nil, err
 	}
@@ -89,6 +96,9 @@ func (s *Service) Start(ctx context.Context, r *google_protobuf.Empty) (*google_
 }
 
 func (s *Service) Delete(ctx context.Context, r *google_protobuf.Empty) (*shimapi.DeleteResponse, error) {
+	if s.initProcess == nil {
+		return nil, errors.New(ErrContainerNotCreated)
+	}
 	p := s.initProcess
 	// TODO (@crosbymichael): how to handle errors here
 	p.Delete(ctx)
@@ -103,6 +113,9 @@ func (s *Service) Delete(ctx context.Context, r *google_protobuf.Empty) (*shimap
 }
 
 func (s *Service) DeleteProcess(ctx context.Context, r *shimapi.DeleteProcessRequest) (*shimapi.DeleteResponse, error) {
+	if s.initProcess == nil {
+		return nil, errors.New(ErrContainerNotCreated)
+	}
 	if int(r.Pid) == s.initProcess.pid {
 		return nil, fmt.Errorf("cannot delete init process with DeleteProcess")
 	}
@@ -125,6 +138,9 @@ func (s *Service) DeleteProcess(ctx context.Context, r *shimapi.DeleteProcessReq
 }
 
 func (s *Service) Exec(ctx context.Context, r *shimapi.ExecProcessRequest) (*shimapi.ExecProcessResponse, error) {
+	if s.initProcess == nil {
+		return nil, errors.New(ErrContainerNotCreated)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.execID++
@@ -196,6 +212,9 @@ func (s *Service) Stream(r *shimapi.StreamEventsRequest, stream shimapi.Shim_Str
 }
 
 func (s *Service) State(ctx context.Context, r *google_protobuf.Empty) (*shimapi.StateResponse, error) {
+	if s.initProcess == nil {
+		return nil, errors.New(ErrContainerNotCreated)
+	}
 	st, err := s.initProcess.ContainerStatus(ctx)
 	if err != nil {
 		return nil, err
@@ -246,6 +265,9 @@ func (s *Service) State(ctx context.Context, r *google_protobuf.Empty) (*shimapi
 }
 
 func (s *Service) Pause(ctx context.Context, r *google_protobuf.Empty) (*google_protobuf.Empty, error) {
+	if s.initProcess == nil {
+		return nil, errors.New(ErrContainerNotCreated)
+	}
 	if err := s.initProcess.Pause(ctx); err != nil {
 		return nil, err
 	}
@@ -253,6 +275,9 @@ func (s *Service) Pause(ctx context.Context, r *google_protobuf.Empty) (*google_
 }
 
 func (s *Service) Resume(ctx context.Context, r *google_protobuf.Empty) (*google_protobuf.Empty, error) {
+	if s.initProcess == nil {
+		return nil, errors.New(ErrContainerNotCreated)
+	}
 	if err := s.initProcess.Resume(ctx); err != nil {
 		return nil, err
 	}
@@ -260,6 +285,9 @@ func (s *Service) Resume(ctx context.Context, r *google_protobuf.Empty) (*google
 }
 
 func (s *Service) Kill(ctx context.Context, r *shimapi.KillRequest) (*google_protobuf.Empty, error) {
+	if s.initProcess == nil {
+		return nil, errors.New(ErrContainerNotCreated)
+	}
 	if r.Pid == 0 {
 		if err := s.initProcess.Kill(ctx, r.Signal, r.All); err != nil {
 			return nil, err
@@ -321,6 +349,9 @@ func (s *Service) CloseIO(ctx context.Context, r *shimapi.CloseIORequest) (*goog
 }
 
 func (s *Service) Checkpoint(ctx context.Context, r *shimapi.CheckpointTaskRequest) (*google_protobuf.Empty, error) {
+	if s.initProcess == nil {
+		return nil, errors.New(ErrContainerNotCreated)
+	}
 	if err := s.initProcess.Checkpoint(ctx, r); err != nil {
 		return nil, err
 	}
