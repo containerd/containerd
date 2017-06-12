@@ -41,30 +41,50 @@ func init() {
 	grpclog.SetLogger(log.New(ioutil.Discard, "", log.LstdFlags))
 }
 
-type NewClientOpts func(c *Client) error
+type clientOpts struct {
+	defaultns string
+}
+
+type ClientOpt func(c *clientOpts) error
+
+func WithDefaultNamespace(ns string) ClientOpt {
+	return func(c *clientOpts) error {
+		c.defaultns = ns
+		return nil
+	}
+}
 
 // New returns a new containerd client that is connected to the containerd
 // instance provided by address
-func New(address string, opts ...NewClientOpts) (*Client, error) {
+func New(address string, opts ...ClientOpt) (*Client, error) {
+	var copts clientOpts
+	for _, o := range opts {
+		if err := o(&copts); err != nil {
+			return nil, err
+		}
+	}
+
 	gopts := []grpc.DialOption{
 		grpc.WithInsecure(),
 		grpc.WithTimeout(100 * time.Second),
 		grpc.WithDialer(dialer),
 	}
+	if copts.defaultns != "" {
+		unary, stream := newNSInterceptors(copts.defaultns)
+		gopts = append(gopts,
+			grpc.WithUnaryInterceptor(unary),
+			grpc.WithStreamInterceptor(stream),
+		)
+	}
+
 	conn, err := grpc.Dial(dialAddress(address), gopts...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to dial %q", address)
 	}
-	c := &Client{
+	return &Client{
 		conn:    conn,
 		runtime: runtime.GOOS,
-	}
-	for _, o := range opts {
-		if err := o(c); err != nil {
-			return nil, err
-		}
-	}
-	return c, nil
+	}, nil
 }
 
 // Client is the client to interact with containerd and its various services
@@ -72,7 +92,8 @@ func New(address string, opts ...NewClientOpts) (*Client, error) {
 type Client struct {
 	conn *grpc.ClientConn
 
-	runtime string
+	defaultns string
+	runtime   string
 }
 
 func (c *Client) IsServing(ctx context.Context) (bool, error) {
