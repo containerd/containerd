@@ -40,6 +40,25 @@ import (
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
 )
 
+func checkMount(t *testing.T, mounts []runtimespec.Mount, src, dest, typ string,
+	contains, notcontains []string) {
+	found := false
+	for _, m := range mounts {
+		if m.Source == src && m.Destination == dest {
+			assert.Equal(t, m.Type, typ)
+			for _, c := range contains {
+				assert.Contains(t, m.Options, c)
+			}
+			for _, n := range notcontains {
+				assert.NotContains(t, m.Options, n)
+			}
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "mount from %q to %q not found", src, dest)
+}
+
 func getStartContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandboxConfig,
 	*imagespec.ImageConfig, func(*testing.T, string, uint32, *runtimespec.Spec)) {
 	config := &runtime.ContainerConfig{
@@ -107,22 +126,12 @@ func getStartContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandboxC
 		assert.Equal(t, "test-cwd", spec.Process.Cwd)
 		assert.Contains(t, spec.Process.Env, "k1=v1", "k2=v2", "ik1=iv1", "ik2=iv2")
 
+		t.Logf("Check cgroups bind mount")
+		checkMount(t, spec.Mounts, "cgroup", "/sys/fs/cgroup", "cgroup", []string{"ro"}, nil)
+
 		t.Logf("Check bind mount")
-		found1, found2 := false, false
-		for _, m := range spec.Mounts {
-			if m.Source == "host-path-1" {
-				assert.Equal(t, m.Destination, "container-path-1")
-				assert.Contains(t, m.Options, "rw")
-				found1 = true
-			}
-			if m.Source == "host-path-2" {
-				assert.Equal(t, m.Destination, "container-path-2")
-				assert.Contains(t, m.Options, "ro")
-				found2 = true
-			}
-		}
-		assert.True(t, found1)
-		assert.True(t, found2)
+		checkMount(t, spec.Mounts, "host-path-1", "container-path-1", "bind", []string{"rw"}, nil)
+		checkMount(t, spec.Mounts, "host-path-2", "container-path-2", "bind", []string{"ro"}, nil)
 
 		t.Logf("Check resource limits")
 		assert.EqualValues(t, *spec.Linux.Resources.CPU.Period, 100)
@@ -386,6 +395,47 @@ func TestGenerateContainerMounts(t *testing.T) {
 		c := newTestCRIContainerdService()
 		mounts := c.generateContainerMounts(testSandboxRootDir, config)
 		assert.Equal(t, test.expectedMounts, mounts, desc)
+	}
+}
+
+func TestPrivilegedBindMount(t *testing.T) {
+	for desc, test := range map[string]struct {
+		privileged         bool
+		readonlyRootFS     bool
+		expectedSysFSRO    bool
+		expectedCgroupFSRO bool
+	}{
+		"sysfs and cgroupfs should mount as 'ro' by default": {
+			expectedSysFSRO:    true,
+			expectedCgroupFSRO: true,
+		},
+		"sysfs and cgroupfs should not mount as 'ro' if privileged": {
+			privileged:         true,
+			expectedSysFSRO:    false,
+			expectedCgroupFSRO: false,
+		},
+		"sysfs should mount as 'ro' if root filrsystem is readonly": {
+			privileged:         true,
+			readonlyRootFS:     true,
+			expectedSysFSRO:    true,
+			expectedCgroupFSRO: false,
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		g := generate.New()
+		g.SetRootReadonly(test.readonlyRootFS)
+		addOCIBindMounts(&g, nil, test.privileged)
+		spec := g.Spec()
+		if test.expectedSysFSRO {
+			checkMount(t, spec.Mounts, "sysfs", "/sys", "sysfs", []string{"ro"}, nil)
+		} else {
+			checkMount(t, spec.Mounts, "sysfs", "/sys", "sysfs", nil, []string{"ro"})
+		}
+		if test.expectedCgroupFSRO {
+			checkMount(t, spec.Mounts, "cgroup", "/sys/fs/cgroup", "cgroup", []string{"ro"}, nil)
+		} else {
+			checkMount(t, spec.Mounts, "cgroup", "/sys/fs/cgroup", "cgroup", nil, []string{"ro"})
+		}
 	}
 }
 
