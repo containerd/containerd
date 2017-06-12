@@ -71,10 +71,10 @@ func (c *criContainerdService) StopContainer(ctx context.Context, r *runtime.Sto
 		glog.V(2).Infof("Stop container %q with signal %v", id, stopSignal)
 		_, err = c.containerService.Kill(ctx, &execution.KillRequest{ID: id, Signal: uint32(stopSignal)})
 		if err != nil {
-			if isContainerdContainerNotExistError(err) {
-				return &runtime.StopContainerResponse{}, nil
+			if !isContainerdContainerNotExistError(err) && !isRuncProcessAlreadyFinishedError(err) {
+				return nil, fmt.Errorf("failed to stop container %q: %v", id, err)
 			}
-			return nil, fmt.Errorf("failed to stop container %q: %v", id, err)
+			// Move on to make sure container status is updated.
 		}
 
 		err = c.waitContainerStop(ctx, id, time.Duration(r.GetTimeout())*time.Second)
@@ -84,20 +84,19 @@ func (c *criContainerdService) StopContainer(ctx context.Context, r *runtime.Sto
 		glog.Errorf("Stop container %q timed out: %v", id, err)
 	}
 
-	glog.V(2).Infof("Delete container from containerd %q", id)
-	// Delete sends SIGKILL to the container in the containerd version we are using.
-	// TODO(random-liu): Replace with `Kill` to avoid race soon.
-	_, err = c.containerService.Delete(ctx, &execution.DeleteRequest{ID: id})
+	// Event handler will Delete the container from containerd after it handles the Exited event.
+	glog.V(2).Infof("Kill container %q", id)
+	_, err = c.containerService.Kill(ctx, &execution.KillRequest{ID: id, Signal: uint32(unix.SIGKILL)})
 	if err != nil {
-		if isContainerdContainerNotExistError(err) {
-			return &runtime.StopContainerResponse{}, nil
+		if !isContainerdContainerNotExistError(err) && !isRuncProcessAlreadyFinishedError(err) {
+			return nil, fmt.Errorf("failed to kill container %q: %v", id, err)
 		}
-		return nil, fmt.Errorf("failed to delete container %q: %v", id, err)
+		// Move on to make sure container status is updated.
 	}
 
-	// Wait forever until container stop is observed by event monitor.
+	// Wait for a fixed timeout until container stop is observed by event monitor.
 	if err := c.waitContainerStop(ctx, id, killContainerTimeout); err != nil {
-		return nil, fmt.Errorf("error occurs during waiting for container %q to stop: %v",
+		return nil, fmt.Errorf("an error occurs during waiting for container %q to stop: %v",
 			id, err)
 	}
 	return &runtime.StopContainerResponse{}, nil

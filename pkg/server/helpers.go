@@ -226,6 +226,13 @@ func isContainerdContainerNotExistError(grpcError error) bool {
 	return grpc.ErrorDesc(grpcError) == containerd.ErrContainerNotExist.Error()
 }
 
+// isRuncProcessAlreadyFinishedError checks whether a grpc error is a process already
+// finished error.
+// TODO(random-liu): Containerd should expose this error in api. (containerd#999)
+func isRuncProcessAlreadyFinishedError(grpcError error) bool {
+	return strings.Contains(grpc.ErrorDesc(grpcError), "os: process already finished")
+}
+
 // getSandbox gets the sandbox metadata from the sandbox store. It returns nil without
 // error if the sandbox metadata is not found. It also tries to get full sandbox id and
 // retry if the sandbox metadata is not found with the initial id.
