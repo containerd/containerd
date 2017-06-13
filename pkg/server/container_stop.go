@@ -65,24 +65,28 @@ func (c *criContainerdService) StopContainer(ctx context.Context, r *runtime.Sto
 		return &runtime.StopContainerResponse{}, nil
 	}
 
-	// TODO(random-liu): [P1] Get stop signal from image config.
-	stopSignal := unix.SIGTERM
-	glog.V(2).Infof("Stop container %q with signal %v", id, stopSignal)
-	_, err = c.containerService.Kill(ctx, &execution.KillRequest{ID: id, Signal: uint32(stopSignal)})
-	if err != nil {
-		if isContainerdContainerNotExistError(err) {
+	if r.GetTimeout() > 0 {
+		// TODO(random-liu): [P1] Get stop signal from image config.
+		stopSignal := unix.SIGTERM
+		glog.V(2).Infof("Stop container %q with signal %v", id, stopSignal)
+		_, err = c.containerService.Kill(ctx, &execution.KillRequest{ID: id, Signal: uint32(stopSignal)})
+		if err != nil {
+			if isContainerdContainerNotExistError(err) {
+				return &runtime.StopContainerResponse{}, nil
+			}
+			return nil, fmt.Errorf("failed to stop container %q: %v", id, err)
+		}
+
+		err = c.waitContainerStop(ctx, id, time.Duration(r.GetTimeout())*time.Second)
+		if err == nil {
 			return &runtime.StopContainerResponse{}, nil
 		}
-		return nil, fmt.Errorf("failed to stop container %q: %v", id, err)
+		glog.Errorf("Stop container %q timed out: %v", id, err)
 	}
-
-	err = c.waitContainerStop(ctx, id, time.Duration(r.GetTimeout())*time.Second)
-	if err == nil {
-		return &runtime.StopContainerResponse{}, nil
-	}
-	glog.Errorf("Stop container %q timed out: %v", id, err)
 
 	glog.V(2).Infof("Delete container from containerd %q", id)
+	// Delete sends SIGKILL to the container in the containerd version we are using.
+	// TODO(random-liu): Replace with `Kill` to avoid race soon.
 	_, err = c.containerService.Delete(ctx, &execution.DeleteRequest{ID: id})
 	if err != nil {
 		if isContainerdContainerNotExistError(err) {
