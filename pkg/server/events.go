@@ -58,10 +58,11 @@ func (c *criContainerdService) startEventMonitor() {
 			b.Reset()
 			// TODO(random-liu): Relist to recover state, should prevent other operations
 			// until state is fully recovered.
-			if err := c.handleEventStream(events); err != nil {
-				glog.Errorf("Failed to handle event stream: %v", err)
-				time.Sleep(b.Duration())
-				continue
+			for {
+				if err := c.handleEventStream(events); err != nil {
+					glog.Errorf("Failed to handle event stream: %v", err)
+					break
+				}
 			}
 		}
 	}()
