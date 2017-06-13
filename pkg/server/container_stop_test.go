@@ -109,6 +109,7 @@ func TestStopContainer(t *testing.T) {
 		killErr             error
 		deleteErr           error
 		discardEvents       int
+		noTimeout           bool
 		expectErr           bool
 		expectCalls         []string
 	}{
@@ -154,6 +155,12 @@ func TestStopContainer(t *testing.T) {
 			killErr:             errors.New("random error"),
 			expectErr:           true,
 			expectCalls:         []string{"kill"},
+		},
+		"should directly kill container if timeout is 0": {
+			metadata:            &testMetadata,
+			containerdContainer: &testContainer,
+			noTimeout:           true,
+			expectCalls:         []string{"delete", "delete"},
 		},
 		"should return error if delete failed": {
 			metadata:            &testMetadata,
@@ -201,11 +208,15 @@ func TestStopContainer(t *testing.T) {
 			}
 		}(eventClient, test.discardEvents)
 		fake.ClearCalls()
+		timeout := int64(1)
+		if test.noTimeout {
+			timeout = 0
+		}
 		// 1 second timeout should be enough for the unit test.
 		// TODO(random-liu): Use fake clock for this test.
 		resp, err := c.StopContainer(context.Background(), &runtime.StopContainerRequest{
 			ContainerId: testID,
-			Timeout:     1,
+			Timeout:     timeout,
 		})
 		if test.expectErr {
 			assert.Error(t, err)
