@@ -3,7 +3,6 @@ package containerd
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"path/filepath"
 	"sync"
 
@@ -17,7 +16,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-var ErrNoRunningTask = errors.New("no running task")
+var (
+	ErrNoImage       = errors.New("container does not have an image")
+	ErrNoRunningTask = errors.New("no running task")
+)
 
 type Container interface {
 	ID() string
@@ -96,7 +98,7 @@ func (c *container) Task(ctx context.Context, attach IOAttach) (Task, error) {
 // Image returns the image that the container is based on
 func (c *container) Image(ctx context.Context) (Image, error) {
 	if c.c.Image == "" {
-		return nil, fmt.Errorf("container is not based on an image")
+		return nil, ErrNoImage
 	}
 	i, err := c.client.ImageService().Get(ctx, c.c.Image)
 	if err != nil {

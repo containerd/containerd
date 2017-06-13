@@ -48,9 +48,14 @@ var listCommand = cli.Command{
 		w := tabwriter.NewWriter(os.Stdout, 10, 1, 3, ' ', 0)
 		fmt.Fprintln(w, "ID\tIMAGE\tPID\tSTATUS")
 		for _, c := range containers {
-			image, err := c.Image(ctx)
-			if err != nil {
-				return err
+			var imageName string
+			if image, err := c.Image(ctx); err != nil {
+				if err != containerd.ErrNoImage {
+					return err
+				}
+				imageName = "-"
+			} else {
+				imageName = image.Name()
 			}
 			var (
 				status string
@@ -73,7 +78,7 @@ var listCommand = cli.Command{
 			}
 			if _, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s\n",
 				c.ID(),
-				image.Name(),
+				imageName,
 				pid,
 				status,
 			); err != nil {
