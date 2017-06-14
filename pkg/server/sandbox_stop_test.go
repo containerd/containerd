@@ -20,7 +20,9 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
+	"github.com/containerd/containerd/api/services/execution"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
@@ -164,5 +166,110 @@ func TestStopPodSandbox(t *testing.T) {
 		}
 		assert.Equal(t, test.expectCalls, fake.GetCalledNames())
 		assert.Equal(t, test.expectedCNICalls, fakeCNIPlugin.GetCalledNames())
+	}
+}
+
+func TestStopContainersInSandbox(t *testing.T) {
+	testID := "test-id"
+	testSandbox := metadata.SandboxMetadata{
+		ID:   testID,
+		Name: "test-name",
+		Config: &runtime.PodSandboxConfig{
+			Metadata: &runtime.PodSandboxMetadata{
+				Name:      "test-name",
+				Uid:       "test-uid",
+				Namespace: "test-ns",
+			}},
+		NetNS: "test-netns",
+	}
+	testContainers := []metadata.ContainerMetadata{
+		{
+			ID:        "test-cid-1",
+			Name:      "test-cname-1",
+			SandboxID: testID,
+			Pid:       2,
+			StartedAt: time.Now().UnixNano(),
+		},
+		{
+			ID:        "test-cid-2",
+			Name:      "test-cname-2",
+			SandboxID: testID,
+			Pid:       3,
+			StartedAt: time.Now().UnixNano(),
+		},
+		{
+			ID:        "test-cid-3",
+			Name:      "test-cname-3",
+			SandboxID: "other-sandbox-id",
+			Pid:       4,
+			StartedAt: time.Now().UnixNano(),
+		},
+	}
+	testContainerdContainers := []task.Task{
+		{
+			ID:     testID,
+			Pid:    1,
+			Status: task.StatusRunning,
+		},
+		{
+			ID:     "test-cid-1",
+			Pid:    2,
+			Status: task.StatusRunning,
+		},
+		{
+			ID:     "test-cid-2",
+			Pid:    3,
+			Status: task.StatusRunning,
+		},
+		{
+			ID:     "test-cid-3",
+			Pid:    4,
+			Status: task.StatusRunning,
+		},
+	}
+
+	c := newTestCRIContainerdService()
+	fake := servertesting.NewFakeExecutionClient().WithEvents()
+	defer fake.Stop()
+	c.taskService = fake
+	fake.SetFakeTasks(testContainerdContainers)
+	assert.NoError(t, c.sandboxStore.Create(testSandbox))
+	assert.NoError(t, c.sandboxIDIndex.Add(testID))
+	for _, cntr := range testContainers {
+		assert.NoError(t, c.containerStore.Create(cntr))
+	}
+
+	fakeCNIPlugin := c.netPlugin.(*servertesting.FakeCNIPlugin)
+	fakeCNIPlugin.SetFakePodNetwork(testSandbox.NetNS, testSandbox.Config.GetMetadata().GetNamespace(),
+		testSandbox.Config.GetMetadata().GetName(), testID, sandboxStatusTestIP)
+
+	eventClient, err := fake.Events(context.Background(), &execution.EventsRequest{})
+	assert.NoError(t, err)
+	// Start a simple test event monitor.
+	go func(e execution.Tasks_EventsClient) {
+		for {
+			if err := c.handleEventStream(e); err != nil { // nolint: vetshadow
+				return
+			}
+		}
+	}(eventClient)
+	res, err := c.StopPodSandbox(context.Background(), &runtime.StopPodSandboxRequest{
+		PodSandboxId: testID,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+
+	cntrs, err := c.containerStore.List()
+	assert.NoError(t, err)
+	assert.Len(t, cntrs, 3)
+	expectedStates := map[string]runtime.ContainerState{
+		"test-cid-1": runtime.ContainerState_CONTAINER_EXITED,
+		"test-cid-2": runtime.ContainerState_CONTAINER_EXITED,
+		"test-cid-3": runtime.ContainerState_CONTAINER_RUNNING,
+	}
+	for id, expected := range expectedStates {
+		cntr, err := c.containerStore.Get(id)
+		assert.NoError(t, err)
+		assert.Equal(t, expected, cntr.State())
 	}
 }

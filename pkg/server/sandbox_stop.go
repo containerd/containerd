@@ -46,6 +46,25 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 	// Use the full sandbox id.
 	id := sandbox.ID
 
+	// Stop all containers inside the sandbox. This terminates the container forcibly,
+	// and container may still be so production should not rely on this behavior.
+	// TODO(random-liu): Delete the sandbox container before this after permanent network namespace
+	// is introduced, so that no container will be started after that.
+	containers, err := c.containerStore.List()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list all containers: %v", err)
+	}
+	for _, container := range containers {
+		if container.SandboxID != id {
+			continue
+		}
+		// Forcibly stop the container. Do not use `StopContainer`, because it introduces a race
+		// if a container is removed after list.
+		if err = c.stopContainer(ctx, container, 0); err != nil {
+			return nil, fmt.Errorf("failed to stop container %q: %v", container.ID, err)
+		}
+	}
+
 	// Teardown network for sandbox.
 	_, err = c.os.Stat(sandbox.NetNS)
 	if err == nil {
@@ -70,6 +89,5 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 		return nil, fmt.Errorf("failed to delete sandbox container %q: %v", id, err)
 	}
 
-	// TODO(random-liu): [P2] Stop all containers inside the sandbox.
 	return &runtime.StopPodSandboxResponse{}, nil
 }

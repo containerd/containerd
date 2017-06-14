@@ -55,59 +55,68 @@ func (c *criContainerdService) StopContainer(ctx context.Context, r *runtime.Sto
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find container %q: %v", r.GetContainerId(), err)
 	}
-	id := r.GetContainerId()
+
+	if err := c.stopContainer(ctx, meta, time.Duration(r.GetTimeout())*time.Second); err != nil {
+		return nil, err
+	}
+
+	return &runtime.StopContainerResponse{}, nil
+}
+
+// stopContainer stops a container based on the container metadata.
+func (c *criContainerdService) stopContainer(ctx context.Context, meta *metadata.ContainerMetadata, timeout time.Duration) error {
+	id := meta.ID
 
 	// Return without error if container is not running. This makes sure that
 	// stop only takes real action after the container is started.
 	if meta.State() != runtime.ContainerState_CONTAINER_RUNNING {
 		glog.V(2).Infof("Container to stop %q is not running, current state %q",
 			id, criContainerStateToString(meta.State()))
-		return &runtime.StopContainerResponse{}, nil
+		return nil
 	}
 
-	if r.GetTimeout() > 0 {
+	if timeout > 0 {
 		// TODO(random-liu): [P1] Get stop signal from image config.
 		stopSignal := unix.SIGTERM
 		glog.V(2).Infof("Stop container %q with signal %v", id, stopSignal)
-		_, err = c.taskService.Kill(ctx, &execution.KillRequest{
+		_, err := c.taskService.Kill(ctx, &execution.KillRequest{
 			ContainerID: id,
 			Signal:      uint32(stopSignal),
 			PidOrAll:    &execution.KillRequest_All{All: true},
 		})
 		if err != nil {
 			if !isContainerdGRPCNotFoundError(err) && !isRuncProcessAlreadyFinishedError(err) {
-				return nil, fmt.Errorf("failed to stop container %q: %v", id, err)
+				return fmt.Errorf("failed to stop container %q: %v", id, err)
 			}
 			// Move on to make sure container status is updated.
 		}
 
-		err = c.waitContainerStop(ctx, id, time.Duration(r.GetTimeout())*time.Second)
+		err = c.waitContainerStop(ctx, id, timeout)
 		if err == nil {
-			return &runtime.StopContainerResponse{}, nil
+			return nil
 		}
 		glog.Errorf("Stop container %q timed out: %v", id, err)
 	}
 
 	// Event handler will Delete the container from containerd after it handles the Exited event.
 	glog.V(2).Infof("Kill container %q", id)
-	_, err = c.taskService.Kill(ctx, &execution.KillRequest{
+	_, err := c.taskService.Kill(ctx, &execution.KillRequest{
 		ContainerID: id,
 		Signal:      uint32(unix.SIGKILL),
 		PidOrAll:    &execution.KillRequest_All{All: true},
 	})
 	if err != nil {
 		if !isContainerdGRPCNotFoundError(err) && !isRuncProcessAlreadyFinishedError(err) {
-			return nil, fmt.Errorf("failed to kill container %q: %v", id, err)
+			return fmt.Errorf("failed to kill container %q: %v", id, err)
 		}
 		// Move on to make sure container status is updated.
 	}
 
 	// Wait for a fixed timeout until container stop is observed by event monitor.
 	if err := c.waitContainerStop(ctx, id, killContainerTimeout); err != nil {
-		return nil, fmt.Errorf("an error occurs during waiting for container %q to stop: %v",
-			id, err)
+		return fmt.Errorf("an error occurs during waiting for container %q to stop: %v", id, err)
 	}
-	return &runtime.StopContainerResponse{}, nil
+	return nil
 }
 
 // waitContainerStop polls container state until timeout exceeds or container is stopped.

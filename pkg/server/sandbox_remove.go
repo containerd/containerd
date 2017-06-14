@@ -53,8 +53,6 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 	// Use the full sandbox id.
 	id := sandbox.ID
 
-	// TODO(random-liu): [P2] Remove all containers in the sandbox.
-
 	// Return error if sandbox container is not fully stopped.
 	// TODO(random-liu): [P0] Make sure network is torn down, may need to introduce a state.
 	_, err = c.taskService.Info(ctx, &execution.InfoRequest{ContainerID: id})
@@ -71,6 +69,25 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 			return nil, fmt.Errorf("failed to remove sandbox container snapshot %q: %v", id, err)
 		}
 		glog.V(5).Infof("Remove called for snapshot %q that does not exist", id)
+	}
+
+	// Remove all containers inside the sandbox.
+	// NOTE(random-liu): container could still be created after this point, Kubelet should
+	// not rely on this behavior.
+	// TODO(random-liu): Introduce an intermediate state to avoid container creation after
+	// this point.
+	cntrs, err := c.containerStore.List()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list all containers: %v", err)
+	}
+	for _, cntr := range cntrs {
+		if cntr.SandboxID != id {
+			continue
+		}
+		_, err = c.RemoveContainer(ctx, &runtime.RemoveContainerRequest{ContainerId: cntr.ID})
+		if err != nil {
+			return nil, fmt.Errorf("failed to remove container %q: %v", cntr.ID, err)
+		}
 	}
 
 	// TODO(random-liu): [P1] Remove permanent namespace once used.

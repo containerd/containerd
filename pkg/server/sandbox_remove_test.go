@@ -17,6 +17,7 @@ package server
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/api/services/containers"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
@@ -175,4 +176,58 @@ func TestRemovePodSandbox(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, res, "remove should be idempotent")
 	}
+}
+
+func TestRemoveContainersInSandbox(t *testing.T) {
+	testID := "test-id"
+	testName := "test-name"
+	testMetadata := metadata.SandboxMetadata{
+		ID:   testID,
+		Name: testName,
+	}
+	testContainersMetadata := []*metadata.ContainerMetadata{
+		{
+			ID:         "test-cid-1",
+			Name:       "test-cname-1",
+			SandboxID:  testID,
+			FinishedAt: time.Now().UnixNano(),
+		},
+		{
+			ID:         "test-cid-2",
+			Name:       "test-cname-2",
+			SandboxID:  testID,
+			FinishedAt: time.Now().UnixNano(),
+		},
+		{
+			ID:         "test-cid-3",
+			Name:       "test-cname-3",
+			SandboxID:  "other-sandbox-id",
+			FinishedAt: time.Now().UnixNano(),
+		},
+	}
+
+	c := newTestCRIContainerdService()
+	WithFakeSnapshotClient(c)
+	assert.NoError(t, c.sandboxNameIndex.Reserve(testName, testID))
+	assert.NoError(t, c.sandboxIDIndex.Add(testID))
+	assert.NoError(t, c.sandboxStore.Create(testMetadata))
+	for _, cntr := range testContainersMetadata {
+		assert.NoError(t, c.containerNameIndex.Reserve(cntr.Name, cntr.ID))
+		assert.NoError(t, c.containerStore.Create(*cntr))
+	}
+
+	res, err := c.RemovePodSandbox(context.Background(), &runtime.RemovePodSandboxRequest{
+		PodSandboxId: testID,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+
+	meta, err := c.sandboxStore.Get(testID)
+	assert.Error(t, err)
+	assert.True(t, metadata.IsNotExistError(err))
+	assert.Nil(t, meta, "sandbox metadata should be removed")
+
+	cntrs, err := c.containerStore.List()
+	assert.NoError(t, err)
+	assert.Equal(t, testContainersMetadata[2:], cntrs, "container metadata should be removed")
 }
