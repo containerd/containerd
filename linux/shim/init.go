@@ -4,6 +4,7 @@ package shim
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -21,6 +22,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
+	"github.com/pkg/errors"
 )
 
 type initProcess struct {
@@ -57,7 +59,7 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 			Options: rm.Options,
 		}
 		if err := m.Mount(filepath.Join(path, "rootfs")); err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "failed to mount rootfs component %v", m)
 		}
 	}
 	runtime := &runc.Runc{
@@ -83,13 +85,13 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 	)
 	if r.Terminal {
 		if socket, err = runc.NewConsoleSocket(filepath.Join(path, "pty.sock")); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to create runc console socket")
 		}
 		defer os.Remove(socket.Path())
 	} else {
 		// TODO: get uid/gid
 		if io, err = runc.NewPipeIO(0, 0); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to create runc io pipes")
 		}
 		p.io = io
 	}
@@ -108,7 +110,7 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 			NoSubreaper: true,
 		}
 		if _, err := p.runc.Restore(context, r.ID, r.Bundle, opts); err != nil {
-			return nil, err
+			return nil, p.runcError(err, "runc restore failed")
 		}
 	} else {
 		opts := &runc.CreateOpts{
@@ -120,13 +122,13 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 			opts.ConsoleSocket = socket
 		}
 		if err := p.runc.Create(context, r.ID, r.Bundle, opts); err != nil {
-			return nil, err
+			return nil, p.runcError(err, "runc create failed")
 		}
 	}
 	if r.Stdin != "" {
 		sc, err := fifo.OpenFifo(context, r.Stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "failed to open stdin fifo %s", r.Stdin)
 		}
 		p.stdin = sc
 		p.closers = append(p.closers, sc)
@@ -135,22 +137,22 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 	if socket != nil {
 		console, err := socket.ReceiveMaster()
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to retrieve console master")
 		}
 		p.console = console
 		if err := copyConsole(context, console, r.Stdin, r.Stdout, r.Stderr, &p.WaitGroup, &copyWaitGroup); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to start console copy")
 		}
 	} else {
 		if err := copyPipes(context, io, r.Stdin, r.Stdout, r.Stderr, &p.WaitGroup, &copyWaitGroup); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to start io pipe copy")
 		}
 	}
 
 	copyWaitGroup.Wait()
 	pid, err := runc.ReadPidFile(pidFile)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to retrieve runc container pid")
 	}
 	p.pid = pid
 	return p, nil
@@ -172,7 +174,7 @@ func (p *initProcess) ExitedAt() time.Time {
 func (p *initProcess) ContainerStatus(ctx context.Context) (string, error) {
 	c, err := p.runc.State(ctx, p.id)
 	if err != nil {
-		return "", err
+		return "", p.runcError(err, "runc state failed")
 	}
 	return c.Status, nil
 }
@@ -180,7 +182,8 @@ func (p *initProcess) ContainerStatus(ctx context.Context) (string, error) {
 func (p *initProcess) Start(context context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return p.runc.Start(context, p.id)
+	err := p.runc.Start(context, p.id)
+	return p.runcError(err, "runc start failed")
 }
 
 func (p *initProcess) Exited(status int) {
@@ -207,7 +210,7 @@ func (p *initProcess) Delete(context context.Context) error {
 		}
 		p.io.Close()
 	}
-	return err
+	return p.runcError(err, "runc delete failed")
 }
 
 func (p *initProcess) Resize(ws console.WinSize) error {
@@ -218,23 +221,27 @@ func (p *initProcess) Resize(ws console.WinSize) error {
 }
 
 func (p *initProcess) Pause(context context.Context) error {
-	return p.runc.Pause(context, p.id)
+	err := p.runc.Pause(context, p.id)
+	return p.runcError(err, "runc pause failed")
 }
 
 func (p *initProcess) Resume(context context.Context) error {
-	return p.runc.Resume(context, p.id)
+	err := p.runc.Resume(context, p.id)
+	return p.runcError(err, "runc resume failed")
 }
 
 func (p *initProcess) Kill(context context.Context, signal uint32, all bool) error {
-	return p.runc.Kill(context, p.id, int(signal), &runc.KillOpts{
+	err := p.runc.Kill(context, p.id, int(signal), &runc.KillOpts{
 		All: all,
 	})
+	return p.runcError(err, "runc kill failed")
 }
 
 func (p *initProcess) killAll(context context.Context) error {
-	return p.runc.Kill(context, p.id, int(syscall.SIGKILL), &runc.KillOpts{
+	err := p.runc.Kill(context, p.id, int(syscall.SIGKILL), &runc.KillOpts{
 		All: true,
 	})
+	return p.runcError(err, "runc killall failed")
 }
 
 func (p *initProcess) Signal(sig int) error {
@@ -268,6 +275,55 @@ func (p *initProcess) Checkpoint(context context.Context, r *shimapi.CheckpointR
 		return fmt.Errorf("%s path= %s", criuError(err), dumpLog)
 	}
 	return nil
+}
+
+// TODO(mlaventure): move to runc package?
+func getLastRuncError(r *runc.Runc) (string, error) {
+	if r.Log == "" {
+		return "", nil
+	}
+
+	f, err := os.OpenFile(r.Log, os.O_RDONLY, 0400)
+	if err != nil {
+		return "", err
+	}
+
+	var (
+		errMsg string
+		log    struct {
+			Level string
+			Msg   string
+			Time  time.Time
+		}
+	)
+
+	dec := json.NewDecoder(f)
+	for err = nil; err == nil; {
+		if err = dec.Decode(&log); err != nil && err != io.EOF {
+			return "", err
+		}
+		if log.Level == "error" {
+			errMsg = strings.TrimSpace(log.Msg)
+		}
+	}
+
+	return errMsg, nil
+}
+
+func (p *initProcess) runcError(rErr error, msg string) error {
+	if rErr == nil {
+		return nil
+	}
+
+	rMsg, err := getLastRuncError(p.runc)
+	switch {
+	case err != nil:
+		return errors.Wrapf(err, "%s: %s (%s)", msg, "unable to retrieve runc error", err.Error())
+	case rMsg == "":
+		return errors.Wrap(err, msg)
+	default:
+		return errors.Errorf("%s: %s", msg, rMsg)
+	}
 }
 
 // criuError returns only the first line of the error message from criu

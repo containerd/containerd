@@ -20,6 +20,7 @@ import (
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
 )
 
 type execProcess struct {
@@ -59,13 +60,13 @@ func newExecProcess(context context.Context, path string, r *shimapi.ExecRequest
 	)
 	if r.Terminal {
 		if socket, err = runc.NewConsoleSocket(filepath.Join(path, "pty.sock")); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to create runc console socket")
 		}
 		defer os.Remove(socket.Path())
 	} else {
 		// TODO: get uid/gid
 		if io, err = runc.NewPipeIO(0, 0); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to create runc io pipes")
 		}
 		e.io = io
 	}
@@ -85,12 +86,12 @@ func newExecProcess(context context.Context, path string, r *shimapi.ExecRequest
 	spec.Terminal = r.Terminal
 
 	if err := parent.runc.Exec(context, parent.id, spec, opts); err != nil {
-		return nil, err
+		return nil, parent.runcError(err, "runc exec failed")
 	}
 	if r.Stdin != "" {
 		sc, err := fifo.OpenFifo(context, r.Stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "failed to open stdin fifo %s", r.Stdin)
 		}
 		e.closers = append(e.closers, sc)
 		e.stdin = sc
@@ -99,21 +100,21 @@ func newExecProcess(context context.Context, path string, r *shimapi.ExecRequest
 	if socket != nil {
 		console, err := socket.ReceiveMaster()
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to retrieve console master")
 		}
 		e.console = console
 		if err := copyConsole(context, console, r.Stdin, r.Stdout, r.Stderr, &e.WaitGroup, &copyWaitGroup); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to start console copy")
 		}
 	} else {
 		if err := copyPipes(context, io, r.Stdin, r.Stdout, r.Stderr, &e.WaitGroup, &copyWaitGroup); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to start io pipe copy")
 		}
 	}
 	copyWaitGroup.Wait()
 	pid, err := runc.ReadPidFile(opts.PidFile)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to retrieve runc exec pid")
 	}
 	e.pid = pid
 	return e, nil

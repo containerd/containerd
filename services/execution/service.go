@@ -23,6 +23,7 @@ import (
 	protobuf "github.com/gogo/protobuf/types"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	specs "github.com/opencontainers/image-spec/specs-go"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -129,7 +130,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 	}
 	c, err := runtime.Create(ctx, r.ContainerID, opts)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "runtime create failed")
 	}
 	state, err := c.State(ctx)
 	if err != nil {

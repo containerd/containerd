@@ -5,7 +5,6 @@ package linux
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -15,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/grpc"
+
 	"github.com/containerd/containerd/api/services/shim"
 	"github.com/containerd/containerd/api/types/mount"
 	"github.com/containerd/containerd/api/types/task"
@@ -23,6 +24,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
 	runc "github.com/containerd/go-runc"
+	"github.com/pkg/errors"
 
 	"golang.org/x/sys/unix"
 )
@@ -181,7 +183,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts)
 	if err != nil {
 		return nil, err
 	}
-	s, err := newShim(r.shim, path, namespace, r.remote)
+	s, err := newShim(ctx, r.shim, path, namespace, r.remote)
 	if err != nil {
 		os.RemoveAll(path)
 		return nil, err
@@ -215,7 +217,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts)
 	}
 	if _, err = s.Create(ctx, sopts); err != nil {
 		os.RemoveAll(path)
-		return nil, err
+		return nil, errors.New(grpc.ErrorDesc(err))
 	}
 	c := newTask(id, namespace, opts.Spec, s)
 	if err := r.tasks.add(ctx, c); err != nil {
@@ -244,7 +246,7 @@ func (r *Runtime) Delete(ctx context.Context, c plugin.Task) (*plugin.Exit, erro
 	}
 	rsp, err := lc.shim.Delete(ctx, &shim.DeleteRequest{})
 	if err != nil {
-		return nil, err
+		return nil, errors.New(grpc.ErrorDesc(err))
 	}
 	lc.shim.Exit(ctx, &shim.ExitRequest{})
 	r.tasks.delete(ctx, lc)
