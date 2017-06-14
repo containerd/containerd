@@ -16,7 +16,6 @@ import (
 	"github.com/containerd/containerd/api/services/execution"
 	imagesapi "github.com/containerd/containerd/api/services/images"
 	namespacesapi "github.com/containerd/containerd/api/services/namespaces"
-	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	versionservice "github.com/containerd/containerd/api/services/version"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
@@ -28,8 +27,6 @@ import (
 	"github.com/containerd/containerd/services/diff"
 	diffservice "github.com/containerd/containerd/services/diff"
 	imagesservice "github.com/containerd/containerd/services/images"
-	snapshotservice "github.com/containerd/containerd/services/snapshot"
-	"github.com/containerd/containerd/snapshot"
 	pempty "github.com/golang/protobuf/ptypes/empty"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -46,6 +43,7 @@ func init() {
 
 type clientOpts struct {
 	defaultns string
+	ssmount   bool
 }
 
 type ClientOpt func(c *clientOpts) error
@@ -53,6 +51,17 @@ type ClientOpt func(c *clientOpts) error
 func WithDefaultNamespace(ns string) ClientOpt {
 	return func(c *clientOpts) error {
 		c.defaultns = ns
+		return nil
+	}
+}
+
+// WithSnapshotMount is used to indicate that snapshots will
+// not be mounted by the client. In this case snapshot will
+// return mounts of type snapshot and only be mountable using
+// containerd.
+func WithSnapshotMount() ClientOpt {
+	return func(c *clientOpts) error {
+		c.ssmount = true
 		return nil
 	}
 }
@@ -86,6 +95,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 	}
 	return &Client{
 		conn:    conn,
+		ssmount: copts.ssmount,
 		runtime: fmt.Sprintf("%s.%s", plugin.RuntimePlugin, runtime.GOOS),
 	}, nil
 }
@@ -95,8 +105,8 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 type Client struct {
 	conn *grpc.ClientConn
 
-	defaultns string
-	runtime   string
+	ssmount bool
+	runtime string
 }
 
 func (c *Client) IsServing(ctx context.Context) (bool, error) {
@@ -441,10 +451,6 @@ func (c *Client) ContainerService() containers.ContainersClient {
 
 func (c *Client) ContentStore() content.Store {
 	return contentservice.NewStoreFromClient(contentapi.NewContentClient(c.conn))
-}
-
-func (c *Client) SnapshotService() snapshot.Snapshotter {
-	return snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotClient(c.conn))
 }
 
 func (c *Client) TaskService() execution.TasksClient {
