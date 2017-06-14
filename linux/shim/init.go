@@ -21,6 +21,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
+	"github.com/pkg/errors"
 )
 
 type initProcess struct {
@@ -57,7 +58,7 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 			Options: rm.Options,
 		}
 		if err := m.Mount(filepath.Join(path, "rootfs")); err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "failed to mount rootfs component %v", m)
 		}
 	}
 	runtime := &runc.Runc{
@@ -83,13 +84,13 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 	)
 	if r.Terminal {
 		if socket, err = runc.NewConsoleSocket(filepath.Join(path, "pty.sock")); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to create runc console socket")
 		}
 		defer os.Remove(socket.Path())
 	} else {
 		// TODO: get uid/gid
 		if io, err = runc.NewPipeIO(0, 0); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to create runc io pipes")
 		}
 		p.io = io
 	}
@@ -126,7 +127,7 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 	if r.Stdin != "" {
 		sc, err := fifo.OpenFifo(context, r.Stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "failed to open stdin fifo %s", r.Stdin)
 		}
 		p.stdin = sc
 		p.closers = append(p.closers, sc)
@@ -135,22 +136,22 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 	if socket != nil {
 		console, err := socket.ReceiveMaster()
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to retrieve console master")
 		}
 		p.console = console
 		if err := copyConsole(context, console, r.Stdin, r.Stdout, r.Stderr, &p.WaitGroup, &copyWaitGroup); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to start console copy")
 		}
 	} else {
 		if err := copyPipes(context, io, r.Stdin, r.Stdout, r.Stderr, &p.WaitGroup, &copyWaitGroup); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to start io pipe copy")
 		}
 	}
 
 	copyWaitGroup.Wait()
 	pid, err := runc.ReadPidFile(pidFile)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to retrieve runc container pid")
 	}
 	p.pid = pid
 	return p, nil
