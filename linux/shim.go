@@ -5,8 +5,6 @@ package linux
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"net"
 	"os/exec"
 	"path/filepath"
@@ -14,11 +12,10 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/grpclog"
 
 	"github.com/containerd/containerd/api/services/shim"
 	localShim "github.com/containerd/containerd/linux/shim"
-	containerdlog "github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/sys"
 	"github.com/pkg/errors"
@@ -58,7 +55,7 @@ func newShim(ctx context.Context, shimName string, path, namespace string, remot
 			cmd.Process.Kill()
 			reaper.Default.Wait(cmd)
 		} else {
-			containerdlog.G(ctx).WithField("socket", socket).Infof("new shim started")
+			log.G(ctx).WithField("socket", socket).Infof("new shim started")
 		}
 	}()
 	if err = sys.SetOOMScore(cmd.Process.Pid, sys.OOMScoreMaxKillable); err != nil {
@@ -77,7 +74,6 @@ func loadShim(path, namespace string, remote bool) (shim.ShimClient, error) {
 
 func connectShim(socket string) (shim.ShimClient, error) {
 	// reset the logger for grpc to log to dev/null so that it does not mess with our stdio
-	grpclog.SetLogger(log.New(ioutil.Discard, "", log.LstdFlags))
 	dialOpts := []grpc.DialOption{grpc.WithInsecure(), grpc.WithTimeout(100 * time.Second)}
 	dialOpts = append(dialOpts,
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
