@@ -89,6 +89,7 @@ func (f *FakeExecutionClient) Stop() {
 	for _, client := range f.eventClients {
 		close(client.Events)
 	}
+	f.eventClients = nil
 }
 
 // WithEvents setup events publisher for FakeExecutionClient
