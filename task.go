@@ -16,9 +16,11 @@ import (
 	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"google.golang.org/grpc"
 )
 
 const UnknownExitStatus = 255
@@ -108,11 +110,17 @@ func (t *task) Kill(ctx context.Context, s syscall.Signal) error {
 	_, err := t.client.TaskService().Kill(ctx, &tasks.KillRequest{
 		Signal:      uint32(s),
 		ContainerID: t.containerID,
-		PidOrAll: &tasks.KillRequest_All{
-			All: true,
+		PidOrAll: &tasks.KillRequest_Pid{
+			Pid: t.pid,
 		},
 	})
-	return err
+	if err != nil {
+		if strings.Contains(grpc.ErrorDesc(err), plugin.ErrProcessExited.Error()) {
+			return ErrProcessExited
+		}
+		return err
+	}
+	return nil
 }
 
 func (t *task) Pause(ctx context.Context) error {

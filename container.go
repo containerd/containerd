@@ -20,6 +20,7 @@ var (
 	ErrNoImage           = errors.New("container does not have an image")
 	ErrNoRunningTask     = errors.New("no running task")
 	ErrDeleteRunningTask = errors.New("cannot delete container with running task")
+	ErrProcessExited     = errors.New("process already exited")
 )
 
 type Container interface {

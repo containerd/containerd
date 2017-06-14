@@ -167,7 +167,10 @@ func (e *execProcess) Resize(ws console.WinSize) error {
 }
 
 func (e *execProcess) Signal(sig int) error {
-	return unix.Kill(e.pid, syscall.Signal(sig))
+	if err := unix.Kill(e.pid, syscall.Signal(sig)); err != nil {
+		return checkKillError(err)
+	}
+	return nil
 }
 
 func (e *execProcess) Stdin() io.Closer {
