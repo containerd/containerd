@@ -4,10 +4,8 @@ import (
 	gocontext "context"
 	"encoding/csv"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -129,18 +127,6 @@ func getVersionService(context *cli.Context) (versionservice.VersionClient, erro
 		return nil, err
 	}
 	return versionservice.NewVersionClient(conn), nil
-}
-
-func getTempDir(id string) (string, error) {
-	err := os.MkdirAll(filepath.Join(os.TempDir(), "ctr"), 0700)
-	if err != nil {
-		return "", err
-	}
-	tmpDir, err := ioutil.TempDir(filepath.Join(os.TempDir(), "ctr"), fmt.Sprintf("%s-", id))
-	if err != nil {
-		return "", err
-	}
-	return tmpDir, nil
 }
 
 func waitContainer(events execution.Tasks_EventsClient, id string, pid uint32) (uint32, error) {
