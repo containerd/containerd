@@ -86,7 +86,7 @@ func newExecProcess(context context.Context, path string, r *shimapi.ExecRequest
 	spec.Terminal = r.Terminal
 
 	if err := parent.runc.Exec(context, parent.id, spec, opts); err != nil {
-		return nil, err
+		return nil, parent.runcError(err, "runc exec failed")
 	}
 	if r.Stdin != "" {
 		sc, err := fifo.OpenFifo(context, r.Stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
