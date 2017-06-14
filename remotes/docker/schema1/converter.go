@@ -29,23 +29,29 @@ var (
 	mediaTypeManifest = "application/vnd.docker.distribution.manifest.v1+json"
 )
 
+type blobState struct {
+	diffID digest.Digest
+	empty  bool
+}
+
 // Converter converts schema1 manifests to schema2 on fetch
 type Converter struct {
 	contentStore content.Store
 	fetcher      remotes.Fetcher
 
 	pulledManifest *manifest
-	layers         []ocispec.Descriptor
 
-	mu      sync.Mutex
-	blobMap map[digest.Digest]digest.Digest
+	mu         sync.Mutex
+	blobMap    map[digest.Digest]blobState
+	layerBlobs map[digest.Digest]ocispec.Descriptor
 }
 
 func NewConverter(contentStore content.Store, fetcher remotes.Fetcher) *Converter {
 	return &Converter{
 		contentStore: contentStore,
 		fetcher:      fetcher,
-		blobMap:      map[digest.Digest]digest.Digest{},
+		blobMap:      map[digest.Digest]blobState{},
+		layerBlobs:   map[digest.Digest]ocispec.Descriptor{},
 	}
 }
 
@@ -63,21 +69,27 @@ func (c *Converter) Handle(ctx context.Context, desc ocispec.Descriptor) ([]ocis
 		descs := make([]ocispec.Descriptor, 0, len(c.pulledManifest.FSLayers))
 
 		for i := range m.FSLayers {
-			var h v1History
-			if err := json.Unmarshal([]byte(m.History[i].V1Compatibility), &h); err != nil {
-				return nil, err
-			}
-			if !h.EmptyLayer() {
-				descs = append([]ocispec.Descriptor{
-					{
-						MediaType: images.MediaTypeDockerSchema2LayerGzip,
-						Digest:    c.pulledManifest.FSLayers[i].BlobSum,
-					},
-				}, descs...)
+			if _, ok := c.blobMap[c.pulledManifest.FSLayers[i].BlobSum]; !ok {
+				empty, err := isEmptyLayer([]byte(m.History[i].V1Compatibility))
+				if err != nil {
+					return nil, err
+				}
+
+				// Do no attempt to download a known empty blob
+				if !empty {
+					descs = append([]ocispec.Descriptor{
+						{
+							MediaType: images.MediaTypeDockerSchema2LayerGzip,
+							Digest:    c.pulledManifest.FSLayers[i].BlobSum,
+						},
+					}, descs...)
+				}
+				c.blobMap[c.pulledManifest.FSLayers[i].BlobSum] = blobState{
+					empty: empty,
+				}
 			}
 		}
-		c.layers = descs
-		return c.layers, nil
+		return descs, nil
 	case images.MediaTypeDockerSchema2LayerGzip:
 		if c.pulledManifest == nil {
 			return nil, errors.New("manifest required for schema 1 blob pull")
@@ -89,14 +101,9 @@ func (c *Converter) Handle(ctx context.Context, desc ocispec.Descriptor) ([]ocis
 }
 
 func (c *Converter) Convert(ctx context.Context) (ocispec.Descriptor, error) {
-	if c.pulledManifest == nil {
-		return ocispec.Descriptor{}, errors.New("missing schema 1 manifest for conversion")
-	}
-	if len(c.pulledManifest.History) == 0 {
-		return ocispec.Descriptor{}, errors.New("no history")
-	}
-	if len(c.layers) == 0 {
-		return ocispec.Descriptor{}, errors.New("schema 1 manifest has no usable layers")
+	history, diffIDs, err := c.schema1ManifestHistory()
+	if err != nil {
+		return ocispec.Descriptor{}, errors.Wrap(err, "schema 1 conversion failed")
 	}
 
 	var img ocispec.Image
@@ -104,28 +111,7 @@ func (c *Converter) Convert(ctx context.Context) (ocispec.Descriptor, error) {
 		return ocispec.Descriptor{}, errors.Wrap(err, "failed to unmarshal image from schema 1 history")
 	}
 
-	history, err := schema1ManifestHistory(c.pulledManifest)
-	if err != nil {
-		return ocispec.Descriptor{}, errors.Wrap(err, "schema 1 conversion failed")
-	}
 	img.History = history
-
-	diffIDs := make([]digest.Digest, len(c.layers))
-	for i, layer := range c.layers {
-		info, err := c.contentStore.Info(ctx, layer.Digest)
-		if err != nil {
-			return ocispec.Descriptor{}, errors.Wrap(err, "failed to get blob info")
-		}
-
-		// Fill in size since not given by schema 1 manifest
-		c.layers[i].Size = info.Size
-
-		diffID, ok := c.blobMap[layer.Digest]
-		if !ok {
-			return ocispec.Descriptor{}, errors.New("missing diff id")
-		}
-		diffIDs[i] = diffID
-	}
 	img.RootFS = ocispec.RootFS{
 		Type:    "layers",
 		DiffIDs: diffIDs,
@@ -147,12 +133,17 @@ func (c *Converter) Convert(ctx context.Context) (ocispec.Descriptor, error) {
 		return ocispec.Descriptor{}, errors.Wrap(err, "failed to write config")
 	}
 
+	layers := make([]ocispec.Descriptor, len(diffIDs))
+	for i, diffID := range diffIDs {
+		layers[i] = c.layerBlobs[diffID]
+	}
+
 	manifest := ocispec.Manifest{
 		Versioned: specs.Versioned{
 			SchemaVersion: 2,
 		},
 		Config: config,
-		Layers: c.layers,
+		Layers: layers,
 	}
 
 	b, err = json.Marshal(manifest)
@@ -207,7 +198,7 @@ func (c *Converter) fetchBlob(ctx context.Context, desc ocispec.Descriptor) erro
 
 	ref := remotes.MakeRefKey(ctx, desc)
 
-	var diffID digest.Digest
+	calc := newBlobStateCalculator()
 
 	cw, err := c.contentStore.Writer(ctx, ref, desc.Size, desc.Digest)
 	if err != nil {
@@ -216,6 +207,7 @@ func (c *Converter) fetchBlob(ctx context.Context, desc ocispec.Descriptor) erro
 		}
 
 		// TODO: Check if blob -> diff id mapping already exists
+		// TODO: Check if blob empty label exists
 
 		r, err := c.contentStore.Reader(ctx, desc.Digest)
 		if err != nil {
@@ -226,7 +218,7 @@ func (c *Converter) fetchBlob(ctx context.Context, desc ocispec.Descriptor) erro
 		gr, err := gzip.NewReader(r)
 		defer gr.Close()
 
-		diffID, err = digest.Canonical.FromReader(gr)
+		_, err = io.Copy(calc, gr)
 		if err != nil {
 			return err
 		}
@@ -246,7 +238,7 @@ func (c *Converter) fetchBlob(ctx context.Context, desc ocispec.Descriptor) erro
 			gr, err := gzip.NewReader(pr)
 			defer gr.Close()
 
-			diffID, err = digest.Canonical.FromReader(gr)
+			_, err = io.Copy(calc, gr)
 			pr.CloseWithError(err)
 			return err
 		})
@@ -259,13 +251,64 @@ func (c *Converter) fetchBlob(ctx context.Context, desc ocispec.Descriptor) erro
 		if err := eg.Wait(); err != nil {
 			return err
 		}
+
+		// TODO: Label blob
 	}
 
+	if desc.Size == 0 {
+		info, err := c.contentStore.Info(ctx, desc.Digest)
+		if err != nil {
+			return errors.Wrap(err, "failed to get blob info")
+		}
+		desc.Size = info.Size
+	}
+
+	state := calc.State()
+
 	c.mu.Lock()
-	c.blobMap[desc.Digest] = diffID
+	c.blobMap[desc.Digest] = state
+	c.layerBlobs[state.diffID] = desc
 	c.mu.Unlock()
 
 	return nil
+}
+func (c *Converter) schema1ManifestHistory() ([]ocispec.History, []digest.Digest, error) {
+	if c.pulledManifest == nil {
+		return nil, nil, errors.New("missing schema 1 manifest for conversion")
+	}
+	m := *c.pulledManifest
+
+	if len(m.History) == 0 {
+		return nil, nil, errors.New("no history")
+	}
+
+	history := make([]ocispec.History, len(m.History))
+	diffIDs := []digest.Digest{}
+	for i := range m.History {
+		var h v1History
+		if err := json.Unmarshal([]byte(m.History[i].V1Compatibility), &h); err != nil {
+			return nil, nil, errors.Wrap(err, "failed to unmarshal history")
+		}
+
+		blobSum := m.FSLayers[i].BlobSum
+
+		state := c.blobMap[blobSum]
+
+		history[len(history)-i-1] = ocispec.History{
+			Author:     h.Author,
+			Comment:    h.Comment,
+			Created:    &h.Created,
+			CreatedBy:  strings.Join(h.ContainerConfig.Cmd, " "),
+			EmptyLayer: state.empty,
+		}
+
+		if !state.empty {
+			diffIDs = append([]digest.Digest{state.diffID}, diffIDs...)
+
+		}
+	}
+
+	return history, diffIDs, nil
 }
 
 type fsLayer struct {
@@ -292,37 +335,26 @@ type v1History struct {
 	} `json:"container_config,omitempty"`
 }
 
-func (h *v1History) EmptyLayer() bool {
+// isEmptyLayer returns whether the v1 compability history describes an
+// empty layer. A return value of true indicates the layer is empty,
+// however false does not indicate non-empty.
+func isEmptyLayer(compatHistory []byte) (bool, error) {
+	var h v1History
+	if err := json.Unmarshal(compatHistory, &h); err != nil {
+		return false, err
+	}
+
 	if h.ThrowAway != nil {
-		return !(*h.ThrowAway)
+		return *h.ThrowAway, nil
 	}
 	if h.Size != nil {
-		return *h.Size == 0
+		return *h.Size == 0, nil
 	}
 
-	// If no size is given or `ThrowAway` specified, the image is empty
-	return true
-}
-
-func schema1ManifestHistory(m *manifest) ([]ocispec.History, error) {
-	history := make([]ocispec.History, len(m.History))
-	for i := range m.History {
-		var h v1History
-		if err := json.Unmarshal([]byte(m.History[i].V1Compatibility), &h); err != nil {
-			return nil, errors.Wrap(err, "failed to unmarshal history")
-		}
-
-		empty := h.EmptyLayer()
-		history[len(history)-i-1] = ocispec.History{
-			Author:     h.Author,
-			Comment:    h.Comment,
-			Created:    &h.Created,
-			CreatedBy:  strings.Join(h.ContainerConfig.Cmd, " "),
-			EmptyLayer: empty,
-		}
-	}
-
-	return history, nil
+	// If no `Size` or `throwaway` field is given, then
+	// it cannot be determined whether the layer is empty
+	// from the history, return false
+	return false, nil
 }
 
 type signature struct {
@@ -383,4 +415,35 @@ func stripSignature(b []byte) ([]byte, error) {
 	}
 
 	return append(b[:protected.Length], tail...), nil
+}
+
+type blobStateCalculator struct {
+	empty    bool
+	digester digest.Digester
+}
+
+func newBlobStateCalculator() *blobStateCalculator {
+	return &blobStateCalculator{
+		empty:    true,
+		digester: digest.Canonical.Digester(),
+	}
+}
+
+func (c *blobStateCalculator) Write(p []byte) (int, error) {
+	if c.empty {
+		for _, b := range p {
+			if b != 0x00 {
+				c.empty = false
+				break
+			}
+		}
+	}
+	return c.digester.Hash().Write(p)
+}
+
+func (c *blobStateCalculator) State() blobState {
+	return blobState{
+		empty:  c.empty,
+		diffID: c.digester.Digest(),
+	}
 }
