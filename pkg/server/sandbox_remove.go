@@ -73,7 +73,6 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 		glog.V(5).Infof("Remove called for snapshot %q that does not exist", id)
 	}
 
-	// TODO(random-liu): [P0] Cleanup shm created in RunPodSandbox.
 	// TODO(random-liu): [P1] Remove permanent namespace once used.
 
 	// Cleanup the sandbox root directory.

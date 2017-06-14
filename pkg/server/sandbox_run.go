@@ -183,7 +183,10 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	}
 	defer func() {
 		if retErr != nil {
-			c.cleanupSandboxFiles(sandboxRootDir, config)
+			if err = c.unmountSandboxFiles(sandboxRootDir, config); err != nil {
+				glog.Errorf("Failed to unmount sandbox files in %q: %v",
+					sandboxRootDir, err)
+			}
 		}
 	}()
 
@@ -403,12 +406,15 @@ func parseDNSOptions(servers, searches, options []string) (string, error) {
 	return resolvContent, nil
 }
 
-// cleanupSandboxFiles only unmount files, we rely on the removal of sandbox root directory to remove files.
-// Each cleanup task should log error instead of returning, so as to keep on cleanup on error.
-func (c *criContainerdService) cleanupSandboxFiles(rootDir string, config *runtime.PodSandboxConfig) {
+// unmountSandboxFiles unmount some sandbox files, we rely on the removal of sandbox root directory to
+// remove these files. Unmount should *NOT* return error when:
+//  1) The mount point is already unmounted.
+//  2) The mount point doesn't exist.
+func (c *criContainerdService) unmountSandboxFiles(rootDir string, config *runtime.PodSandboxConfig) error {
 	if !config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostIpc() {
-		if err := c.os.Unmount(getSandboxDevShm(rootDir), unix.MNT_DETACH); err != nil && os.IsNotExist(err) {
-			glog.Errorf("failed to unmount sandbox shm: %v", err)
+		if err := c.os.Unmount(getSandboxDevShm(rootDir), unix.MNT_DETACH); err != nil && !os.IsNotExist(err) {
+			return err
 		}
 	}
+	return nil
 }

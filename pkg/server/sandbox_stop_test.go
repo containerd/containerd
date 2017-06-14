@@ -58,6 +58,7 @@ func TestStopPodSandbox(t *testing.T) {
 		injectErr        error
 		injectStatErr    error
 		injectCNIErr     error
+		injectUnmountErr error
 		expectErr        bool
 		expectCalls      []string
 		expectedCNICalls []string
@@ -115,6 +116,15 @@ func TestStopPodSandbox(t *testing.T) {
 			injectCNIErr:     errors.New("arbitrary error"),
 			expectCalls:      []string{},
 		},
+		"stop sandbox with unmount error": {
+			sandboxTasks:     []task.Task{testContainer},
+			injectSandbox:    true,
+			expectErr:        true,
+			expectedCNICalls: []string{"TearDownPod"},
+			injectCNIErr:     errors.New("arbitrary error"),
+			injectUnmountErr: errors.New("arbitrary error"),
+			expectCalls:      []string{},
+		},
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIContainerdService()
@@ -135,6 +145,9 @@ func TestStopPodSandbox(t *testing.T) {
 		}
 		if test.injectStatErr != nil {
 			fakeOS.InjectError("Stat", test.injectStatErr)
+		}
+		if test.injectUnmountErr != nil {
+			fakeOS.InjectError("Unmount", test.injectUnmountErr)
 		}
 		fakeCNIPlugin.SetFakePodNetwork(testSandbox.NetNS, testSandbox.Config.GetMetadata().GetNamespace(),
 			testSandbox.Config.GetMetadata().GetName(), testID, sandboxStatusTestIP)
