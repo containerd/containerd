@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/api/types/container"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
+	"golang.org/x/sys/unix"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
@@ -106,17 +107,15 @@ func TestStopContainer(t *testing.T) {
 	for desc, test := range map[string]struct {
 		metadata            *metadata.ContainerMetadata
 		containerdContainer *container.Container
-		killErr             error
-		deleteErr           error
-		discardEvents       int
+		stopErr             error
 		noTimeout           bool
 		expectErr           bool
-		expectCalls         []string
+		expectCalls         []servertesting.CalledDetail
 	}{
 		"should return error when container does not exist": {
 			metadata:    nil,
 			expectErr:   true,
-			expectCalls: []string{},
+			expectCalls: []servertesting.CalledDetail{},
 		},
 		"should not return error when container is not running": {
 			metadata: &metadata.ContainerMetadata{
@@ -124,52 +123,99 @@ func TestStopContainer(t *testing.T) {
 				CreatedAt: time.Now().UnixNano(),
 			},
 			expectErr:   false,
-			expectCalls: []string{},
+			expectCalls: []servertesting.CalledDetail{},
 		},
 		"should not return error if containerd container does not exist": {
-			metadata:    &testMetadata,
-			expectErr:   false,
-			expectCalls: []string{"kill"},
+			metadata:            &testMetadata,
+			containerdContainer: &testContainer,
+			// Since it's hard to inject event during `StopContainer` is running,
+			// we only test the case that first stop returns error, but container
+			// status is not updated yet.
+			// We also leverage this behavior to test that when graceful
+			// stop doesn't take effect, container should be SIGKILL-ed.
+			stopErr:   servertesting.ContainerNotExistError,
+			expectErr: false,
+			expectCalls: []servertesting.CalledDetail{
+				{
+					Name:     "kill",
+					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGTERM)},
+				},
+				{
+					Name:     "kill",
+					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGKILL)},
+				},
+				{
+					Name:     "delete",
+					Argument: &execution.DeleteRequest{ID: testID},
+				},
+			},
 		},
-		"should not return error if containerd container is killed": {
+		"should not return error if containerd container process already finished": {
+			metadata:            &testMetadata,
+			containerdContainer: &testContainer,
+			stopErr:             errors.New("os: process already finished"),
+			expectErr:           false,
+			expectCalls: []servertesting.CalledDetail{
+				{
+					Name:     "kill",
+					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGTERM)},
+				},
+				{
+					Name:     "kill",
+					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGKILL)},
+				},
+				{
+					Name:     "delete",
+					Argument: &execution.DeleteRequest{ID: testID},
+				},
+			},
+		},
+		"should return error if graceful stop returns random error": {
+			metadata:            &testMetadata,
+			containerdContainer: &testContainer,
+			stopErr:             errors.New("random stop error"),
+			expectErr:           true,
+			expectCalls: []servertesting.CalledDetail{
+				{
+					Name:     "kill",
+					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGTERM)},
+				},
+			},
+		},
+		"should not return error if containerd container is gracefully stopped": {
 			metadata:            &testMetadata,
 			containerdContainer: &testContainer,
 			expectErr:           false,
 			// deleted by the event monitor.
-			expectCalls: []string{"kill", "delete"},
-		},
-		"should not return error if containerd container is deleted": {
-			metadata:            &testMetadata,
-			containerdContainer: &testContainer,
-			// discard killed events to force a delete. This is only
-			// for testing. Actually real containerd should only generate
-			// one EXIT event.
-			discardEvents: 1,
-			expectErr:     false,
-			// one more delete from the event monitor.
-			expectCalls: []string{"kill", "delete", "delete"},
-		},
-		"should return error if kill failed": {
-			metadata:            &testMetadata,
-			containerdContainer: &testContainer,
-			killErr:             errors.New("random error"),
-			expectErr:           true,
-			expectCalls:         []string{"kill"},
+			expectCalls: []servertesting.CalledDetail{
+				{
+					Name:     "kill",
+					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGTERM)},
+				},
+				{
+					Name:     "delete",
+					Argument: &execution.DeleteRequest{ID: testID},
+				},
+			},
 		},
 		"should directly kill container if timeout is 0": {
 			metadata:            &testMetadata,
 			containerdContainer: &testContainer,
 			noTimeout:           true,
-			expectCalls:         []string{"delete", "delete"},
+			expectErr:           false,
+			expectCalls: []servertesting.CalledDetail{
+				{
+					Name:     "kill",
+					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGKILL)},
+				},
+				{
+					Name:     "delete",
+					Argument: &execution.DeleteRequest{ID: testID},
+				},
+			},
 		},
-		"should return error if delete failed": {
-			metadata:            &testMetadata,
-			containerdContainer: &testContainer,
-			deleteErr:           errors.New("random error"),
-			discardEvents:       1,
-			expectErr:           true,
-			expectCalls:         []string{"kill", "delete"},
-		},
+		// TODO(random-liu): Test "should return error if both failed" after we have
+		// fake clock for test.
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIContainerdService()
@@ -185,28 +231,19 @@ func TestStopContainer(t *testing.T) {
 		if test.containerdContainer != nil {
 			fake.SetFakeContainers([]container.Container{*test.containerdContainer})
 		}
-		if test.killErr != nil {
-			fake.InjectError("kill", test.killErr)
-		}
-		if test.deleteErr != nil {
-			fake.InjectError("delete", test.deleteErr)
+		if test.stopErr != nil {
+			fake.InjectError("kill", test.stopErr)
 		}
 		eventClient, err := fake.Events(context.Background(), &execution.EventsRequest{})
 		assert.NoError(t, err)
 		// Start a simple test event monitor.
-		go func(e execution.ContainerService_EventsClient, discard int) {
+		go func(e execution.ContainerService_EventsClient) {
 			for {
-				e, err := e.Recv() // nolint: vetshadow
-				if err != nil {
+				if err := c.handleEventStream(e); err != nil { // nolint: vetshadow
 					return
 				}
-				if discard > 0 {
-					discard--
-					continue
-				}
-				c.handleEvent(e)
 			}
-		}(eventClient, test.discardEvents)
+		}(eventClient)
 		fake.ClearCalls()
 		timeout := int64(1)
 		if test.noTimeout {
@@ -225,6 +262,6 @@ func TestStopContainer(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotNil(t, resp)
 		}
-		assert.Equal(t, test.expectCalls, fake.GetCalledNames())
+		assert.Equal(t, test.expectCalls, fake.GetCalledDetails())
 	}
 }

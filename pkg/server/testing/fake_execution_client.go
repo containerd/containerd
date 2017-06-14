@@ -31,7 +31,8 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
-var containerNotExistError = grpc.Errorf(codes.Unknown, containerd.ErrContainerNotExist.Error())
+// ContainerNotExistError is the fake error returned when container does not exist.
+var ContainerNotExistError = grpc.Errorf(codes.Unknown, containerd.ErrContainerNotExist.Error())
 
 // CalledDetail is the struct contains called function name and arguments.
 type CalledDetail struct {
@@ -230,7 +231,7 @@ func (f *FakeExecutionClient) Start(ctx context.Context, startOpts *execution.St
 	}
 	c, ok := f.ContainerList[startOpts.ID]
 	if !ok {
-		return nil, containerNotExistError
+		return nil, ContainerNotExistError
 	}
 	f.sendEvent(&container.Event{
 		ID:   c.ID,
@@ -261,7 +262,7 @@ func (f *FakeExecutionClient) Delete(ctx context.Context, deleteOpts *execution.
 	}
 	c, ok := f.ContainerList[deleteOpts.ID]
 	if !ok {
-		return nil, containerNotExistError
+		return nil, ContainerNotExistError
 	}
 	delete(f.ContainerList, deleteOpts.ID)
 	f.sendEvent(&container.Event{
@@ -282,7 +283,7 @@ func (f *FakeExecutionClient) Info(ctx context.Context, infoOpts *execution.Info
 	}
 	c, ok := f.ContainerList[infoOpts.ID]
 	if !ok {
-		return nil, containerNotExistError
+		return nil, ContainerNotExistError
 	}
 	return &c, nil
 }
@@ -316,7 +317,7 @@ func (f *FakeExecutionClient) Kill(ctx context.Context, killOpts *execution.Kill
 	}
 	c, ok := f.ContainerList[killOpts.ID]
 	if !ok {
-		return nil, containerNotExistError
+		return nil, ContainerNotExistError
 	}
 	c.Status = container.Status_STOPPED
 	f.ContainerList[killOpts.ID] = c
