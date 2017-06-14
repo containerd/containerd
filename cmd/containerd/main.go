@@ -147,6 +147,8 @@ func main() {
 				return err
 			}
 		}
+		// register metrics last after all other services
+		grpc_prometheus.Register(server)
 		log.G(global).Info("starting GRPC API server...")
 		if err := serveGRPC(server); err != nil {
 			return err
