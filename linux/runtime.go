@@ -183,7 +183,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts)
 	if err != nil {
 		return nil, err
 	}
-	s, err := newShim(r.shim, path, namespace, r.remote)
+	s, err := newShim(ctx, r.shim, path, namespace, r.remote)
 	if err != nil {
 		os.RemoveAll(path)
 		return nil, err

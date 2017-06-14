@@ -3,6 +3,7 @@
 package linux
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -17,12 +18,13 @@ import (
 
 	"github.com/containerd/containerd/api/services/shim"
 	localShim "github.com/containerd/containerd/linux/shim"
+	containerdlog "github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/sys"
 	"github.com/pkg/errors"
 )
 
-func newShim(shimName string, path, namespace string, remote bool) (shim.ShimClient, error) {
+func newShim(ctx context.Context, shimName string, path, namespace string, remote bool) (shim.ShimClient, error) {
 	if !remote {
 		return localShim.Client(path, namespace)
 	}
@@ -51,8 +53,16 @@ func newShim(shimName string, path, namespace string, remote bool) (shim.ShimCli
 	if err := reaper.Default.Start(cmd); err != nil {
 		return nil, errors.Wrapf(err, "failed to start shim")
 	}
-	if err := sys.SetOOMScore(cmd.Process.Pid, sys.OOMScoreMaxKillable); err != nil {
-		return nil, err
+	defer func() {
+		if err != nil {
+			cmd.Process.Kill()
+			reaper.Default.Wait(cmd)
+		} else {
+			containerdlog.G(ctx).WithField("socket", socket).Infof("new shim started")
+		}
+	}()
+	if err = sys.SetOOMScore(cmd.Process.Pid, sys.OOMScoreMaxKillable); err != nil {
+		return nil, errors.Wrap(err, "failed to set OOM Score on shim")
 	}
 	return connectShim(socket)
 }
