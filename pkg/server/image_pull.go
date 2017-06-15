@@ -99,13 +99,11 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 
 	// TODO(random-liu): [P1] Schema 1 image is not supported in containerd now, we need to support
 	// it for backward compatiblity.
-	cfgDigest, manifestDigest, err := c.pullImage(ctx, image)
+	// TODO(mikebrow): add truncIndex for image id
+	imageID, manifestDigest, err := c.pullImage(ctx, image)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull image %q: %v", image, err)
 	}
-	// Use config digest as imageID to conform to oci image spec.
-	// TODO(mikebrow): add truncIndex for image id
-	imageID := cfgDigest.String()
 	glog.V(4).Infof("Pulled image %q with image id %q, manifest digest %q", image, imageID, manifestDigest)
 
 	repoDigest, repoTag := getRepoDigestAndTag(namedRef, manifestDigest)
@@ -188,7 +186,7 @@ func (r *resourceSet) all() map[string]struct{} {
 // The ref should be normalized image reference.
 func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
 	// TODO(random-liu): Replace with client.Pull.
-	imagedigest.Digest, imagedigest.Digest, error) {
+	string, imagedigest.Digest, error) {
 	// Resolve the image reference to get descriptor and fetcher.
 	resolver := docker.NewResolver(docker.ResolverOptions{
 		// TODO(random-liu): Add authentication by setting credentials.
@@ -213,15 +211,14 @@ func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
 	// In the future, containerd will rely on the information in the image store to perform image
 	// garbage collection.
 	// For now, we simply use it to store and retrieve information required for pulling an image.
-	if putErr := c.imageStoreService.Put(ctx, ref, desc); putErr != nil {
+	if err = c.imageStoreService.Put(ctx, ref, desc); err != nil {
 		return "", "", fmt.Errorf("failed to put image %q desc %v into containerd image store: %v",
-			ref, desc, putErr)
+			ref, desc, err)
 	}
-	// TODO(random-liu): What if following operations fail? Do we need to do cleanup?
-
-	resources := newResourceSet()
+	// Do not cleanup if following operations fail so as to make resumable download possible.
 
 	glog.V(4).Infof("Start downloading resources for image %q", ref)
+	resources := newResourceSet()
 	// Fetch all image resources into content store.
 	// Dispatch a handler which will run a sequence of handlers to:
 	// 1) track all resources associated using a customized handler;
@@ -294,7 +291,14 @@ func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
 	if err != nil {
 		return "", "", fmt.Errorf("failed to get config descriptor for image %q: %v", ref, err)
 	}
-	return configDesc.Digest, manifestDigest, nil
+	// Use config digest as imageID to conform to oci image spec, and also add image id as
+	// image reference.
+	imageID := configDesc.Digest.String()
+	if err = c.imageStoreService.Put(ctx, imageID, desc); err != nil {
+		return "", "", fmt.Errorf("failed to put image id %q into containerd image store: %v",
+			imageID, err)
+	}
+	return imageID, manifestDigest, nil
 }
 
 // waitDownloadingPollInterval is the interval to check resource downloading progress.

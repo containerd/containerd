@@ -65,7 +65,8 @@ func newTestCRIContainerdService() *criContainerdService {
 		sandboxIDIndex:     truncindex.NewTruncIndex(nil),
 		containerStore:     metadata.NewContainerStore(store.NewMetadataStore()),
 		containerNameIndex: registrar.NewRegistrar(),
-		taskService:   servertesting.NewFakeExecutionClient(),
+		taskService:        servertesting.NewFakeExecutionClient(),
+		containerService:   servertesting.NewFakeContainersClient(),
 		netPlugin:          servertesting.NewFakeCNIPlugin(),
 		agentFactory:       agentstesting.NewFakeAgentFactory(),
 	}

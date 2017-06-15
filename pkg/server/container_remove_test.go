@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/api/services/containers"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	"github.com/containerd/containerd/api/types/mount"
 	"github.com/stretchr/testify/assert"
@@ -100,6 +101,7 @@ func TestRemoveContainer(t *testing.T) {
 	for desc, test := range map[string]struct {
 		metadata            *metadata.ContainerMetadata
 		removeSnapshotErr   error
+		deleteContainerErr  error
 		removeDirErr        error
 		expectErr           bool
 		expectUnsetRemoving bool
@@ -122,10 +124,11 @@ func TestRemoveContainer(t *testing.T) {
 			},
 			expectErr: true,
 		},
-		"should not return error if container does not exist": {
-			metadata:          nil,
-			removeSnapshotErr: servertesting.SnapshotNotExistError,
-			expectErr:         false,
+		"should not return error if container metadata does not exist": {
+			metadata:           nil,
+			removeSnapshotErr:  servertesting.SnapshotNotExistError,
+			deleteContainerErr: servertesting.ContainerNotExistError,
+			expectErr:          false,
 		},
 		"should not return error if snapshot does not exist": {
 			metadata:          testContainerMetadata,
@@ -136,6 +139,16 @@ func TestRemoveContainer(t *testing.T) {
 			metadata:          testContainerMetadata,
 			removeSnapshotErr: errors.New("random error"),
 			expectErr:         true,
+		},
+		"should not return error if containerd container does not exist": {
+			metadata:           testContainerMetadata,
+			deleteContainerErr: servertesting.ContainerNotExistError,
+			expectErr:          false,
+		},
+		"should return error if delete containerd container fails": {
+			metadata:           testContainerMetadata,
+			deleteContainerErr: errors.New("random error"),
+			expectErr:          true,
 		},
 		"should return error if remove container root fails": {
 			metadata:            testContainerMetadata,
@@ -150,6 +163,7 @@ func TestRemoveContainer(t *testing.T) {
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIContainerdService()
+		fake := c.containerService.(*servertesting.FakeContainersClient)
 		fakeSnapshotClient := WithFakeSnapshotClient(c)
 		fakeOS := c.os.(*ostesting.FakeOS)
 		if test.metadata != nil {
@@ -170,6 +184,14 @@ func TestRemoveContainer(t *testing.T) {
 			})
 		} else {
 			fakeSnapshotClient.InjectError("remove", test.removeSnapshotErr)
+		}
+		if test.deleteContainerErr == nil {
+			_, err := fake.Create(context.Background(), &containers.CreateContainerRequest{
+				Container: containers.Container{ID: testID},
+			})
+			assert.NoError(t, err)
+		} else {
+			fake.InjectError("delete", test.deleteContainerErr)
 		}
 		resp, err := c.RemoveContainer(context.Background(), &runtime.RemoveContainerRequest{
 			ContainerId: testID,
@@ -198,5 +220,15 @@ func TestRemoveContainer(t *testing.T) {
 		mountsResp, err := fakeSnapshotClient.Mounts(context.Background(), &snapshotapi.MountsRequest{Key: testID})
 		assert.Equal(t, servertesting.SnapshotNotExistError, err, "snapshot should be removed")
 		assert.Nil(t, mountsResp)
+		getResp, err := fake.Get(context.Background(), &containers.GetContainerRequest{ID: testID})
+		assert.Equal(t, servertesting.ContainerNotExistError, err, "containerd container should be removed")
+		assert.Nil(t, getResp)
+
+		resp, err = c.RemoveContainer(context.Background(), &runtime.RemoveContainerRequest{
+			ContainerId: testID,
+		})
+		assert.NoError(t, err)
+		assert.NotNil(t, resp, "remove should be idempotent")
+
 	}
 }

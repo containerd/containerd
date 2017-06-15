@@ -19,6 +19,7 @@ package server
 import (
 	"fmt"
 
+	"github.com/containerd/containerd/api/services/containers"
 	contentapi "github.com/containerd/containerd/api/services/content"
 	diffapi "github.com/containerd/containerd/api/services/diff"
 	"github.com/containerd/containerd/api/services/execution"
@@ -77,6 +78,8 @@ type criContainerdService struct {
 	// containerNameIndex stores all container names and make sure each
 	// name is unique.
 	containerNameIndex *registrar.Registrar
+	// containerService is containerd tasks client.
+	containerService containers.ContainersClient
 	// taskService is containerd tasks client.
 	taskService execution.TasksClient
 	// contentStoreService is the containerd content service client.
@@ -114,7 +117,8 @@ func NewCRIContainerdService(conn *grpc.ClientConn, rootDir, networkPluginBinDir
 		sandboxIDIndex:   truncindex.NewTruncIndex(nil),
 		// TODO(random-liu): Add container id index.
 		containerNameIndex:  registrar.NewRegistrar(),
-		taskService:    execution.NewTasksClient(conn),
+		containerService:    containers.NewContainersClient(conn),
+		taskService:         execution.NewTasksClient(conn),
 		imageStoreService:   imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)),
 		contentStoreService: contentservice.NewStoreFromClient(contentapi.NewContentClient(conn)),
 		snapshotService:     snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotClient(conn)),

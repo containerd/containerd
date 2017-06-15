@@ -187,6 +187,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		}
 	}()
 
+	meta.Pid = createResp.Pid
 	meta.NetNS = getNetworkNamespace(createResp.Pid)
 	if !config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostNetwork() {
 		// Setup network for sandbox.
