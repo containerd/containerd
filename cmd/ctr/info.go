@@ -10,8 +10,9 @@ import (
 )
 
 var infoCommand = cli.Command{
-	Name:  "info",
-	Usage: "get info about a container",
+	Name:      "info",
+	Usage:     "get info about a container",
+	ArgsUsage: "CONTAINER",
 	Action: func(context *cli.Context) error {
 		var (
 			ctx, cancel = appContext(context)

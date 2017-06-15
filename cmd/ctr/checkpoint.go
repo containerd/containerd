@@ -9,8 +9,9 @@ import (
 )
 
 var checkpointCommand = cli.Command{
-	Name:  "checkpoint",
-	Usage: "checkpoint a container",
+	Name:      "checkpoint",
+	Usage:     "checkpoint a container",
+	ArgsUsage: "CONTAINER",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "exit",
