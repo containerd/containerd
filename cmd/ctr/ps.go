@@ -10,8 +10,9 @@ import (
 )
 
 var psCommand = cli.Command{
-	Name:  "ps",
-	Usage: "list processes for container",
+	Name:      "ps",
+	Usage:     "list processes for container",
+	ArgsUsage: "CONTAINER",
 	Action: func(context *cli.Context) error {
 		var (
 			id          = context.Args().First()

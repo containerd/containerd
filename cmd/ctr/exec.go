@@ -10,8 +10,9 @@ import (
 )
 
 var execCommand = cli.Command{
-	Name:  "exec",
-	Usage: "execute additional processes in an existing container",
+	Name:      "exec",
+	Usage:     "execute additional processes in an existing container",
+	ArgsUsage: "CONTAINER CMD [ARG...]",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "cwd",
