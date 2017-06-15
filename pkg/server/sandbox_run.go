@@ -24,9 +24,8 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/api/services/execution"
-	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
+	"github.com/containerd/containerd/api/types/mount"
 	"github.com/golang/glog"
-	imagedigest "github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
@@ -86,17 +85,25 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox image %q: %v", defaultSandboxImage, err)
 	}
-	prepareResp, err := c.snapshotService.Prepare(ctx, &snapshotapi.PrepareRequest{
-		Key: id,
-		// We are sure that ChainID must be a digest.
-		Parent: imagedigest.Digest(imageMeta.ChainID).String(),
-		//Readonly: true,
-	})
+	rootfsMounts, err := c.snapshotService.View(ctx, id, imageMeta.ChainID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare sandbox rootfs %q: %v", imageMeta.ChainID, err)
 	}
-	// TODO(random-liu): [P0] Cleanup snapshot on failure after switching to new snapshot api.
-	rootfsMounts := prepareResp.Mounts
+	defer func() {
+		if retErr != nil {
+			if err := c.snapshotService.Remove(ctx, id); err != nil {
+				glog.Errorf("Failed to remove sandbox container snapshot %q: %v", id, err)
+			}
+		}
+	}()
+	var rootfs []*mount.Mount
+	for _, m := range rootfsMounts {
+		rootfs = append(rootfs, &mount.Mount{
+			Type:    m.Type,
+			Source:  m.Source,
+			Options: m.Options,
+		})
+	}
 
 	// Create sandbox container root directory.
 	// Prepare streaming named pipe.
@@ -156,7 +163,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	glog.V(4).Infof("Sandbox container spec: %+v", spec)
 	createOpts := &execution.CreateRequest{
 		ContainerID: id,
-		Rootfs:      rootfsMounts,
+		Rootfs:      rootfs,
 		// No stdin for sandbox container.
 		Stdout: stdout,
 		Stderr: stderr,

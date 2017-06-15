@@ -25,7 +25,11 @@ import (
 	google_protobuf1 "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 )
+
+// SnapshotNotExistError is the fake error returned when snapshot does not exist.
+var SnapshotNotExistError = grpc.Errorf(codes.NotFound, "snapshot does not exist")
 
 // FakeSnapshotClient is a simple fake snapshot client, so that cri-containerd
 // can be run for testing without requiring a real containerd setup.
@@ -109,6 +113,17 @@ func (f *FakeSnapshotClient) SetFakeMounts(name string, mounts []*mount.Mount) {
 	f.MountList[name] = mounts
 }
 
+// ListMounts lists all the fake mounts.
+func (f *FakeSnapshotClient) ListMounts() [][]*mount.Mount {
+	f.Lock()
+	defer f.Unlock()
+	var ms [][]*mount.Mount
+	for _, m := range f.MountList {
+		ms = append(ms, m)
+	}
+	return ms
+}
+
 // Prepare is a test implementation of snapshot.Prepare
 func (f *FakeSnapshotClient) Prepare(ctx context.Context, prepareOpts *snapshot.PrepareRequest, opts ...grpc.CallOption) (*snapshot.MountsResponse, error) {
 	f.Lock()
@@ -141,7 +156,7 @@ func (f *FakeSnapshotClient) Mounts(ctx context.Context, mountsOpts *snapshot.Mo
 	}
 	mounts, ok := f.MountList[mountsOpts.Key]
 	if !ok {
-		return nil, fmt.Errorf("mounts not exist")
+		return nil, SnapshotNotExistError
 	}
 	return &snapshot.MountsResponse{
 		Mounts: mounts,
@@ -154,13 +169,40 @@ func (f *FakeSnapshotClient) Commit(ctx context.Context, in *snapshot.CommitRequ
 }
 
 // View is a test implementation of snapshot.View
-func (f *FakeSnapshotClient) View(ctx context.Context, in *snapshot.PrepareRequest, opts ...grpc.CallOption) (*snapshot.MountsResponse, error) {
-	return nil, nil
+func (f *FakeSnapshotClient) View(ctx context.Context, viewOpts *snapshot.PrepareRequest, opts ...grpc.CallOption) (*snapshot.MountsResponse, error) {
+	f.Lock()
+	defer f.Unlock()
+	f.appendCalled("view", viewOpts)
+	if err := f.getError("view"); err != nil {
+		return nil, err
+	}
+	_, ok := f.MountList[viewOpts.Key]
+	if ok {
+		return nil, fmt.Errorf("mounts already exist")
+	}
+	f.MountList[viewOpts.Key] = []*mount.Mount{{
+		Type:   "bind",
+		Source: viewOpts.Key,
+		// TODO(random-liu): Fake options based on Readonly option.
+	}}
+	return &snapshot.MountsResponse{
+		Mounts: f.MountList[viewOpts.Key],
+	}, nil
 }
 
 // Remove is a test implementation of snapshot.Remove
-func (f *FakeSnapshotClient) Remove(ctx context.Context, in *snapshot.RemoveRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error) {
-	return nil, nil
+func (f *FakeSnapshotClient) Remove(ctx context.Context, removeOpts *snapshot.RemoveRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error) {
+	f.Lock()
+	defer f.Unlock()
+	f.appendCalled("remove", removeOpts)
+	if err := f.getError("remove"); err != nil {
+		return nil, err
+	}
+	if _, ok := f.MountList[removeOpts.Key]; !ok {
+		return nil, SnapshotNotExistError
+	}
+	delete(f.MountList, removeOpts.Key)
+	return &google_protobuf1.Empty{}, nil
 }
 
 // Stat is a test implementation of snapshot.Stat

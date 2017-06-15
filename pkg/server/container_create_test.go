@@ -134,7 +134,7 @@ func TestCreateContainer(t *testing.T) {
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIContainerdService()
-		fakeSnapshotClient := c.snapshotService.(*servertesting.FakeSnapshotClient)
+		fakeSnapshotClient := WithFakeSnapshotClient(c)
 		fakeOS := c.os.(*ostesting.FakeOS)
 		if test.sandboxMetadata != nil {
 			assert.NoError(t, c.sandboxStore.Create(*test.sandboxMetadata))
@@ -177,6 +177,7 @@ func TestCreateContainer(t *testing.T) {
 				assert.NoError(t, c.containerNameIndex.Reserve(containerName, "random id"),
 					"container name should be released")
 			}
+			assert.Empty(t, fakeSnapshotClient.ListMounts(), "snapshot should be cleaned up")
 			metas, err := c.containerStore.List()
 			assert.NoError(t, err)
 			assert.Empty(t, metas, "container metadata should not be created")

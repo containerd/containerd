@@ -268,7 +268,7 @@ options timeout:1
 func TestRunPodSandbox(t *testing.T) {
 	config, imageConfig, _ := getRunPodSandboxTestData() // TODO: declare and test specCheck see below
 	c := newTestCRIContainerdService()
-	fakeSnapshotClient := c.snapshotService.(*servertesting.FakeSnapshotClient)
+	fakeSnapshotClient := WithFakeSnapshotClient(c)
 	fakeExecutionClient := c.containerService.(*servertesting.FakeExecutionClient)
 	fakeCNIPlugin := c.netPlugin.(*servertesting.FakeCNIPlugin)
 	fakeOS := c.os.(*ostesting.FakeOS)
@@ -292,7 +292,7 @@ func TestRunPodSandbox(t *testing.T) {
 	}
 	// Insert sandbox image metadata.
 	assert.NoError(t, c.imageMetadataStore.Create(imageMetadata))
-	expectSnapshotClientCalls := []string{"prepare"}
+	expectSnapshotClientCalls := []string{"view"}
 	expectExecutionClientCalls := []string{"create", "start"}
 
 	res, err := c.RunPodSandbox(context.Background(), &runtime.RunPodSandboxRequest{Config: config})

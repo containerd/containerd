@@ -19,11 +19,10 @@ package server
 import (
 	"fmt"
 
+	"github.com/containerd/containerd/api/services/execution"
+	"github.com/containerd/containerd/snapshot"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
-
-	"github.com/containerd/containerd/api/services/execution"
-
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
@@ -65,7 +64,14 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 		return nil, fmt.Errorf("sandbox container %q is not fully stopped", id)
 	}
 
-	// TODO(random-liu): [P0] Cleanup snapshot after switching to new snapshot api.
+	// Remove sandbox container snapshot.
+	if err := c.snapshotService.Remove(ctx, id); err != nil {
+		if !snapshot.IsNotExist(err) {
+			return nil, fmt.Errorf("failed to remove sandbox container snapshot %q: %v", id, err)
+		}
+		glog.V(5).Infof("Remove called for snapshot %q that does not exist", id)
+	}
+
 	// TODO(random-liu): [P0] Cleanup shm created in RunPodSandbox.
 	// TODO(random-liu): [P1] Remove permanent namespace once used.
 

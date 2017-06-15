@@ -19,9 +19,9 @@ package server
 import (
 	"fmt"
 
+	"github.com/containerd/containerd/snapshot"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
-
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
@@ -69,7 +69,13 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 	// kubelet implementation, we'll never start a container once we decide to remove it,
 	// so we don't need the "Dead" state for now.
 
-	// TODO(random-liu): [P0] Cleanup snapshot after switching to new snapshot api.
+	// Remove container snapshot.
+	if err := c.snapshotService.Remove(ctx, id); err != nil {
+		if !snapshot.IsNotExist(err) {
+			return nil, fmt.Errorf("failed to remove container snapshot %q: %v", id, err)
+		}
+		glog.V(5).Infof("Remove called for snapshot %q that does not exist", id)
+	}
 
 	// Cleanup container root directory.
 	containerRootDir := getContainerRootDir(c.rootDir, id)

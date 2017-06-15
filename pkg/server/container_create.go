@@ -20,9 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	"github.com/golang/glog"
-	imagedigest "github.com/opencontainers/go-digest"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
@@ -79,15 +77,22 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	if imageMeta == nil {
 		return nil, fmt.Errorf("image %q not found", image)
 	}
-	if _, err := c.snapshotService.Prepare(ctx, &snapshotapi.PrepareRequest{
-		Key: id,
-		// We are sure that ChainID must be a digest.
-		Parent: imagedigest.Digest(imageMeta.ChainID).String(),
-		//Readonly: config.GetLinux().GetSecurityContext().GetReadonlyRootfs(),
-	}); err != nil {
-		return nil, fmt.Errorf("failed to prepare container rootfs %q: %v", imageMeta.ChainID, err)
+	if config.GetLinux().GetSecurityContext().GetReadonlyRootfs() {
+		if _, err := c.snapshotService.View(ctx, id, imageMeta.ChainID); err != nil {
+			return nil, fmt.Errorf("failed to view container rootfs %q: %v", imageMeta.ChainID, err)
+		}
+	} else {
+		if _, err := c.snapshotService.Prepare(ctx, id, imageMeta.ChainID); err != nil {
+			return nil, fmt.Errorf("failed to prepare container rootfs %q: %v", imageMeta.ChainID, err)
+		}
 	}
-	// TODO(random-liu): [P0] Cleanup snapshot on failure after switching to new snapshot api.
+	defer func() {
+		if retErr != nil {
+			if err := c.snapshotService.Remove(ctx, id); err != nil {
+				glog.Errorf("Failed to remove container snapshot %q: %v", id, err)
+			}
+		}
+	}()
 	meta.ImageRef = imageMeta.ID
 
 	// Create container root directory.

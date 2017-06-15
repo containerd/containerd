@@ -22,10 +22,13 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/api/services/execution"
+	snapshotservice "github.com/containerd/containerd/services/snapshot"
 	"github.com/docker/docker/pkg/truncindex"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
@@ -33,9 +36,6 @@ import (
 	"github.com/kubernetes-incubator/cri-containerd/pkg/registrar"
 	agentstesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/agents/testing"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 )
 
 type nopReadWriteCloser struct{}
@@ -66,20 +66,25 @@ func newTestCRIContainerdService() *criContainerdService {
 		containerStore:     metadata.NewContainerStore(store.NewMetadataStore()),
 		containerNameIndex: registrar.NewRegistrar(),
 		containerService:   servertesting.NewFakeExecutionClient(),
-		snapshotService:    servertesting.NewFakeSnapshotClient(),
 		netPlugin:          servertesting.NewFakeCNIPlugin(),
 		agentFactory:       agentstesting.NewFakeAgentFactory(),
 	}
+}
+
+// WithFakeSnapshotClient add and return fake snapshot client.
+func WithFakeSnapshotClient(c *criContainerdService) *servertesting.FakeSnapshotClient {
+	fake := servertesting.NewFakeSnapshotClient()
+	c.snapshotService = snapshotservice.NewSnapshotterFromClient(fake)
+	return fake
 }
 
 // Test all sandbox operations.
 func TestSandboxOperations(t *testing.T) {
 	c := newTestCRIContainerdService()
 	fake := c.containerService.(*servertesting.FakeExecutionClient)
-	// TODO(random-liu): Clean this up if needed.
-	// fakeSnapshotClient := c.snapshotService.(*servertesting.FakeSnapshotClient)
 	fakeOS := c.os.(*ostesting.FakeOS)
 	fakeCNIPlugin := c.netPlugin.(*servertesting.FakeCNIPlugin)
+	WithFakeSnapshotClient(c)
 	fakeOS.OpenFifoFn = func(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
 		return nopReadWriteCloser{}, nil
 	}

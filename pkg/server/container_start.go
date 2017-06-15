@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/api/services/execution"
-	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
+	"github.com/containerd/containerd/api/types/mount"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -176,15 +176,23 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 	}
 
 	// Get rootfs mounts.
-	mountsResp, err := c.snapshotService.Mounts(ctx, &snapshotapi.MountsRequest{Key: id})
+	rootfsMounts, err := c.snapshotService.Mounts(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to get rootfs mounts %q: %v", id, err)
+	}
+	var rootfs []*mount.Mount
+	for _, m := range rootfsMounts {
+		rootfs = append(rootfs, &mount.Mount{
+			Type:    m.Type,
+			Source:  m.Source,
+			Options: m.Options,
+		})
 	}
 
 	// Create containerd container.
 	createOpts := &execution.CreateRequest{
 		ContainerID: id,
-		Rootfs:      mountsResp.Mounts,
+		Rootfs:      rootfs,
 		Stdin:       stdin,
 		Stdout:      stdout,
 		Stderr:      stderr,

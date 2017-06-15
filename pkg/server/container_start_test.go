@@ -590,7 +590,7 @@ func TestStartContainer(t *testing.T) {
 		c := newTestCRIContainerdService()
 		fake := c.containerService.(*servertesting.FakeExecutionClient)
 		fakeOS := c.os.(*ostesting.FakeOS)
-		fakeSnapshotClient := c.snapshotService.(*servertesting.FakeSnapshotClient)
+		fakeSnapshotClient := WithFakeSnapshotClient(c)
 		if test.containerMetadata != nil {
 			assert.NoError(t, c.containerStore.Create(*test.containerMetadata))
 		}

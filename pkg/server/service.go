@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	contentapi "github.com/containerd/containerd/api/services/content"
+	diffapi "github.com/containerd/containerd/api/services/diff"
 	"github.com/containerd/containerd/api/services/execution"
 	imagesapi "github.com/containerd/containerd/api/services/images"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
@@ -27,7 +28,10 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	contentservice "github.com/containerd/containerd/services/content"
+	diffservice "github.com/containerd/containerd/services/diff"
 	imagesservice "github.com/containerd/containerd/services/images"
+	snapshotservice "github.com/containerd/containerd/services/snapshot"
+	"github.com/containerd/containerd/snapshot"
 	"github.com/docker/docker/pkg/truncindex"
 	"github.com/kubernetes-incubator/cri-o/pkg/ocicni"
 	"google.golang.org/grpc"
@@ -78,7 +82,9 @@ type criContainerdService struct {
 	// contentStoreService is the containerd content service client.
 	contentStoreService content.Store
 	// snapshotService is the containerd snapshot service client.
-	snapshotService snapshotapi.SnapshotClient
+	snapshotService snapshot.Snapshotter
+	// diffService is the containerd diff service client.
+	diffService diffservice.DiffService
 	// imageStoreService is the containerd service to store and track
 	// image metadata.
 	imageStoreService images.Store
@@ -111,7 +117,8 @@ func NewCRIContainerdService(conn *grpc.ClientConn, rootDir, networkPluginBinDir
 		containerService:    execution.NewTasksClient(conn),
 		imageStoreService:   imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)),
 		contentStoreService: contentservice.NewStoreFromClient(contentapi.NewContentClient(conn)),
-		snapshotService:     snapshotapi.NewSnapshotClient(conn),
+		snapshotService:     snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotClient(conn)),
+		diffService:         diffservice.NewDiffServiceFromClient(diffapi.NewDiffClient(conn)),
 		versionService:      versionapi.NewVersionClient(conn),
 		healthService:       healthapi.NewHealthClient(conn),
 		agentFactory:        agents.NewAgentFactory(),

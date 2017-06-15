@@ -24,11 +24,11 @@ import (
 	"sync"
 	"time"
 
-	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	"github.com/containerd/containerd/content"
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
+	containerdrootfs "github.com/containerd/containerd/rootfs"
 	"github.com/golang/glog"
 	imagedigest "github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -187,6 +187,7 @@ func (r *resourceSet) all() map[string]struct{} {
 // pullImage pulls image and returns image id (config digest) and manifest digest.
 // The ref should be normalized image reference.
 func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
+	// TODO(random-liu): Replace with client.Pull.
 	imagedigest.Digest, imagedigest.Digest, error) {
 	// Resolve the image reference to get descriptor and fetcher.
 	resolver := docker.NewResolver(docker.ResolverOptions{
@@ -250,6 +251,8 @@ func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
 	}
 	glog.V(4).Infof("Finished downloading resources for image %q", ref)
 
+	// TODO(random-liu): Replace with image.Unpack.
+	// Unpack the image layers into snapshots.
 	image, err := c.imageStoreService.Get(ctx, ref)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to get image %q from containerd image store: %v", ref, err)
@@ -265,18 +268,24 @@ func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
 		return "", "", fmt.Errorf("unmarshal blob to manifest failed for manifest digest %q: %v",
 			manifestDigest, err)
 	}
-
-	// Unpack the image layers into snapshots.
-	/* snapshotUnpacker := snapshotservice.NewUnpackerFromClient(c.snapshotService)
-	if _, err = snapshotUnpacker.Unpack(ctx, manifest.Layers); err != nil {
-		return "", "", fmt.Errorf("unpack failed for manifest layers %+v: %v", manifest.Layers, err)
-	} TODO(mikebrow): WIP replacing the commented Unpack with the below Prepare request */
-	_, err = image.RootFS(ctx, c.contentStoreService)
+	diffIDs, err := image.RootFS(ctx, c.contentStoreService)
 	if err != nil {
 		return "", "", err
 	}
-	if _, err = c.snapshotService.Prepare(ctx, &snapshotapi.PrepareRequest{Key: ref, Parent: ""}); err != nil {
-		return "", "", err
+	if len(diffIDs) != len(manifest.Layers) {
+		return "", "", fmt.Errorf("mismatched image rootfs and manifest layers")
+	}
+	layers := make([]containerdrootfs.Layer, len(diffIDs))
+	for i := range diffIDs {
+		layers[i].Diff = imagespec.Descriptor{
+			// TODO: derive media type from compressed type
+			MediaType: imagespec.MediaTypeImageLayer,
+			Digest:    diffIDs[i],
+		}
+		layers[i].Blob = manifest.Layers[i]
+	}
+	if _, err = containerdrootfs.ApplyLayers(ctx, layers, c.snapshotService, c.diffService); err != nil {
+		return "", "", fmt.Errorf("failed to apply layers %+v: %v", layers, err)
 	}
 
 	// TODO(random-liu): Considering how to deal with the disk usage of content.
