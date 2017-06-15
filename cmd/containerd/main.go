@@ -117,10 +117,11 @@ func main() {
 		)
 		for _, init := range plugin.Graph() {
 			id := init.URI()
-			log.G(global).WithField("type", init.Type).Infof("loading plugin %q...", id)
 			if !shouldLoad(init) {
+				log.G(global).WithField("type", init.Type).Infof("skipping plugin %q...", id)
 				continue
 			}
+			log.G(global).WithField("type", init.Type).Infof("loading plugin %q...", id)
 			ic := plugin.NewContext(plugins)
 			ic.Root = filepath.Join(conf.Root, id)
 			ic.Context = log.WithModule(global, id)
