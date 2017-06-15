@@ -127,6 +127,10 @@ integration: ## run integration tests
 	@echo "$(WHALE) $@"
 	@go test ${TESTFLAGS}
 
+benchmark: ## run benchmarks tests
+	@echo "$(WHALE) $@"
+	@go test ${TESTFLAGS} -bench . -run Benchmark
+
 FORCE:
 
 # Build a binary from a cmd.
