@@ -172,7 +172,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	// Create sandbox container in containerd.
 	glog.V(5).Infof("Create sandbox container (id=%q, name=%q) with options %+v.",
 		id, name, createOpts)
-	createResp, err := c.containerService.Create(ctx, createOpts)
+	createResp, err := c.taskService.Create(ctx, createOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create sandbox container %q: %v",
 			id, err)
@@ -180,7 +180,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	defer func() {
 		if retErr != nil {
 			// Cleanup the sandbox container if an error is returned.
-			if _, err = c.containerService.Delete(ctx, &execution.DeleteRequest{ContainerID: id}); err != nil {
+			if _, err = c.taskService.Delete(ctx, &execution.DeleteRequest{ContainerID: id}); err != nil {
 				glog.Errorf("Failed to delete sandbox container %q: %v",
 					id, err)
 			}
@@ -206,7 +206,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	}
 
 	// Start sandbox container in containerd.
-	if _, err := c.containerService.Start(ctx, &execution.StartRequest{ContainerID: id}); err != nil {
+	if _, err := c.taskService.Start(ctx, &execution.StartRequest{ContainerID: id}); err != nil {
 		return nil, fmt.Errorf("failed to start sandbox container %q: %v",
 			id, err)
 	}

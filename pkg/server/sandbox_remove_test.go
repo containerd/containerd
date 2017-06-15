@@ -38,7 +38,7 @@ func TestRemovePodSandbox(t *testing.T) {
 		Name: testName,
 	}
 	for desc, test := range map[string]struct {
-		sandboxContainers   []task.Task
+		sandboxTasks        []task.Task
 		injectMetadata      bool
 		removeSnapshotErr   error
 		injectContainerdErr error
@@ -66,10 +66,10 @@ func TestRemovePodSandbox(t *testing.T) {
 			expectCalls:       []string{"info"},
 		},
 		"should return error when sandbox container is not deleted": {
-			injectMetadata:    true,
-			sandboxContainers: []task.Task{{ID: testID}},
-			expectErr:         true,
-			expectCalls:       []string{"info"},
+			injectMetadata: true,
+			sandboxTasks:   []task.Task{{ID: testID}},
+			expectErr:      true,
+			expectCalls:    []string{"info"},
 		},
 		"should return error when arbitrary containerd error is injected": {
 			injectMetadata:      true,
@@ -92,10 +92,10 @@ func TestRemovePodSandbox(t *testing.T) {
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIContainerdService()
-		fake := c.containerService.(*servertesting.FakeExecutionClient)
+		fake := c.taskService.(*servertesting.FakeExecutionClient)
 		fakeOS := c.os.(*ostesting.FakeOS)
 		fakeSnapshotClient := WithFakeSnapshotClient(c)
-		fake.SetFakeContainers(test.sandboxContainers)
+		fake.SetFakeTasks(test.sandboxTasks)
 		if test.injectMetadata {
 			c.sandboxNameIndex.Reserve(testName, testID)
 			c.sandboxIDIndex.Add(testID)

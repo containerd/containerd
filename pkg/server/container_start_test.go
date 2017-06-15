@@ -573,7 +573,7 @@ func TestStartContainer(t *testing.T) {
 			sandboxContainerdContainer: testSandboxContainer,
 			startContainerErr:          errors.New("start error"),
 			expectStateChange:          true,
-			// cleanup the containerd container.
+			// cleanup the containerd task.
 			expectCalls: []string{"info", "create", "start", "delete"},
 			expectErr:   true,
 		},
@@ -588,7 +588,7 @@ func TestStartContainer(t *testing.T) {
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIContainerdService()
-		fake := c.containerService.(*servertesting.FakeExecutionClient)
+		fake := c.taskService.(*servertesting.FakeExecutionClient)
 		fakeOS := c.os.(*ostesting.FakeOS)
 		fakeSnapshotClient := WithFakeSnapshotClient(c)
 		if test.containerMetadata != nil {
@@ -598,7 +598,7 @@ func TestStartContainer(t *testing.T) {
 			assert.NoError(t, c.sandboxStore.Create(*test.sandboxMetadata))
 		}
 		if test.sandboxContainerdContainer != nil {
-			fake.SetFakeContainers([]task.Task{*test.sandboxContainerdContainer})
+			fake.SetFakeTasks([]task.Task{*test.sandboxContainerdContainer})
 		}
 		if !test.imageMetadataErr {
 			assert.NoError(t, c.imageMetadataStore.Create(metadata.ImageMetadata{
@@ -650,8 +650,8 @@ func TestStartContainer(t *testing.T) {
 			assert.Equal(t, errorStartReason, meta.Reason)
 			assert.NotEmpty(t, meta.Message)
 			_, err := fake.Info(context.Background(), &execution.InfoRequest{ContainerID: testID})
-			assert.True(t, isContainerdContainerNotExistError(err),
-				"containerd container should be cleaned up after when fail to start")
+			assert.True(t, isContainerdGRPCNotFoundError(err),
+				"containerd task should be cleaned up after when fail to start")
 			continue
 		}
 		t.Logf("container state should be running when start successfully")

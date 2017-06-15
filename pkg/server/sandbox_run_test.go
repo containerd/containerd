@@ -269,7 +269,7 @@ func TestRunPodSandbox(t *testing.T) {
 	config, imageConfig, _ := getRunPodSandboxTestData() // TODO: declare and test specCheck see below
 	c := newTestCRIContainerdService()
 	fakeSnapshotClient := WithFakeSnapshotClient(c)
-	fakeExecutionClient := c.containerService.(*servertesting.FakeExecutionClient)
+	fakeExecutionClient := c.taskService.(*servertesting.FakeExecutionClient)
 	fakeCNIPlugin := c.netPlugin.(*servertesting.FakeCNIPlugin)
 	fakeOS := c.os.(*ostesting.FakeOS)
 	var dirs []string

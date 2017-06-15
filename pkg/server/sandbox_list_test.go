@@ -135,7 +135,7 @@ func TestFilterSandboxes(t *testing.T) {
 func TestListPodSandbox(t *testing.T) {
 	c := newTestCRIContainerdService()
 
-	fake := c.containerService.(*servertesting.FakeExecutionClient)
+	fake := c.taskService.(*servertesting.FakeExecutionClient)
 
 	sandboxesInStore := []metadata.SandboxMetadata{
 		{
@@ -197,8 +197,8 @@ func TestListPodSandbox(t *testing.T) {
 		c.sandboxStore.Create(s)
 	}
 
-	// Inject fake containerd containers
-	fake.SetFakeContainers(sandboxesInContainerd)
+	// Inject fake containerd tasks
+	fake.SetFakeTasks(sandboxesInContainerd)
 
 	resp, err := c.ListPodSandbox(context.Background(), &runtime.ListPodSandboxRequest{})
 	assert.NoError(t, err)

@@ -65,7 +65,7 @@ func newTestCRIContainerdService() *criContainerdService {
 		sandboxIDIndex:     truncindex.NewTruncIndex(nil),
 		containerStore:     metadata.NewContainerStore(store.NewMetadataStore()),
 		containerNameIndex: registrar.NewRegistrar(),
-		containerService:   servertesting.NewFakeExecutionClient(),
+		taskService:   servertesting.NewFakeExecutionClient(),
 		netPlugin:          servertesting.NewFakeCNIPlugin(),
 		agentFactory:       agentstesting.NewFakeAgentFactory(),
 	}
@@ -81,7 +81,7 @@ func WithFakeSnapshotClient(c *criContainerdService) *servertesting.FakeSnapshot
 // Test all sandbox operations.
 func TestSandboxOperations(t *testing.T) {
 	c := newTestCRIContainerdService()
-	fake := c.containerService.(*servertesting.FakeExecutionClient)
+	fake := c.taskService.(*servertesting.FakeExecutionClient)
 	fakeOS := c.os.(*ostesting.FakeOS)
 	fakeCNIPlugin := c.netPlugin.(*servertesting.FakeCNIPlugin)
 	WithFakeSnapshotClient(c)

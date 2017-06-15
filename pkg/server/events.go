@@ -48,7 +48,7 @@ func (c *criContainerdService) startEventMonitor() {
 	}
 	go func() {
 		for {
-			events, err := c.containerService.Events(context.Background(), &execution.EventsRequest{})
+			events, err := c.taskService.Events(context.Background(), &execution.EventsRequest{})
 			if err != nil {
 				glog.Errorf("Failed to connect to containerd event stream: %v", err)
 				time.Sleep(b.Duration())
@@ -97,8 +97,8 @@ func (c *criContainerdService) handleEvent(e *task.Event) {
 			return
 		}
 		// Delete the container from containerd.
-		_, err = c.containerService.Delete(context.Background(), &execution.DeleteRequest{ContainerID: e.ID})
-		if err != nil && !isContainerdContainerNotExistError(err) {
+		_, err = c.taskService.Delete(context.Background(), &execution.DeleteRequest{ContainerID: e.ID})
+		if err != nil && !isContainerdGRPCNotFoundError(err) {
 			// TODO(random-liu): [P0] Enqueue the event and retry.
 			glog.Errorf("Failed to delete container %q: %v", e.ID, err)
 			return

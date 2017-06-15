@@ -47,8 +47,8 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 	// Use the full sandbox id.
 	id := sandbox.ID
 
-	info, err := c.containerService.Info(ctx, &execution.InfoRequest{ContainerID: id})
-	if err != nil && !isContainerdContainerNotExistError(err) {
+	info, err := c.taskService.Info(ctx, &execution.InfoRequest{ContainerID: id})
+	if err != nil && !isContainerdGRPCNotFoundError(err) {
 		return nil, fmt.Errorf("failed to get sandbox container info for %q: %v", id, err)
 	}
 

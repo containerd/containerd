@@ -21,14 +21,11 @@ import (
 	"os"
 	"testing"
 
+	"github.com/containerd/containerd/api/types/task"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-
-	"github.com/containerd/containerd/api/types/task"
-	"github.com/containerd/containerd/plugin"
-
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
@@ -56,14 +53,14 @@ func TestStopPodSandbox(t *testing.T) {
 	}
 
 	for desc, test := range map[string]struct {
-		sandboxContainers []task.Task
-		injectSandbox     bool
-		injectErr         error
-		injectStatErr     error
-		injectCNIErr      error
-		expectErr         bool
-		expectCalls       []string
-		expectedCNICalls  []string
+		sandboxTasks     []task.Task
+		injectSandbox    bool
+		injectErr        error
+		injectStatErr    error
+		injectCNIErr     error
+		expectErr        bool
+		expectCalls      []string
+		expectedCNICalls []string
 	}{
 		"stop non-existing sandbox": {
 			injectSandbox:    false,
@@ -72,17 +69,17 @@ func TestStopPodSandbox(t *testing.T) {
 			expectedCNICalls: []string{},
 		},
 		"stop sandbox with sandbox container": {
-			sandboxContainers: []task.Task{testContainer},
-			injectSandbox:     true,
-			expectErr:         false,
-			expectCalls:       []string{"delete"},
-			expectedCNICalls:  []string{"TearDownPod"},
+			sandboxTasks:     []task.Task{testContainer},
+			injectSandbox:    true,
+			expectErr:        false,
+			expectCalls:      []string{"delete"},
+			expectedCNICalls: []string{"TearDownPod"},
 		},
 		"stop sandbox with sandbox container not exist error": {
-			sandboxContainers: []task.Task{},
-			injectSandbox:     true,
+			sandboxTasks:  []task.Task{},
+			injectSandbox: true,
 			// Inject error to make sure fake execution client returns error.
-			injectErr:        grpc.Errorf(codes.Unknown, plugin.ErrContainerNotExist.Error()),
+			injectErr:        servertesting.TaskNotExistError,
 			expectErr:        false,
 			expectCalls:      []string{"delete"},
 			expectedCNICalls: []string{"TearDownPod"},
@@ -95,36 +92,36 @@ func TestStopPodSandbox(t *testing.T) {
 			expectedCNICalls: []string{"TearDownPod"},
 		},
 		"stop sandbox with Stat returns arbitrary error": {
-			sandboxContainers: []task.Task{testContainer},
-			injectSandbox:     true,
-			expectErr:         true,
-			injectStatErr:     errors.New("arbitrary error"),
-			expectCalls:       []string{},
-			expectedCNICalls:  []string{},
+			sandboxTasks:     []task.Task{testContainer},
+			injectSandbox:    true,
+			expectErr:        true,
+			injectStatErr:    errors.New("arbitrary error"),
+			expectCalls:      []string{},
+			expectedCNICalls: []string{},
 		},
 		"stop sandbox with Stat returns not exist error": {
-			sandboxContainers: []task.Task{testContainer},
-			injectSandbox:     true,
-			expectErr:         false,
-			expectCalls:       []string{"delete"},
-			injectStatErr:     os.ErrNotExist,
-			expectedCNICalls:  []string{},
+			sandboxTasks:     []task.Task{testContainer},
+			injectSandbox:    true,
+			expectErr:        false,
+			expectCalls:      []string{"delete"},
+			injectStatErr:    os.ErrNotExist,
+			expectedCNICalls: []string{},
 		},
 		"stop sandbox with TearDownPod fails": {
-			sandboxContainers: []task.Task{testContainer},
-			injectSandbox:     true,
-			expectErr:         true,
-			expectedCNICalls:  []string{"TearDownPod"},
-			injectCNIErr:      errors.New("arbitrary error"),
-			expectCalls:       []string{},
+			sandboxTasks:     []task.Task{testContainer},
+			injectSandbox:    true,
+			expectErr:        true,
+			expectedCNICalls: []string{"TearDownPod"},
+			injectCNIErr:     errors.New("arbitrary error"),
+			expectCalls:      []string{},
 		},
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIContainerdService()
-		fake := c.containerService.(*servertesting.FakeExecutionClient)
+		fake := c.taskService.(*servertesting.FakeExecutionClient)
 		fakeCNIPlugin := c.netPlugin.(*servertesting.FakeCNIPlugin)
 		fakeOS := c.os.(*ostesting.FakeOS)
-		fake.SetFakeContainers(test.sandboxContainers)
+		fake.SetFakeTasks(test.sandboxTasks)
 
 		if test.injectSandbox {
 			assert.NoError(t, c.sandboxStore.Create(testSandbox))

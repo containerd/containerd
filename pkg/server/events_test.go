@@ -93,7 +93,7 @@ func TestHandleEvent(t *testing.T) {
 			containerdContainer: &testContainerdContainer,
 			expected:            &testMetadata,
 		},
-		"should not update state when fail to delete containerd container": {
+		"should not update state when fail to delete containerd task": {
 			event:               &testExitEvent,
 			metadata:            &testMetadata,
 			containerdContainer: &testContainerdContainer,
@@ -112,12 +112,12 @@ func TestHandleEvent(t *testing.T) {
 			containerdContainer: &testContainerdContainer,
 			expected:            &testMetadata,
 		},
-		"should update state when containerd container is already deleted": {
+		"should update state when containerd task is already deleted": {
 			event:    &testExitEvent,
 			metadata: &testMetadata,
 			expected: &testFinishedMetadata,
 		},
-		"should update state when delete containerd container successfully": {
+		"should update state when delete containerd task successfully": {
 			event:               &testExitEvent,
 			metadata:            &testMetadata,
 			containerdContainer: &testContainerdContainer,
@@ -126,7 +126,7 @@ func TestHandleEvent(t *testing.T) {
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIContainerdService()
-		fake := c.containerService.(*servertesting.FakeExecutionClient)
+		fake := c.taskService.(*servertesting.FakeExecutionClient)
 		e, err := fake.Events(context.Background(), &execution.EventsRequest{})
 		assert.NoError(t, err)
 		fakeEvents := e.(*servertesting.EventClient)
@@ -139,9 +139,9 @@ func TestHandleEvent(t *testing.T) {
 			// Make sure that original data will not be changed.
 			assert.NoError(t, c.containerStore.Create(*test.metadata))
 		}
-		// Inject containerd container.
+		// Inject containerd task.
 		if test.containerdContainer != nil {
-			fake.SetFakeContainers([]task.Task{*test.containerdContainer})
+			fake.SetFakeTasks([]task.Task{*test.containerdContainer})
 		}
 		// Inject containerd delete error.
 		if test.containerdErr != nil {

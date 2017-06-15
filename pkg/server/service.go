@@ -77,8 +77,8 @@ type criContainerdService struct {
 	// containerNameIndex stores all container names and make sure each
 	// name is unique.
 	containerNameIndex *registrar.Registrar
-	// containerService is containerd tasks client.
-	containerService execution.TasksClient
+	// taskService is containerd tasks client.
+	taskService execution.TasksClient
 	// contentStoreService is the containerd content service client.
 	contentStoreService content.Store
 	// snapshotService is the containerd snapshot service client.
@@ -114,7 +114,7 @@ func NewCRIContainerdService(conn *grpc.ClientConn, rootDir, networkPluginBinDir
 		sandboxIDIndex:   truncindex.NewTruncIndex(nil),
 		// TODO(random-liu): Add container id index.
 		containerNameIndex:  registrar.NewRegistrar(),
-		containerService:    execution.NewTasksClient(conn),
+		taskService:    execution.NewTasksClient(conn),
 		imageStoreService:   imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)),
 		contentStoreService: contentservice.NewStoreFromClient(contentapi.NewContentClient(conn)),
 		snapshotService:     snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotClient(conn)),

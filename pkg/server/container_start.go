@@ -103,7 +103,7 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 	sandboxConfig := sandboxMeta.Config
 	sandboxID := meta.SandboxID
 	// Make sure sandbox is running.
-	sandboxInfo, err := c.containerService.Info(ctx, &execution.InfoRequest{ContainerID: sandboxID})
+	sandboxInfo, err := c.taskService.Info(ctx, &execution.InfoRequest{ContainerID: sandboxID})
 	if err != nil {
 		return fmt.Errorf("failed to get sandbox container %q info: %v", sandboxID, err)
 	}
@@ -115,7 +115,7 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 	sandboxPid := sandboxInfo.Task.Pid
 	glog.V(2).Infof("Sandbox container %q is running with pid %d", sandboxID, sandboxPid)
 
-	// Generate containerd container create options.
+	// Generate containerd task create options.
 	imageMeta, err := c.imageMetadataStore.Get(meta.ImageRef)
 	if err != nil {
 		return fmt.Errorf("failed to get container image %q: %v", meta.ImageRef, err)
@@ -189,7 +189,7 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 		})
 	}
 
-	// Create containerd container.
+	// Create containerd task.
 	createOpts := &execution.CreateRequest{
 		ContainerID: id,
 		Rootfs:      rootfs,
@@ -198,24 +198,24 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 		Stderr:      stderr,
 		Terminal:    config.GetTty(),
 	}
-	glog.V(5).Infof("Create containerd container (id=%q, name=%q) with options %+v.",
+	glog.V(5).Infof("Create containerd task (id=%q, name=%q) with options %+v.",
 		id, meta.Name, createOpts)
-	createResp, err := c.containerService.Create(ctx, createOpts)
+	createResp, err := c.taskService.Create(ctx, createOpts)
 	if err != nil {
-		return fmt.Errorf("failed to create containerd container: %v", err)
+		return fmt.Errorf("failed to create containerd task: %v", err)
 	}
 	defer func() {
 		if retErr != nil {
-			// Cleanup the containerd container if an error is returned.
-			if _, err := c.containerService.Delete(ctx, &execution.DeleteRequest{ContainerID: id}); err != nil {
-				glog.Errorf("Failed to delete containerd container %q: %v", id, err)
+			// Cleanup the containerd task if an error is returned.
+			if _, err := c.taskService.Delete(ctx, &execution.DeleteRequest{ContainerID: id}); err != nil {
+				glog.Errorf("Failed to delete containerd task %q: %v", id, err)
 			}
 		}
 	}()
 
-	// Start containerd container.
-	if _, err := c.containerService.Start(ctx, &execution.StartRequest{ContainerID: id}); err != nil {
-		return fmt.Errorf("failed to start containerd container %q: %v", id, err)
+	// Start containerd task.
+	if _, err := c.taskService.Start(ctx, &execution.StartRequest{ContainerID: id}); err != nil {
+		return fmt.Errorf("failed to start containerd task %q: %v", id, err)
 	}
 
 	// Update container start timestamp.

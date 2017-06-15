@@ -69,9 +69,9 @@ func (c *criContainerdService) StopContainer(ctx context.Context, r *runtime.Sto
 		// TODO(random-liu): [P1] Get stop signal from image config.
 		stopSignal := unix.SIGTERM
 		glog.V(2).Infof("Stop container %q with signal %v", id, stopSignal)
-		_, err = c.containerService.Kill(ctx, &execution.KillRequest{ContainerID: id, Signal: uint32(stopSignal)})
+		_, err = c.taskService.Kill(ctx, &execution.KillRequest{ContainerID: id, Signal: uint32(stopSignal)})
 		if err != nil {
-			if !isContainerdContainerNotExistError(err) && !isRuncProcessAlreadyFinishedError(err) {
+			if !isContainerdGRPCNotFoundError(err) && !isRuncProcessAlreadyFinishedError(err) {
 				return nil, fmt.Errorf("failed to stop container %q: %v", id, err)
 			}
 			// Move on to make sure container status is updated.
@@ -86,9 +86,9 @@ func (c *criContainerdService) StopContainer(ctx context.Context, r *runtime.Sto
 
 	// Event handler will Delete the container from containerd after it handles the Exited event.
 	glog.V(2).Infof("Kill container %q", id)
-	_, err = c.containerService.Kill(ctx, &execution.KillRequest{ContainerID: id, Signal: uint32(unix.SIGKILL)})
+	_, err = c.taskService.Kill(ctx, &execution.KillRequest{ContainerID: id, Signal: uint32(unix.SIGKILL)})
 	if err != nil {
-		if !isContainerdContainerNotExistError(err) && !isRuncProcessAlreadyFinishedError(err) {
+		if !isContainerdGRPCNotFoundError(err) && !isRuncProcessAlreadyFinishedError(err) {
 			return nil, fmt.Errorf("failed to kill container %q: %v", id, err)
 		}
 		// Move on to make sure container status is updated.

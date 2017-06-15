@@ -125,7 +125,7 @@ func TestStopContainer(t *testing.T) {
 			expectErr:   false,
 			expectCalls: []servertesting.CalledDetail{},
 		},
-		"should not return error if containerd container does not exist": {
+		"should not return error if containerd task does not exist": {
 			metadata:            &testMetadata,
 			containerdContainer: &testContainer,
 			// Since it's hard to inject event during `StopContainer` is running,
@@ -133,7 +133,7 @@ func TestStopContainer(t *testing.T) {
 			// status is not updated yet.
 			// We also leverage this behavior to test that when graceful
 			// stop doesn't take effect, container should be SIGKILL-ed.
-			stopErr:   servertesting.ContainerNotExistError,
+			stopErr:   servertesting.TaskNotExistError,
 			expectErr: false,
 			expectCalls: []servertesting.CalledDetail{
 				{
@@ -150,7 +150,7 @@ func TestStopContainer(t *testing.T) {
 				},
 			},
 		},
-		"should not return error if containerd container process already finished": {
+		"should not return error if containerd task process already finished": {
 			metadata:            &testMetadata,
 			containerdContainer: &testContainer,
 			stopErr:             errors.New("os: process already finished"),
@@ -182,7 +182,7 @@ func TestStopContainer(t *testing.T) {
 				},
 			},
 		},
-		"should not return error if containerd container is gracefully stopped": {
+		"should not return error if containerd task is gracefully stopped": {
 			metadata:            &testMetadata,
 			containerdContainer: &testContainer,
 			expectErr:           false,
@@ -221,15 +221,15 @@ func TestStopContainer(t *testing.T) {
 		c := newTestCRIContainerdService()
 		fake := servertesting.NewFakeExecutionClient().WithEvents()
 		defer fake.Stop()
-		c.containerService = fake
+		c.taskService = fake
 
 		// Inject metadata.
 		if test.metadata != nil {
 			assert.NoError(t, c.containerStore.Create(*test.metadata))
 		}
-		// Inject containerd container.
+		// Inject containerd task.
 		if test.containerdContainer != nil {
-			fake.SetFakeContainers([]task.Task{*test.containerdContainer})
+			fake.SetFakeTasks([]task.Task{*test.containerdContainer})
 		}
 		if test.stopErr != nil {
 			fake.InjectError("kill", test.stopErr)
