@@ -27,14 +27,15 @@ const (
 var _ = (plugin.Runtime)(&Runtime{})
 
 func init() {
-	plugin.Register(runtimeName, &plugin.Registration{
+	plugin.Register(&plugin.Registration{
+		ID:   "windows",
 		Type: plugin.RuntimePlugin,
 		Init: New,
 	})
 }
 
 func New(ic *plugin.InitContext) (interface{}, error) {
-	rootDir := filepath.Join(ic.Root, runtimeName)
+	rootDir := filepath.Join(ic.Root)
 	if err := os.MkdirAll(rootDir, 0755); err != nil {
 		return nil, errors.Wrapf(err, "could not create state directory at %s", rootDir)
 	}
@@ -63,7 +64,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	}
 
 	// Try to delete the old state dir and recreate it
-	stateDir := filepath.Join(ic.State, runtimeName)
+	stateDir := filepath.Join(ic.Root, "state")
 	if err := os.RemoveAll(stateDir); err != nil {
 		log.G(c).WithError(err).Warnf("failed to cleanup old state directory at %s", stateDir)
 	}
@@ -97,6 +98,10 @@ type RuntimeSpec struct {
 
 	// HCS specific options
 	hcs.Configuration
+}
+
+func (r *Runtime) ID() string {
+	return fmt.Sprintf("%s.%s", plugin.RuntimePlugin, runtimeName)
 }
 
 func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts) (plugin.Task, error) {

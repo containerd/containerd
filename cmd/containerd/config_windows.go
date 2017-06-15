@@ -7,8 +7,7 @@ import (
 
 func defaultConfig() *config {
 	return &config{
-		Root:  filepath.Join(os.Getenv("programfiles"), "containerd", "root"),
-		State: filepath.Join(os.Getenv("programfiles"), "containerd", "state"),
+		Root: filepath.Join(os.Getenv("programfiles"), "containerd", "root"),
 		GRPC: grpcConfig{
 			Address: `\\.\pipe\containerd-containerd`,
 		},
@@ -16,7 +15,7 @@ func defaultConfig() *config {
 			Level:   "info",
 			Address: `\\.\pipe\containerd-debug`,
 		},
-		Snapshotter: "windows",
-		Differ:      "base",
+		Snapshotter: "io.containerd.snapshotter.v1.windows",
+		Differ:      "io.containerd.differ.v1.base-diff",
 	}
 }

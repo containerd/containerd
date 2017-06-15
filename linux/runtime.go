@@ -32,19 +32,23 @@ import (
 var (
 	ErrTaskNotExists     = errors.New("task does not exist")
 	ErrTaskAlreadyExists = errors.New("task already exists")
+	pluginID             = fmt.Sprintf("%s.%s", plugin.RuntimePlugin, "linux")
 )
 
 const (
-	runtimeName    = "linux"
 	configFilename = "config.json"
 	defaultRuntime = "runc"
 	defaultShim    = "containerd-shim"
 )
 
 func init() {
-	plugin.Register(runtimeName, &plugin.Registration{
+	plugin.Register(&plugin.Registration{
 		Type: plugin.RuntimePlugin,
+		ID:   "linux",
 		Init: New,
+		Requires: []plugin.PluginType{
+			plugin.TaskMonitorPlugin,
+		},
 		Config: &Config{
 			Shim:    defaultShim,
 			Runtime: defaultRuntime,
@@ -129,25 +133,28 @@ func (l *taskList) delete(ctx context.Context, t *Task) {
 }
 
 func New(ic *plugin.InitContext) (interface{}, error) {
-	path := filepath.Join(ic.State, runtimeName)
-	if err := os.MkdirAll(path, 0700); err != nil {
+	if err := os.MkdirAll(ic.Root, 0700); err != nil {
+		return nil, err
+	}
+	monitor, err := ic.Get(plugin.TaskMonitorPlugin)
+	if err != nil {
 		return nil, err
 	}
 	cfg := ic.Config.(*Config)
 	c, cancel := context.WithCancel(ic.Context)
 	r := &Runtime{
-		root:          path,
+		root:          ic.Root,
 		remote:        !cfg.NoShim,
 		shim:          cfg.Shim,
 		runtime:       cfg.Runtime,
 		events:        make(chan *plugin.Event, 2048),
 		eventsContext: c,
 		eventsCancel:  cancel,
-		monitor:       ic.Monitor,
+		monitor:       monitor.(plugin.TaskMonitor),
 		tasks:         newTaskList(),
 	}
 	// set the events output for a monitor if it generates events
-	ic.Monitor.Events(r.events)
+	r.monitor.Events(r.events)
 	tasks, err := r.loadAllTasks(ic.Context)
 	if err != nil {
 		return nil, err
@@ -157,7 +164,6 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 			return nil, err
 		}
 	}
-	// load all tasks from disk
 	return r, nil
 }
 
@@ -172,6 +178,10 @@ type Runtime struct {
 	eventsCancel  func()
 	monitor       plugin.TaskMonitor
 	tasks         *taskList
+}
+
+func (r *Runtime) ID() string {
+	return pluginID
 }
 
 func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts) (t plugin.Task, err error) {
@@ -358,7 +368,7 @@ func (r *Runtime) forward(events shim.Shim_EventsClient) {
 		}
 		r.events <- &plugin.Event{
 			Timestamp:  time.Now(),
-			Runtime:    runtimeName,
+			Runtime:    r.ID(),
 			Type:       et,
 			Pid:        e.Pid,
 			ID:         e.ID,

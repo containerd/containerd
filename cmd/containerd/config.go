@@ -37,8 +37,6 @@ func loadConfig(path string) error {
 // config specifies the containerd configuration file in the TOML format.
 // It contains fields to configure various subsystems and containerd as a whole.
 type config struct {
-	// State is the path to a directory where containerd will store runtime state
-	State string `toml:"state"`
 	// Root is the path to a directory where containerd will store persistent data
 	Root string `toml:"root"`
 	// GRPC configuration settings

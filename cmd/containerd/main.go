@@ -29,7 +29,6 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/containerd/version"
 	metrics "github.com/docker/go-metrics"
@@ -105,41 +104,42 @@ func main() {
 		if err := plugin.Load(filepath.Join(conf.Root, "plugins")); err != nil {
 			return err
 		}
+		registerContentStore()
+		registerMetaDB()
 		// start debug and metrics APIs
 		if err := serveDebugAPI(); err != nil {
 			return err
 		}
-		monitor, err := loadMonitor()
-		if err != nil {
-			return err
-		}
-		runtimes, err := loadRuntimes(monitor)
-		if err != nil {
-			return err
-		}
-		store, err := resolveContentStore()
-		if err != nil {
-			return err
-		}
-		meta, err := resolveMetaDB(context)
-		if err != nil {
-			return err
-		}
-		defer meta.Close()
-		snapshotter, err := loadSnapshotter(store)
-		if err != nil {
-			return err
+
+		var (
+			services []plugin.Service
+			plugins  = make(map[plugin.PluginType][]interface{})
+		)
+		for _, init := range plugin.Graph() {
+			id := init.URI()
+			log.G(global).WithField("type", init.Type).Infof("loading plugin %q...", id)
+			if !shouldLoad(init) {
+				continue
+			}
+			ic := plugin.NewContext(plugins)
+			ic.Root = filepath.Join(conf.Root, id)
+			ic.Context = log.WithModule(global, id)
+			if init.Config != nil {
+				if err := loadPluginConfig(init.ID, init.Config, ic); err != nil {
+					return err
+				}
+			}
+
+			p, err := init.Init(ic)
+			if err != nil {
+				return err
+			}
+			plugins[init.Type] = append(plugins[init.Type], p)
+			if s, ok := p.(plugin.Service); ok {
+				services = append(services, s)
+			}
 		}
 
-		differ, err := loadDiffer(snapshotter, store)
-		if err != nil {
-			return err
-		}
-
-		services, err := loadServices(runtimes, store, snapshotter, meta, differ)
-		if err != nil {
-			return err
-		}
 		// start the GRPC api with the execution service registered
 		server := newGRPCServer()
 		for _, service := range services {
@@ -159,7 +159,6 @@ func main() {
 		log.G(global).Infof("containerd successfully booted in %fs", time.Since(start).Seconds())
 		return handleSignals(signals, server)
 	}
-
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "containerd: %s\n", err)
 		os.Exit(1)
@@ -183,10 +182,6 @@ func before(context *cli.Context) error {
 		{
 			name: "root",
 			d:    &conf.Root,
-		},
-		{
-			name: "state",
-			d:    &conf.State,
 		},
 		{
 			name: "address",
@@ -254,139 +249,27 @@ func serveDebugAPI() error {
 	return nil
 }
 
-func resolveContentStore() (content.Store, error) {
-	cp := filepath.Join(conf.Root, "content")
-	return content.NewStore(cp)
+func registerContentStore() {
+	plugin.Register(&plugin.Registration{
+		Type: plugin.ContentPlugin,
+		ID:   "content",
+		Init: func(ic *plugin.InitContext) (interface{}, error) {
+			return content.NewStore(ic.Root)
+		},
+	})
 }
 
-func resolveMetaDB(ctx *cli.Context) (*bolt.DB, error) {
-	path := filepath.Join(conf.Root, "meta.db")
-
-	db, err := bolt.Open(path, 0644, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return db, nil
-}
-
-func loadRuntimes(monitor plugin.TaskMonitor) (map[string]plugin.Runtime, error) {
-	o := make(map[string]plugin.Runtime)
-	for name, rr := range plugin.Registrations() {
-		if rr.Type != plugin.RuntimePlugin {
-			continue
-		}
-		log.G(global).Infof("loading runtime plugin %q...", name)
-		ic := &plugin.InitContext{
-			Root:    conf.Root,
-			State:   conf.State,
-			Context: log.WithModule(global, fmt.Sprintf("runtime-%s", name)),
-			Monitor: monitor,
-		}
-		if rr.Config != nil {
-			if err := conf.decodePlugin(name, rr.Config); err != nil {
+func registerMetaDB() {
+	plugin.Register(&plugin.Registration{
+		Type: plugin.MetadataPlugin,
+		ID:   "bolt",
+		Init: func(ic *plugin.InitContext) (interface{}, error) {
+			if err := os.MkdirAll(ic.Root, 0700); err != nil {
 				return nil, err
 			}
-			ic.Config = rr.Config
-		}
-		vr, err := rr.Init(ic)
-		if err != nil {
-			return nil, err
-		}
-		o[name] = vr.(plugin.Runtime)
-	}
-	return o, nil
-}
-
-func loadMonitor() (plugin.TaskMonitor, error) {
-	var monitors []plugin.TaskMonitor
-	for name, m := range plugin.Registrations() {
-		if m.Type != plugin.TaskMonitorPlugin {
-			continue
-		}
-		log.G(global).Infof("loading monitor plugin %q...", name)
-		ic := &plugin.InitContext{
-			Root:    conf.Root,
-			State:   conf.State,
-			Context: log.WithModule(global, fmt.Sprintf("monitor-%s", name)),
-		}
-		mm, err := m.Init(ic)
-		if err != nil {
-			return nil, err
-		}
-		monitors = append(monitors, mm.(plugin.TaskMonitor))
-	}
-	if len(monitors) == 0 {
-		return plugin.NewNoopMonitor(), nil
-	}
-	return plugin.NewMultiTaskMonitor(monitors...), nil
-}
-
-func loadSnapshotter(store content.Store) (snapshot.Snapshotter, error) {
-	for name, sr := range plugin.Registrations() {
-		if sr.Type != plugin.SnapshotPlugin {
-			continue
-		}
-		moduleName := fmt.Sprintf("snapshot-%s", conf.Snapshotter)
-		if name != moduleName {
-			continue
-		}
-
-		log.G(global).Infof("loading snapshot plugin %q...", name)
-		ic := &plugin.InitContext{
-			Root:    conf.Root,
-			State:   conf.State,
-			Content: store,
-			Context: log.WithModule(global, moduleName),
-		}
-		if sr.Config != nil {
-			if err := conf.decodePlugin(name, sr.Config); err != nil {
-				return nil, err
-			}
-			ic.Config = sr.Config
-		}
-		sn, err := sr.Init(ic)
-		if err != nil {
-			return nil, err
-		}
-
-		return sn.(snapshot.Snapshotter), nil
-	}
-	return nil, fmt.Errorf("snapshotter not loaded: %v", conf.Snapshotter)
-}
-
-func loadDiffer(snapshotter snapshot.Snapshotter, store content.Store) (plugin.Differ, error) {
-	for name, sr := range plugin.Registrations() {
-		if sr.Type != plugin.DiffPlugin {
-			continue
-		}
-		moduleName := fmt.Sprintf("diff-%s", conf.Differ)
-		if name != moduleName {
-			continue
-		}
-
-		log.G(global).Infof("loading differ plugin %q...", name)
-		ic := &plugin.InitContext{
-			Root:        conf.Root,
-			State:       conf.State,
-			Content:     store,
-			Snapshotter: snapshotter,
-			Context:     log.WithModule(global, moduleName),
-		}
-		if sr.Config != nil {
-			if err := conf.decodePlugin(name, sr.Config); err != nil {
-				return nil, err
-			}
-			ic.Config = sr.Config
-		}
-		sn, err := sr.Init(ic)
-		if err != nil {
-			return nil, err
-		}
-
-		return sn.(plugin.Differ), nil
-	}
-	return nil, fmt.Errorf("differ not loaded: %v", conf.Differ)
+			return bolt.Open(filepath.Join(ic.Root, "meta.db"), 0644, nil)
+		},
+	})
 }
 
 func newGRPCServer() *grpc.Server {
@@ -395,40 +278,6 @@ func newGRPCServer() *grpc.Server {
 		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
 	)
 	return s
-}
-
-func loadServices(runtimes map[string]plugin.Runtime,
-	store content.Store, sn snapshot.Snapshotter,
-	meta *bolt.DB, differ plugin.Differ) ([]plugin.Service, error) {
-	var o []plugin.Service
-	for name, sr := range plugin.Registrations() {
-		if sr.Type != plugin.GRPCPlugin {
-			continue
-		}
-		log.G(global).Infof("loading grpc service plugin %q...", name)
-		ic := &plugin.InitContext{
-			Root:        conf.Root,
-			State:       conf.State,
-			Context:     log.WithModule(global, fmt.Sprintf("service-%s", name)),
-			Runtimes:    runtimes,
-			Content:     store,
-			Meta:        meta,
-			Snapshotter: sn,
-			Differ:      differ,
-		}
-		if sr.Config != nil {
-			if err := conf.decodePlugin(name, sr.Config); err != nil {
-				return nil, err
-			}
-			ic.Config = sr.Config
-		}
-		vs, err := sr.Init(ic)
-		if err != nil {
-			return nil, err
-		}
-		o = append(o, vs.(plugin.Service))
-	}
-	return o, nil
 }
 
 func serveGRPC(server *grpc.Server) error {
@@ -493,4 +342,24 @@ func dumpStacks() {
 	}
 	buf = buf[:stackSize]
 	logrus.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
+}
+
+func loadPluginConfig(name string, c interface{}, ic *plugin.InitContext) error {
+	if err := conf.decodePlugin(name, c); err != nil {
+		return err
+	}
+	ic.Config = c
+	return nil
+}
+
+func shouldLoad(r *plugin.Registration) bool {
+	// only load certain plugins based on the config values
+	switch r.Type {
+	case plugin.SnapshotPlugin:
+		return r.URI() == conf.Snapshotter
+	case plugin.DiffPlugin:
+		return r.URI() == conf.Differ
+	default:
+		return true
+	}
 }

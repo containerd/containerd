@@ -15,10 +15,18 @@ import (
 )
 
 func init() {
-	plugin.Register("namespaces-grpc", &plugin.Registration{
+	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
+		ID:   "namespaces",
+		Requires: []plugin.PluginType{
+			plugin.MetadataPlugin,
+		},
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			return NewService(ic.Meta), nil
+			m, err := ic.Get(plugin.MetadataPlugin)
+			if err != nil {
+				return nil, err
+			}
+			return NewService(m.(*bolt.DB)), nil
 		},
 	})
 }

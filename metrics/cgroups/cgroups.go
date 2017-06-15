@@ -13,11 +13,10 @@ import (
 	"golang.org/x/net/context"
 )
 
-const name = "cgroups"
-
 func init() {
-	plugin.Register(name, &plugin.Registration{
+	plugin.Register(&plugin.Registration{
 		Type: plugin.TaskMonitorPlugin,
+		ID:   "cgroups",
 		Init: New,
 	})
 }

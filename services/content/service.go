@@ -30,15 +30,23 @@ var bufPool = sync.Pool{
 var _ api.ContentServer = &Service{}
 
 func init() {
-	plugin.Register("content-grpc", &plugin.Registration{
+	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
+		ID:   "content",
+		Requires: []plugin.PluginType{
+			plugin.ContentPlugin,
+		},
 		Init: NewService,
 	})
 }
 
 func NewService(ic *plugin.InitContext) (interface{}, error) {
+	c, err := ic.Get(plugin.ContentPlugin)
+	if err != nil {
+		return nil, err
+	}
 	return &Service{
-		store: ic.Content,
+		store: c.(content.Store),
 	}, nil
 }
 

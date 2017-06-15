@@ -20,11 +20,11 @@ import (
 )
 
 func init() {
-	plugin.Register("snapshot-btrfs", &plugin.Registration{
+	plugin.Register(&plugin.Registration{
+		ID:   "btrfs",
 		Type: plugin.SnapshotPlugin,
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			root := filepath.Join(ic.Root, "snapshot", "btrfs")
-			return NewSnapshotter(root)
+			return NewSnapshotter(ic.Root)
 		},
 	})
 }

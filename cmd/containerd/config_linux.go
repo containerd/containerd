@@ -2,8 +2,7 @@ package main
 
 func defaultConfig() *config {
 	return &config{
-		Root:  "/var/lib/containerd",
-		State: "/run/containerd",
+		Root: "/var/lib/containerd",
 		GRPC: grpcConfig{
 			Address: "/run/containerd/containerd.sock",
 		},
@@ -11,7 +10,7 @@ func defaultConfig() *config {
 			Level:   "info",
 			Address: "/run/containerd/debug.sock",
 		},
-		Snapshotter: "overlay",
-		Differ:      "base",
+		Snapshotter: "io.containerd.snapshotter.v1.overlayfs",
+		Differ:      "io.containerd.differ.v1.base-diff",
 	}
 }

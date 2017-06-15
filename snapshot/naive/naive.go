@@ -16,10 +16,11 @@ import (
 )
 
 func init() {
-	plugin.Register("snapshot-naive", &plugin.Registration{
+	plugin.Register(&plugin.Registration{
 		Type: plugin.SnapshotPlugin,
+		ID:   "naive",
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			return NewSnapshotter(filepath.Join(ic.Root, "snapshot", "naive"))
+			return NewSnapshotter(ic.Root)
 		},
 	})
 }

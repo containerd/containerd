@@ -1,45 +1,42 @@
 package plugin
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
-	"github.com/boltdb/bolt"
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/snapshot"
-
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
-type PluginType int
+var (
+	ErrNoPluginType = errors.New("plugin: no type")
+	ErrNoPluginID   = errors.New("plugin: no id")
+)
+
+type PluginType string
 
 const (
-	RuntimePlugin PluginType = iota + 1
-	GRPCPlugin
-	SnapshotPlugin
-	TaskMonitorPlugin
-	DiffPlugin
+	RuntimePlugin     PluginType = "io.containerd.runtime.v1"
+	GRPCPlugin        PluginType = "io.containerd.grpc.v1"
+	SnapshotPlugin    PluginType = "io.containerd.snapshotter.v1"
+	TaskMonitorPlugin PluginType = "io.containerd.monitor.v1"
+	DiffPlugin        PluginType = "io.containerd.differ.v1"
+	MetadataPlugin    PluginType = "io.containerd.metadata.v1"
+	ContentPlugin     PluginType = "io.containerd.content.v1"
 )
 
 type Registration struct {
-	Type   PluginType
-	Config interface{}
-	Init   func(*InitContext) (interface{}, error)
+	Type     PluginType
+	ID       string
+	Config   interface{}
+	Requires []PluginType
+	Init     func(*InitContext) (interface{}, error)
+
+	added bool
 }
 
-// TODO(@crosbymichael): how do we keep this struct from growing but support dependency injection for loaded plugins?
-type InitContext struct {
-	Root        string
-	State       string
-	Runtimes    map[string]Runtime
-	Content     content.Store
-	Meta        *bolt.DB
-	Snapshotter snapshot.Snapshotter
-	Differ      Differ
-	Config      interface{}
-	Context     context.Context
-	Monitor     TaskMonitor
+func (r *Registration) URI() string {
+	return fmt.Sprintf("%s.%s", r.Type, r.ID)
 }
 
 type Service interface {
@@ -48,10 +45,8 @@ type Service interface {
 
 var register = struct {
 	sync.Mutex
-	r map[string]*Registration
-}{
-	r: make(map[string]*Registration),
-}
+	r []*Registration
+}{}
 
 // Load loads all plugins at the provided path into containerd
 func Load(path string) (err error) {
@@ -67,16 +62,39 @@ func Load(path string) (err error) {
 	return loadPlugins(path)
 }
 
-func Register(name string, r *Registration) error {
+func Register(r *Registration) {
 	register.Lock()
 	defer register.Unlock()
-	if _, ok := register.r[name]; ok {
-		return fmt.Errorf("plugin already registered as %q", name)
+	if r.Type == "" {
+		panic(ErrNoPluginType)
 	}
-	register.r[name] = r
-	return nil
+	if r.ID == "" {
+		panic(ErrNoPluginID)
+	}
+	register.r = append(register.r, r)
 }
 
-func Registrations() map[string]*Registration {
-	return register.r
+func Graph() (ordered []*Registration) {
+	for _, r := range register.r {
+		children(r.Requires, &ordered)
+		if !r.added {
+			ordered = append(ordered, r)
+			r.added = true
+		}
+	}
+	return ordered
+}
+
+func children(types []PluginType, ordered *[]*Registration) {
+	for _, t := range types {
+		for _, r := range register.r {
+			if r.Type == t {
+				children(r.Requires, ordered)
+				if !r.added {
+					*ordered = append(*ordered, r)
+					r.added = true
+				}
+			}
+		}
+	}
 }

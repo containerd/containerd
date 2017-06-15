@@ -18,10 +18,23 @@ import (
 )
 
 func init() {
-	plugin.Register("diff-base", &plugin.Registration{
+	plugin.Register(&plugin.Registration{
 		Type: plugin.DiffPlugin,
+		ID:   "base-diff",
+		Requires: []plugin.PluginType{
+			plugin.ContentPlugin,
+			plugin.SnapshotPlugin,
+		},
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			return newBaseDiff(ic.Content, ic.Snapshotter)
+			c, err := ic.Get(plugin.ContentPlugin)
+			if err != nil {
+				return nil, err
+			}
+			s, err := ic.Get(plugin.SnapshotPlugin)
+			if err != nil {
+				return nil, err
+			}
+			return newBaseDiff(c.(content.Store), s.(snapshot.Snapshotter))
 		},
 	})
 }

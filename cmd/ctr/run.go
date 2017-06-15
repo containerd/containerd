@@ -55,8 +55,8 @@ var runCommand = cli.Command{
 		},
 		cli.StringFlag{
 			Name:  "runtime",
-			Usage: "runtime name (linux, windows, vmware-linux)",
-			Value: "linux",
+			Usage: "runtime name (io.containerd.runtime.v1.linux, io.containerd.runtime.v1.windows, io.containerd.runtime.v1.com.vmware.linux)",
+			Value: "io.containerd.runtime.v1.linux",
 		},
 		cli.BoolFlag{
 			Name:  "readonly",
