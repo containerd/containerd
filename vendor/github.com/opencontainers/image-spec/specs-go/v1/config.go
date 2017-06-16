@@ -14,7 +14,11 @@
 
 package v1
 
-import "time"
+import (
+	"time"
+
+	digest "github.com/opencontainers/go-digest"
+)
 
 // ImageConfig defines the execution parameters which should be used as a base when running a container using an image.
 type ImageConfig struct {
@@ -40,7 +44,10 @@ type ImageConfig struct {
 	WorkingDir string `json:"WorkingDir,omitempty"`
 
 	// Labels contains arbitrary metadata for the container.
-	Labels map[string]string `json:"labels,omitempty"`
+	Labels map[string]string `json:"Labels,omitempty"`
+
+	// StopSignal contains the system call signal that will be sent to the container to exit.
+	StopSignal string `json:"StopSignal,omitempty"`
 }
 
 // RootFS describes a layer content addresses
@@ -49,13 +56,13 @@ type RootFS struct {
 	Type string `json:"type"`
 
 	// DiffIDs is an array of layer content hashes (DiffIDs), in order from bottom-most to top-most.
-	DiffIDs []string `json:"diff_ids"`
+	DiffIDs []digest.Digest `json:"diff_ids"`
 }
 
 // History describes the history of a layer.
 type History struct {
 	// Created is the combined date and time at which the layer was created, formatted as defined by RFC 3339, section 5.6.
-	Created time.Time `json:"created,omitempty"`
+	Created *time.Time `json:"created,omitempty"`
 
 	// CreatedBy is the command which created the layer.
 	CreatedBy string `json:"created_by,omitempty"`
@@ -74,7 +81,7 @@ type History struct {
 // This provides the `application/vnd.oci.image.config.v1+json` mediatype when marshalled to JSON.
 type Image struct {
 	// Created is the combined date and time at which the image was created, formatted as defined by RFC 3339, section 5.6.
-	Created time.Time `json:"created,omitempty"`
+	Created *time.Time `json:"created,omitempty"`
 
 	// Author defines the name and/or email address of the person or entity which created and is responsible for maintaining the image.
 	Author string `json:"author,omitempty"`

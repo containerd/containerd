@@ -67,6 +67,7 @@ func getV2URLPaths(desc ocispec.Descriptor) ([]string, error) {
 
 	switch desc.MediaType {
 	case images.MediaTypeDockerSchema2Manifest, images.MediaTypeDockerSchema2ManifestList,
+		images.MediaTypeDockerSchema1Manifest,
 		ocispec.MediaTypeImageManifest, ocispec.MediaTypeImageIndex:
 		urls = append(urls, path.Join("manifests", desc.Digest.String()))
 	}

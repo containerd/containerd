@@ -38,6 +38,7 @@ type dockerResolver struct {
 	credentials func(string) (string, string, error)
 	plainHTTP   bool
 	client      *http.Client
+	tracker     StatusTracker
 }
 
 // ResolverOptions are used to configured a new Docker register resolver
@@ -52,14 +53,24 @@ type ResolverOptions struct {
 
 	// Client is the http client to used when making registry requests
 	Client *http.Client
+
+	// Tracker is used to track uploads to the registry. This is used
+	// since the registry does not have upload tracking and the existing
+	// mechanism for getting blob upload status is expensive.
+	Tracker StatusTracker
 }
 
 // NewResolver returns a new resolver to a Docker registry
 func NewResolver(options ResolverOptions) remotes.Resolver {
+	tracker := options.Tracker
+	if tracker == nil {
+		tracker = NewInMemoryTracker()
+	}
 	return &dockerResolver{
 		credentials: options.Credentials,
 		plainHTTP:   options.PlainHTTP,
 		client:      options.Client,
+		tracker:     tracker,
 	}
 }
 
@@ -212,6 +223,7 @@ func (r *dockerResolver) Pusher(ctx context.Context, ref string) (remotes.Pusher
 	return dockerPusher{
 		dockerBase: base,
 		tag:        refspec.Object,
+		tracker:    r.tracker,
 	}, nil
 }
 

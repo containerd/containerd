@@ -275,7 +275,7 @@ func (s *Service) Write(session api.Content_WriteServer) (err error) {
 	// this action locks the writer for the session.
 	wr, err := s.store.Writer(ctx, ref, total, expected)
 	if err != nil {
-		return err
+		return serverErrorToGRPC(err, ref)
 	}
 	defer wr.Close()
 
@@ -283,7 +283,7 @@ func (s *Service) Write(session api.Content_WriteServer) (err error) {
 		msg.Action = req.Action
 		ws, err := wr.Status()
 		if err != nil {
-			return err
+			return serverErrorToGRPC(err, ref)
 		}
 
 		msg.Offset = ws.Offset // always set the offset.

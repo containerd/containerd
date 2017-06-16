@@ -18,6 +18,9 @@ const (
 	// MediaTypeDescriptor specifies the media type for a content descriptor.
 	MediaTypeDescriptor = "application/vnd.oci.descriptor.v1+json"
 
+	// MediaTypeLayoutHeader specifies the media type for the oci-layout.
+	MediaTypeLayoutHeader = "application/vnd.oci.layout.header.v1+json"
+
 	// MediaTypeImageManifest specifies the media type for an image manifest.
 	MediaTypeImageManifest = "application/vnd.oci.image.manifest.v1+json"
 

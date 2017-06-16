@@ -1,14 +1,13 @@
 package diff
 
 import (
-	"context"
-
 	diffapi "github.com/containerd/containerd/api/services/diff"
 	"github.com/containerd/containerd/api/types/descriptor"
 	mounttypes "github.com/containerd/containerd/api/types/mount"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/rootfs"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/net/context"
 )
 
 type DiffService interface {
@@ -52,6 +51,14 @@ func (r *remote) DiffMounts(ctx context.Context, a, b []mount.Mount, media, ref 
 		return ocispec.Descriptor{}, err
 	}
 	return toDescriptor(resp.Diff), nil
+}
+
+func toDescriptor(d *descriptor.Descriptor) ocispec.Descriptor {
+	return ocispec.Descriptor{
+		MediaType: d.MediaType,
+		Digest:    d.Digest,
+		Size:      d.Size_,
+	}
 }
 
 func fromDescriptor(d ocispec.Descriptor) *descriptor.Descriptor {

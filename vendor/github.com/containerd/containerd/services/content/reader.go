@@ -1,7 +1,10 @@
 package content
 
 import (
+	"context"
+
 	contentapi "github.com/containerd/containerd/api/services/content"
+	digest "github.com/opencontainers/go-digest"
 )
 
 type remoteReader struct {
@@ -34,18 +37,46 @@ func (rr *remoteReader) Read(p []byte) (n int, err error) {
 		n += copied
 		p = p[copied:]
 
-		if copied < len(p) {
-			continue
+		if len(p) == 0 {
+			rr.extra = append(rr.extra, resp.Data[copied:]...)
 		}
-
-		rr.extra = append(rr.extra, resp.Data[copied:]...)
 	}
 
 	return
 }
 
-// TODO(stevvooe): Implemente io.ReaderAt.
-
 func (rr *remoteReader) Close() error {
 	return rr.client.CloseSend()
+}
+
+type remoteReaderAt struct {
+	ctx    context.Context
+	digest digest.Digest
+	client contentapi.ContentClient
+}
+
+func (ra *remoteReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
+	rr := &contentapi.ReadRequest{
+		Digest: ra.digest,
+		Offset: off,
+		Size_:  int64(len(p)),
+	}
+	rc, err := ra.client.Read(ra.ctx, rr)
+	if err != nil {
+		return 0, err
+	}
+
+	for len(p) > 0 {
+		var resp *contentapi.ReadResponse
+		// fill our buffer up until we can fill p.
+		resp, err = rc.Recv()
+		if err != nil {
+			return n, err
+		}
+
+		copied := copy(p, resp.Data)
+		n += copied
+		p = p[copied:]
+	}
+	return n, nil
 }
