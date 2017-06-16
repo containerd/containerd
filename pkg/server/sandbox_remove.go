@@ -19,6 +19,7 @@ package server
 import (
 	"fmt"
 
+	"github.com/containerd/containerd/api/services/containers"
 	"github.com/containerd/containerd/api/services/execution"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/golang/glog"
@@ -80,6 +81,14 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 	if err := c.os.RemoveAll(sandboxRootDir); err != nil {
 		return nil, fmt.Errorf("failed to remove sandbox root directory %q: %v",
 			sandboxRootDir, err)
+	}
+
+	// Delete sandbox container.
+	if _, err := c.containerService.Delete(ctx, &containers.DeleteContainerRequest{ID: id}); err != nil {
+		if !isContainerdGRPCNotFoundError(err) {
+			return nil, fmt.Errorf("failed to delete sandbox container %q: %v", id, err)
+		}
+		glog.V(5).Infof("Remove called for sandbox container %q that does not exist", id, err)
 	}
 
 	// Remove sandbox metadata from metadata store. Note that once the sandbox

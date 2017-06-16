@@ -17,11 +17,13 @@ limitations under the License.
 package server
 
 import (
+	"encoding/json"
 	"io"
 	"os"
 	"syscall"
 	"testing"
 
+	"github.com/containerd/containerd/api/services/containers"
 	"github.com/containerd/containerd/api/services/execution"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -266,8 +268,9 @@ options timeout:1
 }
 
 func TestRunPodSandbox(t *testing.T) {
-	config, imageConfig, _ := getRunPodSandboxTestData() // TODO: declare and test specCheck see below
+	config, imageConfig, specCheck := getRunPodSandboxTestData()
 	c := newTestCRIContainerdService()
+	fake := c.containerService.(*servertesting.FakeContainersClient)
 	fakeSnapshotClient := WithFakeSnapshotClient(c)
 	fakeExecutionClient := c.taskService.(*servertesting.FakeExecutionClient)
 	fakeCNIPlugin := c.netPlugin.(*servertesting.FakeCNIPlugin)
@@ -292,6 +295,7 @@ func TestRunPodSandbox(t *testing.T) {
 	}
 	// Insert sandbox image metadata.
 	assert.NoError(t, c.imageMetadataStore.Create(imageMetadata))
+	expectContainersClientCalls := []string{"create"}
 	expectSnapshotClientCalls := []string{"view"}
 	expectExecutionClientCalls := []string{"create", "start"}
 
@@ -316,21 +320,29 @@ func TestRunPodSandbox(t *testing.T) {
 		Parent: testChainID,
 	}, prepareOpts, "prepare request should be correct")
 
-	assert.Equal(t, expectExecutionClientCalls, fakeExecutionClient.GetCalledNames(), "expect containerd functions should be called")
+	assert.Equal(t, expectContainersClientCalls, fake.GetCalledNames(), "expect containers functions should be called")
+	calls = fake.GetCalledDetails()
+	createOpts, ok := calls[0].Argument.(*containers.CreateContainerRequest)
+	assert.True(t, ok, "should create sandbox container")
+	assert.Equal(t, id, createOpts.Container.ID, "container id should be correct")
+	assert.Equal(t, testSandboxImage, createOpts.Container.Image, "test image should be correct")
+	assert.Equal(t, id, createOpts.Container.RootFS, "rootfs should be correct")
+	spec := &runtimespec.Spec{}
+	assert.NoError(t, json.Unmarshal(createOpts.Container.Spec.Value, spec))
+	t.Logf("oci spec check")
+	specCheck(t, id, spec)
+
+	assert.Equal(t, expectExecutionClientCalls, fakeExecutionClient.GetCalledNames(), "expect execution functions should be called")
 	calls = fakeExecutionClient.GetCalledDetails()
-	createOpts := calls[0].Argument.(*execution.CreateRequest)
-	assert.Equal(t, id, createOpts.ContainerID, "create id should be correct")
-	assert.Equal(t, stdout, createOpts.Stdout, "stdout pipe should be passed to containerd")
-	assert.Equal(t, stderr, createOpts.Stderr, "stderr pipe should be passed to containerd")
+	createTaskOpts := calls[0].Argument.(*execution.CreateRequest)
 	mountsResp, err := fakeSnapshotClient.Mounts(context.Background(), &snapshotapi.MountsRequest{Key: id})
 	assert.NoError(t, err)
-	assert.Equal(t, mountsResp.Mounts, createOpts.Rootfs, "rootfs mount should be correct")
-
-	// TODO: Need to create container first.. see Create in containerd/containerd/apsi/services/containers spec is no longer in the create request
-	//spec := &runtimespec.Spec{}
-	//assert.NoError(t, json.Unmarshal(createOpts.Spec.Value, spec))
-	//t.Logf("oci spec check")
-	//specCheck(t, id, spec)
+	assert.Equal(t, &execution.CreateRequest{
+		ContainerID: id,
+		Rootfs:      mountsResp.Mounts,
+		Stdout:      stdout,
+		Stderr:      stderr,
+	}, createTaskOpts, "create options should be correct")
 
 	startID := calls[1].Argument.(*execution.StartRequest).ContainerID
 	assert.Equal(t, id, startID, "start id should be correct")

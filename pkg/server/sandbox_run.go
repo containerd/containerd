@@ -23,8 +23,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/containerd/api/services/containers"
 	"github.com/containerd/containerd/api/services/execution"
 	"github.com/containerd/containerd/api/types/mount"
+	prototypes "github.com/gogo/protobuf/types"
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -85,6 +87,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox image %q: %v", defaultSandboxImage, err)
 	}
+
 	rootfsMounts, err := c.snapshotService.View(ctx, id, imageMeta.ChainID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare sandbox rootfs %q: %v", imageMeta.ChainID, err)
@@ -104,6 +107,39 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 			Options: m.Options,
 		})
 	}
+
+	// Create sandbox container.
+	spec, err := c.generateSandboxContainerSpec(id, config, imageMeta.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate sandbox container spec: %v", err)
+	}
+	rawSpec, err := json.Marshal(spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal oci spec %+v: %v", spec, err)
+	}
+	glog.V(4).Infof("Sandbox container spec: %+v", spec)
+	if _, err = c.containerService.Create(ctx, &containers.CreateContainerRequest{
+		Container: containers.Container{
+			ID: id,
+			// TODO(random-liu): Checkpoint metadata into container labels.
+			Image:   imageMeta.ID,
+			Runtime: defaultRuntime,
+			Spec: &prototypes.Any{
+				TypeUrl: runtimespec.Version,
+				Value:   rawSpec,
+			},
+			RootFS: id,
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("failed to create containerd container: %v", err)
+	}
+	defer func() {
+		if retErr != nil {
+			if _, err := c.containerService.Delete(ctx, &containers.DeleteContainerRequest{ID: id}); err != nil {
+				glog.Errorf("Failed to delete containerd container%q: %v", id, err)
+			}
+		}
+	}()
 
 	// Create sandbox container root directory.
 	// Prepare streaming named pipe.
@@ -151,16 +187,6 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		}
 	}()
 
-	// Start sandbox container.
-	spec, err := c.generateSandboxContainerSpec(id, config, imageMeta.Config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate sandbox container spec: %v", err)
-	}
-	_, err = json.Marshal(spec)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal oci spec %+v: %v", spec, err)
-	}
-	glog.V(4).Infof("Sandbox container spec: %+v", spec)
 	createOpts := &execution.CreateRequest{
 		ContainerID: id,
 		Rootfs:      rootfs,
@@ -168,8 +194,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		Stdout: stdout,
 		Stderr: stderr,
 	}
-
-	// Create sandbox container in containerd.
+	// Create sandbox task in containerd.
 	glog.V(5).Infof("Create sandbox container (id=%q, name=%q) with options %+v.",
 		id, name, createOpts)
 	createResp, err := c.taskService.Create(ctx, createOpts)

@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/containerd/containerd/api/services/containers"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	"github.com/containerd/containerd/api/types/mount"
 	"github.com/containerd/containerd/api/types/task"
@@ -38,20 +39,22 @@ func TestRemovePodSandbox(t *testing.T) {
 		Name: testName,
 	}
 	for desc, test := range map[string]struct {
-		sandboxTasks        []task.Task
-		injectMetadata      bool
-		removeSnapshotErr   error
-		injectContainerdErr error
-		injectFSErr         error
-		expectErr           bool
-		expectRemoved       string
-		expectCalls         []string
+		sandboxTasks       []task.Task
+		injectMetadata     bool
+		removeSnapshotErr  error
+		deleteContainerErr error
+		taskInfoErr        error
+		injectFSErr        error
+		expectErr          bool
+		expectRemoved      string
+		expectCalls        []string
 	}{
 		"should not return error if sandbox does not exist": {
-			injectMetadata:    false,
-			removeSnapshotErr: servertesting.SnapshotNotExistError,
-			expectErr:         false,
-			expectCalls:       []string{},
+			injectMetadata:     false,
+			removeSnapshotErr:  servertesting.SnapshotNotExistError,
+			deleteContainerErr: servertesting.ContainerNotExistError,
+			expectErr:          false,
+			expectCalls:        []string{},
 		},
 		"should not return error if snapshot does not exist": {
 			injectMetadata:    true,
@@ -65,17 +68,17 @@ func TestRemovePodSandbox(t *testing.T) {
 			expectErr:         true,
 			expectCalls:       []string{"info"},
 		},
-		"should return error when sandbox container is not deleted": {
+		"should return error when sandbox container task is not deleted": {
 			injectMetadata: true,
 			sandboxTasks:   []task.Task{{ID: testID}},
 			expectErr:      true,
 			expectCalls:    []string{"info"},
 		},
 		"should return error when arbitrary containerd error is injected": {
-			injectMetadata:      true,
-			injectContainerdErr: fmt.Errorf("arbitrary error"),
-			expectErr:           true,
-			expectCalls:         []string{"info"},
+			injectMetadata: true,
+			taskInfoErr:    fmt.Errorf("arbitrary error"),
+			expectErr:      true,
+			expectCalls:    []string{"info"},
 		},
 		"should return error when error fs error is injected": {
 			injectMetadata: true,
@@ -83,6 +86,19 @@ func TestRemovePodSandbox(t *testing.T) {
 			expectRemoved:  getSandboxRootDir(testRootDir, testID),
 			expectErr:      true,
 			expectCalls:    []string{"info"},
+		},
+		"should not return error if sandbox container does not exist": {
+			injectMetadata:     true,
+			deleteContainerErr: servertesting.ContainerNotExistError,
+			expectRemoved:      getSandboxRootDir(testRootDir, testID),
+			expectCalls:        []string{"info"},
+		},
+		"should return error if delete sandbox container fails": {
+			injectMetadata:     true,
+			deleteContainerErr: fmt.Errorf("arbitrary error"),
+			expectRemoved:      getSandboxRootDir(testRootDir, testID),
+			expectErr:          true,
+			expectCalls:        []string{"info"},
 		},
 		"should be able to successfully delete": {
 			injectMetadata: true,
@@ -92,10 +108,11 @@ func TestRemovePodSandbox(t *testing.T) {
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIContainerdService()
-		fake := c.taskService.(*servertesting.FakeExecutionClient)
+		fake := c.containerService.(*servertesting.FakeContainersClient)
 		fakeOS := c.os.(*ostesting.FakeOS)
+		fakeExecutionClient := c.taskService.(*servertesting.FakeExecutionClient)
 		fakeSnapshotClient := WithFakeSnapshotClient(c)
-		fake.SetFakeTasks(test.sandboxTasks)
+		fakeExecutionClient.SetFakeTasks(test.sandboxTasks)
 		if test.injectMetadata {
 			c.sandboxNameIndex.Reserve(testName, testID)
 			c.sandboxIDIndex.Add(testID)
@@ -112,8 +129,16 @@ func TestRemovePodSandbox(t *testing.T) {
 		} else {
 			fakeSnapshotClient.InjectError("remove", test.removeSnapshotErr)
 		}
-		if test.injectContainerdErr != nil {
-			fake.InjectError("info", test.injectContainerdErr)
+		if test.deleteContainerErr == nil {
+			_, err := fake.Create(context.Background(), &containers.CreateContainerRequest{
+				Container: containers.Container{ID: testID},
+			})
+			assert.NoError(t, err)
+		} else {
+			fake.InjectError("delete", test.deleteContainerErr)
+		}
+		if test.taskInfoErr != nil {
+			fakeExecutionClient.InjectError("info", test.taskInfoErr)
 		}
 		fakeOS.RemoveAllFn = func(path string) error {
 			assert.Equal(t, test.expectRemoved, path)
@@ -122,7 +147,7 @@ func TestRemovePodSandbox(t *testing.T) {
 		res, err := c.RemovePodSandbox(context.Background(), &runtime.RemovePodSandboxRequest{
 			PodSandboxId: testID,
 		})
-		assert.Equal(t, test.expectCalls, fake.GetCalledNames())
+		assert.Equal(t, test.expectCalls, fakeExecutionClient.GetCalledNames())
 		if test.expectErr {
 			assert.Error(t, err)
 			assert.Nil(t, res)
@@ -141,6 +166,9 @@ func TestRemovePodSandbox(t *testing.T) {
 		mountsResp, err := fakeSnapshotClient.Mounts(context.Background(), &snapshotapi.MountsRequest{Key: testID})
 		assert.Equal(t, servertesting.SnapshotNotExistError, err, "snapshot should be removed")
 		assert.Nil(t, mountsResp)
+		getResp, err := fake.Get(context.Background(), &containers.GetContainerRequest{ID: testID})
+		assert.Equal(t, servertesting.ContainerNotExistError, err, "containerd container should be removed")
+		assert.Nil(t, getResp)
 		res, err = c.RemovePodSandbox(context.Background(), &runtime.RemovePodSandboxRequest{
 			PodSandboxId: testID,
 		})
