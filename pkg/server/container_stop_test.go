@@ -137,12 +137,20 @@ func TestStopContainer(t *testing.T) {
 			expectErr: false,
 			expectCalls: []servertesting.CalledDetail{
 				{
-					Name:     "kill",
-					Argument: &execution.KillRequest{ContainerID: testID, Signal: uint32(unix.SIGTERM)},
+					Name: "kill",
+					Argument: &execution.KillRequest{
+						ContainerID: testID,
+						Signal:      uint32(unix.SIGTERM),
+						PidOrAll:    &execution.KillRequest_All{All: true},
+					},
 				},
 				{
-					Name:     "kill",
-					Argument: &execution.KillRequest{ContainerID: testID, Signal: uint32(unix.SIGKILL)},
+					Name: "kill",
+					Argument: &execution.KillRequest{
+						ContainerID: testID,
+						Signal:      uint32(unix.SIGKILL),
+						PidOrAll:    &execution.KillRequest_All{All: true},
+					},
 				},
 				{
 					Name:     "delete",
@@ -157,12 +165,20 @@ func TestStopContainer(t *testing.T) {
 			expectErr:           false,
 			expectCalls: []servertesting.CalledDetail{
 				{
-					Name:     "kill",
-					Argument: &execution.KillRequest{ContainerID: testID, Signal: uint32(unix.SIGTERM)},
+					Name: "kill",
+					Argument: &execution.KillRequest{
+						ContainerID: testID,
+						Signal:      uint32(unix.SIGTERM),
+						PidOrAll:    &execution.KillRequest_All{All: true},
+					},
 				},
 				{
-					Name:     "kill",
-					Argument: &execution.KillRequest{ContainerID: testID, Signal: uint32(unix.SIGKILL)},
+					Name: "kill",
+					Argument: &execution.KillRequest{
+						ContainerID: testID,
+						Signal:      uint32(unix.SIGKILL),
+						PidOrAll:    &execution.KillRequest_All{All: true},
+					},
 				},
 				{
 					Name:     "delete",
@@ -177,8 +193,12 @@ func TestStopContainer(t *testing.T) {
 			expectErr:           true,
 			expectCalls: []servertesting.CalledDetail{
 				{
-					Name:     "kill",
-					Argument: &execution.KillRequest{ContainerID: testID, Signal: uint32(unix.SIGTERM)},
+					Name: "kill",
+					Argument: &execution.KillRequest{
+						ContainerID: testID,
+						Signal:      uint32(unix.SIGTERM),
+						PidOrAll:    &execution.KillRequest_All{All: true},
+					},
 				},
 			},
 		},
@@ -189,8 +209,12 @@ func TestStopContainer(t *testing.T) {
 			// deleted by the event monitor.
 			expectCalls: []servertesting.CalledDetail{
 				{
-					Name:     "kill",
-					Argument: &execution.KillRequest{ContainerID: testID, Signal: uint32(unix.SIGTERM)},
+					Name: "kill",
+					Argument: &execution.KillRequest{
+						ContainerID: testID,
+						Signal:      uint32(unix.SIGTERM),
+						PidOrAll:    &execution.KillRequest_All{All: true},
+					},
 				},
 				{
 					Name:     "delete",
@@ -205,8 +229,12 @@ func TestStopContainer(t *testing.T) {
 			expectErr:           false,
 			expectCalls: []servertesting.CalledDetail{
 				{
-					Name:     "kill",
-					Argument: &execution.KillRequest{ContainerID: testID, Signal: uint32(unix.SIGKILL)},
+					Name: "kill",
+					Argument: &execution.KillRequest{
+						ContainerID: testID,
+						Signal:      uint32(unix.SIGKILL),
+						PidOrAll:    &execution.KillRequest_All{All: true},
+					},
 				},
 				{
 					Name:     "delete",
