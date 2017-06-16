@@ -227,8 +227,14 @@ func (s *store) total(ingestPath string) int64 {
 //
 // The argument `ref` is used to uniquely identify a long-lived writer transaction.
 func (s *store) Writer(ctx context.Context, ref string, total int64, expected digest.Digest) (Writer, error) {
-	// TODO(stevvooe): Need to actually store and handle expected here. We have
+	// TODO(stevvooe): Need to actually store expected here. We have
 	// code in the service that shouldn't be dealing with this.
+	if expected != "" {
+		p := s.blobPath(expected)
+		if _, err := os.Stat(p); err == nil {
+			return nil, ErrExists
+		}
+	}
 
 	path, refp, data := s.ingestPaths(ref)
 
