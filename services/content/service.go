@@ -238,13 +238,15 @@ func (s *Service) Write(session api.Content_WriteServer) (err error) {
 	defer func(msg *api.WriteResponse) {
 		// pump through the last message if no error was encountered
 		if err != nil {
-			// TODO(stevvooe): Really need a log line here to track which
-			// errors are actually causing failure on the server side. May want
-			// to configure the service with an interceptor to make this work
-			// identically across all GRPC methods.
-			//
-			// This is pretty noisy, so we can remove it but leave it for now.
-			log.G(ctx).WithError(err).Error("(*Service).Write failed")
+			if grpc.Code(err) != codes.AlreadyExists {
+				// TODO(stevvooe): Really need a log line here to track which
+				// errors are actually causing failure on the server side. May want
+				// to configure the service with an interceptor to make this work
+				// identically across all GRPC methods.
+				//
+				// This is pretty noisy, so we can remove it but leave it for now.
+				log.G(ctx).WithError(err).Error("(*Service).Write failed")
+			}
 
 			return
 		}
