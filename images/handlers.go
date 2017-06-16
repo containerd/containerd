@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
@@ -128,31 +129,42 @@ func Dispatch(ctx context.Context, handler Handler, descs ...ocispec.Descriptor)
 // arbitrary types.
 func ChildrenHandler(provider content.Provider) HandlerFunc {
 	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		var descs []ocispec.Descriptor
 		switch desc.MediaType {
 		case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+			p, err := content.ReadBlob(ctx, provider, desc.Digest)
+			if err != nil {
+				return nil, err
+			}
+
+			// TODO(stevvooe): We just assume oci manifest, for now. There may be
+			// subtle differences from the docker version.
+			var manifest ocispec.Manifest
+			if err := json.Unmarshal(p, &manifest); err != nil {
+				return nil, err
+			}
+
+			descs = append(descs, manifest.Config)
+			descs = append(descs, manifest.Layers...)
+		case MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+			p, err := content.ReadBlob(ctx, provider, desc.Digest)
+			if err != nil {
+				return nil, err
+			}
+
+			var index ocispec.Index
+			if err := json.Unmarshal(p, &index); err != nil {
+				return nil, err
+			}
+
+			descs = append(descs, index.Manifests...)
 		case MediaTypeDockerSchema2Layer, MediaTypeDockerSchema2LayerGzip,
-			MediaTypeDockerSchema2Config:
+			MediaTypeDockerSchema2Config, ocispec.MediaTypeImageLayer,
+			ocispec.MediaTypeImageLayerGzip: // childless data types.
 			return nil, nil
 		default:
-			return nil, fmt.Errorf("%v not yet supported", desc.MediaType)
+			log.G(ctx).Warnf("encounted unknown type %v; children may not be fetched", desc.MediaType)
 		}
-
-		p, err := content.ReadBlob(ctx, provider, desc.Digest)
-		if err != nil {
-			return nil, err
-		}
-
-		// TODO(stevvooe): We just assume oci manifest, for now. There may be
-		// subtle differences from the docker version.
-		var manifest ocispec.Manifest
-		if err := json.Unmarshal(p, &manifest); err != nil {
-			return nil, err
-		}
-
-		var descs []ocispec.Descriptor
-
-		descs = append(descs, manifest.Config)
-		descs = append(descs, manifest.Layers...)
 
 		return descs, nil
 	}
