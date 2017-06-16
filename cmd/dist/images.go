@@ -57,9 +57,8 @@ var imagesListCommand = cli.Command{
 
 			fmt.Fprintf(tw, "%v\t%v\t%v\t%v\t\n", image.Name, image.Target.MediaType, image.Target.Digest, progress.Bytes(size))
 		}
-		tw.Flush()
 
-		return nil
+		return tw.Flush()
 	},
 }
 

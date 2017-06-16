@@ -46,15 +46,14 @@ var activeCommand = cli.Command{
 		}
 
 		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, '\t', 0)
-		fmt.Fprintln(tw, "REF\tSIZE\tAGE")
+		fmt.Fprintln(tw, "REF\tSIZE\tAGE\t")
 		for _, active := range active {
-			fmt.Fprintf(tw, "%s\t%s\t%s\n",
+			fmt.Fprintf(tw, "%s\t%s\t%s\t\n",
 				active.Ref,
 				units.HumanSize(float64(active.Offset)),
 				units.HumanDuration(time.Since(active.StartedAt)))
 		}
-		tw.Flush()
 
-		return nil
+		return tw.Flush()
 	},
 }

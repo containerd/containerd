@@ -156,7 +156,8 @@ var namespacesListCommand = cli.Command{
 
 				fmt.Fprintf(tw, "%v\t%v\t\n", ns, strings.Join(labelStrings, ","))
 			}
-			tw.Flush()
+
+			return tw.Flush()
 		}
 
 		return nil
