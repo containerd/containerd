@@ -34,7 +34,7 @@ func TestCheckpointRestore(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithImage(image), WithNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewRootFS(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -127,7 +127,7 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithImage(image), WithNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewRootFS(id, image))
 	if err != nil {
 		t.Error(err)
 		return

@@ -154,6 +154,7 @@ func WithNewRootFS(id string, i Image) NewContainerOpts {
 			return err
 		}
 		c.RootFS = id
+		c.Image = i.Name()
 		return nil
 	}
 }
@@ -170,6 +171,7 @@ func WithNewReadonlyRootFS(id string, i Image) NewContainerOpts {
 			return err
 		}
 		c.RootFS = id
+		c.Image = i.Name()
 		return nil
 	}
 }
