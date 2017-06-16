@@ -79,20 +79,20 @@ func Parse(s string) (Spec, error) {
 		return Spec{}, ErrHostnameRequired
 	}
 
-	parts := splitRe.Split(u.Path, 2)
-	if len(parts) < 2 {
-		return Spec{}, ErrObjectRequired
-	}
+	var object string
 
-	// This allows us to retain the @ to signify digests or shortend digests in
-	// the object.
-	object := u.Path[len(parts[0]):]
-	if object[:1] == ":" {
-		object = object[1:]
+	if idx := splitRe.FindStringIndex(u.Path); idx != nil {
+		// This allows us to retain the @ to signify digests or shortend digests in
+		// the object.
+		object = u.Path[idx[0]:]
+		if object[:1] == ":" {
+			object = object[1:]
+		}
+		u.Path = u.Path[:idx[0]]
 	}
 
 	return Spec{
-		Locator: path.Join(u.Host, parts[0]),
+		Locator: path.Join(u.Host, u.Path),
 		Object:  object,
 	}, nil
 }
@@ -119,6 +119,9 @@ func (r Spec) Digest() digest.Digest {
 
 // String returns the normalized string for the ref.
 func (r Spec) String() string {
+	if r.Object == "" {
+		return r.Locator
+	}
 	if r.Object[:1] == "@" {
 		return fmt.Sprintf("%v%v", r.Locator, r.Object)
 	}

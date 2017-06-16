@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/api/services/execution"
-	"github.com/containerd/containerd/api/types/container"
+	"github.com/containerd/containerd/api/types/task"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
@@ -46,9 +46,9 @@ func TestHandleEvent(t *testing.T) {
 		StartedAt: testStartedAt,
 	}
 	testExitedAt := time.Now()
-	testExitEvent := container.Event{
+	testExitEvent := task.Event{
 		ID:         testID,
-		Type:       container.Event_EXIT,
+		Type:       task.Event_EXIT,
 		Pid:        testPid,
 		ExitStatus: 1,
 		ExitedAt:   testExitedAt,
@@ -64,16 +64,16 @@ func TestHandleEvent(t *testing.T) {
 		ExitCode:   1,
 	}
 	assert.Equal(t, runtime.ContainerState_CONTAINER_RUNNING, testMetadata.State())
-	testContainerdContainer := container.Container{
+	testContainerdContainer := task.Task{
 		ID:     testID,
 		Pid:    testPid,
-		Status: container.Status_RUNNING,
+		Status: task.StatusRunning,
 	}
 
 	for desc, test := range map[string]struct {
-		event               *container.Event
+		event               *task.Event
 		metadata            *metadata.ContainerMetadata
-		containerdContainer *container.Container
+		containerdContainer *task.Task
 		containerdErr       error
 		expected            *metadata.ContainerMetadata
 	}{
@@ -82,9 +82,9 @@ func TestHandleEvent(t *testing.T) {
 			expected: nil,
 		},
 		"should not update state when exited process is not init process": {
-			event: &container.Event{
+			event: &task.Event{
 				ID:         testID,
-				Type:       container.Event_EXIT,
+				Type:       task.Event_EXIT,
 				Pid:        9999,
 				ExitStatus: 1,
 				ExitedAt:   testExitedAt,
@@ -93,7 +93,7 @@ func TestHandleEvent(t *testing.T) {
 			containerdContainer: &testContainerdContainer,
 			expected:            &testMetadata,
 		},
-		"should not update state when fail to delete containerd container": {
+		"should not update state when fail to delete containerd task": {
 			event:               &testExitEvent,
 			metadata:            &testMetadata,
 			containerdContainer: &testContainerdContainer,
@@ -101,9 +101,9 @@ func TestHandleEvent(t *testing.T) {
 			expected:            &testMetadata,
 		},
 		"should not update state for non-exited events": {
-			event: &container.Event{
+			event: &task.Event{
 				ID:         testID,
-				Type:       container.Event_OOM,
+				Type:       task.Event_OOM,
 				Pid:        testPid,
 				ExitStatus: 1,
 				ExitedAt:   testExitedAt,
@@ -112,12 +112,12 @@ func TestHandleEvent(t *testing.T) {
 			containerdContainer: &testContainerdContainer,
 			expected:            &testMetadata,
 		},
-		"should update state when containerd container is already deleted": {
+		"should update state when containerd task is already deleted": {
 			event:    &testExitEvent,
 			metadata: &testMetadata,
 			expected: &testFinishedMetadata,
 		},
-		"should update state when delete containerd container successfully": {
+		"should update state when delete containerd task successfully": {
 			event:               &testExitEvent,
 			metadata:            &testMetadata,
 			containerdContainer: &testContainerdContainer,
@@ -126,7 +126,7 @@ func TestHandleEvent(t *testing.T) {
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIContainerdService()
-		fake := c.containerService.(*servertesting.FakeExecutionClient)
+		fake := c.taskService.(*servertesting.FakeExecutionClient)
 		e, err := fake.Events(context.Background(), &execution.EventsRequest{})
 		assert.NoError(t, err)
 		fakeEvents := e.(*servertesting.EventClient)
@@ -139,9 +139,9 @@ func TestHandleEvent(t *testing.T) {
 			// Make sure that original data will not be changed.
 			assert.NoError(t, c.containerStore.Create(*test.metadata))
 		}
-		// Inject containerd container.
+		// Inject containerd task.
 		if test.containerdContainer != nil {
-			fake.SetFakeContainers([]container.Container{*test.containerdContainer})
+			fake.SetFakeTasks([]task.Task{*test.containerdContainer})
 		}
 		// Inject containerd delete error.
 		if test.containerdErr != nil {

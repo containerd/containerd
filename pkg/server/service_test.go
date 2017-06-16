@@ -22,10 +22,13 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/api/services/execution"
+	snapshotservice "github.com/containerd/containerd/services/snapshot"
 	"github.com/docker/docker/pkg/truncindex"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
@@ -33,10 +36,6 @@ import (
 	"github.com/kubernetes-incubator/cri-containerd/pkg/registrar"
 	agentstesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/agents/testing"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
-	imagedigest "github.com/opencontainers/go-digest"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 )
 
 type nopReadWriteCloser struct{}
@@ -66,20 +65,27 @@ func newTestCRIContainerdService() *criContainerdService {
 		sandboxIDIndex:     truncindex.NewTruncIndex(nil),
 		containerStore:     metadata.NewContainerStore(store.NewMetadataStore()),
 		containerNameIndex: registrar.NewRegistrar(),
-		containerService:   servertesting.NewFakeExecutionClient(),
-		rootfsService:      servertesting.NewFakeRootfsClient(),
+		taskService:        servertesting.NewFakeExecutionClient(),
+		containerService:   servertesting.NewFakeContainersClient(),
 		netPlugin:          servertesting.NewFakeCNIPlugin(),
 		agentFactory:       agentstesting.NewFakeAgentFactory(),
 	}
 }
 
+// WithFakeSnapshotClient add and return fake snapshot client.
+func WithFakeSnapshotClient(c *criContainerdService) *servertesting.FakeSnapshotClient {
+	fake := servertesting.NewFakeSnapshotClient()
+	c.snapshotService = snapshotservice.NewSnapshotterFromClient(fake)
+	return fake
+}
+
 // Test all sandbox operations.
 func TestSandboxOperations(t *testing.T) {
 	c := newTestCRIContainerdService()
-	fake := c.containerService.(*servertesting.FakeExecutionClient)
-	fakeRootfsClient := c.rootfsService.(*servertesting.FakeRootfsClient)
+	fake := c.taskService.(*servertesting.FakeExecutionClient)
 	fakeOS := c.os.(*ostesting.FakeOS)
 	fakeCNIPlugin := c.netPlugin.(*servertesting.FakeCNIPlugin)
+	WithFakeSnapshotClient(c)
 	fakeOS.OpenFifoFn = func(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
 		return nopReadWriteCloser{}, nil
 	}
@@ -89,8 +95,6 @@ func TestSandboxOperations(t *testing.T) {
 		ChainID: "test-chain-id",
 		Config:  &imagespec.ImageConfig{Entrypoint: []string{"/pause"}},
 	}))
-	// Insert fake chainID
-	fakeRootfsClient.SetFakeChainIDs([]imagedigest.Digest{imagedigest.Digest("test-chain-id")})
 
 	config := &runtime.PodSandboxConfig{
 		Metadata: &runtime.PodSandboxMetadata{
@@ -112,8 +116,8 @@ func TestSandboxOperations(t *testing.T) {
 	id := runRes.GetPodSandboxId()
 
 	t.Logf("should be able to get pod sandbox status")
-	info, err := fake.Info(context.Background(), &execution.InfoRequest{ID: id})
-	netns := getNetworkNamespace(info.Pid)
+	info, err := fake.Info(context.Background(), &execution.InfoRequest{ContainerID: id})
+	netns := getNetworkNamespace(info.Task.Pid)
 	assert.NoError(t, err)
 	expectSandboxStatus := &runtime.PodSandboxStatus{
 		Id:       id,
@@ -146,7 +150,7 @@ func TestSandboxOperations(t *testing.T) {
 	expectSandbox := &runtime.PodSandbox{
 		Id:          id,
 		Metadata:    config.GetMetadata(),
-		State:       runtime.PodSandboxState_SANDBOX_READY,
+		State:       runtime.PodSandboxState_SANDBOX_NOTREADY, // TODO(mikebrow) converting to client... should this be ready?
 		Labels:      config.GetLabels(),
 		Annotations: config.GetAnnotations(),
 	}

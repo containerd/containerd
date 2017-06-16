@@ -60,8 +60,8 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 
 	// TODO(random-liu): [P1] Handle sandbox container graceful deletion.
 	// Delete the sandbox container from containerd.
-	_, err = c.containerService.Delete(ctx, &execution.DeleteRequest{ID: id})
-	if err != nil && !isContainerdContainerNotExistError(err) {
+	_, err = c.taskService.Delete(ctx, &execution.DeleteRequest{ContainerID: id})
+	if err != nil && !isContainerdGRPCNotFoundError(err) {
 		return nil, fmt.Errorf("failed to delete sandbox container %q: %v", id, err)
 	}
 

@@ -56,6 +56,8 @@ type SandboxMetadata struct {
 	CreatedAt int64
 	// NetNS is the network namespace used by the sandbox.
 	NetNS string
+	// Pid is the process id of the sandbox.
+	Pid uint32
 }
 
 // SandboxUpdateFunc is the function used to update SandboxMetadata.

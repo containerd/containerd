@@ -22,17 +22,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/execution"
-	"github.com/containerd/containerd/api/types/container"
+	"github.com/containerd/containerd/api/types/task"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 )
 
-// ContainerNotExistError is the fake error returned when container does not exist.
-var ContainerNotExistError = grpc.Errorf(codes.Unknown, containerd.ErrContainerNotExist.Error())
+// TaskNotExistError is the fake error returned when task does not exist.
+var TaskNotExistError = grpc.Errorf(codes.NotFound, "task does not exist")
 
 // CalledDetail is the struct contains called function name and arguments.
 type CalledDetail struct {
@@ -42,16 +41,16 @@ type CalledDetail struct {
 	Argument interface{}
 }
 
-var _ execution.ContainerService_EventsClient = &EventClient{}
+var _ execution.Tasks_EventsClient = &EventClient{}
 
-// EventClient is a test implementation of execution.ContainerService_EventsClient
+// EventClient is a test implementation of execution.Tasks_EventsClient
 type EventClient struct {
-	Events chan *container.Event
+	Events chan *task.Event
 	grpc.ClientStream
 }
 
 // Recv is a test implementation of Recv
-func (cli *EventClient) Recv() (*container.Event, error) {
+func (cli *EventClient) Recv() (*task.Event, error) {
 	event, ok := <-cli.Events
 	if !ok {
 		return nil, fmt.Errorf("event channel closed")
@@ -63,20 +62,20 @@ func (cli *EventClient) Recv() (*container.Event, error) {
 // can be run for testing without requiring a real containerd setup.
 type FakeExecutionClient struct {
 	sync.Mutex
-	called        []CalledDetail
-	errors        map[string]error
-	ContainerList map[string]container.Container
-	eventsQueue   chan *container.Event
-	eventClients  []*EventClient
+	called       []CalledDetail
+	errors       map[string]error
+	TaskList     map[string]task.Task
+	eventsQueue  chan *task.Event
+	eventClients []*EventClient
 }
 
-var _ execution.ContainerServiceClient = &FakeExecutionClient{}
+var _ execution.TasksClient = &FakeExecutionClient{}
 
 // NewFakeExecutionClient creates a FakeExecutionClient
 func NewFakeExecutionClient() *FakeExecutionClient {
 	return &FakeExecutionClient{
-		errors:        make(map[string]error),
-		ContainerList: make(map[string]container.Container),
+		errors:   make(map[string]error),
+		TaskList: make(map[string]task.Task),
 	}
 }
 
@@ -95,7 +94,7 @@ func (f *FakeExecutionClient) Stop() {
 
 // WithEvents setup events publisher for FakeExecutionClient
 func (f *FakeExecutionClient) WithEvents() *FakeExecutionClient {
-	f.eventsQueue = make(chan *container.Event, 1024)
+	f.eventsQueue = make(chan *task.Event, 1024)
 	go func() {
 		for e := range f.eventsQueue {
 			f.Lock()
@@ -146,7 +145,7 @@ func generatePid() uint32 {
 	return randPid
 }
 
-func (f *FakeExecutionClient) sendEvent(event *container.Event) {
+func (f *FakeExecutionClient) sendEvent(event *task.Event) {
 	if f.eventsQueue != nil {
 		f.eventsQueue <- event
 	}
@@ -183,12 +182,12 @@ func (f *FakeExecutionClient) GetCalledDetails() []CalledDetail {
 	return append([]CalledDetail{}, f.called...)
 }
 
-// SetFakeContainers injects fake containers.
-func (f *FakeExecutionClient) SetFakeContainers(containers []container.Container) {
+// SetFakeTasks injects fake tasks.
+func (f *FakeExecutionClient) SetFakeTasks(tasks []task.Task) {
 	f.Lock()
 	defer f.Unlock()
-	for _, c := range containers {
-		f.ContainerList[c.ID] = c
+	for _, t := range tasks {
+		f.TaskList[t.ID] = t
 	}
 }
 
@@ -200,24 +199,24 @@ func (f *FakeExecutionClient) Create(ctx context.Context, createOpts *execution.
 	if err := f.getError("create"); err != nil {
 		return nil, err
 	}
-	_, ok := f.ContainerList[createOpts.ID]
+	_, ok := f.TaskList[createOpts.ContainerID]
 	if ok {
-		return nil, containerd.ErrContainerExists
+		return nil, fmt.Errorf("task already exists")
 	}
 	pid := generatePid()
-	f.ContainerList[createOpts.ID] = container.Container{
-		ID:     createOpts.ID,
-		Pid:    pid,
-		Status: container.Status_CREATED,
+	f.TaskList[createOpts.ContainerID] = task.Task{
+		ContainerID: createOpts.ContainerID,
+		Pid:         pid,
+		Status:      task.StatusCreated,
 	}
-	f.sendEvent(&container.Event{
-		ID:   createOpts.ID,
-		Type: container.Event_CREATE,
+	f.sendEvent(&task.Event{
+		ID:   createOpts.ContainerID,
+		Type: task.Event_CREATE,
 		Pid:  pid,
 	})
 	return &execution.CreateResponse{
-		ID:  createOpts.ID,
-		Pid: pid,
+		ContainerID: createOpts.ContainerID,
+		Pid:         pid,
 	}, nil
 }
 
@@ -229,23 +228,23 @@ func (f *FakeExecutionClient) Start(ctx context.Context, startOpts *execution.St
 	if err := f.getError("start"); err != nil {
 		return nil, err
 	}
-	c, ok := f.ContainerList[startOpts.ID]
+	c, ok := f.TaskList[startOpts.ContainerID]
 	if !ok {
-		return nil, ContainerNotExistError
+		return nil, TaskNotExistError
 	}
-	f.sendEvent(&container.Event{
+	f.sendEvent(&task.Event{
 		ID:   c.ID,
-		Type: container.Event_START,
+		Type: task.Event_START,
 		Pid:  c.Pid,
 	})
 	switch c.Status {
-	case container.Status_CREATED:
-		c.Status = container.Status_RUNNING
-		f.ContainerList[startOpts.ID] = c
+	case task.StatusCreated:
+		c.Status = task.StatusRunning
+		f.TaskList[startOpts.ContainerID] = c
 		return &googleprotobuf.Empty{}, nil
-	case container.Status_STOPPED:
+	case task.StatusStopped:
 		return &googleprotobuf.Empty{}, fmt.Errorf("cannot start a container that has stopped")
-	case container.Status_RUNNING:
+	case task.StatusRunning:
 		return &googleprotobuf.Empty{}, fmt.Errorf("cannot start an already running container")
 	default:
 		return &googleprotobuf.Empty{}, fmt.Errorf("cannot start a container in the %s state", c.Status)
@@ -260,32 +259,32 @@ func (f *FakeExecutionClient) Delete(ctx context.Context, deleteOpts *execution.
 	if err := f.getError("delete"); err != nil {
 		return nil, err
 	}
-	c, ok := f.ContainerList[deleteOpts.ID]
+	c, ok := f.TaskList[deleteOpts.ContainerID]
 	if !ok {
-		return nil, ContainerNotExistError
+		return nil, TaskNotExistError
 	}
-	delete(f.ContainerList, deleteOpts.ID)
-	f.sendEvent(&container.Event{
+	delete(f.TaskList, deleteOpts.ContainerID)
+	f.sendEvent(&task.Event{
 		ID:   c.ID,
-		Type: container.Event_EXIT,
+		Type: task.Event_EXIT,
 		Pid:  c.Pid,
 	})
 	return nil, nil
 }
 
 // Info is a test implementation of execution.Info
-func (f *FakeExecutionClient) Info(ctx context.Context, infoOpts *execution.InfoRequest, opts ...grpc.CallOption) (*container.Container, error) {
+func (f *FakeExecutionClient) Info(ctx context.Context, infoOpts *execution.InfoRequest, opts ...grpc.CallOption) (*execution.InfoResponse, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.appendCalled("info", infoOpts)
 	if err := f.getError("info"); err != nil {
 		return nil, err
 	}
-	c, ok := f.ContainerList[infoOpts.ID]
+	c, ok := f.TaskList[infoOpts.ContainerID]
 	if !ok {
-		return nil, ContainerNotExistError
+		return nil, TaskNotExistError
 	}
-	return &c, nil
+	return &execution.InfoResponse{Task: &c}, nil
 }
 
 // List is a test implementation of execution.List
@@ -297,8 +296,8 @@ func (f *FakeExecutionClient) List(ctx context.Context, listOpts *execution.List
 		return nil, err
 	}
 	resp := &execution.ListResponse{}
-	for _, c := range f.ContainerList {
-		resp.Containers = append(resp.Containers, &container.Container{
+	for _, c := range f.TaskList {
+		resp.Tasks = append(resp.Tasks, &task.Task{
 			ID:     c.ID,
 			Pid:    c.Pid,
 			Status: c.Status,
@@ -315,22 +314,22 @@ func (f *FakeExecutionClient) Kill(ctx context.Context, killOpts *execution.Kill
 	if err := f.getError("kill"); err != nil {
 		return nil, err
 	}
-	c, ok := f.ContainerList[killOpts.ID]
+	c, ok := f.TaskList[killOpts.ContainerID]
 	if !ok {
-		return nil, ContainerNotExistError
+		return nil, TaskNotExistError
 	}
-	c.Status = container.Status_STOPPED
-	f.ContainerList[killOpts.ID] = c
-	f.sendEvent(&container.Event{
+	c.Status = task.StatusStopped
+	f.TaskList[killOpts.ContainerID] = c
+	f.sendEvent(&task.Event{
 		ID:   c.ID,
-		Type: container.Event_EXIT,
+		Type: task.Event_EXIT,
 		Pid:  c.Pid,
 	})
 	return &googleprotobuf.Empty{}, nil
 }
 
 // Events is a test implementation of execution.Events
-func (f *FakeExecutionClient) Events(ctx context.Context, eventsOpts *execution.EventsRequest, opts ...grpc.CallOption) (execution.ContainerService_EventsClient, error) {
+func (f *FakeExecutionClient) Events(ctx context.Context, eventsOpts *execution.EventsRequest, opts ...grpc.CallOption) (execution.Tasks_EventsClient, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.appendCalled("events", eventsOpts)
@@ -338,7 +337,7 @@ func (f *FakeExecutionClient) Events(ctx context.Context, eventsOpts *execution.
 		return nil, err
 	}
 	var client = &EventClient{
-		Events: make(chan *container.Event, 100),
+		Events: make(chan *task.Event, 100),
 	}
 	f.eventClients = append(f.eventClients, client)
 	return client, nil
@@ -371,5 +370,17 @@ func (f *FakeExecutionClient) Pause(ctx context.Context, in *execution.PauseRequ
 // Resume is a test implementation of execution.Resume
 func (f *FakeExecutionClient) Resume(ctx context.Context, in *execution.ResumeRequest, opts ...grpc.CallOption) (*googleprotobuf.Empty, error) {
 	// TODO: implement Resume()
+	return nil, nil
+}
+
+// Checkpoint is a test implementation of execution.Checkpoint
+func (f *FakeExecutionClient) Checkpoint(ctx context.Context, in *execution.CheckpointRequest, opts ...grpc.CallOption) (*execution.CheckpointResponse, error) {
+	// TODO: implement Checkpoint()
+	return nil, nil
+}
+
+// Processes is a test implementation of execution.Processes
+func (f *FakeExecutionClient) Processes(ctx context.Context, in *execution.ProcessesRequest, opts ...grpc.CallOption) (*execution.ProcessesResponse, error) {
+	// TODO: implement Processes()
 	return nil, nil
 }

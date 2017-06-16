@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/boltdb/bolt"
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/snapshot"
 
@@ -19,7 +18,7 @@ const (
 	RuntimePlugin PluginType = iota + 1
 	GRPCPlugin
 	SnapshotPlugin
-	ContainerMonitorPlugin
+	TaskMonitorPlugin
 )
 
 type Registration struct {
@@ -28,17 +27,17 @@ type Registration struct {
 	Init   func(*InitContext) (interface{}, error)
 }
 
-// TODO(@crosbymichael): how to we keep this struct from growing but support dependency injection for loaded plugins?
+// TODO(@crosbymichael): how do we keep this struct from growing but support dependency injection for loaded plugins?
 type InitContext struct {
 	Root        string
 	State       string
-	Runtimes    map[string]containerd.Runtime
+	Runtimes    map[string]Runtime
 	Content     content.Store
 	Meta        *bolt.DB
 	Snapshotter snapshot.Snapshotter
 	Config      interface{}
 	Context     context.Context
-	Monitor     ContainerMonitor
+	Monitor     TaskMonitor
 }
 
 type Service interface {

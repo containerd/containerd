@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/api/services/execution"
-	"github.com/containerd/containerd/api/types/container"
+	"github.com/containerd/containerd/api/types/task"
 	"github.com/golang/glog"
 	"github.com/jpillora/backoff"
 	"golang.org/x/net/context"
@@ -48,7 +48,7 @@ func (c *criContainerdService) startEventMonitor() {
 	}
 	go func() {
 		for {
-			events, err := c.containerService.Events(context.Background(), &execution.EventsRequest{})
+			events, err := c.taskService.Events(context.Background(), &execution.EventsRequest{})
 			if err != nil {
 				glog.Errorf("Failed to connect to containerd event stream: %v", err)
 				time.Sleep(b.Duration())
@@ -69,7 +69,7 @@ func (c *criContainerdService) startEventMonitor() {
 }
 
 // handleEventStream receives an event from containerd and handles the event.
-func (c *criContainerdService) handleEventStream(events execution.ContainerService_EventsClient) error {
+func (c *criContainerdService) handleEventStream(events execution.Tasks_EventsClient) error {
 	e, err := events.Recv()
 	if err != nil {
 		return err
@@ -80,13 +80,13 @@ func (c *criContainerdService) handleEventStream(events execution.ContainerServi
 }
 
 // handleEvent handles a containerd event.
-func (c *criContainerdService) handleEvent(e *container.Event) {
+func (c *criContainerdService) handleEvent(e *task.Event) {
 	switch e.Type {
 	// If containerd-shim exits unexpectedly, there will be no corresponding event.
 	// However, containerd could not retrieve container state in that case, so it's
 	// fine to leave out that case for now.
 	// TODO(random-liu): [P2] Handle containerd-shim exit.
-	case container.Event_EXIT:
+	case task.Event_EXIT:
 		meta, err := c.containerStore.Get(e.ID)
 		if err != nil {
 			glog.Errorf("Failed to get container %q metadata: %v", e.ID, err)
@@ -97,8 +97,8 @@ func (c *criContainerdService) handleEvent(e *container.Event) {
 			return
 		}
 		// Delete the container from containerd.
-		_, err = c.containerService.Delete(context.Background(), &execution.DeleteRequest{ID: e.ID})
-		if err != nil && !isContainerdContainerNotExistError(err) {
+		_, err = c.taskService.Delete(context.Background(), &execution.DeleteRequest{ContainerID: e.ID})
+		if err != nil && !isContainerdGRPCNotFoundError(err) {
 			// TODO(random-liu): [P0] Enqueue the event and retry.
 			glog.Errorf("Failed to delete container %q: %v", e.ID, err)
 			return
@@ -119,7 +119,7 @@ func (c *criContainerdService) handleEvent(e *container.Event) {
 			// TODO(random-liu): [P0] Enqueue the event and retry.
 			return
 		}
-	case container.Event_OOM:
+	case task.Event_OOM:
 		// TODO(random-liu): [P1] Handle OOM event.
 	}
 }

@@ -1,0 +1,116 @@
+syntax = "proto3";
+
+package containerd.v1;
+
+import "gogoproto/gogo.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
+import "github.com/containerd/containerd/api/types/descriptor/descriptor.proto";
+
+// Containers provides metadata storage for containers used in the execution
+// service.
+//
+// The objects here provide an state-independent view of containers for use in
+// management and resource pinning. From that perspective, contaienrs do not
+// have a "state" but rather this is the set of resources that will be
+// considered in use by the container.
+//
+// From the perspective of the execution service, these objects represent the
+// base parameters for creating a container process.
+//
+// In general, when looking to add fields for this type, first ask yourself
+// whether or not the function of the field has to do with runtime execution or
+// is invariant of the runtime state of the container. If it has to do with
+// runtime, or changes as the "container" is started and stops, it probably
+// doesn't belong on this object.
+service Containers {
+	rpc Get(GetContainerRequest) returns (GetContainerResponse);
+	rpc List(ListContainersRequest) returns (ListContainersResponse);
+	rpc Create(CreateContainerRequest) returns (CreateContainerResponse);
+	rpc Update(UpdateContainerRequest) returns (UpdateContainerResponse);
+	rpc Delete(DeleteContainerRequest) returns (google.protobuf.Empty);
+}
+
+message Container {
+	// ID is the user-specified identifier.
+	//
+	// This field may not be updated.
+	string id = 1;
+
+	// Labels provides an area to include arbitrary data on containers.
+	//
+	// Note that to add a new value to this field, read the existing set and
+	// include the entire result in the update call.
+	map<string, string> labels  = 2;
+
+	// Image contains the reference of the image used to build the
+	// specification and snapshots for running this container.
+	//
+	// If this field is updated, the spec and rootfs needed to updated, as well.
+	string image = 3;
+
+	// Runtime specifies which runtime to use for executing this container.
+	string runtime = 4;
+
+	// Spec to be used when creating the container. This is runtime specific.
+	google.protobuf.Any spec = 6;
+
+	// RootFS specifies the snapshot key to use for the container's root
+	// filesystem. When starting a task from this container, a caller should
+	// look up the mounts from the snapshot service and include those on the
+	// task create request.
+	//
+	// Snapshots referenced in this field will not be garbage collected.
+	//
+	// This field may be updated.
+	string rootfs = 7 [(gogoproto.customname) = "RootFS"];
+}
+
+message GetContainerRequest {
+	string id = 1;
+}
+
+message GetContainerResponse {
+	Container container = 1 [(gogoproto.nullable) = false];
+}
+
+message ListContainersRequest {
+	string filter = 1; // TODO(stevvooe): Define a filtering syntax to make these queries.
+}
+
+message ListContainersResponse {
+	repeated Container containers = 1 [(gogoproto.nullable) = false];
+}
+
+message CreateContainerRequest {
+	Container container = 1 [(gogoproto.nullable) = false];
+}
+
+message CreateContainerResponse {
+	Container container = 1 [(gogoproto.nullable) = false];
+}
+
+// UpdateContainerRequest updates the metadata on one or more container.
+//
+// The operation should follow semantics described in
+// https://developers.google.com/protocol-buffers/docs/reference/csharp/class/google/protobuf/well-known-types/field-mask,
+// unless otherwise qualified.
+message UpdateContainerRequest {
+	// Container provides the target values, as declared by the mask, for the update.
+	//
+	// The ID field must be set.
+	Container container = 1 [(gogoproto.nullable) = false];
+
+	// UpdateMask specifies which fields to perform the update on. If empty,
+	// the operation applies to all fields.
+	google.protobuf.FieldMask update_mask = 2;
+}
+
+message UpdateContainerResponse {
+	Container container = 1 [(gogoproto.nullable) = false];
+}
+
+message DeleteContainerRequest {
+	string id = 1;
+}

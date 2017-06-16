@@ -7,7 +7,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-// Resolver provides a remote based on a locator.
+// Resolver provides remotes based on a locator.
 type Resolver interface {
 	// Resolve attempts to resolve the reference into a name and descriptor.
 	//
@@ -20,12 +20,26 @@ type Resolver interface {
 	// While the name may differ from ref, it should itself be a valid ref.
 	//
 	// If the resolution fails, an error will be returned.
-	Resolve(ctx context.Context, ref string) (name string, desc ocispec.Descriptor, fetcher Fetcher, err error)
+	Resolve(ctx context.Context, ref string) (name string, desc ocispec.Descriptor, err error)
+
+	// Fetcher returns a new fetcher for the provided reference.
+	// All content fetched from the returned fetcher will be
+	// from the namespace referred to by ref.
+	Fetcher(ctx context.Context, ref string) (Fetcher, error)
+
+	// Pusher returns a new pusher for the provided reference
+	Pusher(ctx context.Context, ref string) (Pusher, error)
 }
 
 type Fetcher interface {
 	// Fetch the resource identified by the descriptor.
 	Fetch(ctx context.Context, desc ocispec.Descriptor) (io.ReadCloser, error)
+}
+
+type Pusher interface {
+	// Push pushes the resource identified by the descriptor using the
+	// passed in reader.
+	Push(ctx context.Context, d ocispec.Descriptor, r io.Reader) error
 }
 
 // FetcherFunc allows package users to implement a Fetcher with just a
@@ -34,4 +48,12 @@ type FetcherFunc func(ctx context.Context, desc ocispec.Descriptor) (io.ReadClos
 
 func (fn FetcherFunc) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.ReadCloser, error) {
 	return fn(ctx, desc)
+}
+
+// PusherFunc allows package users to implement a Pusher with just a
+// function.
+type PusherFunc func(ctx context.Context, desc ocispec.Descriptor, r io.Reader) error
+
+func (fn PusherFunc) Pusher(ctx context.Context, desc ocispec.Descriptor, r io.Reader) error {
+	return fn(ctx, desc, r)
 }

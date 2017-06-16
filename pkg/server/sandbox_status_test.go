@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
 
-	"github.com/containerd/containerd/api/types/container"
+	"github.com/containerd/containerd/api/types/task"
 
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
@@ -95,15 +95,15 @@ func getSandboxStatusTestData() (*metadata.SandboxMetadata, *runtime.PodSandboxS
 
 func TestPodSandboxStatus(t *testing.T) {
 	for desc, test := range map[string]struct {
-		sandboxContainers []container.Container
-		injectMetadata    bool
-		injectErr         error
-		injectIP          bool
-		injectCNIErr      error
-		expectState       runtime.PodSandboxState
-		expectErr         bool
-		expectCalls       []string
-		expectedCNICalls  []string
+		sandboxTasks     []task.Task
+		injectMetadata   bool
+		injectErr        error
+		injectIP         bool
+		injectCNIErr     error
+		expectState      runtime.PodSandboxState
+		expectErr        bool
+		expectCalls      []string
+		expectedCNICalls []string
 	}{
 		"sandbox status without metadata": {
 			injectMetadata:   false,
@@ -112,10 +112,10 @@ func TestPodSandboxStatus(t *testing.T) {
 			expectedCNICalls: []string{},
 		},
 		"sandbox status with running sandbox container": {
-			sandboxContainers: []container.Container{{
+			sandboxTasks: []task.Task{{
 				ID:     sandboxStatusTestID,
 				Pid:    1,
-				Status: container.Status_RUNNING,
+				Status: task.StatusRunning,
 			}},
 			injectMetadata:   true,
 			expectState:      runtime.PodSandboxState_SANDBOX_READY,
@@ -123,10 +123,10 @@ func TestPodSandboxStatus(t *testing.T) {
 			expectedCNICalls: []string{"GetContainerNetworkStatus"},
 		},
 		"sandbox status with stopped sandbox container": {
-			sandboxContainers: []container.Container{{
+			sandboxTasks: []task.Task{{
 				ID:     sandboxStatusTestID,
 				Pid:    1,
-				Status: container.Status_STOPPED,
+				Status: task.StatusStopped,
 			}},
 			injectMetadata:   true,
 			expectState:      runtime.PodSandboxState_SANDBOX_NOTREADY,
@@ -134,17 +134,17 @@ func TestPodSandboxStatus(t *testing.T) {
 			expectedCNICalls: []string{"GetContainerNetworkStatus"},
 		},
 		"sandbox status with non-existing sandbox container": {
-			sandboxContainers: []container.Container{},
-			injectMetadata:    true,
-			expectState:       runtime.PodSandboxState_SANDBOX_NOTREADY,
-			expectCalls:       []string{"info"},
-			expectedCNICalls:  []string{"GetContainerNetworkStatus"},
+			sandboxTasks:     []task.Task{},
+			injectMetadata:   true,
+			expectState:      runtime.PodSandboxState_SANDBOX_NOTREADY,
+			expectCalls:      []string{"info"},
+			expectedCNICalls: []string{"GetContainerNetworkStatus"},
 		},
 		"sandbox status with arbitrary error": {
-			sandboxContainers: []container.Container{{
+			sandboxTasks: []task.Task{{
 				ID:     sandboxStatusTestID,
 				Pid:    1,
-				Status: container.Status_RUNNING,
+				Status: task.StatusRunning,
 			}},
 			injectMetadata:   true,
 			expectState:      runtime.PodSandboxState_SANDBOX_READY,
@@ -154,10 +154,10 @@ func TestPodSandboxStatus(t *testing.T) {
 			expectedCNICalls: []string{},
 		},
 		"sandbox status with IP address": {
-			sandboxContainers: []container.Container{{
+			sandboxTasks: []task.Task{{
 				ID:     sandboxStatusTestID,
 				Pid:    1,
-				Status: container.Status_RUNNING,
+				Status: task.StatusRunning,
 			}},
 			injectMetadata:   true,
 			expectState:      runtime.PodSandboxState_SANDBOX_READY,
@@ -166,10 +166,10 @@ func TestPodSandboxStatus(t *testing.T) {
 			expectedCNICalls: []string{"GetContainerNetworkStatus"},
 		},
 		"sandbox status with GetContainerNetworkStatus returns error": {
-			sandboxContainers: []container.Container{{
+			sandboxTasks: []task.Task{{
 				ID:     sandboxStatusTestID,
 				Pid:    1,
-				Status: container.Status_RUNNING,
+				Status: task.StatusRunning,
 			}},
 			injectMetadata:   true,
 			expectState:      runtime.PodSandboxState_SANDBOX_READY,
@@ -182,9 +182,9 @@ func TestPodSandboxStatus(t *testing.T) {
 		metadata, expect := getSandboxStatusTestData()
 		expect.Network.Ip = ""
 		c := newTestCRIContainerdService()
-		fake := c.containerService.(*servertesting.FakeExecutionClient)
+		fake := c.taskService.(*servertesting.FakeExecutionClient)
 		fakeCNIPlugin := c.netPlugin.(*servertesting.FakeCNIPlugin)
-		fake.SetFakeContainers(test.sandboxContainers)
+		fake.SetFakeTasks(test.sandboxTasks)
 		if test.injectMetadata {
 			assert.NoError(t, c.sandboxIDIndex.Add(metadata.ID))
 			assert.NoError(t, c.sandboxStore.Create(*metadata))

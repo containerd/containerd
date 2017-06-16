@@ -19,11 +19,11 @@ package server
 import (
 	"fmt"
 
+	"github.com/containerd/containerd/api/services/containers"
+	"github.com/containerd/containerd/api/services/execution"
+	"github.com/containerd/containerd/snapshot"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
-
-	"github.com/containerd/containerd/api/services/execution"
-
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
@@ -57,15 +57,22 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 
 	// Return error if sandbox container is not fully stopped.
 	// TODO(random-liu): [P0] Make sure network is torn down, may need to introduce a state.
-	_, err = c.containerService.Info(ctx, &execution.InfoRequest{ID: id})
-	if err != nil && !isContainerdContainerNotExistError(err) {
+	_, err = c.taskService.Info(ctx, &execution.InfoRequest{ContainerID: id})
+	if err != nil && !isContainerdGRPCNotFoundError(err) {
 		return nil, fmt.Errorf("failed to get sandbox container info for %q: %v", id, err)
 	}
 	if err == nil {
 		return nil, fmt.Errorf("sandbox container %q is not fully stopped", id)
 	}
 
-	// TODO(random-liu): [P0] Cleanup snapshot after switching to new snapshot api.
+	// Remove sandbox container snapshot.
+	if err := c.snapshotService.Remove(ctx, id); err != nil {
+		if !snapshot.IsNotExist(err) {
+			return nil, fmt.Errorf("failed to remove sandbox container snapshot %q: %v", id, err)
+		}
+		glog.V(5).Infof("Remove called for snapshot %q that does not exist", id)
+	}
+
 	// TODO(random-liu): [P0] Cleanup shm created in RunPodSandbox.
 	// TODO(random-liu): [P1] Remove permanent namespace once used.
 
@@ -74,6 +81,14 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 	if err := c.os.RemoveAll(sandboxRootDir); err != nil {
 		return nil, fmt.Errorf("failed to remove sandbox root directory %q: %v",
 			sandboxRootDir, err)
+	}
+
+	// Delete sandbox container.
+	if _, err := c.containerService.Delete(ctx, &containers.DeleteContainerRequest{ID: id}); err != nil {
+		if !isContainerdGRPCNotFoundError(err) {
+			return nil, fmt.Errorf("failed to delete sandbox container %q: %v", id, err)
+		}
+		glog.V(5).Infof("Remove called for sandbox container %q that does not exist", id, err)
 	}
 
 	// Remove sandbox metadata from metadata store. Note that once the sandbox

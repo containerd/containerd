@@ -25,6 +25,7 @@ import (
 	"strings"
 	"syscall"
 
+	containerdmetadata "github.com/containerd/containerd/metadata"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/docker/pkg/truncindex"
@@ -33,13 +34,10 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
-
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/images"
+	"google.golang.org/grpc/codes"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
-
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 )
 
 const (
@@ -219,11 +217,9 @@ func getPIDNamespace(pid uint32) string {
 	return fmt.Sprintf(pidNSFormat, pid)
 }
 
-// isContainerdContainerNotExistError checks whether a grpc error is containerd
-// ErrContainerNotExist error.
-// TODO(random-liu): Containerd should expose error better through api.
-func isContainerdContainerNotExistError(grpcError error) bool {
-	return grpc.ErrorDesc(grpcError) == containerd.ErrContainerNotExist.Error()
+// isContainerdGRPCNotFoundError checks whether a grpc error is not found error.
+func isContainerdGRPCNotFoundError(grpcError error) bool {
+	return grpc.Code(grpcError) == codes.NotFound
 }
 
 // isRuncProcessAlreadyFinishedError checks whether a grpc error is a process already
@@ -354,7 +350,7 @@ func (c *criContainerdService) localResolve(ctx context.Context, ref string) (*m
 		}
 		image, err := c.imageStoreService.Get(ctx, normalized.String())
 		if err != nil {
-			if images.IsNotFound(err) {
+			if containerdmetadata.IsNotFound(err) {
 				return nil, nil
 			}
 			return nil, fmt.Errorf("an error occurred when getting image %q from containerd image store: %v",

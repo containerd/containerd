@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 
-	"github.com/containerd/containerd/api/types/container"
+	"github.com/containerd/containerd/api/types/task"
 
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
@@ -135,7 +135,7 @@ func TestFilterSandboxes(t *testing.T) {
 func TestListPodSandbox(t *testing.T) {
 	c := newTestCRIContainerdService()
 
-	fake := c.containerService.(*servertesting.FakeExecutionClient)
+	fake := c.taskService.(*servertesting.FakeExecutionClient)
 
 	sandboxesInStore := []metadata.SandboxMetadata{
 		{
@@ -154,24 +154,24 @@ func TestListPodSandbox(t *testing.T) {
 			Config: &runtime.PodSandboxConfig{Metadata: &runtime.PodSandboxMetadata{Name: "name-3"}},
 		},
 	}
-	sandboxesInContainerd := []container.Container{
+	sandboxesInContainerd := []task.Task{
 		// Running container with corresponding metadata
 		{
 			ID:     "1",
 			Pid:    1,
-			Status: container.Status_RUNNING,
+			Status: task.StatusRunning,
 		},
 		// Stopped container with corresponding metadata
 		{
 			ID:     "2",
 			Pid:    2,
-			Status: container.Status_STOPPED,
+			Status: task.StatusStopped,
 		},
 		// Container without corresponding metadata
 		{
 			ID:     "4",
 			Pid:    4,
-			Status: container.Status_STOPPED,
+			Status: task.StatusStopped,
 		},
 	}
 	expect := []*runtime.PodSandbox{
@@ -197,8 +197,8 @@ func TestListPodSandbox(t *testing.T) {
 		c.sandboxStore.Create(s)
 	}
 
-	// Inject fake containerd containers
-	fake.SetFakeContainers(sandboxesInContainerd)
+	// Inject fake containerd tasks
+	fake.SetFakeTasks(sandboxesInContainerd)
 
 	resp, err := c.ListPodSandbox(context.Background(), &runtime.ListPodSandboxRequest{})
 	assert.NoError(t, err)

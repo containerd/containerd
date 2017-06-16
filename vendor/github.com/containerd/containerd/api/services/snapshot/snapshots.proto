@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package containerd.v1.snapshot;
+
+import "gogoproto/gogo.proto";
+import "google/protobuf/empty.proto";
+import "github.com/containerd/containerd/api/types/mount/mount.proto";
+
+// Snapshot service manages snapshots
+service Snapshot {
+	rpc Prepare(PrepareRequest) returns (MountsResponse);
+	rpc View(PrepareRequest) returns (MountsResponse);
+	rpc Mounts(MountsRequest) returns (MountsResponse);
+	rpc Commit(CommitRequest) returns (google.protobuf.Empty);
+	rpc Remove(RemoveRequest) returns (google.protobuf.Empty);
+	rpc Stat(StatRequest) returns (StatResponse);
+	rpc List(ListRequest) returns (stream ListResponse);
+	rpc Usage(UsageRequest) returns (UsageResponse);
+	// "Snapshot" prepares a new set of mounts from existing name
+}
+
+message PrepareRequest {
+	string key = 1;
+	string parent = 2;
+}
+
+message MountsRequest {
+	string key = 1;
+}
+
+message MountsResponse {
+	repeated containerd.v1.types.Mount mounts = 1;
+}
+
+message RemoveRequest {
+	string key = 1;
+}
+
+message CommitRequest {
+	string name = 1;
+	string key = 2;
+}
+
+message StatRequest {
+	string key = 1;
+}
+
+enum Kind {
+	option (gogoproto.goproto_enum_prefix) = false;
+	option (gogoproto.enum_customname) = "Kind";
+
+	ACTIVE = 0 [(gogoproto.enumvalue_customname) = "KindActive"];
+
+	COMMITTED = 1 [(gogoproto.enumvalue_customname) = "KindCommitted"];
+}
+
+message Info {
+	string name = 1;
+	string parent = 2;
+	Kind kind = 3;
+	bool readonly = 4;
+}
+
+message StatResponse {
+	Info info = 1 [(gogoproto.nullable) = false];
+}
+
+message ListRequest{}
+
+message ListResponse {
+	repeated Info info = 1 [(gogoproto.nullable) = false];
+}
+
+message UsageRequest {
+	string key = 1;
+}
+
+message UsageResponse {
+	int64 inodes = 2;
+	int64 size = 1;
+}

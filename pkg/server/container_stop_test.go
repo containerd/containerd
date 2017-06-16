@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/api/services/execution"
-	"github.com/containerd/containerd/api/types/container"
+	"github.com/containerd/containerd/api/types/task"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
@@ -99,14 +99,14 @@ func TestStopContainer(t *testing.T) {
 		CreatedAt: time.Now().UnixNano(),
 		StartedAt: time.Now().UnixNano(),
 	}
-	testContainer := container.Container{
+	testContainer := task.Task{
 		ID:     testID,
 		Pid:    testPid,
-		Status: container.Status_RUNNING,
+		Status: task.StatusRunning,
 	}
 	for desc, test := range map[string]struct {
 		metadata            *metadata.ContainerMetadata
-		containerdContainer *container.Container
+		containerdContainer *task.Task
 		stopErr             error
 		noTimeout           bool
 		expectErr           bool
@@ -125,7 +125,7 @@ func TestStopContainer(t *testing.T) {
 			expectErr:   false,
 			expectCalls: []servertesting.CalledDetail{},
 		},
-		"should not return error if containerd container does not exist": {
+		"should not return error if containerd task does not exist": {
 			metadata:            &testMetadata,
 			containerdContainer: &testContainer,
 			// Since it's hard to inject event during `StopContainer` is running,
@@ -133,40 +133,56 @@ func TestStopContainer(t *testing.T) {
 			// status is not updated yet.
 			// We also leverage this behavior to test that when graceful
 			// stop doesn't take effect, container should be SIGKILL-ed.
-			stopErr:   servertesting.ContainerNotExistError,
+			stopErr:   servertesting.TaskNotExistError,
 			expectErr: false,
 			expectCalls: []servertesting.CalledDetail{
 				{
-					Name:     "kill",
-					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGTERM)},
+					Name: "kill",
+					Argument: &execution.KillRequest{
+						ContainerID: testID,
+						Signal:      uint32(unix.SIGTERM),
+						PidOrAll:    &execution.KillRequest_All{All: true},
+					},
 				},
 				{
-					Name:     "kill",
-					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGKILL)},
+					Name: "kill",
+					Argument: &execution.KillRequest{
+						ContainerID: testID,
+						Signal:      uint32(unix.SIGKILL),
+						PidOrAll:    &execution.KillRequest_All{All: true},
+					},
 				},
 				{
 					Name:     "delete",
-					Argument: &execution.DeleteRequest{ID: testID},
+					Argument: &execution.DeleteRequest{ContainerID: testID},
 				},
 			},
 		},
-		"should not return error if containerd container process already finished": {
+		"should not return error if containerd task process already finished": {
 			metadata:            &testMetadata,
 			containerdContainer: &testContainer,
 			stopErr:             errors.New("os: process already finished"),
 			expectErr:           false,
 			expectCalls: []servertesting.CalledDetail{
 				{
-					Name:     "kill",
-					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGTERM)},
+					Name: "kill",
+					Argument: &execution.KillRequest{
+						ContainerID: testID,
+						Signal:      uint32(unix.SIGTERM),
+						PidOrAll:    &execution.KillRequest_All{All: true},
+					},
 				},
 				{
-					Name:     "kill",
-					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGKILL)},
+					Name: "kill",
+					Argument: &execution.KillRequest{
+						ContainerID: testID,
+						Signal:      uint32(unix.SIGKILL),
+						PidOrAll:    &execution.KillRequest_All{All: true},
+					},
 				},
 				{
 					Name:     "delete",
-					Argument: &execution.DeleteRequest{ID: testID},
+					Argument: &execution.DeleteRequest{ContainerID: testID},
 				},
 			},
 		},
@@ -177,24 +193,32 @@ func TestStopContainer(t *testing.T) {
 			expectErr:           true,
 			expectCalls: []servertesting.CalledDetail{
 				{
-					Name:     "kill",
-					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGTERM)},
+					Name: "kill",
+					Argument: &execution.KillRequest{
+						ContainerID: testID,
+						Signal:      uint32(unix.SIGTERM),
+						PidOrAll:    &execution.KillRequest_All{All: true},
+					},
 				},
 			},
 		},
-		"should not return error if containerd container is gracefully stopped": {
+		"should not return error if containerd task is gracefully stopped": {
 			metadata:            &testMetadata,
 			containerdContainer: &testContainer,
 			expectErr:           false,
 			// deleted by the event monitor.
 			expectCalls: []servertesting.CalledDetail{
 				{
-					Name:     "kill",
-					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGTERM)},
+					Name: "kill",
+					Argument: &execution.KillRequest{
+						ContainerID: testID,
+						Signal:      uint32(unix.SIGTERM),
+						PidOrAll:    &execution.KillRequest_All{All: true},
+					},
 				},
 				{
 					Name:     "delete",
-					Argument: &execution.DeleteRequest{ID: testID},
+					Argument: &execution.DeleteRequest{ContainerID: testID},
 				},
 			},
 		},
@@ -205,12 +229,16 @@ func TestStopContainer(t *testing.T) {
 			expectErr:           false,
 			expectCalls: []servertesting.CalledDetail{
 				{
-					Name:     "kill",
-					Argument: &execution.KillRequest{ID: testID, Signal: uint32(unix.SIGKILL)},
+					Name: "kill",
+					Argument: &execution.KillRequest{
+						ContainerID: testID,
+						Signal:      uint32(unix.SIGKILL),
+						PidOrAll:    &execution.KillRequest_All{All: true},
+					},
 				},
 				{
 					Name:     "delete",
-					Argument: &execution.DeleteRequest{ID: testID},
+					Argument: &execution.DeleteRequest{ContainerID: testID},
 				},
 			},
 		},
@@ -221,15 +249,15 @@ func TestStopContainer(t *testing.T) {
 		c := newTestCRIContainerdService()
 		fake := servertesting.NewFakeExecutionClient().WithEvents()
 		defer fake.Stop()
-		c.containerService = fake
+		c.taskService = fake
 
 		// Inject metadata.
 		if test.metadata != nil {
 			assert.NoError(t, c.containerStore.Create(*test.metadata))
 		}
-		// Inject containerd container.
+		// Inject containerd task.
 		if test.containerdContainer != nil {
-			fake.SetFakeContainers([]container.Container{*test.containerdContainer})
+			fake.SetFakeTasks([]task.Task{*test.containerdContainer})
 		}
 		if test.stopErr != nil {
 			fake.InjectError("kill", test.stopErr)
@@ -237,7 +265,7 @@ func TestStopContainer(t *testing.T) {
 		eventClient, err := fake.Events(context.Background(), &execution.EventsRequest{})
 		assert.NoError(t, err)
 		// Start a simple test event monitor.
-		go func(e execution.ContainerService_EventsClient) {
+		go func(e execution.Tasks_EventsClient) {
 			for {
 				if err := c.handleEventStream(e); err != nil { // nolint: vetshadow
 					return
