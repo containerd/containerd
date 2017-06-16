@@ -41,7 +41,7 @@ func BenchmarkContainerCreate(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		id := fmt.Sprintf("%s-%d", b.Name(), i)
-		container, err := client.NewContainer(ctx, id, WithSpec(spec), WithImage(image), WithNewRootFS(id, image))
+		container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewRootFS(id, image))
 		if err != nil {
 			b.Error(err)
 			return
@@ -85,7 +85,7 @@ func BenchmarkContainerStart(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		id := fmt.Sprintf("%s-%d", b.Name(), i)
-		container, err := client.NewContainer(ctx, id, WithSpec(spec), WithImage(image), WithNewRootFS(id, image))
+		container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewRootFS(id, image))
 		if err != nil {
 			b.Error(err)
 			return
