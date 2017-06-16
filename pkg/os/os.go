@@ -22,6 +22,7 @@ import (
 	"os"
 
 	"github.com/containerd/fifo"
+	"github.com/docker/docker/pkg/mount"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 )
@@ -90,7 +91,12 @@ func (RealOS) Mount(source string, target string, fstype string, flags uintptr, 
 	return unix.Mount(source, target, fstype, flags, data)
 }
 
-// Unmount will call unix.Unmount to unmount the file.
+// Unmount will call unix.Unmount to unmount the file. The function doesn't
+// return error if target is not mounted.
 func (RealOS) Unmount(target string, flags int) error {
+	// TODO(random-liu): Follow symlink to make sure the result is correct.
+	if mounted, err := mount.Mounted(target); err != nil || !mounted {
+		return err
+	}
 	return unix.Unmount(target, flags)
 }
