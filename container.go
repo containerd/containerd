@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"google.golang.org/grpc"
@@ -71,7 +72,7 @@ func (c *container) Spec() (*specs.Spec, error) {
 func (c *container) Delete(ctx context.Context) (err error) {
 	// TODO: should the client be the one removing resources attached
 	// to the container at the moment before we have GC?
-	if c.c.RootFS != "" {
+	if c.c.RootFS != "" && strings.HasPrefix(c.c.RootFS, "containerd-client-tmp-") {
 		err = c.client.SnapshotService().Remove(ctx, c.c.RootFS)
 	}
 	if _, cerr := c.client.ContainerService().Delete(ctx, &containers.DeleteContainerRequest{
