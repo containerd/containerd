@@ -19,9 +19,10 @@ package metadata
 import (
 	"encoding/json"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
-
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+
+	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
 )
 
 // The code is very similar with sandbox.go, but there is no template support
@@ -71,8 +72,13 @@ type ContainerMetadata struct {
 	// In fact, this field doesn't need to be checkpointed.
 	// TODO(random-liu): Skip this during serialization when we put object
 	// into the store directly.
-	// TODO(random-liu): Reset this field to false during state recoverry.
+	// TODO(random-liu): Reset this field to false during state recovery.
 	Removing bool
+	// TODO(random-liu): Remove following field after switching to new containerd
+	// client.
+	// Not including them in unit test now because they will be removed soon.
+	// Spec is the oci runtime spec used to run the container.
+	Spec *runtimespec.Spec
 }
 
 // State returns current state of the container based on the metadata.

@@ -160,6 +160,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 
 	// Update container CreatedAt.
 	meta.CreatedAt = time.Now().UnixNano()
+	meta.Spec = spec
 	// Add container into container store.
 	if err := c.containerStore.Create(meta); err != nil {
 		return nil, fmt.Errorf("failed to add container metadata %+v into store: %v",
