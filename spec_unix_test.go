@@ -2,7 +2,11 @@
 
 package containerd
 
-import "testing"
+import (
+	"testing"
+
+	specs "github.com/opencontainers/runtime-spec/specs-go"
+)
 
 func TestGenerateSpec(t *testing.T) {
 	s, err := GenerateSpec()
@@ -54,5 +58,25 @@ func TestSpecWithTTY(t *testing.T) {
 	v := s.Process.Env[len(s.Process.Env)-1]
 	if v != "TERM=xterm" {
 		t.Errorf("xterm not set in env for TTY")
+	}
+}
+
+func TestWithLinuxNamespace(t *testing.T) {
+	replacedNS := specs.LinuxNamespace{Type: specs.NetworkNamespace, Path: "/var/run/netns/test"}
+	s, err := GenerateSpec(WithLinuxNamespace(replacedNS))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defaultNS := defaultNamespaces()
+	found := false
+	for i, ns := range s.Linux.Namespaces {
+		if ns == replacedNS && !found {
+			found = true
+			continue
+		}
+		if defaultNS[i] != ns {
+			t.Errorf("ns at %d does not match set %q != %q", i, defaultNS[i], ns)
+		}
 	}
 }
