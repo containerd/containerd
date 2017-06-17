@@ -384,3 +384,9 @@ func (f *FakeExecutionClient) Processes(ctx context.Context, in *execution.Proce
 	// TODO: implement Processes()
 	return nil, nil
 }
+
+// DeleteProcess is a test implementation of execution.DeleteProcess
+func (f *FakeExecutionClient) DeleteProcess(ctx context.Context, in *execution.DeleteProcessRequest, opts ...grpc.CallOption) (*execution.DeleteResponse, error) {
+	// TODO: implement DeleteProcess()
+	return nil, nil
+}

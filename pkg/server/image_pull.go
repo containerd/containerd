@@ -28,6 +28,7 @@ import (
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
+	"github.com/containerd/containerd/remotes/docker/schema1"
 	containerdrootfs "github.com/containerd/containerd/rootfs"
 	"github.com/golang/glog"
 	imagedigest "github.com/opencontainers/go-digest"
@@ -207,35 +208,37 @@ func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
 	// TODO(random-liu): Always resolve image reference and use resolved image name in
 	// the system.
 
-	// Put the image information into containerd image store.
-	// In the future, containerd will rely on the information in the image store to perform image
-	// garbage collection.
-	// For now, we simply use it to store and retrieve information required for pulling an image.
-	if err = c.imageStoreService.Put(ctx, ref, desc); err != nil {
-		return "", "", fmt.Errorf("failed to put image %q desc %v into containerd image store: %v",
-			ref, desc, err)
-	}
-	// Do not cleanup if following operations fail so as to make resumable download possible.
-
 	glog.V(4).Infof("Start downloading resources for image %q", ref)
 	resources := newResourceSet()
+	resourceTrackHandler := containerdimages.HandlerFunc(func(ctx gocontext.Context, desc imagespec.Descriptor) (
+		[]imagespec.Descriptor, error) {
+		resources.add(remotes.MakeRefKey(ctx, desc))
+		return nil, nil
+	})
 	// Fetch all image resources into content store.
 	// Dispatch a handler which will run a sequence of handlers to:
 	// 1) track all resources associated using a customized handler;
 	// 2) fetch the object using a FetchHandler;
 	// 3) recurse through any sub-layers via a ChildrenHandler.
-	err = containerdimages.Dispatch(
-		ctx,
-		containerdimages.Handlers(
-			containerdimages.HandlerFunc(func(ctx gocontext.Context, desc imagespec.Descriptor) (
-				[]imagespec.Descriptor, error) {
-				resources.add(remotes.MakeRefKey(ctx, desc))
-				return nil, nil
-			}),
+	// Support schema1 image.
+	var (
+		schema1Converter *schema1.Converter
+		handler          containerdimages.Handler
+	)
+	if desc.MediaType == containerdimages.MediaTypeDockerSchema1Manifest {
+		schema1Converter = schema1.NewConverter(c.contentStoreService, fetcher)
+		handler = containerdimages.Handlers(
+			resourceTrackHandler,
+			schema1Converter,
+		)
+	} else {
+		handler = containerdimages.Handlers(
+			resourceTrackHandler,
 			remotes.FetchHandler(c.contentStoreService, fetcher),
-			containerdimages.ChildrenHandler(c.contentStoreService)),
-		desc)
-	if err != nil {
+			containerdimages.ChildrenHandler(c.contentStoreService),
+		)
+	}
+	if err = containerdimages.Dispatch(ctx, handler, desc); err != nil {
 		// Dispatch returns error when requested resources are locked.
 		// In that case, we should start waiting and checking the pulling
 		// progress.
@@ -247,7 +250,26 @@ func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
 		return "", "", fmt.Errorf("failed to wait for image %q downloading: %v", ref, err)
 	}
 	glog.V(4).Infof("Finished downloading resources for image %q", ref)
+	if schema1Converter != nil {
+		desc, err = schema1Converter.Convert(ctx)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to convert schema 1 image %q: %v", ref, err)
+		}
+	}
 
+	// In the future, containerd will rely on the information in the image store to perform image
+	// garbage collection.
+	// For now, we simply use it to store and retrieve information required for pulling an image.
+	// @stevvooe said we should `Put` before downloading content, However:
+	// 1) Containerd client put image metadata after downloading;
+	// 2) We need desc returned by schema1 converter.
+	// So just put the image metadata after downloading now.
+	// TODO(random-liu): Fix the potential garbage collection race.
+	if err = c.imageStoreService.Put(ctx, ref, desc); err != nil {
+		return "", "", fmt.Errorf("failed to put image %q desc %v into containerd image store: %v",
+			ref, desc, err)
+	}
+	// Do not cleanup if following operations fail so as to make resumable download possible.
 	// TODO(random-liu): Replace with image.Unpack.
 	// Unpack the image layers into snapshots.
 	image, err := c.imageStoreService.Get(ctx, ref)
