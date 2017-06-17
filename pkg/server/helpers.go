@@ -330,12 +330,17 @@ func (c *criContainerdService) getImageInfo(ctx context.Context, ref string) (
 }
 
 // getRepoDigestAngTag returns image repoDigest and repoTag of the named image reference.
-func getRepoDigestAndTag(namedRef reference.Named, digest imagedigest.Digest) (string, string) {
-	var repoTag string
+func getRepoDigestAndTag(namedRef reference.Named, digest imagedigest.Digest, schema1 bool) (string, string) {
+	var repoTag, repoDigest string
 	if _, ok := namedRef.(reference.NamedTagged); ok {
 		repoTag = namedRef.String()
 	}
-	repoDigest := namedRef.Name() + "@" + digest.String()
+	if _, ok := namedRef.(reference.Canonical); ok {
+		repoDigest = namedRef.String()
+	} else if !schema1 {
+		// digest is not actual repo digest for schema1 image.
+		repoDigest = namedRef.Name() + "@" + digest.String()
+	}
 	return repoDigest, repoTag
 }
 
