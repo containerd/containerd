@@ -19,6 +19,7 @@ package server
 import (
 	"fmt"
 
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/containers"
 	contentapi "github.com/containerd/containerd/api/services/content"
 	diffapi "github.com/containerd/containerd/api/services/diff"
@@ -99,11 +100,19 @@ type criContainerdService struct {
 	netPlugin ocicni.CNIPlugin
 	// agentFactory is the factory to create agent used in the cri containerd service.
 	agentFactory agents.AgentFactory
+	// client is an instance of the containerd client
+	client *containerd.Client
 }
 
 // NewCRIContainerdService returns a new instance of CRIContainerdService
-func NewCRIContainerdService(conn *grpc.ClientConn, rootDir, networkPluginBinDir, networkPluginConfDir string) (CRIContainerdService, error) {
+func NewCRIContainerdService(conn *grpc.ClientConn, containerdEndpoint, rootDir, networkPluginBinDir, networkPluginConfDir string) (CRIContainerdService, error) {
 	// TODO(random-liu): [P2] Recover from runtime state and metadata store.
+
+	client, err := containerd.New(containerdEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize client: %v", err)
+	}
+
 	c := &criContainerdService{
 		os:                 osinterface.RealOS{},
 		rootDir:            rootDir,
@@ -126,6 +135,7 @@ func NewCRIContainerdService(conn *grpc.ClientConn, rootDir, networkPluginBinDir
 		versionService:      versionapi.NewVersionClient(conn),
 		healthService:       healthapi.NewHealthClient(conn),
 		agentFactory:        agents.NewAgentFactory(),
+		client:              client,
 	}
 
 	netPlugin, err := ocicni.InitCNI(networkPluginBinDir, networkPluginConfDir)
