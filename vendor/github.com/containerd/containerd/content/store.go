@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/log"
-	"github.com/nightlyone/lockfile"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
@@ -58,11 +57,7 @@ func (s *store) info(dgst digest.Digest, fi os.FileInfo) Info {
 	}
 }
 
-// Open returns an io.ReadCloser for the blob.
-//
-// TODO(stevvooe): This would work much better as an io.ReaderAt in practice.
-// Right now, we are doing type assertion to tease that out, but it won't scale
-// well.
+// Reader returns an io.ReadCloser for the blob.
 func (s *store) Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, error) {
 	fp, err := os.Open(s.blobPath(dgst))
 	if err != nil {
@@ -73,6 +68,11 @@ func (s *store) Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, 
 	}
 
 	return fp, nil
+}
+
+// ReaderAt returns an io.ReaderAt for the blob.
+func (s *store) ReaderAt(ctx context.Context, dgst digest.Digest) (io.ReaderAt, error) {
+	return readerAt{f: s.blobPath(dgst)}, nil
 }
 
 // Delete removes a blob by its digest.
@@ -230,17 +230,10 @@ func (s *store) Writer(ctx context.Context, ref string, total int64, expected di
 	// TODO(stevvooe): Need to actually store and handle expected here. We have
 	// code in the service that shouldn't be dealing with this.
 
-	path, refp, data, lock, err := s.ingestPaths(ref)
-	if err != nil {
-		return nil, err
-	}
+	path, refp, data := s.ingestPaths(ref)
 
-	if err := tryLock(lock); err != nil {
-		if !os.IsNotExist(errors.Cause(err)) {
-			return nil, errors.Wrapf(err, "locking %v failed", ref)
-		}
-
-		// if it doesn't exist, we'll make it so below!
+	if err := tryLock(ref); err != nil {
+		return nil, errors.Wrapf(err, "locking %v failed", ref)
 	}
 
 	var (
@@ -314,7 +307,6 @@ func (s *store) Writer(ctx context.Context, ref string, total int64, expected di
 	return &writer{
 		s:         s,
 		fp:        fp,
-		lock:      lock,
 		ref:       ref,
 		path:      path,
 		offset:    offset,
@@ -349,25 +341,18 @@ func (s *store) ingestRoot(ref string) string {
 	return filepath.Join(s.root, "ingest", dgst.Hex())
 }
 
-// ingestPaths are returned, including the lockfile. The paths are the following:
+// ingestPaths are returned. The paths are the following:
 //
 // - root: entire ingest directory
 // - ref: name of the starting ref, must be unique
 // - data: file where data is written
-// - lock: lock file location
 //
-func (s *store) ingestPaths(ref string) (string, string, string, lockfile.Lockfile, error) {
+func (s *store) ingestPaths(ref string) (string, string, string) {
 	var (
 		fp = s.ingestRoot(ref)
 		rp = filepath.Join(fp, "ref")
-		lp = filepath.Join(fp, "lock")
 		dp = filepath.Join(fp, "data")
 	)
 
-	lock, err := lockfile.New(lp)
-	if err != nil {
-		return "", "", "", "", errors.Wrapf(err, "error creating lockfile %v", lp)
-	}
-
-	return fp, rp, dp, lock, nil
+	return fp, rp, dp
 }

@@ -23,15 +23,20 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containerd/containerd/namespaces"
 	"github.com/golang/glog"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
-
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 )
 
-// unixProtocol is the network protocol of unix socket.
-const unixProtocol = "unix"
+const (
+	// unixProtocol is the network protocol of unix socket.
+	unixProtocol = "unix"
+	// k8sContainerdNamespace is the namespace we use to connect containerd.
+	k8sContainerdNamespace = "k8s.io"
+)
 
 // CRIContainerdServer is the grpc server of cri-containerd.
 type CRIContainerdServer struct {
@@ -84,6 +89,28 @@ func ConnectToContainerd(path string, connectionTimeout time.Duration) (*grpc.Cl
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
 			return net.DialTimeout(unixProtocol, path, timeout)
 		}),
+		grpc.WithUnaryInterceptor(grpc.UnaryClientInterceptor(unary)),
+		grpc.WithStreamInterceptor(grpc.StreamClientInterceptor(stream)),
 	}
 	return grpc.Dial(fmt.Sprintf("%s://%s", unixProtocol, path), dialOpts...)
+}
+
+// TODO(random-liu): Get rid of following functions after switching to containerd client.
+// unary is a wrapper to apply kubernetes namespace in each grpc unary call.
+func unary(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+	_, ok := namespaces.Namespace(ctx)
+	if !ok {
+		ctx = namespaces.WithNamespace(ctx, k8sContainerdNamespace)
+	}
+	return invoker(ctx, method, req, reply, cc, opts...)
+}
+
+// stream is a wrapper to apply kubernetes namespace in each grpc stream call.
+func stream(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+	_, ok := namespaces.Namespace(ctx)
+	if !ok {
+		ctx = namespaces.WithNamespace(ctx, k8sContainerdNamespace)
+	}
+
+	return streamer(ctx, desc, cc, method, opts...)
 }

@@ -85,6 +85,14 @@ func (rs *remoteStore) Reader(ctx context.Context, dgst digest.Digest) (io.ReadC
 	}, nil
 }
 
+func (rs *remoteStore) ReaderAt(ctx context.Context, dgst digest.Digest) (io.ReaderAt, error) {
+	return &remoteReaderAt{
+		ctx:    ctx,
+		digest: dgst,
+		client: rs.client,
+	}, nil
+}
+
 func (rs *remoteStore) Status(ctx context.Context, re string) ([]content.Status, error) {
 	resp, err := rs.client.Status(ctx, &contentapi.StatusRequest{
 		Regexp: re,
@@ -115,6 +123,7 @@ func (rs *remoteStore) Writer(ctx context.Context, ref string, size int64, expec
 	}
 
 	return &remoteWriter{
+		ref:    ref,
 		client: wrclient,
 		offset: offset,
 	}, nil

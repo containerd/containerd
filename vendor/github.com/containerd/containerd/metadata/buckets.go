@@ -2,13 +2,36 @@ package metadata
 
 import (
 	"github.com/boltdb/bolt"
-	"github.com/containerd/containerd/log"
 )
 
+// The layout where a "/" delineates a bucket is desribed in the following
+// section. Please try to follow this as closely as possible when adding
+// functionality. We can bolster this with helpers and more structure if that
+// becomes an issue.
+//
+// Generically, we try to do the following:
+//
+// 	<version>/<namespace>/<object>/<key> -> <field>
+//
+// version: Currently, this is "v1". Additions can be made to v1 in a backwards
+// compatible way. If the layout changes, a new version must be made, along
+// with a migration.
+//
+// namespace: the namespace to which this object belongs.
+//
+// object: defines which object set is stored in the bucket. There are two
+// special objects, "labels" and "indexes". The "labels" bucket stores the
+// labels for the parent namespace. The "indexes" object is reserved for
+// indexing objects, if we require in the future.
+//
+// key: object-specific key identifying the storage bucket for the objects
+// contents.
 var (
-	bucketKeyStorageVersion = []byte("v1")
-	bucketKeyImages         = []byte("images")
-	bucketKeyContainers     = []byte("containers")
+	bucketKeyVersion          = []byte("v1")
+	bucketKeyObjectLabels     = []byte("labels")     // stores the labels for a namespace.
+	bucketKeyObjectIndexes    = []byte("indexes")    // reserved
+	bucketKeyObjectImages     = []byte("images")     // stores image objects
+	bucketKeyObjectContainers = []byte("containers") // stores container objects
 
 	bucketKeyDigest    = []byte("digest")
 	bucketKeyMediaType = []byte("mediatype")
@@ -18,22 +41,9 @@ var (
 	bucketKeyRuntime   = []byte("runtime")
 	bucketKeySpec      = []byte("spec")
 	bucketKeyRootFS    = []byte("rootfs")
+	bucketKeyCreatedAt = []byte("createdat")
+	bucketKeyUpdatedAt = []byte("updatedat")
 )
-
-// InitDB will initialize the database for use. The database must be opened for
-// write and the caller must not be holding an open transaction.
-func InitDB(db *bolt.DB) error {
-	log.L.Debug("init db")
-	return db.Update(func(tx *bolt.Tx) error {
-		if _, err := createBucketIfNotExists(tx, bucketKeyStorageVersion, bucketKeyImages); err != nil {
-			return err
-		}
-		if _, err := createBucketIfNotExists(tx, bucketKeyStorageVersion, bucketKeyContainers); err != nil {
-			return err
-		}
-		return nil
-	})
-}
 
 func getBucket(tx *bolt.Tx, keys ...[]byte) *bolt.Bucket {
 	bkt := tx.Bucket(keys[0])
@@ -64,44 +74,52 @@ func createBucketIfNotExists(tx *bolt.Tx, keys ...[]byte) (*bolt.Bucket, error) 
 	return bkt, nil
 }
 
-func withImagesBucket(tx *bolt.Tx, fn func(bkt *bolt.Bucket) error) error {
-	bkt := getImagesBucket(tx)
-	if bkt == nil {
-		return ErrNotFound
+func namespaceLabelsBucketPath(namespace string) [][]byte {
+	return [][]byte{bucketKeyVersion, []byte(namespace), bucketKeyObjectLabels}
+}
+
+func withNamespacesLabelsBucket(tx *bolt.Tx, namespace string, fn func(bkt *bolt.Bucket) error) error {
+	bkt, err := createBucketIfNotExists(tx, namespaceLabelsBucketPath(namespace)...)
+	if err != nil {
+		return err
 	}
 
 	return fn(bkt)
 }
 
-func withImageBucket(tx *bolt.Tx, name string, fn func(bkt *bolt.Bucket) error) error {
-	bkt := getImageBucket(tx, name)
-	if bkt == nil {
-		return ErrNotFound
+func getNamespaceLabelsBucket(tx *bolt.Tx, namespace string) *bolt.Bucket {
+	return getBucket(tx, namespaceLabelsBucketPath(namespace)...)
+}
+
+func imagesBucketPath(namespace string) [][]byte {
+	return [][]byte{bucketKeyVersion, []byte(namespace), bucketKeyObjectImages}
+}
+
+func withImagesBucket(tx *bolt.Tx, namespace string, fn func(bkt *bolt.Bucket) error) error {
+	bkt, err := createBucketIfNotExists(tx, imagesBucketPath(namespace)...)
+	if err != nil {
+		return err
 	}
 
 	return fn(bkt)
 }
 
-func getImagesBucket(tx *bolt.Tx) *bolt.Bucket {
-	return getBucket(tx, bucketKeyStorageVersion, bucketKeyImages)
+func getImagesBucket(tx *bolt.Tx, namespace string) *bolt.Bucket {
+	return getBucket(tx, imagesBucketPath(namespace)...)
 }
 
-func getImageBucket(tx *bolt.Tx, name string) *bolt.Bucket {
-	return getBucket(tx, bucketKeyStorageVersion, bucketKeyImages, []byte(name))
-}
-
-func createContainersBucket(tx *bolt.Tx) (*bolt.Bucket, error) {
-	bkt, err := tx.CreateBucketIfNotExists(bucketKeyStorageVersion)
+func createContainersBucket(tx *bolt.Tx, namespace string) (*bolt.Bucket, error) {
+	bkt, err := createBucketIfNotExists(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectContainers)
 	if err != nil {
 		return nil, err
 	}
-	return bkt.CreateBucketIfNotExists(bucketKeyContainers)
+	return bkt, nil
 }
 
-func getContainersBucket(tx *bolt.Tx) *bolt.Bucket {
-	return getBucket(tx, bucketKeyStorageVersion, bucketKeyContainers)
+func getContainersBucket(tx *bolt.Tx, namespace string) *bolt.Bucket {
+	return getBucket(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectContainers)
 }
 
-func getContainerBucket(tx *bolt.Tx, id string) *bolt.Bucket {
-	return getBucket(tx, bucketKeyStorageVersion, bucketKeyContainers, []byte(id))
+func getContainerBucket(tx *bolt.Tx, namespace, id string) *bolt.Bucket {
+	return getBucket(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectContainers, []byte(id))
 }

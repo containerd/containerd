@@ -16,14 +16,6 @@ type remoteWriter struct {
 	digest digest.Digest
 }
 
-func newRemoteWriter(client contentapi.Content_WriteClient, ref string, offset int64) (*remoteWriter, error) {
-	return &remoteWriter{
-		ref:    ref,
-		client: client,
-		offset: offset,
-	}, nil
-}
-
 // send performs a synchronous req-resp cycle on the client.
 func (rw *remoteWriter) send(req *contentapi.WriteRequest) (*contentapi.WriteResponse, error) {
 	if err := rw.client.Send(req); err != nil {

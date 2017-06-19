@@ -23,6 +23,10 @@ message Task {
 	uint32 pid = 3;
 	Status status = 4;
 	google.protobuf.Any spec = 5;
+	string stdin = 6;
+	string stdout = 7;
+	string stderr = 8;
+	bool terminal = 9;
 }
 
 message Process {
@@ -35,6 +39,9 @@ message Process {
 	uint32 exit_status = 7;
 	Status status = 8;
 	google.protobuf.Any runtime_data = 9;
+	string stdin = 10;
+	string stdout = 11;
+	string stderr = 12;
 }
 
 message User {

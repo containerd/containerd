@@ -19,6 +19,7 @@ const (
 	GRPCPlugin
 	SnapshotPlugin
 	TaskMonitorPlugin
+	DiffPlugin
 )
 
 type Registration struct {
@@ -35,6 +36,7 @@ type InitContext struct {
 	Content     content.Store
 	Meta        *bolt.DB
 	Snapshotter snapshot.Snapshotter
+	Differ      Differ
 	Config      interface{}
 	Context     context.Context
 	Monitor     TaskMonitor
