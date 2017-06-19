@@ -119,11 +119,13 @@ func (c *container) UpdateResources(r *Resource) error {
 			KernelTCP:   u64Ptr(uint64(r.KernelTCPMemory)),
 		},
 		CPU: &ocs.LinuxCPU{
-			Shares: u64Ptr(uint64(r.CPUShares)),
-			Quota:  i64Ptr(int64(r.CPUQuota)),
-			Period: u64Ptr(uint64(r.CPUPeriod)),
-			Cpus:   r.CpusetCpus,
-			Mems:   r.CpusetMems,
+			Shares:          u64Ptr(uint64(r.CPUShares)),
+			Quota:           i64Ptr(int64(r.CPUQuota)),
+			Period:          u64Ptr(uint64(r.CPUPeriod)),
+			Cpus:            r.CpusetCpus,
+			Mems:            r.CpusetMems,
+			RealtimePeriod:  u64Ptr(uint64(r.CPURealtimePeriod)),
+			RealtimeRuntime: i64Ptr(int64(r.CPURealtimdRuntime)),
 		},
 		BlockIO: &ocs.LinuxBlockIO{
 			Weight: &r.BlkioWeight,
