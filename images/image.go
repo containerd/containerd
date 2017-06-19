@@ -3,12 +3,12 @@ package images
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io/ioutil"
 
 	"github.com/containerd/containerd/content"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 )
 
 // Image provides the model for how containerd views container images.
@@ -51,38 +51,13 @@ func (image *Image) RootFS(ctx context.Context, provider content.Provider) ([]di
 // Size returns the total size of an image's packed resources.
 func (image *Image) Size(ctx context.Context, provider content.Provider) (int64, error) {
 	var size int64
-	return size, Walk(ctx, HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		switch image.Target.MediaType {
-		case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
-			size += desc.Size
-			rc, err := provider.Reader(ctx, image.Target.Digest)
-			if err != nil {
-				return nil, err
-			}
-			defer rc.Close()
-
-			p, err := ioutil.ReadAll(rc)
-			if err != nil {
-				return nil, err
-			}
-
-			var manifest ocispec.Manifest
-			if err := json.Unmarshal(p, &manifest); err != nil {
-				return nil, err
-			}
-
-			size += manifest.Config.Size
-
-			for _, layer := range manifest.Layers {
-				size += layer.Size
-			}
-
-			return nil, nil
-		default:
-			return nil, errors.New("unsupported type")
+	return size, Walk(ctx, Handlers(HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		if desc.Size < 0 {
+			return nil, errors.Errorf("invalid size %v in %v (%v)", desc.Size, desc.Digest, desc.MediaType)
 		}
-
-	}), image.Target)
+		size += desc.Size
+		return nil, nil
+	}), ChildrenHandler(provider)), image.Target)
 }
 
 func Config(ctx context.Context, provider content.Provider, image ocispec.Descriptor) (ocispec.Descriptor, error) {
