@@ -34,14 +34,15 @@ type Exit struct {
 type Runtime interface {
 	// ID of the runtime
 	ID() string
-	// Create creates a container with the provided id and options
+	// Create creates a task with the provided id and options.
 	Create(ctx context.Context, id string, opts CreateOpts) (Task, error)
-	// Get returns a container
+	// Get returns a task.
 	Get(context.Context, string) (Task, error)
-	// Containers returns all the current containers for the runtime
+	// Tasks returns all the current tasks for the runtime.
+	// Any container runs at most one task at a time.
 	Tasks(context.Context) ([]Task, error)
-	// Delete removes the container in the runtime
+	// Delete removes the task in the runtime.
 	Delete(context.Context, Task) (*Exit, error)
-	// Events returns events for the runtime and all containers created by the runtime
+	// Events returns events for the runtime and all tasks created by the runtime
 	Events(context.Context) <-chan *Event
 }
