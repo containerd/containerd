@@ -8,8 +8,8 @@
 	"Deps": [
 		{
 			"ImportPath": "github.com/Microsoft/go-winio",
-			"Comment": "v0.3.8",
-			"Rev": "fff283ad5116362ca252298cfc9b95828956d85d"
+			"Comment": "v0.4.1",
+			"Rev": "706941bedd2d9b3a8c88e4022bd0078101f233f2"
 		},
 		{
 			"ImportPath": "github.com/Sirupsen/logrus",

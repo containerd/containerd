@@ -137,12 +137,12 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 	if config.GetLogPath() != "" {
 		// Only generate container log when log path is specified.
 		logPath := filepath.Join(sandboxConfig.GetLogDirectory(), config.GetLogPath())
-		if err = c.agentFactory.NewContainerLogger(logPath, agents.Stdout, stdoutPipe).Start(); err != nil {
+		if err := c.agentFactory.NewContainerLogger(logPath, agents.Stdout, stdoutPipe).Start(); err != nil {
 			return fmt.Errorf("failed to start container stdout logger: %v", err)
 		}
 		// Only redirect stderr when there is no tty.
 		if !config.GetTty() {
-			if err = c.agentFactory.NewContainerLogger(logPath, agents.Stderr, stderrPipe).Start(); err != nil {
+			if err := c.agentFactory.NewContainerLogger(logPath, agents.Stderr, stderrPipe).Start(); err != nil {
 				return fmt.Errorf("failed to start container stderr logger: %v", err)
 			}
 		}

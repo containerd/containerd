@@ -118,7 +118,7 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 	// recover in-memory state during startup.
 	if err == nil {
 		// Update existing image metadata.
-		if err = c.imageMetadataStore.Update(imageID, func(m metadata.ImageMetadata) (metadata.ImageMetadata, error) {
+		if err := c.imageMetadataStore.Update(imageID, func(m metadata.ImageMetadata) (metadata.ImageMetadata, error) {
 			updateImageMetadata(&m, repoTag, repoDigest)
 			return m, nil
 		}); err != nil {
@@ -246,7 +246,7 @@ func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
 		glog.V(5).Infof("Dispatch for %q returns error: %v", ref, err)
 	}
 	// Wait for the image pulling to finish
-	if err = c.waitForResourcesDownloading(ctx, resources.all()); err != nil {
+	if err := c.waitForResourcesDownloading(ctx, resources.all()); err != nil {
 		return "", "", fmt.Errorf("failed to wait for image %q downloading: %v", ref, err)
 	}
 	glog.V(4).Infof("Finished downloading resources for image %q", ref)
@@ -283,7 +283,7 @@ func (c *criContainerdService) pullImage(ctx context.Context, ref string) (
 		return "", "", fmt.Errorf("readblob failed for manifest digest %q: %v", manifestDigest, err)
 	}
 	var manifest imagespec.Manifest
-	if err = json.Unmarshal(p, &manifest); err != nil {
+	if err := json.Unmarshal(p, &manifest); err != nil {
 		return "", "", fmt.Errorf("unmarshal blob to manifest failed for manifest digest %q: %v",
 			manifestDigest, err)
 	}
