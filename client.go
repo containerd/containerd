@@ -334,9 +334,9 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpts) (Imag
 			return nil, err
 		}
 	}
-
+	emptyLabels := map[string]string{}
 	is := c.ImageService()
-	if err := is.Update(ctx, name, desc); err != nil {
+	if err := is.Update(ctx, images.Image{Name: name, Labels: emptyLabels, Target: desc}); err != nil {
 		return nil, err
 	}
 	i, err := is.Get(ctx, name)

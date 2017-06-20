@@ -9,7 +9,6 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
 	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type imageStore struct {
@@ -46,14 +45,14 @@ func (s *imageStore) Get(ctx context.Context, name string) (images.Image, error)
 	return image, nil
 }
 
-func (s *imageStore) Update(ctx context.Context, name string, desc ocispec.Descriptor) error {
+func (s *imageStore) Update(ctx context.Context, image images.Image) error {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return err
 	}
 
 	return withImagesBucket(s.tx, namespace, func(bkt *bolt.Bucket) error {
-		ibkt, err := bkt.CreateBucketIfNotExists([]byte(name))
+		ibkt, err := bkt.CreateBucketIfNotExists([]byte(image.Name))
 		if err != nil {
 			return err
 		}
@@ -62,24 +61,40 @@ func (s *imageStore) Update(ctx context.Context, name string, desc ocispec.Descr
 			buf         [binary.MaxVarintLen64]byte
 			sizeEncoded []byte = buf[:]
 		)
-		sizeEncoded = sizeEncoded[:binary.PutVarint(sizeEncoded, desc.Size)]
+		sizeEncoded = sizeEncoded[:binary.PutVarint(sizeEncoded, image.Target.Size)]
 
 		if len(sizeEncoded) == 0 {
-			return fmt.Errorf("failed encoding size = %v", desc.Size)
+			return fmt.Errorf("failed encoding size = %v", image.Target.Size)
 		}
 
 		for _, v := range [][2][]byte{
-			{bucketKeyDigest, []byte(desc.Digest)},
-			{bucketKeyMediaType, []byte(desc.MediaType)},
+			{bucketKeyDigest, []byte(image.Target.Digest)},
+			{bucketKeyMediaType, []byte(image.Target.MediaType)},
 			{bucketKeySize, sizeEncoded},
 		} {
 			if err := ibkt.Put(v[0], v[1]); err != nil {
 				return err
 			}
 		}
+		// Remove existing labels to keep from merging
+		if lbkt := ibkt.Bucket(bucketKeyRuntimeLabels); lbkt != nil {
+			if err := ibkt.DeleteBucket(bucketKeyRuntimeLabels); err != nil {
+				return err
+			}
+		}
+		lbkt, err := ibkt.CreateBucket(bucketKeyRuntimeLabels)
+		if err != nil {
+			return err
+		}
+		for k, v := range image.Labels {
+			if err := lbkt.Put([]byte(k), []byte(v)); err != nil {
+				return err
+			}
+		}
 
 		return nil
 	})
+
 }
 
 func (s *imageStore) List(ctx context.Context) ([]images.Image, error) {
@@ -145,6 +160,24 @@ func readImage(image *images.Image, bkt *bolt.Bucket) error {
 			image.Target.MediaType = string(v)
 		case string(bucketKeySize):
 			image.Target.Size, _ = binary.Varint(v)
+		case string(bucketKeyRuntimeLabels):
+			// Remove existing labels to keep from merging
+			if lbkt := bkt.Bucket(bucketKeyRuntimeLabels); lbkt != nil {
+				if err := bkt.DeleteBucket(bucketKeyRuntimeLabels); err != nil {
+					return err
+				}
+			}
+			lbkt := bkt.Bucket(bucketKeyRuntimeLabels)
+			if lbkt == nil {
+				return nil
+			}
+			image.Labels = map[string]string{}
+			if err := lbkt.ForEach(func(k, v []byte) error {
+				image.Labels[string(k)] = string(v)
+				return nil
+			}); err != nil {
+				return err
+			}
 		}
 
 		return nil
