@@ -83,7 +83,8 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 		}
 		instance, err := p.Init(initContext)
 		if err != nil {
-			return nil, err
+			log.G(ctx).WithError(err).Warnf("failed to load plugin %s", id)
+			continue
 		}
 		initialized[p.Type] = append(initialized[p.Type], instance)
 		// check for grpc services that should be registered with the server
