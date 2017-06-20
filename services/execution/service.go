@@ -20,6 +20,7 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/snapshot"
 	protobuf "github.com/gogo/protobuf/types"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	specs "github.com/opencontainers/image-spec/specs-go"
@@ -42,6 +43,7 @@ func init() {
 			plugin.RuntimePlugin,
 			plugin.MetadataPlugin,
 			plugin.ContentPlugin,
+			plugin.SnapshotPlugin,
 		},
 		Init: New,
 	})
@@ -60,6 +62,10 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+	sn, err := ic.Get(plugin.SnapshotPlugin)
+	if err != nil {
+		return nil, err
+	}
 	runtimes := make(map[string]plugin.Runtime)
 	for _, rr := range rt {
 		r := rr.(plugin.Runtime)
@@ -70,18 +76,20 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		return nil, err
 	}
 	return &Service{
-		runtimes:  runtimes,
-		db:        m.(*bolt.DB),
-		collector: c,
-		store:     ct.(content.Store),
+		runtimes:    runtimes,
+		db:          m.(*bolt.DB),
+		collector:   c,
+		store:       ct.(content.Store),
+		snapshotter: sn.(snapshot.Snapshotter),
 	}, nil
 }
 
 type Service struct {
-	runtimes  map[string]plugin.Runtime
-	db        *bolt.DB
-	collector *collector
-	store     content.Store
+	runtimes    map[string]plugin.Runtime
+	db          *bolt.DB
+	collector   *collector
+	store       content.Store
+	snapshotter snapshot.Snapshotter
 }
 
 func (s *Service) Register(server *grpc.Server) error {
@@ -141,11 +149,19 @@ func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 		Checkpoint: checkpointPath,
 	}
 	for _, m := range r.Rootfs {
-		opts.Rootfs = append(opts.Rootfs, mount.Mount{
-			Type:    m.Type,
-			Source:  m.Source,
-			Options: m.Options,
-		})
+		if m.Type == "snapshot" {
+			mounts, err := s.snapshotter.Mounts(ctx, m.Source)
+			if err != nil {
+				return nil, errors.Wrapf(err, "unable to get mounts for snapshot %s", m.Source)
+			}
+			opts.Rootfs = append(opts.Rootfs, mounts...)
+		} else {
+			opts.Rootfs = append(opts.Rootfs, mount.Mount{
+				Type:    m.Type,
+				Source:  m.Source,
+				Options: m.Options,
+			})
+		}
 	}
 	runtime, err := s.getRuntime(container.Runtime)
 	if err != nil {
