@@ -9,6 +9,9 @@ import (
 	"time"
 )
 
+// DefaultAddress is the default unix socket address
+const DefaultAddress = "/run/containerd/containerd.sock"
+
 func dialer(address string, timeout time.Duration) (net.Conn, error) {
 	address = strings.TrimPrefix(address, "unix://")
 	return net.DialTimeout("unix", address, timeout)

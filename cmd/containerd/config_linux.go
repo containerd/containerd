@@ -1,10 +1,12 @@
 package main
 
+import "github.com/containerd/containerd"
+
 func defaultConfig() *config {
 	return &config{
 		Root: "/var/lib/containerd",
 		GRPC: grpcConfig{
-			Address: "/run/containerd/containerd.sock",
+			Address: containerd.DefaultAddress,
 		},
 		Debug: debug{
 			Level:   "info",
