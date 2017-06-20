@@ -163,11 +163,11 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 
 	<-statusC
 
-	if err := container.Delete(ctx); err != nil {
+	if _, err := task.Delete(ctx); err != nil {
 		t.Error(err)
 		return
 	}
-	if _, err := task.Delete(ctx); err != nil {
+	if err := container.Delete(ctx); err != nil {
 		t.Error(err)
 		return
 	}
