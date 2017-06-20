@@ -223,7 +223,7 @@ func TestStartContainer(t *testing.T) {
 			assert.EqualValues(t, errorStartExitCode, meta.ExitCode)
 			assert.Equal(t, errorStartReason, meta.Reason)
 			assert.NotEmpty(t, meta.Message)
-			_, err := fake.Info(context.Background(), &execution.InfoRequest{ContainerID: testID})
+			_, err = fake.Info(context.Background(), &execution.InfoRequest{ContainerID: testID})
 			assert.True(t, isContainerdGRPCNotFoundError(err),
 				"containerd task should be cleaned up when fail to start")
 			continue

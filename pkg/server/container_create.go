@@ -58,7 +58,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	// the same container.
 	id := generateID()
 	name := makeContainerName(config.GetMetadata(), sandboxConfig.GetMetadata())
-	if err := c.containerNameIndex.Reserve(name, id); err != nil {
+	if err = c.containerNameIndex.Reserve(name, id); err != nil {
 		return nil, fmt.Errorf("failed to reserve container name %q: %v", name, err)
 	}
 	defer func() {
@@ -101,17 +101,17 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 
 	// Prepare container rootfs.
 	if config.GetLinux().GetSecurityContext().GetReadonlyRootfs() {
-		if _, err := c.snapshotService.View(ctx, id, imageMeta.ChainID); err != nil {
+		if _, err = c.snapshotService.View(ctx, id, imageMeta.ChainID); err != nil {
 			return nil, fmt.Errorf("failed to view container rootfs %q: %v", imageMeta.ChainID, err)
 		}
 	} else {
-		if _, err := c.snapshotService.Prepare(ctx, id, imageMeta.ChainID); err != nil {
+		if _, err = c.snapshotService.Prepare(ctx, id, imageMeta.ChainID); err != nil {
 			return nil, fmt.Errorf("failed to prepare container rootfs %q: %v", imageMeta.ChainID, err)
 		}
 	}
 	defer func() {
 		if retErr != nil {
-			if err := c.snapshotService.Remove(ctx, id); err != nil {
+			if err = c.snapshotService.Remove(ctx, id); err != nil {
 				glog.Errorf("Failed to remove container snapshot %q: %v", id, err)
 			}
 		}
@@ -120,14 +120,14 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 
 	// Create container root directory.
 	containerRootDir := getContainerRootDir(c.rootDir, id)
-	if err := c.os.MkdirAll(containerRootDir, 0755); err != nil {
+	if err = c.os.MkdirAll(containerRootDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create container root directory %q: %v",
 			containerRootDir, err)
 	}
 	defer func() {
 		if retErr != nil {
 			// Cleanup the container root directory.
-			if err := c.os.RemoveAll(containerRootDir); err != nil {
+			if err = c.os.RemoveAll(containerRootDir); err != nil {
 				glog.Errorf("Failed to remove container root directory %q: %v",
 					containerRootDir, err)
 			}

@@ -346,21 +346,21 @@ func (c *criContainerdService) localResolve(ctx context.Context, ref string) (*m
 	_, err := imagedigest.Parse(ref)
 	if err != nil {
 		// ref is not image id, try to resolve it locally.
-		normalized, err := normalizeImageRef(ref)
+		normalized, nerr := normalizeImageRef(ref)
 		if err != nil {
-			return nil, fmt.Errorf("invalid image reference %q: %v", ref, err)
+			return nil, fmt.Errorf("invalid image reference %q: %v", ref, nerr)
 		}
-		image, err := c.imageStoreService.Get(ctx, normalized.String())
-		if err != nil {
-			if containerdmetadata.IsNotFound(err) {
+		image, gerr := c.imageStoreService.Get(ctx, normalized.String())
+		if gerr != nil {
+			if containerdmetadata.IsNotFound(gerr) {
 				return nil, nil
 			}
 			return nil, fmt.Errorf("an error occurred when getting image %q from containerd image store: %v",
-				normalized.String(), err)
+				normalized.String(), gerr)
 		}
-		desc, err := image.Config(ctx, c.contentStoreService)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get image config descriptor: %v", err)
+		desc, cerr := image.Config(ctx, c.contentStoreService)
+		if cerr != nil {
+			return nil, fmt.Errorf("failed to get image config descriptor: %v", cerr)
 		}
 		ref = desc.Digest.String()
 	}

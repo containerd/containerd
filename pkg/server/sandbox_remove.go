@@ -64,7 +64,7 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 	}
 
 	// Remove sandbox container snapshot.
-	if err := c.snapshotService.Remove(ctx, id); err != nil {
+	if err = c.snapshotService.Remove(ctx, id); err != nil {
 		if !snapshot.IsNotExist(err) {
 			return nil, fmt.Errorf("failed to remove sandbox container snapshot %q: %v", id, err)
 		}

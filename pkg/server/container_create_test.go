@@ -552,11 +552,11 @@ func TestCreateContainer(t *testing.T) {
 					"container name should be released")
 			}
 			assert.Empty(t, fakeSnapshotClient.ListMounts(), "snapshot should be cleaned up")
-			listResp, err := fake.List(context.Background(), &containers.ListContainersRequest{})
-			assert.NoError(t, err)
+			listResp, listerr := fake.List(context.Background(), &containers.ListContainersRequest{})
+			assert.NoError(t, listerr)
 			assert.Empty(t, listResp.Containers, "containerd container should be cleaned up")
-			metas, err := c.containerStore.List()
-			assert.NoError(t, err)
+			metas, metaserr := c.containerStore.List()
+			assert.NoError(t, metaserr)
 			assert.Empty(t, metas, "container metadata should not be created")
 			continue
 		}
