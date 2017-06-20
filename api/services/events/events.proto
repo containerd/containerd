@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package containerd.v1.services.events;
+
+import "github.com/containerd/containerd/api/types/event/event.proto";
+
+service Events {
+	rpc EventStream(EventStreamRequest) returns (stream containerd.v1.types.Envelope);
+}
+
+message EventStreamRequest {}

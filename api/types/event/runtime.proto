@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package containerd.v1.types;
+
+import "gogoproto/gogo.proto";
+import "google/protobuf/timestamp.proto";
+import "github.com/containerd/containerd/api/types/task/task.proto";
+
+message RuntimeIO {
+	string stdin = 1;
+	string stdout = 2;
+	string stderr = 3;
+	bool terminal = 4;
+}
+
+message RuntimeMount {
+	string type = 1;
+	string source = 2;
+	repeated string options = 3;
+}
+
+message RuntimeCreate {
+	string id = 1;
+	string bundle = 2;
+	repeated RuntimeMount rootfs = 3 [(gogoproto.customname) = "RootFS"];
+	RuntimeIO io = 4 [(gogoproto.customname) = "IO"];
+	string checkpoint = 5;
+}
+
+message RuntimeEvent {
+	string id = 1;
+	containerd.v1.types.Event.EventType type = 2;
+	uint32 pid = 3;
+	uint32 exit_status = 4;
+	google.protobuf.Timestamp exited_at = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}
+
+message RuntimeDelete {
+	string id = 1;
+	string runtime = 2;
+	uint32 exit_status = 3;
+	google.protobuf.Timestamp exited_at = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}

@@ -3,6 +3,8 @@ package plugin
 import (
 	"context"
 	"fmt"
+
+	"github.com/containerd/containerd/events"
 )
 
 func NewContext(plugins map[PluginType][]interface{}) *InitContext {
@@ -15,6 +17,7 @@ type InitContext struct {
 	Root    string
 	Context context.Context
 	Config  interface{}
+	Emitter *events.Emitter
 
 	plugins map[PluginType][]interface{}
 }

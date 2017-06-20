@@ -57,6 +57,7 @@ containerd CLI
 		runCommand,
 		deleteCommand,
 		namespacesCommand,
+		eventsCommand,
 		listCommand,
 		infoCommand,
 		killCommand,

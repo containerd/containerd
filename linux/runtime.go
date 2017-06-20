@@ -17,8 +17,10 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/containerd/containerd/api/services/shim"
+	"github.com/containerd/containerd/api/types/event"
 	"github.com/containerd/containerd/api/types/mount"
 	"github.com/containerd/containerd/api/types/task"
+	"github.com/containerd/containerd/events"
 	shimb "github.com/containerd/containerd/linux/shim"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
@@ -152,6 +154,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		eventsCancel:  cancel,
 		monitor:       monitor.(plugin.TaskMonitor),
 		tasks:         newTaskList(),
+		emitter:       events.GetPoster(ic.Context),
 	}
 	// set the events output for a monitor if it generates events
 	r.monitor.Events(r.events)
@@ -178,6 +181,7 @@ type Runtime struct {
 	eventsCancel  func()
 	monitor       plugin.TaskMonitor
 	tasks         *taskList
+	emitter       events.Poster
 }
 
 func (r *Runtime) ID() string {
@@ -204,7 +208,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts)
 			s.Exit(context.Background(), &shim.ExitRequest{})
 		}
 	}()
-	if err = r.handleEvents(s); err != nil {
+	if err = r.handleEvents(ctx, s); err != nil {
 		os.RemoveAll(path)
 		return nil, err
 	}
@@ -237,6 +241,30 @@ func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts)
 	if err = r.monitor.Monitor(c); err != nil {
 		return nil, err
 	}
+
+	var runtimeMounts []*event.RuntimeMount
+	for _, m := range opts.Rootfs {
+		runtimeMounts = append(runtimeMounts, &event.RuntimeMount{
+			Type:    m.Type,
+			Source:  m.Source,
+			Options: m.Options,
+		})
+	}
+	if err := r.emit(ctx, "/runtime/create", event.RuntimeCreate{
+		ID:     id,
+		Bundle: path,
+		RootFS: runtimeMounts,
+		IO: &event.RuntimeIO{
+			Stdin:    opts.IO.Stdin,
+			Stdout:   opts.IO.Stdout,
+			Stderr:   opts.IO.Stderr,
+			Terminal: opts.IO.Terminal,
+		},
+		Checkpoint: opts.Checkpoint,
+	}); err != nil {
+		return nil, err
+	}
+
 	return c, nil
 }
 
@@ -260,6 +288,17 @@ func (r *Runtime) Delete(ctx context.Context, c plugin.Task) (*plugin.Exit, erro
 	}
 	lc.shim.Exit(ctx, &shim.ExitRequest{})
 	r.tasks.delete(ctx, lc)
+
+	i := c.Info()
+	if err := r.emit(ctx, "/runtime/delete", event.RuntimeDelete{
+		ID:         i.ID,
+		Runtime:    i.Runtime,
+		ExitStatus: rsp.ExitStatus,
+		ExitedAt:   rsp.ExitedAt,
+	}); err != nil {
+		return nil, err
+	}
+
 	return &plugin.Exit{
 		Status:    rsp.ExitStatus,
 		Timestamp: rsp.ExitedAt,
@@ -318,7 +357,7 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 		id := fi.Name()
 		// TODO: optimize this if it is call frequently to list all containers
 		// i.e. dont' reconnect to the the shim's ever time
-		c, err := r.loadTask(ns, filepath.Join(r.root, ns, id))
+		c, err := r.loadTask(ctx, ns, filepath.Join(r.root, ns, id))
 		if err != nil {
 			log.G(ctx).WithError(err).Warnf("failed to load container %s/%s", ns, id)
 			// if we fail to load the container, connect to the shim, make sure if the shim has
@@ -335,16 +374,16 @@ func (r *Runtime) Events(ctx context.Context) <-chan *plugin.Event {
 	return r.events
 }
 
-func (r *Runtime) handleEvents(s shim.ShimClient) error {
+func (r *Runtime) handleEvents(ctx context.Context, s shim.ShimClient) error {
 	events, err := s.Events(r.eventsContext, &shim.EventsRequest{})
 	if err != nil {
 		return err
 	}
-	go r.forward(events)
+	go r.forward(ctx, events)
 	return nil
 }
 
-func (r *Runtime) forward(events shim.Shim_EventsClient) {
+func (r *Runtime) forward(ctx context.Context, events shim.Shim_EventsClient) {
 	for {
 		e, err := events.Recv()
 		if err != nil {
@@ -353,18 +392,24 @@ func (r *Runtime) forward(events shim.Shim_EventsClient) {
 			}
 			return
 		}
+		topic := ""
 		var et plugin.EventType
 		switch e.Type {
 		case task.Event_CREATE:
+			topic = "task-create"
 			et = plugin.CreateEvent
-		case task.Event_EXEC_ADDED:
-			et = plugin.ExecAddEvent
-		case task.Event_EXIT:
-			et = plugin.ExitEvent
-		case task.Event_OOM:
-			et = plugin.OOMEvent
 		case task.Event_START:
+			topic = "task-start"
 			et = plugin.StartEvent
+		case task.Event_EXEC_ADDED:
+			topic = "task-execadded"
+			et = plugin.ExecAddEvent
+		case task.Event_OOM:
+			topic = "task-oom"
+			et = plugin.OOMEvent
+		case task.Event_EXIT:
+			topic = "task-exit"
+			et = plugin.ExitEvent
 		}
 		r.events <- &plugin.Event{
 			Timestamp:  time.Now(),
@@ -374,6 +419,15 @@ func (r *Runtime) forward(events shim.Shim_EventsClient) {
 			ID:         e.ID,
 			ExitStatus: e.ExitStatus,
 			ExitedAt:   e.ExitedAt,
+		}
+		if err := r.emit(ctx, "/runtime/"+topic, event.RuntimeEvent{
+			ID:         e.ID,
+			Type:       e.Type,
+			Pid:        e.Pid,
+			ExitStatus: e.ExitStatus,
+			ExitedAt:   e.ExitedAt,
+		}); err != nil {
+			return
 		}
 	}
 }
@@ -403,13 +457,14 @@ func (r *Runtime) deleteBundle(namespace, id string) error {
 	return os.RemoveAll(filepath.Join(r.root, namespace, id))
 }
 
-func (r *Runtime) loadTask(namespace, path string) (*Task, error) {
+func (r *Runtime) loadTask(ctx context.Context, namespace, path string) (*Task, error) {
 	id := filepath.Base(path)
 	s, err := loadShim(path, namespace, r.remote)
 	if err != nil {
 		return nil, err
 	}
-	if err = r.handleEvents(s); err != nil {
+
+	if err = r.handleEvents(ctx, s); err != nil {
 		return nil, err
 	}
 	data, err := ioutil.ReadFile(filepath.Join(path, configFilename))
@@ -460,4 +515,13 @@ func (r *Runtime) killContainer(ctx context.Context, ns, id string) {
 	if err := r.deleteBundle(ns, id); err != nil {
 		log.G(ctx).WithError(err).Warnf("delete container bundle %s", id)
 	}
+}
+
+func (r *Runtime) emit(ctx context.Context, topic string, evt interface{}) error {
+	emitterCtx := events.WithTopic(ctx, topic)
+	if err := r.emitter.Post(emitterCtx, evt); err != nil {
+		return err
+	}
+
+	return nil
 }

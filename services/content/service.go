@@ -6,7 +6,9 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	api "github.com/containerd/containerd/api/services/content"
+	"github.com/containerd/containerd/api/types/event"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	"github.com/golang/protobuf/ptypes/empty"
@@ -18,7 +20,8 @@ import (
 )
 
 type Service struct {
-	store content.Store
+	store   content.Store
+	emitter events.Poster
 }
 
 var bufPool = sync.Pool{
@@ -46,7 +49,8 @@ func NewService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, err
 	}
 	return &Service{
-		store: c.(content.Store),
+		store:   c.(content.Store),
+		emitter: events.GetPoster(ic.Context),
 	}, nil
 }
 
@@ -122,6 +126,12 @@ func (s *Service) Delete(ctx context.Context, req *api.DeleteContentRequest) (*e
 
 	if err := s.store.Delete(ctx, req.Digest); err != nil {
 		return nil, serverErrorToGRPC(err, req.Digest.String())
+	}
+
+	if err := s.emit(ctx, "/content/delete", event.ContentDelete{
+		Digest: req.Digest,
+	}); err != nil {
+		return nil, err
 	}
 
 	return &empty.Empty{}, nil
@@ -408,4 +418,13 @@ func (s *Service) Abort(ctx context.Context, req *api.AbortRequest) (*empty.Empt
 	}
 
 	return &empty.Empty{}, nil
+}
+
+func (s *Service) emit(ctx context.Context, topic string, evt interface{}) error {
+	emitterCtx := events.WithTopic(ctx, topic)
+	if err := s.emitter.Post(emitterCtx, evt); err != nil {
+		return err
+	}
+
+	return nil
 }

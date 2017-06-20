@@ -27,6 +27,7 @@ import (
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	versionapi "github.com/containerd/containerd/api/services/version"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/sys"
@@ -112,8 +113,9 @@ func main() {
 		}
 
 		var (
-			services []plugin.Service
-			plugins  = make(map[plugin.PluginType][]interface{})
+			services     []plugin.Service
+			plugins      = make(map[plugin.PluginType][]interface{})
+			eventEmitter = events.NewEmitter()
 		)
 		for _, init := range plugin.Graph() {
 			id := init.URI()
@@ -124,12 +126,15 @@ func main() {
 			log.G(global).WithField("type", init.Type).Infof("loading plugin %q...", id)
 			ic := plugin.NewContext(plugins)
 			ic.Root = filepath.Join(conf.Root, id)
-			ic.Context = log.WithModule(global, id)
+
+			rCtx := events.WithPoster(global, eventEmitter)
+			ic.Context = log.WithModule(rCtx, id)
 			if init.Config != nil {
 				if err := loadPluginConfig(init.ID, init.Config, ic); err != nil {
 					return err
 				}
 			}
+			ic.Emitter = eventEmitter
 
 			p, err := init.Init(ic)
 			if err != nil {

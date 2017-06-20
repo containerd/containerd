@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package containerd.v1.types;
+
+import "gogoproto/gogo.proto";
+
+message ContentDelete {
+	string digest = 1 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
+}

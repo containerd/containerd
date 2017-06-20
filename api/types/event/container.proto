@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package containerd.v1.types;
+
+import "gogoproto/gogo.proto";
+
+message ContainerCreate {
+	string container_id = 1;
+	string image = 2;
+	string runtime = 3;
+}
+
+message ContainerUpdate {
+	string container_id = 1;
+	string image = 2;
+	map<string, string> labels  = 3;
+	string rootfs = 4 [(gogoproto.customname) = "RootFS"];
+}
+
+message ContainerDelete {
+	string container_id = 1;
+}
