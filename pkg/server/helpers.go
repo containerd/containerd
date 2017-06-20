@@ -56,8 +56,7 @@ const (
 
 const (
 	// defaultSandboxImage is the image used by sandbox container.
-	// TODO(random-liu): [P1] Build schema 2 pause image and use it here.
-	defaultSandboxImage = "gcr.io/google.com/noogler-kubernetes/pause-amd64:3.0"
+	defaultSandboxImage = "gcr.io/google_containers/pause:3.0"
 	// defaultShmSize is the default size of the sandbox shm.
 	defaultShmSize = int64(1024 * 1024 * 64)
 	// relativeRootfsPath is the rootfs path relative to bundle path.
