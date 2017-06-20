@@ -21,7 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 // ImageStatus returns the status of the image, returns nil if the image isn't present.

@@ -499,14 +499,14 @@
 			"Rev": "d2e1b51f33ff8c5e4a15560ff049d200e83726c5"
 		},
 		{
-			"ImportPath": "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1",
-			"Comment": "v1.7.0-alpha.3-396-g1369a26",
-			"Rev": "1369a263f576270c85974e69b6ad8e7a80a6f494"
+			"ImportPath": "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime",
+			"Comment": "v1.8.0-alpha.0-743-gd779e9c",
+			"Rev": "d779e9c9561b732adf06263c5424889e7564fdbd"
 		},
 		{
 			"ImportPath": "k8s.io/kubernetes/pkg/util/interrupt",
-			"Comment": "v1.7.0-alpha.3-396-g1369a26",
-			"Rev": "1369a263f576270c85974e69b6ad8e7a80a6f494"
+			"Comment": "v1.8.0-alpha.0-743-gd779e9c",
+			"Rev": "d779e9c9561b732adf06263c5424889e7564fdbd"
 		}
 	]
 }

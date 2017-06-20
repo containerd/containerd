@@ -37,7 +37,7 @@ import (
 	"github.com/kubernetes-incubator/cri-o/pkg/ocicni"
 	"google.golang.org/grpc"
 	healthapi "google.golang.org/grpc/health/grpc_health_v1"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"

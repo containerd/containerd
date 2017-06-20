@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
 	healthapi "google.golang.org/grpc/health/grpc_health_v1"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
 )

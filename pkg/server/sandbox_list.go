@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/api/services/execution"
 
 	"github.com/containerd/containerd/api/types/task"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 )

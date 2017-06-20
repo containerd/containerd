@@ -24,7 +24,7 @@ import (
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
 
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 func TestSandboxStore(t *testing.T) {
