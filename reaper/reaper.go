@@ -71,13 +71,13 @@ func (m *Monitor) Start(c *exec.Cmd) error {
 		ExitCh: make(chan int, 1),
 	}
 	// start the process
-	if err := rc.c.Start(); err != nil {
-		return err
-	}
 	m.Lock()
-	m.cmds[rc.c.Process.Pid] = rc
+	err := c.Start()
+	if c.Process != nil {
+		m.RegisterNL(c.Process.Pid, rc)
+	}
 	m.Unlock()
-	return nil
+	return err
 }
 
 // Run runs and waits for the command to finish
@@ -95,20 +95,19 @@ func (m *Monitor) Wait(c *exec.Cmd) (int, error) {
 
 func (m *Monitor) Register(pid int, c *Cmd) {
 	m.Lock()
-	if status, ok := m.unknown[pid]; ok {
-		delete(m.unknown, pid)
-		m.cmds[pid] = c
-		m.Unlock()
-		c.ExitCh <- status
-		return
-	}
-	m.cmds[pid] = c
+	m.RegisterNL(pid, c)
 	m.Unlock()
 }
 
 // RegisterNL does not grab the lock internally
 // the caller is responsible for locking the monitor
 func (m *Monitor) RegisterNL(pid int, c *Cmd) {
+	if status, ok := m.unknown[pid]; ok {
+		delete(m.unknown, pid)
+		m.cmds[pid] = c
+		c.ExitCh <- status
+		return
+	}
 	m.cmds[pid] = c
 }
 
