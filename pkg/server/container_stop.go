@@ -20,12 +20,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/containerd/containerd/api/services/execution"
+	"github.com/docker/docker/pkg/signal"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
-
-	"github.com/containerd/containerd/api/services/execution"
-
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
@@ -76,10 +75,24 @@ func (c *criContainerdService) stopContainer(ctx context.Context, meta *metadata
 	}
 
 	if timeout > 0 {
-		// TODO(random-liu): [P1] Get stop signal from image config.
 		stopSignal := unix.SIGTERM
+		imageMeta, err := c.imageMetadataStore.Get(meta.ImageRef)
+		if err != nil {
+			// NOTE(random-liu): It's possible that the container is stopped,
+			// deleted and image is garbage collected before this point. However,
+			// the chance is really slim, even it happens, it's still fine to return
+			// an error here.
+			return fmt.Errorf("failed to get image metadata %q: %v", meta.ImageRef, err)
+		}
+		if imageMeta.Config.StopSignal != "" {
+			stopSignal, err = signal.ParseSignal(imageMeta.Config.StopSignal)
+			if err != nil {
+				return fmt.Errorf("failed to parse stop signal %q: %v",
+					imageMeta.Config.StopSignal, err)
+			}
+		}
 		glog.V(2).Infof("Stop container %q with signal %v", id, stopSignal)
-		_, err := c.taskService.Kill(ctx, &execution.KillRequest{
+		_, err = c.taskService.Kill(ctx, &execution.KillRequest{
 			ContainerID: id,
 			Signal:      uint32(stopSignal),
 			PidOrAll:    &execution.KillRequest_All{All: true},

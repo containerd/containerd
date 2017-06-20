@@ -211,6 +211,11 @@
 			"Rev": "092cba3727bb9b4a2f0e922cd6c0f93ea270e363"
 		},
 		{
+			"ImportPath": "github.com/docker/docker/pkg/signal",
+			"Comment": "v1.13.1",
+			"Rev": "092cba3727bb9b4a2f0e922cd6c0f93ea270e363"
+		},
+		{
 			"ImportPath": "github.com/docker/docker/pkg/stringid",
 			"Comment": "v1.13.1",
 			"Rev": "092cba3727bb9b4a2f0e922cd6c0f93ea270e363"
