@@ -54,6 +54,5 @@ func (s *eventSink) Write(evt goevents.Event) error {
 }
 
 func (s *eventSink) Close() error {
-	close(s.ch)
 	return nil
 }

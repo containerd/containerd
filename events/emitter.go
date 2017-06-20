@@ -63,7 +63,3 @@ func (e *Emitter) Remove(clientID string) {
 	}
 	e.m.Unlock()
 }
-
-func (e *Emitter) Close() error {
-	return e.broadcaster.Close()
-}

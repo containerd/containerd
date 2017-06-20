@@ -16,7 +16,6 @@ func init() {
 		Type: plugin.GRPCPlugin,
 		ID:   "events",
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			logrus.Debug(ic.Emitter)
 			return NewService(ic.Emitter), nil
 		},
 	})

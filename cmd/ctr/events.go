@@ -77,25 +77,25 @@ func getEventOutput(evt *event.Envelope) (string, error) {
 		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
 			return out, err
 		}
-		out = fmt.Sprintf("id=%s", e.ContainerID)
+		out = "id=" + e.ContainerID
 	case "types.containerd.io/containerd.v1.types.event.TaskDelete":
 		e := &event.TaskDelete{}
 		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
 			return out, err
 		}
-		out = fmt.Sprintf("id=%s", e.ContainerID)
+		out = "id=" + e.ContainerID
 	case "types.containerd.io/containerd.v1.types.event.ContainerUpdate":
 		e := &event.ContainerUpdate{}
 		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
 			return out, err
 		}
-		out = fmt.Sprintf("id=%s", e.ContainerID)
+		out = "id=" + e.ContainerID
 	case "types.containerd.io/containerd.v1.types.event.ContainerDelete":
 		e := &event.ContainerDelete{}
 		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
 			return out, err
 		}
-		out = fmt.Sprintf("id=%s", e.ContainerID)
+		out = "id=" + e.ContainerID
 	case "types.containerd.io/containerd.v1.types.event.SnapshotPrepare":
 		e := &event.SnapshotPrepare{}
 		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
@@ -113,7 +113,7 @@ func getEventOutput(evt *event.Envelope) (string, error) {
 		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
 			return out, err
 		}
-		out = fmt.Sprintf("key=%s", e.Key)
+		out = "key=" + e.Key
 	case "types.containerd.io/containerd.v1.types.event.ImagePut":
 		e := &event.ImagePut{}
 		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
@@ -125,7 +125,7 @@ func getEventOutput(evt *event.Envelope) (string, error) {
 		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
 			return out, err
 		}
-		out = fmt.Sprintf("name=%s", e.Name)
+		out = "name=" + e.Name
 	case "types.containerd.io/containerd.v1.types.event.NamespaceCreate":
 		e := &event.NamespaceCreate{}
 		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
@@ -143,7 +143,7 @@ func getEventOutput(evt *event.Envelope) (string, error) {
 		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
 			return out, err
 		}
-		out = fmt.Sprintf("name=%s", e.Name)
+		out = "name=" + e.Name
 	case "types.containerd.io/containerd.v1.types.event.RuntimeCreate":
 		e := &event.RuntimeCreate{}
 		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
