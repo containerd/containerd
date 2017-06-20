@@ -5,7 +5,6 @@ import (
 	"context"
 	contextpkg "context"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -21,10 +20,8 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
-	"github.com/containerd/containerd/rootfs"
 	contentservice "github.com/containerd/containerd/services/content"
 	imagesservice "github.com/containerd/containerd/services/images"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
@@ -178,37 +175,4 @@ func passwordPrompt() (string, error) {
 		return "", errors.Wrap(err, "failed to read line")
 	}
 	return string(line), nil
-}
-
-func getImageLayers(ctx context.Context, image images.Image, cs content.Store) ([]rootfs.Layer, error) {
-	p, err := content.ReadBlob(ctx, cs, image.Target.Digest)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read manifest blob")
-	}
-
-	var manifest ocispec.Manifest
-	if err := json.Unmarshal(p, &manifest); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal manifest")
-	}
-
-	diffIDs, err := image.RootFS(ctx, cs)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to resolve rootfs")
-	}
-
-	if len(diffIDs) != len(manifest.Layers) {
-		return nil, errors.Errorf("mismatched image rootfs and manifest layers")
-	}
-
-	layers := make([]rootfs.Layer, len(diffIDs))
-	for i := range diffIDs {
-		layers[i].Diff = ocispec.Descriptor{
-			// TODO: derive media type from compressed type
-			MediaType: ocispec.MediaTypeImageLayer,
-			Digest:    diffIDs[i],
-		}
-		layers[i].Blob = manifest.Layers[i]
-	}
-
-	return layers, nil
 }
