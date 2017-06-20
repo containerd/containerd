@@ -23,6 +23,7 @@ import (
 
 	"github.com/containerd/containerd/api/services/execution"
 	"github.com/containerd/containerd/api/types/task"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
@@ -96,8 +97,13 @@ func TestStopContainer(t *testing.T) {
 	testMetadata := metadata.ContainerMetadata{
 		ID:        testID,
 		Pid:       testPid,
+		ImageRef:  "test-image-id",
 		CreatedAt: time.Now().UnixNano(),
 		StartedAt: time.Now().UnixNano(),
+	}
+	testImageMetadata := metadata.ImageMetadata{
+		ID:     "test-image-id",
+		Config: &imagespec.ImageConfig{},
 	}
 	testContainer := task.Task{
 		ID:     testID,
@@ -107,6 +113,7 @@ func TestStopContainer(t *testing.T) {
 	for desc, test := range map[string]struct {
 		metadata            *metadata.ContainerMetadata
 		containerdContainer *task.Task
+		stopSignal          string
 		stopErr             error
 		noTimeout           bool
 		expectErr           bool
@@ -222,6 +229,27 @@ func TestStopContainer(t *testing.T) {
 				},
 			},
 		},
+		"should use stop signal specified in image config if not empty": {
+			metadata:            &testMetadata,
+			containerdContainer: &testContainer,
+			stopSignal:          "SIGHUP",
+			expectErr:           false,
+			// deleted by the event monitor.
+			expectCalls: []servertesting.CalledDetail{
+				{
+					Name: "kill",
+					Argument: &execution.KillRequest{
+						ContainerID: testID,
+						Signal:      uint32(unix.SIGHUP),
+						PidOrAll:    &execution.KillRequest_All{All: true},
+					},
+				},
+				{
+					Name:     "delete",
+					Argument: &execution.DeleteRequest{ContainerID: testID},
+				},
+			},
+		},
 		"should directly kill container if timeout is 0": {
 			metadata:            &testMetadata,
 			containerdContainer: &testContainer,
@@ -259,6 +287,8 @@ func TestStopContainer(t *testing.T) {
 		if test.containerdContainer != nil {
 			fake.SetFakeTasks([]task.Task{*test.containerdContainer})
 		}
+		testImageMetadata.Config.StopSignal = test.stopSignal
+		assert.NoError(t, c.imageMetadataStore.Create(testImageMetadata))
 		if test.stopErr != nil {
 			fake.InjectError("kill", test.stopErr)
 		}
