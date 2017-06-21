@@ -112,13 +112,8 @@ func (s *Service) Create(ctx context.Context, r *api.CreateTaskRequest) (*api.Cr
 		}
 	}
 
-	var container containers.Container
-	if err := s.db.View(func(tx *bolt.Tx) error {
-		store := metadata.NewContainerStore(tx)
-		var err error
-		container, err = store.Get(ctx, r.ContainerID)
-		return err
-	}); err != nil {
+	container, err := s.getContainer(ctx, r.ContainerID)
+	if err != nil {
 		switch {
 		case metadata.IsNotFound(err):
 			return nil, grpc.Errorf(codes.NotFound, "container %v not found", r.ContainerID)
@@ -476,14 +471,38 @@ func (s *Service) writeContent(ctx context.Context, mediaType, ref string, r io.
 	}, nil
 }
 
-func (s *Service) getTask(ctx context.Context, id string) (plugin.Task, error) {
-	for _, r := range s.runtimes {
-		t, err := r.Get(ctx, id)
-		if err == nil {
-			return t, nil
-		}
+func (s *Service) getContainer(ctx context.Context, id string) (containers.Container, error) {
+	var container containers.Container
+
+	if err := s.db.View(func(tx *bolt.Tx) error {
+		store := metadata.NewContainerStore(tx)
+		var err error
+		container, err = store.Get(ctx, id)
+		return err
+	}); err != nil {
+		return containers.Container{}, err
 	}
-	return nil, grpc.Errorf(codes.NotFound, "task %v not found", id)
+
+	return container, nil
+}
+
+func (s *Service) getTask(ctx context.Context, id string) (plugin.Task, error) {
+	container, err := s.getContainer(ctx, id)
+	if err != nil {
+		return nil, grpc.Errorf(codes.InvalidArgument, "task %v not found: %s", id, err.Error())
+	}
+
+	runtime, err := s.getRuntime(container.Runtime.Name)
+	if err != nil {
+		return nil, grpc.Errorf(codes.NotFound, "task %v not found: %s", id, err.Error())
+	}
+
+	t, err := runtime.Get(ctx, id)
+	if err != nil {
+		return nil, grpc.Errorf(codes.NotFound, "task %v not found", id)
+	}
+
+	return t, nil
 }
 
 func (s *Service) getRuntime(name string) (plugin.Runtime, error) {
