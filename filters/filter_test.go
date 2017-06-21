@@ -56,6 +56,12 @@ func TestFilters(t *testing.T) {
 			Name:  "bazo",
 			Other: "abc",
 		},
+		{
+			Name: "compound",
+			Labels: map[string]string{
+				"foo": "omg_asdf.asdf-qwer",
+			},
+		},
 	}
 
 	var corpus []interface{}
@@ -103,6 +109,7 @@ func TestFilters(t *testing.T) {
 			expected: []interface{}{
 				corpus[0],
 				corpus[2],
+				corpus[8],
 			},
 		},
 		{
@@ -110,6 +117,13 @@ func TestFilters(t *testing.T) {
 			input: "labels.foo==true",
 			expected: []interface{}{
 				corpus[0],
+			},
+		},
+		{
+			name:  "LabelValuePunctuated",
+			input: "labels.foo==omg_asdf.asdf-qwer",
+			expected: []interface{}{
+				corpus[8],
 			},
 		},
 		{
@@ -130,6 +144,7 @@ func TestFilters(t *testing.T) {
 				corpus[5],
 				corpus[6],
 				corpus[7],
+				corpus[8],
 			},
 		},
 		{

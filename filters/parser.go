@@ -72,7 +72,7 @@ loop:
 		switch tok {
 		case ',':
 			pos, tok, _ := p.scanner.scan()
-			if tok != tokenSelectorSeparator {
+			if tok != tokenSeparator {
 				return nil, p.mkerr(pos, "expected a separator")
 			}
 
@@ -85,7 +85,7 @@ loop:
 		case tokenEOF:
 			break loop
 		default:
-			panic("unconsumed input")
+			return nil, p.mkerr(p.scanner.ppos, "unexpected input: %v", string(tok))
 		}
 	}
 
@@ -99,7 +99,7 @@ func (p *parser) selector() (selector, error) {
 	}
 
 	switch p.scanner.peek() {
-	case tokenSelectorSeparator, tokenEOF:
+	case tokenSeparator, tokenEOF:
 		return selector{
 			fieldpath: fieldpath,
 			operator:  operatorPresent,
@@ -140,7 +140,7 @@ loop:
 		switch tok {
 		case '.':
 			pos, tok, _ := p.scanner.scan() // consume separator
-			if tok != tokenFieldSeparator {
+			if tok != tokenSeparator {
 				return nil, p.mkerr(pos, "expected a field separator (`.`)")
 			}
 
