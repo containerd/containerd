@@ -11,9 +11,8 @@ const (
 	tokenQuoted
 	tokenValue
 	tokenField
-	tokenFieldSeparator
+	tokenSeparator
 	tokenOperator
-	tokenSelectorSeparator
 	tokenIllegal
 )
 
@@ -29,12 +28,10 @@ func (t token) String() string {
 		return "Value"
 	case tokenField:
 		return "Field"
+	case tokenSeparator:
+		return "Separator"
 	case tokenOperator:
 		return "Operator"
-	case tokenFieldSeparator:
-		return "FieldSeparator"
-	case tokenSelectorSeparator:
-		return "SelectorSeparator"
 	case tokenIllegal:
 		return "Illegal"
 	}
@@ -102,12 +99,10 @@ chomp:
 	case ch == tokenEOF:
 	case ch == tokenIllegal:
 	case isQuoteRune(ch):
-		s.scanString(ch)
+		s.scanQuoted(ch)
 		return pos, tokenQuoted, s.input[pos:s.ppos]
-	case ch == ',':
-		return pos, tokenSelectorSeparator, s.input[pos:s.ppos]
-	case ch == '.':
-		return pos, tokenFieldSeparator, s.input[pos:s.ppos]
+	case isSeparatorRune(ch):
+		return pos, tokenSeparator, s.input[pos:s.ppos]
 	case isOperatorRune(ch):
 		s.scanOperator()
 		s.value = true
@@ -119,12 +114,6 @@ chomp:
 		goto chomp
 	case s.value:
 		s.scanValue()
-
-		// TODO(stevvooe): We can get rid of the value flag by by having a
-		// scanUnquoted that accumulates characters. If it is a legal field,
-		// then we return a field token. The parser can then treat fields as
-		// values. This will allow the default case here to just scan value or
-		// field.
 		s.value = false
 		return pos, tokenValue, s.input[pos:s.ppos]
 	case isFieldRune(ch):
@@ -167,7 +156,7 @@ func (s *scanner) scanValue() {
 	}
 }
 
-func (s *scanner) scanString(quote rune) {
+func (s *scanner) scanQuoted(quote rune) {
 	ch := s.next() // read character after quote
 	for ch != quote {
 		if ch == '\n' || ch < 0 {
