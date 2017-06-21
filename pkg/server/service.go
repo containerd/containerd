@@ -19,23 +19,16 @@ package server
 import (
 	"fmt"
 
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/containers"
-	contentapi "github.com/containerd/containerd/api/services/content"
-	diffapi "github.com/containerd/containerd/api/services/diff"
 	"github.com/containerd/containerd/api/services/execution"
-	imagesapi "github.com/containerd/containerd/api/services/images"
-	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	versionapi "github.com/containerd/containerd/api/services/version"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
-	contentservice "github.com/containerd/containerd/services/content"
 	diffservice "github.com/containerd/containerd/services/diff"
-	imagesservice "github.com/containerd/containerd/services/images"
-	snapshotservice "github.com/containerd/containerd/services/snapshot"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/docker/docker/pkg/truncindex"
 	"github.com/kubernetes-incubator/cri-o/pkg/ocicni"
-	"google.golang.org/grpc"
 	healthapi "google.golang.org/grpc/health/grpc_health_v1"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 
@@ -45,6 +38,9 @@ import (
 	"github.com/kubernetes-incubator/cri-containerd/pkg/registrar"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/server/agents"
 )
+
+// k8sContainerdNamespace is the namespace we use to connect containerd.
+const k8sContainerdNamespace = "k8s.io"
 
 // CRIContainerdService is the interface implement CRI remote service server.
 type CRIContainerdService interface {
@@ -99,11 +95,19 @@ type criContainerdService struct {
 	netPlugin ocicni.CNIPlugin
 	// agentFactory is the factory to create agent used in the cri containerd service.
 	agentFactory agents.AgentFactory
+	// client is an instance of the containerd client
+	client *containerd.Client
 }
 
 // NewCRIContainerdService returns a new instance of CRIContainerdService
-func NewCRIContainerdService(conn *grpc.ClientConn, rootDir, networkPluginBinDir, networkPluginConfDir string) (CRIContainerdService, error) {
+func NewCRIContainerdService(containerdEndpoint, rootDir, networkPluginBinDir, networkPluginConfDir string) (CRIContainerdService, error) {
 	// TODO(random-liu): [P2] Recover from runtime state and metadata store.
+
+	client, err := containerd.New(containerdEndpoint, containerd.WithDefaultNamespace(k8sContainerdNamespace))
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize containerd client with endpoint %q: %v", containerdEndpoint, err)
+	}
+
 	c := &criContainerdService{
 		os:                 osinterface.RealOS{},
 		rootDir:            rootDir,
@@ -117,15 +121,16 @@ func NewCRIContainerdService(conn *grpc.ClientConn, rootDir, networkPluginBinDir
 		sandboxIDIndex:   truncindex.NewTruncIndex(nil),
 		// TODO(random-liu): Add container id index.
 		containerNameIndex:  registrar.NewRegistrar(),
-		containerService:    containers.NewContainersClient(conn),
-		taskService:         execution.NewTasksClient(conn),
-		imageStoreService:   imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)),
-		contentStoreService: contentservice.NewStoreFromClient(contentapi.NewContentClient(conn)),
-		snapshotService:     snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotClient(conn)),
-		diffService:         diffservice.NewDiffServiceFromClient(diffapi.NewDiffClient(conn)),
-		versionService:      versionapi.NewVersionClient(conn),
-		healthService:       healthapi.NewHealthClient(conn),
+		containerService:    client.ContainerService(),
+		taskService:         client.TaskService(),
+		imageStoreService:   client.ImageService(),
+		contentStoreService: client.ContentStore(),
+		snapshotService:     client.SnapshotService(),
+		diffService:         client.DiffService(),
+		versionService:      client.VersionService(),
+		healthService:       client.HealthService(),
 		agentFactory:        agents.NewAgentFactory(),
+		client:              client,
 	}
 
 	netPlugin, err := ocicni.InitCNI(networkPluginBinDir, networkPluginConfDir)
