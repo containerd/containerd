@@ -12,7 +12,7 @@ import (
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
 	containersapi "github.com/containerd/containerd/api/services/containers"
-	"github.com/containerd/containerd/api/services/execution"
+	"github.com/containerd/containerd/api/services/tasks"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/windows"
@@ -160,8 +160,8 @@ func newCreateContainerRequest(context *cli.Context, id, snapshot, image string,
 	return create, nil
 }
 
-func newCreateTaskRequest(context *cli.Context, id, tmpDir string, checkpoint *ocispec.Descriptor, mounts []mount.Mount) (*execution.CreateTaskRequest, error) {
-	create := &execution.CreateTaskRequest{
+func newCreateTaskRequest(context *cli.Context, id, tmpDir string, checkpoint *ocispec.Descriptor, mounts []mount.Mount) (*tasks.CreateTaskRequest, error) {
+	create := &tasks.CreateTaskRequest{
 		ContainerID: id,
 		Terminal:    context.Bool("tty"),
 		Stdin:       fmt.Sprintf(`%s\ctr-%s-stdin`, pipeRoot, id),

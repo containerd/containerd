@@ -6,7 +6,7 @@ import (
 	"syscall"
 
 	eventsapi "github.com/containerd/containerd/api/services/events"
-	"github.com/containerd/containerd/api/services/execution"
+	"github.com/containerd/containerd/api/services/tasks"
 	"github.com/containerd/containerd/api/types/event"
 	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/gogo/protobuf/proto"
@@ -41,7 +41,7 @@ func (p *process) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	request := &execution.ExecProcessRequest{
+	request := &tasks.ExecProcessRequest{
 		ContainerID: p.task.containerID,
 		Terminal:    p.io.Terminal,
 		Stdin:       p.io.Stdin,
@@ -62,10 +62,10 @@ func (p *process) Start(ctx context.Context) error {
 }
 
 func (p *process) Kill(ctx context.Context, s syscall.Signal) error {
-	_, err := p.task.client.TaskService().Kill(ctx, &execution.KillRequest{
+	_, err := p.task.client.TaskService().Kill(ctx, &tasks.KillRequest{
 		Signal:      uint32(s),
 		ContainerID: p.task.containerID,
-		PidOrAll: &execution.KillRequest_Pid{
+		PidOrAll: &tasks.KillRequest_Pid{
 			Pid: p.pid,
 		},
 	})
@@ -102,7 +102,7 @@ func (p *process) Wait(ctx context.Context) (uint32, error) {
 }
 
 func (p *process) CloseIO(ctx context.Context, opts ...IOCloserOpts) error {
-	r := &execution.CloseIORequest{
+	r := &tasks.CloseIORequest{
 		ContainerID: p.task.containerID,
 		Pid:         p.pid,
 	}
@@ -118,7 +118,7 @@ func (p *process) IO() *IO {
 }
 
 func (p *process) Resize(ctx context.Context, w, h uint32) error {
-	_, err := p.task.client.TaskService().ResizePty(ctx, &execution.ResizePtyRequest{
+	_, err := p.task.client.TaskService().ResizePty(ctx, &tasks.ResizePtyRequest{
 		ContainerID: p.task.containerID,
 		Width:       w,
 		Height:      h,
@@ -129,7 +129,7 @@ func (p *process) Resize(ctx context.Context, w, h uint32) error {
 
 func (p *process) Delete(ctx context.Context) (uint32, error) {
 	cerr := p.io.Close()
-	r, err := p.task.client.TaskService().DeleteProcess(ctx, &execution.DeleteProcessRequest{
+	r, err := p.task.client.TaskService().DeleteProcess(ctx, &tasks.DeleteProcessRequest{
 		ContainerID: p.task.containerID,
 		Pid:         p.pid,
 	})

@@ -14,10 +14,10 @@ import (
 	contentapi "github.com/containerd/containerd/api/services/content"
 	diffapi "github.com/containerd/containerd/api/services/diff"
 	eventsapi "github.com/containerd/containerd/api/services/events"
-	"github.com/containerd/containerd/api/services/execution"
 	imagesapi "github.com/containerd/containerd/api/services/images"
 	namespacesapi "github.com/containerd/containerd/api/services/namespaces"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
+	"github.com/containerd/containerd/api/services/tasks"
 	versionservice "github.com/containerd/containerd/api/services/version"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
@@ -456,8 +456,8 @@ func (c *Client) SnapshotService() snapshot.Snapshotter {
 	return snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotsClient(c.conn))
 }
 
-func (c *Client) TaskService() execution.TasksClient {
-	return execution.NewTasksClient(c.conn)
+func (c *Client) TaskService() tasks.TasksClient {
+	return tasks.NewTasksClient(c.conn)
 }
 
 func (c *Client) ImageService() images.Store {
