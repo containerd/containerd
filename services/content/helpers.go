@@ -10,13 +10,12 @@ import (
 func rewriteGRPCError(err error) error {
 	switch grpc.Code(errors.Cause(err)) {
 	case codes.AlreadyExists:
-		return content.ErrExists
+		return content.ErrExists(grpc.ErrorDesc(err))
 	case codes.NotFound:
-		return content.ErrNotFound
+		return content.ErrNotFound(grpc.ErrorDesc(err))
 	case codes.Unavailable:
-		return content.ErrLocked
+		return content.ErrLocked(grpc.ErrorDesc(err))
 	}
-
 	return err
 }
 

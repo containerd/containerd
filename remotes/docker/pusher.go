@@ -31,7 +31,7 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 	status, err := p.tracker.GetStatus(ref)
 	if err == nil {
 		if status.Offset == status.Total {
-			return nil, content.ErrExists
+			return nil, content.ErrExists("")
 		}
 		// TODO: Handle incomplete status
 	} else if !content.IsNotFound(err) {
@@ -72,7 +72,7 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 					// TODO: Set updated time?
 				},
 			})
-			return nil, content.ErrExists
+			return nil, content.ErrExists("")
 		}
 		if resp.StatusCode != http.StatusNotFound {
 			// TODO: log error

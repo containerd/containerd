@@ -99,7 +99,7 @@ func (w *writer) Commit(size int64, expected digest.Digest) error {
 	if err := os.Rename(ingest, target); err != nil {
 		if os.IsExist(err) {
 			// collision with the target file!
-			return ErrExists
+			return ErrExists("")
 		}
 		return err
 	}

@@ -34,7 +34,7 @@ func (t *memoryStatusTracker) GetStatus(ref string) (Status, error) {
 	defer t.m.Unlock()
 	status, ok := t.statuses[ref]
 	if !ok {
-		return Status{}, content.ErrNotFound
+		return Status{}, content.ErrNotFound("")
 	}
 	return status, nil
 }

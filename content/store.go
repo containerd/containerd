@@ -40,7 +40,7 @@ func (s *store) Info(ctx context.Context, dgst digest.Digest) (Info, error) {
 	fi, err := os.Stat(p)
 	if err != nil {
 		if os.IsNotExist(err) {
-			err = ErrNotFound
+			err = ErrNotFound("")
 		}
 
 		return Info{}, err
@@ -62,7 +62,7 @@ func (s *store) Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, 
 	fp, err := os.Open(s.blobPath(dgst))
 	if err != nil {
 		if os.IsNotExist(err) {
-			err = ErrNotFound
+			err = ErrNotFound("")
 		}
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func (cs *store) Delete(ctx context.Context, dgst digest.Digest) error {
 			return err
 		}
 
-		return ErrNotFound
+		return ErrNotFound("")
 	}
 
 	return nil
@@ -329,7 +329,7 @@ func (s *store) Abort(ctx context.Context, ref string) error {
 	root := s.ingestRoot(ref)
 	if err := os.RemoveAll(root); err != nil {
 		if os.IsNotExist(err) {
-			return ErrNotFound
+			return ErrNotFound("")
 		}
 
 		return err
