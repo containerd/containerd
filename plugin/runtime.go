@@ -43,6 +43,4 @@ type Runtime interface {
 	Tasks(context.Context) ([]Task, error)
 	// Delete removes the task in the runtime.
 	Delete(context.Context, Task) (*Exit, error)
-	// Events returns events for the runtime and all tasks created by the runtime
-	Events(context.Context) <-chan *Event
 }

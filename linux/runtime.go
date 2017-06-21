@@ -370,10 +370,6 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 	return o, nil
 }
 
-func (r *Runtime) Events(ctx context.Context) <-chan *plugin.Event {
-	return r.events
-}
-
 func (r *Runtime) handleEvents(ctx context.Context, s shim.ShimClient) error {
 	events, err := s.Events(r.eventsContext, &shim.EventsRequest{})
 	if err != nil {
