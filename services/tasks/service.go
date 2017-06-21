@@ -1,4 +1,4 @@
-package execution
+package tasks
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/boltdb/bolt"
-	api "github.com/containerd/containerd/api/services/execution"
+	api "github.com/containerd/containerd/api/services/tasks"
 	"github.com/containerd/containerd/api/types/descriptor"
 	"github.com/containerd/containerd/api/types/event"
 	"github.com/containerd/containerd/api/types/task"

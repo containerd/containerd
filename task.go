@@ -12,7 +12,7 @@ import (
 
 	"github.com/containerd/containerd/api/services/containers"
 	eventsapi "github.com/containerd/containerd/api/services/events"
-	"github.com/containerd/containerd/api/services/execution"
+	"github.com/containerd/containerd/api/services/tasks"
 	"github.com/containerd/containerd/api/types/event"
 	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/content"
@@ -34,13 +34,13 @@ const (
 	Pausing TaskStatus = "pausing"
 )
 
-type IOCloserOpts func(*execution.CloseIORequest)
+type IOCloserOpts func(*tasks.CloseIORequest)
 
-func WithStdinCloser(r *execution.CloseIORequest) {
+func WithStdinCloser(r *tasks.CloseIORequest) {
 	r.Stdin = true
 }
 
-type CheckpointOpts func(*execution.CheckpointTaskRequest) error
+type CheckpointOpts func(*tasks.CheckpointTaskRequest) error
 
 type Task interface {
 	Pid() uint32
@@ -79,7 +79,7 @@ type task struct {
 	containerID string
 	pid         uint32
 
-	deferred *execution.CreateTaskRequest
+	deferred *tasks.CreateTaskRequest
 	pidSync  chan struct{}
 }
 
@@ -99,17 +99,17 @@ func (t *task) Start(ctx context.Context) error {
 		close(t.pidSync)
 		return nil
 	}
-	_, err := t.client.TaskService().Start(ctx, &execution.StartTaskRequest{
+	_, err := t.client.TaskService().Start(ctx, &tasks.StartTaskRequest{
 		ContainerID: t.containerID,
 	})
 	return err
 }
 
 func (t *task) Kill(ctx context.Context, s syscall.Signal) error {
-	_, err := t.client.TaskService().Kill(ctx, &execution.KillRequest{
+	_, err := t.client.TaskService().Kill(ctx, &tasks.KillRequest{
 		Signal:      uint32(s),
 		ContainerID: t.containerID,
-		PidOrAll: &execution.KillRequest_All{
+		PidOrAll: &tasks.KillRequest_All{
 			All: true,
 		},
 	})
@@ -117,21 +117,21 @@ func (t *task) Kill(ctx context.Context, s syscall.Signal) error {
 }
 
 func (t *task) Pause(ctx context.Context) error {
-	_, err := t.client.TaskService().Pause(ctx, &execution.PauseTaskRequest{
+	_, err := t.client.TaskService().Pause(ctx, &tasks.PauseTaskRequest{
 		ContainerID: t.containerID,
 	})
 	return err
 }
 
 func (t *task) Resume(ctx context.Context) error {
-	_, err := t.client.TaskService().Resume(ctx, &execution.ResumeTaskRequest{
+	_, err := t.client.TaskService().Resume(ctx, &tasks.ResumeTaskRequest{
 		ContainerID: t.containerID,
 	})
 	return err
 }
 
 func (t *task) Status(ctx context.Context) (TaskStatus, error) {
-	r, err := t.client.TaskService().Get(ctx, &execution.GetTaskRequest{
+	r, err := t.client.TaskService().Get(ctx, &tasks.GetTaskRequest{
 		ContainerID: t.containerID,
 	})
 	if err != nil {
@@ -178,7 +178,7 @@ func (t *task) Delete(ctx context.Context) (uint32, error) {
 	if t.io != nil {
 		cerr = t.io.Close()
 	}
-	r, err := t.client.TaskService().Delete(ctx, &execution.DeleteTaskRequest{
+	r, err := t.client.TaskService().Delete(ctx, &tasks.DeleteTaskRequest{
 		ContainerID: t.containerID,
 	})
 	if err != nil {
@@ -201,7 +201,7 @@ func (t *task) Exec(ctx context.Context, spec *specs.Process, ioCreate IOCreatio
 }
 
 func (t *task) Processes(ctx context.Context) ([]uint32, error) {
-	response, err := t.client.TaskService().ListProcesses(ctx, &execution.ListProcessesRequest{
+	response, err := t.client.TaskService().ListProcesses(ctx, &tasks.ListProcessesRequest{
 		ContainerID: t.containerID,
 	})
 	if err != nil {
@@ -215,7 +215,7 @@ func (t *task) Processes(ctx context.Context) ([]uint32, error) {
 }
 
 func (t *task) CloseIO(ctx context.Context, opts ...IOCloserOpts) error {
-	r := &execution.CloseIORequest{
+	r := &tasks.CloseIORequest{
 		ContainerID: t.containerID,
 		Pid:         t.pid,
 	}
@@ -231,7 +231,7 @@ func (t *task) IO() *IO {
 }
 
 func (t *task) Resize(ctx context.Context, w, h uint32) error {
-	_, err := t.client.TaskService().ResizePty(ctx, &execution.ResizePtyRequest{
+	_, err := t.client.TaskService().ResizePty(ctx, &tasks.ResizePtyRequest{
 		ContainerID: t.containerID,
 		Width:       w,
 		Height:      h,
@@ -240,13 +240,13 @@ func (t *task) Resize(ctx context.Context, w, h uint32) error {
 	return err
 }
 
-func WithExit(r *execution.CheckpointTaskRequest) error {
+func WithExit(r *tasks.CheckpointTaskRequest) error {
 	r.Options["exit"] = "true"
 	return nil
 }
 
 func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointOpts) (d v1.Descriptor, err error) {
-	request := &execution.CheckpointTaskRequest{
+	request := &tasks.CheckpointTaskRequest{
 		ContainerID: t.containerID,
 		Options:     make(map[string]string),
 	}
@@ -281,7 +281,7 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointOpts) (d v1.Des
 	return t.writeIndex(ctx, &index)
 }
 
-func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *execution.CheckpointTaskRequest) error {
+func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tasks.CheckpointTaskRequest) error {
 	response, err := t.client.TaskService().Checkpoint(ctx, request)
 	if err != nil {
 		return err

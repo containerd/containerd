@@ -9,7 +9,7 @@ import (
 	"io/ioutil"
 
 	"github.com/containerd/containerd/api/services/containers"
-	"github.com/containerd/containerd/api/services/execution"
+	"github.com/containerd/containerd/api/services/tasks"
 	"github.com/containerd/containerd/api/types/descriptor"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
@@ -83,7 +83,7 @@ func WithCheckpoint(desc v1.Descriptor, rootfsID string) NewContainerOpts {
 }
 
 func WithTaskCheckpoint(desc v1.Descriptor) NewTaskOpts {
-	return func(ctx context.Context, c *Client, r *execution.CreateTaskRequest) error {
+	return func(ctx context.Context, c *Client, r *tasks.CreateTaskRequest) error {
 		id := desc.Digest
 		index, err := decodeIndex(ctx, c.ContentStore(), id)
 		if err != nil {
