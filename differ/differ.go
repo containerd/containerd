@@ -11,6 +11,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/snapshot/namespaced"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -51,7 +52,7 @@ var emptyDesc = ocispec.Descriptor{}
 func newBaseDiff(store content.Store, snapshotter snapshot.Snapshotter) (*BaseDiff, error) {
 	return &BaseDiff{
 		store:       store,
-		snapshotter: snapshotter,
+		snapshotter: namespaced.NewSnapshotter(snapshotter),
 	}, nil
 }
 
