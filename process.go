@@ -3,10 +3,13 @@ package containerd
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"syscall"
 
+	eventsapi "github.com/containerd/containerd/api/services/events"
 	"github.com/containerd/containerd/api/services/execution"
+	"github.com/containerd/containerd/api/types/event"
+	tasktypes "github.com/containerd/containerd/api/types/task"
+	"github.com/gogo/protobuf/proto"
 	protobuf "github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -70,7 +73,31 @@ func (p *process) Kill(ctx context.Context, s syscall.Signal) error {
 }
 
 func (p *process) Wait(ctx context.Context) (uint32, error) {
-	return 255, fmt.Errorf("not implemented")
+	// TODO (ehazlett): add filtering for specific event
+	events, err := p.task.client.EventService().Stream(ctx, &eventsapi.StreamEventsRequest{})
+	if err != nil {
+		return UnknownExitStatus, err
+	}
+	for {
+		evt, err := events.Recv()
+		if err != nil {
+			return UnknownExitStatus, err
+		}
+		if evt.Event.TypeUrl == "types.containerd.io/containerd.v1.types.event.RuntimeEvent" {
+			e := &event.RuntimeEvent{}
+			if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
+				return UnknownExitStatus, err
+			}
+
+			if e.Type != tasktypes.Event_EXIT {
+				continue
+			}
+
+			if e.ID == p.task.containerID && e.Pid == p.pid {
+				return e.ExitStatus, nil
+			}
+		}
+	}
 }
 
 func (p *process) CloseIO(ctx context.Context, opts ...IOCloserOpts) error {

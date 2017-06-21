@@ -83,7 +83,7 @@ func getEventOutput(evt *event.Envelope) (string, error) {
 		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
 			return out, err
 		}
-		out = "id=" + e.ContainerID
+		out = fmt.Sprintf("id=%s pid=%d status=%d", e.ContainerID, e.Pid, e.ExitStatus)
 	case "types.containerd.io/containerd.v1.types.event.ContainerUpdate":
 		e := &event.ContainerUpdate{}
 		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
