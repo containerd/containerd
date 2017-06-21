@@ -67,13 +67,9 @@ func TestMain(m *testing.M) {
 		}
 	}
 
-	client, err := New(address)
+	client, err := waitForDaemonStart(ctx, address)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	if err := waitForDaemonStart(ctx, client); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, "immediate fail!", err)
 		os.Exit(1)
 	}
 
@@ -110,20 +106,26 @@ func TestMain(m *testing.M) {
 	os.Exit(status)
 }
 
-func waitForDaemonStart(ctx context.Context, client *Client) error {
+func waitForDaemonStart(ctx context.Context, address string) (*Client, error) {
 	var (
+		client  *Client
 		serving bool
 		err     error
 	)
 
 	for i := 0; i < 20; i++ {
-		serving, err = client.IsServing(ctx)
-		if serving {
-			return nil
+		if client == nil {
+			client, err = New(address)
+		}
+		if err == nil {
+			serving, err = client.IsServing(ctx)
+			if serving {
+				return client, nil
+			}
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	return fmt.Errorf("containerd did not start within 2s: %v", err)
+	return nil, fmt.Errorf("containerd did not start within 2s: %v", err)
 }
 
 func TestNewClient(t *testing.T) {
