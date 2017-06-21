@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"

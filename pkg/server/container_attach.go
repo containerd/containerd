@@ -21,7 +21,7 @@ import (
 
 	"golang.org/x/net/context"
 
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 // Attach prepares a streaming endpoint to attach to a running container, and returns the address.

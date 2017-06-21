@@ -24,7 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 )
 

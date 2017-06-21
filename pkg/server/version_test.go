@@ -25,7 +25,7 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
 )

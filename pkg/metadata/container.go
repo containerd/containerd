@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
 )

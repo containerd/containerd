@@ -33,7 +33,7 @@ import (
 	"github.com/opencontainers/runtime-tools/generate"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 )

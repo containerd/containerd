@@ -17,13 +17,14 @@ limitations under the License.
 package server
 
 import (
+	"errors"
+
 	"golang.org/x/net/context"
 
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
-// UpdateRuntimeConfig updates the runtime config. Currently only handles podCIDR updates.
-// TODO(random-liu): Figure out how to handle pod cidr in cri-containerd.
-func (c *criContainerdService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateRuntimeConfigRequest) (*runtime.UpdateRuntimeConfigResponse, error) {
-	return &runtime.UpdateRuntimeConfigResponse{}, nil
+// ListContainerStats returns stats of all running containers.
+func (c *criContainerdService) ListContainerStats(ctx context.Context, in *runtime.ListContainerStatsRequest) (*runtime.ListContainerStatsResponse, error) {
+	return nil, errors.New("not implemented")
 }

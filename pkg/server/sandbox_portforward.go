@@ -21,7 +21,7 @@ import (
 
 	"golang.org/x/net/context"
 
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 // PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
