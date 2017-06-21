@@ -21,7 +21,6 @@ import (
 	namespacesapi "github.com/containerd/containerd/api/services/namespaces"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	versionservice "github.com/containerd/containerd/api/services/version"
-	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
@@ -112,7 +111,7 @@ func getSnapshotter(context *cli.Context) (snapshot.Snapshotter, error) {
 	if err != nil {
 		return nil, err
 	}
-	return snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotClient(conn)), nil
+	return snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotsClient(conn)), nil
 }
 
 func getImageStore(clicontext *cli.Context) (images.Store, error) {
@@ -137,21 +136,6 @@ func getVersionService(context *cli.Context) (versionservice.VersionClient, erro
 		return nil, err
 	}
 	return versionservice.NewVersionClient(conn), nil
-}
-
-func waitContainer(events execution.Tasks_EventsClient, id string, pid uint32) (uint32, error) {
-	for {
-		e, err := events.Recv()
-		if err != nil {
-			return 255, err
-		}
-		if e.Type != task.Event_EXIT {
-			continue
-		}
-		if e.ID == id && e.Pid == pid {
-			return e.ExitStatus, nil
-		}
-	}
 }
 
 func forwardAllSignals(ctx gocontext.Context, task killer) chan os.Signal {

@@ -98,6 +98,7 @@ func (s *Service) Delete(ctx context.Context, r *shimapi.DeleteRequest) (*shimap
 	return &shimapi.DeleteResponse{
 		ExitStatus: uint32(p.Status()),
 		ExitedAt:   p.ExitedAt(),
+		Pid:        uint32(p.Pid()),
 	}, nil
 }
 
@@ -119,6 +120,7 @@ func (s *Service) DeleteProcess(ctx context.Context, r *shimapi.DeleteProcessReq
 	return &shimapi.DeleteResponse{
 		ExitStatus: uint32(p.Status()),
 		ExitedAt:   p.ExitedAt(),
+		Pid:        uint32(p.Pid()),
 	}, nil
 }
 

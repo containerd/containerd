@@ -169,10 +169,6 @@ func (r *Runtime) Get(ctx context.Context, id string) (plugin.Task, error) {
 	return c, nil
 }
 
-func (r *Runtime) Events(ctx context.Context) <-chan *plugin.Event {
-	return r.events
-}
-
 func (r *Runtime) sendEvent(id string, evType plugin.EventType, pid, exitStatus uint32, exitedAt time.Time) {
 	r.events <- &plugin.Event{
 		Timestamp:  time.Now(),

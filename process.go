@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"syscall"
 
+	eventsapi "github.com/containerd/containerd/api/services/events"
 	"github.com/containerd/containerd/api/services/execution"
-	taskapi "github.com/containerd/containerd/api/types/task"
+	"github.com/containerd/containerd/api/types/event"
+	tasktypes "github.com/containerd/containerd/api/types/task"
+	"github.com/gogo/protobuf/proto"
 	protobuf "github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -38,7 +41,7 @@ func (p *process) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	request := &execution.ExecRequest{
+	request := &execution.ExecProcessRequest{
 		ContainerID: p.task.containerID,
 		Terminal:    p.io.Terminal,
 		Stdin:       p.io.Stdin,
@@ -70,30 +73,43 @@ func (p *process) Kill(ctx context.Context, s syscall.Signal) error {
 }
 
 func (p *process) Wait(ctx context.Context) (uint32, error) {
-	events, err := p.task.client.TaskService().Events(ctx, &execution.EventsRequest{})
+	// TODO (ehazlett): add filtering for specific event
+	events, err := p.task.client.EventService().Stream(ctx, &eventsapi.StreamEventsRequest{})
 	if err != nil {
 		return UnknownExitStatus, err
 	}
 	<-p.pidSync
 	for {
-		e, err := events.Recv()
+		evt, err := events.Recv()
 		if err != nil {
 			return UnknownExitStatus, err
 		}
-		if e.Type != taskapi.Event_EXIT {
-			continue
-		}
-		if e.ID == p.task.containerID && e.Pid == p.pid {
-			return e.ExitStatus, nil
+		if evt.Event.TypeUrl == "types.containerd.io/containerd.v1.types.event.RuntimeEvent" {
+			e := &event.RuntimeEvent{}
+			if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
+				return UnknownExitStatus, err
+			}
+
+			if e.Type != tasktypes.Event_EXIT {
+				continue
+			}
+
+			if e.ID == p.task.containerID && e.Pid == p.pid {
+				return e.ExitStatus, nil
+			}
 		}
 	}
 }
 
-func (p *process) CloseStdin(ctx context.Context) error {
-	_, err := p.task.client.TaskService().CloseStdin(ctx, &execution.CloseStdinRequest{
+func (p *process) CloseIO(ctx context.Context, opts ...IOCloserOpts) error {
+	r := &execution.CloseIORequest{
 		ContainerID: p.task.containerID,
 		Pid:         p.pid,
-	})
+	}
+	for _, o := range opts {
+		o(r)
+	}
+	_, err := p.task.client.TaskService().CloseIO(ctx, r)
 	return err
 }
 
@@ -102,7 +118,7 @@ func (p *process) IO() *IO {
 }
 
 func (p *process) Resize(ctx context.Context, w, h uint32) error {
-	_, err := p.task.client.TaskService().Pty(ctx, &execution.PtyRequest{
+	_, err := p.task.client.TaskService().ResizePty(ctx, &execution.ResizePtyRequest{
 		ContainerID: p.task.containerID,
 		Width:       w,
 		Height:      h,

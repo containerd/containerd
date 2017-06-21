@@ -9,28 +9,27 @@
 		github.com/containerd/containerd/api/services/execution/execution.proto
 
 	It has these top-level messages:
-		CreateRequest
-		CreateResponse
-		StartRequest
-		DeleteRequest
+		CreateTaskRequest
+		CreateTaskResponse
+		StartTaskRequest
+		DeleteTaskRequest
 		DeleteResponse
 		DeleteProcessRequest
-		InfoRequest
-		InfoResponse
-		ListRequest
-		ListResponse
+		GetTaskRequest
+		GetTaskResponse
+		ListTasksRequest
+		ListTasksResponse
 		KillRequest
-		EventsRequest
-		ExecRequest
-		ExecResponse
-		PtyRequest
-		CloseStdinRequest
-		PauseRequest
-		ResumeRequest
-		ProcessesRequest
-		ProcessesResponse
-		CheckpointRequest
-		CheckpointResponse
+		ExecProcessRequest
+		ExecProcessResponse
+		ResizePtyRequest
+		CloseIORequest
+		PauseTaskRequest
+		ResumeTaskRequest
+		ListProcessesRequest
+		ListProcessesResponse
+		CheckpointTaskRequest
+		CheckpointTaskResponse
 */
 package execution
 
@@ -57,6 +56,7 @@ import github_com_gogo_protobuf_types "github.com/gogo/protobuf/types"
 
 import strings "strings"
 import reflect "reflect"
+import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
 
 import io "io"
 
@@ -72,14 +72,12 @@ var _ = time.Kitchen
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
-type CreateRequest struct {
+type CreateTaskRequest struct {
 	// ContainerID specifies the container to use for creating this task.
 	//
 	// The spec from the provided container id will be used to create the
 	// task associated with this container. Only one task can be run at a time
 	// per container.
-	//
-	// This should be created using the Containers service.
 	ContainerID string `protobuf:"bytes,2,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
 	// RootFS provides the pre-chroot mounts to perform in the shim before
 	// executing the container task.
@@ -88,46 +86,47 @@ type CreateRequest struct {
 	// Typically, these mounts should be resolved from snapshots specified on
 	// the container object.
 	Rootfs     []*containerd_v1_types.Mount     `protobuf:"bytes,3,rep,name=rootfs" json:"rootfs,omitempty"`
-	Stdin      string                           `protobuf:"bytes,5,opt,name=stdin,proto3" json:"stdin,omitempty"`
-	Stdout     string                           `protobuf:"bytes,6,opt,name=stdout,proto3" json:"stdout,omitempty"`
-	Stderr     string                           `protobuf:"bytes,7,opt,name=stderr,proto3" json:"stderr,omitempty"`
-	Terminal   bool                             `protobuf:"varint,8,opt,name=terminal,proto3" json:"terminal,omitempty"`
-	Checkpoint *containerd_v1_types1.Descriptor `protobuf:"bytes,9,opt,name=checkpoint" json:"checkpoint,omitempty"`
+	Stdin      string                           `protobuf:"bytes,4,opt,name=stdin,proto3" json:"stdin,omitempty"`
+	Stdout     string                           `protobuf:"bytes,5,opt,name=stdout,proto3" json:"stdout,omitempty"`
+	Stderr     string                           `protobuf:"bytes,6,opt,name=stderr,proto3" json:"stderr,omitempty"`
+	Terminal   bool                             `protobuf:"varint,7,opt,name=terminal,proto3" json:"terminal,omitempty"`
+	Checkpoint *containerd_v1_types1.Descriptor `protobuf:"bytes,8,opt,name=checkpoint" json:"checkpoint,omitempty"`
 }
 
-func (m *CreateRequest) Reset()                    { *m = CreateRequest{} }
-func (*CreateRequest) ProtoMessage()               {}
-func (*CreateRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{0} }
+func (m *CreateTaskRequest) Reset()                    { *m = CreateTaskRequest{} }
+func (*CreateTaskRequest) ProtoMessage()               {}
+func (*CreateTaskRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{0} }
 
-type CreateResponse struct {
+type CreateTaskResponse struct {
 	ContainerID string `protobuf:"bytes,2,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
 	Pid         uint32 `protobuf:"varint,3,opt,name=pid,proto3" json:"pid,omitempty"`
 }
 
-func (m *CreateResponse) Reset()                    { *m = CreateResponse{} }
-func (*CreateResponse) ProtoMessage()               {}
-func (*CreateResponse) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{1} }
+func (m *CreateTaskResponse) Reset()                    { *m = CreateTaskResponse{} }
+func (*CreateTaskResponse) ProtoMessage()               {}
+func (*CreateTaskResponse) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{1} }
 
-type StartRequest struct {
+type StartTaskRequest struct {
 	ContainerID string `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
 }
 
-func (m *StartRequest) Reset()                    { *m = StartRequest{} }
-func (*StartRequest) ProtoMessage()               {}
-func (*StartRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{2} }
+func (m *StartTaskRequest) Reset()                    { *m = StartTaskRequest{} }
+func (*StartTaskRequest) ProtoMessage()               {}
+func (*StartTaskRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{2} }
 
-type DeleteRequest struct {
+type DeleteTaskRequest struct {
 	ContainerID string `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
 }
 
-func (m *DeleteRequest) Reset()                    { *m = DeleteRequest{} }
-func (*DeleteRequest) ProtoMessage()               {}
-func (*DeleteRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{3} }
+func (m *DeleteTaskRequest) Reset()                    { *m = DeleteTaskRequest{} }
+func (*DeleteTaskRequest) ProtoMessage()               {}
+func (*DeleteTaskRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{3} }
 
 type DeleteResponse struct {
 	ContainerID string    `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
-	ExitStatus  uint32    `protobuf:"varint,2,opt,name=exit_status,json=exitStatus,proto3" json:"exit_status,omitempty"`
-	ExitedAt    time.Time `protobuf:"bytes,3,opt,name=exited_at,json=exitedAt,stdtime" json:"exited_at"`
+	Pid         uint32    `protobuf:"varint,2,opt,name=pid,proto3" json:"pid,omitempty"`
+	ExitStatus  uint32    `protobuf:"varint,3,opt,name=exit_status,json=exitStatus,proto3" json:"exit_status,omitempty"`
+	ExitedAt    time.Time `protobuf:"bytes,4,opt,name=exited_at,json=exitedAt,stdtime" json:"exited_at"`
 }
 
 func (m *DeleteResponse) Reset()                    { *m = DeleteResponse{} }
@@ -143,36 +142,37 @@ func (m *DeleteProcessRequest) Reset()                    { *m = DeleteProcessRe
 func (*DeleteProcessRequest) ProtoMessage()               {}
 func (*DeleteProcessRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{5} }
 
-type InfoRequest struct {
+type GetTaskRequest struct {
 	ContainerID string `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
 }
 
-func (m *InfoRequest) Reset()                    { *m = InfoRequest{} }
-func (*InfoRequest) ProtoMessage()               {}
-func (*InfoRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{6} }
+func (m *GetTaskRequest) Reset()                    { *m = GetTaskRequest{} }
+func (*GetTaskRequest) ProtoMessage()               {}
+func (*GetTaskRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{6} }
 
-type InfoResponse struct {
+type GetTaskResponse struct {
 	Task *containerd_v1_types2.Task `protobuf:"bytes,1,opt,name=task" json:"task,omitempty"`
 }
 
-func (m *InfoResponse) Reset()                    { *m = InfoResponse{} }
-func (*InfoResponse) ProtoMessage()               {}
-func (*InfoResponse) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{7} }
+func (m *GetTaskResponse) Reset()                    { *m = GetTaskResponse{} }
+func (*GetTaskResponse) ProtoMessage()               {}
+func (*GetTaskResponse) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{7} }
 
-type ListRequest struct {
+type ListTasksRequest struct {
+	Filter string `protobuf:"bytes,1,opt,name=filter,proto3" json:"filter,omitempty"`
 }
 
-func (m *ListRequest) Reset()                    { *m = ListRequest{} }
-func (*ListRequest) ProtoMessage()               {}
-func (*ListRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{8} }
+func (m *ListTasksRequest) Reset()                    { *m = ListTasksRequest{} }
+func (*ListTasksRequest) ProtoMessage()               {}
+func (*ListTasksRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{8} }
 
-type ListResponse struct {
+type ListTasksResponse struct {
 	Tasks []*containerd_v1_types2.Task `protobuf:"bytes,1,rep,name=tasks" json:"tasks,omitempty"`
 }
 
-func (m *ListResponse) Reset()                    { *m = ListResponse{} }
-func (*ListResponse) ProtoMessage()               {}
-func (*ListResponse) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{9} }
+func (m *ListTasksResponse) Reset()                    { *m = ListTasksResponse{} }
+func (*ListTasksResponse) ProtoMessage()               {}
+func (*ListTasksResponse) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{9} }
 
 type KillRequest struct {
 	ContainerID string `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
@@ -292,136 +292,124 @@ func _KillRequest_OneofSizer(msg proto.Message) (n int) {
 	return n
 }
 
-type EventsRequest struct {
-}
-
-func (m *EventsRequest) Reset()                    { *m = EventsRequest{} }
-func (*EventsRequest) ProtoMessage()               {}
-func (*EventsRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{11} }
-
-type ExecRequest struct {
+type ExecProcessRequest struct {
 	// ContainerID specifies the container in which to exec the process.
 	ContainerID string `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
-	Terminal    bool   `protobuf:"varint,2,opt,name=terminal,proto3" json:"terminal,omitempty"`
-	Stdin       string `protobuf:"bytes,3,opt,name=stdin,proto3" json:"stdin,omitempty"`
-	Stdout      string `protobuf:"bytes,4,opt,name=stdout,proto3" json:"stdout,omitempty"`
-	Stderr      string `protobuf:"bytes,5,opt,name=stderr,proto3" json:"stderr,omitempty"`
+	Stdin       string `protobuf:"bytes,2,opt,name=stdin,proto3" json:"stdin,omitempty"`
+	Stdout      string `protobuf:"bytes,3,opt,name=stdout,proto3" json:"stdout,omitempty"`
+	Stderr      string `protobuf:"bytes,4,opt,name=stderr,proto3" json:"stderr,omitempty"`
+	Terminal    bool   `protobuf:"varint,5,opt,name=terminal,proto3" json:"terminal,omitempty"`
 	// Spec for starting a process in the target container.
 	//
 	// For runc, this is a process spec, for example.
 	Spec *google_protobuf1.Any `protobuf:"bytes,6,opt,name=spec" json:"spec,omitempty"`
 }
 
-func (m *ExecRequest) Reset()                    { *m = ExecRequest{} }
-func (*ExecRequest) ProtoMessage()               {}
-func (*ExecRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{12} }
+func (m *ExecProcessRequest) Reset()                    { *m = ExecProcessRequest{} }
+func (*ExecProcessRequest) ProtoMessage()               {}
+func (*ExecProcessRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{11} }
 
-type ExecResponse struct {
+type ExecProcessResponse struct {
 	Pid uint32 `protobuf:"varint,1,opt,name=pid,proto3" json:"pid,omitempty"`
 }
 
-func (m *ExecResponse) Reset()                    { *m = ExecResponse{} }
-func (*ExecResponse) ProtoMessage()               {}
-func (*ExecResponse) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{13} }
+func (m *ExecProcessResponse) Reset()                    { *m = ExecProcessResponse{} }
+func (*ExecProcessResponse) ProtoMessage()               {}
+func (*ExecProcessResponse) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{12} }
 
-type PtyRequest struct {
+type ResizePtyRequest struct {
 	ContainerID string `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
 	Pid         uint32 `protobuf:"varint,2,opt,name=pid,proto3" json:"pid,omitempty"`
 	Width       uint32 `protobuf:"varint,3,opt,name=width,proto3" json:"width,omitempty"`
 	Height      uint32 `protobuf:"varint,4,opt,name=height,proto3" json:"height,omitempty"`
 }
 
-func (m *PtyRequest) Reset()                    { *m = PtyRequest{} }
-func (*PtyRequest) ProtoMessage()               {}
-func (*PtyRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{14} }
+func (m *ResizePtyRequest) Reset()                    { *m = ResizePtyRequest{} }
+func (*ResizePtyRequest) ProtoMessage()               {}
+func (*ResizePtyRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{13} }
 
-type CloseStdinRequest struct {
+type CloseIORequest struct {
 	ContainerID string `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
 	Pid         uint32 `protobuf:"varint,2,opt,name=pid,proto3" json:"pid,omitempty"`
+	Stdin       bool   `protobuf:"varint,3,opt,name=stdin,proto3" json:"stdin,omitempty"`
 }
 
-func (m *CloseStdinRequest) Reset()                    { *m = CloseStdinRequest{} }
-func (*CloseStdinRequest) ProtoMessage()               {}
-func (*CloseStdinRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{15} }
+func (m *CloseIORequest) Reset()                    { *m = CloseIORequest{} }
+func (*CloseIORequest) ProtoMessage()               {}
+func (*CloseIORequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{14} }
 
-type PauseRequest struct {
+type PauseTaskRequest struct {
 	ContainerID string `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
 }
 
-func (m *PauseRequest) Reset()                    { *m = PauseRequest{} }
-func (*PauseRequest) ProtoMessage()               {}
-func (*PauseRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{16} }
+func (m *PauseTaskRequest) Reset()                    { *m = PauseTaskRequest{} }
+func (*PauseTaskRequest) ProtoMessage()               {}
+func (*PauseTaskRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{15} }
 
-type ResumeRequest struct {
+type ResumeTaskRequest struct {
 	ContainerID string `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
 }
 
-func (m *ResumeRequest) Reset()                    { *m = ResumeRequest{} }
-func (*ResumeRequest) ProtoMessage()               {}
-func (*ResumeRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{17} }
+func (m *ResumeTaskRequest) Reset()                    { *m = ResumeTaskRequest{} }
+func (*ResumeTaskRequest) ProtoMessage()               {}
+func (*ResumeTaskRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{16} }
 
-type ProcessesRequest struct {
+type ListProcessesRequest struct {
 	ContainerID string `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
 }
 
-func (m *ProcessesRequest) Reset()                    { *m = ProcessesRequest{} }
-func (*ProcessesRequest) ProtoMessage()               {}
-func (*ProcessesRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{18} }
+func (m *ListProcessesRequest) Reset()                    { *m = ListProcessesRequest{} }
+func (*ListProcessesRequest) ProtoMessage()               {}
+func (*ListProcessesRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{17} }
 
-type ProcessesResponse struct {
+type ListProcessesResponse struct {
 	Processes []*containerd_v1_types2.Process `protobuf:"bytes,1,rep,name=processes" json:"processes,omitempty"`
 }
 
-func (m *ProcessesResponse) Reset()                    { *m = ProcessesResponse{} }
-func (*ProcessesResponse) ProtoMessage()               {}
-func (*ProcessesResponse) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{19} }
+func (m *ListProcessesResponse) Reset()                    { *m = ListProcessesResponse{} }
+func (*ListProcessesResponse) ProtoMessage()               {}
+func (*ListProcessesResponse) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{18} }
 
-type CheckpointRequest struct {
+type CheckpointTaskRequest struct {
 	ContainerID      string                                     `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
-	AllowTcp         bool                                       `protobuf:"varint,2,opt,name=allow_tcp,json=allowTcp,proto3" json:"allow_tcp,omitempty"`
-	AllowUnixSockets bool                                       `protobuf:"varint,3,opt,name=allow_unix_sockets,json=allowUnixSockets,proto3" json:"allow_unix_sockets,omitempty"`
-	AllowTerminal    bool                                       `protobuf:"varint,4,opt,name=allow_terminal,json=allowTerminal,proto3" json:"allow_terminal,omitempty"`
-	FileLocks        bool                                       `protobuf:"varint,5,opt,name=file_locks,json=fileLocks,proto3" json:"file_locks,omitempty"`
-	EmptyNamespaces  []string                                   `protobuf:"bytes,6,rep,name=empty_namespaces,json=emptyNamespaces" json:"empty_namespaces,omitempty"`
-	ParentCheckpoint github_com_opencontainers_go_digest.Digest `protobuf:"bytes,7,opt,name=parent_checkpoint,json=parentCheckpoint,proto3,customtype=github.com/opencontainers/go-digest.Digest" json:"parent_checkpoint"`
-	Exit             bool                                       `protobuf:"varint,8,opt,name=exit,proto3" json:"exit,omitempty"`
+	ParentCheckpoint github_com_opencontainers_go_digest.Digest `protobuf:"bytes,2,opt,name=parent_checkpoint,json=parentCheckpoint,proto3,customtype=github.com/opencontainers/go-digest.Digest" json:"parent_checkpoint"`
+	Options          map[string]string                          `protobuf:"bytes,3,rep,name=options" json:"options,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
-func (m *CheckpointRequest) Reset()                    { *m = CheckpointRequest{} }
-func (*CheckpointRequest) ProtoMessage()               {}
-func (*CheckpointRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{20} }
+func (m *CheckpointTaskRequest) Reset()                    { *m = CheckpointTaskRequest{} }
+func (*CheckpointTaskRequest) ProtoMessage()               {}
+func (*CheckpointTaskRequest) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{19} }
 
-type CheckpointResponse struct {
+type CheckpointTaskResponse struct {
 	Descriptors []*containerd_v1_types1.Descriptor `protobuf:"bytes,1,rep,name=descriptors" json:"descriptors,omitempty"`
 }
 
-func (m *CheckpointResponse) Reset()                    { *m = CheckpointResponse{} }
-func (*CheckpointResponse) ProtoMessage()               {}
-func (*CheckpointResponse) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{21} }
+func (m *CheckpointTaskResponse) Reset()                    { *m = CheckpointTaskResponse{} }
+func (*CheckpointTaskResponse) ProtoMessage()               {}
+func (*CheckpointTaskResponse) Descriptor() ([]byte, []int) { return fileDescriptorExecution, []int{20} }
 
 func init() {
-	proto.RegisterType((*CreateRequest)(nil), "containerd.v1.services.execution.CreateRequest")
-	proto.RegisterType((*CreateResponse)(nil), "containerd.v1.services.execution.CreateResponse")
-	proto.RegisterType((*StartRequest)(nil), "containerd.v1.services.execution.StartRequest")
-	proto.RegisterType((*DeleteRequest)(nil), "containerd.v1.services.execution.DeleteRequest")
-	proto.RegisterType((*DeleteResponse)(nil), "containerd.v1.services.execution.DeleteResponse")
-	proto.RegisterType((*DeleteProcessRequest)(nil), "containerd.v1.services.execution.DeleteProcessRequest")
-	proto.RegisterType((*InfoRequest)(nil), "containerd.v1.services.execution.InfoRequest")
-	proto.RegisterType((*InfoResponse)(nil), "containerd.v1.services.execution.InfoResponse")
-	proto.RegisterType((*ListRequest)(nil), "containerd.v1.services.execution.ListRequest")
-	proto.RegisterType((*ListResponse)(nil), "containerd.v1.services.execution.ListResponse")
-	proto.RegisterType((*KillRequest)(nil), "containerd.v1.services.execution.KillRequest")
-	proto.RegisterType((*EventsRequest)(nil), "containerd.v1.services.execution.EventsRequest")
-	proto.RegisterType((*ExecRequest)(nil), "containerd.v1.services.execution.ExecRequest")
-	proto.RegisterType((*ExecResponse)(nil), "containerd.v1.services.execution.ExecResponse")
-	proto.RegisterType((*PtyRequest)(nil), "containerd.v1.services.execution.PtyRequest")
-	proto.RegisterType((*CloseStdinRequest)(nil), "containerd.v1.services.execution.CloseStdinRequest")
-	proto.RegisterType((*PauseRequest)(nil), "containerd.v1.services.execution.PauseRequest")
-	proto.RegisterType((*ResumeRequest)(nil), "containerd.v1.services.execution.ResumeRequest")
-	proto.RegisterType((*ProcessesRequest)(nil), "containerd.v1.services.execution.ProcessesRequest")
-	proto.RegisterType((*ProcessesResponse)(nil), "containerd.v1.services.execution.ProcessesResponse")
-	proto.RegisterType((*CheckpointRequest)(nil), "containerd.v1.services.execution.CheckpointRequest")
-	proto.RegisterType((*CheckpointResponse)(nil), "containerd.v1.services.execution.CheckpointResponse")
+	proto.RegisterType((*CreateTaskRequest)(nil), "containerd.services.tasks.v1.CreateTaskRequest")
+	proto.RegisterType((*CreateTaskResponse)(nil), "containerd.services.tasks.v1.CreateTaskResponse")
+	proto.RegisterType((*StartTaskRequest)(nil), "containerd.services.tasks.v1.StartTaskRequest")
+	proto.RegisterType((*DeleteTaskRequest)(nil), "containerd.services.tasks.v1.DeleteTaskRequest")
+	proto.RegisterType((*DeleteResponse)(nil), "containerd.services.tasks.v1.DeleteResponse")
+	proto.RegisterType((*DeleteProcessRequest)(nil), "containerd.services.tasks.v1.DeleteProcessRequest")
+	proto.RegisterType((*GetTaskRequest)(nil), "containerd.services.tasks.v1.GetTaskRequest")
+	proto.RegisterType((*GetTaskResponse)(nil), "containerd.services.tasks.v1.GetTaskResponse")
+	proto.RegisterType((*ListTasksRequest)(nil), "containerd.services.tasks.v1.ListTasksRequest")
+	proto.RegisterType((*ListTasksResponse)(nil), "containerd.services.tasks.v1.ListTasksResponse")
+	proto.RegisterType((*KillRequest)(nil), "containerd.services.tasks.v1.KillRequest")
+	proto.RegisterType((*ExecProcessRequest)(nil), "containerd.services.tasks.v1.ExecProcessRequest")
+	proto.RegisterType((*ExecProcessResponse)(nil), "containerd.services.tasks.v1.ExecProcessResponse")
+	proto.RegisterType((*ResizePtyRequest)(nil), "containerd.services.tasks.v1.ResizePtyRequest")
+	proto.RegisterType((*CloseIORequest)(nil), "containerd.services.tasks.v1.CloseIORequest")
+	proto.RegisterType((*PauseTaskRequest)(nil), "containerd.services.tasks.v1.PauseTaskRequest")
+	proto.RegisterType((*ResumeTaskRequest)(nil), "containerd.services.tasks.v1.ResumeTaskRequest")
+	proto.RegisterType((*ListProcessesRequest)(nil), "containerd.services.tasks.v1.ListProcessesRequest")
+	proto.RegisterType((*ListProcessesResponse)(nil), "containerd.services.tasks.v1.ListProcessesResponse")
+	proto.RegisterType((*CheckpointTaskRequest)(nil), "containerd.services.tasks.v1.CheckpointTaskRequest")
+	proto.RegisterType((*CheckpointTaskResponse)(nil), "containerd.services.tasks.v1.CheckpointTaskResponse")
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -435,21 +423,24 @@ const _ = grpc.SupportPackageIsVersion4
 // Client API for Tasks service
 
 type TasksClient interface {
-	Create(ctx context.Context, in *CreateRequest, opts ...grpc.CallOption) (*CreateResponse, error)
-	Start(ctx context.Context, in *StartRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error)
-	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
+	// Create a task.
+	Create(ctx context.Context, in *CreateTaskRequest, opts ...grpc.CallOption) (*CreateTaskResponse, error)
+	// Start a task.
+	Start(ctx context.Context, in *StartTaskRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error)
+	// Delete a task and on disk state.
+	Delete(ctx context.Context, in *DeleteTaskRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
 	DeleteProcess(ctx context.Context, in *DeleteProcessRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
-	Info(ctx context.Context, in *InfoRequest, opts ...grpc.CallOption) (*InfoResponse, error)
-	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
+	Get(ctx context.Context, in *GetTaskRequest, opts ...grpc.CallOption) (*GetTaskResponse, error)
+	List(ctx context.Context, in *ListTasksRequest, opts ...grpc.CallOption) (*ListTasksResponse, error)
+	// Kill a task or process.
 	Kill(ctx context.Context, in *KillRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error)
-	Events(ctx context.Context, in *EventsRequest, opts ...grpc.CallOption) (Tasks_EventsClient, error)
-	Exec(ctx context.Context, in *ExecRequest, opts ...grpc.CallOption) (*ExecResponse, error)
-	Pty(ctx context.Context, in *PtyRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error)
-	CloseStdin(ctx context.Context, in *CloseStdinRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error)
-	Pause(ctx context.Context, in *PauseRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error)
-	Resume(ctx context.Context, in *ResumeRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error)
-	Processes(ctx context.Context, in *ProcessesRequest, opts ...grpc.CallOption) (*ProcessesResponse, error)
-	Checkpoint(ctx context.Context, in *CheckpointRequest, opts ...grpc.CallOption) (*CheckpointResponse, error)
+	Exec(ctx context.Context, in *ExecProcessRequest, opts ...grpc.CallOption) (*ExecProcessResponse, error)
+	ResizePty(ctx context.Context, in *ResizePtyRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error)
+	CloseIO(ctx context.Context, in *CloseIORequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error)
+	Pause(ctx context.Context, in *PauseTaskRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error)
+	Resume(ctx context.Context, in *ResumeTaskRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error)
+	ListProcesses(ctx context.Context, in *ListProcessesRequest, opts ...grpc.CallOption) (*ListProcessesResponse, error)
+	Checkpoint(ctx context.Context, in *CheckpointTaskRequest, opts ...grpc.CallOption) (*CheckpointTaskResponse, error)
 }
 
 type tasksClient struct {
@@ -460,27 +451,27 @@ func NewTasksClient(cc *grpc.ClientConn) TasksClient {
 	return &tasksClient{cc}
 }
 
-func (c *tasksClient) Create(ctx context.Context, in *CreateRequest, opts ...grpc.CallOption) (*CreateResponse, error) {
-	out := new(CreateResponse)
-	err := grpc.Invoke(ctx, "/containerd.v1.services.execution.Tasks/Create", in, out, c.cc, opts...)
+func (c *tasksClient) Create(ctx context.Context, in *CreateTaskRequest, opts ...grpc.CallOption) (*CreateTaskResponse, error) {
+	out := new(CreateTaskResponse)
+	err := grpc.Invoke(ctx, "/containerd.services.tasks.v1.Tasks/Create", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *tasksClient) Start(ctx context.Context, in *StartRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+func (c *tasksClient) Start(ctx context.Context, in *StartTaskRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
 	out := new(google_protobuf.Empty)
-	err := grpc.Invoke(ctx, "/containerd.v1.services.execution.Tasks/Start", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/containerd.services.tasks.v1.Tasks/Start", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *tasksClient) Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error) {
+func (c *tasksClient) Delete(ctx context.Context, in *DeleteTaskRequest, opts ...grpc.CallOption) (*DeleteResponse, error) {
 	out := new(DeleteResponse)
-	err := grpc.Invoke(ctx, "/containerd.v1.services.execution.Tasks/Delete", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/containerd.services.tasks.v1.Tasks/Delete", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -489,25 +480,25 @@ func (c *tasksClient) Delete(ctx context.Context, in *DeleteRequest, opts ...grp
 
 func (c *tasksClient) DeleteProcess(ctx context.Context, in *DeleteProcessRequest, opts ...grpc.CallOption) (*DeleteResponse, error) {
 	out := new(DeleteResponse)
-	err := grpc.Invoke(ctx, "/containerd.v1.services.execution.Tasks/DeleteProcess", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/containerd.services.tasks.v1.Tasks/DeleteProcess", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *tasksClient) Info(ctx context.Context, in *InfoRequest, opts ...grpc.CallOption) (*InfoResponse, error) {
-	out := new(InfoResponse)
-	err := grpc.Invoke(ctx, "/containerd.v1.services.execution.Tasks/Info", in, out, c.cc, opts...)
+func (c *tasksClient) Get(ctx context.Context, in *GetTaskRequest, opts ...grpc.CallOption) (*GetTaskResponse, error) {
+	out := new(GetTaskResponse)
+	err := grpc.Invoke(ctx, "/containerd.services.tasks.v1.Tasks/Get", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *tasksClient) List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error) {
-	out := new(ListResponse)
-	err := grpc.Invoke(ctx, "/containerd.v1.services.execution.Tasks/List", in, out, c.cc, opts...)
+func (c *tasksClient) List(ctx context.Context, in *ListTasksRequest, opts ...grpc.CallOption) (*ListTasksResponse, error) {
+	out := new(ListTasksResponse)
+	err := grpc.Invoke(ctx, "/containerd.services.tasks.v1.Tasks/List", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -516,102 +507,70 @@ func (c *tasksClient) List(ctx context.Context, in *ListRequest, opts ...grpc.Ca
 
 func (c *tasksClient) Kill(ctx context.Context, in *KillRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
 	out := new(google_protobuf.Empty)
-	err := grpc.Invoke(ctx, "/containerd.v1.services.execution.Tasks/Kill", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/containerd.services.tasks.v1.Tasks/Kill", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *tasksClient) Events(ctx context.Context, in *EventsRequest, opts ...grpc.CallOption) (Tasks_EventsClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_Tasks_serviceDesc.Streams[0], c.cc, "/containerd.v1.services.execution.Tasks/Events", opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &tasksEventsClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-type Tasks_EventsClient interface {
-	Recv() (*containerd_v1_types2.Event, error)
-	grpc.ClientStream
-}
-
-type tasksEventsClient struct {
-	grpc.ClientStream
-}
-
-func (x *tasksEventsClient) Recv() (*containerd_v1_types2.Event, error) {
-	m := new(containerd_v1_types2.Event)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-func (c *tasksClient) Exec(ctx context.Context, in *ExecRequest, opts ...grpc.CallOption) (*ExecResponse, error) {
-	out := new(ExecResponse)
-	err := grpc.Invoke(ctx, "/containerd.v1.services.execution.Tasks/Exec", in, out, c.cc, opts...)
+func (c *tasksClient) Exec(ctx context.Context, in *ExecProcessRequest, opts ...grpc.CallOption) (*ExecProcessResponse, error) {
+	out := new(ExecProcessResponse)
+	err := grpc.Invoke(ctx, "/containerd.services.tasks.v1.Tasks/Exec", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *tasksClient) Pty(ctx context.Context, in *PtyRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+func (c *tasksClient) ResizePty(ctx context.Context, in *ResizePtyRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
 	out := new(google_protobuf.Empty)
-	err := grpc.Invoke(ctx, "/containerd.v1.services.execution.Tasks/Pty", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/containerd.services.tasks.v1.Tasks/ResizePty", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *tasksClient) CloseStdin(ctx context.Context, in *CloseStdinRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+func (c *tasksClient) CloseIO(ctx context.Context, in *CloseIORequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
 	out := new(google_protobuf.Empty)
-	err := grpc.Invoke(ctx, "/containerd.v1.services.execution.Tasks/CloseStdin", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/containerd.services.tasks.v1.Tasks/CloseIO", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *tasksClient) Pause(ctx context.Context, in *PauseRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+func (c *tasksClient) Pause(ctx context.Context, in *PauseTaskRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
 	out := new(google_protobuf.Empty)
-	err := grpc.Invoke(ctx, "/containerd.v1.services.execution.Tasks/Pause", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/containerd.services.tasks.v1.Tasks/Pause", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *tasksClient) Resume(ctx context.Context, in *ResumeRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+func (c *tasksClient) Resume(ctx context.Context, in *ResumeTaskRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
 	out := new(google_protobuf.Empty)
-	err := grpc.Invoke(ctx, "/containerd.v1.services.execution.Tasks/Resume", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/containerd.services.tasks.v1.Tasks/Resume", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *tasksClient) Processes(ctx context.Context, in *ProcessesRequest, opts ...grpc.CallOption) (*ProcessesResponse, error) {
-	out := new(ProcessesResponse)
-	err := grpc.Invoke(ctx, "/containerd.v1.services.execution.Tasks/Processes", in, out, c.cc, opts...)
+func (c *tasksClient) ListProcesses(ctx context.Context, in *ListProcessesRequest, opts ...grpc.CallOption) (*ListProcessesResponse, error) {
+	out := new(ListProcessesResponse)
+	err := grpc.Invoke(ctx, "/containerd.services.tasks.v1.Tasks/ListProcesses", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *tasksClient) Checkpoint(ctx context.Context, in *CheckpointRequest, opts ...grpc.CallOption) (*CheckpointResponse, error) {
-	out := new(CheckpointResponse)
-	err := grpc.Invoke(ctx, "/containerd.v1.services.execution.Tasks/Checkpoint", in, out, c.cc, opts...)
+func (c *tasksClient) Checkpoint(ctx context.Context, in *CheckpointTaskRequest, opts ...grpc.CallOption) (*CheckpointTaskResponse, error) {
+	out := new(CheckpointTaskResponse)
+	err := grpc.Invoke(ctx, "/containerd.services.tasks.v1.Tasks/Checkpoint", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -621,21 +580,24 @@ func (c *tasksClient) Checkpoint(ctx context.Context, in *CheckpointRequest, opt
 // Server API for Tasks service
 
 type TasksServer interface {
-	Create(context.Context, *CreateRequest) (*CreateResponse, error)
-	Start(context.Context, *StartRequest) (*google_protobuf.Empty, error)
-	Delete(context.Context, *DeleteRequest) (*DeleteResponse, error)
+	// Create a task.
+	Create(context.Context, *CreateTaskRequest) (*CreateTaskResponse, error)
+	// Start a task.
+	Start(context.Context, *StartTaskRequest) (*google_protobuf.Empty, error)
+	// Delete a task and on disk state.
+	Delete(context.Context, *DeleteTaskRequest) (*DeleteResponse, error)
 	DeleteProcess(context.Context, *DeleteProcessRequest) (*DeleteResponse, error)
-	Info(context.Context, *InfoRequest) (*InfoResponse, error)
-	List(context.Context, *ListRequest) (*ListResponse, error)
+	Get(context.Context, *GetTaskRequest) (*GetTaskResponse, error)
+	List(context.Context, *ListTasksRequest) (*ListTasksResponse, error)
+	// Kill a task or process.
 	Kill(context.Context, *KillRequest) (*google_protobuf.Empty, error)
-	Events(*EventsRequest, Tasks_EventsServer) error
-	Exec(context.Context, *ExecRequest) (*ExecResponse, error)
-	Pty(context.Context, *PtyRequest) (*google_protobuf.Empty, error)
-	CloseStdin(context.Context, *CloseStdinRequest) (*google_protobuf.Empty, error)
-	Pause(context.Context, *PauseRequest) (*google_protobuf.Empty, error)
-	Resume(context.Context, *ResumeRequest) (*google_protobuf.Empty, error)
-	Processes(context.Context, *ProcessesRequest) (*ProcessesResponse, error)
-	Checkpoint(context.Context, *CheckpointRequest) (*CheckpointResponse, error)
+	Exec(context.Context, *ExecProcessRequest) (*ExecProcessResponse, error)
+	ResizePty(context.Context, *ResizePtyRequest) (*google_protobuf.Empty, error)
+	CloseIO(context.Context, *CloseIORequest) (*google_protobuf.Empty, error)
+	Pause(context.Context, *PauseTaskRequest) (*google_protobuf.Empty, error)
+	Resume(context.Context, *ResumeTaskRequest) (*google_protobuf.Empty, error)
+	ListProcesses(context.Context, *ListProcessesRequest) (*ListProcessesResponse, error)
+	Checkpoint(context.Context, *CheckpointTaskRequest) (*CheckpointTaskResponse, error)
 }
 
 func RegisterTasksServer(s *grpc.Server, srv TasksServer) {
@@ -643,7 +605,7 @@ func RegisterTasksServer(s *grpc.Server, srv TasksServer) {
 }
 
 func _Tasks_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateRequest)
+	in := new(CreateTaskRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -652,16 +614,16 @@ func _Tasks_Create_Handler(srv interface{}, ctx context.Context, dec func(interf
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.services.execution.Tasks/Create",
+		FullMethod: "/containerd.services.tasks.v1.Tasks/Create",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TasksServer).Create(ctx, req.(*CreateRequest))
+		return srv.(TasksServer).Create(ctx, req.(*CreateTaskRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _Tasks_Start_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StartRequest)
+	in := new(StartTaskRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -670,16 +632,16 @@ func _Tasks_Start_Handler(srv interface{}, ctx context.Context, dec func(interfa
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.services.execution.Tasks/Start",
+		FullMethod: "/containerd.services.tasks.v1.Tasks/Start",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TasksServer).Start(ctx, req.(*StartRequest))
+		return srv.(TasksServer).Start(ctx, req.(*StartTaskRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _Tasks_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeleteRequest)
+	in := new(DeleteTaskRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -688,10 +650,10 @@ func _Tasks_Delete_Handler(srv interface{}, ctx context.Context, dec func(interf
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.services.execution.Tasks/Delete",
+		FullMethod: "/containerd.services.tasks.v1.Tasks/Delete",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TasksServer).Delete(ctx, req.(*DeleteRequest))
+		return srv.(TasksServer).Delete(ctx, req.(*DeleteTaskRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -706,7 +668,7 @@ func _Tasks_DeleteProcess_Handler(srv interface{}, ctx context.Context, dec func
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.services.execution.Tasks/DeleteProcess",
+		FullMethod: "/containerd.services.tasks.v1.Tasks/DeleteProcess",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TasksServer).DeleteProcess(ctx, req.(*DeleteProcessRequest))
@@ -714,26 +676,26 @@ func _Tasks_DeleteProcess_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Tasks_Info_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(InfoRequest)
+func _Tasks_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTaskRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TasksServer).Info(ctx, in)
+		return srv.(TasksServer).Get(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.services.execution.Tasks/Info",
+		FullMethod: "/containerd.services.tasks.v1.Tasks/Get",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TasksServer).Info(ctx, req.(*InfoRequest))
+		return srv.(TasksServer).Get(ctx, req.(*GetTaskRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _Tasks_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListRequest)
+	in := new(ListTasksRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -742,10 +704,10 @@ func _Tasks_List_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.services.execution.Tasks/List",
+		FullMethod: "/containerd.services.tasks.v1.Tasks/List",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TasksServer).List(ctx, req.(*ListRequest))
+		return srv.(TasksServer).List(ctx, req.(*ListTasksRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -760,7 +722,7 @@ func _Tasks_Kill_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.services.execution.Tasks/Kill",
+		FullMethod: "/containerd.services.tasks.v1.Tasks/Kill",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TasksServer).Kill(ctx, req.(*KillRequest))
@@ -768,29 +730,8 @@ func _Tasks_Kill_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Tasks_Events_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(EventsRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(TasksServer).Events(m, &tasksEventsServer{stream})
-}
-
-type Tasks_EventsServer interface {
-	Send(*containerd_v1_types2.Event) error
-	grpc.ServerStream
-}
-
-type tasksEventsServer struct {
-	grpc.ServerStream
-}
-
-func (x *tasksEventsServer) Send(m *containerd_v1_types2.Event) error {
-	return x.ServerStream.SendMsg(m)
-}
-
 func _Tasks_Exec_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ExecRequest)
+	in := new(ExecProcessRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -799,52 +740,52 @@ func _Tasks_Exec_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.services.execution.Tasks/Exec",
+		FullMethod: "/containerd.services.tasks.v1.Tasks/Exec",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TasksServer).Exec(ctx, req.(*ExecRequest))
+		return srv.(TasksServer).Exec(ctx, req.(*ExecProcessRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Tasks_Pty_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PtyRequest)
+func _Tasks_ResizePty_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResizePtyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TasksServer).Pty(ctx, in)
+		return srv.(TasksServer).ResizePty(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.services.execution.Tasks/Pty",
+		FullMethod: "/containerd.services.tasks.v1.Tasks/ResizePty",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TasksServer).Pty(ctx, req.(*PtyRequest))
+		return srv.(TasksServer).ResizePty(ctx, req.(*ResizePtyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Tasks_CloseStdin_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CloseStdinRequest)
+func _Tasks_CloseIO_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CloseIORequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TasksServer).CloseStdin(ctx, in)
+		return srv.(TasksServer).CloseIO(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.services.execution.Tasks/CloseStdin",
+		FullMethod: "/containerd.services.tasks.v1.Tasks/CloseIO",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TasksServer).CloseStdin(ctx, req.(*CloseStdinRequest))
+		return srv.(TasksServer).CloseIO(ctx, req.(*CloseIORequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _Tasks_Pause_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PauseRequest)
+	in := new(PauseTaskRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -853,16 +794,16 @@ func _Tasks_Pause_Handler(srv interface{}, ctx context.Context, dec func(interfa
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.services.execution.Tasks/Pause",
+		FullMethod: "/containerd.services.tasks.v1.Tasks/Pause",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TasksServer).Pause(ctx, req.(*PauseRequest))
+		return srv.(TasksServer).Pause(ctx, req.(*PauseTaskRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _Tasks_Resume_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ResumeRequest)
+	in := new(ResumeTaskRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -871,34 +812,34 @@ func _Tasks_Resume_Handler(srv interface{}, ctx context.Context, dec func(interf
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.services.execution.Tasks/Resume",
+		FullMethod: "/containerd.services.tasks.v1.Tasks/Resume",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TasksServer).Resume(ctx, req.(*ResumeRequest))
+		return srv.(TasksServer).Resume(ctx, req.(*ResumeTaskRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Tasks_Processes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ProcessesRequest)
+func _Tasks_ListProcesses_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListProcessesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TasksServer).Processes(ctx, in)
+		return srv.(TasksServer).ListProcesses(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.services.execution.Tasks/Processes",
+		FullMethod: "/containerd.services.tasks.v1.Tasks/ListProcesses",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TasksServer).Processes(ctx, req.(*ProcessesRequest))
+		return srv.(TasksServer).ListProcesses(ctx, req.(*ListProcessesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _Tasks_Checkpoint_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CheckpointRequest)
+	in := new(CheckpointTaskRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -907,16 +848,16 @@ func _Tasks_Checkpoint_Handler(srv interface{}, ctx context.Context, dec func(in
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.services.execution.Tasks/Checkpoint",
+		FullMethod: "/containerd.services.tasks.v1.Tasks/Checkpoint",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TasksServer).Checkpoint(ctx, req.(*CheckpointRequest))
+		return srv.(TasksServer).Checkpoint(ctx, req.(*CheckpointTaskRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 var _Tasks_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "containerd.v1.services.execution.Tasks",
+	ServiceName: "containerd.services.tasks.v1.Tasks",
 	HandlerType: (*TasksServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -936,8 +877,8 @@ var _Tasks_serviceDesc = grpc.ServiceDesc{
 			Handler:    _Tasks_DeleteProcess_Handler,
 		},
 		{
-			MethodName: "Info",
-			Handler:    _Tasks_Info_Handler,
+			MethodName: "Get",
+			Handler:    _Tasks_Get_Handler,
 		},
 		{
 			MethodName: "List",
@@ -952,12 +893,12 @@ var _Tasks_serviceDesc = grpc.ServiceDesc{
 			Handler:    _Tasks_Exec_Handler,
 		},
 		{
-			MethodName: "Pty",
-			Handler:    _Tasks_Pty_Handler,
+			MethodName: "ResizePty",
+			Handler:    _Tasks_ResizePty_Handler,
 		},
 		{
-			MethodName: "CloseStdin",
-			Handler:    _Tasks_CloseStdin_Handler,
+			MethodName: "CloseIO",
+			Handler:    _Tasks_CloseIO_Handler,
 		},
 		{
 			MethodName: "Pause",
@@ -968,25 +909,19 @@ var _Tasks_serviceDesc = grpc.ServiceDesc{
 			Handler:    _Tasks_Resume_Handler,
 		},
 		{
-			MethodName: "Processes",
-			Handler:    _Tasks_Processes_Handler,
+			MethodName: "ListProcesses",
+			Handler:    _Tasks_ListProcesses_Handler,
 		},
 		{
 			MethodName: "Checkpoint",
 			Handler:    _Tasks_Checkpoint_Handler,
 		},
 	},
-	Streams: []grpc.StreamDesc{
-		{
-			StreamName:    "Events",
-			Handler:       _Tasks_Events_Handler,
-			ServerStreams: true,
-		},
-	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "github.com/containerd/containerd/api/services/execution/execution.proto",
 }
 
-func (m *CreateRequest) Marshal() (dAtA []byte, err error) {
+func (m *CreateTaskRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -996,7 +931,7 @@ func (m *CreateRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *CreateRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *CreateTaskRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -1020,25 +955,25 @@ func (m *CreateRequest) MarshalTo(dAtA []byte) (int, error) {
 		}
 	}
 	if len(m.Stdin) > 0 {
-		dAtA[i] = 0x2a
+		dAtA[i] = 0x22
 		i++
 		i = encodeVarintExecution(dAtA, i, uint64(len(m.Stdin)))
 		i += copy(dAtA[i:], m.Stdin)
 	}
 	if len(m.Stdout) > 0 {
-		dAtA[i] = 0x32
+		dAtA[i] = 0x2a
 		i++
 		i = encodeVarintExecution(dAtA, i, uint64(len(m.Stdout)))
 		i += copy(dAtA[i:], m.Stdout)
 	}
 	if len(m.Stderr) > 0 {
-		dAtA[i] = 0x3a
+		dAtA[i] = 0x32
 		i++
 		i = encodeVarintExecution(dAtA, i, uint64(len(m.Stderr)))
 		i += copy(dAtA[i:], m.Stderr)
 	}
 	if m.Terminal {
-		dAtA[i] = 0x40
+		dAtA[i] = 0x38
 		i++
 		if m.Terminal {
 			dAtA[i] = 1
@@ -1048,7 +983,7 @@ func (m *CreateRequest) MarshalTo(dAtA []byte) (int, error) {
 		i++
 	}
 	if m.Checkpoint != nil {
-		dAtA[i] = 0x4a
+		dAtA[i] = 0x42
 		i++
 		i = encodeVarintExecution(dAtA, i, uint64(m.Checkpoint.Size()))
 		n1, err := m.Checkpoint.MarshalTo(dAtA[i:])
@@ -1060,7 +995,7 @@ func (m *CreateRequest) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *CreateResponse) Marshal() (dAtA []byte, err error) {
+func (m *CreateTaskResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -1070,7 +1005,7 @@ func (m *CreateResponse) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *CreateResponse) MarshalTo(dAtA []byte) (int, error) {
+func (m *CreateTaskResponse) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -1089,7 +1024,7 @@ func (m *CreateResponse) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *StartRequest) Marshal() (dAtA []byte, err error) {
+func (m *StartTaskRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -1099,7 +1034,7 @@ func (m *StartRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *StartRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *StartTaskRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -1113,7 +1048,7 @@ func (m *StartRequest) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *DeleteRequest) Marshal() (dAtA []byte, err error) {
+func (m *DeleteTaskRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -1123,7 +1058,7 @@ func (m *DeleteRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *DeleteRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *DeleteTaskRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -1158,12 +1093,17 @@ func (m *DeleteResponse) MarshalTo(dAtA []byte) (int, error) {
 		i = encodeVarintExecution(dAtA, i, uint64(len(m.ContainerID)))
 		i += copy(dAtA[i:], m.ContainerID)
 	}
-	if m.ExitStatus != 0 {
+	if m.Pid != 0 {
 		dAtA[i] = 0x10
+		i++
+		i = encodeVarintExecution(dAtA, i, uint64(m.Pid))
+	}
+	if m.ExitStatus != 0 {
+		dAtA[i] = 0x18
 		i++
 		i = encodeVarintExecution(dAtA, i, uint64(m.ExitStatus))
 	}
-	dAtA[i] = 0x1a
+	dAtA[i] = 0x22
 	i++
 	i = encodeVarintExecution(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.ExitedAt)))
 	n2, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.ExitedAt, dAtA[i:])
@@ -1203,7 +1143,7 @@ func (m *DeleteProcessRequest) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *InfoRequest) Marshal() (dAtA []byte, err error) {
+func (m *GetTaskRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -1213,7 +1153,7 @@ func (m *InfoRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *InfoRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *GetTaskRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -1227,7 +1167,7 @@ func (m *InfoRequest) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *InfoResponse) Marshal() (dAtA []byte, err error) {
+func (m *GetTaskResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -1237,7 +1177,7 @@ func (m *InfoResponse) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *InfoResponse) MarshalTo(dAtA []byte) (int, error) {
+func (m *GetTaskResponse) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -1255,7 +1195,7 @@ func (m *InfoResponse) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ListRequest) Marshal() (dAtA []byte, err error) {
+func (m *ListTasksRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -1265,15 +1205,21 @@ func (m *ListRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *ListRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *ListTasksRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
+	if len(m.Filter) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintExecution(dAtA, i, uint64(len(m.Filter)))
+		i += copy(dAtA[i:], m.Filter)
+	}
 	return i, nil
 }
 
-func (m *ListResponse) Marshal() (dAtA []byte, err error) {
+func (m *ListTasksResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -1283,7 +1229,7 @@ func (m *ListResponse) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *ListResponse) MarshalTo(dAtA []byte) (int, error) {
+func (m *ListTasksResponse) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -1358,7 +1304,7 @@ func (m *KillRequest_Pid) MarshalTo(dAtA []byte) (int, error) {
 	i = encodeVarintExecution(dAtA, i, uint64(m.Pid))
 	return i, nil
 }
-func (m *EventsRequest) Marshal() (dAtA []byte, err error) {
+func (m *ExecProcessRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -1368,25 +1314,7 @@ func (m *EventsRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *EventsRequest) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	return i, nil
-}
-
-func (m *ExecRequest) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *ExecRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *ExecProcessRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -1397,8 +1325,26 @@ func (m *ExecRequest) MarshalTo(dAtA []byte) (int, error) {
 		i = encodeVarintExecution(dAtA, i, uint64(len(m.ContainerID)))
 		i += copy(dAtA[i:], m.ContainerID)
 	}
+	if len(m.Stdin) > 0 {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintExecution(dAtA, i, uint64(len(m.Stdin)))
+		i += copy(dAtA[i:], m.Stdin)
+	}
+	if len(m.Stdout) > 0 {
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintExecution(dAtA, i, uint64(len(m.Stdout)))
+		i += copy(dAtA[i:], m.Stdout)
+	}
+	if len(m.Stderr) > 0 {
+		dAtA[i] = 0x22
+		i++
+		i = encodeVarintExecution(dAtA, i, uint64(len(m.Stderr)))
+		i += copy(dAtA[i:], m.Stderr)
+	}
 	if m.Terminal {
-		dAtA[i] = 0x10
+		dAtA[i] = 0x28
 		i++
 		if m.Terminal {
 			dAtA[i] = 1
@@ -1406,24 +1352,6 @@ func (m *ExecRequest) MarshalTo(dAtA []byte) (int, error) {
 			dAtA[i] = 0
 		}
 		i++
-	}
-	if len(m.Stdin) > 0 {
-		dAtA[i] = 0x1a
-		i++
-		i = encodeVarintExecution(dAtA, i, uint64(len(m.Stdin)))
-		i += copy(dAtA[i:], m.Stdin)
-	}
-	if len(m.Stdout) > 0 {
-		dAtA[i] = 0x22
-		i++
-		i = encodeVarintExecution(dAtA, i, uint64(len(m.Stdout)))
-		i += copy(dAtA[i:], m.Stdout)
-	}
-	if len(m.Stderr) > 0 {
-		dAtA[i] = 0x2a
-		i++
-		i = encodeVarintExecution(dAtA, i, uint64(len(m.Stderr)))
-		i += copy(dAtA[i:], m.Stderr)
 	}
 	if m.Spec != nil {
 		dAtA[i] = 0x32
@@ -1438,7 +1366,7 @@ func (m *ExecRequest) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ExecResponse) Marshal() (dAtA []byte, err error) {
+func (m *ExecProcessResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -1448,7 +1376,7 @@ func (m *ExecResponse) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *ExecResponse) MarshalTo(dAtA []byte) (int, error) {
+func (m *ExecProcessResponse) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -1461,7 +1389,7 @@ func (m *ExecResponse) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *PtyRequest) Marshal() (dAtA []byte, err error) {
+func (m *ResizePtyRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -1471,7 +1399,7 @@ func (m *PtyRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *PtyRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *ResizePtyRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -1500,7 +1428,7 @@ func (m *PtyRequest) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *CloseStdinRequest) Marshal() (dAtA []byte, err error) {
+func (m *CloseIORequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -1510,7 +1438,7 @@ func (m *CloseStdinRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *CloseStdinRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *CloseIORequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -1526,10 +1454,20 @@ func (m *CloseStdinRequest) MarshalTo(dAtA []byte) (int, error) {
 		i++
 		i = encodeVarintExecution(dAtA, i, uint64(m.Pid))
 	}
+	if m.Stdin {
+		dAtA[i] = 0x18
+		i++
+		if m.Stdin {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i++
+	}
 	return i, nil
 }
 
-func (m *PauseRequest) Marshal() (dAtA []byte, err error) {
+func (m *PauseTaskRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -1539,7 +1477,7 @@ func (m *PauseRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *PauseRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *PauseTaskRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -1553,7 +1491,7 @@ func (m *PauseRequest) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ResumeRequest) Marshal() (dAtA []byte, err error) {
+func (m *ResumeTaskRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -1563,7 +1501,7 @@ func (m *ResumeRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *ResumeRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *ResumeTaskRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -1577,7 +1515,7 @@ func (m *ResumeRequest) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ProcessesRequest) Marshal() (dAtA []byte, err error) {
+func (m *ListProcessesRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -1587,7 +1525,7 @@ func (m *ProcessesRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *ProcessesRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *ListProcessesRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -1601,7 +1539,7 @@ func (m *ProcessesRequest) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ProcessesResponse) Marshal() (dAtA []byte, err error) {
+func (m *ListProcessesResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -1611,7 +1549,7 @@ func (m *ProcessesResponse) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *ProcessesResponse) MarshalTo(dAtA []byte) (int, error) {
+func (m *ListProcessesResponse) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -1631,7 +1569,7 @@ func (m *ProcessesResponse) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *CheckpointRequest) Marshal() (dAtA []byte, err error) {
+func (m *CheckpointTaskRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -1641,7 +1579,7 @@ func (m *CheckpointRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *CheckpointRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *CheckpointTaskRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -1652,81 +1590,33 @@ func (m *CheckpointRequest) MarshalTo(dAtA []byte) (int, error) {
 		i = encodeVarintExecution(dAtA, i, uint64(len(m.ContainerID)))
 		i += copy(dAtA[i:], m.ContainerID)
 	}
-	if m.AllowTcp {
-		dAtA[i] = 0x10
-		i++
-		if m.AllowTcp {
-			dAtA[i] = 1
-		} else {
-			dAtA[i] = 0
-		}
-		i++
-	}
-	if m.AllowUnixSockets {
-		dAtA[i] = 0x18
-		i++
-		if m.AllowUnixSockets {
-			dAtA[i] = 1
-		} else {
-			dAtA[i] = 0
-		}
-		i++
-	}
-	if m.AllowTerminal {
-		dAtA[i] = 0x20
-		i++
-		if m.AllowTerminal {
-			dAtA[i] = 1
-		} else {
-			dAtA[i] = 0
-		}
-		i++
-	}
-	if m.FileLocks {
-		dAtA[i] = 0x28
-		i++
-		if m.FileLocks {
-			dAtA[i] = 1
-		} else {
-			dAtA[i] = 0
-		}
-		i++
-	}
-	if len(m.EmptyNamespaces) > 0 {
-		for _, s := range m.EmptyNamespaces {
-			dAtA[i] = 0x32
-			i++
-			l = len(s)
-			for l >= 1<<7 {
-				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
-				l >>= 7
-				i++
-			}
-			dAtA[i] = uint8(l)
-			i++
-			i += copy(dAtA[i:], s)
-		}
-	}
 	if len(m.ParentCheckpoint) > 0 {
-		dAtA[i] = 0x3a
+		dAtA[i] = 0x12
 		i++
 		i = encodeVarintExecution(dAtA, i, uint64(len(m.ParentCheckpoint)))
 		i += copy(dAtA[i:], m.ParentCheckpoint)
 	}
-	if m.Exit {
-		dAtA[i] = 0x40
-		i++
-		if m.Exit {
-			dAtA[i] = 1
-		} else {
-			dAtA[i] = 0
+	if len(m.Options) > 0 {
+		for k, _ := range m.Options {
+			dAtA[i] = 0x1a
+			i++
+			v := m.Options[k]
+			mapSize := 1 + len(k) + sovExecution(uint64(len(k))) + 1 + len(v) + sovExecution(uint64(len(v)))
+			i = encodeVarintExecution(dAtA, i, uint64(mapSize))
+			dAtA[i] = 0xa
+			i++
+			i = encodeVarintExecution(dAtA, i, uint64(len(k)))
+			i += copy(dAtA[i:], k)
+			dAtA[i] = 0x12
+			i++
+			i = encodeVarintExecution(dAtA, i, uint64(len(v)))
+			i += copy(dAtA[i:], v)
 		}
-		i++
 	}
 	return i, nil
 }
 
-func (m *CheckpointResponse) Marshal() (dAtA []byte, err error) {
+func (m *CheckpointTaskResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -1736,7 +1626,7 @@ func (m *CheckpointResponse) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *CheckpointResponse) MarshalTo(dAtA []byte) (int, error) {
+func (m *CheckpointTaskResponse) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -1783,7 +1673,7 @@ func encodeVarintExecution(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
-func (m *CreateRequest) Size() (n int) {
+func (m *CreateTaskRequest) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.ContainerID)
@@ -1818,7 +1708,7 @@ func (m *CreateRequest) Size() (n int) {
 	return n
 }
 
-func (m *CreateResponse) Size() (n int) {
+func (m *CreateTaskResponse) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.ContainerID)
@@ -1831,7 +1721,7 @@ func (m *CreateResponse) Size() (n int) {
 	return n
 }
 
-func (m *StartRequest) Size() (n int) {
+func (m *StartTaskRequest) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.ContainerID)
@@ -1841,7 +1731,7 @@ func (m *StartRequest) Size() (n int) {
 	return n
 }
 
-func (m *DeleteRequest) Size() (n int) {
+func (m *DeleteTaskRequest) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.ContainerID)
@@ -1857,6 +1747,9 @@ func (m *DeleteResponse) Size() (n int) {
 	l = len(m.ContainerID)
 	if l > 0 {
 		n += 1 + l + sovExecution(uint64(l))
+	}
+	if m.Pid != 0 {
+		n += 1 + sovExecution(uint64(m.Pid))
 	}
 	if m.ExitStatus != 0 {
 		n += 1 + sovExecution(uint64(m.ExitStatus))
@@ -1879,7 +1772,7 @@ func (m *DeleteProcessRequest) Size() (n int) {
 	return n
 }
 
-func (m *InfoRequest) Size() (n int) {
+func (m *GetTaskRequest) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.ContainerID)
@@ -1889,7 +1782,7 @@ func (m *InfoRequest) Size() (n int) {
 	return n
 }
 
-func (m *InfoResponse) Size() (n int) {
+func (m *GetTaskResponse) Size() (n int) {
 	var l int
 	_ = l
 	if m.Task != nil {
@@ -1899,13 +1792,17 @@ func (m *InfoResponse) Size() (n int) {
 	return n
 }
 
-func (m *ListRequest) Size() (n int) {
+func (m *ListTasksRequest) Size() (n int) {
 	var l int
 	_ = l
+	l = len(m.Filter)
+	if l > 0 {
+		n += 1 + l + sovExecution(uint64(l))
+	}
 	return n
 }
 
-func (m *ListResponse) Size() (n int) {
+func (m *ListTasksResponse) Size() (n int) {
 	var l int
 	_ = l
 	if len(m.Tasks) > 0 {
@@ -1945,21 +1842,12 @@ func (m *KillRequest_Pid) Size() (n int) {
 	n += 1 + sovExecution(uint64(m.Pid))
 	return n
 }
-func (m *EventsRequest) Size() (n int) {
-	var l int
-	_ = l
-	return n
-}
-
-func (m *ExecRequest) Size() (n int) {
+func (m *ExecProcessRequest) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.ContainerID)
 	if l > 0 {
 		n += 1 + l + sovExecution(uint64(l))
-	}
-	if m.Terminal {
-		n += 2
 	}
 	l = len(m.Stdin)
 	if l > 0 {
@@ -1973,6 +1861,9 @@ func (m *ExecRequest) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovExecution(uint64(l))
 	}
+	if m.Terminal {
+		n += 2
+	}
 	if m.Spec != nil {
 		l = m.Spec.Size()
 		n += 1 + l + sovExecution(uint64(l))
@@ -1980,7 +1871,7 @@ func (m *ExecRequest) Size() (n int) {
 	return n
 }
 
-func (m *ExecResponse) Size() (n int) {
+func (m *ExecProcessResponse) Size() (n int) {
 	var l int
 	_ = l
 	if m.Pid != 0 {
@@ -1989,7 +1880,7 @@ func (m *ExecResponse) Size() (n int) {
 	return n
 }
 
-func (m *PtyRequest) Size() (n int) {
+func (m *ResizePtyRequest) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.ContainerID)
@@ -2008,7 +1899,7 @@ func (m *PtyRequest) Size() (n int) {
 	return n
 }
 
-func (m *CloseStdinRequest) Size() (n int) {
+func (m *CloseIORequest) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.ContainerID)
@@ -2018,10 +1909,13 @@ func (m *CloseStdinRequest) Size() (n int) {
 	if m.Pid != 0 {
 		n += 1 + sovExecution(uint64(m.Pid))
 	}
+	if m.Stdin {
+		n += 2
+	}
 	return n
 }
 
-func (m *PauseRequest) Size() (n int) {
+func (m *PauseTaskRequest) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.ContainerID)
@@ -2031,7 +1925,7 @@ func (m *PauseRequest) Size() (n int) {
 	return n
 }
 
-func (m *ResumeRequest) Size() (n int) {
+func (m *ResumeTaskRequest) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.ContainerID)
@@ -2041,7 +1935,7 @@ func (m *ResumeRequest) Size() (n int) {
 	return n
 }
 
-func (m *ProcessesRequest) Size() (n int) {
+func (m *ListProcessesRequest) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.ContainerID)
@@ -2051,7 +1945,7 @@ func (m *ProcessesRequest) Size() (n int) {
 	return n
 }
 
-func (m *ProcessesResponse) Size() (n int) {
+func (m *ListProcessesResponse) Size() (n int) {
 	var l int
 	_ = l
 	if len(m.Processes) > 0 {
@@ -2063,42 +1957,29 @@ func (m *ProcessesResponse) Size() (n int) {
 	return n
 }
 
-func (m *CheckpointRequest) Size() (n int) {
+func (m *CheckpointTaskRequest) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.ContainerID)
 	if l > 0 {
 		n += 1 + l + sovExecution(uint64(l))
 	}
-	if m.AllowTcp {
-		n += 2
-	}
-	if m.AllowUnixSockets {
-		n += 2
-	}
-	if m.AllowTerminal {
-		n += 2
-	}
-	if m.FileLocks {
-		n += 2
-	}
-	if len(m.EmptyNamespaces) > 0 {
-		for _, s := range m.EmptyNamespaces {
-			l = len(s)
-			n += 1 + l + sovExecution(uint64(l))
-		}
-	}
 	l = len(m.ParentCheckpoint)
 	if l > 0 {
 		n += 1 + l + sovExecution(uint64(l))
 	}
-	if m.Exit {
-		n += 2
+	if len(m.Options) > 0 {
+		for k, v := range m.Options {
+			_ = k
+			_ = v
+			mapEntrySize := 1 + len(k) + sovExecution(uint64(len(k))) + 1 + len(v) + sovExecution(uint64(len(v)))
+			n += mapEntrySize + 1 + sovExecution(uint64(mapEntrySize))
+		}
 	}
 	return n
 }
 
-func (m *CheckpointResponse) Size() (n int) {
+func (m *CheckpointTaskResponse) Size() (n int) {
 	var l int
 	_ = l
 	if len(m.Descriptors) > 0 {
@@ -2123,11 +2004,11 @@ func sovExecution(x uint64) (n int) {
 func sozExecution(x uint64) (n int) {
 	return sovExecution(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (this *CreateRequest) String() string {
+func (this *CreateTaskRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&CreateRequest{`,
+	s := strings.Join([]string{`&CreateTaskRequest{`,
 		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
 		`Rootfs:` + strings.Replace(fmt.Sprintf("%v", this.Rootfs), "Mount", "containerd_v1_types.Mount", 1) + `,`,
 		`Stdin:` + fmt.Sprintf("%v", this.Stdin) + `,`,
@@ -2139,32 +2020,32 @@ func (this *CreateRequest) String() string {
 	}, "")
 	return s
 }
-func (this *CreateResponse) String() string {
+func (this *CreateTaskResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&CreateResponse{`,
+	s := strings.Join([]string{`&CreateTaskResponse{`,
 		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
 		`Pid:` + fmt.Sprintf("%v", this.Pid) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *StartRequest) String() string {
+func (this *StartTaskRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&StartRequest{`,
+	s := strings.Join([]string{`&StartTaskRequest{`,
 		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *DeleteRequest) String() string {
+func (this *DeleteTaskRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&DeleteRequest{`,
+	s := strings.Join([]string{`&DeleteTaskRequest{`,
 		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
 		`}`,
 	}, "")
@@ -2176,6 +2057,7 @@ func (this *DeleteResponse) String() string {
 	}
 	s := strings.Join([]string{`&DeleteResponse{`,
 		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
+		`Pid:` + fmt.Sprintf("%v", this.Pid) + `,`,
 		`ExitStatus:` + fmt.Sprintf("%v", this.ExitStatus) + `,`,
 		`ExitedAt:` + strings.Replace(strings.Replace(this.ExitedAt.String(), "Timestamp", "google_protobuf3.Timestamp", 1), `&`, ``, 1) + `,`,
 		`}`,
@@ -2193,40 +2075,41 @@ func (this *DeleteProcessRequest) String() string {
 	}, "")
 	return s
 }
-func (this *InfoRequest) String() string {
+func (this *GetTaskRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&InfoRequest{`,
+	s := strings.Join([]string{`&GetTaskRequest{`,
 		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *InfoResponse) String() string {
+func (this *GetTaskResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&InfoResponse{`,
+	s := strings.Join([]string{`&GetTaskResponse{`,
 		`Task:` + strings.Replace(fmt.Sprintf("%v", this.Task), "Task", "containerd_v1_types2.Task", 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *ListRequest) String() string {
+func (this *ListTasksRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ListRequest{`,
+	s := strings.Join([]string{`&ListTasksRequest{`,
+		`Filter:` + fmt.Sprintf("%v", this.Filter) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *ListResponse) String() string {
+func (this *ListTasksResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ListResponse{`,
+	s := strings.Join([]string{`&ListTasksResponse{`,
 		`Tasks:` + strings.Replace(fmt.Sprintf("%v", this.Tasks), "Task", "containerd_v1_types2.Task", 1) + `,`,
 		`}`,
 	}, "")
@@ -2264,45 +2147,36 @@ func (this *KillRequest_Pid) String() string {
 	}, "")
 	return s
 }
-func (this *EventsRequest) String() string {
+func (this *ExecProcessRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&EventsRequest{`,
-		`}`,
-	}, "")
-	return s
-}
-func (this *ExecRequest) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&ExecRequest{`,
+	s := strings.Join([]string{`&ExecProcessRequest{`,
 		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
-		`Terminal:` + fmt.Sprintf("%v", this.Terminal) + `,`,
 		`Stdin:` + fmt.Sprintf("%v", this.Stdin) + `,`,
 		`Stdout:` + fmt.Sprintf("%v", this.Stdout) + `,`,
 		`Stderr:` + fmt.Sprintf("%v", this.Stderr) + `,`,
+		`Terminal:` + fmt.Sprintf("%v", this.Terminal) + `,`,
 		`Spec:` + strings.Replace(fmt.Sprintf("%v", this.Spec), "Any", "google_protobuf1.Any", 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *ExecResponse) String() string {
+func (this *ExecProcessResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ExecResponse{`,
+	s := strings.Join([]string{`&ExecProcessResponse{`,
 		`Pid:` + fmt.Sprintf("%v", this.Pid) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *PtyRequest) String() string {
+func (this *ResizePtyRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&PtyRequest{`,
+	s := strings.Join([]string{`&ResizePtyRequest{`,
 		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
 		`Pid:` + fmt.Sprintf("%v", this.Pid) + `,`,
 		`Width:` + fmt.Sprintf("%v", this.Width) + `,`,
@@ -2311,79 +2185,85 @@ func (this *PtyRequest) String() string {
 	}, "")
 	return s
 }
-func (this *CloseStdinRequest) String() string {
+func (this *CloseIORequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&CloseStdinRequest{`,
+	s := strings.Join([]string{`&CloseIORequest{`,
 		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
 		`Pid:` + fmt.Sprintf("%v", this.Pid) + `,`,
+		`Stdin:` + fmt.Sprintf("%v", this.Stdin) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *PauseRequest) String() string {
+func (this *PauseTaskRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&PauseRequest{`,
+	s := strings.Join([]string{`&PauseTaskRequest{`,
 		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *ResumeRequest) String() string {
+func (this *ResumeTaskRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ResumeRequest{`,
+	s := strings.Join([]string{`&ResumeTaskRequest{`,
 		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *ProcessesRequest) String() string {
+func (this *ListProcessesRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ProcessesRequest{`,
+	s := strings.Join([]string{`&ListProcessesRequest{`,
 		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *ProcessesResponse) String() string {
+func (this *ListProcessesResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ProcessesResponse{`,
+	s := strings.Join([]string{`&ListProcessesResponse{`,
 		`Processes:` + strings.Replace(fmt.Sprintf("%v", this.Processes), "Process", "containerd_v1_types2.Process", 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *CheckpointRequest) String() string {
+func (this *CheckpointTaskRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&CheckpointRequest{`,
+	keysForOptions := make([]string, 0, len(this.Options))
+	for k, _ := range this.Options {
+		keysForOptions = append(keysForOptions, k)
+	}
+	github_com_gogo_protobuf_sortkeys.Strings(keysForOptions)
+	mapStringForOptions := "map[string]string{"
+	for _, k := range keysForOptions {
+		mapStringForOptions += fmt.Sprintf("%v: %v,", k, this.Options[k])
+	}
+	mapStringForOptions += "}"
+	s := strings.Join([]string{`&CheckpointTaskRequest{`,
 		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
-		`AllowTcp:` + fmt.Sprintf("%v", this.AllowTcp) + `,`,
-		`AllowUnixSockets:` + fmt.Sprintf("%v", this.AllowUnixSockets) + `,`,
-		`AllowTerminal:` + fmt.Sprintf("%v", this.AllowTerminal) + `,`,
-		`FileLocks:` + fmt.Sprintf("%v", this.FileLocks) + `,`,
-		`EmptyNamespaces:` + fmt.Sprintf("%v", this.EmptyNamespaces) + `,`,
 		`ParentCheckpoint:` + fmt.Sprintf("%v", this.ParentCheckpoint) + `,`,
-		`Exit:` + fmt.Sprintf("%v", this.Exit) + `,`,
+		`Options:` + mapStringForOptions + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *CheckpointResponse) String() string {
+func (this *CheckpointTaskResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&CheckpointResponse{`,
+	s := strings.Join([]string{`&CheckpointTaskResponse{`,
 		`Descriptors:` + strings.Replace(fmt.Sprintf("%v", this.Descriptors), "Descriptor", "containerd_v1_types1.Descriptor", 1) + `,`,
 		`}`,
 	}, "")
@@ -2397,7 +2277,7 @@ func valueToStringExecution(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
-func (m *CreateRequest) Unmarshal(dAtA []byte) error {
+func (m *CreateTaskRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -2420,10 +2300,10 @@ func (m *CreateRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: CreateRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: CreateTaskRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: CreateRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: CreateTaskRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 2:
@@ -2486,7 +2366,7 @@ func (m *CreateRequest) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 5:
+		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Stdin", wireType)
 			}
@@ -2515,7 +2395,7 @@ func (m *CreateRequest) Unmarshal(dAtA []byte) error {
 			}
 			m.Stdin = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 6:
+		case 5:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Stdout", wireType)
 			}
@@ -2544,7 +2424,7 @@ func (m *CreateRequest) Unmarshal(dAtA []byte) error {
 			}
 			m.Stdout = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 7:
+		case 6:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Stderr", wireType)
 			}
@@ -2573,7 +2453,7 @@ func (m *CreateRequest) Unmarshal(dAtA []byte) error {
 			}
 			m.Stderr = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 8:
+		case 7:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Terminal", wireType)
 			}
@@ -2593,7 +2473,7 @@ func (m *CreateRequest) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.Terminal = bool(v != 0)
-		case 9:
+		case 8:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Checkpoint", wireType)
 			}
@@ -2647,7 +2527,7 @@ func (m *CreateRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *CreateResponse) Unmarshal(dAtA []byte) error {
+func (m *CreateTaskResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -2670,10 +2550,10 @@ func (m *CreateResponse) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: CreateResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: CreateTaskResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: CreateResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: CreateTaskResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 2:
@@ -2745,7 +2625,7 @@ func (m *CreateResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *StartRequest) Unmarshal(dAtA []byte) error {
+func (m *StartTaskRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -2768,10 +2648,10 @@ func (m *StartRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: StartRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: StartTaskRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: StartRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: StartTaskRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -2824,7 +2704,7 @@ func (m *StartRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *DeleteRequest) Unmarshal(dAtA []byte) error {
+func (m *DeleteTaskRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -2847,10 +2727,10 @@ func (m *DeleteRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: DeleteRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: DeleteTaskRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: DeleteRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: DeleteTaskRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -2963,6 +2843,25 @@ func (m *DeleteResponse) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 2:
 			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Pid", wireType)
+			}
+			m.Pid = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowExecution
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Pid |= (uint32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ExitStatus", wireType)
 			}
 			m.ExitStatus = 0
@@ -2980,7 +2879,7 @@ func (m *DeleteResponse) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
-		case 3:
+		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ExitedAt", wireType)
 			}
@@ -3129,7 +3028,7 @@ func (m *DeleteProcessRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *InfoRequest) Unmarshal(dAtA []byte) error {
+func (m *GetTaskRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -3152,10 +3051,10 @@ func (m *InfoRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: InfoRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: GetTaskRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: InfoRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: GetTaskRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -3208,7 +3107,7 @@ func (m *InfoRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *InfoResponse) Unmarshal(dAtA []byte) error {
+func (m *GetTaskResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -3231,10 +3130,10 @@ func (m *InfoResponse) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: InfoResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: GetTaskResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: InfoResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: GetTaskResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -3291,7 +3190,7 @@ func (m *InfoResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *ListRequest) Unmarshal(dAtA []byte) error {
+func (m *ListTasksRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -3314,12 +3213,41 @@ func (m *ListRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: ListRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: ListTasksRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ListRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ListTasksRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Filter", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowExecution
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthExecution
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Filter = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipExecution(dAtA[iNdEx:])
@@ -3341,7 +3269,7 @@ func (m *ListRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *ListResponse) Unmarshal(dAtA []byte) error {
+func (m *ListTasksResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -3364,10 +3292,10 @@ func (m *ListResponse) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: ListResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: ListTasksResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ListResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ListTasksResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -3561,7 +3489,7 @@ func (m *KillRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *EventsRequest) Unmarshal(dAtA []byte) error {
+func (m *ExecProcessRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -3584,60 +3512,10 @@ func (m *EventsRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: EventsRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: ExecProcessRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: EventsRequest: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		default:
-			iNdEx = preIndex
-			skippy, err := skipExecution(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthExecution
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *ExecRequest) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowExecution
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: ExecRequest: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ExecRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ExecProcessRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -3670,26 +3548,6 @@ func (m *ExecRequest) Unmarshal(dAtA []byte) error {
 			m.ContainerID = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Terminal", wireType)
-			}
-			var v int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowExecution
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				v |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Terminal = bool(v != 0)
-		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Stdin", wireType)
 			}
@@ -3718,7 +3576,7 @@ func (m *ExecRequest) Unmarshal(dAtA []byte) error {
 			}
 			m.Stdin = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 4:
+		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Stdout", wireType)
 			}
@@ -3747,7 +3605,7 @@ func (m *ExecRequest) Unmarshal(dAtA []byte) error {
 			}
 			m.Stdout = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 5:
+		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Stderr", wireType)
 			}
@@ -3776,6 +3634,26 @@ func (m *ExecRequest) Unmarshal(dAtA []byte) error {
 			}
 			m.Stderr = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Terminal", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowExecution
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Terminal = bool(v != 0)
 		case 6:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Spec", wireType)
@@ -3830,7 +3708,7 @@ func (m *ExecRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *ExecResponse) Unmarshal(dAtA []byte) error {
+func (m *ExecProcessResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -3853,10 +3731,10 @@ func (m *ExecResponse) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: ExecResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: ExecProcessResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ExecResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ExecProcessResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -3899,7 +3777,7 @@ func (m *ExecResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *PtyRequest) Unmarshal(dAtA []byte) error {
+func (m *ResizePtyRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -3922,10 +3800,10 @@ func (m *PtyRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: PtyRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: ResizePtyRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: PtyRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ResizePtyRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -4035,7 +3913,7 @@ func (m *PtyRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *CloseStdinRequest) Unmarshal(dAtA []byte) error {
+func (m *CloseIORequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -4058,10 +3936,10 @@ func (m *CloseStdinRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: CloseStdinRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: CloseIORequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: CloseStdinRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: CloseIORequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -4112,6 +3990,26 @@ func (m *CloseStdinRequest) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Stdin", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowExecution
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Stdin = bool(v != 0)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipExecution(dAtA[iNdEx:])
@@ -4133,7 +4031,7 @@ func (m *CloseStdinRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *PauseRequest) Unmarshal(dAtA []byte) error {
+func (m *PauseTaskRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -4156,10 +4054,10 @@ func (m *PauseRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: PauseRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: PauseTaskRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: PauseRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: PauseTaskRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -4212,7 +4110,7 @@ func (m *PauseRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *ResumeRequest) Unmarshal(dAtA []byte) error {
+func (m *ResumeTaskRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -4235,10 +4133,10 @@ func (m *ResumeRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: ResumeRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: ResumeTaskRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ResumeRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ResumeTaskRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -4291,7 +4189,7 @@ func (m *ResumeRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *ProcessesRequest) Unmarshal(dAtA []byte) error {
+func (m *ListProcessesRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -4314,10 +4212,10 @@ func (m *ProcessesRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: ProcessesRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: ListProcessesRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ProcessesRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ListProcessesRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -4370,7 +4268,7 @@ func (m *ProcessesRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *ProcessesResponse) Unmarshal(dAtA []byte) error {
+func (m *ListProcessesResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -4393,10 +4291,10 @@ func (m *ProcessesResponse) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: ProcessesResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: ListProcessesResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ProcessesResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ListProcessesResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -4451,7 +4349,7 @@ func (m *ProcessesResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *CheckpointRequest) Unmarshal(dAtA []byte) error {
+func (m *CheckpointTaskRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -4474,10 +4372,10 @@ func (m *CheckpointRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: CheckpointRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: CheckpointTaskRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: CheckpointRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: CheckpointTaskRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -4510,115 +4408,6 @@ func (m *CheckpointRequest) Unmarshal(dAtA []byte) error {
 			m.ContainerID = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field AllowTcp", wireType)
-			}
-			var v int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowExecution
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				v |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.AllowTcp = bool(v != 0)
-		case 3:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field AllowUnixSockets", wireType)
-			}
-			var v int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowExecution
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				v |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.AllowUnixSockets = bool(v != 0)
-		case 4:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field AllowTerminal", wireType)
-			}
-			var v int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowExecution
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				v |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.AllowTerminal = bool(v != 0)
-		case 5:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field FileLocks", wireType)
-			}
-			var v int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowExecution
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				v |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.FileLocks = bool(v != 0)
-		case 6:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field EmptyNamespaces", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowExecution
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthExecution
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.EmptyNamespaces = append(m.EmptyNamespaces, string(dAtA[iNdEx:postIndex]))
-			iNdEx = postIndex
-		case 7:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ParentCheckpoint", wireType)
 			}
@@ -4647,11 +4436,11 @@ func (m *CheckpointRequest) Unmarshal(dAtA []byte) error {
 			}
 			m.ParentCheckpoint = github_com_opencontainers_go_digest.Digest(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 8:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Exit", wireType)
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Options", wireType)
 			}
-			var v int
+			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowExecution
@@ -4661,12 +4450,108 @@ func (m *CheckpointRequest) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				v |= (int(b) & 0x7F) << shift
+				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			m.Exit = bool(v != 0)
+			if msglen < 0 {
+				return ErrInvalidLengthExecution
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			var keykey uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowExecution
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				keykey |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			var stringLenmapkey uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowExecution
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLenmapkey |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLenmapkey := int(stringLenmapkey)
+			if intStringLenmapkey < 0 {
+				return ErrInvalidLengthExecution
+			}
+			postStringIndexmapkey := iNdEx + intStringLenmapkey
+			if postStringIndexmapkey > l {
+				return io.ErrUnexpectedEOF
+			}
+			mapkey := string(dAtA[iNdEx:postStringIndexmapkey])
+			iNdEx = postStringIndexmapkey
+			if m.Options == nil {
+				m.Options = make(map[string]string)
+			}
+			if iNdEx < postIndex {
+				var valuekey uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowExecution
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					valuekey |= (uint64(b) & 0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				var stringLenmapvalue uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowExecution
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					stringLenmapvalue |= (uint64(b) & 0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				intStringLenmapvalue := int(stringLenmapvalue)
+				if intStringLenmapvalue < 0 {
+					return ErrInvalidLengthExecution
+				}
+				postStringIndexmapvalue := iNdEx + intStringLenmapvalue
+				if postStringIndexmapvalue > l {
+					return io.ErrUnexpectedEOF
+				}
+				mapvalue := string(dAtA[iNdEx:postStringIndexmapvalue])
+				iNdEx = postStringIndexmapvalue
+				m.Options[mapkey] = mapvalue
+			} else {
+				var mapvalue string
+				m.Options[mapkey] = mapvalue
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipExecution(dAtA[iNdEx:])
@@ -4688,7 +4573,7 @@ func (m *CheckpointRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *CheckpointResponse) Unmarshal(dAtA []byte) error {
+func (m *CheckpointTaskResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -4711,10 +4596,10 @@ func (m *CheckpointResponse) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: CheckpointResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: CheckpointTaskResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: CheckpointResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: CheckpointTaskResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -4879,83 +4764,79 @@ func init() {
 }
 
 var fileDescriptorExecution = []byte{
-	// 1242 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x56, 0xcd, 0x6e, 0xdb, 0xc6,
-	0x13, 0x37, 0xad, 0x8f, 0xbf, 0x34, 0x94, 0x12, 0x7b, 0x61, 0x04, 0x8a, 0xf2, 0xaf, 0x24, 0x10,
-	0x28, 0xa0, 0x16, 0x09, 0x95, 0x2a, 0x45, 0x0f, 0x41, 0x8b, 0xc0, 0xb2, 0x9d, 0xd6, 0x48, 0x52,
-	0xbb, 0xb4, 0xdb, 0x20, 0x40, 0x01, 0x81, 0x26, 0xd7, 0xf2, 0x42, 0x14, 0x97, 0xe5, 0xae, 0x6c,
-	0xeb, 0x96, 0x37, 0x68, 0xcf, 0x7d, 0x82, 0xbe, 0x48, 0x01, 0x5f, 0x0a, 0xf4, 0x58, 0xf4, 0xe0,
-	0x36, 0x7e, 0x8a, 0x1e, 0x8b, 0xdd, 0x25, 0x25, 0x4a, 0xb1, 0x2a, 0x3a, 0xca, 0x45, 0xda, 0x1d,
-	0xce, 0xcc, 0xee, 0xfe, 0xe6, 0xe3, 0x37, 0xf0, 0x65, 0x8f, 0xf0, 0x93, 0xe1, 0x91, 0xe9, 0xd0,
-	0x41, 0xcb, 0xa1, 0x3e, 0xb7, 0x89, 0x8f, 0x43, 0x37, 0xb9, 0xb4, 0x03, 0xd2, 0x62, 0x38, 0x3c,
-	0x25, 0x0e, 0x66, 0x2d, 0x7c, 0x8e, 0x9d, 0x21, 0x27, 0xd4, 0x9f, 0xac, 0xcc, 0x20, 0xa4, 0x9c,
-	0xa2, 0xc6, 0xc4, 0xc4, 0x3c, 0xfd, 0xc4, 0x8c, 0x2d, 0xcc, 0xb1, 0x5e, 0xf5, 0x5e, 0x8f, 0xd2,
-	0x9e, 0x87, 0x5b, 0x52, 0xff, 0x68, 0x78, 0xdc, 0xc2, 0x83, 0x80, 0x8f, 0x94, 0x79, 0xf5, 0xee,
-	0xec, 0x47, 0xdb, 0x8f, 0x3f, 0x6d, 0xf4, 0x68, 0x8f, 0xca, 0x65, 0x4b, 0xac, 0x22, 0xe9, 0xe7,
-	0xa9, 0x2e, 0xce, 0x47, 0x01, 0x66, 0xad, 0x01, 0x1d, 0xfa, 0x5c, 0xfd, 0x46, 0xd6, 0x4f, 0x6f,
-	0x60, 0xed, 0x62, 0xe6, 0x84, 0x24, 0xe0, 0x34, 0x4c, 0x2c, 0x23, 0x3f, 0x8f, 0x6f, 0xe0, 0x87,
-	0xdb, 0xac, 0x2f, 0x7f, 0x22, 0xdb, 0xfa, 0xec, 0x93, 0x39, 0x19, 0x60, 0xc6, 0xed, 0x41, 0xa0,
-	0x14, 0x8c, 0x9f, 0x57, 0xa1, 0xbc, 0x15, 0x62, 0x9b, 0x63, 0x0b, 0xff, 0x30, 0xc4, 0x8c, 0xa3,
-	0x36, 0x94, 0xc6, 0xae, 0xbb, 0xc4, 0xad, 0xac, 0x36, 0xb4, 0x66, 0xb1, 0x73, 0xfb, 0xea, 0xb2,
-	0xae, 0x6f, 0xc5, 0xf2, 0xdd, 0x6d, 0x4b, 0x1f, 0x2b, 0xed, 0xba, 0xa8, 0x0d, 0xf9, 0x90, 0x52,
-	0x7e, 0xcc, 0x2a, 0x99, 0x46, 0xa6, 0xa9, 0xb7, 0xab, 0xe6, 0x74, 0xa4, 0xe4, 0xe5, 0xcc, 0x17,
-	0x02, 0x1c, 0x2b, 0xd2, 0x44, 0x1b, 0x90, 0x63, 0xdc, 0x25, 0x7e, 0x25, 0x27, 0x0e, 0xb0, 0xd4,
-	0x06, 0xdd, 0x81, 0x3c, 0xe3, 0x2e, 0x1d, 0xf2, 0x4a, 0x5e, 0x8a, 0xa3, 0x5d, 0x24, 0xc7, 0x61,
-	0x58, 0xf9, 0xdf, 0x58, 0x8e, 0xc3, 0x10, 0x55, 0xa1, 0xc0, 0x71, 0x38, 0x20, 0xbe, 0xed, 0x55,
-	0x0a, 0x0d, 0xad, 0x59, 0xb0, 0xc6, 0x7b, 0xf4, 0x04, 0xc0, 0x39, 0xc1, 0x4e, 0x3f, 0xa0, 0xc4,
-	0xe7, 0x95, 0x62, 0x43, 0x6b, 0xea, 0xed, 0xfa, 0xb5, 0x37, 0xdb, 0x1e, 0x63, 0x6e, 0x25, 0x4c,
-	0x8c, 0xef, 0xe0, 0x56, 0x8c, 0x0d, 0x0b, 0xa8, 0xcf, 0xf0, 0x3b, 0x81, 0xb3, 0x06, 0x99, 0x80,
-	0xb8, 0x95, 0x4c, 0x43, 0x6b, 0x96, 0x2d, 0xb1, 0x34, 0x3a, 0x50, 0x3a, 0xe0, 0x76, 0xc8, 0xe7,
-	0x41, 0xae, 0x2d, 0xf6, 0x6a, 0x6c, 0x41, 0x79, 0x1b, 0x7b, 0x78, 0x7e, 0xdc, 0xd2, 0x38, 0xf9,
-	0x45, 0x83, 0x5b, 0xb1, 0x97, 0x39, 0x2f, 0x4c, 0xe1, 0x06, 0xd5, 0x41, 0xc7, 0xe7, 0x84, 0x77,
-	0x19, 0xb7, 0xf9, 0x90, 0x49, 0x50, 0xca, 0x16, 0x08, 0xd1, 0x81, 0x94, 0xa0, 0x4d, 0x28, 0x8a,
-	0x1d, 0x76, 0xbb, 0x36, 0x97, 0x40, 0x88, 0x14, 0x51, 0xa9, 0x69, 0xc6, 0xa9, 0x69, 0x1e, 0xc6,
-	0xa9, 0xd9, 0x29, 0x5c, 0x5c, 0xd6, 0x57, 0x7e, 0xfa, 0xab, 0xae, 0x59, 0x05, 0x65, 0xb6, 0xc9,
-	0x8d, 0xef, 0x61, 0x43, 0xdd, 0x74, 0x3f, 0xa4, 0x0e, 0x66, 0x6c, 0x89, 0x67, 0xc7, 0x11, 0x59,
-	0x9d, 0x44, 0x64, 0x13, 0xf4, 0x5d, 0xff, 0x98, 0x2e, 0x83, 0xe5, 0x17, 0x50, 0x52, 0x2e, 0x22,
-	0x20, 0x1f, 0x40, 0x56, 0x14, 0xa2, 0xb4, 0xd5, 0xdb, 0x77, 0xaf, 0xcd, 0xbb, 0x43, 0x9b, 0xf5,
-	0x2d, 0xa9, 0x66, 0x94, 0x41, 0x7f, 0x4e, 0x58, 0x9c, 0x12, 0xc6, 0x13, 0x28, 0xa9, 0x6d, 0xe4,
-	0xad, 0x05, 0x39, 0xa1, 0xc6, 0x2a, 0x9a, 0x2c, 0xb0, 0xff, 0x70, 0xa7, 0xf4, 0x8c, 0x1f, 0x35,
-	0xd0, 0x9f, 0x11, 0xcf, 0x5b, 0x06, 0x27, 0x51, 0x74, 0xa4, 0x27, 0x4a, 0x4b, 0x41, 0x15, 0xed,
-	0x10, 0x82, 0x8c, 0xed, 0x79, 0x32, 0x90, 0x85, 0xaf, 0x56, 0x2c, 0xb1, 0x11, 0x32, 0x81, 0x69,
-	0x56, 0x28, 0x0a, 0x59, 0x40, 0xdc, 0x4e, 0x09, 0x20, 0x20, 0x6e, 0x97, 0x86, 0x5d, 0xdb, 0xf3,
-	0x8c, 0xdb, 0x50, 0xde, 0x39, 0xc5, 0x3e, 0x8f, 0x43, 0x67, 0xfc, 0xa6, 0x81, 0xbe, 0x73, 0x8e,
-	0x9d, 0x65, 0xae, 0x98, 0xac, 0xff, 0xd5, 0x99, 0xfa, 0x1f, 0x77, 0x98, 0xcc, 0xf5, 0x1d, 0x26,
-	0x3b, 0xa7, 0xc3, 0xe4, 0xa6, 0x3a, 0x4c, 0x13, 0xb2, 0x2c, 0xc0, 0x8e, 0xec, 0x47, 0x7a, 0x7b,
-	0xe3, 0xad, 0xb4, 0xdd, 0xf4, 0x47, 0x96, 0xd4, 0x30, 0x1a, 0x50, 0x52, 0xcf, 0x89, 0x62, 0x16,
-	0xa5, 0x99, 0x36, 0x49, 0xb3, 0xd7, 0x1a, 0xc0, 0x3e, 0x1f, 0xbd, 0xd7, 0xdc, 0x15, 0xcf, 0x3c,
-	0x23, 0x2e, 0x3f, 0x89, 0x3a, 0x8c, 0xda, 0x88, 0xe7, 0x9c, 0x60, 0xd2, 0x3b, 0x51, 0xcf, 0x2c,
-	0x5b, 0xd1, 0xce, 0x78, 0x05, 0xeb, 0x5b, 0x1e, 0x65, 0xf8, 0x40, 0x80, 0xf1, 0x7e, 0x8b, 0xa8,
-	0x03, 0xa5, 0x7d, 0x7b, 0xc8, 0xf0, 0x92, 0x6d, 0xcd, 0xc2, 0x6c, 0x38, 0x58, 0xca, 0xc9, 0x53,
-	0x58, 0x8b, 0xba, 0x04, 0x5e, 0xa6, 0x4f, 0x18, 0x7b, 0xb0, 0x9e, 0xf0, 0x13, 0x45, 0xf5, 0x31,
-	0x14, 0x83, 0x58, 0x18, 0x55, 0xe3, 0xff, 0xaf, 0xad, 0xc6, 0xb8, 0x51, 0x4d, 0xd4, 0x8d, 0x7f,
-	0x56, 0x61, 0x7d, 0x6b, 0xcc, 0x2f, 0xcb, 0xa0, 0x7f, 0x0f, 0x8a, 0xb6, 0xe7, 0xd1, 0xb3, 0x2e,
-	0x77, 0x82, 0x38, 0xf1, 0xa5, 0xe0, 0xd0, 0x09, 0xd0, 0x7d, 0x40, 0xea, 0xe3, 0xd0, 0x27, 0xe7,
-	0x5d, 0x46, 0x9d, 0x3e, 0xe6, 0x4c, 0x95, 0xab, 0xb5, 0x26, 0xbf, 0x7c, 0xeb, 0x93, 0xf3, 0x03,
-	0x25, 0x47, 0x1f, 0xc2, 0xad, 0xc8, 0x55, 0x5c, 0x48, 0x59, 0xa9, 0x59, 0x56, 0xfe, 0xe2, 0x6a,
-	0xfa, 0x00, 0xe0, 0x98, 0x78, 0xb8, 0xeb, 0x51, 0xa7, 0xcf, 0x64, 0x8d, 0x14, 0xac, 0xa2, 0x90,
-	0x3c, 0x17, 0x02, 0xf4, 0x11, 0xac, 0xc9, 0x59, 0xab, 0xeb, 0xdb, 0x03, 0xcc, 0x02, 0xdb, 0xc1,
-	0xac, 0x92, 0x6f, 0x64, 0x9a, 0x45, 0xeb, 0xb6, 0x94, 0x7f, 0x3d, 0x16, 0xa3, 0x2e, 0xac, 0x07,
-	0x76, 0x88, 0x7d, 0xde, 0x4d, 0xd0, 0xb3, 0xa4, 0xf5, 0x4e, 0x5b, 0x74, 0xfe, 0x3f, 0x2f, 0xeb,
-	0x1f, 0x27, 0x66, 0x1e, 0x1a, 0x60, 0x7f, 0xfc, 0x74, 0xd6, 0xea, 0xd1, 0x07, 0x2e, 0xe9, 0x61,
-	0xc6, 0xcd, 0x6d, 0xf9, 0x67, 0xad, 0x29, 0x67, 0x13, 0x5c, 0x11, 0x82, 0xac, 0xe0, 0x8d, 0x68,
-	0x20, 0x90, 0x6b, 0xe3, 0x25, 0xa0, 0x24, 0xf2, 0x51, 0x30, 0x37, 0x41, 0x9f, 0xcc, 0x5b, 0x71,
-	0x38, 0x17, 0xce, 0x08, 0x49, 0x9b, 0xf6, 0xaf, 0x3a, 0xe4, 0x44, 0xe3, 0x65, 0xa8, 0x0f, 0x79,
-	0x35, 0x2e, 0xa0, 0x96, 0xb9, 0x68, 0x52, 0x35, 0xa7, 0x86, 0xae, 0xea, 0xc3, 0xf4, 0x06, 0xd1,
-	0xcd, 0xf7, 0x20, 0x27, 0x67, 0x08, 0x64, 0x2e, 0x36, 0x4d, 0x0e, 0x1b, 0xd5, 0x3b, 0x6f, 0x75,
-	0xb0, 0x1d, 0x11, 0x1f, 0x71, 0x7b, 0x45, 0xb0, 0x69, 0x6e, 0x3f, 0x35, 0x7a, 0xa4, 0xb9, 0xfd,
-	0xcc, 0x94, 0x31, 0x8a, 0xa7, 0x97, 0xa8, 0x48, 0xd0, 0x67, 0x69, 0x5d, 0x4c, 0xd3, 0xff, 0x3b,
-	0x1c, 0x8d, 0x21, 0x2b, 0x78, 0x1a, 0x3d, 0x58, 0x6c, 0x99, 0x18, 0x09, 0xaa, 0x66, 0x5a, 0xf5,
-	0xc9, 0x31, 0x82, 0xc0, 0xd3, 0x1c, 0x93, 0xe0, 0xfd, 0x34, 0xc7, 0x4c, 0xcd, 0x05, 0x2f, 0x20,
-	0x2b, 0x58, 0x3e, 0xcd, 0x31, 0x89, 0x69, 0x60, 0x6e, 0x12, 0xbc, 0x84, 0xbc, 0xe2, 0xe8, 0x34,
-	0x49, 0x30, 0xc5, 0xe6, 0xd5, 0xeb, 0x67, 0x7e, 0xa9, 0xf3, 0x50, 0x13, 0x70, 0x08, 0x6e, 0x4c,
-	0x73, 0xcf, 0xc4, 0x48, 0x90, 0x06, 0x8e, 0x29, 0xca, 0x7d, 0x06, 0x99, 0x7d, 0x3e, 0x42, 0xf7,
-	0x17, 0x9b, 0x4d, 0x68, 0x78, 0x2e, 0x18, 0xaf, 0x00, 0x26, 0x54, 0x89, 0x1e, 0xa5, 0x28, 0xd1,
-	0x59, 0x62, 0x9d, 0xeb, 0x7a, 0x0f, 0x72, 0x92, 0x2a, 0xd3, 0x54, 0x6f, 0x92, 0x53, 0xe7, 0x3a,
-	0xfc, 0x06, 0xf2, 0x8a, 0x37, 0xd3, 0x04, 0x6e, 0x8a, 0x61, 0xe7, 0xba, 0xe4, 0x50, 0x1c, 0xb3,
-	0x1f, 0x6a, 0xa7, 0xb8, 0xe7, 0x0c, 0xe5, 0x56, 0x1f, 0xdd, 0xc8, 0x26, 0x8a, 0xe0, 0x19, 0x40,
-	0xa2, 0x93, 0xa7, 0x01, 0x7d, 0x96, 0x4f, 0xab, 0x9f, 0xde, 0xcc, 0x48, 0x1d, 0xdc, 0xa9, 0x5c,
-	0xbc, 0xa9, 0xad, 0xfc, 0xf1, 0xa6, 0xb6, 0xf2, 0xfa, 0xaa, 0xa6, 0x5d, 0x5c, 0xd5, 0xb4, 0xdf,
-	0xaf, 0x6a, 0xda, 0xdf, 0x57, 0x35, 0xed, 0x28, 0x2f, 0x81, 0x79, 0xf4, 0x6f, 0x00, 0x00, 0x00,
-	0xff, 0xff, 0x46, 0xa7, 0x8c, 0x94, 0xc8, 0x10, 0x00, 0x00,
+	// 1183 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x56, 0xcd, 0x4f, 0xe3, 0x46,
+	0x14, 0xc7, 0xf9, 0x22, 0xbc, 0x00, 0x0b, 0x53, 0x16, 0x65, 0xdd, 0x55, 0x82, 0x7c, 0x69, 0xba,
+	0x2a, 0x4e, 0x09, 0x3d, 0x54, 0xa8, 0x52, 0x17, 0x08, 0x4b, 0xe9, 0x87, 0xa0, 0x66, 0x4f, 0xdb,
+	0x4a, 0x91, 0x89, 0x87, 0x30, 0x8a, 0x63, 0x7b, 0x3d, 0x13, 0x96, 0xf4, 0xd4, 0x53, 0xaf, 0xed,
+	0x5f, 0xd0, 0x3f, 0xa4, 0xe7, 0x1e, 0x38, 0xf6, 0xd0, 0x43, 0xd5, 0x03, 0xed, 0xd2, 0x7f, 0xa4,
+	0x9a, 0xf1, 0xc4, 0x71, 0x3e, 0x9d, 0x6c, 0xb8, 0x24, 0x33, 0xcf, 0xef, 0xbd, 0x79, 0xdf, 0xbf,
+	0x07, 0xc7, 0x0d, 0xc2, 0xae, 0xda, 0x17, 0x7a, 0xdd, 0x6d, 0x95, 0xeb, 0xae, 0xc3, 0x4c, 0xe2,
+	0x60, 0xdf, 0x8a, 0x1e, 0x4d, 0x8f, 0x94, 0x29, 0xf6, 0xaf, 0x49, 0x1d, 0xd3, 0x32, 0xbe, 0xc1,
+	0xf5, 0x36, 0x23, 0xae, 0xd3, 0x3b, 0xe9, 0x9e, 0xef, 0x32, 0x17, 0x3d, 0xed, 0x89, 0xe8, 0x5d,
+	0x76, 0x9d, 0x99, 0xb4, 0x49, 0xf5, 0xeb, 0x1d, 0xf5, 0xfd, 0x86, 0xeb, 0x36, 0x6c, 0x5c, 0x16,
+	0xbc, 0x17, 0xed, 0xcb, 0x32, 0x6e, 0x79, 0xac, 0x13, 0x88, 0xaa, 0x4f, 0x06, 0x3f, 0x9a, 0x4e,
+	0xf7, 0xd3, 0x46, 0xc3, 0x6d, 0xb8, 0xe2, 0x58, 0xe6, 0x27, 0x49, 0xfd, 0x6c, 0x2a, 0xa3, 0x59,
+	0xc7, 0xc3, 0xb4, 0xdc, 0x72, 0xdb, 0x0e, 0x0b, 0x7e, 0xa5, 0xf4, 0x8b, 0x19, 0xa4, 0x2d, 0x4c,
+	0xeb, 0x3e, 0xf1, 0x98, 0xeb, 0x47, 0x8e, 0x52, 0xcf, 0xde, 0x0c, 0x7a, 0x78, 0x20, 0xc4, 0x8f,
+	0x94, 0x2d, 0x0e, 0xba, 0xcc, 0x48, 0x0b, 0x53, 0x66, 0xb6, 0xbc, 0x80, 0x41, 0xfb, 0x35, 0x01,
+	0xeb, 0x87, 0x3e, 0x36, 0x19, 0x7e, 0x69, 0xd2, 0xa6, 0x81, 0x5f, 0xb7, 0x31, 0x65, 0xa8, 0x02,
+	0xcb, 0xa1, 0xfa, 0x1a, 0xb1, 0xf2, 0x89, 0x2d, 0xa5, 0xb4, 0x74, 0xf0, 0xe8, 0xfe, 0xae, 0x98,
+	0x3b, 0xec, 0xd2, 0x4f, 0xaa, 0x46, 0x2e, 0x64, 0x3a, 0xb1, 0x50, 0x05, 0x32, 0xbe, 0xeb, 0xb2,
+	0x4b, 0x9a, 0x4f, 0x6e, 0x25, 0x4b, 0xb9, 0x8a, 0xaa, 0x47, 0x32, 0x75, 0xbd, 0xa3, 0x0b, 0x03,
+	0xf5, 0x6f, 0x78, 0x80, 0x0c, 0xc9, 0x89, 0x36, 0x20, 0x4d, 0x99, 0x45, 0x9c, 0x7c, 0x8a, 0x3f,
+	0x60, 0x04, 0x17, 0xb4, 0x09, 0x19, 0xca, 0x2c, 0xb7, 0xcd, 0xf2, 0x69, 0x41, 0x96, 0x37, 0x49,
+	0xc7, 0xbe, 0x9f, 0xcf, 0x84, 0x74, 0xec, 0xfb, 0x48, 0x85, 0x2c, 0xc3, 0x7e, 0x8b, 0x38, 0xa6,
+	0x9d, 0x5f, 0xdc, 0x52, 0x4a, 0x59, 0x23, 0xbc, 0xa3, 0xcf, 0x01, 0xea, 0x57, 0xb8, 0xde, 0xf4,
+	0x5c, 0xe2, 0xb0, 0x7c, 0x76, 0x4b, 0x29, 0xe5, 0x2a, 0xc5, 0x91, 0x96, 0x55, 0xc3, 0xb8, 0x1b,
+	0x11, 0x11, 0xed, 0x15, 0xa0, 0x68, 0x7c, 0xa8, 0xe7, 0x3a, 0x14, 0xbf, 0x53, 0x80, 0xd6, 0x20,
+	0xe9, 0x11, 0x2b, 0x9f, 0xdc, 0x52, 0x4a, 0x2b, 0x06, 0x3f, 0x6a, 0x2f, 0x60, 0xed, 0x9c, 0x99,
+	0x3e, 0x9b, 0x14, 0x7a, 0x25, 0x5e, 0xb3, 0x76, 0x0c, 0xeb, 0x55, 0x6c, 0xe3, 0xc9, 0x39, 0x9c,
+	0x46, 0xd1, 0x6f, 0x0a, 0xac, 0x06, 0x9a, 0xc6, 0x7a, 0xaa, 0x4c, 0xef, 0x69, 0x22, 0xf4, 0x14,
+	0x15, 0x21, 0x87, 0x6f, 0x08, 0xab, 0x51, 0x66, 0xb2, 0x36, 0x95, 0x31, 0x00, 0x4e, 0x3a, 0x17,
+	0x14, 0xb4, 0x0f, 0x4b, 0xfc, 0x86, 0xad, 0x9a, 0xc9, 0x44, 0x35, 0xf0, 0x02, 0x0a, 0x8a, 0x57,
+	0xef, 0x16, 0xaf, 0xfe, 0xb2, 0x5b, 0xbc, 0x07, 0xd9, 0xdb, 0xbb, 0xe2, 0xc2, 0x2f, 0xff, 0x14,
+	0x15, 0x23, 0x1b, 0x88, 0xed, 0x33, 0xed, 0x7b, 0xd8, 0x08, 0x6c, 0x3f, 0xf3, 0xdd, 0x3a, 0xa6,
+	0x74, 0x8e, 0x40, 0x0c, 0x7b, 0xa0, 0x55, 0x61, 0xf5, 0x18, 0xcf, 0x9d, 0xa9, 0xe7, 0xf0, 0x28,
+	0xd4, 0x22, 0x03, 0xbc, 0x0d, 0x29, 0xde, 0xb0, 0x42, 0x3c, 0x57, 0x79, 0x32, 0xb2, 0x36, 0x85,
+	0x80, 0x60, 0xd3, 0x9e, 0xc1, 0xda, 0xd7, 0x84, 0x0a, 0x15, 0xa1, 0x87, 0x9b, 0x90, 0xb9, 0x24,
+	0x36, 0xc3, 0x7e, 0x60, 0x83, 0x21, 0x6f, 0x5a, 0x15, 0xd6, 0x23, 0xbc, 0xf2, 0xbd, 0x32, 0xa4,
+	0xc5, 0xb8, 0xcc, 0x2b, 0xa2, 0x4d, 0x27, 0x3c, 0x18, 0xf0, 0x69, 0x3f, 0x2b, 0x90, 0xfb, 0x8a,
+	0xd8, 0xf6, 0x3c, 0xf1, 0xe4, 0xad, 0x4b, 0x1a, 0xbc, 0x41, 0x83, 0x90, 0xca, 0x1b, 0x42, 0x90,
+	0x34, 0x6d, 0x5b, 0xd4, 0x43, 0xf6, 0x8b, 0x05, 0x83, 0x5f, 0x38, 0x8d, 0xc7, 0x9e, 0x17, 0xc1,
+	0x0a, 0xa7, 0x79, 0xc4, 0x3a, 0x58, 0x06, 0xf0, 0x88, 0x55, 0x73, 0xfd, 0x9a, 0x69, 0xdb, 0xda,
+	0x9f, 0x0a, 0xa0, 0xa3, 0x1b, 0x5c, 0x7f, 0x80, 0x44, 0x87, 0x13, 0x28, 0x31, 0x7a, 0x02, 0x25,
+	0xc7, 0x4c, 0xa0, 0xd4, 0xd8, 0x09, 0x94, 0x1e, 0x98, 0x40, 0x25, 0x48, 0x51, 0x0f, 0xd7, 0xc5,
+	0xcc, 0xca, 0x55, 0x36, 0x86, 0x8a, 0x7a, 0xdf, 0xe9, 0x18, 0x82, 0x43, 0xfb, 0x00, 0xde, 0xeb,
+	0xf3, 0x4a, 0x26, 0x4c, 0xd6, 0xa2, 0xd2, 0xab, 0xc5, 0x9f, 0x14, 0x58, 0x33, 0x30, 0x25, 0x3f,
+	0xe0, 0x33, 0xd6, 0x79, 0xd0, 0x32, 0xe7, 0xf1, 0x78, 0x43, 0x2c, 0x76, 0x25, 0x5b, 0x34, 0xb8,
+	0x70, 0xbf, 0xaf, 0x30, 0x69, 0x5c, 0x05, 0xad, 0xb9, 0x62, 0xc8, 0x9b, 0x66, 0xc3, 0xea, 0xa1,
+	0xed, 0x52, 0x7c, 0x72, 0xfa, 0xe0, 0x56, 0x04, 0x59, 0x11, 0x85, 0x21, 0xb3, 0xc2, 0xc7, 0xe5,
+	0x99, 0xd9, 0xa6, 0xf8, 0x01, 0xc6, 0xa5, 0x81, 0x69, 0xbb, 0x35, 0xb7, 0xa2, 0x2f, 0x61, 0x83,
+	0xf7, 0x97, 0x4c, 0x18, 0x9e, 0xa7, 0x10, 0xb5, 0x73, 0x78, 0x3c, 0xa0, 0x4b, 0xa6, 0x7f, 0x0f,
+	0x96, 0xbc, 0x2e, 0x51, 0xf6, 0xec, 0xd3, 0x91, 0x3d, 0xdb, 0xad, 0x9b, 0x1e, 0xbb, 0xf6, 0x7b,
+	0x02, 0x1e, 0x1f, 0x86, 0x58, 0x36, 0xa7, 0xbb, 0xa8, 0x06, 0xeb, 0x9e, 0xe9, 0x63, 0x87, 0xd5,
+	0x22, 0x90, 0x1a, 0x20, 0x5f, 0x85, 0xcf, 0xe3, 0xbf, 0xef, 0x8a, 0xcf, 0x22, 0xbb, 0x8a, 0xeb,
+	0x61, 0x27, 0x14, 0xa7, 0xe5, 0x86, 0xbb, 0x6d, 0x91, 0x06, 0xa6, 0x4c, 0xaf, 0x8a, 0x3f, 0x63,
+	0x2d, 0x50, 0xd6, 0xb3, 0x0f, 0xbd, 0x82, 0x45, 0xd7, 0xe3, 0xbb, 0x5e, 0x77, 0x87, 0x78, 0xae,
+	0x4f, 0xda, 0xf6, 0xf4, 0x91, 0xae, 0xe9, 0xa7, 0x81, 0x8a, 0x23, 0x87, 0xf9, 0x1d, 0xa3, 0xab,
+	0x50, 0xdd, 0x83, 0xe5, 0xe8, 0x07, 0x5e, 0x74, 0x4d, 0xdc, 0x91, 0x03, 0x93, 0x1f, 0x79, 0xd1,
+	0x5d, 0x9b, 0x76, 0x1b, 0x77, 0x47, 0x81, 0xb8, 0xec, 0x25, 0x3e, 0x55, 0xb4, 0xef, 0x60, 0x73,
+	0xf0, 0x29, 0x99, 0x9c, 0x7d, 0xc8, 0xf5, 0xf6, 0xb5, 0x6e, 0x7a, 0x62, 0xf7, 0x8b, 0xa8, 0x4c,
+	0xe5, 0x3f, 0x80, 0xb4, 0x98, 0xd0, 0xa8, 0x09, 0x99, 0x60, 0xd5, 0x40, 0xe5, 0x18, 0xbf, 0x07,
+	0x17, 0x36, 0xf5, 0xe3, 0xe9, 0x05, 0xa4, 0xe5, 0xa7, 0x90, 0x16, 0xbb, 0x07, 0xd2, 0x27, 0x8b,
+	0x0e, 0x2e, 0x28, 0xea, 0xe6, 0xd0, 0x04, 0x3b, 0xe2, 0x3b, 0x36, 0x6a, 0x40, 0x26, 0x80, 0xdf,
+	0x38, 0xeb, 0x87, 0x56, 0x15, 0xf5, 0xa3, 0x69, 0x04, 0x42, 0xcb, 0x5f, 0xc3, 0x4a, 0x1f, 0xce,
+	0xa3, 0xca, 0x34, 0xe2, 0xfd, 0x58, 0x31, 0xe3, 0x93, 0x17, 0x90, 0x3c, 0xc6, 0x0c, 0xc5, 0x08,
+	0xf5, 0xef, 0x07, 0xea, 0xf6, 0x94, 0xdc, 0xf2, 0x8d, 0x06, 0xa4, 0xf8, 0x00, 0x88, 0xcb, 0xc7,
+	0x20, 0xf8, 0xab, 0xe5, 0xa9, 0xf9, 0xe5, 0x43, 0x27, 0x90, 0xe2, 0x70, 0x8e, 0x3e, 0x9c, 0x2c,
+	0x18, 0x81, 0xfc, 0xb1, 0x39, 0x6f, 0x42, 0x8a, 0x23, 0x16, 0x8a, 0x29, 0xbf, 0x61, 0xac, 0x56,
+	0x77, 0x66, 0x90, 0x90, 0x76, 0x9f, 0xc3, 0x52, 0x08, 0x7a, 0x71, 0x51, 0x1a, 0x44, 0xc7, 0xb1,
+	0x1e, 0x9c, 0xc2, 0xa2, 0x44, 0xb0, 0xb8, 0xec, 0xf6, 0x03, 0xdd, 0x04, 0x85, 0x69, 0x01, 0x52,
+	0x71, 0x16, 0x0e, 0x22, 0xd9, 0x58, 0x85, 0xdf, 0x42, 0x26, 0x40, 0xab, 0xb8, 0xbe, 0x1a, 0xc2,
+	0xb4, 0xb1, 0x2a, 0x6f, 0x60, 0xa5, 0x0f, 0x6b, 0xe2, 0x3a, 0x68, 0x14, 0xc8, 0xa9, 0xbb, 0x33,
+	0xc9, 0xc8, 0x1c, 0xbe, 0x01, 0x88, 0xcc, 0xfb, 0xdd, 0x77, 0x18, 0xef, 0xea, 0x27, 0xb3, 0x09,
+	0x05, 0x0f, 0x1f, 0xe4, 0x6f, 0xdf, 0x16, 0x16, 0xfe, 0x7a, 0x5b, 0x58, 0xf8, 0xf1, 0xbe, 0xa0,
+	0xdc, 0xde, 0x17, 0x94, 0x3f, 0xee, 0x0b, 0xca, 0xbf, 0xf7, 0x05, 0xe5, 0x22, 0x23, 0x82, 0xb3,
+	0xfb, 0x7f, 0x00, 0x00, 0x00, 0xff, 0xff, 0xc0, 0x2e, 0x03, 0x28, 0xa2, 0x10, 0x00, 0x00,
 }

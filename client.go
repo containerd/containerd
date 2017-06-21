@@ -13,6 +13,7 @@ import (
 	"github.com/containerd/containerd/api/services/containers"
 	contentapi "github.com/containerd/containerd/api/services/content"
 	diffapi "github.com/containerd/containerd/api/services/diff"
+	eventsapi "github.com/containerd/containerd/api/services/events"
 	"github.com/containerd/containerd/api/services/execution"
 	imagesapi "github.com/containerd/containerd/api/services/images"
 	namespacesapi "github.com/containerd/containerd/api/services/namespaces"
@@ -180,7 +181,9 @@ func WithNewReadonlyRootFS(id string, i Image) NewContainerOpts {
 
 func WithRuntime(name string) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		c.Runtime = name
+		c.Runtime = &containers.Container_Runtime{
+			Name: name,
+		}
 		return nil
 	}
 }
@@ -196,8 +199,10 @@ func WithImage(i Image) NewContainerOpts {
 // the id must be unique within the namespace
 func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error) {
 	container := containers.Container{
-		ID:      id,
-		Runtime: c.runtime,
+		ID: id,
+		Runtime: &containers.Container_Runtime{
+			Name: c.runtime,
+		},
 	}
 	for _, o := range opts {
 		if err := o(ctx, c, &container); err != nil {
@@ -331,7 +336,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpts) (Imag
 	}
 
 	is := c.ImageService()
-	if err := is.Put(ctx, name, desc); err != nil {
+	if err := is.Update(ctx, name, desc); err != nil {
 		return nil, err
 	}
 	i, err := is.Get(ctx, name)
@@ -448,7 +453,7 @@ func (c *Client) ContentStore() content.Store {
 }
 
 func (c *Client) SnapshotService() snapshot.Snapshotter {
-	return snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotClient(c.conn))
+	return snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotsClient(c.conn))
 }
 
 func (c *Client) TaskService() execution.TasksClient {
@@ -465,6 +470,10 @@ func (c *Client) DiffService() diff.DiffService {
 
 func (c *Client) HealthService() grpc_health_v1.HealthClient {
 	return grpc_health_v1.NewHealthClient(c.conn)
+}
+
+func (c *Client) EventService() eventsapi.EventsClient {
+	return eventsapi.NewEventsClient(c.conn)
 }
 
 func (c *Client) VersionService() versionservice.VersionClient {

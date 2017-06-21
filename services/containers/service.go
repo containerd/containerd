@@ -96,7 +96,10 @@ func (s *Service) Create(ctx context.Context, req *api.CreateContainerRequest) (
 	if err := s.emit(ctx, "/containers/create", event.ContainerCreate{
 		ContainerID: resp.Container.ID,
 		Image:       resp.Container.Image,
-		Runtime:     resp.Container.Runtime,
+		Runtime: &event.ContainerCreate_Runtime{
+			Name:    resp.Container.Runtime.Name,
+			Options: resp.Container.Runtime.Options,
+		},
 	}); err != nil {
 		return &resp, err
 	}

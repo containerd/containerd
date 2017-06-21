@@ -1,7 +1,10 @@
 package containers
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
+	"errors"
 	"time"
 )
 
@@ -13,11 +16,49 @@ type Container struct {
 	ID        string
 	Labels    map[string]string
 	Image     string
-	Runtime   string
+	Runtime   RuntimeInfo
 	Spec      []byte
 	RootFS    string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+type RuntimeInfo struct {
+	Name    string
+	Options map[string]string
+}
+
+type marshaledRuntimeInfo struct {
+	Name    string
+	Options map[string]string
+}
+
+func (r *RuntimeInfo) MarshalBinary() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	if err := gob.NewEncoder(buf).Encode(marshaledRuntimeInfo{
+		Name:    r.Name,
+		Options: r.Options,
+	}); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (r *RuntimeInfo) UnmarshalBinary(data []byte) error {
+	buf := data
+	if len(buf) == 0 {
+		return errors.New("RuntimeInfo: no data")
+	}
+	var (
+		mr     marshaledRuntimeInfo
+		reader = bytes.NewReader(buf)
+	)
+	if err := gob.NewDecoder(reader).Decode(&mr); err != nil {
+		return err
+	}
+	r.Name = mr.Name
+	r.Options = mr.Options
+	return nil
 }
 
 type Store interface {

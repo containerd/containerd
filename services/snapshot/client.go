@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/codes"
 
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
+	mountapi "github.com/containerd/containerd/api/types/mount"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/pkg/errors"
@@ -16,18 +17,18 @@ import (
 
 // NewSnapshotterFromClient returns a new Snapshotter which communicates
 // over a GRPC connection.
-func NewSnapshotterFromClient(client snapshotapi.SnapshotClient) snapshot.Snapshotter {
+func NewSnapshotterFromClient(client snapshotapi.SnapshotsClient) snapshot.Snapshotter {
 	return &remoteSnapshotter{
 		client: client,
 	}
 }
 
 type remoteSnapshotter struct {
-	client snapshotapi.SnapshotClient
+	client snapshotapi.SnapshotsClient
 }
 
 func (r *remoteSnapshotter) Stat(ctx context.Context, key string) (snapshot.Info, error) {
-	resp, err := r.client.Stat(ctx, &snapshotapi.StatRequest{Key: key})
+	resp, err := r.client.Stat(ctx, &snapshotapi.StatSnapshotRequest{Key: key})
 	if err != nil {
 		return snapshot.Info{}, rewriteGRPCError(err)
 	}
@@ -47,27 +48,27 @@ func (r *remoteSnapshotter) Mounts(ctx context.Context, key string) ([]mount.Mou
 	if err != nil {
 		return nil, rewriteGRPCError(err)
 	}
-	return toMounts(resp), nil
+	return toMounts(resp.Mounts), nil
 }
 
 func (r *remoteSnapshotter) Prepare(ctx context.Context, key, parent string) ([]mount.Mount, error) {
-	resp, err := r.client.Prepare(ctx, &snapshotapi.PrepareRequest{Key: key, Parent: parent})
+	resp, err := r.client.Prepare(ctx, &snapshotapi.PrepareSnapshotRequest{Key: key, Parent: parent})
 	if err != nil {
 		return nil, rewriteGRPCError(err)
 	}
-	return toMounts(resp), nil
+	return toMounts(resp.Mounts), nil
 }
 
 func (r *remoteSnapshotter) View(ctx context.Context, key, parent string) ([]mount.Mount, error) {
-	resp, err := r.client.View(ctx, &snapshotapi.PrepareRequest{Key: key, Parent: parent})
+	resp, err := r.client.View(ctx, &snapshotapi.ViewSnapshotRequest{Key: key, Parent: parent})
 	if err != nil {
 		return nil, rewriteGRPCError(err)
 	}
-	return toMounts(resp), nil
+	return toMounts(resp.Mounts), nil
 }
 
 func (r *remoteSnapshotter) Commit(ctx context.Context, name, key string) error {
-	_, err := r.client.Commit(ctx, &snapshotapi.CommitRequest{
+	_, err := r.client.Commit(ctx, &snapshotapi.CommitSnapshotRequest{
 		Name: name,
 		Key:  key,
 	})
@@ -75,12 +76,12 @@ func (r *remoteSnapshotter) Commit(ctx context.Context, name, key string) error 
 }
 
 func (r *remoteSnapshotter) Remove(ctx context.Context, key string) error {
-	_, err := r.client.Remove(ctx, &snapshotapi.RemoveRequest{Key: key})
+	_, err := r.client.Remove(ctx, &snapshotapi.RemoveSnapshotRequest{Key: key})
 	return rewriteGRPCError(err)
 }
 
 func (r *remoteSnapshotter) Walk(ctx context.Context, fn func(context.Context, snapshot.Info) error) error {
-	sc, err := r.client.List(ctx, &snapshotapi.ListRequest{})
+	sc, err := r.client.List(ctx, &snapshotapi.ListSnapshotsRequest{})
 	if err != nil {
 		rewriteGRPCError(err)
 	}
@@ -145,9 +146,9 @@ func toUsage(resp *snapshotapi.UsageResponse) snapshot.Usage {
 	}
 }
 
-func toMounts(resp *snapshotapi.MountsResponse) []mount.Mount {
-	mounts := make([]mount.Mount, len(resp.Mounts))
-	for i, m := range resp.Mounts {
+func toMounts(mm []*mountapi.Mount) []mount.Mount {
+	mounts := make([]mount.Mount, len(mm))
+	for i, m := range mm {
 		mounts[i] = mount.Mount{
 			Type:    m.Type,
 			Source:  m.Source,

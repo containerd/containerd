@@ -75,7 +75,7 @@ func (rs *remoteStore) Delete(ctx context.Context, dgst digest.Digest) error {
 }
 
 func (rs *remoteStore) Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, error) {
-	client, err := rs.client.Read(ctx, &contentapi.ReadRequest{Digest: dgst})
+	client, err := rs.client.Read(ctx, &contentapi.ReadContentRequest{Digest: dgst})
 	if err != nil {
 		return nil, err
 	}
@@ -93,9 +93,9 @@ func (rs *remoteStore) ReaderAt(ctx context.Context, dgst digest.Digest) (io.Rea
 	}, nil
 }
 
-func (rs *remoteStore) Status(ctx context.Context, re string) ([]content.Status, error) {
+func (rs *remoteStore) Status(ctx context.Context, filter string) ([]content.Status, error) {
 	resp, err := rs.client.Status(ctx, &contentapi.StatusRequest{
-		Regexp: re,
+		Filter: filter,
 	})
 	if err != nil {
 		return nil, rewriteGRPCError(err)
@@ -146,7 +146,7 @@ func (rs *remoteStore) negotiate(ctx context.Context, ref string, size int64, ex
 		return nil, 0, err
 	}
 
-	if err := wrclient.Send(&contentapi.WriteRequest{
+	if err := wrclient.Send(&contentapi.WriteContentRequest{
 		Action:   contentapi.WriteActionStat,
 		Ref:      ref,
 		Total:    size,

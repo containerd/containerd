@@ -26,7 +26,7 @@ func (rr *remoteReader) Read(p []byte) (n int, err error) {
 
 	p = p[n:]
 	for len(p) > 0 {
-		var resp *contentapi.ReadResponse
+		var resp *contentapi.ReadContentResponse
 		// fill our buffer up until we can fill p.
 		resp, err = rr.client.Recv()
 		if err != nil {
@@ -56,7 +56,7 @@ type remoteReaderAt struct {
 }
 
 func (ra *remoteReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
-	rr := &contentapi.ReadRequest{
+	rr := &contentapi.ReadContentRequest{
 		Digest: ra.digest,
 		Offset: off,
 		Size_:  int64(len(p)),
@@ -67,7 +67,7 @@ func (ra *remoteReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
 	}
 
 	for len(p) > 0 {
-		var resp *contentapi.ReadResponse
+		var resp *contentapi.ReadContentResponse
 		// fill our buffer up until we can fill p.
 		resp, err = rc.Recv()
 		if err != nil {

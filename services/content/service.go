@@ -137,7 +137,7 @@ func (s *Service) Delete(ctx context.Context, req *api.DeleteContentRequest) (*e
 	return &empty.Empty{}, nil
 }
 
-func (s *Service) Read(req *api.ReadRequest, session api.Content_ReadServer) error {
+func (s *Service) Read(req *api.ReadContentRequest, session api.Content_ReadServer) error {
 	if err := req.Digest.Validate(); err != nil {
 		return grpc.Errorf(codes.InvalidArgument, "%v: %v", req.Digest, err)
 	}
@@ -193,7 +193,7 @@ func (s *Service) Read(req *api.ReadRequest, session api.Content_ReadServer) err
 	return nil
 }
 
-// readResponseWriter is a writer that places the output into ReadResponse messages.
+// readResponseWriter is a writer that places the output into ReadContentRequest messages.
 //
 // This allows io.CopyBuffer to do the heavy lifting of chunking the responses
 // into the buffer size.
@@ -203,7 +203,7 @@ type readResponseWriter struct {
 }
 
 func (rw *readResponseWriter) Write(p []byte) (n int, err error) {
-	if err := rw.session.Send(&api.ReadResponse{
+	if err := rw.session.Send(&api.ReadContentResponse{
 		Offset: rw.offset,
 		Data:   p,
 	}); err != nil {
@@ -215,9 +215,9 @@ func (rw *readResponseWriter) Write(p []byte) (n int, err error) {
 }
 
 func (s *Service) Status(ctx context.Context, req *api.StatusRequest) (*api.StatusResponse, error) {
-	statuses, err := s.store.Status(ctx, req.Regexp)
+	statuses, err := s.store.Status(ctx, req.Filter)
 	if err != nil {
-		return nil, serverErrorToGRPC(err, req.Regexp)
+		return nil, serverErrorToGRPC(err, req.Filter)
 	}
 
 	var resp api.StatusResponse
@@ -238,14 +238,14 @@ func (s *Service) Status(ctx context.Context, req *api.StatusRequest) (*api.Stat
 func (s *Service) Write(session api.Content_WriteServer) (err error) {
 	var (
 		ctx      = session.Context()
-		msg      api.WriteResponse
-		req      *api.WriteRequest
+		msg      api.WriteContentResponse
+		req      *api.WriteContentRequest
 		ref      string
 		total    int64
 		expected digest.Digest
 	)
 
-	defer func(msg *api.WriteResponse) {
+	defer func(msg *api.WriteContentResponse) {
 		// pump through the last message if no error was encountered
 		if err != nil {
 			if grpc.Code(err) != codes.AlreadyExists {

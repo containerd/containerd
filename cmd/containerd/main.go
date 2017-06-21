@@ -323,7 +323,7 @@ func interceptor(ctx gocontext.Context,
 		// No need to change the context
 	case versionapi.VersionServer:
 		ctx = log.WithModule(ctx, "version")
-	case snapshotapi.SnapshotServer:
+	case snapshotapi.SnapshotsServer:
 		ctx = log.WithModule(ctx, "snapshot")
 	case diffapi.DiffServer:
 		ctx = log.WithModule(ctx, "diff")

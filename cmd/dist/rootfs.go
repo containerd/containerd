@@ -99,7 +99,6 @@ var rootfsPrepareCommand = cli.Command{
 		}
 
 		snapshotter := client.SnapshotService()
-
 		mounts, err := snapshotter.Prepare(ctx, target, dgst.String())
 		if err != nil {
 			return err

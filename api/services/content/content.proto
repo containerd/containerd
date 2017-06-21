@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package containerd.v1;
+package containerd.services.content.v1;
 
 import "gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
@@ -28,7 +28,7 @@ service Content {
 	// Read allows one to read an object based on the offset into the content.
 	//
 	// The requested data may be returned in one or more messages.
-	rpc Read(ReadRequest) returns (stream ReadResponse);
+	rpc Read(ReadContentRequest) returns (stream ReadContentResponse);
 
 	// Status returns the status of ongoing object ingestions, started via
 	// Write.
@@ -54,7 +54,7 @@ service Content {
 	//
 	// When completed, the commit flag should be set to true. If expected size
 	// or digest is set, the content will be validated against those values.
-	rpc Write(stream WriteRequest) returns (stream WriteResponse);
+	rpc Write(stream WriteContentRequest) returns (stream WriteContentResponse);
 
 	// Abort cancels the ongoing write named in the request. Any resources
 	// associated with the write will be collected.
@@ -91,9 +91,9 @@ message DeleteContentRequest {
 	string digest = 1 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
 }
 
-// ReadRequest defines the fields that make up a request to read a portion of
+// ReadContentRequest defines the fields that make up a request to read a portion of
 // data from a stored object.
-message ReadRequest {
+message ReadContentRequest {
 	// Digest is the hash identity to read.
 	string digest = 1 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
 
@@ -107,14 +107,10 @@ message ReadRequest {
 	int64 size = 3;
 }
 
-// ReadResponse carries byte data for a read request.
-message ReadResponse {
+// ReadContentResponse carries byte data for a read request.
+message ReadContentResponse {
 	int64 offset = 1; // offset of the returned data
 	bytes data = 2; // actual data
-}
-
-message StatusRequest {
-	string regexp = 1;
 }
 
 message Status {
@@ -124,6 +120,10 @@ message Status {
 	int64 offset = 4;
 	int64 total = 5;
 	string expected = 6 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
+}
+
+message StatusRequest {
+	string filter = 1;
 }
 
 message StatusResponse {
@@ -157,8 +157,8 @@ enum WriteAction {
 	COMMIT = 2 [(gogoproto.enumvalue_customname) = "WriteActionCommit"];
 }
 
-// WriteRequest writes data to the request ref at offset. 
-message WriteRequest {
+// WriteContentRequest writes data to the request ref at offset.
+message WriteContentRequest {
 	// Action sets the behavior of the write.
 	//
 	// When this is a write and the ref is not yet allocated, the ref will be
@@ -215,8 +215,8 @@ message WriteRequest {
 	bytes data = 6;
 }
 
-// WriteResponse is returned on the culmination of a write call.
-message WriteResponse {
+// WriteContentResponse is returned on the culmination of a write call.
+message WriteContentResponse {
 	// Action contains the action for the final message of the stream. A writer
 	// should confirm that they match the intended result.
 	WriteAction action = 1;

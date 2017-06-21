@@ -9,7 +9,7 @@
 		github.com/containerd/containerd/api/services/events/events.proto
 
 	It has these top-level messages:
-		EventStreamRequest
+		StreamEventsRequest
 */
 package events
 
@@ -39,15 +39,15 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
-type EventStreamRequest struct {
+type StreamEventsRequest struct {
 }
 
-func (m *EventStreamRequest) Reset()                    { *m = EventStreamRequest{} }
-func (*EventStreamRequest) ProtoMessage()               {}
-func (*EventStreamRequest) Descriptor() ([]byte, []int) { return fileDescriptorEvents, []int{0} }
+func (m *StreamEventsRequest) Reset()                    { *m = StreamEventsRequest{} }
+func (*StreamEventsRequest) ProtoMessage()               {}
+func (*StreamEventsRequest) Descriptor() ([]byte, []int) { return fileDescriptorEvents, []int{0} }
 
 func init() {
-	proto.RegisterType((*EventStreamRequest)(nil), "containerd.v1.services.events.EventStreamRequest")
+	proto.RegisterType((*StreamEventsRequest)(nil), "containerd.services.events.v1.StreamEventsRequest")
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -61,7 +61,7 @@ const _ = grpc.SupportPackageIsVersion4
 // Client API for Events service
 
 type EventsClient interface {
-	EventStream(ctx context.Context, in *EventStreamRequest, opts ...grpc.CallOption) (Events_EventStreamClient, error)
+	Stream(ctx context.Context, in *StreamEventsRequest, opts ...grpc.CallOption) (Events_StreamClient, error)
 }
 
 type eventsClient struct {
@@ -72,12 +72,12 @@ func NewEventsClient(cc *grpc.ClientConn) EventsClient {
 	return &eventsClient{cc}
 }
 
-func (c *eventsClient) EventStream(ctx context.Context, in *EventStreamRequest, opts ...grpc.CallOption) (Events_EventStreamClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_Events_serviceDesc.Streams[0], c.cc, "/containerd.v1.services.events.Events/EventStream", opts...)
+func (c *eventsClient) Stream(ctx context.Context, in *StreamEventsRequest, opts ...grpc.CallOption) (Events_StreamClient, error) {
+	stream, err := grpc.NewClientStream(ctx, &_Events_serviceDesc.Streams[0], c.cc, "/containerd.services.events.v1.Events/Stream", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &eventsEventStreamClient{stream}
+	x := &eventsStreamClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -87,16 +87,16 @@ func (c *eventsClient) EventStream(ctx context.Context, in *EventStreamRequest, 
 	return x, nil
 }
 
-type Events_EventStreamClient interface {
+type Events_StreamClient interface {
 	Recv() (*containerd_v1_types.Envelope, error)
 	grpc.ClientStream
 }
 
-type eventsEventStreamClient struct {
+type eventsStreamClient struct {
 	grpc.ClientStream
 }
 
-func (x *eventsEventStreamClient) Recv() (*containerd_v1_types.Envelope, error) {
+func (x *eventsStreamClient) Recv() (*containerd_v1_types.Envelope, error) {
 	m := new(containerd_v1_types.Envelope)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -107,49 +107,49 @@ func (x *eventsEventStreamClient) Recv() (*containerd_v1_types.Envelope, error) 
 // Server API for Events service
 
 type EventsServer interface {
-	EventStream(*EventStreamRequest, Events_EventStreamServer) error
+	Stream(*StreamEventsRequest, Events_StreamServer) error
 }
 
 func RegisterEventsServer(s *grpc.Server, srv EventsServer) {
 	s.RegisterService(&_Events_serviceDesc, srv)
 }
 
-func _Events_EventStream_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(EventStreamRequest)
+func _Events_Stream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamEventsRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(EventsServer).EventStream(m, &eventsEventStreamServer{stream})
+	return srv.(EventsServer).Stream(m, &eventsStreamServer{stream})
 }
 
-type Events_EventStreamServer interface {
+type Events_StreamServer interface {
 	Send(*containerd_v1_types.Envelope) error
 	grpc.ServerStream
 }
 
-type eventsEventStreamServer struct {
+type eventsStreamServer struct {
 	grpc.ServerStream
 }
 
-func (x *eventsEventStreamServer) Send(m *containerd_v1_types.Envelope) error {
+func (x *eventsStreamServer) Send(m *containerd_v1_types.Envelope) error {
 	return x.ServerStream.SendMsg(m)
 }
 
 var _Events_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "containerd.v1.services.events.Events",
+	ServiceName: "containerd.services.events.v1.Events",
 	HandlerType: (*EventsServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "EventStream",
-			Handler:       _Events_EventStream_Handler,
+			StreamName:    "Stream",
+			Handler:       _Events_Stream_Handler,
 			ServerStreams: true,
 		},
 	},
 	Metadata: "github.com/containerd/containerd/api/services/events/events.proto",
 }
 
-func (m *EventStreamRequest) Marshal() (dAtA []byte, err error) {
+func (m *StreamEventsRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -159,7 +159,7 @@ func (m *EventStreamRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *EventStreamRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *StreamEventsRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -194,7 +194,7 @@ func encodeVarintEvents(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
-func (m *EventStreamRequest) Size() (n int) {
+func (m *StreamEventsRequest) Size() (n int) {
 	var l int
 	_ = l
 	return n
@@ -213,11 +213,11 @@ func sovEvents(x uint64) (n int) {
 func sozEvents(x uint64) (n int) {
 	return sovEvents(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (this *EventStreamRequest) String() string {
+func (this *StreamEventsRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&EventStreamRequest{`,
+	s := strings.Join([]string{`&StreamEventsRequest{`,
 		`}`,
 	}, "")
 	return s
@@ -230,7 +230,7 @@ func valueToStringEvents(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
-func (m *EventStreamRequest) Unmarshal(dAtA []byte) error {
+func (m *StreamEventsRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -253,10 +253,10 @@ func (m *EventStreamRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: EventStreamRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: StreamEventsRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: EventStreamRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: StreamEventsRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		default:
@@ -390,17 +390,18 @@ func init() {
 }
 
 var fileDescriptorEvents = []byte{
-	// 192 bytes of a gzipped FileDescriptorProto
+	// 194 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x72, 0x4c, 0xcf, 0x2c, 0xc9,
 	0x28, 0x4d, 0xd2, 0x4b, 0xce, 0xcf, 0xd5, 0x4f, 0xce, 0xcf, 0x2b, 0x49, 0xcc, 0xcc, 0x4b, 0x2d,
 	0x4a, 0x41, 0x66, 0x26, 0x16, 0x64, 0xea, 0x17, 0xa7, 0x16, 0x95, 0x65, 0x26, 0xa7, 0x16, 0xeb,
 	0xa7, 0x96, 0xa5, 0xe6, 0x95, 0xc0, 0x28, 0xbd, 0x82, 0xa2, 0xfc, 0x92, 0x7c, 0x21, 0x59, 0x84,
-	0x62, 0xbd, 0x32, 0x43, 0x3d, 0x98, 0x5a, 0x3d, 0x88, 0x22, 0x29, 0x1b, 0xa2, 0x6c, 0x28, 0xa9,
-	0x2c, 0x80, 0x19, 0x0f, 0x21, 0x21, 0x86, 0x2b, 0x89, 0x70, 0x09, 0xb9, 0x82, 0xb8, 0xc1, 0x25,
-	0x45, 0xa9, 0x89, 0xb9, 0x41, 0xa9, 0x85, 0xa5, 0xa9, 0xc5, 0x25, 0x46, 0xd9, 0x5c, 0x6c, 0x60,
-	0xd1, 0x62, 0xa1, 0x44, 0x2e, 0x6e, 0x24, 0x79, 0x21, 0x43, 0x3d, 0xbc, 0x8e, 0xd1, 0xc3, 0x34,
-	0x4b, 0x4a, 0x16, 0x4d, 0x0b, 0xd8, 0x25, 0x7a, 0xae, 0x79, 0x65, 0xa9, 0x39, 0xf9, 0x05, 0xa9,
-	0x06, 0x8c, 0x4e, 0x12, 0x27, 0x1e, 0xca, 0x31, 0xdc, 0x78, 0x28, 0xc7, 0xd0, 0xf0, 0x48, 0x8e,
-	0xf1, 0xc4, 0x23, 0x39, 0xc6, 0x0b, 0x8f, 0xe4, 0x18, 0x1f, 0x3c, 0x92, 0x63, 0x4c, 0x62, 0x03,
-	0xbb, 0xd1, 0x18, 0x10, 0x00, 0x00, 0xff, 0xff, 0xd7, 0x73, 0xbd, 0xf1, 0x45, 0x01, 0x00, 0x00,
+	0x62, 0x3d, 0x98, 0x42, 0x3d, 0xa8, 0x8a, 0x32, 0x43, 0x29, 0x1b, 0xa2, 0x6c, 0x28, 0xa9, 0x2c,
+	0x80, 0x19, 0x0f, 0x21, 0x21, 0x86, 0x2b, 0x89, 0x72, 0x09, 0x07, 0x97, 0x14, 0xa5, 0x26, 0xe6,
+	0xba, 0x82, 0x0d, 0x0c, 0x4a, 0x2d, 0x2c, 0x4d, 0x2d, 0x2e, 0x31, 0x4a, 0xe7, 0x62, 0x83, 0x08,
+	0x08, 0xc5, 0x72, 0xb1, 0x41, 0x14, 0x08, 0x19, 0xe9, 0xe1, 0x75, 0x88, 0x1e, 0x16, 0x73, 0xa4,
+	0x64, 0x91, 0xf5, 0x94, 0x19, 0xea, 0x81, 0x9d, 0xa1, 0xe7, 0x9a, 0x57, 0x96, 0x9a, 0x93, 0x5f,
+	0x90, 0x6a, 0xc0, 0xe8, 0x24, 0x71, 0xe2, 0xa1, 0x1c, 0xc3, 0x8d, 0x87, 0x72, 0x0c, 0x0d, 0x8f,
+	0xe4, 0x18, 0x4f, 0x3c, 0x92, 0x63, 0xbc, 0xf0, 0x48, 0x8e, 0xf1, 0xc1, 0x23, 0x39, 0xc6, 0x24,
+	0x36, 0xb0, 0x03, 0x8d, 0x01, 0x01, 0x00, 0x00, 0xff, 0xff, 0x82, 0x06, 0x73, 0x76, 0x42, 0x01,
+	0x00, 0x00,
 }

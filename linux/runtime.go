@@ -298,10 +298,10 @@ func (r *Runtime) Delete(ctx context.Context, c plugin.Task) (*plugin.Exit, erro
 	}); err != nil {
 		return nil, err
 	}
-
 	return &plugin.Exit{
 		Status:    rsp.ExitStatus,
 		Timestamp: rsp.ExitedAt,
+		Pid:       rsp.Pid,
 	}, r.deleteBundle(namespace, lc.containerID)
 }
 
@@ -368,10 +368,6 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 		o = append(o, c)
 	}
 	return o, nil
-}
-
-func (r *Runtime) Events(ctx context.Context) <-chan *plugin.Event {
-	return r.events
 }
 
 func (r *Runtime) handleEvents(ctx context.Context, s shim.ShimClient) error {

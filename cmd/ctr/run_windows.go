@@ -150,16 +150,18 @@ func newCreateContainerRequest(context *cli.Context, id, snapshot, image string,
 				TypeUrl: specs.Version,
 				Value:   spec,
 			},
-			Runtime: context.String("runtime"),
-			RootFS:  snapshot,
+			Runtime: &containersapi.Container_Runtime{
+				Name: context.String("runtime"),
+			},
+			RootFS: snapshot,
 		},
 	}
 
 	return create, nil
 }
 
-func newCreateTaskRequest(context *cli.Context, id, tmpDir string, checkpoint *ocispec.Descriptor, mounts []mount.Mount) (*execution.CreateRequest, error) {
-	create := &execution.CreateRequest{
+func newCreateTaskRequest(context *cli.Context, id, tmpDir string, checkpoint *ocispec.Descriptor, mounts []mount.Mount) (*execution.CreateTaskRequest, error) {
+	create := &execution.CreateTaskRequest{
 		ContainerID: id,
 		Terminal:    context.Bool("tty"),
 		Stdin:       fmt.Sprintf(`%s\ctr-%s-stdin`, pipeRoot, id),

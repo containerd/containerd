@@ -46,7 +46,7 @@ func (s *imageStore) Get(ctx context.Context, name string) (images.Image, error)
 	return image, nil
 }
 
-func (s *imageStore) Put(ctx context.Context, name string, desc ocispec.Descriptor) error {
+func (s *imageStore) Update(ctx context.Context, name string, desc ocispec.Descriptor) error {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return err
