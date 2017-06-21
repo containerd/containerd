@@ -178,11 +178,11 @@ func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 }
 
 func (s *Service) Start(ctx context.Context, r *api.StartRequest) (*google_protobuf.Empty, error) {
-	c, err := s.getTask(ctx, r.ContainerID)
+	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
 	}
-	if err := c.Start(ctx); err != nil {
+	if err := t.Start(ctx); err != nil {
 		return nil, err
 	}
 
@@ -196,15 +196,15 @@ func (s *Service) Start(ctx context.Context, r *api.StartRequest) (*google_proto
 }
 
 func (s *Service) Delete(ctx context.Context, r *api.DeleteRequest) (*api.DeleteResponse, error) {
-	c, err := s.getTask(ctx, r.ContainerID)
+	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
 	}
-	runtime, err := s.getRuntime(c.Info().Runtime)
+	runtime, err := s.getRuntime(t.Info().Runtime)
 	if err != nil {
 		return nil, err
 	}
-	exit, err := runtime.Delete(ctx, c)
+	exit, err := runtime.Delete(ctx, t)
 	if err != nil {
 		return nil, err
 	}
@@ -222,11 +222,11 @@ func (s *Service) Delete(ctx context.Context, r *api.DeleteRequest) (*api.Delete
 }
 
 func (s *Service) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest) (*api.DeleteResponse, error) {
-	c, err := s.getTask(ctx, r.ContainerID)
+	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
 	}
-	exit, err := c.DeleteProcess(ctx, r.Pid)
+	exit, err := t.DeleteProcess(ctx, r.Pid)
 	if err != nil {
 		return nil, err
 	}
@@ -304,11 +304,11 @@ func (s *Service) List(ctx context.Context, r *api.ListRequest) (*api.ListRespon
 }
 
 func (s *Service) Pause(ctx context.Context, r *api.PauseRequest) (*google_protobuf.Empty, error) {
-	c, err := s.getTask(ctx, r.ContainerID)
+	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
 	}
-	err = c.Pause(ctx)
+	err = t.Pause(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -316,11 +316,11 @@ func (s *Service) Pause(ctx context.Context, r *api.PauseRequest) (*google_proto
 }
 
 func (s *Service) Resume(ctx context.Context, r *api.ResumeRequest) (*google_protobuf.Empty, error) {
-	c, err := s.getTask(ctx, r.ContainerID)
+	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
 	}
-	err = c.Resume(ctx)
+	err = t.Resume(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -328,18 +328,18 @@ func (s *Service) Resume(ctx context.Context, r *api.ResumeRequest) (*google_pro
 }
 
 func (s *Service) Kill(ctx context.Context, r *api.KillRequest) (*google_protobuf.Empty, error) {
-	c, err := s.getTask(ctx, r.ContainerID)
+	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
 	}
 
 	switch v := r.PidOrAll.(type) {
 	case *api.KillRequest_All:
-		if err := c.Kill(ctx, r.Signal, 0, true); err != nil {
+		if err := t.Kill(ctx, r.Signal, 0, true); err != nil {
 			return nil, err
 		}
 	case *api.KillRequest_Pid:
-		if err := c.Kill(ctx, r.Signal, v.Pid, false); err != nil {
+		if err := t.Kill(ctx, r.Signal, v.Pid, false); err != nil {
 			return nil, err
 		}
 	default:
@@ -349,12 +349,12 @@ func (s *Service) Kill(ctx context.Context, r *api.KillRequest) (*google_protobu
 }
 
 func (s *Service) Processes(ctx context.Context, r *api.ProcessesRequest) (*api.ProcessesResponse, error) {
-	c, err := s.getTask(ctx, r.ContainerID)
+	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
 	}
 
-	pids, err := c.Processes(ctx)
+	pids, err := t.Processes(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -381,11 +381,11 @@ func (s *Service) Events(r *api.EventsRequest, server api.Tasks_EventsServer) er
 }
 
 func (s *Service) Exec(ctx context.Context, r *api.ExecRequest) (*api.ExecResponse, error) {
-	c, err := s.getTask(ctx, r.ContainerID)
+	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
 	}
-	process, err := c.Exec(ctx, plugin.ExecOpts{
+	process, err := t.Exec(ctx, plugin.ExecOpts{
 		Spec: r.Spec.Value,
 		IO: plugin.IO{
 			Stdin:    r.Stdin,
@@ -407,11 +407,11 @@ func (s *Service) Exec(ctx context.Context, r *api.ExecRequest) (*api.ExecRespon
 }
 
 func (s *Service) Pty(ctx context.Context, r *api.PtyRequest) (*google_protobuf.Empty, error) {
-	c, err := s.getTask(ctx, r.ContainerID)
+	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
 	}
-	if err := c.Pty(ctx, r.Pid, plugin.ConsoleSize{
+	if err := t.Pty(ctx, r.Pid, plugin.ConsoleSize{
 		Width:  r.Width,
 		Height: r.Height,
 	}); err != nil {
@@ -421,18 +421,18 @@ func (s *Service) Pty(ctx context.Context, r *api.PtyRequest) (*google_protobuf.
 }
 
 func (s *Service) CloseStdin(ctx context.Context, r *api.CloseStdinRequest) (*google_protobuf.Empty, error) {
-	c, err := s.getTask(ctx, r.ContainerID)
+	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
 	}
-	if err := c.CloseStdin(ctx, r.Pid); err != nil {
+	if err := t.CloseStdin(ctx, r.Pid); err != nil {
 		return nil, err
 	}
 	return empty, nil
 }
 
 func (s *Service) Checkpoint(ctx context.Context, r *api.CheckpointRequest) (*api.CheckpointResponse, error) {
-	c, err := s.getTask(ctx, r.ContainerID)
+	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
 	}
@@ -441,7 +441,7 @@ func (s *Service) Checkpoint(ctx context.Context, r *api.CheckpointRequest) (*ap
 		return nil, err
 	}
 	defer os.RemoveAll(image)
-	if err := c.Checkpoint(ctx, plugin.CheckpointOpts{
+	if err := t.Checkpoint(ctx, plugin.CheckpointOpts{
 		Exit:             r.Exit,
 		AllowTCP:         r.AllowTcp,
 		AllowTerminal:    r.AllowTerminal,
@@ -464,7 +464,7 @@ func (s *Service) Checkpoint(ctx context.Context, r *api.CheckpointRequest) (*ap
 		return nil, err
 	}
 	// write the config to the content store
-	spec := bytes.NewReader(c.Info().Spec)
+	spec := bytes.NewReader(t.Info().Spec)
 	specD, err := s.writeContent(ctx, images.MediaTypeContainerd1CheckpointConfig, filepath.Join(image, "spec"), spec)
 	if err != nil {
 		return nil, err
