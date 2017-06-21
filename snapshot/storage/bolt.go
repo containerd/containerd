@@ -298,6 +298,17 @@ func CommitActive(ctx context.Context, key, name string, usage snapshot.Usage) (
 		if err := bkt.Delete([]byte(key)); err != nil {
 			return errors.Wrap(err, "failed to delete active")
 		}
+		if ss.Parent != "" {
+			var ps db.Snapshot
+			if err := getSnapshot(bkt, ss.Parent, &ps); err != nil {
+				return errors.Wrap(err, "failed to get parent snapshot")
+			}
+
+			// Updates parent back link to use new key
+			if err := pbkt.Put(parentKey(ps.ID, ss.ID), []byte(name)); err != nil {
+				return errors.Wrap(err, "failed to update parent link")
+			}
+		}
 
 		id = fmt.Sprintf("%d", ss.ID)
 

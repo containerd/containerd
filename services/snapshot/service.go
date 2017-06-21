@@ -12,6 +12,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/snapshot/namespaced"
 	protoempty "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -44,7 +45,7 @@ type service struct {
 
 func newService(snapshotter snapshot.Snapshotter, evts events.Poster) (*service, error) {
 	return &service{
-		snapshotter: snapshotter,
+		snapshotter: namespaced.NewSnapshotter(snapshotter),
 		emitter:     evts,
 	}, nil
 }

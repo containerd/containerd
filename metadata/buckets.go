@@ -32,6 +32,7 @@ var (
 	bucketKeyObjectIndexes    = []byte("indexes")    // reserved
 	bucketKeyObjectImages     = []byte("images")     // stores image objects
 	bucketKeyObjectContainers = []byte("containers") // stores container objects
+	bucketKeyObjectSnapshots  = []byte("snapshots")  // stores snapshot references
 
 	bucketKeyDigest    = []byte("digest")
 	bucketKeyMediaType = []byte("mediatype")
@@ -124,4 +125,16 @@ func getContainersBucket(tx *bolt.Tx, namespace string) *bolt.Bucket {
 
 func getContainerBucket(tx *bolt.Tx, namespace, id string) *bolt.Bucket {
 	return getBucket(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectContainers, []byte(id))
+}
+
+func createSnapshotterBucket(tx *bolt.Tx, namespace, snapshotter string) (*bolt.Bucket, error) {
+	bkt, err := createBucketIfNotExists(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectSnapshots, []byte(snapshotter))
+	if err != nil {
+		return nil, err
+	}
+	return bkt, nil
+}
+
+func getSnapshotterBucket(tx *bolt.Tx, namespace, snapshotter string) *bolt.Bucket {
+	return getBucket(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectSnapshots, []byte(snapshotter))
 }
