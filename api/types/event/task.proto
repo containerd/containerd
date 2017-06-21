@@ -12,6 +12,6 @@ message TaskStart {
 
 message TaskDelete {
 	string container_id = 1;
-        uint32 pid = 2;
-        uint32 exit_status = 3;
+	uint32 pid = 2;
+	uint32 exit_status = 3;
 }

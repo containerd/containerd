@@ -190,7 +190,7 @@ func (c *container) Processes(ctx context.Context) ([]uint32, error) {
 	return pids, nil
 }
 
-func (c *container) Checkpoint(ctx context.Context, opts plugin.CheckpointOpts) error {
+func (c *container) Checkpoint(ctx context.Context, _ string, _ map[string]string) error {
 	return fmt.Errorf("Windows containers do not support checkpoint")
 }
 

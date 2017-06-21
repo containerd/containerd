@@ -298,10 +298,10 @@ func (r *Runtime) Delete(ctx context.Context, c plugin.Task) (*plugin.Exit, erro
 	}); err != nil {
 		return nil, err
 	}
-
 	return &plugin.Exit{
 		Status:    rsp.ExitStatus,
 		Timestamp: rsp.ExitedAt,
+		Pid:       rsp.Pid,
 	}, r.deleteBundle(namespace, lc.containerID)
 }
 

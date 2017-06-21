@@ -186,6 +186,7 @@ func (t *Task) DeleteProcess(ctx context.Context, pid uint32) (*plugin.Exit, err
 	return &plugin.Exit{
 		Status:    r.ExitStatus,
 		Timestamp: r.ExitedAt,
+		Pid:       pid,
 	}, nil
 }
 

@@ -78,6 +78,7 @@ func (p *process) Wait(ctx context.Context) (uint32, error) {
 	if err != nil {
 		return UnknownExitStatus, err
 	}
+	<-p.pidSync
 	for {
 		evt, err := events.Recv()
 		if err != nil {

@@ -94,8 +94,9 @@ message DeleteTaskRequest {
 
 message DeleteResponse {
 	string container_id = 1;
-	uint32 exit_status = 2;
-	google.protobuf.Timestamp exited_at = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	uint32 pid = 2;
+	uint32 exit_status = 3;
+	google.protobuf.Timestamp exited_at = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message DeleteProcessRequest {

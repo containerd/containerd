@@ -57,8 +57,9 @@ message DeleteRequest {
 }
 
 message DeleteResponse {
-	uint32 exit_status = 1;
-	google.protobuf.Timestamp exited_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	uint32 pid = 1;
+	uint32 exit_status = 2;
+	google.protobuf.Timestamp exited_at = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message DeleteProcessRequest {

@@ -25,6 +25,7 @@ type CreateOpts struct {
 }
 
 type Exit struct {
+	Pid       uint32
 	Status    uint32
 	Timestamp time.Time
 }

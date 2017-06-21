@@ -147,6 +147,7 @@ func (t *task) Wait(ctx context.Context) (uint32, error) {
 	if err != nil {
 		return UnknownExitStatus, err
 	}
+	<-t.pidSync
 	for {
 		evt, err := events.Recv()
 		if err != nil {

@@ -198,26 +198,21 @@ func (s *Service) Delete(ctx context.Context, r *api.DeleteTaskRequest) (*api.De
 	if err != nil {
 		return nil, err
 	}
-	state, err := t.State(ctx)
-	if err != nil {
-		return nil, err
-	}
 	exit, err := runtime.Delete(ctx, t)
 	if err != nil {
 		return nil, err
 	}
-
 	if err := s.emit(ctx, "/tasks/delete", event.TaskDelete{
 		ContainerID: r.ContainerID,
-		Pid:         state.Pid,
+		Pid:         exit.Pid,
 		ExitStatus:  exit.Status,
 	}); err != nil {
 		return nil, err
 	}
-
 	return &api.DeleteResponse{
 		ExitStatus: exit.Status,
 		ExitedAt:   exit.Timestamp,
+		Pid:        exit.Pid,
 	}, nil
 }
 
@@ -233,6 +228,7 @@ func (s *Service) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest
 	return &api.DeleteResponse{
 		ExitStatus: exit.Status,
 		ExitedAt:   exit.Timestamp,
+		Pid:        exit.Pid,
 	}, nil
 }
 
