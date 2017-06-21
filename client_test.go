@@ -27,7 +27,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&address, "address", "/run/containerd/containerd.sock", "The address to the containerd socket for use in the tests")
+	flag.StringVar(&address, "address", "/run/containerd-test/containerd.sock", "The address to the containerd socket for use in the tests")
 	flag.BoolVar(&noDaemon, "no-daemon", false, "Do not start a dedicated daemon for the tests")
 	flag.Parse()
 }
@@ -59,6 +59,7 @@ func TestMain(m *testing.M) {
 		cmd = exec.Command("containerd",
 			"--root", defaultRoot,
 			"--state", defaultState,
+			"--address", address,
 		)
 		cmd.Stderr = buf
 		if err := cmd.Start(); err != nil {

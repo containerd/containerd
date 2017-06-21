@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package containerd.v1.services.shim;
+package containerd.runtime.linux.shim.v1;
 
 import "google/protobuf/any.proto";
 import "google/protobuf/empty.proto";
@@ -135,11 +135,6 @@ message ProcessesResponse{
 }
 
 message CheckpointRequest {
-	bool exit = 1;
-	bool allow_tcp = 2;
-	bool allow_unix_sockets = 3;
-	bool allow_terminal = 4;
-	bool file_locks = 5;
-	repeated string empty_namespaces = 6;
-	string checkpoint_path = 7;
+	string path = 1;
+	map<string, string> options = 2;
 }

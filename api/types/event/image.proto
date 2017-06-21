@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package containerd.v1.types;
 
-message ImagePut {
+message ImageUpdate {
 	string name = 1;
-	string labels = 2;
+	map<string, string> labels = 2;
 }
 
 message ImageDelete {

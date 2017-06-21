@@ -48,8 +48,8 @@ func (s *Service) Register(server *grpc.Server) error {
 	return nil
 }
 
-func (s *Service) Get(ctx context.Context, req *imagesapi.GetRequest) (*imagesapi.GetResponse, error) {
-	var resp imagesapi.GetResponse
+func (s *Service) Get(ctx context.Context, req *imagesapi.GetImageRequest) (*imagesapi.GetImageResponse, error) {
+	var resp imagesapi.GetImageResponse
 
 	return &resp, s.withStoreView(ctx, func(ctx context.Context, store images.Store) error {
 		image, err := store.Get(ctx, req.Name)
@@ -62,25 +62,28 @@ func (s *Service) Get(ctx context.Context, req *imagesapi.GetRequest) (*imagesap
 	})
 }
 
-func (s *Service) Put(ctx context.Context, req *imagesapi.PutRequest) (*empty.Empty, error) {
+func (s *Service) Update(ctx context.Context, req *imagesapi.UpdateImageRequest) (*imagesapi.UpdateImageResponse, error) {
 	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store images.Store) error {
-		return mapGRPCError(store.Put(ctx, req.Image.Name, descFromProto(&req.Image.Target)), req.Image.Name)
+		return mapGRPCError(store.Update(ctx, req.Image.Name, descFromProto(&req.Image.Target)), req.Image.Name)
 	}); err != nil {
-		return &empty.Empty{}, err
+		return nil, err
 	}
 
-	if err := s.emit(ctx, "/images/put", event.ImagePut{
+	if err := s.emit(ctx, "/images/update", event.ImageUpdate{
 		Name:   req.Image.Name,
 		Labels: req.Image.Labels,
 	}); err != nil {
-		return &empty.Empty{}, err
+		return nil, err
 	}
 
-	return &empty.Empty{}, nil
+	// TODO: get image back out to return
+	return &imagesapi.UpdateImageResponse{
+	//Image: nil,
+	}, nil
 }
 
-func (s *Service) List(ctx context.Context, _ *imagesapi.ListRequest) (*imagesapi.ListResponse, error) {
-	var resp imagesapi.ListResponse
+func (s *Service) List(ctx context.Context, _ *imagesapi.ListImagesRequest) (*imagesapi.ListImagesResponse, error) {
+	var resp imagesapi.ListImagesResponse
 
 	return &resp, s.withStoreView(ctx, func(ctx context.Context, store images.Store) error {
 		images, err := store.List(ctx)
@@ -93,17 +96,17 @@ func (s *Service) List(ctx context.Context, _ *imagesapi.ListRequest) (*imagesap
 	})
 }
 
-func (s *Service) Delete(ctx context.Context, req *imagesapi.DeleteRequest) (*empty.Empty, error) {
+func (s *Service) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest) (*empty.Empty, error) {
 	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store images.Store) error {
 		return mapGRPCError(store.Delete(ctx, req.Name), req.Name)
 	}); err != nil {
-		return &empty.Empty{}, err
+		return nil, err
 	}
 
 	if err := s.emit(ctx, "/images/delete", event.ImageDelete{
 		Name: req.Name,
 	}); err != nil {
-		return &empty.Empty{}, err
+		return nil, err
 	}
 
 	return &empty.Empty{}, nil

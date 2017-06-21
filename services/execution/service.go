@@ -67,26 +67,20 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		r := rr.(plugin.Runtime)
 		runtimes[r.ID()] = r
 	}
-	c, err := newCollector(ic.Context, runtimes)
-	if err != nil {
-		return nil, err
-	}
 	e := events.GetPoster(ic.Context)
 	return &Service{
-		runtimes:  runtimes,
-		db:        m.(*bolt.DB),
-		collector: c,
-		store:     ct.(content.Store),
-		emitter:   e,
+		runtimes: runtimes,
+		db:       m.(*bolt.DB),
+		store:    ct.(content.Store),
+		emitter:  e,
 	}, nil
 }
 
 type Service struct {
-	runtimes  map[string]plugin.Runtime
-	db        *bolt.DB
-	collector *collector
-	store     content.Store
-	emitter   events.Poster
+	runtimes map[string]plugin.Runtime
+	db       *bolt.DB
+	store    content.Store
+	emitter  events.Poster
 }
 
 func (s *Service) Register(server *grpc.Server) error {
@@ -94,7 +88,7 @@ func (s *Service) Register(server *grpc.Server) error {
 	return nil
 }
 
-func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.CreateResponse, error) {
+func (s *Service) Create(ctx context.Context, r *api.CreateTaskRequest) (*api.CreateTaskResponse, error) {
 	var (
 		checkpointPath string
 		err            error
@@ -152,7 +146,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 			Options: m.Options,
 		})
 	}
-	runtime, err := s.getRuntime(container.Runtime)
+	runtime, err := s.getRuntime(container.Runtime.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -171,13 +165,13 @@ func (s *Service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 		return nil, err
 	}
 
-	return &api.CreateResponse{
+	return &api.CreateTaskResponse{
 		ContainerID: r.ContainerID,
 		Pid:         state.Pid,
 	}, nil
 }
 
-func (s *Service) Start(ctx context.Context, r *api.StartRequest) (*google_protobuf.Empty, error) {
+func (s *Service) Start(ctx context.Context, r *api.StartTaskRequest) (*google_protobuf.Empty, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -195,7 +189,7 @@ func (s *Service) Start(ctx context.Context, r *api.StartRequest) (*google_proto
 	return empty, nil
 }
 
-func (s *Service) Delete(ctx context.Context, r *api.DeleteRequest) (*api.DeleteResponse, error) {
+func (s *Service) Delete(ctx context.Context, r *api.DeleteTaskRequest) (*api.DeleteResponse, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -271,7 +265,7 @@ func taskFromContainerd(ctx context.Context, c plugin.Task) (*task.Task, error) 
 	}, nil
 }
 
-func (s *Service) Info(ctx context.Context, r *api.InfoRequest) (*api.InfoResponse, error) {
+func (s *Service) Get(ctx context.Context, r *api.GetTaskRequest) (*api.GetTaskResponse, error) {
 	task, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -280,13 +274,13 @@ func (s *Service) Info(ctx context.Context, r *api.InfoRequest) (*api.InfoRespon
 	if err != nil {
 		return nil, err
 	}
-	return &api.InfoResponse{
+	return &api.GetTaskResponse{
 		Task: t,
 	}, nil
 }
 
-func (s *Service) List(ctx context.Context, r *api.ListRequest) (*api.ListResponse, error) {
-	resp := &api.ListResponse{}
+func (s *Service) List(ctx context.Context, r *api.ListTasksRequest) (*api.ListTasksResponse, error) {
+	resp := &api.ListTasksResponse{}
 	for _, r := range s.runtimes {
 		tasks, err := r.Tasks(ctx)
 		if err != nil {
@@ -303,7 +297,7 @@ func (s *Service) List(ctx context.Context, r *api.ListRequest) (*api.ListRespon
 	return resp, nil
 }
 
-func (s *Service) Pause(ctx context.Context, r *api.PauseRequest) (*google_protobuf.Empty, error) {
+func (s *Service) Pause(ctx context.Context, r *api.PauseTaskRequest) (*google_protobuf.Empty, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -315,7 +309,7 @@ func (s *Service) Pause(ctx context.Context, r *api.PauseRequest) (*google_proto
 	return empty, nil
 }
 
-func (s *Service) Resume(ctx context.Context, r *api.ResumeRequest) (*google_protobuf.Empty, error) {
+func (s *Service) Resume(ctx context.Context, r *api.ResumeTaskRequest) (*google_protobuf.Empty, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -348,7 +342,7 @@ func (s *Service) Kill(ctx context.Context, r *api.KillRequest) (*google_protobu
 	return empty, nil
 }
 
-func (s *Service) Processes(ctx context.Context, r *api.ProcessesRequest) (*api.ProcessesResponse, error) {
+func (s *Service) ListProcesses(ctx context.Context, r *api.ListProcessesRequest) (*api.ListProcessesResponse, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -365,22 +359,12 @@ func (s *Service) Processes(ctx context.Context, r *api.ProcessesRequest) (*api.
 			Pid: pid,
 		})
 	}
-
-	resp := &api.ProcessesResponse{
+	return &api.ListProcessesResponse{
 		Processes: ps,
-	}
-
-	return resp, nil
+	}, nil
 }
 
-func (s *Service) Events(r *api.EventsRequest, server api.Tasks_EventsServer) error {
-	w := &grpcEventWriter{
-		server: server,
-	}
-	return s.collector.forward(w)
-}
-
-func (s *Service) Exec(ctx context.Context, r *api.ExecRequest) (*api.ExecResponse, error) {
+func (s *Service) Exec(ctx context.Context, r *api.ExecProcessRequest) (*api.ExecProcessResponse, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -401,12 +385,12 @@ func (s *Service) Exec(ctx context.Context, r *api.ExecRequest) (*api.ExecRespon
 	if err != nil {
 		return nil, err
 	}
-	return &api.ExecResponse{
+	return &api.ExecProcessResponse{
 		Pid: state.Pid,
 	}, nil
 }
 
-func (s *Service) Pty(ctx context.Context, r *api.PtyRequest) (*google_protobuf.Empty, error) {
+func (s *Service) ResizePty(ctx context.Context, r *api.ResizePtyRequest) (*google_protobuf.Empty, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -420,18 +404,20 @@ func (s *Service) Pty(ctx context.Context, r *api.PtyRequest) (*google_protobuf.
 	return empty, nil
 }
 
-func (s *Service) CloseStdin(ctx context.Context, r *api.CloseStdinRequest) (*google_protobuf.Empty, error) {
+func (s *Service) CloseIO(ctx context.Context, r *api.CloseIORequest) (*google_protobuf.Empty, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
 	}
-	if err := t.CloseStdin(ctx, r.Pid); err != nil {
-		return nil, err
+	if r.Stdin {
+		if err := t.CloseStdin(ctx, r.Pid); err != nil {
+			return nil, err
+		}
 	}
 	return empty, nil
 }
 
-func (s *Service) Checkpoint(ctx context.Context, r *api.CheckpointRequest) (*api.CheckpointResponse, error) {
+func (s *Service) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest) (*api.CheckpointTaskResponse, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -441,16 +427,7 @@ func (s *Service) Checkpoint(ctx context.Context, r *api.CheckpointRequest) (*ap
 		return nil, err
 	}
 	defer os.RemoveAll(image)
-	if err := t.Checkpoint(ctx, plugin.CheckpointOpts{
-		Exit:             r.Exit,
-		AllowTCP:         r.AllowTcp,
-		AllowTerminal:    r.AllowTerminal,
-		AllowUnixSockets: r.AllowUnixSockets,
-		FileLocks:        r.FileLocks,
-		// ParentImage: r.ParentImage,
-		EmptyNamespaces: r.EmptyNamespaces,
-		Path:            image,
-	}); err != nil {
+	if err := t.Checkpoint(ctx, image, r.Options); err != nil {
 		return nil, err
 	}
 	// write checkpoint to the content store
@@ -469,7 +446,7 @@ func (s *Service) Checkpoint(ctx context.Context, r *api.CheckpointRequest) (*ap
 	if err != nil {
 		return nil, err
 	}
-	return &api.CheckpointResponse{
+	return &api.CheckpointTaskResponse{
 		Descriptors: []*descriptor.Descriptor{
 			cp,
 			specD,
@@ -522,32 +499,4 @@ func (s *Service) emit(ctx context.Context, topic string, evt interface{}) error
 	}
 
 	return nil
-}
-
-type grpcEventWriter struct {
-	server api.Tasks_EventsServer
-}
-
-func (g *grpcEventWriter) Write(e *plugin.Event) error {
-	var t task.Event_EventType
-	switch e.Type {
-	case plugin.ExitEvent:
-		t = task.Event_EXIT
-	case plugin.ExecAddEvent:
-		t = task.Event_EXEC_ADDED
-	case plugin.PausedEvent:
-		t = task.Event_PAUSED
-	case plugin.CreateEvent:
-		t = task.Event_CREATE
-	case plugin.StartEvent:
-		t = task.Event_START
-	case plugin.OOMEvent:
-		t = task.Event_OOM
-	}
-	return g.server.Send(&task.Event{
-		Type:       t,
-		ID:         e.ID,
-		Pid:        e.Pid,
-		ExitStatus: e.ExitStatus,
-	})
 }

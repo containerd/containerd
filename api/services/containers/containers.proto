@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package containerd.v1;
+package containerd.services.containers.v1;
 
 import "gogoproto/gogo.proto";
 import "google/protobuf/any.proto";
@@ -51,11 +51,17 @@ message Container {
 	// If this field is updated, the spec and rootfs needed to updated, as well.
 	string image = 3;
 
+	message Runtime {
+		// Name is the name of the runtime.
+		string name = 1;
+		// Options specify additional runtime initialization options.
+		map<string, string> options = 2;
+	}
 	// Runtime specifies which runtime to use for executing this container.
-	string runtime = 4;
+	Runtime runtime = 4;
 
 	// Spec to be used when creating the container. This is runtime specific.
-	google.protobuf.Any spec = 6;
+	google.protobuf.Any spec = 5;
 
 	// RootFS specifies the snapshot key to use for the container's root
 	// filesystem. When starting a task from this container, a caller should
@@ -65,10 +71,13 @@ message Container {
 	// Snapshots referenced in this field will not be garbage collected.
 	//
 	// This field may be updated.
-	string rootfs = 7 [(gogoproto.customname) = "RootFS"];
+	string rootfs = 6 [(gogoproto.customname) = "RootFS"];
 
-	google.protobuf.Timestamp created_at = 8 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-	google.protobuf.Timestamp updated_at = 9 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	// CreatedAt is the time the container was first created.
+	google.protobuf.Timestamp created_at = 7 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+
+	// UpdatedAt is the last time the container was mutated.
+	google.protobuf.Timestamp updated_at = 8 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message GetContainerRequest {

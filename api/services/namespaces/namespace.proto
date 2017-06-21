@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package containerd.v1.namespaces;
+package containerd.services.namespaces.v1;
 
 import "gogoproto/gogo.proto";
 import "google/protobuf/empty.proto";
@@ -44,7 +44,7 @@ message GetNamespaceResponse {
 }
 
 message ListNamespacesRequest {
-	string filter = 1; // TODO(stevvooe): Define a filtering syntax to make these queries.
+	string filter = 1;
 }
 
 message ListNamespacesResponse {

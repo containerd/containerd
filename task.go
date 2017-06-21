@@ -12,7 +12,6 @@ import (
 
 	"github.com/containerd/containerd/api/services/containers"
 	"github.com/containerd/containerd/api/services/execution"
-	taskapi "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/opencontainers/image-spec/specs-go/v1"
@@ -31,7 +30,13 @@ const (
 	Pausing TaskStatus = "pausing"
 )
 
-type CheckpointOpts func(*execution.CheckpointRequest) error
+type IOCloserOpts func(*execution.CloseIORequest)
+
+func WithStdinCloser(r *execution.CloseIORequest) {
+	r.Stdin = true
+}
+
+type CheckpointOpts func(*execution.CheckpointTaskRequest) error
 
 type Task interface {
 	Pid() uint32
@@ -44,7 +49,7 @@ type Task interface {
 	Wait(context.Context) (uint32, error)
 	Exec(context.Context, *specs.Process, IOCreation) (Process, error)
 	Processes(context.Context) ([]uint32, error)
-	CloseStdin(context.Context) error
+	CloseIO(context.Context, ...IOCloserOpts) error
 	Resize(ctx context.Context, w, h uint32) error
 	IO() *IO
 	Checkpoint(context.Context, ...CheckpointOpts) (v1.Descriptor, error)
@@ -56,7 +61,7 @@ type Process interface {
 	Delete(context.Context) (uint32, error)
 	Kill(context.Context, syscall.Signal) error
 	Wait(context.Context) (uint32, error)
-	CloseStdin(context.Context) error
+	CloseIO(context.Context, ...IOCloserOpts) error
 	Resize(ctx context.Context, w, h uint32) error
 	IO() *IO
 }
@@ -70,7 +75,7 @@ type task struct {
 	containerID string
 	pid         uint32
 
-	deferred *execution.CreateRequest
+	deferred *execution.CreateTaskRequest
 	pidSync  chan struct{}
 }
 
@@ -90,7 +95,7 @@ func (t *task) Start(ctx context.Context) error {
 		close(t.pidSync)
 		return nil
 	}
-	_, err := t.client.TaskService().Start(ctx, &execution.StartRequest{
+	_, err := t.client.TaskService().Start(ctx, &execution.StartTaskRequest{
 		ContainerID: t.containerID,
 	})
 	return err
@@ -108,21 +113,21 @@ func (t *task) Kill(ctx context.Context, s syscall.Signal) error {
 }
 
 func (t *task) Pause(ctx context.Context) error {
-	_, err := t.client.TaskService().Pause(ctx, &execution.PauseRequest{
+	_, err := t.client.TaskService().Pause(ctx, &execution.PauseTaskRequest{
 		ContainerID: t.containerID,
 	})
 	return err
 }
 
 func (t *task) Resume(ctx context.Context) error {
-	_, err := t.client.TaskService().Resume(ctx, &execution.ResumeRequest{
+	_, err := t.client.TaskService().Resume(ctx, &execution.ResumeTaskRequest{
 		ContainerID: t.containerID,
 	})
 	return err
 }
 
 func (t *task) Status(ctx context.Context) (TaskStatus, error) {
-	r, err := t.client.TaskService().Info(ctx, &execution.InfoRequest{
+	r, err := t.client.TaskService().Get(ctx, &execution.GetTaskRequest{
 		ContainerID: t.containerID,
 	})
 	if err != nil {
@@ -133,23 +138,7 @@ func (t *task) Status(ctx context.Context) (TaskStatus, error) {
 
 // Wait is a blocking call that will wait for the task to exit and return the exit status
 func (t *task) Wait(ctx context.Context) (uint32, error) {
-	events, err := t.client.TaskService().Events(ctx, &execution.EventsRequest{})
-	if err != nil {
-		return UnknownExitStatus, err
-	}
-	<-t.pidSync
-	for {
-		e, err := events.Recv()
-		if err != nil {
-			return UnknownExitStatus, err
-		}
-		if e.Type != taskapi.Event_EXIT {
-			continue
-		}
-		if e.ID == t.containerID && e.Pid == t.pid {
-			return e.ExitStatus, nil
-		}
-	}
+	return 255, fmt.Errorf("not implemented")
 }
 
 // Delete deletes the task and its runtime state
@@ -160,7 +149,7 @@ func (t *task) Delete(ctx context.Context) (uint32, error) {
 	if t.io != nil {
 		cerr = t.io.Close()
 	}
-	r, err := t.client.TaskService().Delete(ctx, &execution.DeleteRequest{
+	r, err := t.client.TaskService().Delete(ctx, &execution.DeleteTaskRequest{
 		ContainerID: t.containerID,
 	})
 	if err != nil {
@@ -183,7 +172,7 @@ func (t *task) Exec(ctx context.Context, spec *specs.Process, ioCreate IOCreatio
 }
 
 func (t *task) Processes(ctx context.Context) ([]uint32, error) {
-	response, err := t.client.TaskService().Processes(ctx, &execution.ProcessesRequest{
+	response, err := t.client.TaskService().ListProcesses(ctx, &execution.ListProcessesRequest{
 		ContainerID: t.containerID,
 	})
 	if err != nil {
@@ -196,11 +185,15 @@ func (t *task) Processes(ctx context.Context) ([]uint32, error) {
 	return out, nil
 }
 
-func (t *task) CloseStdin(ctx context.Context) error {
-	_, err := t.client.TaskService().CloseStdin(ctx, &execution.CloseStdinRequest{
+func (t *task) CloseIO(ctx context.Context, opts ...IOCloserOpts) error {
+	r := &execution.CloseIORequest{
 		ContainerID: t.containerID,
 		Pid:         t.pid,
-	})
+	}
+	for _, o := range opts {
+		o(r)
+	}
+	_, err := t.client.TaskService().CloseIO(ctx, r)
 	return err
 }
 
@@ -209,7 +202,7 @@ func (t *task) IO() *IO {
 }
 
 func (t *task) Resize(ctx context.Context, w, h uint32) error {
-	_, err := t.client.TaskService().Pty(ctx, &execution.PtyRequest{
+	_, err := t.client.TaskService().ResizePty(ctx, &execution.ResizePtyRequest{
 		ContainerID: t.containerID,
 		Width:       w,
 		Height:      h,
@@ -218,28 +211,26 @@ func (t *task) Resize(ctx context.Context, w, h uint32) error {
 	return err
 }
 
-func WithExit(r *execution.CheckpointRequest) error {
-	r.Exit = true
+func WithExit(r *execution.CheckpointTaskRequest) error {
+	r.Options["exit"] = "true"
 	return nil
 }
 
 func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointOpts) (d v1.Descriptor, err error) {
-	request := &execution.CheckpointRequest{
+	request := &execution.CheckpointTaskRequest{
 		ContainerID: t.containerID,
+		Options:     make(map[string]string),
 	}
 	for _, o := range opts {
 		if err := o(request); err != nil {
 			return d, err
 		}
 	}
-	// if we are not exiting the container after the checkpoint, make sure we pause it and resume after
-	// all other filesystem operations are completed
-	if !request.Exit {
-		if err := t.Pause(ctx); err != nil {
-			return d, err
-		}
-		defer t.Resume(ctx)
+	// make sure we pause it and resume after all other filesystem operations are completed
+	if err := t.Pause(ctx); err != nil {
+		return d, err
 	}
+	defer t.Resume(ctx)
 	cr, err := t.client.ContainerService().Get(ctx, &containers.GetContainerRequest{
 		ID: t.containerID,
 	})
@@ -261,7 +252,7 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointOpts) (d v1.Des
 	return t.writeIndex(ctx, &index)
 }
 
-func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *execution.CheckpointRequest) error {
+func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *execution.CheckpointTaskRequest) error {
 	response, err := t.client.TaskService().Checkpoint(ctx, request)
 	if err != nil {
 		return err

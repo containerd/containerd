@@ -9,16 +9,19 @@
 		github.com/containerd/containerd/api/services/snapshot/snapshots.proto
 
 	It has these top-level messages:
-		PrepareRequest
+		PrepareSnapshotRequest
+		PrepareSnapshotResponse
+		ViewSnapshotRequest
+		ViewSnapshotResponse
 		MountsRequest
 		MountsResponse
-		RemoveRequest
-		CommitRequest
-		StatRequest
+		RemoveSnapshotRequest
+		CommitSnapshotRequest
+		StatSnapshotRequest
 		Info
-		StatResponse
-		ListRequest
-		ListResponse
+		StatSnapshotResponse
+		ListSnapshotsRequest
+		ListSnapshotsResponse
 		UsageRequest
 		UsageResponse
 */
@@ -73,14 +76,39 @@ func (x Kind) String() string {
 }
 func (Kind) EnumDescriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{0} }
 
-type PrepareRequest struct {
+type PrepareSnapshotRequest struct {
 	Key    string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	Parent string `protobuf:"bytes,2,opt,name=parent,proto3" json:"parent,omitempty"`
 }
 
-func (m *PrepareRequest) Reset()                    { *m = PrepareRequest{} }
-func (*PrepareRequest) ProtoMessage()               {}
-func (*PrepareRequest) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{0} }
+func (m *PrepareSnapshotRequest) Reset()                    { *m = PrepareSnapshotRequest{} }
+func (*PrepareSnapshotRequest) ProtoMessage()               {}
+func (*PrepareSnapshotRequest) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{0} }
+
+type PrepareSnapshotResponse struct {
+	Mounts []*containerd_v1_types.Mount `protobuf:"bytes,1,rep,name=mounts" json:"mounts,omitempty"`
+}
+
+func (m *PrepareSnapshotResponse) Reset()                    { *m = PrepareSnapshotResponse{} }
+func (*PrepareSnapshotResponse) ProtoMessage()               {}
+func (*PrepareSnapshotResponse) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{1} }
+
+type ViewSnapshotRequest struct {
+	Key    string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Parent string `protobuf:"bytes,2,opt,name=parent,proto3" json:"parent,omitempty"`
+}
+
+func (m *ViewSnapshotRequest) Reset()                    { *m = ViewSnapshotRequest{} }
+func (*ViewSnapshotRequest) ProtoMessage()               {}
+func (*ViewSnapshotRequest) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{2} }
+
+type ViewSnapshotResponse struct {
+	Mounts []*containerd_v1_types.Mount `protobuf:"bytes,1,rep,name=mounts" json:"mounts,omitempty"`
+}
+
+func (m *ViewSnapshotResponse) Reset()                    { *m = ViewSnapshotResponse{} }
+func (*ViewSnapshotResponse) ProtoMessage()               {}
+func (*ViewSnapshotResponse) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{3} }
 
 type MountsRequest struct {
 	Key string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
@@ -88,7 +116,7 @@ type MountsRequest struct {
 
 func (m *MountsRequest) Reset()                    { *m = MountsRequest{} }
 func (*MountsRequest) ProtoMessage()               {}
-func (*MountsRequest) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{1} }
+func (*MountsRequest) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{4} }
 
 type MountsResponse struct {
 	Mounts []*containerd_v1_types.Mount `protobuf:"bytes,1,rep,name=mounts" json:"mounts,omitempty"`
@@ -96,66 +124,66 @@ type MountsResponse struct {
 
 func (m *MountsResponse) Reset()                    { *m = MountsResponse{} }
 func (*MountsResponse) ProtoMessage()               {}
-func (*MountsResponse) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{2} }
+func (*MountsResponse) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{5} }
 
-type RemoveRequest struct {
+type RemoveSnapshotRequest struct {
 	Key string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 }
 
-func (m *RemoveRequest) Reset()                    { *m = RemoveRequest{} }
-func (*RemoveRequest) ProtoMessage()               {}
-func (*RemoveRequest) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{3} }
+func (m *RemoveSnapshotRequest) Reset()                    { *m = RemoveSnapshotRequest{} }
+func (*RemoveSnapshotRequest) ProtoMessage()               {}
+func (*RemoveSnapshotRequest) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{6} }
 
-type CommitRequest struct {
+type CommitSnapshotRequest struct {
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Key  string `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
 }
 
-func (m *CommitRequest) Reset()                    { *m = CommitRequest{} }
-func (*CommitRequest) ProtoMessage()               {}
-func (*CommitRequest) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{4} }
+func (m *CommitSnapshotRequest) Reset()                    { *m = CommitSnapshotRequest{} }
+func (*CommitSnapshotRequest) ProtoMessage()               {}
+func (*CommitSnapshotRequest) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{7} }
 
-type StatRequest struct {
+type StatSnapshotRequest struct {
 	Key string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 }
 
-func (m *StatRequest) Reset()                    { *m = StatRequest{} }
-func (*StatRequest) ProtoMessage()               {}
-func (*StatRequest) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{5} }
+func (m *StatSnapshotRequest) Reset()                    { *m = StatSnapshotRequest{} }
+func (*StatSnapshotRequest) ProtoMessage()               {}
+func (*StatSnapshotRequest) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{8} }
 
 type Info struct {
 	Name     string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Parent   string `protobuf:"bytes,2,opt,name=parent,proto3" json:"parent,omitempty"`
-	Kind     Kind   `protobuf:"varint,3,opt,name=kind,proto3,enum=containerd.v1.snapshot.Kind" json:"kind,omitempty"`
+	Kind     Kind   `protobuf:"varint,3,opt,name=kind,proto3,enum=containerd.services.snapshots.v1.Kind" json:"kind,omitempty"`
 	Readonly bool   `protobuf:"varint,4,opt,name=readonly,proto3" json:"readonly,omitempty"`
 }
 
 func (m *Info) Reset()                    { *m = Info{} }
 func (*Info) ProtoMessage()               {}
-func (*Info) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{6} }
+func (*Info) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{9} }
 
-type StatResponse struct {
+type StatSnapshotResponse struct {
 	Info Info `protobuf:"bytes,1,opt,name=info" json:"info"`
 }
 
-func (m *StatResponse) Reset()                    { *m = StatResponse{} }
-func (*StatResponse) ProtoMessage()               {}
-func (*StatResponse) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{7} }
+func (m *StatSnapshotResponse) Reset()                    { *m = StatSnapshotResponse{} }
+func (*StatSnapshotResponse) ProtoMessage()               {}
+func (*StatSnapshotResponse) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{10} }
 
-type ListRequest struct {
+type ListSnapshotsRequest struct {
 }
 
-func (m *ListRequest) Reset()                    { *m = ListRequest{} }
-func (*ListRequest) ProtoMessage()               {}
-func (*ListRequest) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{8} }
+func (m *ListSnapshotsRequest) Reset()                    { *m = ListSnapshotsRequest{} }
+func (*ListSnapshotsRequest) ProtoMessage()               {}
+func (*ListSnapshotsRequest) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{11} }
 
-type ListResponse struct {
+type ListSnapshotsResponse struct {
 	Info []Info `protobuf:"bytes,1,rep,name=info" json:"info"`
 }
 
-func (m *ListResponse) Reset()                    { *m = ListResponse{} }
-func (*ListResponse) ProtoMessage()               {}
-func (*ListResponse) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{9} }
+func (m *ListSnapshotsResponse) Reset()                    { *m = ListSnapshotsResponse{} }
+func (*ListSnapshotsResponse) ProtoMessage()               {}
+func (*ListSnapshotsResponse) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{12} }
 
 type UsageRequest struct {
 	Key string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
@@ -163,31 +191,34 @@ type UsageRequest struct {
 
 func (m *UsageRequest) Reset()                    { *m = UsageRequest{} }
 func (*UsageRequest) ProtoMessage()               {}
-func (*UsageRequest) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{10} }
+func (*UsageRequest) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{13} }
 
 type UsageResponse struct {
-	Inodes int64 `protobuf:"varint,2,opt,name=inodes,proto3" json:"inodes,omitempty"`
 	Size_  int64 `protobuf:"varint,1,opt,name=size,proto3" json:"size,omitempty"`
+	Inodes int64 `protobuf:"varint,2,opt,name=inodes,proto3" json:"inodes,omitempty"`
 }
 
 func (m *UsageResponse) Reset()                    { *m = UsageResponse{} }
 func (*UsageResponse) ProtoMessage()               {}
-func (*UsageResponse) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{11} }
+func (*UsageResponse) Descriptor() ([]byte, []int) { return fileDescriptorSnapshots, []int{14} }
 
 func init() {
-	proto.RegisterType((*PrepareRequest)(nil), "containerd.v1.snapshot.PrepareRequest")
-	proto.RegisterType((*MountsRequest)(nil), "containerd.v1.snapshot.MountsRequest")
-	proto.RegisterType((*MountsResponse)(nil), "containerd.v1.snapshot.MountsResponse")
-	proto.RegisterType((*RemoveRequest)(nil), "containerd.v1.snapshot.RemoveRequest")
-	proto.RegisterType((*CommitRequest)(nil), "containerd.v1.snapshot.CommitRequest")
-	proto.RegisterType((*StatRequest)(nil), "containerd.v1.snapshot.StatRequest")
-	proto.RegisterType((*Info)(nil), "containerd.v1.snapshot.Info")
-	proto.RegisterType((*StatResponse)(nil), "containerd.v1.snapshot.StatResponse")
-	proto.RegisterType((*ListRequest)(nil), "containerd.v1.snapshot.ListRequest")
-	proto.RegisterType((*ListResponse)(nil), "containerd.v1.snapshot.ListResponse")
-	proto.RegisterType((*UsageRequest)(nil), "containerd.v1.snapshot.UsageRequest")
-	proto.RegisterType((*UsageResponse)(nil), "containerd.v1.snapshot.UsageResponse")
-	proto.RegisterEnum("containerd.v1.snapshot.Kind", Kind_name, Kind_value)
+	proto.RegisterType((*PrepareSnapshotRequest)(nil), "containerd.services.snapshots.v1.PrepareSnapshotRequest")
+	proto.RegisterType((*PrepareSnapshotResponse)(nil), "containerd.services.snapshots.v1.PrepareSnapshotResponse")
+	proto.RegisterType((*ViewSnapshotRequest)(nil), "containerd.services.snapshots.v1.ViewSnapshotRequest")
+	proto.RegisterType((*ViewSnapshotResponse)(nil), "containerd.services.snapshots.v1.ViewSnapshotResponse")
+	proto.RegisterType((*MountsRequest)(nil), "containerd.services.snapshots.v1.MountsRequest")
+	proto.RegisterType((*MountsResponse)(nil), "containerd.services.snapshots.v1.MountsResponse")
+	proto.RegisterType((*RemoveSnapshotRequest)(nil), "containerd.services.snapshots.v1.RemoveSnapshotRequest")
+	proto.RegisterType((*CommitSnapshotRequest)(nil), "containerd.services.snapshots.v1.CommitSnapshotRequest")
+	proto.RegisterType((*StatSnapshotRequest)(nil), "containerd.services.snapshots.v1.StatSnapshotRequest")
+	proto.RegisterType((*Info)(nil), "containerd.services.snapshots.v1.Info")
+	proto.RegisterType((*StatSnapshotResponse)(nil), "containerd.services.snapshots.v1.StatSnapshotResponse")
+	proto.RegisterType((*ListSnapshotsRequest)(nil), "containerd.services.snapshots.v1.ListSnapshotsRequest")
+	proto.RegisterType((*ListSnapshotsResponse)(nil), "containerd.services.snapshots.v1.ListSnapshotsResponse")
+	proto.RegisterType((*UsageRequest)(nil), "containerd.services.snapshots.v1.UsageRequest")
+	proto.RegisterType((*UsageResponse)(nil), "containerd.services.snapshots.v1.UsageResponse")
+	proto.RegisterEnum("containerd.services.snapshots.v1.Kind", Kind_name, Kind_value)
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -198,87 +229,87 @@ var _ grpc.ClientConn
 // is compatible with the grpc package it is being compiled against.
 const _ = grpc.SupportPackageIsVersion4
 
-// Client API for Snapshot service
+// Client API for Snapshots service
 
-type SnapshotClient interface {
-	Prepare(ctx context.Context, in *PrepareRequest, opts ...grpc.CallOption) (*MountsResponse, error)
-	View(ctx context.Context, in *PrepareRequest, opts ...grpc.CallOption) (*MountsResponse, error)
+type SnapshotsClient interface {
+	Prepare(ctx context.Context, in *PrepareSnapshotRequest, opts ...grpc.CallOption) (*PrepareSnapshotResponse, error)
+	View(ctx context.Context, in *ViewSnapshotRequest, opts ...grpc.CallOption) (*ViewSnapshotResponse, error)
 	Mounts(ctx context.Context, in *MountsRequest, opts ...grpc.CallOption) (*MountsResponse, error)
-	Commit(ctx context.Context, in *CommitRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error)
-	Remove(ctx context.Context, in *RemoveRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error)
-	Stat(ctx context.Context, in *StatRequest, opts ...grpc.CallOption) (*StatResponse, error)
-	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (Snapshot_ListClient, error)
+	Commit(ctx context.Context, in *CommitSnapshotRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error)
+	Remove(ctx context.Context, in *RemoveSnapshotRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error)
+	Stat(ctx context.Context, in *StatSnapshotRequest, opts ...grpc.CallOption) (*StatSnapshotResponse, error)
+	List(ctx context.Context, in *ListSnapshotsRequest, opts ...grpc.CallOption) (Snapshots_ListClient, error)
 	Usage(ctx context.Context, in *UsageRequest, opts ...grpc.CallOption) (*UsageResponse, error)
 }
 
-type snapshotClient struct {
+type snapshotsClient struct {
 	cc *grpc.ClientConn
 }
 
-func NewSnapshotClient(cc *grpc.ClientConn) SnapshotClient {
-	return &snapshotClient{cc}
+func NewSnapshotsClient(cc *grpc.ClientConn) SnapshotsClient {
+	return &snapshotsClient{cc}
 }
 
-func (c *snapshotClient) Prepare(ctx context.Context, in *PrepareRequest, opts ...grpc.CallOption) (*MountsResponse, error) {
-	out := new(MountsResponse)
-	err := grpc.Invoke(ctx, "/containerd.v1.snapshot.Snapshot/Prepare", in, out, c.cc, opts...)
+func (c *snapshotsClient) Prepare(ctx context.Context, in *PrepareSnapshotRequest, opts ...grpc.CallOption) (*PrepareSnapshotResponse, error) {
+	out := new(PrepareSnapshotResponse)
+	err := grpc.Invoke(ctx, "/containerd.services.snapshots.v1.Snapshots/Prepare", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *snapshotClient) View(ctx context.Context, in *PrepareRequest, opts ...grpc.CallOption) (*MountsResponse, error) {
-	out := new(MountsResponse)
-	err := grpc.Invoke(ctx, "/containerd.v1.snapshot.Snapshot/View", in, out, c.cc, opts...)
+func (c *snapshotsClient) View(ctx context.Context, in *ViewSnapshotRequest, opts ...grpc.CallOption) (*ViewSnapshotResponse, error) {
+	out := new(ViewSnapshotResponse)
+	err := grpc.Invoke(ctx, "/containerd.services.snapshots.v1.Snapshots/View", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *snapshotClient) Mounts(ctx context.Context, in *MountsRequest, opts ...grpc.CallOption) (*MountsResponse, error) {
+func (c *snapshotsClient) Mounts(ctx context.Context, in *MountsRequest, opts ...grpc.CallOption) (*MountsResponse, error) {
 	out := new(MountsResponse)
-	err := grpc.Invoke(ctx, "/containerd.v1.snapshot.Snapshot/Mounts", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/containerd.services.snapshots.v1.Snapshots/Mounts", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *snapshotClient) Commit(ctx context.Context, in *CommitRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error) {
+func (c *snapshotsClient) Commit(ctx context.Context, in *CommitSnapshotRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error) {
 	out := new(google_protobuf1.Empty)
-	err := grpc.Invoke(ctx, "/containerd.v1.snapshot.Snapshot/Commit", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/containerd.services.snapshots.v1.Snapshots/Commit", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *snapshotClient) Remove(ctx context.Context, in *RemoveRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error) {
+func (c *snapshotsClient) Remove(ctx context.Context, in *RemoveSnapshotRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error) {
 	out := new(google_protobuf1.Empty)
-	err := grpc.Invoke(ctx, "/containerd.v1.snapshot.Snapshot/Remove", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/containerd.services.snapshots.v1.Snapshots/Remove", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *snapshotClient) Stat(ctx context.Context, in *StatRequest, opts ...grpc.CallOption) (*StatResponse, error) {
-	out := new(StatResponse)
-	err := grpc.Invoke(ctx, "/containerd.v1.snapshot.Snapshot/Stat", in, out, c.cc, opts...)
+func (c *snapshotsClient) Stat(ctx context.Context, in *StatSnapshotRequest, opts ...grpc.CallOption) (*StatSnapshotResponse, error) {
+	out := new(StatSnapshotResponse)
+	err := grpc.Invoke(ctx, "/containerd.services.snapshots.v1.Snapshots/Stat", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *snapshotClient) List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (Snapshot_ListClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_Snapshot_serviceDesc.Streams[0], c.cc, "/containerd.v1.snapshot.Snapshot/List", opts...)
+func (c *snapshotsClient) List(ctx context.Context, in *ListSnapshotsRequest, opts ...grpc.CallOption) (Snapshots_ListClient, error) {
+	stream, err := grpc.NewClientStream(ctx, &_Snapshots_serviceDesc.Streams[0], c.cc, "/containerd.services.snapshots.v1.Snapshots/List", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &snapshotListClient{stream}
+	x := &snapshotsListClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -288,240 +319,240 @@ func (c *snapshotClient) List(ctx context.Context, in *ListRequest, opts ...grpc
 	return x, nil
 }
 
-type Snapshot_ListClient interface {
-	Recv() (*ListResponse, error)
+type Snapshots_ListClient interface {
+	Recv() (*ListSnapshotsResponse, error)
 	grpc.ClientStream
 }
 
-type snapshotListClient struct {
+type snapshotsListClient struct {
 	grpc.ClientStream
 }
 
-func (x *snapshotListClient) Recv() (*ListResponse, error) {
-	m := new(ListResponse)
+func (x *snapshotsListClient) Recv() (*ListSnapshotsResponse, error) {
+	m := new(ListSnapshotsResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func (c *snapshotClient) Usage(ctx context.Context, in *UsageRequest, opts ...grpc.CallOption) (*UsageResponse, error) {
+func (c *snapshotsClient) Usage(ctx context.Context, in *UsageRequest, opts ...grpc.CallOption) (*UsageResponse, error) {
 	out := new(UsageResponse)
-	err := grpc.Invoke(ctx, "/containerd.v1.snapshot.Snapshot/Usage", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/containerd.services.snapshots.v1.Snapshots/Usage", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// Server API for Snapshot service
+// Server API for Snapshots service
 
-type SnapshotServer interface {
-	Prepare(context.Context, *PrepareRequest) (*MountsResponse, error)
-	View(context.Context, *PrepareRequest) (*MountsResponse, error)
+type SnapshotsServer interface {
+	Prepare(context.Context, *PrepareSnapshotRequest) (*PrepareSnapshotResponse, error)
+	View(context.Context, *ViewSnapshotRequest) (*ViewSnapshotResponse, error)
 	Mounts(context.Context, *MountsRequest) (*MountsResponse, error)
-	Commit(context.Context, *CommitRequest) (*google_protobuf1.Empty, error)
-	Remove(context.Context, *RemoveRequest) (*google_protobuf1.Empty, error)
-	Stat(context.Context, *StatRequest) (*StatResponse, error)
-	List(*ListRequest, Snapshot_ListServer) error
+	Commit(context.Context, *CommitSnapshotRequest) (*google_protobuf1.Empty, error)
+	Remove(context.Context, *RemoveSnapshotRequest) (*google_protobuf1.Empty, error)
+	Stat(context.Context, *StatSnapshotRequest) (*StatSnapshotResponse, error)
+	List(*ListSnapshotsRequest, Snapshots_ListServer) error
 	Usage(context.Context, *UsageRequest) (*UsageResponse, error)
 }
 
-func RegisterSnapshotServer(s *grpc.Server, srv SnapshotServer) {
-	s.RegisterService(&_Snapshot_serviceDesc, srv)
+func RegisterSnapshotsServer(s *grpc.Server, srv SnapshotsServer) {
+	s.RegisterService(&_Snapshots_serviceDesc, srv)
 }
 
-func _Snapshot_Prepare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PrepareRequest)
+func _Snapshots_Prepare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PrepareSnapshotRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SnapshotServer).Prepare(ctx, in)
+		return srv.(SnapshotsServer).Prepare(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.snapshot.Snapshot/Prepare",
+		FullMethod: "/containerd.services.snapshots.v1.Snapshots/Prepare",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SnapshotServer).Prepare(ctx, req.(*PrepareRequest))
+		return srv.(SnapshotsServer).Prepare(ctx, req.(*PrepareSnapshotRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Snapshot_View_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PrepareRequest)
+func _Snapshots_View_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ViewSnapshotRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SnapshotServer).View(ctx, in)
+		return srv.(SnapshotsServer).View(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.snapshot.Snapshot/View",
+		FullMethod: "/containerd.services.snapshots.v1.Snapshots/View",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SnapshotServer).View(ctx, req.(*PrepareRequest))
+		return srv.(SnapshotsServer).View(ctx, req.(*ViewSnapshotRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Snapshot_Mounts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Snapshots_Mounts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(MountsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SnapshotServer).Mounts(ctx, in)
+		return srv.(SnapshotsServer).Mounts(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.snapshot.Snapshot/Mounts",
+		FullMethod: "/containerd.services.snapshots.v1.Snapshots/Mounts",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SnapshotServer).Mounts(ctx, req.(*MountsRequest))
+		return srv.(SnapshotsServer).Mounts(ctx, req.(*MountsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Snapshot_Commit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CommitRequest)
+func _Snapshots_Commit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CommitSnapshotRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SnapshotServer).Commit(ctx, in)
+		return srv.(SnapshotsServer).Commit(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.snapshot.Snapshot/Commit",
+		FullMethod: "/containerd.services.snapshots.v1.Snapshots/Commit",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SnapshotServer).Commit(ctx, req.(*CommitRequest))
+		return srv.(SnapshotsServer).Commit(ctx, req.(*CommitSnapshotRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Snapshot_Remove_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RemoveRequest)
+func _Snapshots_Remove_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveSnapshotRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SnapshotServer).Remove(ctx, in)
+		return srv.(SnapshotsServer).Remove(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.snapshot.Snapshot/Remove",
+		FullMethod: "/containerd.services.snapshots.v1.Snapshots/Remove",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SnapshotServer).Remove(ctx, req.(*RemoveRequest))
+		return srv.(SnapshotsServer).Remove(ctx, req.(*RemoveSnapshotRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Snapshot_Stat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StatRequest)
+func _Snapshots_Stat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StatSnapshotRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SnapshotServer).Stat(ctx, in)
+		return srv.(SnapshotsServer).Stat(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.snapshot.Snapshot/Stat",
+		FullMethod: "/containerd.services.snapshots.v1.Snapshots/Stat",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SnapshotServer).Stat(ctx, req.(*StatRequest))
+		return srv.(SnapshotsServer).Stat(ctx, req.(*StatSnapshotRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Snapshot_List_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(ListRequest)
+func _Snapshots_List_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ListSnapshotsRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(SnapshotServer).List(m, &snapshotListServer{stream})
+	return srv.(SnapshotsServer).List(m, &snapshotsListServer{stream})
 }
 
-type Snapshot_ListServer interface {
-	Send(*ListResponse) error
+type Snapshots_ListServer interface {
+	Send(*ListSnapshotsResponse) error
 	grpc.ServerStream
 }
 
-type snapshotListServer struct {
+type snapshotsListServer struct {
 	grpc.ServerStream
 }
 
-func (x *snapshotListServer) Send(m *ListResponse) error {
+func (x *snapshotsListServer) Send(m *ListSnapshotsResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func _Snapshot_Usage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Snapshots_Usage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UsageRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SnapshotServer).Usage(ctx, in)
+		return srv.(SnapshotsServer).Usage(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.v1.snapshot.Snapshot/Usage",
+		FullMethod: "/containerd.services.snapshots.v1.Snapshots/Usage",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SnapshotServer).Usage(ctx, req.(*UsageRequest))
+		return srv.(SnapshotsServer).Usage(ctx, req.(*UsageRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-var _Snapshot_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "containerd.v1.snapshot.Snapshot",
-	HandlerType: (*SnapshotServer)(nil),
+var _Snapshots_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "containerd.services.snapshots.v1.Snapshots",
+	HandlerType: (*SnapshotsServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "Prepare",
-			Handler:    _Snapshot_Prepare_Handler,
+			Handler:    _Snapshots_Prepare_Handler,
 		},
 		{
 			MethodName: "View",
-			Handler:    _Snapshot_View_Handler,
+			Handler:    _Snapshots_View_Handler,
 		},
 		{
 			MethodName: "Mounts",
-			Handler:    _Snapshot_Mounts_Handler,
+			Handler:    _Snapshots_Mounts_Handler,
 		},
 		{
 			MethodName: "Commit",
-			Handler:    _Snapshot_Commit_Handler,
+			Handler:    _Snapshots_Commit_Handler,
 		},
 		{
 			MethodName: "Remove",
-			Handler:    _Snapshot_Remove_Handler,
+			Handler:    _Snapshots_Remove_Handler,
 		},
 		{
 			MethodName: "Stat",
-			Handler:    _Snapshot_Stat_Handler,
+			Handler:    _Snapshots_Stat_Handler,
 		},
 		{
 			MethodName: "Usage",
-			Handler:    _Snapshot_Usage_Handler,
+			Handler:    _Snapshots_Usage_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "List",
-			Handler:       _Snapshot_List_Handler,
+			Handler:       _Snapshots_List_Handler,
 			ServerStreams: true,
 		},
 	},
 	Metadata: "github.com/containerd/containerd/api/services/snapshot/snapshots.proto",
 }
 
-func (m *PrepareRequest) Marshal() (dAtA []byte, err error) {
+func (m *PrepareSnapshotRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -531,7 +562,7 @@ func (m *PrepareRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *PrepareRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *PrepareSnapshotRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -547,6 +578,96 @@ func (m *PrepareRequest) MarshalTo(dAtA []byte) (int, error) {
 		i++
 		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Parent)))
 		i += copy(dAtA[i:], m.Parent)
+	}
+	return i, nil
+}
+
+func (m *PrepareSnapshotResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PrepareSnapshotResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Mounts) > 0 {
+		for _, msg := range m.Mounts {
+			dAtA[i] = 0xa
+			i++
+			i = encodeVarintSnapshots(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
+func (m *ViewSnapshotRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ViewSnapshotRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Key) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Key)))
+		i += copy(dAtA[i:], m.Key)
+	}
+	if len(m.Parent) > 0 {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Parent)))
+		i += copy(dAtA[i:], m.Parent)
+	}
+	return i, nil
+}
+
+func (m *ViewSnapshotResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ViewSnapshotResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Mounts) > 0 {
+		for _, msg := range m.Mounts {
+			dAtA[i] = 0xa
+			i++
+			i = encodeVarintSnapshots(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
 	}
 	return i, nil
 }
@@ -605,7 +726,7 @@ func (m *MountsResponse) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *RemoveRequest) Marshal() (dAtA []byte, err error) {
+func (m *RemoveSnapshotRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -615,7 +736,7 @@ func (m *RemoveRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *RemoveRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *RemoveSnapshotRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -629,7 +750,7 @@ func (m *RemoveRequest) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *CommitRequest) Marshal() (dAtA []byte, err error) {
+func (m *CommitSnapshotRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -639,7 +760,7 @@ func (m *CommitRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *CommitRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *CommitSnapshotRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -659,7 +780,7 @@ func (m *CommitRequest) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *StatRequest) Marshal() (dAtA []byte, err error) {
+func (m *StatSnapshotRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -669,7 +790,7 @@ func (m *StatRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *StatRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *StatSnapshotRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -728,7 +849,7 @@ func (m *Info) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *StatResponse) Marshal() (dAtA []byte, err error) {
+func (m *StatSnapshotResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -738,7 +859,7 @@ func (m *StatResponse) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *StatResponse) MarshalTo(dAtA []byte) (int, error) {
+func (m *StatSnapshotResponse) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -754,7 +875,7 @@ func (m *StatResponse) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ListRequest) Marshal() (dAtA []byte, err error) {
+func (m *ListSnapshotsRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -764,7 +885,7 @@ func (m *ListRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *ListRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *ListSnapshotsRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -772,7 +893,7 @@ func (m *ListRequest) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ListResponse) Marshal() (dAtA []byte, err error) {
+func (m *ListSnapshotsResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -782,7 +903,7 @@ func (m *ListResponse) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *ListResponse) MarshalTo(dAtA []byte) (int, error) {
+func (m *ListSnapshotsResponse) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -881,7 +1002,7 @@ func encodeVarintSnapshots(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
-func (m *PrepareRequest) Size() (n int) {
+func (m *PrepareSnapshotRequest) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.Key)
@@ -891,6 +1012,44 @@ func (m *PrepareRequest) Size() (n int) {
 	l = len(m.Parent)
 	if l > 0 {
 		n += 1 + l + sovSnapshots(uint64(l))
+	}
+	return n
+}
+
+func (m *PrepareSnapshotResponse) Size() (n int) {
+	var l int
+	_ = l
+	if len(m.Mounts) > 0 {
+		for _, e := range m.Mounts {
+			l = e.Size()
+			n += 1 + l + sovSnapshots(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *ViewSnapshotRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Key)
+	if l > 0 {
+		n += 1 + l + sovSnapshots(uint64(l))
+	}
+	l = len(m.Parent)
+	if l > 0 {
+		n += 1 + l + sovSnapshots(uint64(l))
+	}
+	return n
+}
+
+func (m *ViewSnapshotResponse) Size() (n int) {
+	var l int
+	_ = l
+	if len(m.Mounts) > 0 {
+		for _, e := range m.Mounts {
+			l = e.Size()
+			n += 1 + l + sovSnapshots(uint64(l))
+		}
 	}
 	return n
 }
@@ -917,7 +1076,7 @@ func (m *MountsResponse) Size() (n int) {
 	return n
 }
 
-func (m *RemoveRequest) Size() (n int) {
+func (m *RemoveSnapshotRequest) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.Key)
@@ -927,7 +1086,7 @@ func (m *RemoveRequest) Size() (n int) {
 	return n
 }
 
-func (m *CommitRequest) Size() (n int) {
+func (m *CommitSnapshotRequest) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.Name)
@@ -941,7 +1100,7 @@ func (m *CommitRequest) Size() (n int) {
 	return n
 }
 
-func (m *StatRequest) Size() (n int) {
+func (m *StatSnapshotRequest) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.Key)
@@ -971,7 +1130,7 @@ func (m *Info) Size() (n int) {
 	return n
 }
 
-func (m *StatResponse) Size() (n int) {
+func (m *StatSnapshotResponse) Size() (n int) {
 	var l int
 	_ = l
 	l = m.Info.Size()
@@ -979,13 +1138,13 @@ func (m *StatResponse) Size() (n int) {
 	return n
 }
 
-func (m *ListRequest) Size() (n int) {
+func (m *ListSnapshotsRequest) Size() (n int) {
 	var l int
 	_ = l
 	return n
 }
 
-func (m *ListResponse) Size() (n int) {
+func (m *ListSnapshotsResponse) Size() (n int) {
 	var l int
 	_ = l
 	if len(m.Info) > 0 {
@@ -1032,13 +1191,44 @@ func sovSnapshots(x uint64) (n int) {
 func sozSnapshots(x uint64) (n int) {
 	return sovSnapshots(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (this *PrepareRequest) String() string {
+func (this *PrepareSnapshotRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&PrepareRequest{`,
+	s := strings.Join([]string{`&PrepareSnapshotRequest{`,
 		`Key:` + fmt.Sprintf("%v", this.Key) + `,`,
 		`Parent:` + fmt.Sprintf("%v", this.Parent) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PrepareSnapshotResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PrepareSnapshotResponse{`,
+		`Mounts:` + strings.Replace(fmt.Sprintf("%v", this.Mounts), "Mount", "containerd_v1_types.Mount", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ViewSnapshotRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ViewSnapshotRequest{`,
+		`Key:` + fmt.Sprintf("%v", this.Key) + `,`,
+		`Parent:` + fmt.Sprintf("%v", this.Parent) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ViewSnapshotResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ViewSnapshotResponse{`,
+		`Mounts:` + strings.Replace(fmt.Sprintf("%v", this.Mounts), "Mount", "containerd_v1_types.Mount", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1063,32 +1253,32 @@ func (this *MountsResponse) String() string {
 	}, "")
 	return s
 }
-func (this *RemoveRequest) String() string {
+func (this *RemoveSnapshotRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&RemoveRequest{`,
+	s := strings.Join([]string{`&RemoveSnapshotRequest{`,
 		`Key:` + fmt.Sprintf("%v", this.Key) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *CommitRequest) String() string {
+func (this *CommitSnapshotRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&CommitRequest{`,
+	s := strings.Join([]string{`&CommitSnapshotRequest{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`Key:` + fmt.Sprintf("%v", this.Key) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *StatRequest) String() string {
+func (this *StatSnapshotRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&StatRequest{`,
+	s := strings.Join([]string{`&StatSnapshotRequest{`,
 		`Key:` + fmt.Sprintf("%v", this.Key) + `,`,
 		`}`,
 	}, "")
@@ -1107,30 +1297,30 @@ func (this *Info) String() string {
 	}, "")
 	return s
 }
-func (this *StatResponse) String() string {
+func (this *StatSnapshotResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&StatResponse{`,
+	s := strings.Join([]string{`&StatSnapshotResponse{`,
 		`Info:` + strings.Replace(strings.Replace(this.Info.String(), "Info", "Info", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *ListRequest) String() string {
+func (this *ListSnapshotsRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ListRequest{`,
+	s := strings.Join([]string{`&ListSnapshotsRequest{`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *ListResponse) String() string {
+func (this *ListSnapshotsResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ListResponse{`,
+	s := strings.Join([]string{`&ListSnapshotsResponse{`,
 		`Info:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Info), "Info", "Info", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -1165,7 +1355,7 @@ func valueToStringSnapshots(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
-func (m *PrepareRequest) Unmarshal(dAtA []byte) error {
+func (m *PrepareSnapshotRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1188,10 +1378,10 @@ func (m *PrepareRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: PrepareRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: PrepareSnapshotRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: PrepareRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: PrepareSnapshotRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -1251,6 +1441,276 @@ func (m *PrepareRequest) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Parent = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipSnapshots(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthSnapshots
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *PrepareSnapshotResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowSnapshots
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PrepareSnapshotResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PrepareSnapshotResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Mounts", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSnapshots
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthSnapshots
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Mounts = append(m.Mounts, &containerd_v1_types.Mount{})
+			if err := m.Mounts[len(m.Mounts)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipSnapshots(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthSnapshots
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ViewSnapshotRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowSnapshots
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ViewSnapshotRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ViewSnapshotRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Key", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSnapshots
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthSnapshots
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Key = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Parent", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSnapshots
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthSnapshots
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Parent = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipSnapshots(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthSnapshots
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ViewSnapshotResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowSnapshots
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ViewSnapshotResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ViewSnapshotResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Mounts", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSnapshots
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthSnapshots
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Mounts = append(m.Mounts, &containerd_v1_types.Mount{})
+			if err := m.Mounts[len(m.Mounts)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -1433,7 +1893,7 @@ func (m *MountsResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *RemoveRequest) Unmarshal(dAtA []byte) error {
+func (m *RemoveSnapshotRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1456,10 +1916,10 @@ func (m *RemoveRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: RemoveRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: RemoveSnapshotRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: RemoveRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: RemoveSnapshotRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -1512,7 +1972,7 @@ func (m *RemoveRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *CommitRequest) Unmarshal(dAtA []byte) error {
+func (m *CommitSnapshotRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1535,10 +1995,10 @@ func (m *CommitRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: CommitRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: CommitSnapshotRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: CommitRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: CommitSnapshotRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -1620,7 +2080,7 @@ func (m *CommitRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *StatRequest) Unmarshal(dAtA []byte) error {
+func (m *StatSnapshotRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1643,10 +2103,10 @@ func (m *StatRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: StatRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: StatSnapshotRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: StatRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: StatSnapshotRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -1846,7 +2306,7 @@ func (m *Info) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *StatResponse) Unmarshal(dAtA []byte) error {
+func (m *StatSnapshotResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1869,10 +2329,10 @@ func (m *StatResponse) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: StatResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: StatSnapshotResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: StatResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: StatSnapshotResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -1926,7 +2386,7 @@ func (m *StatResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *ListRequest) Unmarshal(dAtA []byte) error {
+func (m *ListSnapshotsRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1949,10 +2409,10 @@ func (m *ListRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: ListRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: ListSnapshotsRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ListRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ListSnapshotsRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		default:
@@ -1976,7 +2436,7 @@ func (m *ListRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *ListResponse) Unmarshal(dAtA []byte) error {
+func (m *ListSnapshotsResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1999,10 +2459,10 @@ func (m *ListResponse) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: ListResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: ListSnapshotsResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ListResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ListSnapshotsResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -2334,46 +2794,50 @@ func init() {
 }
 
 var fileDescriptorSnapshots = []byte{
-	// 649 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x94, 0xcd, 0x6e, 0x13, 0x31,
-	0x10, 0xc7, 0xb3, 0xcd, 0x36, 0xb4, 0x93, 0x26, 0x2a, 0x16, 0xaa, 0xa2, 0x05, 0x6d, 0x97, 0x40,
-	0x51, 0xc4, 0x61, 0xb7, 0x04, 0xc1, 0x01, 0xb8, 0xf4, 0x13, 0x55, 0xa5, 0x02, 0xb6, 0xa1, 0x88,
-	0xe3, 0x36, 0x71, 0x53, 0xab, 0x5d, 0x7b, 0x89, 0x9d, 0xa0, 0x70, 0xea, 0x11, 0xf5, 0x1d, 0x7a,
-	0x02, 0xf1, 0x10, 0x3c, 0x41, 0x8f, 0x1c, 0x39, 0x21, 0x9a, 0x27, 0x41, 0xb6, 0x77, 0xdb, 0x04,
-	0xea, 0x96, 0x4a, 0x5c, 0x56, 0x33, 0xf6, 0x7f, 0x7e, 0x1e, 0xcf, 0xce, 0x18, 0x56, 0xdb, 0x44,
-	0xec, 0x76, 0xb7, 0xfd, 0x26, 0x8b, 0x83, 0x26, 0xa3, 0x22, 0x22, 0x14, 0x77, 0x5a, 0xc3, 0x66,
-	0x94, 0x90, 0x80, 0xe3, 0x4e, 0x8f, 0x34, 0x31, 0x0f, 0x38, 0x8d, 0x12, 0xbe, 0xcb, 0xc4, 0xa9,
-	0xc1, 0xfd, 0xa4, 0xc3, 0x04, 0x43, 0x33, 0x67, 0x11, 0x7e, 0xef, 0x81, 0x9f, 0x6d, 0x3b, 0x37,
-	0xda, 0xac, 0xcd, 0x94, 0x24, 0x90, 0x96, 0x56, 0x3b, 0x37, 0xdb, 0x8c, 0xb5, 0xf7, 0x71, 0xa0,
-	0xbc, 0xed, 0xee, 0x4e, 0x80, 0xe3, 0x44, 0xf4, 0xd3, 0xcd, 0x67, 0xff, 0x94, 0x92, 0xe8, 0x27,
-	0x98, 0x07, 0x31, 0xeb, 0x52, 0xa1, 0xbf, 0x3a, 0xba, 0xfa, 0x04, 0xca, 0xaf, 0x3a, 0x38, 0x89,
-	0x3a, 0x38, 0xc4, 0xef, 0xbb, 0x98, 0x0b, 0x34, 0x0d, 0xf9, 0x3d, 0xdc, 0xaf, 0x58, 0x9e, 0x55,
-	0x9b, 0x0c, 0xa5, 0x89, 0x66, 0xa0, 0x20, 0x05, 0x54, 0x54, 0xc6, 0xd4, 0x62, 0xea, 0x55, 0x6f,
-	0x43, 0x69, 0x43, 0xa2, 0xb8, 0x31, 0xb4, 0xba, 0x0c, 0xe5, 0x4c, 0xc2, 0x13, 0x46, 0x39, 0x46,
-	0x75, 0x28, 0xa8, 0xf3, 0x79, 0xc5, 0xf2, 0xf2, 0xb5, 0x62, 0xdd, 0xf1, 0x47, 0x4b, 0xa1, 0x12,
-	0xf5, 0x55, 0x50, 0x98, 0x2a, 0xe5, 0x41, 0x21, 0x8e, 0x59, 0xcf, 0x9c, 0x63, 0xf5, 0x11, 0x94,
-	0x96, 0x58, 0x1c, 0x13, 0x91, 0x49, 0x10, 0xd8, 0x34, 0x8a, 0x71, 0xaa, 0x51, 0x76, 0x16, 0x36,
-	0x76, 0x16, 0x36, 0x0b, 0xc5, 0x4d, 0x11, 0x09, 0x33, 0xf7, 0xc0, 0x02, 0x7b, 0x8d, 0xee, 0xb0,
-	0x73, 0x79, 0x86, 0xc2, 0xa0, 0x79, 0xb0, 0xf7, 0x08, 0x6d, 0x55, 0xf2, 0x9e, 0x55, 0x2b, 0xd7,
-	0x6f, 0xf9, 0xe7, 0xff, 0x6c, 0x7f, 0x9d, 0xd0, 0x56, 0xa8, 0x94, 0xc8, 0x81, 0x89, 0x0e, 0x8e,
-	0x5a, 0x8c, 0xee, 0xf7, 0x2b, 0xb6, 0x67, 0xd5, 0x26, 0xc2, 0x53, 0xbf, 0xba, 0x0a, 0x53, 0x3a,
-	0xc7, 0xb4, 0x82, 0x8f, 0xc1, 0x26, 0x74, 0x87, 0xa9, 0x4c, 0x8a, 0x66, 0xba, 0xcc, 0x7a, 0xd1,
-	0x3e, 0xfe, 0x39, 0x9b, 0x0b, 0x95, 0xbe, 0x5a, 0x82, 0xe2, 0x0b, 0xc2, 0xb3, 0xbb, 0x4a, 0xac,
-	0x76, 0xff, 0xc2, 0xe6, 0xaf, 0x84, 0xf5, 0x60, 0xea, 0x0d, 0x8f, 0xda, 0x17, 0xfc, 0x9b, 0xa7,
-	0x50, 0x4a, 0x15, 0xe9, 0x51, 0x08, 0x6c, 0x4e, 0x3e, 0xea, 0x5a, 0xe6, 0x43, 0x65, 0xcb, 0x5a,
-	0x12, 0xca, 0x5a, 0x98, 0xab, 0x5a, 0xe6, 0xc3, 0xd4, 0xbb, 0x1f, 0x82, 0xbd, 0xae, 0x2b, 0x54,
-	0x58, 0x58, 0x6a, 0xac, 0x6d, 0xad, 0x4c, 0xe7, 0x9c, 0xf2, 0xe1, 0x91, 0x07, 0x72, 0x75, 0xa1,
-	0x29, 0x48, 0x0f, 0x23, 0x0f, 0x26, 0x97, 0x5e, 0x6e, 0x6c, 0xac, 0x35, 0x1a, 0x2b, 0xcb, 0xd3,
-	0x96, 0x73, 0xfd, 0xf0, 0xc8, 0x2b, 0xc9, 0x6d, 0xdd, 0x11, 0x02, 0xb7, 0x9c, 0xa9, 0x4f, 0x9f,
-	0xdd, 0xdc, 0xb7, 0x2f, 0xae, 0x62, 0xd5, 0xbf, 0x8e, 0xc3, 0xc4, 0x66, 0x7a, 0x21, 0xf4, 0x0e,
-	0xae, 0xa5, 0x13, 0x80, 0xee, 0x99, 0x2e, 0x3d, 0x3a, 0x22, 0x8e, 0x51, 0xf7, 0x47, 0xaf, 0x6f,
-	0x81, 0xbd, 0x45, 0xf0, 0x87, 0xff, 0xce, 0x7d, 0x0b, 0x05, 0xbd, 0x82, 0xe6, 0x2e, 0x8b, 0xb8,
-	0x1a, 0xf8, 0x39, 0x14, 0x74, 0xcd, 0xcc, 0xe0, 0x91, 0x29, 0x73, 0x66, 0x7c, 0xfd, 0x34, 0xf9,
-	0xd9, 0xd3, 0xe4, 0xaf, 0xc8, 0xa7, 0x49, 0x82, 0xf4, 0xc4, 0x9a, 0x41, 0x23, 0x13, 0x6d, 0x04,
-	0xbd, 0x06, 0x5b, 0x36, 0x3f, 0xba, 0x63, 0xc2, 0x0c, 0x8d, 0xaf, 0x73, 0xf7, 0x62, 0x51, 0x7a,
-	0xc9, 0x4d, 0xb0, 0x65, 0xe3, 0x9b, 0x91, 0x43, 0x53, 0x62, 0x46, 0x0e, 0xcf, 0xce, 0xbc, 0x85,
-	0x1a, 0x30, 0xae, 0x7a, 0x1c, 0x19, 0x03, 0x86, 0x87, 0xc4, 0x99, 0xbb, 0x44, 0xa5, 0xb9, 0x8b,
-	0x95, 0xe3, 0x13, 0x37, 0xf7, 0xe3, 0xc4, 0xcd, 0x1d, 0x0c, 0x5c, 0xeb, 0x78, 0xe0, 0x5a, 0xdf,
-	0x07, 0xae, 0xf5, 0x6b, 0xe0, 0x5a, 0xdb, 0x05, 0x55, 0xa7, 0x87, 0xbf, 0x03, 0x00, 0x00, 0xff,
-	0xff, 0xed, 0x08, 0xd9, 0xe9, 0x91, 0x06, 0x00, 0x00,
+	// 710 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x55, 0x4b, 0x6f, 0xd3, 0x4e,
+	0x10, 0x8f, 0x1b, 0xff, 0xd3, 0x76, 0xfa, 0x50, 0xff, 0xdb, 0x34, 0x44, 0x46, 0x32, 0xc6, 0x07,
+	0x08, 0x1c, 0xec, 0x36, 0x08, 0xca, 0x53, 0xd0, 0x17, 0x52, 0x29, 0x11, 0xc8, 0x2d, 0x15, 0x3d,
+	0xba, 0xc9, 0x36, 0xb5, 0x5a, 0x7b, 0x4d, 0x76, 0x13, 0x14, 0x0e, 0x08, 0x6e, 0xa8, 0xdf, 0xa1,
+	0x27, 0xf8, 0x14, 0x7c, 0x82, 0x1e, 0x39, 0x72, 0x42, 0x34, 0x9f, 0x04, 0xed, 0x7a, 0x93, 0xbe,
+	0x1c, 0xd9, 0x4d, 0x2f, 0xd1, 0xec, 0xe6, 0xf7, 0x18, 0xcf, 0x78, 0xc6, 0xf0, 0xb2, 0xee, 0xb1,
+	0xdd, 0xe6, 0xb6, 0x55, 0x25, 0xbe, 0x5d, 0x25, 0x01, 0x73, 0xbd, 0x00, 0x37, 0x6a, 0xa7, 0x43,
+	0x37, 0xf4, 0x6c, 0x8a, 0x1b, 0x2d, 0xaf, 0x8a, 0xa9, 0x4d, 0x03, 0x37, 0xa4, 0xbb, 0x84, 0xf5,
+	0x02, 0x6a, 0x85, 0x0d, 0xc2, 0x08, 0x32, 0x4e, 0x18, 0x56, 0x17, 0x6d, 0x9d, 0x80, 0x5a, 0x73,
+	0x5a, 0xbe, 0x4e, 0xea, 0x44, 0x80, 0x6d, 0x1e, 0x45, 0x3c, 0xed, 0x7a, 0x9d, 0x90, 0xfa, 0x3e,
+	0xb6, 0xc5, 0x69, 0xbb, 0xb9, 0x63, 0x63, 0x3f, 0x64, 0x6d, 0xf9, 0xe7, 0xd3, 0x54, 0xc9, 0xb1,
+	0x76, 0x88, 0xa9, 0xed, 0x93, 0x66, 0xc0, 0xa2, 0xdf, 0x88, 0x6d, 0x2e, 0x42, 0xe1, 0x6d, 0x03,
+	0x87, 0x6e, 0x03, 0xaf, 0xcb, 0x3c, 0x1c, 0xfc, 0xa1, 0x89, 0x29, 0x43, 0x53, 0x90, 0xdd, 0xc3,
+	0xed, 0xa2, 0x62, 0x28, 0xa5, 0x51, 0x87, 0x87, 0xa8, 0x00, 0x39, 0x0e, 0x0c, 0x58, 0x71, 0x48,
+	0x5c, 0xca, 0x93, 0x59, 0x81, 0x6b, 0x17, 0x34, 0x68, 0x48, 0x02, 0x8a, 0x51, 0x19, 0x72, 0xc2,
+	0x8d, 0x16, 0x15, 0x23, 0x5b, 0x1a, 0x2b, 0x6b, 0xd6, 0xa9, 0x12, 0xb4, 0xe6, 0x2c, 0x91, 0x96,
+	0x55, 0xe1, 0x10, 0x47, 0x22, 0xcd, 0xe7, 0x30, 0xbd, 0xe9, 0xe1, 0x8f, 0x83, 0xe7, 0xf3, 0x0a,
+	0xf2, 0x67, 0x05, 0xae, 0x90, 0xcc, 0x4d, 0x98, 0x10, 0x17, 0xb4, 0x6f, 0x1a, 0xe6, 0x32, 0x4c,
+	0x76, 0x21, 0x57, 0x30, 0xba, 0x03, 0x33, 0x0e, 0xf6, 0x49, 0x2b, 0xb9, 0x0f, 0xe6, 0x33, 0x98,
+	0x59, 0x22, 0xbe, 0xef, 0xb1, 0xf3, 0x50, 0x04, 0x6a, 0xe0, 0xfa, 0x58, 0x62, 0x45, 0xdc, 0xa5,
+	0x0f, 0x9d, 0xd0, 0x6f, 0xc3, 0xf4, 0x3a, 0x73, 0x59, 0xb2, 0xcf, 0x81, 0x02, 0xea, 0x6a, 0xb0,
+	0x43, 0x62, 0x75, 0xfb, 0x14, 0x1f, 0x3d, 0x06, 0x75, 0xcf, 0x0b, 0x6a, 0xc5, 0xac, 0xa1, 0x94,
+	0x26, 0xcb, 0xb7, 0xac, 0xa4, 0x57, 0xde, 0x5a, 0xf3, 0x82, 0x9a, 0x23, 0x38, 0x48, 0x83, 0x91,
+	0x06, 0x76, 0x6b, 0x24, 0xd8, 0x6f, 0x17, 0x55, 0x43, 0x29, 0x8d, 0x38, 0xbd, 0xb3, 0xf9, 0x1e,
+	0xf2, 0x67, 0xb3, 0x96, 0xb5, 0x7e, 0x01, 0xaa, 0x17, 0xec, 0x10, 0x91, 0xdb, 0x58, 0x1a, 0x3f,
+	0xfe, 0x44, 0x8b, 0xea, 0xd1, 0x9f, 0x1b, 0x19, 0x47, 0x30, 0xcd, 0x02, 0xe4, 0x5f, 0x7b, 0xb4,
+	0xa7, 0xdc, 0xed, 0xb4, 0xb9, 0x05, 0x33, 0xe7, 0xee, 0x2f, 0x58, 0x66, 0x07, 0xb4, 0x34, 0x60,
+	0xfc, 0x1d, 0x75, 0xeb, 0xb8, 0x7f, 0xed, 0x9f, 0xc0, 0x84, 0x44, 0x48, 0x53, 0x04, 0x2a, 0xf5,
+	0x3e, 0x45, 0x3d, 0xc8, 0x3a, 0x22, 0xe6, 0x3d, 0xf0, 0x02, 0x52, 0xc3, 0x54, 0xf4, 0x20, 0xeb,
+	0xc8, 0xd3, 0x5d, 0x07, 0xd4, 0xb5, 0xa8, 0x9e, 0xb9, 0x85, 0xa5, 0x8d, 0xd5, 0xcd, 0x95, 0xa9,
+	0x8c, 0x36, 0x79, 0x70, 0x68, 0x00, 0xbf, 0x5d, 0xa8, 0x32, 0xaf, 0x85, 0x91, 0x01, 0xa3, 0x4b,
+	0x6f, 0x2a, 0x95, 0xd5, 0x8d, 0x8d, 0x95, 0xe5, 0x29, 0x45, 0xfb, 0xff, 0xe0, 0xd0, 0x98, 0xe0,
+	0x7f, 0x47, 0x6f, 0x16, 0xc3, 0x35, 0x6d, 0xfc, 0xdb, 0x77, 0x3d, 0xf3, 0xf3, 0x87, 0x2e, 0xb4,
+	0xca, 0x5f, 0x87, 0x61, 0xb4, 0x57, 0x0a, 0xf4, 0x19, 0x86, 0xe5, 0xc8, 0xa3, 0x87, 0xc9, 0xcf,
+	0x1f, 0xbf, 0x61, 0xb4, 0x47, 0x03, 0x30, 0x65, 0x35, 0x9a, 0xa0, 0xf2, 0x11, 0x47, 0xf7, 0x93,
+	0x25, 0x62, 0x76, 0x89, 0xf6, 0xe0, 0xb2, 0x34, 0x69, 0xbb, 0x07, 0xb9, 0x68, 0xd4, 0x91, 0x9d,
+	0xac, 0x70, 0x66, 0x6f, 0x68, 0xb3, 0xe9, 0x09, 0xd2, 0x6c, 0x0b, 0x72, 0x51, 0x33, 0xd0, 0x7c,
+	0x32, 0x37, 0x76, 0x21, 0x68, 0x05, 0x2b, 0xfa, 0x72, 0x58, 0xdd, 0x2f, 0x87, 0xb5, 0xc2, 0xbf,
+	0x1c, 0x5c, 0x3a, 0x5a, 0x36, 0x69, 0xa4, 0x63, 0xd7, 0x52, 0x5f, 0xe9, 0x26, 0xa8, 0x7c, 0x4e,
+	0xd3, 0x74, 0x26, 0x66, 0x0b, 0xa5, 0xe9, 0x4c, 0xec, 0x1a, 0x68, 0x83, 0xca, 0x87, 0x15, 0xa5,
+	0xe0, 0xc7, 0x0d, 0xbb, 0x36, 0x7f, 0x69, 0x5e, 0x64, 0x3c, 0xab, 0xa0, 0x5d, 0xf8, 0x4f, 0x8c,
+	0x2a, 0xb2, 0x92, 0x35, 0x4e, 0x4f, 0xbd, 0x66, 0xa7, 0xc6, 0x47, 0x5e, 0x8b, 0xc5, 0xa3, 0x63,
+	0x3d, 0xf3, 0xfb, 0x58, 0xcf, 0x7c, 0xe9, 0xe8, 0xca, 0x51, 0x47, 0x57, 0x7e, 0x75, 0x74, 0xe5,
+	0x6f, 0x47, 0x57, 0xb6, 0x73, 0xa2, 0x0b, 0xf7, 0xfe, 0x05, 0x00, 0x00, 0xff, 0xff, 0xa9, 0xee,
+	0xc9, 0x12, 0xaa, 0x08, 0x00, 0x00,
 }

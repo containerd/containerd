@@ -18,7 +18,7 @@ type Image struct {
 }
 
 type Store interface {
-	Put(ctx context.Context, name string, desc ocispec.Descriptor) error
+	Update(ctx context.Context, name string, desc ocispec.Descriptor) error
 	Get(ctx context.Context, name string) (Image, error)
 	List(ctx context.Context) ([]Image, error)
 	Delete(ctx context.Context, name string) error

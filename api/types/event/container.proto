@@ -7,7 +7,11 @@ import "gogoproto/gogo.proto";
 message ContainerCreate {
 	string container_id = 1;
 	string image = 2;
-	string runtime = 3;
+	message Runtime {
+		string name = 1;
+		map<string, string> options = 2;
+	}
+	Runtime runtime = 3;
 }
 
 message ContainerUpdate {

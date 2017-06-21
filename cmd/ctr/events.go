@@ -23,7 +23,7 @@ var eventsCommand = cli.Command{
 		ctx, cancel := appContext(context)
 		defer cancel()
 
-		events, err := eventsClient.EventStream(ctx, &eventsapi.EventStreamRequest{})
+		events, err := eventsClient.Stream(ctx, &eventsapi.StreamEventsRequest{})
 		if err != nil {
 			return err
 		}
@@ -114,8 +114,8 @@ func getEventOutput(evt *event.Envelope) (string, error) {
 			return out, err
 		}
 		out = "key=" + e.Key
-	case "types.containerd.io/containerd.v1.types.event.ImagePut":
-		e := &event.ImagePut{}
+	case "types.containerd.io/containerd.v1.types.event.ImageUpdate":
+		e := &event.ImageUpdate{}
 		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
 			return out, err
 		}

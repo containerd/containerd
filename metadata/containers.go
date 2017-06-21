@@ -146,7 +146,9 @@ func readContainer(container *containers.Container, bkt *bolt.Bucket) error {
 		case string(bucketKeyImage):
 			container.Image = string(v)
 		case string(bucketKeyRuntime):
-			container.Runtime = string(v)
+			if err := container.Runtime.UnmarshalBinary(v); err != nil {
+				return err
+			}
 		case string(bucketKeySpec):
 			container.Spec = make([]byte, len(v))
 			copy(container.Spec, v)
@@ -187,9 +189,13 @@ func writeContainer(container *containers.Container, bkt *bolt.Bucket) error {
 	if err != nil {
 		return err
 	}
+	runtime, err := container.Runtime.MarshalBinary()
+	if err != nil {
+		return err
+	}
 	for _, v := range [][2][]byte{
 		{bucketKeyImage, []byte(container.Image)},
-		{bucketKeyRuntime, []byte(container.Runtime)},
+		{bucketKeyRuntime, runtime},
 		{bucketKeySpec, container.Spec},
 		{bucketKeyRootFS, []byte(container.RootFS)},
 		{bucketKeyCreatedAt, createdAt},

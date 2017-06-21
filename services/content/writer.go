@@ -17,7 +17,7 @@ type remoteWriter struct {
 }
 
 // send performs a synchronous req-resp cycle on the client.
-func (rw *remoteWriter) send(req *contentapi.WriteRequest) (*contentapi.WriteResponse, error) {
+func (rw *remoteWriter) send(req *contentapi.WriteContentRequest) (*contentapi.WriteContentResponse, error) {
 	if err := rw.client.Send(req); err != nil {
 		return nil, err
 	}
@@ -35,7 +35,7 @@ func (rw *remoteWriter) send(req *contentapi.WriteRequest) (*contentapi.WriteRes
 }
 
 func (rw *remoteWriter) Status() (content.Status, error) {
-	resp, err := rw.send(&contentapi.WriteRequest{
+	resp, err := rw.send(&contentapi.WriteContentRequest{
 		Action: contentapi.WriteActionStat,
 	})
 	if err != nil {
@@ -57,7 +57,7 @@ func (rw *remoteWriter) Digest() digest.Digest {
 func (rw *remoteWriter) Write(p []byte) (n int, err error) {
 	offset := rw.offset
 
-	resp, err := rw.send(&contentapi.WriteRequest{
+	resp, err := rw.send(&contentapi.WriteContentRequest{
 		Action: contentapi.WriteActionWrite,
 		Offset: offset,
 		Data:   p,
@@ -79,7 +79,7 @@ func (rw *remoteWriter) Write(p []byte) (n int, err error) {
 }
 
 func (rw *remoteWriter) Commit(size int64, expected digest.Digest) error {
-	resp, err := rw.send(&contentapi.WriteRequest{
+	resp, err := rw.send(&contentapi.WriteContentRequest{
 		Action:   contentapi.WriteActionCommit,
 		Total:    size,
 		Offset:   rw.offset,

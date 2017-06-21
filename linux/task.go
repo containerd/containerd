@@ -165,20 +165,15 @@ func (t *Task) CloseStdin(ctx context.Context, pid uint32) error {
 	return err
 }
 
-func (t *Task) Checkpoint(ctx context.Context, opts plugin.CheckpointOpts) error {
-	_, err := t.shim.Checkpoint(ctx, &shim.CheckpointRequest{
-		Exit:             opts.Exit,
-		AllowTcp:         opts.AllowTCP,
-		AllowUnixSockets: opts.AllowUnixSockets,
-		AllowTerminal:    opts.AllowTerminal,
-		FileLocks:        opts.FileLocks,
-		EmptyNamespaces:  opts.EmptyNamespaces,
-		CheckpointPath:   opts.Path,
-	})
-	if err != nil {
-		err = errors.New(grpc.ErrorDesc(err))
+func (t *Task) Checkpoint(ctx context.Context, path string, options map[string]string) error {
+	r := &shim.CheckpointRequest{
+		Path:    path,
+		Options: options,
 	}
-	return err
+	if _, err := t.shim.Checkpoint(ctx, r); err != nil {
+		return errors.New(grpc.ErrorDesc(err))
+	}
+	return nil
 }
 
 func (t *Task) DeleteProcess(ctx context.Context, pid uint32) (*plugin.Exit, error) {

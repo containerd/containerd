@@ -1,27 +1,39 @@
 syntax = "proto3";
 
-package containerd.v1.snapshot;
+package containerd.services.snapshots.v1;
 
 import "gogoproto/gogo.proto";
 import "google/protobuf/empty.proto";
 import "github.com/containerd/containerd/api/types/mount/mount.proto";
 
 // Snapshot service manages snapshots
-service Snapshot {
-	rpc Prepare(PrepareRequest) returns (MountsResponse);
-	rpc View(PrepareRequest) returns (MountsResponse);
+service Snapshots {
+	rpc Prepare(PrepareSnapshotRequest) returns (PrepareSnapshotResponse);
+	rpc View(ViewSnapshotRequest) returns (ViewSnapshotResponse);
 	rpc Mounts(MountsRequest) returns (MountsResponse);
-	rpc Commit(CommitRequest) returns (google.protobuf.Empty);
-	rpc Remove(RemoveRequest) returns (google.protobuf.Empty);
-	rpc Stat(StatRequest) returns (StatResponse);
-	rpc List(ListRequest) returns (stream ListResponse);
+	rpc Commit(CommitSnapshotRequest) returns (google.protobuf.Empty);
+	rpc Remove(RemoveSnapshotRequest) returns (google.protobuf.Empty);
+	rpc Stat(StatSnapshotRequest) returns (StatSnapshotResponse);
+	rpc List(ListSnapshotsRequest) returns (stream ListSnapshotsResponse);
 	rpc Usage(UsageRequest) returns (UsageResponse);
-	// "Snapshot" prepares a new set of mounts from existing name
 }
 
-message PrepareRequest {
+message PrepareSnapshotRequest {
 	string key = 1;
 	string parent = 2;
+}
+
+message PrepareSnapshotResponse {
+	repeated containerd.v1.types.Mount mounts = 1;
+}
+
+message ViewSnapshotRequest {
+	string key = 1;
+	string parent = 2;
+}
+
+message ViewSnapshotResponse {
+	repeated containerd.v1.types.Mount mounts = 1;
 }
 
 message MountsRequest {
@@ -32,16 +44,16 @@ message MountsResponse {
 	repeated containerd.v1.types.Mount mounts = 1;
 }
 
-message RemoveRequest {
+message RemoveSnapshotRequest {
 	string key = 1;
 }
 
-message CommitRequest {
+message CommitSnapshotRequest {
 	string name = 1;
 	string key = 2;
 }
 
-message StatRequest {
+message StatSnapshotRequest {
 	string key = 1;
 }
 
@@ -61,13 +73,14 @@ message Info {
 	bool readonly = 4;
 }
 
-message StatResponse {
+message StatSnapshotResponse {
 	Info info = 1 [(gogoproto.nullable) = false];
 }
 
-message ListRequest{}
+message ListSnapshotsRequest{
+}
 
-message ListResponse {
+message ListSnapshotsResponse {
 	repeated Info info = 1 [(gogoproto.nullable) = false];
 }
 
@@ -76,6 +89,6 @@ message UsageRequest {
 }
 
 message UsageResponse {
-	int64 inodes = 2;
 	int64 size = 1;
+	int64 inodes = 2;
 }

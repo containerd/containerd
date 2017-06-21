@@ -389,7 +389,7 @@ func TestContainerProcesses(t *testing.T) {
 	<-statusC
 }
 
-func TestContainerCloseStdin(t *testing.T) {
+func TestContainerCloseIO(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
@@ -456,7 +456,7 @@ func TestContainerCloseStdin(t *testing.T) {
 		t.Error(err)
 	}
 	w.Close()
-	if err := task.CloseStdin(ctx); err != nil {
+	if err := task.CloseIO(ctx, WithStdinCloser); err != nil {
 		t.Error(err)
 	}
 
@@ -576,7 +576,7 @@ func TestContainerAttach(t *testing.T) {
 	}
 	w.Close()
 
-	if err := task.CloseStdin(ctx); err != nil {
+	if err := task.CloseIO(ctx, WithStdinCloser); err != nil {
 		t.Error(err)
 	}
 

@@ -32,19 +32,9 @@ type Task interface {
 	// CloseStdin closes the processes stdin
 	CloseStdin(context.Context, uint32) error
 	// Checkpoint checkpoints a container to an image with live system data
-	Checkpoint(context.Context, CheckpointOpts) error
+	Checkpoint(context.Context, string, map[string]string) error
 	// DeleteProcess deletes a specific exec process via the pid
 	DeleteProcess(context.Context, uint32) (*Exit, error)
-}
-
-type CheckpointOpts struct {
-	Exit             bool
-	AllowTCP         bool
-	AllowUnixSockets bool
-	AllowTerminal    bool
-	FileLocks        bool
-	EmptyNamespaces  []string
-	Path             string
 }
 
 type ExecOpts struct {

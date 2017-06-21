@@ -10,6 +10,7 @@ import math "math"
 
 import strings "strings"
 import reflect "reflect"
+import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
 
 import io "io"
 
@@ -18,14 +19,14 @@ var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
-type ImagePut struct {
-	Name   string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Labels string `protobuf:"bytes,2,opt,name=labels,proto3" json:"labels,omitempty"`
+type ImageUpdate struct {
+	Name   string            `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Labels map[string]string `protobuf:"bytes,2,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
-func (m *ImagePut) Reset()                    { *m = ImagePut{} }
-func (*ImagePut) ProtoMessage()               {}
-func (*ImagePut) Descriptor() ([]byte, []int) { return fileDescriptorImage, []int{0} }
+func (m *ImageUpdate) Reset()                    { *m = ImageUpdate{} }
+func (*ImageUpdate) ProtoMessage()               {}
+func (*ImageUpdate) Descriptor() ([]byte, []int) { return fileDescriptorImage, []int{0} }
 
 type ImageDelete struct {
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -36,10 +37,10 @@ func (*ImageDelete) ProtoMessage()               {}
 func (*ImageDelete) Descriptor() ([]byte, []int) { return fileDescriptorImage, []int{1} }
 
 func init() {
-	proto.RegisterType((*ImagePut)(nil), "containerd.v1.types.ImagePut")
+	proto.RegisterType((*ImageUpdate)(nil), "containerd.v1.types.ImageUpdate")
 	proto.RegisterType((*ImageDelete)(nil), "containerd.v1.types.ImageDelete")
 }
-func (m *ImagePut) Marshal() (dAtA []byte, err error) {
+func (m *ImageUpdate) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -49,7 +50,7 @@ func (m *ImagePut) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *ImagePut) MarshalTo(dAtA []byte) (int, error) {
+func (m *ImageUpdate) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -61,10 +62,21 @@ func (m *ImagePut) MarshalTo(dAtA []byte) (int, error) {
 		i += copy(dAtA[i:], m.Name)
 	}
 	if len(m.Labels) > 0 {
-		dAtA[i] = 0x12
-		i++
-		i = encodeVarintImage(dAtA, i, uint64(len(m.Labels)))
-		i += copy(dAtA[i:], m.Labels)
+		for k, _ := range m.Labels {
+			dAtA[i] = 0x12
+			i++
+			v := m.Labels[k]
+			mapSize := 1 + len(k) + sovImage(uint64(len(k))) + 1 + len(v) + sovImage(uint64(len(v)))
+			i = encodeVarintImage(dAtA, i, uint64(mapSize))
+			dAtA[i] = 0xa
+			i++
+			i = encodeVarintImage(dAtA, i, uint64(len(k)))
+			i += copy(dAtA[i:], k)
+			dAtA[i] = 0x12
+			i++
+			i = encodeVarintImage(dAtA, i, uint64(len(v)))
+			i += copy(dAtA[i:], v)
+		}
 	}
 	return i, nil
 }
@@ -120,16 +132,20 @@ func encodeVarintImage(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
-func (m *ImagePut) Size() (n int) {
+func (m *ImageUpdate) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.Name)
 	if l > 0 {
 		n += 1 + l + sovImage(uint64(l))
 	}
-	l = len(m.Labels)
-	if l > 0 {
-		n += 1 + l + sovImage(uint64(l))
+	if len(m.Labels) > 0 {
+		for k, v := range m.Labels {
+			_ = k
+			_ = v
+			mapEntrySize := 1 + len(k) + sovImage(uint64(len(k))) + 1 + len(v) + sovImage(uint64(len(v)))
+			n += mapEntrySize + 1 + sovImage(uint64(mapEntrySize))
+		}
 	}
 	return n
 }
@@ -157,13 +173,23 @@ func sovImage(x uint64) (n int) {
 func sozImage(x uint64) (n int) {
 	return sovImage(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (this *ImagePut) String() string {
+func (this *ImageUpdate) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ImagePut{`,
+	keysForLabels := make([]string, 0, len(this.Labels))
+	for k, _ := range this.Labels {
+		keysForLabels = append(keysForLabels, k)
+	}
+	github_com_gogo_protobuf_sortkeys.Strings(keysForLabels)
+	mapStringForLabels := "map[string]string{"
+	for _, k := range keysForLabels {
+		mapStringForLabels += fmt.Sprintf("%v: %v,", k, this.Labels[k])
+	}
+	mapStringForLabels += "}"
+	s := strings.Join([]string{`&ImageUpdate{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
-		`Labels:` + fmt.Sprintf("%v", this.Labels) + `,`,
+		`Labels:` + mapStringForLabels + `,`,
 		`}`,
 	}, "")
 	return s
@@ -186,7 +212,7 @@ func valueToStringImage(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
-func (m *ImagePut) Unmarshal(dAtA []byte) error {
+func (m *ImageUpdate) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -209,10 +235,10 @@ func (m *ImagePut) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: ImagePut: wiretype end group for non-group")
+			return fmt.Errorf("proto: ImageUpdate: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ImagePut: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ImageUpdate: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -248,7 +274,7 @@ func (m *ImagePut) Unmarshal(dAtA []byte) error {
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Labels", wireType)
 			}
-			var stringLen uint64
+			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowImage
@@ -258,20 +284,107 @@ func (m *ImagePut) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
+				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
+			if msglen < 0 {
 				return ErrInvalidLengthImage
 			}
-			postIndex := iNdEx + intStringLen
+			postIndex := iNdEx + msglen
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Labels = string(dAtA[iNdEx:postIndex])
+			var keykey uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowImage
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				keykey |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			var stringLenmapkey uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowImage
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLenmapkey |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLenmapkey := int(stringLenmapkey)
+			if intStringLenmapkey < 0 {
+				return ErrInvalidLengthImage
+			}
+			postStringIndexmapkey := iNdEx + intStringLenmapkey
+			if postStringIndexmapkey > l {
+				return io.ErrUnexpectedEOF
+			}
+			mapkey := string(dAtA[iNdEx:postStringIndexmapkey])
+			iNdEx = postStringIndexmapkey
+			if m.Labels == nil {
+				m.Labels = make(map[string]string)
+			}
+			if iNdEx < postIndex {
+				var valuekey uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowImage
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					valuekey |= (uint64(b) & 0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				var stringLenmapvalue uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowImage
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					stringLenmapvalue |= (uint64(b) & 0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				intStringLenmapvalue := int(stringLenmapvalue)
+				if intStringLenmapvalue < 0 {
+					return ErrInvalidLengthImage
+				}
+				postStringIndexmapvalue := iNdEx + intStringLenmapvalue
+				if postStringIndexmapvalue > l {
+					return io.ErrUnexpectedEOF
+				}
+				mapvalue := string(dAtA[iNdEx:postStringIndexmapvalue])
+				iNdEx = postStringIndexmapvalue
+				m.Labels[mapkey] = mapvalue
+			} else {
+				var mapvalue string
+				m.Labels[mapkey] = mapvalue
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -483,16 +596,20 @@ func init() {
 }
 
 var fileDescriptorImage = []byte{
-	// 175 bytes of a gzipped FileDescriptorProto
+	// 232 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xb2, 0x49, 0xcf, 0x2c, 0xc9,
 	0x28, 0x4d, 0xd2, 0x4b, 0xce, 0xcf, 0xd5, 0x4f, 0xce, 0xcf, 0x2b, 0x49, 0xcc, 0xcc, 0x4b, 0x2d,
 	0x4a, 0x41, 0x66, 0x26, 0x16, 0x64, 0xea, 0x97, 0x54, 0x16, 0xa4, 0x16, 0xeb, 0xa7, 0x96, 0xa5,
 	0xe6, 0x95, 0xe8, 0x67, 0xe6, 0x26, 0xa6, 0xa7, 0xea, 0x15, 0x14, 0xe5, 0x97, 0xe4, 0x0b, 0x09,
-	0x23, 0xd4, 0xe9, 0x95, 0x19, 0xea, 0x81, 0x95, 0x29, 0x99, 0x71, 0x71, 0x78, 0x82, 0xd4, 0x04,
-	0x94, 0x96, 0x08, 0x09, 0x71, 0xb1, 0xe4, 0x25, 0xe6, 0xa6, 0x4a, 0x30, 0x2a, 0x30, 0x6a, 0x70,
-	0x06, 0x81, 0xd9, 0x42, 0x62, 0x5c, 0x6c, 0x39, 0x89, 0x49, 0xa9, 0x39, 0xc5, 0x12, 0x4c, 0x60,
-	0x51, 0x28, 0x4f, 0x49, 0x91, 0x8b, 0x1b, 0xac, 0xcf, 0x25, 0x35, 0x27, 0xb5, 0x24, 0x15, 0x9b,
-	0x56, 0x27, 0x89, 0x13, 0x0f, 0xe5, 0x18, 0x6e, 0x3c, 0x94, 0x63, 0x68, 0x78, 0x24, 0xc7, 0x78,
-	0xe2, 0x91, 0x1c, 0xe3, 0x85, 0x47, 0x72, 0x8c, 0x0f, 0x1e, 0xc9, 0x31, 0x26, 0xb1, 0x81, 0x1d,
-	0x64, 0x0c, 0x08, 0x00, 0x00, 0xff, 0xff, 0xfa, 0x87, 0x34, 0x3a, 0xd0, 0x00, 0x00, 0x00,
+	0x23, 0xd4, 0xe9, 0x95, 0x19, 0xea, 0x81, 0x95, 0x29, 0x2d, 0x62, 0xe4, 0xe2, 0xf6, 0x04, 0x29,
+	0x0a, 0x2d, 0x48, 0x49, 0x2c, 0x49, 0x15, 0x12, 0xe2, 0x62, 0xc9, 0x4b, 0xcc, 0x4d, 0x95, 0x60,
+	0x54, 0x60, 0xd4, 0xe0, 0x0c, 0x02, 0xb3, 0x85, 0x5c, 0xb8, 0xd8, 0x72, 0x12, 0x93, 0x52, 0x73,
+	0x8a, 0x25, 0x98, 0x14, 0x98, 0x35, 0xb8, 0x8d, 0x74, 0xf4, 0xb0, 0x98, 0xa4, 0x87, 0x64, 0x8a,
+	0x9e, 0x0f, 0x58, 0xb9, 0x6b, 0x5e, 0x49, 0x51, 0x65, 0x10, 0x54, 0xaf, 0x94, 0x25, 0x17, 0x37,
+	0x92, 0xb0, 0x90, 0x00, 0x17, 0x73, 0x76, 0x6a, 0x25, 0xd4, 0x1e, 0x10, 0x53, 0x48, 0x84, 0x8b,
+	0xb5, 0x2c, 0x31, 0xa7, 0x34, 0x55, 0x82, 0x09, 0x2c, 0x06, 0xe1, 0x58, 0x31, 0x59, 0x30, 0x2a,
+	0x29, 0x42, 0xdd, 0xe8, 0x92, 0x9a, 0x93, 0x8a, 0xdd, 0x8d, 0x4e, 0x12, 0x27, 0x1e, 0xca, 0x31,
+	0xdc, 0x78, 0x28, 0xc7, 0xd0, 0xf0, 0x48, 0x8e, 0xf1, 0xc4, 0x23, 0x39, 0xc6, 0x0b, 0x8f, 0xe4,
+	0x18, 0x1f, 0x3c, 0x92, 0x63, 0x4c, 0x62, 0x03, 0xfb, 0xde, 0x18, 0x10, 0x00, 0x00, 0xff, 0xff,
+	0xa7, 0x64, 0x49, 0x13, 0x3d, 0x01, 0x00, 0x00,
 }

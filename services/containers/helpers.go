@@ -22,10 +22,13 @@ func containersToProto(containers []containers.Container) []api.Container {
 
 func containerToProto(container *containers.Container) api.Container {
 	return api.Container{
-		ID:      container.ID,
-		Labels:  container.Labels,
-		Image:   container.Image,
-		Runtime: container.Runtime,
+		ID:     container.ID,
+		Labels: container.Labels,
+		Image:  container.Image,
+		Runtime: &api.Container_Runtime{
+			Name:    container.Runtime.Name,
+			Options: container.Runtime.Options,
+		},
 		Spec: &types.Any{
 			TypeUrl: specs.Version,
 			Value:   container.Spec,
@@ -36,12 +39,15 @@ func containerToProto(container *containers.Container) api.Container {
 
 func containerFromProto(containerpb *api.Container) containers.Container {
 	return containers.Container{
-		ID:      containerpb.ID,
-		Labels:  containerpb.Labels,
-		Image:   containerpb.Image,
-		Runtime: containerpb.Runtime,
-		Spec:    containerpb.Spec.Value,
-		RootFS:  containerpb.RootFS,
+		ID:     containerpb.ID,
+		Labels: containerpb.Labels,
+		Image:  containerpb.Image,
+		Runtime: containers.RuntimeInfo{
+			Name:    containerpb.Runtime.Name,
+			Options: containerpb.Runtime.Options,
+		},
+		Spec:   containerpb.Spec.Value,
+		RootFS: containerpb.RootFS,
 	}
 }
 

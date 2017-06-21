@@ -104,7 +104,7 @@ func (c *container) Image(ctx context.Context) (Image, error) {
 	}, nil
 }
 
-type NewTaskOpts func(context.Context, *Client, *execution.CreateRequest) error
+type NewTaskOpts func(context.Context, *Client, *execution.CreateTaskRequest) error
 
 func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...NewTaskOpts) (Task, error) {
 	c.mu.Lock()
@@ -113,7 +113,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...Ne
 	if err != nil {
 		return nil, err
 	}
-	request := &execution.CreateRequest{
+	request := &execution.CreateTaskRequest{
 		ContainerID: c.c.ID,
 		Terminal:    i.Terminal,
 		Stdin:       i.Stdin,
@@ -161,7 +161,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...Ne
 }
 
 func (c *container) loadTask(ctx context.Context, ioAttach IOAttach) (Task, error) {
-	response, err := c.client.TaskService().Info(ctx, &execution.InfoRequest{
+	response, err := c.client.TaskService().Get(ctx, &execution.GetTaskRequest{
 		ContainerID: c.c.ID,
 	})
 	if err != nil {

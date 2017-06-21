@@ -254,19 +254,24 @@ func (p *initProcess) Stdin() io.Closer {
 
 func (p *initProcess) Checkpoint(context context.Context, r *shimapi.CheckpointRequest) error {
 	var actions []runc.CheckpointAction
-	if !r.Exit {
-		actions = append(actions, runc.LeaveRunning)
-	}
+	/*
+		if !r.Exit {
+			actions = append(actions, runc.LeaveRunning)
+		}
+	*/
 	work := filepath.Join(p.bundle, "work")
 	defer os.RemoveAll(work)
+	// TODO: convert options into runc flags or a better format for criu
 	if err := p.runc.Checkpoint(context, p.id, &runc.CheckpointOpts{
-		WorkDir:                  work,
-		ImagePath:                r.CheckpointPath,
-		AllowOpenTCP:             r.AllowTcp,
-		AllowExternalUnixSockets: r.AllowUnixSockets,
-		AllowTerminal:            r.AllowTerminal,
-		FileLocks:                r.FileLocks,
-		EmptyNamespaces:          r.EmptyNamespaces,
+		WorkDir:   work,
+		ImagePath: r.Path,
+		/*
+			AllowOpenTCP:             r.AllowTcp,
+			AllowExternalUnixSockets: r.AllowUnixSockets,
+			AllowTerminal:            r.AllowTerminal,
+			FileLocks:                r.FileLocks,
+			EmptyNamespaces:          r.EmptyNamespaces,
+		*/
 	}, actions...); err != nil {
 		dumpLog := filepath.Join(p.bundle, "criu-dump.log")
 		if cerr := copyFile(dumpLog, filepath.Join(work, "dump.log")); cerr != nil {

@@ -52,8 +52,8 @@ func convertToAny(evt Event) (*protobuf.Any, error) {
 	case event.SnapshotRemove:
 		url = getUrl("SnapshotRemove")
 		pb = &v
-	case event.ImagePut:
-		url = getUrl("ImagePut")
+	case event.ImageUpdate:
+		url = getUrl("ImageUpdate")
 		pb = &v
 	case event.ImageDelete:
 		url = getUrl("ImageDelete")

@@ -35,7 +35,7 @@ func (s *Service) Register(server *grpc.Server) error {
 	return nil
 }
 
-func (s *Service) EventStream(req *api.EventStreamRequest, srv api.Events_EventStreamServer) error {
+func (s *Service) Stream(req *api.StreamEventsRequest, srv api.Events_StreamServer) error {
 	clientID := fmt.Sprintf("%d", time.Now().UnixNano())
 	for {
 		e := <-s.emitter.Events(srv.Context(), clientID)

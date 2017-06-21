@@ -83,7 +83,7 @@ func WithCheckpoint(desc v1.Descriptor, rootfsID string) NewContainerOpts {
 }
 
 func WithTaskCheckpoint(desc v1.Descriptor) NewTaskOpts {
-	return func(ctx context.Context, c *Client, r *execution.CreateRequest) error {
+	return func(ctx context.Context, c *Client, r *execution.CreateTaskRequest) error {
 		id := desc.Digest
 		index, err := decodeIndex(ctx, c.ContentStore(), id)
 		if err != nil {
