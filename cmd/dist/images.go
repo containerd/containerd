@@ -32,15 +32,13 @@ var imagesListCommand = cli.Command{
 		ctx, cancel := appContext(clicontext)
 		defer cancel()
 
-		imageStore, err := resolveImageStore(clicontext)
+		client, err := getClient(clicontext)
 		if err != nil {
 			return err
 		}
 
-		cs, err := resolveContentStore(clicontext)
-		if err != nil {
-			return err
-		}
+		imageStore := client.ImageService()
+		cs := client.ContentStore()
 
 		images, err := imageStore.List(ctx)
 		if err != nil {
@@ -76,10 +74,12 @@ var imageRemoveCommand = cli.Command{
 		ctx, cancel := appContext(clicontext)
 		defer cancel()
 
-		imageStore, err := resolveImageStore(clicontext)
+		client, err := getClient(clicontext)
 		if err != nil {
 			return err
 		}
+
+		imageStore := client.ImageService()
 
 		for _, target := range clicontext.Args() {
 			if err := imageStore.Delete(ctx, target); err != nil {

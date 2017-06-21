@@ -14,20 +14,15 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
-	contentapi "github.com/containerd/containerd/api/services/content"
-	imagesapi "github.com/containerd/containerd/api/services/images"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/rootfs"
-	contentservice "github.com/containerd/containerd/services/content"
-	imagesservice "github.com/containerd/containerd/services/images"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
-	"google.golang.org/grpc"
 )
 
 var registryFlags = []cli.Flag{
@@ -81,32 +76,11 @@ func appContext(clicontext *cli.Context) (contextpkg.Context, contextpkg.CancelF
 }
 
 func resolveContentStore(context *cli.Context) (content.Store, error) {
-	conn, err := connectGRPC(context)
+	client, err := getClient(context)
 	if err != nil {
 		return nil, err
 	}
-
-	return contentservice.NewStoreFromClient(contentapi.NewContentClient(conn)), nil
-}
-
-func resolveImageStore(clicontext *cli.Context) (images.Store, error) {
-	conn, err := connectGRPC(clicontext)
-	if err != nil {
-		return nil, err
-	}
-	return imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)), nil
-}
-
-func connectGRPC(context *cli.Context) (*grpc.ClientConn, error) {
-	address := context.GlobalString("address")
-	timeout := context.GlobalDuration("connect-timeout")
-	return grpc.Dial(address,
-		grpc.WithTimeout(timeout),
-		grpc.WithInsecure(),
-		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
-			return net.DialTimeout("unix", address, timeout)
-		}),
-	)
+	return client.ContentStore(), nil
 }
 
 // getResolver prepares the resolver from the environment and options.
