@@ -16,9 +16,9 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/containerd/console"
 	"github.com/containerd/containerd/api/grpc/types"
 	"github.com/containerd/containerd/specs"
-	"github.com/containerd/console"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/urfave/cli"
 	netcontext "golang.org/x/net/context"
@@ -577,7 +577,21 @@ var statsCommand = cli.Command{
 	},
 }
 
-func getUpdateCommandInt64Flag(context *cli.Context, name string) uint64 {
+func getUpdateCommandInt64Flag(context *cli.Context, name string) int64 {
+	str := context.String(name)
+	if str == "" {
+		return 0
+	}
+
+	val, err := strconv.ParseInt(str, 0, 64)
+	if err != nil {
+		fatal(err.Error(), 1)
+	}
+
+	return val
+}
+
+func getUpdateCommandUInt64Flag(context *cli.Context, name string) uint64 {
 	str := context.String(name)
 	if str == "" {
 		return 0
@@ -628,24 +642,32 @@ var updateCommand = cli.Command{
 		cli.StringFlag{
 			Name: "pids-limit",
 		},
+		cli.StringFlag{
+			Name: "cpu-realtime-period",
+		},
+		cli.StringFlag{
+			Name: "cpu-realtime-runtime",
+		},
 	},
 	Action: func(context *cli.Context) error {
 		req := &types.UpdateContainerRequest{
 			Id: context.Args().First(),
 		}
 		req.Resources = &types.UpdateResource{}
-		req.Resources.MemoryLimit = getUpdateCommandInt64Flag(context, "memory-limit")
-		req.Resources.MemoryReservation = getUpdateCommandInt64Flag(context, "memory-reservation")
-		req.Resources.MemorySwap = getUpdateCommandInt64Flag(context, "memory-swap")
-		req.Resources.BlkioWeight = getUpdateCommandInt64Flag(context, "blkio-weight")
-		req.Resources.CpuPeriod = getUpdateCommandInt64Flag(context, "cpu-period")
-		req.Resources.CpuQuota = getUpdateCommandInt64Flag(context, "cpu-quota")
-		req.Resources.CpuShares = getUpdateCommandInt64Flag(context, "cpu-shares")
+		req.Resources.MemoryLimit = getUpdateCommandUInt64Flag(context, "memory-limit")
+		req.Resources.MemoryReservation = getUpdateCommandUInt64Flag(context, "memory-reservation")
+		req.Resources.MemorySwap = getUpdateCommandUInt64Flag(context, "memory-swap")
+		req.Resources.BlkioWeight = getUpdateCommandUInt64Flag(context, "blkio-weight")
+		req.Resources.CpuPeriod = getUpdateCommandUInt64Flag(context, "cpu-period")
+		req.Resources.CpuQuota = getUpdateCommandUInt64Flag(context, "cpu-quota")
+		req.Resources.CpuShares = getUpdateCommandUInt64Flag(context, "cpu-shares")
 		req.Resources.CpusetCpus = context.String("cpuset-cpus")
 		req.Resources.CpusetMems = context.String("cpuset-mems")
-		req.Resources.KernelMemoryLimit = getUpdateCommandInt64Flag(context, "kernel-limit")
-		req.Resources.KernelTCPMemoryLimit = getUpdateCommandInt64Flag(context, "kernel-tcp-limit")
-		req.Resources.PidsLimit = getUpdateCommandInt64Flag(context, "pids-limit")
+		req.Resources.KernelMemoryLimit = getUpdateCommandUInt64Flag(context, "kernel-limit")
+		req.Resources.KernelTCPMemoryLimit = getUpdateCommandUInt64Flag(context, "kernel-tcp-limit")
+		req.Resources.PidsLimit = getUpdateCommandUInt64Flag(context, "pids-limit")
+		req.Resources.CpuRealtimePeriod = getUpdateCommandUInt64Flag(context, "cpu-realtime-period")
+		req.Resources.CpuRealtimeRuntime = getUpdateCommandInt64Flag(context, "cpu-realtime-runtime")
 		c := getClient(context)
 		_, err := c.UpdateContainer(netcontext.Background(), req)
 		return err
