@@ -74,6 +74,10 @@ var runCommand = cli.Command{
 			Name:  "env",
 			Usage: "specify additional container environment variables (i.e. FOO=bar)",
 		},
+		cli.StringSliceFlag{
+			Name:  "label",
+			Usage: "specify additional labels (foo=bar)",
+		},
 		cli.BoolFlag{
 			Name:  "rm",
 			Usage: "remove the container after running",

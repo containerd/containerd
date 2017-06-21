@@ -136,7 +136,7 @@ func (s *namespaceStore) namespaceEmpty(ctx context.Context, namespace string) (
 	}
 
 	containerStore := NewContainerStore(s.tx)
-	containers, err := containerStore.List(ctx, "")
+	containers, err := containerStore.List(ctx)
 	if err != nil {
 		return false, err
 	}

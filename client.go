@@ -127,8 +127,10 @@ func (c *Client) IsServing(ctx context.Context) (bool, error) {
 }
 
 // Containers returns all containers created in containerd
-func (c *Client) Containers(ctx context.Context) ([]Container, error) {
-	r, err := c.ContainerService().List(ctx, &containers.ListContainersRequest{})
+func (c *Client) Containers(ctx context.Context, filters ...string) ([]Container, error) {
+	r, err := c.ContainerService().List(ctx, &containers.ListContainersRequest{
+		Filters: filters,
+	})
 	if err != nil {
 		return nil, err
 	}
