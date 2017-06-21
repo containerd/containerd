@@ -232,7 +232,7 @@ func (s *store) Writer(ctx context.Context, ref string, total int64, expected di
 	if expected != "" {
 		p := s.blobPath(expected)
 		if _, err := os.Stat(p); err == nil {
-			return nil, ErrExists
+			return nil, ErrExists("")
 		}
 	}
 
