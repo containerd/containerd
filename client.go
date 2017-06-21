@@ -13,6 +13,7 @@ import (
 	"github.com/containerd/containerd/api/services/containers"
 	contentapi "github.com/containerd/containerd/api/services/content"
 	diffapi "github.com/containerd/containerd/api/services/diff"
+	eventsapi "github.com/containerd/containerd/api/services/events"
 	"github.com/containerd/containerd/api/services/execution"
 	imagesapi "github.com/containerd/containerd/api/services/images"
 	namespacesapi "github.com/containerd/containerd/api/services/namespaces"
@@ -469,6 +470,10 @@ func (c *Client) DiffService() diff.DiffService {
 
 func (c *Client) HealthService() grpc_health_v1.HealthClient {
 	return grpc_health_v1.NewHealthClient(c.conn)
+}
+
+func (c *Client) EventService() eventsapi.EventsClient {
+	return eventsapi.NewEventsClient(c.conn)
 }
 
 func (c *Client) VersionService() versionservice.VersionClient {
