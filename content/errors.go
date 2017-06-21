@@ -1,5 +1,7 @@
 package content
 
+import "github.com/pkg/errors"
+
 type contentExistsErr struct {
 	desc string
 }
@@ -17,9 +19,9 @@ func ErrExists(msg string) error {
 	if msg == "" {
 		msg = "content: exists"
 	}
-	return contentExistsErr{
+	return errors.WithStack(contentExistsErr{
 		desc: msg,
-	}
+	})
 }
 
 // ErrNotFound is returned when an item is not found.
@@ -27,9 +29,9 @@ func ErrNotFound(msg string) error {
 	if msg == "" {
 		msg = "content: not found"
 	}
-	return contentNotFoundErr{
+	return errors.WithStack(contentNotFoundErr{
 		desc: msg,
-	}
+	})
 }
 
 // ErrLocked is returned when content is actively being uploaded, this
@@ -38,9 +40,9 @@ func ErrLocked(msg string) error {
 	if msg == "" {
 		msg = "content: locked"
 	}
-	return contentLockedErr{
+	return errors.WithStack(contentLockedErr{
 		desc: msg,
-	}
+	})
 }
 
 func (c contentExistsErr) Error() string {
@@ -67,54 +69,30 @@ func (c contentLockedErr) Locked() bool {
 
 // IsNotFound returns true if the error is due to a not found content item
 func IsNotFound(err error) bool {
-	if err, ok := err.(interface {
+	if err, ok := errors.Cause(err).(interface {
 		NotFound() bool
 	}); ok {
 		return err.NotFound()
 	}
-
-	causal, ok := err.(interface {
-		Cause() error
-	})
-	if !ok {
-		return false
-	}
-
-	return IsNotFound(causal.Cause())
+	return false
 }
 
 // IsExists returns true if the error is due to an already existing content item
 func IsExists(err error) bool {
-	if err, ok := err.(interface {
+	if err, ok := errors.Cause(err).(interface {
 		Exists() bool
 	}); ok {
 		return err.Exists()
 	}
-
-	causal, ok := err.(interface {
-		Cause() error
-	})
-	if !ok {
-		return false
-	}
-
-	return IsExists(causal.Cause())
+	return false
 }
 
 // IsLocked returns true if the error is due to a currently locked content item
 func IsLocked(err error) bool {
-	if err, ok := err.(interface {
+	if err, ok := errors.Cause(err).(interface {
 		Locked() bool
 	}); ok {
 		return err.Locked()
 	}
-
-	causal, ok := err.(interface {
-		Cause() error
-	})
-	if !ok {
-		return false
-	}
-
-	return IsLocked(causal.Cause())
+	return false
 }
