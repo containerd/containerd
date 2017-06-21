@@ -8,8 +8,6 @@ import (
 	"os"
 	"os/exec"
 
-	contentapi "github.com/containerd/containerd/api/services/content"
-	"github.com/containerd/containerd/services/content"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/urfave/cli"
 )
@@ -45,12 +43,12 @@ var editCommand = cli.Command{
 			return err
 		}
 
-		conn, err := connectGRPC(context)
+		client, err := getClient(context)
 		if err != nil {
 			return err
 		}
 
-		content := content.NewStoreFromClient(contentapi.NewContentClient(conn))
+		content := client.ContentStore()
 
 		rc, err := content.Reader(ctx, dgst)
 		if err != nil {

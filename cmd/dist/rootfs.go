@@ -6,9 +6,7 @@ import (
 	"os"
 	"strings"
 
-	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	"github.com/containerd/containerd/log"
-	snapshotservice "github.com/containerd/containerd/services/snapshot"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/urfave/cli"
 )
@@ -95,12 +93,12 @@ var rootfsPrepareCommand = cli.Command{
 
 		log.G(ctx).Infof("preparing mounts %s", dgst.String())
 
-		conn, err := connectGRPC(clicontext)
+		client, err := getClient(clicontext)
 		if err != nil {
 			return err
 		}
 
-		snapshotter := snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotClient(conn))
+		snapshotter := client.SnapshotService()
 
 		mounts, err := snapshotter.Prepare(ctx, target, dgst.String())
 		if err != nil {

@@ -3,10 +3,7 @@ package main
 import (
 	"fmt"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-
-	contentapi "github.com/containerd/containerd/api/services/content"
+	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/urfave/cli"
@@ -28,12 +25,12 @@ var deleteCommand = cli.Command{
 		ctx, cancel := appContext(context)
 		defer cancel()
 
-		conn, err := connectGRPC(context)
+		client, err := getClient(context)
 		if err != nil {
 			return err
 		}
 
-		client := contentapi.NewContentClient(conn)
+		cs := client.ContentStore()
 
 		for _, arg := range args {
 			dgst, err := digest.Parse(arg)
@@ -45,13 +42,8 @@ var deleteCommand = cli.Command{
 				continue
 			}
 
-			if _, err := client.Delete(ctx, &contentapi.DeleteContentRequest{
-				Digest: dgst,
-			}); err != nil {
-				switch grpc.Code(err) {
-				case codes.NotFound:
-					// if it is already deleted, ignore!
-				default:
+			if err := cs.Delete(ctx, dgst); err != nil {
+				if !content.IsNotFound(err) {
 					if exitError == nil {
 						exitError = err
 					}
