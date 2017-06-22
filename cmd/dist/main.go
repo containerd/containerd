@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	namespaces2 "github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/version"
 	"github.com/urfave/cli"
 )
@@ -62,8 +63,8 @@ distribution tool
 		cli.StringFlag{
 			Name:   "namespace, n",
 			Usage:  "namespace to use with commands",
-			Value:  "default",
-			EnvVar: "CONTAINERD_NAMESPACE",
+			Value:  namespaces2.Default,
+			EnvVar: namespaces2.NamespaceEnvVar,
 		},
 	}
 	app.Commands = []cli.Command{

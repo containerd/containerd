@@ -6,6 +6,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/version"
 	"github.com/urfave/cli"
 )
@@ -48,8 +49,8 @@ containerd CLI
 		cli.StringFlag{
 			Name:   "namespace, n",
 			Usage:  "namespace to use with commands",
-			Value:  "default",
-			EnvVar: "CONTAINERD_NAMESPACE",
+			Value:  namespaces.Default,
+			EnvVar: namespaces.NamespaceEnvVar,
 		},
 	}
 	app.Commands = append([]cli.Command{
