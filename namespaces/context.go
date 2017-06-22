@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	namespaceEnvVar  = "CONTAINERD_NAMESPACE"
-	defaultNamespace = "default"
+	NamespaceEnvVar = "CONTAINERD_NAMESPACE"
+	Default         = "default"
 )
 
 var (
@@ -30,9 +30,9 @@ func WithNamespace(ctx context.Context, namespace string) context.Context {
 // NamespaceFromEnv uses the namespace defined in CONTAINERD_NAMESPACE or
 // default
 func NamespaceFromEnv(ctx context.Context) context.Context {
-	namespace := os.Getenv(namespaceEnvVar)
+	namespace := os.Getenv(NamespaceEnvVar)
 	if namespace == "" {
-		namespace = defaultNamespace
+		namespace = Default
 	}
 	return WithNamespace(ctx, namespace)
 }
