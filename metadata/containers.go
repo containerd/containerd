@@ -146,9 +146,26 @@ func readContainer(container *containers.Container, bkt *bolt.Bucket) error {
 		case string(bucketKeyImage):
 			container.Image = string(v)
 		case string(bucketKeyRuntime):
-			if err := container.Runtime.UnmarshalBinary(v); err != nil {
-				return err
+			rbkt := bkt.Bucket(bucketKeyRuntime)
+			if rbkt == nil {
+				return nil // skip runtime. should be an error?
 			}
+
+			n := rbkt.Get(bucketKeyName)
+			if n != nil {
+				container.Runtime.Name = string(n)
+			}
+
+			obkt := rbkt.Bucket(bucketKeyOptions)
+			if obkt == nil {
+				return nil
+			}
+
+			container.Runtime.Options = map[string]string{}
+			return obkt.ForEach(func(k, v []byte) error {
+				container.Runtime.Options[string(k)] = string(v)
+				return nil
+			})
 		case string(bucketKeySpec):
 			container.Spec = make([]byte, len(v))
 			copy(container.Spec, v)
@@ -189,13 +206,9 @@ func writeContainer(container *containers.Container, bkt *bolt.Bucket) error {
 	if err != nil {
 		return err
 	}
-	runtime, err := container.Runtime.MarshalBinary()
-	if err != nil {
-		return err
-	}
+
 	for _, v := range [][2][]byte{
 		{bucketKeyImage, []byte(container.Image)},
-		{bucketKeyRuntime, runtime},
 		{bucketKeySpec, container.Spec},
 		{bucketKeyRootFS, []byte(container.RootFS)},
 		{bucketKeyCreatedAt, createdAt},
@@ -205,6 +218,33 @@ func writeContainer(container *containers.Container, bkt *bolt.Bucket) error {
 			return err
 		}
 	}
+
+	if rbkt := bkt.Bucket(bucketKeyRuntime); rbkt != nil {
+		if err := bkt.DeleteBucket(bucketKeyRuntime); err != nil {
+			return err
+		}
+	}
+
+	rbkt, err := bkt.CreateBucket(bucketKeyRuntime)
+	if err != nil {
+		return err
+	}
+
+	if err := rbkt.Put(bucketKeyName, []byte(container.Runtime.Name)); err != nil {
+		return err
+	}
+
+	obkt, err := rbkt.CreateBucket(bucketKeyOptions)
+	if err != nil {
+		return err
+	}
+
+	for k, v := range container.Runtime.Options {
+		if err := obkt.Put([]byte(k), []byte(v)); err != nil {
+			return err
+		}
+	}
+
 	// Remove existing labels to keep from merging
 	if lbkt := bkt.Bucket(bucketKeyLabels); lbkt != nil {
 		if err := bkt.DeleteBucket(bucketKeyLabels); err != nil {
