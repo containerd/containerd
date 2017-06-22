@@ -4,6 +4,8 @@ package containerd.services.events.v1;
 
 import "github.com/containerd/containerd/api/types/event/event.proto";
 
+option go_package = "github.com/containerd/containerd/api/services/events/v1;events";
+
 service Events {
 	rpc Stream(StreamEventsRequest) returns (stream containerd.v1.types.Envelope);
 }

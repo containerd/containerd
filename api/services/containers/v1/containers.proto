@@ -9,6 +9,8 @@ import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "github.com/containerd/containerd/api/types/descriptor/descriptor.proto";
 
+option go_package = "github.com/containerd/containerd/api/services/containers/v1;containers";
+
 // Containers provides metadata storage for containers used in the execution
 // service.
 //
