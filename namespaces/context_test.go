@@ -2,6 +2,7 @@ package namespaces
 
 import (
 	"context"
+	"os"
 	"testing"
 )
 
@@ -18,6 +19,34 @@ func TestContext(t *testing.T) {
 
 	expected := "test"
 	nctx := WithNamespace(ctx, expected)
+
+	namespace, ok = Namespace(nctx)
+	if !ok {
+		t.Fatal("expected to find a namespace")
+	}
+
+	if namespace != expected {
+		t.Fatalf("unexpected namespace: %q != %q", namespace, expected)
+	}
+}
+
+func TestNamespaceFromEnv(t *testing.T) {
+	oldenv := os.Getenv(namespaceEnvVar)
+	defer os.Setenv(namespaceEnvVar, oldenv) // restore old env var
+
+	ctx := context.Background()
+	namespace, ok := Namespace(ctx)
+	if ok {
+		t.Fatal("namespace should not be present")
+	}
+
+	if namespace != "" {
+		t.Fatalf("namespace should not be defined: got %q", namespace)
+	}
+
+	expected := "test-namespace"
+	os.Setenv(namespaceEnvVar, expected)
+	nctx := NamespaceFromEnv(ctx)
 
 	namespace, ok = Namespace(nctx)
 	if !ok {
