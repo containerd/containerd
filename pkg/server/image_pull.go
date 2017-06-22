@@ -18,9 +18,11 @@ package server
 
 import (
 	gocontext "context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -77,7 +79,6 @@ import (
 // contents are missing but snapshots are ready, is the image still "READY"?
 
 // PullImage pulls an image with authentication config.
-// TODO(mikebrow): harden api (including figuring out at what layer we should be blocking on duplicate requests.)
 func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (retRes *runtime.PullImageResponse, retErr error) {
 	glog.V(2).Infof("PullImage %q with auth config %+v", r.GetImage().GetImage(), r.GetAuth())
 	defer func() {
@@ -88,10 +89,8 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 	}()
 	image := r.GetImage().GetImage()
 
-	// TODO(random-liu): [P1] Schema 1 image is not supported in containerd now, we need to support
-	// it for backward compatiblity.
 	// TODO(mikebrow): add truncIndex for image id
-	imageID, repoTag, repoDigest, err := c.pullImage(ctx, image)
+	imageID, repoTag, repoDigest, err := c.pullImage(ctx, image, r.GetAuth())
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull image %q: %v", image, err)
 	}
@@ -173,8 +172,37 @@ func (r *resourceSet) all() map[string]struct{} {
 	return resources
 }
 
+// ParseAuth parses AuthConfig and returns username and password/secret required by containerd.
+func ParseAuth(auth *runtime.AuthConfig) (string, string, error) {
+	if auth == nil {
+		return "", "", nil
+	}
+	if auth.Username != "" {
+		return auth.Username, auth.Password, nil
+	}
+	if auth.IdentityToken != "" {
+		return "", auth.IdentityToken, nil
+	}
+	if auth.Auth != "" {
+		decLen := base64.StdEncoding.DecodedLen(len(auth.Auth))
+		decoded := make([]byte, decLen)
+		_, err := base64.StdEncoding.Decode(decoded, []byte(auth.Auth))
+		if err != nil {
+			return "", "", err
+		}
+		fields := strings.SplitN(string(decoded), ":", 2)
+		if len(fields) != 2 {
+			return "", "", fmt.Errorf("invalid decoded auth: %q", decoded)
+		}
+		user, passwd := fields[0], fields[1]
+		return user, strings.Trim(passwd, "\x00"), nil
+	}
+	// TODO(random-liu): Support RegistryToken.
+	return "", "", fmt.Errorf("invalid auth config")
+}
+
 // pullImage pulls image and returns image id (config digest), repoTag and repoDigest.
-func (c *criContainerdService) pullImage(ctx context.Context, rawRef string) (
+func (c *criContainerdService) pullImage(ctx context.Context, rawRef string, auth *runtime.AuthConfig) (
 	// TODO(random-liu): Replace with client.Pull.
 	string, string, string, error) {
 	namedRef, err := normalizeImageRef(rawRef)
@@ -189,10 +217,8 @@ func (c *criContainerdService) pullImage(ctx context.Context, rawRef string) (
 
 	// Resolve the image reference to get descriptor and fetcher.
 	resolver := docker.NewResolver(docker.ResolverOptions{
-		// TODO(random-liu): Add authentication by setting credentials.
-		// TODO(random-liu): Handle https.
-		PlainHTTP: true,
-		Client:    http.DefaultClient,
+		Credentials: func(string) (string, string, error) { return ParseAuth(auth) },
+		Client:      http.DefaultClient,
 	})
 	_, desc, err := resolver.Resolve(ctx, ref)
 	if err != nil {
