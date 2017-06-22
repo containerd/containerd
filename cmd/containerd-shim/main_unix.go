@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/Sirupsen/logrus"
-	shimapi "github.com/containerd/containerd/api/services/shim"
+	shimapi "github.com/containerd/containerd/api/services/shim/v1"
 	"github.com/containerd/containerd/linux/shim"
 	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/version"

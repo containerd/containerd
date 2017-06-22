@@ -16,7 +16,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
-	shimapi "github.com/containerd/containerd/api/services/shim"
+	shimapi "github.com/containerd/containerd/api/services/shim/v1"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	specs "github.com/opencontainers/runtime-spec/specs-go"

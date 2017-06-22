@@ -9,8 +9,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
-	"github.com/containerd/containerd/api/services/containers"
-	"github.com/containerd/containerd/api/services/tasks"
+	"github.com/containerd/containerd/api/services/containers/v1"
+	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types/mount"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"

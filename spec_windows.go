@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/containerd/containerd/api/services/containers"
+	"github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/images"
 	protobuf "github.com/gogo/protobuf/types"
 	"github.com/opencontainers/image-spec/specs-go/v1"

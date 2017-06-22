@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
-	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
+	snapshotapi "github.com/containerd/containerd/api/services/snapshot/v1"
 	mountapi "github.com/containerd/containerd/api/types/mount"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshot"

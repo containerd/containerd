@@ -10,9 +10,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/containerd/containerd/api/services/containers"
-	eventsapi "github.com/containerd/containerd/api/services/events"
-	"github.com/containerd/containerd/api/services/tasks"
+	"github.com/containerd/containerd/api/services/containers/v1"
+	eventsapi "github.com/containerd/containerd/api/services/events/v1"
+	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types/event"
 	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/content"

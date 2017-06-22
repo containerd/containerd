@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	api "github.com/containerd/containerd/api/services/namespaces"
+	api "github.com/containerd/containerd/api/services/namespaces/v1"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/gogo/protobuf/types"
 )

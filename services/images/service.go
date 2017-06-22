@@ -2,7 +2,7 @@ package images
 
 import (
 	"github.com/boltdb/bolt"
-	imagesapi "github.com/containerd/containerd/api/services/images"
+	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	"github.com/containerd/containerd/api/types/event"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/images"

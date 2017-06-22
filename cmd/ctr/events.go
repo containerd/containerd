@@ -6,7 +6,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	eventsapi "github.com/containerd/containerd/api/services/events"
+	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/types/event"
 	"github.com/gogo/protobuf/proto"
 	"github.com/urfave/cli"

@@ -3,7 +3,7 @@ package snapshot
 import (
 	gocontext "context"
 
-	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
+	snapshotapi "github.com/containerd/containerd/api/services/snapshot/v1"
 	"github.com/containerd/containerd/api/types/event"
 	mounttypes "github.com/containerd/containerd/api/types/mount"
 	"github.com/containerd/containerd/events"

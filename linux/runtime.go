@@ -16,7 +16,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/containerd/containerd/api/services/shim"
+	"github.com/containerd/containerd/api/services/shim/v1"
 	"github.com/containerd/containerd/api/types/event"
 	"github.com/containerd/containerd/api/types/mount"
 	"github.com/containerd/containerd/api/types/task"

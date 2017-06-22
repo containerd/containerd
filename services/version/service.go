@@ -1,7 +1,7 @@
 package version
 
 import (
-	api "github.com/containerd/containerd/api/services/version"
+	api "github.com/containerd/containerd/api/services/version/v1"
 	"github.com/containerd/containerd/plugin"
 	ctrdversion "github.com/containerd/containerd/version"
 	empty "github.com/golang/protobuf/ptypes/empty"

@@ -6,6 +6,8 @@ import "gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 
+option go_package = "github.com/containerd/containerd/api/services/content/v1;content";
+
 // Content provides access to a content addressable storage system.
 service Content {
 	// Info returns information about a committed object.

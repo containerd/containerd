@@ -6,6 +6,8 @@ import "gogoproto/gogo.proto";
 import "google/protobuf/empty.proto";
 import "github.com/containerd/containerd/api/types/descriptor/descriptor.proto";
 
+option go_package = "github.com/containerd/containerd/api/services/images/v1;images";
+
 // Images is a service that allows one to register images with containerd.
 //
 // In containerd, an image is merely the mapping of a name to a content root,

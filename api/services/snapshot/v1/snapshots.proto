@@ -6,6 +6,8 @@ import "gogoproto/gogo.proto";
 import "google/protobuf/empty.proto";
 import "github.com/containerd/containerd/api/types/mount/mount.proto";
 
+option go_package = "github.com/containerd/containerd/api/services/snapshot/v1;snapshot";
+
 // Snapshot service manages snapshots
 service Snapshots {
 	rpc Prepare(PrepareSnapshotRequest) returns (PrepareSnapshotResponse);

@@ -10,6 +10,8 @@ import "github.com/containerd/containerd/api/types/descriptor/descriptor.proto";
 import "github.com/containerd/containerd/api/types/task/task.proto";
 import "google/protobuf/timestamp.proto";
 
+option go_package = "github.com/containerd/containerd/api/services/tasks/v1;tasks";
+
 service Tasks {
 	// Create a task.
 	rpc Create(CreateTaskRequest) returns (CreateTaskResponse);

@@ -1,7 +1,7 @@
 package containers
 
 import (
-	api "github.com/containerd/containerd/api/services/containers"
+	api "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/namespaces"

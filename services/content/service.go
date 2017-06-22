@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
-	api "github.com/containerd/containerd/api/services/content"
+	api "github.com/containerd/containerd/api/services/content/v1"
 	"github.com/containerd/containerd/api/types/event"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/events"

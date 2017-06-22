@@ -8,6 +8,8 @@ import "google/protobuf/timestamp.proto";
 import "github.com/containerd/containerd/api/types/mount/mount.proto";
 import "github.com/containerd/containerd/api/types/descriptor/descriptor.proto";
 
+option go_package = "github.com/containerd/containerd/api/services/diff/v1;diff";
+
 // Diff service creates and applies diffs
 service Diff {
 	// Apply applies the content associated with the provided digests onto

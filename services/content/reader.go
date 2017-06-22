@@ -3,7 +3,7 @@ package content
 import (
 	"context"
 
-	contentapi "github.com/containerd/containerd/api/services/content"
+	contentapi "github.com/containerd/containerd/api/services/content/v1"
 	digest "github.com/opencontainers/go-digest"
 )
 

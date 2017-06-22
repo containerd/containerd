@@ -7,7 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/containerd/containerd/api/services/shim"
+	"github.com/containerd/containerd/api/services/shim/v1"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/plugin"
 	protobuf "github.com/gogo/protobuf/types"
