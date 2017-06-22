@@ -19,7 +19,12 @@ import (
 	"github.com/containerd/containerd/rootfs"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
 	"google.golang.org/grpc"
+)
+
+var (
+	ErrTaskNotRunning = errors.New("task is not running")
 )
 
 const UnknownExitStatus = 255
@@ -154,6 +159,17 @@ func (t *task) Wait(ctx context.Context) (uint32, error) {
 		return UnknownExitStatus, err
 	}
 	<-t.pidSync
+
+	// Now that event stream has started check that the
+	// container still lives, otherwise we may have
+	// already missed its demise.
+	status, err := t.Status(ctx)
+	if err != nil {
+		return UnknownExitStatus, err
+	}
+	if status != Running {
+		return UnknownExitStatus, ErrTaskNotRunning
+	}
 
 	var e eventsapi.RuntimeEvent
 
