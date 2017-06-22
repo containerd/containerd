@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	api "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/plugin"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 )
 
 func init() {
@@ -36,17 +37,24 @@ func (s *Service) Register(server *grpc.Server) error {
 }
 
 func (s *Service) Stream(req *api.StreamEventsRequest, srv api.Events_StreamServer) error {
+	var fs []filters.Filter
+	for _, s := range req.Filters {
+		f, err := filters.Parse(s)
+		if err != nil {
+			return grpc.Errorf(codes.InvalidArgument, err.Error())
+		}
+
+		fs = append(fs, f)
+	}
+
 	clientID := fmt.Sprintf("%d", time.Now().UnixNano())
 	for {
-		e := <-s.emitter.Events(srv.Context(), clientID)
+		e := <-s.emitter.Events(srv.Context(), clientID, fs...)
 		// upon the client event timeout this will be nil; ignore
 		if e == nil {
 			return nil
 		}
 		if err := srv.Send(e); err != nil {
-			logrus.WithFields(logrus.Fields{
-				"client": clientID,
-			}).Debug("error sending event; unsubscribing client")
 			s.emitter.Remove(clientID)
 			return err
 		}

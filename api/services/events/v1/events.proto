@@ -19,5 +19,5 @@ message Envelope {
 }
 
 message StreamEventsRequest {
-  repeated string filters = 1;
+	repeated string filters = 1;
 }

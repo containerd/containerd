@@ -14,15 +14,23 @@ import (
 var eventsCommand = cli.Command{
 	Name:  "events",
 	Usage: "display containerd events",
+	Flags: []cli.Flag{
+		cli.StringSliceFlag{
+			Name:  "filter, f",
+			Usage: "Specify one or more event filters (i.e. type==ContainerCreate or container_id==alpine)",
+			Value: &cli.StringSlice{},
+		},
+	},
 	Action: func(context *cli.Context) error {
-		eventsClient, err := getEventsService(context)
+		client, err := newClient(context)
 		if err != nil {
 			return err
 		}
+
 		ctx, cancel := appContext(context)
 		defer cancel()
 
-		events, err := eventsClient.Stream(ctx, &eventsapi.StreamEventsRequest{})
+		events, err := client.Events(ctx, context.StringSlice("filter")...)
 		if err != nil {
 			return err
 		}
