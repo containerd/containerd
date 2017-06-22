@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"runtime"
 	"strings"
 
 	"golang.org/x/sys/unix"
@@ -13,8 +14,8 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/Sirupsen/logrus"
-	shimapi "github.com/containerd/containerd/api/services/shim/v1"
 	"github.com/containerd/containerd/linux/shim"
+	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/version"
 	"github.com/urfave/cli"
@@ -66,7 +67,7 @@ func main() {
 			return err
 		}
 		server := grpc.NewServer()
-		sv, err := shim.New(path, context.GlobalString("namespace"))
+		sv, err := shim.NewService(path, context.GlobalString("namespace"))
 		if err != nil {
 			return err
 		}
@@ -114,7 +115,24 @@ func handleSignals(signals chan os.Signal, server *grpc.Server) error {
 			// i.e. machine reboot
 			server.Stop()
 			return nil
+		case unix.SIGUSR1:
+			dumpStacks()
 		}
 	}
 	return nil
+}
+
+func dumpStacks() {
+	var (
+		buf       []byte
+		stackSize int
+	)
+	bufferLen := 16384
+	for stackSize == len(buf) {
+		buf = make([]byte, bufferLen)
+		stackSize = runtime.Stack(buf, true)
+		bufferLen *= 2
+	}
+	buf = buf[:stackSize]
+	logrus.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
 }

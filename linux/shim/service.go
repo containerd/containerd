@@ -9,8 +9,8 @@ import (
 	"syscall"
 
 	"github.com/containerd/console"
-	shimapi "github.com/containerd/containerd/api/services/shim/v1"
 	"github.com/containerd/containerd/api/types/task"
+	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/reaper"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
@@ -22,15 +22,15 @@ var empty = &google_protobuf.Empty{}
 
 const RuncRoot = "/run/containerd/runc"
 
-// New returns a new shim service that can be used via GRPC
-func New(path, namespace string) (*Service, error) {
+// NewService returns a new shim service that can be used via GRPC
+func NewService(path, namespace string) (*Service, error) {
 	if namespace == "" {
 		return nil, fmt.Errorf("shim namespace cannot be empty")
 	}
 	return &Service{
 		path:      path,
 		processes: make(map[int]process),
-		events:    make(chan *task.Event, 4096),
+		events:    make(chan *shimapi.Event, 4096),
 		namespace: namespace,
 	}, nil
 }
@@ -42,14 +42,14 @@ type Service struct {
 	bundle        string
 	mu            sync.Mutex
 	processes     map[int]process
-	events        chan *task.Event
+	events        chan *shimapi.Event
 	eventsMu      sync.Mutex
-	deferredEvent *task.Event
+	deferredEvent *shimapi.Event
 	execID        int
 	namespace     string
 }
 
-func (s *Service) Create(ctx context.Context, r *shimapi.CreateRequest) (*shimapi.CreateResponse, error) {
+func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*shimapi.CreateTaskResponse, error) {
 	process, err := newInitProcess(ctx, s.path, s.namespace, r)
 	if err != nil {
 		return nil, err
@@ -65,30 +65,30 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateRequest) (*shimap
 		ExitCh: make(chan int, 1),
 	}
 	reaper.Default.Register(pid, cmd)
-	s.events <- &task.Event{
-		Type: task.Event_CREATE,
+	s.events <- &shimapi.Event{
+		Type: shimapi.Event_CREATE,
 		ID:   r.ID,
 		Pid:  uint32(pid),
 	}
 	go s.waitExit(process, pid, cmd)
-	return &shimapi.CreateResponse{
+	return &shimapi.CreateTaskResponse{
 		Pid: uint32(pid),
 	}, nil
 }
 
-func (s *Service) Start(ctx context.Context, r *shimapi.StartRequest) (*google_protobuf.Empty, error) {
+func (s *Service) Start(ctx context.Context, r *google_protobuf.Empty) (*google_protobuf.Empty, error) {
 	if err := s.initProcess.Start(ctx); err != nil {
 		return nil, err
 	}
-	s.events <- &task.Event{
-		Type: task.Event_START,
+	s.events <- &shimapi.Event{
+		Type: shimapi.Event_START,
 		ID:   s.id,
 		Pid:  uint32(s.initProcess.Pid()),
 	}
 	return empty, nil
 }
 
-func (s *Service) Delete(ctx context.Context, r *shimapi.DeleteRequest) (*shimapi.DeleteResponse, error) {
+func (s *Service) Delete(ctx context.Context, r *google_protobuf.Empty) (*shimapi.DeleteResponse, error) {
 	p := s.initProcess
 	// TODO (@crosbymichael): how to handle errors here
 	p.Delete(ctx)
@@ -124,7 +124,7 @@ func (s *Service) DeleteProcess(ctx context.Context, r *shimapi.DeleteProcessReq
 	}, nil
 }
 
-func (s *Service) Exec(ctx context.Context, r *shimapi.ExecRequest) (*shimapi.ExecResponse, error) {
+func (s *Service) Exec(ctx context.Context, r *shimapi.ExecProcessRequest) (*shimapi.ExecProcessResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.execID++
@@ -140,18 +140,18 @@ func (s *Service) Exec(ctx context.Context, r *shimapi.ExecRequest) (*shimapi.Ex
 	reaper.Default.Register(pid, cmd)
 	s.processes[pid] = process
 
-	s.events <- &task.Event{
-		Type: task.Event_EXEC_ADDED,
+	s.events <- &shimapi.Event{
+		Type: shimapi.Event_EXEC_ADDED,
 		ID:   s.id,
 		Pid:  uint32(pid),
 	}
 	go s.waitExit(process, pid, cmd)
-	return &shimapi.ExecResponse{
+	return &shimapi.ExecProcessResponse{
 		Pid: uint32(pid),
 	}, nil
 }
 
-func (s *Service) Pty(ctx context.Context, r *shimapi.PtyRequest) (*google_protobuf.Empty, error) {
+func (s *Service) ResizePty(ctx context.Context, r *shimapi.ResizePtyRequest) (*google_protobuf.Empty, error) {
 	if r.Pid == 0 {
 		return nil, errors.Errorf("pid not provided in request")
 	}
@@ -171,7 +171,7 @@ func (s *Service) Pty(ctx context.Context, r *shimapi.PtyRequest) (*google_proto
 	return empty, nil
 }
 
-func (s *Service) Events(r *shimapi.EventsRequest, stream shimapi.Shim_EventsServer) error {
+func (s *Service) Stream(r *shimapi.StreamEventsRequest, stream shimapi.Shim_StreamServer) error {
 	s.eventsMu.Lock()
 	defer s.eventsMu.Unlock()
 
@@ -195,7 +195,7 @@ func (s *Service) Events(r *shimapi.EventsRequest, stream shimapi.Shim_EventsSer
 	}
 }
 
-func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.StateResponse, error) {
+func (s *Service) State(ctx context.Context, r *google_protobuf.Empty) (*shimapi.StateResponse, error) {
 	st, err := s.initProcess.ContainerStatus(ctx)
 	if err != nil {
 		return nil, err
@@ -245,23 +245,15 @@ func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.
 	return o, nil
 }
 
-func (s *Service) Pause(ctx context.Context, r *shimapi.PauseRequest) (*google_protobuf.Empty, error) {
+func (s *Service) Pause(ctx context.Context, r *google_protobuf.Empty) (*google_protobuf.Empty, error) {
 	if err := s.initProcess.Pause(ctx); err != nil {
 		return nil, err
 	}
 	return empty, nil
 }
 
-func (s *Service) Resume(ctx context.Context, r *shimapi.ResumeRequest) (*google_protobuf.Empty, error) {
+func (s *Service) Resume(ctx context.Context, r *google_protobuf.Empty) (*google_protobuf.Empty, error) {
 	if err := s.initProcess.Resume(ctx); err != nil {
-		return nil, err
-	}
-	return empty, nil
-}
-
-func (s *Service) Exit(ctx context.Context, r *shimapi.ExitRequest) (*google_protobuf.Empty, error) {
-	// signal ourself to exit
-	if err := unix.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
 		return nil, err
 	}
 	return empty, nil
@@ -300,7 +292,7 @@ func (s *Service) Kill(ctx context.Context, r *shimapi.KillRequest) (*google_pro
 	return empty, nil
 }
 
-func (s *Service) Processes(ctx context.Context, r *shimapi.ProcessesRequest) (*shimapi.ProcessesResponse, error) {
+func (s *Service) ListProcesses(ctx context.Context, r *shimapi.ListProcessesRequest) (*shimapi.ListProcessesResponse, error) {
 	pids, err := s.getContainerPids(ctx, r.ID)
 	if err != nil {
 		return nil, err
@@ -311,13 +303,13 @@ func (s *Service) Processes(ctx context.Context, r *shimapi.ProcessesRequest) (*
 			Pid: pid,
 		})
 	}
-	resp := &shimapi.ProcessesResponse{
+	resp := &shimapi.ListProcessesResponse{
 		Processes: ps,
 	}
 	return resp, nil
 }
 
-func (s *Service) CloseStdin(ctx context.Context, r *shimapi.CloseStdinRequest) (*google_protobuf.Empty, error) {
+func (s *Service) CloseIO(ctx context.Context, r *shimapi.CloseIORequest) (*google_protobuf.Empty, error) {
 	p, ok := s.processes[int(r.Pid)]
 	if !ok {
 		return nil, fmt.Errorf("process does not exist %d", r.Pid)
@@ -328,11 +320,17 @@ func (s *Service) CloseStdin(ctx context.Context, r *shimapi.CloseStdinRequest) 
 	return empty, nil
 }
 
-func (s *Service) Checkpoint(ctx context.Context, r *shimapi.CheckpointRequest) (*google_protobuf.Empty, error) {
+func (s *Service) Checkpoint(ctx context.Context, r *shimapi.CheckpointTaskRequest) (*google_protobuf.Empty, error) {
 	if err := s.initProcess.Checkpoint(ctx, r); err != nil {
 		return nil, err
 	}
 	return empty, nil
+}
+
+func (s *Service) ShimInfo(ctx context.Context, r *google_protobuf.Empty) (*shimapi.ShimInfoResponse, error) {
+	return &shimapi.ShimInfoResponse{
+		ShimPid: uint32(os.Getpid()),
+	}, nil
 }
 
 func (s *Service) waitExit(p process, pid int, cmd *reaper.Cmd) {
@@ -340,8 +338,8 @@ func (s *Service) waitExit(p process, pid int, cmd *reaper.Cmd) {
 	p.Exited(status)
 
 	reaper.Default.Delete(pid)
-	s.events <- &task.Event{
-		Type:       task.Event_EXIT,
+	s.events <- &shimapi.Event{
+		Type:       shimapi.Event_EXIT,
 		ID:         s.id,
 		Pid:        uint32(pid),
 		ExitStatus: uint32(status),

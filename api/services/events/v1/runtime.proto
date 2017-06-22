@@ -4,7 +4,6 @@ package containerd.services.events.v1;
 
 import "gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
-import "github.com/containerd/containerd/api/types/task/task.proto";
 
 option go_package = "github.com/containerd/containerd/api/services/events/v1;events";
 
@@ -31,7 +30,15 @@ message RuntimeCreate {
 
 message RuntimeEvent {
 	string id = 1;
-	containerd.v1.types.Event.EventType type = 2;
+	enum EventType {
+		EXIT = 0;
+		OOM = 1;
+		CREATE = 2;
+		START = 3;
+		EXEC_ADDED = 4;
+		PAUSED = 5;
+	}
+	EventType type = 2;
 	uint32 pid = 3;
 	uint32 exit_status = 4;
 	google.protobuf.Timestamp exited_at = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];

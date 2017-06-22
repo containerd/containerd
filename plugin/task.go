@@ -28,9 +28,9 @@ type Task interface {
 	// Processes returns all pids for the container
 	Processes(context.Context) ([]uint32, error)
 	// Pty resizes the processes pty/console
-	Pty(context.Context, uint32, ConsoleSize) error
+	ResizePty(context.Context, uint32, ConsoleSize) error
 	// CloseStdin closes the processes stdin
-	CloseStdin(context.Context, uint32) error
+	CloseIO(context.Context, uint32) error
 	// Checkpoint checkpoints a container to an image with live system data
 	Checkpoint(context.Context, string, map[string]string) error
 	// DeleteProcess deletes a specific exec process via the pid

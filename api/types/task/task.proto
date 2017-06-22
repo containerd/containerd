@@ -4,7 +4,6 @@ package containerd.v1.types;
 
 import "gogoproto/gogo.proto";
 import "google/protobuf/any.proto";
-import "google/protobuf/timestamp.proto";
 
 enum Status {
 	option (gogoproto.goproto_enum_prefix) = false;
@@ -48,22 +47,4 @@ message User {
 	uint32 uid = 1;
 	uint32 gid = 2;
 	repeated uint32 additional_gids = 3;
-}
-
-message Event {
-	string id = 1;
-
-	enum EventType {
-		EXIT = 0;
-		OOM = 1;
-		CREATE = 2;
-		START = 3;
-		EXEC_ADDED = 4;
-		PAUSED = 5;
-	}
-
-	EventType type = 2;
-	uint32 pid = 3;
-	uint32 exit_status = 4;
-	google.protobuf.Timestamp exited_at = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }

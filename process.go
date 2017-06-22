@@ -7,7 +7,6 @@ import (
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
-	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/events"
 	protobuf "github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -92,7 +91,7 @@ evloop:
 				return UnknownExitStatus, err
 			}
 
-			if e.Type != tasktypes.Event_EXIT {
+			if e.Type != eventsapi.RuntimeEvent_EXIT {
 				continue evloop
 			}
 
