@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	shimapi "github.com/containerd/containerd/api/services/shim"
+	shimapi "github.com/containerd/containerd/api/services/shim/v1"
 	"github.com/containerd/containerd/api/types/task"
 	runc "github.com/containerd/go-runc"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"

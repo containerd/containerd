@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/boltdb/bolt"
-	api "github.com/containerd/containerd/api/services/namespaces"
+	api "github.com/containerd/containerd/api/services/namespaces/v1"
 	"github.com/containerd/containerd/api/types/event"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/metadata"

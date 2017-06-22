@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/boltdb/bolt"
-	api "github.com/containerd/containerd/api/services/tasks"
+	api "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types/descriptor"
 	"github.com/containerd/containerd/api/types/event"
 	"github.com/containerd/containerd/api/types/task"

@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/containerd/containerd/api/services/containers"
-	"github.com/containerd/containerd/api/services/tasks"
+	"github.com/containerd/containerd/api/services/containers/v1"
+	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types/descriptor"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"

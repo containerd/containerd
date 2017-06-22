@@ -17,7 +17,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
-	shimapi "github.com/containerd/containerd/api/services/shim"
+	shimapi "github.com/containerd/containerd/api/services/shim/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/fifo"

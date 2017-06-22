@@ -3,7 +3,7 @@ package content
 import (
 	"io"
 
-	contentapi "github.com/containerd/containerd/api/services/content"
+	contentapi "github.com/containerd/containerd/api/services/content/v1"
 	"github.com/containerd/containerd/content"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"

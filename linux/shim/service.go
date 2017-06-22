@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	"github.com/containerd/console"
-	shimapi "github.com/containerd/containerd/api/services/shim"
+	shimapi "github.com/containerd/containerd/api/services/shim/v1"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/reaper"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"

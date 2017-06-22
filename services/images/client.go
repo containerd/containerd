@@ -3,7 +3,7 @@ package images
 import (
 	"context"
 
-	imagesapi "github.com/containerd/containerd/api/services/images"
+	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	"github.com/containerd/containerd/images"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )

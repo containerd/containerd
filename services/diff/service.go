@@ -1,7 +1,7 @@
 package diff
 
 import (
-	diffapi "github.com/containerd/containerd/api/services/diff"
+	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	mounttypes "github.com/containerd/containerd/api/types/mount"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"

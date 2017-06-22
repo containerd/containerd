@@ -1,7 +1,7 @@
 package images
 
 import (
-	imagesapi "github.com/containerd/containerd/api/services/images"
+	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	"github.com/containerd/containerd/api/types/descriptor"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/metadata"

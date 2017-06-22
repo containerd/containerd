@@ -2,7 +2,7 @@ package containers
 
 import (
 	"github.com/boltdb/bolt"
-	api "github.com/containerd/containerd/api/services/containers"
+	api "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/api/types/event"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/events"
