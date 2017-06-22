@@ -69,6 +69,9 @@ func TestMain(m *testing.M) {
 
 	client, err := waitForDaemonStart(ctx, address)
 	if err != nil {
+		if cmd.Process != nil {
+			cmd.Process.Kill()
+		}
 		cmd.Wait()
 		fmt.Fprintf(os.Stderr, "%s: %s", err, buf.String())
 		os.Exit(1)

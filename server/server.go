@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
+	"path/filepath"
 
+	"github.com/boltdb/bolt"
 	containers "github.com/containerd/containerd/api/services/containers/v1"
 	content "github.com/containerd/containerd/api/services/content/v1"
 	diff "github.com/containerd/containerd/api/services/diff/v1"
@@ -16,6 +18,7 @@ import (
 	snapshot "github.com/containerd/containerd/api/services/snapshot/v1"
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	version "github.com/containerd/containerd/api/services/version/v1"
+	store "github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
@@ -28,11 +31,18 @@ import (
 )
 
 // New creates and initializes a new containerd server
-func New(ctx context.Context, config *Config, plugins []*plugin.Registration) (*Server, error) {
+func New(ctx context.Context, config *Config) (*Server, error) {
 	if config.Root == "" {
 		return nil, errors.New("root must be specified")
 	}
 	if err := os.MkdirAll(config.Root, 0700); err != nil {
+		return nil, err
+	}
+	if err := apply(ctx, config); err != nil {
+		return nil, err
+	}
+	plugins, err := loadPlugins(config)
+	if err != nil {
 		return nil, err
 	}
 	rpc := grpc.NewServer(
@@ -129,6 +139,34 @@ func (s *Server) ServeDebug(l net.Listener) error {
 // Stop gracefully stops the containerd server
 func (s *Server) Stop() {
 	s.rpc.GracefulStop()
+}
+
+func loadPlugins(config *Config) ([]*plugin.Registration, error) {
+	// load all plugins into containerd
+	if err := plugin.Load(filepath.Join(config.Root, "plugins")); err != nil {
+		return nil, err
+	}
+	// load additional plugins that don't automatically register themselves
+	plugin.Register(&plugin.Registration{
+		Type: plugin.ContentPlugin,
+		ID:   "content",
+		Init: func(ic *plugin.InitContext) (interface{}, error) {
+			return store.NewStore(ic.Root)
+		},
+	})
+	plugin.Register(&plugin.Registration{
+		Type: plugin.MetadataPlugin,
+		ID:   "bolt",
+		Init: func(ic *plugin.InitContext) (interface{}, error) {
+			if err := os.MkdirAll(ic.Root, 0700); err != nil {
+				return nil, err
+			}
+			return bolt.Open(filepath.Join(ic.Root, "meta.db"), 0644, nil)
+		},
+	})
+
+	// return the ordered graph for plugins
+	return plugin.Graph(), nil
 }
 
 func shouldLoadPlugin(p *plugin.Registration, config *Config) bool {

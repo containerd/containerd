@@ -22,10 +22,6 @@ var handledSignals = []os.Signal{
 	unix.SIGCHLD,
 }
 
-func platformInit(context context.Context, config *server.Config) error {
-	return nil
-}
-
 func handleSignals(ctx context.Context, signals chan os.Signal, server *server.Server) error {
 	for s := range signals {
 		log.G(ctx).WithField("signal", s).Debug("received signal")

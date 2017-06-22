@@ -6,17 +6,13 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"runtime"
 	"time"
 
-	"github.com/boltdb/bolt"
 	gocontext "golang.org/x/net/context"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/server"
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/containerd/version"
@@ -89,18 +85,9 @@ func main() {
 		if address == "" {
 			return errors.New("grpc address cannot be empty")
 		}
-
-		if err := platformInit(ctx, config); err != nil {
-			return err
-		}
 		log.G(ctx).Info("starting containerd boot...")
 
-		plugins, err := loadPlugins(config)
-		if err != nil {
-			return err
-		}
-
-		server, err := server.New(ctx, config, plugins)
+		server, err := server.New(ctx, config)
 		if err != nil {
 			return err
 		}
@@ -184,41 +171,6 @@ func setLevel(context *cli.Context, config *server.Config) error {
 		logrus.SetLevel(lvl)
 	}
 	return nil
-}
-
-func loadPlugins(config *server.Config) ([]*plugin.Registration, error) {
-	// load all plugins into containerd
-	if err := plugin.Load(filepath.Join(config.Root, "plugins")); err != nil {
-		return nil, err
-	}
-	// load additional plugins that don't automatically register themselves
-	registerContentStore()
-	registerMetaDB()
-	// return the ordered graph for plugins
-	return plugin.Graph(), nil
-}
-
-func registerContentStore() {
-	plugin.Register(&plugin.Registration{
-		Type: plugin.ContentPlugin,
-		ID:   "content",
-		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			return content.NewStore(ic.Root)
-		},
-	})
-}
-
-func registerMetaDB() {
-	plugin.Register(&plugin.Registration{
-		Type: plugin.MetadataPlugin,
-		ID:   "bolt",
-		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			if err := os.MkdirAll(ic.Root, 0700); err != nil {
-				return nil, err
-			}
-			return bolt.Open(filepath.Join(ic.Root, "meta.db"), 0644, nil)
-		},
-	})
 }
 
 func dumpStacks() {
