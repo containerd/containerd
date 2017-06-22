@@ -85,6 +85,8 @@ func mapGRPCError(err error, id string) error {
 		return grpc.Errorf(codes.AlreadyExists, "image %v already exists", id)
 	case namespaces.IsNamespaceRequired(err):
 		return grpc.Errorf(codes.InvalidArgument, "namespace required, please set %q header", namespaces.GRPCHeader)
+	case namespaces.IsNamespaceInvalid(err):
+		return grpc.Errorf(codes.InvalidArgument, err.Error())
 	}
 
 	return err

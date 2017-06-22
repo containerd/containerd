@@ -4,6 +4,7 @@ import (
 	api "github.com/containerd/containerd/api/services/containers"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/metadata"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"google.golang.org/grpc"
@@ -57,6 +58,10 @@ func mapGRPCError(err error, id string) error {
 		return grpc.Errorf(codes.NotFound, "container %v not found", id)
 	case metadata.IsExists(err):
 		return grpc.Errorf(codes.AlreadyExists, "container %v already exists", id)
+	case namespaces.IsNamespaceRequired(err):
+		return grpc.Errorf(codes.InvalidArgument, "namespace required, please set %q header", namespaces.GRPCHeader)
+	case namespaces.IsNamespaceInvalid(err):
+		return grpc.Errorf(codes.InvalidArgument, err.Error())
 	}
 
 	return err

@@ -21,6 +21,10 @@ func (s *namespaceStore) Create(ctx context.Context, namespace string, labels ma
 		return err
 	}
 
+	if err := namespaces.Validate(namespace); err != nil {
+		return err
+	}
+
 	// provides the already exists error.
 	bkt, err := topbkt.CreateBucket([]byte(namespace))
 	if err != nil {
