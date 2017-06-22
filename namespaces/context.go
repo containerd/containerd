@@ -37,7 +37,9 @@ func NamespaceFromEnv(ctx context.Context) context.Context {
 	return WithNamespace(ctx, namespace)
 }
 
-// Namespace returns the namespace from the context
+// Namespace returns the namespace from the context.
+//
+// The namespace is not guaranteed to be valid.
 func Namespace(ctx context.Context) (string, bool) {
 	namespace, ok := ctx.Value(namespaceKey{}).(string)
 	if !ok {
@@ -52,11 +54,15 @@ func IsNamespaceRequired(err error) bool {
 	return errors.Cause(err) == errNamespaceRequired
 }
 
-// NamespaceRequired returns the namespace or an error
+// NamespaceRequired returns the valid namepace from the context or an error.
 func NamespaceRequired(ctx context.Context) (string, error) {
 	namespace, ok := Namespace(ctx)
 	if !ok || namespace == "" {
 		return "", errNamespaceRequired
+	}
+
+	if err := Validate(namespace); err != nil {
+		return "", err
 	}
 
 	return namespace, nil
