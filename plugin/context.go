@@ -3,13 +3,17 @@ package plugin
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/log"
 )
 
-func NewContext(plugins map[PluginType][]interface{}) *InitContext {
+func NewContext(ctx context.Context, plugins map[PluginType][]interface{}, root, id string) *InitContext {
 	return &InitContext{
 		plugins: plugins,
+		Root:    filepath.Join(root, id),
+		Context: log.WithModule(ctx, id),
 	}
 }
 

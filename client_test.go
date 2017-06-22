@@ -15,9 +15,8 @@ import (
 )
 
 const (
-	defaultRoot  = "/var/lib/containerd-test"
-	defaultState = "/run/containerd-test"
-	testImage    = "docker.io/library/alpine:latest"
+	defaultRoot = "/var/lib/containerd-test"
+	testImage   = "docker.io/library/alpine:latest"
 )
 
 var (
@@ -58,25 +57,28 @@ func TestMain(m *testing.M) {
 		// setup a new containerd daemon if !testing.Short
 		cmd = exec.Command("containerd",
 			"--root", defaultRoot,
-			"--state", defaultState,
 			"--address", address,
 		)
 		cmd.Stderr = buf
 		if err := cmd.Start(); err != nil {
-			fmt.Println(err)
+			cmd.Wait()
+			fmt.Fprintf(os.Stderr, "%s: %s", err, buf.String())
 			os.Exit(1)
 		}
 	}
 
 	client, err := waitForDaemonStart(ctx, address)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "immediate fail!", err)
+		cmd.Wait()
+		fmt.Fprintf(os.Stderr, "%s: %s", err, buf.String())
 		os.Exit(1)
 	}
 
 	// pull a seed image
 	if _, err = client.Pull(ctx, testImage, WithPullUnpack); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		cmd.Process.Signal(syscall.SIGTERM)
+		cmd.Wait()
+		fmt.Fprintf(os.Stderr, "%s: %s", err, buf.String())
 		os.Exit(1)
 
 	}
