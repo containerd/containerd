@@ -12,10 +12,12 @@ service Events {
 	rpc Stream(StreamEventsRequest) returns (stream Envelope);
 }
 
-message StreamEventsRequest {}
-
 message Envelope {
 	google.protobuf.Timestamp timestamp = 1 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 	string topic = 2;
 	google.protobuf.Any event = 3;
+}
+
+message StreamEventsRequest {
+  repeated string filters = 1;
 }

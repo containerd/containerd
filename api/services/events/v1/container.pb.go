@@ -20,8 +20,8 @@
 		ContainerUpdate
 		ContainerDelete
 		ContentDelete
-		StreamEventsRequest
 		Envelope
+		StreamEventsRequest
 		ImageUpdate
 		ImageDelete
 		NamespaceCreate
