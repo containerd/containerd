@@ -31,7 +31,7 @@ func BenchmarkContainerCreate(b *testing.B) {
 	var containers []Container
 	defer func() {
 		for _, c := range containers {
-			if err := c.Delete(ctx); err != nil {
+			if err := c.Delete(ctx, WithRootFSDeletion); err != nil {
 				b.Error(err)
 			}
 		}
@@ -77,7 +77,7 @@ func BenchmarkContainerStart(b *testing.B) {
 	var containers []Container
 	defer func() {
 		for _, c := range containers {
-			if err := c.Delete(ctx); err != nil {
+			if err := c.Delete(ctx, WithRootFSDeletion); err != nil {
 				b.Error(err)
 			}
 		}
