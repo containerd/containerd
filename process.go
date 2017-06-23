@@ -7,9 +7,8 @@ import (
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
-	"github.com/containerd/containerd/api/types/event"
 	tasktypes "github.com/containerd/containerd/api/types/task"
-	"github.com/gogo/protobuf/proto"
+	"github.com/containerd/containerd/events"
 	protobuf "github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -74,24 +73,27 @@ func (p *process) Kill(ctx context.Context, s syscall.Signal) error {
 
 func (p *process) Wait(ctx context.Context) (uint32, error) {
 	// TODO (ehazlett): add filtering for specific event
-	events, err := p.task.client.EventService().Stream(ctx, &eventsapi.StreamEventsRequest{})
+	eventstream, err := p.task.client.EventService().Stream(ctx, &eventsapi.StreamEventsRequest{})
 	if err != nil {
 		return UnknownExitStatus, err
 	}
 	<-p.pidSync
+evloop:
 	for {
-		evt, err := events.Recv()
+		evt, err := eventstream.Recv()
 		if err != nil {
 			return UnknownExitStatus, err
 		}
-		if evt.Event.TypeUrl == "types.containerd.io/containerd.v1.types.event.RuntimeEvent" {
-			e := &event.RuntimeEvent{}
-			if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
+
+		switch {
+		case events.Is(evt.Event, &eventsapi.RuntimeEvent{}):
+			var e eventsapi.RuntimeEvent
+			if err := events.UnmarshalEvent(evt.Event, &e); err != nil {
 				return UnknownExitStatus, err
 			}
 
 			if e.Type != tasktypes.Event_EXIT {
-				continue
+				continue evloop
 			}
 
 			if e.ID == p.task.containerID && e.Pid == p.pid {

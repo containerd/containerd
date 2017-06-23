@@ -16,8 +16,8 @@ import (
 
 	"google.golang.org/grpc"
 
+	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/services/shim/v1"
-	"github.com/containerd/containerd/api/types/event"
 	"github.com/containerd/containerd/api/types/mount"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/events"
@@ -242,19 +242,19 @@ func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts)
 		return nil, err
 	}
 
-	var runtimeMounts []*event.RuntimeMount
+	var runtimeMounts []*eventsapi.RuntimeMount
 	for _, m := range opts.Rootfs {
-		runtimeMounts = append(runtimeMounts, &event.RuntimeMount{
+		runtimeMounts = append(runtimeMounts, &eventsapi.RuntimeMount{
 			Type:    m.Type,
 			Source:  m.Source,
 			Options: m.Options,
 		})
 	}
-	if err := r.emit(ctx, "/runtime/create", event.RuntimeCreate{
+	if err := r.emit(ctx, "/runtime/create", &eventsapi.RuntimeCreate{
 		ID:     id,
 		Bundle: path,
 		RootFS: runtimeMounts,
-		IO: &event.RuntimeIO{
+		IO: &eventsapi.RuntimeIO{
 			Stdin:    opts.IO.Stdin,
 			Stdout:   opts.IO.Stdout,
 			Stderr:   opts.IO.Stderr,
@@ -290,7 +290,7 @@ func (r *Runtime) Delete(ctx context.Context, c plugin.Task) (*plugin.Exit, erro
 	r.tasks.delete(ctx, lc)
 
 	i := c.Info()
-	if err := r.emit(ctx, "/runtime/delete", event.RuntimeDelete{
+	if err := r.emit(ctx, "/runtime/delete", &eventsapi.RuntimeDelete{
 		ID:         i.ID,
 		Runtime:    i.Runtime,
 		ExitStatus: rsp.ExitStatus,
@@ -416,7 +416,7 @@ func (r *Runtime) forward(ctx context.Context, events shim.Shim_EventsClient) {
 			ExitStatus: e.ExitStatus,
 			ExitedAt:   e.ExitedAt,
 		}
-		if err := r.emit(ctx, "/runtime/"+topic, event.RuntimeEvent{
+		if err := r.emit(ctx, "/runtime/"+topic, &eventsapi.RuntimeEvent{
 			ID:         e.ID,
 			Type:       e.Type,
 			Pid:        e.Pid,

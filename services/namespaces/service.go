@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/boltdb/bolt"
+	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	api "github.com/containerd/containerd/api/services/namespaces/v1"
-	"github.com/containerd/containerd/api/types/event"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/namespaces"
@@ -118,7 +118,7 @@ func (s *Service) Create(ctx context.Context, req *api.CreateNamespaceRequest) (
 		return &resp, err
 	}
 
-	if err := s.emit(ctx, "/namespaces/create", event.NamespaceCreate{
+	if err := s.emit(ctx, "/namespaces/create", &eventsapi.NamespaceCreate{
 		Name:   req.Namespace.Name,
 		Labels: req.Namespace.Labels,
 	}); err != nil {
@@ -171,7 +171,7 @@ func (s *Service) Update(ctx context.Context, req *api.UpdateNamespaceRequest) (
 		return &resp, err
 	}
 
-	if err := s.emit(ctx, "/namespaces/update", event.NamespaceUpdate{
+	if err := s.emit(ctx, "/namespaces/update", &eventsapi.NamespaceUpdate{
 		Name:   req.Namespace.Name,
 		Labels: req.Namespace.Labels,
 	}); err != nil {
@@ -188,7 +188,7 @@ func (s *Service) Delete(ctx context.Context, req *api.DeleteNamespaceRequest) (
 		return &empty.Empty{}, err
 	}
 
-	if err := s.emit(ctx, "/namespaces/delete", event.NamespaceDelete{
+	if err := s.emit(ctx, "/namespaces/delete", &eventsapi.NamespaceDelete{
 		Name: req.Name,
 	}); err != nil {
 		return &empty.Empty{}, err

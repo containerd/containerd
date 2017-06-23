@@ -1,6 +1,8 @@
 syntax = "proto3";
 
-package containerd.v1.types;
+package containerd.services.events.v1;
+
+option go_package = "github.com/containerd/containerd/api/services/events/v1;events";
 
 message TaskCreate {
 	string container_id = 1;

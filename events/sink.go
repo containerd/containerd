@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/containerd/containerd/api/types/event"
+	"github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/namespaces"
 	goevents "github.com/docker/go-events"
 	"github.com/pkg/errors"
@@ -18,7 +18,7 @@ type sinkEvent struct {
 
 type eventSink struct {
 	ns string
-	ch chan *event.Envelope
+	ch chan *events.Envelope
 }
 
 func (s *eventSink) Write(evt goevents.Event) error {
@@ -34,7 +34,7 @@ func (s *eventSink) Write(evt goevents.Event) error {
 		return nil
 	}
 
-	eventData, err := convertToAny(e.event)
+	eventData, err := MarshalEvent(e.event)
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func (s *eventSink) Write(evt goevents.Event) error {
 		"ns":    ns,
 	}).Debug("event")
 
-	s.ch <- &event.Envelope{
+	s.ch <- &events.Envelope{
 		Timestamp: time.Now(),
 		Topic:     topic,
 		Event:     eventData,

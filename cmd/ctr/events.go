@@ -7,8 +7,7 @@ import (
 	"text/tabwriter"
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
-	"github.com/containerd/containerd/api/types/event"
-	"github.com/gogo/protobuf/proto"
+	"github.com/containerd/containerd/events"
 	"github.com/urfave/cli"
 )
 
@@ -56,118 +55,55 @@ var eventsCommand = cli.Command{
 	},
 }
 
-func getEventOutput(evt *event.Envelope) (string, error) {
-
+func getEventOutput(env *eventsapi.Envelope) (string, error) {
 	out := ""
-	switch evt.Event.TypeUrl {
-	case "types.containerd.io/containerd.v1.types.event.ContainerCreate":
-		e := &event.ContainerCreate{}
-		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
-			return out, err
-		}
+
+	var de events.DynamicEvent
+	if err := events.UnmarshalEvent(env.Event, &de); err != nil {
+		return "", err
+	}
+
+	switch e := de.Event.(type) {
+	case *eventsapi.ContainerCreate:
 		out = fmt.Sprintf("id=%s image=%s runtime=%s", e.ContainerID, e.Image, e.Runtime)
-	case "types.containerd.io/containerd.v1.types.event.TaskCreate":
-		e := &event.TaskCreate{}
-		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
-			return out, err
-		}
+	case *eventsapi.TaskCreate:
 		out = "id=" + e.ContainerID
-	case "types.containerd.io/containerd.v1.types.event.TaskStart":
-		e := &event.TaskStart{}
-		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
-			return out, err
-		}
+	case *eventsapi.TaskStart:
 		out = "id=" + e.ContainerID
-	case "types.containerd.io/containerd.v1.types.event.TaskDelete":
-		e := &event.TaskDelete{}
-		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
-			return out, err
-		}
+	case *eventsapi.TaskDelete:
 		out = fmt.Sprintf("id=%s pid=%d status=%d", e.ContainerID, e.Pid, e.ExitStatus)
-	case "types.containerd.io/containerd.v1.types.event.ContainerUpdate":
-		e := &event.ContainerUpdate{}
-		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
-			return out, err
-		}
+	case *eventsapi.ContainerUpdate:
 		out = "id=" + e.ContainerID
-	case "types.containerd.io/containerd.v1.types.event.ContainerDelete":
-		e := &event.ContainerDelete{}
-		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
-			return out, err
-		}
+	case *eventsapi.ContainerDelete:
 		out = "id=" + e.ContainerID
-	case "types.containerd.io/containerd.v1.types.event.SnapshotPrepare":
-		e := &event.SnapshotPrepare{}
-		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
-			return out, err
-		}
+	case *eventsapi.SnapshotPrepare:
 		out = fmt.Sprintf("key=%s parent=%s", e.Key, e.Parent)
-	case "types.containerd.io/containerd.v1.types.event.SnapshotCommit":
-		e := &event.SnapshotCommit{}
-		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
-			return out, err
-		}
+	case *eventsapi.SnapshotCommit:
 		out = fmt.Sprintf("key=%s name=%s", e.Key, e.Name)
-	case "types.containerd.io/containerd.v1.types.event.SnapshotRemove":
-		e := &event.SnapshotRemove{}
-		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
-			return out, err
-		}
+	case *eventsapi.SnapshotRemove:
 		out = "key=" + e.Key
-	case "types.containerd.io/containerd.v1.types.event.ImageUpdate":
-		e := &event.ImageUpdate{}
-		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
-			return out, err
-		}
+	case *eventsapi.ImageUpdate:
 		out = fmt.Sprintf("name=%s labels=%s", e.Name, e.Labels)
-	case "types.containerd.io/containerd.v1.types.event.ImageDelete":
-		e := &event.ImageDelete{}
-		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
-			return out, err
-		}
+	case *eventsapi.ImageDelete:
 		out = "name=" + e.Name
-	case "types.containerd.io/containerd.v1.types.event.NamespaceCreate":
-		e := &event.NamespaceCreate{}
-		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
-			return out, err
-		}
+	case *eventsapi.NamespaceCreate:
 		out = fmt.Sprintf("name=%s labels=%s", e.Name, e.Labels)
-	case "types.containerd.io/containerd.v1.types.event.NamespaceUpdate":
-		e := &event.NamespaceUpdate{}
-		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
-			return out, err
-		}
+	case *eventsapi.NamespaceUpdate:
 		out = fmt.Sprintf("name=%s labels=%s", e.Name, e.Labels)
-	case "types.containerd.io/containerd.v1.types.event.NamespaceDelete":
-		e := &event.NamespaceDelete{}
-		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
-			return out, err
-		}
+	case *eventsapi.NamespaceDelete:
 		out = "name=" + e.Name
-	case "types.containerd.io/containerd.v1.types.event.RuntimeCreate":
-		e := &event.RuntimeCreate{}
-		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
-			return out, err
-		}
+	case *eventsapi.RuntimeCreate:
 		mounts := []string{}
 		for _, m := range e.RootFS {
 			mounts = append(mounts, fmt.Sprintf("type=%s:src=%s", m.Type, m.Source))
 		}
 		out = fmt.Sprintf("id=%s bundle=%s rootfs=%s checkpoint=%s", e.ID, e.Bundle, strings.Join(mounts, ","), e.Checkpoint)
-	case "types.containerd.io/containerd.v1.types.event.RuntimeEvent":
-		e := &event.RuntimeEvent{}
-		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
-			return out, err
-		}
+	case *eventsapi.RuntimeEvent:
 		out = fmt.Sprintf("id=%s type=%s pid=%d status=%d exited=%s", e.ID, e.Type, e.Pid, e.ExitStatus, e.ExitedAt)
-	case "types.containerd.io/containerd.v1.types.event.RuntimeDelete":
-		e := &event.RuntimeDelete{}
-		if err := proto.Unmarshal(evt.Event.Value, e); err != nil {
-			return out, err
-		}
+	case *eventsapi.RuntimeDelete:
 		out = fmt.Sprintf("id=%s runtime=%s status=%d exited=%s", e.ID, e.Runtime, e.ExitStatus, e.ExitedAt)
 	default:
-		out = evt.Event.TypeUrl
+		out = env.Event.TypeUrl
 	}
 
 	return out, nil

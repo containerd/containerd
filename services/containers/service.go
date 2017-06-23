@@ -3,7 +3,7 @@ package containers
 import (
 	"github.com/boltdb/bolt"
 	api "github.com/containerd/containerd/api/services/containers/v1"
-	"github.com/containerd/containerd/api/types/event"
+	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/metadata"
@@ -93,10 +93,10 @@ func (s *Service) Create(ctx context.Context, req *api.CreateContainerRequest) (
 	}); err != nil {
 		return &resp, err
 	}
-	if err := s.emit(ctx, "/containers/create", event.ContainerCreate{
+	if err := s.emit(ctx, "/containers/create", &eventsapi.ContainerCreate{
 		ContainerID: resp.Container.ID,
 		Image:       resp.Container.Image,
-		Runtime: &event.ContainerCreate_Runtime{
+		Runtime: &eventsapi.ContainerCreate_Runtime{
 			Name:    resp.Container.Runtime.Name,
 			Options: resp.Container.Runtime.Options,
 		},
@@ -160,7 +160,7 @@ func (s *Service) Update(ctx context.Context, req *api.UpdateContainerRequest) (
 		return &resp, err
 	}
 
-	if err := s.emit(ctx, "/containers/update", event.ContainerUpdate{
+	if err := s.emit(ctx, "/containers/update", &eventsapi.ContainerUpdate{
 		ContainerID: resp.Container.ID,
 		Image:       resp.Container.Image,
 		Labels:      resp.Container.Labels,
@@ -179,7 +179,7 @@ func (s *Service) Delete(ctx context.Context, req *api.DeleteContainerRequest) (
 		return &empty.Empty{}, mapGRPCError(err, req.ID)
 	}
 
-	if err := s.emit(ctx, "/containers/delete", event.ContainerDelete{
+	if err := s.emit(ctx, "/containers/delete", &eventsapi.ContainerDelete{
 		ContainerID: req.ID,
 	}); err != nil {
 		return &empty.Empty{}, err

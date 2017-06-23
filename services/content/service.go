@@ -6,7 +6,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	api "github.com/containerd/containerd/api/services/content/v1"
-	"github.com/containerd/containerd/api/types/event"
+	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
@@ -128,7 +128,7 @@ func (s *Service) Delete(ctx context.Context, req *api.DeleteContentRequest) (*e
 		return nil, serverErrorToGRPC(err, req.Digest.String())
 	}
 
-	if err := s.emit(ctx, "/content/delete", event.ContentDelete{
+	if err := s.emit(ctx, "/content/delete", &eventsapi.ContentDelete{
 		Digest: req.Digest,
 	}); err != nil {
 		return nil, err

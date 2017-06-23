@@ -2,8 +2,8 @@ package images
 
 import (
 	"github.com/boltdb/bolt"
+	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
-	"github.com/containerd/containerd/api/types/event"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/metadata"
@@ -69,7 +69,7 @@ func (s *Service) Update(ctx context.Context, req *imagesapi.UpdateImageRequest)
 		return nil, err
 	}
 
-	if err := s.emit(ctx, "/images/update", event.ImageUpdate{
+	if err := s.emit(ctx, "/images/update", &eventsapi.ImageUpdate{
 		Name:   req.Image.Name,
 		Labels: req.Image.Labels,
 	}); err != nil {
@@ -103,7 +103,7 @@ func (s *Service) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest)
 		return nil, err
 	}
 
-	if err := s.emit(ctx, "/images/delete", event.ImageDelete{
+	if err := s.emit(ctx, "/images/delete", &eventsapi.ImageDelete{
 		Name: req.Name,
 	}); err != nil {
 		return nil, err
