@@ -243,14 +243,9 @@ func writeImage(bkt *bolt.Bucket, image *images.Image) error {
 		return err
 	}
 
-	var (
-		buf         [binary.MaxVarintLen64]byte
-		sizeEncoded []byte = buf[:]
-	)
-	sizeEncoded = sizeEncoded[:binary.PutVarint(sizeEncoded, image.Target.Size)]
-
-	if len(sizeEncoded) == 0 {
-		return fmt.Errorf("failed encoding size = %v", image.Target.Size)
+	sizeEncoded, err := encodeSize(image.Target.Size)
+	if err != nil {
+		return err
 	}
 
 	for _, v := range [][2][]byte{
@@ -264,4 +259,17 @@ func writeImage(bkt *bolt.Bucket, image *images.Image) error {
 	}
 
 	return nil
+}
+
+func encodeSize(size int64) ([]byte, error) {
+	var (
+		buf         [binary.MaxVarintLen64]byte
+		sizeEncoded []byte = buf[:]
+	)
+	sizeEncoded = sizeEncoded[:binary.PutVarint(sizeEncoded, size)]
+
+	if len(sizeEncoded) == 0 {
+		return nil, fmt.Errorf("failed encoding size = %v", size)
+	}
+	return sizeEncoded, nil
 }

@@ -5,12 +5,14 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/boltdb/bolt"
 	api "github.com/containerd/containerd/api/services/content/v1"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
 	"github.com/golang/protobuf/ptypes/empty"
 	digest "github.com/opencontainers/go-digest"
@@ -39,6 +41,7 @@ func init() {
 		ID:   "content",
 		Requires: []plugin.PluginType{
 			plugin.ContentPlugin,
+			plugin.MetadataPlugin,
 		},
 		Init: NewService,
 	})
@@ -49,8 +52,13 @@ func NewService(ic *plugin.InitContext) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+	m, err := ic.Get(plugin.MetadataPlugin)
+	if err != nil {
+		return nil, err
+	}
+	cs := metadata.NewContentStore(m.(*bolt.DB), c.(content.Store))
 	return &Service{
-		store:   c.(content.Store),
+		store:   cs,
 		emitter: events.GetPoster(ic.Context),
 	}, nil
 }

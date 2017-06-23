@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"github.com/boltdb/bolt"
+	digest "github.com/opencontainers/go-digest"
 )
 
 // The layout where a "/" delineates a bucket is desribed in the following
@@ -33,6 +34,7 @@ var (
 	bucketKeyObjectImages     = []byte("images")     // stores image objects
 	bucketKeyObjectContainers = []byte("containers") // stores container objects
 	bucketKeyObjectSnapshots  = []byte("snapshots")  // stores snapshot references
+	bucketKeyObjectContent    = []byte("content")    // stores content links
 
 	bucketKeyDigest    = []byte("digest")
 	bucketKeyMediaType = []byte("mediatype")
@@ -138,4 +140,20 @@ func createSnapshotterBucket(tx *bolt.Tx, namespace, snapshotter string) (*bolt.
 
 func getSnapshotterBucket(tx *bolt.Tx, namespace, snapshotter string) *bolt.Bucket {
 	return getBucket(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectSnapshots, []byte(snapshotter))
+}
+
+func createContentBucket(tx *bolt.Tx, namespace string, dgst digest.Digest) (*bolt.Bucket, error) {
+	bkt, err := createBucketIfNotExists(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectContent, []byte(dgst.String()))
+	if err != nil {
+		return nil, err
+	}
+	return bkt, nil
+}
+
+func getAllContentBucket(tx *bolt.Tx, namespace string) *bolt.Bucket {
+	return getBucket(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectContent)
+}
+
+func getContentBucket(tx *bolt.Tx, namespace string, dgst digest.Digest) *bolt.Bucket {
+	return getBucket(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectContent, []byte(dgst.String()))
 }
