@@ -57,6 +57,10 @@ const (
 const (
 	// defaultSandboxImage is the image used by sandbox container.
 	defaultSandboxImage = "gcr.io/google_containers/pause:3.0"
+	// defaultSandboxOOMAdj is default omm adj for sandbox container. (kubernetes#47938).
+	defaultSandboxOOMAdj = -998
+	// defaultSandboxCPUshares is default cpu shares for sandbox container.
+	defaultSandboxCPUshares = 2
 	// defaultShmSize is the default size of the sandbox shm.
 	defaultShmSize = int64(1024 * 1024 * 64)
 	// relativeRootfsPath is the rootfs path relative to bundle path.

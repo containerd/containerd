@@ -68,6 +68,8 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 		assert.Contains(t, spec.Process.Env, "a=b", "c=d")
 		assert.Equal(t, []string{"/pause", "forever"}, spec.Process.Args)
 		assert.Equal(t, "/workspace", spec.Process.Cwd)
+		assert.EqualValues(t, *spec.Linux.Resources.CPU.Shares, defaultSandboxCPUshares)
+		assert.EqualValues(t, *spec.Linux.Resources.OOMScoreAdj, defaultSandboxOOMAdj)
 	}
 	return config, imageConfig, specCheck
 }
