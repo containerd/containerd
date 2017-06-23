@@ -323,9 +323,9 @@ func (p *initProcess) runcError(rErr error, msg string) error {
 	rMsg, err := getLastRuncError(p.runc)
 	switch {
 	case err != nil:
-		return errors.Wrapf(err, "%s: %s (%s)", msg, "unable to retrieve runc error", err.Error())
+		return errors.Wrapf(rErr, "%s: %s (%s)", msg, "unable to retrieve runc error", err.Error())
 	case rMsg == "":
-		return errors.Wrap(err, msg)
+		return errors.Wrap(rErr, msg)
 	default:
 		return errors.Errorf("%s: %s", msg, rMsg)
 	}
