@@ -15,7 +15,7 @@ GOOS ?= $(shell go env GOOS)
 else
 GOOS ?= $$GOOS
 endif
-WHALE = "🐳"
+WHALE = "🇩"
 ONI = "👹"
 ifeq ("$(OS)", "Windows_NT")
 	WHALE="+"
