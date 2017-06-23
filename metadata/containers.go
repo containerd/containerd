@@ -6,6 +6,7 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/pkg/errors"
 )
@@ -74,6 +75,10 @@ func (s *containerStore) List(ctx context.Context, filter string) ([]containers.
 func (s *containerStore) Create(ctx context.Context, container containers.Container) (containers.Container, error) {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
+		return containers.Container{}, err
+	}
+
+	if err := identifiers.Validate(container.ID); err != nil {
 		return containers.Container{}, err
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/boltdb/bolt"
+	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/namespaces"
 )
 
@@ -21,7 +22,7 @@ func (s *namespaceStore) Create(ctx context.Context, namespace string, labels ma
 		return err
 	}
 
-	if err := namespaces.Validate(namespace); err != nil {
+	if err := identifiers.Validate(namespace); err != nil {
 		return err
 	}
 
