@@ -6,47 +6,94 @@ import (
 	"text/tabwriter"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/api/services/execution"
+	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/urfave/cli"
 )
 
-var containersCommand = cli.Command{
-	Name: "containers",
-}
-
-var listCommand = cli.Command{
-	Name:    "list",
-	Aliases: []string{"ls"},
-	Usage:   "list containers",
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "quiet, q",
-			Usage: "print only the container id",
+var taskListCommand = cli.Command{
+	Name:    "tasks",
+	Usage:   "manage tasks",
+	Aliases: []string{"t"},
+	Subcommands: []cli.Command{
+		{
+			Name:    "list",
+			Usage:   "list tasks",
+			Aliases: []string{"ls"},
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "quiet, q",
+					Usage: "print only the task id & pid",
+				},
+			},
+			Action: taskListFn,
 		},
 	},
-	Action: func(context *cli.Context) error {
-		var (
-			quiet       = context.Bool("quiet")
-			ctx, cancel = appContext(context)
-		)
-		defer cancel()
+}
 
-		client, err := newClient(context)
-		if err != nil {
-			return err
-		}
-		containers, err := client.Containers(ctx)
-		if err != nil {
-			return err
-		}
-		if quiet {
-			for _, c := range containers {
-				fmt.Println(c.ID())
+var containerListCommand = cli.Command{
+	Name:    "containers",
+	Usage:   "manage containers (metadata)",
+	Aliases: []string{"c"},
+	Subcommands: []cli.Command{
+		{
+			Name:    "list",
+			Usage:   "list tasks",
+			Aliases: []string{"ls"},
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "quiet, q",
+					Usage: "print only the container id",
+				},
+			},
+			Action: containerListFn,
+		},
+	},
+}
+
+func taskListFn(context *cli.Context) error {
+	var (
+		quiet       = context.Bool("quiet")
+		ctx, cancel = appContext(context)
+	)
+	defer cancel()
+
+	client, err := newClient(context)
+	if err != nil {
+		return err
+	}
+	containers, err := client.Containers(ctx)
+	if err != nil {
+		return err
+	}
+
+	tasks := client.TaskService()
+
+	tasksResponse, err := tasks.List(ctx, &execution.ListRequest{})
+	if err != nil {
+		return err
+	}
+
+	// Join with tasks to get status.
+	tasksByContainerID := map[string]*tasktypes.Task{}
+	for _, task := range tasksResponse.Tasks {
+		tasksByContainerID[task.ContainerID] = task
+	}
+
+	if quiet {
+		for _, c := range containers {
+			task, ok := tasksByContainerID[c.ID()]
+			if ok {
+				fmt.Printf("%s\t%d\n", c.ID(), task.Pid)
+			} else {
+				//Since task is not running, PID is printed 0
+				fmt.Printf("%s\t%d\n", c.ID(), 0)
 			}
-			return nil
 		}
+	} else {
 
 		w := tabwriter.NewWriter(os.Stdout, 10, 1, 3, ' ', 0)
-		fmt.Fprintln(w, "ID\tIMAGE\tPID\tSTATUS")
+		fmt.Fprintln(w, "TASK-ID\tIMAGE\tPID\tSTATUS")
 		for _, c := range containers {
 			var imageName string
 			if image, err := c.Image(ctx); err != nil {
@@ -61,21 +108,15 @@ var listCommand = cli.Command{
 				status string
 				pid    uint32
 			)
-			task, err := c.Task(ctx, nil)
-			if err == nil {
-				s, err := task.Status(ctx)
-				if err != nil {
-					return err
-				}
-				status = string(s)
-				pid = task.Pid()
+			task, ok := tasksByContainerID[c.ID()]
+			if ok {
+				status = task.Status.String()
+				pid = task.Pid
 			} else {
-				if err != containerd.ErrNoRunningTask {
-					return err
-				}
-				status = string(containerd.Stopped)
+				status = "STOPPED" // TODO(stevvooe): Is this assumption correct?
 				pid = 0
 			}
+
 			if _, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s\n",
 				c.ID(),
 				imageName,
@@ -85,7 +126,54 @@ var listCommand = cli.Command{
 				return err
 			}
 		}
-
 		return w.Flush()
-	},
+	}
+	return nil
+}
+
+func containerListFn(context *cli.Context) error {
+	var (
+		quiet       = context.Bool("quiet")
+		ctx, cancel = appContext(context)
+	)
+	defer cancel()
+
+	client, err := newClient(context)
+	if err != nil {
+		return err
+	}
+	containers, err := client.Containers(ctx)
+	if err != nil {
+		return err
+	}
+	if quiet {
+		for _, c := range containers {
+			fmt.Printf("%s\n", c.ID())
+		}
+	} else {
+		cl := tabwriter.NewWriter(os.Stdout, 10, 1, 3, ' ', 0)
+		fmt.Fprintln(cl, "ID\tIMAGE\tRUNTIME\tSIZE")
+		for _, c := range containers {
+			var imageName string
+			if image, err := c.Image(ctx); err != nil {
+				if err != containerd.ErrNoImage {
+					return err
+				}
+				imageName = "-"
+			} else {
+				imageName = image.Name()
+			}
+			proto := c.Proto()
+			if _, err := fmt.Fprintf(cl, "%s\t%s\t%s\t%d\n",
+				c.ID(),
+				imageName,
+				proto.Runtime,
+				proto.Size(),
+			); err != nil {
+				return err
+			}
+		}
+		return cl.Flush()
+	}
+	return nil
 }
