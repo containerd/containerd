@@ -146,13 +146,17 @@ func WithExistingRootFS(id string) NewContainerOpts {
 }
 
 // WithNewRootFS allocates a new snapshot to be used by the container as the
-// root filesystem in read-write mode
+// root filesystem in read-write mode.
+// This newly created snapshot will be removed by the client when the container
+// is deleted. Use `WithExistingRootFS` to control the lifecycle of snapshot
+// separately from the container.
 func WithNewRootFS(id string, i Image) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore())
 		if err != nil {
 			return err
 		}
+		id = fmt.Sprintf("containerd-client-tmp-%s", id)
 		if _, err := client.SnapshotService().Prepare(ctx, id, identity.ChainID(diffIDs).String()); err != nil {
 			return err
 		}
@@ -163,13 +167,17 @@ func WithNewRootFS(id string, i Image) NewContainerOpts {
 }
 
 // WithNewReadonlyRootFS allocates a new snapshot to be used by the container as the
-// root filesystem in read-only mode
+// root filesystem in read-only mode.
+// This newly created snapshot will be removed by the client when the container
+// is deleted. Use `WithExistingRootFS` to control the lifecycle of snapshot
+// separately from the container.
 func WithNewReadonlyRootFS(id string, i Image) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore())
 		if err != nil {
 			return err
 		}
+		id = fmt.Sprintf("containerd-client-tmp-%s", id)
 		if _, err := client.SnapshotService().View(ctx, id, identity.ChainID(diffIDs).String()); err != nil {
 			return err
 		}
