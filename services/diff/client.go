@@ -2,8 +2,7 @@ package diff
 
 import (
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
-	"github.com/containerd/containerd/api/types/descriptor"
-	mounttypes "github.com/containerd/containerd/api/types/mount"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/rootfs"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -53,7 +52,7 @@ func (r *remote) DiffMounts(ctx context.Context, a, b []mount.Mount, media, ref 
 	return toDescriptor(resp.Diff), nil
 }
 
-func toDescriptor(d *descriptor.Descriptor) ocispec.Descriptor {
+func toDescriptor(d *types.Descriptor) ocispec.Descriptor {
 	return ocispec.Descriptor{
 		MediaType: d.MediaType,
 		Digest:    d.Digest,
@@ -61,18 +60,18 @@ func toDescriptor(d *descriptor.Descriptor) ocispec.Descriptor {
 	}
 }
 
-func fromDescriptor(d ocispec.Descriptor) *descriptor.Descriptor {
-	return &descriptor.Descriptor{
+func fromDescriptor(d ocispec.Descriptor) *types.Descriptor {
+	return &types.Descriptor{
 		MediaType: d.MediaType,
 		Digest:    d.Digest,
 		Size_:     d.Size,
 	}
 }
 
-func fromMounts(mounts []mount.Mount) []*mounttypes.Mount {
-	apiMounts := make([]*mounttypes.Mount, len(mounts))
+func fromMounts(mounts []mount.Mount) []*types.Mount {
+	apiMounts := make([]*types.Mount, len(mounts))
 	for i, m := range mounts {
-		apiMounts[i] = &mounttypes.Mount{
+		apiMounts[i] = &types.Mount{
 			Type:    m.Type,
 			Source:  m.Source,
 			Options: m.Options,

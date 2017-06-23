@@ -2,7 +2,7 @@ package diff
 
 import (
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
-	mounttypes "github.com/containerd/containerd/api/types/mount"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"golang.org/x/net/context"
@@ -68,7 +68,7 @@ func (s *service) Diff(ctx context.Context, dr *diffapi.DiffRequest) (*diffapi.D
 	}, nil
 }
 
-func toMounts(apim []*mounttypes.Mount) []mount.Mount {
+func toMounts(apim []*types.Mount) []mount.Mount {
 	mounts := make([]mount.Mount, len(apim))
 	for i, m := range apim {
 		mounts[i] = mount.Mount{

@@ -2,7 +2,7 @@ package images
 
 import (
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
-	"github.com/containerd/containerd/api/types/descriptor"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/namespaces"
@@ -46,7 +46,7 @@ func imageFromProto(imagepb *imagesapi.Image) images.Image {
 	}
 }
 
-func descFromProto(desc *descriptor.Descriptor) ocispec.Descriptor {
+func descFromProto(desc *types.Descriptor) ocispec.Descriptor {
 	return ocispec.Descriptor{
 		MediaType: desc.MediaType,
 		Size:      desc.Size_,
@@ -54,8 +54,8 @@ func descFromProto(desc *descriptor.Descriptor) ocispec.Descriptor {
 	}
 }
 
-func descToProto(desc *ocispec.Descriptor) descriptor.Descriptor {
-	return descriptor.Descriptor{
+func descToProto(desc *ocispec.Descriptor) types.Descriptor {
+	return types.Descriptor{
 		MediaType: desc.MediaType,
 		Size_:     desc.Size,
 		Digest:    desc.Digest,

@@ -5,8 +5,8 @@ package containerd.services.diff.v1;
 import "gogoproto/gogo.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
-import "github.com/containerd/containerd/api/types/mount/mount.proto";
-import "github.com/containerd/containerd/api/types/descriptor/descriptor.proto";
+import "github.com/containerd/containerd/api/types/mount.proto";
+import "github.com/containerd/containerd/api/types/descriptor.proto";
 
 option go_package = "github.com/containerd/containerd/api/services/diff/v1;diff";
 
@@ -24,26 +24,26 @@ service Diff {
 
 message ApplyRequest {
 	// Diff is the descriptor of the diff to be extracted
-	containerd.v1.types.Descriptor diff = 1;
+	containerd.types.Descriptor diff = 1;
 
-	repeated containerd.v1.types.Mount mounts = 2;
+	repeated containerd.types.Mount mounts = 2;
 }
 
 message ApplyResponse {
 	// Applied is the descriptor for the object which was applied.
 	// If the input was a compressed blob then the result will be
 	// the descriptor for the uncompressed blob.
-	containerd.v1.types.Descriptor applied = 1;
+	containerd.types.Descriptor applied = 1;
 }
 
 message DiffRequest {
 	// Left are the mounts which represent the older copy
 	// in which is the base of the computed changes.
-	repeated containerd.v1.types.Mount left = 1;
+	repeated containerd.types.Mount left = 1;
 
 	// Right are the mounts which represents the newer copy
 	// in which changes from the left were made into.
-	repeated containerd.v1.types.Mount right = 2;
+	repeated containerd.types.Mount right = 2;
 
 	// MediaType is the media type descriptor for the created diff
 	// object
@@ -56,5 +56,5 @@ message DiffRequest {
 
 message DiffResponse {
 	// Diff is the descriptor of the diff which can be applied
-	containerd.v1.types.Descriptor diff = 3;
+	containerd.types.Descriptor diff = 3;
 }

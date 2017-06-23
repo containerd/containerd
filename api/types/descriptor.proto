@@ -1,8 +1,10 @@
 syntax = "proto3";
 
-package containerd.v1.types;
+package containerd.types;
 
 import "gogoproto/gogo.proto";
+
+option go_package = "github.com/containerd/containerd/api/types;types";
 
 // Descriptor describes a blob in a content store.
 //

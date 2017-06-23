@@ -10,7 +10,7 @@ import (
 
 	"github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
-	"github.com/containerd/containerd/api/types/descriptor"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/snapshot"
@@ -91,7 +91,7 @@ func WithTaskCheckpoint(desc v1.Descriptor) NewTaskOpts {
 		}
 		for _, m := range index.Manifests {
 			if m.MediaType == images.MediaTypeContainerd1Checkpoint {
-				r.Checkpoint = &descriptor.Descriptor{
+				r.Checkpoint = &types.Descriptor{
 					MediaType: m.MediaType,
 					Size_:     m.Size,
 					Digest:    m.Digest,

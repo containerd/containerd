@@ -4,7 +4,7 @@ package containerd.services.images.v1;
 
 import "gogoproto/gogo.proto";
 import "google/protobuf/empty.proto";
-import "github.com/containerd/containerd/api/types/descriptor/descriptor.proto";
+import "github.com/containerd/containerd/api/types/descriptor.proto";
 
 option go_package = "github.com/containerd/containerd/api/services/images/v1;images";
 
@@ -37,7 +37,7 @@ service Images {
 message Image {
 	string name = 1;
 	map<string, string> labels = 2;
-	containerd.v1.types.Descriptor target = 3 [(gogoproto.nullable) = false];
+	containerd.types.Descriptor target = 3 [(gogoproto.nullable) = false];
 }
 
 message GetImageRequest {

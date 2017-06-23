@@ -5,8 +5,8 @@ package containerd.services.tasks.v1;
 import "google/protobuf/empty.proto";
 import "google/protobuf/any.proto";
 import "gogoproto/gogo.proto";
-import "github.com/containerd/containerd/api/types/mount/mount.proto";
-import "github.com/containerd/containerd/api/types/descriptor/descriptor.proto";
+import "github.com/containerd/containerd/api/types/mount.proto";
+import "github.com/containerd/containerd/api/types/descriptor.proto";
 import "github.com/containerd/containerd/api/types/task/task.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -62,14 +62,14 @@ message CreateTaskRequest {
 	// These are for mounts that cannot be performed in the user namespace.
 	// Typically, these mounts should be resolved from snapshots specified on
 	// the container object.
-	repeated containerd.v1.types.Mount rootfs = 3;
+	repeated containerd.types.Mount rootfs = 3;
 
 	string stdin = 4;
 	string stdout = 5;
 	string stderr = 6;
 	bool terminal = 7;
 
-	containerd.v1.types.Descriptor checkpoint = 8;
+	containerd.types.Descriptor checkpoint = 8;
 }
 
 message CreateTaskResponse {
@@ -186,5 +186,5 @@ message CheckpointTaskRequest {
 }
 
 message CheckpointTaskResponse {
-	repeated containerd.v1.types.Descriptor descriptors = 1;
+	repeated containerd.types.Descriptor descriptors = 1;
 }

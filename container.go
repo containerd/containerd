@@ -11,7 +11,7 @@ import (
 
 	"github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
-	"github.com/containerd/containerd/api/types/mount"
+	"github.com/containerd/containerd/api/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
@@ -128,7 +128,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...Ne
 			return nil, err
 		}
 		for _, m := range mounts {
-			request.Rootfs = append(request.Rootfs, &mount.Mount{
+			request.Rootfs = append(request.Rootfs, &types.Mount{
 				Type:    m.Type,
 				Source:  m.Source,
 				Options: m.Options,

@@ -4,7 +4,7 @@ package containerd.services.snapshots.v1;
 
 import "gogoproto/gogo.proto";
 import "google/protobuf/empty.proto";
-import "github.com/containerd/containerd/api/types/mount/mount.proto";
+import "github.com/containerd/containerd/api/types/mount.proto";
 
 option go_package = "github.com/containerd/containerd/api/services/snapshot/v1;snapshot";
 
@@ -26,7 +26,7 @@ message PrepareSnapshotRequest {
 }
 
 message PrepareSnapshotResponse {
-	repeated containerd.v1.types.Mount mounts = 1;
+	repeated containerd.types.Mount mounts = 1;
 }
 
 message ViewSnapshotRequest {
@@ -35,7 +35,7 @@ message ViewSnapshotRequest {
 }
 
 message ViewSnapshotResponse {
-	repeated containerd.v1.types.Mount mounts = 1;
+	repeated containerd.types.Mount mounts = 1;
 }
 
 message MountsRequest {
@@ -43,7 +43,7 @@ message MountsRequest {
 }
 
 message MountsResponse {
-	repeated containerd.v1.types.Mount mounts = 1;
+	repeated containerd.types.Mount mounts = 1;
 }
 
 message RemoveSnapshotRequest {

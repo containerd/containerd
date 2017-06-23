@@ -18,7 +18,7 @@ import (
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/services/shim/v1"
-	"github.com/containerd/containerd/api/types/mount"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/events"
 	shimb "github.com/containerd/containerd/linux/shim"
@@ -223,7 +223,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts)
 		Checkpoint: opts.Checkpoint,
 	}
 	for _, m := range opts.Rootfs {
-		sopts.Rootfs = append(sopts.Rootfs, &mount.Mount{
+		sopts.Rootfs = append(sopts.Rootfs, &types.Mount{
 			Type:    m.Type,
 			Source:  m.Source,
 			Options: m.Options,
