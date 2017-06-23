@@ -120,6 +120,13 @@ func (c *criContainerdService) handleEvent(e *task.Event) {
 			return
 		}
 	case task.Event_OOM:
-		// TODO(random-liu): [P1] Handle OOM event.
+		err := c.containerStore.Update(e.ID, func(meta metadata.ContainerMetadata) (metadata.ContainerMetadata, error) {
+			meta.Reason = oomExitReason
+			return meta, nil
+		})
+		if err != nil && !metadata.IsNotExistError(err) {
+			glog.Errorf("Failed to update container %q oom: %v", e.ID, err)
+			return
+		}
 	}
 }
