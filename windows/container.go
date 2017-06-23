@@ -187,7 +187,7 @@ func (c *container) Pids(ctx context.Context) ([]uint32, error) {
 	return pids, nil
 }
 
-func (c *container) Checkpoint(ctx context.Context, _ string, _ map[string]string) error {
+func (c *container) Checkpoint(ctx context.Context, _ string, _ []byte) error {
 	return fmt.Errorf("Windows containers do not support checkpoint")
 }
 

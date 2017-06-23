@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
 	runc "github.com/containerd/go-runc"
+	protobuf "github.com/gogo/protobuf/types"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
 
@@ -171,6 +172,9 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 		Stderr:     opts.IO.Stderr,
 		Terminal:   opts.IO.Terminal,
 		Checkpoint: opts.Checkpoint,
+		Options: &protobuf.Any{
+			Value: opts.Options,
+		},
 	}
 	for _, m := range opts.Rootfs {
 		sopts.Rootfs = append(sopts.Rootfs, &types.Mount{

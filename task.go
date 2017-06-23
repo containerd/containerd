@@ -248,15 +248,9 @@ func (t *task) Resize(ctx context.Context, w, h uint32) error {
 	return err
 }
 
-func WithExit(r *tasks.CheckpointTaskRequest) error {
-	r.Options["exit"] = "true"
-	return nil
-}
-
 func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointOpts) (d v1.Descriptor, err error) {
 	request := &tasks.CheckpointTaskRequest{
 		ContainerID: t.containerID,
-		Options:     make(map[string]string),
 	}
 	for _, o := range opts {
 		if err := o(request); err != nil {

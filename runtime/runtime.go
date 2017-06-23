@@ -20,8 +20,11 @@ type CreateOpts struct {
 	// Rootfs mounts to perform to gain access to the container's filesystem
 	Rootfs []mount.Mount
 	// IO for the container's main process
-	IO         IO
+	IO IO
+	// Checkpoint digest to restore container state
 	Checkpoint string
+	// Options for the runtime and container
+	Options []byte
 }
 
 type Exit struct {

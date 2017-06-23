@@ -32,7 +32,7 @@ type Task interface {
 	// CloseStdin closes the processes stdin
 	CloseIO(context.Context, uint32) error
 	// Checkpoint checkpoints a container to an image with live system data
-	Checkpoint(context.Context, string, map[string]string) error
+	Checkpoint(context.Context, string, []byte) error
 	// DeleteProcess deletes a specific exec process via the pid
 	DeleteProcess(context.Context, uint32) (*Exit, error)
 	// Update sets the provided resources to a running task

@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package containerd.linux.runc;
+
+import "gogoproto/gogo.proto";
+
+option go_package = "github.com/containerd/containerd/linux/runcopts;runcopts";
+
+message RuncOptions {
+	string criu_path = 1;
+	string systemd_cgroup = 2;
+}
+
+message CreateOptions {
+	bool no_pivot_root = 1;
+	bool open_tcp = 2;
+	bool external_unix_sockets = 3;
+	bool terminal = 4;
+	bool file_locks = 5;
+	repeated string empty_namespaces = 6;
+	string cgroups_mode = 7;
+	bool no_new_keyring = 8;
+}
+
+message CheckpointOptions {
+	bool exit = 1;
+	bool open_tcp = 2;
+	bool external_unix_sockets = 3;
+	bool terminal = 4;
+	bool file_locks = 5;
+	repeated string empty_namespaces = 6;
+	string cgroups_mode = 7;
+}

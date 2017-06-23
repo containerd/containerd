@@ -160,10 +160,12 @@ func (t *Task) CloseIO(ctx context.Context, pid uint32) error {
 	return err
 }
 
-func (t *Task) Checkpoint(ctx context.Context, path string, options map[string]string) error {
+func (t *Task) Checkpoint(ctx context.Context, path string, options []byte) error {
 	r := &shim.CheckpointTaskRequest{
-		Path:    path,
-		Options: options,
+		Path: path,
+		Options: &protobuf.Any{
+			Value: options,
+		},
 	}
 	if _, err := t.shim.Checkpoint(ctx, r); err != nil {
 		return errors.New(grpc.ErrorDesc(err))

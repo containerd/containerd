@@ -17,12 +17,14 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
+	"github.com/containerd/containerd/linux/runcopts"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
+	"github.com/gogo/protobuf/proto"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
@@ -54,6 +56,12 @@ type initProcess struct {
 }
 
 func newInitProcess(context context.Context, path, namespace string, r *shimapi.CreateTaskRequest) (*initProcess, error) {
+	var options runcopts.CreateOptions
+	if r.Options != nil {
+		if err := proto.Unmarshal(r.Options.Value, &options); err != nil {
+			return nil, err
+		}
+	}
 	for _, rm := range r.Rootfs {
 		m := &mount.Mount{
 			Type:    rm.Type,
@@ -105,10 +113,9 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 				WorkDir:    filepath.Join(r.Bundle, "work"),
 				ParentPath: r.ParentCheckpoint,
 			},
-			PidFile: pidFile,
-			IO:      io,
-			// TODO: implement runtime options
-			//NoPivot:     r.NoPivot,
+			PidFile:     pidFile,
+			IO:          io,
+			NoPivot:     options.NoPivotRoot,
 			Detach:      true,
 			NoSubreaper: true,
 		}
@@ -117,9 +124,10 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 		}
 	} else {
 		opts := &runc.CreateOpts{
-			PidFile: pidFile,
-			IO:      io,
-			// NoPivot: r.NoPivot,
+			PidFile:      pidFile,
+			IO:           io,
+			NoPivot:      options.NoPivotRoot,
+			NoNewKeyring: options.NoNewKeyring,
 		}
 		if socket != nil {
 			opts.ConsoleSocket = socket
@@ -256,25 +264,26 @@ func (p *initProcess) Stdin() io.Closer {
 }
 
 func (p *initProcess) Checkpoint(context context.Context, r *shimapi.CheckpointTaskRequest) error {
-	var actions []runc.CheckpointAction
-	/*
-		if !r.Exit {
-			actions = append(actions, runc.LeaveRunning)
+	var options runcopts.CheckpointOptions
+	if r.Options != nil {
+		if err := proto.Unmarshal(r.Options.Value, &options); err != nil {
+			return err
 		}
-	*/
+	}
+	var actions []runc.CheckpointAction
+	if !options.Exit {
+		actions = append(actions, runc.LeaveRunning)
+	}
 	work := filepath.Join(p.bundle, "work")
 	defer os.RemoveAll(work)
-	// TODO: convert options into runc flags or a better format for criu
 	if err := p.runc.Checkpoint(context, p.id, &runc.CheckpointOpts{
-		WorkDir:   work,
-		ImagePath: r.Path,
-		/*
-			AllowOpenTCP:             r.AllowTcp,
-			AllowExternalUnixSockets: r.AllowUnixSockets,
-			AllowTerminal:            r.AllowTerminal,
-			FileLocks:                r.FileLocks,
-			EmptyNamespaces:          r.EmptyNamespaces,
-		*/
+		WorkDir:                  work,
+		ImagePath:                r.Path,
+		AllowOpenTCP:             options.OpenTcp,
+		AllowExternalUnixSockets: options.ExternalUnixSockets,
+		AllowTerminal:            options.Terminal,
+		FileLocks:                options.FileLocks,
+		EmptyNamespaces:          options.EmptyNamespaces,
 	}, actions...); err != nil {
 		dumpLog := filepath.Join(p.bundle, "criu-dump.log")
 		if cerr := copyFile(dumpLog, filepath.Join(work, "dump.log")); cerr != nil {
