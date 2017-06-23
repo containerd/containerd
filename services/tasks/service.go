@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 
 	"github.com/boltdb/bolt"
+	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	api "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types/descriptor"
-	"github.com/containerd/containerd/api/types/event"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/containers"
@@ -154,7 +154,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateTaskRequest) (*api.Cr
 		log.G(ctx).Error(err)
 	}
 
-	if err := s.emit(ctx, "/tasks/create", event.TaskCreate{
+	if err := s.emit(ctx, "/tasks/create", &eventsapi.TaskCreate{
 		ContainerID: r.ContainerID,
 	}); err != nil {
 		return nil, err
@@ -175,7 +175,7 @@ func (s *Service) Start(ctx context.Context, r *api.StartTaskRequest) (*google_p
 		return nil, err
 	}
 
-	if err := s.emit(ctx, "/tasks/start", event.TaskStart{
+	if err := s.emit(ctx, "/tasks/start", &eventsapi.TaskStart{
 		ContainerID: r.ContainerID,
 	}); err != nil {
 		return nil, err
@@ -197,7 +197,7 @@ func (s *Service) Delete(ctx context.Context, r *api.DeleteTaskRequest) (*api.De
 	if err != nil {
 		return nil, err
 	}
-	if err := s.emit(ctx, "/tasks/delete", event.TaskDelete{
+	if err := s.emit(ctx, "/tasks/delete", &eventsapi.TaskDelete{
 		ContainerID: r.ContainerID,
 		Pid:         exit.Pid,
 		ExitStatus:  exit.Status,

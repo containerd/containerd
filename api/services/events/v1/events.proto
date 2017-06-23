@@ -2,12 +2,20 @@ syntax = "proto3";
 
 package containerd.services.events.v1;
 
-import "github.com/containerd/containerd/api/types/event/event.proto";
+import "gogoproto/gogo.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
 
 option go_package = "github.com/containerd/containerd/api/services/events/v1;events";
 
 service Events {
-	rpc Stream(StreamEventsRequest) returns (stream containerd.v1.types.Envelope);
+	rpc Stream(StreamEventsRequest) returns (stream Envelope);
 }
 
 message StreamEventsRequest {}
+
+message Envelope {
+	google.protobuf.Timestamp timestamp = 1 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	string topic = 2;
+	google.protobuf.Any event = 3;
+}

@@ -2,26 +2,23 @@
 // source: github.com/containerd/containerd/api/services/events/v1/events.proto
 // DO NOT EDIT!
 
-/*
-	Package events is a generated protocol buffer package.
-
-	It is generated from these files:
-		github.com/containerd/containerd/api/services/events/v1/events.proto
-
-	It has these top-level messages:
-		StreamEventsRequest
-*/
 package events
 
 import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
-import containerd_v1_types "github.com/containerd/containerd/api/types/event"
+import _ "github.com/gogo/protobuf/gogoproto"
+import _ "github.com/gogo/protobuf/types"
+import google_protobuf2 "github.com/gogo/protobuf/types"
+
+import time "time"
 
 import (
 	context "golang.org/x/net/context"
 	grpc "google.golang.org/grpc"
 )
+
+import github_com_gogo_protobuf_types "github.com/gogo/protobuf/types"
 
 import strings "strings"
 import reflect "reflect"
@@ -32,12 +29,7 @@ import io "io"
 var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
-
-// This is a compile-time assertion to ensure that this generated file
-// is compatible with the proto package it is being compiled against.
-// A compilation error at this line likely means your copy of the
-// proto package needs to be updated.
-const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
+var _ = time.Kitchen
 
 type StreamEventsRequest struct {
 }
@@ -46,8 +38,19 @@ func (m *StreamEventsRequest) Reset()                    { *m = StreamEventsRequ
 func (*StreamEventsRequest) ProtoMessage()               {}
 func (*StreamEventsRequest) Descriptor() ([]byte, []int) { return fileDescriptorEvents, []int{0} }
 
+type Envelope struct {
+	Timestamp time.Time             `protobuf:"bytes,1,opt,name=timestamp,stdtime" json:"timestamp"`
+	Topic     string                `protobuf:"bytes,2,opt,name=topic,proto3" json:"topic,omitempty"`
+	Event     *google_protobuf2.Any `protobuf:"bytes,3,opt,name=event" json:"event,omitempty"`
+}
+
+func (m *Envelope) Reset()                    { *m = Envelope{} }
+func (*Envelope) ProtoMessage()               {}
+func (*Envelope) Descriptor() ([]byte, []int) { return fileDescriptorEvents, []int{1} }
+
 func init() {
 	proto.RegisterType((*StreamEventsRequest)(nil), "containerd.services.events.v1.StreamEventsRequest")
+	proto.RegisterType((*Envelope)(nil), "containerd.services.events.v1.Envelope")
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -88,7 +91,7 @@ func (c *eventsClient) Stream(ctx context.Context, in *StreamEventsRequest, opts
 }
 
 type Events_StreamClient interface {
-	Recv() (*containerd_v1_types.Envelope, error)
+	Recv() (*Envelope, error)
 	grpc.ClientStream
 }
 
@@ -96,8 +99,8 @@ type eventsStreamClient struct {
 	grpc.ClientStream
 }
 
-func (x *eventsStreamClient) Recv() (*containerd_v1_types.Envelope, error) {
-	m := new(containerd_v1_types.Envelope)
+func (x *eventsStreamClient) Recv() (*Envelope, error) {
+	m := new(Envelope)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -123,7 +126,7 @@ func _Events_Stream_Handler(srv interface{}, stream grpc.ServerStream) error {
 }
 
 type Events_StreamServer interface {
-	Send(*containerd_v1_types.Envelope) error
+	Send(*Envelope) error
 	grpc.ServerStream
 }
 
@@ -131,7 +134,7 @@ type eventsStreamServer struct {
 	grpc.ServerStream
 }
 
-func (x *eventsStreamServer) Send(m *containerd_v1_types.Envelope) error {
+func (x *eventsStreamServer) Send(m *Envelope) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -164,6 +167,48 @@ func (m *StreamEventsRequest) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	return i, nil
+}
+
+func (m *Envelope) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *Envelope) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintEvents(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.Timestamp)))
+	n1, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.Timestamp, dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n1
+	if len(m.Topic) > 0 {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintEvents(dAtA, i, uint64(len(m.Topic)))
+		i += copy(dAtA[i:], m.Topic)
+	}
+	if m.Event != nil {
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintEvents(dAtA, i, uint64(m.Event.Size()))
+		n2, err := m.Event.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n2
+	}
 	return i, nil
 }
 
@@ -200,6 +245,22 @@ func (m *StreamEventsRequest) Size() (n int) {
 	return n
 }
 
+func (m *Envelope) Size() (n int) {
+	var l int
+	_ = l
+	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.Timestamp)
+	n += 1 + l + sovEvents(uint64(l))
+	l = len(m.Topic)
+	if l > 0 {
+		n += 1 + l + sovEvents(uint64(l))
+	}
+	if m.Event != nil {
+		l = m.Event.Size()
+		n += 1 + l + sovEvents(uint64(l))
+	}
+	return n
+}
+
 func sovEvents(x uint64) (n int) {
 	for {
 		n++
@@ -218,6 +279,18 @@ func (this *StreamEventsRequest) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&StreamEventsRequest{`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Envelope) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Envelope{`,
+		`Timestamp:` + strings.Replace(strings.Replace(this.Timestamp.String(), "Timestamp", "google_protobuf1.Timestamp", 1), `&`, ``, 1) + `,`,
+		`Topic:` + fmt.Sprintf("%v", this.Topic) + `,`,
+		`Event:` + strings.Replace(fmt.Sprintf("%v", this.Event), "Any", "google_protobuf2.Any", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -259,6 +332,148 @@ func (m *StreamEventsRequest) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: StreamEventsRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipEvents(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthEvents
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *Envelope) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowEvents
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Envelope: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Envelope: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Timestamp", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEvents
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthEvents
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := github_com_gogo_protobuf_types.StdTimeUnmarshal(&m.Timestamp, dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Topic", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEvents
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthEvents
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Topic = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Event", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEvents
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthEvents
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Event == nil {
+				m.Event = &google_protobuf2.Any{}
+			}
+			if err := m.Event.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipEvents(dAtA[iNdEx:])
@@ -390,18 +605,25 @@ func init() {
 }
 
 var fileDescriptorEvents = []byte{
-	// 205 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x72, 0x49, 0xcf, 0x2c, 0xc9,
-	0x28, 0x4d, 0xd2, 0x4b, 0xce, 0xcf, 0xd5, 0x4f, 0xce, 0xcf, 0x2b, 0x49, 0xcc, 0xcc, 0x4b, 0x2d,
-	0x4a, 0x41, 0x66, 0x26, 0x16, 0x64, 0xea, 0x17, 0xa7, 0x16, 0x95, 0x65, 0x26, 0xa7, 0x16, 0xeb,
-	0xa7, 0x96, 0xa5, 0xe6, 0x95, 0x14, 0xeb, 0x97, 0x19, 0x42, 0x59, 0x7a, 0x05, 0x45, 0xf9, 0x25,
-	0xf9, 0x42, 0xb2, 0x08, 0xf5, 0x7a, 0x30, 0xb5, 0x7a, 0x50, 0x15, 0x65, 0x86, 0x52, 0x36, 0x44,
-	0x59, 0x52, 0x52, 0x59, 0x00, 0xb3, 0x01, 0x42, 0x42, 0x0c, 0x57, 0x12, 0xe5, 0x12, 0x0e, 0x2e,
-	0x29, 0x4a, 0x4d, 0xcc, 0x75, 0x05, 0x1b, 0x18, 0x94, 0x5a, 0x58, 0x9a, 0x5a, 0x5c, 0x62, 0x94,
-	0xce, 0xc5, 0x06, 0x11, 0x10, 0x8a, 0xe5, 0x62, 0x83, 0x28, 0x10, 0x32, 0xd2, 0xc3, 0xeb, 0x10,
-	0x3d, 0x2c, 0xe6, 0x48, 0xc9, 0x22, 0xeb, 0x29, 0x33, 0xd4, 0x03, 0x3b, 0x43, 0xcf, 0x35, 0xaf,
-	0x2c, 0x35, 0x27, 0xbf, 0x20, 0xd5, 0x80, 0xd1, 0x29, 0xe2, 0xc4, 0x43, 0x39, 0x86, 0x1b, 0x0f,
-	0xe5, 0x18, 0x1a, 0x1e, 0xc9, 0x31, 0x9e, 0x78, 0x24, 0xc7, 0x78, 0xe1, 0x91, 0x1c, 0xe3, 0x83,
-	0x47, 0x72, 0x8c, 0x51, 0x76, 0x64, 0x06, 0x9e, 0x35, 0x84, 0x95, 0xc4, 0x06, 0xf6, 0xa0, 0x31,
-	0x20, 0x00, 0x00, 0xff, 0xff, 0xf9, 0x3a, 0x20, 0x52, 0x85, 0x01, 0x00, 0x00,
+	// 313 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x91, 0xc1, 0x4a, 0xc3, 0x30,
+	0x1c, 0xc6, 0x17, 0x65, 0x63, 0x8b, 0xb7, 0x38, 0x61, 0x16, 0xcc, 0xc6, 0x2e, 0x0e, 0x0f, 0x89,
+	0x9b, 0x47, 0x41, 0x70, 0xb8, 0x17, 0xa8, 0x1e, 0xc4, 0x5b, 0x57, 0xff, 0xc6, 0xc0, 0x9a, 0x74,
+	0x6d, 0x56, 0xd8, 0xcd, 0x47, 0xd8, 0x63, 0xf5, 0xe8, 0xd1, 0x93, 0xba, 0x3e, 0x89, 0x98, 0xb4,
+	0x4e, 0x54, 0x14, 0xbc, 0x7d, 0x7f, 0xf2, 0xfb, 0xbe, 0xfc, 0xbf, 0x04, 0x5f, 0x08, 0x69, 0xee,
+	0x17, 0x53, 0x16, 0xea, 0x88, 0x87, 0x5a, 0x99, 0x40, 0x2a, 0x48, 0x6e, 0x3f, 0xcb, 0x20, 0x96,
+	0x3c, 0x85, 0x24, 0x93, 0x21, 0xa4, 0x1c, 0x32, 0x50, 0x26, 0xe5, 0xd9, 0xb0, 0x54, 0x2c, 0x4e,
+	0xb4, 0xd1, 0xe4, 0x60, 0xc3, 0xb3, 0x8a, 0x65, 0x25, 0x91, 0x0d, 0xbd, 0xb6, 0xd0, 0x42, 0x5b,
+	0x92, 0xbf, 0x2b, 0x67, 0xf2, 0xba, 0x42, 0x6b, 0x31, 0x03, 0x6e, 0xa7, 0xe9, 0xe2, 0x8e, 0x1b,
+	0x19, 0x41, 0x6a, 0x82, 0x28, 0x2e, 0x81, 0xfd, 0xaf, 0x40, 0xa0, 0x96, 0xee, 0xa8, 0xbf, 0x87,
+	0x77, 0x2f, 0x4d, 0x02, 0x41, 0x34, 0xb1, 0x97, 0xf8, 0x30, 0x5f, 0x40, 0x6a, 0xfa, 0x2b, 0x84,
+	0x9b, 0x13, 0x95, 0xc1, 0x4c, 0xc7, 0x40, 0xc6, 0xb8, 0xf5, 0x91, 0xd8, 0x41, 0x3d, 0x34, 0xd8,
+	0x19, 0x79, 0xcc, 0x45, 0xb2, 0x2a, 0x92, 0x5d, 0x55, 0xc4, 0xb8, 0x99, 0x3f, 0x77, 0x6b, 0xab,
+	0x97, 0x2e, 0xf2, 0x37, 0x36, 0xd2, 0xc6, 0x75, 0xa3, 0x63, 0x19, 0x76, 0xb6, 0x7a, 0x68, 0xd0,
+	0xf2, 0xdd, 0x40, 0x8e, 0x70, 0xdd, 0x96, 0xeb, 0x6c, 0xdb, 0xd4, 0xf6, 0xb7, 0xd4, 0x73, 0xb5,
+	0xf4, 0x1d, 0x32, 0x9a, 0xe3, 0x86, 0xdb, 0x91, 0x08, 0xdc, 0x70, 0x3b, 0x93, 0x11, 0xfb, 0xf5,
+	0xbd, 0xd8, 0x0f, 0xd5, 0xbc, 0xc3, 0x3f, 0x3c, 0x55, 0xed, 0x63, 0x34, 0xbe, 0xce, 0xd7, 0xb4,
+	0xf6, 0xb4, 0xa6, 0xb5, 0x87, 0x82, 0xa2, 0xbc, 0xa0, 0xe8, 0xb1, 0xa0, 0xe8, 0xb5, 0xa0, 0xe8,
+	0xe6, 0xec, 0x9f, 0xbf, 0x7d, 0xea, 0xd4, 0xb4, 0x61, 0x1b, 0x9e, 0xbc, 0x05, 0x00, 0x00, 0xff,
+	0xff, 0xc3, 0x54, 0xa2, 0xf3, 0x36, 0x02, 0x00, 0x00,
 }

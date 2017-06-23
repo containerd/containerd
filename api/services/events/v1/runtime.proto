@@ -1,10 +1,12 @@
 syntax = "proto3";
 
-package containerd.v1.types;
+package containerd.services.events.v1;
 
 import "gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
 import "github.com/containerd/containerd/api/types/task/task.proto";
+
+option go_package = "github.com/containerd/containerd/api/services/events/v1;events";
 
 message RuntimeIO {
 	string stdin = 1;
