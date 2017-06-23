@@ -11,7 +11,7 @@ import (
 	"github.com/boltdb/bolt"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	api "github.com/containerd/containerd/api/services/tasks/v1"
-	"github.com/containerd/containerd/api/types/descriptor"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/containers"
@@ -444,14 +444,14 @@ func (s *Service) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest) 
 		return nil, err
 	}
 	return &api.CheckpointTaskResponse{
-		Descriptors: []*descriptor.Descriptor{
+		Descriptors: []*types.Descriptor{
 			cp,
 			specD,
 		},
 	}, nil
 }
 
-func (s *Service) writeContent(ctx context.Context, mediaType, ref string, r io.Reader) (*descriptor.Descriptor, error) {
+func (s *Service) writeContent(ctx context.Context, mediaType, ref string, r io.Reader) (*types.Descriptor, error) {
 	writer, err := s.store.Writer(ctx, ref, 0, "")
 	if err != nil {
 		return nil, err
@@ -464,7 +464,7 @@ func (s *Service) writeContent(ctx context.Context, mediaType, ref string, r io.
 	if err := writer.Commit(0, ""); err != nil {
 		return nil, err
 	}
-	return &descriptor.Descriptor{
+	return &types.Descriptor{
 		MediaType: mediaType,
 		Digest:    writer.Digest(),
 		Size_:     size,

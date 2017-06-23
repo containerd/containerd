@@ -5,7 +5,7 @@ import (
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot/v1"
-	mounttypes "github.com/containerd/containerd/api/types/mount"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
@@ -227,10 +227,10 @@ func fromUsage(usage snapshot.Usage) *snapshotapi.UsageResponse {
 	}
 }
 
-func fromMounts(mounts []mount.Mount) []*mounttypes.Mount {
-	out := make([]*mounttypes.Mount, len(mounts))
+func fromMounts(mounts []mount.Mount) []*types.Mount {
+	out := make([]*types.Mount, len(mounts))
 	for i, m := range mounts {
-		out[i] = &mounttypes.Mount{
+		out[i] = &types.Mount{
 			Type:    m.Type,
 			Source:  m.Source,
 			Options: m.Options,
