@@ -6,7 +6,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/api/services/execution"
+	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/urfave/cli"
 )
@@ -67,9 +67,9 @@ func taskListFn(context *cli.Context) error {
 		return err
 	}
 
-	tasks := client.TaskService()
+	s := client.TaskService()
 
-	tasksResponse, err := tasks.List(ctx, &execution.ListRequest{})
+	tasksResponse, err := s.List(ctx, &tasks.ListTasksRequest{})
 	if err != nil {
 		return err
 	}
