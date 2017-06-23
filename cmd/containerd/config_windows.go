@@ -3,15 +3,17 @@ package main
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/containerd/containerd/server"
 )
 
-func defaultConfig() *config {
-	return &config{
+func defaultConfig() *server.Config {
+	return &server.Config{
 		Root: filepath.Join(os.Getenv("programfiles"), "containerd", "root"),
-		GRPC: grpcConfig{
+		GRPC: server.GRPCConfig{
 			Address: `\\.\pipe\containerd-containerd`,
 		},
-		Debug: debug{
+		Debug: server.Debug{
 			Level:   "info",
 			Address: `\\.\pipe\containerd-debug`,
 		},
