@@ -3,7 +3,8 @@ package plugin
 import "errors"
 
 var (
-	ErrContainerExists   = errors.New("container with id already exists")
-	ErrContainerNotExist = errors.New("container does not exist")
-	ErrRuntimeNotExist   = errors.New("runtime does not exist")
+	ErrContainerExists   = errors.New("runtime: container with id already exists")
+	ErrContainerNotExist = errors.New("runtime: container does not exist")
+	ErrRuntimeNotExist   = errors.New("runtime: runtime does not exist")
+	ErrProcessExited     = errors.New("runtime: process already exited")
 )

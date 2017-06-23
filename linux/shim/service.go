@@ -274,12 +274,16 @@ func (s *Service) Kill(ctx context.Context, r *shimapi.KillRequest) (*google_pro
 		}
 		return empty, nil
 	}
-
+	if int(r.Pid) == s.initProcess.pid {
+		if err := s.initProcess.Kill(ctx, r.Signal, r.All); err != nil {
+			return nil, err
+		}
+		return empty, nil
+	}
 	pids, err := s.getContainerPids(ctx, s.initProcess.id)
 	if err != nil {
 		return nil, err
 	}
-
 	valid := false
 	for _, p := range pids {
 		if r.Pid == p {
@@ -287,15 +291,12 @@ func (s *Service) Kill(ctx context.Context, r *shimapi.KillRequest) (*google_pro
 			break
 		}
 	}
-
 	if !valid {
 		return nil, errors.Errorf("process %d does not exist in container", r.Pid)
 	}
-
 	if err := unix.Kill(int(r.Pid), syscall.Signal(r.Signal)); err != nil {
-		return nil, err
+		return nil, checkKillError(err)
 	}
-
 	return empty, nil
 }
 

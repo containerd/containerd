@@ -20,6 +20,7 @@ import (
 	shimapi "github.com/containerd/containerd/api/services/shim/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	"github.com/pkg/errors"
@@ -234,7 +235,7 @@ func (p *initProcess) Kill(context context.Context, signal uint32, all bool) err
 	err := p.runc.Kill(context, p.id, int(signal), &runc.KillOpts{
 		All: all,
 	})
-	return p.runcError(err, "runc kill failed")
+	return checkKillError(err)
 }
 
 func (p *initProcess) killAll(context context.Context) error {
@@ -245,7 +246,7 @@ func (p *initProcess) killAll(context context.Context) error {
 }
 
 func (p *initProcess) Signal(sig int) error {
-	return unix.Kill(p.pid, syscall.Signal(sig))
+	return checkKillError(unix.Kill(p.pid, syscall.Signal(sig)))
 }
 
 func (p *initProcess) Stdin() io.Closer {
@@ -350,5 +351,15 @@ func copyFile(to, from string) error {
 	}
 	defer tt.Close()
 	_, err = io.Copy(tt, ff)
+	return err
+}
+
+func checkKillError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(err.Error(), "os: process already finished") || err == unix.ESRCH {
+		return plugin.ErrProcessExited
+	}
 	return err
 }
