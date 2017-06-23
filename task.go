@@ -147,27 +147,29 @@ func (t *task) Wait(ctx context.Context) (uint32, error) {
 		return UnknownExitStatus, err
 	}
 	<-t.pidSync
-evloop:
+
+	var e eventsapi.RuntimeEvent
+
 	for {
 		evt, err := eventstream.Recv()
 		if err != nil {
 			return UnknownExitStatus, err
 		}
 
-		switch {
-		case events.Is(evt.Event, &eventsapi.RuntimeEvent{}):
-			var e eventsapi.RuntimeEvent
-			if err := events.UnmarshalEvent(evt.Event, &e); err != nil {
-				return UnknownExitStatus, err
-			}
+		if !events.Is(evt.Event, &eventsapi.RuntimeEvent{}) {
+			continue
+		}
 
-			if e.Type != tasktypes.Event_EXIT {
-				continue evloop
-			}
+		if err := events.UnmarshalEvent(evt.Event, &e); err != nil {
+			return UnknownExitStatus, err
+		}
 
-			if e.ID == t.containerID && e.Pid == t.pid {
-				return e.ExitStatus, nil
-			}
+		if e.Type != tasktypes.Event_EXIT {
+			continue
+		}
+
+		if e.ID == t.containerID && e.Pid == t.pid {
+			return e.ExitStatus, nil
 		}
 	}
 }
