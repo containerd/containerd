@@ -199,7 +199,7 @@ func (c *Container) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (c *Container) CloseStdin(ctx context.Context, pid uint32) error {
+func (c *Container) CloseIO(ctx context.Context, pid uint32) error {
 	var proc *Process
 	c.Lock()
 	for _, p := range c.processes {
@@ -216,7 +216,7 @@ func (c *Container) CloseStdin(ctx context.Context, pid uint32) error {
 	return proc.CloseStdin()
 }
 
-func (c *Container) Pty(ctx context.Context, pid uint32, size plugin.ConsoleSize) error {
+func (c *Container) ResizePty(ctx context.Context, pid uint32, size plugin.ConsoleSize) error {
 	var proc *Process
 	c.Lock()
 	for _, p := range c.processes {

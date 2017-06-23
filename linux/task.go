@@ -7,8 +7,9 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/containerd/containerd/api/services/shim/v1"
 	"github.com/containerd/containerd/api/types/task"
+	client "github.com/containerd/containerd/linux/shim"
+	shim "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/plugin"
 	protobuf "github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -18,11 +19,11 @@ import (
 type Task struct {
 	containerID string
 	spec        []byte
-	shim        shim.ShimClient
+	shim        *client.Client
 	namespace   string
 }
 
-func newTask(id, namespace string, spec []byte, shim shim.ShimClient) *Task {
+func newTask(id, namespace string, spec []byte, shim *client.Client) *Task {
 	return &Task{
 		containerID: id,
 		shim:        shim,
@@ -42,7 +43,7 @@ func (t *Task) Info() plugin.TaskInfo {
 }
 
 func (t *Task) Start(ctx context.Context) error {
-	_, err := t.shim.Start(ctx, &shim.StartRequest{})
+	_, err := t.shim.Start(ctx, empty)
 	if err != nil {
 		err = errors.New(grpc.ErrorDesc(err))
 	}
@@ -50,7 +51,7 @@ func (t *Task) Start(ctx context.Context) error {
 }
 
 func (t *Task) State(ctx context.Context) (plugin.State, error) {
-	response, err := t.shim.State(ctx, &shim.StateRequest{})
+	response, err := t.shim.State(ctx, empty)
 	if err != nil {
 		return plugin.State{}, errors.New(grpc.ErrorDesc(err))
 	}
@@ -77,7 +78,7 @@ func (t *Task) State(ctx context.Context) (plugin.State, error) {
 }
 
 func (t *Task) Pause(ctx context.Context) error {
-	_, err := t.shim.Pause(ctx, &shim.PauseRequest{})
+	_, err := t.shim.Pause(ctx, empty)
 	if err != nil {
 		err = errors.New(grpc.ErrorDesc(err))
 	}
@@ -85,7 +86,7 @@ func (t *Task) Pause(ctx context.Context) error {
 }
 
 func (t *Task) Resume(ctx context.Context) error {
-	_, err := t.shim.Resume(ctx, &shim.ResumeRequest{})
+	_, err := t.shim.Resume(ctx, empty)
 	if err != nil {
 		err = errors.New(grpc.ErrorDesc(err))
 	}
@@ -105,7 +106,7 @@ func (t *Task) Kill(ctx context.Context, signal uint32, pid uint32, all bool) er
 }
 
 func (t *Task) Exec(ctx context.Context, opts plugin.ExecOpts) (plugin.Process, error) {
-	request := &shim.ExecRequest{
+	request := &shim.ExecProcessRequest{
 		Stdin:    opts.IO.Stdin,
 		Stdout:   opts.IO.Stdout,
 		Stderr:   opts.IO.Stderr,
@@ -127,7 +128,7 @@ func (t *Task) Exec(ctx context.Context, opts plugin.ExecOpts) (plugin.Process, 
 }
 
 func (t *Task) Processes(ctx context.Context) ([]uint32, error) {
-	resp, err := t.shim.Processes(ctx, &shim.ProcessesRequest{
+	resp, err := t.shim.ListProcesses(ctx, &shim.ListProcessesRequest{
 		ID: t.containerID,
 	})
 	if err != nil {
@@ -143,8 +144,8 @@ func (t *Task) Processes(ctx context.Context) ([]uint32, error) {
 	return pids, nil
 }
 
-func (t *Task) Pty(ctx context.Context, pid uint32, size plugin.ConsoleSize) error {
-	_, err := t.shim.Pty(ctx, &shim.PtyRequest{
+func (t *Task) ResizePty(ctx context.Context, pid uint32, size plugin.ConsoleSize) error {
+	_, err := t.shim.ResizePty(ctx, &shim.ResizePtyRequest{
 		Pid:    pid,
 		Width:  size.Width,
 		Height: size.Height,
@@ -155,9 +156,10 @@ func (t *Task) Pty(ctx context.Context, pid uint32, size plugin.ConsoleSize) err
 	return err
 }
 
-func (t *Task) CloseStdin(ctx context.Context, pid uint32) error {
-	_, err := t.shim.CloseStdin(ctx, &shim.CloseStdinRequest{
-		Pid: pid,
+func (t *Task) CloseIO(ctx context.Context, pid uint32) error {
+	_, err := t.shim.CloseIO(ctx, &shim.CloseIORequest{
+		Pid:   pid,
+		Stdin: true,
 	})
 	if err != nil {
 		err = errors.New(grpc.ErrorDesc(err))
@@ -166,7 +168,7 @@ func (t *Task) CloseStdin(ctx context.Context, pid uint32) error {
 }
 
 func (t *Task) Checkpoint(ctx context.Context, path string, options map[string]string) error {
-	r := &shim.CheckpointRequest{
+	r := &shim.CheckpointTaskRequest{
 		Path:    path,
 		Options: options,
 	}

@@ -1,0 +1,156 @@
+syntax = "proto3";
+
+package containerd.runtime.linux.shim.v1;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/empty.proto";
+import "gogoproto/gogo.proto";
+import "google/protobuf/timestamp.proto";
+import "github.com/containerd/containerd/api/types/mount.proto";
+import "github.com/containerd/containerd/api/types/task/task.proto";
+
+option go_package = "github.com/containerd/containerd/linux/shim/v1;shim";
+
+// Shim service is launched for each container and is responsible for owning the IO
+// for the container and its additional processes.  The shim is also the parent of
+// each container and allows reattaching to the IO and receiving the exit status
+// for the container processes.
+service Shim {
+	// State returns shim and task state information.
+	rpc State(google.protobuf.Empty) returns (StateResponse);
+
+	rpc Create(CreateTaskRequest) returns (CreateTaskResponse);
+
+	rpc Start(google.protobuf.Empty) returns (google.protobuf.Empty);
+
+	rpc Delete(google.protobuf.Empty) returns (DeleteResponse);
+
+	rpc DeleteProcess(DeleteProcessRequest) returns (DeleteResponse);
+
+	rpc ListProcesses(ListProcessesRequest) returns (ListProcessesResponse);
+
+	rpc Pause(google.protobuf.Empty) returns (google.protobuf.Empty);
+
+	rpc Resume(google.protobuf.Empty) returns (google.protobuf.Empty);
+
+	rpc Checkpoint(CheckpointTaskRequest) returns (google.protobuf.Empty);
+
+	rpc Stream(StreamEventsRequest) returns (stream Event);
+
+	rpc Kill(KillRequest) returns (google.protobuf.Empty);
+
+	rpc Exec(ExecProcessRequest) returns (ExecProcessResponse);
+
+	rpc ResizePty(ResizePtyRequest) returns (google.protobuf.Empty);
+
+	rpc CloseIO(CloseIORequest) returns (google.protobuf.Empty);
+
+	// ShimInfo returns information about the shim.
+	rpc ShimInfo(google.protobuf.Empty) returns (ShimInfoResponse);
+}
+
+message CreateTaskRequest {
+	string id = 1;
+	string bundle = 2;
+	string runtime = 3;
+	repeated containerd.types.Mount rootfs = 4;
+	bool terminal = 5;
+	string stdin = 6;
+	string stdout = 7;
+	string stderr = 8;
+	string checkpoint = 9;
+	string parent_checkpoint = 10;
+}
+
+message CreateTaskResponse {
+	uint32 pid = 1;
+}
+
+message DeleteResponse {
+	uint32 pid = 1;
+	uint32 exit_status = 2;
+	google.protobuf.Timestamp exited_at = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}
+
+message DeleteProcessRequest {
+	uint32 pid = 1;
+}
+
+message ExecProcessRequest {
+	bool terminal = 1;
+	string stdin = 2;
+	string stdout = 3;
+	string stderr = 4;
+	google.protobuf.Any spec = 5;
+}
+
+message ExecProcessResponse {
+	uint32 pid = 1;
+}
+
+message ResizePtyRequest {
+	uint32 pid = 1;
+	uint32 width = 2;
+	uint32 height = 3;
+}
+
+message StateResponse {
+	string id = 1;
+	string bundle = 2;
+	uint32 pid = 3;
+	containerd.v1.types.Status status = 4;
+	repeated containerd.v1.types.Process processes = 5;
+	string stdin = 6;
+	string stdout = 7;
+	string stderr = 8;
+	bool terminal = 9;
+}
+
+message KillRequest {
+	uint32 signal = 1;
+	bool all = 2;
+	uint32 pid = 3;
+}
+
+message CloseIORequest {
+	uint32 pid = 1;
+	bool stdin = 2;
+}
+
+message ListProcessesRequest {
+	string id = 1;
+}
+
+message ListProcessesResponse{
+	repeated containerd.v1.types.Process processes = 1;
+}
+
+message CheckpointTaskRequest {
+	string path = 1;
+	map<string, string> options = 2;
+}
+
+message ShimInfoResponse {
+	uint32 shim_pid = 1;
+}
+
+message StreamEventsRequest {
+}
+
+message Event {
+	string id = 1;
+
+	enum EventType {
+		EXIT = 0;
+		OOM = 1;
+		CREATE = 2;
+		START = 3;
+		EXEC_ADDED = 4;
+		PAUSED = 5;
+	}
+
+	EventType type = 2;
+	uint32 pid = 3;
+	uint32 exit_status = 4;
+	google.protobuf.Timestamp exited_at = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}

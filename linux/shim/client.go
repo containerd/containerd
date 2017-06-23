@@ -1,150 +1,181 @@
-// +build !windows
+// +build linux
 
 package shim
 
 import (
-	"path/filepath"
+	"context"
+	"fmt"
+	"io"
+	"net"
+	"os"
+	"os/exec"
+	"strings"
 	"syscall"
+	"time"
 
-	shimapi "github.com/containerd/containerd/api/services/shim/v1"
-	"github.com/containerd/containerd/api/types/task"
-	runc "github.com/containerd/go-runc"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
-	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/pkg/errors"
+
+	shim "github.com/containerd/containerd/linux/shim/v1"
+	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/reaper"
+	"github.com/containerd/containerd/sys"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 )
 
-func Client(path, namespace string) (shimapi.ShimClient, error) {
-	pid, err := runc.ReadPidFile(filepath.Join(path, "init.pid"))
+type ClientOpt func(context.Context, Config) (shim.ShimClient, io.Closer, error)
+
+// WithStart executes a new shim process
+func WithStart(binary string) ClientOpt {
+	return func(ctx context.Context, config Config) (shim.ShimClient, io.Closer, error) {
+		socket, err := newSocket(config)
+		if err != nil {
+			return nil, nil, err
+		}
+		// close our side of the socket, do not close the listener as it will
+		// remove the socket from disk
+		defer socket.Close()
+
+		cmd := newCommand(binary, config, socket)
+		if err := reaper.Default.Start(cmd); err != nil {
+			return nil, nil, errors.Wrapf(err, "failed to start shim")
+		}
+		log.G(ctx).WithFields(logrus.Fields{
+			"pid":     cmd.Process.Pid,
+			"address": config.Address,
+		}).Infof("shim %s started", binary)
+		if err = sys.SetOOMScore(cmd.Process.Pid, sys.OOMScoreMaxKillable); err != nil {
+			return nil, nil, errors.Wrap(err, "failed to set OOM Score on shim")
+		}
+		return WithConnect(ctx, config)
+	}
+}
+
+func newCommand(binary string, config Config, socket *os.File) *exec.Cmd {
+	args := []string{
+		"--namespace", config.Namespace,
+	}
+	if config.Debug {
+		args = append(args, "--debug")
+	}
+	cmd := exec.Command(binary, args...)
+	cmd.Dir = config.Path
+	// make sure the shim can be re-parented to system init
+	// and is cloned in a new mount namespace because the overlay/filesystems
+	// will be mounted by the shim
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Cloneflags: syscall.CLONE_NEWNS,
+		Setpgid:    true,
+	}
+	cmd.ExtraFiles = append(cmd.ExtraFiles, socket)
+	return cmd
+}
+
+func newSocket(config Config) (*os.File, error) {
+	l, err := sys.CreateUnixSocket(config.Address)
 	if err != nil {
 		return nil, err
 	}
+	return l.(*net.UnixListener).File()
+}
 
-	s, err := New(path, namespace)
+func connect(address string) (*grpc.ClientConn, error) {
+	gopts := []grpc.DialOption{
+		grpc.WithBlock(),
+		grpc.WithInsecure(),
+		grpc.WithTimeout(100 * time.Second),
+		grpc.WithDialer(dialer),
+		grpc.FailOnNonTempDialError(true),
+	}
+	conn, err := grpc.Dial(dialAddress(address), gopts...)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to dial %q", address)
+	}
+	return conn, nil
+}
+
+func dialer(address string, timeout time.Duration) (net.Conn, error) {
+	address = strings.TrimPrefix(address, "unix://")
+	return net.DialTimeout("unix", address, timeout)
+}
+
+func dialAddress(address string) string {
+	return fmt.Sprintf("unix://%s", address)
+}
+
+// WithConnect connects to an existing shim
+func WithConnect(ctx context.Context, config Config) (shim.ShimClient, io.Closer, error) {
+	conn, err := connect(config.Address)
+	if err != nil {
+		return nil, nil, err
+	}
+	return shim.NewShimClient(conn), conn, nil
+}
+
+// WithLocal uses an in process shim
+func WithLocal(ctx context.Context, config Config) (shim.ShimClient, io.Closer, error) {
+	service, err := NewService(config.Path, config.Namespace)
+	if err != nil {
+		return nil, nil, err
+	}
+	return NewLocal(service), nil, nil
+}
+
+type Config struct {
+	Address   string
+	Path      string
+	Namespace string
+	Debug     bool
+}
+
+// New returns a new shim client
+func New(ctx context.Context, config Config, opt ClientOpt) (*Client, error) {
+	s, c, err := opt(ctx, config)
 	if err != nil {
 		return nil, err
 	}
-	cl := &client{
-		s: s,
-	}
-	// used when quering container status and info
-	cl.s.initProcess = &initProcess{
-		id:  filepath.Base(path),
-		pid: pid,
-		runc: &runc.Runc{
-			Log:          filepath.Join(path, "log.json"),
-			LogFormat:    runc.JSON,
-			PdeathSignal: syscall.SIGKILL,
-			Root:         filepath.Join(RuncRoot, namespace),
-		},
-	}
-	return cl, nil
-}
-
-type client struct {
-	s *Service
-}
-
-func (c *client) Create(ctx context.Context, in *shimapi.CreateRequest, opts ...grpc.CallOption) (*shimapi.CreateResponse, error) {
-	return c.s.Create(ctx, in)
-}
-
-func (c *client) Start(ctx context.Context, in *shimapi.StartRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
-	return c.s.Start(ctx, in)
-}
-
-func (c *client) Delete(ctx context.Context, in *shimapi.DeleteRequest, opts ...grpc.CallOption) (*shimapi.DeleteResponse, error) {
-	return c.s.Delete(ctx, in)
-}
-
-func (c *client) DeleteProcess(ctx context.Context, in *shimapi.DeleteProcessRequest, opts ...grpc.CallOption) (*shimapi.DeleteResponse, error) {
-	return c.s.DeleteProcess(ctx, in)
-}
-
-func (c *client) Exec(ctx context.Context, in *shimapi.ExecRequest, opts ...grpc.CallOption) (*shimapi.ExecResponse, error) {
-	return c.s.Exec(ctx, in)
-}
-
-func (c *client) Pty(ctx context.Context, in *shimapi.PtyRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
-	return c.s.Pty(ctx, in)
-}
-
-func (c *client) Events(ctx context.Context, in *shimapi.EventsRequest, opts ...grpc.CallOption) (shimapi.Shim_EventsClient, error) {
-	return &events{
-		c:   c.s.events,
-		ctx: ctx,
+	return &Client{
+		ShimClient: s,
+		c:          c,
 	}, nil
 }
 
-func (c *client) State(ctx context.Context, in *shimapi.StateRequest, opts ...grpc.CallOption) (*shimapi.StateResponse, error) {
-	return c.s.State(ctx, in)
+type Client struct {
+	shim.ShimClient
+
+	c io.Closer
 }
 
-func (c *client) Pause(ctx context.Context, in *shimapi.PauseRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
-	return c.s.Pause(ctx, in)
-}
-
-func (c *client) Resume(ctx context.Context, in *shimapi.ResumeRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
-	return c.s.Resume(ctx, in)
-}
-
-func (c *client) Kill(ctx context.Context, in *shimapi.KillRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
-	return c.s.Kill(ctx, in)
-}
-
-func (c *client) Processes(ctx context.Context, in *shimapi.ProcessesRequest, opts ...grpc.CallOption) (*shimapi.ProcessesResponse, error) {
-	return c.s.Processes(ctx, in)
-}
-
-func (c *client) Exit(ctx context.Context, in *shimapi.ExitRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
-	// don't exit the calling process for the client
-	// but make sure we unmount the containers rootfs for this client
-	if err := unix.Unmount(filepath.Join(c.s.path, "rootfs"), 0); err != nil {
-		return nil, err
+func (c *Client) IsAlive(ctx context.Context) (bool, error) {
+	_, err := c.ShimInfo(ctx, empty)
+	if err != nil {
+		if err != grpc.ErrServerStopped {
+			return false, err
+		}
+		return false, nil
 	}
-	return empty, nil
+	return true, nil
 }
 
-func (c *client) CloseStdin(ctx context.Context, in *shimapi.CloseStdinRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
-	return c.s.CloseStdin(ctx, in)
+// KillShim kills the shim forcefully
+func (c *Client) KillShim(ctx context.Context) error {
+	info, err := c.ShimInfo(ctx, empty)
+	if err != nil {
+		return err
+	}
+	pid := int(info.ShimPid)
+	// make sure we don't kill ourselves if we are running a local shim
+	if os.Getpid() == pid {
+		return nil
+	}
+	return unix.Kill(pid, unix.SIGKILL)
 }
 
-func (c *client) Checkpoint(ctx context.Context, in *shimapi.CheckpointRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
-	return c.s.Checkpoint(ctx, in)
-}
-
-type events struct {
-	c   chan *task.Event
-	ctx context.Context
-}
-
-func (e *events) Recv() (*task.Event, error) {
-	ev := <-e.c
-	return ev, nil
-}
-
-func (e *events) Header() (metadata.MD, error) {
-	return nil, nil
-}
-
-func (e *events) Trailer() metadata.MD {
-	return nil
-}
-
-func (e *events) CloseSend() error {
-	return nil
-}
-
-func (e *events) Context() context.Context {
-	return e.ctx
-}
-
-func (e *events) SendMsg(m interface{}) error {
-	return nil
-}
-
-func (e *events) RecvMsg(m interface{}) error {
-	return nil
+func (c *Client) Close() error {
+	if c.c == nil {
+		return nil
+	}
+	return c.c.Close()
 }

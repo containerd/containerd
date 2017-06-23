@@ -13,7 +13,6 @@ import (
 	"github.com/containerd/containerd/api/services/containers/v1"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
-	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/plugin"
@@ -172,7 +171,7 @@ func (t *task) Wait(ctx context.Context) (uint32, error) {
 			return UnknownExitStatus, err
 		}
 
-		if e.Type != tasktypes.Event_EXIT {
+		if e.Type != eventsapi.RuntimeEvent_EXIT {
 			continue
 		}
 

@@ -19,12 +19,15 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/api/services/shim/v1"
+	shim "github.com/containerd/containerd/linux/shim/v1"
 	protobuf "github.com/gogo/protobuf/types"
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
+
+var empty = &google_protobuf.Empty{}
 
 var fifoFlags = []cli.Flag{
 	cli.StringFlag{
@@ -94,7 +97,7 @@ var shimCreateCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		r, err := service.Create(ctx, &shim.CreateRequest{
+		r, err := service.Create(ctx, &shim.CreateTaskRequest{
 			ID:       id,
 			Bundle:   context.String("bundle"),
 			Runtime:  context.String("runtime"),
@@ -118,7 +121,7 @@ var shimCreateCommand = cli.Command{
 				if err != nil {
 					return err
 				}
-				if _, err := service.Pty(ctx, &shim.PtyRequest{
+				if _, err := service.ResizePty(ctx, &shim.ResizePtyRequest{
 					Pid:    r.Pid,
 					Width:  uint32(size.Width),
 					Height: uint32(size.Height),
@@ -140,7 +143,7 @@ var shimStartCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		_, err = service.Start(gocontext.Background(), &shim.StartRequest{})
+		_, err = service.Start(gocontext.Background(), empty)
 		return err
 	},
 }
@@ -153,7 +156,7 @@ var shimDeleteCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		r, err := service.Delete(gocontext.Background(), &shim.DeleteRequest{})
+		r, err := service.Delete(gocontext.Background(), empty)
 		if err != nil {
 			return err
 		}
@@ -170,7 +173,7 @@ var shimStateCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		r, err := service.State(gocontext.Background(), &shim.StateRequest{})
+		r, err := service.State(gocontext.Background(), empty)
 		if err != nil {
 			return err
 		}
@@ -227,7 +230,7 @@ var shimExecCommand = cli.Command{
 			return err
 		}
 
-		rq := &shim.ExecRequest{
+		rq := &shim.ExecProcessRequest{
 			Spec: &protobuf.Any{
 				TypeUrl: specs.Version,
 				Value:   spec,
@@ -254,7 +257,7 @@ var shimExecCommand = cli.Command{
 				if err != nil {
 					return err
 				}
-				if _, err := service.Pty(ctx, &shim.PtyRequest{
+				if _, err := service.ResizePty(ctx, &shim.ResizePtyRequest{
 					Pid:    r.Pid,
 					Width:  uint32(size.Width),
 					Height: uint32(size.Height),
@@ -276,7 +279,7 @@ var shimEventsCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		events, err := service.Events(gocontext.Background(), &shim.EventsRequest{})
+		events, err := service.Stream(gocontext.Background(), &shim.StreamEventsRequest{})
 		if err != nil {
 			return err
 		}

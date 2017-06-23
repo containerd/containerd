@@ -16,7 +16,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
-	shimapi "github.com/containerd/containerd/api/services/shim/v1"
+	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -43,7 +43,7 @@ type execProcess struct {
 	terminal   bool
 }
 
-func newExecProcess(context context.Context, path string, r *shimapi.ExecRequest, parent *initProcess, id int) (process, error) {
+func newExecProcess(context context.Context, path string, r *shimapi.ExecProcessRequest, parent *initProcess, id int) (process, error) {
 	e := &execProcess{
 		id:         id,
 		parent:     parent,
@@ -118,17 +118,6 @@ func newExecProcess(context context.Context, path string, r *shimapi.ExecRequest
 	}
 	e.pid = pid
 	return e, nil
-}
-
-func rlimits(rr []*shimapi.Rlimit) (o []specs.LinuxRlimit) {
-	for _, r := range rr {
-		o = append(o, specs.LinuxRlimit{
-			Type: r.Type,
-			Hard: r.Hard,
-			Soft: r.Soft,
-		})
-	}
-	return o
 }
 
 func (e *execProcess) Pid() int {

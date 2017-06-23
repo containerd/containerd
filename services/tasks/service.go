@@ -392,7 +392,7 @@ func (s *Service) ResizePty(ctx context.Context, r *api.ResizePtyRequest) (*goog
 	if err != nil {
 		return nil, err
 	}
-	if err := t.Pty(ctx, r.Pid, plugin.ConsoleSize{
+	if err := t.ResizePty(ctx, r.Pid, plugin.ConsoleSize{
 		Width:  r.Width,
 		Height: r.Height,
 	}); err != nil {
@@ -407,7 +407,7 @@ func (s *Service) CloseIO(ctx context.Context, r *api.CloseIORequest) (*google_p
 		return nil, err
 	}
 	if r.Stdin {
-		if err := t.CloseStdin(ctx, r.Pid); err != nil {
+		if err := t.CloseIO(ctx, r.Pid); err != nil {
 			return nil, err
 		}
 	}

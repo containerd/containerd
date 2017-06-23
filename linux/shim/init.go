@@ -17,7 +17,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
-	shimapi "github.com/containerd/containerd/api/services/shim/v1"
+	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
@@ -52,7 +52,7 @@ type initProcess struct {
 	terminal   bool
 }
 
-func newInitProcess(context context.Context, path, namespace string, r *shimapi.CreateRequest) (*initProcess, error) {
+func newInitProcess(context context.Context, path, namespace string, r *shimapi.CreateTaskRequest) (*initProcess, error) {
 	for _, rm := range r.Rootfs {
 		m := &mount.Mount{
 			Type:    rm.Type,
@@ -104,9 +104,10 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 				WorkDir:    filepath.Join(r.Bundle, "work"),
 				ParentPath: r.ParentCheckpoint,
 			},
-			PidFile:     pidFile,
-			IO:          io,
-			NoPivot:     r.NoPivot,
+			PidFile: pidFile,
+			IO:      io,
+			// TODO: implement runtime options
+			//NoPivot:     r.NoPivot,
 			Detach:      true,
 			NoSubreaper: true,
 		}
@@ -117,7 +118,7 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 		opts := &runc.CreateOpts{
 			PidFile: pidFile,
 			IO:      io,
-			NoPivot: r.NoPivot,
+			// NoPivot: r.NoPivot,
 		}
 		if socket != nil {
 			opts.ConsoleSocket = socket
@@ -253,7 +254,7 @@ func (p *initProcess) Stdin() io.Closer {
 	return p.stdin
 }
 
-func (p *initProcess) Checkpoint(context context.Context, r *shimapi.CheckpointRequest) error {
+func (p *initProcess) Checkpoint(context context.Context, r *shimapi.CheckpointTaskRequest) error {
 	var actions []runc.CheckpointAction
 	/*
 		if !r.Exit {
