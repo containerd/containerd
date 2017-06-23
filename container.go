@@ -23,10 +23,12 @@ var (
 	ErrProcessExited     = errors.New("process already exited")
 )
 
+type DeleteOpts func(context.Context, *Client, containers.Container) error
+
 type Container interface {
 	ID() string
 	Proto() containers.Container
-	Delete(context.Context) error
+	Delete(context.Context, ...DeleteOpts) error
 	NewTask(context.Context, IOCreation, ...NewTaskOpts) (Task, error)
 	Spec() (*specs.Spec, error)
 	Task(context.Context, IOAttach) (Task, error)
@@ -67,16 +69,24 @@ func (c *container) Spec() (*specs.Spec, error) {
 	return &s, nil
 }
 
+// WithRootFSDeletion deletes the rootfs allocated for the container
+func WithRootFSDeletion(ctx context.Context, client *Client, c containers.Container) error {
+	if c.RootFS != "" {
+		return client.SnapshotService().Remove(ctx, c.RootFS)
+	}
+	return nil
+}
+
 // Delete deletes an existing container
 // an error is returned if the container has running tasks
-func (c *container) Delete(ctx context.Context) (err error) {
+func (c *container) Delete(ctx context.Context, opts ...DeleteOpts) (err error) {
 	if _, err := c.Task(ctx, nil); err == nil {
 		return ErrDeleteRunningTask
 	}
-	// TODO: should the client be the one removing resources attached
-	// to the container at the moment before we have GC?
-	if c.c.RootFS != "" {
-		err = c.client.SnapshotService().Remove(ctx, c.c.RootFS)
+	for _, o := range opts {
+		if err := o(ctx, c.client, c.c); err != nil {
+			return err
+		}
 	}
 	if _, cerr := c.client.ContainerService().Delete(ctx, &containers.DeleteContainerRequest{
 		ID: c.c.ID,

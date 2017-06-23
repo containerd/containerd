@@ -109,7 +109,7 @@ func TestContainerStart(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	defer container.Delete(ctx)
+	defer container.Delete(ctx, WithRootFSDeletion)
 
 	task, err := container.NewTask(ctx, Stdio)
 	if err != nil {
@@ -180,7 +180,7 @@ func TestContainerOutput(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	defer container.Delete(ctx)
+	defer container.Delete(ctx, WithRootFSDeletion)
 
 	stdout := bytes.NewBuffer(nil)
 	task, err := container.NewTask(ctx, NewIO(bytes.NewBuffer(nil), stdout, bytes.NewBuffer(nil)))
@@ -252,7 +252,7 @@ func TestContainerExec(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	defer container.Delete(ctx)
+	defer container.Delete(ctx, WithRootFSDeletion)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
@@ -347,7 +347,7 @@ func TestContainerProcesses(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	defer container.Delete(ctx)
+	defer container.Delete(ctx, WithRootFSDeletion)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
@@ -420,7 +420,7 @@ func TestContainerCloseIO(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	defer container.Delete(ctx)
+	defer container.Delete(ctx, WithRootFSDeletion)
 
 	const expected = "hello\n"
 	stdout := bytes.NewBuffer(nil)
@@ -504,7 +504,7 @@ func TestContainerAttach(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	defer container.Delete(ctx)
+	defer container.Delete(ctx, WithRootFSDeletion)
 
 	expected := "hello\n"
 	stdout := bytes.NewBuffer(nil)
@@ -629,7 +629,7 @@ func TestDeleteRunningContainer(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	defer container.Delete(ctx)
+	defer container.Delete(ctx, WithRootFSDeletion)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
@@ -652,7 +652,7 @@ func TestDeleteRunningContainer(t *testing.T) {
 		return
 	}
 
-	err = container.Delete(ctx)
+	err = container.Delete(ctx, WithRootFSDeletion)
 	if err == nil {
 		t.Error("delete did not error with running task")
 	}
