@@ -25,7 +25,7 @@ endif
 # Project packages.
 PACKAGES=$(shell go list ./... | grep -v /vendor/)
 INTEGRATION_PACKAGE=${PKG}/integration
-SNAPSHOT_PACKAGES=$(shell go list ./snapshot/...)
+TEST_REQUIRES_ROOT_PACKAGES=$(shell for f in $$(git grep -l testutil.RequiresRoot | grep -v Makefile);do echo "${PKG}/$$(dirname $$f)"; done)
 
 # Project binaries.
 COMMANDS=ctr containerd protoc-gen-gogoctrd dist ctrd-protobuild
@@ -121,7 +121,7 @@ test: ## run tests, except integration tests and tests that require root
 
 root-test: ## run tests, except integration tests
 	@echo "$(WHALE) $@"
-	@go test ${TESTFLAGS} ${SNAPSHOT_PACKAGES} -test.root
+	@go test ${TESTFLAGS} ${TEST_REQUIRES_ROOT_PACKAGES} -test.root
 
 integration: ## run integration tests
 	@echo "$(WHALE) $@"
@@ -173,7 +173,7 @@ coverage: ## generate coverprofiles from the unit tests, except tests that requi
 
 root-coverage: ## generae coverage profiles for the unit tests
 	@echo "$(WHALE) $@"
-	@( for pkg in ${SNAPSHOT_PACKAGES}; do \
+	@( for pkg in ${TEST_REQUIRES_ROOT_PACKAGES}; do \
 		go test -i ${TESTFLAGS} -test.short -coverprofile="../../../$$pkg/coverage.txt" -covermode=atomic $$pkg -test.root || exit; \
 		go test ${TESTFLAGS} -test.short -coverprofile="../../../$$pkg/coverage.txt" -covermode=atomic $$pkg -test.root || exit; \
 	done )

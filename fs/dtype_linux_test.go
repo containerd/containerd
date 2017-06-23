@@ -6,76 +6,40 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"syscall"
 	"testing"
+
+	"github.com/containerd/containerd/testutil"
+	"github.com/stretchr/testify/assert"
 )
 
-func testSupportsDType(t *testing.T, expected bool, mkfsCommand string, mkfsArg ...string) {
-	// check whether mkfs is installed
-	if _, err := exec.LookPath(mkfsCommand); err != nil {
-		t.Skipf("%s not installed: %v", mkfsCommand, err)
-	}
-
-	// create a sparse image
-	imageSize := int64(32 * 1024 * 1024)
-	imageFile, err := ioutil.TempFile("", "fsutils-image")
+func testSupportsDType(t *testing.T, expected bool, mkfs ...string) {
+	testutil.RequiresRoot(t)
+	mnt, err := ioutil.TempDir("", "containerd-fs-test-supports-dtype")
 	if err != nil {
 		t.Fatal(err)
 	}
-	imageFileName := imageFile.Name()
-	defer os.Remove(imageFileName)
-	if _, err = imageFile.Seek(imageSize-1, 0); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = imageFile.Write([]byte{0}); err != nil {
-		t.Fatal(err)
-	}
-	if err = imageFile.Close(); err != nil {
-		t.Fatal(err)
-	}
+	defer os.RemoveAll(mnt)
 
-	// create a mountpoint
-	mountpoint, err := ioutil.TempDir("", "fsutils-mountpoint")
-	if err != nil {
-		t.Fatal(err)
+	deviceName, cleanupDevice := testutil.NewLoopback(t, 100<<20) // 100 MB
+	if out, err := exec.Command(mkfs[0], append(mkfs[1:], deviceName)...).CombinedOutput(); err != nil {
+		// not fatal
+		t.Skipf("could not mkfs (%v) %s: %v (out: %q)", mkfs, deviceName, err, string(out))
 	}
-	defer os.RemoveAll(mountpoint)
-
-	// format the image
-	args := append(mkfsArg, imageFileName)
-	t.Logf("Executing `%s %v`", mkfsCommand, args)
-	out, err := exec.Command(mkfsCommand, args...).CombinedOutput()
-	if len(out) > 0 {
-		t.Log(string(out))
-	}
-	if err != nil {
-		t.Skip("skipping the test because %s failed. This is probably your %s is an unsupported version.", mkfsCommand, mkfsCommand)
-	}
-
-	// loopback-mount the image.
-	// for ease of setting up loopback device, we use os/exec rather than syscall.Mount
-	out, err = exec.Command("mount", "-o", "loop", imageFileName, mountpoint).CombinedOutput()
-	if len(out) > 0 {
-		t.Log(string(out))
-	}
-	if err != nil {
-		t.Skip("skipping the test because mount failed")
+	if out, err := exec.Command("mount", deviceName, mnt).CombinedOutput(); err != nil {
+		// not fatal
+		t.Skipf("could not mount %s: %v (out: %q)", deviceName, err, string(out))
 	}
 	defer func() {
-		if err := syscall.Unmount(mountpoint, 0); err != nil {
-			t.Fatal(err)
-		}
+		testutil.Unmount(t, mnt)
+		cleanupDevice()
 	}()
-
 	// check whether it supports d_type
-	result, err := SupportsDType(mountpoint)
+	result, err := SupportsDType(mnt)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("Supports d_type: %v", result)
-	if result != expected {
-		t.Fatalf("expected %v, got %v", expected, result)
-	}
+	assert.Equal(t, expected, result)
 }
 
 func TestSupportsDTypeWithFType0XFS(t *testing.T) {

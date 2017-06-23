@@ -18,20 +18,28 @@ import (
 	"github.com/containerd/containerd/testutil"
 )
 
-const (
-	mib = 1024 * 1024
-)
-
 func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshot.Snapshotter, func(), error) {
 	return func(ctx context.Context, root string) (snapshot.Snapshotter, func(), error) {
-		device := setupBtrfsLoopbackDevice(t, root)
+
+		deviceName, cleanupDevice := testutil.NewLoopback(t, 100<<20) // 100 MB
+
+		if out, err := exec.Command("mkfs.btrfs", deviceName).CombinedOutput(); err != nil {
+			// not fatal
+			t.Skipf("could not mkfs.btrfs %s: %v (out: %q)", deviceName, err, string(out))
+		}
+		if out, err := exec.Command("mount", deviceName, root).CombinedOutput(); err != nil {
+			// not fatal
+			t.Skipf("could not mount %s: %v (out: %q)", deviceName, err, string(out))
+		}
+
 		snapshotter, err := NewSnapshotter(root)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		return snapshotter, func() {
-			device.remove(t)
+			testutil.Unmount(t, root)
+			cleanupDevice()
 		}, nil
 	}
 }
@@ -128,152 +136,5 @@ func TestBtrfsMounts(t *testing.T) {
 
 	if err := b.Commit(ctx, filepath.Join(root, "snapshots/committed2"), target); err != nil {
 		t.Fatal(err)
-	}
-}
-
-type testDevice struct {
-	mountPoint string
-	fileName   string
-	deviceName string
-}
-
-// setupBtrfsLoopbackDevice creates a file, mounts it as a loopback device, and
-// formats it as btrfs.  The device should be cleaned up by calling
-// removeBtrfsLoopbackDevice.
-func setupBtrfsLoopbackDevice(t *testing.T, mountPoint string) *testDevice {
-
-	// create temporary file for the disk image
-	file, err := ioutil.TempFile("", "containerd-btrfs-test")
-	if err != nil {
-		t.Fatal("Could not create temporary file for btrfs test", err)
-	}
-	t.Log("Temporary file created", file.Name())
-
-	// initialize file with 100 MiB
-	if err := file.Truncate(100 << 20); err != nil {
-		t.Fatal(err)
-	}
-	file.Close()
-
-	// create device
-	losetup := exec.Command("losetup", "--find", "--show", file.Name())
-	p, err := losetup.Output()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	deviceName := strings.TrimSpace(string(p))
-	t.Log("Created loop device", deviceName)
-
-	// format
-	t.Log("Creating btrfs filesystem")
-	mkfs := exec.Command("mkfs.btrfs", deviceName)
-	err = mkfs.Run()
-	if err != nil {
-		t.Fatal("Could not run mkfs.btrfs", err)
-	}
-
-	// mount
-	t.Logf("Mounting %s at %s", deviceName, mountPoint)
-	mount := exec.Command("mount", deviceName, mountPoint)
-	err = mount.Run()
-	if err != nil {
-		t.Fatal("Could not mount", err)
-	}
-
-	return &testDevice{
-		mountPoint: mountPoint,
-		fileName:   file.Name(),
-		deviceName: deviceName,
-	}
-}
-
-// remove cleans up the test device, unmounting the loopback and disk image
-// file.
-func (device *testDevice) remove(t *testing.T) {
-	// unmount
-	testutil.Unmount(t, device.mountPoint)
-
-	// detach device
-	t.Log("Removing loop device")
-	losetup := exec.Command("losetup", "--detach", device.deviceName)
-	err := losetup.Run()
-	if err != nil {
-		t.Error("Could not remove loop device", device.deviceName, err)
-	}
-
-	// remove file
-	t.Log("Removing temporary file")
-	err = os.Remove(device.fileName)
-	if err != nil {
-		t.Error(err)
-	}
-
-	// remove mount point
-	t.Log("Removing temporary mount point")
-	err = os.RemoveAll(device.mountPoint)
-	if err != nil {
-		t.Error(err)
-	}
-}
-
-func TestGetBtrfsDevice(t *testing.T) {
-	testCases := []struct {
-		expectedDevice string
-		expectedError  string
-		root           string
-		mounts         []mount.Info
-	}{
-		{
-			expectedDevice: "/dev/loop0",
-			root:           "/var/lib/containerd/snapshot/btrfs",
-			mounts: []mount.Info{
-				{Root: "/", Mountpoint: "/", FSType: "ext4", Source: "/dev/sda1"},
-				{Root: "/", Mountpoint: "/var/lib/containerd/snapshot/btrfs", FSType: "btrfs", Source: "/dev/loop0"},
-			},
-		},
-		{
-			expectedError: "/var/lib/containerd/snapshot/btrfs is not mounted as btrfs",
-			root:          "/var/lib/containerd/snapshot/btrfs",
-			mounts: []mount.Info{
-				{Root: "/", Mountpoint: "/", FSType: "ext4", Source: "/dev/sda1"},
-			},
-		},
-		{
-			expectedDevice: "/dev/sda1",
-			root:           "/var/lib/containerd/snapshot/btrfs",
-			mounts: []mount.Info{
-				{Root: "/", Mountpoint: "/", FSType: "btrfs", Source: "/dev/sda1"},
-			},
-		},
-		{
-			expectedDevice: "/dev/sda2",
-			root:           "/var/lib/containerd/snapshot/btrfs",
-			mounts: []mount.Info{
-				{Root: "/", Mountpoint: "/", FSType: "btrfs", Source: "/dev/sda1"},
-				{Root: "/", Mountpoint: "/var/lib/containerd/snapshot/btrfs", FSType: "btrfs", Source: "/dev/sda2"},
-			},
-		},
-		{
-			expectedDevice: "/dev/sda2",
-			root:           "/var/lib/containerd/snapshot/btrfs",
-			mounts: []mount.Info{
-				{Root: "/", Mountpoint: "/var/lib/containerd/snapshot/btrfs", FSType: "btrfs", Source: "/dev/sda2"},
-				{Root: "/", Mountpoint: "/var/lib/foooooooooooooooooooo/baaaaaaaaaaaaaaaaaaaar", FSType: "btrfs", Source: "/dev/sda3"}, // mountpoint length longer than /var/lib/containerd/snapshot/btrfs
-				{Root: "/", Mountpoint: "/", FSType: "btrfs", Source: "/dev/sda1"},
-			},
-		},
-	}
-	for i, tc := range testCases {
-		device, err := getBtrfsDevice(tc.root, tc.mounts)
-		if err != nil && tc.expectedError == "" {
-			t.Fatalf("%d: expected nil, got %v", i, err)
-		}
-		if err != nil && !strings.Contains(err.Error(), tc.expectedError) {
-			t.Fatalf("%d: expected %s, got %v", i, tc.expectedError, err)
-		}
-		if err == nil && device != tc.expectedDevice {
-			t.Fatalf("%d: expected %s, got %s", i, tc.expectedDevice, device)
-		}
 	}
 }
