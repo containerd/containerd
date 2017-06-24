@@ -326,7 +326,8 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 
 	// TODO(random-liu): [P2] Set apparmor and seccomp from annotations.
 
-	// TODO(random-liu): [P1] Set default sandbox container resource limit.
+	g.SetLinuxResourcesCPUShares(uint64(defaultSandboxCPUshares))
+	g.SetLinuxResourcesOOMScoreAdj(int(defaultSandboxOOMAdj))
 
 	return g.Spec(), nil
 }
