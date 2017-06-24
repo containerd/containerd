@@ -111,7 +111,7 @@ var runCommand = cli.Command{
 			return err
 		}
 		if context.Bool("rm") {
-			defer container.Delete(ctx)
+			defer container.Delete(ctx, containerd.WithRootFSDeletion)
 		}
 		task, err := newTask(ctx, container, checkpointIndex, tty)
 		if err != nil {
