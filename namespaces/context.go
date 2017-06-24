@@ -3,6 +3,7 @@ package namespaces
 import (
 	"os"
 
+	"github.com/containerd/containerd/identifiers"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -61,8 +62,8 @@ func NamespaceRequired(ctx context.Context) (string, error) {
 		return "", errNamespaceRequired
 	}
 
-	if err := Validate(namespace); err != nil {
-		return "", err
+	if err := identifiers.Validate(namespace); err != nil {
+		return "", errors.Wrap(err, "namespace validation")
 	}
 
 	return namespace, nil

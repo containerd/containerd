@@ -3,6 +3,7 @@ package images
 import (
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/namespaces"
@@ -85,7 +86,7 @@ func mapGRPCError(err error, id string) error {
 		return grpc.Errorf(codes.AlreadyExists, "image %v already exists", id)
 	case namespaces.IsNamespaceRequired(err):
 		return grpc.Errorf(codes.InvalidArgument, "namespace required, please set %q header", namespaces.GRPCHeader)
-	case namespaces.IsNamespaceInvalid(err):
+	case identifiers.IsInvalid(err):
 		return grpc.Errorf(codes.InvalidArgument, err.Error())
 	}
 
