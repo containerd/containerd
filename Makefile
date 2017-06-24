@@ -35,9 +35,11 @@ help:
 	@echo " * 'install'       - Install binaries to system locations"
 	@echo " * 'binaries'      - Build cri-containerd"
 	@echo " * 'test'          - Test cri-containerd"
+	@echo " * 'test-cri'      - Test cri-containerd with cri validation test"
 	@echo " * 'clean'         - Clean artifacts"
 	@echo " * 'verify'        - Execute the source code verification tools"
-	@echo " * 'install.tools' - Installs tools used by verify"
+	@echo " * 'install.tools' - Install tools used by verify"
+	@echo " * 'install.deps'  - Install dependencies of cri-containerd (containerd, runc, cni)"
 	@echo " * 'uninstall'     - Remove installed binaries from system locations"
 	@echo " * 'version'       - Print current cri-containerd release version"
 
@@ -71,7 +73,10 @@ cri-containerd: check-gopath
 	   $(PROJECT)/cmd/cri-containerd
 
 test:
-	go test -timeout=10m -v -race ./pkg/... $(BUILD_TAGS)
+	go test -timeout=10m -race ./pkg/... $(BUILD_TAGS)
+
+test-cri:
+	@./hack/test-cri.sh
 
 clean:
 	rm -f $(BUILD_DIR)/cri-containerd
@@ -83,6 +88,11 @@ install: check-gopath
 
 uninstall:
 	rm -f $(BINDIR)/cri-containerd
+
+.PHONY: install.deps
+
+install.deps:
+	@./hack/install-deps.sh
 
 .PHONY: .gitvalidation
 # When this is running in travis, it will only check the travis commit range.
@@ -115,5 +125,6 @@ install.tools: .install.gitvalidation .install.gometalinter
 	install \
 	lint \
 	test \
+	test-cri \
 	uninstall \
 	version

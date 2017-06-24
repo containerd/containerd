@@ -5,8 +5,21 @@ go:
 
 sudo: required
 
-install:
+services:
+    - docker
+
+before_install:
+    # libseccomp in trusty is not new enough, need backports version.
+    - sudo sh -c "echo 'deb http://archive.ubuntu.com/ubuntu trusty-backports main restricted universe multiverse' > /etc/apt/sources.list.d/backports.list"
+    - sudo apt-get update
+
+install: 
+    - sudo apt-get install btrfs-tools
+    - sudo apt-get install libseccomp2/trusty-backports
+    - sudo apt-get install libseccomp-dev/trusty-backports
+    - docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter 
     - make install.tools
+    - make install.deps
 
 before_script:
     - export PATH=$HOME/gopath/bin:$PATH
@@ -16,3 +29,9 @@ script:
     - make verify
     - make binaries
     - make test
+    - make test-cri
+after_script:
+    # Abuse travis to preserve the log.
+    # TODO(random-liu): Use prow for integration test.
+    - cat /tmp/cri-containerd.log
+    - cat /tmp/containerd.log
