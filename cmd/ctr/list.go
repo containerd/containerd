@@ -152,7 +152,7 @@ func containerListFn(context *cli.Context) error {
 		}
 	} else {
 		cl := tabwriter.NewWriter(os.Stdout, 10, 1, 3, ' ', 0)
-		fmt.Fprintln(cl, "ID\tIMAGE\tRUNTIME\tSIZE")
+		fmt.Fprintln(cl, "TASK-ID\tIMAGE\tRUNTIME\tSIZE")
 		for _, c := range containers {
 			var imageName string
 			if image, err := c.Image(ctx); err != nil {
