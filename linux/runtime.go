@@ -241,7 +241,7 @@ func (r *Runtime) Delete(ctx context.Context, c plugin.Task) (*plugin.Exit, erro
 		bundle = loadBundle(filepath.Join(r.root, namespace, lc.containerID), namespace)
 		i      = c.Info()
 	)
-	if err := r.emit(ctx, "/runtime/delete", eventsapi.RuntimeDelete{
+	if err := r.emit(ctx, "/runtime/delete", &eventsapi.RuntimeDelete{
 		ID:         i.ID,
 		Runtime:    i.Runtime,
 		ExitStatus: rsp.ExitStatus,
