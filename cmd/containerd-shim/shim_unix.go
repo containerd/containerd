@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/signal"
 
+	"google.golang.org/grpc"
+
 	"github.com/containerd/containerd/reaper"
 	runc "github.com/containerd/go-runc"
 )
@@ -24,4 +26,8 @@ func setupSignals() (chan os.Signal, error) {
 // setupRoot is a no op except on Linux
 func setupRoot() error {
 	return nil
+}
+
+func newServer() *grpc.Server {
+	return grpc.NewServer()
 }

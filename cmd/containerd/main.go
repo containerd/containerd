@@ -94,21 +94,21 @@ func main() {
 		if config.Debug.Address != "" {
 			l, err := sys.GetLocalListener(config.Debug.Address, config.Debug.Uid, config.Debug.Gid)
 			if err != nil {
-				return err
+				return errors.Wrapf(err, "failed to get listener for debug endpoint")
 			}
 			serve(log.WithModule(ctx, "debug"), l, server.ServeDebug)
 		}
 		if config.Metrics.Address != "" {
 			l, err := net.Listen("tcp", config.Metrics.Address)
 			if err != nil {
-				return err
+				return errors.Wrapf(err, "failed to get listener for metrics endpoint")
 			}
 			serve(log.WithModule(ctx, "metrics"), l, server.ServeMetrics)
 		}
 
 		l, err := sys.GetLocalListener(address, config.GRPC.Uid, config.GRPC.Gid)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "failed to get listener for main endpoint")
 		}
 		serve(log.WithModule(ctx, "grpc"), l, server.ServeGRPC)
 

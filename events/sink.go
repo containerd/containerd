@@ -6,6 +6,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd/api/services/events/v1"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	goevents "github.com/docker/go-events"
 	"github.com/pkg/errors"
@@ -39,7 +40,7 @@ func (s *eventSink) Write(evt goevents.Event) error {
 		return err
 	}
 
-	logrus.WithFields(logrus.Fields{
+	log.G(e.ctx).WithFields(logrus.Fields{
 		"topic": topic,
 		"type":  eventData.TypeUrl,
 		"ns":    ns,

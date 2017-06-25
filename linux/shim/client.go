@@ -34,11 +34,14 @@ func WithStart(binary string) ClientOpt {
 		if err != nil {
 			return nil, nil, err
 		}
-		// close our side of the socket, do not close the listener as it will
-		// remove the socket from disk
 		defer socket.Close()
+		f, err := socket.File()
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "failed to get fd for socket %s", config.Address)
+		}
+		defer f.Close()
 
-		cmd := newCommand(binary, config, socket)
+		cmd := newCommand(binary, config, f)
 		if err := reaper.Default.Start(cmd); err != nil {
 			return nil, nil, errors.Wrapf(err, "failed to start shim")
 		}
@@ -73,12 +76,16 @@ func newCommand(binary string, config Config, socket *os.File) *exec.Cmd {
 	return cmd
 }
 
-func newSocket(config Config) (*os.File, error) {
-	l, err := sys.CreateUnixSocket(config.Address)
-	if err != nil {
-		return nil, err
+func newSocket(config Config) (*net.UnixListener, error) {
+	if len(config.Address) > 106 {
+		return nil, errors.Errorf("%q: unix socket path too long (limit 106)", config.Address)
 	}
-	return l.(*net.UnixListener).File()
+	l, err := net.Listen("unix", "\x00"+config.Address)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to listen to abstract unix socket %q", config.Address)
+	}
+
+	return l.(*net.UnixListener), nil
 }
 
 func connect(address string) (*grpc.ClientConn, error) {
@@ -98,7 +105,7 @@ func connect(address string) (*grpc.ClientConn, error) {
 
 func dialer(address string, timeout time.Duration) (net.Conn, error) {
 	address = strings.TrimPrefix(address, "unix://")
-	return net.DialTimeout("unix", address, timeout)
+	return net.DialTimeout("unix", "\x00"+address, timeout)
 }
 
 func dialAddress(address string) string {

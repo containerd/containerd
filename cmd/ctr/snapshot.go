@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -10,6 +9,7 @@ import (
 	"github.com/containerd/containerd/progress"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/snapshot"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
@@ -20,6 +20,7 @@ var snapshotCommand = cli.Command{
 		archiveSnapshotCommand,
 		listSnapshotCommand,
 		usageSnapshotCommand,
+		removeSnapshotCommand,
 	},
 }
 
@@ -163,5 +164,32 @@ var usageSnapshotCommand = cli.Command{
 		}
 
 		return tw.Flush()
+	},
+}
+
+var removeSnapshotCommand = cli.Command{
+	Name:      "remove",
+	Aliases:   []string{"rm"},
+	ArgsUsage: "id [id] ...",
+	Usage:     "remove snapshots",
+	Action: func(clicontext *cli.Context) error {
+		ctx, cancel := appContext(clicontext)
+		defer cancel()
+
+		client, err := newClient(clicontext)
+		if err != nil {
+			return err
+		}
+
+		snapshotter := client.SnapshotService()
+
+		for _, id := range clicontext.Args() {
+			err = snapshotter.Remove(ctx, id)
+			if err != nil {
+				return errors.Wrapf(err, "failed to remove %q", id)
+			}
+		}
+
+		return nil
 	},
 }

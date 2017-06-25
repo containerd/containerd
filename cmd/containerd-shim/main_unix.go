@@ -22,12 +22,12 @@ import (
 )
 
 const usage = `
-                    __        _                     __           __    _         
-  _________  ____  / /_____ _(_)___  ___  _________/ /     _____/ /_  (_)___ ___ 
+                    __        _                     __           __    _
+  _________  ____  / /_____ _(_)___  ___  _________/ /     _____/ /_  (_)___ ___
  / ___/ __ \/ __ \/ __/ __ ` + "`" + `/ / __ \/ _ \/ ___/ __  /_____/ ___/ __ \/ / __ ` + "`" + `__ \
 / /__/ /_/ / / / / /_/ /_/ / / / / /  __/ /  / /_/ /_____(__  ) / / / / / / / / /
-\___/\____/_/ /_/\__/\__,_/_/_/ /_/\___/_/   \__,_/     /____/_/ /_/_/_/ /_/ /_/ 
-                                                                                 
+\___/\____/_/ /_/\__/\__,_/_/_/ /_/\___/_/   \__,_/     /____/_/ /_/_/_/ /_/ /_/
+
 shim for container lifecycle and reconnection
 `
 
@@ -44,6 +44,10 @@ func main() {
 		cli.StringFlag{
 			Name:  "namespace,n",
 			Usage: "namespace that owns the task",
+		},
+		cli.StringFlag{
+			Name:  "socket,s",
+			Usage: "abstract socket path to serve on",
 		},
 	}
 	app.Before = func(context *cli.Context) error {
@@ -73,7 +77,8 @@ func main() {
 		}
 		logrus.Debug("registering grpc server")
 		shimapi.RegisterShimServer(server, sv)
-		if err := serve(server, "shim.sock"); err != nil {
+		socket := context.GlobalString("socket")
+		if err := serve(server, socket); err != nil {
 			return err
 		}
 		return handleSignals(signals, server)
@@ -87,7 +92,16 @@ func main() {
 // serve serves the grpc API over a unix socket at the provided path
 // this function does not block
 func serve(server *grpc.Server, path string) error {
-	l, err := net.FileListener(os.NewFile(3, "socket"))
+	var (
+		l   net.Listener
+		err error
+	)
+	if path == "" {
+		l, err = net.FileListener(os.NewFile(3, "socket"))
+		path = "[inherited from parent]"
+	} else {
+		l, err = net.Listen("unix", "\x00"+path)
+	}
 	if err != nil {
 		return err
 	}

@@ -51,6 +51,12 @@ var fifoFlags = []cli.Flag{
 var shimCommand = cli.Command{
 	Name:  "shim",
 	Usage: "interact with a shim directly",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "socket",
+			Usage: "socket on which to connect to the shim",
+		},
+	},
 	Subcommands: []cli.Command{
 		shimCreateCommand,
 		shimStartCommand,
@@ -88,7 +94,7 @@ var shimCreateCommand = cli.Command{
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		service, err := getShimService()
+		service, err := getShimService(context)
 		if err != nil {
 			return err
 		}
@@ -139,7 +145,7 @@ var shimStartCommand = cli.Command{
 	Name:  "start",
 	Usage: "start a container with a shim",
 	Action: func(context *cli.Context) error {
-		service, err := getShimService()
+		service, err := getShimService(context)
 		if err != nil {
 			return err
 		}
@@ -152,7 +158,7 @@ var shimDeleteCommand = cli.Command{
 	Name:  "delete",
 	Usage: "delete a container with a shim",
 	Action: func(context *cli.Context) error {
-		service, err := getShimService()
+		service, err := getShimService(context)
 		if err != nil {
 			return err
 		}
@@ -169,7 +175,7 @@ var shimStateCommand = cli.Command{
 	Name:  "state",
 	Usage: "get the state of all the processes of the shim",
 	Action: func(context *cli.Context) error {
-		service, err := getShimService()
+		service, err := getShimService(context)
 		if err != nil {
 			return err
 		}
@@ -213,7 +219,7 @@ var shimExecCommand = cli.Command{
 		},
 	),
 	Action: func(context *cli.Context) error {
-		service, err := getShimService()
+		service, err := getShimService(context)
 		ctx := gocontext.Background()
 		if err != nil {
 			return err
@@ -275,7 +281,7 @@ var shimEventsCommand = cli.Command{
 	Name:  "events",
 	Usage: "get events for a shim",
 	Action: func(context *cli.Context) error {
-		service, err := getShimService()
+		service, err := getShimService(context)
 		if err != nil {
 			return err
 		}
@@ -293,15 +299,18 @@ var shimEventsCommand = cli.Command{
 	},
 }
 
-func getShimService() (shim.ShimClient, error) {
-	bindSocket := "shim.sock"
+func getShimService(context *cli.Context) (shim.ShimClient, error) {
+	bindSocket := context.GlobalString("socket")
+	if bindSocket == "" {
+		return nil, errors.New("socket path must be specified")
+	}
 
 	// reset the logger for grpc to log to dev/null so that it does not mess with our stdio
 	grpclog.SetLogger(log.New(ioutil.Discard, "", log.LstdFlags))
 	dialOpts := []grpc.DialOption{grpc.WithInsecure(), grpc.WithTimeout(100 * time.Second)}
 	dialOpts = append(dialOpts,
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
-			return net.DialTimeout("unix", bindSocket, timeout)
+			return net.DialTimeout("unix", "\x00"+bindSocket, timeout)
 		},
 		))
 	conn, err := grpc.Dial(fmt.Sprintf("unix://%s", bindSocket), dialOpts...)
