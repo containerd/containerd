@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/containerd/cgroups"
-	"github.com/containerd/cgroups/prometheus"
 	"github.com/containerd/containerd/plugin"
 	metrics "github.com/docker/go-metrics"
 	"golang.org/x/net/context"
@@ -24,9 +23,9 @@ func init() {
 func New(ic *plugin.InitContext) (interface{}, error) {
 	var (
 		ns        = metrics.NewNamespace("container", "", nil)
-		collector = prometheus.New(ns)
+		collector = NewCollector(ns)
 	)
-	oom, err := prometheus.NewOOMCollector(ns)
+	oom, err := NewOOMCollector(ns)
 	if err != nil {
 		return nil, err
 	}
@@ -39,8 +38,8 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 }
 
 type cgroupsMonitor struct {
-	collector *prometheus.Collector
-	oom       *prometheus.OOMCollector
+	collector *Collector
+	oom       *OOMCollector
 	context   context.Context
 	events    chan<- *plugin.Event
 }
