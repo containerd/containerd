@@ -167,7 +167,7 @@ func containerListFn(context *cli.Context) error {
 			if _, err := fmt.Fprintf(cl, "%s\t%s\t%s\t%d\n",
 				c.ID(),
 				imageName,
-				proto.Runtime,
+				proto.Runtime.Name,
 				proto.Size(),
 			); err != nil {
 				return err
