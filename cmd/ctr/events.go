@@ -83,7 +83,7 @@ func getEventOutput(env *eventsapi.Envelope) (string, error) {
 	case *eventsapi.ContainerUpdate:
 		out = "id=" + e.ContainerID
 	case *eventsapi.ContainerDelete:
-		out = "id=" + e.ContainerID
+		out = fmt.Sprintf("id=%s image=%s", e.ContainerID, e.Image)
 	case *eventsapi.SnapshotPrepare:
 		out = fmt.Sprintf("key=%s parent=%s", e.Key, e.Parent)
 	case *eventsapi.SnapshotCommit:

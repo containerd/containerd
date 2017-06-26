@@ -25,4 +25,5 @@ message ContainerUpdate {
 
 message ContainerDelete {
 	string container_id = 1;
+	string image = 2;
 }

@@ -173,7 +173,13 @@ func (s *Service) Update(ctx context.Context, req *api.UpdateContainerRequest) (
 }
 
 func (s *Service) Delete(ctx context.Context, req *api.DeleteContainerRequest) (*empty.Empty, error) {
+	image := ""
 	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store containers.Store) error {
+		c, err := store.Get(ctx, req.ID)
+		if err != nil {
+			return mapGRPCError(err, req.ID)
+		}
+		image = c.Image
 		return mapGRPCError(store.Delete(ctx, req.ID), req.ID)
 	}); err != nil {
 		return &empty.Empty{}, mapGRPCError(err, req.ID)
@@ -181,6 +187,7 @@ func (s *Service) Delete(ctx context.Context, req *api.DeleteContainerRequest) (
 
 	if err := s.emit(ctx, "/containers/delete", &eventsapi.ContainerDelete{
 		ContainerID: req.ID,
+		Image:       image,
 	}); err != nil {
 		return &empty.Empty{}, err
 	}
