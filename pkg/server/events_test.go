@@ -100,13 +100,11 @@ func TestHandleEvent(t *testing.T) {
 			containerdErr:       fmt.Errorf("random error"),
 			expected:            &testMetadata,
 		},
-		"should not update state for non-exited events": {
+		"should not update state for irrelevant events": {
 			event: &task.Event{
-				ID:         testID,
-				Type:       task.Event_OOM,
-				Pid:        testPid,
-				ExitStatus: 1,
-				ExitedAt:   testExitedAt,
+				ID:   testID,
+				Type: task.Event_PAUSED,
+				Pid:  testPid,
 			},
 			metadata:            &testMetadata,
 			containerdContainer: &testContainerdContainer,
@@ -122,6 +120,22 @@ func TestHandleEvent(t *testing.T) {
 			metadata:            &testMetadata,
 			containerdContainer: &testContainerdContainer,
 			expected:            &testFinishedMetadata,
+		},
+		"should update exit reason when container is oom killed": {
+			event: &task.Event{
+				ID:   testID,
+				Type: task.Event_OOM,
+			},
+			metadata: &testMetadata,
+			expected: &metadata.ContainerMetadata{
+				ID:        testID,
+				Name:      "test-name",
+				SandboxID: "test-sandbox-id",
+				Pid:       testPid,
+				CreatedAt: testCreatedAt,
+				StartedAt: testStartedAt,
+				Reason:    oomExitReason,
+			},
 		},
 	} {
 		t.Logf("TestCase %q", desc)
