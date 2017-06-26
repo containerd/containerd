@@ -25,6 +25,19 @@ type eventSink struct {
 	f  filters.Filter
 }
 
+func (s sinkEvent) Field(fieldpath []string) (string, bool) {
+	if len(fieldpath) == 0 {
+		return "", false
+	}
+	topic := getTopic(s.ctx)
+	switch fieldpath[0] {
+	case "topic":
+		return topic, len(topic) > 0
+	}
+
+	return "", false
+}
+
 func (s *eventSink) Write(evt goevents.Event) error {
 	e, ok := evt.(*sinkEvent)
 	if !ok {
@@ -39,8 +52,22 @@ func (s *eventSink) Write(evt goevents.Event) error {
 
 	topic := getTopic(e.ctx)
 
-	if !s.f.Match(adaptEvent(topic, evt)) {
-		return nil
+	// filter
+	if !s.f.Match(e) {
+		var f filters.Adaptor
+		switch v := e.event.(type) {
+		case *events.ContainerCreate:
+			f = v
+		case *events.ContainerUpdate:
+			f = v
+		case *events.ContainerDelete:
+			f = v
+			// TODO (ehazlett): other event types
+		}
+
+		if f == nil || !s.f.Match(f) {
+			return nil
+		}
 	}
 
 	eventData, err := MarshalEvent(e.event)
