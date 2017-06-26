@@ -12,6 +12,11 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
+const (
+	//TypeURLPrefix adds prefix to make OCI spec version as per protobuf's TypeUrl
+	TypeURLPrefix = "types.containerd.io/opencontainers/runtime-spec/"
+)
+
 func containersToProto(containers []containers.Container) []api.Container {
 	var containerspb []api.Container
 
@@ -32,7 +37,7 @@ func containerToProto(container *containers.Container) api.Container {
 			Options: container.Runtime.Options,
 		},
 		Spec: &types.Any{
-			TypeUrl: specs.Version,
+			TypeUrl: TypeURLPrefix + specs.Version,
 			Value:   container.Spec,
 		},
 		RootFS: container.RootFS,
