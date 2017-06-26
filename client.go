@@ -46,7 +46,8 @@ func init() {
 }
 
 type clientOpts struct {
-	defaultns string
+	defaultns   string
+	dialOptions []grpc.DialOption
 }
 
 type ClientOpt func(c *clientOpts) error
@@ -54,6 +55,14 @@ type ClientOpt func(c *clientOpts) error
 func WithDefaultNamespace(ns string) ClientOpt {
 	return func(c *clientOpts) error {
 		c.defaultns = ns
+		return nil
+	}
+}
+
+// WithDialOpts allows grpc.DialOptions to be set on the connection
+func WithDialOpts(opts []grpc.DialOption) ClientOpt {
+	return func(c *clientOpts) error {
+		c.dialOptions = opts
 		return nil
 	}
 }
@@ -67,13 +76,15 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 			return nil, err
 		}
 	}
-
 	gopts := []grpc.DialOption{
 		grpc.WithBlock(),
 		grpc.WithInsecure(),
 		grpc.WithTimeout(100 * time.Second),
-		grpc.WithDialer(dialer),
 		grpc.FailOnNonTempDialError(true),
+		grpc.WithDialer(dialer),
+	}
+	if len(copts.dialOptions) > 0 {
+		gopts = copts.dialOptions
 	}
 	if copts.defaultns != "" {
 		unary, stream := newNSInterceptors(copts.defaultns)
@@ -82,11 +93,16 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 			grpc.WithStreamInterceptor(stream),
 		)
 	}
-
 	conn, err := grpc.Dial(dialAddress(address), gopts...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to dial %q", address)
 	}
+	return NewWithConn(conn, opts...)
+}
+
+// NewWithConn returns a new containerd client that is connected to the containerd
+// instance provided by the connection
+func NewWithConn(conn *grpc.ClientConn, opts ...ClientOpt) (*Client, error) {
 	return &Client{
 		conn:    conn,
 		runtime: fmt.Sprintf("%s.%s", plugin.RuntimePlugin, runtime.GOOS),
