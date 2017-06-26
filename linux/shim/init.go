@@ -23,6 +23,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
 
@@ -282,6 +283,14 @@ func (p *initProcess) Checkpoint(context context.Context, r *shimapi.CheckpointT
 		return fmt.Errorf("%s path= %s", criuError(err), dumpLog)
 	}
 	return nil
+}
+
+func (p *initProcess) Update(context context.Context, r *shimapi.UpdateTaskRequest) error {
+	var resources specs.LinuxResources
+	if err := json.Unmarshal(r.Resources.Value, &resources); err != nil {
+		return err
+	}
+	return p.runc.Update(context, p.id, &resources)
 }
 
 // TODO(mlaventure): move to runc package?

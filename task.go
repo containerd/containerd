@@ -57,6 +57,7 @@ type Task interface {
 	Resize(ctx context.Context, w, h uint32) error
 	IO() *IO
 	Checkpoint(context.Context, ...CheckpointOpts) (v1.Descriptor, error)
+	Update(context.Context, ...UpdateTaskOpts) error
 }
 
 type Process interface {
@@ -290,6 +291,21 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointOpts) (d v1.Des
 	index.Annotations = make(map[string]string)
 	index.Annotations["image.name"] = cr.Container.Image
 	return t.writeIndex(ctx, &index)
+}
+
+type UpdateTaskOpts func(context.Context, *Client, *tasks.UpdateTaskRequest) error
+
+func (t *task) Update(ctx context.Context, opts ...UpdateTaskOpts) error {
+	request := &tasks.UpdateTaskRequest{
+		ContainerID: t.containerID,
+	}
+	for _, o := range opts {
+		if err := o(ctx, t.client, request); err != nil {
+			return err
+		}
+	}
+	_, err := t.client.TaskService().Update(ctx, request)
+	return err
 }
 
 func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tasks.CheckpointTaskRequest) error {

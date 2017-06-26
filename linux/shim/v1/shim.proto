@@ -47,6 +47,8 @@ service Shim {
 
 	// ShimInfo returns information about the shim.
 	rpc ShimInfo(google.protobuf.Empty) returns (ShimInfoResponse);
+
+	rpc Update(UpdateTaskRequest) returns (google.protobuf.Empty);
 }
 
 message CreateTaskRequest {
@@ -153,4 +155,8 @@ message Event {
 	uint32 pid = 3;
 	uint32 exit_status = 4;
 	google.protobuf.Timestamp exited_at = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}
+
+message UpdateTaskRequest {
+	google.protobuf.Any resources = 1;
 }

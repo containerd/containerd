@@ -451,6 +451,17 @@ func (s *Service) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest) 
 	}, nil
 }
 
+func (s *Service) Update(ctx context.Context, r *api.UpdateTaskRequest) (*google_protobuf.Empty, error) {
+	t, err := s.getTask(ctx, r.ContainerID)
+	if err != nil {
+		return nil, err
+	}
+	if err := t.Update(ctx, r.Resources.Value); err != nil {
+		return nil, err
+	}
+	return empty, nil
+}
+
 func (s *Service) writeContent(ctx context.Context, mediaType, ref string, r io.Reader) (*types.Descriptor, error) {
 	writer, err := s.store.Writer(ctx, ref, 0, "")
 	if err != nil {

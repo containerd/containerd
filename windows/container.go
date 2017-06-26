@@ -214,6 +214,10 @@ func (c *container) DeleteProcess(ctx context.Context, pid uint32) (*plugin.Exit
 	}, nil
 }
 
+func (c *container) Update(ctx context.Context, spec []byte) error {
+	return fmt.Errorf("Windows containers do not support update")
+}
+
 func (c *container) setStatus(status plugin.Status) {
 	c.Lock()
 	c.status = status

@@ -364,6 +364,16 @@ func (s *Service) ShimInfo(ctx context.Context, r *google_protobuf.Empty) (*shim
 	}, nil
 }
 
+func (s *Service) Update(ctx context.Context, r *shimapi.UpdateTaskRequest) (*google_protobuf.Empty, error) {
+	if s.initProcess == nil {
+		return nil, errors.New(ErrContainerNotCreated)
+	}
+	if err := s.initProcess.Update(ctx, r); err != nil {
+		return nil, err
+	}
+	return empty, nil
+}
+
 func (s *Service) waitExit(p process, pid int, cmd *reaper.Cmd) {
 	status := <-cmd.ExitCh
 	p.Exited(status)
