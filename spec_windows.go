@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"runtime"
 
 	"github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/images"
@@ -18,13 +17,9 @@ const pipeRoot = `\\.\pipe`
 func createDefaultSpec() (*specs.Spec, error) {
 	return &specs.Spec{
 		Version: specs.Version,
-		Platform: specs.Platform{
-			OS:   runtime.GOOS,
-			Arch: runtime.GOARCH,
-		},
-		Root: specs.Root{},
-		Process: specs.Process{
-			ConsoleSize: specs.Box{
+		Root:    specs.Root{},
+		Process: &specs.Process{
+			ConsoleSize: &specs.Box{
 				Width:  80,
 				Height: 20,
 			},

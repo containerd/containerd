@@ -1,7 +1,10 @@
+// +build linux
+
 package cgroups
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"sync"
 
@@ -41,6 +44,10 @@ type task struct {
 	id        string
 	namespace string
 	cgroup    cgroups.Cgroup
+}
+
+func taskID(id, namespace string) string {
+	return fmt.Sprintf("%s-%s", id, namespace)
 }
 
 // Collector provides the ability to collect container stats and export
@@ -86,10 +93,10 @@ func (c *Collector) collect(id, namespace string, cg cgroups.Cgroup, ch chan<- p
 func (c *Collector) Add(id, namespace string, cg cgroups.Cgroup) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if _, ok := c.cgroups[id+namespace]; ok {
+	if _, ok := c.cgroups[taskID(id, namespace)]; ok {
 		return ErrAlreadyCollected
 	}
-	c.cgroups[id+namespace] = &task{
+	c.cgroups[taskID(id, namespace)] = &task{
 		id:        id,
 		namespace: namespace,
 		cgroup:    cg,
@@ -102,7 +109,7 @@ func (c *Collector) Add(id, namespace string, cg cgroups.Cgroup) error {
 func (c *Collector) Get(id, namespace string) (cgroups.Cgroup, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	t, ok := c.cgroups[id+namespace]
+	t, ok := c.cgroups[taskID(id, namespace)]
 	if !ok {
 		return nil, ErrCgroupNotExists
 	}
@@ -113,7 +120,7 @@ func (c *Collector) Get(id, namespace string) (cgroups.Cgroup, error) {
 func (c *Collector) Remove(id, namespace string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	delete(c.cgroups, id+namespace)
+	delete(c.cgroups, taskID(id, namespace))
 }
 
 func blkioValues(l []cgroups.BlkioEntry) []value {

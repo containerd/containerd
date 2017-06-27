@@ -142,7 +142,7 @@ func (c *container) Exec(ctx context.Context, opts plugin.ExecOpts) (plugin.Proc
 		return nil, errors.Wrap(err, "failed to unmarshal oci spec")
 	}
 
-	p, err := c.ctr.AddProcess(ctx, procSpec, pio)
+	p, err := c.ctr.AddProcess(ctx, &procSpec, pio)
 	if err != nil {
 		return nil, err
 	}
