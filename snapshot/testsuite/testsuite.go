@@ -181,13 +181,14 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	if err := mount.MountAll(mounts, nextnext); err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
-	defer testutil.Unmount(t, nextnext)
 
 	if err := fstest.CheckDirectoryEqualWithApplier(nextnext,
 		fstest.Apply(initialApplier, diffApplier)); err != nil {
+		testutil.Unmount(t, nextnext)
 		t.Fatalf("failure reason: %+v", err)
 	}
 
+	testutil.Unmount(t, nextnext)
 	assert.NoError(t, snapshotter.Remove(ctx, nextnext))
 	assert.Error(t, snapshotter.Remove(ctx, committed))
 	assert.NoError(t, snapshotter.Remove(ctx, nextCommitted))
