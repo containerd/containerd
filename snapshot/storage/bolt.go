@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/boltdb/bolt"
-	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/snapshot"
 	db "github.com/containerd/containerd/snapshot/storage/proto"
 	"github.com/gogo/protobuf/proto"
@@ -137,7 +136,7 @@ func CreateActive(ctx context.Context, key, parent string, readonly bool) (a Act
 			return snapshot.ErrSnapshotExist
 		}
 
-		id, err := nextSequence(ctx)
+		id, err := bkt.NextSequence()
 		if err != nil {
 			return errors.Wrap(err, "unable to get identifier")
 		}
@@ -310,68 +309,28 @@ func CommitActive(ctx context.Context, key, name string, usage snapshot.Usage) (
 	return
 }
 
-// nextSequence maintains the snapshot ids in the same space across namespaces
-// to avoid collisions on the filesystem, which is typically not namespace
-// aware. This will also be useful to ensure that snapshots can be used across
-// namespaces in the future, by projecting parent relationships into an
-// alternate namespace without fixing up identifiers.
-func nextSequence(ctx context.Context) (uint64, error) {
-	t, ok := ctx.Value(transactionKey{}).(*boltFileTransactor)
-	if !ok {
-		return 0, ErrNoTransaction
-	}
-
-	bkt := t.tx.Bucket(bucketKeyStorageVersion)
-	if bkt == nil {
-		return 0, errors.New("version bucket required for sequence")
-	}
-
-	return bkt.NextSequence()
-}
-
 func withBucket(ctx context.Context, fn func(context.Context, *bolt.Bucket, *bolt.Bucket) error) error {
-	namespace, err := namespaces.NamespaceRequired(ctx)
-	if err != nil {
-		return err
-	}
 	t, ok := ctx.Value(transactionKey{}).(*boltFileTransactor)
 	if !ok {
 		return ErrNoTransaction
 	}
-	nbkt := t.tx.Bucket(bucketKeyStorageVersion)
-	if nbkt == nil {
+	bkt := t.tx.Bucket(bucketKeyStorageVersion)
+	if bkt == nil {
 		return errors.Wrap(snapshot.ErrSnapshotNotExist, "bucket does not exist")
 	}
-
-	bkt := nbkt.Bucket([]byte(namespace))
-	if bkt == nil {
-		return errors.Wrap(snapshot.ErrSnapshotNotExist, "namespace not available in snapshotter")
-	}
-
 	return fn(ctx, bkt.Bucket(bucketKeySnapshot), bkt.Bucket(bucketKeyParents))
 }
 
 func createBucketIfNotExists(ctx context.Context, fn func(context.Context, *bolt.Bucket, *bolt.Bucket) error) error {
-	namespace, err := namespaces.NamespaceRequired(ctx)
-	if err != nil {
-		return err
-	}
-
 	t, ok := ctx.Value(transactionKey{}).(*boltFileTransactor)
 	if !ok {
 		return ErrNoTransaction
 	}
 
-	nbkt, err := t.tx.CreateBucketIfNotExists(bucketKeyStorageVersion)
+	bkt, err := t.tx.CreateBucketIfNotExists(bucketKeyStorageVersion)
 	if err != nil {
 		return errors.Wrap(err, "failed to create version bucket")
 	}
-
-	bkt, err := nbkt.CreateBucketIfNotExists([]byte(namespace))
-	if err != nil {
-		return err
-	}
-
 	sbkt, err := bkt.CreateBucketIfNotExists(bucketKeySnapshot)
 	if err != nil {
 		return errors.Wrap(err, "failed to create snapshots bucket")
