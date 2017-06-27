@@ -33,7 +33,7 @@ Example use cases include sophisticated network configuration, volume garbage co
 
 ### Runtime Developers
 
-Runtime developers can build runtime implementations that run OCI-compliant bundles and container configuration, containing low-level OS and host specific details, on a particular platform.
+Runtime developers can build runtime implementations that run OCI-compliant bundles and container configuration, containing low-level OS and host-specific details, on a particular platform.
 
 ## Releases
 
@@ -60,10 +60,16 @@ When in doubt, start on the [mailing-list](#mailing-list).
 
 ### Weekly Call
 
-The contributors and maintainers of all OCI projects have a weekly meeting Wednesdays at 2:00 PM (USA Pacific).
-Everyone is welcome to participate via [UberConference web][uberconference] or audio-only: 415-968-0849 (no PIN needed.)
+The contributors and maintainers of all OCI projects have a weekly meeting on Wednesdays at:
+
+* 8:00 AM (USA Pacific), during [odd weeks][iso-week].
+* 2:00 PM (USA Pacific), during [even weeks][iso-week].
+
+There is an [iCalendar][rfc5545] format for the meetings [here](meeting.ics).
+
+Everyone is welcome to participate via [UberConference web][uberconference] or audio-only: +1 415 968 0849 (no PIN needed).
 An initial agenda will be posted to the [mailing list](#mailing-list) earlier in the week, and everyone is welcome to propose additional topics or suggest other agenda alterations there.
-Minutes are posted to the [mailing list](#mailing-list) and minutes from past calls are archived to the [wiki][runtime-wiki].
+Minutes are posted to the [mailing list](#mailing-list) and minutes from past calls are archived [here][minutes], with minutes from especially old meetings (September 2015 and earlier) archived [here][runtime-wiki].
 
 ### Mailing List
 
@@ -139,7 +145,7 @@ Read more on [How to Write a Git Commit Message][how-to-git-commit] or the Discu
 5. Use the imperative mood in the subject line
 6. Wrap the body at 72 characters
 7. Use the body to explain what and why vs. how
-  * If there was important/useful/essential conversation or information, copy or include a reference
+    * If there was important/useful/essential conversation or information, copy or include a reference
 8. When possible, one keyword to scope the change in the subject (i.e. "README: ...", "runtime: ...")
 
 
@@ -148,7 +154,10 @@ Read more on [How to Write a Git Commit Message][how-to-git-commit] or the Discu
 [dev-list]: https://groups.google.com/a/opencontainers.org/forum/#!forum/dev
 [how-to-git-commit]: http://chris.beams.io/posts/git-commit
 [irc-logs]: http://ircbot.wl.linuxfoundation.org/eavesdrop/%23opencontainers/
+[iso-week]: https://en.wikipedia.org/wiki/ISO_week_date#Calculating_the_week_number_of_a_given_date
+[minutes]: http://ircbot.wl.linuxfoundation.org/meetings/opencontainers/
 [oci]: https://www.opencontainers.org
+[rfc5545]: https://tools.ietf.org/html/rfc5545
 [runtime-wiki]: https://github.com/opencontainers/runtime-spec/wiki
 [uberconference]: https://www.uberconference.com/opencontainers
 

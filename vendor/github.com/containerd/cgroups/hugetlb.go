@@ -13,7 +13,7 @@ import (
 func NewHugetlb(root string) (*hugetlbController, error) {
 	sizes, err := hugePageSizes()
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	return &hugetlbController{

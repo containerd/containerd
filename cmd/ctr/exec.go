@@ -52,7 +52,7 @@ var execCommand = cli.Command{
 			return err
 		}
 
-		pspec := &spec.Process
+		pspec := spec.Process
 		pspec.Terminal = tty
 		pspec.Args = args
 

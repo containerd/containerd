@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -64,14 +63,10 @@ func defaultNamespaces() []specs.LinuxNamespace {
 func createDefaultSpec() (*specs.Spec, error) {
 	s := &specs.Spec{
 		Version: specs.Version,
-		Platform: specs.Platform{
-			OS:   runtime.GOOS,
-			Arch: runtime.GOARCH,
-		},
 		Root: specs.Root{
 			Path: defaultRootfsPath,
 		},
-		Process: specs.Process{
+		Process: &specs.Process{
 			Cwd:             "/",
 			NoNewPrivileges: true,
 			User: specs.User{

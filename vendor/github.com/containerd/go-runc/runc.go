@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -31,13 +33,14 @@ const (
 // Runc is the client to the runc cli
 type Runc struct {
 	//If command is empty, DefaultCommand is used
-	Command      string
-	Root         string
-	Debug        bool
-	Log          string
-	LogFormat    Format
-	PdeathSignal syscall.Signal
-	Criu         string
+	Command       string
+	Root          string
+	Debug         bool
+	Log           string
+	LogFormat     Format
+	PdeathSignal  syscall.Signal
+	Criu          string
+	SystemdCgroup string
 }
 
 // List returns all containers created inside the provided runc root directory
@@ -240,9 +243,24 @@ func (r *Runc) Run(context context.Context, id, bundle string, opts *CreateOpts)
 	return Monitor.Wait(cmd)
 }
 
+type DeleteOpts struct {
+	Force bool
+}
+
+func (o *DeleteOpts) args() (out []string) {
+	if o.Force {
+		out = append(out, "--force")
+	}
+	return out
+}
+
 // Delete deletes the container
-func (r *Runc) Delete(context context.Context, id string) error {
-	return r.runOrError(r.command(context, "delete", id))
+func (r *Runc) Delete(context context.Context, id string, opts *DeleteOpts) error {
+	args := []string{"delete"}
+	if opts != nil {
+		args = append(args, opts.args()...)
+	}
+	return r.runOrError(r.command(context, append(args, id)...))
 }
 
 // KillOpts specifies options for killing a container and its processes
@@ -511,6 +529,56 @@ func (r *Runc) Update(context context.Context, id string, resources *specs.Linux
 	return r.runOrError(cmd)
 }
 
+var ErrParseRuncVersion = errors.New("unable to parse runc version")
+
+type Version struct {
+	Runc   string
+	Commit string
+	Spec   string
+}
+
+// Version returns the runc and runtime-spec versions
+func (r *Runc) Version(context context.Context) (Version, error) {
+	data, err := Monitor.Output(r.command(context, "--version"))
+	if err != nil {
+		return Version{}, err
+	}
+	return parseVersion(data)
+}
+
+func parseVersion(data []byte) (Version, error) {
+	var v Version
+	parts := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(parts) != 3 {
+		return v, ErrParseRuncVersion
+	}
+
+	for i, p := range []struct {
+		dest  *string
+		split string
+	}{
+		{
+			dest:  &v.Runc,
+			split: "version ",
+		},
+		{
+			dest:  &v.Commit,
+			split: ": ",
+		},
+		{
+			dest:  &v.Spec,
+			split: ": ",
+		},
+	} {
+		p2 := strings.Split(parts[i], p.split)
+		if len(p2) != 2 {
+			return v, fmt.Errorf("unable to parse version line %q", parts[i])
+		}
+		*p.dest = p2[1]
+	}
+	return v, nil
+}
+
 func (r *Runc) args() (out []string) {
 	if r.Root != "" {
 		out = append(out, "--root", r.Root)
@@ -526,6 +594,9 @@ func (r *Runc) args() (out []string) {
 	}
 	if r.Criu != "" {
 		out = append(out, "--criu", r.Criu)
+	}
+	if r.SystemdCgroup != "" {
+		out = append(out, "--systemd-cgroup", r.SystemdCgroup)
 	}
 	return out
 }

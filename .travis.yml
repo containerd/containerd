@@ -38,7 +38,7 @@ install:
   - unzip -o -d /tmp/protobuf /tmp/protoc-3.1.0-linux-x86_64.zip
   - export PATH=$PATH:/tmp/protobuf/bin/
   - go get -u github.com/vbatts/git-validation
-  - sudo wget https://github.com/crosbymichael/runc/releases/download/ctd-1/runc -O /bin/runc; sudo chmod +x /bin/runc
+  - sudo wget https://github.com/crosbymichael/runc/releases/download/ctd-2/runc -O /bin/runc; sudo chmod +x /bin/runc
   - wget https://github.com/xemul/criu/archive/v3.0.tar.gz -O /tmp/criu.tar.gz
   - tar -C /tmp/ -zxf /tmp/criu.tar.gz
   - cd /tmp/criu-3.0 && sudo make install-criu
