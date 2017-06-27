@@ -7,9 +7,9 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/identifiers"
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
@@ -94,8 +94,8 @@ var runCommand = cli.Command{
 		)
 		defer cancel()
 
-		if id == "" {
-			return errors.New("container id must be provided")
+		if err := identifiers.ValidateContainerId(id); err != nil {
+			return err
 		}
 		if raw := context.String("checkpoint"); raw != "" {
 			if checkpointIndex, err = digest.Parse(raw); err != nil {
