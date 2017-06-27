@@ -400,21 +400,9 @@ func (r *Runtime) terminate(ctx context.Context, bundle *bundle, ns, id string) 
 	if err != nil {
 		return err
 	}
-	if err := rt.Kill(ctx, id, int(unix.SIGKILL), &runc.KillOpts{All: true}); err != nil {
-		log.G(ctx).WithError(err).Warnf("kill all processes for %s", id)
-	}
-	// it can take a while for the container to be killed so poll for the container's status
-	// until it is in a stopped state
-	status := "running"
-	for status != "stopped" {
-		c, err := rt.State(ctx, id)
-		if err != nil {
-			break
-		}
-		status = c.Status
-		time.Sleep(50 * time.Millisecond)
-	}
-	if err := rt.Delete(ctx, id); err != nil {
+	if err := rt.Delete(ctx, id, &runc.DeleteOpts{
+		Force: true,
+	}); err != nil {
 		log.G(ctx).WithError(err).Warnf("delete runtime state %s", id)
 	}
 	if err := unix.Unmount(filepath.Join(bundle.path, "rootfs"), 0); err != nil {

@@ -276,7 +276,7 @@ func TestContainerExec(t *testing.T) {
 		"exit 6",
 	}
 
-	process, err := task.Exec(ctx, &processSpec, empty())
+	process, err := task.Exec(ctx, processSpec, empty())
 	if err != nil {
 		t.Error(err)
 		return
