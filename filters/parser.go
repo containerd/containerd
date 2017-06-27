@@ -99,7 +99,7 @@ func (p *parser) selector() (selector, error) {
 	}
 
 	switch p.scanner.peek() {
-	case tokenSeparator, tokenEOF:
+	case ',', tokenSeparator, tokenEOF:
 		return selector{
 			fieldpath: fieldpath,
 			operator:  operatorPresent,

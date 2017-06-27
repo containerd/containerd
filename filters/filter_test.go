@@ -113,6 +113,15 @@ func TestFilters(t *testing.T) {
 			},
 		},
 		{
+			name:  "NameAndLabelPresent",
+			input: "labels.foo,name",
+			expected: []interface{}{
+				corpus[0],
+				corpus[2],
+				corpus[8],
+			},
+		},
+		{
 			name:  "LabelValue",
 			input: "labels.foo==true",
 			expected: []interface{}{
