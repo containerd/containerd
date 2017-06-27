@@ -1,17 +1,30 @@
 package plugin
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
+	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 
 var (
 	ErrNoPluginType = errors.New("plugin: no type")
 	ErrNoPluginID   = errors.New("plugin: no id")
+
+	// SkipPlugin is used when a plugin is not initialized and should not be loaded,
+	// this allows the plugin loader differentiate between a plugin which is configured
+	// not to load and one that fails to load.
+	SkipPlugin = errors.New("skip plugin")
 )
+
+// IsSkipPlugin returns true if the error is skipping the plugin
+func IsSkipPlugin(err error) bool {
+	if errors.Cause(err) == SkipPlugin {
+		return true
+	}
+	return false
+}
 
 type PluginType string
 

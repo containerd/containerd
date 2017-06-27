@@ -17,7 +17,5 @@ func defaultConfig() *server.Config {
 			Level:   "info",
 			Address: `\\.\pipe\containerd-debug`,
 		},
-		Snapshotter: "io.containerd.snapshotter.v1.windows",
-		Differ:      "io.containerd.differ.v1.base-diff",
 	}
 }
