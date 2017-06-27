@@ -192,6 +192,16 @@ func (t *Task) DeleteProcess(ctx context.Context, pid uint32) (*plugin.Exit, err
 	}, nil
 }
 
+func (t *Task) Update(ctx context.Context, resources []byte) error {
+	_, err := t.shim.Update(ctx, &shim.UpdateTaskRequest{
+		Resources: &protobuf.Any{
+			TypeUrl: specs.Version,
+			Value:   resources,
+		},
+	})
+	return err
+}
+
 type Process struct {
 	pid int
 	t   *Task

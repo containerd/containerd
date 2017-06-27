@@ -35,6 +35,8 @@ type Task interface {
 	Checkpoint(context.Context, string, map[string]string) error
 	// DeleteProcess deletes a specific exec process via the pid
 	DeleteProcess(context.Context, uint32) (*Exit, error)
+	// Update sets the provided resources to a running task
+	Update(context.Context, []byte) error
 }
 
 type ExecOpts struct {

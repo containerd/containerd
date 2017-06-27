@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd/api/services/containers/v1"
+	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/images"
 	protobuf "github.com/gogo/protobuf/types"
 	"github.com/opencontainers/image-spec/specs-go/v1"
@@ -82,6 +83,20 @@ func WithSpec(spec *specs.Spec) NewContainerOpts {
 		}
 		c.Spec = &protobuf.Any{
 			TypeUrl: spec.Version,
+			Value:   data,
+		}
+		return nil
+	}
+}
+
+func WithResources(resources *specs.WindowsResources) UpdateTaskOpts {
+	return func(ctx context.Context, client *Client, r *tasks.UpdateTaskRequest) error {
+		data, err := json.Marshal(resources)
+		if err != nil {
+			return err
+		}
+		r.Resources = &protobuf.Any{
+			TypeUrl: specs.Version,
 			Value:   data,
 		}
 		return nil

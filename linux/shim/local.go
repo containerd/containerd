@@ -91,6 +91,10 @@ func (c *local) ShimInfo(ctx context.Context, in *google_protobuf.Empty, opts ..
 	return c.s.ShimInfo(ctx, in)
 }
 
+func (c *local) Update(ctx context.Context, in *shimapi.UpdateTaskRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+	return c.s.Update(ctx, in)
+}
+
 type events struct {
 	c   chan *shimapi.Event
 	ctx context.Context

@@ -44,6 +44,8 @@ service Tasks {
 	rpc ListProcesses(ListProcessesRequest) returns (ListProcessesResponse);
 
 	rpc Checkpoint(CheckpointTaskRequest) returns (CheckpointTaskResponse);
+
+	rpc Update(UpdateTaskRequest) returns (google.protobuf.Empty);
 }
 
 message CreateTaskRequest {
@@ -187,4 +189,9 @@ message CheckpointTaskRequest {
 
 message CheckpointTaskResponse {
 	repeated containerd.types.Descriptor descriptors = 1;
+}
+
+message UpdateTaskRequest {
+	string container_id = 1;
+	google.protobuf.Any resources = 2;
 }
