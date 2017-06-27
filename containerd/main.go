@@ -17,15 +17,15 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/urfave/cli"
-	"github.com/cyberdelia/go-metrics-graphite"
 	"github.com/containerd/containerd"
 	grpcserver "github.com/containerd/containerd/api/grpc/server"
 	"github.com/containerd/containerd/api/grpc/types"
 	"github.com/containerd/containerd/api/http/pprof"
 	"github.com/containerd/containerd/supervisor"
+	"github.com/cyberdelia/go-metrics-graphite"
 	"github.com/docker/docker/pkg/listeners"
 	"github.com/rcrowley/go-metrics"
+	"github.com/urfave/cli"
 )
 
 const (
@@ -174,7 +174,7 @@ func daemon(context *cli.Context) error {
 		return err
 	}
 	s := make(chan os.Signal, 2048)
-	signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
+	signal.Notify(s, syscall.SIGTERM, syscall.SIGINT, syscall.SIGPIPE)
 	// Split the listen string of the form proto://addr
 	listenSpec := context.String("listen")
 	listenParts := strings.SplitN(listenSpec, "://", 2)
