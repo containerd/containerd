@@ -303,7 +303,7 @@ func (c *Container) GetConfiguration() Configuration {
 	return c.conf
 }
 
-func (c *Container) AddProcess(ctx context.Context, spec specs.Process, io *IO) (*Process, error) {
+func (c *Container) AddProcess(ctx context.Context, spec *specs.Process, io *IO) (*Process, error) {
 	if len(c.processes) == 0 {
 		return nil, errors.New("container not started")
 	}
@@ -311,7 +311,7 @@ func (c *Container) AddProcess(ctx context.Context, spec specs.Process, io *IO) 
 	return c.addProcess(ctx, spec, io)
 }
 
-func (c *Container) addProcess(ctx context.Context, spec specs.Process, pio *IO) (*Process, error) {
+func (c *Container) addProcess(ctx context.Context, spec *specs.Process, pio *IO) (*Process, error) {
 	// If we don't have a process yet, reused the container pid
 	var pid uint32
 	if len(c.processes) == 0 {

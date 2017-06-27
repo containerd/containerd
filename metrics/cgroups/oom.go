@@ -1,4 +1,6 @@
-package prometheus
+// +build linux
+
+package cgroups
 
 import (
 	"sync"
@@ -17,7 +19,7 @@ func NewOOMCollector(ns *metrics.Namespace) (*OOMCollector, error) {
 	}
 	c := &OOMCollector{
 		fd:        fd,
-		memoryOOM: ns.NewLabeledGauge("memory_oom", "The number of times a container received an oom event", metrics.Total, "id"),
+		memoryOOM: ns.NewLabeledGauge("memory_oom", "The number of times a container received an oom event", metrics.Total, "id", "namespace"),
 		set:       make(map[uintptr]*oom),
 	}
 	go c.start()
@@ -33,12 +35,13 @@ type OOMCollector struct {
 }
 
 type oom struct {
-	id       string
-	c        cgroups.Cgroup
-	triggers []Trigger
+	id        string
+	namespace string
+	c         cgroups.Cgroup
+	triggers  []Trigger
 }
 
-func (o *OOMCollector) Add(id string, cg cgroups.Cgroup, triggers ...Trigger) error {
+func (o *OOMCollector) Add(id, namespace string, cg cgroups.Cgroup, triggers ...Trigger) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	fd, err := cg.OOMEventFD()
@@ -46,12 +49,13 @@ func (o *OOMCollector) Add(id string, cg cgroups.Cgroup, triggers ...Trigger) er
 		return err
 	}
 	o.set[fd] = &oom{
-		id:       id,
-		c:        cg,
-		triggers: triggers,
+		id:        id,
+		c:         cg,
+		triggers:  triggers,
+		namespace: namespace,
 	}
 	// set the gauge's default value
-	o.memoryOOM.WithValues(id).Set(0)
+	o.memoryOOM.WithValues(id, namespace).Set(0)
 	event := unix.EpollEvent{
 		Fd:     int32(fd),
 		Events: unix.EPOLLHUP | unix.EPOLLIN | unix.EPOLLERR,
@@ -103,7 +107,7 @@ func (o *OOMCollector) process(fd uintptr, event uint32) {
 		unix.Close(int(fd))
 		return
 	}
-	o.memoryOOM.WithValues(info.id).Inc(1)
+	o.memoryOOM.WithValues(info.id, info.namespace).Inc(1)
 	for _, t := range info.triggers {
 		t(info.id, info.c)
 	}

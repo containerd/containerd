@@ -205,7 +205,7 @@ func (p *initProcess) Delete(context context.Context) error {
 	}
 	p.killAll(context)
 	p.Wait()
-	err = p.runc.Delete(context, p.id)
+	err = p.runc.Delete(context, p.id, nil)
 	if p.io != nil {
 		for _, c := range p.closers {
 			c.Close()

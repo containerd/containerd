@@ -1,7 +1,10 @@
-package prometheus
+// +build linux
+
+package cgroups
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"sync"
 
@@ -22,11 +25,11 @@ type Trigger func(string, cgroups.Cgroup)
 
 // New registers the Collector with the provided namespace and returns it so
 // that cgroups can be added for collection
-func New(ns *metrics.Namespace) *Collector {
+func NewCollector(ns *metrics.Namespace) *Collector {
 	// add machine cpus and memory info
 	c := &Collector{
 		ns:      ns,
-		cgroups: make(map[string]cgroups.Cgroup),
+		cgroups: make(map[string]*task),
 	}
 	c.metrics = append(c.metrics, pidMetrics...)
 	c.metrics = append(c.metrics, cpuMetrics...)
@@ -37,12 +40,22 @@ func New(ns *metrics.Namespace) *Collector {
 	return c
 }
 
+type task struct {
+	id        string
+	namespace string
+	cgroup    cgroups.Cgroup
+}
+
+func taskID(id, namespace string) string {
+	return fmt.Sprintf("%s-%s", id, namespace)
+}
+
 // Collector provides the ability to collect container stats and export
 // them in the prometheus format
 type Collector struct {
 	mu sync.RWMutex
 
-	cgroups map[string]cgroups.Cgroup
+	cgroups map[string]*task
 	ns      *metrics.Namespace
 	metrics []*metric
 }
@@ -56,15 +69,15 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	c.mu.RLock()
 	wg := &sync.WaitGroup{}
-	for id, cg := range c.cgroups {
+	for _, t := range c.cgroups {
 		wg.Add(1)
-		go c.collect(id, cg, ch, wg)
+		go c.collect(t.id, t.namespace, t.cgroup, ch, wg)
 	}
 	c.mu.RUnlock()
 	wg.Wait()
 }
 
-func (c *Collector) collect(id string, cg cgroups.Cgroup, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
+func (c *Collector) collect(id, namespace string, cg cgroups.Cgroup, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
 	defer wg.Done()
 	stats, err := cg.Stat(cgroups.IgnoreNotExist)
 	if err != nil {
@@ -72,38 +85,42 @@ func (c *Collector) collect(id string, cg cgroups.Cgroup, ch chan<- prometheus.M
 		return
 	}
 	for _, m := range c.metrics {
-		m.collect(id, stats, c.ns, ch)
+		m.collect(id, namespace, stats, c.ns, ch)
 	}
 }
 
 // Add adds the provided cgroup and id so that metrics are collected and exported
-func (c *Collector) Add(id string, cg cgroups.Cgroup) error {
+func (c *Collector) Add(id, namespace string, cg cgroups.Cgroup) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if _, ok := c.cgroups[id]; ok {
+	if _, ok := c.cgroups[taskID(id, namespace)]; ok {
 		return ErrAlreadyCollected
 	}
-	c.cgroups[id] = cg
+	c.cgroups[taskID(id, namespace)] = &task{
+		id:        id,
+		namespace: namespace,
+		cgroup:    cg,
+	}
 	return nil
 }
 
 // Get returns the cgroup that is being collected under the provided id
 // returns ErrCgroupNotExists if the id is not being collected
-func (c *Collector) Get(id string) (cgroups.Cgroup, error) {
+func (c *Collector) Get(id, namespace string) (cgroups.Cgroup, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	cg, ok := c.cgroups[id]
+	t, ok := c.cgroups[taskID(id, namespace)]
 	if !ok {
 		return nil, ErrCgroupNotExists
 	}
-	return cg, nil
+	return t.cgroup, nil
 }
 
 // Remove removes the provided cgroup by id from the collector
-func (c *Collector) Remove(id string) {
+func (c *Collector) Remove(id, namespace string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	delete(c.cgroups, id)
+	delete(c.cgroups, taskID(id, namespace))
 }
 
 func blkioValues(l []cgroups.BlkioEntry) []value {

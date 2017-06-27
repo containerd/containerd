@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"runtime"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -67,14 +66,10 @@ func spec(id string, config *ocispec.ImageConfig, context *cli.Context) *specs.S
 
 	return &specs.Spec{
 		Version: specs.Version,
-		Platform: specs.Platform{
-			OS:   runtime.GOOS,
-			Arch: runtime.GOARCH,
-		},
 		Root: specs.Root{
 			Readonly: context.Bool("readonly"),
 		},
-		Process: specs.Process{
+		Process: &specs.Process{
 			Args:     args,
 			Terminal: tty,
 			Cwd:      cwd,
@@ -82,7 +77,7 @@ func spec(id string, config *ocispec.ImageConfig, context *cli.Context) *specs.S
 			User: specs.User{
 				Username: config.User,
 			},
-			ConsoleSize: specs.Box{
+			ConsoleSize: &specs.Box{
 				Height: uint(w),
 				Width:  uint(h),
 			},

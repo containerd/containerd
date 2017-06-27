@@ -1,4 +1,6 @@
-package prometheus
+// +build linux
+
+package cgroups
 
 import (
 	"github.com/containerd/cgroups"

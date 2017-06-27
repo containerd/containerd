@@ -1,4 +1,6 @@
-package prometheus
+// +build linux
+
+package cgroups
 
 import (
 	"github.com/containerd/cgroups"
@@ -22,12 +24,13 @@ type metric struct {
 }
 
 func (m *metric) desc(ns *metrics.Namespace) *prometheus.Desc {
-	return ns.NewDesc(m.name, m.help, m.unit, append([]string{"id"}, m.labels...)...)
+	// the namespace label is for containerd namespaces
+	return ns.NewDesc(m.name, m.help, m.unit, append([]string{"id", "namespace"}, m.labels...)...)
 }
 
-func (m *metric) collect(id string, stats *cgroups.Stats, ns *metrics.Namespace, ch chan<- prometheus.Metric) {
+func (m *metric) collect(id, namespace string, stats *cgroups.Stats, ns *metrics.Namespace, ch chan<- prometheus.Metric) {
 	values := m.getValues(stats)
 	for _, v := range values {
-		ch <- prometheus.MustNewConstMetric(m.desc(ns), m.vt, v.v, append([]string{id}, v.l...)...)
+		ch <- prometheus.MustNewConstMetric(m.desc(ns), m.vt, v.v, append([]string{id, namespace}, v.l...)...)
 	}
 }

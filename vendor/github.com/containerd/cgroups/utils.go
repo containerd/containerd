@@ -49,12 +49,11 @@ func runningInUserNS() bool {
 // defaults returns all known groups
 func defaults(root string) ([]Subsystem, error) {
 	h, err := NewHugetlb(root)
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
 	s := []Subsystem{
 		NewNamed(root, "systemd"),
-		h,
 		NewFreezer(root),
 		NewPids(root),
 		NewNetCls(root),
@@ -70,6 +69,11 @@ func defaults(root string) ([]Subsystem, error) {
 	// because modifications are not allowed
 	if !isUserNS {
 		s = append(s, NewDevices(root))
+	}
+	// add the hugetlb cgroup if error wasn't due to missing hugetlb
+	// cgroup support on the host
+	if err == nil {
+		s = append(s, h)
 	}
 	return s, nil
 }
