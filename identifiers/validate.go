@@ -6,8 +6,12 @@
 // 2.3.1. This will make identifiers safe for use across networks, filesystems
 // and other media.
 //
-// While the character set may expand in the future, we guarantee that the
-// identifiers will be safe for use as filesystem path components.
+// The identifier specification departs from RFC 1035 in that it allows
+// "labels" to start with number and only enforces a total length restriction
+// of 76 characters.
+//
+// While the character set may be expanded in the future, identifiers are
+// guaranteed to be safely used as filesystem path components.
 package identifiers
 
 import (
@@ -17,7 +21,9 @@ import (
 )
 
 const (
-	label = `[A-Za-z][A-Za-z0-9]+(?:[-]+[A-Za-z0-9]+)*`
+	maxLength = 76
+	charclass = `[A-Za-z0-9]+`
+	label     = charclass + `(:?[-]+` + charclass + `)*`
 )
 
 var (
@@ -27,7 +33,7 @@ var (
 	// identifiers.
 	identifierRe = regexp.MustCompile(reAnchor(label + reGroup("[.]"+reGroup(label)) + "*"))
 
-	errIdentifierInvalid = errors.Errorf("invalid, must match %v", identifierRe)
+	errIdentifierInvalid = errors.New("invalid identifier")
 )
 
 // IsInvalid return true if the error was due to an invalid identifer.
@@ -43,8 +49,12 @@ func IsInvalid(err error) bool {
 // In general, identifiers that pass this validation, should be safe for use as
 // a domain identifier or filesystem path component.
 func Validate(s string) error {
+	if len(s) > maxLength {
+		return errors.Wrapf(errIdentifierInvalid, "identifier %q greater than maximum length (%d characters)", s, maxLength)
+	}
+
 	if !identifierRe.MatchString(s) {
-		return errors.Wrapf(errIdentifierInvalid, "identifier %q", s)
+		return errors.Wrapf(errIdentifierInvalid, "identifier %q must match %v", s, identifierRe)
 	}
 	return nil
 }
