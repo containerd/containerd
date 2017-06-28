@@ -68,6 +68,10 @@ type container struct {
 	sendEvent eventCallback
 }
 
+func (c *container) ID() string {
+	return c.ctr.ID()
+}
+
 func (c *container) Info() runtime.TaskInfo {
 	return runtime.TaskInfo{
 		ID:      c.ctr.ID(),
@@ -122,14 +126,23 @@ func (c *container) State(ctx context.Context) (runtime.State, error) {
 	}, nil
 }
 
-func (c *container) Kill(ctx context.Context, signal uint32, pid uint32, all bool) error {
+func (c *container) Kill(ctx context.Context, signal uint32, all bool) error {
 	if winsys.Signal(signal) == winsys.SIGKILL {
 		return c.ctr.Kill(ctx)
 	}
 	return c.ctr.Stop(ctx)
 }
 
-func (c *container) Exec(ctx context.Context, opts runtime.ExecOpts) (runtime.Process, error) {
+func (c *container) Process(ctx context.Context, id string) (runtime.Process, error) {
+	for _, p := range c.ctr.Processes() {
+		if p.ID() == id {
+			return &process{p}, nil
+		}
+	}
+	return nil, errors.Errorf("process %s not found", id)
+}
+
+func (c *container) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runtime.Process, error) {
 	if c.ctr.Pid() == 0 {
 		return nil, ErrLoadedContainer
 	}
@@ -144,7 +157,7 @@ func (c *container) Exec(ctx context.Context, opts runtime.ExecOpts) (runtime.Pr
 		return nil, errors.Wrap(err, "failed to unmarshal oci spec")
 	}
 
-	p, err := c.ctr.AddProcess(ctx, &procSpec, pio)
+	p, err := c.ctr.AddProcess(ctx, id, &procSpec, pio)
 	if err != nil {
 		return nil, err
 	}
@@ -160,12 +173,12 @@ func (c *container) Exec(ctx context.Context, opts runtime.ExecOpts) (runtime.Pr
 	return &process{p}, nil
 }
 
-func (c *container) CloseIO(ctx context.Context, pid uint32) error {
-	return c.ctr.CloseIO(ctx, pid)
+func (c *container) CloseIO(ctx context.Context) error {
+	return c.ctr.CloseIO(ctx)
 }
 
-func (c *container) ResizePty(ctx context.Context, pid uint32, size runtime.ConsoleSize) error {
-	return c.ctr.ResizePty(ctx, pid, size)
+func (c *container) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
+	return c.ctr.ResizePty(ctx, size)
 }
 
 func (c *container) Status() runtime.Status {
@@ -192,16 +205,16 @@ func (c *container) Checkpoint(ctx context.Context, _ string, _ *types.Any) erro
 	return fmt.Errorf("Windows containers do not support checkpoint")
 }
 
-func (c *container) DeleteProcess(ctx context.Context, pid uint32) (*runtime.Exit, error) {
+func (c *container) DeleteProcess(ctx context.Context, id string) (*runtime.Exit, error) {
 	var process *hcs.Process
 	for _, p := range c.ctr.Processes() {
-		if p.Pid() == pid {
+		if p.ID() == id {
 			process = p
 			break
 		}
 	}
 	if process == nil {
-		return nil, fmt.Errorf("process %d not found", pid)
+		return nil, fmt.Errorf("process %s not found", id)
 	}
 	ec, err := process.ExitCode()
 	if err != nil {

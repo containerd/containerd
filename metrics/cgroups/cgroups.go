@@ -73,8 +73,9 @@ func (m *cgroupsMonitor) Events(events chan<- *events.RuntimeEvent) {
 
 func (m *cgroupsMonitor) trigger(id string, cg cgroups.Cgroup) {
 	m.events <- &events.RuntimeEvent{
-		Timestamp: time.Now(),
-		Type:      events.RuntimeEvent_OOM,
-		ID:        id,
+		Timestamp:   time.Now(),
+		Type:        events.RuntimeEvent_OOM,
+		ID:          id,
+		ContainerID: id,
 	}
 }

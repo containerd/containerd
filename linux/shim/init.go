@@ -48,11 +48,7 @@ type initProcess struct {
 	pid     int
 	closers []io.Closer
 	stdin   io.Closer
-
-	stdinPath  string
-	stdoutPath string
-	stderrPath string
-	terminal   bool
+	stdio   stdio
 }
 
 func newInitProcess(context context.Context, path, namespace string, r *shimapi.CreateTaskRequest) (*initProcess, error) {
@@ -82,13 +78,15 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 		Root:         filepath.Join(RuncRoot, namespace),
 	}
 	p := &initProcess{
-		id:         r.ID,
-		bundle:     r.Bundle,
-		runtime:    runtime,
-		stdinPath:  r.Stdin,
-		stdoutPath: r.Stdout,
-		stderrPath: r.Stderr,
-		terminal:   r.Terminal,
+		id:      r.ID,
+		bundle:  r.Bundle,
+		runtime: runtime,
+		stdio: stdio{
+			stdin:    r.Stdin,
+			stdout:   r.Stdout,
+			stderr:   r.Stderr,
+			terminal: r.Terminal,
+		},
 	}
 	var (
 		err    error
@@ -169,6 +167,10 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 	}
 	p.pid = pid
 	return p, nil
+}
+
+func (p *initProcess) ID() string {
+	return p.id
 }
 
 func (p *initProcess) Pid() int {
@@ -257,10 +259,6 @@ func (p *initProcess) killAll(context context.Context) error {
 	return p.runtimeError(err, "OCI runtime killall failed")
 }
 
-func (p *initProcess) Signal(sig int) error {
-	return checkKillError(unix.Kill(p.pid, syscall.Signal(sig)))
-}
-
 func (p *initProcess) Stdin() io.Closer {
 	return p.stdin
 }
@@ -304,6 +302,10 @@ func (p *initProcess) Update(context context.Context, r *shimapi.UpdateTaskReque
 		return err
 	}
 	return p.runtime.Update(context, p.id, &resources)
+}
+
+func (p *initProcess) Stdio() stdio {
+	return p.stdio
 }
 
 // TODO(mlaventure): move to runc package?

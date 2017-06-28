@@ -71,7 +71,10 @@ func main() {
 			return err
 		}
 		server := grpc.NewServer()
-		sv, err := shim.NewService(path, context.GlobalString("namespace"))
+		sv, err := shim.NewService(
+			path,
+			context.GlobalString("namespace"),
+		)
 		if err != nil {
 			return err
 		}

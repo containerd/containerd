@@ -36,7 +36,7 @@ var psCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		processes, err := task.Processes(ctx)
+		processes, err := task.Pids(ctx)
 		if err != nil {
 			return err
 		}

@@ -50,7 +50,7 @@ func (l *taskList) addWithNamespace(namespace string, t *Task) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	id := t.containerID
+	id := t.id
 	if _, ok := l.tasks[namespace]; !ok {
 		l.tasks[namespace] = make(map[string]*Task)
 	}
@@ -70,6 +70,6 @@ func (l *taskList) delete(ctx context.Context, t *Task) {
 	}
 	tasks, ok := l.tasks[namespace]
 	if ok {
-		delete(tasks, t.containerID)
+		delete(tasks, t.id)
 	}
 }

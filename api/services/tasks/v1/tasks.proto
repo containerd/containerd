@@ -49,14 +49,7 @@ service Tasks {
 }
 
 message CreateTaskRequest {
-	// NOTE: reserve field 1 for task id.
-
-	// ContainerID specifies the container to use for creating this task.
-	//
-	// The spec from the provided container id will be used to create the
-	// task associated with this container. Only one task can be run at a time
-	// per container.
-	string container_id = 2;
+	string container_id = 1;
 
 	// RootFS provides the pre-chroot mounts to perform in the shim before
 	// executing the container task.
@@ -77,17 +70,8 @@ message CreateTaskRequest {
 }
 
 message CreateTaskResponse {
-	// TODO(stevvooe): We no longer have an id for a task since they are bound
-	// to a single container. Although, we should represent each new task with
-	// an ID so one can differentiate between each instance of a container
-	// running.
-	//
-	// Hence, we are leaving this here and reserving the field number in case
-	// we need to move in this direction.
-	// string id = 1;
-
-	string container_id = 2;
-	uint32 pid = 3;
+	string container_id = 1;
+	uint32 pid = 2;
 }
 
 message StartTaskRequest {
@@ -99,7 +83,7 @@ message DeleteTaskRequest {
 }
 
 message DeleteResponse {
-	string container_id = 1;
+	string id = 1;
 	uint32 pid = 2;
 	uint32 exit_status = 3;
 	google.protobuf.Timestamp exited_at = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
@@ -107,7 +91,7 @@ message DeleteResponse {
 
 message DeleteProcessRequest {
 	string container_id = 1;
-	uint32 pid = 2;
+	string exec_id = 2;
 }
 
 message GetTaskRequest {
@@ -128,26 +112,23 @@ message ListTasksResponse {
 
 message KillRequest {
 	string container_id = 1;
-	uint32 signal = 2;
-	oneof pid_or_all {
-	    bool all = 3;
-	    uint32 pid = 4;
-	}
+	string exec_id = 2;
+	uint32 signal = 3;
+	bool all = 4;
 }
 
 message ExecProcessRequest {
-	// ContainerID specifies the container in which to exec the process.
 	string container_id = 1;
-
 	string stdin = 2;
 	string stdout = 3;
 	string stderr = 4;
 	bool terminal = 5;
-
 	// Spec for starting a process in the target container.
 	//
 	// For runc, this is a process spec, for example.
 	google.protobuf.Any spec = 6;
+	// id of the exec process
+	string exec_id = 7;
 }
 
 message ExecProcessResponse {
@@ -156,14 +137,14 @@ message ExecProcessResponse {
 
 message ResizePtyRequest {
 	string container_id = 1;
-	uint32 pid = 2;
+	string exec_id = 2;
 	uint32 width = 3;
 	uint32 height = 4;
 }
 
 message CloseIORequest {
 	string container_id = 1;
-	uint32 pid = 2;
+	string exec_id = 2;
 	bool stdin = 3;
 }
 

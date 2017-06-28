@@ -202,10 +202,9 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...Ne
 		}
 	}
 	t := &task{
-		client:      c.client,
-		io:          i,
-		containerID: c.ID(),
-		pidSync:     make(chan struct{}),
+		client: c.client,
+		io:     i,
+		id:     c.ID(),
 	}
 
 	if request.Checkpoint != nil {
@@ -217,7 +216,6 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...Ne
 			return nil, err
 		}
 		t.pid = response.Pid
-		close(t.pidSync)
 	}
 	return t, nil
 }
@@ -250,16 +248,11 @@ func (c *container) loadTask(ctx context.Context, ioAttach IOAttach) (Task, erro
 			return nil, err
 		}
 	}
-	// create and close a channel on load as we already have the pid
-	// and don't want to block calls to Wait(), etc...
-	ps := make(chan struct{})
-	close(ps)
 	t := &task{
-		client:      c.client,
-		io:          i,
-		containerID: response.Task.ContainerID,
-		pid:         response.Task.Pid,
-		pidSync:     ps,
+		client: c.client,
+		io:     i,
+		id:     response.Task.ID,
+		pid:    response.Task.Pid,
 	}
 	return t, nil
 }

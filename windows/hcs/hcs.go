@@ -172,7 +172,7 @@ func (c *Container) Processes() []*Process {
 }
 
 func (c *Container) Start(ctx context.Context) error {
-	_, err := c.addProcess(ctx, c.spec.Process, c.io)
+	_, err := c.addProcess(ctx, c.id, c.spec.Process, c.io)
 	return err
 }
 
@@ -199,35 +199,35 @@ func (c *Container) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (c *Container) CloseIO(ctx context.Context, pid uint32) error {
+func (c *Container) CloseIO(ctx context.Context) error {
 	var proc *Process
 	c.Lock()
 	for _, p := range c.processes {
-		if p.Pid() == pid {
+		if p.id == c.id {
 			proc = p
 			break
 		}
 	}
 	c.Unlock()
 	if proc == nil {
-		return errors.Errorf("no such process %v", pid)
+		return errors.Errorf("no such process %s", c.id)
 	}
 
 	return proc.CloseStdin()
 }
 
-func (c *Container) ResizePty(ctx context.Context, pid uint32, size runtime.ConsoleSize) error {
+func (c *Container) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
 	var proc *Process
 	c.Lock()
 	for _, p := range c.processes {
-		if p.Pid() == pid {
+		if p.id == c.id {
 			proc = p
 			break
 		}
 	}
 	c.Unlock()
 	if proc == nil {
-		return errors.Errorf("no such process %v", pid)
+		return errors.Errorf("no such process %s", c.id)
 	}
 
 	return proc.ResizeConsole(uint16(size.Width), uint16(size.Height))
@@ -303,15 +303,14 @@ func (c *Container) GetConfiguration() Configuration {
 	return c.conf
 }
 
-func (c *Container) AddProcess(ctx context.Context, spec *specs.Process, io *IO) (*Process, error) {
+func (c *Container) AddProcess(ctx context.Context, id string, spec *specs.Process, io *IO) (*Process, error) {
 	if len(c.processes) == 0 {
 		return nil, errors.New("container not started")
 	}
-
-	return c.addProcess(ctx, spec, io)
+	return c.addProcess(ctx, id, spec, io)
 }
 
-func (c *Container) addProcess(ctx context.Context, spec *specs.Process, pio *IO) (*Process, error) {
+func (c *Container) addProcess(ctx context.Context, id string, spec *specs.Process, pio *IO) (*Process, error) {
 	// If we don't have a process yet, reused the container pid
 	var pid uint32
 	if len(c.processes) == 0 {
@@ -388,6 +387,7 @@ func (c *Container) addProcess(ctx context.Context, spec *specs.Process, pio *IO
 	}
 
 	p := &Process{
+		id:      id,
 		Process: proc,
 		pid:     pid,
 		io:      pio,

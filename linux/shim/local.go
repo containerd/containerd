@@ -60,7 +60,7 @@ func (c *local) Stream(ctx context.Context, in *shimapi.StreamEventsRequest, opt
 	}, nil
 }
 
-func (c *local) State(ctx context.Context, in *google_protobuf.Empty, opts ...grpc.CallOption) (*shimapi.StateResponse, error) {
+func (c *local) State(ctx context.Context, in *shimapi.StateRequest, opts ...grpc.CallOption) (*shimapi.StateResponse, error) {
 	return c.s.State(ctx, in)
 }
 

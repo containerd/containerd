@@ -18,7 +18,7 @@ option go_package = "github.com/containerd/containerd/linux/shim/v1;shim";
 // for the container processes.
 service Shim {
 	// State returns shim and task state information.
-	rpc State(google.protobuf.Empty) returns (StateResponse);
+	rpc State(StateRequest) returns (StateResponse);
 
 	rpc Create(CreateTaskRequest) returns (CreateTaskResponse);
 
@@ -77,15 +77,16 @@ message DeleteResponse {
 }
 
 message DeleteProcessRequest {
-	uint32 pid = 1;
+	string id = 1;
 }
 
 message ExecProcessRequest {
-	bool terminal = 1;
-	string stdin = 2;
-	string stdout = 3;
-	string stderr = 4;
-	google.protobuf.Any spec = 5;
+	string id = 1;
+	bool terminal = 2;
+	string stdin = 3;
+	string stdout = 4;
+	string stderr = 5;
+	google.protobuf.Any spec = 6;
 }
 
 message ExecProcessResponse {
@@ -93,9 +94,13 @@ message ExecProcessResponse {
 }
 
 message ResizePtyRequest {
-	uint32 pid = 1;
+	string id = 1;
 	uint32 width = 2;
 	uint32 height = 3;
+}
+
+message StateRequest {
+	string id = 1;
 }
 
 message StateResponse {
@@ -103,21 +108,20 @@ message StateResponse {
 	string bundle = 2;
 	uint32 pid = 3;
 	containerd.v1.types.Status status = 4;
-	repeated containerd.v1.types.Process processes = 5;
-	string stdin = 6;
-	string stdout = 7;
-	string stderr = 8;
-	bool terminal = 9;
+	string stdin = 5;
+	string stdout = 6;
+	string stderr = 7;
+	bool terminal = 8;
 }
 
 message KillRequest {
-	uint32 signal = 1;
-	bool all = 2;
-	uint32 pid = 3;
+	string id = 1;
+	uint32 signal = 2;
+	bool all = 3;
 }
 
 message CloseIORequest {
-	uint32 pid = 1;
+	string id = 1;
 	bool stdin = 2;
 }
 

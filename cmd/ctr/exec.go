@@ -22,6 +22,10 @@ var execCommand = cli.Command{
 			Name:  "tty,t",
 			Usage: "allocate a TTY for the container",
 		},
+		cli.StringFlag{
+			Name:  "exec-id",
+			Usage: "exec specific id for the process",
+		},
 	},
 	Action: func(context *cli.Context) error {
 		var (
@@ -60,7 +64,7 @@ var execCommand = cli.Command{
 		if tty {
 			io = containerd.StdioTerminal
 		}
-		process, err := task.Exec(ctx, pspec, io)
+		process, err := task.Exec(ctx, context.String("exec-id"), pspec, io)
 		if err != nil {
 			return err
 		}
