@@ -467,7 +467,6 @@ func TestCreateContainer(t *testing.T) {
 		imageMetadataErr   bool
 		prepareSnapshotErr error
 		createRootDirErr   error
-		createMetadataErr  bool
 		expectErr          bool
 		expectMeta         *metadata.ContainerMetadata
 	}{
