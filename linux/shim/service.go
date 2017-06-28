@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/containerd/console"
+	events "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/types/task"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/reaper"
@@ -34,7 +35,7 @@ func NewService(path, namespace string) (*Service, error) {
 	return &Service{
 		path:      path,
 		processes: make(map[int]process),
-		events:    make(chan *shimapi.Event, 4096),
+		events:    make(chan *events.RuntimeEvent, 4096),
 		namespace: namespace,
 	}, nil
 }
@@ -46,9 +47,9 @@ type Service struct {
 	bundle        string
 	mu            sync.Mutex
 	processes     map[int]process
-	events        chan *shimapi.Event
+	events        chan *events.RuntimeEvent
 	eventsMu      sync.Mutex
-	deferredEvent *shimapi.Event
+	deferredEvent *events.RuntimeEvent
 	execID        int
 	namespace     string
 }
@@ -69,8 +70,8 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*sh
 		ExitCh: make(chan int, 1),
 	}
 	reaper.Default.Register(pid, cmd)
-	s.events <- &shimapi.Event{
-		Type: shimapi.Event_CREATE,
+	s.events <- &events.RuntimeEvent{
+		Type: events.RuntimeEvent_CREATE,
 		ID:   r.ID,
 		Pid:  uint32(pid),
 	}
@@ -87,8 +88,8 @@ func (s *Service) Start(ctx context.Context, r *google_protobuf.Empty) (*google_
 	if err := s.initProcess.Start(ctx); err != nil {
 		return nil, err
 	}
-	s.events <- &shimapi.Event{
-		Type: shimapi.Event_START,
+	s.events <- &events.RuntimeEvent{
+		Type: events.RuntimeEvent_START,
 		ID:   s.id,
 		Pid:  uint32(s.initProcess.Pid()),
 	}
@@ -156,8 +157,8 @@ func (s *Service) Exec(ctx context.Context, r *shimapi.ExecProcessRequest) (*shi
 	reaper.Default.Register(pid, cmd)
 	s.processes[pid] = process
 
-	s.events <- &shimapi.Event{
-		Type: shimapi.Event_EXEC_ADDED,
+	s.events <- &events.RuntimeEvent{
+		Type: events.RuntimeEvent_EXEC_ADDED,
 		ID:   s.id,
 		Pid:  uint32(pid),
 	}
@@ -379,8 +380,8 @@ func (s *Service) waitExit(p process, pid int, cmd *reaper.Cmd) {
 	p.Exited(status)
 
 	reaper.Default.Delete(pid)
-	s.events <- &shimapi.Event{
-		Type:       shimapi.Event_EXIT,
+	s.events <- &events.RuntimeEvent{
+		Type:       events.RuntimeEvent_EXIT,
 		ID:         s.id,
 		Pid:        uint32(pid),
 		ExitStatus: uint32(status),

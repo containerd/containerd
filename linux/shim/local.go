@@ -5,6 +5,7 @@ package shim
 import (
 	"path/filepath"
 
+	events "github.com/containerd/containerd/api/services/events/v1"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
@@ -53,7 +54,7 @@ func (c *local) ResizePty(ctx context.Context, in *shimapi.ResizePtyRequest, opt
 }
 
 func (c *local) Stream(ctx context.Context, in *shimapi.StreamEventsRequest, opts ...grpc.CallOption) (shimapi.Shim_StreamClient, error) {
-	return &events{
+	return &streamEvents{
 		c:   c.s.events,
 		ctx: ctx,
 	}, nil
@@ -95,36 +96,36 @@ func (c *local) Update(ctx context.Context, in *shimapi.UpdateTaskRequest, opts 
 	return c.s.Update(ctx, in)
 }
 
-type events struct {
-	c   chan *shimapi.Event
+type streamEvents struct {
+	c   chan *events.RuntimeEvent
 	ctx context.Context
 }
 
-func (e *events) Recv() (*shimapi.Event, error) {
+func (e *streamEvents) Recv() (*events.RuntimeEvent, error) {
 	ev := <-e.c
 	return ev, nil
 }
 
-func (e *events) Header() (metadata.MD, error) {
+func (e *streamEvents) Header() (metadata.MD, error) {
 	return nil, nil
 }
 
-func (e *events) Trailer() metadata.MD {
+func (e *streamEvents) Trailer() metadata.MD {
 	return nil
 }
 
-func (e *events) CloseSend() error {
+func (e *streamEvents) CloseSend() error {
 	return nil
 }
 
-func (e *events) Context() context.Context {
+func (e *streamEvents) Context() context.Context {
 	return e.ctx
 }
 
-func (e *events) SendMsg(m interface{}) error {
+func (e *streamEvents) SendMsg(m interface{}) error {
 	return nil
 }
 
-func (e *events) RecvMsg(m interface{}) error {
+func (e *streamEvents) RecvMsg(m interface{}) error {
 	return nil
 }

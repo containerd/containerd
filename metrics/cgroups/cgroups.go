@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/containerd/cgroups"
+	events "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
 	metrics "github.com/docker/go-metrics"
@@ -41,7 +42,7 @@ type cgroupsMonitor struct {
 	collector *Collector
 	oom       *OOMCollector
 	context   context.Context
-	events    chan<- *runtime.Event
+	events    chan<- *events.RuntimeEvent
 }
 
 func (m *cgroupsMonitor) Monitor(c runtime.Task) error {
@@ -66,14 +67,14 @@ func (m *cgroupsMonitor) Stop(c runtime.Task) error {
 	return nil
 }
 
-func (m *cgroupsMonitor) Events(events chan<- *runtime.Event) {
+func (m *cgroupsMonitor) Events(events chan<- *events.RuntimeEvent) {
 	m.events = events
 }
 
 func (m *cgroupsMonitor) trigger(id string, cg cgroups.Cgroup) {
-	m.events <- &runtime.Event{
+	m.events <- &events.RuntimeEvent{
 		Timestamp: time.Now(),
-		Type:      runtime.OOMEvent,
+		Type:      events.RuntimeEvent_OOM,
 		ID:        id,
 	}
 }

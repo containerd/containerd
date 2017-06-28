@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"google.golang.org/grpc"
 
@@ -91,7 +90,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		remote:        !cfg.NoShim,
 		shim:          cfg.Shim,
 		runtime:       cfg.Runtime,
-		events:        make(chan *runtime.Event, 2048),
+		events:        make(chan *eventsapi.RuntimeEvent, 2048),
 		eventsContext: c,
 		eventsCancel:  cancel,
 		monitor:       monitor.(runtime.TaskMonitor),
@@ -122,7 +121,7 @@ type Runtime struct {
 	runtime string
 	remote  bool
 
-	events        chan *runtime.Event
+	events        chan *eventsapi.RuntimeEvent
 	eventsContext context.Context
 	eventsCancel  func()
 	monitor       runtime.TaskMonitor
@@ -346,6 +345,7 @@ func (r *Runtime) handleEvents(ctx context.Context, s *client.Client) error {
 	return nil
 }
 
+// forward forwards events from a shim to the events service and monitors
 func (r *Runtime) forward(ctx context.Context, events shim.Shim_StreamClient) {
 	for {
 		e, err := events.Recv()
@@ -355,44 +355,27 @@ func (r *Runtime) forward(ctx context.Context, events shim.Shim_StreamClient) {
 			}
 			return
 		}
-		topic := ""
-		var et runtime.EventType
-		switch e.Type {
-		case shim.Event_CREATE:
-			topic = "task-create"
-			et = runtime.CreateEvent
-		case shim.Event_START:
-			topic = "task-start"
-			et = runtime.StartEvent
-		case shim.Event_EXEC_ADDED:
-			topic = "task-execadded"
-			et = runtime.ExecAddEvent
-		case shim.Event_OOM:
-			topic = "task-oom"
-			et = runtime.OOMEvent
-		case shim.Event_EXIT:
-			topic = "task-exit"
-			et = runtime.ExitEvent
-		}
-		r.events <- &runtime.Event{
-			Timestamp:  time.Now(),
-			Runtime:    r.ID(),
-			Type:       et,
-			Pid:        e.Pid,
-			ID:         e.ID,
-			ExitStatus: e.ExitStatus,
-			ExitedAt:   e.ExitedAt,
-		}
-		if err := r.emit(ctx, "/runtime/"+topic, &eventsapi.RuntimeEvent{
-			ID:         e.ID,
-			Type:       eventsapi.RuntimeEvent_EventType(e.Type),
-			Pid:        e.Pid,
-			ExitStatus: e.ExitStatus,
-			ExitedAt:   e.ExitedAt,
-		}); err != nil {
+		r.events <- e
+		if err := r.emit(ctx, "/runtime/"+getTopic(e), e); err != nil {
 			return
 		}
 	}
+}
+
+func getTopic(e *eventsapi.RuntimeEvent) string {
+	switch e.Type {
+	case eventsapi.RuntimeEvent_CREATE:
+		return "task-create"
+	case eventsapi.RuntimeEvent_START:
+		return "task-start"
+	case eventsapi.RuntimeEvent_EXEC_ADDED:
+		return "task-execadded"
+	case eventsapi.RuntimeEvent_OOM:
+		return "task-oom"
+	case eventsapi.RuntimeEvent_EXIT:
+		return "task-exit"
+	}
+	return ""
 }
 
 func (r *Runtime) terminate(ctx context.Context, bundle *bundle, ns, id string) error {

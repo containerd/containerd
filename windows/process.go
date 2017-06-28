@@ -5,7 +5,7 @@ package windows
 import (
 	"context"
 
-	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/windows/hcs"
 )
 
@@ -14,8 +14,8 @@ type process struct {
 	*hcs.Process
 }
 
-func (p *process) State(ctx context.Context) (plugin.State, error) {
-	return plugin.State{
+func (p *process) State(ctx context.Context) (runtime.State, error) {
+	return runtime.State{
 		Pid:    p.Pid(),
 		Status: p.Status(),
 	}, nil
@@ -25,7 +25,7 @@ func (p *process) Kill(ctx context.Context, sig uint32, all bool) error {
 	return p.Process.Kill()
 }
 
-func (p *process) Status() plugin.Status {
+func (p *process) Status() runtime.Status {
 	return p.Process.Status()
 }
 
