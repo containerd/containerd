@@ -33,12 +33,10 @@ import (
 func TestVersion(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	// TODO(random-liu): Check containerd version after containerd fixes its version.
 	for desc, test := range map[string]struct {
-		versionRes      *versionapi.VersionResponse
-		versionErr      error
-		expectErr       bool
-		expectedVersion string
+		versionRes *versionapi.VersionResponse
+		versionErr error
+		expectErr  bool
 	}{
 		"should return error if containerd version returns error": {
 			versionErr: errors.New("random error"),
