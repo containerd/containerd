@@ -1,4 +1,4 @@
-package plugin
+package runtime
 
 // TaskMonitor provides an interface for monitoring of containers within containerd
 type TaskMonitor interface {

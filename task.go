@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"runtime"
+	goruntime "runtime"
 	"strings"
 	"syscall"
 
@@ -15,8 +15,8 @@ import (
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/events"
-	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/rootfs"
+	"github.com/containerd/containerd/runtime"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"google.golang.org/grpc"
@@ -115,7 +115,7 @@ func (t *task) Kill(ctx context.Context, s syscall.Signal) error {
 		},
 	})
 	if err != nil {
-		if strings.Contains(grpc.ErrorDesc(err), plugin.ErrProcessExited.Error()) {
+		if strings.Contains(grpc.ErrorDesc(err), runtime.ErrProcessExited.Error()) {
 			return ErrProcessExited
 		}
 		return err
@@ -320,8 +320,8 @@ func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tas
 			Size:      d.Size_,
 			Digest:    d.Digest,
 			Platform: &v1.Platform{
-				OS:           runtime.GOOS,
-				Architecture: runtime.GOARCH,
+				OS:           goruntime.GOOS,
+				Architecture: goruntime.GOARCH,
 			},
 		})
 	}
@@ -334,8 +334,8 @@ func (t *task) checkpointRWSnapshot(ctx context.Context, index *v1.Index, id str
 		return err
 	}
 	rw.Platform = &v1.Platform{
-		OS:           runtime.GOOS,
-		Architecture: runtime.GOARCH,
+		OS:           goruntime.GOOS,
+		Architecture: goruntime.GOARCH,
 	}
 	index.Manifests = append(index.Manifests, rw)
 	return nil

@@ -22,6 +22,7 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/runtime"
 	protobuf "github.com/gogo/protobuf/types"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	specs "github.com/opencontainers/image-spec/specs-go"
@@ -62,9 +63,9 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	runtimes := make(map[string]plugin.Runtime)
+	runtimes := make(map[string]runtime.Runtime)
 	for _, rr := range rt {
-		r := rr.(plugin.Runtime)
+		r := rr.(runtime.Runtime)
 		runtimes[r.ID()] = r
 	}
 	e := events.GetPoster(ic.Context)
@@ -77,7 +78,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 }
 
 type Service struct {
-	runtimes map[string]plugin.Runtime
+	runtimes map[string]runtime.Runtime
 	db       *bolt.DB
 	store    content.Store
 	emitter  events.Poster
@@ -124,9 +125,9 @@ func (s *Service) Create(ctx context.Context, r *api.CreateTaskRequest) (*api.Cr
 		return nil, err
 	}
 
-	opts := plugin.CreateOpts{
+	opts := runtime.CreateOpts{
 		Spec: container.Spec,
-		IO: plugin.IO{
+		IO: runtime.IO{
 			Stdin:    r.Stdin,
 			Stdout:   r.Stdout,
 			Stderr:   r.Stderr,
@@ -227,7 +228,7 @@ func (s *Service) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest
 	}, nil
 }
 
-func taskFromContainerd(ctx context.Context, c plugin.Task) (*task.Task, error) {
+func taskFromContainerd(ctx context.Context, c runtime.Task) (*task.Task, error) {
 	state, err := c.State(ctx)
 	if err != nil {
 		return nil, err
@@ -235,13 +236,13 @@ func taskFromContainerd(ctx context.Context, c plugin.Task) (*task.Task, error) 
 
 	var status task.Status
 	switch state.Status {
-	case plugin.CreatedStatus:
+	case runtime.CreatedStatus:
 		status = task.StatusCreated
-	case plugin.RunningStatus:
+	case runtime.RunningStatus:
 		status = task.StatusRunning
-	case plugin.StoppedStatus:
+	case runtime.StoppedStatus:
 		status = task.StatusStopped
-	case plugin.PausedStatus:
+	case runtime.PausedStatus:
 		status = task.StatusPaused
 	default:
 		log.G(ctx).WithField("status", state.Status).Warn("unknown status")
@@ -366,9 +367,9 @@ func (s *Service) Exec(ctx context.Context, r *api.ExecProcessRequest) (*api.Exe
 	if err != nil {
 		return nil, err
 	}
-	process, err := t.Exec(ctx, plugin.ExecOpts{
+	process, err := t.Exec(ctx, runtime.ExecOpts{
 		Spec: r.Spec.Value,
-		IO: plugin.IO{
+		IO: runtime.IO{
 			Stdin:    r.Stdin,
 			Stdout:   r.Stdout,
 			Stderr:   r.Stderr,
@@ -392,7 +393,7 @@ func (s *Service) ResizePty(ctx context.Context, r *api.ResizePtyRequest) (*goog
 	if err != nil {
 		return nil, err
 	}
-	if err := t.ResizePty(ctx, r.Pid, plugin.ConsoleSize{
+	if err := t.ResizePty(ctx, r.Pid, runtime.ConsoleSize{
 		Width:  r.Width,
 		Height: r.Height,
 	}); err != nil {
@@ -497,7 +498,7 @@ func (s *Service) getContainer(ctx context.Context, id string) (containers.Conta
 	return container, nil
 }
 
-func (s *Service) getTask(ctx context.Context, id string) (plugin.Task, error) {
+func (s *Service) getTask(ctx context.Context, id string) (runtime.Task, error) {
 	container, err := s.getContainer(ctx, id)
 	if err != nil {
 		return nil, grpc.Errorf(codes.InvalidArgument, "task %v not found: %s", id, err.Error())
@@ -516,7 +517,7 @@ func (s *Service) getTask(ctx context.Context, id string) (plugin.Task, error) {
 	return t, nil
 }
 
-func (s *Service) getRuntime(name string) (plugin.Runtime, error) {
+func (s *Service) getRuntime(name string) (runtime.Runtime, error) {
 	runtime, ok := s.runtimes[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown runtime %q", name)

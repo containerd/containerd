@@ -7,6 +7,7 @@ import (
 
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/runtime"
 	metrics "github.com/docker/go-metrics"
 	"golang.org/x/net/context"
 )
@@ -40,10 +41,10 @@ type cgroupsMonitor struct {
 	collector *Collector
 	oom       *OOMCollector
 	context   context.Context
-	events    chan<- *plugin.Event
+	events    chan<- *runtime.Event
 }
 
-func (m *cgroupsMonitor) Monitor(c plugin.Task) error {
+func (m *cgroupsMonitor) Monitor(c runtime.Task) error {
 	info := c.Info()
 	state, err := c.State(m.context)
 	if err != nil {
@@ -59,20 +60,20 @@ func (m *cgroupsMonitor) Monitor(c plugin.Task) error {
 	return m.oom.Add(info.ID, info.Namespace, cg, m.trigger)
 }
 
-func (m *cgroupsMonitor) Stop(c plugin.Task) error {
+func (m *cgroupsMonitor) Stop(c runtime.Task) error {
 	info := c.Info()
 	m.collector.Remove(info.ID, info.Namespace)
 	return nil
 }
 
-func (m *cgroupsMonitor) Events(events chan<- *plugin.Event) {
+func (m *cgroupsMonitor) Events(events chan<- *runtime.Event) {
 	m.events = events
 }
 
 func (m *cgroupsMonitor) trigger(id string, cg cgroups.Cgroup) {
-	m.events <- &plugin.Event{
+	m.events <- &runtime.Event{
 		Timestamp: time.Now(),
-		Type:      plugin.OOMEvent,
+		Type:      runtime.OOMEvent,
 		ID:        id,
 	}
 }
