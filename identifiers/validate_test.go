@@ -1,6 +1,7 @@
 package identifiers
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -15,6 +16,9 @@ func TestValidIdentifiers(t *testing.T) {
 		"foo.boo",
 		"swarmkit.docker.io",
 		"zn--e9.org", // or something like it!
+		"0912341234",
+		"task.0.0123456789",
+		strings.Repeat("a", maxLength),
 	} {
 		t.Run(input, func(t *testing.T) {
 			if err := Validate(input); err != nil {
@@ -34,6 +38,7 @@ func TestInvalidIdentifiers(t *testing.T) {
 		"-foo.boo",
 		"foo.boo-",
 		"foo_foo.boo_underscores", // boo-urns?
+		strings.Repeat("a", maxLength+1),
 	} {
 
 		t.Run(input, func(t *testing.T) {
