@@ -764,7 +764,7 @@ func TestContainerUpdate(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	limit := uint64(32 * 1024 * 1024)
+	limit := int64(32 * 1024 * 1024)
 	spec.Linux.Resources.Memory = &specs.LinuxMemory{
 		Limit: &limit,
 	}
@@ -802,7 +802,7 @@ func TestContainerUpdate(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if stat.Memory.Usage.Limit != limit {
+	if int64(stat.Memory.Usage.Limit) != limit {
 		t.Errorf("expected memory limit to be set to %d but received %d", limit, stat.Memory.Usage.Limit)
 		return
 	}
@@ -819,7 +819,7 @@ func TestContainerUpdate(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if stat.Memory.Usage.Limit != limit {
+	if int64(stat.Memory.Usage.Limit) != limit {
 		t.Errorf("expected memory limit to be set to %d but received %d", limit, stat.Memory.Usage.Limit)
 	}
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
