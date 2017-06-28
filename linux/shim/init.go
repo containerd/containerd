@@ -20,7 +20,7 @@ import (
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -369,7 +369,7 @@ func checkKillError(err error) error {
 		return nil
 	}
 	if strings.Contains(err.Error(), "os: process already finished") || err == unix.ESRCH {
-		return plugin.ErrProcessExited
+		return runtime.ErrProcessExited
 	}
 	return err
 }

@@ -1,4 +1,6 @@
-package plugin
+package runtime
+
+import events "github.com/containerd/containerd/api/services/events/v1"
 
 // TaskMonitor provides an interface for monitoring of containers within containerd
 type TaskMonitor interface {
@@ -6,8 +8,8 @@ type TaskMonitor interface {
 	Monitor(Task) error
 	// Stop stops and removes the provided container from the monitor
 	Stop(Task) error
-	// Events emits events from the monitor
-	Events(chan<- *Event)
+	// Events emits events to the channel for the monitor
+	Events(chan<- *events.RuntimeEvent)
 }
 
 func NewMultiTaskMonitor(monitors ...TaskMonitor) TaskMonitor {
@@ -31,7 +33,7 @@ func (mm *noopTaskMonitor) Stop(c Task) error {
 	return nil
 }
 
-func (mm *noopTaskMonitor) Events(events chan<- *Event) {
+func (mm *noopTaskMonitor) Events(events chan<- *events.RuntimeEvent) {
 }
 
 type multiTaskMonitor struct {
@@ -56,7 +58,7 @@ func (mm *multiTaskMonitor) Stop(c Task) error {
 	return nil
 }
 
-func (mm *multiTaskMonitor) Events(events chan<- *Event) {
+func (mm *multiTaskMonitor) Events(events chan<- *events.RuntimeEvent) {
 	for _, m := range mm.monitors {
 		m.Events(events)
 	}

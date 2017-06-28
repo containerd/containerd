@@ -1,4 +1,4 @@
-package plugin
+package runtime
 
 import "errors"
 

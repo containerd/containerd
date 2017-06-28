@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"google.golang.org/grpc"
 
@@ -24,6 +23,7 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/runtime"
 	runc "github.com/containerd/go-runc"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
@@ -60,7 +60,7 @@ func init() {
 	})
 }
 
-var _ = (plugin.Runtime)(&Runtime{})
+var _ = (runtime.Runtime)(&Runtime{})
 
 type Config struct {
 	// Shim is a path or name of binary implementing the Shim GRPC API
@@ -90,10 +90,10 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		remote:        !cfg.NoShim,
 		shim:          cfg.Shim,
 		runtime:       cfg.Runtime,
-		events:        make(chan *plugin.Event, 2048),
+		events:        make(chan *eventsapi.RuntimeEvent, 2048),
 		eventsContext: c,
 		eventsCancel:  cancel,
-		monitor:       monitor.(plugin.TaskMonitor),
+		monitor:       monitor.(runtime.TaskMonitor),
 		tasks:         newTaskList(),
 		emitter:       events.GetPoster(ic.Context),
 		db:            m.(*bolt.DB),
@@ -121,10 +121,10 @@ type Runtime struct {
 	runtime string
 	remote  bool
 
-	events        chan *plugin.Event
+	events        chan *eventsapi.RuntimeEvent
 	eventsContext context.Context
 	eventsCancel  func()
-	monitor       plugin.TaskMonitor
+	monitor       runtime.TaskMonitor
 	tasks         *taskList
 	emitter       events.Poster
 	db            *bolt.DB
@@ -134,7 +134,7 @@ func (r *Runtime) ID() string {
 	return pluginID
 }
 
-func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts) (_ plugin.Task, err error) {
+func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts) (_ runtime.Task, err error) {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -216,7 +216,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts)
 	return t, nil
 }
 
-func (r *Runtime) Delete(ctx context.Context, c plugin.Task) (*plugin.Exit, error) {
+func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, error) {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -249,19 +249,19 @@ func (r *Runtime) Delete(ctx context.Context, c plugin.Task) (*plugin.Exit, erro
 	}); err != nil {
 		return nil, err
 	}
-	return &plugin.Exit{
+	return &runtime.Exit{
 		Status:    rsp.ExitStatus,
 		Timestamp: rsp.ExitedAt,
 		Pid:       rsp.Pid,
 	}, bundle.Delete()
 }
 
-func (r *Runtime) Tasks(ctx context.Context) ([]plugin.Task, error) {
+func (r *Runtime) Tasks(ctx context.Context) ([]runtime.Task, error) {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
 	}
-	var o []plugin.Task
+	var o []runtime.Task
 	tasks, ok := r.tasks.tasks[namespace]
 	if !ok {
 		return o, nil
@@ -293,7 +293,7 @@ func (r *Runtime) restoreTasks(ctx context.Context) ([]*Task, error) {
 	return o, nil
 }
 
-func (r *Runtime) Get(ctx context.Context, id string) (plugin.Task, error) {
+func (r *Runtime) Get(ctx context.Context, id string) (runtime.Task, error) {
 	return r.tasks.get(ctx, id)
 }
 
@@ -345,6 +345,7 @@ func (r *Runtime) handleEvents(ctx context.Context, s *client.Client) error {
 	return nil
 }
 
+// forward forwards events from a shim to the events service and monitors
 func (r *Runtime) forward(ctx context.Context, events shim.Shim_StreamClient) {
 	for {
 		e, err := events.Recv()
@@ -354,44 +355,27 @@ func (r *Runtime) forward(ctx context.Context, events shim.Shim_StreamClient) {
 			}
 			return
 		}
-		topic := ""
-		var et plugin.EventType
-		switch e.Type {
-		case shim.Event_CREATE:
-			topic = "task-create"
-			et = plugin.CreateEvent
-		case shim.Event_START:
-			topic = "task-start"
-			et = plugin.StartEvent
-		case shim.Event_EXEC_ADDED:
-			topic = "task-execadded"
-			et = plugin.ExecAddEvent
-		case shim.Event_OOM:
-			topic = "task-oom"
-			et = plugin.OOMEvent
-		case shim.Event_EXIT:
-			topic = "task-exit"
-			et = plugin.ExitEvent
-		}
-		r.events <- &plugin.Event{
-			Timestamp:  time.Now(),
-			Runtime:    r.ID(),
-			Type:       et,
-			Pid:        e.Pid,
-			ID:         e.ID,
-			ExitStatus: e.ExitStatus,
-			ExitedAt:   e.ExitedAt,
-		}
-		if err := r.emit(ctx, "/runtime/"+topic, &eventsapi.RuntimeEvent{
-			ID:         e.ID,
-			Type:       eventsapi.RuntimeEvent_EventType(e.Type),
-			Pid:        e.Pid,
-			ExitStatus: e.ExitStatus,
-			ExitedAt:   e.ExitedAt,
-		}); err != nil {
+		r.events <- e
+		if err := r.emit(ctx, "/runtime/"+getTopic(e), e); err != nil {
 			return
 		}
 	}
+}
+
+func getTopic(e *eventsapi.RuntimeEvent) string {
+	switch e.Type {
+	case eventsapi.RuntimeEvent_CREATE:
+		return "task-create"
+	case eventsapi.RuntimeEvent_START:
+		return "task-start"
+	case eventsapi.RuntimeEvent_EXEC_ADDED:
+		return "task-execadded"
+	case eventsapi.RuntimeEvent_OOM:
+		return "task-oom"
+	case eventsapi.RuntimeEvent_EXIT:
+		return "task-exit"
+	}
+	return ""
 }
 
 func (r *Runtime) terminate(ctx context.Context, bundle *bundle, ns, id string) error {

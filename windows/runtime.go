@@ -11,8 +11,10 @@ import (
 	"sync"
 	"time"
 
+	events "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/windows/hcs"
 	"github.com/containerd/containerd/windows/pid"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -24,7 +26,7 @@ const (
 	owner       = "containerd"
 )
 
-var _ = (plugin.Runtime)(&Runtime{})
+var _ = (runtime.Runtime)(&Runtime{})
 
 func init() {
 	plugin.Register(&plugin.Registration{
@@ -44,7 +46,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	r := &Runtime{
 		pidPool:       pid.NewPool(),
 		containers:    make(map[string]*container),
-		events:        make(chan *plugin.Event, 2048),
+		events:        make(chan *events.RuntimeEvent, 2048),
 		eventsContext: c,
 		eventsCancel:  cancel,
 		rootDir:       rootDir,
@@ -60,7 +62,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 
 	for _, c := range ctrs {
 		c.ctr.Delete(ic.Context)
-		r.sendEvent(c.ctr.ID(), plugin.ExitEvent, c.ctr.Pid(), 255, time.Time{})
+		r.sendEvent(c.ctr.ID(), events.RuntimeEvent_EXIT, c.ctr.Pid(), 255, time.Time{})
 	}
 
 	// Try to delete the old state dir and recreate it
@@ -87,7 +89,7 @@ type Runtime struct {
 
 	containers map[string]*container
 
-	events        chan *plugin.Event
+	events        chan *events.RuntimeEvent
 	eventsContext context.Context
 	eventsCancel  func()
 }
@@ -104,7 +106,7 @@ func (r *Runtime) ID() string {
 	return fmt.Sprintf("%s.%s", plugin.RuntimePlugin, runtimeName)
 }
 
-func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts) (plugin.Task, error) {
+func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts) (runtime.Task, error) {
 	var rtSpec RuntimeSpec
 	if err := json.Unmarshal(opts.Spec, &rtSpec); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal oci spec")
@@ -122,7 +124,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts plugin.CreateOpts)
 	return ctr, nil
 }
 
-func (r *Runtime) Delete(ctx context.Context, c plugin.Task) (*plugin.Exit, error) {
+func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, error) {
 	wc, ok := c.(*container)
 	if !ok {
 		return nil, fmt.Errorf("container cannot be cast as *windows.container")
@@ -138,16 +140,16 @@ func (r *Runtime) Delete(ctx context.Context, c plugin.Task) (*plugin.Exit, erro
 	delete(r.containers, wc.ctr.ID())
 	r.Unlock()
 
-	return &plugin.Exit{
+	return &runtime.Exit{
 		Status:    ec,
 		Timestamp: wc.ctr.Processes()[0].ExitedAt(),
 	}, nil
 }
 
-func (r *Runtime) Tasks(ctx context.Context) ([]plugin.Task, error) {
+func (r *Runtime) Tasks(ctx context.Context) ([]runtime.Task, error) {
 	r.Lock()
 	defer r.Unlock()
-	list := make([]plugin.Task, len(r.containers))
+	list := make([]runtime.Task, len(r.containers))
 	for _, c := range r.containers {
 		select {
 		case <-ctx.Done():
@@ -159,7 +161,7 @@ func (r *Runtime) Tasks(ctx context.Context) ([]plugin.Task, error) {
 	return list, nil
 }
 
-func (r *Runtime) Get(ctx context.Context, id string) (plugin.Task, error) {
+func (r *Runtime) Get(ctx context.Context, id string) (runtime.Task, error) {
 	r.Lock()
 	defer r.Unlock()
 	c, ok := r.containers[id]
@@ -169,10 +171,9 @@ func (r *Runtime) Get(ctx context.Context, id string) (plugin.Task, error) {
 	return c, nil
 }
 
-func (r *Runtime) sendEvent(id string, evType plugin.EventType, pid, exitStatus uint32, exitedAt time.Time) {
-	r.events <- &plugin.Event{
+func (r *Runtime) sendEvent(id string, evType events.RuntimeEvent_EventType, pid, exitStatus uint32, exitedAt time.Time) {
+	r.events <- &events.RuntimeEvent{
 		Timestamp:  time.Now(),
-		Runtime:    runtimeName,
 		Type:       evType,
 		Pid:        pid,
 		ID:         id,

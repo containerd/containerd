@@ -8,6 +8,7 @@ import "gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
 import "github.com/containerd/containerd/api/types/mount.proto";
 import "github.com/containerd/containerd/api/types/task/task.proto";
+import "github.com/containerd/containerd/api/services/events/v1/runtime.proto";
 
 option go_package = "github.com/containerd/containerd/linux/shim/v1;shim";
 
@@ -35,7 +36,7 @@ service Shim {
 
 	rpc Checkpoint(CheckpointTaskRequest) returns (google.protobuf.Empty);
 
-	rpc Stream(StreamEventsRequest) returns (stream Event);
+	rpc Stream(StreamEventsRequest) returns (stream containerd.services.events.v1.RuntimeEvent);
 
 	rpc Kill(KillRequest) returns (google.protobuf.Empty);
 
@@ -137,24 +138,6 @@ message ShimInfoResponse {
 }
 
 message StreamEventsRequest {
-}
-
-message Event {
-	string id = 1;
-
-	enum EventType {
-		EXIT = 0;
-		OOM = 1;
-		CREATE = 2;
-		START = 3;
-		EXEC_ADDED = 4;
-		PAUSED = 5;
-	}
-
-	EventType type = 2;
-	uint32 pid = 3;
-	uint32 exit_status = 4;
-	google.protobuf.Timestamp exited_at = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message UpdateTaskRequest {

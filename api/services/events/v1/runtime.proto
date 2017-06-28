@@ -42,6 +42,7 @@ message RuntimeEvent {
 	uint32 pid = 3;
 	uint32 exit_status = 4;
 	google.protobuf.Timestamp exited_at = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp timestamp = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message RuntimeDelete {
