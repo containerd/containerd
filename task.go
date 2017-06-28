@@ -213,17 +213,13 @@ func (t *task) Exec(ctx context.Context, spec *specs.Process, ioCreate IOCreatio
 }
 
 func (t *task) Processes(ctx context.Context) ([]uint32, error) {
-	response, err := t.client.TaskService().ListProcesses(ctx, &tasks.ListProcessesRequest{
+	response, err := t.client.TaskService().ListPids(ctx, &tasks.ListPidsRequest{
 		ContainerID: t.containerID,
 	})
 	if err != nil {
 		return nil, err
 	}
-	var out []uint32
-	for _, p := range response.Processes {
-		out = append(out, p.Pid)
-	}
-	return out, nil
+	return response.Pids, nil
 }
 
 func (t *task) CloseIO(ctx context.Context, opts ...IOCloserOpts) error {

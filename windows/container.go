@@ -175,17 +175,15 @@ func (c *container) Pid() uint32 {
 	return c.ctr.Pid()
 }
 
-func (c *container) Processes(ctx context.Context) ([]uint32, error) {
+func (c *container) Pids(ctx context.Context) ([]uint32, error) {
 	pl, err := c.ctr.ProcessList()
 	if err != nil {
 		return nil, err
 	}
-
 	pids := make([]uint32, 0, len(pl))
 	for _, p := range pl {
 		pids = append(pids, p.ProcessId)
 	}
-
 	return pids, nil
 }
 

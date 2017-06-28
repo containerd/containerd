@@ -28,7 +28,7 @@ service Shim {
 
 	rpc DeleteProcess(DeleteProcessRequest) returns (DeleteResponse);
 
-	rpc ListProcesses(ListProcessesRequest) returns (ListProcessesResponse);
+	rpc ListPids(ListPidsRequest) returns (ListPidsResponse);
 
 	rpc Pause(google.protobuf.Empty) returns (google.protobuf.Empty);
 
@@ -120,12 +120,12 @@ message CloseIORequest {
 	bool stdin = 2;
 }
 
-message ListProcessesRequest {
+message ListPidsRequest {
 	string id = 1;
 }
 
-message ListProcessesResponse{
-	repeated containerd.v1.types.Process processes = 1;
+message ListPidsResponse{
+	repeated uint32 pids = 1;
 }
 
 message CheckpointTaskRequest {
