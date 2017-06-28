@@ -1,4 +1,4 @@
-// +build !linux,!windows,!solaris
+// +build solaris
 
 package main
 
