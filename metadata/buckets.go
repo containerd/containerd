@@ -29,6 +29,7 @@ import (
 var (
 	bucketKeyVersion          = []byte("v1")
 	bucketKeyObjectLabels     = []byte("labels")     // stores the labels for a namespace.
+	bucketKeyRuntimeLabels    = []byte("clabels")    // stores the runtime labels for images
 	bucketKeyObjectIndexes    = []byte("indexes")    // reserved
 	bucketKeyObjectImages     = []byte("images")     // stores image objects
 	bucketKeyObjectContainers = []byte("containers") // stores container objects

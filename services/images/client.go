@@ -5,7 +5,6 @@ import (
 
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	"github.com/containerd/containerd/images"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type remoteStore struct {
@@ -18,13 +17,14 @@ func NewStoreFromClient(client imagesapi.ImagesClient) images.Store {
 	}
 }
 
-func (s *remoteStore) Update(ctx context.Context, name string, desc ocispec.Descriptor) error {
+func (s *remoteStore) Update(ctx context.Context, image images.Image) error {
 	// TODO(stevvooe): Consider that the remote may want to augment and return
 	// a modified image.
 	_, err := s.client.Update(ctx, &imagesapi.UpdateImageRequest{
 		Image: imagesapi.Image{
-			Name:   name,
-			Target: descToProto(&desc),
+			Name:   image.Name,
+			Labels: image.Labels,
+			Target: descToProto(&image.Target),
 		},
 	})
 

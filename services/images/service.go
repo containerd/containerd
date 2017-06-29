@@ -64,7 +64,11 @@ func (s *Service) Get(ctx context.Context, req *imagesapi.GetImageRequest) (*ima
 
 func (s *Service) Update(ctx context.Context, req *imagesapi.UpdateImageRequest) (*imagesapi.UpdateImageResponse, error) {
 	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store images.Store) error {
-		return mapGRPCError(store.Update(ctx, req.Image.Name, descFromProto(&req.Image.Target)), req.Image.Name)
+		return mapGRPCError(store.Update(ctx,
+			images.Image{Name: req.Image.Name,
+				Labels: req.Image.Labels,
+				Target: descFromProto(&req.Image.Target)}),
+			req.Image.Name)
 	}); err != nil {
 		return nil, err
 	}

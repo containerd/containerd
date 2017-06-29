@@ -14,11 +14,12 @@ import (
 // Image provides the model for how containerd views container images.
 type Image struct {
 	Name   string
+	Labels map[string]string
 	Target ocispec.Descriptor
 }
 
 type Store interface {
-	Update(ctx context.Context, name string, desc ocispec.Descriptor) error
+	Update(ctx context.Context, image Image) error
 	Get(ctx context.Context, name string) (Image, error)
 	List(ctx context.Context) ([]Image, error)
 	Delete(ctx context.Context, name string) error
