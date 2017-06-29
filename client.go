@@ -139,6 +139,12 @@ func (c *Client) Containers(ctx context.Context) ([]Container, error) {
 	return out, nil
 }
 
+func (c *Client) Events(ctx context.Context, filters ...string) (eventsapi.Events_StreamClient, error) {
+	return c.EventService().Stream(ctx, &eventsapi.StreamEventsRequest{
+		Filters: filters,
+	})
+}
+
 type NewContainerOpts func(ctx context.Context, client *Client, c *containers.Container) error
 
 // WithContainerLabels adds the provided labels to the container

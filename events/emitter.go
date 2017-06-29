@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	events "github.com/containerd/containerd/api/services/events/v1"
+	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/namespaces"
 	goevents "github.com/docker/go-events"
 )
@@ -38,13 +39,19 @@ func (e *Emitter) Post(ctx context.Context, evt Event) error {
 	return nil
 }
 
-func (e *Emitter) Events(ctx context.Context, clientID string) chan *events.Envelope {
+func (e *Emitter) Events(ctx context.Context, clientID string, fs ...filters.Filter) chan *events.Envelope {
+	eventFilters := filters.Filter(filters.Any(fs))
+	if len(fs) == 0 {
+		eventFilters = filters.Always
+	}
+
 	e.m.Lock()
 	if _, ok := e.sinks[clientID]; !ok {
 		ns, _ := namespaces.Namespace(ctx)
 		s := &eventSink{
 			ch: make(chan *events.Envelope),
 			ns: ns,
+			f:  eventFilters,
 		}
 		e.sinks[clientID] = s
 		e.broadcaster.Add(s)
