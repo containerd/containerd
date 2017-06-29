@@ -224,12 +224,31 @@ func (rw *readResponseWriter) Write(p []byte) (n int, err error) {
 }
 
 func (s *Service) Status(ctx context.Context, req *api.StatusRequest) (*api.StatusResponse, error) {
-	statuses, err := s.store.Status(ctx, req.Filter)
+	status, err := s.store.Status(ctx, req.Ref)
+	if err != nil {
+		return nil, errdefs.ToGRPCf(err, "could not get status for ref %q", req.Ref)
+	}
+
+	var resp api.StatusResponse
+	resp.Status = &api.Status{
+		StartedAt: status.StartedAt,
+		UpdatedAt: status.UpdatedAt,
+		Ref:       status.Ref,
+		Offset:    status.Offset,
+		Total:     status.Total,
+		Expected:  status.Expected,
+	}
+
+	return &resp, nil
+}
+
+func (s *Service) ListStatuses(ctx context.Context, req *api.ListStatusesRequest) (*api.ListStatusesResponse, error) {
+	statuses, err := s.store.ListStatuses(ctx, req.Filter)
 	if err != nil {
 		return nil, errdefs.ToGRPCf(err, "could not get status for filter %q", req.Filter)
 	}
 
-	var resp api.StatusResponse
+	var resp api.ListStatusesResponse
 	for _, status := range statuses {
 		resp.Statuses = append(resp.Statuses, api.Status{
 			StartedAt: status.StartedAt,

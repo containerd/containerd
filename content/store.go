@@ -136,7 +136,11 @@ func (cs *store) Walk(ctx context.Context, fn WalkFunc) error {
 	})
 }
 
-func (s *store) Status(ctx context.Context, re string) ([]Status, error) {
+func (s *store) Status(ctx context.Context, ref string) (Status, error) {
+	return s.status(s.ingestRoot(ref))
+}
+
+func (s *store) ListStatuses(ctx context.Context, re string) ([]Status, error) {
 	fp, err := os.Open(filepath.Join(s.root, "ingest"))
 	if err != nil {
 		return nil, err

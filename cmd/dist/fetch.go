@@ -123,7 +123,7 @@ outer:
 
 			activeSeen := map[string]struct{}{}
 			if !done {
-				active, err := cs.Status(ctx, "")
+				active, err := cs.ListStatuses(ctx, "")
 				if err != nil {
 					log.G(ctx).WithError(err).Error("active check failed")
 					continue

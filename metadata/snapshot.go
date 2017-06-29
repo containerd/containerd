@@ -29,11 +29,11 @@ func NewSnapshotter(db *bolt.DB, name string, sn snapshot.Snapshotter) snapshot.
 	}
 }
 
-func snapshotKey(id uint64, namespace, key string) string {
+func createKey(id uint64, namespace, key string) string {
 	return fmt.Sprintf("%s/%d/%s", namespace, id, key)
 }
 
-func trimName(key string) string {
+func trimKey(key string) string {
 	parts := strings.SplitN(key, "/", 3)
 	if len(parts) < 3 {
 		return ""
@@ -82,9 +82,9 @@ func (s *snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, erro
 	if err != nil {
 		return snapshot.Info{}, err
 	}
-	info.Name = trimName(info.Name)
+	info.Name = trimKey(info.Name)
 	if info.Parent != "" {
-		info.Parent = trimName(info.Parent)
+		info.Parent = trimKey(info.Parent)
 	}
 
 	return info, nil
@@ -143,7 +143,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 		if err != nil {
 			return err
 		}
-		bkey = snapshotKey(sid, ns, key)
+		bkey = createKey(sid, ns, key)
 		if err := bkt.Put([]byte(key), []byte(bkey)); err != nil {
 			return err
 		}
@@ -188,7 +188,7 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string) error {
 		if err != nil {
 			return err
 		}
-		nameKey = snapshotKey(sid, ns, name)
+		nameKey = createKey(sid, ns, name)
 		if err := bkt.Put([]byte(name), []byte(nameKey)); err != nil {
 			return err
 		}
@@ -259,9 +259,9 @@ func (s *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 			return err
 		}
 
-		info.Name = trimName(info.Name)
+		info.Name = trimKey(info.Name)
 		if info.Parent != "" {
-			info.Parent = trimName(info.Parent)
+			info.Parent = trimKey(info.Parent)
 		}
 		if err := fn(ctx, info); err != nil {
 			return err
