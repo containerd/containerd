@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -28,12 +29,24 @@ func Unmount(t *testing.T, mountPoint string) {
 
 // RequiresRoot skips tests that require root, unless the test.root flag has
 // been set
-func RequiresRoot(t *testing.T) {
+func RequiresRoot(t testing.TB) {
 	if !rootEnabled {
 		t.Skip("skipping test that requires root")
 		return
 	}
 	assert.Equal(t, 0, os.Getuid(), "This test must be run as root.")
+}
+
+// RequiresRootM is similar to RequiresRoot but intended to be called from *testing.M.
+func RequiresRootM() {
+	if !rootEnabled {
+		fmt.Fprintln(os.Stderr, "skipping test that requires root")
+		os.Exit(0)
+	}
+	if 0 != os.Getuid() {
+		fmt.Fprintln(os.Stderr, "This test must be run as root.")
+		os.Exit(1)
+	}
 }
 
 // DumpDir will log out all of the contents of the provided directory to

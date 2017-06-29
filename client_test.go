@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/testutil"
 )
 
 const (
@@ -41,7 +42,7 @@ func TestMain(m *testing.M) {
 	if testing.Short() {
 		os.Exit(m.Run())
 	}
-
+	testutil.RequiresRootM()
 	// check if criu is installed on the system
 	_, err := exec.LookPath("criu")
 	supportsCriu = err == nil
@@ -134,11 +135,16 @@ func waitForDaemonStart(ctx context.Context, address string) (*Client, error) {
 	return nil, fmt.Errorf("containerd did not start within 2s: %v", err)
 }
 
-func TestNewClient(t *testing.T) {
+func newClient(t testing.TB, address string, opts ...ClientOpt) (*Client, error) {
 	if testing.Short() {
 		t.Skip()
 	}
-	client, err := New(address)
+	// testutil.RequiresRoot(t) is not needed here (already called in TestMain)
+	return New(address, opts...)
+}
+
+func TestNewClient(t *testing.T) {
+	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,18 +157,14 @@ func TestNewClient(t *testing.T) {
 }
 
 func TestImagePull(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-	ctx, cancel := testContext()
-	defer cancel()
-
-	client, err := New(address)
+	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
 
+	ctx, cancel := testContext()
+	defer cancel()
 	_, err = client.Pull(ctx, testImage)
 	if err != nil {
 		t.Error(err)
