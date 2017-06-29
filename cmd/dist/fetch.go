@@ -11,6 +11,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/progress"
@@ -153,7 +154,7 @@ outer:
 				if !done && (!ok || status.Status == "downloading") {
 					info, err := cs.Info(ctx, j.Digest)
 					if err != nil {
-						if !content.IsNotFound(err) {
+						if !errdefs.IsNotFound(err) {
 							log.G(ctx).WithError(err).Errorf("failed to get content info")
 							continue outer
 						} else {

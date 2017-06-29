@@ -6,6 +6,7 @@ import (
 	"github.com/boltdb/bolt"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	api "github.com/containerd/containerd/api/services/namespaces/v1"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/namespaces"
@@ -59,7 +60,7 @@ func (s *Service) Get(ctx context.Context, req *api.GetNamespaceRequest) (*api.G
 	return &resp, s.withStoreView(ctx, func(ctx context.Context, store namespaces.Store) error {
 		labels, err := store.Labels(ctx, req.Name)
 		if err != nil {
-			return mapGRPCError(err, req.Name)
+			return errdefs.ToGRPC(err)
 		}
 
 		resp.Namespace = api.Namespace{
@@ -85,7 +86,7 @@ func (s *Service) List(ctx context.Context, req *api.ListNamespacesRequest) (*ap
 			if err != nil {
 				// In general, this should be unlikely, since we are holding a
 				// transaction to service this request.
-				return mapGRPCError(err, namespace)
+				return errdefs.ToGRPC(err)
 			}
 
 			resp.Namespaces = append(resp.Namespaces, api.Namespace{
@@ -103,7 +104,7 @@ func (s *Service) Create(ctx context.Context, req *api.CreateNamespaceRequest) (
 
 	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store namespaces.Store) error {
 		if err := store.Create(ctx, req.Namespace.Name, req.Namespace.Labels); err != nil {
-			return mapGRPCError(err, req.Namespace.Name)
+			return errdefs.ToGRPC(err)
 		}
 
 		for k, v := range req.Namespace.Labels {
@@ -149,7 +150,7 @@ func (s *Service) Update(ctx context.Context, req *api.UpdateNamespaceRequest) (
 			// get current set of labels
 			labels, err := store.Labels(ctx, req.Namespace.Name)
 			if err != nil {
-				return mapGRPCError(err, req.Namespace.Name)
+				return errdefs.ToGRPC(err)
 			}
 
 			for k := range labels {
@@ -183,7 +184,7 @@ func (s *Service) Update(ctx context.Context, req *api.UpdateNamespaceRequest) (
 
 func (s *Service) Delete(ctx context.Context, req *api.DeleteNamespaceRequest) (*empty.Empty, error) {
 	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store namespaces.Store) error {
-		return mapGRPCError(store.Delete(ctx, req.Name), req.Name)
+		return errdefs.ToGRPC(store.Delete(ctx, req.Name))
 	}); err != nil {
 		return &empty.Empty{}, err
 	}

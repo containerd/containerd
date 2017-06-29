@@ -4,6 +4,7 @@ import (
 	"context"
 
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -28,7 +29,7 @@ func (s *remoteStore) Update(ctx context.Context, name string, desc ocispec.Desc
 		},
 	})
 
-	return rewriteGRPCError(err)
+	return errdefs.FromGRPC(err)
 }
 
 func (s *remoteStore) Get(ctx context.Context, name string) (images.Image, error) {
@@ -36,7 +37,7 @@ func (s *remoteStore) Get(ctx context.Context, name string) (images.Image, error
 		Name: name,
 	})
 	if err != nil {
-		return images.Image{}, rewriteGRPCError(err)
+		return images.Image{}, errdefs.FromGRPC(err)
 	}
 
 	return imageFromProto(resp.Image), nil
@@ -45,7 +46,7 @@ func (s *remoteStore) Get(ctx context.Context, name string) (images.Image, error
 func (s *remoteStore) List(ctx context.Context) ([]images.Image, error) {
 	resp, err := s.client.List(ctx, &imagesapi.ListImagesRequest{})
 	if err != nil {
-		return nil, rewriteGRPCError(err)
+		return nil, errdefs.FromGRPC(err)
 	}
 
 	return imagesFromProto(resp.Images), nil
@@ -56,5 +57,5 @@ func (s *remoteStore) Delete(ctx context.Context, name string) error {
 		Name: name,
 	})
 
-	return rewriteGRPCError(err)
+	return errdefs.FromGRPC(err)
 }

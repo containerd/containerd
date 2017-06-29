@@ -4,6 +4,7 @@ import (
 	"github.com/boltdb/bolt"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/metadata"
@@ -51,22 +52,22 @@ func (s *Service) Register(server *grpc.Server) error {
 func (s *Service) Get(ctx context.Context, req *imagesapi.GetImageRequest) (*imagesapi.GetImageResponse, error) {
 	var resp imagesapi.GetImageResponse
 
-	return &resp, s.withStoreView(ctx, func(ctx context.Context, store images.Store) error {
+	return &resp, errdefs.ToGRPC(s.withStoreView(ctx, func(ctx context.Context, store images.Store) error {
 		image, err := store.Get(ctx, req.Name)
 		if err != nil {
-			return mapGRPCError(err, req.Name)
+			return err
 		}
 		imagepb := imageToProto(&image)
 		resp.Image = &imagepb
 		return nil
-	})
+	}))
 }
 
 func (s *Service) Update(ctx context.Context, req *imagesapi.UpdateImageRequest) (*imagesapi.UpdateImageResponse, error) {
 	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store images.Store) error {
-		return mapGRPCError(store.Update(ctx, req.Image.Name, descFromProto(&req.Image.Target)), req.Image.Name)
+		return store.Update(ctx, req.Image.Name, descFromProto(&req.Image.Target))
 	}); err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 
 	if err := s.emit(ctx, "/images/update", &eventsapi.ImageUpdate{
@@ -88,7 +89,7 @@ func (s *Service) List(ctx context.Context, _ *imagesapi.ListImagesRequest) (*im
 	return &resp, s.withStoreView(ctx, func(ctx context.Context, store images.Store) error {
 		images, err := store.List(ctx)
 		if err != nil {
-			return mapGRPCError(err, "")
+			return errdefs.ToGRPC(err)
 		}
 
 		resp.Images = imagesToProto(images)
@@ -98,7 +99,7 @@ func (s *Service) List(ctx context.Context, _ *imagesapi.ListImagesRequest) (*im
 
 func (s *Service) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest) (*empty.Empty, error) {
 	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store images.Store) error {
-		return mapGRPCError(store.Delete(ctx, req.Name), req.Name)
+		return errdefs.ToGRPC(store.Delete(ctx, req.Name))
 	}); err != nil {
 		return nil, err
 	}

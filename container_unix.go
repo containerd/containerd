@@ -12,8 +12,8 @@ import (
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/snapshot"
 	protobuf "github.com/gogo/protobuf/types"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
@@ -46,7 +46,7 @@ func WithCheckpoint(desc v1.Descriptor, rootfsID string) NewContainerOpts {
 					return err
 				}
 				if _, err := client.SnapshotService().Prepare(ctx, rootfsID, identity.ChainID(diffIDs).String()); err != nil {
-					if !snapshot.IsExist(err) {
+					if !errdefs.IsAlreadyExists(err) {
 						return err
 					}
 				}

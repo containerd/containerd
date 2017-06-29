@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/remotes"
@@ -31,10 +32,10 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 	status, err := p.tracker.GetStatus(ref)
 	if err == nil {
 		if status.Offset == status.Total {
-			return nil, content.ErrExists("")
+			return nil, errors.Wrapf(errdefs.ErrAlreadyExists, "ref %v already exists", ref)
 		}
 		// TODO: Handle incomplete status
-	} else if !content.IsNotFound(err) {
+	} else if !errdefs.IsNotFound(err) {
 		return nil, errors.Wrap(err, "failed to get status")
 	}
 
@@ -72,7 +73,7 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 					// TODO: Set updated time?
 				},
 			})
-			return nil, content.ErrExists("")
+			return nil, errors.Wrapf(errdefs.ErrAlreadyExists, "content %v on remote", desc.Digest)
 		}
 		if resp.StatusCode != http.StatusNotFound {
 			// TODO: log error

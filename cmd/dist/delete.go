@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/urfave/cli"
@@ -43,7 +43,7 @@ var deleteCommand = cli.Command{
 			}
 
 			if err := cs.Delete(ctx, dgst); err != nil {
-				if !content.IsNotFound(err) {
+				if !errdefs.IsNotFound(err) {
 					if exitError == nil {
 						exitError = err
 					}

@@ -17,6 +17,7 @@ package identifiers
 import (
 	"regexp"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/pkg/errors"
 )
 
@@ -32,14 +33,7 @@ var (
 	// Rules for domains, defined in RFC 1035, section 2.3.1, are used for
 	// identifiers.
 	identifierRe = regexp.MustCompile(reAnchor(label + reGroup("[.]"+reGroup(label)) + "*"))
-
-	errIdentifierInvalid = errors.New("invalid identifier")
 )
-
-// IsInvalid return true if the error was due to an invalid identifer.
-func IsInvalid(err error) bool {
-	return errors.Cause(err) == errIdentifierInvalid
-}
 
 // Validate return nil if the string s is a valid identifier.
 //
@@ -50,11 +44,11 @@ func IsInvalid(err error) bool {
 // a domain identifier or filesystem path component.
 func Validate(s string) error {
 	if len(s) > maxLength {
-		return errors.Wrapf(errIdentifierInvalid, "identifier %q greater than maximum length (%d characters)", s, maxLength)
+		return errors.Wrapf(errdefs.ErrInvalidArgument, "identifier %q greater than maximum length (%d characters)", s, maxLength)
 	}
 
 	if !identifierRe.MatchString(s) {
-		return errors.Wrapf(errIdentifierInvalid, "identifier %q must match %v", s, identifierRe)
+		return errors.Wrapf(errdefs.ErrInvalidArgument, "identifier %q must match %v", s, identifierRe)
 	}
 	return nil
 }

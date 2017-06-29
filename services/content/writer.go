@@ -5,6 +5,7 @@ import (
 
 	contentapi "github.com/containerd/containerd/api/services/content/v1"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
@@ -86,7 +87,7 @@ func (rw *remoteWriter) Commit(size int64, expected digest.Digest) error {
 		Expected: expected,
 	})
 	if err != nil {
-		return rewriteGRPCError(err)
+		return errdefs.FromGRPC(err)
 	}
 
 	if size != 0 && resp.Offset != size {

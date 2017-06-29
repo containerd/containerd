@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -40,7 +41,7 @@ func (s *store) Info(ctx context.Context, dgst digest.Digest) (Info, error) {
 	fi, err := os.Stat(p)
 	if err != nil {
 		if os.IsNotExist(err) {
-			err = ErrNotFound("")
+			err = errors.Wrapf(errdefs.ErrNotFound, "content %v", dgst)
 		}
 
 		return Info{}, err
@@ -62,7 +63,7 @@ func (s *store) Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, 
 	fp, err := os.Open(s.blobPath(dgst))
 	if err != nil {
 		if os.IsNotExist(err) {
-			err = ErrNotFound("")
+			err = errors.Wrapf(errdefs.ErrNotFound, "content %v", dgst)
 		}
 		return nil, err
 	}
@@ -85,7 +86,7 @@ func (cs *store) Delete(ctx context.Context, dgst digest.Digest) error {
 			return err
 		}
 
-		return ErrNotFound("")
+		return errors.Wrapf(errdefs.ErrNotFound, "content %v", dgst)
 	}
 
 	return nil
@@ -232,7 +233,7 @@ func (s *store) Writer(ctx context.Context, ref string, total int64, expected di
 	if expected != "" {
 		p := s.blobPath(expected)
 		if _, err := os.Stat(p); err == nil {
-			return nil, ErrExists("")
+			return nil, errors.Wrapf(errdefs.ErrAlreadyExists, "content %v", expected)
 		}
 	}
 
@@ -329,7 +330,7 @@ func (s *store) Abort(ctx context.Context, ref string) error {
 	root := s.ingestRoot(ref)
 	if err := os.RemoveAll(root); err != nil {
 		if os.IsNotExist(err) {
-			return ErrNotFound("")
+			return errors.Wrapf(errdefs.ErrNotFound, "ingest ref %q", ref)
 		}
 
 		return err
