@@ -60,7 +60,7 @@ if [ ! -x "$(command -v containerd)" ]; then
   exit 1
 fi
 sudo pkill containerd
-sudo containerd &> ${REPORT_DIR}/containerd.log &
+sudo containerd -l debug &> ${REPORT_DIR}/containerd.log &
 
 # Start cri-containerd
 cd ${ROOT}
