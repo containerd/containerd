@@ -11,8 +11,7 @@ import (
 	client "github.com/containerd/containerd/linux/shim"
 	shim "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/runtime"
-	protobuf "github.com/gogo/protobuf/types"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 )
 
@@ -111,10 +110,7 @@ func (t *Task) Exec(ctx context.Context, opts runtime.ExecOpts) (runtime.Process
 		Stdout:   opts.IO.Stdout,
 		Stderr:   opts.IO.Stderr,
 		Terminal: opts.IO.Terminal,
-		Spec: &protobuf.Any{
-			TypeUrl: specs.Version,
-			Value:   opts.Spec,
-		},
+		Spec:     opts.Spec,
 	}
 	resp, err := t.shim.Exec(ctx, request)
 	if err != nil {
@@ -160,12 +156,10 @@ func (t *Task) CloseIO(ctx context.Context, pid uint32) error {
 	return err
 }
 
-func (t *Task) Checkpoint(ctx context.Context, path string, options []byte) error {
+func (t *Task) Checkpoint(ctx context.Context, path string, options *types.Any) error {
 	r := &shim.CheckpointTaskRequest{
-		Path: path,
-		Options: &protobuf.Any{
-			Value: options,
-		},
+		Path:    path,
+		Options: options,
 	}
 	if _, err := t.shim.Checkpoint(ctx, r); err != nil {
 		return errors.New(grpc.ErrorDesc(err))
@@ -187,12 +181,9 @@ func (t *Task) DeleteProcess(ctx context.Context, pid uint32) (*runtime.Exit, er
 	}, nil
 }
 
-func (t *Task) Update(ctx context.Context, resources []byte) error {
+func (t *Task) Update(ctx context.Context, resources *types.Any) error {
 	_, err := t.shim.Update(ctx, &shim.UpdateTaskRequest{
-		Resources: &protobuf.Any{
-			TypeUrl: specs.Version,
-			Value:   resources,
-		},
+		Resources: resources,
 	})
 	return err
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/mount"
+	"github.com/gogo/protobuf/types"
 )
 
 type IO struct {
@@ -24,7 +25,7 @@ type CreateOpts struct {
 	// Checkpoint digest to restore container state
 	Checkpoint string
 	// Options for the runtime and container
-	Options []byte
+	Options *types.Any
 }
 
 type Exit struct {
