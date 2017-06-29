@@ -2,13 +2,9 @@ package main
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/containerd/containerd"
-	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/linux/runcopts"
-	"github.com/gogo/protobuf/proto"
-	protobuf "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -47,7 +43,7 @@ var checkpointCommand = cli.Command{
 		}
 		var opts []containerd.CheckpointOpts
 		if context.Bool("exit") {
-			opts = append(opts, WithExit)
+			opts = append(opts, runcopts.WithExit)
 		}
 		checkpoint, err := task.Checkpoint(ctx, opts...)
 		if err != nil {
@@ -56,26 +52,4 @@ var checkpointCommand = cli.Command{
 		fmt.Println(checkpoint.Digest.String())
 		return nil
 	},
-}
-
-func WithExit(r *tasks.CheckpointTaskRequest) error {
-	a, err := marshal(&runcopts.CheckpointOptions{
-		Exit: true,
-	}, "CheckpointOptions")
-	if err != nil {
-		return err
-	}
-	r.Options = a
-	return nil
-}
-
-func marshal(m proto.Message, name string) (*protobuf.Any, error) {
-	data, err := proto.Marshal(m)
-	if err != nil {
-		return nil, err
-	}
-	return &protobuf.Any{
-		TypeUrl: filepath.Join(runcopts.URIBase, name),
-		Value:   data,
-	}, nil
 }

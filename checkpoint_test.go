@@ -1,14 +1,10 @@
 package containerd
 
 import (
-	"path/filepath"
 	"syscall"
 	"testing"
 
-	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/linux/runcopts"
-	"github.com/gogo/protobuf/proto"
-	protobuf "github.com/gogo/protobuf/types"
 )
 
 func TestCheckpointRestore(t *testing.T) {
@@ -68,7 +64,7 @@ func TestCheckpointRestore(t *testing.T) {
 		return
 	}
 
-	checkpoint, err := task.Checkpoint(ctx, WithExit)
+	checkpoint, err := task.Checkpoint(ctx, runcopts.WithExit)
 	if err != nil {
 		t.Error(err)
 		return
@@ -161,7 +157,7 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 		return
 	}
 
-	checkpoint, err := task.Checkpoint(ctx, WithExit)
+	checkpoint, err := task.Checkpoint(ctx, runcopts.WithExit)
 	if err != nil {
 		t.Error(err)
 		return
@@ -285,26 +281,4 @@ func TestCheckpointLeaveRunning(t *testing.T) {
 	}
 
 	<-statusC
-}
-
-func WithExit(r *tasks.CheckpointTaskRequest) error {
-	a, err := marshal(&runcopts.CheckpointOptions{
-		Exit: true,
-	}, "CheckpointOptions")
-	if err != nil {
-		return err
-	}
-	r.Options = a
-	return nil
-}
-
-func marshal(m proto.Message, name string) (*protobuf.Any, error) {
-	data, err := proto.Marshal(m)
-	if err != nil {
-		return nil, err
-	}
-	return &protobuf.Any{
-		TypeUrl: filepath.Join(runcopts.URIBase, name),
-		Value:   data,
-	}, nil
 }
