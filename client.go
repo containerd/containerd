@@ -197,11 +197,10 @@ func WithNewReadonlyRootFS(id string, i Image) NewContainerOpts {
 
 // WithRuntime allows a user to specify the runtime name and additional options that should
 // be used to create tasks for the container
-func WithRuntime(name string, options map[string]string) NewContainerOpts {
+func WithRuntime(name string) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		c.Runtime = &containers.Container_Runtime{
-			Name:    name,
-			Options: options,
+			Name: name,
 		}
 		return nil
 	}

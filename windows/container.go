@@ -13,6 +13,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/windows/hcs"
+	"github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	winsys "golang.org/x/sys/windows"
@@ -139,7 +140,7 @@ func (c *container) Exec(ctx context.Context, opts runtime.ExecOpts) (runtime.Pr
 	}
 
 	var procSpec specs.Process
-	if err := json.Unmarshal(opts.Spec, &procSpec); err != nil {
+	if err := json.Unmarshal(opts.Spec.Value, &procSpec); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal oci spec")
 	}
 
@@ -187,7 +188,7 @@ func (c *container) Pids(ctx context.Context) ([]uint32, error) {
 	return pids, nil
 }
 
-func (c *container) Checkpoint(ctx context.Context, _ string, _ []byte) error {
+func (c *container) Checkpoint(ctx context.Context, _ string, _ *types.Any) error {
 	return fmt.Errorf("Windows containers do not support checkpoint")
 }
 
@@ -213,7 +214,7 @@ func (c *container) DeleteProcess(ctx context.Context, pid uint32) (*runtime.Exi
 	}, nil
 }
 
-func (c *container) Update(ctx context.Context, spec []byte) error {
+func (c *container) Update(ctx context.Context, spec *types.Any) error {
 	return fmt.Errorf("Windows containers do not support update")
 }
 
