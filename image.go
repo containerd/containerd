@@ -7,7 +7,6 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/rootfs"
-	"github.com/opencontainers/image-spec/specs-go/v1"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
@@ -52,7 +51,7 @@ func (i *image) getLayers(ctx context.Context) ([]rootfs.Layer, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read manifest blob")
 	}
-	var manifest v1.Manifest
+	var manifest ocispec.Manifest
 	if err := json.Unmarshal(p, &manifest); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal manifest")
 	}
@@ -65,9 +64,9 @@ func (i *image) getLayers(ctx context.Context) ([]rootfs.Layer, error) {
 	}
 	layers := make([]rootfs.Layer, len(diffIDs))
 	for i := range diffIDs {
-		layers[i].Diff = v1.Descriptor{
+		layers[i].Diff = ocispec.Descriptor{
 			// TODO: derive media type from compressed type
-			MediaType: v1.MediaTypeImageLayer,
+			MediaType: ocispec.MediaTypeImageLayer,
 			Digest:    diffIDs[i],
 		}
 		layers[i].Blob = manifest.Layers[i]
