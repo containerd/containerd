@@ -41,7 +41,7 @@ service Tasks {
 
 	rpc Resume(ResumeTaskRequest) returns (google.protobuf.Empty);
 
-	rpc ListProcesses(ListProcessesRequest) returns (ListProcessesResponse);
+	rpc ListPids(ListPidsRequest) returns (ListPidsResponse);
 
 	rpc Checkpoint(CheckpointTaskRequest) returns (CheckpointTaskResponse);
 
@@ -173,12 +173,12 @@ message ResumeTaskRequest {
 	string container_id = 1;
 }
 
-message ListProcessesRequest {
+message ListPidsRequest {
 	string container_id = 1;
 }
 
-message ListProcessesResponse{
-	repeated containerd.v1.types.Process processes = 1;
+message ListPidsResponse{
+	repeated uint32 pids = 1;
 }
 
 message CheckpointTaskRequest {

@@ -321,21 +321,14 @@ func (s *Service) Kill(ctx context.Context, r *shimapi.KillRequest) (*google_pro
 	return empty, nil
 }
 
-func (s *Service) ListProcesses(ctx context.Context, r *shimapi.ListProcessesRequest) (*shimapi.ListProcessesResponse, error) {
+func (s *Service) ListPids(ctx context.Context, r *shimapi.ListPidsRequest) (*shimapi.ListPidsResponse, error) {
 	pids, err := s.getContainerPids(ctx, r.ID)
 	if err != nil {
 		return nil, err
 	}
-	ps := []*task.Process{}
-	for _, pid := range pids {
-		ps = append(ps, &task.Process{
-			Pid: pid,
-		})
-	}
-	resp := &shimapi.ListProcessesResponse{
-		Processes: ps,
-	}
-	return resp, nil
+	return &shimapi.ListPidsResponse{
+		Pids: pids,
+	}, nil
 }
 
 func (s *Service) CloseIO(ctx context.Context, r *shimapi.CloseIORequest) (*google_protobuf.Empty, error) {

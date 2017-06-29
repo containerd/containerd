@@ -127,21 +127,14 @@ func (t *Task) Exec(ctx context.Context, opts runtime.ExecOpts) (runtime.Process
 	}, nil
 }
 
-func (t *Task) Processes(ctx context.Context) ([]uint32, error) {
-	resp, err := t.shim.ListProcesses(ctx, &shim.ListProcessesRequest{
+func (t *Task) Pids(ctx context.Context) ([]uint32, error) {
+	resp, err := t.shim.ListPids(ctx, &shim.ListPidsRequest{
 		ID: t.containerID,
 	})
 	if err != nil {
 		return nil, errors.New(grpc.ErrorDesc(err))
 	}
-
-	pids := make([]uint32, 0, len(resp.Processes))
-
-	for _, ps := range resp.Processes {
-		pids = append(pids, ps.Pid)
-	}
-
-	return pids, nil
+	return resp.Pids, nil
 }
 
 func (t *Task) ResizePty(ctx context.Context, pid uint32, size runtime.ConsoleSize) error {

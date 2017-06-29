@@ -76,8 +76,8 @@ func (c *local) Kill(ctx context.Context, in *shimapi.KillRequest, opts ...grpc.
 	return c.s.Kill(ctx, in)
 }
 
-func (c *local) ListProcesses(ctx context.Context, in *shimapi.ListProcessesRequest, opts ...grpc.CallOption) (*shimapi.ListProcessesResponse, error) {
-	return c.s.ListProcesses(ctx, in)
+func (c *local) ListPids(ctx context.Context, in *shimapi.ListPidsRequest, opts ...grpc.CallOption) (*shimapi.ListPidsResponse, error) {
+	return c.s.ListPids(ctx, in)
 }
 
 func (c *local) CloseIO(ctx context.Context, in *shimapi.CloseIORequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
