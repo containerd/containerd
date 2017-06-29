@@ -16,6 +16,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/remotes"
@@ -202,7 +203,7 @@ func (c *Converter) fetchBlob(ctx context.Context, desc ocispec.Descriptor) erro
 
 	cw, err := c.contentStore.Writer(ctx, ref, desc.Size, desc.Digest)
 	if err != nil {
-		if !content.IsExists(err) {
+		if !errdefs.IsAlreadyExists(err) {
 			return err
 		}
 

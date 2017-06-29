@@ -1,8 +1,10 @@
 package content
 
 import (
-	"fmt"
 	"sync"
+
+	"github.com/containerd/containerd/errdefs"
+	"github.com/pkg/errors"
 )
 
 // Handles locking references
@@ -19,7 +21,7 @@ func tryLock(ref string) error {
 	defer locksMu.Unlock()
 
 	if _, ok := locks[ref]; ok {
-		return ErrLocked(fmt.Sprintf("key %s is locked", ref))
+		return errors.Wrapf(errdefs.ErrUnavailable, "ref %s locked", ref)
 	}
 
 	locks[ref] = struct{}{}

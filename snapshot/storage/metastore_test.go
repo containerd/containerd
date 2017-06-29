@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/pkg/errors"
@@ -205,7 +206,7 @@ func assertNotExist(t *testing.T, err error) {
 	if err == nil {
 		t.Fatal("Expected not exist error")
 	}
-	if !snapshot.IsNotExist(err) {
+	if !errdefs.IsNotFound(err) {
 		t.Fatalf("Expected not exist error, got %+v", err)
 	}
 }
@@ -214,7 +215,7 @@ func assertNotActive(t *testing.T, err error) {
 	if err == nil {
 		t.Fatal("Expected not active error")
 	}
-	if !snapshot.IsNotActive(err) {
+	if !errdefs.IsFailedPrecondition(err) {
 		t.Fatalf("Expected not active error, got %+v", err)
 	}
 }
@@ -223,7 +224,7 @@ func assertNotCommitted(t *testing.T, err error) {
 	if err == nil {
 		t.Fatal("Expected active error")
 	}
-	if !snapshot.IsNotCommitted(err) {
+	if !errdefs.IsInvalidArgument(err) {
 		t.Fatalf("Expected active error, got %+v", err)
 	}
 }
@@ -232,7 +233,7 @@ func assertExist(t *testing.T, err error) {
 	if err == nil {
 		t.Fatal("Expected exist error")
 	}
-	if !snapshot.IsExist(err) {
+	if !errdefs.IsAlreadyExists(err) {
 		t.Fatalf("Expected exist error, got %+v", err)
 	}
 }

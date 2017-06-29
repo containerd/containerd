@@ -5,6 +5,7 @@ import (
 	api "github.com/containerd/containerd/api/services/containers/v1"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
@@ -49,31 +50,30 @@ func (s *Service) Register(server *grpc.Server) error {
 func (s *Service) Get(ctx context.Context, req *api.GetContainerRequest) (*api.GetContainerResponse, error) {
 	var resp api.GetContainerResponse
 
-	return &resp, s.withStoreView(ctx, func(ctx context.Context, store containers.Store) error {
+	return &resp, errdefs.ToGRPC(s.withStoreView(ctx, func(ctx context.Context, store containers.Store) error {
 		container, err := store.Get(ctx, req.ID)
 		if err != nil {
-			return mapGRPCError(err, req.ID)
+			return err
 		}
 		containerpb := containerToProto(&container)
 		resp.Container = containerpb
 
 		return nil
-	})
+	}))
 }
 
 func (s *Service) List(ctx context.Context, req *api.ListContainersRequest) (*api.ListContainersResponse, error) {
 	var resp api.ListContainersResponse
 
-	return &resp, s.withStoreView(ctx, func(ctx context.Context, store containers.Store) error {
+	return &resp, errdefs.ToGRPC(s.withStoreView(ctx, func(ctx context.Context, store containers.Store) error {
 		containers, err := store.List(ctx, req.Filter)
 		if err != nil {
-			return mapGRPCError(err, "")
+			return err
 		}
 
 		resp.Containers = containersToProto(containers)
 		return nil
-	})
-
+	}))
 }
 
 func (s *Service) Create(ctx context.Context, req *api.CreateContainerRequest) (*api.CreateContainerResponse, error) {
@@ -84,14 +84,14 @@ func (s *Service) Create(ctx context.Context, req *api.CreateContainerRequest) (
 
 		created, err := store.Create(ctx, container)
 		if err != nil {
-			return mapGRPCError(err, req.Container.ID)
+			return err
 		}
 
 		resp.Container = containerToProto(&created)
 
 		return nil
 	}); err != nil {
-		return &resp, err
+		return &resp, errdefs.ToGRPC(err)
 	}
 	if err := s.emit(ctx, "/containers/create", &eventsapi.ContainerCreate{
 		ContainerID: resp.Container.ID,
@@ -115,7 +115,7 @@ func (s *Service) Update(ctx context.Context, req *api.UpdateContainerRequest) (
 
 		current, err := store.Get(ctx, container.ID)
 		if err != nil {
-			return mapGRPCError(err, container.ID)
+			return err
 		}
 
 		if current.ID != container.ID {
@@ -150,14 +150,14 @@ func (s *Service) Update(ctx context.Context, req *api.UpdateContainerRequest) (
 
 		created, err := store.Update(ctx, container)
 		if err != nil {
-			return mapGRPCError(err, req.Container.ID)
+			return err
 		}
 
 		resp.Container = containerToProto(&created)
 
 		return nil
 	}); err != nil {
-		return &resp, err
+		return &resp, errdefs.ToGRPC(err)
 	}
 
 	if err := s.emit(ctx, "/containers/update", &eventsapi.ContainerUpdate{
@@ -174,9 +174,9 @@ func (s *Service) Update(ctx context.Context, req *api.UpdateContainerRequest) (
 
 func (s *Service) Delete(ctx context.Context, req *api.DeleteContainerRequest) (*empty.Empty, error) {
 	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store containers.Store) error {
-		return mapGRPCError(store.Delete(ctx, req.ID), req.ID)
+		return store.Delete(ctx, req.ID)
 	}); err != nil {
-		return &empty.Empty{}, mapGRPCError(err, req.ID)
+		return &empty.Empty{}, errdefs.ToGRPC(err)
 	}
 
 	if err := s.emit(ctx, "/containers/delete", &eventsapi.ContainerDelete{

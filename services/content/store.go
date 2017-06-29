@@ -6,6 +6,7 @@ import (
 
 	contentapi "github.com/containerd/containerd/api/services/content/v1"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
 	digest "github.com/opencontainers/go-digest"
 )
 
@@ -24,7 +25,7 @@ func (rs *remoteStore) Info(ctx context.Context, dgst digest.Digest) (content.In
 		Digest: dgst,
 	})
 	if err != nil {
-		return content.Info{}, rewriteGRPCError(err)
+		return content.Info{}, errdefs.FromGRPC(err)
 	}
 
 	return content.Info{
@@ -37,14 +38,14 @@ func (rs *remoteStore) Info(ctx context.Context, dgst digest.Digest) (content.In
 func (rs *remoteStore) Walk(ctx context.Context, fn content.WalkFunc) error {
 	session, err := rs.client.List(ctx, &contentapi.ListContentRequest{})
 	if err != nil {
-		return rewriteGRPCError(err)
+		return errdefs.FromGRPC(err)
 	}
 
 	for {
 		msg, err := session.Recv()
 		if err != nil {
 			if err != io.EOF {
-				return rewriteGRPCError(err)
+				return errdefs.FromGRPC(err)
 			}
 
 			break
@@ -68,7 +69,7 @@ func (rs *remoteStore) Delete(ctx context.Context, dgst digest.Digest) error {
 	if _, err := rs.client.Delete(ctx, &contentapi.DeleteContentRequest{
 		Digest: dgst,
 	}); err != nil {
-		return rewriteGRPCError(err)
+		return errdefs.FromGRPC(err)
 	}
 
 	return nil
@@ -98,7 +99,7 @@ func (rs *remoteStore) Status(ctx context.Context, filter string) ([]content.Sta
 		Filter: filter,
 	})
 	if err != nil {
-		return nil, rewriteGRPCError(err)
+		return nil, errdefs.FromGRPC(err)
 	}
 
 	var statuses []content.Status
@@ -119,7 +120,7 @@ func (rs *remoteStore) Status(ctx context.Context, filter string) ([]content.Sta
 func (rs *remoteStore) Writer(ctx context.Context, ref string, size int64, expected digest.Digest) (content.Writer, error) {
 	wrclient, offset, err := rs.negotiate(ctx, ref, size, expected)
 	if err != nil {
-		return nil, rewriteGRPCError(err)
+		return nil, errdefs.FromGRPC(err)
 	}
 
 	return &remoteWriter{
@@ -134,7 +135,7 @@ func (rs *remoteStore) Abort(ctx context.Context, ref string) error {
 	if _, err := rs.client.Abort(ctx, &contentapi.AbortRequest{
 		Ref: ref,
 	}); err != nil {
-		return rewriteGRPCError(err)
+		return errdefs.FromGRPC(err)
 	}
 
 	return nil

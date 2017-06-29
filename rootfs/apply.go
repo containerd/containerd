@@ -3,6 +3,7 @@ package rootfs
 import (
 	"fmt"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshot"
@@ -46,7 +47,7 @@ func applyLayer(ctx context.Context, layer Layer, chain []digest.Digest, sn snap
 	if err == nil {
 		log.G(ctx).Debugf("Extraction not needed, layer snapshot exists")
 		return nil
-	} else if !snapshot.IsNotExist(err) {
+	} else if !errdefs.IsNotFound(err) {
 		return errors.Wrap(err, "failed to stat snapshot")
 	}
 

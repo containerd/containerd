@@ -6,10 +6,12 @@ import (
 	"fmt"
 
 	"github.com/boltdb/bolt"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 )
 
 type imageStore struct {
@@ -30,12 +32,12 @@ func (s *imageStore) Get(ctx context.Context, name string) (images.Image, error)
 
 	bkt := getImagesBucket(s.tx, namespace)
 	if bkt == nil {
-		return images.Image{}, ErrNotFound("")
+		return images.Image{}, errors.Wrapf(errdefs.ErrNotFound, "image %q", name)
 	}
 
 	ibkt := bkt.Bucket([]byte(name))
 	if ibkt == nil {
-		return images.Image{}, ErrNotFound("")
+		return images.Image{}, errors.Wrapf(errdefs.ErrNotFound, "image %q", name)
 	}
 
 	image.Name = name
@@ -124,7 +126,7 @@ func (s *imageStore) Delete(ctx context.Context, name string) error {
 	return withImagesBucket(s.tx, namespace, func(bkt *bolt.Bucket) error {
 		err := bkt.DeleteBucket([]byte(name))
 		if err == bolt.ErrBucketNotFound {
-			return ErrNotFound("")
+			return errors.Wrapf(errdefs.ErrNotFound, "image %q", name)
 		}
 		return err
 	})

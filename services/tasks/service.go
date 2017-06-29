@@ -16,6 +16,7 @@ import (
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
@@ -35,6 +36,9 @@ var (
 	_     = (api.TasksServer)(&Service{})
 	empty = &google_protobuf.Empty{}
 )
+
+// TODO(stevvooe): Clean up error mapping to avoid double mapping certain
+// errors within helper methods.
 
 func init() {
 	plugin.Register(&plugin.Registration{
@@ -114,14 +118,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateTaskRequest) (*api.Cr
 
 	container, err := s.getContainer(ctx, r.ContainerID)
 	if err != nil {
-		switch {
-		case metadata.IsNotFound(err):
-			return nil, grpc.Errorf(codes.NotFound, "container %v not found", r.ContainerID)
-		case metadata.IsExists(err):
-			return nil, grpc.Errorf(codes.AlreadyExists, "container %v already exists", r.ContainerID)
-		}
-
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 
 	opts := plugin.CreateOpts{
@@ -491,7 +488,7 @@ func (s *Service) getContainer(ctx context.Context, id string) (containers.Conta
 		container, err = store.Get(ctx, id)
 		return err
 	}); err != nil {
-		return containers.Container{}, err
+		return containers.Container{}, errdefs.ToGRPC(err)
 	}
 
 	return container, nil
@@ -500,12 +497,12 @@ func (s *Service) getContainer(ctx context.Context, id string) (containers.Conta
 func (s *Service) getTask(ctx context.Context, id string) (plugin.Task, error) {
 	container, err := s.getContainer(ctx, id)
 	if err != nil {
-		return nil, grpc.Errorf(codes.InvalidArgument, "task %v not found: %s", id, err.Error())
+		return nil, err
 	}
 
 	runtime, err := s.getRuntime(container.Runtime.Name)
 	if err != nil {
-		return nil, grpc.Errorf(codes.NotFound, "task %v not found: %s", id, err.Error())
+		return nil, errdefs.ToGRPCf(err, "runtime for task %v", id)
 	}
 
 	t, err := runtime.Get(ctx, id)
@@ -519,7 +516,7 @@ func (s *Service) getTask(ctx context.Context, id string) (plugin.Task, error) {
 func (s *Service) getRuntime(name string) (plugin.Runtime, error) {
 	runtime, ok := s.runtimes[name]
 	if !ok {
-		return nil, fmt.Errorf("unknown runtime %q", name)
+		return nil, grpc.Errorf(codes.NotFound, "unknown runtime %q", name)
 	}
 	return runtime, nil
 }

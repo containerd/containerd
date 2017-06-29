@@ -3,6 +3,8 @@ package identifiers
 import (
 	"strings"
 	"testing"
+
+	"github.com/containerd/containerd/errdefs"
 )
 
 func TestValidIdentifiers(t *testing.T) {
@@ -44,7 +46,7 @@ func TestInvalidIdentifiers(t *testing.T) {
 		t.Run(input, func(t *testing.T) {
 			if err := Validate(input); err == nil {
 				t.Fatal("expected invalid error")
-			} else if !IsInvalid(err) {
+			} else if !errdefs.IsInvalidArgument(err) {
 				t.Fatal("error should be an invalid identifier error")
 			}
 		})

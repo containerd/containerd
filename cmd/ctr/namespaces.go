@@ -8,8 +8,8 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/metadata"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -183,7 +183,7 @@ var namespacesRemoveCommand = cli.Command{
 
 		for _, target := range clicontext.Args() {
 			if err := namespaces.Delete(ctx, target); err != nil {
-				if !metadata.IsNotFound(err) {
+				if !errdefs.IsNotFound(err) {
 					if exitErr == nil {
 						exitErr = errors.Wrapf(err, "unable to delete %v", target)
 					}

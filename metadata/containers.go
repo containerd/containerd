@@ -6,6 +6,7 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/pkg/errors"
@@ -29,12 +30,12 @@ func (s *containerStore) Get(ctx context.Context, id string) (containers.Contain
 
 	bkt := getContainerBucket(s.tx, namespace, id)
 	if bkt == nil {
-		return containers.Container{}, ErrNotFound("bucket does not exist")
+		return containers.Container{}, errors.Wrapf(errdefs.ErrNotFound, "bucket name %q")
 	}
 
 	container := containers.Container{ID: id}
 	if err := readContainer(&container, bkt); err != nil {
-		return containers.Container{}, errors.Wrap(err, "failed to read container")
+		return containers.Container{}, errors.Wrapf(err, "failed to read container %v", id)
 	}
 
 	return container, nil
@@ -90,7 +91,7 @@ func (s *containerStore) Create(ctx context.Context, container containers.Contai
 	cbkt, err := bkt.CreateBucket([]byte(container.ID))
 	if err != nil {
 		if err == bolt.ErrBucketExists {
-			err = ErrExists("content for id already exists")
+			err = errors.Wrapf(errdefs.ErrAlreadyExists, "content %q")
 		}
 		return containers.Container{}, err
 	}
@@ -110,14 +111,18 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 		return containers.Container{}, err
 	}
 
+	if container.ID == "" {
+		return containers.Container{}, errors.Wrapf(errdefs.ErrInvalidArgument, "must specify a container id")
+	}
+
 	bkt := getContainersBucket(s.tx, namespace)
 	if bkt == nil {
-		return containers.Container{}, ErrNotFound("no containers")
+		return containers.Container{}, errors.Wrapf(errdefs.ErrNotFound, "container %q", container.ID)
 	}
 
 	cbkt := bkt.Bucket([]byte(container.ID))
 	if cbkt == nil {
-		return containers.Container{}, ErrNotFound("no content for id")
+		return containers.Container{}, errors.Wrapf(errdefs.ErrNotFound, "container %q", container.ID)
 	}
 
 	container.UpdatedAt = time.Now()
@@ -136,11 +141,11 @@ func (s *containerStore) Delete(ctx context.Context, id string) error {
 
 	bkt := getContainersBucket(s.tx, namespace)
 	if bkt == nil {
-		return ErrNotFound("no containers")
+		return errors.Wrapf(errdefs.ErrNotFound, "cannot delete container %v, bucket not present", id)
 	}
 
 	if err := bkt.DeleteBucket([]byte(id)); err == bolt.ErrBucketNotFound {
-		return ErrNotFound("no content for id")
+		return errors.Wrapf(errdefs.ErrNotFound, "container %v", id)
 	}
 	return err
 }

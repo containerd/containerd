@@ -5,8 +5,8 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/progress"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -83,7 +83,7 @@ var imageRemoveCommand = cli.Command{
 
 		for _, target := range clicontext.Args() {
 			if err := imageStore.Delete(ctx, target); err != nil {
-				if !metadata.IsNotFound(err) {
+				if !errdefs.IsNotFound(err) {
 					if exitErr == nil {
 						exitErr = errors.Wrapf(err, "unable to delete %v", target)
 					}

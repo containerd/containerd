@@ -8,6 +8,7 @@ import (
 	api "github.com/containerd/containerd/api/services/content/v1"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
@@ -66,7 +67,7 @@ func (s *Service) Info(ctx context.Context, req *api.InfoRequest) (*api.InfoResp
 
 	bi, err := s.store.Info(ctx, req.Digest)
 	if err != nil {
-		return nil, serverErrorToGRPC(err, req.Digest.String())
+		return nil, errdefs.ToGRPC(err)
 	}
 
 	return &api.InfoResponse{
@@ -125,7 +126,7 @@ func (s *Service) Delete(ctx context.Context, req *api.DeleteContentRequest) (*e
 	}
 
 	if err := s.store.Delete(ctx, req.Digest); err != nil {
-		return nil, serverErrorToGRPC(err, req.Digest.String())
+		return nil, errdefs.ToGRPC(err)
 	}
 
 	if err := s.emit(ctx, "/content/delete", &eventsapi.ContentDelete{
@@ -144,12 +145,12 @@ func (s *Service) Read(req *api.ReadContentRequest, session api.Content_ReadServ
 
 	oi, err := s.store.Info(session.Context(), req.Digest)
 	if err != nil {
-		return serverErrorToGRPC(err, req.Digest.String())
+		return errdefs.ToGRPC(err)
 	}
 
 	rc, err := s.store.Reader(session.Context(), req.Digest)
 	if err != nil {
-		return serverErrorToGRPC(err, req.Digest.String())
+		return errdefs.ToGRPC(err)
 	}
 	defer rc.Close() // TODO(stevvooe): Cache these file descriptors for performance.
 
@@ -217,7 +218,7 @@ func (rw *readResponseWriter) Write(p []byte) (n int, err error) {
 func (s *Service) Status(ctx context.Context, req *api.StatusRequest) (*api.StatusResponse, error) {
 	statuses, err := s.store.Status(ctx, req.Filter)
 	if err != nil {
-		return nil, serverErrorToGRPC(err, req.Filter)
+		return nil, errdefs.ToGRPCf(err, "could not get status for filter %q", req.Filter)
 	}
 
 	var resp api.StatusResponse
@@ -295,7 +296,7 @@ func (s *Service) Write(session api.Content_WriteServer) (err error) {
 	// this action locks the writer for the session.
 	wr, err := s.store.Writer(ctx, ref, total, expected)
 	if err != nil {
-		return serverErrorToGRPC(err, ref)
+		return errdefs.ToGRPC(err)
 	}
 	defer wr.Close()
 
@@ -303,7 +304,7 @@ func (s *Service) Write(session api.Content_WriteServer) (err error) {
 		msg.Action = req.Action
 		ws, err := wr.Status()
 		if err != nil {
-			return serverErrorToGRPC(err, ref)
+			return errdefs.ToGRPC(err)
 		}
 
 		msg.Offset = ws.Offset // always set the offset.
@@ -414,7 +415,7 @@ func (s *Service) Write(session api.Content_WriteServer) (err error) {
 
 func (s *Service) Abort(ctx context.Context, req *api.AbortRequest) (*empty.Empty, error) {
 	if err := s.store.Abort(ctx, req.Ref); err != nil {
-		return nil, serverErrorToGRPC(err, req.Ref)
+		return nil, errdefs.ToGRPC(err)
 	}
 
 	return &empty.Empty{}, nil

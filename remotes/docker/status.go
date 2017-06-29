@@ -4,6 +4,8 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/pkg/errors"
 )
 
 type Status struct {
@@ -34,7 +36,7 @@ func (t *memoryStatusTracker) GetStatus(ref string) (Status, error) {
 	defer t.m.Unlock()
 	status, ok := t.statuses[ref]
 	if !ok {
-		return Status{}, content.ErrNotFound("")
+		return Status{}, errors.Wrapf(errdefs.ErrNotFound, "status for ref %v", ref)
 	}
 	return status, nil
 }

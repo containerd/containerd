@@ -3,6 +3,7 @@ package namespaces
 import (
 	"os"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/identifiers"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -11,10 +12,6 @@ import (
 const (
 	NamespaceEnvVar = "CONTAINERD_NAMESPACE"
 	Default         = "default"
-)
-
-var (
-	errNamespaceRequired = errors.New("namespace is required")
 )
 
 type namespaceKey struct{}
@@ -50,16 +47,11 @@ func Namespace(ctx context.Context) (string, bool) {
 	return namespace, ok
 }
 
-// IsNamespaceRequired returns whether an error is caused by a missing namespace
-func IsNamespaceRequired(err error) bool {
-	return errors.Cause(err) == errNamespaceRequired
-}
-
 // NamespaceRequired returns the valid namepace from the context or an error.
 func NamespaceRequired(ctx context.Context) (string, error) {
 	namespace, ok := Namespace(ctx)
 	if !ok || namespace == "" {
-		return "", errNamespaceRequired
+		return "", errors.Wrapf(errdefs.ErrFailedPrecondition, "namespace is required")
 	}
 
 	if err := identifiers.Validate(namespace); err != nil {
