@@ -1,3 +1,3 @@
 package runcopts
 
-const URIBase = "containerd.io/linux/runc"
+const URIBase = "types.containerd.io/linux/runc"
