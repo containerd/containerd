@@ -35,15 +35,25 @@ func containerToProto(container *containers.Container) api.Container {
 }
 
 func containerFromProto(containerpb *api.Container) containers.Container {
-	return containers.Container{
-		ID:     containerpb.ID,
-		Labels: containerpb.Labels,
-		Image:  containerpb.Image,
-		Runtime: containers.RuntimeInfo{
+	var runtime containers.RuntimeInfo
+	if containerpb.Runtime != nil {
+		runtime = containers.RuntimeInfo{
 			Name:    containerpb.Runtime.Name,
 			Options: containerpb.Runtime.Options,
-		},
-		Spec:   containerpb.Spec.Value,
-		RootFS: containerpb.RootFS,
+		}
+	}
+
+	var spec []byte
+	if containerpb.Spec != nil {
+		spec = containerpb.Spec.Value
+	}
+
+	return containers.Container{
+		ID:      containerpb.ID,
+		Labels:  containerpb.Labels,
+		Image:   containerpb.Image,
+		Runtime: runtime,
+		Spec:    spec,
+		RootFS:  containerpb.RootFS,
 	}
 }

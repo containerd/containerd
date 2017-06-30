@@ -60,7 +60,7 @@ containerd CLI
 		deleteCommand,
 		namespacesCommand,
 		eventsCommand,
-		containerListCommand,
+		containersCommand,
 		taskListCommand,
 		infoCommand,
 		killCommand,
@@ -82,4 +82,14 @@ containerd CLI
 		fmt.Fprintf(os.Stderr, "ctr: %s\n", err)
 		os.Exit(1)
 	}
+}
+
+var containersCommand = cli.Command{
+	Name:    "containers",
+	Usage:   "manage containers (metadata)",
+	Aliases: []string{"c"},
+	Subcommands: []cli.Command{
+		containersListCommand,
+		containersSetLabelsCommand,
+	},
 }

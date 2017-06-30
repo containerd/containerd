@@ -2,11 +2,13 @@ package metadata
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/gogo/protobuf/proto"
@@ -43,16 +45,22 @@ func (s *containerStore) Get(ctx context.Context, id string) (containers.Contain
 	return container, nil
 }
 
-func (s *containerStore) List(ctx context.Context, filter string) ([]containers.Container, error) {
+func (s *containerStore) List(ctx context.Context, fs ...filters.Filter) ([]containers.Container, error) {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	var (
-		m   []containers.Container
-		bkt = getContainersBucket(s.tx, namespace)
+		m      []containers.Container
+		filter = filters.Filter(filters.Any(fs))
+		bkt    = getContainersBucket(s.tx, namespace)
 	)
+
+	if len(fs) == 0 {
+		filter = filters.Always
+	}
+
 	if bkt == nil {
 		return m, nil
 	}
@@ -66,13 +74,56 @@ func (s *containerStore) List(ctx context.Context, filter string) ([]containers.
 		if err := readContainer(&container, cbkt); err != nil {
 			return errors.Wrap(err, "failed to read container")
 		}
-		m = append(m, container)
+
+		if filter.Match(adaptContainer(container)) {
+			m = append(m, container)
+		}
 		return nil
 	}); err != nil {
 		return nil, err
 	}
 
 	return m, nil
+}
+
+func adaptContainer(o interface{}) filters.Adaptor {
+	obj := o.(containers.Container)
+	return filters.AdapterFunc(func(fieldpath []string) (string, bool) {
+		if len(fieldpath) == 0 {
+			return "", false
+		}
+
+		switch fieldpath[0] {
+		case "id":
+			return obj.ID, len(obj.ID) > 0
+		case "runtime":
+			if len(fieldpath) <= 1 {
+				return "", false
+			}
+
+			switch fieldpath[1] {
+			case "name":
+				return obj.Runtime.Name, len(obj.Runtime.Name) > 0
+			default:
+				return "", false
+			}
+		case "image":
+			return obj.Image, len(obj.Image) > 0
+		case "labels":
+			return checkMap(fieldpath[1:], obj.Labels)
+		}
+
+		return "", false
+	})
+}
+
+func checkMap(fieldpath []string, m map[string]string) (string, bool) {
+	if len(m) == 0 {
+		return "", false
+	}
+
+	value, ok := m[strings.Join(fieldpath, ".")]
+	return value, ok
 }
 
 func (s *containerStore) Create(ctx context.Context, container containers.Container) (containers.Container, error) {
@@ -268,14 +319,22 @@ func writeContainer(container *containers.Container, bkt *bolt.Bucket) error {
 			return err
 		}
 	}
+
 	lbkt, err := bkt.CreateBucket(bucketKeyLabels)
 	if err != nil {
 		return err
 	}
+
 	for k, v := range container.Labels {
+		if v == "" {
+			delete(container.Labels, k) // remove since we don't actually set it
+			continue
+		}
+
 		if err := lbkt.Put([]byte(k), []byte(v)); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }

@@ -33,7 +33,7 @@ var namespacesCreateCommand = cli.Command{
 	Action: func(clicontext *cli.Context) error {
 		var (
 			ctx               = context.Background()
-			namespace, labels = namespaceWithLabelArgs(clicontext)
+			namespace, labels = objectWithLabelArgs(clicontext)
 		)
 
 		if namespace == "" {
@@ -53,27 +53,6 @@ var namespacesCreateCommand = cli.Command{
 	},
 }
 
-func namespaceWithLabelArgs(clicontext *cli.Context) (string, map[string]string) {
-	var (
-		namespace    = clicontext.Args().First()
-		labelStrings = clicontext.Args().Tail()
-		labels       = make(map[string]string, len(labelStrings))
-	)
-
-	for _, label := range labelStrings {
-		parts := strings.SplitN(label, "=", 2)
-		key := parts[0]
-		value := "true"
-		if len(parts) > 1 {
-			value = parts[1]
-		}
-
-		labels[key] = value
-	}
-
-	return namespace, labels
-}
-
 var namespacesSetLabelsCommand = cli.Command{
 	Name:        "set-labels",
 	Usage:       "Set and clear labels for a namespace.",
@@ -83,7 +62,7 @@ var namespacesSetLabelsCommand = cli.Command{
 	Action: func(clicontext *cli.Context) error {
 		var (
 			ctx               = context.Background()
-			namespace, labels = namespaceWithLabelArgs(clicontext)
+			namespace, labels = objectWithLabelArgs(clicontext)
 		)
 
 		namespaces, err := getNamespacesService(clicontext)

@@ -57,11 +57,15 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		err             error
 		checkpointIndex digest.Digest
 
-		ref  = context.Args().First()
-		id   = context.Args().Get(1)
-		args = context.Args()[2:]
-		tty  = context.Bool("tty")
+		ref          = context.Args().First()
+		id           = context.Args().Get(1)
+		args         = context.Args()[2:]
+		tty          = context.Bool("tty")
+		labelStrings = context.StringSlice("label")
 	)
+
+	labels := labelArgs(labelStrings)
+
 	if raw := context.String("checkpoint"); raw != "" {
 		if checkpointIndex, err = digest.Parse(raw); err != nil {
 			return nil, err
@@ -71,6 +75,7 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	if err != nil {
 		return nil, err
 	}
+
 	if checkpointIndex == "" {
 		opts := []containerd.SpecOpts{
 			containerd.WithImageConfig(ctx, image),
@@ -96,12 +101,15 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		} else {
 			rootfs = containerd.WithNewRootFS(id, image)
 		}
+
 		return client.NewContainer(ctx, id,
 			containerd.WithSpec(spec),
 			containerd.WithImage(image),
+			containerd.WithContainerLabels(labels),
 			rootfs,
 		)
 	}
+
 	return client.NewContainer(ctx, id, containerd.WithCheckpoint(v1.Descriptor{
 		Digest: checkpointIndex,
 	}, id))

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"google.golang.org/grpc"
@@ -12,6 +13,7 @@ import (
 	"github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
+	ptypes "github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
@@ -33,6 +35,8 @@ type Container interface {
 	Spec() (*specs.Spec, error)
 	Task(context.Context, IOAttach) (Task, error)
 	Image(context.Context) (Image, error)
+	Labels(context.Context) (map[string]string, error)
+	SetLabels(context.Context, map[string]string) (map[string]string, error)
 }
 
 func containerFromProto(client *Client, c containers.Container) *container {
@@ -58,6 +62,53 @@ func (c *container) ID() string {
 
 func (c *container) Proto() containers.Container {
 	return c.c
+}
+
+func (c *container) Labels(ctx context.Context) (map[string]string, error) {
+	resp, err := c.client.ContainerService().Get(ctx, &containers.GetContainerRequest{
+		ID: c.ID(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	c.c = resp.Container
+
+	m := make(map[string]string, len(resp.Container.Labels))
+	for k, v := range c.c.Labels {
+		m[k] = v
+	}
+
+	return m, nil
+}
+
+func (c *container) SetLabels(ctx context.Context, labels map[string]string) (map[string]string, error) {
+	var req containers.UpdateContainerRequest
+
+	req.Container.ID = c.ID()
+	req.Container.Labels = labels
+
+	req.UpdateMask = &ptypes.FieldMask{
+		Paths: make([]string, 0, len(labels)),
+	}
+	// mask off paths so we only muck with the labels encountered in labels.
+	// Labels not in the passed in argument will be left alone.
+	for k := range labels {
+		req.UpdateMask.Paths = append(req.UpdateMask.Paths, strings.Join([]string{"labels", k}, "."))
+	}
+
+	resp, err := c.client.ContainerService().Update(ctx, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	c.c = resp.Container // update our local container
+
+	m := make(map[string]string, len(resp.Container.Labels))
+	for k, v := range c.c.Labels {
+		m[k] = v
+	}
+	return m, nil
 }
 
 // Spec returns the current OCI specification for the container

@@ -91,7 +91,17 @@ message GetContainerResponse {
 }
 
 message ListContainersRequest {
-	string filter = 1; // TODO(stevvooe): Define a filtering syntax to make these queries.
+	// Filters contains one or more filters using the syntax defined in the
+	// containerd filter package.
+	//
+	// The returned result will be those that match any of the provided
+	// filters. Expanded, containers that match the following will be
+	// returned:
+	//
+	//   filters[0] or filters[1] or ... or filters[n-1] or filters[n]
+	//
+	// If filters is zero-length or nil, all items will be returned.
+	repeated string filters = 1;
 }
 
 message ListContainersResponse {
