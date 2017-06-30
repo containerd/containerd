@@ -1,6 +1,10 @@
 package runtime
 
-import "context"
+import (
+	"context"
+
+	"github.com/gogo/protobuf/types"
+)
 
 type TaskInfo struct {
 	ID          string
@@ -32,15 +36,15 @@ type Task interface {
 	// CloseStdin closes the processes stdin
 	CloseIO(context.Context, uint32) error
 	// Checkpoint checkpoints a container to an image with live system data
-	Checkpoint(context.Context, string, map[string]string) error
+	Checkpoint(context.Context, string, *types.Any) error
 	// DeleteProcess deletes a specific exec process via the pid
 	DeleteProcess(context.Context, uint32) (*Exit, error)
 	// Update sets the provided resources to a running task
-	Update(context.Context, []byte) error
+	Update(context.Context, *types.Any) error
 }
 
 type ExecOpts struct {
-	Spec []byte
+	Spec *types.Any
 	IO   IO
 }
 

@@ -57,7 +57,7 @@ message Container {
 		// Name is the name of the runtime.
 		string name = 1;
 		// Options specify additional runtime initialization options.
-		map<string, string> options = 2;
+		google.protobuf.Any options = 2;
 	}
 	// Runtime specifies which runtime to use for executing this container.
 	Runtime runtime = 4;

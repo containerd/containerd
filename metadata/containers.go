@@ -9,6 +9,8 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/gogo/protobuf/proto"
+	"github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 )
 
@@ -166,16 +168,16 @@ func readContainer(container *containers.Container, bkt *bolt.Bucket) error {
 				container.Runtime.Name = string(n)
 			}
 
-			obkt := rbkt.Bucket(bucketKeyOptions)
+			obkt := rbkt.Get(bucketKeyOptions)
 			if obkt == nil {
 				return nil
 			}
 
-			container.Runtime.Options = map[string]string{}
-			return obkt.ForEach(func(k, v []byte) error {
-				container.Runtime.Options[string(k)] = string(v)
-				return nil
-			})
+			var any types.Any
+			if err := proto.Unmarshal(obkt, &any); err != nil {
+				return err
+			}
+			container.Runtime.Options = &any
 		case string(bucketKeySpec):
 			container.Spec = make([]byte, len(v))
 			copy(container.Spec, v)
@@ -249,8 +251,13 @@ func writeContainer(container *containers.Container, bkt *bolt.Bucket) error {
 		return err
 	}
 
-	for k, v := range container.Runtime.Options {
-		if err := obkt.Put([]byte(k), []byte(v)); err != nil {
+	if container.Runtime.Options != nil {
+		data, err := proto.Marshal(container.Runtime.Options)
+		if err != nil {
+			return err
+		}
+
+		if err := obkt.Put(bucketKeyOptions, data); err != nil {
 			return err
 		}
 	}

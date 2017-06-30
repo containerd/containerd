@@ -3,6 +3,8 @@ package containers
 import (
 	"context"
 	"time"
+
+	"github.com/gogo/protobuf/types"
 )
 
 // Container represents the set of data pinned by a container. Unless otherwise
@@ -22,7 +24,7 @@ type Container struct {
 
 type RuntimeInfo struct {
 	Name    string
-	Options map[string]string
+	Options *types.Any
 }
 
 type Store interface {

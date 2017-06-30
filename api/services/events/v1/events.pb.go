@@ -9,7 +9,7 @@ import fmt "fmt"
 import math "math"
 import _ "github.com/gogo/protobuf/gogoproto"
 import _ "github.com/gogo/protobuf/types"
-import google_protobuf2 "github.com/gogo/protobuf/types"
+import google_protobuf1 "github.com/gogo/protobuf/types"
 
 import time "time"
 
@@ -41,7 +41,7 @@ func (*StreamEventsRequest) Descriptor() ([]byte, []int) { return fileDescriptor
 type Envelope struct {
 	Timestamp time.Time             `protobuf:"bytes,1,opt,name=timestamp,stdtime" json:"timestamp"`
 	Topic     string                `protobuf:"bytes,2,opt,name=topic,proto3" json:"topic,omitempty"`
-	Event     *google_protobuf2.Any `protobuf:"bytes,3,opt,name=event" json:"event,omitempty"`
+	Event     *google_protobuf1.Any `protobuf:"bytes,3,opt,name=event" json:"event,omitempty"`
 }
 
 func (m *Envelope) Reset()                    { *m = Envelope{} }
@@ -288,9 +288,9 @@ func (this *Envelope) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&Envelope{`,
-		`Timestamp:` + strings.Replace(strings.Replace(this.Timestamp.String(), "Timestamp", "google_protobuf1.Timestamp", 1), `&`, ``, 1) + `,`,
+		`Timestamp:` + strings.Replace(strings.Replace(this.Timestamp.String(), "Timestamp", "google_protobuf2.Timestamp", 1), `&`, ``, 1) + `,`,
 		`Topic:` + fmt.Sprintf("%v", this.Topic) + `,`,
-		`Event:` + strings.Replace(fmt.Sprintf("%v", this.Event), "Any", "google_protobuf2.Any", 1) + `,`,
+		`Event:` + strings.Replace(fmt.Sprintf("%v", this.Event), "Any", "google_protobuf1.Any", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -468,7 +468,7 @@ func (m *Envelope) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.Event == nil {
-				m.Event = &google_protobuf2.Any{}
+				m.Event = &google_protobuf1.Any{}
 			}
 			if err := m.Event.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err

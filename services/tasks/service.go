@@ -121,7 +121,6 @@ func (s *Service) Create(ctx context.Context, r *api.CreateTaskRequest) (*api.Cr
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-
 	opts := runtime.CreateOpts{
 		Spec: container.Spec,
 		IO: runtime.IO{
@@ -131,6 +130,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateTaskRequest) (*api.Cr
 			Terminal: r.Terminal,
 		},
 		Checkpoint: checkpointPath,
+		Options:    r.Options,
 	}
 	for _, m := range r.Rootfs {
 		opts.Rootfs = append(opts.Rootfs, mount.Mount{
@@ -357,7 +357,7 @@ func (s *Service) Exec(ctx context.Context, r *api.ExecProcessRequest) (*api.Exe
 		return nil, err
 	}
 	process, err := t.Exec(ctx, runtime.ExecOpts{
-		Spec: r.Spec.Value,
+		Spec: r.Spec,
 		IO: runtime.IO{
 			Stdin:    r.Stdin,
 			Stdout:   r.Stdout,
@@ -446,7 +446,7 @@ func (s *Service) Update(ctx context.Context, r *api.UpdateTaskRequest) (*google
 	if err != nil {
 		return nil, err
 	}
-	if err := t.Update(ctx, r.Resources.Value); err != nil {
+	if err := t.Update(ctx, r.Resources); err != nil {
 		return nil, err
 	}
 	return empty, nil

@@ -3,6 +3,7 @@ syntax = "proto3";
 package containerd.services.events.v1;
 
 import "gogoproto/gogo.proto";
+import "google/protobuf/any.proto";
 
 option go_package = "github.com/containerd/containerd/api/services/events/v1;events";
 
@@ -11,7 +12,7 @@ message ContainerCreate {
 	string image = 2;
 	message Runtime {
 		string name = 1;
-		map<string, string> options = 2;
+		google.protobuf.Any options = 2;
 	}
 	Runtime runtime = 3;
 }

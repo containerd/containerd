@@ -171,6 +171,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 		Stderr:     opts.IO.Stderr,
 		Terminal:   opts.IO.Terminal,
 		Checkpoint: opts.Checkpoint,
+		Options:    opts.Options,
 	}
 	for _, m := range opts.Rootfs {
 		sopts.Rootfs = append(sopts.Rootfs, &types.Mount{

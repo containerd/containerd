@@ -63,6 +63,7 @@ message CreateTaskRequest {
 	string stderr = 8;
 	string checkpoint = 9;
 	string parent_checkpoint = 10;
+	google.protobuf.Any options = 11;
 }
 
 message CreateTaskResponse {
@@ -130,7 +131,7 @@ message ListPidsResponse{
 
 message CheckpointTaskRequest {
 	string path = 1;
-	map<string, string> options = 2;
+	google.protobuf.Any options = 2;
 }
 
 message ShimInfoResponse {

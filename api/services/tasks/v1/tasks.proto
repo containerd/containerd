@@ -72,6 +72,8 @@ message CreateTaskRequest {
 	bool terminal = 7;
 
 	containerd.types.Descriptor checkpoint = 8;
+
+	google.protobuf.Any options = 9;
 }
 
 message CreateTaskResponse {
@@ -184,7 +186,7 @@ message ListPidsResponse{
 message CheckpointTaskRequest {
 	string container_id = 1;
 	string parent_checkpoint = 2 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
-	map<string, string> options = 3;
+	google.protobuf.Any options = 3;
 }
 
 message CheckpointTaskResponse {
