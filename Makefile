@@ -121,15 +121,15 @@ test: ## run tests, except integration tests and tests that require root
 
 root-test: ## run tests, except integration tests
 	@echo "$(WHALE) $@"
-	@go test ${TESTFLAGS} ${TEST_REQUIRES_ROOT_PACKAGES} -test.root
+	@go test ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES}) -test.root
 
 integration: ## run integration tests
 	@echo "$(WHALE) $@"
-	@go test ${TESTFLAGS}
+	@go test ${TESTFLAGS} -test.root
 
 benchmark: ## run benchmarks tests
 	@echo "$(WHALE) $@"
-	@go test ${TESTFLAGS} -bench . -run Benchmark
+	@go test ${TESTFLAGS} -bench . -run Benchmark -test.root
 
 FORCE:
 
@@ -173,14 +173,14 @@ coverage: ## generate coverprofiles from the unit tests, except tests that requi
 
 root-coverage: ## generae coverage profiles for the unit tests
 	@echo "$(WHALE) $@"
-	@( for pkg in ${TEST_REQUIRES_ROOT_PACKAGES}; do \
+	@( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES}); do \
 		go test -i ${TESTFLAGS} -test.short -coverprofile="../../../$$pkg/coverage.txt" -covermode=atomic $$pkg -test.root || exit; \
 		go test ${TESTFLAGS} -test.short -coverprofile="../../../$$pkg/coverage.txt" -covermode=atomic $$pkg -test.root || exit; \
 	done )
 
 coverage-integration: ## generate coverprofiles from the integration tests
 	@echo "$(WHALE) $@"
-	go test ${TESTFLAGS} -test.short -coverprofile="../../../${INTEGRATION_PACKAGE}/coverage.txt" -covermode=atomic ${INTEGRATION_PACKAGE}
+	go test ${TESTFLAGS} -test.short -coverprofile="../../../${INTEGRATION_PACKAGE}/coverage.txt" -covermode=atomic ${INTEGRATION_PACKAGE} -test.root
 
 vendor:
 	@echo "$(WHALE) $@"

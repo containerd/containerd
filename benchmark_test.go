@@ -6,10 +6,7 @@ import (
 )
 
 func BenchmarkContainerCreate(b *testing.B) {
-	if testing.Short() {
-		b.Skip()
-	}
-	client, err := New(address)
+	client, err := newClient(b, address)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -52,10 +49,7 @@ func BenchmarkContainerCreate(b *testing.B) {
 }
 
 func BenchmarkContainerStart(b *testing.B) {
-	if testing.Short() {
-		b.Skip()
-	}
-	client, err := New(address)
+	client, err := newClient(b, address)
 	if err != nil {
 		b.Fatal(err)
 	}

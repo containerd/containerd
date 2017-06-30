@@ -20,10 +20,7 @@ func empty() IOCreation {
 }
 
 func TestContainerList(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-	client, err := New(address)
+	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,11 +40,8 @@ func TestContainerList(t *testing.T) {
 }
 
 func TestNewContainer(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
 	id := t.Name()
-	client, err := New(address)
+	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,10 +76,7 @@ func TestNewContainer(t *testing.T) {
 }
 
 func TestContainerStart(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-	client, err := New(address)
+	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,10 +143,7 @@ func TestContainerStart(t *testing.T) {
 }
 
 func TestContainerOutput(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-	client, err := New(address)
+	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,10 +213,7 @@ func TestContainerOutput(t *testing.T) {
 }
 
 func TestContainerExec(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-	client, err := New(address)
+	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -320,10 +305,7 @@ func TestContainerExec(t *testing.T) {
 }
 
 func TestContainerProcesses(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-	client, err := New(address)
+	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -393,10 +375,7 @@ func TestContainerProcesses(t *testing.T) {
 }
 
 func TestContainerCloseIO(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-	client, err := New(address)
+	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -477,10 +456,7 @@ func TestContainerCloseIO(t *testing.T) {
 }
 
 func TestContainerAttach(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-	client, err := New(address)
+	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -602,10 +578,7 @@ func TestContainerAttach(t *testing.T) {
 }
 
 func TestDeleteRunningContainer(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-	client, err := New(address)
+	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -670,10 +643,7 @@ func TestDeleteRunningContainer(t *testing.T) {
 }
 
 func TestContainerKill(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-	client, err := New(address)
+	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -739,10 +709,7 @@ func TestContainerKill(t *testing.T) {
 }
 
 func TestContainerUpdate(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-	client, err := New(address)
+	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
 	}
