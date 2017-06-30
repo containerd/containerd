@@ -11,7 +11,7 @@ import (
 	"github.com/containerd/fifo"
 )
 
-func copyIO(fifos *FifoSet, ioset *ioSet, tty bool) (closer io.Closer, err error) {
+func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (closer io.Closer, err error) {
 	var (
 		f   io.ReadWriteCloser
 		ctx = context.Background()

@@ -184,7 +184,7 @@ func (c *container) loadTask(ctx context.Context, ioAttach IOAttach) (Task, erro
 	var i *IO
 	if ioAttach != nil {
 		// get the existing fifo paths from the task information stored by the daemon
-		paths := &FifoSet{
+		paths := &FIFOSet{
 			Dir: getFifoDir([]string{
 				response.Task.Stdin,
 				response.Task.Stdout,

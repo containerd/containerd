@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func copyIO(fifos *FifoSet, ioset *ioSet, tty bool) (closer io.Closer, err error) {
+func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (closer io.Closer, err error) {
 	var wg sync.WaitGroup
 
 	if fifos.In != "" {
