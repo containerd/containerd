@@ -564,3 +564,56 @@ func (cs *ContainerdSuite) TestSigkillShimReuseName(t *check.C) {
 		t.Fatal(err)
 	}
 }
+
+func (cs *ContainerdSuite) TestSigkillShimWhileContainerIsPaused(t *check.C) {
+	bundleName := "busybox-top"
+	if err := CreateBusyboxBundle(bundleName, []string{"top"}); err != nil {
+		t.Fatal(err)
+	}
+	containerID := "top"
+	c, err := cs.StartContainer(containerID, bundleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// pause the container
+	err = cs.PauseContainer(containerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Sigkill the shim
+	exec.Command("pkill", "-9", "containerd-shim").Run()
+
+	for _, evt := range []types.Event{
+		{
+			Type:   "start-container",
+			Id:     containerID,
+			Status: 0,
+			Pid:    "",
+		},
+		{
+			Type:   "pause",
+			Id:     containerID,
+			Status: 0,
+			Pid:    "",
+		},
+		{
+			Type:   "exit",
+			Id:     containerID,
+			Status: 128 + 9,
+			Pid:    "init",
+		},
+	} {
+		ch := c.GetEventsChannel()
+		select {
+		case e := <-ch:
+			evt.Timestamp = e.Timestamp
+
+			t.Assert(*e, checker.Equals, evt)
+		case <-time.After(2 * time.Second):
+			t.Fatal("Container took more than 2 seconds to terminate")
+		}
+	}
+
+}
