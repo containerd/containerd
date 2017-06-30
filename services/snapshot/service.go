@@ -3,19 +3,27 @@ package snapshot
 import (
 	gocontext "context"
 
+	"github.com/boltdb/bolt"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
 	protoempty "github.com/golang/protobuf/ptypes/empty"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
+
+type config struct {
+	// Default is the default snapshotter to use for the service
+	Default string `toml:"default,omitempty"`
+}
 
 func init() {
 	plugin.Register(&plugin.Registration{
@@ -23,15 +31,12 @@ func init() {
 		ID:   "snapshots",
 		Requires: []plugin.PluginType{
 			plugin.SnapshotPlugin,
+			plugin.MetadataPlugin,
 		},
-		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			e := events.GetPoster(ic.Context)
-			s, err := ic.Get(plugin.SnapshotPlugin)
-			if err != nil {
-				return nil, err
-			}
-			return newService(s.(snapshot.Snapshotter), e)
+		Config: &config{
+			Default: defaultSnapshotter,
 		},
+		Init: newService,
 	})
 }
 
@@ -42,9 +47,26 @@ type service struct {
 	emitter     events.Poster
 }
 
-func newService(snapshotter snapshot.Snapshotter, evts events.Poster) (*service, error) {
+func newService(ic *plugin.InitContext) (interface{}, error) {
+	evts := events.GetPoster(ic.Context)
+	snapshotters, err := ic.GetAll(plugin.SnapshotPlugin)
+	if err != nil {
+		return nil, err
+	}
+	cfg := ic.Config.(*config)
+
+	sn, ok := snapshotters[cfg.Default]
+	if !ok {
+		return nil, errors.Errorf("default snapshotter not loaded: %s", cfg.Default)
+	}
+
+	md, err := ic.Get(plugin.MetadataPlugin)
+	if err != nil {
+		return nil, err
+	}
+
 	return &service{
-		snapshotter: snapshotter,
+		snapshotter: metadata.NewSnapshotter(md.(*bolt.DB), cfg.Default, sn.(snapshot.Snapshotter)),
 		emitter:     evts,
 	}, nil
 }

@@ -63,7 +63,7 @@ func applyLayer(ctx context.Context, layer Layer, chain []digest.Digest, sn snap
 		if err != nil {
 			log.G(ctx).WithError(err).WithField("key", key).Infof("Apply failure, attempting cleanup")
 			if rerr := sn.Remove(ctx, key); rerr != nil {
-				log.G(ctx).WithError(rerr).Warnf("Extraction snapshot %q removal failed: %v", key)
+				log.G(ctx).WithError(rerr).Warnf("Extraction snapshot %q removal failed", key)
 			}
 		}
 	}()

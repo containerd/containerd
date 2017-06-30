@@ -10,7 +10,6 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/snapshot"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -23,35 +22,28 @@ func init() {
 		ID:   "base-diff",
 		Requires: []plugin.PluginType{
 			plugin.ContentPlugin,
-			plugin.SnapshotPlugin,
 		},
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
 			c, err := ic.Get(plugin.ContentPlugin)
 			if err != nil {
 				return nil, err
 			}
-			s, err := ic.Get(plugin.SnapshotPlugin)
-			if err != nil {
-				return nil, err
-			}
-			return newBaseDiff(c.(content.Store), s.(snapshot.Snapshotter))
+			return newBaseDiff(c.(content.Store))
 		},
 	})
 }
 
 type BaseDiff struct {
-	store       content.Store
-	snapshotter snapshot.Snapshotter
+	store content.Store
 }
 
 var _ plugin.Differ = &BaseDiff{}
 
 var emptyDesc = ocispec.Descriptor{}
 
-func newBaseDiff(store content.Store, snapshotter snapshot.Snapshotter) (*BaseDiff, error) {
+func newBaseDiff(store content.Store) (*BaseDiff, error) {
 	return &BaseDiff{
-		store:       store,
-		snapshotter: snapshotter,
+		store: store,
 	}, nil
 }
 

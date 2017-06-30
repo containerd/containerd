@@ -55,14 +55,10 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 			rpc:     rpc,
 			emitter: events.NewEmitter(),
 		}
-		initialized = make(map[plugin.PluginType][]interface{})
+		initialized = make(map[plugin.PluginType]map[string]interface{})
 	)
 	for _, p := range plugins {
 		id := p.URI()
-		if !shouldLoadPlugin(p, config) {
-			log.G(ctx).WithField("type", p.Type).Infof("skip loading plugin %q...", id)
-			continue
-		}
 		log.G(ctx).WithField("type", p.Type).Infof("loading plugin %q...", id)
 
 		initContext := plugin.NewContext(
@@ -83,10 +79,21 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 		}
 		instance, err := p.Init(initContext)
 		if err != nil {
-			log.G(ctx).WithError(err).Warnf("failed to load plugin %s", id)
+			if plugin.IsSkipPlugin(err) {
+				log.G(ctx).WithField("type", p.Type).Infof("skip loading plugin %q...", id)
+			} else {
+				log.G(ctx).WithError(err).Warnf("failed to load plugin %s", id)
+			}
 			continue
 		}
-		initialized[p.Type] = append(initialized[p.Type], instance)
+
+		if types, ok := initialized[p.Type]; ok {
+			types[p.ID] = instance
+		} else {
+			initialized[p.Type] = map[string]interface{}{
+				p.ID: instance,
+			}
+		}
 		// check for grpc services that should be registered with the server
 		if service, ok := instance.(plugin.Service); ok {
 			services = append(services, service)
@@ -168,17 +175,6 @@ func loadPlugins(config *Config) ([]*plugin.Registration, error) {
 
 	// return the ordered graph for plugins
 	return plugin.Graph(), nil
-}
-
-func shouldLoadPlugin(p *plugin.Registration, config *Config) bool {
-	switch p.Type {
-	case plugin.SnapshotPlugin:
-		return p.URI() == config.Snapshotter
-	case plugin.DiffPlugin:
-		return p.URI() == config.Differ
-	default:
-		return true
-	}
 }
 
 func interceptor(
