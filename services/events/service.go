@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	api "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/plugin"
@@ -44,9 +43,6 @@ func (s *Service) Stream(req *api.StreamEventsRequest, srv api.Events_StreamServ
 			return nil
 		}
 		if err := srv.Send(e); err != nil {
-			logrus.WithFields(logrus.Fields{
-				"client": clientID,
-			}).Debug("error sending event; unsubscribing client")
 			s.emitter.Remove(clientID)
 			return err
 		}

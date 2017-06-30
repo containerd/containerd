@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"sync"
+	"time"
 
 	events "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/namespaces"
@@ -14,14 +15,14 @@ const (
 )
 
 type Emitter struct {
-	sinks       map[string]*eventSink
+	sinks       map[string]*goevents.RetryingSink
 	broadcaster *goevents.Broadcaster
 	m           sync.Mutex
 }
 
 func NewEmitter() *Emitter {
 	return &Emitter{
-		sinks:       make(map[string]*eventSink),
+		sinks:       make(map[string]*goevents.RetryingSink),
 		broadcaster: goevents.NewBroadcaster(),
 		m:           sync.Mutex{},
 	}
@@ -40,19 +41,25 @@ func (e *Emitter) Post(ctx context.Context, evt Event) error {
 
 func (e *Emitter) Events(ctx context.Context, clientID string) chan *events.Envelope {
 	e.m.Lock()
-	if _, ok := e.sinks[clientID]; !ok {
-		ns, _ := namespaces.Namespace(ctx)
-		s := &eventSink{
-			ch: make(chan *events.Envelope),
-			ns: ns,
-		}
-		e.sinks[clientID] = s
-		e.broadcaster.Add(s)
-	}
-	ch := e.sinks[clientID].ch
-	e.m.Unlock()
+	defer e.m.Unlock()
 
-	return ch
+	if v, ok := e.sinks[clientID]; ok {
+		e.broadcaster.Remove(v)
+	}
+
+	ns, _ := namespaces.Namespace(ctx)
+	s := &eventSink{
+		id: clientID,
+		ch: make(chan *events.Envelope),
+		ns: ns,
+	}
+	q := goevents.NewQueue(s)
+	r := goevents.NewRetryingSink(q, goevents.NewBreaker(5, time.Millisecond*100))
+
+	e.broadcaster.Add(r)
+	e.sinks[clientID] = r
+
+	return s.ch
 }
 
 func (e *Emitter) Remove(clientID string) {
