@@ -281,9 +281,6 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 	// Set hostname.
 	g.SetHostname(config.GetHostname())
 
-	// TODO(random-liu): [P0] Add NamespaceGetter and PortMappingGetter to initialize network plugin.
-
-	// TODO(random-liu): [P0] Add annotation to identify the container is managed by cri-containerd.
 	// TODO(random-liu): [P2] Consider whether to add labels and annotations to the container.
 
 	// Set cgroups parent.

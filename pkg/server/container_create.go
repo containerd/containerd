@@ -173,7 +173,6 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint32, config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig, extraMounts []*runtime.Mount) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
-	// TODO(random-liu): [P2] Move container runtime spec generation into a helper function.
 	g := generate.New()
 
 	// Set the relative path to the rootfs of the container from containerd's
@@ -210,8 +209,6 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 	if err := addOCIDevices(&g, config.GetDevices(), securityContext.GetPrivileged()); err != nil {
 		return nil, fmt.Errorf("failed to set devices mapping %+v: %v", config.GetDevices(), err)
 	}
-
-	// TODO(random-liu): [P1] Handle container logging, decorate and redirect to file.
 
 	setOCILinuxResource(&g, config.GetLinux().GetResources())
 

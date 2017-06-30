@@ -29,7 +29,6 @@ import (
 )
 
 // RemoveImage removes the image.
-// TODO(mikebrow): harden api
 // TODO(random-liu): Update CRI to pass image reference instead of ImageSpec. (See
 // kubernetes/kubernetes#46255)
 // TODO(random-liu): We should change CRI to distinguish image id and image spec.
