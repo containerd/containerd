@@ -25,7 +25,7 @@ type metric struct {
 
 func (m *metric) desc(ns *metrics.Namespace) *prometheus.Desc {
 	// the namespace label is for containerd namespaces
-	return ns.NewDesc(m.name, m.help, m.unit, append([]string{"id", "namespace"}, m.labels...)...)
+	return ns.NewDesc(m.name, m.help, m.unit, append([]string{"container_id", "namespace"}, m.labels...)...)
 }
 
 func (m *metric) collect(id, namespace string, stats *cgroups.Stats, ns *metrics.Namespace, ch chan<- prometheus.Metric) {

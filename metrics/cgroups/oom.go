@@ -19,7 +19,7 @@ func NewOOMCollector(ns *metrics.Namespace) (*OOMCollector, error) {
 	}
 	c := &OOMCollector{
 		fd:        fd,
-		memoryOOM: ns.NewLabeledGauge("memory_oom", "The number of times a container received an oom event", metrics.Total, "id", "namespace"),
+		memoryOOM: ns.NewLabeledGauge("memory_oom", "The number of times a container received an oom event", metrics.Total, "container_id", "namespace"),
 		set:       make(map[uintptr]*oom),
 	}
 	go c.start()
