@@ -27,8 +27,13 @@ func diskUsage(roots ...string) (Usage, error) {
 			}
 
 			stat := fi.Sys().(*syscall.Stat_t)
-			inodes[inode{dev: uint64(stat.Dev), ino: uint64(stat.Ino)}] = struct{}{}
-			size += fi.Size()
+
+			inoKey := inode{dev: uint64(stat.Dev), ino: uint64(stat.Ino)}
+			if _, ok := inodes[inoKey]; !ok {
+				inodes[inoKey] = struct{}{}
+				size += fi.Size()
+			}
+
 			return nil
 		}); err != nil {
 			return Usage{}, err
