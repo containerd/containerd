@@ -15,7 +15,7 @@ option go_package = "github.com/containerd/containerd/api/services/containers/v1
 // service.
 //
 // The objects here provide an state-independent view of containers for use in
-// management and resource pinning. From that perspective, contaienrs do not
+// management and resource pinning. From that perspective, containers do not
 // have a "state" but rather this is the set of resources that will be
 // considered in use by the container.
 //
