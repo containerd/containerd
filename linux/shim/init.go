@@ -42,7 +42,7 @@ type initProcess struct {
 	bundle  string
 	console console.Console
 	io      runc.IO
-	runc    *runc.Runc
+	runtime *runc.Runc
 	status  int
 	exited  time.Time
 	pid     int
@@ -82,7 +82,7 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 	p := &initProcess{
 		id:         r.ID,
 		bundle:     r.Bundle,
-		runc:       runtime,
+		runtime:    runtime,
 		stdinPath:  r.Stdin,
 		stdoutPath: r.Stdout,
 		stderrPath: r.Stderr,
@@ -95,13 +95,13 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 	)
 	if r.Terminal {
 		if socket, err = runc.NewConsoleSocket(filepath.Join(path, "pty.sock")); err != nil {
-			return nil, errors.Wrap(err, "failed to create runc console socket")
+			return nil, errors.Wrap(err, "failed to create OCI runtime console socket")
 		}
 		defer os.Remove(socket.Path())
 	} else {
 		// TODO: get uid/gid
 		if io, err = runc.NewPipeIO(0, 0); err != nil {
-			return nil, errors.Wrap(err, "failed to create runc io pipes")
+			return nil, errors.Wrap(err, "failed to create OCI runtime io pipes")
 		}
 		p.io = io
 	}
@@ -119,8 +119,8 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 			Detach:      true,
 			NoSubreaper: true,
 		}
-		if _, err := p.runc.Restore(context, r.ID, r.Bundle, opts); err != nil {
-			return nil, p.runcError(err, "runc restore failed")
+		if _, err := p.runtime.Restore(context, r.ID, r.Bundle, opts); err != nil {
+			return nil, p.runtimeError(err, "OCI runtime restore failed")
 		}
 	} else {
 		opts := &runc.CreateOpts{
@@ -132,8 +132,8 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 		if socket != nil {
 			opts.ConsoleSocket = socket
 		}
-		if err := p.runc.Create(context, r.ID, r.Bundle, opts); err != nil {
-			return nil, p.runcError(err, "runc create failed")
+		if err := p.runtime.Create(context, r.ID, r.Bundle, opts); err != nil {
+			return nil, p.runtimeError(err, "OCI runtime create failed")
 		}
 	}
 	if r.Stdin != "" {
@@ -163,7 +163,7 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 	copyWaitGroup.Wait()
 	pid, err := runc.ReadPidFile(pidFile)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to retrieve runc container pid")
+		return nil, errors.Wrap(err, "failed to retrieve OCI runtime container pid")
 	}
 	p.pid = pid
 	return p, nil
@@ -183,9 +183,9 @@ func (p *initProcess) ExitedAt() time.Time {
 
 // ContainerStatus return the state of the container (created, running, paused, stopped)
 func (p *initProcess) ContainerStatus(ctx context.Context) (string, error) {
-	c, err := p.runc.State(ctx, p.id)
+	c, err := p.runtime.State(ctx, p.id)
 	if err != nil {
-		return "", p.runcError(err, "runc state failed")
+		return "", p.runtimeError(err, "OCI runtime state failed")
 	}
 	return c.Status, nil
 }
@@ -193,8 +193,8 @@ func (p *initProcess) ContainerStatus(ctx context.Context) (string, error) {
 func (p *initProcess) Start(context context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	err := p.runc.Start(context, p.id)
-	return p.runcError(err, "runc start failed")
+	err := p.runtime.Start(context, p.id)
+	return p.runtimeError(err, "OCI runtime start failed")
 }
 
 func (p *initProcess) Exited(status int) {
@@ -214,14 +214,14 @@ func (p *initProcess) Delete(context context.Context) error {
 	}
 	p.killAll(context)
 	p.Wait()
-	err = p.runc.Delete(context, p.id, nil)
+	err = p.runtime.Delete(context, p.id, nil)
 	if p.io != nil {
 		for _, c := range p.closers {
 			c.Close()
 		}
 		p.io.Close()
 	}
-	return p.runcError(err, "runc delete failed")
+	return p.runtimeError(err, "OCI runtime delete failed")
 }
 
 func (p *initProcess) Resize(ws console.WinSize) error {
@@ -232,27 +232,27 @@ func (p *initProcess) Resize(ws console.WinSize) error {
 }
 
 func (p *initProcess) Pause(context context.Context) error {
-	err := p.runc.Pause(context, p.id)
-	return p.runcError(err, "runc pause failed")
+	err := p.runtime.Pause(context, p.id)
+	return p.runtimeError(err, "OCI runtime pause failed")
 }
 
 func (p *initProcess) Resume(context context.Context) error {
-	err := p.runc.Resume(context, p.id)
-	return p.runcError(err, "runc resume failed")
+	err := p.runtime.Resume(context, p.id)
+	return p.runtimeError(err, "OCI runtime resume failed")
 }
 
 func (p *initProcess) Kill(context context.Context, signal uint32, all bool) error {
-	err := p.runc.Kill(context, p.id, int(signal), &runc.KillOpts{
+	err := p.runtime.Kill(context, p.id, int(signal), &runc.KillOpts{
 		All: all,
 	})
 	return checkKillError(err)
 }
 
 func (p *initProcess) killAll(context context.Context) error {
-	err := p.runc.Kill(context, p.id, int(syscall.SIGKILL), &runc.KillOpts{
+	err := p.runtime.Kill(context, p.id, int(syscall.SIGKILL), &runc.KillOpts{
 		All: true,
 	})
-	return p.runcError(err, "runc killall failed")
+	return p.runtimeError(err, "OCI runtime killall failed")
 }
 
 func (p *initProcess) Signal(sig int) error {
@@ -276,7 +276,7 @@ func (p *initProcess) Checkpoint(context context.Context, r *shimapi.CheckpointT
 	}
 	work := filepath.Join(p.bundle, "work")
 	defer os.RemoveAll(work)
-	if err := p.runc.Checkpoint(context, p.id, &runc.CheckpointOpts{
+	if err := p.runtime.Checkpoint(context, p.id, &runc.CheckpointOpts{
 		WorkDir:                  work,
 		ImagePath:                r.Path,
 		AllowOpenTCP:             options.OpenTcp,
@@ -299,11 +299,11 @@ func (p *initProcess) Update(context context.Context, r *shimapi.UpdateTaskReque
 	if err := json.Unmarshal(r.Resources.Value, &resources); err != nil {
 		return err
 	}
-	return p.runc.Update(context, p.id, &resources)
+	return p.runtime.Update(context, p.id, &resources)
 }
 
 // TODO(mlaventure): move to runc package?
-func getLastRuncError(r *runc.Runc) (string, error) {
+func getLastRuntimeError(r *runc.Runc) (string, error) {
 	if r.Log == "" {
 		return "", nil
 	}
@@ -335,15 +335,15 @@ func getLastRuncError(r *runc.Runc) (string, error) {
 	return errMsg, nil
 }
 
-func (p *initProcess) runcError(rErr error, msg string) error {
+func (p *initProcess) runtimeError(rErr error, msg string) error {
 	if rErr == nil {
 		return nil
 	}
 
-	rMsg, err := getLastRuncError(p.runc)
+	rMsg, err := getLastRuntimeError(p.runtime)
 	switch {
 	case err != nil:
-		return errors.Wrapf(rErr, "%s: %s (%s)", msg, "unable to retrieve runc error", err.Error())
+		return errors.Wrapf(rErr, "%s: %s (%s)", msg, "unable to retrieve OCI runtime error", err.Error())
 	case rMsg == "":
 		return errors.Wrap(rErr, msg)
 	default:
