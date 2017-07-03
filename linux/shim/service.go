@@ -383,7 +383,7 @@ func (s *Service) waitExit(p process, pid int, cmd *reaper.Cmd) {
 }
 
 func (s *Service) getContainerPids(ctx context.Context, id string) ([]uint32, error) {
-	p, err := s.initProcess.runc.Ps(ctx, id)
+	p, err := s.initProcess.runtime.Ps(ctx, id)
 	if err != nil {
 		return nil, err
 	}

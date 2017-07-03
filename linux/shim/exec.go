@@ -85,8 +85,8 @@ func newExecProcess(context context.Context, path string, r *shimapi.ExecProcess
 	}
 	spec.Terminal = r.Terminal
 
-	if err := parent.runc.Exec(context, parent.id, spec, opts); err != nil {
-		return nil, parent.runcError(err, "runc exec failed")
+	if err := parent.runtime.Exec(context, parent.id, spec, opts); err != nil {
+		return nil, parent.runtimeError(err, "OCI runtime exec failed")
 	}
 	if r.Stdin != "" {
 		sc, err := fifo.OpenFifo(context, r.Stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
@@ -114,7 +114,7 @@ func newExecProcess(context context.Context, path string, r *shimapi.ExecProcess
 	copyWaitGroup.Wait()
 	pid, err := runc.ReadPidFile(opts.PidFile)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to retrieve runc exec pid")
+		return nil, errors.Wrap(err, "failed to retrieve OCI runtime exec pid")
 	}
 	e.pid = pid
 	return e, nil
