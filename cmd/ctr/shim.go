@@ -20,6 +20,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/console"
 	shim "github.com/containerd/containerd/linux/shim/v1"
+	"github.com/containerd/containerd/typeurl"
 	protobuf "github.com/gogo/protobuf/types"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -235,10 +236,14 @@ var shimExecCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		url, err := typeurl.TypeUrl(specs.Process{})
+		if err != nil {
+			return err
+		}
 
 		rq := &shim.ExecProcessRequest{
 			Spec: &protobuf.Any{
-				TypeUrl: specs.Version,
+				TypeUrl: url,
 				Value:   spec,
 			},
 			Stdin:    context.String("stdin"),

@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -80,11 +79,6 @@ func (b *bundle) Connect(ctx context.Context, remote bool) (*client.Client, erro
 		Path:      b.path,
 		Namespace: b.namespace,
 	}, opt)
-}
-
-// spec returns the spec written to the bundle
-func (b *bundle) Spec() ([]byte, error) {
-	return ioutil.ReadFile(filepath.Join(b.path, configFilename))
 }
 
 // Delete deletes the bundle from disk

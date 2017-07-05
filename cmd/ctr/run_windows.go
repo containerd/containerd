@@ -10,13 +10,11 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
-	containersapi "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/windows"
 	"github.com/containerd/containerd/windows/hcs"
-	protobuf "github.com/gogo/protobuf/types"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -134,25 +132,6 @@ func newContainerSpec(context *cli.Context, config *ocispec.ImageConfig, imageRe
 			AllowUnqualifiedDNSQuery: true},
 	}
 	return json.Marshal(rtSpec)
-}
-
-func newCreateContainerRequest(context *cli.Context, id, snapshot, image string, spec []byte) (*containersapi.CreateContainerRequest, error) {
-	create := &containersapi.CreateContainerRequest{
-		Container: containersapi.Container{
-			ID:    id,
-			Image: image,
-			Spec: &protobuf.Any{
-				TypeUrl: specs.Version,
-				Value:   spec,
-			},
-			Runtime: &containersapi.Container_Runtime{
-				Name: context.String("runtime"),
-			},
-			RootFS: snapshot,
-		},
-	}
-
-	return create, nil
 }
 
 func newCreateTaskRequest(context *cli.Context, id, tmpDir string, checkpoint *ocispec.Descriptor, mounts []mount.Mount) (*tasks.CreateTaskRequest, error) {

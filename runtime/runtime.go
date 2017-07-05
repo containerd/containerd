@@ -17,7 +17,7 @@ type IO struct {
 
 type CreateOpts struct {
 	// Spec is the OCI runtime spec
-	Spec []byte
+	Spec *types.Any
 	// Rootfs mounts to perform to gain access to the container's filesystem
 	Rootfs []mount.Mount
 	// IO for the container's main process

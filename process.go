@@ -2,13 +2,12 @@ package containerd
 
 import (
 	"context"
-	"encoding/json"
 	"syscall"
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/events"
-	protobuf "github.com/gogo/protobuf/types"
+	"github.com/containerd/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -35,7 +34,7 @@ func (p *process) Pid() uint32 {
 
 // Start starts the exec process
 func (p *process) Start(ctx context.Context) error {
-	data, err := json.Marshal(p.spec)
+	any, err := typeurl.MarshalAny(p.spec)
 	if err != nil {
 		return err
 	}
@@ -45,10 +44,7 @@ func (p *process) Start(ctx context.Context) error {
 		Stdin:       p.io.Stdin,
 		Stdout:      p.io.Stdout,
 		Stderr:      p.io.Stderr,
-		Spec: &protobuf.Any{
-			TypeUrl: specs.Version,
-			Value:   data,
-		},
+		Spec:        any,
 	}
 	response, err := p.task.client.TaskService().Exec(ctx, request)
 	if err != nil {

@@ -12,7 +12,7 @@ import (
 	"github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/images"
-	protobuf "github.com/gogo/protobuf/types"
+	"github.com/containerd/containerd/typeurl"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -275,28 +275,22 @@ func WithImageConfig(ctx context.Context, i Image) SpecOpts {
 
 func WithSpec(spec *specs.Spec) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		data, err := json.Marshal(spec)
+		any, err := typeurl.MarshalAny(spec)
 		if err != nil {
 			return err
 		}
-		c.Spec = &protobuf.Any{
-			TypeUrl: spec.Version,
-			Value:   data,
-		}
+		c.Spec = any
 		return nil
 	}
 }
 
 func WithResources(resources *specs.LinuxResources) UpdateTaskOpts {
 	return func(ctx context.Context, client *Client, r *tasks.UpdateTaskRequest) error {
-		data, err := json.Marshal(resources)
+		any, err := typeurl.MarshalAny(resources)
 		if err != nil {
 			return err
 		}
-		r.Resources = &protobuf.Any{
-			TypeUrl: specs.Version,
-			Value:   data,
-		}
+		r.Resources = any
 		return nil
 	}
 }

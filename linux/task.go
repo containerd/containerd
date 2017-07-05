@@ -17,16 +17,14 @@ import (
 
 type Task struct {
 	containerID string
-	spec        []byte
 	shim        *client.Client
 	namespace   string
 }
 
-func newTask(id, namespace string, spec []byte, shim *client.Client) *Task {
+func newTask(id, namespace string, shim *client.Client) *Task {
 	return &Task{
 		containerID: id,
 		shim:        shim,
-		spec:        spec,
 		namespace:   namespace,
 	}
 }
@@ -36,7 +34,6 @@ func (t *Task) Info() runtime.TaskInfo {
 		ID:          t.containerID,
 		ContainerID: t.containerID,
 		Runtime:     pluginID,
-		Spec:        t.spec,
 		Namespace:   t.namespace,
 	}
 }

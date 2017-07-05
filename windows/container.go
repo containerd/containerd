@@ -41,7 +41,7 @@ func loadContainers(ctx context.Context, h *hcs.HCS, sendEvent eventCallback) ([
 	return containers, nil
 }
 
-func newContainer(ctx context.Context, h *hcs.HCS, id string, spec RuntimeSpec, io runtime.IO, sendEvent eventCallback) (*container, error) {
+func newContainer(ctx context.Context, h *hcs.HCS, id string, spec *RuntimeSpec, io runtime.IO, sendEvent eventCallback) (*container, error) {
 	cio, err := hcs.NewIO(io.Stdin, io.Stdout, io.Stderr, io.Terminal)
 	if err != nil {
 		return nil, err

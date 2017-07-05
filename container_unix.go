@@ -14,11 +14,11 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/gogo/protobuf/proto"
 	protobuf "github.com/gogo/protobuf/types"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/opencontainers/image-spec/specs-go/v1"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func WithCheckpoint(desc v1.Descriptor, rootfsID string) NewContainerOpts {
@@ -61,10 +61,11 @@ func WithCheckpoint(desc v1.Descriptor, rootfsID string) NewContainerOpts {
 				if err != nil {
 					return err
 				}
-				c.Spec = &protobuf.Any{
-					TypeUrl: specs.Version,
-					Value:   data,
+				var any protobuf.Any
+				if err := proto.Unmarshal(data, &any); err != nil {
+					return err
 				}
+				c.Spec = &any
 			}
 		}
 		if rw != nil {
