@@ -66,7 +66,6 @@ func (p *process) Kill(ctx context.Context, s syscall.Signal) error {
 }
 
 func (p *process) Wait(ctx context.Context) (uint32, error) {
-	// TODO (ehazlett): add filtering for specific event
 	eventstream, err := p.task.client.EventService().Stream(ctx, &eventsapi.StreamEventsRequest{})
 	if err != nil {
 		return UnknownExitStatus, err
@@ -78,15 +77,15 @@ evloop:
 		if err != nil {
 			return UnknownExitStatus, err
 		}
-		v, err := typeurl.UnmarshalAny(evt.Event)
-		if err != nil {
-			return UnknownExitStatus, err
-		}
-		if e, ok := v.(*eventsapi.RuntimeEvent); ok {
+		if typeurl.Is(evt.Event, eventsapi.RuntimeEvent{}) {
+			v, err := typeurl.UnmarshalAny(evt.Event)
+			if err != nil {
+				return UnknownExitStatus, err
+			}
+			e := v.(*eventsapi.RuntimeEvent)
 			if e.Type != eventsapi.RuntimeEvent_EXIT {
 				continue evloop
 			}
-
 			if e.ID == p.task.containerID && e.Pid == p.pid {
 				return e.ExitStatus, nil
 			}

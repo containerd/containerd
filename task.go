@@ -160,8 +160,12 @@ func (t *task) Wait(ctx context.Context) (uint32, error) {
 		if err != nil {
 			return UnknownExitStatus, err
 		}
-		v, err := typeurl.UnmarshalAny(evt.Event)
-		if e, ok := v.(*eventsapi.RuntimeEvent); ok {
+		if typeurl.Is(evt.Event, eventsapi.RuntimeEvent{}) {
+			v, err := typeurl.UnmarshalAny(evt.Event)
+			if err != nil {
+				return UnknownExitStatus, err
+			}
+			e := v.(*eventsapi.RuntimeEvent)
 			if e.Type != eventsapi.RuntimeEvent_EXIT {
 				continue
 			}

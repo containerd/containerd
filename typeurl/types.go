@@ -2,12 +2,12 @@ package typeurl
 
 import (
 	"encoding/json"
-	"errors"
 	"path"
 	"reflect"
 	"strings"
 	"sync"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
 )
@@ -15,10 +15,8 @@ import (
 const Prefix = "types.containerd.io"
 
 var (
-	mu            sync.Mutex
-	registry      = make(map[reflect.Type]string)
-	ErrRegistered = errors.New("typeurl: type already registred")
-	ErrNotExists  = errors.New("typeurl: type is not registered")
+	mu       sync.Mutex
+	registry = make(map[reflect.Type]string)
 )
 
 // Register a type with the base url of the type
@@ -27,7 +25,7 @@ func Register(v interface{}, args ...string) {
 	mu.Lock()
 	defer mu.Unlock()
 	if _, ok := registry[t]; ok {
-		panic(ErrRegistered)
+		panic(errdefs.ErrAlreadyExists)
 	}
 	registry[t] = path.Join(append([]string{Prefix}, args...)...)
 }
@@ -41,11 +39,19 @@ func TypeURL(v interface{}) (string, error) {
 		// fallback to the proto registry if it is a proto message
 		pb, ok := v.(proto.Message)
 		if !ok {
-			return "", ErrNotExists
+			return "", errdefs.ErrNotFound
 		}
 		return path.Join(Prefix, proto.MessageName(pb)), nil
 	}
 	return u, nil
+}
+
+func Is(any *types.Any, v interface{}) bool {
+	url, err := TypeURL(v)
+	if err != nil {
+		return false
+	}
+	return any.TypeUrl == url
 }
 
 func MarshalAny(v interface{}) (*types.Any, error) {
@@ -108,7 +114,7 @@ func getTypeByUrl(url string) (urlType, error) {
 			isProto: true,
 		}, nil
 	}
-	return urlType{}, ErrNotExists
+	return urlType{}, errdefs.ErrNotFound
 }
 
 func tryDereference(v interface{}) reflect.Type {

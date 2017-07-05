@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
-	events "github.com/containerd/containerd/events"
 )
 
 type test struct {
@@ -121,9 +120,26 @@ func TestMarshalUnmarshal(t *testing.T) {
 	}
 }
 
+func TestIs(t *testing.T) {
+	clear()
+	Register(test{}, "test")
+
+	v := &test{
+		Name: "koye",
+		Age:  6,
+	}
+	any, err := MarshalAny(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !Is(any, test{}) {
+		t.Fatal("Is(any, test{}) should be true")
+	}
+}
+
 func TestMarshalEvent(t *testing.T) {
 	for _, testcase := range []struct {
-		event events.Event
+		event interface{}
 		url   string
 	}{
 		{
