@@ -8,6 +8,7 @@ import (
 	"github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/typeurl"
 	goevents "github.com/docker/go-events"
 	"github.com/pkg/errors"
 )
@@ -35,7 +36,7 @@ func (s *eventSink) Write(evt goevents.Event) error {
 		return nil
 	}
 
-	eventData, err := MarshalEvent(e.event)
+	eventData, err := typeurl.MarshalAny(e.event)
 	if err != nil {
 		return err
 	}

@@ -3,15 +3,16 @@ package typeurl
 import (
 	"encoding/json"
 	"errors"
-	"path/filepath"
+	"path"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
 )
 
-const Namespace = "types.containerd.io"
+const Prefix = "types.containerd.io"
 
 var (
 	mu            sync.Mutex
@@ -28,16 +29,21 @@ func Register(v interface{}, args ...string) {
 	if _, ok := registry[t]; ok {
 		panic(ErrRegistered)
 	}
-	registry[t] = filepath.Join(append([]string{Namespace}, args...)...)
+	registry[t] = path.Join(append([]string{Prefix}, args...)...)
 }
 
-// TypeUrl returns the type url for a registred type
-func TypeUrl(v interface{}) (string, error) {
+// TypeURL returns the type url for a registred type
+func TypeURL(v interface{}) (string, error) {
 	mu.Lock()
 	defer mu.Unlock()
 	u, ok := registry[tryDereference(v)]
 	if !ok {
-		return "", ErrNotExists
+		// fallback to the proto registry if it is a proto message
+		pb, ok := v.(proto.Message)
+		if !ok {
+			return "", ErrNotExists
+		}
+		return path.Join(Prefix, proto.MessageName(pb)), nil
 	}
 	return u, nil
 }
@@ -47,7 +53,7 @@ func MarshalAny(v interface{}) (*types.Any, error) {
 		err  error
 		data []byte
 	)
-	url, err := TypeUrl(v)
+	url, err := TypeURL(v)
 	if err != nil {
 		return nil, err
 	}
@@ -71,23 +77,38 @@ func UnmarshalAny(any *types.Any) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	v := reflect.New(t).Interface()
-	switch dt := v.(type) {
-	case proto.Message:
-		err = proto.Unmarshal(any.Value, dt)
-	default:
+	v := reflect.New(t.t).Interface()
+	if t.isProto {
+		err = proto.Unmarshal(any.Value, v.(proto.Message))
+	} else {
 		err = json.Unmarshal(any.Value, v)
 	}
 	return v, err
 }
 
-func getTypeByUrl(url string) (reflect.Type, error) {
+type urlType struct {
+	t       reflect.Type
+	isProto bool
+}
+
+func getTypeByUrl(url string) (urlType, error) {
 	for t, u := range registry {
 		if u == url {
-			return t, nil
+			return urlType{
+				t: t,
+			}, nil
 		}
 	}
-	return nil, ErrNotExists
+	// fallback to proto registry
+	t := proto.MessageType(strings.TrimPrefix(url, Prefix+"/"))
+	if t != nil {
+		return urlType{
+			// get the underlying Elem because proto returns a pointer to the type
+			t:       t.Elem(),
+			isProto: true,
+		}, nil
+	}
+	return urlType{}, ErrNotExists
 }
 
 func tryDereference(v interface{}) reflect.Type {

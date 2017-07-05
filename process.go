@@ -6,7 +6,6 @@ import (
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
-	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -79,14 +78,11 @@ evloop:
 		if err != nil {
 			return UnknownExitStatus, err
 		}
-
-		switch {
-		case events.Is(evt.Event, &eventsapi.RuntimeEvent{}):
-			var e eventsapi.RuntimeEvent
-			if err := events.UnmarshalEvent(evt.Event, &e); err != nil {
-				return UnknownExitStatus, err
-			}
-
+		v, err := typeurl.UnmarshalAny(evt.Event)
+		if err != nil {
+			return UnknownExitStatus, err
+		}
+		if e, ok := v.(*eventsapi.RuntimeEvent); ok {
 			if e.Type != eventsapi.RuntimeEvent_EXIT {
 				continue evloop
 			}

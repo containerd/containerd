@@ -1,9 +1,13 @@
 package typeurl
 
 import (
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	eventsapi "github.com/containerd/containerd/api/services/events/v1"
+	events "github.com/containerd/containerd/events"
 )
 
 type test struct {
@@ -17,10 +21,10 @@ func clear() {
 
 func TestRegsiterValueGetValue(t *testing.T) {
 	clear()
-	expected := filepath.Join(Namespace, "test")
+	expected := filepath.Join(Prefix, "test")
 	Register(test{}, "test")
 
-	url, err := TypeUrl(test{})
+	url, err := TypeURL(test{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,10 +35,10 @@ func TestRegsiterValueGetValue(t *testing.T) {
 
 func TestRegsiterValueGetPointer(t *testing.T) {
 	clear()
-	expected := filepath.Join(Namespace, "test")
+	expected := filepath.Join(Prefix, "test")
 	Register(test{}, "test")
 
-	url, err := TypeUrl(&test{})
+	url, err := TypeURL(&test{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,10 +49,10 @@ func TestRegsiterValueGetPointer(t *testing.T) {
 
 func TestRegsiterPointerGetPointer(t *testing.T) {
 	clear()
-	expected := filepath.Join(Namespace, "test")
+	expected := filepath.Join(Prefix, "test")
 	Register(&test{}, "test")
 
-	url, err := TypeUrl(&test{})
+	url, err := TypeURL(&test{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,10 +63,10 @@ func TestRegsiterPointerGetPointer(t *testing.T) {
 
 func TestRegsiterPointerGetValue(t *testing.T) {
 	clear()
-	expected := filepath.Join(Namespace, "test")
+	expected := filepath.Join(Prefix, "test")
 	Register(&test{}, "test")
 
-	url, err := TypeUrl(test{})
+	url, err := TypeURL(test{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +77,7 @@ func TestRegsiterPointerGetValue(t *testing.T) {
 
 func TestMarshal(t *testing.T) {
 	clear()
-	expected := filepath.Join(Namespace, "test")
+	expected := filepath.Join(Prefix, "test")
 	Register(test{}, "test")
 
 	v := &test{
@@ -114,5 +118,57 @@ func TestMarshalUnmarshal(t *testing.T) {
 	}
 	if td.Age != 6 {
 		t.Fatal("invalid age")
+	}
+}
+
+func TestMarshalEvent(t *testing.T) {
+	for _, testcase := range []struct {
+		event events.Event
+		url   string
+	}{
+		{
+			event: &eventsapi.TaskStart{},
+			url:   "types.containerd.io/containerd.services.events.v1.TaskStart",
+		},
+
+		{
+			event: &eventsapi.NamespaceUpdate{},
+			url:   "types.containerd.io/containerd.services.events.v1.NamespaceUpdate",
+		},
+	} {
+		t.Run(fmt.Sprintf("%T", testcase.event), func(t *testing.T) {
+			a, err := MarshalAny(testcase.event)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if a.TypeUrl != testcase.url {
+				t.Fatalf("unexpected url: %v != %v", a.TypeUrl, testcase.url)
+			}
+
+			v, err := UnmarshalAny(a)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(v, testcase.event) {
+				t.Fatalf("round trip failed %v != %v", v, testcase.event)
+			}
+		})
+	}
+}
+
+func BenchmarkMarshalEvent(b *testing.B) {
+	ev := &eventsapi.TaskStart{}
+	expected, err := MarshalAny(ev)
+	if err != nil {
+		b.Fatal(err)
+	}
+	for i := 0; i < b.N; i++ {
+		a, err := MarshalAny(ev)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if a.TypeUrl != expected.TypeUrl {
+			b.Fatalf("incorrect type url: %v != %v", a, expected)
+		}
 	}
 }

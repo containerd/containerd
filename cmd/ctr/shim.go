@@ -236,7 +236,7 @@ var shimExecCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		url, err := typeurl.TypeUrl(specs.Process{})
+		url, err := typeurl.TypeURL(specs.Process{})
 		if err != nil {
 			return err
 		}
