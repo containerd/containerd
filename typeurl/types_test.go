@@ -18,54 +18,12 @@ func clear() {
 	registry = make(map[reflect.Type]string)
 }
 
-func TestRegsiterValueGetValue(t *testing.T) {
-	clear()
-	expected := filepath.Join(Prefix, "test")
-	Register(test{}, "test")
-
-	url, err := TypeURL(test{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if url != expected {
-		t.Fatalf("expected %q but received %q", expected, url)
-	}
-}
-
-func TestRegsiterValueGetPointer(t *testing.T) {
-	clear()
-	expected := filepath.Join(Prefix, "test")
-	Register(test{}, "test")
-
-	url, err := TypeURL(&test{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if url != expected {
-		t.Fatalf("expected %q but received %q", expected, url)
-	}
-}
-
-func TestRegsiterPointerGetPointer(t *testing.T) {
+func TestRegisterPointerGetPointer(t *testing.T) {
 	clear()
 	expected := filepath.Join(Prefix, "test")
 	Register(&test{}, "test")
 
 	url, err := TypeURL(&test{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if url != expected {
-		t.Fatalf("expected %q but received %q", expected, url)
-	}
-}
-
-func TestRegsiterPointerGetValue(t *testing.T) {
-	clear()
-	expected := filepath.Join(Prefix, "test")
-	Register(&test{}, "test")
-
-	url, err := TypeURL(test{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +35,7 @@ func TestRegsiterPointerGetValue(t *testing.T) {
 func TestMarshal(t *testing.T) {
 	clear()
 	expected := filepath.Join(Prefix, "test")
-	Register(test{}, "test")
+	Register(&test{}, "test")
 
 	v := &test{
 		Name: "koye",
@@ -94,7 +52,7 @@ func TestMarshal(t *testing.T) {
 
 func TestMarshalUnmarshal(t *testing.T) {
 	clear()
-	Register(test{}, "test")
+	Register(&test{}, "test")
 
 	v := &test{
 		Name: "koye",
@@ -122,7 +80,7 @@ func TestMarshalUnmarshal(t *testing.T) {
 
 func TestIs(t *testing.T) {
 	clear()
-	Register(test{}, "test")
+	Register(&test{}, "test")
 
 	v := &test{
 		Name: "koye",
@@ -132,7 +90,7 @@ func TestIs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !Is(any, test{}) {
+	if !Is(any, &test{}) {
 		t.Fatal("Is(any, test{}) should be true")
 	}
 }

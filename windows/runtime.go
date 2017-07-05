@@ -34,7 +34,7 @@ func init() {
 		Type: plugin.RuntimePlugin,
 		Init: New,
 	})
-	typeurl.Register(RuntimeSpec{}, "windows/Spec")
+	typeurl.Register(&RuntimeSpec{}, "windows/Spec")
 }
 
 func New(ic *plugin.InitContext) (interface{}, error) {

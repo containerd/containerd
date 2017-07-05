@@ -33,8 +33,8 @@ func Register(v interface{}, args ...string) {
 // TypeURL returns the type url for a registred type
 func TypeURL(v interface{}) (string, error) {
 	mu.Lock()
-	defer mu.Unlock()
 	u, ok := registry[tryDereference(v)]
+	mu.Unlock()
 	if !ok {
 		// fallback to the proto registry if it is a proto message
 		pb, ok := v.(proto.Message)
@@ -46,7 +46,10 @@ func TypeURL(v interface{}) (string, error) {
 	return u, nil
 }
 
+// Is returns true if the type of the Any is the same as v
 func Is(any *types.Any, v interface{}) bool {
+	// call to check that v is a pointer
+	tryDereference(v)
 	url, err := TypeURL(v)
 	if err != nil {
 		return false
@@ -54,11 +57,9 @@ func Is(any *types.Any, v interface{}) bool {
 	return any.TypeUrl == url
 }
 
+// MarshalAny marshals the value v into an any with the correct TypeUrl
 func MarshalAny(v interface{}) (*types.Any, error) {
-	var (
-		err  error
-		data []byte
-	)
+	var data []byte
 	url, err := TypeURL(v)
 	if err != nil {
 		return nil, err
@@ -78,6 +79,7 @@ func MarshalAny(v interface{}) (*types.Any, error) {
 	}, nil
 }
 
+// UnmarshalAny unmarshals the any type into a concrete type
 func UnmarshalAny(any *types.Any) (interface{}, error) {
 	t, err := getTypeByUrl(any.TypeUrl)
 	if err != nil {
@@ -120,7 +122,8 @@ func getTypeByUrl(url string) (urlType, error) {
 func tryDereference(v interface{}) reflect.Type {
 	t := reflect.TypeOf(v)
 	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
+		// require check of pointer but dereference to register
+		return t.Elem()
 	}
-	return t
+	panic("v is not a pointer to a type")
 }
