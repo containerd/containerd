@@ -14,8 +14,8 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	shim "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"

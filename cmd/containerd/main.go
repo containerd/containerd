@@ -11,12 +11,12 @@ import (
 
 	gocontext "golang.org/x/net/context"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/server"
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/containerd/version"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 

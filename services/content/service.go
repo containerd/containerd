@@ -4,7 +4,6 @@ import (
 	"io"
 	"sync"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/boltdb/bolt"
 	api "github.com/containerd/containerd/api/services/content/v1"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
@@ -17,6 +16,7 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"

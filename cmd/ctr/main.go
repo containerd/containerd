@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/server"
 	"github.com/containerd/containerd/version"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
