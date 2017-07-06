@@ -3,11 +3,11 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
 	"time"
 
 	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/log"
 	units "github.com/docker/go-units"
 	"github.com/urfave/cli"
 )
@@ -16,7 +16,7 @@ var listCommand = cli.Command{
 	Name:        "list",
 	Aliases:     []string{"ls"},
 	Usage:       "list all blobs in the store.",
-	ArgsUsage:   "[flags] [<prefix>, ...]",
+	ArgsUsage:   "[flags] [<filter>, ...]",
 	Description: `List blobs in the content store.`,
 	Flags: []cli.Flag{
 		cli.BoolFlag{
@@ -37,12 +37,6 @@ var listCommand = cli.Command{
 			return err
 		}
 
-		if len(args) > 0 {
-			// TODO(stevvooe): Implement selection of a few blobs. Not sure
-			// what kind of efficiency gains we can actually get here.
-			log.G(ctx).Warnf("args ignored; need to implement matchers")
-		}
-
 		var walkFn content.WalkFunc
 		if quiet {
 			walkFn = func(info content.Info) error {
@@ -53,17 +47,27 @@ var listCommand = cli.Command{
 			tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, '\t', 0)
 			defer tw.Flush()
 
-			fmt.Fprintln(tw, "DIGEST\tSIZE\tAGE")
+			fmt.Fprintln(tw, "DIGEST\tSIZE\tAGE\tLABELS")
 			walkFn = func(info content.Info) error {
-				fmt.Fprintf(tw, "%s\t%s\t%s\n",
+				var labelStrings []string
+				for k, v := range info.Labels {
+					labelStrings = append(labelStrings, strings.Join([]string{k, v}, "="))
+				}
+				labels := strings.Join(labelStrings, ",")
+				if labels == "" {
+					labels = "-"
+				}
+
+				fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n",
 					info.Digest,
 					units.HumanSize(float64(info.Size)),
-					units.HumanDuration(time.Since(info.CommittedAt)))
+					units.HumanDuration(time.Since(info.CommittedAt)),
+					labels)
 				return nil
 			}
 
 		}
 
-		return cs.Walk(ctx, walkFn)
+		return cs.Walk(ctx, walkFn, args...)
 	},
 }

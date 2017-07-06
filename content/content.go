@@ -32,6 +32,8 @@ type Info struct {
 	Digest      digest.Digest
 	Size        int64
 	CommittedAt time.Time
+	UpdatedAt   time.Time
+	Labels      map[string]string
 }
 
 type Status struct {
@@ -53,8 +55,17 @@ type Manager interface {
 	// If the content is not present, ErrNotFound will be returned.
 	Info(ctx context.Context, dgst digest.Digest) (Info, error)
 
-	// Walk will call fn for each item in the content store.
-	Walk(ctx context.Context, fn WalkFunc) error
+	// Update updates mutable information related to content.
+	// If one or more fieldpaths are provided, only those
+	// fields will be updated.
+	// Mutable fields:
+	//  labels.*
+	Update(ctx context.Context, info Info, fieldpaths ...string) error
+
+	// Walk will call fn for each item in the content store which
+	// match the provided filters. If no filters are given all
+	// items will be walked.
+	Walk(ctx context.Context, fn WalkFunc, filters ...string) error
 
 	// Delete removes the content from the store.
 	Delete(ctx context.Context, dgst digest.Digest) error

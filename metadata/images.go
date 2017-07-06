@@ -232,10 +232,8 @@ func writeImage(bkt *bolt.Bucket, image *images.Image) error {
 		return err
 	}
 
-	if len(image.Labels) > 0 {
-		if err := writeLabels(bkt, image.Labels); err != nil {
-			return errors.Wrapf(err, "writing labels for image %v", image.Name)
-		}
+	if err := writeLabels(bkt, image.Labels); err != nil {
+		return errors.Wrapf(err, "writing labels for image %v", image.Name)
 	}
 
 	// write the target bucket

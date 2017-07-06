@@ -26,7 +26,7 @@ type Layer struct {
 func ApplyLayers(ctx context.Context, layers []Layer, sn snapshot.Snapshotter, a Applier) (digest.Digest, error) {
 	var chain []digest.Digest
 	for _, layer := range layers {
-		if err := applyLayer(ctx, layer, chain, sn, a); err != nil {
+		if _, err := ApplyLayer(ctx, layer, chain, sn, a); err != nil {
 			// TODO: possibly wait and retry if extraction of same chain id was in progress
 			return "", err
 		}
@@ -36,7 +36,7 @@ func ApplyLayers(ctx context.Context, layers []Layer, sn snapshot.Snapshotter, a
 	return identity.ChainID(chain), nil
 }
 
-func applyLayer(ctx context.Context, layer Layer, chain []digest.Digest, sn snapshot.Snapshotter, a Applier) error {
+func ApplyLayer(ctx context.Context, layer Layer, chain []digest.Digest, sn snapshot.Snapshotter, a Applier) (bool, error) {
 	var (
 		parent  = identity.ChainID(chain)
 		chainID = identity.ChainID(append(chain, layer.Diff.Digest))
@@ -46,9 +46,9 @@ func applyLayer(ctx context.Context, layer Layer, chain []digest.Digest, sn snap
 	_, err := sn.Stat(ctx, chainID.String())
 	if err == nil {
 		log.G(ctx).Debugf("Extraction not needed, layer snapshot exists")
-		return nil
+		return false, nil
 	} else if !errdefs.IsNotFound(err) {
-		return errors.Wrap(err, "failed to stat snapshot")
+		return false, errors.Wrap(err, "failed to stat snapshot")
 	}
 
 	key := fmt.Sprintf("extract %s", chainID)
@@ -57,7 +57,7 @@ func applyLayer(ctx context.Context, layer Layer, chain []digest.Digest, sn snap
 	mounts, err := sn.Prepare(ctx, key, parent.String())
 	if err != nil {
 		//TODO: If is snapshot exists error, retry
-		return errors.Wrap(err, "failed to prepare extraction layer")
+		return false, errors.Wrap(err, "failed to prepare extraction layer")
 	}
 	defer func() {
 		if err != nil {
@@ -70,16 +70,16 @@ func applyLayer(ctx context.Context, layer Layer, chain []digest.Digest, sn snap
 
 	diff, err = a.Apply(ctx, layer.Blob, mounts)
 	if err != nil {
-		return errors.Wrapf(err, "failed to extract layer %s", layer.Diff.Digest)
+		return false, errors.Wrapf(err, "failed to extract layer %s", layer.Diff.Digest)
 	}
 	if diff.Digest != layer.Diff.Digest {
 		err = errors.Errorf("wrong diff id calculated on extraction %q", diff.Digest)
-		return err
+		return false, err
 	}
 
 	if err = sn.Commit(ctx, chainID.String(), key); err != nil {
-		return errors.Wrapf(err, "failed to commit snapshot %s", parent)
+		return false, errors.Wrapf(err, "failed to commit snapshot %s", parent)
 	}
 
-	return nil
+	return true, nil
 }

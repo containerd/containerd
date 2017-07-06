@@ -27,6 +27,10 @@ func writeLabels(bkt *bolt.Bucket, labels map[string]string) error {
 		}
 	}
 
+	if len(labels) == 0 {
+		return nil
+	}
+
 	lbkt, err := bkt.CreateBucket(bucketKeyLabels)
 	if err != nil {
 		return err

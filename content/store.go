@@ -55,6 +55,7 @@ func (s *store) info(dgst digest.Digest, fi os.FileInfo) Info {
 		Digest:      dgst,
 		Size:        fi.Size(),
 		CommittedAt: fi.ModTime(),
+		UpdatedAt:   fi.ModTime(),
 	}
 }
 
@@ -92,9 +93,13 @@ func (cs *store) Delete(ctx context.Context, dgst digest.Digest) error {
 	return nil
 }
 
-// TODO(stevvooe): Allow querying the set of blobs in the blob store.
+func (cs *store) Update(ctx context.Context, info Info, fieldpaths ...string) error {
+	// TODO: Support persisting and updating mutable content data
+	return errors.Wrapf(errdefs.ErrFailedPrecondition, "update not supported on immutable content store")
+}
 
-func (cs *store) Walk(ctx context.Context, fn WalkFunc) error {
+func (cs *store) Walk(ctx context.Context, fn WalkFunc, filters ...string) error {
+	// TODO: Support filters
 	root := filepath.Join(cs.root, "blobs")
 	var alg digest.Algorithm
 	return filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {

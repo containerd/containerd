@@ -101,5 +101,6 @@ var contentCommand = cli.Command{
 		getCommand,
 		editCommand,
 		deleteCommand,
+		labelCommand,
 	},
 }
