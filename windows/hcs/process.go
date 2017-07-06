@@ -14,12 +14,17 @@ import (
 type Process struct {
 	hcsshim.Process
 
+	id       string
 	pid      uint32
 	io       *IO
 	ec       uint32
 	exitedAt time.Time
 	ecErr    error
 	ecSync   chan struct{}
+}
+
+func (p *Process) ID() string {
+	return p.id
 }
 
 func (p *Process) Pid() uint32 {

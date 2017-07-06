@@ -8,7 +8,7 @@ import "google/protobuf/any.proto";
 option go_package = "github.com/containerd/containerd/api/services/events/v1;events";
 
 message ContainerCreate {
-	string container_id = 1;
+	string id = 1;
 	string image = 2;
 	message Runtime {
 		string name = 1;
@@ -18,12 +18,12 @@ message ContainerCreate {
 }
 
 message ContainerUpdate {
-	string container_id = 1;
+	string id = 1;
 	string image = 2;
 	map<string, string> labels  = 3;
 	string rootfs = 4 [(gogoproto.customname) = "RootFS"];
 }
 
 message ContainerDelete {
-	string container_id = 1;
+	string id = 1;
 }

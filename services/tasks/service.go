@@ -36,9 +36,6 @@ var (
 	empty = &google_protobuf.Empty{}
 )
 
-// TODO(stevvooe): Clean up error mapping to avoid double mapping certain
-// errors within helper methods.
-
 func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
@@ -212,11 +209,12 @@ func (s *Service) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest
 	if err != nil {
 		return nil, err
 	}
-	exit, err := t.DeleteProcess(ctx, r.Pid)
+	exit, err := t.DeleteProcess(ctx, r.ExecID)
 	if err != nil {
 		return nil, err
 	}
 	return &api.DeleteResponse{
+		ID:         r.ExecID,
 		ExitStatus: exit.Status,
 		ExitedAt:   exit.Timestamp,
 		Pid:        exit.Pid,
@@ -228,7 +226,6 @@ func taskFromContainerd(ctx context.Context, c runtime.Task) (*task.Task, error)
 	if err != nil {
 		return nil, err
 	}
-
 	var status task.Status
 	switch state.Status {
 	case runtime.CreatedStatus:
@@ -243,14 +240,13 @@ func taskFromContainerd(ctx context.Context, c runtime.Task) (*task.Task, error)
 		log.G(ctx).WithField("status", state.Status).Warn("unknown status")
 	}
 	return &task.Task{
-		ID:          c.Info().ID,
-		ContainerID: c.Info().ContainerID,
-		Pid:         state.Pid,
-		Status:      status,
-		Stdin:       state.Stdin,
-		Stdout:      state.Stdout,
-		Stderr:      state.Stderr,
-		Terminal:    state.Terminal,
+		ID:       c.Info().ID,
+		Pid:      state.Pid,
+		Status:   status,
+		Stdin:    state.Stdin,
+		Stdout:   state.Stdout,
+		Stderr:   state.Stderr,
+		Terminal: state.Terminal,
 	}, nil
 }
 
@@ -315,18 +311,14 @@ func (s *Service) Kill(ctx context.Context, r *api.KillRequest) (*google_protobu
 	if err != nil {
 		return nil, err
 	}
-
-	switch v := r.PidOrAll.(type) {
-	case *api.KillRequest_All:
-		if err := t.Kill(ctx, r.Signal, 0, true); err != nil {
+	p := runtime.Process(t)
+	if r.ExecID != "" {
+		if p, err = t.Process(ctx, r.ExecID); err != nil {
 			return nil, err
 		}
-	case *api.KillRequest_Pid:
-		if err := t.Kill(ctx, r.Signal, v.Pid, false); err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("invalid option specified; expected pid or all")
+	}
+	if err := p.Kill(ctx, r.Signal, r.All); err != nil {
+		return nil, err
 	}
 	return empty, nil
 }
@@ -346,11 +338,14 @@ func (s *Service) ListPids(ctx context.Context, r *api.ListPidsRequest) (*api.Li
 }
 
 func (s *Service) Exec(ctx context.Context, r *api.ExecProcessRequest) (*api.ExecProcessResponse, error) {
+	if r.ExecID == "" {
+		return nil, grpc.Errorf(codes.InvalidArgument, "exec id cannot be empty")
+	}
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
 	}
-	process, err := t.Exec(ctx, runtime.ExecOpts{
+	process, err := t.Exec(ctx, r.ExecID, runtime.ExecOpts{
 		Spec: r.Spec,
 		IO: runtime.IO{
 			Stdin:    r.Stdin,
@@ -376,7 +371,13 @@ func (s *Service) ResizePty(ctx context.Context, r *api.ResizePtyRequest) (*goog
 	if err != nil {
 		return nil, err
 	}
-	if err := t.ResizePty(ctx, r.Pid, runtime.ConsoleSize{
+	p := runtime.Process(t)
+	if r.ExecID != "" {
+		if p, err = t.Process(ctx, r.ExecID); err != nil {
+			return nil, err
+		}
+	}
+	if err := p.ResizePty(ctx, runtime.ConsoleSize{
 		Width:  r.Width,
 		Height: r.Height,
 	}); err != nil {
@@ -390,8 +391,14 @@ func (s *Service) CloseIO(ctx context.Context, r *api.CloseIORequest) (*google_p
 	if err != nil {
 		return nil, err
 	}
+	p := runtime.Process(t)
+	if r.ExecID != "" {
+		if p, err = t.Process(ctx, r.ExecID); err != nil {
+			return nil, err
+		}
+	}
 	if r.Stdin {
-		if err := t.CloseIO(ctx, r.Pid); err != nil {
+		if err := p.CloseIO(ctx); err != nil {
 			return nil, err
 		}
 	}
@@ -505,7 +512,6 @@ func (s *Service) getTaskFromContainer(ctx context.Context, container *container
 		return nil, grpc.Errorf(codes.NotFound, "task %v not found", container.ID)
 	}
 	return t, nil
-
 }
 
 func (s *Service) getRuntime(name string) (runtime.Runtime, error) {

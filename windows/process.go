@@ -32,3 +32,11 @@ func (p *process) Status() runtime.Status {
 func (p *process) Pid() uint32 {
 	return p.Process.Pid()
 }
+
+func (p *process) CloseIO(ctx context.Context) error {
+	return p.Process.CloseStdin()
+}
+
+func (p *process) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
+	return p.Process.ResizeConsole(uint16(size.Width), uint16(size.Height))
+}

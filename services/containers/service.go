@@ -107,8 +107,8 @@ func (s *Service) Create(ctx context.Context, req *api.CreateContainerRequest) (
 		return &resp, errdefs.ToGRPC(err)
 	}
 	if err := s.emit(ctx, "/containers/create", &eventsapi.ContainerCreate{
-		ContainerID: resp.Container.ID,
-		Image:       resp.Container.Image,
+		ID:    resp.Container.ID,
+		Image: resp.Container.Image,
 		Runtime: &eventsapi.ContainerCreate_Runtime{
 			Name:    resp.Container.Runtime.Name,
 			Options: resp.Container.Runtime.Options,
@@ -181,10 +181,10 @@ func (s *Service) Update(ctx context.Context, req *api.UpdateContainerRequest) (
 	}
 
 	if err := s.emit(ctx, "/containers/update", &eventsapi.ContainerUpdate{
-		ContainerID: resp.Container.ID,
-		Image:       resp.Container.Image,
-		Labels:      resp.Container.Labels,
-		RootFS:      resp.Container.RootFS,
+		ID:     resp.Container.ID,
+		Image:  resp.Container.Image,
+		Labels: resp.Container.Labels,
+		RootFS: resp.Container.RootFS,
 	}); err != nil {
 		return &resp, err
 	}
@@ -200,7 +200,7 @@ func (s *Service) Delete(ctx context.Context, req *api.DeleteContainerRequest) (
 	}
 
 	if err := s.emit(ctx, "/containers/delete", &eventsapi.ContainerDelete{
-		ContainerID: req.ID,
+		ID: req.ID,
 	}); err != nil {
 		return &empty.Empty{}, err
 	}

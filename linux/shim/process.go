@@ -10,7 +10,16 @@ import (
 	"github.com/containerd/console"
 )
 
+type stdio struct {
+	stdin    string
+	stdout   string
+	stderr   string
+	terminal bool
+}
+
 type process interface {
+	// ID returns the id for the process
+	ID() string
 	// Pid returns the pid for the process
 	Pid() int
 	// Resize resizes the process console
@@ -23,8 +32,10 @@ type process interface {
 	ExitedAt() time.Time
 	// Delete deletes the process and its resourcess
 	Delete(context.Context) error
-	// Signal directly signals the process
-	Signal(int) error
 	// Stdin returns the process STDIN
 	Stdin() io.Closer
+	// Kill kills the process
+	Kill(context.Context, uint32, bool) error
+	// Stdio returns io information for the container
+	Stdio() stdio
 }

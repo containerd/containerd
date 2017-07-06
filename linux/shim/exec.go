@@ -26,7 +26,7 @@ import (
 type execProcess struct {
 	sync.WaitGroup
 
-	id      int
+	id      string
 	console console.Console
 	io      runc.IO
 	status  int
@@ -34,29 +34,27 @@ type execProcess struct {
 	pid     int
 	closers []io.Closer
 	stdin   io.Closer
+	stdio   stdio
 
 	parent *initProcess
-
-	stdinPath  string
-	stdoutPath string
-	stderrPath string
-	terminal   bool
 }
 
-func newExecProcess(context context.Context, path string, r *shimapi.ExecProcessRequest, parent *initProcess, id int) (process, error) {
+func newExecProcess(context context.Context, path string, r *shimapi.ExecProcessRequest, parent *initProcess, id string) (process, error) {
 	e := &execProcess{
-		id:         id,
-		parent:     parent,
-		stdinPath:  r.Stdin,
-		stdoutPath: r.Stdout,
-		stderrPath: r.Stderr,
-		terminal:   r.Terminal,
+		id:     id,
+		parent: parent,
+		stdio: stdio{
+			stdin:    r.Stdin,
+			stdout:   r.Stdout,
+			stderr:   r.Stderr,
+			terminal: r.Terminal,
+		},
 	}
 	var (
 		err     error
 		socket  *runc.Socket
 		io      runc.IO
-		pidfile = filepath.Join(path, fmt.Sprintf("%d.pid", id))
+		pidfile = filepath.Join(path, fmt.Sprintf("%s.pid", id))
 	)
 	if r.Terminal {
 		if socket, err = runc.NewConsoleSocket(filepath.Join(path, "pty.sock")); err != nil {
@@ -120,6 +118,10 @@ func newExecProcess(context context.Context, path string, r *shimapi.ExecProcess
 	return e, nil
 }
 
+func (e *execProcess) ID() string {
+	return e.id
+}
+
 func (e *execProcess) Pid() int {
 	return e.pid
 }
@@ -155,7 +157,7 @@ func (e *execProcess) Resize(ws console.WinSize) error {
 	return e.console.Resize(ws)
 }
 
-func (e *execProcess) Signal(sig int) error {
+func (e *execProcess) Kill(ctx context.Context, sig uint32, _ bool) error {
 	if err := unix.Kill(e.pid, syscall.Signal(sig)); err != nil {
 		return checkKillError(err)
 	}
@@ -164,4 +166,8 @@ func (e *execProcess) Signal(sig int) error {
 
 func (e *execProcess) Stdin() io.Closer {
 	return e.stdin
+}
+
+func (e *execProcess) Stdio() stdio {
+	return e.stdio
 }

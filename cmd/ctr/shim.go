@@ -129,7 +129,7 @@ var shimCreateCommand = cli.Command{
 					return err
 				}
 				if _, err := service.ResizePty(ctx, &shim.ResizePtyRequest{
-					Pid:    r.Pid,
+					ID:     id,
 					Width:  uint32(size.Width),
 					Height: uint32(size.Height),
 				}); err != nil {
@@ -180,7 +180,9 @@ var shimStateCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		r, err := service.State(gocontext.Background(), empty)
+		r, err := service.State(gocontext.Background(), &shim.StateRequest{
+			ID: context.Args().First(),
+		})
 		if err != nil {
 			return err
 		}
@@ -221,10 +223,18 @@ var shimExecCommand = cli.Command{
 	),
 	Action: func(context *cli.Context) error {
 		service, err := getShimService(context)
-		ctx := gocontext.Background()
 		if err != nil {
 			return err
 		}
+		var (
+			id  = context.Args().First()
+			ctx = gocontext.Background()
+		)
+
+		if id == "" {
+			return errors.New("exec id must be provided")
+		}
+
 		tty := context.Bool("tty")
 		wg, err := prepareStdio(context.String("stdin"), context.String("stdout"), context.String("stderr"), tty)
 		if err != nil {
@@ -242,6 +252,7 @@ var shimExecCommand = cli.Command{
 		}
 
 		rq := &shim.ExecProcessRequest{
+			ID: id,
 			Spec: &protobuf.Any{
 				TypeUrl: url,
 				Value:   spec,
@@ -269,7 +280,7 @@ var shimExecCommand = cli.Command{
 					return err
 				}
 				if _, err := service.ResizePty(ctx, &shim.ResizePtyRequest{
-					Pid:    r.Pid,
+					ID:     id,
 					Width:  uint32(size.Width),
 					Height: uint32(size.Height),
 				}); err != nil {

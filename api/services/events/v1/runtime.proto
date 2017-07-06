@@ -21,7 +21,7 @@ message RuntimeMount {
 }
 
 message RuntimeCreate {
-	string id = 1;
+	string container_id = 1;
 	string bundle = 2;
 	repeated RuntimeMount rootfs = 3 [(gogoproto.customname) = "RootFS"];
 	RuntimeIO io = 4 [(gogoproto.customname) = "IO"];
@@ -30,6 +30,7 @@ message RuntimeCreate {
 
 message RuntimeEvent {
 	string id = 1;
+	string container_id = 2;
 	enum EventType {
 		EXIT = 0;
 		OOM = 1;
@@ -38,15 +39,15 @@ message RuntimeEvent {
 		EXEC_ADDED = 4;
 		PAUSED = 5;
 	}
-	EventType type = 2;
-	uint32 pid = 3;
-	uint32 exit_status = 4;
-	google.protobuf.Timestamp exited_at = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-	google.protobuf.Timestamp timestamp = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	EventType type = 3;
+	uint32 pid = 4;
+	uint32 exit_status = 5;
+	google.protobuf.Timestamp exited_at = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp timestamp = 7 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message RuntimeDelete {
-	string id = 1;
+	string container_id = 1;
 	string runtime = 2;
 	uint32 exit_status = 3;
 	google.protobuf.Timestamp exited_at = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];

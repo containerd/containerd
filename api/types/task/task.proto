@@ -17,33 +17,12 @@ enum Status {
 }
 
 message Task {
-	string id = 1; // TODO(stevvooe): For now, this is just the container id.
-	string container_id = 2;
-	uint32 pid = 3;
-	Status status = 4;
+	string id = 1;
+	uint32 pid = 2;
+	Status status = 3;
+	google.protobuf.Any spec = 4;
 	string stdin = 5;
 	string stdout = 6;
 	string stderr = 7;
 	bool terminal = 8;
-}
-
-message Process {
-	uint32 pid = 1;
-	repeated string args = 2;
-	repeated string env = 3;
-	User user = 4;
-	string cwd = 5;
-	bool terminal = 6;
-	uint32 exit_status = 7;
-	Status status = 8;
-	google.protobuf.Any runtime_data = 9;
-	string stdin = 10;
-	string stdout = 11;
-	string stderr = 12;
-}
-
-message User {
-	uint32 uid = 1;
-	uint32 gid = 2;
-	repeated uint32 additional_gids = 3;
 }

@@ -263,8 +263,8 @@ func TestContainerExec(t *testing.T) {
 		"sh", "-c",
 		"exit 6",
 	}
-
-	process, err := task.Exec(ctx, processSpec, empty())
+	execID := t.Name() + "_exec"
+	process, err := task.Exec(ctx, execID, processSpec, empty())
 	if err != nil {
 		t.Error(err)
 		return
@@ -354,7 +354,7 @@ func TestContainerProcesses(t *testing.T) {
 	if pid <= 0 {
 		t.Errorf("invalid task pid %d", pid)
 	}
-	processes, err := task.Processes(ctx)
+	processes, err := task.Pids(ctx)
 	if err != nil {
 		t.Error(err)
 		return
