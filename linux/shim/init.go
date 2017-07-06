@@ -22,9 +22,9 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/runtime"
+	"github.com/containerd/containerd/typeurl"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
-	"github.com/gogo/protobuf/proto"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
@@ -58,9 +58,11 @@ type initProcess struct {
 func newInitProcess(context context.Context, path, namespace string, r *shimapi.CreateTaskRequest) (*initProcess, error) {
 	var options runcopts.CreateOptions
 	if r.Options != nil {
-		if err := proto.Unmarshal(r.Options.Value, &options); err != nil {
+		v, err := typeurl.UnmarshalAny(r.Options)
+		if err != nil {
 			return nil, err
 		}
+		options = *v.(*runcopts.CreateOptions)
 	}
 	for _, rm := range r.Rootfs {
 		m := &mount.Mount{
@@ -266,9 +268,11 @@ func (p *initProcess) Stdin() io.Closer {
 func (p *initProcess) Checkpoint(context context.Context, r *shimapi.CheckpointTaskRequest) error {
 	var options runcopts.CheckpointOptions
 	if r.Options != nil {
-		if err := proto.Unmarshal(r.Options.Value, &options); err != nil {
+		v, err := typeurl.UnmarshalAny(r.Options)
+		if err != nil {
 			return err
 		}
+		options = *v.(*runcopts.CheckpointOptions)
 	}
 	var actions []runc.CheckpointAction
 	if !options.Exit {

@@ -230,8 +230,11 @@ func readContainer(container *containers.Container, bkt *bolt.Bucket) error {
 			}
 			container.Runtime.Options = &any
 		case string(bucketKeySpec):
-			container.Spec = make([]byte, len(v))
-			copy(container.Spec, v)
+			var any types.Any
+			if err := proto.Unmarshal(v, &any); err != nil {
+				return err
+			}
+			container.Spec = &any
 		case string(bucketKeyRootFS):
 			container.RootFS = string(v)
 		case string(bucketKeyCreatedAt):
@@ -269,10 +272,14 @@ func writeContainer(container *containers.Container, bkt *bolt.Bucket) error {
 	if err != nil {
 		return err
 	}
+	spec, err := container.Spec.Marshal()
+	if err != nil {
+		return err
+	}
 
 	for _, v := range [][2][]byte{
 		{bucketKeyImage, []byte(container.Image)},
-		{bucketKeySpec, container.Spec},
+		{bucketKeySpec, spec},
 		{bucketKeyRootFS, []byte(container.RootFS)},
 		{bucketKeyCreatedAt, createdAt},
 		{bucketKeyUpdatedAt, updatedAt},

@@ -3,8 +3,6 @@ package containers
 import (
 	api "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/containers"
-	"github.com/gogo/protobuf/types"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func containersToProto(containers []containers.Container) []api.Container {
@@ -26,10 +24,7 @@ func containerToProto(container *containers.Container) api.Container {
 			Name:    container.Runtime.Name,
 			Options: container.Runtime.Options,
 		},
-		Spec: &types.Any{
-			TypeUrl: specs.Version,
-			Value:   container.Spec,
-		},
+		Spec:   container.Spec,
 		RootFS: container.RootFS,
 	}
 }
@@ -42,18 +37,12 @@ func containerFromProto(containerpb *api.Container) containers.Container {
 			Options: containerpb.Runtime.Options,
 		}
 	}
-
-	var spec []byte
-	if containerpb.Spec != nil {
-		spec = containerpb.Spec.Value
-	}
-
 	return containers.Container{
 		ID:      containerpb.ID,
 		Labels:  containerpb.Labels,
 		Image:   containerpb.Image,
 		Runtime: runtime,
-		Spec:    spec,
+		Spec:    containerpb.Spec,
 		RootFS:  containerpb.RootFS,
 	}
 }

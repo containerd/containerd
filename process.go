@@ -2,13 +2,11 @@ package containerd
 
 import (
 	"context"
-	"encoding/json"
 	"syscall"
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
-	"github.com/containerd/containerd/events"
-	protobuf "github.com/gogo/protobuf/types"
+	"github.com/containerd/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -35,7 +33,7 @@ func (p *process) Pid() uint32 {
 
 // Start starts the exec process
 func (p *process) Start(ctx context.Context) error {
-	data, err := json.Marshal(p.spec)
+	any, err := typeurl.MarshalAny(p.spec)
 	if err != nil {
 		return err
 	}
@@ -45,10 +43,7 @@ func (p *process) Start(ctx context.Context) error {
 		Stdin:       p.io.Stdin,
 		Stdout:      p.io.Stdout,
 		Stderr:      p.io.Stderr,
-		Spec: &protobuf.Any{
-			TypeUrl: specs.Version,
-			Value:   data,
-		},
+		Spec:        any,
 	}
 	response, err := p.task.client.TaskService().Exec(ctx, request)
 	if err != nil {
@@ -71,7 +66,6 @@ func (p *process) Kill(ctx context.Context, s syscall.Signal) error {
 }
 
 func (p *process) Wait(ctx context.Context) (uint32, error) {
-	// TODO (ehazlett): add filtering for specific event
 	eventstream, err := p.task.client.EventService().Stream(ctx, &eventsapi.StreamEventsRequest{})
 	if err != nil {
 		return UnknownExitStatus, err
@@ -83,18 +77,15 @@ evloop:
 		if err != nil {
 			return UnknownExitStatus, err
 		}
-
-		switch {
-		case events.Is(evt.Event, &eventsapi.RuntimeEvent{}):
-			var e eventsapi.RuntimeEvent
-			if err := events.UnmarshalEvent(evt.Event, &e); err != nil {
+		if typeurl.Is(evt.Event, &eventsapi.RuntimeEvent{}) {
+			v, err := typeurl.UnmarshalAny(evt.Event)
+			if err != nil {
 				return UnknownExitStatus, err
 			}
-
+			e := v.(*eventsapi.RuntimeEvent)
 			if e.Type != eventsapi.RuntimeEvent_EXIT {
 				continue evloop
 			}
-
 			if e.ID == p.task.containerID && e.Pid == p.pid {
 				return e.ExitStatus, nil
 			}

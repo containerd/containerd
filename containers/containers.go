@@ -17,7 +17,7 @@ type Container struct {
 	Labels    map[string]string
 	Image     string
 	Runtime   RuntimeInfo
-	Spec      []byte
+	Spec      *types.Any
 	RootFS    string
 	CreatedAt time.Time
 	UpdatedAt time.Time

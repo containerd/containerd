@@ -10,7 +10,6 @@ type TaskInfo struct {
 	ID          string
 	ContainerID string
 	Runtime     string
-	Spec        []byte
 	Namespace   string
 }
 

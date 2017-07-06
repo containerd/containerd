@@ -14,9 +14,9 @@ import (
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/runtime"
+	"github.com/containerd/containerd/typeurl"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"google.golang.org/grpc"
@@ -149,35 +149,29 @@ func (t *task) Status(ctx context.Context) (TaskStatus, error) {
 
 // Wait is a blocking call that will wait for the task to exit and return the exit status
 func (t *task) Wait(ctx context.Context) (uint32, error) {
-	// TODO (ehazlett): add filtering for specific event
 	eventstream, err := t.client.EventService().Stream(ctx, &eventsapi.StreamEventsRequest{})
 	if err != nil {
 		return UnknownExitStatus, err
 	}
 	<-t.pidSync
 
-	var e eventsapi.RuntimeEvent
-
 	for {
 		evt, err := eventstream.Recv()
 		if err != nil {
 			return UnknownExitStatus, err
 		}
-
-		if !events.Is(evt.Event, &eventsapi.RuntimeEvent{}) {
-			continue
-		}
-
-		if err := events.UnmarshalEvent(evt.Event, &e); err != nil {
-			return UnknownExitStatus, err
-		}
-
-		if e.Type != eventsapi.RuntimeEvent_EXIT {
-			continue
-		}
-
-		if e.ID == t.containerID && e.Pid == t.pid {
-			return e.ExitStatus, nil
+		if typeurl.Is(evt.Event, &eventsapi.RuntimeEvent{}) {
+			v, err := typeurl.UnmarshalAny(evt.Event)
+			if err != nil {
+				return UnknownExitStatus, err
+			}
+			e := v.(*eventsapi.RuntimeEvent)
+			if e.Type != eventsapi.RuntimeEvent_EXIT {
+				continue
+			}
+			if e.ID == t.containerID && e.Pid == t.pid {
+				return e.ExitStatus, nil
+			}
 		}
 	}
 }

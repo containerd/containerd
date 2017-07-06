@@ -24,9 +24,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
-	protobuf "github.com/gogo/protobuf/types"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
-	specs "github.com/opencontainers/image-spec/specs-go"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -249,14 +247,10 @@ func taskFromContainerd(ctx context.Context, c runtime.Task) (*task.Task, error)
 		ContainerID: c.Info().ContainerID,
 		Pid:         state.Pid,
 		Status:      status,
-		Spec: &protobuf.Any{
-			TypeUrl: specs.Version,
-			Value:   c.Info().Spec,
-		},
-		Stdin:    state.Stdin,
-		Stdout:   state.Stdout,
-		Stderr:   state.Stderr,
-		Terminal: state.Terminal,
+		Stdin:       state.Stdin,
+		Stdout:      state.Stdout,
+		Stderr:      state.Stderr,
+		Terminal:    state.Terminal,
 	}, nil
 }
 
@@ -405,7 +399,11 @@ func (s *Service) CloseIO(ctx context.Context, r *api.CloseIORequest) (*google_p
 }
 
 func (s *Service) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest) (*api.CheckpointTaskResponse, error) {
-	t, err := s.getTask(ctx, r.ContainerID)
+	container, err := s.getContainer(ctx, r.ContainerID)
+	if err != nil {
+		return nil, err
+	}
+	t, err := s.getTaskFromContainer(ctx, container)
 	if err != nil {
 		return nil, err
 	}
@@ -428,7 +426,11 @@ func (s *Service) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest) 
 		return nil, err
 	}
 	// write the config to the content store
-	spec := bytes.NewReader(t.Info().Spec)
+	data, err := container.Spec.Marshal()
+	if err != nil {
+		return nil, err
+	}
+	spec := bytes.NewReader(data)
 	specD, err := s.writeContent(ctx, images.MediaTypeContainerd1CheckpointConfig, filepath.Join(image, "spec"), spec)
 	if err != nil {
 		return nil, err
@@ -472,19 +474,17 @@ func (s *Service) writeContent(ctx context.Context, mediaType, ref string, r io.
 	}, nil
 }
 
-func (s *Service) getContainer(ctx context.Context, id string) (containers.Container, error) {
+func (s *Service) getContainer(ctx context.Context, id string) (*containers.Container, error) {
 	var container containers.Container
-
 	if err := s.db.View(func(tx *bolt.Tx) error {
 		store := metadata.NewContainerStore(tx)
 		var err error
 		container, err = store.Get(ctx, id)
 		return err
 	}); err != nil {
-		return containers.Container{}, errdefs.ToGRPC(err)
+		return nil, errdefs.ToGRPC(err)
 	}
-
-	return container, nil
+	return &container, nil
 }
 
 func (s *Service) getTask(ctx context.Context, id string) (runtime.Task, error) {
@@ -492,18 +492,20 @@ func (s *Service) getTask(ctx context.Context, id string) (runtime.Task, error) 
 	if err != nil {
 		return nil, err
 	}
+	return s.getTaskFromContainer(ctx, container)
+}
 
+func (s *Service) getTaskFromContainer(ctx context.Context, container *containers.Container) (runtime.Task, error) {
 	runtime, err := s.getRuntime(container.Runtime.Name)
 	if err != nil {
-		return nil, errdefs.ToGRPCf(err, "runtime for task %v", id)
+		return nil, errdefs.ToGRPCf(err, "runtime for task %s", container.Runtime.Name)
 	}
-
-	t, err := runtime.Get(ctx, id)
+	t, err := runtime.Get(ctx, container.ID)
 	if err != nil {
-		return nil, grpc.Errorf(codes.NotFound, "task %v not found", id)
+		return nil, grpc.Errorf(codes.NotFound, "task %v not found", container.ID)
 	}
-
 	return t, nil
+
 }
 
 func (s *Service) getRuntime(name string) (runtime.Runtime, error) {

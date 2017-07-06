@@ -7,7 +7,7 @@ import (
 	"text/tabwriter"
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
-	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/typeurl"
 	"github.com/urfave/cli"
 )
 
@@ -57,13 +57,11 @@ var eventsCommand = cli.Command{
 
 func getEventOutput(env *eventsapi.Envelope) (string, error) {
 	out := ""
-
-	var de events.DynamicEvent
-	if err := events.UnmarshalEvent(env.Event, &de); err != nil {
+	v, err := typeurl.UnmarshalAny(env.Event)
+	if err != nil {
 		return "", err
 	}
-
-	switch e := de.Event.(type) {
+	switch e := v.(type) {
 	case *eventsapi.ContainerCreate:
 		out = fmt.Sprintf("id=%s image=%s runtime=%s", e.ContainerID, e.Image, e.Runtime)
 	case *eventsapi.TaskCreate:
@@ -105,6 +103,5 @@ func getEventOutput(env *eventsapi.Envelope) (string, error) {
 	default:
 		out = env.Event.TypeUrl
 	}
-
 	return out, nil
 }

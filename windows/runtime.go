@@ -4,7 +4,6 @@ package windows
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,6 +14,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
+	"github.com/containerd/containerd/typeurl"
 	"github.com/containerd/containerd/windows/hcs"
 	"github.com/containerd/containerd/windows/pid"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -34,6 +34,7 @@ func init() {
 		Type: plugin.RuntimePlugin,
 		Init: New,
 	})
+	typeurl.Register(&RuntimeSpec{}, "windows/Spec")
 }
 
 func New(ic *plugin.InitContext) (interface{}, error) {
@@ -107,11 +108,11 @@ func (r *Runtime) ID() string {
 }
 
 func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts) (runtime.Task, error) {
-	var rtSpec RuntimeSpec
-	if err := json.Unmarshal(opts.Spec, &rtSpec); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal oci spec")
+	v, err := typeurl.UnmarshalAny(opts.Spec)
+	if err != nil {
+		return nil, err
 	}
-
+	rtSpec := v.(*RuntimeSpec)
 	ctr, err := newContainer(ctx, r.hcs, id, rtSpec, opts.IO, r.sendEvent)
 	if err != nil {
 		return nil, err

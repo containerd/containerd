@@ -21,11 +21,10 @@ message Task {
 	string container_id = 2;
 	uint32 pid = 3;
 	Status status = 4;
-	google.protobuf.Any spec = 5;
-	string stdin = 6;
-	string stdout = 7;
-	string stderr = 8;
-	bool terminal = 9;
+	string stdin = 5;
+	string stdout = 6;
+	string stderr = 7;
+	bool terminal = 8;
 }
 
 message Process {
