@@ -20,6 +20,7 @@ message CreateOptions {
 	repeated string empty_namespaces = 6;
 	string cgroups_mode = 7;
 	bool no_new_keyring = 8;
+	string shim_cgroup = 9;
 }
 
 message CheckpointOptions {

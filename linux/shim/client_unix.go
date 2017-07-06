@@ -2,8 +2,16 @@
 
 package shim
 
-import "syscall"
+import (
+	"context"
+	"os/exec"
+	"syscall"
+)
 
 var atter = syscall.SysProcAttr{
 	Setpgid: true,
+}
+
+func setCgroup(ctx context.Context, config Config, cmd *exec.Cmd) error {
+	return nil
 }

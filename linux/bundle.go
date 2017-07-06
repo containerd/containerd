@@ -9,7 +9,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/containerd/containerd/linux/runcopts"
 	client "github.com/containerd/containerd/linux/shim"
+	"github.com/containerd/containerd/runtime"
+	"github.com/containerd/containerd/typeurl"
 )
 
 func loadBundle(path, namespace string) *bundle {
@@ -56,15 +59,24 @@ type bundle struct {
 }
 
 // NewShim connects to the shim managing the bundle and tasks
-func (b *bundle) NewShim(ctx context.Context, binary, grpcAddress string, remote, debug bool) (*client.Client, error) {
+func (b *bundle) NewShim(ctx context.Context, binary, grpcAddress string, remote, debug bool, createOpts runtime.CreateOpts) (*client.Client, error) {
 	opt := client.WithStart(binary, grpcAddress, debug)
 	if !remote {
 		opt = client.WithLocal
 	}
+	var options runcopts.CreateOptions
+	if createOpts.Options != nil {
+		v, err := typeurl.UnmarshalAny(createOpts.Options)
+		if err != nil {
+			return nil, err
+		}
+		options = *v.(*runcopts.CreateOptions)
+	}
 	return client.New(ctx, client.Config{
-		Address:   b.shimAddress(),
-		Path:      b.path,
-		Namespace: b.namespace,
+		Address:    b.shimAddress(),
+		Path:       b.path,
+		Namespace:  b.namespace,
+		CgroupPath: options.ShimCgroup,
 	}, opt)
 }
 
