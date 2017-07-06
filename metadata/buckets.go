@@ -36,7 +36,7 @@ var (
 	bucketKeyObjectSnapshots  = []byte("snapshots")  // stores snapshot references
 	bucketKeyObjectContent    = []byte("content")    // stores content references
 	bucketKeyObjectBlob       = []byte("blob")       // stores content links
-	bucketKeyObjectIngest     = []byte("ingest")     // stores content links
+	bucketKeyObjectIngest     = []byte("ingest")     // stores ingest links
 
 	bucketKeyDigest    = []byte("digest")
 	bucketKeyMediaType = []byte("mediatype")

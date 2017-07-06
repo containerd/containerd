@@ -136,7 +136,6 @@ message StatusResponse {
 	Status status = 1;
 }
 
-
 message ListStatusesRequest {
 	string filter = 1;
 }

@@ -296,6 +296,11 @@ func (nw *namespacedWriter) commit(tx *bolt.Tx, size int64, expected digest.Dige
 	if err != nil {
 		return err
 	}
+	if size != 0 && size != status.Offset {
+		return errors.Errorf("%q failed size validation: %v != %v", nw.ref, status.Offset, size)
+	}
+	size = status.Offset
+
 	actual := nw.Writer.Digest()
 
 	if err := nw.Writer.Commit(size, expected); err != nil {
@@ -306,8 +311,6 @@ func (nw *namespacedWriter) commit(tx *bolt.Tx, size int64, expected digest.Dige
 			return errors.Wrapf(errdefs.ErrAlreadyExists, "content %v", actual)
 		}
 	}
-
-	size = status.Total
 
 	bkt, err := createBlobBucket(tx, nw.namespace, actual)
 	if err != nil {

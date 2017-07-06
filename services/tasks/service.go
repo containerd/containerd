@@ -62,6 +62,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs := metadata.NewContentStore(m.(*bolt.DB), ct.(content.Store))
 	runtimes := make(map[string]runtime.Runtime)
 	for _, rr := range rt {
 		r := rr.(runtime.Runtime)
@@ -71,7 +72,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	return &Service{
 		runtimes: runtimes,
 		db:       m.(*bolt.DB),
-		store:    ct.(content.Store),
+		store:    cs,
 		emitter:  e,
 	}, nil
 }
