@@ -3,9 +3,9 @@ package main
 import (
 	"errors"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 

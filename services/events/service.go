@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	api "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/plugin"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 

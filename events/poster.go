@@ -3,9 +3,9 @@ package events
 import (
 	"context"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/sirupsen/logrus"
 )
 
 var (
