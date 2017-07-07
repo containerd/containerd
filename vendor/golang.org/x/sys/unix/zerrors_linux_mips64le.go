@@ -1056,6 +1056,16 @@ const (
 	PARMRK                               = 0x8
 	PARODD                               = 0x200
 	PENDIN                               = 0x4000
+	PERF_EVENT_IOC_DISABLE               = 0x20002401
+	PERF_EVENT_IOC_ENABLE                = 0x20002400
+	PERF_EVENT_IOC_ID                    = 0x40082407
+	PERF_EVENT_IOC_PAUSE_OUTPUT          = 0x80042409
+	PERF_EVENT_IOC_PERIOD                = 0x80082404
+	PERF_EVENT_IOC_REFRESH               = 0x20002402
+	PERF_EVENT_IOC_RESET                 = 0x20002403
+	PERF_EVENT_IOC_SET_BPF               = 0x80042408
+	PERF_EVENT_IOC_SET_FILTER            = 0x80082406
+	PERF_EVENT_IOC_SET_OUTPUT            = 0x20002405
 	PRIO_PGRP                            = 0x1
 	PRIO_PROCESS                         = 0x0
 	PRIO_USER                            = 0x2
@@ -1395,6 +1405,9 @@ const (
 	SCM_TIMESTAMPING_OPT_STATS           = 0x36
 	SCM_TIMESTAMPNS                      = 0x23
 	SCM_WIFI_STATUS                      = 0x29
+	SECCOMP_MODE_DISABLED                = 0x0
+	SECCOMP_MODE_FILTER                  = 0x2
+	SECCOMP_MODE_STRICT                  = 0x1
 	SHUT_RD                              = 0x0
 	SHUT_RDWR                            = 0x2
 	SHUT_WR                              = 0x1
@@ -1756,6 +1769,7 @@ const (
 	TUNSETVNETBE                         = 0x800454de
 	TUNSETVNETHDRSZ                      = 0x800454d8
 	TUNSETVNETLE                         = 0x800454dc
+	UMOUNT_NOFOLLOW                      = 0x8
 	VDISCARD                             = 0xd
 	VEOF                                 = 0x10
 	VEOL                                 = 0x11
@@ -1793,6 +1807,8 @@ const (
 	WORDSIZE                             = 0x40
 	WSTOPPED                             = 0x2
 	WUNTRACED                            = 0x2
+	XATTR_CREATE                         = 0x1
+	XATTR_REPLACE                        = 0x2
 	XCASE                                = 0x4
 	XTABS                                = 0x1800
 )

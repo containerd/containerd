@@ -245,6 +245,9 @@ func (c *cgroup) processes(subsystem Name, recursive bool) ([]Process, error) {
 			return err
 		}
 		if !recursive && info.IsDir() {
+			if p == path {
+				return nil
+			}
 			return filepath.SkipDir
 		}
 		dir, name := filepath.Split(p)
