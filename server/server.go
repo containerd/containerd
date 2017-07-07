@@ -13,6 +13,7 @@ import (
 	containers "github.com/containerd/containerd/api/services/containers/v1"
 	content "github.com/containerd/containerd/api/services/content/v1"
 	diff "github.com/containerd/containerd/api/services/diff/v1"
+	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	images "github.com/containerd/containerd/api/services/images/v1"
 	namespaces "github.com/containerd/containerd/api/services/namespaces/v1"
 	snapshot "github.com/containerd/containerd/api/services/snapshot/v1"
@@ -68,6 +69,7 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 			id,
 		)
 		initContext.Emitter = s.emitter
+		initContext.Address = config.GRPC.Address
 
 		// load the plugin specific configuration if it is provided
 		if p.Config != nil {
@@ -203,6 +205,8 @@ func interceptor(
 		ctx = log.WithModule(ctx, "diff")
 	case namespaces.NamespacesServer:
 		ctx = log.WithModule(ctx, "namespaces")
+	case eventsapi.EventsServer:
+		ctx = log.WithModule(ctx, "events")
 	default:
 		log.G(ctx).Warnf("unknown GRPC server type: %#v\n", info.Server)
 	}

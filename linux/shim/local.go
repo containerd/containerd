@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	events "github.com/containerd/containerd/api/services/events/v1"
+	evt "github.com/containerd/containerd/events"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
@@ -128,4 +129,20 @@ func (e *streamEvents) SendMsg(m interface{}) error {
 
 func (e *streamEvents) RecvMsg(m interface{}) error {
 	return nil
+}
+
+type poster interface {
+	Post(ctx context.Context, in *events.PostEventRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error)
+}
+
+type localEventsClient struct {
+	emitter evt.Poster
+}
+
+func (l *localEventsClient) Post(ctx context.Context, r *events.PostEventRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+	ctx = evt.WithTopic(ctx, r.Envelope.Topic)
+	if err := l.emitter.Post(ctx, r.Envelope); err != nil {
+		return nil, err
+	}
+	return empty, nil
 }
