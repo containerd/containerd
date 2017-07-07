@@ -186,7 +186,7 @@ func interceptor(
 	ctx = log.WithModule(ctx, "containerd")
 	switch info.Server.(type) {
 	case tasks.TasksServer:
-		ctx = log.WithModule(ctx, "execution")
+		ctx = log.WithModule(ctx, "tasks")
 	case containers.ContainersServer:
 		ctx = log.WithModule(ctx, "containers")
 	case content.ContentServer:
