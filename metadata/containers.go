@@ -34,7 +34,7 @@ func (s *containerStore) Get(ctx context.Context, id string) (containers.Contain
 
 	bkt := getContainerBucket(s.tx, namespace, id)
 	if bkt == nil {
-		return containers.Container{}, errors.Wrapf(errdefs.ErrNotFound, "bucket name %q")
+		return containers.Container{}, errors.Wrapf(errdefs.ErrNotFound, "bucket name %q:%q", namespace, id)
 	}
 
 	container := containers.Container{ID: id}
@@ -144,7 +144,7 @@ func (s *containerStore) Create(ctx context.Context, container containers.Contai
 	cbkt, err := bkt.CreateBucket([]byte(container.ID))
 	if err != nil {
 		if err == bolt.ErrBucketExists {
-			err = errors.Wrapf(errdefs.ErrAlreadyExists, "content %q")
+			err = errors.Wrapf(errdefs.ErrAlreadyExists, "content %q", container.ID)
 		}
 		return containers.Container{}, err
 	}

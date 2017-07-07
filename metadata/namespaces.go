@@ -32,7 +32,7 @@ func (s *namespaceStore) Create(ctx context.Context, namespace string, labels ma
 	bkt, err := topbkt.CreateBucket([]byte(namespace))
 	if err != nil {
 		if err == bolt.ErrBucketExists {
-			return errors.Wrapf(errdefs.ErrAlreadyExists, "namespace %q")
+			return errors.Wrapf(errdefs.ErrAlreadyExists, "namespace %q", namespace)
 		}
 
 		return err
