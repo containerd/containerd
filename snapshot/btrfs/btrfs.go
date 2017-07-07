@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containerd/btrfs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
@@ -16,6 +15,7 @@ import (
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/snapshot/storage"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 func init() {

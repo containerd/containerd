@@ -5,9 +5,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	namespaces2 "github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/version"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 

@@ -13,11 +13,11 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd/linux/shim"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/version"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 

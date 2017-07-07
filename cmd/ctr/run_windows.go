@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/tasks/v1"
@@ -18,6 +17,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
