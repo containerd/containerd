@@ -10,7 +10,6 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"golang.org/x/net/context"
-	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/sys"
@@ -31,11 +30,6 @@ func setupSignals() (chan os.Signal, error) {
 		return nil, err
 	}
 	return signals, nil
-}
-
-// setupRoot sets up the root as the shim is started in its own mount namespace
-func setupRoot() error {
-	return unix.Mount("", "/", "", unix.MS_SLAVE|unix.MS_REC, "")
 }
 
 func newServer() *grpc.Server {

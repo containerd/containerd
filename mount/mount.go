@@ -22,3 +22,19 @@ func MountAll(mounts []Mount, target string) error {
 	}
 	return nil
 }
+
+// UnmountN tries to unmount the given mount point nr times, which is
+// useful for undoing a stack of mounts on the same mount
+// point. Returns the first error encountered, but always attempts the
+// full nr umounts.
+func UnmountN(mount string, flags, nr int) error {
+	var err error
+	for i := 0; i < nr; i++ {
+		if err2 := Unmount(mount, flags); err2 != nil {
+			if err == nil {
+				err = err2
+			}
+		}
+	}
+	return err
+}

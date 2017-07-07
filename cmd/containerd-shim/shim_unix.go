@@ -23,11 +23,6 @@ func setupSignals() (chan os.Signal, error) {
 	return signals, nil
 }
 
-// setupRoot is a no op except on Linux
-func setupRoot() error {
-	return nil
-}
-
 func newServer() *grpc.Server {
 	return grpc.NewServer()
 }
