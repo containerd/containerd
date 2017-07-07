@@ -21,6 +21,7 @@
 		ContainerDelete
 		ContentDelete
 		StreamEventsRequest
+		PostEventRequest
 		Envelope
 		ImageUpdate
 		ImageDelete

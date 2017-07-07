@@ -8,6 +8,8 @@ import (
 	api "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/plugin"
+	"github.com/golang/protobuf/ptypes/empty"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
@@ -51,4 +53,12 @@ func (s *Service) Stream(req *api.StreamEventsRequest, srv api.Events_StreamServ
 			return err
 		}
 	}
+}
+
+func (s *Service) Post(ctx context.Context, r *api.PostEventRequest) (*empty.Empty, error) {
+	ctx = events.WithTopic(ctx, r.Envelope.Topic)
+	if err := s.emitter.Post(ctx, r.Envelope); err != nil {
+		return nil, err
+	}
+	return &empty.Empty{}, nil
 }
