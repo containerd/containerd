@@ -54,6 +54,11 @@ func New(stateDir string, runtimeName, shimName string, runtimeArgs []string, ti
 	return s, nil
 }
 
+// GetDefaultWorkersNum Get default Worker or handleTask goroutine num
+func GetDefaultWorkersNum() int {
+	return 10
+}
+
 type containerInfo struct {
 	container runtime.Container
 }
@@ -275,11 +280,17 @@ func (s *Supervisor) Start() error {
 		"memory":      s.machine.Memory,
 		"cpus":        s.machine.Cpus,
 	}).Debug("containerd: supervisor running")
-	go func() {
-		for i := range s.tasks {
-			s.handleTask(i)
-		}
-	}()
+
+	wg := &sync.WaitGroup{}
+	for i := 0; i < GetDefaultWorkersNum(); i++ {
+		wg.Add(1)
+		go func() {
+			for i := range s.tasks {
+				s.handleTask(i)
+			}
+			wg.Done()
+		}()
+	}
 	return nil
 }
 

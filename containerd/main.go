@@ -198,7 +198,7 @@ func daemon(context *cli.Context) error {
 	}
 	types.RegisterAPIServer(server, grpcserver.NewServer(sv))
 	wg := &sync.WaitGroup{}
-	for i := 0; i < 10; i++ {
+	for i := 0; i < supervisor.GetDefaultWorkersNum(); i++ {
 		wg.Add(1)
 		w := supervisor.NewWorker(sv, wg)
 		go w.Start()
