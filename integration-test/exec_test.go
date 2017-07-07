@@ -3,7 +3,9 @@
 package main
 
 import (
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -393,4 +395,66 @@ func (cs *ContainerdSuite) TestBusyboxRestoreDeadExec(t *check.C) {
 	case <-time.After(8 * time.Second):
 		t.Fatal("exec did not exit within 5 seconds")
 	}
+}
+
+func (cs *ContainerdSuite) TestExecKillShimNoPanic(t *check.C) {
+	bundleName := "busybox-top"
+	if err := CreateBusyboxBundle(bundleName, []string{"top"}); err != nil {
+		t.Fatal(err)
+	}
+
+	var (
+		err   error
+		initp *ContainerProcess
+	)
+
+	containerID := "top"
+	initp, err = cs.StartContainer(containerID, bundleName)
+	t.Assert(err, checker.Equals, nil)
+
+	// Get the shim pid
+	b, err := exec.Command("pgrep", "containerd-shim").CombinedOutput()
+	t.Assert(err, checker.Equals, nil)
+	shimPid := strings.TrimSpace(string(b))
+	t.Assert(string(shimPid), checker.Not(checker.Equals), "")
+
+	execID := "top1"
+	_, err = cs.AddProcessToContainer(initp, execID, "/", []string{"PATH=/usr/bin"}, []string{"top"}, 0, 0)
+	t.Assert(err, checker.Equals, nil)
+
+	for idx, evt := range []types.Event{
+		{
+			Type:   "start-container",
+			Id:     containerID,
+			Status: 0,
+			Pid:    "",
+		},
+		{
+			Type:   "start-process",
+			Id:     containerID,
+			Status: 0,
+			Pid:    execID,
+		},
+		{
+			Type:   "exit",
+			Id:     containerID,
+			Status: 0xff,
+			Pid:    execID,
+		},
+	} {
+		ch := initp.GetEventsChannel()
+		e := <-ch
+		evt.Timestamp = e.Timestamp
+		t.Assert(*e, checker.Equals, evt)
+		if idx == 1 {
+			// Process Started, SIGKILL the container shim
+			err = exec.Command("kill", "-9", string(shimPid)).Run()
+			t.Assert(err, checker.Equals, nil)
+		}
+	}
+
+	// Container should be dead
+	containers, err := cs.ListRunningContainers()
+	t.Assert(err, checker.Equals, nil)
+	t.Assert(len(containers), checker.Equals, 0)
 }
