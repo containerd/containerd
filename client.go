@@ -21,6 +21,7 @@ import (
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	versionservice "github.com/containerd/containerd/api/services/version/v1"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/remotes"
@@ -365,17 +366,30 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpts) (Imag
 		}
 	}
 
+	imgrec := images.Image{
+		Name:   name,
+		Target: desc,
+	}
+
 	is := c.ImageService()
-	if err := is.Update(ctx, name, desc); err != nil {
-		return nil, err
+	if updated, err := is.Update(ctx, imgrec, "target"); err != nil {
+		if !errdefs.IsNotFound(err) {
+			return nil, err
+		}
+
+		created, err := is.Create(ctx, imgrec)
+		if err != nil {
+			return nil, err
+		}
+
+		imgrec = created
+	} else {
+		imgrec = updated
 	}
-	i, err := is.Get(ctx, name)
-	if err != nil {
-		return nil, err
-	}
+
 	img := &image{
 		client: c,
-		i:      i,
+		i:      imgrec,
 	}
 	if pullCtx.Unpack {
 		if err := img.Unpack(ctx); err != nil {

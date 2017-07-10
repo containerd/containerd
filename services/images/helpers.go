@@ -29,15 +29,21 @@ func imagesFromProto(imagespb []imagesapi.Image) []images.Image {
 
 func imageToProto(image *images.Image) imagesapi.Image {
 	return imagesapi.Image{
-		Name:   image.Name,
-		Target: descToProto(&image.Target),
+		Name:      image.Name,
+		Labels:    image.Labels,
+		Target:    descToProto(&image.Target),
+		CreatedAt: image.CreatedAt,
+		UpdatedAt: image.UpdatedAt,
 	}
 }
 
 func imageFromProto(imagepb *imagesapi.Image) images.Image {
 	return images.Image{
-		Name:   imagepb.Name,
-		Target: descFromProto(&imagepb.Target),
+		Name:      imagepb.Name,
+		Labels:    imagepb.Labels,
+		Target:    descFromProto(&imagepb.Target),
+		CreatedAt: imagepb.CreatedAt,
+		UpdatedAt: imagepb.UpdatedAt,
 	}
 }
 

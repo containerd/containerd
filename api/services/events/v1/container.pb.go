@@ -22,6 +22,7 @@
 		ContentDelete
 		StreamEventsRequest
 		Envelope
+		ImageCreate
 		ImageUpdate
 		ImageDelete
 		NamespaceCreate

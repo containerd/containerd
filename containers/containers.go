@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/containerd/containerd/filters"
 	"github.com/gogo/protobuf/types"
 )
 
@@ -32,9 +31,15 @@ type Store interface {
 	Get(ctx context.Context, id string) (Container, error)
 
 	// List returns containers that match one or more of the provided filters.
-	List(ctx context.Context, filters ...filters.Filter) ([]Container, error)
+	List(ctx context.Context, filters ...string) ([]Container, error)
 
 	Create(ctx context.Context, container Container) (Container, error)
-	Update(ctx context.Context, container Container) (Container, error)
+
+	// Update the container with the provided container object. ID must be set.
+	//
+	// If one or more fieldpaths are provided, only the field corresponding to
+	// the fieldpaths will be mutated.
+	Update(ctx context.Context, container Container, fieldpaths ...string) (Container, error)
+
 	Delete(ctx context.Context, id string) error
 }
