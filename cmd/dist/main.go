@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/containerd/containerd"
 	namespaces2 "github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/version"
 	"github.com/urfave/cli"
@@ -58,7 +59,7 @@ distribution tool
 		cli.StringFlag{
 			Name:  "address, a",
 			Usage: "address for containerd's GRPC server",
-			Value: "/run/containerd/containerd.sock",
+			Value: containerd.DefaultAddress,
 		},
 		cli.StringFlag{
 			Name:   "namespace, n",
