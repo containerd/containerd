@@ -31,7 +31,7 @@ var infoCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		cjson, err := json.MarshalIndent(container, "", "    ")
+		cjson, err := json.MarshalIndent(container.Proto(), "", "    ")
 		if err != nil {
 			return err
 		}
