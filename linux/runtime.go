@@ -337,12 +337,13 @@ func (r *Runtime) handleEvents(ctx context.Context, s *client.Client) error {
 	if err != nil {
 		return err
 	}
-	go r.forward(ctx, events)
+	go r.forwardShimEvents(ctx, events)
+	go r.forwardMonitorEvents(ctx)
 	return nil
 }
 
-// forward forwards events from a shim to the events service and monitors
-func (r *Runtime) forward(ctx context.Context, events shim.Shim_StreamClient) {
+// forwardShimEvents forwards events from a shim to the events service
+func (r *Runtime) forwardShimEvents(ctx context.Context, events shim.Shim_StreamClient) {
 	for {
 		e, err := events.Recv()
 		if err != nil {
@@ -351,9 +352,19 @@ func (r *Runtime) forward(ctx context.Context, events shim.Shim_StreamClient) {
 			}
 			return
 		}
-		r.events <- e
 		if err := r.emit(ctx, "/runtime/"+getTopic(e), e); err != nil {
 			return
+		}
+	}
+}
+
+// forwardMonitorEvents forwards events from a monitor to the events service
+func (r *Runtime) forwardMonitorEvents(ctx context.Context) {
+	for {
+		for e := range r.events {
+			if err := r.emit(ctx, "/runtime/"+getTopic(e), e); err != nil {
+				return
+			}
 		}
 	}
 }
