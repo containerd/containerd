@@ -28,7 +28,7 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			return newBaseDiff(c.(content.Store))
+			return NewBaseDiff(c.(content.Store))
 		},
 	})
 }
@@ -41,7 +41,7 @@ var _ plugin.Differ = &BaseDiff{}
 
 var emptyDesc = ocispec.Descriptor{}
 
-func newBaseDiff(store content.Store) (*BaseDiff, error) {
+func NewBaseDiff(store content.Store) (*BaseDiff, error) {
 	return &BaseDiff{
 		store: store,
 	}, nil
