@@ -110,6 +110,10 @@ func (w *writer) Commit(size int64, expected digest.Digest) error {
 		}
 		return err
 	}
+	commitTime := time.Now()
+	if err := os.Chtimes(target, commitTime, commitTime); err != nil {
+		return err
+	}
 
 	unlock(w.ref)
 	w.fp = nil

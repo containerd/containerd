@@ -1,4 +1,4 @@
-package content
+package fs
 
 import (
 	"bufio"
@@ -17,9 +17,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/content/testsuite"
 	"github.com/containerd/containerd/testutil"
 	"github.com/opencontainers/go-digest"
 )
+
+func TestContent(t *testing.T) {
+	testsuite.ContentSuite(t, "fs", func(ctx context.Context, root string) (content.Store, func(), error) {
+		cs, err := NewStore(root)
+		if err != nil {
+			return nil, nil, err
+		}
+		return cs, func() {}, nil
+	})
+}
 
 func TestContentWriter(t *testing.T) {
 	ctx, tmpdir, cs, cleanup := contentStoreEnv(t)
@@ -63,7 +75,7 @@ func TestContentWriter(t *testing.T) {
 		ingestions[i].StartedAt = time.Time{}
 	}
 
-	if !reflect.DeepEqual(ingestions, []Status{
+	if !reflect.DeepEqual(ingestions, []content.Status{
 		{
 			Ref:    "myref",
 			Offset: 0,
@@ -132,7 +144,7 @@ func TestWalkBlobs(t *testing.T) {
 		expected[dgst] = struct{}{}
 	}
 
-	if err := cs.Walk(ctx, func(bi Info) error {
+	if err := cs.Walk(ctx, func(bi content.Info) error {
 		found[bi.Digest] = struct{}{}
 		checkBlobPath(t, cs, bi.Digest)
 		return nil
@@ -201,7 +213,7 @@ func generateBlobs(t checker, nblobs, maxsize int64) map[digest.Digest][]byte {
 	return blobs
 }
 
-func populateBlobStore(t checker, ctx context.Context, cs Store, nblobs, maxsize int64) map[digest.Digest][]byte {
+func populateBlobStore(t checker, ctx context.Context, cs content.Store, nblobs, maxsize int64) map[digest.Digest][]byte {
 	blobs := generateBlobs(t, nblobs, maxsize)
 
 	for dgst, p := range blobs {
@@ -211,7 +223,7 @@ func populateBlobStore(t checker, ctx context.Context, cs Store, nblobs, maxsize
 	return blobs
 }
 
-func contentStoreEnv(t checker) (context.Context, string, Store, func()) {
+func contentStoreEnv(t checker) (context.Context, string, content.Store, func()) {
 	pc, _, _, ok := runtime.Caller(1)
 	if !ok {
 		t.Fatal("failed to resolve caller")
@@ -247,7 +259,7 @@ func checkCopy(t checker, size int64, dst io.Writer, src io.Reader) {
 	}
 }
 
-func checkBlobPath(t *testing.T, cs Store, dgst digest.Digest) string {
+func checkBlobPath(t *testing.T, cs content.Store, dgst digest.Digest) string {
 	path := cs.(*store).blobPath(dgst)
 
 	if path != filepath.Join(cs.(*store).root, "blobs", dgst.Algorithm().String(), dgst.Hex()) {
@@ -268,8 +280,8 @@ func checkBlobPath(t *testing.T, cs Store, dgst digest.Digest) string {
 	return path
 }
 
-func checkWrite(t checker, ctx context.Context, cs Store, dgst digest.Digest, p []byte) digest.Digest {
-	if err := WriteBlob(ctx, cs, dgst.String(), bytes.NewReader(p), int64(len(p)), dgst); err != nil {
+func checkWrite(t checker, ctx context.Context, cs content.Store, dgst digest.Digest, p []byte) digest.Digest {
+	if err := content.WriteBlob(ctx, cs, dgst.String(), bytes.NewReader(p), int64(len(p)), dgst); err != nil {
 		t.Fatal(err)
 	}
 

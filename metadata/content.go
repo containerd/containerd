@@ -385,13 +385,14 @@ func (nw *namespacedWriter) commit(tx *bolt.Tx, size int64, expected digest.Dige
 		return err
 	}
 
-	timeEncoded, err := status.UpdatedAt.MarshalBinary()
+	timeEncoded, err := time.Now().UTC().MarshalBinary()
 	if err != nil {
 		return err
 	}
 
 	for _, v := range [][2][]byte{
 		{bucketKeyCreatedAt, timeEncoded},
+		{bucketKeyUpdatedAt, timeEncoded},
 		{bucketKeySize, sizeEncoded},
 	} {
 		if err := bkt.Put(v[0], v[1]); err != nil {
