@@ -42,9 +42,13 @@ func (m *defaultMonitor) Start(c *exec.Cmd) error {
 }
 
 func (m *defaultMonitor) Wait(c *exec.Cmd) (int, error) {
-	status, err := c.Process.Wait()
-	if err != nil {
+	if err := c.Wait(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
+				return status.ExitStatus(), nil
+			}
+		}
 		return -1, err
 	}
-	return status.Sys().(syscall.WaitStatus).ExitStatus(), nil
+	return 0, nil
 }

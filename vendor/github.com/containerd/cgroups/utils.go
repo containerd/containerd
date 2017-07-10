@@ -207,7 +207,9 @@ func parseCgroupFromReader(r io.Reader) (map[string]string, error) {
 			return nil, fmt.Errorf("invalid cgroup entry: must contain at least two colons: %v", text)
 		}
 		for _, subs := range strings.Split(parts[1], ",") {
-			cgroups[subs] = parts[2]
+			if subs != "" {
+				cgroups[subs] = parts[2]
+			}
 		}
 	}
 	return cgroups, nil

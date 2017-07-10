@@ -114,6 +114,10 @@ func (m *master) Size() (WinSize, error) {
 	return ws, nil
 }
 
+func (m *master) Fd() uintptr {
+	return m.f.Fd()
+}
+
 // checkConsole checks if the provided file is a console
 func checkConsole(f *os.File) error {
 	var termios unix.Termios

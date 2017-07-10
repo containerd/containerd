@@ -84,15 +84,14 @@ func (c *cpusetController) ensureParent(current, root string) error {
 	if _, err := filepath.Rel(root, parent); err != nil {
 		return nil
 	}
-	if cleanPath(parent) == root {
-		return nil
-	}
 	// Avoid infinite recursion.
 	if parent == current {
 		return fmt.Errorf("cpuset: cgroup parent path outside cgroup root")
 	}
-	if err := c.ensureParent(parent, root); err != nil {
-		return err
+	if cleanPath(parent) != root {
+		if err := c.ensureParent(parent, root); err != nil {
+			return err
+		}
 	}
 	if err := os.MkdirAll(current, defaultDirPerm); err != nil {
 		return err

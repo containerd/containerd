@@ -39,6 +39,7 @@ type Runc struct {
 	Log           string
 	LogFormat     Format
 	PdeathSignal  syscall.Signal
+	Setpgid       bool
 	Criu          string
 	SystemdCgroup string
 }

@@ -9,11 +9,16 @@ import (
 )
 
 func tcget(fd uintptr, p *unix.Termios) error {
-	return ioctl(fd, unix.TCGETS, uintptr(unsafe.Pointer(p)))
+	termios, err := unix.IoctlGetTermios(int(fd), unix.TCGETS)
+	if err != nil {
+		return err
+	}
+	*p = *termios
+	return nil
 }
 
 func tcset(fd uintptr, p *unix.Termios) error {
-	return ioctl(fd, unix.TCSETS, uintptr(unsafe.Pointer(p)))
+	return unix.IoctlSetTermios(int(fd), unix.TCSETS, p)
 }
 
 func ioctl(fd, flag, data uintptr) error {
@@ -32,15 +37,14 @@ func unlockpt(f *os.File) error {
 
 // ptsname retrieves the name of the first available pts for the given master.
 func ptsname(f *os.File) (string, error) {
-	var n int32
-	if err := ioctl(f.Fd(), unix.TIOCGPTN, uintptr(unsafe.Pointer(&n))); err != nil {
+	n, err := unix.IoctlGetInt(int(f.Fd()), unix.TIOCGPTN)
+	if err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("/dev/pts/%d", n), nil
 }
 
 func saneTerminal(f *os.File) error {
-	// Go doesn't have a wrapper for any of the termios ioctls.
 	var termios unix.Termios
 	if err := tcget(f.Fd(), &termios); err != nil {
 		return err

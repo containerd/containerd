@@ -150,6 +150,10 @@ func (m *master) Write(b []byte) (int, error) {
 	panic("not implemented on windows")
 }
 
+func (m *master) Fd() uintptr {
+	return m.in
+}
+
 // makeInputRaw puts the terminal (Windows Console) connected to the given
 // file descriptor into raw mode
 func makeInputRaw(fd uintptr, mode uint32) error {

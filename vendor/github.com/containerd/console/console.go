@@ -26,6 +26,8 @@ type Console interface {
 	Reset() error
 	// Size returns the window size of the console
 	Size() (WinSize, error)
+	// Fd returns the console's file descriptor
+	Fd() uintptr
 }
 
 // WinSize specifies the window size of the console
