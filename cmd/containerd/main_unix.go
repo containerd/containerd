@@ -20,6 +20,7 @@ var handledSignals = []os.Signal{
 	unix.SIGINT,
 	unix.SIGUSR1,
 	unix.SIGCHLD,
+	unix.SIGPIPE,
 }
 
 func handleSignals(ctx context.Context, signals chan os.Signal, server *server.Server) error {
@@ -32,6 +33,8 @@ func handleSignals(ctx context.Context, signals chan os.Signal, server *server.S
 			}
 		case unix.SIGUSR1:
 			dumpStacks()
+		case unix.SIGPIPE:
+			continue
 		default:
 			server.Stop()
 			return nil
