@@ -140,6 +140,7 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 	if err := readContainer(&updated, cbkt); err != nil {
 		return updated, errors.Wrapf(err, "failed to read container from bucket")
 	}
+	createdat := updated.CreatedAt
 	updated.ID = container.ID
 
 	// apply the field mask. If you update this code, you better follow the
@@ -178,6 +179,7 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 		updated = container
 	}
 
+	updated.CreatedAt = createdat
 	updated.UpdatedAt = time.Now().UTC()
 	if err := writeContainer(cbkt, &updated); err != nil {
 		return containers.Container{}, errors.Wrap(err, "failed to write container")
