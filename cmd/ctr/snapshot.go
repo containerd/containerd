@@ -27,6 +27,7 @@ var snapshotCommand = cli.Command{
 		removeSnapshotCommand,
 		prepareSnapshotCommand,
 		treeSnapshotCommand,
+		mountSnapshotCommand,
 	},
 }
 
@@ -196,9 +197,14 @@ var removeSnapshotCommand = cli.Command{
 
 var prepareSnapshotCommand = cli.Command{
 	Name:      "prepare",
-	Usage:     "prepare gets mount commands for digest",
-	ArgsUsage: "[flags] <digest> <target>",
-	Flags:     []cli.Flag{},
+	Usage:     "prepare a snapshot from a committed snapshot",
+	ArgsUsage: "[flags] digest target",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "snapshot-name",
+			Usage: "name of the target snapshot",
+		},
+	},
 	Action: func(clicontext *cli.Context) error {
 		ctx, cancel := appContext(clicontext)
 		defer cancel()
@@ -211,7 +217,14 @@ var prepareSnapshotCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+
 		target := clicontext.Args().Get(1)
+
+		snapshotName := clicontext.String("snapshot-name")
+		// Use the target as the snapshotName if no snapshot-name is provided
+		if snapshotName == "" {
+			snapshotName = target
+		}
 
 		logrus.Infof("preparing mounts %s", dgst.String())
 
@@ -220,7 +233,51 @@ var prepareSnapshotCommand = cli.Command{
 			return err
 		}
 
-		mounts, err := snapshotter.Prepare(ctx, target, dgst.String())
+		mounts, err := snapshotter.Prepare(ctx, snapshotName, dgst.String())
+		if err != nil {
+			return err
+		}
+
+		for _, m := range mounts {
+			fmt.Fprintf(os.Stdout, "mount -t %s %s %s -o %s\n", m.Type, m.Source, target, strings.Join(m.Options, ","))
+		}
+
+		return nil
+	},
+}
+
+var mountSnapshotCommand = cli.Command{
+	Name:      "mount",
+	Usage:     "mount gets mount commands for the active snapshots",
+	ArgsUsage: "[flags] target",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "snapshot-name",
+			Usage: "name of the snapshot",
+		},
+	},
+	Action: func(clicontext *cli.Context) error {
+		ctx, cancel := appContext(clicontext)
+		defer cancel()
+
+		if clicontext.NArg() != 1 {
+			return cli.ShowSubcommandHelp(clicontext)
+		}
+
+		target := clicontext.Args().Get(0)
+
+		snapshotName := clicontext.String("snapshot-name")
+		// Use the target as the snapshotName if no snapshot-name is provided
+		if snapshotName == "" {
+			snapshotName = target
+		}
+
+		snapshotter, err := getSnapshotter(clicontext)
+		if err != nil {
+			return err
+		}
+
+		mounts, err := snapshotter.Mounts(ctx, snapshotName)
 		if err != nil {
 			return err
 		}
