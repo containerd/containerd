@@ -28,13 +28,18 @@ func (s *eventSink) Write(evt goevents.Event) error {
 	if !ok {
 		return errors.New("event is not a sink event")
 	}
-	topic := getTopic(e.ctx)
 
 	ns, _ := namespaces.Namespace(e.ctx)
 	if ns != "" && ns != s.ns {
 		// ignore events not intended for this ns
 		return nil
 	}
+
+	if ev, ok := e.event.(*events.Envelope); ok {
+		s.ch <- ev
+		return nil
+	}
+	topic := getTopic(e.ctx)
 
 	eventData, err := typeurl.MarshalAny(e.event)
 	if err != nil {

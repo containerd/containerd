@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -13,8 +14,12 @@ import (
 	"github.com/containerd/console"
 	events "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/types/task"
+	evt "github.com/containerd/containerd/events"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
+	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/reaper"
+	"github.com/containerd/containerd/typeurl"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -29,16 +34,32 @@ var empty = &google_protobuf.Empty{}
 const RuncRoot = "/run/containerd/runc"
 
 // NewService returns a new shim service that can be used via GRPC
-func NewService(path, namespace string) (*Service, error) {
+func NewService(path, namespace, address string) (*Service, error) {
 	if namespace == "" {
 		return nil, fmt.Errorf("shim namespace cannot be empty")
 	}
-	return &Service{
+	context := namespaces.WithNamespace(context.Background(), namespace)
+	var client poster
+	if address != "" {
+		conn, err := connect(address, dialer)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to dial %q", address)
+		}
+		client = events.NewEventsClient(conn)
+	} else {
+		client = &localEventsClient{
+			emitter: evt.GetPoster(context),
+		}
+	}
+	s := &Service{
 		path:      path,
 		processes: make(map[string]process),
 		events:    make(chan *events.RuntimeEvent, 4096),
 		namespace: namespace,
-	}, nil
+		context:   context,
+	}
+	go s.forward(client)
+	return s, nil
 }
 
 type Service struct {
@@ -52,6 +73,7 @@ type Service struct {
 	eventsMu      sync.Mutex
 	deferredEvent *events.RuntimeEvent
 	namespace     string
+	context       context.Context
 }
 
 func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*shimapi.CreateTaskResponse, error) {
@@ -366,4 +388,39 @@ func (s *Service) getContainerPids(ctx context.Context, id string) ([]uint32, er
 		pids = append(pids, uint32(pid))
 	}
 	return pids, nil
+}
+
+func (s *Service) forward(client poster) {
+	for e := range s.events {
+		a, err := typeurl.MarshalAny(e)
+		if err != nil {
+			log.G(s.context).WithError(err).Error("marshal event")
+			continue
+		}
+		if _, err := client.Post(s.context, &events.PostEventRequest{
+			Envelope: &events.Envelope{
+				Timestamp: time.Now(),
+				Topic:     "/runtime/" + getTopic(e),
+				Event:     a,
+			},
+		}); err != nil {
+			log.G(s.context).WithError(err).Error("post event")
+		}
+	}
+}
+
+func getTopic(e *events.RuntimeEvent) string {
+	switch e.Type {
+	case events.RuntimeEvent_CREATE:
+		return "task-create"
+	case events.RuntimeEvent_START:
+		return "task-start"
+	case events.RuntimeEvent_EXEC_ADDED:
+		return "task-execadded"
+	case events.RuntimeEvent_OOM:
+		return "task-oom"
+	case events.RuntimeEvent_EXIT:
+		return "task-exit"
+	}
+	return "?"
 }

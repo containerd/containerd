@@ -49,6 +49,10 @@ func main() {
 			Name:  "socket,s",
 			Usage: "abstract socket path to serve on",
 		},
+		cli.StringFlag{
+			Name:  "address,a",
+			Usage: "grpc address back to containerd",
+		},
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
@@ -74,6 +78,7 @@ func main() {
 		sv, err := shim.NewService(
 			path,
 			context.GlobalString("namespace"),
+			context.GlobalString("address"),
 		)
 		if err != nil {
 			return err

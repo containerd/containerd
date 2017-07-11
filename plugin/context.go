@@ -19,6 +19,7 @@ func NewContext(ctx context.Context, plugins map[PluginType]map[string]interface
 
 type InitContext struct {
 	Root    string
+	Address string
 	Context context.Context
 	Config  interface{}
 	Emitter *events.Emitter
