@@ -283,6 +283,12 @@ func (s *Service) Pause(ctx context.Context, r *google_protobuf.Empty) (*google_
 	if err := s.initProcess.Pause(ctx); err != nil {
 		return nil, err
 	}
+	s.events <- &events.RuntimeEvent{
+		Type:        events.RuntimeEvent_PAUSED,
+		ID:          s.id,
+		ContainerID: s.id,
+		Timestamp:   time.Now(),
+	}
 	return empty, nil
 }
 
@@ -292,6 +298,12 @@ func (s *Service) Resume(ctx context.Context, r *google_protobuf.Empty) (*google
 	}
 	if err := s.initProcess.Resume(ctx); err != nil {
 		return nil, err
+	}
+	s.events <- &events.RuntimeEvent{
+		Type:        events.RuntimeEvent_RESUMED,
+		ID:          s.id,
+		ContainerID: s.id,
+		Timestamp:   time.Now(),
 	}
 	return empty, nil
 }
@@ -343,6 +355,12 @@ func (s *Service) Checkpoint(ctx context.Context, r *shimapi.CheckpointTaskReque
 	}
 	if err := s.initProcess.Checkpoint(ctx, r); err != nil {
 		return nil, err
+	}
+	s.events <- &events.RuntimeEvent{
+		Type:        events.RuntimeEvent_CHECKPOINTED,
+		ID:          s.id,
+		ContainerID: s.id,
+		Timestamp:   time.Now(),
 	}
 	return empty, nil
 }

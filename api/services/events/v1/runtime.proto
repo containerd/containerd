@@ -38,6 +38,8 @@ message RuntimeEvent {
 		START = 3;
 		EXEC_ADDED = 4;
 		PAUSED = 5;
+		RESUMED = 6;
+		CHECKPOINTED = 7;
 	}
 	EventType type = 3;
 	uint32 pid = 4;
