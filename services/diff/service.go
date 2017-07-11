@@ -32,18 +32,28 @@ type service struct {
 	diff plugin.Differ
 }
 
+func (s *service) getDiffer(snapshotterName string) (plugin.Differ, error) {
+	// In current implementation, the base differ is used for any snapshotter.
+	// Future implementation would allow snapshotter-specific differs.
+	return s.diff, nil
+}
+
 func (s *service) Register(gs *grpc.Server) error {
 	diffapi.RegisterDiffServer(gs, s)
 	return nil
 }
 
 func (s *service) Apply(ctx context.Context, er *diffapi.ApplyRequest) (*diffapi.ApplyResponse, error) {
+	differ, err := s.getDiffer(er.Snapshotter)
+	if err != nil {
+		return nil, err
+	}
 	desc := toDescriptor(er.Diff)
 	// TODO: Check for supported media types
 
 	mounts := toMounts(er.Mounts)
 
-	ocidesc, err := s.diff.Apply(ctx, desc, mounts)
+	ocidesc, err := differ.Apply(ctx, desc, mounts)
 	if err != nil {
 		return nil, err
 	}
@@ -55,10 +65,14 @@ func (s *service) Apply(ctx context.Context, er *diffapi.ApplyRequest) (*diffapi
 }
 
 func (s *service) Diff(ctx context.Context, dr *diffapi.DiffRequest) (*diffapi.DiffResponse, error) {
+	differ, err := s.getDiffer(dr.Snapshotter)
+	if err != nil {
+		return nil, err
+	}
 	aMounts := toMounts(dr.Left)
 	bMounts := toMounts(dr.Right)
 
-	ocidesc, err := s.diff.DiffMounts(ctx, aMounts, bMounts, dr.MediaType, dr.Ref)
+	ocidesc, err := differ.DiffMounts(ctx, aMounts, bMounts, dr.MediaType, dr.Ref)
 	if err != nil {
 		return nil, err
 	}

@@ -45,7 +45,7 @@ func WithCheckpoint(desc v1.Descriptor, rootfsID string) NewContainerOpts {
 				if err != nil {
 					return err
 				}
-				if _, err := client.SnapshotService().Prepare(ctx, rootfsID, identity.ChainID(diffIDs).String()); err != nil {
+				if _, err := client.SnapshotService(c.Snapshotter).Prepare(ctx, rootfsID, identity.ChainID(diffIDs).String()); err != nil {
 					if !errdefs.IsAlreadyExists(err) {
 						return err
 					}
@@ -70,7 +70,7 @@ func WithCheckpoint(desc v1.Descriptor, rootfsID string) NewContainerOpts {
 		}
 		if rw != nil {
 			// apply the rw snapshot to the new rw layer
-			mounts, err := client.SnapshotService().Mounts(ctx, rootfsID)
+			mounts, err := client.SnapshotService(c.Snapshotter).Mounts(ctx, rootfsID)
 			if err != nil {
 				return err
 			}

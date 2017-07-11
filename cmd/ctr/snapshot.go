@@ -16,6 +16,7 @@ import (
 var snapshotCommand = cli.Command{
 	Name:  "snapshot",
 	Usage: "snapshot management",
+	Flags: snapshotterFlags,
 	Subcommands: cli.Commands{
 		archiveSnapshotCommand,
 		listSnapshotCommand,
@@ -75,12 +76,10 @@ var listSnapshotCommand = cli.Command{
 		ctx, cancel := appContext(clicontext)
 		defer cancel()
 
-		client, err := newClient(clicontext)
+		snapshotter, err := getSnapshotter(clicontext)
 		if err != nil {
 			return err
 		}
-
-		snapshotter := client.SnapshotService()
 
 		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
 		fmt.Fprintln(tw, "ID\tParent\tState\tReadonly\t")
@@ -121,11 +120,6 @@ var usageSnapshotCommand = cli.Command{
 		ctx, cancel := appContext(clicontext)
 		defer cancel()
 
-		client, err := newClient(clicontext)
-		if err != nil {
-			return err
-		}
-
 		var displaySize func(int64) string
 		if clicontext.Bool("b") {
 			displaySize = func(s int64) string {
@@ -137,7 +131,10 @@ var usageSnapshotCommand = cli.Command{
 			}
 		}
 
-		snapshotter := client.SnapshotService()
+		snapshotter, err := getSnapshotter(clicontext)
+		if err != nil {
+			return err
+		}
 
 		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
 		fmt.Fprintln(tw, "ID\tSize\tInodes\t")
@@ -176,12 +173,10 @@ var removeSnapshotCommand = cli.Command{
 		ctx, cancel := appContext(clicontext)
 		defer cancel()
 
-		client, err := newClient(clicontext)
+		snapshotter, err := getSnapshotter(clicontext)
 		if err != nil {
 			return err
 		}
-
-		snapshotter := client.SnapshotService()
 
 		for _, id := range clicontext.Args() {
 			err = snapshotter.Remove(ctx, id)

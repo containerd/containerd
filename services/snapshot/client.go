@@ -13,18 +13,24 @@ import (
 
 // NewSnapshotterFromClient returns a new Snapshotter which communicates
 // over a GRPC connection.
-func NewSnapshotterFromClient(client snapshotapi.SnapshotsClient) snapshot.Snapshotter {
+func NewSnapshotterFromClient(client snapshotapi.SnapshotsClient, snapshotterName string) snapshot.Snapshotter {
 	return &remoteSnapshotter{
-		client: client,
+		client:          client,
+		snapshotterName: snapshotterName,
 	}
 }
 
 type remoteSnapshotter struct {
-	client snapshotapi.SnapshotsClient
+	client          snapshotapi.SnapshotsClient
+	snapshotterName string
 }
 
 func (r *remoteSnapshotter) Stat(ctx context.Context, key string) (snapshot.Info, error) {
-	resp, err := r.client.Stat(ctx, &snapshotapi.StatSnapshotRequest{Key: key})
+	resp, err := r.client.Stat(ctx,
+		&snapshotapi.StatSnapshotRequest{
+			Snapshotter: r.snapshotterName,
+			Key:         key,
+		})
 	if err != nil {
 		return snapshot.Info{}, errdefs.FromGRPC(err)
 	}
@@ -32,7 +38,10 @@ func (r *remoteSnapshotter) Stat(ctx context.Context, key string) (snapshot.Info
 }
 
 func (r *remoteSnapshotter) Usage(ctx context.Context, key string) (snapshot.Usage, error) {
-	resp, err := r.client.Usage(ctx, &snapshotapi.UsageRequest{Key: key})
+	resp, err := r.client.Usage(ctx, &snapshotapi.UsageRequest{
+		Snapshotter: r.snapshotterName,
+		Key:         key,
+	})
 	if err != nil {
 		return snapshot.Usage{}, errdefs.FromGRPC(err)
 	}
@@ -40,7 +49,10 @@ func (r *remoteSnapshotter) Usage(ctx context.Context, key string) (snapshot.Usa
 }
 
 func (r *remoteSnapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
-	resp, err := r.client.Mounts(ctx, &snapshotapi.MountsRequest{Key: key})
+	resp, err := r.client.Mounts(ctx, &snapshotapi.MountsRequest{
+		Snapshotter: r.snapshotterName,
+		Key:         key,
+	})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
@@ -48,7 +60,11 @@ func (r *remoteSnapshotter) Mounts(ctx context.Context, key string) ([]mount.Mou
 }
 
 func (r *remoteSnapshotter) Prepare(ctx context.Context, key, parent string) ([]mount.Mount, error) {
-	resp, err := r.client.Prepare(ctx, &snapshotapi.PrepareSnapshotRequest{Key: key, Parent: parent})
+	resp, err := r.client.Prepare(ctx, &snapshotapi.PrepareSnapshotRequest{
+		Snapshotter: r.snapshotterName,
+		Key:         key,
+		Parent:      parent,
+	})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
@@ -56,7 +72,11 @@ func (r *remoteSnapshotter) Prepare(ctx context.Context, key, parent string) ([]
 }
 
 func (r *remoteSnapshotter) View(ctx context.Context, key, parent string) ([]mount.Mount, error) {
-	resp, err := r.client.View(ctx, &snapshotapi.ViewSnapshotRequest{Key: key, Parent: parent})
+	resp, err := r.client.View(ctx, &snapshotapi.ViewSnapshotRequest{
+		Snapshotter: r.snapshotterName,
+		Key:         key,
+		Parent:      parent,
+	})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
@@ -65,19 +85,25 @@ func (r *remoteSnapshotter) View(ctx context.Context, key, parent string) ([]mou
 
 func (r *remoteSnapshotter) Commit(ctx context.Context, name, key string) error {
 	_, err := r.client.Commit(ctx, &snapshotapi.CommitSnapshotRequest{
-		Name: name,
-		Key:  key,
+		Snapshotter: r.snapshotterName,
+		Name:        name,
+		Key:         key,
 	})
 	return errdefs.FromGRPC(err)
 }
 
 func (r *remoteSnapshotter) Remove(ctx context.Context, key string) error {
-	_, err := r.client.Remove(ctx, &snapshotapi.RemoveSnapshotRequest{Key: key})
+	_, err := r.client.Remove(ctx, &snapshotapi.RemoveSnapshotRequest{
+		Snapshotter: r.snapshotterName,
+		Key:         key,
+	})
 	return errdefs.FromGRPC(err)
 }
 
 func (r *remoteSnapshotter) Walk(ctx context.Context, fn func(context.Context, snapshot.Info) error) error {
-	sc, err := r.client.List(ctx, &snapshotapi.ListSnapshotsRequest{})
+	sc, err := r.client.List(ctx, &snapshotapi.ListSnapshotsRequest{
+		Snapshotter: r.snapshotterName,
+	})
 	if err != nil {
 		errdefs.FromGRPC(err)
 	}

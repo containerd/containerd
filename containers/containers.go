@@ -13,14 +13,15 @@ import (
 //
 // The resources specified in this object are used to create tasks from the container.
 type Container struct {
-	ID        string
-	Labels    map[string]string
-	Image     string
-	Runtime   RuntimeInfo
-	Spec      *types.Any
-	RootFS    string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID          string
+	Labels      map[string]string
+	Image       string
+	Runtime     RuntimeInfo
+	Spec        *types.Any
+	RootFS      string
+	Snapshotter string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type RuntimeInfo struct {

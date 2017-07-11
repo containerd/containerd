@@ -23,10 +23,11 @@ service Diff {
 }
 
 message ApplyRequest {
+	string snapshotter = 1;
 	// Diff is the descriptor of the diff to be extracted
-	containerd.types.Descriptor diff = 1;
+	containerd.types.Descriptor diff = 2;
 
-	repeated containerd.types.Mount mounts = 2;
+	repeated containerd.types.Mount mounts = 3;
 }
 
 message ApplyResponse {
@@ -37,17 +38,18 @@ message ApplyResponse {
 }
 
 message DiffRequest {
+	string snapshotter = 1;
 	// Left are the mounts which represent the older copy
 	// in which is the base of the computed changes.
-	repeated containerd.types.Mount left = 1;
+	repeated containerd.types.Mount left = 2;
 
 	// Right are the mounts which represents the newer copy
 	// in which changes from the left were made into.
-	repeated containerd.types.Mount right = 2;
+	repeated containerd.types.Mount right = 3;
 
 	// MediaType is the media type descriptor for the created diff
 	// object
-	string media_type = 3;
+	string media_type = 4;
 
 	// Ref identifies the pre-commit content store object. This
 	// reference can be used to get the status from the content store.

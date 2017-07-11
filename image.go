@@ -15,7 +15,7 @@ type Image interface {
 	Name() string
 	Target() ocispec.Descriptor
 
-	Unpack(context.Context) error
+	Unpack(context.Context, string) error
 }
 
 var _ = (Image)(&image{})
@@ -34,12 +34,12 @@ func (i *image) Target() ocispec.Descriptor {
 	return i.i.Target
 }
 
-func (i *image) Unpack(ctx context.Context) error {
+func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
 	layers, err := i.getLayers(ctx)
 	if err != nil {
 		return err
 	}
-	if _, err := rootfs.ApplyLayers(ctx, layers, i.client.SnapshotService(), i.client.DiffService()); err != nil {
+	if _, err := rootfs.ApplyLayers(ctx, layers, i.client.SnapshotService(snapshotterName), i.client.DiffService()); err != nil {
 		return err
 	}
 	return nil
