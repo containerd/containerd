@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd/progress"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/snapshot"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -21,6 +24,7 @@ var snapshotCommand = cli.Command{
 		listSnapshotCommand,
 		usageSnapshotCommand,
 		removeSnapshotCommand,
+		prepareSnapshotCommand,
 	},
 }
 
@@ -188,6 +192,46 @@ var removeSnapshotCommand = cli.Command{
 			if err != nil {
 				return errors.Wrapf(err, "failed to remove %q", id)
 			}
+		}
+
+		return nil
+	},
+}
+
+var prepareSnapshotCommand = cli.Command{
+	Name:      "prepare",
+	Usage:     "prepare gets mount commands for digest",
+	ArgsUsage: "[flags] <digest> <target>",
+	Flags:     []cli.Flag{},
+	Action: func(clicontext *cli.Context) error {
+		ctx, cancel := appContext(clicontext)
+		defer cancel()
+
+		if clicontext.NArg() != 2 {
+			return cli.ShowSubcommandHelp(clicontext)
+		}
+
+		dgst, err := digest.Parse(clicontext.Args().Get(0))
+		if err != nil {
+			return err
+		}
+		target := clicontext.Args().Get(1)
+
+		logrus.Infof("preparing mounts %s", dgst.String())
+
+		client, err := newClient(clicontext)
+		if err != nil {
+			return err
+		}
+
+		snapshotter := client.SnapshotService()
+		mounts, err := snapshotter.Prepare(ctx, target, dgst.String())
+		if err != nil {
+			return err
+		}
+
+		for _, m := range mounts {
+			fmt.Fprintf(os.Stdout, "mount -t %s %s %s -o %s\n", m.Type, m.Source, target, strings.Join(m.Options, ","))
 		}
 
 		return nil
