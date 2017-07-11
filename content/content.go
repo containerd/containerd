@@ -68,7 +68,7 @@ type IngestManager interface {
 	// ListStatuses returns the status of any active ingestions whose ref match the
 	// provided regular expression. If empty, all active ingestions will be
 	// returned.
-	ListStatuses(ctx context.Context, ref string) ([]Status, error)
+	ListStatuses(ctx context.Context, filters ...string) ([]Status, error)
 
 	// Abort completely cancels the ingest operation targeted by ref.
 	Abort(ctx context.Context, ref string) error

@@ -113,9 +113,9 @@ func (rs *remoteStore) Status(ctx context.Context, ref string) (content.Status, 
 	}, nil
 }
 
-func (rs *remoteStore) ListStatuses(ctx context.Context, filter string) ([]content.Status, error) {
+func (rs *remoteStore) ListStatuses(ctx context.Context, filters ...string) ([]content.Status, error) {
 	resp, err := rs.client.ListStatuses(ctx, &contentapi.ListStatusesRequest{
-		Filter: filter,
+		Filters: filters,
 	})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)

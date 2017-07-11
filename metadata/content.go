@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/binary"
 	"io"
-	"regexp"
 
 	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/namespaces"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -109,21 +109,18 @@ func (cs *contentStore) Delete(ctx context.Context, dgst digest.Digest) error {
 	})
 }
 
-func (cs *contentStore) ListStatuses(ctx context.Context, re string) ([]content.Status, error) {
+func (cs *contentStore) ListStatuses(ctx context.Context, fs ...string) ([]content.Status, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	var rec *regexp.Regexp
-	if re != "" {
-		rec, err = regexp.Compile(re)
-		if err != nil {
-			return nil, err
-		}
+	filter, err := filters.ParseAll(fs...)
+	if err != nil {
+		return nil, err
 	}
 
-	var brefs []string
+	brefs := map[string]string{}
 	if err := view(ctx, cs.db, func(tx *bolt.Tx) error {
 		bkt := getIngestBucket(tx, ns)
 		if bkt == nil {
@@ -131,9 +128,8 @@ func (cs *contentStore) ListStatuses(ctx context.Context, re string) ([]content.
 		}
 
 		return bkt.ForEach(func(k, v []byte) error {
-			if rec == nil || rec.Match(k) {
-				brefs = append(brefs, string(v))
-			}
+			// TODO(dmcgowan): match name and potentially labels here
+			brefs[string(k)] = string(v)
 			return nil
 		})
 	}); err != nil {
@@ -141,7 +137,7 @@ func (cs *contentStore) ListStatuses(ctx context.Context, re string) ([]content.
 	}
 
 	statuses := make([]content.Status, 0, len(brefs))
-	for _, bref := range brefs {
+	for k, bref := range brefs {
 		status, err := cs.Store.Status(ctx, bref)
 		if err != nil {
 			if errdefs.IsNotFound(err) {
@@ -149,9 +145,11 @@ func (cs *contentStore) ListStatuses(ctx context.Context, re string) ([]content.
 			}
 			return nil, err
 		}
-		status.Ref = trimKey(status.Ref)
+		status.Ref = k
 
-		statuses = append(statuses, status)
+		if filter.Match(adaptContentStatus(status)) {
+			statuses = append(statuses, status)
+		}
 	}
 
 	return statuses, nil

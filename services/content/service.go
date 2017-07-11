@@ -243,9 +243,9 @@ func (s *Service) Status(ctx context.Context, req *api.StatusRequest) (*api.Stat
 }
 
 func (s *Service) ListStatuses(ctx context.Context, req *api.ListStatusesRequest) (*api.ListStatusesResponse, error) {
-	statuses, err := s.store.ListStatuses(ctx, req.Filter)
+	statuses, err := s.store.ListStatuses(ctx, req.Filters...)
 	if err != nil {
-		return nil, errdefs.ToGRPCf(err, "could not get status for filter %q", req.Filter)
+		return nil, errdefs.ToGRPC(err)
 	}
 
 	var resp api.ListStatusesResponse
