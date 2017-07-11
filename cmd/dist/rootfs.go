@@ -24,7 +24,7 @@ var rootfsUnpackCommand = cli.Command{
 	Name:      "unpack",
 	Usage:     "unpack applies layers from a manifest to a snapshot",
 	ArgsUsage: "[flags] <digest>",
-	Flags:     []cli.Flag{},
+	Flags:     snapshotterFlags,
 	Action: func(clicontext *cli.Context) error {
 		ctx, cancel := appContext(clicontext)
 		defer cancel()
@@ -52,7 +52,7 @@ var rootfsUnpackCommand = cli.Command{
 		for _, image := range images {
 			if image.Target().Digest == dgst {
 				fmt.Printf("unpacking %s (%s)...", dgst, image.Target().MediaType)
-				if err := image.Unpack(ctx); err != nil {
+				if err := image.Unpack(ctx, clicontext.String("snapshotter")); err != nil {
 					fmt.Println()
 					return err
 				}
@@ -76,7 +76,7 @@ var rootfsPrepareCommand = cli.Command{
 	Name:      "prepare",
 	Usage:     "prepare gets mount commands for digest",
 	ArgsUsage: "[flags] <digest> <target>",
-	Flags:     []cli.Flag{},
+	Flags:     snapshotterFlags,
 	Action: func(clicontext *cli.Context) error {
 		ctx, cancel := appContext(clicontext)
 		defer cancel()
@@ -98,7 +98,7 @@ var rootfsPrepareCommand = cli.Command{
 			return err
 		}
 
-		snapshotter := client.SnapshotService()
+		snapshotter := client.SnapshotService(clicontext.String("snapshotter"))
 		mounts, err := snapshotter.Prepare(ctx, target, dgst.String())
 		if err != nil {
 			return err
