@@ -7,6 +7,13 @@ package events
 import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
+import _ "github.com/gogo/protobuf/gogoproto"
+import _ "github.com/gogo/protobuf/types"
+import containerd_types "github.com/containerd/containerd/api/types"
+
+import time "time"
+
+import github_com_gogo_protobuf_types "github.com/gogo/protobuf/types"
 
 import strings "strings"
 import reflect "reflect"
@@ -17,9 +24,15 @@ import io "io"
 var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
+var _ = time.Kitchen
 
 type TaskCreate struct {
-	ContainerID string `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
+	ContainerID string                    `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
+	Bundle      string                    `protobuf:"bytes,2,opt,name=bundle,proto3" json:"bundle,omitempty"`
+	Rootfs      []*containerd_types.Mount `protobuf:"bytes,3,rep,name=rootfs" json:"rootfs,omitempty"`
+	IO          *TaskIO                   `protobuf:"bytes,4,opt,name=io" json:"io,omitempty"`
+	Checkpoint  string                    `protobuf:"bytes,5,opt,name=checkpoint,proto3" json:"checkpoint,omitempty"`
+	Pid         uint32                    `protobuf:"varint,6,opt,name=pid,proto3" json:"pid,omitempty"`
 }
 
 func (m *TaskCreate) Reset()                    { *m = TaskCreate{} }
@@ -28,6 +41,7 @@ func (*TaskCreate) Descriptor() ([]byte, []int) { return fileDescriptorTask, []i
 
 type TaskStart struct {
 	ContainerID string `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
+	Pid         uint32 `protobuf:"varint,2,opt,name=pid,proto3" json:"pid,omitempty"`
 }
 
 func (m *TaskStart) Reset()                    { *m = TaskStart{} }
@@ -35,19 +49,93 @@ func (*TaskStart) ProtoMessage()               {}
 func (*TaskStart) Descriptor() ([]byte, []int) { return fileDescriptorTask, []int{1} }
 
 type TaskDelete struct {
-	ContainerID string `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
-	Pid         uint32 `protobuf:"varint,2,opt,name=pid,proto3" json:"pid,omitempty"`
-	ExitStatus  uint32 `protobuf:"varint,3,opt,name=exit_status,json=exitStatus,proto3" json:"exit_status,omitempty"`
+	ContainerID string    `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
+	Pid         uint32    `protobuf:"varint,2,opt,name=pid,proto3" json:"pid,omitempty"`
+	ExitStatus  uint32    `protobuf:"varint,3,opt,name=exit_status,json=exitStatus,proto3" json:"exit_status,omitempty"`
+	ExitedAt    time.Time `protobuf:"bytes,4,opt,name=exited_at,json=exitedAt,stdtime" json:"exited_at"`
 }
 
 func (m *TaskDelete) Reset()                    { *m = TaskDelete{} }
 func (*TaskDelete) ProtoMessage()               {}
 func (*TaskDelete) Descriptor() ([]byte, []int) { return fileDescriptorTask, []int{2} }
 
+type TaskIO struct {
+	Stdin    string `protobuf:"bytes,1,opt,name=stdin,proto3" json:"stdin,omitempty"`
+	Stdout   string `protobuf:"bytes,2,opt,name=stdout,proto3" json:"stdout,omitempty"`
+	Stderr   string `protobuf:"bytes,3,opt,name=stderr,proto3" json:"stderr,omitempty"`
+	Terminal bool   `protobuf:"varint,4,opt,name=terminal,proto3" json:"terminal,omitempty"`
+}
+
+func (m *TaskIO) Reset()                    { *m = TaskIO{} }
+func (*TaskIO) ProtoMessage()               {}
+func (*TaskIO) Descriptor() ([]byte, []int) { return fileDescriptorTask, []int{3} }
+
+type TaskExit struct {
+	ContainerID string    `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
+	ID          string    `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+	Pid         uint32    `protobuf:"varint,3,opt,name=pid,proto3" json:"pid,omitempty"`
+	ExitStatus  uint32    `protobuf:"varint,4,opt,name=exit_status,json=exitStatus,proto3" json:"exit_status,omitempty"`
+	ExitedAt    time.Time `protobuf:"bytes,5,opt,name=exited_at,json=exitedAt,stdtime" json:"exited_at"`
+}
+
+func (m *TaskExit) Reset()                    { *m = TaskExit{} }
+func (*TaskExit) ProtoMessage()               {}
+func (*TaskExit) Descriptor() ([]byte, []int) { return fileDescriptorTask, []int{4} }
+
+type TaskOOM struct {
+	ContainerID string `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
+}
+
+func (m *TaskOOM) Reset()                    { *m = TaskOOM{} }
+func (*TaskOOM) ProtoMessage()               {}
+func (*TaskOOM) Descriptor() ([]byte, []int) { return fileDescriptorTask, []int{5} }
+
+type TaskExecAdded struct {
+	ContainerID string `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
+	ExecID      string `protobuf:"bytes,2,opt,name=exec_id,json=execId,proto3" json:"exec_id,omitempty"`
+	Pid         uint32 `protobuf:"varint,3,opt,name=pid,proto3" json:"pid,omitempty"`
+}
+
+func (m *TaskExecAdded) Reset()                    { *m = TaskExecAdded{} }
+func (*TaskExecAdded) ProtoMessage()               {}
+func (*TaskExecAdded) Descriptor() ([]byte, []int) { return fileDescriptorTask, []int{6} }
+
+type TaskPaused struct {
+	ContainerID string `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
+}
+
+func (m *TaskPaused) Reset()                    { *m = TaskPaused{} }
+func (*TaskPaused) ProtoMessage()               {}
+func (*TaskPaused) Descriptor() ([]byte, []int) { return fileDescriptorTask, []int{7} }
+
+type TaskResumed struct {
+	ContainerID string `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
+}
+
+func (m *TaskResumed) Reset()                    { *m = TaskResumed{} }
+func (*TaskResumed) ProtoMessage()               {}
+func (*TaskResumed) Descriptor() ([]byte, []int) { return fileDescriptorTask, []int{8} }
+
+type TaskCheckpointed struct {
+	ContainerID string `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
+	Checkpoint  string `protobuf:"bytes,2,opt,name=checkpoint,proto3" json:"checkpoint,omitempty"`
+}
+
+func (m *TaskCheckpointed) Reset()                    { *m = TaskCheckpointed{} }
+func (*TaskCheckpointed) ProtoMessage()               {}
+func (*TaskCheckpointed) Descriptor() ([]byte, []int) { return fileDescriptorTask, []int{9} }
+
 func init() {
 	proto.RegisterType((*TaskCreate)(nil), "containerd.services.events.v1.TaskCreate")
 	proto.RegisterType((*TaskStart)(nil), "containerd.services.events.v1.TaskStart")
 	proto.RegisterType((*TaskDelete)(nil), "containerd.services.events.v1.TaskDelete")
+	proto.RegisterType((*TaskIO)(nil), "containerd.services.events.v1.TaskIO")
+	proto.RegisterType((*TaskExit)(nil), "containerd.services.events.v1.TaskExit")
+	proto.RegisterType((*TaskOOM)(nil), "containerd.services.events.v1.TaskOOM")
+	proto.RegisterType((*TaskExecAdded)(nil), "containerd.services.events.v1.TaskExecAdded")
+	proto.RegisterType((*TaskPaused)(nil), "containerd.services.events.v1.TaskPaused")
+	proto.RegisterType((*TaskResumed)(nil), "containerd.services.events.v1.TaskResumed")
+	proto.RegisterType((*TaskCheckpointed)(nil), "containerd.services.events.v1.TaskCheckpointed")
 }
 func (m *TaskCreate) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
@@ -69,6 +157,45 @@ func (m *TaskCreate) MarshalTo(dAtA []byte) (int, error) {
 		i++
 		i = encodeVarintTask(dAtA, i, uint64(len(m.ContainerID)))
 		i += copy(dAtA[i:], m.ContainerID)
+	}
+	if len(m.Bundle) > 0 {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintTask(dAtA, i, uint64(len(m.Bundle)))
+		i += copy(dAtA[i:], m.Bundle)
+	}
+	if len(m.Rootfs) > 0 {
+		for _, msg := range m.Rootfs {
+			dAtA[i] = 0x1a
+			i++
+			i = encodeVarintTask(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.IO != nil {
+		dAtA[i] = 0x22
+		i++
+		i = encodeVarintTask(dAtA, i, uint64(m.IO.Size()))
+		n1, err := m.IO.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n1
+	}
+	if len(m.Checkpoint) > 0 {
+		dAtA[i] = 0x2a
+		i++
+		i = encodeVarintTask(dAtA, i, uint64(len(m.Checkpoint)))
+		i += copy(dAtA[i:], m.Checkpoint)
+	}
+	if m.Pid != 0 {
+		dAtA[i] = 0x30
+		i++
+		i = encodeVarintTask(dAtA, i, uint64(m.Pid))
 	}
 	return i, nil
 }
@@ -93,6 +220,11 @@ func (m *TaskStart) MarshalTo(dAtA []byte) (int, error) {
 		i++
 		i = encodeVarintTask(dAtA, i, uint64(len(m.ContainerID)))
 		i += copy(dAtA[i:], m.ContainerID)
+	}
+	if m.Pid != 0 {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintTask(dAtA, i, uint64(m.Pid))
 	}
 	return i, nil
 }
@@ -127,6 +259,245 @@ func (m *TaskDelete) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x18
 		i++
 		i = encodeVarintTask(dAtA, i, uint64(m.ExitStatus))
+	}
+	dAtA[i] = 0x22
+	i++
+	i = encodeVarintTask(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.ExitedAt)))
+	n2, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.ExitedAt, dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n2
+	return i, nil
+}
+
+func (m *TaskIO) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *TaskIO) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Stdin) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintTask(dAtA, i, uint64(len(m.Stdin)))
+		i += copy(dAtA[i:], m.Stdin)
+	}
+	if len(m.Stdout) > 0 {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintTask(dAtA, i, uint64(len(m.Stdout)))
+		i += copy(dAtA[i:], m.Stdout)
+	}
+	if len(m.Stderr) > 0 {
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintTask(dAtA, i, uint64(len(m.Stderr)))
+		i += copy(dAtA[i:], m.Stderr)
+	}
+	if m.Terminal {
+		dAtA[i] = 0x20
+		i++
+		if m.Terminal {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i++
+	}
+	return i, nil
+}
+
+func (m *TaskExit) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *TaskExit) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.ContainerID) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintTask(dAtA, i, uint64(len(m.ContainerID)))
+		i += copy(dAtA[i:], m.ContainerID)
+	}
+	if len(m.ID) > 0 {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintTask(dAtA, i, uint64(len(m.ID)))
+		i += copy(dAtA[i:], m.ID)
+	}
+	if m.Pid != 0 {
+		dAtA[i] = 0x18
+		i++
+		i = encodeVarintTask(dAtA, i, uint64(m.Pid))
+	}
+	if m.ExitStatus != 0 {
+		dAtA[i] = 0x20
+		i++
+		i = encodeVarintTask(dAtA, i, uint64(m.ExitStatus))
+	}
+	dAtA[i] = 0x2a
+	i++
+	i = encodeVarintTask(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.ExitedAt)))
+	n3, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.ExitedAt, dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n3
+	return i, nil
+}
+
+func (m *TaskOOM) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *TaskOOM) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.ContainerID) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintTask(dAtA, i, uint64(len(m.ContainerID)))
+		i += copy(dAtA[i:], m.ContainerID)
+	}
+	return i, nil
+}
+
+func (m *TaskExecAdded) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *TaskExecAdded) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.ContainerID) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintTask(dAtA, i, uint64(len(m.ContainerID)))
+		i += copy(dAtA[i:], m.ContainerID)
+	}
+	if len(m.ExecID) > 0 {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintTask(dAtA, i, uint64(len(m.ExecID)))
+		i += copy(dAtA[i:], m.ExecID)
+	}
+	if m.Pid != 0 {
+		dAtA[i] = 0x18
+		i++
+		i = encodeVarintTask(dAtA, i, uint64(m.Pid))
+	}
+	return i, nil
+}
+
+func (m *TaskPaused) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *TaskPaused) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.ContainerID) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintTask(dAtA, i, uint64(len(m.ContainerID)))
+		i += copy(dAtA[i:], m.ContainerID)
+	}
+	return i, nil
+}
+
+func (m *TaskResumed) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *TaskResumed) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.ContainerID) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintTask(dAtA, i, uint64(len(m.ContainerID)))
+		i += copy(dAtA[i:], m.ContainerID)
+	}
+	return i, nil
+}
+
+func (m *TaskCheckpointed) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *TaskCheckpointed) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.ContainerID) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintTask(dAtA, i, uint64(len(m.ContainerID)))
+		i += copy(dAtA[i:], m.ContainerID)
+	}
+	if len(m.Checkpoint) > 0 {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintTask(dAtA, i, uint64(len(m.Checkpoint)))
+		i += copy(dAtA[i:], m.Checkpoint)
 	}
 	return i, nil
 }
@@ -165,6 +536,27 @@ func (m *TaskCreate) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovTask(uint64(l))
 	}
+	l = len(m.Bundle)
+	if l > 0 {
+		n += 1 + l + sovTask(uint64(l))
+	}
+	if len(m.Rootfs) > 0 {
+		for _, e := range m.Rootfs {
+			l = e.Size()
+			n += 1 + l + sovTask(uint64(l))
+		}
+	}
+	if m.IO != nil {
+		l = m.IO.Size()
+		n += 1 + l + sovTask(uint64(l))
+	}
+	l = len(m.Checkpoint)
+	if l > 0 {
+		n += 1 + l + sovTask(uint64(l))
+	}
+	if m.Pid != 0 {
+		n += 1 + sovTask(uint64(m.Pid))
+	}
 	return n
 }
 
@@ -174,6 +566,9 @@ func (m *TaskStart) Size() (n int) {
 	l = len(m.ContainerID)
 	if l > 0 {
 		n += 1 + l + sovTask(uint64(l))
+	}
+	if m.Pid != 0 {
+		n += 1 + sovTask(uint64(m.Pid))
 	}
 	return n
 }
@@ -190,6 +585,112 @@ func (m *TaskDelete) Size() (n int) {
 	}
 	if m.ExitStatus != 0 {
 		n += 1 + sovTask(uint64(m.ExitStatus))
+	}
+	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.ExitedAt)
+	n += 1 + l + sovTask(uint64(l))
+	return n
+}
+
+func (m *TaskIO) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Stdin)
+	if l > 0 {
+		n += 1 + l + sovTask(uint64(l))
+	}
+	l = len(m.Stdout)
+	if l > 0 {
+		n += 1 + l + sovTask(uint64(l))
+	}
+	l = len(m.Stderr)
+	if l > 0 {
+		n += 1 + l + sovTask(uint64(l))
+	}
+	if m.Terminal {
+		n += 2
+	}
+	return n
+}
+
+func (m *TaskExit) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.ContainerID)
+	if l > 0 {
+		n += 1 + l + sovTask(uint64(l))
+	}
+	l = len(m.ID)
+	if l > 0 {
+		n += 1 + l + sovTask(uint64(l))
+	}
+	if m.Pid != 0 {
+		n += 1 + sovTask(uint64(m.Pid))
+	}
+	if m.ExitStatus != 0 {
+		n += 1 + sovTask(uint64(m.ExitStatus))
+	}
+	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.ExitedAt)
+	n += 1 + l + sovTask(uint64(l))
+	return n
+}
+
+func (m *TaskOOM) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.ContainerID)
+	if l > 0 {
+		n += 1 + l + sovTask(uint64(l))
+	}
+	return n
+}
+
+func (m *TaskExecAdded) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.ContainerID)
+	if l > 0 {
+		n += 1 + l + sovTask(uint64(l))
+	}
+	l = len(m.ExecID)
+	if l > 0 {
+		n += 1 + l + sovTask(uint64(l))
+	}
+	if m.Pid != 0 {
+		n += 1 + sovTask(uint64(m.Pid))
+	}
+	return n
+}
+
+func (m *TaskPaused) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.ContainerID)
+	if l > 0 {
+		n += 1 + l + sovTask(uint64(l))
+	}
+	return n
+}
+
+func (m *TaskResumed) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.ContainerID)
+	if l > 0 {
+		n += 1 + l + sovTask(uint64(l))
+	}
+	return n
+}
+
+func (m *TaskCheckpointed) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.ContainerID)
+	if l > 0 {
+		n += 1 + l + sovTask(uint64(l))
+	}
+	l = len(m.Checkpoint)
+	if l > 0 {
+		n += 1 + l + sovTask(uint64(l))
 	}
 	return n
 }
@@ -213,6 +714,11 @@ func (this *TaskCreate) String() string {
 	}
 	s := strings.Join([]string{`&TaskCreate{`,
 		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
+		`Bundle:` + fmt.Sprintf("%v", this.Bundle) + `,`,
+		`Rootfs:` + strings.Replace(fmt.Sprintf("%v", this.Rootfs), "Mount", "containerd_types.Mount", 1) + `,`,
+		`IO:` + strings.Replace(fmt.Sprintf("%v", this.IO), "TaskIO", "TaskIO", 1) + `,`,
+		`Checkpoint:` + fmt.Sprintf("%v", this.Checkpoint) + `,`,
+		`Pid:` + fmt.Sprintf("%v", this.Pid) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -223,6 +729,7 @@ func (this *TaskStart) String() string {
 	}
 	s := strings.Join([]string{`&TaskStart{`,
 		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
+		`Pid:` + fmt.Sprintf("%v", this.Pid) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -235,6 +742,87 @@ func (this *TaskDelete) String() string {
 		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
 		`Pid:` + fmt.Sprintf("%v", this.Pid) + `,`,
 		`ExitStatus:` + fmt.Sprintf("%v", this.ExitStatus) + `,`,
+		`ExitedAt:` + strings.Replace(strings.Replace(this.ExitedAt.String(), "Timestamp", "google_protobuf3.Timestamp", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *TaskIO) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&TaskIO{`,
+		`Stdin:` + fmt.Sprintf("%v", this.Stdin) + `,`,
+		`Stdout:` + fmt.Sprintf("%v", this.Stdout) + `,`,
+		`Stderr:` + fmt.Sprintf("%v", this.Stderr) + `,`,
+		`Terminal:` + fmt.Sprintf("%v", this.Terminal) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *TaskExit) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&TaskExit{`,
+		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
+		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
+		`Pid:` + fmt.Sprintf("%v", this.Pid) + `,`,
+		`ExitStatus:` + fmt.Sprintf("%v", this.ExitStatus) + `,`,
+		`ExitedAt:` + strings.Replace(strings.Replace(this.ExitedAt.String(), "Timestamp", "google_protobuf3.Timestamp", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *TaskOOM) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&TaskOOM{`,
+		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *TaskExecAdded) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&TaskExecAdded{`,
+		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
+		`ExecID:` + fmt.Sprintf("%v", this.ExecID) + `,`,
+		`Pid:` + fmt.Sprintf("%v", this.Pid) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *TaskPaused) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&TaskPaused{`,
+		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *TaskResumed) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&TaskResumed{`,
+		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *TaskCheckpointed) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&TaskCheckpointed{`,
+		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
+		`Checkpoint:` + fmt.Sprintf("%v", this.Checkpoint) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -305,6 +893,147 @@ func (m *TaskCreate) Unmarshal(dAtA []byte) error {
 			}
 			m.ContainerID = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Bundle", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTask
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Bundle = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Rootfs", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthTask
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Rootfs = append(m.Rootfs, &containerd_types.Mount{})
+			if err := m.Rootfs[len(m.Rootfs)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field IO", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthTask
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.IO == nil {
+				m.IO = &TaskIO{}
+			}
+			if err := m.IO.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Checkpoint", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTask
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Checkpoint = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Pid", wireType)
+			}
+			m.Pid = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Pid |= (uint32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipTask(dAtA[iNdEx:])
@@ -384,6 +1113,25 @@ func (m *TaskStart) Unmarshal(dAtA []byte) error {
 			}
 			m.ContainerID = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Pid", wireType)
+			}
+			m.Pid = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Pid |= (uint32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipTask(dAtA[iNdEx:])
@@ -501,6 +1249,841 @@ func (m *TaskDelete) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExitedAt", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthTask
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := github_com_gogo_protobuf_types.StdTimeUnmarshal(&m.ExitedAt, dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTask(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthTask
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *TaskIO) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTask
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TaskIO: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TaskIO: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Stdin", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTask
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Stdin = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Stdout", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTask
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Stdout = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Stderr", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTask
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Stderr = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Terminal", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Terminal = bool(v != 0)
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTask(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthTask
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *TaskExit) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTask
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TaskExit: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TaskExit: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ContainerID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTask
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ContainerID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTask
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Pid", wireType)
+			}
+			m.Pid = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Pid |= (uint32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExitStatus", wireType)
+			}
+			m.ExitStatus = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ExitStatus |= (uint32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExitedAt", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthTask
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := github_com_gogo_protobuf_types.StdTimeUnmarshal(&m.ExitedAt, dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTask(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthTask
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *TaskOOM) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTask
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TaskOOM: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TaskOOM: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ContainerID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTask
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ContainerID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTask(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthTask
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *TaskExecAdded) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTask
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TaskExecAdded: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TaskExecAdded: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ContainerID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTask
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ContainerID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExecID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTask
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ExecID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Pid", wireType)
+			}
+			m.Pid = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Pid |= (uint32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTask(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthTask
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *TaskPaused) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTask
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TaskPaused: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TaskPaused: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ContainerID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTask
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ContainerID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTask(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthTask
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *TaskResumed) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTask
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TaskResumed: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TaskResumed: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ContainerID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTask
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ContainerID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTask(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthTask
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *TaskCheckpointed) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTask
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TaskCheckpointed: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TaskCheckpointed: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ContainerID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTask
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ContainerID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Checkpoint", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTask
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTask
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Checkpoint = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipTask(dAtA[iNdEx:])
@@ -632,21 +2215,43 @@ func init() {
 }
 
 var fileDescriptorTask = []byte{
-	// 245 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x72, 0x4a, 0xcf, 0x2c, 0xc9,
-	0x28, 0x4d, 0xd2, 0x4b, 0xce, 0xcf, 0xd5, 0x4f, 0xce, 0xcf, 0x2b, 0x49, 0xcc, 0xcc, 0x4b, 0x2d,
-	0x4a, 0x41, 0x66, 0x26, 0x16, 0x64, 0xea, 0x17, 0xa7, 0x16, 0x95, 0x65, 0x26, 0xa7, 0x16, 0xeb,
-	0xa7, 0x96, 0xa5, 0xe6, 0x95, 0x14, 0xeb, 0x97, 0x19, 0xea, 0x97, 0x24, 0x16, 0x67, 0xeb, 0x15,
-	0x14, 0xe5, 0x97, 0xe4, 0x0b, 0xc9, 0x22, 0x54, 0xeb, 0xc1, 0x54, 0xea, 0x41, 0x54, 0xea, 0x95,
-	0x19, 0x2a, 0x39, 0x70, 0x71, 0x85, 0x24, 0x16, 0x67, 0x3b, 0x17, 0xa5, 0x26, 0x96, 0xa4, 0x0a,
-	0x19, 0x71, 0xf1, 0xc0, 0x95, 0xc7, 0x67, 0xa6, 0x48, 0x30, 0x2a, 0x30, 0x6a, 0x70, 0x3a, 0xf1,
-	0x3f, 0xba, 0x27, 0xcf, 0xed, 0x0c, 0x13, 0xf7, 0x74, 0x09, 0xe2, 0x86, 0x2b, 0xf2, 0x4c, 0x51,
-	0xb2, 0xe7, 0xe2, 0x04, 0x99, 0x10, 0x5c, 0x92, 0x58, 0x54, 0x42, 0x96, 0x01, 0xc5, 0x10, 0x27,
-	0xb8, 0xa4, 0xe6, 0xa4, 0x92, 0xe7, 0x04, 0x21, 0x01, 0x2e, 0xe6, 0x82, 0xcc, 0x14, 0x09, 0x26,
-	0x05, 0x46, 0x0d, 0xde, 0x20, 0x10, 0x53, 0x48, 0x9e, 0x8b, 0x3b, 0xb5, 0x22, 0xb3, 0x24, 0xbe,
-	0xb8, 0x24, 0xb1, 0xa4, 0xb4, 0x58, 0x82, 0x19, 0x2c, 0xc3, 0x05, 0x12, 0x0a, 0x06, 0x8b, 0x38,
-	0x45, 0x9c, 0x78, 0x28, 0xc7, 0x70, 0xe3, 0xa1, 0x1c, 0x43, 0xc3, 0x23, 0x39, 0xc6, 0x13, 0x8f,
-	0xe4, 0x18, 0x2f, 0x3c, 0x92, 0x63, 0x7c, 0xf0, 0x48, 0x8e, 0x31, 0xca, 0x8e, 0xcc, 0x40, 0xb7,
-	0x86, 0xb0, 0x92, 0xd8, 0xc0, 0xe1, 0x6e, 0x0c, 0x08, 0x00, 0x00, 0xff, 0xff, 0xfe, 0x52, 0xb1,
-	0x6e, 0xbd, 0x01, 0x00, 0x00,
+	// 607 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x94, 0xcf, 0x6e, 0xd3, 0x40,
+	0x10, 0xc6, 0x6b, 0xa7, 0x75, 0x93, 0x09, 0x15, 0x95, 0x55, 0x41, 0x14, 0x09, 0x3b, 0x32, 0x42,
+	0xca, 0xc9, 0x56, 0x8b, 0xc4, 0x05, 0x15, 0x91, 0x34, 0x1c, 0x72, 0xa8, 0x02, 0x6e, 0x0f, 0x88,
+	0x4b, 0xe4, 0xd8, 0xd3, 0x74, 0x69, 0xe2, 0x8d, 0xbc, 0xe3, 0xa8, 0x70, 0xe2, 0x11, 0x78, 0x1a,
+	0x9e, 0xa1, 0x07, 0x0e, 0x1c, 0x39, 0x05, 0xea, 0xc7, 0xe0, 0x84, 0xd6, 0xeb, 0xa4, 0xe1, 0x5f,
+	0x85, 0x7c, 0xdb, 0x19, 0x7f, 0x3b, 0xfe, 0xe6, 0xe7, 0xf1, 0x40, 0x77, 0xcc, 0xe8, 0x3c, 0x1d,
+	0xb9, 0x21, 0x9f, 0x7a, 0x21, 0x8f, 0x29, 0x60, 0x31, 0x26, 0xd1, 0xfa, 0x31, 0x98, 0x31, 0x4f,
+	0x60, 0x32, 0x67, 0x21, 0x0a, 0x0f, 0xe7, 0x18, 0x93, 0xf0, 0xe6, 0xfb, 0x1e, 0x05, 0xe2, 0xc2,
+	0x9d, 0x25, 0x9c, 0xb8, 0xf9, 0xe0, 0x46, 0xed, 0x2e, 0x95, 0xae, 0x52, 0xba, 0xf3, 0xfd, 0xe6,
+	0xde, 0x98, 0x8f, 0x79, 0xae, 0xf4, 0xe4, 0x49, 0x5d, 0x6a, 0xda, 0x63, 0xce, 0xc7, 0x13, 0xf4,
+	0xf2, 0x68, 0x94, 0x9e, 0x79, 0xc4, 0xa6, 0x28, 0x28, 0x98, 0xce, 0x0a, 0xc1, 0x93, 0xff, 0x72,
+	0x46, 0xef, 0x66, 0x28, 0xbc, 0x29, 0x4f, 0x63, 0x52, 0xf7, 0x9c, 0x1f, 0x1a, 0xc0, 0x69, 0x20,
+	0x2e, 0x8e, 0x12, 0x0c, 0x08, 0xcd, 0x03, 0xb8, 0xb3, 0xba, 0x32, 0x64, 0x51, 0x43, 0x6b, 0x69,
+	0xed, 0x5a, 0xf7, 0x6e, 0xb6, 0xb0, 0xeb, 0x47, 0xcb, 0x7c, 0xbf, 0xe7, 0xd7, 0x57, 0xa2, 0x7e,
+	0x64, 0xde, 0x03, 0x63, 0x94, 0xc6, 0xd1, 0x04, 0x1b, 0xba, 0x54, 0xfb, 0x45, 0x64, 0x7a, 0x60,
+	0x24, 0x9c, 0xd3, 0x99, 0x68, 0x54, 0x5a, 0x95, 0x76, 0xfd, 0xe0, 0xbe, 0xbb, 0xd6, 0x79, 0xee,
+	0xc4, 0x3d, 0x96, 0x4e, 0xfc, 0x42, 0x66, 0x1e, 0x82, 0xce, 0x78, 0x63, 0xb3, 0xa5, 0xb5, 0xeb,
+	0x07, 0x8f, 0xdc, 0x5b, 0x31, 0xb9, 0xd2, 0x73, 0x7f, 0xd0, 0x35, 0xb2, 0x85, 0xad, 0xf7, 0x07,
+	0xbe, 0xce, 0xb8, 0x69, 0x01, 0x84, 0xe7, 0x18, 0x5e, 0xcc, 0x38, 0x8b, 0xa9, 0xb1, 0x95, 0x7b,
+	0x59, 0xcb, 0x98, 0xbb, 0x50, 0x99, 0xb1, 0xa8, 0x61, 0xb4, 0xb4, 0xf6, 0x8e, 0x2f, 0x8f, 0xce,
+	0x2b, 0xa8, 0xc9, 0x3a, 0x27, 0x14, 0x24, 0x54, 0xaa, 0xf5, 0xa2, 0xa4, 0x7e, 0x53, 0xf2, 0x53,
+	0xc1, 0xb3, 0x87, 0x13, 0x2c, 0xc9, 0xf3, 0x8f, 0xa2, 0xa6, 0x0d, 0x75, 0xbc, 0x64, 0x34, 0x14,
+	0x14, 0x50, 0x2a, 0x71, 0xca, 0x27, 0x20, 0x53, 0x27, 0x79, 0xc6, 0xec, 0x40, 0x4d, 0x46, 0x18,
+	0x0d, 0x03, 0x2a, 0x00, 0x36, 0x5d, 0x35, 0x32, 0xee, 0x72, 0x64, 0xdc, 0xd3, 0xe5, 0xc8, 0x74,
+	0xab, 0x57, 0x0b, 0x7b, 0xe3, 0xe3, 0x37, 0x5b, 0xf3, 0xab, 0xea, 0x5a, 0x87, 0x9c, 0xb7, 0x60,
+	0x28, 0xa6, 0xe6, 0x1e, 0x6c, 0x09, 0x8a, 0x58, 0xac, 0xcc, 0xfa, 0x2a, 0x90, 0x5f, 0x59, 0x50,
+	0xc4, 0x53, 0x5a, 0x7e, 0x65, 0x15, 0x15, 0x79, 0x4c, 0x92, 0xdc, 0x96, 0xca, 0x63, 0x92, 0x98,
+	0x4d, 0xa8, 0x12, 0x26, 0x53, 0x16, 0x07, 0x93, 0xdc, 0x51, 0xd5, 0x5f, 0xc5, 0xce, 0x67, 0x0d,
+	0xaa, 0xf2, 0x65, 0x2f, 0x2e, 0x19, 0x95, 0x1c, 0x39, 0xbd, 0x20, 0x54, 0x2b, 0x46, 0xa0, 0xe7,
+	0xeb, 0x6c, 0x85, 0xae, 0xf2, 0x4f, 0x74, 0x9b, 0xb7, 0xa3, 0xdb, 0x2a, 0x85, 0xee, 0x10, 0xb6,
+	0x65, 0x37, 0x83, 0xc1, 0x71, 0x99, 0x66, 0x9c, 0xf7, 0xb0, 0xa3, 0x60, 0x60, 0xd8, 0x89, 0x22,
+	0x8c, 0x4a, 0x11, 0x79, 0x08, 0xdb, 0x78, 0x89, 0xe1, 0x70, 0x85, 0x05, 0xb2, 0x85, 0x6d, 0xc8,
+	0x9a, 0xfd, 0x9e, 0x6f, 0xc8, 0x47, 0xfd, 0xbf, 0xe0, 0x71, 0x9e, 0xab, 0x69, 0x7d, 0x19, 0xa4,
+	0xa2, 0xdc, 0x8b, 0x9d, 0x0e, 0xd4, 0x65, 0x05, 0x1f, 0x45, 0x3a, 0x2d, 0x59, 0xe2, 0x0c, 0x76,
+	0xf3, 0x15, 0xb4, 0xfa, 0x55, 0x4b, 0x32, 0xf8, 0x75, 0x01, 0xe8, 0xbf, 0x2f, 0x80, 0xee, 0xeb,
+	0xab, 0x6b, 0x6b, 0xe3, 0xeb, 0xb5, 0xb5, 0xf1, 0x21, 0xb3, 0xb4, 0xab, 0xcc, 0xd2, 0xbe, 0x64,
+	0x96, 0xf6, 0x3d, 0xb3, 0xb4, 0x37, 0xcf, 0x4a, 0xee, 0xf5, 0xa7, 0xea, 0x34, 0x32, 0xf2, 0x49,
+	0x79, 0xfc, 0x33, 0x00, 0x00, 0xff, 0xff, 0xbd, 0xfa, 0x67, 0x90, 0x20, 0x06, 0x00, 0x00,
 }

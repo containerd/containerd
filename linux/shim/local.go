@@ -12,7 +12,6 @@ import (
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 )
 
 // NewLocal returns a shim client implementation for issue commands to a shim
@@ -54,13 +53,6 @@ func (c *local) ResizePty(ctx context.Context, in *shimapi.ResizePtyRequest, opt
 	return c.s.ResizePty(ctx, in)
 }
 
-func (c *local) Stream(ctx context.Context, in *shimapi.StreamEventsRequest, opts ...grpc.CallOption) (shimapi.Shim_StreamClient, error) {
-	return &streamEvents{
-		c:   c.s.events,
-		ctx: ctx,
-	}, nil
-}
-
 func (c *local) State(ctx context.Context, in *shimapi.StateRequest, opts ...grpc.CallOption) (*shimapi.StateResponse, error) {
 	return c.s.State(ctx, in)
 }
@@ -95,40 +87,6 @@ func (c *local) ShimInfo(ctx context.Context, in *google_protobuf.Empty, opts ..
 
 func (c *local) Update(ctx context.Context, in *shimapi.UpdateTaskRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
 	return c.s.Update(ctx, in)
-}
-
-type streamEvents struct {
-	c   chan *events.RuntimeEvent
-	ctx context.Context
-}
-
-func (e *streamEvents) Recv() (*events.RuntimeEvent, error) {
-	ev := <-e.c
-	return ev, nil
-}
-
-func (e *streamEvents) Header() (metadata.MD, error) {
-	return nil, nil
-}
-
-func (e *streamEvents) Trailer() metadata.MD {
-	return nil
-}
-
-func (e *streamEvents) CloseSend() error {
-	return nil
-}
-
-func (e *streamEvents) Context() context.Context {
-	return e.ctx
-}
-
-func (e *streamEvents) SendMsg(m interface{}) error {
-	return nil
-}
-
-func (e *streamEvents) RecvMsg(m interface{}) error {
-	return nil
 }
 
 type poster interface {

@@ -153,16 +153,13 @@ func (t *task) Wait(ctx context.Context) (uint32, error) {
 		if err != nil {
 			return UnknownExitStatus, err
 		}
-		if typeurl.Is(evt.Event, &eventsapi.RuntimeEvent{}) {
+		if typeurl.Is(evt.Event, &eventsapi.TaskExit{}) {
 			v, err := typeurl.UnmarshalAny(evt.Event)
 			if err != nil {
 				return UnknownExitStatus, err
 			}
-			e := v.(*eventsapi.RuntimeEvent)
-			if e.Type != eventsapi.RuntimeEvent_EXIT {
-				continue
-			}
-			if e.ID == t.id && e.Pid == t.pid {
+			e := v.(*eventsapi.TaskExit)
+			if e.ContainerID == t.id && e.Pid == t.pid {
 				return e.ExitStatus, nil
 			}
 		}

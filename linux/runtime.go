@@ -12,9 +12,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/boltdb/bolt"
-	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/events"
 	client "github.com/containerd/containerd/linux/shim"
 	shim "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
@@ -92,7 +90,6 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		runtime:   cfg.Runtime,
 		monitor:   monitor.(runtime.TaskMonitor),
 		tasks:     newTaskList(),
-		emitter:   events.GetPoster(ic.Context),
 		db:        m.(*bolt.DB),
 		address:   ic.Address,
 	}
@@ -118,7 +115,6 @@ type Runtime struct {
 
 	monitor runtime.TaskMonitor
 	tasks   *taskList
-	emitter events.Poster
 	db      *bolt.DB
 }
 
@@ -180,29 +176,6 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 	if err = r.monitor.Monitor(t); err != nil {
 		return nil, err
 	}
-
-	var runtimeMounts []*eventsapi.RuntimeMount
-	for _, m := range opts.Rootfs {
-		runtimeMounts = append(runtimeMounts, &eventsapi.RuntimeMount{
-			Type:    m.Type,
-			Source:  m.Source,
-			Options: m.Options,
-		})
-	}
-	if err := r.emit(ctx, "/runtime/create", &eventsapi.RuntimeCreate{
-		ContainerID: id,
-		Bundle:      bundle.path,
-		RootFS:      runtimeMounts,
-		IO: &eventsapi.RuntimeIO{
-			Stdin:    opts.IO.Stdin,
-			Stdout:   opts.IO.Stdout,
-			Stderr:   opts.IO.Stderr,
-			Terminal: opts.IO.Terminal,
-		},
-		Checkpoint: opts.Checkpoint,
-	}); err != nil {
-		return nil, err
-	}
 	return t, nil
 }
 
@@ -227,23 +200,15 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 	}
 	r.tasks.delete(ctx, lc)
 
-	var (
-		bundle = loadBundle(filepath.Join(r.root, namespace, lc.id), namespace)
-		i      = c.Info()
-	)
-	if err := r.emit(ctx, "/runtime/delete", &eventsapi.RuntimeDelete{
-		ContainerID: i.ID,
-		Runtime:     i.Runtime,
-		ExitStatus:  rsp.ExitStatus,
-		ExitedAt:    rsp.ExitedAt,
-	}); err != nil {
+	bundle := loadBundle(filepath.Join(r.root, namespace, lc.id), namespace)
+	if err := bundle.Delete(); err != nil {
 		return nil, err
 	}
 	return &runtime.Exit{
 		Status:    rsp.ExitStatus,
 		Timestamp: rsp.ExitedAt,
 		Pid:       rsp.Pid,
-	}, bundle.Delete()
+	}, nil
 }
 
 func (r *Runtime) Tasks(ctx context.Context) ([]runtime.Task, error) {
@@ -355,13 +320,4 @@ func (r *Runtime) getRuntime(ctx context.Context, ns, id string) (*runc.Runc, er
 		PdeathSignal: unix.SIGKILL,
 		Root:         filepath.Join(client.RuncRoot, ns),
 	}, nil
-}
-
-func (r *Runtime) emit(ctx context.Context, topic string, evt interface{}) error {
-	emitterCtx := events.WithTopic(ctx, topic)
-	if err := r.emitter.Post(emitterCtx, evt); err != nil {
-		return err
-	}
-
-	return nil
 }

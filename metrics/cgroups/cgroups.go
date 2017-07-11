@@ -3,8 +3,6 @@
 package cgroups
 
 import (
-	"time"
-
 	"github.com/containerd/cgroups"
 	events "github.com/containerd/containerd/api/services/events/v1"
 	evt "github.com/containerd/containerd/events"
@@ -71,10 +69,7 @@ func (m *cgroupsMonitor) Stop(c runtime.Task) error {
 }
 
 func (m *cgroupsMonitor) trigger(id string, cg cgroups.Cgroup) {
-	if err := m.emitter.Post(m.context, &events.RuntimeEvent{
-		Timestamp:   time.Now(),
-		Type:        events.RuntimeEvent_OOM,
-		ID:          id,
+	if err := m.emitter.Post(m.context, &events.TaskOOM{
 		ContainerID: id,
 	}); err != nil {
 		log.G(m.context).WithError(err).Error("post OOM event")

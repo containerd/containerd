@@ -62,7 +62,6 @@ var shimCommand = cli.Command{
 		shimCreateCommand,
 		shimStartCommand,
 		shimDeleteCommand,
-		shimEventsCommand,
 		shimStateCommand,
 		shimExecCommand,
 	},
@@ -290,28 +289,6 @@ var shimExecCommand = cli.Command{
 			wg.Wait()
 		}
 		return nil
-	},
-}
-
-var shimEventsCommand = cli.Command{
-	Name:  "events",
-	Usage: "get events for a shim",
-	Action: func(context *cli.Context) error {
-		service, err := getShimService(context)
-		if err != nil {
-			return err
-		}
-		events, err := service.Stream(gocontext.Background(), &shim.StreamEventsRequest{})
-		if err != nil {
-			return err
-		}
-		for {
-			e, err := events.Recv()
-			if err != nil {
-				return err
-			}
-			fmt.Printf("type=%s id=%s pid=%d status=%d\n", e.Type, e.ID, e.Pid, e.ExitStatus)
-		}
 	},
 }
 
