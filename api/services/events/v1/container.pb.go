@@ -23,6 +23,7 @@
 		StreamEventsRequest
 		PostEventRequest
 		Envelope
+		ImageCreate
 		ImageUpdate
 		ImageDelete
 		NamespaceCreate

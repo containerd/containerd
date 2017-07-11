@@ -44,6 +44,7 @@ var (
 	bucketKeyOptions   = []byte("options")
 	bucketKeySpec      = []byte("spec")
 	bucketKeyRootFS    = []byte("rootfs")
+	bucketKeyTarget    = []byte("target")
 	bucketKeyCreatedAt = []byte("createdat")
 	bucketKeyUpdatedAt = []byte("updatedat")
 )

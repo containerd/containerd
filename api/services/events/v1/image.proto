@@ -4,6 +4,11 @@ package containerd.services.images.v1;
 
 option go_package = "github.com/containerd/containerd/api/services/events/v1;events";
 
+message ImageCreate {
+	string name = 1;
+	map<string, string> labels = 2;
+}
+
 message ImageUpdate {
 	string name = 1;
 	map<string, string> labels = 2;

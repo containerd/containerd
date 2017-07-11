@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
+	"time"
 
 	"github.com/containerd/containerd/content"
 	digest "github.com/opencontainers/go-digest"
@@ -13,14 +14,21 @@ import (
 
 // Image provides the model for how containerd views container images.
 type Image struct {
-	Name   string
-	Target ocispec.Descriptor
+	Name                 string
+	Labels               map[string]string
+	Target               ocispec.Descriptor
+	CreatedAt, UpdatedAt time.Time
 }
 
 type Store interface {
-	Update(ctx context.Context, name string, desc ocispec.Descriptor) error
 	Get(ctx context.Context, name string) (Image, error)
-	List(ctx context.Context) ([]Image, error)
+	List(ctx context.Context, filters ...string) ([]Image, error)
+	Create(ctx context.Context, image Image) (Image, error)
+
+	// Update will replace the data in the store with the provided image. If
+	// one or more fieldpaths are provided, only those fields will be updated.
+	Update(ctx context.Context, image Image, fieldpaths ...string) (Image, error)
+
 	Delete(ctx context.Context, name string) error
 }
 

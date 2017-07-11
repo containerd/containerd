@@ -5,6 +5,7 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/pkg/errors"
 )
 
@@ -40,6 +41,28 @@ func Parse(s string) (Filter, error) {
 
 	p := parser{input: s}
 	return p.parse()
+}
+
+// ParseAll parses each filter in ss and returns a filter that will return true
+// if any filter matches the expression.
+//
+// If no fitlers are provided, the filter will match anything.
+func ParseAll(ss ...string) (Filter, error) {
+	if len(ss) == 0 {
+		return Always, nil
+	}
+
+	var fs []Filter
+	for _, s := range ss {
+		f, err := Parse(s)
+		if err != nil {
+			return nil, errors.Wrapf(errdefs.ErrInvalidArgument, err.Error())
+		}
+
+		fs = append(fs, f)
+	}
+
+	return Any(fs), nil
 }
 
 type parser struct {

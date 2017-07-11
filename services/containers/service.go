@@ -1,21 +1,19 @@
 package containers
 
 import (
-	"strings"
-
 	"github.com/boltdb/bolt"
 	api "github.com/containerd/containerd/api/services/containers/v1"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
-	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
 	"github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func init() {
@@ -68,18 +66,8 @@ func (s *Service) Get(ctx context.Context, req *api.GetContainerRequest) (*api.G
 func (s *Service) List(ctx context.Context, req *api.ListContainersRequest) (*api.ListContainersResponse, error) {
 	var resp api.ListContainersResponse
 
-	var fs []filters.Filter
-	for _, s := range req.Filters {
-		f, err := filters.Parse(s)
-		if err != nil {
-			return nil, grpc.Errorf(codes.InvalidArgument, err.Error())
-		}
-
-		fs = append(fs, f)
-	}
-
 	return &resp, errdefs.ToGRPC(s.withStoreView(ctx, func(ctx context.Context, store containers.Store) error {
-		containers, err := store.List(ctx, fs...)
+		containers, err := store.List(ctx, req.Filters...)
 		if err != nil {
 			return err
 		}
@@ -121,52 +109,20 @@ func (s *Service) Create(ctx context.Context, req *api.CreateContainerRequest) (
 }
 
 func (s *Service) Update(ctx context.Context, req *api.UpdateContainerRequest) (*api.UpdateContainerResponse, error) {
+	if req.Container.ID == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "Container.ID required")
+	}
 	var (
-		resp     api.UpdateContainerResponse
-		incoming = containerFromProto(&req.Container)
+		resp      api.UpdateContainerResponse
+		container = containerFromProto(&req.Container)
 	)
 
 	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store containers.Store) error {
-
-		container, err := store.Get(ctx, incoming.ID)
-		if err != nil {
-			return err
-		}
-
-		if container.ID != incoming.ID {
-			return grpc.Errorf(codes.InvalidArgument, "container ids must match: %v != %v", container.ID, incoming.ID)
-		}
-
-		// apply the field mask. If you update this code, you better follow the
-		// field mask rules in field_mask.proto. If you don't know what this
-		// is, do not update this code.
+		var fieldpaths []string
 		if req.UpdateMask != nil && len(req.UpdateMask.Paths) > 0 {
 			for _, path := range req.UpdateMask.Paths {
-				if strings.HasPrefix(path, "labels.") {
-					key := strings.TrimPrefix(path, "labels.")
-					container.Labels[key] = incoming.Labels[key]
-					continue
-				}
-
-				switch path {
-				case "labels":
-					container.Labels = incoming.Labels
-				case "image":
-					container.Image = incoming.Image
-				case "runtime":
-					// TODO(stevvooe): Should this actually be allowed?
-					container.Runtime = incoming.Runtime
-				case "spec":
-					container.Spec = incoming.Spec
-				case "rootfs":
-					container.RootFS = incoming.RootFS
-				default:
-					return grpc.Errorf(codes.InvalidArgument, "cannot update %q field", path)
-				}
+				fieldpaths = append(fieldpaths, path)
 			}
-		} else {
-			// no field mask present, just replace everything
-			container = incoming
 		}
 
 		updated, err := store.Update(ctx, container)
