@@ -35,6 +35,13 @@ import (
 	"google.golang.org/grpc"
 )
 
+var snapshotterFlags = []cli.Flag{
+	cli.StringFlag{
+		Name:  "snapshotter",
+		Usage: "Snapshotter name. Empty value stands for the daemon default value.",
+	},
+}
+
 var grpcConn *grpc.ClientConn
 
 // appContext returns the context for a command. Should only be called once per
@@ -111,7 +118,7 @@ func getSnapshotter(context *cli.Context) (snapshot.Snapshotter, error) {
 	if err != nil {
 		return nil, err
 	}
-	return snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotsClient(conn)), nil
+	return snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotsClient(conn), context.GlobalString("snapshotter")), nil
 }
 
 func getImageStore(clicontext *cli.Context) (images.Store, error) {

@@ -123,7 +123,7 @@ func (c *container) Spec() (*specs.Spec, error) {
 // WithRootFSDeletion deletes the rootfs allocated for the container
 func WithRootFSDeletion(ctx context.Context, client *Client, c containers.Container) error {
 	if c.RootFS != "" {
-		return client.SnapshotService().Remove(ctx, c.RootFS)
+		return client.SnapshotService(c.Snapshotter).Remove(ctx, c.RootFS)
 	}
 	return nil
 }
@@ -184,7 +184,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...Ne
 	}
 	if c.c.RootFS != "" {
 		// get the rootfs from the snapshotter and add it to the request
-		mounts, err := c.client.SnapshotService().Mounts(ctx, c.c.RootFS)
+		mounts, err := c.client.SnapshotService(c.c.Snapshotter).Mounts(ctx, c.c.RootFS)
 		if err != nil {
 			return nil, err
 		}

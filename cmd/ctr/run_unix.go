@@ -106,6 +106,7 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			containerd.WithSpec(spec),
 			containerd.WithImage(image),
 			containerd.WithContainerLabels(labels),
+			containerd.WithSnapshotter(context.String("snapshotter")),
 			rootfs,
 		)
 	}
