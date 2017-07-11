@@ -5,9 +5,11 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	digest "github.com/opencontainers/go-digest"
@@ -22,13 +24,18 @@ func init() {
 		ID:   "base-diff",
 		Requires: []plugin.PluginType{
 			plugin.ContentPlugin,
+			plugin.MetadataPlugin,
 		},
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
 			c, err := ic.Get(plugin.ContentPlugin)
 			if err != nil {
 				return nil, err
 			}
-			return NewBaseDiff(c.(content.Store))
+			md, err := ic.Get(plugin.MetadataPlugin)
+			if err != nil {
+				return nil, err
+			}
+			return NewBaseDiff(metadata.NewContentStore(md.(*bolt.DB), c.(content.Store)))
 		},
 	})
 }

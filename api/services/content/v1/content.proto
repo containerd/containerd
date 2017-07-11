@@ -32,13 +32,16 @@ service Content {
 	// The requested data may be returned in one or more messages.
 	rpc Read(ReadContentRequest) returns (stream ReadContentResponse);
 
-	// Status returns the status of ongoing object ingestions, started via
+	// Status returns the status for a single reference.
+	rpc Status(StatusRequest) returns (StatusResponse);
+
+	// ListStatuses returns the status of ongoing object ingestions, started via
 	// Write.
 	//
 	// Only those matching the regular expression will be provided in the
 	// response. If the provided regular expression is empty, all ingestions
 	// will be provided.
-	rpc Status(StatusRequest) returns (StatusResponse);
+	rpc ListStatuses(ListStatusesRequest) returns (ListStatusesResponse);
 
 	// Write begins or resumes writes to a resource identified by a unique ref.
 	// Only one active stream may exist at a time for each ref.
@@ -124,11 +127,20 @@ message Status {
 	string expected = 6 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
 }
 
+
 message StatusRequest {
-	string filter = 1;
+	string ref = 1;
 }
 
 message StatusResponse {
+	Status status = 1;
+}
+
+message ListStatusesRequest {
+	repeated string filters = 1;
+}
+
+message ListStatusesResponse {
 	repeated Status statuses = 1 [(gogoproto.nullable) = false];
 }
 

@@ -58,19 +58,19 @@ type Manager interface {
 
 	// Delete removes the content from the store.
 	Delete(ctx context.Context, dgst digest.Digest) error
+}
 
-	// Status returns the status of any active ingestions whose ref match the
+// IngestManager provides methods for managing ingests.
+type IngestManager interface {
+	// Status returns the status of the provided ref.
+	Status(ctx context.Context, ref string) (Status, error)
+
+	// ListStatuses returns the status of any active ingestions whose ref match the
 	// provided regular expression. If empty, all active ingestions will be
 	// returned.
-	//
-	// TODO(stevvooe): Status may be slighly out of place here. If this remains
-	// here, we should remove Manager and just define these on store.
-	Status(ctx context.Context, re string) ([]Status, error)
+	ListStatuses(ctx context.Context, filters ...string) ([]Status, error)
 
 	// Abort completely cancels the ingest operation targeted by ref.
-	//
-	// TODO(stevvooe): Same consideration as above. This should really be
-	// restricted to an ingest management interface.
 	Abort(ctx context.Context, ref string) error
 }
 
@@ -86,6 +86,7 @@ type Writer interface {
 // are commonly provided by complete implementations.
 type Store interface {
 	Manager
-	Ingester
 	Provider
+	IngestManager
+	Ingester
 }

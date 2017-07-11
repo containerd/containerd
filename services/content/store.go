@@ -94,9 +94,28 @@ func (rs *remoteStore) ReaderAt(ctx context.Context, dgst digest.Digest) (io.Rea
 	}, nil
 }
 
-func (rs *remoteStore) Status(ctx context.Context, filter string) ([]content.Status, error) {
+func (rs *remoteStore) Status(ctx context.Context, ref string) (content.Status, error) {
 	resp, err := rs.client.Status(ctx, &contentapi.StatusRequest{
-		Filter: filter,
+		Ref: ref,
+	})
+	if err != nil {
+		return content.Status{}, errdefs.FromGRPC(err)
+	}
+
+	status := resp.Status
+	return content.Status{
+		Ref:       status.Ref,
+		StartedAt: status.StartedAt,
+		UpdatedAt: status.UpdatedAt,
+		Offset:    status.Offset,
+		Total:     status.Total,
+		Expected:  status.Expected,
+	}, nil
+}
+
+func (rs *remoteStore) ListStatuses(ctx context.Context, filters ...string) ([]content.Status, error) {
+	resp, err := rs.client.ListStatuses(ctx, &contentapi.ListStatusesRequest{
+		Filters: filters,
 	})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)

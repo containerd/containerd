@@ -7,11 +7,11 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -136,7 +136,11 @@ func (cs *store) Walk(ctx context.Context, fn WalkFunc) error {
 	})
 }
 
-func (s *store) Status(ctx context.Context, re string) ([]Status, error) {
+func (s *store) Status(ctx context.Context, ref string) (Status, error) {
+	return s.status(s.ingestRoot(ref))
+}
+
+func (s *store) ListStatuses(ctx context.Context, fs ...string) ([]Status, error) {
 	fp, err := os.Open(filepath.Join(s.root, "ingest"))
 	if err != nil {
 		return nil, err
@@ -149,7 +153,7 @@ func (s *store) Status(ctx context.Context, re string) ([]Status, error) {
 		return nil, err
 	}
 
-	rec, err := regexp.Compile(re)
+	filter, err := filters.ParseAll(fs...)
 	if err != nil {
 		return nil, err
 	}
@@ -174,11 +178,9 @@ func (s *store) Status(ctx context.Context, re string) ([]Status, error) {
 			continue
 		}
 
-		if !rec.MatchString(stat.Ref) {
-			continue
+		if filter.Match(adaptStatus(stat)) {
+			active = append(active, stat)
 		}
-
-		active = append(active, stat)
 	}
 
 	return active, nil
@@ -204,6 +206,20 @@ func (s *store) status(ingestPath string) (Status, error) {
 		UpdatedAt: fi.ModTime(),
 		StartedAt: getStartTime(fi),
 	}, nil
+}
+
+func adaptStatus(status Status) filters.Adaptor {
+	return filters.AdapterFunc(func(fieldpath []string) (string, bool) {
+		if len(fieldpath) == 0 {
+			return "", false
+		}
+		switch fieldpath[0] {
+		case "ref":
+			return status.Ref, true
+		}
+
+		return "", false
+	})
 }
 
 // total attempts to resolve the total expected size for the write.

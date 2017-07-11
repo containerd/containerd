@@ -40,7 +40,7 @@ var activeCommand = cli.Command{
 			return err
 		}
 
-		active, err := cs.Status(ctx, match)
+		active, err := cs.ListStatuses(ctx, match)
 		if err != nil {
 			return err
 		}

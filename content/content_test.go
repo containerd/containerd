@@ -52,7 +52,7 @@ func TestContentWriter(t *testing.T) {
 	}
 
 	// we should also see this as an active ingestion
-	ingestions, err := cs.Status(ctx, "")
+	ingestions, err := cs.ListStatuses(ctx, "")
 	if err != nil {
 		t.Fatal(err)
 	}
