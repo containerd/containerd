@@ -196,7 +196,7 @@ type ImagesClient interface {
 	Get(ctx context.Context, in *GetImageRequest, opts ...grpc.CallOption) (*GetImageResponse, error)
 	// List returns a list of all images known to containerd.
 	List(ctx context.Context, in *ListImagesRequest, opts ...grpc.CallOption) (*ListImagesResponse, error)
-	// Create an image reocrd in the metadata store.
+	// Create an image record in the metadata store.
 	//
 	// The name of the image must be unique.
 	Create(ctx context.Context, in *CreateImageRequest, opts ...grpc.CallOption) (*CreateImageResponse, error)
@@ -267,7 +267,7 @@ type ImagesServer interface {
 	Get(context.Context, *GetImageRequest) (*GetImageResponse, error)
 	// List returns a list of all images known to containerd.
 	List(context.Context, *ListImagesRequest) (*ListImagesResponse, error)
-	// Create an image reocrd in the metadata store.
+	// Create an image record in the metadata store.
 	//
 	// The name of the image must be unique.
 	Create(context.Context, *CreateImageRequest) (*CreateImageResponse, error)
