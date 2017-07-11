@@ -136,6 +136,7 @@ func (s *imageStore) Update(ctx context.Context, image images.Image, fieldpaths 
 		if err := readImage(&updated, ibkt); err != nil {
 			return errors.Wrapf(err, "image %q", image.Name)
 		}
+		createdat := updated.CreatedAt
 		updated.Name = image.Name
 
 		if len(fieldpaths) > 0 {
@@ -168,7 +169,7 @@ func (s *imageStore) Update(ctx context.Context, image images.Image, fieldpaths 
 			updated = image
 		}
 
-		// TODO(stevvooe): Should only mark as updated if we have actual changes.
+		updated.CreatedAt = createdat
 		updated.UpdatedAt = time.Now().UTC()
 		return writeImage(ibkt, &updated)
 	})
