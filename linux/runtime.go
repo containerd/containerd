@@ -14,7 +14,6 @@ import (
 	"github.com/boltdb/bolt"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/events"
 	client "github.com/containerd/containerd/linux/shim"
 	shim "github.com/containerd/containerd/linux/shim/v1"
@@ -336,11 +335,10 @@ func (r *Runtime) terminate(ctx context.Context, bundle *bundle, ns, id string) 
 }
 
 func (r *Runtime) getRuntime(ctx context.Context, ns, id string) (*runc.Runc, error) {
-	var c containers.Container
 	if err := r.db.View(func(tx *bolt.Tx) error {
 		store := metadata.NewContainerStore(tx)
 		var err error
-		c, err = store.Get(ctx, id)
+		_, err = store.Get(ctx, id)
 		return err
 	}); err != nil {
 		return nil, err
