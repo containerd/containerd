@@ -1,9 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 	"text/tabwriter"
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
@@ -33,7 +33,11 @@ var eventsCommand = cli.Command{
 				return err
 			}
 
-			out, err := getEventOutput(e)
+			v, err := typeurl.UnmarshalAny(e.Event)
+			if err != nil {
+				return err
+			}
+			out, err := json.Marshal(v)
 			if err != nil {
 				return err
 			}
@@ -53,55 +57,4 @@ var eventsCommand = cli.Command{
 			}
 		}
 	},
-}
-
-func getEventOutput(env *eventsapi.Envelope) (string, error) {
-	out := ""
-	v, err := typeurl.UnmarshalAny(env.Event)
-	if err != nil {
-		return "", err
-	}
-	switch e := v.(type) {
-	case *eventsapi.ContainerCreate:
-		out = fmt.Sprintf("id=%s image=%s runtime=%s", e.ID, e.Image, e.Runtime)
-	case *eventsapi.TaskCreate:
-		out = "id=" + e.ContainerID
-	case *eventsapi.TaskStart:
-		out = "id=" + e.ContainerID
-	case *eventsapi.TaskDelete:
-		out = fmt.Sprintf("id=%s pid=%d status=%d", e.ContainerID, e.Pid, e.ExitStatus)
-	case *eventsapi.ContainerUpdate:
-		out = "id=" + e.ID
-	case *eventsapi.ContainerDelete:
-		out = "id=" + e.ID
-	case *eventsapi.SnapshotPrepare:
-		out = fmt.Sprintf("key=%s parent=%s", e.Key, e.Parent)
-	case *eventsapi.SnapshotCommit:
-		out = fmt.Sprintf("key=%s name=%s", e.Key, e.Name)
-	case *eventsapi.SnapshotRemove:
-		out = "key=" + e.Key
-	case *eventsapi.ImageUpdate:
-		out = fmt.Sprintf("name=%s labels=%s", e.Name, e.Labels)
-	case *eventsapi.ImageDelete:
-		out = "name=" + e.Name
-	case *eventsapi.NamespaceCreate:
-		out = fmt.Sprintf("name=%s labels=%s", e.Name, e.Labels)
-	case *eventsapi.NamespaceUpdate:
-		out = fmt.Sprintf("name=%s labels=%s", e.Name, e.Labels)
-	case *eventsapi.NamespaceDelete:
-		out = "name=" + e.Name
-	case *eventsapi.RuntimeCreate:
-		mounts := []string{}
-		for _, m := range e.RootFS {
-			mounts = append(mounts, fmt.Sprintf("type=%s:src=%s", m.Type, m.Source))
-		}
-		out = fmt.Sprintf("id=%s bundle=%s rootfs=%s checkpoint=%s", e.ContainerID, e.Bundle, strings.Join(mounts, ","), e.Checkpoint)
-	case *eventsapi.RuntimeEvent:
-		out = fmt.Sprintf("id=%s container_id=%s type=%s pid=%d status=%d exited=%s", e.ID, e.ContainerID, e.Type, e.Pid, e.ExitStatus, e.ExitedAt)
-	case *eventsapi.RuntimeDelete:
-		out = fmt.Sprintf("id=%s runtime=%s status=%d exited=%s", e.ContainerID, e.Runtime, e.ExitStatus, e.ExitedAt)
-	default:
-		out = env.Event.TypeUrl
-	}
-	return out, nil
 }

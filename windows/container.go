@@ -7,9 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
-	"time"
 
-	events "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/windows/hcs"
@@ -21,9 +19,7 @@ import (
 
 var ErrLoadedContainer = errors.New("loaded container can only be terminated")
 
-type eventCallback func(id string, evType events.RuntimeEvent_EventType, pid, exitStatus uint32, exitedAt time.Time)
-
-func loadContainers(ctx context.Context, h *hcs.HCS, sendEvent eventCallback) ([]*container, error) {
+func loadContainers(ctx context.Context, h *hcs.HCS) ([]*container, error) {
 	hCtr, err := h.LoadContainers(ctx)
 	if err != nil {
 		return nil, err
@@ -32,16 +28,15 @@ func loadContainers(ctx context.Context, h *hcs.HCS, sendEvent eventCallback) ([
 	containers := make([]*container, 0)
 	for _, c := range hCtr {
 		containers = append(containers, &container{
-			ctr:       c,
-			status:    runtime.RunningStatus,
-			sendEvent: sendEvent,
+			ctr:    c,
+			status: runtime.RunningStatus,
 		})
 	}
 
 	return containers, nil
 }
 
-func newContainer(ctx context.Context, h *hcs.HCS, id string, spec *RuntimeSpec, io runtime.IO, sendEvent eventCallback) (*container, error) {
+func newContainer(ctx context.Context, h *hcs.HCS, id string, spec *RuntimeSpec, io runtime.IO) (*container, error) {
 	cio, err := hcs.NewIO(io.Stdin, io.Stdout, io.Stderr, io.Terminal)
 	if err != nil {
 		return nil, err
@@ -51,21 +46,19 @@ func newContainer(ctx context.Context, h *hcs.HCS, id string, spec *RuntimeSpec,
 	if err != nil {
 		return nil, err
 	}
-	sendEvent(id, events.RuntimeEvent_CREATE, hcsCtr.Pid(), 0, time.Time{})
+	//sendEvent(id, events.RuntimeEvent_CREATE, hcsCtr.Pid(), 0, time.Time{})
 
 	return &container{
-		ctr:       hcsCtr,
-		status:    runtime.CreatedStatus,
-		sendEvent: sendEvent,
+		ctr:    hcsCtr,
+		status: runtime.CreatedStatus,
 	}, nil
 }
 
 type container struct {
 	sync.Mutex
 
-	ctr       *hcs.Container
-	status    runtime.Status
-	sendEvent eventCallback
+	ctr    *hcs.Container
+	status runtime.Status
 }
 
 func (c *container) ID() string {
@@ -90,16 +83,16 @@ func (c *container) Start(ctx context.Context) error {
 	}
 
 	c.setStatus(runtime.RunningStatus)
-	c.sendEvent(c.ctr.ID(), events.RuntimeEvent_START, c.ctr.Pid(), 0, time.Time{})
+	//	c.sendEvent(c.ctr.ID(), events.RuntimeEvent_START, c.ctr.Pid(), 0, time.Time{})
 
 	// Wait for our process to terminate
 	go func() {
-		ec, err := c.ctr.ExitCode()
+		_, err := c.ctr.ExitCode()
 		if err != nil {
 			log.G(ctx).Debug(err)
 		}
 		c.setStatus(runtime.StoppedStatus)
-		c.sendEvent(c.ctr.ID(), events.RuntimeEvent_EXIT, c.ctr.Pid(), ec, c.ctr.Processes()[0].ExitedAt())
+		//		c.sendEvent(c.ctr.ID(), events.RuntimeEvent_EXIT, c.ctr.Pid(), ec, c.ctr.Processes()[0].ExitedAt())
 	}()
 
 	return nil
@@ -163,11 +156,11 @@ func (c *container) Exec(ctx context.Context, id string, opts runtime.ExecOpts) 
 	}
 
 	go func() {
-		ec, err := p.ExitCode()
+		_, err := p.ExitCode()
 		if err != nil {
 			log.G(ctx).Debug(err)
 		}
-		c.sendEvent(c.ctr.ID(), events.RuntimeEvent_EXEC_ADDED, p.Pid(), ec, p.ExitedAt())
+		//c.sendEvent(c.ctr.ID(), events.RuntimeEvent_EXEC_ADDED, p.Pid(), ec, p.ExitedAt())
 	}()
 
 	return &process{p}, nil

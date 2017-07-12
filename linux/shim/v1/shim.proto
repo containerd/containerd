@@ -8,7 +8,6 @@ import "gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
 import "github.com/containerd/containerd/api/types/mount.proto";
 import "github.com/containerd/containerd/api/types/task/task.proto";
-import "github.com/containerd/containerd/api/services/events/v1/runtime.proto";
 
 option go_package = "github.com/containerd/containerd/linux/shim/v1;shim";
 
@@ -35,8 +34,6 @@ service Shim {
 	rpc Resume(google.protobuf.Empty) returns (google.protobuf.Empty);
 
 	rpc Checkpoint(CheckpointTaskRequest) returns (google.protobuf.Empty);
-
-	rpc Stream(StreamEventsRequest) returns (stream containerd.services.events.v1.RuntimeEvent);
 
 	rpc Kill(KillRequest) returns (google.protobuf.Empty);
 
@@ -140,9 +137,6 @@ message CheckpointTaskRequest {
 
 message ShimInfoResponse {
 	uint32 shim_pid = 1;
-}
-
-message StreamEventsRequest {
 }
 
 message UpdateTaskRequest {

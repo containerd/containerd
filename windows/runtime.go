@@ -8,9 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 
-	events "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
@@ -47,7 +45,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	r := &Runtime{
 		pidPool:       pid.NewPool(),
 		containers:    make(map[string]*container),
-		events:        make(chan *events.RuntimeEvent, 2048),
+		events:        make(chan interface{}, 2048),
 		eventsContext: c,
 		eventsCancel:  cancel,
 		rootDir:       rootDir,
@@ -56,14 +54,14 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 
 	// Terminate all previous container that we may have started. We don't
 	// support restoring containers
-	ctrs, err := loadContainers(ic.Context, r.hcs, r.sendEvent)
+	ctrs, err := loadContainers(ic.Context, r.hcs)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, c := range ctrs {
 		c.ctr.Delete(ic.Context)
-		r.sendEvent(c.ctr.ID(), events.RuntimeEvent_EXIT, c.ctr.Pid(), 255, time.Time{})
+		//r.sendEvent(c.ctr.ID(), events.RuntimeEvent_EXIT, c.ctr.Pid(), 255, time.Time{})
 	}
 
 	// Try to delete the old state dir and recreate it
@@ -90,7 +88,7 @@ type Runtime struct {
 
 	containers map[string]*container
 
-	events        chan *events.RuntimeEvent
+	events        chan interface{}
 	eventsContext context.Context
 	eventsCancel  func()
 }
@@ -113,7 +111,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 		return nil, err
 	}
 	rtSpec := v.(*RuntimeSpec)
-	ctr, err := newContainer(ctx, r.hcs, id, rtSpec, opts.IO, r.sendEvent)
+	ctr, err := newContainer(ctx, r.hcs, id, rtSpec, opts.IO)
 	if err != nil {
 		return nil, err
 	}
@@ -170,15 +168,4 @@ func (r *Runtime) Get(ctx context.Context, id string) (runtime.Task, error) {
 		return nil, fmt.Errorf("container %s does not exit", id)
 	}
 	return c, nil
-}
-
-func (r *Runtime) sendEvent(id string, evType events.RuntimeEvent_EventType, pid, exitStatus uint32, exitedAt time.Time) {
-	r.events <- &events.RuntimeEvent{
-		Timestamp:  time.Now(),
-		Type:       evType,
-		Pid:        pid,
-		ID:         id,
-		ExitStatus: exitStatus,
-		ExitedAt:   exitedAt,
-	}
 }
