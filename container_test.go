@@ -796,3 +796,104 @@ func TestContainerUpdate(t *testing.T) {
 
 	<-statusC
 }
+
+func TestContainerNoBinaryExists(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err := client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	spec, err := GenerateSpec(WithImageConfig(ctx, image), WithProcessArgs("nothing"))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewRootFS(id, image))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithRootFSDeletion)
+
+	if _, err := container.NewTask(ctx, Stdio); err == nil {
+		t.Error("NewTask should return an error when binary does not exist")
+	}
+}
+
+func TestContainerExecNoBinaryExists(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err := client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	spec, err := GenerateSpec(WithImageConfig(ctx, image), WithProcessArgs("sleep", "100"))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewRootFS(id, image))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithRootFSDeletion)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	finished := make(chan struct{}, 1)
+	go func() {
+		if _, err := task.Wait(ctx); err != nil {
+			t.Error(err)
+		}
+		close(finished)
+	}()
+
+	// start an exec process without running the original container process info
+	processSpec := spec.Process
+	processSpec.Args = []string{
+		"none",
+	}
+	execID := t.Name() + "_exec"
+	process, err := task.Exec(ctx, execID, processSpec, empty())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer process.Delete(ctx)
+	if err := process.Start(ctx); err == nil {
+		t.Error("Process.Start should fail when process does not exist")
+	}
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Error(err)
+	}
+	<-finished
+}

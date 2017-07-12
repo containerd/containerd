@@ -45,6 +45,7 @@ func (p *process) Start(ctx context.Context) error {
 	}
 	response, err := p.task.client.TaskService().Exec(ctx, request)
 	if err != nil {
+		p.io.Close()
 		return err
 	}
 	p.pid = response.Pid
@@ -114,7 +115,10 @@ func (p *process) Resize(ctx context.Context, w, h uint32) error {
 }
 
 func (p *process) Delete(ctx context.Context) (uint32, error) {
-	cerr := p.io.Close()
+	if p.io != nil {
+		p.io.Wait()
+		p.io.Close()
+	}
 	r, err := p.task.client.TaskService().DeleteProcess(ctx, &tasks.DeleteProcessRequest{
 		ContainerID: p.task.id,
 		ExecID:      p.id,
@@ -122,5 +126,5 @@ func (p *process) Delete(ctx context.Context) (uint32, error) {
 	if err != nil {
 		return UnknownExitStatus, err
 	}
-	return r.ExitStatus, cerr
+	return r.ExitStatus, nil
 }

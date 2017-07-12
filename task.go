@@ -93,6 +93,7 @@ func (t *task) Start(ctx context.Context) error {
 		response, err := t.client.TaskService().Create(ctx, t.deferred)
 		t.deferred = nil
 		if err != nil {
+			t.io.closer.Close()
 			return err
 		}
 		t.pid = response.Pid
@@ -101,6 +102,9 @@ func (t *task) Start(ctx context.Context) error {
 	_, err := t.client.TaskService().Start(ctx, &tasks.StartTaskRequest{
 		ContainerID: t.id,
 	})
+	if err != nil {
+		t.io.closer.Close()
+	}
 	return err
 }
 
@@ -173,9 +177,9 @@ func (t *task) Wait(ctx context.Context) (uint32, error) {
 // it returns the exit status of the task and any errors that were encountered
 // during cleanup
 func (t *task) Delete(ctx context.Context) (uint32, error) {
-	var cerr error
 	if t.io != nil {
-		cerr = t.io.Close()
+		t.io.Wait()
+		t.io.Close()
 	}
 	r, err := t.client.TaskService().Delete(ctx, &tasks.DeleteTaskRequest{
 		ContainerID: t.id,
@@ -183,7 +187,7 @@ func (t *task) Delete(ctx context.Context) (uint32, error) {
 	if err != nil {
 		return UnknownExitStatus, err
 	}
-	return r.ExitStatus, cerr
+	return r.ExitStatus, nil
 }
 
 func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreate IOCreation) (Process, error) {
