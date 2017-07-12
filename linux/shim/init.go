@@ -72,6 +72,11 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 	// what was actually done rather than what should have been
 	// done.
 	nrRootMounts := 0
+	cleanupMounts := func() {
+		if err2 := mount.UnmountN(rootfs, 0, nrRootMounts); err2 != nil {
+			log.G(context).WithError(err2).Warn("Failed to cleanup rootfs mount")
+		}
+	}
 	for _, rm := range r.Rootfs {
 		m := &mount.Mount{
 			Type:    rm.Type,
@@ -79,14 +84,10 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 			Options: rm.Options,
 		}
 		if err := m.Mount(rootfs); err != nil {
+			cleanupMounts()
 			return nil, errors.Wrapf(err, "failed to mount rootfs component %v", m)
 		}
 		nrRootMounts++
-	}
-	cleanupMounts := func() {
-		if err2 := mount.UnmountN(rootfs, 0, nrRootMounts); err2 != nil {
-			log.G(context).WithError(err2).Warn("Failed to cleanup rootfs mount")
-		}
 	}
 	runtime := &runc.Runc{
 		Command:      r.Runtime,
