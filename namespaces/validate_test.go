@@ -1,4 +1,4 @@
-package identifiers
+package namespaces
 
 import (
 	"strings"
@@ -7,18 +7,17 @@ import (
 	"github.com/containerd/containerd/errdefs"
 )
 
-func TestValidIdentifiers(t *testing.T) {
+func TestValidNamespaces(t *testing.T) {
 	for _, input := range []string{
 		"default",
 		"Default",
 		t.Name(),
 		"default-default",
+		"default--default",
 		"containerd.io",
 		"foo.boo",
 		"swarmkit.docker.io",
-		"0912341234",
-		"task.0.0123456789",
-		"underscores_are_allowed",
+		"zn--e9.org", // or something like it!
 		strings.Repeat("a", maxLength),
 	} {
 		t.Run(input, func(t *testing.T) {
@@ -29,19 +28,19 @@ func TestValidIdentifiers(t *testing.T) {
 	}
 }
 
-func TestInvalidIdentifiers(t *testing.T) {
+func TestInvalidNamespaces(t *testing.T) {
 	for _, input := range []string{
-		"",
 		".foo..foo",
 		"foo/foo",
 		"foo/..",
 		"foo..foo",
 		"foo.-boo",
+		"foo.-boo.bar",
 		"-foo.boo",
 		"foo.boo-",
-		"but__only_tasteful_underscores",
-		"zn--e9.org", // or something like it!
-		"default--default",
+		"foo_foo.boo_underscores", // boo-urns?
+		"0912341234",
+		"task.0.0123456789",
 		strings.Repeat("a", maxLength+1),
 	} {
 

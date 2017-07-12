@@ -16,6 +16,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
+	"github.com/containerd/containerd/identifiers"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
@@ -40,6 +41,10 @@ type execProcess struct {
 }
 
 func newExecProcess(context context.Context, path string, r *shimapi.ExecProcessRequest, parent *initProcess, id string) (process, error) {
+	if err := identifiers.Validate(id); err != nil {
+		return nil, errors.Wrapf(err, "invalid exec id")
+	}
+
 	e := &execProcess{
 		id:     id,
 		parent: parent,

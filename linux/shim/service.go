@@ -14,6 +14,7 @@ import (
 	"github.com/containerd/console"
 	events "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/types/task"
+	"github.com/containerd/containerd/errdefs"
 	evt "github.com/containerd/containerd/events"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
@@ -77,12 +78,9 @@ type Service struct {
 }
 
 func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*shimapi.CreateTaskResponse, error) {
-	if r.ID == "" {
-		return nil, grpc.Errorf(codes.InvalidArgument, "task id cannot be empty")
-	}
 	process, err := newInitProcess(ctx, s.path, s.namespace, r)
 	if err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	s.mu.Lock()
 	// save the main task id and bundle to the shim for additional requests
