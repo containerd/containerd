@@ -64,7 +64,7 @@ func spec(id string, config *ocispec.ImageConfig, context *cli.Context) *specs.S
 
 	return &specs.Spec{
 		Version: specs.Version,
-		Root: specs.Root{
+		Root: &specs.Root{
 			Readonly: context.Bool("readonly"),
 		},
 		Process: &specs.Process{

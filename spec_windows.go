@@ -18,7 +18,7 @@ const pipeRoot = `\\.\pipe`
 func createDefaultSpec() (*specs.Spec, error) {
 	return &specs.Spec{
 		Version: specs.Version,
-		Root:    specs.Root{},
+		Root:    &specs.Root{},
 		Process: &specs.Process{
 			ConsoleSize: &specs.Box{
 				Width:  80,
