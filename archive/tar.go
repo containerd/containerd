@@ -446,6 +446,7 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 		}
 		buf := bufferPool.Get().([]byte)
 		_, err = io.CopyBuffer(file, reader, buf)
+		bufferPool.Put(buf)
 		if err1 := file.Close(); err == nil {
 			err = err1
 		}
