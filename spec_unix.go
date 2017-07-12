@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/api/services/containers/v1"
-	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/typeurl"
 	"github.com/opencontainers/image-spec/specs-go/v1"
@@ -285,12 +284,8 @@ func WithSpec(spec *specs.Spec) NewContainerOpts {
 }
 
 func WithResources(resources *specs.LinuxResources) UpdateTaskOpts {
-	return func(ctx context.Context, client *Client, r *tasks.UpdateTaskRequest) error {
-		any, err := typeurl.MarshalAny(resources)
-		if err != nil {
-			return err
-		}
-		r.Resources = any
+	return func(ctx context.Context, client *Client, r *UpdateTaskInfo) error {
+		r.Resources = resources
 		return nil
 	}
 }

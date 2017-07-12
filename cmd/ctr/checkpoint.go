@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/linux/runcopts"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -41,9 +40,9 @@ var checkpointCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		var opts []containerd.CheckpointOpts
+		var opts []containerd.CheckpointTaskOpts
 		if context.Bool("exit") {
-			opts = append(opts, runcopts.WithExit)
+			opts = append(opts, containerd.WithExit)
 		}
 		checkpoint, err := task.Checkpoint(ctx, opts...)
 		if err != nil {

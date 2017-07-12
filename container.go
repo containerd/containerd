@@ -13,6 +13,7 @@ import (
 	"github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -167,7 +168,7 @@ func (c *container) Image(ctx context.Context) (Image, error) {
 	}, nil
 }
 
-type NewTaskOpts func(context.Context, *Client, *tasks.CreateTaskRequest) error
+type NewTaskOpts func(context.Context, *Client, *TaskInfo) error
 
 func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...NewTaskOpts) (Task, error) {
 	c.mu.Lock()
@@ -197,18 +198,26 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...Ne
 			})
 		}
 	}
+	var info TaskInfo
 	for _, o := range opts {
-		if err := o(ctx, c.client, request); err != nil {
+		if err := o(ctx, c.client, &info); err != nil {
 			return nil, err
 		}
+	}
+	if info.Options != nil {
+		any, err := typeurl.MarshalAny(info.Options)
+		if err != nil {
+			return nil, err
+		}
+		request.Options = any
 	}
 	t := &task{
 		client: c.client,
 		io:     i,
 		id:     c.ID(),
 	}
-
-	if request.Checkpoint != nil {
+	if info.Checkpoint != nil {
+		request.Checkpoint = info.Checkpoint
 		// we need to defer the create call to start
 		t.deferred = request
 	} else {
