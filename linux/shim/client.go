@@ -27,7 +27,7 @@ import (
 type ClientOpt func(context.Context, Config) (shim.ShimClient, io.Closer, error)
 
 // WithStart executes a new shim process
-func WithStart(binary, address string) ClientOpt {
+func WithStart(binary, address string, debug bool) ClientOpt {
 	return func(ctx context.Context, config Config) (shim.ShimClient, io.Closer, error) {
 		socket, err := newSocket(config)
 		if err != nil {
@@ -40,13 +40,14 @@ func WithStart(binary, address string) ClientOpt {
 		}
 		defer f.Close()
 
-		cmd := newCommand(binary, address, config, f)
+		cmd := newCommand(binary, address, debug, config, f)
 		if err := reaper.Default.Start(cmd); err != nil {
 			return nil, nil, errors.Wrapf(err, "failed to start shim")
 		}
 		log.G(ctx).WithFields(logrus.Fields{
 			"pid":     cmd.Process.Pid,
 			"address": config.Address,
+			"debug":   debug,
 		}).Infof("shim %s started", binary)
 		if err = sys.SetOOMScore(cmd.Process.Pid, sys.OOMScoreMaxKillable); err != nil {
 			return nil, nil, errors.Wrap(err, "failed to set OOM Score on shim")
@@ -55,12 +56,12 @@ func WithStart(binary, address string) ClientOpt {
 	}
 }
 
-func newCommand(binary, address string, config Config, socket *os.File) *exec.Cmd {
+func newCommand(binary, address string, debug bool, config Config, socket *os.File) *exec.Cmd {
 	args := []string{
 		"--namespace", config.Namespace,
 		"--address", address,
 	}
-	if config.Debug {
+	if debug {
 		args = append(args, "--debug")
 	}
 	cmd := exec.Command(binary, args...)
@@ -70,7 +71,7 @@ func newCommand(binary, address string, config Config, socket *os.File) *exec.Cm
 	// will be mounted by the shim
 	cmd.SysProcAttr = &atter
 	cmd.ExtraFiles = append(cmd.ExtraFiles, socket)
-	if config.Debug {
+	if debug {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
@@ -140,7 +141,6 @@ type Config struct {
 	Address   string
 	Path      string
 	Namespace string
-	Debug     bool
 }
 
 // New returns a new shim client

@@ -67,6 +67,8 @@ type Config struct {
 	Runtime string `toml:"runtime,omitempty"`
 	// NoShim calls runc directly from within the pkg
 	NoShim bool `toml:"no_shim,omitempty"`
+	// Debug enable debug on the shim
+	ShimDebug bool `toml:"shim_debug,omitempty"`
 }
 
 func New(ic *plugin.InitContext) (interface{}, error) {
@@ -83,15 +85,16 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	}
 	cfg := ic.Config.(*Config)
 	r := &Runtime{
-		root:    ic.Root,
-		remote:  !cfg.NoShim,
-		shim:    cfg.Shim,
-		runtime: cfg.Runtime,
-		monitor: monitor.(runtime.TaskMonitor),
-		tasks:   newTaskList(),
-		emitter: events.GetPoster(ic.Context),
-		db:      m.(*bolt.DB),
-		address: ic.Address,
+		root:      ic.Root,
+		remote:    !cfg.NoShim,
+		shim:      cfg.Shim,
+		shimDebug: cfg.ShimDebug,
+		runtime:   cfg.Runtime,
+		monitor:   monitor.(runtime.TaskMonitor),
+		tasks:     newTaskList(),
+		emitter:   events.GetPoster(ic.Context),
+		db:        m.(*bolt.DB),
+		address:   ic.Address,
 	}
 	tasks, err := r.restoreTasks(ic.Context)
 	if err != nil {
@@ -106,11 +109,12 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 }
 
 type Runtime struct {
-	root    string
-	shim    string
-	runtime string
-	remote  bool
-	address string
+	root      string
+	shim      string
+	shimDebug bool
+	runtime   string
+	remote    bool
+	address   string
 
 	monitor runtime.TaskMonitor
 	tasks   *taskList
@@ -136,7 +140,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 			bundle.Delete()
 		}
 	}()
-	s, err := bundle.NewShim(ctx, r.shim, r.address, r.remote)
+	s, err := bundle.NewShim(ctx, r.shim, r.address, r.remote, r.shimDebug)
 	if err != nil {
 		return nil, err
 	}
