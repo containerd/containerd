@@ -10,7 +10,6 @@ Additional documentation about how this group operates:
 
 - [Code of Conduct][code-of-conduct]
 - [Style and Conventions](style.md)
-- [Roadmap](ROADMAP.md)
 - [Implementations](implementations.md)
 - [Releases](RELEASES.md)
 - [project](project.md)
@@ -34,11 +33,6 @@ Example use cases include sophisticated network configuration, volume garbage co
 ### Runtime Developers
 
 Runtime developers can build runtime implementations that run OCI-compliant bundles and container configuration, containing low-level OS and host-specific details, on a particular platform.
-
-## Releases
-
-There is a loose [Road Map](./ROADMAP.md).
-During the `0.x` series of OCI releases we make no backwards compatibility guarantees and intend to break the schema during this series.
 
 ## Contributing
 
