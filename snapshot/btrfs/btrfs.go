@@ -39,12 +39,22 @@ type snapshotter struct {
 // a file in the provided root.
 // root needs to be a mount point of btrfs.
 func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
-	mnt, err := mount.Lookup(root)
-	if mnt.FSType != "btrfs" {
-		return nil, fmt.Errorf("expected btrfs, got %s", mnt.FSType)
+	// If directory does not exist, create it
+	if _, err := os.Stat(root); err != nil {
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+		if err := os.Mkdir(root, 0755); err != nil {
+			return nil, err
+		}
 	}
+
+	mnt, err := mount.Lookup(root)
 	if err != nil {
 		return nil, err
+	}
+	if mnt.FSType != "btrfs" {
+		return nil, fmt.Errorf("expected btrfs, got %s", mnt.FSType)
 	}
 	var (
 		active    = filepath.Join(root, "active")
