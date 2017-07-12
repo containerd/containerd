@@ -3,8 +3,6 @@ package containerd
 import (
 	"syscall"
 	"testing"
-
-	"github.com/containerd/containerd/linux/runcopts"
 )
 
 func TestCheckpointRestore(t *testing.T) {
@@ -61,7 +59,7 @@ func TestCheckpointRestore(t *testing.T) {
 		return
 	}
 
-	checkpoint, err := task.Checkpoint(ctx, runcopts.WithExit)
+	checkpoint, err := task.Checkpoint(ctx, WithExit)
 	if err != nil {
 		t.Error(err)
 		return
@@ -151,7 +149,7 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 		return
 	}
 
-	checkpoint, err := task.Checkpoint(ctx, runcopts.WithExit)
+	checkpoint, err := task.Checkpoint(ctx, WithExit)
 	if err != nil {
 		t.Error(err)
 		return

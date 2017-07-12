@@ -89,9 +89,11 @@ func (p *process) CloseIO(ctx context.Context, opts ...IOCloserOpts) error {
 		ContainerID: p.task.id,
 		ExecID:      p.id,
 	}
+	var i IOCloseInfo
 	for _, o := range opts {
-		o(r)
+		o(&i)
 	}
+	r.Stdin = i.Stdin
 	_, err := p.task.client.TaskService().CloseIO(ctx, r)
 	return err
 }
