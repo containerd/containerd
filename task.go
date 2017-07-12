@@ -10,7 +10,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/containerd/containerd/api/services/containers/v1"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
@@ -279,9 +278,7 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (d v1
 		return d, err
 	}
 	defer t.Resume(ctx)
-	cr, err := t.client.ContainerService().Get(ctx, &containers.GetContainerRequest{
-		ID: t.id,
-	})
+	cr, err := t.client.ContainerService().Get(ctx, t.id)
 	if err != nil {
 		return d, err
 	}
@@ -289,14 +286,14 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (d v1
 	if err := t.checkpointTask(ctx, &index, request); err != nil {
 		return d, err
 	}
-	if err := t.checkpointImage(ctx, &index, cr.Container.Image); err != nil {
+	if err := t.checkpointImage(ctx, &index, cr.Image); err != nil {
 		return d, err
 	}
-	if err := t.checkpointRWSnapshot(ctx, &index, cr.Container.Snapshotter, cr.Container.RootFS); err != nil {
+	if err := t.checkpointRWSnapshot(ctx, &index, cr.Snapshotter, cr.RootFS); err != nil {
 		return d, err
 	}
 	index.Annotations = make(map[string]string)
-	index.Annotations["image.name"] = cr.Container.Image
+	index.Annotations["image.name"] = cr.Image
 	return t.writeIndex(ctx, &index)
 }
 

@@ -10,11 +10,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
-	"github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/typeurl"
-	ptypes "github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
@@ -31,7 +30,7 @@ type DeleteOpts func(context.Context, *Client, containers.Container) error
 
 type Container interface {
 	ID() string
-	Proto() containers.Container
+	Info() containers.Container
 	Delete(context.Context, ...DeleteOpts) error
 	NewTask(context.Context, IOCreation, ...NewTaskOpts) (Task, error)
 	Spec() (*specs.Spec, error)
@@ -41,7 +40,7 @@ type Container interface {
 	SetLabels(context.Context, map[string]string) (map[string]string, error)
 }
 
-func containerFromProto(client *Client, c containers.Container) *container {
+func containerFromRecord(client *Client, c containers.Container) *container {
 	return &container{
 		client: client,
 		c:      c,
@@ -62,21 +61,19 @@ func (c *container) ID() string {
 	return c.c.ID
 }
 
-func (c *container) Proto() containers.Container {
+func (c *container) Info() containers.Container {
 	return c.c
 }
 
 func (c *container) Labels(ctx context.Context) (map[string]string, error) {
-	resp, err := c.client.ContainerService().Get(ctx, &containers.GetContainerRequest{
-		ID: c.ID(),
-	})
+	r, err := c.client.ContainerService().Get(ctx, c.ID())
 	if err != nil {
 		return nil, err
 	}
 
-	c.c = resp.Container
+	c.c = r
 
-	m := make(map[string]string, len(resp.Container.Labels))
+	m := make(map[string]string, len(r.Labels))
 	for k, v := range c.c.Labels {
 		m[k] = v
 	}
@@ -85,28 +82,26 @@ func (c *container) Labels(ctx context.Context) (map[string]string, error) {
 }
 
 func (c *container) SetLabels(ctx context.Context, labels map[string]string) (map[string]string, error) {
-	var req containers.UpdateContainerRequest
-
-	req.Container.ID = c.ID()
-	req.Container.Labels = labels
-
-	req.UpdateMask = &ptypes.FieldMask{
-		Paths: make([]string, 0, len(labels)),
+	container := containers.Container{
+		ID:     c.ID(),
+		Labels: labels,
 	}
+
+	var paths []string
 	// mask off paths so we only muck with the labels encountered in labels.
 	// Labels not in the passed in argument will be left alone.
 	for k := range labels {
-		req.UpdateMask.Paths = append(req.UpdateMask.Paths, strings.Join([]string{"labels", k}, "."))
+		paths = append(paths, strings.Join([]string{"labels", k}, "."))
 	}
 
-	resp, err := c.client.ContainerService().Update(ctx, &req)
+	r, err := c.client.ContainerService().Update(ctx, container, paths...)
 	if err != nil {
 		return nil, err
 	}
 
-	c.c = resp.Container // update our local container
+	c.c = r // update our local container
 
-	m := make(map[string]string, len(resp.Container.Labels))
+	m := make(map[string]string, len(r.Labels))
 	for k, v := range c.c.Labels {
 		m[k] = v
 	}
@@ -141,9 +136,8 @@ func (c *container) Delete(ctx context.Context, opts ...DeleteOpts) (err error) 
 			return err
 		}
 	}
-	if _, cerr := c.client.ContainerService().Delete(ctx, &containers.DeleteContainerRequest{
-		ID: c.c.ID,
-	}); err == nil {
+
+	if cerr := c.client.ContainerService().Delete(ctx, c.ID()); err == nil {
 		err = cerr
 	}
 	return err

@@ -110,7 +110,7 @@ func containerListFn(context *cli.Context) error {
 		fmt.Fprintln(w, "CONTAINER\tIMAGE\tRUNTIME\tLABELS\t")
 		for _, c := range containers {
 			var labelStrings []string
-			for k, v := range c.Proto().Labels {
+			for k, v := range c.Info().Labels {
 				labelStrings = append(labelStrings, strings.Join([]string{k, v}, "="))
 			}
 			labels := strings.Join(labelStrings, ",")
@@ -128,11 +128,11 @@ func containerListFn(context *cli.Context) error {
 				imageName = image.Name()
 			}
 
-			proto := c.Proto()
+			record := c.Info()
 			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%v\t\n",
 				c.ID(),
 				imageName,
-				proto.Runtime.Name,
+				record.Runtime.Name,
 				labels,
 			); err != nil {
 				return err

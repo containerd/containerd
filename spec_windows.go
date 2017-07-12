@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/containerd/containerd/api/services/containers/v1"
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/typeurl"
 	"github.com/opencontainers/image-spec/specs-go/v1"
