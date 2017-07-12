@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/binary"
 	"io"
+	"strings"
+	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/content"
@@ -50,8 +52,64 @@ func (cs *contentStore) Info(ctx context.Context, dgst digest.Digest) (content.I
 	return info, nil
 }
 
-func (cs *contentStore) Walk(ctx context.Context, fn content.WalkFunc) error {
+func (cs *contentStore) Update(ctx context.Context, info content.Info, fieldpaths ...string) (content.Info, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return content.Info{}, err
+	}
+
+	updated := content.Info{
+		Digest: info.Digest,
+	}
+	if err := update(ctx, cs.db, func(tx *bolt.Tx) error {
+		bkt := getBlobBucket(tx, ns, info.Digest)
+		if bkt == nil {
+			return errors.Wrapf(errdefs.ErrNotFound, "content digest %v", info.Digest)
+		}
+
+		if err := readInfo(&updated, bkt); err != nil {
+			return errors.Wrapf(err, "info %q", info.Digest)
+		}
+
+		if len(fieldpaths) > 0 {
+			for _, path := range fieldpaths {
+				if strings.HasPrefix(path, "labels.") {
+					if updated.Labels == nil {
+						updated.Labels = map[string]string{}
+					}
+
+					key := strings.TrimPrefix(path, "labels.")
+					updated.Labels[key] = info.Labels[key]
+					continue
+				}
+
+				switch path {
+				case "labels":
+					updated.Labels = info.Labels
+				default:
+					return errors.Wrapf(errdefs.ErrInvalidArgument, "cannot update %q field on content info %q", path, info.Digest)
+				}
+			}
+		} else {
+			// Set mutable fields
+			updated.Labels = info.Labels
+		}
+
+		updated.UpdatedAt = time.Now().UTC()
+		return writeInfo(&updated, bkt)
+	}); err != nil {
+		return content.Info{}, err
+	}
+	return updated, nil
+}
+
+func (cs *contentStore) Walk(ctx context.Context, fn content.WalkFunc, fs ...string) error {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return err
+	}
+
+	filter, err := filters.ParseAll(fs...)
 	if err != nil {
 		return err
 	}
@@ -67,6 +125,11 @@ func (cs *contentStore) Walk(ctx context.Context, fn content.WalkFunc) error {
 		return bkt.ForEach(func(k, v []byte) error {
 			dgst, err := digest.Parse(string(k))
 			if err != nil {
+				// Not a digest, skip
+				return nil
+			}
+			bbkt := bkt.Bucket(k)
+			if bbkt == nil {
 				return nil
 			}
 			info := content.Info{
@@ -75,7 +138,9 @@ func (cs *contentStore) Walk(ctx context.Context, fn content.WalkFunc) error {
 			if err := readInfo(&info, bkt.Bucket(k)); err != nil {
 				return err
 			}
-			infos = append(infos, info)
+			if filter.Match(adaptContentInfo(info)) {
+				infos = append(infos, info)
+			}
 			return nil
 		})
 	}); err != nil {
@@ -367,16 +432,43 @@ func (cs *contentStore) checkAccess(ctx context.Context, dgst digest.Digest) err
 }
 
 func readInfo(info *content.Info, bkt *bolt.Bucket) error {
-	return bkt.ForEach(func(k, v []byte) error {
-		switch string(k) {
-		case string(bucketKeyCreatedAt):
-			if err := info.CommittedAt.UnmarshalBinary(v); err != nil {
-				return err
-			}
-		case string(bucketKeySize):
-			info.Size, _ = binary.Varint(v)
+	if err := readTimestamps(&info.CommittedAt, &info.UpdatedAt, bkt); err != nil {
+		return err
+	}
+
+	lbkt := bkt.Bucket(bucketKeyLabels)
+	if lbkt != nil {
+		info.Labels = map[string]string{}
+		if err := readLabels(info.Labels, lbkt); err != nil {
+			return err
 		}
-		// TODO: Read labels
-		return nil
-	})
+	}
+
+	if v := bkt.Get(bucketKeySize); len(v) > 0 {
+		info.Size, _ = binary.Varint(v)
+	}
+
+	return nil
+}
+
+func writeInfo(info *content.Info, bkt *bolt.Bucket) error {
+	if err := writeTimestamps(bkt, info.CommittedAt, info.UpdatedAt); err != nil {
+		return err
+	}
+
+	if err := writeLabels(bkt, info.Labels); err != nil {
+		return errors.Wrapf(err, "writing labels for info %v", info.Digest)
+	}
+
+	// Write size
+	sizeEncoded, err := encodeSize(info.Size)
+	if err != nil {
+		return err
+	}
+
+	if err := bkt.Put(bucketKeySize, sizeEncoded); err != nil {
+		return err
+	}
+
+	return nil
 }

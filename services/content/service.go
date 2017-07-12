@@ -79,11 +79,22 @@ func (s *Service) Info(ctx context.Context, req *api.InfoRequest) (*api.InfoResp
 	}
 
 	return &api.InfoResponse{
-		Info: api.Info{
-			Digest:      bi.Digest,
-			Size_:       bi.Size,
-			CommittedAt: bi.CommittedAt,
-		},
+		Info: infoToGRPC(bi),
+	}, nil
+}
+
+func (s *Service) Update(ctx context.Context, req *api.UpdateRequest) (*api.UpdateResponse, error) {
+	if err := req.Info.Digest.Validate(); err != nil {
+		return nil, grpc.Errorf(codes.InvalidArgument, "%q failed validation", req.Info.Digest)
+	}
+
+	info, err := s.store.Update(ctx, infoFromGRPC(req.Info), req.UpdateMask.GetPaths()...)
+	if err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+
+	return &api.UpdateResponse{
+		Info: infoToGRPC(info),
 	}, nil
 }
 
@@ -103,6 +114,7 @@ func (s *Service) List(req *api.ListContentRequest, session api.Content_ListServ
 			Digest:      info.Digest,
 			Size_:       info.Size,
 			CommittedAt: info.CommittedAt,
+			Labels:      info.Labels,
 		})
 
 		if len(buffer) >= 100 {
@@ -114,7 +126,7 @@ func (s *Service) List(req *api.ListContentRequest, session api.Content_ListServ
 		}
 
 		return nil
-	}); err != nil {
+	}, req.Filters...); err != nil {
 		return err
 	}
 
