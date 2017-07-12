@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/containerd/containerd/content"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/urfave/cli"
 )
@@ -16,8 +17,7 @@ var labelCommand = cli.Command{
 	Flags:       []cli.Flag{},
 	Action: func(context *cli.Context) error {
 		var (
-			object    = context.Args().First()
-			labelArgs = context.Args().Tail()
+			object, labels = objectWithLabelArgs(context)
 		)
 		ctx, cancel := appContext(context)
 		defer cancel()
@@ -32,32 +32,36 @@ var labelCommand = cli.Command{
 			return err
 		}
 
-		info, err := cs.Info(ctx, dgst)
-		if err != nil {
-			return err
-		}
-
-		if info.Labels == nil {
-			info.Labels = map[string]string{}
+		info := content.Info{
+			Digest: dgst,
+			Labels: map[string]string{},
 		}
 
 		var paths []string
-		for _, arg := range labelArgs {
-			var k, v string
-			if idx := strings.IndexByte(arg, '='); idx > 0 {
-				k = arg[:idx]
-				v = arg[idx+1:]
-			} else {
-				k = arg
-			}
+		for k, v := range labels {
 			paths = append(paths, fmt.Sprintf("labels.%s", k))
-			if v == "" {
-				delete(info.Labels, k)
-			} else {
+			if v != "" {
 				info.Labels[k] = v
 			}
 		}
 
-		return cs.Update(ctx, info, paths...)
+		// Nothing updated, do no clear
+		if len(paths) == 0 {
+			info, err = cs.Info(ctx, info.Digest)
+		} else {
+			info, err = cs.Update(ctx, info, paths...)
+		}
+		if err != nil {
+			return err
+		}
+
+		var labelStrings []string
+		for k, v := range info.Labels {
+			labelStrings = append(labelStrings, fmt.Sprintf("%s=%s", k, v))
+		}
+
+		fmt.Println(strings.Join(labelStrings, ","))
+
+		return nil
 	},
 }

@@ -52,20 +52,19 @@ func (cs *contentStore) Info(ctx context.Context, dgst digest.Digest) (content.I
 	return info, nil
 }
 
-func (cs *contentStore) Update(ctx context.Context, info content.Info, fieldpaths ...string) error {
+func (cs *contentStore) Update(ctx context.Context, info content.Info, fieldpaths ...string) (content.Info, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
-		return err
+		return content.Info{}, err
 	}
 
+	updated := content.Info{
+		Digest: info.Digest,
+	}
 	if err := update(ctx, cs.db, func(tx *bolt.Tx) error {
 		bkt := getBlobBucket(tx, ns, info.Digest)
 		if bkt == nil {
 			return errors.Wrapf(errdefs.ErrNotFound, "content digest %v", info.Digest)
-		}
-
-		updated := content.Info{
-			Digest: info.Digest,
 		}
 
 		if err := readInfo(&updated, bkt); err != nil {
@@ -92,16 +91,16 @@ func (cs *contentStore) Update(ctx context.Context, info content.Info, fieldpath
 				}
 			}
 		} else {
-			info.CommittedAt = updated.CommittedAt
-			updated = info
+			// Set mutable fields
+			updated.Labels = info.Labels
 		}
 
 		updated.UpdatedAt = time.Now().UTC()
 		return writeInfo(&updated, bkt)
 	}); err != nil {
-		return err
+		return content.Info{}, err
 	}
-	return nil
+	return updated, nil
 }
 
 func (cs *contentStore) Walk(ctx context.Context, fn content.WalkFunc, fs ...string) error {
@@ -110,17 +109,9 @@ func (cs *contentStore) Walk(ctx context.Context, fn content.WalkFunc, fs ...str
 		return err
 	}
 
-	var filter filters.Filter = filters.Always
-	if len(fs) > 0 {
-		fa := make([]filters.Filter, 0, len(fs))
-		for _, s := range fs {
-			f, err := filters.Parse(s)
-			if err != nil {
-				return errors.Wrapf(errdefs.ErrInvalidArgument, "bad filter %q", s)
-			}
-			fa = append(fa, f)
-		}
-		filter = filters.Filter(filters.Any(fa))
+	filter, err := filters.ParseAll(fs...)
+	if err != nil {
+		return err
 	}
 
 	// TODO: Batch results to keep from reading all info into memory
@@ -480,23 +471,4 @@ func writeInfo(info *content.Info, bkt *bolt.Bucket) error {
 	}
 
 	return nil
-}
-
-func adaptContentInfo(info content.Info) filters.Adaptor {
-	return filters.AdapterFunc(func(fieldpath []string) (string, bool) {
-		if len(fieldpath) == 0 {
-			return "", false
-		}
-
-		switch fieldpath[0] {
-		case "digest":
-			return info.Digest.String(), true
-		case "size":
-			// TODO: support size based filtering
-		case "labels":
-			return checkMap(fieldpath[1:], info.Labels)
-		}
-
-		return "", false
-	})
 }

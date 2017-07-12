@@ -60,7 +60,7 @@ type Manager interface {
 	// fields will be updated.
 	// Mutable fields:
 	//  labels.*
-	Update(ctx context.Context, info Info, fieldpaths ...string) error
+	Update(ctx context.Context, info Info, fieldpaths ...string) (Info, error)
 
 	// Walk will call fn for each item in the content store which
 	// match the provided filters. If no filters are given all

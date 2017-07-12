@@ -93,9 +93,9 @@ func (cs *store) Delete(ctx context.Context, dgst digest.Digest) error {
 	return nil
 }
 
-func (cs *store) Update(ctx context.Context, info Info, fieldpaths ...string) error {
+func (cs *store) Update(ctx context.Context, info Info, fieldpaths ...string) (Info, error) {
 	// TODO: Support persisting and updating mutable content data
-	return errors.Wrapf(errdefs.ErrFailedPrecondition, "update not supported on immutable content store")
+	return Info{}, errors.Wrapf(errdefs.ErrFailedPrecondition, "update not supported on immutable content store")
 }
 
 func (cs *store) Walk(ctx context.Context, fn WalkFunc, filters ...string) error {

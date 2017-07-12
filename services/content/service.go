@@ -83,16 +83,19 @@ func (s *Service) Info(ctx context.Context, req *api.InfoRequest) (*api.InfoResp
 	}, nil
 }
 
-func (s *Service) Update(ctx context.Context, req *api.UpdateRequest) (*empty.Empty, error) {
+func (s *Service) Update(ctx context.Context, req *api.UpdateRequest) (*api.UpdateResponse, error) {
 	if err := req.Info.Digest.Validate(); err != nil {
 		return nil, grpc.Errorf(codes.InvalidArgument, "%q failed validation", req.Info.Digest)
 	}
 
-	if err := s.store.Update(ctx, infoFromGRPC(req.Info), req.UpdateMask.GetPaths()...); err != nil {
+	info, err := s.store.Update(ctx, infoFromGRPC(req.Info), req.UpdateMask.GetPaths()...)
+	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	return &empty.Empty{}, nil
+	return &api.UpdateResponse{
+		Info: infoToGRPC(info),
+	}, nil
 }
 
 func (s *Service) List(req *api.ListContentRequest, session api.Content_ListServer) error {

@@ -108,16 +108,17 @@ func (rs *remoteStore) Status(ctx context.Context, ref string) (content.Status, 
 	}, nil
 }
 
-func (rs *remoteStore) Update(ctx context.Context, info content.Info, fieldpaths ...string) error {
-	if _, err := rs.client.Update(ctx, &contentapi.UpdateRequest{
+func (rs *remoteStore) Update(ctx context.Context, info content.Info, fieldpaths ...string) (content.Info, error) {
+	resp, err := rs.client.Update(ctx, &contentapi.UpdateRequest{
 		Info: infoToGRPC(info),
 		UpdateMask: &protobuftypes.FieldMask{
 			Paths: fieldpaths,
 		},
-	}); err != nil {
-		return errdefs.FromGRPC(err)
+	})
+	if err != nil {
+		return content.Info{}, errdefs.FromGRPC(err)
 	}
-	return nil
+	return infoFromGRPC(resp.Info), nil
 }
 
 func (rs *remoteStore) ListStatuses(ctx context.Context, filters ...string) ([]content.Status, error) {

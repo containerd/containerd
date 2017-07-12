@@ -22,7 +22,7 @@ service Content {
 	// This call can be used to manage the mutable content labels. The
 	// immutable metadata such as digest, size, and committed at cannot
 	// be updated.
-	rpc Update(UpdateRequest) returns (google.protobuf.Empty);
+	rpc Update(UpdateRequest) returns (UpdateResponse);
 
 	// List streams the entire set of content as Info objects and closes the
 	// stream.
@@ -109,6 +109,10 @@ message UpdateRequest {
 	// other field may be updated using this mask.
 	// If no mask is provided, all mutable field are updated.
 	google.protobuf.FieldMask update_mask = 2;
+}
+
+message UpdateResponse {
+	Info info = 1 [(gogoproto.nullable) = false];
 }
 
 message ListContentRequest {
