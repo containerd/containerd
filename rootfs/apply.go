@@ -14,15 +14,24 @@ import (
 	"golang.org/x/net/context"
 )
 
+// Applier is used to apply a descriptor of a layer diff on top of mounts.
 type Applier interface {
 	Apply(context.Context, ocispec.Descriptor, []mount.Mount) (ocispec.Descriptor, error)
 }
 
+// Layer represents the descriptors for a layer diff. These descriptions
+// include the descriptor for the uncompressed tar diff as well as a blob
+// used to transport that tar. The blob descriptor may or may not describe
+// a compressed object.
 type Layer struct {
 	Diff ocispec.Descriptor
 	Blob ocispec.Descriptor
 }
 
+// ApplyLayers applies all the layers using the given snapshotter and applier.
+// The returned result is a chain id digest representing all the applied layers.
+// Layers are applied in order they are given, making the first layer the
+// bottom-most layer in the layer chain.
 func ApplyLayers(ctx context.Context, layers []Layer, sn snapshot.Snapshotter, a Applier) (digest.Digest, error) {
 	var chain []digest.Digest
 	for _, layer := range layers {
@@ -36,6 +45,9 @@ func ApplyLayers(ctx context.Context, layers []Layer, sn snapshot.Snapshotter, a
 	return identity.ChainID(chain), nil
 }
 
+// ApplyLayer applies a single layer on top of the given provided layer chain,
+// using the provided snapshotter and applier. If the layer was unpacked true
+// is returned, if the layer already exists false is returned.
 func ApplyLayer(ctx context.Context, layer Layer, chain []digest.Digest, sn snapshot.Snapshotter, a Applier) (bool, error) {
 	var (
 		parent  = identity.ChainID(chain)
