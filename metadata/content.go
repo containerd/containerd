@@ -432,7 +432,7 @@ func (cs *contentStore) checkAccess(ctx context.Context, dgst digest.Digest) err
 }
 
 func readInfo(info *content.Info, bkt *bolt.Bucket) error {
-	if err := readTimestamps(&info.CommittedAt, &info.UpdatedAt, bkt); err != nil {
+	if err := readTimestamps(&info.CreatedAt, &info.UpdatedAt, bkt); err != nil {
 		return err
 	}
 
@@ -452,7 +452,7 @@ func readInfo(info *content.Info, bkt *bolt.Bucket) error {
 }
 
 func writeInfo(info *content.Info, bkt *bolt.Bucket) error {
-	if err := writeTimestamps(bkt, info.CommittedAt, info.UpdatedAt); err != nil {
+	if err := writeTimestamps(bkt, info.CreatedAt, info.UpdatedAt); err != nil {
 		return err
 	}
 

@@ -193,20 +193,20 @@ func (rs *remoteStore) negotiate(ctx context.Context, ref string, size int64, ex
 
 func infoToGRPC(info content.Info) contentapi.Info {
 	return contentapi.Info{
-		Digest:      info.Digest,
-		Size_:       info.Size,
-		CommittedAt: info.CommittedAt,
-		UpdatedAt:   info.UpdatedAt,
-		Labels:      info.Labels,
+		Digest:    info.Digest,
+		Size_:     info.Size,
+		CreatedAt: info.CreatedAt,
+		UpdatedAt: info.UpdatedAt,
+		Labels:    info.Labels,
 	}
 }
 
 func infoFromGRPC(info contentapi.Info) content.Info {
 	return content.Info{
-		Digest:      info.Digest,
-		Size:        info.Size_,
-		CommittedAt: info.CommittedAt,
-		UpdatedAt:   info.UpdatedAt,
-		Labels:      info.Labels,
+		Digest:    info.Digest,
+		Size:      info.Size_,
+		CreatedAt: info.CreatedAt,
+		UpdatedAt: info.UpdatedAt,
+		Labels:    info.Labels,
 	}
 }

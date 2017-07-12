@@ -163,13 +163,13 @@ outer:
 								Status: "waiting",
 							}
 						}
-					} else if info.CommittedAt.After(start) {
+					} else if info.CreatedAt.After(start) {
 						statuses[key] = statusInfo{
 							Ref:       key,
 							Status:    "done",
 							Offset:    info.Size,
 							Total:     info.Size,
-							UpdatedAt: info.CommittedAt,
+							UpdatedAt: info.CreatedAt,
 						}
 					} else {
 						statuses[key] = statusInfo{
