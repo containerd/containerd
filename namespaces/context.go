@@ -4,7 +4,6 @@ import (
 	"os"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/identifiers"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -54,7 +53,7 @@ func NamespaceRequired(ctx context.Context) (string, error) {
 		return "", errors.Wrapf(errdefs.ErrFailedPrecondition, "namespace is required")
 	}
 
-	if err := identifiers.Validate(namespace); err != nil {
+	if err := Validate(namespace); err != nil {
 		return "", errors.Wrap(err, "namespace validation")
 	}
 

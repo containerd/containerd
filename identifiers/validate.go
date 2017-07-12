@@ -1,17 +1,11 @@
-// Package identifiers provides common validation for identifiers, keys and ids
+// Package identifiers provides common validation for identifiers and keys
 // across containerd.
 //
-// To allow such identifiers to be used across various contexts safely, the character
-// set has been restricted to that defined for domains in RFC 1035, section
-// 2.3.1. This will make identifiers safe for use across networks, filesystems
-// and other media.
+// Identifiers in containerd must be a alphanumeric, allowing limited
+// underscores, dashes and dots.
 //
-// The identifier specification departs from RFC 1035 in that it allows
-// "labels" to start with number and only enforces a total length restriction
-// of 76 characters.
-//
-// While the character set may be expanded in the future, identifiers are
-// guaranteed to be safely used as filesystem path components.
+// While the character set may be expanded in the future, identifiers
+// are guaranteed to be safely used as filesystem path components.
 package identifiers
 
 import (
@@ -22,27 +16,28 @@ import (
 )
 
 const (
-	maxLength = 76
-	charclass = `[A-Za-z0-9]+`
-	label     = charclass + `(:?[-]+` + charclass + `)*`
+	maxLength  = 76
+	alphanum   = `[A-Za-z0-9]+`
+	separators = `[._-]`
 )
 
 var (
-	// identifierRe validates that a identifier matches valid identifiers.
-	//
-	// Rules for domains, defined in RFC 1035, section 2.3.1, are used for
-	// identifiers.
-	identifierRe = regexp.MustCompile(reAnchor(label + reGroup("[.]"+reGroup(label)) + "*"))
+	// identifierRe defines the pattern for valid identifiers.
+	identifierRe = regexp.MustCompile(reAnchor(alphanum + reGroup(separators+reGroup(alphanum)) + "*"))
 )
 
 // Validate return nil if the string s is a valid identifier.
 //
-// identifiers must be valid domain identifiers according to RFC 1035, section 2.3.1.  To
+// identifiers must be valid domain names according to RFC 1035, section 2.3.1.  To
 // enforce case insensitvity, all characters must be lower case.
 //
 // In general, identifiers that pass this validation, should be safe for use as
-// a domain identifier or filesystem path component.
+// a domain names or filesystem path component.
 func Validate(s string) error {
+	if len(s) == 0 {
+		return errors.Wrapf(errdefs.ErrInvalidArgument, "identifier must not be empty")
+	}
+
 	if len(s) > maxLength {
 		return errors.Wrapf(errdefs.ErrInvalidArgument, "identifier %q greater than maximum length (%d characters)", s, maxLength)
 	}

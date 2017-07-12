@@ -17,6 +17,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
+	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/linux/runcopts"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
@@ -52,6 +53,9 @@ type initProcess struct {
 }
 
 func newInitProcess(context context.Context, path, namespace string, r *shimapi.CreateTaskRequest) (*initProcess, error) {
+	if err := identifiers.Validate(r.ID); err != nil {
+		return nil, errors.Wrapf(err, "invalid task id")
+	}
 	var options runcopts.CreateOptions
 	if r.Options != nil {
 		v, err := typeurl.UnmarshalAny(r.Options)

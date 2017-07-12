@@ -13,6 +13,7 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/identifiers"
 	client "github.com/containerd/containerd/linux/shim"
 	shim "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
@@ -127,6 +128,11 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 	if err != nil {
 		return nil, err
 	}
+
+	if err := identifiers.Validate(id); err != nil {
+		return nil, errors.Wrapf(err, "invalid task id")
+	}
+
 	bundle, err := newBundle(filepath.Join(r.root, namespace), namespace, id, opts.Spec.Value)
 	if err != nil {
 		return nil, err
