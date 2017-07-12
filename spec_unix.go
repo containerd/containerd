@@ -64,7 +64,7 @@ func defaultNamespaces() []specs.LinuxNamespace {
 func createDefaultSpec() (*specs.Spec, error) {
 	s := &specs.Spec{
 		Version: specs.Version,
-		Root: specs.Root{
+		Root: &specs.Root{
 			Path: defaultRootfsPath,
 		},
 		Process: &specs.Process{
@@ -81,7 +81,7 @@ func createDefaultSpec() (*specs.Spec, error) {
 				Effective:   defaltCaps(),
 				Ambient:     defaltCaps(),
 			},
-			Rlimits: []specs.LinuxRlimit{
+			Rlimits: []specs.POSIXRlimit{
 				{
 					Type: "RLIMIT_NOFILE",
 					Hard: uint64(1024),
