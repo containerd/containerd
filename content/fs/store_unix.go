@@ -1,6 +1,6 @@
 // +build darwin freebsd
 
-package content
+package fs
 
 import (
 	"os"

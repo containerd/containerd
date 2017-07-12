@@ -5,10 +5,19 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"sync"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
+)
+
+var (
+	bufPool = sync.Pool{
+		New: func() interface{} {
+			return make([]byte, 1<<20)
+		},
+	}
 )
 
 // ReadBlob retrieves the entire contents of the blob from the provider.
@@ -120,9 +129,4 @@ func seekReader(r io.Reader, offset, size int64) (io.Reader, error) {
 	}
 
 	return r, errors.Wrapf(errUnseekable, "seek to offset %v failed", offset)
-}
-
-func readFileString(path string) (string, error) {
-	p, err := ioutil.ReadFile(path)
-	return string(p), err
 }

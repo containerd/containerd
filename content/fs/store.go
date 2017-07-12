@@ -1,4 +1,4 @@
-package content
+package fs
 
 import (
 	"context"
@@ -8,13 +8,23 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
+	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
+)
+
+var (
+	bufPool = sync.Pool{
+		New: func() interface{} {
+			return make([]byte, 1<<20)
+		},
+	}
 )
 
 // Store is digest-keyed store for content. All data written into the store is
@@ -26,7 +36,7 @@ type store struct {
 	root string
 }
 
-func NewStore(root string) (Store, error) {
+func NewStore(root string) (content.Store, error) {
 	if err := os.MkdirAll(filepath.Join(root, "ingest"), 0777); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
@@ -36,7 +46,7 @@ func NewStore(root string) (Store, error) {
 	}, nil
 }
 
-func (s *store) Info(ctx context.Context, dgst digest.Digest) (Info, error) {
+func (s *store) Info(ctx context.Context, dgst digest.Digest) (content.Info, error) {
 	p := s.blobPath(dgst)
 	fi, err := os.Stat(p)
 	if err != nil {
@@ -44,14 +54,14 @@ func (s *store) Info(ctx context.Context, dgst digest.Digest) (Info, error) {
 			err = errors.Wrapf(errdefs.ErrNotFound, "content %v", dgst)
 		}
 
-		return Info{}, err
+		return content.Info{}, err
 	}
 
 	return s.info(dgst, fi), nil
 }
 
-func (s *store) info(dgst digest.Digest, fi os.FileInfo) Info {
-	return Info{
+func (s *store) info(dgst digest.Digest, fi os.FileInfo) content.Info {
+	return content.Info{
 		Digest:    dgst,
 		Size:      fi.Size(),
 		CreatedAt: fi.ModTime(),
@@ -93,12 +103,12 @@ func (cs *store) Delete(ctx context.Context, dgst digest.Digest) error {
 	return nil
 }
 
-func (cs *store) Update(ctx context.Context, info Info, fieldpaths ...string) (Info, error) {
+func (cs *store) Update(ctx context.Context, info content.Info, fieldpaths ...string) (content.Info, error) {
 	// TODO: Support persisting and updating mutable content data
-	return Info{}, errors.Wrapf(errdefs.ErrFailedPrecondition, "update not supported on immutable content store")
+	return content.Info{}, errors.Wrapf(errdefs.ErrFailedPrecondition, "update not supported on immutable content store")
 }
 
-func (cs *store) Walk(ctx context.Context, fn WalkFunc, filters ...string) error {
+func (cs *store) Walk(ctx context.Context, fn content.WalkFunc, filters ...string) error {
 	// TODO: Support filters
 	root := filepath.Join(cs.root, "blobs")
 	var alg digest.Algorithm
@@ -141,11 +151,11 @@ func (cs *store) Walk(ctx context.Context, fn WalkFunc, filters ...string) error
 	})
 }
 
-func (s *store) Status(ctx context.Context, ref string) (Status, error) {
+func (s *store) Status(ctx context.Context, ref string) (content.Status, error) {
 	return s.status(s.ingestRoot(ref))
 }
 
-func (s *store) ListStatuses(ctx context.Context, fs ...string) ([]Status, error) {
+func (s *store) ListStatuses(ctx context.Context, fs ...string) ([]content.Status, error) {
 	fp, err := os.Open(filepath.Join(s.root, "ingest"))
 	if err != nil {
 		return nil, err
@@ -163,7 +173,7 @@ func (s *store) ListStatuses(ctx context.Context, fs ...string) ([]Status, error
 		return nil, err
 	}
 
-	var active []Status
+	var active []content.Status
 	for _, fi := range fis {
 		p := filepath.Join(s.root, "ingest", fi.Name())
 		stat, err := s.status(p)
@@ -192,19 +202,19 @@ func (s *store) ListStatuses(ctx context.Context, fs ...string) ([]Status, error
 }
 
 // status works like stat above except uses the path to the ingest.
-func (s *store) status(ingestPath string) (Status, error) {
+func (s *store) status(ingestPath string) (content.Status, error) {
 	dp := filepath.Join(ingestPath, "data")
 	fi, err := os.Stat(dp)
 	if err != nil {
-		return Status{}, err
+		return content.Status{}, err
 	}
 
 	ref, err := readFileString(filepath.Join(ingestPath, "ref"))
 	if err != nil {
-		return Status{}, err
+		return content.Status{}, err
 	}
 
-	return Status{
+	return content.Status{
 		Ref:       ref,
 		Offset:    fi.Size(),
 		Total:     s.total(ingestPath),
@@ -213,7 +223,7 @@ func (s *store) status(ingestPath string) (Status, error) {
 	}, nil
 }
 
-func adaptStatus(status Status) filters.Adaptor {
+func adaptStatus(status content.Status) filters.Adaptor {
 	return filters.AdapterFunc(func(fieldpath []string) (string, bool) {
 		if len(fieldpath) == 0 {
 			return "", false
@@ -248,7 +258,7 @@ func (s *store) total(ingestPath string) int64 {
 // ref at a time.
 //
 // The argument `ref` is used to uniquely identify a long-lived writer transaction.
-func (s *store) Writer(ctx context.Context, ref string, total int64, expected digest.Digest) (Writer, error) {
+func (s *store) Writer(ctx context.Context, ref string, total int64, expected digest.Digest) (content.Writer, error) {
 	// TODO(stevvooe): Need to actually store expected here. We have
 	// code in the service that shouldn't be dealing with this.
 	if expected != "" {
@@ -383,4 +393,9 @@ func (s *store) ingestPaths(ref string) (string, string, string) {
 	)
 
 	return fp, rp, dp
+}
+
+func readFileString(path string) (string, error) {
+	p, err := ioutil.ReadFile(path)
+	return string(p), err
 }

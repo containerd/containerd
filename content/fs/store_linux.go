@@ -1,4 +1,4 @@
-package content
+package fs
 
 import (
 	"os"

@@ -1,4 +1,4 @@
-package content
+package fs
 
 import (
 	"os"
@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -24,8 +25,8 @@ type writer struct {
 	updatedAt time.Time
 }
 
-func (w *writer) Status() (Status, error) {
-	return Status{
+func (w *writer) Status() (content.Status, error) {
+	return content.Status{
 		Ref:       w.ref,
 		Offset:    w.offset,
 		Total:     w.total,
