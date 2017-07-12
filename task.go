@@ -191,6 +191,9 @@ func (t *task) Delete(ctx context.Context) (uint32, error) {
 }
 
 func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreate IOCreation) (Process, error) {
+	if id == "" {
+		return nil, ErrNoExecID
+	}
 	i, err := ioCreate()
 	if err != nil {
 		return nil, err

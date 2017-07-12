@@ -23,6 +23,7 @@ var (
 	ErrNoRunningTask     = errors.New("no running task")
 	ErrDeleteRunningTask = errors.New("cannot delete container with running task")
 	ErrProcessExited     = errors.New("process already exited")
+	ErrNoExecID          = errors.New("exec id must be provided")
 )
 
 type DeleteOpts func(context.Context, *Client, containers.Container) error
