@@ -274,7 +274,7 @@ func getMemorySettings(resources *specs.LinuxResources) []memorySettings {
 		},
 		{
 			name:  "oom_control",
-			value: getOomControlValue(resources),
+			value: getOomControlValue(mem),
 		},
 		{
 			name:  "swappiness",
@@ -295,8 +295,8 @@ func checkEBUSY(err error) error {
 	return err
 }
 
-func getOomControlValue(resources *specs.LinuxResources) *int64 {
-	if resources.DisableOOMKiller != nil && *resources.DisableOOMKiller {
+func getOomControlValue(mem *specs.LinuxMemory) *int64 {
+	if mem.DisableOOMKiller != nil && *mem.DisableOOMKiller {
 		i := int64(1)
 		return &i
 	}
