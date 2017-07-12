@@ -20,7 +20,7 @@ command. As part of this process, we do the following:
 2. Prepare the snapshot filesystem with the pulled resources.
 3. Register metadata for the image.
 `,
-	Flags: registryFlags,
+	Flags: append(registryFlags, snapshotterFlags...),
 	Action: func(clicontext *cli.Context) error {
 		var (
 			ref = clicontext.Args().First()
@@ -38,7 +38,7 @@ command. As part of this process, we do the following:
 
 		// TODO: Show unpack status
 		fmt.Printf("unpacking %s...", img.Target().Digest)
-		err = img.Unpack(ctx)
+		err = img.Unpack(ctx, clicontext.String("snapshotter"))
 		fmt.Println("done")
 		return err
 	},

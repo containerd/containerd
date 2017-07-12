@@ -44,6 +44,13 @@ var registryFlags = []cli.Flag{
 	},
 }
 
+var snapshotterFlags = []cli.Flag{
+	cli.StringFlag{
+		Name:  "snapshotter",
+		Usage: "Snapshotter name. Empty value stands for the daemon default value.",
+	},
+}
+
 func getClient(context *cli.Context) (*containerd.Client, error) {
 	address := context.GlobalString("address")
 	//timeout := context.GlobalDuration("connect-timeout")

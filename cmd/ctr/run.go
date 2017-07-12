@@ -48,7 +48,7 @@ var runCommand = cli.Command{
 	Name:      "run",
 	Usage:     "run a container",
 	ArgsUsage: "IMAGE ID [COMMAND] [ARG...]",
-	Flags: []cli.Flag{
+	Flags: append([]cli.Flag{
 		cli.BoolFlag{
 			Name:  "tty,t",
 			Usage: "allocate a TTY for the container",
@@ -86,7 +86,7 @@ var runCommand = cli.Command{
 			Name:  "checkpoint",
 			Usage: "provide the checkpoint digest to restore the container",
 		},
-	},
+	}, snapshotterFlags...),
 	Action: func(context *cli.Context) error {
 		var (
 			err             error

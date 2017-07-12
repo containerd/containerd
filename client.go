@@ -166,7 +166,7 @@ func WithContainerLabels(labels map[string]string) NewContainerOpts {
 func WithExistingRootFS(id string) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		// check that the snapshot exists, if not, fail on creation
-		if _, err := client.SnapshotService().Mounts(ctx, id); err != nil {
+		if _, err := client.SnapshotService(c.Snapshotter).Mounts(ctx, id); err != nil {
 			return err
 		}
 		c.RootFS = id
@@ -182,7 +182,7 @@ func WithNewRootFS(id string, i Image) NewContainerOpts {
 		if err != nil {
 			return err
 		}
-		if _, err := client.SnapshotService().Prepare(ctx, id, identity.ChainID(diffIDs).String()); err != nil {
+		if _, err := client.SnapshotService(c.Snapshotter).Prepare(ctx, id, identity.ChainID(diffIDs).String()); err != nil {
 			return err
 		}
 		c.RootFS = id
@@ -199,7 +199,7 @@ func WithNewReadonlyRootFS(id string, i Image) NewContainerOpts {
 		if err != nil {
 			return err
 		}
-		if _, err := client.SnapshotService().View(ctx, id, identity.ChainID(diffIDs).String()); err != nil {
+		if _, err := client.SnapshotService(c.Snapshotter).View(ctx, id, identity.ChainID(diffIDs).String()); err != nil {
 			return err
 		}
 		c.RootFS = id
@@ -215,6 +215,13 @@ func WithRuntime(name string) NewContainerOpts {
 		c.Runtime = &containers.Container_Runtime{
 			Name: name,
 		}
+		return nil
+	}
+}
+
+func WithSnapshotter(name string) NewContainerOpts {
+	return func(ctx context.Context, client *Client, c *containers.Container) error {
+		c.Snapshotter = name
 		return nil
 	}
 }
@@ -273,6 +280,9 @@ type RemoteContext struct {
 	// afterwards. Unpacking is required to run an image.
 	Unpack bool
 
+	// Snapshotter used for unpacking
+	Snapshotter string
+
 	// BaseHandlers are a set of handlers which get are called on dispatch.
 	// These handlers always get called before any operation specific
 	// handlers.
@@ -298,6 +308,14 @@ func defaultRemoteContext() *RemoteContext {
 func WithPullUnpack(client *Client, c *RemoteContext) error {
 	c.Unpack = true
 	return nil
+}
+
+// WithPullSnapshotter specifies snapshotter name used for unpacking
+func WithPullSnapshotter(snapshotterName string) RemoteOpts {
+	return func(client *Client, c *RemoteContext) error {
+		c.Snapshotter = snapshotterName
+		return nil
+	}
 }
 
 // WithSchema1Conversion is used to convert Docker registry schema 1
@@ -392,7 +410,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpts) (Imag
 		i:      imgrec,
 	}
 	if pullCtx.Unpack {
-		if err := img.Unpack(ctx); err != nil {
+		if err := img.Unpack(ctx, pullCtx.Snapshotter); err != nil {
 			return nil, err
 		}
 	}
@@ -496,8 +514,8 @@ func (c *Client) ContentStore() content.Store {
 	return contentservice.NewStoreFromClient(contentapi.NewContentClient(c.conn))
 }
 
-func (c *Client) SnapshotService() snapshot.Snapshotter {
-	return snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotsClient(c.conn))
+func (c *Client) SnapshotService(snapshotterName string) snapshot.Snapshotter {
+	return snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotsClient(c.conn), snapshotterName)
 }
 
 func (c *Client) TaskService() tasks.TasksClient {

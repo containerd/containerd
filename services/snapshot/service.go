@@ -43,32 +43,48 @@ func init() {
 var empty = &protoempty.Empty{}
 
 type service struct {
-	snapshotter snapshot.Snapshotter
-	emitter     events.Poster
+	snapshotters           map[string]snapshot.Snapshotter
+	defaultSnapshotterName string
+	emitter                events.Poster
 }
 
 func newService(ic *plugin.InitContext) (interface{}, error) {
 	evts := events.GetPoster(ic.Context)
-	snapshotters, err := ic.GetAll(plugin.SnapshotPlugin)
+	rawSnapshotters, err := ic.GetAll(plugin.SnapshotPlugin)
 	if err != nil {
 		return nil, err
 	}
-	cfg := ic.Config.(*config)
-
-	sn, ok := snapshotters[cfg.Default]
-	if !ok {
-		return nil, errors.Errorf("default snapshotter not loaded: %s", cfg.Default)
-	}
-
 	md, err := ic.Get(plugin.MetadataPlugin)
 	if err != nil {
 		return nil, err
 	}
+	snapshotters := make(map[string]snapshot.Snapshotter)
+	for name, sn := range rawSnapshotters {
+		snapshotters[name] = metadata.NewSnapshotter(md.(*bolt.DB), name, sn.(snapshot.Snapshotter))
+	}
+
+	cfg := ic.Config.(*config)
+	_, ok := snapshotters[cfg.Default]
+	if !ok {
+		return nil, errors.Errorf("default snapshotter not loaded: %s", cfg.Default)
+	}
 
 	return &service{
-		snapshotter: metadata.NewSnapshotter(md.(*bolt.DB), cfg.Default, sn.(snapshot.Snapshotter)),
-		emitter:     evts,
+		snapshotters:           snapshotters,
+		defaultSnapshotterName: cfg.Default,
+		emitter:                evts,
 	}, nil
+}
+
+func (s *service) getSnapshotter(name string) (snapshot.Snapshotter, error) {
+	if name == "" {
+		name = s.defaultSnapshotterName
+	}
+	sn, ok := s.snapshotters[name]
+	if !ok {
+		return nil, errors.Errorf("snapshotter not loaded: %s", name)
+	}
+	return sn, nil
 }
 
 func (s *service) Register(gs *grpc.Server) error {
@@ -78,9 +94,13 @@ func (s *service) Register(gs *grpc.Server) error {
 
 func (s *service) Prepare(ctx context.Context, pr *snapshotapi.PrepareSnapshotRequest) (*snapshotapi.PrepareSnapshotResponse, error) {
 	log.G(ctx).WithField("parent", pr.Parent).WithField("key", pr.Key).Debugf("Preparing snapshot")
+	sn, err := s.getSnapshotter(pr.Snapshotter)
+	if err != nil {
+		return nil, err
+	}
 	// TODO: Apply namespace
 	// TODO: Lookup snapshot id from metadata store
-	mounts, err := s.snapshotter.Prepare(ctx, pr.Key, pr.Parent)
+	mounts, err := sn.Prepare(ctx, pr.Key, pr.Parent)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -98,9 +118,13 @@ func (s *service) Prepare(ctx context.Context, pr *snapshotapi.PrepareSnapshotRe
 
 func (s *service) View(ctx context.Context, pr *snapshotapi.ViewSnapshotRequest) (*snapshotapi.ViewSnapshotResponse, error) {
 	log.G(ctx).WithField("parent", pr.Parent).WithField("key", pr.Key).Debugf("Preparing view snapshot")
+	sn, err := s.getSnapshotter(pr.Snapshotter)
+	if err != nil {
+		return nil, err
+	}
 	// TODO: Apply namespace
 	// TODO: Lookup snapshot id from metadata store
-	mounts, err := s.snapshotter.View(ctx, pr.Key, pr.Parent)
+	mounts, err := sn.View(ctx, pr.Key, pr.Parent)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -111,9 +135,13 @@ func (s *service) View(ctx context.Context, pr *snapshotapi.ViewSnapshotRequest)
 
 func (s *service) Mounts(ctx context.Context, mr *snapshotapi.MountsRequest) (*snapshotapi.MountsResponse, error) {
 	log.G(ctx).WithField("key", mr.Key).Debugf("Getting snapshot mounts")
+	sn, err := s.getSnapshotter(mr.Snapshotter)
+	if err != nil {
+		return nil, err
+	}
 	// TODO: Apply namespace
 	// TODO: Lookup snapshot id from metadata store
-	mounts, err := s.snapshotter.Mounts(ctx, mr.Key)
+	mounts, err := sn.Mounts(ctx, mr.Key)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -124,9 +152,13 @@ func (s *service) Mounts(ctx context.Context, mr *snapshotapi.MountsRequest) (*s
 
 func (s *service) Commit(ctx context.Context, cr *snapshotapi.CommitSnapshotRequest) (*protoempty.Empty, error) {
 	log.G(ctx).WithField("key", cr.Key).WithField("name", cr.Name).Debugf("Committing snapshot")
+	sn, err := s.getSnapshotter(cr.Snapshotter)
+	if err != nil {
+		return nil, err
+	}
 	// TODO: Apply namespace
 	// TODO: Lookup snapshot id from metadata store
-	if err := s.snapshotter.Commit(ctx, cr.Name, cr.Key); err != nil {
+	if err := sn.Commit(ctx, cr.Name, cr.Key); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 
@@ -141,9 +173,13 @@ func (s *service) Commit(ctx context.Context, cr *snapshotapi.CommitSnapshotRequ
 
 func (s *service) Remove(ctx context.Context, rr *snapshotapi.RemoveSnapshotRequest) (*protoempty.Empty, error) {
 	log.G(ctx).WithField("key", rr.Key).Debugf("Removing snapshot")
+	sn, err := s.getSnapshotter(rr.Snapshotter)
+	if err != nil {
+		return nil, err
+	}
 	// TODO: Apply namespace
 	// TODO: Lookup snapshot id from metadata store
-	if err := s.snapshotter.Remove(ctx, rr.Key); err != nil {
+	if err := sn.Remove(ctx, rr.Key); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 
@@ -157,8 +193,12 @@ func (s *service) Remove(ctx context.Context, rr *snapshotapi.RemoveSnapshotRequ
 
 func (s *service) Stat(ctx context.Context, sr *snapshotapi.StatSnapshotRequest) (*snapshotapi.StatSnapshotResponse, error) {
 	log.G(ctx).WithField("key", sr.Key).Debugf("Statting snapshot")
+	sn, err := s.getSnapshotter(sr.Snapshotter)
+	if err != nil {
+		return nil, err
+	}
 	// TODO: Apply namespace
-	info, err := s.snapshotter.Stat(ctx, sr.Key)
+	info, err := sn.Stat(ctx, sr.Key)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -167,6 +207,10 @@ func (s *service) Stat(ctx context.Context, sr *snapshotapi.StatSnapshotRequest)
 }
 
 func (s *service) List(sr *snapshotapi.ListSnapshotsRequest, ss snapshotapi.Snapshots_ListServer) error {
+	sn, err := s.getSnapshotter(sr.Snapshotter)
+	if err != nil {
+		return err
+	}
 	// TODO: Apply namespace
 	var (
 		buffer    []snapshotapi.Info
@@ -176,7 +220,7 @@ func (s *service) List(sr *snapshotapi.ListSnapshotsRequest, ss snapshotapi.Snap
 			})
 		}
 	)
-	err := s.snapshotter.Walk(ss.Context(), func(ctx gocontext.Context, info snapshot.Info) error {
+	err = sn.Walk(ss.Context(), func(ctx gocontext.Context, info snapshot.Info) error {
 		buffer = append(buffer, fromInfo(info))
 
 		if len(buffer) >= 100 {
@@ -203,8 +247,12 @@ func (s *service) List(sr *snapshotapi.ListSnapshotsRequest, ss snapshotapi.Snap
 }
 
 func (s *service) Usage(ctx context.Context, ur *snapshotapi.UsageRequest) (*snapshotapi.UsageResponse, error) {
+	sn, err := s.getSnapshotter(ur.Snapshotter)
+	if err != nil {
+		return nil, err
+	}
 	// TODO: Apply namespace
-	usage, err := s.snapshotter.Usage(ctx, ur.Key)
+	usage, err := sn.Usage(ctx, ur.Key)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}

@@ -51,7 +51,7 @@ message DiffRequest {
 
 	// Ref identifies the pre-commit content store object. This
 	// reference can be used to get the status from the content store.
-	string ref = 5;
+	string ref = 4;
 }
 
 message DiffResponse {

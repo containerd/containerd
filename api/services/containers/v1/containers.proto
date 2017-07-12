@@ -65,6 +65,9 @@ message Container {
 	// Spec to be used when creating the container. This is runtime specific.
 	google.protobuf.Any spec = 5;
 
+	// Snapshotter specifies the snapshotter name used for rootfs
+	string snapshotter = 6;
+
 	// RootFS specifies the snapshot key to use for the container's root
 	// filesystem. When starting a task from this container, a caller should
 	// look up the mounts from the snapshot service and include those on the
@@ -73,13 +76,13 @@ message Container {
 	// Snapshots referenced in this field will not be garbage collected.
 	//
 	// This field may be updated.
-	string rootfs = 6 [(gogoproto.customname) = "RootFS"];
+	string rootfs = 7 [(gogoproto.customname) = "RootFS"];
 
 	// CreatedAt is the time the container was first created.
-	google.protobuf.Timestamp created_at = 7 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp created_at = 8 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 
 	// UpdatedAt is the last time the container was mutated.
-	google.protobuf.Timestamp updated_at = 8 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp updated_at = 9 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message GetContainerRequest {

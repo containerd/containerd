@@ -264,7 +264,7 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointOpts) (d v1.Des
 	if err := t.checkpointImage(ctx, &index, cr.Container.Image); err != nil {
 		return d, err
 	}
-	if err := t.checkpointRWSnapshot(ctx, &index, cr.Container.RootFS); err != nil {
+	if err := t.checkpointRWSnapshot(ctx, &index, cr.Container.Snapshotter, cr.Container.RootFS); err != nil {
 		return d, err
 	}
 	index.Annotations = make(map[string]string)
@@ -307,8 +307,8 @@ func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tas
 	return nil
 }
 
-func (t *task) checkpointRWSnapshot(ctx context.Context, index *v1.Index, id string) error {
-	rw, err := rootfs.Diff(ctx, id, fmt.Sprintf("checkpoint-rw-%s", id), t.client.SnapshotService(), t.client.DiffService())
+func (t *task) checkpointRWSnapshot(ctx context.Context, index *v1.Index, snapshotterName string, id string) error {
+	rw, err := rootfs.Diff(ctx, id, fmt.Sprintf("checkpoint-rw-%s", id), t.client.SnapshotService(snapshotterName), t.client.DiffService())
 	if err != nil {
 		return err
 	}

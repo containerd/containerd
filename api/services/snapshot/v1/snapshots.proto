@@ -21,8 +21,9 @@ service Snapshots {
 }
 
 message PrepareSnapshotRequest {
-	string key = 1;
-	string parent = 2;
+	string snapshotter = 1;
+	string key = 2;
+	string parent = 3;
 }
 
 message PrepareSnapshotResponse {
@@ -30,8 +31,9 @@ message PrepareSnapshotResponse {
 }
 
 message ViewSnapshotRequest {
-	string key = 1;
-	string parent = 2;
+	string snapshotter = 1;
+	string key = 2;
+	string parent = 3;
 }
 
 message ViewSnapshotResponse {
@@ -39,7 +41,8 @@ message ViewSnapshotResponse {
 }
 
 message MountsRequest {
-	string key = 1;
+	string snapshotter = 1;
+	string key = 2;
 }
 
 message MountsResponse {
@@ -47,16 +50,19 @@ message MountsResponse {
 }
 
 message RemoveSnapshotRequest {
-	string key = 1;
-}
-
-message CommitSnapshotRequest {
-	string name = 1;
+	string snapshotter = 1;
 	string key = 2;
 }
 
+message CommitSnapshotRequest {
+	string snapshotter = 1;
+	string name = 2;
+	string key = 3;
+}
+
 message StatSnapshotRequest {
-	string key = 1;
+	string snapshotter = 1;
+	string key = 2;
 }
 
 enum Kind {
@@ -80,6 +86,7 @@ message StatSnapshotResponse {
 }
 
 message ListSnapshotsRequest{
+	string snapshotter = 1;
 }
 
 message ListSnapshotsResponse {
@@ -87,7 +94,8 @@ message ListSnapshotsResponse {
 }
 
 message UsageRequest {
-	string key = 1;
+	string snapshotter = 1;
+	string key = 2;
 }
 
 message UsageResponse {
