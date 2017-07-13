@@ -29,10 +29,8 @@ import (
 )
 
 var (
-	ErrTaskNotExists     = errors.New("task does not exist")
-	ErrTaskAlreadyExists = errors.New("task already exists")
-	pluginID             = fmt.Sprintf("%s.%s", plugin.RuntimePlugin, "linux")
-	empty                = &google_protobuf.Empty{}
+	pluginID = fmt.Sprintf("%s.%s", plugin.RuntimePlugin, "linux")
+	empty    = &google_protobuf.Empty{}
 )
 
 const (
@@ -90,7 +88,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		shimDebug: cfg.ShimDebug,
 		runtime:   cfg.Runtime,
 		monitor:   monitor.(runtime.TaskMonitor),
-		tasks:     newTaskList(),
+		tasks:     runtime.NewTaskList(),
 		db:        m.(*bolt.DB),
 		address:   ic.Address,
 	}
@@ -99,7 +97,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		return nil, err
 	}
 	for _, t := range tasks {
-		if err := r.tasks.addWithNamespace(t.namespace, t); err != nil {
+		if err := r.tasks.AddWithNamespace(t.namespace, t); err != nil {
 			return nil, err
 		}
 	}
@@ -115,7 +113,7 @@ type Runtime struct {
 	address   string
 
 	monitor runtime.TaskMonitor
-	tasks   *taskList
+	tasks   *runtime.TaskList
 	db      *bolt.DB
 }
 
@@ -175,7 +173,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 		return nil, errors.New(grpc.ErrorDesc(err))
 	}
 	t := newTask(id, namespace, s)
-	if err := r.tasks.add(ctx, t); err != nil {
+	if err := r.tasks.Add(ctx, t); err != nil {
 		return nil, err
 	}
 	// after the task is created, add it to the monitor
@@ -204,7 +202,7 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 	if err := lc.shim.KillShim(ctx); err != nil {
 		log.G(ctx).WithError(err).Error("failed to kill shim")
 	}
-	r.tasks.delete(ctx, lc)
+	r.tasks.Delete(ctx, lc)
 
 	bundle := loadBundle(filepath.Join(r.root, namespace, lc.id), namespace)
 	if err := bundle.Delete(); err != nil {
@@ -218,19 +216,7 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 }
 
 func (r *Runtime) Tasks(ctx context.Context) ([]runtime.Task, error) {
-	namespace, err := namespaces.NamespaceRequired(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var o []runtime.Task
-	tasks, ok := r.tasks.tasks[namespace]
-	if !ok {
-		return o, nil
-	}
-	for _, t := range tasks {
-		o = append(o, t)
-	}
-	return o, nil
+	return r.tasks.GetAll(ctx)
 }
 
 func (r *Runtime) restoreTasks(ctx context.Context) ([]*Task, error) {
@@ -255,7 +241,7 @@ func (r *Runtime) restoreTasks(ctx context.Context) ([]*Task, error) {
 }
 
 func (r *Runtime) Get(ctx context.Context, id string) (runtime.Task, error) {
-	return r.tasks.get(ctx, id)
+	return r.tasks.Get(ctx, id)
 }
 
 func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
