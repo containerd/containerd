@@ -98,7 +98,7 @@ func TestMain(m *testing.M) {
 		if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 		}
-		if _, err := cmd.Process.Wait(); err != nil {
+		if err := cmd.Wait(); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 		}
 		if err := os.RemoveAll(defaultRoot); err != nil {
