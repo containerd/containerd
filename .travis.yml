@@ -49,7 +49,9 @@ script:
   - export CGO_ENABLED=$TRAVIS_CGO_ENABLED
   - GIT_CHECK_EXCLUDE="./vendor" TRAVIS_COMMIT_RANGE="${TRAVIS_COMMIT_RANGE/.../..}" make dco
   - make fmt
-  - make vet
+# FIXME: For non-linux GOOS, without running `go build -i`, vet fails with `vet: import failed: can't find import: fmt`...
+# However, running `go build -i` requires root privilege. So let's skip vet for non-linux atm (#1179).
+  - if [ "$GOOS" = "linux" ]; then make vet; fi
   - make build
   - make binaries
   - if [ "$GOOS" = "linux" ]; then sudo make install ; fi
