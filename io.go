@@ -1,6 +1,7 @@
 package containerd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -16,6 +17,13 @@ type IO struct {
 	Stderr   string
 
 	closer *wgCloser
+}
+
+func (i *IO) Cancel() {
+	if i.closer == nil {
+		return
+	}
+	i.closer.Cancel()
 }
 
 func (i *IO) Wait() {
@@ -134,9 +142,10 @@ type ioSet struct {
 }
 
 type wgCloser struct {
-	wg  *sync.WaitGroup
-	dir string
-	set []io.Closer
+	wg     *sync.WaitGroup
+	dir    string
+	set    []io.Closer
+	cancel context.CancelFunc
 }
 
 func (g *wgCloser) Wait() {
@@ -151,4 +160,8 @@ func (g *wgCloser) Close() error {
 		return os.RemoveAll(g.dir)
 	}
 	return nil
+}
+
+func (g *wgCloser) Cancel() {
+	g.cancel()
 }
