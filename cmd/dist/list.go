@@ -61,7 +61,7 @@ var listCommand = cli.Command{
 				fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n",
 					info.Digest,
 					units.HumanSize(float64(info.Size)),
-					units.HumanDuration(time.Since(info.CommittedAt)),
+					units.HumanDuration(time.Since(info.CreatedAt)),
 					labels)
 				return nil
 			}

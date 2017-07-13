@@ -29,11 +29,11 @@ type Ingester interface {
 // TODO(stevvooe): Consider a very different name for this struct. Info is way
 // to general. It also reads very weird in certain context, like pluralization.
 type Info struct {
-	Digest      digest.Digest
-	Size        int64
-	CommittedAt time.Time
-	UpdatedAt   time.Time
-	Labels      map[string]string
+	Digest    digest.Digest
+	Size      int64
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	Labels    map[string]string
 }
 
 type Status struct {

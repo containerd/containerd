@@ -81,8 +81,8 @@ message Info {
 	// Size is the total number of bytes in the blob.
 	int64 size = 2;
 
-	// CommittedAt provides the time at which the blob was committed.
-	google.protobuf.Timestamp committed_at = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	// CreatedAt provides the time at which the blob was committed.
+	google.protobuf.Timestamp created_at = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 
 	// UpdatedAt provides the time the info was last updated.
 	google.protobuf.Timestamp updated_at = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
@@ -105,7 +105,7 @@ message UpdateRequest {
 	// UpdateMask specifies which fields to perform the update on. If empty,
 	// the operation applies to all fields.
 	//
-	// In info, Digest, Size, and CommittedAt are immutable,
+	// In info, Digest, Size, and CreatedAt are immutable,
 	// other field may be updated using this mask.
 	// If no mask is provided, all mutable field are updated.
 	google.protobuf.FieldMask update_mask = 2;

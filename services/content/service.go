@@ -111,10 +111,10 @@ func (s *Service) List(req *api.ListContentRequest, session api.Content_ListServ
 
 	if err := s.store.Walk(session.Context(), func(info content.Info) error {
 		buffer = append(buffer, api.Info{
-			Digest:      info.Digest,
-			Size_:       info.Size,
-			CommittedAt: info.CommittedAt,
-			Labels:      info.Labels,
+			Digest:    info.Digest,
+			Size_:     info.Size,
+			CreatedAt: info.CreatedAt,
+			Labels:    info.Labels,
 		})
 
 		if len(buffer) >= 100 {

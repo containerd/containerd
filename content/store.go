@@ -52,10 +52,10 @@ func (s *store) Info(ctx context.Context, dgst digest.Digest) (Info, error) {
 
 func (s *store) info(dgst digest.Digest, fi os.FileInfo) Info {
 	return Info{
-		Digest:      dgst,
-		Size:        fi.Size(),
-		CommittedAt: fi.ModTime(),
-		UpdatedAt:   fi.ModTime(),
+		Digest:    dgst,
+		Size:      fi.Size(),
+		CreatedAt: fi.ModTime(),
+		UpdatedAt: fi.ModTime(),
 	}
 }
 
