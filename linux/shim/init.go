@@ -39,19 +39,18 @@ type initProcess struct {
 	// the reaper interface.
 	mu sync.Mutex
 
-	id           string
-	bundle       string
-	console      console.Console
-	io           runc.IO
-	runtime      *runc.Runc
-	status       int
-	exited       time.Time
-	pid          int
-	closers      []io.Closer
-	stdin        io.Closer
-	stdio        stdio
-	rootfs       string
-	nrRootMounts int // Number of rootfs overmounts
+	id      string
+	bundle  string
+	console console.Console
+	io      runc.IO
+	runtime *runc.Runc
+	status  int
+	exited  time.Time
+	pid     int
+	closers []io.Closer
+	stdin   io.Closer
+	stdio   stdio
+	rootfs  string
 }
 
 func newInitProcess(context context.Context, path, namespace string, r *shimapi.CreateTaskRequest) (*initProcess, error) {
@@ -73,12 +72,11 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 	// count the number of successful mounts so we can undo
 	// what was actually done rather than what should have been
 	// done.
-	nrRootMounts := 0
 	defer func() {
 		if success {
 			return
 		}
-		if err2 := mount.UnmountN(rootfs, 0, nrRootMounts); err2 != nil {
+		if err2 := mount.UnmountAll(rootfs, 0); err2 != nil {
 			log.G(context).WithError(err2).Warn("Failed to cleanup rootfs mount")
 		}
 	}()
@@ -91,7 +89,6 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 		if err := m.Mount(rootfs); err != nil {
 			return nil, errors.Wrapf(err, "failed to mount rootfs component %v", m)
 		}
-		nrRootMounts++
 	}
 	runtime := &runc.Runc{
 		Command:      r.Runtime,
@@ -110,8 +107,7 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 			stderr:   r.Stderr,
 			terminal: r.Terminal,
 		},
-		rootfs:       rootfs,
-		nrRootMounts: nrRootMounts,
+		rootfs: rootfs,
 	}
 	var (
 		err    error
@@ -253,7 +249,7 @@ func (p *initProcess) Delete(context context.Context) error {
 	}
 	err = p.runtimeError(err, "OCI runtime delete failed")
 
-	if err2 := mount.UnmountN(p.rootfs, 0, p.nrRootMounts); err2 != nil {
+	if err2 := mount.UnmountAll(p.rootfs, 0); err2 != nil {
 		log.G(context).WithError(err2).Warn("Failed to cleanup rootfs mount")
 		if err == nil {
 			err = errors.Wrap(err2, "Failed rootfs umount")
