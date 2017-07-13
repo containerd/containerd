@@ -9,7 +9,7 @@ import (
 )
 
 var containersSetLabelsCommand = cli.Command{
-	Name:        "set-labels",
+	Name:        "label",
 	Usage:       "Set and clear labels for a container.",
 	ArgsUsage:   "[flags] <name> [<key>=<value>, ...]",
 	Description: "Set and clear labels for a container.",
