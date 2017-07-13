@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	defaultConfigPath = filepath.Join(os.Getenv("programfiles"), "containerd", "config.toml")
+	defaultConfigPath = filepath.Join(os.Getenv("programdata"), "containerd", "config.toml")
 	handledSignals    = []os.Signal{
 		syscall.SIGTERM,
 		syscall.SIGINT,
