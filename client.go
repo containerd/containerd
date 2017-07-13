@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/api/services/containers/v1"
+	containersapi "github.com/containerd/containerd/api/services/containers/v1"
 	contentapi "github.com/containerd/containerd/api/services/content/v1"
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
@@ -20,6 +20,7 @@ import (
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	versionservice "github.com/containerd/containerd/api/services/version/v1"
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
@@ -139,15 +140,13 @@ func (c *Client) IsServing(ctx context.Context) (bool, error) {
 
 // Containers returns all containers created in containerd
 func (c *Client) Containers(ctx context.Context, filters ...string) ([]Container, error) {
-	r, err := c.ContainerService().List(ctx, &containers.ListContainersRequest{
-		Filters: filters,
-	})
+	r, err := c.ContainerService().List(ctx, filters...)
 	if err != nil {
 		return nil, err
 	}
 	var out []Container
-	for _, container := range r.Containers {
-		out = append(out, containerFromProto(c, container))
+	for _, container := range r {
+		out = append(out, containerFromRecord(c, container))
 	}
 	return out, nil
 }
@@ -212,7 +211,7 @@ func WithNewReadonlyRootFS(id string, i Image) NewContainerOpts {
 // be used to create tasks for the container
 func WithRuntime(name string) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		c.Runtime = &containers.Container_Runtime{
+		c.Runtime = containers.RuntimeInfo{
 			Name: name,
 		}
 		return nil
@@ -238,7 +237,7 @@ func WithImage(i Image) NewContainerOpts {
 func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error) {
 	container := containers.Container{
 		ID: id,
-		Runtime: &containers.Container_Runtime{
+		Runtime: containers.RuntimeInfo{
 			Name: c.runtime,
 		},
 	}
@@ -247,23 +246,19 @@ func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContain
 			return nil, err
 		}
 	}
-	r, err := c.ContainerService().Create(ctx, &containers.CreateContainerRequest{
-		Container: container,
-	})
+	r, err := c.ContainerService().Create(ctx, container)
 	if err != nil {
 		return nil, err
 	}
-	return containerFromProto(c, r.Container), nil
+	return containerFromRecord(c, r), nil
 }
 
 func (c *Client) LoadContainer(ctx context.Context, id string) (Container, error) {
-	response, err := c.ContainerService().Get(ctx, &containers.GetContainerRequest{
-		ID: id,
-	})
+	r, err := c.ContainerService().Get(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	return containerFromProto(c, response.Container), nil
+	return containerFromRecord(c, r), nil
 }
 
 type RemoteOpts func(*Client, *RemoteContext) error
@@ -506,8 +501,8 @@ func (c *Client) NamespaceService() namespacesapi.NamespacesClient {
 	return namespacesapi.NewNamespacesClient(c.conn)
 }
 
-func (c *Client) ContainerService() containers.ContainersClient {
-	return containers.NewContainersClient(c.conn)
+func (c *Client) ContainerService() containers.Store {
+	return NewRemoteContainerStore(containersapi.NewContainersClient(c.conn))
 }
 
 func (c *Client) ContentStore() content.Store {
