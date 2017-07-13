@@ -11,6 +11,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/windows/hcs"
+	"github.com/containerd/containerd/windows/hcsshimopts"
 	"github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -36,20 +37,21 @@ func loadContainers(ctx context.Context, h *hcs.HCS) ([]*container, error) {
 	return containers, nil
 }
 
-func newContainer(ctx context.Context, h *hcs.HCS, id string, spec *RuntimeSpec, io runtime.IO) (*container, error) {
+func (r *Runtime) newContainer(ctx context.Context, id string, spec *specs.Spec, createOpts *hcsshimopts.CreateOptions, io runtime.IO) (*container, error) {
 	cio, err := hcs.NewIO(io.Stdin, io.Stdout, io.Stderr, io.Terminal)
 	if err != nil {
 		return nil, err
 	}
 
-	hcsCtr, err := h.CreateContainer(ctx, id, spec.OCISpec, spec.Configuration.TerminateDuration, cio)
+	ctr, err := r.hcs.CreateContainer(ctx, id, spec, createOpts.TerminateDuration, cio)
 	if err != nil {
+		cio.Close()
 		return nil, err
 	}
 	//sendEvent(id, events.RuntimeEvent_CREATE, hcsCtr.Pid(), 0, time.Time{})
 
 	return &container{
-		ctr:    hcsCtr,
+		ctr:    ctr,
 		status: runtime.CreatedStatus,
 	}, nil
 }

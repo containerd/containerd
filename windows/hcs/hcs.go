@@ -79,7 +79,7 @@ type HCS struct {
 	pidPool  *pid.Pool
 }
 
-func (s *HCS) CreateContainer(ctx context.Context, id string, spec specs.Spec, terminateDuration time.Duration, io *IO) (c *Container, err error) {
+func (s *HCS) CreateContainer(ctx context.Context, id string, spec *specs.Spec, terminateDuration time.Duration, io *IO) (c *Container, err error) {
 	pid, err := s.pidPool.Get()
 	if err != nil {
 		return nil, err
@@ -151,7 +151,7 @@ type Container struct {
 	id              string
 	stateDir        string
 	pid             uint32
-	spec            specs.Spec
+	spec            *specs.Spec
 	io              *IO
 	hcs             *HCS
 	layerFolderPath string
@@ -418,7 +418,7 @@ func (c *Container) addProcess(ctx context.Context, id string, spec *specs.Proce
 
 // newContainerConfig generates a hcsshim container configuration from the
 // provided OCI Spec
-func newContainerConfig(ctx context.Context, owner, id string, spec specs.Spec) (*hcsshim.ContainerConfig, error) {
+func newContainerConfig(ctx context.Context, owner, id string, spec *specs.Spec) (*hcsshim.ContainerConfig, error) {
 	if len(spec.Windows.LayerFolders) == 0 {
 		return nil, errors.New("LayerFolders cannot be empty")
 	}

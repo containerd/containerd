@@ -14,6 +14,7 @@ import (
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/typeurl"
 	"github.com/containerd/containerd/windows/hcs"
+	"github.com/containerd/containerd/windows/hcsshimopts"
 	"github.com/containerd/containerd/windows/pid"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -106,12 +107,18 @@ func (r *Runtime) ID() string {
 }
 
 func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts) (runtime.Task, error) {
-	v, err := typeurl.UnmarshalAny(opts.Spec)
+	s, err := typeurl.UnmarshalAny(opts.Spec)
 	if err != nil {
 		return nil, err
 	}
-	rtSpec := v.(*RuntimeSpec)
-	ctr, err := newContainer(ctx, r.hcs, id, rtSpec, opts.IO)
+	spec := s.(*specs.Spec)
+
+	o, err := typeurl.UnmarshalAny(opts.Options)
+	if err != nil {
+		return nil, err
+	}
+	createOpts := o.(*hcsshimopts.CreateOptions)
+	ctr, err := r.newContainer(ctx, id, spec, createOpts, opts.IO)
 	if err != nil {
 		return nil, err
 	}
