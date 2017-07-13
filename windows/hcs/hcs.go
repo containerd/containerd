@@ -52,24 +52,22 @@ func (s *HCS) LoadContainers(ctx context.Context) ([]*Container, error) {
 		stateDir := filepath.Join(s.stateDir, p.ID)
 		b, err := ioutil.ReadFile(filepath.Join(stateDir, layerFile))
 		containers = append(containers, &Container{
-			id:              p.ID,
-			Container:       container,
-			stateDir:        stateDir,
-			hcs:             s,
-			io:              &IO{},
-			layerFolderPath: string(b),
-			conf: Configuration{
-				TerminateDuration: defaultTerminateTimeout,
-			},
+			id:                p.ID,
+			Container:         container,
+			stateDir:          stateDir,
+			hcs:               s,
+			io:                &IO{},
+			layerFolderPath:   string(b),
+			terminateDuration: defaultTerminateTimeout,
 		})
 	}
 
 	return containers, nil
 }
 
-func New(owner, rootDir string) *HCS {
+func New(owner, root string) *HCS {
 	return &HCS{
-		stateDir: rootDir,
+		stateDir: root,
 		owner:    owner,
 		pidPool:  pid.NewPool(),
 	}
@@ -81,7 +79,7 @@ type HCS struct {
 	pidPool  *pid.Pool
 }
 
-func (s *HCS) CreateContainer(ctx context.Context, id string, spec specs.Spec, conf Configuration, io *IO) (c *Container, err error) {
+func (s *HCS) CreateContainer(ctx context.Context, id string, spec specs.Spec, terminateDuration time.Duration, io *IO) (c *Container, err error) {
 	pid, err := s.pidPool.Get()
 	if err != nil {
 		return nil, err
@@ -102,44 +100,44 @@ func (s *HCS) CreateContainer(ctx context.Context, id string, spec specs.Spec, c
 		}
 	}()
 
-	if conf.TerminateDuration == 0 {
-		conf.TerminateDuration = defaultTerminateTimeout
+	if terminateDuration == 0 {
+		terminateDuration = defaultTerminateTimeout
 	}
 
-	ctrConf, err := newContainerConfig(s.owner, id, spec, conf)
+	conf, err := newContainerConfig(ctx, s.owner, id, spec)
 	if err != nil {
 		return nil, err
 	}
 
 	layerPathFile := filepath.Join(stateDir, layerFile)
-	if err := ioutil.WriteFile(layerPathFile, []byte(ctrConf.LayerFolderPath), 0644); err != nil {
-		log.G(ctx).WithError(err).Warnf("failed to save active layer %s", ctrConf.LayerFolderPath)
+	if err := ioutil.WriteFile(layerPathFile, []byte(conf.LayerFolderPath), 0644); err != nil {
+		log.G(ctx).WithError(err).Warnf("failed to save active layer %s", conf.LayerFolderPath)
 	}
 
-	ctr, err := hcsshim.CreateContainer(id, ctrConf)
+	ctr, err := hcsshim.CreateContainer(id, conf)
 	if err != nil {
-		removeLayer(ctx, ctrConf.LayerFolderPath)
+		removeLayer(ctx, conf.LayerFolderPath)
 		return nil, errors.Wrapf(err, "failed to create container %s", id)
 	}
 
 	err = ctr.Start()
 	if err != nil {
 		ctr.Terminate()
-		removeLayer(ctx, ctrConf.LayerFolderPath)
+		removeLayer(ctx, conf.LayerFolderPath)
 		return nil, errors.Wrapf(err, "failed to start container %s", id)
 	}
 
 	return &Container{
-		Container:       ctr,
-		id:              id,
-		pid:             pid,
-		spec:            spec,
-		conf:            conf,
-		stateDir:        stateDir,
-		io:              io,
-		hcs:             s,
-		layerFolderPath: ctrConf.LayerFolderPath,
-		processes:       make([]*Process, 0),
+		Container:         ctr,
+		id:                id,
+		pid:               pid,
+		spec:              spec,
+		stateDir:          stateDir,
+		io:                io,
+		hcs:               s,
+		conf:              conf,
+		terminateDuration: terminateDuration,
+		processes:         make([]*Process, 0),
 	}, nil
 }
 
@@ -147,11 +145,13 @@ type Container struct {
 	sync.Mutex
 	hcsshim.Container
 
+	conf              *hcsshim.ContainerConfig
+	terminateDuration time.Duration
+
 	id              string
 	stateDir        string
 	pid             uint32
 	spec            specs.Spec
-	conf            Configuration
 	io              *IO
 	hcs             *HCS
 	layerFolderPath string
@@ -179,7 +179,7 @@ func (c *Container) Start(ctx context.Context) error {
 func (c *Container) getDeathErr(err error) error {
 	switch {
 	case hcsshim.IsPending(err):
-		err = c.WaitTimeout(c.conf.TerminateDuration)
+		err = c.WaitTimeout(c.terminateDuration)
 	case hcsshim.IsAlreadyStopped(err):
 		err = nil
 	}
@@ -265,7 +265,7 @@ func (c *Container) Delete(ctx context.Context) {
 		return
 	}
 
-	serviceCtr, err := c.hcs.CreateContainer(ctx, c.id+"_servicing", c.spec, c.conf, &IO{})
+	serviceCtr, err := c.hcs.CreateContainer(ctx, c.id+"_servicing", c.spec, c.terminateDuration, &IO{})
 	if err != nil {
 		log.G(ctx).WithError(err).WithField("id", c.id).Warn("could not create servicing container")
 		return
@@ -299,8 +299,8 @@ func (c *Container) ExitCode() (uint32, error) {
 	return c.processes[0].ExitCode()
 }
 
-func (c *Container) GetConfiguration() Configuration {
-	return c.conf
+func (c *Container) IsHyperV() bool {
+	return c.conf.HvPartition
 }
 
 func (c *Container) AddProcess(ctx context.Context, id string, spec *specs.Process, io *IO) (*Process, error) {
@@ -416,30 +416,36 @@ func (c *Container) addProcess(ctx context.Context, id string, spec *specs.Proce
 	return p, nil
 }
 
-// newHCSConfiguration generates a hcsshim configuration from the instance
-// OCI Spec and hcs.Configuration.
-func newContainerConfig(owner, id string, spec specs.Spec, conf Configuration) (*hcsshim.ContainerConfig, error) {
-	configuration := &hcsshim.ContainerConfig{
-		SystemType:                 "Container",
-		Name:                       id,
-		Owner:                      owner,
-		HostName:                   spec.Hostname,
-		IgnoreFlushesDuringBoot:    conf.IgnoreFlushesDuringBoot,
-		HvPartition:                conf.UseHyperV,
-		AllowUnqualifiedDNSQuery:   conf.AllowUnqualifiedDNSQuery,
-		EndpointList:               conf.NetworkEndpoints,
-		NetworkSharedContainerName: conf.NetworkSharedContainerID,
-		Credentials:                conf.Credentials,
+// newContainerConfig generates a hcsshim container configuration from the
+// provided OCI Spec
+func newContainerConfig(ctx context.Context, owner, id string, spec specs.Spec) (*hcsshim.ContainerConfig, error) {
+	if len(spec.Windows.LayerFolders) == 0 {
+		return nil, errors.New("LayerFolders cannot be empty")
 	}
 
+	var (
+		layerFolders = spec.Windows.LayerFolders
+		conf         = &hcsshim.ContainerConfig{
+			SystemType:                 "Container",
+			Name:                       id,
+			Owner:                      owner,
+			HostName:                   spec.Hostname,
+			IgnoreFlushesDuringBoot:    spec.Windows.IgnoreFlushesDuringBoot,
+			AllowUnqualifiedDNSQuery:   spec.Windows.Network.AllowUnqualifiedDNSQuery,
+			EndpointList:               spec.Windows.Network.EndpointList,
+			NetworkSharedContainerName: spec.Windows.Network.NetworkSharedContainerName,
+			Credentials:                spec.Windows.CredentialSpec.(string),
+		}
+	)
+
 	// TODO: use the create request Mount for those
-	for _, layerPath := range conf.Layers {
+	for _, layerPath := range layerFolders {
 		_, filename := filepath.Split(layerPath)
 		guid, err := hcsshim.NameToGuid(filename)
 		if err != nil {
 			return nil, err
 		}
-		configuration.Layers = append(configuration.Layers, hcsshim.Layer{
+		conf.Layers = append(conf.Layers, hcsshim.Layer{
 			ID:   guid.ToString(),
 			Path: layerPath,
 		})
@@ -459,19 +465,20 @@ func newContainerConfig(owner, id string, spec specs.Spec, conf Configuration) (
 				}
 			}
 		}
-		configuration.MappedDirectories = mds
+		conf.MappedDirectories = mds
 	}
 
-	if conf.DNSSearchList != nil {
-		configuration.DNSSearchList = strings.Join(conf.DNSSearchList, ",")
+	if spec.Windows.Network.DNSSearchList != nil {
+		conf.DNSSearchList = strings.Join(spec.Windows.Network.DNSSearchList, ",")
 	}
 
-	if configuration.HvPartition {
-		for _, layerPath := range conf.Layers {
-			utilityVMPath := filepath.Join(layerPath, "UtilityVM")
+	if spec.Windows.HyperV != nil {
+		conf.HvPartition = true
+		for _, layerPath := range layerFolders {
+			utilityVMPath := spec.Windows.HyperV.UtilityVMPath
 			_, err := os.Stat(utilityVMPath)
 			if err == nil {
-				configuration.HvRuntime = &hcsshim.HvRuntime{ImagePath: utilityVMPath}
+				conf.HvRuntime = &hcsshim.HvRuntime{ImagePath: utilityVMPath}
 				break
 			} else if !os.IsNotExist(err) {
 				return nil, errors.Wrapf(err, "failed to access layer %s", layerPath)
@@ -479,78 +486,71 @@ func newContainerConfig(owner, id string, spec specs.Spec, conf Configuration) (
 		}
 	}
 
-	if len(configuration.Layers) == 0 {
-		// TODO: support starting with 0 layers, this mean we need the "filter" directory as parameter
-		return nil, errors.New("at least one layers must be provided")
-	}
-
-	di := hcsshim.DriverInfo{
-		Flavour: 1, // filter driver
-	}
-
-	if len(configuration.Layers) > 0 {
-		di.HomeDir = filepath.Dir(conf.Layers[0])
-	}
+	var (
+		err error
+		di  = hcsshim.DriverInfo{
+			Flavour: 1, // filter driver
+			HomeDir: filepath.Dir(layerFolders[0]),
+		}
+	)
 
 	// Windows doesn't support creating a container with a readonly
 	// filesystem, so always create a RW one
-	if err := hcsshim.CreateSandboxLayer(di, id, conf.Layers[0], conf.Layers); err != nil {
+	if err = hcsshim.CreateSandboxLayer(di, id, layerFolders[0], layerFolders); err != nil {
 		return nil, errors.Wrapf(err, "failed to create sandbox layer for %s: layers: %#v, driverInfo: %#v",
-			id, configuration.Layers, di)
+			id, layerFolders, di)
 	}
-	configuration.LayerFolderPath = filepath.Join(di.HomeDir, id)
-
-	err := hcsshim.ActivateLayer(di, id)
-	if err != nil {
-		removeLayer(context.TODO(), configuration.LayerFolderPath)
-		return nil, errors.Wrapf(err, "failed to active layer %s", configuration.LayerFolderPath)
-	}
-
-	err = hcsshim.PrepareLayer(di, id, conf.Layers)
-	if err != nil {
-		removeLayer(context.TODO(), configuration.LayerFolderPath)
-		return nil, errors.Wrapf(err, "failed to prepare layer %s", configuration.LayerFolderPath)
-	}
-
-	volumePath, err := hcsshim.GetLayerMountPath(di, id)
-	if err != nil {
-		if err := hcsshim.DestroyLayer(di, id); err != nil {
-			log.L.Warnf("failed to DestroyLayer %s: %s", id, err)
+	conf.LayerFolderPath = filepath.Join(di.HomeDir, id)
+	defer func() {
+		if err != nil {
+			removeLayer(ctx, conf.LayerFolderPath)
 		}
+	}()
+
+	if err = hcsshim.ActivateLayer(di, id); err != nil {
+		return nil, errors.Wrapf(err, "failed to activate layer %s", conf.LayerFolderPath)
+	}
+
+	if err = hcsshim.PrepareLayer(di, id, layerFolders); err != nil {
+		return nil, errors.Wrapf(err, "failed to prepare layer %s", conf.LayerFolderPath)
+	}
+
+	conf.VolumePath, err = hcsshim.GetLayerMountPath(di, id)
+	if err != nil {
 		return nil, errors.Wrapf(err, "failed to getmount path for layer %s: driverInfo: %#v", id, di)
 	}
-	configuration.VolumePath = volumePath
 
-	return configuration, nil
+	return conf, nil
 }
 
 // removeLayer deletes the given layer, all associated containers must have
 // been shutdown for this to succeed.
 func removeLayer(ctx context.Context, path string) error {
-	layerID := filepath.Base(path)
-	parentPath := filepath.Dir(path)
-	di := hcsshim.DriverInfo{
-		Flavour: 1, // filter driver
-		HomeDir: parentPath,
-	}
+	var (
+		err        error
+		layerID    = filepath.Base(path)
+		parentPath = filepath.Dir(path)
+		di         = hcsshim.DriverInfo{
+			Flavour: 1, // filter driver
+			HomeDir: parentPath,
+		}
+	)
 
-	err := hcsshim.UnprepareLayer(di, layerID)
-	if err != nil {
+	if err = hcsshim.UnprepareLayer(di, layerID); err != nil {
 		log.G(ctx).WithError(err).Warnf("failed to unprepare layer %s for removal", path)
 	}
 
-	err = hcsshim.DeactivateLayer(di, layerID)
-	if err != nil {
+	if err = hcsshim.DeactivateLayer(di, layerID); err != nil {
 		log.G(ctx).WithError(err).Warnf("failed to deactivate layer %s for removal", path)
 	}
 
 	removePath := filepath.Join(parentPath, fmt.Sprintf("%s-removing", layerID))
-	err = os.Rename(path, removePath)
-	if err != nil {
+	if err = os.Rename(path, removePath); err != nil {
 		log.G(ctx).WithError(err).Warnf("failed to rename container layer %s for removal", path)
 		removePath = path
 	}
-	if err := hcsshim.DestroyLayer(di, removePath); err != nil {
+
+	if err = hcsshim.DestroyLayer(di, removePath); err != nil {
 		log.G(ctx).WithError(err).Errorf("failed to remove container layer %s", removePath)
 		return err
 	}

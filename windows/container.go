@@ -42,7 +42,7 @@ func newContainer(ctx context.Context, h *hcs.HCS, id string, spec *RuntimeSpec,
 		return nil, err
 	}
 
-	hcsCtr, err := h.CreateContainer(ctx, id, spec.OCISpec, spec.Configuration, cio)
+	hcsCtr, err := h.CreateContainer(ctx, id, spec.OCISpec, spec.Configuration.TerminateDuration, cio)
 	if err != nil {
 		return nil, err
 	}
@@ -99,15 +99,15 @@ func (c *container) Start(ctx context.Context) error {
 }
 
 func (c *container) Pause(ctx context.Context) error {
-	if c.ctr.GetConfiguration().UseHyperV == false {
-		return fmt.Errorf("Windows non-HyperV containers do not support pause")
+	if c.ctr.IsHyperV() {
+		return c.ctr.Pause()
 	}
-	return c.ctr.Pause()
+	return errors.New("Windows non-HyperV containers do not support pause")
 }
 
 func (c *container) Resume(ctx context.Context) error {
-	if c.ctr.GetConfiguration().UseHyperV == false {
-		return fmt.Errorf("Windows non-HyperV containers do not support resume")
+	if c.ctr.IsHyperV() == false {
+		return errors.New("Windows non-HyperV containers do not support resume")
 	}
 	return c.ctr.Resume()
 }
