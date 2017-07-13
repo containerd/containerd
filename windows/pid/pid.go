@@ -31,6 +31,7 @@ func (p *Pool) Get() (uint32, error) {
 		}
 		if _, ok := p.pool[pid]; !ok {
 			p.cur = pid
+			p.pool[pid] = struct{}{}
 			return pid, nil
 		}
 		pid++
