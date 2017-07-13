@@ -45,6 +45,7 @@ func (p *process) Start(ctx context.Context) error {
 	}
 	response, err := p.task.client.TaskService().Exec(ctx, request)
 	if err != nil {
+		p.io.Wait()
 		p.io.Close()
 		return err
 	}
