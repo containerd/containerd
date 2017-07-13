@@ -47,7 +47,7 @@ func withMounts(context *cli.Context) containerd.SpecOpts {
 var runCommand = cli.Command{
 	Name:      "run",
 	Usage:     "run a container",
-	ArgsUsage: "IMAGE CONTAINER [COMMAND] [ARG...]",
+	ArgsUsage: "Image|RootFS ID [COMMAND] [ARG...]",
 	Flags: append([]cli.Flag{
 		cli.BoolFlag{
 			Name:  "tty,t",

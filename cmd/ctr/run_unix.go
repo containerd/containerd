@@ -18,6 +18,13 @@ import (
 	"github.com/urfave/cli"
 )
 
+func init() {
+	runCommand.Flags = append(runCommand.Flags, cli.BoolFlag{
+		Name:  "rootfs",
+		Usage: "Use custom rootfs that is not managed by containerd snapshotter.",
+	})
+}
+
 func handleConsoleResize(ctx gocontext.Context, task resizer, con console.Console) error {
 	// do an initial resize of the console
 	size, err := con.Size()
@@ -54,66 +61,61 @@ func setHostNetworking() containerd.SpecOpts {
 
 func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli.Context) (containerd.Container, error) {
 	var (
-		err             error
-		checkpointIndex digest.Digest
-
-		ref          = context.Args().First()
-		id           = context.Args().Get(1)
-		args         = context.Args()[2:]
-		tty          = context.Bool("tty")
-		labelStrings = context.StringSlice("label")
+		ref  = context.Args().First()
+		id   = context.Args().Get(1)
+		args = context.Args()[2:]
 	)
 
-	labels := labelArgs(labelStrings)
-
 	if raw := context.String("checkpoint"); raw != "" {
-		if checkpointIndex, err = digest.Parse(raw); err != nil {
-			return nil, err
-		}
-	}
-	image, err := client.GetImage(ctx, ref)
-	if err != nil {
-		return nil, err
-	}
-
-	if checkpointIndex == "" {
-		opts := []containerd.SpecOpts{
-			containerd.WithImageConfig(ctx, image),
-			withEnv(context),
-			withMounts(context),
-		}
-		if len(args) > 0 {
-			opts = append(opts, containerd.WithProcessArgs(args...))
-		}
-		if tty {
-			opts = append(opts, withTTY())
-		}
-		if context.Bool("net-host") {
-			opts = append(opts, setHostNetworking())
-		}
-		spec, err := containerd.GenerateSpec(opts...)
+		checkpointIndex, err := digest.Parse(raw)
 		if err != nil {
 			return nil, err
 		}
-		var rootfs containerd.NewContainerOpts
-		if context.Bool("readonly") {
-			rootfs = containerd.WithNewSnapshotView(id, image)
-		} else {
-			rootfs = containerd.WithNewSnapshot(id, image)
+		if checkpointIndex != "" {
+			return client.NewContainer(ctx, id, containerd.WithCheckpoint(v1.Descriptor{
+				Digest: checkpointIndex,
+			}, id))
 		}
-
-		return client.NewContainer(ctx, id,
-			containerd.WithSpec(spec),
-			containerd.WithImage(image),
-			containerd.WithContainerLabels(labels),
-			containerd.WithSnapshotter(context.String("snapshotter")),
-			rootfs,
-		)
 	}
 
-	return client.NewContainer(ctx, id, containerd.WithCheckpoint(v1.Descriptor{
-		Digest: checkpointIndex,
-	}, id))
+	var (
+		opts  []containerd.SpecOpts
+		cOpts []containerd.NewContainerOpts
+	)
+	cOpts = append(cOpts, containerd.WithContainerLabels(labelArgs(context.StringSlice("label"))))
+	if context.Bool("rootfs") {
+		opts = append(opts, containerd.WithRootFSPath(ref, context.Bool("readonly")))
+	} else {
+		image, err := client.GetImage(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		opts = append(opts, containerd.WithImageConfig(ctx, image))
+		cOpts = append(cOpts, containerd.WithImage(image))
+		if context.Bool("readonly") {
+			cOpts = append(cOpts, containerd.WithNewSnapshotView(id, image))
+		} else {
+			cOpts = append(cOpts, containerd.WithNewSnapshot(id, image))
+		}
+		cOpts = append(cOpts, containerd.WithSnapshotter(context.String("snapshotter")))
+	}
+
+	opts = append(opts, withEnv(context), withMounts(context))
+	if len(args) > 0 {
+		opts = append(opts, containerd.WithProcessArgs(args...))
+	}
+	if context.Bool("tty") {
+		opts = append(opts, withTTY())
+	}
+	if context.Bool("net-host") {
+		opts = append(opts, setHostNetworking())
+	}
+	spec, err := containerd.GenerateSpec(opts...)
+	if err != nil {
+		return nil, err
+	}
+	cOpts = append([]containerd.NewContainerOpts{containerd.WithSpec(spec)}, cOpts...)
+	return client.NewContainer(ctx, id, cOpts...)
 }
 
 func newTask(ctx gocontext.Context, container containerd.Container, checkpoint digest.Digest, tty bool) (containerd.Task, error) {
