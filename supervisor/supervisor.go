@@ -48,9 +48,6 @@ func New(stateDir string, runtimeName, shimName string, runtimeArgs []string, ti
 	}
 	go s.exitHandler()
 	go s.oomHandler()
-	if err := s.restore(); err != nil {
-		return nil, err
-	}
 	return s, nil
 }
 
@@ -268,6 +265,9 @@ func (s *Supervisor) notifySubscribers(e Event) {
 // therefore it is save to do operations in the handlers that modify state of the system or
 // state of the Supervisor
 func (s *Supervisor) Start() error {
+	if err := s.restore(); err != nil {
+		return err
+	}
 	logrus.WithFields(logrus.Fields{
 		"stateDir":    s.stateDir,
 		"runtime":     s.runtime,
