@@ -59,6 +59,11 @@ containerd CLI
 	}
 	app.Commands = append([]cli.Command{
 		imageCommand,
+		pullCommand,
+		fetchCommand,
+		fetchObjectCommand,
+		pushCommand,
+		pushObjectCommand,
 		containersCommand,
 		checkpointCommand,
 		runCommand,
@@ -76,6 +81,8 @@ containerd CLI
 		snapshotCommand,
 		versionCommand,
 		psCommand,
+		applyCommand,
+		rootfsCommand,
 	}, extraCmds...)
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {

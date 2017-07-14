@@ -54,7 +54,7 @@ Most of this is experimental and there are few leaps to make this work.`,
 }
 
 func fetch(ctx context.Context, ref string, clicontext *cli.Context) (containerd.Image, error) {
-	client, err := getClient(clicontext)
+	client, err := newClient(clicontext)
 	if err != nil {
 		return nil, err
 	}

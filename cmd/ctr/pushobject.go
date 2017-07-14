@@ -43,7 +43,7 @@ var pushObjectCommand = cli.Command{
 			return err
 		}
 
-		cs, err := resolveContentStore(clicontext)
+		cs, err := getContentStore(clicontext)
 		if err != nil {
 			return err
 		}

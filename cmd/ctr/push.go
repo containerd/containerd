@@ -55,7 +55,7 @@ var pushCommand = cli.Command{
 		ctx, cancel := appContext(clicontext)
 		defer cancel()
 
-		client, err := getClient(clicontext)
+		client, err := newClient(clicontext)
 		if err != nil {
 			return err
 		}
