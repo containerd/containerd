@@ -46,6 +46,10 @@ containerd CLI
 			Name:  "timeout",
 			Usage: "total timeout for ctr commands",
 		},
+		cli.DurationFlag{
+			Name:  "connect-timeout",
+			Usage: "timeout for connecting to containerd",
+		},
 		cli.StringFlag{
 			Name:   "namespace, n",
 			Usage:  "namespace to use with commands",
@@ -54,13 +58,14 @@ containerd CLI
 		},
 	}
 	app.Commands = append([]cli.Command{
-		attachCommand,
+		imageCommand,
+		containersCommand,
 		checkpointCommand,
 		runCommand,
+		attachCommand,
 		deleteCommand,
 		namespacesCommand,
 		eventsCommand,
-		containersCommand,
 		taskListCommand,
 		infoCommand,
 		killCommand,

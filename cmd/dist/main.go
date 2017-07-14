@@ -45,17 +45,6 @@ distribution tool
 			Name:  "timeout",
 			Usage: "total timeout for dist commands",
 		},
-		cli.DurationFlag{
-			Name:  "connect-timeout",
-			Usage: "timeout for connecting to containerd",
-		},
-		cli.StringFlag{
-			// TODO(stevvooe): for now, we allow circumventing the GRPC. Once
-			// we have clear separation, this will likely go away.
-			Name:  "root",
-			Usage: "path to content store root",
-			Value: "/var/lib/containerd",
-		},
 		cli.StringFlag{
 			Name:  "address, a",
 			Usage: "address for containerd's GRPC server",
@@ -69,7 +58,6 @@ distribution tool
 		},
 	}
 	app.Commands = []cli.Command{
-		imageCommand,
 		contentCommand,
 		pullCommand,
 		fetchCommand,
@@ -101,6 +89,6 @@ var contentCommand = cli.Command{
 		getCommand,
 		editCommand,
 		deleteCommand,
-		labelCommand,
+		labelContentCommand,
 	},
 }

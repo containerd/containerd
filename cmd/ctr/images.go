@@ -39,7 +39,7 @@ var imagesListCommand = cli.Command{
 		)
 		defer cancel()
 
-		client, err := getClient(clicontext)
+		client, err := newClient(clicontext)
 		if err != nil {
 			return err
 		}
@@ -95,7 +95,7 @@ var imagesSetLabelsCommand = cli.Command{
 		)
 		defer cancel()
 
-		client, err := getClient(clicontext)
+		client, err := newClient(clicontext)
 		if err != nil {
 			return err
 		}
@@ -148,7 +148,7 @@ var imageRemoveCommand = cli.Command{
 		ctx, cancel := appContext(clicontext)
 		defer cancel()
 
-		client, err := getClient(clicontext)
+		client, err := newClient(clicontext)
 		if err != nil {
 			return err
 		}
@@ -171,31 +171,4 @@ var imageRemoveCommand = cli.Command{
 
 		return exitErr
 	},
-}
-
-// TODO(stevvooe): These helpers should go away when we merge dist and ctr.
-
-func objectWithLabelArgs(clicontext *cli.Context) (string, map[string]string) {
-	var (
-		name         = clicontext.Args().First()
-		labelStrings = clicontext.Args().Tail()
-	)
-
-	return name, labelArgs(labelStrings)
-}
-
-func labelArgs(labelStrings []string) map[string]string {
-	labels := make(map[string]string, len(labelStrings))
-	for _, label := range labelStrings {
-		parts := strings.SplitN(label, "=", 2)
-		key := parts[0]
-		value := "true"
-		if len(parts) > 1 {
-			value = parts[1]
-		}
-
-		labels[key] = value
-	}
-
-	return labels
 }
