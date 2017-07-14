@@ -54,7 +54,7 @@ var namespacesCreateCommand = cli.Command{
 }
 
 var namespacesSetLabelsCommand = cli.Command{
-	Name:        "set-labels",
+	Name:        "label",
 	Usage:       "Set and clear labels for a namespace.",
 	ArgsUsage:   "[flags] <name> [<key>=<value>, ...]",
 	Description: "Set and clear labels for a namespace.",

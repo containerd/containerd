@@ -83,7 +83,7 @@ var imagesListCommand = cli.Command{
 }
 
 var imagesSetLabelsCommand = cli.Command{
-	Name:        "set-labels",
+	Name:        "label",
 	Usage:       "Set and clear labels for an image.",
 	ArgsUsage:   "[flags] <name> [<key>=<value>, ...]",
 	Description: "Set and clear labels for an image.",
