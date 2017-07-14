@@ -28,7 +28,7 @@ INTEGRATION_PACKAGE=${PKG}
 TEST_REQUIRES_ROOT_PACKAGES=$(shell for f in $$(git grep -l testutil.RequiresRoot | grep -v Makefile);do echo "${PKG}/$$(dirname $$f)"; done)
 
 # Project binaries.
-COMMANDS=ctr containerd protoc-gen-gogoctrd dist ctrd-protobuild
+COMMANDS=ctr containerd protoc-gen-gogoctrd dist
 ifneq ("$(GOOS)", "windows")
 	COMMANDS += containerd-shim
 endif
@@ -61,14 +61,15 @@ setup: ## install dependencies
 	@go get -u github.com/golang/lint/golint
 	#@go get -u github.com/kisielk/errcheck
 	@go get -u github.com/gordonklaus/ineffassign
+	@go get -u github.com/stevvooe/protobuild
 
 generate: protos
 	@echo "$(WHALE) $@"
 	@PATH=${ROOTDIR}/bin:${PATH} go generate -x ${PACKAGES}
 
-protos: bin/protoc-gen-gogoctrd bin/ctrd-protobuild ## generate protobuf
+protos: bin/protoc-gen-gogoctrd ## generate protobuf
 	@echo "$(WHALE) $@"
-	@PATH=${ROOTDIR}/bin:${PATH} ctrd-protobuild ${PACKAGES}
+	@PATH=${ROOTDIR}/bin:${PATH} protobuild ${PACKAGES}
 
 checkprotos: protos ## check if protobufs needs to be generated again
 	@echo "$(WHALE) $@"
