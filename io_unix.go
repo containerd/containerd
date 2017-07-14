@@ -13,16 +13,17 @@ import (
 
 func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 	var (
-		f   io.ReadWriteCloser
-		set []io.Closer
-		ctx = context.Background()
-		wg  = &sync.WaitGroup{}
+		f           io.ReadWriteCloser
+		set         []io.Closer
+		ctx, cancel = context.WithCancel(context.Background())
+		wg          = &sync.WaitGroup{}
 	)
 	defer func() {
 		if err != nil {
 			for _, f := range set {
 				f.Close()
 			}
+			cancel()
 		}
 	}()
 
@@ -55,13 +56,14 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 		wg.Add(1)
 		go func(r io.ReadCloser) {
 			io.Copy(ioset.err, r)
-			wg.Done()
 			r.Close()
+			wg.Done()
 		}(f)
 	}
 	return &wgCloser{
-		wg:  wg,
-		dir: fifos.Dir,
-		set: set,
+		wg:     wg,
+		dir:    fifos.Dir,
+		set:    set,
+		cancel: cancel,
 	}, nil
 }
