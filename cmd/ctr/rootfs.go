@@ -33,7 +33,7 @@ var rootfsUnpackCommand = cli.Command{
 
 		log.G(ctx).Debugf("unpacking layers from manifest %s", dgst.String())
 
-		client, err := getClient(clicontext)
+		client, err := newClient(clicontext)
 		if err != nil {
 			return err
 		}
