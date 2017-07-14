@@ -9,7 +9,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-var labelCommand = cli.Command{
+var labelContentCommand = cli.Command{
 	Name:        "label",
 	Usage:       "adds labels to content",
 	ArgsUsage:   "[flags] <digest> [<label>=<value> ...]",
@@ -64,4 +64,29 @@ var labelCommand = cli.Command{
 
 		return nil
 	},
+}
+
+func objectWithLabelArgs(clicontext *cli.Context) (string, map[string]string) {
+	var (
+		namespace    = clicontext.Args().First()
+		labelStrings = clicontext.Args().Tail()
+	)
+
+	return namespace, labelArgs(labelStrings)
+}
+
+func labelArgs(labelStrings []string) map[string]string {
+	labels := make(map[string]string, len(labelStrings))
+	for _, label := range labelStrings {
+		parts := strings.SplitN(label, "=", 2)
+		key := parts[0]
+		value := "true"
+		if len(parts) > 1 {
+			value = parts[1]
+		}
+
+		labels[key] = value
+	}
+
+	return labels
 }
