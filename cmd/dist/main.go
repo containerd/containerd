@@ -58,7 +58,6 @@ distribution tool
 		},
 	}
 	app.Commands = []cli.Command{
-		contentCommand,
 		pullCommand,
 		fetchCommand,
 		fetchObjectCommand,
@@ -77,18 +76,4 @@ distribution tool
 		fmt.Fprintf(os.Stderr, "dist: %s\n", err)
 		os.Exit(1)
 	}
-}
-
-var contentCommand = cli.Command{
-	Name:  "content",
-	Usage: "content management",
-	Subcommands: cli.Commands{
-		listCommand,
-		ingestCommand,
-		activeCommand,
-		getCommand,
-		editCommand,
-		deleteCommand,
-		labelContentCommand,
-	},
 }
