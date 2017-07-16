@@ -25,7 +25,7 @@ func withEnv(context *cli.Context) containerd.SpecOpts {
 	return func(s *specs.Spec) error {
 		env := context.StringSlice("env")
 		if len(env) > 0 {
-			s.Process.Env = append(s.Process.Env, env...)
+			s.Process.Env = replaceOrAppendEnvValues(s.Process.Env, env)
 		}
 		return nil
 	}

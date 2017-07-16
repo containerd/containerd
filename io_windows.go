@@ -1,6 +1,7 @@
 package containerd
 
 import (
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -10,8 +11,22 @@ import (
 	"github.com/pkg/errors"
 )
 
+const pipeRoot = `\\.\pipe`
+
+// NewFifos returns a new set of fifos for the task
+func NewFifos(id string) (*FIFOSet, error) {
+	return &FIFOSet{
+		In:  fmt.Sprintf(`%s\ctr-%s-stdin`, pipeRoot, id),
+		Out: fmt.Sprintf(`%s\ctr-%s-stdout`, pipeRoot, id),
+		Err: fmt.Sprintf(`%s\ctr-%s-stderr`, pipeRoot, id),
+	}, nil
+}
+
 func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
-	var wg sync.WaitGroup
+	var (
+		wg  sync.WaitGroup
+		set []io.Closer
+	)
 
 	if fifos.In != "" {
 		l, err := winio.ListenPipe(fifos.In, nil)
@@ -23,6 +38,7 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 				l.Close()
 			}
 		}(l)
+		set = append(set, l)
 
 		go func() {
 			c, err := l.Accept()
@@ -46,6 +62,7 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 				l.Close()
 			}
 		}(l)
+		set = append(set, l)
 
 		wg.Add(1)
 		go func() {
@@ -71,6 +88,7 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 				l.Close()
 			}
 		}(l)
+		set = append(set, l)
 
 		wg.Add(1)
 		go func() {
@@ -89,5 +107,11 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 	return &wgCloser{
 		wg:  &wg,
 		dir: fifos.Dir,
+		set: set,
+		cancel: func() {
+			for _, l := range set {
+				l.Close()
+			}
+		},
 	}, nil
 }

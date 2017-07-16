@@ -5,11 +5,32 @@ package containerd
 import (
 	"context"
 	"io"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"sync"
 	"syscall"
 
 	"github.com/containerd/fifo"
 )
+
+// NewFifos returns a new set of fifos for the task
+func NewFifos(id string) (*FIFOSet, error) {
+	root := filepath.Join(os.TempDir(), "containerd")
+	if err := os.MkdirAll(root, 0700); err != nil {
+		return nil, err
+	}
+	dir, err := ioutil.TempDir(root, "")
+	if err != nil {
+		return nil, err
+	}
+	return &FIFOSet{
+		Dir: dir,
+		In:  filepath.Join(dir, id+"-stdin"),
+		Out: filepath.Join(dir, id+"-stdout"),
+		Err: filepath.Join(dir, id+"-stderr"),
+	}, nil
+}
 
 func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 	var (

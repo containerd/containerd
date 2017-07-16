@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/server"
 	"github.com/containerd/containerd/version"
 	"github.com/urfave/cli"
 )
@@ -40,7 +40,7 @@ containerd CLI
 		cli.StringFlag{
 			Name:  "address, a",
 			Usage: "address for containerd's GRPC server",
-			Value: containerd.DefaultAddress,
+			Value: server.DefaultAddress,
 		},
 		cli.DurationFlag{
 			Name:  "timeout",

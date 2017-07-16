@@ -8,6 +8,13 @@ import (
 	"github.com/containerd/containerd/sys"
 )
 
+const (
+	// DefaultAddress is the default unix socket address
+	DefaultAddress = "/run/containerd/containerd.sock"
+	// DefaultDebuggAddress is the default unix socket address for pprof data
+	DefaultDebugAddress = "/run/containerd/debug.sock"
+)
+
 // apply sets config settings on the server process
 func apply(ctx context.Context, config *Config) error {
 	if config.Subreaper {
