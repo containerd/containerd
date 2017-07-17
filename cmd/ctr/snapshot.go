@@ -26,6 +26,7 @@ var snapshotCommand = cli.Command{
 		usageSnapshotCommand,
 		removeSnapshotCommand,
 		prepareSnapshotCommand,
+		treeSnapshotCommand,
 	},
 }
 
@@ -230,4 +231,73 @@ var prepareSnapshotCommand = cli.Command{
 
 		return nil
 	},
+}
+
+var treeSnapshotCommand = cli.Command{
+	Name:  "tree",
+	Usage: "Display tree view of snapshot branches",
+	Action: func(clicontext *cli.Context) error {
+		ctx, cancel := appContext(clicontext)
+		defer cancel()
+
+		snapshotter, err := getSnapshotter(clicontext)
+		if err != nil {
+			return err
+		}
+
+		tree := make(map[string]*snapshotTreeNode)
+
+		if err := snapshotter.Walk(ctx, func(ctx context.Context, info snapshot.Info) error {
+			// Get or create node and add node details
+			node := getOrCreateTreeNode(info.Name, tree)
+			if info.Parent != "" {
+				node.Parent = info.Parent
+				p := getOrCreateTreeNode(info.Parent, tree)
+				p.Children = append(p.Children, info.Name)
+			}
+
+			return nil
+		}); err != nil {
+			return err
+		}
+
+		printTree(tree)
+
+		return nil
+	},
+}
+
+type snapshotTreeNode struct {
+	Name     string
+	Parent   string
+	Children []string
+}
+
+func getOrCreateTreeNode(name string, tree map[string]*snapshotTreeNode) *snapshotTreeNode {
+	if node, ok := tree[name]; ok {
+		return node
+	}
+	node := &snapshotTreeNode{
+		Name: name,
+	}
+	tree[name] = node
+	return node
+}
+
+func printTree(tree map[string]*snapshotTreeNode) {
+	for _, node := range tree {
+		// Print for root(parent-less) nodes only
+		if node.Parent == "" {
+			printNode(node.Name, tree, 0)
+		}
+	}
+}
+
+func printNode(name string, tree map[string]*snapshotTreeNode, level int) {
+	node := tree[name]
+	fmt.Printf("%s\\_ %s\n", strings.Repeat("  ", level), node.Name)
+	level++
+	for _, child := range node.Children {
+		printNode(child, tree, level)
+	}
 }
