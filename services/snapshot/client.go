@@ -105,7 +105,7 @@ func (r *remoteSnapshotter) Walk(ctx context.Context, fn func(context.Context, s
 		Snapshotter: r.snapshotterName,
 	})
 	if err != nil {
-		errdefs.FromGRPC(err)
+		return errdefs.FromGRPC(err)
 	}
 	for {
 		resp, err := sc.Recv()
