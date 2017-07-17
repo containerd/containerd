@@ -85,7 +85,10 @@ func main() {
 		if address == "" {
 			return errors.New("grpc address cannot be empty")
 		}
-		log.G(ctx).Info("starting containerd boot...")
+		log.G(ctx).WithFields(logrus.Fields{
+			"version":  version.Version,
+			"revision": version.Revision,
+		}).Info("starting containerd")
 
 		server, err := server.New(ctx, config)
 		if err != nil {
