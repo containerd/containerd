@@ -6,7 +6,6 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/containerd/containerd"
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/urfave/cli"
 )
@@ -118,14 +117,9 @@ func containerListFn(context *cli.Context) error {
 				labels = "-"
 			}
 
-			var imageName string
-			if image, err := c.Image(ctx); err != nil {
-				if err != containerd.ErrNoImage {
-					return err
-				}
+			imageName := c.Info().Image
+			if imageName == "" {
 				imageName = "-"
-			} else {
-				imageName = image.Name()
 			}
 
 			record := c.Info()
