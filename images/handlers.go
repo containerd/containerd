@@ -159,8 +159,9 @@ func ChildrenHandler(provider content.Provider) HandlerFunc {
 
 			descs = append(descs, index.Manifests...)
 		case MediaTypeDockerSchema2Layer, MediaTypeDockerSchema2LayerGzip,
-			MediaTypeDockerSchema2Config, ocispec.MediaTypeImageLayer,
-			ocispec.MediaTypeImageLayerGzip: // childless data types.
+			MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig,
+			ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerGzip:
+			// childless data types.
 			return nil, nil
 		default:
 			log.G(ctx).Warnf("encounted unknown type %v; children may not be fetched", desc.MediaType)
