@@ -23,6 +23,11 @@ func CreateUnixSocket(path string) (net.Listener, error) {
 
 // GetLocalListener returns a listerner out of a unix socket.
 func GetLocalListener(path string, uid, gid int) (net.Listener, error) {
+	// Ensure parent directory is created
+	if err := mkdirAs(filepath.Dir(path), uid, gid); err != nil {
+		return nil, err
+	}
+
 	l, err := CreateUnixSocket(path)
 	if err != nil {
 		return l, err
@@ -39,4 +44,16 @@ func GetLocalListener(path string, uid, gid int) (net.Listener, error) {
 	}
 
 	return l, nil
+}
+
+func mkdirAs(path string, uid, gid int) error {
+	if _, err := os.Stat(path); err == nil || !os.IsNotExist(err) {
+		return err
+	}
+
+	if err := os.Mkdir(path, 0770); err != nil {
+		return err
+	}
+
+	return os.Chown(path, uid, gid)
 }
