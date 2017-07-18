@@ -1,13 +1,13 @@
 package archive
 
 import (
-	"archive/tar"
 	"errors"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/containerd/containerd/sys"
+	"github.com/dmcgowan/go-tar"
 )
 
 // tarName returns platform-specific filepath

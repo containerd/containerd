@@ -3,12 +3,12 @@
 package archive
 
 import (
-	"archive/tar"
 	"os"
 	"sync"
 	"syscall"
 
 	"github.com/containerd/continuity/sysx"
+	"github.com/dmcgowan/go-tar"
 	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/pkg/errors"
 )

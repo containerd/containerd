@@ -1,7 +1,6 @@
 package archive
 
 import (
-	"archive/tar"
 	"context"
 	"fmt"
 	"io"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/containerd/containerd/fs"
 	"github.com/containerd/containerd/log"
+	"github.com/dmcgowan/go-tar"
 	"github.com/pkg/errors"
 )
 
