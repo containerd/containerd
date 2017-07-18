@@ -54,7 +54,7 @@ func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
 		return nil, err
 	}
 	if mnt.FSType != "btrfs" {
-		return nil, fmt.Errorf("expected btrfs, got %s", mnt.FSType)
+		return nil, fmt.Errorf("path %s must be a btrfs filesystem to be used with the btrfs snapshotter", root)
 	}
 	var (
 		active    = filepath.Join(root, "active")
