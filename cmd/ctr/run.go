@@ -47,7 +47,7 @@ func withMounts(context *cli.Context) containerd.SpecOpts {
 var runCommand = cli.Command{
 	Name:      "run",
 	Usage:     "run a container",
-	ArgsUsage: "IMAGE ID [COMMAND] [ARG...]",
+	ArgsUsage: "IMAGE CONTAINER [COMMAND] [ARG...]",
 	Flags: append([]cli.Flag{
 		cli.BoolFlag{
 			Name:  "tty,t",
@@ -94,10 +94,14 @@ var runCommand = cli.Command{
 
 			ctx, cancel = appContext(context)
 			id          = context.Args().Get(1)
+			imageRef    = context.Args().First()
 			tty         = context.Bool("tty")
 		)
 		defer cancel()
 
+		if imageRef == "" {
+			return errors.New("image ref must be provided")
+		}
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
