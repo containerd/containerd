@@ -47,8 +47,8 @@ type Spec struct {
 
 	// Object contains the identifier for the remote resource. Classically,
 	// this is a tag but can refer to anything in a remote. By convention, any
-	// portion that may be a partial or whole digest will be preceeded by an
-	// `@`. Anything preceeding the `@` will be referred to as the "tag".
+	// portion that may be a partial or whole digest will be preceded by an
+	// `@`. Anything preceding the `@` will be referred to as the "tag".
 	//
 	// In practice, we will see this broken down into the following formats:
 	//
@@ -82,7 +82,7 @@ func Parse(s string) (Spec, error) {
 	var object string
 
 	if idx := splitRe.FindStringIndex(u.Path); idx != nil {
-		// This allows us to retain the @ to signify digests or shortend digests in
+		// This allows us to retain the @ to signify digests or shortened digests in
 		// the object.
 		object = u.Path[idx[0]:]
 		if object[:1] == ":" {
@@ -129,7 +129,7 @@ func (r Spec) String() string {
 	return fmt.Sprintf("%v:%v", r.Locator, r.Object)
 }
 
-// SplitObject provides two parts of the object spec, delimiited by an `@`
+// SplitObject provides two parts of the object spec, delimited by an `@`
 // symbol.
 //
 // Either may be empty and it is the callers job to validate them
