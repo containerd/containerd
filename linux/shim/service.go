@@ -404,23 +404,23 @@ func (s *Service) forward(client poster) {
 func getTopic(e interface{}) string {
 	switch e.(type) {
 	case *events.TaskCreate:
-		return "task-create"
+		return "/tasks/create"
 	case *events.TaskStart:
-		return "task-start"
+		return "/tasks/start"
 	case *events.TaskOOM:
-		return "task-oom"
+		return "/tasks/oom"
 	case *events.TaskExit:
-		return "task-exit"
+		return "/tasks/exit"
 	case *events.TaskDelete:
-		return "task-delete"
+		return "/tasks/delete"
 	case *events.TaskExecAdded:
-		return "task-exec-added"
+		return "/tasks/exec-added"
 	case *events.TaskPaused:
-		return "task-paused"
+		return "/tasks/paused"
 	case *events.TaskResumed:
-		return "task-resumed"
+		return "/tasks/resumed"
 	case *events.TaskCheckpointed:
-		return "task-checkpointed"
+		return "/tasks/checkpointed"
 	}
 	return "?"
 }

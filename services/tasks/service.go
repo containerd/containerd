@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 
 	"github.com/boltdb/bolt"
-	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	api "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/task"
@@ -148,12 +147,6 @@ func (s *Service) Create(ctx context.Context, r *api.CreateTaskRequest) (*api.Cr
 		log.G(ctx).Error(err)
 	}
 
-	if err := s.emit(ctx, "/tasks/create", &eventsapi.TaskCreate{
-		ContainerID: r.ContainerID,
-	}); err != nil {
-		return nil, err
-	}
-
 	return &api.CreateTaskResponse{
 		ContainerID: r.ContainerID,
 		Pid:         state.Pid,
@@ -166,12 +159,6 @@ func (s *Service) Start(ctx context.Context, r *api.StartTaskRequest) (*google_p
 		return nil, err
 	}
 	if err := t.Start(ctx); err != nil {
-		return nil, err
-	}
-
-	if err := s.emit(ctx, "/tasks/start", &eventsapi.TaskStart{
-		ContainerID: r.ContainerID,
-	}); err != nil {
 		return nil, err
 	}
 
@@ -189,13 +176,6 @@ func (s *Service) Delete(ctx context.Context, r *api.DeleteTaskRequest) (*api.De
 	}
 	exit, err := runtime.Delete(ctx, t)
 	if err != nil {
-		return nil, err
-	}
-	if err := s.emit(ctx, "/tasks/delete", &eventsapi.TaskDelete{
-		ContainerID: r.ContainerID,
-		Pid:         exit.Pid,
-		ExitStatus:  exit.Status,
-	}); err != nil {
 		return nil, err
 	}
 	return &api.DeleteResponse{
