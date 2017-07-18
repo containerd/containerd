@@ -10,6 +10,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
+	"github.com/pkg/errors"
 )
 
 const Prefix = "types.containerd.io"
@@ -39,7 +40,7 @@ func TypeURL(v interface{}) (string, error) {
 		// fallback to the proto registry if it is a proto message
 		pb, ok := v.(proto.Message)
 		if !ok {
-			return "", errdefs.ErrNotFound
+			return "", errors.Wrapf(errdefs.ErrNotFound, "type %s", reflect.TypeOf(v))
 		}
 		return path.Join(Prefix, proto.MessageName(pb)), nil
 	}
@@ -116,7 +117,7 @@ func getTypeByUrl(url string) (urlType, error) {
 			isProto: true,
 		}, nil
 	}
-	return urlType{}, errdefs.ErrNotFound
+	return urlType{}, errors.Wrapf(errdefs.ErrNotFound, "type with url %s", url)
 }
 
 func tryDereference(v interface{}) reflect.Type {
