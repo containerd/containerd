@@ -83,6 +83,7 @@ containerd CLI
 		psCommand,
 		applyCommand,
 		rootfsCommand,
+		contentCommand,
 	}, extraCmds...)
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
