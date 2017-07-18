@@ -44,7 +44,7 @@ GO_TAGS=$(if $(BUILDTAGS),-tags "$(BUILDTAGS)",)
 GO_LDFLAGS=-ldflags "-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG) $(EXTRA_LDFLAGS)"
 
 # Flags passed to `go test`
-TESTFLAGS ?=-parallel 8 -race
+TESTFLAGS ?=-parallel 8 -race -v
 
 .PHONY: clean all AUTHORS fmt vet lint dco build binaries test integration setup generate protos checkprotos coverage ci check help install uninstall vendor release
 .DEFAULT: default
