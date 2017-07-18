@@ -21,7 +21,7 @@ import "github.com/pkg/errors"
 // map very well to those defined by grpc.
 var (
 	ErrUnknown            = errors.New("unknown") // used internally to represent a missed mapping.
-	ErrInvalidArgument    = errors.New("invalid")
+	ErrInvalidArgument    = errors.New("invalid argument")
 	ErrNotFound           = errors.New("not found")
 	ErrAlreadyExists      = errors.New("already exists")
 	ErrFailedPrecondition = errors.New("failed precondition")
