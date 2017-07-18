@@ -20,6 +20,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/reaper"
+	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/typeurl"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
@@ -404,23 +405,23 @@ func (s *Service) forward(client poster) {
 func getTopic(e interface{}) string {
 	switch e.(type) {
 	case *events.TaskCreate:
-		return "/tasks/create"
+		return runtime.TaskCreateEventTopic
 	case *events.TaskStart:
-		return "/tasks/start"
+		return runtime.TaskStartEventTopic
 	case *events.TaskOOM:
-		return "/tasks/oom"
+		return runtime.TaskOOMEventTopic
 	case *events.TaskExit:
-		return "/tasks/exit"
+		return runtime.TaskExitEventTopic
 	case *events.TaskDelete:
-		return "/tasks/delete"
+		return runtime.TaskDeleteEventTopic
 	case *events.TaskExecAdded:
-		return "/tasks/exec-added"
+		return runtime.TaskExecAddedEventTopic
 	case *events.TaskPaused:
-		return "/tasks/paused"
+		return runtime.TaskPausedEventTopic
 	case *events.TaskResumed:
-		return "/tasks/resumed"
+		return runtime.TaskResumedEventTopic
 	case *events.TaskCheckpointed:
-		return "/tasks/checkpointed"
+		return runtime.TaskCheckpointedEventTopic
 	}
 	return "?"
 }
