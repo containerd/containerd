@@ -164,7 +164,7 @@ func (e *execProcess) Resize(ws console.WinSize) error {
 
 func (e *execProcess) Kill(ctx context.Context, sig uint32, _ bool) error {
 	if err := unix.Kill(e.pid, syscall.Signal(sig)); err != nil {
-		return checkKillError(err)
+		return errors.Wrapf(checkKillError(err), "exec kill error")
 	}
 	return nil
 }

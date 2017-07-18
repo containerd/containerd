@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Sirupsen/logrus"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/testutil"
 )
@@ -78,13 +80,25 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
+	// print out the version in information
+	version, err := client.Version(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error getting version: %s", err)
+		os.Exit(1)
+	}
+
+	// allow comparison with containerd under test
+	log.G(ctx).WithFields(logrus.Fields{
+		"version":  version.Version,
+		"revision": version.Revision,
+	}).Info("running tests against containerd")
+
 	// pull a seed image
 	if _, err = client.Pull(ctx, testImage, WithPullUnpack); err != nil {
 		cmd.Process.Signal(syscall.SIGTERM)
 		cmd.Wait()
 		fmt.Fprintf(os.Stderr, "%s: %s", err, buf.String())
 		os.Exit(1)
-
 	}
 	if err := client.Close(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

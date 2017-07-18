@@ -4,12 +4,11 @@ package linux
 
 import (
 	"context"
-	"errors"
 
 	"github.com/containerd/containerd/api/types/task"
+	"github.com/containerd/containerd/errdefs"
 	shim "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/runtime"
-	"google.golang.org/grpc"
 )
 
 type Process struct {
@@ -27,7 +26,7 @@ func (p *Process) Kill(ctx context.Context, signal uint32, _ bool) error {
 		ID:     p.id,
 	})
 	if err != nil {
-		err = errors.New(grpc.ErrorDesc(err))
+		return errdefs.FromGRPC(err)
 	}
 	return err
 }
@@ -38,7 +37,7 @@ func (p *Process) State(ctx context.Context) (runtime.State, error) {
 		ID: p.id,
 	})
 	if err != nil {
-		return runtime.State{}, errors.New(grpc.ErrorDesc(err))
+		return runtime.State{}, errdefs.FromGRPC(err)
 	}
 	var status runtime.Status
 	switch response.Status {
@@ -69,7 +68,7 @@ func (p *Process) ResizePty(ctx context.Context, size runtime.ConsoleSize) error
 		Height: size.Height,
 	})
 	if err != nil {
-		err = errors.New(grpc.ErrorDesc(err))
+		err = errdefs.FromGRPC(err)
 	}
 	return err
 }
@@ -80,7 +79,7 @@ func (p *Process) CloseIO(ctx context.Context) error {
 		Stdin: true,
 	})
 	if err != nil {
-		err = errors.New(grpc.ErrorDesc(err))
+		err = errdefs.FromGRPC(err)
 	}
 	return err
 }

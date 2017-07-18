@@ -7,23 +7,13 @@ import (
 	"strings"
 	"sync"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
-)
-
-var (
-	ErrNoImage           = errors.New("container does not have an image")
-	ErrNoRunningTask     = errors.New("no running task")
-	ErrDeleteRunningTask = errors.New("cannot delete container with running task")
-	ErrProcessExited     = errors.New("process already exited")
-	ErrNoExecID          = errors.New("exec id must be provided")
 )
 
 type DeleteOpts func(context.Context, *Client, containers.Container) error
@@ -129,7 +119,7 @@ func WithRootFSDeletion(ctx context.Context, client *Client, c containers.Contai
 // an error is returned if the container has running tasks
 func (c *container) Delete(ctx context.Context, opts ...DeleteOpts) (err error) {
 	if _, err := c.Task(ctx, nil); err == nil {
-		return ErrDeleteRunningTask
+		return errors.Wrapf(errdefs.ErrFailedPrecondition, "cannot delete running task %v", c.ID())
 	}
 	for _, o := range opts {
 		if err := o(ctx, c.client, c.c); err != nil {
@@ -150,11 +140,11 @@ func (c *container) Task(ctx context.Context, attach IOAttach) (Task, error) {
 // Image returns the image that the container is based on
 func (c *container) Image(ctx context.Context) (Image, error) {
 	if c.c.Image == "" {
-		return nil, ErrNoImage
+		return nil, errors.Wrapf(errdefs.ErrNotFound, "container not created from an image")
 	}
 	i, err := c.client.ImageService().Get(ctx, c.c.Image)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to get image for container")
 	}
 	return &image{
 		client: c.client,
@@ -229,8 +219,9 @@ func (c *container) loadTask(ctx context.Context, ioAttach IOAttach) (Task, erro
 		ContainerID: c.c.ID,
 	})
 	if err != nil {
-		if grpc.Code(errors.Cause(err)) == codes.NotFound {
-			return nil, ErrNoRunningTask
+		err = errdefs.FromGRPC(err)
+		if errdefs.IsNotFound(err) {
+			return nil, errors.Wrapf(err, "no running task found")
 		}
 		return nil, err
 	}

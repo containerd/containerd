@@ -9,10 +9,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"google.golang.org/grpc"
-
 	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/identifiers"
 	client "github.com/containerd/containerd/linux/shim"
 	shim "github.com/containerd/containerd/linux/shim/v1"
@@ -170,7 +169,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 		})
 	}
 	if _, err = s.Create(ctx, sopts); err != nil {
-		return nil, errors.New(grpc.ErrorDesc(err))
+		return nil, errdefs.FromGRPC(err)
 	}
 	t := newTask(id, namespace, s)
 	if err := r.tasks.Add(ctx, t); err != nil {
@@ -197,7 +196,7 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 	}
 	rsp, err := lc.shim.Delete(ctx, empty)
 	if err != nil {
-		return nil, errors.New(grpc.ErrorDesc(err))
+		return nil, errdefs.FromGRPC(err)
 	}
 	if err := lc.shim.KillShim(ctx); err != nil {
 		log.G(ctx).WithError(err).Error("failed to kill shim")
