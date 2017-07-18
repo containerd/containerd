@@ -12,7 +12,6 @@ import (
 	"github.com/Microsoft/hcsshim"
 	"github.com/Sirupsen/logrus"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
-	containerdtypes "github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
@@ -31,16 +30,17 @@ type task struct {
 	pid       uint32
 	io        *pipeSet
 	status    runtime.Status
-	initSpec  *specs.Process
+	spec      *specs.Spec
 	processes map[string]*process
 	hyperV    bool
 
-	rootfs  []*containerdtypes.Mount
 	emitter *events.Emitter
+	rwLayer string
 
 	pidPool           *pidPool
 	hcsContainer      hcsshim.Container
 	terminateDuration time.Duration
+	servicing         bool
 }
 
 func (t *task) ID() string {
@@ -107,7 +107,7 @@ func (t *task) Info() runtime.TaskInfo {
 }
 
 func (t *task) Start(ctx context.Context) error {
-	conf := newProcessConfig(t.initSpec, t.io)
+	conf := newProcessConfig(t.spec.Process, t.io)
 	if _, err := t.newProcess(ctx, t.id, conf, t.io); err != nil {
 		return err
 	}
@@ -173,7 +173,7 @@ func (t *task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runt
 	}
 	spec := s.(*specs.Process)
 	if spec.Cwd == "" {
-		spec.Cwd = t.initSpec.Cwd
+		spec.Cwd = t.spec.Process.Cwd
 	}
 
 	var pset *pipeSet
@@ -431,6 +431,6 @@ func (t *task) cleanup() {
 	for _, p := range t.processes {
 		t.removeProcessNL(p.id)
 	}
-	removeLayer(context.Background(), t.rootfs[len(t.rootfs)-1].Source)
+	removeLayer(context.Background(), t.rwLayer)
 	t.Unlock()
 }
