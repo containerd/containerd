@@ -336,7 +336,7 @@ type v1History struct {
 	} `json:"container_config,omitempty"`
 }
 
-// isEmptyLayer returns whether the v1 compability history describes an
+// isEmptyLayer returns whether the v1 compatibility history describes an
 // empty layer. A return value of true indicates the layer is empty,
 // however false does not indicate non-empty.
 func isEmptyLayer(compatHistory []byte) (bool, error) {

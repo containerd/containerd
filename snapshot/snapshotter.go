@@ -36,7 +36,7 @@ func (u *Usage) Add(other Usage) {
 	u.Size += other.Size
 
 	// TODO(stevvooe): assumes independent inodes, but provides and upper
-	// bound. This should be pretty close, assumming the inodes for a
+	// bound. This should be pretty close, assuming the inodes for a
 	// snapshot are roughly unique to it. Don't trust this assumption.
 	u.Inodes += other.Inodes
 }
@@ -50,7 +50,7 @@ func (u *Usage) Add(other Usage) {
 // between a parent and its snapshot to generate a classic layer.
 //
 // An active snapshot is created by calling `Prepare`. After mounting, changes
-// can be made to the snapshot. The act of commiting creates a committed
+// can be made to the snapshot. The act of committing creates a committed
 // snapshot. The committed snapshot will get the parent of active snapshot. The
 // committed snapshot can then be used as a parent. Active snapshots can never
 // act as a parent.

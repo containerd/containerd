@@ -164,7 +164,7 @@ func ChildrenHandler(provider content.Provider) HandlerFunc {
 			// childless data types.
 			return nil, nil
 		default:
-			log.G(ctx).Warnf("encounted unknown type %v; children may not be fetched", desc.MediaType)
+			log.G(ctx).Warnf("encountered unknown type %v; children may not be fetched", desc.MediaType)
 		}
 
 		return descs, nil

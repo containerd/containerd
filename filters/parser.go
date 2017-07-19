@@ -46,7 +46,7 @@ func Parse(s string) (Filter, error) {
 // ParseAll parses each filter in ss and returns a filter that will return true
 // if any filter matches the expression.
 //
-// If no fitlers are provided, the filter will match anything.
+// If no filters are provided, the filter will match anything.
 func ParseAll(ss ...string) (Filter, error) {
 	if len(ss) == 0 {
 		return Always, nil
@@ -158,7 +158,7 @@ func (p *parser) fieldpath() ([]string, error) {
 	fs := []string{f}
 loop:
 	for {
-		tok := p.scanner.peek() // lookahead to consume field separtor
+		tok := p.scanner.peek() // lookahead to consume field separator
 
 		switch tok {
 		case '.':
