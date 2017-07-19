@@ -28,7 +28,7 @@ INTEGRATION_PACKAGE=${PKG}
 TEST_REQUIRES_ROOT_PACKAGES=$(shell for f in $$(git grep -l testutil.RequiresRoot | grep -v Makefile);do echo "${PKG}/$$(dirname $$f)"; done)
 
 # Project binaries.
-COMMANDS=ctr containerd protoc-gen-gogoctrd
+COMMANDS=ctr containerd
 ifneq ("$(GOOS)", "windows")
 	COMMANDS += containerd-shim
 endif
