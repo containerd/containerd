@@ -25,8 +25,6 @@ var (
 			return make([]byte, 32*1024)
 		},
 	}
-
-	breakoutError = errors.New("file name outside of root")
 )
 
 // Diff returns a tar stream of the computed filesystem
@@ -134,7 +132,10 @@ func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 			// This happened in some tests where an image had a tarfile without any
 			// parent directories.
 			parent := filepath.Dir(hdr.Name)
-			parentPath := filepath.Join(root, parent)
+			parentPath, err := rootPath(root, parent)
+			if err != nil {
+				return 0, err
+			}
 
 			if _, err := os.Lstat(parentPath); err != nil && os.IsNotExist(err) {
 				err = mkdirAll(parentPath, 0600)
@@ -158,7 +159,11 @@ func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 					}
 					defer os.RemoveAll(aufsTempdir)
 				}
-				if err := createTarFile(ctx, filepath.Join(aufsTempdir, basename), root, hdr, tr); err != nil {
+				p, err := rootPath(aufsTempdir, basename)
+				if err != nil {
+					return 0, err
+				}
+				if err := createTarFile(ctx, p, root, hdr, tr); err != nil {
 					return 0, err
 				}
 			}
@@ -168,16 +173,11 @@ func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 			}
 		}
 
-		path := filepath.Join(root, hdr.Name)
-		rel, err := filepath.Rel(root, path)
+		path, err := rootPath(root, hdr.Name)
 		if err != nil {
-			return 0, err
+			return 0, errors.Wrap(err, "failed to get root path")
 		}
 
-		// Note as these operations are platform specific, so must the slash be.
-		if strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-			return 0, errors.Wrapf(breakoutError, "%q is outside of %q", hdr.Name, root)
-		}
 		base := filepath.Base(path)
 
 		if strings.HasPrefix(base, whiteoutPrefix) {
@@ -239,7 +239,11 @@ func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 			if srcHdr == nil {
 				return 0, fmt.Errorf("Invalid aufs hardlink")
 			}
-			tmpFile, err := os.Open(filepath.Join(aufsTempdir, linkBasename))
+			p, err := rootPath(aufsTempdir, linkBasename)
+			if err != nil {
+				return 0, err
+			}
+			tmpFile, err := os.Open(p)
 			if err != nil {
 				return 0, err
 			}
@@ -260,7 +264,10 @@ func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 	}
 
 	for _, hdr := range dirs {
-		path := filepath.Join(root, hdr.Name)
+		path, err := rootPath(root, hdr.Name)
+		if err != nil {
+			return 0, err
+		}
 		if err := chtimes(path, boundTime(latestTime(hdr.AccessTime, hdr.ModTime)), boundTime(hdr.ModTime)); err != nil {
 			return 0, err
 		}
@@ -467,25 +474,15 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 		}
 
 	case tar.TypeLink:
-		targetPath := filepath.Join(extractDir, hdr.Linkname)
-		// check for hardlink breakout
-		if !strings.HasPrefix(targetPath, extractDir) {
-			return errors.Wrapf(breakoutError, "invalid hardlink %q -> %q", targetPath, hdr.Linkname)
+		targetPath, err := rootPath(extractDir, hdr.Linkname)
+		if err != nil {
+			return err
 		}
 		if err := os.Link(targetPath, path); err != nil {
 			return err
 		}
 
 	case tar.TypeSymlink:
-		// 	path 				-> hdr.Linkname = targetPath
-		// e.g. /extractDir/path/to/symlink 	-> ../2/file	= /extractDir/path/2/file
-		targetPath := filepath.Join(filepath.Dir(path), hdr.Linkname)
-
-		// the reason we don't need to check symlinks in the path (with FollowSymlinkInScope) is because
-		// that symlink would first have to be created, which would be caught earlier, at this very check:
-		if !strings.HasPrefix(targetPath, extractDir) {
-			return errors.Wrapf(breakoutError, "invalid symlink %q -> %q", path, hdr.Linkname)
-		}
 		if err := os.Symlink(hdr.Linkname, path); err != nil {
 			return err
 		}
