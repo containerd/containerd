@@ -15,6 +15,7 @@ import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/linux/runcopts"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/typeurl"
@@ -55,6 +56,7 @@ type CheckpointTaskOpts func(*CheckpointTaskInfo) error
 
 type TaskInfo struct {
 	Checkpoint *types.Descriptor
+	RootMounts []mount.Mount
 	Options    interface{}
 }
 
