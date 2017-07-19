@@ -17,12 +17,12 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/linux/runcopts"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/typeurl"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
@@ -388,7 +388,7 @@ func checkKillError(err error) error {
 		return nil
 	}
 	if strings.Contains(err.Error(), "os: process already finished") || err == unix.ESRCH {
-		return runtime.ErrProcessExited
+		return errors.Wrapf(errdefs.ErrNotFound, "process already finished")
 	}
-	return err
+	return errors.Wrapf(err, "unknown error after kill")
 }

@@ -14,14 +14,14 @@ import (
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/linux/runcopts"
 	"github.com/containerd/containerd/rootfs"
-	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/typeurl"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"google.golang.org/grpc"
+	"github.com/pkg/errors"
 )
 
 const UnknownExitStatus = 255
@@ -130,10 +130,7 @@ func (t *task) Kill(ctx context.Context, s syscall.Signal) error {
 		ContainerID: t.id,
 	})
 	if err != nil {
-		if strings.Contains(grpc.ErrorDesc(err), runtime.ErrProcessExited.Error()) {
-			return ErrProcessExited
-		}
-		return err
+		return errdefs.FromGRPC(err)
 	}
 	return nil
 }
@@ -142,14 +139,14 @@ func (t *task) Pause(ctx context.Context) error {
 	_, err := t.client.TaskService().Pause(ctx, &tasks.PauseTaskRequest{
 		ContainerID: t.id,
 	})
-	return err
+	return errdefs.FromGRPC(err)
 }
 
 func (t *task) Resume(ctx context.Context) error {
 	_, err := t.client.TaskService().Resume(ctx, &tasks.ResumeTaskRequest{
 		ContainerID: t.id,
 	})
-	return err
+	return errdefs.FromGRPC(err)
 }
 
 func (t *task) Status(ctx context.Context) (TaskStatus, error) {
@@ -157,7 +154,7 @@ func (t *task) Status(ctx context.Context) (TaskStatus, error) {
 		ContainerID: t.id,
 	})
 	if err != nil {
-		return "", err
+		return "", errdefs.FromGRPC(err)
 	}
 	return TaskStatus(strings.ToLower(r.Task.Status.String())), nil
 }
@@ -166,7 +163,7 @@ func (t *task) Status(ctx context.Context) (TaskStatus, error) {
 func (t *task) Wait(ctx context.Context) (uint32, error) {
 	eventstream, err := t.client.EventService().Stream(ctx, &eventsapi.StreamEventsRequest{})
 	if err != nil {
-		return UnknownExitStatus, err
+		return UnknownExitStatus, errdefs.FromGRPC(err)
 	}
 	for {
 		evt, err := eventstream.Recv()
@@ -205,7 +202,7 @@ func (t *task) Delete(ctx context.Context) (uint32, error) {
 
 func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreate IOCreation) (Process, error) {
 	if id == "" {
-		return nil, ErrNoExecID
+		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "exec id must not be empty")
 	}
 	i, err := ioCreate()
 	if err != nil {

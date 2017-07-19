@@ -299,7 +299,7 @@ func (s *Service) Kill(ctx context.Context, r *api.KillRequest) (*google_protobu
 		}
 	}
 	if err := p.Kill(ctx, r.Signal, r.All); err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	return empty, nil
 }

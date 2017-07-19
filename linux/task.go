@@ -5,14 +5,12 @@ package linux
 import (
 	"context"
 
-	"google.golang.org/grpc"
-
 	"github.com/containerd/containerd/api/types/task"
+	"github.com/containerd/containerd/errdefs"
 	client "github.com/containerd/containerd/linux/shim"
 	shim "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/runtime"
 	"github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
 )
 
 type Task struct {
@@ -44,7 +42,7 @@ func (t *Task) Info() runtime.TaskInfo {
 func (t *Task) Start(ctx context.Context) error {
 	_, err := t.shim.Start(ctx, empty)
 	if err != nil {
-		err = errors.New(grpc.ErrorDesc(err))
+		err = errdefs.FromGRPC(err)
 	}
 	return err
 }
@@ -54,7 +52,7 @@ func (t *Task) State(ctx context.Context) (runtime.State, error) {
 		ID: t.id,
 	})
 	if err != nil {
-		return runtime.State{}, errors.New(grpc.ErrorDesc(err))
+		return runtime.State{}, errdefs.FromGRPC(err)
 	}
 	var status runtime.Status
 	switch response.Status {
@@ -81,7 +79,7 @@ func (t *Task) State(ctx context.Context) (runtime.State, error) {
 func (t *Task) Pause(ctx context.Context) error {
 	_, err := t.shim.Pause(ctx, empty)
 	if err != nil {
-		err = errors.New(grpc.ErrorDesc(err))
+		err = errdefs.FromGRPC(err)
 	}
 	return err
 }
@@ -89,7 +87,7 @@ func (t *Task) Pause(ctx context.Context) error {
 func (t *Task) Resume(ctx context.Context) error {
 	_, err := t.shim.Resume(ctx, empty)
 	if err != nil {
-		err = errors.New(grpc.ErrorDesc(err))
+		err = errdefs.FromGRPC(err)
 	}
 	return err
 }
@@ -101,7 +99,7 @@ func (t *Task) Kill(ctx context.Context, signal uint32, all bool) error {
 		All:    all,
 	})
 	if err != nil {
-		err = errors.New(grpc.ErrorDesc(err))
+		return errdefs.FromGRPC(err)
 	}
 	return err
 }
@@ -116,7 +114,7 @@ func (t *Task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runt
 		Spec:     opts.Spec,
 	}
 	if _, err := t.shim.Exec(ctx, request); err != nil {
-		return nil, errors.New(grpc.ErrorDesc(err))
+		return nil, errdefs.FromGRPC(err)
 	}
 	return &Process{
 		id: id,
@@ -130,7 +128,7 @@ func (t *Task) Pids(ctx context.Context) ([]uint32, error) {
 		ID: t.id,
 	})
 	if err != nil {
-		return nil, errors.New(grpc.ErrorDesc(err))
+		return nil, errdefs.FromGRPC(err)
 	}
 	return resp.Pids, nil
 }
@@ -142,7 +140,7 @@ func (t *Task) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
 		Height: size.Height,
 	})
 	if err != nil {
-		err = errors.New(grpc.ErrorDesc(err))
+		err = errdefs.FromGRPC(err)
 	}
 	return err
 }
@@ -153,7 +151,7 @@ func (t *Task) CloseIO(ctx context.Context) error {
 		Stdin: true,
 	})
 	if err != nil {
-		err = errors.New(grpc.ErrorDesc(err))
+		err = errdefs.FromGRPC(err)
 	}
 	return err
 }
@@ -164,7 +162,7 @@ func (t *Task) Checkpoint(ctx context.Context, path string, options *types.Any) 
 		Options: options,
 	}
 	if _, err := t.shim.Checkpoint(ctx, r); err != nil {
-		return errors.New(grpc.ErrorDesc(err))
+		return errdefs.FromGRPC(err)
 	}
 	return nil
 }
@@ -174,7 +172,7 @@ func (t *Task) DeleteProcess(ctx context.Context, id string) (*runtime.Exit, err
 		ID: id,
 	})
 	if err != nil {
-		return nil, errors.New(grpc.ErrorDesc(err))
+		return nil, errdefs.FromGRPC(err)
 	}
 	return &runtime.Exit{
 		Status:    r.ExitStatus,

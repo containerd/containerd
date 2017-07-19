@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/containerd/cgroups"
+	"github.com/containerd/containerd/errdefs"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -632,8 +633,8 @@ func TestDeleteRunningContainer(t *testing.T) {
 	if err == nil {
 		t.Error("delete did not error with running task")
 	}
-	if err != ErrDeleteRunningTask {
-		t.Errorf("expected error %q but received %q", ErrDeleteRunningTask, err)
+	if !errdefs.IsFailedPrecondition(err) {
+		t.Errorf("expected error %q but received %q", errdefs.ErrFailedPrecondition, err)
 	}
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
 		t.Error(err)
@@ -703,8 +704,8 @@ func TestContainerKill(t *testing.T) {
 		t.Error("second call to kill should return an error")
 		return
 	}
-	if err != ErrProcessExited {
-		t.Errorf("expected error %q but received %q", ErrProcessExited, err)
+	if !errdefs.IsNotFound(err) {
+		t.Errorf("expected error %q but received %q", errdefs.ErrNotFound, err)
 	}
 }
 
