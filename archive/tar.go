@@ -132,7 +132,10 @@ func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 			// This happened in some tests where an image had a tarfile without any
 			// parent directories.
 			parent := filepath.Dir(hdr.Name)
-			parentPath := filepath.Join(root, parent)
+			parentPath, err := rootPath(root, parent)
+			if err != nil {
+				return 0, err
+			}
 
 			if _, err := os.Lstat(parentPath); err != nil && os.IsNotExist(err) {
 				err = mkdirAll(parentPath, 0600)
@@ -156,7 +159,11 @@ func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 					}
 					defer os.RemoveAll(aufsTempdir)
 				}
-				if err := createTarFile(ctx, filepath.Join(aufsTempdir, basename), root, hdr, tr); err != nil {
+				p, err := rootPath(aufsTempdir, basename)
+				if err != nil {
+					return 0, err
+				}
+				if err := createTarFile(ctx, p, root, hdr, tr); err != nil {
 					return 0, err
 				}
 			}
@@ -232,7 +239,11 @@ func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 			if srcHdr == nil {
 				return 0, fmt.Errorf("Invalid aufs hardlink")
 			}
-			tmpFile, err := os.Open(filepath.Join(aufsTempdir, linkBasename))
+			p, err := rootPath(aufsTempdir, linkBasename)
+			if err != nil {
+				return 0, err
+			}
+			tmpFile, err := os.Open(p)
 			if err != nil {
 				return 0, err
 			}
@@ -253,7 +264,10 @@ func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 	}
 
 	for _, hdr := range dirs {
-		path := filepath.Join(root, hdr.Name)
+		path, err := rootPath(root, hdr.Name)
+		if err != nil {
+			return 0, err
+		}
 		if err := chtimes(path, boundTime(latestTime(hdr.AccessTime, hdr.ModTime)), boundTime(hdr.ModTime)); err != nil {
 			return 0, err
 		}
