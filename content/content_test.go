@@ -258,9 +258,11 @@ func checkBlobPath(t *testing.T, cs Store, dgst digest.Digest) string {
 		t.Fatalf("error stating blob path: %v", err)
 	}
 
-	// ensure that only read bits are set.
-	if ((fi.Mode() & os.ModePerm) & 0333) != 0 {
-		t.Fatalf("incorrect permissions: %v", fi.Mode())
+	if runtime.GOOS != "windows" {
+		// ensure that only read bits are set.
+		if ((fi.Mode() & os.ModePerm) & 0333) != 0 {
+			t.Fatalf("incorrect permissions: %v", fi.Mode())
+		}
 	}
 
 	return path
