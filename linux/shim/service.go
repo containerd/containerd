@@ -393,7 +393,7 @@ func (s *Service) forward(client poster) {
 		if _, err := client.Post(s.context, &events.PostEventRequest{
 			Envelope: &events.Envelope{
 				Timestamp: time.Now(),
-				Topic:     "/task/" + getTopic(e),
+				Topic:     getTopic(e),
 				Event:     a,
 			},
 		}); err != nil {
