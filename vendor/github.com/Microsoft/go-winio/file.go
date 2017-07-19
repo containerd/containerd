@@ -139,10 +139,10 @@ func (f *win32File) Close() error {
 // prepareIo prepares for a new IO operation.
 // The caller must call f.wg.Done() when the IO is finished, prior to Close() returning.
 func (f *win32File) prepareIo() (*ioOperation, error) {
-	f.wg.Add(1)
 	if f.isClosing() {
 		return nil, ErrFileClosed
 	}
+	f.wg.Add(1)
 	c := &ioOperation{}
 	c.ch = make(chan ioResult)
 	return c, nil
