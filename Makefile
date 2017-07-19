@@ -8,8 +8,6 @@ DESTDIR=/usr/local
 VERSION=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
 REVISION=$(shell git rev-parse HEAD)$(shell if ! git diff --no-ext-diff --quiet --exit-code; then echo .m; fi)
 
-PKG=github.com/containerd/containerd
-
 ifneq "$(strip $(shell command -v go 2>/dev/null))" ""
 GOOS ?= $(shell go env GOOS)
 else
@@ -21,6 +19,11 @@ ifeq ("$(OS)", "Windows_NT")
 	WHALE="+"
 	ONI="-"
 endif
+GOARCH ?= $(shell go env GOARCH)
+
+RELEASE=containerd-$(VERSION:v%=%).${GOOS}-${GOARCH}
+
+PKG=github.com/containerd/containerd
 
 # Project packages.
 PACKAGES=$(shell go list ./... | grep -v /vendor/)
@@ -43,7 +46,7 @@ GO_LDFLAGS=-ldflags "-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revi
 # Flags passed to `go test`
 TESTFLAGS ?=-parallel 8 -race
 
-.PHONY: clean all AUTHORS fmt vet lint dco build binaries test integration setup generate protos checkprotos coverage ci check help install uninstall vendor
+.PHONY: clean all AUTHORS fmt vet lint dco build binaries test integration setup generate protos checkprotos coverage ci check help install uninstall vendor release
 .DEFAULT: default
 
 all: binaries
@@ -141,6 +144,12 @@ bin/%: cmd/% FORCE
 
 binaries: $(BINARIES) ## build binaries
 	@echo "$(WHALE) $@"
+
+release: $(BINARIES)
+	@echo "$(WHALE) $@"
+	@mkdir -p releases/${RELEASE}
+	@cp $(BINARIES) releases/$(RELEASE)/
+	@cd releases/$(RELEASE) && tar -czf ../$(RELEASE).tar.gz *
 
 clean: ## clean up binaries
 	@echo "$(WHALE) $@"
