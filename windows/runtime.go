@@ -194,12 +194,13 @@ func (r *windowsRuntime) Delete(ctx context.Context, t runtime.Task) (*runtime.E
 	wt.cleanup()
 	r.tasks.Delete(ctx, t)
 
-	r.emitter.Post(events.WithTopic(ctx, "/tasks/delete"), &eventsapi.TaskDelete{
-		ContainerID: wt.id,
-		Pid:         wt.pid,
-		ExitStatus:  rtExit.Status,
-		ExitedAt:    rtExit.Timestamp,
-	})
+	r.emitter.Post(events.WithTopic(ctx, runtime.TaskDeleteEventTopic),
+		&eventsapi.TaskDelete{
+			ContainerID: wt.id,
+			Pid:         wt.pid,
+			ExitStatus:  rtExit.Status,
+			ExitedAt:    rtExit.Timestamp,
+		})
 
 	if needServicing {
 		ns, _ := namespaces.Namespace(ctx)
@@ -311,18 +312,19 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, spec
 		})
 	}
 
-	r.emitter.Post(events.WithTopic(ctx, "/tasks/create"), &eventsapi.TaskCreate{
-		ContainerID: id,
-		IO: &eventsapi.TaskIO{
-			Stdin:    io.Stdin,
-			Stdout:   io.Stdout,
-			Stderr:   io.Stderr,
-			Terminal: io.Terminal,
-		},
-		Pid:    t.pid,
-		Rootfs: rootfs,
-		// TODO: what should be in Bundle for windows?
-	})
+	r.emitter.Post(events.WithTopic(ctx, runtime.TaskCreateEventTopic),
+		&eventsapi.TaskCreate{
+			ContainerID: id,
+			IO: &eventsapi.TaskIO{
+				Stdin:    io.Stdin,
+				Stdout:   io.Stdout,
+				Stderr:   io.Stderr,
+				Terminal: io.Terminal,
+			},
+			Pid:    t.pid,
+			Rootfs: rootfs,
+			// TODO: what should be in Bundle for windows?
+		})
 
 	return t, nil
 }
