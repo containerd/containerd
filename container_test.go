@@ -273,6 +273,11 @@ func TestContainerExec(t *testing.T) {
 		close(finished)
 	}()
 
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+
 	// start an exec process without running the original container process info
 	processSpec := spec.Process
 	withExecExitStatus(processSpec, 6)
@@ -366,6 +371,11 @@ func TestContainerPids(t *testing.T) {
 		}
 		statusC <- status
 	}()
+
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
 
 	pid := task.Pid()
 	if pid <= 0 {
@@ -846,6 +856,11 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 		return
 	}
 	defer task.Delete(ctx)
+
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
 
 	finished := make(chan struct{}, 1)
 	go func() {
