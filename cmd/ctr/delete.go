@@ -40,12 +40,12 @@ var deleteCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		if status == containerd.Stopped {
+		if status == containerd.Stopped || status == containerd.Created {
 			if _, err := task.Delete(ctx); err != nil {
 				return err
 			}
 			return container.Delete(ctx, deleteOpts...)
 		}
-		return fmt.Errorf("cannot delete a container with an existing task")
+		return fmt.Errorf("cannot delete a non stopped container: %v", status)
 	},
 }
