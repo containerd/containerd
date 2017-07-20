@@ -292,7 +292,6 @@ func TestContainerExec(t *testing.T) {
 		status, err := process.Wait(ctx)
 		if err != nil {
 			t.Error(err)
-			return
 		}
 		processStatusC <- status
 	}()
