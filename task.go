@@ -188,6 +188,7 @@ func (t *task) Wait(ctx context.Context) (uint32, error) {
 // during cleanup
 func (t *task) Delete(ctx context.Context) (uint32, error) {
 	if t.io != nil {
+		t.io.Cancel()
 		t.io.Wait()
 		t.io.Close()
 	}
