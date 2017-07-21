@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/testutil"
+	"github.com/sirupsen/logrus"
 )
 
 var (

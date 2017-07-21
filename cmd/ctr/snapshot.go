@@ -7,12 +7,12 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd/progress"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/snapshot"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 

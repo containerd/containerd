@@ -4,12 +4,12 @@ import (
 	gocontext "context"
 	"syscall"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 

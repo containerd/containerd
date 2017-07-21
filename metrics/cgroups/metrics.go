@@ -8,10 +8,10 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containerd/cgroups"
 	metrics "github.com/docker/go-metrics"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 )
 
 var (

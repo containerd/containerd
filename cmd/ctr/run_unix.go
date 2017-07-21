@@ -9,12 +9,12 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 

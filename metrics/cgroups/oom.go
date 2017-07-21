@@ -7,9 +7,9 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containerd/cgroups"
 	metrics "github.com/docker/go-metrics"
+	"github.com/sirupsen/logrus"
 )
 
 func NewOOMCollector(ns *metrics.Namespace) (*OOMCollector, error) {
