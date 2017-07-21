@@ -4,7 +4,7 @@ import (
 	"container/list"
 	"sync"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // Queue accepts all messages into a queue for asynchronous consumption

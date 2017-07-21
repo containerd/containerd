@@ -4,12 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"runtime"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -17,9 +16,10 @@ var (
 )
 
 const (
-	pendingUpdatesQuery = `{ "PropertyTypes" : ["PendingUpdates"]}`
-	statisticsQuery     = `{ "PropertyTypes" : ["Statistics"]}`
-	processListQuery    = `{ "PropertyTypes" : ["ProcessList"]}`
+	pendingUpdatesQuery    = `{ "PropertyTypes" : ["PendingUpdates"]}`
+	statisticsQuery        = `{ "PropertyTypes" : ["Statistics"]}`
+	processListQuery       = `{ "PropertyTypes" : ["ProcessList"]}`
+	mappedVirtualDiskQuery = `{ "PropertyTypes" : ["MappedVirtualDisk"]}`
 )
 
 type container struct {
@@ -31,21 +31,21 @@ type container struct {
 
 // ContainerProperties holds the properties for a container and the processes running in that container
 type ContainerProperties struct {
-	ID                string `json:"Id"`
-	Name              string
-	SystemType        string
-	Owner             string
-	SiloGUID          string            `json:"SiloGuid,omitempty"`
-	IsDummy           bool              `json:",omitempty"`
-	RuntimeID         string            `json:"RuntimeId,omitempty"`
-	IsRuntimeTemplate bool              `json:",omitempty"`
-	RuntimeImagePath  string            `json:",omitempty"`
-	Stopped           bool              `json:",omitempty"`
-	ExitType          string            `json:",omitempty"`
-	AreUpdatesPending bool              `json:",omitempty"`
-	ObRoot            string            `json:",omitempty"`
-	Statistics        Statistics        `json:",omitempty"`
-	ProcessList       []ProcessListItem `json:",omitempty"`
+	ID                           string `json:"Id"`
+	Name                         string
+	SystemType                   string
+	Owner                        string
+	SiloGUID                     string                              `json:"SiloGuid,omitempty"`
+	RuntimeID                    string                              `json:"RuntimeId,omitempty"`
+	IsRuntimeTemplate            bool                                `json:",omitempty"`
+	RuntimeImagePath             string                              `json:",omitempty"`
+	Stopped                      bool                                `json:",omitempty"`
+	ExitType                     string                              `json:",omitempty"`
+	AreUpdatesPending            bool                                `json:",omitempty"`
+	ObRoot                       string                              `json:",omitempty"`
+	Statistics                   Statistics                          `json:",omitempty"`
+	ProcessList                  []ProcessListItem                   `json:",omitempty"`
+	MappedVirtualDiskControllers map[int]MappedVirtualDiskController `json:",omitempty"`
 }
 
 // MemoryStats holds the memory statistics for a container
@@ -105,6 +105,11 @@ type ProcessListItem struct {
 	UserTime100ns                uint64    `json:",omitempty"`
 }
 
+// MappedVirtualDiskController is the structure of an item returned by a MappedVirtualDiskList call on a container
+type MappedVirtualDiskController struct {
+	MappedVirtualDisks map[int]MappedVirtualDisk `json:",omitempty"`
+}
+
 // Type of Request Support in ModifySystem
 type RequestType string
 
@@ -122,7 +127,7 @@ const (
 // Supported resource types are Network and Request Types are Add/Remove
 type ResourceModificationRequestResponse struct {
 	Resource ResourceType `json:"ResourceType"`
-	Data     string       `json:"Settings"`
+	Data     interface{}  `json:"Settings"`
 	Request  RequestType  `json:"RequestType,omitempty"`
 }
 
@@ -206,7 +211,6 @@ func createContainerWithJSON(id string, c *ContainerConfig, additionalJSON strin
 	}
 
 	logrus.Debugf(title+" succeeded id=%s handle=%d", id, container.handle)
-	runtime.SetFinalizer(container, closeContainer)
 	return container, nil
 }
 
@@ -264,7 +268,6 @@ func OpenContainer(id string) (Container, error) {
 	}
 
 	logrus.Debugf(title+" succeeded id=%s handle=%d", id, handle)
-	runtime.SetFinalizer(container, closeContainer)
 	return container, nil
 }
 
@@ -491,6 +494,55 @@ func (container *container) ProcessList() ([]ProcessListItem, error) {
 	return properties.ProcessList, nil
 }
 
+// MappedVirtualDisks returns a map of the controllers and the disks mapped
+// to a container.
+//
+// Example of JSON returned by the query.
+//{
+//   "Id":"1126e8d7d279c707a666972a15976371d365eaf622c02cea2c442b84f6f550a3_svm",
+//   "SystemType":"Container",
+//   "RuntimeOsType":"Linux",
+//   "RuntimeId":"00000000-0000-0000-0000-000000000000",
+//   "State":"Running",
+//   "MappedVirtualDiskControllers":{
+//      "0":{
+//         "MappedVirtualDisks":{
+//            "2":{
+//               "HostPath":"C:\\lcow\\lcow\\scratch\\1126e8d7d279c707a666972a15976371d365eaf622c02cea2c442b84f6f550a3.vhdx",
+//               "ContainerPath":"/mnt/gcs/LinuxServiceVM/scratch",
+//               "Lun":2,
+//               "CreateInUtilityVM":true
+//            },
+//            "3":{
+//               "HostPath":"C:\\lcow\\lcow\\1126e8d7d279c707a666972a15976371d365eaf622c02cea2c442b84f6f550a3\\sandbox.vhdx",
+//               "Lun":3,
+//               "CreateInUtilityVM":true,
+//               "AttachOnly":true
+//            }
+//         }
+//      }
+//   }
+//}
+func (container *container) MappedVirtualDisks() (map[int]MappedVirtualDiskController, error) {
+	container.handleLock.RLock()
+	defer container.handleLock.RUnlock()
+	operation := "MappedVirtualDiskList"
+	title := "HCSShim::Container::" + operation
+	logrus.Debugf(title+" id=%s", container.id)
+
+	if container.handle == 0 {
+		return nil, makeContainerError(container, operation, "", ErrAlreadyClosed)
+	}
+
+	properties, err := container.properties(mappedVirtualDiskQuery)
+	if err != nil {
+		return nil, makeContainerError(container, operation, "", err)
+	}
+
+	logrus.Debugf(title+" succeeded id=%s", container.id)
+	return properties.MappedVirtualDiskControllers, nil
+}
+
 // Pause pauses the execution of the container. This feature is not enabled in TP5.
 func (container *container) Pause() error {
 	container.handleLock.RLock()
@@ -588,8 +640,7 @@ func (container *container) CreateProcess(c *ProcessConfig) (Process, error) {
 		return nil, makeContainerError(container, operation, "", err)
 	}
 
-	logrus.Debugf(title+" succeeded id=%s processid=%s", container.id, process.processID)
-	runtime.SetFinalizer(process, closeProcess)
+	logrus.Debugf(title+" succeeded id=%s processid=%d", container.id, process.processID)
 	return process, nil
 }
 
@@ -626,7 +677,6 @@ func (container *container) OpenProcess(pid int) (Process, error) {
 	}
 
 	logrus.Debugf(title+" succeeded id=%s processid=%s", container.id, process.processID)
-	runtime.SetFinalizer(process, closeProcess)
 	return process, nil
 }
 
@@ -652,15 +702,9 @@ func (container *container) Close() error {
 	}
 
 	container.handle = 0
-	runtime.SetFinalizer(container, nil)
 
 	logrus.Debugf(title+" succeeded id=%s", container.id)
 	return nil
-}
-
-// closeContainer wraps container.Close for use by a finalizer
-func closeContainer(container *container) {
-	container.Close()
 }
 
 func (container *container) registerCallback() error {

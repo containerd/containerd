@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/Microsoft/hcsshim"
-	"github.com/Sirupsen/logrus"
 	"github.com/boltdb/bolt"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	containerdtypes "github.com/containerd/containerd/api/types"
@@ -24,6 +23,7 @@ import (
 	"github.com/containerd/containerd/windows/hcsshimopts"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const (
