@@ -7,14 +7,14 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/content/fs"
+	"github.com/containerd/containerd/content/local"
 	"github.com/containerd/containerd/content/testsuite"
 )
 
 func TestContent(t *testing.T) {
 	testsuite.ContentSuite(t, "metadata", func(ctx context.Context, root string) (content.Store, func(), error) {
 		// TODO: Use mocked or in-memory store
-		cs, err := fs.NewStore(root)
+		cs, err := local.NewStore(root)
 		if err != nil {
 			return nil, nil, err
 		}
