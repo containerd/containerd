@@ -19,6 +19,7 @@ type sinkEvent struct {
 }
 
 type eventSink struct {
+	id string
 	ns string
 	ch chan *events.Envelope
 }
@@ -47,10 +48,11 @@ func (s *eventSink) Write(evt goevents.Event) error {
 	}
 
 	log.G(e.ctx).WithFields(logrus.Fields{
+		"id":    s.id,
 		"topic": topic,
 		"type":  eventData.TypeUrl,
 		"ns":    ns,
-	}).Debug("event")
+	}).Debug("sink event")
 
 	s.ch <- &events.Envelope{
 		Timestamp: time.Now(),
