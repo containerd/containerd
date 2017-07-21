@@ -28,6 +28,7 @@ var snapshotCommand = cli.Command{
 		prepareSnapshotCommand,
 		treeSnapshotCommand,
 		mountSnapshotCommand,
+		commitSnapshotCommand,
 	},
 }
 
@@ -287,6 +288,30 @@ var mountSnapshotCommand = cli.Command{
 		}
 
 		return nil
+	},
+}
+
+var commitSnapshotCommand = cli.Command{
+	Name:      "commit",
+	Usage:     "commit creates a new snapshot with diff from parent snapshot",
+	ArgsUsage: "[flags] <id> <target>",
+	Action: func(clicontext *cli.Context) error {
+		ctx, cancel := appContext(clicontext)
+		defer cancel()
+
+		if clicontext.NArg() != 2 {
+			return cli.ShowSubcommandHelp(clicontext)
+		}
+
+		id := clicontext.Args().Get(0)
+		target := clicontext.Args().Get(1)
+
+		snapshotter, err := getSnapshotter(clicontext)
+		if err != nil {
+			return err
+		}
+
+		return snapshotter.Commit(ctx, target, id)
 	},
 }
 
