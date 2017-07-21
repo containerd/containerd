@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"syscall"
 	"testing"
 	"time"
@@ -17,11 +18,6 @@ import (
 	"github.com/containerd/containerd/testutil"
 )
 
-const (
-	defaultRoot = "/var/lib/containerd-test"
-	testImage   = "docker.io/library/alpine:latest"
-)
-
 var (
 	address      string
 	noDaemon     bool
@@ -29,7 +25,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&address, "address", "/run/containerd-test/containerd.sock", "The address to the containerd socket for use in the tests")
+	flag.StringVar(&address, "address", defaultAddress, "The address to the containerd socket for use in the tests")
 	flag.BoolVar(&noDaemon, "no-daemon", false, "Do not start a dedicated daemon for the tests")
 	flag.Parse()
 }
@@ -57,11 +53,15 @@ func TestMain(m *testing.M) {
 	defer cancel()
 
 	if !noDaemon {
+		os.RemoveAll(defaultRoot)
+
 		// setup a new containerd daemon if !testing.Short
 		cmd = exec.Command("containerd",
 			"--root", defaultRoot,
 			"--address", address,
+			"--log-level", "debug",
 		)
+		cmd.Stdout = buf
 		cmd.Stderr = buf
 		if err := cmd.Start(); err != nil {
 			cmd.Wait()
@@ -94,14 +94,22 @@ func TestMain(m *testing.M) {
 	}).Info("running tests against containerd")
 
 	// pull a seed image
-	if _, err = client.Pull(ctx, testImage, WithPullUnpack); err != nil {
-		cmd.Process.Signal(syscall.SIGTERM)
-		cmd.Wait()
-		fmt.Fprintf(os.Stderr, "%s: %s", err, buf.String())
+	if runtime.GOOS != "windows" { // TODO: remove once pull is supported on windows
+		if _, err = client.Pull(ctx, testImage, WithPullUnpack); err != nil {
+			cmd.Process.Signal(syscall.SIGTERM)
+			cmd.Wait()
+			fmt.Fprintf(os.Stderr, "%s: %s", err, buf.String())
+			os.Exit(1)
+		}
+	}
+
+	if err := platformTestSetup(client); err != nil {
+		fmt.Fprintln(os.Stderr, "platform test setup failed", err)
 		os.Exit(1)
 	}
+
 	if err := client.Close(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, "failed to close client", err)
 	}
 
 	// run the test
@@ -110,13 +118,15 @@ func TestMain(m *testing.M) {
 	if !noDaemon {
 		// tear down the daemon and resources created
 		if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
-			fmt.Fprintln(os.Stderr, err)
+			if err := cmd.Process.Kill(); err != nil {
+				fmt.Fprintln(os.Stderr, "failed to signal containerd", err)
+			}
 		}
 		if err := cmd.Wait(); err != nil {
-			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, "failed to wait for containerd", err)
 		}
 		if err := os.RemoveAll(defaultRoot); err != nil {
-			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, "failed to remove test root dir", err)
 			os.Exit(1)
 		}
 		// only print containerd logs if the test failed
@@ -171,6 +181,11 @@ func TestNewClient(t *testing.T) {
 }
 
 func TestImagePull(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// TODO: remove once Windows has a snapshotter
+		t.Skip("Windows does not have a snapshotter yet")
+	}
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)

@@ -47,7 +47,9 @@ func (e *Emitter) Events(ctx context.Context, clientID string) chan *events.Enve
 			ns: ns,
 		}
 		e.sinks[clientID] = s
+		e.m.Unlock()
 		e.broadcaster.Add(s)
+		return s.ch
 	}
 	ch := e.sinks[clientID].ch
 	e.m.Unlock()

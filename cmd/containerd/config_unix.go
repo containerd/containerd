@@ -8,7 +8,7 @@ func defaultConfig() *server.Config {
 	return &server.Config{
 		Root: "/var/lib/containerd",
 		GRPC: server.GRPCConfig{
-			Address: "/run/containerd/containerd.sock",
+			Address: server.DefaultAddress,
 		},
 		Debug: server.Debug{
 			Level:   "info",

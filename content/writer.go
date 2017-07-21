@@ -3,6 +3,7 @@ package content
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
@@ -67,8 +68,12 @@ func (w *writer) Commit(size int64, expected digest.Digest) error {
 	// only allowing reads honoring the umask on creation.
 	//
 	// This removes write and exec, only allowing read per the creation umask.
-	if err := w.fp.Chmod((fi.Mode() & os.ModePerm) &^ 0333); err != nil {
-		return errors.Wrap(err, "failed to change ingest file permissions")
+	//
+	// NOTE: Windows does not support this operation
+	if runtime.GOOS != "windows" {
+		if err := w.fp.Chmod((fi.Mode() & os.ModePerm) &^ 0333); err != nil {
+			return errors.Wrap(err, "failed to change ingest file permissions")
+		}
 	}
 
 	if size > 0 && size != fi.Size() {

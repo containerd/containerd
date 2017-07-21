@@ -42,7 +42,7 @@ type Task interface {
 	Pids(context.Context) ([]uint32, error)
 	// Checkpoint checkpoints a container to an image with live system data
 	Checkpoint(context.Context, string, *types.Any) error
-	// DeleteProcess deletes a specific exec process via the pid
+	// DeleteProcess deletes a specific exec process via its id
 	DeleteProcess(context.Context, string) (*Exit, error)
 	// Update sets the provided resources to a running task
 	Update(context.Context, *types.Any) error

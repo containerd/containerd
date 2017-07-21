@@ -188,6 +188,7 @@ func (t *task) Wait(ctx context.Context) (uint32, error) {
 // during cleanup
 func (t *task) Delete(ctx context.Context) (uint32, error) {
 	if t.io != nil {
+		t.io.Cancel()
 		t.io.Wait()
 		t.io.Close()
 	}
@@ -204,7 +205,7 @@ func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreat
 	if id == "" {
 		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "exec id must not be empty")
 	}
-	i, err := ioCreate()
+	i, err := ioCreate(id)
 	if err != nil {
 		return nil, err
 	}

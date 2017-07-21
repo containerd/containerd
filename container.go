@@ -157,7 +157,7 @@ type NewTaskOpts func(context.Context, *Client, *TaskInfo) error
 func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...NewTaskOpts) (Task, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	i, err := ioCreate()
+	i, err := ioCreate(c.c.ID)
 	if err != nil {
 		return nil, err
 	}

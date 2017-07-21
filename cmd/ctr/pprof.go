@@ -3,13 +3,12 @@ package main
 import (
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/containerd/containerd/server"
 	"github.com/pkg/errors"
-
 	"github.com/urfave/cli"
 )
 
@@ -25,7 +24,7 @@ var pprofCommand = cli.Command{
 		cli.StringFlag{
 			Name:  "debug-socket, d",
 			Usage: "socket path for containerd's debug server",
-			Value: "/run/containerd/debug.sock",
+			Value: server.DefaultDebugAddress,
 		},
 	},
 	Subcommands: []cli.Command{
@@ -143,13 +142,8 @@ var pprofThreadcreateCommand = cli.Command{
 	},
 }
 
-func (d *pprofDialer) pprofDial(proto, addr string) (conn net.Conn, err error) {
-	return net.Dial(d.proto, d.addr)
-}
-
 func getPProfClient(context *cli.Context) *http.Client {
-	addr := context.GlobalString("debug-socket")
-	dialer := pprofDialer{"unix", addr}
+	dialer := getPProfDialer(context.GlobalString("debug-socket"))
 
 	tr := &http.Transport{
 		Dial: dialer.pprofDial,

@@ -13,7 +13,7 @@ type resourceUpdate struct {
 }
 
 func (u resourceUpdate) String() string {
-	return fmt.Sprintf("%s(mode: %o, uid: %s, gid: %s) -> %s(mode: %o, uid: %s, gid: %s)",
+	return fmt.Sprintf("%s(mode: %o, uid: %d, gid: %d) -> %s(mode: %o, uid: %d, gid: %d)",
 		u.Original.Path(), u.Original.Mode(), u.Original.UID(), u.Original.GID(),
 		u.Updated.Path(), u.Updated.Mode(), u.Updated.UID(), u.Updated.GID(),
 	)

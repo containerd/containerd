@@ -6,13 +6,16 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"testing"
 
-	"github.com/containerd/cgroups"
+	// Register the typeurl
+	_ "github.com/containerd/containerd/runtime"
+
 	"github.com/containerd/containerd/errdefs"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func empty() IOCreation {
@@ -48,7 +51,7 @@ func TestNewContainer(t *testing.T) {
 	}
 	defer client.Close()
 
-	spec, err := GenerateSpec()
+	spec, err := generateSpec()
 	if err != nil {
 		t.Error(err)
 		return
@@ -84,22 +87,26 @@ func TestContainerStart(t *testing.T) {
 	defer client.Close()
 
 	var (
+		image       Image
 		ctx, cancel = testContext()
 		id          = t.Name()
 	)
 	defer cancel()
 
-	image, err := client.GetImage(ctx, testImage)
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	spec, err := generateSpec(withImageConfig(ctx, image), withExitStatus(7))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	spec, err := GenerateSpec(WithImageConfig(ctx, image), WithProcessArgs("sh", "-c", "exit 7"))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewRootFS(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -151,23 +158,27 @@ func TestContainerOutput(t *testing.T) {
 	defer client.Close()
 
 	var (
+		image       Image
 		ctx, cancel = testContext()
 		id          = t.Name()
 		expected    = "kingkoye"
 	)
 	defer cancel()
 
-	image, err := client.GetImage(ctx, testImage)
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("echo", expected))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	spec, err := GenerateSpec(WithImageConfig(ctx, image), WithProcessArgs("echo", expected))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewRootFS(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -207,7 +218,7 @@ func TestContainerOutput(t *testing.T) {
 
 	actual := stdout.String()
 	// echo adds a new line
-	expected = expected + "\n"
+	expected = expected + newLine
 	if actual != expected {
 		t.Errorf("expected output %q but received %q", expected, actual)
 	}
@@ -221,22 +232,26 @@ func TestContainerExec(t *testing.T) {
 	defer client.Close()
 
 	var (
+		image       Image
 		ctx, cancel = testContext()
 		id          = t.Name()
 	)
 	defer cancel()
 
-	image, err := client.GetImage(ctx, testImage)
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("sleep", "100"))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	spec, err := GenerateSpec(WithImageConfig(ctx, image), WithProcessArgs("sleep", "100"))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewRootFS(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -258,12 +273,14 @@ func TestContainerExec(t *testing.T) {
 		close(finished)
 	}()
 
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+
 	// start an exec process without running the original container process info
 	processSpec := spec.Process
-	processSpec.Args = []string{
-		"sh", "-c",
-		"exit 6",
-	}
+	withExecExitStatus(processSpec, 6)
 	execID := t.Name() + "_exec"
 	process, err := task.Exec(ctx, execID, processSpec, empty())
 	if err != nil {
@@ -275,7 +292,6 @@ func TestContainerExec(t *testing.T) {
 		status, err := process.Wait(ctx)
 		if err != nil {
 			t.Error(err)
-			return
 		}
 		processStatusC <- status
 	}()
@@ -305,7 +321,7 @@ func TestContainerExec(t *testing.T) {
 	<-finished
 }
 
-func TestContainerProcesses(t *testing.T) {
+func TestContainerPids(t *testing.T) {
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -313,22 +329,26 @@ func TestContainerProcesses(t *testing.T) {
 	defer client.Close()
 
 	var (
+		image       Image
 		ctx, cancel = testContext()
 		id          = t.Name()
 	)
 	defer cancel()
 
-	image, err := client.GetImage(ctx, testImage)
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("sleep", "100"))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	spec, err := GenerateSpec(WithImageConfig(ctx, image), WithProcessArgs("sleep", "100"))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewRootFS(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -350,6 +370,11 @@ func TestContainerProcesses(t *testing.T) {
 		}
 		statusC <- status
 	}()
+
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
 
 	pid := task.Pid()
 	if pid <= 0 {
@@ -383,29 +408,33 @@ func TestContainerCloseIO(t *testing.T) {
 	defer client.Close()
 
 	var (
+		image       Image
 		ctx, cancel = testContext()
 		id          = t.Name()
 	)
 	defer cancel()
 
-	image, err := client.GetImage(ctx, testImage)
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	spec, err := generateSpec(withImageConfig(ctx, image), withCat())
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	spec, err := GenerateSpec(WithImageConfig(ctx, image), WithProcessArgs("cat"))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewRootFS(id, image))
 	if err != nil {
 		t.Error(err)
 		return
 	}
 	defer container.Delete(ctx, WithRootFSDeletion)
 
-	const expected = "hello\n"
+	const expected = "hello" + newLine
 	stdout := bytes.NewBuffer(nil)
 
 	r, w, err := os.Pipe()
@@ -451,12 +480,25 @@ func TestContainerCloseIO(t *testing.T) {
 
 	output := stdout.String()
 
+	if runtime.GOOS == "windows" {
+		// On windows we use more and it always adds an extra newline
+		// remove it here
+		output = strings.TrimSuffix(output, newLine)
+	}
+
 	if output != expected {
 		t.Errorf("expected output %q but received %q", expected, output)
 	}
 }
 
 func TestContainerAttach(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// On windows, closing the write side of the pipe closes the read
+		// side, sending an EOF to it and preventing reopening it.
+		// Hence this test will always fails on windows
+		t.Skip("invalid logic on windows")
+	}
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -464,29 +506,33 @@ func TestContainerAttach(t *testing.T) {
 	defer client.Close()
 
 	var (
+		image       Image
 		ctx, cancel = testContext()
 		id          = t.Name()
 	)
 	defer cancel()
 
-	image, err := client.GetImage(ctx, testImage)
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	spec, err := generateSpec(withImageConfig(ctx, image), withCat())
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	spec, err := GenerateSpec(WithImageConfig(ctx, image), WithProcessArgs("cat"))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewRootFS(id, image))
 	if err != nil {
 		t.Error(err)
 		return
 	}
 	defer container.Delete(ctx, WithRootFSDeletion)
 
-	expected := "hello\n"
+	expected := "hello" + newLine
 	stdout := bytes.NewBuffer(nil)
 
 	r, w, err := os.Pipe()
@@ -586,22 +632,26 @@ func TestDeleteRunningContainer(t *testing.T) {
 	defer client.Close()
 
 	var (
+		image       Image
 		ctx, cancel = testContext()
 		id          = t.Name()
 	)
 	defer cancel()
 
-	image, err := client.GetImage(ctx, testImage)
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("sleep", "100"))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	spec, err := GenerateSpec(WithImageConfig(ctx, image), WithProcessArgs("sleep", "100"))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithImage(image), WithNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewRootFS(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -651,22 +701,26 @@ func TestContainerKill(t *testing.T) {
 	defer client.Close()
 
 	var (
+		image       Image
 		ctx, cancel = testContext()
 		id          = t.Name()
 	)
 	defer cancel()
 
-	image, err := client.GetImage(ctx, testImage)
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	spec, err := generateSpec(withImageConfig(ctx, image), withCat())
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	spec, err := GenerateSpec(WithImageConfig(ctx, image), WithProcessArgs("sh", "-c", "cat"))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithImage(image), WithNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewRootFS(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -709,95 +763,6 @@ func TestContainerKill(t *testing.T) {
 	}
 }
 
-func TestContainerUpdate(t *testing.T) {
-	client, err := newClient(t, address)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
-
-	var (
-		ctx, cancel = testContext()
-		id          = t.Name()
-	)
-	defer cancel()
-
-	image, err := client.GetImage(ctx, testImage)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	spec, err := GenerateSpec(WithImageConfig(ctx, image), WithProcessArgs("sleep", "30"))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	limit := int64(32 * 1024 * 1024)
-	spec.Linux.Resources.Memory = &specs.LinuxMemory{
-		Limit: &limit,
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewRootFS(id, image))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	defer container.Delete(ctx, WithRootFSDeletion)
-
-	task, err := container.NewTask(ctx, empty())
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	defer task.Delete(ctx)
-
-	statusC := make(chan uint32, 1)
-	go func() {
-		status, err := task.Wait(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		statusC <- status
-	}()
-
-	// check that the task has a limit of 32mb
-	cgroup, err := cgroups.Load(cgroups.V1, cgroups.PidPath(int(task.Pid())))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	stat, err := cgroup.Stat(cgroups.IgnoreNotExist)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	if int64(stat.Memory.Usage.Limit) != limit {
-		t.Errorf("expected memory limit to be set to %d but received %d", limit, stat.Memory.Usage.Limit)
-		return
-	}
-	limit = 64 * 1024 * 1024
-	if err := task.Update(ctx, WithResources(&specs.LinuxResources{
-		Memory: &specs.LinuxMemory{
-			Limit: &limit,
-		},
-	})); err != nil {
-		t.Error(err)
-	}
-	// check that the task has a limit of 64mb
-	if stat, err = cgroup.Stat(cgroups.IgnoreNotExist); err != nil {
-		t.Error(err)
-		return
-	}
-	if int64(stat.Memory.Usage.Limit) != limit {
-		t.Errorf("expected memory limit to be set to %d but received %d", limit, stat.Memory.Usage.Limit)
-	}
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
-		t.Error(err)
-		return
-	}
-
-	<-statusC
-}
-
 func TestContainerNoBinaryExists(t *testing.T) {
 	client, err := newClient(t, address)
 	if err != nil {
@@ -806,30 +771,47 @@ func TestContainerNoBinaryExists(t *testing.T) {
 	defer client.Close()
 
 	var (
+		image       Image
 		ctx, cancel = testContext()
 		id          = t.Name()
 	)
 	defer cancel()
 
-	image, err := client.GetImage(ctx, testImage)
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("nothing"))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	spec, err := GenerateSpec(WithImageConfig(ctx, image), WithProcessArgs("nothing"))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewRootFS(id, image))
 	if err != nil {
 		t.Error(err)
 		return
 	}
 	defer container.Delete(ctx, WithRootFSDeletion)
 
-	if _, err := container.NewTask(ctx, Stdio); err == nil {
-		t.Error("NewTask should return an error when binary does not exist")
+	task, err := container.NewTask(ctx, Stdio)
+	switch runtime.GOOS {
+	case "windows":
+		if err != nil {
+			t.Errorf("failed to create task %v", err)
+		}
+		if err := task.Start(ctx); err != nil {
+			t.Error("task.Start() should return an error when binary does not exist")
+			task.Delete(ctx)
+		}
+	default:
+		if err == nil {
+			t.Error("NewTask should return an error when binary does not exist")
+			task.Delete(ctx)
+		}
 	}
 }
 
@@ -841,22 +823,26 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 	defer client.Close()
 
 	var (
+		image       Image
 		ctx, cancel = testContext()
 		id          = t.Name()
 	)
 	defer cancel()
 
-	image, err := client.GetImage(ctx, testImage)
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("sleep", "100"))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	spec, err := GenerateSpec(WithImageConfig(ctx, image), WithProcessArgs("sleep", "100"))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewRootFS(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -869,6 +855,11 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 		return
 	}
 	defer task.Delete(ctx)
+
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
 
 	finished := make(chan struct{}, 1)
 	go func() {
