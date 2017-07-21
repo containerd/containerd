@@ -15,3 +15,7 @@ func (m *Mount) Mount(target string) error {
 func Unmount(mount string, flags int) error {
 	return ErrNotImplementOnUnix
 }
+
+func UnmountAll(mount string, flags int) error {
+	return ErrNotImplementOnUnix
+}

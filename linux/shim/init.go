@@ -50,9 +50,12 @@ type initProcess struct {
 	closers []io.Closer
 	stdin   io.Closer
 	stdio   stdio
+	rootfs  string
 }
 
 func newInitProcess(context context.Context, path, namespace string, r *shimapi.CreateTaskRequest) (*initProcess, error) {
+	var success bool
+
 	if err := identifiers.Validate(r.ID); err != nil {
 		return nil, errors.Wrapf(err, "invalid task id")
 	}
@@ -64,13 +67,26 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 		}
 		options = *v.(*runcopts.CreateOptions)
 	}
+
+	rootfs := filepath.Join(path, "rootfs")
+	// count the number of successful mounts so we can undo
+	// what was actually done rather than what should have been
+	// done.
+	defer func() {
+		if success {
+			return
+		}
+		if err2 := mount.UnmountAll(rootfs, 0); err2 != nil {
+			log.G(context).WithError(err2).Warn("Failed to cleanup rootfs mount")
+		}
+	}()
 	for _, rm := range r.Rootfs {
 		m := &mount.Mount{
 			Type:    rm.Type,
 			Source:  rm.Source,
 			Options: rm.Options,
 		}
-		if err := m.Mount(filepath.Join(path, "rootfs")); err != nil {
+		if err := m.Mount(rootfs); err != nil {
 			return nil, errors.Wrapf(err, "failed to mount rootfs component %v", m)
 		}
 	}
@@ -91,6 +107,7 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 			stderr:   r.Stderr,
 			terminal: r.Terminal,
 		},
+		rootfs: rootfs,
 	}
 	var (
 		err    error
@@ -170,6 +187,7 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 		return nil, errors.Wrap(err, "failed to retrieve OCI runtime container pid")
 	}
 	p.pid = pid
+	success = true
 	return p, nil
 }
 
@@ -229,7 +247,16 @@ func (p *initProcess) Delete(context context.Context) error {
 		}
 		p.io.Close()
 	}
-	return p.runtimeError(err, "OCI runtime delete failed")
+	err = p.runtimeError(err, "OCI runtime delete failed")
+
+	if err2 := mount.UnmountAll(p.rootfs, 0); err2 != nil {
+		log.G(context).WithError(err2).Warn("Failed to cleanup rootfs mount")
+		if err == nil {
+			err = errors.Wrap(err2, "Failed rootfs umount")
+		}
+	}
+
+	return err
 }
 
 func (p *initProcess) Resize(ws console.WinSize) error {

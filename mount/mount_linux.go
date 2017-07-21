@@ -15,6 +15,25 @@ func Unmount(mount string, flags int) error {
 	return unix.Unmount(mount, flags)
 }
 
+// UnmountAll repeatedly unmounts the given mount point until there
+// are no mounts remaining (EINVAL is returned by mount), which is
+// useful for undoing a stack of mounts on the same mount point.
+func UnmountAll(mount string, flags int) error {
+	for {
+		if err := Unmount(mount, flags); err != nil {
+			// EINVAL is returned if the target is not a
+			// mount point, indicating that we are
+			// done. It can also indicate a few other
+			// things (such as invalid flags) which we
+			// unfortunately end up squelching here too.
+			if err == unix.EINVAL {
+				return nil
+			}
+			return err
+		}
+	}
+}
+
 // parseMountOptions takes fstab style mount options and parses them for
 // use with a standard mount() syscall
 func parseMountOptions(options []string) (int, string) {
