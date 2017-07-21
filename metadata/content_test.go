@@ -23,8 +23,9 @@ func TestContent(t *testing.T) {
 		if err != nil {
 			return nil, nil, err
 		}
-		cs = NewContentStore(db, cs)
 
-		return cs, func() {}, nil
+		return NewContentStore(db, cs), func() {
+			db.Close()
+		}, nil
 	})
 }

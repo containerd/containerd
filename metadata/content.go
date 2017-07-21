@@ -251,7 +251,12 @@ func (cs *contentStore) Status(ctx context.Context, ref string) (content.Status,
 		return content.Status{}, err
 	}
 
-	return cs.Store.Status(ctx, bref)
+	st, err := cs.Store.Status(ctx, bref)
+	if err != nil {
+		return content.Status{}, err
+	}
+	st.Ref = ref
+	return st, nil
 }
 
 func (cs *contentStore) Abort(ctx context.Context, ref string) error {
@@ -401,6 +406,14 @@ func (nw *namespacedWriter) commit(tx *bolt.Tx, size int64, expected digest.Dige
 	}
 
 	return nil
+}
+
+func (nw *namespacedWriter) Status() (content.Status, error) {
+	st, err := nw.Writer.Status()
+	if err == nil {
+		st.Ref = nw.ref
+	}
+	return st, err
 }
 
 func (cs *contentStore) Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, error) {
