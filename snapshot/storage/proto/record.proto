@@ -4,16 +4,14 @@ package containerd.snapshot.v1;
 
 import "gogoproto/gogo.proto";
 
-// Kind defines the kind of snapshot.
 enum Kind {
 	option (gogoproto.goproto_enum_prefix) = false;
 	option (gogoproto.enum_customname) = "Kind";
 
-	// KindActive represents an active snapshot
-	ACTIVE = 0 [(gogoproto.enumvalue_customname) = "KindActive"];
-
-	// KindCommitted represents a committed immutable snapshot
-	COMMITTED = 1 [(gogoproto.enumvalue_customname) = "KindCommitted"];
+	UNKNOWN = 0 [(gogoproto.enumvalue_customname) = "KindUnknown"];
+	VIEW = 1 [(gogoproto.enumvalue_customname) = "KindView"];
+	ACTIVE = 2 [(gogoproto.enumvalue_customname) = "KindActive"];
+	COMMITTED = 3 [(gogoproto.enumvalue_customname) = "KindCommitted"];
 }
 
 // Snapshot defines the storage type for a snapshot in the
@@ -22,7 +20,6 @@ message Snapshot {
 	uint64 id = 1;
 	string parent = 2;
 	Kind kind = 4;
-	bool readonly = 5;
 
 	// inodes stores the number inodes in use for the snapshot.
 	//

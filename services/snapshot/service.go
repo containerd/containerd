@@ -269,10 +269,9 @@ func fromKind(kind snapshot.Kind) snapshotapi.Kind {
 
 func fromInfo(info snapshot.Info) snapshotapi.Info {
 	return snapshotapi.Info{
-		Name:     info.Name,
-		Parent:   info.Parent,
-		Kind:     fromKind(info.Kind),
-		Readonly: info.Readonly,
+		Name:   info.Name,
+		Parent: info.Parent,
+		Kind:   fromKind(info.Kind),
 	}
 }
 

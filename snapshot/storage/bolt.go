@@ -79,10 +79,9 @@ func GetInfo(ctx context.Context, key string) (string, snapshot.Info, snapshot.U
 	}
 
 	return fmt.Sprint(ss.ID), snapshot.Info{
-		Name:     key,
-		Parent:   ss.Parent,
-		Kind:     fromProtoKind(ss.Kind),
-		Readonly: ss.Readonly,
+		Name:   key,
+		Parent: ss.Parent,
+		Kind:   snapshot.Kind(ss.Kind),
 	}, usage, nil
 }
 
@@ -102,22 +101,64 @@ func WalkInfo(ctx context.Context, fn func(context.Context, snapshot.Info) error
 			}
 
 			info := snapshot.Info{
-				Name:     string(k),
-				Parent:   ss.Parent,
-				Kind:     fromProtoKind(ss.Kind),
-				Readonly: ss.Readonly,
+				Name:   string(k),
+				Parent: ss.Parent,
+				Kind:   snapshot.Kind(ss.Kind),
 			}
 			return fn(ctx, info)
 		})
 	})
 }
 
-// CreateActive creates a new active snapshot transaction referenced by
-// the provided key. The new active snapshot will have the provided
-// parent. If the readonly option is given, the active snapshot will be
-// marked as readonly and can only be removed, and not committed. The
-// provided context must contain a writable transaction.
-func CreateActive(ctx context.Context, key, parent string, readonly bool) (a Active, err error) {
+// GetSnapshot returns the metadata for the active or view snapshot transaction
+// referenced by the given key. Requires a context with a storage transaction.
+func GetSnapshot(ctx context.Context, key string) (s Snapshot, err error) {
+	err = withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
+		b := bkt.Get([]byte(key))
+		if len(b) == 0 {
+			return errors.Wrapf(errdefs.ErrNotFound, "snapshot %v", key)
+		}
+
+		var ss db.Snapshot
+		if err := proto.Unmarshal(b, &ss); err != nil {
+			return errors.Wrap(err, "failed to unmarshal snapshot")
+		}
+
+		if ss.Kind != db.KindActive && ss.Kind != db.KindView {
+			return errors.Wrapf(errdefs.ErrFailedPrecondition, "requested snapshot %v not active or view", key)
+		}
+
+		s.ID = fmt.Sprintf("%d", ss.ID)
+		s.Kind = snapshot.Kind(ss.Kind)
+
+		if ss.Parent != "" {
+			var parent db.Snapshot
+			if err := getSnapshot(bkt, ss.Parent, &parent); err != nil {
+				return errors.Wrap(err, "failed to get parent snapshot")
+			}
+
+			s.ParentIDs, err = parents(bkt, &parent)
+			if err != nil {
+				return errors.Wrap(err, "failed to get parent chain")
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return Snapshot{}, err
+	}
+
+	return
+}
+
+// CreateSnapshot inserts a record for an active or view snapshot with the provided parent.
+func CreateSnapshot(ctx context.Context, kind snapshot.Kind, key, parent string) (s Snapshot, err error) {
+	switch kind {
+	case snapshot.KindActive, snapshot.KindView:
+	default:
+		return Snapshot{}, errors.Wrapf(errdefs.ErrInvalidArgument, "snapshot type %v invalid; only snapshots of type Active or View can be created", kind)
+	}
+
 	err = createBucketIfNotExists(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
 		var (
 			parentS *db.Snapshot
@@ -143,10 +184,9 @@ func CreateActive(ctx context.Context, key, parent string, readonly bool) (a Act
 		}
 
 		ss := db.Snapshot{
-			ID:       id,
-			Parent:   parent,
-			Kind:     db.KindActive,
-			Readonly: readonly,
+			ID:     id,
+			Parent: parent,
+			Kind:   db.Kind(kind),
 		}
 		if err := putSnapshot(bkt, key, &ss); err != nil {
 			return err
@@ -159,59 +199,18 @@ func CreateActive(ctx context.Context, key, parent string, readonly bool) (a Act
 				return errors.Wrap(err, "failed to write parent link")
 			}
 
-			a.ParentIDs, err = parents(bkt, parentS)
+			s.ParentIDs, err = parents(bkt, parentS)
 			if err != nil {
 				return errors.Wrap(err, "failed to get parent chain")
 			}
 		}
 
-		a.ID = fmt.Sprintf("%d", id)
-		a.Readonly = readonly
-
+		s.ID = fmt.Sprintf("%d", id)
+		s.Kind = kind
 		return nil
 	})
 	if err != nil {
-		return Active{}, err
-	}
-
-	return
-}
-
-// GetActive returns the metadata for the active snapshot transaction referenced
-// by the given key. Requires a context with a storage transaction.
-func GetActive(ctx context.Context, key string) (a Active, err error) {
-	err = withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
-		b := bkt.Get([]byte(key))
-		if len(b) == 0 {
-			return errors.Wrapf(errdefs.ErrNotFound, "snapshot %v", key)
-		}
-
-		var ss db.Snapshot
-		if err := proto.Unmarshal(b, &ss); err != nil {
-			return errors.Wrap(err, "failed to unmarshal snapshot")
-		}
-		if ss.Kind != db.KindActive {
-			return errors.Wrapf(errdefs.ErrFailedPrecondition, "requested snapshot %v not active", key)
-		}
-
-		a.ID = fmt.Sprintf("%d", ss.ID)
-		a.Readonly = ss.Readonly
-
-		if ss.Parent != "" {
-			var parent db.Snapshot
-			if err := getSnapshot(bkt, ss.Parent, &parent); err != nil {
-				return errors.Wrap(err, "failed to get parent snapshot")
-			}
-
-			a.ParentIDs, err = parents(bkt, &parent)
-			if err != nil {
-				return errors.Wrap(err, "failed to get parent chain")
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return Active{}, err
+		return Snapshot{}, err
 	}
 
 	return
@@ -255,7 +254,7 @@ func Remove(ctx context.Context, key string) (id string, k snapshot.Kind, err er
 		}
 
 		id = fmt.Sprintf("%d", ss.ID)
-		k = fromProtoKind(ss.Kind)
+		k = snapshot.Kind(ss.Kind)
 
 		return nil
 	})
@@ -283,12 +282,8 @@ func CommitActive(ctx context.Context, key, name string, usage snapshot.Usage) (
 		if ss.Kind != db.KindActive {
 			return errors.Wrapf(errdefs.ErrFailedPrecondition, "snapshot %v is not active", name)
 		}
-		if ss.Readonly {
-			return errors.Errorf("active snapshot is readonly")
-		}
 
 		ss.Kind = db.KindCommitted
-		ss.Readonly = true
 		ss.Inodes = usage.Inodes
 		ss.Size_ = usage.Size
 
@@ -352,13 +347,6 @@ func createBucketIfNotExists(ctx context.Context, fn func(context.Context, *bolt
 		return errors.Wrap(err, "failed to create snapshots bucket")
 	}
 	return fn(ctx, sbkt, pbkt)
-}
-
-func fromProtoKind(k db.Kind) snapshot.Kind {
-	if k == db.KindActive {
-		return snapshot.KindActive
-	}
-	return snapshot.KindCommitted
 }
 
 func parents(bkt *bolt.Bucket, parent *db.Snapshot) (parents []string, err error) {

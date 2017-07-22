@@ -11,16 +11,29 @@ type Kind int
 
 // definitions of snapshot kinds
 const (
-	KindActive Kind = iota
+	KindView Kind = iota + 1
+	KindActive
 	KindCommitted
 )
 
+func (k Kind) String() string {
+	switch k {
+	case KindView:
+		return "View"
+	case KindActive:
+		return "Active"
+	case KindCommitted:
+		return "Committed"
+	default:
+		return "Unknown"
+	}
+}
+
 // Info provides information about a particular snapshot.
 type Info struct {
-	Name     string // name or key of snapshot
-	Parent   string // name of parent snapshot
-	Kind     Kind   // active or committed snapshot
-	Readonly bool   // true if readonly, only valid for active
+	Kind   Kind   // active or committed snapshot
+	Name   string // name or key of snapshot
+	Parent string // name of parent snapshot
 }
 
 // Usage defines statistics for disk resources consumed by the snapshot.

@@ -69,16 +69,16 @@ enum Kind {
 	option (gogoproto.goproto_enum_prefix) = false;
 	option (gogoproto.enum_customname) = "Kind";
 
-	ACTIVE = 0 [(gogoproto.enumvalue_customname) = "KindActive"];
-
-	COMMITTED = 1 [(gogoproto.enumvalue_customname) = "KindCommitted"];
+	UNKNOWN = 0 [(gogoproto.enumvalue_customname) = "KindUnknown"];
+	VIEW = 1 [(gogoproto.enumvalue_customname) = "KindView"];
+	ACTIVE = 2 [(gogoproto.enumvalue_customname) = "KindActive"];
+	COMMITTED = 3 [(gogoproto.enumvalue_customname) = "KindCommitted"];
 }
 
 message Info {
 	string name = 1;
 	string parent = 2;
 	Kind kind = 3;
-	bool readonly = 4;
 }
 
 message StatSnapshotResponse {
