@@ -271,7 +271,7 @@ func (s *store) Writer(ctx context.Context, ref string, total int64, expected di
 	path, refp, data := s.ingestPaths(ref)
 
 	if err := tryLock(ref); err != nil {
-		return nil, errors.Wrapf(err, "locking %v failed", ref)
+		return nil, errors.Wrapf(err, "locking ref %v failed", ref)
 	}
 
 	var (
