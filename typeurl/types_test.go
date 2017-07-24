@@ -130,6 +130,17 @@ func TestMarshalEvent(t *testing.T) {
 	}
 }
 
+func TestRegisterDiffUrls(t *testing.T) {
+	clear()
+	defer func() {
+		if err := recover(); err == nil {
+			t.Error("registering the same type with different urls should panic")
+		}
+	}()
+	Register(&test{}, "test")
+	Register(&test{}, "test", "two")
+}
+
 func BenchmarkMarshalEvent(b *testing.B) {
 	ev := &eventsapi.TaskStart{}
 	expected, err := MarshalAny(ev)
