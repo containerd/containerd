@@ -1,4 +1,4 @@
-package content
+package local
 
 import (
 	"sync"

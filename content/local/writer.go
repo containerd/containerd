@@ -1,4 +1,4 @@
-package content
+package local
 
 import (
 	"os"
@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -24,8 +25,8 @@ type writer struct {
 	updatedAt time.Time
 }
 
-func (w *writer) Status() (Status, error) {
-	return Status{
+func (w *writer) Status() (content.Status, error) {
+	return content.Status{
 		Ref:       w.ref,
 		Offset:    w.offset,
 		Total:     w.total,
@@ -107,6 +108,10 @@ func (w *writer) Commit(size int64, expected digest.Digest) error {
 			// collision with the target file!
 			return errors.Wrapf(errdefs.ErrAlreadyExists, "content %v", dgst)
 		}
+		return err
+	}
+	commitTime := time.Now()
+	if err := os.Chtimes(target, commitTime, commitTime); err != nil {
 		return err
 	}
 

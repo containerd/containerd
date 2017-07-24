@@ -19,7 +19,7 @@ import (
 	snapshot "github.com/containerd/containerd/api/services/snapshot/v1"
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	version "github.com/containerd/containerd/api/services/version/v1"
-	store "github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/content/local"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
@@ -161,7 +161,7 @@ func loadPlugins(config *Config) ([]*plugin.Registration, error) {
 		Type: plugin.ContentPlugin,
 		ID:   "content",
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			return store.NewStore(ic.Root)
+			return local.NewStore(ic.Root)
 		},
 	})
 	plugin.Register(&plugin.Registration{
