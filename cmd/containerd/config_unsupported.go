@@ -1,4 +1,4 @@
-// +build darwin freebsd
+// +build !linux,!windows
 
 package main
 
@@ -12,7 +12,7 @@ func defaultConfig() *server.Config {
 		},
 		Debug: server.Debug{
 			Level:   "info",
-			Address: "/run/containerd/debug.sock",
+			Address: server.DefaultDebugAddress,
 		},
 	}
 }

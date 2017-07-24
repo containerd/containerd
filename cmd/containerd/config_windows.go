@@ -11,11 +11,11 @@ func defaultConfig() *server.Config {
 	return &server.Config{
 		Root: filepath.Join(os.Getenv("programfiles"), "containerd", "root"),
 		GRPC: server.GRPCConfig{
-			Address: `\\.\pipe\containerd-containerd`,
+			Address: server.DefaultAddress,
 		},
 		Debug: server.Debug{
 			Level:   "info",
-			Address: `\\.\pipe\containerd-debug`,
+			Address: server.DefaultDebugAddress,
 		},
 	}
 }
