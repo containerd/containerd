@@ -4,6 +4,10 @@ image: Visual Studio 2017
 
 clone_folder: c:\gopath\src\github.com\containerd\containerd
 
+branches:
+  only:
+    - master
+
 environment:
   GOPATH: C:\gopath
   CGO_ENABLED: 1
