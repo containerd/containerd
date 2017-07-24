@@ -22,13 +22,19 @@ var (
 
 // Register a type with the base url of the type
 func Register(v interface{}, args ...string) {
-	t := tryDereference(v)
+	var (
+		t = tryDereference(v)
+		p = path.Join(append([]string{Prefix}, args...)...)
+	)
 	mu.Lock()
 	defer mu.Unlock()
-	if _, ok := registry[t]; ok {
+	if et, ok := registry[t]; ok {
+		if et != p {
+			panic(errors.Errorf("type registred with alternate path %q != %q", et, p))
+		}
 		return
 	}
-	registry[t] = path.Join(append([]string{Prefix}, args...)...)
+	registry[t] = p
 }
 
 // TypeURL returns the type url for a registred type
