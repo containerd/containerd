@@ -303,18 +303,23 @@ func (cs *contentStore) Writer(ctx context.Context, ref string, size int64, expe
 			return err
 		}
 
-		if len(bkt.Get([]byte(ref))) > 0 {
-			return errors.Wrapf(errdefs.ErrUnavailable, "ref %v is currently in use", ref)
-		}
+		var (
+			bref  string
+			brefb = bkt.Get([]byte(ref))
+		)
 
-		sid, err := bkt.NextSequence()
-		if err != nil {
-			return err
-		}
+		if brefb == nil {
+			sid, err := bkt.NextSequence()
+			if err != nil {
+				return err
+			}
 
-		bref := createKey(sid, ns, ref)
-		if err := bkt.Put([]byte(ref), []byte(bref)); err != nil {
-			return err
+			bref = createKey(sid, ns, ref)
+			if err := bkt.Put([]byte(ref), []byte(bref)); err != nil {
+				return err
+			}
+		} else {
+			bref = string(brefb)
 		}
 
 		// Do not use the passed in expected value here since it was
