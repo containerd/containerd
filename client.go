@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"runtime"
+	"strconv"
 	"sync"
 	"time"
 
@@ -33,9 +34,11 @@ import (
 	imagesservice "github.com/containerd/containerd/services/images"
 	snapshotservice "github.com/containerd/containerd/services/snapshot"
 	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/typeurl"
 	pempty "github.com/golang/protobuf/ptypes/empty"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
@@ -45,6 +48,13 @@ import (
 func init() {
 	// reset the grpc logger so that it does not output in the STDIO of the calling process
 	grpclog.SetLogger(log.New(ioutil.Discard, "", log.LstdFlags))
+
+	// register TypeUrls for commonly marshaled external types
+	major := strconv.Itoa(specs.VersionMajor)
+	typeurl.Register(&specs.Spec{}, "opencontainers/runtime-spec", major, "Spec")
+	typeurl.Register(&specs.Process{}, "opencontainers/runtime-spec", major, "Process")
+	typeurl.Register(&specs.LinuxResources{}, "opencontainers/runtime-spec", major, "LinuxResources")
+	typeurl.Register(&specs.WindowsResources{}, "opencontainers/runtime-spec", major, "WindowsResources")
 }
 
 type clientOpts struct {

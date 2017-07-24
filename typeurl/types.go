@@ -26,7 +26,7 @@ func Register(v interface{}, args ...string) {
 	mu.Lock()
 	defer mu.Unlock()
 	if _, ok := registry[t]; ok {
-		panic(errdefs.ErrAlreadyExists)
+		return
 	}
 	registry[t] = path.Join(append([]string{Prefix}, args...)...)
 }
