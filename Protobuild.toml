@@ -19,7 +19,7 @@ plugins = ["grpc"]
   # This is the default.
   after = ["/usr/local/include"]
 
-# This section let's us map protobuf imports to Go packages. These will become
+# This section maps protobuf imports to Go packages. These will become
 # `-M` directives in the call to the go protobuf generator.
 [packages]
   "gogoproto/gogo.proto" = "github.com/gogo/protobuf/gogoproto"
