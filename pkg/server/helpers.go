@@ -25,7 +25,7 @@ import (
 	"strings"
 	"syscall"
 
-	containerdmetadata "github.com/containerd/containerd/metadata"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/pkg/stringid"
 	imagedigest "github.com/opencontainers/go-digest"
@@ -69,7 +69,7 @@ const (
 	relativeRootfsPath = "rootfs"
 	// defaultRuntime is the runtime to use in containerd. We may support
 	// other runtime in the future.
-	defaultRuntime = "linux"
+	defaultRuntime = "io.containerd.runtime.v1.linux"
 	// sandboxesDir contains all sandbox root. A sandbox root is the running
 	// directory of the sandbox, all files created for the sandbox will be
 	// placed under this directory.
@@ -339,7 +339,7 @@ func (c *criContainerdService) localResolve(ctx context.Context, ref string) (*i
 		}
 		imageInContainerd, err := c.imageStoreService.Get(ctx, normalized.String())
 		if err != nil {
-			if containerdmetadata.IsNotFound(err) {
+			if errdefs.IsNotFound(err) {
 				return nil, nil
 			}
 			return nil, fmt.Errorf("an error occurred when getting image %q from containerd image store: %v",

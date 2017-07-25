@@ -128,7 +128,7 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		assert.EqualValues(t, *spec.Linux.Resources.CPU.Quota, 200)
 		assert.EqualValues(t, *spec.Linux.Resources.CPU.Shares, 300)
 		assert.EqualValues(t, *spec.Linux.Resources.Memory.Limit, 400)
-		assert.EqualValues(t, *spec.Linux.Resources.OOMScoreAdj, 500)
+		assert.EqualValues(t, *spec.Process.OOMScoreAdj, 500)
 
 		t.Logf("Check capabilities")
 		assert.Contains(t, spec.Process.Capabilities.Bounding, "CAP_SYS_ADMIN")

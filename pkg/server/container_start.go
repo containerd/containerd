@@ -23,8 +23,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/containerd/containerd/api/services/execution"
-	"github.com/containerd/containerd/api/types/mount"
+	"github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
@@ -97,7 +97,7 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 	sandboxConfig := sandbox.Config
 	sandboxID := meta.SandboxID
 	// Make sure sandbox is running.
-	sandboxInfo, err := c.taskService.Info(ctx, &execution.InfoRequest{ContainerID: sandboxID})
+	sandboxInfo, err := c.taskService.Get(ctx, &tasks.GetTaskRequest{ContainerID: sandboxID})
 	if err != nil {
 		return fmt.Errorf("failed to get sandbox container %q info: %v", sandboxID, err)
 	}
@@ -153,9 +153,9 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 	if err != nil {
 		return fmt.Errorf("failed to get rootfs mounts %q: %v", id, err)
 	}
-	var rootfs []*mount.Mount
+	var rootfs []*types.Mount
 	for _, m := range rootfsMounts {
-		rootfs = append(rootfs, &mount.Mount{
+		rootfs = append(rootfs, &types.Mount{
 			Type:    m.Type,
 			Source:  m.Source,
 			Options: m.Options,
@@ -163,7 +163,7 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 	}
 
 	// Create containerd task.
-	createOpts := &execution.CreateRequest{
+	createOpts := &tasks.CreateTaskRequest{
 		ContainerID: id,
 		Rootfs:      rootfs,
 		Stdin:       stdin,
@@ -180,14 +180,14 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 	defer func() {
 		if retErr != nil {
 			// Cleanup the containerd task if an error is returned.
-			if _, err := c.taskService.Delete(ctx, &execution.DeleteRequest{ContainerID: id}); err != nil {
+			if _, err := c.taskService.Delete(ctx, &tasks.DeleteTaskRequest{ContainerID: id}); err != nil {
 				glog.Errorf("Failed to delete containerd task %q: %v", id, err)
 			}
 		}
 	}()
 
 	// Start containerd task.
-	if _, err := c.taskService.Start(ctx, &execution.StartRequest{ContainerID: id}); err != nil {
+	if _, err := c.taskService.Start(ctx, &tasks.StartTaskRequest{ContainerID: id}); err != nil {
 		return fmt.Errorf("failed to start containerd task %q: %v", id, err)
 	}
 

@@ -19,8 +19,7 @@ package server
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/api/services/containers"
-	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -71,7 +70,7 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 
 	// Remove container snapshot.
 	if err := c.snapshotService.Remove(ctx, id); err != nil {
-		if !snapshot.IsNotExist(err) {
+		if !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to remove container snapshot %q: %v", id, err)
 		}
 		glog.V(5).Infof("Remove called for snapshot %q that does not exist", id)
@@ -89,7 +88,7 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 	}
 
 	// Delete containerd container.
-	if _, err := c.containerService.Delete(ctx, &containers.DeleteContainerRequest{ID: id}); err != nil {
+	if err := c.containerService.Delete(ctx, id); err != nil {
 		if !isContainerdGRPCNotFoundError(err) {
 			return nil, fmt.Errorf("failed to delete containerd container %q: %v", id, err)
 		}

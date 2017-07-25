@@ -19,8 +19,9 @@ package server
 import (
 	"time"
 
-	"github.com/containerd/containerd/api/services/execution"
-	"github.com/containerd/containerd/api/types/task"
+	"github.com/containerd/containerd/api/services/events/v1"
+	"github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/typeurl"
 	"github.com/golang/glog"
 	"github.com/jpillora/backoff"
 	"golang.org/x/net/context"
@@ -48,7 +49,7 @@ func (c *criContainerdService) startEventMonitor() {
 	}
 	go func() {
 		for {
-			events, err := c.taskService.Events(context.Background(), &execution.EventsRequest{})
+			eventstream, err := c.eventService.Subscribe(context.Background(), &events.SubscribeRequest{})
 			if err != nil {
 				glog.Errorf("Failed to connect to containerd event stream: %v", err)
 				time.Sleep(b.Duration())
@@ -59,7 +60,7 @@ func (c *criContainerdService) startEventMonitor() {
 			// TODO(random-liu): Relist to recover state, should prevent other operations
 			// until state is fully recovered.
 			for {
-				if err := c.handleEventStream(events); err != nil {
+				if err := c.handleEventStream(eventstream); err != nil {
 					glog.Errorf("Failed to handle event stream: %v", err)
 					break
 				}
@@ -69,27 +70,34 @@ func (c *criContainerdService) startEventMonitor() {
 }
 
 // handleEventStream receives an event from containerd and handles the event.
-func (c *criContainerdService) handleEventStream(events execution.Tasks_EventsClient) error {
-	e, err := events.Recv()
+func (c *criContainerdService) handleEventStream(eventstream events.Events_SubscribeClient) error {
+	e, err := eventstream.Recv()
 	if err != nil {
 		return err
 	}
-	glog.V(2).Infof("Received container event: %+v", e)
+	glog.V(4).Infof("Received container event timestamp - %v, namespace - %q, topic - %q", e.Timestamp, e.Namespace, e.Topic)
 	c.handleEvent(e)
 	return nil
 }
 
 // handleEvent handles a containerd event.
-func (c *criContainerdService) handleEvent(e *task.Event) {
-	switch e.Type {
+func (c *criContainerdService) handleEvent(evt *events.Envelope) {
+	any, err := typeurl.UnmarshalAny(evt.Event)
+	if err != nil {
+		glog.Errorf("Failed to convert event envelope %+v: %v", evt, err)
+		return
+	}
+	switch any.(type) {
 	// If containerd-shim exits unexpectedly, there will be no corresponding event.
 	// However, containerd could not retrieve container state in that case, so it's
 	// fine to leave out that case for now.
 	// TODO(random-liu): [P2] Handle containerd-shim exit.
-	case task.Event_EXIT:
-		cntr, err := c.containerStore.Get(e.ID)
+	case *events.TaskExit:
+		e := any.(*events.TaskExit)
+		glog.V(2).Infof("TaskExit event %+v", e)
+		cntr, err := c.containerStore.Get(e.ContainerID)
 		if err != nil {
-			glog.Errorf("Failed to get container %q: %v", e.ID, err)
+			glog.Errorf("Failed to get container %q: %v", e.ContainerID, err)
 			return
 		}
 		if e.Pid != cntr.Status.Get().Pid {
@@ -97,10 +105,11 @@ func (c *criContainerdService) handleEvent(e *task.Event) {
 			return
 		}
 		// Delete the container from containerd.
-		_, err = c.taskService.Delete(context.Background(), &execution.DeleteRequest{ContainerID: e.ID})
+		_, err = c.taskService.Delete(context.Background(), &tasks.DeleteTaskRequest{ContainerID: e.ContainerID})
+		// TODO(random-liu): Change isContainerdGRPCNotFoundError to use errdefs.
 		if err != nil && !isContainerdGRPCNotFoundError(err) {
 			// TODO(random-liu): [P0] Enqueue the event and retry.
-			glog.Errorf("Failed to delete container %q: %v", e.ID, err)
+			glog.Errorf("Failed to delete container %q: %v", e.ContainerID, err)
 			return
 		}
 		err = cntr.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
@@ -115,21 +124,23 @@ func (c *criContainerdService) handleEvent(e *task.Event) {
 			return status, nil
 		})
 		if err != nil {
-			glog.Errorf("Failed to update container %q state: %v", e.ID, err)
+			glog.Errorf("Failed to update container %q state: %v", e.ContainerID, err)
 			// TODO(random-liu): [P0] Enqueue the event and retry.
 			return
 		}
-	case task.Event_OOM:
-		cntr, err := c.containerStore.Get(e.ID)
+	case *events.TaskOOM:
+		e := any.(*events.TaskOOM)
+		glog.V(2).Infof("TaskOOM event %+v", e)
+		cntr, err := c.containerStore.Get(e.ContainerID)
 		if err != nil {
-			glog.Errorf("Failed to get container %q: %v", e.ID, err)
+			glog.Errorf("Failed to get container %q: %v", e.ContainerID, err)
 		}
 		err = cntr.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
 			status.Reason = oomExitReason
 			return status, nil
 		})
 		if err != nil {
-			glog.Errorf("Failed to update container %q oom: %v", e.ID, err)
+			glog.Errorf("Failed to update container %q oom: %v", e.ContainerID, err)
 			return
 		}
 	}

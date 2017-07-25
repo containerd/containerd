@@ -20,7 +20,7 @@ limitations under the License.
 package testing
 
 import (
-	version "github.com/containerd/containerd/api/services/version"
+	version "github.com/containerd/containerd/api/services/version/v1"
 	gomock "github.com/golang/mock/gomock"
 	empty "github.com/golang/protobuf/ptypes/empty"
 	context "golang.org/x/net/context"

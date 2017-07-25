@@ -22,7 +22,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 
-	"github.com/containerd/containerd/api/services/execution"
+	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types/task"
 
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -47,7 +47,7 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 	// Use the full sandbox id.
 	id := sandbox.ID
 
-	info, err := c.taskService.Info(ctx, &execution.InfoRequest{ContainerID: id})
+	info, err := c.taskService.Get(ctx, &tasks.GetTaskRequest{ContainerID: id})
 	if err != nil && !isContainerdGRPCNotFoundError(err) {
 		return nil, fmt.Errorf("failed to get sandbox container info for %q: %v", id, err)
 	}

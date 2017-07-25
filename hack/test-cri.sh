@@ -61,6 +61,7 @@ if [ ! -x "$(command -v containerd)" ]; then
 fi
 sudo pkill containerd
 sudo containerd -l debug &> ${REPORT_DIR}/containerd.log &
+sleep 1 # sleep 1 seconds for containerd to be ready.
 
 # Start cri-containerd
 cd ${ROOT}
