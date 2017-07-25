@@ -11,6 +11,7 @@ import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -154,6 +155,13 @@ func (c *container) Image(ctx context.Context) (Image, error) {
 
 type NewTaskOpts func(context.Context, *Client, *TaskInfo) error
 
+func WithRootFS(mounts []mount.Mount) NewTaskOpts {
+	return func(ctx context.Context, c *Client, ti *TaskInfo) error {
+		ti.RootFS = mounts
+		return nil
+	}
+}
+
 func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...NewTaskOpts) (Task, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -186,6 +194,15 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...Ne
 	for _, o := range opts {
 		if err := o(ctx, c.client, &info); err != nil {
 			return nil, err
+		}
+	}
+	if info.RootFS != nil {
+		for _, m := range info.RootFS {
+			request.Rootfs = append(request.Rootfs, &types.Mount{
+				Type:    m.Type,
+				Source:  m.Source,
+				Options: m.Options,
+			})
 		}
 	}
 	if info.Options != nil {
