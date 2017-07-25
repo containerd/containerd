@@ -25,27 +25,26 @@ func init() {
 			plugin.MetadataPlugin,
 		},
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			e := events.GetPoster(ic.Context)
 			m, err := ic.Get(plugin.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}
-			return NewService(m.(*bolt.DB), e), nil
+			return NewService(m.(*bolt.DB), ic.Events), nil
 		},
 	})
 }
 
 type Service struct {
-	db      *bolt.DB
-	emitter events.Poster
+	db        *bolt.DB
+	publisher events.Publisher
 }
 
 var _ api.NamespacesServer = &Service{}
 
-func NewService(db *bolt.DB, evts events.Poster) api.NamespacesServer {
+func NewService(db *bolt.DB, publisher events.Publisher) api.NamespacesServer {
 	return &Service{
-		db:      db,
-		emitter: evts,
+		db:        db,
+		publisher: publisher,
 	}
 }
 
@@ -119,7 +118,7 @@ func (s *Service) Create(ctx context.Context, req *api.CreateNamespaceRequest) (
 		return &resp, err
 	}
 
-	if err := s.emit(ctx, "/namespaces/create", &eventsapi.NamespaceCreate{
+	if err := s.publisher.Publish(ctx, "/namespaces/create", &eventsapi.NamespaceCreate{
 		Name:   req.Namespace.Name,
 		Labels: req.Namespace.Labels,
 	}); err != nil {
@@ -172,7 +171,7 @@ func (s *Service) Update(ctx context.Context, req *api.UpdateNamespaceRequest) (
 		return &resp, err
 	}
 
-	if err := s.emit(ctx, "/namespaces/update", &eventsapi.NamespaceUpdate{
+	if err := s.publisher.Publish(ctx, "/namespaces/update", &eventsapi.NamespaceUpdate{
 		Name:   req.Namespace.Name,
 		Labels: req.Namespace.Labels,
 	}); err != nil {
@@ -189,7 +188,7 @@ func (s *Service) Delete(ctx context.Context, req *api.DeleteNamespaceRequest) (
 		return &empty.Empty{}, err
 	}
 
-	if err := s.emit(ctx, "/namespaces/delete", &eventsapi.NamespaceDelete{
+	if err := s.publisher.Publish(ctx, "/namespaces/delete", &eventsapi.NamespaceDelete{
 		Name: req.Name,
 	}); err != nil {
 		return &empty.Empty{}, err
@@ -208,13 +207,4 @@ func (s *Service) withStoreView(ctx context.Context, fn func(ctx context.Context
 
 func (s *Service) withStoreUpdate(ctx context.Context, fn func(ctx context.Context, store namespaces.Store) error) error {
 	return s.db.Update(s.withStore(ctx, fn))
-}
-
-func (s *Service) emit(ctx context.Context, topic string, evt interface{}) error {
-	emitterCtx := events.WithTopic(ctx, topic)
-	if err := s.emitter.Post(emitterCtx, evt); err != nil {
-		return err
-	}
-
-	return nil
 }

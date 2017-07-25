@@ -63,8 +63,8 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		root:    ic.Root,
 		pidPool: newPidPool(),
 
-		events:  make(chan interface{}, 4096),
-		emitter: ic.Emitter,
+		events:    make(chan interface{}, 4096),
+		publisher: ic.Events,
 		// TODO(mlaventure): windows needs a stat monitor
 		monitor: nil,
 		tasks:   runtime.NewTaskList(),
@@ -84,8 +84,8 @@ type windowsRuntime struct {
 	root    string
 	pidPool *pidPool
 
-	emitter *events.Emitter
-	events  chan interface{}
+	publisher events.Publisher
+	events    chan interface{}
 
 	monitor runtime.TaskMonitor
 	tasks   *runtime.TaskList
@@ -194,7 +194,8 @@ func (r *windowsRuntime) Delete(ctx context.Context, t runtime.Task) (*runtime.E
 	wt.cleanup()
 	r.tasks.Delete(ctx, t)
 
-	r.emitter.Post(events.WithTopic(ctx, runtime.TaskDeleteEventTopic),
+	r.publisher.Publish(ctx,
+		runtime.TaskDeleteEventTopic,
 		&eventsapi.TaskDelete{
 			ContainerID: wt.id,
 			Pid:         wt.pid,
@@ -296,7 +297,7 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, spec
 		spec:              spec,
 		processes:         make(map[string]*process),
 		hyperV:            spec.Windows.HyperV != nil,
-		emitter:           r.emitter,
+		publisher:         r.publisher,
 		rwLayer:           conf.LayerFolderPath,
 		pidPool:           r.pidPool,
 		hcsContainer:      ctr,
@@ -312,7 +313,8 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, spec
 		})
 	}
 
-	r.emitter.Post(events.WithTopic(ctx, runtime.TaskCreateEventTopic),
+	r.publisher.Publish(ctx,
+		runtime.TaskCreateEventTopic,
 		&eventsapi.TaskCreate{
 			ContainerID: id,
 			IO: &eventsapi.TaskIO{

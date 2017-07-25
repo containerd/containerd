@@ -37,7 +37,7 @@ func NewService(path, namespace, address string) (*Service, error) {
 		return nil, fmt.Errorf("shim namespace cannot be empty")
 	}
 	context := namespaces.WithNamespace(context.Background(), namespace)
-	var client poster
+	var client publisher
 	if address != "" {
 		conn, err := connect(address, dialer)
 		if err != nil {
@@ -46,7 +46,7 @@ func NewService(path, namespace, address string) (*Service, error) {
 		client = events.NewEventsClient(conn)
 	} else {
 		client = &localEventsClient{
-			emitter: evt.GetPoster(context),
+			forwarder: evt.NewExchange(),
 		}
 	}
 	s := &Service{
@@ -379,16 +379,18 @@ func (s *Service) getContainerPids(ctx context.Context, id string) ([]uint32, er
 	return pids, nil
 }
 
-func (s *Service) forward(client poster) {
+func (s *Service) forward(client publisher) {
 	for e := range s.events {
 		a, err := typeurl.MarshalAny(e)
 		if err != nil {
 			log.G(s.context).WithError(err).Error("marshal event")
 			continue
 		}
-		if _, err := client.Post(s.context, &events.PostEventRequest{
+
+		if _, err := client.Publish(s.context, &events.PublishRequest{
 			Envelope: &events.Envelope{
-				Timestamp: time.Now(),
+				Namespace: s.namespace,
+				Timestamp: time.Now().UTC(),
 				Topic:     getTopic(e),
 				Event:     a,
 			},

@@ -64,7 +64,7 @@ func (p *process) Kill(ctx context.Context, s syscall.Signal) error {
 }
 
 func (p *process) Wait(ctx context.Context) (uint32, error) {
-	eventstream, err := p.task.client.EventService().Stream(ctx, &eventsapi.StreamEventsRequest{})
+	eventstream, err := p.task.client.EventService().Subscribe(ctx, &eventsapi.SubscribeRequest{})
 	if err != nil {
 		return UnknownExitStatus, err
 	}

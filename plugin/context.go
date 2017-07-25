@@ -22,7 +22,7 @@ type InitContext struct {
 	Address string
 	Context context.Context
 	Config  interface{}
-	Emitter *events.Emitter
+	Events  *events.Exchange
 
 	plugins map[PluginType]map[string]interface{}
 }

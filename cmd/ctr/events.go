@@ -22,7 +22,7 @@ var eventsCommand = cli.Command{
 		ctx, cancel := appContext(context)
 		defer cancel()
 
-		events, err := eventsClient.Stream(ctx, &eventsapi.StreamEventsRequest{})
+		events, err := eventsClient.Subscribe(ctx, &eventsapi.SubscribeRequest{})
 		if err != nil {
 			return err
 		}

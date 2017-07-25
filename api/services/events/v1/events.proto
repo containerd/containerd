@@ -10,18 +10,21 @@ import "google/protobuf/timestamp.proto";
 option go_package = "github.com/containerd/containerd/api/services/events/v1;events";
 
 service Events {
-	rpc Stream(StreamEventsRequest) returns (stream Envelope);
-	rpc Post(PostEventRequest) returns (google.protobuf.Empty);
+	rpc Publish(PublishRequest) returns (google.protobuf.Empty);
+	rpc Subscribe(SubscribeRequest) returns (stream Envelope);
 }
 
-message StreamEventsRequest {}
+message SubscribeRequest {
+	repeated string filters = 1;
+}
 
-message PostEventRequest {
+message PublishRequest {
 	Envelope envelope = 1;
 }
 
 message Envelope {
 	google.protobuf.Timestamp timestamp = 1 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-	string topic = 2;
-	google.protobuf.Any event = 3;
+	string namespace = 2;
+	string topic = 3;
+	google.protobuf.Any event = 4;
 }

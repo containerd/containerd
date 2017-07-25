@@ -45,11 +45,10 @@ var empty = &protoempty.Empty{}
 type service struct {
 	snapshotters           map[string]snapshot.Snapshotter
 	defaultSnapshotterName string
-	emitter                events.Poster
+	publisher              events.Publisher
 }
 
 func newService(ic *plugin.InitContext) (interface{}, error) {
-	evts := events.GetPoster(ic.Context)
 	rawSnapshotters, err := ic.GetAll(plugin.SnapshotPlugin)
 	if err != nil {
 		return nil, err
@@ -72,7 +71,7 @@ func newService(ic *plugin.InitContext) (interface{}, error) {
 	return &service{
 		snapshotters:           snapshotters,
 		defaultSnapshotterName: cfg.Default,
-		emitter:                evts,
+		publisher:              ic.Events,
 	}, nil
 }
 
@@ -105,7 +104,7 @@ func (s *service) Prepare(ctx context.Context, pr *snapshotapi.PrepareSnapshotRe
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	if err := s.emit(ctx, "/snapshot/prepare", &eventsapi.SnapshotPrepare{
+	if err := s.publisher.Publish(ctx, "/snapshot/prepare", &eventsapi.SnapshotPrepare{
 		Key:    pr.Key,
 		Parent: pr.Parent,
 	}); err != nil {
@@ -162,7 +161,7 @@ func (s *service) Commit(ctx context.Context, cr *snapshotapi.CommitSnapshotRequ
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	if err := s.emit(ctx, "/snapshot/commit", &eventsapi.SnapshotCommit{
+	if err := s.publisher.Publish(ctx, "/snapshot/commit", &eventsapi.SnapshotCommit{
 		Key:  cr.Key,
 		Name: cr.Name,
 	}); err != nil {
@@ -183,7 +182,7 @@ func (s *service) Remove(ctx context.Context, rr *snapshotapi.RemoveSnapshotRequ
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	if err := s.emit(ctx, "/snapshot/remove", &eventsapi.SnapshotRemove{
+	if err := s.publisher.Publish(ctx, "/snapshot/remove", &eventsapi.SnapshotRemove{
 		Key: rr.Key,
 	}); err != nil {
 		return nil, err
@@ -293,13 +292,4 @@ func fromMounts(mounts []mount.Mount) []*types.Mount {
 		}
 	}
 	return out
-}
-
-func (s *service) emit(ctx context.Context, topic string, evt interface{}) error {
-	emitterCtx := events.WithTopic(ctx, topic)
-	if err := s.emitter.Post(emitterCtx, evt); err != nil {
-		return err
-	}
-
-	return nil
 }
