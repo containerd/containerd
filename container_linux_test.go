@@ -37,12 +37,12 @@ func TestContainerUpdate(t *testing.T) {
 	spec.Linux.Resources.Memory = &specs.LinuxMemory{
 		Limit: &limit,
 	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	defer container.Delete(ctx, WithRootFSDeletion)
+	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {

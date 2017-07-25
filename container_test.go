@@ -106,12 +106,12 @@ func TestContainerStart(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	defer container.Delete(ctx, WithRootFSDeletion)
+	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, Stdio)
 	if err != nil {
@@ -178,12 +178,12 @@ func TestContainerOutput(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	defer container.Delete(ctx, WithRootFSDeletion)
+	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	stdout := bytes.NewBuffer(nil)
 	task, err := container.NewTask(ctx, NewIO(bytes.NewBuffer(nil), stdout, bytes.NewBuffer(nil)))
@@ -251,12 +251,12 @@ func TestContainerExec(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	defer container.Delete(ctx, WithRootFSDeletion)
+	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
@@ -348,12 +348,12 @@ func TestContainerPids(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	defer container.Delete(ctx, WithRootFSDeletion)
+	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
@@ -427,12 +427,12 @@ func TestContainerCloseIO(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	defer container.Delete(ctx, WithRootFSDeletion)
+	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	const expected = "hello" + newLine
 	stdout := bytes.NewBuffer(nil)
@@ -525,12 +525,12 @@ func TestContainerAttach(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	defer container.Delete(ctx, WithRootFSDeletion)
+	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	expected := "hello" + newLine
 	stdout := bytes.NewBuffer(nil)
@@ -651,12 +651,12 @@ func TestDeleteRunningContainer(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	defer container.Delete(ctx, WithRootFSDeletion)
+	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
@@ -679,7 +679,7 @@ func TestDeleteRunningContainer(t *testing.T) {
 		return
 	}
 
-	err = container.Delete(ctx, WithRootFSDeletion)
+	err = container.Delete(ctx, WithSnapshotCleanup)
 	if err == nil {
 		t.Error("delete did not error with running task")
 	}
@@ -720,7 +720,7 @@ func TestContainerKill(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -790,12 +790,12 @@ func TestContainerNoBinaryExists(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	defer container.Delete(ctx, WithRootFSDeletion)
+	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, Stdio)
 	switch runtime.GOOS {
@@ -842,12 +842,12 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewRootFS(id, image))
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	defer container.Delete(ctx, WithRootFSDeletion)
+	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {

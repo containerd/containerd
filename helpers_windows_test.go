@@ -57,8 +57,8 @@ func withImageConfig(ctx context.Context, i Image) SpecOpts {
 	}
 }
 
-func withNewRootFS(id string, i Image) NewContainerOpts {
-	// TODO: when windows has a snapshotter remove the withNewRootFS helper
+func withNewSnapshot(id string, i Image) NewContainerOpts {
+	// TODO: when windows has a snapshotter remove the withNewSnapshot helper
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		return nil
 	}
