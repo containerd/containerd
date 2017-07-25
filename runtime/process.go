@@ -300,12 +300,6 @@ func (p *process) handleSigkilledShim(rst uint32, rerr error) (uint32, error) {
 		return rst, rerr
 	}
 
-	// Possible that the shim was SIGKILLED
-	e := unix.Kill(p.cmd.Process.Pid, 0)
-	if e != syscall.ESRCH {
-		return rst, rerr
-	}
-
 	// The shim was SIGKILLED
 	// We should get the container state first
 	// to make sure the container is not in
@@ -318,7 +312,11 @@ func (p *process) handleSigkilledShim(rst uint32, rerr error) (uint32, error) {
 	}
 
 	// Ensure we got the shim ProcessState
-	<-p.cmdDoneCh
+	select {
+	case <-p.cmdDoneCh:
+	case <-time.After(2 * time.Minute):
+		return rst, fmt.Errorf("could not get the shim ProcessState within two minutes")
+	}
 
 	shimStatus := p.cmd.ProcessState.Sys().(syscall.WaitStatus)
 	if shimStatus.Signaled() && shimStatus.Signal() == syscall.SIGKILL {
