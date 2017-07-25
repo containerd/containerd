@@ -97,9 +97,9 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		}
 		var rootfs containerd.NewContainerOpts
 		if context.Bool("readonly") {
-			rootfs = containerd.WithNewReadonlyRootFS(id, image)
+			rootfs = containerd.WithNewSnapshotView(id, image)
 		} else {
-			rootfs = containerd.WithNewRootFS(id, image)
+			rootfs = containerd.WithNewSnapshot(id, image)
 		}
 
 		return client.NewContainer(ctx, id,

@@ -46,6 +46,6 @@ func withImageConfig(ctx context.Context, i Image) SpecOpts {
 	return WithImageConfig(ctx, i)
 }
 
-func withNewRootFS(id string, i Image) NewContainerOpts {
-	return WithNewRootFS(id, i)
+func withNewSnapshot(id string, i Image) NewContainerOpts {
+	return WithNewSnapshot(id, i)
 }

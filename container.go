@@ -107,8 +107,8 @@ func (c *container) Spec() (*specs.Spec, error) {
 	return &s, nil
 }
 
-// WithRootFSDeletion deletes the rootfs allocated for the container
-func WithRootFSDeletion(ctx context.Context, client *Client, c containers.Container) error {
+// WithSnapshotCleanup deletes the rootfs allocated for the container
+func WithSnapshotCleanup(ctx context.Context, client *Client, c containers.Container) error {
 	if c.RootFS != "" {
 		return client.SnapshotService(c.Snapshotter).Remove(ctx, c.RootFS)
 	}

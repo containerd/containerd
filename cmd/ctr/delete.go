@@ -26,7 +26,7 @@ var deleteCommand = cli.Command{
 		}
 		deleteOpts := []containerd.DeleteOpts{}
 		if !context.Bool("keep-snapshot") {
-			deleteOpts = append(deleteOpts, containerd.WithRootFSDeletion)
+			deleteOpts = append(deleteOpts, containerd.WithSnapshotCleanup)
 		}
 		container, err := client.LoadContainer(ctx, context.Args().First())
 		if err != nil {

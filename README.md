@@ -86,7 +86,7 @@ image, err := client.Pull(context, "docker.io/library/redis:latest", containerd.
 // allocate a new RW root filesystem for a container based on the image
 redis, err := client.NewContainer(context, "redis-master",
 	containerd.WithSpec(spec),
-	containerd.WithNewRootFS("redis-rootfs", image),
+	containerd.WithNewSnapshot("redis-rootfs", image),
 )
 
 // use a readonly filesystem with multiple containers
@@ -94,7 +94,7 @@ for i := 0; i < 10; i++ {
 	id := fmt.Sprintf("id-%s", i)
 	container, err := client.NewContainer(ctx, id,
 		containerd.WithSpec(spec),
-		containerd.WithNewReadonlyRootFS(id, image),
+		containerd.WithNewSnapshotView(id, image),
 	)
 }
 ```

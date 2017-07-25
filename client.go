@@ -161,8 +161,8 @@ func WithContainerLabels(labels map[string]string) NewContainerOpts {
 	}
 }
 
-// WithExistingRootFS uses an existing root filesystem for the container
-func WithExistingRootFS(id string) NewContainerOpts {
+// WithSnapshot uses an existing root filesystem for the container
+func WithSnapshot(id string) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		// check that the snapshot exists, if not, fail on creation
 		if _, err := client.SnapshotService(c.Snapshotter).Mounts(ctx, id); err != nil {
@@ -173,9 +173,9 @@ func WithExistingRootFS(id string) NewContainerOpts {
 	}
 }
 
-// WithNewRootFS allocates a new snapshot to be used by the container as the
+// WithNewSnapshot allocates a new snapshot to be used by the container as the
 // root filesystem in read-write mode
-func WithNewRootFS(id string, i Image) NewContainerOpts {
+func WithNewSnapshot(id string, i Image) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore())
 		if err != nil {
@@ -190,9 +190,9 @@ func WithNewRootFS(id string, i Image) NewContainerOpts {
 	}
 }
 
-// WithNewReadonlyRootFS allocates a new snapshot to be used by the container as the
+// WithNewSnapshotView allocates a new snapshot to be used by the container as the
 // root filesystem in read-only mode
-func WithNewReadonlyRootFS(id string, i Image) NewContainerOpts {
+func WithNewSnapshotView(id string, i Image) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore())
 		if err != nil {
