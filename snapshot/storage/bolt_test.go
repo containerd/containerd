@@ -18,15 +18,28 @@ func TestMetastore(t *testing.T) {
 
 // TestKidnConversion ensures we can blindly cast from protobuf types.
 func TestKindConversion(t *testing.T) {
-	for _, testcase := range []snapshot.Kind{
-		snapshot.KindView,
-		snapshot.KindActive,
-		snapshot.KindCommitted,
+	for _, testcase := range []struct {
+		s snapshot.Kind
+		p proto.Kind
+	}{
+		{
+			s: snapshot.KindView,
+			p: proto.KindView,
+		},
+		{
+			s: snapshot.KindActive,
+			p: proto.KindActive,
+		},
+		{
+			s: snapshot.KindCommitted,
+			p: proto.KindCommitted,
+		},
 	} {
-		cast := proto.Kind(testcase)
-		uncast := snapshot.Kind(cast)
-		if uncast != testcase {
-			t.Fatalf("kind value cast failed: %v != %v", uncast, testcase)
+		if testcase.s != snapshot.Kind(testcase.p) {
+			t.Fatalf("snapshot kind value cast failed: %v != %v", testcase.s, testcase.p)
+		}
+		if testcase.p != proto.Kind(testcase.s) {
+			t.Fatalf("proto kind value cast failed: %v != %v", testcase.s, testcase.p)
 		}
 	}
 }
