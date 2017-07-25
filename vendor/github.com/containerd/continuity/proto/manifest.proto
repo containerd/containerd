@@ -24,8 +24,8 @@ message Resource {
 
     // user and group are not currently used but their field numbers have been
     // reserved for future use. As such, they are marked as deprecated.
-    string user = 4 [deprecated=true];
-    string group = 5 [deprecated=true];
+    string user = 4 [deprecated=true]; // "deprecated" stands for "reserved" here
+    string group = 5 [deprecated=true]; // "deprecated" stands for "reserved" here
 
     // Mode defines the file mode and permissions. We've used the same
     // bit-packing from Go's os package,
@@ -40,7 +40,9 @@ message Resource {
     uint64 size = 7;
 
     // Digest specifies the content digest of the target file. Only valid for
-    // regular files. The strings are formatted as <alg>:<digest hex bytes>.
+    // regular files. The strings are formatted in OCI style, i.e. <alg>:<encoded>.
+    // For detailed information about the format, please refer to OCI Image Spec:
+    // https://github.com/opencontainers/image-spec/blob/master/descriptor.md#digests-and-verification
     // The digests are sorted in lexical order and implementations may choose
     // which algorithms they prefer.
     repeated string digest = 8;
