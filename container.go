@@ -188,6 +188,15 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...Ne
 			return nil, err
 		}
 	}
+	if info.RootMounts != nil {
+		for _, m := range info.RootMounts {
+			request.Rootfs = append(request.Rootfs, &types.Mount{
+				Type:    m.Type,
+				Source:  m.Source,
+				Options: m.Options,
+			})
+		}
+	}
 	if info.Options != nil {
 		any, err := typeurl.MarshalAny(info.Options)
 		if err != nil {
