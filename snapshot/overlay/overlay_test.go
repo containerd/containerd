@@ -158,12 +158,12 @@ func getBasePath(ctx context.Context, sn snapshot.Snapshotter, root, key string)
 	}
 	defer t.Rollback()
 
-	active, err := storage.GetActive(ctx, key)
+	s, err := storage.GetSnapshot(ctx, key)
 	if err != nil {
 		panic(err)
 	}
 
-	return filepath.Join(root, "snapshots", active.ID)
+	return filepath.Join(root, "snapshots", s.ID)
 }
 
 func getParents(ctx context.Context, sn snapshot.Snapshotter, root, key string) []string {
@@ -173,13 +173,13 @@ func getParents(ctx context.Context, sn snapshot.Snapshotter, root, key string) 
 		panic(err)
 	}
 	defer t.Rollback()
-	active, err := storage.GetActive(ctx, key)
+	s, err := storage.GetSnapshot(ctx, key)
 	if err != nil {
 		panic(err)
 	}
-	parents := make([]string, len(active.ParentIDs))
-	for i := range active.ParentIDs {
-		parents[i] = filepath.Join(root, "snapshots", active.ParentIDs[i], "fs")
+	parents := make([]string, len(s.ParentIDs))
+	for i := range s.ParentIDs {
+		parents[i] = filepath.Join(root, "snapshots", s.ParentIDs[i], "fs")
 	}
 	return parents
 }

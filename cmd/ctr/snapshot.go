@@ -89,10 +89,13 @@ var listSnapshotCommand = cli.Command{
 		}
 
 		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
-		fmt.Fprintln(tw, "ID\tParent\tState\tReadonly\t")
+		fmt.Fprintln(tw, "ID\tPARENT\tKIND\t")
 
 		if err := snapshotter.Walk(ctx, func(ctx context.Context, info snapshot.Info) error {
-			fmt.Fprintf(tw, "%v\t%v\t%v\t%t\t\n", info.Name, info.Parent, state(info.Kind), info.Readonly)
+			fmt.Fprintf(tw, "%v\t%v\t%v\t\n",
+				info.Name,
+				info.Parent,
+				info.Kind)
 			return nil
 		}); err != nil {
 			return err
@@ -100,17 +103,6 @@ var listSnapshotCommand = cli.Command{
 
 		return tw.Flush()
 	},
-}
-
-func state(k snapshot.Kind) string {
-	switch k {
-	case snapshot.KindActive:
-		return "active"
-	case snapshot.KindCommitted:
-		return "committed"
-	default:
-		return ""
-	}
 }
 
 var usageSnapshotCommand = cli.Command{

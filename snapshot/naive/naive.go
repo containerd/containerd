@@ -94,11 +94,11 @@ func (o *snapshotter) Usage(ctx context.Context, key string) (snapshot.Usage, er
 }
 
 func (o *snapshotter) Prepare(ctx context.Context, key, parent string) ([]mount.Mount, error) {
-	return o.createActive(ctx, key, parent, false)
+	return o.createSnapshot(ctx, snapshot.KindActive, key, parent)
 }
 
 func (o *snapshotter) View(ctx context.Context, key, parent string) ([]mount.Mount, error) {
-	return o.createActive(ctx, key, parent, true)
+	return o.createSnapshot(ctx, snapshot.KindView, key, parent)
 }
 
 // Mounts returns the mounts for the transaction identified by key. Can be
@@ -110,12 +110,12 @@ func (o *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 	if err != nil {
 		return nil, err
 	}
-	active, err := storage.GetActive(ctx, key)
+	s, err := storage.GetSnapshot(ctx, key)
 	t.Rollback()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get active mount")
+		return nil, errors.Wrap(err, "failed to get snapshot mount")
 	}
-	return o.mounts(active), nil
+	return o.mounts(s), nil
 }
 
 func (o *snapshotter) Commit(ctx context.Context, name, key string) error {
@@ -203,13 +203,13 @@ func (o *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 	return storage.WalkInfo(ctx, fn)
 }
 
-func (o *snapshotter) createActive(ctx context.Context, key, parent string, readonly bool) ([]mount.Mount, error) {
+func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshot.Kind, key, parent string) ([]mount.Mount, error) {
 	var (
 		err      error
 		path, td string
 	)
 
-	if !readonly || parent == "" {
+	if kind == snapshot.KindActive || parent == "" {
 		td, err = ioutil.TempDir(filepath.Join(o.root, "snapshots"), "new-")
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create temp dir")
@@ -235,23 +235,23 @@ func (o *snapshotter) createActive(ctx context.Context, key, parent string, read
 		return nil, err
 	}
 
-	active, err := storage.CreateActive(ctx, key, parent, readonly)
+	s, err := storage.CreateSnapshot(ctx, kind, key, parent)
 	if err != nil {
 		if rerr := t.Rollback(); rerr != nil {
 			log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
 		}
-		return nil, errors.Wrap(err, "failed to create active")
+		return nil, errors.Wrap(err, "failed to create snapshot")
 	}
 
 	if td != "" {
-		if len(active.ParentIDs) > 0 {
-			parent := o.getSnapshotDir(active.ParentIDs[0])
+		if len(s.ParentIDs) > 0 {
+			parent := o.getSnapshotDir(s.ParentIDs[0])
 			if err := fs.CopyDir(td, parent); err != nil {
 				return nil, errors.Wrap(err, "copying of parent failed")
 			}
 		}
 
-		path = o.getSnapshotDir(active.ID)
+		path = o.getSnapshotDir(s.ID)
 		if err := os.Rename(td, path); err != nil {
 			if rerr := t.Rollback(); rerr != nil {
 				log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
@@ -265,29 +265,29 @@ func (o *snapshotter) createActive(ctx context.Context, key, parent string, read
 		return nil, errors.Wrap(err, "commit failed")
 	}
 
-	return o.mounts(active), nil
+	return o.mounts(s), nil
 }
 
 func (o *snapshotter) getSnapshotDir(id string) string {
 	return filepath.Join(o.root, "snapshots", id)
 }
 
-func (o *snapshotter) mounts(active storage.Active) []mount.Mount {
+func (o *snapshotter) mounts(s storage.Snapshot) []mount.Mount {
 	var (
 		roFlag string
 		source string
 	)
 
-	if active.Readonly {
+	if s.Kind == snapshot.KindView {
 		roFlag = "ro"
 	} else {
 		roFlag = "rw"
 	}
 
-	if len(active.ParentIDs) == 0 || !active.Readonly {
-		source = o.getSnapshotDir(active.ID)
+	if len(s.ParentIDs) == 0 || s.Kind == snapshot.KindActive {
+		source = o.getSnapshotDir(s.ID)
 	} else {
-		source = o.getSnapshotDir(active.ParentIDs[0])
+		source = o.getSnapshotDir(s.ParentIDs[0])
 	}
 
 	return []mount.Mount{

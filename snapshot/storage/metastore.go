@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/boltdb/bolt"
+	"github.com/containerd/containerd/snapshot"
 	"github.com/pkg/errors"
 )
 
@@ -26,15 +27,16 @@ type Transactor interface {
 	Rollback() error
 }
 
-// Active hold the metadata for an active snapshot transaction. The ParentIDs
-// hold the snapshot identifiers for the committed snapshots this active is
-// based on. The ParentIDs are ordered from the lowest base to highest, meaning
-// they should be applied in order from the first index to the last index. The
-// last index should always be considered the active snapshots immediate parent.
-type Active struct {
+// Snapshot hold the metadata for an active or view snapshot transaction. The
+// ParentIDs hold the snapshot identifiers for the committed snapshots this
+// active or view is based on. The ParentIDs are ordered from the lowest base
+// to highest, meaning they should be applied in order from the first index to
+// the last index. The last index should always be considered the active
+// snapshots immediate parent.
+type Snapshot struct {
+	Kind      snapshot.Kind
 	ID        string
 	ParentIDs []string
-	Readonly  bool
 }
 
 // MetaStore is used to store metadata related to a snapshot driver. The

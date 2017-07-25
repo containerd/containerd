@@ -122,11 +122,11 @@ func (o *snapshotter) Usage(ctx context.Context, key string) (snapshot.Usage, er
 }
 
 func (o *snapshotter) Prepare(ctx context.Context, key, parent string) ([]mount.Mount, error) {
-	return o.createActive(ctx, key, parent, false)
+	return o.createSnapshot(ctx, snapshot.KindActive, key, parent)
 }
 
 func (o *snapshotter) View(ctx context.Context, key, parent string) ([]mount.Mount, error) {
-	return o.createActive(ctx, key, parent, true)
+	return o.createSnapshot(ctx, snapshot.KindView, key, parent)
 }
 
 // Mounts returns the mounts for the transaction identified by key. Can be
@@ -138,12 +138,12 @@ func (o *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 	if err != nil {
 		return nil, err
 	}
-	active, err := storage.GetActive(ctx, key)
+	s, err := storage.GetSnapshot(ctx, key)
 	t.Rollback()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get active mount")
 	}
-	return o.mounts(active), nil
+	return o.mounts(s), nil
 }
 
 func (o *snapshotter) Commit(ctx context.Context, name, key string) error {
@@ -230,7 +230,7 @@ func (o *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 	return storage.WalkInfo(ctx, fn)
 }
 
-func (o *snapshotter) createActive(ctx context.Context, key, parent string, readonly bool) ([]mount.Mount, error) {
+func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshot.Kind, key, parent string) ([]mount.Mount, error) {
 	var (
 		path        string
 		snapshotDir = filepath.Join(o.root, "snapshots")
@@ -258,7 +258,8 @@ func (o *snapshotter) createActive(ctx context.Context, key, parent string, read
 	if err = os.MkdirAll(filepath.Join(td, "fs"), 0711); err != nil {
 		return nil, err
 	}
-	if !readonly {
+
+	if kind == snapshot.KindActive {
 		if err = os.MkdirAll(filepath.Join(td, "work"), 0700); err != nil {
 			return nil, err
 		}
@@ -269,7 +270,7 @@ func (o *snapshotter) createActive(ctx context.Context, key, parent string, read
 		return nil, err
 	}
 
-	active, err := storage.CreateActive(ctx, key, parent, readonly)
+	s, err := storage.CreateSnapshot(ctx, kind, key, parent)
 	if err != nil {
 		if rerr := t.Rollback(); rerr != nil {
 			log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
@@ -277,7 +278,7 @@ func (o *snapshotter) createActive(ctx context.Context, key, parent string, read
 		return nil, errors.Wrap(err, "failed to create active")
 	}
 
-	path = filepath.Join(snapshotDir, active.ID)
+	path = filepath.Join(snapshotDir, s.ID)
 	if err = os.Rename(td, path); err != nil {
 		if rerr := t.Rollback(); rerr != nil {
 			log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
@@ -290,21 +291,21 @@ func (o *snapshotter) createActive(ctx context.Context, key, parent string, read
 		return nil, errors.Wrap(err, "commit failed")
 	}
 
-	return o.mounts(active), nil
+	return o.mounts(s), nil
 }
 
-func (o *snapshotter) mounts(active storage.Active) []mount.Mount {
-	if len(active.ParentIDs) == 0 {
+func (o *snapshotter) mounts(s storage.Snapshot) []mount.Mount {
+	if len(s.ParentIDs) == 0 {
 		// if we only have one layer/no parents then just return a bind mount as overlay
 		// will not work
 		roFlag := "rw"
-		if active.Readonly {
+		if s.Kind == snapshot.KindView {
 			roFlag = "ro"
 		}
 
 		return []mount.Mount{
 			{
-				Source: o.upperPath(active.ID),
+				Source: o.upperPath(s.ID),
 				Type:   "bind",
 				Options: []string{
 					roFlag,
@@ -315,15 +316,15 @@ func (o *snapshotter) mounts(active storage.Active) []mount.Mount {
 	}
 	var options []string
 
-	if !active.Readonly {
+	if s.Kind == snapshot.KindActive {
 		options = append(options,
-			fmt.Sprintf("workdir=%s", o.workPath(active.ID)),
-			fmt.Sprintf("upperdir=%s", o.upperPath(active.ID)),
+			fmt.Sprintf("workdir=%s", o.workPath(s.ID)),
+			fmt.Sprintf("upperdir=%s", o.upperPath(s.ID)),
 		)
-	} else if len(active.ParentIDs) == 1 {
+	} else if len(s.ParentIDs) == 1 {
 		return []mount.Mount{
 			{
-				Source: o.upperPath(active.ParentIDs[0]),
+				Source: o.upperPath(s.ParentIDs[0]),
 				Type:   "bind",
 				Options: []string{
 					"ro",
@@ -333,9 +334,9 @@ func (o *snapshotter) mounts(active storage.Active) []mount.Mount {
 		}
 	}
 
-	parentPaths := make([]string, len(active.ParentIDs))
-	for i := range active.ParentIDs {
-		parentPaths[i] = o.upperPath(active.ParentIDs[i])
+	parentPaths := make([]string, len(s.ParentIDs))
+	for i := range s.ParentIDs {
+		parentPaths[i] = o.upperPath(s.ParentIDs[i])
 	}
 
 	options = append(options, fmt.Sprintf("lowerdir=%s", strings.Join(parentPaths, ":")))

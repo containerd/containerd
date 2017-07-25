@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/containerd/btrfs"
 	"github.com/containerd/containerd/log"
@@ -58,11 +59,13 @@ func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
 	}
 	var (
 		active    = filepath.Join(root, "active")
+		view      = filepath.Join(root, "view")
 		snapshots = filepath.Join(root, "snapshots")
 	)
 
 	for _, path := range []string{
 		active,
+		view,
 		snapshots,
 	} {
 		if err := os.Mkdir(path, 0755); err != nil && !os.IsExist(err) {
@@ -127,14 +130,14 @@ func (b *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 }
 
 func (b *snapshotter) Prepare(ctx context.Context, key, parent string) ([]mount.Mount, error) {
-	return b.makeActive(ctx, key, parent, false)
+	return b.makeSnapshot(ctx, snapshot.KindActive, key, parent)
 }
 
 func (b *snapshotter) View(ctx context.Context, key, parent string) ([]mount.Mount, error) {
-	return b.makeActive(ctx, key, parent, true)
+	return b.makeSnapshot(ctx, snapshot.KindView, key, parent)
 }
 
-func (b *snapshotter) makeActive(ctx context.Context, key, parent string, readonly bool) ([]mount.Mount, error) {
+func (b *snapshotter) makeSnapshot(ctx context.Context, kind snapshot.Kind, key, parent string) ([]mount.Mount, error) {
 	ctx, t, err := b.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return nil, err
@@ -147,23 +150,29 @@ func (b *snapshotter) makeActive(ctx context.Context, key, parent string, readon
 		}
 	}()
 
-	a, err := storage.CreateActive(ctx, key, parent, readonly)
+	s, err := storage.CreateSnapshot(ctx, kind, key, parent)
 	if err != nil {
 		return nil, err
 	}
 
-	target := filepath.Join(b.root, "active", a.ID)
+	target := filepath.Join(b.root, strings.ToLower(s.Kind.String()), s.ID)
 
-	if len(a.ParentIDs) == 0 {
+	if len(s.ParentIDs) == 0 {
 		// create new subvolume
 		// btrfs subvolume create /dir
 		if err = btrfs.SubvolCreate(target); err != nil {
 			return nil, err
 		}
 	} else {
-		parentp := filepath.Join(b.root, "snapshots", a.ParentIDs[0])
+		parentp := filepath.Join(b.root, "snapshots", s.ParentIDs[0])
+
+		var readonly bool
+		if kind == snapshot.KindView {
+			readonly = true
+		}
+
 		// btrfs subvolume snapshot /parent /subvol
-		if err = btrfs.SubvolSnapshot(target, parentp, a.Readonly); err != nil {
+		if err = btrfs.SubvolSnapshot(target, parentp, readonly); err != nil {
 			return nil, err
 		}
 	}
@@ -256,12 +265,13 @@ func (b *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 	if err != nil {
 		return nil, err
 	}
-	a, err := storage.GetActive(ctx, key)
+	s, err := storage.GetSnapshot(ctx, key)
 	t.Rollback()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get active snapshot")
 	}
-	dir := filepath.Join(b.root, "active", a.ID)
+
+	dir := filepath.Join(b.root, strings.ToLower(s.Kind.String()), s.ID)
 	return b.mounts(dir)
 }
 
@@ -296,18 +306,15 @@ func (b *snapshotter) Remove(ctx context.Context, key string) (err error) {
 		return errors.Wrap(err, "failed to remove snapshot")
 	}
 
-	if k == snapshot.KindActive {
+	switch k {
+	case snapshot.KindView:
+		source = filepath.Join(b.root, "view", id)
+		removed = filepath.Join(b.root, "view", "rm-"+id)
+		readonly = true
+	case snapshot.KindActive:
 		source = filepath.Join(b.root, "active", id)
-
-		info, err := btrfs.SubvolInfo(source)
-		if err != nil {
-			source = ""
-			return err
-		}
-
-		readonly = info.Readonly
 		removed = filepath.Join(b.root, "active", "rm-"+id)
-	} else {
+	case snapshot.KindCommitted:
 		source = filepath.Join(b.root, "snapshots", id)
 		removed = filepath.Join(b.root, "snapshots", "rm-"+id)
 		readonly = true
