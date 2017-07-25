@@ -126,19 +126,30 @@ func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 			continue
 		}
 
-		// Note as these operations are platform specific, so must the slash be.
-		if !strings.HasSuffix(hdr.Name, string(os.PathSeparator)) {
-			// Not the root directory, ensure that the parent directory exists.
-			// This happened in some tests where an image had a tarfile without any
-			// parent directories.
-			parent := filepath.Dir(hdr.Name)
-			parentPath, err := rootPath(root, parent)
-			if err != nil {
-				return 0, err
-			}
+		// Split name and resolve symlinks for root directory.
+		ppath, base := filepath.Split(hdr.Name)
+		ppath, err = rootPath(root, ppath)
+		if err != nil {
+			return 0, errors.Wrap(err, "failed to get root path")
+		}
 
+		// Join to root before joining to parent path to ensure relative links are
+		// already resolved based on the root before adding to parent.
+		path := filepath.Join(ppath, filepath.Join("/", base))
+		if path == root {
+			log.G(ctx).Debugf("file %q ignored: resolved to root", hdr.Name)
+			continue
+		}
+
+		// If file is not directly under root, ensure parent directory
+		// exists or is created.
+		if ppath != root {
+			parentPath := ppath
+			if base == "" {
+				parentPath = filepath.Dir(path)
+			}
 			if _, err := os.Lstat(parentPath); err != nil && os.IsNotExist(err) {
-				err = mkdirAll(parentPath, 0600)
+				err = mkdirAll(parentPath, 0700)
 				if err != nil {
 					return 0, err
 				}
@@ -172,13 +183,6 @@ func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 				continue
 			}
 		}
-
-		path, err := rootPath(root, hdr.Name)
-		if err != nil {
-			return 0, errors.Wrap(err, "failed to get root path")
-		}
-
-		base := filepath.Base(path)
 
 		if strings.HasPrefix(base, whiteoutPrefix) {
 			dir := filepath.Dir(path)

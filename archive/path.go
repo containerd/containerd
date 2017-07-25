@@ -28,7 +28,7 @@ func rootPath(root, path string) (string, error) {
 		}
 		path = newpath
 		if i == linksWalked {
-			newpath = rootJoin(newpath)
+			newpath = filepath.Join("/", newpath)
 			if path == newpath {
 				return filepath.Join(root, newpath), nil
 			}
@@ -37,28 +37,12 @@ func rootPath(root, path string) (string, error) {
 	}
 }
 
-// rootJoin joins a path with root, cleaning up any links that
-// reference above root.
-func rootJoin(path string) string {
-	if filepath.IsAbs(path) {
-		path = filepath.Clean(path)
-	}
-
-	// Resolve any ".." or "/.." before joining to root
-	for !filepath.IsAbs(path) {
-		path = "/" + path
-		path = filepath.Clean(path)
-	}
-
-	return path
-}
-
 func walkLink(root, path string, linksWalked *int) (newpath string, islink bool, err error) {
 	if *linksWalked > 255 {
 		return "", false, errTooManyLinks
 	}
 
-	path = rootJoin(path)
+	path = filepath.Join("/", path)
 	if path == "/" {
 		return path, false, nil
 	}
