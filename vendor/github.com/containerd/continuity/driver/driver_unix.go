@@ -1,6 +1,6 @@
-// +build linux darwin freebsd
+// +build linux darwin freebsd solaris
 
-package continuity
+package driver
 
 import (
 	"errors"
@@ -9,11 +9,12 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/containerd/continuity/devices"
 	"github.com/containerd/continuity/sysx"
 )
 
 func (d *driver) Mknod(path string, mode os.FileMode, major, minor int) error {
-	return mknod(path, mode, major, minor)
+	return devices.Mknod(path, mode, major, minor)
 }
 
 func (d *driver) Mkfifo(path string, mode os.FileMode) error {
@@ -22,7 +23,7 @@ func (d *driver) Mkfifo(path string, mode os.FileMode) error {
 	}
 	// mknod with a mode that has ModeNamedPipe set creates a fifo, not a
 	// device.
-	return mknod(path, mode, 0, 0)
+	return devices.Mknod(path, mode, 0, 0)
 }
 
 // Lchmod changes the mode of an file not following symlinks.
@@ -117,5 +118,5 @@ func (d *driver) LSetxattr(path string, attrMap map[string][]byte) error {
 }
 
 func (d *driver) DeviceInfo(fi os.FileInfo) (maj uint64, min uint64, err error) {
-	return deviceInfo(fi)
+	return devices.DeviceInfo(fi)
 }

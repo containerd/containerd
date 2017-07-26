@@ -1,4 +1,4 @@
-package continuity
+package devices
 
 // from /usr/include/linux/kdev_t.h
 
