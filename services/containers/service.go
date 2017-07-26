@@ -24,23 +24,22 @@ func init() {
 			plugin.MetadataPlugin,
 		},
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			e := events.GetPoster(ic.Context)
 			m, err := ic.Get(plugin.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}
-			return NewService(m.(*bolt.DB), e), nil
+			return NewService(m.(*bolt.DB), ic.Events), nil
 		},
 	})
 }
 
 type Service struct {
-	db      *bolt.DB
-	emitter events.Poster
+	db        *bolt.DB
+	publisher events.Publisher
 }
 
-func NewService(db *bolt.DB, evts events.Poster) api.ContainersServer {
-	return &Service{db: db, emitter: evts}
+func NewService(db *bolt.DB, publisher events.Publisher) api.ContainersServer {
+	return &Service{db: db, publisher: publisher}
 }
 
 func (s *Service) Register(server *grpc.Server) error {
@@ -94,7 +93,7 @@ func (s *Service) Create(ctx context.Context, req *api.CreateContainerRequest) (
 	}); err != nil {
 		return &resp, errdefs.ToGRPC(err)
 	}
-	if err := s.emit(ctx, "/containers/create", &eventsapi.ContainerCreate{
+	if err := s.publisher.Publish(ctx, "/containers/create", &eventsapi.ContainerCreate{
 		ID:    resp.Container.ID,
 		Image: resp.Container.Image,
 		Runtime: &eventsapi.ContainerCreate_Runtime{
@@ -136,7 +135,7 @@ func (s *Service) Update(ctx context.Context, req *api.UpdateContainerRequest) (
 		return &resp, errdefs.ToGRPC(err)
 	}
 
-	if err := s.emit(ctx, "/containers/update", &eventsapi.ContainerUpdate{
+	if err := s.publisher.Publish(ctx, "/containers/update", &eventsapi.ContainerUpdate{
 		ID:     resp.Container.ID,
 		Image:  resp.Container.Image,
 		Labels: resp.Container.Labels,
@@ -155,7 +154,7 @@ func (s *Service) Delete(ctx context.Context, req *api.DeleteContainerRequest) (
 		return &empty.Empty{}, errdefs.ToGRPC(err)
 	}
 
-	if err := s.emit(ctx, "/containers/delete", &eventsapi.ContainerDelete{
+	if err := s.publisher.Publish(ctx, "/containers/delete", &eventsapi.ContainerDelete{
 		ID: req.ID,
 	}); err != nil {
 		return &empty.Empty{}, err
@@ -174,13 +173,4 @@ func (s *Service) withStoreView(ctx context.Context, fn func(ctx context.Context
 
 func (s *Service) withStoreUpdate(ctx context.Context, fn func(ctx context.Context, store containers.Store) error) error {
 	return s.db.Update(s.withStore(ctx, fn))
-}
-
-func (s *Service) emit(ctx context.Context, topic string, evt interface{}) error {
-	emitterCtx := events.WithTopic(ctx, topic)
-	if err := s.emitter.Post(emitterCtx, evt); err != nil {
-		return err
-	}
-
-	return nil
 }

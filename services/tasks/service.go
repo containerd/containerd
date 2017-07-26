@@ -67,20 +67,19 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		r := rr.(runtime.Runtime)
 		runtimes[r.ID()] = r
 	}
-	e := events.GetPoster(ic.Context)
 	return &Service{
-		runtimes: runtimes,
-		db:       m.(*bolt.DB),
-		store:    cs,
-		emitter:  e,
+		runtimes:  runtimes,
+		db:        m.(*bolt.DB),
+		store:     cs,
+		publisher: ic.Events,
 	}, nil
 }
 
 type Service struct {
-	runtimes map[string]runtime.Runtime
-	db       *bolt.DB
-	store    content.Store
-	emitter  events.Poster
+	runtimes  map[string]runtime.Runtime
+	db        *bolt.DB
+	store     content.Store
+	publisher events.Publisher
 }
 
 func (s *Service) Register(server *grpc.Server) error {
@@ -501,13 +500,4 @@ func (s *Service) getRuntime(name string) (runtime.Runtime, error) {
 		return nil, grpc.Errorf(codes.NotFound, "unknown runtime %q", name)
 	}
 	return runtime, nil
-}
-
-func (s *Service) emit(ctx context.Context, topic string, evt interface{}) error {
-	emitterCtx := events.WithTopic(ctx, topic)
-	if err := s.emitter.Post(emitterCtx, evt); err != nil {
-		return err
-	}
-
-	return nil
 }

@@ -19,8 +19,8 @@
 		ContainerUpdate
 		ContainerDelete
 		ContentDelete
-		StreamEventsRequest
-		PostEventRequest
+		SubscribeRequest
+		PublishRequest
 		Envelope
 		ImageCreate
 		ImageUpdate

@@ -4,8 +4,8 @@ package cgroups
 
 import (
 	"github.com/containerd/cgroups"
-	events "github.com/containerd/containerd/api/services/events/v1"
-	evt "github.com/containerd/containerd/events"
+	eventsapi "github.com/containerd/containerd/api/services/events/v1"
+	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
@@ -35,7 +35,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		collector: collector,
 		oom:       oom,
 		context:   ic.Context,
-		emitter:   ic.Emitter,
+		publisher: ic.Events,
 	}, nil
 }
 
@@ -43,7 +43,7 @@ type cgroupsMonitor struct {
 	collector *Collector
 	oom       *OOMCollector
 	context   context.Context
-	emitter   *evt.Emitter
+	publisher events.Publisher
 }
 
 func (m *cgroupsMonitor) Monitor(c runtime.Task) error {
@@ -69,7 +69,7 @@ func (m *cgroupsMonitor) Stop(c runtime.Task) error {
 }
 
 func (m *cgroupsMonitor) trigger(id string, cg cgroups.Cgroup) {
-	if err := m.emitter.Post(m.context, &events.TaskOOM{
+	if err := m.publisher.Publish(m.context, runtime.TaskOOMEventTopic, &eventsapi.TaskOOM{
 		ContainerID: id,
 	}); err != nil {
 		log.G(m.context).WithError(err).Error("post OOM event")

@@ -163,7 +163,7 @@ func (t *task) Status(ctx context.Context) (TaskStatus, error) {
 
 // Wait is a blocking call that will wait for the task to exit and return the exit status
 func (t *task) Wait(ctx context.Context) (uint32, error) {
-	eventstream, err := t.client.EventService().Stream(ctx, &eventsapi.StreamEventsRequest{})
+	eventstream, err := t.client.EventService().Subscribe(ctx, &eventsapi.SubscribeRequest{})
 	if err != nil {
 		return UnknownExitStatus, errdefs.FromGRPC(err)
 	}

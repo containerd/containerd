@@ -89,17 +89,16 @@ func (c *local) Update(ctx context.Context, in *shimapi.UpdateTaskRequest, opts 
 	return c.s.Update(ctx, in)
 }
 
-type poster interface {
-	Post(ctx context.Context, in *events.PostEventRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error)
+type publisher interface {
+	Publish(ctx context.Context, in *events.PublishRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error)
 }
 
 type localEventsClient struct {
-	emitter evt.Poster
+	forwarder evt.Forwarder
 }
 
-func (l *localEventsClient) Post(ctx context.Context, r *events.PostEventRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
-	ctx = evt.WithTopic(ctx, r.Envelope.Topic)
-	if err := l.emitter.Post(ctx, r.Envelope); err != nil {
+func (l *localEventsClient) Publish(ctx context.Context, r *events.PublishRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+	if err := l.forwarder.Forward(ctx, r.Envelope); err != nil {
 		return nil, err
 	}
 	return empty, nil

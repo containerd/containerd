@@ -34,8 +34,8 @@ type task struct {
 	processes map[string]*process
 	hyperV    bool
 
-	emitter *events.Emitter
-	rwLayer string
+	publisher events.Publisher
+	rwLayer   string
 
 	pidPool           *pidPool
 	hcsContainer      hcsshim.Container
@@ -112,7 +112,8 @@ func (t *task) Start(ctx context.Context) error {
 		return err
 	}
 
-	t.emitter.Post(events.WithTopic(ctx, runtime.TaskStartEventTopic),
+	t.publisher.Publish(ctx,
+		runtime.TaskStartEventTopic,
 		&eventsapi.TaskStart{
 			ContainerID: t.id,
 			Pid:         t.pid,
@@ -130,7 +131,8 @@ func (t *task) Pause(ctx context.Context) error {
 			t.Unlock()
 		}
 		if err == nil {
-			t.emitter.Post(events.WithTopic(ctx, runtime.TaskPausedEventTopic),
+			t.publisher.Publish(ctx,
+				runtime.TaskPausedEventTopic,
 				&eventsapi.TaskPaused{
 					ContainerID: t.id,
 				})
@@ -150,7 +152,8 @@ func (t *task) Resume(ctx context.Context) error {
 			t.Unlock()
 		}
 		if err == nil {
-			t.emitter.Post(events.WithTopic(ctx, runtime.TaskResumedEventTopic),
+			t.publisher.Publish(ctx,
+				runtime.TaskResumedEventTopic,
 				&eventsapi.TaskResumed{
 					ContainerID: t.id,
 				})
@@ -195,7 +198,8 @@ func (t *task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runt
 		return nil, err
 	}
 
-	t.emitter.Post(events.WithTopic(ctx, runtime.TaskExecAddedEventTopic),
+	t.publisher.Publish(ctx,
+		runtime.TaskExecAddedEventTopic,
 		&eventsapi.TaskExecAdded{
 			ContainerID: t.id,
 			ExecID:      id,
@@ -358,7 +362,8 @@ func (t *task) newProcess(ctx context.Context, id string, conf *hcsshim.ProcessC
 		}
 		wp.exitCode = uint32(ec)
 
-		t.emitter.Post(events.WithTopic(ctx, runtime.TaskExitEventTopic),
+		t.publisher.Publish(ctx,
+			runtime.TaskExitEventTopic,
 			&eventsapi.TaskExit{
 				ContainerID: t.id,
 				ID:          id,
