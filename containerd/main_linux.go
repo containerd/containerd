@@ -5,10 +5,10 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/cloudfoundry/gosigar"
 	"github.com/containerd/containerd/osutils"
 	"github.com/rcrowley/go-metrics"
+	"github.com/sirupsen/logrus"
 )
 
 func processMetrics() {

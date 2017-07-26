@@ -4,8 +4,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd/runtime"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )
 

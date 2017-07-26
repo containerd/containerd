@@ -7,10 +7,10 @@ import (
 
 	netcontext "golang.org/x/net/context"
 
-	"github.com/Sirupsen/logrus"
-	"github.com/urfave/cli"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/grpc/types"
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 )
 
 const usage = `High performance container daemon cli`
