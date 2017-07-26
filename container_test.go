@@ -889,3 +889,81 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 	}
 	<-finished
 }
+
+func TestUserNamespaces(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	spec, err := generateSpec(
+		withImageConfig(ctx, image),
+		withExitStatus(7),
+		withUserNamespace(0, 1000, 10000),
+	)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	container, err := client.NewContainer(ctx, id,
+		WithSpec(spec),
+		withRemappedSnapshot(id, image, 1000, 1000),
+	)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, Stdio)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	statusC := make(chan uint32, 1)
+	go func() {
+		status, err := task.Wait(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+		statusC <- status
+	}()
+
+	if pid := task.Pid(); pid <= 0 {
+		t.Errorf("invalid task pid %d", pid)
+	}
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		task.Delete(ctx)
+		return
+	}
+	status := <-statusC
+	if status != 7 {
+		t.Errorf("expected status 7 from wait but received %d", status)
+	}
+	if status, err = task.Delete(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+	if status != 7 {
+		t.Errorf("expected status 7 from delete but received %d", status)
+	}
+}

@@ -36,7 +36,7 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 	if config.Root == "" {
 		return nil, errors.New("root must be specified")
 	}
-	if err := os.MkdirAll(config.Root, 0700); err != nil {
+	if err := os.MkdirAll(config.Root, 0711); err != nil {
 		return nil, err
 	}
 	if err := apply(ctx, config); err != nil {
@@ -168,7 +168,7 @@ func loadPlugins(config *Config) ([]*plugin.Registration, error) {
 		Type: plugin.MetadataPlugin,
 		ID:   "bolt",
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			if err := os.MkdirAll(ic.Root, 0700); err != nil {
+			if err := os.MkdirAll(ic.Root, 0711); err != nil {
 				return nil, err
 			}
 			return bolt.Open(filepath.Join(ic.Root, "meta.db"), 0644, nil)

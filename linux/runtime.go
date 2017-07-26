@@ -68,7 +68,7 @@ type Config struct {
 }
 
 func New(ic *plugin.InitContext) (interface{}, error) {
-	if err := os.MkdirAll(ic.Root, 0700); err != nil {
+	if err := os.MkdirAll(ic.Root, 0711); err != nil {
 		return nil, err
 	}
 	monitor, err := ic.Get(plugin.TaskMonitorPlugin)

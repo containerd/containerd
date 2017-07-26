@@ -21,7 +21,7 @@ func loadBundle(path, namespace string) *bundle {
 
 // newBundle creates a new bundle on disk at the provided path for the given id
 func newBundle(path, namespace, id string, spec []byte) (b *bundle, err error) {
-	if err := os.MkdirAll(path, 0700); err != nil {
+	if err := os.MkdirAll(path, 0711); err != nil {
 		return nil, err
 	}
 	path = filepath.Join(path, id)
@@ -30,10 +30,10 @@ func newBundle(path, namespace, id string, spec []byte) (b *bundle, err error) {
 			os.RemoveAll(path)
 		}
 	}()
-	if err := os.Mkdir(path, 0700); err != nil {
+	if err := os.Mkdir(path, 0711); err != nil {
 		return nil, err
 	}
-	if err := os.Mkdir(filepath.Join(path, "rootfs"), 0700); err != nil {
+	if err := os.Mkdir(filepath.Join(path, "rootfs"), 0711); err != nil {
 		return nil, err
 	}
 	f, err := os.Create(filepath.Join(path, configFilename))

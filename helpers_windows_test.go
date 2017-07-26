@@ -63,3 +63,15 @@ func withNewSnapshot(id string, i Image) NewContainerOpts {
 		return nil
 	}
 }
+
+func withUserNamespace(u, g, s uint32) SpecOpts {
+	return func(s *specs.Spec) error {
+		return nil
+	}
+}
+
+func withRemappedSnapshot(id string, i Image, u, g uint32) NewContainerOpts {
+	return func(ctx context.Context, client *Client, c *containers.Container) error {
+		return nil
+	}
+}

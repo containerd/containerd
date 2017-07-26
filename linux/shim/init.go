@@ -120,7 +120,6 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 		}
 		defer os.Remove(socket.Path())
 	} else {
-		// TODO: get uid/gid
 		if io, err = runc.NewPipeIO(0, 0); err != nil {
 			return nil, errors.Wrap(err, "failed to create OCI runtime io pipes")
 		}

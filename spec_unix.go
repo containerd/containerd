@@ -6,12 +6,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/fs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/typeurl"
+	"github.com/opencontainers/image-spec/identity"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -78,7 +87,6 @@ func createDefaultSpec() (*specs.Spec, error) {
 				Permitted:   defaltCaps(),
 				Inheritable: defaltCaps(),
 				Effective:   defaltCaps(),
-				Ambient:     defaltCaps(),
 			},
 			Rlimits: []specs.POSIXRlimit{
 				{
@@ -129,24 +137,6 @@ func createDefaultSpec() (*specs.Spec, error) {
 				Type:        "tmpfs",
 				Source:      "tmpfs",
 				Options:     []string{"nosuid", "strictatime", "mode=755", "size=65536k"},
-			},
-			{
-				Destination: "/etc/resolv.conf",
-				Type:        "bind",
-				Source:      "/etc/resolv.conf",
-				Options:     []string{"rbind", "ro"},
-			},
-			{
-				Destination: "/etc/hosts",
-				Type:        "bind",
-				Source:      "/etc/hosts",
-				Options:     []string{"rbind", "ro"},
-			},
-			{
-				Destination: "/etc/localtime",
-				Type:        "bind",
-				Source:      "/etc/localtime",
-				Options:     []string{"rbind", "ro"},
 			},
 		},
 		Linux: &specs.Linux{
@@ -272,6 +262,7 @@ func WithImageConfig(ctx context.Context, i Image) SpecOpts {
 	}
 }
 
+// WithSpec sets the provided spec for a new container
 func WithSpec(spec *specs.Spec) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		any, err := typeurl.MarshalAny(spec)
@@ -283,9 +274,153 @@ func WithSpec(spec *specs.Spec) NewContainerOpts {
 	}
 }
 
+// WithResources sets the provided resources on the spec for task updates
 func WithResources(resources *specs.LinuxResources) UpdateTaskOpts {
 	return func(ctx context.Context, client *Client, r *UpdateTaskInfo) error {
 		r.Resources = resources
+		return nil
+	}
+}
+
+// WithNoNewPrivileges sets no_new_privileges on the process for the container
+func WithNoNewPrivileges(s *specs.Spec) error {
+	s.Process.NoNewPrivileges = true
+	return nil
+}
+
+func WithHostHosts(s *specs.Spec) error {
+	s.Mounts = append(s.Mounts, specs.Mount{
+		Destination: "/etc/hosts",
+		Type:        "bind",
+		Source:      "/etc/hosts",
+		Options:     []string{"rbind", "ro"},
+	})
+	return nil
+}
+
+func WithHostResoveconf(s *specs.Spec) error {
+	s.Mounts = append(s.Mounts, specs.Mount{
+		Destination: "/etc/resolv.conf",
+		Type:        "bind",
+		Source:      "/etc/resolv.conf",
+		Options:     []string{"rbind", "ro"},
+	})
+	return nil
+}
+
+func WithHostLocaltime(s *specs.Spec) error {
+	s.Mounts = append(s.Mounts, specs.Mount{
+		Destination: "/etc/localtime",
+		Type:        "bind",
+		Source:      "/etc/localtime",
+		Options:     []string{"rbind", "ro"},
+	})
+	return nil
+}
+
+// WithUserNamespace sets the uid and gid mappings for the task
+// this can be called multiple times to add more mappings to the generated spec
+func WithUserNamespace(container, host, size uint32) SpecOpts {
+	return func(s *specs.Spec) error {
+		var hasUserns bool
+		for _, ns := range s.Linux.Namespaces {
+			if ns.Type == specs.UserNamespace {
+				hasUserns = true
+				break
+			}
+		}
+		if !hasUserns {
+			s.Linux.Namespaces = append(s.Linux.Namespaces, specs.LinuxNamespace{
+				Type: specs.UserNamespace,
+			})
+		}
+		mapping := specs.LinuxIDMapping{
+			ContainerID: container,
+			HostID:      host,
+			Size:        size,
+		}
+		s.Linux.UIDMappings = append(s.Linux.UIDMappings, mapping)
+		s.Linux.GIDMappings = append(s.Linux.GIDMappings, mapping)
+		return nil
+	}
+}
+
+// WithRemappedSnapshot creates a new snapshot and remaps the uid/gid for the
+// filesystem to be used by a container with user namespaces
+func WithRemappedSnapshot(id string, i Image, uid, gid uint32) NewContainerOpts {
+	return func(ctx context.Context, client *Client, c *containers.Container) error {
+		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore())
+		if err != nil {
+			return err
+		}
+		var (
+			snapshotter = client.SnapshotService(c.Snapshotter)
+			parent      = identity.ChainID(diffIDs).String()
+			usernsID    = fmt.Sprintf("%s-%d-%d", parent, uid, gid)
+		)
+		if _, err := snapshotter.Stat(ctx, usernsID); err == nil {
+			if _, err := snapshotter.Prepare(ctx, id, usernsID); err != nil {
+				return err
+			}
+			c.RootFS = id
+			c.Image = i.Name()
+			return nil
+		}
+		mounts, err := snapshotter.Prepare(ctx, usernsID+"-remap", parent)
+		if err != nil {
+			return err
+		}
+		if err := remapRootFS(mounts, uid, gid); err != nil {
+			snapshotter.Remove(ctx, usernsID)
+			return err
+		}
+		if err := snapshotter.Commit(ctx, usernsID, usernsID+"-remap"); err != nil {
+			return err
+		}
+		if _, err := snapshotter.Prepare(ctx, id, usernsID); err != nil {
+			return err
+		}
+		c.RootFS = id
+		c.Image = i.Name()
+		return nil
+	}
+}
+
+func remapRootFS(mounts []mount.Mount, uid, gid uint32) error {
+	root, err := ioutil.TempDir("", "ctd-remap")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(root)
+	for _, m := range mounts {
+		if err := m.Mount(root); err != nil {
+			return err
+		}
+	}
+	defer unix.Unmount(root, 0)
+	return filepath.Walk(root, incrementFS(root, uid, gid))
+}
+
+func incrementFS(root string, uidInc, gidInc uint32) filepath.WalkFunc {
+	return func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if root == path {
+			return nil
+		}
+		var (
+			stat    = info.Sys().(*syscall.Stat_t)
+			u, g    = int(stat.Uid + uidInc), int(stat.Gid + gidInc)
+			symlink = info.Mode()&os.ModeSymlink != 0
+		)
+		// make sure we resolve links inside the root for symlinks
+		if path, err = fs.RootPath(root, strings.TrimPrefix(path, root)); err != nil {
+			return err
+		}
+		if err := os.Chown(path, u, g); err != nil && !symlink {
+			return err
+		}
 		return nil
 	}
 }
