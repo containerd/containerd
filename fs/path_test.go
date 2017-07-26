@@ -1,6 +1,6 @@
 // +build !windows
 
-package archive
+package fs
 
 import (
 	"io/ioutil"
@@ -179,7 +179,7 @@ func testRootPathSymlinkRootScope(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rewrite, err := rootPath("/", tmpdir)
+	rewrite, err := RootPath("/", tmpdir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +192,7 @@ func testRootPathSymlinkEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := rootPath(wd, "")
+	res, err := RootPath(wd, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +221,7 @@ func makeRootPathTest(t *testing.T, apply fstest.Applier, checks []rootCheck) fu
 				root = check.scope(root)
 			}
 
-			actual, err := rootPath(root, check.unresolved)
+			actual, err := RootPath(root, check.unresolved)
 			if check.cause != nil {
 				if err == nil {
 					t.Errorf("(Check %d) Expected error %q, %q evaluated as %q", i+1, check.cause.Error(), check.unresolved, actual)
