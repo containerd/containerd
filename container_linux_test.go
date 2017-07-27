@@ -3,10 +3,12 @@
 package containerd
 
 import (
+	"context"
 	"syscall"
 	"testing"
 
 	"github.com/containerd/cgroups"
+	"github.com/containerd/containerd/linux/runcopts"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -90,6 +92,81 @@ func TestContainerUpdate(t *testing.T) {
 	}
 	if int64(stat.Memory.Usage.Limit) != limit {
 		t.Errorf("expected memory limit to be set to %d but received %d", limit, stat.Memory.Usage.Limit)
+	}
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Error(err)
+		return
+	}
+
+	<-statusC
+}
+
+func TestShimInCgroup(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err := client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	spec, err := GenerateSpec(WithImageConfig(ctx, image), WithProcessArgs("sleep", "30"))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewSnapshot(id, image))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+	// create a cgroup for the shim to use
+	path := "/containerd/shim"
+	cg, err := cgroups.New(cgroups.V1, cgroups.StaticPath(path), &specs.LinuxResources{})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer cg.Delete()
+
+	task, err := container.NewTask(ctx, empty(), func(_ context.Context, client *Client, r *TaskInfo) error {
+		r.Options = &runcopts.CreateOptions{
+			ShimCgroup: path,
+		}
+		return nil
+	})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	statusC := make(chan uint32, 1)
+	go func() {
+		status, err := task.Wait(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+		statusC <- status
+	}()
+	// check to see if the shim is inside the cgroup
+	processes, err := cg.Processes(cgroups.Devices, false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	if len(processes) == 0 {
+		t.Errorf("created cgroup should have atleast one process inside: %d", len(processes))
 	}
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
 		t.Error(err)

@@ -139,7 +139,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 			bundle.Delete()
 		}
 	}()
-	s, err := bundle.NewShim(ctx, r.shim, r.address, r.remote, r.shimDebug)
+	s, err := bundle.NewShim(ctx, r.shim, r.address, r.remote, r.shimDebug, opts)
 	if err != nil {
 		return nil, err
 	}

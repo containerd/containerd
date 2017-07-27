@@ -28,7 +28,7 @@ type ClientOpt func(context.Context, Config) (shim.ShimClient, io.Closer, error)
 
 // WithStart executes a new shim process
 func WithStart(binary, address string, debug bool) ClientOpt {
-	return func(ctx context.Context, config Config) (shim.ShimClient, io.Closer, error) {
+	return func(ctx context.Context, config Config) (_ shim.ShimClient, _ io.Closer, err error) {
 		socket, err := newSocket(config)
 		if err != nil {
 			return nil, nil, err
@@ -44,16 +44,36 @@ func WithStart(binary, address string, debug bool) ClientOpt {
 		if err := reaper.Default.Start(cmd); err != nil {
 			return nil, nil, errors.Wrapf(err, "failed to start shim")
 		}
+		defer func() {
+			if err != nil {
+				terminate(cmd)
+			}
+		}()
 		log.G(ctx).WithFields(logrus.Fields{
 			"pid":     cmd.Process.Pid,
 			"address": config.Address,
 			"debug":   debug,
 		}).Infof("shim %s started", binary)
+		// set shim in cgroup if it is provided
+		if config.CgroupPath != "" {
+			if err := setCgroup(ctx, config, cmd); err != nil {
+				return nil, nil, err
+			}
+		}
 		if err = sys.SetOOMScore(cmd.Process.Pid, sys.OOMScoreMaxKillable); err != nil {
 			return nil, nil, errors.Wrap(err, "failed to set OOM Score on shim")
 		}
-		return WithConnect(ctx, config)
+		c, clo, err := WithConnect(ctx, config)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "failed to connect")
+		}
+		return c, clo, nil
 	}
+}
+
+func terminate(cmd *exec.Cmd) {
+	cmd.Process.Kill()
+	reaper.Default.Wait(cmd)
 }
 
 func newCommand(binary, address string, debug bool, config Config, socket *os.File) *exec.Cmd {
@@ -138,9 +158,10 @@ func WithLocal(ctx context.Context, config Config) (shim.ShimClient, io.Closer, 
 }
 
 type Config struct {
-	Address   string
-	Path      string
-	Namespace string
+	Address    string
+	Path       string
+	Namespace  string
+	CgroupPath string
 }
 
 // New returns a new shim client
