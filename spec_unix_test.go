@@ -20,7 +20,6 @@ func TestGenerateSpec(t *testing.T) {
 	// check for matching caps
 	defaults := defaltCaps()
 	for _, cl := range [][]string{
-		s.Process.Capabilities.Ambient,
 		s.Process.Capabilities.Bounding,
 		s.Process.Capabilities.Permitted,
 		s.Process.Capabilities.Inheritable,

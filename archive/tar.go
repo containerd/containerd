@@ -128,7 +128,7 @@ func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 
 		// Split name and resolve symlinks for root directory.
 		ppath, base := filepath.Split(hdr.Name)
-		ppath, err = rootPath(root, ppath)
+		ppath, err = fs.RootPath(root, ppath)
 		if err != nil {
 			return 0, errors.Wrap(err, "failed to get root path")
 		}
@@ -170,7 +170,7 @@ func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 					}
 					defer os.RemoveAll(aufsTempdir)
 				}
-				p, err := rootPath(aufsTempdir, basename)
+				p, err := fs.RootPath(aufsTempdir, basename)
 				if err != nil {
 					return 0, err
 				}
@@ -243,7 +243,7 @@ func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 			if srcHdr == nil {
 				return 0, fmt.Errorf("Invalid aufs hardlink")
 			}
-			p, err := rootPath(aufsTempdir, linkBasename)
+			p, err := fs.RootPath(aufsTempdir, linkBasename)
 			if err != nil {
 				return 0, err
 			}
@@ -268,7 +268,7 @@ func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 	}
 
 	for _, hdr := range dirs {
-		path, err := rootPath(root, hdr.Name)
+		path, err := fs.RootPath(root, hdr.Name)
 		if err != nil {
 			return 0, err
 		}
@@ -478,7 +478,7 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 		}
 
 	case tar.TypeLink:
-		targetPath, err := rootPath(extractDir, hdr.Linkname)
+		targetPath, err := fs.RootPath(extractDir, hdr.Linkname)
 		if err != nil {
 			return err
 		}

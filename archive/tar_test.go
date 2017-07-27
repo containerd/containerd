@@ -182,11 +182,11 @@ func TestBreakouts(t *testing.T) {
 	errFileDiff := errors.New("files differ")
 	sameFile := func(f1, f2 string) func(string) error {
 		return func(root string) error {
-			p1, err := rootPath(root, f1)
+			p1, err := fs.RootPath(root, f1)
 			if err != nil {
 				return err
 			}
-			p2, err := rootPath(root, f2)
+			p2, err := fs.RootPath(root, f2)
 			if err != nil {
 				return err
 			}
@@ -484,7 +484,7 @@ func TestApplyTar(t *testing.T) {
 	directoriesExist := func(dirs ...string) func(string) error {
 		return func(root string) error {
 			for _, d := range dirs {
-				p, err := rootPath(root, d)
+				p, err := fs.RootPath(root, d)
 				if err != nil {
 					return err
 				}

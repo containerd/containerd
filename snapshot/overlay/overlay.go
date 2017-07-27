@@ -255,12 +255,12 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshot.Kind, ke
 		}
 	}()
 
-	if err = os.MkdirAll(filepath.Join(td, "fs"), 0711); err != nil {
+	if err = os.MkdirAll(filepath.Join(td, "fs"), 0755); err != nil {
 		return nil, err
 	}
 
 	if kind == snapshot.KindActive {
-		if err = os.MkdirAll(filepath.Join(td, "work"), 0700); err != nil {
+		if err = os.MkdirAll(filepath.Join(td, "work"), 0711); err != nil {
 			return nil, err
 		}
 	}

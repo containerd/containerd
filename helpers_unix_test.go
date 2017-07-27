@@ -49,3 +49,7 @@ func withImageConfig(ctx context.Context, i Image) SpecOpts {
 func withNewSnapshot(id string, i Image) NewContainerOpts {
 	return WithNewSnapshot(id, i)
 }
+
+var withUserNamespace = WithUserNamespace
+
+var withRemappedSnapshot = WithRemappedSnapshot
