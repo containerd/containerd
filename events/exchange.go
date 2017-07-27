@@ -98,6 +98,7 @@ func (e *Exchange) Subscribe(ctx context.Context, filters ...filters.Filter) (ch
 		defer close(errq)
 		defer e.broadcaster.Remove(queue)
 		defer queue.Close()
+		defer channel.Close()
 
 		var err error
 	loop:
