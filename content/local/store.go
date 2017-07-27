@@ -206,11 +206,17 @@ func (s *store) status(ingestPath string) (content.Status, error) {
 	dp := filepath.Join(ingestPath, "data")
 	fi, err := os.Stat(dp)
 	if err != nil {
+		if os.IsNotExist(err) {
+			err = errors.Wrap(errdefs.ErrNotFound, err.Error())
+		}
 		return content.Status{}, err
 	}
 
 	ref, err := readFileString(filepath.Join(ingestPath, "ref"))
 	if err != nil {
+		if os.IsNotExist(err) {
+			err = errors.Wrap(errdefs.ErrNotFound, err.Error())
+		}
 		return content.Status{}, err
 	}
 
