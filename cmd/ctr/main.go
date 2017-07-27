@@ -63,7 +63,6 @@ containerd CLI
 		checkpointCommand,
 		containersCommand,
 		contentCommand,
-		deleteCommand,
 		eventsCommand,
 		execCommand,
 		fetchCommand,
@@ -103,6 +102,7 @@ var containersCommand = cli.Command{
 	Aliases: []string{"c"},
 	Subcommands: []cli.Command{
 		containersListCommand,
+		containersDeleteCommand,
 		containersSetLabelsCommand,
 	},
 }
