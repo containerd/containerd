@@ -25,12 +25,12 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
+	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
 )
 
 func TestImageStatus(t *testing.T) {
 	testID := "sha256:d848ce12891bf78792cda4a23c58984033b0c397a55e93a1556202222ecc5ed4"
-	meta := metadata.ImageMetadata{
+	image := imagestore.Image{
 		ID:          testID,
 		ChainID:     "test-chain-id",
 		RepoTags:    []string{"a", "b"},
@@ -57,7 +57,7 @@ func TestImageStatus(t *testing.T) {
 	require.NotNil(t, resp)
 	assert.Nil(t, resp.GetImage())
 
-	assert.NoError(t, c.imageMetadataStore.Create(meta))
+	c.imageStore.Add(image)
 
 	t.Logf("should return correct image status for exist image")
 	resp, err = c.ImageStatus(context.Background(), &runtime.ImageStatusRequest{

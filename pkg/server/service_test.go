@@ -29,12 +29,13 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
 	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/registrar"
 	agentstesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/agents/testing"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
+	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
+	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
+	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
 )
 
 type nopReadWriteCloser struct{}
@@ -58,10 +59,10 @@ func newTestCRIContainerdService() *criContainerdService {
 		os:                 ostesting.NewFakeOS(),
 		rootDir:            testRootDir,
 		sandboxImage:       testSandboxImage,
-		sandboxStore:       metadata.NewSandboxStore(store.NewMetadataStore()),
-		imageMetadataStore: metadata.NewImageMetadataStore(store.NewMetadataStore()),
+		sandboxStore:       sandboxstore.NewStore(),
+		imageStore:         imagestore.NewStore(),
 		sandboxNameIndex:   registrar.NewRegistrar(),
-		containerStore:     metadata.NewContainerStore(store.NewMetadataStore()),
+		containerStore:     containerstore.NewStore(),
 		containerNameIndex: registrar.NewRegistrar(),
 		taskService:        servertesting.NewFakeExecutionClient(),
 		containerService:   servertesting.NewFakeContainersClient(),
@@ -88,11 +89,11 @@ func TestSandboxOperations(t *testing.T) {
 		return nopReadWriteCloser{}, nil
 	}
 	// Insert sandbox image metadata.
-	assert.NoError(t, c.imageMetadataStore.Create(metadata.ImageMetadata{
+	c.imageStore.Add(imagestore.Image{
 		ID:      testSandboxImage,
 		ChainID: "test-chain-id",
 		Config:  &imagespec.ImageConfig{Entrypoint: []string{"/pause"}},
-	}))
+	})
 
 	config := &runtime.PodSandboxConfig{
 		Metadata: &runtime.PodSandboxMetadata{

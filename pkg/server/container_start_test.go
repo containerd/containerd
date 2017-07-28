@@ -27,27 +27,29 @@ import (
 	"github.com/containerd/containerd/api/types/mount"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
+	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
+	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
 )
 
 func TestStartContainer(t *testing.T) {
 	testID := "test-id"
 	testSandboxID := "test-sandbox-id"
-	testMetadata := &metadata.ContainerMetadata{
+	testMetadata := containerstore.Metadata{
 		ID:        testID,
 		Name:      "test-name",
 		SandboxID: testSandboxID,
-		CreatedAt: time.Now().UnixNano(),
 	}
-	testSandboxMetadata := &metadata.SandboxMetadata{
-		ID:   testSandboxID,
-		Name: "test-sandbox-name",
+	testStatus := &containerstore.Status{CreatedAt: time.Now().UnixNano()}
+	testSandbox := &sandboxstore.Sandbox{
+		Metadata: sandboxstore.Metadata{
+			ID:   testSandboxID,
+			Name: "test-sandbox-name",
+		},
 	}
 	testSandboxContainer := &task.Task{
 		ID:     testSandboxID,
@@ -56,8 +58,8 @@ func TestStartContainer(t *testing.T) {
 	}
 	testMounts := []*mount.Mount{{Type: "bind", Source: "test-source"}}
 	for desc, test := range map[string]struct {
-		containerMetadata          *metadata.ContainerMetadata
-		sandboxMetadata            *metadata.SandboxMetadata
+		status                     *containerstore.Status
+		sandbox                    *sandboxstore.Sandbox
 		sandboxContainerdContainer *task.Task
 		snapshotMountsErr          bool
 		prepareFIFOErr             error
@@ -67,50 +69,44 @@ func TestStartContainer(t *testing.T) {
 		expectCalls                []string
 		expectErr                  bool
 	}{
-		"should return error when container metadata does not exist": {
-			containerMetadata:          nil,
-			sandboxMetadata:            testSandboxMetadata,
+		"should return error when container does not exist": {
+			status:                     nil,
+			sandbox:                    testSandbox,
 			sandboxContainerdContainer: testSandboxContainer,
 			expectCalls:                []string{},
 			expectErr:                  true,
 		},
 		"should return error when container is not in created state": {
-			containerMetadata: &metadata.ContainerMetadata{
-				ID:        testID,
-				Name:      "test-name",
-				SandboxID: testSandboxID,
+			status: &containerstore.Status{
 				CreatedAt: time.Now().UnixNano(),
 				StartedAt: time.Now().UnixNano(),
 			},
-			sandboxMetadata:            testSandboxMetadata,
+			sandbox:                    testSandbox,
 			sandboxContainerdContainer: testSandboxContainer,
 			expectCalls:                []string{},
 			expectErr:                  true,
 		},
 		"should return error when container is in removing state": {
-			containerMetadata: &metadata.ContainerMetadata{
-				ID:        testID,
-				Name:      "test-name",
-				SandboxID: testSandboxID,
+			status: &containerstore.Status{
 				CreatedAt: time.Now().UnixNano(),
 				Removing:  true,
 			},
-			sandboxMetadata:            testSandboxMetadata,
+			sandbox:                    testSandbox,
 			sandboxContainerdContainer: testSandboxContainer,
 			expectCalls:                []string{},
 			expectErr:                  true,
 		},
 		"should return error when sandbox does not exist": {
-			containerMetadata:          testMetadata,
-			sandboxMetadata:            nil,
+			status:                     testStatus,
+			sandbox:                    nil,
 			sandboxContainerdContainer: testSandboxContainer,
 			expectStateChange:          true,
 			expectCalls:                []string{},
 			expectErr:                  true,
 		},
 		"should return error when sandbox is not running": {
-			containerMetadata: testMetadata,
-			sandboxMetadata:   testSandboxMetadata,
+			status:  testStatus,
+			sandbox: testSandbox,
 			sandboxContainerdContainer: &task.Task{
 				ID:     testSandboxID,
 				Pid:    uint32(4321),
@@ -121,8 +117,8 @@ func TestStartContainer(t *testing.T) {
 			expectErr:         true,
 		},
 		"should return error when snapshot mounts fails": {
-			containerMetadata:          testMetadata,
-			sandboxMetadata:            testSandboxMetadata,
+			status:                     testStatus,
+			sandbox:                    testSandbox,
 			sandboxContainerdContainer: testSandboxContainer,
 			snapshotMountsErr:          true,
 			expectStateChange:          true,
@@ -130,8 +126,8 @@ func TestStartContainer(t *testing.T) {
 			expectErr:                  true,
 		},
 		"should return error when fail to open streaming pipes": {
-			containerMetadata:          testMetadata,
-			sandboxMetadata:            testSandboxMetadata,
+			status:                     testStatus,
+			sandbox:                    testSandbox,
 			sandboxContainerdContainer: testSandboxContainer,
 			prepareFIFOErr:             errors.New("open error"),
 			expectStateChange:          true,
@@ -139,8 +135,8 @@ func TestStartContainer(t *testing.T) {
 			expectErr:                  true,
 		},
 		"should return error when fail to create container": {
-			containerMetadata:          testMetadata,
-			sandboxMetadata:            testSandboxMetadata,
+			status:                     testStatus,
+			sandbox:                    testSandbox,
 			sandboxContainerdContainer: testSandboxContainer,
 			createContainerErr:         errors.New("create error"),
 			expectStateChange:          true,
@@ -148,8 +144,8 @@ func TestStartContainer(t *testing.T) {
 			expectErr:                  true,
 		},
 		"should return error when fail to start container": {
-			containerMetadata:          testMetadata,
-			sandboxMetadata:            testSandboxMetadata,
+			status:                     testStatus,
+			sandbox:                    testSandbox,
 			sandboxContainerdContainer: testSandboxContainer,
 			startContainerErr:          errors.New("start error"),
 			expectStateChange:          true,
@@ -158,8 +154,8 @@ func TestStartContainer(t *testing.T) {
 			expectErr:   true,
 		},
 		"should be able to start container successfully": {
-			containerMetadata:          testMetadata,
-			sandboxMetadata:            testSandboxMetadata,
+			status:                     testStatus,
+			sandbox:                    testSandbox,
 			sandboxContainerdContainer: testSandboxContainer,
 			expectStateChange:          true,
 			expectCalls:                []string{"info", "create", "start"},
@@ -171,11 +167,16 @@ func TestStartContainer(t *testing.T) {
 		fake := c.taskService.(*servertesting.FakeExecutionClient)
 		fakeOS := c.os.(*ostesting.FakeOS)
 		fakeSnapshotClient := WithFakeSnapshotClient(c)
-		if test.containerMetadata != nil {
-			assert.NoError(t, c.containerStore.Create(*test.containerMetadata))
+		if test.status != nil {
+			cntr, err := containerstore.NewContainer(
+				testMetadata,
+				*test.status,
+			)
+			assert.NoError(t, err)
+			assert.NoError(t, c.containerStore.Add(cntr))
 		}
-		if test.sandboxMetadata != nil {
-			assert.NoError(t, c.sandboxStore.Create(*test.sandboxMetadata))
+		if test.sandbox != nil {
+			assert.NoError(t, c.sandboxStore.Add(*test.sandbox))
 		}
 		if test.sandboxContainerdContainer != nil {
 			fake.SetFakeTasks([]task.Task{*test.sandboxContainerdContainer})
@@ -206,35 +207,39 @@ func TestStartContainer(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotNil(t, resp)
 		}
-		// Check container state.
-		meta, err := c.containerStore.Get(testID)
-		if !test.expectStateChange {
-			// Do not check the error, because container may not exist
-			// in the test case.
-			assert.Equal(t, meta, test.containerMetadata)
+		// Skip following validation if no container is injected initially.
+		if test.status == nil {
 			continue
 		}
+		// Check container state.
+		cntr, err := c.containerStore.Get(testID)
 		assert.NoError(t, err)
-		require.NotNil(t, meta)
+		status := cntr.Status.Get()
+		if !test.expectStateChange {
+			assert.Equal(t, testMetadata, cntr.Metadata)
+			assert.Equal(t, *test.status, status)
+			continue
+		}
 		if test.expectErr {
 			t.Logf("container state should be in exited state when fail to start")
-			assert.Equal(t, runtime.ContainerState_CONTAINER_EXITED, meta.State())
-			assert.Zero(t, meta.Pid)
-			assert.EqualValues(t, errorStartExitCode, meta.ExitCode)
-			assert.Equal(t, errorStartReason, meta.Reason)
-			assert.NotEmpty(t, meta.Message)
+			assert.Equal(t, runtime.ContainerState_CONTAINER_EXITED, status.State())
+			assert.Zero(t, status.Pid)
+			assert.EqualValues(t, errorStartExitCode, status.ExitCode)
+			assert.Equal(t, errorStartReason, status.Reason)
+			assert.NotEmpty(t, status.Message)
 			_, err := fake.Info(context.Background(), &execution.InfoRequest{ContainerID: testID})
 			assert.True(t, isContainerdGRPCNotFoundError(err),
 				"containerd task should be cleaned up when fail to start")
 			continue
 		}
 		t.Logf("container state should be running when start successfully")
-		assert.Equal(t, runtime.ContainerState_CONTAINER_RUNNING, meta.State())
+		assert.Equal(t, runtime.ContainerState_CONTAINER_RUNNING, status.State())
 		info, err := fake.Info(context.Background(), &execution.InfoRequest{ContainerID: testID})
 		assert.NoError(t, err)
 		pid := info.Task.Pid
-		assert.Equal(t, pid, meta.Pid)
+		assert.Equal(t, pid, status.Pid)
 		assert.Equal(t, task.StatusRunning, info.Task.Status)
+		// Check runtime spec
 		calls := fake.GetCalledDetails()
 		createOpts, ok := calls[1].Argument.(*execution.CreateRequest)
 		assert.True(t, ok, "2nd call should be create")

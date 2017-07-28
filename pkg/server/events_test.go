@@ -27,8 +27,8 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
+	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 )
 
 func TestHandleEvent(t *testing.T) {
@@ -36,11 +36,13 @@ func TestHandleEvent(t *testing.T) {
 	testPid := uint32(1234)
 	testCreatedAt := time.Now().UnixNano()
 	testStartedAt := time.Now().UnixNano()
-	// Container metadata in running state.
-	testMetadata := metadata.ContainerMetadata{
+	testMetadata := containerstore.Metadata{
 		ID:        testID,
 		Name:      "test-name",
 		SandboxID: "test-sandbox-id",
+	}
+	// Container status in running state.
+	testStatus := containerstore.Status{
 		Pid:       testPid,
 		CreatedAt: testCreatedAt,
 		StartedAt: testStartedAt,
@@ -53,17 +55,14 @@ func TestHandleEvent(t *testing.T) {
 		ExitStatus: 1,
 		ExitedAt:   testExitedAt,
 	}
-	testFinishedMetadata := metadata.ContainerMetadata{
-		ID:         testID,
-		Name:       "test-name",
-		SandboxID:  "test-sandbox-id",
+	testFinishedStatus := containerstore.Status{
 		Pid:        0,
 		CreatedAt:  testCreatedAt,
 		StartedAt:  testStartedAt,
 		FinishedAt: testExitedAt.UnixNano(),
 		ExitCode:   1,
 	}
-	assert.Equal(t, runtime.ContainerState_CONTAINER_RUNNING, testMetadata.State())
+	assert.Equal(t, runtime.ContainerState_CONTAINER_RUNNING, testStatus.State())
 	testContainerdContainer := task.Task{
 		ID:     testID,
 		Pid:    testPid,
@@ -72,12 +71,12 @@ func TestHandleEvent(t *testing.T) {
 
 	for desc, test := range map[string]struct {
 		event               *task.Event
-		metadata            *metadata.ContainerMetadata
+		status              *containerstore.Status
 		containerdContainer *task.Task
 		containerdErr       error
-		expected            *metadata.ContainerMetadata
+		expected            *containerstore.Status
 	}{
-		"should not update state when no corresponding metadata for event": {
+		"should not update state when no corresponding container for event": {
 			event:    &testExitEvent,
 			expected: nil,
 		},
@@ -89,16 +88,16 @@ func TestHandleEvent(t *testing.T) {
 				ExitStatus: 1,
 				ExitedAt:   testExitedAt,
 			},
-			metadata:            &testMetadata,
+			status:              &testStatus,
 			containerdContainer: &testContainerdContainer,
-			expected:            &testMetadata,
+			expected:            &testStatus,
 		},
 		"should not update state when fail to delete containerd task": {
 			event:               &testExitEvent,
-			metadata:            &testMetadata,
+			status:              &testStatus,
 			containerdContainer: &testContainerdContainer,
 			containerdErr:       fmt.Errorf("random error"),
-			expected:            &testMetadata,
+			expected:            &testStatus,
 		},
 		"should not update state for irrelevant events": {
 			event: &task.Event{
@@ -106,31 +105,28 @@ func TestHandleEvent(t *testing.T) {
 				Type: task.Event_PAUSED,
 				Pid:  testPid,
 			},
-			metadata:            &testMetadata,
+			status:              &testStatus,
 			containerdContainer: &testContainerdContainer,
-			expected:            &testMetadata,
+			expected:            &testStatus,
 		},
 		"should update state when containerd task is already deleted": {
 			event:    &testExitEvent,
-			metadata: &testMetadata,
-			expected: &testFinishedMetadata,
+			status:   &testStatus,
+			expected: &testFinishedStatus,
 		},
 		"should update state when delete containerd task successfully": {
 			event:               &testExitEvent,
-			metadata:            &testMetadata,
+			status:              &testStatus,
 			containerdContainer: &testContainerdContainer,
-			expected:            &testFinishedMetadata,
+			expected:            &testFinishedStatus,
 		},
 		"should update exit reason when container is oom killed": {
 			event: &task.Event{
 				ID:   testID,
 				Type: task.Event_OOM,
 			},
-			metadata: &testMetadata,
-			expected: &metadata.ContainerMetadata{
-				ID:        testID,
-				Name:      "test-name",
-				SandboxID: "test-sandbox-id",
+			status: &testStatus,
+			expected: &containerstore.Status{
 				Pid:       testPid,
 				CreatedAt: testCreatedAt,
 				StartedAt: testStartedAt,
@@ -148,10 +144,14 @@ func TestHandleEvent(t *testing.T) {
 		if test.event != nil {
 			fakeEvents.Events <- test.event
 		}
-		// Inject metadata.
-		if test.metadata != nil {
-			// Make sure that original data will not be changed.
-			assert.NoError(t, c.containerStore.Create(*test.metadata))
+		// Inject internal container object.
+		if test.status != nil {
+			cntr, err := containerstore.NewContainer( // nolint: vetshadow
+				testMetadata,
+				*test.status,
+			)
+			assert.NoError(t, err)
+			assert.NoError(t, c.containerStore.Add(cntr))
 		}
 		// Inject containerd task.
 		if test.containerdContainer != nil {
@@ -161,8 +161,12 @@ func TestHandleEvent(t *testing.T) {
 		if test.containerdErr != nil {
 			fake.InjectError("delete", test.containerdErr)
 		}
-		c.handleEventStream(e)
-		got, _ := c.containerStore.Get(testID)
-		assert.Equal(t, test.expected, got)
+		assert.NoError(t, c.handleEventStream(e))
+		if test.expected == nil {
+			continue
+		}
+		got, err := c.containerStore.Get(testID)
+		assert.NoError(t, err)
+		assert.Equal(t, *test.expected, got.Status.Get())
 	}
 }

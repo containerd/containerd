@@ -35,7 +35,7 @@ import (
 	"golang.org/x/sys/unix"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
+	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
 )
 
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
@@ -65,22 +65,23 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		}
 	}()
 
-	// Create initial sandbox metadata.
-	meta := metadata.SandboxMetadata{
-		ID:     id,
-		Name:   name,
-		Config: config,
+	// Create initial internal sandbox object.
+	sandbox := sandboxstore.Sandbox{
+		Metadata: sandboxstore.Metadata{
+			ID:     id,
+			Name:   name,
+			Config: config,
+		},
 	}
 
 	// Ensure sandbox container image snapshot.
-	imageMeta, err := c.ensureImageExists(ctx, c.sandboxImage)
+	image, err := c.ensureImageExists(ctx, c.sandboxImage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox image %q: %v", defaultSandboxImage, err)
 	}
-
-	rootfsMounts, err := c.snapshotService.View(ctx, id, imageMeta.ChainID)
+	rootfsMounts, err := c.snapshotService.View(ctx, id, image.ChainID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to prepare sandbox rootfs %q: %v", imageMeta.ChainID, err)
+		return nil, fmt.Errorf("failed to prepare sandbox rootfs %q: %v", image.ChainID, err)
 	}
 	defer func() {
 		if retErr != nil {
@@ -99,7 +100,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	}
 
 	// Create sandbox container.
-	spec, err := c.generateSandboxContainerSpec(id, config, imageMeta.Config)
+	spec, err := c.generateSandboxContainerSpec(id, config, image.Config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox container spec: %v", err)
 	}
@@ -112,7 +113,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		Container: containers.Container{
 			ID: id,
 			// TODO(random-liu): Checkpoint metadata into container labels.
-			Image:   imageMeta.ID,
+			Image:   image.ID,
 			Runtime: defaultRuntime,
 			Spec: &prototypes.Any{
 				TypeUrl: runtimespec.Version,
@@ -205,19 +206,19 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		}
 	}()
 
-	meta.Pid = createResp.Pid
-	meta.NetNS = getNetworkNamespace(createResp.Pid)
+	sandbox.Pid = createResp.Pid
+	sandbox.NetNS = getNetworkNamespace(createResp.Pid)
 	if !config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostNetwork() {
 		// Setup network for sandbox.
 		// TODO(random-liu): [P2] Replace with permanent network namespace.
 		podName := config.GetMetadata().GetName()
-		if err = c.netPlugin.SetUpPod(meta.NetNS, config.GetMetadata().GetNamespace(), podName, id); err != nil {
+		if err = c.netPlugin.SetUpPod(sandbox.NetNS, config.GetMetadata().GetNamespace(), podName, id); err != nil {
 			return nil, fmt.Errorf("failed to setup network for sandbox %q: %v", id, err)
 		}
 		defer func() {
 			if retErr != nil {
 				// Teardown network if an error is returned.
-				if err := c.netPlugin.TearDownPod(meta.NetNS, config.GetMetadata().GetNamespace(), podName, id); err != nil {
+				if err := c.netPlugin.TearDownPod(sandbox.NetNS, config.GetMetadata().GetNamespace(), podName, id); err != nil {
 					glog.Errorf("failed to destroy network for sandbox %q: %v", id, err)
 				}
 			}
@@ -231,10 +232,9 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	}
 
 	// Add sandbox into sandbox store.
-	meta.CreatedAt = time.Now().UnixNano()
-	if err := c.sandboxStore.Create(meta); err != nil {
-		return nil, fmt.Errorf("failed to add sandbox metadata %+v into store: %v",
-			meta, err)
+	sandbox.CreatedAt = time.Now().UnixNano()
+	if err := c.sandboxStore.Add(sandbox); err != nil {
+		return nil, fmt.Errorf("failed to add sandbox %+v into store: %v", sandbox, err)
 	}
 
 	return &runtime.RunPodSandboxResponse{PodSandboxId: id}, nil

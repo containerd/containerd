@@ -50,10 +50,7 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 	// and container may still be so production should not rely on this behavior.
 	// TODO(random-liu): Delete the sandbox container before this after permanent network namespace
 	// is introduced, so that no container will be started after that.
-	containers, err := c.containerStore.List()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list all containers: %v", err)
-	}
+	containers := c.containerStore.List()
 	for _, container := range containers {
 		if container.SandboxID != id {
 			continue

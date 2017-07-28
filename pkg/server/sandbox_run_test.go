@@ -33,9 +33,9 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
+	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
 )
 
 func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
@@ -290,13 +290,13 @@ func TestRunPodSandbox(t *testing.T) {
 		return nopReadWriteCloser{}, nil
 	}
 	testChainID := "test-sandbox-chain-id"
-	imageMetadata := metadata.ImageMetadata{
+	image := imagestore.Image{
 		ID:      testSandboxImage,
 		ChainID: testChainID,
 		Config:  imageConfig,
 	}
-	// Insert sandbox image metadata.
-	assert.NoError(t, c.imageMetadataStore.Create(imageMetadata))
+	// Insert sandbox image.
+	c.imageStore.Add(image)
 	expectContainersClientCalls := []string{"create"}
 	expectSnapshotClientCalls := []string{"view"}
 	expectExecutionClientCalls := []string{"create", "start"}
@@ -349,25 +349,25 @@ func TestRunPodSandbox(t *testing.T) {
 	startID := calls[1].Argument.(*execution.StartRequest).ContainerID
 	assert.Equal(t, id, startID, "start id should be correct")
 
-	meta, err := c.sandboxStore.Get(id)
+	sandbox, err := c.sandboxStore.Get(id)
 	assert.NoError(t, err)
-	assert.Equal(t, id, meta.ID, "metadata id should be correct")
-	err = c.sandboxNameIndex.Reserve(meta.Name, "random-id")
-	assert.Error(t, err, "metadata name should be reserved")
-	assert.Equal(t, config, meta.Config, "metadata config should be correct")
+	assert.Equal(t, id, sandbox.ID, "sandbox id should be correct")
+	err = c.sandboxNameIndex.Reserve(sandbox.Name, "random-id")
+	assert.Error(t, err, "sandbox name should be reserved")
+	assert.Equal(t, config, sandbox.Config, "sandbox config should be correct")
 	// TODO(random-liu): [P2] Add clock interface and use fake clock.
-	assert.NotZero(t, meta.CreatedAt, "metadata CreatedAt should be set")
+	assert.NotZero(t, sandbox.CreatedAt, "sandbox CreatedAt should be set")
 	info, err := fakeExecutionClient.Info(context.Background(), &execution.InfoRequest{ContainerID: id})
 	assert.NoError(t, err)
 	pid := info.Task.Pid
-	assert.Equal(t, meta.NetNS, getNetworkNamespace(pid), "metadata network namespace should be correct")
+	assert.Equal(t, sandbox.NetNS, getNetworkNamespace(pid), "sandbox network namespace should be correct")
 
 	expectedCNICalls := []string{"SetUpPod"}
 	assert.Equal(t, expectedCNICalls, fakeCNIPlugin.GetCalledNames(), "expect SetUpPod should be called")
 	calls = fakeCNIPlugin.GetCalledDetails()
 	pluginArgument := calls[0].Argument.(servertesting.CNIPluginArgument)
 	expectedPluginArgument := servertesting.CNIPluginArgument{
-		NetnsPath:   meta.NetNS,
+		NetnsPath:   sandbox.NetNS,
 		Namespace:   config.GetMetadata().GetNamespace(),
 		Name:        config.GetMetadata().GetName(),
 		ContainerID: id,

@@ -17,13 +17,11 @@ limitations under the License.
 package server
 
 import (
-	"fmt"
-
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
+	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
 )
 
 // ListImages lists existing images.
@@ -37,12 +35,10 @@ func (c *criContainerdService) ListImages(ctx context.Context, r *runtime.ListIm
 		}
 	}()
 
-	imageMetadataA, err := c.imageMetadataStore.List()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list image metadata from store: %v", err)
-	}
+	imagesInStore := c.imageStore.List()
+
 	var images []*runtime.Image
-	for _, image := range imageMetadataA {
+	for _, image := range imagesInStore {
 		// TODO(random-liu): [P0] Make sure corresponding snapshot exists. What if snapshot
 		// doesn't exist?
 		images = append(images, toCRIImage(image))
@@ -51,8 +47,8 @@ func (c *criContainerdService) ListImages(ctx context.Context, r *runtime.ListIm
 	return &runtime.ListImagesResponse{Images: images}, nil
 }
 
-// toCRIImage converts image metadata to CRI image type.
-func toCRIImage(image *metadata.ImageMetadata) *runtime.Image {
+// toCRIImage converts image to CRI image type.
+func toCRIImage(image imagestore.Image) *runtime.Image {
 	runtimeImage := &runtime.Image{
 		Id:          image.ID,
 		RepoTags:    image.RepoTags,

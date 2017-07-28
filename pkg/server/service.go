@@ -31,11 +31,12 @@ import (
 	healthapi "google.golang.org/grpc/health/grpc_health_v1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
 	osinterface "github.com/kubernetes-incubator/cri-containerd/pkg/os"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/registrar"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/server/agents"
+	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
+	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
+	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
 )
 
 // k8sContainerdNamespace is the namespace we use to connect containerd.
@@ -57,19 +58,19 @@ type criContainerdService struct {
 	// sandboxImage is the image to use for sandbox container.
 	// TODO(random-liu): Make this configurable via flag.
 	sandboxImage string
-	// sandboxStore stores all sandbox metadata.
-	sandboxStore metadata.SandboxStore
-	// imageMetadataStore stores all image metadata.
-	imageMetadataStore metadata.ImageMetadataStore
+	// sandboxStore stores all resources associated with sandboxes.
+	sandboxStore *sandboxstore.Store
 	// sandboxNameIndex stores all sandbox names and make sure each name
 	// is unique.
 	sandboxNameIndex *registrar.Registrar
-	// containerStore stores all container metadata.
-	containerStore metadata.ContainerStore
+	// containerStore stores all resources associated with containers.
+	containerStore *containerstore.Store
 	// containerNameIndex stores all container names and make sure each
 	// name is unique.
 	containerNameIndex *registrar.Registrar
-	// containerService is containerd tasks client.
+	// imageStore stores all resources associated with images.
+	imageStore *imagestore.Store
+	// containerService is containerd containers client.
 	containerService containers.ContainersClient
 	// taskService is containerd tasks client.
 	taskService execution.TasksClient
@@ -96,7 +97,7 @@ type criContainerdService struct {
 
 // NewCRIContainerdService returns a new instance of CRIContainerdService
 func NewCRIContainerdService(containerdEndpoint, rootDir, networkPluginBinDir, networkPluginConfDir string) (CRIContainerdService, error) {
-	// TODO(random-liu): [P2] Recover from runtime state and metadata store.
+	// TODO(random-liu): [P2] Recover from runtime state and checkpoint.
 
 	client, err := containerd.New(containerdEndpoint, containerd.WithDefaultNamespace(k8sContainerdNamespace))
 	if err != nil {
@@ -107,9 +108,9 @@ func NewCRIContainerdService(containerdEndpoint, rootDir, networkPluginBinDir, n
 		os:                  osinterface.RealOS{},
 		rootDir:             rootDir,
 		sandboxImage:        defaultSandboxImage,
-		sandboxStore:        metadata.NewSandboxStore(store.NewMetadataStore()),
-		containerStore:      metadata.NewContainerStore(store.NewMetadataStore()),
-		imageMetadataStore:  metadata.NewImageMetadataStore(store.NewMetadataStore()),
+		sandboxStore:        sandboxstore.NewStore(),
+		containerStore:      containerstore.NewStore(),
+		imageStore:          imagestore.NewStore(),
 		sandboxNameIndex:    registrar.NewRegistrar(),
 		containerNameIndex:  registrar.NewRegistrar(),
 		containerService:    client.ContainerService(),

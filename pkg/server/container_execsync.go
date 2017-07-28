@@ -45,15 +45,16 @@ func (c *criContainerdService) ExecSync(ctx context.Context, r *runtime.ExecSync
 		}
 	}()
 
-	// Get container metadata from our container store.
-	meta, err := c.containerStore.Get(r.GetContainerId())
+	// Get container from our container store.
+	cntr, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find container %q: %v", r.GetContainerId(), err)
 	}
-	id := meta.ID
+	id := cntr.ID
 
-	if meta.State() != runtime.ContainerState_CONTAINER_RUNNING {
-		return nil, fmt.Errorf("container %q is in %s state", id, criContainerStateToString(meta.State()))
+	state := cntr.Status.Get().State()
+	if state != runtime.ContainerState_CONTAINER_RUNNING {
+		return nil, fmt.Errorf("container %q is in %s state", id, criContainerStateToString(state))
 	}
 
 	// Get exec process spec.

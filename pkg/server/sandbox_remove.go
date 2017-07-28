@@ -26,7 +26,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
+	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
 )
 
 // RemovePodSandbox removes the sandbox. If there are running containers in the
@@ -41,7 +41,7 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
-		if !metadata.IsNotExistError(err) {
+		if err != store.ErrNotExist {
 			return nil, fmt.Errorf("an error occurred when try to find sandbox %q: %v",
 				r.GetPodSandboxId(), err)
 		}
@@ -76,10 +76,7 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 	// not rely on this behavior.
 	// TODO(random-liu): Introduce an intermediate state to avoid container creation after
 	// this point.
-	cntrs, err := c.containerStore.List()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list all containers: %v", err)
-	}
+	cntrs := c.containerStore.List()
 	for _, cntr := range cntrs {
 		if cntr.SandboxID != id {
 			continue
@@ -107,15 +104,12 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 		glog.V(5).Infof("Remove called for sandbox container %q that does not exist", id, err)
 	}
 
-	// Remove sandbox metadata from metadata store. Note that once the sandbox
-	// metadata is successfully deleted:
+	// Remove sandbox from sandbox store. Note that once the sandbox is successfully
+	// deleted:
 	// 1) ListPodSandbox will not include this sandbox.
 	// 2) PodSandboxStatus and StopPodSandbox will return error.
-	// 3) On-going operations which have held the metadata reference will not be
-	// affected.
-	if err := c.sandboxStore.Delete(id); err != nil {
-		return nil, fmt.Errorf("failed to delete sandbox metadata for %q: %v", id, err)
-	}
+	// 3) On-going operations which have held the reference will not be affected.
+	c.sandboxStore.Delete(id)
 
 	// Release the sandbox name reserved for the sandbox.
 	c.sandboxNameIndex.ReleaseByKey(id)

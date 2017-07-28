@@ -24,58 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
-
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 )
-
-func TestUpdateImageMetadata(t *testing.T) {
-	meta := metadata.ImageMetadata{
-		ID:      "test-id",
-		ChainID: "test-chain-id",
-		Size:    1234,
-	}
-	for desc, test := range map[string]struct {
-		repoTags            []string
-		repoDigests         []string
-		repoTag             string
-		repoDigest          string
-		expectedRepoTags    []string
-		expectedRepoDigests []string
-	}{
-		"Add duplicated repo tag and digest": {
-			repoTags:            []string{"a", "b"},
-			repoDigests:         []string{"c", "d"},
-			repoTag:             "a",
-			repoDigest:          "c",
-			expectedRepoTags:    []string{"a", "b"},
-			expectedRepoDigests: []string{"c", "d"},
-		},
-		"Add new repo tag and digest": {
-			repoTags:            []string{"a", "b"},
-			repoDigests:         []string{"c", "d"},
-			repoTag:             "e",
-			repoDigest:          "f",
-			expectedRepoTags:    []string{"a", "b", "e"},
-			expectedRepoDigests: []string{"c", "d", "f"},
-		},
-		"Add empty repo tag and digest": {
-			repoTags:            []string{"a", "b"},
-			repoDigests:         []string{"c", "d"},
-			repoTag:             "",
-			repoDigest:          "",
-			expectedRepoTags:    []string{"a", "b"},
-			expectedRepoDigests: []string{"c", "d"},
-		},
-	} {
-		t.Logf("TestCase %q", desc)
-		m := meta
-		m.RepoTags = test.repoTags
-		m.RepoDigests = test.repoDigests
-		updateImageMetadata(&m, test.repoTag, test.repoDigest)
-		assert.Equal(t, test.expectedRepoTags, m.RepoTags)
-		assert.Equal(t, test.expectedRepoDigests, m.RepoDigests)
-	}
-}
 
 func TestResources(t *testing.T) {
 	const threads = 10

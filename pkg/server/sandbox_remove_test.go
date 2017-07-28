@@ -27,21 +27,25 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
+	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
+	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
+	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
 )
 
 func TestRemovePodSandbox(t *testing.T) {
 	testID := "test-id"
 	testName := "test-name"
-	testMetadata := metadata.SandboxMetadata{
-		ID:   testID,
-		Name: testName,
+	testSandbox := sandboxstore.Sandbox{
+		Metadata: sandboxstore.Metadata{
+			ID:   testID,
+			Name: testName,
+		},
 	}
 	for desc, test := range map[string]struct {
 		sandboxTasks       []task.Task
-		injectMetadata     bool
+		injectSandbox      bool
 		removeSnapshotErr  error
 		deleteContainerErr error
 		taskInfoErr        error
@@ -51,60 +55,60 @@ func TestRemovePodSandbox(t *testing.T) {
 		expectCalls        []string
 	}{
 		"should not return error if sandbox does not exist": {
-			injectMetadata:     false,
+			injectSandbox:      false,
 			removeSnapshotErr:  servertesting.SnapshotNotExistError,
 			deleteContainerErr: servertesting.ContainerNotExistError,
 			expectErr:          false,
 			expectCalls:        []string{},
 		},
 		"should not return error if snapshot does not exist": {
-			injectMetadata:    true,
+			injectSandbox:     true,
 			removeSnapshotErr: servertesting.SnapshotNotExistError,
 			expectRemoved:     getSandboxRootDir(testRootDir, testID),
 			expectCalls:       []string{"info"},
 		},
 		"should return error if remove snapshot fails": {
-			injectMetadata:    true,
+			injectSandbox:     true,
 			removeSnapshotErr: fmt.Errorf("arbitrary error"),
 			expectErr:         true,
 			expectCalls:       []string{"info"},
 		},
 		"should return error when sandbox container task is not deleted": {
-			injectMetadata: true,
-			sandboxTasks:   []task.Task{{ID: testID}},
-			expectErr:      true,
-			expectCalls:    []string{"info"},
+			injectSandbox: true,
+			sandboxTasks:  []task.Task{{ID: testID}},
+			expectErr:     true,
+			expectCalls:   []string{"info"},
 		},
 		"should return error when arbitrary containerd error is injected": {
-			injectMetadata: true,
-			taskInfoErr:    fmt.Errorf("arbitrary error"),
-			expectErr:      true,
-			expectCalls:    []string{"info"},
+			injectSandbox: true,
+			taskInfoErr:   fmt.Errorf("arbitrary error"),
+			expectErr:     true,
+			expectCalls:   []string{"info"},
 		},
 		"should return error when error fs error is injected": {
-			injectMetadata: true,
-			injectFSErr:    fmt.Errorf("fs error"),
-			expectRemoved:  getSandboxRootDir(testRootDir, testID),
-			expectErr:      true,
-			expectCalls:    []string{"info"},
+			injectSandbox: true,
+			injectFSErr:   fmt.Errorf("fs error"),
+			expectRemoved: getSandboxRootDir(testRootDir, testID),
+			expectErr:     true,
+			expectCalls:   []string{"info"},
 		},
 		"should not return error if sandbox container does not exist": {
-			injectMetadata:     true,
+			injectSandbox:      true,
 			deleteContainerErr: servertesting.ContainerNotExistError,
 			expectRemoved:      getSandboxRootDir(testRootDir, testID),
 			expectCalls:        []string{"info"},
 		},
 		"should return error if delete sandbox container fails": {
-			injectMetadata:     true,
+			injectSandbox:      true,
 			deleteContainerErr: fmt.Errorf("arbitrary error"),
 			expectRemoved:      getSandboxRootDir(testRootDir, testID),
 			expectErr:          true,
 			expectCalls:        []string{"info"},
 		},
 		"should be able to successfully delete": {
-			injectMetadata: true,
-			expectRemoved:  getSandboxRootDir(testRootDir, testID),
-			expectCalls:    []string{"info"},
+			injectSandbox: true,
+			expectRemoved: getSandboxRootDir(testRootDir, testID),
+			expectCalls:   []string{"info"},
 		},
 	} {
 		t.Logf("TestCase %q", desc)
@@ -114,9 +118,9 @@ func TestRemovePodSandbox(t *testing.T) {
 		fakeExecutionClient := c.taskService.(*servertesting.FakeExecutionClient)
 		fakeSnapshotClient := WithFakeSnapshotClient(c)
 		fakeExecutionClient.SetFakeTasks(test.sandboxTasks)
-		if test.injectMetadata {
+		if test.injectSandbox {
 			c.sandboxNameIndex.Reserve(testName, testID)
-			c.sandboxStore.Create(testMetadata)
+			assert.NoError(t, c.sandboxStore.Add(testSandbox))
 		}
 		if test.removeSnapshotErr == nil {
 			fakeSnapshotClient.SetFakeMounts(testID, []*mount.Mount{
@@ -157,10 +161,8 @@ func TestRemovePodSandbox(t *testing.T) {
 		assert.NotNil(t, res)
 		assert.NoError(t, c.sandboxNameIndex.Reserve(testName, testID),
 			"sandbox name should be released")
-		meta, err := c.sandboxStore.Get(testID)
-		assert.Error(t, err)
-		assert.True(t, metadata.IsNotExistError(err))
-		assert.Nil(t, meta, "sandbox metadata should be removed")
+		_, err = c.sandboxStore.Get(testID)
+		assert.Equal(t, store.ErrNotExist, err, "sandbox should be removed")
 		mountsResp, err := fakeSnapshotClient.Mounts(context.Background(), &snapshotapi.MountsRequest{Key: testID})
 		assert.Equal(t, servertesting.SnapshotNotExistError, err, "snapshot should be removed")
 		assert.Nil(t, mountsResp)
@@ -178,38 +180,49 @@ func TestRemovePodSandbox(t *testing.T) {
 func TestRemoveContainersInSandbox(t *testing.T) {
 	testID := "test-id"
 	testName := "test-name"
-	testMetadata := metadata.SandboxMetadata{
-		ID:   testID,
-		Name: testName,
+	testSandbox := sandboxstore.Sandbox{
+		Metadata: sandboxstore.Metadata{
+			ID:   testID,
+			Name: testName,
+		},
 	}
-	testContainersMetadata := []*metadata.ContainerMetadata{
+	testContainers := []containerForTest{
 		{
-			ID:         "test-cid-1",
-			Name:       "test-cname-1",
-			SandboxID:  testID,
-			FinishedAt: time.Now().UnixNano(),
+			metadata: containerstore.Metadata{
+				ID:        "test-cid-1",
+				Name:      "test-cname-1",
+				SandboxID: testID,
+			},
+			status: containerstore.Status{FinishedAt: time.Now().UnixNano()},
 		},
 		{
-			ID:         "test-cid-2",
-			Name:       "test-cname-2",
-			SandboxID:  testID,
-			FinishedAt: time.Now().UnixNano(),
+			metadata: containerstore.Metadata{
+
+				ID:        "test-cid-2",
+				Name:      "test-cname-2",
+				SandboxID: testID,
+			},
+			status: containerstore.Status{FinishedAt: time.Now().UnixNano()},
 		},
 		{
-			ID:         "test-cid-3",
-			Name:       "test-cname-3",
-			SandboxID:  "other-sandbox-id",
-			FinishedAt: time.Now().UnixNano(),
+			metadata: containerstore.Metadata{
+				ID:        "test-cid-3",
+				Name:      "test-cname-3",
+				SandboxID: "other-sandbox-id",
+			},
+			status: containerstore.Status{FinishedAt: time.Now().UnixNano()},
 		},
 	}
 
 	c := newTestCRIContainerdService()
 	WithFakeSnapshotClient(c)
 	assert.NoError(t, c.sandboxNameIndex.Reserve(testName, testID))
-	assert.NoError(t, c.sandboxStore.Create(testMetadata))
-	for _, cntr := range testContainersMetadata {
-		assert.NoError(t, c.containerNameIndex.Reserve(cntr.Name, cntr.ID))
-		assert.NoError(t, c.containerStore.Create(*cntr))
+	assert.NoError(t, c.sandboxStore.Add(testSandbox))
+	for _, tc := range testContainers {
+		assert.NoError(t, c.containerNameIndex.Reserve(tc.metadata.Name, tc.metadata.ID))
+		cntr, err := tc.toContainer()
+		assert.NoError(t, err)
+		assert.NoError(t, c.containerStore.Add(cntr))
 	}
 
 	res, err := c.RemovePodSandbox(context.Background(), &runtime.RemovePodSandboxRequest{
@@ -218,12 +231,11 @@ func TestRemoveContainersInSandbox(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 
-	meta, err := c.sandboxStore.Get(testID)
-	assert.Error(t, err)
-	assert.True(t, metadata.IsNotExistError(err))
-	assert.Nil(t, meta, "sandbox metadata should be removed")
+	_, err = c.sandboxStore.Get(testID)
+	assert.Equal(t, store.ErrNotExist, err, "sandbox metadata should be removed")
 
-	cntrs, err := c.containerStore.List()
-	assert.NoError(t, err)
-	assert.Equal(t, testContainersMetadata[2:], cntrs, "container metadata should be removed")
+	cntrs := c.containerStore.List()
+	assert.Len(t, cntrs, 1)
+	assert.Equal(t, testContainers[2].metadata, cntrs[0].Metadata, "container should be removed")
+	assert.Equal(t, testContainers[2].status, cntrs[0].Status.Get(), "container should be removed")
 }

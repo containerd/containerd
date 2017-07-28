@@ -37,7 +37,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
+	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
 )
 
 // For image management:
@@ -87,60 +87,41 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 				r.GetImage().GetImage(), retRes.GetImageRef())
 		}
 	}()
-	image := r.GetImage().GetImage()
+	imageRef := r.GetImage().GetImage()
 
 	// TODO(mikebrow): add truncIndex for image id
-	imageID, repoTag, repoDigest, err := c.pullImage(ctx, image, r.GetAuth())
+	imageID, repoTag, repoDigest, err := c.pullImage(ctx, imageRef, r.GetAuth())
 	if err != nil {
-		return nil, fmt.Errorf("failed to pull image %q: %v", image, err)
+		return nil, fmt.Errorf("failed to pull image %q: %v", imageRef, err)
 	}
-	glog.V(4).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q", image, imageID,
+	glog.V(4).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q", imageRef, imageID,
 		repoTag, repoDigest)
 
-	_, err = c.imageMetadataStore.Get(imageID)
-	if err != nil && !metadata.IsNotExistError(err) {
-		return nil, fmt.Errorf("failed to get image %q metadata: %v", imageID, err)
-	}
-	// There is a known race here because the image metadata could be created after `Get`.
-	// TODO(random-liu): [P1] Do not use metadata store. Use simple in-memory data structure to
-	// maintain the id -> information index. And use the container image store as backup and
-	// recover in-memory state during startup.
-	if err == nil {
-		// Update existing image metadata.
-		if err := c.imageMetadataStore.Update(imageID, func(m metadata.ImageMetadata) (metadata.ImageMetadata, error) {
-			updateImageMetadata(&m, repoTag, repoDigest)
-			return m, nil
-		}); err != nil {
-			return nil, fmt.Errorf("failed to update image %q metadata: %v", imageID, err)
-		}
-		return &runtime.PullImageResponse{ImageRef: imageID}, err
-	}
-
 	// Get image information.
-	chainID, size, config, err := c.getImageInfo(ctx, image)
+	chainID, size, config, err := c.getImageInfo(ctx, imageRef)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get image %q information: %v", image, err)
+		return nil, fmt.Errorf("failed to get image %q information: %v", imageRef, err)
 	}
-
-	// NOTE(random-liu): the actual state in containerd is the source of truth, even we maintain
-	// in-memory image metadata, it's only for in-memory indexing. The image could be removed
-	// by someone else anytime, before/during/after we create the metadata. We should always
-	// check the actual state in containerd before using the image or returning status of the
-	// image.
-
-	// Create corresponding image metadata.
-	newMeta := metadata.ImageMetadata{
+	image := imagestore.Image{
 		ID:      imageID,
 		ChainID: chainID.String(),
 		Size:    size,
 		Config:  config,
 	}
-	// Add the image reference used into repo tags. Note if the image is pulled with
-	// repo digest, it will also be added in to repo tags, which is fine.
-	updateImageMetadata(&newMeta, repoTag, repoDigest)
-	if err := c.imageMetadataStore.Create(newMeta); err != nil {
-		return nil, fmt.Errorf("failed to create image %q metadata: %v", imageID, err)
+
+	if repoDigest != "" {
+		image.RepoDigests = []string{repoDigest}
 	}
+	if repoTag != "" {
+		image.RepoTags = []string{repoTag}
+	}
+	c.imageStore.Add(image)
+
+	// NOTE(random-liu): the actual state in containerd is the source of truth, even we maintain
+	// in-memory image store, it's only for in-memory indexing. The image could be removed
+	// by someone else anytime, before/during/after we create the metadata. We should always
+	// check the actual state in containerd before using the image or returning status of the
+	// image.
 	return &runtime.PullImageResponse{ImageRef: imageID}, err
 }
 
@@ -391,31 +372,5 @@ func (c *criContainerdService) waitForResourcesDownloading(ctx context.Context, 
 			// TODO(random-liu): Abort ongoing pulling if cancelled.
 			return fmt.Errorf("image resources pulling is cancelled")
 		}
-	}
-}
-
-// insertToStringSlice is a helper function to insert a string into the string slice
-// if the string is not in the slice yet.
-func insertToStringSlice(ss []string, s string) []string {
-	found := false
-	for _, str := range ss {
-		if s == str {
-			found = true
-			break
-		}
-	}
-	if !found {
-		ss = append(ss, s)
-	}
-	return ss
-}
-
-// updateImageMetadata updates existing image meta with new repoTag and repoDigest.
-func updateImageMetadata(meta *metadata.ImageMetadata, repoTag, repoDigest string) {
-	if repoTag != "" {
-		meta.RepoTags = insertToStringSlice(meta.RepoTags, repoTag)
-	}
-	if repoDigest != "" {
-		meta.RepoDigests = insertToStringSlice(meta.RepoDigests, repoDigest)
 	}
 }

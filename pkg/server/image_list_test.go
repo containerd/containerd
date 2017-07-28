@@ -25,12 +25,12 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
+	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
 )
 
 func TestListImages(t *testing.T) {
 	c := newTestCRIContainerdService()
-	imagesInStore := []metadata.ImageMetadata{
+	imagesInStore := []imagestore.Image{
 		{
 			ID:          "test-id-1",
 			ChainID:     "test-chainid-1",
@@ -87,7 +87,7 @@ func TestListImages(t *testing.T) {
 	}
 
 	for _, i := range imagesInStore {
-		assert.NoError(t, c.imageMetadataStore.Create(i))
+		c.imageStore.Add(i)
 	}
 
 	resp, err := c.ListImages(context.Background(), &runtime.ListImagesRequest{})

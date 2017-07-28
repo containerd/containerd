@@ -27,7 +27,8 @@ import (
 	"golang.org/x/sys/unix"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
+	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
+	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 )
 
 const (
@@ -50,12 +51,12 @@ func (c *criContainerdService) StopContainer(ctx context.Context, r *runtime.Sto
 	}()
 
 	// Get container config from container store.
-	meta, err := c.containerStore.Get(r.GetContainerId())
+	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find container %q: %v", r.GetContainerId(), err)
 	}
 
-	if err := c.stopContainer(ctx, meta, time.Duration(r.GetTimeout())*time.Second); err != nil {
+	if err := c.stopContainer(ctx, container, time.Duration(r.GetTimeout())*time.Second); err != nil {
 		return nil, err
 	}
 
@@ -63,32 +64,33 @@ func (c *criContainerdService) StopContainer(ctx context.Context, r *runtime.Sto
 }
 
 // stopContainer stops a container based on the container metadata.
-func (c *criContainerdService) stopContainer(ctx context.Context, meta *metadata.ContainerMetadata, timeout time.Duration) error {
-	id := meta.ID
+func (c *criContainerdService) stopContainer(ctx context.Context, container containerstore.Container, timeout time.Duration) error {
+	id := container.ID
 
 	// Return without error if container is not running. This makes sure that
 	// stop only takes real action after the container is started.
-	if meta.State() != runtime.ContainerState_CONTAINER_RUNNING {
+	state := container.Status.Get().State()
+	if state != runtime.ContainerState_CONTAINER_RUNNING {
 		glog.V(2).Infof("Container to stop %q is not running, current state %q",
-			id, criContainerStateToString(meta.State()))
+			id, criContainerStateToString(state))
 		return nil
 	}
 
 	if timeout > 0 {
 		stopSignal := unix.SIGTERM
-		imageMeta, err := c.imageMetadataStore.Get(meta.ImageRef)
+		image, err := c.imageStore.Get(container.ImageRef)
 		if err != nil {
 			// NOTE(random-liu): It's possible that the container is stopped,
 			// deleted and image is garbage collected before this point. However,
 			// the chance is really slim, even it happens, it's still fine to return
 			// an error here.
-			return fmt.Errorf("failed to get image metadata %q: %v", meta.ImageRef, err)
+			return fmt.Errorf("failed to get image metadata %q: %v", container.ImageRef, err)
 		}
-		if imageMeta.Config.StopSignal != "" {
-			stopSignal, err = signal.ParseSignal(imageMeta.Config.StopSignal)
+		if image.Config.StopSignal != "" {
+			stopSignal, err = signal.ParseSignal(image.Config.StopSignal)
 			if err != nil {
 				return fmt.Errorf("failed to parse stop signal %q: %v",
-					imageMeta.Config.StopSignal, err)
+					image.Config.StopSignal, err)
 			}
 		}
 		glog.V(2).Infof("Stop container %q with signal %v", id, stopSignal)
@@ -140,10 +142,10 @@ func (c *criContainerdService) waitContainerStop(ctx context.Context, id string,
 	defer timeoutTimer.Stop()
 	for {
 		// Poll once before waiting for stopCheckPollInterval.
-		meta, err := c.containerStore.Get(id)
+		container, err := c.containerStore.Get(id)
 		if err != nil {
-			if !metadata.IsNotExistError(err) {
-				return fmt.Errorf("failed to get container %q metadata: %v", id, err)
+			if err != store.ErrNotExist {
+				return fmt.Errorf("failed to get container %q: %v", id, err)
 			}
 			// Do not return error here because container was removed means
 			// it is already stopped.
@@ -151,7 +153,7 @@ func (c *criContainerdService) waitContainerStop(ctx context.Context, id string,
 			return nil
 		}
 		// TODO(random-liu): Use channel with event handler instead of polling.
-		if meta.State() == runtime.ContainerState_CONTAINER_EXITED {
+		if container.Status.Get().State() == runtime.ContainerState_CONTAINER_EXITED {
 			return nil
 		}
 		select {

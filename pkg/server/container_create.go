@@ -32,7 +32,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
+	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 )
 
 // CreateContainer creates a new container in the given PodSandbox.
@@ -58,7 +58,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	// the same container.
 	id := generateID()
 	name := makeContainerName(config.GetMetadata(), sandboxConfig.GetMetadata())
-	if err := c.containerNameIndex.Reserve(name, id); err != nil {
+	if err = c.containerNameIndex.Reserve(name, id); err != nil {
 		return nil, fmt.Errorf("failed to reserve container name %q: %v", name, err)
 	}
 	defer func() {
@@ -68,8 +68,8 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 		}
 	}()
 
-	// Create initial container metadata.
-	meta := metadata.ContainerMetadata{
+	// Create initial internal container metadata.
+	meta := containerstore.Metadata{
 		ID:        id,
 		Name:      name,
 		SandboxID: sandboxID,
@@ -78,18 +78,18 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 
 	// Prepare container image snapshot. For container, the image should have
 	// been pulled before creating the container, so do not ensure the image.
-	image := config.GetImage().GetImage()
-	imageMeta, err := c.localResolve(ctx, image)
+	imageRef := config.GetImage().GetImage()
+	image, err := c.localResolve(ctx, imageRef)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve image %q: %v", image, err)
+		return nil, fmt.Errorf("failed to resolve image %q: %v", imageRef, err)
 	}
-	if imageMeta == nil {
-		return nil, fmt.Errorf("image %q not found", image)
+	if image == nil {
+		return nil, fmt.Errorf("image %q not found", imageRef)
 	}
 
 	// Generate container runtime spec.
 	mounts := c.generateContainerMounts(getSandboxRootDir(c.rootDir, sandboxID), config)
-	spec, err := c.generateContainerSpec(id, sandbox.Pid, config, sandboxConfig, imageMeta.Config, mounts)
+	spec, err := c.generateContainerSpec(id, sandbox.Pid, config, sandboxConfig, image.Config, mounts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate container %q spec: %v", id, err)
 	}
@@ -101,12 +101,12 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 
 	// Prepare container rootfs.
 	if config.GetLinux().GetSecurityContext().GetReadonlyRootfs() {
-		if _, err := c.snapshotService.View(ctx, id, imageMeta.ChainID); err != nil {
-			return nil, fmt.Errorf("failed to view container rootfs %q: %v", imageMeta.ChainID, err)
+		if _, err := c.snapshotService.View(ctx, id, image.ChainID); err != nil {
+			return nil, fmt.Errorf("failed to view container rootfs %q: %v", image.ChainID, err)
 		}
 	} else {
-		if _, err := c.snapshotService.Prepare(ctx, id, imageMeta.ChainID); err != nil {
-			return nil, fmt.Errorf("failed to prepare container rootfs %q: %v", imageMeta.ChainID, err)
+		if _, err := c.snapshotService.Prepare(ctx, id, image.ChainID); err != nil {
+			return nil, fmt.Errorf("failed to prepare container rootfs %q: %v", image.ChainID, err)
 		}
 	}
 	defer func() {
@@ -116,18 +116,18 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 			}
 		}
 	}()
-	meta.ImageRef = imageMeta.ID
+	meta.ImageRef = image.ID
 
 	// Create container root directory.
 	containerRootDir := getContainerRootDir(c.rootDir, id)
-	if err := c.os.MkdirAll(containerRootDir, 0755); err != nil {
+	if err = c.os.MkdirAll(containerRootDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create container root directory %q: %v",
 			containerRootDir, err)
 	}
 	defer func() {
 		if retErr != nil {
 			// Cleanup the container root directory.
-			if err := c.os.RemoveAll(containerRootDir); err != nil {
+			if err = c.os.RemoveAll(containerRootDir); err != nil {
 				glog.Errorf("Failed to remove container root directory %q: %v",
 					containerRootDir, err)
 			}
@@ -139,7 +139,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 		Container: containers.Container{
 			ID: id,
 			// TODO(random-liu): Checkpoint metadata into container labels.
-			Image:   imageMeta.ID,
+			Image:   image.ID,
 			Runtime: defaultRuntime,
 			Spec: &prototypes.Any{
 				TypeUrl: runtimespec.Version,
@@ -158,12 +158,23 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 		}
 	}()
 
-	// Update container CreatedAt.
-	meta.CreatedAt = time.Now().UnixNano()
+	container, err := containerstore.NewContainer(meta, containerstore.Status{CreatedAt: time.Now().UnixNano()})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create internal container object for %q: %v",
+			id, err)
+	}
+	defer func() {
+		if retErr != nil {
+			// Cleanup container checkpoint on error.
+			if err := container.Delete(); err != nil {
+				glog.Errorf("Failed to cleanup container checkpoint for %q: %v", id, err)
+			}
+		}
+	}()
+
 	// Add container into container store.
-	if err := c.containerStore.Create(meta); err != nil {
-		return nil, fmt.Errorf("failed to add container metadata %+v into store: %v",
-			meta, err)
+	if err := c.containerStore.Add(container); err != nil {
+		return nil, fmt.Errorf("failed to add container %q into store: %v", id, err)
 	}
 
 	return &runtime.CreateContainerResponse{ContainerId: id}, nil

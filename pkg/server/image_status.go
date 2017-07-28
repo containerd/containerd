@@ -35,28 +35,28 @@ func (c *criContainerdService) ImageStatus(ctx context.Context, r *runtime.Image
 				r.GetImage().GetImage(), retRes.GetImage())
 		}
 	}()
-	meta, err := c.localResolve(ctx, r.GetImage().GetImage())
+	image, err := c.localResolve(ctx, r.GetImage().GetImage())
 	if err != nil {
 		return nil, fmt.Errorf("can not resolve %q locally: %v", r.GetImage().GetImage(), err)
 	}
-	if meta == nil {
+	if image == nil {
 		// return empty without error when image not found.
 		return &runtime.ImageStatusResponse{}, nil
 	}
 	// TODO(random-liu): [P0] Make sure corresponding snapshot exists. What if snapshot
 	// doesn't exist?
 	runtimeImage := &runtime.Image{
-		Id:          meta.ID,
-		RepoTags:    meta.RepoTags,
-		RepoDigests: meta.RepoDigests,
-		Size_:       uint64(meta.Size),
+		Id:          image.ID,
+		RepoTags:    image.RepoTags,
+		RepoDigests: image.RepoDigests,
+		Size_:       uint64(image.Size),
 	}
-	uid, username := getUserFromImage(meta.Config.User)
+	uid, username := getUserFromImage(image.Config.User)
 	if uid != nil {
 		runtimeImage.Uid = &runtime.Int64Value{Value: *uid}
 	}
 	runtimeImage.Username = username
 
-	// TODO(mikebrow): write a ImageMetadata to runtim.Image converter
+	// TODO(mikebrow): write a ImageMetadata to runtime.Image converter
 	return &runtime.ImageStatusResponse{Image: runtimeImage}, nil
 }

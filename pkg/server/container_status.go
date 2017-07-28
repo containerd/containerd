@@ -21,10 +21,9 @@ import (
 
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
-
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
+	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 )
 
 // ContainerStatus inspects the container and returns the status.
@@ -36,22 +35,23 @@ func (c *criContainerdService) ContainerStatus(ctx context.Context, r *runtime.C
 		}
 	}()
 
-	meta, err := c.containerStore.Get(r.GetContainerId())
+	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find container %q: %v", r.GetContainerId(), err)
 	}
 
 	return &runtime.ContainerStatusResponse{
-		Status: toCRIContainerStatus(meta),
+		Status: toCRIContainerStatus(container),
 	}, nil
 }
 
-// toCRIContainerStatus converts container metadata to CRI container status.
-func toCRIContainerStatus(meta *metadata.ContainerMetadata) *runtime.ContainerStatus {
-	state := meta.State()
-	reason := meta.Reason
-	if state == runtime.ContainerState_CONTAINER_EXITED && reason == "" {
-		if meta.ExitCode == 0 {
+// toCRIContainerStatus converts internal container object to CRI container status.
+func toCRIContainerStatus(container containerstore.Container) *runtime.ContainerStatus {
+	meta := container.Metadata
+	status := container.Status.Get()
+	reason := status.Reason
+	if status.State() == runtime.ContainerState_CONTAINER_EXITED && reason == "" {
+		if status.ExitCode == 0 {
 			reason = completeExitReason
 		} else {
 			reason = errorExitReason
@@ -60,15 +60,15 @@ func toCRIContainerStatus(meta *metadata.ContainerMetadata) *runtime.ContainerSt
 	return &runtime.ContainerStatus{
 		Id:          meta.ID,
 		Metadata:    meta.Config.GetMetadata(),
-		State:       state,
-		CreatedAt:   meta.CreatedAt,
-		StartedAt:   meta.StartedAt,
-		FinishedAt:  meta.FinishedAt,
-		ExitCode:    meta.ExitCode,
+		State:       status.State(),
+		CreatedAt:   status.CreatedAt,
+		StartedAt:   status.StartedAt,
+		FinishedAt:  status.FinishedAt,
+		ExitCode:    status.ExitCode,
 		Image:       meta.Config.GetImage(),
 		ImageRef:    meta.ImageRef,
 		Reason:      reason,
-		Message:     meta.Message,
+		Message:     status.Message,
 		Labels:      meta.Config.GetLabels(),
 		Annotations: meta.Config.GetAnnotations(),
 		Mounts:      meta.Config.GetMounts(),
