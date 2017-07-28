@@ -103,6 +103,25 @@ func (b *snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, erro
 	return info, nil
 }
 
+func (o *snapshotter) Update(ctx context.Context, info snapshot.Info, fieldpaths ...string) (snapshot.Info, error) {
+	ctx, t, err := o.ms.TransactionContext(ctx, true)
+	if err != nil {
+		return snapshot.Info{}, err
+	}
+
+	info, err = storage.UpdateInfo(ctx, info, fieldpaths...)
+	if err != nil {
+		t.Rollback()
+		return snapshot.Info{}, err
+	}
+
+	if err := t.Commit(); err != nil {
+		return snapshot.Info{}, err
+	}
+
+	return info, nil
+}
+
 // Usage retrieves the disk usage of the top-level snapshot.
 func (b *snapshotter) Usage(ctx context.Context, key string) (snapshot.Usage, error) {
 	panic("not implemented")
@@ -129,15 +148,15 @@ func (b *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 	return storage.WalkInfo(ctx, fn)
 }
 
-func (b *snapshotter) Prepare(ctx context.Context, key, parent string) ([]mount.Mount, error) {
-	return b.makeSnapshot(ctx, snapshot.KindActive, key, parent)
+func (b *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshot.Opt) ([]mount.Mount, error) {
+	return b.makeSnapshot(ctx, snapshot.KindActive, key, parent, opts)
 }
 
-func (b *snapshotter) View(ctx context.Context, key, parent string) ([]mount.Mount, error) {
-	return b.makeSnapshot(ctx, snapshot.KindView, key, parent)
+func (b *snapshotter) View(ctx context.Context, key, parent string, opts ...snapshot.Opt) ([]mount.Mount, error) {
+	return b.makeSnapshot(ctx, snapshot.KindView, key, parent, opts)
 }
 
-func (b *snapshotter) makeSnapshot(ctx context.Context, kind snapshot.Kind, key, parent string) ([]mount.Mount, error) {
+func (b *snapshotter) makeSnapshot(ctx context.Context, kind snapshot.Kind, key, parent string, opts []snapshot.Opt) ([]mount.Mount, error) {
 	ctx, t, err := b.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return nil, err
@@ -150,7 +169,7 @@ func (b *snapshotter) makeSnapshot(ctx context.Context, kind snapshot.Kind, key,
 		}
 	}()
 
-	s, err := storage.CreateSnapshot(ctx, kind, key, parent)
+	s, err := storage.CreateSnapshot(ctx, kind, key, parent, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +233,7 @@ func (b *snapshotter) mounts(dir string) ([]mount.Mount, error) {
 	}, nil
 }
 
-func (b *snapshotter) Commit(ctx context.Context, name, key string) (err error) {
+func (b *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshot.Opt) (err error) {
 	ctx, t, err := b.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return err
@@ -227,7 +246,7 @@ func (b *snapshotter) Commit(ctx context.Context, name, key string) (err error) 
 		}
 	}()
 
-	id, err := storage.CommitActive(ctx, key, name, snapshot.Usage{}) // TODO(stevvooe): Resolve a usage value for btrfs
+	id, err := storage.CommitActive(ctx, key, name, snapshot.Usage{}, opts...) // TODO(stevvooe): Resolve a usage value for btrfs
 	if err != nil {
 		return errors.Wrap(err, "failed to commit")
 	}

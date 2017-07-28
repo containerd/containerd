@@ -89,6 +89,25 @@ func (o *snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, erro
 	return info, nil
 }
 
+func (o *snapshotter) Update(ctx context.Context, info snapshot.Info, fieldpaths ...string) (snapshot.Info, error) {
+	ctx, t, err := o.ms.TransactionContext(ctx, true)
+	if err != nil {
+		return snapshot.Info{}, err
+	}
+
+	info, err = storage.UpdateInfo(ctx, info, fieldpaths...)
+	if err != nil {
+		t.Rollback()
+		return snapshot.Info{}, err
+	}
+
+	if err := t.Commit(); err != nil {
+		return snapshot.Info{}, err
+	}
+
+	return info, nil
+}
+
 // Usage returns the resources taken by the snapshot identified by key.
 //
 // For active snapshots, this will scan the usage of the overlay "diff" (aka
@@ -121,12 +140,12 @@ func (o *snapshotter) Usage(ctx context.Context, key string) (snapshot.Usage, er
 	return usage, nil
 }
 
-func (o *snapshotter) Prepare(ctx context.Context, key, parent string) ([]mount.Mount, error) {
-	return o.createSnapshot(ctx, snapshot.KindActive, key, parent)
+func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshot.Opt) ([]mount.Mount, error) {
+	return o.createSnapshot(ctx, snapshot.KindActive, key, parent, opts)
 }
 
-func (o *snapshotter) View(ctx context.Context, key, parent string) ([]mount.Mount, error) {
-	return o.createSnapshot(ctx, snapshot.KindView, key, parent)
+func (o *snapshotter) View(ctx context.Context, key, parent string, opts ...snapshot.Opt) ([]mount.Mount, error) {
+	return o.createSnapshot(ctx, snapshot.KindView, key, parent, opts)
 }
 
 // Mounts returns the mounts for the transaction identified by key. Can be
@@ -146,7 +165,7 @@ func (o *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 	return o.mounts(s), nil
 }
 
-func (o *snapshotter) Commit(ctx context.Context, name, key string) error {
+func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshot.Opt) error {
 	ctx, t, err := o.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return err
@@ -171,7 +190,7 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string) error {
 		return err
 	}
 
-	if _, err = storage.CommitActive(ctx, key, name, snapshot.Usage(usage)); err != nil {
+	if _, err = storage.CommitActive(ctx, key, name, snapshot.Usage(usage), opts...); err != nil {
 		return errors.Wrap(err, "failed to commit snapshot")
 	}
 	return t.Commit()
@@ -230,7 +249,7 @@ func (o *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 	return storage.WalkInfo(ctx, fn)
 }
 
-func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshot.Kind, key, parent string) ([]mount.Mount, error) {
+func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshot.Kind, key, parent string, opts []snapshot.Opt) ([]mount.Mount, error) {
 	var (
 		path        string
 		snapshotDir = filepath.Join(o.root, "snapshots")
@@ -270,7 +289,7 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshot.Kind, ke
 		return nil, err
 	}
 
-	s, err := storage.CreateSnapshot(ctx, kind, key, parent)
+	s, err := storage.CreateSnapshot(ctx, kind, key, parent, opts...)
 	if err != nil {
 		if rerr := t.Rollback(); rerr != nil {
 			log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
