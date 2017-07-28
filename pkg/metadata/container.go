@@ -19,7 +19,6 @@ package metadata
 import (
 	"encoding/json"
 
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
@@ -74,11 +73,6 @@ type ContainerMetadata struct {
 	// into the store directly.
 	// TODO(random-liu): Reset this field to false during state recovery.
 	Removing bool
-	// TODO(random-liu): Remove following field after switching to new containerd
-	// client.
-	// Not including them in unit test now because they will be removed soon.
-	// Spec is the oci runtime spec used to run the container.
-	Spec *runtimespec.Spec
 }
 
 // State returns current state of the container based on the metadata.

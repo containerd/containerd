@@ -23,6 +23,7 @@ import (
 	"io"
 	"io/ioutil"
 
+	"github.com/containerd/containerd/api/services/containers"
 	"github.com/containerd/containerd/api/services/execution"
 	"github.com/containerd/containerd/api/types/task"
 	prototypes "github.com/gogo/protobuf/types"
@@ -44,7 +45,7 @@ func (c *criContainerdService) ExecSync(ctx context.Context, r *runtime.ExecSync
 		}
 	}()
 
-	// Get container config from container store.
+	// Get container metadata from our container store.
 	meta, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find container %q: %v", r.GetContainerId(), err)
@@ -53,6 +54,22 @@ func (c *criContainerdService) ExecSync(ctx context.Context, r *runtime.ExecSync
 
 	if meta.State() != runtime.ContainerState_CONTAINER_RUNNING {
 		return nil, fmt.Errorf("container %q is in %s state", id, criContainerStateToString(meta.State()))
+	}
+
+	// Get exec process spec.
+	cntrResp, err := c.containerService.Get(ctx, &containers.GetContainerRequest{ID: id})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container %q from containerd: %v", id, err)
+	}
+	var spec runtimespec.Spec
+	if err := json.Unmarshal(cntrResp.Container.Spec.Value, &spec); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal container spec: %v", err)
+	}
+	pspec := &spec.Process
+	pspec.Args = r.GetCmd()
+	rawSpec, err := json.Marshal(pspec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal oci process spec %+v: %v", pspec, err)
 	}
 
 	// TODO(random-liu): Replace the following logic with containerd client and add unit test.
@@ -86,13 +103,6 @@ func (c *criContainerdService) ExecSync(ctx context.Context, r *runtime.ExecSync
 	events, err := c.taskService.Events(cancellable, &execution.EventsRequest{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get containerd event: %v", err)
-	}
-
-	spec := &meta.Spec.Process
-	spec.Args = r.GetCmd()
-	rawSpec, err := json.Marshal(spec)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal oci spec %+v: %v", spec, err)
 	}
 
 	resp, err := c.taskService.Exec(ctx, &execution.ExecRequest{
