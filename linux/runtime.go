@@ -12,6 +12,7 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/identifiers"
 	client "github.com/containerd/containerd/linux/shim"
 	shim "github.com/containerd/containerd/linux/shim/v1"
@@ -90,6 +91,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		tasks:     runtime.NewTaskList(),
 		db:        m.(*bolt.DB),
 		address:   ic.Address,
+		events:    ic.Events,
 	}
 	tasks, err := r.restoreTasks(ic.Context)
 	if err != nil {
@@ -114,6 +116,7 @@ type Runtime struct {
 	monitor runtime.TaskMonitor
 	tasks   *runtime.TaskList
 	db      *bolt.DB
+	events  *events.Exchange
 }
 
 func (r *Runtime) ID() string {
@@ -130,7 +133,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 		return nil, errors.Wrapf(err, "invalid task id")
 	}
 
-	bundle, err := newBundle(filepath.Join(r.root, namespace), namespace, id, opts.Spec.Value)
+	bundle, err := newBundle(filepath.Join(r.root, namespace), namespace, id, opts.Spec.Value, r.events)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +206,7 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 	}
 	r.tasks.Delete(ctx, lc)
 
-	bundle := loadBundle(filepath.Join(r.root, namespace, lc.id), namespace)
+	bundle := loadBundle(filepath.Join(r.root, namespace, lc.id), namespace, r.events)
 	if err := bundle.Delete(); err != nil {
 		return nil, err
 	}
@@ -254,7 +257,7 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			continue
 		}
 		id := path.Name()
-		bundle := loadBundle(filepath.Join(r.root, ns, id), ns)
+		bundle := loadBundle(filepath.Join(r.root, ns, id), ns, r.events)
 
 		s, err := bundle.Connect(ctx, r.remote)
 		if err != nil {

@@ -15,7 +15,6 @@ import (
 	events "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
-	evt "github.com/containerd/containerd/events"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
@@ -32,23 +31,11 @@ var empty = &google_protobuf.Empty{}
 const RuncRoot = "/run/containerd/runc"
 
 // NewService returns a new shim service that can be used via GRPC
-func NewService(path, namespace, address string) (*Service, error) {
+func NewService(path, namespace string, client publisher) (*Service, error) {
 	if namespace == "" {
 		return nil, fmt.Errorf("shim namespace cannot be empty")
 	}
 	context := namespaces.WithNamespace(context.Background(), namespace)
-	var client publisher
-	if address != "" {
-		conn, err := connect(address, dialer)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to dial %q", address)
-		}
-		client = events.NewEventsClient(conn)
-	} else {
-		client = &localEventsClient{
-			forwarder: evt.NewExchange(),
-		}
-	}
 	s := &Service{
 		path:      path,
 		processes: make(map[string]process),
