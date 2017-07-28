@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	events "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/errdefs"
@@ -131,10 +132,12 @@ func TestExchangeValidateTopic(t *testing.T) {
 			}
 
 			envelope := events.Envelope{
+				Timestamp: time.Now().UTC(),
 				Namespace: namespace,
 				Topic:     testcase.input,
 				Event:     evany,
 			}
+
 			// make sure we get same errors with forward.
 			if err := exchange.Forward(ctx, &envelope); errors.Cause(err) != testcase.err {
 				if err == nil {

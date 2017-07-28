@@ -4,7 +4,6 @@ import (
 	api "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
-	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/plugin"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
@@ -35,16 +34,27 @@ func (s *Service) Register(server *grpc.Server) error {
 	return nil
 }
 
+func (s *Service) Publish(ctx context.Context, r *api.PublishRequest) (*empty.Empty, error) {
+	if err := s.events.Publish(ctx, r.Topic, r.Event); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+
+	return &empty.Empty{}, nil
+}
+
+func (s *Service) Forward(ctx context.Context, r *api.ForwardRequest) (*empty.Empty, error) {
+	if err := s.events.Forward(ctx, r.Envelope); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+
+	return &empty.Empty{}, nil
+}
+
 func (s *Service) Subscribe(req *api.SubscribeRequest, srv api.Events_SubscribeServer) error {
 	ctx, cancel := context.WithCancel(srv.Context())
 	defer cancel()
 
-	filter, err := filters.ParseAll(req.Filters...)
-	if err != nil {
-		return errdefs.ToGRPC(err)
-	}
-
-	eventq, errq := s.events.Subscribe(ctx, filter)
+	eventq, errq := s.events.Subscribe(ctx, req.Filters...)
 	for {
 		select {
 		case ev := <-eventq:
@@ -59,12 +69,4 @@ func (s *Service) Subscribe(req *api.SubscribeRequest, srv api.Events_SubscribeS
 			return nil
 		}
 	}
-}
-
-func (s *Service) Publish(ctx context.Context, r *api.PublishRequest) (*empty.Empty, error) {
-	if err := s.events.Forward(ctx, r.Envelope); err != nil {
-		return nil, errdefs.ToGRPC(err)
-	}
-
-	return &empty.Empty{}, nil
 }

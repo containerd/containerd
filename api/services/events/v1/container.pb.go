@@ -19,8 +19,9 @@
 		ContainerUpdate
 		ContainerDelete
 		ContentDelete
-		SubscribeRequest
 		PublishRequest
+		ForwardRequest
+		SubscribeRequest
 		Envelope
 		ImageCreate
 		ImageUpdate

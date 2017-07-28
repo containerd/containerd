@@ -66,17 +66,25 @@ func Is(any *types.Any, v interface{}) bool {
 
 // MarshalAny marshals the value v into an any with the correct TypeUrl
 func MarshalAny(v interface{}) (*types.Any, error) {
-	var data []byte
+	var marshal func(v interface{}) ([]byte, error)
+	switch t := v.(type) {
+	case *types.Any:
+		// avoid reserializing the type if we have an any.
+		return t, nil
+	case proto.Message:
+		marshal = func(v interface{}) ([]byte, error) {
+			return proto.Marshal(t)
+		}
+	default:
+		marshal = json.Marshal
+	}
+
 	url, err := TypeURL(v)
 	if err != nil {
 		return nil, err
 	}
-	switch t := v.(type) {
-	case proto.Message:
-		data, err = proto.Marshal(t)
-	default:
-		data, err = json.Marshal(v)
-	}
+
+	data, err := marshal(v)
 	if err != nil {
 		return nil, err
 	}

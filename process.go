@@ -6,6 +6,7 @@ import (
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -64,7 +65,9 @@ func (p *process) Kill(ctx context.Context, s syscall.Signal) error {
 }
 
 func (p *process) Wait(ctx context.Context) (uint32, error) {
-	eventstream, err := p.task.client.EventService().Subscribe(ctx, &eventsapi.SubscribeRequest{})
+	eventstream, err := p.task.client.EventService().Subscribe(ctx, &eventsapi.SubscribeRequest{
+		Filters: []string{"topic==" + runtime.TaskExitEventTopic},
+	})
 	if err != nil {
 		return UnknownExitStatus, err
 	}
