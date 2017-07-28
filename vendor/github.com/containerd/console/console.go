@@ -28,6 +28,8 @@ type Console interface {
 	Size() (WinSize, error)
 	// Fd returns the console's file descriptor
 	Fd() uintptr
+	// Name returns the console's file name
+	Name() string
 }
 
 // WinSize specifies the window size of the console
