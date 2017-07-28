@@ -50,6 +50,7 @@ func (w *worker) Start() {
 				"id":    t.Container.ID(),
 			}).Error("containerd: start container")
 			t.Err <- err
+			close(t.Err)
 			evt := &DeleteTask{
 				ID:      t.Container.ID(),
 				NoEvent: true,
@@ -67,6 +68,7 @@ func (w *worker) Start() {
 		if err := w.s.monitorProcess(process); err != nil {
 			logrus.WithField("error", err).Error("containerd: add process to monitor")
 			t.Err <- err
+			close(t.Err)
 			evt := &DeleteTask{
 				ID:      t.Container.ID(),
 				NoEvent: true,
@@ -82,6 +84,7 @@ func (w *worker) Start() {
 			if err := process.Start(); err != nil {
 				logrus.WithField("error", err).Error("containerd: start init process")
 				t.Err <- err
+				close(t.Err)
 				evt := &DeleteTask{
 					ID:      t.Container.ID(),
 					NoEvent: true,
@@ -95,6 +98,7 @@ func (w *worker) Start() {
 		ContainerStartTimer.UpdateSince(started)
 		w.s.newExecSyncMap(t.Container.ID())
 		t.Err <- nil
+		close(t.Err)
 		t.StartResponse <- StartResponse{
 			Container: t.Container,
 		}

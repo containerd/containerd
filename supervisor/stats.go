@@ -27,6 +27,7 @@ func (s *Supervisor) stats(t *StatsTask) error {
 			return
 		}
 		t.ErrorCh() <- nil
+		close(t.ErrorCh())
 		t.Stat <- s
 		ContainerStatsTimer.UpdateSince(start)
 	}()
