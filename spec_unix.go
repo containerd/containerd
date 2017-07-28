@@ -30,6 +30,12 @@ const (
 	defaultRootfsPath = "rootfs"
 )
 
+var (
+	defaultEnv = []string{
+		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+	}
+)
+
 func defaltCaps() []string {
 	return []string{
 		"CAP_CHOWN",
@@ -76,6 +82,7 @@ func createDefaultSpec() (*specs.Spec, error) {
 			Path: defaultRootfsPath,
 		},
 		Process: &specs.Process{
+			Env:             defaultEnv,
 			Cwd:             "/",
 			NoNewPrivileges: true,
 			User: specs.User{
@@ -220,10 +227,7 @@ func WithImageConfig(ctx context.Context, i Image) SpecOpts {
 		default:
 			return fmt.Errorf("unknown image config media type %s", ic.MediaType)
 		}
-		env := []string{
-			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-		}
-		s.Process.Env = append(env, config.Env...)
+		s.Process.Env = append(s.Process.Env, config.Env...)
 		var (
 			uid, gid uint32
 		)
@@ -258,6 +262,18 @@ func WithImageConfig(ctx context.Context, i Image) SpecOpts {
 			cwd = "/"
 		}
 		s.Process.Cwd = cwd
+		return nil
+	}
+}
+
+// WithRootFSPath specifies unmanaged rootfs path.
+func WithRootFSPath(path string, readonly bool) SpecOpts {
+	return func(s *specs.Spec) error {
+		s.Root = &specs.Root{
+			Path:     path,
+			Readonly: readonly,
+		}
+		// Entrypoint is not set here (it's up to caller)
 		return nil
 	}
 }
