@@ -592,7 +592,6 @@ func TestCreateContainer(t *testing.T) {
 		test.expectMeta.ID = id
 		// TODO(random-liu): Use fake clock to test CreatedAt.
 		test.expectMeta.CreatedAt = meta.CreatedAt
-		test.expectMeta.Spec = spec
 		assert.Equal(t, test.expectMeta, meta, "container metadata should be created")
 	}
 }
