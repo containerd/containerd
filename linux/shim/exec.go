@@ -105,10 +105,11 @@ func newExecProcess(context context.Context, path string, r *shimapi.ExecProcess
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to retrieve console master")
 		}
-		e.console = console
-		if err := copyConsole(context, console, r.Stdin, r.Stdout, r.Stderr, &e.WaitGroup, &copyWaitGroup); err != nil {
+		console, err = e.parent.platform.copyConsole(context, console, r.Stdin, r.Stdout, r.Stderr, &e.WaitGroup, &copyWaitGroup)
+		if err != nil {
 			return nil, errors.Wrap(err, "failed to start console copy")
 		}
+		e.console = console
 	} else {
 		if err := copyPipes(context, io, r.Stdin, r.Stdout, r.Stderr, &e.WaitGroup, &copyWaitGroup); err != nil {
 			return nil, errors.Wrap(err, "failed to start io pipe copy")
@@ -142,6 +143,7 @@ func (e *execProcess) ExitedAt() time.Time {
 func (e *execProcess) Exited(status int) {
 	e.status = status
 	e.exited = time.Now()
+	e.parent.platform.shutdownConsole(context.Background(), e.console)
 	e.Wait()
 	if e.io != nil {
 		for _, c := range e.closers {
