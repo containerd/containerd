@@ -9,9 +9,14 @@ import (
 	"github.com/opencontainers/go-digest"
 )
 
+type ReaderAt interface {
+	io.ReaderAt
+	io.Closer
+	Size() int64
+}
+
 type Provider interface {
-	Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, error)
-	ReaderAt(ctx context.Context, dgst digest.Digest) (io.ReaderAt, error)
+	ReaderAt(ctx context.Context, dgst digest.Digest) (ReaderAt, error)
 }
 
 type Ingester interface {

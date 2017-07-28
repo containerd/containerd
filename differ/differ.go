@@ -67,14 +67,14 @@ func (s *BaseDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 	}
 	defer mount.Unmount(dir, 0)
 
-	r, err := s.store.Reader(ctx, desc.Digest)
+	r, err := s.store.ReaderAt(ctx, desc.Digest)
 	if err != nil {
 		return emptyDesc, errors.Wrap(err, "failed to get reader from content store")
 	}
 	defer r.Close()
 
 	// TODO: only decompress stream if media type is compressed
-	ds, err := compression.DecompressStream(r)
+	ds, err := compression.DecompressStream(content.NewReader(r))
 	if err != nil {
 		return emptyDesc, err
 	}

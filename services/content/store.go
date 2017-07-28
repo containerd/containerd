@@ -70,21 +70,16 @@ func (rs *remoteStore) Delete(ctx context.Context, dgst digest.Digest) error {
 	return nil
 }
 
-func (rs *remoteStore) Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, error) {
-	client, err := rs.client.Read(ctx, &contentapi.ReadContentRequest{Digest: dgst})
+func (rs *remoteStore) ReaderAt(ctx context.Context, dgst digest.Digest) (content.ReaderAt, error) {
+	i, err := rs.Info(ctx, dgst)
 	if err != nil {
 		return nil, err
 	}
 
-	return &remoteReader{
-		client: client,
-	}, nil
-}
-
-func (rs *remoteStore) ReaderAt(ctx context.Context, dgst digest.Digest) (io.ReaderAt, error) {
 	return &remoteReaderAt{
 		ctx:    ctx,
 		digest: dgst,
+		size:   i.Size,
 		client: rs.client,
 	}, nil
 }

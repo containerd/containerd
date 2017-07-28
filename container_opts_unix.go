@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/containers"
@@ -54,12 +53,7 @@ func WithCheckpoint(desc v1.Descriptor, rootfsID string) NewContainerOpts {
 				}
 				c.Image = index.Annotations["image.name"]
 			case images.MediaTypeContainerd1CheckpointConfig:
-				r, err := store.Reader(ctx, m.Digest)
-				if err != nil {
-					return err
-				}
-				data, err := ioutil.ReadAll(r)
-				r.Close()
+				data, err := content.ReadBlob(ctx, store, m.Digest)
 				if err != nil {
 					return err
 				}
@@ -111,11 +105,13 @@ func WithTaskCheckpoint(desc v1.Descriptor) NewTaskOpts {
 
 func decodeIndex(ctx context.Context, store content.Store, id digest.Digest) (*v1.Index, error) {
 	var index v1.Index
-	r, err := store.Reader(ctx, id)
+	p, err := content.ReadBlob(ctx, store, id)
 	if err != nil {
 		return nil, err
 	}
-	err = json.NewDecoder(r).Decode(&index)
-	r.Close()
-	return &index, err
+	if err := json.Unmarshal(p, &index); err != nil {
+		return nil, err
+	}
+
+	return &index, nil
 }
