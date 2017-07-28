@@ -41,7 +41,6 @@ var (
 	bucketKeyDigest    = []byte("digest")
 	bucketKeyMediaType = []byte("mediatype")
 	bucketKeySize      = []byte("size")
-	bucketKeyLabels    = []byte("labels")
 	bucketKeyImage     = []byte("image")
 	bucketKeyRuntime   = []byte("runtime")
 	bucketKeyName      = []byte("name")
@@ -49,8 +48,6 @@ var (
 	bucketKeySpec      = []byte("spec")
 	bucketKeyRootFS    = []byte("rootfs")
 	bucketKeyTarget    = []byte("target")
-	bucketKeyCreatedAt = []byte("createdat")
-	bucketKeyUpdatedAt = []byte("updatedat")
 )
 
 func getBucket(tx *bolt.Tx, keys ...[]byte) *bolt.Bucket {
