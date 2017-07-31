@@ -150,9 +150,9 @@ func WithConnect(ctx context.Context, config Config) (shim.ShimClient, io.Closer
 }
 
 // WithLocal uses an in process shim
-func WithLocal(events *events.Exchange) func(context.Context, Config) (shim.ShimClient, io.Closer, error) {
+func WithLocal(publisher events.Publisher) func(context.Context, Config) (shim.ShimClient, io.Closer, error) {
 	return func(ctx context.Context, config Config) (shim.ShimClient, io.Closer, error) {
-		service, err := NewService(config.Path, config.Namespace, &localEventsClient{publisher: events})
+		service, err := NewService(config.Path, config.Namespace, publisher)
 		if err != nil {
 			return nil, nil, err
 		}

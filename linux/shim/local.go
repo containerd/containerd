@@ -5,8 +5,6 @@ package shim
 import (
 	"path/filepath"
 
-	events "github.com/containerd/containerd/api/services/events/v1"
-	evt "github.com/containerd/containerd/events"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
@@ -87,19 +85,4 @@ func (c *local) ShimInfo(ctx context.Context, in *google_protobuf.Empty, opts ..
 
 func (c *local) Update(ctx context.Context, in *shimapi.UpdateTaskRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
 	return c.s.Update(ctx, in)
-}
-
-type publisher interface {
-	Publish(ctx context.Context, in *events.PublishRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error)
-}
-
-type localEventsClient struct {
-	publisher evt.Publisher
-}
-
-func (l *localEventsClient) Publish(ctx context.Context, r *events.PublishRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
-	if err := l.publisher.Publish(ctx, r.Topic, r.Event); err != nil {
-		return nil, err
-	}
-	return empty, nil
 }
