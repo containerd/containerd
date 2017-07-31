@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"sync"
-	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -375,12 +374,8 @@ func (s *Service) forward(client publisher) {
 		}
 
 		if _, err := client.Publish(s.context, &events.PublishRequest{
-			Envelope: &events.Envelope{
-				Namespace: s.namespace,
-				Timestamp: time.Now().UTC(),
-				Topic:     getTopic(e),
-				Event:     a,
-			},
+			Topic: getTopic(e),
+			Event: a,
 		}); err != nil {
 			log.G(s.context).WithError(err).Error("post event")
 		}

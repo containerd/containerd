@@ -18,6 +18,7 @@ import (
 	"github.com/containerd/containerd/linux/runcopts"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/rootfs"
+	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/typeurl"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go/v1"
@@ -163,7 +164,9 @@ func (t *task) Status(ctx context.Context) (TaskStatus, error) {
 
 // Wait is a blocking call that will wait for the task to exit and return the exit status
 func (t *task) Wait(ctx context.Context) (uint32, error) {
-	eventstream, err := t.client.EventService().Subscribe(ctx, &eventsapi.SubscribeRequest{})
+	eventstream, err := t.client.EventService().Subscribe(ctx, &eventsapi.SubscribeRequest{
+		Filters: []string{"topic==" + runtime.TaskExitEventTopic},
+	})
 	if err != nil {
 		return UnknownExitStatus, errdefs.FromGRPC(err)
 	}

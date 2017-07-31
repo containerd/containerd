@@ -48,6 +48,17 @@ func TestMarshal(t *testing.T) {
 	if any.TypeUrl != expected {
 		t.Fatalf("expected %q but received %q", expected, any.TypeUrl)
 	}
+
+	// marshal it again and make sure we get the same thing back.
+	newany, err := MarshalAny(any)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if newany != any { // you that right: we want the same *pointer*!
+		t.Fatalf("expected to get back same object: %v != %v", newany, any)
+	}
+
 }
 
 func TestMarshalUnmarshal(t *testing.T) {

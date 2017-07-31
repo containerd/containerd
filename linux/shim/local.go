@@ -94,11 +94,11 @@ type publisher interface {
 }
 
 type localEventsClient struct {
-	forwarder evt.Forwarder
+	publisher evt.Publisher
 }
 
 func (l *localEventsClient) Publish(ctx context.Context, r *events.PublishRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
-	if err := l.forwarder.Forward(ctx, r.Envelope); err != nil {
+	if err := l.publisher.Publish(ctx, r.Topic, r.Event); err != nil {
 		return nil, err
 	}
 	return empty, nil
