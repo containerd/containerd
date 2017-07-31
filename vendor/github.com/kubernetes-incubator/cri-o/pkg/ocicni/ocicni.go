@@ -7,10 +7,10 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containernetworking/cni/libcni"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/fsnotify/fsnotify"
+	"github.com/sirupsen/logrus"
 )
 
 type cniNetworkPlugin struct {

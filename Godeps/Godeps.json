@@ -12,11 +12,6 @@
 			"Rev": "7ff89941bcb93df2e962467fb073c6e997b13cf0"
 		},
 		{
-			"ImportPath": "github.com/Sirupsen/logrus",
-			"Comment": "v1.0.0",
-			"Rev": "202f25545ea4cf9b191ff7f846df5d87c9382c2b"
-		},
-		{
 			"ImportPath": "github.com/blang/semver",
 			"Comment": "v3.1.0",
 			"Rev": "aea32c919a18e5ef4537bbd283ff29594b1b0165"
