@@ -152,12 +152,12 @@ func (s *Service) Delete(ctx context.Context, r *google_protobuf.Empty) (*shimap
 	s.mu.Unlock()
 	s.events <- &eventsapi.TaskDelete{
 		ContainerID: s.id,
-		ExitStatus:  uint32(p.Status()),
+		ExitStatus:  uint32(p.ExitStatus()),
 		ExitedAt:    p.ExitedAt(),
 		Pid:         uint32(p.Pid()),
 	}
 	return &shimapi.DeleteResponse{
-		ExitStatus: uint32(p.Status()),
+		ExitStatus: uint32(p.ExitStatus()),
 		ExitedAt:   p.ExitedAt(),
 		Pid:        uint32(p.Pid()),
 	}, nil
@@ -182,7 +182,7 @@ func (s *Service) DeleteProcess(ctx context.Context, r *shimapi.DeleteProcessReq
 	delete(s.processes, p.ID())
 	s.mu.Unlock()
 	return &shimapi.DeleteResponse{
-		ExitStatus: uint32(p.Status()),
+		ExitStatus: uint32(p.ExitStatus()),
 		ExitedAt:   p.ExitedAt(),
 		Pid:        uint32(p.Pid()),
 	}, nil
@@ -362,7 +362,7 @@ func (s *Service) Update(ctx context.Context, r *shimapi.UpdateTaskRequest) (*go
 
 func (s *Service) waitExit(p process, pid int, cmd *reaper.Cmd) {
 	status := <-cmd.ExitCh
-	p.Exited(status)
+	p.SetExited(status)
 
 	reaper.Default.Delete(pid)
 	s.events <- &eventsapi.TaskExit{

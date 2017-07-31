@@ -76,7 +76,7 @@ func (e *execProcess) Pid() int {
 	return e.pid
 }
 
-func (e *execProcess) Status() int {
+func (e *execProcess) ExitStatus() int {
 	return e.status
 }
 
@@ -84,7 +84,7 @@ func (e *execProcess) ExitedAt() time.Time {
 	return e.exited
 }
 
-func (e *execProcess) Exited(status int) {
+func (e *execProcess) SetExited(status int) {
 	e.status = status
 	e.exited = time.Now()
 	e.parent.platform.shutdownConsole(context.Background(), e.console)

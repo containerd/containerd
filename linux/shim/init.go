@@ -201,7 +201,7 @@ func (p *initProcess) Pid() int {
 	return p.pid
 }
 
-func (p *initProcess) Status() int {
+func (p *initProcess) ExitStatus() int {
 	return p.status
 }
 
@@ -225,7 +225,7 @@ func (p *initProcess) Start(context context.Context) error {
 	return p.runtimeError(err, "OCI runtime start failed")
 }
 
-func (p *initProcess) Exited(status int) {
+func (p *initProcess) SetExited(status int) {
 	p.mu.Lock()
 	p.status = status
 	p.exited = time.Now()
