@@ -118,11 +118,6 @@ func (t *Task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runt
 	if _, err := t.shim.Exec(ctx, request); err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
-	if _, err := t.shim.Start(ctx, &shim.StartRequest{
-		ID: id,
-	}); err != nil {
-		return nil, errdefs.FromGRPC(err)
-	}
 	return &Process{
 		id: id,
 		t:  t,

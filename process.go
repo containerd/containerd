@@ -31,27 +31,17 @@ func (p *process) Pid() uint32 {
 
 // Start starts the exec process
 func (p *process) Start(ctx context.Context) error {
-	any, err := typeurl.MarshalAny(p.spec)
-	if err != nil {
-		return err
-	}
-	request := &tasks.ExecProcessRequest{
+	r, err := p.task.client.TaskService().Start(ctx, &tasks.StartRequest{
 		ContainerID: p.task.id,
 		ExecID:      p.id,
-		Terminal:    p.io.Terminal,
-		Stdin:       p.io.Stdin,
-		Stdout:      p.io.Stdout,
-		Stderr:      p.io.Stderr,
-		Spec:        any,
-	}
-	response, err := p.task.client.TaskService().Exec(ctx, request)
+	})
 	if err != nil {
 		p.io.Cancel()
 		p.io.Wait()
 		p.io.Close()
 		return err
 	}
-	p.pid = response.Pid
+	p.pid = r.Pid
 	return nil
 }
 

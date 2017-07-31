@@ -869,7 +869,7 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 		close(finished)
 	}()
 
-	// start an exec process without running the original container process info
+	// start an exec process without running the original container process
 	processSpec := spec.Process
 	processSpec.Args = []string{
 		"none",

@@ -118,7 +118,7 @@ func (t *task) Start(ctx context.Context) error {
 		t.pid = response.Pid
 		return nil
 	}
-	_, err := t.client.TaskService().Start(ctx, &tasks.StartTaskRequest{
+	_, err := t.client.TaskService().Start(ctx, &tasks.StartRequest{
 		ContainerID: t.id,
 	})
 	if err != nil {
@@ -212,6 +212,25 @@ func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreat
 	}
 	i, err := ioCreate(id)
 	if err != nil {
+		return nil, err
+	}
+	any, err := typeurl.MarshalAny(spec)
+	if err != nil {
+		return nil, err
+	}
+	request := &tasks.ExecProcessRequest{
+		ContainerID: t.id,
+		ExecID:      id,
+		Terminal:    i.Terminal,
+		Stdin:       i.Stdin,
+		Stdout:      i.Stdout,
+		Stderr:      i.Stderr,
+		Spec:        any,
+	}
+	if _, err := t.client.TaskService().Exec(ctx, request); err != nil {
+		i.Cancel()
+		i.Wait()
+		i.Close()
 		return nil, err
 	}
 	return &process{

@@ -79,7 +79,17 @@ func (p *Process) CloseIO(ctx context.Context) error {
 		Stdin: true,
 	})
 	if err != nil {
-		err = errdefs.FromGRPC(err)
+		return errdefs.FromGRPC(err)
 	}
-	return err
+	return nil
+}
+
+func (p *Process) Start(ctx context.Context) error {
+	_, err := p.t.shim.Start(ctx, &shim.StartRequest{
+		ID: p.id,
+	})
+	if err != nil {
+		return errdefs.FromGRPC(err)
+	}
+	return nil
 }

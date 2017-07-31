@@ -16,8 +16,8 @@ service Tasks {
 	// Create a task.
 	rpc Create(CreateTaskRequest) returns (CreateTaskResponse);
 
-	// Start a task.
-	rpc Start(StartTaskRequest) returns (google.protobuf.Empty);
+	// Start a process.
+	rpc Start(StartRequest) returns (StartResponse);
 
 	// Delete a task and on disk state.
 	rpc Delete(DeleteTaskRequest) returns (DeleteResponse);
@@ -31,7 +31,7 @@ service Tasks {
 	// Kill a task or process.
 	rpc Kill(KillRequest) returns (google.protobuf.Empty);
 
-	rpc Exec(ExecProcessRequest) returns (ExecProcessResponse);
+	rpc Exec(ExecProcessRequest) returns (google.protobuf.Empty);
 
 	rpc ResizePty(ResizePtyRequest) returns (google.protobuf.Empty);
 
@@ -74,8 +74,13 @@ message CreateTaskResponse {
 	uint32 pid = 2;
 }
 
-message StartTaskRequest {
+message StartRequest {
 	string container_id = 1;
+	string exec_id = 2;
+}
+
+message StartResponse {
+	uint32 pid = 1;
 }
 
 message DeleteTaskRequest {
@@ -132,7 +137,6 @@ message ExecProcessRequest {
 }
 
 message ExecProcessResponse {
-	uint32 pid = 1;
 }
 
 message ResizePtyRequest {

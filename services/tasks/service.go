@@ -152,16 +152,27 @@ func (s *Service) Create(ctx context.Context, r *api.CreateTaskRequest) (*api.Cr
 	}, nil
 }
 
-func (s *Service) Start(ctx context.Context, r *api.StartTaskRequest) (*google_protobuf.Empty, error) {
+func (s *Service) Start(ctx context.Context, r *api.StartRequest) (*api.StartResponse, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
 	}
-	if err := t.Start(ctx); err != nil {
+	p := runtime.Process(t)
+	if r.ExecID != "" {
+		if p, err = t.Process(ctx, r.ExecID); err != nil {
+			return nil, err
+		}
+	}
+	if err := p.Start(ctx); err != nil {
 		return nil, err
 	}
-
-	return empty, nil
+	state, err := p.State(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &api.StartResponse{
+		Pid: state.Pid,
+	}, nil
 }
 
 func (s *Service) Delete(ctx context.Context, r *api.DeleteTaskRequest) (*api.DeleteResponse, error) {
@@ -317,7 +328,7 @@ func (s *Service) ListPids(ctx context.Context, r *api.ListPidsRequest) (*api.Li
 	}, nil
 }
 
-func (s *Service) Exec(ctx context.Context, r *api.ExecProcessRequest) (*api.ExecProcessResponse, error) {
+func (s *Service) Exec(ctx context.Context, r *api.ExecProcessRequest) (*google_protobuf.Empty, error) {
 	if r.ExecID == "" {
 		return nil, grpc.Errorf(codes.InvalidArgument, "exec id cannot be empty")
 	}
@@ -325,7 +336,7 @@ func (s *Service) Exec(ctx context.Context, r *api.ExecProcessRequest) (*api.Exe
 	if err != nil {
 		return nil, err
 	}
-	process, err := t.Exec(ctx, r.ExecID, runtime.ExecOpts{
+	if _, err := t.Exec(ctx, r.ExecID, runtime.ExecOpts{
 		Spec: r.Spec,
 		IO: runtime.IO{
 			Stdin:    r.Stdin,
@@ -333,17 +344,10 @@ func (s *Service) Exec(ctx context.Context, r *api.ExecProcessRequest) (*api.Exe
 			Stderr:   r.Stderr,
 			Terminal: r.Terminal,
 		},
-	})
-	if err != nil {
+	}); err != nil {
 		return nil, err
 	}
-	state, err := process.State(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return &api.ExecProcessResponse{
-		Pid: state.Pid,
-	}, nil
+	return empty, nil
 }
 
 func (s *Service) ResizePty(ctx context.Context, r *api.ResizePtyRequest) (*google_protobuf.Empty, error) {
