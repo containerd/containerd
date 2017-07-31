@@ -18,16 +18,6 @@ package server
 
 import (
 	"io"
-	"os"
-	"testing"
-
-	"github.com/containerd/containerd/api/services/execution"
-	snapshotservice "github.com/containerd/containerd/services/snapshot"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"golang.org/x/net/context"
-	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/registrar"
@@ -64,132 +54,7 @@ func newTestCRIContainerdService() *criContainerdService {
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerStore:     containerstore.NewStore(),
 		containerNameIndex: registrar.NewRegistrar(),
-		taskService:        servertesting.NewFakeExecutionClient(),
-		containerService:   servertesting.NewFakeContainersClient(),
 		netPlugin:          servertesting.NewFakeCNIPlugin(),
 		agentFactory:       agentstesting.NewFakeAgentFactory(),
 	}
-}
-
-// WithFakeSnapshotClient add and return fake snapshot client.
-func WithFakeSnapshotClient(c *criContainerdService) *servertesting.FakeSnapshotClient {
-	fake := servertesting.NewFakeSnapshotClient()
-	c.snapshotService = snapshotservice.NewSnapshotterFromClient(fake)
-	return fake
-}
-
-// Test all sandbox operations.
-func TestSandboxOperations(t *testing.T) {
-	c := newTestCRIContainerdService()
-	fake := c.taskService.(*servertesting.FakeExecutionClient)
-	fakeOS := c.os.(*ostesting.FakeOS)
-	fakeCNIPlugin := c.netPlugin.(*servertesting.FakeCNIPlugin)
-	WithFakeSnapshotClient(c)
-	fakeOS.OpenFifoFn = func(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
-		return nopReadWriteCloser{}, nil
-	}
-	// Insert sandbox image metadata.
-	c.imageStore.Add(imagestore.Image{
-		ID:      testSandboxImage,
-		ChainID: "test-chain-id",
-		Config:  &imagespec.ImageConfig{Entrypoint: []string{"/pause"}},
-	})
-
-	config := &runtime.PodSandboxConfig{
-		Metadata: &runtime.PodSandboxMetadata{
-			Name:      "test-name",
-			Uid:       "test-uid",
-			Namespace: "test-ns",
-			Attempt:   1,
-		},
-		Hostname:     "test-hostname",
-		LogDirectory: "test-log-directory",
-		Labels:       map[string]string{"a": "b"},
-		Annotations:  map[string]string{"c": "d"},
-	}
-
-	t.Logf("should be able to run a pod sandbox")
-	runRes, err := c.RunPodSandbox(context.Background(), &runtime.RunPodSandboxRequest{Config: config})
-	assert.NoError(t, err)
-	require.NotNil(t, runRes)
-	id := runRes.GetPodSandboxId()
-
-	t.Logf("should be able to get pod sandbox status")
-	info, err := fake.Info(context.Background(), &execution.InfoRequest{ContainerID: id})
-	netns := getNetworkNamespace(info.Task.Pid)
-	assert.NoError(t, err)
-	expectSandboxStatus := &runtime.PodSandboxStatus{
-		Id:       id,
-		Metadata: config.GetMetadata(),
-		// TODO(random-liu): [P2] Use fake clock for CreatedAt.
-		Network: &runtime.PodSandboxNetworkStatus{},
-		Linux: &runtime.LinuxPodSandboxStatus{
-			Namespaces: &runtime.Namespace{
-				Options: &runtime.NamespaceOption{
-					HostNetwork: false,
-					HostPid:     false,
-					HostIpc:     false,
-				},
-			},
-		},
-		Labels:      config.GetLabels(),
-		Annotations: config.GetAnnotations(),
-	}
-	statusRes, err := c.PodSandboxStatus(context.Background(), &runtime.PodSandboxStatusRequest{PodSandboxId: id})
-	assert.NoError(t, err)
-	require.NotNil(t, statusRes)
-	status := statusRes.GetStatus()
-	expectSandboxStatus.CreatedAt = status.GetCreatedAt()
-	ip, err := fakeCNIPlugin.GetContainerNetworkStatus(netns, config.GetMetadata().GetNamespace(), config.GetMetadata().GetName(), id)
-	assert.NoError(t, err)
-	expectSandboxStatus.Network.Ip = ip
-	assert.Equal(t, expectSandboxStatus, status)
-
-	t.Logf("should be able to list pod sandboxes")
-	expectSandbox := &runtime.PodSandbox{
-		Id:          id,
-		Metadata:    config.GetMetadata(),
-		State:       runtime.PodSandboxState_SANDBOX_NOTREADY, // TODO(mikebrow) converting to client... should this be ready?
-		Labels:      config.GetLabels(),
-		Annotations: config.GetAnnotations(),
-	}
-	listRes, err := c.ListPodSandbox(context.Background(), &runtime.ListPodSandboxRequest{})
-	assert.NoError(t, err)
-	require.NotNil(t, listRes)
-	sandboxes := listRes.GetItems()
-	assert.Len(t, sandboxes, 1)
-	expectSandbox.CreatedAt = sandboxes[0].CreatedAt
-	assert.Equal(t, expectSandbox, sandboxes[0])
-
-	t.Logf("should be able to stop a pod sandbox")
-	stopRes, err := c.StopPodSandbox(context.Background(), &runtime.StopPodSandboxRequest{PodSandboxId: id})
-	assert.NoError(t, err)
-	require.NotNil(t, stopRes)
-	statusRes, err = c.PodSandboxStatus(context.Background(), &runtime.PodSandboxStatusRequest{PodSandboxId: id})
-	assert.NoError(t, err)
-	require.NotNil(t, statusRes)
-	assert.Equal(t, runtime.PodSandboxState_SANDBOX_NOTREADY, statusRes.GetStatus().GetState(),
-		"sandbox status should be NOTREADY after stopped")
-	listRes, err = c.ListPodSandbox(context.Background(), &runtime.ListPodSandboxRequest{})
-	assert.NoError(t, err)
-	require.NotNil(t, listRes)
-	assert.Len(t, listRes.GetItems(), 1)
-	assert.Equal(t, runtime.PodSandboxState_SANDBOX_NOTREADY, listRes.GetItems()[0].State,
-		"sandbox in list should be NOTREADY after stopped")
-
-	t.Logf("should be able to remove a pod sandbox")
-	removeRes, err := c.RemovePodSandbox(context.Background(), &runtime.RemovePodSandboxRequest{PodSandboxId: id})
-	assert.NoError(t, err)
-	require.NotNil(t, removeRes)
-	_, err = c.PodSandboxStatus(context.Background(), &runtime.PodSandboxStatusRequest{PodSandboxId: id})
-	assert.Error(t, err, "should not be able to get sandbox status after removed")
-	listRes, err = c.ListPodSandbox(context.Background(), &runtime.ListPodSandboxRequest{})
-	assert.NoError(t, err)
-	require.NotNil(t, listRes)
-	assert.Empty(t, listRes.GetItems(), "should not be able to list the sandbox after removed")
-
-	t.Logf("should be able to create the sandbox again")
-	runRes, err = c.RunPodSandbox(context.Background(), &runtime.RunPodSandboxRequest{Config: config})
-	assert.NoError(t, err)
-	require.NotNil(t, runRes)
 }

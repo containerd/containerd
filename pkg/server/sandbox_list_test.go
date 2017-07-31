@@ -21,13 +21,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/context"
-
-	"github.com/containerd/containerd/api/types/task"
-
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
 	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
 )
 
@@ -129,88 +124,5 @@ func TestFilterSandboxes(t *testing.T) {
 	} {
 		filtered := c.filterCRISandboxes(testSandboxes, test.filter)
 		assert.Equal(t, test.expect, filtered, desc)
-	}
-}
-
-func TestListPodSandbox(t *testing.T) {
-	c := newTestCRIContainerdService()
-
-	fake := c.taskService.(*servertesting.FakeExecutionClient)
-
-	sandboxesInStore := []sandboxstore.Sandbox{
-		{
-			Metadata: sandboxstore.Metadata{
-				ID:     "1",
-				Name:   "name-1",
-				Config: &runtime.PodSandboxConfig{Metadata: &runtime.PodSandboxMetadata{Name: "name-1"}},
-			},
-		},
-		{
-			Metadata: sandboxstore.Metadata{
-				ID:     "2",
-				Name:   "name-2",
-				Config: &runtime.PodSandboxConfig{Metadata: &runtime.PodSandboxMetadata{Name: "name-2"}},
-			},
-		},
-		{
-			Metadata: sandboxstore.Metadata{
-				ID:     "3",
-				Name:   "name-3",
-				Config: &runtime.PodSandboxConfig{Metadata: &runtime.PodSandboxMetadata{Name: "name-3"}},
-			},
-		},
-	}
-	sandboxesInContainerd := []task.Task{
-		// Running container with corresponding metadata
-		{
-			ID:     "1",
-			Pid:    1,
-			Status: task.StatusRunning,
-		},
-		// Stopped container with corresponding metadata
-		{
-			ID:     "2",
-			Pid:    2,
-			Status: task.StatusStopped,
-		},
-		// Container without corresponding metadata
-		{
-			ID:     "4",
-			Pid:    4,
-			Status: task.StatusStopped,
-		},
-	}
-	expect := []*runtime.PodSandbox{
-		{
-			Id:       "1",
-			Metadata: &runtime.PodSandboxMetadata{Name: "name-1"},
-			State:    runtime.PodSandboxState_SANDBOX_READY,
-		},
-		{
-			Id:       "2",
-			Metadata: &runtime.PodSandboxMetadata{Name: "name-2"},
-			State:    runtime.PodSandboxState_SANDBOX_NOTREADY,
-		},
-		{
-			Id:       "3",
-			Metadata: &runtime.PodSandboxMetadata{Name: "name-3"},
-			State:    runtime.PodSandboxState_SANDBOX_NOTREADY,
-		},
-	}
-
-	// Inject test metadata
-	for _, s := range sandboxesInStore {
-		assert.NoError(t, c.sandboxStore.Add(s))
-	}
-
-	// Inject fake containerd tasks
-	fake.SetFakeTasks(sandboxesInContainerd)
-
-	resp, err := c.ListPodSandbox(context.Background(), &runtime.ListPodSandboxRequest{})
-	assert.NoError(t, err)
-	sandboxes := resp.GetItems()
-	assert.Len(t, sandboxes, len(expect))
-	for _, s := range expect {
-		assert.Contains(t, sandboxes, s)
 	}
 }

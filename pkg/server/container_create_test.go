@@ -17,26 +17,14 @@ limitations under the License.
 package server
 
 import (
-	"encoding/json"
-	"errors"
-	"os"
 	"testing"
 
-	"github.com/containerd/containerd/api/services/containers"
-	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
-
-	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
-	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
-	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
-	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
-	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
 )
 
 func checkMount(t *testing.T, mounts []runtimespec.Mount, src, dest, typ string,
@@ -438,161 +426,5 @@ func TestPrivilegedBindMount(t *testing.T) {
 		} else {
 			checkMount(t, spec.Mounts, "cgroup", "/sys/fs/cgroup", "cgroup", nil, []string{"ro"})
 		}
-	}
-}
-
-func TestCreateContainer(t *testing.T) {
-	testSandboxID := "test-sandbox-id"
-	testSandboxPid := uint32(4321)
-	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
-	testSandbox := &sandboxstore.Sandbox{
-		Metadata: sandboxstore.Metadata{
-			ID:     testSandboxID,
-			Name:   "test-sandbox-name",
-			Config: sandboxConfig,
-			Pid:    testSandboxPid,
-		},
-	}
-	testContainerName := makeContainerName(config.Metadata, sandboxConfig.Metadata)
-	// Use an image id to avoid image name resolution.
-	// TODO(random-liu): Change this to image name after we have complete image
-	// management unit test framework.
-	testImageRef := config.GetImage().GetImage()
-	testChainID := "test-chain-id"
-	testImage := imagestore.Image{
-		ID:      testImageRef,
-		ChainID: testChainID,
-		Config:  imageConfig,
-	}
-
-	for desc, test := range map[string]struct {
-		sandbox            *sandboxstore.Sandbox
-		reserveNameErr     bool
-		imageStoreErr      bool
-		prepareSnapshotErr error
-		createRootDirErr   error
-		expectErr          bool
-		expectedMeta       containerstore.Metadata
-	}{
-		"should return error if sandbox does not exist": {
-			sandbox:   nil,
-			expectErr: true,
-		},
-		"should return error if name is reserved": {
-			sandbox:        testSandbox,
-			reserveNameErr: true,
-			expectErr:      true,
-		},
-		"should return error if fail to create root directory": {
-			sandbox:          testSandbox,
-			createRootDirErr: errors.New("random error"),
-			expectErr:        true,
-		},
-		"should return error if image is not pulled": {
-			sandbox:       testSandbox,
-			imageStoreErr: true,
-			expectErr:     true,
-		},
-		"should return error if prepare snapshot fails": {
-			sandbox:            testSandbox,
-			prepareSnapshotErr: errors.New("random error"),
-			expectErr:          true,
-		},
-		"should be able to create container successfully": {
-			sandbox:   testSandbox,
-			expectErr: false,
-			expectedMeta: containerstore.Metadata{
-				Name:      testContainerName,
-				SandboxID: testSandboxID,
-				ImageRef:  testImageRef,
-				Config:    config,
-			},
-		},
-	} {
-		t.Logf("TestCase %q", desc)
-		c := newTestCRIContainerdService()
-		fake := c.containerService.(*servertesting.FakeContainersClient)
-		fakeSnapshotClient := WithFakeSnapshotClient(c)
-		fakeOS := c.os.(*ostesting.FakeOS)
-		if test.sandbox != nil {
-			assert.NoError(t, c.sandboxStore.Add(*test.sandbox))
-		}
-		if test.reserveNameErr {
-			assert.NoError(t, c.containerNameIndex.Reserve(testContainerName, "random id"))
-		}
-		if !test.imageStoreErr {
-			c.imageStore.Add(testImage)
-		}
-		if test.prepareSnapshotErr != nil {
-			fakeSnapshotClient.InjectError("prepare", test.prepareSnapshotErr)
-		}
-		rootExists := false
-		rootPath := ""
-		fakeOS.MkdirAllFn = func(path string, perm os.FileMode) error {
-			assert.Equal(t, os.FileMode(0755), perm)
-			rootPath = path
-			if test.createRootDirErr == nil {
-				rootExists = true
-			}
-			return test.createRootDirErr
-		}
-		fakeOS.RemoveAllFn = func(path string) error {
-			assert.Equal(t, rootPath, path)
-			rootExists = false
-			return nil
-		}
-		resp, err := c.CreateContainer(context.Background(), &runtime.CreateContainerRequest{
-			PodSandboxId:  testSandboxID,
-			Config:        config,
-			SandboxConfig: sandboxConfig,
-		})
-		if test.expectErr {
-			assert.Error(t, err)
-			assert.Nil(t, resp)
-			assert.False(t, rootExists, "root directory should be cleaned up")
-			if !test.reserveNameErr {
-				assert.NoError(t, c.containerNameIndex.Reserve(testContainerName, "random id"),
-					"container name should be released")
-			}
-			assert.Empty(t, fakeSnapshotClient.ListMounts(), "snapshot should be cleaned up")
-			listResp, err := fake.List(context.Background(), &containers.ListContainersRequest{})
-			assert.NoError(t, err)
-			assert.Empty(t, listResp.Containers, "containerd container should be cleaned up")
-			assert.Empty(t, c.containerStore.List(), "container metadata should not be created")
-			continue
-		}
-		assert.NoError(t, err)
-		assert.NotNil(t, resp)
-		id := resp.GetContainerId()
-		assert.True(t, rootExists)
-		assert.Equal(t, getContainerRootDir(c.rootDir, id), rootPath, "root directory should be created")
-
-		// Check runtime spec
-		containersCalls := fake.GetCalledDetails()
-		require.Len(t, containersCalls, 1)
-		createOpts, ok := containersCalls[0].Argument.(*containers.CreateContainerRequest)
-		assert.True(t, ok, "should create containerd container")
-		assert.Equal(t, id, createOpts.Container.ID, "container id should be correct")
-		assert.Equal(t, testImageRef, createOpts.Container.Image, "test image should be correct")
-		assert.Equal(t, id, createOpts.Container.RootFS, "rootfs should be correct")
-		spec := &runtimespec.Spec{}
-		assert.NoError(t, json.Unmarshal(createOpts.Container.Spec.Value, spec))
-		specCheck(t, id, testSandboxPid, spec)
-
-		assert.Equal(t, []string{"prepare"}, fakeSnapshotClient.GetCalledNames(), "prepare should be called")
-		snapshotCalls := fakeSnapshotClient.GetCalledDetails()
-		require.Len(t, snapshotCalls, 1)
-		prepareOpts := snapshotCalls[0].Argument.(*snapshotapi.PrepareRequest)
-		assert.Equal(t, &snapshotapi.PrepareRequest{
-			Key:    id,
-			Parent: testChainID,
-		}, prepareOpts, "prepare request should be correct")
-
-		container, err := c.containerStore.Get(id)
-		assert.NoError(t, err)
-		test.expectedMeta.ID = id
-		assert.Equal(t, test.expectedMeta, container.Metadata, "container metadata should be created")
-		assert.Equal(t, runtime.ContainerState_CONTAINER_CREATED, container.Status.Get().State(),
-			"container should be in created state")
 	}
 }

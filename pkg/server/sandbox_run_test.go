@@ -17,25 +17,16 @@ limitations under the License.
 package server
 
 import (
-	"encoding/json"
-	"io"
 	"os"
-	"syscall"
 	"testing"
 
-	"github.com/containerd/containerd/api/services/containers"
-	"github.com/containerd/containerd/api/services/execution"
-	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
-	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
-	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
 )
 
 func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
@@ -267,112 +258,6 @@ options timeout:1
 			assert.Equal(t, expected, calls[i])
 		}
 	}
-}
-
-func TestRunPodSandbox(t *testing.T) {
-	config, imageConfig, specCheck := getRunPodSandboxTestData()
-	c := newTestCRIContainerdService()
-	fake := c.containerService.(*servertesting.FakeContainersClient)
-	fakeSnapshotClient := WithFakeSnapshotClient(c)
-	fakeExecutionClient := c.taskService.(*servertesting.FakeExecutionClient)
-	fakeCNIPlugin := c.netPlugin.(*servertesting.FakeCNIPlugin)
-	fakeOS := c.os.(*ostesting.FakeOS)
-	var dirs []string
-	var pipes []string
-	fakeOS.MkdirAllFn = func(path string, perm os.FileMode) error {
-		dirs = append(dirs, path)
-		return nil
-	}
-	fakeOS.OpenFifoFn = func(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
-		pipes = append(pipes, fn)
-		assert.Equal(t, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, flag)
-		assert.Equal(t, os.FileMode(0700), perm)
-		return nopReadWriteCloser{}, nil
-	}
-	testChainID := "test-sandbox-chain-id"
-	image := imagestore.Image{
-		ID:      testSandboxImage,
-		ChainID: testChainID,
-		Config:  imageConfig,
-	}
-	// Insert sandbox image.
-	c.imageStore.Add(image)
-	expectContainersClientCalls := []string{"create"}
-	expectSnapshotClientCalls := []string{"view"}
-	expectExecutionClientCalls := []string{"create", "start"}
-
-	res, err := c.RunPodSandbox(context.Background(), &runtime.RunPodSandboxRequest{Config: config})
-	assert.NoError(t, err)
-	require.NotNil(t, res)
-	id := res.GetPodSandboxId()
-
-	sandboxRootDir := getSandboxRootDir(c.rootDir, id)
-	assert.Contains(t, dirs[0], sandboxRootDir, "sandbox root directory should be created")
-
-	assert.Len(t, pipes, 2)
-	_, stdout, stderr := getStreamingPipes(sandboxRootDir)
-	assert.Contains(t, pipes, stdout, "sandbox stdout pipe should be created")
-	assert.Contains(t, pipes, stderr, "sandbox stderr pipe should be created")
-
-	assert.Equal(t, expectSnapshotClientCalls, fakeSnapshotClient.GetCalledNames(), "expect snapshot functions should be called")
-	calls := fakeSnapshotClient.GetCalledDetails()
-	prepareOpts := calls[0].Argument.(*snapshotapi.PrepareRequest)
-	assert.Equal(t, &snapshotapi.PrepareRequest{
-		Key:    id,
-		Parent: testChainID,
-	}, prepareOpts, "prepare request should be correct")
-
-	assert.Equal(t, expectContainersClientCalls, fake.GetCalledNames(), "expect containers functions should be called")
-	calls = fake.GetCalledDetails()
-	createOpts, ok := calls[0].Argument.(*containers.CreateContainerRequest)
-	assert.True(t, ok, "should create sandbox container")
-	assert.Equal(t, id, createOpts.Container.ID, "container id should be correct")
-	assert.Equal(t, testSandboxImage, createOpts.Container.Image, "test image should be correct")
-	assert.Equal(t, id, createOpts.Container.RootFS, "rootfs should be correct")
-	spec := &runtimespec.Spec{}
-	assert.NoError(t, json.Unmarshal(createOpts.Container.Spec.Value, spec))
-	t.Logf("oci spec check")
-	specCheck(t, id, spec)
-
-	assert.Equal(t, expectExecutionClientCalls, fakeExecutionClient.GetCalledNames(), "expect execution functions should be called")
-	calls = fakeExecutionClient.GetCalledDetails()
-	createTaskOpts := calls[0].Argument.(*execution.CreateRequest)
-	mountsResp, err := fakeSnapshotClient.Mounts(context.Background(), &snapshotapi.MountsRequest{Key: id})
-	assert.NoError(t, err)
-	assert.Equal(t, &execution.CreateRequest{
-		ContainerID: id,
-		Rootfs:      mountsResp.Mounts,
-		Stdout:      stdout,
-		Stderr:      stderr,
-	}, createTaskOpts, "create options should be correct")
-
-	startID := calls[1].Argument.(*execution.StartRequest).ContainerID
-	assert.Equal(t, id, startID, "start id should be correct")
-
-	sandbox, err := c.sandboxStore.Get(id)
-	assert.NoError(t, err)
-	assert.Equal(t, id, sandbox.ID, "sandbox id should be correct")
-	err = c.sandboxNameIndex.Reserve(sandbox.Name, "random-id")
-	assert.Error(t, err, "sandbox name should be reserved")
-	assert.Equal(t, config, sandbox.Config, "sandbox config should be correct")
-	// TODO(random-liu): [P2] Add clock interface and use fake clock.
-	assert.NotZero(t, sandbox.CreatedAt, "sandbox CreatedAt should be set")
-	info, err := fakeExecutionClient.Info(context.Background(), &execution.InfoRequest{ContainerID: id})
-	assert.NoError(t, err)
-	pid := info.Task.Pid
-	assert.Equal(t, sandbox.NetNS, getNetworkNamespace(pid), "sandbox network namespace should be correct")
-
-	expectedCNICalls := []string{"SetUpPod"}
-	assert.Equal(t, expectedCNICalls, fakeCNIPlugin.GetCalledNames(), "expect SetUpPod should be called")
-	calls = fakeCNIPlugin.GetCalledDetails()
-	pluginArgument := calls[0].Argument.(servertesting.CNIPluginArgument)
-	expectedPluginArgument := servertesting.CNIPluginArgument{
-		NetnsPath:   sandbox.NetNS,
-		Namespace:   config.GetMetadata().GetNamespace(),
-		Name:        config.GetMetadata().GetName(),
-		ContainerID: id,
-	}
-	assert.Equal(t, expectedPluginArgument, pluginArgument, "SetUpPod should be called with correct arguments")
 }
 
 func TestParseDNSOption(t *testing.T) {

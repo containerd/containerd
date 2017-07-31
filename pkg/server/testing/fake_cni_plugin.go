@@ -26,6 +26,14 @@ import (
 	"github.com/kubernetes-incubator/cri-o/pkg/ocicni"
 )
 
+// CalledDetail is the struct contains called function name and arguments.
+type CalledDetail struct {
+	// Name of the function called.
+	Name string
+	// Argument of the function called.
+	Argument interface{}
+}
+
 // CNIPluginArgument is arguments used to call CNI related functions.
 type CNIPluginArgument struct {
 	NetnsPath   string
