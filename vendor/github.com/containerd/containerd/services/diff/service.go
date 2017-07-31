@@ -1,8 +1,9 @@
 package diff
 
 import (
-	diffapi "github.com/containerd/containerd/api/services/diff"
-	mounttypes "github.com/containerd/containerd/api/types/mount"
+	diffapi "github.com/containerd/containerd/api/services/diff/v1"
+	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"golang.org/x/net/context"
@@ -10,11 +11,19 @@ import (
 )
 
 func init() {
-	plugin.Register("diff-grpc", &plugin.Registration{
+	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
+		ID:   "diff",
+		Requires: []plugin.PluginType{
+			plugin.DiffPlugin,
+		},
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
+			d, err := ic.Get(plugin.DiffPlugin)
+			if err != nil {
+				return nil, err
+			}
 			return &service{
-				diff: ic.Differ,
+				diff: d.(plugin.Differ),
 			}, nil
 		},
 	})
@@ -37,7 +46,7 @@ func (s *service) Apply(ctx context.Context, er *diffapi.ApplyRequest) (*diffapi
 
 	ocidesc, err := s.diff.Apply(ctx, desc, mounts)
 	if err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 
 	return &diffapi.ApplyResponse{
@@ -52,7 +61,7 @@ func (s *service) Diff(ctx context.Context, dr *diffapi.DiffRequest) (*diffapi.D
 
 	ocidesc, err := s.diff.DiffMounts(ctx, aMounts, bMounts, dr.MediaType, dr.Ref)
 	if err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 
 	return &diffapi.DiffResponse{
@@ -60,7 +69,7 @@ func (s *service) Diff(ctx context.Context, dr *diffapi.DiffRequest) (*diffapi.D
 	}, nil
 }
 
-func toMounts(apim []*mounttypes.Mount) []mount.Mount {
+func toMounts(apim []*types.Mount) []mount.Mount {
 	mounts := make([]mount.Mount, len(apim))
 	for i, m := range apim {
 		mounts[i] = mount.Mount{

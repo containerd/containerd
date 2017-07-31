@@ -9,6 +9,8 @@ In first you need to setup your Go development environment. You can follow this
 guideline [How to write go code](https://golang.org/doc/code.html) and at the
 end you need to have `GOPATH` and `GOROOT` set in your environment.
 
+Current containerd requires Go 1.8.x or above.
+
 At this point you can use `go` to checkout `containerd` in your `GOPATH`:
 
 ```sh

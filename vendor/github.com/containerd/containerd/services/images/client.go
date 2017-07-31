@@ -3,9 +3,10 @@ package images
 import (
 	"context"
 
-	imagesapi "github.com/containerd/containerd/api/services/images"
+	imagesapi "github.com/containerd/containerd/api/services/images/v1"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	ptypes "github.com/gogo/protobuf/types"
 )
 
 type remoteStore struct {
@@ -18,43 +19,62 @@ func NewStoreFromClient(client imagesapi.ImagesClient) images.Store {
 	}
 }
 
-func (s *remoteStore) Put(ctx context.Context, name string, desc ocispec.Descriptor) error {
-	// TODO(stevvooe): Consider that the remote may want to augment and return
-	// a modified image.
-	_, err := s.client.Put(ctx, &imagesapi.PutRequest{
-		Image: imagesapi.Image{
-			Name:   name,
-			Target: descToProto(&desc),
-		},
-	})
-
-	return rewriteGRPCError(err)
-}
-
 func (s *remoteStore) Get(ctx context.Context, name string) (images.Image, error) {
-	resp, err := s.client.Get(ctx, &imagesapi.GetRequest{
+	resp, err := s.client.Get(ctx, &imagesapi.GetImageRequest{
 		Name: name,
 	})
 	if err != nil {
-		return images.Image{}, rewriteGRPCError(err)
+		return images.Image{}, errdefs.FromGRPC(err)
 	}
 
 	return imageFromProto(resp.Image), nil
 }
 
-func (s *remoteStore) List(ctx context.Context) ([]images.Image, error) {
-	resp, err := s.client.List(ctx, &imagesapi.ListRequest{})
+func (s *remoteStore) List(ctx context.Context, filters ...string) ([]images.Image, error) {
+	resp, err := s.client.List(ctx, &imagesapi.ListImagesRequest{
+		Filters: filters,
+	})
 	if err != nil {
-		return nil, rewriteGRPCError(err)
+		return nil, errdefs.FromGRPC(err)
 	}
 
 	return imagesFromProto(resp.Images), nil
 }
 
+func (s *remoteStore) Create(ctx context.Context, image images.Image) (images.Image, error) {
+	created, err := s.client.Create(ctx, &imagesapi.CreateImageRequest{
+		Image: imageToProto(&image),
+	})
+	if err != nil {
+		return images.Image{}, errdefs.FromGRPC(err)
+	}
+
+	return imageFromProto(&created.Image), nil
+}
+
+func (s *remoteStore) Update(ctx context.Context, image images.Image, fieldpaths ...string) (images.Image, error) {
+	var updateMask *ptypes.FieldMask
+	if len(fieldpaths) > 0 {
+		updateMask = &ptypes.FieldMask{
+			Paths: fieldpaths,
+		}
+	}
+
+	updated, err := s.client.Update(ctx, &imagesapi.UpdateImageRequest{
+		Image:      imageToProto(&image),
+		UpdateMask: updateMask,
+	})
+	if err != nil {
+		return images.Image{}, errdefs.FromGRPC(err)
+	}
+
+	return imageFromProto(&updated.Image), nil
+}
+
 func (s *remoteStore) Delete(ctx context.Context, name string) error {
-	_, err := s.client.Delete(ctx, &imagesapi.DeleteRequest{
+	_, err := s.client.Delete(ctx, &imagesapi.DeleteImageRequest{
 		Name: name,
 	})
 
-	return rewriteGRPCError(err)
+	return errdefs.FromGRPC(err)
 }

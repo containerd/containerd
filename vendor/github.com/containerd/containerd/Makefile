@@ -8,27 +8,33 @@ DESTDIR=/usr/local
 VERSION=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
 REVISION=$(shell git rev-parse HEAD)$(shell if ! git diff --no-ext-diff --quiet --exit-code; then echo .m; fi)
 
-PKG=github.com/containerd/containerd
-
 ifneq "$(strip $(shell command -v go 2>/dev/null))" ""
-GOOS ?= $(shell go env GOOS)
+	GOOS ?= $(shell go env GOOS)
 else
-GOOS ?= $$GOOS
+	GOOS ?= $$GOOS
 endif
-WHALE = "🐳"
+
+WHALE = "🇩"
 ONI = "👹"
+FIX_PATH = $1
 ifeq ("$(OS)", "Windows_NT")
 	WHALE="+"
 	ONI="-"
+	FIX_PATH = $(subst /,\,$1)
 endif
+GOARCH ?= $(shell go env GOARCH)
+
+RELEASE=containerd-$(VERSION:v%=%).${GOOS}-${GOARCH}
+
+PKG=github.com/containerd/containerd
 
 # Project packages.
 PACKAGES=$(shell go list ./... | grep -v /vendor/)
-INTEGRATION_PACKAGE=${PKG}/integration
-SNAPSHOT_PACKAGES=$(shell go list ./snapshot/...)
+INTEGRATION_PACKAGE=${PKG}
+TEST_REQUIRES_ROOT_PACKAGES=$(shell for f in $$(git grep -l testutil.RequiresRoot | grep -v Makefile);do echo "${PKG}/$$(dirname $$f)"; done)
 
 # Project binaries.
-COMMANDS=ctr containerd protoc-gen-gogoctrd dist ctrd-protobuild
+COMMANDS=ctr containerd
 ifneq ("$(GOOS)", "windows")
 	COMMANDS += containerd-shim
 endif
@@ -41,9 +47,9 @@ GO_TAGS=$(if $(BUILDTAGS),-tags "$(BUILDTAGS)",)
 GO_LDFLAGS=-ldflags "-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG) $(EXTRA_LDFLAGS)"
 
 # Flags passed to `go test`
-TESTFLAGS ?=-parallel 8 -race
+TESTFLAGS ?=-parallel 8 -race -v
 
-.PHONY: clean all AUTHORS fmt vet lint dco build binaries test integration setup generate protos checkprotos coverage ci check help install uninstall vendor
+.PHONY: clean all AUTHORS fmt vet lint dco build binaries test integration setup generate protos checkprotos coverage ci check help install uninstall vendor release
 .DEFAULT: default
 
 all: binaries
@@ -61,14 +67,15 @@ setup: ## install dependencies
 	@go get -u github.com/golang/lint/golint
 	#@go get -u github.com/kisielk/errcheck
 	@go get -u github.com/gordonklaus/ineffassign
+	@go get -u github.com/stevvooe/protobuild
 
 generate: protos
 	@echo "$(WHALE) $@"
 	@PATH=${ROOTDIR}/bin:${PATH} go generate -x ${PACKAGES}
 
-protos: bin/protoc-gen-gogoctrd bin/ctrd-protobuild ## generate protobuf
+protos: bin/protoc-gen-gogoctrd ## generate protobuf
 	@echo "$(WHALE) $@"
-	@PATH=${ROOTDIR}/bin:${PATH} ctrd-protobuild ${PACKAGES}
+	@PATH=${ROOTDIR}/bin:${PATH} protobuild ${PACKAGES}
 
 checkprotos: protos ## check if protobufs needs to be generated again
 	@echo "$(WHALE) $@"
@@ -84,7 +91,7 @@ vet: binaries ## run go vet
 
 fmt: ## run go fmt
 	@echo "$(WHALE) $@"
-	@test -z "$$(gofmt -s -l . | grep -v vendor/ | grep -v ".pb.go$$" | tee /dev/stderr)" || \
+	@test -z "$$(gofmt -s -l . | grep -Fv $(call FIX_PATH,'vendor/') | grep -v ".pb.go$$" | tee /dev/stderr)" || \
 		(echo "$(ONI) please format Go code with 'gofmt -s -w'" && false)
 	@test -z "$$(find . -path ./vendor -prune -o ! -name timestamp.proto ! -name duration.proto -name '*.proto' -type f -exec grep -Hn -e "^ " {} \; | tee /dev/stderr)" || \
 		(echo "$(ONI) please indent proto files with tabs only" && false)
@@ -93,7 +100,7 @@ fmt: ## run go fmt
 
 lint: ## run go lint
 	@echo "$(WHALE) $@"
-	@test -z "$$(golint ./... | grep -v vendor/ | grep -v ".pb.go:" | tee /dev/stderr)"
+	@test -z "$$(golint ./... | grep -Fv $(call FIX_PATH,'vendor/') | grep -v ".pb.go:" | tee /dev/stderr)"
 
 dco: ## dco check
 	@which git-validation > /dev/null 2>/dev/null || (echo "ERROR: git-validation not found" && false)
@@ -105,15 +112,15 @@ endif
 
 ineffassign: ## run ineffassign
 	@echo "$(WHALE) $@"
-	@test -z "$$(ineffassign . | grep -v vendor/ | grep -v ".pb.go:" | tee /dev/stderr)"
+	@test -z "$$(ineffassign . | grep -Fv $(call FIX_PATH,'vendor/') | grep -v ".pb.go:" | tee /dev/stderr)"
 
 #errcheck: ## run go errcheck
 #	@echo "$(WHALE) $@"
-#	@test -z "$$(errcheck ./... | grep -v vendor/ | grep -v ".pb.go:" | tee /dev/stderr)"
+#	@test -z "$$(errcheck ./... | grep -Fv $(call FIX_PATH,'vendor/') | grep -v ".pb.go:" | tee /dev/stderr)"
 
 build: ## build the go packages
 	@echo "$(WHALE) $@"
-	@go build -i -v ${EXTRA_FLAGS} ${GO_LDFLAGS} ${GO_GCFLAGS} ${PACKAGES}
+	@go build -v ${EXTRA_FLAGS} ${GO_LDFLAGS} ${GO_GCFLAGS} ${PACKAGES}
 
 test: ## run tests, except integration tests and tests that require root
 	@echo "$(WHALE) $@"
@@ -121,21 +128,31 @@ test: ## run tests, except integration tests and tests that require root
 
 root-test: ## run tests, except integration tests
 	@echo "$(WHALE) $@"
-	@go test ${TESTFLAGS} ${SNAPSHOT_PACKAGES} -test.root
+	@go test ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES}) -test.root
 
 integration: ## run integration tests
 	@echo "$(WHALE) $@"
-	@go test ${TESTFLAGS}
+	@go test ${TESTFLAGS} -test.root
+
+benchmark: ## run benchmarks tests
+	@echo "$(WHALE) $@"
+	@go test ${TESTFLAGS} -bench . -run Benchmark -test.root
 
 FORCE:
 
 # Build a binary from a cmd.
 bin/%: cmd/% FORCE
 	@echo "$(WHALE) $@${BINARY_SUFFIX}"
-	@go build -i -o $@${BINARY_SUFFIX} ${GO_LDFLAGS} ${GO_TAGS} ${GO_GCFLAGS} ./$<
+	@go build -o $@${BINARY_SUFFIX} ${GO_LDFLAGS} ${GO_TAGS} ${GO_GCFLAGS} ./$<
 
 binaries: $(BINARIES) ## build binaries
 	@echo "$(WHALE) $@"
+
+release: $(BINARIES)
+	@echo "$(WHALE) $@"
+	@mkdir -p releases/${RELEASE}
+	@cp $(BINARIES) releases/$(RELEASE)/
+	@cd releases/$(RELEASE) && tar -czf ../$(RELEASE).tar.gz *
 
 clean: ## clean up binaries
 	@echo "$(WHALE) $@"
@@ -169,14 +186,14 @@ coverage: ## generate coverprofiles from the unit tests, except tests that requi
 
 root-coverage: ## generae coverage profiles for the unit tests
 	@echo "$(WHALE) $@"
-	@( for pkg in ${SNAPSHOT_PACKAGES}; do \
+	@( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES}); do \
 		go test -i ${TESTFLAGS} -test.short -coverprofile="../../../$$pkg/coverage.txt" -covermode=atomic $$pkg -test.root || exit; \
 		go test ${TESTFLAGS} -test.short -coverprofile="../../../$$pkg/coverage.txt" -covermode=atomic $$pkg -test.root || exit; \
 	done )
 
 coverage-integration: ## generate coverprofiles from the integration tests
 	@echo "$(WHALE) $@"
-	go test ${TESTFLAGS} -test.short -coverprofile="../../../${INTEGRATION_PACKAGE}/coverage.txt" -covermode=atomic ${INTEGRATION_PACKAGE}
+	go test ${TESTFLAGS} -test.short -coverprofile="../../../${INTEGRATION_PACKAGE}/coverage.txt" -covermode=atomic ${INTEGRATION_PACKAGE} -test.root
 
 vendor:
 	@echo "$(WHALE) $@"

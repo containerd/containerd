@@ -4,7 +4,9 @@ import (
 	"context"
 
 	"github.com/boltdb/bolt"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/pkg/errors"
 )
 
 type namespaceStore struct {
@@ -21,11 +23,15 @@ func (s *namespaceStore) Create(ctx context.Context, namespace string, labels ma
 		return err
 	}
 
+	if err := namespaces.Validate(namespace); err != nil {
+		return err
+	}
+
 	// provides the already exists error.
 	bkt, err := topbkt.CreateBucket([]byte(namespace))
 	if err != nil {
 		if err == bolt.ErrBucketExists {
-			return ErrExists
+			return errors.Wrapf(errdefs.ErrAlreadyExists, "namespace %q", namespace)
 		}
 
 		return err
@@ -100,12 +106,12 @@ func (s *namespaceStore) Delete(ctx context.Context, namespace string) error {
 	if empty, err := s.namespaceEmpty(ctx, namespace); err != nil {
 		return err
 	} else if !empty {
-		return ErrNotEmpty
+		return errors.Wrapf(errdefs.ErrFailedPrecondition, "namespace %q must be empty", namespace)
 	}
 
 	if err := bkt.DeleteBucket([]byte(namespace)); err != nil {
 		if err == bolt.ErrBucketNotFound {
-			return ErrNotFound
+			return errors.Wrapf(errdefs.ErrNotFound, "namespace %q", namespace)
 		}
 
 		return err
@@ -129,7 +135,7 @@ func (s *namespaceStore) namespaceEmpty(ctx context.Context, namespace string) (
 	}
 
 	containerStore := NewContainerStore(s.tx)
-	containers, err := containerStore.List(ctx, "")
+	containers, err := containerStore.List(ctx)
 	if err != nil {
 		return false, err
 	}

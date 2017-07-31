@@ -2,13 +2,13 @@ package devices
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"syscall"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
+
+	"golang.org/x/sys/unix"
 )
 
 var (
@@ -17,45 +17,41 @@ var (
 
 // Testing dependencies
 var (
-	osLstat       = os.Lstat
+	unixLstat     = unix.Lstat
 	ioutilReadDir = ioutil.ReadDir
 )
 
 // Given the path to a device and its cgroup_permissions(which cannot be easily queried) look up the information about a linux device and return that information as a Device struct.
 func DeviceFromPath(path, permissions string) (*configs.Device, error) {
-	fileInfo, err := osLstat(path)
+	var stat unix.Stat_t
+	err := unixLstat(path, &stat)
 	if err != nil {
 		return nil, err
 	}
 	var (
-		devType                rune
-		mode                   = fileInfo.Mode()
-		fileModePermissionBits = os.FileMode.Perm(mode)
+		devType rune
+		mode    = stat.Mode
 	)
 	switch {
-	case mode&os.ModeDevice == 0:
-		return nil, ErrNotADevice
-	case mode&os.ModeCharDevice != 0:
-		fileModePermissionBits |= syscall.S_IFCHR
+	case mode&unix.S_IFBLK != 0:
+		devType = 'b'
+	case mode&unix.S_IFCHR != 0:
 		devType = 'c'
 	default:
-		fileModePermissionBits |= syscall.S_IFBLK
-		devType = 'b'
+		return nil, ErrNotADevice
 	}
-	stat_t, ok := fileInfo.Sys().(*syscall.Stat_t)
-	if !ok {
-		return nil, fmt.Errorf("cannot determine the device number for device %s", path)
-	}
-	devNumber := int(stat_t.Rdev)
+	devNumber := int(stat.Rdev)
+	uid := stat.Uid
+	gid := stat.Gid
 	return &configs.Device{
 		Type:        devType,
 		Path:        path,
 		Major:       Major(devNumber),
 		Minor:       Minor(devNumber),
 		Permissions: permissions,
-		FileMode:    fileModePermissionBits,
-		Uid:         stat_t.Uid,
-		Gid:         stat_t.Gid,
+		FileMode:    os.FileMode(mode),
+		Uid:         uid,
+		Gid:         gid,
 	}, nil
 }
 

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
 	"strings"
 
 	rspec "github.com/opencontainers/runtime-spec/specs-go"
@@ -35,15 +34,11 @@ type ExportOptions struct {
 func New() Generator {
 	spec := rspec.Spec{
 		Version: rspec.Version,
-		Platform: rspec.Platform{
-			OS:   runtime.GOOS,
-			Arch: runtime.GOARCH,
-		},
-		Root: rspec.Root{
+		Root: &rspec.Root{
 			Path:     "",
 			Readonly: false,
 		},
-		Process: rspec.Process{
+		Process: &rspec.Process{
 			Terminal: false,
 			User:     rspec.User{},
 			Args: []string{
@@ -136,7 +131,7 @@ func New() Generator {
 					"CAP_AUDIT_WRITE",
 				},
 			},
-			Rlimits: []rspec.LinuxRlimit{
+			Rlimits: []rspec.POSIXRlimit{
 				{
 					Type: "RLIMIT_NOFILE",
 					Hard: uint64(1024),
@@ -308,13 +303,13 @@ func (g *Generator) SetVersion(version string) {
 
 // SetRootPath sets g.spec.Root.Path.
 func (g *Generator) SetRootPath(path string) {
-	g.initSpec()
+	g.initSpecRoot()
 	g.spec.Root.Path = path
 }
 
 // SetRootReadonly sets g.spec.Root.Readonly.
 func (g *Generator) SetRootReadonly(b bool) {
-	g.initSpec()
+	g.initSpecRoot()
 	g.spec.Root.Readonly = b
 }
 
@@ -346,57 +341,45 @@ func (g *Generator) RemoveAnnotation(key string) {
 	delete(g.spec.Annotations, key)
 }
 
-// SetPlatformOS sets g.spec.Process.OS.
-func (g *Generator) SetPlatformOS(os string) {
-	g.initSpec()
-	g.spec.Platform.OS = os
-}
-
-// SetPlatformArch sets g.spec.Platform.Arch.
-func (g *Generator) SetPlatformArch(arch string) {
-	g.initSpec()
-	g.spec.Platform.Arch = arch
-}
-
 // SetProcessUID sets g.spec.Process.User.UID.
 func (g *Generator) SetProcessUID(uid uint32) {
-	g.initSpec()
+	g.initSpecProcess()
 	g.spec.Process.User.UID = uid
 }
 
 // SetProcessGID sets g.spec.Process.User.GID.
 func (g *Generator) SetProcessGID(gid uint32) {
-	g.initSpec()
+	g.initSpecProcess()
 	g.spec.Process.User.GID = gid
 }
 
 // SetProcessCwd sets g.spec.Process.Cwd.
 func (g *Generator) SetProcessCwd(cwd string) {
-	g.initSpec()
+	g.initSpecProcess()
 	g.spec.Process.Cwd = cwd
 }
 
 // SetProcessNoNewPrivileges sets g.spec.Process.NoNewPrivileges.
 func (g *Generator) SetProcessNoNewPrivileges(b bool) {
-	g.initSpec()
+	g.initSpecProcess()
 	g.spec.Process.NoNewPrivileges = b
 }
 
 // SetProcessTerminal sets g.spec.Process.Terminal.
 func (g *Generator) SetProcessTerminal(b bool) {
-	g.initSpec()
+	g.initSpecProcess()
 	g.spec.Process.Terminal = b
 }
 
 // SetProcessApparmorProfile sets g.spec.Process.ApparmorProfile.
 func (g *Generator) SetProcessApparmorProfile(prof string) {
-	g.initSpec()
+	g.initSpecProcess()
 	g.spec.Process.ApparmorProfile = prof
 }
 
 // SetProcessArgs sets g.spec.Process.Args.
 func (g *Generator) SetProcessArgs(args []string) {
-	g.initSpec()
+	g.initSpecProcess()
 	g.spec.Process.Args = args
 }
 
@@ -411,7 +394,7 @@ func (g *Generator) ClearProcessEnv() {
 // AddProcessEnv adds name=value into g.spec.Process.Env, or replaces an
 // existing entry with the given name.
 func (g *Generator) AddProcessEnv(name, value string) {
-	g.initSpec()
+	g.initSpecProcess()
 
 	env := fmt.Sprintf("%s=%s", name, value)
 	for idx := range g.spec.Process.Env {
@@ -425,7 +408,7 @@ func (g *Generator) AddProcessEnv(name, value string) {
 
 // AddProcessRlimits adds rlimit into g.spec.Process.Rlimits.
 func (g *Generator) AddProcessRlimits(rType string, rHard uint64, rSoft uint64) {
-	g.initSpec()
+	g.initSpecProcess()
 	for i, rlimit := range g.spec.Process.Rlimits {
 		if rlimit.Type == rType {
 			g.spec.Process.Rlimits[i].Hard = rHard
@@ -434,7 +417,7 @@ func (g *Generator) AddProcessRlimits(rType string, rHard uint64, rSoft uint64) 
 		}
 	}
 
-	newRlimit := rspec.LinuxRlimit{
+	newRlimit := rspec.POSIXRlimit{
 		Type: rType,
 		Hard: rHard,
 		Soft: rSoft,
@@ -461,7 +444,7 @@ func (g *Generator) ClearProcessRlimits() {
 	if g.spec == nil {
 		return
 	}
-	g.spec.Process.Rlimits = []rspec.LinuxRlimit{}
+	g.spec.Process.Rlimits = []rspec.POSIXRlimit{}
 }
 
 // ClearProcessAdditionalGids clear g.spec.Process.AdditionalGids.
@@ -474,7 +457,7 @@ func (g *Generator) ClearProcessAdditionalGids() {
 
 // AddProcessAdditionalGid adds an additional gid into g.spec.Process.AdditionalGids.
 func (g *Generator) AddProcessAdditionalGid(gid uint32) {
-	g.initSpec()
+	g.initSpecProcess()
 	for _, group := range g.spec.Process.User.AdditionalGids {
 		if group == gid {
 			return
@@ -485,7 +468,7 @@ func (g *Generator) AddProcessAdditionalGid(gid uint32) {
 
 // SetProcessSelinuxLabel sets g.spec.Process.SelinuxLabel.
 func (g *Generator) SetProcessSelinuxLabel(label string) {
-	g.initSpec()
+	g.initSpecProcess()
 	g.spec.Process.SelinuxLabel = label
 }
 
@@ -501,16 +484,10 @@ func (g *Generator) SetLinuxMountLabel(label string) {
 	g.spec.Linux.MountLabel = label
 }
 
-// SetLinuxResourcesDisableOOMKiller sets g.spec.Linux.Resources.DisableOOMKiller.
-func (g *Generator) SetLinuxResourcesDisableOOMKiller(disable bool) {
-	g.initSpecLinuxResources()
-	g.spec.Linux.Resources.DisableOOMKiller = &disable
-}
-
-// SetLinuxResourcesOOMScoreAdj sets g.spec.Linux.Resources.OOMScoreAdj.
-func (g *Generator) SetLinuxResourcesOOMScoreAdj(adj int) {
-	g.initSpecLinuxResources()
-	g.spec.Linux.Resources.OOMScoreAdj = &adj
+// SetProcessOOMScoreAdj sets g.spec.Process.OOMScoreAdj.
+func (g *Generator) SetProcessOOMScoreAdj(adj int) {
+	g.initSpecProcess()
+	g.spec.Process.OOMScoreAdj = &adj
 }
 
 // SetLinuxResourcesCPUShares sets g.spec.Linux.Resources.CPU.Shares.
@@ -555,32 +532,62 @@ func (g *Generator) SetLinuxResourcesCPUMems(mems string) {
 	g.spec.Linux.Resources.CPU.Mems = mems
 }
 
+// AddLinuxResourcesHugepageLimit adds or sets g.spec.Linux.Resources.HugepageLimits.
+func (g *Generator) AddLinuxResourcesHugepageLimit(pageSize string, limit uint64) {
+	hugepageLimit := rspec.LinuxHugepageLimit{
+		Pagesize: pageSize,
+		Limit:    limit,
+	}
+
+	g.initSpecLinuxResources()
+	for i, pageLimit := range g.spec.Linux.Resources.HugepageLimits {
+		if pageLimit.Pagesize == pageSize {
+			g.spec.Linux.Resources.HugepageLimits[i].Limit = limit
+			return
+		}
+	}
+	g.spec.Linux.Resources.HugepageLimits = append(g.spec.Linux.Resources.HugepageLimits, hugepageLimit)
+}
+
+// DropLinuxResourcesHugepageLimit drops a hugepage limit from g.spec.Linux.Resources.HugepageLimits.
+func (g *Generator) DropLinuxResourcesHugepageLimit(pageSize string) error {
+	g.initSpecLinuxResources()
+	for i, pageLimit := range g.spec.Linux.Resources.HugepageLimits {
+		if pageLimit.Pagesize == pageSize {
+			g.spec.Linux.Resources.HugepageLimits = append(g.spec.Linux.Resources.HugepageLimits[:i], g.spec.Linux.Resources.HugepageLimits[i+1:]...)
+			return nil
+		}
+	}
+
+	return nil
+}
+
 // SetLinuxResourcesMemoryLimit sets g.spec.Linux.Resources.Memory.Limit.
-func (g *Generator) SetLinuxResourcesMemoryLimit(limit uint64) {
+func (g *Generator) SetLinuxResourcesMemoryLimit(limit int64) {
 	g.initSpecLinuxResourcesMemory()
 	g.spec.Linux.Resources.Memory.Limit = &limit
 }
 
 // SetLinuxResourcesMemoryReservation sets g.spec.Linux.Resources.Memory.Reservation.
-func (g *Generator) SetLinuxResourcesMemoryReservation(reservation uint64) {
+func (g *Generator) SetLinuxResourcesMemoryReservation(reservation int64) {
 	g.initSpecLinuxResourcesMemory()
 	g.spec.Linux.Resources.Memory.Reservation = &reservation
 }
 
 // SetLinuxResourcesMemorySwap sets g.spec.Linux.Resources.Memory.Swap.
-func (g *Generator) SetLinuxResourcesMemorySwap(swap uint64) {
+func (g *Generator) SetLinuxResourcesMemorySwap(swap int64) {
 	g.initSpecLinuxResourcesMemory()
 	g.spec.Linux.Resources.Memory.Swap = &swap
 }
 
 // SetLinuxResourcesMemoryKernel sets g.spec.Linux.Resources.Memory.Kernel.
-func (g *Generator) SetLinuxResourcesMemoryKernel(kernel uint64) {
+func (g *Generator) SetLinuxResourcesMemoryKernel(kernel int64) {
 	g.initSpecLinuxResourcesMemory()
 	g.spec.Linux.Resources.Memory.Kernel = &kernel
 }
 
 // SetLinuxResourcesMemoryKernelTCP sets g.spec.Linux.Resources.Memory.KernelTCP.
-func (g *Generator) SetLinuxResourcesMemoryKernelTCP(kernelTCP uint64) {
+func (g *Generator) SetLinuxResourcesMemoryKernelTCP(kernelTCP int64) {
 	g.initSpecLinuxResourcesMemory()
 	g.spec.Linux.Resources.Memory.KernelTCP = &kernelTCP
 }
@@ -589,6 +596,12 @@ func (g *Generator) SetLinuxResourcesMemoryKernelTCP(kernelTCP uint64) {
 func (g *Generator) SetLinuxResourcesMemorySwappiness(swappiness uint64) {
 	g.initSpecLinuxResourcesMemory()
 	g.spec.Linux.Resources.Memory.Swappiness = &swappiness
+}
+
+// SetLinuxResourcesMemoryDisableOOMKiller sets g.spec.Linux.Resources.Memory.DisableOOMKiller.
+func (g *Generator) SetLinuxResourcesMemoryDisableOOMKiller(disable bool) {
+	g.initSpecLinuxResourcesMemory()
+	g.spec.Linux.Resources.Memory.DisableOOMKiller = &disable
 }
 
 // SetLinuxResourcesNetworkClassID sets g.spec.Linux.Resources.Network.ClassID.
@@ -714,12 +727,15 @@ func (g *Generator) ClearPreStartHooks() {
 	if g.spec == nil {
 		return
 	}
+	if g.spec.Hooks == nil {
+		return
+	}
 	g.spec.Hooks.Prestart = []rspec.Hook{}
 }
 
 // AddPreStartHook add a prestart hook into g.spec.Hooks.Prestart.
 func (g *Generator) AddPreStartHook(path string, args []string) {
-	g.initSpec()
+	g.initSpecHooks()
 	hook := rspec.Hook{Path: path, Args: args}
 	g.spec.Hooks.Prestart = append(g.spec.Hooks.Prestart, hook)
 }
@@ -729,12 +745,15 @@ func (g *Generator) ClearPostStopHooks() {
 	if g.spec == nil {
 		return
 	}
+	if g.spec.Hooks == nil {
+		return
+	}
 	g.spec.Hooks.Poststop = []rspec.Hook{}
 }
 
 // AddPostStopHook adds a poststop hook into g.spec.Hooks.Poststop.
 func (g *Generator) AddPostStopHook(path string, args []string) {
-	g.initSpec()
+	g.initSpecHooks()
 	hook := rspec.Hook{Path: path, Args: args}
 	g.spec.Hooks.Poststop = append(g.spec.Hooks.Poststop, hook)
 }
@@ -744,12 +763,15 @@ func (g *Generator) ClearPostStartHooks() {
 	if g.spec == nil {
 		return
 	}
+	if g.spec.Hooks == nil {
+		return
+	}
 	g.spec.Hooks.Poststart = []rspec.Hook{}
 }
 
 // AddPostStartHook adds a poststart hook into g.spec.Hooks.Poststart.
 func (g *Generator) AddPostStartHook(path string, args []string) {
-	g.initSpec()
+	g.initSpecHooks()
 	hook := rspec.Hook{Path: path, Args: args}
 	g.spec.Hooks.Poststart = append(g.spec.Hooks.Poststart, hook)
 }
@@ -830,6 +852,7 @@ func (g *Generator) SetupPrivileged(privileged bool) {
 			finalCapList = append(finalCapList, fmt.Sprintf("CAP_%s", strings.ToUpper(cap.String())))
 		}
 		g.initSpecLinux()
+		g.initSpecProcessCapabilities()
 		g.spec.Process.Capabilities.Bounding = finalCapList
 		g.spec.Process.Capabilities.Effective = finalCapList
 		g.spec.Process.Capabilities.Inheritable = finalCapList
@@ -860,7 +883,7 @@ func (g *Generator) AddProcessCapability(c string) error {
 		return err
 	}
 
-	g.initSpec()
+	g.initSpecProcessCapabilities()
 
 	for _, cap := range g.spec.Process.Capabilities.Bounding {
 		if strings.ToUpper(cap) == cp {
@@ -907,7 +930,7 @@ func (g *Generator) DropProcessCapability(c string) error {
 		return err
 	}
 
-	g.initSpec()
+	g.initSpecProcessCapabilities()
 
 	for i, cap := range g.spec.Process.Capabilities.Bounding {
 		if strings.ToUpper(cap) == cp {
@@ -959,7 +982,7 @@ func mapStrToNamespace(ns string, path string) (rspec.LinuxNamespace, error) {
 	case "cgroup":
 		return rspec.LinuxNamespace{Type: rspec.CgroupNamespace, Path: path}, nil
 	default:
-		return rspec.LinuxNamespace{}, fmt.Errorf("Should not reach here!")
+		return rspec.LinuxNamespace{}, fmt.Errorf("unrecognized namespace %q", ns)
 	}
 }
 

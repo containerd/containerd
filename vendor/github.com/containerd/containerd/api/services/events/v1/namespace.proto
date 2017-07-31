@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package containerd.services.events.v1;
+
+import "gogoproto/gogo.proto";
+
+option go_package = "github.com/containerd/containerd/api/services/events/v1;events";
+
+message NamespaceCreate {
+	string name = 1;
+	map<string, string> labels  = 2;
+}
+
+message NamespaceUpdate {
+	string name = 1;
+	map<string, string> labels  = 2;
+}
+
+message NamespaceDelete {
+	string name = 1;
+}

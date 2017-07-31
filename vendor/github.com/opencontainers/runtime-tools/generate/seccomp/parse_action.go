@@ -30,8 +30,9 @@ func ParseSyscallFlag(args SyscallOpts, config *rspec.LinuxSeccomp) error {
 	}
 
 	action, _ := parseAction(arguments[0])
-	if action == config.DefaultAction {
-		return fmt.Errorf("default action already set as %s", action)
+	if action == config.DefaultAction && args.argsAreEmpty() {
+		// default already set, no need to make changes
+		return nil
 	}
 
 	var newSyscall rspec.LinuxSyscall
@@ -96,7 +97,7 @@ func ParseDefaultAction(action string, config *rspec.LinuxSeccomp) error {
 		return err
 	}
 	config.DefaultAction = defaultAction
-	err = RemoveAllMatchingRules(config, action)
+	err = RemoveAllMatchingRules(config, defaultAction)
 	if err != nil {
 		return err
 	}
@@ -124,4 +125,11 @@ func newSyscallStruct(name string, action rspec.LinuxSeccompAction, args []rspec
 		Args:   args,
 	}
 	return syscallStruct
+}
+
+func (s SyscallOpts) argsAreEmpty() bool {
+	return (s.Index == "" &&
+		s.Value == "" &&
+		s.ValueTwo == "" &&
+		s.Operator == "")
 }

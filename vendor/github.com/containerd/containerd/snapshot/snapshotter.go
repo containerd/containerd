@@ -11,16 +11,29 @@ type Kind int
 
 // definitions of snapshot kinds
 const (
-	KindActive Kind = iota
+	KindView Kind = iota + 1
+	KindActive
 	KindCommitted
 )
 
+func (k Kind) String() string {
+	switch k {
+	case KindView:
+		return "View"
+	case KindActive:
+		return "Active"
+	case KindCommitted:
+		return "Committed"
+	default:
+		return "Unknown"
+	}
+}
+
 // Info provides information about a particular snapshot.
 type Info struct {
-	Name     string // name or key of snapshot
-	Parent   string // name of parent snapshot
-	Kind     Kind   // active or committed snapshot
-	Readonly bool   // true if readonly, only valid for active
+	Kind   Kind   // active or committed snapshot
+	Name   string // name or key of snapshot
+	Parent string // name of parent snapshot
 }
 
 // Usage defines statistics for disk resources consumed by the snapshot.
@@ -36,7 +49,7 @@ func (u *Usage) Add(other Usage) {
 	u.Size += other.Size
 
 	// TODO(stevvooe): assumes independent inodes, but provides and upper
-	// bound. This should be pretty close, assumming the inodes for a
+	// bound. This should be pretty close, assuming the inodes for a
 	// snapshot are roughly unique to it. Don't trust this assumption.
 	u.Inodes += other.Inodes
 }
@@ -50,7 +63,7 @@ func (u *Usage) Add(other Usage) {
 // between a parent and its snapshot to generate a classic layer.
 //
 // An active snapshot is created by calling `Prepare`. After mounting, changes
-// can be made to the snapshot. The act of commiting creates a committed
+// can be made to the snapshot. The act of committing creates a committed
 // snapshot. The committed snapshot will get the parent of active snapshot. The
 // committed snapshot can then be used as a parent. Active snapshots can never
 // act as a parent.
