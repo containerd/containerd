@@ -78,17 +78,6 @@ type Task interface {
 	Update(context.Context, ...UpdateTaskOpts) error
 }
 
-type Process interface {
-	Pid() uint32
-	Start(context.Context) error
-	Delete(context.Context) (uint32, error)
-	Kill(context.Context, syscall.Signal) error
-	Wait(context.Context) (uint32, error)
-	CloseIO(context.Context, ...IOCloserOpts) error
-	Resize(ctx context.Context, w, h uint32) error
-	IO() *IO
-}
-
 var _ = (Task)(&task{})
 
 type task struct {
@@ -162,10 +151,17 @@ func (t *task) Status(ctx context.Context) (TaskStatus, error) {
 }
 
 // Wait is a blocking call that will wait for the task to exit and return the exit status
+//
+// Wait returns an ErrUnavailable when the task has already run and stopped
 func (t *task) Wait(ctx context.Context) (uint32, error) {
 	eventstream, err := t.client.EventService().Subscribe(ctx, &eventsapi.SubscribeRequest{})
 	if err != nil {
 		return UnknownExitStatus, errdefs.FromGRPC(err)
+	}
+	// first check if the task has exited
+	// ignore there error here as we only care about the Stopped Status
+	if status, _ := t.Status(ctx); status == Stopped {
+		return UnknownExitStatus, errdefs.ErrUnavailable
 	}
 	for {
 		evt, err := eventstream.Recv()
