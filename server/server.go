@@ -42,7 +42,7 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 	if err := apply(ctx, config); err != nil {
 		return nil, err
 	}
-	plugins, err := loadPlugins(config)
+	plugins, err := loadPlugins(ctx, config)
 	if err != nil {
 		return nil, err
 	}
@@ -151,9 +151,15 @@ func (s *Server) Stop() {
 	s.rpc.GracefulStop()
 }
 
-func loadPlugins(config *Config) ([]*plugin.Registration, error) {
+func loadPlugins(ctx context.Context, config *Config) ([]*plugin.Registration, error) {
+	onPluginOpenError := func(dllPath string, openError error) error {
+		// typically, openError is "plugin.Open: plugin was built with a different version of package..."
+		log.G(ctx).WithError(openError).Warnf("could not load %s", dllPath)
+		// ignore and continue
+		return nil
+	}
 	// load all plugins into containerd
-	if err := plugin.Load(filepath.Join(config.Root, "plugins")); err != nil {
+	if err := plugin.Load(filepath.Join(config.Root, "plugins"), onPluginOpenError); err != nil {
 		return nil, err
 	}
 	// load additional plugins that don't automatically register themselves

@@ -11,8 +11,8 @@ import (
 
 // loadPlugins loads all plugins for the OS and Arch
 // that containerd is built for inside the provided path
-func loadPlugins(path string) error {
-	abs, err := filepath.Abs(path)
+func loadPlugins(dir string, onError func(dllPath string, loadErr error) error) error {
+	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return err
 	}
@@ -27,8 +27,10 @@ func loadPlugins(path string) error {
 		return err
 	}
 	for _, lib := range libs {
-		if _, err := plugin.Open(lib); err != nil {
-			return err
+		if _, loadErr := plugin.Open(lib); loadErr != nil {
+			if err := onError(lib, loadErr); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

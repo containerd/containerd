@@ -61,8 +61,9 @@ var register = struct {
 	r []*Registration
 }{}
 
-// Load loads all plugins at the provided path into containerd
-func Load(path string) (err error) {
+// Load loads all plugins at the provided directory path into containerd.
+// Load stops loading plugins and returns non-nil error if onError returns non-nil error.
+func Load(dir string, onError func(dllPath string, openErr error) error) (err error) {
 	defer func() {
 		if v := recover(); v != nil {
 			rerr, ok := v.(error)
@@ -72,7 +73,7 @@ func Load(path string) (err error) {
 			err = rerr
 		}
 	}()
-	return loadPlugins(path)
+	return loadPlugins(dir, onError)
 }
 
 func Register(r *Registration) {
