@@ -17,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	"github.com/containerd/containerd/events"
 	shim "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/reaper"
@@ -149,12 +150,14 @@ func WithConnect(ctx context.Context, config Config) (shim.ShimClient, io.Closer
 }
 
 // WithLocal uses an in process shim
-func WithLocal(ctx context.Context, config Config) (shim.ShimClient, io.Closer, error) {
-	service, err := NewService(config.Path, config.Namespace, "")
-	if err != nil {
-		return nil, nil, err
+func WithLocal(events *events.Exchange) func(context.Context, Config) (shim.ShimClient, io.Closer, error) {
+	return func(ctx context.Context, config Config) (shim.ShimClient, io.Closer, error) {
+		service, err := NewService(config.Path, config.Namespace, &localEventsClient{forwarder: events})
+		if err != nil {
+			return nil, nil, err
+		}
+		return NewLocal(service), nil, nil
 	}
-	return NewLocal(service), nil, nil
 }
 
 type Config struct {

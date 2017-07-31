@@ -9,21 +9,23 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/linux/runcopts"
 	client "github.com/containerd/containerd/linux/shim"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/typeurl"
 )
 
-func loadBundle(path, namespace string) *bundle {
+func loadBundle(path, namespace string, events *events.Exchange) *bundle {
 	return &bundle{
 		path:      path,
 		namespace: namespace,
+		events:    events,
 	}
 }
 
 // newBundle creates a new bundle on disk at the provided path for the given id
-func newBundle(path, namespace, id string, spec []byte) (b *bundle, err error) {
+func newBundle(path, namespace, id string, spec []byte, events *events.Exchange) (b *bundle, err error) {
 	if err := os.MkdirAll(path, 0711); err != nil {
 		return nil, err
 	}
@@ -49,6 +51,7 @@ func newBundle(path, namespace, id string, spec []byte) (b *bundle, err error) {
 		id:        id,
 		path:      path,
 		namespace: namespace,
+		events:    events,
 	}, err
 }
 
@@ -56,13 +59,14 @@ type bundle struct {
 	id        string
 	path      string
 	namespace string
+	events    *events.Exchange
 }
 
 // NewShim connects to the shim managing the bundle and tasks
 func (b *bundle) NewShim(ctx context.Context, binary, grpcAddress string, remote, debug bool, createOpts runtime.CreateOpts) (*client.Client, error) {
 	opt := client.WithStart(binary, grpcAddress, debug)
 	if !remote {
-		opt = client.WithLocal
+		opt = client.WithLocal(b.events)
 	}
 	var options runcopts.CreateOptions
 	if createOpts.Options != nil {
@@ -84,7 +88,7 @@ func (b *bundle) NewShim(ctx context.Context, binary, grpcAddress string, remote
 func (b *bundle) Connect(ctx context.Context, remote bool) (*client.Client, error) {
 	opt := client.WithConnect
 	if !remote {
-		opt = client.WithLocal
+		opt = client.WithLocal(b.events)
 	}
 	return client.New(ctx, client.Config{
 		Address:   b.shimAddress(),
