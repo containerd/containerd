@@ -154,6 +154,13 @@ func (m *master) Fd() uintptr {
 	return m.in
 }
 
+// on windows, console can only be made from os.Std{in,out,err}, hence there
+// isnt a single name here we can use. Return a dummy "console" value in this
+// case should be sufficient.
+func (m *master) Name() string {
+	return "console"
+}
+
 // makeInputRaw puts the terminal (Windows Console) connected to the given
 // file descriptor into raw mode
 func makeInputRaw(fd uintptr, mode uint32) error {

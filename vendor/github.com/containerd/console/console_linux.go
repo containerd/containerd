@@ -1,4 +1,5 @@
 // +build linux
+
 package console
 
 import (

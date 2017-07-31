@@ -39,21 +39,22 @@ type initProcess struct {
 	// the reaper interface.
 	mu sync.Mutex
 
-	id      string
-	bundle  string
-	console console.Console
-	io      runc.IO
-	runtime *runc.Runc
-	status  int
-	exited  time.Time
-	pid     int
-	closers []io.Closer
-	stdin   io.Closer
-	stdio   stdio
-	rootfs  string
+	id       string
+	bundle   string
+	console  console.Console
+	platform platform
+	io       runc.IO
+	runtime  *runc.Runc
+	status   int
+	exited   time.Time
+	pid      int
+	closers  []io.Closer
+	stdin    io.Closer
+	stdio    stdio
+	rootfs   string
 }
 
-func newInitProcess(context context.Context, path, namespace string, r *shimapi.CreateTaskRequest) (*initProcess, error) {
+func newInitProcess(context context.Context, plat platform, path, namespace string, r *shimapi.CreateTaskRequest) (*initProcess, error) {
 	var success bool
 
 	if err := identifiers.Validate(r.ID); err != nil {
@@ -98,9 +99,10 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 		Root:         filepath.Join(RuncRoot, namespace),
 	}
 	p := &initProcess{
-		id:      r.ID,
-		bundle:  r.Bundle,
-		runtime: runtime,
+		id:       r.ID,
+		bundle:   r.Bundle,
+		runtime:  runtime,
+		platform: plat,
 		stdio: stdio{
 			stdin:    r.Stdin,
 			stdout:   r.Stdout,
@@ -170,10 +172,11 @@ func newInitProcess(context context.Context, path, namespace string, r *shimapi.
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to retrieve console master")
 		}
-		p.console = console
-		if err := copyConsole(context, console, r.Stdin, r.Stdout, r.Stderr, &p.WaitGroup, &copyWaitGroup); err != nil {
+		console, err = plat.copyConsole(context, console, r.Stdin, r.Stdout, r.Stderr, &p.WaitGroup, &copyWaitGroup)
+		if err != nil {
 			return nil, errors.Wrap(err, "failed to start console copy")
 		}
+		p.console = console
 	} else {
 		if err := copyPipes(context, io, r.Stdin, r.Stdout, r.Stderr, &p.WaitGroup, &copyWaitGroup); err != nil {
 			return nil, errors.Wrap(err, "failed to start io pipe copy")
@@ -238,6 +241,9 @@ func (p *initProcess) Delete(context context.Context) error {
 		return fmt.Errorf("cannot delete a running container")
 	}
 	p.killAll(context)
+	if err := p.platform.shutdownConsole(context, p.console); err != nil {
+		log.G(context).WithError(err).Warn("Failed to shutdown container console")
+	}
 	p.Wait()
 	err = p.runtime.Delete(context, p.id, nil)
 	if p.io != nil {

@@ -42,8 +42,18 @@ func NewService(path, namespace string, client publisher) (*Service, error) {
 		namespace: namespace,
 		context:   context,
 	}
+	if err := s.initPlatform(); err != nil {
+		return nil, errors.Wrap(err, "failed to initialized platform behavior")
+	}
 	go s.forward(client)
 	return s, nil
+}
+
+// platform handles platform-specific behavior that may differs across
+// platform implementations
+type platform interface {
+	copyConsole(ctx context.Context, console console.Console, stdin, stdout, stderr string, wg, cwg *sync.WaitGroup) (console.Console, error)
+	shutdownConsole(ctx context.Context, console console.Console) error
 }
 
 type Service struct {
@@ -58,10 +68,12 @@ type Service struct {
 	deferredEvent interface{}
 	namespace     string
 	context       context.Context
+
+	platform platform
 }
 
 func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*shimapi.CreateTaskResponse, error) {
-	process, err := newInitProcess(ctx, s.path, s.namespace, r)
+	process, err := newInitProcess(ctx, s.platform, s.path, s.namespace, r)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
