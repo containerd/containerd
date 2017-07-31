@@ -13,6 +13,18 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
+type Process interface {
+	Pid() uint32
+	Start(context.Context) error
+	Delete(context.Context) (uint32, error)
+	Kill(context.Context, syscall.Signal) error
+	Wait(context.Context) (uint32, error)
+	CloseIO(context.Context, ...IOCloserOpts) error
+	Resize(ctx context.Context, w, h uint32) error
+	IO() *IO
+	Status(context.Context) (Status, error)
+}
+
 type process struct {
 	id   string
 	task *task
@@ -62,6 +74,10 @@ func (p *process) Wait(ctx context.Context) (uint32, error) {
 	})
 	if err != nil {
 		return UnknownExitStatus, err
+	}
+	// first check if the task has exited
+	if status, _ := p.Status(ctx); status == Stopped {
+		return UnknownExitStatus, errdefs.ErrUnavailable
 	}
 	for {
 		evt, err := eventstream.Recv()

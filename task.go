@@ -79,18 +79,6 @@ type Task interface {
 	Update(context.Context, ...UpdateTaskOpts) error
 }
 
-type Process interface {
-	Pid() uint32
-	Start(context.Context) error
-	Delete(context.Context) (uint32, error)
-	Kill(context.Context, syscall.Signal) error
-	Wait(context.Context) (uint32, error)
-	CloseIO(context.Context, ...IOCloserOpts) error
-	Resize(ctx context.Context, w, h uint32) error
-	IO() *IO
-	Status(context.Context) (Status, error)
-}
-
 var _ = (Task)(&task{})
 
 type task struct {
@@ -170,6 +158,10 @@ func (t *task) Wait(ctx context.Context) (uint32, error) {
 	})
 	if err != nil {
 		return UnknownExitStatus, errdefs.FromGRPC(err)
+	}
+	// first check if the task has exited
+	if status, _ := t.Status(ctx); status == Stopped {
+		return UnknownExitStatus, errdefs.ErrUnavailable
 	}
 	for {
 		evt, err := eventstream.Recv()
