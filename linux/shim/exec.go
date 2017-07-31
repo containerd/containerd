@@ -27,6 +27,7 @@ import (
 type execProcess struct {
 	sync.WaitGroup
 
+	mu      sync.Mutex
 	id      string
 	console console.Console
 	io      runc.IO
@@ -73,6 +74,8 @@ func (e *execProcess) ID() string {
 }
 
 func (e *execProcess) Pid() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	return e.pid
 }
 
@@ -109,8 +112,13 @@ func (e *execProcess) Resize(ws console.WinSize) error {
 }
 
 func (e *execProcess) Kill(ctx context.Context, sig uint32, _ bool) error {
-	if err := unix.Kill(e.pid, syscall.Signal(sig)); err != nil {
-		return errors.Wrapf(checkKillError(err), "exec kill error")
+	e.mu.Lock()
+	pid := e.pid
+	e.mu.Unlock()
+	if pid != 0 {
+		if err := unix.Kill(pid, syscall.Signal(sig)); err != nil {
+			return errors.Wrapf(checkKillError(err), "exec kill error")
+		}
 	}
 	return nil
 }
@@ -179,6 +187,33 @@ func (e *execProcess) Start(ctx context.Context) (err error) {
 	if err != nil {
 		return errors.Wrap(err, "failed to retrieve OCI runtime exec pid")
 	}
+	e.mu.Lock()
 	e.pid = pid
+	e.mu.Unlock()
 	return nil
+}
+
+func (e *execProcess) Status(ctx context.Context) (string, error) {
+	s, err := e.parent.Status(ctx)
+	if err != nil {
+		return "", err
+	}
+	// if the container as a whole is in the pausing/paused state, so are all
+	// other processes inside the container, use container state here
+	switch s {
+	case "paused", "pausing":
+		return s, nil
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	// if we don't have a pid then the exec process has just been created
+	if e.pid == 0 {
+		return "created", nil
+	}
+	// if we have a pid and it can be signaled, the process is running
+	if err := unix.Kill(e.pid, 0); err == nil {
+		return "running", nil
+	}
+	// else if we have a pid but it can nolonger be signaled, it has stopped
+	return "stopped", nil
 }

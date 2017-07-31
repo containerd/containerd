@@ -209,8 +209,8 @@ func (p *initProcess) ExitedAt() time.Time {
 	return p.exited
 }
 
-// ContainerStatus return the state of the container (created, running, paused, stopped)
-func (p *initProcess) ContainerStatus(ctx context.Context) (string, error) {
+// Status return the state of the container (created, running, paused, stopped)
+func (p *initProcess) Status(ctx context.Context) (string, error) {
 	c, err := p.runtime.State(ctx, p.id)
 	if err != nil {
 		return "", p.runtimeError(err, "OCI runtime state failed")
@@ -233,7 +233,7 @@ func (p *initProcess) SetExited(status int) {
 }
 
 func (p *initProcess) Delete(context context.Context) error {
-	status, err := p.ContainerStatus(context)
+	status, err := p.Status(context)
 	if err != nil {
 		return err
 	}

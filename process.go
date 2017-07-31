@@ -2,10 +2,12 @@ package containerd
 
 import (
 	"context"
+	"strings"
 	"syscall"
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -120,4 +122,15 @@ func (p *process) Delete(ctx context.Context) (uint32, error) {
 		return UnknownExitStatus, err
 	}
 	return r.ExitStatus, nil
+}
+
+func (p *process) Status(ctx context.Context) (TaskStatus, error) {
+	r, err := p.task.client.TaskService().Get(ctx, &tasks.GetRequest{
+		ContainerID: p.task.id,
+		ExecID:      p.id,
+	})
+	if err != nil {
+		return "", errdefs.FromGRPC(err)
+	}
+	return TaskStatus(strings.ToLower(r.Process.Status.String())), nil
 }

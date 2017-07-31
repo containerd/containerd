@@ -40,4 +40,6 @@ type process interface {
 	Stdio() stdio
 	// Start execution of the process
 	Start(context.Context) error
+	// Status returns the process status
+	Status(ctx context.Context) (string, error)
 }

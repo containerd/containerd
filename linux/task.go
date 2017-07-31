@@ -66,7 +66,6 @@ func (t *Task) State(ctx context.Context) (runtime.State, error) {
 		status = runtime.StoppedStatus
 	case task.StatusPaused:
 		status = runtime.PausedStatus
-		// TODO: containerd.DeletedStatus
 	}
 	return runtime.State{
 		Pid:      response.Pid,

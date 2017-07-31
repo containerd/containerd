@@ -212,8 +212,8 @@ func (s *Service) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest
 	}, nil
 }
 
-func taskFromContainerd(ctx context.Context, c runtime.Task) (*task.Task, error) {
-	state, err := c.State(ctx)
+func processFromContainerd(ctx context.Context, p runtime.Process) (*task.Process, error) {
+	state, err := p.State(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -230,8 +230,8 @@ func taskFromContainerd(ctx context.Context, c runtime.Task) (*task.Task, error)
 	default:
 		log.G(ctx).WithField("status", state.Status).Warn("unknown status")
 	}
-	return &task.Task{
-		ID:       c.Info().ID,
+	return &task.Process{
+		ID:       p.ID(),
 		Pid:      state.Pid,
 		Status:   status,
 		Stdin:    state.Stdin,
@@ -241,17 +241,23 @@ func taskFromContainerd(ctx context.Context, c runtime.Task) (*task.Task, error)
 	}, nil
 }
 
-func (s *Service) Get(ctx context.Context, r *api.GetTaskRequest) (*api.GetTaskResponse, error) {
+func (s *Service) Get(ctx context.Context, r *api.GetRequest) (*api.GetResponse, error) {
 	task, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
 	}
-	t, err := taskFromContainerd(ctx, task)
+	p := runtime.Process(task)
+	if r.ExecID != "" {
+		if p, err = task.Process(ctx, r.ExecID); err != nil {
+			return nil, err
+		}
+	}
+	t, err := processFromContainerd(ctx, p)
 	if err != nil {
 		return nil, err
 	}
-	return &api.GetTaskResponse{
-		Task: t,
+	return &api.GetResponse{
+		Process: t,
 	}, nil
 }
 
@@ -263,7 +269,7 @@ func (s *Service) List(ctx context.Context, r *api.ListTasksRequest) (*api.ListT
 			return nil, err
 		}
 		for _, t := range tasks {
-			tt, err := taskFromContainerd(ctx, t)
+			tt, err := processFromContainerd(ctx, t)
 			if err != nil {
 				return nil, err
 			}

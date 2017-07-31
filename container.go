@@ -232,7 +232,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...Ne
 }
 
 func (c *container) loadTask(ctx context.Context, ioAttach IOAttach) (Task, error) {
-	response, err := c.client.TaskService().Get(ctx, &tasks.GetTaskRequest{
+	response, err := c.client.TaskService().Get(ctx, &tasks.GetRequest{
 		ContainerID: c.c.ID,
 	})
 	if err != nil {
@@ -247,14 +247,14 @@ func (c *container) loadTask(ctx context.Context, ioAttach IOAttach) (Task, erro
 		// get the existing fifo paths from the task information stored by the daemon
 		paths := &FIFOSet{
 			Dir: getFifoDir([]string{
-				response.Task.Stdin,
-				response.Task.Stdout,
-				response.Task.Stderr,
+				response.Process.Stdin,
+				response.Process.Stdout,
+				response.Process.Stderr,
 			}),
-			In:       response.Task.Stdin,
-			Out:      response.Task.Stdout,
-			Err:      response.Task.Stderr,
-			Terminal: response.Task.Terminal,
+			In:       response.Process.Stdin,
+			Out:      response.Process.Stdout,
+			Err:      response.Process.Stderr,
+			Terminal: response.Process.Terminal,
 		}
 		if i, err = ioAttach(paths); err != nil {
 			return nil, err
@@ -263,8 +263,8 @@ func (c *container) loadTask(ctx context.Context, ioAttach IOAttach) (Task, erro
 	t := &task{
 		client: c.client,
 		io:     i,
-		id:     response.Task.ID,
-		pid:    response.Task.Pid,
+		id:     response.Process.ID,
+		pid:    response.Process.Pid,
 	}
 	return t, nil
 }

@@ -229,14 +229,11 @@ func (s *Service) ResizePty(ctx context.Context, r *shimapi.ResizePtyRequest) (*
 }
 
 func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.StateResponse, error) {
-	if s.initProcess == nil {
-		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
-	}
 	p, ok := s.processes[r.ID]
 	if !ok {
 		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "process id %s not found", r.ID)
 	}
-	st, err := s.initProcess.ContainerStatus(ctx)
+	st, err := p.Status(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -88,6 +88,7 @@ type Process interface {
 	CloseIO(context.Context, ...IOCloserOpts) error
 	Resize(ctx context.Context, w, h uint32) error
 	IO() *IO
+	Status(context.Context) (TaskStatus, error)
 }
 
 var _ = (Task)(&task{})
@@ -153,13 +154,13 @@ func (t *task) Resume(ctx context.Context) error {
 }
 
 func (t *task) Status(ctx context.Context) (TaskStatus, error) {
-	r, err := t.client.TaskService().Get(ctx, &tasks.GetTaskRequest{
+	r, err := t.client.TaskService().Get(ctx, &tasks.GetRequest{
 		ContainerID: t.id,
 	})
 	if err != nil {
 		return "", errdefs.FromGRPC(err)
 	}
-	return TaskStatus(strings.ToLower(r.Task.Status.String())), nil
+	return TaskStatus(strings.ToLower(r.Process.Status.String())), nil
 }
 
 // Wait is a blocking call that will wait for the task to exit and return the exit status
