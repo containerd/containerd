@@ -28,14 +28,14 @@ import (
 
 const UnknownExitStatus = 255
 
-type TaskStatus string
+type Status string
 
 const (
-	Running TaskStatus = "running"
-	Created TaskStatus = "created"
-	Stopped TaskStatus = "stopped"
-	Paused  TaskStatus = "paused"
-	Pausing TaskStatus = "pausing"
+	Running Status = "running"
+	Created Status = "created"
+	Stopped Status = "stopped"
+	Paused  Status = "paused"
+	Pausing Status = "pausing"
 )
 
 type IOCloseInfo struct {
@@ -68,7 +68,7 @@ type Task interface {
 	Pause(context.Context) error
 	Resume(context.Context) error
 	Start(context.Context) error
-	Status(context.Context) (TaskStatus, error)
+	Status(context.Context) (Status, error)
 	Wait(context.Context) (uint32, error)
 	Exec(context.Context, string, *specs.Process, IOCreation) (Process, error)
 	Pids(context.Context) ([]uint32, error)
@@ -88,7 +88,7 @@ type Process interface {
 	CloseIO(context.Context, ...IOCloserOpts) error
 	Resize(ctx context.Context, w, h uint32) error
 	IO() *IO
-	Status(context.Context) (TaskStatus, error)
+	Status(context.Context) (Status, error)
 }
 
 var _ = (Task)(&task{})
@@ -153,14 +153,14 @@ func (t *task) Resume(ctx context.Context) error {
 	return errdefs.FromGRPC(err)
 }
 
-func (t *task) Status(ctx context.Context) (TaskStatus, error) {
+func (t *task) Status(ctx context.Context) (Status, error) {
 	r, err := t.client.TaskService().Get(ctx, &tasks.GetRequest{
 		ContainerID: t.id,
 	})
 	if err != nil {
 		return "", errdefs.FromGRPC(err)
 	}
-	return TaskStatus(strings.ToLower(r.Process.Status.String())), nil
+	return Status(strings.ToLower(r.Process.Status.String())), nil
 }
 
 // Wait is a blocking call that will wait for the task to exit and return the exit status

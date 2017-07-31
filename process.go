@@ -124,7 +124,7 @@ func (p *process) Delete(ctx context.Context) (uint32, error) {
 	return r.ExitStatus, nil
 }
 
-func (p *process) Status(ctx context.Context) (TaskStatus, error) {
+func (p *process) Status(ctx context.Context) (Status, error) {
 	r, err := p.task.client.TaskService().Get(ctx, &tasks.GetRequest{
 		ContainerID: p.task.id,
 		ExecID:      p.id,
@@ -132,5 +132,5 @@ func (p *process) Status(ctx context.Context) (TaskStatus, error) {
 	if err != nil {
 		return "", errdefs.FromGRPC(err)
 	}
-	return TaskStatus(strings.ToLower(r.Process.Status.String())), nil
+	return Status(strings.ToLower(r.Process.Status.String())), nil
 }
