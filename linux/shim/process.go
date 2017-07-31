@@ -38,4 +38,6 @@ type process interface {
 	Kill(context.Context, uint32, bool) error
 	// Stdio returns io information for the container
 	Stdio() stdio
+	// Start execution of the process
+	Start(context.Context) error
 }

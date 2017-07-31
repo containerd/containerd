@@ -149,7 +149,9 @@ var shimStartCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		_, err = service.Start(gocontext.Background(), empty)
+		_, err = service.Start(gocontext.Background(), &shim.StartRequest{
+			ID: context.Args().First(),
+		})
 		return err
 	},
 }
@@ -261,7 +263,12 @@ var shimExecCommand = cli.Command{
 			Stderr:   context.String("stderr"),
 			Terminal: tty,
 		}
-		r, err := service.Exec(ctx, rq)
+		if _, err := service.Exec(ctx, rq); err != nil {
+			return err
+		}
+		r, err := service.Start(ctx, &shim.StartRequest{
+			ID: id,
+		})
 		if err != nil {
 			return err
 		}

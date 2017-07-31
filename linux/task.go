@@ -40,11 +40,13 @@ func (t *Task) Info() runtime.TaskInfo {
 }
 
 func (t *Task) Start(ctx context.Context) error {
-	_, err := t.shim.Start(ctx, empty)
+	_, err := t.shim.Start(ctx, &shim.StartRequest{
+		ID: t.id,
+	})
 	if err != nil {
-		err = errdefs.FromGRPC(err)
+		return errdefs.FromGRPC(err)
 	}
-	return err
+	return nil
 }
 
 func (t *Task) State(ctx context.Context) (runtime.State, error) {
@@ -114,6 +116,11 @@ func (t *Task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runt
 		Spec:     opts.Spec,
 	}
 	if _, err := t.shim.Exec(ctx, request); err != nil {
+		return nil, errdefs.FromGRPC(err)
+	}
+	if _, err := t.shim.Start(ctx, &shim.StartRequest{
+		ID: id,
+	}); err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
 	return &Process{

@@ -27,7 +27,7 @@ func (c *local) Create(ctx context.Context, in *shimapi.CreateTaskRequest, opts 
 	return c.s.Create(ctx, in)
 }
 
-func (c *local) Start(ctx context.Context, in *google_protobuf.Empty, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+func (c *local) Start(ctx context.Context, in *shimapi.StartRequest, opts ...grpc.CallOption) (*shimapi.StartResponse, error) {
 	return c.s.Start(ctx, in)
 }
 
@@ -43,7 +43,7 @@ func (c *local) DeleteProcess(ctx context.Context, in *shimapi.DeleteProcessRequ
 	return c.s.DeleteProcess(ctx, in)
 }
 
-func (c *local) Exec(ctx context.Context, in *shimapi.ExecProcessRequest, opts ...grpc.CallOption) (*shimapi.ExecProcessResponse, error) {
+func (c *local) Exec(ctx context.Context, in *shimapi.ExecProcessRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
 	return c.s.Exec(ctx, in)
 }
 

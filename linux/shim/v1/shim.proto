@@ -21,7 +21,7 @@ service Shim {
 
 	rpc Create(CreateTaskRequest) returns (CreateTaskResponse);
 
-	rpc Start(google.protobuf.Empty) returns (google.protobuf.Empty);
+	rpc Start(StartRequest) returns (StartResponse);
 
 	rpc Delete(google.protobuf.Empty) returns (DeleteResponse);
 
@@ -37,7 +37,7 @@ service Shim {
 
 	rpc Kill(KillRequest) returns (google.protobuf.Empty);
 
-	rpc Exec(ExecProcessRequest) returns (ExecProcessResponse);
+	rpc Exec(ExecProcessRequest) returns (google.protobuf.Empty);
 
 	rpc ResizePty(ResizePtyRequest) returns (google.protobuf.Empty);
 
@@ -87,7 +87,6 @@ message ExecProcessRequest {
 }
 
 message ExecProcessResponse {
-	uint32 pid = 1;
 }
 
 message ResizePtyRequest {
@@ -141,4 +140,13 @@ message ShimInfoResponse {
 
 message UpdateTaskRequest {
 	google.protobuf.Any resources = 1;
+}
+
+message StartRequest {
+	string id = 1;
+}
+
+message StartResponse {
+	string id = 1;
+	uint32 pid = 2;
 }
