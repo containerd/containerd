@@ -2,7 +2,7 @@ containerd is built with OCI support and with support for advanced features prov
 
 We depend on a specific runc version when dealing with advanced features.  You should have a specific build for development.  The current supported runc commit is:
 
-RUNC_COMMIT = 429a5387123625040bacfbb60d96b1cbd02293ab
+RUNC_COMMIT = e775f0fba3ea329b8b766451c892c41a3d49594d
 
 ## building
 

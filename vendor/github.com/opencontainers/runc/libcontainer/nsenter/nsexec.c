@@ -143,8 +143,7 @@ static int write_file(char *data, size_t data_len, char *pathfmt, ...)
 
 	fd = open(path, O_RDWR);
 	if (fd < 0) {
-		ret = -1;
-		goto out;
+		return -1;
 	}
 
 	len = write(fd, data, data_len);
