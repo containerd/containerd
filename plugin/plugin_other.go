@@ -2,7 +2,7 @@
 
 package plugin
 
-func loadPlugins(path string) error {
+func loadPlugins(dir string, onError func(dllPath string, openErr error) error) error {
 	// plugins not supported until 1.8
 	return nil
 }
