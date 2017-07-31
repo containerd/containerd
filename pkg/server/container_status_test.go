@@ -22,13 +22,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
-
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
+	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 )
 
-func getContainerStatusTestData() (*metadata.ContainerMetadata, *runtime.ContainerStatus) {
+func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Status, *runtime.ContainerStatus) {
 	testID := "test-id"
 	config := &runtime.ContainerConfig{
 		Metadata: &runtime.ContainerMetadata{
@@ -47,17 +46,18 @@ func getContainerStatusTestData() (*metadata.ContainerMetadata, *runtime.Contain
 	createdAt := time.Now().UnixNano()
 	startedAt := time.Now().UnixNano()
 
-	metadata := &metadata.ContainerMetadata{
+	metadata := &containerstore.Metadata{
 		ID:        testID,
 		Name:      "test-long-name",
 		SandboxID: "test-sandbox-id",
 		Config:    config,
 		ImageRef:  "test-image-ref",
+	}
+	status := &containerstore.Status{
 		Pid:       1234,
 		CreatedAt: createdAt,
 		StartedAt: startedAt,
 	}
-
 	expected := &runtime.ContainerStatus{
 		Id:          testID,
 		Metadata:    config.GetMetadata(),
@@ -72,7 +72,7 @@ func getContainerStatusTestData() (*metadata.ContainerMetadata, *runtime.Contain
 		Mounts:      config.GetMounts(),
 	}
 
-	return metadata, expected
+	return metadata, status, expected
 }
 
 func TestToCRIContainerStatus(t *testing.T) {
@@ -110,19 +110,21 @@ func TestToCRIContainerStatus(t *testing.T) {
 			expectedReason: errorExitReason,
 		},
 	} {
-		meta, expected := getContainerStatusTestData()
-		// Update metadata with test case.
-		meta.FinishedAt = test.finishedAt
-		meta.ExitCode = test.exitCode
-		meta.Reason = test.reason
-		meta.Message = test.message
+		metadata, status, expected := getContainerStatusTestData()
+		// Update status with test case.
+		status.FinishedAt = test.finishedAt
+		status.ExitCode = test.exitCode
+		status.Reason = test.reason
+		status.Message = test.message
+		container, err := containerstore.NewContainer(*metadata, *status)
+		assert.NoError(t, err)
 		// Set expectation based on test case.
 		expected.State = test.expectedState
 		expected.Reason = test.expectedReason
 		expected.FinishedAt = test.finishedAt
 		expected.ExitCode = test.exitCode
 		expected.Message = test.message
-		assert.Equal(t, expected, toCRIContainerStatus(meta), desc)
+		assert.Equal(t, expected, toCRIContainerStatus(container), desc)
 	}
 }
 
@@ -151,14 +153,16 @@ func TestContainerStatus(t *testing.T) {
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIContainerdService()
-		meta, expected := getContainerStatusTestData()
-		// Update metadata with test case.
-		meta.FinishedAt = test.finishedAt
-		meta.Reason = test.reason
+		metadata, status, expected := getContainerStatusTestData()
+		// Update status with test case.
+		status.FinishedAt = test.finishedAt
+		status.Reason = test.reason
+		container, err := containerstore.NewContainer(*metadata, *status)
+		assert.NoError(t, err)
 		if test.exist {
-			assert.NoError(t, c.containerStore.Create(*meta))
+			assert.NoError(t, c.containerStore.Add(container))
 		}
-		resp, err := c.ContainerStatus(context.Background(), &runtime.ContainerStatusRequest{ContainerId: meta.ID})
+		resp, err := c.ContainerStatus(context.Background(), &runtime.ContainerStatusRequest{ContainerId: container.ID})
 		if test.expectErr {
 			assert.Error(t, err)
 			assert.Nil(t, resp)

@@ -29,21 +29,21 @@ import (
 	"golang.org/x/sys/unix"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
+	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
+	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
 )
 
 func TestWaitContainerStop(t *testing.T) {
 	id := "test-id"
 	for desc, test := range map[string]struct {
-		metadata  *metadata.ContainerMetadata
+		status    *containerstore.Status
 		cancel    bool
 		timeout   time.Duration
 		expectErr bool
 	}{
 		"should return error if timeout exceeds": {
-			metadata: &metadata.ContainerMetadata{
-				ID:        id,
+			status: &containerstore.Status{
 				CreatedAt: time.Now().UnixNano(),
 				StartedAt: time.Now().UnixNano(),
 			},
@@ -51,8 +51,7 @@ func TestWaitContainerStop(t *testing.T) {
 			expectErr: true,
 		},
 		"should return error if context is cancelled": {
-			metadata: &metadata.ContainerMetadata{
-				ID:        id,
+			status: &containerstore.Status{
 				CreatedAt: time.Now().UnixNano(),
 				StartedAt: time.Now().UnixNano(),
 			},
@@ -61,13 +60,12 @@ func TestWaitContainerStop(t *testing.T) {
 			expectErr: true,
 		},
 		"should not return error if container is removed before timeout": {
-			metadata:  nil,
+			status:    nil,
 			timeout:   time.Hour,
 			expectErr: false,
 		},
 		"should not return error if container is stopped before timeout": {
-			metadata: &metadata.ContainerMetadata{
-				ID:         id,
+			status: &containerstore.Status{
 				CreatedAt:  time.Now().UnixNano(),
 				StartedAt:  time.Now().UnixNano(),
 				FinishedAt: time.Now().UnixNano(),
@@ -77,8 +75,13 @@ func TestWaitContainerStop(t *testing.T) {
 		},
 	} {
 		c := newTestCRIContainerdService()
-		if test.metadata != nil {
-			assert.NoError(t, c.containerStore.Create(*test.metadata))
+		if test.status != nil {
+			container, err := containerstore.NewContainer(
+				containerstore.Metadata{ID: id},
+				*test.status,
+			)
+			assert.NoError(t, err)
+			assert.NoError(t, c.containerStore.Add(container))
 		}
 		ctx := context.Background()
 		if test.cancel {
@@ -94,15 +97,14 @@ func TestWaitContainerStop(t *testing.T) {
 func TestStopContainer(t *testing.T) {
 	testID := "test-id"
 	testPid := uint32(1234)
-	testMetadata := metadata.ContainerMetadata{
-		ID:        testID,
+	testImageID := "test-image-id"
+	testStatus := containerstore.Status{
 		Pid:       testPid,
-		ImageRef:  "test-image-id",
 		CreatedAt: time.Now().UnixNano(),
 		StartedAt: time.Now().UnixNano(),
 	}
-	testImageMetadata := metadata.ImageMetadata{
-		ID:     "test-image-id",
+	testImage := imagestore.Image{
+		ID:     testImageID,
 		Config: &imagespec.ImageConfig{},
 	}
 	testContainer := task.Task{
@@ -111,7 +113,7 @@ func TestStopContainer(t *testing.T) {
 		Status: task.StatusRunning,
 	}
 	for desc, test := range map[string]struct {
-		metadata            *metadata.ContainerMetadata
+		status              *containerstore.Status
 		containerdContainer *task.Task
 		stopSignal          string
 		stopErr             error
@@ -120,20 +122,17 @@ func TestStopContainer(t *testing.T) {
 		expectCalls         []servertesting.CalledDetail
 	}{
 		"should return error when container does not exist": {
-			metadata:    nil,
+			status:      nil,
 			expectErr:   true,
 			expectCalls: []servertesting.CalledDetail{},
 		},
 		"should not return error when container is not running": {
-			metadata: &metadata.ContainerMetadata{
-				ID:        testID,
-				CreatedAt: time.Now().UnixNano(),
-			},
+			status:      &containerstore.Status{CreatedAt: time.Now().UnixNano()},
 			expectErr:   false,
 			expectCalls: []servertesting.CalledDetail{},
 		},
 		"should not return error if containerd task does not exist": {
-			metadata:            &testMetadata,
+			status:              &testStatus,
 			containerdContainer: &testContainer,
 			// Since it's hard to inject event during `StopContainer` is running,
 			// we only test the case that first stop returns error, but container
@@ -166,7 +165,7 @@ func TestStopContainer(t *testing.T) {
 			},
 		},
 		"should not return error if containerd task process already finished": {
-			metadata:            &testMetadata,
+			status:              &testStatus,
 			containerdContainer: &testContainer,
 			stopErr:             errors.New("os: process already finished"),
 			expectErr:           false,
@@ -194,7 +193,7 @@ func TestStopContainer(t *testing.T) {
 			},
 		},
 		"should return error if graceful stop returns random error": {
-			metadata:            &testMetadata,
+			status:              &testStatus,
 			containerdContainer: &testContainer,
 			stopErr:             errors.New("random stop error"),
 			expectErr:           true,
@@ -210,7 +209,7 @@ func TestStopContainer(t *testing.T) {
 			},
 		},
 		"should not return error if containerd task is gracefully stopped": {
-			metadata:            &testMetadata,
+			status:              &testStatus,
 			containerdContainer: &testContainer,
 			expectErr:           false,
 			// deleted by the event monitor.
@@ -230,7 +229,7 @@ func TestStopContainer(t *testing.T) {
 			},
 		},
 		"should use stop signal specified in image config if not empty": {
-			metadata:            &testMetadata,
+			status:              &testStatus,
 			containerdContainer: &testContainer,
 			stopSignal:          "SIGHUP",
 			expectErr:           false,
@@ -251,7 +250,7 @@ func TestStopContainer(t *testing.T) {
 			},
 		},
 		"should directly kill container if timeout is 0": {
-			metadata:            &testMetadata,
+			status:              &testStatus,
 			containerdContainer: &testContainer,
 			noTimeout:           true,
 			expectErr:           false,
@@ -279,16 +278,24 @@ func TestStopContainer(t *testing.T) {
 		defer fake.Stop()
 		c.taskService = fake
 
-		// Inject metadata.
-		if test.metadata != nil {
-			assert.NoError(t, c.containerStore.Create(*test.metadata))
+		// Inject the container.
+		if test.status != nil {
+			cntr, err := containerstore.NewContainer(
+				containerstore.Metadata{
+					ID:       testID,
+					ImageRef: testImageID,
+				},
+				*test.status,
+			)
+			assert.NoError(t, err)
+			assert.NoError(t, c.containerStore.Add(cntr))
 		}
 		// Inject containerd task.
 		if test.containerdContainer != nil {
 			fake.SetFakeTasks([]task.Task{*test.containerdContainer})
 		}
-		testImageMetadata.Config.StopSignal = test.stopSignal
-		assert.NoError(t, c.imageMetadataStore.Create(testImageMetadata))
+		testImage.Config.StopSignal = test.stopSignal
+		c.imageStore.Add(testImage)
 		if test.stopErr != nil {
 			fake.InjectError("kill", test.stopErr)
 		}

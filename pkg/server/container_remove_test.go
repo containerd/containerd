@@ -25,13 +25,13 @@ import (
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot"
 	"github.com/containerd/containerd/api/types/mount"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
+	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
+	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 )
 
 // TestSetContainerRemoving tests setContainerRemoving sets removing
@@ -39,20 +39,18 @@ import (
 func TestSetContainerRemoving(t *testing.T) {
 	testID := "test-id"
 	for desc, test := range map[string]struct {
-		metadata  *metadata.ContainerMetadata
+		status    containerstore.Status
 		expectErr bool
 	}{
 		"should return error when container is in running state": {
-			metadata: &metadata.ContainerMetadata{
-				ID:        testID,
+			status: containerstore.Status{
 				CreatedAt: time.Now().UnixNano(),
 				StartedAt: time.Now().UnixNano(),
 			},
 			expectErr: true,
 		},
 		"should return error when container is in removing state": {
-			metadata: &metadata.ContainerMetadata{
-				ID:         testID,
+			status: containerstore.Status{
 				CreatedAt:  time.Now().UnixNano(),
 				StartedAt:  time.Now().UnixNano(),
 				FinishedAt: time.Now().UnixNano(),
@@ -61,8 +59,7 @@ func TestSetContainerRemoving(t *testing.T) {
 			expectErr: true,
 		},
 		"should not return error when container is not running and removing": {
-			metadata: &metadata.ContainerMetadata{
-				ID:         testID,
+			status: containerstore.Status{
 				CreatedAt:  time.Now().UnixNano(),
 				StartedAt:  time.Now().UnixNano(),
 				FinishedAt: time.Now().UnixNano(),
@@ -71,19 +68,18 @@ func TestSetContainerRemoving(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		c := newTestCRIContainerdService()
-		if test.metadata != nil {
-			assert.NoError(t, c.containerStore.Create(*test.metadata))
-		}
-		err := c.setContainerRemoving(testID)
-		meta, getErr := c.containerStore.Get(testID)
-		assert.NoError(t, getErr)
+		container, err := containerstore.NewContainer(
+			containerstore.Metadata{ID: testID},
+			test.status,
+		)
+		assert.NoError(t, err)
+		err = setContainerRemoving(container)
 		if test.expectErr {
 			assert.Error(t, err)
-			assert.Equal(t, test.metadata, meta, "metadata should not be updated")
+			assert.Equal(t, test.status, container.Status.Get(), "metadata should not be updated")
 		} else {
 			assert.NoError(t, err)
-			assert.True(t, meta.Removing, "removing should be set")
+			assert.True(t, container.Status.Get().Removing, "removing should be set")
 		}
 	}
 }
@@ -91,15 +87,14 @@ func TestSetContainerRemoving(t *testing.T) {
 func TestRemoveContainer(t *testing.T) {
 	testID := "test-id"
 	testName := "test-name"
-	testContainerMetadata := &metadata.ContainerMetadata{
-		ID:         testID,
+	testContainerStatus := &containerstore.Status{
 		CreatedAt:  time.Now().UnixNano(),
 		StartedAt:  time.Now().UnixNano(),
 		FinishedAt: time.Now().UnixNano(),
 	}
 
 	for desc, test := range map[string]struct {
-		metadata            *metadata.ContainerMetadata
+		status              *containerstore.Status
 		removeSnapshotErr   error
 		deleteContainerErr  error
 		removeDirErr        error
@@ -107,16 +102,14 @@ func TestRemoveContainer(t *testing.T) {
 		expectUnsetRemoving bool
 	}{
 		"should return error when container is still running": {
-			metadata: &metadata.ContainerMetadata{
-				ID:        testID,
+			status: &containerstore.Status{
 				CreatedAt: time.Now().UnixNano(),
 				StartedAt: time.Now().UnixNano(),
 			},
 			expectErr: true,
 		},
 		"should return error when there is ongoing removing": {
-			metadata: &metadata.ContainerMetadata{
-				ID:         testID,
+			status: &containerstore.Status{
 				CreatedAt:  time.Now().UnixNano(),
 				StartedAt:  time.Now().UnixNano(),
 				FinishedAt: time.Now().UnixNano(),
@@ -124,40 +117,40 @@ func TestRemoveContainer(t *testing.T) {
 			},
 			expectErr: true,
 		},
-		"should not return error if container metadata does not exist": {
-			metadata:           nil,
+		"should not return error if container does not exist": {
+			status:             nil,
 			removeSnapshotErr:  servertesting.SnapshotNotExistError,
 			deleteContainerErr: servertesting.ContainerNotExistError,
 			expectErr:          false,
 		},
 		"should not return error if snapshot does not exist": {
-			metadata:          testContainerMetadata,
+			status:            testContainerStatus,
 			removeSnapshotErr: servertesting.SnapshotNotExistError,
 			expectErr:         false,
 		},
 		"should return error if remove snapshot fails": {
-			metadata:          testContainerMetadata,
+			status:            testContainerStatus,
 			removeSnapshotErr: errors.New("random error"),
 			expectErr:         true,
 		},
 		"should not return error if containerd container does not exist": {
-			metadata:           testContainerMetadata,
+			status:             testContainerStatus,
 			deleteContainerErr: servertesting.ContainerNotExistError,
 			expectErr:          false,
 		},
 		"should return error if delete containerd container fails": {
-			metadata:           testContainerMetadata,
+			status:             testContainerStatus,
 			deleteContainerErr: errors.New("random error"),
 			expectErr:          true,
 		},
 		"should return error if remove container root fails": {
-			metadata:            testContainerMetadata,
+			status:              testContainerStatus,
 			removeDirErr:        errors.New("random error"),
 			expectErr:           true,
 			expectUnsetRemoving: true,
 		},
 		"should be able to remove container successfully": {
-			metadata:  testContainerMetadata,
+			status:    testContainerStatus,
 			expectErr: false,
 		},
 	} {
@@ -166,9 +159,14 @@ func TestRemoveContainer(t *testing.T) {
 		fake := c.containerService.(*servertesting.FakeContainersClient)
 		fakeSnapshotClient := WithFakeSnapshotClient(c)
 		fakeOS := c.os.(*ostesting.FakeOS)
-		if test.metadata != nil {
+		if test.status != nil {
 			assert.NoError(t, c.containerNameIndex.Reserve(testName, testID))
-			assert.NoError(t, c.containerStore.Create(*test.metadata))
+			container, err := containerstore.NewContainer(
+				containerstore.Metadata{ID: testID},
+				*test.status,
+			)
+			assert.NoError(t, err)
+			assert.NoError(t, c.containerStore.Add(container))
 		}
 		fakeOS.RemoveAllFn = func(path string) error {
 			assert.Equal(t, getContainerRootDir(c.rootDir, testID), path)
@@ -202,19 +200,16 @@ func TestRemoveContainer(t *testing.T) {
 			if !test.expectUnsetRemoving {
 				continue
 			}
-			meta, err := c.containerStore.Get(testID)
+			container, err := c.containerStore.Get(testID)
 			assert.NoError(t, err)
-			require.NotNil(t, meta)
 			// Also covers resetContainerRemoving.
-			assert.False(t, meta.Removing, "removing state should be unset")
+			assert.False(t, container.Status.Get().Removing, "removing state should be unset")
 			continue
 		}
 		assert.NoError(t, err)
 		assert.NotNil(t, resp)
-		meta, err := c.containerStore.Get(testID)
-		assert.Error(t, err)
-		assert.True(t, metadata.IsNotExistError(err))
-		assert.Nil(t, meta, "container metadata should be removed")
+		_, err = c.containerStore.Get(testID)
+		assert.Equal(t, store.ErrNotExist, err)
 		assert.NoError(t, c.containerNameIndex.Reserve(testName, testID),
 			"container name should be released")
 		mountsResp, err := fakeSnapshotClient.Mounts(context.Background(), &snapshotapi.MountsRequest{Key: testID})
@@ -229,6 +224,5 @@ func TestRemoveContainer(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		assert.NotNil(t, resp, "remove should be idempotent")
-
 	}
 }

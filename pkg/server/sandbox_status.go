@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
+	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
 )
 
 // PodSandboxStatus returns the status of the PodSandbox.
@@ -39,7 +39,7 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 		}
 	}()
 
-	sandbox, err := c.getSandbox(r.GetPodSandboxId())
+	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find sandbox %q: %v",
 			r.GetPodSandboxId(), err)
@@ -66,11 +66,11 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 		glog.V(4).Infof("GetContainerNetworkStatus returns error: %v", err)
 	}
 
-	return &runtime.PodSandboxStatusResponse{Status: toCRISandboxStatus(sandbox, state, ip)}, nil
+	return &runtime.PodSandboxStatusResponse{Status: toCRISandboxStatus(sandbox.Metadata, state, ip)}, nil
 }
 
 // toCRISandboxStatus converts sandbox metadata into CRI pod sandbox status.
-func toCRISandboxStatus(meta *metadata.SandboxMetadata, state runtime.PodSandboxState, ip string) *runtime.PodSandboxStatus {
+func toCRISandboxStatus(meta sandboxstore.Metadata, state runtime.PodSandboxState, ip string) *runtime.PodSandboxStatus {
 	nsOpts := meta.Config.GetLinux().GetSecurityContext().GetNamespaceOptions()
 	return &runtime.PodSandboxStatus{
 		Id:        meta.ID,

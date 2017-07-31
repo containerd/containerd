@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/api/types/task"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
+	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
 )
 
 // ListPodSandbox returns a list of Sandbox.
@@ -39,11 +39,8 @@ func (c *criContainerdService) ListPodSandbox(ctx context.Context, r *runtime.Li
 		}
 	}()
 
-	// List all sandbox metadata from store.
-	sandboxesInStore, err := c.sandboxStore.List()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list metadata from sandbox store: %v", err)
-	}
+	// List all sandboxes from store.
+	sandboxesInStore := c.sandboxStore.List()
 
 	resp, err := c.taskService.List(ctx, &execution.ListRequest{})
 	if err != nil {
@@ -68,7 +65,7 @@ func (c *criContainerdService) ListPodSandbox(ctx context.Context, r *runtime.Li
 			state = runtime.PodSandboxState_SANDBOX_READY
 		}
 
-		sandboxes = append(sandboxes, toCRISandbox(sandboxInStore, state))
+		sandboxes = append(sandboxes, toCRISandbox(sandboxInStore.Metadata, state))
 	}
 
 	sandboxes = c.filterCRISandboxes(sandboxes, r.GetFilter())
@@ -76,7 +73,7 @@ func (c *criContainerdService) ListPodSandbox(ctx context.Context, r *runtime.Li
 }
 
 // toCRISandbox converts sandbox metadata into CRI pod sandbox.
-func toCRISandbox(meta *metadata.SandboxMetadata, state runtime.PodSandboxState) *runtime.PodSandbox {
+func toCRISandbox(meta sandboxstore.Metadata, state runtime.PodSandboxState) *runtime.PodSandbox {
 	return &runtime.PodSandbox{
 		Id:          meta.ID,
 		Metadata:    meta.Config.GetMetadata(),
@@ -93,20 +90,10 @@ func (c *criContainerdService) filterCRISandboxes(sandboxes []*runtime.PodSandbo
 		return sandboxes
 	}
 
-	var filterID string
-	if filter.GetId() != "" {
-		// Handle truncate id. Use original filter if failed to convert.
-		var err error
-		filterID, err = c.sandboxIDIndex.Get(filter.GetId())
-		if err != nil {
-			filterID = filter.GetId()
-		}
-	}
-
 	filtered := []*runtime.PodSandbox{}
 	for _, s := range sandboxes {
 		// Filter by id
-		if filterID != "" && filterID != s.Id {
+		if filter.GetId() != "" && filter.GetId() != s.Id {
 			continue
 		}
 		// Filter by state

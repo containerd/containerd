@@ -23,10 +23,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
-
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
+	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 )
 
 func TestToCRIContainer(t *testing.T) {
@@ -40,20 +39,25 @@ func TestToCRIContainer(t *testing.T) {
 		Annotations: map[string]string{"c": "d"},
 	}
 	createdAt := time.Now().UnixNano()
-	meta := &metadata.ContainerMetadata{
-		ID:         "test-id",
-		Name:       "test-name",
-		SandboxID:  "test-sandbox-id",
-		Config:     config,
-		ImageRef:   "test-image-ref",
-		Pid:        1234,
-		CreatedAt:  createdAt,
-		StartedAt:  time.Now().UnixNano(),
-		FinishedAt: time.Now().UnixNano(),
-		ExitCode:   1,
-		Reason:     "test-reason",
-		Message:    "test-message",
-	}
+	container, err := containerstore.NewContainer(
+		containerstore.Metadata{
+			ID:        "test-id",
+			Name:      "test-name",
+			SandboxID: "test-sandbox-id",
+			Config:    config,
+			ImageRef:  "test-image-ref",
+		},
+		containerstore.Status{
+			Pid:        1234,
+			CreatedAt:  createdAt,
+			StartedAt:  time.Now().UnixNano(),
+			FinishedAt: time.Now().UnixNano(),
+			ExitCode:   1,
+			Reason:     "test-reason",
+			Message:    "test-message",
+		},
+	)
+	assert.NoError(t, err)
 	expect := &runtime.Container{
 		Id:           "test-id",
 		PodSandboxId: "test-sandbox-id",
@@ -65,7 +69,7 @@ func TestToCRIContainer(t *testing.T) {
 		Labels:       config.GetLabels(),
 		Annotations:  config.GetAnnotations(),
 	}
-	c := toCRIContainer(meta)
+	c := toCRIContainer(container)
 	assert.Equal(t, expect, c)
 }
 
@@ -147,43 +151,67 @@ func TestFilterContainers(t *testing.T) {
 	}
 }
 
+// containerForTest is a helper type for test.
+type containerForTest struct {
+	metadata containerstore.Metadata
+	status   containerstore.Status
+}
+
+func (c containerForTest) toContainer() (containerstore.Container, error) {
+	return containerstore.NewContainer(c.metadata, c.status)
+}
+
 func TestListContainers(t *testing.T) {
 	c := newTestCRIContainerdService()
 
 	createdAt := time.Now().UnixNano()
 	startedAt := time.Now().UnixNano()
 	finishedAt := time.Now().UnixNano()
-	containersInStore := []metadata.ContainerMetadata{
+	containersInStore := []containerForTest{
 		{
-			ID:        "1",
-			Name:      "name-1",
-			SandboxID: "s-1",
-			Config:    &runtime.ContainerConfig{Metadata: &runtime.ContainerMetadata{Name: "name-1"}},
-			CreatedAt: createdAt,
+			metadata: containerstore.Metadata{
+				ID:        "1",
+				Name:      "name-1",
+				SandboxID: "s-1",
+				Config:    &runtime.ContainerConfig{Metadata: &runtime.ContainerMetadata{Name: "name-1"}},
+			},
+			status: containerstore.Status{CreatedAt: createdAt},
 		},
 		{
-			ID:        "2",
-			Name:      "name-2",
-			SandboxID: "s-1",
-			Config:    &runtime.ContainerConfig{Metadata: &runtime.ContainerMetadata{Name: "name-2"}},
-			CreatedAt: createdAt,
-			StartedAt: startedAt,
+			metadata: containerstore.Metadata{
+				ID:        "2",
+				Name:      "name-2",
+				SandboxID: "s-1",
+				Config:    &runtime.ContainerConfig{Metadata: &runtime.ContainerMetadata{Name: "name-2"}},
+			},
+			status: containerstore.Status{
+				CreatedAt: createdAt,
+				StartedAt: startedAt,
+			},
 		},
 		{
-			ID:         "3",
-			Name:       "name-3",
-			SandboxID:  "s-1",
-			Config:     &runtime.ContainerConfig{Metadata: &runtime.ContainerMetadata{Name: "name-3"}},
-			CreatedAt:  createdAt,
-			StartedAt:  startedAt,
-			FinishedAt: finishedAt,
+			metadata: containerstore.Metadata{
+				ID:        "3",
+				Name:      "name-3",
+				SandboxID: "s-1",
+				Config:    &runtime.ContainerConfig{Metadata: &runtime.ContainerMetadata{Name: "name-3"}},
+			},
+			status: containerstore.Status{
+				CreatedAt:  createdAt,
+				StartedAt:  startedAt,
+				FinishedAt: finishedAt,
+			},
 		},
 		{
-			ID:        "4",
-			Name:      "name-4",
-			SandboxID: "s-2",
-			Config:    &runtime.ContainerConfig{Metadata: &runtime.ContainerMetadata{Name: "name-4"}},
-			CreatedAt: createdAt,
+			metadata: containerstore.Metadata{
+				ID:        "4",
+				Name:      "name-4",
+				SandboxID: "s-2",
+				Config:    &runtime.ContainerConfig{Metadata: &runtime.ContainerMetadata{Name: "name-4"}},
+			},
+			status: containerstore.Status{
+				CreatedAt: createdAt,
+			},
 		},
 	}
 	filter := &runtime.ContainerFilter{
@@ -215,7 +243,9 @@ func TestListContainers(t *testing.T) {
 
 	// Inject test metadata
 	for _, cntr := range containersInStore {
-		c.containerStore.Create(cntr)
+		container, err := cntr.toContainer()
+		assert.NoError(t, err)
+		assert.NoError(t, c.containerStore.Add(container))
 	}
 
 	resp, err := c.ListContainers(context.Background(), &runtime.ListContainersRequest{Filter: filter})

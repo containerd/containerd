@@ -25,7 +25,8 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
+	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
+	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 )
 
 // RemoveContainer removes the container.
@@ -37,31 +38,29 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 		}
 	}()
 
-	id := r.GetContainerId()
+	container, err := c.containerStore.Get(r.GetContainerId())
+	if err != nil {
+		if err != store.ErrNotExist {
+			return nil, fmt.Errorf("an error occurred when try to find container %q: %v", r.GetContainerId(), err)
+		}
+		// Do not return error if container metadata doesn't exist.
+		glog.V(5).Infof("RemoveContainer called for container %q that does not exist", r.GetContainerId())
+		return &runtime.RemoveContainerResponse{}, nil
+	}
+	id := container.ID
 
 	// Set removing state to prevent other start/remove operations against this container
 	// while it's being removed.
-	if err := c.setContainerRemoving(id); err != nil {
-		if !metadata.IsNotExistError(err) {
-			return nil, fmt.Errorf("failed to set removing state for container %q: %v",
-				id, err)
-		}
-		// Do not return error if container metadata doesn't exist.
-		glog.V(5).Infof("RemoveContainer called for container %q that does not exist", id)
-		return &runtime.RemoveContainerResponse{}, nil
+	if err := setContainerRemoving(container); err != nil {
+		return nil, fmt.Errorf("failed to set removing state for container %q: %v", id, err)
 	}
 	defer func() {
-		if retErr == nil {
-			// Cleanup all index after successfully remove the container.
-			c.containerNameIndex.ReleaseByKey(id)
-			return
-		}
-		// Reset removing if remove failed.
-		if err := c.resetContainerRemoving(id); err != nil {
-			// TODO(random-liu): Deal with update failure. Actually Removing doesn't need to
-			// be checkpointed, we only need it to have the same lifecycle with container metadata.
-			glog.Errorf("failed to reset removing state for container %q: %v",
-				id, err)
+		if retErr != nil {
+			// Reset removing if remove failed.
+			if err := resetContainerRemoving(container); err != nil {
+				// TODO(random-liu): Do not checkpoint `Removing` state.
+				glog.Errorf("failed to reset removing state for container %q: %v", id, err)
+			}
 		}
 	}()
 
@@ -78,11 +77,15 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 		glog.V(5).Infof("Remove called for snapshot %q that does not exist", id)
 	}
 
-	// Cleanup container root directory.
 	containerRootDir := getContainerRootDir(c.rootDir, id)
 	if err := c.os.RemoveAll(containerRootDir); err != nil {
 		return nil, fmt.Errorf("failed to remove container root directory %q: %v",
 			containerRootDir, err)
+	}
+
+	// Delete container checkpoint.
+	if err := container.Delete(); err != nil {
+		return nil, fmt.Errorf("failed to delete container checkpoint for %q: %v", id, err)
 	}
 
 	// Delete containerd container.
@@ -93,35 +96,34 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 		glog.V(5).Infof("Remove called for containerd container %q that does not exist", id, err)
 	}
 
-	// Delete container metadata.
-	if err := c.containerStore.Delete(id); err != nil {
-		return nil, fmt.Errorf("failed to delete container metadata for %q: %v", id, err)
-	}
+	c.containerStore.Delete(id)
+
+	c.containerNameIndex.ReleaseByKey(id)
 
 	return &runtime.RemoveContainerResponse{}, nil
 }
 
 // setContainerRemoving sets the container into removing state. In removing state, the
 // container will not be started or removed again.
-func (c *criContainerdService) setContainerRemoving(id string) error {
-	return c.containerStore.Update(id, func(meta metadata.ContainerMetadata) (metadata.ContainerMetadata, error) {
+func setContainerRemoving(container containerstore.Container) error {
+	return container.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
 		// Do not remove container if it's still running.
-		if meta.State() == runtime.ContainerState_CONTAINER_RUNNING {
-			return meta, fmt.Errorf("container %q is still running", id)
+		if status.State() == runtime.ContainerState_CONTAINER_RUNNING {
+			return status, fmt.Errorf("container is still running")
 		}
-		if meta.Removing {
-			return meta, fmt.Errorf("container is already in removing state")
+		if status.Removing {
+			return status, fmt.Errorf("container is already in removing state")
 		}
-		meta.Removing = true
-		return meta, nil
+		status.Removing = true
+		return status, nil
 	})
 }
 
 // resetContainerRemoving resets the container removing state on remove failure. So
 // that we could remove the container again.
-func (c *criContainerdService) resetContainerRemoving(id string) error {
-	return c.containerStore.Update(id, func(meta metadata.ContainerMetadata) (metadata.ContainerMetadata, error) {
-		meta.Removing = false
-		return meta, nil
+func resetContainerRemoving(container containerstore.Container) error {
+	return container.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
+		status.Removing = false
+		return status, nil
 	})
 }

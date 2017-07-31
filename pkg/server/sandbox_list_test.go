@@ -27,8 +27,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
+	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
 )
 
 func TestToCRISandbox(t *testing.T) {
@@ -43,7 +43,7 @@ func TestToCRISandbox(t *testing.T) {
 		Annotations: map[string]string{"c": "d"},
 	}
 	createdAt := time.Now().UnixNano()
-	meta := &metadata.SandboxMetadata{
+	meta := sandboxstore.Metadata{
 		ID:        "test-id",
 		Name:      "test-name",
 		Config:    config,
@@ -137,21 +137,27 @@ func TestListPodSandbox(t *testing.T) {
 
 	fake := c.taskService.(*servertesting.FakeExecutionClient)
 
-	sandboxesInStore := []metadata.SandboxMetadata{
+	sandboxesInStore := []sandboxstore.Sandbox{
 		{
-			ID:     "1",
-			Name:   "name-1",
-			Config: &runtime.PodSandboxConfig{Metadata: &runtime.PodSandboxMetadata{Name: "name-1"}},
+			Metadata: sandboxstore.Metadata{
+				ID:     "1",
+				Name:   "name-1",
+				Config: &runtime.PodSandboxConfig{Metadata: &runtime.PodSandboxMetadata{Name: "name-1"}},
+			},
 		},
 		{
-			ID:     "2",
-			Name:   "name-2",
-			Config: &runtime.PodSandboxConfig{Metadata: &runtime.PodSandboxMetadata{Name: "name-2"}},
+			Metadata: sandboxstore.Metadata{
+				ID:     "2",
+				Name:   "name-2",
+				Config: &runtime.PodSandboxConfig{Metadata: &runtime.PodSandboxMetadata{Name: "name-2"}},
+			},
 		},
 		{
-			ID:     "3",
-			Name:   "name-3",
-			Config: &runtime.PodSandboxConfig{Metadata: &runtime.PodSandboxMetadata{Name: "name-3"}},
+			Metadata: sandboxstore.Metadata{
+				ID:     "3",
+				Name:   "name-3",
+				Config: &runtime.PodSandboxConfig{Metadata: &runtime.PodSandboxMetadata{Name: "name-3"}},
+			},
 		},
 	}
 	sandboxesInContainerd := []task.Task{
@@ -194,7 +200,7 @@ func TestListPodSandbox(t *testing.T) {
 
 	// Inject test metadata
 	for _, s := range sandboxesInStore {
-		c.sandboxStore.Create(s)
+		assert.NoError(t, c.sandboxStore.Add(s))
 	}
 
 	// Inject fake containerd tasks

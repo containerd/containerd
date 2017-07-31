@@ -30,8 +30,8 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/server/agents"
+	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 )
 
 // StartContainer starts the container.
@@ -50,12 +50,12 @@ func (c *criContainerdService) StartContainer(ctx context.Context, r *runtime.St
 	id := container.ID
 
 	var startErr error
-	// start container in one transaction to avoid race with event monitor.
-	if err := c.containerStore.Update(id, func(meta metadata.ContainerMetadata) (metadata.ContainerMetadata, error) {
-		// Always apply metadata change no matter startContainer fails or not. Because startContainer
+	// update container status in one transaction to avoid race with event monitor.
+	if err := container.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
+		// Always apply status change no matter startContainer fails or not. Because startContainer
 		// may change container state no matter it fails or succeeds.
-		startErr = c.startContainer(ctx, id, &meta)
-		return meta, nil
+		startErr = c.startContainer(ctx, id, container.Metadata, &status)
+		return status, nil
 	}); startErr != nil {
 		return nil, startErr
 	} else if err != nil {
@@ -65,36 +65,36 @@ func (c *criContainerdService) StartContainer(ctx context.Context, r *runtime.St
 }
 
 // startContainer actually starts the container. The function needs to be run in one transaction. Any updates
-// to the metadata passed in will be applied to container store no matter the function returns error or not.
-func (c *criContainerdService) startContainer(ctx context.Context, id string, meta *metadata.ContainerMetadata) (retErr error) {
+// to the status passed in will be applied no matter the function returns error or not.
+func (c *criContainerdService) startContainer(ctx context.Context, id string, meta containerstore.Metadata, status *containerstore.Status) (retErr error) {
 	config := meta.Config
 	// Return error if container is not in created state.
-	if meta.State() != runtime.ContainerState_CONTAINER_CREATED {
-		return fmt.Errorf("container %q is in %s state", id, criContainerStateToString(meta.State()))
+	if status.State() != runtime.ContainerState_CONTAINER_CREATED {
+		return fmt.Errorf("container %q is in %s state", id, criContainerStateToString(status.State()))
 	}
 
 	// Do not start the container when there is a removal in progress.
-	if meta.Removing {
+	if status.Removing {
 		return fmt.Errorf("container %q is in removing state", id)
 	}
 
 	defer func() {
 		if retErr != nil {
 			// Set container to exited if fail to start.
-			meta.Pid = 0
-			meta.FinishedAt = time.Now().UnixNano()
-			meta.ExitCode = errorStartExitCode
-			meta.Reason = errorStartReason
-			meta.Message = retErr.Error()
+			status.Pid = 0
+			status.FinishedAt = time.Now().UnixNano()
+			status.ExitCode = errorStartExitCode
+			status.Reason = errorStartReason
+			status.Message = retErr.Error()
 		}
 	}()
 
 	// Get sandbox config from sandbox store.
-	sandboxMeta, err := c.getSandbox(meta.SandboxID)
+	sandbox, err := c.sandboxStore.Get(meta.SandboxID)
 	if err != nil {
 		return fmt.Errorf("sandbox %q not found: %v", meta.SandboxID, err)
 	}
-	sandboxConfig := sandboxMeta.Config
+	sandboxConfig := sandbox.Config
 	sandboxID := meta.SandboxID
 	// Make sure sandbox is running.
 	sandboxInfo, err := c.taskService.Info(ctx, &execution.InfoRequest{ContainerID: sandboxID})
@@ -137,12 +137,12 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 	if config.GetLogPath() != "" {
 		// Only generate container log when log path is specified.
 		logPath := filepath.Join(sandboxConfig.GetLogDirectory(), config.GetLogPath())
-		if err := c.agentFactory.NewContainerLogger(logPath, agents.Stdout, stdoutPipe).Start(); err != nil {
+		if err = c.agentFactory.NewContainerLogger(logPath, agents.Stdout, stdoutPipe).Start(); err != nil {
 			return fmt.Errorf("failed to start container stdout logger: %v", err)
 		}
 		// Only redirect stderr when there is no tty.
 		if !config.GetTty() {
-			if err := c.agentFactory.NewContainerLogger(logPath, agents.Stderr, stderrPipe).Start(); err != nil {
+			if err = c.agentFactory.NewContainerLogger(logPath, agents.Stderr, stderrPipe).Start(); err != nil {
 				return fmt.Errorf("failed to start container stderr logger: %v", err)
 			}
 		}
@@ -192,7 +192,7 @@ func (c *criContainerdService) startContainer(ctx context.Context, id string, me
 	}
 
 	// Update container start timestamp.
-	meta.Pid = createResp.Pid
-	meta.StartedAt = time.Now().UnixNano()
+	status.Pid = createResp.Pid
+	status.StartedAt = time.Now().UnixNano()
 	return nil
 }

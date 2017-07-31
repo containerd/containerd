@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package metadata
+package image
 
 import (
 	"testing"
@@ -22,11 +22,11 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	assertlib "github.com/stretchr/testify/assert"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
+	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
 )
 
-func TestImageMetadataStore(t *testing.T) {
-	imageMetadataMap := map[string]*ImageMetadata{
+func TestImageStore(t *testing.T) {
+	images := map[string]Image{
 		"1": {
 			ID:          "1",
 			ChainID:     "test-chain-id-1",
@@ -54,47 +54,53 @@ func TestImageMetadataStore(t *testing.T) {
 	}
 	assert := assertlib.New(t)
 
-	s := NewImageMetadataStore(store.NewMetadataStore())
+	s := NewStore()
 
-	t.Logf("should be able to create image metadata")
-	for _, meta := range imageMetadataMap {
-		assert.NoError(s.Create(*meta))
+	t.Logf("should be able to add image")
+	for _, img := range images {
+		s.Add(img)
 	}
 
-	t.Logf("should be able to get image metadata")
-	for id, expectMeta := range imageMetadataMap {
-		meta, err := s.Get(id)
+	t.Logf("should be able to get image")
+	for id, img := range images {
+		got, err := s.Get(id)
 		assert.NoError(err)
-		assert.Equal(expectMeta, meta)
+		assert.Equal(img, got)
 	}
 
-	t.Logf("should be able to list image metadata")
-	imgs, err := s.List()
-	assert.NoError(err)
+	t.Logf("should be able to list images")
+	imgs := s.List()
 	assert.Len(imgs, 3)
 
-	t.Logf("should be able to update image metadata")
 	testID := "2"
-	newSize := int64(200)
-	expectMeta := *imageMetadataMap[testID]
-	expectMeta.Size = newSize
-	err = s.Update(testID, func(o ImageMetadata) (ImageMetadata, error) {
-		o.Size = newSize
-		return o, nil
-	})
+	t.Logf("should be able to add new repo tags/digests")
+	newImg := images[testID]
+	newImg.RepoTags = []string{"tag-new"}
+	newImg.RepoDigests = []string{"digest-new"}
+	s.Add(newImg)
+	got, err := s.Get(testID)
 	assert.NoError(err)
-	newMeta, err := s.Get(testID)
-	assert.NoError(err)
-	assert.Equal(&expectMeta, newMeta)
+	assert.Len(got.RepoTags, 2)
+	assert.Contains(got.RepoTags, "tag-2", "tag-new")
+	assert.Len(got.RepoDigests, 2)
+	assert.Contains(got.RepoDigests, "digest-2", "digest-new")
 
-	t.Logf("should be able to delete image metadata")
-	assert.NoError(s.Delete(testID))
-	imgs, err = s.List()
+	t.Logf("should not be able to add duplicated repo tags/digests")
+	s.Add(newImg)
+	got, err = s.Get(testID)
 	assert.NoError(err)
+	assert.Len(got.RepoTags, 2)
+	assert.Contains(got.RepoTags, "tag-2", "tag-new")
+	assert.Len(got.RepoDigests, 2)
+	assert.Contains(got.RepoDigests, "digest-2", "digest-new")
+
+	t.Logf("should be able to delete image")
+	s.Delete(testID)
+	imgs = s.List()
 	assert.Len(imgs, 2)
 
-	t.Logf("get should return nil not exist error after deletion")
-	meta, err := s.Get(testID)
-	assert.Error(store.ErrNotExist, err)
-	assert.Nil(meta)
+	t.Logf("get should return nil after deletion")
+	img, err := s.Get(testID)
+	assert.Equal(Image{}, img)
+	assert.Equal(store.ErrNotExist, err)
 }

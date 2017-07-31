@@ -32,9 +32,11 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
+	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
+	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
+	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
 )
 
 func checkMount(t *testing.T, mounts []runtimespec.Mount, src, dest, typ string,
@@ -443,64 +445,66 @@ func TestCreateContainer(t *testing.T) {
 	testSandboxID := "test-sandbox-id"
 	testSandboxPid := uint32(4321)
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
-	testSandboxMetadata := &metadata.SandboxMetadata{
-		ID:     testSandboxID,
-		Name:   "test-sandbox-name",
-		Config: sandboxConfig,
-		Pid:    testSandboxPid,
+	testSandbox := &sandboxstore.Sandbox{
+		Metadata: sandboxstore.Metadata{
+			ID:     testSandboxID,
+			Name:   "test-sandbox-name",
+			Config: sandboxConfig,
+			Pid:    testSandboxPid,
+		},
 	}
 	testContainerName := makeContainerName(config.Metadata, sandboxConfig.Metadata)
 	// Use an image id to avoid image name resolution.
 	// TODO(random-liu): Change this to image name after we have complete image
 	// management unit test framework.
-	testImage := config.GetImage().GetImage()
+	testImageRef := config.GetImage().GetImage()
 	testChainID := "test-chain-id"
-	testImageMetadata := metadata.ImageMetadata{
-		ID:      testImage,
+	testImage := imagestore.Image{
+		ID:      testImageRef,
 		ChainID: testChainID,
 		Config:  imageConfig,
 	}
 
 	for desc, test := range map[string]struct {
-		sandboxMetadata    *metadata.SandboxMetadata
+		sandbox            *sandboxstore.Sandbox
 		reserveNameErr     bool
-		imageMetadataErr   bool
+		imageStoreErr      bool
 		prepareSnapshotErr error
 		createRootDirErr   error
 		expectErr          bool
-		expectMeta         *metadata.ContainerMetadata
+		expectedMeta       containerstore.Metadata
 	}{
 		"should return error if sandbox does not exist": {
-			sandboxMetadata: nil,
-			expectErr:       true,
+			sandbox:   nil,
+			expectErr: true,
 		},
 		"should return error if name is reserved": {
-			sandboxMetadata: testSandboxMetadata,
-			reserveNameErr:  true,
-			expectErr:       true,
+			sandbox:        testSandbox,
+			reserveNameErr: true,
+			expectErr:      true,
 		},
 		"should return error if fail to create root directory": {
-			sandboxMetadata:  testSandboxMetadata,
+			sandbox:          testSandbox,
 			createRootDirErr: errors.New("random error"),
 			expectErr:        true,
 		},
 		"should return error if image is not pulled": {
-			sandboxMetadata:  testSandboxMetadata,
-			imageMetadataErr: true,
-			expectErr:        true,
+			sandbox:       testSandbox,
+			imageStoreErr: true,
+			expectErr:     true,
 		},
 		"should return error if prepare snapshot fails": {
-			sandboxMetadata:    testSandboxMetadata,
+			sandbox:            testSandbox,
 			prepareSnapshotErr: errors.New("random error"),
 			expectErr:          true,
 		},
 		"should be able to create container successfully": {
-			sandboxMetadata: testSandboxMetadata,
-			expectErr:       false,
-			expectMeta: &metadata.ContainerMetadata{
+			sandbox:   testSandbox,
+			expectErr: false,
+			expectedMeta: containerstore.Metadata{
 				Name:      testContainerName,
 				SandboxID: testSandboxID,
-				ImageRef:  testImage,
+				ImageRef:  testImageRef,
 				Config:    config,
 			},
 		},
@@ -510,14 +514,14 @@ func TestCreateContainer(t *testing.T) {
 		fake := c.containerService.(*servertesting.FakeContainersClient)
 		fakeSnapshotClient := WithFakeSnapshotClient(c)
 		fakeOS := c.os.(*ostesting.FakeOS)
-		if test.sandboxMetadata != nil {
-			assert.NoError(t, c.sandboxStore.Create(*test.sandboxMetadata))
+		if test.sandbox != nil {
+			assert.NoError(t, c.sandboxStore.Add(*test.sandbox))
 		}
 		if test.reserveNameErr {
 			assert.NoError(t, c.containerNameIndex.Reserve(testContainerName, "random id"))
 		}
-		if !test.imageMetadataErr {
-			assert.NoError(t, c.imageMetadataStore.Create(testImageMetadata))
+		if !test.imageStoreErr {
+			c.imageStore.Add(testImage)
 		}
 		if test.prepareSnapshotErr != nil {
 			fakeSnapshotClient.InjectError("prepare", test.prepareSnapshotErr)
@@ -554,9 +558,7 @@ func TestCreateContainer(t *testing.T) {
 			listResp, err := fake.List(context.Background(), &containers.ListContainersRequest{})
 			assert.NoError(t, err)
 			assert.Empty(t, listResp.Containers, "containerd container should be cleaned up")
-			metas, err := c.containerStore.List()
-			assert.NoError(t, err)
-			assert.Empty(t, metas, "container metadata should not be created")
+			assert.Empty(t, c.containerStore.List(), "container metadata should not be created")
 			continue
 		}
 		assert.NoError(t, err)
@@ -571,7 +573,7 @@ func TestCreateContainer(t *testing.T) {
 		createOpts, ok := containersCalls[0].Argument.(*containers.CreateContainerRequest)
 		assert.True(t, ok, "should create containerd container")
 		assert.Equal(t, id, createOpts.Container.ID, "container id should be correct")
-		assert.Equal(t, testImage, createOpts.Container.Image, "test image should be correct")
+		assert.Equal(t, testImageRef, createOpts.Container.Image, "test image should be correct")
 		assert.Equal(t, id, createOpts.Container.RootFS, "rootfs should be correct")
 		spec := &runtimespec.Spec{}
 		assert.NoError(t, json.Unmarshal(createOpts.Container.Spec.Value, spec))
@@ -586,12 +588,11 @@ func TestCreateContainer(t *testing.T) {
 			Parent: testChainID,
 		}, prepareOpts, "prepare request should be correct")
 
-		meta, err := c.containerStore.Get(id)
+		container, err := c.containerStore.Get(id)
 		assert.NoError(t, err)
-		require.NotNil(t, meta)
-		test.expectMeta.ID = id
-		// TODO(random-liu): Use fake clock to test CreatedAt.
-		test.expectMeta.CreatedAt = meta.CreatedAt
-		assert.Equal(t, test.expectMeta, meta, "container metadata should be created")
+		test.expectedMeta.ID = id
+		assert.Equal(t, test.expectedMeta, container.Metadata, "container metadata should be created")
+		assert.Equal(t, runtime.ContainerState_CONTAINER_CREATED, container.Status.Get().State(),
+			"container should be in created state")
 	}
 }

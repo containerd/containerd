@@ -14,12 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package metadata
+package store
 
-import "github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
+import "errors"
 
-// IsNotExistError is a helper function to check whether the error returned
-// by metadata store is not exist error.
-func IsNotExistError(err error) bool {
-	return err.Error() == store.ErrNotExist.Error()
-}
+var (
+	// ErrAlreadyExist is the error returned when data added in the store
+	// already exists.
+	ErrAlreadyExist = errors.New("already exists")
+	// ErrNotExist is the error returned when data is not in the store.
+	ErrNotExist = errors.New("does not exist")
+)

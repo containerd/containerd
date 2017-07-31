@@ -17,14 +17,12 @@ limitations under the License.
 package server
 
 import (
-	"fmt"
-
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
+	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 )
 
 // ListContainers lists all containers matching the filter.
@@ -36,33 +34,31 @@ func (c *criContainerdService) ListContainers(ctx context.Context, r *runtime.Li
 		}
 	}()
 
-	// List all container metadata from store.
-	metas, err := c.containerStore.List()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list metadata from container store: %v", err)
-	}
+	// List all containers from store.
+	containersInStore := c.containerStore.List()
 
 	var containers []*runtime.Container
-	for _, meta := range metas {
-		containers = append(containers, toCRIContainer(meta))
+	for _, container := range containersInStore {
+		containers = append(containers, toCRIContainer(container))
 	}
 
 	containers = c.filterCRIContainers(containers, r.GetFilter())
 	return &runtime.ListContainersResponse{Containers: containers}, nil
 }
 
-// toCRIContainer converts container metadata into CRI container.
-func toCRIContainer(meta *metadata.ContainerMetadata) *runtime.Container {
+// toCRIContainer converts internal container object into CRI container.
+func toCRIContainer(container containerstore.Container) *runtime.Container {
+	status := container.Status.Get()
 	return &runtime.Container{
-		Id:           meta.ID,
-		PodSandboxId: meta.SandboxID,
-		Metadata:     meta.Config.GetMetadata(),
-		Image:        meta.Config.GetImage(),
-		ImageRef:     meta.ImageRef,
-		State:        meta.State(),
-		CreatedAt:    meta.CreatedAt,
-		Labels:       meta.Config.GetLabels(),
-		Annotations:  meta.Config.GetAnnotations(),
+		Id:           container.ID,
+		PodSandboxId: container.SandboxID,
+		Metadata:     container.Config.GetMetadata(),
+		Image:        container.Config.GetImage(),
+		ImageRef:     container.ImageRef,
+		State:        status.State(),
+		CreatedAt:    status.CreatedAt,
+		Labels:       container.Config.GetLabels(),
+		Annotations:  container.Config.GetAnnotations(),
 	}
 }
 

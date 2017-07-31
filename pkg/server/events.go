@@ -25,7 +25,7 @@ import (
 	"github.com/jpillora/backoff"
 	"golang.org/x/net/context"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
+	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 )
 
 const (
@@ -87,12 +87,12 @@ func (c *criContainerdService) handleEvent(e *task.Event) {
 	// fine to leave out that case for now.
 	// TODO(random-liu): [P2] Handle containerd-shim exit.
 	case task.Event_EXIT:
-		meta, err := c.containerStore.Get(e.ID)
+		cntr, err := c.containerStore.Get(e.ID)
 		if err != nil {
-			glog.Errorf("Failed to get container %q metadata: %v", e.ID, err)
+			glog.Errorf("Failed to get container %q: %v", e.ID, err)
 			return
 		}
-		if e.Pid != meta.Pid {
+		if e.Pid != cntr.Status.Get().Pid {
 			// Non-init process died, ignore the event.
 			return
 		}
@@ -103,16 +103,16 @@ func (c *criContainerdService) handleEvent(e *task.Event) {
 			glog.Errorf("Failed to delete container %q: %v", e.ID, err)
 			return
 		}
-		err = c.containerStore.Update(e.ID, func(meta metadata.ContainerMetadata) (metadata.ContainerMetadata, error) {
+		err = cntr.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
 			// If FinishedAt has been set (e.g. with start failure), keep as
 			// it is.
-			if meta.FinishedAt != 0 {
-				return meta, nil
+			if status.FinishedAt != 0 {
+				return status, nil
 			}
-			meta.Pid = 0
-			meta.FinishedAt = e.ExitedAt.UnixNano()
-			meta.ExitCode = int32(e.ExitStatus)
-			return meta, nil
+			status.Pid = 0
+			status.FinishedAt = e.ExitedAt.UnixNano()
+			status.ExitCode = int32(e.ExitStatus)
+			return status, nil
 		})
 		if err != nil {
 			glog.Errorf("Failed to update container %q state: %v", e.ID, err)
@@ -120,11 +120,15 @@ func (c *criContainerdService) handleEvent(e *task.Event) {
 			return
 		}
 	case task.Event_OOM:
-		err := c.containerStore.Update(e.ID, func(meta metadata.ContainerMetadata) (metadata.ContainerMetadata, error) {
-			meta.Reason = oomExitReason
-			return meta, nil
+		cntr, err := c.containerStore.Get(e.ID)
+		if err != nil {
+			glog.Errorf("Failed to get container %q: %v", e.ID, err)
+		}
+		err = cntr.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
+			status.Reason = oomExitReason
+			return status, nil
 		})
-		if err != nil && !metadata.IsNotExistError(err) {
+		if err != nil {
 			glog.Errorf("Failed to update container %q oom: %v", e.ID, err)
 			return
 		}

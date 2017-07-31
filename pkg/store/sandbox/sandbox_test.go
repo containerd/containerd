@@ -14,21 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package metadata
+package sandbox
 
 import (
 	"testing"
 	"time"
 
 	assertlib "github.com/stretchr/testify/assert"
-
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata/store"
-
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+
+	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
 )
 
 func TestSandboxStore(t *testing.T) {
-	sandboxes := map[string]*SandboxMetadata{
+	ids := []string{"1", "2", "3"}
+	metadatas := map[string]Metadata{
 		"1": {
 			ID:   "1",
 			Name: "Sandbox-1",
@@ -41,8 +41,8 @@ func TestSandboxStore(t *testing.T) {
 				},
 			},
 			CreatedAt: time.Now().UnixNano(),
-			NetNS:     "TestNetNS-1",
 			Pid:       1001,
+			NetNS:     "TestNetNS-1",
 		},
 		"2": {
 			ID:   "2",
@@ -56,8 +56,8 @@ func TestSandboxStore(t *testing.T) {
 				},
 			},
 			CreatedAt: time.Now().UnixNano(),
-			NetNS:     "TestNetNS-2",
 			Pid:       1002,
+			NetNS:     "TestNetNS-2",
 		},
 		"3": {
 			ID:   "3",
@@ -71,53 +71,45 @@ func TestSandboxStore(t *testing.T) {
 				},
 			},
 			CreatedAt: time.Now().UnixNano(),
-			NetNS:     "TestNetNS-3",
 			Pid:       1003,
+			NetNS:     "TestNetNS-3",
 		},
 	}
 	assert := assertlib.New(t)
-
-	s := NewSandboxStore(store.NewMetadataStore())
-
-	t.Logf("should be able to create sandbox metadata")
-	for _, meta := range sandboxes {
-		assert.NoError(s.Create(*meta))
+	sandboxes := map[string]Sandbox{}
+	for _, id := range ids {
+		sandboxes[id] = Sandbox{metadatas[id]}
 	}
 
-	t.Logf("should be able to get sandbox metadata")
-	for id, expectMeta := range sandboxes {
-		meta, err := s.Get(id)
+	s := NewStore()
+
+	t.Logf("should be able to add sandbox")
+	for _, sb := range sandboxes {
+		assert.NoError(s.Add(sb))
+	}
+
+	t.Logf("should be able to get sandbox")
+	for id, sb := range sandboxes {
+		got, err := s.Get(id)
 		assert.NoError(err)
-		assert.Equal(expectMeta, meta)
+		assert.Equal(sb, got)
 	}
 
-	t.Logf("should be able to list sandbox metadata")
-	sbs, err := s.List()
-	assert.NoError(err)
+	t.Logf("should be able to list sandboxes")
+	sbs := s.List()
 	assert.Len(sbs, 3)
 
-	t.Logf("should be able to update sandbox metadata")
 	testID := "2"
-	newCreatedAt := time.Now().UnixNano()
-	expectMeta := *sandboxes[testID]
-	expectMeta.CreatedAt = newCreatedAt
-	err = s.Update(testID, func(o SandboxMetadata) (SandboxMetadata, error) {
-		o.CreatedAt = newCreatedAt
-		return o, nil
-	})
-	assert.NoError(err)
-	newMeta, err := s.Get(testID)
-	assert.NoError(err)
-	assert.Equal(&expectMeta, newMeta)
+	t.Logf("add should return already exists error for duplicated sandbox")
+	assert.Equal(store.ErrAlreadyExist, s.Add(sandboxes[testID]))
 
-	t.Logf("should be able to delete sandbox metadata")
-	assert.NoError(s.Delete(testID))
-	sbs, err = s.List()
-	assert.NoError(err)
+	t.Logf("should be able to delete sandbox")
+	s.Delete(testID)
+	sbs = s.List()
 	assert.Len(sbs, 2)
 
-	t.Logf("get should return nil with not exist error after deletion")
-	meta, err := s.Get(testID)
-	assert.Error(store.ErrNotExist, err)
-	assert.Nil(meta)
+	t.Logf("get should return not exist error after deletion")
+	sb, err := s.Get(testID)
+	assert.Equal(Sandbox{}, sb)
+	assert.Equal(store.ErrNotExist, err)
 }

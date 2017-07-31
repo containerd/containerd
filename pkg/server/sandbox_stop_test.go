@@ -30,23 +30,26 @@ import (
 	"google.golang.org/grpc/codes"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/metadata"
 	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
+	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
+	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
 )
 
 func TestStopPodSandbox(t *testing.T) {
 	testID := "test-id"
-	testSandbox := metadata.SandboxMetadata{
-		ID:   testID,
-		Name: "test-name",
-		Config: &runtime.PodSandboxConfig{
-			Metadata: &runtime.PodSandboxMetadata{
-				Name:      "test-name",
-				Uid:       "test-uid",
-				Namespace: "test-ns",
-			}},
-		NetNS: "test-netns",
+	testSandbox := sandboxstore.Sandbox{
+		Metadata: sandboxstore.Metadata{
+			ID:   testID,
+			Name: "test-name",
+			Config: &runtime.PodSandboxConfig{
+				Metadata: &runtime.PodSandboxMetadata{
+					Name:      "test-name",
+					Uid:       "test-uid",
+					Namespace: "test-ns",
+				}},
+			NetNS: "test-netns",
+		},
 	}
 	testContainer := task.Task{
 		ID:     testID,
@@ -136,8 +139,7 @@ func TestStopPodSandbox(t *testing.T) {
 		fake.SetFakeTasks(test.sandboxTasks)
 
 		if test.injectSandbox {
-			assert.NoError(t, c.sandboxStore.Create(testSandbox))
-			c.sandboxIDIndex.Add(testID)
+			assert.NoError(t, c.sandboxStore.Add(testSandbox))
 		}
 		if test.injectErr != nil {
 			fake.InjectError("delete", test.injectErr)
@@ -171,38 +173,53 @@ func TestStopPodSandbox(t *testing.T) {
 
 func TestStopContainersInSandbox(t *testing.T) {
 	testID := "test-id"
-	testSandbox := metadata.SandboxMetadata{
-		ID:   testID,
-		Name: "test-name",
-		Config: &runtime.PodSandboxConfig{
-			Metadata: &runtime.PodSandboxMetadata{
-				Name:      "test-name",
-				Uid:       "test-uid",
-				Namespace: "test-ns",
-			}},
-		NetNS: "test-netns",
+	testSandbox := sandboxstore.Sandbox{
+		Metadata: sandboxstore.Metadata{
+			ID:   testID,
+			Name: "test-name",
+			Config: &runtime.PodSandboxConfig{
+				Metadata: &runtime.PodSandboxMetadata{
+					Name:      "test-name",
+					Uid:       "test-uid",
+					Namespace: "test-ns",
+				}},
+			NetNS: "test-netns",
+		},
 	}
-	testContainers := []metadata.ContainerMetadata{
+	testContainers := []containerForTest{
 		{
-			ID:        "test-cid-1",
-			Name:      "test-cname-1",
-			SandboxID: testID,
-			Pid:       2,
-			StartedAt: time.Now().UnixNano(),
+			metadata: containerstore.Metadata{
+				ID:        "test-cid-1",
+				Name:      "test-cname-1",
+				SandboxID: testID,
+			},
+			status: containerstore.Status{
+				Pid:       2,
+				StartedAt: time.Now().UnixNano(),
+			},
 		},
 		{
-			ID:        "test-cid-2",
-			Name:      "test-cname-2",
-			SandboxID: testID,
-			Pid:       3,
-			StartedAt: time.Now().UnixNano(),
+
+			metadata: containerstore.Metadata{
+				ID:        "test-cid-2",
+				Name:      "test-cname-2",
+				SandboxID: testID,
+			},
+			status: containerstore.Status{
+				Pid:       3,
+				StartedAt: time.Now().UnixNano(),
+			},
 		},
 		{
-			ID:        "test-cid-3",
-			Name:      "test-cname-3",
-			SandboxID: "other-sandbox-id",
-			Pid:       4,
-			StartedAt: time.Now().UnixNano(),
+			metadata: containerstore.Metadata{
+				ID:        "test-cid-3",
+				Name:      "test-cname-3",
+				SandboxID: "other-sandbox-id",
+			},
+			status: containerstore.Status{
+				Pid:       4,
+				StartedAt: time.Now().UnixNano(),
+			},
 		},
 	}
 	testContainerdContainers := []task.Task{
@@ -233,10 +250,11 @@ func TestStopContainersInSandbox(t *testing.T) {
 	defer fake.Stop()
 	c.taskService = fake
 	fake.SetFakeTasks(testContainerdContainers)
-	assert.NoError(t, c.sandboxStore.Create(testSandbox))
-	assert.NoError(t, c.sandboxIDIndex.Add(testID))
-	for _, cntr := range testContainers {
-		assert.NoError(t, c.containerStore.Create(cntr))
+	c.sandboxStore.Add(testSandbox)
+	for _, tc := range testContainers {
+		cntr, err := tc.toContainer()
+		assert.NoError(t, err)
+		assert.NoError(t, c.containerStore.Add(cntr))
 	}
 
 	fakeCNIPlugin := c.netPlugin.(*servertesting.FakeCNIPlugin)
@@ -259,8 +277,7 @@ func TestStopContainersInSandbox(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 
-	cntrs, err := c.containerStore.List()
-	assert.NoError(t, err)
+	cntrs := c.containerStore.List()
 	assert.Len(t, cntrs, 3)
 	expectedStates := map[string]runtime.ContainerState{
 		"test-cid-1": runtime.ContainerState_CONTAINER_EXITED,
@@ -270,6 +287,6 @@ func TestStopContainersInSandbox(t *testing.T) {
 	for id, expected := range expectedStates {
 		cntr, err := c.containerStore.Get(id)
 		assert.NoError(t, err)
-		assert.Equal(t, expected, cntr.State())
+		assert.Equal(t, expected, cntr.Status.Get().State())
 	}
 }
