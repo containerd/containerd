@@ -3,8 +3,8 @@ package supervisor
 import (
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd/runtime"
+	"github.com/sirupsen/logrus"
 )
 
 // DeleteTask holds needed parameters to remove a container

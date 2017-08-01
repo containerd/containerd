@@ -7,7 +7,7 @@ import (
 	// net/http/pprof installs the "/debug/pprof/{block,heap,goroutine,threadcreate}" handler
 	_ "net/http/pprof"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // Enable registers the "/debug/pprof" handler

@@ -3,7 +3,7 @@ package supervisor
 import (
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // OOMTask holds needed parameters to report a container OOM

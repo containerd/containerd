@@ -4,9 +4,9 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd/archutils"
 	"github.com/containerd/containerd/runtime"
+	"github.com/sirupsen/logrus"
 )
 
 // NewMonitor starts a new process monitor and returns it
