@@ -44,6 +44,7 @@ var (
 	bucketKeyImage     = []byte("image")
 	bucketKeyRuntime   = []byte("runtime")
 	bucketKeyName      = []byte("name")
+	bucketKeyParent    = []byte("parent")
 	bucketKeyOptions   = []byte("options")
 	bucketKeySpec      = []byte("spec")
 	bucketKeyRootFS    = []byte("rootfs")

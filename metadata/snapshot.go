@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/snapshot"
@@ -46,7 +48,11 @@ func getKey(tx *bolt.Tx, ns, name, key string) string {
 	if bkt == nil {
 		return ""
 	}
-	v := bkt.Get([]byte(key))
+	bkt = bkt.Bucket([]byte(key))
+	if bkt == nil {
+		return ""
+	}
+	v := bkt.Get(bucketKeyName)
 	if len(v) == 0 {
 		return ""
 	}
@@ -74,20 +80,144 @@ func (s *snapshotter) resolveKey(ctx context.Context, key string) (string, error
 }
 
 func (s *snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, error) {
-	bkey, err := s.resolveKey(ctx, key)
+	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return snapshot.Info{}, err
 	}
+
+	var (
+		bkey  string
+		local = snapshot.Info{
+			Name: key,
+		}
+	)
+	if err := view(ctx, s.db, func(tx *bolt.Tx) error {
+		bkt := getSnapshotterBucket(tx, ns, s.name)
+		if bkt == nil {
+			return errors.Wrapf(errdefs.ErrNotFound, "snapshot %v does not exist", key)
+		}
+		sbkt := bkt.Bucket([]byte(key))
+		if sbkt == nil {
+			return errors.Wrapf(errdefs.ErrNotFound, "snapshot %v does not exist", key)
+		}
+		local.Labels, err = boltutil.ReadLabels(sbkt)
+		if err != nil {
+			return errors.Wrap(err, "failed to read labels")
+		}
+		if err := boltutil.ReadTimestamps(sbkt, &local.Created, &local.Updated); err != nil {
+			return errors.Wrap(err, "failed to read timestamps")
+		}
+		bkey = string(sbkt.Get(bucketKeyName))
+		local.Parent = string(sbkt.Get(bucketKeyParent))
+
+		return nil
+	}); err != nil {
+		return snapshot.Info{}, err
+	}
+
 	info, err := s.Snapshotter.Stat(ctx, bkey)
 	if err != nil {
 		return snapshot.Info{}, err
 	}
-	info.Name = trimKey(info.Name)
-	if info.Parent != "" {
-		info.Parent = trimKey(info.Parent)
+
+	return overlayInfo(info, local), nil
+}
+
+func (s *snapshotter) Update(ctx context.Context, info snapshot.Info, fieldpaths ...string) (snapshot.Info, error) {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return snapshot.Info{}, err
 	}
 
-	return info, nil
+	if info.Name == "" {
+		return snapshot.Info{}, errors.Wrap(errdefs.ErrInvalidArgument, "")
+	}
+
+	var (
+		bkey  string
+		local = snapshot.Info{
+			Name: info.Name,
+		}
+	)
+	if err := update(ctx, s.db, func(tx *bolt.Tx) error {
+		bkt := getSnapshotterBucket(tx, ns, s.name)
+		if bkt == nil {
+			return errors.Wrapf(errdefs.ErrNotFound, "snapshot %v does not exist", info.Name)
+		}
+		sbkt := bkt.Bucket([]byte(info.Name))
+		if sbkt == nil {
+			return errors.Wrapf(errdefs.ErrNotFound, "snapshot %v does not exist", info.Name)
+		}
+
+		local.Labels, err = boltutil.ReadLabels(sbkt)
+		if err != nil {
+			return errors.Wrap(err, "failed to read labels")
+		}
+		if err := boltutil.ReadTimestamps(sbkt, &local.Created, &local.Updated); err != nil {
+			return errors.Wrap(err, "failed to read timestamps")
+		}
+
+		// Handle field updates
+		if len(fieldpaths) > 0 {
+			for _, path := range fieldpaths {
+				if strings.HasPrefix(path, "labels.") {
+					if local.Labels == nil {
+						local.Labels = map[string]string{}
+					}
+
+					key := strings.TrimPrefix(path, "labels.")
+					local.Labels[key] = info.Labels[key]
+					continue
+				}
+
+				switch path {
+				case "labels":
+					local.Labels = info.Labels
+				default:
+					return errors.Wrapf(errdefs.ErrInvalidArgument, "cannot update %q field on snapshot %q", path, info.Name)
+				}
+			}
+		} else {
+			local.Labels = info.Labels
+		}
+		local.Updated = time.Now().UTC()
+
+		if err := boltutil.WriteTimestamps(sbkt, local.Created, local.Updated); err != nil {
+			return errors.Wrap(err, "failed to read timestamps")
+		}
+		if err := boltutil.WriteLabels(sbkt, local.Labels); err != nil {
+			return errors.Wrap(err, "failed to read labels")
+		}
+		bkey = string(sbkt.Get(bucketKeyName))
+		local.Parent = string(sbkt.Get(bucketKeyParent))
+
+		return nil
+	}); err != nil {
+		return snapshot.Info{}, err
+	}
+
+	info, err = s.Snapshotter.Stat(ctx, bkey)
+	if err != nil {
+		return snapshot.Info{}, err
+	}
+
+	return overlayInfo(info, local), nil
+}
+
+func overlayInfo(info, overlay snapshot.Info) snapshot.Info {
+	// Merge info
+	info.Name = overlay.Name
+	info.Created = overlay.Created
+	info.Updated = overlay.Updated
+	info.Parent = overlay.Parent
+	if info.Labels == nil {
+		info.Labels = overlay.Labels
+	} else {
+		for k, v := range overlay.Labels {
+			overlay.Labels[k] = v
+		}
+	}
+	return info
 }
 
 func (s *snapshotter) Usage(ctx context.Context, key string) (snapshot.Usage, error) {
@@ -106,18 +236,25 @@ func (s *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 	return s.Snapshotter.Mounts(ctx, bkey)
 }
 
-func (s *snapshotter) Prepare(ctx context.Context, key, parent string) ([]mount.Mount, error) {
-	return s.createSnapshot(ctx, key, parent, false)
+func (s *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshot.Opt) ([]mount.Mount, error) {
+	return s.createSnapshot(ctx, key, parent, false, opts)
 }
 
-func (s *snapshotter) View(ctx context.Context, key, parent string) ([]mount.Mount, error) {
-	return s.createSnapshot(ctx, key, parent, true)
+func (s *snapshotter) View(ctx context.Context, key, parent string, opts ...snapshot.Opt) ([]mount.Mount, error) {
+	return s.createSnapshot(ctx, key, parent, true, opts)
 }
 
-func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, readonly bool) ([]mount.Mount, error) {
+func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, readonly bool, opts []snapshot.Opt) ([]mount.Mount, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	var base snapshot.Info
+	for _, opt := range opts {
+		if err := opt(&base); err != nil {
+			return nil, err
+		}
 	}
 
 	var m []mount.Mount
@@ -127,15 +264,23 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 			return err
 		}
 
-		bkey := string(bkt.Get([]byte(key)))
-		if bkey != "" {
-			return errors.Wrapf(errdefs.ErrAlreadyExists, "snapshot %v already exists", key)
+		bbkt, err := bkt.CreateBucket([]byte(key))
+		if err != nil {
+			if err == bolt.ErrBucketExists {
+				err = errors.Wrapf(errdefs.ErrAlreadyExists, "snapshot %v already exists", key)
+			}
+			return err
 		}
 		var bparent string
 		if parent != "" {
-			bparent = string(bkt.Get([]byte(parent)))
-			if bparent == "" {
+			pbkt := bkt.Bucket([]byte(parent))
+			if pbkt == nil {
 				return errors.Wrapf(errdefs.ErrNotFound, "snapshot %v does not exist", parent)
+			}
+			bparent = string(pbkt.Get(bucketKeyName))
+
+			if err := bbkt.Put(bucketKeyParent, []byte(parent)); err != nil {
+				return err
 			}
 		}
 
@@ -143,8 +288,16 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 		if err != nil {
 			return err
 		}
-		bkey = createKey(sid, ns, key)
-		if err := bkt.Put([]byte(key), []byte(bkey)); err != nil {
+		bkey := createKey(sid, ns, key)
+		if err := bbkt.Put(bucketKeyName, []byte(bkey)); err != nil {
+			return err
+		}
+
+		ts := time.Now().UTC()
+		if err := boltutil.WriteTimestamps(bbkt, ts, ts); err != nil {
+			return err
+		}
+		if err := boltutil.WriteLabels(bbkt, base.Labels); err != nil {
 			return err
 		}
 
@@ -162,10 +315,17 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 	return m, nil
 }
 
-func (s *snapshotter) Commit(ctx context.Context, name, key string) error {
+func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshot.Opt) error {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return err
+	}
+
+	var base snapshot.Info
+	for _, opt := range opts {
+		if err := opt(&base); err != nil {
+			return err
+		}
 	}
 
 	return update(ctx, s.db, func(tx *bolt.Tx) error {
@@ -174,25 +334,43 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string) error {
 			return errors.Wrapf(errdefs.ErrNotFound, "snapshot %v does not exist", key)
 		}
 
-		nameKey := string(bkt.Get([]byte(name)))
-		if nameKey != "" {
-			return errors.Wrapf(errdefs.ErrAlreadyExists, "snapshot %v already exists", name)
+		bbkt, err := bkt.CreateBucket([]byte(name))
+		if err != nil {
+			if err == bolt.ErrBucketExists {
+				err = errors.Wrapf(errdefs.ErrAlreadyExists, "snapshot %v already exists", name)
+			}
+			return err
 		}
 
-		bkey := string(bkt.Get([]byte(key)))
-		if bkey == "" {
+		obkt := bkt.Bucket([]byte(key))
+		if obkt == nil {
 			return errors.Wrapf(errdefs.ErrNotFound, "snapshot %v does not exist", key)
 		}
+
+		bkey := string(obkt.Get(bucketKeyName))
+		parent := string(obkt.Get(bucketKeyParent))
 
 		sid, err := bkt.NextSequence()
 		if err != nil {
 			return err
 		}
-		nameKey = createKey(sid, ns, name)
-		if err := bkt.Put([]byte(name), []byte(nameKey)); err != nil {
+
+		nameKey := createKey(sid, ns, name)
+
+		if err := bbkt.Put(bucketKeyName, []byte(nameKey)); err != nil {
 			return err
 		}
-		if err := bkt.Delete([]byte(key)); err != nil {
+		if err := bbkt.Put(bucketKeyParent, []byte(parent)); err != nil {
+			return err
+		}
+		ts := time.Now().UTC()
+		if err := boltutil.WriteTimestamps(bbkt, ts, ts); err != nil {
+			return err
+		}
+		if err := boltutil.WriteLabels(bbkt, base.Labels); err != nil {
+			return err
+		}
+		if err := bkt.DeleteBucket([]byte(key)); err != nil {
 			return err
 		}
 
@@ -210,21 +388,29 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 	}
 
 	return update(ctx, s.db, func(tx *bolt.Tx) error {
+		var bkey string
 		bkt := getSnapshotterBucket(tx, ns, s.name)
-		if bkt == nil {
-			return errors.Wrapf(errdefs.ErrNotFound, "snapshot %v does not exist", key)
+		if bkt != nil {
+			sbkt := bkt.Bucket([]byte(key))
+			if sbkt != nil {
+				bkey = string(sbkt.Get(bucketKeyName))
+			}
 		}
-
-		bkey := string(bkt.Get([]byte(key)))
 		if bkey == "" {
 			return errors.Wrapf(errdefs.ErrNotFound, "snapshot %v does not exist", key)
 		}
-		if err := bkt.Delete([]byte(key)); err != nil {
+
+		if err := bkt.DeleteBucket([]byte(key)); err != nil {
 			return err
 		}
 
 		return s.Snapshotter.Remove(ctx, bkey)
 	})
+}
+
+type infoPair struct {
+	bkey string
+	info snapshot.Info
 }
 
 func (s *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshot.Info) error) error {
@@ -233,39 +419,82 @@ func (s *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 		return err
 	}
 
-	var keys []string
+	var (
+		batchSize = 100
+		pairs     = []infoPair{}
+		lastKey   string
+	)
 
-	if err := view(ctx, s.db, func(tx *bolt.Tx) error {
-		bkt := getSnapshotterBucket(tx, ns, s.name)
-		if bkt == nil {
-			return nil
-		}
-
-		bkt.ForEach(func(k, v []byte) error {
-			if len(v) > 0 {
-				keys = append(keys, string(v))
+	for {
+		if err := view(ctx, s.db, func(tx *bolt.Tx) error {
+			bkt := getSnapshotterBucket(tx, ns, s.name)
+			if bkt == nil {
+				return nil
 			}
+
+			c := bkt.Cursor()
+
+			var k, v []byte
+			if lastKey == "" {
+				k, v = c.First()
+			} else {
+				k, v = c.Seek([]byte(lastKey))
+			}
+
+			for k != nil {
+				if v == nil {
+					if len(pairs) >= batchSize {
+						break
+					}
+					sbkt := bkt.Bucket(k)
+
+					pair := infoPair{
+						bkey: string(sbkt.Get(bucketKeyName)),
+						info: snapshot.Info{
+							Name:   string(k),
+							Parent: string(sbkt.Get(bucketKeyParent)),
+						},
+					}
+
+					err := boltutil.ReadTimestamps(sbkt, &pair.info.Created, &pair.info.Updated)
+					if err != nil {
+						return err
+					}
+					pair.info.Labels, err = boltutil.ReadLabels(sbkt)
+					if err != nil {
+						return err
+					}
+
+					pairs = append(pairs, pair)
+				}
+
+				k, v = c.Next()
+			}
+
+			lastKey = string(k)
+
 			return nil
-		})
-
-		return nil
-	}); err != nil {
-		return err
-	}
-
-	for _, k := range keys {
-		info, err := s.Snapshotter.Stat(ctx, k)
-		if err != nil {
+		}); err != nil {
 			return err
 		}
 
-		info.Name = trimKey(info.Name)
-		if info.Parent != "" {
-			info.Parent = trimKey(info.Parent)
+		for _, pair := range pairs {
+			info, err := s.Snapshotter.Stat(ctx, pair.bkey)
+			if err != nil {
+				return err
+			}
+
+			if err := fn(ctx, overlayInfo(info, pair.info)); err != nil {
+				return err
+			}
 		}
-		if err := fn(ctx, info); err != nil {
-			return err
+
+		if lastKey == "" {
+			break
 		}
+
+		pairs = pairs[:0]
+
 	}
 
 	return nil
