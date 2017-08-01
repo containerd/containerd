@@ -110,8 +110,7 @@ func TestOverlayOverlayMount(t *testing.T) {
 		return
 	}
 	key := "/tmp/test"
-	mounts, err := o.Prepare(ctx, key, "")
-	if err != nil {
+	if _, err = o.Prepare(ctx, key, ""); err != nil {
 		t.Error(err)
 		return
 	}
@@ -119,6 +118,7 @@ func TestOverlayOverlayMount(t *testing.T) {
 		t.Error(err)
 		return
 	}
+	var mounts []mount.Mount
 	if mounts, err = o.Prepare(ctx, "/tmp/layer2", "base"); err != nil {
 		t.Error(err)
 		return

@@ -69,7 +69,7 @@ func TestNewContainer(t *testing.T) {
 	if container.ID() != id {
 		t.Errorf("expected container id %q but received %q", id, container.ID())
 	}
-	if spec, err = container.Spec(); err != nil {
+	if _, err = container.Spec(); err != nil {
 		t.Error(err)
 		return
 	}

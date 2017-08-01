@@ -87,7 +87,7 @@ func appContext(clicontext *cli.Context) (gocontext.Context, gocontext.CancelFun
 		ctx       = gocontext.Background()
 		timeout   = clicontext.GlobalDuration("timeout")
 		namespace = clicontext.GlobalString("namespace")
-		cancel    = func() {}
+		cancel    gocontext.CancelFunc
 	)
 
 	ctx = namespaces.WithNamespace(ctx, namespace)
