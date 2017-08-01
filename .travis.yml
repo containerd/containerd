@@ -53,7 +53,9 @@ script:
 # FIXME: For non-linux GOOS, without running `go build -i`, vet fails with `vet: import failed: can't find import: fmt`...
 # Note that `go build -i` requires write permission to GOROOT. (So it is not called in Makefile)
   - go build -i .
+  - make setup
   - make vet
+  - make ineffassign
   - make build
   - make binaries
   - if [ "$GOOS" = "linux" ]; then sudo make install ; fi
