@@ -1,6 +1,6 @@
 version = "unstable"
 generator = "gogoctrd"
-plugins = ["grpc"]
+plugins = ["grpc", "fieldpath"]
 
 # Control protoc include paths. Below are usually some good defaults, but feel
 # free to try it without them if it works for your project.
