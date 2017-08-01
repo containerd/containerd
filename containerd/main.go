@@ -169,10 +169,6 @@ func main() {
 }
 
 func daemon(context *cli.Context) error {
-	stateDir := context.String("state-dir")
-	if err := os.MkdirAll(stateDir, 0755); err != nil {
-		return err
-	}
 	s := make(chan os.Signal, 2048)
 	signal.Notify(s, syscall.SIGTERM, syscall.SIGINT, syscall.SIGPIPE)
 	// Split the listen string of the form proto://addr
@@ -181,29 +177,9 @@ func daemon(context *cli.Context) error {
 	if len(listenParts) != 2 {
 		return fmt.Errorf("bad listen address format %s, expected proto://address", listenSpec)
 	}
-	// Register server early to allow healthcheck to be done
-	server, err := startServer(listenParts[0], listenParts[1])
+
+	server, err := startServer(context, listenParts[0], listenParts[1])
 	if err != nil {
-		return err
-	}
-	sv, err := supervisor.New(
-		stateDir,
-		context.String("runtime"),
-		context.String("shim"),
-		context.StringSlice("runtime-args"),
-		context.Duration("start-timeout"),
-		context.Int("retain-count"))
-	if err != nil {
-		return err
-	}
-	types.RegisterAPIServer(server, grpcserver.NewServer(sv))
-	wg := &sync.WaitGroup{}
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		w := supervisor.NewWorker(sv, wg)
-		go w.Start()
-	}
-	if err := sv.Start(); err != nil {
 		return err
 	}
 	for ss := range s {
@@ -219,7 +195,12 @@ func daemon(context *cli.Context) error {
 	return nil
 }
 
-func startServer(protocol, address string) (*grpc.Server, error) {
+func startServer(context *cli.Context, protocol, address string) (*grpc.Server, error) {
+	stateDir := context.String("state-dir")
+	if err := os.MkdirAll(stateDir, 0755); err != nil {
+		return nil, err
+	}
+
 	// TODO: We should use TLS.
 	// TODO: Add an option for the SocketGroup.
 	sockets, err := listeners.Init(protocol, address, "", nil)
@@ -234,12 +215,34 @@ func startServer(protocol, address string) (*grpc.Server, error) {
 	healthServer := health.NewServer()
 	grpc_health_v1.RegisterHealthServer(s, healthServer)
 
+	sv, err := supervisor.New(
+		stateDir,
+		context.String("runtime"),
+		context.String("shim"),
+		context.StringSlice("runtime-args"),
+		context.Duration("start-timeout"),
+		context.Int("retain-count"))
+	if err != nil {
+		return nil, err
+	}
+	types.RegisterAPIServer(s, grpcserver.NewServer(sv))
+	wg := &sync.WaitGroup{}
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		w := supervisor.NewWorker(sv, wg)
+		go w.Start()
+	}
+
 	go func() {
 		logrus.Debugf("containerd: grpc api on %s", address)
 		if err := s.Serve(l); err != nil {
 			logrus.WithField("error", err).Fatal("containerd: serve grpc")
 		}
 	}()
+
+	if err := sv.Start(); err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
