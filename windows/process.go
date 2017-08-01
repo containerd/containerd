@@ -89,6 +89,13 @@ func (p *process) ExitCode() (uint32, time.Time, error) {
 }
 
 func (p *process) Start(ctx context.Context) (err error) {
+	// If we fail, close the io right now
+	defer func() {
+		if err != nil {
+			p.io.Close()
+		}
+	}()
+
 	var hp hcsshim.Process
 	if hp, err = p.task.hcsContainer.CreateProcess(p.conf); err != nil {
 		return errors.Wrapf(err, "failed to create process")

@@ -104,17 +104,19 @@ func (t *task) Info() runtime.TaskInfo {
 
 func (t *task) Start(ctx context.Context) error {
 	conf := newProcessConfig(t.spec.Process, t.io)
-	if _, err := t.newProcess(ctx, t.id, conf, t.io); err != nil {
+	p, err := t.newProcess(ctx, t.id, conf, t.io)
+	if err != nil {
 		return err
 	}
-
+	if err := p.Start(ctx); err != nil {
+		return err
+	}
 	t.publisher.Publish(ctx,
 		runtime.TaskStartEventTopic,
 		&eventsapi.TaskStart{
 			ContainerID: t.id,
 			Pid:         t.pid,
 		})
-
 	return nil
 }
 
@@ -182,11 +184,6 @@ func (t *task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runt
 	if pset, err = newPipeSet(ctx, opts.IO); err != nil {
 		return nil, err
 	}
-	defer func() {
-		if err != nil {
-			pset.Close()
-		}
-	}()
 
 	conf := newProcessConfig(spec, pset)
 	p, err := t.newProcess(ctx, id, conf, pset)
@@ -284,8 +281,6 @@ func (t *task) newProcess(ctx context.Context, id string, conf *hcsshim.ProcessC
 			}
 		}()
 	}
-	t.Unlock()
-	t.Lock()
 	wp := &process{
 		id:     id,
 		pid:    pid,
@@ -293,6 +288,7 @@ func (t *task) newProcess(ctx context.Context, id string, conf *hcsshim.ProcessC
 		status: runtime.CreatedStatus,
 		task:   t,
 		exitCh: make(chan struct{}),
+		conf:   conf,
 	}
 	t.processes[id] = wp
 	t.Unlock()
