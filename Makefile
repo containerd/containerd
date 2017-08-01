@@ -70,10 +70,11 @@ boiler:
 cri-containerd: check-gopath
 	$(GO) build -o $(BUILD_DIR)/$@ \
 	   $(BUILD_TAGS) \
+	   $(GO_LDFLAGS) $(GO_GCFLAGS) \
 	   $(PROJECT)/cmd/cri-containerd
 
 test:
-	go test -timeout=10m -race ./pkg/... $(BUILD_TAGS)
+	go test -timeout=10m -race ./pkg/... $(BUILD_TAGS) $(GO_LDFLAGS) $(GO_GCFLAGS)
 
 test-cri:
 	@./hack/test-cri.sh
