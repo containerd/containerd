@@ -24,10 +24,10 @@ type process interface {
 	Pid() int
 	// Resize resizes the process console
 	Resize(ws console.WinSize) error
-	// Exited sets the exit status for the process
-	Exited(status int)
-	// Status returns the exit status
-	Status() int
+	// SetExited sets the exit status for the process
+	SetExited(status int)
+	// ExitStatus returns the exit status
+	ExitStatus() int
 	// ExitedAt is the time the process exited
 	ExitedAt() time.Time
 	// Delete deletes the process and its resourcess
@@ -38,4 +38,8 @@ type process interface {
 	Kill(context.Context, uint32, bool) error
 	// Stdio returns io information for the container
 	Stdio() stdio
+	// Start execution of the process
+	Start(context.Context) error
+	// Status returns the process status
+	Status(ctx context.Context) (string, error)
 }

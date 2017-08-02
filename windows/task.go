@@ -4,22 +4,18 @@ package windows
 
 import (
 	"context"
-	"io"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/Microsoft/hcsshim"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/typeurl"
 	"github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 type task struct {
@@ -108,17 +104,19 @@ func (t *task) Info() runtime.TaskInfo {
 
 func (t *task) Start(ctx context.Context) error {
 	conf := newProcessConfig(t.spec.Process, t.io)
-	if _, err := t.newProcess(ctx, t.id, conf, t.io); err != nil {
+	p, err := t.newProcess(ctx, t.id, conf, t.io)
+	if err != nil {
 		return err
 	}
-
+	if err := p.Start(ctx); err != nil {
+		return err
+	}
 	t.publisher.Publish(ctx,
 		runtime.TaskStartEventTopic,
 		&eventsapi.TaskStart{
 			ContainerID: t.id,
 			Pid:         t.pid,
 		})
-
 	return nil
 }
 
@@ -186,11 +184,6 @@ func (t *task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runt
 	if pset, err = newPipeSet(ctx, opts.IO); err != nil {
 		return nil, err
 	}
-	defer func() {
-		if err != nil {
-			pset.Close()
-		}
-	}()
 
 	conf := newProcessConfig(spec, pset)
 	p, err := t.newProcess(ctx, id, conf, pset)
@@ -203,7 +196,6 @@ func (t *task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runt
 		&eventsapi.TaskExecAdded{
 			ContainerID: t.id,
 			ExecID:      id,
-			Pid:         p.Pid(),
 		})
 
 	return p, nil
@@ -289,95 +281,17 @@ func (t *task) newProcess(ctx context.Context, id string, conf *hcsshim.ProcessC
 			}
 		}()
 	}
-	t.Unlock()
-
-	var p hcsshim.Process
-	if p, err = t.hcsContainer.CreateProcess(conf); err != nil {
-		return nil, errors.Wrapf(err, "failed to create process")
-	}
-
-	stdin, stdout, stderr, err := p.Stdio()
-	if err != nil {
-		p.Kill()
-		return nil, errors.Wrapf(err, "failed to retrieve init process stdio")
-	}
-
-	ioCopy := func(name string, dst io.WriteCloser, src io.ReadCloser) {
-		log.G(ctx).WithFields(logrus.Fields{"id": id, "pid": pid}).
-			Debugf("%s: copy started", name)
-		io.Copy(dst, src)
-		log.G(ctx).WithFields(logrus.Fields{"id": id, "pid": pid}).
-			Debugf("%s: copy done", name)
-		dst.Close()
-		src.Close()
-	}
-
-	if pset.stdin != nil {
-		go ioCopy("stdin", stdin, pset.stdin)
-	}
-
-	if pset.stdout != nil {
-		go ioCopy("stdout", pset.stdout, stdout)
-	}
-
-	if pset.stderr != nil {
-		go ioCopy("stderr", pset.stderr, stderr)
-	}
-
-	t.Lock()
 	wp := &process{
 		id:     id,
 		pid:    pid,
 		io:     pset,
-		status: runtime.RunningStatus,
+		status: runtime.CreatedStatus,
 		task:   t,
-		hcs:    p,
 		exitCh: make(chan struct{}),
+		conf:   conf,
 	}
 	t.processes[id] = wp
 	t.Unlock()
-
-	// Wait for the process to exit to get the exit status
-	go func() {
-		if err := p.Wait(); err != nil {
-			herr, ok := err.(*hcsshim.ProcessError)
-			if ok && herr.Err != syscall.ERROR_BROKEN_PIPE {
-				log.G(ctx).
-					WithError(err).
-					WithFields(logrus.Fields{"id": id, "pid": pid}).
-					Warnf("hcsshim wait failed (process may have been killed)")
-			}
-			// Try to get the exit code nonetheless
-		}
-		wp.exitTime = time.Now()
-
-		ec, err := p.ExitCode()
-		if err != nil {
-			log.G(ctx).
-				WithError(err).
-				WithFields(logrus.Fields{"id": id, "pid": pid}).
-				Warnf("hcsshim could not retrieve exit code")
-			// Use the unknown exit code
-			ec = 255
-		}
-		wp.exitCode = uint32(ec)
-
-		t.publisher.Publish(ctx,
-			runtime.TaskExitEventTopic,
-			&eventsapi.TaskExit{
-				ContainerID: t.id,
-				ID:          id,
-				Pid:         pid,
-				ExitStatus:  wp.exitCode,
-				ExitedAt:    wp.exitTime,
-			})
-
-		close(wp.exitCh)
-		// Ensure io's are closed
-		pset.Close()
-		// Cleanup HCS resources
-		p.Close()
-	}()
 
 	return wp, nil
 }

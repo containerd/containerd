@@ -21,12 +21,14 @@ import (
 var (
 	address      string
 	noDaemon     bool
+	noCriu       bool
 	supportsCriu bool
 )
 
 func init() {
 	flag.StringVar(&address, "address", defaultAddress, "The address to the containerd socket for use in the tests")
 	flag.BoolVar(&noDaemon, "no-daemon", false, "Do not start a dedicated daemon for the tests")
+	flag.BoolVar(&noCriu, "no-criu", false, "Do not run the checkpoint tests")
 	flag.Parse()
 }
 
@@ -43,7 +45,7 @@ func TestMain(m *testing.M) {
 	testutil.RequiresRootM()
 	// check if criu is installed on the system
 	_, err := exec.LookPath("criu")
-	supportsCriu = err == nil
+	supportsCriu = err == nil && !noCriu
 
 	var (
 		cmd         *exec.Cmd

@@ -53,6 +53,11 @@ message TaskOOM {
 message TaskExecAdded {
 	string container_id = 1;
 	string exec_id = 2;
+}
+
+message TaskExecStarted {
+	string container_id = 1;
+	string exec_id = 2;
 	uint32 pid = 3;
 }
 

@@ -40,11 +40,13 @@ func (t *Task) Info() runtime.TaskInfo {
 }
 
 func (t *Task) Start(ctx context.Context) error {
-	_, err := t.shim.Start(ctx, empty)
+	_, err := t.shim.Start(ctx, &shim.StartRequest{
+		ID: t.id,
+	})
 	if err != nil {
-		err = errdefs.FromGRPC(err)
+		return errdefs.FromGRPC(err)
 	}
-	return err
+	return nil
 }
 
 func (t *Task) State(ctx context.Context) (runtime.State, error) {
@@ -64,7 +66,6 @@ func (t *Task) State(ctx context.Context) (runtime.State, error) {
 		status = runtime.StoppedStatus
 	case task.StatusPaused:
 		status = runtime.PausedStatus
-		// TODO: containerd.DeletedStatus
 	}
 	return runtime.State{
 		Pid:      response.Pid,

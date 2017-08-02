@@ -23,6 +23,8 @@ type Process interface {
 	ResizePty(context.Context, ConsoleSize) error
 	// CloseStdin closes the processes stdin
 	CloseIO(context.Context) error
+	// Start the container's user defined process
+	Start(context.Context) error
 }
 
 type Task interface {
@@ -30,8 +32,6 @@ type Task interface {
 
 	// Information of the container
 	Info() TaskInfo
-	// Start the container's user defined process
-	Start(context.Context) error
 	// Pause pauses the container process
 	Pause(context.Context) error
 	// Resume unpauses the container process

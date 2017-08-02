@@ -2,14 +2,28 @@ package containerd
 
 import (
 	"context"
+	"strings"
 	"syscall"
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
+
+type Process interface {
+	Pid() uint32
+	Start(context.Context) error
+	Delete(context.Context) (uint32, error)
+	Kill(context.Context, syscall.Signal) error
+	Wait(context.Context) (uint32, error)
+	CloseIO(context.Context, ...IOCloserOpts) error
+	Resize(ctx context.Context, w, h uint32) error
+	IO() *IO
+	Status(context.Context) (Status, error)
+}
 
 type process struct {
 	id   string
@@ -31,27 +45,17 @@ func (p *process) Pid() uint32 {
 
 // Start starts the exec process
 func (p *process) Start(ctx context.Context) error {
-	any, err := typeurl.MarshalAny(p.spec)
-	if err != nil {
-		return err
-	}
-	request := &tasks.ExecProcessRequest{
+	r, err := p.task.client.TaskService().Start(ctx, &tasks.StartRequest{
 		ContainerID: p.task.id,
 		ExecID:      p.id,
-		Terminal:    p.io.Terminal,
-		Stdin:       p.io.Stdin,
-		Stdout:      p.io.Stdout,
-		Stderr:      p.io.Stderr,
-		Spec:        any,
-	}
-	response, err := p.task.client.TaskService().Exec(ctx, request)
+	})
 	if err != nil {
 		p.io.Cancel()
 		p.io.Wait()
 		p.io.Close()
 		return err
 	}
-	p.pid = response.Pid
+	p.pid = r.Pid
 	return nil
 }
 
@@ -70,6 +74,10 @@ func (p *process) Wait(ctx context.Context) (uint32, error) {
 	})
 	if err != nil {
 		return UnknownExitStatus, err
+	}
+	// first check if the task has exited
+	if status, _ := p.Status(ctx); status == Stopped {
+		return UnknownExitStatus, errdefs.ErrUnavailable
 	}
 	for {
 		evt, err := eventstream.Recv()
@@ -130,4 +138,15 @@ func (p *process) Delete(ctx context.Context) (uint32, error) {
 		return UnknownExitStatus, err
 	}
 	return r.ExitStatus, nil
+}
+
+func (p *process) Status(ctx context.Context) (Status, error) {
+	r, err := p.task.client.TaskService().Get(ctx, &tasks.GetRequest{
+		ContainerID: p.task.id,
+		ExecID:      p.id,
+	})
+	if err != nil {
+		return "", errdefs.FromGRPC(err)
+	}
+	return Status(strings.ToLower(r.Process.Status.String())), nil
 }

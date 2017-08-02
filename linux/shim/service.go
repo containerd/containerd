@@ -108,18 +108,36 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*sh
 	}, nil
 }
 
-func (s *Service) Start(ctx context.Context, r *google_protobuf.Empty) (*google_protobuf.Empty, error) {
-	if s.initProcess == nil {
-		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
+func (s *Service) Start(ctx context.Context, r *shimapi.StartRequest) (*shimapi.StartResponse, error) {
+	p, ok := s.processes[r.ID]
+	if !ok {
+		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "process %s not found", r.ID)
 	}
-	if err := s.initProcess.Start(ctx); err != nil {
+	if err := p.Start(ctx); err != nil {
 		return nil, err
 	}
-	s.events <- &eventsapi.TaskStart{
-		ContainerID: s.id,
-		Pid:         uint32(s.initProcess.Pid()),
+	if r.ID == s.id {
+		s.events <- &eventsapi.TaskStart{
+			ContainerID: s.id,
+			Pid:         uint32(s.initProcess.Pid()),
+		}
+	} else {
+		pid := p.Pid()
+		cmd := &reaper.Cmd{
+			ExitCh: make(chan int, 1),
+		}
+		reaper.Default.Register(pid, cmd)
+		go s.waitExit(p, pid, cmd)
+		s.events <- &eventsapi.TaskExecStarted{
+			ContainerID: s.id,
+			ExecID:      r.ID,
+			Pid:         uint32(pid),
+		}
 	}
-	return empty, nil
+	return &shimapi.StartResponse{
+		ID:  p.ID(),
+		Pid: uint32(p.Pid()),
+	}, nil
 }
 
 func (s *Service) Delete(ctx context.Context, r *google_protobuf.Empty) (*shimapi.DeleteResponse, error) {
@@ -134,12 +152,12 @@ func (s *Service) Delete(ctx context.Context, r *google_protobuf.Empty) (*shimap
 	s.mu.Unlock()
 	s.events <- &eventsapi.TaskDelete{
 		ContainerID: s.id,
-		ExitStatus:  uint32(p.Status()),
+		ExitStatus:  uint32(p.ExitStatus()),
 		ExitedAt:    p.ExitedAt(),
 		Pid:         uint32(p.Pid()),
 	}
 	return &shimapi.DeleteResponse{
-		ExitStatus: uint32(p.Status()),
+		ExitStatus: uint32(p.ExitStatus()),
 		ExitedAt:   p.ExitedAt(),
 		Pid:        uint32(p.Pid()),
 	}, nil
@@ -164,13 +182,13 @@ func (s *Service) DeleteProcess(ctx context.Context, r *shimapi.DeleteProcessReq
 	delete(s.processes, p.ID())
 	s.mu.Unlock()
 	return &shimapi.DeleteResponse{
-		ExitStatus: uint32(p.Status()),
+		ExitStatus: uint32(p.ExitStatus()),
 		ExitedAt:   p.ExitedAt(),
 		Pid:        uint32(p.Pid()),
 	}, nil
 }
 
-func (s *Service) Exec(ctx context.Context, r *shimapi.ExecProcessRequest) (*shimapi.ExecProcessResponse, error) {
+func (s *Service) Exec(ctx context.Context, r *shimapi.ExecProcessRequest) (*google_protobuf.Empty, error) {
 	if s.initProcess == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
@@ -181,22 +199,13 @@ func (s *Service) Exec(ctx context.Context, r *shimapi.ExecProcessRequest) (*shi
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-	pid := process.Pid()
-	cmd := &reaper.Cmd{
-		ExitCh: make(chan int, 1),
-	}
-	reaper.Default.Register(pid, cmd)
 	s.processes[r.ID] = process
 
 	s.events <- &eventsapi.TaskExecAdded{
 		ContainerID: s.id,
 		ExecID:      r.ID,
-		Pid:         uint32(pid),
 	}
-	go s.waitExit(process, pid, cmd)
-	return &shimapi.ExecProcessResponse{
-		Pid: uint32(pid),
-	}, nil
+	return empty, nil
 }
 
 func (s *Service) ResizePty(ctx context.Context, r *shimapi.ResizePtyRequest) (*google_protobuf.Empty, error) {
@@ -220,14 +229,11 @@ func (s *Service) ResizePty(ctx context.Context, r *shimapi.ResizePtyRequest) (*
 }
 
 func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.StateResponse, error) {
-	if s.initProcess == nil {
-		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
-	}
 	p, ok := s.processes[r.ID]
 	if !ok {
 		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "process id %s not found", r.ID)
 	}
-	st, err := s.initProcess.ContainerStatus(ctx)
+	st, err := p.Status(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -353,7 +359,7 @@ func (s *Service) Update(ctx context.Context, r *shimapi.UpdateTaskRequest) (*go
 
 func (s *Service) waitExit(p process, pid int, cmd *reaper.Cmd) {
 	status := <-cmd.ExitCh
-	p.Exited(status)
+	p.SetExited(status)
 
 	reaper.Default.Delete(pid)
 	s.events <- &eventsapi.TaskExit{

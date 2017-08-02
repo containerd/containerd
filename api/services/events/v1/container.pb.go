@@ -39,6 +39,7 @@
 		TaskExit
 		TaskOOM
 		TaskExecAdded
+		TaskExecStarted
 		TaskPaused
 		TaskResumed
 		TaskCheckpointed
