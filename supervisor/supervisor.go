@@ -43,6 +43,15 @@ func New(stateDir string, runtimeName, shimName string, runtimeArgs []string, ti
 		timeout:           timeout,
 		containerExecSync: make(map[string]map[string]chan struct{}),
 	}
+	factory, err := NewTransactionFactory(filepath.Dir(stateDir),
+		WithOption(PauseTransaction, s.HandlePauseTransaction),
+		WithOption(ResumeTransaction, s.HandleResumeTransaction),
+		WithOption(ExitTransaction, s.HandleExitTransaction))
+	if err != nil {
+		return nil, err
+	}
+	s.transactionFactory = factory
+
 	if err := setupEventLog(s, retainCount); err != nil {
 		return nil, err
 	}
@@ -75,6 +84,17 @@ func eventLogger(s *Supervisor, path string, events chan Event, retainCount int)
 			enc   = json.NewEncoder(f)
 		)
 		for e := range events {
+			if e.TransactionID != 0 {
+				// event saved in event.log now, we could close the transaction:
+				transaction, err := s.transactionFactory.GetTransaction(e.TransactionID)
+				if err != nil {
+					logrus.WithField("error", err).Errorf("containerd: failed to get transaction for transactionID %d", e.TransactionID)
+				}
+				if transaction != nil {
+					transaction.Close()
+				}
+			}
+
 			// if we have a specified retain count make sure the truncate the event
 			// log if it grows past the specified number of events to keep.
 			if retainCount > 0 {
@@ -171,6 +191,8 @@ type Supervisor struct {
 	// before the init process death
 	containerExecSyncLock sync.Mutex
 	containerExecSync     map[string]map[string]chan struct{}
+	// Transaction factory is response to handle transaction for container operations in containerd
+	transactionFactory TransactionFactory
 }
 
 // Stop closes all startTasks and sends a SIGTERM to each container's pid1 then waits for they to
@@ -189,11 +211,12 @@ func (s *Supervisor) Close() error {
 
 // Event represents a container event
 type Event struct {
-	ID        string    `json:"id"`
-	Type      string    `json:"type"`
-	Timestamp time.Time `json:"timestamp"`
-	PID       string    `json:"pid,omitempty"`
-	Status    uint32    `json:"status,omitempty"`
+	ID            string    `json:"id"`
+	Type          string    `json:"type"`
+	Timestamp     time.Time `json:"timestamp"`
+	PID           string    `json:"pid,omitempty"`
+	Status        uint32    `json:"status,omitempty"`
+	TransactionID int64     `json:"-"`
 }
 
 type eventV1 struct {
@@ -371,6 +394,10 @@ func (s *Supervisor) restore() error {
 				s.newExecSyncChannel(container.ID(), p.ID())
 			}
 		}
+
+		// Handle transaction need before handle process exit
+		// As exit is the real states of a container.
+		s.transactionFactory.HandleTransaction(id)
 		if len(exitedProcesses) > 0 {
 			// sort processes so that init is fired last because that is how the kernel sends the
 			// exit events

@@ -19,7 +19,20 @@ type DeleteTask struct {
 
 func (s *Supervisor) delete(t *DeleteTask) error {
 	if i, ok := s.containers[t.ID]; ok {
-		start := time.Now()
+		var transactionID int64
+		now := time.Now()
+		if !t.NoEvent {
+			transaction, err := s.transactionFactory.OpenTransaction(t.ID,
+				ExitTransaction,
+				WithTransactionMetadata("pid", t.PID),
+				WithTransactionMetadata("status", t.Status),
+				WithTransactionTimestamp(now))
+			if err != nil {
+				return err
+			}
+			transactionID = transaction.TransactionID()
+		}
+
 		if err := s.deleteContainer(i.container); err != nil {
 			logrus.WithField("error", err).Error("containerd: deleting container")
 		}
@@ -36,16 +49,17 @@ func (s *Supervisor) delete(t *DeleteTask) error {
 				}
 				s.deleteExecSyncMap(t.ID)
 				s.notifySubscribers(Event{
-					Type:      StateExit,
-					Timestamp: time.Now(),
-					ID:        t.ID,
-					Status:    t.Status,
-					PID:       t.PID,
+					Type:          StateExit,
+					Timestamp:     now,
+					ID:            t.ID,
+					Status:        t.Status,
+					PID:           t.PID,
+					TransactionID: transactionID,
 				})
 			}()
 		}
 		ContainersCounter.Dec(1)
-		ContainerDeleteTimer.UpdateSince(start)
+		ContainerDeleteTimer.UpdateSince(now)
 	}
 	return nil
 }
