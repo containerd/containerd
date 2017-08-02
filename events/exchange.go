@@ -219,25 +219,8 @@ func validateEnvelope(envelope *events.Envelope) error {
 }
 
 func adapt(ev interface{}) filters.Adaptor {
-	switch ev := ev.(type) {
-	case *events.Envelope:
-		return filters.AdapterFunc(func(fieldpath []string) (string, bool) {
-			if len(fieldpath) == 0 {
-				return "", false
-			}
-
-			switch fieldpath[0] {
-			case "namespace":
-				return ev.Namespace, len(ev.Namespace) > 0
-			case "topic":
-				return ev.Topic, len(ev.Topic) > 0
-			default:
-				// TODO(stevvooe): Handle event fields.
-				return "", false
-			}
-		})
-	case filters.Adaptor:
-		return ev
+	if adaptor, ok := ev.(filters.Adaptor); ok {
+		return adaptor
 	}
 
 	return filters.AdapterFunc(func(fieldpath []string) (string, bool) {

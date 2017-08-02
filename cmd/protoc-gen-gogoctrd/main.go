@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "github.com/containerd/containerd/protobuf/plugin/fieldpath"
 	"github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
 	"github.com/gogo/protobuf/vanity"
 	"github.com/gogo/protobuf/vanity/command"
