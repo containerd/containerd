@@ -229,6 +229,7 @@ func (p *initProcess) SetExited(status int) {
 	p.mu.Lock()
 	p.status = status
 	p.exited = time.Now()
+	p.platform.shutdownConsole(context.Background(), p.console)
 	p.mu.Unlock()
 }
 
@@ -241,9 +242,6 @@ func (p *initProcess) Delete(context context.Context) error {
 		return fmt.Errorf("cannot delete a running container")
 	}
 	p.killAll(context)
-	if err := p.platform.shutdownConsole(context, p.console); err != nil {
-		log.G(context).WithError(err).Warn("Failed to shutdown container console")
-	}
 	p.Wait()
 	err = p.runtime.Delete(context, p.id, nil)
 	if p.io != nil {

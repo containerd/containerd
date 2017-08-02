@@ -86,23 +86,21 @@ func (t *Task) Pause(ctx context.Context) error {
 }
 
 func (t *Task) Resume(ctx context.Context) error {
-	_, err := t.shim.Resume(ctx, empty)
-	if err != nil {
-		err = errdefs.FromGRPC(err)
+	if _, err := t.shim.Resume(ctx, empty); err != nil {
+		return errdefs.FromGRPC(err)
 	}
-	return err
+	return nil
 }
 
 func (t *Task) Kill(ctx context.Context, signal uint32, all bool) error {
-	_, err := t.shim.Kill(ctx, &shim.KillRequest{
+	if _, err := t.shim.Kill(ctx, &shim.KillRequest{
 		ID:     t.id,
 		Signal: signal,
 		All:    all,
-	})
-	if err != nil {
+	}); err != nil {
 		return errdefs.FromGRPC(err)
 	}
-	return err
+	return nil
 }
 
 func (t *Task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runtime.Process, error) {
@@ -125,7 +123,6 @@ func (t *Task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runt
 
 func (t *Task) Pids(ctx context.Context) ([]uint32, error) {
 	resp, err := t.shim.ListPids(ctx, &shim.ListPidsRequest{
-		// TODO: (@crosbymichael) this id can probably be removed
 		ID: t.id,
 	})
 	if err != nil {
