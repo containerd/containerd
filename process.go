@@ -69,7 +69,9 @@ func (p *process) Kill(ctx context.Context, s syscall.Signal) error {
 }
 
 func (p *process) Wait(ctx context.Context) (uint32, error) {
-	eventstream, err := p.task.client.EventService().Subscribe(ctx, &eventsapi.SubscribeRequest{
+	cancellable, cancel := context.WithCancel(ctx)
+	defer cancel()
+	eventstream, err := p.task.client.EventService().Subscribe(cancellable, &eventsapi.SubscribeRequest{
 		Filters: []string{"topic==" + runtime.TaskExitEventTopic},
 	})
 	if err != nil {
