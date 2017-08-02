@@ -4,6 +4,8 @@ package containerd.services.snapshots.v1;
 
 import "gogoproto/gogo.proto";
 import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
 import "github.com/containerd/containerd/api/types/mount.proto";
 
 option go_package = "github.com/containerd/containerd/api/services/snapshot/v1;snapshot";
@@ -16,6 +18,7 @@ service Snapshots {
 	rpc Commit(CommitSnapshotRequest) returns (google.protobuf.Empty);
 	rpc Remove(RemoveSnapshotRequest) returns (google.protobuf.Empty);
 	rpc Stat(StatSnapshotRequest) returns (StatSnapshotResponse);
+	rpc Update(UpdateSnapshotRequest) returns (UpdateSnapshotResponse);
 	rpc List(ListSnapshotsRequest) returns (stream ListSnapshotsResponse);
 	rpc Usage(UsageRequest) returns (UsageResponse);
 }
@@ -24,6 +27,9 @@ message PrepareSnapshotRequest {
 	string snapshotter = 1;
 	string key = 2;
 	string parent = 3;
+
+	// Labels are arbitrary data on snapshots.
+	map<string, string> labels  = 4;
 }
 
 message PrepareSnapshotResponse {
@@ -34,6 +40,9 @@ message ViewSnapshotRequest {
 	string snapshotter = 1;
 	string key = 2;
 	string parent = 3;
+
+	// Labels are arbitrary data on snapshots.
+	map<string, string> labels  = 4;
 }
 
 message ViewSnapshotResponse {
@@ -58,6 +67,9 @@ message CommitSnapshotRequest {
 	string snapshotter = 1;
 	string name = 2;
 	string key = 3;
+
+	// Labels are arbitrary data on snapshots.
+	map<string, string> labels  = 4;
 }
 
 message StatSnapshotRequest {
@@ -79,9 +91,35 @@ message Info {
 	string name = 1;
 	string parent = 2;
 	Kind kind = 3;
+
+	// CreatedAt provides the time at which the snapshot was created.
+	google.protobuf.Timestamp created_at = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+
+	// UpdatedAt provides the time the info was last updated.
+	google.protobuf.Timestamp updated_at = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+
+	// Labels are arbitrary data on snapshots.
+	map<string, string> labels  = 6;
 }
 
 message StatSnapshotResponse {
+	Info info = 1 [(gogoproto.nullable) = false];
+}
+
+message UpdateSnapshotRequest {
+	string snapshotter = 1;
+	Info info = 2 [(gogoproto.nullable) = false];
+
+	// UpdateMask specifies which fields to perform the update on. If empty,
+	// the operation applies to all fields.
+	//
+	// In info, Name, Parent, Kind, Created are immutable,
+	// other field may be updated using this mask.
+	// If no mask is provided, all mutable field are updated.
+	google.protobuf.FieldMask update_mask = 3;
+}
+
+message UpdateSnapshotResponse {
 	Info info = 1 [(gogoproto.nullable) = false];
 }
 
