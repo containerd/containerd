@@ -44,15 +44,19 @@ func (o *Snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, erro
 	panic("not implemented")
 }
 
+func (o *Snapshotter) Update(ctx context.Context, info snapshot.Info, fieldpaths ...string) (snapshot.Info, error) {
+	panic("not implemented")
+}
+
 func (o *Snapshotter) Usage(ctx context.Context, key string) (snapshot.Usage, error) {
 	panic("not implemented")
 }
 
-func (o *Snapshotter) Prepare(ctx context.Context, key, parent string) ([]mount.Mount, error) {
+func (o *Snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshot.Opt) ([]mount.Mount, error) {
 	panic("not implemented")
 }
 
-func (o *Snapshotter) View(ctx context.Context, key, parent string) ([]mount.Mount, error) {
+func (o *Snapshotter) View(ctx context.Context, key, parent string, opts ...snapshot.Opt) ([]mount.Mount, error) {
 	panic("not implemented")
 }
 
@@ -64,7 +68,7 @@ func (o *Snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 	panic("not implemented")
 }
 
-func (o *Snapshotter) Commit(ctx context.Context, name, key string) error {
+func (o *Snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshot.Opt) error {
 	panic("not implemented")
 }
 
