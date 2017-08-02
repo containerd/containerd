@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package containerd.services.events.v1;
+
+import "gogoproto/gogo.proto";
+
+option go_package = "github.com/containerd/containerd/api/services/events/v1;events";
+
+message ContentDelete {
+	string digest = 1 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
+}

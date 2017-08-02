@@ -5,27 +5,53 @@ package containerd
 import (
 	"context"
 	"io"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"sync"
 	"syscall"
 
 	"github.com/containerd/fifo"
 )
 
-func copyIO(fifos *FifoSet, ioset *ioSet, tty bool) (closer io.Closer, err error) {
+// NewFifos returns a new set of fifos for the task
+func NewFifos(id string) (*FIFOSet, error) {
+	root := filepath.Join(os.TempDir(), "containerd")
+	if err := os.MkdirAll(root, 0700); err != nil {
+		return nil, err
+	}
+	dir, err := ioutil.TempDir(root, "")
+	if err != nil {
+		return nil, err
+	}
+	return &FIFOSet{
+		Dir: dir,
+		In:  filepath.Join(dir, id+"-stdin"),
+		Out: filepath.Join(dir, id+"-stdout"),
+		Err: filepath.Join(dir, id+"-stderr"),
+	}, nil
+}
+
+func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 	var (
-		f   io.ReadWriteCloser
-		ctx = context.Background()
-		wg  = &sync.WaitGroup{}
+		f           io.ReadWriteCloser
+		set         []io.Closer
+		ctx, cancel = context.WithCancel(context.Background())
+		wg          = &sync.WaitGroup{}
 	)
+	defer func() {
+		if err != nil {
+			for _, f := range set {
+				f.Close()
+			}
+			cancel()
+		}
+	}()
 
 	if f, err = fifo.OpenFifo(ctx, fifos.In, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
 		return nil, err
 	}
-	defer func(c io.Closer) {
-		if err != nil {
-			c.Close()
-		}
-	}(f)
+	set = append(set, f)
 	go func(w io.WriteCloser) {
 		io.Copy(w, ioset.in)
 		w.Close()
@@ -34,11 +60,7 @@ func copyIO(fifos *FifoSet, ioset *ioSet, tty bool) (closer io.Closer, err error
 	if f, err = fifo.OpenFifo(ctx, fifos.Out, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
 		return nil, err
 	}
-	defer func(c io.Closer) {
-		if err != nil {
-			c.Close()
-		}
-	}(f)
+	set = append(set, f)
 	wg.Add(1)
 	go func(r io.ReadCloser) {
 		io.Copy(ioset.out, r)
@@ -49,11 +71,7 @@ func copyIO(fifos *FifoSet, ioset *ioSet, tty bool) (closer io.Closer, err error
 	if f, err = fifo.OpenFifo(ctx, fifos.Err, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
 		return nil, err
 	}
-	defer func(c io.Closer) {
-		if err != nil {
-			c.Close()
-		}
-	}(f)
+	set = append(set, f)
 
 	if !tty {
 		wg.Add(1)
@@ -63,9 +81,10 @@ func copyIO(fifos *FifoSet, ioset *ioSet, tty bool) (closer io.Closer, err error
 			wg.Done()
 		}(f)
 	}
-
 	return &wgCloser{
-		wg:  wg,
-		dir: fifos.Dir,
+		wg:     wg,
+		dir:    fifos.Dir,
+		set:    set,
+		cancel: cancel,
 	}, nil
 }

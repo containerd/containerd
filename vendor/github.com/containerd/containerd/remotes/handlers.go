@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/sirupsen/logrus"
 )
 
 // MakeRef returns a unique reference for the descriptor. This reference can be
@@ -20,10 +21,13 @@ func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
 	// product of the context, which may include information about the ongoing
 	// fetch process.
 	switch desc.MediaType {
-	case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest,
-		images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+	case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
 		return "manifest-" + desc.Digest.String()
-	case images.MediaTypeDockerSchema2Layer, images.MediaTypeDockerSchema2LayerGzip:
+	case images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+		return "index-" + desc.Digest.String()
+	case images.MediaTypeDockerSchema2Layer, images.MediaTypeDockerSchema2LayerGzip,
+		ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerGzip,
+		ocispec.MediaTypeImageLayerNonDistributable, ocispec.MediaTypeImageLayerNonDistributableGzip:
 		return "layer-" + desc.Digest.String()
 	case images.MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig:
 		return "config-" + desc.Digest.String()
@@ -45,8 +49,6 @@ func FetchHandler(ingester content.Ingester, fetcher Fetcher) images.HandlerFunc
 		}))
 
 		switch desc.MediaType {
-		case images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
-			return nil, fmt.Errorf("%v not yet supported", desc.MediaType)
 		case images.MediaTypeDockerSchema1Manifest:
 			return nil, fmt.Errorf("%v not supported", desc.MediaType)
 		default:
@@ -68,9 +70,9 @@ func fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc
 	for {
 		cw, err = ingester.Writer(ctx, ref, desc.Size, desc.Digest)
 		if err != nil {
-			if content.IsExists(err) {
+			if errdefs.IsAlreadyExists(err) {
 				return nil
-			} else if !content.IsLocked(err) {
+			} else if !errdefs.IsUnavailable(err) {
 				return err
 			}
 
@@ -121,7 +123,7 @@ func push(ctx context.Context, provider content.Provider, pusher Pusher, desc oc
 
 	cw, err := pusher.Push(ctx, desc)
 	if err != nil {
-		if !content.IsExists(err) {
+		if !errdefs.IsAlreadyExists(err) {
 			return err
 		}
 

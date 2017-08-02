@@ -4,8 +4,10 @@ import (
 	"context"
 	"io"
 
-	contentapi "github.com/containerd/containerd/api/services/content"
+	contentapi "github.com/containerd/containerd/api/services/content/v1"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
+	protobuftypes "github.com/gogo/protobuf/types"
 	digest "github.com/opencontainers/go-digest"
 )
 
@@ -24,38 +26,32 @@ func (rs *remoteStore) Info(ctx context.Context, dgst digest.Digest) (content.In
 		Digest: dgst,
 	})
 	if err != nil {
-		return content.Info{}, rewriteGRPCError(err)
+		return content.Info{}, errdefs.FromGRPC(err)
 	}
 
-	return content.Info{
-		Digest:      resp.Info.Digest,
-		Size:        resp.Info.Size_,
-		CommittedAt: resp.Info.CommittedAt,
-	}, nil
+	return infoFromGRPC(resp.Info), nil
 }
 
-func (rs *remoteStore) Walk(ctx context.Context, fn content.WalkFunc) error {
-	session, err := rs.client.List(ctx, &contentapi.ListContentRequest{})
+func (rs *remoteStore) Walk(ctx context.Context, fn content.WalkFunc, filters ...string) error {
+	session, err := rs.client.List(ctx, &contentapi.ListContentRequest{
+		Filters: filters,
+	})
 	if err != nil {
-		return rewriteGRPCError(err)
+		return errdefs.FromGRPC(err)
 	}
 
 	for {
 		msg, err := session.Recv()
 		if err != nil {
 			if err != io.EOF {
-				return rewriteGRPCError(err)
+				return errdefs.FromGRPC(err)
 			}
 
 			break
 		}
 
 		for _, info := range msg.Info {
-			if err := fn(content.Info{
-				Digest:      info.Digest,
-				Size:        info.Size_,
-				CommittedAt: info.CommittedAt,
-			}); err != nil {
+			if err := fn(infoFromGRPC(info)); err != nil {
 				return err
 			}
 		}
@@ -68,14 +64,14 @@ func (rs *remoteStore) Delete(ctx context.Context, dgst digest.Digest) error {
 	if _, err := rs.client.Delete(ctx, &contentapi.DeleteContentRequest{
 		Digest: dgst,
 	}); err != nil {
-		return rewriteGRPCError(err)
+		return errdefs.FromGRPC(err)
 	}
 
 	return nil
 }
 
 func (rs *remoteStore) Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, error) {
-	client, err := rs.client.Read(ctx, &contentapi.ReadRequest{Digest: dgst})
+	client, err := rs.client.Read(ctx, &contentapi.ReadContentRequest{Digest: dgst})
 	if err != nil {
 		return nil, err
 	}
@@ -93,12 +89,44 @@ func (rs *remoteStore) ReaderAt(ctx context.Context, dgst digest.Digest) (io.Rea
 	}, nil
 }
 
-func (rs *remoteStore) Status(ctx context.Context, re string) ([]content.Status, error) {
+func (rs *remoteStore) Status(ctx context.Context, ref string) (content.Status, error) {
 	resp, err := rs.client.Status(ctx, &contentapi.StatusRequest{
-		Regexp: re,
+		Ref: ref,
 	})
 	if err != nil {
-		return nil, rewriteGRPCError(err)
+		return content.Status{}, errdefs.FromGRPC(err)
+	}
+
+	status := resp.Status
+	return content.Status{
+		Ref:       status.Ref,
+		StartedAt: status.StartedAt,
+		UpdatedAt: status.UpdatedAt,
+		Offset:    status.Offset,
+		Total:     status.Total,
+		Expected:  status.Expected,
+	}, nil
+}
+
+func (rs *remoteStore) Update(ctx context.Context, info content.Info, fieldpaths ...string) (content.Info, error) {
+	resp, err := rs.client.Update(ctx, &contentapi.UpdateRequest{
+		Info: infoToGRPC(info),
+		UpdateMask: &protobuftypes.FieldMask{
+			Paths: fieldpaths,
+		},
+	})
+	if err != nil {
+		return content.Info{}, errdefs.FromGRPC(err)
+	}
+	return infoFromGRPC(resp.Info), nil
+}
+
+func (rs *remoteStore) ListStatuses(ctx context.Context, filters ...string) ([]content.Status, error) {
+	resp, err := rs.client.ListStatuses(ctx, &contentapi.ListStatusesRequest{
+		Filters: filters,
+	})
+	if err != nil {
+		return nil, errdefs.FromGRPC(err)
 	}
 
 	var statuses []content.Status
@@ -119,7 +147,7 @@ func (rs *remoteStore) Status(ctx context.Context, re string) ([]content.Status,
 func (rs *remoteStore) Writer(ctx context.Context, ref string, size int64, expected digest.Digest) (content.Writer, error) {
 	wrclient, offset, err := rs.negotiate(ctx, ref, size, expected)
 	if err != nil {
-		return nil, rewriteGRPCError(err)
+		return nil, errdefs.FromGRPC(err)
 	}
 
 	return &remoteWriter{
@@ -134,7 +162,7 @@ func (rs *remoteStore) Abort(ctx context.Context, ref string) error {
 	if _, err := rs.client.Abort(ctx, &contentapi.AbortRequest{
 		Ref: ref,
 	}); err != nil {
-		return rewriteGRPCError(err)
+		return errdefs.FromGRPC(err)
 	}
 
 	return nil
@@ -146,7 +174,7 @@ func (rs *remoteStore) negotiate(ctx context.Context, ref string, size int64, ex
 		return nil, 0, err
 	}
 
-	if err := wrclient.Send(&contentapi.WriteRequest{
+	if err := wrclient.Send(&contentapi.WriteContentRequest{
 		Action:   contentapi.WriteActionStat,
 		Ref:      ref,
 		Total:    size,
@@ -161,4 +189,24 @@ func (rs *remoteStore) negotiate(ctx context.Context, ref string, size int64, ex
 	}
 
 	return wrclient, resp.Offset, nil
+}
+
+func infoToGRPC(info content.Info) contentapi.Info {
+	return contentapi.Info{
+		Digest:    info.Digest,
+		Size_:     info.Size,
+		CreatedAt: info.CreatedAt,
+		UpdatedAt: info.UpdatedAt,
+		Labels:    info.Labels,
+	}
+}
+
+func infoFromGRPC(info contentapi.Info) content.Info {
+	return content.Info{
+		Digest:    info.Digest,
+		Size:      info.Size_,
+		CreatedAt: info.CreatedAt,
+		UpdatedAt: info.UpdatedAt,
+		Labels:    info.Labels,
+	}
 }

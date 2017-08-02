@@ -20,7 +20,7 @@ import (
 	"errors"
 	"testing"
 
-	versionapi "github.com/containerd/containerd/api/services/version"
+	versionapi "github.com/containerd/containerd/api/services/version/v1"
 	"github.com/golang/mock/gomock"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/assert"

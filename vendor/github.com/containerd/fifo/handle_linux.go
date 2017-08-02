@@ -15,6 +15,7 @@ const O_PATH = 010000000
 
 type handle struct {
 	f         *os.File
+	fd        uintptr
 	dev       uint64
 	ino       uint64
 	closeOnce sync.Once
@@ -27,10 +28,13 @@ func getHandle(fn string) (*handle, error) {
 		return nil, errors.Wrapf(err, "failed to open %v with O_PATH", fn)
 	}
 
-	var stat syscall.Stat_t
-	if err := syscall.Fstat(int(f.Fd()), &stat); err != nil {
+	var (
+		stat syscall.Stat_t
+		fd   = f.Fd()
+	)
+	if err := syscall.Fstat(int(fd), &stat); err != nil {
 		f.Close()
-		return nil, errors.Wrapf(err, "failed to stat handle %v", f.Fd())
+		return nil, errors.Wrapf(err, "failed to stat handle %v", fd)
 	}
 
 	h := &handle{
@@ -38,6 +42,7 @@ func getHandle(fn string) (*handle, error) {
 		name: fn,
 		dev:  uint64(stat.Dev),
 		ino:  stat.Ino,
+		fd:   fd,
 	}
 
 	// check /proc just in case
@@ -50,7 +55,7 @@ func getHandle(fn string) (*handle, error) {
 }
 
 func (h *handle) procPath() string {
-	return fmt.Sprintf("/proc/self/fd/%d", h.f.Fd())
+	return fmt.Sprintf("/proc/self/fd/%d", h.fd)
 }
 
 func (h *handle) Name() string {

@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
@@ -279,9 +280,8 @@ func (c *criContainerdService) pullImage(ctx context.Context, rawRef string, aut
 		if r == "" {
 			continue
 		}
-		if err := c.imageStoreService.Put(ctx, r, desc); err != nil {
-			return "", "", "", fmt.Errorf("failed to put image reference %q desc %v into containerd image store: %v",
-				r, desc, err)
+		if err := c.createImageReference(ctx, r, desc); err != nil {
+			return "", "", "", fmt.Errorf("failed to update image reference %q: %v", r, err)
 		}
 	}
 	// Do not cleanup if following operations fail so as to make resumable download possible.
@@ -331,11 +331,32 @@ func (c *criContainerdService) pullImage(ctx context.Context, rawRef string, aut
 	// Use config digest as imageID to conform to oci image spec, and also add image id as
 	// image reference.
 	imageID := configDesc.Digest.String()
-	if err := c.imageStoreService.Put(ctx, imageID, desc); err != nil {
-		return "", "", "", fmt.Errorf("failed to put image id %q into containerd image store: %v",
-			imageID, err)
+	if err := c.createImageReference(ctx, imageID, desc); err != nil {
+		return "", "", "", fmt.Errorf("failed to update image id %q: %v", imageID, err)
 	}
 	return imageID, repoTag, repoDigest, nil
+}
+
+// createImageReference creates image reference inside containerd image store.
+// Note that because create and update are not finished in one transaction, there could be race. E.g.
+// the image reference is deleted by someone else after create returns already exists, but before update
+// happens.
+func (c *criContainerdService) createImageReference(ctx context.Context, name string, desc imagespec.Descriptor) error {
+	img := containerdimages.Image{
+		Name:   name,
+		Target: desc,
+	}
+	// TODO(random-liu): Figure out which is the more performant sequence create then update or
+	// update then create.
+	_, err := c.imageStoreService.Create(ctx, img)
+	if err == nil {
+		return nil
+	}
+	if err != nil && !errdefs.IsAlreadyExists(err) {
+		return err
+	}
+	_, err = c.imageStoreService.Update(ctx, img, "target")
+	return err
 }
 
 // waitDownloadingPollInterval is the interval to check resource downloading progress.
@@ -350,7 +371,7 @@ func (c *criContainerdService) waitForResourcesDownloading(ctx context.Context, 
 		case <-ticker.C:
 			// TODO(random-liu): Use better regexp when containerd `MakeRefKey` contains more
 			// information.
-			statuses, err := c.contentStoreService.Status(ctx, "")
+			statuses, err := c.contentStoreService.ListStatuses(ctx, "")
 			if err != nil {
 				return fmt.Errorf("failed to get content status: %v", err)
 			}

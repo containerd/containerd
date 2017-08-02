@@ -15,12 +15,7 @@ func RemoveAction(arguments string, config *rspec.LinuxSeccomp) error {
 		return fmt.Errorf("Cannot remove action from nil Seccomp pointer")
 	}
 
-	var syscallsToRemove []string
-	if strings.Contains(arguments, ",") {
-		syscallsToRemove = strings.Split(arguments, ",")
-	} else {
-		syscallsToRemove = append(syscallsToRemove, arguments)
-	}
+	syscallsToRemove := strings.Split(arguments, ",")
 
 	for counter, syscallStruct := range config.Syscalls {
 		if reflect.DeepEqual(syscallsToRemove, syscallStruct.Names) {
@@ -42,14 +37,9 @@ func RemoveAllSeccompRules(config *rspec.LinuxSeccomp) error {
 }
 
 // RemoveAllMatchingRules will remove any syscall rules that match the specified action
-func RemoveAllMatchingRules(config *rspec.LinuxSeccomp, action string) error {
+func RemoveAllMatchingRules(config *rspec.LinuxSeccomp, seccompAction rspec.LinuxSeccompAction) error {
 	if config == nil {
 		return fmt.Errorf("Cannot remove action from nil Seccomp pointer")
-	}
-
-	seccompAction, err := parseAction(action)
-	if err != nil {
-		return err
 	}
 
 	for _, syscall := range config.Syscalls {

@@ -22,7 +22,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 
-	"github.com/containerd/containerd/api/services/execution"
+	"github.com/containerd/containerd/api/services/tasks/v1"
 
 	"github.com/containerd/containerd/api/types/task"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -42,7 +42,7 @@ func (c *criContainerdService) ListPodSandbox(ctx context.Context, r *runtime.Li
 	// List all sandboxes from store.
 	sandboxesInStore := c.sandboxStore.List()
 
-	resp, err := c.taskService.List(ctx, &execution.ListRequest{})
+	resp, err := c.taskService.List(ctx, &tasks.ListTasksRequest{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list sandbox containers: %v", err)
 	}

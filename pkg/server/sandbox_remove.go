@@ -19,9 +19,8 @@ package server
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/api/services/containers"
-	"github.com/containerd/containerd/api/services/execution"
-	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -55,7 +54,7 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 
 	// Return error if sandbox container is not fully stopped.
 	// TODO(random-liu): [P0] Make sure network is torn down, may need to introduce a state.
-	_, err = c.taskService.Info(ctx, &execution.InfoRequest{ContainerID: id})
+	_, err = c.taskService.Get(ctx, &tasks.GetTaskRequest{ContainerID: id})
 	if err != nil && !isContainerdGRPCNotFoundError(err) {
 		return nil, fmt.Errorf("failed to get sandbox container info for %q: %v", id, err)
 	}
@@ -65,7 +64,7 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 
 	// Remove sandbox container snapshot.
 	if err := c.snapshotService.Remove(ctx, id); err != nil {
-		if !snapshot.IsNotExist(err) {
+		if !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to remove sandbox container snapshot %q: %v", id, err)
 		}
 		glog.V(5).Infof("Remove called for snapshot %q that does not exist", id)
@@ -97,7 +96,7 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 	}
 
 	// Delete sandbox container.
-	if _, err := c.containerService.Delete(ctx, &containers.DeleteContainerRequest{ID: id}); err != nil {
+	if err := c.containerService.Delete(ctx, id); err != nil {
 		if !isContainerdGRPCNotFoundError(err) {
 			return nil, fmt.Errorf("failed to delete sandbox container %q: %v", id, err)
 		}

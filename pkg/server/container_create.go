@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd/api/services/containers"
+	"github.com/containerd/containerd/containers"
 	prototypes "github.com/gogo/protobuf/types"
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -135,24 +135,22 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	}()
 
 	// Create containerd container.
-	if _, err = c.containerService.Create(ctx, &containers.CreateContainerRequest{
-		Container: containers.Container{
-			ID: id,
-			// TODO(random-liu): Checkpoint metadata into container labels.
-			Image:   image.ID,
-			Runtime: defaultRuntime,
-			Spec: &prototypes.Any{
-				TypeUrl: runtimespec.Version,
-				Value:   rawSpec,
-			},
-			RootFS: id,
+	if _, err = c.containerService.Create(ctx, containers.Container{
+		ID: id,
+		// TODO(random-liu): Checkpoint metadata into container labels.
+		Image:   image.ID,
+		Runtime: containers.RuntimeInfo{Name: defaultRuntime},
+		Spec: &prototypes.Any{
+			TypeUrl: runtimespec.Version,
+			Value:   rawSpec,
 		},
+		RootFS: id,
 	}); err != nil {
 		return nil, fmt.Errorf("failed to create containerd container: %v", err)
 	}
 	defer func() {
 		if retErr != nil {
-			if _, err := c.containerService.Delete(ctx, &containers.DeleteContainerRequest{ID: id}); err != nil {
+			if err := c.containerService.Delete(ctx, id); err != nil {
 				glog.Errorf("Failed to delete containerd container %q: %v", id, err)
 			}
 		}
@@ -419,8 +417,8 @@ func setOCILinuxResource(g *generate.Generator, resources *runtime.LinuxContaine
 	g.SetLinuxResourcesCPUPeriod(uint64(resources.GetCpuPeriod()))
 	g.SetLinuxResourcesCPUQuota(resources.GetCpuQuota())
 	g.SetLinuxResourcesCPUShares(uint64(resources.GetCpuShares()))
-	g.SetLinuxResourcesMemoryLimit(uint64(resources.GetMemoryLimitInBytes()))
-	g.SetLinuxResourcesOOMScoreAdj(int(resources.GetOomScoreAdj()))
+	g.SetLinuxResourcesMemoryLimit(resources.GetMemoryLimitInBytes())
+	g.SetProcessOOMScoreAdj(int(resources.GetOomScoreAdj()))
 }
 
 // setOCICapabilities adds/drops process capabilities.

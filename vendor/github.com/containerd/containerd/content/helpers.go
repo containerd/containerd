@@ -5,9 +5,19 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"sync"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
+)
+
+var (
+	bufPool = sync.Pool{
+		New: func() interface{} {
+			return make([]byte, 1<<20)
+		},
+	}
 )
 
 // ReadBlob retrieves the entire contents of the blob from the provider.
@@ -33,7 +43,7 @@ func ReadBlob(ctx context.Context, provider Provider, dgst digest.Digest) ([]byt
 func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, size int64, expected digest.Digest) error {
 	cw, err := cs.Writer(ctx, ref, size, expected)
 	if err != nil {
-		if !IsExists(err) {
+		if !errdefs.IsAlreadyExists(err) {
 			return err
 		}
 
@@ -79,7 +89,7 @@ func Copy(cw Writer, r io.Reader, size int64, expected digest.Digest) error {
 	}
 
 	if err := cw.Commit(size, expected); err != nil {
-		if !IsExists(err) {
+		if !errdefs.IsAlreadyExists(err) {
 			return errors.Wrapf(err, "failed commit on ref %q", ws.Ref)
 		}
 	}
@@ -119,9 +129,4 @@ func seekReader(r io.Reader, offset, size int64) (io.Reader, error) {
 	}
 
 	return r, errors.Wrapf(errUnseekable, "seek to offset %v failed", offset)
-}
-
-func readFileString(path string) (string, error) {
-	p, err := ioutil.ReadFile(path)
-	return string(p), err
 }

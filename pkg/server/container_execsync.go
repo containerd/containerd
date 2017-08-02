@@ -23,9 +23,9 @@ import (
 	"io"
 	"io/ioutil"
 
-	"github.com/containerd/containerd/api/services/containers"
-	"github.com/containerd/containerd/api/services/execution"
-	"github.com/containerd/containerd/api/types/task"
+	"github.com/containerd/containerd/api/services/events/v1"
+	"github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/typeurl"
 	prototypes "github.com/gogo/protobuf/types"
 	"github.com/golang/glog"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -58,15 +58,15 @@ func (c *criContainerdService) ExecSync(ctx context.Context, r *runtime.ExecSync
 	}
 
 	// Get exec process spec.
-	cntrResp, err := c.containerService.Get(ctx, &containers.GetContainerRequest{ID: id})
+	container, err := c.containerService.Get(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container %q from containerd: %v", id, err)
 	}
 	var spec runtimespec.Spec
-	if err := json.Unmarshal(cntrResp.Container.Spec.Value, &spec); err != nil {
+	if err := json.Unmarshal(container.Spec.Value, &spec); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal container spec: %v", err)
 	}
-	pspec := &spec.Process
+	pspec := spec.Process
 	pspec.Args = r.GetCmd()
 	rawSpec, err := json.Marshal(pspec)
 	if err != nil {
@@ -98,15 +98,16 @@ func (c *criContainerdService) ExecSync(ctx context.Context, r *runtime.ExecSync
 	go io.Copy(stderrBuf, stderrPipe) // nolint: errcheck
 
 	// Get containerd event client first, so that we won't miss any events.
-	// TODO(random-liu): Handle this in event handler. Create an events client for
-	// each exec introduces unnecessary overhead.
+	// TODO(random-liu): Add filter to only subscribe events of the exec process.
 	cancellable, cancel := context.WithCancel(ctx)
-	events, err := c.taskService.Events(cancellable, &execution.EventsRequest{})
+	eventstream, err := c.eventService.Subscribe(cancellable, &events.SubscribeRequest{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get containerd event: %v", err)
 	}
+	defer cancel()
 
-	resp, err := c.taskService.Exec(ctx, &execution.ExecRequest{
+	execID := generateID()
+	_, err = c.taskService.Exec(ctx, &tasks.ExecProcessRequest{
 		ContainerID: id,
 		Terminal:    false,
 		Stdout:      stdout,
@@ -115,14 +116,22 @@ func (c *criContainerdService) ExecSync(ctx context.Context, r *runtime.ExecSync
 			TypeUrl: runtimespec.Version,
 			Value:   rawSpec,
 		},
+		ExecID: execID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to exec in container %q: %v", id, err)
 	}
-	exitCode, err := waitContainerExec(cancel, events, id, resp.Pid, r.GetTimeout())
+	exitCode, err := c.waitContainerExec(eventstream, id, execID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to wait for exec in container %q to finish: %v", id, err)
 	}
+	if _, err := c.taskService.DeleteProcess(ctx, &tasks.DeleteProcessRequest{
+		ContainerID: id,
+		ExecID:      execID,
+	}); err != nil && !isContainerdGRPCNotFoundError(err) {
+		return nil, fmt.Errorf("failed to delete exec %q in container %q: %v", execID, id, err)
+	}
+	// TODO(random-liu): [P1] Deal with timeout, kill and wait again on timeout.
 
 	// TODO(random-liu): Make sure stdout/stderr are drained.
 	return &runtime.ExecSyncResponse{
@@ -133,30 +142,24 @@ func (c *criContainerdService) ExecSync(ctx context.Context, r *runtime.ExecSync
 }
 
 // waitContainerExec waits for container exec to finish and returns the exit code.
-func waitContainerExec(cancel context.CancelFunc, events execution.Tasks_EventsClient, id string,
-	pid uint32, timeout int64) (uint32, error) {
-	// TODO(random-liu): [P1] Support ExecSync timeout.
-	// TODO(random-liu): Delete process after containerd upgrade.
-	defer func() {
-		// Stop events and drain the event channel. grpc-go#188
-		cancel()
-		for {
-			_, err := events.Recv()
-			if err != nil {
-				break
-			}
-		}
-	}()
+func (c *criContainerdService) waitContainerExec(eventstream events.Events_SubscribeClient, id string,
+	execID string) (uint32, error) {
 	for {
-		e, err := events.Recv()
+		evt, err := eventstream.Recv()
 		if err != nil {
 			// Return non-zero exit code just in case.
 			return unknownExitCode, err
 		}
-		if e.Type != task.Event_EXIT {
+		// Continue until the event received is of type task exit.
+		if !typeurl.Is(evt.Event, &events.TaskExit{}) {
 			continue
 		}
-		if e.ID == id && e.Pid == pid {
+		any, err := typeurl.UnmarshalAny(evt.Event)
+		if err != nil {
+			return unknownExitCode, err
+		}
+		e := any.(*events.TaskExit)
+		if e.ContainerID == id && e.ID == execID {
 			return e.ExitStatus, nil
 		}
 	}

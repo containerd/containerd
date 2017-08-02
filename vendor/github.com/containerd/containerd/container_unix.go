@@ -8,17 +8,16 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/containerd/containerd/api/services/containers"
-	"github.com/containerd/containerd/api/services/execution"
-	"github.com/containerd/containerd/api/types/descriptor"
+	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/snapshot"
+	"github.com/gogo/protobuf/proto"
 	protobuf "github.com/gogo/protobuf/types"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/opencontainers/image-spec/specs-go/v1"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func WithCheckpoint(desc v1.Descriptor, rootfsID string) NewContainerOpts {
@@ -45,8 +44,8 @@ func WithCheckpoint(desc v1.Descriptor, rootfsID string) NewContainerOpts {
 				if err != nil {
 					return err
 				}
-				if _, err := client.SnapshotService().Prepare(ctx, rootfsID, identity.ChainID(diffIDs).String()); err != nil {
-					if !snapshot.IsExist(err) {
+				if _, err := client.SnapshotService(c.Snapshotter).Prepare(ctx, rootfsID, identity.ChainID(diffIDs).String()); err != nil {
+					if !errdefs.IsAlreadyExists(err) {
 						return err
 					}
 				}
@@ -61,15 +60,16 @@ func WithCheckpoint(desc v1.Descriptor, rootfsID string) NewContainerOpts {
 				if err != nil {
 					return err
 				}
-				c.Spec = &protobuf.Any{
-					TypeUrl: specs.Version,
-					Value:   data,
+				var any protobuf.Any
+				if err := proto.Unmarshal(data, &any); err != nil {
+					return err
 				}
+				c.Spec = &any
 			}
 		}
 		if rw != nil {
 			// apply the rw snapshot to the new rw layer
-			mounts, err := client.SnapshotService().Mounts(ctx, rootfsID)
+			mounts, err := client.SnapshotService(c.Snapshotter).Mounts(ctx, rootfsID)
 			if err != nil {
 				return err
 			}
@@ -83,7 +83,7 @@ func WithCheckpoint(desc v1.Descriptor, rootfsID string) NewContainerOpts {
 }
 
 func WithTaskCheckpoint(desc v1.Descriptor) NewTaskOpts {
-	return func(ctx context.Context, c *Client, r *execution.CreateRequest) error {
+	return func(ctx context.Context, c *Client, info *TaskInfo) error {
 		id := desc.Digest
 		index, err := decodeIndex(ctx, c.ContentStore(), id)
 		if err != nil {
@@ -91,7 +91,7 @@ func WithTaskCheckpoint(desc v1.Descriptor) NewTaskOpts {
 		}
 		for _, m := range index.Manifests {
 			if m.MediaType == images.MediaTypeContainerd1Checkpoint {
-				r.Checkpoint = &descriptor.Descriptor{
+				info.Checkpoint = &types.Descriptor{
 					MediaType: m.MediaType,
 					Size_:     m.Size,
 					Digest:    m.Digest,

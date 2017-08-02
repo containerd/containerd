@@ -1,0 +1,37 @@
+version: "{build}"
+
+image: Visual Studio 2017
+
+clone_folder: c:\gopath\src\github.com\containerd\containerd
+
+branches:
+  only:
+    - master
+
+environment:
+  GOPATH: C:\gopath
+  CGO_ENABLED: 1
+
+before_build:
+  - choco install -y mingw
+  # TODO: re-enable once the content unit-test have been updated to pass on windows
+  #- choco install codecov
+
+build_script:
+  - bash.exe -lc "export PATH=/c/tools/mingw64/bin:/c/gopath/src/github.com/containerd/containerd/bin:$PATH ; mingw32-make.exe fmt"
+  - bash.exe -lc "export PATH=/c/tools/mingw64/bin:/c/gopath/src/github.com/containerd/containerd/bin:$PATH ; mingw32-make.exe vet"
+  - bash.exe -lc "export PATH=/c/tools/mingw64/bin:$PATH ; mingw32-make.exe build"
+  - bash.exe -lc "export PATH=/c/tools/mingw64/bin:$PATH ; mingw32-make.exe binaries"
+
+test_script:
+  # TODO: need an equivalent of TRAVIS_COMMIT_RANGE
+  # - GIT_CHECK_EXCLUDE="./vendor" TRAVIS_COMMIT_RANGE="${TRAVIS_COMMIT_RANGE/.../..}" C:\MinGW\bin\mingw32-make.exe dco
+  - bash.exe -lc "export PATH=/c/tools/mingw64/bin:/c/gopath/src/github.com/containerd/containerd/bin:$PATH ; mingw32-make.exe integration"
+  # TODO: re-enable once the content unit-test have been updated to pass on windows
+  #- bash.exe -lc "export PATH=/c/tools/mingw64/bin:/c/gopath/src/github.com/containerd/containerd/bin:$PATH ; mingw32-make.exe coverage"
+  #- bash.exe -lc "export PATH=/c/tools/mingw64/bin:/c/gopath/src/github.com/containerd/containerd/bin:$PATH ; mingw32-make.exe root-coverage"
+
+on_success:
+  # Note that, a Codecov upload token is not required.
+  # TODO: re-enable once the content unit-test have been updated to pass on windows
+  #- codecov -f coverage.txt
