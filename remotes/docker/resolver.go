@@ -35,10 +35,11 @@ var (
 )
 
 type dockerResolver struct {
-	credentials func(string) (string, string, error)
-	plainHTTP   bool
-	client      *http.Client
-	tracker     StatusTracker
+	credentials      func(string) (string, string, error)
+	plainHTTP        bool
+	client           *http.Client
+	tracker          StatusTracker
+	workaroundPingV2 bool // see explanation in ResolverOptions
 }
 
 // ResolverOptions are used to configured a new Docker register resolver
@@ -58,6 +59,12 @@ type ResolverOptions struct {
 	// since the registry does not have upload tracking and the existing
 	// mechanism for getting blob upload status is expensive.
 	Tracker StatusTracker
+
+	// WorkaroundPingV2 pings `/v2/` first to get WWW-authenticate header.
+	// As of August 2017, Google Container Registry (*.gcr.io) is known to require this workaround.
+	// This workaround is very likely to be removed in future releases.
+	// See https://github.com/containerd/containerd/pull/1205
+	WorkaroundPingV2 bool
 }
 
 // NewResolver returns a new resolver to a Docker registry
@@ -67,14 +74,19 @@ func NewResolver(options ResolverOptions) remotes.Resolver {
 		tracker = NewInMemoryTracker()
 	}
 	return &dockerResolver{
-		credentials: options.Credentials,
-		plainHTTP:   options.PlainHTTP,
-		client:      options.Client,
-		tracker:     tracker,
+		credentials:      options.Credentials,
+		plainHTTP:        options.PlainHTTP,
+		client:           options.Client,
+		tracker:          tracker,
+		workaroundPingV2: options.WorkaroundPingV2,
 	}
 }
 
 var _ remotes.Resolver = &dockerResolver{}
+
+// tokenScopesKey is used for the key for context.WithValue().
+// value: []string (e.g. {"registry:foo/bar:pull"})
+type tokenScopesKey struct{}
 
 func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocispec.Descriptor, error) {
 	refspec, err := reference.Parse(ref)
@@ -90,7 +102,11 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 	if err != nil {
 		return "", ocispec.Descriptor{}, err
 	}
-
+	if r.workaroundPingV2 {
+		if err := base.workaroundPingV2(ctx, false); err != nil {
+			return "", ocispec.Descriptor{}, err
+		}
+	}
 	fetcher := dockerFetcher{
 		dockerBase: base,
 	}
@@ -196,7 +212,11 @@ func (r *dockerResolver) Fetcher(ctx context.Context, ref string) (remotes.Fetch
 	if err != nil {
 		return nil, err
 	}
-
+	if r.workaroundPingV2 {
+		if err := base.workaroundPingV2(ctx, false); err != nil {
+			return nil, err
+		}
+	}
 	return dockerFetcher{
 		dockerBase: base,
 	}, nil
@@ -219,7 +239,11 @@ func (r *dockerResolver) Pusher(ctx context.Context, ref string) (remotes.Pusher
 	if err != nil {
 		return nil, err
 	}
-
+	if r.workaroundPingV2 {
+		if err := base.workaroundPingV2(ctx, true); err != nil {
+			return nil, err
+		}
+	}
 	return dockerPusher{
 		dockerBase: base,
 		tag:        refspec.Object,
@@ -228,8 +252,9 @@ func (r *dockerResolver) Pusher(ctx context.Context, ref string) (remotes.Pusher
 }
 
 type dockerBase struct {
-	base  url.URL
-	token string
+	refspec reference.Spec
+	base    url.URL
+	token   string
 
 	client   *http.Client
 	useBasic bool
@@ -264,10 +289,10 @@ func (r *dockerResolver) base(refspec reference.Spec) (*dockerBase, error) {
 		}
 	}
 
-	prefix := strings.TrimPrefix(refspec.Locator, host+"/")
-	base.Path = path.Join("/v2", prefix)
+	base.Path = path.Join("/v2", refspec.Path())
 
 	return &dockerBase{
+		refspec:  refspec,
 		base:     base,
 		client:   r.client,
 		username: username,
@@ -423,18 +448,25 @@ func (r *dockerBase) setTokenAuth(ctx context.Context, params map[string]string)
 		return fmt.Errorf("invalid token auth challenge realm: %s", err)
 	}
 
+	service, ok := params["service"]
+	if !ok {
+		return errors.Errorf("no service specified for token auth challenge")
+	}
+
 	to := tokenOptions{
 		realm:   realmURL.String(),
-		service: params["service"],
+		service: service,
 	}
 
-	scope, ok := params["scope"]
-	if !ok {
-		return errors.Errorf("no scope specified for token auth challenge")
+	if x := ctx.Value(tokenScopesKey{}); x != nil {
+		to.scopes = append(to.scopes, x.([]string)...)
 	}
-
-	// TODO: Get added scopes from context
-	to.scopes = []string{scope}
+	if scope, ok := params["scope"]; ok {
+		to.scopes = append(to.scopes, scope)
+	}
+	if len(to.scopes) == 0 {
+		return errors.Errorf("no token specified for token auth challenge")
+	}
 
 	if r.secret != "" {
 		// Credential information is provided, use oauth POST endpoint
@@ -489,7 +521,8 @@ func (r *dockerBase) fetchTokenWithOAuth(ctx context.Context, to tokenOptions) (
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 405 && r.username != "" {
+	// GCR returns 404 for POST /v2/token
+	if (resp.StatusCode == 405 && r.username != "") || resp.StatusCode == 404 {
 		// It would be nice if registries would implement the specifications
 		return r.getToken(ctx, to)
 	} else if resp.StatusCode < 200 || resp.StatusCode >= 400 {
@@ -573,4 +606,30 @@ func (r *dockerBase) getToken(ctx context.Context, to tokenOptions) (string, err
 	}
 
 	return tr.Token, nil
+}
+
+// workaroundPingV2 pings /v2/ to get WWW-Authenticate header (#1205)
+func (b *dockerBase) workaroundPingV2(ctx context.Context, push bool) error {
+	u := b.base.Scheme + "://" + b.base.Host + "/v2/"
+	// if Post fails, Get is used on retry
+	req, err := http.NewRequest(http.MethodPost, u, nil)
+	if err != nil {
+		return err
+	}
+	ctxWithScope := context.WithValue(ctx, tokenScopesKey{}, []string{tokenRepoScope(b.refspec, push)})
+	resp, err := b.doRequestWithRetries(ctxWithScope, req, nil)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close() // don't care about body contents.
+	return nil
+}
+
+// tokenRepoScope: https://docs.docker.com/registry/spec/auth/scope
+func tokenRepoScope(refspec reference.Spec, push bool) string {
+	s := "repository:" + refspec.Path() + ":pull"
+	if push {
+		s += ",push"
+	}
+	return s
 }

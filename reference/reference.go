@@ -110,6 +110,12 @@ func (r Spec) Hostname() string {
 	return r.Locator[:i]
 }
 
+// Path returns the path portion of the locator without the head slash.
+// e.g. "foo/bar" for "host/foo/bar:baz".
+func (r Spec) Path() string {
+	return strings.TrimPrefix(r.Locator, r.Hostname()+"/")
+}
+
 // Digest returns the digest portion of the reference spec. This may be a
 // partial or invalid digest, which may be used to lookup a complete digest.
 func (r Spec) Digest() digest.Digest {
