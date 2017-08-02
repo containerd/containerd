@@ -211,7 +211,7 @@ func (cs *ContainerdSuite) SetUpSuite(c *check.C) {
 	cs.grpcSocket = "unix://" + filepath.Join(cs.outputDir, "containerd-master", "containerd.sock")
 	cdLogFile := filepath.Join(cs.outputDir, "containerd-master", "containerd.log")
 
-	f, err := os.OpenFile(cdLogFile, os.O_CREATE|os.O_TRUNC|os.O_RDWR|os.O_SYNC, 0777)
+	f, err := os.OpenFile(cdLogFile, os.O_CREATE|os.O_APPEND|os.O_RDWR|os.O_SYNC, 0777)
 	if err != nil {
 		c.Fatalf("Failed to create master containerd log file: %v", err)
 	}
@@ -222,7 +222,6 @@ func (cs *ContainerdSuite) SetUpSuite(c *check.C) {
 }
 
 func (cs *ContainerdSuite) TearDownSuite(c *check.C) {
-
 	// tell containerd to stop
 	if cs.cd != nil {
 		cs.cd.Process.Signal(os.Interrupt)
