@@ -36,7 +36,7 @@ func (s *apiServer) AddProcess(ctx context.Context, r *types.AddProcessRequest) 
 	process.SelinuxLabel = r.SelinuxLabel
 	process.NoNewPrivileges = r.NoNewPrivileges
 	for _, rl := range r.Rlimits {
-		process.Rlimits = append(process.Rlimits, ocs.LinuxRlimit{
+		process.Rlimits = append(process.Rlimits, ocs.POSIXRlimit{
 			Type: rl.Type,
 			Soft: rl.Soft,
 			Hard: rl.Hard,

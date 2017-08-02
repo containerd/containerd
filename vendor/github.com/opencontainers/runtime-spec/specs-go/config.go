@@ -6,18 +6,16 @@ import "os"
 type Spec struct {
 	// Version of the Open Container Runtime Specification with which the bundle complies.
 	Version string `json:"ociVersion"`
-	// Platform specifies the configuration's target platform.
-	Platform Platform `json:"platform"`
 	// Process configures the container process.
 	Process *Process `json:"process,omitempty"`
 	// Root configures the container's root filesystem.
-	Root Root `json:"root"`
+	Root *Root `json:"root,omitempty"`
 	// Hostname configures the container's hostname.
 	Hostname string `json:"hostname,omitempty"`
 	// Mounts configures additional mounts (on top of Root).
 	Mounts []Mount `json:"mounts,omitempty"`
 	// Hooks configures callbacks for container lifecycle events.
-	Hooks *Hooks `json:"hooks,omitempty"`
+	Hooks *Hooks `json:"hooks,omitempty" platform:"linux,solaris"`
 	// Annotations contains arbitrary metadata for the container.
 	Annotations map[string]string `json:"annotations,omitempty"`
 
@@ -47,7 +45,7 @@ type Process struct {
 	// Capabilities are Linux capabilities that are kept for the process.
 	Capabilities *LinuxCapabilities `json:"capabilities,omitempty" platform:"linux"`
 	// Rlimits specifies rlimit options to apply to the process.
-	Rlimits []LinuxRlimit `json:"rlimits,omitempty" platform:"linux"`
+	Rlimits []POSIXRlimit `json:"rlimits,omitempty" platform:"linux,solaris"`
 	// NoNewPrivileges controls whether additional privileges could be gained by processes in the container.
 	NoNewPrivileges bool `json:"noNewPrivileges,omitempty" platform:"linux"`
 	// ApparmorProfile specifies the apparmor profile for the container.
@@ -96,28 +94,18 @@ type User struct {
 // Root contains information about the container's root filesystem on the host.
 type Root struct {
 	// Path is the absolute path to the container's root filesystem.
-	Path string `json:"path,omitempty"`
+	Path string `json:"path"`
 	// Readonly makes the root filesystem for the container readonly before the process is executed.
 	Readonly bool `json:"readonly,omitempty"`
 }
 
-// Platform specifies OS and arch information for the host system that the container
-// is created for.
-type Platform struct {
-	// OS is the operating system.
-	OS string `json:"os"`
-	// Arch is the architecture
-	Arch string `json:"arch"`
-}
-
 // Mount specifies a mount for a container.
 type Mount struct {
-	// Destination is the path where the mount will be placed relative to the container's root.  The path and child directories MUST exist, a runtime MUST NOT create directories automatically to a mount point.
+	// Destination is the absolute path where the mount will be placed in the container.
 	Destination string `json:"destination"`
 	// Type specifies the mount kind.
-	Type string `json:"type,omitempty"`
-	// Source specifies the source path of the mount.  In the case of bind mounts on
-	// Linux based systems this would be the file on the host.
+	Type string `json:"type,omitempty" platform:"linux,solaris"`
+	// Source specifies the source path of the mount.
 	Source string `json:"source,omitempty"`
 	// Options are fstab style mount options.
 	Options []string `json:"options,omitempty"`
@@ -134,7 +122,6 @@ type Hook struct {
 // Hooks for container setup and teardown
 type Hooks struct {
 	// Prestart is a list of hooks to be run before the container process is executed.
-	// On Linux, they are run after the container namespaces are created.
 	Prestart []Hook `json:"prestart,omitempty"`
 	// Poststart is a list of hooks to be run after the container process is started.
 	Poststart []Hook `json:"poststart,omitempty"`
@@ -215,8 +202,8 @@ type LinuxIDMapping struct {
 	Size uint32 `json:"size"`
 }
 
-// LinuxRlimit type and restrictions
-type LinuxRlimit struct {
+// POSIXRlimit type and restrictions
+type POSIXRlimit struct {
 	// Type of the rlimit to set
 	Type string `json:"type"`
 	// Hard is the hard limit for the specified type
@@ -249,7 +236,7 @@ type linuxBlockIODevice struct {
 	Minor int64 `json:"minor"`
 }
 
-// LinuxWeightDevice struct holds a `major:minor weight` pair for blkioWeightDevice
+// LinuxWeightDevice struct holds a `major:minor weight` pair for weightDevice
 type LinuxWeightDevice struct {
 	linuxBlockIODevice
 	// Weight is the bandwidth rate for the device.
@@ -268,35 +255,37 @@ type LinuxThrottleDevice struct {
 // LinuxBlockIO for Linux cgroup 'blkio' resource management
 type LinuxBlockIO struct {
 	// Specifies per cgroup weight
-	Weight *uint16 `json:"blkioWeight,omitempty"`
+	Weight *uint16 `json:"weight,omitempty"`
 	// Specifies tasks' weight in the given cgroup while competing with the cgroup's child cgroups, CFQ scheduler only
-	LeafWeight *uint16 `json:"blkioLeafWeight,omitempty"`
+	LeafWeight *uint16 `json:"leafWeight,omitempty"`
 	// Weight per cgroup per device, can override BlkioWeight
-	WeightDevice []LinuxWeightDevice `json:"blkioWeightDevice,omitempty"`
+	WeightDevice []LinuxWeightDevice `json:"weightDevice,omitempty"`
 	// IO read rate limit per cgroup per device, bytes per second
-	ThrottleReadBpsDevice []LinuxThrottleDevice `json:"blkioThrottleReadBpsDevice,omitempty"`
+	ThrottleReadBpsDevice []LinuxThrottleDevice `json:"throttleReadBpsDevice,omitempty"`
 	// IO write rate limit per cgroup per device, bytes per second
-	ThrottleWriteBpsDevice []LinuxThrottleDevice `json:"blkioThrottleWriteBpsDevice,omitempty"`
+	ThrottleWriteBpsDevice []LinuxThrottleDevice `json:"throttleWriteBpsDevice,omitempty"`
 	// IO read rate limit per cgroup per device, IO per second
-	ThrottleReadIOPSDevice []LinuxThrottleDevice `json:"blkioThrottleReadIOPSDevice,omitempty"`
+	ThrottleReadIOPSDevice []LinuxThrottleDevice `json:"throttleReadIOPSDevice,omitempty"`
 	// IO write rate limit per cgroup per device, IO per second
-	ThrottleWriteIOPSDevice []LinuxThrottleDevice `json:"blkioThrottleWriteIOPSDevice,omitempty"`
+	ThrottleWriteIOPSDevice []LinuxThrottleDevice `json:"throttleWriteIOPSDevice,omitempty"`
 }
 
 // LinuxMemory for Linux cgroup 'memory' resource management
 type LinuxMemory struct {
 	// Memory limit (in bytes).
-	Limit *uint64 `json:"limit,omitempty"`
+	Limit *int64 `json:"limit,omitempty"`
 	// Memory reservation or soft_limit (in bytes).
-	Reservation *uint64 `json:"reservation,omitempty"`
+	Reservation *int64 `json:"reservation,omitempty"`
 	// Total memory limit (memory + swap).
-	Swap *uint64 `json:"swap,omitempty"`
+	Swap *int64 `json:"swap,omitempty"`
 	// Kernel memory limit (in bytes).
-	Kernel *uint64 `json:"kernel,omitempty"`
+	Kernel *int64 `json:"kernel,omitempty"`
 	// Kernel memory limit for tcp (in bytes)
-	KernelTCP *uint64 `json:"kernelTCP,omitempty"`
+	KernelTCP *int64 `json:"kernelTCP,omitempty"`
 	// How aggressive the kernel will swap memory pages.
 	Swappiness *uint64 `json:"swappiness,omitempty"`
+	// DisableOOMKiller disables the OOM killer for out of memory conditions
+	DisableOOMKiller *bool `json:"disableOOMKiller,omitempty"`
 }
 
 // LinuxCPU for Linux cgroup 'cpu' resource management
@@ -335,8 +324,6 @@ type LinuxNetwork struct {
 type LinuxResources struct {
 	// Devices configures the device whitelist.
 	Devices []LinuxDeviceCgroup `json:"devices,omitempty"`
-	// DisableOOMKiller disables the OOM killer for out of memory conditions
-	DisableOOMKiller *bool `json:"disableOOMKiller,omitempty"`
 	// Memory restriction configuration
 	Memory *LinuxMemory `json:"memory,omitempty"`
 	// CPU resource restriction configuration
@@ -435,11 +422,11 @@ type Windows struct {
 	// Resources contains information for handling resource constraints for the container.
 	Resources *WindowsResources `json:"resources,omitempty"`
 	// CredentialSpec contains a JSON object describing a group Managed Service Account (gMSA) specification.
-	CredentialSpec interface{} `json:"credentialspec,omitempty"`
+	CredentialSpec interface{} `json:"credentialSpec,omitempty"`
 	// Servicing indicates if the container is being started in a mode to apply a Windows Update servicing operation.
 	Servicing bool `json:"servicing,omitempty"`
 	// IgnoreFlushesDuringBoot indicates if the container is being started in a mode where disk writes are not flushed during its boot process.
-	IgnoreFlushesDuringBoot bool `json:"ignoreflushesduringboot,omitempty"`
+	IgnoreFlushesDuringBoot bool `json:"ignoreFlushesDuringBoot,omitempty"`
 	// HyperV contains information for running a container with Hyper-V isolation.
 	HyperV *WindowsHyperV `json:"hyperv,omitempty"`
 	// Network restriction configuration.
@@ -488,7 +475,7 @@ type WindowsNetwork struct {
 	EndpointList []string `json:"endpointList,omitempty"`
 	// Specifies if unqualified DNS name resolution is allowed.
 	AllowUnqualifiedDNSQuery bool `json:"allowUnqualifiedDNSQuery,omitempty"`
-	// Comma seperated list of DNS suffixes to use for name resolution.
+	// Comma separated list of DNS suffixes to use for name resolution.
 	DNSSearchList []string `json:"DNSSearchList,omitempty"`
 	// Name (ID) of the container that we will share with the network stack.
 	NetworkSharedContainerName string `json:"networkSharedContainerName,omitempty"`
@@ -497,7 +484,7 @@ type WindowsNetwork struct {
 // WindowsHyperV contains information for configuring a container to run with Hyper-V isolation.
 type WindowsHyperV struct {
 	// UtilityVMPath is an optional path to the image used for the Utility VM.
-	UtilityVMPath string `json:"utilityvmpath,omitempty"`
+	UtilityVMPath string `json:"utilityVMPath,omitempty"`
 }
 
 // LinuxSeccomp represents syscall restrictions
@@ -563,7 +550,7 @@ const (
 type LinuxSeccompArg struct {
 	Index    uint                 `json:"index"`
 	Value    uint64               `json:"value"`
-	ValueTwo uint64               `json:"valueTwo"`
+	ValueTwo uint64               `json:"valueTwo,omitempty"`
 	Op       LinuxSeccompOperator `json:"op"`
 }
 

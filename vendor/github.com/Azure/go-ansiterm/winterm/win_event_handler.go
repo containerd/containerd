@@ -9,7 +9,7 @@ import (
 	"strconv"
 
 	. "github.com/Azure/go-ansiterm"
-	"github.com/sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 )
 
 var logger *logrus.Logger

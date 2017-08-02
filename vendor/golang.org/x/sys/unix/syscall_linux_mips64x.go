@@ -7,13 +7,7 @@
 
 package unix
 
-// Linux introduced getdents64 syscall for N64 ABI only in 3.10
-// (May 21 2013, rev dec33abaafc89bcbd78f85fad0513170415a26d5),
-// to support older kernels, we have to use getdents for mips64.
-// Also note that struct dirent is different for these two.
-// Lookup linux_dirent{,64} in kernel source code for details.
-const _SYS_getdents = SYS_GETDENTS
-
+//sys	Dup2(oldfd int, newfd int) (err error)
 //sys	EpollWait(epfd int, events []EpollEvent, msec int) (n int, err error)
 //sys	Fchown(fd int, uid int, gid int) (err error)
 //sys	Fstatfs(fd int, buf *Statfs_t) (err error)
@@ -189,9 +183,9 @@ func fillStat_t(s *Stat_t, st *stat_t) {
 	s.Blocks = st.Blocks
 }
 
-func (r *PtraceRegs) PC() uint64 { return r.Regs[64] }
+func (r *PtraceRegs) PC() uint64 { return r.Epc }
 
-func (r *PtraceRegs) SetPC(pc uint64) { r.Regs[64] = pc }
+func (r *PtraceRegs) SetPC(pc uint64) { r.Epc = pc }
 
 func (iov *Iovec) SetLen(length int) {
 	iov.Len = uint64(length)
@@ -203,4 +197,13 @@ func (msghdr *Msghdr) SetControllen(length int) {
 
 func (cmsg *Cmsghdr) SetLen(length int) {
 	cmsg.Len = uint64(length)
+}
+
+//sys	poll(fds *PollFd, nfds int, timeout int) (n int, err error)
+
+func Poll(fds []PollFd, timeout int) (n int, err error) {
+	if len(fds) == 0 {
+		return poll(nil, 0, timeout)
+	}
+	return poll(&fds[0], len(fds), timeout)
 }
