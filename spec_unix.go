@@ -162,12 +162,15 @@ func createDefaultSpec() (*specs.Spec, error) {
 	return s, nil
 }
 
+// WithTTY sets the information on the spec as well as the environment variables for
+// using a TTY
 func WithTTY(s *specs.Spec) error {
 	s.Process.Terminal = true
 	s.Process.Env = append(s.Process.Env, "TERM=xterm")
 	return nil
 }
 
+// WithHostNamespace allows a task to run inside the host's linux namespace
 func WithHostNamespace(ns specs.LinuxNamespaceType) SpecOpts {
 	return func(s *specs.Spec) error {
 		for i, n := range s.Linux.Namespaces {
@@ -198,6 +201,7 @@ func WithLinuxNamespace(ns specs.LinuxNamespace) SpecOpts {
 	}
 }
 
+// WithImageConfig configures the spec to from the configuration of an Image
 func WithImageConfig(ctx context.Context, i Image) SpecOpts {
 	return func(s *specs.Spec) error {
 		var (
@@ -304,7 +308,8 @@ func WithNoNewPrivileges(s *specs.Spec) error {
 	return nil
 }
 
-func WithHostHosts(s *specs.Spec) error {
+// WithHostHostsFile bind-mounts the host's /etc/hosts into the container as readonly
+func WithHostHostsFile(s *specs.Spec) error {
 	s.Mounts = append(s.Mounts, specs.Mount{
 		Destination: "/etc/hosts",
 		Type:        "bind",
@@ -314,6 +319,7 @@ func WithHostHosts(s *specs.Spec) error {
 	return nil
 }
 
+// WithHostResoveconf bind-mounts the host's /etc/resolv.conf into the container as readonly
 func WithHostResoveconf(s *specs.Spec) error {
 	s.Mounts = append(s.Mounts, specs.Mount{
 		Destination: "/etc/resolv.conf",
@@ -324,6 +330,7 @@ func WithHostResoveconf(s *specs.Spec) error {
 	return nil
 }
 
+// WithHostLocaltime bind-mounts the host's /etc/localtime into the container as readonly
 func WithHostLocaltime(s *specs.Spec) error {
 	s.Mounts = append(s.Mounts, specs.Mount{
 		Destination: "/etc/localtime",

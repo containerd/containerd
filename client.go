@@ -64,8 +64,13 @@ type clientOpts struct {
 	dialOptions []grpc.DialOption
 }
 
+// ClientOpt allows callers to set options on the containerd client
 type ClientOpt func(c *clientOpts) error
 
+// WithDefaultNamespace sets the default namespace on the client
+//
+// Any operation that does not have a namespace set on the context will
+// be provided the default namespace
 func WithDefaultNamespace(ns string) ClientOpt {
 	return func(c *clientOpts) error {
 		c.defaultns = ns
@@ -132,6 +137,8 @@ type Client struct {
 	runtime   string
 }
 
+// IsServing returns true if the client can successfully connect to the containerd daemon
+// and the healthcheck service returns the SERVING response
 func (c *Client) IsServing(ctx context.Context) (bool, error) {
 	r, err := c.HealthService().Check(ctx, &grpc_health_v1.HealthCheckRequest{})
 	if err != nil {
@@ -153,6 +160,7 @@ func (c *Client) Containers(ctx context.Context, filters ...string) ([]Container
 	return out, nil
 }
 
+// NewContainerOpts allows the caller to set additional options when creating a container
 type NewContainerOpts func(ctx context.Context, client *Client, c *containers.Container) error
 
 // WithContainerLabels adds the provided labels to the container
@@ -220,6 +228,7 @@ func WithRuntime(name string) NewContainerOpts {
 	}
 }
 
+// WithSnapshotter sets the provided snapshotter for use by the container
 func WithSnapshotter(name string) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		c.Snapshotter = name
@@ -227,6 +236,7 @@ func WithSnapshotter(name string) NewContainerOpts {
 	}
 }
 
+// WithImage sets the provided image as the base for the container
 func WithImage(i Image) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		c.Image = i.Name()
@@ -255,6 +265,7 @@ func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContain
 	return containerFromRecord(c, r), nil
 }
 
+// LoadContainer loads an existing container from metadata
 func (c *Client) LoadContainer(ctx context.Context, id string) (Container, error) {
 	r, err := c.ContainerService().Get(ctx, id)
 	if err != nil {
@@ -263,6 +274,7 @@ func (c *Client) LoadContainer(ctx context.Context, id string) (Container, error
 	return containerFromRecord(c, r), nil
 }
 
+// RemoteOpts allows the caller to set distribution options for a remote
 type RemoteOpts func(*Client, *RemoteContext) error
 
 // RemoteContext is used to configure object resolutions and transfers with
@@ -339,6 +351,7 @@ func WithImageHandler(h images.Handler) RemoteOpts {
 	}
 }
 
+// Pull downloads the provided content into containerd's content store
 func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpts) (Image, error) {
 	pullCtx := defaultRemoteContext()
 	for _, o := range opts {
@@ -414,6 +427,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpts) (Imag
 	return img, nil
 }
 
+// Push uploads the provided content to a remote resource
 func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, opts ...RemoteOpts) error {
 	pushCtx := defaultRemoteContext()
 	for _, o := range opts {
@@ -539,11 +553,15 @@ func (c *Client) VersionService() versionservice.VersionClient {
 	return versionservice.NewVersionClient(c.conn)
 }
 
+// Version of containerd
 type Version struct {
-	Version  string
+	// Version number
+	Version string
+	// Revision from git that was built
 	Revision string
 }
 
+// Version returns the version of containerd that the client is connected to
 func (c *Client) Version(ctx context.Context) (Version, error) {
 	response, err := c.VersionService().Version(ctx, &pempty.Empty{})
 	if err != nil {
@@ -566,8 +584,10 @@ type importOpts struct {
 	refObject string
 }
 
+// ImportOpt allows the caller to specify import specific options
 type ImportOpt func(c *importOpts) error
 
+// WithOCIImportFormat sets the import format for an OCI image format
 func WithOCIImportFormat() ImportOpt {
 	return func(c *importOpts) error {
 		if c.format != "" {
@@ -630,8 +650,10 @@ type exportOpts struct {
 	format imageFormat
 }
 
+// ExportOpt allows callers to set export options
 type ExportOpt func(c *exportOpts) error
 
+// WithOCIExportFormat sets the OCI image format as the export target
 func WithOCIExportFormat() ExportOpt {
 	return func(c *exportOpts) error {
 		if c.format != "" {

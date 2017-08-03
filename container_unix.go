@@ -20,6 +20,9 @@ import (
 	"github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+// WithCheckpoint allows a container to be created from the checkpointed information
+// provided by the descriptor. The image, snapshot, and runtime specifications are
+// restored on the container
 func WithCheckpoint(desc v1.Descriptor, rootfsID string) NewContainerOpts {
 	// set image and rw, and spec
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
@@ -82,6 +85,9 @@ func WithCheckpoint(desc v1.Descriptor, rootfsID string) NewContainerOpts {
 	}
 }
 
+// WithTaskCheckpoint allows a task to be created with live runtime and memory data from a
+// previous checkpoint. Additional software such as CRIU may be required to
+// restore a task from a checkpoint
 func WithTaskCheckpoint(desc v1.Descriptor) NewTaskOpts {
 	return func(ctx context.Context, c *Client, info *TaskInfo) error {
 		id := desc.Digest

@@ -8,15 +8,21 @@ import (
 	"sync"
 )
 
+// IO holds the io information for a task or process
 type IO struct {
+	// Terminal is true if one has been allocated
 	Terminal bool
-	Stdin    string
-	Stdout   string
-	Stderr   string
+	// Stdin path
+	Stdin string
+	// Stdout path
+	Stdout string
+	// Stderr path
+	Stderr string
 
 	closer *wgCloser
 }
 
+// Cancel aborts all current io operations
 func (i *IO) Cancel() {
 	if i.closer == nil {
 		return
@@ -24,6 +30,7 @@ func (i *IO) Cancel() {
 	i.closer.Cancel()
 }
 
+// Wait blocks until all io copy operations have completed
 func (i *IO) Wait() {
 	if i.closer == nil {
 		return
@@ -31,6 +38,7 @@ func (i *IO) Wait() {
 	i.closer.Wait()
 }
 
+// Close cleans up all open io resources
 func (i *IO) Close() error {
 	if i.closer == nil {
 		return nil
@@ -38,14 +46,18 @@ func (i *IO) Close() error {
 	return i.closer.Close()
 }
 
+// IOCreation creates new IO sets for a task
 type IOCreation func(id string) (*IO, error)
 
+// IOAttach allows callers to reattach to running tasks
 type IOAttach func(*FIFOSet) (*IO, error)
 
+// NewIO returns an IOCreation that will provide IO sets without a terminal
 func NewIO(stdin io.Reader, stdout, stderr io.Writer) IOCreation {
 	return NewIOWithTerminal(stdin, stdout, stderr, false)
 }
 
+// NewIOWithTerminal creates a new io set with the provied io.Reader/Writers for use with a terminal
 func NewIOWithTerminal(stdin io.Reader, stdout, stderr io.Writer, terminal bool) IOCreation {
 	return func(id string) (*IO, error) {
 		paths, err := NewFifos(id)
@@ -72,6 +84,7 @@ func NewIOWithTerminal(stdin io.Reader, stdout, stderr io.Writer, terminal bool)
 	}
 }
 
+// WithAttach attaches the existing io for a task to the provided io.Reader/Writers
 func WithAttach(stdin io.Reader, stdout, stderr io.Writer) IOAttach {
 	return func(paths *FIFOSet) (*IO, error) {
 		if paths == nil {
@@ -97,7 +110,7 @@ func WithAttach(stdin io.Reader, stdout, stderr io.Writer) IOAttach {
 	}
 }
 
-// Stdio returns an IO implementation to be used for a task
+// Stdio returns an IO set to be used for a task
 // that outputs the container's IO as the current processes Stdio
 func Stdio(id string) (*IO, error) {
 	return NewIO(os.Stdin, os.Stdout, os.Stderr)(id)
@@ -108,11 +121,14 @@ func StdioTerminal(id string) (*IO, error) {
 	return NewIOWithTerminal(os.Stdin, os.Stdout, os.Stderr, true)(id)
 }
 
+// FIFOSet is a set of fifos for use with tasks
 type FIFOSet struct {
 	// Dir is the directory holding the task fifos
-	Dir          string
+	Dir string
+	// In, Out, and Err fifo paths
 	In, Out, Err string
-	Terminal     bool
+	// Terminal returns true if a terminal is being used for the task
+	Terminal bool
 }
 
 type ioSet struct {
