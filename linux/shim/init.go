@@ -117,10 +117,10 @@ func newInitProcess(context context.Context, plat platform, path, namespace stri
 		io     runc.IO
 	)
 	if r.Terminal {
-		if socket, err = runc.NewConsoleSocket(filepath.Join(path, "pty.sock")); err != nil {
+		if socket, err = runc.NewTempConsoleSocket(); err != nil {
 			return nil, errors.Wrap(err, "failed to create OCI runtime console socket")
 		}
-		defer os.Remove(socket.Path())
+		defer socket.Close()
 	} else {
 		if io, err = runc.NewPipeIO(0, 0); err != nil {
 			return nil, errors.Wrap(err, "failed to create OCI runtime io pipes")
