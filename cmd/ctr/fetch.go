@@ -69,7 +69,10 @@ func fetch(ctx context.Context, ref string, clicontext *cli.Context) (containerd
 	progress := make(chan struct{})
 
 	go func() {
-		showProgress(pctx, ongoing, client.ContentStore(), os.Stdout)
+		if !clicontext.GlobalBool("debug") {
+			// no progress bar, because it hides some debug logs
+			showProgress(pctx, ongoing, client.ContentStore(), os.Stdout)
+		}
 		close(progress)
 	}()
 
