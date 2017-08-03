@@ -26,9 +26,9 @@ SKIP=${SKIP:-"Streaming|RunAsUser|host port"}
 REPORT_DIR=${REPORT_DIR:-"/tmp"}
 
 if [[ -z "${GOPATH}" ]]; then
-  echo "GOPATH is not set"	
+  echo "GOPATH is not set"
   exit 1
-fi       
+fi
 
 if [[ ! "${PATH}" =~ (^|:)${GOPATH}/bin(|/)(:|$) ]]; then
   echo "GOPATH/bin is not in path"
@@ -46,12 +46,12 @@ CRICONTAINERD_SOCK=/var/run/cri-containerd.sock
 
 # Install critest
 if [ ! -x "$(command -v ${CRITEST})" ]; then
-  go get -d ${CRITEST_PKG}/... 
+  go get -d ${CRITEST_PKG}/...
   cd ${GOPATH}/src/${CRITEST_PKG}
   git fetch --all
   git checkout ${CRITEST_VERSION}
   make
-fi	
+fi
 which ${CRITEST}
 
 # Start containerd
@@ -61,11 +61,20 @@ if [ ! -x "$(command -v containerd)" ]; then
 fi
 sudo pkill containerd
 sudo containerd -l debug &> ${REPORT_DIR}/containerd.log &
-sleep 1 # sleep 1 seconds for containerd to be ready.
+
+# Wait for containerd to be running by using the containerd client ctr to check the version
+# of the containerd server. Wait an increasing amount of time after each of five attempts
+MAX_ATTEMPTS=5
+attempt_num=1
+until sudo ctr version &> /dev/null || (( attempt_num == MAX_ATTEMPTS ))
+do
+    echo "Attempt $attempt_num to connect to containerd failed! Trying again in $attempt_num seconds..."
+    sleep $(( attempt_num++ ))
+done
 
 # Start cri-containerd
 cd ${ROOT}
-sudo _output/cri-containerd --alsologtostderr --v 4 &> ${REPORT_DIR}/cri-containerd.log & 
+sudo _output/cri-containerd --alsologtostderr --v 4 &> ${REPORT_DIR}/cri-containerd.log &
 
 # Run cri validation test
 sudo env PATH=${PATH} GOPATH=${GOPATH} ${CRITEST} --runtime-endpoint=${CRICONTAINERD_SOCK} --focus="${FOCUS}" --ginkgo-flags="--skip=\"${SKIP}\"" validation
