@@ -39,12 +39,13 @@ func (p *process) ID() string {
 
 func (p *process) State(ctx context.Context) (runtime.State, error) {
 	return runtime.State{
-		Status:   p.Status(),
-		Pid:      p.pid,
-		Stdin:    p.io.src.Stdin,
-		Stdout:   p.io.src.Stdout,
-		Stderr:   p.io.src.Stderr,
-		Terminal: p.io.src.Terminal,
+		Status:     p.Status(),
+		Pid:        p.pid,
+		Stdin:      p.io.src.Stdin,
+		Stdout:     p.io.src.Stdout,
+		Stderr:     p.io.src.Stderr,
+		Terminal:   p.io.src.Terminal,
+		ExitStatus: p.exitCode,
 	}, nil
 }
 

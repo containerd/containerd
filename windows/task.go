@@ -44,21 +44,26 @@ func (t *task) ID() string {
 }
 
 func (t *task) State(ctx context.Context) (runtime.State, error) {
-	var status runtime.Status
+	var (
+		status     runtime.Status
+		exitStatus uint32
+	)
 
 	if p := t.getProcess(t.id); p != nil {
 		status = p.Status()
+		exitStatus = p.exitCode
 	} else {
 		status = t.getStatus()
 	}
 
 	return runtime.State{
-		Status:   status,
-		Pid:      t.pid,
-		Stdin:    t.io.src.Stdin,
-		Stdout:   t.io.src.Stdout,
-		Stderr:   t.io.src.Stderr,
-		Terminal: t.io.src.Terminal,
+		Status:     status,
+		Pid:        t.pid,
+		Stdin:      t.io.src.Stdin,
+		Stdout:     t.io.src.Stdout,
+		Stderr:     t.io.src.Stderr,
+		Terminal:   t.io.src.Terminal,
+		ExitStatus: exitStatus,
 	}, nil
 }
 
