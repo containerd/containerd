@@ -81,6 +81,7 @@ func newCommand(binary, address string, debug bool, config Config, socket *os.Fi
 	args := []string{
 		"--namespace", config.Namespace,
 		"--address", address,
+		"--workdir", config.WorkDir,
 	}
 	if debug {
 		args = append(args, "--debug")
@@ -152,7 +153,7 @@ func WithConnect(ctx context.Context, config Config) (shim.ShimClient, io.Closer
 // WithLocal uses an in process shim
 func WithLocal(publisher events.Publisher) func(context.Context, Config) (shim.ShimClient, io.Closer, error) {
 	return func(ctx context.Context, config Config) (shim.ShimClient, io.Closer, error) {
-		service, err := NewService(config.Path, config.Namespace, publisher)
+		service, err := NewService(config.Path, config.Namespace, config.WorkDir, publisher)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -165,6 +166,7 @@ type Config struct {
 	Path       string
 	Namespace  string
 	CgroupPath string
+	WorkDir    string
 }
 
 // New returns a new shim client

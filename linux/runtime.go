@@ -69,6 +69,9 @@ type Config struct {
 }
 
 func New(ic *plugin.InitContext) (interface{}, error) {
+	if err := os.MkdirAll(ic.Root, 0711); err != nil {
+		return nil, err
+	}
 	if err := os.MkdirAll(ic.State, 0711); err != nil {
 		return nil, err
 	}
@@ -82,7 +85,8 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	}
 	cfg := ic.Config.(*Config)
 	r := &Runtime{
-		root:      ic.State,
+		root:      ic.Root,
+		state:     ic.State,
 		remote:    !cfg.NoShim,
 		shim:      cfg.Shim,
 		shimDebug: cfg.ShimDebug,
@@ -107,6 +111,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 
 type Runtime struct {
 	root      string
+	state     string
 	shim      string
 	shimDebug bool
 	runtime   string
@@ -133,7 +138,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 		return nil, errors.Wrapf(err, "invalid task id")
 	}
 
-	bundle, err := newBundle(filepath.Join(r.root, namespace), namespace, id, opts.Spec.Value, r.events)
+	bundle, err := newBundle(filepath.Join(r.state, namespace), namespace, filepath.Join(r.root, namespace), id, opts.Spec.Value, r.events)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +211,7 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 	}
 	r.tasks.Delete(ctx, lc)
 
-	bundle := loadBundle(filepath.Join(r.root, namespace, lc.id), namespace, r.events)
+	bundle := loadBundle(filepath.Join(r.state, namespace, lc.id), namespace, r.events)
 	if err := bundle.Delete(); err != nil {
 		return nil, err
 	}
@@ -222,7 +227,7 @@ func (r *Runtime) Tasks(ctx context.Context) ([]runtime.Task, error) {
 }
 
 func (r *Runtime) restoreTasks(ctx context.Context) ([]*Task, error) {
-	dir, err := ioutil.ReadDir(r.root)
+	dir, err := ioutil.ReadDir(r.state)
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +252,7 @@ func (r *Runtime) Get(ctx context.Context, id string) (runtime.Task, error) {
 }
 
 func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
-	dir, err := ioutil.ReadDir(filepath.Join(r.root, ns))
+	dir, err := ioutil.ReadDir(filepath.Join(r.state, ns))
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +262,7 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			continue
 		}
 		id := path.Name()
-		bundle := loadBundle(filepath.Join(r.root, ns, id), ns, r.events)
+		bundle := loadBundle(filepath.Join(r.state, ns, id), ns, r.events)
 
 		s, err := bundle.Connect(ctx, r.remote)
 		if err != nil {
