@@ -1,15 +1,11 @@
 package main
 
-import (
-	"os"
-	"path/filepath"
-
-	"github.com/containerd/containerd/server"
-)
+import "github.com/containerd/containerd/server"
 
 func defaultConfig() *server.Config {
 	return &server.Config{
-		Root: filepath.Join(os.Getenv("programfiles"), "containerd", "root"),
+		Root:  server.DefaultRootDir,
+		State: server.DefaultStateDir,
 		GRPC: server.GRPCConfig{
 			Address: server.DefaultAddress,
 		},

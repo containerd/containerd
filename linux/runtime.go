@@ -69,7 +69,7 @@ type Config struct {
 }
 
 func New(ic *plugin.InitContext) (interface{}, error) {
-	if err := os.MkdirAll(ic.Root, 0711); err != nil {
+	if err := os.MkdirAll(ic.State, 0711); err != nil {
 		return nil, err
 	}
 	monitor, err := ic.Get(plugin.TaskMonitorPlugin)
@@ -82,7 +82,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	}
 	cfg := ic.Config.(*Config)
 	r := &Runtime{
-		root:      ic.Root,
+		root:      ic.State,
 		remote:    !cfg.NoShim,
 		shim:      cfg.Shim,
 		shimDebug: cfg.ShimDebug,

@@ -36,7 +36,13 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 	if config.Root == "" {
 		return nil, errors.New("root must be specified")
 	}
+	if config.State == "" {
+		return nil, errors.New("state must be specified")
+	}
 	if err := os.MkdirAll(config.Root, 0711); err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(config.State, 0711); err != nil {
 		return nil, err
 	}
 	if err := apply(ctx, config); err != nil {
@@ -66,6 +72,7 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 			ctx,
 			initialized,
 			config.Root,
+			config.State,
 			id,
 		)
 		initContext.Events = s.events
