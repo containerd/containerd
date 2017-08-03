@@ -10,10 +10,12 @@ the [roadmap](./docs/proposal.md#roadmap-and-milestones)
 for information about current and future milestones.
 ## Getting started
 ### Binary Dependencies and Specifications
-The current release of cri-containerd has been tested with:
-* [containerd](https://github.com/containerd/containerd) v0.2.3-1098-g8ed1e24
-* [runc](https://github.com/opencontainers/runc) v1.0.0-rc3
-* [CNI](https://github.com/containernetworking/cni) v0.4.0
+The current release of `cri-containerd` has following depedencies:
+* [containerd](https://github.com/containerd/containerd)
+* [runc](https://github.com/opencontainers/runc)
+* [CNI](https://github.com/containernetworking/cni)
+
+See [versions](./hack/versions) of these dependencies `cri-containerd` is tested with.
 
 As containerd and runc move to their respective general availability releases,
 we will do our best to rebase/retest `cri-containerd` with these releases on a
