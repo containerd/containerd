@@ -16,22 +16,22 @@ service Tasks {
 	// Create a task.
 	rpc Create(CreateTaskRequest) returns (CreateTaskResponse);
 
-	// Start a task.
-	rpc Start(StartTaskRequest) returns (google.protobuf.Empty);
+	// Start a process.
+	rpc Start(StartRequest) returns (StartResponse);
 
 	// Delete a task and on disk state.
 	rpc Delete(DeleteTaskRequest) returns (DeleteResponse);
 
 	rpc DeleteProcess(DeleteProcessRequest) returns (DeleteResponse);
 
-	rpc Get(GetTaskRequest) returns (GetTaskResponse);
+	rpc Get(GetRequest) returns (GetResponse);
 
 	rpc List(ListTasksRequest) returns (ListTasksResponse);
 
 	// Kill a task or process.
 	rpc Kill(KillRequest) returns (google.protobuf.Empty);
 
-	rpc Exec(ExecProcessRequest) returns (ExecProcessResponse);
+	rpc Exec(ExecProcessRequest) returns (google.protobuf.Empty);
 
 	rpc ResizePty(ResizePtyRequest) returns (google.protobuf.Empty);
 
@@ -74,8 +74,13 @@ message CreateTaskResponse {
 	uint32 pid = 2;
 }
 
-message StartTaskRequest {
+message StartRequest {
 	string container_id = 1;
+	string exec_id = 2;
+}
+
+message StartResponse {
+	uint32 pid = 1;
 }
 
 message DeleteTaskRequest {
@@ -94,12 +99,13 @@ message DeleteProcessRequest {
 	string exec_id = 2;
 }
 
-message GetTaskRequest {
+message GetRequest {
 	string container_id = 1;
+	string exec_id = 2;
 }
 
-message GetTaskResponse {
-	containerd.v1.types.Task task = 1;
+message GetResponse {
+	containerd.v1.types.Process process = 1;
 }
 
 message ListTasksRequest {
@@ -107,7 +113,7 @@ message ListTasksRequest {
 }
 
 message ListTasksResponse {
-	repeated containerd.v1.types.Task tasks = 1;
+	repeated containerd.v1.types.Process tasks = 1;
 }
 
 message KillRequest {
@@ -132,7 +138,6 @@ message ExecProcessRequest {
 }
 
 message ExecProcessResponse {
-	uint32 pid = 1;
 }
 
 message ResizePtyRequest {

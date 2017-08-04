@@ -168,20 +168,11 @@ func (s *Service) Read(req *api.ReadContentRequest, session api.Content_ReadServ
 		return errdefs.ToGRPC(err)
 	}
 
-	rc, err := s.store.Reader(session.Context(), req.Digest)
+	ra, err := s.store.ReaderAt(session.Context(), req.Digest)
 	if err != nil {
 		return errdefs.ToGRPC(err)
 	}
-	defer rc.Close() // TODO(stevvooe): Cache these file descriptors for performance.
-
-	ra, ok := rc.(io.ReaderAt)
-	if !ok {
-		// TODO(stevvooe): Need to set this up to get correct behavior across
-		// board. May change interface to store to just return ReaderAtCloser.
-		// Possibly, we could just return io.ReaderAt and handle file
-		// descriptors internally.
-		return errors.New("content service only supports content stores that return ReaderAt")
-	}
+	defer ra.Close()
 
 	var (
 		offset = req.Offset

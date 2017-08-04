@@ -3,7 +3,6 @@ package images
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"time"
 
 	"github.com/containerd/containerd/content"
@@ -73,13 +72,7 @@ func Config(ctx context.Context, provider content.Provider, image ocispec.Descri
 	return configDesc, Walk(ctx, HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		switch image.MediaType {
 		case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
-			rc, err := provider.Reader(ctx, image.Digest)
-			if err != nil {
-				return nil, err
-			}
-			defer rc.Close()
-
-			p, err := ioutil.ReadAll(rc)
+			p, err := content.ReadBlob(ctx, provider, image.Digest)
 			if err != nil {
 				return nil, err
 			}

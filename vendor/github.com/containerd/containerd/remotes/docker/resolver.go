@@ -109,12 +109,12 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 
 		// turns out, we have a valid digest, make a url.
 		urls = append(urls, fetcher.url("manifests", dgst.String()))
+
+		// fallback to blobs on not found.
+		urls = append(urls, fetcher.url("blobs", dgst.String()))
 	} else {
 		urls = append(urls, fetcher.url("manifests", refspec.Object))
 	}
-
-	// fallback to blobs on not found.
-	urls = append(urls, fetcher.url("blobs", dgst.String()))
 
 	for _, u := range urls {
 		req, err := http.NewRequest(http.MethodHead, u, nil)

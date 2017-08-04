@@ -17,22 +17,15 @@ limitations under the License.
 package server
 
 import (
-	gocontext "context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
-	"sync"
-	"time"
 
-	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
-	"github.com/containerd/containerd/remotes/docker/schema1"
-	containerdrootfs "github.com/containerd/containerd/rootfs"
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/net/context"
@@ -88,70 +81,70 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 				r.GetImage().GetImage(), retRes.GetImageRef())
 		}
 	}()
+
 	imageRef := r.GetImage().GetImage()
+	namedRef, err := normalizeImageRef(imageRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse image reference %q: %v", imageRef, err)
+	}
+	// TODO(random-liu): [P0] Avoid concurrent pulling/removing on the same image reference.
+	ref := namedRef.String()
+	if ref != imageRef {
+		glog.V(4).Infof("PullImage using normalized image ref: %q", ref)
+	}
+
+	resolver := docker.NewResolver(docker.ResolverOptions{
+		Credentials: func(string) (string, string, error) { return ParseAuth(r.GetAuth()) },
+		Client:      http.DefaultClient,
+	})
 
 	// TODO(mikebrow): add truncIndex for image id
-	imageID, repoTag, repoDigest, err := c.pullImage(ctx, imageRef, r.GetAuth())
+	image, err := c.client.Pull(ctx, ref, containerd.WithPullUnpack, containerd.WithSchema1Conversion, containerd.WithResolver(resolver))
 	if err != nil {
-		return nil, fmt.Errorf("failed to pull image %q: %v", imageRef, err)
+		return nil, fmt.Errorf("failed to pull image %q: %v", ref, err)
 	}
-	glog.V(4).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q", imageRef, imageID,
-		repoTag, repoDigest)
-
+	repoDigest, repoTag := getRepoDigestAndTag(namedRef, image.Target().Digest, image.Target().MediaType == containerdimages.MediaTypeDockerSchema1Manifest)
+	for _, r := range []string{repoTag, repoDigest} {
+		if r == "" {
+			continue
+		}
+		if err := c.createImageReference(ctx, r, image.Target()); err != nil {
+			return nil, fmt.Errorf("failed to update image reference %q: %v", r, err)
+		}
+	}
 	// Get image information.
-	chainID, size, config, err := c.getImageInfo(ctx, imageRef)
+	chainID, size, config, id, err := c.getImageInfo(ctx, imageRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get image %q information: %v", imageRef, err)
 	}
-	image := imagestore.Image{
+	imageID := id.String()
+	if err := c.createImageReference(ctx, imageID, image.Target()); err != nil {
+		return nil, fmt.Errorf("failed to update image reference %q: %v", imageID, err)
+	}
+	glog.V(4).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q", imageRef, imageID,
+		repoTag, repoDigest)
+	img := imagestore.Image{
 		ID:      imageID,
 		ChainID: chainID.String(),
 		Size:    size,
 		Config:  config,
+		Image:   image,
 	}
-
 	if repoDigest != "" {
-		image.RepoDigests = []string{repoDigest}
+		img.RepoDigests = []string{repoDigest}
 	}
 	if repoTag != "" {
-		image.RepoTags = []string{repoTag}
+		img.RepoTags = []string{repoTag}
 	}
-	c.imageStore.Add(image)
+
+	c.imageStore.Add(img)
 
 	// NOTE(random-liu): the actual state in containerd is the source of truth, even we maintain
 	// in-memory image store, it's only for in-memory indexing. The image could be removed
 	// by someone else anytime, before/during/after we create the metadata. We should always
 	// check the actual state in containerd before using the image or returning status of the
 	// image.
-	return &runtime.PullImageResponse{ImageRef: imageID}, err
-}
-
-// resourceSet is the helper struct to help tracking all resources associated
-// with an image.
-type resourceSet struct {
-	sync.Mutex
-	resources map[string]struct{}
-}
-
-func newResourceSet() *resourceSet {
-	return &resourceSet{resources: make(map[string]struct{})}
-}
-
-func (r *resourceSet) add(resource string) {
-	r.Lock()
-	defer r.Unlock()
-	r.resources[resource] = struct{}{}
-}
-
-// all returns an array of all resources added.
-func (r *resourceSet) all() map[string]struct{} {
-	r.Lock()
-	defer r.Unlock()
-	resources := make(map[string]struct{})
-	for resource := range r.resources {
-		resources[resource] = struct{}{}
-	}
-	return resources
+	return &runtime.PullImageResponse{ImageRef: img.ID}, err
 }
 
 // ParseAuth parses AuthConfig and returns username and password/secret required by containerd.
@@ -183,160 +176,6 @@ func ParseAuth(auth *runtime.AuthConfig) (string, string, error) {
 	return "", "", fmt.Errorf("invalid auth config")
 }
 
-// pullImage pulls image and returns image id (config digest), repoTag and repoDigest.
-func (c *criContainerdService) pullImage(ctx context.Context, rawRef string, auth *runtime.AuthConfig) (
-	// TODO(random-liu): Replace with client.Pull.
-	string, string, string, error) {
-	namedRef, err := normalizeImageRef(rawRef)
-	if err != nil {
-		return "", "", "", fmt.Errorf("failed to parse image reference %q: %v", rawRef, err)
-	}
-	// TODO(random-liu): [P0] Avoid concurrent pulling/removing on the same image reference.
-	ref := namedRef.String()
-	if ref != rawRef {
-		glog.V(4).Infof("PullImage using normalized image ref: %q", ref)
-	}
-
-	// Resolve the image reference to get descriptor and fetcher.
-	resolver := docker.NewResolver(docker.ResolverOptions{
-		Credentials: func(string) (string, string, error) { return ParseAuth(auth) },
-		Client:      http.DefaultClient,
-	})
-	_, desc, err := resolver.Resolve(ctx, ref)
-	if err != nil {
-		return "", "", "", fmt.Errorf("failed to resolve ref %q: %v", ref, err)
-	}
-	fetcher, err := resolver.Fetcher(ctx, ref)
-	if err != nil {
-		return "", "", "", fmt.Errorf("failed to get fetcher for ref %q: %v", ref, err)
-	}
-	// Currently, the resolved image name is the same with ref in docker resolver,
-	// but they may be different in the future.
-	// TODO(random-liu): Always resolve image reference and use resolved image name in
-	// the system.
-
-	glog.V(4).Infof("Start downloading resources for image %q", ref)
-	resources := newResourceSet()
-	resourceTrackHandler := containerdimages.HandlerFunc(func(ctx gocontext.Context, desc imagespec.Descriptor) (
-		[]imagespec.Descriptor, error) {
-		resources.add(remotes.MakeRefKey(ctx, desc))
-		return nil, nil
-	})
-	// Fetch all image resources into content store.
-	// Dispatch a handler which will run a sequence of handlers to:
-	// 1) track all resources associated using a customized handler;
-	// 2) fetch the object using a FetchHandler;
-	// 3) recurse through any sub-layers via a ChildrenHandler.
-	// Support schema1 image.
-	var (
-		schema1Converter *schema1.Converter
-		handler          containerdimages.Handler
-	)
-	if desc.MediaType == containerdimages.MediaTypeDockerSchema1Manifest {
-		schema1Converter = schema1.NewConverter(c.contentStoreService, fetcher)
-		handler = containerdimages.Handlers(
-			resourceTrackHandler,
-			schema1Converter,
-		)
-	} else {
-		handler = containerdimages.Handlers(
-			resourceTrackHandler,
-			remotes.FetchHandler(c.contentStoreService, fetcher),
-			containerdimages.ChildrenHandler(c.contentStoreService),
-		)
-	}
-	if err := containerdimages.Dispatch(ctx, handler, desc); err != nil {
-		// Dispatch returns error when requested resources are locked.
-		// In that case, we should start waiting and checking the pulling
-		// progress.
-		// TODO(random-liu): Check specific resource locked error type.
-		glog.V(5).Infof("Dispatch for %q returns error: %v", ref, err)
-	}
-	// Wait for the image pulling to finish
-	if err := c.waitForResourcesDownloading(ctx, resources.all()); err != nil {
-		return "", "", "", fmt.Errorf("failed to wait for image %q downloading: %v", ref, err)
-	}
-	glog.V(4).Infof("Finished downloading resources for image %q", ref)
-	if schema1Converter != nil {
-		desc, err = schema1Converter.Convert(ctx)
-		if err != nil {
-			return "", "", "", fmt.Errorf("failed to convert schema 1 image %q: %v", ref, err)
-		}
-	}
-
-	// In the future, containerd will rely on the information in the image store to perform image
-	// garbage collection.
-	// For now, we simply use it to store and retrieve information required for pulling an image.
-	// @stevvooe said we should `Put` before downloading content, However:
-	// 1) Containerd client put image metadata after downloading;
-	// 2) We need desc returned by schema1 converter.
-	// So just put the image metadata after downloading now.
-	// TODO(random-liu): Fix the potential garbage collection race.
-	repoDigest, repoTag := getRepoDigestAndTag(namedRef, desc.Digest, schema1Converter != nil)
-	if ref != repoTag && ref != repoDigest {
-		return "", "", "", fmt.Errorf("unexpected repo tag %q and repo digest %q for %q", repoTag, repoDigest, ref)
-	}
-	for _, r := range []string{repoTag, repoDigest} {
-		if r == "" {
-			continue
-		}
-		if err := c.createImageReference(ctx, r, desc); err != nil {
-			return "", "", "", fmt.Errorf("failed to update image reference %q: %v", r, err)
-		}
-	}
-	// Do not cleanup if following operations fail so as to make resumable download possible.
-	// TODO(random-liu): Replace with image.Unpack.
-	// Unpack the image layers into snapshots.
-	image, err := c.imageStoreService.Get(ctx, ref)
-	if err != nil {
-		return "", "", "", fmt.Errorf("failed to get image %q from containerd image store: %v", ref, err)
-	}
-	// Read the image manifest from content store.
-	manifestDigest := image.Target.Digest
-	p, err := content.ReadBlob(ctx, c.contentStoreService, manifestDigest)
-	if err != nil {
-		return "", "", "", fmt.Errorf("readblob failed for manifest digest %q: %v", manifestDigest, err)
-	}
-	var manifest imagespec.Manifest
-	if err := json.Unmarshal(p, &manifest); err != nil {
-		return "", "", "", fmt.Errorf("unmarshal blob to manifest failed for manifest digest %q: %v",
-			manifestDigest, err)
-	}
-	diffIDs, err := image.RootFS(ctx, c.contentStoreService)
-	if err != nil {
-		return "", "", "", fmt.Errorf("failed to get image rootfs: %v", err)
-	}
-	if len(diffIDs) != len(manifest.Layers) {
-		return "", "", "", fmt.Errorf("mismatched image rootfs and manifest layers")
-	}
-	layers := make([]containerdrootfs.Layer, len(diffIDs))
-	for i := range diffIDs {
-		layers[i].Diff = imagespec.Descriptor{
-			// TODO: derive media type from compressed type
-			MediaType: imagespec.MediaTypeImageLayer,
-			Digest:    diffIDs[i],
-		}
-		layers[i].Blob = manifest.Layers[i]
-	}
-	if _, err := containerdrootfs.ApplyLayers(ctx, layers, c.snapshotService, c.diffService); err != nil {
-		return "", "", "", fmt.Errorf("failed to apply layers %+v: %v", layers, err)
-	}
-
-	// TODO(random-liu): Considering how to deal with the disk usage of content.
-
-	configDesc, err := image.Config(ctx, c.contentStoreService)
-	if err != nil {
-		return "", "", "", fmt.Errorf("failed to get config descriptor for image %q: %v", ref, err)
-	}
-	// Use config digest as imageID to conform to oci image spec, and also add image id as
-	// image reference.
-	imageID := configDesc.Digest.String()
-	if err := c.createImageReference(ctx, imageID, desc); err != nil {
-		return "", "", "", fmt.Errorf("failed to update image id %q: %v", imageID, err)
-	}
-	return imageID, repoTag, repoDigest, nil
-}
-
 // createImageReference creates image reference inside containerd image store.
 // Note that because create and update are not finished in one transaction, there could be race. E.g.
 // the image reference is deleted by someone else after create returns already exists, but before update
@@ -357,41 +196,4 @@ func (c *criContainerdService) createImageReference(ctx context.Context, name st
 	}
 	_, err = c.imageStoreService.Update(ctx, img, "target")
 	return err
-}
-
-// waitDownloadingPollInterval is the interval to check resource downloading progress.
-const waitDownloadingPollInterval = 200 * time.Millisecond
-
-// waitForResourcesDownloading waits for all resource downloading to finish.
-func (c *criContainerdService) waitForResourcesDownloading(ctx context.Context, resources map[string]struct{}) error {
-	ticker := time.NewTicker(waitDownloadingPollInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			// TODO(random-liu): Use better regexp when containerd `MakeRefKey` contains more
-			// information.
-			statuses, err := c.contentStoreService.ListStatuses(ctx, "")
-			if err != nil {
-				return fmt.Errorf("failed to get content status: %v", err)
-			}
-			pulling := false
-			// TODO(random-liu): Move Dispatch into a separate goroutine, so that we could report
-			// image pulling progress concurrently.
-			for _, status := range statuses {
-				_, ok := resources[status.Ref]
-				if ok {
-					glog.V(5).Infof("Pulling resource %q with progress %d/%d",
-						status.Ref, status.Offset, status.Total)
-					pulling = true
-				}
-			}
-			if !pulling {
-				return nil
-			}
-		case <-ctx.Done():
-			// TODO(random-liu): Abort ongoing pulling if cancelled.
-			return fmt.Errorf("image resources pulling is cancelled")
-		}
-	}
 }

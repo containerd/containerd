@@ -9,6 +9,10 @@ containerd is an industry-standard container runtime with an emphasis on simplic
 
 containerd is designed to be embedded into a larger system, rather than being used directly by developers or end-users.
 
+## Getting Started
+
+If you are interested in trying out containerd please see our [Getting Started Guide](docs/getting-started.md).
+
 ## Features
 
 ### Client
@@ -168,16 +172,10 @@ Vendoring of external imports uses the [`vndr` tool](https://github.com/LK4D4/vn
 
 Please refer to [RUNC.md](/RUNC.md) for the currently supported version of `runc` that is used by containerd.
 
-### Releases
+### Releases and API Stability
 
-containerd will be released with a 1.0 when feature complete and this version will be supported for 1 year with security and bug fixes applied and released.
-
-The upgrade path for containerd is that the 0.0.x patch releases are always backward compatible with its major and minor version.
-Minor (0.x.0) version will always be compatible with the previous minor release. i.e. 1.2.0 is backwards compatible with 1.1.0 and 1.1.0 is compatible with 1.0.0.
-There is no compatibility guarantees with upgrades from two minor releases. i.e. 1.0.0 to 1.2.0.
-
-There are not backwards compatibility guarantees with upgrades to major versions. i.e 1.0.0 to 2.0.0.
-Each major version will be supported for 1 year with bug fixes and security patches.
+Please see [RELEASES.md](RELEASES.md) for details on versioning and stability
+of containerd components.
 
 ### Development reports.
 

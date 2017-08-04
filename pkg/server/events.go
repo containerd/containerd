@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/api/services/events/v1"
-	"github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/typeurl"
 	"github.com/golang/glog"
 	"github.com/jpillora/backoff"
@@ -104,13 +104,22 @@ func (c *criContainerdService) handleEvent(evt *events.Envelope) {
 			// Non-init process died, ignore the event.
 			return
 		}
-		// Delete the container from containerd.
-		_, err = c.taskService.Delete(context.Background(), &tasks.DeleteTaskRequest{ContainerID: e.ContainerID})
-		// TODO(random-liu): Change isContainerdGRPCNotFoundError to use errdefs.
-		if err != nil && !isContainerdGRPCNotFoundError(err) {
-			// TODO(random-liu): [P0] Enqueue the event and retry.
-			glog.Errorf("Failed to delete container %q: %v", e.ContainerID, err)
-			return
+		task, err := cntr.Container.Task(context.Background(), nil)
+		if err != nil {
+			if !errdefs.IsNotFound(err) {
+				glog.Errorf("failed to stop container, task not found for container %q: %v", e.ContainerID, err)
+				return
+			}
+		}
+		if task != nil {
+			if _, err = task.Delete(context.Background()); err != nil {
+				if !errdefs.IsNotFound(err) {
+					// TODO(random-liu): [P0] Enqueue the event and retry.
+					glog.Errorf("failed to stop container %q: %v", e.ContainerID, err)
+					return
+				}
+				// Move on to make sure container status is updated.
+			}
 		}
 		err = cntr.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
 			// If FinishedAt has been set (e.g. with start failure), keep as

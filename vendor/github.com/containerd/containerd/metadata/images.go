@@ -11,6 +11,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/namespaces"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -191,17 +192,15 @@ func (s *imageStore) Delete(ctx context.Context, name string) error {
 }
 
 func readImage(image *images.Image, bkt *bolt.Bucket) error {
-	if err := readTimestamps(&image.CreatedAt, &image.UpdatedAt, bkt); err != nil {
+	if err := boltutil.ReadTimestamps(bkt, &image.CreatedAt, &image.UpdatedAt); err != nil {
 		return err
 	}
 
-	lbkt := bkt.Bucket(bucketKeyLabels)
-	if lbkt != nil {
-		image.Labels = map[string]string{}
-		if err := readLabels(image.Labels, lbkt); err != nil {
-			return err
-		}
+	labels, err := boltutil.ReadLabels(bkt)
+	if err != nil {
+		return err
 	}
+	image.Labels = labels
 
 	tbkt := bkt.Bucket(bucketKeyTarget)
 	if tbkt == nil {
@@ -228,11 +227,11 @@ func readImage(image *images.Image, bkt *bolt.Bucket) error {
 }
 
 func writeImage(bkt *bolt.Bucket, image *images.Image) error {
-	if err := writeTimestamps(bkt, image.CreatedAt, image.UpdatedAt); err != nil {
+	if err := boltutil.WriteTimestamps(bkt, image.CreatedAt, image.UpdatedAt); err != nil {
 		return err
 	}
 
-	if err := writeLabels(bkt, image.Labels); err != nil {
+	if err := boltutil.WriteLabels(bkt, image.Labels); err != nil {
 		return errors.Wrapf(err, "writing labels for image %v", image.Name)
 	}
 

@@ -3,7 +3,6 @@ syntax = "proto3";
 package containerd.v1.types;
 
 import "gogoproto/gogo.proto";
-import "google/protobuf/any.proto";
 
 enum Status {
 	option (gogoproto.goproto_enum_prefix) = false;
@@ -14,15 +13,17 @@ enum Status {
 	RUNNING = 2 [(gogoproto.enumvalue_customname) = "StatusRunning"];
 	STOPPED = 3 [(gogoproto.enumvalue_customname) = "StatusStopped"];
 	PAUSED = 4 [(gogoproto.enumvalue_customname) = "StatusPaused"];
+	PAUSING = 5 [(gogoproto.enumvalue_customname) = "StatusPausing"];
 }
 
-message Task {
-	string id = 1;
-	uint32 pid = 2;
-	Status status = 3;
-	google.protobuf.Any spec = 4;
+message Process {
+	string container_id = 1;
+	string id = 2;
+	uint32 pid = 3;
+	Status status = 4;
 	string stdin = 5;
 	string stdout = 6;
 	string stderr = 7;
 	bool terminal = 8;
+	uint32 exit_status = 9;
 }

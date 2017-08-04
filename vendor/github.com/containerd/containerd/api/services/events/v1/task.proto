@@ -5,8 +5,10 @@ package containerd.services.events.v1;
 import "gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
 import "github.com/containerd/containerd/api/types/mount.proto";
+import "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto";
 
 option go_package = "github.com/containerd/containerd/api/services/events/v1;events";
+option (containerd.plugin.fieldpath_all) = true;
 
 message TaskCreate {
 	string container_id = 1;
@@ -49,6 +51,11 @@ message TaskOOM {
 }
 
 message TaskExecAdded {
+	string container_id = 1;
+	string exec_id = 2;
+}
+
+message TaskExecStarted {
 	string container_id = 1;
 	string exec_id = 2;
 	uint32 pid = 3;

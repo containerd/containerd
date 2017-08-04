@@ -22,9 +22,8 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 
-	"github.com/containerd/containerd/api/services/tasks/v1"
-	"github.com/containerd/containerd/api/types/task"
-
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/errdefs"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
@@ -47,18 +46,24 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 	// Use the full sandbox id.
 	id := sandbox.ID
 
-	info, err := c.taskService.Get(ctx, &tasks.GetTaskRequest{ContainerID: id})
-	if err != nil && !isContainerdGRPCNotFoundError(err) {
+	task, err := sandbox.Container.Task(ctx, nil)
+	if err != nil && !errdefs.IsNotFound(err) {
 		return nil, fmt.Errorf("failed to get sandbox container info for %q: %v", id, err)
 	}
 
 	// Set sandbox state to NOTREADY by default.
 	state := runtime.PodSandboxState_SANDBOX_NOTREADY
 	// If the sandbox container is running, treat it as READY.
-	if info != nil && info.Task.Status == task.StatusRunning {
-		state = runtime.PodSandboxState_SANDBOX_READY
-	}
+	if task != nil {
+		taskStatus, err := task.Status(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get task status for sandbox container %q: %v", id, err)
+		}
 
+		if taskStatus.Status == containerd.Running {
+			state = runtime.PodSandboxState_SANDBOX_READY
+		}
+	}
 	ip, err := c.netPlugin.GetContainerNetworkStatus(sandbox.NetNS, sandbox.Config.GetMetadata().GetNamespace(), sandbox.Config.GetMetadata().GetName(), id)
 	if err != nil {
 		// Ignore the error on network status

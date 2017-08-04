@@ -9,16 +9,18 @@ import (
 	"github.com/containerd/containerd/log"
 )
 
-func NewContext(ctx context.Context, plugins map[PluginType]map[string]interface{}, root, id string) *InitContext {
+func NewContext(ctx context.Context, plugins map[PluginType]map[string]interface{}, root, state, id string) *InitContext {
 	return &InitContext{
 		plugins: plugins,
 		Root:    filepath.Join(root, id),
+		State:   filepath.Join(state, id),
 		Context: log.WithModule(ctx, id),
 	}
 }
 
 type InitContext struct {
 	Root    string
+	State   string
 	Address string
 	Context context.Context
 	Config  interface{}
