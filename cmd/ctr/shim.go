@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"os"
 	"time"
@@ -15,7 +14,6 @@ import (
 	gocontext "context"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/grpclog"
 
 	"github.com/containerd/console"
 	shim "github.com/containerd/containerd/linux/shim/v1"
@@ -305,8 +303,6 @@ func getShimService(context *cli.Context) (shim.ShimClient, error) {
 		return nil, errors.New("socket path must be specified")
 	}
 
-	// reset the logger for grpc to log to dev/null so that it does not mess with our stdio
-	grpclog.SetLogger(log.New(ioutil.Discard, "", log.LstdFlags))
 	dialOpts := []grpc.DialOption{grpc.WithInsecure(), grpc.WithTimeout(100 * time.Second)}
 	dialOpts = append(dialOpts,
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {

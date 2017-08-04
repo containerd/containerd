@@ -6,8 +6,6 @@ import (
 	gocontext "context"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"log"
 	"net"
 	"os"
 	"sync"
@@ -18,7 +16,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/grpclog"
 )
 
 func prepareStdio(stdin, stdout, stderr string, console bool) (wg *sync.WaitGroup, err error) {
@@ -82,8 +79,6 @@ func getGRPCConnection(context *cli.Context) (*grpc.ClientConn, error) {
 	}
 
 	bindSocket := context.GlobalString("address")
-	// reset the logger for grpc to log to dev/null so that it does not mess with our stdio
-	grpclog.SetLogger(log.New(ioutil.Discard, "", log.LstdFlags))
 	dialOpts := []grpc.DialOption{grpc.WithInsecure(), grpc.WithTimeout(100 * time.Second)}
 	dialOpts = append(dialOpts,
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {

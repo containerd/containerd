@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"log"
 	"net/http"
 	"runtime"
 	"strconv"
@@ -43,14 +41,10 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
 func init() {
-	// reset the grpc logger so that it does not output in the STDIO of the calling process
-	grpclog.SetLogger(log.New(ioutil.Discard, "", log.LstdFlags))
-
 	// register TypeUrls for commonly marshaled external types
 	major := strconv.Itoa(specs.VersionMajor)
 	typeurl.Register(&specs.Spec{}, "opencontainers/runtime-spec", major, "Spec")
