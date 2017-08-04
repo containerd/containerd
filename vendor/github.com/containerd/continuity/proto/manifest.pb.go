@@ -71,7 +71,9 @@ type Resource struct {
 	// for regular files.
 	Size uint64 `protobuf:"varint,7,opt,name=size" json:"size,omitempty"`
 	// Digest specifies the content digest of the target file. Only valid for
-	// regular files. The strings are formatted as <alg>:<digest hex bytes>.
+	// regular files. The strings are formatted in OCI style, i.e. <alg>:<encoded>.
+	// For detailed information about the format, please refer to OCI Image Spec:
+	// https://github.com/opencontainers/image-spec/blob/master/descriptor.md#digests-and-verification
 	// The digests are sorted in lexical order and implementations may choose
 	// which algorithms they prefer.
 	Digest []string `protobuf:"bytes,8,rep,name=digest" json:"digest,omitempty"`
