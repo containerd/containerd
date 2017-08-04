@@ -27,61 +27,89 @@ import (
 	"github.com/pkg/errors"
 )
 
+// UnknownExitStatus is returned when containerd is unable to
+// determine the exit status of a process. This can happen if the process never starts
+// or if an error was encountered when obtaining the exit status, it is set to 255.
 const UnknownExitStatus = 255
 
+// Status returns process status and exit information
 type Status struct {
-	Status     ProcessStatus
+	// Status of the process
+	Status ProcessStatus
+	// ExitStatus returned by the process
 	ExitStatus uint32
 }
 
 type ProcessStatus string
 
 const (
+	// Running indicates the process is currently executing
 	Running ProcessStatus = "running"
+	// Created indicates the process has been created within containerd but the
+	// user's defined process has not started
 	Created ProcessStatus = "created"
+	// Stopped indicates that the process has ran and exited
 	Stopped ProcessStatus = "stopped"
-	Paused  ProcessStatus = "paused"
+	// Paused indicates that the process is currently paused
+	Paused ProcessStatus = "paused"
+	// Pausing indicates that the process is currently switching from a
+	// running state into a paused state
 	Pausing ProcessStatus = "pausing"
 )
 
+// IOCloseInfo allows specific io pipes to be closed on a process
 type IOCloseInfo struct {
 	Stdin bool
 }
 
+// IOCloserOpts allows the caller to set specific pipes as closed on a process
 type IOCloserOpts func(*IOCloseInfo)
 
+// WithStdinCloser closes the stdin of a process
 func WithStdinCloser(r *IOCloseInfo) {
 	r.Stdin = true
 }
 
+// CheckpointTaskInfo allows specific checkpoint information to be set for the task
 type CheckpointTaskInfo struct {
+	// ParentCheckpoint is the digest of a parent checkpoint
 	ParentCheckpoint digest.Digest
-	Options          interface{}
+	// Options hold runtime specific settings for checkpointing a task
+	Options interface{}
 }
 
+// CheckpointTaskOpts allows the caller to set checkpoint options
 type CheckpointTaskOpts func(*CheckpointTaskInfo) error
 
+// TaskInfo sets options for task creation
 type TaskInfo struct {
+	// Checkpoint is the Descriptor for an existing checkpoint that can be used
+	// to restore a task's runtime and memory state
 	Checkpoint *types.Descriptor
-	RootFS     []mount.Mount
-	Options    interface{}
+	// RootFS is a list of mounts to use as the task's root filesystem
+	RootFS []mount.Mount
+	// Options hold runtime specific settings for task creation
+	Options interface{}
 }
 
+// Task is the executable object within containerd
 type Task interface {
-	Pid() uint32
-	Delete(context.Context) (uint32, error)
-	Kill(context.Context, syscall.Signal) error
+	Process
+
+	// Pause suspends the execution of the task
 	Pause(context.Context) error
+	// Resume the execution of the task
 	Resume(context.Context) error
-	Start(context.Context) error
-	Status(context.Context) (Status, error)
-	Wait(context.Context) (uint32, error)
+	// Exec creates a new process inside the task
 	Exec(context.Context, string, *specs.Process, IOCreation) (Process, error)
+	// Pids returns a list of system specific process ids inside the task
 	Pids(context.Context) ([]uint32, error)
-	CloseIO(context.Context, ...IOCloserOpts) error
-	Resize(ctx context.Context, w, h uint32) error
-	IO() *IO
+	// Checkpoint serializes the runtime and memory information of a task into an
+	// OCI Index that can be push and pulled from a remote resource.
+	//
+	// Additional software like CRIU maybe required to checkpoint and restore tasks
 	Checkpoint(context.Context, ...CheckpointTaskOpts) (v1.Descriptor, error)
+	// Update modifies executing tasks with updated settings
 	Update(context.Context, ...UpdateTaskOpts) error
 }
 
@@ -337,10 +365,13 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (d v1
 	return t.writeIndex(ctx, &index)
 }
 
+// UpdateTaskInfo allows updated specific settings to be changed on a task
 type UpdateTaskInfo struct {
+	// Resources updates a tasks resource constraints
 	Resources interface{}
 }
 
+// UpdateTaskOpts allows a caller to update task settings
 type UpdateTaskOpts func(context.Context, *Client, *UpdateTaskInfo) error
 
 func (t *task) Update(ctx context.Context, opts ...UpdateTaskOpts) error {
@@ -437,6 +468,7 @@ func writeContent(ctx context.Context, store content.Store, mediaType, ref strin
 	}, nil
 }
 
+// WithExit causes the task to exit after a successful checkpoint
 func WithExit(r *CheckpointTaskInfo) error {
 	r.Options = &runcopts.CheckpointOptions{
 		Exit: true,

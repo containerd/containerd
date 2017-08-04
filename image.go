@@ -12,10 +12,13 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Image describes an image used by containers
 type Image interface {
+	// Name of the image
 	Name() string
+	// Target descriptor for the image content
 	Target() ocispec.Descriptor
-
+	// Unpack unpacks the image's content into a snapshot
 	Unpack(context.Context, string) error
 }
 

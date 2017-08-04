@@ -13,15 +13,25 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
+// Process represents a system process
 type Process interface {
+	// Pid is the system specific process id
 	Pid() uint32
+	// Start starts the process executing the user's defined binary
 	Start(context.Context) error
+	// Delete removes the process and any resources allocated returning the exit status
 	Delete(context.Context) (uint32, error)
+	// Kill sends the provided signal to the process
 	Kill(context.Context, syscall.Signal) error
+	// Wait blocks until the process has exited returning the exit status
 	Wait(context.Context) (uint32, error)
+	// CloseIO allows various pipes to be closed on the process
 	CloseIO(context.Context, ...IOCloserOpts) error
+	// Resize changes the width and heigh of the process's terminal
 	Resize(ctx context.Context, w, h uint32) error
+	// IO returns the io set for the process
 	IO() *IO
+	// Status returns the executing status of the process
 	Status(context.Context) (Status, error)
 }
 
