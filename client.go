@@ -36,7 +36,6 @@ import (
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/typeurl"
 	pempty "github.com/golang/protobuf/ptypes/empty"
-	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -51,33 +50,6 @@ func init() {
 	typeurl.Register(&specs.Process{}, "opencontainers/runtime-spec", major, "Process")
 	typeurl.Register(&specs.LinuxResources{}, "opencontainers/runtime-spec", major, "LinuxResources")
 	typeurl.Register(&specs.WindowsResources{}, "opencontainers/runtime-spec", major, "WindowsResources")
-}
-
-type clientOpts struct {
-	defaultns   string
-	dialOptions []grpc.DialOption
-}
-
-// ClientOpt allows callers to set options on the containerd client
-type ClientOpt func(c *clientOpts) error
-
-// WithDefaultNamespace sets the default namespace on the client
-//
-// Any operation that does not have a namespace set on the context will
-// be provided the default namespace
-func WithDefaultNamespace(ns string) ClientOpt {
-	return func(c *clientOpts) error {
-		c.defaultns = ns
-		return nil
-	}
-}
-
-// WithDialOpts allows grpc.DialOptions to be set on the connection
-func WithDialOpts(opts []grpc.DialOption) ClientOpt {
-	return func(c *clientOpts) error {
-		c.dialOptions = opts
-		return nil
-	}
 }
 
 // New returns a new containerd client that is connected to the containerd
@@ -154,90 +126,6 @@ func (c *Client) Containers(ctx context.Context, filters ...string) ([]Container
 	return out, nil
 }
 
-// NewContainerOpts allows the caller to set additional options when creating a container
-type NewContainerOpts func(ctx context.Context, client *Client, c *containers.Container) error
-
-// WithContainerLabels adds the provided labels to the container
-func WithContainerLabels(labels map[string]string) NewContainerOpts {
-	return func(_ context.Context, _ *Client, c *containers.Container) error {
-		c.Labels = labels
-		return nil
-	}
-}
-
-// WithSnapshot uses an existing root filesystem for the container
-func WithSnapshot(id string) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		// check that the snapshot exists, if not, fail on creation
-		if _, err := client.SnapshotService(c.Snapshotter).Mounts(ctx, id); err != nil {
-			return err
-		}
-		c.RootFS = id
-		return nil
-	}
-}
-
-// WithNewSnapshot allocates a new snapshot to be used by the container as the
-// root filesystem in read-write mode
-func WithNewSnapshot(id string, i Image) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore())
-		if err != nil {
-			return err
-		}
-		if _, err := client.SnapshotService(c.Snapshotter).Prepare(ctx, id, identity.ChainID(diffIDs).String()); err != nil {
-			return err
-		}
-		c.RootFS = id
-		c.Image = i.Name()
-		return nil
-	}
-}
-
-// WithNewSnapshotView allocates a new snapshot to be used by the container as the
-// root filesystem in read-only mode
-func WithNewSnapshotView(id string, i Image) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore())
-		if err != nil {
-			return err
-		}
-		if _, err := client.SnapshotService(c.Snapshotter).View(ctx, id, identity.ChainID(diffIDs).String()); err != nil {
-			return err
-		}
-		c.RootFS = id
-		c.Image = i.Name()
-		return nil
-	}
-}
-
-// WithRuntime allows a user to specify the runtime name and additional options that should
-// be used to create tasks for the container
-func WithRuntime(name string) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		c.Runtime = containers.RuntimeInfo{
-			Name: name,
-		}
-		return nil
-	}
-}
-
-// WithSnapshotter sets the provided snapshotter for use by the container
-func WithSnapshotter(name string) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		c.Snapshotter = name
-		return nil
-	}
-}
-
-// WithImage sets the provided image as the base for the container
-func WithImage(i Image) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		c.Image = i.Name()
-		return nil
-	}
-}
-
 // NewContainer will create a new container in container with the provided id
 // the id must be unique within the namespace
 func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error) {
@@ -267,9 +155,6 @@ func (c *Client) LoadContainer(ctx context.Context, id string) (Container, error
 	}
 	return containerFromRecord(c, r), nil
 }
-
-// RemoteOpts allows the caller to set distribution options for a remote
-type RemoteOpts func(*Client, *RemoteContext) error
 
 // RemoteContext is used to configure object resolutions and transfers with
 // remote content stores and image providers.
@@ -302,46 +187,6 @@ func defaultRemoteContext() *RemoteContext {
 		Resolver: docker.NewResolver(docker.ResolverOptions{
 			Client: http.DefaultClient,
 		}),
-	}
-}
-
-// WithPullUnpack is used to unpack an image after pull. This
-// uses the snapshotter, content store, and diff service
-// configured for the client.
-func WithPullUnpack(client *Client, c *RemoteContext) error {
-	c.Unpack = true
-	return nil
-}
-
-// WithPullSnapshotter specifies snapshotter name used for unpacking
-func WithPullSnapshotter(snapshotterName string) RemoteOpts {
-	return func(client *Client, c *RemoteContext) error {
-		c.Snapshotter = snapshotterName
-		return nil
-	}
-}
-
-// WithSchema1Conversion is used to convert Docker registry schema 1
-// manifests to oci manifests on pull. Without this option schema 1
-// manifests will return a not supported error.
-func WithSchema1Conversion(client *Client, c *RemoteContext) error {
-	c.ConvertSchema1 = true
-	return nil
-}
-
-// WithResolver specifies the resolver to use.
-func WithResolver(resolver remotes.Resolver) RemoteOpts {
-	return func(client *Client, c *RemoteContext) error {
-		c.Resolver = resolver
-		return nil
-	}
-}
-
-// WithImageHandler adds a base handler to be called on dispatch.
-func WithImageHandler(h images.Handler) RemoteOpts {
-	return func(client *Client, c *RemoteContext) error {
-		c.BaseHandlers = append(c.BaseHandlers, h)
-		return nil
 	}
 }
 

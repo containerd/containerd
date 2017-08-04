@@ -11,7 +11,6 @@ import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -122,14 +121,6 @@ func (c *container) Spec() (*specs.Spec, error) {
 	return &s, nil
 }
 
-// WithSnapshotCleanup deletes the rootfs allocated for the container
-func WithSnapshotCleanup(ctx context.Context, client *Client, c containers.Container) error {
-	if c.RootFS != "" {
-		return client.SnapshotService(c.Snapshotter).Remove(ctx, c.RootFS)
-	}
-	return nil
-}
-
 // Delete deletes an existing container
 // an error is returned if the container has running tasks
 func (c *container) Delete(ctx context.Context, opts ...DeleteOpts) (err error) {
@@ -165,17 +156,6 @@ func (c *container) Image(ctx context.Context) (Image, error) {
 		client: c.client,
 		i:      i,
 	}, nil
-}
-
-// NewTaskOpts allows the caller to set options on a new task
-type NewTaskOpts func(context.Context, *Client, *TaskInfo) error
-
-// WithRootFS allows a task to be created without a snapshot being allocated to its container
-func WithRootFS(mounts []mount.Mount) NewTaskOpts {
-	return func(ctx context.Context, c *Client, ti *TaskInfo) error {
-		ti.RootFS = mounts
-		return nil
-	}
 }
 
 func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...NewTaskOpts) (Task, error) {
