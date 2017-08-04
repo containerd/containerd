@@ -27,3 +27,29 @@ plugins = ["grpc", "fieldpath"]
   "google/protobuf/descriptor.proto" = "github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
   "google/protobuf/field_mask.proto" = "github.com/gogo/protobuf/types"
   "google/protobuf/timestamp.proto" = "github.com/gogo/protobuf/types"
+
+# Aggregrate the API descriptors to lock down API changes.
+[[descriptors]]
+prefix = "github.com/containerd/containerd/api"
+target = "api/next.pb.txt"
+ignore_files = [
+	"google/protobuf/descriptor.proto",
+	"gogoproto/gogo.proto"
+]
+
+# Lock down runc config
+[[descriptors]]
+prefix = "github.com/containerd/containerd/linux/runcopts"
+target = "linux/runcopts/next.pb.txt"
+ignore_files = [
+	"google/protobuf/descriptor.proto",
+	"gogoproto/gogo.proto"
+]
+
+[[descriptors]]
+prefix = "github.com/containerd/containerd/windows/hcsshimopts"
+target = "windows/hcsshimopts/next.pb.txt"
+ignore_files = [
+	"google/protobuf/descriptor.proto",
+	"gogoproto/gogo.proto"
+]
