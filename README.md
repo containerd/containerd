@@ -9,6 +9,10 @@ containerd is an industry-standard container runtime with an emphasis on simplic
 
 containerd is designed to be embedded into a larger system, rather than being used directly by developers or end-users.
 
+## Getting Started
+
+If you are interested in trying out containerd please see our [Getting Started Guide](docs/getting-started.md).
+
 ## Features
 
 ### Client
