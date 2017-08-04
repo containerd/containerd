@@ -7,7 +7,7 @@ plugins = ["grpc", "fieldpath"]
 [includes]
   # Include paths that will be added before all others. Typically, you want to
   # treat the root of the project as an include, but this may not be necessary.
-  before = ["."]
+  # before = ["."]
 
   # Paths that should be treated as include roots in relation to the vendor
   # directory. These will be calculated with the vendor directory nearest the
