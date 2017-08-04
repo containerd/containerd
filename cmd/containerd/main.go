@@ -3,11 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	golog "log"
 	"net"
 	"os"
 	"os/signal"
 	"runtime"
 	"time"
+
+	"google.golang.org/grpc/grpclog"
 
 	gocontext "golang.org/x/net/context"
 
@@ -31,6 +35,9 @@ high performance container runtime
 `
 
 func init() {
+	// Discard grpc logs so that they don't mess with our stdio
+	grpclog.SetLogger(golog.New(ioutil.Discard, "", golog.LstdFlags))
+
 	cli.VersionPrinter = func(c *cli.Context) {
 		fmt.Println(c.App.Name, version.Package, c.App.Version)
 	}
