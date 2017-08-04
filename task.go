@@ -167,7 +167,9 @@ func (t *task) Status(ctx context.Context) (Status, error) {
 }
 
 func (t *task) Wait(ctx context.Context) (uint32, error) {
-	eventstream, err := t.client.EventService().Subscribe(ctx, &eventsapi.SubscribeRequest{
+	cancellable, cancel := context.WithCancel(ctx)
+	defer cancel()
+	eventstream, err := t.client.EventService().Subscribe(cancellable, &eventsapi.SubscribeRequest{
 		Filters: []string{"topic==" + runtime.TaskExitEventTopic},
 	})
 	if err != nil {
