@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"sync"
 	"syscall"
@@ -138,10 +137,10 @@ func (e *execProcess) Start(ctx context.Context) (err error) {
 		pidfile = filepath.Join(e.path, fmt.Sprintf("%s.pid", e.id))
 	)
 	if e.stdio.terminal {
-		if socket, err = runc.NewConsoleSocket(filepath.Join(e.path, "pty.sock")); err != nil {
+		if socket, err = runc.NewTempConsoleSocket(); err != nil {
 			return errors.Wrap(err, "failed to create runc console socket")
 		}
-		defer os.Remove(socket.Path())
+		defer socket.Close()
 	} else {
 		if io, err = runc.NewPipeIO(0, 0); err != nil {
 			return errors.Wrap(err, "failed to create runc io pipes")
