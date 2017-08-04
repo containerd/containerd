@@ -68,15 +68,19 @@ const (
 	StoppedStatus
 	DeletedStatus
 	PausedStatus
+	PausingStatus
 )
 
 type State struct {
 	// Status is the current status of the container
 	Status Status
 	// Pid is the main process id for the container
-	Pid      uint32
-	Stdin    string
-	Stdout   string
-	Stderr   string
-	Terminal bool
+	Pid uint32
+	// ExitStatus of the process
+	// Only vaid if the Status is Stopped
+	ExitStatus uint32
+	Stdin      string
+	Stdout     string
+	Stderr     string
+	Terminal   bool
 }

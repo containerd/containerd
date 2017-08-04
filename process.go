@@ -76,8 +76,12 @@ func (p *process) Wait(ctx context.Context) (uint32, error) {
 		return UnknownExitStatus, err
 	}
 	// first check if the task has exited
-	if status, _ := p.Status(ctx); status == Stopped {
-		return UnknownExitStatus, errdefs.ErrUnavailable
+	status, err := p.Status(ctx)
+	if err != nil {
+		return UnknownExitStatus, errdefs.FromGRPC(err)
+	}
+	if status.Status == Stopped {
+		return status.ExitStatus, nil
 	}
 	for {
 		evt, err := eventstream.Recv()
@@ -146,7 +150,10 @@ func (p *process) Status(ctx context.Context) (Status, error) {
 		ExecID:      p.id,
 	})
 	if err != nil {
-		return "", errdefs.FromGRPC(err)
+		return Status{}, errdefs.FromGRPC(err)
 	}
-	return Status(strings.ToLower(r.Process.Status.String())), nil
+	return Status{
+		Status:     ProcessStatus(strings.ToLower(r.Process.Status.String())),
+		ExitStatus: r.Process.ExitStatus,
+	}, nil
 }

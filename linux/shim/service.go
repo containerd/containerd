@@ -247,17 +247,20 @@ func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.
 		status = task.StatusStopped
 	case "paused":
 		status = task.StatusPaused
+	case "pausing":
+		status = task.StatusPausing
 	}
 	sio := p.Stdio()
 	return &shimapi.StateResponse{
-		ID:       p.ID(),
-		Bundle:   s.bundle,
-		Pid:      uint32(p.Pid()),
-		Status:   status,
-		Stdin:    sio.stdin,
-		Stdout:   sio.stdout,
-		Stderr:   sio.stderr,
-		Terminal: sio.terminal,
+		ID:         p.ID(),
+		Bundle:     s.bundle,
+		Pid:        uint32(p.Pid()),
+		Status:     status,
+		Stdin:      sio.stdin,
+		Stdout:     sio.stdout,
+		Stderr:     sio.stderr,
+		Terminal:   sio.terminal,
+		ExitStatus: uint32(p.ExitStatus()),
 	}, nil
 }
 

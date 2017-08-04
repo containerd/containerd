@@ -1028,13 +1028,13 @@ func TestWaitStoppedTask(t *testing.T) {
 	}
 	// wait for the task to stop then call wait again
 	<-statusC
-	_, err = task.Wait(ctx)
-	if err == nil {
-		t.Error("Wait after task exits should return an error")
+	status, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
 		return
 	}
-	if !errdefs.IsUnavailable(err) {
-		t.Errorf("Wait should return %q when task Stopped: %v", errdefs.ErrUnavailable, err)
+	if status != 7 {
+		t.Errorf("exit status from stopped task should be 7 but received %d", status)
 	}
 }
 
@@ -1119,13 +1119,13 @@ func TestWaitStoppedProcess(t *testing.T) {
 	// wait for the exec to return
 	<-processStatusC
 	// try to wait on the process after it has stopped
-	_, err = process.Wait(ctx)
-	if err == nil {
-		t.Error("Wait after process exits should return an error")
+	status, err := process.Wait(ctx)
+	if err != nil {
+		t.Error(err)
 		return
 	}
-	if !errdefs.IsUnavailable(err) {
-		t.Errorf("Wait should return %q when process has exited: %v", errdefs.ErrUnavailable, err)
+	if status != 6 {
+		t.Errorf("exit status from stopped process should be 6 but received %d", status)
 	}
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
 		t.Error(err)

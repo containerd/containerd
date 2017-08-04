@@ -264,7 +264,7 @@ func TestCheckpointLeaveRunning(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if status != Running {
+	if status.Status != Running {
 		t.Errorf("expected status %q but received %q", Running, status)
 		return
 	}

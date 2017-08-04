@@ -108,6 +108,7 @@ message StateResponse {
 	string stdout = 6;
 	string stderr = 7;
 	bool terminal = 8;
+	uint32 exit_status = 9;
 }
 
 message KillRequest {

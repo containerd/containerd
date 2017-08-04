@@ -66,14 +66,17 @@ func (t *Task) State(ctx context.Context) (runtime.State, error) {
 		status = runtime.StoppedStatus
 	case task.StatusPaused:
 		status = runtime.PausedStatus
+	case task.StatusPausing:
+		status = runtime.PausingStatus
 	}
 	return runtime.State{
-		Pid:      response.Pid,
-		Status:   status,
-		Stdin:    response.Stdin,
-		Stdout:   response.Stdout,
-		Stderr:   response.Stderr,
-		Terminal: response.Terminal,
+		Pid:        response.Pid,
+		Status:     status,
+		Stdin:      response.Stdin,
+		Stdout:     response.Stdout,
+		Stderr:     response.Stderr,
+		Terminal:   response.Terminal,
+		ExitStatus: response.ExitStatus,
 	}, nil
 }
 

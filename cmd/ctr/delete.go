@@ -59,7 +59,7 @@ func deleteContainer(ctx context.Context, client *containerd.Client, id string, 
 	if err != nil {
 		return err
 	}
-	if status == containerd.Stopped || status == containerd.Created {
+	if status.Status == containerd.Stopped || status.Status == containerd.Created {
 		if _, err := task.Delete(ctx); err != nil {
 			return err
 		}

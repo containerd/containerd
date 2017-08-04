@@ -14,6 +14,7 @@ enum Status {
 	RUNNING = 2 [(gogoproto.enumvalue_customname) = "StatusRunning"];
 	STOPPED = 3 [(gogoproto.enumvalue_customname) = "StatusStopped"];
 	PAUSED = 4 [(gogoproto.enumvalue_customname) = "StatusPaused"];
+	PAUSING = 5 [(gogoproto.enumvalue_customname) = "StatusPausing"];
 }
 
 message Process {
@@ -25,4 +26,5 @@ message Process {
 	string stdout = 6;
 	string stderr = 7;
 	bool terminal = 8;
+	uint32 exit_status = 9;
 }

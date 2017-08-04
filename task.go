@@ -8,6 +8,7 @@ import (
 	"io"
 	goruntime "runtime"
 	"strings"
+	"sync"
 	"syscall"
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
@@ -28,14 +29,19 @@ import (
 
 const UnknownExitStatus = 255
 
-type Status string
+type Status struct {
+	Status     ProcessStatus
+	ExitStatus uint32
+}
+
+type ProcessStatus string
 
 const (
-	Running Status = "running"
-	Created Status = "created"
-	Stopped Status = "stopped"
-	Paused  Status = "paused"
-	Pausing Status = "pausing"
+	Running ProcessStatus = "running"
+	Created ProcessStatus = "created"
+	Stopped ProcessStatus = "stopped"
+	Paused  ProcessStatus = "paused"
+	Pausing ProcessStatus = "pausing"
 )
 
 type IOCloseInfo struct {
@@ -88,6 +94,7 @@ type task struct {
 	id  string
 	pid uint32
 
+	mu       sync.Mutex
 	deferred *tasks.CreateTaskRequest
 }
 
@@ -97,9 +104,14 @@ func (t *task) Pid() uint32 {
 }
 
 func (t *task) Start(ctx context.Context) error {
-	if t.deferred != nil {
-		response, err := t.client.TaskService().Create(ctx, t.deferred)
+	t.mu.Lock()
+	deferred := t.deferred
+	t.mu.Unlock()
+	if deferred != nil {
+		response, err := t.client.TaskService().Create(ctx, deferred)
+		t.mu.Lock()
 		t.deferred = nil
+		t.mu.Unlock()
 		if err != nil {
 			t.io.closer.Close()
 			return err
@@ -146,12 +158,14 @@ func (t *task) Status(ctx context.Context) (Status, error) {
 		ContainerID: t.id,
 	})
 	if err != nil {
-		return "", errdefs.FromGRPC(err)
+		return Status{}, errdefs.FromGRPC(err)
 	}
-	return Status(strings.ToLower(r.Process.Status.String())), nil
+	return Status{
+		Status:     ProcessStatus(strings.ToLower(r.Process.Status.String())),
+		ExitStatus: r.Process.ExitStatus,
+	}, nil
 }
 
-// Wait is a blocking call that will wait for the task to exit and return the exit status
 func (t *task) Wait(ctx context.Context) (uint32, error) {
 	eventstream, err := t.client.EventService().Subscribe(ctx, &eventsapi.SubscribeRequest{
 		Filters: []string{"topic==" + runtime.TaskExitEventTopic},
@@ -159,9 +173,18 @@ func (t *task) Wait(ctx context.Context) (uint32, error) {
 	if err != nil {
 		return UnknownExitStatus, errdefs.FromGRPC(err)
 	}
-	// first check if the task has exited
-	if status, _ := t.Status(ctx); status == Stopped {
-		return UnknownExitStatus, errdefs.ErrUnavailable
+	t.mu.Lock()
+	checkpoint := t.deferred != nil
+	t.mu.Unlock()
+	if !checkpoint {
+		// first check if the task has exited
+		status, err := t.Status(ctx)
+		if err != nil {
+			return UnknownExitStatus, errdefs.FromGRPC(err)
+		}
+		if status.Status == Stopped {
+			return status.ExitStatus, nil
+		}
 	}
 	for {
 		evt, err := eventstream.Recv()
