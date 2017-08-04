@@ -92,12 +92,12 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		}
 		opts = append(opts, containerd.WithImageConfig(ctx, image))
 		cOpts = append(cOpts, containerd.WithImage(image))
+		cOpts = append(cOpts, containerd.WithSnapshotter(context.String("snapshotter")))
 		if context.Bool("readonly") {
 			cOpts = append(cOpts, containerd.WithNewSnapshotView(id, image))
 		} else {
 			cOpts = append(cOpts, containerd.WithNewSnapshot(id, image))
 		}
-		cOpts = append(cOpts, containerd.WithSnapshotter(context.String("snapshotter")))
 	}
 
 	opts = append(opts, withEnv(context), withMounts(context))
