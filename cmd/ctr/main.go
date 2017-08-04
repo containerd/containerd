@@ -81,6 +81,7 @@ containerd CLI
 		rootfsCommand,
 		runCommand,
 		snapshotCommand,
+		startCommand,
 		taskListCommand,
 		versionCommand,
 	}, extraCmds...)
