@@ -18,17 +18,12 @@ package server
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
 
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/events/v1"
-	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/typeurl"
-	prototypes "github.com/gogo/protobuf/types"
 	"github.com/golang/glog"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
@@ -48,92 +43,68 @@ func (c *criContainerdService) ExecSync(ctx context.Context, r *runtime.ExecSync
 	// Get container from our container store.
 	cntr, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
-		return nil, fmt.Errorf("an error occurred when try to find container %q: %v", r.GetContainerId(), err)
+		return nil, fmt.Errorf("failed to find container in store: %v", err)
 	}
 	id := cntr.ID
 
 	state := cntr.Status.Get().State()
 	if state != runtime.ContainerState_CONTAINER_RUNNING {
-		return nil, fmt.Errorf("container %q is in %s state", id, criContainerStateToString(state))
+		return nil, fmt.Errorf("container is in %s state", criContainerStateToString(state))
 	}
 
-	// Get exec process spec.
-	container, err := c.containerService.Get(ctx, id)
+	// TODO(random-liu): Store container client in container store.
+	container, err := c.client.LoadContainer(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get container %q from containerd: %v", id, err)
+		return nil, fmt.Errorf("failed to load container: %v", err)
 	}
-	var spec runtimespec.Spec
-	if err := json.Unmarshal(container.Spec.Value, &spec); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal container spec: %v", err)
+	spec, err := container.Spec()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container spec: %v", err)
 	}
+	task, err := container.Task(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load task: %v", err)
+	}
+
 	pspec := spec.Process
 	pspec.Args = r.GetCmd()
-	rawSpec, err := json.Marshal(pspec)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal oci process spec %+v: %v", pspec, err)
-	}
 
-	// TODO(random-liu): Replace the following logic with containerd client and add unit test.
-	// Prepare streaming pipes.
-	execDir, err := ioutil.TempDir(getContainerRootDir(c.rootDir, id), "exec")
+	execID := generateID()
+	stdinBuf, stdoutBuf, stderrBuf := new(bytes.Buffer), new(bytes.Buffer), new(bytes.Buffer)
+	io := containerd.NewIOWithTerminal(stdinBuf, stdoutBuf, stderrBuf, pspec.Terminal)
+	process, err := task.Exec(ctx, execID, pspec, io)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create exec streaming directory: %v", err)
+		return nil, fmt.Errorf("failed to create exec %q: %v", execID, err)
 	}
 	defer func() {
-		if err = c.os.RemoveAll(execDir); err != nil {
-			glog.Errorf("Failed to remove exec streaming directory %q: %v", execDir, err)
+		if _, err := process.Delete(ctx); err != nil {
+			glog.Errorf("Failed to delete exec process %q for container %q: %v", execID, id, err)
 		}
 	}()
-	_, stdout, stderr := getStreamingPipes(execDir)
-	_, stdoutPipe, stderrPipe, err := c.prepareStreamingPipes(ctx, "", stdout, stderr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare streaming pipes: %v", err)
-	}
-	defer stdoutPipe.Close()
-	defer stderrPipe.Close()
-
-	// Start redirecting exec output.
-	stdoutBuf, stderrBuf := new(bytes.Buffer), new(bytes.Buffer)
-	go io.Copy(stdoutBuf, stdoutPipe) // nolint: errcheck
-	go io.Copy(stderrBuf, stderrPipe) // nolint: errcheck
 
 	// Get containerd event client first, so that we won't miss any events.
 	// TODO(random-liu): Add filter to only subscribe events of the exec process.
+	// TODO(random-liu): Use `Wait` after is fixed. (containerd#1279, containerd#1287)
 	cancellable, cancel := context.WithCancel(ctx)
 	eventstream, err := c.eventService.Subscribe(cancellable, &events.SubscribeRequest{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get containerd event: %v", err)
+		return nil, fmt.Errorf("failed to subscribe event stream: %v", err)
 	}
 	defer cancel()
 
-	execID := generateID()
-	_, err = c.taskService.Exec(ctx, &tasks.ExecProcessRequest{
-		ContainerID: id,
-		Terminal:    false,
-		Stdout:      stdout,
-		Stderr:      stderr,
-		Spec: &prototypes.Any{
-			TypeUrl: runtimespec.Version,
-			Value:   rawSpec,
-		},
-		ExecID: execID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to exec in container %q: %v", id, err)
+	if err := process.Start(ctx); err != nil {
+		return nil, fmt.Errorf("failed to start exec %q: %v", execID, err)
 	}
+
 	exitCode, err := c.waitContainerExec(eventstream, id, execID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to wait for exec in container %q to finish: %v", id, err)
 	}
-	if _, err := c.taskService.DeleteProcess(ctx, &tasks.DeleteProcessRequest{
-		ContainerID: id,
-		ExecID:      execID,
-	}); err != nil && !isContainerdGRPCNotFoundError(err) {
-		return nil, fmt.Errorf("failed to delete exec %q in container %q: %v", execID, id, err)
-	}
 	// TODO(random-liu): [P1] Deal with timeout, kill and wait again on timeout.
 
-	// TODO(random-liu): Make sure stdout/stderr are drained.
+	// Wait for the io to be drained.
+	process.IO().Wait()
+
 	return &runtime.ExecSyncResponse{
 		Stdout:   stdoutBuf.Bytes(),
 		Stderr:   stderrBuf.Bytes(),
