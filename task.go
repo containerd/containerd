@@ -16,7 +16,6 @@ import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/linux/runcopts"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/runtime"
@@ -466,12 +465,4 @@ func writeContent(ctx context.Context, store content.Store, mediaType, ref strin
 		Digest:    writer.Digest(),
 		Size:      size,
 	}, nil
-}
-
-// WithExit causes the task to exit after a successful checkpoint
-func WithExit(r *CheckpointTaskInfo) error {
-	r.Options = &runcopts.CheckpointOptions{
-		Exit: true,
-	}
-	return nil
 }
