@@ -59,11 +59,16 @@ func NewIO(stdin io.Reader, stdout, stderr io.Writer) IOCreation {
 
 // NewIOWithTerminal creates a new io set with the provied io.Reader/Writers for use with a terminal
 func NewIOWithTerminal(stdin io.Reader, stdout, stderr io.Writer, terminal bool) IOCreation {
-	return func(id string) (*IO, error) {
+	return func(id string) (_ *IO, err error) {
 		paths, err := NewFifos(id)
 		if err != nil {
 			return nil, err
 		}
+		defer func() {
+			if err != nil && paths.Dir != "" {
+				os.RemoveAll(paths.Dir)
+			}
+		}()
 		i := &IO{
 			Terminal: terminal,
 			Stdout:   paths.Out,
