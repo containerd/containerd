@@ -314,7 +314,7 @@ func (cw *changeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 			ChangeTime: cw.whiteoutT,
 		}
 		if err := cw.tw.WriteHeader(hdr); err != nil {
-			errors.Wrap(err, "failed to write whiteout header")
+			return errors.Wrap(err, "failed to write whiteout header")
 		}
 	} else {
 		var (
