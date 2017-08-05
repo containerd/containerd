@@ -52,8 +52,6 @@ const (
 	errorExitReason = "Error"
 	// oomExitReason is the exit reason when process in container is oom killed.
 	oomExitReason = "OOMKilled"
-	// unknownExitCode is the exit code when exit reason is unknown.
-	unknownExitCode = 255
 )
 
 const (
