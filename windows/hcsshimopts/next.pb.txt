@@ -1,0 +1,56 @@
+file {
+  name: "google/protobuf/duration.proto"
+  package: "google.protobuf"
+  message_type {
+    name: "Duration"
+    field {
+      name: "seconds"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_INT64
+      json_name: "seconds"
+    }
+    field {
+      name: "nanos"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_INT32
+      json_name: "nanos"
+    }
+  }
+  options {
+    java_package: "com.google.protobuf"
+    java_outer_classname: "DurationProto"
+    java_multiple_files: true
+    go_package: "github.com/golang/protobuf/ptypes/duration"
+    cc_enable_arenas: true
+    objc_class_prefix: "GPB"
+    csharp_namespace: "Google.Protobuf.WellKnownTypes"
+  }
+  syntax: "proto3"
+}
+file {
+  name: "github.com/containerd/containerd/windows/hcsshimopts/hcsshim.proto"
+  package: "containerd.windows.hcsshim"
+  dependency: "gogoproto/gogo.proto"
+  dependency: "google/protobuf/duration.proto"
+  message_type {
+    name: "CreateOptions"
+    field {
+      name: "terminate_duration"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Duration"
+      options {
+        65011: 1
+        65001: 0
+      }
+      json_name: "terminateDuration"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/windows/hcsshimopts;hcsshimopts"
+  }
+  syntax: "proto3"
+}
