@@ -17,10 +17,74 @@ limitations under the License.
 package server
 
 import (
+	"errors"
+	"fmt"
+	"io"
+	"net"
+
+	"golang.org/x/net/context"
+	k8snet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/remotecommand"
-	_ "k8s.io/kubernetes/pkg/kubelet/server/streaming"
+	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
+	// TODO(random-liu): k8s.io/utils/exec after bump up kubernetes version.
+	"k8s.io/kubernetes/pkg/util/exec"
 )
+
+func newStreamServer(c *criContainerdService, addr, port string) (streaming.Server, error) {
+	if addr == "" {
+		a, err := k8snet.ChooseBindAddress(nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get stream server address: %v", err)
+		}
+		addr = a.String()
+	}
+	config := streaming.DefaultConfig
+	config.Addr = net.JoinHostPort(addr, port)
+	runtime := newStreamRuntime(c)
+	return streaming.NewServer(config, runtime)
+}
+
+type streamRuntime struct {
+	c *criContainerdService
+}
+
+func newStreamRuntime(c *criContainerdService) streaming.Runtime {
+	return &streamRuntime{c: c}
+}
+
+// Exec executes a command inside the container. exec.ExitError is returned if the command
+// returns non-zero exit code.
+func (s *streamRuntime) Exec(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser,
+	tty bool, resize <-chan remotecommand.TerminalSize) error {
+	exitCode, err := s.c.execInContainer(context.Background(), containerID, execOptions{
+		cmd:    cmd,
+		stdin:  stdin,
+		stdout: stdout,
+		stderr: stderr,
+		tty:    tty,
+		resize: resize,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to exec in container: %v", err)
+	}
+	if *exitCode == 0 {
+		return nil
+	}
+	return &exec.CodeExitError{
+		Err:  fmt.Errorf("error executing command %v, exit code %d", cmd, *exitCode),
+		Code: int(*exitCode),
+	}
+}
+
+func (s *streamRuntime) Attach(containerID string, in io.Reader, out, err io.WriteCloser, tty bool,
+	resize <-chan remotecommand.TerminalSize) error {
+	return errors.New("not implemented")
+}
+
+func (s *streamRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
+	return errors.New("not implemented")
+}
 
 // handleResizing spawns a goroutine that processes the resize channel, calling resizeFunc for each
 // remotecommand.TerminalSize received from the channel. The resize channel must be closed elsewhere to stop the

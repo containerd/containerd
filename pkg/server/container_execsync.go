@@ -43,10 +43,9 @@ func (c *criContainerdService) ExecSync(ctx context.Context, r *runtime.ExecSync
 		}
 	}()
 
-	var stdin, stdout, stderr bytes.Buffer
+	var stdout, stderr bytes.Buffer
 	exitCode, err := c.execInContainer(ctx, r.GetContainerId(), execOptions{
 		cmd:     r.GetCmd(),
-		stdin:   &stdin,
 		stdout:  &stdout,
 		stderr:  &stderr,
 		timeout: time.Duration(r.GetTimeout()) * time.Second,
@@ -106,6 +105,10 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 	pspec.Args = opts.cmd
 	pspec.Terminal = opts.tty
 
+	if opts.stdin == nil {
+		// Create empty buffer if stdin is nil.
+		opts.stdin = new(bytes.Buffer)
+	}
 	execID := generateID()
 	process, err := task.Exec(ctx, execID, pspec, containerd.NewIOWithTerminal(
 		opts.stdin,

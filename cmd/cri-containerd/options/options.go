@@ -40,6 +40,10 @@ type CRIContainerdOptions struct {
 	NetworkPluginBinDir string
 	// NetworkPluginConfDir is the directory in which the admin places a CNI conf.
 	NetworkPluginConfDir string
+	// StreamServerAddress is the ip address streaming server is listening on.
+	StreamServerAddress string
+	// StreamServerPort is the port streaming server is listening on.
+	StreamServerPort string
 }
 
 // NewCRIContainerdOptions returns a reference to CRIContainerdOptions
@@ -63,6 +67,10 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		"/etc/cni/net.d", "The directory for putting network binaries.")
 	fs.StringVar(&c.NetworkPluginConfDir, "network-conf-dir",
 		"/opt/cni/bin", "The directory for putting network plugin configuration files.")
+	fs.StringVar(&c.StreamServerAddress, "stream-addr",
+		"", "The ip address streaming server is listening on. Default host interface is used if this is empty.")
+	fs.StringVar(&c.StreamServerPort, "stream-port",
+		"10010", "The port streaming server is listening on.")
 }
 
 // InitFlags must be called after adding all cli options flags are defined and
