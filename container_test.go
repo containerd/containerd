@@ -1132,3 +1132,133 @@ func TestWaitStoppedProcess(t *testing.T) {
 	}
 	<-finished
 }
+
+func TestTaskForceDelete(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("sleep", "30"))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, Stdio)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+	if _, err := task.Delete(ctx); err == nil {
+		t.Error("task.Delete of a running task should create an error")
+	}
+	if _, err := task.Delete(ctx, WithProcessKill); err != nil {
+		t.Error(err)
+		return
+	}
+}
+
+func TestProcessForceDelete(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("sleep", "30"))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, Stdio)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	statusC := make(chan uint32, 1)
+	go func() {
+		status, err := task.Wait(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+		statusC <- status
+	}()
+
+	// task must be started on windows
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+	processSpec := spec.Process
+	withExecArgs(processSpec, "sleep", "20")
+	execID := t.Name() + "_exec"
+	process, err := task.Exec(ctx, execID, processSpec, empty())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	if err := process.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+	if _, err := process.Delete(ctx); err == nil {
+		t.Error("process.Delete should return an error when process is running")
+	}
+	if _, err := process.Delete(ctx, WithProcessKill); err != nil {
+		t.Error(err)
+	}
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Error(err)
+		return
+	}
+	<-statusC
+}

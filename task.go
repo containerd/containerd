@@ -54,6 +54,8 @@ const (
 	// Pausing indicates that the process is currently switching from a
 	// running state into a paused state
 	Pausing ProcessStatus = "pausing"
+	// Unknown indicates that we could not determine the status from the runtime
+	Unknown ProcessStatus = "unknown"
 )
 
 // IOCloseInfo allows specific io pipes to be closed on a process
@@ -236,7 +238,21 @@ func (t *task) Wait(ctx context.Context) (uint32, error) {
 // Delete deletes the task and its runtime state
 // it returns the exit status of the task and any errors that were encountered
 // during cleanup
-func (t *task) Delete(ctx context.Context) (uint32, error) {
+func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (uint32, error) {
+	for _, o := range opts {
+		if err := o(ctx, t); err != nil {
+			return UnknownExitStatus, err
+		}
+	}
+	status, err := t.Status(ctx)
+	if err != nil && errdefs.IsNotFound(err) {
+		return UnknownExitStatus, err
+	}
+	switch status.Status {
+	case Stopped, Unknown, "":
+	default:
+		return UnknownExitStatus, errors.Wrapf(errdefs.ErrFailedPrecondition, "task must be stopped before deletion: %s", status.Status)
+	}
 	if t.io != nil {
 		t.io.Cancel()
 		t.io.Wait()
