@@ -39,6 +39,8 @@ type initProcess struct {
 	// the reaper interface.
 	mu sync.Mutex
 
+	workDir string
+
 	id       string
 	bundle   string
 	console  console.Console
@@ -54,7 +56,7 @@ type initProcess struct {
 	rootfs   string
 }
 
-func newInitProcess(context context.Context, plat platform, path, namespace string, r *shimapi.CreateTaskRequest) (*initProcess, error) {
+func newInitProcess(context context.Context, plat platform, path, namespace, workDir string, r *shimapi.CreateTaskRequest) (*initProcess, error) {
 	var success bool
 
 	if err := identifiers.Validate(r.ID); err != nil {
@@ -109,7 +111,8 @@ func newInitProcess(context context.Context, plat platform, path, namespace stri
 			stderr:   r.Stderr,
 			terminal: r.Terminal,
 		},
-		rootfs: rootfs,
+		rootfs:  rootfs,
+		workDir: workDir,
 	}
 	var (
 		err    error
@@ -132,7 +135,7 @@ func newInitProcess(context context.Context, plat platform, path, namespace stri
 		opts := &runc.RestoreOpts{
 			CheckpointOpts: runc.CheckpointOpts{
 				ImagePath:  r.Checkpoint,
-				WorkDir:    filepath.Join(r.Bundle, "work"),
+				WorkDir:    p.workDir,
 				ParentPath: r.ParentCheckpoint,
 			},
 			PidFile:     pidFile,
@@ -310,10 +313,10 @@ func (p *initProcess) Checkpoint(context context.Context, r *shimapi.CheckpointT
 	if !options.Exit {
 		actions = append(actions, runc.LeaveRunning)
 	}
-	work := filepath.Join(p.bundle, "work")
+	work := filepath.Join(p.workDir, "criu-work")
 	defer os.RemoveAll(work)
 	if err := p.runtime.Checkpoint(context, p.id, &runc.CheckpointOpts{
-		WorkDir:                  work,
+		WorkDir:                  p.workDir,
 		ImagePath:                r.Path,
 		AllowOpenTCP:             options.OpenTcp,
 		AllowExternalUnixSockets: options.ExternalUnixSockets,

@@ -25,7 +25,7 @@ func loadBundle(path, namespace string, events *events.Exchange) *bundle {
 }
 
 // newBundle creates a new bundle on disk at the provided path for the given id
-func newBundle(path, namespace, id string, spec []byte, events *events.Exchange) (b *bundle, err error) {
+func newBundle(path, namespace, workDir, id string, spec []byte, events *events.Exchange) (b *bundle, err error) {
 	if err := os.MkdirAll(path, 0711); err != nil {
 		return nil, err
 	}
@@ -35,6 +35,16 @@ func newBundle(path, namespace, id string, spec []byte, events *events.Exchange)
 			os.RemoveAll(path)
 		}
 	}()
+	workDir = filepath.Join(workDir, id)
+	if err := os.MkdirAll(workDir, 0711); err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			os.RemoveAll(workDir)
+		}
+	}()
+
 	if err := os.Mkdir(path, 0711); err != nil {
 		return nil, err
 	}
@@ -50,6 +60,7 @@ func newBundle(path, namespace, id string, spec []byte, events *events.Exchange)
 	return &bundle{
 		id:        id,
 		path:      path,
+		workDir:   workDir,
 		namespace: namespace,
 		events:    events,
 	}, err
@@ -58,6 +69,7 @@ func newBundle(path, namespace, id string, spec []byte, events *events.Exchange)
 type bundle struct {
 	id        string
 	path      string
+	workDir   string
 	namespace string
 	events    *events.Exchange
 }
@@ -81,6 +93,7 @@ func (b *bundle) NewShim(ctx context.Context, binary, grpcAddress string, remote
 		Path:       b.path,
 		Namespace:  b.namespace,
 		CgroupPath: options.ShimCgroup,
+		WorkDir:    b.workDir,
 	}, opt)
 }
 

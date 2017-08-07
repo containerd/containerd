@@ -11,6 +11,8 @@ import (
 type Config struct {
 	// Root is the path to a directory where containerd will store persistent data
 	Root string `toml:"root"`
+	// State is the path to a directory where containerd will store transient data
+	State string `toml:"state"`
 	// GRPC configuration settings
 	GRPC GRPCConfig `toml:"grpc"`
 	// Debug and profiling settings

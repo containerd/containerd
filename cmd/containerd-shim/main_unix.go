@@ -58,6 +58,10 @@ func main() {
 			Name:  "address,a",
 			Usage: "grpc address back to containerd",
 		},
+		cli.StringFlag{
+			Name:  "workdir,w",
+			Usage: "path used to store large temporary data",
+		},
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
@@ -84,6 +88,7 @@ func main() {
 		sv, err := shim.NewService(
 			path,
 			context.GlobalString("namespace"),
+			context.GlobalString("workdir"),
 			&remoteEventsPublisher{client: e},
 		)
 		if err != nil {

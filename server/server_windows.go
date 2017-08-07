@@ -2,7 +2,20 @@
 
 package server
 
-import "context"
+import (
+	"context"
+	"os"
+	"path/filepath"
+)
+
+var (
+	// DefaultRootDir is the default location used by containerd to store
+	// persistent data
+	DefaultRootDir = filepath.Join(os.Getenv("programfiles"), "containerd", "root")
+	// DefaultStateDir is the default location used by containerd to store
+	// transient data
+	DefaultStateDir = filepath.Join(os.Getenv("programfiles"), "containerd", "state")
+)
 
 const (
 	// DefaultAddress is the default winpipe address
