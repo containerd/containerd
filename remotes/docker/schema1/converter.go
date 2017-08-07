@@ -217,6 +217,9 @@ func (c *Converter) fetchBlob(ctx context.Context, desc ocispec.Descriptor) erro
 		defer r.Close()
 
 		gr, err := gzip.NewReader(r)
+		if err != nil {
+			return err
+		}
 		defer gr.Close()
 
 		_, err = io.Copy(calc, gr)
@@ -237,6 +240,9 @@ func (c *Converter) fetchBlob(ctx context.Context, desc ocispec.Descriptor) erro
 
 		eg.Go(func() error {
 			gr, err := gzip.NewReader(pr)
+			if err != nil {
+				return err
+			}
 			defer gr.Close()
 
 			_, err = io.Copy(calc, gr)

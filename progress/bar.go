@@ -58,7 +58,7 @@ func (h Bar) Format(state fmt.State, r rune) {
 	n += copy(p[n:], []byte(reset))
 
 	if negative > 0 {
-		n += copy(p[n:len(p)-1], bytes.Repeat([]byte("-"), negative))
+		copy(p[n:len(p)-1], bytes.Repeat([]byte("-"), negative))
 	}
 
 	state.Write(p)
