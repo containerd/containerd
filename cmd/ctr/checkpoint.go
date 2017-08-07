@@ -8,7 +8,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-var checkpointCommand = cli.Command{
+var taskCheckpointCommand = cli.Command{
 	Name:      "checkpoint",
 	Usage:     "checkpoint a container",
 	ArgsUsage: "CONTAINER",

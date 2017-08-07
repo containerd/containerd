@@ -8,7 +8,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-var startCommand = cli.Command{
+var taskStartCommand = cli.Command{
 	Name:      "start",
 	Usage:     "start a container that have been created",
 	ArgsUsage: "CONTAINER",

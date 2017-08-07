@@ -5,7 +5,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-var killCommand = cli.Command{
+var taskKillCommand = cli.Command{
 	Name:      "kill",
 	Usage:     "signal a container (default: SIGTERM)",
 	ArgsUsage: "CONTAINER",
