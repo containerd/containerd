@@ -65,30 +65,21 @@ containerd CLI
 	}
 	app.Commands = append([]cli.Command{
 		applyCommand,
-		attachCommand,
-		checkpointCommand,
 		containersCommand,
 		contentCommand,
 		eventsCommand,
-		execCommand,
 		fetchCommand,
 		fetchObjectCommand,
 		imageCommand,
-		infoCommand,
-		killCommand,
 		namespacesCommand,
-		pauseCommand,
 		pprofCommand,
-		psCommand,
 		pullCommand,
 		pushCommand,
 		pushObjectCommand,
-		resumeCommand,
 		rootfsCommand,
 		runCommand,
 		snapshotCommand,
-		startCommand,
-		taskListCommand,
+		tasksCommand,
 		versionCommand,
 	}, extraCmds...)
 	app.Before = func(context *cli.Context) error {
@@ -101,15 +92,4 @@ containerd CLI
 		fmt.Fprintf(os.Stderr, "ctr: %s\n", err)
 		os.Exit(1)
 	}
-}
-
-var containersCommand = cli.Command{
-	Name:    "containers",
-	Usage:   "manage containers (metadata)",
-	Aliases: []string{"c"},
-	Subcommands: []cli.Command{
-		containersListCommand,
-		containersDeleteCommand,
-		containersSetLabelsCommand,
-	},
 }

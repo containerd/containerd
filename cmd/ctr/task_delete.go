@@ -2,14 +2,13 @@ package main
 
 import "github.com/urfave/cli"
 
-var taskPauseCommand = cli.Command{
-	Name:      "pause",
-	Usage:     "pause an existing container",
+var taskDeleteCommand = cli.Command{
+	Name:      "delete",
+	Usage:     "delete a task",
 	ArgsUsage: "CONTAINER",
 	Action: func(context *cli.Context) error {
 		ctx, cancel := appContext(context)
 		defer cancel()
-
 		client, err := newClient(context)
 		if err != nil {
 			return err
@@ -22,6 +21,13 @@ var taskPauseCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		return task.Pause(ctx)
+		status, err := task.Delete(ctx)
+		if err != nil {
+			return err
+		}
+		if status != 0 {
+			return cli.NewExitError("", int(status))
+		}
+		return nil
 	},
 }

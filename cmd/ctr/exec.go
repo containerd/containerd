@@ -9,7 +9,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-var execCommand = cli.Command{
+var taskExecCommand = cli.Command{
 	Name:      "exec",
 	Usage:     "execute additional processes in an existing container",
 	ArgsUsage: "CONTAINER CMD [ARG...]",

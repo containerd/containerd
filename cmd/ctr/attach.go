@@ -9,7 +9,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-var attachCommand = cli.Command{
+var taskAttachCommand = cli.Command{
 	Name:      "attach",
 	Usage:     "attach to the IO of a running container",
 	ArgsUsage: "CONTAINER",

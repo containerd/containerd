@@ -9,7 +9,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-var infoCommand = cli.Command{
+var containerInfoCommand = cli.Command{
 	Name:      "info",
 	Usage:     "get info about a container",
 	ArgsUsage: "CONTAINER",

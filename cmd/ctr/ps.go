@@ -9,7 +9,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-var psCommand = cli.Command{
+var taskPsCommand = cli.Command{
 	Name:      "ps",
 	Usage:     "list processes for container",
 	ArgsUsage: "CONTAINER",

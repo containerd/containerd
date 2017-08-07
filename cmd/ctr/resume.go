@@ -2,7 +2,7 @@ package main
 
 import "github.com/urfave/cli"
 
-var resumeCommand = cli.Command{
+var taskResumeCommand = cli.Command{
 	Name:      "resume",
 	Usage:     "resume a paused container",
 	ArgsUsage: "CONTAINER",
