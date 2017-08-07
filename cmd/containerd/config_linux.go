@@ -11,6 +11,7 @@ func defaultConfig() *server.Config {
 		GRPC: server.GRPCConfig{
 			Address: server.DefaultAddress,
 		},
+		Subreaper: true,
 		Debug: server.Debug{
 			Level:   "info",
 			Address: server.DefaultDebugAddress,
