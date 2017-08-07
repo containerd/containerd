@@ -1,10 +1,9 @@
-// +build darwin freebsd linux
+// +build darwin freebsd linux solaris
 
 package console
 
 import (
 	"os"
-	"unsafe"
 
 	"golang.org/x/sys/unix"
 )
@@ -50,11 +49,7 @@ func (m *master) Close() error {
 }
 
 func (m *master) Resize(ws WinSize) error {
-	return ioctl(
-		m.f.Fd(),
-		uintptr(unix.TIOCSWINSZ),
-		uintptr(unsafe.Pointer(&ws)),
-	)
+	return tcswinsz(m.f.Fd(), ws)
 }
 
 func (m *master) ResizeFrom(c Console) error {
@@ -103,15 +98,7 @@ func (m *master) DisableEcho() error {
 }
 
 func (m *master) Size() (WinSize, error) {
-	var ws WinSize
-	if err := ioctl(
-		m.f.Fd(),
-		uintptr(unix.TIOCGWINSZ),
-		uintptr(unsafe.Pointer(&ws)),
-	); err != nil {
-		return ws, err
-	}
-	return ws, nil
+	return tcgwinsz(m.f.Fd())
 }
 
 func (m *master) Fd() uintptr {

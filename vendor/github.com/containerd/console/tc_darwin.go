@@ -16,6 +16,26 @@ func tcset(fd uintptr, p *unix.Termios) error {
 	return ioctl(fd, unix.TIOCSETA, uintptr(unsafe.Pointer(p)))
 }
 
+func tcgwinsz(fd uintptr) (WinSize, error) {
+	var ws WinSize
+	if err := ioctl(
+		fd,
+		uintptr(unix.TIOCGWINSZ),
+		uintptr(unsafe.Pointer(&ws)),
+	); err != nil {
+		return ws, err
+	}
+	return ws, nil
+}
+
+func tcswinsz(fd uintptr, ws WinSize) error {
+	return ioctl(
+		fd,
+		uintptr(unix.TIOCSWINSZ),
+		uintptr(unsafe.Pointer(&ws)),
+	)
+}
+
 func ioctl(fd, flag, data uintptr) error {
 	if _, _, err := unix.Syscall(unix.SYS_IOCTL, fd, flag, data); err != 0 {
 		return err

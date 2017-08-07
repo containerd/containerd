@@ -10,8 +10,10 @@ REVISION=$(shell git rev-parse HEAD)$(shell if ! git diff --no-ext-diff --quiet 
 
 ifneq "$(strip $(shell command -v go 2>/dev/null))" ""
 	GOOS ?= $(shell go env GOOS)
+	GOARCH ?= $(shell go env GOARCH)
 else
 	GOOS ?= $$GOOS
+	GOARCH ?= $$GOARCH
 endif
 
 WHALE = "🇩"
@@ -22,16 +24,28 @@ ifeq ("$(OS)", "Windows_NT")
 	ONI="-"
 	FIX_PATH = $(subst /,\,$1)
 endif
-GOARCH ?= $(shell go env GOARCH)
 
 RELEASE=containerd-$(VERSION:v%=%).${GOOS}-${GOARCH}
 
 PKG=github.com/containerd/containerd
 
+# on SunOS default to gnu utilities for things like grep, sed, etc.
+ifeq ($(shell uname -s),SunOS)
+	export PATH := /usr/gnu/bin:$(PATH)
+endif
+
 # Project packages.
 PACKAGES=$(shell go list ./... | grep -v /vendor/)
 INTEGRATION_PACKAGE=${PKG}
-TEST_REQUIRES_ROOT_PACKAGES=$(shell for f in $$(git grep -l testutil.RequiresRoot | grep -v Makefile);do echo "${PKG}/$$(dirname $$f)"; done)
+TEST_REQUIRES_ROOT_PACKAGES=$(filter \
+    ${PACKAGES}, \
+    $(shell \
+	for f in $$(git grep -l testutil.RequiresRoot | grep -v Makefile); do \
+		d="$$(dirname $$f)"; \
+		[ "$$d" = "." ] && echo "${PKG}" && continue; \
+		echo "${PKG}/$$d"; \
+	done | sort -u) \
+    )
 
 # Project binaries.
 COMMANDS=ctr containerd
@@ -46,8 +60,16 @@ endif
 GO_TAGS=$(if $(BUILDTAGS),-tags "$(BUILDTAGS)",)
 GO_LDFLAGS=-ldflags "-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG) $(EXTRA_LDFLAGS)"
 
+# go test -race is only supported on the patforms listed below.
+TESTFLAGS_RACE=
+ifeq ($(filter \
+    linux/amd64 freebsd/amd64 darwin/amd64 windows/amd64, \
+    $(GOOS)/$(GOARCH)),$(GOOS)/$(GOARCH))
+	TESTFLAGS_RACE= -race
+endif
+
 # Flags passed to `go test`
-TESTFLAGS ?=-parallel 8 -race -v
+TESTFLAGS ?=-parallel 8 -v $(TESTFLAGS_RACE)
 
 .PHONY: clean all AUTHORS fmt vet lint dco build binaries test integration setup generate protos checkprotos coverage ci check help install uninstall vendor release
 .DEFAULT: default

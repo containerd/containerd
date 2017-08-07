@@ -1,4 +1,4 @@
-// +build darwin freebsd
+// +build solaris darwin freebsd
 
 package fs
 
@@ -7,6 +7,7 @@ import (
 	"os"
 	"syscall"
 
+	"github.com/containerd/containerd/sys"
 	"github.com/containerd/continuity/sysx"
 	"github.com/pkg/errors"
 )
@@ -23,7 +24,8 @@ func copyFileInfo(fi os.FileInfo, name string) error {
 		}
 	}
 
-	if err := syscall.UtimesNano(name, []syscall.Timespec{st.Atimespec, st.Mtimespec}); err != nil {
+	timespec := []syscall.Timespec{sys.StatAtime(st), sys.StatMtime(st)}
+	if err := syscall.UtimesNano(name, timespec); err != nil {
 		return errors.Wrapf(err, "failed to utime %s", name)
 	}
 

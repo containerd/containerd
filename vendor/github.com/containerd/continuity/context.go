@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/containerd/continuity/devices"
+	driverpkg "github.com/containerd/continuity/driver"
+	"github.com/containerd/continuity/pathdriver"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -34,19 +37,21 @@ type Context interface {
 type SymlinkPath func(root, linkname, target string) (string, error)
 
 type ContextOptions struct {
-	Digester Digester
-	Driver   Driver
-	Provider ContentProvider
+	Digester   Digester
+	Driver     driverpkg.Driver
+	PathDriver pathdriver.PathDriver
+	Provider   ContentProvider
 }
 
 // context represents a file system context for accessing resources.
 // Generally, all path qualified access and system considerations should land
 // here.
 type context struct {
-	driver   Driver
-	root     string
-	digester Digester
-	provider ContentProvider
+	driver     driverpkg.Driver
+	pathDriver pathdriver.PathDriver
+	root       string
+	digester   Digester
+	provider   ContentProvider
 }
 
 // NewContext returns a Context associated with root. The default driver will
@@ -58,14 +63,20 @@ func NewContext(root string) (Context, error) {
 // NewContextWithOptions returns a Context associate with the root.
 func NewContextWithOptions(root string, options ContextOptions) (Context, error) {
 	// normalize to absolute path
-	root, err := filepath.Abs(filepath.Clean(root))
+	pathDriver := options.PathDriver
+	if pathDriver == nil {
+		pathDriver = pathdriver.LocalPathDriver
+	}
+
+	root = pathDriver.FromSlash(root)
+	root, err := pathDriver.Abs(pathDriver.Clean(root))
 	if err != nil {
 		return nil, err
 	}
 
 	driver := options.Driver
 	if driver == nil {
-		driver, err = NewSystemDriver()
+		driver, err = driverpkg.NewSystemDriver()
 		if err != nil {
 			return nil, err
 		}
@@ -90,10 +101,11 @@ func NewContextWithOptions(root string, options ContextOptions) (Context, error)
 	}
 
 	return &context{
-		root:     root,
-		driver:   driver,
-		digester: digester,
-		provider: options.Provider,
+		root:       root,
+		driver:     driver,
+		pathDriver: pathDriver,
+		digester:   digester,
+		provider:   options.Provider,
 	}, nil
 }
 
@@ -158,7 +170,7 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 	}
 
 	if fi.Mode()&os.ModeDevice != 0 {
-		deviceDriver, ok := c.driver.(DeviceInfoDriver)
+		deviceDriver, ok := c.driver.(driverpkg.DeviceInfoDriver)
 		if !ok {
 			log.Printf("device extraction not supported %s", fp)
 			return nil, ErrNotSupported
@@ -473,7 +485,7 @@ func (c *context) Apply(resource Resource) error {
 		} else if (fi.Mode() & os.ModeDevice) == 0 {
 			return fmt.Errorf("%q should be a device, but is not", resource.Path())
 		} else {
-			major, minor, err := deviceInfo(fi)
+			major, minor, err := devices.DeviceInfo(fi)
 			if err != nil {
 				return err
 			}
@@ -535,7 +547,7 @@ func (c *context) Apply(resource Resource) error {
 		// we only set xattres defined by resource but never remove.
 
 		if _, ok := resource.(SymLink); ok {
-			lxattrDriver, ok := c.driver.(LXAttrDriver)
+			lxattrDriver, ok := c.driver.(driverpkg.LXAttrDriver)
 			if !ok {
 				return fmt.Errorf("unsupported symlink xattr for resource %q", resource.Path())
 			}
@@ -543,7 +555,7 @@ func (c *context) Apply(resource Resource) error {
 				return err
 			}
 		} else {
-			xattrDriver, ok := c.driver.(XAttrDriver)
+			xattrDriver, ok := c.driver.(driverpkg.XAttrDriver)
 			if !ok {
 				return fmt.Errorf("unsupported xattr for resource %q", resource.Path())
 			}
@@ -560,7 +572,7 @@ func (c *context) Apply(resource Resource) error {
 // the context. Otherwise identical to filepath.Walk, the path argument is
 // corrected to be contained within the context.
 func (c *context) Walk(fn filepath.WalkFunc) error {
-	return filepath.Walk(c.root, func(p string, fi os.FileInfo, err error) error {
+	return c.pathDriver.Walk(c.root, func(p string, fi os.FileInfo, err error) error {
 		contained, err := c.contain(p)
 		return fn(contained, fi, err)
 	})
@@ -569,7 +581,7 @@ func (c *context) Walk(fn filepath.WalkFunc) error {
 // fullpath returns the system path for the resource, joined with the context
 // root. The path p must be a part of the context.
 func (c *context) fullpath(p string) (string, error) {
-	p = filepath.Join(c.root, p)
+	p = c.pathDriver.Join(c.root, p)
 	if !strings.HasPrefix(p, c.root) {
 		return "", fmt.Errorf("invalid context path")
 	}
@@ -580,19 +592,19 @@ func (c *context) fullpath(p string) (string, error) {
 // contain cleans and santizes the filesystem path p to be an absolute path,
 // effectively relative to the context root.
 func (c *context) contain(p string) (string, error) {
-	sanitized, err := filepath.Rel(c.root, p)
+	sanitized, err := c.pathDriver.Rel(c.root, p)
 	if err != nil {
 		return "", err
 	}
 
 	// ZOMBIES(stevvooe): In certain cases, we may want to remap these to a
 	// "containment error", so the caller can decide what to do.
-	return filepath.Join("/", filepath.Clean(sanitized)), nil
+	return c.pathDriver.Join("/", c.pathDriver.Clean(sanitized)), nil
 }
 
 // digest returns the digest of the file at path p, relative to the root.
 func (c *context) digest(p string) (digest.Digest, error) {
-	f, err := c.driver.Open(filepath.Join(c.root, p))
+	f, err := c.driver.Open(c.pathDriver.Join(c.root, p))
 	if err != nil {
 		return "", err
 	}
@@ -606,7 +618,7 @@ func (c *context) digest(p string) (digest.Digest, error) {
 // cannot have xattrs, nil will be returned.
 func (c *context) resolveXAttrs(fp string, fi os.FileInfo, base *resource) (map[string][]byte, error) {
 	if fi.Mode().IsRegular() || fi.Mode().IsDir() {
-		xattrDriver, ok := c.driver.(XAttrDriver)
+		xattrDriver, ok := c.driver.(driverpkg.XAttrDriver)
 		if !ok {
 			log.Println("xattr extraction not supported")
 			return nil, ErrNotSupported
@@ -616,7 +628,7 @@ func (c *context) resolveXAttrs(fp string, fi os.FileInfo, base *resource) (map[
 	}
 
 	if fi.Mode()&os.ModeSymlink != 0 {
-		lxattrDriver, ok := c.driver.(LXAttrDriver)
+		lxattrDriver, ok := c.driver.(driverpkg.LXAttrDriver)
 		if !ok {
 			log.Println("xattr extraction for symlinks not supported")
 			return nil, ErrNotSupported

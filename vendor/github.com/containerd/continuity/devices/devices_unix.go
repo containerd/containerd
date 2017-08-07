@@ -1,6 +1,6 @@
-// +build linux darwin freebsd
+// +build linux darwin freebsd solaris
 
-package continuity
+package devices
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"syscall"
 )
 
-func deviceInfo(fi os.FileInfo) (uint64, uint64, error) {
+func DeviceInfo(fi os.FileInfo) (uint64, uint64, error) {
 	sys, ok := fi.Sys().(*syscall.Stat_t)
 	if !ok {
 		return 0, 0, fmt.Errorf("cannot extract device from os.FileInfo")
@@ -18,7 +18,7 @@ func deviceInfo(fi os.FileInfo) (uint64, uint64, error) {
 }
 
 // mknod provides a shortcut for syscall.Mknod
-func mknod(p string, mode os.FileMode, maj, min int) error {
+func Mknod(p string, mode os.FileMode, maj, min int) error {
 	var (
 		m   = syscallMode(mode.Perm())
 		dev int
