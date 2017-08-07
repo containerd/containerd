@@ -341,6 +341,10 @@ func addOCIDevices(g *generate.Generator, devs []*runtime.Device, privileged boo
 				UID:   &hostDevice.Uid,
 				GID:   &hostDevice.Gid,
 			}
+			if hostDevice.Major == 0 && hostDevice.Minor == 0 {
+				// Invalid device, most likely a symbolic link, skip it.
+				continue
+			}
 			g.AddDevice(rd)
 		}
 		spec.Linux.Resources.Devices = []runtimespec.LinuxDeviceCgroup{
@@ -352,7 +356,11 @@ func addOCIDevices(g *generate.Generator, devs []*runtime.Device, privileged boo
 		return nil
 	}
 	for _, device := range devs {
-		dev, err := devices.DeviceFromPath(device.HostPath, device.Permissions)
+		path, err := resolveSymbolicLink(device.HostPath)
+		if err != nil {
+			return err
+		}
+		dev, err := devices.DeviceFromPath(path, device.Permissions)
 		if err != nil {
 			return err
 		}
