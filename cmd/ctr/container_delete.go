@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/containerd/containerd"
@@ -11,8 +12,8 @@ import (
 
 var containersDeleteCommand = cli.Command{
 	Name:      "delete",
-	Usage:     "delete an existing container",
-	ArgsUsage: "CONTAINER",
+	Usage:     "deletes one or more existing containers",
+	ArgsUsage: "CONTAINER [CONTAINER, ...]",
 	Aliases:   []string{"del", "rm"},
 	Flags: []cli.Flag{
 		cli.BoolFlag{
@@ -33,6 +34,9 @@ var containersDeleteCommand = cli.Command{
 			deleteOpts = append(deleteOpts, containerd.WithSnapshotCleanup)
 		}
 
+		if context.NArg() == 0 {
+			return errors.New("must specify at least one container to delete")
+		}
 		for _, arg := range context.Args() {
 			if err := deleteContainer(ctx, client, arg, deleteOpts...); err != nil {
 				if exitErr == nil {
