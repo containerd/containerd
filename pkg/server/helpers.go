@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -401,4 +402,17 @@ func (c *criContainerdService) ensureImageExists(ctx context.Context, ref string
 		return nil, fmt.Errorf("failed to get image %q metadata after pulling: %v", imageID, err)
 	}
 	return &newImage, nil
+}
+
+// resolveSymbolicLink resolves a possbile symlink path. If the path is a symlink, returns resolved
+// path; if not, returns the original path.
+func resolveSymbolicLink(path string) (string, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return "", err
+	}
+	if info.Mode()&os.ModeSymlink != os.ModeSymlink {
+		return path, nil
+	}
+	return filepath.EvalSymlinks(path)
 }
