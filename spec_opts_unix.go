@@ -6,11 +6,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/typeurl"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/opencontainers/image-spec/specs-go/v1"
@@ -260,6 +262,27 @@ func WithRemappedSnapshot(id string, i Image, uid, gid uint32) NewContainerOpts 
 		}
 		c.RootFS = id
 		c.Image = i.Name()
+		return nil
+	}
+}
+
+// WithCgroup sets the container's cgroup path
+func WithCgroup(path string) SpecOpts {
+	return func(s *specs.Spec) error {
+		s.Linux.CgroupsPath = path
+		return nil
+	}
+}
+
+// WithNamespacedCgroup uses the namespace set on the context to create a
+// root directory for containers in the cgroup with the id as the subcgroup
+func WithNamespacedCgroup(ctx context.Context, id string) SpecOpts {
+	return func(s *specs.Spec) error {
+		namespace, err := namespaces.NamespaceRequired(ctx)
+		if err != nil {
+			return err
+		}
+		s.Linux.CgroupsPath = filepath.Join("/", namespace, id)
 		return nil
 	}
 }

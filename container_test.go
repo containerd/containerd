@@ -1262,3 +1262,83 @@ func TestProcessForceDelete(t *testing.T) {
 	}
 	<-statusC
 }
+
+func TestContainerHostname(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+		expected    = "myhostname"
+	)
+	defer cancel()
+
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	spec, err := generateSpec(
+		withImageConfig(ctx, image),
+		withProcessArgs("hostname"),
+		WithHostname(expected),
+	)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	stdout := bytes.NewBuffer(nil)
+	task, err := container.NewTask(ctx, NewIO(bytes.NewBuffer(nil), stdout, bytes.NewBuffer(nil)))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	statusC := make(chan uint32, 1)
+	go func() {
+		status, err := task.Wait(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+		statusC <- status
+	}()
+
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+
+	status := <-statusC
+	if status != 0 {
+		t.Errorf("expected status 0 but received %d", status)
+	}
+	if _, err := task.Delete(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+	cutset := "\n"
+	if runtime.GOOS == "windows" {
+		cutset = "\r\n"
+	}
+
+	actual := strings.TrimSuffix(stdout.String(), cutset)
+	if actual != expected {
+		t.Errorf("expected output %q but received %q", expected, actual)
+	}
+}

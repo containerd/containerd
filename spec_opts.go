@@ -12,3 +12,11 @@ func WithProcessArgs(args ...string) SpecOpts {
 		return nil
 	}
 }
+
+// WithHostname sets the container's hostname
+func WithHostname(name string) SpecOpts {
+	return func(s *specs.Spec) error {
+		s.Hostname = name
+		return nil
+	}
+}
