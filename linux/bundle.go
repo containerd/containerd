@@ -14,13 +14,15 @@ import (
 	client "github.com/containerd/containerd/linux/shim"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/typeurl"
+	"github.com/pkg/errors"
 )
 
-func loadBundle(path, namespace string, events *events.Exchange) *bundle {
+func loadBundle(path, workdir, namespace string, events *events.Exchange) *bundle {
 	return &bundle{
 		path:      path,
 		namespace: namespace,
 		events:    events,
+		workDir:   workdir,
 	}
 }
 
@@ -112,7 +114,16 @@ func (b *bundle) Connect(ctx context.Context, remote bool) (*client.Client, erro
 
 // Delete deletes the bundle from disk
 func (b *bundle) Delete() error {
-	return os.RemoveAll(b.path)
+	err := os.RemoveAll(b.path)
+	if err == nil {
+		return os.RemoveAll(b.workDir)
+	}
+	// error removing the bundle path; still attempt removing work dir
+	err2 := os.RemoveAll(b.workDir)
+	if err2 == nil {
+		return err
+	}
+	return errors.Wrapf(err, "Failed to remove both bundle and workdir locations: %v", err2)
 }
 
 func (b *bundle) shimAddress() string {
