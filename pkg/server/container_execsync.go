@@ -19,12 +19,15 @@ package server
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/typeurl"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
+	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
@@ -40,12 +43,45 @@ func (c *criContainerdService) ExecSync(ctx context.Context, r *runtime.ExecSync
 		}
 	}()
 
+	var stdout, stderr bytes.Buffer
+	exitCode, err := c.execInContainer(ctx, r.GetContainerId(), execOptions{
+		cmd:     r.GetCmd(),
+		stdout:  &stdout,
+		stderr:  &stderr,
+		timeout: time.Duration(r.GetTimeout()) * time.Second,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to exec in container: %v", err)
+	}
+
+	return &runtime.ExecSyncResponse{
+		Stdout:   stdout.Bytes(),
+		Stderr:   stderr.Bytes(),
+		ExitCode: int32(*exitCode),
+	}, nil
+}
+
+// execOptions specifies how to execute command in container.
+type execOptions struct {
+	cmd     []string
+	stdin   io.Reader
+	stdout  io.Writer
+	stderr  io.Writer
+	tty     bool
+	resize  <-chan remotecommand.TerminalSize
+	timeout time.Duration
+}
+
+// execInContainer executes a command inside the container synchronously, and
+// redirects stdio stream properly.
+// TODO(random-liu): Support timeout.
+func (c *criContainerdService) execInContainer(ctx context.Context, id string, opts execOptions) (*uint32, error) {
 	// Get container from our container store.
-	cntr, err := c.containerStore.Get(r.GetContainerId())
+	cntr, err := c.containerStore.Get(id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find container in store: %v", err)
 	}
-	id := cntr.ID
+	id = cntr.ID
 
 	state := cntr.Status.Get().State()
 	if state != runtime.ContainerState_CONTAINER_RUNNING {
@@ -65,14 +101,21 @@ func (c *criContainerdService) ExecSync(ctx context.Context, r *runtime.ExecSync
 	if err != nil {
 		return nil, fmt.Errorf("failed to load task: %v", err)
 	}
-
 	pspec := spec.Process
-	pspec.Args = r.GetCmd()
+	pspec.Args = opts.cmd
+	pspec.Terminal = opts.tty
 
+	if opts.stdin == nil {
+		// Create empty buffer if stdin is nil.
+		opts.stdin = new(bytes.Buffer)
+	}
 	execID := generateID()
-	stdinBuf, stdoutBuf, stderrBuf := new(bytes.Buffer), new(bytes.Buffer), new(bytes.Buffer)
-	io := containerd.NewIOWithTerminal(stdinBuf, stdoutBuf, stderrBuf, pspec.Terminal)
-	process, err := task.Exec(ctx, execID, pspec, io)
+	process, err := task.Exec(ctx, execID, pspec, containerd.NewIOWithTerminal(
+		opts.stdin,
+		opts.stdout,
+		opts.stderr,
+		opts.tty,
+	))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create exec %q: %v", execID, err)
 	}
@@ -81,6 +124,12 @@ func (c *criContainerdService) ExecSync(ctx context.Context, r *runtime.ExecSync
 			glog.Errorf("Failed to delete exec process %q for container %q: %v", execID, id, err)
 		}
 	}()
+
+	handleResizing(opts.resize, func(size remotecommand.TerminalSize) {
+		if err := process.Resize(ctx, uint32(size.Width), uint32(size.Height)); err != nil {
+			glog.Errorf("Failed to resize process %q console for container %q: %v", execID, id, err)
+		}
+	})
 
 	// Get containerd event client first, so that we won't miss any events.
 	// TODO(random-liu): Add filter to only subscribe events of the exec process.
@@ -100,26 +149,20 @@ func (c *criContainerdService) ExecSync(ctx context.Context, r *runtime.ExecSync
 	if err != nil {
 		return nil, fmt.Errorf("failed to wait for exec in container %q to finish: %v", id, err)
 	}
-	// TODO(random-liu): [P1] Deal with timeout, kill and wait again on timeout.
 
 	// Wait for the io to be drained.
 	process.IO().Wait()
 
-	return &runtime.ExecSyncResponse{
-		Stdout:   stdoutBuf.Bytes(),
-		Stderr:   stderrBuf.Bytes(),
-		ExitCode: int32(exitCode),
-	}, nil
+	return exitCode, nil
 }
 
 // waitContainerExec waits for container exec to finish and returns the exit code.
 func (c *criContainerdService) waitContainerExec(eventstream events.Events_SubscribeClient, id string,
-	execID string) (uint32, error) {
+	execID string) (*uint32, error) {
 	for {
 		evt, err := eventstream.Recv()
 		if err != nil {
-			// Return non-zero exit code just in case.
-			return unknownExitCode, err
+			return nil, err
 		}
 		// Continue until the event received is of type task exit.
 		if !typeurl.Is(evt.Event, &events.TaskExit{}) {
@@ -127,11 +170,11 @@ func (c *criContainerdService) waitContainerExec(eventstream events.Events_Subsc
 		}
 		any, err := typeurl.UnmarshalAny(evt.Event)
 		if err != nil {
-			return unknownExitCode, err
+			return nil, err
 		}
 		e := any.(*events.TaskExit)
 		if e.ContainerID == id && e.ID == execID {
-			return e.ExitStatus, nil
+			return &e.ExitStatus, nil
 		}
 	}
 }

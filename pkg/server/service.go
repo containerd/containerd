@@ -28,9 +28,11 @@ import (
 	"github.com/containerd/containerd/images"
 	diffservice "github.com/containerd/containerd/services/diff"
 	"github.com/containerd/containerd/snapshot"
+	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/cri-o/pkg/ocicni"
 	healthapi "google.golang.org/grpc/health/grpc_health_v1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 
 	osinterface "github.com/kubernetes-incubator/cri-containerd/pkg/os"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/registrar"
@@ -84,6 +86,8 @@ type criContainerdService struct {
 	// imageStoreService is the containerd service to store and track
 	// image metadata.
 	imageStoreService images.Store
+	// eventsService is the containerd task service client
+	eventService events.EventsClient
 	// versionService is the containerd version service client.
 	versionService versionapi.VersionClient
 	// healthService is the healthcheck service of containerd grpc server.
@@ -94,12 +98,14 @@ type criContainerdService struct {
 	agentFactory agents.AgentFactory
 	// client is an instance of the containerd client
 	client *containerd.Client
-	// eventsService is the containerd task service client
-	eventService events.EventsClient
+	// streamServer is the streaming server serves container streaming request.
+	streamServer streaming.Server
 }
 
 // NewCRIContainerdService returns a new instance of CRIContainerdService
-func NewCRIContainerdService(containerdEndpoint, rootDir, networkPluginBinDir, networkPluginConfDir string) (CRIContainerdService, error) {
+// TODO(random-liu): Add cri-containerd server config to get rid of the long arg list.
+func NewCRIContainerdService(containerdEndpoint, rootDir, networkPluginBinDir, networkPluginConfDir,
+	streamAddress, streamPort string) (CRIContainerdService, error) {
 	// TODO(random-liu): [P2] Recover from runtime state and checkpoint.
 
 	client, err := containerd.New(containerdEndpoint, containerd.WithDefaultNamespace(k8sContainerdNamespace))
@@ -119,6 +125,7 @@ func NewCRIContainerdService(containerdEndpoint, rootDir, networkPluginBinDir, n
 		containerService:    client.ContainerService(),
 		taskService:         client.TaskService(),
 		imageStoreService:   client.ImageService(),
+		eventService:        client.EventService(),
 		contentStoreService: client.ContentStore(),
 		// Use daemon default snapshotter.
 		snapshotService: client.SnapshotService(""),
@@ -127,7 +134,6 @@ func NewCRIContainerdService(containerdEndpoint, rootDir, networkPluginBinDir, n
 		healthService:   client.HealthService(),
 		agentFactory:    agents.NewAgentFactory(),
 		client:          client,
-		eventService:    client.EventService(),
 	}
 
 	netPlugin, err := ocicni.InitCNI(networkPluginBinDir, networkPluginConfDir)
@@ -136,9 +142,20 @@ func NewCRIContainerdService(containerdEndpoint, rootDir, networkPluginBinDir, n
 	}
 	c.netPlugin = netPlugin
 
+	// prepare streaming server
+	c.streamServer, err = newStreamServer(c, streamAddress, streamPort)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stream server: %v", err)
+	}
+
 	return c, nil
 }
 
 func (c *criContainerdService) Start() {
 	c.startEventMonitor()
+	go func() {
+		if err := c.streamServer.Start(true); err != nil {
+			glog.Errorf("Failed to start streaming server: %v", err)
+		}
+	}()
 }
