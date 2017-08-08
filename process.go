@@ -11,6 +11,7 @@ import (
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
 )
 
 // Process represents a system process
@@ -20,7 +21,7 @@ type Process interface {
 	// Start starts the process executing the user's defined binary
 	Start(context.Context) error
 	// Delete removes the process and any resources allocated returning the exit status
-	Delete(context.Context) (uint32, error)
+	Delete(context.Context, ...ProcessDeleteOpts) (uint32, error)
 	// Kill sends the provided signal to the process
 	Kill(context.Context, syscall.Signal) error
 	// Wait blocks until the process has exited returning the exit status
@@ -141,7 +142,19 @@ func (p *process) Resize(ctx context.Context, w, h uint32) error {
 	return err
 }
 
-func (p *process) Delete(ctx context.Context) (uint32, error) {
+func (p *process) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (uint32, error) {
+	for _, o := range opts {
+		if err := o(ctx, p); err != nil {
+			return UnknownExitStatus, err
+		}
+	}
+	status, err := p.Status(ctx)
+	if err != nil {
+		return UnknownExitStatus, err
+	}
+	if status.Status != Stopped {
+		return UnknownExitStatus, errors.Wrapf(errdefs.ErrFailedPrecondition, "process must be stopped before deletion")
+	}
 	if p.io != nil {
 		p.io.Wait()
 		p.io.Close()
