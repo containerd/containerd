@@ -170,7 +170,7 @@ func (cs *contentStore) Delete(ctx context.Context, dgst digest.Digest) error {
 
 		// Just remove local reference, garbage collector is responsible for
 		// cleaning up on disk content
-		return getBlobsBucket(tx, ns).Delete([]byte(dgst.String()))
+		return getBlobsBucket(tx, ns).DeleteBucket([]byte(dgst.String()))
 	})
 }
 

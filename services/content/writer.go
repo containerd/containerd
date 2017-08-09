@@ -46,6 +46,7 @@ func (rw *remoteWriter) Status() (content.Status, error) {
 	return content.Status{
 		Ref:       rw.ref,
 		Offset:    resp.Offset,
+		Total:     resp.Total,
 		StartedAt: resp.StartedAt,
 		UpdatedAt: resp.UpdatedAt,
 	}, nil
