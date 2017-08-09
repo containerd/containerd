@@ -6,12 +6,10 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"syscall"
 
 	"golang.org/x/sys/unix"
 
-	"github.com/containerd/containerd/fs"
 	"github.com/containerd/containerd/mount"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -177,17 +175,10 @@ func incrementFS(root string, uidInc, gidInc uint32) filepath.WalkFunc {
 			return nil
 		}
 		var (
-			stat    = info.Sys().(*syscall.Stat_t)
-			u, g    = int(stat.Uid + uidInc), int(stat.Gid + gidInc)
-			symlink = info.Mode()&os.ModeSymlink != 0
+			stat = info.Sys().(*syscall.Stat_t)
+			u, g = int(stat.Uid + uidInc), int(stat.Gid + gidInc)
 		)
-		// make sure we resolve links inside the root for symlinks
-		if path, err = fs.RootPath(root, strings.TrimPrefix(path, root)); err != nil {
-			return err
-		}
-		if err := os.Chown(path, u, g); err != nil && !symlink {
-			return err
-		}
-		return nil
+		// be sure the lchown the path as to not de-reference the symlink to a host file
+		return os.Lchown(path, u, g)
 	}
 }
