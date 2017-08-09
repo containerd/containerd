@@ -10,6 +10,7 @@ import (
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/continuity/sysx"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 )
 
 func copyFileInfo(fi os.FileInfo, name string) error {
@@ -63,5 +64,5 @@ func copyDevice(dst string, fi os.FileInfo) error {
 	if !ok {
 		return errors.New("unsupported stat type")
 	}
-	return syscall.Mknod(dst, uint32(fi.Mode()), int(st.Rdev))
+	return unix.Mknod(dst, uint32(fi.Mode()), int(st.Rdev))
 }

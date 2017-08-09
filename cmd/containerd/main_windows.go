@@ -4,17 +4,18 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"syscall"
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/server"
+
+	"golang.org/x/sys/windows"
 )
 
 var (
 	defaultConfigPath = filepath.Join(os.Getenv("programfiles"), "containerd", "config.toml")
 	handledSignals    = []os.Signal{
-		syscall.SIGTERM,
-		syscall.SIGINT,
+		windows.SIGTERM,
+		windows.SIGINT,
 	}
 )
 
