@@ -37,9 +37,9 @@ func copyFileContent(dst, src *os.File) error {
 		return errors.Wrap(err, "unable to stat source")
 	}
 
-	n, err := sysx.CopyFileRange(src.Fd(), nil, dst.Fd(), nil, int(st.Size()), 0)
+	n, err := unix.CopyFileRange(int(src.Fd()), nil, int(dst.Fd()), nil, int(st.Size()), 0)
 	if err != nil {
-		if err != syscall.ENOSYS && err != syscall.EXDEV {
+		if err != unix.ENOSYS && err != unix.EXDEV {
 			return errors.Wrap(err, "copy file range failed")
 		}
 
@@ -79,5 +79,5 @@ func copyDevice(dst string, fi os.FileInfo) error {
 	if !ok {
 		return errors.New("unsupported stat type")
 	}
-	return syscall.Mknod(dst, uint32(fi.Mode()), int(st.Rdev))
+	return unix.Mknod(dst, uint32(fi.Mode()), int(st.Rdev))
 }

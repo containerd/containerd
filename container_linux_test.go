@@ -4,12 +4,12 @@ package containerd
 
 import (
 	"context"
-	"syscall"
 	"testing"
 
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd/linux/runcopts"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"golang.org/x/sys/unix"
 )
 
 func TestContainerUpdate(t *testing.T) {
@@ -93,7 +93,7 @@ func TestContainerUpdate(t *testing.T) {
 	if int64(stat.Memory.Usage.Limit) != limit {
 		t.Errorf("expected memory limit to be set to %d but received %d", limit, stat.Memory.Usage.Limit)
 	}
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, unix.SIGKILL); err != nil {
 		t.Error(err)
 		return
 	}
@@ -168,7 +168,7 @@ func TestShimInCgroup(t *testing.T) {
 	if len(processes) == 0 {
 		t.Errorf("created cgroup should have atleast one process inside: %d", len(processes))
 	}
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, unix.SIGKILL); err != nil {
 		t.Error(err)
 		return
 	}

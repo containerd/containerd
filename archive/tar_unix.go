@@ -11,6 +11,7 @@ import (
 	"github.com/dmcgowan/go-tar"
 	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 )
 
 func tarName(p string) (string, error) {
@@ -64,9 +65,9 @@ func mkdirAll(path string, perm os.FileMode) error {
 func prepareApply() func() {
 	// Unset unmask before doing an apply operation,
 	// restore unmask when complete
-	oldmask := syscall.Umask(0)
+	oldmask := unix.Umask(0)
 	return func() {
-		syscall.Umask(oldmask)
+		unix.Umask(oldmask)
 	}
 }
 
@@ -95,14 +96,14 @@ func handleTarTypeBlockCharFifo(hdr *tar.Header, path string) error {
 	mode := uint32(hdr.Mode & 07777)
 	switch hdr.Typeflag {
 	case tar.TypeBlock:
-		mode |= syscall.S_IFBLK
+		mode |= unix.S_IFBLK
 	case tar.TypeChar:
-		mode |= syscall.S_IFCHR
+		mode |= unix.S_IFCHR
 	case tar.TypeFifo:
-		mode |= syscall.S_IFIFO
+		mode |= unix.S_IFIFO
 	}
 
-	return syscall.Mknod(path, mode, int(mkdev(hdr.Devmajor, hdr.Devminor)))
+	return unix.Mknod(path, mode, int(mkdev(hdr.Devmajor, hdr.Devminor)))
 }
 
 func handleLChmod(hdr *tar.Header, path string, hdrInfo os.FileInfo) error {
@@ -122,7 +123,7 @@ func handleLChmod(hdr *tar.Header, path string, hdrInfo os.FileInfo) error {
 
 func getxattr(path, attr string) ([]byte, error) {
 	b, err := sysx.LGetxattr(path, attr)
-	if err == syscall.ENOTSUP || err == sysx.ENODATA {
+	if err == unix.ENOTSUP || err == unix.ENODATA {
 		return nil, nil
 	}
 	return b, err

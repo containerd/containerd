@@ -4,12 +4,12 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"syscall"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
 	"golang.org/x/net/context"
+	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/sys"
@@ -60,7 +60,7 @@ func (u *unixSocketCredentials) ServerHandshake(c net.Conn) (net.Conn, credentia
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unixSocketCredentials: failed to retrieve connection underlying fd")
 	}
-	pcred, err := syscall.GetsockoptUcred(int(f.Fd()), syscall.SOL_SOCKET, syscall.SO_PEERCRED)
+	pcred, err := unix.GetsockoptUcred(int(f.Fd()), unix.SOL_SOCKET, unix.SO_PEERCRED)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unixSocketCredentials: failed to retrieve socket peer credentials")
 	}

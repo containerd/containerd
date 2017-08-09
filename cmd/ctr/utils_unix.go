@@ -9,12 +9,12 @@ import (
 	"net"
 	"os"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/containerd/fifo"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
+	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
 )
 
@@ -22,7 +22,7 @@ func prepareStdio(stdin, stdout, stderr string, console bool) (wg *sync.WaitGrou
 	wg = &sync.WaitGroup{}
 	ctx := gocontext.Background()
 
-	f, err := fifo.OpenFifo(ctx, stdin, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700)
+	f, err := fifo.OpenFifo(ctx, stdin, unix.O_WRONLY|unix.O_CREAT|unix.O_NONBLOCK, 0700)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func prepareStdio(stdin, stdout, stderr string, console bool) (wg *sync.WaitGrou
 		w.Close()
 	}(f)
 
-	f, err = fifo.OpenFifo(ctx, stdout, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700)
+	f, err = fifo.OpenFifo(ctx, stdout, unix.O_RDONLY|unix.O_CREAT|unix.O_NONBLOCK, 0700)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func prepareStdio(stdin, stdout, stderr string, console bool) (wg *sync.WaitGrou
 		wg.Done()
 	}(f)
 
-	f, err = fifo.OpenFifo(ctx, stderr, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700)
+	f, err = fifo.OpenFifo(ctx, stderr, unix.O_RDONLY|unix.O_CREAT|unix.O_NONBLOCK, 0700)
 	if err != nil {
 		return nil, err
 	}
