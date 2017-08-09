@@ -2,9 +2,11 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/snapshot"
@@ -40,6 +42,7 @@ func MetaStoreSuite(t *testing.T, name string, meta func(root string) (*MetaStor
 	t.Run("Remove", makeTest(t, name, meta, inWriteTransaction(testRemove)))
 	t.Run("RemoveNotExist", makeTest(t, name, meta, inWriteTransaction(testRemoveNotExist)))
 	t.Run("RemoveWithChildren", makeTest(t, name, meta, inWriteTransaction(testRemoveWithChildren)))
+	t.Run("ParentIDs", makeTest(t, name, meta, inWriteTransaction(testParents)))
 }
 
 // makeTest creates a testsuite with a writable transaction
@@ -236,6 +239,9 @@ func testGetInfo(ctx context.Context, t *testing.T, ms *MetaStore) {
 		if err != nil {
 			t.Fatalf("GetInfo on %v failed: %+v", key, err)
 		}
+		// TODO: Check timestamp range
+		info.Created = time.Time{}
+		info.Updated = time.Time{}
 		assert.Equal(t, expected, info)
 	}
 }
@@ -251,6 +257,9 @@ func testWalk(ctx context.Context, t *testing.T, ms *MetaStore) {
 		if _, ok := found[info.Name]; ok {
 			return errors.Errorf("entry already encountered")
 		}
+		// TODO: Check time range
+		info.Created = time.Time{}
+		info.Updated = time.Time{}
 		found[info.Name] = info
 		return nil
 	})
@@ -544,4 +553,87 @@ func testRemoveWithChildren(ctx context.Context, t *testing.T, ms *MetaStore) {
 func testRemoveNotExist(ctx context.Context, t *testing.T, ms *MetaStore) {
 	_, _, err := Remove(ctx, "does-not-exist")
 	assertNotExist(t, err)
+}
+
+func testParents(ctx context.Context, t *testing.T, ms *MetaStore) {
+	if err := basePopulate(ctx, ms); err != nil {
+		t.Fatalf("Populate failed: %+v", err)
+	}
+
+	testcases := []struct {
+		Name    string
+		Parents int
+	}{
+		{"committed-1", 0},
+		{"committed-2", 1},
+		{"active-1", 0},
+		{"active-2", 1},
+		{"active-3", 2},
+		{"view-1", 0},
+		{"view-2", 2},
+	}
+
+	for _, tc := range testcases {
+		name := tc.Name
+		expectedID := ""
+		expectedParents := []string{}
+		for i := tc.Parents; i >= 0; i-- {
+			sid, info, _, err := GetInfo(ctx, name)
+			if err != nil {
+				t.Fatalf("Failed to get snapshot %s: %v", tc.Name, err)
+			}
+			var (
+				id      string
+				parents []string
+			)
+			if info.Kind == snapshot.KindCommitted {
+				// When commited, create view and resolve from view
+				nid := fmt.Sprintf("test-%s-%d", tc.Name, i)
+				s, err := CreateSnapshot(ctx, snapshot.KindView, nid, name)
+				if err != nil {
+					t.Fatalf("Failed to get snapshot %s: %v", tc.Name, err)
+				}
+				if len(s.ParentIDs) != i+1 {
+					t.Fatalf("Unexpected number of parents for view of %s: %d, expected %d", name, len(s.ParentIDs), i+1)
+				}
+				id = s.ParentIDs[0]
+				parents = s.ParentIDs[1:]
+			} else {
+				s, err := GetSnapshot(ctx, name)
+				if err != nil {
+					t.Fatalf("Failed to get snapshot %s: %v", tc.Name, err)
+				}
+				if len(s.ParentIDs) != i {
+					t.Fatalf("Unexpected number of parents for %s: %d, expected %d", name, len(s.ParentIDs), i)
+				}
+
+				id = s.ID
+				parents = s.ParentIDs
+			}
+			if sid != id {
+				t.Fatalf("Info ID mismatched resolved snapshot ID for %s, %s vs %s", name, sid, id)
+			}
+
+			if expectedID != "" {
+				if id != expectedID {
+					t.Errorf("Unexpected ID of parent: %s, expected %s", id, expectedID)
+				}
+			}
+
+			if len(expectedParents) > 0 {
+				for j := range expectedParents {
+					if parents[j] != expectedParents[j] {
+						t.Errorf("Unexpected ID in parent array at %d: %s, expected %s", j, parents[j], expectedParents[j])
+					}
+				}
+			}
+
+			if i > 0 {
+				name = info.Parent
+				expectedID = parents[0]
+				expectedParents = parents[1:]
+			}
+
+		}
+	}
 }

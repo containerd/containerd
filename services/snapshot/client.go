@@ -9,6 +9,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshot"
+	protobuftypes "github.com/gogo/protobuf/types"
 )
 
 // NewSnapshotterFromClient returns a new Snapshotter which communicates
@@ -30,6 +31,21 @@ func (r *remoteSnapshotter) Stat(ctx context.Context, key string) (snapshot.Info
 		&snapshotapi.StatSnapshotRequest{
 			Snapshotter: r.snapshotterName,
 			Key:         key,
+		})
+	if err != nil {
+		return snapshot.Info{}, errdefs.FromGRPC(err)
+	}
+	return toInfo(resp.Info), nil
+}
+
+func (r *remoteSnapshotter) Update(ctx context.Context, info snapshot.Info, fieldpaths ...string) (snapshot.Info, error) {
+	resp, err := r.client.Update(ctx,
+		&snapshotapi.UpdateSnapshotRequest{
+			Snapshotter: r.snapshotterName,
+			Info:        fromInfo(info),
+			UpdateMask: &protobuftypes.FieldMask{
+				Paths: fieldpaths,
+			},
 		})
 	if err != nil {
 		return snapshot.Info{}, errdefs.FromGRPC(err)
@@ -59,11 +75,18 @@ func (r *remoteSnapshotter) Mounts(ctx context.Context, key string) ([]mount.Mou
 	return toMounts(resp.Mounts), nil
 }
 
-func (r *remoteSnapshotter) Prepare(ctx context.Context, key, parent string) ([]mount.Mount, error) {
+func (r *remoteSnapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshot.Opt) ([]mount.Mount, error) {
+	var local snapshot.Info
+	for _, opt := range opts {
+		if err := opt(&local); err != nil {
+			return nil, err
+		}
+	}
 	resp, err := r.client.Prepare(ctx, &snapshotapi.PrepareSnapshotRequest{
 		Snapshotter: r.snapshotterName,
 		Key:         key,
 		Parent:      parent,
+		Labels:      local.Labels,
 	})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
@@ -71,11 +94,18 @@ func (r *remoteSnapshotter) Prepare(ctx context.Context, key, parent string) ([]
 	return toMounts(resp.Mounts), nil
 }
 
-func (r *remoteSnapshotter) View(ctx context.Context, key, parent string) ([]mount.Mount, error) {
+func (r *remoteSnapshotter) View(ctx context.Context, key, parent string, opts ...snapshot.Opt) ([]mount.Mount, error) {
+	var local snapshot.Info
+	for _, opt := range opts {
+		if err := opt(&local); err != nil {
+			return nil, err
+		}
+	}
 	resp, err := r.client.View(ctx, &snapshotapi.ViewSnapshotRequest{
 		Snapshotter: r.snapshotterName,
 		Key:         key,
 		Parent:      parent,
+		Labels:      local.Labels,
 	})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
@@ -83,11 +113,18 @@ func (r *remoteSnapshotter) View(ctx context.Context, key, parent string) ([]mou
 	return toMounts(resp.Mounts), nil
 }
 
-func (r *remoteSnapshotter) Commit(ctx context.Context, name, key string) error {
+func (r *remoteSnapshotter) Commit(ctx context.Context, name, key string, opts ...snapshot.Opt) error {
+	var local snapshot.Info
+	for _, opt := range opts {
+		if err := opt(&local); err != nil {
+			return err
+		}
+	}
 	_, err := r.client.Commit(ctx, &snapshotapi.CommitSnapshotRequest{
 		Snapshotter: r.snapshotterName,
 		Name:        name,
 		Key:         key,
+		Labels:      local.Labels,
 	})
 	return errdefs.FromGRPC(err)
 }
@@ -130,14 +167,20 @@ func toKind(kind snapshotapi.Kind) snapshot.Kind {
 	if kind == snapshotapi.KindActive {
 		return snapshot.KindActive
 	}
+	if kind == snapshotapi.KindView {
+		return snapshot.KindView
+	}
 	return snapshot.KindCommitted
 }
 
 func toInfo(info snapshotapi.Info) snapshot.Info {
 	return snapshot.Info{
-		Name:   info.Name,
-		Parent: info.Parent,
-		Kind:   toKind(info.Kind),
+		Name:    info.Name,
+		Parent:  info.Parent,
+		Kind:    toKind(info.Kind),
+		Created: info.CreatedAt,
+		Updated: info.UpdatedAt,
+		Labels:  info.Labels,
 	}
 }
 

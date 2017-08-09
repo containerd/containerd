@@ -7,7 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/fs/fstest"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
@@ -23,6 +25,8 @@ func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(ctx context.
 	t.Run("StatComitted", makeTest(t, name, snapshotterFn, checkSnapshotterStatCommitted))
 	t.Run("TransitivityTest", makeTest(t, name, snapshotterFn, checkSnapshotterTransitivity))
 	t.Run("PreareViewFailingtest", makeTest(t, name, snapshotterFn, checkSnapshotterPrepareView))
+	t.Run("Update", makeTest(t, name, snapshotterFn, checkUpdate))
+	t.Run("Remove", makeTest(t, name, snapshotterFn, checkRemove))
 
 	t.Run("LayerFileupdate", makeTest(t, name, snapshotterFn, checkLayerFileUpdate))
 	t.Run("RemoveDirectoryInLowerLayer", makeTest(t, name, snapshotterFn, checkRemoveDirectoryInLowerLayer))
@@ -413,4 +417,221 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 	//must be err != nil
 	assert.NotNil(t, err)
 
+}
+
+// baseTestSnapshots creates a base set of snapshots for tests, each snapshot is empty
+// Tests snapshots:
+//  c1 - committed snapshot, no parent
+//  c2 - commited snapshot, c1 is parent
+//  a1 - active snapshot, c2 is parent
+//  a1 - active snapshot, no parent
+//  v1 - view snapshot, v1 is parent
+//  v2 - view snapshot, no parent
+func baseTestSnapshots(ctx context.Context, snapshotter snapshot.Snapshotter) error {
+	if _, err := snapshotter.Prepare(ctx, "c1-a", ""); err != nil {
+		return err
+	}
+	if err := snapshotter.Commit(ctx, "c1", "c1-a"); err != nil {
+		return err
+	}
+	if _, err := snapshotter.Prepare(ctx, "c2-a", "c1"); err != nil {
+		return err
+	}
+	if err := snapshotter.Commit(ctx, "c2", "c2-a"); err != nil {
+		return err
+	}
+	if _, err := snapshotter.Prepare(ctx, "a1", "c2"); err != nil {
+		return err
+	}
+	if _, err := snapshotter.Prepare(ctx, "a2", ""); err != nil {
+		return err
+	}
+	if _, err := snapshotter.View(ctx, "v1", "c2"); err != nil {
+		return err
+	}
+	if _, err := snapshotter.View(ctx, "v2", ""); err != nil {
+		return err
+	}
+	return nil
+}
+
+func checkUpdate(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+	t1 := time.Now().UTC()
+	if err := baseTestSnapshots(ctx, snapshotter); err != nil {
+		t.Fatalf("Failed to create base snapshots: %v", err)
+	}
+	t2 := time.Now().UTC()
+	testcases := []struct {
+		name   string
+		kind   snapshot.Kind
+		parent string
+	}{
+		{
+			name: "c1",
+			kind: snapshot.KindCommitted,
+		},
+		{
+			name:   "c2",
+			kind:   snapshot.KindCommitted,
+			parent: "c1",
+		},
+		{
+			name:   "a1",
+			kind:   snapshot.KindActive,
+			parent: "c2",
+		},
+		{
+			name: "a2",
+			kind: snapshot.KindActive,
+		},
+		{
+			name:   "v1",
+			kind:   snapshot.KindView,
+			parent: "c2",
+		},
+		{
+			name: "v2",
+			kind: snapshot.KindView,
+		},
+	}
+	for _, tc := range testcases {
+		st, err := snapshotter.Stat(ctx, tc.name)
+		if err != nil {
+			t.Fatalf("Failed to stat %s: %v", tc.name, err)
+		}
+		if st.Created.Before(t1) || st.Created.After(t2) {
+			t.Errorf("(%s) wrong created time %s: expected between %s and %s", tc.name, st.Created, t1, t2)
+			continue
+		}
+		if st.Created != st.Updated {
+			t.Errorf("(%s) unexpected updated time %s: expected %s", tc.name, st.Updated, st.Created)
+			continue
+		}
+		if st.Kind != tc.kind {
+			t.Errorf("(%s) unexpected kind %s, expected %s", tc.name, st.Kind, tc.kind)
+			continue
+		}
+		if st.Parent != tc.parent {
+			t.Errorf("(%s) unexpected parent %q, expected %q", tc.name, st.Parent, tc.parent)
+			continue
+		}
+		if st.Name != tc.name {
+			t.Errorf("(%s) unexpected name %q, expected %q", tc.name, st.Name, tc.name)
+			continue
+		}
+
+		createdAt := st.Created
+		expected := map[string]string{
+			"l1": "v1",
+			"l2": "v2",
+			"l3": "v3",
+		}
+		st.Parent = "doesnotexist"
+		st.Labels = expected
+		u1 := time.Now().UTC()
+		st, err = snapshotter.Update(ctx, st)
+		if err != nil {
+			t.Fatalf("Failed to update %s: %v", tc.name, err)
+		}
+		u2 := time.Now().UTC()
+
+		if st.Created != createdAt {
+			t.Errorf("(%s) wrong created time %s: expected %s", tc.name, st.Created, createdAt)
+			continue
+		}
+		if st.Updated.Before(u1) || st.Updated.After(u2) {
+			t.Errorf("(%s) wrong updated time %s: expected between %s and %s", tc.name, st.Updated, u1, u2)
+			continue
+		}
+		if st.Kind != tc.kind {
+			t.Errorf("(%s) unexpected kind %s, expected %s", tc.name, st.Kind, tc.kind)
+			continue
+		}
+		if st.Parent != tc.parent {
+			t.Errorf("(%s) unexpected parent %q, expected %q", tc.name, st.Parent, tc.parent)
+			continue
+		}
+		if st.Name != tc.name {
+			t.Errorf("(%s) unexpected name %q, expected %q", tc.name, st.Name, tc.name)
+			continue
+		}
+		assertLabels(t, st.Labels, expected)
+
+		expected = map[string]string{
+			"l1": "updated",
+			"l3": "v3",
+		}
+		st.Labels = map[string]string{
+			"l1": "updated",
+			"l4": "v4",
+		}
+		st, err = snapshotter.Update(ctx, st, "labels.l1", "labels.l2")
+		if err != nil {
+			t.Fatalf("Failed to update %s: %v", tc.name, err)
+		}
+		assertLabels(t, st.Labels, expected)
+
+		expected = map[string]string{
+			"l4": "v4",
+		}
+		st.Labels = expected
+		st, err = snapshotter.Update(ctx, st, "labels")
+		if err != nil {
+			t.Fatalf("Failed to update %s: %v", tc.name, err)
+		}
+		assertLabels(t, st.Labels, expected)
+
+		// Test failure received when providing immutable field path
+		st.Parent = "doesnotexist"
+		st, err = snapshotter.Update(ctx, st, "parent")
+		if err == nil {
+			t.Errorf("Expected error updating with immutable field path")
+		} else if !errdefs.IsInvalidArgument(err) {
+			t.Fatalf("Unexpected error updating %s: %+v", tc.name, err)
+		}
+	}
+}
+
+func assertLabels(t *testing.T, actual, expected map[string]string) {
+	if len(actual) != len(expected) {
+		t.Fatalf("Label size mismatch: %d vs %d\n\tActual: %#v\n\tExpected: %#v", len(actual), len(expected), actual, expected)
+	}
+	for k, v := range expected {
+		if a := actual[k]; v != a {
+			t.Errorf("Wrong label value for %s, got %q, expected %q", k, a, v)
+		}
+	}
+	if t.Failed() {
+		t.FailNow()
+	}
+}
+
+func checkRemove(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+	if _, err := snapshotter.Prepare(ctx, "committed-a", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := snapshotter.Commit(ctx, "committed-1", "committed-a"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := snapshotter.Prepare(ctx, "reuse-1", "committed-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := snapshotter.Remove(ctx, "reuse-1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := snapshotter.View(ctx, "reuse-1", "committed-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := snapshotter.Remove(ctx, "reuse-1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := snapshotter.Prepare(ctx, "reuse-1", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := snapshotter.Remove(ctx, "committed-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := snapshotter.Commit(ctx, "commited-1", "reuse-1"); err != nil {
+		t.Fatal(err)
+	}
 }

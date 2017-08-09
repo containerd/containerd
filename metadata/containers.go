@@ -10,6 +10,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/identifiers"
+	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
@@ -206,6 +207,16 @@ func (s *containerStore) Delete(ctx context.Context, id string) error {
 }
 
 func readContainer(container *containers.Container, bkt *bolt.Bucket) error {
+	labels, err := boltutil.ReadLabels(bkt)
+	if err != nil {
+		return err
+	}
+	container.Labels = labels
+
+	if err := boltutil.ReadTimestamps(bkt, &container.CreatedAt, &container.UpdatedAt); err != nil {
+		return err
+	}
+
 	return bkt.ForEach(func(k, v []byte) error {
 		switch string(k) {
 		case string(bucketKeyImage):
@@ -239,24 +250,7 @@ func readContainer(container *containers.Container, bkt *bolt.Bucket) error {
 			container.Spec = &any
 		case string(bucketKeyRootFS):
 			container.RootFS = string(v)
-		case string(bucketKeyCreatedAt):
-			if err := container.CreatedAt.UnmarshalBinary(v); err != nil {
-				return err
-			}
-		case string(bucketKeyUpdatedAt):
-			if err := container.UpdatedAt.UnmarshalBinary(v); err != nil {
-				return err
-			}
-		case string(bucketKeyLabels):
-			lbkt := bkt.Bucket(bucketKeyLabels)
-			if lbkt == nil {
-				return nil
-			}
-			container.Labels = map[string]string{}
 
-			if err := readLabels(container.Labels, lbkt); err != nil {
-				return err
-			}
 		}
 
 		return nil
@@ -264,7 +258,7 @@ func readContainer(container *containers.Container, bkt *bolt.Bucket) error {
 }
 
 func writeContainer(bkt *bolt.Bucket, container *containers.Container) error {
-	if err := writeTimestamps(bkt, container.CreatedAt, container.UpdatedAt); err != nil {
+	if err := boltutil.WriteTimestamps(bkt, container.CreatedAt, container.UpdatedAt); err != nil {
 		return err
 	}
 
@@ -314,5 +308,5 @@ func writeContainer(bkt *bolt.Bucket, container *containers.Container) error {
 		}
 	}
 
-	return writeLabels(bkt, container.Labels)
+	return boltutil.WriteLabels(bkt, container.Labels)
 }
