@@ -4,7 +4,7 @@
 [![Build Status](https://img.shields.io/travis/kubernetes-incubator/cri-o.svg?maxAge=2592000&style=flat-square)](https://travis-ci.org/kubernetes-incubator/cri-o)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kubernetes-incubator/cri-o?style=flat-square)](https://goreportcard.com/report/github.com/kubernetes-incubator/cri-o)
 
-### Status: pre-alpha
+### Status: alpha
 
 ## What is the scope of this project?
 
@@ -36,11 +36,38 @@ The plan is to use OCI projects and best of breed libraries for different aspect
 
 It is currently in active development in the Kubernetes community through the [design proposal](https://github.com/kubernetes/kubernetes/pull/26788).  Questions and issues should be raised in the Kubernetes [sig-node Slack channel](https://kubernetes.slack.com/archives/sig-node).
 
+## Commands
+| Command                                              | Description                                                                                          |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| [crio(8)](/docs/crio.8.md)                 | Enable OCI Kubernetes Container Runtime daemon |
+| [kpod(1)](/docs/kpod.1.md)                 | Simple management tool for pods and images |
+| [kpod-history(1)](/docs/kpod-history.1.md)] | Shows the history of an image |
+| [kpod-images(1)](/docs/kpod-images.1.md)   | List images in local storage |
+| [kpod-inspect(1)](/docs/kpod-inspect.1.md)       | Display the configuration of a container or image |
+| [kpod-load(1)](/docs/kpod-load.1.md)       | Load an image from docker archive or oci |
+| [kpod-pull(1)](/docs/kpod-pull.1.md)       | Pull an image from a registry |
+| [kpod-push(1)](/docs/kpod-push.1.md)       | Push an image to a specified destination |
+| [kpod-rmi(1)](/docs/kpod-rmi.1.md)         | Removes one or more images   |
+| [kpod-save(1)](/docs/kpod-save.1.md)       | Saves an image to an archive |
+| [kpod-tag(1)](/docs/kpod-tag.1.md)         | Add an additional name to a local image |
+| [kpod-version(1)](/docs/kpod-version.1.md) | Display the Kpod Version Information |
+
+## Configuration
+| File                                       | Description                                                                                          |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| [crio.conf(5)](/docs/crio.conf.5.md)       | CRI-O Configuation file |
+
+## Communication
+
+For async communication and long running discussions please use issues and pull requests on the github repo. This will be the best place to discuss design and implementation.
+
+For sync communication we have an IRC channel #cri-o, on chat.freenode.net, that everyone is welcome to join and chat about development.
+
 ## Getting started
 
 ### Prerequisites
 
-`runc` version 1.0.0.rc1 or greater is expected to be installed on the system. It is picked up as the default runtime by ocid.
+Latest verion of `runc` is expected to be installed on the system. It is picked up as the default runtime by crio.
 
 ### Build Dependencies
 
@@ -60,6 +87,7 @@ yum install -y \
   libgpg-error-devel \
   libseccomp-devel \
   libselinux-devel \
+  ostree-devel \
   pkgconfig \
   runc
 ```
@@ -81,7 +109,9 @@ apt install -y \
   runc
 ```
 
-If using an older release or a long-term support release, be careful to double-check that the version of `runc` is new enough, or else build your own.
+Debian, Ubuntu, and related distributions will also need a copy of the development libraries for `ostree`, either in the form of the `libostree-dev` package from the [flatpak](https://launchpad.net/~alexlarsson/+archive/ubuntu/flatpak) PPA, or built [from source](https://github.com/ostreedev/ostree) (more on that [here](https://ostree.readthedocs.io/en/latest/#building)).
+
+If using an older release or a long-term support release, be careful to double-check that the version of `runc` is new enough (running `runc --version` should produce `spec: 1.0.0`), or else build your own.
 
 **Optional**
 
@@ -170,16 +200,18 @@ your system.
 You can run a local version of kubernetes with cri-o using `local-up-cluster.sh`:
 
 1. Clone the [kubernetes repository](https://github.com/kubernetes/kubernetes)
-1. Start the cri-o daemon (`ocid`)
-1. From the kubernetes project directory, run: `CONTAINER_RUNTIME=remote CONTAINER_RUNTIME_ENDPOINT='/var/run/ocid.sock --runtime-request-timeout=15m' ./hack/local-up-cluster.sh`
+1. Start the cri-o daemon (`crio`)
+1. From the kubernetes project directory, run: `CONTAINER_RUNTIME=remote CONTAINER_RUNTIME_ENDPOINT='/var/run/crio.sock --runtime-request-timeout=15m' ./hack/local-up-cluster.sh`
 
 To run a full cluster, see [the instructions](kubernetes.md).
 
 ### Current Roadmap
 
-1. Basic pod/container lifecycle, basic image pull (already works)
-1. Support for tty handling and state management
-1. Basic integration with kubelet once client side changes are ready
-1. Support for log management, networking integration using CNI, pluggable image/storage management
-1. Support for exec/attach
-1. Target fully automated kubernetes testing without failures
+1. Basic pod/container lifecycle, basic image pull (done)
+1. Support for tty handling and state management (done)
+1. Basic integration with kubelet once client side changes are ready (done)
+1. Support for log management, networking integration using CNI, pluggable image/storage management (done)
+1. Support for exec/attach (done)
+1. Target fully automated kubernetes testing without failures [e2e status](https://github.com/kubernetes-incubator/cri-o/issues/533)
+1. Release 1.0
+1. Track upstream k8s releases
