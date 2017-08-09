@@ -37,7 +37,7 @@ func copyFileContent(dst, src *os.File) error {
 		return errors.Wrap(err, "unable to stat source")
 	}
 
-	n, err := sysx.CopyFileRange(src.Fd(), nil, dst.Fd(), nil, int(st.Size()), 0)
+	n, err := unix.CopyFileRange(int(src.Fd()), nil, int(dst.Fd()), nil, int(st.Size()), 0)
 	if err != nil {
 		if err != unix.ENOSYS && err != unix.EXDEV {
 			return errors.Wrap(err, "copy file range failed")
