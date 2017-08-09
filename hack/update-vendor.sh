@@ -23,8 +23,6 @@ set -o pipefail
 # TODO(random-liu): Remove this after #106 is resolved.
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
 cd ${ROOT}
-echo "Replace invalid imports..."
-find vendor/ -name *.go | xargs sed -i 's/"github.com\/Sirupsen\/logrus"/"github.com\/sirupsen\/logrus"/g'
 
 echo "Sort vendor.conf..."
 sort vendor.conf -o vendor.conf

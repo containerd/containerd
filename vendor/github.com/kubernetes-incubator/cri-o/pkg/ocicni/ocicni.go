@@ -7,10 +7,10 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/sirupsen/logrus"
 	"github.com/containernetworking/cni/libcni"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/fsnotify/fsnotify"
+	"github.com/sirupsen/logrus"
 )
 
 type cniNetworkPlugin struct {
@@ -48,7 +48,8 @@ func (plugin *cniNetworkPlugin) monitorNetDir() {
 			select {
 			case event := <-watcher.Events:
 				logrus.Debugf("CNI monitoring event %v", event)
-				if event.Op&fsnotify.Create != fsnotify.Create {
+				if event.Op&fsnotify.Create != fsnotify.Create &&
+					event.Op&fsnotify.Write != fsnotify.Write {
 					continue
 				}
 
