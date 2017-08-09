@@ -147,8 +147,9 @@ func (s *Service) Delete(ctx context.Context, r *google_protobuf.Empty) (*shimap
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
 	p := s.initProcess
-	// TODO (@crosbymichael): how to handle errors here
-	p.Delete(ctx)
+	if err := p.Delete(ctx); err != nil {
+		return nil, err
+	}
 	s.mu.Lock()
 	delete(s.processes, p.ID())
 	s.mu.Unlock()
@@ -178,8 +179,9 @@ func (s *Service) DeleteProcess(ctx context.Context, r *shimapi.DeleteProcessReq
 	if !ok {
 		return nil, errors.Wrapf(errdefs.ErrNotFound, "process %s not found", r.ID)
 	}
-	// TODO (@crosbymichael): how to handle errors here
-	p.Delete(ctx)
+	if err := p.Delete(ctx); err != nil {
+		return nil, err
+	}
 	s.mu.Lock()
 	delete(s.processes, p.ID())
 	s.mu.Unlock()

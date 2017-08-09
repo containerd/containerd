@@ -237,31 +237,33 @@ func (p *initProcess) SetExited(status int) {
 }
 
 func (p *initProcess) Delete(context context.Context) error {
-	status, err := p.Status(context)
-	if err != nil {
-		return err
-	}
-	if status != "stopped" {
-		return fmt.Errorf("cannot delete a running container")
-	}
 	p.killAll(context)
 	p.Wait()
-	err = p.runtime.Delete(context, p.id, nil)
+	err := p.runtime.Delete(context, p.id, nil)
+	// ignore errors if a runtime has already deleted the process
+	// but we still hold metadata and pipes
+	//
+	// this is common during a checkpoint, runc will delete the container state
+	// after a checkpoint and the container will no longer exist within runc
+	if err != nil {
+		if strings.Contains(err.Error(), "does not exist") {
+			err = nil
+		} else {
+			err = p.runtimeError(err, "failed to delete task")
+		}
+	}
 	if p.io != nil {
 		for _, c := range p.closers {
 			c.Close()
 		}
 		p.io.Close()
 	}
-	err = p.runtimeError(err, "OCI runtime delete failed")
-
 	if err2 := mount.UnmountAll(p.rootfs, 0); err2 != nil {
-		log.G(context).WithError(err2).Warn("Failed to cleanup rootfs mount")
+		log.G(context).WithError(err2).Warn("failed to cleanup rootfs mount")
 		if err == nil {
-			err = errors.Wrap(err2, "Failed rootfs umount")
+			err = errors.Wrap(err2, "failed rootfs umount")
 		}
 	}
-
 	return err
 }
 
