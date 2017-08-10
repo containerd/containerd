@@ -32,16 +32,17 @@ default: help
 help:
 	@echo "Usage: make <target>"
 	@echo
-	@echo " * 'install'       - Install binaries to system locations"
-	@echo " * 'binaries'      - Build cri-containerd"
-	@echo " * 'test'          - Test cri-containerd"
-	@echo " * 'test-cri'      - Test cri-containerd with cri validation test"
-	@echo " * 'clean'         - Clean artifacts"
-	@echo " * 'verify'        - Execute the source code verification tools"
-	@echo " * 'install.tools' - Install tools used by verify"
-	@echo " * 'install.deps'  - Install dependencies of cri-containerd (containerd, runc, cni)"
-	@echo " * 'uninstall'     - Remove installed binaries from system locations"
-	@echo " * 'version'       - Print current cri-containerd release version"
+	@echo " * 'install'        - Install binaries to system locations"
+	@echo " * 'binaries'       - Build cri-containerd"
+	@echo " * 'static-binaries - Build static cri-containerd"
+	@echo " * 'test'           - Test cri-containerd"
+	@echo " * 'test-cri'       - Test cri-containerd with cri validation test"
+	@echo " * 'clean'          - Clean artifacts"
+	@echo " * 'verify'         - Execute the source code verification tools"
+	@echo " * 'install.tools'  - Install tools used by verify"
+	@echo " * 'install.deps'   - Install dependencies of cri-containerd (containerd, runc, cni)"
+	@echo " * 'uninstall'      - Remove installed binaries from system locations"
+	@echo " * 'version'        - Print current cri-containerd release version"
 
 .PHONY: check-gopath
 
@@ -70,10 +71,11 @@ boiler:
 cri-containerd: check-gopath
 	$(GO) build -o $(BUILD_DIR)/$@ \
 	   $(BUILD_TAGS) \
+	   $(GO_LDFLAGS) $(GO_GCFLAGS) \
 	   $(PROJECT)/cmd/cri-containerd
 
 test:
-	go test -timeout=10m -race ./pkg/... $(BUILD_TAGS)
+	go test -timeout=10m -race ./pkg/... $(BUILD_TAGS) $(GO_LDFLAGS) $(GO_GCFLAGS)
 
 test-cri:
 	@./hack/test-cri.sh
@@ -82,6 +84,9 @@ clean:
 	rm -f $(BUILD_DIR)/cri-containerd
 
 binaries: cri-containerd
+
+static-binaries: GO_LDFLAGS=--ldflags '-extldflags "-fno-PIC -static"'
+static-binaries: cri-containerd
 
 install: check-gopath
 	install -D -m 755 $(BUILD_DIR)/cri-containerd $(BINDIR)/cri-containerd
@@ -117,6 +122,7 @@ install.tools: .install.gitvalidation .install.gometalinter
 
 .PHONY: \
 	binaries \
+	static-binaries \
 	boiler \
 	clean \
 	default \
