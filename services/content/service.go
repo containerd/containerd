@@ -420,7 +420,11 @@ func (s *Service) Write(session api.Content_WriteServer) (err error) {
 			}
 
 			if req.Action == api.WriteActionCommit {
-				if err := wr.Commit(total, expected); err != nil {
+				var opts []content.Opt
+				if req.Labels != nil {
+					opts = append(opts, content.WithLabels(req.Labels))
+				}
+				if err := wr.Commit(total, expected, opts...); err != nil {
 					return err
 				}
 			}

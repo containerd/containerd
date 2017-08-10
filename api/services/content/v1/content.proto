@@ -269,6 +269,9 @@ message WriteContentRequest {
 	// If this is empty and the message is not a commit, a response will be
 	// returned with the current write state.
 	bytes data = 6;
+
+	// Labels are arbitrary data to set on commit.
+	map<string, string> labels  = 7;
 }
 
 // WriteContentResponse is returned on the culmination of a write call.
