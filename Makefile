@@ -172,8 +172,9 @@ binaries: $(BINARIES) ## build binaries
 
 release: $(BINARIES)
 	@echo "$(WHALE) $@"
-	@mkdir -p releases/${RELEASE}
-	@cp $(BINARIES) releases/$(RELEASE)/
+	@rm -rf releases/$(RELEASE) releases/$(RELEASE).tar.gz
+	@install -d releases/$(RELEASE)/bin
+	@install $(BINARIES) releases/$(RELEASE)/bin
 	@cd releases/$(RELEASE) && tar -czf ../$(RELEASE).tar.gz *
 
 clean: ## clean up binaries
