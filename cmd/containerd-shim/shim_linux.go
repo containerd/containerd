@@ -33,7 +33,7 @@ func setupSignals() (chan os.Signal, error) {
 }
 
 func newServer() *grpc.Server {
-	return grpc.NewServer(grpc.Creds(NewUnixSocketCredentils(0, 0)))
+	return grpc.NewServer(grpc.Creds(NewUnixSocketCredentials(0, 0)))
 }
 
 type unixSocketCredentials struct {
@@ -42,7 +42,7 @@ type unixSocketCredentials struct {
 	serverName string
 }
 
-func NewUnixSocketCredentils(uid, gid int) credentials.TransportCredentials {
+func NewUnixSocketCredentials(uid, gid int) credentials.TransportCredentials {
 	return &unixSocketCredentials{uid, gid, "locahost"}
 }
 

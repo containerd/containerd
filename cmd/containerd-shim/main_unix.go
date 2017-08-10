@@ -80,7 +80,7 @@ func main() {
 		if err != nil {
 			return err
 		}
-		server := grpc.NewServer()
+		server := newServer()
 		e, err := connectEvents(context.GlobalString("address"))
 		if err != nil {
 			return err
@@ -182,9 +182,10 @@ func connect(address string, d func(string, time.Duration) (net.Conn, error)) (*
 	gopts := []grpc.DialOption{
 		grpc.WithBlock(),
 		grpc.WithInsecure(),
-		grpc.WithTimeout(100 * time.Second),
+		grpc.WithTimeout(60 * time.Second),
 		grpc.WithDialer(d),
 		grpc.FailOnNonTempDialError(true),
+		grpc.WithBackoffMaxDelay(3 * time.Second),
 	}
 	conn, err := grpc.Dial(dialAddress(address), gopts...)
 	if err != nil {
