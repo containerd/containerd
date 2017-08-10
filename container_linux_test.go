@@ -4,7 +4,9 @@ package containerd
 
 import (
 	"context"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd/linux/runcopts"
@@ -171,6 +173,97 @@ func TestShimInCgroup(t *testing.T) {
 	if err := task.Kill(ctx, unix.SIGKILL); err != nil {
 		t.Error(err)
 		return
+	}
+
+	<-statusC
+}
+
+func TestDaemonRestart(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("sleep", "30"))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, Stdio)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	synC := make(chan struct{})
+	statusC := make(chan uint32, 1)
+	go func() {
+		synC <- struct{}{}
+		status, err := task.Wait(ctx)
+		if err == nil {
+			t.Errorf(`first task.Wait() should have failed with "transport is closing"`)
+		}
+		statusC <- status
+	}()
+	<-synC
+
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+
+	if err := ctrd.Restart(); err != nil {
+		t.Fatal(err)
+	}
+
+	<-statusC
+
+	serving := false
+	for i := 0; i < 20; i++ {
+		serving, err = client.IsServing(ctx)
+		if serving {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if !serving {
+		t.Fatalf("containerd did not start within 2s: %v", err)
+	}
+
+	go func() {
+		synC <- struct{}{}
+		status, err := task.Wait(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+		statusC <- status
+	}()
+	<-synC
+
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
 	}
 
 	<-statusC
