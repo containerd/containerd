@@ -26,6 +26,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
+	cioutil "github.com/kubernetes-incubator/cri-containerd/pkg/ioutil"
 )
 
 const (
@@ -42,67 +44,39 @@ const (
 	bufSize = pipeBufSize - len(timestampFormat) - len(Stdout) - 2 /*2 delimiter*/ - 1 /*eol*/
 )
 
-// sandboxLogger is the log agent used for sandbox.
-// It discards sandbox all output for now.
-type sandboxLogger struct {
-	rc io.ReadCloser
+// NewDiscardLogger creates logger which discards all the input.
+func NewDiscardLogger() io.WriteCloser {
+	return cioutil.NewNopWriteCloser(ioutil.Discard)
 }
 
-func (*agentFactory) NewSandboxLogger(rc io.ReadCloser) Agent {
-	return &sandboxLogger{rc: rc}
-}
-
-func (s *sandboxLogger) Start() error {
-	go func() {
-		// Discard the output for now.
-		io.Copy(ioutil.Discard, s.rc) // nolint: errcheck
-		s.rc.Close()
-	}()
-	return nil
-}
-
-// containerLogger is the log agent used for container.
-// It redirect container log into CRI log file, and decorate the log
-// line into CRI defined format.
-type containerLogger struct {
-	path   string
-	stream StreamType
-	rc     io.ReadCloser
-}
-
-func (*agentFactory) NewContainerLogger(path string, stream StreamType, rc io.ReadCloser) Agent {
-	return &containerLogger{
-		path:   path,
-		stream: stream,
-		rc:     rc,
-	}
-}
-
-func (c *containerLogger) Start() error {
-	glog.V(4).Infof("Start reading log file %q", c.path)
-	wc, err := os.OpenFile(c.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0640)
+// NewCRILogger returns a write closer which redirect container log into
+// log file, and decorate the log line into CRI defined format.
+func NewCRILogger(path string, stream StreamType) (io.WriteCloser, error) {
+	glog.V(4).Infof("Start reading log file %q", path)
+	prc, pwc := io.Pipe()
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0640)
 	if err != nil {
-		return fmt.Errorf("failed to open log file %q: %v", c.path, err)
+		return nil, fmt.Errorf("failed to open log file: %v", err)
 	}
-	go c.redirectLogs(wc)
-	return nil
+	go redirectLogs(path, prc, f, stream)
+	return pwc, nil
 }
 
-func (c *containerLogger) redirectLogs(wc io.WriteCloser) {
-	defer c.rc.Close()
+func redirectLogs(path string, rc io.ReadCloser, wc io.WriteCloser, stream StreamType) {
+	defer rc.Close()
 	defer wc.Close()
-	streamBytes := []byte(c.stream)
+	streamBytes := []byte(stream)
 	delimiterBytes := []byte{delimiter}
-	r := bufio.NewReaderSize(c.rc, bufSize)
+	r := bufio.NewReaderSize(rc, bufSize)
 	for {
 		// TODO(random-liu): Better define CRI log format, and escape newline in log.
 		lineBytes, _, err := r.ReadLine()
 		if err == io.EOF {
-			glog.V(4).Infof("Finish redirecting log file %q", c.path)
+			glog.V(4).Infof("Finish redirecting log file %q", path)
 			return
 		}
 		if err != nil {
-			glog.Errorf("An error occurred when redirecting log file %q: %v", c.path, err)
+			glog.Errorf("An error occurred when redirecting log file %q: %v", path, err)
 			return
 		}
 		timestampBytes := time.Now().AppendFormat(nil, time.RFC3339Nano)

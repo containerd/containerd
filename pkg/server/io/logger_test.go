@@ -25,20 +25,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	cioutil "github.com/kubernetes-incubator/cri-containerd/pkg/ioutil"
 )
 
-// writeCloserBuffer is a writecloser wrapper for bytes.Buffer
-// with a nop closer.
-type writeCloserBuffer struct {
-	*bytes.Buffer
-}
-
-// nop close
-func (*writeCloserBuffer) Close() error { return nil }
-
 func TestRedirectLogs(t *testing.T) {
-	f := NewAgentFactory()
-	// f.NewContainerLogger(
 	for desc, test := range map[string]struct {
 		input   string
 		stream  StreamType
@@ -71,10 +62,10 @@ func TestRedirectLogs(t *testing.T) {
 	} {
 		t.Logf("TestCase %q", desc)
 		rc := ioutil.NopCloser(strings.NewReader(test.input))
-		c := f.NewContainerLogger("test-path", test.stream, rc).(*containerLogger)
-		wc := &writeCloserBuffer{bytes.NewBuffer(nil)}
-		c.redirectLogs(wc)
-		output := wc.String()
+		buf := bytes.NewBuffer(nil)
+		wc := cioutil.NewNopWriteCloser(buf)
+		redirectLogs("test-path", rc, wc, test.stream)
+		output := buf.String()
 		lines := strings.Split(output, "\n")
 		lines = lines[:len(lines)-1] // Discard empty string after last \n
 		assert.Len(t, lines, len(test.content))

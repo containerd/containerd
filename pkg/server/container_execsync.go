@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -115,8 +116,13 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 	pspec.Terminal = opts.tty
 
 	if opts.stdin == nil {
-		// Create empty buffer if stdin is nil.
 		opts.stdin = new(bytes.Buffer)
+	}
+	if opts.stdout == nil {
+		opts.stdout = ioutil.Discard
+	}
+	if opts.stderr == nil {
+		opts.stderr = ioutil.Discard
 	}
 	execID := util.GenerateID()
 	process, err := task.Exec(ctx, execID, pspec, containerd.NewIOWithTerminal(

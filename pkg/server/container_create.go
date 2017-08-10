@@ -30,6 +30,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
+	cio "github.com/kubernetes-incubator/cri-containerd/pkg/server/io"
 	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
 )
@@ -119,6 +120,21 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 		}
 	}()
 
+	containerIO, err := cio.NewContainerIO(id,
+		cio.WithStdin(config.GetStdin()),
+		cio.WithTerminal(config.GetTty()),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create container io: %v", err)
+	}
+	defer func() {
+		if retErr != nil {
+			if err := containerIO.Close(); err != nil {
+				glog.Errorf("Failed to close container io %q : %v", id, err)
+			}
+		}
+	}()
+
 	metaBytes, err := meta.Encode()
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert sandbox metadata: %+v, %v", meta, err)
@@ -143,9 +159,11 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 		}
 	}()
 
-	container, err := containerstore.NewContainer(meta,
-		containerstore.Status{CreatedAt: time.Now().UnixNano()},
-		containerstore.WithContainer(cntr))
+	status := containerstore.Status{CreatedAt: time.Now().UnixNano()}
+	container, err := containerstore.NewContainer(meta, status,
+		containerstore.WithContainer(cntr),
+		containerstore.WithContainerIO(containerIO),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create internal container object for %q: %v",
 			id, err)
