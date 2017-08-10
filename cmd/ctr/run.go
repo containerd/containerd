@@ -2,6 +2,8 @@ package main
 
 import (
 	gocontext "context"
+	"fmt"
+	"runtime"
 	"syscall"
 
 	"github.com/containerd/console"
@@ -56,7 +58,7 @@ var runCommand = cli.Command{
 		cli.StringFlag{
 			Name:  "runtime",
 			Usage: "runtime name (io.containerd.runtime.v1.linux, io.containerd.runtime.v1.windows, io.containerd.runtime.v1.com.vmware.linux)",
-			Value: "io.containerd.runtime.v1.linux",
+			Value: fmt.Sprintf("io.containerd.runtime.v1.%s", runtime.GOOS),
 		},
 		cli.BoolFlag{
 			Name:  "readonly",
