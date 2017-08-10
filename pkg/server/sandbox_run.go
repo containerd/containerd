@@ -306,7 +306,11 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 
 	// TODO(random-liu): [P1] Set privileged.
 
-	// TODO(random-liu): [P2] Set sysctl from annotations.
+	// Add sysctls
+	sysctls := config.GetLinux().GetSysctls()
+	for key, value := range sysctls {
+		g.AddLinuxSysctl(key, value)
+	}
 
 	// TODO(random-liu): [P2] Set apparmor and seccomp from annotations.
 
