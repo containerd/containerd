@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/containers"
@@ -241,7 +242,11 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 	imageConfig *imagespec.ImageConfig) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
 	// TODO(random-liu): [P1] Compare the default settings with docker and containerd default.
-	g := generate.New()
+	spec, err := containerd.GenerateSpec()
+	if err != nil {
+		return nil, err
+	}
+	g := generate.NewFromSpec(spec)
 
 	// Apply default config from image config.
 	if err := addImageEnvs(&g, imageConfig.Env); err != nil {
