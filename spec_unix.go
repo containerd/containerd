@@ -128,12 +128,6 @@ func createDefaultSpec() (*specs.Spec, error) {
 				Source:      "sysfs",
 				Options:     []string{"nosuid", "noexec", "nodev", "ro"},
 			},
-			{
-				Destination: "/run",
-				Type:        "tmpfs",
-				Source:      "tmpfs",
-				Options:     []string{"nosuid", "strictatime", "mode=755", "size=65536k"},
-			},
 		},
 		Linux: &specs.Linux{
 			// TODO (@crosbymichael) make sure we don't have have two containers in the same cgroup

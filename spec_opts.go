@@ -20,3 +20,17 @@ func WithHostname(name string) SpecOpts {
 		return nil
 	}
 }
+
+// WithMount adds passed in mount into the spec.
+func WithMount(mount specs.Mount) SpecOpts {
+	return func(s *specs.Spec) error {
+		mounts := s.Mounts
+		for i, m := range mounts {
+			if m.Destination == mount.Destination {
+				mounts = append(mounts[:i], mounts[i+1:]...)
+			}
+		}
+		s.Mounts = append(mounts, mount)
+		return nil
+	}
+}
