@@ -1,26 +1,24 @@
 package local
 
 import (
-	"io"
 	"os"
 )
 
 // readerat implements io.ReaderAt in a completely stateless manner by opening
 // the referenced file for each call to ReadAt.
-type readerAt struct {
-	f string
+type sizeReaderAt struct {
+	size int64
+	fp   *os.File
 }
 
-func (ra readerAt) ReadAt(p []byte, offset int64) (int, error) {
-	fp, err := os.Open(ra.f)
-	if err != nil {
-		return 0, err
-	}
-	defer fp.Close()
+func (ra sizeReaderAt) ReadAt(p []byte, offset int64) (int, error) {
+	return ra.fp.ReadAt(p, offset)
+}
 
-	if _, err := fp.Seek(offset, io.SeekStart); err != nil {
-		return 0, err
-	}
+func (ra sizeReaderAt) Size() int64 {
+	return ra.size
+}
 
-	return fp.Read(p)
+func (ra sizeReaderAt) Close() error {
+	return ra.fp.Close()
 }

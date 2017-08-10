@@ -210,13 +210,13 @@ func (c *Converter) fetchBlob(ctx context.Context, desc ocispec.Descriptor) erro
 		// TODO: Check if blob -> diff id mapping already exists
 		// TODO: Check if blob empty label exists
 
-		r, err := c.contentStore.Reader(ctx, desc.Digest)
+		ra, err := c.contentStore.ReaderAt(ctx, desc.Digest)
 		if err != nil {
 			return err
 		}
-		defer r.Close()
+		defer ra.Close()
 
-		gr, err := gzip.NewReader(r)
+		gr, err := gzip.NewReader(content.NewReader(ra))
 		if err != nil {
 			return err
 		}

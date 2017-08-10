@@ -58,11 +58,11 @@ var pushObjectCommand = cli.Command{
 			Size:      info.Size,
 		}
 
-		rc, err := cs.Reader(ctx, dgst)
+		ra, err := cs.ReaderAt(ctx, dgst)
 		if err != nil {
 			return err
 		}
-		defer rc.Close()
+		defer ra.Close()
 
 		cw, err := pusher.Push(ctx, desc)
 		if err != nil {
@@ -70,7 +70,7 @@ var pushObjectCommand = cli.Command{
 		}
 
 		// TODO: Progress reader
-		if err := content.Copy(cw, rc, desc.Size, desc.Digest); err != nil {
+		if err := content.Copy(cw, content.NewReader(ra), desc.Size, desc.Digest); err != nil {
 			return err
 		}
 

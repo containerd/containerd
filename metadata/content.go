@@ -3,7 +3,6 @@ package metadata
 import (
 	"context"
 	"encoding/binary"
-	"io"
 	"strings"
 	"time"
 
@@ -416,14 +415,7 @@ func (nw *namespacedWriter) Status() (content.Status, error) {
 	return st, err
 }
 
-func (cs *contentStore) Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, error) {
-	if err := cs.checkAccess(ctx, dgst); err != nil {
-		return nil, err
-	}
-	return cs.Store.Reader(ctx, dgst)
-}
-
-func (cs *contentStore) ReaderAt(ctx context.Context, dgst digest.Digest) (io.ReaderAt, error) {
+func (cs *contentStore) ReaderAt(ctx context.Context, dgst digest.Digest) (content.ReaderAt, error) {
 	if err := cs.checkAccess(ctx, dgst); err != nil {
 		return nil, err
 	}

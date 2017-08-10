@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/typeurl"
 	"github.com/opencontainers/image-spec/specs-go/v1"
@@ -30,15 +31,13 @@ func WithImageConfig(ctx context.Context, i Image) SpecOpts {
 		)
 		switch ic.MediaType {
 		case v1.MediaTypeImageConfig, images.MediaTypeDockerSchema2Config:
-			r, err := store.Reader(ctx, ic.Digest)
+			p, err := content.ReadBlob(ctx, store, ic.Digest)
 			if err != nil {
 				return err
 			}
-			if err := json.NewDecoder(r).Decode(&ociimage); err != nil {
-				r.Close()
+			if err := json.Unmarshal(p, &ociimage); err != nil {
 				return err
 			}
-			r.Close()
 			config = ociimage.Config
 		default:
 			return fmt.Errorf("unknown image config media type %s", ic.MediaType)

@@ -54,13 +54,13 @@ var (
 				return err
 			}
 
-			rc, err := cs.Reader(ctx, dgst)
+			ra, err := cs.ReaderAt(ctx, dgst)
 			if err != nil {
 				return err
 			}
-			defer rc.Close()
+			defer ra.Close()
 
-			_, err = io.Copy(os.Stdout, rc)
+			_, err = io.Copy(os.Stdout, content.NewReader(ra))
 			return err
 		},
 	}
@@ -306,24 +306,24 @@ var (
 				return err
 			}
 
-			content, err := getContentStore(context)
+			cs, err := getContentStore(context)
 			if err != nil {
 				return err
 			}
 
-			rc, err := content.Reader(ctx, dgst)
+			ra, err := cs.ReaderAt(ctx, dgst)
 			if err != nil {
 				return err
 			}
-			defer rc.Close()
+			defer ra.Close()
 
-			nrc, err := edit(rc)
+			nrc, err := edit(content.NewReader(ra))
 			if err != nil {
 				return err
 			}
 			defer nrc.Close()
 
-			wr, err := content.Writer(ctx, "edit-"+object, 0, "") // TODO(stevvooe): Choose a better key?
+			wr, err := cs.Writer(ctx, "edit-"+object, 0, "") // TODO(stevvooe): Choose a better key?
 			if err != nil {
 				return err
 			}

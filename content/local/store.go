@@ -69,22 +69,28 @@ func (s *store) info(dgst digest.Digest, fi os.FileInfo) content.Info {
 	}
 }
 
-// Reader returns an io.ReadCloser for the blob.
-func (s *store) Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, error) {
-	fp, err := os.Open(s.blobPath(dgst))
+// ReaderAt returns an io.ReaderAt for the blob.
+func (s *store) ReaderAt(ctx context.Context, dgst digest.Digest) (content.ReaderAt, error) {
+	p := s.blobPath(dgst)
+	fi, err := os.Stat(p)
 	if err != nil {
-		if os.IsNotExist(err) {
-			err = errors.Wrapf(errdefs.ErrNotFound, "content %v", dgst)
+		if !os.IsNotExist(err) {
+			return nil, err
 		}
-		return nil, err
+
+		return nil, errors.Wrapf(errdefs.ErrNotFound, "blob %s expected at %s", dgst, p)
 	}
 
-	return fp, nil
-}
+	fp, err := os.Open(p)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
 
-// ReaderAt returns an io.ReaderAt for the blob.
-func (s *store) ReaderAt(ctx context.Context, dgst digest.Digest) (io.ReaderAt, error) {
-	return readerAt{f: s.blobPath(dgst)}, nil
+		return nil, errors.Wrapf(errdefs.ErrNotFound, "blob %s expected at %s", dgst, p)
+	}
+
+	return sizeReaderAt{size: fi.Size(), fp: fp}, nil
 }
 
 // Delete removes a blob by its digest.

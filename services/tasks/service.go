@@ -100,11 +100,11 @@ func (s *Service) Create(ctx context.Context, r *api.CreateTaskRequest) (*api.Cr
 		if r.Checkpoint.MediaType != images.MediaTypeContainerd1Checkpoint {
 			return nil, fmt.Errorf("unsupported checkpoint type %q", r.Checkpoint.MediaType)
 		}
-		reader, err := s.store.Reader(ctx, r.Checkpoint.Digest)
+		reader, err := s.store.ReaderAt(ctx, r.Checkpoint.Digest)
 		if err != nil {
 			return nil, err
 		}
-		_, err = archive.Apply(ctx, checkpointPath, reader)
+		_, err = archive.Apply(ctx, checkpointPath, content.NewReader(reader))
 		reader.Close()
 		if err != nil {
 			return nil, err

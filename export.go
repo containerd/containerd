@@ -43,15 +43,17 @@ func (c *Client) exportToOCITar(ctx context.Context, desc ocispec.Descriptor, wr
 
 func exportHandler(cs content.Store, img oci.ImageDriver) images.HandlerFunc {
 	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		r, err := cs.Reader(ctx, desc.Digest)
+		r, err := cs.ReaderAt(ctx, desc.Digest)
 		if err != nil {
 			return nil, err
 		}
+		defer r.Close()
+
 		w, err := oci.NewBlobWriter(img, desc.Digest.Algorithm())
 		if err != nil {
 			return nil, err
 		}
-		if _, err = io.Copy(w, r); err != nil {
+		if _, err = io.Copy(w, content.NewReader(r)); err != nil {
 			return nil, err
 		}
 		if err = w.Commit(desc.Size, desc.Digest); err != nil {
