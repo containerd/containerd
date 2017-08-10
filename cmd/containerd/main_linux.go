@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"path/filepath"
 
 	"golang.org/x/sys/unix"
 
@@ -11,7 +12,7 @@ import (
 	"github.com/containerd/containerd/server"
 )
 
-const defaultConfigPath = "/etc/containerd/config.toml"
+var defaultConfigPath = "/etc/containerd/config.toml"
 
 var handledSignals = []os.Signal{
 	unix.SIGTERM,
@@ -36,4 +37,13 @@ func handleSignals(ctx context.Context, signals chan os.Signal, server *server.S
 		}
 	}
 	return nil
+}
+
+func init() {
+	// if we are installed in another root, tweak the default config path to be
+	// relative the binary location.
+	t, err := os.Readlink("/proc/self/exe")
+	if err == nil {
+		defaultConfigPath = filepath.Join(filepath.Dir(t), "../"+defaultConfigPath)
+	}
 }
