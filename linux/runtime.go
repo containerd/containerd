@@ -215,6 +215,7 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 		filepath.Join(r.state, namespace, lc.id),
 		filepath.Join(r.root, namespace, lc.id),
 		namespace,
+		lc.id,
 		r.events,
 	)
 	if err := bundle.Delete(); err != nil {
@@ -267,7 +268,8 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			continue
 		}
 		id := path.Name()
-		bundle := loadBundle(filepath.Join(r.state, ns, id), filepath.Join(r.root, ns, id), ns, r.events)
+		bundle := loadBundle(filepath.Join(r.state, ns, id),
+			filepath.Join(r.root, ns, id), ns, id, r.events)
 
 		s, err := bundle.Connect(ctx, r.remote)
 		if err != nil {

@@ -17,10 +17,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-func loadBundle(path, workdir, namespace string, events *events.Exchange) *bundle {
+func loadBundle(path, workdir, namespace, id string, events *events.Exchange) *bundle {
 	return &bundle{
 		path:      path,
 		namespace: namespace,
+		id:        id,
 		events:    events,
 		workDir:   workdir,
 	}
