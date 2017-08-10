@@ -7,10 +7,10 @@ import (
 	winio "github.com/Microsoft/go-winio"
 )
 
-func dialer(address string, timeout time.Duration) (net.Conn, error) {
+func Dialer(address string, timeout time.Duration) (net.Conn, error) {
 	return winio.DialPipe(address, &timeout)
 }
 
-func dialAddress(address string) string {
+func DialAddress(address string) string {
 	return address
 }

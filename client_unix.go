@@ -31,7 +31,7 @@ type dialResult struct {
 	err error
 }
 
-func dialer(address string, timeout time.Duration) (net.Conn, error) {
+func Dialer(address string, timeout time.Duration) (net.Conn, error) {
 	var (
 		stopC = make(chan struct{})
 		synC  = make(chan *dialResult)
@@ -69,6 +69,6 @@ func dialer(address string, timeout time.Duration) (net.Conn, error) {
 	}
 }
 
-func dialAddress(address string) string {
+func DialAddress(address string) string {
 	return fmt.Sprintf("unix://%s", address)
 }

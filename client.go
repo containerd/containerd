@@ -67,7 +67,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 		grpc.WithTimeout(60 * time.Second),
 		grpc.FailOnNonTempDialError(true),
 		grpc.WithBackoffMaxDelay(3 * time.Second),
-		grpc.WithDialer(dialer),
+		grpc.WithDialer(Dialer),
 	}
 	if len(copts.dialOptions) > 0 {
 		gopts = copts.dialOptions
@@ -79,7 +79,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 			grpc.WithStreamInterceptor(stream),
 		)
 	}
-	conn, err := grpc.Dial(dialAddress(address), gopts...)
+	conn, err := grpc.Dial(DialAddress(address), gopts...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to dial %q", address)
 	}
