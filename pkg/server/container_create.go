@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	prototypes "github.com/gogo/protobuf/types"
 	"github.com/golang/glog"
@@ -181,7 +182,11 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint32, config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig, extraMounts []*runtime.Mount) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
-	g := generate.New()
+	spec, err := containerd.GenerateSpec()
+	if err != nil {
+		return nil, err
+	}
+	g := generate.NewFromSpec(spec)
 
 	// Set the relative path to the rootfs of the container from containerd's
 	// pre-defined directory.
