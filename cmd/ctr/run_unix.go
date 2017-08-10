@@ -99,6 +99,7 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			cOpts = append(cOpts, containerd.WithNewSnapshot(id, image))
 		}
 	}
+	cOpts = append(cOpts, containerd.WithRuntime(context.String("runtime")))
 
 	opts = append(opts, withEnv(context), withMounts(context))
 	if len(args) > 0 {

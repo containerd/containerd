@@ -117,6 +117,7 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	return client.NewContainer(ctx, id,
 		containerd.WithSpec(spec),
 		containerd.WithContainerLabels(labels),
+		containerd.WithRuntime(context.String("runtime")),
 		// TODO(mlaventure): containerd.WithImage(image),
 	)
 }
