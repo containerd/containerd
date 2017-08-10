@@ -1,4 +1,4 @@
-This directory contains the GRPC API definitions for contaienrd.
+This directory contains the GRPC API definitions for containerd.
 
 All defined services and messages have been aggregated into `*.pb.txt`
 descriptors files in this directory. Definitions present here are considered
