@@ -8,11 +8,8 @@ import (
 	"text/tabwriter"
 
 	"github.com/containerd/containerd/progress"
-	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/snapshot"
-	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -21,7 +18,6 @@ var snapshotCommand = cli.Command{
 	Usage: "snapshot management",
 	Flags: snapshotterFlags,
 	Subcommands: cli.Commands{
-		archiveSnapshotCommand,
 		listSnapshotCommand,
 		usageSnapshotCommand,
 		removeSnapshotCommand,
@@ -29,49 +25,6 @@ var snapshotCommand = cli.Command{
 		treeSnapshotCommand,
 		mountSnapshotCommand,
 		commitSnapshotCommand,
-	},
-}
-
-var archiveSnapshotCommand = cli.Command{
-	Name:      "archive",
-	Usage:     "Create an archive of a snapshot",
-	ArgsUsage: "[flags] id",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "id",
-			Usage: "id of the container or snapshot",
-		},
-	},
-	Action: func(clicontext *cli.Context) error {
-		ctx, cancel := appContext(clicontext)
-		defer cancel()
-
-		id := clicontext.String("id")
-		if id == "" {
-			return errors.New("container id must be provided")
-		}
-
-		snapshotter, err := getSnapshotter(clicontext)
-		if err != nil {
-			return err
-		}
-
-		differ, err := getDiffService(clicontext)
-		if err != nil {
-			return err
-		}
-
-		contentRef := fmt.Sprintf("diff-%s", id)
-
-		d, err := rootfs.Diff(ctx, id, contentRef, snapshotter, differ)
-		if err != nil {
-			return err
-		}
-
-		// TODO: Track progress
-		fmt.Printf("%s %s\n", d.MediaType, d.Digest)
-
-		return nil
 	},
 }
 
@@ -89,7 +42,7 @@ var listSnapshotCommand = cli.Command{
 		}
 
 		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
-		fmt.Fprintln(tw, "ID\tPARENT\tKIND\t")
+		fmt.Fprintln(tw, "KEY\tPARENT\tKIND\t")
 
 		if err := snapshotter.Walk(ctx, func(ctx context.Context, info snapshot.Info) error {
 			fmt.Fprintf(tw, "%v\t%v\t%v\t\n",
@@ -108,7 +61,7 @@ var listSnapshotCommand = cli.Command{
 var usageSnapshotCommand = cli.Command{
 	Name:      "usage",
 	Usage:     "Usage snapshots",
-	ArgsUsage: "[flags] [id] ...",
+	ArgsUsage: "[flags] [<key>, ...]",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "b",
@@ -136,7 +89,7 @@ var usageSnapshotCommand = cli.Command{
 		}
 
 		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
-		fmt.Fprintln(tw, "ID\tSize\tInodes\t")
+		fmt.Fprintln(tw, "KEY\tSIZE\tINODES\t")
 
 		if clicontext.NArg() == 0 {
 			if err := snapshotter.Walk(ctx, func(ctx context.Context, info snapshot.Info) error {
@@ -166,7 +119,7 @@ var usageSnapshotCommand = cli.Command{
 var removeSnapshotCommand = cli.Command{
 	Name:      "remove",
 	Aliases:   []string{"rm"},
-	ArgsUsage: "id [id] ...",
+	ArgsUsage: "<key> [<key>, ...]",
 	Usage:     "remove snapshots",
 	Action: func(clicontext *cli.Context) error {
 		ctx, cancel := appContext(clicontext)
@@ -177,10 +130,10 @@ var removeSnapshotCommand = cli.Command{
 			return err
 		}
 
-		for _, id := range clicontext.Args() {
-			err = snapshotter.Remove(ctx, id)
+		for _, key := range clicontext.Args() {
+			err = snapshotter.Remove(ctx, key)
 			if err != nil {
-				return errors.Wrapf(err, "failed to remove %q", id)
+				return errors.Wrapf(err, "failed to remove %q", key)
 			}
 		}
 
@@ -191,11 +144,11 @@ var removeSnapshotCommand = cli.Command{
 var prepareSnapshotCommand = cli.Command{
 	Name:      "prepare",
 	Usage:     "prepare a snapshot from a committed snapshot",
-	ArgsUsage: "[flags] digest target",
+	ArgsUsage: "[flags] <key> [<parent>]",
 	Flags: []cli.Flag{
 		cli.StringFlag{
-			Name:  "snapshot-name",
-			Usage: "name of the target snapshot",
+			Name:  "target, t",
+			Usage: "mount target path, will print mount, if provided",
 		},
 	},
 	Action: func(clicontext *cli.Context) error {
@@ -206,33 +159,24 @@ var prepareSnapshotCommand = cli.Command{
 			return cli.ShowSubcommandHelp(clicontext)
 		}
 
-		dgst, err := digest.Parse(clicontext.Args().Get(0))
-		if err != nil {
-			return err
-		}
-
-		target := clicontext.Args().Get(1)
-
-		snapshotName := clicontext.String("snapshot-name")
-		// Use the target as the snapshotName if no snapshot-name is provided
-		if snapshotName == "" {
-			snapshotName = target
-		}
-
-		logrus.Infof("preparing mounts %s", dgst.String())
+		target := clicontext.String("target")
+		key := clicontext.Args().Get(0)
+		parent := clicontext.Args().Get(1)
 
 		snapshotter, err := getSnapshotter(clicontext)
 		if err != nil {
 			return err
 		}
 
-		mounts, err := snapshotter.Prepare(ctx, snapshotName, dgst.String())
+		mounts, err := snapshotter.Prepare(ctx, key, parent)
 		if err != nil {
 			return err
 		}
 
-		for _, m := range mounts {
-			fmt.Fprintf(os.Stdout, "mount -t %s %s %s -o %s\n", m.Type, m.Source, target, strings.Join(m.Options, ","))
+		if target != "" {
+			for _, m := range mounts {
+				fmt.Fprintf(os.Stdout, "mount -t %s %s %s -o %s\n", m.Type, m.Source, target, strings.Join(m.Options, ","))
+			}
 		}
 
 		return nil
@@ -240,37 +184,26 @@ var prepareSnapshotCommand = cli.Command{
 }
 
 var mountSnapshotCommand = cli.Command{
-	Name:      "mount",
+	Name:      "mounts",
+	Aliases:   []string{"m", "mount"},
 	Usage:     "mount gets mount commands for the active snapshots",
-	ArgsUsage: "[flags] target",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "snapshot-name",
-			Usage: "name of the snapshot",
-		},
-	},
+	ArgsUsage: "[flags] <target> <key>",
 	Action: func(clicontext *cli.Context) error {
 		ctx, cancel := appContext(clicontext)
 		defer cancel()
 
-		if clicontext.NArg() != 1 {
+		if clicontext.NArg() != 2 {
 			return cli.ShowSubcommandHelp(clicontext)
 		}
 
 		target := clicontext.Args().Get(0)
-
-		snapshotName := clicontext.String("snapshot-name")
-		// Use the target as the snapshotName if no snapshot-name is provided
-		if snapshotName == "" {
-			snapshotName = target
-		}
-
+		key := clicontext.Args().Get(1)
 		snapshotter, err := getSnapshotter(clicontext)
 		if err != nil {
 			return err
 		}
 
-		mounts, err := snapshotter.Mounts(ctx, snapshotName)
+		mounts, err := snapshotter.Mounts(ctx, key)
 		if err != nil {
 			return err
 		}
@@ -285,8 +218,8 @@ var mountSnapshotCommand = cli.Command{
 
 var commitSnapshotCommand = cli.Command{
 	Name:      "commit",
-	Usage:     "commit creates a new snapshot with diff from parent snapshot",
-	ArgsUsage: "[flags] <id> <target>",
+	Usage:     "commit an active snapshot into the provided name",
+	ArgsUsage: "[flags] <key> <active>",
 	Action: func(clicontext *cli.Context) error {
 		ctx, cancel := appContext(clicontext)
 		defer cancel()
@@ -295,15 +228,15 @@ var commitSnapshotCommand = cli.Command{
 			return cli.ShowSubcommandHelp(clicontext)
 		}
 
-		id := clicontext.Args().Get(0)
-		target := clicontext.Args().Get(1)
+		key := clicontext.Args().Get(1)
+		active := clicontext.Args().Get(0)
 
 		snapshotter, err := getSnapshotter(clicontext)
 		if err != nil {
 			return err
 		}
 
-		return snapshotter.Commit(ctx, target, id)
+		return snapshotter.Commit(ctx, key, active)
 	},
 }
 
