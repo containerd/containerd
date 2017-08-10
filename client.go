@@ -64,8 +64,9 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 	gopts := []grpc.DialOption{
 		grpc.WithBlock(),
 		grpc.WithInsecure(),
-		grpc.WithTimeout(100 * time.Second),
+		grpc.WithTimeout(60 * time.Second),
 		grpc.FailOnNonTempDialError(true),
+		grpc.WithBackoffMaxDelay(3 * time.Second),
 		grpc.WithDialer(dialer),
 	}
 	if len(copts.dialOptions) > 0 {
