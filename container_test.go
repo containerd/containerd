@@ -805,7 +805,7 @@ func TestContainerNoBinaryExists(t *testing.T) {
 		}
 	}
 
-	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("nothing"))
+	spec, err := generateSpec(withImageConfig(ctx, image), WithProcessArgs("nothing"))
 	if err != nil {
 		t.Error(err)
 		return
@@ -821,11 +821,12 @@ func TestContainerNoBinaryExists(t *testing.T) {
 	switch runtime.GOOS {
 	case "windows":
 		if err != nil {
-			t.Errorf("failed to create task %v", err)
+			t.Fatalf("failed to create task %v", err)
 		}
-		if err := task.Start(ctx); err != nil {
+		defer task.Delete(ctx)
+		if err := task.Start(ctx); err == nil {
+			task.Kill(ctx, syscall.SIGKILL)
 			t.Error("task.Start() should return an error when binary does not exist")
-			task.Delete(ctx)
 		}
 	default:
 		if err == nil {

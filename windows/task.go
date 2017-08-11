@@ -114,6 +114,7 @@ func (t *task) Start(ctx context.Context) error {
 		return err
 	}
 	if err := p.Start(ctx); err != nil {
+		t.removeProcess(t.id)
 		return err
 	}
 	t.publisher.Publish(ctx,
