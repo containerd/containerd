@@ -149,6 +149,8 @@ func newClient(t testing.TB, address string, opts ...ClientOpt) (*Client, error)
 }
 
 func TestNewClient(t *testing.T) {
+	t.Parallel()
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -161,6 +163,7 @@ func TestNewClient(t *testing.T) {
 	}
 }
 
+// All the container's tests depends on this, we need it to run first.
 func TestImagePull(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		// TODO: remove once Windows has a snapshotter

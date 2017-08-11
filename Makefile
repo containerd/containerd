@@ -69,7 +69,8 @@ ifeq ($(filter \
 endif
 
 # Flags passed to `go test`
-TESTFLAGS ?=-parallel 8 -v $(TESTFLAGS_RACE)
+TESTFLAGS ?= -v $(TESTFLAGS_RACE)
+TESTFLAGS_PARALLEL ?= 8
 
 .PHONY: clean all AUTHORS fmt vet lint dco build binaries test integration setup generate protos checkprotos coverage ci check help install uninstall vendor release
 .DEFAULT: default
@@ -154,7 +155,11 @@ root-test: ## run tests, except integration tests
 
 integration: ## run integration tests
 	@echo "$(WHALE) $@"
-	@go test ${TESTFLAGS} -test.root
+	@go test ${TESTFLAGS} -test.root -parallel 1
+
+integration-parallel: ## run integration tests
+	@echo "$(WHALE) $@"
+	@go test ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL}
 
 benchmark: ## run benchmarks tests
 	@echo "$(WHALE) $@"

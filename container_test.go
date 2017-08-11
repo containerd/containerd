@@ -44,6 +44,8 @@ func TestContainerList(t *testing.T) {
 }
 
 func TestNewContainer(t *testing.T) {
+	t.Parallel()
+
 	id := t.Name()
 	client, err := newClient(t, address)
 	if err != nil {
@@ -80,6 +82,8 @@ func TestNewContainer(t *testing.T) {
 }
 
 func TestContainerStart(t *testing.T) {
+	t.Parallel()
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -151,6 +155,8 @@ func TestContainerStart(t *testing.T) {
 }
 
 func TestContainerOutput(t *testing.T) {
+	t.Parallel()
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -225,6 +231,8 @@ func TestContainerOutput(t *testing.T) {
 }
 
 func TestContainerExec(t *testing.T) {
+	t.Parallel()
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -322,6 +330,8 @@ func TestContainerExec(t *testing.T) {
 }
 
 func TestContainerPids(t *testing.T) {
+	t.Parallel()
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -401,6 +411,8 @@ func TestContainerPids(t *testing.T) {
 }
 
 func TestContainerCloseIO(t *testing.T) {
+	t.Parallel()
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -492,6 +504,8 @@ func TestContainerCloseIO(t *testing.T) {
 }
 
 func TestContainerAttach(t *testing.T) {
+	t.Parallel()
+
 	if runtime.GOOS == "windows" {
 		// On windows, closing the write side of the pipe closes the read
 		// side, sending an EOF to it and preventing reopening it.
@@ -625,6 +639,8 @@ func TestContainerAttach(t *testing.T) {
 }
 
 func TestDeleteRunningContainer(t *testing.T) {
+	t.Parallel()
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -694,6 +710,8 @@ func TestDeleteRunningContainer(t *testing.T) {
 }
 
 func TestContainerKill(t *testing.T) {
+	t.Parallel()
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -764,6 +782,8 @@ func TestContainerKill(t *testing.T) {
 }
 
 func TestContainerNoBinaryExists(t *testing.T) {
+	t.Parallel()
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -816,6 +836,8 @@ func TestContainerNoBinaryExists(t *testing.T) {
 }
 
 func TestContainerExecNoBinaryExists(t *testing.T) {
+	t.Parallel()
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -891,6 +913,8 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 }
 
 func TestUserNamespaces(t *testing.T) {
+	t.Parallel()
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -969,6 +993,8 @@ func TestUserNamespaces(t *testing.T) {
 }
 
 func TestWaitStoppedTask(t *testing.T) {
+	t.Parallel()
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -1039,6 +1065,8 @@ func TestWaitStoppedTask(t *testing.T) {
 }
 
 func TestWaitStoppedProcess(t *testing.T) {
+	t.Parallel()
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -1134,6 +1162,8 @@ func TestWaitStoppedProcess(t *testing.T) {
 }
 
 func TestTaskForceDelete(t *testing.T) {
+	t.Parallel()
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -1185,6 +1215,8 @@ func TestTaskForceDelete(t *testing.T) {
 }
 
 func TestProcessForceDelete(t *testing.T) {
+	t.Parallel()
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -1264,6 +1296,8 @@ func TestProcessForceDelete(t *testing.T) {
 }
 
 func TestContainerHostname(t *testing.T) {
+	t.Parallel()
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
