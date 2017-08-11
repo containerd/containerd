@@ -165,12 +165,13 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...Ne
 	if err != nil {
 		return nil, err
 	}
+	cfg := i.Config()
 	request := &tasks.CreateTaskRequest{
 		ContainerID: c.c.ID,
-		Terminal:    i.Terminal,
-		Stdin:       i.Stdin,
-		Stdout:      i.Stdout,
-		Stderr:      i.Stderr,
+		Terminal:    cfg.Terminal,
+		Stdin:       cfg.Stdin,
+		Stdout:      cfg.Stdout,
+		Stderr:      cfg.Stderr,
 	}
 	if c.c.RootFS != "" {
 		// get the rootfs from the snapshotter and add it to the request
@@ -238,7 +239,7 @@ func (c *container) loadTask(ctx context.Context, ioAttach IOAttach) (Task, erro
 		}
 		return nil, err
 	}
-	var i *IO
+	var i IO
 	if ioAttach != nil {
 		// get the existing fifo paths from the task information stored by the daemon
 		paths := &FIFOSet{

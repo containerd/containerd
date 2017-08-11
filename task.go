@@ -119,7 +119,7 @@ var _ = (Task)(&task{})
 type task struct {
 	client *Client
 
-	io  *IO
+	io  IO
 	id  string
 	pid uint32
 
@@ -142,7 +142,7 @@ func (t *task) Start(ctx context.Context) error {
 		t.deferred = nil
 		t.mu.Unlock()
 		if err != nil {
-			t.io.closer.Close()
+			t.io.Close()
 			return err
 		}
 		t.pid = response.Pid
@@ -152,7 +152,7 @@ func (t *task) Start(ctx context.Context) error {
 		ContainerID: t.id,
 	})
 	if err != nil {
-		t.io.closer.Close()
+		t.io.Close()
 	}
 	return err
 }
@@ -279,13 +279,14 @@ func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreat
 	if err != nil {
 		return nil, err
 	}
+	cfg := i.Config()
 	request := &tasks.ExecProcessRequest{
 		ContainerID: t.id,
 		ExecID:      id,
-		Terminal:    i.Terminal,
-		Stdin:       i.Stdin,
-		Stdout:      i.Stdout,
-		Stderr:      i.Stderr,
+		Terminal:    cfg.Terminal,
+		Stdin:       cfg.Stdin,
+		Stdout:      cfg.Stdout,
+		Stderr:      cfg.Stderr,
 		Spec:        any,
 	}
 	if _, err := t.client.TaskService().Exec(ctx, request); err != nil {
@@ -325,7 +326,7 @@ func (t *task) CloseIO(ctx context.Context, opts ...IOCloserOpts) error {
 	return err
 }
 
-func (t *task) IO() *IO {
+func (t *task) IO() IO {
 	return t.io
 }
 

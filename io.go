@@ -8,8 +8,8 @@ import (
 	"sync"
 )
 
-// IO holds the io information for a task or process
-type IO struct {
+// IOConfig holds the io configurations.
+type IOConfig struct {
 	// Terminal is true if one has been allocated
 	Terminal bool
 	// Stdin path
@@ -18,39 +18,58 @@ type IO struct {
 	Stdout string
 	// Stderr path
 	Stderr string
+}
+
+// IO holds the io information for a task or process
+type IO interface {
+	// Config returns the IO configuration.
+	Config() IOConfig
+
+	// Cancel aborts all current io operations
+	Cancel()
+	// Wait blocks until all io copy operations have completed
+	Wait()
+	// Close cleans up all open io resources
+	Close() error
+}
+
+// cio is a basic container IO implementation.
+type cio struct {
+	config IOConfig
 
 	closer *wgCloser
 }
 
-// Cancel aborts all current io operations
-func (i *IO) Cancel() {
-	if i.closer == nil {
-		return
-	}
-	i.closer.Cancel()
+func (c *cio) Config() IOConfig {
+	return c.config
 }
 
-// Wait blocks until all io copy operations have completed
-func (i *IO) Wait() {
-	if i.closer == nil {
+func (c *cio) Cancel() {
+	if c.closer == nil {
 		return
 	}
-	i.closer.Wait()
+	c.closer.Cancel()
 }
 
-// Close cleans up all open io resources
-func (i *IO) Close() error {
-	if i.closer == nil {
+func (c *cio) Wait() {
+	if c.closer == nil {
+		return
+	}
+	c.closer.Wait()
+}
+
+func (c *cio) Close() error {
+	if c.closer == nil {
 		return nil
 	}
-	return i.closer.Close()
+	return c.closer.Close()
 }
 
 // IOCreation creates new IO sets for a task
-type IOCreation func(id string) (*IO, error)
+type IOCreation func(id string) (IO, error)
 
 // IOAttach allows callers to reattach to running tasks
-type IOAttach func(*FIFOSet) (*IO, error)
+type IOAttach func(*FIFOSet) (IO, error)
 
 // NewIO returns an IOCreation that will provide IO sets without a terminal
 func NewIO(stdin io.Reader, stdout, stderr io.Writer) IOCreation {
@@ -59,7 +78,7 @@ func NewIO(stdin io.Reader, stdout, stderr io.Writer) IOCreation {
 
 // NewIOWithTerminal creates a new io set with the provied io.Reader/Writers for use with a terminal
 func NewIOWithTerminal(stdin io.Reader, stdout, stderr io.Writer, terminal bool) IOCreation {
-	return func(id string) (_ *IO, err error) {
+	return func(id string) (_ IO, err error) {
 		paths, err := NewFifos(id)
 		if err != nil {
 			return nil, err
@@ -69,18 +88,19 @@ func NewIOWithTerminal(stdin io.Reader, stdout, stderr io.Writer, terminal bool)
 				os.RemoveAll(paths.Dir)
 			}
 		}()
-		i := &IO{
+		cfg := IOConfig{
 			Terminal: terminal,
 			Stdout:   paths.Out,
 			Stderr:   paths.Err,
 			Stdin:    paths.In,
 		}
+		i := &cio{config: cfg}
 		set := &ioSet{
 			in:  stdin,
 			out: stdout,
 			err: stderr,
 		}
-		closer, err := copyIO(paths, set, i.Terminal)
+		closer, err := copyIO(paths, set, cfg.Terminal)
 		if err != nil {
 			return nil, err
 		}
@@ -91,22 +111,23 @@ func NewIOWithTerminal(stdin io.Reader, stdout, stderr io.Writer, terminal bool)
 
 // WithAttach attaches the existing io for a task to the provided io.Reader/Writers
 func WithAttach(stdin io.Reader, stdout, stderr io.Writer) IOAttach {
-	return func(paths *FIFOSet) (*IO, error) {
+	return func(paths *FIFOSet) (IO, error) {
 		if paths == nil {
 			return nil, fmt.Errorf("cannot attach to existing fifos")
 		}
-		i := &IO{
+		cfg := IOConfig{
 			Terminal: paths.Terminal,
 			Stdout:   paths.Out,
 			Stderr:   paths.Err,
 			Stdin:    paths.In,
 		}
+		i := &cio{config: cfg}
 		set := &ioSet{
 			in:  stdin,
 			out: stdout,
 			err: stderr,
 		}
-		closer, err := copyIO(paths, set, i.Terminal)
+		closer, err := copyIO(paths, set, cfg.Terminal)
 		if err != nil {
 			return nil, err
 		}
@@ -117,18 +138,18 @@ func WithAttach(stdin io.Reader, stdout, stderr io.Writer) IOAttach {
 
 // Stdio returns an IO set to be used for a task
 // that outputs the container's IO as the current processes Stdio
-func Stdio(id string) (*IO, error) {
+func Stdio(id string) (IO, error) {
 	return NewIO(os.Stdin, os.Stdout, os.Stderr)(id)
 }
 
 // StdioTerminal will setup the IO for the task to use a terminal
-func StdioTerminal(id string) (*IO, error) {
+func StdioTerminal(id string) (IO, error) {
 	return NewIOWithTerminal(os.Stdin, os.Stdout, os.Stderr, true)(id)
 }
 
 // NullIO redirects the container's IO into /dev/null
-func NullIO(id string) (*IO, error) {
-	return &IO{}, nil
+func NullIO(id string) (IO, error) {
+	return &cio{}, nil
 }
 
 // FIFOSet is a set of fifos for use with tasks
