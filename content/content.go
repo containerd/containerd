@@ -5,7 +5,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/containerd/containerd/oci"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -83,8 +82,20 @@ type IngestManager interface {
 }
 
 type Writer interface {
-	oci.BlobWriter
+	// Close is expected to be called after Commit() when commission is needed.
+	io.WriteCloser
+
+	// Digest may return empty digest or panics until committed.
+	Digest() digest.Digest
+
+	// Commit commits the blob (but no roll-back is guaranteed on an error).
+	// size and expected can be zero-value when unknown.
+	Commit(size int64, expected digest.Digest) error
+
+	// Status returns the current state of write
 	Status() (Status, error)
+
+	// Truncate updates the size of the target blob
 	Truncate(size int64) error
 }
 

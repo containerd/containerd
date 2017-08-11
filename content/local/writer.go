@@ -8,7 +8,6 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/oci"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
@@ -79,7 +78,7 @@ func (w *writer) Commit(size int64, expected digest.Digest) error {
 	}
 
 	if size > 0 && size != fi.Size() {
-		return oci.ErrUnexpectedSize{Expected: size, Actual: fi.Size()}
+		return errors.Errorf("unexpected commit size %d, expected %d", fi.Size(), size)
 	}
 
 	if err := w.fp.Close(); err != nil {
@@ -88,7 +87,7 @@ func (w *writer) Commit(size int64, expected digest.Digest) error {
 
 	dgst := w.digester.Digest()
 	if expected != "" && expected != dgst {
-		return oci.ErrUnexpectedDigest{Expected: expected, Actual: dgst}
+		return errors.Errorf("unexpected commit digest %s, expected %s", dgst, expected)
 	}
 
 	var (
