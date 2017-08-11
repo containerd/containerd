@@ -29,6 +29,7 @@ test_script:
   # TODO: need an equivalent of TRAVIS_COMMIT_RANGE
   # - GIT_CHECK_EXCLUDE="./vendor" TRAVIS_COMMIT_RANGE="${TRAVIS_COMMIT_RANGE/.../..}" C:\MinGW\bin\mingw32-make.exe dco
   - bash.exe -elc "export PATH=/c/tools/mingw64/bin:/c/gopath/src/github.com/containerd/containerd/bin:$PATH ; mingw32-make.exe integration"
+  - bash.exe -elc "export PATH=/c/tools/mingw64/bin:/c/gopath/src/github.com/containerd/containerd/bin:$PATH ; mingw32-make.exe integration-parallel"
   # TODO: re-enable once the content unit-test have been updated to pass on windows
   #- bash.exe -lc "export PATH=/c/tools/mingw64/bin:/c/gopath/src/github.com/containerd/containerd/bin:$PATH ; mingw32-make.exe coverage"
   #- bash.exe -lc "export PATH=/c/tools/mingw64/bin:/c/gopath/src/github.com/containerd/containerd/bin:$PATH ; mingw32-make.exe root-coverage"
