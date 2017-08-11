@@ -1,30 +1,12 @@
-// +build !windows
-
 package containerd
 
 import (
-	"fmt"
 	"net"
-	"os"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
 )
-
-func isNoent(err error) bool {
-	if err != nil {
-		if nerr, ok := err.(*net.OpError); ok {
-			if serr, ok := nerr.Err.(*os.SyscallError); ok {
-				if serr.Err == syscall.ENOENT {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
 
 type dialResult struct {
 	c   net.Conn
@@ -44,7 +26,7 @@ func Dialer(address string, timeout time.Duration) (net.Conn, error) {
 			case <-stopC:
 				return
 			default:
-				c, err := net.DialTimeout("unix", address, timeout)
+				c, err := dialer(address, timeout)
 				if isNoent(err) {
 					<-time.After(10 * time.Millisecond)
 					continue
@@ -67,8 +49,4 @@ func Dialer(address string, timeout time.Duration) (net.Conn, error) {
 		}()
 		return nil, errors.Errorf("dial %s: no such file or directory", address)
 	}
-}
-
-func DialAddress(address string) string {
-	return fmt.Sprintf("unix://%s", address)
 }

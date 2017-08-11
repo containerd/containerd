@@ -104,10 +104,14 @@ type Client struct {
 	runtime   string
 }
 
-// IsServing returns true if the client can successfully connect to the containerd daemon
-// and the healthcheck service returns the SERVING response
+// IsServing returns true if the client can successfully connect to the
+// containerd daemon and the healthcheck service returns the SERVING
+// response.
+// This call will block if a transient error is encountered during
+// connection. A timeout can be set in the context to ensure it returns
+// early.
 func (c *Client) IsServing(ctx context.Context) (bool, error) {
-	r, err := c.HealthService().Check(ctx, &grpc_health_v1.HealthCheckRequest{})
+	r, err := c.HealthService().Check(ctx, &grpc_health_v1.HealthCheckRequest{}, grpc.FailFast(false))
 	if err != nil {
 		return false, err
 	}

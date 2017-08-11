@@ -2,7 +2,6 @@ package containerd
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os/exec"
 	"sync"
@@ -44,19 +43,19 @@ func (d *daemon) waitForStart(ctx context.Context) (*Client, error) {
 		err     error
 	)
 
-	for i := 0; i < 20; i++ {
-		if client == nil {
-			client, err = New(d.addr)
-		}
-		if err == nil {
-			serving, err = client.IsServing(ctx)
-			if serving {
-				return client, nil
-			}
-		}
-		time.Sleep(100 * time.Millisecond)
+	client, err = New(address)
+	if err != nil {
+		return nil, err
 	}
-	return nil, fmt.Errorf("containerd did not start within 2s: %v", err)
+	serving, err = client.IsServing(ctx)
+	if !serving {
+		client.Close()
+		if err == nil {
+			err = errors.New("connection was successful but service is not available")
+		}
+		return nil, err
+	}
+	return client, err
 }
 
 func (d *daemon) Stop() error {

@@ -240,14 +240,9 @@ func TestDaemonRestart(t *testing.T) {
 
 	<-statusC
 
-	serving := false
-	for i := 0; i < 20; i++ {
-		serving, err = client.IsServing(ctx)
-		if serving {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
+	waitCtx, waitCancel := context.WithTimeout(ctx, 2*time.Second)
+	serving, err := client.IsServing(waitCtx)
+	waitCancel()
 	if !serving {
 		t.Fatalf("containerd did not start within 2s: %v", err)
 	}
