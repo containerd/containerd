@@ -10,9 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"syscall"
 	"testing"
-	"time"
 
 	"google.golang.org/grpc/grpclog"
 
@@ -27,6 +25,8 @@ var (
 	noDaemon     bool
 	noCriu       bool
 	supportsCriu bool
+
+	ctrd = &daemon{}
 )
 
 func init() {
@@ -55,7 +55,6 @@ func TestMain(m *testing.M) {
 	supportsCriu = err == nil && !noCriu
 
 	var (
-		cmd         *exec.Cmd
 		buf         = bytes.NewBuffer(nil)
 		ctx, cancel = testContext()
 	)
@@ -64,27 +63,20 @@ func TestMain(m *testing.M) {
 	if !noDaemon {
 		os.RemoveAll(defaultRoot)
 
-		// setup a new containerd daemon if !testing.Short
-		cmd = exec.Command("containerd",
+		err := ctrd.start("containerd", address, []string{
 			"--root", defaultRoot,
-			"--address", address,
 			"--log-level", "debug",
-		)
-		cmd.Stdout = buf
-		cmd.Stderr = buf
-		if err := cmd.Start(); err != nil {
-			cmd.Wait()
+		}, buf, buf)
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %s", err, buf.String())
 			os.Exit(1)
 		}
 	}
 
-	client, err := waitForDaemonStart(ctx, address)
+	client, err := ctrd.waitForStart(ctx)
 	if err != nil {
-		if cmd.Process != nil {
-			cmd.Process.Kill()
-		}
-		cmd.Wait()
+		ctrd.Kill()
+		ctrd.Wait()
 		fmt.Fprintf(os.Stderr, "%s: %s", err, buf.String())
 		os.Exit(1)
 	}
@@ -105,8 +97,8 @@ func TestMain(m *testing.M) {
 	// pull a seed image
 	if runtime.GOOS != "windows" { // TODO: remove once pull is supported on windows
 		if _, err = client.Pull(ctx, testImage, WithPullUnpack); err != nil {
-			cmd.Process.Signal(syscall.SIGTERM)
-			cmd.Wait()
+			ctrd.Stop()
+			ctrd.Wait()
 			fmt.Fprintf(os.Stderr, "%s: %s", err, buf.String())
 			os.Exit(1)
 		}
@@ -126,12 +118,12 @@ func TestMain(m *testing.M) {
 
 	if !noDaemon {
 		// tear down the daemon and resources created
-		if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
-			if err := cmd.Process.Kill(); err != nil {
+		if err := ctrd.Stop(); err != nil {
+			if err := ctrd.Kill(); err != nil {
 				fmt.Fprintln(os.Stderr, "failed to signal containerd", err)
 			}
 		}
-		if err := cmd.Wait(); err != nil {
+		if err := ctrd.Wait(); err != nil {
 			if _, ok := err.(*exec.ExitError); !ok {
 				fmt.Fprintln(os.Stderr, "failed to wait for containerd", err)
 			}
@@ -146,28 +138,6 @@ func TestMain(m *testing.M) {
 		}
 	}
 	os.Exit(status)
-}
-
-func waitForDaemonStart(ctx context.Context, address string) (*Client, error) {
-	var (
-		client  *Client
-		serving bool
-		err     error
-	)
-
-	for i := 0; i < 20; i++ {
-		if client == nil {
-			client, err = New(address)
-		}
-		if err == nil {
-			serving, err = client.IsServing(ctx)
-			if serving {
-				return client, nil
-			}
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	return nil, fmt.Errorf("containerd did not start within 2s: %v", err)
 }
 
 func newClient(t testing.TB, address string, opts ...ClientOpt) (*Client, error) {

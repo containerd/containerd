@@ -220,7 +220,7 @@ func (t *task) Wait(ctx context.Context) (uint32, error) {
 	for {
 		evt, err := eventstream.Recv()
 		if err != nil {
-			return UnknownExitStatus, err
+			return UnknownExitStatus, errdefs.FromGRPC(err)
 		}
 		if typeurl.Is(evt.Event, &eventsapi.TaskExit{}) {
 			v, err := typeurl.UnmarshalAny(evt.Event)

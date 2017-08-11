@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/containerd"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
@@ -80,7 +81,7 @@ func main() {
 		if err != nil {
 			return err
 		}
-		server := grpc.NewServer()
+		server := newServer()
 		e, err := connectEvents(context.GlobalString("address"))
 		if err != nil {
 			return err
@@ -171,7 +172,7 @@ func dumpStacks() {
 }
 
 func connectEvents(address string) (eventsapi.EventsClient, error) {
-	conn, err := connect(address, dialer)
+	conn, err := connect(address, containerd.Dialer)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to dial %q", address)
 	}
@@ -182,24 +183,16 @@ func connect(address string, d func(string, time.Duration) (net.Conn, error)) (*
 	gopts := []grpc.DialOption{
 		grpc.WithBlock(),
 		grpc.WithInsecure(),
-		grpc.WithTimeout(100 * time.Second),
+		grpc.WithTimeout(60 * time.Second),
 		grpc.WithDialer(d),
 		grpc.FailOnNonTempDialError(true),
+		grpc.WithBackoffMaxDelay(3 * time.Second),
 	}
-	conn, err := grpc.Dial(dialAddress(address), gopts...)
+	conn, err := grpc.Dial(containerd.DialAddress(address), gopts...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to dial %q", address)
 	}
 	return conn, nil
-}
-
-func dialer(address string, timeout time.Duration) (net.Conn, error) {
-	address = strings.TrimPrefix(address, "unix://")
-	return net.DialTimeout("unix", address, timeout)
-}
-
-func dialAddress(address string) string {
-	return fmt.Sprintf("unix://%s", address)
 }
 
 type remoteEventsPublisher struct {
