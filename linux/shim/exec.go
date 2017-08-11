@@ -142,7 +142,7 @@ func (e *execProcess) Start(ctx context.Context) (err error) {
 		}
 		defer socket.Close()
 	} else {
-		if io, err = runc.NewPipeIO(0, 0); err != nil {
+		if io, err = runc.NewPipeIO(); err != nil {
 			return errors.Wrap(err, "failed to create runc io pipes")
 		}
 		e.io = io

@@ -125,7 +125,7 @@ func newInitProcess(context context.Context, plat platform, path, namespace, wor
 		}
 		defer socket.Close()
 	} else {
-		if io, err = runc.NewPipeIO(0, 0); err != nil {
+		if io, err = runc.NewPipeIO(); err != nil {
 			return nil, errors.Wrap(err, "failed to create OCI runtime io pipes")
 		}
 		p.io = io
