@@ -191,6 +191,11 @@ func TestContainerSpecTty(t *testing.T) {
 		assert.NoError(t, err)
 		specCheck(t, testID, testPid, spec)
 		assert.Equal(t, tty, spec.Process.Terminal)
+		if tty {
+			assert.Contains(t, spec.Process.Env, "TERM=xterm")
+		} else {
+			assert.NotContains(t, spec.Process.Env, "TERM=xterm")
+		}
 	}
 }
 

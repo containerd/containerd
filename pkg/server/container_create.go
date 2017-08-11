@@ -202,6 +202,11 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 		g.SetProcessCwd(imageConfig.WorkingDir)
 	}
 
+	g.SetProcessTerminal(config.GetTty())
+	if config.GetTty() {
+		g.AddProcessEnv("TERM", "xterm")
+	}
+
 	// Apply envs from image config first, so that envs from container config
 	// can override them.
 	if err := addImageEnvs(&g, imageConfig.Env); err != nil {
@@ -229,8 +234,6 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 		cgroupsPath := getCgroupsPath(sandboxConfig.GetLinux().GetCgroupParent(), id)
 		g.SetLinuxCgroupsPath(cgroupsPath)
 	}
-
-	g.SetProcessTerminal(config.GetTty())
 
 	if err := setOCICapabilities(&g, securityContext.GetCapabilities(), securityContext.GetPrivileged()); err != nil {
 		return nil, fmt.Errorf("failed to set capabilities %+v: %v",
