@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
+	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
 )
 
 // CreateContainer creates a new container in the given PodSandbox.
@@ -54,7 +55,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	// Generate unique id and name for the container and reserve the name.
 	// Reserve the container name to avoid concurrent `CreateContainer` request creating
 	// the same container.
-	id := generateID()
+	id := util.GenerateID()
 	name := makeContainerName(config.GetMetadata(), sandboxConfig.GetMetadata())
 	if err = c.containerNameIndex.Reserve(name, id); err != nil {
 		return nil, fmt.Errorf("failed to reserve container name %q: %v", name, err)
