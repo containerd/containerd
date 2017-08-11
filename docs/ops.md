@@ -113,6 +113,45 @@ containerd itself does not actually have any persistent data that it needs to st
 `state` will be used to store any type of ephemeral data.
 Sockets, pids, runtime state, mount points, and other plugin data that must not persist between reboots are stored in this location.
 
+```
+/run/containerd
+├── containerd.sock
+├── debug.sock
+├── io.containerd.runtime.v1.linux
+│   └── default
+│       └── redis
+│           ├── config.json
+│           ├── init.pid
+│           ├── log.json
+│           └── rootfs
+│               ├── bin
+│               ├── data
+│               ├── dev
+│               ├── etc
+│               ├── home
+│               ├── lib
+│               ├── media
+│               ├── mnt
+│               ├── proc
+│               ├── root
+│               ├── run
+│               ├── sbin
+│               ├── srv
+│               ├── sys
+│               ├── tmp
+│               ├── usr
+│               └── var
+└── runc
+    └── default
+        └── redis
+            └── state.json
+```
+
+Both the `root` and `state` directories are namespaced for plugins.
+Both directories are an implementation detail of containerd and its plugins.
+They should not be tampered with as corruption and bugs can and will happen.
+External apps reading or watching changes in these directories have been know to cause `EBUSY` and stale file handles when containerd and/or its plugins try to cleanup resources.
+
 ```toml
 # persistent data location
 root = "/var/lib/containerd"
