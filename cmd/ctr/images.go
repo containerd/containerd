@@ -22,8 +22,6 @@ var imageCommand = cli.Command{
 		imagesListCommand,
 		imageRemoveCommand,
 		imagesSetLabelsCommand,
-		imagesImportCommand,
-		imagesExportCommand,
 	},
 }
 

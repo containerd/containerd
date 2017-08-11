@@ -5,7 +5,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/containerd/containerd/oci"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -83,8 +82,10 @@ type IngestManager interface {
 }
 
 type Writer interface {
-	oci.BlobWriter
+	io.WriteCloser
 	Status() (Status, error)
+	Digest() digest.Digest
+	Commit(size int64, expected digest.Digest) error
 	Truncate(size int64) error
 }
 
