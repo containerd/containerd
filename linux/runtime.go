@@ -211,9 +211,14 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 	}
 	r.tasks.Delete(ctx, lc)
 
-	bundle := loadBundle(filepath.Join(r.state, namespace, lc.id), filepath.Join(r.root, namespace, lc.id), namespace, r.events)
+	bundle := loadBundle(
+		filepath.Join(r.state, namespace, lc.id),
+		filepath.Join(r.root, namespace, lc.id),
+		namespace,
+		r.events,
+	)
 	if err := bundle.Delete(); err != nil {
-		return nil, err
+		log.G(ctx).WithError(err).Error("failed to delete bundle")
 	}
 	return &runtime.Exit{
 		Status:    rsp.ExitStatus,

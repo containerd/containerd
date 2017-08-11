@@ -209,7 +209,18 @@ func (c *Client) KillShim(ctx context.Context) error {
 	if os.Getpid() == pid {
 		return nil
 	}
-	return unix.Kill(pid, unix.SIGKILL)
+	if err := unix.Kill(pid, unix.SIGKILL); err != nil {
+		return err
+	}
+	// wait for shim to die after being SIGKILL'd
+	for {
+		// use kill(pid, 0) here because the shim could have been reparented
+		// and we are no longer able to waitpid(pid, ...) on the shim
+		if err := unix.Kill(pid, 0); err != nil && err == unix.ESRCH {
+			return nil
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }
 
 func (c *Client) Close() error {
