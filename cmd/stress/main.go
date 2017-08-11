@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"runtime"
@@ -205,7 +203,7 @@ func (w *worker) runContainer(ctx context.Context, id string) error {
 	}
 	defer c.Delete(ctx, containerd.WithSnapshotCleanup)
 
-	task, err := c.NewTask(ctx, containerd.NewIO(bytes.NewBuffer(nil), ioutil.Discard, ioutil.Discard))
+	task, err := c.NewTask(ctx, containerd.NullIO)
 	if err != nil {
 		return err
 	}

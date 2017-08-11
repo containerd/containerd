@@ -19,8 +19,7 @@ import (
 )
 
 func empty() IOCreation {
-	null := ioutil.Discard
-	return NewIO(bytes.NewBuffer(nil), null, null)
+	return NullIO
 }
 
 func TestContainerList(t *testing.T) {

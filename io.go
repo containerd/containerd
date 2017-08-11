@@ -126,6 +126,11 @@ func StdioTerminal(id string) (*IO, error) {
 	return NewIOWithTerminal(os.Stdin, os.Stdout, os.Stderr, true)(id)
 }
 
+// NullIO redirects the container's IO into /dev/null
+func NullIO(id string) (*IO, error) {
+	return &IO{}, nil
+}
+
 // FIFOSet is a set of fifos for use with tasks
 type FIFOSet struct {
 	// Dir is the directory holding the task fifos
