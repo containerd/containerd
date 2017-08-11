@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"runtime"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc/grpclog"
 
@@ -73,18 +74,20 @@ func TestMain(m *testing.M) {
 		}
 	}
 
-	client, err := ctrd.waitForStart(ctx)
+	waitCtx, waitCancel := context.WithTimeout(ctx, 2*time.Second)
+	client, err := ctrd.waitForStart(waitCtx)
+	waitCancel()
 	if err != nil {
 		ctrd.Kill()
 		ctrd.Wait()
-		fmt.Fprintf(os.Stderr, "%s: %s", err, buf.String())
+		fmt.Fprintf(os.Stderr, "%s: %s\n", err, buf.String())
 		os.Exit(1)
 	}
 
 	// print out the version in information
 	version, err := client.Version(ctx)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error getting version: %s", err)
+		fmt.Fprintf(os.Stderr, "error getting version: %s\n", err)
 		os.Exit(1)
 	}
 
@@ -99,7 +102,7 @@ func TestMain(m *testing.M) {
 		if _, err = client.Pull(ctx, testImage, WithPullUnpack); err != nil {
 			ctrd.Stop()
 			ctrd.Wait()
-			fmt.Fprintf(os.Stderr, "%s: %s", err, buf.String())
+			fmt.Fprintf(os.Stderr, "%s: %s\n", err, buf.String())
 			os.Exit(1)
 		}
 	}
