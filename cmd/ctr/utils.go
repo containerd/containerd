@@ -72,6 +72,10 @@ var (
 			Name:  "refresh",
 			Usage: "Refresh token for authorization server",
 		},
+		cli.BoolFlag{
+			Name:  "workaround-ping-v2",
+			Usage: "Pings /v2/ first to get WWW-authenticate header. As of August 2017, GCR is known to require this. Will be removed in future releases.",
+		},
 	}
 )
 
@@ -235,8 +239,9 @@ func getResolver(ctx gocontext.Context, clicontext *cli.Context) (remotes.Resolv
 		username = username[0:i]
 	}
 	options := docker.ResolverOptions{
-		PlainHTTP: clicontext.Bool("plain-http"),
-		Tracker:   pushTracker,
+		PlainHTTP:        clicontext.Bool("plain-http"),
+		Tracker:          pushTracker,
+		WorkaroundPingV2: clicontext.Bool("workaround-ping-v2"),
 	}
 	if username != "" {
 		if secret == "" {
