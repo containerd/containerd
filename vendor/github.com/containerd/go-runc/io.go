@@ -4,8 +4,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-
-	"golang.org/x/sys/unix"
 )
 
 type IO interface {
@@ -21,7 +19,7 @@ type StartCloser interface {
 }
 
 // NewPipeIO creates pipe pairs to be used with runc
-func NewPipeIO(uid, gid int) (i IO, err error) {
+func NewPipeIO() (i IO, err error) {
 	var pipes []*pipe
 	// cleanup in case of an error
 	defer func() {
@@ -31,19 +29,19 @@ func NewPipeIO(uid, gid int) (i IO, err error) {
 			}
 		}
 	}()
-	stdin, err := newPipe(uid, gid)
+	stdin, err := newPipe()
 	if err != nil {
 		return nil, err
 	}
 	pipes = append(pipes, stdin)
 
-	stdout, err := newPipe(uid, gid)
+	stdout, err := newPipe()
 	if err != nil {
 		return nil, err
 	}
 	pipes = append(pipes, stdout)
 
-	stderr, err := newPipe(uid, gid)
+	stderr, err := newPipe()
 	if err != nil {
 		return nil, err
 	}
@@ -56,15 +54,9 @@ func NewPipeIO(uid, gid int) (i IO, err error) {
 	}, nil
 }
 
-func newPipe(uid, gid int) (*pipe, error) {
+func newPipe() (*pipe, error) {
 	r, w, err := os.Pipe()
 	if err != nil {
-		return nil, err
-	}
-	if err := unix.Fchown(int(r.Fd()), uid, gid); err != nil {
-		return nil, err
-	}
-	if err := unix.Fchown(int(w.Fd()), uid, gid); err != nil {
 		return nil, err
 	}
 	return &pipe{
@@ -162,4 +154,48 @@ func (s *stdio) Stdout() io.ReadCloser {
 
 func (s *stdio) Stderr() io.ReadCloser {
 	return os.Stderr
+}
+
+// NewNullIO returns IO setup for /dev/null use with runc
+func NewNullIO() (IO, error) {
+	f, err := os.Open(os.DevNull)
+	if err != nil {
+		return nil, err
+	}
+	return &nullIO{
+		devNull: f,
+	}, nil
+}
+
+type nullIO struct {
+	devNull *os.File
+}
+
+func (n *nullIO) Close() error {
+	// this should be closed after start but if not
+	// make sure we close the file but don't return the error
+	n.devNull.Close()
+	return nil
+}
+
+func (n *nullIO) Stdin() io.WriteCloser {
+	return nil
+}
+
+func (n *nullIO) Stdout() io.ReadCloser {
+	return nil
+}
+
+func (n *nullIO) Stderr() io.ReadCloser {
+	return nil
+}
+
+func (n *nullIO) Set(c *exec.Cmd) {
+	// don't set STDIN here
+	c.Stdout = n.devNull
+	c.Stderr = n.devNull
+}
+
+func (n *nullIO) CloseAfterStart() error {
+	return n.devNull.Close()
 }
