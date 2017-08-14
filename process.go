@@ -31,7 +31,7 @@ type Process interface {
 	// Resize changes the width and heigh of the process's terminal
 	Resize(ctx context.Context, w, h uint32) error
 	// IO returns the io set for the process
-	IO() *IO
+	IO() IO
 	// Status returns the executing status of the process
 	Status(context.Context) (Status, error)
 }
@@ -40,7 +40,7 @@ type process struct {
 	id   string
 	task *task
 	pid  uint32
-	io   *IO
+	io   IO
 	spec *specs.Process
 }
 
@@ -128,7 +128,7 @@ func (p *process) CloseIO(ctx context.Context, opts ...IOCloserOpts) error {
 	return err
 }
 
-func (p *process) IO() *IO {
+func (p *process) IO() IO {
 	return p.io
 }
 
