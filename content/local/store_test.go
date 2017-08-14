@@ -24,12 +24,14 @@ import (
 )
 
 func TestContent(t *testing.T) {
-	testsuite.ContentSuite(t, "fs", func(ctx context.Context, root string) (content.Store, func(), error) {
+	testsuite.ContentSuite(t, "fs", func(ctx context.Context, root string) (content.Store, func() error, error) {
 		cs, err := NewStore(root)
 		if err != nil {
 			return nil, nil, err
 		}
-		return cs, func() {}, nil
+		return cs, func() error {
+			return nil
+		}, nil
 	})
 }
 

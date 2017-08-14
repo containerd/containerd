@@ -54,7 +54,7 @@ func (w *writer) Write(p []byte) (n int, err error) {
 	return n, err
 }
 
-func (w *writer) Commit(size int64, expected digest.Digest) error {
+func (w *writer) Commit(size int64, expected digest.Digest, opts ...content.Opt) error {
 	if err := w.fp.Sync(); err != nil {
 		return errors.Wrap(err, "sync failed")
 	}

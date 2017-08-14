@@ -102,7 +102,17 @@ func (s *BaseDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 }
 
 func (s *BaseDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount, media, ref string) (ocispec.Descriptor, error) {
-
+	var isCompressed bool
+	switch media {
+	case ocispec.MediaTypeImageLayer:
+	case ocispec.MediaTypeImageLayerGzip:
+		isCompressed = true
+	case "":
+		media = ocispec.MediaTypeImageLayerGzip
+		isCompressed = true
+	default:
+		return emptyDesc, errors.Errorf("unsupported diff media type: %v", media)
+	}
 	aDir, err := ioutil.TempDir("", "left-")
 	if err != nil {
 		return emptyDesc, errors.Wrap(err, "failed to create temporary directory")
@@ -130,25 +140,29 @@ func (s *BaseDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount, m
 		return emptyDesc, errors.Wrap(err, "failed to open writer")
 	}
 
-	// TODO: Validate media type
-
-	// TODO: Support compressed media types (link compressed to uncompressed)
-	//dgstr := digest.SHA256.Digester()
-	//wc := &writeCounter{}
-	//compressed, err := compression.CompressStream(cw, compression.Gzip)
-	//if err != nil {
-	//	return nil, errors.Wrap(err, "failed to get compressed stream")
-	//}
-	//err = archive.WriteDiff(ctx, io.MultiWriter(compressed, dgstr.Hash(), wc), lowerDir, upperDir)
-	//compressed.Close()
-
-	err = archive.WriteDiff(ctx, cw, aDir, bDir)
-	if err != nil {
-		return emptyDesc, errors.Wrap(err, "failed to write diff")
+	var opts []content.Opt
+	if isCompressed {
+		dgstr := digest.SHA256.Digester()
+		compressed, err := compression.CompressStream(cw, compression.Gzip)
+		if err != nil {
+			return emptyDesc, errors.Wrap(err, "failed to get compressed stream")
+		}
+		err = archive.WriteDiff(ctx, io.MultiWriter(compressed, dgstr.Hash()), aDir, bDir)
+		compressed.Close()
+		if err != nil {
+			return emptyDesc, errors.Wrap(err, "failed to write compressed diff")
+		}
+		opts = append(opts, content.WithLabels(map[string]string{
+			"containerd.io/uncompressed": dgstr.Digest().String(),
+		}))
+	} else {
+		if err = archive.WriteDiff(ctx, cw, aDir, bDir); err != nil {
+			return emptyDesc, errors.Wrap(err, "failed to write diff")
+		}
 	}
 
 	dgst := cw.Digest()
-	if err := cw.Commit(0, dgst); err != nil {
+	if err := cw.Commit(0, dgst, opts...); err != nil {
 		return emptyDesc, errors.Wrap(err, "failed to commit")
 	}
 

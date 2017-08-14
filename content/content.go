@@ -90,7 +90,7 @@ type Writer interface {
 
 	// Commit commits the blob (but no roll-back is guaranteed on an error).
 	// size and expected can be zero-value when unknown.
-	Commit(size int64, expected digest.Digest) error
+	Commit(size int64, expected digest.Digest, opts ...Opt) error
 
 	// Status returns the current state of write
 	Status() (Status, error)
@@ -106,4 +106,14 @@ type Store interface {
 	Provider
 	IngestManager
 	Ingester
+}
+
+// Opt is used to alter the mutable properties of content
+type Opt func(*Info) error
+
+func WithLabels(labels map[string]string) Opt {
+	return func(info *Info) error {
+		info.Labels = labels
+		return nil
+	}
 }

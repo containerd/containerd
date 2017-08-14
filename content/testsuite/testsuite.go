@@ -17,13 +17,20 @@ import (
 	"github.com/pkg/errors"
 )
 
-// ContentSuite runs a test suite on the snapshotter given a factory function.
-func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, root string) (content.Store, func(), error)) {
+// ContentSuite runs a test suite on the content store given a factory function.
+func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, root string) (content.Store, func() error, error)) {
 	t.Run("Writer", makeTest(t, name, storeFn, checkContentStoreWriter))
 	t.Run("UploadStatus", makeTest(t, name, storeFn, checkUploadStatus))
 }
 
-func makeTest(t *testing.T, name string, storeFn func(ctx context.Context, root string) (content.Store, func(), error), fn func(ctx context.Context, t *testing.T, cs content.Store)) func(t *testing.T) {
+// ContentLabelSuite runs a test suite for the content store supporting
+// labels.
+// TODO: Merge this with ContentSuite once all content stores support labels
+func ContentLabelSuite(t *testing.T, name string, storeFn func(ctx context.Context, root string) (content.Store, func() error, error)) {
+	t.Run("Labels", makeTest(t, name, storeFn, checkLabels))
+}
+
+func makeTest(t *testing.T, name string, storeFn func(ctx context.Context, root string) (content.Store, func() error, error), fn func(ctx context.Context, t *testing.T, cs content.Store)) func(t *testing.T) {
 	return func(t *testing.T) {
 		ctx := namespaces.WithNamespace(context.Background(), name)
 
@@ -37,7 +44,11 @@ func makeTest(t *testing.T, name string, storeFn func(ctx context.Context, root 
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer cleanup()
+		defer func() {
+			if err := cleanup(); err != nil && !t.Failed() {
+				t.Fatalf("Cleanup failed: %+v", err)
+			}
+		}()
 
 		defer testutil.DumpDir(t, tmpDir)
 		fn(ctx, t, cs)
@@ -198,6 +209,69 @@ func checkUploadStatus(ctx context.Context, t *testing.T, cs content.Store) {
 	if err := checkInfo(ctx, cs, d1, info, preCommit, postCommit, preCommit, postCommit); err != nil {
 		t.Fatalf("Check info failed: %+v", err)
 	}
+}
+
+func checkLabels(ctx context.Context, t *testing.T, cs content.Store) {
+	c1, d1 := createContent(256, 1)
+
+	w1, err := cs.Writer(ctx, "c1", 256, d1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := w1.Write(c1); err != nil {
+		t.Fatalf("Failed to write: %+v", err)
+	}
+
+	labels := map[string]string{
+		"k1": "v1",
+		"k2": "v2",
+	}
+
+	preCommit := time.Now()
+	if err := w1.Commit(0, "", content.WithLabels(labels)); err != nil {
+		t.Fatalf("Commit failed: %+v", err)
+	}
+	postCommit := time.Now()
+
+	info := content.Info{
+		Digest: d1,
+		Size:   256,
+		Labels: labels,
+	}
+
+	if err := checkInfo(ctx, cs, d1, info, preCommit, postCommit, preCommit, postCommit); err != nil {
+		t.Fatalf("Check info failed: %+v", err)
+	}
+
+	labels["k1"] = "newvalue"
+	delete(labels, "k2")
+	labels["k3"] = "v3"
+
+	info.Labels = labels
+	preUpdate := time.Now()
+	if _, err := cs.Update(ctx, info); err != nil {
+		t.Fatalf("Update failed: %+v", err)
+	}
+	postUpdate := time.Now()
+
+	if err := checkInfo(ctx, cs, d1, info, preCommit, postCommit, preUpdate, postUpdate); err != nil {
+		t.Fatalf("Check info failed: %+v", err)
+	}
+
+	info.Labels = map[string]string{
+		"k1": "v1",
+	}
+	preUpdate = time.Now()
+	if _, err := cs.Update(ctx, info, "labels.k3", "labels.k1"); err != nil {
+		t.Fatalf("Update failed: %+v", err)
+	}
+	postUpdate = time.Now()
+
+	if err := checkInfo(ctx, cs, d1, info, preCommit, postCommit, preUpdate, postUpdate); err != nil {
+		t.Fatalf("Check info failed: %+v", err)
+	}
+
 }
 
 func checkStatus(w content.Writer, expected content.Status, d digest.Digest, preStart, postStart, preUpdate, postUpdate time.Time) error {

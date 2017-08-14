@@ -215,7 +215,7 @@ func (pw *pushWriter) Digest() digest.Digest {
 	return pw.expected
 }
 
-func (pw *pushWriter) Commit(size int64, expected digest.Digest) error {
+func (pw *pushWriter) Commit(size int64, expected digest.Digest, opts ...content.Opt) error {
 	// Check whether read has already thrown an error
 	if _, err := pw.pipe.Write([]byte{}); err != nil && err != io.ErrClosedPipe {
 		return errors.Wrap(err, "pipe error before commit")
