@@ -22,7 +22,7 @@ ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
 # FOCUS focuses the test to run.
 FOCUS=${FOCUS:-}
 # SKIP skips the test to skip.
-SKIP=${SKIP:-"attach|portforward|RunAsUser|host port"}
+SKIP=${SKIP:-"attach|RunAsUser|host port"}
 REPORT_DIR=${REPORT_DIR:-"/tmp"}
 
 if [[ -z "${GOPATH}" ]]; then
