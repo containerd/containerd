@@ -88,7 +88,7 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*sh
 	s.processes[r.ID] = process
 	s.mu.Unlock()
 	cmd := &reaper.Cmd{
-		ExitCh: make(chan int, 1),
+		ExitCh: make(chan struct{}),
 	}
 	reaper.Default.Register(pid, cmd)
 	s.events <- &eventsapi.TaskCreate{
@@ -126,7 +126,7 @@ func (s *Service) Start(ctx context.Context, r *shimapi.StartRequest) (*shimapi.
 	} else {
 		pid := p.Pid()
 		cmd := &reaper.Cmd{
-			ExitCh: make(chan int, 1),
+			ExitCh: make(chan struct{}),
 		}
 		reaper.Default.Register(pid, cmd)
 		go s.waitExit(p, pid, cmd)
@@ -366,7 +366,7 @@ func (s *Service) Update(ctx context.Context, r *shimapi.UpdateTaskRequest) (*go
 }
 
 func (s *Service) waitExit(p process, pid int, cmd *reaper.Cmd) {
-	status := <-cmd.ExitCh
+	status, _ := reaper.Default.WaitPid(pid)
 	p.SetExited(status)
 
 	reaper.Default.Delete(pid)
