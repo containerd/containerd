@@ -823,9 +823,8 @@ func TestContainerNoBinaryExists(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create task %v", err)
 		}
-		defer task.Delete(ctx)
+		defer task.Delete(ctx, WithProcessKill)
 		if err := task.Start(ctx); err == nil {
-			task.Kill(ctx, syscall.SIGKILL)
 			t.Error("task.Start() should return an error when binary does not exist")
 		}
 	default:
