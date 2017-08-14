@@ -171,9 +171,6 @@ func incrementFS(root string, uidInc, gidInc uint32) filepath.WalkFunc {
 		if err != nil {
 			return err
 		}
-		if root == path {
-			return nil
-		}
 		var (
 			stat = info.Sys().(*syscall.Stat_t)
 			u, g = int(stat.Uid + uidInc), int(stat.Gid + gidInc)

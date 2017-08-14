@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/containerd/containerd/fs"
 	"github.com/containerd/containerd/log"
@@ -274,7 +275,8 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshot.Kind, ke
 		}
 	}()
 
-	if err = os.MkdirAll(filepath.Join(td, "fs"), 0755); err != nil {
+	fs := filepath.Join(td, "fs")
+	if err = os.MkdirAll(fs, 0755); err != nil {
 		return nil, err
 	}
 
@@ -295,6 +297,25 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshot.Kind, ke
 			log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
 		}
 		return nil, errors.Wrap(err, "failed to create active")
+	}
+
+	if len(s.ParentIDs) > 0 {
+		st, err := os.Stat(filepath.Join(o.upperPath(s.ParentIDs[0])))
+		if err != nil {
+			if rerr := t.Rollback(); rerr != nil {
+				log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
+			}
+			return nil, errors.Wrap(err, "failed to stat parent")
+		}
+
+		stat := st.Sys().(*syscall.Stat_t)
+
+		if err := os.Lchown(fs, int(stat.Uid), int(stat.Gid)); err != nil {
+			if rerr := t.Rollback(); rerr != nil {
+				log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
+			}
+			return nil, errors.Wrap(err, "failed to chown")
+		}
 	}
 
 	path = filepath.Join(snapshotDir, s.ID)
