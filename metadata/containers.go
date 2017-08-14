@@ -262,14 +262,19 @@ func writeContainer(bkt *bolt.Bucket, container *containers.Container) error {
 		return err
 	}
 
-	spec, err := container.Spec.Marshal()
-	if err != nil {
-		return err
+	if container.Spec != nil {
+		spec, err := container.Spec.Marshal()
+		if err != nil {
+			return err
+		}
+
+		if err := bkt.Put(bucketKeySpec, spec); err != nil {
+			return err
+		}
 	}
 
 	for _, v := range [][2][]byte{
 		{bucketKeyImage, []byte(container.Image)},
-		{bucketKeySpec, spec},
 		{bucketKeyRootFS, []byte(container.RootFS)},
 	} {
 		if err := bkt.Put(v[0], v[1]); err != nil {
