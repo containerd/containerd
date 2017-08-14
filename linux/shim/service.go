@@ -58,7 +58,6 @@ type platform interface {
 }
 
 type Service struct {
-	initProcess   *initProcess
 	path          string
 	id            string
 	bundle        string
@@ -83,7 +82,6 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*sh
 	// save the main task id and bundle to the shim for additional requests
 	s.id = r.ID
 	s.bundle = r.Bundle
-	s.initProcess = process
 	pid := process.Pid()
 	s.processes[r.ID] = process
 	s.mu.Unlock()
@@ -111,8 +109,8 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*sh
 }
 
 func (s *Service) Start(ctx context.Context, r *shimapi.StartRequest) (*shimapi.StartResponse, error) {
-	p, ok := s.processes[r.ID]
-	if !ok {
+	p := s.getProcess(r.ID)
+	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "process %s not found", r.ID)
 	}
 	if err := p.Start(ctx); err != nil {
@@ -121,7 +119,7 @@ func (s *Service) Start(ctx context.Context, r *shimapi.StartRequest) (*shimapi.
 	if r.ID == s.id {
 		s.events <- &eventsapi.TaskStart{
 			ContainerID: s.id,
-			Pid:         uint32(s.initProcess.Pid()),
+			Pid:         uint32(p.Pid()),
 		}
 	} else {
 		pid := p.Pid()
@@ -143,16 +141,15 @@ func (s *Service) Start(ctx context.Context, r *shimapi.StartRequest) (*shimapi.
 }
 
 func (s *Service) Delete(ctx context.Context, r *google_protobuf.Empty) (*shimapi.DeleteResponse, error) {
-	if s.initProcess == nil {
+	p := s.getProcess(s.id)
+	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
-	p := s.initProcess
+
 	if err := p.Delete(ctx); err != nil {
 		return nil, err
 	}
-	s.mu.Lock()
-	delete(s.processes, p.ID())
-	s.mu.Unlock()
+	s.deleteProcess(p.ID())
 	s.events <- &eventsapi.TaskDelete{
 		ContainerID: s.id,
 		ExitStatus:  uint32(p.ExitStatus()),
@@ -167,24 +164,17 @@ func (s *Service) Delete(ctx context.Context, r *google_protobuf.Empty) (*shimap
 }
 
 func (s *Service) DeleteProcess(ctx context.Context, r *shimapi.DeleteProcessRequest) (*shimapi.DeleteResponse, error) {
-	if s.initProcess == nil {
-		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
-	}
-	if r.ID == s.initProcess.id {
+	if r.ID == s.id {
 		return nil, grpc.Errorf(codes.InvalidArgument, "cannot delete init process with DeleteProcess")
 	}
-	s.mu.Lock()
-	p, ok := s.processes[r.ID]
-	s.mu.Unlock()
-	if !ok {
-		return nil, errors.Wrapf(errdefs.ErrNotFound, "process %s not found", r.ID)
+	p := s.getProcess(r.ID)
+	if p == nil {
+		return nil, errors.Wrapf(errdefs.ErrNotFound, "process %s", r.ID)
 	}
 	if err := p.Delete(ctx); err != nil {
 		return nil, err
 	}
-	s.mu.Lock()
-	delete(s.processes, p.ID())
-	s.mu.Unlock()
+	s.deleteProcess(r.ID)
 	return &shimapi.DeleteResponse{
 		ExitStatus: uint32(p.ExitStatus()),
 		ExitedAt:   p.ExitedAt(),
@@ -193,13 +183,19 @@ func (s *Service) DeleteProcess(ctx context.Context, r *shimapi.DeleteProcessReq
 }
 
 func (s *Service) Exec(ctx context.Context, r *shimapi.ExecProcessRequest) (*google_protobuf.Empty, error) {
-	if s.initProcess == nil {
-		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
-	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	process, err := newExecProcess(ctx, s.path, r, s.initProcess, r.ID)
+	if p := s.processes[r.ID]; p != nil {
+		return nil, errdefs.ToGRPCf(errdefs.ErrAlreadyExists, "id %s", r.ID)
+	}
+
+	p := s.processes[s.id]
+	if p == nil {
+		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
+	}
+
+	process, err := newExecProcess(ctx, s.path, r, p.(*initProcess), r.ID)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -220,10 +216,8 @@ func (s *Service) ResizePty(ctx context.Context, r *shimapi.ResizePtyRequest) (*
 		Width:  uint16(r.Width),
 		Height: uint16(r.Height),
 	}
-	s.mu.Lock()
-	p, ok := s.processes[r.ID]
-	s.mu.Unlock()
-	if !ok {
+	p := s.getProcess(r.ID)
+	if p == nil {
 		return nil, errors.Errorf("process does not exist %s", r.ID)
 	}
 	if err := p.Resize(ws); err != nil {
@@ -233,8 +227,8 @@ func (s *Service) ResizePty(ctx context.Context, r *shimapi.ResizePtyRequest) (*
 }
 
 func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.StateResponse, error) {
-	p, ok := s.processes[r.ID]
-	if !ok {
+	p := s.getProcess(r.ID)
+	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "process id %s not found", r.ID)
 	}
 	st, err := p.Status(ctx)
@@ -270,10 +264,11 @@ func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.
 }
 
 func (s *Service) Pause(ctx context.Context, r *google_protobuf.Empty) (*google_protobuf.Empty, error) {
-	if s.initProcess == nil {
+	p := s.getProcess(s.id)
+	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
-	if err := s.initProcess.Pause(ctx); err != nil {
+	if err := p.(*initProcess).Pause(ctx); err != nil {
 		return nil, err
 	}
 	s.events <- &eventsapi.TaskPaused{
@@ -283,10 +278,11 @@ func (s *Service) Pause(ctx context.Context, r *google_protobuf.Empty) (*google_
 }
 
 func (s *Service) Resume(ctx context.Context, r *google_protobuf.Empty) (*google_protobuf.Empty, error) {
-	if s.initProcess == nil {
+	p := s.getProcess(s.id)
+	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
-	if err := s.initProcess.Resume(ctx); err != nil {
+	if err := p.(*initProcess).Resume(ctx); err != nil {
 		return nil, err
 	}
 	s.events <- &eventsapi.TaskResumed{
@@ -296,17 +292,19 @@ func (s *Service) Resume(ctx context.Context, r *google_protobuf.Empty) (*google
 }
 
 func (s *Service) Kill(ctx context.Context, r *shimapi.KillRequest) (*google_protobuf.Empty, error) {
-	if s.initProcess == nil {
-		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
-	}
 	if r.ID == "" {
-		if err := s.initProcess.Kill(ctx, r.Signal, r.All); err != nil {
+		p := s.getProcess(s.id)
+		if p == nil {
+			return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
+		}
+		if err := p.Kill(ctx, r.Signal, r.All); err != nil {
 			return nil, errdefs.ToGRPC(err)
 		}
 		return empty, nil
 	}
-	p, ok := s.processes[r.ID]
-	if !ok {
+
+	p := s.getProcess(r.ID)
+	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "process id %s not found", r.ID)
 	}
 	if err := p.Kill(ctx, r.Signal, r.All); err != nil {
@@ -326,8 +324,8 @@ func (s *Service) ListPids(ctx context.Context, r *shimapi.ListPidsRequest) (*sh
 }
 
 func (s *Service) CloseIO(ctx context.Context, r *shimapi.CloseIORequest) (*google_protobuf.Empty, error) {
-	p, ok := s.processes[r.ID]
-	if !ok {
+	p := s.getProcess(r.ID)
+	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "process does not exist %s", r.ID)
 	}
 	if err := p.Stdin().Close(); err != nil {
@@ -337,10 +335,11 @@ func (s *Service) CloseIO(ctx context.Context, r *shimapi.CloseIORequest) (*goog
 }
 
 func (s *Service) Checkpoint(ctx context.Context, r *shimapi.CheckpointTaskRequest) (*google_protobuf.Empty, error) {
-	if s.initProcess == nil {
+	p := s.getProcess(s.id)
+	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
-	if err := s.initProcess.Checkpoint(ctx, r); err != nil {
+	if err := p.(*initProcess).Checkpoint(ctx, r); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 	s.events <- &eventsapi.TaskCheckpointed{
@@ -356,13 +355,33 @@ func (s *Service) ShimInfo(ctx context.Context, r *google_protobuf.Empty) (*shim
 }
 
 func (s *Service) Update(ctx context.Context, r *shimapi.UpdateTaskRequest) (*google_protobuf.Empty, error) {
-	if s.initProcess == nil {
+	p := s.getProcess(s.id)
+	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
-	if err := s.initProcess.Update(ctx, r); err != nil {
+	if err := p.(*initProcess).Update(ctx, r); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 	return empty, nil
+}
+
+func (s *Service) addProcess(id string, p process) {
+	s.mu.Lock()
+	s.processes[id] = p
+	s.mu.Unlock()
+}
+
+func (s *Service) getProcess(id string) process {
+	s.mu.Lock()
+	p := s.processes[id]
+	s.mu.Unlock()
+	return p
+}
+
+func (s *Service) deleteProcess(id string) {
+	s.mu.Lock()
+	delete(s.processes, id)
+	s.mu.Unlock()
 }
 
 func (s *Service) waitExit(p process, pid int, cmd *reaper.Cmd) {
@@ -380,12 +399,17 @@ func (s *Service) waitExit(p process, pid int, cmd *reaper.Cmd) {
 }
 
 func (s *Service) getContainerPids(ctx context.Context, id string) ([]uint32, error) {
-	p, err := s.initProcess.runtime.Ps(ctx, id)
+	p := s.getProcess(s.id)
+	if p == nil {
+		return nil, errors.Wrapf(errdefs.ErrFailedPrecondition, "container must be created")
+	}
+
+	ps, err := p.(*initProcess).runtime.Ps(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	pids := make([]uint32, 0, len(p))
-	for _, pid := range p {
+	pids := make([]uint32, 0, len(ps))
+	for _, pid := range ps {
 		pids = append(pids, uint32(pid))
 	}
 	return pids, nil

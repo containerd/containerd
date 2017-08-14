@@ -185,6 +185,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 	}
 	// after the task is created, add it to the monitor
 	if err = r.monitor.Monitor(t); err != nil {
+		r.tasks.Delete(ctx, t)
 		return nil, err
 	}
 	return t, nil
