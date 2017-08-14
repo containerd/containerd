@@ -1,7 +1,6 @@
 language: go
 go:
-    - 1.8.x
-    - tip
+    - 1.8
 
 sudo: required
 
@@ -24,12 +23,20 @@ install:
 before_script:
     - export PATH=$HOME/gopath/bin:$PATH
 
-script:
-    - make .gitvalidation
-    - make verify
-    - make binaries
-    - make test
-    - make test-cri
+jobs:
+  include:
+    - stage: Static Check
+      script: 
+        - make .gitvalidation
+        - make verify
+    - stage: Build
+      script: make binaries
+    - stage: Unit Test
+      script: make test
+    - stage: Integration Test
+      script:
+        - make binaries
+        - make test-cri
 after_script:
     # Abuse travis to preserve the log.
     # TODO(random-liu): Use prow for integration test.
