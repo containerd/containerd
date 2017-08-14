@@ -17,6 +17,10 @@ type stdio struct {
 	terminal bool
 }
 
+func (s stdio) isNull() bool {
+	return s.stdin == "" && s.stdout == "" && s.stderr == ""
+}
+
 type process interface {
 	// ID returns the id for the process
 	ID() string

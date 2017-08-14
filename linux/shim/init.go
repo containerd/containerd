@@ -117,18 +117,20 @@ func newInitProcess(context context.Context, plat platform, path, namespace, wor
 	var (
 		err    error
 		socket *runc.Socket
-		io     runc.IO
 	)
 	if r.Terminal {
 		if socket, err = runc.NewTempConsoleSocket(); err != nil {
 			return nil, errors.Wrap(err, "failed to create OCI runtime console socket")
 		}
 		defer socket.Close()
+	} else if hasNoIO(r) {
+		if p.io, err = runc.NewNullIO(); err != nil {
+			return nil, errors.Wrap(err, "creating new NULL IO")
+		}
 	} else {
-		if io, err = runc.NewPipeIO(); err != nil {
+		if p.io, err = runc.NewPipeIO(); err != nil {
 			return nil, errors.Wrap(err, "failed to create OCI runtime io pipes")
 		}
-		p.io = io
 	}
 	pidFile := filepath.Join(path, "init.pid")
 	if r.Checkpoint != "" {
@@ -139,7 +141,7 @@ func newInitProcess(context context.Context, plat platform, path, namespace, wor
 				ParentPath: r.ParentCheckpoint,
 			},
 			PidFile:     pidFile,
-			IO:          io,
+			IO:          p.io,
 			NoPivot:     options.NoPivotRoot,
 			Detach:      true,
 			NoSubreaper: true,
@@ -150,7 +152,7 @@ func newInitProcess(context context.Context, plat platform, path, namespace, wor
 	} else {
 		opts := &runc.CreateOpts{
 			PidFile:      pidFile,
-			IO:           io,
+			IO:           p.io,
 			NoPivot:      options.NoPivotRoot,
 			NoNewKeyring: options.NoNewKeyring,
 		}
@@ -180,8 +182,8 @@ func newInitProcess(context context.Context, plat platform, path, namespace, wor
 			return nil, errors.Wrap(err, "failed to start console copy")
 		}
 		p.console = console
-	} else {
-		if err := copyPipes(context, io, r.Stdin, r.Stdout, r.Stderr, &p.WaitGroup, &copyWaitGroup); err != nil {
+	} else if !hasNoIO(r) {
+		if err := copyPipes(context, p.io, r.Stdin, r.Stdout, r.Stderr, &p.WaitGroup, &copyWaitGroup); err != nil {
 			return nil, errors.Wrap(err, "failed to start io pipe copy")
 		}
 	}
@@ -426,4 +428,8 @@ func checkKillError(err error) error {
 		return errors.Wrapf(errdefs.ErrNotFound, "process already finished")
 	}
 	return errors.Wrapf(err, "unknown error after kill")
+}
+
+func hasNoIO(r *shimapi.CreateTaskRequest) bool {
+	return r.Stdin == "" && r.Stdout == "" && r.Stderr == ""
 }

@@ -133,7 +133,6 @@ func (e *execProcess) Stdio() stdio {
 func (e *execProcess) Start(ctx context.Context) (err error) {
 	var (
 		socket  *runc.Socket
-		io      runc.IO
 		pidfile = filepath.Join(e.path, fmt.Sprintf("%s.pid", e.id))
 	)
 	if e.stdio.terminal {
@@ -141,15 +140,18 @@ func (e *execProcess) Start(ctx context.Context) (err error) {
 			return errors.Wrap(err, "failed to create runc console socket")
 		}
 		defer socket.Close()
+	} else if e.stdio.isNull() {
+		if e.io, err = runc.NewNullIO(); err != nil {
+			return errors.Wrap(err, "creating new NULL IO")
+		}
 	} else {
-		if io, err = runc.NewPipeIO(); err != nil {
+		if e.io, err = runc.NewPipeIO(); err != nil {
 			return errors.Wrap(err, "failed to create runc io pipes")
 		}
-		e.io = io
 	}
 	opts := &runc.ExecOpts{
 		PidFile: pidfile,
-		IO:      io,
+		IO:      e.io,
 		Detach:  true,
 	}
 	if socket != nil {
@@ -175,8 +177,8 @@ func (e *execProcess) Start(ctx context.Context) (err error) {
 		if e.console, err = e.parent.platform.copyConsole(ctx, console, e.stdio.stdin, e.stdio.stdout, e.stdio.stderr, &e.WaitGroup, &copyWaitGroup); err != nil {
 			return errors.Wrap(err, "failed to start console copy")
 		}
-	} else {
-		if err := copyPipes(ctx, io, e.stdio.stdin, e.stdio.stdout, e.stdio.stderr, &e.WaitGroup, &copyWaitGroup); err != nil {
+	} else if !e.stdio.isNull() {
+		if err := copyPipes(ctx, e.io, e.stdio.stdin, e.stdio.stdout, e.stdio.stderr, &e.WaitGroup, &copyWaitGroup); err != nil {
 			return errors.Wrap(err, "failed to start io pipe copy")
 		}
 	}
