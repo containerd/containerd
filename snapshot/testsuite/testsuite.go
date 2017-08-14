@@ -20,24 +20,26 @@ import (
 
 // SnapshotterSuite runs a test suite on the snapshotter given a factory function.
 func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(ctx context.Context, root string) (snapshot.Snapshotter, func(), error)) {
-	t.Run("Basic", makeTest(t, name, snapshotterFn, checkSnapshotterBasic))
-	t.Run("StatActive", makeTest(t, name, snapshotterFn, checkSnapshotterStatActive))
-	t.Run("StatComitted", makeTest(t, name, snapshotterFn, checkSnapshotterStatCommitted))
-	t.Run("TransitivityTest", makeTest(t, name, snapshotterFn, checkSnapshotterTransitivity))
-	t.Run("PreareViewFailingtest", makeTest(t, name, snapshotterFn, checkSnapshotterPrepareView))
-	t.Run("Update", makeTest(t, name, snapshotterFn, checkUpdate))
-	t.Run("Remove", makeTest(t, name, snapshotterFn, checkRemove))
+	t.Parallel()
 
-	t.Run("LayerFileupdate", makeTest(t, name, snapshotterFn, checkLayerFileUpdate))
-	t.Run("RemoveDirectoryInLowerLayer", makeTest(t, name, snapshotterFn, checkRemoveDirectoryInLowerLayer))
-	t.Run("Chown", makeTest(t, name, snapshotterFn, checkChown))
-	t.Run("DirectoryPermissionOnCommit", makeTest(t, name, snapshotterFn, checkDirectoryPermissionOnCommit))
+	t.Run("Basic", makeTest(name, snapshotterFn, checkSnapshotterBasic))
+	t.Run("StatActive", makeTest(name, snapshotterFn, checkSnapshotterStatActive))
+	t.Run("StatComitted", makeTest(name, snapshotterFn, checkSnapshotterStatCommitted))
+	t.Run("TransitivityTest", makeTest(name, snapshotterFn, checkSnapshotterTransitivity))
+	t.Run("PreareViewFailingtest", makeTest(name, snapshotterFn, checkSnapshotterPrepareView))
+	t.Run("Update", makeTest(name, snapshotterFn, checkUpdate))
+	t.Run("Remove", makeTest(name, snapshotterFn, checkRemove))
+
+	t.Run("LayerFileupdate", makeTest(name, snapshotterFn, checkLayerFileUpdate))
+	t.Run("RemoveDirectoryInLowerLayer", makeTest(name, snapshotterFn, checkRemoveDirectoryInLowerLayer))
+	t.Run("Chown", makeTest(name, snapshotterFn, checkChown))
+	t.Run("DirectoryPermissionOnCommit", makeTest(name, snapshotterFn, checkDirectoryPermissionOnCommit))
 
 	// Rename test still fails on some kernels with overlay
-	//t.Run("Rename", makeTest(t, name, snapshotterFn, checkRename))
+	//t.Run("Rename", makeTest(name, snapshotterFn, checkRename))
 }
 
-func makeTest(t *testing.T, name string, snapshotterFn func(ctx context.Context, root string) (snapshot.Snapshotter, func(), error), fn func(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string)) func(t *testing.T) {
+func makeTest(name string, snapshotterFn func(ctx context.Context, root string) (snapshot.Snapshotter, func(), error), fn func(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string)) func(t *testing.T) {
 	return func(t *testing.T) {
 		ctx := context.Background()
 		ctx = namespaces.WithNamespace(ctx, "testsuite")
@@ -78,6 +80,9 @@ func makeTest(t *testing.T, name string, snapshotterFn func(ctx context.Context,
 
 // checkSnapshotterBasic tests the basic workflow of a snapshot snapshotter.
 func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+	// TODO: this always fails when run in parallel, why?
+	//	t.Parallel()
+
 	initialApplier := fstest.Apply(
 		fstest.CreateFile("/foo", []byte("foo\n"), 0777),
 		fstest.CreateDir("/a", 0755),
@@ -211,6 +216,8 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 
 // Create a New Layer on top of base layer with Prepare, Stat on new layer, should return Active layer.
 func checkSnapshotterStatActive(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+	t.Parallel()
+
 	preparing := filepath.Join(work, "preparing")
 	if err := os.MkdirAll(preparing, 0777); err != nil {
 		t.Fatal(err)
@@ -245,6 +252,8 @@ func checkSnapshotterStatActive(ctx context.Context, t *testing.T, snapshotter s
 
 // Commit a New Layer on top of base layer with Prepare & Commit , Stat on new layer, should return Committed layer.
 func checkSnapshotterStatCommitted(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+	t.Parallel()
+
 	preparing := filepath.Join(work, "preparing")
 	if err := os.MkdirAll(preparing, 0777); err != nil {
 		t.Fatal(err)
@@ -306,6 +315,8 @@ func snapshotterPrepareMount(ctx context.Context, snapshotter snapshot.Snapshott
 
 // Given A <- B <- C, B is the parent of C and A is a transitive parent of C (in this case, a "grandparent")
 func checkSnapshotterTransitivity(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+	t.Parallel()
+
 	preparing, err := snapshotterPrepareMount(ctx, snapshotter, "preparing", "", work)
 	if err != nil {
 		t.Fatal(err)
@@ -360,6 +371,8 @@ func checkSnapshotterTransitivity(ctx context.Context, t *testing.T, snapshotter
 
 // Creating two layers with Prepare or View with same key must fail.
 func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+	t.Parallel()
+
 	preparing, err := snapshotterPrepareMount(ctx, snapshotter, "preparing", "", work)
 	if err != nil {
 		t.Fatal(err)
@@ -456,6 +469,8 @@ func baseTestSnapshots(ctx context.Context, snapshotter snapshot.Snapshotter) er
 }
 
 func checkUpdate(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+	t.Parallel()
+
 	t1 := time.Now().UTC()
 	if err := baseTestSnapshots(ctx, snapshotter); err != nil {
 		t.Fatalf("Failed to create base snapshots: %v", err)
@@ -607,6 +622,8 @@ func assertLabels(t *testing.T, actual, expected map[string]string) {
 }
 
 func checkRemove(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+	t.Parallel()
+
 	if _, err := snapshotter.Prepare(ctx, "committed-a", ""); err != nil {
 		t.Fatal(err)
 	}

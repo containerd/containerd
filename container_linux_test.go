@@ -15,6 +15,8 @@ import (
 )
 
 func TestContainerUpdate(t *testing.T) {
+	t.Parallel()
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -104,6 +106,8 @@ func TestContainerUpdate(t *testing.T) {
 }
 
 func TestShimInCgroup(t *testing.T) {
+	t.Parallel()
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)

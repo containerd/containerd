@@ -17,6 +17,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/typeurl"
@@ -117,7 +118,8 @@ type Task interface {
 var _ = (Task)(&task{})
 
 type task struct {
-	client *Client
+	client    *Client
+	container Container
 
 	io  IO
 	id  string
@@ -250,6 +252,12 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (uint32, e
 	}
 	switch status.Status {
 	case Stopped, Unknown, "":
+	case Created:
+		if t.client.runtime == fmt.Sprintf("%s.%s", plugin.RuntimePlugin, "windows") {
+			// On windows Created is akin to Stopped
+			break
+		}
+		fallthrough
 	default:
 		return UnknownExitStatus, errors.Wrapf(errdefs.ErrFailedPrecondition, "task must be stopped before deletion: %s", status.Status)
 	}

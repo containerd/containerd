@@ -9,6 +9,8 @@ import (
 )
 
 func TestGenerateSpec(t *testing.T) {
+	t.Parallel()
+
 	s, err := GenerateSpec()
 	if err != nil {
 		t.Fatal(err)
@@ -47,6 +49,8 @@ func TestGenerateSpec(t *testing.T) {
 }
 
 func TestSpecWithTTY(t *testing.T) {
+	t.Parallel()
+
 	s, err := GenerateSpec(WithTTY)
 	if err != nil {
 		t.Fatal(err)
@@ -61,6 +65,8 @@ func TestSpecWithTTY(t *testing.T) {
 }
 
 func TestWithLinuxNamespace(t *testing.T) {
+	t.Parallel()
+
 	replacedNS := specs.LinuxNamespace{Type: specs.NetworkNamespace, Path: "/var/run/netns/test"}
 	s, err := GenerateSpec(WithLinuxNamespace(replacedNS))
 	if err != nil {
