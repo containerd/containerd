@@ -164,9 +164,6 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 				updated.Labels = container.Labels
 			case "image":
 				updated.Image = container.Image
-			case "runtime":
-				// TODO(stevvooe): Should this actually be allowed?
-				updated.Runtime = container.Runtime
 			case "spec":
 				updated.Spec = container.Spec
 			case "rootfs":
