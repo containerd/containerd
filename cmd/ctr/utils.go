@@ -417,3 +417,11 @@ func labelArgs(labelStrings []string) map[string]string {
 
 	return labels
 }
+
+func printAsJSON(x interface{}) {
+	b, err := json.MarshalIndent(x, "", "    ")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "can't marshal %+v as a JSON string: %v\n", x, err)
+	}
+	fmt.Println(string(b))
+}

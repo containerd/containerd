@@ -1,10 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-
-	"fmt"
-
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -31,11 +27,9 @@ var containerInfoCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		cjson, err := json.MarshalIndent(container.Info(), "", "    ")
-		if err != nil {
-			return err
-		}
-		fmt.Println(string(cjson))
+
+		printAsJSON(container.Info())
+
 		return nil
 	},
 }
