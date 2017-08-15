@@ -8,8 +8,10 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/boltdb/bolt"
+	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
@@ -20,10 +22,13 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/runtime"
+	"github.com/containerd/containerd/sys"
 	runc "github.com/containerd/go-runc"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"golang.org/x/sys/unix"
 )
@@ -101,6 +106,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+	// TODO: need to add the tasks to the monitor
 	for _, t := range tasks {
 		if err := r.tasks.AddWithNamespace(t.namespace, t); err != nil {
 			return nil, err
@@ -138,7 +144,11 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 		return nil, errors.Wrapf(err, "invalid task id")
 	}
 
-	bundle, err := newBundle(filepath.Join(r.state, namespace), namespace, filepath.Join(r.root, namespace), id, opts.Spec.Value, r.events)
+	bundle, err := newBundle(
+		namespace, id,
+		filepath.Join(r.state, namespace),
+		filepath.Join(r.root, namespace),
+		opts.Spec.Value, r.events)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +157,36 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 			bundle.Delete()
 		}
 	}()
-	s, err := bundle.NewShim(ctx, r.shim, r.address, r.remote, r.shimDebug, opts)
+	s, err := bundle.NewShim(ctx, r.shim, r.address, r.remote, r.shimDebug, opts, func() {
+		t, err := r.tasks.Get(ctx, id)
+		if err != nil {
+			// Task was never started or was already sucessfully deleted
+			return
+		}
+		lc := t.(*Task)
+
+		// Stop the monitor
+		if err := r.monitor.Stop(lc); err != nil {
+			log.G(ctx).WithError(err).WithFields(logrus.Fields{
+				"id":        id,
+				"namespace": namespace,
+			}).Warn("failed to stop monitor")
+		}
+
+		log.G(ctx).WithFields(logrus.Fields{
+			"id":        id,
+			"namespace": namespace,
+		}).Warn("cleaning up after killed shim")
+		err = r.cleanupAfterDeadShim(context.Background(), bundle, namespace, id, lc.pid, true)
+		if err == nil {
+			r.tasks.Delete(ctx, lc)
+		} else {
+			log.G(ctx).WithError(err).WithFields(logrus.Fields{
+				"id":        id,
+				"namespace": namespace,
+			}).Warn("failed to clen up after killed shim")
+		}
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -176,10 +215,11 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 			Options: m.Options,
 		})
 	}
-	if _, err = s.Create(ctx, sopts); err != nil {
+	cr, err := s.Create(ctx, sopts)
+	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
-	t := newTask(id, namespace, s)
+	t := newTask(id, namespace, int(cr.Pid), s)
 	if err := r.tasks.Add(ctx, t); err != nil {
 		return nil, err
 	}
@@ -207,10 +247,10 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
+	r.tasks.Delete(ctx, lc)
 	if err := lc.shim.KillShim(ctx); err != nil {
 		log.G(ctx).WithError(err).Error("failed to kill shim")
 	}
-	r.tasks.Delete(ctx, lc)
 
 	bundle := loadBundle(
 		filepath.Join(r.state, namespace, lc.id),
@@ -269,18 +309,21 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			continue
 		}
 		id := path.Name()
-		bundle := loadBundle(filepath.Join(r.state, ns, id),
-			filepath.Join(r.root, ns, id), ns, id, r.events)
-
+		bundle := loadBundle(
+			filepath.Join(r.state, ns, id),
+			filepath.Join(r.root, ns, id),
+			ns, id, r.events)
 		s, err := bundle.Connect(ctx, r.remote)
 		if err != nil {
-			log.G(ctx).WithError(err).Error("connecting to shim")
-			if err := r.terminate(ctx, bundle, ns, id); err != nil {
-				log.G(ctx).WithError(err).WithField("bundle", bundle.path).Error("failed to terminate task, leaving bundle for debugging")
-				continue
-			}
-			if err := bundle.Delete(); err != nil {
-				log.G(ctx).WithError(err).Error("delete bundle")
+			log.G(ctx).WithError(err).WithFields(logrus.Fields{
+				"id":        id,
+				"namespace": ns,
+			}).Error("connecting to shim")
+			pid, _ := runc.ReadPidFile(filepath.Join(bundle.path, client.InitPidFile))
+			err := r.cleanupAfterDeadShim(ctx, bundle, ns, id, pid, false)
+			if err != nil {
+				log.G(ctx).WithError(err).WithField("bundle", bundle.path).
+					Error("cleaning up after dead shim")
 			}
 			continue
 		}
@@ -291,6 +334,45 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 		})
 	}
 	return o, nil
+}
+
+func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, id string, pid int, reap bool) error {
+	ctx = namespaces.WithNamespace(ctx, ns)
+	if err := r.terminate(ctx, bundle, ns, id); err != nil {
+		return errors.New("failed to terminate task, leaving bundle for debugging")
+	}
+
+	if reap {
+		// if sub-reaper is set, reap our new child
+		if v, err := sys.GetSubreaper(); err == nil && v == 1 {
+			reaper.Default.Register(pid, &reaper.Cmd{ExitCh: make(chan struct{})})
+			reaper.Default.WaitPid(pid)
+			reaper.Default.Delete(pid)
+		}
+	}
+
+	// Notify Client
+	exitedAt := time.Now().UTC()
+	r.events.Publish(ctx, runtime.TaskExitEventTopic, &eventsapi.TaskExit{
+		ContainerID: id,
+		ID:          id,
+		Pid:         uint32(pid),
+		ExitStatus:  128 + uint32(unix.SIGKILL),
+		ExitedAt:    exitedAt,
+	})
+
+	if err := bundle.Delete(); err != nil {
+		log.G(ctx).WithError(err).Error("delete bundle")
+	}
+
+	r.events.Publish(ctx, runtime.TaskDeleteEventTopic, &eventsapi.TaskDelete{
+		ContainerID: id,
+		Pid:         uint32(pid),
+		ExitStatus:  128 + uint32(unix.SIGKILL),
+		ExitedAt:    exitedAt,
+	})
+
+	return nil
 }
 
 func (r *Runtime) terminate(ctx context.Context, bundle *bundle, ns, id string) error {
@@ -305,7 +387,10 @@ func (r *Runtime) terminate(ctx context.Context, bundle *bundle, ns, id string) 
 		log.G(ctx).WithError(err).Warnf("delete runtime state %s", id)
 	}
 	if err := unix.Unmount(filepath.Join(bundle.path, "rootfs"), 0); err != nil {
-		log.G(ctx).WithError(err).Warnf("unmount task rootfs %s", id)
+		log.G(ctx).WithError(err).WithFields(logrus.Fields{
+			"path": bundle.path,
+			"id":   id,
+		}).Warnf("unmount task rootfs")
 	}
 	return nil
 }

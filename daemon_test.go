@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"sync"
 	"syscall"
-	"time"
 
 	"github.com/pkg/errors"
 )
@@ -82,10 +81,12 @@ func (d *daemon) Wait() error {
 	if d.cmd == nil {
 		return errors.New("daemon is not running")
 	}
-	return d.cmd.Wait()
+	err := d.cmd.Wait()
+	d.cmd = nil
+	return err
 }
 
-func (d *daemon) Restart() error {
+func (d *daemon) Restart(stopCb func()) error {
 	d.Lock()
 	defer d.Unlock()
 	if d.cmd == nil {
@@ -99,7 +100,9 @@ func (d *daemon) Restart() error {
 
 	d.cmd.Wait()
 
-	<-time.After(1 * time.Second)
+	if stopCb != nil {
+		stopCb()
+	}
 
 	cmd := exec.Command(d.cmd.Path, d.cmd.Args[1:]...)
 	cmd.Stdout = d.cmd.Stdout

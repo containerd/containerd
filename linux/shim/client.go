@@ -10,6 +10,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -28,7 +30,7 @@ import (
 type ClientOpt func(context.Context, Config) (shim.ShimClient, io.Closer, error)
 
 // WithStart executes a new shim process
-func WithStart(binary, address string, debug bool) ClientOpt {
+func WithStart(binary, address string, debug bool, exitHandler func()) ClientOpt {
 	return func(ctx context.Context, config Config) (_ shim.ShimClient, _ io.Closer, err error) {
 		socket, err := newSocket(config)
 		if err != nil {
@@ -47,8 +49,13 @@ func WithStart(binary, address string, debug bool) ClientOpt {
 		}
 		defer func() {
 			if err != nil {
-				terminate(cmd)
+				cmd.Process.Kill()
 			}
+		}()
+		go func() {
+			reaper.Default.Wait(cmd)
+			reaper.Default.Delete(cmd.Process.Pid)
+			exitHandler()
 		}()
 		log.G(ctx).WithFields(logrus.Fields{
 			"pid":     cmd.Process.Pid,
@@ -70,11 +77,6 @@ func WithStart(binary, address string, debug bool) ClientOpt {
 		}
 		return c, clo, nil
 	}
-}
-
-func terminate(cmd *exec.Cmd) {
-	cmd.Process.Kill()
-	reaper.Default.Wait(cmd)
 }
 
 func newCommand(binary, address string, debug bool, config Config, socket *os.File) *exec.Cmd {
@@ -178,15 +180,20 @@ func New(ctx context.Context, config Config, opt ClientOpt) (*Client, error) {
 	return &Client{
 		ShimClient: s,
 		c:          c,
+		exitCh:     make(chan struct{}),
 	}, nil
 }
 
 type Client struct {
 	shim.ShimClient
 
-	c io.Closer
+	c        io.Closer
+	exitCh   chan struct{}
+	exitOnce sync.Once
 }
 
+// IsAlive returns true if the shim can be contacted.
+// NOTE: a negative answer doesn't mean that the process is gone.
 func (c *Client) IsAlive(ctx context.Context) (bool, error) {
 	_, err := c.ShimInfo(ctx, empty)
 	if err != nil {
@@ -198,8 +205,24 @@ func (c *Client) IsAlive(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-// KillShim kills the shim forcefully
+// StopShim signals the shim to exit and wait for the process to disappear
+func (c *Client) StopShim(ctx context.Context) error {
+	return c.signalShim(ctx, unix.SIGTERM)
+}
+
+// KillShim kills the shim forcefully and wait for the process to disappear
 func (c *Client) KillShim(ctx context.Context) error {
+	return c.signalShim(ctx, unix.SIGKILL)
+}
+
+func (c *Client) Close() error {
+	if c.c == nil {
+		return nil
+	}
+	return c.c.Close()
+}
+
+func (c *Client) signalShim(ctx context.Context, sig syscall.Signal) error {
 	info, err := c.ShimInfo(ctx, empty)
 	if err != nil {
 		return err
@@ -209,23 +232,29 @@ func (c *Client) KillShim(ctx context.Context) error {
 	if os.Getpid() == pid {
 		return nil
 	}
-	if err := unix.Kill(pid, unix.SIGKILL); err != nil {
+	if err := unix.Kill(pid, sig); err != nil && err != unix.ESRCH {
 		return err
 	}
-	// wait for shim to die after being SIGKILL'd
-	for {
-		// use kill(pid, 0) here because the shim could have been reparented
-		// and we are no longer able to waitpid(pid, ...) on the shim
-		if err := unix.Kill(pid, 0); err != nil && err == unix.ESRCH {
-			return nil
-		}
-		time.Sleep(10 * time.Millisecond)
+	// wait for shim to die after being signaled
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-c.waitForExit(pid):
+		return nil
 	}
 }
 
-func (c *Client) Close() error {
-	if c.c == nil {
-		return nil
-	}
-	return c.c.Close()
+func (c *Client) waitForExit(pid int) <-chan struct{} {
+	c.exitOnce.Do(func() {
+		for {
+			// use kill(pid, 0) here because the shim could have been reparented
+			// and we are no longer able to waitpid(pid, ...) on the shim
+			if err := unix.Kill(pid, 0); err == unix.ESRCH {
+				close(c.exitCh)
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	})
+	return c.exitCh
 }
