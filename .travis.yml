@@ -1,7 +1,6 @@
 language: go
 go:
-    - 1.8.x
-    - tip
+    - 1.8
 
 sudo: required
 
@@ -18,18 +17,25 @@ install:
     - sudo apt-get install libseccomp2/trusty-backports
     - sudo apt-get install libseccomp-dev/trusty-backports
     - docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter 
-    - make install.tools
-    - make install.deps
 
 before_script:
     - export PATH=$HOME/gopath/bin:$PATH
 
-script:
-    - make .gitvalidation
-    - make verify
-    - make binaries
-    - make test
-    - make test-cri
+jobs:
+  include:
+    - stage: Build
+      script: 
+        - make install.tools
+        - make .gitvalidation
+        - make verify
+        - make binaries
+    - stage: Test
+      script:
+        - make install.deps
+        - make test
+        - make binaries
+        - make test-cri
+
 after_script:
     # Abuse travis to preserve the log.
     # TODO(random-liu): Use prow for integration test.
