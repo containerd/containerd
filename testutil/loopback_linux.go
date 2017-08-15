@@ -7,19 +7,21 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"testing"
+
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // NewLoopback creates a loopback device, and returns its device name (/dev/loopX), and its clean-up function.
-func NewLoopback(t *testing.T, size int64) (string, func()) {
+func NewLoopback(size int64) (string, func() error, error) {
 	// create temporary file for the disk image
 	file, err := ioutil.TempFile("", "containerd-test-loopback")
 	if err != nil {
-		t.Fatalf("could not create temporary file for loopback: %v", err)
+		return "", nil, errors.Wrap(err, "could not create temporary file for loopback")
 	}
 
 	if err := file.Truncate(size); err != nil {
-		t.Fatal(err)
+		return "", nil, errors.Wrap(err, "failed to resize temp file")
 	}
 	file.Close()
 
@@ -27,27 +29,28 @@ func NewLoopback(t *testing.T, size int64) (string, func()) {
 	losetup := exec.Command("losetup", "--find", "--show", file.Name())
 	p, err := losetup.Output()
 	if err != nil {
-		t.Fatal(err)
+		return "", nil, errors.Wrap(err, "loopback setup failed")
 	}
 
 	deviceName := strings.TrimSpace(string(p))
-	t.Logf("Created loop device %s (using %s)", deviceName, file.Name())
+	logrus.Debugf("Created loop device %s (using %s)", deviceName, file.Name())
 
-	cleanup := func() {
+	cleanup := func() error {
 		// detach device
-		t.Logf("Removing loop device %s", deviceName)
+		logrus.Debugf("Removing loop device %s", deviceName)
 		losetup := exec.Command("losetup", "--detach", deviceName)
 		err := losetup.Run()
 		if err != nil {
-			t.Error("Could not remove loop device", deviceName, err)
+			return errors.Wrapf(err, "Could not remove loop device %s", deviceName)
 		}
 
 		// remove file
-		t.Logf("Removing temporary file %s", file.Name())
+		logrus.Debugf("Removing temporary file %s", file.Name())
 		if err = os.Remove(file.Name()); err != nil {
-			t.Error(err)
+			return err
 		}
+		return nil
 	}
 
-	return deviceName, cleanup
+	return deviceName, cleanup, nil
 }

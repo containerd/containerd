@@ -20,7 +20,10 @@ func testSupportsDType(t *testing.T, expected bool, mkfs ...string) {
 	}
 	defer os.RemoveAll(mnt)
 
-	deviceName, cleanupDevice := testutil.NewLoopback(t, 100<<20) // 100 MB
+	deviceName, cleanupDevice, err := testutil.NewLoopback(100 << 20) // 100 MB
+	if err != nil {
+		t.Fatal(err)
+	}
 	if out, err := exec.Command(mkfs[0], append(mkfs[1:], deviceName)...).CombinedOutput(); err != nil {
 		// not fatal
 		t.Skipf("could not mkfs (%v) %s: %v (out: %q)", mkfs, deviceName, err, string(out))
