@@ -228,8 +228,8 @@ var commitSnapshotCommand = cli.Command{
 			return cli.ShowSubcommandHelp(clicontext)
 		}
 
-		key := clicontext.Args().Get(1)
-		active := clicontext.Args().Get(0)
+		key := clicontext.Args().Get(0)
+		active := clicontext.Args().Get(1)
 
 		snapshotter, err := getSnapshotter(clicontext)
 		if err != nil {
