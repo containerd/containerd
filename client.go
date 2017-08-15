@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/schema1"
+	"github.com/containerd/containerd/server"
 	contentservice "github.com/containerd/containerd/services/content"
 	"github.com/containerd/containerd/services/diff"
 	diffservice "github.com/containerd/containerd/services/diff"
@@ -53,8 +54,12 @@ func init() {
 }
 
 // New returns a new containerd client that is connected to the containerd
-// instance provided by address
+// instance provided by address.
+// If address is empty, the default address is used.
 func New(address string, opts ...ClientOpt) (*Client, error) {
+	if address == "" {
+		address = server.DefaultAddress
+	}
 	var copts clientOpts
 	for _, o := range opts {
 		if err := o(&copts); err != nil {
