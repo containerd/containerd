@@ -21,29 +21,25 @@ before_script:
 
 jobs:
   include:
-    - stage: Build
+    - stage: Verify
       script:
         - make install.tools
         - make .gitvalidation
         - make verify
-        - make binaries
       go: 1.8.x
-    - stage: Build
-      script:
+    - script:
         - make install.tools
         - make .gitvalidation
         - make verify
-        - make binaries
       go: tip
-    - stage: Test
+    - stage: Build and Test
       script:
         - make install.deps
         - make test
         - make binaries
         - make test-cri
       go: 1.8.x
-    - stage: Test
-      script:
+    - script:
         - make install.deps
         - make test
         - make binaries
