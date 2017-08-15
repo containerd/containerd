@@ -48,7 +48,7 @@ TEST_REQUIRES_ROOT_PACKAGES=$(filter \
     )
 
 # Project binaries.
-COMMANDS=ctr containerd stress
+COMMANDS=ctr containerd containerd-stress
 ifneq ("$(GOOS)", "windows")
 	COMMANDS += containerd-shim
 endif

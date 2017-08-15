@@ -25,7 +25,7 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	app := cli.NewApp()
-	app.Name = "stress"
+	app.Name = "containerd-stress"
 	app.Description = "stress test a containerd daemon"
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
