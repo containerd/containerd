@@ -4,13 +4,14 @@ package windows
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/Microsoft/hcsshim"
-	"github.com/Microsoft/opengcs/client"
+	opengcs "github.com/Microsoft/opengcs/client"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -166,11 +167,13 @@ func newLinuxConfig(ctx context.Context, owner, id string, spec *specs.Spec) (*h
 		layerFolders = spec.Windows.LayerFolders
 	)
 
-	config := &client.Config{}
+	config := &opengcs.Config{}
 	if err := config.GenerateDefault(nil); err != nil {
 		return nil, err
 	}
 
+	// TODO(darrenstahlmsft): Allow the client to pass these values to the
+	// runtime via optional params
 	conf.HvRuntime = &hcsshim.HvRuntime{
 		ImagePath:           config.KirdPath,
 		LinuxKernelFile:     config.KernelFile,
@@ -229,6 +232,30 @@ func removeLayer(ctx context.Context, path string) error {
 	return nil
 }
 
+// removeLinuxLayer deletes the given layer, all associated containers must have
+// been shutdown for this to succeed.
+func removeLinuxLayer(ctx context.Context, layerPath string) error {
+	var (
+		id         = filepath.Base(layerPath)
+		parentPath = filepath.Dir(layerPath)
+	)
+	log.G(ctx).Debugf("lcowdriver: remove: id %s", id)
+	tmpID := fmt.Sprintf("%s-removing", id)
+	tmpLayerPath := filepath.Join(parentPath, tmpID)
+
+	log.G(ctx).Debugf("lcowdriver: remove: id %s: layerPath %s", id, layerPath)
+	if err := os.Rename(layerPath, tmpLayerPath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	if err := os.RemoveAll(tmpLayerPath); err != nil {
+		return err
+	}
+
+	log.G(ctx).Debugf("lcowdriver: remove: id %s: layerPath %s succeeded", id, layerPath)
+	return nil
+}
+
 func newProcessConfig(processSpec *specs.Process, pset *pipeSet) *hcsshim.ProcessConfig {
 	conf := &hcsshim.ProcessConfig{
 		EmulateConsole:   pset.src.Terminal,
@@ -261,8 +288,19 @@ func newWindowsProcessConfig(processSpec *specs.Process, pset *pipeSet) *hcsshim
 	return conf
 }
 
-func newLinuxProcessConfig(processSpec *specs.Process, pset *pipeSet) (*hcsshim.ProcessConfig, error) {
+func newLinuxProcessConfig(processSpec *specs.Process, pset *pipeSet) *hcsshim.ProcessConfig {
 	conf := newProcessConfig(processSpec, pset)
 	conf.CommandArgs = processSpec.Args
+	return conf
+}
+
+func newInitialLinuxProcessConfig(spec *specs.Spec, pset *pipeSet) (*hcsshim.ProcessConfig, error) {
+	conf := newLinuxProcessConfig(spec.Process, pset)
+	ociBuf, err := json.Marshal(spec)
+	if err != nil {
+		return nil, err
+	}
+	ociRaw := json.RawMessage(ociBuf)
+	conf.OCISpecification = &ociRaw
 	return conf, nil
 }

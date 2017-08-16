@@ -29,6 +29,7 @@ type task struct {
 	spec      *specs.Spec
 	processes map[string]*process
 	hyperV    bool
+	isWindows bool
 
 	publisher events.Publisher
 	rwLayer   string
@@ -102,16 +103,32 @@ func (t *task) CloseIO(ctx context.Context) error {
 }
 
 func (t *task) Info() runtime.TaskInfo {
-	return runtime.TaskInfo{
+	taskInfo := runtime.TaskInfo{
 		ID:        t.id,
-		Runtime:   pluginID,
 		Namespace: t.namespace,
 		// TODO(mlaventure): what about Spec? I think this could be removed from the info, the id is enough since it matches the one from the container
 	}
+	if t.isWindows {
+		taskInfo.Runtime = windowsPluginID
+	} else {
+		taskInfo.Runtime = lcowPluginID
+	}
+	return taskInfo
 }
 
 func (t *task) Start(ctx context.Context) error {
-	conf := newWindowsProcessConfig(t.spec.Process, t.io)
+	var (
+		conf *hcsshim.ProcessConfig
+		err  error
+	)
+	if t.isWindows {
+		conf = newWindowsProcessConfig(t.spec.Process, t.io)
+	} else {
+		conf, err = newInitialLinuxProcessConfig(t.spec, t.io)
+		if err != nil {
+			return err
+		}
+	}
 	p, err := t.newProcess(ctx, t.id, conf, t.io)
 	if err != nil {
 		return err
@@ -194,7 +211,12 @@ func (t *task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runt
 		return nil, err
 	}
 
-	conf := newWindowsProcessConfig(spec, pset)
+	var conf *hcsshim.ProcessConfig
+	if t.isWindows {
+		conf = newWindowsProcessConfig(spec, t.io)
+	} else {
+		conf = newLinuxProcessConfig(spec, t.io)
+	}
 	p, err := t.newProcess(ctx, id, conf, pset)
 	if err != nil {
 		return nil, err
@@ -371,6 +393,10 @@ func (t *task) cleanup() {
 	for _, p := range t.processes {
 		t.removeProcessNL(p.id)
 	}
-	removeLayer(context.Background(), t.rwLayer)
+	if t.isWindows {
+		removeLayer(context.Background(), t.rwLayer)
+	} else {
+		removeLinuxLayer(context.Background(), t.rwLayer)
+	}
 	t.Unlock()
 }
