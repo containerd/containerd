@@ -1,6 +1,4 @@
 language: go
-go:
-    - 1.8
 
 sudo: required
 
@@ -12,29 +10,41 @@ before_install:
     - sudo sh -c "echo 'deb http://archive.ubuntu.com/ubuntu trusty-backports main restricted universe multiverse' > /etc/apt/sources.list.d/backports.list"
     - sudo apt-get update
 
-install: 
+install:
     - sudo apt-get install btrfs-tools
     - sudo apt-get install libseccomp2/trusty-backports
     - sudo apt-get install libseccomp-dev/trusty-backports
-    - docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter 
+    - docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
 
 before_script:
     - export PATH=$HOME/gopath/bin:$PATH
 
 jobs:
   include:
-    - stage: Build
-      script: 
+    - stage: Verify
+      script:
         - make install.tools
         - make .gitvalidation
         - make verify
-        - make binaries
-    - stage: Test
+      go: 1.8.x
+    - script:
+        - make install.tools
+        - make .gitvalidation
+        - make verify
+      go: tip
+    - stage: Build and Test
       script:
         - make install.deps
         - make test
         - make binaries
         - make test-cri
+      go: 1.8.x
+    - script:
+        - make install.deps
+        - make test
+        - make binaries
+        - make test-cri
+      go: tip
 
 after_script:
     # Abuse travis to preserve the log.
