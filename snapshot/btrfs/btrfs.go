@@ -204,21 +204,21 @@ func (b *snapshotter) makeSnapshot(ctx context.Context, kind snapshot.Kind, key,
 		return nil, err
 	}
 
-	return b.mounts(target)
+	return b.mounts(target, s)
 }
 
-func (b *snapshotter) mounts(dir string) ([]mount.Mount, error) {
+func (b *snapshotter) mounts(dir string, s storage.Snapshot) ([]mount.Mount, error) {
 	var options []string
 
 	// get the subvolume id back out for the mount
-	info, err := btrfs.SubvolInfo(dir)
+	sid, err := btrfs.SubvolID(dir)
 	if err != nil {
 		return nil, err
 	}
 
-	options = append(options, fmt.Sprintf("subvolid=%d", info.ID))
+	options = append(options, fmt.Sprintf("subvolid=%d", sid))
 
-	if info.Readonly {
+	if s.Kind != snapshot.KindActive {
 		options = append(options, "ro")
 	}
 
@@ -291,7 +291,7 @@ func (b *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 	}
 
 	dir := filepath.Join(b.root, strings.ToLower(s.Kind.String()), s.ID)
-	return b.mounts(dir)
+	return b.mounts(dir, s)
 }
 
 // Remove abandons the transaction identified by key. All resources
