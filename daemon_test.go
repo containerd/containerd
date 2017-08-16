@@ -60,7 +60,7 @@ func (d *daemon) waitForStart(ctx context.Context) (*Client, error) {
 
 func (d *daemon) Stop() error {
 	d.Lock()
-	d.Unlock()
+	defer d.Unlock()
 	if d.cmd == nil {
 		return errors.New("daemon is not running")
 	}
@@ -69,7 +69,7 @@ func (d *daemon) Stop() error {
 
 func (d *daemon) Kill() error {
 	d.Lock()
-	d.Unlock()
+	defer d.Unlock()
 	if d.cmd == nil {
 		return errors.New("daemon is not running")
 	}
@@ -78,7 +78,7 @@ func (d *daemon) Kill() error {
 
 func (d *daemon) Wait() error {
 	d.Lock()
-	d.Unlock()
+	defer d.Unlock()
 	if d.cmd == nil {
 		return errors.New("daemon is not running")
 	}
@@ -87,7 +87,7 @@ func (d *daemon) Wait() error {
 
 func (d *daemon) Restart() error {
 	d.Lock()
-	d.Unlock()
+	defer d.Unlock()
 	if d.cmd == nil {
 		return errors.New("daemon is not running")
 	}
