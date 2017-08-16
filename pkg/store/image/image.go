@@ -19,6 +19,7 @@ package image
 import (
 	"sync"
 
+	"github.com/containerd/containerd"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
@@ -39,7 +40,8 @@ type Image struct {
 	Size int64
 	// Config is the oci image config of the image.
 	Config *imagespec.ImageConfig
-	// TODO(random-liu): Add containerd image client.
+	// Containerd image reference
+	Image containerd.Image
 }
 
 // Store stores all images.

@@ -17,17 +17,14 @@ limitations under the License.
 package server
 
 import (
-	"encoding/json"
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/api/services/tasks/v1"
-	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/containers"
-	prototypes "github.com/gogo/protobuf/types"
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -78,26 +75,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	// Ensure sandbox container image snapshot.
 	image, err := c.ensureImageExists(ctx, c.sandboxImage)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox image %q: %v", defaultSandboxImage, err)
-	}
-	rootfsMounts, err := c.snapshotService.View(ctx, id, image.ChainID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare sandbox rootfs %q: %v", image.ChainID, err)
-	}
-	defer func() {
-		if retErr != nil {
-			if err := c.snapshotService.Remove(ctx, id); err != nil {
-				glog.Errorf("Failed to remove sandbox container snapshot %q: %v", id, err)
-			}
-		}
-	}()
-	var rootfs []*types.Mount
-	for _, m := range rootfsMounts {
-		rootfs = append(rootfs, &types.Mount{
-			Type:    m.Type,
-			Source:  m.Source,
-			Options: m.Options,
-		})
+		return nil, fmt.Errorf("failed to get sandbox image %q: %v", c.sandboxImage, err)
 	}
 
 	// Create sandbox container.
@@ -105,34 +83,26 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox container spec: %v", err)
 	}
-	rawSpec, err := json.Marshal(spec)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal oci spec %+v: %v", spec, err)
-	}
 	glog.V(4).Infof("Sandbox container spec: %+v", spec)
-	if _, err = c.containerService.Create(ctx, containers.Container{
-		ID: id,
-		// TODO(random-liu): Checkpoint metadata into container labels.
-		Image:   image.ID,
-		Runtime: containers.RuntimeInfo{Name: defaultRuntime},
-		Spec: &prototypes.Any{
-			TypeUrl: runtimespec.Version,
-			Value:   rawSpec,
-		},
-		RootFS: id,
-	}); err != nil {
+	// TODO(random-liu): Checkpoint metadata into container labels.
+
+	opts := []containerd.NewContainerOpts{
+		containerd.WithSpec(spec),
+		containerd.WithRuntime(defaultRuntime),
+		containerd.WithNewSnapshotView(id, image.Image)}
+	container, err := c.client.NewContainer(ctx, id, opts...)
+	if err != nil {
 		return nil, fmt.Errorf("failed to create containerd container: %v", err)
 	}
 	defer func() {
 		if retErr != nil {
-			if err := c.containerService.Delete(ctx, id); err != nil {
-				glog.Errorf("Failed to delete containerd container%q: %v", id, err)
+			if err := container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
+				glog.Errorf("Failed to delete containerd container %q: %v", id, err)
 			}
 		}
 	}()
 
 	// Create sandbox container root directory.
-	// Prepare streaming named pipe.
 	sandboxRootDir := getSandboxRootDir(c.rootDir, id)
 	if err := c.os.MkdirAll(sandboxRootDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create sandbox root directory %q: %v",
@@ -149,21 +119,18 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	}()
 
 	// Discard sandbox container output because we don't care about it.
-	_, stdout, stderr := getStreamingPipes(sandboxRootDir)
-	_, stdoutPipe, stderrPipe, err := c.prepareStreamingPipes(ctx, "", stdout, stderr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare streaming pipes: %v", err)
-	}
+	rStdoutPipe, wStdoutPipe := io.Pipe()
+	rStderrPipe, wStderrPipe := io.Pipe()
 	defer func() {
 		if retErr != nil {
-			stdoutPipe.Close()
-			stderrPipe.Close()
+			rStdoutPipe.Close()
+			rStderrPipe.Close()
 		}
 	}()
-	if err := c.agentFactory.NewSandboxLogger(stdoutPipe).Start(); err != nil {
+	if err := c.agentFactory.NewSandboxLogger(rStdoutPipe).Start(); err != nil {
 		return nil, fmt.Errorf("failed to start sandbox stdout logger: %v", err)
 	}
-	if err := c.agentFactory.NewSandboxLogger(stderrPipe).Start(); err != nil {
+	if err := c.agentFactory.NewSandboxLogger(rStderrPipe).Start(); err != nil {
 		return nil, fmt.Errorf("failed to start sandbox stderr logger: %v", err)
 	}
 
@@ -180,32 +147,25 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		}
 	}()
 
-	createOpts := &tasks.CreateTaskRequest{
-		ContainerID: id,
-		Rootfs:      rootfs,
-		// No stdin for sandbox container.
-		Stdout: stdout,
-		Stderr: stderr,
-	}
 	// Create sandbox task in containerd.
-	glog.V(5).Infof("Create sandbox container (id=%q, name=%q) with options %+v.",
-		id, name, createOpts)
-	createResp, err := c.taskService.Create(ctx, createOpts)
+	glog.V(5).Infof("Create sandbox container (id=%q, name=%q).",
+		id, name)
+	//TODO(Abhi): close the stdin or pass newIOCreation with /dev/null stdin
+	task, err := container.NewTask(ctx, containerd.NewIO(new(bytes.Buffer), wStdoutPipe, wStderrPipe))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create sandbox container %q: %v",
-			id, err)
+		return nil, fmt.Errorf("failed to create task for sandbox %q: %v", id, err)
 	}
 	defer func() {
 		if retErr != nil {
 			// Cleanup the sandbox container if an error is returned.
-			if err := c.stopSandboxContainer(ctx, id); err != nil {
+			if _, err := task.Delete(ctx, containerd.WithProcessKill); err != nil {
 				glog.Errorf("Failed to delete sandbox container %q: %v", id, err)
 			}
 		}
 	}()
 
-	sandbox.Pid = createResp.Pid
-	sandbox.NetNS = getNetworkNamespace(createResp.Pid)
+	sandbox.Pid = task.Pid()
+	sandbox.NetNS = getNetworkNamespace(task.Pid())
 	if !config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostNetwork() {
 		// Setup network for sandbox.
 		// TODO(random-liu): [P2] Replace with permanent network namespace.
@@ -223,14 +183,14 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		}()
 	}
 
-	// Start sandbox container in containerd.
-	if _, err := c.taskService.Start(ctx, &tasks.StartTaskRequest{ContainerID: id}); err != nil {
-		return nil, fmt.Errorf("failed to start sandbox container %q: %v",
+	if err = task.Start(ctx); err != nil {
+		return nil, fmt.Errorf("failed to start sandbox container task %q: %v",
 			id, err)
 	}
 
 	// Add sandbox into sandbox store.
 	sandbox.CreatedAt = time.Now().UnixNano()
+	sandbox.Container = container
 	if err := c.sandboxStore.Add(sandbox); err != nil {
 		return nil, fmt.Errorf("failed to add sandbox %+v into store: %v", sandbox, err)
 	}

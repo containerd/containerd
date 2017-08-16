@@ -78,7 +78,7 @@ func TestSandboxStore(t *testing.T) {
 	assert := assertlib.New(t)
 	sandboxes := map[string]Sandbox{}
 	for _, id := range ids {
-		sandboxes[id] = Sandbox{metadatas[id]}
+		sandboxes[id] = Sandbox{Metadata: metadatas[id]}
 	}
 
 	s := NewStore()

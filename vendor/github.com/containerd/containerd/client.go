@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"log"
 	"net/http"
 	"runtime"
 	"strconv"
@@ -38,47 +36,20 @@ import (
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/typeurl"
 	pempty "github.com/golang/protobuf/ptypes/empty"
-	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
 func init() {
-	// reset the grpc logger so that it does not output in the STDIO of the calling process
-	grpclog.SetLogger(log.New(ioutil.Discard, "", log.LstdFlags))
-
 	// register TypeUrls for commonly marshaled external types
 	major := strconv.Itoa(specs.VersionMajor)
 	typeurl.Register(&specs.Spec{}, "opencontainers/runtime-spec", major, "Spec")
 	typeurl.Register(&specs.Process{}, "opencontainers/runtime-spec", major, "Process")
 	typeurl.Register(&specs.LinuxResources{}, "opencontainers/runtime-spec", major, "LinuxResources")
 	typeurl.Register(&specs.WindowsResources{}, "opencontainers/runtime-spec", major, "WindowsResources")
-}
-
-type clientOpts struct {
-	defaultns   string
-	dialOptions []grpc.DialOption
-}
-
-type ClientOpt func(c *clientOpts) error
-
-func WithDefaultNamespace(ns string) ClientOpt {
-	return func(c *clientOpts) error {
-		c.defaultns = ns
-		return nil
-	}
-}
-
-// WithDialOpts allows grpc.DialOptions to be set on the connection
-func WithDialOpts(opts []grpc.DialOption) ClientOpt {
-	return func(c *clientOpts) error {
-		c.dialOptions = opts
-		return nil
-	}
 }
 
 // New returns a new containerd client that is connected to the containerd
@@ -93,9 +64,10 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 	gopts := []grpc.DialOption{
 		grpc.WithBlock(),
 		grpc.WithInsecure(),
-		grpc.WithTimeout(100 * time.Second),
+		grpc.WithTimeout(60 * time.Second),
 		grpc.FailOnNonTempDialError(true),
-		grpc.WithDialer(dialer),
+		grpc.WithBackoffMaxDelay(3 * time.Second),
+		grpc.WithDialer(Dialer),
 	}
 	if len(copts.dialOptions) > 0 {
 		gopts = copts.dialOptions
@@ -107,7 +79,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 			grpc.WithStreamInterceptor(stream),
 		)
 	}
-	conn, err := grpc.Dial(dialAddress(address), gopts...)
+	conn, err := grpc.Dial(DialAddress(address), gopts...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to dial %q", address)
 	}
@@ -132,8 +104,14 @@ type Client struct {
 	runtime   string
 }
 
+// IsServing returns true if the client can successfully connect to the
+// containerd daemon and the healthcheck service returns the SERVING
+// response.
+// This call will block if a transient error is encountered during
+// connection. A timeout can be set in the context to ensure it returns
+// early.
 func (c *Client) IsServing(ctx context.Context) (bool, error) {
-	r, err := c.HealthService().Check(ctx, &grpc_health_v1.HealthCheckRequest{})
+	r, err := c.HealthService().Check(ctx, &grpc_health_v1.HealthCheckRequest{}, grpc.FailFast(false))
 	if err != nil {
 		return false, err
 	}
@@ -151,87 +129,6 @@ func (c *Client) Containers(ctx context.Context, filters ...string) ([]Container
 		out = append(out, containerFromRecord(c, container))
 	}
 	return out, nil
-}
-
-type NewContainerOpts func(ctx context.Context, client *Client, c *containers.Container) error
-
-// WithContainerLabels adds the provided labels to the container
-func WithContainerLabels(labels map[string]string) NewContainerOpts {
-	return func(_ context.Context, _ *Client, c *containers.Container) error {
-		c.Labels = labels
-		return nil
-	}
-}
-
-// WithSnapshot uses an existing root filesystem for the container
-func WithSnapshot(id string) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		// check that the snapshot exists, if not, fail on creation
-		if _, err := client.SnapshotService(c.Snapshotter).Mounts(ctx, id); err != nil {
-			return err
-		}
-		c.RootFS = id
-		return nil
-	}
-}
-
-// WithNewSnapshot allocates a new snapshot to be used by the container as the
-// root filesystem in read-write mode
-func WithNewSnapshot(id string, i Image) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore())
-		if err != nil {
-			return err
-		}
-		if _, err := client.SnapshotService(c.Snapshotter).Prepare(ctx, id, identity.ChainID(diffIDs).String()); err != nil {
-			return err
-		}
-		c.RootFS = id
-		c.Image = i.Name()
-		return nil
-	}
-}
-
-// WithNewSnapshotView allocates a new snapshot to be used by the container as the
-// root filesystem in read-only mode
-func WithNewSnapshotView(id string, i Image) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore())
-		if err != nil {
-			return err
-		}
-		if _, err := client.SnapshotService(c.Snapshotter).View(ctx, id, identity.ChainID(diffIDs).String()); err != nil {
-			return err
-		}
-		c.RootFS = id
-		c.Image = i.Name()
-		return nil
-	}
-}
-
-// WithRuntime allows a user to specify the runtime name and additional options that should
-// be used to create tasks for the container
-func WithRuntime(name string) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		c.Runtime = containers.RuntimeInfo{
-			Name: name,
-		}
-		return nil
-	}
-}
-
-func WithSnapshotter(name string) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		c.Snapshotter = name
-		return nil
-	}
-}
-
-func WithImage(i Image) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		c.Image = i.Name()
-		return nil
-	}
 }
 
 // NewContainer will create a new container in container with the provided id
@@ -255,6 +152,7 @@ func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContain
 	return containerFromRecord(c, r), nil
 }
 
+// LoadContainer loads an existing container from metadata
 func (c *Client) LoadContainer(ctx context.Context, id string) (Container, error) {
 	r, err := c.ContainerService().Get(ctx, id)
 	if err != nil {
@@ -262,8 +160,6 @@ func (c *Client) LoadContainer(ctx context.Context, id string) (Container, error
 	}
 	return containerFromRecord(c, r), nil
 }
-
-type RemoteOpts func(*Client, *RemoteContext) error
 
 // RemoteContext is used to configure object resolutions and transfers with
 // remote content stores and image providers.
@@ -299,46 +195,7 @@ func defaultRemoteContext() *RemoteContext {
 	}
 }
 
-// WithPullUnpack is used to unpack an image after pull. This
-// uses the snapshotter, content store, and diff service
-// configured for the client.
-func WithPullUnpack(client *Client, c *RemoteContext) error {
-	c.Unpack = true
-	return nil
-}
-
-// WithPullSnapshotter specifies snapshotter name used for unpacking
-func WithPullSnapshotter(snapshotterName string) RemoteOpts {
-	return func(client *Client, c *RemoteContext) error {
-		c.Snapshotter = snapshotterName
-		return nil
-	}
-}
-
-// WithSchema1Conversion is used to convert Docker registry schema 1
-// manifests to oci manifests on pull. Without this option schema 1
-// manifests will return a not supported error.
-func WithSchema1Conversion(client *Client, c *RemoteContext) error {
-	c.ConvertSchema1 = true
-	return nil
-}
-
-// WithResolver specifies the resolver to use.
-func WithResolver(resolver remotes.Resolver) RemoteOpts {
-	return func(client *Client, c *RemoteContext) error {
-		c.Resolver = resolver
-		return nil
-	}
-}
-
-// WithImageHandler adds a base handler to be called on dispatch.
-func WithImageHandler(h images.Handler) RemoteOpts {
-	return func(client *Client, c *RemoteContext) error {
-		c.BaseHandlers = append(c.BaseHandlers, h)
-		return nil
-	}
-}
-
+// Pull downloads the provided content into containerd's content store
 func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpts) (Image, error) {
 	pullCtx := defaultRemoteContext()
 	for _, o := range opts {
@@ -414,6 +271,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpts) (Imag
 	return img, nil
 }
 
+// Push uploads the provided content to a remote resource
 func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, opts ...RemoteOpts) error {
 	pushCtx := defaultRemoteContext()
 	for _, o := range opts {
@@ -539,11 +397,15 @@ func (c *Client) VersionService() versionservice.VersionClient {
 	return versionservice.NewVersionClient(c.conn)
 }
 
+// Version of containerd
 type Version struct {
-	Version  string
+	// Version number
+	Version string
+	// Revision from git that was built
 	Revision string
 }
 
+// Version returns the version of containerd that the client is connected to
 func (c *Client) Version(ctx context.Context) (Version, error) {
 	response, err := c.VersionService().Version(ctx, &pempty.Empty{})
 	if err != nil {
@@ -566,8 +428,10 @@ type importOpts struct {
 	refObject string
 }
 
+// ImportOpt allows the caller to specify import specific options
 type ImportOpt func(c *importOpts) error
 
+// WithOCIImportFormat sets the import format for an OCI image format
 func WithOCIImportFormat() ImportOpt {
 	return func(c *importOpts) error {
 		if c.format != "" {
@@ -630,8 +494,10 @@ type exportOpts struct {
 	format imageFormat
 }
 
+// ExportOpt allows callers to set export options
 type ExportOpt func(c *exportOpts) error
 
+// WithOCIExportFormat sets the OCI image format as the export target
 func WithOCIExportFormat() ExportOpt {
 	return func(c *exportOpts) error {
 		if c.format != "" {

@@ -19,6 +19,8 @@ package sandbox
 import (
 	"sync"
 
+	"github.com/containerd/containerd"
+
 	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
 )
 
@@ -27,7 +29,8 @@ import (
 type Sandbox struct {
 	// Metadata is the metadata of the sandbox, it is immutable after created.
 	Metadata
-	// TODO(random-liu): Add containerd container client.
+	// Containerd sandbox container
+	Container containerd.Container
 	// TODO(random-liu): Add cni network namespace client.
 }
 

@@ -97,9 +97,12 @@ func (s *service) Prepare(ctx context.Context, pr *snapshotapi.PrepareSnapshotRe
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Apply namespace
-	// TODO: Lookup snapshot id from metadata store
-	mounts, err := sn.Prepare(ctx, pr.Key, pr.Parent)
+
+	var opts []snapshot.Opt
+	if pr.Labels != nil {
+		opts = append(opts, snapshot.WithLabels(pr.Labels))
+	}
+	mounts, err := sn.Prepare(ctx, pr.Key, pr.Parent, opts...)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -121,9 +124,11 @@ func (s *service) View(ctx context.Context, pr *snapshotapi.ViewSnapshotRequest)
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Apply namespace
-	// TODO: Lookup snapshot id from metadata store
-	mounts, err := sn.View(ctx, pr.Key, pr.Parent)
+	var opts []snapshot.Opt
+	if pr.Labels != nil {
+		opts = append(opts, snapshot.WithLabels(pr.Labels))
+	}
+	mounts, err := sn.View(ctx, pr.Key, pr.Parent, opts...)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -138,8 +143,7 @@ func (s *service) Mounts(ctx context.Context, mr *snapshotapi.MountsRequest) (*s
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Apply namespace
-	// TODO: Lookup snapshot id from metadata store
+
 	mounts, err := sn.Mounts(ctx, mr.Key)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
@@ -155,9 +159,12 @@ func (s *service) Commit(ctx context.Context, cr *snapshotapi.CommitSnapshotRequ
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Apply namespace
-	// TODO: Lookup snapshot id from metadata store
-	if err := sn.Commit(ctx, cr.Name, cr.Key); err != nil {
+
+	var opts []snapshot.Opt
+	if cr.Labels != nil {
+		opts = append(opts, snapshot.WithLabels(cr.Labels))
+	}
+	if err := sn.Commit(ctx, cr.Name, cr.Key, opts...); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 
@@ -176,8 +183,7 @@ func (s *service) Remove(ctx context.Context, rr *snapshotapi.RemoveSnapshotRequ
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Apply namespace
-	// TODO: Lookup snapshot id from metadata store
+
 	if err := sn.Remove(ctx, rr.Key); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -196,7 +202,7 @@ func (s *service) Stat(ctx context.Context, sr *snapshotapi.StatSnapshotRequest)
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Apply namespace
+
 	info, err := sn.Stat(ctx, sr.Key)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
@@ -205,12 +211,27 @@ func (s *service) Stat(ctx context.Context, sr *snapshotapi.StatSnapshotRequest)
 	return &snapshotapi.StatSnapshotResponse{Info: fromInfo(info)}, nil
 }
 
+func (s *service) Update(ctx context.Context, sr *snapshotapi.UpdateSnapshotRequest) (*snapshotapi.UpdateSnapshotResponse, error) {
+	log.G(ctx).WithField("key", sr.Info.Name).Debugf("Updating snapshot")
+	sn, err := s.getSnapshotter(sr.Snapshotter)
+	if err != nil {
+		return nil, err
+	}
+
+	info, err := sn.Update(ctx, toInfo(sr.Info), sr.UpdateMask.GetPaths()...)
+	if err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+
+	return &snapshotapi.UpdateSnapshotResponse{Info: fromInfo(info)}, nil
+}
+
 func (s *service) List(sr *snapshotapi.ListSnapshotsRequest, ss snapshotapi.Snapshots_ListServer) error {
 	sn, err := s.getSnapshotter(sr.Snapshotter)
 	if err != nil {
 		return err
 	}
-	// TODO: Apply namespace
+
 	var (
 		buffer    []snapshotapi.Info
 		sendBlock = func(block []snapshotapi.Info) error {
@@ -250,7 +271,7 @@ func (s *service) Usage(ctx context.Context, ur *snapshotapi.UsageRequest) (*sna
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Apply namespace
+
 	usage, err := sn.Usage(ctx, ur.Key)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
@@ -263,14 +284,20 @@ func fromKind(kind snapshot.Kind) snapshotapi.Kind {
 	if kind == snapshot.KindActive {
 		return snapshotapi.KindActive
 	}
+	if kind == snapshot.KindView {
+		return snapshotapi.KindView
+	}
 	return snapshotapi.KindCommitted
 }
 
 func fromInfo(info snapshot.Info) snapshotapi.Info {
 	return snapshotapi.Info{
-		Name:   info.Name,
-		Parent: info.Parent,
-		Kind:   fromKind(info.Kind),
+		Name:      info.Name,
+		Parent:    info.Parent,
+		Kind:      fromKind(info.Kind),
+		CreatedAt: info.Created,
+		UpdatedAt: info.Updated,
+		Labels:    info.Labels,
 	}
 }
 

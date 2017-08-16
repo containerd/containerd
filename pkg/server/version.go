@@ -19,7 +19,6 @@ package server
 import (
 	"fmt"
 
-	"github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -34,7 +33,7 @@ const (
 
 // Version returns the runtime name, runtime version and runtime API version.
 func (c *criContainerdService) Version(ctx context.Context, r *runtime.VersionRequest) (*runtime.VersionResponse, error) {
-	resp, err := c.versionService.Version(ctx, &empty.Empty{})
+	resp, err := c.client.Version(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get containerd version: %v", err)
 	}

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/docker/docker/pkg/signal"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
@@ -94,16 +94,20 @@ func (c *criContainerdService) stopContainer(ctx context.Context, container cont
 			}
 		}
 		glog.V(2).Infof("Stop container %q with signal %v", id, stopSignal)
-		_, err = c.taskService.Kill(ctx, &tasks.KillRequest{
-			ContainerID: id,
-			Signal:      uint32(stopSignal),
-			All:         true,
-		})
+		task, err := container.Container.Task(ctx, nil)
 		if err != nil {
-			if !isContainerdGRPCNotFoundError(err) && !isRuncProcessAlreadyFinishedError(err) {
-				return fmt.Errorf("failed to stop container %q: %v", id, err)
+			if !errdefs.IsNotFound(err) {
+				return fmt.Errorf("failed to stop container, task not found for container %q: %v", id, err)
 			}
-			// Move on to make sure container status is updated.
+			return nil
+		}
+		if task != nil {
+			if err = task.Kill(ctx, stopSignal); err != nil {
+				if !errdefs.IsNotFound(err) {
+					return fmt.Errorf("failed to stop container %q: %v", id, err)
+				}
+				// Move on to make sure container status is updated.
+			}
 		}
 
 		err = c.waitContainerStop(ctx, id, timeout)
@@ -113,18 +117,22 @@ func (c *criContainerdService) stopContainer(ctx context.Context, container cont
 		glog.Errorf("Stop container %q timed out: %v", id, err)
 	}
 
+	task, err := container.Container.Task(ctx, nil)
+	if err != nil {
+		if !errdefs.IsNotFound(err) {
+			return fmt.Errorf("failed to stop container, task not found for container %q: %v", id, err)
+		}
+		return nil
+	}
 	// Event handler will Delete the container from containerd after it handles the Exited event.
 	glog.V(2).Infof("Kill container %q", id)
-	_, err := c.taskService.Kill(ctx, &tasks.KillRequest{
-		ContainerID: id,
-		Signal:      uint32(unix.SIGKILL),
-		All:         true,
-	})
-	if err != nil {
-		if !isContainerdGRPCNotFoundError(err) && !isRuncProcessAlreadyFinishedError(err) {
-			return fmt.Errorf("failed to kill container %q: %v", id, err)
+	if task != nil {
+		if err = task.Kill(ctx, unix.SIGKILL); err != nil {
+			if !errdefs.IsNotFound(err) {
+				return fmt.Errorf("failed to kill container %q: %v", id, err)
+			}
+			// Move on to make sure container status is updated.
 		}
-		// Move on to make sure container status is updated.
 	}
 
 	// Wait for a fixed timeout until container stop is observed by event monitor.

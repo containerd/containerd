@@ -19,6 +19,7 @@ package server
 import (
 	"fmt"
 
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
@@ -68,14 +69,6 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 	// kubelet implementation, we'll never start a container once we decide to remove it,
 	// so we don't need the "Dead" state for now.
 
-	// Remove container snapshot.
-	if err := c.snapshotService.Remove(ctx, id); err != nil {
-		if !errdefs.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to remove container snapshot %q: %v", id, err)
-		}
-		glog.V(5).Infof("Remove called for snapshot %q that does not exist", id)
-	}
-
 	containerRootDir := getContainerRootDir(c.rootDir, id)
 	if err := c.os.RemoveAll(containerRootDir); err != nil {
 		return nil, fmt.Errorf("failed to remove container root directory %q: %v",
@@ -88,8 +81,8 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 	}
 
 	// Delete containerd container.
-	if err := c.containerService.Delete(ctx, id); err != nil {
-		if !isContainerdGRPCNotFoundError(err) {
+	if err := container.Container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
+		if !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to delete containerd container %q: %v", id, err)
 		}
 		glog.V(5).Infof("Remove called for containerd container %q that does not exist", id, err)

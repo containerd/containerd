@@ -26,6 +26,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/pkg/stringid"
@@ -33,8 +34,6 @@ import (
 	"github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
@@ -78,12 +77,6 @@ const (
 	// According to http://man7.org/linux/man-pages/man5/resolv.conf.5.html:
 	// "The search list is currently limited to six domains with a total of 256 characters."
 	maxDNSSearches = 6
-	// stdinNamedPipe is the name of stdin named pipe.
-	stdinNamedPipe = "stdin"
-	// stdoutNamedPipe is the name of stdout named pipe.
-	stdoutNamedPipe = "stdout"
-	// stderrNamedPipe is the name of stderr named pipe.
-	stderrNamedPipe = "stderr"
 	// Delimiter used to construct container/sandbox names.
 	nameDelimiter = "_"
 	// netNSFormat is the format of network namespace of a process.
@@ -146,15 +139,6 @@ func getSandboxRootDir(rootDir, id string) string {
 // getContainerRootDir returns the root directory for managing container files.
 func getContainerRootDir(rootDir, id string) string {
 	return filepath.Join(rootDir, containersDir, id)
-}
-
-// getStreamingPipes returns the stdin/stdout/stderr pipes path in the
-// container/sandbox root.
-func getStreamingPipes(rootDir string) (string, string, string) {
-	stdin := filepath.Join(rootDir, stdinNamedPipe)
-	stdout := filepath.Join(rootDir, stdoutNamedPipe)
-	stderr := filepath.Join(rootDir, stderrNamedPipe)
-	return stdin, stdout, stderr
 }
 
 // getSandboxHosts returns the hosts file path inside the sandbox root directory.
@@ -223,18 +207,6 @@ func getPIDNamespace(pid uint32) string {
 	return fmt.Sprintf(pidNSFormat, pid)
 }
 
-// isContainerdGRPCNotFoundError checks whether a grpc error is not found error.
-func isContainerdGRPCNotFoundError(grpcError error) bool {
-	return grpc.Code(grpcError) == codes.NotFound
-}
-
-// isRuncProcessAlreadyFinishedError checks whether a grpc error is a process already
-// finished error.
-// TODO(random-liu): Containerd should expose this error in api. (containerd#999)
-func isRuncProcessAlreadyFinishedError(grpcError error) bool {
-	return strings.Contains(grpc.ErrorDesc(grpcError), "os: process already finished")
-}
-
 // criContainerStateToString formats CRI container state to string.
 func criContainerStateToString(state runtime.ContainerState) string {
 	return runtime.ContainerState_name[int32(state)]
@@ -269,46 +241,48 @@ func normalizeImageRef(ref string) (reference.Named, error) {
 	return reference.TagNameOnly(named), nil
 }
 
-// getImageInfo returns image chainID, compressed size and oci config. Note that getImageInfo
+// getImageInfo returns image chainID, compressed size, oci config, imageID. Note that getImageInfo
 // assumes that the image has been pulled or it will return an error.
 func (c *criContainerdService) getImageInfo(ctx context.Context, ref string) (
-	imagedigest.Digest, int64, *imagespec.ImageConfig, error) {
+	imagedigest.Digest, int64, *imagespec.ImageConfig, imagedigest.Digest, error) {
+
+	// Get image config
 	normalized, err := normalizeImageRef(ref)
 	if err != nil {
-		return "", 0, nil, fmt.Errorf("failed to normalize image reference %q: %v", ref, err)
+		return "", 0, nil, "", fmt.Errorf("failed to normalize image reference %q: %v", ref, err)
 	}
 	normalizedRef := normalized.String()
+	//TODO(Abhi): Switch to using containerd client GetImage() api
 	image, err := c.imageStoreService.Get(ctx, normalizedRef)
 	if err != nil {
-		return "", 0, nil, fmt.Errorf("failed to get image %q from containerd image store: %v",
+		return "", 0, nil, "", fmt.Errorf("failed to get image %q from containerd image store: %v",
 			normalizedRef, err)
 	}
 	// Get image config
 	desc, err := image.Config(ctx, c.contentStoreService)
 	if err != nil {
-		return "", 0, nil, fmt.Errorf("failed to get image config descriptor: %v", err)
+		return "", 0, nil, "", fmt.Errorf("failed to get image config descriptor: %v", err)
 	}
-	rc, err := c.contentStoreService.Reader(ctx, desc.Digest)
+	rb, err := content.ReadBlob(ctx, c.contentStoreService, desc.Digest)
 	if err != nil {
-		return "", 0, nil, fmt.Errorf("failed to get image config reader: %v", err)
+		return "", 0, nil, "", fmt.Errorf("failed to get image config reader: %v", err)
 	}
-	defer rc.Close()
 	var imageConfig imagespec.Image
-	if err = json.NewDecoder(rc).Decode(&imageConfig); err != nil {
-		return "", 0, nil, fmt.Errorf("failed to decode image config: %v", err)
+	if err = json.Unmarshal(rb, &imageConfig); err != nil {
+		return "", 0, nil, "", err
 	}
 	// Get image chainID
 	diffIDs, err := image.RootFS(ctx, c.contentStoreService)
 	if err != nil {
-		return "", 0, nil, fmt.Errorf("failed to get image diff ids: %v", err)
+		return "", 0, nil, "", fmt.Errorf("failed to get image diff ids: %v", err)
 	}
 	chainID := identity.ChainID(diffIDs)
 	// Get image size
 	size, err := image.Size(ctx, c.contentStoreService)
 	if err != nil {
-		return "", 0, nil, fmt.Errorf("failed to get image size: %v", err)
+		return "", 0, nil, "", fmt.Errorf("failed to get image size: %v", err)
 	}
-	return chainID, size, &imageConfig.Config, nil
+	return chainID, size, &imageConfig.Config, desc.Digest, nil
 }
 
 // getRepoDigestAngTag returns image repoDigest and repoTag of the named image reference.
@@ -336,6 +310,7 @@ func (c *criContainerdService) localResolve(ctx context.Context, ref string) (*i
 		if err != nil {
 			return nil, fmt.Errorf("invalid image reference %q: %v", ref, err)
 		}
+		//TODO(Abhi): Switch to using containerd client GetImage() api
 		imageInContainerd, err := c.imageStoreService.Get(ctx, normalized.String())
 		if err != nil {
 			if errdefs.IsNotFound(err) {

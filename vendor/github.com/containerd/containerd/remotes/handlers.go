@@ -3,6 +3,7 @@ package remotes
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/containerd/containerd/content"
@@ -131,11 +132,12 @@ func push(ctx context.Context, provider content.Provider, pusher Pusher, desc oc
 	}
 	defer cw.Close()
 
-	rc, err := provider.Reader(ctx, desc.Digest)
+	ra, err := provider.ReaderAt(ctx, desc.Digest)
 	if err != nil {
 		return err
 	}
-	defer rc.Close()
+	defer ra.Close()
 
-	return content.Copy(cw, rc, desc.Size, desc.Digest)
+	rd := io.NewSectionReader(ra, 0, desc.Size)
+	return content.Copy(cw, rd, desc.Size, desc.Digest)
 }

@@ -3,7 +3,6 @@ package metadata
 import (
 	"context"
 	"encoding/binary"
-	"io"
 	"strings"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
+	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/namespaces"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -390,24 +390,18 @@ func (nw *namespacedWriter) commit(tx *bolt.Tx, size int64, expected digest.Dige
 		return err
 	}
 
+	commitTime := time.Now().UTC()
+
 	sizeEncoded, err := encodeSize(size)
 	if err != nil {
 		return err
 	}
 
-	timeEncoded, err := time.Now().UTC().MarshalBinary()
-	if err != nil {
+	if err := boltutil.WriteTimestamps(bkt, commitTime, commitTime); err != nil {
 		return err
 	}
-
-	for _, v := range [][2][]byte{
-		{bucketKeyCreatedAt, timeEncoded},
-		{bucketKeyUpdatedAt, timeEncoded},
-		{bucketKeySize, sizeEncoded},
-	} {
-		if err := bkt.Put(v[0], v[1]); err != nil {
-			return err
-		}
+	if err := bkt.Put(bucketKeySize, sizeEncoded); err != nil {
+		return err
 	}
 
 	return nil
@@ -421,14 +415,7 @@ func (nw *namespacedWriter) Status() (content.Status, error) {
 	return st, err
 }
 
-func (cs *contentStore) Reader(ctx context.Context, dgst digest.Digest) (io.ReadCloser, error) {
-	if err := cs.checkAccess(ctx, dgst); err != nil {
-		return nil, err
-	}
-	return cs.Store.Reader(ctx, dgst)
-}
-
-func (cs *contentStore) ReaderAt(ctx context.Context, dgst digest.Digest) (io.ReaderAt, error) {
+func (cs *contentStore) ReaderAt(ctx context.Context, dgst digest.Digest) (content.ReaderAt, error) {
 	if err := cs.checkAccess(ctx, dgst); err != nil {
 		return nil, err
 	}
@@ -451,17 +438,15 @@ func (cs *contentStore) checkAccess(ctx context.Context, dgst digest.Digest) err
 }
 
 func readInfo(info *content.Info, bkt *bolt.Bucket) error {
-	if err := readTimestamps(&info.CreatedAt, &info.UpdatedAt, bkt); err != nil {
+	if err := boltutil.ReadTimestamps(bkt, &info.CreatedAt, &info.UpdatedAt); err != nil {
 		return err
 	}
 
-	lbkt := bkt.Bucket(bucketKeyLabels)
-	if lbkt != nil {
-		info.Labels = map[string]string{}
-		if err := readLabels(info.Labels, lbkt); err != nil {
-			return err
-		}
+	labels, err := boltutil.ReadLabels(bkt)
+	if err != nil {
+		return err
 	}
+	info.Labels = labels
 
 	if v := bkt.Get(bucketKeySize); len(v) > 0 {
 		info.Size, _ = binary.Varint(v)
@@ -471,11 +456,11 @@ func readInfo(info *content.Info, bkt *bolt.Bucket) error {
 }
 
 func writeInfo(info *content.Info, bkt *bolt.Bucket) error {
-	if err := writeTimestamps(bkt, info.CreatedAt, info.UpdatedAt); err != nil {
+	if err := boltutil.WriteTimestamps(bkt, info.CreatedAt, info.UpdatedAt); err != nil {
 		return err
 	}
 
-	if err := writeLabels(bkt, info.Labels); err != nil {
+	if err := boltutil.WriteLabels(bkt, info.Labels); err != nil {
 		return errors.Wrapf(err, "writing labels for info %v", info.Digest)
 	}
 

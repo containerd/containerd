@@ -18,32 +18,11 @@ package server
 
 import (
 	"encoding/base64"
-	"fmt"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
-
-func TestResources(t *testing.T) {
-	const threads = 10
-	var wg sync.WaitGroup
-	r := newResourceSet()
-	for i := 0; i < threads; i++ {
-		wg.Add(1)
-		go func(ref string) {
-			r.add(ref)
-			wg.Done()
-		}(fmt.Sprintf("sha256:%d", i))
-	}
-	wg.Wait()
-	refs := r.all()
-	for i := 0; i < threads; i++ {
-		_, ok := refs[fmt.Sprintf("sha256:%d", i)]
-		assert.True(t, ok)
-	}
-}
 
 func TestParseAuth(t *testing.T) {
 	testUser := "username"

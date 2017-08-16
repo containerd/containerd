@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"sync"
 
 	"github.com/containerd/containerd/errdefs"
@@ -20,17 +19,25 @@ var (
 	}
 )
 
+func NewReader(ra ReaderAt) io.Reader {
+	rd := io.NewSectionReader(ra, 0, ra.Size())
+	return rd
+}
+
 // ReadBlob retrieves the entire contents of the blob from the provider.
 //
 // Avoid using this for large blobs, such as layers.
 func ReadBlob(ctx context.Context, provider Provider, dgst digest.Digest) ([]byte, error) {
-	rc, err := provider.Reader(ctx, dgst)
+	ra, err := provider.ReaderAt(ctx, dgst)
 	if err != nil {
 		return nil, err
 	}
-	defer rc.Close()
+	defer ra.Close()
 
-	return ioutil.ReadAll(rc)
+	p := make([]byte, ra.Size())
+
+	_, err = ra.ReadAt(p, 0)
+	return p, err
 }
 
 // WriteBlob writes data with the expected digest into the content store. If

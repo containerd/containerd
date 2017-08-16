@@ -19,12 +19,10 @@ package server
 import (
 	"fmt"
 
+	tasks "github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/api/types/task"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
-
-	"github.com/containerd/containerd/api/services/tasks/v1"
-
-	"github.com/containerd/containerd/api/types/task"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
@@ -42,16 +40,15 @@ func (c *criContainerdService) ListPodSandbox(ctx context.Context, r *runtime.Li
 	// List all sandboxes from store.
 	sandboxesInStore := c.sandboxStore.List()
 
-	resp, err := c.taskService.List(ctx, &tasks.ListTasksRequest{})
+	response, err := c.taskService.List(ctx, &tasks.ListTasksRequest{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list sandbox containers: %v", err)
 	}
-	sandboxesInContainerd := resp.Tasks
 
 	var sandboxes []*runtime.PodSandbox
 	for _, sandboxInStore := range sandboxesInStore {
-		var sandboxInContainerd *task.Task
-		for _, s := range sandboxesInContainerd {
+		var sandboxInContainerd *task.Process
+		for _, s := range response.Tasks {
 			if s.ID == sandboxInStore.ID {
 				sandboxInContainerd = s
 				break
