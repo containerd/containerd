@@ -64,9 +64,9 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&c.PrintVersion, "version",
 		false, "Print cri-containerd version information and quit.")
 	fs.StringVar(&c.NetworkPluginBinDir, "network-bin-dir",
-		"/etc/cni/net.d", "The directory for putting network binaries.")
+		"/opt/cni/bin", "The directory for putting network binaries.")
 	fs.StringVar(&c.NetworkPluginConfDir, "network-conf-dir",
-		"/opt/cni/bin", "The directory for putting network plugin configuration files.")
+		"/etc/cni/net.d", "The directory for putting network plugin configuration files.")
 	fs.StringVar(&c.StreamServerAddress, "stream-addr",
 		"", "The ip address streaming server is listening on. Default host interface is used if this is empty.")
 	fs.StringVar(&c.StreamServerPort, "stream-port",

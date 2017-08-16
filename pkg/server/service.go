@@ -136,7 +136,7 @@ func NewCRIContainerdService(containerdEndpoint, rootDir, networkPluginBinDir, n
 		client:          client,
 	}
 
-	netPlugin, err := ocicni.InitCNI(networkPluginBinDir, networkPluginConfDir)
+	netPlugin, err := ocicni.InitCNI(networkPluginConfDir, networkPluginBinDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize cni plugin: %v", err)
 	}
