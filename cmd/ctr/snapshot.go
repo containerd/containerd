@@ -7,6 +7,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/progress"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/pkg/errors"
@@ -22,6 +23,7 @@ var snapshotCommand = cli.Command{
 		usageSnapshotCommand,
 		removeSnapshotCommand,
 		prepareSnapshotCommand,
+		viewSnapshotCommand,
 		treeSnapshotCommand,
 		mountSnapshotCommand,
 		commitSnapshotCommand,
@@ -174,9 +176,47 @@ var prepareSnapshotCommand = cli.Command{
 		}
 
 		if target != "" {
-			for _, m := range mounts {
-				fmt.Fprintf(os.Stdout, "mount -t %s %s %s -o %s\n", m.Type, m.Source, target, strings.Join(m.Options, ","))
-			}
+			printMounts(target, mounts)
+		}
+
+		return nil
+	},
+}
+
+var viewSnapshotCommand = cli.Command{
+	Name:      "view",
+	Usage:     "create a read-only snapshot from a committed snapshot",
+	ArgsUsage: "[flags] <key> [<parent>]",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "target, t",
+			Usage: "mount target path, will print mount, if provided",
+		},
+	},
+	Action: func(clicontext *cli.Context) error {
+		ctx, cancel := appContext(clicontext)
+		defer cancel()
+
+		if clicontext.NArg() != 2 {
+			return cli.ShowSubcommandHelp(clicontext)
+		}
+
+		target := clicontext.String("target")
+		key := clicontext.Args().Get(0)
+		parent := clicontext.Args().Get(1)
+
+		snapshotter, err := getSnapshotter(clicontext)
+		if err != nil {
+			return err
+		}
+
+		mounts, err := snapshotter.View(ctx, key, parent)
+		if err != nil {
+			return err
+		}
+
+		if target != "" {
+			printMounts(target, mounts)
 		}
 
 		return nil
@@ -186,7 +226,7 @@ var prepareSnapshotCommand = cli.Command{
 var mountSnapshotCommand = cli.Command{
 	Name:      "mounts",
 	Aliases:   []string{"m", "mount"},
-	Usage:     "mount gets mount commands for the active snapshots",
+	Usage:     "mount gets mount commands for the snapshots",
 	ArgsUsage: "[flags] <target> <key>",
 	Action: func(clicontext *cli.Context) error {
 		ctx, cancel := appContext(clicontext)
@@ -208,9 +248,7 @@ var mountSnapshotCommand = cli.Command{
 			return err
 		}
 
-		for _, m := range mounts {
-			fmt.Fprintf(os.Stdout, "mount -t %s %s %s -o %s\n", m.Type, m.Source, target, strings.Join(m.Options, ","))
-		}
+		printMounts(target, mounts)
 
 		return nil
 	},
@@ -306,5 +344,12 @@ func printNode(name string, tree map[string]*snapshotTreeNode, level int) {
 	level++
 	for _, child := range node.Children {
 		printNode(child, tree, level)
+	}
+}
+
+func printMounts(target string, mounts []mount.Mount) {
+	// FIXME: This is specific to Unix
+	for _, m := range mounts {
+		fmt.Printf("mount -t %s %s %s -o %s\n", m.Type, m.Source, target, strings.Join(m.Options, ","))
 	}
 }
