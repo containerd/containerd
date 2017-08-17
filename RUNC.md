@@ -1,10 +1,16 @@
-containerd is built with OCI support and with support for advanced features provided by `runc`.
+containerd is built with OCI support and with support for advanced features provided by [runc](https://github.com/opencontainers/runc).
 
-We depend on a specific runc version when dealing with advanced features.  You should have a specific build for development.  The current supported runc commit is:
+We depend on a specific `runc` version when dealing with advanced features.  You should have a specific runc build for development.  The current supported runc commit is:
 
 RUNC_COMMIT = e775f0fba3ea329b8b766451c892c41a3d49594d
 
+For more information on how to clone and build runc see the runc Building [documentation](https://github.com/opencontainers/runc#building).
+
+Note: before building you may need to install additional support, which will vary by platform. For example, you may need to install `libseccomp` and `libapparmor` e.g. `libseccomp-dev` and `libapparmor-dev` for Ubuntu.
+
 ## building
+
+From within your `opencontainers/runc` repository run:
 
 ### apparmor
 
