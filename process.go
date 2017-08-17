@@ -152,7 +152,8 @@ func (p *process) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (uint32
 	if err != nil {
 		return UnknownExitStatus, err
 	}
-	if status.Status != Stopped {
+	switch status.Status {
+	case Running, Paused, Pausing:
 		return UnknownExitStatus, errors.Wrapf(errdefs.ErrFailedPrecondition, "process must be stopped before deletion")
 	}
 	if p.io != nil {
