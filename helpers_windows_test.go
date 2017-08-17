@@ -63,6 +63,12 @@ func withRemappedSnapshot(id string, i Image, u, g uint32) NewContainerOpts {
 	}
 }
 
+func withRemappedSnapshotView(id string, i Image, u, g uint32) NewContainerOpts {
+	return func(ctx context.Context, client *Client, c *containers.Container) error {
+		return nil
+	}
+}
+
 func withNoop(_ context.Context, _ *Client, _ *containers.Container, _ *specs.Spec) error {
 	return nil
 }

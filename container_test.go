@@ -704,7 +704,12 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 
 func TestUserNamespaces(t *testing.T) {
 	t.Parallel()
+	t.Run("WritableRootFS", func(t *testing.T) { testUserNamespaces(t, false) })
+	// see #1373 and runc#1572
+	t.Run("ReadonlyRootFS", func(t *testing.T) { testUserNamespaces(t, true) })
+}
 
+func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -714,7 +719,7 @@ func TestUserNamespaces(t *testing.T) {
 	var (
 		image       Image
 		ctx, cancel = testContext()
-		id          = t.Name()
+		id          = strings.Replace(t.Name(), "/", "-", -1)
 	)
 	defer cancel()
 
@@ -726,13 +731,17 @@ func TestUserNamespaces(t *testing.T) {
 		}
 	}
 
-	container, err := client.NewContainer(ctx, id,
-		WithNewSpec(withImageConfig(image),
-			withExitStatus(7),
-			withUserNamespace(0, 1000, 10000),
-		),
-		withRemappedSnapshot(id, image, 1000, 1000),
-	)
+	opts := []NewContainerOpts{WithNewSpec(withImageConfig(image),
+		withExitStatus(7),
+		withUserNamespace(0, 1000, 10000),
+	)}
+	if readonlyRootFS {
+		opts = append(opts, withRemappedSnapshotView(id, image, 1000, 1000))
+	} else {
+		opts = append(opts, withRemappedSnapshot(id, image, 1000, 1000))
+	}
+
+	container, err := client.NewContainer(ctx, id, opts...)
 	if err != nil {
 		t.Error(err)
 		return

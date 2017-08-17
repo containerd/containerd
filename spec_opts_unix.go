@@ -225,6 +225,15 @@ func WithUserNamespace(container, host, size uint32) SpecOpts {
 // WithRemappedSnapshot creates a new snapshot and remaps the uid/gid for the
 // filesystem to be used by a container with user namespaces
 func WithRemappedSnapshot(id string, i Image, uid, gid uint32) NewContainerOpts {
+	return withRemappedSnapshotBase(id, i, uid, gid, false)
+}
+
+// WithRemappedSnapshotView is similar to WithRemappedSnapshot but rootfs is mounted as read-only.
+func WithRemappedSnapshotView(id string, i Image, uid, gid uint32) NewContainerOpts {
+	return withRemappedSnapshotBase(id, i, uid, gid, true)
+}
+
+func withRemappedSnapshotBase(id string, i Image, uid, gid uint32, readonly bool) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore())
 		if err != nil {
@@ -257,7 +266,12 @@ func WithRemappedSnapshot(id string, i Image, uid, gid uint32) NewContainerOpts 
 		if err := snapshotter.Commit(ctx, usernsID, usernsID+"-remap"); err != nil {
 			return err
 		}
-		if _, err := snapshotter.Prepare(ctx, id, usernsID); err != nil {
+		if readonly {
+			_, err = snapshotter.View(ctx, id, usernsID)
+		} else {
+			_, err = snapshotter.Prepare(ctx, id, usernsID)
+		}
+		if err != nil {
 			return err
 		}
 		c.RootFS = id
