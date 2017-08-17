@@ -1,0 +1,5 @@
+#linux specific settings
+COMMANDS += containerd-shim
+
+# supports go test -race
+TESTFLAGS_RACE= -race
