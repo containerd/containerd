@@ -68,6 +68,7 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 
 func TestGenerateSandboxContainerSpec(t *testing.T) {
 	testID := "test-id"
+	nsPath := "test-cni"
 	for desc, test := range map[string]struct {
 		configChange      func(*runtime.PodSandboxConfig)
 		imageConfigChange func(*imagespec.ImageConfig)
@@ -80,6 +81,7 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 				require.NotNil(t, spec.Linux)
 				assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
 					Type: runtimespec.NetworkNamespace,
+					Path: nsPath,
 				})
 				assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
 					Type: runtimespec.PIDNamespace,
@@ -136,7 +138,7 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 		if test.imageConfigChange != nil {
 			test.imageConfigChange(imageConfig)
 		}
-		spec, err := c.generateSandboxContainerSpec(testID, config, imageConfig)
+		spec, err := c.generateSandboxContainerSpec(testID, config, imageConfig, nsPath)
 		if test.expectErr {
 			assert.Error(t, err)
 			assert.Nil(t, spec)

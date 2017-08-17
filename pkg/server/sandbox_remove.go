@@ -78,8 +78,6 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 		}
 	}
 
-	// TODO(random-liu): [P1] Remove permanent namespace once used.
-
 	// Cleanup the sandbox root directory.
 	sandboxRootDir := getSandboxRootDir(c.rootDir, id)
 	if err := c.os.RemoveAll(sandboxRootDir); err != nil {

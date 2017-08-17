@@ -63,22 +63,29 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 	}
 
 	// Teardown network for sandbox.
-	_, err = c.os.Stat(sandbox.NetNS)
-	if err == nil {
-		if !sandbox.Config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostNetwork() {
-			if teardownErr := c.netPlugin.TearDownPod(ocicni.PodNetwork{
-				Name:         sandbox.Config.GetMetadata().GetName(),
-				Namespace:    sandbox.Config.GetMetadata().GetNamespace(),
-				ID:           id,
-				NetNS:        sandbox.NetNS,
-				PortMappings: toCNIPortMappings(sandbox.Config.GetPortMappings()),
-			}); teardownErr != nil {
-				return nil, fmt.Errorf("failed to destroy network for sandbox %q: %v", id, teardownErr)
-			}
+	if sandbox.NetNSPath != "" {
+		if _, err := os.Stat(sandbox.NetNSPath); err != nil {
+			return nil, fmt.Errorf("failed to stat network namespace path %s :%v", sandbox.NetNSPath, err)
 		}
-	} else if !os.IsNotExist(err) { // It's ok for sandbox.NetNS to *not* exist
-		return nil, fmt.Errorf("failed to stat netns path for sandbox %q before tearing down the network: %v", id, err)
+		if teardownErr := c.netPlugin.TearDownPod(ocicni.PodNetwork{
+			Name:         sandbox.Config.GetMetadata().GetName(),
+			Namespace:    sandbox.Config.GetMetadata().GetNamespace(),
+			ID:           id,
+			NetNS:        sandbox.NetNSPath,
+			PortMappings: toCNIPortMappings(sandbox.Config.GetPortMappings()),
+		}); teardownErr != nil {
+			return nil, fmt.Errorf("failed to destroy network for sandbox %q: %v", id, teardownErr)
+		}
+		/*TODO:It is still possible that cri-containerd crashes after we teardown the network, but before we remove the network namespace.
+		In that case, we'll not be able to remove the sandbox anymore. The chance is slim, but we should be aware of that.
+		In the future, once TearDownPod is idempotent, this will be fixed.*/
+
+		//Close the sandbox network namespace if it was created
+		if err = sandbox.NetNS.Remove(); err != nil {
+			return nil, fmt.Errorf("failed to remove network namespace for sandbox %q:  %v", id, err)
+		}
 	}
+
 	glog.V(2).Infof("TearDown network for sandbox %q successfully", id)
 
 	sandboxRoot := getSandboxRootDir(c.rootDir, id)

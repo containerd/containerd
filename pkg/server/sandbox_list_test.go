@@ -43,7 +43,7 @@ func TestToCRISandbox(t *testing.T) {
 		Name:      "test-name",
 		Config:    config,
 		CreatedAt: createdAt,
-		NetNS:     "test-netns",
+		NetNSPath: "test-netns",
 	}
 	state := runtime.PodSandboxState_SANDBOX_READY
 	expect := &runtime.PodSandbox{

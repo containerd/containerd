@@ -51,8 +51,8 @@ type Metadata struct {
 	CreatedAt int64
 	// Pid is the process id of the sandbox.
 	Pid uint32
-	// NetNS is the network namespace used by the sandbox.
-	NetNS string
+	// NetNSPath is the network namespace used by the sandbox.
+	NetNSPath string
 }
 
 // Encode encodes Metadata into bytes in json format.

@@ -31,7 +31,8 @@ type Sandbox struct {
 	Metadata
 	// Containerd sandbox container
 	Container containerd.Container
-	// TODO(random-liu): Add cni network namespace client.
+	// CNI network namespace client
+	NetNS *NetNS
 }
 
 // Store stores all sandboxes.
