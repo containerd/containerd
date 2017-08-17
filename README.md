@@ -31,9 +31,12 @@ specifications as appropriate.
 trusty.
 2. Install containerd dependencies.
 * containerd requires installation of a btrfs development library. `btrfs-tools`(Ubuntu, Debian) / `btrfs-progs-devel`(Fedora, CentOS, RHEL)
-3. Install and setup a go1.8.x development environment.
-4. Make a local clone of this repository.
-5. Install binary dependencies by running the following command from your cloned `cri-containerd/` project directory:
+3. Install other dependencies:
+* `nsenter`: Required by CNI and portforward.
+* `socat`: Required by portforward.
+4. Install and setup a go1.8.x development environment.
+5. Make a local clone of this repository.
+6. Install binary dependencies by running the following command from your cloned `cri-containerd/` project directory:
 ```shell
 # Note: install.deps installs the above mentioned runc, containerd, and CNI
 # binary dependencies. install.deps is only provided for general use and ease of

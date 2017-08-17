@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 
 	"golang.org/x/net/context"
@@ -83,7 +84,10 @@ func (s *streamRuntime) Attach(containerID string, in io.Reader, out, err io.Wri
 }
 
 func (s *streamRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
-	return errors.New("not implemented")
+	if port <= 0 || port > math.MaxUint16 {
+		return fmt.Errorf("invalid port %d", port)
+	}
+	return s.c.portForward(podSandboxID, port, stream)
 }
 
 // handleResizing spawns a goroutine that processes the resize channel, calling resizeFunc for each

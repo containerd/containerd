@@ -30,7 +30,7 @@ func (c *criContainerdService) Exec(ctx context.Context, r *runtime.ExecRequest)
 		r.GetContainerId(), r.GetCmd(), r.GetTty(), r.GetStdin())
 	defer func() {
 		if retErr == nil {
-			glog.V(2).Infof("Exec for %q returns URL %q", r.GetContainerId(), retRes.Url)
+			glog.V(2).Infof("Exec for %q returns URL %q", r.GetContainerId(), retRes.GetUrl())
 		}
 	}()
 
