@@ -762,6 +762,34 @@ file {
       type: TYPE_BYTES
       json_name: "data"
     }
+    field {
+      name: "labels"
+      number: 7
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.content.v1.WriteContentRequest.LabelsEntry"
+      json_name: "labels"
+    }
+    nested_type {
+      name: "LabelsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
   }
   message_type {
     name: "WriteContentResponse"
@@ -2332,6 +2360,8 @@ file {
   package: "containerd.services.snapshots.v1"
   dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/empty.proto"
+  dependency: "google/protobuf/field_mask.proto"
+  dependency: "google/protobuf/timestamp.proto"
   dependency: "github.com/containerd/containerd/api/types/mount.proto"
   message_type {
     name: "PrepareSnapshotRequest"
@@ -2355,6 +2385,34 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "parent"
+    }
+    field {
+      name: "labels"
+      number: 4
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.snapshots.v1.PrepareSnapshotRequest.LabelsEntry"
+      json_name: "labels"
+    }
+    nested_type {
+      name: "LabelsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
     }
   }
   message_type {
@@ -2390,6 +2448,34 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "parent"
+    }
+    field {
+      name: "labels"
+      number: 4
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.snapshots.v1.ViewSnapshotRequest.LabelsEntry"
+      json_name: "labels"
+    }
+    nested_type {
+      name: "LabelsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
     }
   }
   message_type {
@@ -2471,6 +2557,34 @@ file {
       type: TYPE_STRING
       json_name: "key"
     }
+    field {
+      name: "labels"
+      number: 4
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.snapshots.v1.CommitSnapshotRequest.LabelsEntry"
+      json_name: "labels"
+    }
+    nested_type {
+      name: "LabelsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
   }
   message_type {
     name: "StatSnapshotRequest"
@@ -2513,9 +2627,104 @@ file {
       type_name: ".containerd.services.snapshots.v1.Kind"
       json_name: "kind"
     }
+    field {
+      name: "created_at"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      options {
+        65010: 1
+        65001: 0
+      }
+      json_name: "createdAt"
+    }
+    field {
+      name: "updated_at"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      options {
+        65010: 1
+        65001: 0
+      }
+      json_name: "updatedAt"
+    }
+    field {
+      name: "labels"
+      number: 6
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.snapshots.v1.Info.LabelsEntry"
+      json_name: "labels"
+    }
+    nested_type {
+      name: "LabelsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
   }
   message_type {
     name: "StatSnapshotResponse"
+    field {
+      name: "info"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.snapshots.v1.Info"
+      options {
+        65001: 0
+      }
+      json_name: "info"
+    }
+  }
+  message_type {
+    name: "UpdateSnapshotRequest"
+    field {
+      name: "snapshotter"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "snapshotter"
+    }
+    field {
+      name: "info"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.snapshots.v1.Info"
+      options {
+        65001: 0
+      }
+      json_name: "info"
+    }
+    field {
+      name: "update_mask"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.FieldMask"
+      json_name: "updateMask"
+    }
+  }
+  message_type {
+    name: "UpdateSnapshotResponse"
     field {
       name: "info"
       number: 1
@@ -2652,6 +2861,11 @@ file {
       name: "Stat"
       input_type: ".containerd.services.snapshots.v1.StatSnapshotRequest"
       output_type: ".containerd.services.snapshots.v1.StatSnapshotResponse"
+    }
+    method {
+      name: "Update"
+      input_type: ".containerd.services.snapshots.v1.UpdateSnapshotRequest"
+      output_type: ".containerd.services.snapshots.v1.UpdateSnapshotResponse"
     }
     method {
       name: "List"
