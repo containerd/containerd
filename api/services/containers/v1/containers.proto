@@ -84,6 +84,12 @@ message Container {
 
 	// UpdatedAt is the last time the container was mutated.
 	google.protobuf.Timestamp updated_at = 9 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+
+	// Extensions allow clients to provide zero or more blobs that are directly
+	// associated with the container. One may provide protobuf, json, or other
+	// encoding formats. The primary use of this is to further decorate the
+	// container object with fields that may be specific to a client integration.
+	repeated google.protobuf.Any extensions = 10 [(gogoproto.nullable) = false];
 }
 
 message GetContainerRequest {

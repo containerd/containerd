@@ -185,6 +185,17 @@ file {
       }
       json_name: "updatedAt"
     }
+    field {
+      name: "extensions"
+      number: 10
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      options {
+        65001: 0
+      }
+      json_name: "extensions"
+    }
     nested_type {
       name: "LabelsEntry"
       field {

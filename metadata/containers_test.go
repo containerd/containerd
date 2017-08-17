@@ -16,6 +16,7 @@ import (
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/typeurl"
+	"github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
@@ -419,6 +420,124 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				},
 			},
 			createerr: errdefs.ErrInvalidArgument,
+		},
+		{
+			name: "UpdateExtensionsFull",
+			original: containers.Container{
+				Spec: encoded,
+				Runtime: containers.RuntimeInfo{
+					Name: "testruntime",
+				},
+				Extensions: []types.Any{
+					{
+						TypeUrl: "test.update.extensions",
+						Value:   []byte("hello"),
+					},
+				},
+			},
+			input: containers.Container{
+				Spec: encoded,
+				Runtime: containers.RuntimeInfo{
+					Name: "testruntime",
+				},
+				Extensions: []types.Any{
+					{
+						TypeUrl: "test.update.extensions",
+						Value:   []byte("world"),
+					},
+				},
+			},
+			expected: containers.Container{
+				Spec: encoded,
+				Runtime: containers.RuntimeInfo{
+					Name: "testruntime",
+				},
+				Extensions: []types.Any{
+					{
+						TypeUrl: "test.update.extensions",
+						Value:   []byte("world"),
+					},
+				},
+			},
+		},
+		{
+			name: "UpdateExtensionsNotInFieldpath",
+			original: containers.Container{
+				Spec: encoded,
+				Runtime: containers.RuntimeInfo{
+					Name: "testruntime",
+				},
+				Extensions: []types.Any{
+					{
+						TypeUrl: "test.update.extensions",
+						Value:   []byte("hello"),
+					},
+				},
+			},
+			input: containers.Container{
+				Spec: encoded,
+				Runtime: containers.RuntimeInfo{
+					Name: "testruntime",
+				},
+				Extensions: []types.Any{
+					{
+						TypeUrl: "test.update.extensions",
+						Value:   []byte("world"),
+					},
+				},
+			},
+			fieldpaths: []string{"labels"},
+			expected: containers.Container{
+				Spec: encoded,
+				Runtime: containers.RuntimeInfo{
+					Name: "testruntime",
+				},
+				Extensions: []types.Any{
+					{
+						TypeUrl: "test.update.extensions",
+						Value:   []byte("hello"),
+					},
+				},
+			},
+		},
+		{
+			name: "UpdateExtensionsFieldPath",
+			original: containers.Container{
+				Spec: encoded,
+				Runtime: containers.RuntimeInfo{
+					Name: "testruntime",
+				},
+				Extensions: []types.Any{
+					{
+						TypeUrl: "test.update.extensions",
+						Value:   []byte("hello"),
+					},
+				},
+			},
+			input: containers.Container{
+				Labels: map[string]string{
+					"foo": "one",
+				},
+				Extensions: []types.Any{
+					{
+						TypeUrl: "test.update.extensions",
+						Value:   []byte("world"),
+					},
+				},
+			},
+			fieldpaths: []string{"extensions"},
+			expected: containers.Container{
+				Spec: encoded,
+				Runtime: containers.RuntimeInfo{
+					Name: "testruntime",
+				},
+				Extensions: []types.Any{
+					{
+						TypeUrl: "test.update.extensions",
+						Value:   []byte("world"),
+					},
+				},
+			},
 		},
 	} {
 		t.Run(testcase.name, func(t *testing.T) {

@@ -127,3 +127,21 @@ func setSnapshotterIfEmpty(c *containers.Container) {
 		c.Snapshotter = DefaultSnapshotter
 	}
 }
+
+// WithContainerExtension appends extension data to the container object.
+// Use this to decorate the container object with additional data for the client
+// integration.
+//
+// Make sure to register the type of `extension` in the typeurl package via
+// `typeurl.Register` otherwise the type data will be inferred, including how
+// to encode and decode the object.
+func WithContainerExtension(extension interface{}) NewContainerOpts {
+	return func(ctx context.Context, client *Client, c *containers.Container) error {
+		any, err := typeurl.MarshalAny(extension)
+		if err != nil {
+			return err
+		}
+		c.Extensions = append(c.Extensions, *any)
+		return nil
+	}
+}

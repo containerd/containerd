@@ -14,6 +14,7 @@ import (
 	_ "github.com/containerd/containerd/runtime"
 
 	"github.com/containerd/containerd/errdefs"
+	gogotypes "github.com/gogo/protobuf/types"
 )
 
 func empty() IOCreation {
@@ -1367,4 +1368,46 @@ func TestContainerMetrics(t *testing.T) {
 	}
 
 	<-statusC
+}
+
+func TestContainerExtensions(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := testContext()
+	defer cancel()
+	id := t.Name()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	ext := gogotypes.Any{TypeUrl: "test.ext.url", Value: []byte("hello")}
+	container, err := client.NewContainer(ctx, id, WithNewSpec(), WithContainerExtension(&ext))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx)
+
+	checkExt := func(container Container) {
+		cExts := container.Extensions()
+		if len(cExts) != 1 {
+			t.Fatal("expected 1 container extension")
+		}
+		if cExts[0].TypeUrl != ext.TypeUrl {
+			t.Fatalf("got unexpected type url for extension: %s", cExts[0].TypeUrl)
+		}
+		if !bytes.Equal(cExts[0].Value, ext.Value) {
+			t.Fatalf("expected extension value %q, got: %q", ext.Value, cExts[0].Value)
+		}
+	}
+
+	checkExt(container)
+
+	container, err = client.LoadContainer(ctx, container.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkExt(container)
 }

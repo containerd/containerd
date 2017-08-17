@@ -146,7 +146,7 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 
 	if len(fieldpaths) == 0 {
 		// only allow updates to these field on full replace.
-		fieldpaths = []string{"labels", "spec"}
+		fieldpaths = []string{"labels", "spec", "extensions"}
 
 		// Fields that are immutable must cause an error when no field paths
 		// are provided. This allows these fields to become mutable in the
@@ -186,6 +186,8 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 			updated.Labels = container.Labels
 		case "spec":
 			updated.Spec = container.Spec
+		case "extensions":
+			updated.Extensions = container.Extensions
 		default:
 			return containers.Container{}, errors.Wrapf(errdefs.ErrInvalidArgument, "cannot update %q field on %q", path, container.ID)
 		}
@@ -288,6 +290,21 @@ func readContainer(container *containers.Container, bkt *bolt.Bucket) error {
 			container.SnapshotKey = string(v)
 		case string(bucketKeySnapshotter):
 			container.Snapshotter = string(v)
+		case string(bucketKeyExtensions):
+			buf := proto.NewBuffer(v)
+			n, err := buf.DecodeVarint()
+			if err != nil {
+				return errors.Wrap(err, "error reading number of container extensions")
+			}
+			extensions := make([]types.Any, 0, n)
+			for i := 0; i < int(n); i++ {
+				var any types.Any
+				if err := buf.DecodeMessage(&any); err != nil {
+					return errors.Wrap(err, "error decoding container extension")
+				}
+				extensions = append(extensions, any)
+			}
+			container.Extensions = extensions
 		}
 
 		return nil
@@ -333,6 +350,21 @@ func writeContainer(bkt *bolt.Bucket, container *containers.Container) error {
 
 	if err := rbkt.Put(bucketKeyName, []byte(container.Runtime.Name)); err != nil {
 		return err
+	}
+
+	if container.Extensions != nil {
+		buf := proto.NewBuffer(nil)
+		if err := buf.EncodeVarint(uint64(len(container.Extensions))); err != nil {
+			return err
+		}
+		for _, ext := range container.Extensions {
+			if err := buf.EncodeMessage(&ext); err != nil {
+				return err
+			}
+		}
+		if err := bkt.Put(bucketKeyExtensions, buf.Bytes()); err != nil {
+			return err
+		}
 	}
 
 	if container.Runtime.Options != nil {
