@@ -176,8 +176,8 @@ func WithHostHostsFile(s *specs.Spec) error {
 	return nil
 }
 
-// WithHostResoveconf bind-mounts the host's /etc/resolv.conf into the container as readonly
-func WithHostResoveconf(s *specs.Spec) error {
+// WithHostResolvconf bind-mounts the host's /etc/resolv.conf into the container as readonly
+func WithHostResolvconf(s *specs.Spec) error {
 	s.Mounts = append(s.Mounts, specs.Mount{
 		Destination: "/etc/resolv.conf",
 		Type:        "bind",
