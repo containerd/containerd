@@ -233,6 +233,9 @@ func WithRemappedSnapshot(id string, i Image, uid, gid uint32) NewContainerOpts 
 		if err != nil {
 			return err
 		}
+
+		setSnapshotterIfEmpty(c)
+
 		var (
 			snapshotter = client.SnapshotService(c.Snapshotter)
 			parent      = identity.ChainID(diffIDs).String()

@@ -174,6 +174,10 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...Ne
 		Stderr:      cfg.Stderr,
 	}
 	if c.c.RootFS != "" {
+		if c.c.Snapshotter == "" {
+			return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "unable to resolve rootfs mounts without snapshotter on container")
+		}
+
 		// get the rootfs from the snapshotter and add it to the request
 		mounts, err := c.client.SnapshotService(c.c.Snapshotter).Mounts(ctx, c.c.RootFS)
 		if err != nil {
