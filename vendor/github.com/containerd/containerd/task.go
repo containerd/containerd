@@ -143,7 +143,7 @@ func (t *task) Start(ctx context.Context) error {
 		t.mu.Unlock()
 		if err != nil {
 			t.io.Close()
-			return err
+			return errdefs.FromGRPC(err)
 		}
 		t.pid = response.Pid
 		return nil
@@ -154,7 +154,7 @@ func (t *task) Start(ctx context.Context) error {
 	if err != nil {
 		t.io.Close()
 	}
-	return err
+	return errdefs.FromGRPC(err)
 }
 
 func (t *task) Kill(ctx context.Context, s syscall.Signal) error {
@@ -262,7 +262,7 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (uint32, e
 		ContainerID: t.id,
 	})
 	if err != nil {
-		return UnknownExitStatus, err
+		return UnknownExitStatus, errdefs.FromGRPC(err)
 	}
 	return r.ExitStatus, nil
 }
@@ -293,7 +293,7 @@ func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreat
 		i.Cancel()
 		i.Wait()
 		i.Close()
-		return nil, err
+		return nil, errdefs.FromGRPC(err)
 	}
 	return &process{
 		id:   id,
@@ -308,7 +308,7 @@ func (t *task) Pids(ctx context.Context) ([]uint32, error) {
 		ContainerID: t.id,
 	})
 	if err != nil {
-		return nil, err
+		return nil, errdefs.FromGRPC(err)
 	}
 	return response.Pids, nil
 }
@@ -323,7 +323,7 @@ func (t *task) CloseIO(ctx context.Context, opts ...IOCloserOpts) error {
 	}
 	r.Stdin = i.Stdin
 	_, err := t.client.TaskService().CloseIO(ctx, r)
-	return err
+	return errdefs.FromGRPC(err)
 }
 
 func (t *task) IO() IO {
@@ -336,7 +336,7 @@ func (t *task) Resize(ctx context.Context, w, h uint32) error {
 		Width:       w,
 		Height:      h,
 	})
-	return err
+	return errdefs.FromGRPC(err)
 }
 
 func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (d v1.Descriptor, err error) {
@@ -408,13 +408,13 @@ func (t *task) Update(ctx context.Context, opts ...UpdateTaskOpts) error {
 		request.Resources = any
 	}
 	_, err := t.client.TaskService().Update(ctx, request)
-	return err
+	return errdefs.FromGRPC(err)
 }
 
 func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tasks.CheckpointTaskRequest) error {
 	response, err := t.client.TaskService().Checkpoint(ctx, request)
 	if err != nil {
-		return err
+		return errdefs.FromGRPC(err)
 	}
 	// add the checkpoint descriptors to the index
 	for _, d := range response.Descriptors {
