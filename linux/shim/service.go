@@ -22,6 +22,7 @@ import (
 	"github.com/containerd/containerd/runtime"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )
 
@@ -35,6 +36,11 @@ func NewService(path, namespace, workDir string, publisher events.Publisher) (*S
 		return nil, fmt.Errorf("shim namespace cannot be empty")
 	}
 	context := namespaces.WithNamespace(context.Background(), namespace)
+	context = log.WithLogger(context, logrus.WithFields(logrus.Fields{
+		"namespace": namespace,
+		"pid":       os.Getpid(),
+		"path":      path,
+	}))
 	s := &Service{
 		path:      path,
 		processes: make(map[string]process),
@@ -417,13 +423,13 @@ func (s *Service) getContainerPids(ctx context.Context, id string) ([]uint32, er
 
 func (s *Service) forward(publisher events.Publisher) {
 	for e := range s.events {
-		if err := publisher.Publish(s.context, getTopic(e), e); err != nil {
+		if err := publisher.Publish(s.context, getTopic(s.context, e), e); err != nil {
 			log.G(s.context).WithError(err).Error("post event")
 		}
 	}
 }
 
-func getTopic(e interface{}) string {
+func getTopic(ctx context.Context, e interface{}) string {
 	switch e.(type) {
 	case *eventsapi.TaskCreate:
 		return runtime.TaskCreateEventTopic
@@ -437,12 +443,16 @@ func getTopic(e interface{}) string {
 		return runtime.TaskDeleteEventTopic
 	case *eventsapi.TaskExecAdded:
 		return runtime.TaskExecAddedEventTopic
+	case *eventsapi.TaskExecStarted:
+		return runtime.TaskExecStartedEventTopic
 	case *eventsapi.TaskPaused:
 		return runtime.TaskPausedEventTopic
 	case *eventsapi.TaskResumed:
 		return runtime.TaskResumedEventTopic
 	case *eventsapi.TaskCheckpointed:
 		return runtime.TaskCheckpointedEventTopic
+	default:
+		log.G(ctx).Warnf("no topic for type %#v", e)
 	}
-	return "?"
+	return runtime.TaskUnknownTopic
 }

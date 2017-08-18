@@ -104,7 +104,12 @@ func main() {
 		if err := serve(server, socket); err != nil {
 			return err
 		}
-		return handleSignals(signals, server, sv)
+		logger := logrus.WithFields(logrus.Fields{
+			"pid":       os.Getpid(),
+			"path":      path,
+			"namespace": context.GlobalString("namespace"),
+		})
+		return handleSignals(logger, signals, server, sv)
 	}
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "containerd-shim: %s\n", err)
@@ -139,7 +144,7 @@ func serve(server *grpc.Server, path string) error {
 	return nil
 }
 
-func handleSignals(signals chan os.Signal, server *grpc.Server, sv *shim.Service) error {
+func handleSignals(logger *logrus.Entry, signals chan os.Signal, server *grpc.Server, sv *shim.Service) error {
 	var (
 		termOnce sync.Once
 		done     = make(chan struct{})
@@ -153,7 +158,7 @@ func handleSignals(signals chan os.Signal, server *grpc.Server, sv *shim.Service
 			switch s {
 			case unix.SIGCHLD:
 				if err := reaper.Reap(); err != nil {
-					logrus.WithError(err).Error("reap exit status")
+					logger.WithError(err).Error("reap exit status")
 				}
 			case unix.SIGTERM, unix.SIGINT:
 				go termOnce.Do(func() {
@@ -167,13 +172,13 @@ func handleSignals(signals chan os.Signal, server *grpc.Server, sv *shim.Service
 					close(done)
 				})
 			case unix.SIGUSR1:
-				dumpStacks()
+				dumpStacks(logger)
 			}
 		}
 	}
 }
 
-func dumpStacks() {
+func dumpStacks(logger *logrus.Entry) {
 	var (
 		buf       []byte
 		stackSize int
@@ -185,7 +190,7 @@ func dumpStacks() {
 		bufferLen *= 2
 	}
 	buf = buf[:stackSize]
-	logrus.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
+	logger.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
 }
 
 func connectEvents(address string) (eventsapi.EventsClient, error) {
