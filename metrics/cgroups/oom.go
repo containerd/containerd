@@ -9,7 +9,6 @@ import (
 
 	"github.com/containerd/cgroups"
 	metrics "github.com/docker/go-metrics"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 )
 
@@ -19,21 +18,20 @@ func NewOOMCollector(ns *metrics.Namespace) (*OOMCollector, error) {
 		return nil, err
 	}
 	c := &OOMCollector{
-		fd:   fd,
-		set:  make(map[uintptr]*oom),
-		desc: ns.NewDesc("memory_oom", "The number of times a container has received an oom event", metrics.Total, "container_id", "namespace"),
+		fd:        fd,
+		memoryOOM: ns.NewLabeledGauge("memory_oom", "The number of times a container received an oom event", metrics.Total, "container_id", "namespace"),
+		set:       make(map[uintptr]*oom),
 	}
 	go c.start()
-	ns.Add(c)
 	return c, nil
 }
 
 type OOMCollector struct {
 	mu sync.Mutex
 
-	fd   int
-	set  map[uintptr]*oom
-	desc *prometheus.Desc
+	memoryOOM metrics.LabeledGauge
+	fd        int
+	set       map[uintptr]*oom
 }
 
 type oom struct {
@@ -41,7 +39,6 @@ type oom struct {
 	namespace string
 	c         cgroups.Cgroup
 	triggers  []Trigger
-	count     int
 }
 
 func (o *OOMCollector) Add(id, namespace string, cg cgroups.Cgroup, triggers ...Trigger) error {
@@ -53,10 +50,12 @@ func (o *OOMCollector) Add(id, namespace string, cg cgroups.Cgroup, triggers ...
 	}
 	o.set[fd] = &oom{
 		id:        id,
-		namespace: namespace,
 		c:         cg,
 		triggers:  triggers,
+		namespace: namespace,
 	}
+	// set the gauge's default value
+	o.memoryOOM.WithValues(id, namespace).Set(0)
 	event := unix.EpollEvent{
 		Fd:     int32(fd),
 		Events: unix.EPOLLHUP | unix.EPOLLIN | unix.EPOLLERR,
@@ -67,35 +66,9 @@ func (o *OOMCollector) Add(id, namespace string, cg cgroups.Cgroup, triggers ...
 	return nil
 }
 
-func (o *OOMCollector) Remove(id, namespace string) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	for fd, t := range o.set {
-		if t.id == id && t.namespace == namespace {
-			unix.Close(int(fd))
-			delete(o.set, fd)
-			return
-		}
-	}
-}
-
 // Close closes the epoll fd
 func (o *OOMCollector) Close() error {
 	return unix.Close(int(o.fd))
-}
-
-func (o *OOMCollector) Describe(ch chan<- *prometheus.Desc) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	ch <- o.desc
-}
-
-func (o *OOMCollector) Collect(ch chan<- prometheus.Metric) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	for _, t := range o.set {
-		ch <- prometheus.MustNewConstMetric(o.desc, prometheus.GaugeValue, float64(t.count), t.id, t.namespace)
-	}
 }
 
 func (o *OOMCollector) start() {
@@ -134,7 +107,7 @@ func (o *OOMCollector) process(fd uintptr, event uint32) {
 		unix.Close(int(fd))
 		return
 	}
-	info.count++
+	o.memoryOOM.WithValues(info.id, info.namespace).Inc(1)
 	for _, t := range info.triggers {
 		t(info.id, info.c)
 	}

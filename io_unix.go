@@ -36,7 +36,6 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 	var (
 		f           io.ReadWriteCloser
 		set         []io.Closer
-		cwg         sync.WaitGroup
 		ctx, cancel = context.WithCancel(context.Background())
 		wg          = &sync.WaitGroup{}
 	)
@@ -53,9 +52,7 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 		return nil, err
 	}
 	set = append(set, f)
-	cwg.Add(1)
 	go func(w io.WriteCloser) {
-		cwg.Done()
 		io.Copy(w, ioset.in)
 		w.Close()
 	}(f)
@@ -65,9 +62,7 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 	}
 	set = append(set, f)
 	wg.Add(1)
-	cwg.Add(1)
 	go func(r io.ReadCloser) {
-		cwg.Done()
 		io.Copy(ioset.out, r)
 		r.Close()
 		wg.Done()
@@ -80,15 +75,12 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 
 	if !tty {
 		wg.Add(1)
-		cwg.Add(1)
 		go func(r io.ReadCloser) {
-			cwg.Done()
 			io.Copy(ioset.err, r)
 			r.Close()
 			wg.Done()
 		}(f)
 	}
-	cwg.Wait()
 	return &wgCloser{
 		wg:     wg,
 		dir:    fifos.Dir,
