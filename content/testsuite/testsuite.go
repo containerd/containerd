@@ -61,24 +61,28 @@ func checkContentStoreWriter(ctx context.Context, t *testing.T, cs content.Store
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer w1.Close()
 
 	c2, d2 := createContent(256, 2)
 	w2, err := cs.Writer(ctx, "c2", int64(len(c2)), "")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer w2.Close()
 
 	c3, d3 := createContent(256, 3)
 	w3, err := cs.Writer(ctx, "c3", 0, d3)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer w3.Close()
 
 	c4, d4 := createContent(256, 4)
 	w4, err := cs.Writer(ctx, "c4", int64(len(c4)), d4)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer w4.Close()
 
 	smallbuf := make([]byte, 32)
 	for _, s := range []struct {
@@ -144,6 +148,7 @@ func checkUploadStatus(ctx context.Context, t *testing.T, cs content.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer w1.Close()
 	postStart := time.Now()
 
 	d := digest.FromBytes([]byte{})
@@ -218,6 +223,7 @@ func checkLabels(ctx context.Context, t *testing.T, cs content.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer w1.Close()
 
 	if _, err := w1.Write(c1); err != nil {
 		t.Fatalf("Failed to write: %+v", err)
