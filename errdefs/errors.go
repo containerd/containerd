@@ -26,6 +26,7 @@ var (
 	ErrAlreadyExists      = errors.New("already exists")
 	ErrFailedPrecondition = errors.New("failed precondition")
 	ErrUnavailable        = errors.New("unavailable")
+	ErrNotSupported       = errors.New("not supported") // represents not supported and unimplemented
 )
 
 func IsInvalidArgument(err error) bool {
@@ -51,4 +52,8 @@ func IsFailedPrecondition(err error) bool {
 
 func IsUnavailable(err error) bool {
 	return errors.Cause(err) == ErrUnavailable
+}
+
+func IsNotSupported(err error) bool {
+	return errors.Cause(err) == ErrNotSupported
 }
