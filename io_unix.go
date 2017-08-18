@@ -54,12 +54,10 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 	}
 	set = append(set, f)
 	cwg.Add(1)
-	wg.Add(1)
 	go func(w io.WriteCloser) {
 		cwg.Done()
 		io.Copy(w, ioset.in)
 		w.Close()
-		wg.Done()
 	}(f)
 
 	if f, err = fifo.OpenFifo(ctx, fifos.Out, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
