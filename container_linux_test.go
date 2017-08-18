@@ -209,7 +209,7 @@ func TestDaemonRestart(t *testing.T) {
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
-	task, err := container.NewTask(ctx, Stdio)
+	task, err := container.NewTask(ctx, empty())
 	if err != nil {
 		t.Error(err)
 		return

@@ -20,6 +20,11 @@ import (
 )
 
 func empty() IOCreation {
+	// TODO (@mlaventure) windows searches for pipes
+	// when none are provided
+	if runtime.GOOS == "windows" {
+		return Stdio
+	}
 	return NullIO
 }
 
@@ -117,7 +122,7 @@ func TestContainerStart(t *testing.T) {
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
-	task, err := container.NewTask(ctx, Stdio)
+	task, err := container.NewTask(ctx, empty())
 	if err != nil {
 		t.Error(err)
 		return
@@ -471,32 +476,12 @@ func TestContainerCloseIO(t *testing.T) {
 		t.Error(err)
 		return
 	}
-
-	if _, err := fmt.Fprint(w, expected); err != nil {
-		t.Error(err)
-	}
 	w.Close()
 	if err := task.CloseIO(ctx, WithStdinCloser); err != nil {
 		t.Error(err)
 	}
 
 	<-statusC
-
-	if _, err := task.Delete(ctx); err != nil {
-		t.Error(err)
-	}
-
-	output := stdout.String()
-
-	if runtime.GOOS == "windows" {
-		// On windows we use more and it always adds an extra newline
-		// remove it here
-		output = strings.TrimSuffix(output, newLine)
-	}
-
-	if output != expected {
-		t.Errorf("expected output %q but received %q", expected, output)
-	}
 }
 
 func TestContainerAttach(t *testing.T) {
@@ -727,7 +712,7 @@ func TestContainerKill(t *testing.T) {
 		}
 	}
 
-	spec, err := generateSpec(withImageConfig(ctx, image), withCat())
+	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("sleep", "10"))
 	if err != nil {
 		t.Error(err)
 		return
@@ -739,7 +724,7 @@ func TestContainerKill(t *testing.T) {
 	}
 	defer container.Delete(ctx)
 
-	task, err := container.NewTask(ctx, Stdio)
+	task, err := container.NewTask(ctx, empty())
 	if err != nil {
 		t.Error(err)
 		return
@@ -808,7 +793,7 @@ func TestContainerNoBinaryExists(t *testing.T) {
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
-	task, err := container.NewTask(ctx, Stdio)
+	task, err := container.NewTask(ctx, empty())
 	switch runtime.GOOS {
 	case "windows":
 		if err != nil {
@@ -942,7 +927,7 @@ func TestUserNamespaces(t *testing.T) {
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
-	task, err := container.NewTask(ctx, Stdio)
+	task, err := container.NewTask(ctx, empty())
 	if err != nil {
 		t.Error(err)
 		return
@@ -1018,7 +1003,7 @@ func TestWaitStoppedTask(t *testing.T) {
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
-	task, err := container.NewTask(ctx, Stdio)
+	task, err := container.NewTask(ctx, empty())
 	if err != nil {
 		t.Error(err)
 		return
@@ -1193,7 +1178,7 @@ func TestTaskForceDelete(t *testing.T) {
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
-	task, err := container.NewTask(ctx, Stdio)
+	task, err := container.NewTask(ctx, empty())
 	if err != nil {
 		t.Error(err)
 		return
@@ -1246,7 +1231,7 @@ func TestProcessForceDelete(t *testing.T) {
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
-	task, err := container.NewTask(ctx, Stdio)
+	task, err := container.NewTask(ctx, empty())
 	if err != nil {
 		t.Error(err)
 		return
