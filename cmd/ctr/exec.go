@@ -70,14 +70,11 @@ var taskExecCommand = cli.Command{
 		}
 		defer process.Delete(ctx)
 
-		statusC := make(chan uint32, 1)
-		go func() {
-			status, err := process.Wait(ctx)
-			if err != nil {
-				logrus.WithError(err).Error("wait process")
-			}
-			statusC <- status
-		}()
+		statusC, err := task.Wait(ctx)
+		if err != nil {
+			return err
+		}
+
 		var con console.Console
 		if tty {
 			con = console.Current()
@@ -98,8 +95,11 @@ var taskExecCommand = cli.Command{
 			defer stopCatch(sigc)
 		}
 		status := <-statusC
-		if status != 0 {
-			return cli.NewExitError("", int(status))
+		if status.Err != nil {
+			return status.Err
+		}
+		if status.Code != 0 {
+			return cli.NewExitError("", int(status.Code))
 		}
 		return nil
 	},

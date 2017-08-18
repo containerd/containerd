@@ -47,14 +47,11 @@ var taskStartCommand = cli.Command{
 		}
 		defer task.Delete(ctx)
 
-		statusC := make(chan uint32, 1)
-		go func() {
-			status, err := task.Wait(ctx)
-			if err != nil {
-				logrus.WithError(err).Error("wait process")
-			}
-			statusC <- status
-		}()
+		statusC, err := task.Wait(ctx)
+		if err != nil {
+			return err
+		}
+
 		var con console.Console
 		if tty {
 			con = console.Current()
@@ -76,11 +73,14 @@ var taskStartCommand = cli.Command{
 		}
 
 		status := <-statusC
+		if status.Err != nil {
+			return err
+		}
 		if _, err := task.Delete(ctx); err != nil {
 			return err
 		}
-		if status != 0 {
-			return cli.NewExitError("", int(status))
+		if status.Code != 0 {
+			return cli.NewExitError("", int(status.Code))
 		}
 		return nil
 	},

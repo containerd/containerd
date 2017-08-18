@@ -124,14 +124,11 @@ func TestContainerStart(t *testing.T) {
 	}
 	defer task.Delete(ctx)
 
-	statusC := make(chan uint32, 1)
-	go func() {
-		status, err := task.Wait(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		statusC <- status
-	}()
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	if pid := task.Pid(); pid <= 0 {
 		t.Errorf("invalid task pid %d", pid)
@@ -142,15 +139,21 @@ func TestContainerStart(t *testing.T) {
 		return
 	}
 	status := <-statusC
-	if status != 7 {
-		t.Errorf("expected status 7 from wait but received %d", status)
-	}
-	if status, err = task.Delete(ctx); err != nil {
+	if status.Err != nil {
 		t.Error(err)
 		return
 	}
-	if status != 7 {
-		t.Errorf("expected status 7 from delete but received %d", status)
+	if status.Code != 7 {
+		t.Errorf("expected status 7 from wait but received %d", status.Code)
+	}
+
+	deleteStatus, err := task.Delete(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	if deleteStatus != 7 {
+		t.Errorf("expected status 7 from delete but received %d", deleteStatus)
 	}
 }
 
@@ -199,14 +202,11 @@ func TestContainerOutput(t *testing.T) {
 	}
 	defer task.Delete(ctx)
 
-	statusC := make(chan uint32, 1)
-	go func() {
-		status, err := task.Wait(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		statusC <- status
-	}()
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	if err := task.Start(ctx); err != nil {
 		t.Error(err)
@@ -214,7 +214,7 @@ func TestContainerOutput(t *testing.T) {
 	}
 
 	status := <-statusC
-	if status != 0 {
+	if status.Code != 0 {
 		t.Errorf("expected status 0 but received %d", status)
 	}
 	if _, err := task.Delete(ctx); err != nil {
@@ -273,13 +273,11 @@ func TestContainerExec(t *testing.T) {
 	}
 	defer task.Delete(ctx)
 
-	finished := make(chan struct{}, 1)
-	go func() {
-		if _, err := task.Wait(ctx); err != nil {
-			t.Error(err)
-		}
-		close(finished)
-	}()
+	finishedC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	if err := task.Start(ctx); err != nil {
 		t.Error(err)
@@ -295,14 +293,11 @@ func TestContainerExec(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	processStatusC := make(chan uint32, 1)
-	go func() {
-		status, err := process.Wait(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		processStatusC <- status
-	}()
+	processStatusC, err := process.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	if err := process.Start(ctx); err != nil {
 		t.Error(err)
@@ -311,9 +306,13 @@ func TestContainerExec(t *testing.T) {
 
 	// wait for the exec to return
 	status := <-processStatusC
+	if status.Err != nil {
+		t.Error(err)
+		return
+	}
 
-	if status != 6 {
-		t.Errorf("expected exec exit code 6 but received %d", status)
+	if status.Code != 6 {
+		t.Errorf("expected exec exit code 6 but received %d", status.Code)
 	}
 	deleteStatus, err := process.Delete(ctx)
 	if err != nil {
@@ -326,7 +325,7 @@ func TestContainerExec(t *testing.T) {
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
 		t.Error(err)
 	}
-	<-finished
+	<-finishedC
 }
 
 func TestContainerPids(t *testing.T) {
@@ -372,14 +371,11 @@ func TestContainerPids(t *testing.T) {
 	}
 	defer task.Delete(ctx)
 
-	statusC := make(chan uint32, 1)
-	go func() {
-		status, err := task.Wait(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		statusC <- status
-	}()
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	if err := task.Start(ctx); err != nil {
 		t.Error(err)
@@ -462,14 +458,11 @@ func TestContainerCloseIO(t *testing.T) {
 	}
 	defer task.Delete(ctx)
 
-	statusC := make(chan uint32, 1)
-	go func() {
-		status, err := task.Wait(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		statusC <- status
-	}()
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	if err := task.Start(ctx); err != nil {
 		t.Error(err)
@@ -576,14 +569,10 @@ func TestContainerAttach(t *testing.T) {
 	defer task.Delete(ctx)
 	originalIO := task.IO()
 
-	statusC := make(chan uint32, 1)
-	go func() {
-		status, err := task.Wait(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		statusC <- status
-	}()
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+	}
 
 	if err := task.Start(ctx); err != nil {
 		t.Error(err)
@@ -620,7 +609,11 @@ func TestContainerAttach(t *testing.T) {
 		t.Error(err)
 	}
 
-	<-statusC
+	status := <-statusC
+	if status.Err != nil {
+		t.Error(err)
+		return
+	}
 
 	originalIO.Close()
 	if _, err := task.Delete(ctx); err != nil {
@@ -681,14 +674,11 @@ func TestDeleteRunningContainer(t *testing.T) {
 	}
 	defer task.Delete(ctx)
 
-	statusC := make(chan uint32, 1)
-	go func() {
-		status, err := task.Wait(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		statusC <- status
-	}()
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	if err := task.Start(ctx); err != nil {
 		t.Error(err)
@@ -752,14 +742,11 @@ func TestContainerKill(t *testing.T) {
 	}
 	defer task.Delete(ctx)
 
-	statusC := make(chan uint32, 1)
-	go func() {
-		status, err := task.Wait(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		statusC <- status
-	}()
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	if err := task.Start(ctx); err != nil {
 		t.Error(err)
@@ -878,18 +865,14 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 	}
 	defer task.Delete(ctx)
 
+	finishedC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+	}
 	if err := task.Start(ctx); err != nil {
 		t.Error(err)
 		return
 	}
-
-	finished := make(chan struct{}, 1)
-	go func() {
-		if _, err := task.Wait(ctx); err != nil {
-			t.Error(err)
-		}
-		close(finished)
-	}()
 
 	// start an exec process without running the original container process
 	processSpec := spec.Process
@@ -909,7 +892,7 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
 		t.Error(err)
 	}
-	<-finished
+	<-finishedC
 }
 
 func TestUserNamespaces(t *testing.T) {
@@ -962,14 +945,11 @@ func TestUserNamespaces(t *testing.T) {
 	}
 	defer task.Delete(ctx)
 
-	statusC := make(chan uint32, 1)
-	go func() {
-		status, err := task.Wait(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		statusC <- status
-	}()
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	if pid := task.Pid(); pid <= 0 {
 		t.Errorf("invalid task pid %d", pid)
@@ -980,15 +960,20 @@ func TestUserNamespaces(t *testing.T) {
 		return
 	}
 	status := <-statusC
-	if status != 7 {
-		t.Errorf("expected status 7 from wait but received %d", status)
-	}
-	if status, err = task.Delete(ctx); err != nil {
+	if status.Err != nil {
 		t.Error(err)
 		return
 	}
-	if status != 7 {
-		t.Errorf("expected status 7 from delete but received %d", status)
+	if status.Code != 7 {
+		t.Errorf("expected status 7 from wait but received %d", status.Code)
+	}
+	deleteStatus, err := task.Delete(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	if deleteStatus != 7 {
+		t.Errorf("expected status 7 from delete but received %d", deleteStatus)
 	}
 }
 
@@ -1035,14 +1020,11 @@ func TestWaitStoppedTask(t *testing.T) {
 	}
 	defer task.Delete(ctx)
 
-	statusC := make(chan uint32, 1)
-	go func() {
-		status, err := task.Wait(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		statusC <- status
-	}()
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	if pid := task.Pid(); pid <= 0 {
 		t.Errorf("invalid task pid %d", pid)
@@ -1052,15 +1034,21 @@ func TestWaitStoppedTask(t *testing.T) {
 		task.Delete(ctx)
 		return
 	}
+
 	// wait for the task to stop then call wait again
 	<-statusC
-	status, err := task.Wait(ctx)
+	statusC, err = task.Wait(ctx)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	if status != 7 {
-		t.Errorf("exit status from stopped task should be 7 but received %d", status)
+	status := <-statusC
+	if status.Err != nil {
+		t.Error(status.Err)
+		return
+	}
+	if status.Code != 7 {
+		t.Errorf("exit status from stopped task should be 7 but received %d", status.Code)
 	}
 }
 
@@ -1107,13 +1095,10 @@ func TestWaitStoppedProcess(t *testing.T) {
 	}
 	defer task.Delete(ctx)
 
-	finished := make(chan struct{}, 1)
-	go func() {
-		if _, err := task.Wait(ctx); err != nil {
-			t.Error(err)
-		}
-		close(finished)
-	}()
+	finishedC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+	}
 
 	if err := task.Start(ctx); err != nil {
 		t.Error(err)
@@ -1130,14 +1115,12 @@ func TestWaitStoppedProcess(t *testing.T) {
 		return
 	}
 	defer process.Delete(ctx)
-	processStatusC := make(chan uint32, 1)
-	go func() {
-		status, err := process.Wait(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		processStatusC <- status
-	}()
+
+	statusC, err := process.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	if err := process.Start(ctx); err != nil {
 		t.Error(err)
@@ -1145,20 +1128,27 @@ func TestWaitStoppedProcess(t *testing.T) {
 	}
 
 	// wait for the exec to return
-	<-processStatusC
+	<-statusC
+
 	// try to wait on the process after it has stopped
-	status, err := process.Wait(ctx)
+	statusC, err = process.Wait(ctx)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	if status != 6 {
-		t.Errorf("exit status from stopped process should be 6 but received %d", status)
+	status := <-statusC
+	if status.Err != nil {
+		t.Error(err)
+		return
 	}
+	if status.Code != 6 {
+		t.Errorf("exit status from stopped process should be 6 but received %d", status.Code)
+	}
+
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
 		t.Error(err)
 	}
-	<-finished
+	<-finishedC
 }
 
 func TestTaskForceDelete(t *testing.T) {
@@ -1256,14 +1246,11 @@ func TestProcessForceDelete(t *testing.T) {
 	}
 	defer task.Delete(ctx)
 
-	statusC := make(chan uint32, 1)
-	go func() {
-		status, err := task.Wait(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		statusC <- status
-	}()
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	// task must be started on windows
 	if err := task.Start(ctx); err != nil {
@@ -1344,14 +1331,11 @@ func TestContainerHostname(t *testing.T) {
 	}
 	defer task.Delete(ctx)
 
-	statusC := make(chan uint32, 1)
-	go func() {
-		status, err := task.Wait(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		statusC <- status
-	}()
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	if err := task.Start(ctx); err != nil {
 		t.Error(err)
@@ -1359,7 +1343,11 @@ func TestContainerHostname(t *testing.T) {
 	}
 
 	status := <-statusC
-	if status != 0 {
+	if status.Err != nil {
+		t.Error(status.Err)
+		return
+	}
+	if status.Code != 0 {
 		t.Errorf("expected status 0 but received %d", status)
 	}
 	if _, err := task.Delete(ctx); err != nil {
@@ -1420,14 +1408,10 @@ func TestContainerExitedAtSet(t *testing.T) {
 	}
 	defer task.Delete(ctx)
 
-	statusC := make(chan uint32, 1)
-	go func() {
-		status, err := task.Wait(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		statusC <- status
-	}()
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+	}
 
 	startTime := time.Now()
 	if err := task.Start(ctx); err != nil {
@@ -1436,7 +1420,7 @@ func TestContainerExitedAtSet(t *testing.T) {
 	}
 
 	status := <-statusC
-	if status != 0 {
+	if status.Code != 0 {
 		t.Errorf("expected status 0 but received %d", status)
 	}
 
@@ -1495,13 +1479,10 @@ func TestDeleteContainerExecCreated(t *testing.T) {
 	}
 	defer task.Delete(ctx)
 
-	finished := make(chan struct{}, 1)
-	go func() {
-		if _, err := task.Wait(ctx); err != nil {
-			t.Error(err)
-		}
-		close(finished)
-	}()
+	finished, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+	}
 
 	if err := task.Start(ctx); err != nil {
 		t.Error(err)

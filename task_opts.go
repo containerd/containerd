@@ -33,15 +33,14 @@ type ProcessDeleteOpts func(context.Context, Process) error
 
 // WithProcessKill will forcefully kill and delete a process
 func WithProcessKill(ctx context.Context, p Process) error {
-	s := make(chan struct{}, 1)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	// ignore errors to wait and kill as we are forcefully killing
 	// the process and don't care about the exit status
-	go func() {
-		p.Wait(ctx)
-		close(s)
-	}()
+	s, err := p.Wait(ctx)
+	if err != nil {
+		return err
+	}
 	if err := p.Kill(ctx, syscall.SIGKILL); err != nil {
 		if errdefs.IsFailedPrecondition(err) || errdefs.IsNotFound(err) {
 			return nil
