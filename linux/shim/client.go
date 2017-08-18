@@ -49,7 +49,6 @@ func WithStart(binary, address string, debug bool) ClientOpt {
 			if err != nil {
 				terminate(cmd)
 			}
-			reaper.Default.Delete(cmd.Process.Pid)
 		}()
 		log.G(ctx).WithFields(logrus.Fields{
 			"pid":     cmd.Process.Pid,

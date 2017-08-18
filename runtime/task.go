@@ -9,6 +9,7 @@ import (
 type TaskInfo struct {
 	ID        string
 	Runtime   string
+	Spec      []byte
 	Namespace string
 }
 

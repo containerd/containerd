@@ -65,7 +65,6 @@ func (m *cgroupsMonitor) Monitor(c runtime.Task) error {
 func (m *cgroupsMonitor) Stop(c runtime.Task) error {
 	info := c.Info()
 	m.collector.Remove(info.ID, info.Namespace)
-	m.oom.Remove(info.ID, info.Namespace)
 	return nil
 }
 
