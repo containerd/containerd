@@ -8,6 +8,7 @@ import (
 
 const (
 	defaultRoot    = "/var/lib/containerd-test"
+	defaultState   = "/run/containerd-test"
 	defaultAddress = "/run/containerd-test/containerd.sock"
 )
 

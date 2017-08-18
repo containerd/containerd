@@ -66,6 +66,7 @@ func TestMain(m *testing.M) {
 
 		err := ctrd.start("containerd", address, []string{
 			"--root", defaultRoot,
+			"--state", defaultState,
 			"--log-level", "debug",
 		}, buf, buf)
 		if err != nil {

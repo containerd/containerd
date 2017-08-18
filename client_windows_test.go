@@ -17,7 +17,8 @@ const (
 var (
 	dockerLayerFolders []string
 
-	defaultRoot = filepath.Join(os.Getenv("programfiles"), "containerd", "root-test")
+	defaultRoot  = filepath.Join(os.Getenv("programfiles"), "containerd", "root-test")
+	defaultState = filepath.Join(os.Getenv("programfiles"), "containerd", "state-test")
 )
 
 func platformTestSetup(client *Client) error {
