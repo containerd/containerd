@@ -22,15 +22,10 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
-	versionapi "github.com/containerd/containerd/api/services/version/v1"
-	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
-	diffservice "github.com/containerd/containerd/services/diff"
-	"github.com/containerd/containerd/snapshot"
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/cri-o/pkg/ocicni"
-	healthapi "google.golang.org/grpc/health/grpc_health_v1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 
@@ -73,25 +68,15 @@ type criContainerdService struct {
 	containerNameIndex *registrar.Registrar
 	// imageStore stores all resources associated with images.
 	imageStore *imagestore.Store
-	// containerService is containerd containers client.
-	containerService containers.Store
 	// taskService is containerd tasks client.
 	taskService tasks.TasksClient
 	// contentStoreService is the containerd content service client.
 	contentStoreService content.Store
-	// snapshotService is the containerd snapshot service client.
-	snapshotService snapshot.Snapshotter
-	// diffService is the containerd diff service client.
-	diffService diffservice.DiffService
 	// imageStoreService is the containerd service to store and track
 	// image metadata.
 	imageStoreService images.Store
 	// eventsService is the containerd task service client
 	eventService events.EventsClient
-	// versionService is the containerd version service client.
-	versionService versionapi.VersionClient
-	// healthService is the healthcheck service of containerd grpc server.
-	healthService healthapi.HealthClient
 	// netPlugin is used to setup and teardown network when run/stop pod sandbox.
 	netPlugin ocicni.CNIPlugin
 	// agentFactory is the factory to create agent used in the cri containerd service.
@@ -122,18 +107,12 @@ func NewCRIContainerdService(containerdEndpoint, rootDir, networkPluginBinDir, n
 		imageStore:          imagestore.NewStore(),
 		sandboxNameIndex:    registrar.NewRegistrar(),
 		containerNameIndex:  registrar.NewRegistrar(),
-		containerService:    client.ContainerService(),
 		taskService:         client.TaskService(),
 		imageStoreService:   client.ImageService(),
 		eventService:        client.EventService(),
 		contentStoreService: client.ContentStore(),
-		// Use daemon default snapshotter.
-		snapshotService: client.SnapshotService(""),
-		diffService:     client.DiffService(),
-		versionService:  client.VersionService(),
-		healthService:   client.HealthService(),
-		agentFactory:    agents.NewAgentFactory(),
-		client:          client,
+		agentFactory:        agents.NewAgentFactory(),
+		client:              client,
 	}
 
 	netPlugin, err := ocicni.InitCNI(networkPluginConfDir, networkPluginBinDir)
