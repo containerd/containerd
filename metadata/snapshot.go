@@ -25,11 +25,20 @@ type snapshotter struct {
 // NewSnapshotter returns a new Snapshotter which namespaces the given snapshot
 // using the provided name and metadata store.
 func NewSnapshotter(db *DB, name string, sn snapshot.Snapshotter) snapshot.Snapshotter {
-	return &snapshotter{
-		Snapshotter: sn,
-		name:        name,
-		db:          db,
+	db.storeL.Lock()
+	defer db.storeL.Unlock()
+
+	ss, ok := db.ss[name]
+	if !ok {
+		ss = &snapshotter{
+			Snapshotter: sn,
+			name:        name,
+			db:          db,
+		}
+		db.ss[name] = ss
 	}
+
+	return ss
 }
 
 func createKey(id uint64, namespace, key string) string {

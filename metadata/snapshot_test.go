@@ -28,7 +28,7 @@ func newSnapshotter(ctx context.Context, root string) (snapshot.Snapshotter, fun
 		return nil, nil, err
 	}
 
-	sn := NewSnapshotter(db, "naive", snapshotter)
+	sn := NewSnapshotter(NewDB(db), "naive", snapshotter)
 
 	return sn, func() error {
 		return db.Close()
