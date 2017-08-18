@@ -64,7 +64,7 @@ func (p *process) Start(ctx context.Context) error {
 		p.io.Cancel()
 		p.io.Wait()
 		p.io.Close()
-		return err
+		return errdefs.FromGRPC(err)
 	}
 	p.pid = r.Pid
 	return nil
@@ -76,7 +76,7 @@ func (p *process) Kill(ctx context.Context, s syscall.Signal) error {
 		ContainerID: p.task.id,
 		ExecID:      p.id,
 	})
-	return err
+	return errdefs.FromGRPC(err)
 }
 
 func (p *process) Wait(ctx context.Context) (uint32, error) {
@@ -125,7 +125,7 @@ func (p *process) CloseIO(ctx context.Context, opts ...IOCloserOpts) error {
 	}
 	r.Stdin = i.Stdin
 	_, err := p.task.client.TaskService().CloseIO(ctx, r)
-	return err
+	return errdefs.FromGRPC(err)
 }
 
 func (p *process) IO() IO {
@@ -139,7 +139,7 @@ func (p *process) Resize(ctx context.Context, w, h uint32) error {
 		Height:      h,
 		ExecID:      p.id,
 	})
-	return err
+	return errdefs.FromGRPC(err)
 }
 
 func (p *process) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (uint32, error) {
@@ -164,7 +164,7 @@ func (p *process) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (uint32
 		ExecID:      p.id,
 	})
 	if err != nil {
-		return UnknownExitStatus, err
+		return UnknownExitStatus, errdefs.FromGRPC(err)
 	}
 	return r.ExitStatus, nil
 }

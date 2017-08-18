@@ -221,7 +221,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...Ne
 	} else {
 		response, err := c.client.TaskService().Create(ctx, request)
 		if err != nil {
-			return nil, err
+			return nil, errdefs.FromGRPC(err)
 		}
 		t.pid = response.Pid
 	}
