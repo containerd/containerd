@@ -16,31 +16,20 @@
 set -o nounset
 set -o pipefail
 
-ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
-. ${ROOT}/hack/versions
+source $(dirname "${BASH_SOURCE[0]}")/test-utils.sh
 
 # FOCUS focuses the test to run.
 FOCUS=${FOCUS:-}
 # SKIP skips the test to skip.
 SKIP=${SKIP:-"attach|RunAsUser|host port"}
-REPORT_DIR=${REPORT_DIR:-"/tmp"}
+REPORT_DIR=${REPORT_DIR:-"/tmp/test-cri"}
 
 if [[ -z "${GOPATH}" ]]; then
   echo "GOPATH is not set"
   exit 1
 fi
 
-if [[ ! "${PATH}" =~ (^|:)${GOPATH}/bin(|/)(:|$) ]]; then
-  echo "GOPATH/bin is not in path"
-  exit 1
-fi
-
-if [ ! -x ${ROOT}/_output/cri-containerd ]; then
-  echo "cri-containerd is not built"
-  exit 1
-fi
-
-CRITEST=critest
+CRITEST=${GOPATH}/bin/critest
 CRITEST_PKG=github.com/kubernetes-incubator/cri-tools
 CRICONTAINERD_SOCK=/var/run/cri-containerd.sock
 
@@ -54,32 +43,13 @@ if [ ! -x "$(command -v ${CRITEST})" ]; then
 fi
 which ${CRITEST}
 
-# Start containerd
-if [ ! -x "$(command -v containerd)" ]; then
-  echo "containerd is not installed, please run hack/install-deps.sh"
-  exit 1
-fi
-sudo pkill containerd
-sudo containerd -l debug &> ${REPORT_DIR}/containerd.log &
-
-# Wait for containerd to be running by using the containerd client ctr to check the version
-# of the containerd server. Wait an increasing amount of time after each of five attempts
-MAX_ATTEMPTS=5
-attempt_num=1
-until sudo ctr version &> /dev/null || (( attempt_num == MAX_ATTEMPTS ))
-do
-    echo "Attempt $attempt_num to connect to containerd failed! Trying again in $attempt_num seconds..."
-    sleep $(( attempt_num++ ))
-done
-
-# Start cri-containerd
-cd ${ROOT}
-sudo _output/cri-containerd --alsologtostderr --v 4 &> ${REPORT_DIR}/cri-containerd.log &
+mkdir -p ${REPORT_DIR}
+start_cri_containerd ${REPORT_DIR}
 
 # Run cri validation test
 sudo env PATH=${PATH} GOPATH=${GOPATH} ${CRITEST} --runtime-endpoint=${CRICONTAINERD_SOCK} --focus="${FOCUS}" --ginkgo-flags="--skip=\"${SKIP}\"" validation
 test_exit_code=$?
 
-sudo pkill containerd
+kill_cri_containerd
 
 exit ${test_exit_code}

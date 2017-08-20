@@ -28,10 +28,10 @@ import (
 
 // ContainerStatus inspects the container and returns the status.
 func (c *criContainerdService) ContainerStatus(ctx context.Context, r *runtime.ContainerStatusRequest) (retRes *runtime.ContainerStatusResponse, retErr error) {
-	glog.V(4).Infof("ContainerStatus for container %q", r.GetContainerId())
+	glog.V(5).Infof("ContainerStatus for container %q", r.GetContainerId())
 	defer func() {
 		if retErr == nil {
-			glog.V(4).Infof("ContainerStatus for %q returns status %+v", r.GetContainerId(), retRes.GetStatus())
+			glog.V(5).Infof("ContainerStatus for %q returns status %+v", r.GetContainerId(), retRes.GetStatus())
 		}
 	}()
 

@@ -28,10 +28,10 @@ import (
 // TODO(random-liu): We should change CRI to distinguish image id and image spec. (See
 // kubernetes/kubernetes#46255)
 func (c *criContainerdService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequest) (retRes *runtime.ImageStatusResponse, retErr error) {
-	glog.V(4).Infof("ImageStatus for image %q", r.GetImage().GetImage())
+	glog.V(5).Infof("ImageStatus for image %q", r.GetImage().GetImage())
 	defer func() {
 		if retErr == nil {
-			glog.V(4).Infof("ImageStatus for %q returns image status %+v",
+			glog.V(5).Infof("ImageStatus for %q returns image status %+v",
 				r.GetImage().GetImage(), retRes.GetImage())
 		}
 	}()

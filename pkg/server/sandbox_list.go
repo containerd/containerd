@@ -30,10 +30,10 @@ import (
 
 // ListPodSandbox returns a list of Sandbox.
 func (c *criContainerdService) ListPodSandbox(ctx context.Context, r *runtime.ListPodSandboxRequest) (retRes *runtime.ListPodSandboxResponse, retErr error) {
-	glog.V(4).Infof("ListPodSandbox with filter %+v", r.GetFilter())
+	glog.V(5).Infof("ListPodSandbox with filter %+v", r.GetFilter())
 	defer func() {
 		if retErr == nil {
-			glog.V(4).Infof("ListPodSandbox returns sandboxes %+v", retRes.GetItems())
+			glog.V(5).Infof("ListPodSandbox returns sandboxes %+v", retRes.GetItems())
 		}
 	}()
 

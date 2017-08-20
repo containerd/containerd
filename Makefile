@@ -24,6 +24,7 @@ VERSION := $(shell git describe --tags --dirty)
 # strip the first char of the tag if it's a `v`
 VERSION := $(VERSION:v%=%)
 BUILD_TAGS:= -ldflags '-X $(PROJECT)/pkg/version.criContainerdVersion=$(VERSION)'
+SOURCES := $(shell find . -name '*.go')
 
 all: binaries
 
@@ -37,6 +38,7 @@ help:
 	@echo " * 'static-binaries - Build static cri-containerd"
 	@echo " * 'test'           - Test cri-containerd"
 	@echo " * 'test-cri'       - Test cri-containerd with cri validation test"
+	@echo " * 'test-e2e-node'  - Test cri-containerd with Kubernetes node e2e test"
 	@echo " * 'clean'          - Clean artifacts"
 	@echo " * 'verify'         - Execute the source code verification tools"
 	@echo " * 'install.tools'  - Install tools used by verify"
@@ -44,19 +46,12 @@ help:
 	@echo " * 'uninstall'      - Remove installed binaries from system locations"
 	@echo " * 'version'        - Print current cri-containerd release version"
 
-.PHONY: check-gopath
-
-check-gopath:
-ifndef GOPATH
-	$(error GOPATH is not set)
-endif
-
 verify: lint gofmt boiler
 
 version:
 	@echo $(VERSION)
 
-lint: check-gopath
+lint:
 	@echo "checking lint"
 	@./hack/verify-lint.sh
 
@@ -68,8 +63,8 @@ boiler:
 	@echo "checking boilerplate"
 	@./hack/verify-boilerplate.sh
 
-cri-containerd: check-gopath
-	$(GO) build -o $(BUILD_DIR)/$@ \
+$(BUILD_DIR)/cri-containerd: $(SOURCES)
+	$(GO) build -o $@ \
 	   $(BUILD_TAGS) \
 	   $(GO_LDFLAGS) $(GO_GCFLAGS) \
 	   $(PROJECT)/cmd/cri-containerd
@@ -77,18 +72,21 @@ cri-containerd: check-gopath
 test:
 	go test -timeout=10m -race ./pkg/... $(BUILD_TAGS) $(GO_LDFLAGS) $(GO_GCFLAGS)
 
-test-cri:
+test-cri: binaries
 	@./hack/test-cri.sh
 
-clean:
-	rm -f $(BUILD_DIR)/cri-containerd
+test-e2e-node: binaries
+	@./hack/test-e2e-node.sh
 
-binaries: cri-containerd
+clean:
+	rm -rf $(BUILD_DIR)/*
+
+binaries: $(BUILD_DIR)/cri-containerd
 
 static-binaries: GO_LDFLAGS=--ldflags '-extldflags "-fno-PIC -static"'
-static-binaries: cri-containerd
+static-binaries: $(BUILD_DIR)/cri-containerd
 
-install: check-gopath
+install: binaries
 	install -D -m 755 $(BUILD_DIR)/cri-containerd $(BINDIR)/cri-containerd
 
 uninstall:
@@ -102,7 +100,7 @@ install.deps:
 .PHONY: .gitvalidation
 # When this is running in travis, it will only check the travis commit range.
 # When running outside travis, it will check from $(EPOCH_TEST_COMMIT)..HEAD.
-.gitvalidation: check-gopath
+.gitvalidation:
 ifeq ($(TRAVIS),true)
 	git-validation -q -run DCO,short-subject
 else
@@ -132,5 +130,6 @@ install.tools: .install.gitvalidation .install.gometalinter
 	lint \
 	test \
 	test-cri \
+	test-e2e-node \
 	uninstall \
 	version

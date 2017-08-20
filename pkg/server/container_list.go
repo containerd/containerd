@@ -27,10 +27,10 @@ import (
 
 // ListContainers lists all containers matching the filter.
 func (c *criContainerdService) ListContainers(ctx context.Context, r *runtime.ListContainersRequest) (retRes *runtime.ListContainersResponse, retErr error) {
-	glog.V(4).Infof("ListContainers with filter %+v", r.GetFilter())
+	glog.V(5).Infof("ListContainers with filter %+v", r.GetFilter())
 	defer func() {
 		if retErr == nil {
-			glog.V(4).Infof("ListContainers returns containers %+v", retRes.GetContainers())
+			glog.V(5).Infof("ListContainers returns containers %+v", retRes.GetContainers())
 		}
 	}()
 
