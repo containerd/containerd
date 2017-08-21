@@ -28,8 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
-	// TODO(random-liu): k8s.io/utils/exec after bump up kubernetes version.
-	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/utils/exec"
 )
 
 func newStreamServer(c *criContainerdService, addr, port string) (streaming.Server, error) {
