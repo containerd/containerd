@@ -3,12 +3,10 @@ package containerd
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"runtime"
 	"strings"
-	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -494,142 +492,6 @@ func TestContainerCloseIO(t *testing.T) {
 		output = strings.TrimSuffix(output, newLine)
 	}
 
-	if output != expected {
-		t.Errorf("expected output %q but received %q", expected, output)
-	}
-}
-
-func TestContainerAttach(t *testing.T) {
-	t.Parallel()
-
-	if runtime.GOOS == "windows" {
-		// On windows, closing the write side of the pipe closes the read
-		// side, sending an EOF to it and preventing reopening it.
-		// Hence this test will always fails on windows
-		t.Skip("invalid logic on windows")
-	}
-
-	client, err := newClient(t, address)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
-
-	var (
-		image       Image
-		ctx, cancel = testContext()
-		id          = t.Name()
-	)
-	defer cancel()
-
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-	}
-
-	spec, err := generateSpec(withImageConfig(ctx, image), withCat())
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	defer container.Delete(ctx, WithSnapshotCleanup)
-
-	expected := "hello" + newLine
-	stdout := bytes.NewBuffer(nil)
-
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	or, ow, err := os.Pipe()
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	wg := &sync.WaitGroup{}
-
-	wg.Add(1)
-	go func() {
-		io.Copy(stdout, or)
-		wg.Done()
-	}()
-
-	task, err := container.NewTask(ctx, NewIO(r, ow, ioutil.Discard))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	defer task.Delete(ctx)
-	originalIO := task.IO()
-
-	statusC, err := task.Wait(ctx)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
-	}
-
-	if _, err := fmt.Fprint(w, expected); err != nil {
-		t.Error(err)
-	}
-	w.Close()
-
-	// load the container and re-load the task
-	if container, err = client.LoadContainer(ctx, id); err != nil {
-		t.Error(err)
-		return
-	}
-
-	// create new IO for the loaded task
-	if r, w, err = os.Pipe(); err != nil {
-		t.Error(err)
-		return
-	}
-	if task, err = container.Task(ctx, WithAttach(r, ow, ioutil.Discard)); err != nil {
-		t.Error(err)
-		return
-	}
-
-	if _, err := fmt.Fprint(w, expected); err != nil {
-		t.Error(err)
-	}
-	w.Close()
-
-	if err := task.CloseIO(ctx, WithStdinCloser); err != nil {
-		t.Error(err)
-	}
-
-	status := <-statusC
-	_, _, err = status.Result()
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	originalIO.Close()
-	if _, err := task.Delete(ctx); err != nil {
-		t.Error(err)
-	}
-	ow.Close()
-
-	wg.Wait()
-	output := stdout.String()
-
-	// we wrote the same thing after attach
-	expected = expected + expected
 	if output != expected {
 		t.Errorf("expected output %q but received %q", expected, output)
 	}

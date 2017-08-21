@@ -3,7 +3,12 @@
 package containerd
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"io"
+	"runtime"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -255,4 +260,123 @@ func TestDaemonRestart(t *testing.T) {
 	}
 
 	<-statusC
+}
+
+func TestContainerAttach(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" {
+		// On windows, closing the write side of the pipe closes the read
+		// side, sending an EOF to it and preventing reopening it.
+		// Hence this test will always fails on windows
+		t.Skip("invalid logic on windows")
+	}
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	spec, err := generateSpec(withImageConfig(ctx, image), withCat())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	expected := "hello" + newLine
+
+	direct, err := NewDirectIO(ctx, false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer direct.Delete()
+	var (
+		wg  sync.WaitGroup
+		buf = bytes.NewBuffer(nil)
+	)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		io.Copy(buf, direct.Stdout)
+	}()
+
+	task, err := container.NewTask(ctx, direct.IOCreate)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	status, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+
+	if _, err := fmt.Fprint(direct.Stdin, expected); err != nil {
+		t.Error(err)
+	}
+
+	// load the container and re-load the task
+	if container, err = client.LoadContainer(ctx, id); err != nil {
+		t.Error(err)
+		return
+	}
+
+	if task, err = container.Task(ctx, direct.IOAttach); err != nil {
+		t.Error(err)
+		return
+	}
+
+	if _, err := fmt.Fprint(direct.Stdin, expected); err != nil {
+		t.Error(err)
+	}
+
+	direct.Stdin.Close()
+
+	if err := task.CloseIO(ctx, WithStdinCloser); err != nil {
+		t.Error(err)
+	}
+
+	<-status
+
+	wg.Wait()
+	if _, err := task.Delete(ctx); err != nil {
+		t.Error(err)
+	}
+
+	output := buf.String()
+
+	// we wrote the same thing after attach
+	expected = expected + expected
+	if output != expected {
+		t.Errorf("expected output %q but received %q", expected, output)
+	}
 }
