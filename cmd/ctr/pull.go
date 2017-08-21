@@ -37,7 +37,7 @@ command. As part of this process, we do the following:
 		log.G(ctx).WithField("image", ref).Debug("unpacking")
 
 		// TODO: Show unpack status
-		fmt.Printf("unpacking %s...", img.Target().Digest)
+		fmt.Printf("unpacking %s...\n", img.Target().Digest)
 		err = img.Unpack(ctx, clicontext.String("snapshotter"))
 		fmt.Println("done")
 		return err
