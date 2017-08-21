@@ -241,6 +241,7 @@ func processFromContainerd(ctx context.Context, p runtime.Process) (*task.Proces
 		Stderr:     state.Stderr,
 		Terminal:   state.Terminal,
 		ExitStatus: state.ExitStatus,
+		ExitedAt:   state.ExitedAt,
 	}, nil
 }
 

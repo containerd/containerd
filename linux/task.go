@@ -77,6 +77,7 @@ func (t *Task) State(ctx context.Context) (runtime.State, error) {
 		Stderr:     response.Stderr,
 		Terminal:   response.Terminal,
 		ExitStatus: response.ExitStatus,
+		ExitedAt:   response.ExitedAt,
 	}, nil
 }
 

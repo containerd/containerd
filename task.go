@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
@@ -38,6 +39,8 @@ type Status struct {
 	Status ProcessStatus
 	// ExitStatus returned by the process
 	ExitStatus uint32
+	// ExitedTime is the time at which the process died
+	ExitTime time.Time
 }
 
 type ProcessStatus string
@@ -194,6 +197,7 @@ func (t *task) Status(ctx context.Context) (Status, error) {
 	return Status{
 		Status:     ProcessStatus(strings.ToLower(r.Process.Status.String())),
 		ExitStatus: r.Process.ExitStatus,
+		ExitTime:   r.Process.ExitedAt,
 	}, nil
 }
 
