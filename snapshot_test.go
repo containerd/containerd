@@ -15,7 +15,7 @@ func newSnapshotter(ctx context.Context, root string) (snapshot.Snapshotter, fun
 		return nil, nil, err
 	}
 
-	sn := client.SnapshotService("")
+	sn := client.SnapshotService(DefaultSnapshotter)
 
 	return sn, func() {
 		client.Close()

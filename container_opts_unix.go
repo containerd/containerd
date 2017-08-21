@@ -46,6 +46,7 @@ func WithCheckpoint(desc v1.Descriptor, rootfsID string) NewContainerOpts {
 				if err != nil {
 					return err
 				}
+				setSnapshotterIfEmpty(c)
 				if _, err := client.SnapshotService(c.Snapshotter).Prepare(ctx, rootfsID, identity.ChainID(diffIDs).String()); err != nil {
 					if !errdefs.IsAlreadyExists(err) {
 						return err
