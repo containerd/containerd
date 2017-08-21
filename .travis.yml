@@ -22,33 +22,36 @@ before_script:
 
 jobs:
   include:
-    - stage: Verify
+    - stage: Build
       script:
         - make install.tools
         - make .gitvalidation
         - make verify
+        - make binaries
       go: 1.8.x
     - script:
         - make install.tools
         - make .gitvalidation
         - make verify
+        - make binaries
       go: tip
-    - stage: Build and Test
+    - stage: Test
       script:
         - make install.deps
         - make test
-        - make binaries
         - make test-cri
+      after_script:
+        # Abuse travis to preserve the log.
+        - cat /tmp/test-cri/cri-containerd.log
+        - cat /tmp/test-cri/containerd.log
       go: 1.8.x
-    - script:
+    - stage: E2E Test
+      script:
+        - test "${TRAVIS_EVENT_TYPE}" != "cron" && exit 0
         - make install.deps
-        - make test
-        - make binaries
-        - make test-cri
-      go: tip
-
-after_script:
-    # Abuse travis to preserve the log.
-    # TODO(random-liu): Use prow for integration test.
-    - cat /tmp/cri-containerd.log
-    - cat /tmp/containerd.log
+        - make test-e2e-node
+      after_script:
+        # TODO(random-liu): Upload log to GCS.
+        - test "${TRAVIS_EVENT_TYPE}" != "cron" && exit 0
+        - cat /tmp/test-e2e-node/cri-containerd.log
+      go: 1.8.x

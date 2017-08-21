@@ -28,10 +28,10 @@ import (
 // TODO(random-liu): Add image list filters after CRI defines this more clear, and kubelet
 // actually needs it.
 func (c *criContainerdService) ListImages(ctx context.Context, r *runtime.ListImagesRequest) (retRes *runtime.ListImagesResponse, retErr error) {
-	glog.V(4).Infof("ListImages with filter %+v", r.GetFilter())
+	glog.V(5).Infof("ListImages with filter %+v", r.GetFilter())
 	defer func() {
 		if retErr == nil {
-			glog.V(4).Infof("ListImages returns image list %+v", retRes.GetImages())
+			glog.V(5).Infof("ListImages returns image list %+v", retRes.GetImages())
 		}
 	}()
 

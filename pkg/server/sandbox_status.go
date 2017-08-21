@@ -31,10 +31,10 @@ import (
 
 // PodSandboxStatus returns the status of the PodSandbox.
 func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandboxStatusRequest) (retRes *runtime.PodSandboxStatusResponse, retErr error) {
-	glog.V(4).Infof("PodSandboxStatus for sandbox %q", r.GetPodSandboxId())
+	glog.V(5).Infof("PodSandboxStatus for sandbox %q", r.GetPodSandboxId())
 	defer func() {
 		if retErr == nil {
-			glog.V(4).Infof("PodSandboxStatus for %q returns status %+v", r.GetPodSandboxId(), retRes.GetStatus())
+			glog.V(5).Infof("PodSandboxStatus for %q returns status %+v", r.GetPodSandboxId(), retRes.GetStatus())
 		}
 	}()
 
