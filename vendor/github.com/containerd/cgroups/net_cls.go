@@ -33,7 +33,7 @@ func (n *netclsController) Create(path string, resources *specs.LinuxResources) 
 	}
 	if resources.Network != nil && resources.Network.ClassID != nil && *resources.Network.ClassID > 0 {
 		return ioutil.WriteFile(
-			filepath.Join(n.Path(path), "net_cls_classid_u"),
+			filepath.Join(n.Path(path), "net_cls.classid"),
 			[]byte(strconv.FormatUint(uint64(*resources.Network.ClassID), 10)),
 			defaultFilePerm,
 		)

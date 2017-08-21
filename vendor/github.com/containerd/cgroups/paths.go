@@ -3,6 +3,8 @@ package cgroups
 import (
 	"fmt"
 	"path/filepath"
+
+	"github.com/pkg/errors"
 )
 
 type Path func(subsystem Name) (string, error)
@@ -31,9 +33,10 @@ func NestedPath(suffix string) Path {
 // PidPath will return the correct cgroup paths for an existing process running inside a cgroup
 // This is commonly used for the Load function to restore an existing container
 func PidPath(pid int) Path {
-	paths, err := parseCgroupFile(fmt.Sprintf("/proc/%d/cgroup", pid))
+	p := fmt.Sprintf("/proc/%d/cgroup", pid)
+	paths, err := parseCgroupFile(p)
 	if err != nil {
-		return errorPath(err)
+		return errorPath(errors.Wrapf(err, "parse cgroup file %s", p))
 	}
 	return existingPath(paths, "")
 }
