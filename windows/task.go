@@ -47,11 +47,13 @@ func (t *task) State(ctx context.Context) (runtime.State, error) {
 	var (
 		status     runtime.Status
 		exitStatus uint32
+		exitedAt   time.Time
 	)
 
 	if p := t.getProcess(t.id); p != nil {
 		status = p.Status()
 		exitStatus = p.exitCode
+		exitedAt = p.exitTime
 	} else {
 		status = t.getStatus()
 	}
@@ -64,6 +66,7 @@ func (t *task) State(ctx context.Context) (runtime.State, error) {
 		Stderr:     t.io.src.Stderr,
 		Terminal:   t.io.src.Terminal,
 		ExitStatus: exitStatus,
+		ExitedAt:   exitedAt,
 	}, nil
 }
 

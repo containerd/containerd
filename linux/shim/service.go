@@ -265,6 +265,7 @@ func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.
 		Stderr:     sio.stderr,
 		Terminal:   sio.terminal,
 		ExitStatus: uint32(p.ExitStatus()),
+		ExitedAt:   p.ExitedAt(),
 	}, nil
 }
 

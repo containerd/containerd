@@ -11,6 +11,7 @@ import (
 	"sync"
 	"syscall"
 	"testing"
+	"time"
 
 	// Register the typeurl
 	_ "github.com/containerd/containerd/runtime"
@@ -1373,5 +1374,80 @@ func TestContainerHostname(t *testing.T) {
 	actual := strings.TrimSuffix(stdout.String(), cutset)
 	if actual != expected {
 		t.Errorf("expected output %q but received %q", expected, actual)
+	}
+}
+
+func TestContainerExitedAtSet(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	spec, err := generateSpec(withImageConfig(ctx, image), withTrue())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	statusC := make(chan uint32, 1)
+	go func() {
+		status, err := task.Wait(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+		statusC <- status
+	}()
+
+	startTime := time.Now()
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+
+	status := <-statusC
+	if status != 0 {
+		t.Errorf("expected status 0 but received %d", status)
+	}
+
+	if s, err := task.Status(ctx); err != nil {
+		t.Errorf("failed to retrieve status: %v", err)
+	} else if s.ExitTime.After(startTime) == false {
+		t.Errorf("exit time is not after start time: %v <= %v", startTime, s.ExitTime)
+	}
+
+	if _, err := task.Delete(ctx); err != nil {
+		t.Error(err)
+		return
 	}
 }

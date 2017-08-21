@@ -109,6 +109,7 @@ message StateResponse {
 	string stderr = 7;
 	bool terminal = 8;
 	uint32 exit_status = 9;
+	google.protobuf.Timestamp exited_at = 10 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message KillRequest {

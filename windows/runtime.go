@@ -187,7 +187,7 @@ func (r *windowsRuntime) Delete(ctx context.Context, t runtime.Task) (*runtime.E
 		rtExit = &runtime.Exit{
 			Pid:       wt.pid,
 			Status:    255,
-			Timestamp: time.Now(),
+			Timestamp: time.Now().UTC(),
 		}
 	}
 
