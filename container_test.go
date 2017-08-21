@@ -1451,3 +1451,82 @@ func TestContainerExitedAtSet(t *testing.T) {
 		return
 	}
 }
+
+func TestDeleteContainerExecCreated(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("sleep", "100"))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	finished := make(chan struct{}, 1)
+	go func() {
+		if _, err := task.Wait(ctx); err != nil {
+			t.Error(err)
+		}
+		close(finished)
+	}()
+
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+
+	// start an exec process without running the original container process info
+	processSpec := spec.Process
+	withExecExitStatus(processSpec, 6)
+	execID := t.Name() + "_exec"
+	process, err := task.Exec(ctx, execID, processSpec, empty())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	deleteStatus, err := process.Delete(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	if deleteStatus != 0 {
+		t.Errorf("expected delete exit code 0 but received %d", deleteStatus)
+	}
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Error(err)
+	}
+	<-finished
+}

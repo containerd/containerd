@@ -59,6 +59,9 @@ func (p *process) Status() runtime.Status {
 	case <-p.exitCh:
 		status = runtime.StoppedStatus
 	default:
+		if p.hcs == nil {
+			return runtime.CreatedStatus
+		}
 		status = runtime.RunningStatus
 	}
 	return status
@@ -83,8 +86,8 @@ func (p *process) Pid() uint32 {
 }
 
 func (p *process) ExitCode() (uint32, time.Time, error) {
-	if p.Status() != runtime.StoppedStatus {
-		return 255, time.Time{}, errors.Wrap(errdefs.ErrFailedPrecondition, "process is not stopped")
+	if s := p.Status(); s != runtime.StoppedStatus && s != runtime.CreatedStatus {
+		return 255, time.Time{}, errors.Wrapf(errdefs.ErrFailedPrecondition, "process is not stopped: %s", s)
 	}
 	return p.exitCode, p.exitTime, nil
 }
