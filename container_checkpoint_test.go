@@ -47,14 +47,11 @@ func TestCheckpointRestore(t *testing.T) {
 	}
 	defer task.Delete(ctx)
 
-	statusC := make(chan uint32, 1)
-	go func() {
-		status, err := task.Wait(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		statusC <- status
-	}()
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	if err := task.Start(ctx); err != nil {
 		t.Error(err)
@@ -79,13 +76,11 @@ func TestCheckpointRestore(t *testing.T) {
 	}
 	defer task.Delete(ctx)
 
-	go func() {
-		status, err := task.Wait(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		statusC <- status
-	}()
+	statusC, err = task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	if err := task.Start(ctx); err != nil {
 		t.Error(err)
@@ -137,14 +132,11 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 	}
 	defer task.Delete(ctx)
 
-	statusC := make(chan uint32, 1)
-	go func() {
-		status, err := task.Wait(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		statusC <- status
-	}()
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	if err := task.Start(ctx); err != nil {
 		t.Error(err)
@@ -177,13 +169,11 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 	}
 	defer task.Delete(ctx)
 
-	go func() {
-		status, err := task.Wait(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		statusC <- status
-	}()
+	statusC, err = task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	if err := task.Start(ctx); err != nil {
 		t.Error(err)
@@ -240,14 +230,11 @@ func TestCheckpointLeaveRunning(t *testing.T) {
 	}
 	defer task.Delete(ctx)
 
-	statusC := make(chan uint32, 1)
-	go func() {
-		status, err := task.Wait(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		statusC <- status
-	}()
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	if err := task.Start(ctx); err != nil {
 		t.Error(err)

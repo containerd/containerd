@@ -44,6 +44,12 @@ var taskAttachCommand = cli.Command{
 			return err
 		}
 		defer task.Delete(ctx)
+
+		statusC, err := task.Wait(ctx)
+		if err != nil {
+			return err
+		}
+
 		if tty {
 			if err := handleConsoleResize(ctx, task, con); err != nil {
 				logrus.WithError(err).Error("console resize")
@@ -52,12 +58,14 @@ var taskAttachCommand = cli.Command{
 			sigc := forwardAllSignals(ctx, task)
 			defer stopCatch(sigc)
 		}
-		status, err := task.Wait(ctx)
+
+		ec := <-statusC
+		code, _, err := ec.Result()
 		if err != nil {
 			return err
 		}
-		if status != 0 {
-			return cli.NewExitError("", int(status))
+		if code != 0 {
+			return cli.NewExitError("", int(code))
 		}
 		return nil
 	},

@@ -208,30 +208,23 @@ func (w *worker) runContainer(ctx context.Context, id string) error {
 		return err
 	}
 	defer task.Delete(ctx, containerd.WithProcessKill)
-	var (
-		start  sync.WaitGroup
-		status = make(chan uint32, 1)
-	)
-	start.Add(1)
-	go func() {
-		start.Done()
-		s, err := task.Wait(w.waitContext)
-		if err != nil {
-			if err == context.DeadlineExceeded ||
-				err == context.Canceled {
-				close(status)
-				return
-			}
-			w.failures++
-			logrus.WithError(err).Errorf("wait task %s", id)
-		}
-		status <- s
-	}()
-	start.Wait()
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		return err
+	}
+
 	if err := task.Start(ctx); err != nil {
 		return err
 	}
-	<-status
+	status := <-statusC
+	_, _, err = status.Result()
+	if err != nil {
+		if err == context.DeadlineExceeded || err == context.Canceled {
+			return nil
+		}
+		w.failures++
+	}
 	return nil
 }
 

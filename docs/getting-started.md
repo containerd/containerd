@@ -163,14 +163,10 @@ You always want to make sure you `Wait` before calling `Start` on a task.
 This makes sure that you do not encounter any races if the task has a simple program like `/bin/true` that exits promptly after calling start.
 
 ```go
-	exitStatusC := make(chan uint32, 1)
-	go func() {
-		status, err := task.Wait(ctx)
-		if err != nil {
-			fmt.Println(err)
-		}
-		exitStatusC <- status
-	}()
+	exitStatusC, err := task.Wait(ctx)
+	if err != nil {
+		return err
+	}
 
 	if err := task.Start(ctx); err != nil {
 		return err
@@ -192,7 +188,11 @@ To do this we will simply call `Kill` on the task after waiting a couple of seco
 	}
 
 	status := <-exitStatusC
-	fmt.Printf("redis-server exited with status: %d\n", status)
+	code, exitedAt, err := status.Result()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("redis-server exited with status: %d\n", code)
 ```
 
 We wait on our exit status channel that we setup to ensure the task has fully exited and we get the exit status.
@@ -271,14 +271,10 @@ func redisExample() error {
 	defer task.Delete(ctx)
 
 	// make sure we wait before calling start
-	exitStatusC := make(chan uint32, 1)
-	go func() {
-		status, err := task.Wait(ctx)
-		if err != nil {
-			fmt.Println(err)
-		}
-		exitStatusC <- status
-	}()
+	exitStatusC, err := task.Wait(ctx)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	// call start on the task to execute the redis server
 	if err := task.Start(ctx); err != nil {
@@ -296,7 +292,11 @@ func redisExample() error {
 	// wait for the process to fully exit and print out the exit status
 
 	status := <-exitStatusC
-	fmt.Printf("redis-server exited with status: %d\n", status)
+	code, _, err := status.Result()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("redis-server exited with status: %d\n", code)
 
 	return nil
 }

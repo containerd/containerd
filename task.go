@@ -201,15 +201,18 @@ func (t *task) Status(ctx context.Context) (Status, error) {
 	}, nil
 }
 
-func (t *task) Wait(ctx context.Context) (uint32, error) {
+func (t *task) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 	cancellable, cancel := context.WithCancel(ctx)
-	defer cancel()
 	eventstream, err := t.client.EventService().Subscribe(cancellable, &eventsapi.SubscribeRequest{
 		Filters: []string{"topic==" + runtime.TaskExitEventTopic},
 	})
 	if err != nil {
-		return UnknownExitStatus, errdefs.FromGRPC(err)
+		cancel()
+		return nil, errdefs.FromGRPC(err)
 	}
+
+	chStatus := make(chan ExitStatus, 1)
+
 	t.mu.Lock()
 	checkpoint := t.deferred != nil
 	t.mu.Unlock()
@@ -217,28 +220,42 @@ func (t *task) Wait(ctx context.Context) (uint32, error) {
 		// first check if the task has exited
 		status, err := t.Status(ctx)
 		if err != nil {
-			return UnknownExitStatus, errdefs.FromGRPC(err)
+			cancel()
+			return nil, errdefs.FromGRPC(err)
 		}
 		if status.Status == Stopped {
-			return status.ExitStatus, nil
+			cancel()
+			chStatus <- ExitStatus{code: status.ExitStatus, exitedAt: status.ExitTime}
+			return chStatus, nil
 		}
 	}
-	for {
-		evt, err := eventstream.Recv()
-		if err != nil {
-			return UnknownExitStatus, errdefs.FromGRPC(err)
-		}
-		if typeurl.Is(evt.Event, &eventsapi.TaskExit{}) {
-			v, err := typeurl.UnmarshalAny(evt.Event)
+
+	go func() {
+		defer cancel()
+		chStatus <- ExitStatus{} // signal that goroutine is running
+		for {
+			evt, err := eventstream.Recv()
 			if err != nil {
-				return UnknownExitStatus, err
+				chStatus <- ExitStatus{code: UnknownExitStatus, err: errdefs.FromGRPC(err)}
+				return
 			}
-			e := v.(*eventsapi.TaskExit)
-			if e.ContainerID == t.id && e.Pid == t.pid {
-				return e.ExitStatus, nil
+			if typeurl.Is(evt.Event, &eventsapi.TaskExit{}) {
+				v, err := typeurl.UnmarshalAny(evt.Event)
+				if err != nil {
+					chStatus <- ExitStatus{code: UnknownExitStatus, err: err}
+					return
+				}
+				e := v.(*eventsapi.TaskExit)
+				if e.ContainerID == t.id && e.Pid == t.pid {
+					chStatus <- ExitStatus{code: e.ExitStatus, exitedAt: e.ExitedAt}
+					return
+				}
 			}
 		}
-	}
+	}()
+
+	<-chStatus // wait for the goroutine to be running
+	return chStatus, nil
 }
 
 // Delete deletes the task and its runtime state
