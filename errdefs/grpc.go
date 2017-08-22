@@ -73,13 +73,11 @@ func FromGRPC(err error) error {
 		cls = ErrUnknown
 	}
 
-	if cls != nil {
-		msg := rebaseMessage(cls, err)
-		if msg != "" {
-			err = errors.Wrapf(cls, msg)
-		} else {
-			err = cls
-		}
+	msg := rebaseMessage(cls, err)
+	if msg != "" {
+		err = errors.Wrapf(cls, msg)
+	} else {
+		err = errors.WithStack(cls)
 	}
 
 	return err
