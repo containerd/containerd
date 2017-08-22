@@ -6,17 +6,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/containerd/containerd/containers"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 const newLine = "\n"
 
-func generateSpec(ctx context.Context, client *Client, opts ...SpecOpts) (*specs.Spec, error) {
-	return GenerateSpec(ctx, client, opts...)
-}
-
 func withExitStatus(es int) SpecOpts {
-	return func(_ context.Context, _ *Client, s *specs.Spec) error {
+	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
 		s.Process.Args = []string{"sh", "-c", fmt.Sprintf("exit %d", es)}
 		return nil
 	}

@@ -109,7 +109,7 @@ The container will be based off of the image, use the runtime information in the
 	container, err := client.NewContainer(
 		ctx,
 		"redis-server",
-		containerd.WithSpec(spec),
+		containerd.WithNewSpec(spec),
 		containerd.WithImage(image),
 		containerd.WithNewSnapshot("redis-server-snapshot", image),
 	)
@@ -254,7 +254,7 @@ func redisExample() error {
 	container, err := client.NewContainer(
 		ctx,
 		"redis-server",
-		containerd.WithSpec(spec),
+		containerd.WithNewSpec(spec),
 		containerd.WithImage(image),
 		containerd.WithNewSnapshot("redis-server-snapshot", image),
 	)

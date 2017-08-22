@@ -60,7 +60,7 @@ func WithTTY(width, height int) SpecOpts {
 	}
 }
 
-func WithSpec(spec *specs.Spec) NewContainerOpts {
+func WithNewSpec(spec *specs.Spec) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		any, err := typeurl.MarshalAny(spec)
 		if err != nil {

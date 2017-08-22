@@ -10,7 +10,7 @@ For many functions and methods within the client package you will generally see 
 
 If we look at the `NewContainer` method on the client we can see that it has a required argument of `id` and then additional `NewContainerOpts`.
 
-There are a few built in options that allow the container to be created with an existing spec, `WithSpec`, and snapshot opts for creating or using an existing snapshot.
+There are a few built in options that allow the container to be created with an existing spec, `WithNewSpec`, and snapshot opts for creating or using an existing snapshot.
 
 ```go
 func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error) {

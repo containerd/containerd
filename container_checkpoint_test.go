@@ -28,12 +28,7 @@ func TestCheckpointRestore(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	spec, err := GenerateSpec(ctx, client, WithImageConfig(image), WithProcessArgs("sleep", "100"))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), WithProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -113,12 +108,7 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	spec, err := GenerateSpec(ctx, client, WithImageConfig(image), WithProcessArgs("sleep", "100"))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), WithProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -211,12 +201,7 @@ func TestCheckpointLeaveRunning(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	spec, err := GenerateSpec(ctx, client, WithImageConfig(image), WithProcessArgs("sleep", "100"))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), WithProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return

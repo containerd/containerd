@@ -98,7 +98,7 @@ func test(c config) error {
 		return err
 	}
 	logrus.Info("generating spec from image")
-	spec, err := containerd.GenerateSpec(ctx, client, containerd.WithImageConfig(image), containerd.WithProcessArgs("true"))
+	spec, err := containerd.GenerateSpec(ctx, client, nil, containerd.WithImageConfig(image), containerd.WithProcessArgs("true"))
 	if err != nil {
 		return err
 	}

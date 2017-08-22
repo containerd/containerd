@@ -74,7 +74,7 @@ In containerd, a container is a metadata object.  Resources such as an OCI runti
 
 ```go
 redis, err := client.NewContainer(context, "redis-master",
-	containerd.WithSpec(spec),
+	containerd.WithNewSpec(spec),
 )
 defer redis.Delete(context)
 ```
@@ -89,7 +89,7 @@ image, err := client.Pull(context, "docker.io/library/redis:latest", containerd.
 
 // allocate a new RW root filesystem for a container based on the image
 redis, err := client.NewContainer(context, "redis-master",
-	containerd.WithSpec(spec),
+	containerd.WithNewSpec(spec),
 	containerd.WithNewSnapshot("redis-rootfs", image),
 )
 
@@ -97,7 +97,7 @@ redis, err := client.NewContainer(context, "redis-master",
 for i := 0; i < 10; i++ {
 	id := fmt.Sprintf("id-%s", i)
 	container, err := client.NewContainer(ctx, id,
-		containerd.WithSpec(spec),
+		containerd.WithNewSpec(spec),
 		containerd.WithNewSnapshotView(id, image),
 	)
 }

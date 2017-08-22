@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/containerd/cgroups"
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/linux/runcopts"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
@@ -39,16 +40,14 @@ func TestContainerUpdate(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	spec, err := generateSpec(ctx, client, WithImageConfig(image), withProcessArgs("sleep", "30"))
-	if err != nil {
-		t.Error(err)
-		return
-	}
 	limit := int64(32 * 1024 * 1024)
-	spec.Linux.Resources.Memory = &specs.LinuxMemory{
-		Limit: &limit,
+	memory := func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
+		s.Linux.Resources.Memory = &specs.LinuxMemory{
+			Limit: &limit,
+		}
+		return nil
 	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), withProcessArgs("sleep", "30"), memory), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -127,12 +126,7 @@ func TestShimInCgroup(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	spec, err := GenerateSpec(ctx, client, WithImageConfig(image), WithProcessArgs("sleep", "30"))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), WithProcessArgs("sleep", "30")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -202,12 +196,7 @@ func TestDaemonRestart(t *testing.T) {
 		return
 	}
 
-	spec, err := generateSpec(ctx, client, withImageConfig(image), withProcessArgs("sleep", "30"))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "30")), withNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -293,12 +282,7 @@ func TestContainerAttach(t *testing.T) {
 		}
 	}
 
-	spec, err := generateSpec(withImageConfig(ctx, image), withCat())
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withCat()), withNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
