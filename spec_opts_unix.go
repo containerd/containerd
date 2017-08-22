@@ -289,3 +289,12 @@ func WithNamespacedCgroup(ctx context.Context, id string) SpecOpts {
 		return nil
 	}
 }
+
+// WithUserIDs allows the UID and GID for the Process to be set
+func WithUserIDs(uid, gid uint32) SpecOpts {
+	return func(s *specs.Spec) error {
+		s.Process.User.UID = uid
+		s.Process.User.GID = gid
+		return nil
+	}
+}
