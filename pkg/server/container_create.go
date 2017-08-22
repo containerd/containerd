@@ -192,17 +192,31 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 		g.AddProcessEnv(e.GetKey(), e.GetValue())
 	}
 
-	// TODO: add setOCIPrivileged group all privileged logic together
 	securityContext := config.GetLinux().GetSecurityContext()
 
 	// Add extra mounts first so that CRI specified mounts can override.
-	addOCIBindMounts(&g, append(extraMounts, config.GetMounts()...), securityContext.GetPrivileged())
+	addOCIBindMounts(&g, append(extraMounts, config.GetMounts()...))
+
+	if securityContext.GetPrivileged() {
+		if err := setOCIPrivileged(&g, config); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := addOCIDevices(&g, config.GetDevices()); err != nil {
+			return nil, fmt.Errorf("failed to set devices mapping %+v: %v", config.GetDevices(), err)
+		}
+
+		if err := setOCICapabilities(&g, securityContext.GetCapabilities()); err != nil {
+			return nil, fmt.Errorf("failed to set capabilities %+v: %v",
+				securityContext.GetCapabilities(), err)
+		}
+
+		// TODO(random-liu): [P1] Set selinux options.
+
+		// TODO(random-liu): [P2] Add apparmor and seccomp.
+	}
 
 	g.SetRootReadonly(securityContext.GetReadonlyRootfs())
-
-	if err := addOCIDevices(&g, config.GetDevices(), securityContext.GetPrivileged()); err != nil {
-		return nil, fmt.Errorf("failed to set devices mapping %+v: %v", config.GetDevices(), err)
-	}
 
 	setOCILinuxResource(&g, config.GetLinux().GetResources())
 
@@ -211,15 +225,8 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 		g.SetLinuxCgroupsPath(cgroupsPath)
 	}
 
-	if err := setOCICapabilities(&g, securityContext.GetCapabilities(), securityContext.GetPrivileged()); err != nil {
-		return nil, fmt.Errorf("failed to set capabilities %+v: %v",
-			securityContext.GetCapabilities(), err)
-	}
-
 	// Set namespaces, share namespace with sandbox container.
 	setOCINamespaces(&g, securityContext.GetNamespaceOptions(), sandboxPid)
-
-	// TODO(random-liu): [P1] Set selinux options.
 
 	// TODO(random-liu): [P1] Set user/username.
 
@@ -227,8 +234,6 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 	for _, group := range supplementalGroups {
 		g.AddProcessAdditionalGid(uint32(group))
 	}
-
-	// TODO(random-liu): [P2] Add apparmor and seccomp.
 
 	return g.Spec(), nil
 }
@@ -298,6 +303,16 @@ func addImageEnvs(g *generate.Generator, imageEnvs []string) error {
 	return nil
 }
 
+func setOCIPrivileged(g *generate.Generator, config *runtime.ContainerConfig) error {
+	// Add all capabilities in privileged mode.
+	g.SetupPrivileged(true)
+	setOCIBindMountsPrivileged(g)
+	if err := setOCIDevicesPrivileged(g); err != nil {
+		return fmt.Errorf("failed to set devices mapping %+v: %v", config.GetDevices(), err)
+	}
+	return nil
+}
+
 func clearReadOnly(m *runtimespec.Mount) {
 	var opt []string
 	for _, o := range m.Options {
@@ -308,37 +323,9 @@ func clearReadOnly(m *runtimespec.Mount) {
 	m.Options = opt
 }
 
-// addDevices set device mapping.
-func addOCIDevices(g *generate.Generator, devs []*runtime.Device, privileged bool) error {
+// addDevices set device mapping without privilege.
+func addOCIDevices(g *generate.Generator, devs []*runtime.Device) error {
 	spec := g.Spec()
-	if privileged {
-		hostDevices, err := devices.HostDevices()
-		if err != nil {
-			return err
-		}
-		for _, hostDevice := range hostDevices {
-			rd := runtimespec.LinuxDevice{
-				Path:  hostDevice.Path,
-				Type:  string(hostDevice.Type),
-				Major: hostDevice.Major,
-				Minor: hostDevice.Minor,
-				UID:   &hostDevice.Uid,
-				GID:   &hostDevice.Gid,
-			}
-			if hostDevice.Major == 0 && hostDevice.Minor == 0 {
-				// Invalid device, most likely a symbolic link, skip it.
-				continue
-			}
-			g.AddDevice(rd)
-		}
-		spec.Linux.Resources.Devices = []runtimespec.LinuxDeviceCgroup{
-			{
-				Allow:  true,
-				Access: "rwm",
-			},
-		}
-		return nil
-	}
 	for _, device := range devs {
 		path, err := resolveSymbolicLink(device.HostPath)
 		if err != nil {
@@ -368,10 +355,41 @@ func addOCIDevices(g *generate.Generator, devs []*runtime.Device, privileged boo
 	return nil
 }
 
+// addDevices set device mapping with privilege.
+func setOCIDevicesPrivileged(g *generate.Generator) error {
+	spec := g.Spec()
+	hostDevices, err := devices.HostDevices()
+	if err != nil {
+		return err
+	}
+	for _, hostDevice := range hostDevices {
+		rd := runtimespec.LinuxDevice{
+			Path:  hostDevice.Path,
+			Type:  string(hostDevice.Type),
+			Major: hostDevice.Major,
+			Minor: hostDevice.Minor,
+			UID:   &hostDevice.Uid,
+			GID:   &hostDevice.Gid,
+		}
+		if hostDevice.Major == 0 && hostDevice.Minor == 0 {
+			// Invalid device, most likely a symbolic link, skip it.
+			continue
+		}
+		g.AddDevice(rd)
+	}
+	spec.Linux.Resources.Devices = []runtimespec.LinuxDeviceCgroup{
+		{
+			Allow:  true,
+			Access: "rwm",
+		},
+	}
+	return nil
+}
+
 // addOCIBindMounts adds bind mounts.
 // TODO(random-liu): Figure out whether we need to change all CRI mounts to readonly when
 // rootfs is readonly. (https://github.com/moby/moby/blob/master/daemon/oci_linux.go)
-func addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount, privileged bool) {
+func addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount) {
 	// Mount cgroup into the container as readonly, which inherits docker's behavior.
 	g.AddCgroupsMount("ro") // nolint: errcheck
 	for _, mount := range mounts {
@@ -384,9 +402,9 @@ func addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount, privileged
 		// TODO(random-liu): [P1] Apply selinux label
 		g.AddBindMount(src, dst, options)
 	}
-	if !privileged {
-		return
-	}
+}
+
+func setOCIBindMountsPrivileged(g *generate.Generator) {
 	spec := g.Spec()
 	// clear readonly for /sys and cgroup
 	for i, m := range spec.Mounts {
@@ -414,12 +432,7 @@ func setOCILinuxResource(g *generate.Generator, resources *runtime.LinuxContaine
 }
 
 // setOCICapabilities adds/drops process capabilities.
-func setOCICapabilities(g *generate.Generator, capabilities *runtime.Capability, privileged bool) error {
-	if privileged {
-		// Add all capabilities in privileged mode.
-		g.SetupPrivileged(true)
-		return nil
-	}
+func setOCICapabilities(g *generate.Generator, capabilities *runtime.Capability) error {
 	if capabilities == nil {
 		return nil
 	}
