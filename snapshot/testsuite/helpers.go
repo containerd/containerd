@@ -21,11 +21,11 @@ func applyToMounts(m []mount.Mount, work string, a fstest.Applier) (err error) {
 	defer os.RemoveAll(td)
 
 	if err := mount.MountAll(m, td); err != nil {
-		return err
+		return errors.Wrap(err, "failed to mount")
 	}
 	defer func() {
-		if err1 := mount.UnmountAll(td, 0); err == nil {
-			err = err1
+		if err1 := mount.UnmountAll(td, umountflags); err == nil {
+			err = errors.Wrap(err1, "failed to unmount")
 		}
 	}()
 
@@ -40,26 +40,30 @@ func createSnapshot(ctx context.Context, sn snapshot.Snapshotter, parent, work s
 
 	m, err := sn.Prepare(ctx, prepare, parent)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "failed to prepare snapshot")
 	}
 
 	if err := applyToMounts(m, work, a); err != nil {
-		return "", err
+		return "", errors.Wrap(err, "failed to apply")
 	}
 
 	if err := sn.Commit(ctx, n, prepare); err != nil {
-		return "", err
+		return "", errors.Wrap(err, "failed to commit")
 	}
 
 	return n, nil
 }
 
-func checkSnapshot(ctx context.Context, sn snapshot.Snapshotter, work, name, check string) error {
+func checkSnapshot(ctx context.Context, sn snapshot.Snapshotter, work, name, check string) (err error) {
 	td, err := ioutil.TempDir(work, "check")
 	if err != nil {
 		return errors.Wrap(err, "failed to create temp dir")
 	}
-	defer os.RemoveAll(td)
+	defer func() {
+		if err1 := os.RemoveAll(td); err == nil {
+			err = errors.Wrapf(err1, "failed to remove temporary directory %s", td)
+		}
+	}()
 
 	view := fmt.Sprintf("%s-view", name)
 	m, err := sn.View(ctx, view, name)
@@ -73,10 +77,10 @@ func checkSnapshot(ctx context.Context, sn snapshot.Snapshotter, work, name, che
 	}()
 
 	if err := mount.MountAll(m, td); err != nil {
-		return errors.Wrap(err, "failed to unmount")
+		return errors.Wrap(err, "failed to mount")
 	}
 	defer func() {
-		if err1 := mount.UnmountAll(td, 0); err == nil {
+		if err1 := mount.UnmountAll(td, umountflags); err == nil {
 			err = errors.Wrap(err1, "failed to unmount view")
 		}
 	}()
