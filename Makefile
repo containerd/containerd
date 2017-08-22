@@ -19,20 +19,10 @@ endif
 WHALE = "🇩"
 ONI = "👹"
 FIX_PATH = $1
-ifeq ("$(OS)", "Windows_NT")
-	WHALE="+"
-	ONI="-"
-	FIX_PATH = $(subst /,\,$1)
-endif
 
 RELEASE=containerd-$(VERSION:v%=%).${GOOS}-${GOARCH}
 
 PKG=github.com/containerd/containerd
-
-# on SunOS default to gnu utilities for things like grep, sed, etc.
-ifeq ($(shell uname -s),SunOS)
-	export PATH := /usr/gnu/bin:$(PATH)
-endif
 
 # Project packages.
 PACKAGES=$(shell go list ./... | grep -v /vendor/)
@@ -49,24 +39,17 @@ TEST_REQUIRES_ROOT_PACKAGES=$(filter \
 
 # Project binaries.
 COMMANDS=ctr containerd containerd-stress
-ifneq ("$(GOOS)", "windows")
-	COMMANDS += containerd-shim
-endif
 BINARIES=$(addprefix bin/,$(COMMANDS))
-ifeq ("$(GOOS)", "windows")
-	BINARY_SUFFIX=".exe"
-endif
 
 GO_TAGS=$(if $(BUILDTAGS),-tags "$(BUILDTAGS)",)
 GO_LDFLAGS=-ldflags "-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG) $(EXTRA_LDFLAGS)"
 
-# go test -race is only supported on the patforms listed below.
 TESTFLAGS_RACE=
-ifeq ($(filter \
-    linux/amd64 freebsd/amd64 darwin/amd64 windows/amd64, \
-    $(GOOS)/$(GOARCH)),$(GOOS)/$(GOARCH))
-	TESTFLAGS_RACE= -race
-endif
+
+#Detect the target os
+include Makefile.OS
+#include platform specific makefile
+include Makefile.$(target_os)
 
 # Flags passed to `go test`
 TESTFLAGS ?= -v $(TESTFLAGS_RACE)

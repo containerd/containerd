@@ -1,0 +1,9 @@
+#Windows specific settings.
+WHALE = "+"
+ONI = "-"
+FIX_PATH = $(subst /,\,$1)
+
+BINARY_SUFFIX=".exe"
+
+# supports go test -race
+TESTFLAGS_RACE= -race

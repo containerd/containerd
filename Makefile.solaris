@@ -1,0 +1,6 @@
+#solaris specific settings
+
+# on SunOS default to gnu utilities for things like grep, sed, etc.
+export PATH := /usr/gnu/bin:$(PATH)
+
+COMMANDS += containerd-shim
