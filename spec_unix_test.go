@@ -3,6 +3,7 @@
 package containerd
 
 import (
+	"context"
 	"testing"
 
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -11,7 +12,7 @@ import (
 func TestGenerateSpec(t *testing.T) {
 	t.Parallel()
 
-	s, err := GenerateSpec()
+	s, err := GenerateSpec(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +52,7 @@ func TestGenerateSpec(t *testing.T) {
 func TestSpecWithTTY(t *testing.T) {
 	t.Parallel()
 
-	s, err := GenerateSpec(WithTTY)
+	s, err := GenerateSpec(context.Background(), nil, WithTTY)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +69,7 @@ func TestWithLinuxNamespace(t *testing.T) {
 	t.Parallel()
 
 	replacedNS := specs.LinuxNamespace{Type: specs.NetworkNamespace, Path: "/var/run/netns/test"}
-	s, err := GenerateSpec(WithLinuxNamespace(replacedNS))
+	s, err := GenerateSpec(context.Background(), nil, WithLinuxNamespace(replacedNS))
 	if err != nil {
 		t.Fatal(err)
 	}

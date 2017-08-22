@@ -55,14 +55,14 @@ func TestNewContainer(t *testing.T) {
 	}
 	defer client.Close()
 
-	spec, err := generateSpec()
+	ctx, cancel := testContext()
+	defer cancel()
+
+	spec, err := generateSpec(ctx, client)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-
-	ctx, cancel := testContext()
-	defer cancel()
 
 	container, err := client.NewContainer(ctx, id, WithSpec(spec))
 	if err != nil {
@@ -107,7 +107,7 @@ func TestContainerStart(t *testing.T) {
 		}
 	}
 
-	spec, err := generateSpec(withImageConfig(ctx, image), withExitStatus(7))
+	spec, err := generateSpec(ctx, client, withImageConfig(image), withExitStatus(7))
 	if err != nil {
 		t.Error(err)
 		return
@@ -185,7 +185,7 @@ func TestContainerOutput(t *testing.T) {
 		}
 	}
 
-	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("echo", expected))
+	spec, err := generateSpec(ctx, client, withImageConfig(image), withProcessArgs("echo", expected))
 	if err != nil {
 		t.Error(err)
 		return
@@ -258,7 +258,7 @@ func TestContainerExec(t *testing.T) {
 		}
 	}
 
-	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("sleep", "100"))
+	spec, err := generateSpec(ctx, client, withImageConfig(image), withProcessArgs("sleep", "100"))
 	if err != nil {
 		t.Error(err)
 		return
@@ -357,7 +357,7 @@ func TestContainerPids(t *testing.T) {
 		}
 	}
 
-	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("sleep", "100"))
+	spec, err := generateSpec(ctx, client, withImageConfig(image), withProcessArgs("sleep", "100"))
 	if err != nil {
 		t.Error(err)
 		return
@@ -435,7 +435,7 @@ func TestContainerCloseIO(t *testing.T) {
 		}
 	}
 
-	spec, err := generateSpec(withImageConfig(ctx, image), withCat())
+	spec, err := generateSpec(ctx, client, withImageConfig(image), withCat())
 	if err != nil {
 		t.Error(err)
 		return
@@ -505,7 +505,7 @@ func TestDeleteRunningContainer(t *testing.T) {
 		}
 	}
 
-	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("sleep", "100"))
+	spec, err := generateSpec(ctx, client, withImageConfig(image), withProcessArgs("sleep", "100"))
 	if err != nil {
 		t.Error(err)
 		return
@@ -573,7 +573,7 @@ func TestContainerKill(t *testing.T) {
 		}
 	}
 
-	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("sleep", "10"))
+	spec, err := generateSpec(ctx, client, withImageConfig(image), withProcessArgs("sleep", "10"))
 	if err != nil {
 		t.Error(err)
 		return
@@ -642,7 +642,7 @@ func TestContainerNoBinaryExists(t *testing.T) {
 		}
 	}
 
-	spec, err := generateSpec(withImageConfig(ctx, image), WithProcessArgs("nothing"))
+	spec, err := generateSpec(ctx, client, withImageConfig(image), WithProcessArgs("nothing"))
 	if err != nil {
 		t.Error(err)
 		return
@@ -696,7 +696,7 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 		}
 	}
 
-	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("sleep", "100"))
+	spec, err := generateSpec(ctx, client, withImageConfig(image), withProcessArgs("sleep", "100"))
 	if err != nil {
 		t.Error(err)
 		return
@@ -769,8 +769,8 @@ func TestUserNamespaces(t *testing.T) {
 		}
 	}
 
-	spec, err := generateSpec(
-		withImageConfig(ctx, image),
+	spec, err := generateSpec(ctx, client,
+		withImageConfig(image),
 		withExitStatus(7),
 		withUserNamespace(0, 1000, 10000),
 	)
@@ -852,7 +852,7 @@ func TestWaitStoppedTask(t *testing.T) {
 		}
 	}
 
-	spec, err := generateSpec(withImageConfig(ctx, image), withExitStatus(7))
+	spec, err := generateSpec(ctx, client, withImageConfig(image), withExitStatus(7))
 	if err != nil {
 		t.Error(err)
 		return
@@ -928,7 +928,7 @@ func TestWaitStoppedProcess(t *testing.T) {
 		}
 	}
 
-	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("sleep", "100"))
+	spec, err := generateSpec(ctx, client, withImageConfig(image), withProcessArgs("sleep", "100"))
 	if err != nil {
 		t.Error(err)
 		return
@@ -1027,7 +1027,7 @@ func TestTaskForceDelete(t *testing.T) {
 			return
 		}
 	}
-	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("sleep", "30"))
+	spec, err := generateSpec(ctx, client, withImageConfig(image), withProcessArgs("sleep", "30"))
 	if err != nil {
 		t.Error(err)
 		return
@@ -1080,7 +1080,7 @@ func TestProcessForceDelete(t *testing.T) {
 			return
 		}
 	}
-	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("sleep", "30"))
+	spec, err := generateSpec(ctx, client, withImageConfig(image), withProcessArgs("sleep", "30"))
 	if err != nil {
 		t.Error(err)
 		return
@@ -1160,8 +1160,8 @@ func TestContainerHostname(t *testing.T) {
 		}
 	}
 
-	spec, err := generateSpec(
-		withImageConfig(ctx, image),
+	spec, err := generateSpec(ctx, client,
+		withImageConfig(image),
 		withProcessArgs("hostname"),
 		WithHostname(expected),
 	)
@@ -1243,7 +1243,7 @@ func TestContainerExitedAtSet(t *testing.T) {
 		}
 	}
 
-	spec, err := generateSpec(withImageConfig(ctx, image), withTrue())
+	spec, err := generateSpec(ctx, client, withImageConfig(image), withTrue())
 	if err != nil {
 		t.Error(err)
 		return
@@ -1315,7 +1315,7 @@ func TestDeleteContainerExecCreated(t *testing.T) {
 		}
 	}
 
-	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("sleep", "100"))
+	spec, err := generateSpec(ctx, client, withImageConfig(image), withProcessArgs("sleep", "100"))
 	if err != nil {
 		t.Error(err)
 		return

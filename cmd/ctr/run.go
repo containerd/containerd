@@ -24,7 +24,7 @@ type killer interface {
 }
 
 func withEnv(context *cli.Context) containerd.SpecOpts {
-	return func(s *specs.Spec) error {
+	return func(_ gocontext.Context, _ *containerd.Client, s *specs.Spec) error {
 		env := context.StringSlice("env")
 		if len(env) > 0 {
 			s.Process.Env = replaceOrAppendEnvValues(s.Process.Env, env)
@@ -34,7 +34,7 @@ func withEnv(context *cli.Context) containerd.SpecOpts {
 }
 
 func withMounts(context *cli.Context) containerd.SpecOpts {
-	return func(s *specs.Spec) error {
+	return func(_ gocontext.Context, _ *containerd.Client, s *specs.Spec) error {
 		for _, mount := range context.StringSlice("mount") {
 			m, err := parseMountFlag(mount)
 			if err != nil {

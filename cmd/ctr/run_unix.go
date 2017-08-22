@@ -90,7 +90,7 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		if err != nil {
 			return nil, err
 		}
-		opts = append(opts, containerd.WithImageConfig(ctx, image))
+		opts = append(opts, containerd.WithImageConfig(image))
 		cOpts = append(cOpts, containerd.WithImage(image))
 		cOpts = append(cOpts, containerd.WithSnapshotter(context.String("snapshotter")))
 		if context.Bool("readonly") {
@@ -111,7 +111,7 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	if context.Bool("net-host") {
 		opts = append(opts, setHostNetworking())
 	}
-	spec, err := containerd.GenerateSpec(opts...)
+	spec, err := containerd.GenerateSpec(ctx, client, opts...)
 	if err != nil {
 		return nil, err
 	}

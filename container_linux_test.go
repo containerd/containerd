@@ -39,7 +39,7 @@ func TestContainerUpdate(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	spec, err := generateSpec(WithImageConfig(ctx, image), withProcessArgs("sleep", "30"))
+	spec, err := generateSpec(ctx, client, WithImageConfig(image), withProcessArgs("sleep", "30"))
 	if err != nil {
 		t.Error(err)
 		return
@@ -127,7 +127,7 @@ func TestShimInCgroup(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	spec, err := GenerateSpec(WithImageConfig(ctx, image), WithProcessArgs("sleep", "30"))
+	spec, err := GenerateSpec(ctx, client, WithImageConfig(image), WithProcessArgs("sleep", "30"))
 	if err != nil {
 		t.Error(err)
 		return
@@ -202,7 +202,7 @@ func TestDaemonRestart(t *testing.T) {
 		return
 	}
 
-	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("sleep", "30"))
+	spec, err := generateSpec(ctx, client, withImageConfig(image), withProcessArgs("sleep", "30"))
 	if err != nil {
 		t.Error(err)
 		return
