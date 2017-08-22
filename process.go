@@ -37,14 +37,21 @@ type Process interface {
 	Status(context.Context) (Status, error)
 }
 
-// ExitStatus encapsulates a process' exit code.
+// ExitStatus encapsulates a process' exit status.
 // It is used by `Wait()` to return either a process exit code or an error
-// The `Err` field is provided to return an error that may occur while waiting
-// `Err` is not used to convey an error with the process itself.
 type ExitStatus struct {
-	Code     uint32
-	ExitedAt time.Time
-	Err      error
+	code     uint32
+	exitedAt time.Time
+	err      error
+}
+
+// Result returns the exit code and time of the exit status.
+// An error may be returned here to which indicates there was an error
+//   at some point while waiting for the exit status. It does not signify
+//   an error with the process itself.
+// If an error is returned, the process may still be running.
+func (s ExitStatus) Result() (uint32, time.Time, error) {
+	return s.code, s.exitedAt, s.err
 }
 
 type process struct {
@@ -109,7 +116,7 @@ func (p *process) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 	chStatus := make(chan ExitStatus, 1)
 	if status.Status == Stopped {
 		cancel()
-		chStatus <- ExitStatus{Code: status.ExitStatus, ExitedAt: status.ExitTime}
+		chStatus <- ExitStatus{code: status.ExitStatus, exitedAt: status.ExitTime}
 		return chStatus, nil
 	}
 
@@ -119,18 +126,18 @@ func (p *process) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 		for {
 			evt, err := eventstream.Recv()
 			if err != nil {
-				chStatus <- ExitStatus{Code: UnknownExitStatus, Err: err}
+				chStatus <- ExitStatus{code: UnknownExitStatus, err: err}
 				return
 			}
 			if typeurl.Is(evt.Event, &eventsapi.TaskExit{}) {
 				v, err := typeurl.UnmarshalAny(evt.Event)
 				if err != nil {
-					chStatus <- ExitStatus{Code: UnknownExitStatus, Err: err}
+					chStatus <- ExitStatus{code: UnknownExitStatus, err: err}
 					return
 				}
 				e := v.(*eventsapi.TaskExit)
 				if e.ID == p.id && e.ContainerID == p.task.id {
-					chStatus <- ExitStatus{Code: e.ExitStatus, ExitedAt: e.ExitedAt}
+					chStatus <- ExitStatus{code: e.ExitStatus, exitedAt: e.ExitedAt}
 					return
 				}
 			}

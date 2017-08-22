@@ -188,10 +188,11 @@ To do this we will simply call `Kill` on the task after waiting a couple of seco
 	}
 
 	status := <-exitStatusC
-	if status.Err != nil {
-		return status.Err
+	code, exitedAt, err := status.Result()
+	if err != nil {
+		return err
 	}
-	fmt.Printf("redis-server exited with status: %d\n", status.Code)
+	fmt.Printf("redis-server exited with status: %d\n", code)
 ```
 
 We wait on our exit status channel that we setup to ensure the task has fully exited and we get the exit status.
@@ -291,10 +292,11 @@ func redisExample() error {
 	// wait for the process to fully exit and print out the exit status
 
 	status := <-exitStatusC
-	if status.Err != nil {
+	code, _, err := status.Result()
+	if err != nil {
 		return err
 	}
-	fmt.Printf("redis-server exited with status: %d\n", status.Code)
+	fmt.Printf("redis-server exited with status: %d\n", code)
 
 	return nil
 }

@@ -139,12 +139,13 @@ func TestContainerStart(t *testing.T) {
 		return
 	}
 	status := <-statusC
-	if status.Err != nil {
+	code, _, err := status.Result()
+	if err != nil {
 		t.Error(err)
 		return
 	}
-	if status.Code != 7 {
-		t.Errorf("expected status 7 from wait but received %d", status.Code)
+	if code != 7 {
+		t.Errorf("expected status 7 from wait but received %d", code)
 	}
 
 	deleteStatus, err := task.Delete(ctx)
@@ -214,8 +215,9 @@ func TestContainerOutput(t *testing.T) {
 	}
 
 	status := <-statusC
-	if status.Code != 0 {
-		t.Errorf("expected status 0 but received %d", status)
+	code, _, _ := status.Result()
+	if code != 0 {
+		t.Errorf("expected status 0 but received %d", code)
 	}
 	if _, err := task.Delete(ctx); err != nil {
 		t.Error(err)
@@ -306,13 +308,14 @@ func TestContainerExec(t *testing.T) {
 
 	// wait for the exec to return
 	status := <-processStatusC
-	if status.Err != nil {
+	code, _, err := status.Result()
+	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	if status.Code != 6 {
-		t.Errorf("expected exec exit code 6 but received %d", status.Code)
+	if code != 6 {
+		t.Errorf("expected exec exit code 6 but received %d", code)
 	}
 	deleteStatus, err := process.Delete(ctx)
 	if err != nil {
@@ -610,7 +613,8 @@ func TestContainerAttach(t *testing.T) {
 	}
 
 	status := <-statusC
-	if status.Err != nil {
+	_, _, err = status.Result()
+	if err != nil {
 		t.Error(err)
 		return
 	}
@@ -960,12 +964,13 @@ func TestUserNamespaces(t *testing.T) {
 		return
 	}
 	status := <-statusC
-	if status.Err != nil {
+	code, _, err := status.Result()
+	if err != nil {
 		t.Error(err)
 		return
 	}
-	if status.Code != 7 {
-		t.Errorf("expected status 7 from wait but received %d", status.Code)
+	if code != 7 {
+		t.Errorf("expected status 7 from wait but received %d", code)
 	}
 	deleteStatus, err := task.Delete(ctx)
 	if err != nil {
@@ -1043,12 +1048,13 @@ func TestWaitStoppedTask(t *testing.T) {
 		return
 	}
 	status := <-statusC
-	if status.Err != nil {
-		t.Error(status.Err)
+	code, _, err := status.Result()
+	if err != nil {
+		t.Error(err)
 		return
 	}
-	if status.Code != 7 {
-		t.Errorf("exit status from stopped task should be 7 but received %d", status.Code)
+	if code != 7 {
+		t.Errorf("exit status from stopped task should be 7 but received %d", code)
 	}
 }
 
@@ -1137,12 +1143,13 @@ func TestWaitStoppedProcess(t *testing.T) {
 		return
 	}
 	status := <-statusC
-	if status.Err != nil {
+	code, _, err := status.Result()
+	if err != nil {
 		t.Error(err)
 		return
 	}
-	if status.Code != 6 {
-		t.Errorf("exit status from stopped process should be 6 but received %d", status.Code)
+	if code != 6 {
+		t.Errorf("exit status from stopped process should be 6 but received %d", code)
 	}
 
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
@@ -1343,12 +1350,13 @@ func TestContainerHostname(t *testing.T) {
 	}
 
 	status := <-statusC
-	if status.Err != nil {
-		t.Error(status.Err)
+	code, _, err := status.Result()
+	if err != nil {
+		t.Error(err)
 		return
 	}
-	if status.Code != 0 {
-		t.Errorf("expected status 0 but received %d", status)
+	if code != 0 {
+		t.Errorf("expected status 0 but received %d", code)
 	}
 	if _, err := task.Delete(ctx); err != nil {
 		t.Error(err)
@@ -1420,8 +1428,9 @@ func TestContainerExitedAtSet(t *testing.T) {
 	}
 
 	status := <-statusC
-	if status.Code != 0 {
-		t.Errorf("expected status 0 but received %d", status)
+	code, _, _ := status.Result()
+	if code != 0 {
+		t.Errorf("expected status 0 but received %d", code)
 	}
 
 	if s, err := task.Status(ctx); err != nil {

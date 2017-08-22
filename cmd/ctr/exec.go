@@ -95,11 +95,12 @@ var taskExecCommand = cli.Command{
 			defer stopCatch(sigc)
 		}
 		status := <-statusC
-		if status.Err != nil {
-			return status.Err
+		code, _, err := status.Result()
+		if err != nil {
+			return err
 		}
-		if status.Code != 0 {
-			return cli.NewExitError("", int(status.Code))
+		if code != 0 {
+			return cli.NewExitError("", int(code))
 		}
 		return nil
 	},

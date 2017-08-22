@@ -232,7 +232,8 @@ func TestDaemonRestart(t *testing.T) {
 	}
 
 	status := <-statusC
-	if status.Err == nil {
+	_, _, err = status.Result()
+	if err == nil {
 		t.Errorf(`first task.Wait() should have failed with "transport is closing"`)
 	}
 

@@ -218,8 +218,9 @@ func (w *worker) runContainer(ctx context.Context, id string) error {
 		return err
 	}
 	status := <-statusC
-	if status.Err != nil {
-		if status.Err == context.DeadlineExceeded || status.Err == context.Canceled {
+	_, _, err = status.Result()
+	if err != nil {
+		if err == context.DeadlineExceeded || err == context.Canceled {
 			return nil
 		}
 		w.failures++

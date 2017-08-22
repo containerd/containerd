@@ -60,11 +60,12 @@ var taskAttachCommand = cli.Command{
 		}
 
 		ec := <-statusC
-		if ec.Err != nil {
+		code, _, err := ec.Result()
+		if err != nil {
 			return err
 		}
-		if ec.Code != 0 {
-			return cli.NewExitError("", int(ec.Code))
+		if code != 0 {
+			return cli.NewExitError("", int(code))
 		}
 		return nil
 	},

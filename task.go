@@ -225,7 +225,7 @@ func (t *task) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 		}
 		if status.Status == Stopped {
 			cancel()
-			chStatus <- ExitStatus{Code: status.ExitStatus, ExitedAt: status.ExitTime}
+			chStatus <- ExitStatus{code: status.ExitStatus, exitedAt: status.ExitTime}
 			return chStatus, nil
 		}
 	}
@@ -236,18 +236,18 @@ func (t *task) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 		for {
 			evt, err := eventstream.Recv()
 			if err != nil {
-				chStatus <- ExitStatus{Code: UnknownExitStatus, Err: errdefs.FromGRPC(err)}
+				chStatus <- ExitStatus{code: UnknownExitStatus, err: errdefs.FromGRPC(err)}
 				return
 			}
 			if typeurl.Is(evt.Event, &eventsapi.TaskExit{}) {
 				v, err := typeurl.UnmarshalAny(evt.Event)
 				if err != nil {
-					chStatus <- ExitStatus{Code: UnknownExitStatus, Err: err}
+					chStatus <- ExitStatus{code: UnknownExitStatus, err: err}
 					return
 				}
 				e := v.(*eventsapi.TaskExit)
 				if e.ContainerID == t.id && e.Pid == t.pid {
-					chStatus <- ExitStatus{Code: e.ExitStatus, ExitedAt: e.ExitedAt}
+					chStatus <- ExitStatus{code: e.ExitStatus, exitedAt: e.ExitedAt}
 					return
 				}
 			}
