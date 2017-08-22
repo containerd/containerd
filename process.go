@@ -190,16 +190,16 @@ func (p *process) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (uint32
 	case Running, Paused, Pausing:
 		return UnknownExitStatus, errors.Wrapf(errdefs.ErrFailedPrecondition, "process must be stopped before deletion")
 	}
-	if p.io != nil {
-		p.io.Wait()
-		p.io.Close()
-	}
 	r, err := p.task.client.TaskService().DeleteProcess(ctx, &tasks.DeleteProcessRequest{
 		ContainerID: p.task.id,
 		ExecID:      p.id,
 	})
 	if err != nil {
 		return UnknownExitStatus, errdefs.FromGRPC(err)
+	}
+	if p.io != nil {
+		p.io.Wait()
+		p.io.Close()
 	}
 	return r.ExitStatus, nil
 }

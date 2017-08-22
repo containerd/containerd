@@ -240,6 +240,13 @@ func (t *task) DeleteProcess(ctx context.Context, id string) (*runtime.Exit, err
 		if err != nil {
 			return nil, err
 		}
+
+		// If we never started the process close the pipes
+		if p.Status() == runtime.CreatedStatus {
+			p.io.Close()
+			ea = time.Now()
+		}
+
 		t.removeProcess(id)
 		return &runtime.Exit{
 			Pid:       p.pid,
