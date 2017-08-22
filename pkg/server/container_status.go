@@ -19,7 +19,6 @@ package server
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
@@ -27,14 +26,7 @@ import (
 )
 
 // ContainerStatus inspects the container and returns the status.
-func (c *criContainerdService) ContainerStatus(ctx context.Context, r *runtime.ContainerStatusRequest) (retRes *runtime.ContainerStatusResponse, retErr error) {
-	glog.V(5).Infof("ContainerStatus for container %q", r.GetContainerId())
-	defer func() {
-		if retErr == nil {
-			glog.V(5).Infof("ContainerStatus for %q returns status %+v", r.GetContainerId(), retRes.GetStatus())
-		}
-	}()
-
+func (c *criContainerdService) ContainerStatus(ctx context.Context, r *runtime.ContainerStatusRequest) (*runtime.ContainerStatusResponse, error) {
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find container %q: %v", r.GetContainerId(), err)

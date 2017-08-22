@@ -127,7 +127,7 @@ func NewCRIContainerdService(containerdEndpoint, rootDir, networkPluginBinDir, n
 		return nil, fmt.Errorf("failed to create stream server: %v", err)
 	}
 
-	return c, nil
+	return newInstrumentedService(c), nil
 }
 
 func (c *criContainerdService) Start() {

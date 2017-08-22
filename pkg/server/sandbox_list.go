@@ -21,7 +21,6 @@ import (
 
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types/task"
-	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
@@ -29,14 +28,7 @@ import (
 )
 
 // ListPodSandbox returns a list of Sandbox.
-func (c *criContainerdService) ListPodSandbox(ctx context.Context, r *runtime.ListPodSandboxRequest) (retRes *runtime.ListPodSandboxResponse, retErr error) {
-	glog.V(5).Infof("ListPodSandbox with filter %+v", r.GetFilter())
-	defer func() {
-		if retErr == nil {
-			glog.V(5).Infof("ListPodSandbox returns sandboxes %+v", retRes.GetItems())
-		}
-	}()
-
+func (c *criContainerdService) ListPodSandbox(ctx context.Context, r *runtime.ListPodSandboxRequest) (*runtime.ListPodSandboxResponse, error) {
 	// List all sandboxes from store.
 	sandboxesInStore := c.sandboxStore.List()
 

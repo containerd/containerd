@@ -30,14 +30,7 @@ import (
 
 // StopPodSandbox stops the sandbox. If there are any running containers in the
 // sandbox, they should be forcibly terminated.
-func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandboxRequest) (retRes *runtime.StopPodSandboxResponse, retErr error) {
-	glog.V(2).Infof("StopPodSandbox for sandbox %q", r.GetPodSandboxId())
-	defer func() {
-		if retErr == nil {
-			glog.V(2).Infof("StopPodSandbox %q returns successfully", r.GetPodSandboxId())
-		}
-	}()
-
+func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandboxRequest) (*runtime.StopPodSandboxResponse, error) {
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find sandbox %q: %v",

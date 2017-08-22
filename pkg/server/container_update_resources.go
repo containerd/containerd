@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd"
-	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/net/context"
@@ -29,12 +28,6 @@ import (
 
 // UpdateContainerResources updates ContainerConfig of the container.
 func (c *criContainerdService) UpdateContainerResources(ctx context.Context, r *runtime.UpdateContainerResourcesRequest) (retRes *runtime.UpdateContainerResourcesResponse, retErr error) {
-	glog.V(2).Infof("UpdateContainerResources for container %q with %+v", r.GetContainerId(), r.GetLinux())
-	defer func() {
-		if retErr == nil {
-			glog.V(2).Infof("UpdateContainerResources for container %q returns successfully", r.GetContainerId())
-		}
-	}()
 	cntr, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to find container: %v", err)

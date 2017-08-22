@@ -39,14 +39,7 @@ import (
 
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 // the sandbox is in ready state.
-func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandboxRequest) (retRes *runtime.RunPodSandboxResponse, retErr error) {
-	glog.V(2).Infof("RunPodSandbox with config %+v", r.GetConfig())
-	defer func() {
-		if retErr == nil {
-			glog.V(2).Infof("RunPodSandbox returns sandbox id %q", retRes.GetPodSandboxId())
-		}
-	}()
-
+func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandboxRequest) (_ *runtime.RunPodSandboxResponse, retErr error) {
 	config := r.GetConfig()
 
 	// Generate unique id and name for the sandbox and reserve the name.

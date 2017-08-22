@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
@@ -31,13 +30,7 @@ import (
 // TODO(random-liu): We should change CRI to distinguish image id and image spec.
 // Remove the whole image no matter the it's image id or reference. This is the
 // semantic defined in CRI now.
-func (c *criContainerdService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequest) (retRes *runtime.RemoveImageResponse, retErr error) {
-	glog.V(2).Infof("RemoveImage %q", r.GetImage().GetImage())
-	defer func() {
-		if retErr == nil {
-			glog.V(2).Infof("RemoveImage %q returns successfully", r.GetImage().GetImage())
-		}
-	}()
+func (c *criContainerdService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequest) (*runtime.RemoveImageResponse, error) {
 	image, err := c.localResolve(ctx, r.GetImage().GetImage())
 	if err != nil {
 		return nil, fmt.Errorf("can not resolve %q locally: %v", r.GetImage().GetImage(), err)
