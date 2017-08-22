@@ -17,14 +17,51 @@ limitations under the License.
 package server
 
 import (
-	"errors"
+	"fmt"
 
+	"github.com/containerd/containerd"
+	"github.com/golang/glog"
+	"github.com/golang/protobuf/proto"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/net/context"
-
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 // UpdateContainerResources updates ContainerConfig of the container.
-func (c *criContainerdService) UpdateContainerResources(ctx context.Context, r *runtime.UpdateContainerResourcesRequest) (*runtime.UpdateContainerResourcesResponse, error) {
-	return nil, errors.New("not implemented")
+func (c *criContainerdService) UpdateContainerResources(ctx context.Context, r *runtime.UpdateContainerResourcesRequest) (retRes *runtime.UpdateContainerResourcesResponse, retErr error) {
+	glog.V(2).Infof("UpdateContainerResources for container %q with %+v", r.GetContainerId(), r.GetLinux())
+	defer func() {
+		if retErr == nil {
+			glog.V(2).Infof("UpdateContainerResources for container %q returns successfully", r.GetContainerId())
+		}
+	}()
+	cntr, err := c.containerStore.Get(r.GetContainerId())
+	if err != nil {
+		return nil, fmt.Errorf("failed to find container: %v", err)
+	}
+	task, err := cntr.Container.Task(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find task: %v", err)
+	}
+	resources := toOCIResources(r.GetLinux())
+	if err := task.Update(ctx, containerd.WithResources(resources)); err != nil {
+		return nil, fmt.Errorf("failed to update resources: %v", err)
+	}
+	return &runtime.UpdateContainerResourcesResponse{}, nil
+}
+
+// toOCIResources converts CRI resource constraints to OCI.
+func toOCIResources(r *runtime.LinuxContainerResources) *runtimespec.LinuxResources {
+	return &runtimespec.LinuxResources{
+		CPU: &runtimespec.LinuxCPU{
+			Shares: proto.Uint64(uint64(r.GetCpuShares())),
+			Quota:  proto.Int64(r.GetCpuQuota()),
+			Period: proto.Uint64(uint64(r.GetCpuPeriod())),
+			Cpus:   r.GetCpusetCpus(),
+			Mems:   r.GetCpusetMems(),
+		},
+		Memory: &runtimespec.LinuxMemory{
+			Limit: proto.Int64(r.GetMemoryLimitInBytes()),
+		},
+	}
 }
