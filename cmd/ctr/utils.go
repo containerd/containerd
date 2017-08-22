@@ -52,6 +52,7 @@ var (
 		cli.StringFlag{
 			Name:  "snapshotter",
 			Usage: "Snapshotter name. Empty value stands for the daemon default value.",
+			Value: containerd.DefaultSnapshotter,
 		},
 	}
 
