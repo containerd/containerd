@@ -22,7 +22,7 @@ type Process interface {
 	// Start starts the process executing the user's defined binary
 	Start(context.Context) error
 	// Delete removes the process and any resources allocated returning the exit status
-	Delete(context.Context, ...ProcessDeleteOpts) (uint32, error)
+	Delete(context.Context, ...ProcessDeleteOpts) (*ExitStatus, error)
 	// Kill sends the provided signal to the process
 	Kill(context.Context, syscall.Signal) error
 	// Wait asynchronously waits for the process to exit, and sends the exit code to the returned channel
@@ -52,6 +52,24 @@ type ExitStatus struct {
 // If an error is returned, the process may still be running.
 func (s ExitStatus) Result() (uint32, time.Time, error) {
 	return s.code, s.exitedAt, s.err
+}
+
+// ExitCode returns the exit code of the process.
+// This is only valid is Error() returns nil
+func (s ExitStatus) ExitCode() uint32 {
+	return s.code
+}
+
+// ExitTime returns the exit time of the process
+// This is only valid is Error() returns nil
+func (s ExitStatus) ExitTime() time.Time {
+	return s.exitedAt
+}
+
+// Error returns the error, if any, that occured while waiting for the
+// process.
+func (s ExitStatus) Error() error {
+	return s.err
 }
 
 type process struct {
@@ -176,32 +194,32 @@ func (p *process) Resize(ctx context.Context, w, h uint32) error {
 	return errdefs.FromGRPC(err)
 }
 
-func (p *process) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (uint32, error) {
+func (p *process) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStatus, error) {
 	for _, o := range opts {
 		if err := o(ctx, p); err != nil {
-			return UnknownExitStatus, err
+			return nil, err
 		}
 	}
 	status, err := p.Status(ctx)
 	if err != nil {
-		return UnknownExitStatus, err
+		return nil, err
 	}
 	switch status.Status {
 	case Running, Paused, Pausing:
-		return UnknownExitStatus, errors.Wrapf(errdefs.ErrFailedPrecondition, "process must be stopped before deletion")
+		return nil, errors.Wrapf(errdefs.ErrFailedPrecondition, "process must be stopped before deletion")
 	}
 	r, err := p.task.client.TaskService().DeleteProcess(ctx, &tasks.DeleteProcessRequest{
 		ContainerID: p.task.id,
 		ExecID:      p.id,
 	})
 	if err != nil {
-		return UnknownExitStatus, errdefs.FromGRPC(err)
+		return nil, errdefs.FromGRPC(err)
 	}
 	if p.io != nil {
 		p.io.Wait()
 		p.io.Close()
 	}
-	return r.ExitStatus, nil
+	return &ExitStatus{code: r.ExitStatus, exitedAt: r.ExitedAt}, nil
 }
 
 func (p *process) Status(ctx context.Context) (Status, error) {
