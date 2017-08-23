@@ -15,7 +15,6 @@
 package invoke
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 
@@ -23,7 +22,7 @@ import (
 	"github.com/containernetworking/cni/pkg/version"
 )
 
-func ExecPluginWithResult(pluginPath string, netconf []byte, args CNIArgs) (*types.Result, error) {
+func ExecPluginWithResult(pluginPath string, netconf []byte, args CNIArgs) (types.Result, error) {
 	return defaultPluginExec.WithResult(pluginPath, netconf, args)
 }
 
@@ -49,15 +48,20 @@ type PluginExec struct {
 	}
 }
 
-func (e *PluginExec) WithResult(pluginPath string, netconf []byte, args CNIArgs) (*types.Result, error) {
+func (e *PluginExec) WithResult(pluginPath string, netconf []byte, args CNIArgs) (types.Result, error) {
 	stdoutBytes, err := e.RawExec.ExecPlugin(pluginPath, netconf, args.AsEnv())
 	if err != nil {
 		return nil, err
 	}
 
-	res := &types.Result{}
-	err = json.Unmarshal(stdoutBytes, res)
-	return res, err
+	// Plugin must return result in same version as specified in netconf
+	versionDecoder := &version.ConfigDecoder{}
+	confVersion, err := versionDecoder.Decode(netconf)
+	if err != nil {
+		return nil, err
+	}
+
+	return version.NewResult(confVersion, stdoutBytes)
 }
 
 func (e *PluginExec) WithoutResult(pluginPath string, netconf []byte, args CNIArgs) error {
