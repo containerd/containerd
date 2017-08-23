@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"testing"
@@ -362,5 +363,82 @@ func TestContainerAttach(t *testing.T) {
 	expected = expected + expected
 	if output != expected {
 		t.Errorf("expected output %q but received %q", expected, output)
+	}
+}
+
+func TestContainerUsername(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+	direct, err := NewDirectIO(ctx, false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer direct.Delete()
+	var (
+		wg  sync.WaitGroup
+		buf = bytes.NewBuffer(nil)
+	)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		io.Copy(buf, direct.Stdout)
+	}()
+
+	// squid user in the alpine image has a uid of 31
+	container, err := client.NewContainer(ctx, id,
+		withNewSnapshot(id, image),
+		WithNewSpec(withImageConfig(image), WithUsername("squid"), WithProcessArgs("id", "-u")),
+	)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, direct.IOCreate)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+	<-statusC
+
+	wg.Wait()
+
+	output := strings.TrimSuffix(buf.String(), "\n")
+	if output != "31" {
+		t.Errorf("expected squid uid to be 31 but received %q", output)
 	}
 }

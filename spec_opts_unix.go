@@ -6,9 +6,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
@@ -17,6 +21,7 @@ import (
 	"github.com/containerd/containerd/typeurl"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/opencontainers/runc/libcontainer/user"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -100,6 +105,10 @@ func WithImageConfig(i Image) SpecOpts {
 			case 1:
 				v, err := strconv.ParseUint(parts[0], 0, 10)
 				if err != nil {
+					// if we cannot parse as a uint they try to see if it is a username
+					if err := WithUsername(config.User)(ctx, client, c, s); err != nil {
+						return err
+					}
 					return err
 				}
 				uid, gid = uint32(v), uint32(v)
@@ -316,6 +325,53 @@ func WithUserIDs(uid, gid uint32) SpecOpts {
 	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
 		s.Process.User.UID = uid
 		s.Process.User.GID = gid
+		return nil
+	}
+}
+
+// WithUsername sets the correct UID and GID for the container
+// based on the the image's /etc/passwd contents.
+// id is the snapshot id that is used
+func WithUsername(username string) SpecOpts {
+	return func(ctx context.Context, client *Client, c *containers.Container, s *specs.Spec) error {
+		if c.Snapshotter == "" {
+			return fmt.Errorf("no snapshotter set for container")
+		}
+		if c.RootFS == "" {
+			return fmt.Errorf("rootfs not created for container")
+		}
+		snapshotter := client.SnapshotService(c.Snapshotter)
+		mounts, err := snapshotter.Mounts(ctx, c.RootFS)
+		if err != nil {
+			return err
+		}
+		root, err := ioutil.TempDir("", "ctd-username")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(root)
+		for _, m := range mounts {
+			if err := m.Mount(root); err != nil {
+				return err
+			}
+		}
+		defer unix.Unmount(root, 0)
+		f, err := os.Open(filepath.Join(root, "/etc/passwd"))
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		users, err := user.ParsePasswdFilter(f, func(u user.User) bool {
+			return u.Name == username
+		})
+		if err != nil {
+			return err
+		}
+		if len(users) == 0 {
+			return fmt.Errorf("no users found for %s", username)
+		}
+		u := users[0]
+		s.Process.User.UID, s.Process.User.GID = uint32(u.Uid), uint32(u.Gid)
 		return nil
 	}
 }
