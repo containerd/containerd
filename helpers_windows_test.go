@@ -12,19 +12,8 @@ import (
 
 const newLine = "\r\n"
 
-func generateSpec(ctx context.Context, client *Client, opts ...SpecOpts) (*specs.Spec, error) {
-	spec, err := GenerateSpec(ctx, client, opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	spec.Windows.LayerFolders = dockerLayerFolders
-
-	return spec, nil
-}
-
 func withExitStatus(es int) SpecOpts {
-	return func(_ context.Context, _ *Client, s *specs.Spec) error {
+	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
 		s.Process.Args = []string{"powershell", "-noprofile", "exit", strconv.Itoa(es)}
 		return nil
 	}
@@ -51,8 +40,10 @@ func withExecArgs(s *specs.Process, args ...string) {
 }
 
 func withImageConfig(i Image) SpecOpts {
-	// TODO: when windows has a snapshotter remove the withImageConfig helper
-	return withNoop
+	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
+		s.Windows.LayerFolders = dockerLayerFolders
+		return nil
+	}
 }
 
 func withNewSnapshot(id string, i Image) NewContainerOpts {
@@ -72,6 +63,6 @@ func withRemappedSnapshot(id string, i Image, u, g uint32) NewContainerOpts {
 	}
 }
 
-func withNoop(_ context.Context, _ *Client, _ *specs.Spec) error {
+func withNoop(_ context.Context, _ *Client, _ *containers.Container, _ *specs.Spec) error {
 	return nil
 }

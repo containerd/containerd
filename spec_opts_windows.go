@@ -16,7 +16,7 @@ import (
 )
 
 func WithImageConfig(i Image) SpecOpts {
-	return func(ctx context.Context, client *Client, s *specs.Spec) error {
+	return func(ctx context.Context, client *Client, _ *containers.Container, s *specs.Spec) error {
 		var (
 			image = i.(*image)
 			store = client.ContentStore()
@@ -52,7 +52,7 @@ func WithImageConfig(i Image) SpecOpts {
 }
 
 func WithTTY(width, height int) SpecOpts {
-	return func(_ context.Context, _ *Client, s *specs.Spec) error {
+	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
 		s.Process.Terminal = true
 		s.Process.ConsoleSize.Width = uint(width)
 		s.Process.ConsoleSize.Height = uint(height)
@@ -60,7 +60,27 @@ func WithTTY(width, height int) SpecOpts {
 	}
 }
 
-func WithNewSpec(spec *specs.Spec) NewContainerOpts {
+func WithNewSpec(opts ...SpecOpts) NewContainerOpts {
+	return func(ctx context.Context, client *Client, c *containers.Container) error {
+		s, err := createDefaultSpec()
+		if err != nil {
+			return err
+		}
+		for _, o := range opts {
+			if err := o(ctx, client, c, s); err != nil {
+				return err
+			}
+		}
+		any, err := typeurl.MarshalAny(s)
+		if err != nil {
+			return err
+		}
+		c.Spec = any
+		return nil
+	}
+}
+
+func WithSpec(spec *specs.Spec) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		any, err := typeurl.MarshalAny(spec)
 		if err != nil {
