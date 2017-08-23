@@ -24,10 +24,14 @@ FOCUS=${FOCUS:-}
 SKIP=${SKIP:-""}
 REPORT_DIR=${REPORT_DIR:-"/tmp/test-cri"}
 
+# Check GOPATH
 if [[ -z "${GOPATH}" ]]; then
   echo "GOPATH is not set"
   exit 1
 fi
+
+# For multiple GOPATHs, keep the first one only
+GOPATH=${GOPATH%%:*}
 
 CRITEST=${GOPATH}/bin/critest
 CRITEST_PKG=github.com/kubernetes-incubator/cri-tools
