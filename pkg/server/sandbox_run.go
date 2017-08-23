@@ -294,7 +294,9 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 		g.AddLinuxSysctl(key, value)
 	}
 
-	// TODO(random-liu): [P2] Set apparmor and seccomp from annotations.
+	// TODO(random-liu): [P2] Set seccomp
+
+	// Note: LinuxSandboxSecurityContext does not currently provide an apparmor profile
 
 	g.SetLinuxResourcesCPUShares(uint64(defaultSandboxCPUshares))
 	g.SetProcessOOMScoreAdj(int(defaultSandboxOOMAdj))

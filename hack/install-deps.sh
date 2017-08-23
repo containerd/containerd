@@ -41,7 +41,8 @@ go get -d ${RUNC_PKG}/...
 cd ${GOPATH}/src/${RUNC_PKG}
 git fetch --all
 git checkout ${RUNC_VERSION}
-make
+BUILDTAGS=${BUILDTAGS:-seccomp apparmor}
+make BUILDTAGS="$BUILDTAGS"
 sudo make install
 which runc
 
