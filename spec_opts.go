@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -29,15 +30,15 @@ func WithHostname(name string) SpecOpts {
 
 // WithNewSpec generates a new spec for a new container
 func WithNewSpec(opts ...SpecOpts) NewContainerOpts {
+	return WithNewSpecForPlatform(platforms.Default(), opts...)
+}
+
+// WithNewSpecForPlatform generates a new spec for a new container
+func WithNewSpecForPlatform(platform string, opts ...SpecOpts) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		s, err := createDefaultSpec()
+		s, err := GenerateSpecForPlatform(ctx, client, c, platform, opts...)
 		if err != nil {
 			return err
-		}
-		for _, o := range opts {
-			if err := o(ctx, client, c, s); err != nil {
-				return err
-			}
 		}
 		any, err := typeurl.MarshalAny(s)
 		if err != nil {

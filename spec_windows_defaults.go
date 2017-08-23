@@ -2,7 +2,7 @@ package containerd
 
 import specs "github.com/opencontainers/runtime-spec/specs-go"
 
-func createDefaultSpec() (*specs.Spec, error) {
+func createDefaultWindowsSpec() (*specs.Spec, error) {
 	return &specs.Spec{
 		Version: specs.Version,
 		Root:    &specs.Root{},

@@ -140,6 +140,36 @@ func (m *matcher) String() string {
 //
 // Applications should opt to use `Match` over directly parsing specifiers.
 func Parse(specifier string) (Matcher, error) {
+	p, err := parseSpecifier(specifier)
+	if err != nil {
+		return nil, err
+	}
+	return &matcher{*p}, nil
+}
+
+// Format returns a string specifier from the provided platform specification.
+func Format(platform specs.Platform) string {
+	if platform.OS == "" {
+		return "unknown"
+	}
+
+	return joinNotEmpty(platform.OS, platform.Architecture, platform.Variant)
+}
+
+// ParseOS parses the platform specifier syntax and returns the operating
+// system of the parsed platform.
+//
+// Applications should opt to use `Parse` and the resulting `Matcher` where
+// possible.
+func ParseOS(specifier string) (string, error) {
+	p, err := parseSpecifier(specifier)
+	if err != nil {
+		return "", err
+	}
+	return p.OS, nil
+}
+
+func parseSpecifier(specifier string) (*specs.Platform, error) {
 	if strings.Contains(specifier, "*") {
 		// TODO(stevvooe): need to work out exact wildcard handling
 		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "%q: wildcards not yet supported", specifier)
@@ -153,7 +183,7 @@ func Parse(specifier string) (Matcher, error) {
 		}
 	}
 
-	var p specs.Platform
+	var p = &specs.Platform{}
 	switch len(parts) {
 	case 1:
 		// in this case, we will test that the value might be an OS, then look
@@ -170,13 +200,13 @@ func Parse(specifier string) (Matcher, error) {
 				return nil, errors.Wrapf(errdefs.ErrNotImplemented, "arm support not fully implemented")
 			}
 
-			return &matcher{p}, nil
+			return p, nil
 		}
 
 		p.Architecture, p.Variant = normalizeArch(parts[0], "")
 		if isKnownArch(p.Architecture) {
 			p.OS = runtime.GOOS
-			return &matcher{p}, nil
+			return p, nil
 		}
 
 		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "%q: unknown operating system or architecture", specifier)
@@ -186,25 +216,16 @@ func Parse(specifier string) (Matcher, error) {
 		p.OS = normalizeOS(parts[0])
 		p.Architecture, p.Variant = normalizeArch(parts[1], "")
 
-		return &matcher{p}, nil
+		return p, nil
 	case 3:
 		// we have a fully specified variant, this is rare
 		p.OS = normalizeOS(parts[0])
 		p.Architecture, p.Variant = normalizeArch(parts[1], parts[2])
 
-		return &matcher{p}, nil
+		return p, nil
 	}
 
 	return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "%q: cannot parse platform specifier", specifier)
-}
-
-// Format returns a string specifier from the provided platform specification.
-func Format(platform specs.Platform) string {
-	if platform.OS == "" {
-		return "unknown"
-	}
-
-	return joinNotEmpty(platform.OS, platform.Architecture, platform.Variant)
 }
 
 func joinNotEmpty(s ...string) string {

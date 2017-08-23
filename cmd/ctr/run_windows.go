@@ -31,6 +31,9 @@ func withLayers(context *cli.Context) containerd.SpecOpts {
 		if l == nil {
 			return errors.Wrap(errdefs.ErrInvalidArgument, "base layers must be specified with `--layer`")
 		}
+		if s.Windows == nil {
+			s.Windows = &specs.Windows{}
+		}
 		s.Windows.LayerFolders = l
 		return nil
 	}
@@ -109,7 +112,7 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	}
 
 	return client.NewContainer(ctx, id,
-		containerd.WithNewSpec(opts...),
+		containerd.WithNewSpecForPlatform(context.String("platform"), opts...),
 		containerd.WithContainerLabels(labels),
 		containerd.WithRuntime(context.String("runtime"), nil),
 		// TODO(mlaventure): containerd.WithImage(image),
