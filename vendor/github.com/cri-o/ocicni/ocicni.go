@@ -166,6 +166,7 @@ func getDefaultCNINetwork(pluginDir string, cniDirs []string, vendorCNIDirPrefix
 			logrus.Warningf("CNI config list %s has no networks, skipping", confFile)
 			continue
 		}
+		logrus.Infof("CNI network %s (type=%v) is used from %s", confList.Name, confList.Plugins[0].Network.Type, confFile)
 		// Search for vendor-specific plugins as well as default plugins in the CNI codebase.
 		vendorDir := vendorCNIDir(vendorCNIDirPrefix, confList.Plugins[0].Network.Type)
 		cninet := &libcni.CNIConfig{
@@ -292,7 +293,7 @@ func (network *cniNetwork) addToNetwork(podNetwork PodNetwork) (cnitypes.Result,
 	}
 
 	netconf, cninet := network.NetworkConfig, network.CNIConfig
-	logrus.Infof("About to add CNI network %v (type=%v)", netconf.Name, netconf.Plugins[0].Network.Type)
+	logrus.Infof("About to add CNI network %s (type=%v)", netconf.Name, netconf.Plugins[0].Network.Type)
 	res, err := cninet.AddNetworkList(netconf, rt)
 	if err != nil {
 		logrus.Errorf("Error adding network: %v", err)
@@ -310,7 +311,7 @@ func (network *cniNetwork) deleteFromNetwork(podNetwork PodNetwork) error {
 	}
 
 	netconf, cninet := network.NetworkConfig, network.CNIConfig
-	logrus.Infof("About to del CNI network %v (type=%v)", netconf.Name, netconf.Plugins[0].Network.Type)
+	logrus.Infof("About to del CNI network %s (type=%v)", netconf.Name, netconf.Plugins[0].Network.Type)
 	err = cninet.DelNetworkList(netconf, rt)
 	if err != nil {
 		logrus.Errorf("Error deleting network: %v", err)
