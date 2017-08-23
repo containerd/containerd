@@ -261,15 +261,15 @@ func (t *task) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 // Delete deletes the task and its runtime state
 // it returns the exit status of the task and any errors that were encountered
 // during cleanup
-func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (uint32, error) {
+func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStatus, error) {
 	for _, o := range opts {
 		if err := o(ctx, t); err != nil {
-			return UnknownExitStatus, err
+			return nil, err
 		}
 	}
 	status, err := t.Status(ctx)
 	if err != nil && errdefs.IsNotFound(err) {
-		return UnknownExitStatus, err
+		return nil, err
 	}
 	switch status.Status {
 	case Stopped, Unknown, "":
@@ -280,7 +280,7 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (uint32, e
 		}
 		fallthrough
 	default:
-		return UnknownExitStatus, errors.Wrapf(errdefs.ErrFailedPrecondition, "task must be stopped before deletion: %s", status.Status)
+		return nil, errors.Wrapf(errdefs.ErrFailedPrecondition, "task must be stopped before deletion: %s", status.Status)
 	}
 	if t.io != nil {
 		t.io.Cancel()
@@ -291,9 +291,9 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (uint32, e
 		ContainerID: t.id,
 	})
 	if err != nil {
-		return UnknownExitStatus, errdefs.FromGRPC(err)
+		return nil, errdefs.FromGRPC(err)
 	}
-	return r.ExitStatus, nil
+	return &ExitStatus{code: r.ExitStatus, exitedAt: r.ExitedAt}, nil
 }
 
 func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreate IOCreation) (Process, error) {

@@ -155,8 +155,8 @@ func TestContainerStart(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if deleteStatus != 7 {
-		t.Errorf("expected status 7 from delete but received %d", deleteStatus)
+	if ec := deleteStatus.ExitCode(); ec != 7 {
+		t.Errorf("expected status 7 from delete but received %d", ec)
 	}
 }
 
@@ -324,8 +324,8 @@ func TestContainerExec(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if deleteStatus != 6 {
-		t.Errorf("expected delete exit code e6 but received %d", deleteStatus)
+	if ec := deleteStatus.ExitCode(); ec != 6 {
+		t.Errorf("expected delete exit code 6 but received %d", ec)
 	}
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
 		t.Error(err)
@@ -823,8 +823,8 @@ func TestUserNamespaces(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if deleteStatus != 7 {
-		t.Errorf("expected status 7 from delete but received %d", deleteStatus)
+	if ec := deleteStatus.ExitCode(); ec != 7 {
+		t.Errorf("expected status 7 from delete but received %d", ec)
 	}
 }
 
@@ -1358,8 +1358,8 @@ func TestDeleteContainerExecCreated(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if deleteStatus != 0 {
-		t.Errorf("expected delete exit code 0 but received %d", deleteStatus)
+	if ec := deleteStatus.ExitCode(); ec != 0 {
+		t.Errorf("expected delete exit code 0 but received %d", ec)
 	}
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
 		t.Error(err)

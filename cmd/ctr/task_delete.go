@@ -25,8 +25,8 @@ var taskDeleteCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		if status != 0 {
-			return cli.NewExitError("", int(status))
+		if ec := status.ExitCode(); ec != 0 {
+			return cli.NewExitError("", int(ec))
 		}
 		return nil
 	},
