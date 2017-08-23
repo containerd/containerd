@@ -2,7 +2,6 @@ package containerd
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"runtime"
