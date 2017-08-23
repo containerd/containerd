@@ -419,7 +419,7 @@ func TestPrivilegedBindMount(t *testing.T) {
 		t.Logf("TestCase %q", desc)
 		g := generate.New()
 		g.SetRootReadonly(test.readonlyRootFS)
-		addOCIBindMounts(&g, nil)
+		addOCIBindMounts(&g, nil, "")
 		if test.privileged {
 			setOCIBindMountsPrivileged(&g)
 		}

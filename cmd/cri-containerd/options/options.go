@@ -46,6 +46,8 @@ type CRIContainerdOptions struct {
 	StreamServerPort string
 	// CgroupPath is the path for the cgroup that cri-containerd is placed in.
 	CgroupPath string
+	// EnableSelinux indicates to enable the selinux support
+	EnableSelinux bool
 }
 
 // NewCRIContainerdOptions returns a reference to CRIContainerdOptions
@@ -74,6 +76,8 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.StreamServerPort, "stream-port",
 		"10010", "The port streaming server is listening on.")
 	fs.StringVar(&c.CgroupPath, "cgroup-path", "", "The cgroup that cri-containerd is part of. By default cri-containerd is not placed in a cgroup")
+	fs.BoolVar(&c.EnableSelinux, "selinux-enabled",
+		false, "Enable selinux support.")
 }
 
 // InitFlags must be called after adding all cli options flags are defined and

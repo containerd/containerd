@@ -33,6 +33,8 @@ import (
 	"github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/selinux/go-selinux"
+	"github.com/opencontainers/selinux/go-selinux/label"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
@@ -373,4 +375,17 @@ func getImageInfo(ctx context.Context, image containerd.Image, provider content.
 		size:    size,
 		config:  ociimage.Config,
 	}, nil
+}
+
+func initSelinuxOpts(selinuxOpt *runtime.SELinuxOption) (string, string, error) {
+	if selinuxOpt == nil {
+		return "", "", nil
+	}
+
+	labelOpts := fmt.Sprintf("%s:%s:%s:%s",
+		selinuxOpt.GetUser(),
+		selinuxOpt.GetRole(),
+		selinuxOpt.GetRole(),
+		selinuxOpt.GetType())
+	return label.InitLabels(selinux.DupSecOpt(labelOpts))
 }
