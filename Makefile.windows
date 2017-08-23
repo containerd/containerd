@@ -5,5 +5,7 @@ FIX_PATH = $(subst /,\,$1)
 
 BINARY_SUFFIX=".exe"
 
-# supports go test -race
-TESTFLAGS_RACE= -race
+# amd64 supports go test -race
+ifeq ("amd64", $(GOARCH))
+	TESTFLAGS_RACE= -race
+endif
