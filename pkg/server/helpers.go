@@ -95,6 +95,13 @@ const (
 	resolvConfPath = "/etc/resolv.conf"
 )
 
+const (
+	// sandboxMetadataLabel is label name that identify metadata of sandbox in CreateContainerRequest
+	sandboxMetadataLabel = "io.cri-containerd.sandbox.metadata"
+	// sandboxMetadataLabel is label name that identify metadata of container in CreateContainerRequest
+	containerMetadataLabel = "io.cri-containerd.container.metadata"
+)
+
 // generateID generates a random unique id.
 func generateID() string {
 	return stringid.GenerateNonCryptoID()

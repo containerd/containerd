@@ -85,10 +85,26 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		return nil, fmt.Errorf("failed to generate sandbox container spec: %v", err)
 	}
 	glog.V(4).Infof("Sandbox container spec: %+v", spec)
-	// TODO(random-liu): Checkpoint metadata into container labels.
+
+	// Checkpoint metadata into container
+	// TODO(random-liu): Switch to extensions(after merge containerd #1378).
+	// Actually the Pid, NetNS and CreatedAt underlying are not included here.
+	// I'm fine with this for now. After this PR is merged, we could:
+	// 1.Get Pid from containerd, so that we don't need to checkpoint it ourselves;
+	// 2.Use permanent NetNS after #138 is merged, so that we'll have network namespace here;
+	// 3.Get CreatedAt from containerd, which have been checkpointed by containerd
+	// https://github.com/containerd/containerd/blob/master/containers/containers.go#L14.
+	metaBytes, err := sandbox.Metadata.Encode()
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert sandbox metadata: %+v, %v", sandbox.Metadata, err)
+	}
+	labels := map[string]string{
+		sandboxMetadataLabel: string(metaBytes),
+	}
 
 	opts := []containerd.NewContainerOpts{
 		containerd.WithSpec(spec),
+		containerd.WithContainerLabels(labels),
 		containerd.WithRuntime(defaultRuntime),
 		containerd.WithNewSnapshotView(id, image.Image)}
 	container, err := c.client.NewContainer(ctx, id, opts...)

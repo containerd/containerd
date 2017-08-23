@@ -118,7 +118,18 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 		}
 	}()
 
-	opts = append(opts, containerd.WithSpec(spec), containerd.WithRuntime(defaultRuntime))
+	metaBytes, err := meta.Encode()
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert sandbox metadata: %+v, %v", meta, err)
+	}
+	labels := map[string]string{
+		containerMetadataLabel: string(metaBytes),
+	}
+
+	opts = append(opts,
+		containerd.WithSpec(spec),
+		containerd.WithRuntime(defaultRuntime),
+		containerd.WithContainerLabels(labels))
 	var cntr containerd.Container
 	if cntr, err = c.client.NewContainer(ctx, id, opts...); err != nil {
 		return nil, fmt.Errorf("failed to create containerd container: %v", err)
