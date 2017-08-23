@@ -64,11 +64,11 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 			state = runtime.PodSandboxState_SANDBOX_READY
 		}
 	}
-	ip, err := c.netPlugin.GetContainerNetworkStatus(sandbox.NetNS, sandbox.Config.GetMetadata().GetNamespace(), sandbox.Config.GetMetadata().GetName(), id)
+	ip, err := c.netPlugin.GetPodNetworkStatus(sandbox.NetNS)
 	if err != nil {
 		// Ignore the error on network status
 		ip = ""
-		glog.V(4).Infof("GetContainerNetworkStatus returns error: %v", err)
+		glog.V(4).Infof("GetPodNetworkStatus returns error: %v", err)
 	}
 
 	return &runtime.PodSandboxStatusResponse{Status: toCRISandboxStatus(sandbox.Metadata, state, ip)}, nil
