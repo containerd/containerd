@@ -19,7 +19,6 @@ package sandbox
 import (
 	"encoding/json"
 	"testing"
-	"time"
 
 	assertlib "github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -37,7 +36,6 @@ func TestMetadataEncodeDecode(t *testing.T) {
 				Attempt:   1,
 			},
 		},
-		CreatedAt: time.Now().UnixNano(),
 	}
 	assert := assertlib.New(t)
 	data, err := meta.Encode()

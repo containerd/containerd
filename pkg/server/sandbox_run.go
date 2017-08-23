@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/cri-o/ocicni"
@@ -123,9 +122,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	// Actually the Pid, NetNS and CreatedAt underlying are not included here.
 	// I'm fine with this for now. After this PR is merged, we could:
 	// 1.Get Pid from containerd, so that we don't need to checkpoint it ourselves;
-	// 2.Use permanent NetNS after #138 is merged, so that we'll have network namespace here;
-	// 3.Get CreatedAt from containerd, which have been checkpointed by containerd
-	// https://github.com/containerd/containerd/blob/master/containers/containers.go#L14.
+	// 2.Use permanent NetNS after #138 is merged, so that we'll have network namespace here.
 	metaBytes, err := sandbox.Metadata.Encode()
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert sandbox metadata: %+v, %v", sandbox.Metadata, err)
@@ -204,7 +201,6 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	}
 
 	// Add sandbox into sandbox store.
-	sandbox.CreatedAt = time.Now().UnixNano()
 	sandbox.Container = container
 	if err := c.sandboxStore.Add(sandbox); err != nil {
 		return nil, fmt.Errorf("failed to add sandbox %+v into store: %v", sandbox, err)

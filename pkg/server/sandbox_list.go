@@ -18,6 +18,7 @@ package server
 
 import (
 	"fmt"
+	"time"
 
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types/task"
@@ -54,7 +55,8 @@ func (c *criContainerdService) ListPodSandbox(ctx context.Context, r *runtime.Li
 			state = runtime.PodSandboxState_SANDBOX_READY
 		}
 
-		sandboxes = append(sandboxes, toCRISandbox(sandboxInStore.Metadata, state))
+		createdAt := sandboxInStore.Container.Info().CreatedAt
+		sandboxes = append(sandboxes, toCRISandbox(sandboxInStore.Metadata, state, createdAt))
 	}
 
 	sandboxes = c.filterCRISandboxes(sandboxes, r.GetFilter())
@@ -62,12 +64,12 @@ func (c *criContainerdService) ListPodSandbox(ctx context.Context, r *runtime.Li
 }
 
 // toCRISandbox converts sandbox metadata into CRI pod sandbox.
-func toCRISandbox(meta sandboxstore.Metadata, state runtime.PodSandboxState) *runtime.PodSandbox {
+func toCRISandbox(meta sandboxstore.Metadata, state runtime.PodSandboxState, createdAt time.Time) *runtime.PodSandbox {
 	return &runtime.PodSandbox{
 		Id:          meta.ID,
 		Metadata:    meta.Config.GetMetadata(),
 		State:       state,
-		CreatedAt:   meta.CreatedAt,
+		CreatedAt:   createdAt.UnixNano(),
 		Labels:      meta.Config.GetLabels(),
 		Annotations: meta.Config.GetAnnotations(),
 	}
