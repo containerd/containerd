@@ -10,7 +10,6 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/typeurl"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -56,37 +55,6 @@ func WithTTY(width, height int) SpecOpts {
 		s.Process.Terminal = true
 		s.Process.ConsoleSize.Width = uint(width)
 		s.Process.ConsoleSize.Height = uint(height)
-		return nil
-	}
-}
-
-func WithNewSpec(opts ...SpecOpts) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		s, err := createDefaultSpec()
-		if err != nil {
-			return err
-		}
-		for _, o := range opts {
-			if err := o(ctx, client, c, s); err != nil {
-				return err
-			}
-		}
-		any, err := typeurl.MarshalAny(s)
-		if err != nil {
-			return err
-		}
-		c.Spec = any
-		return nil
-	}
-}
-
-func WithSpec(spec *specs.Spec) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		any, err := typeurl.MarshalAny(spec)
-		if err != nil {
-			return err
-		}
-		c.Spec = any
 		return nil
 	}
 }

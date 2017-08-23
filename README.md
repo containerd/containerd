@@ -60,23 +60,23 @@ image, err := client.Pull(context, "docker.io/library/redis:latest")
 err := client.Push(context, "docker.io/library/redis:latest", image.Target())
 ```
 
-### OCI Runtime Specification
-
-containerd fully supports the OCI runtime specification for running containers.  We have built in functions to help you generate runtime specifications based on images as well as custom parameters.
-
-```go
-spec, err := containerd.GenerateSpec(containerd.WithImageConfig(context, image))
-```
-
 ### Containers
 
 In containerd, a container is a metadata object.  Resources such as an OCI runtime specification, image, root filesystem, and other metadata can be attached to a container.
 
 ```go
-redis, err := client.NewContainer(context, "redis-master",
-	containerd.WithNewSpec(spec),
-)
+redis, err := client.NewContainer(context, "redis-master")
 defer redis.Delete(context)
+```
+
+### OCI Runtime Specification
+
+containerd fully supports the OCI runtime specification for running containers.  We have built in functions to help you generate runtime specifications based on images as well as custom parameters.
+
+You can specify options when creating a container about how to modify the specification.
+
+```go
+redis, err := client.NewContainer(context, "redis-master", containerd.WithNewSpec(containerd.WithImageConfig(image)))
 ```
 
 ## Root Filesystems
@@ -89,16 +89,17 @@ image, err := client.Pull(context, "docker.io/library/redis:latest", containerd.
 
 // allocate a new RW root filesystem for a container based on the image
 redis, err := client.NewContainer(context, "redis-master",
-	containerd.WithNewSpec(spec),
 	containerd.WithNewSnapshot("redis-rootfs", image),
+	containerd.WithNewSpec(containerd.WithImageConfig(image)),
+
 )
 
 // use a readonly filesystem with multiple containers
 for i := 0; i < 10; i++ {
 	id := fmt.Sprintf("id-%s", i)
 	container, err := client.NewContainer(ctx, id,
-		containerd.WithNewSpec(spec),
 		containerd.WithNewSnapshotView(id, image),
+		containerd.WithNewSpec(containerd.WithImageConfig(image)),
 	)
 }
 ```

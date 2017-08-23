@@ -18,11 +18,11 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/typeurl"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runc/libcontainer/user"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
 )
 
 // WithTTY sets the information on the spec as well as the environment variables for
@@ -144,39 +144,6 @@ func WithRootFSPath(path string, readonly bool) SpecOpts {
 			Readonly: readonly,
 		}
 		// Entrypoint is not set here (it's up to caller)
-		return nil
-	}
-}
-
-// WithNewSpec generates a new spec for a new container
-func WithNewSpec(opts ...SpecOpts) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		s, err := createDefaultSpec()
-		if err != nil {
-			return err
-		}
-		for _, o := range opts {
-			if err := o(ctx, client, c, s); err != nil {
-				return err
-			}
-		}
-		any, err := typeurl.MarshalAny(s)
-		if err != nil {
-			return err
-		}
-		c.Spec = any
-		return nil
-	}
-}
-
-// WithSpec sets the provided spec on the container
-func WithSpec(s *specs.Spec) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		any, err := typeurl.MarshalAny(s)
-		if err != nil {
-			return err
-		}
-		c.Spec = any
 		return nil
 	}
 }
@@ -335,10 +302,10 @@ func WithUserIDs(uid, gid uint32) SpecOpts {
 func WithUsername(username string) SpecOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container, s *specs.Spec) error {
 		if c.Snapshotter == "" {
-			return fmt.Errorf("no snapshotter set for container")
+			return errors.Errorf("no snapshotter set for container")
 		}
 		if c.RootFS == "" {
-			return fmt.Errorf("rootfs not created for container")
+			return errors.Errorf("rootfs not created for container")
 		}
 		snapshotter := client.SnapshotService(c.Snapshotter)
 		mounts, err := snapshotter.Mounts(ctx, c.RootFS)
@@ -368,7 +335,7 @@ func WithUsername(username string) SpecOpts {
 			return err
 		}
 		if len(users) == 0 {
-			return fmt.Errorf("no users found for %s", username)
+			return errors.Errorf("no users found for %s", username)
 		}
 		u := users[0]
 		s.Process.User.UID, s.Process.User.GID = uint32(u.Uid), uint32(u.Gid)

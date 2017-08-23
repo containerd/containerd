@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -22,6 +23,44 @@ func WithProcessArgs(args ...string) SpecOpts {
 func WithHostname(name string) SpecOpts {
 	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
 		s.Hostname = name
+		return nil
+	}
+}
+
+// WithNewSpec generates a new spec for a new container
+func WithNewSpec(opts ...SpecOpts) NewContainerOpts {
+	return func(ctx context.Context, client *Client, c *containers.Container) error {
+		s, err := createDefaultSpec()
+		if err != nil {
+			return err
+		}
+		for _, o := range opts {
+			if err := o(ctx, client, c, s); err != nil {
+				return err
+			}
+		}
+		any, err := typeurl.MarshalAny(s)
+		if err != nil {
+			return err
+		}
+		c.Spec = any
+		return nil
+	}
+}
+
+// WithSpec sets the provided spec on the container
+func WithSpec(s *specs.Spec, opts ...SpecOpts) NewContainerOpts {
+	return func(ctx context.Context, client *Client, c *containers.Container) error {
+		for _, o := range opts {
+			if err := o(ctx, client, c, s); err != nil {
+				return err
+			}
+		}
+		any, err := typeurl.MarshalAny(s)
+		if err != nil {
+			return err
+		}
+		c.Spec = any
 		return nil
 	}
 }
