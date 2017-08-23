@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kubernetes-incubator/cri-o/pkg/ocicni"
+	"github.com/cri-o/ocicni"
 )
 
 // CalledDetail is the struct contains called function name and arguments.
@@ -34,20 +34,12 @@ type CalledDetail struct {
 	Argument interface{}
 }
 
-// CNIPluginArgument is arguments used to call CNI related functions.
-type CNIPluginArgument struct {
-	NetnsPath   string
-	Namespace   string
-	Name        string
-	ContainerID string
-}
-
 // FakeCNIPlugin is a fake plugin used for test.
 type FakeCNIPlugin struct {
 	sync.Mutex
 	called []CalledDetail
 	errors map[string]error
-	IPMap  map[CNIPluginArgument]string
+	IPMap  map[string]string
 }
 
 // getError get error for call
@@ -108,18 +100,17 @@ func (f *FakeCNIPlugin) GetCalledDetails() []CalledDetail {
 }
 
 // SetFakePodNetwork sets the given IP for given arguments.
-func (f *FakeCNIPlugin) SetFakePodNetwork(netnsPath string, namespace string, name string, containerID string, ip string) {
+func (f *FakeCNIPlugin) SetFakePodNetwork(podNetwork ocicni.PodNetwork, ip string) {
 	f.Lock()
 	defer f.Unlock()
-	arg := CNIPluginArgument{netnsPath, namespace, name, containerID}
-	f.IPMap[arg] = ip
+	f.IPMap[podNetwork.NetNS] = ip
 }
 
 // NewFakeCNIPlugin create a FakeCNIPlugin.
 func NewFakeCNIPlugin() ocicni.CNIPlugin {
 	return &FakeCNIPlugin{
 		errors: make(map[string]error),
-		IPMap:  make(map[CNIPluginArgument]string),
+		IPMap:  make(map[string]string),
 	}
 }
 
@@ -129,45 +120,42 @@ func (f *FakeCNIPlugin) Name() string {
 }
 
 // SetUpPod setup the network of PodSandbox.
-func (f *FakeCNIPlugin) SetUpPod(netnsPath string, namespace string, name string, containerID string) error {
+func (f *FakeCNIPlugin) SetUpPod(podNetwork ocicni.PodNetwork) error {
 	f.Lock()
 	defer f.Unlock()
-	arg := CNIPluginArgument{netnsPath, namespace, name, containerID}
-	f.appendCalled("SetUpPod", arg)
+	f.appendCalled("SetUpPod", podNetwork)
 	if err := f.getError("SetUpPod"); err != nil {
 		return err
 	}
-	f.IPMap[arg] = generateIP()
+	f.IPMap[podNetwork.NetNS] = generateIP()
 	return nil
 }
 
 // TearDownPod teardown the network of PodSandbox.
-func (f *FakeCNIPlugin) TearDownPod(netnsPath string, namespace string, name string, containerID string) error {
+func (f *FakeCNIPlugin) TearDownPod(podNetwork ocicni.PodNetwork) error {
 	f.Lock()
 	defer f.Unlock()
-	arg := CNIPluginArgument{netnsPath, namespace, name, containerID}
-	f.appendCalled("TearDownPod", arg)
+	f.appendCalled("TearDownPod", podNetwork)
 	if err := f.getError("TearDownPod"); err != nil {
 		return err
 	}
-	_, ok := f.IPMap[arg]
+	_, ok := f.IPMap[podNetwork.NetNS]
 	if !ok {
 		return fmt.Errorf("failed to find the IP")
 	}
-	delete(f.IPMap, arg)
+	delete(f.IPMap, podNetwork.NetNS)
 	return nil
 }
 
-// GetContainerNetworkStatus get the status of network.
-func (f *FakeCNIPlugin) GetContainerNetworkStatus(netnsPath string, namespace string, name string, containerID string) (string, error) {
+// GetPodNetworkStatus get the status of network.
+func (f *FakeCNIPlugin) GetPodNetworkStatus(netnsPath string) (string, error) {
 	f.Lock()
 	defer f.Unlock()
-	arg := CNIPluginArgument{netnsPath, namespace, name, containerID}
-	f.appendCalled("GetContainerNetworkStatus", arg)
-	if err := f.getError("GetContainerNetworkStatus"); err != nil {
+	f.appendCalled("GetPodNetworkStatus", netnsPath)
+	if err := f.getError("GetPodNetworkStatus"); err != nil {
 		return "", err
 	}
-	ip, ok := f.IPMap[arg]
+	ip, ok := f.IPMap[netnsPath]
 	if !ok {
 		return "", fmt.Errorf("failed to find the IP")
 	}
