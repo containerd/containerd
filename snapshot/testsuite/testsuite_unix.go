@@ -2,13 +2,7 @@
 
 package testsuite
 
-import (
-	"syscall"
-
-	"golang.org/x/sys/unix"
-)
-
-const umountflags int = unix.MNT_DETACH
+import "syscall"
 
 func clearMask() func() {
 	oldumask := syscall.Umask(0)

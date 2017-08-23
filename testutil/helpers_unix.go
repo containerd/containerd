@@ -9,13 +9,12 @@ import (
 
 	"github.com/containerd/containerd/mount"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/sys/unix"
 )
 
 // Unmount unmounts a given mountPoint and sets t.Error if it fails
 func Unmount(t *testing.T, mountPoint string) {
 	t.Log("unmount", mountPoint)
-	if err := mount.UnmountAll(mountPoint, unix.MNT_DETACH); err != nil {
+	if err := mount.UnmountAll(mountPoint, umountflags); err != nil {
 		t.Error("Could not umount", mountPoint, err)
 	}
 }
