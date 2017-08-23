@@ -22,8 +22,6 @@ import (
 // avoid such issues by not relying on tar to create layers.
 // See https://github.com/docker/docker/issues/21555
 func checkLayerFileUpdate(ctx context.Context, t *testing.T, sn snapshot.Snapshotter, work string) {
-	t.Parallel()
-
 	l1Init := fstest.Apply(
 		fstest.CreateDir("/etc", 0700),
 		fstest.CreateFile("/etc/hosts", []byte("mydomain 10.0.0.1"), 0644),
@@ -55,8 +53,6 @@ func checkLayerFileUpdate(ctx context.Context, t *testing.T, sn snapshot.Snapsho
 // checkRemoveDirectoryInLowerLayer
 // See https://github.com/docker/docker/issues/25244
 func checkRemoveDirectoryInLowerLayer(ctx context.Context, t *testing.T, sn snapshot.Snapshotter, work string) {
-	t.Parallel()
-
 	l1Init := fstest.Apply(
 		fstest.CreateDir("/lib", 0700),
 		fstest.CreateFile("/lib/hidden", []byte{}, 0644),
@@ -80,8 +76,6 @@ func checkRemoveDirectoryInLowerLayer(ctx context.Context, t *testing.T, sn snap
 // See https://github.com/docker/docker/issues/24913 overlay
 // see https://github.com/docker/docker/issues/28391 overlay2
 func checkChown(ctx context.Context, t *testing.T, sn snapshot.Snapshotter, work string) {
-	t.Parallel()
-
 	l1Init := fstest.Apply(
 		fstest.CreateDir("/opt", 0700),
 		fstest.CreateDir("/opt/a", 0700),
@@ -124,8 +118,6 @@ func checkRename(ctx context.Context, t *testing.T, sn snapshot.Snapshotter, wor
 // checkDirectoryPermissionOnCommit
 // https://github.com/docker/docker/issues/27298
 func checkDirectoryPermissionOnCommit(ctx context.Context, t *testing.T, sn snapshot.Snapshotter, work string) {
-	t.Parallel()
-
 	l1Init := fstest.Apply(
 		fstest.CreateDir("/dir1", 0700),
 		fstest.CreateDir("/dir2", 0700),

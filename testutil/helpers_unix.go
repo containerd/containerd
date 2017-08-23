@@ -14,7 +14,7 @@ import (
 // Unmount unmounts a given mountPoint and sets t.Error if it fails
 func Unmount(t *testing.T, mountPoint string) {
 	t.Log("unmount", mountPoint)
-	if err := mount.Unmount(mountPoint, 0); err != nil {
+	if err := mount.UnmountAll(mountPoint, umountflags); err != nil {
 		t.Error("Could not umount", mountPoint, err)
 	}
 }

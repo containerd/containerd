@@ -29,7 +29,10 @@ func testLookup(t *testing.T, fsType string) {
 	}
 	defer os.RemoveAll(mnt)
 
-	deviceName, cleanupDevice := testutil.NewLoopback(t, 100<<20) // 100 MB
+	deviceName, cleanupDevice, err := testutil.NewLoopback(100 << 20) // 100 MB
+	if err != nil {
+		t.Fatal(err)
+	}
 	if out, err := exec.Command("mkfs", "-t", fsType, deviceName).CombinedOutput(); err != nil {
 		// not fatal
 		t.Skipf("could not mkfs (%s) %s: %v (out: %q)", fsType, deviceName, err, string(out))
