@@ -190,7 +190,14 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 		return nil
 	}))
 
-	assert.Equal(t, expected, walked)
+	for ek, ev := range expected {
+		av, ok := walked[ek]
+		if !ok {
+			t.Errorf("Missing stat for %v", ek)
+			continue
+		}
+		assert.Equal(t, ev, av)
+	}
 
 	nextnext := filepath.Join(work, "nextnextlayer")
 	if err := os.MkdirAll(nextnext, 0777); err != nil {
