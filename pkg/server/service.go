@@ -24,8 +24,8 @@ import (
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
+	"github.com/cri-o/ocicni"
 	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/cri-o/pkg/ocicni"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 

@@ -32,7 +32,7 @@ ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
 
 BUILD_IMAGE=golang:1.8
 RUNC_PKG=github.com/opencontainers/runc
-CNI_PKG=github.com/containernetworking/cni
+CNI_PKG=github.com/containernetworking/plugins
 CNI_DIR=/opt/cni
 CNI_CONFIG_DIR=/etc/cni/net.d
 CONTAINERD_PKG=github.com/containerd/containerd
@@ -51,31 +51,33 @@ go get -d ${CNI_PKG}/...
 cd ${GOPATH}/src/${CNI_PKG}
 git fetch --all
 git checkout ${CNI_VERSION}
-./build
+./build.sh
 sudo mkdir -p ${CNI_DIR}
 sudo cp -r ./bin ${CNI_DIR}
 sudo mkdir -p ${CNI_CONFIG_DIR}
-sudo bash -c 'cat >'${CNI_CONFIG_DIR}'/10-containerd-bridge.conf <<EOF
+sudo bash -c 'cat >'${CNI_CONFIG_DIR}'/10-containerd-net.conflist <<EOF
 {
-	"cniVersion": "0.2.0",
-	"name": "containerd-bridge",
-	"type": "bridge",
-	"bridge": "cni0",
-	"isGateway": true,
-	"ipMasq": true,
-	"ipam": {
+    "cniVersion": "0.3.1",
+    "name": "containerd-net",
+    "plugins": [
+	{
+	    "type": "bridge",
+	    "bridge": "cni0",
+	    "isGateway": true,
+	    "ipMasq": true,
+	    "ipam": {
 		"type": "host-local",
 		"subnet": "10.88.0.0/16",
 		"routes": [
-			{ "dst": "0.0.0.0/0" }
+		    { "dst": "0.0.0.0/0" }
 		]
+	    }
+	},
+	{
+	    "type": "portmap",
+	    "capabilities": {"portMappings": true}
 	}
-}
-EOF'
-sudo bash -c 'cat >'${CNI_CONFIG_DIR}'/99-loopback.conf <<EOF
-{
-	"cniVersion": "0.2.0",
-	"type": "loopback"
+    ]
 }
 EOF'
 

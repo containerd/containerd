@@ -22,6 +22,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/cri-o/ocicni"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -65,8 +66,13 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 	_, err = c.os.Stat(sandbox.NetNS)
 	if err == nil {
 		if !sandbox.Config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostNetwork() {
-			if teardownErr := c.netPlugin.TearDownPod(sandbox.NetNS, sandbox.Config.GetMetadata().GetNamespace(),
-				sandbox.Config.GetMetadata().GetName(), id); teardownErr != nil {
+			if teardownErr := c.netPlugin.TearDownPod(ocicni.PodNetwork{
+				Name:         sandbox.Config.GetMetadata().GetName(),
+				Namespace:    sandbox.Config.GetMetadata().GetNamespace(),
+				ID:           id,
+				NetNS:        sandbox.NetNS,
+				PortMappings: toCNIPortMappings(sandbox.Config.GetPortMappings()),
+			}); teardownErr != nil {
 				return nil, fmt.Errorf("failed to destroy network for sandbox %q: %v", id, teardownErr)
 			}
 		}

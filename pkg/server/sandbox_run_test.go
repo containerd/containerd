@@ -20,6 +20,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/cri-o/ocicni"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
@@ -300,6 +301,71 @@ options timeout:1
 		}
 		assert.NoError(t, err)
 		assert.Equal(t, resolvContent, test.expectedContent)
+	}
+}
+
+func TestToCNIPortMappings(t *testing.T) {
+	for desc, test := range map[string]struct {
+		criPortMappings []*runtime.PortMapping
+		cniPortMappings []ocicni.PortMapping
+	}{
+		"empty CRI port mapping should map to empty CNI port mapping": {},
+		"CRI port mapping should be converted to CNI port mapping properly": {
+			criPortMappings: []*runtime.PortMapping{
+				{
+					Protocol:      runtime.Protocol_UDP,
+					ContainerPort: 1234,
+					HostPort:      5678,
+					HostIp:        "123.124.125.126",
+				},
+				{
+					Protocol:      runtime.Protocol_TCP,
+					ContainerPort: 4321,
+					HostPort:      8765,
+					HostIp:        "126.125.124.123",
+				},
+			},
+			cniPortMappings: []ocicni.PortMapping{
+				{
+					HostPort:      5678,
+					ContainerPort: 1234,
+					Protocol:      "udp",
+					HostIP:        "123.124.125.126",
+				},
+				{
+					HostPort:      8765,
+					ContainerPort: 4321,
+					Protocol:      "tcp",
+					HostIP:        "126.125.124.123",
+				},
+			},
+		},
+		"CRI port mapping without host port should be skipped": {
+			criPortMappings: []*runtime.PortMapping{
+				{
+					Protocol:      runtime.Protocol_UDP,
+					ContainerPort: 1234,
+					HostIp:        "123.124.125.126",
+				},
+				{
+					Protocol:      runtime.Protocol_TCP,
+					ContainerPort: 4321,
+					HostPort:      8765,
+					HostIp:        "126.125.124.123",
+				},
+			},
+			cniPortMappings: []ocicni.PortMapping{
+				{
+					HostPort:      8765,
+					ContainerPort: 4321,
+					Protocol:      "tcp",
+					HostIP:        "126.125.124.123",
+				},
+			},
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		assert.Equal(t, test.cniPortMappings, toCNIPortMappings(test.criPortMappings))
 	}
 }
 

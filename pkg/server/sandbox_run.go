@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/cri-o/ocicni"
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -169,14 +170,20 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	if !config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostNetwork() {
 		// Setup network for sandbox.
 		// TODO(random-liu): [P2] Replace with permanent network namespace.
-		podName := config.GetMetadata().GetName()
-		if err = c.netPlugin.SetUpPod(sandbox.NetNS, config.GetMetadata().GetNamespace(), podName, id); err != nil {
+		podNetwork := ocicni.PodNetwork{
+			Name:         config.GetMetadata().GetName(),
+			Namespace:    config.GetMetadata().GetNamespace(),
+			ID:           id,
+			NetNS:        sandbox.NetNS,
+			PortMappings: toCNIPortMappings(config.GetPortMappings()),
+		}
+		if err = c.netPlugin.SetUpPod(podNetwork); err != nil {
 			return nil, fmt.Errorf("failed to setup network for sandbox %q: %v", id, err)
 		}
 		defer func() {
 			if retErr != nil {
 				// Teardown network if an error is returned.
-				if err := c.netPlugin.TearDownPod(sandbox.NetNS, config.GetMetadata().GetNamespace(), podName, id); err != nil {
+				if err := c.netPlugin.TearDownPod(podNetwork); err != nil {
 					glog.Errorf("failed to destroy network for sandbox %q: %v", id, err)
 				}
 			}
@@ -371,4 +378,21 @@ func (c *criContainerdService) unmountSandboxFiles(rootDir string, config *runti
 		}
 	}
 	return nil
+}
+
+// toCNIPortMappings converts CRI port mappings to CNI.
+func toCNIPortMappings(criPortMappings []*runtime.PortMapping) []ocicni.PortMapping {
+	var portMappings []ocicni.PortMapping
+	for _, mapping := range criPortMappings {
+		if mapping.HostPort <= 0 {
+			continue
+		}
+		portMappings = append(portMappings, ocicni.PortMapping{
+			HostPort:      mapping.HostPort,
+			ContainerPort: mapping.ContainerPort,
+			Protocol:      strings.ToLower(mapping.Protocol.String()),
+			HostIP:        mapping.HostIp,
+		})
+	}
+	return portMappings
 }
