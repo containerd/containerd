@@ -90,6 +90,7 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 					DropCapabilities: []string{"CHOWN"},
 				},
 				SupplementalGroups: []int64{1111, 2222},
+				NoNewPrivs:         true,
 			},
 		},
 	}
@@ -145,6 +146,9 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		t.Logf("Check supplemental groups")
 		assert.Contains(t, spec.Process.User.AdditionalGids, uint32(1111))
 		assert.Contains(t, spec.Process.User.AdditionalGids, uint32(2222))
+
+		t.Logf("Check no_new_privs")
+		assert.Equal(t, spec.Process.NoNewPrivileges, true)
 
 		t.Logf("Check cgroup path")
 		assert.Equal(t, getCgroupsPath("/test/cgroup/parent", id), spec.Linux.CgroupsPath)

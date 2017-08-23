@@ -214,6 +214,9 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 		// TODO(random-liu): [P1] Set selinux options.
 
 		// TODO(random-liu): [P2] Add apparmor and seccomp.
+
+		// TODO: Figure out whether we should set no new privilege for sandbox container by default
+		g.SetProcessNoNewPrivileges(securityContext.GetNoNewPrivs())
 	}
 
 	g.SetRootReadonly(securityContext.GetReadonlyRootfs())
