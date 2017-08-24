@@ -30,7 +30,6 @@ set -o pipefail
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
 . ${ROOT}/hack/versions
 
-BUILD_IMAGE=golang:1.8
 RUNC_PKG=github.com/opencontainers/runc
 CNI_PKG=github.com/containernetworking/plugins
 CNI_DIR=/opt/cni
