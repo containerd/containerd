@@ -42,14 +42,7 @@ const (
 )
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
-func (c *criContainerdService) StopContainer(ctx context.Context, r *runtime.StopContainerRequest) (retRes *runtime.StopContainerResponse, retErr error) {
-	glog.V(2).Infof("StopContainer for %q with timeout %d (s)", r.GetContainerId(), r.GetTimeout())
-	defer func() {
-		if retErr == nil {
-			glog.V(2).Infof("StopContainer %q returns successfully", r.GetContainerId())
-		}
-	}()
-
+func (c *criContainerdService) StopContainer(ctx context.Context, r *runtime.StopContainerRequest) (*runtime.StopContainerResponse, error) {
 	// Get container config from container store.
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {

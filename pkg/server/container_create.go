@@ -36,15 +36,7 @@ import (
 )
 
 // CreateContainer creates a new container in the given PodSandbox.
-func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.CreateContainerRequest) (retRes *runtime.CreateContainerResponse, retErr error) {
-	glog.V(2).Infof("CreateContainer within sandbox %q with container config %+v and sandbox config %+v",
-		r.GetPodSandboxId(), r.GetConfig(), r.GetSandboxConfig())
-	defer func() {
-		if retErr == nil {
-			glog.V(2).Infof("CreateContainer returns container id %q", retRes.GetContainerId())
-		}
-	}()
-
+func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.CreateContainerRequest) (_ *runtime.CreateContainerResponse, retErr error) {
 	config := r.GetConfig()
 	sandboxConfig := r.GetSandboxConfig()
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())

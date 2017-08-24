@@ -30,14 +30,7 @@ import (
 )
 
 // PodSandboxStatus returns the status of the PodSandbox.
-func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandboxStatusRequest) (retRes *runtime.PodSandboxStatusResponse, retErr error) {
-	glog.V(5).Infof("PodSandboxStatus for sandbox %q", r.GetPodSandboxId())
-	defer func() {
-		if retErr == nil {
-			glog.V(5).Infof("PodSandboxStatus for %q returns status %+v", r.GetPodSandboxId(), retRes.GetStatus())
-		}
-	}()
-
+func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandboxStatusRequest) (*runtime.PodSandboxStatusResponse, error) {
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find sandbox %q: %v",

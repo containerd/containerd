@@ -17,7 +17,6 @@ limitations under the License.
 package server
 
 import (
-	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
@@ -27,14 +26,7 @@ import (
 // ListImages lists existing images.
 // TODO(random-liu): Add image list filters after CRI defines this more clear, and kubelet
 // actually needs it.
-func (c *criContainerdService) ListImages(ctx context.Context, r *runtime.ListImagesRequest) (retRes *runtime.ListImagesResponse, retErr error) {
-	glog.V(5).Infof("ListImages with filter %+v", r.GetFilter())
-	defer func() {
-		if retErr == nil {
-			glog.V(5).Infof("ListImages returns image list %+v", retRes.GetImages())
-		}
-	}()
-
+func (c *criContainerdService) ListImages(ctx context.Context, r *runtime.ListImagesRequest) (*runtime.ListImagesResponse, error) {
 	imagesInStore := c.imageStore.List()
 
 	var images []*runtime.Image

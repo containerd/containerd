@@ -30,14 +30,7 @@ import (
 )
 
 // RemoveContainer removes the container.
-func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.RemoveContainerRequest) (retRes *runtime.RemoveContainerResponse, retErr error) {
-	glog.V(2).Infof("RemoveContainer for %q", r.GetContainerId())
-	defer func() {
-		if retErr == nil {
-			glog.V(2).Infof("RemoveContainer %q returns successfully", r.GetContainerId())
-		}
-	}()
-
+func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.RemoveContainerRequest) (_ *runtime.RemoveContainerResponse, retErr error) {
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		if err != store.ErrNotExist {

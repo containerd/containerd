@@ -33,13 +33,6 @@ import (
 
 // StartContainer starts the container.
 func (c *criContainerdService) StartContainer(ctx context.Context, r *runtime.StartContainerRequest) (retRes *runtime.StartContainerResponse, retErr error) {
-	glog.V(2).Infof("StartContainer for %q", r.GetContainerId())
-	defer func() {
-		if retErr == nil {
-			glog.V(2).Infof("StartContainer %q returns successfully", r.GetContainerId())
-		}
-	}()
-
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find container %q: %v", r.GetContainerId(), err)

@@ -19,7 +19,6 @@ package server
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
@@ -27,14 +26,7 @@ import (
 // ImageStatus returns the status of the image, returns nil if the image isn't present.
 // TODO(random-liu): We should change CRI to distinguish image id and image spec. (See
 // kubernetes/kubernetes#46255)
-func (c *criContainerdService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequest) (retRes *runtime.ImageStatusResponse, retErr error) {
-	glog.V(5).Infof("ImageStatus for image %q", r.GetImage().GetImage())
-	defer func() {
-		if retErr == nil {
-			glog.V(5).Infof("ImageStatus for %q returns image status %+v",
-				r.GetImage().GetImage(), retRes.GetImage())
-		}
-	}()
+func (c *criContainerdService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequest) (*runtime.ImageStatusResponse, error) {
 	image, err := c.localResolve(ctx, r.GetImage().GetImage())
 	if err != nil {
 		return nil, fmt.Errorf("can not resolve %q locally: %v", r.GetImage().GetImage(), err)

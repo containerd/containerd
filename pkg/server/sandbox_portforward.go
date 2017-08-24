@@ -33,13 +33,6 @@ import (
 // PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
 func (c *criContainerdService) PortForward(ctx context.Context, r *runtime.PortForwardRequest) (retRes *runtime.PortForwardResponse, retErr error) {
 	// TODO(random-liu): Run a socat container inside the sandbox to do portforward.
-	glog.V(2).Infof("Portforward for sandbox %q port %v", r.GetPodSandboxId(), r.GetPort())
-	defer func() {
-		if retErr == nil {
-			glog.V(2).Infof("Portforward for %q returns URL %q", r.GetPodSandboxId(), retRes.GetUrl())
-		}
-	}()
-
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandbox: %v", err)

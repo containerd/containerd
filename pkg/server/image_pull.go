@@ -73,15 +73,7 @@ import (
 // contents are missing but snapshots are ready, is the image still "READY"?
 
 // PullImage pulls an image with authentication config.
-func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (retRes *runtime.PullImageResponse, retErr error) {
-	glog.V(2).Infof("PullImage %q with auth config %+v", r.GetImage().GetImage(), r.GetAuth())
-	defer func() {
-		if retErr == nil {
-			glog.V(2).Infof("PullImage %q returns image reference %q",
-				r.GetImage().GetImage(), retRes.GetImageRef())
-		}
-	}()
-
+func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (*runtime.PullImageResponse, error) {
 	imageRef := r.GetImage().GetImage()
 	namedRef, err := normalizeImageRef(imageRef)
 	if err != nil {

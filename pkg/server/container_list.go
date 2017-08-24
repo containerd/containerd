@@ -17,7 +17,6 @@ limitations under the License.
 package server
 
 import (
-	"github.com/golang/glog"
 	"golang.org/x/net/context"
 
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -26,14 +25,7 @@ import (
 )
 
 // ListContainers lists all containers matching the filter.
-func (c *criContainerdService) ListContainers(ctx context.Context, r *runtime.ListContainersRequest) (retRes *runtime.ListContainersResponse, retErr error) {
-	glog.V(5).Infof("ListContainers with filter %+v", r.GetFilter())
-	defer func() {
-		if retErr == nil {
-			glog.V(5).Infof("ListContainers returns containers %+v", retRes.GetContainers())
-		}
-	}()
-
+func (c *criContainerdService) ListContainers(ctx context.Context, r *runtime.ListContainersRequest) (*runtime.ListContainersResponse, error) {
 	// List all containers from store.
 	containersInStore := c.containerStore.List()
 
