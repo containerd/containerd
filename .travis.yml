@@ -50,8 +50,5 @@ jobs:
         - test "${TRAVIS_EVENT_TYPE}" != "cron" && exit 0 || true
         - make install.deps
         - make test-e2e-node
-      after_script:
         # TODO(random-liu): Upload log to GCS.
-        - test "${TRAVIS_EVENT_TYPE}" != "cron" && exit 0 || true
-        - cat /tmp/test-e2e-node/cri-containerd.log
       go: 1.8.x
