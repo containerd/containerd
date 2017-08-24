@@ -46,6 +46,7 @@ func (rw *remoteWriter) Status() (content.Status, error) {
 	return content.Status{
 		Ref:       rw.ref,
 		Offset:    resp.Offset,
+		Total:     resp.Total,
 		StartedAt: resp.StartedAt,
 		UpdatedAt: resp.UpdatedAt,
 	}, nil
@@ -79,12 +80,19 @@ func (rw *remoteWriter) Write(p []byte) (n int, err error) {
 	return
 }
 
-func (rw *remoteWriter) Commit(size int64, expected digest.Digest) error {
+func (rw *remoteWriter) Commit(size int64, expected digest.Digest, opts ...content.Opt) error {
+	var base content.Info
+	for _, opt := range opts {
+		if err := opt(&base); err != nil {
+			return err
+		}
+	}
 	resp, err := rw.send(&contentapi.WriteContentRequest{
 		Action:   contentapi.WriteActionCommit,
 		Total:    size,
 		Offset:   rw.offset,
 		Expected: expected,
+		Labels:   base.Labels,
 	})
 	if err != nil {
 		return errdefs.FromGRPC(err)

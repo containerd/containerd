@@ -75,12 +75,6 @@ type execOptions struct {
 	timeout time.Duration
 }
 
-// execResult is the result returned by exec.
-type execResult struct {
-	exitCode uint32
-	err      error
-}
-
 // execInContainer executes a command inside the container synchronously, and
 // redirects stdio stream properly.
 func (c *criContainerdService) execInContainer(ctx context.Context, id string, opts execOptions) (*uint32, error) {
@@ -135,8 +129,6 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 		return nil, fmt.Errorf("failed to create exec %q: %v", execID, err)
 	}
 	defer func() {
-		// TODO(random-liu): There is a containerd bug here containerd#1376, revisit this
-		// after that is fixed.
 		if _, err := process.Delete(ctx); err != nil {
 			glog.Errorf("Failed to delete exec process %q for container %q: %v", execID, id, err)
 		}
@@ -148,16 +140,10 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 		}
 	})
 
-	resCh := make(chan execResult, 1)
-	go func() {
-		// Wait will return if context is cancelled.
-		exitCode, err := process.Wait(ctx)
-		resCh <- execResult{
-			exitCode: exitCode,
-			err:      err,
-		}
-		glog.V(2).Infof("Exec process %q exits with exit code %d and error %v", execID, exitCode, err)
-	}()
+	exitCh, err := process.Wait(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to wait for process %q: %v", execID, err)
+	}
 	if err := process.Start(ctx); err != nil {
 		return nil, fmt.Errorf("failed to start exec %q: %v", execID, err)
 	}
@@ -171,17 +157,22 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 	}
 	select {
 	case <-timeoutCh:
+		//TODO(Abhi) Use context.WithDeadline instead of timeout.
 		// Ignore the not found error because the process may exit itself before killing.
 		if err := process.Kill(ctx, unix.SIGKILL); err != nil && !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to kill exec %q: %v", execID, err)
 		}
 		// Wait for the process to be killed.
-		<-resCh
+		exitRes := <-exitCh
+		glog.V(2).Infof("Timeout received while waiting for exec process kill %q code %d and error %v",
+			execID, exitRes.ExitCode(), exitRes.Error())
 		return nil, fmt.Errorf("timeout %v exceeded", opts.timeout)
-	case res := <-resCh:
-		if res.err != nil {
-			return nil, fmt.Errorf("failed to wait for exec %q: %v", execID, res.err)
+	case exitRes := <-exitCh:
+		code, _, err := exitRes.Result()
+		glog.V(2).Infof("Exec process %q exits with exit code %d and error %v", execID, code, err)
+		if err != nil {
+			return nil, fmt.Errorf("failed while waiting for exec %q: %v", execID, err)
 		}
-		return &res.exitCode, nil
+		return &code, nil
 	}
 }

@@ -20,11 +20,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-type config struct {
-	// Default is the default snapshotter to use for the service
-	Default string `toml:"default,omitempty"`
-}
-
 func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
@@ -33,9 +28,6 @@ func init() {
 			plugin.SnapshotPlugin,
 			plugin.MetadataPlugin,
 		},
-		Config: &config{
-			Default: defaultSnapshotter,
-		},
 		Init: newService,
 	})
 }
@@ -43,9 +35,8 @@ func init() {
 var empty = &protoempty.Empty{}
 
 type service struct {
-	snapshotters           map[string]snapshot.Snapshotter
-	defaultSnapshotterName string
-	publisher              events.Publisher
+	snapshotters map[string]snapshot.Snapshotter
+	publisher    events.Publisher
 }
 
 func newService(ic *plugin.InitContext) (interface{}, error) {
@@ -62,26 +53,24 @@ func newService(ic *plugin.InitContext) (interface{}, error) {
 		snapshotters[name] = metadata.NewSnapshotter(md.(*bolt.DB), name, sn.(snapshot.Snapshotter))
 	}
 
-	cfg := ic.Config.(*config)
-	_, ok := snapshotters[cfg.Default]
-	if !ok {
-		return nil, errors.Errorf("default snapshotter not loaded: %s", cfg.Default)
+	if len(snapshotters) == 0 {
+		return nil, errors.Errorf("failed to create snapshotter service: no snapshotters loaded")
 	}
 
 	return &service{
-		snapshotters:           snapshotters,
-		defaultSnapshotterName: cfg.Default,
-		publisher:              ic.Events,
+		snapshotters: snapshotters,
+		publisher:    ic.Events,
 	}, nil
 }
 
 func (s *service) getSnapshotter(name string) (snapshot.Snapshotter, error) {
 	if name == "" {
-		name = s.defaultSnapshotterName
+		return nil, errdefs.ToGRPCf(errdefs.ErrInvalidArgument, "snapshotter argument missing")
 	}
+
 	sn, ok := s.snapshotters[name]
 	if !ok {
-		return nil, errors.Errorf("snapshotter not loaded: %s", name)
+		return nil, errdefs.ToGRPCf(errdefs.ErrInvalidArgument, "snapshotter not loaded: %s", name)
 	}
 	return sn, nil
 }

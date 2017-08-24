@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"syscall"
+	"time"
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
@@ -21,11 +22,11 @@ type Process interface {
 	// Start starts the process executing the user's defined binary
 	Start(context.Context) error
 	// Delete removes the process and any resources allocated returning the exit status
-	Delete(context.Context, ...ProcessDeleteOpts) (uint32, error)
+	Delete(context.Context, ...ProcessDeleteOpts) (*ExitStatus, error)
 	// Kill sends the provided signal to the process
 	Kill(context.Context, syscall.Signal) error
-	// Wait blocks until the process has exited returning the exit status
-	Wait(context.Context) (uint32, error)
+	// Wait asynchronously waits for the process to exit, and sends the exit code to the returned channel
+	Wait(context.Context) (<-chan ExitStatus, error)
 	// CloseIO allows various pipes to be closed on the process
 	CloseIO(context.Context, ...IOCloserOpts) error
 	// Resize changes the width and heigh of the process's terminal
@@ -34,6 +35,41 @@ type Process interface {
 	IO() IO
 	// Status returns the executing status of the process
 	Status(context.Context) (Status, error)
+}
+
+// ExitStatus encapsulates a process' exit status.
+// It is used by `Wait()` to return either a process exit code or an error
+type ExitStatus struct {
+	code     uint32
+	exitedAt time.Time
+	err      error
+}
+
+// Result returns the exit code and time of the exit status.
+// An error may be returned here to which indicates there was an error
+//   at some point while waiting for the exit status. It does not signify
+//   an error with the process itself.
+// If an error is returned, the process may still be running.
+func (s ExitStatus) Result() (uint32, time.Time, error) {
+	return s.code, s.exitedAt, s.err
+}
+
+// ExitCode returns the exit code of the process.
+// This is only valid is Error() returns nil
+func (s ExitStatus) ExitCode() uint32 {
+	return s.code
+}
+
+// ExitTime returns the exit time of the process
+// This is only valid is Error() returns nil
+func (s ExitStatus) ExitTime() time.Time {
+	return s.exitedAt
+}
+
+// Error returns the error, if any, that occured while waiting for the
+// process.
+func (s ExitStatus) Error() error {
+	return s.err
 }
 
 type process struct {
@@ -79,39 +115,55 @@ func (p *process) Kill(ctx context.Context, s syscall.Signal) error {
 	return errdefs.FromGRPC(err)
 }
 
-func (p *process) Wait(ctx context.Context) (uint32, error) {
+func (p *process) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 	cancellable, cancel := context.WithCancel(ctx)
-	defer cancel()
 	eventstream, err := p.task.client.EventService().Subscribe(cancellable, &eventsapi.SubscribeRequest{
 		Filters: []string{"topic==" + runtime.TaskExitEventTopic},
 	})
 	if err != nil {
-		return UnknownExitStatus, err
+		cancel()
+		return nil, err
 	}
 	// first check if the task has exited
 	status, err := p.Status(ctx)
 	if err != nil {
-		return UnknownExitStatus, errdefs.FromGRPC(err)
+		cancel()
+		return nil, errdefs.FromGRPC(err)
 	}
+
+	chStatus := make(chan ExitStatus, 1)
 	if status.Status == Stopped {
-		return status.ExitStatus, nil
+		cancel()
+		chStatus <- ExitStatus{code: status.ExitStatus, exitedAt: status.ExitTime}
+		return chStatus, nil
 	}
-	for {
-		evt, err := eventstream.Recv()
-		if err != nil {
-			return UnknownExitStatus, err
-		}
-		if typeurl.Is(evt.Event, &eventsapi.TaskExit{}) {
-			v, err := typeurl.UnmarshalAny(evt.Event)
+
+	go func() {
+		defer cancel()
+		chStatus <- ExitStatus{} // signal that the goroutine is running
+		for {
+			evt, err := eventstream.Recv()
 			if err != nil {
-				return UnknownExitStatus, err
+				chStatus <- ExitStatus{code: UnknownExitStatus, err: err}
+				return
 			}
-			e := v.(*eventsapi.TaskExit)
-			if e.ID == p.id && e.ContainerID == p.task.id {
-				return e.ExitStatus, nil
+			if typeurl.Is(evt.Event, &eventsapi.TaskExit{}) {
+				v, err := typeurl.UnmarshalAny(evt.Event)
+				if err != nil {
+					chStatus <- ExitStatus{code: UnknownExitStatus, err: err}
+					return
+				}
+				e := v.(*eventsapi.TaskExit)
+				if e.ID == p.id && e.ContainerID == p.task.id {
+					chStatus <- ExitStatus{code: e.ExitStatus, exitedAt: e.ExitedAt}
+					return
+				}
 			}
 		}
-	}
+	}()
+
+	<-chStatus // wait for the goroutine to be running
+	return chStatus, nil
 }
 
 func (p *process) CloseIO(ctx context.Context, opts ...IOCloserOpts) error {
@@ -142,31 +194,32 @@ func (p *process) Resize(ctx context.Context, w, h uint32) error {
 	return errdefs.FromGRPC(err)
 }
 
-func (p *process) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (uint32, error) {
+func (p *process) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStatus, error) {
 	for _, o := range opts {
 		if err := o(ctx, p); err != nil {
-			return UnknownExitStatus, err
+			return nil, err
 		}
 	}
 	status, err := p.Status(ctx)
 	if err != nil {
-		return UnknownExitStatus, err
+		return nil, err
 	}
-	if status.Status != Stopped {
-		return UnknownExitStatus, errors.Wrapf(errdefs.ErrFailedPrecondition, "process must be stopped before deletion")
-	}
-	if p.io != nil {
-		p.io.Wait()
-		p.io.Close()
+	switch status.Status {
+	case Running, Paused, Pausing:
+		return nil, errors.Wrapf(errdefs.ErrFailedPrecondition, "process must be stopped before deletion")
 	}
 	r, err := p.task.client.TaskService().DeleteProcess(ctx, &tasks.DeleteProcessRequest{
 		ContainerID: p.task.id,
 		ExecID:      p.id,
 	})
 	if err != nil {
-		return UnknownExitStatus, errdefs.FromGRPC(err)
+		return nil, errdefs.FromGRPC(err)
 	}
-	return r.ExitStatus, nil
+	if p.io != nil {
+		p.io.Wait()
+		p.io.Close()
+	}
+	return &ExitStatus{code: r.ExitStatus, exitedAt: r.ExitedAt}, nil
 }
 
 func (p *process) Status(ctx context.Context) (Status, error) {

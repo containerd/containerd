@@ -88,3 +88,85 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 		cancel: cancel,
 	}, nil
 }
+
+// NewDirectIO returns an IO implementation that exposes the pipes directly
+func NewDirectIO(ctx context.Context, terminal bool) (*DirectIO, error) {
+	set, err := NewFifos("")
+	if err != nil {
+		return nil, err
+	}
+	f := &DirectIO{
+		set:      set,
+		terminal: terminal,
+	}
+	defer func() {
+		if err != nil {
+			f.Delete()
+		}
+	}()
+	if f.Stdin, err = fifo.OpenFifo(ctx, set.In, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
+		return nil, err
+	}
+	if f.Stdout, err = fifo.OpenFifo(ctx, set.Out, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
+		f.Stdin.Close()
+		return nil, err
+	}
+	if f.Stderr, err = fifo.OpenFifo(ctx, set.Err, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
+		f.Stdin.Close()
+		f.Stdout.Close()
+		return nil, err
+	}
+	return f, nil
+}
+
+type DirectIO struct {
+	Stdin  io.WriteCloser
+	Stdout io.ReadCloser
+	Stderr io.ReadCloser
+
+	set      *FIFOSet
+	terminal bool
+}
+
+func (f *DirectIO) IOCreate(id string) (IO, error) {
+	return f, nil
+}
+
+func (f *DirectIO) IOAttach(set *FIFOSet) (IO, error) {
+	return f, nil
+}
+
+func (f *DirectIO) Config() IOConfig {
+	return IOConfig{
+		Terminal: f.terminal,
+		Stdin:    f.set.In,
+		Stdout:   f.set.Out,
+		Stderr:   f.set.Err,
+	}
+}
+
+func (f *DirectIO) Cancel() {
+	// nothing to cancel as all operations are handled externally
+}
+
+func (f *DirectIO) Wait() {
+	// nothing to wait on as all operations are handled externally
+}
+
+func (f *DirectIO) Close() error {
+	err := f.Stdin.Close()
+	if err2 := f.Stdout.Close(); err == nil {
+		err = err2
+	}
+	if err2 := f.Stderr.Close(); err == nil {
+		err = err2
+	}
+	return err
+}
+
+func (f *DirectIO) Delete() error {
+	if f.set.Dir == "" {
+		return nil
+	}
+	return os.RemoveAll(f.set.Dir)
+}
