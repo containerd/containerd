@@ -180,7 +180,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint32, config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig, extraMounts []*runtime.Mount) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
-	spec, err := containerd.GenerateSpec()
+	spec, err := containerd.GenerateSpec(context.Background(), nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -220,6 +220,9 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 	addOCIBindMounts(&g, append(extraMounts, config.GetMounts()...))
 
 	if securityContext.GetPrivileged() {
+		if !sandboxConfig.GetLinux().GetSecurityContext().GetPrivileged() {
+			return nil, fmt.Errorf("no privileged container allowed in sandbox")
+		}
 		if err := setOCIPrivileged(&g, config); err != nil {
 			return nil, err
 		}
@@ -233,13 +236,14 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 				securityContext.GetCapabilities(), err)
 		}
 
-		// TODO(random-liu): [P1] Set selinux options.
-
 		// TODO(random-liu): [P2] Add apparmor and seccomp.
 
-		// TODO: Figure out whether we should set no new privilege for sandbox container by default
-		g.SetProcessNoNewPrivileges(securityContext.GetNoNewPrivs())
 	}
+
+	// TODO: Figure out whether we should set no new privilege for sandbox container by default
+	g.SetProcessNoNewPrivileges(securityContext.GetNoNewPrivs())
+
+	// TODO(random-liu): [P1] Set selinux options.
 
 	g.SetRootReadonly(securityContext.GetReadonlyRootfs())
 
