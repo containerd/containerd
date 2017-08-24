@@ -261,7 +261,11 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 	// Set namespaces, share namespace with sandbox container.
 	setOCINamespaces(&g, securityContext.GetNamespaceOptions(), sandboxPid)
 
-	// TODO(random-liu): [P1] Set user/username.
+	// TODO(random-liu): [P1] Set username.
+	runAsUser := securityContext.GetRunAsUser()
+	if runAsUser != nil {
+		g.SetProcessUID(uint32(runAsUser.GetValue()))
+	}
 
 	supplementalGroups := securityContext.GetSupplementalGroups()
 	for _, group := range supplementalGroups {
