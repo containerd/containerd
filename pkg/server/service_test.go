@@ -17,23 +17,13 @@ limitations under the License.
 package server
 
 import (
-	"io"
-
 	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/registrar"
-	agentstesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/agents/testing"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
 	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
 	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
 )
-
-type nopReadWriteCloser struct{}
-
-// Return error directly to avoid read/write.
-func (nopReadWriteCloser) Read(p []byte) (n int, err error)  { return 0, io.EOF }
-func (nopReadWriteCloser) Write(p []byte) (n int, err error) { return 0, io.ErrShortWrite }
-func (nopReadWriteCloser) Close() error                      { return nil }
 
 const (
 	testRootDir = "/test/rootfs"
@@ -55,6 +45,5 @@ func newTestCRIContainerdService() *criContainerdService {
 		containerStore:     containerstore.NewStore(),
 		containerNameIndex: registrar.NewRegistrar(),
 		netPlugin:          servertesting.NewFakeCNIPlugin(),
-		agentFactory:       agentstesting.NewFakeAgentFactory(),
 	}
 }

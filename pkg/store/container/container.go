@@ -21,6 +21,7 @@ import (
 
 	"github.com/containerd/containerd"
 
+	cio "github.com/kubernetes-incubator/cri-containerd/pkg/server/io"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
 )
 
@@ -33,6 +34,9 @@ type Container struct {
 	Status StatusStorage
 	// Containerd container
 	Container containerd.Container
+	// Container IO
+	IO *cio.ContainerIO
+	// TODO(random-liu): Add stop channel to get rid of stop poll waiting.
 }
 
 // Opts sets specific information to newly created Container.
@@ -42,6 +46,13 @@ type Opts func(*Container)
 func WithContainer(cntr containerd.Container) Opts {
 	return func(c *Container) {
 		c.Container = cntr
+	}
+}
+
+// WithContainerIO adds IO into the container.
+func WithContainerIO(io *cio.ContainerIO) Opts {
+	return func(c *Container) {
+		c.IO = io
 	}
 }
 
@@ -55,7 +66,6 @@ func NewContainer(metadata Metadata, status Status, opts ...Opts) (Container, er
 		Metadata: metadata,
 		Status:   s,
 	}
-
 	for _, o := range opts {
 		o(&c)
 	}

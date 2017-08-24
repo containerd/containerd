@@ -21,7 +21,7 @@ source $(dirname "${BASH_SOURCE[0]}")/test-utils.sh
 # FOCUS focuses the test to run.
 FOCUS=${FOCUS:-}
 # SKIP skips the test to skip.
-SKIP=${SKIP:-"attach|RunAsUser"}
+SKIP=${SKIP:-"RunAsUser"}
 REPORT_DIR=${REPORT_DIR:-"/tmp/test-cri"}
 
 if [[ -z "${GOPATH}" ]]; then

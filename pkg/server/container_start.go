@@ -17,7 +17,6 @@ limitations under the License.
 package server
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -28,7 +27,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/server/agents"
+	cio "github.com/kubernetes-incubator/cri-containerd/pkg/server/io"
 	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 )
 
@@ -45,19 +44,18 @@ func (c *criContainerdService) StartContainer(ctx context.Context, r *runtime.St
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find container %q: %v", r.GetContainerId(), err)
 	}
-	id := container.ID
 
 	var startErr error
 	// update container status in one transaction to avoid race with event monitor.
 	if err := container.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
 		// Always apply status change no matter startContainer fails or not. Because startContainer
 		// may change container state no matter it fails or succeeds.
-		startErr = c.startContainer(ctx, container.Container, container.Metadata, &status)
+		startErr = c.startContainer(ctx, container, &status)
 		return status, nil
 	}); startErr != nil {
 		return nil, startErr
 	} else if err != nil {
-		return nil, fmt.Errorf("failed to update container %q metadata: %v", id, err)
+		return nil, fmt.Errorf("failed to update container %q metadata: %v", container.ID, err)
 	}
 	return &runtime.StartContainerResponse{}, nil
 }
@@ -65,11 +63,12 @@ func (c *criContainerdService) StartContainer(ctx context.Context, r *runtime.St
 // startContainer actually starts the container. The function needs to be run in one transaction. Any updates
 // to the status passed in will be applied no matter the function returns error or not.
 func (c *criContainerdService) startContainer(ctx context.Context,
-	container containerd.Container,
-	meta containerstore.Metadata,
+	cntr containerstore.Container,
 	status *containerstore.Status) (retErr error) {
+	id := cntr.ID
+	meta := cntr.Metadata
+	container := cntr.Container
 	config := meta.Config
-	id := container.ID()
 
 	// Return error if container is not in created state.
 	if status.State() != runtime.ContainerState_CONTAINER_CREATED {
@@ -109,37 +108,49 @@ func (c *criContainerdService) startContainer(ctx context.Context,
 	if err != nil {
 		return fmt.Errorf("failed to get task status for sandbox container %q: %v", id, err)
 	}
-
 	if taskStatus.Status != containerd.Running {
 		return fmt.Errorf("sandbox container %q is not running", sandboxID)
 	}
 
-	// Redirect the stream to std for now.
-	// TODO(random-liu): [P1] Support StdinOnce after container logging is added.
-	rStdoutPipe, wStdoutPipe := io.Pipe()
-	rStderrPipe, wStderrPipe := io.Pipe()
-	stdin := new(bytes.Buffer)
-	defer func() {
-		if retErr != nil {
-			rStdoutPipe.Close()
-			rStderrPipe.Close()
-		}
-	}()
-	if config.GetLogPath() != "" {
-		// Only generate container log when log path is specified.
-		logPath := filepath.Join(sandboxConfig.GetLogDirectory(), config.GetLogPath())
-		if err = c.agentFactory.NewContainerLogger(logPath, agents.Stdout, rStdoutPipe).Start(); err != nil {
-			return fmt.Errorf("failed to start container stdout logger: %v", err)
-		}
-		// Only redirect stderr when there is no tty.
-		if !config.GetTty() {
-			if err = c.agentFactory.NewContainerLogger(logPath, agents.Stderr, rStderrPipe).Start(); err != nil {
-				return fmt.Errorf("failed to start container stderr logger: %v", err)
+	ioCreation := func(id string) (_ containerd.IO, err error) {
+		var stdoutWC, stderrWC io.WriteCloser
+		defer func() {
+			if err != nil {
+				if stdoutWC != nil {
+					stdoutWC.Close()
+				}
+				if stderrWC != nil {
+					stderrWC.Close()
+				}
 			}
+		}()
+		if config.GetLogPath() != "" {
+			// Only generate container log when log path is specified.
+			logPath := filepath.Join(sandboxConfig.GetLogDirectory(), config.GetLogPath())
+			if stdoutWC, err = cio.NewCRILogger(logPath, cio.Stdout); err != nil {
+				return nil, fmt.Errorf("failed to start container stdout logger: %v", err)
+			}
+			// Only redirect stderr when there is no tty.
+			if !config.GetTty() {
+				if stderrWC, err = cio.NewCRILogger(logPath, cio.Stderr); err != nil {
+					return nil, fmt.Errorf("failed to start container stderr logger: %v", err)
+				}
+			}
+		} else {
+			stdoutWC = cio.NewDiscardLogger()
+			stderrWC = cio.NewDiscardLogger()
 		}
+
+		if err := cio.WithOutput("log", stdoutWC, stderrWC)(cntr.IO); err != nil {
+			return nil, fmt.Errorf("failed to add container log: %v", err)
+		}
+		if err := cntr.IO.Pipe(); err != nil {
+			return nil, fmt.Errorf("failed to pipe container io: %v", err)
+		}
+		return cntr.IO, nil
 	}
-	//TODO(Abhi): close stdin/pass a managed IOCreation
-	task, err := container.NewTask(ctx, containerd.NewIO(stdin, wStdoutPipe, wStderrPipe))
+
+	task, err := container.NewTask(ctx, ioCreation)
 	if err != nil {
 		return fmt.Errorf("failed to create containerd task: %v", err)
 	}

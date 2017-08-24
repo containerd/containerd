@@ -17,9 +17,7 @@ limitations under the License.
 package server
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 	"time"
@@ -35,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
+	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
 )
 
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
@@ -50,7 +49,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	config := r.GetConfig()
 
 	// Generate unique id and name for the sandbox and reserve the name.
-	id := generateID()
+	id := util.GenerateID()
 	name := makeSandboxName(config.GetMetadata())
 	// Reserve the sandbox name to avoid concurrent `RunPodSandbox` request starting the
 	// same sandbox.
@@ -135,22 +134,6 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		}
 	}()
 
-	// Discard sandbox container output because we don't care about it.
-	rStdoutPipe, wStdoutPipe := io.Pipe()
-	rStderrPipe, wStderrPipe := io.Pipe()
-	defer func() {
-		if retErr != nil {
-			rStdoutPipe.Close()
-			rStderrPipe.Close()
-		}
-	}()
-	if err := c.agentFactory.NewSandboxLogger(rStdoutPipe).Start(); err != nil {
-		return nil, fmt.Errorf("failed to start sandbox stdout logger: %v", err)
-	}
-	if err := c.agentFactory.NewSandboxLogger(rStderrPipe).Start(); err != nil {
-		return nil, fmt.Errorf("failed to start sandbox stderr logger: %v", err)
-	}
-
 	// Setup sandbox /dev/shm, /etc/hosts and /etc/resolv.conf.
 	if err = c.setupSandboxFiles(sandboxRootDir, config); err != nil {
 		return nil, fmt.Errorf("failed to setup sandbox files: %v", err)
@@ -167,8 +150,8 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	// Create sandbox task in containerd.
 	glog.V(5).Infof("Create sandbox container (id=%q, name=%q).",
 		id, name)
-	//TODO(Abhi): close the stdin or pass newIOCreation with /dev/null stdin
-	task, err := container.NewTask(ctx, containerd.NewIO(new(bytes.Buffer), wStdoutPipe, wStderrPipe))
+	// We don't need stdio for sandbox container.
+	task, err := container.NewTask(ctx, containerd.NullIO)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create task for sandbox %q: %v", id, err)
 	}

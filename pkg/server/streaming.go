@@ -17,7 +17,6 @@ limitations under the License.
 package server
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -79,7 +78,7 @@ func (s *streamRuntime) Exec(containerID string, cmd []string, stdin io.Reader, 
 
 func (s *streamRuntime) Attach(containerID string, in io.Reader, out, err io.WriteCloser, tty bool,
 	resize <-chan remotecommand.TerminalSize) error {
-	return errors.New("not implemented")
+	return s.c.attachContainer(context.Background(), containerID, in, out, err, tty, resize)
 }
 
 func (s *streamRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {

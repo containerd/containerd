@@ -17,14 +17,69 @@ limitations under the License.
 package server
 
 import (
-	"errors"
+	"fmt"
+	"io"
 
+	"github.com/containerd/containerd"
+	"github.com/golang/glog"
 	"golang.org/x/net/context"
-
+	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 // Attach prepares a streaming endpoint to attach to a running container, and returns the address.
-func (c *criContainerdService) Attach(ctx context.Context, r *runtime.AttachRequest) (*runtime.AttachResponse, error) {
-	return nil, errors.New("not implemented")
+func (c *criContainerdService) Attach(ctx context.Context, r *runtime.AttachRequest) (retRes *runtime.AttachResponse, retErr error) {
+	glog.V(2).Infof("Attach for %q with tty %v and stdin %v", r.GetContainerId(), r.GetTty(), r.GetStdin())
+	defer func() {
+		if retErr == nil {
+			glog.V(2).Infof("Attach for %q returns URL %q", r.GetContainerId(), retRes.Url)
+		}
+	}()
+
+	cntr, err := c.containerStore.Get(r.GetContainerId())
+	if err != nil {
+		return nil, fmt.Errorf("failed to find container in store: %v", err)
+	}
+	state := cntr.Status.Get().State()
+	if state != runtime.ContainerState_CONTAINER_RUNNING {
+		return nil, fmt.Errorf("container is in %s state", criContainerStateToString(state))
+	}
+	return c.streamServer.GetAttach(r)
+}
+
+func (c *criContainerdService) attachContainer(ctx context.Context, id string, stdin io.Reader, stdout, stderr io.WriteCloser,
+	tty bool, resize <-chan remotecommand.TerminalSize) error {
+	// Get container from our container store.
+	cntr, err := c.containerStore.Get(id)
+	if err != nil {
+		return fmt.Errorf("failed to find container in store: %v", err)
+	}
+	id = cntr.ID
+
+	state := cntr.Status.Get().State()
+	if state != runtime.ContainerState_CONTAINER_RUNNING {
+		return fmt.Errorf("container is in %s state", criContainerStateToString(state))
+	}
+
+	task, err := cntr.Container.Task(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to load task: %v", err)
+	}
+	handleResizing(resize, func(size remotecommand.TerminalSize) {
+		if err := task.Resize(ctx, uint32(size.Width), uint32(size.Height)); err != nil {
+			glog.Errorf("Failed to resize task %q console: %v", id, err)
+		}
+	})
+
+	// TODO(random-liu): Figure out whether we need to support historical output.
+	if err := cntr.IO.Attach(stdin, stdout, stderr); err != nil {
+		return fmt.Errorf("failed to attach container: %v", err)
+	}
+
+	// Close stdin after first attach if StdinOnce is specified, otherwise stdin will
+	// be kept open until container exits.
+	if cntr.Config.StdinOnce {
+		task.CloseIO(ctx, containerd.WithStdinCloser)
+	}
+	return nil
 }

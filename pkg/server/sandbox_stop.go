@@ -107,5 +107,6 @@ func (c *criContainerdService) stopSandboxContainer(ctx context.Context, contain
 	if err != nil && !errdefs.IsNotFound(err) {
 		return fmt.Errorf("failed to delete sandbox container: %v", err)
 	}
+
 	return nil
 }

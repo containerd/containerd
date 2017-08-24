@@ -23,6 +23,7 @@ import (
 	assertlib "github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
+	cio "github.com/kubernetes-incubator/cri-containerd/pkg/server/io"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
 )
 
@@ -135,4 +136,37 @@ func TestContainerStore(t *testing.T) {
 	c, err := s.Get(testID)
 	assert.Equal(Container{}, c)
 	assert.Equal(store.ErrNotExist, err)
+}
+
+func TestWithContainerIO(t *testing.T) {
+	meta := Metadata{
+		ID:        "1",
+		Name:      "Container-1",
+		SandboxID: "Sandbox-1",
+		Config: &runtime.ContainerConfig{
+			Metadata: &runtime.ContainerMetadata{
+				Name:    "TestPod-1",
+				Attempt: 1,
+			},
+		},
+		ImageRef: "TestImage-1",
+	}
+	status := Status{
+		Pid:        1,
+		CreatedAt:  time.Now().UnixNano(),
+		StartedAt:  time.Now().UnixNano(),
+		FinishedAt: time.Now().UnixNano(),
+		ExitCode:   1,
+		Reason:     "TestReason-1",
+		Message:    "TestMessage-1",
+	}
+	assert := assertlib.New(t)
+
+	c, err := NewContainer(meta, status)
+	assert.NoError(err)
+	assert.Nil(c.IO)
+
+	c, err = NewContainer(meta, status, WithContainerIO(&cio.ContainerIO{}))
+	assert.NoError(err)
+	assert.NotNil(c.IO)
 }

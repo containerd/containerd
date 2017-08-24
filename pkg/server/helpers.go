@@ -19,17 +19,14 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/docker/distribution/reference"
-	"github.com/docker/docker/pkg/stringid"
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -102,11 +99,6 @@ const (
 	containerMetadataLabel = "io.cri-containerd.container.metadata"
 )
 
-// generateID generates a random unique id.
-func generateID() string {
-	return stringid.GenerateNonCryptoID()
-}
-
 // makeSandboxName generates sandbox name from sandbox metadata. The name
 // generated is unique as long as sandbox metadata is unique.
 func makeSandboxName(s *runtime.PodSandboxMetadata) string {
@@ -161,37 +153,6 @@ func getResolvPath(sandboxRoot string) string {
 // getSandboxDevShm returns the shm file path inside the sandbox root directory.
 func getSandboxDevShm(sandboxRootDir string) string {
 	return filepath.Join(sandboxRootDir, "shm")
-}
-
-// prepareStreamingPipes prepares stream named pipe for container. returns nil
-// streaming handler if corresponding stream path is empty.
-func (c *criContainerdService) prepareStreamingPipes(ctx context.Context, stdin, stdout, stderr string) (
-	i io.WriteCloser, o io.ReadCloser, e io.ReadCloser, retErr error) {
-	pipes := map[string]io.ReadWriteCloser{}
-	for t, stream := range map[string]struct {
-		path string
-		flag int
-	}{
-		"stdin":  {stdin, syscall.O_WRONLY | syscall.O_CREAT | syscall.O_NONBLOCK},
-		"stdout": {stdout, syscall.O_RDONLY | syscall.O_CREAT | syscall.O_NONBLOCK},
-		"stderr": {stderr, syscall.O_RDONLY | syscall.O_CREAT | syscall.O_NONBLOCK},
-	} {
-		if stream.path == "" {
-			continue
-		}
-		s, err := c.os.OpenFifo(ctx, stream.path, stream.flag, 0700)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to open named pipe %q: %v",
-				stream.path, err)
-		}
-		defer func(cl io.Closer) {
-			if retErr != nil {
-				cl.Close()
-			}
-		}(s)
-		pipes[t] = s
-	}
-	return pipes["stdin"], pipes["stdout"], pipes["stderr"], nil
 }
 
 // getNetworkNamespace returns the network namespace of a process.

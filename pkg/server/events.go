@@ -110,11 +110,11 @@ func (c *criContainerdService) handleEvent(evt *events.Envelope) {
 				glog.Errorf("failed to stop container, task not found for container %q: %v", e.ContainerID, err)
 				return
 			}
-		}
-		if task != nil {
+		} else {
+			// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
 			if _, err = task.Delete(context.Background()); err != nil {
+				// TODO(random-liu): [P0] Enqueue the event and retry.
 				if !errdefs.IsNotFound(err) {
-					// TODO(random-liu): [P0] Enqueue the event and retry.
 					glog.Errorf("failed to stop container %q: %v", e.ContainerID, err)
 					return
 				}
