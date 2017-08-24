@@ -10,16 +10,15 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/typeurl"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
-func WithImageConfig(ctx context.Context, i Image) SpecOpts {
-	return func(s *specs.Spec) error {
+func WithImageConfig(i Image) SpecOpts {
+	return func(ctx context.Context, client *Client, _ *containers.Container, s *specs.Spec) error {
 		var (
 			image = i.(*image)
-			store = image.client.ContentStore()
+			store = client.ContentStore()
 		)
 		ic, err := image.i.Config(ctx, store)
 		if err != nil {
@@ -52,21 +51,10 @@ func WithImageConfig(ctx context.Context, i Image) SpecOpts {
 }
 
 func WithTTY(width, height int) SpecOpts {
-	return func(s *specs.Spec) error {
+	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
 		s.Process.Terminal = true
 		s.Process.ConsoleSize.Width = uint(width)
 		s.Process.ConsoleSize.Height = uint(height)
-		return nil
-	}
-}
-
-func WithSpec(spec *specs.Spec) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		any, err := typeurl.MarshalAny(spec)
-		if err != nil {
-			return err
-		}
-		c.Spec = any
 		return nil
 	}
 }
