@@ -42,7 +42,7 @@ func TestSandboxStore(t *testing.T) {
 			},
 			CreatedAt: time.Now().UnixNano(),
 			Pid:       1001,
-			NetNS:     "TestNetNS-1",
+			NetNSPath: "TestNetNS-1",
 		},
 		"2": {
 			ID:   "2",
@@ -57,7 +57,7 @@ func TestSandboxStore(t *testing.T) {
 			},
 			CreatedAt: time.Now().UnixNano(),
 			Pid:       1002,
-			NetNS:     "TestNetNS-2",
+			NetNSPath: "TestNetNS-2",
 		},
 		"3": {
 			ID:   "3",
@@ -72,7 +72,7 @@ func TestSandboxStore(t *testing.T) {
 			},
 			CreatedAt: time.Now().UnixNano(),
 			Pid:       1003,
-			NetNS:     "TestNetNS-3",
+			NetNSPath: "TestNetNS-3",
 		},
 	}
 	assert := assertlib.New(t)

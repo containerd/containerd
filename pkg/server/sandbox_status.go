@@ -64,7 +64,7 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 			state = runtime.PodSandboxState_SANDBOX_READY
 		}
 	}
-	ip, err := c.netPlugin.GetPodNetworkStatus(sandbox.NetNS)
+	ip, err := c.netPlugin.GetPodNetworkStatus(sandbox.NetNSPath)
 	if err != nil {
 		// Ignore the error on network status
 		ip = ""
