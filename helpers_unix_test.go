@@ -6,17 +6,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/containerd/containerd/containers"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 const newLine = "\n"
 
-func generateSpec(opts ...SpecOpts) (*specs.Spec, error) {
-	return GenerateSpec(opts...)
-}
-
 func withExitStatus(es int) SpecOpts {
-	return func(s *specs.Spec) error {
+	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
 		s.Process.Args = []string{"sh", "-c", fmt.Sprintf("exit %d", es)}
 		return nil
 	}
@@ -42,14 +39,9 @@ func withExecArgs(s *specs.Process, args ...string) {
 	s.Args = args
 }
 
-func withImageConfig(ctx context.Context, i Image) SpecOpts {
-	return WithImageConfig(ctx, i)
-}
-
-func withNewSnapshot(id string, i Image) NewContainerOpts {
-	return WithNewSnapshot(id, i)
-}
-
-var withUserNamespace = WithUserNamespace
-
-var withRemappedSnapshot = WithRemappedSnapshot
+var (
+	withUserNamespace    = WithUserNamespace
+	withRemappedSnapshot = WithRemappedSnapshot
+	withNewSnapshot      = WithNewSnapshot
+	withImageConfig      = WithImageConfig
+)

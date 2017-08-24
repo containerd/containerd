@@ -90,9 +90,8 @@ Adding your new option to spec generation is as easy as importing your new packa
 ```go
 import "github.com/crosbymichael/monitor"
 
-spec, err := containerd.GenerateSpec(
-	containerd.WithImageConfig(ctx, image),
-	monitor.WithHtop,
+container, err := client.NewContainer(ctx, id,
+	containerd.WithNewSpec(containerd.WithImageConfig(image), monitor.WithHtop),
 )
 ```
 

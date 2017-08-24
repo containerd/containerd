@@ -8,12 +8,14 @@ import (
 	"fmt"
 	"io"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/containerd/cgroups"
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/linux/runcopts"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
@@ -39,16 +41,14 @@ func TestContainerUpdate(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	spec, err := generateSpec(WithImageConfig(ctx, image), withProcessArgs("sleep", "30"))
-	if err != nil {
-		t.Error(err)
-		return
-	}
 	limit := int64(32 * 1024 * 1024)
-	spec.Linux.Resources.Memory = &specs.LinuxMemory{
-		Limit: &limit,
+	memory := func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
+		s.Linux.Resources.Memory = &specs.LinuxMemory{
+			Limit: &limit,
+		}
+		return nil
 	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), withProcessArgs("sleep", "30"), memory), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -127,12 +127,7 @@ func TestShimInCgroup(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	spec, err := GenerateSpec(WithImageConfig(ctx, image), WithProcessArgs("sleep", "30"))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), WithProcessArgs("sleep", "30")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -202,12 +197,7 @@ func TestDaemonRestart(t *testing.T) {
 		return
 	}
 
-	spec, err := generateSpec(withImageConfig(ctx, image), withProcessArgs("sleep", "30"))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "30")), withNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -293,12 +283,7 @@ func TestContainerAttach(t *testing.T) {
 		}
 	}
 
-	spec, err := generateSpec(withImageConfig(ctx, image), withCat())
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	container, err := client.NewContainer(ctx, id, WithSpec(spec), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withCat()), withNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -378,5 +363,82 @@ func TestContainerAttach(t *testing.T) {
 	expected = expected + expected
 	if output != expected {
 		t.Errorf("expected output %q but received %q", expected, output)
+	}
+}
+
+func TestContainerUsername(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+	direct, err := NewDirectIO(ctx, false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer direct.Delete()
+	var (
+		wg  sync.WaitGroup
+		buf = bytes.NewBuffer(nil)
+	)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		io.Copy(buf, direct.Stdout)
+	}()
+
+	// squid user in the alpine image has a uid of 31
+	container, err := client.NewContainer(ctx, id,
+		withNewSnapshot(id, image),
+		WithNewSpec(withImageConfig(image), WithUsername("squid"), WithProcessArgs("id", "-u")),
+	)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, direct.IOCreate)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+	<-statusC
+
+	wg.Wait()
+
+	output := strings.TrimSuffix(buf.String(), "\n")
+	if output != "31" {
+		t.Errorf("expected squid uid to be 31 but received %q", output)
 	}
 }

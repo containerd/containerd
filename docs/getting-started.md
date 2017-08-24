@@ -90,34 +90,27 @@ We use the `containerd.WithPullUnpack` so that we not only fetch and download th
 
 ## Creating an OCI Spec and Container
 
-Now that we have an image to base our container off of, we need to generate an OCI runtime specification that the container can be based off of.
+Now that we have an image to base our container off of, we need to generate an OCI runtime specification that the container can be based off of as well as the new container.
 
 containerd provides reasonable defaults for generating OCI runtime specs.
 There is also an `Opt` for modifying the default config based on the image that we pulled.
 
-```go
-	spec, err := containerd.GenerateSpec(containerd.WithImageConfig(ctx, image))
-	if err != nil {
-		return err
-	}
-```
-
-After we have a spec generated we need to create a container.
 The container will be based off of the image, use the runtime information in the spec that was just created, and we will allocate a new read-write snapshot so the container can store any persistent information.
 
 ```go
 	container, err := client.NewContainer(
 		ctx,
 		"redis-server",
-		containerd.WithSpec(spec),
-		containerd.WithImage(image),
 		containerd.WithNewSnapshot("redis-server-snapshot", image),
+		containerd.WithNewSpec(containerd.WithImageConfig(image)),
 	)
 	if err != nil {
 		return err
 	}
 	defer container.Delete(ctx, containerd.WithSnapshotCleanup)
 ```
+
+If you have an existing OCI specification created you can use `containerd.WithSpec(spec)` to set it on the container.
 
 When creating a new snapshot for the container we need to provide a snapshot ID as well as the Image that the container will be based on.
 By providing a separate snapshot ID than the container ID we can easily reuse, existing snapshots across different containers.
@@ -244,19 +237,13 @@ func redisExample() error {
 		return err
 	}
 
-	// generate an OCI runtime spec using the Args, Env, etc from the redis image that we pulled
-	spec, err := containerd.GenerateSpec(containerd.WithImageConfig(ctx, image))
-	if err != nil {
-		return err
-	}
-
 	// create a container
 	container, err := client.NewContainer(
 		ctx,
 		"redis-server",
-		containerd.WithSpec(spec),
 		containerd.WithImage(image),
 		containerd.WithNewSnapshot("redis-server-snapshot", image),
+		containerd.WithNewSpec(containerd.WithImageConfig(image)),
 	)
 	if err != nil {
 		return err

@@ -20,7 +20,7 @@ func BenchmarkContainerCreate(b *testing.B) {
 		b.Error(err)
 		return
 	}
-	spec, err := GenerateSpec(WithImageConfig(ctx, image), withTrue())
+	spec, err := GenerateSpec(ctx, client, nil, WithImageConfig(image), withTrue())
 	if err != nil {
 		b.Error(err)
 		return
@@ -63,7 +63,7 @@ func BenchmarkContainerStart(b *testing.B) {
 		b.Error(err)
 		return
 	}
-	spec, err := GenerateSpec(WithImageConfig(ctx, image), withTrue())
+	spec, err := GenerateSpec(ctx, client, nil, WithImageConfig(image), withTrue())
 	if err != nil {
 		b.Error(err)
 		return

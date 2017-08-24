@@ -6,6 +6,7 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	digest "github.com/opencontainers/go-digest"
@@ -25,7 +26,7 @@ func init() {
 }
 
 func withLayers(context *cli.Context) containerd.SpecOpts {
-	return func(s *specs.Spec) error {
+	return func(ctx gocontext.Context, client *containerd.Client, c *containers.Container, s *specs.Spec) error {
 		l := context.StringSlice("layer")
 		if l == nil {
 			return errors.Wrap(errdefs.ErrInvalidArgument, "base layers must be specified with `--layer`")
@@ -65,7 +66,7 @@ func handleConsoleResize(ctx gocontext.Context, task resizer, con console.Consol
 
 func withTTY(terminal bool) containerd.SpecOpts {
 	if !terminal {
-		return func(s *specs.Spec) error {
+		return func(ctx gocontext.Context, client *containerd.Client, c *containers.Container, s *specs.Spec) error {
 			s.Process.Terminal = false
 			return nil
 		}
@@ -85,8 +86,6 @@ func setHostNetworking() containerd.SpecOpts {
 
 func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli.Context) (containerd.Container, error) {
 	var (
-		err error
-
 		// ref          = context.Args().First()
 		id           = context.Args().Get(1)
 		args         = context.Args()[2:]
@@ -109,13 +108,8 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		opts = append(opts, containerd.WithProcessArgs(args...))
 	}
 
-	spec, err := containerd.GenerateSpec(opts...)
-	if err != nil {
-		return nil, err
-	}
-
 	return client.NewContainer(ctx, id,
-		containerd.WithSpec(spec),
+		containerd.WithNewSpec(opts...),
 		containerd.WithContainerLabels(labels),
 		containerd.WithRuntime(context.String("runtime")),
 		// TODO(mlaventure): containerd.WithImage(image),
