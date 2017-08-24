@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/containerd/console"
+	"github.com/pkg/errors"
 )
 
 type stdio struct {
@@ -22,28 +23,49 @@ func (s stdio) isNull() bool {
 }
 
 type process interface {
+	processState
+
 	// ID returns the id for the process
 	ID() string
 	// Pid returns the pid for the process
 	Pid() int
-	// Resize resizes the process console
-	Resize(ws console.WinSize) error
-	// SetExited sets the exit status for the process
-	SetExited(status int)
 	// ExitStatus returns the exit status
 	ExitStatus() int
 	// ExitedAt is the time the process exited
 	ExitedAt() time.Time
-	// Delete deletes the process and its resourcess
-	Delete(context.Context) error
 	// Stdin returns the process STDIN
 	Stdin() io.Closer
-	// Kill kills the process
-	Kill(context.Context, uint32, bool) error
 	// Stdio returns io information for the container
 	Stdio() stdio
-	// Start execution of the process
-	Start(context.Context) error
 	// Status returns the process status
 	Status(ctx context.Context) (string, error)
+}
+
+type processState interface {
+	// Resize resizes the process console
+	Resize(ws console.WinSize) error
+	// Start execution of the process
+	Start(context.Context) error
+	// Delete deletes the process and its resourcess
+	Delete(context.Context) error
+	// Kill kills the process
+	Kill(context.Context, uint32, bool) error
+	// SetExited sets the exit status for the process
+	SetExited(status int)
+}
+
+func stateName(v interface{}) string {
+	switch v.(type) {
+	case *runningState, *execRunningState:
+		return "running"
+	case *createdState, *execCreatedState:
+		return "created"
+	case *pausedState:
+		return "paused"
+	case *deletedState:
+		return "deleted"
+	case *stoppedState:
+		return "stopped"
+	}
+	panic(errors.Errorf("invalid state %v", v))
 }

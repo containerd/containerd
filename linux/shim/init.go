@@ -14,10 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"golang.org/x/sys/unix"
-
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/linux/runcopts"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
@@ -32,6 +29,7 @@ import (
 
 type initProcess struct {
 	sync.WaitGroup
+	initState
 
 	// mu is used to ensure that `Start()` and `Exited()` calls return in
 	// the right order when invoked in separate go routines.
@@ -114,6 +112,7 @@ func newInitProcess(context context.Context, plat platform, path, namespace, wor
 		rootfs:  rootfs,
 		workDir: workDir,
 	}
+	p.initState = &createdState{p: p}
 	var (
 		err    error
 		socket *runc.Socket
@@ -207,14 +206,17 @@ func (p *initProcess) Pid() int {
 }
 
 func (p *initProcess) ExitStatus() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	return p.status
 }
 
 func (p *initProcess) ExitedAt() time.Time {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	return p.exited
 }
 
-// Status return the state of the container (created, running, paused, stopped)
 func (p *initProcess) Status(ctx context.Context) (string, error) {
 	c, err := p.runtime.State(ctx, p.id)
 	if err != nil {
@@ -223,22 +225,18 @@ func (p *initProcess) Status(ctx context.Context) (string, error) {
 	return c.Status, nil
 }
 
-func (p *initProcess) Start(context context.Context) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+func (p *initProcess) start(context context.Context) error {
 	err := p.runtime.Start(context, p.id)
 	return p.runtimeError(err, "OCI runtime start failed")
 }
 
-func (p *initProcess) SetExited(status int) {
-	p.mu.Lock()
+func (p *initProcess) setExited(status int) {
 	p.status = status
 	p.exited = time.Now()
 	p.platform.shutdownConsole(context.Background(), p.console)
-	p.mu.Unlock()
 }
 
-func (p *initProcess) Delete(context context.Context) error {
+func (p *initProcess) delete(context context.Context) error {
 	p.killAll(context)
 	p.Wait()
 	err := p.runtime.Delete(context, p.id, nil)
@@ -269,24 +267,24 @@ func (p *initProcess) Delete(context context.Context) error {
 	return err
 }
 
-func (p *initProcess) Resize(ws console.WinSize) error {
+func (p *initProcess) resize(ws console.WinSize) error {
 	if p.console == nil {
 		return nil
 	}
 	return p.console.Resize(ws)
 }
 
-func (p *initProcess) Pause(context context.Context) error {
+func (p *initProcess) pause(context context.Context) error {
 	err := p.runtime.Pause(context, p.id)
 	return p.runtimeError(err, "OCI runtime pause failed")
 }
 
-func (p *initProcess) Resume(context context.Context) error {
+func (p *initProcess) resume(context context.Context) error {
 	err := p.runtime.Resume(context, p.id)
 	return p.runtimeError(err, "OCI runtime resume failed")
 }
 
-func (p *initProcess) Kill(context context.Context, signal uint32, all bool) error {
+func (p *initProcess) kill(context context.Context, signal uint32, all bool) error {
 	err := p.runtime.Kill(context, p.id, int(signal), &runc.KillOpts{
 		All: all,
 	})
@@ -304,7 +302,7 @@ func (p *initProcess) Stdin() io.Closer {
 	return p.stdin
 }
 
-func (p *initProcess) Checkpoint(context context.Context, r *shimapi.CheckpointTaskRequest) error {
+func (p *initProcess) checkpoint(context context.Context, r *shimapi.CheckpointTaskRequest) error {
 	var options runcopts.CheckpointOptions
 	if r.Options != nil {
 		v, err := typeurl.UnmarshalAny(r.Options)
@@ -337,7 +335,7 @@ func (p *initProcess) Checkpoint(context context.Context, r *shimapi.CheckpointT
 	return nil
 }
 
-func (p *initProcess) Update(context context.Context, r *shimapi.UpdateTaskRequest) error {
+func (p *initProcess) update(context context.Context, r *shimapi.UpdateTaskRequest) error {
 	var resources specs.LinuxResources
 	if err := json.Unmarshal(r.Resources.Value, &resources); err != nil {
 		return err
@@ -347,39 +345,6 @@ func (p *initProcess) Update(context context.Context, r *shimapi.UpdateTaskReque
 
 func (p *initProcess) Stdio() stdio {
 	return p.stdio
-}
-
-// TODO(mlaventure): move to runc package?
-func getLastRuntimeError(r *runc.Runc) (string, error) {
-	if r.Log == "" {
-		return "", nil
-	}
-
-	f, err := os.OpenFile(r.Log, os.O_RDONLY, 0400)
-	if err != nil {
-		return "", err
-	}
-
-	var (
-		errMsg string
-		log    struct {
-			Level string
-			Msg   string
-			Time  time.Time
-		}
-	)
-
-	dec := json.NewDecoder(f)
-	for err = nil; err == nil; {
-		if err = dec.Decode(&log); err != nil && err != io.EOF {
-			return "", err
-		}
-		if log.Level == "error" {
-			errMsg = strings.TrimSpace(log.Msg)
-		}
-	}
-
-	return errMsg, nil
 }
 
 func (p *initProcess) runtimeError(rErr error, msg string) error {
@@ -396,40 +361,4 @@ func (p *initProcess) runtimeError(rErr error, msg string) error {
 	default:
 		return errors.Errorf("%s: %s", msg, rMsg)
 	}
-}
-
-// criuError returns only the first line of the error message from criu
-// it tries to add an invalid dump log location when returning the message
-func criuError(err error) string {
-	parts := strings.Split(err.Error(), "\n")
-	return parts[0]
-}
-
-func copyFile(to, from string) error {
-	ff, err := os.Open(from)
-	if err != nil {
-		return err
-	}
-	defer ff.Close()
-	tt, err := os.Create(to)
-	if err != nil {
-		return err
-	}
-	defer tt.Close()
-	_, err = io.Copy(tt, ff)
-	return err
-}
-
-func checkKillError(err error) error {
-	if err == nil {
-		return nil
-	}
-	if strings.Contains(err.Error(), "os: process already finished") || err == unix.ESRCH {
-		return errors.Wrapf(errdefs.ErrNotFound, "process already finished")
-	}
-	return errors.Wrapf(err, "unknown error after kill")
-}
-
-func hasNoIO(r *shimapi.CreateTaskRequest) bool {
-	return r.Stdin == "" && r.Stdout == "" && r.Stderr == ""
 }
