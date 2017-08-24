@@ -49,5 +49,5 @@ func Diff(ctx context.Context, snapshotID, contentRef string, sn snapshot.Snapsh
 		defer sn.Remove(ctx, lowerKey)
 	}
 
-	return md.DiffMounts(ctx, lower, upper, ocispec.MediaTypeImageLayer, contentRef)
+	return md.DiffMounts(ctx, lower, upper, ocispec.MediaTypeImageLayerGzip, contentRef)
 }

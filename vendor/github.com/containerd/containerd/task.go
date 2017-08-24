@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
@@ -17,6 +18,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/typeurl"
@@ -37,6 +39,8 @@ type Status struct {
 	Status ProcessStatus
 	// ExitStatus returned by the process
 	ExitStatus uint32
+	// ExitedTime is the time at which the process died
+	ExitTime time.Time
 }
 
 type ProcessStatus string
@@ -117,7 +121,8 @@ type Task interface {
 var _ = (Task)(&task{})
 
 type task struct {
-	client *Client
+	client    *Client
+	container Container
 
 	io  IO
 	id  string
@@ -192,18 +197,22 @@ func (t *task) Status(ctx context.Context) (Status, error) {
 	return Status{
 		Status:     ProcessStatus(strings.ToLower(r.Process.Status.String())),
 		ExitStatus: r.Process.ExitStatus,
+		ExitTime:   r.Process.ExitedAt,
 	}, nil
 }
 
-func (t *task) Wait(ctx context.Context) (uint32, error) {
+func (t *task) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 	cancellable, cancel := context.WithCancel(ctx)
-	defer cancel()
 	eventstream, err := t.client.EventService().Subscribe(cancellable, &eventsapi.SubscribeRequest{
 		Filters: []string{"topic==" + runtime.TaskExitEventTopic},
 	})
 	if err != nil {
-		return UnknownExitStatus, errdefs.FromGRPC(err)
+		cancel()
+		return nil, errdefs.FromGRPC(err)
 	}
+
+	chStatus := make(chan ExitStatus, 1)
+
 	t.mu.Lock()
 	checkpoint := t.deferred != nil
 	t.mu.Unlock()
@@ -211,47 +220,67 @@ func (t *task) Wait(ctx context.Context) (uint32, error) {
 		// first check if the task has exited
 		status, err := t.Status(ctx)
 		if err != nil {
-			return UnknownExitStatus, errdefs.FromGRPC(err)
+			cancel()
+			return nil, errdefs.FromGRPC(err)
 		}
 		if status.Status == Stopped {
-			return status.ExitStatus, nil
+			cancel()
+			chStatus <- ExitStatus{code: status.ExitStatus, exitedAt: status.ExitTime}
+			return chStatus, nil
 		}
 	}
-	for {
-		evt, err := eventstream.Recv()
-		if err != nil {
-			return UnknownExitStatus, errdefs.FromGRPC(err)
-		}
-		if typeurl.Is(evt.Event, &eventsapi.TaskExit{}) {
-			v, err := typeurl.UnmarshalAny(evt.Event)
+
+	go func() {
+		defer cancel()
+		chStatus <- ExitStatus{} // signal that goroutine is running
+		for {
+			evt, err := eventstream.Recv()
 			if err != nil {
-				return UnknownExitStatus, err
+				chStatus <- ExitStatus{code: UnknownExitStatus, err: errdefs.FromGRPC(err)}
+				return
 			}
-			e := v.(*eventsapi.TaskExit)
-			if e.ContainerID == t.id && e.Pid == t.pid {
-				return e.ExitStatus, nil
+			if typeurl.Is(evt.Event, &eventsapi.TaskExit{}) {
+				v, err := typeurl.UnmarshalAny(evt.Event)
+				if err != nil {
+					chStatus <- ExitStatus{code: UnknownExitStatus, err: err}
+					return
+				}
+				e := v.(*eventsapi.TaskExit)
+				if e.ContainerID == t.id && e.Pid == t.pid {
+					chStatus <- ExitStatus{code: e.ExitStatus, exitedAt: e.ExitedAt}
+					return
+				}
 			}
 		}
-	}
+	}()
+
+	<-chStatus // wait for the goroutine to be running
+	return chStatus, nil
 }
 
 // Delete deletes the task and its runtime state
 // it returns the exit status of the task and any errors that were encountered
 // during cleanup
-func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (uint32, error) {
+func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStatus, error) {
 	for _, o := range opts {
 		if err := o(ctx, t); err != nil {
-			return UnknownExitStatus, err
+			return nil, err
 		}
 	}
 	status, err := t.Status(ctx)
 	if err != nil && errdefs.IsNotFound(err) {
-		return UnknownExitStatus, err
+		return nil, err
 	}
 	switch status.Status {
 	case Stopped, Unknown, "":
+	case Created:
+		if t.client.runtime == fmt.Sprintf("%s.%s", plugin.RuntimePlugin, "windows") {
+			// On windows Created is akin to Stopped
+			break
+		}
+		fallthrough
 	default:
-		return UnknownExitStatus, errors.Wrapf(errdefs.ErrFailedPrecondition, "task must be stopped before deletion: %s", status.Status)
+		return nil, errors.Wrapf(errdefs.ErrFailedPrecondition, "task must be stopped before deletion: %s", status.Status)
 	}
 	if t.io != nil {
 		t.io.Cancel()
@@ -262,9 +291,9 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (uint32, e
 		ContainerID: t.id,
 	})
 	if err != nil {
-		return UnknownExitStatus, errdefs.FromGRPC(err)
+		return nil, errdefs.FromGRPC(err)
 	}
-	return r.ExitStatus, nil
+	return &ExitStatus{code: r.ExitStatus, exitedAt: r.ExitedAt}, nil
 }
 
 func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreate IOCreation) (Process, error) {

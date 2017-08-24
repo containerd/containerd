@@ -176,8 +176,8 @@ func WithHostHostsFile(s *specs.Spec) error {
 	return nil
 }
 
-// WithHostResoveconf bind-mounts the host's /etc/resolv.conf into the container as readonly
-func WithHostResoveconf(s *specs.Spec) error {
+// WithHostResolvconf bind-mounts the host's /etc/resolv.conf into the container as readonly
+func WithHostResolvconf(s *specs.Spec) error {
 	s.Mounts = append(s.Mounts, specs.Mount{
 		Destination: "/etc/resolv.conf",
 		Type:        "bind",
@@ -233,6 +233,9 @@ func WithRemappedSnapshot(id string, i Image, uid, gid uint32) NewContainerOpts 
 		if err != nil {
 			return err
 		}
+
+		setSnapshotterIfEmpty(c)
+
 		var (
 			snapshotter = client.SnapshotService(c.Snapshotter)
 			parent      = identity.ChainID(diffIDs).String()

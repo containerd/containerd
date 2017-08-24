@@ -170,7 +170,7 @@ func (cs *contentStore) Delete(ctx context.Context, dgst digest.Digest) error {
 
 		// Just remove local reference, garbage collector is responsible for
 		// cleaning up on disk content
-		return getBlobsBucket(tx, ns).Delete([]byte(dgst.String()))
+		return getBlobsBucket(tx, ns).DeleteBucket([]byte(dgst.String()))
 	})
 }
 
@@ -352,7 +352,7 @@ type namespacedWriter struct {
 	db        *bolt.DB
 }
 
-func (nw *namespacedWriter) Commit(size int64, expected digest.Digest) error {
+func (nw *namespacedWriter) Commit(size int64, expected digest.Digest, opts ...content.Opt) error {
 	return nw.db.Update(func(tx *bolt.Tx) error {
 		bkt := getIngestBucket(tx, nw.namespace)
 		if bkt != nil {
@@ -360,11 +360,17 @@ func (nw *namespacedWriter) Commit(size int64, expected digest.Digest) error {
 				return err
 			}
 		}
-		return nw.commit(tx, size, expected)
+		return nw.commit(tx, size, expected, opts...)
 	})
 }
 
-func (nw *namespacedWriter) commit(tx *bolt.Tx, size int64, expected digest.Digest) error {
+func (nw *namespacedWriter) commit(tx *bolt.Tx, size int64, expected digest.Digest, opts ...content.Opt) error {
+	var base content.Info
+	for _, opt := range opts {
+		if err := opt(&base); err != nil {
+			return err
+		}
+	}
 	status, err := nw.Writer.Status()
 	if err != nil {
 		return err
@@ -398,6 +404,9 @@ func (nw *namespacedWriter) commit(tx *bolt.Tx, size int64, expected digest.Dige
 	}
 
 	if err := boltutil.WriteTimestamps(bkt, commitTime, commitTime); err != nil {
+		return err
+	}
+	if err := boltutil.WriteLabels(bkt, base.Labels); err != nil {
 		return err
 	}
 	if err := bkt.Put(bucketKeySize, sizeEncoded); err != nil {

@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"time"
 
 	"github.com/gogo/protobuf/types"
 )
@@ -77,10 +78,13 @@ type State struct {
 	// Pid is the main process id for the container
 	Pid uint32
 	// ExitStatus of the process
-	// Only vaid if the Status is Stopped
+	// Only valid if the Status is Stopped
 	ExitStatus uint32
-	Stdin      string
-	Stdout     string
-	Stderr     string
-	Terminal   bool
+	// ExitedAt is the time at which the process exited
+	// Only valid if the Status is Stopped
+	ExitedAt time.Time
+	Stdin    string
+	Stdout   string
+	Stderr   string
+	Terminal bool
 }

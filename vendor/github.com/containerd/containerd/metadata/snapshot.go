@@ -481,6 +481,9 @@ func (s *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 		for _, pair := range pairs {
 			info, err := s.Snapshotter.Stat(ctx, pair.bkey)
 			if err != nil {
+				if errdefs.IsNotFound(err) {
+					continue
+				}
 				return err
 			}
 

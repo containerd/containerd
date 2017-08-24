@@ -6,9 +6,21 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
+
+type config struct {
+	// Order is the order of preference in which to try diff algorithms, the
+	// first differ which is supported is used.
+	// Note when multiple differs may be supported, this order will be
+	// respected for which is choosen. Each differ should return the same
+	// correct output, allowing any ordering to be used to prefer
+	// more optimimal implementations.
+	Order []string `toml:"default,omitempty"`
+}
 
 func init() {
 	plugin.Register(&plugin.Registration{
@@ -17,20 +29,34 @@ func init() {
 		Requires: []plugin.PluginType{
 			plugin.DiffPlugin,
 		},
+		Config: &config{
+			Order: []string{"walking"},
+		},
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			d, err := ic.Get(plugin.DiffPlugin)
+			differs, err := ic.GetAll(plugin.DiffPlugin)
 			if err != nil {
 				return nil, err
 			}
+
+			orderedNames := ic.Config.(*config).Order
+			ordered := make([]plugin.Differ, len(orderedNames))
+			for i, n := range orderedNames {
+				differ, ok := differs[n]
+				if !ok {
+					return nil, errors.Errorf("needed differ not loaded: %s", n)
+				}
+				ordered[i] = differ.(plugin.Differ)
+			}
+
 			return &service{
-				diff: d.(plugin.Differ),
+				differs: ordered,
 			}, nil
 		},
 	})
 }
 
 type service struct {
-	diff plugin.Differ
+	differs []plugin.Differ
 }
 
 func (s *service) Register(gs *grpc.Server) error {
@@ -39,12 +65,20 @@ func (s *service) Register(gs *grpc.Server) error {
 }
 
 func (s *service) Apply(ctx context.Context, er *diffapi.ApplyRequest) (*diffapi.ApplyResponse, error) {
-	desc := toDescriptor(er.Diff)
-	// TODO: Check for supported media types
+	var (
+		ocidesc ocispec.Descriptor
+		err     error
+		desc    = toDescriptor(er.Diff)
+		mounts  = toMounts(er.Mounts)
+	)
 
-	mounts := toMounts(er.Mounts)
+	for _, differ := range s.differs {
+		ocidesc, err = differ.Apply(ctx, desc, mounts)
+		if !errdefs.IsNotSupported(err) {
+			break
+		}
+	}
 
-	ocidesc, err := s.diff.Apply(ctx, desc, mounts)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -56,10 +90,19 @@ func (s *service) Apply(ctx context.Context, er *diffapi.ApplyRequest) (*diffapi
 }
 
 func (s *service) Diff(ctx context.Context, dr *diffapi.DiffRequest) (*diffapi.DiffResponse, error) {
-	aMounts := toMounts(dr.Left)
-	bMounts := toMounts(dr.Right)
+	var (
+		ocidesc ocispec.Descriptor
+		err     error
+		aMounts = toMounts(dr.Left)
+		bMounts = toMounts(dr.Right)
+	)
 
-	ocidesc, err := s.diff.DiffMounts(ctx, aMounts, bMounts, dr.MediaType, dr.Ref)
+	for _, differ := range s.differs {
+		ocidesc, err = differ.DiffMounts(ctx, aMounts, bMounts, dr.MediaType, dr.Ref)
+		if !errdefs.IsNotSupported(err) {
+			break
+		}
+	}
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}

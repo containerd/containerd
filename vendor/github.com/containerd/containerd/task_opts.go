@@ -4,6 +4,7 @@ import (
 	"context"
 	"syscall"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/linux/runcopts"
 	"github.com/containerd/containerd/mount"
 )
@@ -32,14 +33,20 @@ type ProcessDeleteOpts func(context.Context, Process) error
 
 // WithProcessKill will forcefully kill and delete a process
 func WithProcessKill(ctx context.Context, p Process) error {
-	s := make(chan struct{}, 1)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	// ignore errors to wait and kill as we are forcefully killing
 	// the process and don't care about the exit status
-	go func() {
-		p.Wait(ctx)
-		close(s)
-	}()
-	p.Kill(ctx, syscall.SIGKILL)
+	s, err := p.Wait(ctx)
+	if err != nil {
+		return err
+	}
+	if err := p.Kill(ctx, syscall.SIGKILL); err != nil {
+		if errdefs.IsFailedPrecondition(err) || errdefs.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
 	// wait for the process to fully stop before letting the rest of the deletion complete
 	<-s
 	return nil

@@ -24,7 +24,6 @@ type IOConfig struct {
 type IO interface {
 	// Config returns the IO configuration.
 	Config() IOConfig
-
 	// Cancel aborts all current io operations
 	Cancel()
 	// Wait blocks until all io copy operations have completed
