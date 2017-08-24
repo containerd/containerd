@@ -46,9 +46,6 @@ type Metadata struct {
 	Name string
 	// Config is the CRI sandbox config.
 	Config *runtime.PodSandboxConfig
-	// CreatedAt is the created timestamp.
-	// TODO(random-liu): Use containerd container CreatedAt (containerd#933)
-	CreatedAt int64
 	// Pid is the process id of the sandbox.
 	Pid uint32
 	// NetNSPath is the network namespace used by the sandbox.

@@ -18,12 +18,12 @@ package server
 
 import (
 	"fmt"
-
-	"github.com/golang/glog"
-	"golang.org/x/net/context"
+	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/golang/glog"
+	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
@@ -64,17 +64,19 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 		glog.V(4).Infof("GetPodNetworkStatus returns error: %v", err)
 	}
 
-	return &runtime.PodSandboxStatusResponse{Status: toCRISandboxStatus(sandbox.Metadata, state, ip)}, nil
+	createdAt := sandbox.Container.Info().CreatedAt
+	status := toCRISandboxStatus(sandbox.Metadata, state, createdAt, ip)
+	return &runtime.PodSandboxStatusResponse{Status: status}, nil
 }
 
 // toCRISandboxStatus converts sandbox metadata into CRI pod sandbox status.
-func toCRISandboxStatus(meta sandboxstore.Metadata, state runtime.PodSandboxState, ip string) *runtime.PodSandboxStatus {
+func toCRISandboxStatus(meta sandboxstore.Metadata, state runtime.PodSandboxState, createdAt time.Time, ip string) *runtime.PodSandboxStatus {
 	nsOpts := meta.Config.GetLinux().GetSecurityContext().GetNamespaceOptions()
 	return &runtime.PodSandboxStatus{
 		Id:        meta.ID,
 		Metadata:  meta.Config.GetMetadata(),
 		State:     state,
-		CreatedAt: meta.CreatedAt,
+		CreatedAt: createdAt.UnixNano(),
 		Network:   &runtime.PodSandboxNetworkStatus{Ip: ip},
 		Linux: &runtime.LinuxPodSandboxStatus{
 			Namespaces: &runtime.Namespace{

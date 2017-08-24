@@ -18,7 +18,6 @@ package sandbox
 
 import (
 	"testing"
-	"time"
 
 	assertlib "github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -40,7 +39,6 @@ func TestSandboxStore(t *testing.T) {
 					Attempt:   1,
 				},
 			},
-			CreatedAt: time.Now().UnixNano(),
 			Pid:       1001,
 			NetNSPath: "TestNetNS-1",
 		},
@@ -55,7 +53,6 @@ func TestSandboxStore(t *testing.T) {
 					Attempt:   2,
 				},
 			},
-			CreatedAt: time.Now().UnixNano(),
 			Pid:       1002,
 			NetNSPath: "TestNetNS-2",
 		},
@@ -70,7 +67,6 @@ func TestSandboxStore(t *testing.T) {
 					Attempt:   3,
 				},
 			},
-			CreatedAt: time.Now().UnixNano(),
 			Pid:       1003,
 			NetNSPath: "TestNetNS-3",
 		},

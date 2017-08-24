@@ -37,12 +37,11 @@ func TestToCRISandbox(t *testing.T) {
 		Labels:      map[string]string{"a": "b"},
 		Annotations: map[string]string{"c": "d"},
 	}
-	createdAt := time.Now().UnixNano()
+	createdAt := time.Now()
 	meta := sandboxstore.Metadata{
 		ID:        "test-id",
 		Name:      "test-name",
 		Config:    config,
-		CreatedAt: createdAt,
 		NetNSPath: "test-netns",
 	}
 	state := runtime.PodSandboxState_SANDBOX_READY
@@ -50,11 +49,11 @@ func TestToCRISandbox(t *testing.T) {
 		Id:          "test-id",
 		Metadata:    config.GetMetadata(),
 		State:       state,
-		CreatedAt:   createdAt,
+		CreatedAt:   createdAt.UnixNano(),
 		Labels:      config.GetLabels(),
 		Annotations: config.GetAnnotations(),
 	}
-	s := toCRISandbox(meta, state)
+	s := toCRISandbox(meta, state, createdAt)
 	assert.Equal(t, expect, s)
 }
 
