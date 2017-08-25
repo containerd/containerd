@@ -16,6 +16,7 @@ import (
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/fs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/opencontainers/image-spec/identity"
@@ -322,7 +323,11 @@ func WithUserID(uid uint32) SpecOpts {
 			}
 		}
 		defer unix.Unmount(root, 0)
-		f, err := os.Open(filepath.Join(root, "/etc/passwd"))
+		ppath, err := fs.RootPath(root, "/etc/passwd")
+		if err != nil {
+			return err
+		}
+		f, err := os.Open(ppath)
 		if err != nil {
 			return err
 		}
@@ -370,7 +375,11 @@ func WithUsername(username string) SpecOpts {
 			}
 		}
 		defer unix.Unmount(root, 0)
-		f, err := os.Open(filepath.Join(root, "/etc/passwd"))
+		ppath, err := fs.RootPath(root, "/etc/passwd")
+		if err != nil {
+			return err
+		}
+		f, err := os.Open(ppath)
 		if err != nil {
 			return err
 		}
