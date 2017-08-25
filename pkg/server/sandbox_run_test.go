@@ -128,6 +128,20 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		"should set user correctly": {
+			configChange: func(c *runtime.PodSandboxConfig) {
+				c.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
+					RunAsUser:          &runtime.Int64Value{Value: 255},
+					SupplementalGroups: []int64{1111, 2222},
+				}
+			},
+			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
+				require.NotNil(t, spec.Process)
+				assert.EqualValues(t, spec.Process.User.UID, 255)
+				assert.Contains(t, spec.Process.User.AdditionalGids, uint32(1111))
+				assert.Contains(t, spec.Process.User.AdditionalGids, uint32(2222))
+			},
+		},
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIContainerdService()

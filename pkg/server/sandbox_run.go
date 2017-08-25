@@ -274,9 +274,9 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 
 	// TODO(random-liu): [P1] Apply SeLinux options.
 
-	// TODO(random-liu): [P1] Set username.
 	runAsUser := securityContext.GetRunAsUser()
 	if runAsUser != nil {
+		// TODO(random-liu): We should also set gid. Use containerd#1425 instead.
 		g.SetProcessUID(uint32(runAsUser.GetValue()))
 	}
 
