@@ -118,11 +118,6 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	glog.V(4).Infof("Sandbox container spec: %+v", spec)
 
 	// Checkpoint metadata into container
-	// TODO(random-liu): Switch to extensions(after merge containerd #1378).
-	// Actually the Pid, NetNS and CreatedAt underlying are not included here.
-	// I'm fine with this for now. After this PR is merged, we could:
-	// 1.Get Pid from containerd, so that we don't need to checkpoint it ourselves;
-	// 2.Use permanent NetNS after #138 is merged, so that we'll have network namespace here.
 	metaBytes, err := sandbox.Metadata.Encode()
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert sandbox metadata: %+v, %v", sandbox.Metadata, err)
@@ -194,7 +189,6 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		}
 	}()
 
-	sandbox.Pid = task.Pid()
 	if err = task.Start(ctx); err != nil {
 		return nil, fmt.Errorf("failed to start sandbox container task %q: %v",
 			id, err)

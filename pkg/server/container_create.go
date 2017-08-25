@@ -44,6 +44,11 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 		return nil, fmt.Errorf("failed to find sandbox id %q: %v", r.GetPodSandboxId(), err)
 	}
 	sandboxID := sandbox.ID
+	s, err := sandbox.Container.Task(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox container task: %v", err)
+	}
+	sandboxPid := s.Pid()
 
 	// Generate unique id and name for the container and reserve the name.
 	// Reserve the container name to avoid concurrent `CreateContainer` request creating
@@ -81,7 +86,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 
 	// Generate container runtime spec.
 	mounts := c.generateContainerMounts(getSandboxRootDir(c.rootDir, sandboxID), config)
-	spec, err := c.generateContainerSpec(id, sandbox.Pid, config, sandboxConfig, image.Config, mounts)
+	spec, err := c.generateContainerSpec(id, sandboxPid, config, sandboxConfig, image.Config, mounts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate container %q spec: %v", id, err)
 	}
