@@ -353,6 +353,13 @@ func (c *Client) ListImages(ctx context.Context) ([]Image, error) {
 	return images, nil
 }
 
+// Events returns an event subscription for the provided filters
+func (c *Client) Events(ctx context.Context, filters ...string) (eventsapi.Events_SubscribeClient, error) {
+	return c.EventService().Subscribe(ctx, &eventsapi.SubscribeRequest{
+		Filters: filters,
+	})
+}
+
 // Close closes the clients connection to containerd
 func (c *Client) Close() error {
 	return c.conn.Close()
