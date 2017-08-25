@@ -26,6 +26,8 @@ import (
 type execProcess struct {
 	sync.WaitGroup
 
+	processState
+
 	mu      sync.Mutex
 	id      string
 	console console.Console
@@ -65,6 +67,7 @@ func newExecProcess(context context.Context, path string, r *shimapi.ExecProcess
 			terminal: r.Terminal,
 		},
 	}
+	e.processState = &execCreatedState{p: e}
 	return e, nil
 }
 
@@ -79,14 +82,18 @@ func (e *execProcess) Pid() int {
 }
 
 func (e *execProcess) ExitStatus() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	return e.status
 }
 
 func (e *execProcess) ExitedAt() time.Time {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	return e.exited
 }
 
-func (e *execProcess) SetExited(status int) {
+func (e *execProcess) setExited(status int) {
 	e.status = status
 	e.exited = time.Now()
 	e.parent.platform.shutdownConsole(context.Background(), e.console)
@@ -99,21 +106,15 @@ func (e *execProcess) SetExited(status int) {
 	}
 }
 
-func (e *execProcess) Delete(ctx context.Context) error {
-	return nil
-}
-
-func (e *execProcess) Resize(ws console.WinSize) error {
+func (e *execProcess) resize(ws console.WinSize) error {
 	if e.console == nil {
 		return nil
 	}
 	return e.console.Resize(ws)
 }
 
-func (e *execProcess) Kill(ctx context.Context, sig uint32, _ bool) error {
-	e.mu.Lock()
+func (e *execProcess) kill(ctx context.Context, sig uint32, _ bool) error {
 	pid := e.pid
-	e.mu.Unlock()
 	if pid != 0 {
 		if err := unix.Kill(pid, syscall.Signal(sig)); err != nil {
 			return errors.Wrapf(checkKillError(err), "exec kill error")
@@ -130,7 +131,7 @@ func (e *execProcess) Stdio() stdio {
 	return e.stdio
 }
 
-func (e *execProcess) Start(ctx context.Context) (err error) {
+func (e *execProcess) start(ctx context.Context) (err error) {
 	var (
 		socket  *runc.Socket
 		pidfile = filepath.Join(e.path, fmt.Sprintf("%s.pid", e.id))
@@ -187,9 +188,7 @@ func (e *execProcess) Start(ctx context.Context) (err error) {
 	if err != nil {
 		return errors.Wrap(err, "failed to retrieve OCI runtime exec pid")
 	}
-	e.mu.Lock()
 	e.pid = pid
-	e.mu.Unlock()
 	return nil
 }
 
