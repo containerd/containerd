@@ -40,7 +40,7 @@ func (c *criContainerdService) PortForward(ctx context.Context, r *runtime.PortF
 
 	t, err := sandbox.Container.Task(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox container: %v", err)
+		return nil, fmt.Errorf("failed to get sandbox container task: %v", err)
 	}
 	status, err := t.Status(ctx)
 	if err != nil {
@@ -61,7 +61,11 @@ func (c *criContainerdService) portForward(id string, port int32, stream io.Read
 	if err != nil {
 		return fmt.Errorf("failed to find sandbox in store: %v", err)
 	}
-	pid := s.Pid
+	t, err := s.Container.Task(context.Background(), nil)
+	if err != nil {
+		return fmt.Errorf("failed to get sandbox container task: %v", err)
+	}
+	pid := t.Pid()
 
 	socat, err := exec.LookPath("socat")
 	if err != nil {

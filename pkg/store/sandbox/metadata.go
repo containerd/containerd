@@ -46,8 +46,6 @@ type Metadata struct {
 	Name string
 	// Config is the CRI sandbox config.
 	Config *runtime.PodSandboxConfig
-	// Pid is the process id of the sandbox.
-	Pid uint32
 	// NetNSPath is the network namespace used by the sandbox.
 	NetNSPath string
 }

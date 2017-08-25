@@ -39,7 +39,6 @@ func TestSandboxStore(t *testing.T) {
 					Attempt:   1,
 				},
 			},
-			Pid:       1001,
 			NetNSPath: "TestNetNS-1",
 		},
 		"2": {
@@ -53,7 +52,6 @@ func TestSandboxStore(t *testing.T) {
 					Attempt:   2,
 				},
 			},
-			Pid:       1002,
 			NetNSPath: "TestNetNS-2",
 		},
 		"3": {
@@ -67,7 +65,6 @@ func TestSandboxStore(t *testing.T) {
 					Attempt:   3,
 				},
 			},
-			Pid:       1003,
 			NetNSPath: "TestNetNS-3",
 		},
 	}
