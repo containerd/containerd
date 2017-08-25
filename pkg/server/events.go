@@ -17,72 +17,69 @@ limitations under the License.
 package server
 
 import (
-	"time"
+	"fmt"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/typeurl"
 	"github.com/golang/glog"
-	"github.com/jpillora/backoff"
 	"golang.org/x/net/context"
 
 	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 )
 
-const (
-	// minRetryInterval is the minimum retry interval when lost connection with containerd.
-	minRetryInterval = 100 * time.Millisecond
-	// maxRetryInterval is the maximum retry interval when lost connection with containerd.
-	maxRetryInterval = 30 * time.Second
-	// exponentialFactor is the exponential backoff factor.
-	exponentialFactor = 2.0
-)
-
-// startEventMonitor starts an event monitor which monitors and handles all
-// container events.
+// eventMonitor monitors containerd event and updates internal state correspondingly.
 // TODO(random-liu): [P1] Is it possible to drop event during containerd is running?
-func (c *criContainerdService) startEventMonitor() {
-	b := backoff.Backoff{
-		Min:    minRetryInterval,
-		Max:    maxRetryInterval,
-		Factor: exponentialFactor,
-	}
-	go func() {
-		for {
-			eventstream, err := c.eventService.Subscribe(context.Background(), &events.SubscribeRequest{})
-			if err != nil {
-				glog.Errorf("Failed to connect to containerd event stream: %v", err)
-				time.Sleep(b.Duration())
-				continue
-			}
-			// Successfully connect with containerd, reset backoff.
-			b.Reset()
-			// TODO(random-liu): Relist to recover state, should prevent other operations
-			// until state is fully recovered.
-			for {
-				if err := c.handleEventStream(eventstream); err != nil {
-					glog.Errorf("Failed to handle event stream: %v", err)
-					break
-				}
-			}
-		}
-	}()
+type eventMonitor struct {
+	c           *criContainerdService
+	eventstream events.Events_SubscribeClient
+	cancel      context.CancelFunc
+	closeCh     chan struct{}
 }
 
-// handleEventStream receives an event from containerd and handles the event.
-func (c *criContainerdService) handleEventStream(eventstream events.Events_SubscribeClient) error {
-	e, err := eventstream.Recv()
+// Create new event monitor. New event monitor will start subscribing containerd event. All events
+// happen after it should be monitored.
+func newEventMonitor(c *criContainerdService) (*eventMonitor, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	e, err := c.client.Events(ctx)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to subscribe containerd event: %v", err)
 	}
-	glog.V(4).Infof("Received container event timestamp - %v, namespace - %q, topic - %q", e.Timestamp, e.Namespace, e.Topic)
-	c.handleEvent(e)
-	return nil
+	return &eventMonitor{
+		c:           c,
+		eventstream: e,
+		cancel:      cancel,
+		closeCh:     make(chan struct{}),
+	}, nil
+}
+
+// start starts the event monitor which monitors and handles all container events. It returns
+// a channel for the caller to wait for the event monitor to stop.
+func (em *eventMonitor) start() <-chan struct{} {
+	go func() {
+		for {
+			e, err := em.eventstream.Recv()
+			if err != nil {
+				glog.Errorf("Failed to handle event stream: %v", err)
+				close(em.closeCh)
+				return
+			}
+			glog.V(4).Infof("Received container event timestamp - %v, namespace - %q, topic - %q", e.Timestamp, e.Namespace, e.Topic)
+			em.handleEvent(e)
+		}
+	}()
+	return em.closeCh
+}
+
+// stop stops the event monitor. It will close the event channel.
+func (em *eventMonitor) stop() {
+	em.cancel()
 }
 
 // handleEvent handles a containerd event.
-func (c *criContainerdService) handleEvent(evt *events.Envelope) {
+func (em *eventMonitor) handleEvent(evt *events.Envelope) {
+	c := em.c
 	any, err := typeurl.UnmarshalAny(evt.Event)
 	if err != nil {
 		glog.Errorf("Failed to convert event envelope %+v: %v", evt, err)
