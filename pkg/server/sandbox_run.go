@@ -207,7 +207,7 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 	imageConfig *imagespec.ImageConfig, nsPath string) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
 	// TODO(random-liu): [P1] Compare the default settings with docker and containerd default.
-	spec, err := containerd.GenerateSpec()
+	spec, err := containerd.GenerateSpec(context.Background(), nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +250,8 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 	// TODO(random-liu): [P2] Set default cgroup path if cgroup parent is not specified.
 
 	// Set namespace options.
-	nsOptions := config.GetLinux().GetSecurityContext().GetNamespaceOptions()
+	securityContext := config.GetLinux().GetSecurityContext()
+	nsOptions := securityContext.GetNamespaceOptions()
 	if nsOptions.GetHostNetwork() {
 		g.RemoveLinuxNamespace(string(runtimespec.NetworkNamespace)) // nolint: errcheck
 	} else {
@@ -267,11 +268,16 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 
 	// TODO(random-liu): [P1] Apply SeLinux options.
 
-	// TODO(random-liu): [P1] Set user.
+	runAsUser := securityContext.GetRunAsUser()
+	if runAsUser != nil {
+		// TODO(random-liu): We should also set gid. Use containerd#1425 instead.
+		g.SetProcessUID(uint32(runAsUser.GetValue()))
+	}
 
-	// TODO(random-liu): [P1] Set supplemental group.
-
-	// TODO(random-liu): [P1] Set privileged.
+	supplementalGroups := securityContext.GetSupplementalGroups()
+	for _, group := range supplementalGroups {
+		g.AddProcessAdditionalGid(uint32(group))
+	}
 
 	// Add sysctls
 	sysctls := config.GetLinux().GetSysctls()

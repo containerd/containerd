@@ -1,16 +1,21 @@
 package containerd
 
-import specs "github.com/opencontainers/runtime-spec/specs-go"
+import (
+	"context"
+
+	"github.com/containerd/containerd/containers"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
+)
 
 // GenerateSpec will generate a default spec from the provided image
 // for use as a containerd container
-func GenerateSpec(opts ...SpecOpts) (*specs.Spec, error) {
+func GenerateSpec(ctx context.Context, client *Client, c *containers.Container, opts ...SpecOpts) (*specs.Spec, error) {
 	s, err := createDefaultSpec()
 	if err != nil {
 		return nil, err
 	}
 	for _, o := range opts {
-		if err := o(s); err != nil {
+		if err := o(ctx, client, c, s); err != nil {
 			return nil, err
 		}
 	}

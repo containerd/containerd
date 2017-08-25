@@ -140,8 +140,16 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 		containerMetadataLabel: string(metaBytes),
 	}
 
+	specOpts := containerd.WithSpec(spec)
+	// Set container username. This could only be done by containerd, because it needs
+	// access to the container rootfs. Pass user name to containerd, and let it overwrite
+	// the spec for us.
+	if username := config.GetLinux().GetSecurityContext().GetRunAsUsername(); username != "" {
+		specOpts = containerd.WithSpec(spec, containerd.WithUsername(username))
+	}
+
 	opts = append(opts,
-		containerd.WithSpec(spec),
+		specOpts,
 		containerd.WithRuntime(defaultRuntime),
 		containerd.WithContainerLabels(labels))
 	var cntr containerd.Container
@@ -185,7 +193,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint32, config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig, extraMounts []*runtime.Mount) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
-	spec, err := containerd.GenerateSpec()
+	spec, err := containerd.GenerateSpec(context.Background(), nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -225,6 +233,9 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 	addOCIBindMounts(&g, append(extraMounts, config.GetMounts()...))
 
 	if securityContext.GetPrivileged() {
+		if !sandboxConfig.GetLinux().GetSecurityContext().GetPrivileged() {
+			return nil, fmt.Errorf("no privileged container allowed in sandbox")
+		}
 		if err := setOCIPrivileged(&g, config); err != nil {
 			return nil, err
 		}
@@ -238,13 +249,14 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 				securityContext.GetCapabilities(), err)
 		}
 
-		// TODO(random-liu): [P1] Set selinux options.
-
 		// TODO(random-liu): [P2] Add apparmor and seccomp.
 
-		// TODO: Figure out whether we should set no new privilege for sandbox container by default
-		g.SetProcessNoNewPrivileges(securityContext.GetNoNewPrivs())
 	}
+
+	// TODO: Figure out whether we should set no new privilege for sandbox container by default
+	g.SetProcessNoNewPrivileges(securityContext.GetNoNewPrivs())
+
+	// TODO(random-liu): [P1] Set selinux options.
 
 	g.SetRootReadonly(securityContext.GetReadonlyRootfs())
 
@@ -258,9 +270,9 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 	// Set namespaces, share namespace with sandbox container.
 	setOCINamespaces(&g, securityContext.GetNamespaceOptions(), sandboxPid)
 
-	// TODO(random-liu): [P1] Set username.
 	runAsUser := securityContext.GetRunAsUser()
 	if runAsUser != nil {
+		// TODO(random-liu): We should also set gid. Use containerd#1425 instead.
 		g.SetProcessUID(uint32(runAsUser.GetValue()))
 	}
 
