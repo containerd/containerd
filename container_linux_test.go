@@ -442,3 +442,139 @@ func TestContainerUsername(t *testing.T) {
 		t.Errorf("expected squid uid to be 31 but received %q", output)
 	}
 }
+
+func TestContainerAttachProcess(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" {
+		// On windows, closing the write side of the pipe closes the read
+		// side, sending an EOF to it and preventing reopening it.
+		// Hence this test will always fails on windows
+		t.Skip("invalid logic on windows")
+	}
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "100")), withNewSnapshot(id, image))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	expected := "hello" + newLine
+
+	// creating IO early for easy resource cleanup
+	direct, err := NewDirectIO(ctx, false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer direct.Delete()
+	var (
+		wg  sync.WaitGroup
+		buf = bytes.NewBuffer(nil)
+	)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		io.Copy(buf, direct.Stdout)
+	}()
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	status, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+
+	spec, err := container.Spec()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	processSpec := spec.Process
+	processSpec.Args = []string{"cat"}
+	execID := t.Name() + "_exec"
+	process, err := task.Exec(ctx, execID, processSpec, direct.IOCreate)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	processStatusC, err := process.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if err := process.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+
+	if _, err := fmt.Fprint(direct.Stdin, expected); err != nil {
+		t.Error(err)
+	}
+
+	if process, err = task.LoadProcess(ctx, execID, direct.IOAttach); err != nil {
+		t.Error(err)
+		return
+	}
+
+	if _, err := fmt.Fprint(direct.Stdin, expected); err != nil {
+		t.Error(err)
+	}
+
+	direct.Stdin.Close()
+
+	if err := process.CloseIO(ctx, WithStdinCloser); err != nil {
+		t.Error(err)
+	}
+
+	<-processStatusC
+
+	wg.Wait()
+
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Error(err)
+	}
+
+	output := buf.String()
+
+	// we wrote the same thing after attach
+	expected = expected + expected
+	if output != expected {
+		t.Errorf("expected output %q but received %q", expected, output)
+	}
+	<-status
+}

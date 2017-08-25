@@ -11,7 +11,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/typeurl"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
 
@@ -77,7 +76,6 @@ type process struct {
 	task *task
 	pid  uint32
 	io   IO
-	spec *specs.Process
 }
 
 func (p *process) ID() string {
