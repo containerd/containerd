@@ -275,12 +275,10 @@ func TestContainerAttach(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
 
 	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withCat()), withNewSnapshot(id, image))
@@ -382,12 +380,10 @@ func TestContainerUsername(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
 	direct, err := NewDirectIO(ctx, false)
 	if err != nil {
@@ -466,12 +462,10 @@ func TestContainerAttachProcess(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
 
 	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "100")), withNewSnapshot(id, image))
@@ -577,4 +571,79 @@ func TestContainerAttachProcess(t *testing.T) {
 		t.Errorf("expected output %q but received %q", expected, output)
 	}
 	<-status
+}
+
+func TestContainerUserID(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	direct, err := NewDirectIO(ctx, false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer direct.Delete()
+	var (
+		wg  sync.WaitGroup
+		buf = bytes.NewBuffer(nil)
+	)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		io.Copy(buf, direct.Stdout)
+	}()
+
+	// adm user in the alpine image has a uid of 3 and gid of 4.
+	container, err := client.NewContainer(ctx, id,
+		withNewSnapshot(id, image),
+		WithNewSpec(withImageConfig(image), WithUserID(3), WithProcessArgs("sh", "-c", "echo $(id -u):$(id -g)")),
+	)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, direct.IOCreate)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+	<-statusC
+
+	wg.Wait()
+
+	output := strings.TrimSuffix(buf.String(), "\n")
+	if output != "3:4" {
+		t.Errorf("expected uid:gid to be 3:4, but received %q", output)
+	}
 }
