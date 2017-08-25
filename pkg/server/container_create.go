@@ -140,16 +140,18 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 		containerMetadataLabel: string(metaBytes),
 	}
 
-	specOpts := containerd.WithSpec(spec)
+	var specOpts []containerd.SpecOpts
 	// Set container username. This could only be done by containerd, because it needs
 	// access to the container rootfs. Pass user name to containerd, and let it overwrite
 	// the spec for us.
-	if username := config.GetLinux().GetSecurityContext().GetRunAsUsername(); username != "" {
-		specOpts = containerd.WithSpec(spec, containerd.WithUsername(username))
+	if uid := config.GetLinux().GetSecurityContext().GetRunAsUser(); uid != nil {
+		specOpts = append(specOpts, containerd.WithUserID(uint32(uid.GetValue())))
 	}
-
+	if username := config.GetLinux().GetSecurityContext().GetRunAsUsername(); username != "" {
+		specOpts = append(specOpts, containerd.WithUsername(username))
+	}
 	opts = append(opts,
-		specOpts,
+		containerd.WithSpec(spec, specOpts...),
 		containerd.WithRuntime(defaultRuntime),
 		containerd.WithContainerLabels(labels))
 	var cntr containerd.Container
@@ -269,12 +271,6 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 
 	// Set namespaces, share namespace with sandbox container.
 	setOCINamespaces(&g, securityContext.GetNamespaceOptions(), sandboxPid)
-
-	runAsUser := securityContext.GetRunAsUser()
-	if runAsUser != nil {
-		// TODO(random-liu): We should also set gid. Use containerd#1425 instead.
-		g.SetProcessUID(uint32(runAsUser.GetValue()))
-	}
 
 	supplementalGroups := securityContext.GetSupplementalGroups()
 	for _, group := range supplementalGroups {
