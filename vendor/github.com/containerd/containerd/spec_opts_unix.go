@@ -16,6 +16,7 @@ import (
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/fs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/opencontainers/image-spec/identity"
@@ -94,9 +95,6 @@ func WithImageConfig(i Image) SpecOpts {
 			return fmt.Errorf("unknown image config media type %s", ic.MediaType)
 		}
 		s.Process.Env = append(s.Process.Env, config.Env...)
-		var (
-			uid, gid uint32
-		)
 		cmd := config.Cmd
 		s.Process.Args = append(config.Entrypoint, cmd...)
 		if config.User != "" {
@@ -111,22 +109,24 @@ func WithImageConfig(i Image) SpecOpts {
 					}
 					return err
 				}
-				uid, gid = uint32(v), uint32(v)
+				if err := WithUserID(uint32(v))(ctx, client, c, s); err != nil {
+					return err
+				}
 			case 2:
 				v, err := strconv.ParseUint(parts[0], 0, 10)
 				if err != nil {
 					return err
 				}
-				uid = uint32(v)
+				uid := uint32(v)
 				if v, err = strconv.ParseUint(parts[1], 0, 10); err != nil {
 					return err
 				}
-				gid = uint32(v)
+				gid := uint32(v)
+				s.Process.User.UID, s.Process.User.GID = uid, gid
 			default:
 				return fmt.Errorf("invalid USER value %s", config.User)
 			}
 		}
-		s.Process.User.UID, s.Process.User.GID = uid, gid
 		cwd := config.WorkingDir
 		if cwd == "" {
 			cwd = "/"
@@ -287,8 +287,8 @@ func WithNamespacedCgroup() SpecOpts {
 	}
 }
 
-// WithUserIDs allows the UID and GID for the Process to be set
-func WithUserIDs(uid, gid uint32) SpecOpts {
+// WithUidGid allows the UID and GID for the Process to be set
+func WithUidGid(uid, gid uint32) SpecOpts {
 	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
 		s.Process.User.UID = uid
 		s.Process.User.GID = gid
@@ -296,9 +296,61 @@ func WithUserIDs(uid, gid uint32) SpecOpts {
 	}
 }
 
+// WithUserID sets the correct UID and GID for the container based
+// on the image's /etc/passwd contents. If uid is not found in
+// /etc/passwd, it sets uid but leaves gid 0, and not returns error.
+func WithUserID(uid uint32) SpecOpts {
+	return func(ctx context.Context, client *Client, c *containers.Container, s *specs.Spec) error {
+		if c.Snapshotter == "" {
+			return errors.Errorf("no snapshotter set for container")
+		}
+		if c.RootFS == "" {
+			return errors.Errorf("rootfs not created for container")
+		}
+		snapshotter := client.SnapshotService(c.Snapshotter)
+		mounts, err := snapshotter.Mounts(ctx, c.RootFS)
+		if err != nil {
+			return err
+		}
+		root, err := ioutil.TempDir("", "ctd-username")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(root)
+		for _, m := range mounts {
+			if err := m.Mount(root); err != nil {
+				return err
+			}
+		}
+		defer unix.Unmount(root, 0)
+		ppath, err := fs.RootPath(root, "/etc/passwd")
+		if err != nil {
+			return err
+		}
+		f, err := os.Open(ppath)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		users, err := user.ParsePasswdFilter(f, func(u user.User) bool {
+			return u.Uid == int(uid)
+		})
+		if err != nil {
+			return err
+		}
+		if len(users) == 0 {
+			s.Process.User.UID = uid
+			return nil
+		}
+		u := users[0]
+		s.Process.User.UID, s.Process.User.GID = uint32(u.Uid), uint32(u.Gid)
+		return nil
+	}
+}
+
 // WithUsername sets the correct UID and GID for the container
-// based on the the image's /etc/passwd contents.
-// id is the snapshot id that is used
+// based on the the image's /etc/passwd contents. If the username
+// is not found in /etc/passwd, it returns error.
 func WithUsername(username string) SpecOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container, s *specs.Spec) error {
 		if c.Snapshotter == "" {
@@ -323,7 +375,11 @@ func WithUsername(username string) SpecOpts {
 			}
 		}
 		defer unix.Unmount(root, 0)
-		f, err := os.Open(filepath.Join(root, "/etc/passwd"))
+		ppath, err := fs.RootPath(root, "/etc/passwd")
+		if err != nil {
+			return err
+		}
+		f, err := os.Open(ppath)
 		if err != nil {
 			return err
 		}

@@ -126,8 +126,12 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		sandboxMetadataLabel: string(metaBytes),
 	}
 
+	var specOpts []containerd.SpecOpts
+	if uid := config.GetLinux().GetSecurityContext().GetRunAsUser(); uid != nil {
+		specOpts = append(specOpts, containerd.WithUserID(uint32(uid.GetValue())))
+	}
 	opts := []containerd.NewContainerOpts{
-		containerd.WithSpec(spec),
+		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(labels),
 		containerd.WithRuntime(defaultRuntime),
 		containerd.WithNewSnapshotView(id, image.Image)}
@@ -267,12 +271,6 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 	}
 
 	// TODO(random-liu): [P1] Apply SeLinux options.
-
-	runAsUser := securityContext.GetRunAsUser()
-	if runAsUser != nil {
-		// TODO(random-liu): We should also set gid. Use containerd#1425 instead.
-		g.SetProcessUID(uint32(runAsUser.GetValue()))
-	}
 
 	supplementalGroups := securityContext.GetSupplementalGroups()
 	for _, group := range supplementalGroups {

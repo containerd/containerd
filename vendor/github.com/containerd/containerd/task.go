@@ -116,13 +116,14 @@ type Task interface {
 	Checkpoint(context.Context, ...CheckpointTaskOpts) (v1.Descriptor, error)
 	// Update modifies executing tasks with updated settings
 	Update(context.Context, ...UpdateTaskOpts) error
+	// LoadProcess loads a previously created exec'd process
+	LoadProcess(context.Context, string, IOAttach) (Process, error)
 }
 
 var _ = (Task)(&task{})
 
 type task struct {
-	client    *Client
-	container Container
+	client *Client
 
 	io  IO
 	id  string
@@ -328,7 +329,6 @@ func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreat
 		id:   id,
 		task: t,
 		io:   i,
-		spec: spec,
 	}, nil
 }
 
@@ -438,6 +438,31 @@ func (t *task) Update(ctx context.Context, opts ...UpdateTaskOpts) error {
 	}
 	_, err := t.client.TaskService().Update(ctx, request)
 	return errdefs.FromGRPC(err)
+}
+
+func (t *task) LoadProcess(ctx context.Context, id string, ioAttach IOAttach) (Process, error) {
+	response, err := t.client.TaskService().Get(ctx, &tasks.GetRequest{
+		ContainerID: t.id,
+		ExecID:      id,
+	})
+	if err != nil {
+		err = errdefs.FromGRPC(err)
+		if errdefs.IsNotFound(err) {
+			return nil, errors.Wrapf(err, "no running process found")
+		}
+		return nil, err
+	}
+	var i IO
+	if ioAttach != nil {
+		if i, err = attachExistingIO(response, ioAttach); err != nil {
+			return nil, err
+		}
+	}
+	return &process{
+		id:   id,
+		task: t,
+		io:   i,
+	}, nil
 }
 
 func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tasks.CheckpointTaskRequest) error {

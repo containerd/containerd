@@ -19,7 +19,6 @@ set -o pipefail
 source $(dirname "${BASH_SOURCE[0]}")/test-utils.sh
 
 DEFAULT_SKIP="\[Flaky\]|\[Slow\]|\[Serial\]"
-DEFAULT_SKIP+="|runAsUser"
 DEFAULT_SKIP+="|scheduling\sa\sGuaranteed\sPod"
 DEFAULT_SKIP+="|scheduling\sa\sBurstable\sPod"
 DEFAULT_SKIP+="|scheduling\sa\sBestEffort\sPod"

@@ -245,19 +245,7 @@ func (c *container) loadTask(ctx context.Context, ioAttach IOAttach) (Task, erro
 	}
 	var i IO
 	if ioAttach != nil {
-		// get the existing fifo paths from the task information stored by the daemon
-		paths := &FIFOSet{
-			Dir: getFifoDir([]string{
-				response.Process.Stdin,
-				response.Process.Stdout,
-				response.Process.Stderr,
-			}),
-			In:       response.Process.Stdin,
-			Out:      response.Process.Stdout,
-			Err:      response.Process.Stderr,
-			Terminal: response.Process.Terminal,
-		}
-		if i, err = ioAttach(paths); err != nil {
+		if i, err = attachExistingIO(response, ioAttach); err != nil {
 			return nil, err
 		}
 	}
@@ -268,6 +256,22 @@ func (c *container) loadTask(ctx context.Context, ioAttach IOAttach) (Task, erro
 		pid:    response.Process.Pid,
 	}
 	return t, nil
+}
+
+func attachExistingIO(response *tasks.GetResponse, ioAttach IOAttach) (IO, error) {
+	// get the existing fifo paths from the task information stored by the daemon
+	paths := &FIFOSet{
+		Dir: getFifoDir([]string{
+			response.Process.Stdin,
+			response.Process.Stdout,
+			response.Process.Stderr,
+		}),
+		In:       response.Process.Stdin,
+		Out:      response.Process.Stdout,
+		Err:      response.Process.Stderr,
+		Terminal: response.Process.Terminal,
+	}
+	return ioAttach(paths)
 }
 
 // getFifoDir looks for any non-empty path for a stdio fifo

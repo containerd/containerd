@@ -91,7 +91,6 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 				},
 				SupplementalGroups: []int64{1111, 2222},
 				NoNewPrivs:         true,
-				RunAsUser:          &runtime.Int64Value{Value: 255},
 			},
 		},
 	}
@@ -143,9 +142,6 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		assert.NotContains(t, spec.Process.Capabilities.Inheritable, "CAP_CHOWN")
 		assert.NotContains(t, spec.Process.Capabilities.Permitted, "CAP_CHOWN")
 		assert.NotContains(t, spec.Process.Capabilities.Ambient, "CAP_CHOWN")
-
-		t.Logf("Check uid")
-		assert.EqualValues(t, spec.Process.User.UID, 255)
 
 		t.Logf("Check supplemental groups")
 		assert.Contains(t, spec.Process.User.AdditionalGids, uint32(1111))
