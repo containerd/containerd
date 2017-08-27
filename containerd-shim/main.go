@@ -117,6 +117,18 @@ func start(log *os.File) error {
 			}
 			// runtime has exited so the shim can also exit
 			if exitShim {
+				//to avoid zombie process ,we still need to handle SIGCHLD signal
+				//before we really exit.
+				//use routines to avoid blocking.
+				go func() {
+					for {
+						si := <-signals
+						switch si {
+						case syscall.SIGCHLD:
+							osutils.Reap(false)
+						}
+					}
+				}()
 				// Let containerd take care of calling the runtime
 				// delete.
 				// This is needed to be done first in order to ensure
