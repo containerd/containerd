@@ -21,7 +21,7 @@ type resizer interface {
 }
 
 type killer interface {
-	Kill(gocontext.Context, syscall.Signal) error
+	Kill(gocontext.Context, syscall.Signal, ...containerd.KillOpts) error
 }
 
 func withEnv(context *cli.Context) containerd.SpecOpts {
