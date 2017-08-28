@@ -647,3 +647,68 @@ func TestContainerUserID(t *testing.T) {
 		t.Errorf("expected uid:gid to be 3:4, but received %q", output)
 	}
 }
+
+func TestContainerKillAll(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	container, err := client.NewContainer(ctx, id,
+		withNewSnapshot(id, image),
+		WithNewSpec(withImageConfig(image),
+			withProcessArgs("sh", "-c", "top"),
+			WithHostNamespace(specs.PIDNamespace),
+		),
+	)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	stdout := bytes.NewBuffer(nil)
+	task, err := container.NewTask(ctx, NewIO(bytes.NewBuffer(nil), stdout, bytes.NewBuffer(nil)))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+
+	if err := task.Kill(ctx, syscall.SIGKILL, WithKillAll); err != nil {
+		t.Error(err)
+	}
+
+	<-statusC
+	if _, err := task.Delete(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+}

@@ -51,3 +51,17 @@ func WithProcessKill(ctx context.Context, p Process) error {
 	<-s
 	return nil
 }
+
+type KillInfo struct {
+	// All kills all processes inside the task
+	// only valid on tasks, ignored on processes
+	All bool
+}
+
+type KillOpts func(context.Context, Process, *KillInfo) error
+
+// WithKillAll kills all processes for a task
+func WithKillAll(ctx context.Context, p Process, i *KillInfo) error {
+	i.All = true
+	return nil
+}

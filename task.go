@@ -163,10 +163,17 @@ func (t *task) Start(ctx context.Context) error {
 	return errdefs.FromGRPC(err)
 }
 
-func (t *task) Kill(ctx context.Context, s syscall.Signal) error {
+func (t *task) Kill(ctx context.Context, s syscall.Signal, opts ...KillOpts) error {
+	var i KillInfo
+	for _, o := range opts {
+		if err := o(ctx, t, &i); err != nil {
+			return err
+		}
+	}
 	_, err := t.client.TaskService().Kill(ctx, &tasks.KillRequest{
 		Signal:      uint32(s),
 		ContainerID: t.id,
+		All:         i.All,
 	})
 	if err != nil {
 		return errdefs.FromGRPC(err)
