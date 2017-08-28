@@ -19,6 +19,7 @@ package server
 import (
 	"time"
 
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/typeurl"
@@ -107,7 +108,12 @@ func (c *criContainerdService) handleEvent(evt *events.Envelope) {
 			// Non-init process died, ignore the event.
 			return
 		}
-		task, err := cntr.Container.Task(context.Background(), nil)
+		// Attach container IO so that `Delete` could cleanup the stream properly.
+		task, err := cntr.Container.Task(context.Background(),
+			func(*containerd.FIFOSet) (containerd.IO, error) {
+				return cntr.IO, nil
+			},
+		)
 		if err != nil {
 			if !errdefs.IsNotFound(err) {
 				glog.Errorf("failed to stop container, task not found for container %q: %v", e.ContainerID, err)

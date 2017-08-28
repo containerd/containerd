@@ -120,6 +120,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	containerIO, err := cio.NewContainerIO(id,
 		cio.WithStdin(config.GetStdin()),
 		cio.WithTerminal(config.GetTty()),
+		cio.WithRootDir(containerRootDir),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container io: %v", err)

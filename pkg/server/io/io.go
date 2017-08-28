@@ -19,7 +19,9 @@ package agents
 import (
 	"errors"
 	"io"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -29,7 +31,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/ioutil"
+	cioutil "github.com/kubernetes-incubator/cri-containerd/pkg/ioutil"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
 )
 
@@ -81,8 +83,9 @@ type ContainerIO struct {
 	id     string
 	tty    bool
 	stdin  bool
-	stdout *ioutil.WriterGroup
-	stderr *ioutil.WriterGroup
+	stdout *cioutil.WriterGroup
+	stderr *cioutil.WriterGroup
+	root   string
 
 	closer *wgCloser
 }
@@ -125,25 +128,34 @@ func WithTerminal(tty bool) Opts {
 	}
 }
 
+// WithRootDir sets the root directory to create container streams.
+func WithRootDir(root string) Opts {
+	return func(c *ContainerIO) error {
+		c.root = root
+		return nil
+	}
+}
+
 // NewContainerIO creates container io.
 func NewContainerIO(id string, opts ...Opts) (*ContainerIO, error) {
-	fifos, err := containerd.NewFifos(id)
-	if err != nil {
-		return nil, err
-	}
 	c := &ContainerIO{
-		id:         id,
-		dir:        fifos.Dir,
-		stdoutPath: fifos.Out,
-		stderrPath: fifos.Err,
-		stdout:     ioutil.NewWriterGroup(),
-		stderr:     ioutil.NewWriterGroup(),
+		id:     id,
+		stdout: cioutil.NewWriterGroup(),
+		stderr: cioutil.NewWriterGroup(),
+		root:   os.TempDir(),
 	}
 	for _, opt := range opts {
 		if err := opt(c); err != nil {
 			return nil, err
 		}
 	}
+	fifos, err := newFifos(c.root, id)
+	if err != nil {
+		return nil, err
+	}
+	c.dir = fifos.Dir
+	c.stdoutPath = fifos.Out
+	c.stderrPath = fifos.Err
 	if c.stdin {
 		c.stdinPath = fifos.In
 	}
@@ -277,7 +289,7 @@ func (c *ContainerIO) Attach(stdin io.Reader, stdout, stderr io.WriteCloser) err
 
 	if stdout != nil {
 		wg.Add(1)
-		wc, close := ioutil.NewWriteCloseInformer(stdout)
+		wc, close := cioutil.NewWriteCloseInformer(stdout)
 		if err := c.stdout.Add(stdoutKey, wc); err != nil {
 			return err
 		}
@@ -285,7 +297,7 @@ func (c *ContainerIO) Attach(stdin io.Reader, stdout, stderr io.WriteCloser) err
 	}
 	if !c.tty && stderr != nil {
 		wg.Add(1)
-		wc, close := ioutil.NewWriteCloseInformer(stderr)
+		wc, close := cioutil.NewWriteCloseInformer(stderr)
 		if err := c.stderr.Add(stderrKey, wc); err != nil {
 			return err
 		}
@@ -314,4 +326,22 @@ func (c *ContainerIO) Close() error {
 		return os.RemoveAll(c.dir)
 	}
 	return nil
+}
+
+// newFifos creates fifos directory for a container.
+func newFifos(root, id string) (*containerd.FIFOSet, error) {
+	root = filepath.Join(root, "io")
+	if err := os.MkdirAll(root, 0700); err != nil {
+		return nil, err
+	}
+	dir, err := ioutil.TempDir(root, "")
+	if err != nil {
+		return nil, err
+	}
+	return &containerd.FIFOSet{
+		Dir: dir,
+		In:  filepath.Join(dir, id+"-stdin"),
+		Out: filepath.Join(dir, id+"-stdout"),
+		Err: filepath.Join(dir, id+"-stderr"),
+	}, nil
 }
