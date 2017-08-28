@@ -11,9 +11,15 @@ branches:
 environment:
   GOPATH: C:\gopath
   CGO_ENABLED: 1
+  GO_VERSION: 1.9
 
 before_build:
   - choco install -y mingw
+  # Install Go
+  - rd C:\Go /s /q
+  - appveyor DownloadFile https://storage.googleapis.com/golang/go%GO_VERSION%.windows-amd64.zip
+  - 7z x go%GO_VERSION%.windows-amd64.zip -oC:\ >nul
+  - go version
   # TODO: re-enable once the content unit-test have been updated to pass on windows
   #- choco install codecov
 
