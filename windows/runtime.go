@@ -243,7 +243,7 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, spec
 		conf *hcsshim.ContainerConfig
 		nsid = namespace + "-" + id
 	)
-	if conf, err = newContainerConfig(ctx, hcsshimOwner, nsid, spec); err != nil {
+	if conf, err = newWindowsContainerConfig(ctx, hcsshimOwner, nsid, spec); err != nil {
 		return nil, err
 	}
 	defer func() {

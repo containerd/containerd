@@ -111,7 +111,7 @@ func (t *task) Info() runtime.TaskInfo {
 }
 
 func (t *task) Start(ctx context.Context) error {
-	conf := newProcessConfig(t.spec.Process, t.io)
+	conf := newWindowsProcessConfig(t.spec.Process, t.io)
 	p, err := t.newProcess(ctx, t.id, conf, t.io)
 	if err != nil {
 		return err
@@ -194,7 +194,7 @@ func (t *task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runt
 		return nil, err
 	}
 
-	conf := newProcessConfig(spec, pset)
+	conf := newWindowsProcessConfig(spec, pset)
 	p, err := t.newProcess(ctx, id, conf, pset)
 	if err != nil {
 		return nil, err
