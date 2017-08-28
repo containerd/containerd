@@ -297,8 +297,9 @@ func WithUidGid(uid, gid uint32) SpecOpts {
 }
 
 // WithUserID sets the correct UID and GID for the container based
-// on the image's /etc/passwd contents. If uid is not found in
-// /etc/passwd, it sets uid but leaves gid 0, and not returns error.
+// on the image's /etc/passwd contents. If /etc/passwd does not exist,
+// or uid is not found in /etc/passwd, it sets gid to be the same with
+// uid, and not returns error.
 func WithUserID(uid uint32) SpecOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container, s *specs.Spec) error {
 		if c.Snapshotter == "" {
@@ -329,6 +330,10 @@ func WithUserID(uid uint32) SpecOpts {
 		}
 		f, err := os.Open(ppath)
 		if err != nil {
+			if os.IsNotExist(err) {
+				s.Process.User.UID, s.Process.User.GID = uid, uid
+				return nil
+			}
 			return err
 		}
 		defer f.Close()
@@ -339,7 +344,7 @@ func WithUserID(uid uint32) SpecOpts {
 			return err
 		}
 		if len(users) == 0 {
-			s.Process.User.UID = uid
+			s.Process.User.UID, s.Process.User.GID = uid, uid
 			return nil
 		}
 		u := users[0]
@@ -349,8 +354,9 @@ func WithUserID(uid uint32) SpecOpts {
 }
 
 // WithUsername sets the correct UID and GID for the container
-// based on the the image's /etc/passwd contents. If the username
-// is not found in /etc/passwd, it returns error.
+// based on the the image's /etc/passwd contents. If /etc/passwd
+// does not exist, or the username is not found in /etc/passwd,
+// it returns error.
 func WithUsername(username string) SpecOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container, s *specs.Spec) error {
 		if c.Snapshotter == "" {
