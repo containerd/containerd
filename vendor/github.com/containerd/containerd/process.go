@@ -23,7 +23,7 @@ type Process interface {
 	// Delete removes the process and any resources allocated returning the exit status
 	Delete(context.Context, ...ProcessDeleteOpts) (*ExitStatus, error)
 	// Kill sends the provided signal to the process
-	Kill(context.Context, syscall.Signal) error
+	Kill(context.Context, syscall.Signal, ...KillOpts) error
 	// Wait asynchronously waits for the process to exit, and sends the exit code to the returned channel
 	Wait(context.Context) (<-chan ExitStatus, error)
 	// CloseIO allows various pipes to be closed on the process
@@ -104,11 +104,18 @@ func (p *process) Start(ctx context.Context) error {
 	return nil
 }
 
-func (p *process) Kill(ctx context.Context, s syscall.Signal) error {
+func (p *process) Kill(ctx context.Context, s syscall.Signal, opts ...KillOpts) error {
+	var i KillInfo
+	for _, o := range opts {
+		if err := o(ctx, p, &i); err != nil {
+			return err
+		}
+	}
 	_, err := p.task.client.TaskService().Kill(ctx, &tasks.KillRequest{
 		Signal:      uint32(s),
 		ContainerID: p.task.id,
 		ExecID:      p.id,
+		All:         i.All,
 	})
 	return errdefs.FromGRPC(err)
 }
