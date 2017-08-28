@@ -97,6 +97,9 @@ func (c *criContainerdService) handleEvent(evt *events.Envelope) {
 		glog.V(2).Infof("TaskExit event %+v", e)
 		cntr, err := c.containerStore.Get(e.ContainerID)
 		if err != nil {
+			if _, err := c.sandboxStore.Get(e.ContainerID); err == nil {
+				return
+			}
 			glog.Errorf("Failed to get container %q: %v", e.ContainerID, err)
 			return
 		}
@@ -142,6 +145,9 @@ func (c *criContainerdService) handleEvent(evt *events.Envelope) {
 		glog.V(2).Infof("TaskOOM event %+v", e)
 		cntr, err := c.containerStore.Get(e.ContainerID)
 		if err != nil {
+			if _, err := c.sandboxStore.Get(e.ContainerID); err == nil {
+				return
+			}
 			glog.Errorf("Failed to get container %q: %v", e.ContainerID, err)
 		}
 		err = cntr.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
