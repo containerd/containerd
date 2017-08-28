@@ -41,7 +41,7 @@ func WithProcessKill(ctx context.Context, p Process) error {
 	if err != nil {
 		return err
 	}
-	if err := p.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := p.Kill(ctx, syscall.SIGKILL, WithKillAll); err != nil {
 		if errdefs.IsFailedPrecondition(err) || errdefs.IsNotFound(err) {
 			return nil
 		}
