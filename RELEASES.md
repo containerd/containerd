@@ -118,6 +118,8 @@ __If you are reporting a security issue, please follow the responsible
 disclosure guidelines and reach out discreetly__. Remember that backported PRs
 must follow the versioning guidelines from this document.
 
+Please send security related issues to containerd-security@googlegroups.com.
+
 Any release that is "active" can accept backports. Opening a backport PR is
 fairly straightforward. The steps differ depending on whether you are pulling
 a fix from master or need to draft a new commit specific to a particular
