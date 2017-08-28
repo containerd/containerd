@@ -3,6 +3,7 @@ package containerd
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
@@ -66,8 +67,18 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
 	for _, layer := range layers {
 		unpacked, err := rootfs.ApplyLayer(ctx, layer, chain, sn, a)
 		if err != nil {
-			// TODO: possibly wait and retry if extraction of same chain id was in progress
-			return err
+			// wait and retry if extraction of same chain id was in progress
+			for retry := 3; retry > 0; retry-- {
+				// 3 second wait seems to be working for various diffrent image pull (parallel) tests.
+				time.Sleep(time.Second * 3)
+				unpacked, err = rootfs.ApplyLayer(ctx, layer, chain, sn, a)
+				if err == nil {
+					break
+				}
+			}
+			if err != nil {
+				return err
+			}
 		}
 		if unpacked {
 			info, err := cs.Info(ctx, layer.Blob.Digest)
