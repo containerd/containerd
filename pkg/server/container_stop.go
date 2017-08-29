@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/docker/docker/pkg/signal"
 	"github.com/golang/glog"
@@ -120,7 +121,7 @@ func (c *criContainerdService) stopContainer(ctx context.Context, container cont
 	// Event handler will Delete the container from containerd after it handles the Exited event.
 	glog.V(2).Infof("Kill container %q", id)
 	if task != nil {
-		if err = task.Kill(ctx, unix.SIGKILL); err != nil {
+		if err = task.Kill(ctx, unix.SIGKILL, containerd.WithKillAll); err != nil {
 			if !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to kill container %q: %v", id, err)
 			}
