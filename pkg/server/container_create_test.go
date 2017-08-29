@@ -166,10 +166,6 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 			Type: runtimespec.UTSNamespace,
 			Path: getUTSNamespace(sandboxPid),
 		})
-		assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
-			Type: runtimespec.PIDNamespace,
-			Path: getPIDNamespace(sandboxPid),
-		})
 	}
 	return config, sandboxConfig, imageConfig, specCheck
 }
@@ -439,4 +435,28 @@ func TestPrivilegedBindMount(t *testing.T) {
 			checkMount(t, spec.Mounts, "cgroup", "/sys/fs/cgroup", "cgroup", nil, []string{"ro"})
 		}
 	}
+}
+
+func TestPidNamespace(t *testing.T) {
+	testID := "test-id"
+	testPid := uint32(1234)
+	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	c := newTestCRIContainerdService()
+	t.Logf("should not set pid namespace when host pid is true")
+	config.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{HostPid: true}
+	spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
+	assert.NoError(t, err)
+	specCheck(t, testID, testPid, spec)
+	for _, ns := range spec.Linux.Namespaces {
+		assert.NotEqual(t, ns.Type, runtimespec.PIDNamespace)
+	}
+
+	t.Logf("should set pid namespace when host pid is false")
+	config.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{HostPid: false}
+	spec, err = c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
+	assert.NoError(t, err)
+	specCheck(t, testID, testPid, spec)
+	assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
+		Type: runtimespec.PIDNamespace,
+	})
 }
