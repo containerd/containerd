@@ -330,8 +330,10 @@ func (s *Service) CloseIO(ctx context.Context, r *shimapi.CloseIORequest) (*goog
 	if !ok {
 		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "process does not exist %s", r.ID)
 	}
-	if err := p.Stdin().Close(); err != nil {
-		return nil, err
+	if stdin := p.Stdin(); stdin != nil {
+		if err := stdin.Close(); err != nil {
+			return nil, errors.Wrap(err, "close stdin")
+		}
 	}
 	return empty, nil
 }
