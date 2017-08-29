@@ -25,6 +25,8 @@ type Config struct {
 	Subreaper bool `toml:"subreaper"`
 	// OOMScore adjust the containerd's oom score
 	OOMScore int `toml:"oom_score"`
+	// Cgroup specifies cgroup information for the containerd daemon process
+	Cgroup CgroupConfig `toml:"cgroup"`
 
 	md toml.MetaData
 }
@@ -44,6 +46,10 @@ type Debug struct {
 
 type MetricsConfig struct {
 	Address string `toml:"address"`
+}
+
+type CgroupConfig struct {
+	Path string `toml:"path"`
 }
 
 // Decode unmarshals a plugin specific configuration by plugin id
