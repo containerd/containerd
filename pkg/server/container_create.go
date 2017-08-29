@@ -171,7 +171,8 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	}()
 
 	status := containerstore.Status{CreatedAt: time.Now().UnixNano()}
-	container, err := containerstore.NewContainer(meta, status,
+	container, err := containerstore.NewContainer(meta,
+		containerstore.WithStatus(status, containerRootDir),
 		containerstore.WithContainer(cntr),
 		containerstore.WithContainerIO(containerIO),
 	)

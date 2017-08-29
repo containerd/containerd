@@ -17,16 +17,19 @@ limitations under the License.
 package container
 
 import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"sync"
 
+	"github.com/docker/docker/pkg/ioutils"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
-// TODO(random-liu): Handle versioning.
-// TODO(random-liu): Add checkpoint support.
-
-// version is current version of container status.
-const version = "v1" // nolint
+// statusVersion is current version of container status.
+const statusVersion = "v1" // nolint
 
 // versionedStatus is the internal used versioned container status.
 // nolint
@@ -60,17 +63,40 @@ type Status struct {
 }
 
 // State returns current state of the container based on the container status.
-func (c Status) State() runtime.ContainerState {
-	if c.FinishedAt != 0 {
+func (s Status) State() runtime.ContainerState {
+	if s.FinishedAt != 0 {
 		return runtime.ContainerState_CONTAINER_EXITED
 	}
-	if c.StartedAt != 0 {
+	if s.StartedAt != 0 {
 		return runtime.ContainerState_CONTAINER_RUNNING
 	}
-	if c.CreatedAt != 0 {
+	if s.CreatedAt != 0 {
 		return runtime.ContainerState_CONTAINER_CREATED
 	}
 	return runtime.ContainerState_CONTAINER_UNKNOWN
+}
+
+// encode encodes Status into bytes in json format.
+func (s *Status) encode() ([]byte, error) {
+	return json.Marshal(&versionedStatus{
+		Version: statusVersion,
+		Status:  *s,
+	})
+}
+
+// decode decodes Status from bytes.
+func (s *Status) decode(data []byte) error {
+	versioned := &versionedStatus{}
+	if err := json.Unmarshal(data, versioned); err != nil {
+		return err
+	}
+	// Handle old version after upgrade.
+	switch versioned.Version {
+	case statusVersion:
+		*s = versioned.Status
+		return nil
+	}
+	return fmt.Errorf("unsupported version")
 }
 
 // UpdateFunc is function used to update the container status. If there
@@ -99,48 +125,73 @@ type StatusStorage interface {
 // StoreStatus creates the storage containing the passed in container status with the
 // specified id.
 // The status MUST be created in one transaction.
-func StoreStatus(id string, status Status) (StatusStorage, error) {
-	return &statusStorage{status: status}, nil
-	// TODO(random-liu): Create the data on disk atomically.
+func StoreStatus(root, id string, status Status) (StatusStorage, error) {
+	data, err := status.encode()
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode status: %v", err)
+	}
+	path := filepath.Join(root, "status")
+	if err := ioutils.AtomicWriteFile(path, data, 0600); err != nil {
+		return nil, fmt.Errorf("failed to checkpoint status to %q: %v", path, err)
+	}
+	return &statusStorage{
+		path:   path,
+		status: status,
+	}, nil
 }
 
-// LoadStatus loads container status from checkpoint.
-func LoadStatus(id string) (StatusStorage, error) {
-	// TODO(random-liu): Load container status from disk.
-	return nil, nil
+// LoadStatus loads container status from checkpoint. There shouldn't be threads
+// writing to the file during loading.
+func LoadStatus(root, id string) (Status, error) {
+	path := filepath.Join(root, "status")
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return Status{}, fmt.Errorf("failed to read status from %q: %v", path, err)
+	}
+	var status Status
+	if err := status.decode(data); err != nil {
+		return Status{}, fmt.Errorf("failed to decode status %q: %v", data, err)
+	}
+	return status, nil
 }
 
 type statusStorage struct {
 	sync.RWMutex
+	path   string
 	status Status
 }
 
 // Get a copy of container status.
-func (m *statusStorage) Get() Status {
-	m.RLock()
-	defer m.RUnlock()
-	return m.status
+func (s *statusStorage) Get() Status {
+	s.RLock()
+	defer s.RUnlock()
+	return s.status
 }
 
 // Update the container status.
-func (m *statusStorage) Update(u UpdateFunc) error {
-	m.Lock()
-	defer m.Unlock()
-	newStatus, err := u(m.status)
+func (s *statusStorage) Update(u UpdateFunc) error {
+	s.Lock()
+	defer s.Unlock()
+	newStatus, err := u(s.status)
 	if err != nil {
 		return err
 	}
-	// TODO(random-liu) *Update* existing status on disk atomically,
-	// return error if checkpoint failed.
-	m.status = newStatus
+	data, err := newStatus.encode()
+	if err != nil {
+		return fmt.Errorf("failed to encode status: %v", err)
+	}
+	if err := ioutils.AtomicWriteFile(s.path, data, 0600); err != nil {
+		return fmt.Errorf("failed to checkpoint status to %q: %v", s.path, err)
+	}
+	s.status = newStatus
 	return nil
 }
 
 // Delete deletes the container status from disk atomically.
-func (m *statusStorage) Delete() error {
-	// TODO(random-liu): Rename the data on the disk, returns error
-	// if fails. No lock is needed because file rename is atomic.
-	// TODO(random-liu): Cleanup temporary files generated, do not
-	// return error.
-	return nil
+func (s *statusStorage) Delete() error {
+	temp := filepath.Dir(s.path) + ".del-" + filepath.Base(s.path)
+	if err := os.Rename(s.path, temp); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return os.RemoveAll(temp)
 }
