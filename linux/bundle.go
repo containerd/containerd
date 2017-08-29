@@ -28,7 +28,7 @@ func loadBundle(path, workdir, namespace, id string, events *events.Exchange) *b
 }
 
 // newBundle creates a new bundle on disk at the provided path for the given id
-func newBundle(path, namespace, workDir, id string, spec []byte, events *events.Exchange) (b *bundle, err error) {
+func newBundle(namespace, id, path, workDir string, spec []byte, events *events.Exchange) (b *bundle, err error) {
 	if err := os.MkdirAll(path, 0711); err != nil {
 		return nil, err
 	}
@@ -78,8 +78,8 @@ type bundle struct {
 }
 
 // NewShim connects to the shim managing the bundle and tasks
-func (b *bundle) NewShim(ctx context.Context, binary, grpcAddress string, remote, debug bool, createOpts runtime.CreateOpts) (*client.Client, error) {
-	opt := client.WithStart(binary, grpcAddress, debug)
+func (b *bundle) NewShim(ctx context.Context, binary, grpcAddress string, remote, debug bool, createOpts runtime.CreateOpts, exitHandler func()) (*client.Client, error) {
+	opt := client.WithStart(binary, grpcAddress, debug, exitHandler)
 	if !remote {
 		opt = client.WithLocal(b.events)
 	}

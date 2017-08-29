@@ -27,6 +27,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const InitPidFile = "init.pid"
+
 type initProcess struct {
 	sync.WaitGroup
 	initState
@@ -131,7 +133,7 @@ func newInitProcess(context context.Context, plat platform, path, namespace, wor
 			return nil, errors.Wrap(err, "failed to create OCI runtime io pipes")
 		}
 	}
-	pidFile := filepath.Join(path, "init.pid")
+	pidFile := filepath.Join(path, InitPidFile)
 	if r.Checkpoint != "" {
 		opts := &runc.RestoreOpts{
 			CheckpointOpts: runc.CheckpointOpts{

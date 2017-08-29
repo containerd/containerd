@@ -66,6 +66,10 @@ func main() {
 			Name:  "root",
 			Usage: "containerd root directory",
 		},
+		cli.StringFlag{
+			Name:  "state",
+			Usage: "containerd state directory",
+		},
 	}
 	app.Commands = []cli.Command{
 		configCommand,
@@ -155,6 +159,10 @@ func applyFlags(context *cli.Context, config *server.Config) error {
 		{
 			name: "root",
 			d:    &config.Root,
+		},
+		{
+			name: "state",
+			d:    &config.State,
 		},
 		{
 			name: "address",

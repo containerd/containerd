@@ -91,7 +91,7 @@ checkprotos: protos ## check if protobufs needs to be generated again
 
 # Depends on binaries because vet will silently fail if it can't load compiled
 # imports
-vet: binaries ## run go vet
+vet: ## run go vet
 	@echo "$(WHALE) $@"
 	@test -z "$$(go vet ${PACKAGES} 2>&1 | grep -v 'constant [0-9]* not a string in call to Errorf' | grep -v 'unrecognized printf verb 'r'' | egrep -v '(timestamp_test.go|duration_test.go|fetch.go|exit status 1)' | tee /dev/stderr)"
 

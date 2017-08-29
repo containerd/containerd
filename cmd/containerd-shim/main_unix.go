@@ -9,6 +9,8 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -20,6 +22,7 @@ import (
 	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/typeurl"
 	"github.com/containerd/containerd/version"
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -101,7 +104,12 @@ func main() {
 		if err := serve(server, socket); err != nil {
 			return err
 		}
-		return handleSignals(signals, server)
+		logger := logrus.WithFields(logrus.Fields{
+			"pid":       os.Getpid(),
+			"path":      path,
+			"namespace": context.GlobalString("namespace"),
+		})
+		return handleSignals(logger, signals, server, sv)
 	}
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "containerd-shim: %s\n", err)
@@ -136,27 +144,41 @@ func serve(server *grpc.Server, path string) error {
 	return nil
 }
 
-func handleSignals(signals chan os.Signal, server *grpc.Server) error {
-	for s := range signals {
-		logrus.WithField("signal", s).Debug("received signal")
-		switch s {
-		case unix.SIGCHLD:
-			if err := reaper.Reap(); err != nil {
-				logrus.WithError(err).Error("reap exit status")
-			}
-		case unix.SIGTERM, unix.SIGINT:
-			// TODO: should we forward signals to the processes if they are still running?
-			// i.e. machine reboot
-			server.Stop()
+func handleSignals(logger *logrus.Entry, signals chan os.Signal, server *grpc.Server, sv *shim.Service) error {
+	var (
+		termOnce sync.Once
+		done     = make(chan struct{})
+	)
+
+	for {
+		select {
+		case <-done:
 			return nil
-		case unix.SIGUSR1:
-			dumpStacks()
+		case s := <-signals:
+			switch s {
+			case unix.SIGCHLD:
+				if err := reaper.Reap(); err != nil {
+					logger.WithError(err).Error("reap exit status")
+				}
+			case unix.SIGTERM, unix.SIGINT:
+				go termOnce.Do(func() {
+					server.Stop()
+					// Ensure our child is dead if any
+					sv.Kill(context.Background(), &shimapi.KillRequest{
+						Signal: uint32(syscall.SIGKILL),
+						All:    true,
+					})
+					sv.Delete(context.Background(), &google_protobuf.Empty{})
+					close(done)
+				})
+			case unix.SIGUSR1:
+				dumpStacks(logger)
+			}
 		}
 	}
-	return nil
 }
 
-func dumpStacks() {
+func dumpStacks(logger *logrus.Entry) {
 	var (
 		buf       []byte
 		stackSize int
@@ -168,7 +190,7 @@ func dumpStacks() {
 		bufferLen *= 2
 	}
 	buf = buf[:stackSize]
-	logrus.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
+	logger.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
 }
 
 func connectEvents(address string) (eventsapi.EventsClient, error) {

@@ -15,13 +15,15 @@ import (
 
 type Task struct {
 	id        string
+	pid       int
 	shim      *client.Client
 	namespace string
 }
 
-func newTask(id, namespace string, shim *client.Client) *Task {
+func newTask(id, namespace string, pid int, shim *client.Client) *Task {
 	return &Task{
 		id:        id,
+		pid:       pid,
 		shim:      shim,
 		namespace: namespace,
 	}

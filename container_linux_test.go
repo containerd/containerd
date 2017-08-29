@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os/exec"
 	"runtime"
 	"strings"
 	"sync"
@@ -222,13 +223,14 @@ func TestDaemonRestart(t *testing.T) {
 		return
 	}
 
-	if err := ctrd.Restart(); err != nil {
+	var exitStatus ExitStatus
+	if err := ctrd.Restart(func() {
+		exitStatus = <-statusC
+	}); err != nil {
 		t.Fatal(err)
 	}
 
-	status := <-statusC
-	_, _, err = status.Result()
-	if err == nil {
+	if exitStatus.Error() == nil {
 		t.Errorf(`first task.Wait() should have failed with "transport is closing"`)
 	}
 
@@ -710,5 +712,142 @@ func TestContainerKillAll(t *testing.T) {
 	if _, err := task.Delete(ctx); err != nil {
 		t.Error(err)
 		return
+	}
+}
+
+func TestShimSigkilled(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	// redis unset its PDeathSignal making it a good candidate
+	image, err = client.Pull(ctx, "docker.io/library/redis:alpine", WithPullUnpack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image)), withNewSnapshot(id, image))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+	}
+
+	pid := task.Pid()
+	if pid <= 0 {
+		t.Fatalf("invalid task pid %d", pid)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	// SIGKILL the shim
+	if err := exec.Command("pkill", "-KILL", "containerd-s").Run(); err != nil {
+		t.Fatalf("failed to kill shim: %v", err)
+	}
+
+	<-statusC
+
+	if err := unix.Kill(int(pid), 0); err != unix.ESRCH {
+		t.Errorf("pid %d still exists", pid)
+	}
+}
+
+func TestDaemonRestartWithRunningShim(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), WithProcessArgs("sleep", "100")), withNewSnapshot(id, image))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+	}
+
+	pid := task.Pid()
+	if pid <= 0 {
+		t.Fatalf("invalid task pid %d", pid)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	var exitStatus ExitStatus
+	if err := ctrd.Restart(func() {
+		exitStatus = <-statusC
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if exitStatus.Error() == nil {
+		t.Errorf(`first task.Wait() should have failed with "transport is closing"`)
+	}
+
+	waitCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+	c, err := ctrd.waitForStart(waitCtx)
+	cancel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Close()
+
+	statusC, err = task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+
+	<-statusC
+
+	if err := unix.Kill(int(pid), 0); err != unix.ESRCH {
+		t.Errorf("pid %d still exists", pid)
 	}
 }

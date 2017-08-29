@@ -2,10 +2,10 @@ package runtime
 
 import (
 	"context"
-	"errors"
 	"sync"
 
 	"github.com/containerd/containerd/namespaces"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -75,7 +75,7 @@ func (l *TaskList) AddWithNamespace(namespace string, t Task) error {
 		l.tasks[namespace] = make(map[string]Task)
 	}
 	if _, ok := l.tasks[namespace][id]; ok {
-		return ErrTaskAlreadyExists
+		return errors.Wrap(ErrTaskAlreadyExists, id)
 	}
 	l.tasks[namespace][id] = t
 	return nil

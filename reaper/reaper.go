@@ -4,12 +4,15 @@ package reaper
 
 import (
 	"bytes"
-	"fmt"
 	"os/exec"
 	"sync"
 
 	"github.com/containerd/containerd/sys"
 	"github.com/pkg/errors"
+)
+
+var (
+	ErrNoSuchProcess = errors.New("no such process")
 )
 
 // Reap should be called when the process receives an SIGCHLD.  Reap will reap
@@ -30,7 +33,8 @@ func Reap() error {
 			// pipes are closed and finalizers are run on the process
 			c.c.Wait()
 		}
-		c.ExitCh <- e.Status
+		c.exitStatus = e.Status
+		close(c.ExitCh)
 	}
 	return err
 }
@@ -68,7 +72,7 @@ func (m *Monitor) CombinedOutput(c *exec.Cmd) ([]byte, error) {
 func (m *Monitor) Start(c *exec.Cmd) error {
 	rc := &Cmd{
 		c:      c,
-		ExitCh: make(chan int, 1),
+		ExitCh: make(chan struct{}),
 	}
 	// start the process
 	m.Lock()
@@ -105,7 +109,8 @@ func (m *Monitor) RegisterNL(pid int, c *Cmd) {
 	if status, ok := m.unknown[pid]; ok {
 		delete(m.unknown, pid)
 		m.cmds[pid] = c
-		c.ExitCh <- status
+		c.exitStatus = status
+		close(c.ExitCh)
 		return
 	}
 	m.cmds[pid] = c
@@ -116,13 +121,13 @@ func (m *Monitor) WaitPid(pid int) (int, error) {
 	rc, ok := m.cmds[pid]
 	m.Unlock()
 	if !ok {
-		return 255, fmt.Errorf("process does not exist")
+		return 255, errors.Wrapf(ErrNoSuchProcess, "pid %d", pid)
 	}
-	ec := <-rc.ExitCh
-	if ec != 0 {
-		return ec, errors.Errorf("exit status %d", ec)
+	<-rc.ExitCh
+	if rc.exitStatus != 0 {
+		return rc.exitStatus, errors.Errorf("exit status %d", rc.exitStatus)
 	}
-	return ec, nil
+	return rc.exitStatus, nil
 }
 
 // Command returns the registered pid for the command created
@@ -139,6 +144,7 @@ func (m *Monitor) Delete(pid int) {
 }
 
 type Cmd struct {
-	c      *exec.Cmd
-	ExitCh chan int
+	c          *exec.Cmd
+	ExitCh     chan struct{}
+	exitStatus int
 }
