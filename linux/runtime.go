@@ -405,9 +405,7 @@ func (r *Runtime) getRuntime(ctx context.Context, ns, id string) (*runc.Runc, er
 		return nil, err
 	}
 	return &runc.Runc{
-		// TODO: until we have a way to store/retrieve the original command
-		// we can only rely on runc from the default $PATH
-		Command:      runc.DefaultCommand,
+		Command:      r.runtime,
 		LogFormat:    runc.JSON,
 		PdeathSignal: unix.SIGKILL,
 		Root:         filepath.Join(client.RuncRoot, ns),
