@@ -84,6 +84,8 @@ type criContainerdService struct {
 	client *containerd.Client
 	// streamServer is the streaming server serves container streaming request.
 	streamServer streaming.Server
+	// cgroupPath in which the cri-containerd is placed in
+	cgroupPath string
 }
 
 // NewCRIContainerdService returns a new instance of CRIContainerdService
@@ -95,12 +97,19 @@ func NewCRIContainerdService(
 	networkPluginBinDir,
 	networkPluginConfDir,
 	streamAddress,
-	streamPort string) (CRIContainerdService, error) {
+	streamPort string,
+	cgroupPath string) (CRIContainerdService, error) {
 	// TODO(random-liu): [P2] Recover from runtime state and checkpoint.
 
 	client, err := containerd.New(containerdEndpoint, containerd.WithDefaultNamespace(k8sContainerdNamespace))
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize containerd client with endpoint %q: %v", containerdEndpoint, err)
+	}
+	if cgroupPath != "" {
+		_, err := loadCgroup(cgroupPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load cgroup for cgroup path %v: %v", cgroupPath, err)
+		}
 	}
 
 	c := &criContainerdService{
@@ -118,6 +127,7 @@ func NewCRIContainerdService(
 		eventService:        client.EventService(),
 		contentStoreService: client.ContentStore(),
 		client:              client,
+		cgroupPath:          cgroupPath,
 	}
 
 	netPlugin, err := ocicni.InitCNI(networkPluginConfDir, networkPluginBinDir)
