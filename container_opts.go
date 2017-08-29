@@ -5,6 +5,8 @@ import (
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/typeurl"
+	"github.com/gogo/protobuf/types"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/pkg/errors"
 )
@@ -14,10 +16,21 @@ type NewContainerOpts func(ctx context.Context, client *Client, c *containers.Co
 
 // WithRuntime allows a user to specify the runtime name and additional options that should
 // be used to create tasks for the container
-func WithRuntime(name string) NewContainerOpts {
+func WithRuntime(name string, options interface{}) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
+		var (
+			any *types.Any
+			err error
+		)
+		if options != nil {
+			any, err = typeurl.MarshalAny(options)
+			if err != nil {
+				return err
+			}
+		}
 		c.Runtime = containers.RuntimeInfo{
-			Name: name,
+			Name:    name,
+			Options: any,
 		}
 		return nil
 	}
