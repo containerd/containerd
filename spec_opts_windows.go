@@ -53,6 +53,9 @@ func WithImageConfig(i Image) SpecOpts {
 func WithTTY(width, height int) SpecOpts {
 	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
 		s.Process.Terminal = true
+		if s.Process.ConsoleSize == nil {
+			s.Process.ConsoleSize = &specs.Box{}
+		}
 		s.Process.ConsoleSize.Width = uint(width)
 		s.Process.ConsoleSize.Height = uint(height)
 		return nil
