@@ -7,10 +7,11 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"syscall"
 
-	"github.com/containerd/containerd/osutils"
 	"github.com/containerd/console"
+	"github.com/containerd/containerd/osutils"
 )
 
 func writeMessage(f *os.File, level string, err error) {
@@ -111,7 +112,10 @@ func start(log *os.File) error {
 	if runtime.GOOS == "solaris" {
 		return nil
 	}
-	var exitShim bool
+	var (
+		exitShim  bool
+		cleanOnce sync.Once
+	)
 	for {
 		select {
 		case s := <-signals:
@@ -128,15 +132,19 @@ func start(log *os.File) error {
 			}
 			// runtime has exited so the shim can also exit
 			if exitShim {
-				// kill all processes in the container incase it was not running in
-				// its own PID namespace
-				p.killAll()
-				// wait for all the processes and IO to finish
-				p.Wait()
-				// delete the container from the runtime
-				p.delete()
-				// the close of the exit fifo will happen when the shim exits
-				return nil
+				cleanOnce.Do(func() {
+					go func() {
+						// kill all processes in the container incase it was not running in
+						// its own PID namespace
+						p.killAll()
+						// wait for all the processes and IO to finish
+						p.Wait()
+						// delete the container from the runtime
+						p.delete()
+						// the close of the exit fifo will happen when the shim exits
+						os.Exit(0)
+					}()
+				})
 			}
 		case msg := <-msgC:
 			switch msg.Type {
