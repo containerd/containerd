@@ -18,8 +18,8 @@ package options
 
 import (
 	"flag"
-	"time"
 
+	"github.com/containerd/containerd"
 	"github.com/spf13/pflag"
 )
 
@@ -34,8 +34,8 @@ type CRIContainerdOptions struct {
 	PrintVersion bool
 	// ContainerdEndpoint is the containerd endpoint path.
 	ContainerdEndpoint string
-	// ContainerdConnectionTimeout is the connection timeout for containerd client.
-	ContainerdConnectionTimeout time.Duration
+	// ContainerdSnapshotter is the snapshotter used by containerd.
+	ContainerdSnapshotter string
 	// NetworkPluginBinDir is the directory in which the binaries for the plugin is kept.
 	NetworkPluginBinDir string
 	// NetworkPluginConfDir is the directory in which the admin places a CNI conf.
@@ -59,8 +59,8 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		"/var/lib/cri-containerd", "Root directory path for cri-containerd managed files (metadata checkpoint etc).")
 	fs.StringVar(&c.ContainerdEndpoint, "containerd-endpoint",
 		"/run/containerd/containerd.sock", "Path to the containerd endpoint.")
-	fs.DurationVar(&c.ContainerdConnectionTimeout, "containerd-connection-timeout",
-		2*time.Minute, "Connection timeout for containerd client.")
+	fs.StringVar(&c.ContainerdSnapshotter, "containerd-snapshotter",
+		containerd.DefaultSnapshotter, "Snapshotter used by containerd.")
 	fs.BoolVar(&c.PrintVersion, "version",
 		false, "Print cri-containerd version information and quit.")
 	fs.StringVar(&c.NetworkPluginBinDir, "network-bin-dir",
