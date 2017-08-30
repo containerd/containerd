@@ -12,23 +12,19 @@ import (
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/linux/runcopts"
 	client "github.com/containerd/containerd/linux/shim"
-	"github.com/containerd/containerd/runtime"
-	"github.com/containerd/containerd/typeurl"
 	"github.com/pkg/errors"
 )
 
-func loadBundle(path, workdir, namespace, id string, events *events.Exchange) *bundle {
+func loadBundle(id, path, workdir string) *bundle {
 	return &bundle{
-		path:      path,
-		namespace: namespace,
-		id:        id,
-		events:    events,
-		workDir:   workdir,
+		id:      id,
+		path:    path,
+		workDir: workdir,
 	}
 }
 
 // newBundle creates a new bundle on disk at the provided path for the given id
-func newBundle(namespace, id, path, workDir string, spec []byte, events *events.Exchange) (b *bundle, err error) {
+func newBundle(id, path, workDir string, spec []byte) (b *bundle, err error) {
 	if err := os.MkdirAll(path, 0711); err != nil {
 		return nil, err
 	}
@@ -61,56 +57,43 @@ func newBundle(namespace, id, path, workDir string, spec []byte, events *events.
 	defer f.Close()
 	_, err = io.Copy(f, bytes.NewReader(spec))
 	return &bundle{
-		id:        id,
-		path:      path,
-		workDir:   workDir,
-		namespace: namespace,
-		events:    events,
+		id:      id,
+		path:    path,
+		workDir: workDir,
 	}, err
 }
 
 type bundle struct {
-	id        string
-	path      string
-	workDir   string
-	namespace string
-	events    *events.Exchange
+	id      string
+	path    string
+	workDir string
 }
 
-// NewShim connects to the shim managing the bundle and tasks
-func (b *bundle) NewShim(ctx context.Context, binary, grpcAddress string, remote, debug bool, createOpts runtime.CreateOpts, exitHandler func()) (*client.Client, error) {
-	opt := client.WithStart(binary, grpcAddress, debug, exitHandler)
-	if !remote {
-		opt = client.WithLocal(b.events)
+type shimOpt func(*bundle, string, *runcopts.RuncOptions) (client.Config, client.ClientOpt)
+
+func ShimRemote(shim, daemonAddress, cgroup string, debug bool, exitHandler func()) shimOpt {
+	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (client.Config, client.ClientOpt) {
+		return b.shimConfig(ns, ropts),
+			client.WithStart(shim, b.shimAddress(ns), daemonAddress, cgroup, debug, exitHandler)
 	}
-	var options runcopts.CreateOptions
-	if createOpts.Options != nil {
-		v, err := typeurl.UnmarshalAny(createOpts.Options)
-		if err != nil {
-			return nil, err
-		}
-		options = *v.(*runcopts.CreateOptions)
-	}
-	return client.New(ctx, client.Config{
-		Address:    b.shimAddress(),
-		Path:       b.path,
-		Namespace:  b.namespace,
-		CgroupPath: options.ShimCgroup,
-		WorkDir:    b.workDir,
-	}, opt)
 }
 
-// Connect reconnects to an existing shim
-func (b *bundle) Connect(ctx context.Context, remote bool) (*client.Client, error) {
-	opt := client.WithConnect
-	if !remote {
-		opt = client.WithLocal(b.events)
+func ShimLocal(exchange *events.Exchange) shimOpt {
+	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (client.Config, client.ClientOpt) {
+		return b.shimConfig(ns, ropts), client.WithLocal(exchange)
 	}
-	return client.New(ctx, client.Config{
-		Address:   b.shimAddress(),
-		Path:      b.path,
-		Namespace: b.namespace,
-	}, opt)
+}
+
+func ShimConnect() shimOpt {
+	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (client.Config, client.ClientOpt) {
+		return b.shimConfig(ns, ropts), client.WithConnect(b.shimAddress(ns))
+	}
+}
+
+// NewShimClient connects to the shim managing the bundle and tasks creating it if needed
+func (b *bundle) NewShimClient(ctx context.Context, namespace string, getClientOpts shimOpt, runcOpts *runcopts.RuncOptions) (*client.Client, error) {
+	cfg, opt := getClientOpts(b, namespace, runcOpts)
+	return client.New(ctx, cfg, opt)
 }
 
 // Delete deletes the bundle from disk
@@ -127,7 +110,26 @@ func (b *bundle) Delete() error {
 	return errors.Wrapf(err, "Failed to remove both bundle and workdir locations: %v", err2)
 }
 
-func (b *bundle) shimAddress() string {
-	return filepath.Join(string(filepath.Separator), "containerd-shim", b.namespace, b.id, "shim.sock")
+func (b *bundle) shimAddress(namespace string) string {
+	return filepath.Join(string(filepath.Separator), "containerd-shim", namespace, b.id, "shim.sock")
 
+}
+
+func (b *bundle) shimConfig(namespace string, runcOptions *runcopts.RuncOptions) client.Config {
+	var (
+		criuPath      string
+		systemdCgroup bool
+	)
+	if runcOptions != nil {
+		criuPath = runcOptions.CriuPath
+		systemdCgroup = runcOptions.SystemdCgroup
+	}
+	return client.Config{
+		Path:          b.path,
+		WorkDir:       b.workDir,
+		Namespace:     namespace,
+		Criu:          criuPath,
+		RuntimeRoot:   runcOptions.RuntimeRoot,
+		SystemdCgroup: systemdCgroup,
+	}
 }
