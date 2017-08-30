@@ -438,9 +438,11 @@ func addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount) {
 	for _, mount := range mounts {
 		dst := mount.GetContainerPath()
 		src := mount.GetHostPath()
-		options := []string{"rw"}
+		options := []string{"rbind", "rprivate"}
 		if mount.GetReadonly() {
-			options = []string{"ro"}
+			options = append(options, "ro")
+		} else {
+			options = append(options, "rw")
 		}
 		// TODO(random-liu): [P1] Apply selinux label
 		g.AddBindMount(src, dst, options)
