@@ -19,13 +19,9 @@ set -o pipefail
 source $(dirname "${BASH_SOURCE[0]}")/test-utils.sh
 
 DEFAULT_SKIP="\[Flaky\]|\[Slow\]|\[Serial\]"
-DEFAULT_SKIP+="|scheduling\sa\sGuaranteed\sPod"
-DEFAULT_SKIP+="|scheduling\sa\sBurstable\sPod"
-DEFAULT_SKIP+="|scheduling\sa\sBestEffort\sPod"
 DEFAULT_SKIP+="|querying\s\/stats\/summary"
 DEFAULT_SKIP+="|set\sto\sthe\smanifest\sdigest"
 DEFAULT_SKIP+="|AppArmor"
-DEFAULT_SKIP+="|Top\slevel\sQoS\scontainers"
 DEFAULT_SKIP+="|pull\sfrom\sprivate\sregistry\swith\ssecret"
 
 # FOCUS focuses the test to run.
@@ -54,6 +50,10 @@ git checkout ${KUBERNETES_VERSION}
 mkdir -p ${REPORT_DIR}
 start_cri_containerd ${REPORT_DIR}
 
-make test-e2e-node RUNTIME=remote CONTAINER_RUNTIME_ENDPOINT=unix:///var/run/cri-containerd.sock ARTIFACTS=${REPORT_DIR}
+make test-e2e-node \
+	RUNTIME=remote \
+	CONTAINER_RUNTIME_ENDPOINT=unix:///var/run/cri-containerd.sock \
+	ARTIFACTS=${REPORT_DIR} \
+	TEST_ARGS='--kubelet-flags=--cgroups-per-qos=true --kubelet-flags=--cgroup-root=/' # Enable the QOS tree.
 
 kill_cri_containerd
