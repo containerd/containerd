@@ -46,6 +46,7 @@ func main() {
 		o.NetworkPluginConfDir,
 		o.StreamServerAddress,
 		o.StreamServerPort,
+		o.CgroupPath,
 	)
 	if err != nil {
 		glog.Exitf("Failed to create CRI containerd service %+v: %v", o, err)

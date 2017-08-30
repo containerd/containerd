@@ -24,12 +24,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/docker/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
@@ -351,4 +353,24 @@ func resolveSymbolicLink(path string) (string, error) {
 		return path, nil
 	}
 	return filepath.EvalSymlinks(path)
+}
+
+// loadCgroup loads the cgroup associated with path if it exists and moves the current process into the cgroup. If the cgroup
+// is not created it is created and returned.
+func loadCgroup(cgroupPath string) (cgroups.Cgroup, error) {
+	cg, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(cgroupPath))
+	if err != nil {
+		if err != cgroups.ErrCgroupDeleted {
+			return nil, err
+		}
+		if cg, err = cgroups.New(cgroups.V1, cgroups.StaticPath(cgroupPath), &specs.LinuxResources{}); err != nil {
+			return nil, err
+		}
+	}
+	if err := cg.Add(cgroups.Process{
+		Pid: os.Getpid(),
+	}); err != nil {
+		return nil, err
+	}
+	return cg, nil
 }

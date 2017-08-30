@@ -44,6 +44,8 @@ type CRIContainerdOptions struct {
 	StreamServerAddress string
 	// StreamServerPort is the port streaming server is listening on.
 	StreamServerPort string
+	// CgroupPath is the path for the cgroup that cri-containerd is placed in.
+	CgroupPath string
 }
 
 // NewCRIContainerdOptions returns a reference to CRIContainerdOptions
@@ -71,6 +73,7 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		"", "The ip address streaming server is listening on. Default host interface is used if this is empty.")
 	fs.StringVar(&c.StreamServerPort, "stream-port",
 		"10010", "The port streaming server is listening on.")
+	fs.StringVar(&c.CgroupPath, "cgroup-path", "", "The cgroup that cri-containerd is part of. By default cri-containerd is not placed in a cgroup")
 }
 
 // InitFlags must be called after adding all cli options flags are defined and
