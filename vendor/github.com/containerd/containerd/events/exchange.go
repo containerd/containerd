@@ -185,11 +185,11 @@ func validateTopic(topic string) error {
 	}
 
 	if topic[0] != '/' {
-		return errors.Wrapf(errdefs.ErrInvalidArgument, "must start with '/'", topic)
+		return errors.Wrapf(errdefs.ErrInvalidArgument, "must start with '/'")
 	}
 
 	if len(topic) == 1 {
-		return errors.Wrapf(errdefs.ErrInvalidArgument, "must have at least one component", topic)
+		return errors.Wrapf(errdefs.ErrInvalidArgument, "must have at least one component")
 	}
 
 	components := strings.Split(topic[1:], "/")

@@ -7,7 +7,9 @@ const (
 	TaskExitEventTopic         = "/tasks/exit"
 	TaskDeleteEventTopic       = "/tasks/delete"
 	TaskExecAddedEventTopic    = "/tasks/exec-added"
+	TaskExecStartedEventTopic  = "/tasks/exec-started"
 	TaskPausedEventTopic       = "/tasks/paused"
 	TaskResumedEventTopic      = "/tasks/resumed"
 	TaskCheckpointedEventTopic = "/tasks/checkpointed"
+	TaskUnknownTopic           = "/tasks/?"
 )
