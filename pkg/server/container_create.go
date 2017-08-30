@@ -92,7 +92,10 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	}
 	glog.V(4).Infof("Container spec: %+v", spec)
 
-	var opts []containerd.NewContainerOpts
+	// Set snapshotter before any other options.
+	opts := []containerd.NewContainerOpts{
+		containerd.WithSnapshotter(c.snapshotter),
+	}
 	// Prepare container rootfs.
 	if config.GetLinux().GetSecurityContext().GetReadonlyRootfs() {
 		opts = append(opts, containerd.WithNewSnapshotView(id, image.Image))

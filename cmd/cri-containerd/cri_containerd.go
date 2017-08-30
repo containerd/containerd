@@ -40,6 +40,7 @@ func main() {
 	glog.V(2).Infof("Run cri-containerd grpc server on socket %q", o.SocketPath)
 	service, err := server.NewCRIContainerdService(
 		o.ContainerdEndpoint,
+		o.ContainerdSnapshotter,
 		o.RootDir,
 		o.NetworkPluginBinDir,
 		o.NetworkPluginConfDir,

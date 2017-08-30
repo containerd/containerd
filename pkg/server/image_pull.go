@@ -91,7 +91,12 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 	})
 
 	// TODO(mikebrow): add truncIndex for image id
-	image, err := c.client.Pull(ctx, ref, containerd.WithPullUnpack, containerd.WithSchema1Conversion, containerd.WithResolver(resolver))
+	image, err := c.client.Pull(ctx, ref,
+		containerd.WithPullUnpack,
+		containerd.WithSchema1Conversion,
+		containerd.WithResolver(resolver),
+		containerd.WithPullSnapshotter(c.snapshotter),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull image %q: %v", ref, err)
 	}

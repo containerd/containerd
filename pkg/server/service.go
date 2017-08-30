@@ -55,6 +55,8 @@ type criContainerdService struct {
 	// sandboxImage is the image to use for sandbox container.
 	// TODO(random-liu): Make this configurable via flag.
 	sandboxImage string
+	// snapshotter is the snapshotter to use in containerd.
+	snapshotter string
 	// sandboxStore stores all resources associated with sandboxes.
 	sandboxStore *sandboxstore.Store
 	// sandboxNameIndex stores all sandbox names and make sure each name
@@ -86,8 +88,14 @@ type criContainerdService struct {
 
 // NewCRIContainerdService returns a new instance of CRIContainerdService
 // TODO(random-liu): Add cri-containerd server config to get rid of the long arg list.
-func NewCRIContainerdService(containerdEndpoint, rootDir, networkPluginBinDir, networkPluginConfDir,
-	streamAddress, streamPort string) (CRIContainerdService, error) {
+func NewCRIContainerdService(
+	containerdEndpoint,
+	containerdSnapshotter,
+	rootDir,
+	networkPluginBinDir,
+	networkPluginConfDir,
+	streamAddress,
+	streamPort string) (CRIContainerdService, error) {
 	// TODO(random-liu): [P2] Recover from runtime state and checkpoint.
 
 	client, err := containerd.New(containerdEndpoint, containerd.WithDefaultNamespace(k8sContainerdNamespace))
@@ -99,6 +107,7 @@ func NewCRIContainerdService(containerdEndpoint, rootDir, networkPluginBinDir, n
 		os:                  osinterface.RealOS{},
 		rootDir:             rootDir,
 		sandboxImage:        defaultSandboxImage,
+		snapshotter:         containerdSnapshotter,
 		sandboxStore:        sandboxstore.NewStore(),
 		containerStore:      containerstore.NewStore(),
 		imageStore:          imagestore.NewStore(),
