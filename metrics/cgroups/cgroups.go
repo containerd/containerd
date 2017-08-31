@@ -7,9 +7,11 @@ import (
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
 	metrics "github.com/docker/go-metrics"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
@@ -54,7 +56,7 @@ func (m *cgroupsMonitor) Monitor(c runtime.Task) error {
 	}
 	cg, err := cgroups.Load(cgroups.V1, cgroups.PidPath(int(state.Pid)))
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "load cgroup for %d", state.Pid)
 	}
 	if err := m.collector.Add(info.ID, info.Namespace, cg); err != nil {
 		return err
@@ -68,8 +70,9 @@ func (m *cgroupsMonitor) Stop(c runtime.Task) error {
 	return nil
 }
 
-func (m *cgroupsMonitor) trigger(id string, cg cgroups.Cgroup) {
-	if err := m.publisher.Publish(m.context, runtime.TaskOOMEventTopic, &eventsapi.TaskOOM{
+func (m *cgroupsMonitor) trigger(id, namespace string, cg cgroups.Cgroup) {
+	ctx := namespaces.WithNamespace(m.context, namespace)
+	if err := m.publisher.Publish(ctx, runtime.TaskOOMEventTopic, &eventsapi.TaskOOM{
 		ContainerID: id,
 	}); err != nil {
 		log.G(m.context).WithError(err).Error("post OOM event")

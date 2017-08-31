@@ -251,7 +251,9 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 	}
 	// after the task is created, add it to the monitor
 	if err = r.monitor.Monitor(t); err != nil {
-		r.tasks.Delete(ctx, t)
+		if _, err := r.Delete(ctx, t); err != nil {
+			log.G(ctx).WithError(err).Error("deleting task after failed monitor")
+		}
 		return nil, err
 	}
 	return t, nil
@@ -269,6 +271,7 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 	if err := r.monitor.Stop(lc); err != nil {
 		return nil, err
 	}
+
 	rsp, err := lc.shim.Delete(ctx, empty)
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)

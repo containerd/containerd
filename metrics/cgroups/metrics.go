@@ -21,7 +21,7 @@ var (
 
 // Trigger will be called when an event happens and provides the cgroup
 // where the event originated from
-type Trigger func(string, cgroups.Cgroup)
+type Trigger func(string, string, cgroups.Cgroup)
 
 // New registers the Collector with the provided namespace and returns it so
 // that cgroups can be added for collection
