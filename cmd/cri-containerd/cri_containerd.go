@@ -20,6 +20,7 @@ import (
 	"os"
 
 	"github.com/golang/glog"
+	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/spf13/pflag"
 
 	"github.com/kubernetes-incubator/cri-containerd/cmd/cri-containerd/options"
@@ -35,6 +36,10 @@ func main() {
 	if o.PrintVersion {
 		version.PrintVersion()
 		os.Exit(0)
+	}
+
+	if !o.EnableSelinux {
+		selinux.SetDisabled()
 	}
 
 	glog.V(2).Infof("Run cri-containerd grpc server on socket %q", o.SocketPath)

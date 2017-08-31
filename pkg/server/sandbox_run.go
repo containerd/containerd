@@ -275,7 +275,13 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 		g.RemoveLinuxNamespace(string(runtimespec.IPCNamespace)) // nolint: errcheck
 	}
 
-	// TODO(random-liu): [P1] Apply SeLinux options.
+	selinuxOpt := securityContext.GetSelinuxOptions()
+	processLabel, mountLabel, err := initSelinuxOpts(selinuxOpt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init selinux options %+v: %v", securityContext.GetSelinuxOptions(), err)
+	}
+	g.SetProcessSelinuxLabel(processLabel)
+	g.SetLinuxMountLabel(mountLabel)
 
 	supplementalGroups := securityContext.GetSupplementalGroups()
 	for _, group := range supplementalGroups {

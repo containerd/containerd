@@ -27,7 +27,9 @@ import (
 	"github.com/opencontainers/runc/libcontainer/devices"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
+	"github.com/opencontainers/selinux/go-selinux/label"
 	"golang.org/x/net/context"
+	"golang.org/x/sys/unix"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	cio "github.com/kubernetes-incubator/cri-containerd/pkg/server/io"
@@ -234,9 +236,17 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 	}
 
 	securityContext := config.GetLinux().GetSecurityContext()
+	selinuxOpt := securityContext.GetSelinuxOptions()
+	processLabel, mountLabel, err := initSelinuxOpts(selinuxOpt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init selinux options %+v: %v", securityContext.GetSelinuxOptions(), err)
+	}
 
 	// Add extra mounts first so that CRI specified mounts can override.
-	addOCIBindMounts(&g, append(extraMounts, config.GetMounts()...))
+	mounts := append(extraMounts, config.GetMounts()...)
+	if err := addOCIBindMounts(&g, mounts, mountLabel); err != nil {
+		return nil, fmt.Errorf("failed to set OCI bind mounts %+v: %v", mounts, err)
+	}
 
 	if securityContext.GetPrivileged() {
 		if !sandboxConfig.GetLinux().GetSecurityContext().GetPrivileged() {
@@ -258,6 +268,9 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 		// TODO(random-liu): [P2] Add apparmor and seccomp.
 
 	}
+
+	g.SetProcessSelinuxLabel(processLabel)
+	g.SetLinuxMountLabel(mountLabel)
 
 	// TODO: Figure out whether we should set no new privilege for sandbox container by default
 	g.SetProcessNoNewPrivileges(securityContext.GetNoNewPrivs())
@@ -435,7 +448,7 @@ func setOCIDevicesPrivileged(g *generate.Generator) error {
 // addOCIBindMounts adds bind mounts.
 // TODO(random-liu): Figure out whether we need to change all CRI mounts to readonly when
 // rootfs is readonly. (https://github.com/moby/moby/blob/master/daemon/oci_linux.go)
-func addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount) {
+func addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount, mountLabel string) error {
 	// Mount cgroup into the container as readonly, which inherits docker's behavior.
 	g.AddCgroupsMount("ro") // nolint: errcheck
 	for _, mount := range mounts {
@@ -447,9 +460,16 @@ func addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount) {
 		} else {
 			options = append(options, "rw")
 		}
-		// TODO(random-liu): [P1] Apply selinux label
+
+		if mount.GetSelinuxRelabel() {
+			if err := label.Relabel(src, mountLabel, true); err != nil && err != unix.ENOTSUP {
+				return fmt.Errorf("relabel %q with %q failed: %v", src, mountLabel, err)
+			}
+		}
 		g.AddBindMount(src, dst, options)
 	}
+
+	return nil
 }
 
 func setOCIBindMountsPrivileged(g *generate.Generator) {
