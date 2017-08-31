@@ -335,18 +335,13 @@ func writeContainer(bkt *bolt.Bucket, container *containers.Container) error {
 		return err
 	}
 
-	obkt, err := rbkt.CreateBucket(bucketKeyOptions)
-	if err != nil {
-		return err
-	}
-
 	if container.Runtime.Options != nil {
 		data, err := proto.Marshal(container.Runtime.Options)
 		if err != nil {
 			return err
 		}
 
-		if err := obkt.Put(bucketKeyOptions, data); err != nil {
+		if err := rbkt.Put(bucketKeyOptions, data); err != nil {
 			return err
 		}
 	}
