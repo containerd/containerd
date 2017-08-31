@@ -94,13 +94,13 @@ func (s *Service) newInitProcess(context context.Context, r *shimapi.CreateTaskR
 		}
 	}
 	runtime := &runc.Runc{
-		Command:      r.Runtime,
-		Log:          filepath.Join(s.config.Path, "log.json"),
-		LogFormat:    runc.JSON,
-		PdeathSignal: syscall.SIGKILL,
-		Root:         filepath.Join(RuncRoot, s.config.Namespace),
-		Criu:         s.config.Criu,
-		//		SystemdCgroup: s.config.SystemdCgroup,
+		Command:       r.Runtime,
+		Log:           filepath.Join(s.config.Path, "log.json"),
+		LogFormat:     runc.JSON,
+		PdeathSignal:  syscall.SIGKILL,
+		Root:          filepath.Join(s.config.RuntimeRoot, s.config.Namespace),
+		Criu:          s.config.Criu,
+		SystemdCgroup: s.config.SystemdCgroup,
 	}
 	p := &initProcess{
 		id:       r.ID,

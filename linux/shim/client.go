@@ -93,6 +93,9 @@ func newCommand(binary, daemonAddress string, debug bool, config Config, socket 
 	if config.Criu != "" {
 		args = append(args, "--criu-path", config.Criu)
 	}
+	if config.RuntimeRoot != "" {
+		args = append(args, "--runtime-root", config.RuntimeRoot)
+	}
 	if config.SystemdCgroup {
 		args = append(args, "--systemd-cgroup")
 	}
@@ -182,6 +185,7 @@ type Config struct {
 	Namespace     string
 	WorkDir       string
 	Criu          string
+	RuntimeRoot   string
 	SystemdCgroup bool
 }
 

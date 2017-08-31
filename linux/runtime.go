@@ -70,6 +70,8 @@ type Config struct {
 	Shim string `toml:"shim,omitempty"`
 	// Runtime is a path or name of an OCI runtime used by the shim
 	Runtime string `toml:"runtime,omitempty"`
+	// RuntimeRoot is the path that shall be used by the OCI runtime for its data
+	RuntimeRoot string `toml:"runtime_root,omitempty"`
 	// NoShim calls runc directly from within the pkg
 	NoShim bool `toml:"no_shim,omitempty"`
 	// Debug enable debug on the shim
@@ -93,17 +95,14 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	}
 	cfg := ic.Config.(*Config)
 	r := &Runtime{
-		root:      ic.Root,
-		state:     ic.State,
-		remote:    !cfg.NoShim,
-		shim:      cfg.Shim,
-		shimDebug: cfg.ShimDebug,
-		runtime:   cfg.Runtime,
-		monitor:   monitor.(runtime.TaskMonitor),
-		tasks:     runtime.NewTaskList(),
-		db:        m.(*bolt.DB),
-		address:   ic.Address,
-		events:    ic.Events,
+		root:    ic.Root,
+		state:   ic.State,
+		monitor: monitor.(runtime.TaskMonitor),
+		tasks:   runtime.NewTaskList(),
+		db:      m.(*bolt.DB),
+		address: ic.Address,
+		events:  ic.Events,
+		config:  cfg,
 	}
 	tasks, err := r.restoreTasks(ic.Context)
 	if err != nil {
@@ -119,18 +118,16 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 }
 
 type Runtime struct {
-	root      string
-	state     string
-	shim      string
-	shimDebug bool
-	runtime   string
-	remote    bool
-	address   string
+	root    string
+	state   string
+	address string
 
 	monitor runtime.TaskMonitor
 	tasks   *runtime.TaskList
 	db      *bolt.DB
 	events  *events.Exchange
+
+	config *Config
 }
 
 func (r *Runtime) ID() string {
@@ -169,7 +166,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 	}()
 
 	shimopt := ShimLocal(r.events)
-	if r.remote {
+	if !r.config.NoShim {
 		var cgroup string
 		if opts.Options != nil {
 			v, err := typeurl.UnmarshalAny(opts.Options)
@@ -178,7 +175,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 			}
 			cgroup = v.(*runcopts.CreateOptions).ShimCgroup
 		}
-		shimopt = ShimRemote(r.shim, r.address, cgroup, r.shimDebug, func() {
+		shimopt = ShimRemote(r.config.Shim, r.address, cgroup, r.config.ShimDebug, func() {
 			t, err := r.tasks.Get(ctx, id)
 			if err != nil {
 				// Task was never started or was already sucessfully deleted
@@ -222,7 +219,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 		}
 	}()
 
-	runtime := r.runtime
+	runtime := r.config.Runtime
 	if ropts != nil && ropts.Runtime != "" {
 		runtime = ropts.Runtime
 	}
@@ -411,6 +408,7 @@ func (r *Runtime) terminate(ctx context.Context, bundle *bundle, ns, id string) 
 	if err != nil {
 		return err
 	}
+
 	if err := rt.Delete(ctx, id, &runc.DeleteOpts{
 		Force: true,
 	}); err != nil {
@@ -431,16 +429,24 @@ func (r *Runtime) getRuntime(ctx context.Context, ns, id string) (*runc.Runc, er
 		return nil, err
 	}
 
-	cmd := r.runtime
-	if ropts != nil && ropts.Runtime != "" {
-		cmd = ropts.Runtime
+	var (
+		cmd  = r.config.Runtime
+		root = client.RuncRoot
+	)
+	if ropts != nil {
+		if ropts.Runtime != "" {
+			cmd = ropts.Runtime
+		}
+		if ropts.RuntimeRoot != "" {
+			root = ropts.RuntimeRoot
+		}
 	}
 
 	return &runc.Runc{
 		Command:      cmd,
 		LogFormat:    runc.JSON,
 		PdeathSignal: unix.SIGKILL,
-		Root:         filepath.Join(client.RuncRoot, ns),
+		Root:         filepath.Join(root, ns),
 	}, nil
 }
 

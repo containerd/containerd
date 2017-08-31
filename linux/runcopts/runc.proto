@@ -8,8 +8,9 @@ option go_package = "github.com/containerd/containerd/linux/runcopts;runcopts";
 
 message RuncOptions {
 	string runtime = 1;
-	string criu_path = 2;
-	bool systemd_cgroup = 3;
+	string runtime_root = 2;
+	string criu_path = 3;
+	bool systemd_cgroup = 4;
 }
 
 message CreateOptions {

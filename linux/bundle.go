@@ -118,18 +118,20 @@ func (b *bundle) shimAddress(namespace string) string {
 func (b *bundle) shimConfig(namespace string, runcOptions *runcopts.RuncOptions) client.Config {
 	var (
 		criuPath      string
+		runtimeRoot   string
 		systemdCgroup bool
 	)
 	if runcOptions != nil {
 		criuPath = runcOptions.CriuPath
 		systemdCgroup = runcOptions.SystemdCgroup
+		runtimeRoot = runcOptions.RuntimeRoot
 	}
 	return client.Config{
 		Path:          b.path,
 		WorkDir:       b.workDir,
 		Namespace:     namespace,
 		Criu:          criuPath,
-		RuntimeRoot:   runcOptions.RuntimeRoot,
+		RuntimeRoot:   runtimeRoot,
 		SystemdCgroup: systemdCgroup,
 	}
 }

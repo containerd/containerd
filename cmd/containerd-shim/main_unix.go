@@ -67,6 +67,11 @@ func main() {
 			Usage: "path used to store large temporary data",
 		},
 		cli.StringFlag{
+			Name:  "runtime-root",
+			Usage: "root directory for the runtime",
+			Value: shim.RuncRoot,
+		},
+		cli.StringFlag{
 			Name:  "criu,c",
 			Usage: "path to criu",
 		},
@@ -104,6 +109,7 @@ func main() {
 				WorkDir:       context.GlobalString("workdir"),
 				Criu:          context.GlobalString("criu"),
 				SystemdCgroup: context.GlobalBool("systemd-cgroup"),
+				RuntimeRoot:   context.GlobalString("runtime-root"),
 			},
 			&remoteEventsPublisher{client: e},
 		)
