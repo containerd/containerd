@@ -35,6 +35,22 @@ if [[ -z "${GOPATH}" ]]; then
   exit 1
 fi
 
+ORIGINAL_RULES=`mktemp`
+sudo iptables-save > ${ORIGINAL_RULES}
+
+# Update ip firewall
+# We need to add rules to accept all TCP/UDP/ICMP packets.
+if sudo iptables -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
+	sudo iptables -A INPUT -w -p TCP -j ACCEPT
+	sudo iptables -A INPUT -w -p UDP -j ACCEPT
+	sudo iptables -A INPUT -w -p ICMP -j ACCEPT
+fi
+if sudo iptables -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
+	sudo iptables -A FORWARD -w -p TCP -j ACCEPT
+	sudo iptables -A FORWARD -w -p UDP -j ACCEPT
+	sudo iptables -A FORWARD -w -p ICMP -j ACCEPT
+fi
+
 # Get kubernetes
 KUBERNETES_REPO="https://github.com/kubernetes/kubernetes"
 KUBERNETES_PATH="${GOPATH}/src/k8s.io/kubernetes"
@@ -57,3 +73,6 @@ make test-e2e-node \
 	TEST_ARGS='--kubelet-flags=--cgroups-per-qos=true --kubelet-flags=--cgroup-root=/' # Enable the QOS tree.
 
 kill_cri_containerd
+
+sudo iptables-restore < ${ORIGINAL_RULES}
+rm ${ORIGINAL_RULES}
