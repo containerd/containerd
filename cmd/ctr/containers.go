@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 	"text/tabwriter"
 
 	"github.com/urfave/cli"
@@ -48,26 +47,17 @@ var containersCommand = cli.Command{
 			return nil
 		}
 		w := tabwriter.NewWriter(os.Stdout, 4, 8, 4, ' ', 0)
-		fmt.Fprintln(w, "CONTAINER\tIMAGE\tRUNTIME\tLABELS\t")
+		fmt.Fprintln(w, "CONTAINER\tIMAGE\tRUNTIME\t")
 		for _, c := range containers {
-			var labelStrings []string
-			for k, v := range c.Info().Labels {
-				labelStrings = append(labelStrings, strings.Join([]string{k, v}, "="))
-			}
-			labels := strings.Join(labelStrings, ",")
-			if labels == "" {
-				labels = "-"
-			}
 			imageName := c.Info().Image
 			if imageName == "" {
 				imageName = "-"
 			}
 			record := c.Info()
-			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%v\t\n",
+			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t\n",
 				c.ID(),
 				imageName,
 				record.Runtime.Name,
-				labels,
 			); err != nil {
 				return err
 			}
