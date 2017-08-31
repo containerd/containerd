@@ -44,7 +44,8 @@ func WithStart(binary, address string, debug bool, exitHandler func()) ClientOpt
 		defer f.Close()
 
 		cmd := newCommand(binary, address, debug, config, f)
-		if err := reaper.Default.Start(cmd); err != nil {
+		ec, err := reaper.Default.Start(cmd)
+		if err != nil {
 			return nil, nil, errors.Wrapf(err, "failed to start shim")
 		}
 		defer func() {
@@ -53,8 +54,7 @@ func WithStart(binary, address string, debug bool, exitHandler func()) ClientOpt
 			}
 		}()
 		go func() {
-			reaper.Default.Wait(cmd)
-			reaper.Default.Delete(cmd.Process.Pid)
+			reaper.Default.Wait(cmd, ec)
 			exitHandler()
 		}()
 		log.G(ctx).WithFields(logrus.Fields{

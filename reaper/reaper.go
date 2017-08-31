@@ -6,49 +6,45 @@ import (
 	"bytes"
 	"os/exec"
 	"sync"
+	"time"
 
 	"github.com/containerd/containerd/sys"
+	runc "github.com/containerd/go-runc"
 	"github.com/pkg/errors"
 )
 
-var (
-	ErrNoSuchProcess = errors.New("no such process")
-)
+var ErrNoSuchProcess = errors.New("no such process")
+
+const bufferSize = 2048
 
 // Reap should be called when the process receives an SIGCHLD.  Reap will reap
 // all exited processes and close their wait channels
 func Reap() error {
+	now := time.Now()
 	exits, err := sys.Reap(false)
-	for _, e := range exits {
-		Default.Lock()
-		c, ok := Default.cmds[e.Pid]
-		if !ok {
-			Default.unknown[e.Pid] = e.Status
-			Default.Unlock()
-			continue
+	Default.Lock()
+	for c := range Default.subscribers {
+		for _, e := range exits {
+			c <- runc.Exit{
+				Timestamp: now,
+				Pid:       e.Pid,
+				Status:    e.Status,
+			}
 		}
-		Default.Unlock()
-		if c.c != nil {
-			// after we get an exit, call wait on the go process to make sure all
-			// pipes are closed and finalizers are run on the process
-			c.c.Wait()
-		}
-		c.exitStatus = e.Status
-		close(c.ExitCh)
+
 	}
+	Default.Unlock()
 	return err
 }
 
 var Default = &Monitor{
-	cmds:    make(map[int]*Cmd),
-	unknown: make(map[int]int),
+	subscribers: make(map[chan runc.Exit]struct{}),
 }
 
 type Monitor struct {
 	sync.Mutex
 
-	cmds    map[int]*Cmd
-	unknown map[int]int
+	subscribers map[chan runc.Exit]struct{}
 }
 
 func (m *Monitor) Output(c *exec.Cmd) ([]byte, error) {
@@ -69,82 +65,50 @@ func (m *Monitor) CombinedOutput(c *exec.Cmd) ([]byte, error) {
 }
 
 // Start starts the command a registers the process with the reaper
-func (m *Monitor) Start(c *exec.Cmd) error {
-	rc := &Cmd{
-		c:      c,
-		ExitCh: make(chan struct{}),
+func (m *Monitor) Start(c *exec.Cmd) (chan runc.Exit, error) {
+	ec := m.Subscribe()
+	if err := c.Start(); err != nil {
+		m.Unsubscribe(ec)
+		return nil, err
 	}
-	// start the process
-	m.Lock()
-	err := c.Start()
-	if c.Process != nil {
-		m.RegisterNL(c.Process.Pid, rc)
-	}
-	m.Unlock()
-	return err
+	return ec, nil
 }
 
 // Run runs and waits for the command to finish
 func (m *Monitor) Run(c *exec.Cmd) error {
-	if err := m.Start(c); err != nil {
+	ec, err := m.Start(c)
+	if err != nil {
 		return err
 	}
-	_, err := m.Wait(c)
+	_, err = m.Wait(c, ec)
 	return err
 }
 
-func (m *Monitor) Wait(c *exec.Cmd) (int, error) {
-	return m.WaitPid(c.Process.Pid)
-}
-
-func (m *Monitor) Register(pid int, c *Cmd) {
-	m.Lock()
-	m.RegisterNL(pid, c)
-	m.Unlock()
-}
-
-// RegisterNL does not grab the lock internally
-// the caller is responsible for locking the monitor
-func (m *Monitor) RegisterNL(pid int, c *Cmd) {
-	if status, ok := m.unknown[pid]; ok {
-		delete(m.unknown, pid)
-		m.cmds[pid] = c
-		c.exitStatus = status
-		close(c.ExitCh)
-		return
+func (m *Monitor) Wait(c *exec.Cmd, ec chan runc.Exit) (int, error) {
+	for e := range ec {
+		if e.Pid == c.Process.Pid {
+			// make sure we flush all IO
+			c.Wait()
+			m.Unsubscribe(ec)
+			return e.Status, nil
+		}
 	}
-	m.cmds[pid] = c
+	// return no such process if the ec channel is closed and no more exit
+	// events will be sent
+	return -1, ErrNoSuchProcess
 }
 
-func (m *Monitor) WaitPid(pid int) (int, error) {
+func (m *Monitor) Subscribe() chan runc.Exit {
+	c := make(chan runc.Exit, bufferSize)
 	m.Lock()
-	rc, ok := m.cmds[pid]
+	m.subscribers[c] = struct{}{}
 	m.Unlock()
-	if !ok {
-		return 255, errors.Wrapf(ErrNoSuchProcess, "pid %d", pid)
-	}
-	<-rc.ExitCh
-	if rc.exitStatus != 0 {
-		return rc.exitStatus, errors.Errorf("exit status %d", rc.exitStatus)
-	}
-	return rc.exitStatus, nil
+	return c
 }
 
-// Command returns the registered pid for the command created
-func (m *Monitor) Command(pid int) *Cmd {
+func (m *Monitor) Unsubscribe(c chan runc.Exit) {
 	m.Lock()
-	defer m.Unlock()
-	return m.cmds[pid]
-}
-
-func (m *Monitor) Delete(pid int) {
-	m.Lock()
-	delete(m.cmds, pid)
+	delete(m.subscribers, c)
+	close(c)
 	m.Unlock()
-}
-
-type Cmd struct {
-	c          *exec.Cmd
-	ExitCh     chan struct{}
-	exitStatus int
 }
