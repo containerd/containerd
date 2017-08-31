@@ -20,10 +20,12 @@ type Image interface {
 	Target() ocispec.Descriptor
 	// Unpack unpacks the image's content into a snapshot
 	Unpack(context.Context, string) error
-	// RootFS returns the image digests
+	// RootFS returns the unpacked diffids that make up images rootfs.
 	RootFS(ctx context.Context) ([]digest.Digest, error)
-	// Size returns the image size
+	// Size returns the total size of the image's packed resources.
 	Size(ctx context.Context) (int64, error)
+	// Config descriptor for the image.
+	Config(ctx context.Context) (ocispec.Descriptor, error)
 }
 
 var _ = (Image)(&image{})
@@ -50,6 +52,11 @@ func (i *image) RootFS(ctx context.Context) ([]digest.Digest, error) {
 func (i *image) Size(ctx context.Context) (int64, error) {
 	provider := i.client.ContentStore()
 	return i.i.Size(ctx, provider)
+}
+
+func (i *image) Config(ctx context.Context) (ocispec.Descriptor, error) {
+	provider := i.client.ContentStore()
+	return i.i.Config(ctx, provider)
 }
 
 func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
