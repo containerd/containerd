@@ -144,6 +144,9 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 		return nil, errors.Wrapf(err, "invalid task id")
 	}
 
+	ec := reaper.Default.Subscribe()
+	defer reaper.Default.Unsubscribe(ec)
+
 	bundle, err := newBundle(
 		namespace, id,
 		filepath.Join(r.state, namespace),
@@ -177,7 +180,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 			"id":        id,
 			"namespace": namespace,
 		}).Warn("cleaning up after killed shim")
-		err = r.cleanupAfterDeadShim(context.Background(), bundle, namespace, id, lc.pid, true)
+		err = r.cleanupAfterDeadShim(context.Background(), bundle, namespace, id, lc.pid, ec)
 		if err == nil {
 			r.tasks.Delete(ctx, lc)
 		} else {
@@ -320,7 +323,7 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 				"namespace": ns,
 			}).Error("connecting to shim")
 			pid, _ := runc.ReadPidFile(filepath.Join(bundle.path, client.InitPidFile))
-			err := r.cleanupAfterDeadShim(ctx, bundle, ns, id, pid, false)
+			err := r.cleanupAfterDeadShim(ctx, bundle, ns, id, pid, nil)
 			if err != nil {
 				log.G(ctx).WithError(err).WithField("bundle", bundle.path).
 					Error("cleaning up after dead shim")
@@ -336,18 +339,20 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 	return o, nil
 }
 
-func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, id string, pid int, reap bool) error {
+func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, id string, pid int, ec chan runc.Exit) error {
 	ctx = namespaces.WithNamespace(ctx, ns)
 	if err := r.terminate(ctx, bundle, ns, id); err != nil {
 		return errors.New("failed to terminate task, leaving bundle for debugging")
 	}
 
-	if reap {
+	if ec != nil {
 		// if sub-reaper is set, reap our new child
 		if v, err := sys.GetSubreaper(); err == nil && v == 1 {
-			reaper.Default.Register(pid, &reaper.Cmd{ExitCh: make(chan struct{})})
-			reaper.Default.WaitPid(pid)
-			reaper.Default.Delete(pid)
+			for e := range ec {
+				if e.Pid == pid {
+					break
+				}
+			}
 		}
 	}
 

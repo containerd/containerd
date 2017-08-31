@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/containerd/console"
+	"github.com/containerd/containerd/errdefs"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/pkg/errors"
 )
@@ -345,10 +346,7 @@ func (s *stoppedState) Delete(ctx context.Context) error {
 }
 
 func (s *stoppedState) Kill(ctx context.Context, sig uint32, all bool) error {
-	s.p.mu.Lock()
-	defer s.p.mu.Unlock()
-
-	return s.p.kill(ctx, sig, all)
+	return errdefs.ToGRPCf(errdefs.ErrNotFound, "process %s not found", s.p.id)
 }
 
 func (s *stoppedState) SetExited(status int) {

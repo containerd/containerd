@@ -20,6 +20,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/runtime"
+	runc "github.com/containerd/go-runc"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -48,7 +49,9 @@ func NewService(path, namespace, workDir string, publisher events.Publisher) (*S
 		namespace: namespace,
 		context:   context,
 		workDir:   workDir,
+		ec:        reaper.Default.Subscribe(),
 	}
+	go s.processExits()
 	if err := s.initPlatform(); err != nil {
 		return nil, errors.Wrap(err, "failed to initialized platform behavior")
 	}
@@ -70,31 +73,27 @@ type Service struct {
 	mu            sync.Mutex
 	processes     map[string]process
 	events        chan interface{}
-	eventsMu      sync.Mutex
 	deferredEvent interface{}
 	namespace     string
 	context       context.Context
+	ec            chan runc.Exit
 
 	workDir  string
 	platform platform
 }
 
 func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*shimapi.CreateTaskResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	process, err := newInitProcess(ctx, s.platform, s.path, s.namespace, s.workDir, r)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-	s.mu.Lock()
 	// save the main task id and bundle to the shim for additional requests
 	s.id = r.ID
 	s.bundle = r.Bundle
 	pid := process.Pid()
 	s.processes[r.ID] = process
-	s.mu.Unlock()
-	cmd := &reaper.Cmd{
-		ExitCh: make(chan struct{}),
-	}
-	reaper.Default.Register(pid, cmd)
 	s.events <- &eventsapi.TaskCreate{
 		ContainerID: r.ID,
 		Bundle:      r.Bundle,
@@ -108,7 +107,6 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*sh
 		Checkpoint: r.Checkpoint,
 		Pid:        uint32(pid),
 	}
-	go s.waitExit(process, pid, cmd)
 	return &shimapi.CreateTaskResponse{
 		Pid: uint32(pid),
 	}, nil
@@ -129,11 +127,6 @@ func (s *Service) Start(ctx context.Context, r *shimapi.StartRequest) (*shimapi.
 		}
 	} else {
 		pid := p.Pid()
-		cmd := &reaper.Cmd{
-			ExitCh: make(chan struct{}),
-		}
-		reaper.Default.Register(pid, cmd)
-		go s.waitExit(p, pid, cmd)
 		s.events <- &eventsapi.TaskExecStarted{
 			ContainerID: s.id,
 			ExecID:      r.ID,
@@ -392,17 +385,27 @@ func (s *Service) deleteProcess(id string) {
 	s.mu.Unlock()
 }
 
-func (s *Service) waitExit(p process, pid int, cmd *reaper.Cmd) {
-	status, _ := reaper.Default.WaitPid(pid)
-	p.SetExited(status)
+func (s *Service) processExits() {
+	for e := range s.ec {
+		s.checkProcesses(e)
+	}
+}
 
-	reaper.Default.Delete(pid)
-	s.events <- &eventsapi.TaskExit{
-		ContainerID: s.id,
-		ID:          p.ID(),
-		Pid:         uint32(pid),
-		ExitStatus:  uint32(status),
-		ExitedAt:    p.ExitedAt(),
+func (s *Service) checkProcesses(e runc.Exit) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, p := range s.processes {
+		if p.Pid() == e.Pid {
+			p.SetExited(e.Status)
+			s.events <- &eventsapi.TaskExit{
+				ContainerID: s.id,
+				ID:          p.ID(),
+				Pid:         uint32(e.Pid),
+				ExitStatus:  uint32(e.Status),
+				ExitedAt:    p.ExitedAt(),
+			}
+			return
+		}
 	}
 }
 

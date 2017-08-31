@@ -41,7 +41,7 @@ type Runc struct {
 	PdeathSignal  syscall.Signal
 	Setpgid       bool
 	Criu          string
-	SystemdCgroup string
+	SystemdCgroup bool
 }
 
 // List returns all containers created inside the provided runc root directory
@@ -134,7 +134,8 @@ func (r *Runc) Create(context context.Context, id, bundle string, opts *CreateOp
 		}
 		return nil
 	}
-	if err := Monitor.Start(cmd); err != nil {
+	ec, err := Monitor.Start(cmd)
+	if err != nil {
 		return err
 	}
 	if opts != nil && opts.IO != nil {
@@ -144,7 +145,7 @@ func (r *Runc) Create(context context.Context, id, bundle string, opts *CreateOp
 			}
 		}
 	}
-	_, err := Monitor.Wait(cmd)
+	_, err = Monitor.Wait(cmd, ec)
 	return err
 }
 
@@ -209,7 +210,8 @@ func (r *Runc) Exec(context context.Context, id string, spec specs.Process, opts
 		}
 		return nil
 	}
-	if err := Monitor.Start(cmd); err != nil {
+	ec, err := Monitor.Start(cmd)
+	if err != nil {
 		return err
 	}
 	if opts != nil && opts.IO != nil {
@@ -219,7 +221,7 @@ func (r *Runc) Exec(context context.Context, id string, spec specs.Process, opts
 			}
 		}
 	}
-	_, err = Monitor.Wait(cmd)
+	_, err = Monitor.Wait(cmd, ec)
 	return err
 }
 
@@ -238,10 +240,11 @@ func (r *Runc) Run(context context.Context, id, bundle string, opts *CreateOpts)
 	if opts != nil {
 		opts.Set(cmd)
 	}
-	if err := Monitor.Start(cmd); err != nil {
+	ec, err := Monitor.Start(cmd)
+	if err != nil {
 		return -1, err
 	}
-	return Monitor.Wait(cmd)
+	return Monitor.Wait(cmd, ec)
 }
 
 type DeleteOpts struct {
@@ -294,13 +297,14 @@ func (r *Runc) Stats(context context.Context, id string) (*Stats, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		rd.Close()
-		Monitor.Wait(cmd)
-	}()
-	if err := Monitor.Start(cmd); err != nil {
+	ec, err := Monitor.Start(cmd)
+	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		rd.Close()
+		Monitor.Wait(cmd, ec)
+	}()
 	var e Event
 	if err := json.NewDecoder(rd).Decode(&e); err != nil {
 		return nil, err
@@ -315,7 +319,8 @@ func (r *Runc) Events(context context.Context, id string, interval time.Duration
 	if err != nil {
 		return nil, err
 	}
-	if err := Monitor.Start(cmd); err != nil {
+	ec, err := Monitor.Start(cmd)
+	if err != nil {
 		rd.Close()
 		return nil, err
 	}
@@ -327,7 +332,7 @@ func (r *Runc) Events(context context.Context, id string, interval time.Duration
 		defer func() {
 			close(c)
 			rd.Close()
-			Monitor.Wait(cmd)
+			Monitor.Wait(cmd, ec)
 		}()
 		for {
 			var e Event
@@ -505,7 +510,8 @@ func (r *Runc) Restore(context context.Context, id, bundle string, opts *Restore
 	if opts != nil {
 		opts.Set(cmd)
 	}
-	if err := Monitor.Start(cmd); err != nil {
+	ec, err := Monitor.Start(cmd)
+	if err != nil {
 		return -1, err
 	}
 	if opts != nil && opts.IO != nil {
@@ -515,7 +521,7 @@ func (r *Runc) Restore(context context.Context, id, bundle string, opts *Restore
 			}
 		}
 	}
-	return Monitor.Wait(cmd)
+	return Monitor.Wait(cmd, ec)
 }
 
 // Update updates the current container with the provided resource spec
@@ -596,8 +602,8 @@ func (r *Runc) args() (out []string) {
 	if r.Criu != "" {
 		out = append(out, "--criu", r.Criu)
 	}
-	if r.SystemdCgroup != "" {
-		out = append(out, "--systemd-cgroup", r.SystemdCgroup)
+	if r.SystemdCgroup {
+		out = append(out, "--systemd-cgroup")
 	}
 	return out
 }
