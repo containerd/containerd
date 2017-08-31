@@ -192,6 +192,11 @@ For sync communication we have a community slack with a #containerd channel that
 
 **Slack:** https://dockr.ly/community
 
+### Reporting security issues
+
+__If you are reporting a security issue, please follow the responsible
+disclosure guidelines and reach out discreetly at containerd-security@googlegroups.com__.
+
 ## Copyright and license
 
 Copyright ©2016-2017 Docker, Inc. All rights reserved, except as follows. Code

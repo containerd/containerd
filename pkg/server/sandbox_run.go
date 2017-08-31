@@ -135,7 +135,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		containerd.WithNewSnapshotView(id, image.Image),
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(labels),
-		containerd.WithRuntime(defaultRuntime)}
+		containerd.WithRuntime(defaultRuntime, nil)}
 	container, err := c.client.NewContainer(ctx, id, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create containerd container: %v", err)

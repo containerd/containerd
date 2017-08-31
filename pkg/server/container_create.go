@@ -156,7 +156,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	}
 	opts = append(opts,
 		containerd.WithSpec(spec, specOpts...),
-		containerd.WithRuntime(defaultRuntime),
+		containerd.WithRuntime(defaultRuntime, nil),
 		containerd.WithContainerLabels(labels))
 	var cntr containerd.Container
 	if cntr, err = c.client.NewContainer(ctx, id, opts...); err != nil {
