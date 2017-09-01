@@ -124,7 +124,7 @@ func (s *Service) Update(ctx context.Context, req *api.UpdateContainerRequest) (
 			}
 		}
 
-		updated, err := store.Update(ctx, container)
+		updated, err := store.Update(ctx, container, fieldpaths...)
 		if err != nil {
 			return err
 		}
