@@ -32,13 +32,23 @@ func (c *criContainerdService) ContainerStatus(ctx context.Context, r *runtime.C
 		return nil, fmt.Errorf("an error occurred when try to find container %q: %v", r.GetContainerId(), err)
 	}
 
+	imageRef := container.ImageRef
+	image, err := c.imageStore.Get(imageRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get image %q: %v", container.ImageRef, err)
+	}
+	if len(image.RepoDigests) > 0 {
+		// Based on the CRI definition, this field will be consumed by user.
+		imageRef = image.RepoDigests[0]
+	}
+
 	return &runtime.ContainerStatusResponse{
-		Status: toCRIContainerStatus(container),
+		Status: toCRIContainerStatus(container, imageRef),
 	}, nil
 }
 
 // toCRIContainerStatus converts internal container object to CRI container status.
-func toCRIContainerStatus(container containerstore.Container) *runtime.ContainerStatus {
+func toCRIContainerStatus(container containerstore.Container, imageRef string) *runtime.ContainerStatus {
 	meta := container.Metadata
 	status := container.Status.Get()
 	reason := status.Reason
@@ -58,7 +68,7 @@ func toCRIContainerStatus(container containerstore.Container) *runtime.Container
 		FinishedAt:  status.FinishedAt,
 		ExitCode:    status.ExitCode,
 		Image:       meta.Config.GetImage(),
-		ImageRef:    meta.ImageRef,
+		ImageRef:    imageRef,
 		Reason:      reason,
 		Message:     status.Message,
 		Labels:      meta.Config.GetLabels(),
