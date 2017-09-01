@@ -25,9 +25,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
+	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
 )
 
-func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Status, *runtime.ContainerStatus) {
+func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Status,
+	*imagestore.Image, *runtime.ContainerStatus) {
 	testID := "test-id"
 	config := &runtime.ContainerConfig{
 		Metadata: &runtime.ContainerMetadata{
@@ -51,12 +53,16 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 		Name:      "test-long-name",
 		SandboxID: "test-sandbox-id",
 		Config:    config,
-		ImageRef:  "test-image-ref",
+		ImageRef:  "test-image-id",
 	}
 	status := &containerstore.Status{
 		Pid:       1234,
 		CreatedAt: createdAt,
 		StartedAt: startedAt,
+	}
+	image := &imagestore.Image{
+		ID:          "test-image-id",
+		RepoDigests: []string{"test-image-repo-digest"},
 	}
 	expected := &runtime.ContainerStatus{
 		Id:          testID,
@@ -65,14 +71,14 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 		CreatedAt:   createdAt,
 		StartedAt:   startedAt,
 		Image:       config.GetImage(),
-		ImageRef:    "test-image-ref",
+		ImageRef:    "test-image-repo-digest",
 		Reason:      completeExitReason,
 		Labels:      config.GetLabels(),
 		Annotations: config.GetAnnotations(),
 		Mounts:      config.GetMounts(),
 	}
 
-	return metadata, status, expected
+	return metadata, status, image, expected
 }
 
 func TestToCRIContainerStatus(t *testing.T) {
@@ -110,7 +116,7 @@ func TestToCRIContainerStatus(t *testing.T) {
 			expectedReason: errorExitReason,
 		},
 	} {
-		metadata, status, expected := getContainerStatusTestData()
+		metadata, status, image, expected := getContainerStatusTestData()
 		// Update status with test case.
 		status.FinishedAt = test.finishedAt
 		status.ExitCode = test.exitCode
@@ -124,13 +130,14 @@ func TestToCRIContainerStatus(t *testing.T) {
 		expected.FinishedAt = test.finishedAt
 		expected.ExitCode = test.exitCode
 		expected.Message = test.message
-		assert.Equal(t, expected, toCRIContainerStatus(container), desc)
+		assert.Equal(t, expected, toCRIContainerStatus(container, image.RepoDigests[0]), desc)
 	}
 }
 
 func TestContainerStatus(t *testing.T) {
 	for desc, test := range map[string]struct {
 		exist         bool
+		imageExist    bool
 		finishedAt    int64
 		reason        string
 		expectedState runtime.ContainerState
@@ -138,22 +145,30 @@ func TestContainerStatus(t *testing.T) {
 	}{
 		"container running": {
 			exist:         true,
+			imageExist:    true,
 			expectedState: runtime.ContainerState_CONTAINER_RUNNING,
 		},
 		"container exited": {
 			exist:         true,
+			imageExist:    true,
 			finishedAt:    time.Now().UnixNano(),
 			reason:        "test-reason",
 			expectedState: runtime.ContainerState_CONTAINER_EXITED,
 		},
 		"container not exist": {
-			exist:     false,
-			expectErr: true,
+			exist:      false,
+			imageExist: true,
+			expectErr:  true,
+		},
+		"image not exist": {
+			exist:      false,
+			imageExist: false,
+			expectErr:  true,
 		},
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIContainerdService()
-		metadata, status, expected := getContainerStatusTestData()
+		metadata, status, image, expected := getContainerStatusTestData()
 		// Update status with test case.
 		status.FinishedAt = test.finishedAt
 		status.Reason = test.reason
@@ -161,6 +176,9 @@ func TestContainerStatus(t *testing.T) {
 		assert.NoError(t, err)
 		if test.exist {
 			assert.NoError(t, c.containerStore.Add(container))
+		}
+		if test.imageExist {
+			c.imageStore.Add(*image)
 		}
 		resp, err := c.ContainerStatus(context.Background(), &runtime.ContainerStatusRequest{ContainerId: container.ID})
 		if test.expectErr {
