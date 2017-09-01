@@ -25,25 +25,30 @@ import (
 	"time"
 )
 
+const (
+	// "default path to the config file"
+	configFilePathArgName = "config-file-path"
+)
+
 //Config contains cri-containerd toml config
 type Config struct {
 	// SocketPath is the path to the socket which cri-containerd serves on.
-	SocketPath string `toml: "socketpath"`
+	SocketPath string `toml:"socketpath"`
 	// RootDir is the root directory path for managing cri-containerd files
 	// (metadata checkpoint etc.)
 	RootDir string `toml: "rootdir"`
 	// ContainerdSnapshotter is the snapshotter used by containerd.
 	ContainerdSnapshotter string `toml: "containerdsnapshotter"`
 	// ContainerdEndpoint is the containerd endpoint path.
-	ContainerdEndpoint string `toml: "containerdendpoint"`
+	ContainerdEndpoint string `toml:"containerdendpoint"`
 	// ContainerdConnectionTimeout is the connection timeout for containerd client.
 	ContainerdConnectionTimeout time.Duration `toml: "containerdconnectiontimeout"`
 	// NetworkPluginBinDir is the directory in which the binaries for the plugin is kept.
-	NetworkPluginBinDir string `toml: "networkpluginbindir"`
+	NetworkPluginBinDir string `toml:"networkpluginbindir"`
 	// NetworkPluginConfDir is the directory in which the admin places a CNI conf.
-	NetworkPluginConfDir string `toml: "networkpluginconfdir"`
+	NetworkPluginConfDir string `toml:"networkpluginconfdir"`
 	// StreamServerAddress is the ip address streaming server is listening on.
-	StreamServerAddress string `toml: "streamserveraddress"`
+	StreamServerAddress string `toml:"streamserveraddress"`
 	// StreamServerPort is the port streaming server is listening on.
 	StreamServerPort string `toml: "streamserverport"`
 	// CgroupPath is the path for the cgroup that cri-containerd is placed in.
@@ -71,7 +76,7 @@ func NewCRIContainerdOptions() *CRIContainerdOptions {
 
 // AddFlags adds cri-containerd command line options to pflag.
 func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&c.ConfigFilePath, "config-file-path",
+	fs.StringVar(&c.ConfigFilePath, configFilePathArgName,
 		"/etc/cri-containerd/config.toml", "Path to the config file")
 	fs.StringVar(&c.SocketPath, "socket-path",
 		"/var/run/cri-containerd.sock", "Path to the socket which cri-containerd serves on.")
@@ -101,18 +106,27 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 // (the default set of command-line flags, parsed from os.Args) and then calls
 // pflag.Parse().
 // precedence:  commandline > configfile > default
-func (c *CRIContainerdOptions) InitFlags(fs *pflag.FlagSet) {
+func (c *CRIContainerdOptions) InitFlags(fs *pflag.FlagSet) error {
 	fs.AddGoFlagSet(flag.CommandLine)
 
 	commandline := os.Args[1:]
-	fs.Parse(commandline) //this time:  config = default + commandline(on top)
-
-	err := loadConfigFile(c.ConfigFilePath, &c.Config) //config = default + commandline + configfile(on top)
+	err := fs.Parse(commandline) //this time:  config = default + commandline(on top)
 	if err != nil {
-		return
+		return err
 	}
 
-	fs.Parse(commandline) //config = default + commandline + configfile + commandline(on top)
+	// will try default config file when user have not seted it in cli
+	err = loadConfigFile(c.ConfigFilePath, &c.Config) //config = default + commandline + configfile(on top)
+	if err != nil {
+		//the absence of default config file is normal case.
+		if !fs.Changed(configFilePathArgName) && os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	err = fs.Parse(commandline) //config = default + commandline + configfile + commandline(on top)
+	return err
 }
 
 func loadConfigFile(fpath string, v *Config) error {
@@ -121,8 +135,5 @@ func loadConfigFile(fpath string, v *Config) error {
 	}
 
 	_, err := toml.DecodeFile(fpath, v)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
