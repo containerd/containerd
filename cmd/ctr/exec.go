@@ -70,7 +70,7 @@ var taskExecCommand = cli.Command{
 		}
 		defer process.Delete(ctx)
 
-		statusC, err := task.Wait(ctx)
+		statusC, err := process.Wait(ctx)
 		if err != nil {
 			return err
 		}
@@ -83,9 +83,6 @@ var taskExecCommand = cli.Command{
 				return err
 			}
 		}
-		if err := process.Start(ctx); err != nil {
-			return err
-		}
 		if tty {
 			if err := handleConsoleResize(ctx, process, con); err != nil {
 				logrus.WithError(err).Error("console resize")
@@ -93,6 +90,10 @@ var taskExecCommand = cli.Command{
 		} else {
 			sigc := forwardAllSignals(ctx, process)
 			defer stopCatch(sigc)
+		}
+
+		if err := process.Start(ctx); err != nil {
+			return err
 		}
 		status := <-statusC
 		code, _, err := status.Result()
