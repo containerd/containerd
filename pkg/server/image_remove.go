@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd/errdefs"
+	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
@@ -40,12 +41,31 @@ func (c *criContainerdService) RemoveImage(ctx context.Context, r *runtime.Remov
 		return &runtime.RemoveImageResponse{}, nil
 	}
 
+	// Exclude out dated image tag.
+	for i, tag := range image.RepoTags {
+		cImage, err := c.client.GetImage(ctx, tag)
+		if err != nil {
+			if errdefs.IsNotFound(err) {
+				continue
+			}
+			return nil, fmt.Errorf("failed to get image %q: %v", tag, err)
+		}
+		desc, err := cImage.Config(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get image %q config descriptor: %v", tag, err)
+		}
+		cID := desc.Digest.String()
+		if cID == image.ID {
+			continue
+		}
+		glog.V(4).Infof("Image tag %q for %q is out dated, it's currently used by %q", tag, image.ID, cID)
+		image.RepoTags = append(image.RepoTags[:i], image.RepoTags[i+1:]...)
+	}
+
 	// Include all image references, including RepoTag, RepoDigest and id.
 	for _, ref := range append(append(image.RepoTags, image.RepoDigests...), image.ID) {
 		// TODO(random-liu): Containerd should schedule a garbage collection immediately,
 		// and we may want to wait for the garbage collection to be over here.
-		// TODO(random-liu): Should check whether descriptor is as expected before delete,
-		// so as to avoid deleting new reference because of staled reference.
 		err = c.imageStoreService.Delete(ctx, ref)
 		if err == nil || errdefs.IsNotFound(err) {
 			continue
