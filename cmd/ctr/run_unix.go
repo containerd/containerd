@@ -109,7 +109,7 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		opts = append(opts, withTTY())
 	}
 	if context.Bool("net-host") {
-		opts = append(opts, setHostNetworking())
+		opts = append(opts, setHostNetworking(), containerd.WithHostHostsFile, containerd.WithHostResolvconf)
 	}
 	cOpts = append([]containerd.NewContainerOpts{containerd.WithNewSpec(opts...)}, cOpts...)
 	return client.NewContainer(ctx, id, cOpts...)
