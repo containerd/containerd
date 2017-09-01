@@ -83,6 +83,18 @@ func (AzureDiskVolumeSource) SwaggerDoc() map[string]string {
 	return map_AzureDiskVolumeSource
 }
 
+var map_AzureFilePersistentVolumeSource = map[string]string{
+	"":                "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
+	"secretName":      "the name of secret that contains Azure Storage Account Name and Key",
+	"shareName":       "Share Name",
+	"readOnly":        "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+	"secretNamespace": "the namespace of the secret that contains Azure Storage Account Name and Key default is the same as the Pod",
+}
+
+func (AzureFilePersistentVolumeSource) SwaggerDoc() map[string]string {
+	return map_AzureFilePersistentVolumeSource
+}
+
 var map_AzureFileVolumeSource = map[string]string{
 	"":           "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
 	"secretName": "the name of secret that contains Azure Storage Account Name and Key",
@@ -114,6 +126,20 @@ func (Capabilities) SwaggerDoc() map[string]string {
 	return map_Capabilities
 }
 
+var map_CephFSPersistentVolumeSource = map[string]string{
+	"":           "Represents a Ceph Filesystem mount that lasts the lifetime of a pod Cephfs volumes do not support ownership management or SELinux relabeling.",
+	"monitors":   "Required: Monitors is a collection of Ceph monitors More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+	"path":       "Optional: Used as the mounted root, rather than the full Ceph tree, default is /",
+	"user":       "Optional: User is the rados user name, default is admin More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+	"secretFile": "Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+	"secretRef":  "Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+	"readOnly":   "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+}
+
+func (CephFSPersistentVolumeSource) SwaggerDoc() map[string]string {
+	return map_CephFSPersistentVolumeSource
+}
+
 var map_CephFSVolumeSource = map[string]string{
 	"":           "Represents a Ceph Filesystem mount that lasts the lifetime of a pod Cephfs volumes do not support ownership management or SELinux relabeling.",
 	"monitors":   "Required: Monitors is a collection of Ceph monitors More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
@@ -137,6 +163,15 @@ var map_CinderVolumeSource = map[string]string{
 
 func (CinderVolumeSource) SwaggerDoc() map[string]string {
 	return map_CinderVolumeSource
+}
+
+var map_ClientIPConfig = map[string]string{
+	"":               "ClientIPConfig represents the configurations of Client IP based session affinity.",
+	"timeoutSeconds": "timeoutSeconds specifies the seconds of ClientIP type session sticky time. The value must be >0 && <=86400(for 1 day) if ServiceAffinity == \"ClientIP\". Default value is 10800(for 3 hours).",
+}
+
+func (ClientIPConfig) SwaggerDoc() map[string]string {
+	return map_ClientIPConfig
 }
 
 var map_ComponentCondition = map[string]string{
@@ -484,7 +519,7 @@ func (EnvVar) SwaggerDoc() map[string]string {
 var map_EnvVarSource = map[string]string{
 	"":                 "EnvVarSource represents a source for the value of an EnvVar.",
 	"fieldRef":         "Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP.",
-	"resourceFieldRef": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.",
+	"resourceFieldRef": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.",
 	"configMapKeyRef":  "Selects a key of a ConfigMap.",
 	"secretKeyRef":     "Selects a key of a secret in the pod's namespace",
 }
@@ -541,10 +576,11 @@ func (ExecAction) SwaggerDoc() map[string]string {
 
 var map_FCVolumeSource = map[string]string{
 	"":           "Represents a Fibre Channel volume. Fibre Channel volumes can only be mounted as read/write once. Fibre Channel volumes support ownership management and SELinux relabeling.",
-	"targetWWNs": "Required: FC target worldwide names (WWNs)",
-	"lun":        "Required: FC target lun number",
+	"targetWWNs": "Optional: FC target worldwide names (WWNs)",
+	"lun":        "Optional: FC target lun number",
 	"fsType":     "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
 	"readOnly":   "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+	"wwids":      "Optional: FC volume world wide identifiers (wwids) Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously.",
 }
 
 func (FCVolumeSource) SwaggerDoc() map[string]string {
@@ -654,7 +690,8 @@ func (HostAlias) SwaggerDoc() map[string]string {
 
 var map_HostPathVolumeSource = map[string]string{
 	"":     "Represents a host path mapped into a pod. Host path volumes do not support ownership management or SELinux relabeling.",
-	"path": "Path of the directory on the host. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",
+	"path": "Path of the directory on the host. If the path is a symlink, it will follow the link to the real path. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",
+	"type": "Type for HostPath Volume Defaults to \"\" More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",
 }
 
 func (HostPathVolumeSource) SwaggerDoc() map[string]string {
@@ -673,6 +710,7 @@ var map_ISCSIVolumeSource = map[string]string{
 	"chapAuthDiscovery": "whether support iSCSI Discovery CHAP authentication",
 	"chapAuthSession":   "whether support iSCSI Session CHAP authentication",
 	"secretRef":         "CHAP secret for iSCSI target and initiator authentication",
+	"initiatorName":     "Custom iSCSI initiator name. If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface <target portal>:<volume name> will be created for the connection.",
 }
 
 func (ISCSIVolumeSource) SwaggerDoc() map[string]string {
@@ -741,16 +779,6 @@ var map_LimitRangeSpec = map[string]string{
 
 func (LimitRangeSpec) SwaggerDoc() map[string]string {
 	return map_LimitRangeSpec
-}
-
-var map_List = map[string]string{
-	"":         "List holds a list of objects, which may not be known by the server.",
-	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
-	"items":    "List of objects",
-}
-
-func (List) SwaggerDoc() map[string]string {
-	return map_List
 }
 
 var map_ListOptions = map[string]string{
@@ -899,6 +927,14 @@ func (NodeCondition) SwaggerDoc() map[string]string {
 	return map_NodeCondition
 }
 
+var map_NodeConfigSource = map[string]string{
+	"": "NodeConfigSource specifies a source of node configuration. Exactly one subfield (excluding metadata) must be non-nil.",
+}
+
+func (NodeConfigSource) SwaggerDoc() map[string]string {
+	return map_NodeConfigSource
+}
+
 var map_NodeDaemonEndpoints = map[string]string{
 	"":                "NodeDaemonEndpoints lists ports opened by daemons running on the Node.",
 	"kubeletEndpoint": "Endpoint on which Kubelet is listening.",
@@ -972,6 +1008,7 @@ var map_NodeSpec = map[string]string{
 	"providerID":    "ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>",
 	"unschedulable": "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: https://kubernetes.io/docs/concepts/nodes/node/#manual-node-administration",
 	"taints":        "If specified, the node's taints.",
+	"configSource":  "If specified, the source to get node configuration from The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field",
 }
 
 func (NodeSpec) SwaggerDoc() map[string]string {
@@ -1175,6 +1212,7 @@ var map_PersistentVolumeSpec = map[string]string{
 	"claimRef":                      "ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding",
 	"persistentVolumeReclaimPolicy": "What happens to a persistent volume when released from its claim. Valid options are Retain (default) and Recycle. Recycling must be supported by the volume plugin underlying this persistent volume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming",
 	"storageClassName":              "Name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
+	"mountOptions":                  "A list of mount options, e.g. [\"ro\", \"soft\"]. Not validated - mount will simply fail if one is invalid. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options",
 }
 
 func (PersistentVolumeSpec) SwaggerDoc() map[string]string {
@@ -1215,7 +1253,7 @@ func (Pod) SwaggerDoc() map[string]string {
 
 var map_PodAffinity = map[string]string{
 	"": "Pod affinity is a group of inter pod affinity scheduling rules.",
-	"requiredDuringSchedulingIgnoredDuringExecution":  "NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented. If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system will try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied. RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm  `json:\"requiredDuringSchedulingRequiredDuringExecution,omitempty\"` If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied.",
+	"requiredDuringSchedulingIgnoredDuringExecution":  "If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied.",
 	"preferredDuringSchedulingIgnoredDuringExecution": "The scheduler will prefer to schedule pods to nodes that satisfy the affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding \"weight\" to the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred.",
 }
 
@@ -1236,7 +1274,7 @@ func (PodAffinityTerm) SwaggerDoc() map[string]string {
 
 var map_PodAntiAffinity = map[string]string{
 	"": "Pod anti affinity is a group of inter pod anti affinity scheduling rules.",
-	"requiredDuringSchedulingIgnoredDuringExecution":  "NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented. If the anti-affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the anti-affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system will try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied. RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm  `json:\"requiredDuringSchedulingRequiredDuringExecution,omitempty\"` If the anti-affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the anti-affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied.",
+	"requiredDuringSchedulingIgnoredDuringExecution":  "If the anti-affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the anti-affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied.",
 	"preferredDuringSchedulingIgnoredDuringExecution": "The scheduler will prefer to schedule pods to nodes that satisfy the anti-affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling anti-affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding \"weight\" to the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred.",
 }
 
@@ -1750,6 +1788,16 @@ func (SecretProjection) SwaggerDoc() map[string]string {
 	return map_SecretProjection
 }
 
+var map_SecretReference = map[string]string{
+	"":          "SecretReference represents a Secret Reference. It has enough information to retrieve secret in any namespace",
+	"name":      "Name is unique within a namespace to reference a secret resource.",
+	"namespace": "Namespace defines the space within which the secret name must be unique.",
+}
+
+func (SecretReference) SwaggerDoc() map[string]string {
+	return map_SecretReference
+}
+
 var map_SecretVolumeSource = map[string]string{
 	"":            "Adapts a Secret into a volume.\n\nThe contents of the target Secret's Data field will be presented in a volume as files using the keys in the Data field as the file names. Secret volumes support ownership management and SELinux relabeling.",
 	"secretName":  "Name of the secret in the pod's namespace to use. More info: https://kubernetes.io/docs/concepts/storage/volumes#secret",
@@ -1864,6 +1912,8 @@ var map_ServiceSpec = map[string]string{
 	"externalName":             "externalName is the external reference that kubedns or equivalent will return as a CNAME record for this service. No proxying will be involved. Must be a valid DNS name and requires Type to be ExternalName.",
 	"externalTrafficPolicy":    "externalTrafficPolicy denotes if this Service desires to route external traffic to node-local or cluster-wide endpoints. \"Local\" preserves the client source IP and avoids a second hop for LoadBalancer and Nodeport type services, but risks potentially imbalanced traffic spreading. \"Cluster\" obscures the client source IP and may cause a second hop to another node, but should have good overall load-spreading.",
 	"healthCheckNodePort":      "healthCheckNodePort specifies the healthcheck nodePort for the service. If not specified, HealthCheckNodePort is created by the service api backend with the allocated nodePort. Will use user-specified nodePort value if specified by the client. Only effects when Type is set to LoadBalancer and ExternalTrafficPolicy is set to Local.",
+	"publishNotReadyAddresses": "publishNotReadyAddresses, when set to true, indicates that DNS implementations must publish the notReadyAddresses of subsets for the Endpoints associated with the Service. The default value is false. The primary use case for setting this field is to use a StatefulSet's Headless Service to propagate SRV records for its Pods without respect to their readiness for purpose of peer discovery. This field will replace the service.alpha.kubernetes.io/tolerate-unready-endpoints when that annotation is deprecated and all clients have been converted to use this field.",
+	"sessionAffinityConfig":    "sessionAffinityConfig contains the configurations of session affinity.",
 }
 
 func (ServiceSpec) SwaggerDoc() map[string]string {
@@ -1877,6 +1927,15 @@ var map_ServiceStatus = map[string]string{
 
 func (ServiceStatus) SwaggerDoc() map[string]string {
 	return map_ServiceStatus
+}
+
+var map_SessionAffinityConfig = map[string]string{
+	"":         "SessionAffinityConfig represents the configurations of session affinity.",
+	"clientIP": "clientIP contains the configurations of Client IP based session affinity.",
+}
+
+func (SessionAffinityConfig) SwaggerDoc() map[string]string {
+	return map_SessionAffinityConfig
 }
 
 var map_StorageOSPersistentVolumeSource = map[string]string{
@@ -1926,7 +1985,7 @@ func (TCPSocketAction) SwaggerDoc() map[string]string {
 }
 
 var map_Taint = map[string]string{
-	"":          "The node this Taint is attached to has the effect \"effect\" on any pod that that does not tolerate the Taint.",
+	"":          "The node this Taint is attached to has the \"effect\" on any pod that does not tolerate the Taint.",
 	"key":       "Required. The taint key to be applied to a node.",
 	"value":     "Required. The taint value corresponding to the taint key.",
 	"effect":    "Required. The effect of the taint on pods that do not tolerate the taint. Valid effects are NoSchedule, PreferNoSchedule and NoExecute.",

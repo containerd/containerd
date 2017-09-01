@@ -2,7 +2,7 @@
 
 Go clients for talking to a [kubernetes](http://kubernetes.io/) cluster.
 
-We currently recommend using the v3.0.0 tag. See [INSTALL.md](/INSTALL.md) for
+We currently recommend using the v4.0.0 tag. See [INSTALL.md](/INSTALL.md) for
 detailed installation instructions. `go get k8s.io/client-go/...` works, but
 will give you head and doesn't handle the dependencies well.
 
@@ -10,7 +10,7 @@ will give you head and doesn't handle the dependencies well.
 [![GoDoc](https://godoc.org/k8s.io/client-go?status.svg)](https://godoc.org/k8s.io/client-go)
 
 ## Table of Contents
- 
+
 - [What's included](#whats-included)
 - [Versioning](#versioning)
   - [Compatibility: your code <-> client-go](#compatibility-your-code---client-go)
@@ -86,7 +86,7 @@ We will backport bugfixes--but not new features--into older versions of
 | client-go 1.5       | +              | +              | -              | -              | -              |
 | client-go 2.0       | +              | +              | ✓              | -              | -              |
 | client-go 3.0       | †              | †              | †              | ✓              | -              |
-| client-go 4.0.beta.0| †              | †              | †              | +              | ✓              |
+| client-go 4.0       | †              | †              | †              | +              | ✓              |
 | client-go HEAD      | †              | †              | †              | +              | +              |
 
 Key:
@@ -111,6 +111,7 @@ between client-go versions.
 | client-go 1.5  | Kubernetes main repo, 1.5 branch     | = -                           |
 | client-go 2.0  | Kubernetes main repo, 1.5 branch     | ✓                             |
 | client-go 3.0  | Kubernetes main repo, 1.6 branch     | ✓                             |
+| client-go 4.0  | Kubernetes main repo, 1.7 branch     | ✓                             |
 | client-go HEAD | Kubernetes main repo, master branch  | ✓                             |
 
 Key:
@@ -142,7 +143,9 @@ management system. See [INSTALL.md](/INSTALL.md) for detailed instructions.
 
 ### How to use it
 
-If your application runs in a Pod in the cluster, please refer to the in-cluster [example](examples/in-cluster/main.go), otherwise please refer to the out-of-cluster [example](examples/out-of-cluster/main.go).
+If your application runs in a Pod in the cluster, please refer to the
+in-cluster [example](examples/in-cluster-client-configuration), otherwise please
+refer to the out-of-cluster [example](examples/out-of-cluster-client-configuration).
 
 ### Dependency management
 

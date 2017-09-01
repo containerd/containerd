@@ -26,9 +26,12 @@ will also do our best to update `cri-containerd` to the latest releases of these
 specifications as appropriate.
 ### Install Dependencies
 1. Install runc dependencies.
-* runc requires installation of the libsecomp development library appropriate for your distribution. `libseccomp-dev` (Ubuntu, Debian) / `libseccomp-devel` (Fedora, CentOS, RHEL). On releases of Ubuntu <=Trusty and Debian <=jessie a backport version of
-`libsecomp-dev` is required. See [travis.yml](.travis.yml) for an example on
-trusty.
+* runc requires installation of the libsecomp development library appropriate
+for your distribution. `libseccomp-dev` (Ubuntu, Debian) / `libseccomp-devel`
+(Fedora, CentOS, RHEL). On releases of Ubuntu <=Trusty and Debian <=jessie a
+backport version of `libsecomp-dev` is required. See [travis.yml](.travis.yml)
+for an example on trusty. To use apparmor on Debian, Ubuntu, and related
+distributions runc requires the installation of `libapparmor-dev`.
 2. Install containerd dependencies.
 * containerd requires installation of a btrfs development library. `btrfs-tools`(Ubuntu, Debian) / `btrfs-progs-devel`(Fedora, CentOS, RHEL)
 3. Install other dependencies:

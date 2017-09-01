@@ -18,10 +18,10 @@ package api
 
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -360,7 +360,7 @@ type PersistentVolumeSource struct {
 	Cinder *CinderVolumeSource
 	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
 	// +optional
-	CephFS *CephFSVolumeSource
+	CephFS *CephFSPersistentVolumeSource
 	// FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
 	// +optional
 	FC *FCVolumeSource
@@ -369,7 +369,7 @@ type PersistentVolumeSource struct {
 	Flocker *FlockerVolumeSource
 	// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 	// +optional
-	AzureFile *AzureFileVolumeSource
+	AzureFile *AzureFilePersistentVolumeSource
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	// +optional
 	VsphereVolume *VsphereVirtualDiskVolumeSource
@@ -455,6 +455,10 @@ type PersistentVolumeSpec struct {
 	// means that this volume does not belong to any StorageClass.
 	// +optional
 	StorageClassName string
+	// A list of mount options, e.g. ["ro", "soft"]. Not validated - mount will
+	// simply fail if one is invalid.
+	// +optional
+	MountOptions []string
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes
@@ -597,10 +601,36 @@ const (
 	ClaimLost PersistentVolumeClaimPhase = "Lost"
 )
 
+type HostPathType string
+
+const (
+	// For backwards compatible, leave it empty if unset
+	HostPathUnset HostPathType = ""
+	// If nothing exists at the given path, an empty directory will be created there
+	// as needed with file mode 0755, having the same group and ownership with Kubelet.
+	HostPathDirectoryOrCreate HostPathType = "DirectoryOrCreate"
+	// A directory must exist at the given path
+	HostPathDirectory HostPathType = "Directory"
+	// If nothing exists at the given path, an empty file will be created there
+	// as needed with file mode 0644, having the same group and ownership with Kubelet.
+	HostPathFileOrCreate HostPathType = "FileOrCreate"
+	// A file must exist at the given path
+	HostPathFile HostPathType = "File"
+	// A UNIX socket must exist at the given path
+	HostPathSocket HostPathType = "Socket"
+	// A character device must exist at the given path
+	HostPathCharDev HostPathType = "CharDevice"
+	// A block device must exist at the given path
+	HostPathBlockDev HostPathType = "BlockDevice"
+)
+
 // Represents a host path mapped into a pod.
 // Host path volumes do not support ownership management or SELinux relabeling.
 type HostPathVolumeSource struct {
+	// If the path is a symlink, it will follow the link to the real path.
 	Path string
+	// Defaults to ""
+	Type *HostPathType
 }
 
 // Represents an empty directory for a pod.
@@ -709,6 +739,11 @@ type ISCSIVolumeSource struct {
 	// The secret is used if either DiscoveryCHAPAuth or SessionCHAPAuth is true
 	// +optional
 	SecretRef *LocalObjectReference
+	// Optional: Custom initiator name per volume.
+	// If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface
+	// <target portal>:<volume name> will be created for the connection.
+	// +optional
+	InitiatorName *string
 }
 
 // Represents a Fibre Channel volume.
@@ -988,6 +1023,40 @@ type CephFSVolumeSource struct {
 	ReadOnly bool
 }
 
+// SecretReference represents a Secret Reference. It has enough information to retrieve secret
+// in any namespace
+type SecretReference struct {
+	// Name is unique within a namespace to reference a secret resource.
+	// +optional
+	Name string
+	// Namespace defines the space within which the secret name must be unique.
+	// +optional
+	Namespace string
+}
+
+// Represents a Ceph Filesystem mount that lasts the lifetime of a pod
+// Cephfs volumes do not support ownership management or SELinux relabeling.
+type CephFSPersistentVolumeSource struct {
+	// Required: Monitors is a collection of Ceph monitors
+	Monitors []string
+	// Optional: Used as the mounted root, rather than the full Ceph tree, default is /
+	// +optional
+	Path string
+	// Optional: User is the rados user name, default is admin
+	// +optional
+	User string
+	// Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret
+	// +optional
+	SecretFile string
+	// Optional: SecretRef is reference to the authentication secret for User, default is empty.
+	// +optional
+	SecretRef *SecretReference
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
+}
+
 // Represents a Flocker volume mounted by the Flocker agent.
 // One and only one of datasetName and datasetUUID should be set.
 // Flocker volumes do not support ownership management or SELinux relabeling.
@@ -1054,6 +1123,22 @@ type AzureFileVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool
+}
+
+// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
+type AzureFilePersistentVolumeSource struct {
+	// the name of secret that contains Azure Storage Account Name and Key
+	SecretName string
+	// Share Name
+	ShareName string
+	// Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
+	// the namespace of the secret that contains Azure Storage Account Name and Key
+	// default is the same as the Pod
+	// +optional
+	SecretNamespace *string
 }
 
 // Represents a vSphere volume resource.
@@ -1389,7 +1474,7 @@ type EnvVarSource struct {
 	// +optional
 	FieldRef *ObjectFieldSelector
 	// Selects a resource of the container: only resources limits and requests
-	// (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
+	// (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
 	// +optional
 	ResourceFieldRef *ResourceFieldSelector
 	// Selects a key of a ConfigMap.
@@ -2034,9 +2119,7 @@ type PodAffinityTerm struct {
 	// the labelSelector in the specified namespaces, where co-located is defined as running on a node
 	// whose value of the label with key topologyKey matches that of any node on which any of the
 	// selected pods is running.
-	// For PreferredDuringScheduling pod anti-affinity, empty topologyKey is interpreted as "all topologies"
-	// ("all topologies" here means all the topologyKeys indicated by scheduler command-line argument --failure-domains);
-	// for affinity and for RequiredDuringScheduling pod anti-affinity, empty topologyKey is not allowed.
+	// Empty topologyKey is not allowed.
 	// +optional
 	TopologyKey string
 }
@@ -2581,6 +2664,31 @@ const (
 	ServiceAffinityNone ServiceAffinity = "None"
 )
 
+const (
+	// DefaultClientIPServiceAffinitySeconds is the default timeout seconds
+	// of Client IP based session affinity - 3 hours.
+	DefaultClientIPServiceAffinitySeconds int32 = 10800
+	// MaxClientIPServiceAffinitySeconds is the max timeout seconds
+	// of Client IP based session affinity - 1 day.
+	MaxClientIPServiceAffinitySeconds int32 = 86400
+)
+
+// SessionAffinityConfig represents the configurations of session affinity.
+type SessionAffinityConfig struct {
+	// clientIP contains the configurations of Client IP based session affinity.
+	// +optional
+	ClientIP *ClientIPConfig
+}
+
+// ClientIPConfig represents the configurations of Client IP based session affinity.
+type ClientIPConfig struct {
+	// timeoutSeconds specifies the seconds of ClientIP type session sticky time.
+	// The value must be >0 && <=86400(for 1 day) if ServiceAffinity == "ClientIP".
+	// Default value is 10800(for 3 hours).
+	// +optional
+	TimeoutSeconds *int32
+}
+
 // Service Type string describes ingress methods for a service
 type ServiceType string
 
@@ -2707,6 +2815,10 @@ type ServiceSpec struct {
 	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.
 	// +optional
 	SessionAffinity ServiceAffinity
+
+	// sessionAffinityConfig contains the configurations of session affinity.
+	// +optional
+	SessionAffinityConfig *SessionAffinityConfig
 
 	// Optional: If specified and supported by the platform, this will restrict traffic through the cloud-provider
 	// load-balancer will be restricted to the specified client IPs. This field will be ignored if the
@@ -3164,20 +3276,18 @@ const (
 	ResourceMemory ResourceName = "memory"
 	// Volume size, in bytes (e,g. 5Gi = 5GiB = 5 * 1024 * 1024 * 1024)
 	ResourceStorage ResourceName = "storage"
-	// Local Storage for overlay filesystem, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-	// The resource name for ResourceStorageOverlay is alpha and it can change across releases.
-	ResourceStorageOverlay ResourceName = "storage.kubernetes.io/overlay"
-	// Local Storage for scratch space, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-	// The resource name for ResourceStorageScratch is alpha and it can change across releases.
-	ResourceStorageScratch ResourceName = "storage.kubernetes.io/scratch"
+	// Local ephemeral storage, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	// The resource name for ResourceEphemeralStorage is alpha and it can change across releases.
+	ResourceEphemeralStorage ResourceName = "ephemeral-storage"
 	// NVIDIA GPU, in devices. Alpha, might change: although fractional and allowing values >1, only one whole device per node is assigned.
 	ResourceNvidiaGPU ResourceName = "alpha.kubernetes.io/nvidia-gpu"
-	// Number of Pods that may be running on this Node: see ResourcePods
 )
 
 const (
 	// Namespace prefix for opaque counted resources (alpha).
 	ResourceOpaqueIntPrefix = "pod.alpha.kubernetes.io/opaque-int-resource-"
+	// Default namespace prefix.
+	ResourceDefaultNamespacePrefix = "kubernetes.io/"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.
@@ -3626,13 +3736,7 @@ type EventList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // List holds a list of objects, which may not be known by the server.
-type List struct {
-	metav1.TypeMeta
-	// +optional
-	metav1.ListMeta
-
-	Items []runtime.Object
-}
+type List metainternalversion.List
 
 // A type of object that is limited
 type LimitType string
@@ -3726,10 +3830,14 @@ const (
 	ResourceRequestsMemory ResourceName = "requests.memory"
 	// Storage request, in bytes
 	ResourceRequestsStorage ResourceName = "requests.storage"
+	// Local ephemeral storage request, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceRequestsEphemeralStorage ResourceName = "requests.ephemeral-storage"
 	// CPU limit, in cores. (500m = .5 cores)
 	ResourceLimitsCPU ResourceName = "limits.cpu"
 	// Memory limit, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	ResourceLimitsMemory ResourceName = "limits.memory"
+	// Local ephemeral storage limit, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceLimitsEphemeralStorage ResourceName = "limits.ephemeral-storage"
 )
 
 // A ResourceQuotaScope defines a filter that must match each object tracked by a quota

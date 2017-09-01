@@ -42,7 +42,7 @@ help:
 	@echo " * 'clean'          - Clean artifacts"
 	@echo " * 'verify'         - Execute the source code verification tools"
 	@echo " * 'install.tools'  - Install tools used by verify"
-	@echo " * 'install.deps'   - Install dependencies of cri-containerd (containerd, runc, cni)"
+	@echo " * 'install.deps'   - Install dependencies of cri-containerd (containerd, runc, cni) Note: BUILDTAGS defaults to 'seccomp apparmor' for runc build"
 	@echo " * 'uninstall'      - Remove installed binaries from system locations"
 	@echo " * 'version'        - Print current cri-containerd release version"
 

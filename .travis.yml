@@ -14,6 +14,7 @@ install:
     - sudo apt-get install btrfs-tools
     - sudo apt-get install libseccomp2/trusty-backports
     - sudo apt-get install libseccomp-dev/trusty-backports
+    - sudo apt-get install libapparmor-dev
     - sudo apt-get install socat
     - docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
 

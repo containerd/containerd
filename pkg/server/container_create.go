@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runc/libcontainer/devices"
@@ -35,6 +36,17 @@ import (
 	cio "github.com/kubernetes-incubator/cri-containerd/pkg/server/io"
 	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
+)
+
+const (
+	// profileNamePrefix is the prefix for loading profiles on a localhost. Eg. AppArmor localhost/profileName.
+	profileNamePrefix = "localhost/" // TODO (mikebrow): get localhost/ & runtime/default from CRI kubernetes/kubernetes#51747
+	// runtimeDefault indicates that we should use or create a runtime default apparmor profile.
+	runtimeDefault = "runtime/default"
+	// appArmorDefaultProfileName is name to use when creating a default apparmor profile.
+	appArmorDefaultProfileName = "cri-containerd.apparmor.d"
+	// appArmorEnabled is a flag for globally enabling/disabling apparmor profiles for containers.
+	appArmorEnabled = true // TODO (mikebrow): make these apparmor defaults configurable
 )
 
 // CreateContainer creates a new container in the given PodSandbox.
@@ -156,6 +168,23 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	if username := config.GetLinux().GetSecurityContext().GetRunAsUsername(); username != "" {
 		specOpts = append(specOpts, containerd.WithUsername(username))
 	}
+	// Set apparmor profile, (privileged or not) if apparmor is enabled
+	if appArmorEnabled {
+		appArmorProf := config.GetLinux().GetSecurityContext().GetApparmorProfile()
+		switch appArmorProf {
+		case runtimeDefault:
+			// TODO (mikebrow): delete created apparmor default profile
+			specOpts = append(specOpts, apparmor.WithDefaultProfile(appArmorDefaultProfileName))
+		case "":
+			// TODO (mikebrow): handle no apparmor profile case see kubernetes/kubernetes#51746
+		default:
+			// Require and Trim default profile name prefix
+			if !strings.HasPrefix(appArmorProf, profileNamePrefix) {
+				return nil, fmt.Errorf("invalid apparmor profile %q", appArmorProf)
+			}
+			specOpts = append(specOpts, apparmor.WithProfile(strings.TrimPrefix(appArmorProf, profileNamePrefix)))
+		}
+	}
 	opts = append(opts,
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithRuntime(defaultRuntime, nil),
@@ -264,9 +293,7 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 			return nil, fmt.Errorf("failed to set capabilities %+v: %v",
 				securityContext.GetCapabilities(), err)
 		}
-
-		// TODO(random-liu): [P2] Add apparmor and seccomp.
-
+		// TODO(random-liu): [P2] Add seccomp not privileged only.
 	}
 
 	g.SetProcessSelinuxLabel(processLabel)
@@ -275,7 +302,7 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 	// TODO: Figure out whether we should set no new privilege for sandbox container by default
 	g.SetProcessNoNewPrivileges(securityContext.GetNoNewPrivs())
 
-	// TODO(random-liu): [P1] Set selinux options.
+	// TODO(random-liu): [P1] Set selinux options (privileged or not).
 
 	g.SetRootReadonly(securityContext.GetReadonlyRootfs())
 

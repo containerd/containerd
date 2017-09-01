@@ -125,6 +125,25 @@ message AzureDiskVolumeSource {
 }
 
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
+message AzureFilePersistentVolumeSource {
+  // the name of secret that contains Azure Storage Account Name and Key
+  optional string secretName = 1;
+
+  // Share Name
+  optional string shareName = 2;
+
+  // Defaults to false (read/write). ReadOnly here will force
+  // the ReadOnly setting in VolumeMounts.
+  // +optional
+  optional bool readOnly = 3;
+
+  // the namespace of the secret that contains Azure Storage Account Name and Key
+  // default is the same as the Pod
+  // +optional
+  optional string secretNamespace = 4;
+}
+
+// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 message AzureFileVolumeSource {
   // the name of secret that contains Azure Storage Account Name and Key
   optional string secretName = 1;
@@ -159,6 +178,39 @@ message Capabilities {
   // Removed capabilities
   // +optional
   repeated string drop = 2;
+}
+
+// Represents a Ceph Filesystem mount that lasts the lifetime of a pod
+// Cephfs volumes do not support ownership management or SELinux relabeling.
+message CephFSPersistentVolumeSource {
+  // Required: Monitors is a collection of Ceph monitors
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  repeated string monitors = 1;
+
+  // Optional: Used as the mounted root, rather than the full Ceph tree, default is /
+  // +optional
+  optional string path = 2;
+
+  // Optional: User is the rados user name, default is admin
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  // +optional
+  optional string user = 3;
+
+  // Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  // +optional
+  optional string secretFile = 4;
+
+  // Optional: SecretRef is reference to the authentication secret for User, default is empty.
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  // +optional
+  optional SecretReference secretRef = 5;
+
+  // Optional: Defaults to false (read/write). ReadOnly here will force
+  // the ReadOnly setting in VolumeMounts.
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  // +optional
+  optional bool readOnly = 6;
 }
 
 // Represents a Ceph Filesystem mount that lasts the lifetime of a pod
@@ -215,6 +267,15 @@ message CinderVolumeSource {
   // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
   // +optional
   optional bool readOnly = 3;
+}
+
+// ClientIPConfig represents the configurations of Client IP based session affinity.
+message ClientIPConfig {
+  // timeoutSeconds specifies the seconds of ClientIP type session sticky time.
+  // The value must be >0 && <=86400(for 1 day) if ServiceAffinity == "ClientIP".
+  // Default value is 10800(for 3 hours).
+  // +optional
+  optional int32 timeoutSeconds = 1;
 }
 
 // Information about the condition of a component.
@@ -922,7 +983,7 @@ message EnvVarSource {
   optional ObjectFieldSelector fieldRef = 1;
 
   // Selects a resource of the container: only resources limits and requests
-  // (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
+  // (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
   // +optional
   optional ResourceFieldSelector resourceFieldRef = 2;
 
@@ -1014,10 +1075,12 @@ message ExecAction {
 // Fibre Channel volumes can only be mounted as read/write once.
 // Fibre Channel volumes support ownership management and SELinux relabeling.
 message FCVolumeSource {
-  // Required: FC target worldwide names (WWNs)
+  // Optional: FC target worldwide names (WWNs)
+  // +optional
   repeated string targetWWNs = 1;
 
-  // Required: FC target lun number
+  // Optional: FC target lun number
+  // +optional
   optional int32 lun = 2;
 
   // Filesystem type to mount.
@@ -1031,6 +1094,11 @@ message FCVolumeSource {
   // the ReadOnly setting in VolumeMounts.
   // +optional
   optional bool readOnly = 4;
+
+  // Optional: FC volume world wide identifiers (wwids)
+  // Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously.
+  // +optional
+  repeated string wwids = 5;
 }
 
 // FlexVolume represents a generic volume resource that is
@@ -1216,8 +1284,15 @@ message HostAlias {
 // Host path volumes do not support ownership management or SELinux relabeling.
 message HostPathVolumeSource {
   // Path of the directory on the host.
+  // If the path is a symlink, it will follow the link to the real path.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
   optional string path = 1;
+
+  // Type for HostPath Volume
+  // Defaults to ""
+  // More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
+  // +optional
+  optional string type = 2;
 }
 
 // Represents an ISCSI disk.
@@ -1267,6 +1342,12 @@ message ISCSIVolumeSource {
   // CHAP secret for iSCSI target and initiator authentication
   // +optional
   optional LocalObjectReference secretRef = 10;
+
+  // Custom iSCSI initiator name.
+  // If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface
+  // <target portal>:<volume name> will be created for the connection.
+  // +optional
+  optional string initiatorName = 12;
 }
 
 // Maps a string key to a path within a volume.
@@ -1599,6 +1680,11 @@ message NodeCondition {
   optional string message = 6;
 }
 
+// NodeConfigSource specifies a source of node configuration. Exactly one subfield (excluding metadata) must be non-nil.
+message NodeConfigSource {
+  optional ObjectReference configMapRef = 1;
+}
+
 // NodeDaemonEndpoints lists ports opened by daemons running on the Node.
 message NodeDaemonEndpoints {
   // Endpoint on which Kubelet is listening.
@@ -1643,8 +1729,6 @@ message NodeSelector {
 // that relates the key and values.
 message NodeSelectorRequirement {
   // The label key that the selector applies to.
-  // +patchMergeKey=key
-  // +patchStrategy=merge
   optional string key = 1;
 
   // Represents a key's relationship to a set of values.
@@ -1689,6 +1773,11 @@ message NodeSpec {
   // If specified, the node's taints.
   // +optional
   repeated Taint taints = 5;
+
+  // If specified, the source to get node configuration from
+  // The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field
+  // +optional
+  optional NodeConfigSource configSource = 6;
 }
 
 // NodeStatus is information about the current status of a node.
@@ -2176,7 +2265,7 @@ message PersistentVolumeSource {
 
   // CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
   // +optional
-  optional CephFSVolumeSource cephfs = 9;
+  optional CephFSPersistentVolumeSource cephfs = 9;
 
   // FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
   // +optional
@@ -2194,7 +2283,7 @@ message PersistentVolumeSource {
 
   // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
   // +optional
-  optional AzureFileVolumeSource azureFile = 13;
+  optional AzureFilePersistentVolumeSource azureFile = 13;
 
   // VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
   // +optional
@@ -2262,6 +2351,12 @@ message PersistentVolumeSpec {
   // means that this volume does not belong to any StorageClass.
   // +optional
   optional string storageClassName = 6;
+
+  // A list of mount options, e.g. ["ro", "soft"]. Not validated - mount will
+  // simply fail if one is invalid.
+  // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options
+  // +optional
+  repeated string mountOptions = 7;
 }
 
 // PersistentVolumeStatus is the current status of a persistent volume.
@@ -2316,16 +2411,6 @@ message Pod {
 
 // Pod affinity is a group of inter pod affinity scheduling rules.
 message PodAffinity {
-  // NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
-  // If the affinity requirements specified by this field are not met at
-  // scheduling time, the pod will not be scheduled onto the node.
-  // If the affinity requirements specified by this field cease to be met
-  // at some point during pod execution (e.g. due to a pod label update), the
-  // system will try to eventually evict the pod from its node.
-  // When there are multiple elements, the lists of nodes corresponding to each
-  // podAffinityTerm are intersected, i.e. all terms must be satisfied.
-  // +optional
-  // RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm  `json:"requiredDuringSchedulingRequiredDuringExecution,omitempty"`
   // If the affinity requirements specified by this field are not met at
   // scheduling time, the pod will not be scheduled onto the node.
   // If the affinity requirements specified by this field cease to be met
@@ -2377,16 +2462,6 @@ message PodAffinityTerm {
 
 // Pod anti affinity is a group of inter pod anti affinity scheduling rules.
 message PodAntiAffinity {
-  // NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
-  // If the anti-affinity requirements specified by this field are not met at
-  // scheduling time, the pod will not be scheduled onto the node.
-  // If the anti-affinity requirements specified by this field cease to be met
-  // at some point during pod execution (e.g. due to a pod label update), the
-  // system will try to eventually evict the pod from its node.
-  // When there are multiple elements, the lists of nodes corresponding to each
-  // podAffinityTerm are intersected, i.e. all terms must be satisfied.
-  // +optional
-  // RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm  `json:"requiredDuringSchedulingRequiredDuringExecution,omitempty"`
   // If the anti-affinity requirements specified by this field are not met at
   // scheduling time, the pod will not be scheduled onto the node.
   // If the anti-affinity requirements specified by this field cease to be met
@@ -2645,7 +2720,7 @@ message PodSpec {
   // More info: https://kubernetes.io/docs/concepts/storage/volumes
   // +optional
   // +patchMergeKey=name
-  // +patchStrategy=merge
+  // +patchStrategy=merge,retainKeys
   repeated Volume volumes = 1;
 
   // List of initialization containers belonging to the pod.
@@ -3464,6 +3539,18 @@ message SecretProjection {
   optional bool optional = 4;
 }
 
+// SecretReference represents a Secret Reference. It has enough information to retrieve secret
+// in any namespace
+message SecretReference {
+  // Name is unique within a namespace to reference a secret resource.
+  // +optional
+  optional string name = 1;
+
+  // Namespace defines the space within which the secret name must be unique.
+  // +optional
+  optional string namespace = 2;
+}
+
 // Adapts a Secret into a volume.
 // 
 // The contents of the target Secret's Data field will be presented in a volume
@@ -3780,6 +3867,22 @@ message ServiceSpec {
   // and ExternalTrafficPolicy is set to Local.
   // +optional
   optional int32 healthCheckNodePort = 12;
+
+  // publishNotReadyAddresses, when set to true, indicates that DNS implementations
+  // must publish the notReadyAddresses of subsets for the Endpoints associated with
+  // the Service. The default value is false.
+  // The primary use case for setting this field is to use a StatefulSet's Headless Service
+  // to propagate SRV records for its Pods without respect to their readiness for purpose
+  // of peer discovery.
+  // This field will replace the service.alpha.kubernetes.io/tolerate-unready-endpoints
+  // when that annotation is deprecated and all clients have been converted to use this
+  // field.
+  // +optional
+  optional bool publishNotReadyAddresses = 13;
+
+  // sessionAffinityConfig contains the configurations of session affinity.
+  // +optional
+  optional SessionAffinityConfig sessionAffinityConfig = 14;
 }
 
 // ServiceStatus represents the current status of a service.
@@ -3788,6 +3891,13 @@ message ServiceStatus {
   // if one is present.
   // +optional
   optional LoadBalancerStatus loadBalancer = 1;
+}
+
+// SessionAffinityConfig represents the configurations of session affinity.
+message SessionAffinityConfig {
+  // clientIP contains the configurations of Client IP based session affinity.
+  // +optional
+  optional ClientIPConfig clientIP = 1;
 }
 
 // Represents a StorageOS persistent volume resource.
@@ -3875,12 +3985,10 @@ message TCPSocketAction {
   optional string host = 2;
 }
 
-// The node this Taint is attached to has the effect "effect" on
-// any pod that that does not tolerate the Taint.
+// The node this Taint is attached to has the "effect" on
+// any pod that does not tolerate the Taint.
 message Taint {
   // Required. The taint key to be applied to a node.
-  // +patchMergeKey=key
-  // +patchStrategy=merge
   optional string key = 1;
 
   // Required. The taint value corresponding to the taint key.
@@ -3904,8 +4012,6 @@ message Toleration {
   // Key is the taint key that the toleration applies to. Empty means match all taint keys.
   // If the key is empty, operator must be Exists; this combination means to match all values and all keys.
   // +optional
-  // +patchMergeKey=key
-  // +patchStrategy=merge
   optional string key = 1;
 
   // Operator represents a key's relationship to the value.

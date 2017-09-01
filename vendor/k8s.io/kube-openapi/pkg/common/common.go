@@ -14,12 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package openapi
+package common
 
 import (
+	"net/http"
+	"strings"
+
 	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
-	"strings"
 )
 
 // OpenAPIDefinition describes single type. Normally these definitions are auto-generated using gen-openapi.
@@ -39,6 +41,10 @@ type GetOpenAPIDefinitions func(ReferenceCallback) map[string]OpenAPIDefinition
 // possible.
 type OpenAPIDefinitionGetter interface {
 	OpenAPIDefinition() *OpenAPIDefinition
+}
+
+type PathHandler interface {
+	Handle(path string, handler http.Handler)
 }
 
 // Config is set of configuration for openAPI spec generation.
