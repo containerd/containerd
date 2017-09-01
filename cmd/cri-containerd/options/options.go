@@ -18,12 +18,11 @@ package options
 
 import (
 	"flag"
-	"os"
-	"time"
-
 	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd"
 	"github.com/spf13/pflag"
+	"os"
+	"time"
 )
 
 //Config contains cri-containerd toml config
