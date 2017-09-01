@@ -90,6 +90,9 @@ func (m *Monitor) Wait(c *exec.Cmd, ec chan runc.Exit) (int, error) {
 			// make sure we flush all IO
 			c.Wait()
 			m.Unsubscribe(ec)
+			if e.Status != 0 {
+				return e.Status, errors.New("unsucessful command")
+			}
 			return e.Status, nil
 		}
 	}
