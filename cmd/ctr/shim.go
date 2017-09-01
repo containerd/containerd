@@ -3,12 +3,9 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
-	"os"
 	"time"
 
 	gocontext "context"
@@ -185,15 +182,7 @@ var shimStateCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		data, err := json.Marshal(r)
-		if err != nil {
-			return err
-		}
-		buf := bytes.NewBuffer(nil)
-		if err := json.Indent(buf, data, " ", "    "); err != nil {
-			return err
-		}
-		buf.WriteTo(os.Stdout)
+		printAsJSON(r)
 		return nil
 	},
 }

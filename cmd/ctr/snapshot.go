@@ -27,6 +27,7 @@ var snapshotCommand = cli.Command{
 		treeSnapshotCommand,
 		mountSnapshotCommand,
 		commitSnapshotCommand,
+		infoSnapshotCommand,
 	},
 }
 
@@ -307,6 +308,36 @@ var treeSnapshotCommand = cli.Command{
 		}
 
 		printTree(tree)
+
+		return nil
+	},
+}
+
+var infoSnapshotCommand = cli.Command{
+	Name:      "info",
+	Usage:     "get info about a snapshot",
+	ArgsUsage: "<key>",
+	Action: func(clicontext *cli.Context) error {
+		ctx, cancel := appContext(clicontext)
+		defer cancel()
+
+		if clicontext.NArg() != 1 {
+			return cli.ShowSubcommandHelp(clicontext)
+		}
+
+		key := clicontext.Args().Get(0)
+
+		snapshotter, err := getSnapshotter(clicontext)
+		if err != nil {
+			return err
+		}
+
+		info, err := snapshotter.Stat(ctx, key)
+		if err != nil {
+			return err
+		}
+
+		printAsJSON(info)
 
 		return nil
 	},
