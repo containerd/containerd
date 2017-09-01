@@ -32,8 +32,9 @@ import (
 func main() {
 	o := options.NewCRIContainerdOptions()
 	o.AddFlags(pflag.CommandLine)
-	options.InitFlags()
+	o.InitFlags(pflag.CommandLine)
 
+	glog.V(2).Infof("Run cri-containerd  %#v", o)
 	if o.PrintVersion {
 		version.PrintVersion()
 		os.Exit(0)
