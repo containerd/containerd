@@ -3,7 +3,6 @@
 package reaper
 
 import (
-	"bytes"
 	"os/exec"
 	"sync"
 	"time"
@@ -47,23 +46,6 @@ type Monitor struct {
 	subscribers map[chan runc.Exit]struct{}
 }
 
-func (m *Monitor) Output(c *exec.Cmd) ([]byte, error) {
-	var b bytes.Buffer
-	c.Stdout = &b
-	if err := m.Run(c); err != nil {
-		return nil, err
-	}
-	return b.Bytes(), nil
-}
-
-func (m *Monitor) CombinedOutput(c *exec.Cmd) ([]byte, error) {
-	var b bytes.Buffer
-	c.Stdout = &b
-	c.Stderr = &b
-	err := m.Run(c)
-	return b.Bytes(), err
-}
-
 // Start starts the command a registers the process with the reaper
 func (m *Monitor) Start(c *exec.Cmd) (chan runc.Exit, error) {
 	ec := m.Subscribe()
@@ -74,25 +56,15 @@ func (m *Monitor) Start(c *exec.Cmd) (chan runc.Exit, error) {
 	return ec, nil
 }
 
-// Run runs and waits for the command to finish
-func (m *Monitor) Run(c *exec.Cmd) error {
-	ec, err := m.Start(c)
-	if err != nil {
-		return err
-	}
-	_, err = m.Wait(c, ec)
-	return err
-}
-
+// Wait blocks until a process is signal as dead.
+// User should rely on the value of the exit status to determine if the
+// command was successful or not.
 func (m *Monitor) Wait(c *exec.Cmd, ec chan runc.Exit) (int, error) {
 	for e := range ec {
 		if e.Pid == c.Process.Pid {
 			// make sure we flush all IO
 			c.Wait()
 			m.Unsubscribe(ec)
-			if e.Status != 0 {
-				return e.Status, errors.New("unsucessful command")
-			}
 			return e.Status, nil
 		}
 	}
