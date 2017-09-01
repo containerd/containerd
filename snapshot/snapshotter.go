@@ -14,24 +14,37 @@ type Kind uint8
 
 // definitions of snapshot kinds
 const (
-	KindView Kind = iota + 1
+	KindUnknown Kind = iota
+	KindView
 	KindActive
 	KindCommitted
 )
 
-var (
-	kindStrings = map[Kind]string{
-		KindView:      "view",
-		KindActive:    "active",
-		KindCommitted: "committed",
+func ParseKind(s string) Kind {
+	s = strings.ToLower(s)
+	switch s {
+	case "view":
+		return KindView
+	case "active":
+		return KindActive
+	case "committed":
+		return KindCommitted
 	}
-)
+
+	return KindUnknown
+}
 
 func (k Kind) String() string {
-	if s, ok := kindStrings[k]; ok {
-		return s
+	switch k {
+	case KindView:
+		return "View"
+	case KindActive:
+		return "Active"
+	case KindCommitted:
+		return "Committed"
 	}
-	return "unknown"
+
+	return "Unknown"
 }
 
 func (k Kind) MarshalJSON() ([]byte, error) {
@@ -43,12 +56,8 @@ func (k *Kind) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
-	for kk, ks := range kindStrings {
-		if strings.EqualFold(s, ks) {
-			*k = kk
-			return nil
-		}
-	}
+
+	*k = ParseKind(s)
 	return nil
 }
 
