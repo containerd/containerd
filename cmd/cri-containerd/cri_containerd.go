@@ -20,13 +20,12 @@ import (
 	"os"
 
 	"github.com/golang/glog"
-	"github.com/opencontainers/selinux/go-selinux"
-	"github.com/spf13/pflag"
-	"k8s.io/kubernetes/pkg/util/interrupt"
-
 	"github.com/kubernetes-incubator/cri-containerd/cmd/cri-containerd/options"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/server"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/version"
+	"github.com/opencontainers/selinux/go-selinux"
+	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/util/interrupt"
 )
 
 func main() {
