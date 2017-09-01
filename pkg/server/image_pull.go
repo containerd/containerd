@@ -89,6 +89,13 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 		Credentials: func(string) (string, string, error) { return ParseAuth(r.GetAuth()) },
 		Client:      http.DefaultClient,
 	})
+	_, desc, err := resolver.Resolve(ctx, ref)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve image %q: %v", ref, err)
+	}
+	// We have to check schema1 here, because after `Pull`, schema1
+	// image has already been converted.
+	isSchema1 := desc.MediaType == containerdimages.MediaTypeDockerSchema1Manifest
 
 	// TODO(mikebrow): add truncIndex for image id
 	image, err := c.client.Pull(ctx, ref,
@@ -100,7 +107,7 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull image %q: %v", ref, err)
 	}
-	repoDigest, repoTag := getRepoDigestAndTag(namedRef, image.Target().Digest, image.Target().MediaType == containerdimages.MediaTypeDockerSchema1Manifest)
+	repoDigest, repoTag := getRepoDigestAndTag(namedRef, image.Target().Digest, isSchema1)
 	for _, r := range []string{repoTag, repoDigest} {
 		if r == "" {
 			continue
