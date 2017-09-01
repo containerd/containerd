@@ -165,11 +165,11 @@ The following table provides an overview of the components covered by
 containerd versions:
 
 
-| Component  | Status   | Stablized Version | Links         |
-|------------|----------|-------------------|---------------|
-| GRPC API   | Alpha    | 1.0               | [api/](api) |
-| Go API     | Unstable | 1.1 tentative     | [godoc](https://godoc.org/github.com/containerd/containerd) |
-| `ctr` tool | Unstable | Out of scope      | -             |
+| Component     | Status   | Stablized Version | Links         |
+|---------------|----------|-------------------|---------------|
+| GRPC API      | Alpha    | 1.0               | [api/](api) |
+| Go client API | Unstable | 1.1 tentative     | [godoc](https://godoc.org/github.com/containerd/containerd) |
+| `ctr` tool    | Unstable | Out of scope      | -             |
 
 From the version stated in the above table, that component must adhere to the
 stability constraints expected in release versions.
@@ -211,9 +211,9 @@ this guarantee and should be treated opaquely. For example, don't rely on the
 format details of a URL field unless we explicitly say that the field will
 follow that format.
 
-### Go API
+### Go client API
 
-The Go API, documented in
+The Go client API, documented in
 [godoc](https://godoc.org/github.com/containerd/containerd), is currently
 considered unstable. It is recommended to vendor the necessary components to
 stabilize your project build. Note that because the Go API interfaces with the
