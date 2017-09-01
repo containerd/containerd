@@ -22,26 +22,11 @@ type Exit struct {
 // These methods should match the methods exposed by exec.Cmd to provide
 // a consistent experience for the caller
 type ProcessMonitor interface {
-	Output(*exec.Cmd) ([]byte, error)
-	CombinedOutput(*exec.Cmd) ([]byte, error)
-	Run(*exec.Cmd) error
 	Start(*exec.Cmd) (chan Exit, error)
 	Wait(*exec.Cmd, chan Exit) (int, error)
 }
 
 type defaultMonitor struct {
-}
-
-func (m *defaultMonitor) Output(c *exec.Cmd) ([]byte, error) {
-	return c.Output()
-}
-
-func (m *defaultMonitor) CombinedOutput(c *exec.Cmd) ([]byte, error) {
-	return c.CombinedOutput()
-}
-
-func (m *defaultMonitor) Run(c *exec.Cmd) error {
-	return c.Run()
 }
 
 func (m *defaultMonitor) Start(c *exec.Cmd) (chan Exit, error) {

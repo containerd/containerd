@@ -367,7 +367,10 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, id string, pid int, ec chan runc.Exit) error {
 	ctx = namespaces.WithNamespace(ctx, ns)
 	if err := r.terminate(ctx, bundle, ns, id); err != nil {
-		return errors.New("failed to terminate task, leaving bundle for debugging")
+		if r.config.ShimDebug {
+			return errors.Wrap(err, "failed to terminate task, leaving bundle for debugging")
+		}
+		log.G(ctx).WithError(err).Warn("failed to terminate task")
 	}
 
 	if ec != nil {

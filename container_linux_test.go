@@ -896,3 +896,79 @@ func TestContainerRuntimeOptions(t *testing.T) {
 		t.Errorf("task creation should have failed because of lack of executable. Instead failed with: %v", err.Error())
 	}
 }
+
+func TestContainerKillInitPidHost(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	container, err := client.NewContainer(ctx, id,
+		withNewSnapshot(id, image),
+		WithNewSpec(withImageConfig(image),
+			withProcessArgs("sh", "-c", "sleep 42; echo hi"),
+			WithHostNamespace(specs.PIDNamespace),
+		),
+	)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	stdout := bytes.NewBuffer(nil)
+	task, err := container.NewTask(ctx, NewIO(bytes.NewBuffer(nil), stdout, bytes.NewBuffer(nil)))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Error(err)
+	}
+
+	// Give the shim time to reap the init process and kill the orphans
+	select {
+	case <-statusC:
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	b, err := exec.Command("ps", "ax").CombinedOutput()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.Contains(string(b), "sleep 42") {
+		t.Fatalf("killing init didn't kill all its children:\n%v", string(b))
+	}
+
+	if _, err := task.Delete(ctx, WithProcessKill); err != nil {
+		t.Error(err)
+	}
+}
