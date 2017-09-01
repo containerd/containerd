@@ -393,6 +393,14 @@ func (s *Service) checkProcesses(e runc.Exit) {
 	defer s.mu.Unlock()
 	for _, p := range s.processes {
 		if p.Pid() == e.Pid {
+			if ip, ok := p.(*initProcess); ok {
+				// Ensure all children are killed
+				if err := ip.killAll(s.context); err != nil {
+					log.G(s.context).WithError(err).WithField("id", ip.ID()).
+						Error("failed to kill init's children")
+				}
+			}
+
 			p.SetExited(e.Status)
 			s.events <- &eventsapi.TaskExit{
 				ContainerID: s.id,
