@@ -56,7 +56,7 @@ type initProcess struct {
 	rootfs   string
 }
 
-func newInitProcess(context context.Context, plat platform, path, namespace, workDir string, r *shimapi.CreateTaskRequest) (*initProcess, error) {
+func (s *Service) newInitProcess(context context.Context, r *shimapi.CreateTaskRequest) (*initProcess, error) {
 	var success bool
 
 	if err := identifiers.Validate(r.ID); err != nil {
@@ -71,7 +71,7 @@ func newInitProcess(context context.Context, plat platform, path, namespace, wor
 		options = *v.(*runcopts.CreateOptions)
 	}
 
-	rootfs := filepath.Join(path, "rootfs")
+	rootfs := filepath.Join(s.config.Path, "rootfs")
 	// count the number of successful mounts so we can undo
 	// what was actually done rather than what should have been
 	// done.
@@ -94,17 +94,19 @@ func newInitProcess(context context.Context, plat platform, path, namespace, wor
 		}
 	}
 	runtime := &runc.Runc{
-		Command:      r.Runtime,
-		Log:          filepath.Join(path, "log.json"),
-		LogFormat:    runc.JSON,
-		PdeathSignal: syscall.SIGKILL,
-		Root:         filepath.Join(RuncRoot, namespace),
+		Command:       r.Runtime,
+		Log:           filepath.Join(s.config.Path, "log.json"),
+		LogFormat:     runc.JSON,
+		PdeathSignal:  syscall.SIGKILL,
+		Root:          filepath.Join(s.config.RuntimeRoot, s.config.Namespace),
+		Criu:          s.config.Criu,
+		SystemdCgroup: s.config.SystemdCgroup,
 	}
 	p := &initProcess{
 		id:       r.ID,
 		bundle:   r.Bundle,
 		runtime:  runtime,
-		platform: plat,
+		platform: s.platform,
 		stdio: stdio{
 			stdin:    r.Stdin,
 			stdout:   r.Stdout,
@@ -112,7 +114,7 @@ func newInitProcess(context context.Context, plat platform, path, namespace, wor
 			terminal: r.Terminal,
 		},
 		rootfs:  rootfs,
-		workDir: workDir,
+		workDir: s.config.WorkDir,
 	}
 	p.initState = &createdState{p: p}
 	var (
@@ -133,7 +135,7 @@ func newInitProcess(context context.Context, plat platform, path, namespace, wor
 			return nil, errors.Wrap(err, "failed to create OCI runtime io pipes")
 		}
 	}
-	pidFile := filepath.Join(path, InitPidFile)
+	pidFile := filepath.Join(s.config.Path, InitPidFile)
 	if r.Checkpoint != "" {
 		opts := &runc.RestoreOpts{
 			CheckpointOpts: runc.CheckpointOpts{
@@ -178,7 +180,7 @@ func newInitProcess(context context.Context, plat platform, path, namespace, wor
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to retrieve console master")
 		}
-		console, err = plat.copyConsole(context, console, r.Stdin, r.Stdout, r.Stderr, &p.WaitGroup, &copyWaitGroup)
+		console, err = s.platform.copyConsole(context, console, r.Stdin, r.Stdout, r.Stderr, &p.WaitGroup, &copyWaitGroup)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to start console copy")
 		}

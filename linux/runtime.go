@@ -13,9 +13,11 @@ import (
 	"github.com/boltdb/bolt"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/identifiers"
+	"github.com/containerd/containerd/linux/runcopts"
 	client "github.com/containerd/containerd/linux/shim"
 	shim "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
@@ -25,6 +27,7 @@ import (
 	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/sys"
+	"github.com/containerd/containerd/typeurl"
 	runc "github.com/containerd/go-runc"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
@@ -67,6 +70,8 @@ type Config struct {
 	Shim string `toml:"shim,omitempty"`
 	// Runtime is a path or name of an OCI runtime used by the shim
 	Runtime string `toml:"runtime,omitempty"`
+	// RuntimeRoot is the path that shall be used by the OCI runtime for its data
+	RuntimeRoot string `toml:"runtime_root,omitempty"`
 	// NoShim calls runc directly from within the pkg
 	NoShim bool `toml:"no_shim,omitempty"`
 	// Debug enable debug on the shim
@@ -90,17 +95,14 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	}
 	cfg := ic.Config.(*Config)
 	r := &Runtime{
-		root:      ic.Root,
-		state:     ic.State,
-		remote:    !cfg.NoShim,
-		shim:      cfg.Shim,
-		shimDebug: cfg.ShimDebug,
-		runtime:   cfg.Runtime,
-		monitor:   monitor.(runtime.TaskMonitor),
-		tasks:     runtime.NewTaskList(),
-		db:        m.(*bolt.DB),
-		address:   ic.Address,
-		events:    ic.Events,
+		root:    ic.Root,
+		state:   ic.State,
+		monitor: monitor.(runtime.TaskMonitor),
+		tasks:   runtime.NewTaskList(),
+		db:      m.(*bolt.DB),
+		address: ic.Address,
+		events:  ic.Events,
+		config:  cfg,
 	}
 	tasks, err := r.restoreTasks(ic.Context)
 	if err != nil {
@@ -116,18 +118,16 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 }
 
 type Runtime struct {
-	root      string
-	state     string
-	shim      string
-	shimDebug bool
-	runtime   string
-	remote    bool
-	address   string
+	root    string
+	state   string
+	address string
 
 	monitor runtime.TaskMonitor
 	tasks   *runtime.TaskList
 	db      *bolt.DB
 	events  *events.Exchange
+
+	config *Config
 }
 
 func (r *Runtime) ID() string {
@@ -144,14 +144,18 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 		return nil, errors.Wrapf(err, "invalid task id")
 	}
 
+	ropts, err := r.getRuncOptions(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
 	ec := reaper.Default.Subscribe()
 	defer reaper.Default.Unsubscribe(ec)
 
-	bundle, err := newBundle(
-		namespace, id,
+	bundle, err := newBundle(id,
 		filepath.Join(r.state, namespace),
 		filepath.Join(r.root, namespace),
-		opts.Spec.Value, r.events)
+		opts.Spec.Value)
 	if err != nil {
 		return nil, err
 	}
@@ -160,36 +164,50 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 			bundle.Delete()
 		}
 	}()
-	s, err := bundle.NewShim(ctx, r.shim, r.address, r.remote, r.shimDebug, opts, func() {
-		t, err := r.tasks.Get(ctx, id)
-		if err != nil {
-			// Task was never started or was already sucessfully deleted
-			return
-		}
-		lc := t.(*Task)
 
-		// Stop the monitor
-		if err := r.monitor.Stop(lc); err != nil {
-			log.G(ctx).WithError(err).WithFields(logrus.Fields{
+	shimopt := ShimLocal(r.events)
+	if !r.config.NoShim {
+		var cgroup string
+		if opts.Options != nil {
+			v, err := typeurl.UnmarshalAny(opts.Options)
+			if err != nil {
+				return nil, err
+			}
+			cgroup = v.(*runcopts.CreateOptions).ShimCgroup
+		}
+		shimopt = ShimRemote(r.config.Shim, r.address, cgroup, r.config.ShimDebug, func() {
+			t, err := r.tasks.Get(ctx, id)
+			if err != nil {
+				// Task was never started or was already sucessfully deleted
+				return
+			}
+			lc := t.(*Task)
+
+			// Stop the monitor
+			if err := r.monitor.Stop(lc); err != nil {
+				log.G(ctx).WithError(err).WithFields(logrus.Fields{
+					"id":        id,
+					"namespace": namespace,
+				}).Warn("failed to stop monitor")
+			}
+
+			log.G(ctx).WithFields(logrus.Fields{
 				"id":        id,
 				"namespace": namespace,
-			}).Warn("failed to stop monitor")
-		}
+			}).Warn("cleaning up after killed shim")
+			err = r.cleanupAfterDeadShim(context.Background(), bundle, namespace, id, lc.pid, ec)
+			if err == nil {
+				r.tasks.Delete(ctx, lc)
+			} else {
+				log.G(ctx).WithError(err).WithFields(logrus.Fields{
+					"id":        id,
+					"namespace": namespace,
+				}).Warn("failed to clen up after killed shim")
+			}
+		})
+	}
 
-		log.G(ctx).WithFields(logrus.Fields{
-			"id":        id,
-			"namespace": namespace,
-		}).Warn("cleaning up after killed shim")
-		err = r.cleanupAfterDeadShim(context.Background(), bundle, namespace, id, lc.pid, ec)
-		if err == nil {
-			r.tasks.Delete(ctx, lc)
-		} else {
-			log.G(ctx).WithError(err).WithFields(logrus.Fields{
-				"id":        id,
-				"namespace": namespace,
-			}).Warn("failed to clen up after killed shim")
-		}
-	})
+	s, err := bundle.NewShimClient(ctx, namespace, shimopt, ropts)
 	if err != nil {
 		return nil, err
 	}
@@ -200,10 +218,15 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 			}
 		}
 	}()
+
+	runtime := r.config.Runtime
+	if ropts != nil && ropts.Runtime != "" {
+		runtime = ropts.Runtime
+	}
 	sopts := &shim.CreateTaskRequest{
 		ID:         id,
 		Bundle:     bundle.path,
-		Runtime:    r.runtime,
+		Runtime:    runtime,
 		Stdin:      opts.IO.Stdin,
 		Stdout:     opts.IO.Stdout,
 		Stderr:     opts.IO.Stderr,
@@ -256,11 +279,9 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 	}
 
 	bundle := loadBundle(
+		lc.id,
 		filepath.Join(r.state, namespace, lc.id),
 		filepath.Join(r.root, namespace, lc.id),
-		namespace,
-		lc.id,
-		r.events,
 	)
 	if err := bundle.Delete(); err != nil {
 		log.G(ctx).WithError(err).Error("failed to delete bundle")
@@ -313,10 +334,11 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 		}
 		id := path.Name()
 		bundle := loadBundle(
+			id,
 			filepath.Join(r.state, ns, id),
 			filepath.Join(r.root, ns, id),
-			ns, id, r.events)
-		s, err := bundle.Connect(ctx, r.remote)
+		)
+		s, err := bundle.NewShimClient(ctx, ns, ShimConnect(), nil)
 		if err != nil {
 			log.G(ctx).WithError(err).WithFields(logrus.Fields{
 				"id":        id,
@@ -386,6 +408,7 @@ func (r *Runtime) terminate(ctx context.Context, bundle *bundle, ns, id string) 
 	if err != nil {
 		return err
 	}
+
 	if err := rt.Delete(ctx, id, &runc.DeleteOpts{
 		Force: true,
 	}); err != nil {
@@ -401,18 +424,56 @@ func (r *Runtime) terminate(ctx context.Context, bundle *bundle, ns, id string) 
 }
 
 func (r *Runtime) getRuntime(ctx context.Context, ns, id string) (*runc.Runc, error) {
+	ropts, err := r.getRuncOptions(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		cmd  = r.config.Runtime
+		root = client.RuncRoot
+	)
+	if ropts != nil {
+		if ropts.Runtime != "" {
+			cmd = ropts.Runtime
+		}
+		if ropts.RuntimeRoot != "" {
+			root = ropts.RuntimeRoot
+		}
+	}
+
+	return &runc.Runc{
+		Command:      cmd,
+		LogFormat:    runc.JSON,
+		PdeathSignal: unix.SIGKILL,
+		Root:         filepath.Join(root, ns),
+	}, nil
+}
+
+func (r *Runtime) getRuncOptions(ctx context.Context, id string) (*runcopts.RuncOptions, error) {
+	var container containers.Container
+
 	if err := r.db.View(func(tx *bolt.Tx) error {
 		store := metadata.NewContainerStore(tx)
 		var err error
-		_, err = store.Get(ctx, id)
+		container, err = store.Get(ctx, id)
 		return err
 	}); err != nil {
 		return nil, err
 	}
-	return &runc.Runc{
-		Command:      r.runtime,
-		LogFormat:    runc.JSON,
-		PdeathSignal: unix.SIGKILL,
-		Root:         filepath.Join(client.RuncRoot, ns),
-	}, nil
+
+	if container.Runtime.Options != nil {
+		v, err := typeurl.UnmarshalAny(container.Runtime.Options)
+		if err != nil {
+			return nil, err
+		}
+		ropts, ok := v.(*runcopts.RuncOptions)
+		if !ok {
+			return nil, errors.New("invalid runtime options format")
+		}
+
+		return ropts, nil
+	}
+
+	return nil, nil
 }

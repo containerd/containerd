@@ -66,6 +66,19 @@ func main() {
 			Name:  "workdir,w",
 			Usage: "path used to store large temporary data",
 		},
+		cli.StringFlag{
+			Name:  "runtime-root",
+			Usage: "root directory for the runtime",
+			Value: shim.RuncRoot,
+		},
+		cli.StringFlag{
+			Name:  "criu,c",
+			Usage: "path to criu",
+		},
+		cli.BoolFlag{
+			Name:  "systemd-cgroup",
+			Usage: "set runtime to use systemd-cgroup",
+		},
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
@@ -90,9 +103,14 @@ func main() {
 			return err
 		}
 		sv, err := shim.NewService(
-			path,
-			context.GlobalString("namespace"),
-			context.GlobalString("workdir"),
+			shim.Config{
+				Path:          path,
+				Namespace:     context.GlobalString("namespace"),
+				WorkDir:       context.GlobalString("workdir"),
+				Criu:          context.GlobalString("criu"),
+				SystemdCgroup: context.GlobalBool("systemd-cgroup"),
+				RuntimeRoot:   context.GlobalString("runtime-root"),
+			},
 			&remoteEventsPublisher{client: e},
 		)
 		if err != nil {

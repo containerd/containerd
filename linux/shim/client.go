@@ -30,20 +30,20 @@ import (
 type ClientOpt func(context.Context, Config) (shim.ShimClient, io.Closer, error)
 
 // WithStart executes a new shim process
-func WithStart(binary, address string, debug bool, exitHandler func()) ClientOpt {
+func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHandler func()) ClientOpt {
 	return func(ctx context.Context, config Config) (_ shim.ShimClient, _ io.Closer, err error) {
-		socket, err := newSocket(config)
+		socket, err := newSocket(address)
 		if err != nil {
 			return nil, nil, err
 		}
 		defer socket.Close()
 		f, err := socket.File()
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "failed to get fd for socket %s", config.Address)
+			return nil, nil, errors.Wrapf(err, "failed to get fd for socket %s", address)
 		}
 		defer f.Close()
 
-		cmd := newCommand(binary, address, debug, config, f)
+		cmd := newCommand(binary, daemonAddress, debug, config, f)
 		ec, err := reaper.Default.Start(cmd)
 		if err != nil {
 			return nil, nil, errors.Wrapf(err, "failed to start shim")
@@ -59,19 +59,23 @@ func WithStart(binary, address string, debug bool, exitHandler func()) ClientOpt
 		}()
 		log.G(ctx).WithFields(logrus.Fields{
 			"pid":     cmd.Process.Pid,
-			"address": config.Address,
+			"address": address,
 			"debug":   debug,
 		}).Infof("shim %s started", binary)
 		// set shim in cgroup if it is provided
-		if config.CgroupPath != "" {
-			if err := setCgroup(ctx, config, cmd); err != nil {
+		if cgroup != "" {
+			if err := setCgroup(cgroup, cmd); err != nil {
 				return nil, nil, err
 			}
+			log.G(ctx).WithFields(logrus.Fields{
+				"pid":     cmd.Process.Pid,
+				"address": address,
+			}).Infof("shim placed in cgroup %s", cgroup)
 		}
 		if err = sys.SetOOMScore(cmd.Process.Pid, sys.OOMScoreMaxKillable); err != nil {
 			return nil, nil, errors.Wrap(err, "failed to set OOM Score on shim")
 		}
-		c, clo, err := WithConnect(ctx, config)
+		c, clo, err := WithConnect(address)(ctx, config)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "failed to connect")
 		}
@@ -79,15 +83,26 @@ func WithStart(binary, address string, debug bool, exitHandler func()) ClientOpt
 	}
 }
 
-func newCommand(binary, address string, debug bool, config Config, socket *os.File) *exec.Cmd {
+func newCommand(binary, daemonAddress string, debug bool, config Config, socket *os.File) *exec.Cmd {
 	args := []string{
 		"--namespace", config.Namespace,
-		"--address", address,
 		"--workdir", config.WorkDir,
+		"--address", daemonAddress,
+	}
+
+	if config.Criu != "" {
+		args = append(args, "--criu-path", config.Criu)
+	}
+	if config.RuntimeRoot != "" {
+		args = append(args, "--runtime-root", config.RuntimeRoot)
+	}
+	if config.SystemdCgroup {
+		args = append(args, "--systemd-cgroup")
 	}
 	if debug {
 		args = append(args, "--debug")
 	}
+
 	cmd := exec.Command(binary, args...)
 	cmd.Dir = config.Path
 	// make sure the shim can be re-parented to system init
@@ -102,13 +117,13 @@ func newCommand(binary, address string, debug bool, config Config, socket *os.Fi
 	return cmd
 }
 
-func newSocket(config Config) (*net.UnixListener, error) {
-	if len(config.Address) > 106 {
-		return nil, errors.Errorf("%q: unix socket path too long (limit 106)", config.Address)
+func newSocket(address string) (*net.UnixListener, error) {
+	if len(address) > 106 {
+		return nil, errors.Errorf("%q: unix socket path too long (limit 106)", address)
 	}
-	l, err := net.Listen("unix", "\x00"+config.Address)
+	l, err := net.Listen("unix", "\x00"+address)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to listen to abstract unix socket %q", config.Address)
+		return nil, errors.Wrapf(err, "failed to listen to abstract unix socket %q", address)
 	}
 
 	return l.(*net.UnixListener), nil
@@ -144,18 +159,20 @@ func dialAddress(address string) string {
 }
 
 // WithConnect connects to an existing shim
-func WithConnect(ctx context.Context, config Config) (shim.ShimClient, io.Closer, error) {
-	conn, err := connect(config.Address, annonDialer)
-	if err != nil {
-		return nil, nil, err
+func WithConnect(address string) ClientOpt {
+	return func(ctx context.Context, config Config) (shim.ShimClient, io.Closer, error) {
+		conn, err := connect(address, annonDialer)
+		if err != nil {
+			return nil, nil, err
+		}
+		return shim.NewShimClient(conn), conn, nil
 	}
-	return shim.NewShimClient(conn), conn, nil
 }
 
 // WithLocal uses an in process shim
 func WithLocal(publisher events.Publisher) func(context.Context, Config) (shim.ShimClient, io.Closer, error) {
 	return func(ctx context.Context, config Config) (shim.ShimClient, io.Closer, error) {
-		service, err := NewService(config.Path, config.Namespace, config.WorkDir, publisher)
+		service, err := NewService(config, publisher)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -164,11 +181,12 @@ func WithLocal(publisher events.Publisher) func(context.Context, Config) (shim.S
 }
 
 type Config struct {
-	Address    string
-	Path       string
-	Namespace  string
-	CgroupPath string
-	WorkDir    string
+	Path          string
+	Namespace     string
+	WorkDir       string
+	Criu          string
+	RuntimeRoot   string
+	SystemdCgroup bool
 }
 
 // New returns a new shim client

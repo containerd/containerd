@@ -3,14 +3,11 @@
 package shim
 
 import (
-	"context"
 	"os/exec"
 	"syscall"
 
 	"github.com/containerd/cgroups"
-	"github.com/containerd/containerd/log"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 var atter = syscall.SysProcAttr{
@@ -18,19 +15,15 @@ var atter = syscall.SysProcAttr{
 	Setpgid:    true,
 }
 
-func setCgroup(ctx context.Context, config Config, cmd *exec.Cmd) error {
-	cg, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(config.CgroupPath))
+func setCgroup(cgroupPath string, cmd *exec.Cmd) error {
+	cg, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(cgroupPath))
 	if err != nil {
-		return errors.Wrapf(err, "failed to load cgroup %s", config.CgroupPath)
+		return errors.Wrapf(err, "failed to load cgroup %s", cgroupPath)
 	}
 	if err := cg.Add(cgroups.Process{
 		Pid: cmd.Process.Pid,
 	}); err != nil {
-		return errors.Wrapf(err, "failed to join cgroup %s", config.CgroupPath)
+		return errors.Wrapf(err, "failed to join cgroup %s", cgroupPath)
 	}
-	log.G(ctx).WithFields(logrus.Fields{
-		"pid":     cmd.Process.Pid,
-		"address": config.Address,
-	}).Infof("shim placed in cgroup %s", config.CgroupPath)
 	return nil
 }

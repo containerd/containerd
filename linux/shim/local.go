@@ -33,7 +33,7 @@ func (c *local) Start(ctx context.Context, in *shimapi.StartRequest, opts ...grp
 
 func (c *local) Delete(ctx context.Context, in *google_protobuf.Empty, opts ...grpc.CallOption) (*shimapi.DeleteResponse, error) {
 	// make sure we unmount the containers rootfs for this local
-	if err := unix.Unmount(filepath.Join(c.s.path, "rootfs"), 0); err != nil {
+	if err := unix.Unmount(filepath.Join(c.s.config.Path, "rootfs"), 0); err != nil {
 		return nil, err
 	}
 	return c.s.Delete(ctx, in)

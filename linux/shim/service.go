@@ -32,23 +32,21 @@ var empty = &google_protobuf.Empty{}
 const RuncRoot = "/run/containerd/runc"
 
 // NewService returns a new shim service that can be used via GRPC
-func NewService(path, namespace, workDir string, publisher events.Publisher) (*Service, error) {
-	if namespace == "" {
+func NewService(config Config, publisher events.Publisher) (*Service, error) {
+	if config.Namespace == "" {
 		return nil, fmt.Errorf("shim namespace cannot be empty")
 	}
-	context := namespaces.WithNamespace(context.Background(), namespace)
+	context := namespaces.WithNamespace(context.Background(), config.Namespace)
 	context = log.WithLogger(context, logrus.WithFields(logrus.Fields{
-		"namespace": namespace,
+		"namespace": config.Namespace,
+		"path":      config.Path,
 		"pid":       os.Getpid(),
-		"path":      path,
 	}))
 	s := &Service{
-		path:      path,
+		config:    config,
+		context:   context,
 		processes: make(map[string]process),
 		events:    make(chan interface{}, 4096),
-		namespace: namespace,
-		context:   context,
-		workDir:   workDir,
 		ec:        reaper.Default.Subscribe(),
 	}
 	go s.processExits()
@@ -67,25 +65,24 @@ type platform interface {
 }
 
 type Service struct {
-	path          string
-	id            string
-	bundle        string
-	mu            sync.Mutex
-	processes     map[string]process
-	events        chan interface{}
-	deferredEvent interface{}
-	namespace     string
-	context       context.Context
-	ec            chan runc.Exit
+	mu sync.Mutex
 
-	workDir  string
-	platform platform
+	config    Config
+	context   context.Context
+	processes map[string]process
+	events    chan interface{}
+	platform  platform
+	ec        chan runc.Exit
+
+	// Filled by Create()
+	id     string
+	bundle string
 }
 
 func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*shimapi.CreateTaskResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	process, err := newInitProcess(ctx, s.platform, s.path, s.namespace, s.workDir, r)
+	process, err := s.newInitProcess(ctx, r)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -194,7 +191,7 @@ func (s *Service) Exec(ctx context.Context, r *shimapi.ExecProcessRequest) (*goo
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
 
-	process, err := newExecProcess(ctx, s.path, r, p.(*initProcess), r.ID)
+	process, err := newExecProcess(ctx, s.config.Path, r, p.(*initProcess), r.ID)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
