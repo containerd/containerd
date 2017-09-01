@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/util/interrupt"
 
 	"github.com/kubernetes-incubator/cri-containerd/cmd/cri-containerd/options"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/server"
@@ -43,7 +44,8 @@ func main() {
 	}
 
 	glog.V(2).Infof("Run cri-containerd grpc server on socket %q", o.SocketPath)
-	service, err := server.NewCRIContainerdService(
+	s, err := server.NewCRIContainerdService(
+		o.SocketPath,
 		o.ContainerdEndpoint,
 		o.ContainerdSnapshotter,
 		o.RootDir,
@@ -56,10 +58,11 @@ func main() {
 	if err != nil {
 		glog.Exitf("Failed to create CRI containerd service %+v: %v", o, err)
 	}
-	service.Start()
-
-	s := server.NewCRIContainerdServer(o.SocketPath, service, service)
-	if err := s.Run(); err != nil {
+	// Use interrupt handler to make sure the server to be stopped properly.
+	// Pass in non-empty final function to avoid os.Exit(1). We expect `Run`
+	// to return itself.
+	h := interrupt.New(func(os.Signal) {}, s.Stop)
+	if err := h.Run(func() error { return s.Run() }); err != nil {
 		glog.Exitf("Failed to run cri-containerd grpc server: %v", err)
 	}
 }
