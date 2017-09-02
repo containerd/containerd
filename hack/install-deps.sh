@@ -36,6 +36,15 @@ CNI_DIR=/opt/cni
 CNI_CONFIG_DIR=/etc/cni/net.d
 CONTAINERD_PKG=github.com/containerd/containerd
 
+# Check GOPATH
+if [[ -z "${GOPATH}" ]]; then
+  echo "GOPATH is not set"
+  exit 1
+fi
+
+# For multiple GOPATHs, keep the first one only
+GOPATH=${GOPATH%%:*}
+
 # Install runc
 go get -d ${RUNC_PKG}/...
 cd ${GOPATH}/src/${RUNC_PKG}

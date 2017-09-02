@@ -28,6 +28,7 @@ export FOCUS=${FOCUS:-""}
 export SKIP=${SKIP:-${DEFAULT_SKIP}}
 REPORT_DIR=${REPORT_DIR:-"/tmp/test-e2e-node"}
 
+# Check GOPATH
 if [[ -z "${GOPATH}" ]]; then
   echo "GOPATH is not set"
   exit 1
@@ -48,6 +49,9 @@ if sudo iptables -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; th
 	sudo iptables -A FORWARD -w -p UDP -j ACCEPT
 	sudo iptables -A FORWARD -w -p ICMP -j ACCEPT
 fi
+
+# For multiple GOPATHs, keep the first one only
+GOPATH=${GOPATH%%:*}
 
 # Get kubernetes
 KUBERNETES_REPO="https://github.com/kubernetes/kubernetes"
