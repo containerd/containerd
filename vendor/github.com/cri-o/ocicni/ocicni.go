@@ -55,9 +55,8 @@ func (plugin *cniNetworkPlugin) monitorNetDir() {
 				}
 
 				if err = plugin.syncNetworkConfig(); err == nil {
-					logrus.Debugf("CNI asynchronous setting succeeded")
-					close(plugin.monitorNetDirChan)
-					return
+					logrus.Infof("CNI asynchronous setting succeeded")
+					continue
 				}
 
 				logrus.Errorf("CNI setting failed, continue monitoring: %v", err)
