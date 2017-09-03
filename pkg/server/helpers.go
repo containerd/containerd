@@ -57,8 +57,6 @@ const (
 )
 
 const (
-	// defaultSandboxImage is the image used by sandbox container.
-	defaultSandboxImage = "gcr.io/google_containers/pause:3.0"
 	// defaultSandboxOOMAdj is default omm adj for sandbox container. (kubernetes#47938).
 	defaultSandboxOOMAdj = -998
 	// defaultSandboxCPUshares is default cpu shares for sandbox container.

@@ -54,6 +54,7 @@ func main() {
 		o.StreamServerAddress,
 		o.StreamServerPort,
 		o.CgroupPath,
+		o.SandboxImage,
 	)
 	if err != nil {
 		glog.Exitf("Failed to create CRI containerd service %+v: %v", o, err)

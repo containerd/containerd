@@ -48,6 +48,8 @@ type CRIContainerdOptions struct {
 	CgroupPath string
 	// EnableSelinux indicates to enable the selinux support
 	EnableSelinux bool
+	// SandboxImage is the image used by sandbox container.
+	SandboxImage string
 }
 
 // NewCRIContainerdOptions returns a reference to CRIContainerdOptions
@@ -78,6 +80,8 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.CgroupPath, "cgroup-path", "", "The cgroup that cri-containerd is part of. By default cri-containerd is not placed in a cgroup")
 	fs.BoolVar(&c.EnableSelinux, "selinux-enabled",
 		false, "Enable selinux support.")
+	fs.StringVar(&c.SandboxImage, "sandbox-image",
+		"gcr.io/google_containers/pause:3.0", "The image used by sandbox container.")
 }
 
 // InitFlags must be called after adding all cli options flags are defined and
