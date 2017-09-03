@@ -111,7 +111,8 @@ func NewCRIContainerdService(
 	networkPluginConfDir,
 	streamAddress,
 	streamPort string,
-	cgroupPath string) (CRIContainerdService, error) {
+	cgroupPath string,
+	sandboxImage string) (CRIContainerdService, error) {
 	// TODO(random-liu): [P2] Recover from runtime state and checkpoint.
 
 	client, err := containerd.New(containerdEndpoint, containerd.WithDefaultNamespace(k8sContainerdNamespace))
@@ -129,7 +130,7 @@ func NewCRIContainerdService(
 		serverAddress:       serverAddress,
 		os:                  osinterface.RealOS{},
 		rootDir:             rootDir,
-		sandboxImage:        defaultSandboxImage,
+		sandboxImage:        sandboxImage,
 		snapshotter:         containerdSnapshotter,
 		sandboxStore:        sandboxstore.NewStore(),
 		containerStore:      containerstore.NewStore(),
