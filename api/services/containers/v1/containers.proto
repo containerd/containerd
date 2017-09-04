@@ -67,15 +67,17 @@ message Container {
 	// Snapshotter specifies the snapshotter name used for rootfs
 	string snapshotter = 6;
 
-	// RootFS specifies the snapshot key to use for the container's root
+	// SnapshotKey specifies the snapshot key to use for the container's root
 	// filesystem. When starting a task from this container, a caller should
 	// look up the mounts from the snapshot service and include those on the
 	// task create request.
 	//
 	// Snapshots referenced in this field will not be garbage collected.
 	//
+	// This field is set to empty when the rootfs is not a snapshot.
+	//
 	// This field may be updated.
-	string rootfs = 7 [(gogoproto.customname) = "RootFS"];
+	string snapshot_key = 7;
 
 	// CreatedAt is the time the container was first created.
 	google.protobuf.Timestamp created_at = 8 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];

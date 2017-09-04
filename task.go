@@ -415,7 +415,7 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (d v1
 	if err := t.checkpointImage(ctx, &index, cr.Image); err != nil {
 		return d, err
 	}
-	if err := t.checkpointRWSnapshot(ctx, &index, cr.Snapshotter, cr.RootFS); err != nil {
+	if err := t.checkpointRWSnapshot(ctx, &index, cr.Snapshotter, cr.SnapshotKey); err != nil {
 		return d, err
 	}
 	index.Annotations = make(map[string]string)

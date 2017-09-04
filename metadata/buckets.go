@@ -47,7 +47,7 @@ var (
 	bucketKeyParent      = []byte("parent")
 	bucketKeyOptions     = []byte("options")
 	bucketKeySpec        = []byte("spec")
-	bucketKeyRootFS      = []byte("rootfs")
+	bucketKeySnapshotKey = []byte("snapshotKey")
 	bucketKeySnapshotter = []byte("snapshotter")
 	bucketKeyTarget      = []byte("target")
 )

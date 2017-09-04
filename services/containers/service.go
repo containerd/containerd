@@ -136,10 +136,10 @@ func (s *Service) Update(ctx context.Context, req *api.UpdateContainerRequest) (
 	}
 
 	if err := s.publisher.Publish(ctx, "/containers/update", &eventsapi.ContainerUpdate{
-		ID:     resp.Container.ID,
-		Image:  resp.Container.Image,
-		Labels: resp.Container.Labels,
-		RootFS: resp.Container.RootFS,
+		ID:          resp.Container.ID,
+		Image:       resp.Container.Image,
+		Labels:      resp.Container.Labels,
+		SnapshotKey: resp.Container.SnapshotKey,
 	}); err != nil {
 		return &resp, err
 	}
