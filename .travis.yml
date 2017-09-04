@@ -29,12 +29,14 @@ jobs:
         - make .gitvalidation
         - make verify
         - make binaries
+        - make release
       go: 1.8.x
     - script:
         - make install.tools
         - make .gitvalidation
         - make verify
         - make binaries
+        - make release
       go: tip
     - stage: Test
       script:

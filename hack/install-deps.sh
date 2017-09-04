@@ -30,10 +30,27 @@ set -o pipefail
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
 . ${ROOT}/hack/versions
 
+# DESTDIR is the dest path to install dependencies.
+DESTDIR=${DESTDIR:-"/"}
+# Convert to absolute path if it's relative.
+if [[ ${DESTDIR} != /* ]]; then
+  DESTDIR=${ROOT}/${DESTDIR}
+fi
+
+# NOSUDO indicates not to use sudo during installation.
+NOSUDO=${NOSUDO:-false}
+sudo="sudo"
+if ${NOSUDO}; then
+  sudo=""
+fi
+
+CONTAINERD_DIR=${DESTDIR}/usr/local
+RUNC_DIR=${DESTDIR}
+CNI_DIR=${DESTDIR}/opt/cni
+CNI_CONFIG_DIR=${DESTDIR}/etc/cni/net.d
+
 RUNC_PKG=github.com/opencontainers/runc
 CNI_PKG=github.com/containernetworking/plugins
-CNI_DIR=/opt/cni
-CNI_CONFIG_DIR=/etc/cni/net.d
 CONTAINERD_PKG=github.com/containerd/containerd
 
 # Check GOPATH
@@ -52,8 +69,7 @@ git fetch --all
 git checkout ${RUNC_VERSION}
 BUILDTAGS=${BUILDTAGS:-seccomp apparmor}
 make BUILDTAGS="$BUILDTAGS"
-sudo make install
-which runc
+${sudo} make install -e DESTDIR=${RUNC_DIR}
 
 # Install cni
 go get -d ${CNI_PKG}/...
@@ -61,10 +77,10 @@ cd ${GOPATH}/src/${CNI_PKG}
 git fetch --all
 git checkout ${CNI_VERSION}
 ./build.sh
-sudo mkdir -p ${CNI_DIR}
-sudo cp -r ./bin ${CNI_DIR}
-sudo mkdir -p ${CNI_CONFIG_DIR}
-sudo bash -c 'cat >'${CNI_CONFIG_DIR}'/10-containerd-net.conflist <<EOF
+${sudo} mkdir -p ${CNI_DIR}
+${sudo} cp -r ./bin ${CNI_DIR}
+${sudo} mkdir -p ${CNI_CONFIG_DIR}
+${sudo} bash -c 'cat >'${CNI_CONFIG_DIR}'/10-containerd-net.conflist <<EOF
 {
     "cniVersion": "0.3.1",
     "name": "containerd-net",
@@ -96,6 +112,4 @@ cd ${GOPATH}/src/${CONTAINERD_PKG}
 git fetch --all
 git checkout ${CONTAINERD_VERSION}
 make
-sudo make install
-which containerd
-which containerd-shim
+${sudo} make install -e DESTDIR=${CONTAINERD_DIR}

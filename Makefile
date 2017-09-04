@@ -23,6 +23,7 @@ BUILD_DIR ?= _output
 VERSION := $(shell git describe --tags --dirty)
 # strip the first char of the tag if it's a `v`
 VERSION := $(VERSION:v%=%)
+TARBALL ?= cri-containerd-$(VERSION).tar.gz
 BUILD_TAGS:= -ldflags '-X $(PROJECT)/pkg/version.criContainerdVersion=$(VERSION)'
 SOURCES := $(shell find . -name '*.go')
 
@@ -36,6 +37,7 @@ help:
 	@echo " * 'install'        - Install binaries to system locations"
 	@echo " * 'binaries'       - Build cri-containerd"
 	@echo " * 'static-binaries - Build static cri-containerd"
+	@echo " * 'release'        - Build release tarball"
 	@echo " * 'test'           - Test cri-containerd"
 	@echo " * 'test-cri'       - Test cri-containerd with cri validation test"
 	@echo " * 'test-e2e-node'  - Test cri-containerd with Kubernetes node e2e test"
@@ -92,6 +94,11 @@ install: binaries
 uninstall:
 	rm -f $(BINDIR)/cri-containerd
 
+$(BUILD_DIR)/$(TARBALL): $(BUILD_DIR)/cri-containerd hack/versions
+	@BUILD_DIR=$(BUILD_DIR) TARBALL=$(TARBALL) ./hack/release.sh
+
+release: $(BUILD_DIR)/$(TARBALL)
+
 .PHONY: install.deps
 
 install.deps:
@@ -121,6 +128,7 @@ install.tools: .install.gitvalidation .install.gometalinter
 .PHONY: \
 	binaries \
 	static-binaries \
+	release \
 	boiler \
 	clean \
 	default \
