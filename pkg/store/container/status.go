@@ -58,8 +58,7 @@ type Status struct {
 	Message string
 	// Removing indicates that the container is in removing state.
 	// This field doesn't need to be checkpointed.
-	// TODO(random-liu): Reset this field to false during state recoverry.
-	Removing bool
+	Removing bool `json:"-"`
 }
 
 // State returns current state of the container based on the container status.

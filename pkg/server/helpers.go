@@ -426,3 +426,9 @@ func getSourceMount(source string, mountInfos []*mount.Info) (string, string, er
 	// If we are here, we did not find parent mount. Something is wrong.
 	return "", "", fmt.Errorf("Could not find source mount of %s", source)
 }
+
+// filterLabel returns a label filter. Use `%q` here because containerd
+// filter needs extra quote to work properly.
+func filterLabel(k, v string) string {
+	return fmt.Sprintf("labels.%q==%q", k, v)
+}

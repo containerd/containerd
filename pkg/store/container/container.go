@@ -88,11 +88,6 @@ func (c *Container) Delete() error {
 	return c.Status.Delete()
 }
 
-// LoadContainer loads the internal used container type.
-func LoadContainer() (Container, error) {
-	return Container{}, nil
-}
-
 // Store stores all Containers.
 type Store struct {
 	lock       sync.RWMutex

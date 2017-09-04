@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/cri-o/ocicni/pkg/ocicni"
 	"github.com/golang/glog"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
@@ -94,8 +95,6 @@ type criContainerdService struct {
 
 // NewCRIContainerdService returns a new instance of CRIContainerdService
 func NewCRIContainerdService(config options.Config) (CRIContainerdService, error) {
-	// TODO(random-liu): [P2] Recover from runtime state and checkpoint.
-
 	client, err := containerd.New(config.ContainerdEndpoint, containerd.WithDefaultNamespace(k8sContainerdNamespace))
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize containerd client with endpoint %q: %v",
@@ -147,7 +146,11 @@ func NewCRIContainerdService(config options.Config) (CRIContainerdService, error
 // Run starts the cri-containerd service.
 func (c *criContainerdService) Run() error {
 	glog.V(2).Info("Start cri-containerd service")
-	// TODO(random-liu): Recover state.
+
+	glog.V(2).Infof("Start recovering state")
+	if err := c.recover(context.Background()); err != nil {
+		return fmt.Errorf("failed to recover state: %v", err)
+	}
 
 	// Start event handler.
 	glog.V(2).Info("Start event monitor")

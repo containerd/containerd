@@ -54,6 +54,8 @@ type Metadata struct {
 	Config *runtime.ContainerConfig
 	// ImageRef is the reference of image used by the container.
 	ImageRef string
+	// LogPath is the container log path.
+	LogPath string
 }
 
 // MarshalJSON encodes Metadata into bytes in json format.
