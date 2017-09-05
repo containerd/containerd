@@ -18,5 +18,6 @@ message MetricsResponse {
 
 message Metric {
 	google.protobuf.Timestamp timestamp = 1 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-	google.protobuf.Any data = 2;
+	string id = 2;
+	google.protobuf.Any data = 3;
 }

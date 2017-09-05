@@ -18,6 +18,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
@@ -457,31 +458,55 @@ func (s *Service) Update(ctx context.Context, r *api.UpdateTaskRequest) (*google
 }
 
 func (s *Service) Metrics(ctx context.Context, r *types.MetricsRequest) (*types.MetricsResponse, error) {
+	filter, err := filters.ParseAll(r.Filters...)
+	if err != nil {
+		return nil, err
+	}
 	var resp types.MetricsResponse
 	for _, r := range s.runtimes {
 		tasks, err := r.Tasks(ctx)
 		if err != nil {
 			return nil, err
 		}
-		for _, t := range tasks {
-			collected := time.Now()
-			metrics, err := t.Metrics(ctx)
-			if err != nil {
-				log.G(ctx).WithError(err).Errorf("collecting metrics for %s", t.ID())
-				continue
-			}
-			data, err := typeurl.MarshalAny(metrics)
-			if err != nil {
-				log.G(ctx).WithError(err).Errorf("marshal metrics for %s", t.ID())
-				continue
-			}
-			resp.Metrics = append(resp.Metrics, &types.Metric{
-				Timestamp: collected,
-				Data:      data,
-			})
-		}
+		getTasksMetrics(ctx, filter, tasks, &resp)
 	}
 	return &resp, nil
+}
+
+func getTasksMetrics(ctx context.Context, filter filters.Filter, tasks []runtime.Task, r *types.MetricsResponse) {
+	for _, tk := range tasks {
+		if !filter.Match(filters.AdapterFunc(func(fieldpath []string) (string, bool) {
+			t := tk
+			switch fieldpath[0] {
+			case "id":
+				return t.ID(), true
+			case "namespace":
+				return t.Info().Namespace, true
+			case "runtime":
+				return t.Info().Runtime, true
+			}
+			return "", false
+		})) {
+			continue
+		}
+
+		collected := time.Now()
+		metrics, err := tk.Metrics(ctx)
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("collecting metrics for %s", tk.ID())
+			continue
+		}
+		data, err := typeurl.MarshalAny(metrics)
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("marshal metrics for %s", tk.ID())
+			continue
+		}
+		r.Metrics = append(r.Metrics, &types.Metric{
+			ID:        tk.ID(),
+			Timestamp: collected,
+			Data:      data,
+		})
+	}
 }
 
 func (s *Service) writeContent(ctx context.Context, mediaType, ref string, r io.Reader) (*types.Descriptor, error) {

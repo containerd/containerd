@@ -2926,8 +2926,15 @@ file {
       json_name: "timestamp"
     }
     field {
-      name: "data"
+      name: "id"
       number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "data"
+      number: 3
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Any"
