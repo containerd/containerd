@@ -2885,9 +2885,65 @@ file {
   syntax: "proto3"
 }
 file {
+  name: "github.com/containerd/containerd/api/types/metrics.proto"
+  package: "containerd.types"
+  dependency: "gogoproto/gogo.proto"
+  dependency: "google/protobuf/any.proto"
+  dependency: "google/protobuf/timestamp.proto"
+  message_type {
+    name: "MetricsRequest"
+    field {
+      name: "filters"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "filters"
+    }
+  }
+  message_type {
+    name: "MetricsResponse"
+    field {
+      name: "metrics"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Metric"
+      json_name: "metrics"
+    }
+  }
+  message_type {
+    name: "Metric"
+    field {
+      name: "timestamp"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      options {
+        65010: 1
+        65001: 0
+      }
+      json_name: "timestamp"
+    }
+    field {
+      name: "data"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "data"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/types;types"
+  }
+  syntax: "proto3"
+}
+file {
   name: "github.com/containerd/containerd/api/types/task/task.proto"
   package: "containerd.v1.types"
   dependency: "gogoproto/gogo.proto"
+  dependency: "google/protobuf/timestamp.proto"
   message_type {
     name: "Process"
     field {
@@ -2954,6 +3010,18 @@ file {
       type: TYPE_UINT32
       json_name: "exitStatus"
     }
+    field {
+      name: "exited_at"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      options {
+        65010: 1
+        65001: 0
+      }
+      json_name: "exitedAt"
+    }
   }
   enum_type {
     name: "Status"
@@ -3013,6 +3081,7 @@ file {
   dependency: "google/protobuf/any.proto"
   dependency: "gogoproto/gogo.proto"
   dependency: "github.com/containerd/containerd/api/types/mount.proto"
+  dependency: "github.com/containerd/containerd/api/types/metrics.proto"
   dependency: "github.com/containerd/containerd/api/types/descriptor.proto"
   dependency: "github.com/containerd/containerd/api/types/task/task.proto"
   dependency: "google/protobuf/timestamp.proto"
@@ -3550,6 +3619,11 @@ file {
       name: "Update"
       input_type: ".containerd.services.tasks.v1.UpdateTaskRequest"
       output_type: ".google.protobuf.Empty"
+    }
+    method {
+      name: "Metrics"
+      input_type: ".containerd.types.MetricsRequest"
+      output_type: ".containerd.types.MetricsResponse"
     }
   }
   options {

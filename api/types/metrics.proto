@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package containerd.types;
+
+import "gogoproto/gogo.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/containerd/containerd/api/types;types";
+
+message MetricsRequest {
+	repeated string filters = 1;
+}
+
+message MetricsResponse {
+	repeated Metric metrics = 1;
+}
+
+message Metric {
+	google.protobuf.Timestamp timestamp = 1 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Any data = 2;
+}

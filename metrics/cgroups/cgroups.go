@@ -11,7 +11,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
 	metrics "github.com/docker/go-metrics"
-	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
@@ -50,15 +49,7 @@ type cgroupsMonitor struct {
 
 func (m *cgroupsMonitor) Monitor(c runtime.Task) error {
 	info := c.Info()
-	state, err := c.State(m.context)
-	if err != nil {
-		return err
-	}
-	cg, err := cgroups.Load(cgroups.V1, cgroups.PidPath(int(state.Pid)))
-	if err != nil {
-		return errors.Wrapf(err, "load cgroup for %d", state.Pid)
-	}
-	if err := m.collector.Add(info.ID, info.Namespace, cg); err != nil {
+	if err := m.collector.Add(info.ID, info.Namespace, c); err != nil {
 		return err
 	}
 	return m.oom.Add(info.ID, info.Namespace, cg, m.trigger)

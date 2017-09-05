@@ -245,7 +245,10 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
-	t := newTask(id, namespace, int(cr.Pid), s)
+	t, err := newTask(id, namespace, int(cr.Pid), s)
+	if err != nil {
+		return nil, err
+	}
 	if err := r.tasks.Add(ctx, t); err != nil {
 		return nil, err
 	}

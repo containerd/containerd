@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/boltdb/bolt"
 	api "github.com/containerd/containerd/api/services/tasks/v1"
@@ -23,6 +24,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
+	"github.com/containerd/containerd/typeurl"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -452,6 +454,34 @@ func (s *Service) Update(ctx context.Context, r *api.UpdateTaskRequest) (*google
 		return nil, errdefs.ToGRPC(err)
 	}
 	return empty, nil
+}
+
+func (s *Service) Metrics(ctx context.Context, r *types.MetricsRequest) (*types.MetricsResponse, error) {
+	var resp types.MetricsResponse
+	for _, r := range s.runtimes {
+		tasks, err := r.Tasks(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, t := range tasks {
+			collected := time.Now()
+			metrics, err := t.Metrics(ctx)
+			if err != nil {
+				log.G(ctx).WithError(err).Errorf("collecting metrics for %s", t.ID())
+				continue
+			}
+			data, err := typeurl.MarshalAny(metrics)
+			if err != nil {
+				log.G(ctx).WithError(err).Errorf("marshal metrics for %s", t.ID())
+				continue
+			}
+			resp.Metrics = append(resp.Metrics, &types.Metric{
+				Timestamp: collected,
+				Data:      data,
+			})
+		}
+	}
+	return &resp, nil
 }
 
 func (s *Service) writeContent(ctx context.Context, mediaType, ref string, r io.Reader) (*types.Descriptor, error) {

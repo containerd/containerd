@@ -49,6 +49,8 @@ type Task interface {
 	Update(context.Context, *types.Any) error
 	// Process returns a process within the task for the provided id
 	Process(context.Context, string) (Process, error)
+	// Metrics returns runtime specific metrics for a task
+	Metrics(context.Context) (interface{}, error)
 }
 
 type ExecOpts struct {
