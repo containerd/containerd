@@ -62,6 +62,8 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		Envs: []*runtime.KeyValue{
 			{Key: "k1", Value: "v1"},
 			{Key: "k2", Value: "v2"},
+			{Key: "k3", Value: "v3=v3bis"},
+			{Key: "k4", Value: "v4=v4bis=foop"},
 		},
 		Mounts: []*runtime.Mount{
 			{
@@ -106,7 +108,7 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		},
 	}
 	imageConfig := &imagespec.ImageConfig{
-		Env:        []string{"ik1=iv1", "ik2=iv2"},
+		Env:        []string{"ik1=iv1", "ik2=iv2", "ik3=iv3=iv3bis", "ik4=iv4=iv4bis=boop"},
 		Entrypoint: []string{"/entrypoint"},
 		Cmd:        []string{"cmd"},
 		WorkingDir: "/workspace",
@@ -115,7 +117,8 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		assert.Equal(t, relativeRootfsPath, spec.Root.Path)
 		assert.Equal(t, []string{"test", "command", "test", "args"}, spec.Process.Args)
 		assert.Equal(t, "test-cwd", spec.Process.Cwd)
-		assert.Contains(t, spec.Process.Env, "k1=v1", "k2=v2", "ik1=iv1", "ik2=iv2")
+		assert.Contains(t, spec.Process.Env, "k1=v1", "k2=v2", "k3=v3=v3bis", "ik4=iv4=iv4bis=boop")
+		assert.Contains(t, spec.Process.Env, "ik1=iv1", "ik2=iv2", "ik3=iv3=iv3bis", "k4=v4=v4bis=foop")
 
 		t.Logf("Check cgroups bind mount")
 		checkMount(t, spec.Mounts, "cgroup", "/sys/fs/cgroup", "cgroup", []string{"ro"}, nil)
