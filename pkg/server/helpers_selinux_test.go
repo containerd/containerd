@@ -36,22 +36,22 @@ func TestInitSelinuxOpts(t *testing.T) {
 		processLabel string
 		mountLabels  []string
 	}{
-		"testNullValue": {
+		"Should return empty strings for processLabel and mountLabel when selinuxOpt is nil": {
 			selinuxOpt:   nil,
 			processLabel: "",
 			mountLabels:  []string{"", ""},
 		},
-		"testEmptyString": {
+		"Should return empty strings for processLabel and mountLabel when selinuxOpt has been initialized partially": {
 			selinuxOpt: &runtime.SELinuxOption{
 				User:  "",
-				Role:  "",
+				Role:  "user_r",
 				Type:  "",
-				Level: "",
+				Level: "s0:c1,c2",
 			},
-			processLabel: ":::",
-			mountLabels:  []string{":object_r:container_file_t:", ":object_r:svirt_sandbox_file_t:"},
+			processLabel: "",
+			mountLabels:  []string{"", ""},
 		},
-		"testUser": {
+		"Should be resolved correctly when selinuxOpt has been initialized completely": {
 			selinuxOpt: &runtime.SELinuxOption{
 				User:  "user_u",
 				Role:  "user_r",
