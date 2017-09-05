@@ -21,6 +21,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/docker/docker/pkg/system"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -63,7 +64,7 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 	// so we don't need the "Dead" state for now.
 
 	containerRootDir := getContainerRootDir(c.rootDir, id)
-	if err := c.os.RemoveAll(containerRootDir); err != nil {
+	if err := system.EnsureRemoveAll(containerRootDir); err != nil {
 		return nil, fmt.Errorf("failed to remove container root directory %q: %v",
 			containerRootDir, err)
 	}
