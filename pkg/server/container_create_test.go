@@ -25,6 +25,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+
+	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
 )
 
 func checkMount(t *testing.T, mounts []runtimespec.Mount, src, dest, typ string,
@@ -85,10 +87,6 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 				OomScoreAdj:        500,
 			},
 			SecurityContext: &runtime.LinuxContainerSecurityContext{
-				Capabilities: &runtime.Capability{
-					AddCapabilities:  []string{"SYS_ADMIN"},
-					DropCapabilities: []string{"CHOWN"},
-				},
 				SupplementalGroups: []int64{1111, 2222},
 				NoNewPrivs:         true,
 			},
@@ -131,18 +129,6 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		assert.EqualValues(t, *spec.Linux.Resources.Memory.Limit, 400)
 		assert.EqualValues(t, *spec.Process.OOMScoreAdj, 500)
 
-		t.Logf("Check capabilities")
-		assert.Contains(t, spec.Process.Capabilities.Bounding, "CAP_SYS_ADMIN")
-		assert.Contains(t, spec.Process.Capabilities.Effective, "CAP_SYS_ADMIN")
-		assert.Contains(t, spec.Process.Capabilities.Inheritable, "CAP_SYS_ADMIN")
-		assert.Contains(t, spec.Process.Capabilities.Permitted, "CAP_SYS_ADMIN")
-		assert.Contains(t, spec.Process.Capabilities.Ambient, "CAP_SYS_ADMIN")
-		assert.NotContains(t, spec.Process.Capabilities.Bounding, "CAP_CHOWN")
-		assert.NotContains(t, spec.Process.Capabilities.Effective, "CAP_CHOWN")
-		assert.NotContains(t, spec.Process.Capabilities.Inheritable, "CAP_CHOWN")
-		assert.NotContains(t, spec.Process.Capabilities.Permitted, "CAP_CHOWN")
-		assert.NotContains(t, spec.Process.Capabilities.Ambient, "CAP_CHOWN")
-
 		t.Logf("Check supplemental groups")
 		assert.Contains(t, spec.Process.User.AdditionalGids, uint32(1111))
 		assert.Contains(t, spec.Process.User.AdditionalGids, uint32(2222))
@@ -178,6 +164,74 @@ func TestGeneralContainerSpec(t *testing.T) {
 	spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
 	assert.NoError(t, err)
 	specCheck(t, testID, testPid, spec)
+}
+
+func TestContainerCapabilities(t *testing.T) {
+	testID := "test-id"
+	testPid := uint32(1234)
+	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	c := newTestCRIContainerdService()
+	for desc, test := range map[string]struct {
+		capability *runtime.Capability
+		includes   []string
+		excludes   []string
+	}{
+		"should be able to add/drop capabilities": {
+			capability: &runtime.Capability{
+				AddCapabilities:  []string{"SYS_ADMIN"},
+				DropCapabilities: []string{"CHOWN"},
+			},
+			includes: []string{"CAP_SYS_ADMIN"},
+			excludes: []string{"CAP_CHOWN"},
+		},
+		"should be able to add all capabilities": {
+			capability: &runtime.Capability{
+				AddCapabilities: []string{"ALL"},
+			},
+			includes: getOCICapabilitiesList(),
+		},
+		"should be able to drop all capabilities": {
+			capability: &runtime.Capability{
+				DropCapabilities: []string{"ALL"},
+			},
+			excludes: getOCICapabilitiesList(),
+		},
+		"should be able to drop capabilities with add all": {
+			capability: &runtime.Capability{
+				AddCapabilities:  []string{"ALL"},
+				DropCapabilities: []string{"CHOWN"},
+			},
+			includes: util.SubstractStringSlice(getOCICapabilitiesList(), "CAP_CHOWN"),
+			excludes: []string{"CAP_CHOWN"},
+		},
+		"should be able to add capabilities with drop all": {
+			capability: &runtime.Capability{
+				AddCapabilities:  []string{"SYS_ADMIN"},
+				DropCapabilities: []string{"ALL"},
+			},
+			includes: []string{"CAP_SYS_ADMIN"},
+			excludes: util.SubstractStringSlice(getOCICapabilitiesList(), "CAP_SYS_ADMIN"),
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		config.Linux.SecurityContext.Capabilities = test.capability
+		spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
+		assert.NoError(t, err)
+		specCheck(t, testID, testPid, spec)
+		t.Log(spec.Process.Capabilities.Bounding)
+		for _, include := range test.includes {
+			assert.Contains(t, spec.Process.Capabilities.Bounding, include)
+			assert.Contains(t, spec.Process.Capabilities.Effective, include)
+			assert.Contains(t, spec.Process.Capabilities.Inheritable, include)
+			assert.Contains(t, spec.Process.Capabilities.Permitted, include)
+		}
+		for _, exclude := range test.excludes {
+			assert.NotContains(t, spec.Process.Capabilities.Bounding, exclude)
+			assert.NotContains(t, spec.Process.Capabilities.Effective, exclude)
+			assert.NotContains(t, spec.Process.Capabilities.Inheritable, exclude)
+			assert.NotContains(t, spec.Process.Capabilities.Permitted, exclude)
+		}
+	}
 }
 
 func TestContainerSpecTty(t *testing.T) {

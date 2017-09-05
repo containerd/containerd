@@ -28,7 +28,9 @@ import (
 	"github.com/opencontainers/runc/libcontainer/devices"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
+	"github.com/opencontainers/runtime-tools/validate"
 	"github.com/opencontainers/selinux/go-selinux/label"
+	"github.com/syndtr/gocapability/capability"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -526,21 +528,58 @@ func setOCILinuxResource(g *generate.Generator, resources *runtime.LinuxContaine
 	g.SetProcessOOMScoreAdj(int(resources.GetOomScoreAdj()))
 }
 
+// getOCICapabilitiesList returns a list of all available capabilities.
+func getOCICapabilitiesList() []string {
+	var caps []string
+	for _, cap := range capability.List() {
+		if cap > validate.LastCap() {
+			continue
+		}
+		caps = append(caps, "CAP_"+strings.ToUpper(cap.String()))
+	}
+	return caps
+}
+
 // setOCICapabilities adds/drops process capabilities.
 func setOCICapabilities(g *generate.Generator, capabilities *runtime.Capability) error {
 	if capabilities == nil {
 		return nil
 	}
 
-	// Capabilities in CRI doesn't have `CAP_` prefix, so add it.
+	// Add/drop all capabilities if "all" is specified, so that
+	// following individual add/drop could still work. E.g.
+	// AddCapabilities: []string{"ALL"}, DropCapabilities: []string{"CHOWN"}
+	// will be all capabilities without `CAP_CHOWN`.
+	if util.InStringSlice(capabilities.GetAddCapabilities(), "ALL") {
+		for _, c := range getOCICapabilitiesList() {
+			if err := g.AddProcessCapability(c); err != nil {
+				return err
+			}
+		}
+	}
+	if util.InStringSlice(capabilities.GetDropCapabilities(), "ALL") {
+		for _, c := range getOCICapabilitiesList() {
+			if err := g.DropProcessCapability(c); err != nil {
+				return err
+			}
+		}
+	}
+
 	for _, c := range capabilities.GetAddCapabilities() {
-		if err := g.AddProcessCapability("CAP_" + c); err != nil {
+		if strings.ToUpper(c) == "ALL" {
+			continue
+		}
+		// Capabilities in CRI doesn't have `CAP_` prefix, so add it.
+		if err := g.AddProcessCapability("CAP_" + strings.ToUpper(c)); err != nil {
 			return err
 		}
 	}
 
 	for _, c := range capabilities.GetDropCapabilities() {
-		if err := g.DropProcessCapability("CAP_" + c); err != nil {
+		if strings.ToUpper(c) == "ALL" {
+			continue
+		}
+		if err := g.DropProcessCapability("CAP_" + strings.ToUpper(c)); err != nil {
 			return err
 		}
 	}
