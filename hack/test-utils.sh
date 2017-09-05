@@ -51,3 +51,28 @@ start_cri_containerd() {
 kill_cri_containerd() {
   sudo pkill containerd
 }
+
+# upload_logs_to_gcs uploads test logs to gcs.
+# Var set:
+# 1. Bucket: gcs bucket to upload logs.
+# 2. Dir: directory name to upload logs.
+# 3. Test Result: directory of the test result.
+upload_logs_to_gcs() {
+  local -r bucket=$1
+  local -r dir=$2
+  local -r result=$3
+  if ! gsutil ls "gs://${bucket}" > /dev/null; then
+    gsutil mb "gs://${bucket}"
+    gsutil -m acl ch -g all:R "gs://${bucket}"
+    gsutil defacl set public-read "gs://${bucket}"
+    local -r bucket_rule=$(mktemp)
+    # Set 30 day TTL for logs inside the bucket.
+    echo '{"rule": [{"action": {"type": "Delete"},"condition": {"age": 30}}]}' > ${bucket_rule}
+    gsutil lifecycle set "${bucket_rule}" "gs://${bucket}"
+    rm "${bucket_rule}"
+  fi
+  local -r upload_log_path=${bucket}/${dir}
+  gsutil cp -r "${REPORT_DIR}" "gs://${upload_log_path}"
+  echo "Test logs are uploaed to:
+    http://gcsweb.k8s.io/gcs/${upload_log_path}/"
+}
