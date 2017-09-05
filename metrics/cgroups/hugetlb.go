@@ -15,7 +15,7 @@ var hugetlbMetrics = []*metric{
 		unit:   metrics.Bytes,
 		vt:     prometheus.GaugeValue,
 		labels: []string{"page"},
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Hugetlb == nil {
 				return nil
 			}
@@ -35,7 +35,7 @@ var hugetlbMetrics = []*metric{
 		unit:   metrics.Total,
 		vt:     prometheus.GaugeValue,
 		labels: []string{"page"},
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Hugetlb == nil {
 				return nil
 			}
@@ -55,7 +55,7 @@ var hugetlbMetrics = []*metric{
 		unit:   metrics.Bytes,
 		vt:     prometheus.GaugeValue,
 		labels: []string{"page"},
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Hugetlb == nil {
 				return nil
 			}

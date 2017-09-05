@@ -19,7 +19,7 @@ type Task struct {
 	pid       int
 	shim      *client.Client
 	namespace string
-	cg        *cgroups.Cgroup
+	cg        cgroups.Cgroup
 }
 
 func newTask(id, namespace string, pid int, shim *client.Client) (*Task, error) {
@@ -210,5 +210,13 @@ func (t *Task) Process(ctx context.Context, id string) (runtime.Process, error) 
 }
 
 func (t *Task) Metrics(ctx context.Context) (interface{}, error) {
-	return nil, nil
+	stats, err := t.cg.Stat(cgroups.IgnoreNotExist)
+	if err != nil {
+		return nil, err
+	}
+	return stats, nil
+}
+
+func (t *Task) Cgroup() cgroups.Cgroup {
+	return t.cg
 }

@@ -16,7 +16,7 @@ var cpuMetrics = []*metric{
 		help: "The total cpu time",
 		unit: metrics.Nanoseconds,
 		vt:   prometheus.GaugeValue,
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Cpu == nil {
 				return nil
 			}
@@ -32,7 +32,7 @@ var cpuMetrics = []*metric{
 		help: "The total kernel cpu time",
 		unit: metrics.Nanoseconds,
 		vt:   prometheus.GaugeValue,
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Cpu == nil {
 				return nil
 			}
@@ -48,7 +48,7 @@ var cpuMetrics = []*metric{
 		help: "The total user cpu time",
 		unit: metrics.Nanoseconds,
 		vt:   prometheus.GaugeValue,
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Cpu == nil {
 				return nil
 			}
@@ -65,7 +65,7 @@ var cpuMetrics = []*metric{
 		unit:   metrics.Nanoseconds,
 		vt:     prometheus.GaugeValue,
 		labels: []string{"cpu"},
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Cpu == nil {
 				return nil
 			}
@@ -84,7 +84,7 @@ var cpuMetrics = []*metric{
 		help: "The total cpu throttle periods",
 		unit: metrics.Total,
 		vt:   prometheus.GaugeValue,
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Cpu == nil {
 				return nil
 			}
@@ -100,7 +100,7 @@ var cpuMetrics = []*metric{
 		help: "The total cpu throttled periods",
 		unit: metrics.Total,
 		vt:   prometheus.GaugeValue,
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Cpu == nil {
 				return nil
 			}
@@ -116,7 +116,7 @@ var cpuMetrics = []*metric{
 		help: "The total cpu throttled time",
 		unit: metrics.Nanoseconds,
 		vt:   prometheus.GaugeValue,
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Cpu == nil {
 				return nil
 			}

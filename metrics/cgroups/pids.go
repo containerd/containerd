@@ -14,7 +14,7 @@ var pidMetrics = []*metric{
 		help: "The limit to the number of pids allowed",
 		unit: metrics.Unit("limit"),
 		vt:   prometheus.GaugeValue,
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Pids == nil {
 				return nil
 			}
@@ -30,7 +30,7 @@ var pidMetrics = []*metric{
 		help: "The current number of pids",
 		unit: metrics.Unit("current"),
 		vt:   prometheus.GaugeValue,
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Pids == nil {
 				return nil
 			}

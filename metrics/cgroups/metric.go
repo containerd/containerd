@@ -20,7 +20,7 @@ type metric struct {
 	vt     prometheus.ValueType
 	labels []string
 	// getValues returns the value and labels for the data
-	getValues func(stats *cgroups.Stats) []value
+	getValues func(stats *cgroups.Metrics) []value
 }
 
 func (m *metric) desc(ns *metrics.Namespace) *prometheus.Desc {
@@ -28,7 +28,7 @@ func (m *metric) desc(ns *metrics.Namespace) *prometheus.Desc {
 	return ns.NewDesc(m.name, m.help, m.unit, append([]string{"container_id", "namespace"}, m.labels...)...)
 }
 
-func (m *metric) collect(id, namespace string, stats *cgroups.Stats, ns *metrics.Namespace, ch chan<- prometheus.Metric) {
+func (m *metric) collect(id, namespace string, stats *cgroups.Metrics, ns *metrics.Namespace, ch chan<- prometheus.Metric) {
 	values := m.getValues(stats)
 	for _, v := range values {
 		ch <- prometheus.MustNewConstMetric(m.desc(ns), m.vt, v.v, append([]string{id, namespace}, v.l...)...)
