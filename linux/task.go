@@ -186,10 +186,12 @@ func (t *Task) DeleteProcess(ctx context.Context, id string) (*runtime.Exit, err
 }
 
 func (t *Task) Update(ctx context.Context, resources *types.Any) error {
-	_, err := t.shim.Update(ctx, &shim.UpdateTaskRequest{
+	if _, err := t.shim.Update(ctx, &shim.UpdateTaskRequest{
 		Resources: resources,
-	})
-	return err
+	}); err != nil {
+		return errdefs.FromGRPC(err)
+	}
+	return nil
 }
 
 func (t *Task) Process(ctx context.Context, id string) (runtime.Process, error) {

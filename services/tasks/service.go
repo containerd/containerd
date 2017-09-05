@@ -24,7 +24,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -139,7 +138,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateTaskRequest) (*api.Cr
 	}
 	c, err := runtime.Create(ctx, r.ContainerID, opts)
 	if err != nil {
-		return nil, errors.Wrap(err, "runtime create failed")
+		return nil, errdefs.ToGRPC(err)
 	}
 	state, err := c.State(ctx)
 	if err != nil {
@@ -160,15 +159,15 @@ func (s *Service) Start(ctx context.Context, r *api.StartRequest) (*api.StartRes
 	p := runtime.Process(t)
 	if r.ExecID != "" {
 		if p, err = t.Process(ctx, r.ExecID); err != nil {
-			return nil, err
+			return nil, errdefs.ToGRPC(err)
 		}
 	}
 	if err := p.Start(ctx); err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	state, err := p.State(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	return &api.StartResponse{
 		Pid: state.Pid,
@@ -186,7 +185,7 @@ func (s *Service) Delete(ctx context.Context, r *api.DeleteTaskRequest) (*api.De
 	}
 	exit, err := runtime.Delete(ctx, t)
 	if err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	return &api.DeleteResponse{
 		ExitStatus: exit.Status,
@@ -202,7 +201,7 @@ func (s *Service) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest
 	}
 	exit, err := t.DeleteProcess(ctx, r.ExecID)
 	if err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	return &api.DeleteResponse{
 		ID:         r.ExecID,
@@ -215,7 +214,7 @@ func (s *Service) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest
 func processFromContainerd(ctx context.Context, p runtime.Process) (*task.Process, error) {
 	state, err := p.State(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	var status task.Status
 	switch state.Status {
@@ -253,7 +252,7 @@ func (s *Service) Get(ctx context.Context, r *api.GetRequest) (*api.GetResponse,
 	p := runtime.Process(task)
 	if r.ExecID != "" {
 		if p, err = task.Process(ctx, r.ExecID); err != nil {
-			return nil, err
+			return nil, errdefs.ToGRPC(err)
 		}
 	}
 	t, err := processFromContainerd(ctx, p)
@@ -270,7 +269,7 @@ func (s *Service) List(ctx context.Context, r *api.ListTasksRequest) (*api.ListT
 	for _, r := range s.runtimes {
 		tasks, err := r.Tasks(ctx)
 		if err != nil {
-			return nil, err
+			return nil, errdefs.ToGRPC(err)
 		}
 		for _, t := range tasks {
 			tt, err := processFromContainerd(ctx, t)
@@ -290,7 +289,7 @@ func (s *Service) Pause(ctx context.Context, r *api.PauseTaskRequest) (*google_p
 	}
 	err = t.Pause(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	return empty, nil
 }
@@ -302,7 +301,7 @@ func (s *Service) Resume(ctx context.Context, r *api.ResumeTaskRequest) (*google
 	}
 	err = t.Resume(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	return empty, nil
 }
@@ -315,7 +314,7 @@ func (s *Service) Kill(ctx context.Context, r *api.KillRequest) (*google_protobu
 	p := runtime.Process(t)
 	if r.ExecID != "" {
 		if p, err = t.Process(ctx, r.ExecID); err != nil {
-			return nil, err
+			return nil, errdefs.ToGRPC(err)
 		}
 	}
 	if err := p.Kill(ctx, r.Signal, r.All); err != nil {
@@ -331,7 +330,7 @@ func (s *Service) ListPids(ctx context.Context, r *api.ListPidsRequest) (*api.Li
 	}
 	pids, err := t.Pids(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	return &api.ListPidsResponse{
 		Pids: pids,
@@ -355,7 +354,7 @@ func (s *Service) Exec(ctx context.Context, r *api.ExecProcessRequest) (*google_
 			Terminal: r.Terminal,
 		},
 	}); err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	return empty, nil
 }
@@ -368,14 +367,14 @@ func (s *Service) ResizePty(ctx context.Context, r *api.ResizePtyRequest) (*goog
 	p := runtime.Process(t)
 	if r.ExecID != "" {
 		if p, err = t.Process(ctx, r.ExecID); err != nil {
-			return nil, err
+			return nil, errdefs.ToGRPC(err)
 		}
 	}
 	if err := p.ResizePty(ctx, runtime.ConsoleSize{
 		Width:  r.Width,
 		Height: r.Height,
 	}); err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	return empty, nil
 }
@@ -388,7 +387,7 @@ func (s *Service) CloseIO(ctx context.Context, r *api.CloseIORequest) (*google_p
 	p := runtime.Process(t)
 	if r.ExecID != "" {
 		if p, err = t.Process(ctx, r.ExecID); err != nil {
-			return nil, err
+			return nil, errdefs.ToGRPC(err)
 		}
 	}
 	if r.Stdin {
@@ -410,11 +409,11 @@ func (s *Service) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest) 
 	}
 	image, err := ioutil.TempDir("", "ctd-checkpoint")
 	if err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	defer os.RemoveAll(image)
 	if err := t.Checkpoint(ctx, image, r.Options); err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	// write checkpoint to the content store
 	tar := archive.Diff(ctx, "", image)
@@ -434,7 +433,7 @@ func (s *Service) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest) 
 	spec := bytes.NewReader(data)
 	specD, err := s.writeContent(ctx, images.MediaTypeContainerd1CheckpointConfig, filepath.Join(image, "spec"), spec)
 	if err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	return &api.CheckpointTaskResponse{
 		Descriptors: []*types.Descriptor{
@@ -450,7 +449,7 @@ func (s *Service) Update(ctx context.Context, r *api.UpdateTaskRequest) (*google
 		return nil, err
 	}
 	if err := t.Update(ctx, r.Resources); err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	return empty, nil
 }
