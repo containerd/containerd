@@ -1,7 +1,7 @@
 // Created by cgo -godefs - DO NOT EDIT
 // cgo -godefs types_openbsd.go
 
-// +build 386,openbsd
+// +build arm,openbsd
 
 package unix
 
@@ -86,7 +86,7 @@ type Stat_t struct {
 	Ctim           Timespec
 	Size           int64
 	Blocks         int64
-	Blksize        uint32
+	Blksize        int32
 	Flags          uint32
 	Gen            uint32
 	X__st_birthtim Timespec
@@ -110,10 +110,10 @@ type Statfs_t struct {
 	F_namemax     uint32
 	F_owner       uint32
 	F_ctime       uint64
-	F_fstypename  [16]int8
-	F_mntonname   [90]int8
-	F_mntfromname [90]int8
-	F_mntfromspec [90]int8
+	F_fstypename  [16]uint8
+	F_mntonname   [90]uint8
+	F_mntfromname [90]uint8
+	F_mntfromspec [90]uint8
 	Pad_cgo_0     [2]byte
 	Mount_info    [160]byte
 }
@@ -133,7 +133,7 @@ type Dirent struct {
 	Type         uint8
 	Namlen       uint8
 	X__d_padding [4]uint8
-	Name         [256]int8
+	Name         [256]uint8
 }
 
 type Fsid struct {
@@ -273,8 +273,8 @@ type FdSet struct {
 }
 
 const (
-	SizeofIfMsghdr         = 0xec
-	SizeofIfData           = 0xd4
+	SizeofIfMsghdr         = 0x98
+	SizeofIfData           = 0x80
 	SizeofIfaMsghdr        = 0x18
 	SizeofIfAnnounceMsghdr = 0x1a
 	SizeofRtMsghdr         = 0x60
@@ -318,7 +318,6 @@ type IfData struct {
 	Noproto      uint64
 	Capabilities uint32
 	Lastchange   Timeval
-	Mclpool      [7]Mclpool
 }
 
 type IfaMsghdr struct {
@@ -342,7 +341,7 @@ type IfAnnounceMsghdr struct {
 	Hdrlen  uint16
 	Index   uint16
 	What    uint16
-	Name    [16]int8
+	Name    [16]uint8
 }
 
 type RtMsghdr struct {
@@ -379,13 +378,7 @@ type RtMetrics struct {
 	Pad      uint32
 }
 
-type Mclpool struct {
-	Grown int32
-	Alive uint16
-	Hwm   uint16
-	Cwm   uint16
-	Lwm   uint16
-}
+type Mclpool struct{}
 
 const (
 	SizeofBpfVersion = 0x4

@@ -352,6 +352,45 @@ func Llistxattr(link string, dest []byte) (sz int, err error) {
 	return s, e
 }
 
+//sys   ioctl(fd int, req uint, arg uintptr) (err error)
+
+// ioctl itself should not be exposed directly, but additional get/set
+// functions for specific types are permissible.
+
+// IoctlSetInt performs an ioctl operation which sets an integer value
+// on fd, using the specified request number.
+func IoctlSetInt(fd int, req uint, value int) error {
+	return ioctl(fd, req, uintptr(value))
+}
+
+func IoctlSetWinsize(fd int, req uint, value *Winsize) error {
+	return ioctl(fd, req, uintptr(unsafe.Pointer(value)))
+}
+
+func IoctlSetTermios(fd int, req uint, value *Termios) error {
+	return ioctl(fd, req, uintptr(unsafe.Pointer(value)))
+}
+
+// IoctlGetInt performs an ioctl operation which gets an integer value
+// from fd, using the specified request number.
+func IoctlGetInt(fd int, req uint) (int, error) {
+	var value int
+	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
+	return value, err
+}
+
+func IoctlGetWinsize(fd int, req uint) (*Winsize, error) {
+	var value Winsize
+	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
+	return &value, err
+}
+
+func IoctlGetTermios(fd int, req uint) (*Termios, error) {
+	var value Termios
+	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
+	return &value, err
+}
+
 /*
  * Exposed directly
  */
@@ -422,11 +461,6 @@ func Llistxattr(link string, dest []byte) (sz int, err error) {
 //sys	Mkdirat(dirfd int, path string, mode uint32) (err error)
 //sys	Mkfifo(path string, mode uint32) (err error)
 //sys	Mknod(path string, mode uint32, dev int) (err error)
-//sys	Mlock(b []byte) (err error)
-//sys	Mlockall(flags int) (err error)
-//sys	Mprotect(b []byte, prot int) (err error)
-//sys	Munlock(b []byte) (err error)
-//sys	Munlockall() (err error)
 //sys	Nanosleep(time *Timespec, leftover *Timespec) (err error)
 //sys	Open(path string, mode int, perm uint32) (fd int, err error)
 //sys	Openat(fdat int, path string, mode int, perm uint32) (fd int, err error)
@@ -473,6 +507,7 @@ func Llistxattr(link string, dest []byte) (sz int, err error) {
 //sys	readlen(fd int, buf *byte, nbuf int) (n int, err error) = SYS_READ
 //sys	writelen(fd int, buf *byte, nbuf int) (n int, err error) = SYS_WRITE
 //sys	accept4(fd int, rsa *RawSockaddrAny, addrlen *_Socklen, flags int) (nfd int, err error)
+//sys	utimensat(dirfd int, path string, times *[2]Timespec, flags int) (err error)
 
 /*
  * Unimplemented
@@ -506,9 +541,6 @@ func Llistxattr(link string, dest []byte) (sz int, err error) {
 // Add_profil
 // Kdebug_trace
 // Sigreturn
-// Mmap
-// Mlock
-// Munlock
 // Atsocket
 // Kqueue_from_portset_np
 // Kqueue_portset
@@ -601,8 +633,6 @@ func Llistxattr(link string, dest []byte) (sz int, err error) {
 // Lio_listio
 // __pthread_cond_wait
 // Iopolicysys
-// Mlockall
-// Munlockall
 // __pthread_kill
 // __pthread_sigmask
 // __sigwait
@@ -655,7 +685,6 @@ func Llistxattr(link string, dest []byte) (sz int, err error) {
 // Sendmsg_nocancel
 // Recvfrom_nocancel
 // Accept_nocancel
-// Msync_nocancel
 // Fcntl_nocancel
 // Select_nocancel
 // Fsync_nocancel
