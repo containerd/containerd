@@ -21,6 +21,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/docker/docker/pkg/system"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -73,7 +74,7 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 
 	// Cleanup the sandbox root directory.
 	sandboxRootDir := getSandboxRootDir(c.rootDir, id)
-	if err := c.os.RemoveAll(sandboxRootDir); err != nil {
+	if err := system.EnsureRemoveAll(sandboxRootDir); err != nil {
 		return nil, fmt.Errorf("failed to remove sandbox root directory %q: %v",
 			sandboxRootDir, err)
 	}
