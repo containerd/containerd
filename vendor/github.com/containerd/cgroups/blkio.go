@@ -56,7 +56,7 @@ func (b *blkioController) Update(path string, resources *specs.LinuxResources) e
 	return b.Create(path, resources)
 }
 
-func (b *blkioController) Stat(path string, stats *Stats) error {
+func (b *blkioController) Stat(path string, stats *Metrics) error {
 	stats.Blkio = &BlkioStat{}
 	settings := []blkioStatSettings{
 		{
@@ -119,7 +119,7 @@ func (b *blkioController) Stat(path string, stats *Stats) error {
 	return nil
 }
 
-func (b *blkioController) readEntry(devices map[deviceKey]string, path, name string, entry *[]BlkioEntry) error {
+func (b *blkioController) readEntry(devices map[deviceKey]string, path, name string, entry *[]*BlkioEntry) error {
 	f, err := os.Open(filepath.Join(b.Path(path), fmt.Sprintf("blkio.%s", name)))
 	if err != nil {
 		return err
@@ -158,7 +158,7 @@ func (b *blkioController) readEntry(devices map[deviceKey]string, path, name str
 		if err != nil {
 			return err
 		}
-		*entry = append(*entry, BlkioEntry{
+		*entry = append(*entry, &BlkioEntry{
 			Device: devices[deviceKey{major, minor}],
 			Major:  major,
 			Minor:  minor,
@@ -235,7 +235,7 @@ type blkioSettings struct {
 
 type blkioStatSettings struct {
 	name  string
-	entry *[]BlkioEntry
+	entry *[]*BlkioEntry
 }
 
 func uintf(v interface{}) []byte {

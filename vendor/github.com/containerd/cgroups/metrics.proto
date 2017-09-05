@@ -1,0 +1,107 @@
+syntax = "proto3";
+
+package cgroups;
+
+message Metrics {
+	map<string, HugetlbStat> hugetlb = 1;
+	PidsStat pids = 2;
+	CpuStat cpu = 3;
+	MemoryStat memory = 4;
+	BlkioStat blkio = 5;
+}
+
+message HugetlbStat {
+	uint64 usage = 1;
+	uint64 max = 2;
+	uint64 failcnt = 3;
+}
+
+message PidsStat {
+	uint64 current = 1;
+	uint64 limit = 2;
+}
+
+message CpuStat {
+	CpuUsage usage = 1;
+	Throttle throttling = 2;
+}
+
+message CpuUsage {
+	// values in nanoseconds
+	uint64 total = 1;
+	uint64 kernel = 2;
+	uint64 user = 3;
+	repeated uint64 per_cpu = 4;
+}
+
+message Throttle {
+	uint64 periods = 1;
+	uint64 throttled_periods = 2;
+	uint64 throttled_time = 3;
+}
+
+message MemoryStat {
+	uint64 cache = 1;
+	uint64 rss = 2;
+	uint64 rss_huge = 3;
+	uint64 mapped_file = 4;
+	uint64 dirty = 5;
+	uint64 writeback = 6;
+	uint64 pg_pg_in = 7;
+	uint64 pg_pg_out = 8;
+	uint64 pg_fault = 9;
+	uint64 pg_maj_fault = 10;
+	uint64 inactive_anon = 11;
+	uint64 active_anon = 12;
+	uint64 inactive_file = 13;
+	uint64 active_file = 14;
+	uint64 unevictable = 15;
+	uint64 hierarchical_memory_limit = 16;
+	uint64 hierarchical_swap_limit = 17;
+	uint64 total_cache = 18;
+	uint64 total_rss = 19;
+	uint64 total_rss_huge = 20;
+	uint64 total_mapped_file = 21;
+	uint64 total_dirty = 22;
+	uint64 total_writeback = 23;
+	uint64 total_pg_pg_in = 24;
+	uint64 total_pg_pg_out = 25;
+	uint64 total_pg_fault = 26;
+	uint64 total_pg_maj_fault = 27;
+	uint64 total_inactive_anon = 28;
+	uint64 total_active_anon = 29;
+	uint64 total_inactive_file = 30;
+	uint64 total_active_file = 31;
+	uint64 total_unevictable = 32;
+	MemoryEntry usage = 33;
+	MemoryEntry swap = 34;
+	MemoryEntry kernel = 35;
+	MemoryEntry kernel_tcp = 36;
+
+}
+
+message MemoryEntry {
+	uint64 limit = 1;
+	uint64 usage = 2;
+	uint64 max = 3;
+	uint64 failcnt = 4;
+}
+
+message BlkioStat {
+	repeated BlkioEntry io_service_bytes_recursive = 1;
+	repeated BlkioEntry io_serviced_recursive = 2;
+	repeated BlkioEntry io_queued_recursive = 3;
+	repeated BlkioEntry io_service_time_recursive = 4;
+	repeated BlkioEntry io_wait_time_recursive = 5;
+	repeated BlkioEntry io_merged_recursive = 6;
+	repeated BlkioEntry io_time_recursive = 7;
+	repeated BlkioEntry sectors_recursive = 8;
+}
+
+message BlkioEntry {
+	string op = 1;
+	string device = 2;
+	uint64 major = 3;
+	uint64 minor = 4;
+	uint64 value = 5;
+}

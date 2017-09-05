@@ -92,6 +92,11 @@ processes, err := control.Processes(cgroups.Devices, recursive)
 stats, err := control.Stat()
 ```
 
+By adding `cgroups.IgnoreNotExist` all non-existent files will be ignored, e.g. swap memory stats without swap enabled
+```go
+stats, err := control.Stat(cgroups.IgnoreNotExist)
+```
+
 ### Move process across cgroups
 
 This allows you to take processes from one cgroup and move them to another.

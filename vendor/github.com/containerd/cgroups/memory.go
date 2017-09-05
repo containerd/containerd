@@ -81,7 +81,7 @@ func (m *memoryController) Update(path string, resources *specs.LinuxResources) 
 	return m.set(path, settings)
 }
 
-func (m *memoryController) Stat(path string, stats *Stats) error {
+func (m *memoryController) Stat(path string, stats *Metrics) error {
 	f, err := os.Open(filepath.Join(m.Path(path), "memory.stat"))
 	if err != nil {
 		return err
@@ -97,19 +97,19 @@ func (m *memoryController) Stat(path string, stats *Stats) error {
 	}{
 		{
 			module: "",
-			entry:  &stats.Memory.Usage,
+			entry:  stats.Memory.Usage,
 		},
 		{
 			module: "memsw",
-			entry:  &stats.Memory.Swap,
+			entry:  stats.Memory.Swap,
 		},
 		{
 			module: "kmem",
-			entry:  &stats.Memory.Kernel,
+			entry:  stats.Memory.Kernel,
 		},
 		{
 			module: "kmem.tcp",
-			entry:  &stats.Memory.KernelTCP,
+			entry:  stats.Memory.KernelTcp,
 		},
 	} {
 		for _, tt := range []struct {
@@ -194,8 +194,8 @@ func (m *memoryController) parseStats(r io.Reader, stat *MemoryStat) error {
 		line++
 	}
 	stat.Cache = raw["cache"]
-	stat.RSS = raw["rss"]
-	stat.RSSHuge = raw["rss_huge"]
+	stat.Rss = raw["rss"]
+	stat.RssHuge = raw["rss_huge"]
 	stat.MappedFile = raw["mapped_file"]
 	stat.Dirty = raw["dirty"]
 	stat.Writeback = raw["writeback"]
@@ -211,8 +211,8 @@ func (m *memoryController) parseStats(r io.Reader, stat *MemoryStat) error {
 	stat.HierarchicalMemoryLimit = raw["hierarchical_memory_limit"]
 	stat.HierarchicalSwapLimit = raw["hierarchical_memsw_limit"]
 	stat.TotalCache = raw["total_cache"]
-	stat.TotalRSS = raw["total_rss"]
-	stat.TotalRSSHuge = raw["total_rss_huge"]
+	stat.TotalRss = raw["total_rss"]
+	stat.TotalRssHuge = raw["total_rss_huge"]
 	stat.TotalMappedFile = raw["total_mapped_file"]
 	stat.TotalDirty = raw["total_dirty"]
 	stat.TotalWriteback = raw["total_writeback"]
