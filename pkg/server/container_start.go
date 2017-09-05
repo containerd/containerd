@@ -27,7 +27,6 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	criopts "github.com/kubernetes-incubator/cri-containerd/pkg/opts"
 	cio "github.com/kubernetes-incubator/cri-containerd/pkg/server/io"
 	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 )
@@ -143,11 +142,8 @@ func (c *criContainerdService) startContainer(ctx context.Context,
 		}
 		return cntr.IO, nil
 	}
-	var taskOpts []containerd.NewTaskOpts
-	if cgroup := sandboxConfig.GetLinux().GetCgroupParent(); cgroup != "" {
-		taskOpts = append(taskOpts, criopts.WithContainerdShimCgroup(cgroup))
-	}
-	task, err := container.NewTask(ctx, ioCreation, taskOpts...)
+
+	task, err := container.NewTask(ctx, ioCreation)
 	if err != nil {
 		return fmt.Errorf("failed to create containerd task: %v", err)
 	}

@@ -31,7 +31,6 @@ import (
 	"golang.org/x/sys/unix"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	criopts "github.com/kubernetes-incubator/cri-containerd/pkg/opts"
 	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
 )
@@ -182,11 +181,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	glog.V(5).Infof("Create sandbox container (id=%q, name=%q).",
 		id, name)
 	// We don't need stdio for sandbox container.
-	var taskOpts []containerd.NewTaskOpts
-	if cgroup := config.GetLinux().GetCgroupParent(); cgroup != "" {
-		taskOpts = append(taskOpts, criopts.WithContainerdShimCgroup(cgroup))
-	}
-	task, err := container.NewTask(ctx, containerd.NullIO, taskOpts...)
+	task, err := container.NewTask(ctx, containerd.NullIO)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create task for sandbox %q: %v", id, err)
 	}
@@ -258,6 +253,7 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 	// When cgroup parent is not set, containerd-shim will create container in a child cgroup
 	// of the cgroup itself is in.
 	// TODO(random-liu): [P2] Set default cgroup path if cgroup parent is not specified.
+
 	// Set namespace options.
 	securityContext := config.GetLinux().GetSecurityContext()
 	nsOptions := securityContext.GetNamespaceOptions()

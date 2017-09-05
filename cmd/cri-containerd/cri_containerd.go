@@ -20,12 +20,13 @@ import (
 	"os"
 
 	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/cri-containerd/cmd/cri-containerd/options"
-	"github.com/kubernetes-incubator/cri-containerd/pkg/server"
-	"github.com/kubernetes-incubator/cri-containerd/pkg/version"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/pkg/util/interrupt"
+
+	"github.com/kubernetes-incubator/cri-containerd/cmd/cri-containerd/options"
+	"github.com/kubernetes-incubator/cri-containerd/pkg/server"
+	"github.com/kubernetes-incubator/cri-containerd/pkg/version"
 )
 
 func main() {
@@ -35,7 +36,7 @@ func main() {
 		glog.Exitf("Failed to init CRI containerd flags: %v", err)
 	}
 
-	glog.V(2).Infof("Run cri-containerd %#v", o)
+	glog.V(2).Infof("Run cri-containerd %+v", o)
 	if o.PrintVersion {
 		version.PrintVersion()
 		os.Exit(0)
@@ -56,6 +57,7 @@ func main() {
 		o.StreamServerAddress,
 		o.StreamServerPort,
 		o.CgroupPath,
+		o.SandboxImage,
 	)
 	if err != nil {
 		glog.Exitf("Failed to create CRI containerd service %+v: %v", o, err)
