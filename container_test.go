@@ -1309,6 +1309,9 @@ func TestDeleteContainerExecCreated(t *testing.T) {
 }
 
 func TestContainerMetrics(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("metrics are currently not supported on windows")
+	}
 	t.Parallel()
 
 	client, err := newClient(t, address)
