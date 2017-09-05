@@ -380,7 +380,7 @@ func setOCIProcessArgs(g *generate.Generator, config *runtime.ContainerConfig, i
 // an invalid environment variable is encountered.
 func addImageEnvs(g *generate.Generator, imageEnvs []string) error {
 	for _, e := range imageEnvs {
-		kv := strings.Split(e, "=")
+		kv := strings.SplitN(e, "=", 2)
 		if len(kv) != 2 {
 			return fmt.Errorf("invalid environment variable %q", e)
 		}
