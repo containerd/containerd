@@ -166,7 +166,10 @@ func (c *cgroup) Stat(handlers ...ErrorHandler) (*Metrics, error) {
 	}
 	var (
 		stats = &Metrics{
-			Cpu: &CpuStat{},
+			Cpu: &CpuStat{
+				Throttling: &Throttle{},
+				Usage:      &CpuUsage{},
+			},
 		}
 		wg   = &sync.WaitGroup{}
 		errs = make(chan error, len(c.subsystems))

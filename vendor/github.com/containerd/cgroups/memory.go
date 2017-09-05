@@ -87,7 +87,12 @@ func (m *memoryController) Stat(path string, stats *Metrics) error {
 		return err
 	}
 	defer f.Close()
-	stats.Memory = &MemoryStat{}
+	stats.Memory = &MemoryStat{
+		Usage:     &MemoryEntry{},
+		Swap:      &MemoryEntry{},
+		Kernel:    &MemoryEntry{},
+		KernelTcp: &MemoryEntry{},
+	}
 	if err := m.parseStats(f, stats.Memory); err != nil {
 		return err
 	}
