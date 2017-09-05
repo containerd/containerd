@@ -2891,27 +2891,6 @@ file {
   dependency: "google/protobuf/any.proto"
   dependency: "google/protobuf/timestamp.proto"
   message_type {
-    name: "MetricsRequest"
-    field {
-      name: "filters"
-      number: 1
-      label: LABEL_REPEATED
-      type: TYPE_STRING
-      json_name: "filters"
-    }
-  }
-  message_type {
-    name: "MetricsResponse"
-    field {
-      name: "metrics"
-      number: 1
-      label: LABEL_REPEATED
-      type: TYPE_MESSAGE
-      type_name: ".containerd.types.Metric"
-      json_name: "metrics"
-    }
-  }
-  message_type {
     name: "Metric"
     field {
       name: "timestamp"
@@ -3550,6 +3529,27 @@ file {
       json_name: "resources"
     }
   }
+  message_type {
+    name: "MetricsRequest"
+    field {
+      name: "filters"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "filters"
+    }
+  }
+  message_type {
+    name: "MetricsResponse"
+    field {
+      name: "metrics"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Metric"
+      json_name: "metrics"
+    }
+  }
   service {
     name: "Tasks"
     method {
@@ -3629,8 +3629,8 @@ file {
     }
     method {
       name: "Metrics"
-      input_type: ".containerd.types.MetricsRequest"
-      output_type: ".containerd.types.MetricsResponse"
+      input_type: ".containerd.services.tasks.v1.MetricsRequest"
+      output_type: ".containerd.services.tasks.v1.MetricsResponse"
     }
   }
   options {

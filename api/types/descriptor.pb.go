@@ -12,8 +12,6 @@
 
 	It has these top-level messages:
 		Descriptor
-		MetricsRequest
-		MetricsResponse
 		Metric
 		Mount
 */

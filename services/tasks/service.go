@@ -457,12 +457,12 @@ func (s *Service) Update(ctx context.Context, r *api.UpdateTaskRequest) (*google
 	return empty, nil
 }
 
-func (s *Service) Metrics(ctx context.Context, r *types.MetricsRequest) (*types.MetricsResponse, error) {
+func (s *Service) Metrics(ctx context.Context, r *api.MetricsRequest) (*api.MetricsResponse, error) {
 	filter, err := filters.ParseAll(r.Filters...)
 	if err != nil {
 		return nil, err
 	}
-	var resp types.MetricsResponse
+	var resp api.MetricsResponse
 	for _, r := range s.runtimes {
 		tasks, err := r.Tasks(ctx)
 		if err != nil {
@@ -473,7 +473,7 @@ func (s *Service) Metrics(ctx context.Context, r *types.MetricsRequest) (*types.
 	return &resp, nil
 }
 
-func getTasksMetrics(ctx context.Context, filter filters.Filter, tasks []runtime.Task, r *types.MetricsResponse) {
+func getTasksMetrics(ctx context.Context, filter filters.Filter, tasks []runtime.Task, r *api.MetricsResponse) {
 	for _, tk := range tasks {
 		if !filter.Match(filters.AdapterFunc(func(fieldpath []string) (string, bool) {
 			t := tk

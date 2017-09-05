@@ -48,7 +48,7 @@ service Tasks {
 
 	rpc Update(UpdateTaskRequest) returns (google.protobuf.Empty);
 
-	rpc Metrics(types.MetricsRequest) returns (types.MetricsResponse);
+	rpc Metrics(MetricsRequest) returns (MetricsResponse);
 }
 
 message CreateTaskRequest {
@@ -185,4 +185,12 @@ message CheckpointTaskResponse {
 message UpdateTaskRequest {
 	string container_id = 1;
 	google.protobuf.Any resources = 2;
+}
+
+message MetricsRequest {
+	repeated string filters = 1;
+}
+
+message MetricsResponse {
+	repeated types.Metric metrics = 1;
 }

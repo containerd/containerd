@@ -344,13 +344,13 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			filepath.Join(r.state, ns, id),
 			filepath.Join(r.root, ns, id),
 		)
+		pid, _ := runc.ReadPidFile(filepath.Join(bundle.path, client.InitPidFile))
 		s, err := bundle.NewShimClient(ctx, ns, ShimConnect(), nil)
 		if err != nil {
 			log.G(ctx).WithError(err).WithFields(logrus.Fields{
 				"id":        id,
 				"namespace": ns,
 			}).Error("connecting to shim")
-			pid, _ := runc.ReadPidFile(filepath.Join(bundle.path, client.InitPidFile))
 			err := r.cleanupAfterDeadShim(ctx, bundle, ns, id, pid, nil)
 			if err != nil {
 				log.G(ctx).WithError(err).WithField("bundle", bundle.path).
@@ -358,11 +358,13 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			}
 			continue
 		}
-		o = append(o, &Task{
-			id:        id,
-			shim:      s,
-			namespace: ns,
-		})
+
+		t, err := newTask(id, ns, pid, s)
+		if err != nil {
+			log.G(ctx).WithError(err).Error("loading task type")
+			continue
+		}
+		o = append(o, t)
 	}
 	return o, nil
 }

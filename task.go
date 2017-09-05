@@ -475,7 +475,7 @@ func (t *task) LoadProcess(ctx context.Context, id string, ioAttach IOAttach) (P
 }
 
 func (t *task) Metrics(ctx context.Context) (*types.Metric, error) {
-	response, err := t.client.TaskService().Metrics(ctx, &types.MetricsRequest{
+	response, err := t.client.TaskService().Metrics(ctx, &tasks.MetricsRequest{
 		Filters: []string{
 			"id==" + t.id,
 		},
