@@ -100,7 +100,10 @@ func TestContainerStore(t *testing.T) {
 	assert := assertlib.New(t)
 	containers := map[string]Container{}
 	for _, id := range ids {
-		container, err := NewContainer(metadatas[id], statuses[id])
+		container, err := NewContainer(
+			metadatas[id],
+			WithFakeStatus(statuses[id]),
+		)
 		assert.NoError(err)
 		containers[id] = container
 	}
@@ -162,11 +165,15 @@ func TestWithContainerIO(t *testing.T) {
 	}
 	assert := assertlib.New(t)
 
-	c, err := NewContainer(meta, status)
+	c, err := NewContainer(meta, WithFakeStatus(status))
 	assert.NoError(err)
 	assert.Nil(c.IO)
 
-	c, err = NewContainer(meta, status, WithContainerIO(&cio.ContainerIO{}))
+	c, err = NewContainer(
+		meta,
+		WithFakeStatus(status),
+		WithContainerIO(&cio.ContainerIO{}),
+	)
 	assert.NoError(err)
 	assert.NotNil(c.IO)
 }

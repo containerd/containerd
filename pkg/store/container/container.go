@@ -40,34 +40,45 @@ type Container struct {
 }
 
 // Opts sets specific information to newly created Container.
-type Opts func(*Container)
+type Opts func(*Container) error
 
 // WithContainer adds the containerd Container to the internal data store.
 func WithContainer(cntr containerd.Container) Opts {
-	return func(c *Container) {
+	return func(c *Container) error {
 		c.Container = cntr
+		return nil
 	}
 }
 
 // WithContainerIO adds IO into the container.
 func WithContainerIO(io *cio.ContainerIO) Opts {
-	return func(c *Container) {
+	return func(c *Container) error {
 		c.IO = io
+		return nil
+	}
+}
+
+// WithStatus adds status to the container.
+func WithStatus(status Status, root string) Opts {
+	return func(c *Container) error {
+		s, err := StoreStatus(root, c.ID, status)
+		if err != nil {
+			return err
+		}
+		c.Status = s
+		return nil
 	}
 }
 
 // NewContainer creates an internally used container type.
-func NewContainer(metadata Metadata, status Status, opts ...Opts) (Container, error) {
-	s, err := StoreStatus(metadata.ID, status)
-	if err != nil {
-		return Container{}, err
-	}
+func NewContainer(metadata Metadata, opts ...Opts) (Container, error) {
 	c := Container{
 		Metadata: metadata,
-		Status:   s,
 	}
 	for _, o := range opts {
-		o(&c)
+		if err := o(&c); err != nil {
+			return Container{}, err
+		}
 	}
 	return c, nil
 }

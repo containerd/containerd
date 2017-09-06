@@ -17,11 +17,16 @@ limitations under the License.
 package container
 
 import (
+	"encoding/json"
 	"errors"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	assertlib "github.com/stretchr/testify/assert"
+	requirelib "github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
@@ -60,6 +65,32 @@ func TestContainerState(t *testing.T) {
 	}
 }
 
+func TestStatusEncodeDecode(t *testing.T) {
+	s := &Status{
+		Pid:        1234,
+		CreatedAt:  time.Now().UnixNano(),
+		StartedAt:  time.Now().UnixNano(),
+		FinishedAt: time.Now().UnixNano(),
+		ExitCode:   1,
+		Reason:     "test-reason",
+		Message:    "test-message",
+		Removing:   true,
+	}
+	assert := assertlib.New(t)
+	data, err := s.encode()
+	assert.NoError(err)
+	newS := &Status{}
+	assert.NoError(newS.decode(data))
+	assert.Equal(s, newS)
+
+	unsupported, err := json.Marshal(&versionedStatus{
+		Version: "random-test-version",
+		Status:  *s,
+	})
+	assert.NoError(err)
+	assert.Error(newS.decode(unsupported))
+}
+
 func TestStatus(t *testing.T) {
 	testID := "test-id"
 	testStatus := Status{
@@ -71,12 +102,23 @@ func TestStatus(t *testing.T) {
 	}
 	updateErr := errors.New("update error")
 	assert := assertlib.New(t)
+	require := requirelib.New(t)
+
+	tempDir, err := ioutil.TempDir(os.TempDir(), "status-test")
+	require.NoError(err)
+	defer os.RemoveAll(tempDir)
+	statusFile := filepath.Join(tempDir, "status")
 
 	t.Logf("simple store and get")
-	s, err := StoreStatus(testID, testStatus)
+	s, err := StoreStatus(tempDir, testID, testStatus)
 	assert.NoError(err)
 	old := s.Get()
 	assert.Equal(testStatus, old)
+	_, err = os.Stat(statusFile)
+	assert.NoError(err)
+	loaded, err := LoadStatus(tempDir, testID)
+	require.NoError(err)
+	assert.Equal(testStatus, loaded)
 
 	t.Logf("failed update should not take effect")
 	err = s.Update(func(o Status) (Status, error) {
@@ -85,6 +127,9 @@ func TestStatus(t *testing.T) {
 	})
 	assert.Equal(updateErr, err)
 	assert.Equal(testStatus, s.Get())
+	loaded, err = LoadStatus(tempDir, testID)
+	require.NoError(err)
+	assert.Equal(testStatus, loaded)
 
 	t.Logf("successful update should take effect")
 	err = s.Update(func(o Status) (Status, error) {
@@ -93,9 +138,20 @@ func TestStatus(t *testing.T) {
 	})
 	assert.NoError(err)
 	assert.Equal(updateStatus, s.Get())
+	loaded, err = LoadStatus(tempDir, testID)
+	require.NoError(err)
+	assert.Equal(updateStatus, loaded)
 
 	t.Logf("successful update should not affect existing snapshot")
 	assert.Equal(testStatus, old)
 
-	// TODO(random-liu): Test Load and Delete after disc checkpoint is added.
+	t.Logf("delete status")
+	assert.NoError(s.Delete())
+	_, err = LoadStatus(tempDir, testID)
+	assert.Error(err)
+	_, err = os.Stat(statusFile)
+	assert.True(os.IsNotExist(err))
+
+	t.Logf("delete status should be idempotent")
+	assert.NoError(s.Delete())
 }

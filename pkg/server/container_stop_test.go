@@ -70,7 +70,7 @@ func TestWaitContainerStop(t *testing.T) {
 		if test.status != nil {
 			container, err := containerstore.NewContainer(
 				containerstore.Metadata{ID: id},
-				*test.status,
+				containerstore.WithFakeStatus(*test.status),
 			)
 			assert.NoError(t, err)
 			assert.NoError(t, c.containerStore.Add(container))

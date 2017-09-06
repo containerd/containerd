@@ -47,15 +47,17 @@ func TestToCRIContainer(t *testing.T) {
 			Config:    config,
 			ImageRef:  "test-image-ref",
 		},
-		containerstore.Status{
-			Pid:        1234,
-			CreatedAt:  createdAt,
-			StartedAt:  time.Now().UnixNano(),
-			FinishedAt: time.Now().UnixNano(),
-			ExitCode:   1,
-			Reason:     "test-reason",
-			Message:    "test-message",
-		},
+		containerstore.WithFakeStatus(
+			containerstore.Status{
+				Pid:        1234,
+				CreatedAt:  createdAt,
+				StartedAt:  time.Now().UnixNano(),
+				FinishedAt: time.Now().UnixNano(),
+				ExitCode:   1,
+				Reason:     "test-reason",
+				Message:    "test-message",
+			},
+		),
 	)
 	assert.NoError(t, err)
 	expect := &runtime.Container{
@@ -158,7 +160,10 @@ type containerForTest struct {
 }
 
 func (c containerForTest) toContainer() (containerstore.Container, error) {
-	return containerstore.NewContainer(c.metadata, c.status)
+	return containerstore.NewContainer(
+		c.metadata,
+		containerstore.WithFakeStatus(c.status),
+	)
 }
 
 func TestListContainers(t *testing.T) {
