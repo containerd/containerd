@@ -224,7 +224,10 @@ func (r *Runc) Exec(context context.Context, id string, spec specs.Process, opts
 			}
 		}
 	}
-	_, err = Monitor.Wait(cmd, ec)
+	status, err := Monitor.Wait(cmd, ec)
+	if err == nil && status != 0 {
+		err = fmt.Errorf("%s did not terminate sucessfully", cmd.Args[0])
+	}
 	return err
 }
 
