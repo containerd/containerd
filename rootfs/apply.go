@@ -1,7 +1,10 @@
 package rootfs
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
+	"time"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
@@ -63,7 +66,7 @@ func ApplyLayer(ctx context.Context, layer Layer, chain []digest.Digest, sn snap
 		return false, errors.Wrap(err, "failed to stat snapshot")
 	}
 
-	key := fmt.Sprintf("extract %s", chainID)
+	key := fmt.Sprintf("extract-%s %s", uniquePart(), chainID)
 
 	// Prepare snapshot with from parent
 	mounts, err := sn.Prepare(ctx, key, parent.String())
@@ -90,8 +93,25 @@ func ApplyLayer(ctx context.Context, layer Layer, chain []digest.Digest, sn snap
 	}
 
 	if err = sn.Commit(ctx, chainID.String(), key); err != nil {
-		return false, errors.Wrapf(err, "failed to commit snapshot %s", parent)
+		if !errdefs.IsAlreadyExists(err) {
+			return false, errors.Wrapf(err, "failed to commit snapshot %s", parent)
+		}
+
+		// Destination already exists, cleanup key and return without error
+		err = nil
+		if err := sn.Remove(ctx, key); err != nil {
+			return false, errors.Wrapf(err, "failed to cleanup aborted apply %s", key)
+		}
+		return false, nil
 	}
 
 	return true, nil
+}
+
+func uniquePart() string {
+	t := time.Now()
+	var b [3]byte
+	// Ignore read failures, just decreases uniqueness
+	rand.Read(b[:])
+	return fmt.Sprintf("%d-%s", t.Nanosecond(), base64.URLEncoding.EncodeToString(b[:]))
 }
