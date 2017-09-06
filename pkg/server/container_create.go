@@ -112,12 +112,12 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	opts := []containerd.NewContainerOpts{
 		containerd.WithSnapshotter(c.snapshotter),
 	}
-	// Prepare container rootfs.
-	if config.GetLinux().GetSecurityContext().GetReadonlyRootfs() {
-		opts = append(opts, containerd.WithNewSnapshotView(id, image.Image))
-	} else {
-		opts = append(opts, containerd.WithNewSnapshot(id, image.Image))
-	}
+	// Prepare container rootfs. This is always writeable even if
+	// the container wants a readonly rootfs since we want to give
+	// the runtime (runc) a chance to modify (e.g. to create mount
+	// points corresponding to spec.Mounts) before making the
+	// rootfs readonly (requested by spec.Root.Readonly).
+	opts = append(opts, containerd.WithNewSnapshot(id, image.Image))
 	meta.ImageRef = image.ID
 
 	// Create container root directory.
