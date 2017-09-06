@@ -1307,3 +1307,64 @@ func TestDeleteContainerExecCreated(t *testing.T) {
 	}
 	<-finished
 }
+
+func TestContainerMetrics(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("metrics are currently not supported on windows")
+	}
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), WithProcessArgs("sleep", "30")), withNewSnapshot(id, image))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	metric, err := task.Metrics(ctx)
+	if err != nil {
+		t.Error(err)
+	}
+	if metric.ID != id {
+		t.Errorf("expected metric id %q but received %q", id, metric.ID)
+	}
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Error(err)
+		return
+	}
+
+	<-statusC
+}

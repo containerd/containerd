@@ -15,15 +15,15 @@ var hugetlbMetrics = []*metric{
 		unit:   metrics.Bytes,
 		vt:     prometheus.GaugeValue,
 		labels: []string{"page"},
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Hugetlb == nil {
 				return nil
 			}
 			var out []value
-			for page, v := range stats.Hugetlb {
+			for _, v := range stats.Hugetlb {
 				out = append(out, value{
 					v: float64(v.Usage),
-					l: []string{page},
+					l: []string{v.Pagesize},
 				})
 			}
 			return out
@@ -35,15 +35,15 @@ var hugetlbMetrics = []*metric{
 		unit:   metrics.Total,
 		vt:     prometheus.GaugeValue,
 		labels: []string{"page"},
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Hugetlb == nil {
 				return nil
 			}
 			var out []value
-			for page, v := range stats.Hugetlb {
+			for _, v := range stats.Hugetlb {
 				out = append(out, value{
 					v: float64(v.Failcnt),
-					l: []string{page},
+					l: []string{v.Pagesize},
 				})
 			}
 			return out
@@ -55,15 +55,15 @@ var hugetlbMetrics = []*metric{
 		unit:   metrics.Bytes,
 		vt:     prometheus.GaugeValue,
 		labels: []string{"page"},
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Hugetlb == nil {
 				return nil
 			}
 			var out []value
-			for page, v := range stats.Hugetlb {
+			for _, v := range stats.Hugetlb {
 				out = append(out, value{
 					v: float64(v.Max),
-					l: []string{page},
+					l: []string{v.Pagesize},
 				})
 			}
 			return out

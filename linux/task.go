@@ -5,6 +5,7 @@ package linux
 import (
 	"context"
 
+	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
 	client "github.com/containerd/containerd/linux/shim"
@@ -18,15 +19,21 @@ type Task struct {
 	pid       int
 	shim      *client.Client
 	namespace string
+	cg        cgroups.Cgroup
 }
 
-func newTask(id, namespace string, pid int, shim *client.Client) *Task {
+func newTask(id, namespace string, pid int, shim *client.Client) (*Task, error) {
+	cg, err := cgroups.Load(cgroups.V1, cgroups.PidPath(pid))
+	if err != nil {
+		return nil, err
+	}
 	return &Task{
 		id:        id,
 		pid:       pid,
 		shim:      shim,
 		namespace: namespace,
-	}
+		cg:        cg,
+	}, nil
 }
 
 func (t *Task) ID() string {
@@ -200,4 +207,16 @@ func (t *Task) Process(ctx context.Context, id string) (runtime.Process, error) 
 		id: id,
 		t:  t,
 	}, nil
+}
+
+func (t *Task) Metrics(ctx context.Context) (interface{}, error) {
+	stats, err := t.cg.Stat(cgroups.IgnoreNotExist)
+	if err != nil {
+		return nil, err
+	}
+	return stats, nil
+}
+
+func (t *Task) Cgroup() cgroups.Cgroup {
+	return t.cg
 }

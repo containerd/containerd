@@ -15,7 +15,7 @@ var blkioMetrics = []*metric{
 		unit:   metrics.Total,
 		vt:     prometheus.GaugeValue,
 		labels: []string{"op", "device", "major", "minor"},
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Blkio == nil {
 				return nil
 			}
@@ -28,7 +28,7 @@ var blkioMetrics = []*metric{
 		unit:   metrics.Total,
 		vt:     prometheus.GaugeValue,
 		labels: []string{"op", "device", "major", "minor"},
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Blkio == nil {
 				return nil
 			}
@@ -41,7 +41,7 @@ var blkioMetrics = []*metric{
 		unit:   metrics.Bytes,
 		vt:     prometheus.GaugeValue,
 		labels: []string{"op", "device", "major", "minor"},
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Blkio == nil {
 				return nil
 			}
@@ -54,7 +54,7 @@ var blkioMetrics = []*metric{
 		unit:   metrics.Total,
 		vt:     prometheus.GaugeValue,
 		labels: []string{"op", "device", "major", "minor"},
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Blkio == nil {
 				return nil
 			}
@@ -67,7 +67,7 @@ var blkioMetrics = []*metric{
 		unit:   metrics.Total,
 		vt:     prometheus.GaugeValue,
 		labels: []string{"op", "device", "major", "minor"},
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Blkio == nil {
 				return nil
 			}
@@ -80,7 +80,7 @@ var blkioMetrics = []*metric{
 		unit:   metrics.Total,
 		vt:     prometheus.GaugeValue,
 		labels: []string{"op", "device", "major", "minor"},
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Blkio == nil {
 				return nil
 			}
@@ -93,7 +93,7 @@ var blkioMetrics = []*metric{
 		unit:   metrics.Total,
 		vt:     prometheus.GaugeValue,
 		labels: []string{"op", "device", "major", "minor"},
-		getValues: func(stats *cgroups.Stats) []value {
+		getValues: func(stats *cgroups.Metrics) []value {
 			if stats.Blkio == nil {
 				return nil
 			}

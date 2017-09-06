@@ -6,12 +6,12 @@ import (
 	"github.com/containerd/cgroups"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/linux"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
 	metrics "github.com/docker/go-metrics"
-	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
@@ -50,18 +50,11 @@ type cgroupsMonitor struct {
 
 func (m *cgroupsMonitor) Monitor(c runtime.Task) error {
 	info := c.Info()
-	state, err := c.State(m.context)
-	if err != nil {
+	t := c.(*linux.Task)
+	if err := m.collector.Add(info.ID, info.Namespace, t.Cgroup()); err != nil {
 		return err
 	}
-	cg, err := cgroups.Load(cgroups.V1, cgroups.PidPath(int(state.Pid)))
-	if err != nil {
-		return errors.Wrapf(err, "load cgroup for %d", state.Pid)
-	}
-	if err := m.collector.Add(info.ID, info.Namespace, cg); err != nil {
-		return err
-	}
-	return m.oom.Add(info.ID, info.Namespace, cg, m.trigger)
+	return m.oom.Add(info.ID, info.Namespace, t.Cgroup(), m.trigger)
 }
 
 func (m *cgroupsMonitor) Stop(c runtime.Task) error {
