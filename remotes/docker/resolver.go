@@ -491,8 +491,9 @@ func (r *dockerBase) fetchTokenWithOAuth(ctx context.Context, to tokenOptions) (
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 405 && r.username != "" {
-		// It would be nice if registries would implement the specifications
+	// Registries without support for POST may return 404 for POST /v2/token.
+	// As of September 2017, GCR is known to return 404.
+	if (resp.StatusCode == 405 && r.username != "") || resp.StatusCode == 404 {
 		return r.getToken(ctx, to)
 	} else if resp.StatusCode < 200 || resp.StatusCode >= 400 {
 		b, _ := ioutil.ReadAll(resp.Body)
