@@ -11,7 +11,6 @@ import (
 
 	"github.com/containerd/continuity/sysx"
 	"github.com/pkg/errors"
-	"golang.org/x/sys/unix"
 )
 
 // whiteouts are files with a special meaning for the layered filesystem.
@@ -84,11 +83,11 @@ func compareSysStat(s1, s2 interface{}) (bool, error) {
 
 func compareCapabilities(p1, p2 string) (bool, error) {
 	c1, err := sysx.LGetxattr(p1, "security.capability")
-	if err != nil && err != unix.ENODATA {
+	if err != nil && err != sysx.ENODATA {
 		return false, errors.Wrapf(err, "failed to get xattr for %s", p1)
 	}
 	c2, err := sysx.LGetxattr(p2, "security.capability")
-	if err != nil && err != unix.ENODATA {
+	if err != nil && err != sysx.ENODATA {
 		return false, errors.Wrapf(err, "failed to get xattr for %s", p2)
 	}
 	return bytes.Equal(c1, c2), nil
