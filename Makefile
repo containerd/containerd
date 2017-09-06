@@ -78,7 +78,7 @@ test-cri: binaries
 	@./hack/test-cri.sh
 
 test-e2e-node: binaries
-	@./hack/test-e2e-node.sh
+	@VERSION=$(VERSION) ./hack/test-e2e-node.sh
 
 clean:
 	rm -rf $(BUILD_DIR)/*

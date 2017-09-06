@@ -5,10 +5,21 @@ sudo: required
 services:
     - docker
 
+cache:
+    directories:
+        - "${HOME}/google-cloud-sdk/"
+
 before_install:
+    # Workaround to make gsutil work (see travis-ci#7940).
+    # TODO(random-liu): Remove this after travis-ci#7940 is fixed.
+    - sudo rm -f /etc/boto.cfg
     # libseccomp in trusty is not new enough, need backports version.
     - sudo sh -c "echo 'deb http://archive.ubuntu.com/ubuntu trusty-backports main restricted universe multiverse' > /etc/apt/sources.list.d/backports.list"
     - sudo apt-get update
+    # Encrypted data is not available for pull request for security concern.
+    - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+        openssl aes-256-cbc -K $encrypted_b5f8c391f742_key -iv $encrypted_b5f8c391f742_iv -in gcp-secret.json.enc -out gcp-secret.json -d;
+      fi
 
 install:
     - sudo apt-get install btrfs-tools
@@ -17,9 +28,19 @@ install:
     - sudo apt-get install libapparmor-dev
     - sudo apt-get install socat
     - docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
+    # Pull request test doesn't need google cloud sdk.
+    - if [ "$TRAVIS_PULL_REQUEST" = "false" ] && [ ! -d ${HOME}/google-cloud-sdk ]; then
+        rm -rf "${HOME}/google-cloud-sdk"; 
+        export CLOUDSDK_CORE_DISABLE_PROMPTS=1;
+        curl https://sdk.cloud.google.com | bash;
+        gcloud version;
+      fi
 
 before_script:
     - export PATH=$HOME/gopath/bin:$PATH
+    - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+        gcloud auth activate-service-account --key-file gcp-secret.json --project=k8s-cri-containerd;
+      fi
 
 jobs:
   include:
@@ -52,6 +73,5 @@ jobs:
       script:
         - test "${TRAVIS_EVENT_TYPE}" != "cron" && exit 0 || true
         - make install.deps
-        - make test-e2e-node
-        # TODO(random-liu): Upload log to GCS.
+        - UPLOAD_LOG=true make test-e2e-node
       go: 1.8.x

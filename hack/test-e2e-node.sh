@@ -27,6 +27,7 @@ export FOCUS=${FOCUS:-""}
 # SKIP skips the test to skip.
 export SKIP=${SKIP:-${DEFAULT_SKIP}}
 REPORT_DIR=${REPORT_DIR:-"/tmp/test-e2e-node"}
+UPLOAD_LOG=${UPLOAD_LOG:-false}
 
 # Check GOPATH
 if [[ -z "${GOPATH}" ]]; then
@@ -78,3 +79,13 @@ kill_cri_containerd
 
 sudo iptables-restore < ${ORIGINAL_RULES}
 rm ${ORIGINAL_RULES}
+
+# UPLOAD_LOG_PATH is bucket to upload test logs.
+UPLOAD_LOG_PATH=cri-containerd_test-e2e-node
+if ${UPLOAD_LOG}; then
+  if [ -z "${VERSION}" ]; then
+	  echo "VERSION is not set"
+	  exit 1
+  fi
+  upload_logs_to_gcs "${UPLOAD_LOG_PATH}" "${VERSION}-$(date +%Y%m%d-%H%M%S)" "${REPORT_DIR}"
+fi
