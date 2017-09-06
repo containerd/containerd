@@ -332,7 +332,7 @@ var (
 				return err
 			}
 
-			if err := wr.Commit(0, wr.Digest()); err != nil {
+			if err := wr.Commit(ctx, 0, wr.Digest()); err != nil {
 				return err
 			}
 

@@ -528,7 +528,7 @@ func writeContent(ctx context.Context, store content.Store, mediaType, ref strin
 	if err != nil {
 		return d, err
 	}
-	if err := writer.Commit(size, ""); err != nil {
+	if err := writer.Commit(ctx, size, ""); err != nil {
 		return d, err
 	}
 	return v1.Descriptor{

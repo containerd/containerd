@@ -1,6 +1,7 @@
 package local
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -54,7 +55,7 @@ func (w *writer) Write(p []byte) (n int, err error) {
 	return n, err
 }
 
-func (w *writer) Commit(size int64, expected digest.Digest, opts ...content.Opt) error {
+func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
 	if w.fp == nil {
 		return errors.Wrap(errdefs.ErrFailedPrecondition, "cannot commit on closed writer")
 	}

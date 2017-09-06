@@ -94,7 +94,7 @@ func TestContentWriter(t *testing.T) {
 
 	checkCopy(t, int64(len(p)), cw, bufio.NewReader(ioutil.NopCloser(bytes.NewReader(p))))
 
-	if err := cw.Commit(int64(len(p)), expected); err != nil {
+	if err := cw.Commit(ctx, int64(len(p)), expected); err != nil {
 		t.Fatal(err)
 	}
 
@@ -109,7 +109,7 @@ func TestContentWriter(t *testing.T) {
 
 	// now, attempt to write the same data again
 	checkCopy(t, int64(len(p)), cw, bufio.NewReader(ioutil.NopCloser(bytes.NewReader(p))))
-	if err := cw.Commit(int64(len(p)), expected); err != nil {
+	if err := cw.Commit(ctx, int64(len(p)), expected); err != nil {
 		t.Fatal(err)
 	}
 

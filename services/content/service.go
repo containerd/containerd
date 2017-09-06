@@ -424,7 +424,7 @@ func (s *Service) Write(session api.Content_WriteServer) (err error) {
 				if req.Labels != nil {
 					opts = append(opts, content.WithLabels(req.Labels))
 				}
-				if err := wr.Commit(total, expected, opts...); err != nil {
+				if err := wr.Commit(ctx, total, expected, opts...); err != nil {
 					return err
 				}
 			}
