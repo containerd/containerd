@@ -70,7 +70,7 @@ var pushObjectCommand = cli.Command{
 		}
 
 		// TODO: Progress reader
-		if err := content.Copy(cw, content.NewReader(ra), desc.Size, desc.Digest); err != nil {
+		if err := content.Copy(ctx, cw, content.NewReader(ra), desc.Size, desc.Digest); err != nil {
 			return err
 		}
 

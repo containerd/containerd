@@ -1,6 +1,7 @@
 package content
 
 import (
+	"context"
 	"io"
 
 	contentapi "github.com/containerd/containerd/api/services/content/v1"
@@ -80,7 +81,7 @@ func (rw *remoteWriter) Write(p []byte) (n int, err error) {
 	return
 }
 
-func (rw *remoteWriter) Commit(size int64, expected digest.Digest, opts ...content.Opt) error {
+func (rw *remoteWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
 	var base content.Info
 	for _, opt := range opts {
 		if err := opt(&base); err != nil {

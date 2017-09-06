@@ -179,7 +179,7 @@ func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount
 	}
 
 	dgst := cw.Digest()
-	if err := cw.Commit(0, dgst, opts...); err != nil {
+	if err := cw.Commit(ctx, 0, dgst, opts...); err != nil {
 		return emptyDesc, errors.Wrap(err, "failed to commit")
 	}
 

@@ -121,7 +121,7 @@ func checkContentStoreWriter(ctx context.Context, t *testing.T, cs content.Store
 		}
 
 		preCommit := time.Now()
-		if err := s.writer.Commit(0, ""); err != nil {
+		if err := s.writer.Commit(ctx, 0, ""); err != nil {
 			t.Fatal(err)
 		}
 		postCommit := time.Now()
@@ -201,7 +201,7 @@ func checkUploadStatus(ctx context.Context, t *testing.T, cs content.Store) {
 	}
 
 	preCommit := time.Now()
-	if err := w1.Commit(0, ""); err != nil {
+	if err := w1.Commit(ctx, 0, ""); err != nil {
 		t.Fatalf("Commit failed: %+v", err)
 	}
 	postCommit := time.Now()
@@ -235,7 +235,7 @@ func checkLabels(ctx context.Context, t *testing.T, cs content.Store) {
 	}
 
 	preCommit := time.Now()
-	if err := w1.Commit(0, "", content.WithLabels(labels)); err != nil {
+	if err := w1.Commit(ctx, 0, "", content.WithLabels(labels)); err != nil {
 		t.Fatalf("Commit failed: %+v", err)
 	}
 	postCommit := time.Now()
