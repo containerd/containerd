@@ -132,6 +132,9 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	}
 	opts := []containerd.NewContainerOpts{
 		containerd.WithSnapshotter(c.snapshotter),
+		// A pure ro rootfs view is OK for the sandbox since
+		// we will never need to modify it or mount anything
+		// in it.
 		containerd.WithNewSnapshotView(id, image.Image),
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(labels),
