@@ -45,7 +45,7 @@ func TestContainersList(t *testing.T) {
 				"odd":     fmt.Sprint(i%2 != 0),
 			},
 			Spec:        encoded,
-			RootFS:      "test-rootfs",
+			SnapshotKey: "test-snapshot-key",
 			Snapshotter: "snapshotter",
 			Runtime: containers.RuntimeInfo{
 				Name: "testruntime",
@@ -194,7 +194,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 			name: "UpdateIDFail",
 			original: containers.Container{
 				Spec:        encoded,
-				RootFS:      "test-rootfs",
+				SnapshotKey: "test-snapshot-key",
 				Snapshotter: "snapshotter",
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
@@ -213,7 +213,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 		{
 			name: "UpdateRuntimeFail",
 			original: containers.Container{
-				RootFS:      "test-rootfs",
+				SnapshotKey: "test-snapshot-key",
 				Snapshotter: "snapshotter",
 				Spec:        encoded,
 				Runtime: containers.RuntimeInfo{
@@ -233,7 +233,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 			name: "UpdateRuntimeClearFail",
 			original: containers.Container{
 				Spec:        encoded,
-				RootFS:      "test-rootfs",
+				SnapshotKey: "test-snapshot-key",
 				Snapshotter: "snapshotter",
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
@@ -249,7 +249,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 			name: "UpdateFail",
 			original: containers.Container{
 				Spec:        encoded,
-				RootFS:      "test-rootfs",
+				SnapshotKey: "test-snapshot-key",
 				Snapshotter: "snapshotter",
 
 				Runtime: containers.RuntimeInfo{
@@ -262,7 +262,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				RootFS:      "test-rootfs",
+				SnapshotKey: "test-snapshot-key",
 				Snapshotter: "snapshotter",
 				// try to clear image field
 			},
@@ -272,7 +272,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 			name: "UpdateSpec",
 			original: containers.Container{
 				Spec:        encoded,
-				RootFS:      "test-rootfs",
+				SnapshotKey: "test-snapshot-key",
 				Snapshotter: "snapshotter",
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
@@ -288,7 +288,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 					Name: "testruntime",
 				},
 				Spec:        encodedUpdated,
-				RootFS:      "test-rootfs",
+				SnapshotKey: "test-snapshot-key",
 				Snapshotter: "snapshotter",
 				Image:       "test image",
 			},
@@ -301,7 +301,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 					"bar": "two",
 				},
 				Spec:        encoded,
-				RootFS:      "test-rootfs",
+				SnapshotKey: "test-snapshot-key",
 				Snapshotter: "snapshotter",
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
@@ -320,7 +320,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 					"bar": "baz",
 				},
 				Spec:        encoded,
-				RootFS:      "test-rootfs",
+				SnapshotKey: "test-snapshot-key",
 				Snapshotter: "snapshotter",
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
@@ -336,7 +336,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 					"bar": "two",
 				},
 				Spec:        encoded,
-				RootFS:      "test-rootfs",
+				SnapshotKey: "test-snapshot-key",
 				Snapshotter: "snapshotter",
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
@@ -349,7 +349,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 			fieldpaths: []string{"labels"},
 			expected: containers.Container{
 				Spec:        encoded,
-				RootFS:      "test-rootfs",
+				SnapshotKey: "test-snapshot-key",
 				Snapshotter: "snapshotter",
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
@@ -365,7 +365,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 					"bar": "two",
 				},
 				Spec:        encoded,
-				RootFS:      "test-rootfs",
+				SnapshotKey: "test-snapshot-key",
 				Snapshotter: "snapshotter",
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
@@ -383,7 +383,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 					"foo": "one",
 				},
 				Spec:        encoded,
-				RootFS:      "test-rootfs",
+				SnapshotKey: "test-snapshot-key",
 				Snapshotter: "snapshotter",
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
@@ -392,27 +392,27 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 			},
 		},
 		{
-			name: "UpdateRootFSImmutable",
+			name: "UpdateSnapshotKeyImmutable",
 			original: containers.Container{
 				Spec:        encoded,
-				RootFS:      "",
+				SnapshotKey: "",
 				Snapshotter: "",
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
 			},
 			input: containers.Container{
-				RootFS:      "something",
+				SnapshotKey: "something",
 				Snapshotter: "something",
 			},
-			fieldpaths: []string{"rootfs", "snapshotter"},
+			fieldpaths: []string{"snapshotkey", "snapshotter"},
 			cause:      errdefs.ErrInvalidArgument,
 		},
 		{
-			name: "RootFSWithoutSnapshot",
+			name: "SnapshotKeyWithoutSnapshot",
 			original: containers.Container{
 				Spec:        encoded,
-				RootFS:      "/nosnapshot",
+				SnapshotKey: "/nosnapshot",
 				Snapshotter: "",
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",

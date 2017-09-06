@@ -155,14 +155,11 @@ file {
       json_name: "snapshotter"
     }
     field {
-      name: "rootfs"
+      name: "snapshot_key"
       number: 7
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65004: "RootFS"
-      }
-      json_name: "rootfs"
+      json_name: "snapshotKey"
     }
     field {
       name: "created_at"
@@ -1216,14 +1213,11 @@ file {
       json_name: "labels"
     }
     field {
-      name: "rootfs"
+      name: "snapshot_key"
       number: 4
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65004: "RootFS"
-      }
-      json_name: "rootfs"
+      json_name: "snapshotKey"
     }
     nested_type {
       name: "LabelsEntry"

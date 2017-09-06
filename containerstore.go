@@ -96,7 +96,7 @@ func containerToProto(container *containers.Container) containersapi.Container {
 		},
 		Spec:        container.Spec,
 		Snapshotter: container.Snapshotter,
-		RootFS:      container.RootFS,
+		SnapshotKey: container.SnapshotKey,
 	}
 }
 
@@ -115,7 +115,7 @@ func containerFromProto(containerpb *containersapi.Container) containers.Contain
 		Runtime:     runtime,
 		Spec:        containerpb.Spec,
 		Snapshotter: containerpb.Snapshotter,
-		RootFS:      containerpb.RootFS,
+		SnapshotKey: containerpb.SnapshotKey,
 	}
 }
 

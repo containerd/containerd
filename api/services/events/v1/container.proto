@@ -23,7 +23,7 @@ message ContainerUpdate {
 	string id = 1;
 	string image = 2;
 	map<string, string> labels  = 3;
-	string rootfs = 4 [(gogoproto.customname) = "RootFS"];
+	string snapshot_key = 4;
 }
 
 message ContainerDelete {
