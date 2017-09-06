@@ -36,9 +36,8 @@ before_install:
   - uname -r
 
 install:
-  - wget https://github.com/google/protobuf/releases/download/v3.1.0/protoc-3.1.0-linux-x86_64.zip -O /tmp/protoc-3.1.0-linux-x86_64.zip
-  - unzip -o -d /tmp/protobuf /tmp/protoc-3.1.0-linux-x86_64.zip
-  - export PATH=$PATH:/tmp/protobuf/bin/
+  - wget https://github.com/google/protobuf/releases/download/v3.3.0/protoc-3.3.0-linux-x86_64.zip -O /tmp/protoc-3.3.0-linux-x86_64.zip
+  - sudo unzip -o -d /usr/local /tmp/protoc-3.3.0-linux-x86_64.zip
   - go get -u github.com/vbatts/git-validation
   - sudo wget https://github.com/crosbymichael/runc/releases/download/ctd-4/runc -O /bin/runc; sudo chmod +x /bin/runc
   - wget https://github.com/xemul/criu/archive/v3.0.tar.gz -O /tmp/criu.tar.gz
@@ -57,6 +56,7 @@ script:
   - make setup
   - make vet
   - make ineffassign
+  - if [ "$GOOS" = "linux" ]; then make check-protos check-api-descriptors; fi
   - make build
   - make binaries
   - if [ "$GOOS" = "linux" ]; then sudo make install ; fi

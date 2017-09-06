@@ -2888,6 +2888,7 @@ file {
   name: "github.com/containerd/containerd/api/types/task/task.proto"
   package: "containerd.v1.types"
   dependency: "gogoproto/gogo.proto"
+  dependency: "google/protobuf/timestamp.proto"
   message_type {
     name: "Process"
     field {
@@ -2953,6 +2954,18 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_UINT32
       json_name: "exitStatus"
+    }
+    field {
+      name: "exited_at"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      options {
+        65010: 1
+        65001: 0
+      }
+      json_name: "exitedAt"
     }
   }
   enum_type {
