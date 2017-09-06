@@ -17,12 +17,12 @@ var cpuMetrics = []*metric{
 		unit: metrics.Nanoseconds,
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *cgroups.Metrics) []value {
-			if stats.Cpu == nil {
+			if stats.CPU == nil {
 				return nil
 			}
 			return []value{
 				{
-					v: float64(stats.Cpu.Usage.Total),
+					v: float64(stats.CPU.Usage.Total),
 				},
 			}
 		},
@@ -33,12 +33,12 @@ var cpuMetrics = []*metric{
 		unit: metrics.Nanoseconds,
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *cgroups.Metrics) []value {
-			if stats.Cpu == nil {
+			if stats.CPU == nil {
 				return nil
 			}
 			return []value{
 				{
-					v: float64(stats.Cpu.Usage.Kernel),
+					v: float64(stats.CPU.Usage.Kernel),
 				},
 			}
 		},
@@ -49,12 +49,12 @@ var cpuMetrics = []*metric{
 		unit: metrics.Nanoseconds,
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *cgroups.Metrics) []value {
-			if stats.Cpu == nil {
+			if stats.CPU == nil {
 				return nil
 			}
 			return []value{
 				{
-					v: float64(stats.Cpu.Usage.User),
+					v: float64(stats.CPU.Usage.User),
 				},
 			}
 		},
@@ -66,11 +66,11 @@ var cpuMetrics = []*metric{
 		vt:     prometheus.GaugeValue,
 		labels: []string{"cpu"},
 		getValues: func(stats *cgroups.Metrics) []value {
-			if stats.Cpu == nil {
+			if stats.CPU == nil {
 				return nil
 			}
 			var out []value
-			for i, v := range stats.Cpu.Usage.PerCpu {
+			for i, v := range stats.CPU.Usage.PerCPU {
 				out = append(out, value{
 					v: float64(v),
 					l: []string{strconv.Itoa(i)},
@@ -85,12 +85,12 @@ var cpuMetrics = []*metric{
 		unit: metrics.Total,
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *cgroups.Metrics) []value {
-			if stats.Cpu == nil {
+			if stats.CPU == nil {
 				return nil
 			}
 			return []value{
 				{
-					v: float64(stats.Cpu.Throttling.Periods),
+					v: float64(stats.CPU.Throttling.Periods),
 				},
 			}
 		},
@@ -101,12 +101,12 @@ var cpuMetrics = []*metric{
 		unit: metrics.Total,
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *cgroups.Metrics) []value {
-			if stats.Cpu == nil {
+			if stats.CPU == nil {
 				return nil
 			}
 			return []value{
 				{
-					v: float64(stats.Cpu.Throttling.ThrottledPeriods),
+					v: float64(stats.CPU.Throttling.ThrottledPeriods),
 				},
 			}
 		},
@@ -117,12 +117,12 @@ var cpuMetrics = []*metric{
 		unit: metrics.Nanoseconds,
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *cgroups.Metrics) []value {
-			if stats.Cpu == nil {
+			if stats.CPU == nil {
 				return nil
 			}
 			return []value{
 				{
-					v: float64(stats.Cpu.Throttling.ThrottledTime),
+					v: float64(stats.CPU.Throttling.ThrottledTime),
 				},
 			}
 		},

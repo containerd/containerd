@@ -102,11 +102,11 @@ func (c *cpuController) Stat(path string, stats *Metrics) error {
 		}
 		switch key {
 		case "nr_periods":
-			stats.Cpu.Throttling.Periods = v
+			stats.CPU.Throttling.Periods = v
 		case "nr_throttled":
-			stats.Cpu.Throttling.ThrottledPeriods = v
+			stats.CPU.Throttling.ThrottledPeriods = v
 		case "throttled_time":
-			stats.Cpu.Throttling.ThrottledTime = v
+			stats.CPU.Throttling.ThrottledTime = v
 		}
 	}
 	return nil

@@ -1,19 +1,22 @@
 syntax = "proto3";
 
-package cgroups;
+package io.containerd.cgroups.v1;
+
+import "gogoproto/gogo.proto";
 
 message Metrics {
-	map<string, HugetlbStat> hugetlb = 1;
+	repeated HugetlbStat hugetlb = 1;
 	PidsStat pids = 2;
-	CpuStat cpu = 3;
+	CPUStat cpu = 3 [(gogoproto.customname) = "CPU"];
 	MemoryStat memory = 4;
-	BlkioStat blkio = 5;
+	BlkIOStat blkio = 5;
 }
 
 message HugetlbStat {
 	uint64 usage = 1;
 	uint64 max = 2;
 	uint64 failcnt = 3;
+	string pagesize = 4;
 }
 
 message PidsStat {
@@ -21,17 +24,18 @@ message PidsStat {
 	uint64 limit = 2;
 }
 
-message CpuStat {
-	CpuUsage usage = 1;
+message CPUStat {
+	CPUUsage usage = 1;
 	Throttle throttling = 2;
 }
 
-message CpuUsage {
+message CPUUsage {
 	// values in nanoseconds
 	uint64 total = 1;
 	uint64 kernel = 2;
 	uint64 user = 3;
-	repeated uint64 per_cpu = 4;
+	repeated uint64 per_cpu = 4 [(gogoproto.customname) = "PerCPU"];
+
 }
 
 message Throttle {
@@ -42,8 +46,8 @@ message Throttle {
 
 message MemoryStat {
 	uint64 cache = 1;
-	uint64 rss = 2;
-	uint64 rss_huge = 3;
+	uint64 rss = 2 [(gogoproto.customname) = "RSS"];
+	uint64 rss_huge = 3 [(gogoproto.customname) = "RSSHuge"];
 	uint64 mapped_file = 4;
 	uint64 dirty = 5;
 	uint64 writeback = 6;
@@ -59,8 +63,8 @@ message MemoryStat {
 	uint64 hierarchical_memory_limit = 16;
 	uint64 hierarchical_swap_limit = 17;
 	uint64 total_cache = 18;
-	uint64 total_rss = 19;
-	uint64 total_rss_huge = 20;
+	uint64 total_rss = 19 [(gogoproto.customname) = "TotalRSS"];
+	uint64 total_rss_huge = 20 [(gogoproto.customname) = "TotalRSSHuge"];
 	uint64 total_mapped_file = 21;
 	uint64 total_dirty = 22;
 	uint64 total_writeback = 23;
@@ -76,7 +80,7 @@ message MemoryStat {
 	MemoryEntry usage = 33;
 	MemoryEntry swap = 34;
 	MemoryEntry kernel = 35;
-	MemoryEntry kernel_tcp = 36;
+	MemoryEntry kernel_tcp = 36 [(gogoproto.customname) = "KernelTCP"];
 
 }
 
@@ -87,18 +91,18 @@ message MemoryEntry {
 	uint64 failcnt = 4;
 }
 
-message BlkioStat {
-	repeated BlkioEntry io_service_bytes_recursive = 1;
-	repeated BlkioEntry io_serviced_recursive = 2;
-	repeated BlkioEntry io_queued_recursive = 3;
-	repeated BlkioEntry io_service_time_recursive = 4;
-	repeated BlkioEntry io_wait_time_recursive = 5;
-	repeated BlkioEntry io_merged_recursive = 6;
-	repeated BlkioEntry io_time_recursive = 7;
-	repeated BlkioEntry sectors_recursive = 8;
+message BlkIOStat {
+	repeated BlkIOEntry io_service_bytes_recursive = 1;
+	repeated BlkIOEntry io_serviced_recursive = 2;
+	repeated BlkIOEntry io_queued_recursive = 3;
+	repeated BlkIOEntry io_service_time_recursive = 4;
+	repeated BlkIOEntry io_wait_time_recursive = 5;
+	repeated BlkIOEntry io_merged_recursive = 6;
+	repeated BlkIOEntry io_time_recursive = 7;
+	repeated BlkIOEntry sectors_recursive = 8;
 }
 
-message BlkioEntry {
+message BlkIOEntry {
 	string op = 1;
 	string device = 2;
 	uint64 major = 3;

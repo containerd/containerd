@@ -36,7 +36,7 @@ var memoryMetrics = []*metric{
 			}
 			return []value{
 				{
-					v: float64(stats.Memory.Rss),
+					v: float64(stats.Memory.RSS),
 				},
 			}
 		},
@@ -52,7 +52,7 @@ var memoryMetrics = []*metric{
 			}
 			return []value{
 				{
-					v: float64(stats.Memory.RssHuge),
+					v: float64(stats.Memory.RSSHuge),
 				},
 			}
 		},
@@ -308,7 +308,7 @@ var memoryMetrics = []*metric{
 			}
 			return []value{
 				{
-					v: float64(stats.Memory.TotalRss),
+					v: float64(stats.Memory.TotalRSS),
 				},
 			}
 		},
@@ -324,7 +324,7 @@ var memoryMetrics = []*metric{
 			}
 			return []value{
 				{
-					v: float64(stats.Memory.TotalRssHuge),
+					v: float64(stats.Memory.TotalRSSHuge),
 				},
 			}
 		},
@@ -724,7 +724,7 @@ var memoryMetrics = []*metric{
 			}
 			return []value{
 				{
-					v: float64(stats.Memory.KernelTcp.Failcnt),
+					v: float64(stats.Memory.KernelTCP.Failcnt),
 				},
 			}
 		},
@@ -740,7 +740,7 @@ var memoryMetrics = []*metric{
 			}
 			return []value{
 				{
-					v: float64(stats.Memory.KernelTcp.Limit),
+					v: float64(stats.Memory.KernelTCP.Limit),
 				},
 			}
 		},
@@ -756,7 +756,7 @@ var memoryMetrics = []*metric{
 			}
 			return []value{
 				{
-					v: float64(stats.Memory.KernelTcp.Max),
+					v: float64(stats.Memory.KernelTCP.Max),
 				},
 			}
 		},
@@ -772,7 +772,7 @@ var memoryMetrics = []*metric{
 			}
 			return []value{
 				{
-					v: float64(stats.Memory.KernelTcp.Usage),
+					v: float64(stats.Memory.KernelTCP.Usage),
 				},
 			}
 		},

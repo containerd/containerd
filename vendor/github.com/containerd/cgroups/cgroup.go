@@ -166,9 +166,9 @@ func (c *cgroup) Stat(handlers ...ErrorHandler) (*Metrics, error) {
 	}
 	var (
 		stats = &Metrics{
-			Cpu: &CpuStat{
+			CPU: &CPUStat{
 				Throttling: &Throttle{},
-				Usage:      &CpuUsage{},
+				Usage:      &CPUUsage{},
 			},
 		}
 		wg   = &sync.WaitGroup{}

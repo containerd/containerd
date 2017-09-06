@@ -123,7 +123,7 @@ func (c *Collector) Remove(id, namespace string) {
 	delete(c.cgroups, taskID(id, namespace))
 }
 
-func blkioValues(l []*cgroups.BlkioEntry) []value {
+func blkioValues(l []*cgroups.BlkIOEntry) []value {
 	var out []value
 	for _, e := range l {
 		out = append(out, value{

@@ -20,10 +20,10 @@ var hugetlbMetrics = []*metric{
 				return nil
 			}
 			var out []value
-			for page, v := range stats.Hugetlb {
+			for _, v := range stats.Hugetlb {
 				out = append(out, value{
 					v: float64(v.Usage),
-					l: []string{page},
+					l: []string{v.Pagesize},
 				})
 			}
 			return out
@@ -40,10 +40,10 @@ var hugetlbMetrics = []*metric{
 				return nil
 			}
 			var out []value
-			for page, v := range stats.Hugetlb {
+			for _, v := range stats.Hugetlb {
 				out = append(out, value{
 					v: float64(v.Failcnt),
-					l: []string{page},
+					l: []string{v.Pagesize},
 				})
 			}
 			return out
@@ -60,10 +60,10 @@ var hugetlbMetrics = []*metric{
 				return nil
 			}
 			var out []value
-			for page, v := range stats.Hugetlb {
+			for _, v := range stats.Hugetlb {
 				out = append(out, value{
 					v: float64(v.Max),
-					l: []string{page},
+					l: []string{v.Pagesize},
 				})
 			}
 			return out

@@ -52,19 +52,20 @@ func (h *hugetlbController) Create(path string, resources *specs.LinuxResources)
 }
 
 func (h *hugetlbController) Stat(path string, stats *Metrics) error {
-	stats.Hugetlb = make(map[string]*HugetlbStat)
 	for _, size := range h.sizes {
 		s, err := h.readSizeStat(path, size)
 		if err != nil {
 			return err
 		}
-		stats.Hugetlb[size] = s
+		stats.Hugetlb = append(stats.Hugetlb, s)
 	}
 	return nil
 }
 
 func (h *hugetlbController) readSizeStat(path, size string) (*HugetlbStat, error) {
-	var s HugetlbStat
+	s := HugetlbStat{
+		Pagesize: size,
+	}
 	for _, t := range []struct {
 		name  string
 		value *uint64

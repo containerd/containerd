@@ -43,10 +43,10 @@ func (c *cpuacctController) Stat(path string, stats *Metrics) error {
 	if err != nil {
 		return err
 	}
-	stats.Cpu.Usage.Total = total
-	stats.Cpu.Usage.User = user
-	stats.Cpu.Usage.Kernel = kernel
-	stats.Cpu.Usage.PerCpu = percpu
+	stats.CPU.Usage.Total = total
+	stats.CPU.Usage.User = user
+	stats.CPU.Usage.Kernel = kernel
+	stats.CPU.Usage.PerCPU = percpu
 	return nil
 }
 

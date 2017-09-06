@@ -119,6 +119,10 @@ type Task interface {
 	// LoadProcess loads a previously created exec'd process
 	LoadProcess(context.Context, string, IOAttach) (Process, error)
 	// Metrics returns task metrics for runtime specific metrics
+	//
+	// The metric types are generic to containerd and change depending on the runtime
+	// For the built in Linux runtime, github.com/containerd/cgroups.Metrics
+	// are returned in protobuf format
 	Metrics(context.Context) (*types.Metric, error)
 }
 
