@@ -65,7 +65,6 @@ type criContainerdService struct {
 	// rootDir is the directory for managing cri-containerd files.
 	rootDir string
 	// sandboxImage is the image to use for sandbox container.
-	// TODO(random-liu): Make this configurable via flag.
 	sandboxImage string
 	// snapshotter is the snapshotter to use in containerd.
 	snapshotter string
