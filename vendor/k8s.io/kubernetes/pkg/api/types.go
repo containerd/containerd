@@ -651,7 +651,7 @@ type EmptyDirVolumeSource struct {
 	// The default is nil which means that the limit is undefined.
 	// More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
 	// +optional
-	SizeLimit resource.Quantity
+	SizeLimit *resource.Quantity
 }
 
 // StorageMedium defines ways that storage can be allocated to a volume.
@@ -1445,7 +1445,33 @@ type VolumeMount struct {
 	// Defaults to "" (volume's root).
 	// +optional
 	SubPath string
+	// mountPropagation determines how mounts are propagated from the host
+	// to container and the other way around.
+	// When not set, MountPropagationHostToContainer is used.
+	// This field is alpha in 1.8 and can be reworked or removed in a future
+	// release.
+	// +optional
+	MountPropagation *MountPropagationMode
 }
+
+// MountPropagationMode describes mount propagation.
+type MountPropagationMode string
+
+const (
+	// MountPropagationHostToContainer means that the volume in a container will
+	// receive new mounts from the host or other containers, but filesystems
+	// mounted inside the container won't be propagated to the host or other
+	// containers.
+	// Note that this mode is recursively applied to all mounts in the volume
+	// ("rslave" in Linux terminology).
+	MountPropagationHostToContainer MountPropagationMode = "HostToContainer"
+	// MountPropagationBidirectional means that the volume in a container will
+	// receive new mounts from the host or other containers, and its own mounts
+	// will be propagated from the container to the host or other containers.
+	// Note that this mode is recursively applied to all mounts in the volume
+	// ("rshared" in Linux terminology).
+	MountPropagationBidirectional MountPropagationMode = "Bidirectional"
+)
 
 // EnvVar represents an environment variable present in a Container.
 type EnvVar struct {
@@ -4172,7 +4198,7 @@ type SecurityContext struct {
 	// +optional
 	ReadOnlyRootFilesystem *bool
 	// AllowPrivilegeEscalation controls whether a process can gain more
-	// privileges than it's parent process. This bool directly controls if
+	// privileges than its parent process. This bool directly controls if
 	// the no_new_privs flag will be set on the container process.
 	// +optional
 	AllowPrivilegeEscalation *bool
