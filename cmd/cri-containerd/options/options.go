@@ -18,6 +18,7 @@ package options
 
 import (
 	"flag"
+	"fmt"
 	"os"
 
 	"github.com/BurntSushi/toml"
@@ -75,6 +76,8 @@ type CRIContainerdOptions struct {
 	ConfigFilePath string
 	// PrintVersion indicates to print version information of cri-containerd.
 	PrintVersion bool
+	// PrintDefaultConfig indicates to print default toml config of cri-containerd.
+	PrintDefaultConfig bool
 }
 
 // NewCRIContainerdOptions returns a reference to CRIContainerdOptions
@@ -109,6 +112,8 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		false, "Enable selinux support.")
 	fs.StringVar(&c.SandboxImage, "sandbox-image",
 		"gcr.io/google_containers/pause:3.0", "The image used by sandbox container.")
+	fs.BoolVar(&c.PrintDefaultConfig, "default-config",
+		false, "Print default toml config of cri-containerd and quit.")
 }
 
 // InitFlags must be called after adding all cli options flags are defined and
@@ -120,14 +125,12 @@ func (c *CRIContainerdOptions) InitFlags(fs *pflag.FlagSet) error {
 	fs.AddGoFlagSet(flag.CommandLine)
 
 	commandline := os.Args[1:]
-	err := fs.Parse(commandline)
-	if err != nil {
+	if err := fs.Parse(commandline); err != nil {
 		return err
 	}
 
 	// Load default config file if none provided
-	_, err = toml.DecodeFile(c.ConfigFilePath, &c.Config)
-	if err != nil {
+	if _, err := toml.DecodeFile(c.ConfigFilePath, &c.Config); err != nil {
 		// the absence of default config file is normal case.
 		if !fs.Changed(configFilePathArgName) && os.IsNotExist(err) {
 			return nil
@@ -144,4 +147,16 @@ func (c *CRIContainerdOptions) InitFlags(fs *pflag.FlagSet) error {
 	// So I have not another way to insert toml config value between default value and command line value.
 	// So I trigger twice parses, one for default value, one for commandline value.
 	return fs.Parse(commandline)
+}
+
+// PrintDefaultTomlConfig print default toml config of cri-containerd.
+func (c *CRIContainerdOptions) PrintDefaultTomlConfig() {
+	fs := pflag.NewFlagSet("default-config", pflag.ExitOnError)
+
+	c.AddFlags(fs)
+
+	if err := toml.NewEncoder(os.Stdout).Encode(c.Config); err != nil {
+		fmt.Println(err)
+		return
+	}
 }
