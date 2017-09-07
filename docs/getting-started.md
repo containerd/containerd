@@ -6,7 +6,7 @@ However, if you want to integrate containerd into your project we have an easy t
 
 In this guide we will pull and run a redis server with containerd using the client package.
 We will assume that you are running a modern linux host for this example with a compatible build of `runc`.
-Please refer to [Runc.md](../runc.md) for the currently supported version of `runc`.
+Please refer to [RUNC.md](/RUNC.md) for the currently supported version of `runc`.
 This project requires Go 1.8.x or above.
 If you need to install Go or update your currently installed one, please refer to Go install page at https://golang.org/doc/install.
 
@@ -79,7 +79,7 @@ Having a namespace for our usage ensures that containers, images, and other reso
 ## Pulling the redis image
 
 Now that we have a client to work with we need to pull an image.
-We can use the redis image based on alpine linux from the DockerHub.
+We can use the redis image based on Alpine Linux from the DockerHub.
 
 ```go
 	image, err := client.Pull(ctx, "docker.io/library/redis:alpine", containerd.WithPullUnpack)
@@ -129,8 +129,8 @@ func redisExample() error {
 ```
 
 ```bash
-> go get
-> sudo go run main.go
+> go build main.go
+> sudo ./main
 
 2017/08/13 17:43:21 Successfully pulled docker.io/library/redis:alpine image
 ```
@@ -222,8 +222,8 @@ func redisExample() error {
 Let's see it in action.
 
 ```bash
-> go get
-> sudo go run main.go
+> go build main.go
+> sudo ./main
 
 2017/08/13 18:01:35 Successfully pulled docker.io/library/redis:alpine image
 2017/08/13 18:01:35 Successfully generate an OCI spec version 1.0.0 based on docker.io/library/redis:alpine image
@@ -406,8 +406,8 @@ func redisExample() error {
 We can build this example and run it as follows to see our hard work come together.
 
 ```bash
-> go get
-> sudo go run main.go
+> go build main.go
+> sudo ./main
 
 1:C 04 Aug 20:41:37.682 # oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
 1:C 04 Aug 20:41:37.682 # Redis version=4.0.1, bits=64, commit=00000000, modified=0, pid=1, just started
