@@ -55,7 +55,7 @@ type CNIPlugin interface {
 	TearDownPod(network PodNetwork) error
 
 	// Status is the method called to obtain the ipv4 or ipv6 addresses of the pod sandbox
-	GetPodNetworkStatus(netnsPath string) (string, error)
+	GetPodNetworkStatus(network PodNetwork) (string, error)
 
 	// NetworkStatus returns error if the network plugin is in error state
 	Status() error

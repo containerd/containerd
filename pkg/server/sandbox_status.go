@@ -22,6 +22,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/cri-o/ocicni/pkg/ocicni"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -57,7 +58,15 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 			state = runtime.PodSandboxState_SANDBOX_READY
 		}
 	}
-	ip, err := c.netPlugin.GetPodNetworkStatus(sandbox.NetNSPath)
+	config := sandbox.Config
+	podNetwork := ocicni.PodNetwork{
+		Name:         config.GetMetadata().GetName(),
+		Namespace:    config.GetMetadata().GetNamespace(),
+		ID:           id,
+		NetNS:        sandbox.NetNSPath,
+		PortMappings: toCNIPortMappings(config.GetPortMappings()),
+	}
+	ip, err := c.netPlugin.GetPodNetworkStatus(podNetwork)
 	if err != nil {
 		// Ignore the error on network status
 		ip = ""

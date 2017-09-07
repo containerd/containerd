@@ -15,7 +15,7 @@ func (noop *cniNoOp) TearDownPod(network PodNetwork) error {
 	return nil
 }
 
-func (noop *cniNoOp) GetPodNetworkStatus(netnsPath string) (string, error) {
+func (noop *cniNoOp) GetPodNetworkStatus(network PodNetwork) (string, error) {
 	return "", nil
 }
 

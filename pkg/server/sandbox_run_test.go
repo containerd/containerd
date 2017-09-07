@@ -20,7 +20,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cri-o/ocicni"
+	"github.com/cri-o/ocicni/pkg/ocicni"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
