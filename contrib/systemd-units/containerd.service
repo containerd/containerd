@@ -4,11 +4,13 @@ Documentation=https://containerd.io
 After=network.target
 
 [Service]
-Restart=always
-RestartSec=10
+ExecStartPre=/sbin/modprobe overlay
 ExecStart=/usr/local/bin/containerd
+Restart=always
+RestartSec=5
 Delegate=yes
 KillMode=process
+OOMScoreAdjust=-999
 
 [Install]
 WantedBy=multi-user.target

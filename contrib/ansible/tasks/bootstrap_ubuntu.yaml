@@ -1,0 +1,16 @@
+---
+- name: "Install required packages on Ubuntu"
+  package:
+    name: "{{ item }}"
+    state: latest
+  with_items:
+      - unzip
+      - tar
+      - apt-transport-https
+      - btrfs-tools
+      - libapparmor-dev
+      - libseccomp-dev # Revisit the need and alternatives for all -dev packages
+      - libseccomp2
+      - socat
+      - util-linux
+# TODO: Limited support for trusty for nsenter. Need to handle/verify 
