@@ -3,6 +3,8 @@
 package cgroups
 
 import (
+	"strconv"
+
 	"github.com/containerd/cgroups"
 	metrics "github.com/docker/go-metrics"
 	"github.com/prometheus/client_golang/prometheus"
@@ -100,4 +102,15 @@ var blkioMetrics = []*metric{
 			return blkioValues(stats.Blkio.SectorsRecursive)
 		},
 	},
+}
+
+func blkioValues(l []*cgroups.BlkIOEntry) []value {
+	var out []value
+	for _, e := range l {
+		out = append(out, value{
+			v: float64(e.Value),
+			l: []string{e.Op, e.Device, strconv.FormatUint(e.Major, 10), strconv.FormatUint(e.Minor, 10)},
+		})
+	}
+	return out
 }

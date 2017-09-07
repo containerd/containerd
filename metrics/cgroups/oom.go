@@ -19,12 +19,18 @@ func NewOOMCollector(ns *metrics.Namespace) (*OOMCollector, error) {
 	if err != nil {
 		return nil, err
 	}
+	var desc *prometheus.Desc
+	if ns != nil {
+		desc = ns.NewDesc("memory_oom", "The number of times a container has received an oom event", metrics.Total, "container_id", "namespace")
+	}
 	c := &OOMCollector{
 		fd:   fd,
-		desc: ns.NewDesc("memory_oom", "The number of times a container has received an oom event", metrics.Total, "container_id", "namespace"),
+		desc: desc,
 		set:  make(map[uintptr]*oom),
 	}
-	ns.Add(c)
+	if ns != nil {
+		ns.Add(c)
+	}
 	go c.start()
 	return c, nil
 }
