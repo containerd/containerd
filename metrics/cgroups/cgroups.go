@@ -15,24 +15,33 @@ import (
 	"golang.org/x/net/context"
 )
 
+type Config struct {
+	NoPrometheus bool `toml:"no_prometheus"`
+}
+
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type: plugin.TaskMonitorPlugin,
-		ID:   "cgroups",
-		Init: New,
+		Type:   plugin.TaskMonitorPlugin,
+		ID:     "cgroups",
+		Init:   New,
+		Config: &Config{},
 	})
 }
 
 func New(ic *plugin.InitContext) (interface{}, error) {
-	var (
-		ns        = metrics.NewNamespace("container", "", nil)
-		collector = NewCollector(ns)
-	)
+	var ns *metrics.Namespace
+	config := ic.Config.(*Config)
+	if !config.NoPrometheus {
+		ns = metrics.NewNamespace("container", "", nil)
+	}
+	collector := NewCollector(ns)
 	oom, err := NewOOMCollector(ns)
 	if err != nil {
 		return nil, err
 	}
-	metrics.Register(ns)
+	if ns != nil {
+		metrics.Register(ns)
+	}
 	return &cgroupsMonitor{
 		collector: collector,
 		oom:       oom,

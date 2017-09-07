@@ -5,7 +5,6 @@ package cgroups
 import (
 	"errors"
 	"fmt"
-	"strconv"
 	"sync"
 
 	"github.com/containerd/cgroups"
@@ -26,6 +25,9 @@ type Trigger func(string, string, cgroups.Cgroup)
 // New registers the Collector with the provided namespace and returns it so
 // that cgroups can be added for collection
 func NewCollector(ns *metrics.Namespace) *Collector {
+	if ns == nil {
+		return &Collector{}
+	}
 	// add machine cpus and memory info
 	c := &Collector{
 		ns:      ns,
@@ -91,6 +93,9 @@ func (c *Collector) collect(id, namespace string, cg cgroups.Cgroup, ch chan<- p
 
 // Add adds the provided cgroup and id so that metrics are collected and exported
 func (c *Collector) Add(id, namespace string, cg cgroups.Cgroup) error {
+	if c.ns == nil {
+		return nil
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if _, ok := c.cgroups[taskID(id, namespace)]; ok {
@@ -104,32 +109,12 @@ func (c *Collector) Add(id, namespace string, cg cgroups.Cgroup) error {
 	return nil
 }
 
-// Get returns the cgroup that is being collected under the provided id
-// returns ErrCgroupNotExists if the id is not being collected
-func (c *Collector) Get(id, namespace string) (cgroups.Cgroup, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	t, ok := c.cgroups[taskID(id, namespace)]
-	if !ok {
-		return nil, ErrCgroupNotExists
-	}
-	return t.cgroup, nil
-}
-
 // Remove removes the provided cgroup by id from the collector
 func (c *Collector) Remove(id, namespace string) {
+	if c.ns == nil {
+		return
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.cgroups, taskID(id, namespace))
-}
-
-func blkioValues(l []*cgroups.BlkIOEntry) []value {
-	var out []value
-	for _, e := range l {
-		out = append(out, value{
-			v: float64(e.Value),
-			l: []string{e.Op, e.Device, strconv.FormatUint(e.Major, 10), strconv.FormatUint(e.Minor, 10)},
-		})
-	}
-	return out
 }
