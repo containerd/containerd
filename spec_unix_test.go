@@ -21,7 +21,7 @@ func TestGenerateSpec(t *testing.T) {
 	}
 
 	// check for matching caps
-	defaults := defaltCaps()
+	defaults := defaultCaps()
 	for _, cl := range [][]string{
 		s.Process.Capabilities.Bounding,
 		s.Process.Capabilities.Permitted,
