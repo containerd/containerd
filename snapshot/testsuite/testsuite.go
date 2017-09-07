@@ -35,6 +35,7 @@ func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(ctx context.
 	t.Run("RemoveDirectoryInLowerLayer", makeTest(name, snapshotterFn, checkRemoveDirectoryInLowerLayer))
 	t.Run("Chown", makeTest(name, snapshotterFn, checkChown))
 	t.Run("DirectoryPermissionOnCommit", makeTest(name, snapshotterFn, checkDirectoryPermissionOnCommit))
+	t.Run("RemoveIntermediateSnapshot", makeTest(name, snapshotterFn, checkRemoveIntermediateSnapshot))
 
 	// Rename test still fails on some kernels with overlay
 	//t.Run("Rename", makeTest(name, snapshotterFn, checkRename))
@@ -435,6 +436,58 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 	//must be err != nil
 	assert.NotNil(t, err)
 
+}
+
+//Create three layers. Deleting intermediate layer must fail.
+func checkRemoveIntermediateSnapshot(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+
+	base, err := snapshotterPrepareMount(ctx, snapshotter, "base", "", work)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer testutil.Unmount(t, base)
+
+	committedBase := filepath.Join(work, "committed-base")
+	if err = snapshotter.Commit(ctx, committedBase, base); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create intermediate layer
+	intermediate := filepath.Join(work, "intermediate")
+	if _, err = snapshotter.Prepare(ctx, intermediate, committedBase); err != nil {
+		t.Fatal(err)
+	}
+
+	committedInter := filepath.Join(work, "committed-inter")
+	if err = snapshotter.Commit(ctx, committedInter, intermediate); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create top layer
+	topLayer := filepath.Join(work, "toplayer")
+	if _, err = snapshotter.Prepare(ctx, topLayer, committedInter); err != nil {
+		t.Fatal(err)
+	}
+
+	// Deletion of intermediate layer must fail.
+	err = snapshotter.Remove(ctx, committedInter)
+	if err == nil {
+		t.Fatal("intermediate layer removal should fail.")
+	}
+
+	//Removal from toplayer to base should not fail.
+	err = snapshotter.Remove(ctx, topLayer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = snapshotter.Remove(ctx, committedInter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = snapshotter.Remove(ctx, committedBase)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 // baseTestSnapshots creates a base set of snapshots for tests, each snapshot is empty
