@@ -71,7 +71,8 @@ jobs:
       go: 1.8.x
     - stage: E2E Test
       script:
-        - test "${TRAVIS_EVENT_TYPE}" != "cron" && exit 0 || true
+        # Skip node e2e test for pull request.
+        - test "${TRAVIS_PULL_REQUEST}" != "false" && exit 0 || true
         - make install.deps
         - UPLOAD_LOG=true make test-e2e-node
       go: 1.8.x
