@@ -18,38 +18,63 @@ package options
 
 import (
 	"flag"
+	"os"
 
+	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd"
 	"github.com/spf13/pflag"
 )
 
-// CRIContainerdOptions contains cri-containerd command line options.
-type CRIContainerdOptions struct {
+// configFilePathArgName is the path to the config file.
+const configFilePathArgName = "config"
+
+// ContainerdConfig contains config related to containerd
+type ContainerdConfig struct {
+	// ContainerdSnapshotter is the snapshotter used by containerd.
+	ContainerdSnapshotter string `toml:"snapshotter"`
+	// ContainerdEndpoint is the containerd endpoint path.
+	ContainerdEndpoint string `toml:"endpoint"`
+}
+
+// CniConfig contains config related to cni
+type CniConfig struct {
+	// NetworkPluginBinDir is the directory in which the binaries for the plugin is kept.
+	NetworkPluginBinDir string `toml:"bin_dir"`
+	// NetworkPluginConfDir is the directory in which the admin places a CNI conf.
+	NetworkPluginConfDir string `toml:"conf_dir"`
+}
+
+// Config contains cri-containerd toml config
+type Config struct {
+	// ContainerdConfig contains config related to containerd
+	ContainerdConfig `toml:"containerd"`
+	// CniConfig contains config related to cni
+	CniConfig `toml:"cni"`
 	// SocketPath is the path to the socket which cri-containerd serves on.
-	SocketPath string
+	SocketPath string `toml:"socket_path"`
 	// RootDir is the root directory path for managing cri-containerd files
 	// (metadata checkpoint etc.)
-	RootDir string
+	RootDir string `toml:"root_dir"`
+	// StreamServerAddress is the ip address streaming server is listening on.
+	StreamServerAddress string `toml:"stream_server_address"`
+	// StreamServerPort is the port streaming server is listening on.
+	StreamServerPort string `toml:"stream_server_port"`
+	// CgroupPath is the path for the cgroup that cri-containerd is placed in.
+	CgroupPath string `toml:"cgroup_path"`
+	// EnableSelinux indicates to enable the selinux support
+	EnableSelinux bool `toml:"enable_selinux"`
+	// SandboxImage is the image used by sandbox container.
+	SandboxImage string `toml:"sandbox_image"`
+}
+
+// CRIContainerdOptions contains cri-containerd command line and toml options.
+type CRIContainerdOptions struct {
+	// Config contains cri-containerd toml config
+	Config
+	// Path to the TOML config file
+	ConfigFilePath string
 	// PrintVersion indicates to print version information of cri-containerd.
 	PrintVersion bool
-	// ContainerdEndpoint is the containerd endpoint path.
-	ContainerdEndpoint string
-	// ContainerdSnapshotter is the snapshotter used by containerd.
-	ContainerdSnapshotter string
-	// NetworkPluginBinDir is the directory in which the binaries for the plugin is kept.
-	NetworkPluginBinDir string
-	// NetworkPluginConfDir is the directory in which the admin places a CNI conf.
-	NetworkPluginConfDir string
-	// StreamServerAddress is the ip address streaming server is listening on.
-	StreamServerAddress string
-	// StreamServerPort is the port streaming server is listening on.
-	StreamServerPort string
-	// CgroupPath is the path for the cgroup that cri-containerd is placed in.
-	CgroupPath string
-	// EnableSelinux indicates to enable the selinux support
-	EnableSelinux bool
-	// SandboxImage is the image used by sandbox container.
-	SandboxImage string
 }
 
 // NewCRIContainerdOptions returns a reference to CRIContainerdOptions
@@ -59,6 +84,8 @@ func NewCRIContainerdOptions() *CRIContainerdOptions {
 
 // AddFlags adds cri-containerd command line options to pflag.
 func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&c.ConfigFilePath, configFilePathArgName,
+		"/etc/cri-containerd/config.toml", "Path to the config file.")
 	fs.StringVar(&c.SocketPath, "socket-path",
 		"/var/run/cri-containerd.sock", "Path to the socket which cri-containerd serves on.")
 	fs.StringVar(&c.RootDir, "root-dir",
@@ -88,7 +115,33 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 // before flags are accessed by the program. Ths fuction adds flag.CommandLine
 // (the default set of command-line flags, parsed from os.Args) and then calls
 // pflag.Parse().
-func InitFlags() {
-	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
-	pflag.Parse()
+// precedence:  commandline > configfile > default
+func (c *CRIContainerdOptions) InitFlags(fs *pflag.FlagSet) error {
+	fs.AddGoFlagSet(flag.CommandLine)
+
+	commandline := os.Args[1:]
+	err := fs.Parse(commandline)
+	if err != nil {
+		return err
+	}
+
+	// Load default config file if none provided
+	_, err = toml.DecodeFile(c.ConfigFilePath, &c.Config)
+	if err != nil {
+		// the absence of default config file is normal case.
+		if !fs.Changed(configFilePathArgName) && os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	// What is the reason for applying the command line twice?
+	// Because the values from command line has the highest priority.
+	// So I must get the path of toml configuration file from command line,
+	// it trigger the first parse.
+	// The first parse generate the the default value and the value from command line at the same time.
+	// But the priority of toml config value is more higher than of default value,
+	// So I have not another way to insert toml config value between default value and command line value.
+	// So I trigger twice parses, one for default value, one for commandline value.
+	return fs.Parse(commandline)
 }
