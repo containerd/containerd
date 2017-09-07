@@ -6,6 +6,9 @@ However, if you want to integrate containerd into your project we have an easy t
 
 In this guide we will pull and run a redis server with containerd using the client package.
 We will assume that you are running a modern linux host for this example with a compatible build of `runc`.
+Please refer to [RUNC.md](/RUNC.md) for the currently supported version of `runc`.
+This project requires Go 1.8.x or above.
+If you need to install Go or update your currently installed one, please refer to Go install page at https://golang.org/doc/install.
 
 ## Starting containerd
 
@@ -76,7 +79,7 @@ Having a namespace for our usage ensures that containers, images, and other reso
 ## Pulling the redis image
 
 Now that we have a client to work with we need to pull an image.
-We can use the redis image based on alpine linux from the DockerHub.
+We can use the redis image based on Alpine Linux from the DockerHub.
 
 ```go
 	image, err := client.Pull(ctx, "docker.io/library/redis:alpine", containerd.WithPullUnpack)
@@ -87,6 +90,50 @@ We can use the redis image based on alpine linux from the DockerHub.
 
 The containerd client uses the `Opts` pattern for many of the method calls.
 We use the `containerd.WithPullUnpack` so that we not only fetch and download the content into containerd's content store but also unpack it into a snapshotter for use as a root filesystem.
+
+Let's put the code together that will pull the redis image based on alpine linux from Dockerhub and then print the name of the image on the console's output.
+
+```go
+package main
+
+import (
+        "context"
+        "log"
+
+        "github.com/containerd/containerd"
+        "github.com/containerd/containerd/namespaces"
+)
+
+func main() {
+        if err := redisExample(); err != nil {
+                log.Fatal(err)
+        }
+}
+
+func redisExample() error {
+        client, err := containerd.New("/run/containerd/containerd.sock")
+        if err != nil {
+                return err
+        }
+        defer client.Close()
+
+        ctx := namespaces.WithNamespace(context.Background(), "example")
+        image, err := client.Pull(ctx, "docker.io/library/redis:alpine", containerd.WithPullUnpack)
+        if err != nil {
+                return err
+        }
+        log.Printf("Successfully pulled %s image\n", image.Name())
+
+        return nil
+}
+```
+
+```bash
+> go build main.go
+> sudo ./main
+
+2017/08/13 17:43:21 Successfully pulled docker.io/library/redis:alpine image
+```
 
 ## Creating an OCI Spec and Container
 
@@ -117,6 +164,72 @@ By providing a separate snapshot ID than the container ID we can easily reuse, e
 
 We also add a line to delete the container along with its snapshot after we are done with this example.
 
+Here is example code to pull the redis image based on alpine linux from Dockerhub, create an OCI spec, create a container based on the spec and finally delete the container.
+```go
+package main
+
+import (
+        "context"
+        "log"
+
+        "github.com/containerd/containerd"
+        "github.com/containerd/containerd/namespaces"
+)
+
+func main() {
+        if err := redisExample(); err != nil {
+                log.Fatal(err)
+        }
+}
+
+func redisExample() error {
+        client, err := containerd.New("/run/containerd/containerd.sock")
+        if err != nil {
+                return err
+        }
+        defer client.Close()
+
+        ctx := namespaces.WithNamespace(context.Background(), "example")
+        image, err := client.Pull(ctx, "docker.io/library/redis:alpine", containerd.WithPullUnpack)
+        if err != nil {
+                return err
+        }
+        log.Printf("Successfully pulled %s image\n", image.Name())
+
+        spec, err := containerd.GenerateSpec(containerd.WithImageConfig(ctx, image))
+        if err != nil {
+                return err
+        }
+        log.Printf("Successfully generate an OCI spec version %s based on %s image", spec.Version, image.Name())
+
+        container, err := client.NewContainer(
+                ctx,
+                "redis-server",
+                containerd.WithSpec(spec),
+                containerd.WithImage(image),
+                containerd.WithNewSnapshot("redis-server-snapshot", image),
+        )
+        if err != nil {
+                return err
+        }
+        defer container.Delete(ctx, containerd.WithSnapshotCleanup)
+        log.Printf("Successfully created container with ID %s and snapshot with ID redis-server-snapshot", container.ID())
+
+        return nil
+}
+```
+
+Let's see it in action.
+
+```bash
+> go build main.go
+> sudo ./main
+
+2017/08/13 18:01:35 Successfully pulled docker.io/library/redis:alpine image
+2017/08/13 18:01:35 Successfully generate an OCI spec version 1.0.0 based on docker.io/library/redis:alpine image
+2017/08/13 18:01:35 Successfully created container with ID redis-server and snapshot with ID redis-server-snapshot
+```
+
 ## Creating a running Task
 
 One thing that may be confusing at first for new containerd users is the separation between a `Container` and a `Task`.
@@ -144,14 +257,15 @@ Waiting on things like the container's exit status and cgroup metrics are setup 
 If you are familiar with prometheus you can curl the containerd metrics endpoint (in the `config.toml` that we created) to see your container's metrics:
 
 ```bash
-> curl 127.0.0.1:1228/metrics
+> curl 127.0.0.1:1338/metrics
 ```
 
 Pretty cool right?
 
 ## Task Wait and Start
 
-Now that we have a task in the created state we need to make sure we that we wait on the task to exit so that we can close our example and cleanup the resources that we created.
+Now that we have a task in the created state we need to make sure that we wait on the task to exit.
+It is essential to wait for the task to finish so that we can close our example and cleanup the resources that we created.
 You always want to make sure you `Wait` before calling `Start` on a task.
 This makes sure that you do not encounter any races if the task has a simple program like `/bin/true` that exits promptly after calling start.
 
@@ -292,8 +406,8 @@ func redisExample() error {
 We can build this example and run it as follows to see our hard work come together.
 
 ```bash
-> go build -o example main.go
-> sudo ./example
+> go build main.go
+> sudo ./main
 
 1:C 04 Aug 20:41:37.682 # oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
 1:C 04 Aug 20:41:37.682 # Redis version=4.0.1, bits=64, commit=00000000, modified=0, pid=1, just started
