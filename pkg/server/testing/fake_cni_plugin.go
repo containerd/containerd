@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cri-o/ocicni"
+	"github.com/cri-o/ocicni/pkg/ocicni"
 )
 
 // CalledDetail is the struct contains called function name and arguments.
@@ -148,14 +148,14 @@ func (f *FakeCNIPlugin) TearDownPod(podNetwork ocicni.PodNetwork) error {
 }
 
 // GetPodNetworkStatus get the status of network.
-func (f *FakeCNIPlugin) GetPodNetworkStatus(netnsPath string) (string, error) {
+func (f *FakeCNIPlugin) GetPodNetworkStatus(podNetwork ocicni.PodNetwork) (string, error) {
 	f.Lock()
 	defer f.Unlock()
-	f.appendCalled("GetPodNetworkStatus", netnsPath)
+	f.appendCalled("GetPodNetworkStatus", podNetwork)
 	if err := f.getError("GetPodNetworkStatus"); err != nil {
 		return "", err
 	}
-	ip, ok := f.IPMap[netnsPath]
+	ip, ok := f.IPMap[podNetwork.NetNS]
 	if !ok {
 		return "", fmt.Errorf("failed to find the IP")
 	}
