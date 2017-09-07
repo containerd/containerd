@@ -5,6 +5,8 @@ package linux
 import (
 	"context"
 
+	"google.golang.org/grpc"
+
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
@@ -63,7 +65,10 @@ func (t *Task) State(ctx context.Context) (runtime.State, error) {
 		ID: t.id,
 	})
 	if err != nil {
-		return runtime.State{}, errdefs.FromGRPC(err)
+		if err != grpc.ErrServerStopped {
+			return runtime.State{}, errdefs.FromGRPC(err)
+		}
+		return runtime.State{}, errdefs.ErrNotFound
 	}
 	var status runtime.Status
 	switch response.Status {
