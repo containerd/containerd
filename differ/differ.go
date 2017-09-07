@@ -38,7 +38,7 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			return newWalkingDiff(metadata.NewContentStore(md.(*bolt.DB), c.(content.Store)))
+			return NewWalkingDiff(metadata.NewContentStore(md.(*bolt.DB), c.(content.Store)))
 		},
 	})
 }
@@ -49,12 +49,17 @@ type walkingDiff struct {
 
 var emptyDesc = ocispec.Descriptor{}
 
-func newWalkingDiff(store content.Store) (plugin.Differ, error) {
+// NewWalkingDiff is a generic implementation of plugin.Differ.
+// NewWalkingDiff is expected to work with any filesystem.
+func NewWalkingDiff(store content.Store) (plugin.Differ, error) {
 	return &walkingDiff{
 		store: store,
 	}, nil
 }
 
+// Apply applies the content associated with the provided digests onto the
+// provided mounts. Archive content will be extracted and decompressed if
+// necessary.
 func (s *walkingDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount) (ocispec.Descriptor, error) {
 	var isCompressed bool
 	switch desc.MediaType {
@@ -118,6 +123,8 @@ func (s *walkingDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts
 	}, nil
 }
 
+// DiffMounts creates a diff between the given mounts and uploads the result
+// to the content store.
 func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount, media, ref string) (ocispec.Descriptor, error) {
 	var isCompressed bool
 	switch media {
