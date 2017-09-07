@@ -38,6 +38,7 @@ help:
 	@echo " * 'binaries'       - Build cri-containerd"
 	@echo " * 'static-binaries - Build static cri-containerd"
 	@echo " * 'release'        - Build release tarball"
+	@echo " * 'push'           - Push release tarball to GCS"
 	@echo " * 'test'           - Test cri-containerd"
 	@echo " * 'test-cri'       - Test cri-containerd with cri validation test"
 	@echo " * 'test-e2e-node'  - Test cri-containerd with Kubernetes node e2e test"
@@ -99,6 +100,9 @@ $(BUILD_DIR)/$(TARBALL): $(BUILD_DIR)/cri-containerd hack/versions
 
 release: $(BUILD_DIR)/$(TARBALL)
 
+push: $(BUILD_DIR)/$(TARBALL)
+	@@BUILD_DIR=$(BUILD_DIR) TARBALL=$(TARBALL) ./hack/push.sh
+
 .PHONY: install.deps
 
 install.deps:
@@ -129,6 +133,7 @@ install.tools: .install.gitvalidation .install.gometalinter
 	binaries \
 	static-binaries \
 	release \
+	push \
 	boiler \
 	clean \
 	default \

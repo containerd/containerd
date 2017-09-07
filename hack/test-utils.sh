@@ -62,17 +62,27 @@ upload_logs_to_gcs() {
   local -r dir=$2
   local -r result=$3
   if ! gsutil ls "gs://${bucket}" > /dev/null; then
-    gsutil mb "gs://${bucket}"
-    gsutil -m acl ch -g all:R "gs://${bucket}"
-    gsutil defacl set public-read "gs://${bucket}"
-    local -r bucket_rule=$(mktemp)
-    # Set 30 day TTL for logs inside the bucket.
-    echo '{"rule": [{"action": {"type": "Delete"},"condition": {"age": 30}}]}' > ${bucket_rule}
-    gsutil lifecycle set "${bucket_rule}" "gs://${bucket}"
-    rm "${bucket_rule}"
+    create_ttl_bucket ${bucket}
   fi
   local -r upload_log_path=${bucket}/${dir}
   gsutil cp -r "${REPORT_DIR}" "gs://${upload_log_path}"
   echo "Test logs are uploaed to:
     http://gcsweb.k8s.io/gcs/${upload_log_path}/"
+}
+
+# create_ttl_bucket create a public bucket in which all objects
+# have a default TTL (30 days).
+# Var set:
+# 1. Bucket: gcs bucket name.
+create_ttl_bucket() {
+  local -r bucket=$1
+  gsutil mb "gs://${bucket}"
+  local -r bucket_rule=$(mktemp)
+  # Set 30 day TTL for logs inside the bucket.
+  echo '{"rule": [{"action": {"type": "Delete"},"condition": {"age": 30}}]}' > ${bucket_rule}
+  gsutil lifecycle set "${bucket_rule}" "gs://${bucket}"
+  rm "${bucket_rule}"
+
+  gsutil -m acl ch -g all:R "gs://${bucket}"
+  gsutil defacl set public-read "gs://${bucket}"
 }

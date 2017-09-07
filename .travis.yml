@@ -50,14 +50,12 @@ jobs:
         - make .gitvalidation
         - make verify
         - make binaries
-        - make release
       go: 1.8.x
     - script:
         - make install.tools
         - make .gitvalidation
         - make verify
         - make binaries
-        - make release
       go: tip
     - stage: Test
       script:
@@ -75,4 +73,9 @@ jobs:
         - test "${TRAVIS_PULL_REQUEST}" != "false" && exit 0 || true
         - make install.deps
         - UPLOAD_LOG=true make test-e2e-node
+      go: 1.8.x
+    - stage: Deploy
+      script:
+        - test "${TRAVIS_PULL_REQUEST}" != "false" && exit 0 || true
+        - make push
       go: 1.8.x
