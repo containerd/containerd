@@ -36,7 +36,7 @@ func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(ctx context.
 	t.Run("Chown", makeTest(name, snapshotterFn, checkChown))
 	t.Run("DirectoryPermissionOnCommit", makeTest(name, snapshotterFn, checkDirectoryPermissionOnCommit))
 	t.Run("RemoveIntermediateSnapshot", makeTest(name, snapshotterFn, checkRemoveIntermediateSnapshot))
-
+	t.Run("DeletedFilesInChildSnapshot", makeTest(name, snapshotterFn, checkDeletedFilesInChildSnapshot))
 	// Rename test still fails on some kernels with overlay
 	//t.Run("Rename", makeTest(name, snapshotterFn, checkRename))
 
@@ -435,6 +435,24 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 	_, err = snapshotter.View(ctx, viewLayer, snapA)
 	//must be err != nil
 	assert.NotNil(t, err)
+
+}
+
+// Deletion of files/folder of base layer in new layer, On Commit, those files should not be visible.
+func checkDeletedFilesInChildSnapshot(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+
+	l1Init := fstest.Apply(
+		fstest.CreateFile("/foo", []byte("foo\n"), 0777),
+		fstest.CreateFile("/foobar", []byte("foobar\n"), 0777),
+	)
+	l2Init := fstest.Apply(
+		fstest.RemoveAll("/foobar"),
+	)
+	l3Init := fstest.Apply()
+
+	if err := checkSnapshots(ctx, snapshotter, work, l1Init, l2Init, l3Init); err != nil {
+		t.Fatalf("Check snapshots failed: %+v", err)
+	}
 
 }
 
