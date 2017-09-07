@@ -68,14 +68,47 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 			{Key: "k4", Value: "v4=v4bis=foop"},
 		},
 		Mounts: []*runtime.Mount{
+			// everything default
 			{
 				ContainerPath: "container-path-1",
 				HostPath:      "host-path-1",
 			},
+			// readOnly
 			{
 				ContainerPath: "container-path-2",
 				HostPath:      "host-path-2",
 				Readonly:      true,
+			},
+			// Propagation private
+			{
+				ContainerPath: "container-path-3",
+				HostPath:      "host-path-3",
+				Propagation:   runtime.MountPropagation_PROPAGATION_PRIVATE,
+			},
+			// Propagation rslave
+			{
+				ContainerPath: "container-path-4",
+				HostPath:      "host-path-4",
+				Propagation:   runtime.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
+			},
+			// Propagation rshared
+			{
+				ContainerPath: "container-path-5",
+				HostPath:      "host-path-5",
+				Propagation:   runtime.MountPropagation_PROPAGATION_BIDIRECTIONAL,
+			},
+			// Propagation unknown (falls back to private)
+			{
+				ContainerPath: "container-path-6",
+				HostPath:      "host-path-6",
+				Propagation:   runtime.MountPropagation(42),
+			},
+			// Everything
+			{
+				ContainerPath: "container-path-7",
+				HostPath:      "host-path-7",
+				Readonly:      true,
+				Propagation:   runtime.MountPropagation_PROPAGATION_BIDIRECTIONAL,
 			},
 		},
 		Labels:      map[string]string{"a": "b"},
@@ -124,6 +157,11 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		t.Logf("Check bind mount")
 		checkMount(t, spec.Mounts, "host-path-1", "container-path-1", "bind", []string{"rbind", "rprivate", "rw"}, nil)
 		checkMount(t, spec.Mounts, "host-path-2", "container-path-2", "bind", []string{"rbind", "rprivate", "ro"}, nil)
+		checkMount(t, spec.Mounts, "host-path-3", "container-path-3", "bind", []string{"rbind", "rprivate", "rw"}, nil)
+		checkMount(t, spec.Mounts, "host-path-4", "container-path-4", "bind", []string{"rbind", "rslave", "rw"}, nil)
+		checkMount(t, spec.Mounts, "host-path-5", "container-path-5", "bind", []string{"rbind", "rshared", "rw"}, nil)
+		checkMount(t, spec.Mounts, "host-path-6", "container-path-6", "bind", []string{"rbind", "rprivate", "rw"}, nil)
+		checkMount(t, spec.Mounts, "host-path-7", "container-path-7", "bind", []string{"rbind", "rshared", "ro"}, nil)
 
 		t.Logf("Check resource limits")
 		assert.EqualValues(t, *spec.Linux.Resources.CPU.Period, 100)

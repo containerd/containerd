@@ -484,7 +484,19 @@ func addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount, mountLabel
 	for _, mount := range mounts {
 		dst := mount.GetContainerPath()
 		src := mount.GetHostPath()
-		options := []string{"rbind", "rprivate"}
+		options := []string{"rbind"}
+		switch mount.GetPropagation() {
+		case runtime.MountPropagation_PROPAGATION_PRIVATE:
+			options = append(options, "rprivate")
+		case runtime.MountPropagation_PROPAGATION_BIDIRECTIONAL:
+			options = append(options, "rshared")
+		case runtime.MountPropagation_PROPAGATION_HOST_TO_CONTAINER:
+			options = append(options, "rslave")
+		default:
+			glog.Warningf("Unknown propagation mode for hostPath %q", mount.HostPath)
+			options = append(options, "rprivate")
+		}
+
 		if mount.GetReadonly() {
 			options = append(options, "ro")
 		} else {
