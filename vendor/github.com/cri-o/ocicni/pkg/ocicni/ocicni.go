@@ -26,6 +26,13 @@ type cniNetworkPlugin struct {
 	vendorCNIDirPrefix string
 
 	monitorNetDirChan chan struct{}
+
+	// The pod map provides synchronization for a given pod's network
+	// operations.  Each pod's setup/teardown/status operations
+	// are synchronized against each other, but network operations of other
+	// pods can proceed in parallel.
+	podsLock sync.Mutex
+	pods     map[string]*podLock
 }
 
 type cniNetwork struct {
@@ -35,6 +42,61 @@ type cniNetwork struct {
 }
 
 var errMissingDefaultNetwork = errors.New("Missing CNI default network")
+
+type podLock struct {
+	// Count of in-flight operations for this pod; when this reaches zero
+	// the lock can be removed from the pod map
+	refcount uint
+
+	// Lock to synchronize operations for this specific pod
+	mu sync.Mutex
+}
+
+func buildFullPodName(podNetwork PodNetwork) string {
+	return podNetwork.Namespace + "_" + podNetwork.Name
+}
+
+// Lock network operations for a specific pod.  If that pod is not yet in
+// the pod map, it will be added.  The reference count for the pod will
+// be increased.
+func (plugin *cniNetworkPlugin) podLock(podNetwork PodNetwork) *sync.Mutex {
+	plugin.podsLock.Lock()
+	defer plugin.podsLock.Unlock()
+
+	fullPodName := buildFullPodName(podNetwork)
+	lock, ok := plugin.pods[fullPodName]
+	if !ok {
+		lock = &podLock{}
+		plugin.pods[fullPodName] = lock
+	}
+	lock.refcount++
+	return &lock.mu
+}
+
+// Unlock network operations for a specific pod.  The reference count for the
+// pod will be decreased.  If the reference count reaches zero, the pod will be
+// removed from the pod map.
+func (plugin *cniNetworkPlugin) podUnlock(podNetwork PodNetwork) {
+	plugin.podsLock.Lock()
+	defer plugin.podsLock.Unlock()
+
+	fullPodName := buildFullPodName(podNetwork)
+	lock, ok := plugin.pods[fullPodName]
+	if !ok {
+		logrus.Warningf("Unbalanced pod lock unref for %s", fullPodName)
+		return
+	} else if lock.refcount == 0 {
+		// This should never ever happen, but handle it anyway
+		delete(plugin.pods, fullPodName)
+		logrus.Errorf("Pod lock for %s still in map with zero refcount", fullPodName)
+		return
+	}
+	lock.refcount--
+	lock.mu.Unlock()
+	if lock.refcount == 0 {
+		delete(plugin.pods, fullPodName)
+	}
+}
 
 func (plugin *cniNetworkPlugin) monitorNetDir() {
 	watcher, err := fsnotify.NewWatcher()
@@ -111,6 +173,7 @@ func probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir string, cniDirs []strin
 		cniDirs:            cniDirs,
 		vendorCNIDirPrefix: vendorCNIDirPrefix,
 		monitorNetDirChan:  make(chan struct{}),
+		pods:               make(map[string]*podLock),
 	}
 
 	// sync NetworkConfig in best effort during probing.
@@ -250,6 +313,9 @@ func (plugin *cniNetworkPlugin) SetUpPod(podNetwork PodNetwork) error {
 		return err
 	}
 
+	plugin.podLock(podNetwork).Lock()
+	defer plugin.podUnlock(podNetwork)
+
 	_, err := plugin.loNetwork.addToNetwork(podNetwork)
 	if err != nil {
 		logrus.Errorf("Error while adding to cni lo network: %s", err)
@@ -270,13 +336,19 @@ func (plugin *cniNetworkPlugin) TearDownPod(podNetwork PodNetwork) error {
 		return err
 	}
 
+	plugin.podLock(podNetwork).Lock()
+	defer plugin.podUnlock(podNetwork)
+
 	return plugin.getDefaultNetwork().deleteFromNetwork(podNetwork)
 }
 
 // TODO: Use the addToNetwork function to obtain the IP of the Pod. That will assume idempotent ADD call to the plugin.
 // Also fix the runtime's call to Status function to be done only in the case that the IP is lost, no need to do periodic calls
-func (plugin *cniNetworkPlugin) GetPodNetworkStatus(netnsPath string) (string, error) {
-	ip, err := getContainerIP(plugin.nsenterPath, netnsPath, DefaultInterfaceName, "-4")
+func (plugin *cniNetworkPlugin) GetPodNetworkStatus(podNetwork PodNetwork) (string, error) {
+	plugin.podLock(podNetwork).Lock()
+	defer plugin.podUnlock(podNetwork)
+
+	ip, err := getContainerIP(plugin.nsenterPath, podNetwork.NetNS, DefaultInterfaceName, "-4")
 	if err != nil {
 		return "", err
 	}
