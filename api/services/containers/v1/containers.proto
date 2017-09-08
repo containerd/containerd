@@ -89,7 +89,12 @@ message Container {
 	// associated with the container. One may provide protobuf, json, or other
 	// encoding formats. The primary use of this is to further decorate the
 	// container object with fields that may be specific to a client integration.
-	repeated google.protobuf.Any extensions = 10 [(gogoproto.nullable) = false];
+	//
+	// The key portion of this map should identify a "name" for the extension
+	// that should be unique against other extensions. When updating extension
+	// data, one should only update the specified extension using field paths
+	// to select a specific map key.
+	map<string, google.protobuf.Any> extensions = 10 [(gogoproto.nullable) = false];
 }
 
 message GetContainerRequest {

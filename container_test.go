@@ -1384,7 +1384,7 @@ func TestContainerExtensions(t *testing.T) {
 	defer client.Close()
 
 	ext := gogotypes.Any{TypeUrl: "test.ext.url", Value: []byte("hello")}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(), WithContainerExtension(&ext))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(), WithContainerExtension("hello", &ext))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1395,11 +1395,11 @@ func TestContainerExtensions(t *testing.T) {
 		if len(cExts) != 1 {
 			t.Fatal("expected 1 container extension")
 		}
-		if cExts[0].TypeUrl != ext.TypeUrl {
-			t.Fatalf("got unexpected type url for extension: %s", cExts[0].TypeUrl)
+		if cExts["hello"].TypeUrl != ext.TypeUrl {
+			t.Fatalf("got unexpected type url for extension: %s", cExts["hello"].TypeUrl)
 		}
-		if !bytes.Equal(cExts[0].Value, ext.Value) {
-			t.Fatalf("expected extension value %q, got: %q", ext.Value, cExts[0].Value)
+		if !bytes.Equal(cExts["hello"].Value, ext.Value) {
+			t.Fatalf("expected extension value %q, got: %q", ext.Value, cExts["hello"].Value)
 		}
 	}
 

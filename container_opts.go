@@ -135,13 +135,20 @@ func setSnapshotterIfEmpty(c *containers.Container) {
 // Make sure to register the type of `extension` in the typeurl package via
 // `typeurl.Register` otherwise the type data will be inferred, including how
 // to encode and decode the object.
-func WithContainerExtension(extension interface{}) NewContainerOpts {
+func WithContainerExtension(name string, extension interface{}) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		any, err := typeurl.MarshalAny(extension)
 		if err != nil {
 			return err
 		}
-		c.Extensions = append(c.Extensions, *any)
+
+		if name == "" {
+			return errors.Wrapf(errdefs.ErrInvalidArgument, "extension key must not be zero-length")
+		}
+		if c.Extensions == nil {
+			c.Extensions = make(map[string]types.Any)
+		}
+		c.Extensions[name] = *any
 		return nil
 	}
 }

@@ -59,7 +59,7 @@ type Container struct {
 	UpdatedAt time.Time
 
 	// Extensions stores client-specified metadata
-	Extensions []types.Any
+	Extensions map[string]types.Any
 }
 
 type RuntimeInfo struct {

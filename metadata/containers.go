@@ -181,6 +181,15 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 			continue
 		}
 
+		if strings.HasPrefix(path, "extensions.") {
+			if updated.Extensions == nil {
+				updated.Extensions = map[string]types.Any{}
+			}
+			key := strings.TrimPrefix(path, "extensions.")
+			updated.Extensions[key] = container.Extensions[key]
+			continue
+		}
+
 		switch path {
 		case "labels":
 			updated.Labels = container.Labels
@@ -226,6 +235,12 @@ func (s *containerStore) Delete(ctx context.Context, id string) error {
 func validateContainer(container *containers.Container) error {
 	if err := identifiers.Validate(container.ID); err != nil {
 		return errors.Wrapf(err, "container.ID validation error")
+	}
+
+	for k := range container.Extensions {
+		if k == "" {
+			return errors.Wrapf(errdefs.ErrInvalidArgument, "container.Extension keys must not be zero-length")
+		}
 	}
 
 	// labels and image have no validation
@@ -291,19 +306,25 @@ func readContainer(container *containers.Container, bkt *bolt.Bucket) error {
 		case string(bucketKeySnapshotter):
 			container.Snapshotter = string(v)
 		case string(bucketKeyExtensions):
-			buf := proto.NewBuffer(v)
-			n, err := buf.DecodeVarint()
-			if err != nil {
-				return errors.Wrap(err, "error reading number of container extensions")
+			ebkt := bkt.Bucket(bucketKeyExtensions)
+			if ebkt == nil {
+				return nil
 			}
-			extensions := make([]types.Any, 0, n)
-			for i := 0; i < int(n); i++ {
-				var any types.Any
-				if err := buf.DecodeMessage(&any); err != nil {
-					return errors.Wrap(err, "error decoding container extension")
+
+			extensions := make(map[string]types.Any)
+			if err := ebkt.ForEach(func(k, v []byte) error {
+				var a types.Any
+				if err := proto.Unmarshal(v, &a); err != nil {
+					return err
 				}
-				extensions = append(extensions, any)
+
+				extensions[string(k)] = a
+				return nil
+			}); err != nil {
+
+				return err
 			}
+
 			container.Extensions = extensions
 		}
 
@@ -352,18 +373,21 @@ func writeContainer(bkt *bolt.Bucket, container *containers.Container) error {
 		return err
 	}
 
-	if container.Extensions != nil {
-		buf := proto.NewBuffer(nil)
-		if err := buf.EncodeVarint(uint64(len(container.Extensions))); err != nil {
+	if len(container.Extensions) > 0 {
+		ebkt, err := bkt.CreateBucketIfNotExists(bucketKeyExtensions)
+		if err != nil {
 			return err
 		}
-		for _, ext := range container.Extensions {
-			if err := buf.EncodeMessage(&ext); err != nil {
+
+		for name, ext := range container.Extensions {
+			p, err := proto.Marshal(&ext)
+			if err != nil {
 				return err
 			}
-		}
-		if err := bkt.Put(bucketKeyExtensions, buf.Bytes()); err != nil {
-			return err
+
+			if err := ebkt.Put([]byte(name), p); err != nil {
+				return err
+			}
 		}
 	}
 

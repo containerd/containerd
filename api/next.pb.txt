@@ -190,7 +190,7 @@ file {
       number: 10
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
-      type_name: ".google.protobuf.Any"
+      type_name: ".containerd.services.containers.v1.Container.ExtensionsEntry"
       options {
         65001: 0
       }
@@ -232,6 +232,27 @@ file {
         type: TYPE_MESSAGE
         type_name: ".google.protobuf.Any"
         json_name: "options"
+      }
+    }
+    nested_type {
+      name: "ExtensionsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_MESSAGE
+        type_name: ".google.protobuf.Any"
+        json_name: "value"
+      }
+      options {
+        map_entry: true
       }
     }
   }

@@ -44,7 +44,7 @@ type Container interface {
 	// SetLabels sets the provided labels for the container and returns the final label set
 	SetLabels(context.Context, map[string]string) (map[string]string, error)
 	// Extensions returns the extensions set on the container
-	Extensions() []prototypes.Any
+	Extensions() map[string]prototypes.Any
 }
 
 func containerFromRecord(client *Client, c containers.Container) *container {
@@ -161,7 +161,7 @@ func (c *container) Image(ctx context.Context) (Image, error) {
 	}, nil
 }
 
-func (c *container) Extensions() []prototypes.Any {
+func (c *container) Extensions() map[string]prototypes.Any {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.c.Extensions
