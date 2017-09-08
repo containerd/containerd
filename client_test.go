@@ -1,10 +1,10 @@
 package containerd
 
 import (
-	"bytes"
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	golog "log"
 	"os"
@@ -26,6 +26,7 @@ var (
 	noDaemon     bool
 	noCriu       bool
 	supportsCriu bool
+	daemonLog    string
 
 	ctrd = &daemon{}
 )
@@ -37,6 +38,7 @@ func init() {
 	flag.StringVar(&address, "address", defaultAddress, "The address to the containerd socket for use in the tests")
 	flag.BoolVar(&noDaemon, "no-daemon", false, "Do not start a dedicated daemon for the tests")
 	flag.BoolVar(&noCriu, "no-criu", false, "Do not run the checkpoint tests")
+	flag.StringVar(&daemonLog, "log", "", "Path to a log file where daemon IO is redirected")
 	flag.Parse()
 }
 
@@ -44,6 +46,13 @@ func testContext() (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = namespaces.WithNamespace(ctx, "testing")
 	return ctx, cancel
+}
+
+func getDaemonLog() (io.Writer, error) {
+	if daemonLog != "" {
+		return os.OpenFile(daemonLog, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
+	}
+	return ioutil.Discard, nil
 }
 
 func TestMain(m *testing.M) {
@@ -55,11 +64,14 @@ func TestMain(m *testing.M) {
 	_, err := exec.LookPath("criu")
 	supportsCriu = err == nil && !noCriu
 
-	var (
-		buf         = bytes.NewBuffer(nil)
-		ctx, cancel = testContext()
-	)
+	ctx, cancel := testContext()
 	defer cancel()
+
+	logger, err := getDaemonLog()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s", err)
+		os.Exit(1)
+	}
 
 	if !noDaemon {
 		os.RemoveAll(defaultRoot)
@@ -67,10 +79,9 @@ func TestMain(m *testing.M) {
 		err := ctrd.start("containerd", address, []string{
 			"--root", defaultRoot,
 			"--state", defaultState,
-			"--log-level", "debug",
-		}, buf, buf)
+		}, logger, logger)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %s", err, buf.String())
+			fmt.Fprintf(os.Stderr, "%s\n", err)
 			os.Exit(1)
 		}
 	}
@@ -81,7 +92,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		ctrd.Kill()
 		ctrd.Wait()
-		fmt.Fprintf(os.Stderr, "%s: %s\n", err, buf.String())
+		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
 	}
 
@@ -103,7 +114,7 @@ func TestMain(m *testing.M) {
 		if _, err = client.Pull(ctx, testImage, WithPullUnpack); err != nil {
 			ctrd.Stop()
 			ctrd.Wait()
-			fmt.Fprintf(os.Stderr, "%s: %s\n", err, buf.String())
+			fmt.Fprintf(os.Stderr, "%s\n", err)
 			os.Exit(1)
 		}
 	}
@@ -135,10 +146,6 @@ func TestMain(m *testing.M) {
 		if err := os.RemoveAll(defaultRoot); err != nil {
 			fmt.Fprintln(os.Stderr, "failed to remove test root dir", err)
 			os.Exit(1)
-		}
-		// only print containerd logs if the test failed
-		if status != 0 {
-			fmt.Fprintln(os.Stderr, buf.String())
 		}
 	}
 	os.Exit(status)
