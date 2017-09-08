@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/docker/docker/pkg/mount"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
@@ -27,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
+	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
 )
 
@@ -80,37 +82,6 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 				HostPath:      "host-path-2",
 				Readonly:      true,
 			},
-			// Propagation private
-			{
-				ContainerPath: "container-path-3",
-				HostPath:      "host-path-3",
-				Propagation:   runtime.MountPropagation_PROPAGATION_PRIVATE,
-			},
-			// Propagation rslave
-			{
-				ContainerPath: "container-path-4",
-				HostPath:      "host-path-4",
-				Propagation:   runtime.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
-			},
-			// Propagation rshared
-			{
-				ContainerPath: "container-path-5",
-				HostPath:      "host-path-5",
-				Propagation:   runtime.MountPropagation_PROPAGATION_BIDIRECTIONAL,
-			},
-			// Propagation unknown (falls back to private)
-			{
-				ContainerPath: "container-path-6",
-				HostPath:      "host-path-6",
-				Propagation:   runtime.MountPropagation(42),
-			},
-			// Everything
-			{
-				ContainerPath: "container-path-7",
-				HostPath:      "host-path-7",
-				Readonly:      true,
-				Propagation:   runtime.MountPropagation_PROPAGATION_BIDIRECTIONAL,
-			},
 		},
 		Labels:      map[string]string{"a": "b"},
 		Annotations: map[string]string{"c": "d"},
@@ -158,11 +129,6 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		t.Logf("Check bind mount")
 		checkMount(t, spec.Mounts, "host-path-1", "container-path-1", "bind", []string{"rbind", "rprivate", "rw"}, nil)
 		checkMount(t, spec.Mounts, "host-path-2", "container-path-2", "bind", []string{"rbind", "rprivate", "ro"}, nil)
-		checkMount(t, spec.Mounts, "host-path-3", "container-path-3", "bind", []string{"rbind", "rprivate", "rw"}, nil)
-		checkMount(t, spec.Mounts, "host-path-4", "container-path-4", "bind", []string{"rbind", "rslave", "rw"}, nil)
-		checkMount(t, spec.Mounts, "host-path-5", "container-path-5", "bind", []string{"rbind", "rshared", "rw"}, nil)
-		checkMount(t, spec.Mounts, "host-path-6", "container-path-6", "bind", []string{"rbind", "rprivate", "rw"}, nil)
-		checkMount(t, spec.Mounts, "host-path-7", "container-path-7", "bind", []string{"rbind", "rshared", "ro"}, nil)
 
 		t.Logf("Check resource limits")
 		assert.EqualValues(t, *spec.Linux.Resources.CPU.Period, 100)
@@ -606,6 +572,113 @@ func TestPrivilegedBindMount(t *testing.T) {
 			checkMount(t, spec.Mounts, "cgroup", "/sys/fs/cgroup", "cgroup", []string{"ro"}, nil)
 		} else {
 			checkMount(t, spec.Mounts, "cgroup", "/sys/fs/cgroup", "cgroup", nil, []string{"ro"})
+		}
+	}
+}
+
+func TestMountPropagation(t *testing.T) {
+	sharedGetMountsFn := func() ([]*mount.Info, error) {
+		return []*mount.Info{
+			{
+				Mountpoint: "host-path",
+				Optional:   "shared:",
+			},
+		}, nil
+	}
+
+	slaveGetMountsFn := func() ([]*mount.Info, error) {
+		return []*mount.Info{
+			{
+				Mountpoint: "host-path",
+				Optional:   "master:",
+			},
+		}, nil
+	}
+
+	othersGetMountsFn := func() ([]*mount.Info, error) {
+		return []*mount.Info{
+			{
+				Mountpoint: "host-path",
+				Optional:   "others",
+			},
+		}, nil
+	}
+
+	for desc, test := range map[string]struct {
+		criMount        *runtime.Mount
+		fakeGetMountsFn func() ([]*mount.Info, error)
+		optionsCheck    []string
+		expectErr       bool
+	}{
+		"HostPath should mount as 'rprivate' if propagation is MountPropagation_PROPAGATION_PRIVATE": {
+			criMount: &runtime.Mount{
+				ContainerPath: "container-path",
+				HostPath:      "host-path",
+				Propagation:   runtime.MountPropagation_PROPAGATION_PRIVATE,
+			},
+			fakeGetMountsFn: nil,
+			optionsCheck:    []string{"rbind", "rprivate"},
+			expectErr:       false,
+		},
+		"HostPath should mount as 'rslave' if propagation is MountPropagation_PROPAGATION_HOST_TO_CONTAINER": {
+			criMount: &runtime.Mount{
+				ContainerPath: "container-path",
+				HostPath:      "host-path",
+				Propagation:   runtime.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
+			},
+			fakeGetMountsFn: slaveGetMountsFn,
+			optionsCheck:    []string{"rbind", "rslave"},
+			expectErr:       false,
+		},
+		"HostPath should mount as 'rshared' if propagation is MountPropagation_PROPAGATION_BIDIRECTIONAL": {
+			criMount: &runtime.Mount{
+				ContainerPath: "container-path",
+				HostPath:      "host-path",
+				Propagation:   runtime.MountPropagation_PROPAGATION_BIDIRECTIONAL,
+			},
+			fakeGetMountsFn: sharedGetMountsFn,
+			optionsCheck:    []string{"rbind", "rshared"},
+			expectErr:       false,
+		},
+		"HostPath should mount as 'rprivate' if propagation is illegal": {
+			criMount: &runtime.Mount{
+				ContainerPath: "container-path",
+				HostPath:      "host-path",
+				Propagation:   runtime.MountPropagation(42),
+			},
+			fakeGetMountsFn: nil,
+			optionsCheck:    []string{"rbind", "rprivate"},
+			expectErr:       false,
+		},
+		"Expect an error if HostPath isn't shared and mount propagation is MountPropagation_PROPAGATION_BIDIRECTIONAL": {
+			criMount: &runtime.Mount{
+				ContainerPath: "container-path",
+				HostPath:      "host-path",
+				Propagation:   runtime.MountPropagation_PROPAGATION_BIDIRECTIONAL,
+			},
+			fakeGetMountsFn: slaveGetMountsFn,
+			expectErr:       true,
+		},
+		"Expect an error if HostPath isn't slave or shared and mount propagation is MountPropagation_PROPAGATION_HOST_TO_CONTAINER": {
+			criMount: &runtime.Mount{
+				ContainerPath: "container-path",
+				HostPath:      "host-path",
+				Propagation:   runtime.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
+			},
+			fakeGetMountsFn: othersGetMountsFn,
+			expectErr:       true,
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		g := generate.New()
+		c := newTestCRIContainerdService()
+		c.os.(*ostesting.FakeOS).GetMountsFn = test.fakeGetMountsFn
+		err := c.addOCIBindMounts(&g, []*runtime.Mount{test.criMount}, "")
+		if test.expectErr {
+			require.Error(t, err)
+		} else {
+			require.NoError(t, err)
+			checkMount(t, g.Spec().Mounts, test.criMount.HostPath, test.criMount.ContainerPath, "bind", test.optionsCheck, nil)
 		}
 	}
 }

@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/docker/distribution/reference"
+	"github.com/docker/docker/pkg/mount"
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -383,4 +384,37 @@ func isInCRIMounts(dst string, mounts []*runtime.Mount) bool {
 		}
 	}
 	return false
+}
+
+//TODO: Replace with `mount.Lookup()`in containerd after #257 is marged
+func getMountInfo(mountInfos []*mount.Info, dir string) *mount.Info {
+	for _, m := range mountInfos {
+		if m.Mountpoint == dir {
+			return m
+		}
+	}
+	return nil
+}
+
+func getSourceMount(source string, mountInfos []*mount.Info) (string, string, error) {
+	mountinfo := getMountInfo(mountInfos, source)
+	if mountinfo != nil {
+		return source, mountinfo.Optional, nil
+	}
+
+	path := source
+	for {
+		path = filepath.Dir(path)
+		mountinfo = getMountInfo(mountInfos, path)
+		if mountinfo != nil {
+			return path, mountinfo.Optional, nil
+		}
+
+		if path == "/" {
+			break
+		}
+	}
+
+	// If we are here, we did not find parent mount. Something is wrong.
+	return "", "", fmt.Errorf("Could not find source mount of %s", source)
 }
