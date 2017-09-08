@@ -1,0 +1,13 @@
+[Unit]
+Description=Kubernetes containerd CRI shim
+Requires=network-online.target
+After=containerd.service
+
+[Service]
+Restart=always
+RestartSec=10
+ExecStart=/usr/local/bin/cri-containerd --logtostderr
+OOMScoreAdjust=-999
+
+[Install]
+WantedBy=multi-user.target
