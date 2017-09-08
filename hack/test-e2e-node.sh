@@ -74,6 +74,7 @@ make test-e2e-node \
 	CONTAINER_RUNTIME_ENDPOINT=unix:///var/run/cri-containerd.sock \
 	ARTIFACTS=${REPORT_DIR} \
 	TEST_ARGS='--kubelet-flags=--cgroups-per-qos=true --kubelet-flags=--cgroup-root=/' # Enable the QOS tree.
+test_exit_code=$?
 
 kill_cri_containerd
 
@@ -89,3 +90,5 @@ if ${UPLOAD_LOG}; then
   fi
   upload_logs_to_gcs "${UPLOAD_LOG_PATH}" "${VERSION}-$(date +%Y%m%d-%H%M%S)" "${REPORT_DIR}"
 fi
+
+exit ${test_exit_code}
