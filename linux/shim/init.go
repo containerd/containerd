@@ -222,8 +222,13 @@ func (p *initProcess) ExitedAt() time.Time {
 }
 
 func (p *initProcess) Status(ctx context.Context) (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	c, err := p.runtime.State(ctx, p.id)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return "stopped", nil
+		}
 		return "", p.runtimeError(err, "OCI runtime state failed")
 	}
 	return c.Status, nil

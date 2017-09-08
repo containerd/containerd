@@ -274,15 +274,20 @@ func (s *Service) List(ctx context.Context, r *api.ListTasksRequest) (*api.ListT
 		if err != nil {
 			return nil, errdefs.ToGRPC(err)
 		}
-		for _, t := range tasks {
-			tt, err := processFromContainerd(ctx, t)
-			if err != nil {
-				return nil, err
-			}
-			resp.Tasks = append(resp.Tasks, tt)
-		}
+		addTasks(ctx, resp, tasks)
 	}
 	return resp, nil
+}
+
+func addTasks(ctx context.Context, r *api.ListTasksResponse, tasks []runtime.Task) {
+	for _, t := range tasks {
+		tt, err := processFromContainerd(ctx, t)
+		if err != nil {
+			log.G(ctx).WithError(err).WithField("id", t.ID()).Error("converting task to protobuf")
+			continue
+		}
+		r.Tasks = append(r.Tasks, tt)
+	}
 }
 
 func (s *Service) Pause(ctx context.Context, r *api.PauseTaskRequest) (*google_protobuf.Empty, error) {
