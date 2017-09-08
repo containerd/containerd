@@ -34,5 +34,9 @@ NOSUDO=true DESTDIR=${destdir} ./hack/install-deps.sh
 # Install cri-containerd into release stage.
 make install -e DESTDIR=${destdir}
 
+# Install systemd units into release stage.
+mkdir -p ${destdir}/etc/systemd/system
+cp ${ROOT}/contrib/systemd-units/* ${destdir}/etc/systemd/system/
+
 # Create release tar
 tar -zcvf ${BUILD_DIR}/${TARBALL} -C ${destdir} .
