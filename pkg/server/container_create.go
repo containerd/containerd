@@ -233,7 +233,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint32, config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig, extraMounts []*runtime.Mount) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
-	spec, err := containerd.GenerateSpec(context.Background(), nil, nil)
+	spec, err := defaultRuntimeSpec()
 	if err != nil {
 		return nil, err
 	}
@@ -608,4 +608,24 @@ func setOCINamespaces(g *generate.Generator, namespaces *runtime.NamespaceOption
 	if namespaces.GetHostPid() {
 		g.RemoveLinuxNamespace(string(runtimespec.PIDNamespace)) // nolint: errcheck
 	}
+}
+
+// defaultRuntimeSpec returns a default runtime spec used in cri-containerd.
+func defaultRuntimeSpec() (*runtimespec.Spec, error) {
+	spec, err := containerd.GenerateSpec(context.Background(), nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Remove `/run` mount
+	// TODO(random-liu): Mount tmpfs for /run and handle copy-up.
+	var mounts []runtimespec.Mount
+	for _, mount := range spec.Mounts {
+		if mount.Destination == "/run" {
+			continue
+		}
+		mounts = append(mounts, mount)
+	}
+	spec.Mounts = mounts
+	return spec, nil
 }

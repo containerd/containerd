@@ -555,3 +555,11 @@ func TestPidNamespace(t *testing.T) {
 		Type: runtimespec.PIDNamespace,
 	})
 }
+
+func TestDefaultRuntimeSpec(t *testing.T) {
+	spec, err := defaultRuntimeSpec()
+	assert.NoError(t, err)
+	for _, mount := range spec.Mounts {
+		assert.NotEqual(t, "/run", mount.Destination)
+	}
+}
