@@ -78,7 +78,7 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 	// Get container from our container store.
 	cntr, err := c.containerStore.Get(id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find container in store: %v", err)
+		return nil, fmt.Errorf("failed to find container %q in store: %v", id, err)
 	}
 	id = cntr.ID
 

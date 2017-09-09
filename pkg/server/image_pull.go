@@ -142,7 +142,9 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 		img.RepoTags = []string{repoTag}
 	}
 
-	c.imageStore.Add(img)
+	if err := c.imageStore.Add(img); err != nil {
+		return nil, fmt.Errorf("failed to add image %q into store: %v", img.ID, err)
+	}
 
 	// NOTE(random-liu): the actual state in containerd is the source of truth, even we maintain
 	// in-memory image store, it's only for in-memory indexing. The image could be removed

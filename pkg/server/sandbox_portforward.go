@@ -35,7 +35,7 @@ func (c *criContainerdService) PortForward(ctx context.Context, r *runtime.PortF
 	// TODO(random-liu): Run a socat container inside the sandbox to do portforward.
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
-		return nil, fmt.Errorf("failed to find sandbox: %v", err)
+		return nil, fmt.Errorf("failed to find sandbox %q: %v", r.GetPodSandboxId(), err)
 	}
 
 	t, err := sandbox.Container.Task(ctx, nil)
@@ -59,7 +59,7 @@ func (c *criContainerdService) PortForward(ctx context.Context, r *runtime.PortF
 func (c *criContainerdService) portForward(id string, port int32, stream io.ReadWriteCloser) error {
 	s, err := c.sandboxStore.Get(id)
 	if err != nil {
-		return fmt.Errorf("failed to find sandbox in store: %v", err)
+		return fmt.Errorf("failed to find sandbox %q in store: %v", id, err)
 	}
 	t, err := s.Container.Task(context.Background(), nil)
 	if err != nil {

@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd"
+	"github.com/docker/docker/pkg/truncindex"
 
 	cio "github.com/kubernetes-incubator/cri-containerd/pkg/server/io"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
@@ -92,7 +93,7 @@ func (c *Container) Delete() error {
 type Store struct {
 	lock       sync.RWMutex
 	containers map[string]Container
-	// TODO(random-liu): Add trunc index.
+	idIndex    *truncindex.TruncIndex
 }
 
 // LoadStore loads containers from runtime.
@@ -101,7 +102,10 @@ func LoadStore() *Store { return nil }
 
 // NewStore creates a container store.
 func NewStore() *Store {
-	return &Store{containers: make(map[string]Container)}
+	return &Store{
+		containers: make(map[string]Container),
+		idIndex:    truncindex.NewTruncIndex([]string{}),
+	}
 }
 
 // Add a container into the store. Returns store.ErrAlreadyExist if the
@@ -112,6 +116,9 @@ func (s *Store) Add(c Container) error {
 	if _, ok := s.containers[c.ID]; ok {
 		return store.ErrAlreadyExist
 	}
+	if err := s.idIndex.Add(c.ID); err != nil {
+		return err
+	}
 	s.containers[c.ID] = c
 	return nil
 }
@@ -121,6 +128,13 @@ func (s *Store) Add(c Container) error {
 func (s *Store) Get(id string) (Container, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
+	id, err := s.idIndex.Get(id)
+	if err != nil {
+		if err == truncindex.ErrNotExist {
+			err = store.ErrNotExist
+		}
+		return Container{}, err
+	}
 	if c, ok := s.containers[id]; ok {
 		return c, nil
 	}
@@ -142,5 +156,12 @@ func (s *Store) List() []Container {
 func (s *Store) Delete(id string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+	id, err := s.idIndex.Get(id)
+	if err != nil {
+		// Note: The idIndex.Delete and delete doesn't handle truncated index.
+		// So we need to return if there are error.
+		return
+	}
+	s.idIndex.Delete(id) // nolint: errcheck
 	delete(s.containers, id)
 }

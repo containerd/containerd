@@ -52,7 +52,7 @@ func (c *criContainerdService) attachContainer(ctx context.Context, id string, s
 	// Get container from our container store.
 	cntr, err := c.containerStore.Get(id)
 	if err != nil {
-		return fmt.Errorf("failed to find container in store: %v", err)
+		return fmt.Errorf("failed to find container %q in store: %v", id, err)
 	}
 	id = cntr.ID
 
