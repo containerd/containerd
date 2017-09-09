@@ -154,8 +154,8 @@ func (c *cgroup) Delete() error {
 	return nil
 }
 
-// Stat returns the current stats for the cgroup
-func (c *cgroup) Stat(handlers ...ErrorHandler) (*Stats, error) {
+// Stat returns the current metrics for the cgroup
+func (c *cgroup) Stat(handlers ...ErrorHandler) (*Metrics, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.err != nil {
@@ -165,9 +165,14 @@ func (c *cgroup) Stat(handlers ...ErrorHandler) (*Stats, error) {
 		handlers = append(handlers, errPassthrough)
 	}
 	var (
-		stats = &Stats{}
-		wg    = &sync.WaitGroup{}
-		errs  = make(chan error, len(c.subsystems))
+		stats = &Metrics{
+			CPU: &CPUStat{
+				Throttling: &Throttle{},
+				Usage:      &CPUUsage{},
+			},
+		}
+		wg   = &sync.WaitGroup{}
+		errs = make(chan error, len(c.subsystems))
 	)
 	for _, s := range c.subsystems {
 		if ss, ok := s.(stater); ok {

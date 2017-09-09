@@ -109,7 +109,10 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 		if err != nil {
 			return nil, err
 		}
-		if resp.StatusCode != http.StatusAccepted {
+
+		switch resp.StatusCode {
+		case http.StatusOK, http.StatusAccepted, http.StatusNoContent:
+		default:
 			// TODO: log error
 			return nil, errors.Errorf("unexpected response: %s", resp.Status)
 		}
@@ -155,7 +158,10 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 			pr.CloseWithError(err)
 			return
 		}
-		if resp.StatusCode != http.StatusCreated {
+
+		switch resp.StatusCode {
+		case http.StatusOK, http.StatusCreated, http.StatusNoContent:
+		default:
 			// TODO: log error
 			pr.CloseWithError(errors.Errorf("unexpected response: %s", resp.Status))
 		}
@@ -215,7 +221,7 @@ func (pw *pushWriter) Digest() digest.Digest {
 	return pw.expected
 }
 
-func (pw *pushWriter) Commit(size int64, expected digest.Digest, opts ...content.Opt) error {
+func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
 	// Check whether read has already thrown an error
 	if _, err := pw.pipe.Write([]byte{}); err != nil && err != io.ErrClosedPipe {
 		return errors.Wrap(err, "pipe error before commit")
@@ -230,6 +236,14 @@ func (pw *pushWriter) Commit(size int64, expected digest.Digest, opts ...content
 	resp := <-pw.responseC
 	if resp == nil {
 		return errors.New("no response")
+	}
+
+	// 201 is specified return status, some registries return
+	// 200 or 204.
+	switch resp.StatusCode {
+	case http.StatusOK, http.StatusCreated, http.StatusNoContent:
+	default:
+		return errors.Errorf("unexpected status: %s", resp.Status)
 	}
 
 	status, err := pw.tracker.GetStatus(pw.ref)

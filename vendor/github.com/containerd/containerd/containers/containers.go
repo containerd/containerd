@@ -39,13 +39,13 @@ type Container struct {
 	// This field is required but mutable.
 	Spec *types.Any
 
-	// RootFS specifies the snapshot key to use for the container's root
+	// SnapshotKey specifies the snapshot key to use for the container's root
 	// filesystem. When starting a task from this container, a caller should
 	// look up the mounts from the snapshot service and include those on the
 	// task create request.
 	//
 	// This field is not required but immutable.
-	RootFS string
+	SnapshotKey string
 
 	// Snapshotter specifies the snapshotter name used for rootfs
 	//

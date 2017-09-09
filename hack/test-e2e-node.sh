@@ -41,14 +41,14 @@ sudo iptables-save > ${ORIGINAL_RULES}
 # Update ip firewall
 # We need to add rules to accept all TCP/UDP/ICMP packets.
 if sudo iptables -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
-	sudo iptables -A INPUT -w -p TCP -j ACCEPT
-	sudo iptables -A INPUT -w -p UDP -j ACCEPT
-	sudo iptables -A INPUT -w -p ICMP -j ACCEPT
+  sudo iptables -A INPUT -w -p TCP -j ACCEPT
+  sudo iptables -A INPUT -w -p UDP -j ACCEPT
+  sudo iptables -A INPUT -w -p ICMP -j ACCEPT
 fi
 if sudo iptables -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
-	sudo iptables -A FORWARD -w -p TCP -j ACCEPT
-	sudo iptables -A FORWARD -w -p UDP -j ACCEPT
-	sudo iptables -A FORWARD -w -p ICMP -j ACCEPT
+  sudo iptables -A FORWARD -w -p TCP -j ACCEPT
+  sudo iptables -A FORWARD -w -p UDP -j ACCEPT
+  sudo iptables -A FORWARD -w -p ICMP -j ACCEPT
 fi
 
 # For multiple GOPATHs, keep the first one only
@@ -85,8 +85,8 @@ rm ${ORIGINAL_RULES}
 UPLOAD_LOG_PATH=cri-containerd_test-e2e-node
 if ${UPLOAD_LOG}; then
   if [ -z "${VERSION}" ]; then
-	  echo "VERSION is not set"
-	  exit 1
+    echo "VERSION is not set"
+    exit 1
   fi
   upload_logs_to_gcs "${UPLOAD_LOG_PATH}" "${VERSION}-$(date +%Y%m%d-%H%M%S)" "${REPORT_DIR}"
 fi

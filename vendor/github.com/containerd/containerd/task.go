@@ -118,6 +118,12 @@ type Task interface {
 	Update(context.Context, ...UpdateTaskOpts) error
 	// LoadProcess loads a previously created exec'd process
 	LoadProcess(context.Context, string, IOAttach) (Process, error)
+	// Metrics returns task metrics for runtime specific metrics
+	//
+	// The metric types are generic to containerd and change depending on the runtime
+	// For the built in Linux runtime, github.com/containerd/cgroups.Metrics
+	// are returned in protobuf format
+	Metrics(context.Context) (*types.Metric, error)
 }
 
 var _ = (Task)(&task{})
@@ -409,7 +415,7 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (d v1
 	if err := t.checkpointImage(ctx, &index, cr.Image); err != nil {
 		return d, err
 	}
-	if err := t.checkpointRWSnapshot(ctx, &index, cr.Snapshotter, cr.RootFS); err != nil {
+	if err := t.checkpointRWSnapshot(ctx, &index, cr.Snapshotter, cr.SnapshotKey); err != nil {
 		return d, err
 	}
 	index.Annotations = make(map[string]string)
@@ -470,6 +476,18 @@ func (t *task) LoadProcess(ctx context.Context, id string, ioAttach IOAttach) (P
 		task: t,
 		io:   i,
 	}, nil
+}
+
+func (t *task) Metrics(ctx context.Context) (*types.Metric, error) {
+	response, err := t.client.TaskService().Metrics(ctx, &tasks.MetricsRequest{
+		Filters: []string{
+			"id==" + t.id,
+		},
+	})
+	if err != nil {
+		return nil, errdefs.FromGRPC(err)
+	}
+	return response.Metrics[0], nil
 }
 
 func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tasks.CheckpointTaskRequest) error {
@@ -535,7 +553,7 @@ func writeContent(ctx context.Context, store content.Store, mediaType, ref strin
 	if err != nil {
 		return d, err
 	}
-	if err := writer.Commit(size, ""); err != nil {
+	if err := writer.Commit(ctx, size, ""); err != nil {
 		return d, err
 	}
 	return v1.Descriptor{

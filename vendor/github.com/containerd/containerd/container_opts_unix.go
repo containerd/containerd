@@ -22,7 +22,7 @@ import (
 // WithCheckpoint allows a container to be created from the checkpointed information
 // provided by the descriptor. The image, snapshot, and runtime specifications are
 // restored on the container
-func WithCheckpoint(desc v1.Descriptor, rootfsID string) NewContainerOpts {
+func WithCheckpoint(desc v1.Descriptor, snapshotKey string) NewContainerOpts {
 	// set image and rw, and spec
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		id := desc.Digest
@@ -47,7 +47,7 @@ func WithCheckpoint(desc v1.Descriptor, rootfsID string) NewContainerOpts {
 					return err
 				}
 				setSnapshotterIfEmpty(c)
-				if _, err := client.SnapshotService(c.Snapshotter).Prepare(ctx, rootfsID, identity.ChainID(diffIDs).String()); err != nil {
+				if _, err := client.SnapshotService(c.Snapshotter).Prepare(ctx, snapshotKey, identity.ChainID(diffIDs).String()); err != nil {
 					if !errdefs.IsAlreadyExists(err) {
 						return err
 					}
@@ -67,7 +67,7 @@ func WithCheckpoint(desc v1.Descriptor, rootfsID string) NewContainerOpts {
 		}
 		if rw != nil {
 			// apply the rw snapshot to the new rw layer
-			mounts, err := client.SnapshotService(c.Snapshotter).Mounts(ctx, rootfsID)
+			mounts, err := client.SnapshotService(c.Snapshotter).Mounts(ctx, snapshotKey)
 			if err != nil {
 				return err
 			}
@@ -75,7 +75,7 @@ func WithCheckpoint(desc v1.Descriptor, rootfsID string) NewContainerOpts {
 				return err
 			}
 		}
-		c.RootFS = rootfsID
+		c.SnapshotKey = snapshotKey
 		return nil
 	}
 }

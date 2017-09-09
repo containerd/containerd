@@ -8,7 +8,36 @@ import (
 
 func (m *Mount) Mount(target string) error {
 	flags, data := parseMountOptions(m.Options)
-	return unix.Mount(m.Source, target, m.Type, uintptr(flags), data)
+
+	// propagation types.
+	const ptypes = unix.MS_SHARED | unix.MS_PRIVATE | unix.MS_SLAVE | unix.MS_UNBINDABLE
+
+	// Ensure propagation type change flags aren't included in other calls.
+	oflags := flags &^ ptypes
+
+	// In the case of remounting with changed data (data != ""), need to call mount (moby/moby#34077).
+	if flags&unix.MS_REMOUNT == 0 || data != "" {
+		// Initial call applying all non-propagation flags for mount
+		// or remount with changed data
+		if err := unix.Mount(m.Source, target, m.Type, uintptr(oflags), data); err != nil {
+			return err
+		}
+	}
+
+	if flags&ptypes != 0 {
+		// Change the propagation type.
+		const pflags = ptypes | unix.MS_REC | unix.MS_SILENT
+		if err := unix.Mount("", target, "", uintptr(flags&pflags), ""); err != nil {
+			return err
+		}
+	}
+
+	const broflags = unix.MS_BIND | unix.MS_RDONLY
+	if oflags&broflags == broflags {
+		// Remount the bind to apply read only.
+		return unix.Mount("", target, "", uintptr(oflags|unix.MS_REMOUNT), "")
+	}
+	return nil
 }
 
 func Unmount(mount string, flags int) error {

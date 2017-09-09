@@ -7,8 +7,10 @@ import "gogoproto/gogo.proto";
 option go_package = "github.com/containerd/containerd/linux/runcopts;runcopts";
 
 message RuncOptions {
-	string criu_path = 1;
-	string systemd_cgroup = 2;
+	string runtime = 1;
+	string runtime_root = 2;
+	string criu_path = 3;
+	bool systemd_cgroup = 4;
 }
 
 message CreateOptions {

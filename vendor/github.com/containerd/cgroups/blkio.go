@@ -56,8 +56,8 @@ func (b *blkioController) Update(path string, resources *specs.LinuxResources) e
 	return b.Create(path, resources)
 }
 
-func (b *blkioController) Stat(path string, stats *Stats) error {
-	stats.Blkio = &BlkioStat{}
+func (b *blkioController) Stat(path string, stats *Metrics) error {
+	stats.Blkio = &BlkIOStat{}
 	settings := []blkioStatSettings{
 		{
 			name:  "throttle.io_serviced",
@@ -119,7 +119,7 @@ func (b *blkioController) Stat(path string, stats *Stats) error {
 	return nil
 }
 
-func (b *blkioController) readEntry(devices map[deviceKey]string, path, name string, entry *[]BlkioEntry) error {
+func (b *blkioController) readEntry(devices map[deviceKey]string, path, name string, entry *[]*BlkIOEntry) error {
 	f, err := os.Open(filepath.Join(b.Path(path), fmt.Sprintf("blkio.%s", name)))
 	if err != nil {
 		return err
@@ -131,7 +131,7 @@ func (b *blkioController) readEntry(devices map[deviceKey]string, path, name str
 			return err
 		}
 		// format: dev type amount
-		fields := strings.FieldsFunc(sc.Text(), splitBlkioStatLine)
+		fields := strings.FieldsFunc(sc.Text(), splitBlkIOStatLine)
 		if len(fields) < 3 {
 			if len(fields) == 2 && fields[0] == "Total" {
 				// skip total line
@@ -158,7 +158,7 @@ func (b *blkioController) readEntry(devices map[deviceKey]string, path, name str
 		if err != nil {
 			return err
 		}
-		*entry = append(*entry, BlkioEntry{
+		*entry = append(*entry, &BlkIOEntry{
 			Device: devices[deviceKey{major, minor}],
 			Major:  major,
 			Minor:  minor,
@@ -235,7 +235,7 @@ type blkioSettings struct {
 
 type blkioStatSettings struct {
 	name  string
-	entry *[]BlkioEntry
+	entry *[]*BlkIOEntry
 }
 
 func uintf(v interface{}) []byte {
@@ -257,7 +257,7 @@ func throttleddev(v interface{}) []byte {
 	return []byte(fmt.Sprintf("%d:%d %d", td.Major, td.Minor, td.Rate))
 }
 
-func splitBlkioStatLine(r rune) bool {
+func splitBlkIOStatLine(r rune) bool {
 	return r == ' ' || r == ':'
 }
 

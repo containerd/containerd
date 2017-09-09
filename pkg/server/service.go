@@ -155,10 +155,7 @@ func NewCRIContainerdService(
 		return nil, fmt.Errorf("failed to create stream server: %v", err)
 	}
 
-	c.eventMonitor, err = newEventMonitor(c)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create event monitor: %v", err)
-	}
+	c.eventMonitor = newEventMonitor(c)
 
 	// Create the grpc server and register runtime and image services.
 	c.server = grpc.NewServer()

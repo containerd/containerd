@@ -155,8 +155,8 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 			return containers.Container{}, errors.Wrapf(errdefs.ErrInvalidArgument, "container.Image field is immutable")
 		}
 
-		if updated.RootFS != container.RootFS {
-			return containers.Container{}, errors.Wrapf(errdefs.ErrInvalidArgument, "container.RootFS field is immutable")
+		if updated.SnapshotKey != container.SnapshotKey {
+			return containers.Container{}, errors.Wrapf(errdefs.ErrInvalidArgument, "container.SnapshotKey field is immutable")
 		}
 
 		if updated.Snapshotter != container.Snapshotter {
@@ -235,8 +235,8 @@ func validateContainer(container *containers.Container) error {
 		return errors.Wrapf(errdefs.ErrInvalidArgument, "container.Spec must be set")
 	}
 
-	if container.RootFS != "" && container.Snapshotter == "" {
-		return errors.Wrapf(errdefs.ErrInvalidArgument, "container.Snapshotter must be set if container.RootFS is set")
+	if container.SnapshotKey != "" && container.Snapshotter == "" {
+		return errors.Wrapf(errdefs.ErrInvalidArgument, "container.Snapshotter must be set if container.SnapshotKey is set")
 	}
 
 	return nil
@@ -284,8 +284,8 @@ func readContainer(container *containers.Container, bkt *bolt.Bucket) error {
 				return err
 			}
 			container.Spec = &any
-		case string(bucketKeyRootFS):
-			container.RootFS = string(v)
+		case string(bucketKeySnapshotKey):
+			container.SnapshotKey = string(v)
 		case string(bucketKeySnapshotter):
 			container.Snapshotter = string(v)
 		}
@@ -313,7 +313,7 @@ func writeContainer(bkt *bolt.Bucket, container *containers.Container) error {
 	for _, v := range [][2][]byte{
 		{bucketKeyImage, []byte(container.Image)},
 		{bucketKeySnapshotter, []byte(container.Snapshotter)},
-		{bucketKeyRootFS, []byte(container.RootFS)},
+		{bucketKeySnapshotKey, []byte(container.SnapshotKey)},
 	} {
 		if err := bkt.Put(v[0], v[1]); err != nil {
 			return err
@@ -335,18 +335,13 @@ func writeContainer(bkt *bolt.Bucket, container *containers.Container) error {
 		return err
 	}
 
-	obkt, err := rbkt.CreateBucket(bucketKeyOptions)
-	if err != nil {
-		return err
-	}
-
 	if container.Runtime.Options != nil {
 		data, err := proto.Marshal(container.Runtime.Options)
 		if err != nil {
 			return err
 		}
 
-		if err := obkt.Put(bucketKeyOptions, data); err != nil {
+		if err := rbkt.Put(bucketKeyOptions, data); err != nil {
 			return err
 		}
 	}

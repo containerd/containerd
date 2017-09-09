@@ -6,6 +6,7 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/any.proto";
 import "gogoproto/gogo.proto";
 import "github.com/containerd/containerd/api/types/mount.proto";
+import "github.com/containerd/containerd/api/types/metrics.proto";
 import "github.com/containerd/containerd/api/types/descriptor.proto";
 import "github.com/containerd/containerd/api/types/task/task.proto";
 import "google/protobuf/timestamp.proto";
@@ -46,6 +47,8 @@ service Tasks {
 	rpc Checkpoint(CheckpointTaskRequest) returns (CheckpointTaskResponse);
 
 	rpc Update(UpdateTaskRequest) returns (google.protobuf.Empty);
+
+	rpc Metrics(MetricsRequest) returns (MetricsResponse);
 }
 
 message CreateTaskRequest {
@@ -182,4 +185,12 @@ message CheckpointTaskResponse {
 message UpdateTaskRequest {
 	string container_id = 1;
 	google.protobuf.Any resources = 2;
+}
+
+message MetricsRequest {
+	repeated string filters = 1;
+}
+
+message MetricsResponse {
+	repeated types.Metric metrics = 1;
 }
