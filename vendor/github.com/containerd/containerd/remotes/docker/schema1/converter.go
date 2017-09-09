@@ -252,7 +252,7 @@ func (c *Converter) fetchBlob(ctx context.Context, desc ocispec.Descriptor) erro
 
 		eg.Go(func() error {
 			defer pw.Close()
-			return content.Copy(cw, io.TeeReader(rc, pw), desc.Size, desc.Digest)
+			return content.Copy(ctx, cw, io.TeeReader(rc, pw), desc.Size, desc.Digest)
 		})
 
 		if err := eg.Wait(); err != nil {

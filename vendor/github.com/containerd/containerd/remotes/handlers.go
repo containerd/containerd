@@ -101,7 +101,7 @@ func fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc
 	}
 	defer rc.Close()
 
-	return content.Copy(cw, rc, desc.Size, desc.Digest)
+	return content.Copy(ctx, cw, rc, desc.Size, desc.Digest)
 }
 
 // PushHandler returns a handler that will push all content from the provider
@@ -139,5 +139,5 @@ func push(ctx context.Context, provider content.Provider, pusher Pusher, desc oc
 	defer ra.Close()
 
 	rd := io.NewSectionReader(ra, 0, desc.Size)
-	return content.Copy(cw, rd, desc.Size, desc.Digest)
+	return content.Copy(ctx, cw, rd, desc.Size, desc.Digest)
 }

@@ -313,9 +313,11 @@ func (r *dockerBase) doRequestWithRetries(ctx context.Context, req *http.Request
 	responses = append(responses, resp)
 	req, err = r.retryRequest(ctx, req, responses)
 	if err != nil {
+		resp.Body.Close()
 		return nil, err
 	}
 	if req != nil {
+		resp.Body.Close()
 		return r.doRequestWithRetries(ctx, req, responses)
 	}
 	return resp, err

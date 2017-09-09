@@ -7,10 +7,12 @@
 
 	It is generated from these files:
 		github.com/containerd/containerd/api/types/descriptor.proto
+		github.com/containerd/containerd/api/types/metrics.proto
 		github.com/containerd/containerd/api/types/mount.proto
 
 	It has these top-level messages:
 		Descriptor
+		Metric
 		Mount
 */
 package types

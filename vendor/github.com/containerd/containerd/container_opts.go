@@ -70,7 +70,7 @@ func WithSnapshot(id string) NewContainerOpts {
 		if _, err := client.SnapshotService(c.Snapshotter).Mounts(ctx, id); err != nil {
 			return err
 		}
-		c.RootFS = id
+		c.SnapshotKey = id
 		return nil
 	}
 }
@@ -87,19 +87,19 @@ func WithNewSnapshot(id string, i Image) NewContainerOpts {
 		if _, err := client.SnapshotService(c.Snapshotter).Prepare(ctx, id, identity.ChainID(diffIDs).String()); err != nil {
 			return err
 		}
-		c.RootFS = id
+		c.SnapshotKey = id
 		c.Image = i.Name()
 		return nil
 	}
 }
 
-// WithSnapshotCleanup deletes the rootfs allocated for the container
+// WithSnapshotCleanup deletes the rootfs snapshot allocated for the container
 func WithSnapshotCleanup(ctx context.Context, client *Client, c containers.Container) error {
-	if c.RootFS != "" {
+	if c.SnapshotKey != "" {
 		if c.Snapshotter == "" {
-			return errors.Wrapf(errdefs.ErrInvalidArgument, "container.Snapshotter must be set to cleanup rootfs")
+			return errors.Wrapf(errdefs.ErrInvalidArgument, "container.Snapshotter must be set to cleanup rootfs snapshot")
 		}
-		return client.SnapshotService(c.Snapshotter).Remove(ctx, c.RootFS)
+		return client.SnapshotService(c.Snapshotter).Remove(ctx, c.SnapshotKey)
 	}
 	return nil
 }
@@ -116,7 +116,7 @@ func WithNewSnapshotView(id string, i Image) NewContainerOpts {
 		if _, err := client.SnapshotService(c.Snapshotter).View(ctx, id, identity.ChainID(diffIDs).String()); err != nil {
 			return err
 		}
-		c.RootFS = id
+		c.SnapshotKey = id
 		c.Image = i.Name()
 		return nil
 	}

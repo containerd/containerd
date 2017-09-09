@@ -58,7 +58,7 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, size i
 	}
 	defer cw.Close()
 
-	return Copy(cw, r, size, expected)
+	return Copy(ctx, cw, r, size, expected)
 }
 
 // Copy copies data with the expected digest from the reader into the
@@ -68,7 +68,7 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, size i
 // the size or digest is unknown, these values may be empty.
 //
 // Copy is buffered, so no need to wrap reader in buffered io.
-func Copy(cw Writer, r io.Reader, size int64, expected digest.Digest) error {
+func Copy(ctx context.Context, cw Writer, r io.Reader, size int64, expected digest.Digest) error {
 	ws, err := cw.Status()
 	if err != nil {
 		return err
@@ -95,7 +95,7 @@ func Copy(cw Writer, r io.Reader, size int64, expected digest.Digest) error {
 		return err
 	}
 
-	if err := cw.Commit(size, expected); err != nil {
+	if err := cw.Commit(ctx, size, expected); err != nil {
 		if !errdefs.IsAlreadyExists(err) {
 			return errors.Wrapf(err, "failed commit on ref %q", ws.Ref)
 		}

@@ -90,7 +90,7 @@ type Writer interface {
 
 	// Commit commits the blob (but no roll-back is guaranteed on an error).
 	// size and expected can be zero-value when unknown.
-	Commit(size int64, expected digest.Digest, opts ...Opt) error
+	Commit(ctx context.Context, size int64, expected digest.Digest, opts ...Opt) error
 
 	// Status returns the current state of write
 	Status() (Status, error)

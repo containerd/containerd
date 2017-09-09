@@ -2,6 +2,8 @@ package snapshot
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/containerd/containerd/mount"
@@ -12,10 +14,25 @@ type Kind uint8
 
 // definitions of snapshot kinds
 const (
-	KindView Kind = iota + 1
+	KindUnknown Kind = iota
+	KindView
 	KindActive
 	KindCommitted
 )
+
+func ParseKind(s string) Kind {
+	s = strings.ToLower(s)
+	switch s {
+	case "view":
+		return KindView
+	case "active":
+		return KindActive
+	case "committed":
+		return KindCommitted
+	}
+
+	return KindUnknown
+}
 
 func (k Kind) String() string {
 	switch k {
@@ -25,19 +42,34 @@ func (k Kind) String() string {
 		return "Active"
 	case KindCommitted:
 		return "Committed"
-	default:
-		return "Unknown"
 	}
+
+	return "Unknown"
+}
+
+func (k Kind) MarshalJSON() ([]byte, error) {
+	return json.Marshal(k.String())
+}
+
+func (k *Kind) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+
+	*k = ParseKind(s)
+	return nil
 }
 
 // Info provides information about a particular snapshot.
+// JSON marshallability is supported for interactive with tools like ctr,
 type Info struct {
 	Kind    Kind              // active or committed snapshot
 	Name    string            // name or key of snapshot
-	Parent  string            // name of parent snapshot
-	Labels  map[string]string // Labels for snapshot
-	Created time.Time         // Created time
-	Updated time.Time         // Last update time
+	Parent  string            `json:",omitempty"` // name of parent snapshot
+	Labels  map[string]string `json:",omitempty"` // Labels for snapshot
+	Created time.Time         `json:",omitempty"` // Created time
+	Updated time.Time         `json:",omitempty"` // Last update time
 }
 
 // Usage defines statistics for disk resources consumed by the snapshot.

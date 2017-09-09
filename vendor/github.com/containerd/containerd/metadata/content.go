@@ -352,19 +352,19 @@ type namespacedWriter struct {
 	db        *bolt.DB
 }
 
-func (nw *namespacedWriter) Commit(size int64, expected digest.Digest, opts ...content.Opt) error {
-	return nw.db.Update(func(tx *bolt.Tx) error {
+func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
+	return update(ctx, nw.db, func(tx *bolt.Tx) error {
 		bkt := getIngestBucket(tx, nw.namespace)
 		if bkt != nil {
 			if err := bkt.Delete([]byte(nw.ref)); err != nil {
 				return err
 			}
 		}
-		return nw.commit(tx, size, expected, opts...)
+		return nw.commit(ctx, tx, size, expected, opts...)
 	})
 }
 
-func (nw *namespacedWriter) commit(tx *bolt.Tx, size int64, expected digest.Digest, opts ...content.Opt) error {
+func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64, expected digest.Digest, opts ...content.Opt) error {
 	var base content.Info
 	for _, opt := range opts {
 		if err := opt(&base); err != nil {
@@ -382,7 +382,7 @@ func (nw *namespacedWriter) commit(tx *bolt.Tx, size int64, expected digest.Dige
 
 	actual := nw.Writer.Digest()
 
-	if err := nw.Writer.Commit(size, expected); err != nil {
+	if err := nw.Writer.Commit(ctx, size, expected); err != nil {
 		if !errdefs.IsAlreadyExists(err) {
 			return err
 		}
