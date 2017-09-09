@@ -1,6 +1,7 @@
 package platforms
 
 import (
+	"fmt"
 	"reflect"
 	"runtime"
 	"testing"
@@ -174,16 +175,25 @@ func TestParseSelector(t *testing.T) {
 			if testcase.skip {
 				t.Skip("this case is not yet supported")
 			}
-			p, err := Parse(testcase.input)
+			m, err := Parse(testcase.input)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			if !reflect.DeepEqual(p, testcase.expected) {
-				t.Fatalf("platform did not match expected: %#v != %#v", p, testcase.expected)
+			if !reflect.DeepEqual(m.Spec(), testcase.expected) {
+				t.Fatalf("platform did not match expected: %#v != %#v", m.Spec(), testcase.expected)
 			}
 
-			formatted := Format(p)
+			// ensure that match works on the input to the output.
+			if ok := m.Match(testcase.expected); !ok {
+				t.Fatalf("expected specifier %q matches %v", testcase.input, testcase.expected)
+			}
+
+			if fmt.Sprint(m) != testcase.formatted {
+				t.Fatalf("unexpected matcher string:  %q != %q", fmt.Sprint(m), testcase.formatted)
+			}
+
+			formatted := Format(m.Spec())
 			if formatted != testcase.formatted {
 				t.Fatalf("unexpected format: %q != %q", formatted, testcase.formatted)
 			}
@@ -194,8 +204,8 @@ func TestParseSelector(t *testing.T) {
 				t.Fatalf("error parsing formatted output: %v", err)
 			}
 
-			if Format(reparsed) != formatted {
-				t.Fatalf("normalized output did not survive the round trip: %v != %v", Format(reparsed), formatted)
+			if Format(reparsed.Spec()) != formatted {
+				t.Fatalf("normalized output did not survive the round trip: %v != %v", Format(reparsed.Spec()), formatted)
 			}
 		})
 	}
@@ -221,7 +231,7 @@ func TestParseSelectorInvalid(t *testing.T) {
 			input: "linux/&arm", // invalid character
 		},
 		{
-			input: "linux/arm/foo/bar", // too mayn components
+			input: "linux/arm/foo/bar", // too many components
 		},
 	} {
 		t.Run(testcase.input, func(t *testing.T) {

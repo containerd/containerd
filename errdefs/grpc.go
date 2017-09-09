@@ -38,7 +38,7 @@ func ToGRPC(err error) error {
 		return grpc.Errorf(codes.FailedPrecondition, err.Error())
 	case IsUnavailable(err):
 		return grpc.Errorf(codes.Unavailable, err.Error())
-	case IsNotSupported(err):
+	case IsNotImplemented(err):
 		return grpc.Errorf(codes.Unimplemented, err.Error())
 	}
 
@@ -72,7 +72,7 @@ func FromGRPC(err error) error {
 	case codes.FailedPrecondition:
 		cls = ErrFailedPrecondition
 	case codes.Unimplemented:
-		cls = ErrNotSupported
+		cls = ErrNotImplemented
 	default:
 		cls = ErrUnknown
 	}
