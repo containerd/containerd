@@ -374,3 +374,13 @@ func initSelinuxOpts(selinuxOpt *runtime.SELinuxOption) (string, string, error) 
 		selinuxOpt.GetType())
 	return label.InitLabels(selinux.DupSecOpt(labelOpts))
 }
+
+// isInCRIMounts checks whether a destination is in CRI mount list.
+func isInCRIMounts(dst string, mounts []*runtime.Mount) bool {
+	for _, m := range mounts {
+		if m.ContainerPath == dst {
+			return true
+		}
+	}
+	return false
+}

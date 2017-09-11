@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"path/filepath"
 	"testing"
 
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -402,9 +403,66 @@ func TestContainerSpecCommand(t *testing.T) {
 	}
 }
 
+func TestGenerateVolumeMounts(t *testing.T) {
+	testContainerRootDir := "test-container-root"
+	for desc, test := range map[string]struct {
+		criMounts         []*runtime.Mount
+		imageVolumes      map[string]struct{}
+		expectedMountDest []string
+	}{
+		"should setup rw mount for image volumes": {
+			imageVolumes: map[string]struct{}{
+				"/test-volume-1": {},
+				"/test-volume-2": {},
+			},
+			expectedMountDest: []string{
+				"/test-volume-1",
+				"/test-volume-2",
+			},
+		},
+		"should skip image volumes if already mounted by CRI": {
+			criMounts: []*runtime.Mount{
+				{
+					ContainerPath: "/test-volume-1",
+					HostPath:      "/test-hostpath-1",
+				},
+			},
+			imageVolumes: map[string]struct{}{
+				"/test-volume-1": {},
+				"/test-volume-2": {},
+			},
+			expectedMountDest: []string{
+				"/test-volume-2",
+			},
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		config := &imagespec.ImageConfig{
+			Volumes: test.imageVolumes,
+		}
+		c := newTestCRIContainerdService()
+		got := c.generateVolumeMounts(testContainerRootDir, test.criMounts, config)
+		assert.Len(t, got, len(test.expectedMountDest))
+		for _, dest := range test.expectedMountDest {
+			found := false
+			for _, m := range got {
+				if m.ContainerPath == dest {
+					found = true
+					assert.Equal(t,
+						filepath.Dir(m.HostPath),
+						filepath.Join(testContainerRootDir, "volumes"))
+					break
+				}
+			}
+			assert.True(t, found)
+		}
+	}
+}
+
 func TestGenerateContainerMounts(t *testing.T) {
 	testSandboxRootDir := "test-sandbox-root"
 	for desc, test := range map[string]struct {
+		criMounts       []*runtime.Mount
 		securityContext *runtime.LinuxContainerSecurityContext
 		expectedMounts  []*runtime.Mount
 	}{
@@ -472,12 +530,31 @@ func TestGenerateContainerMounts(t *testing.T) {
 				},
 			},
 		},
+		"should skip contaner mounts if already mounted by CRI": {
+			criMounts: []*runtime.Mount{
+				{
+					ContainerPath: "/etc/hosts",
+					HostPath:      "/test-etc-host",
+				},
+				{
+					ContainerPath: resolvConfPath,
+					HostPath:      "test-resolv-conf",
+				},
+				{
+					ContainerPath: "/dev/shm",
+					HostPath:      "test-dev-shm",
+				},
+			},
+			securityContext: &runtime.LinuxContainerSecurityContext{},
+			expectedMounts:  nil,
+		},
 	} {
 		config := &runtime.ContainerConfig{
 			Metadata: &runtime.ContainerMetadata{
 				Name:    "test-name",
 				Attempt: 1,
 			},
+			Mounts: test.criMounts,
 			Linux: &runtime.LinuxContainerConfig{
 				SecurityContext: test.securityContext,
 			},
@@ -514,7 +591,8 @@ func TestPrivilegedBindMount(t *testing.T) {
 		t.Logf("TestCase %q", desc)
 		g := generate.New()
 		g.SetRootReadonly(test.readonlyRootFS)
-		addOCIBindMounts(&g, nil, "")
+		c := newTestCRIContainerdService()
+		c.addOCIBindMounts(&g, nil, "")
 		if test.privileged {
 			setOCIBindMountsPrivileged(&g)
 		}
