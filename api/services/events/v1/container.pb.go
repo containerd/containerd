@@ -53,7 +53,7 @@ import _ "github.com/gogo/protobuf/gogoproto"
 import google_protobuf1 "github.com/gogo/protobuf/types"
 import _ "github.com/containerd/containerd/protobuf/plugin"
 
-import github_com_containerd_containerd_typeurl "github.com/containerd/containerd/typeurl"
+import github_com_containerd_typeurl "github.com/containerd/typeurl"
 
 import strings "strings"
 import reflect "reflect"
@@ -158,7 +158,7 @@ func (m *ContainerCreate_Runtime) Field(fieldpath []string) (string, bool) {
 	case "name":
 		return string(m.Name), len(m.Name) > 0
 	case "options":
-		decoded, err := github_com_containerd_containerd_typeurl.UnmarshalAny(m.Options)
+		decoded, err := github_com_containerd_typeurl.UnmarshalAny(m.Options)
 		if err != nil {
 			return "", false
 		}

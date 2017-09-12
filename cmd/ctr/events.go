@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
-	"github.com/containerd/containerd/typeurl"
+	"github.com/containerd/typeurl"
 	"github.com/urfave/cli"
 )
 

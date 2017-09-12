@@ -29,7 +29,7 @@ func (p *fieldpathGenerator) Init(g *generator.Generator) {
 
 func (p *fieldpathGenerator) Generate(file *generator.FileDescriptor) {
 	p.PluginImports = generator.NewPluginImports(p.Generator)
-	p.typeurlPkg = p.NewImport("github.com/containerd/containerd/typeurl")
+	p.typeurlPkg = p.NewImport("github.com/containerd/typeurl")
 
 	for _, m := range file.Messages() {
 		if m.DescriptorProto.GetOptions().GetMapEntry() {

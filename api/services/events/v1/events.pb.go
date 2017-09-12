@@ -15,7 +15,7 @@ import _ "github.com/gogo/protobuf/types"
 
 import time "time"
 
-import github_com_containerd_containerd_typeurl "github.com/containerd/containerd/typeurl"
+import github_com_containerd_typeurl "github.com/containerd/typeurl"
 
 import (
 	context "golang.org/x/net/context"
@@ -92,7 +92,7 @@ func (m *Envelope) Field(fieldpath []string) (string, bool) {
 	case "topic":
 		return string(m.Topic), len(m.Topic) > 0
 	case "event":
-		decoded, err := github_com_containerd_containerd_typeurl.UnmarshalAny(m.Event)
+		decoded, err := github_com_containerd_typeurl.UnmarshalAny(m.Event)
 		if err != nil {
 			return "", false
 		}

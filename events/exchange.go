@@ -11,7 +11,7 @@ import (
 	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/typeurl"
+	"github.com/containerd/typeurl"
 	goevents "github.com/docker/go-events"
 	"github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
