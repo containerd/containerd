@@ -495,6 +495,12 @@ func addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount, mountLabel
 				return fmt.Errorf("failed to mkdir %q: %v", src, err)
 			}
 		}
+		// TODO(random-liu): Add cri-containerd integration test or cri validation test
+		// for this.
+		src, err := resolveSymbolicLink(src)
+		if err != nil {
+			return fmt.Errorf("failed to resolve symlink %q: %v", src, err)
+		}
 		options := []string{"rbind"}
 		switch mount.GetPropagation() {
 		case runtime.MountPropagation_PROPAGATION_PRIVATE:
