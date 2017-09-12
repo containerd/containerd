@@ -18,6 +18,7 @@ package server
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -484,6 +485,16 @@ func addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount, mountLabel
 	for _, mount := range mounts {
 		dst := mount.GetContainerPath()
 		src := mount.GetHostPath()
+		// Create the host path if it doesn't exist.
+		// TODO(random-liu): Add CRI validation test for this case.
+		if _, err := os.Stat(src); err != nil {
+			if !os.IsNotExist(err) {
+				return fmt.Errorf("failed to stat %q: %v", src, err)
+			}
+			if err := os.MkdirAll(src, 0755); err != nil {
+				return fmt.Errorf("failed to mkdir %q: %v", src, err)
+			}
+		}
 		options := []string{"rbind"}
 		switch mount.GetPropagation() {
 		case runtime.MountPropagation_PROPAGATION_PRIVATE:
