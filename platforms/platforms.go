@@ -49,8 +49,9 @@
 // While the OCI platform specifications provide a tool for components to
 // specify structured information, user input typically doesn't need the full
 // context and much can be inferred. To solve this problem, we introduced
-// "specifiers". A specifier has the format `<os|arch>[/<arch>[/<variant>]]`.
-// The user can provide either the operating system or the architecture or both.
+// "specifiers". A specifier has the format
+// `<os>|<arch>|<os>/<arch>[/<variant>]`.  The user can provide either the
+// operating system or the architecture or both.
 //
 // An example of a common specifier is `linux/amd64`. If the host has a default
 // of runtime that matches this, the user can simply provide the component that
@@ -130,10 +131,10 @@ func (m *matcher) String() string {
 
 // Parse parses the platform specifier syntax into a platform declaration.
 //
-// Platform specifiers are in the format <os|arch>[/<arch>[/<variant>]]. The
-// minimum required information for a platform specifier is the operating system
-// or architecture. If there is only a single string (no slashes), the value
-// will be matched against the known set of operating systems, then fall
+// Platform specifiers are in the format `<os>|<arch>|<os>/<arch>[/<variant>]`.
+// The minimum required information for a platform specifier is the operating
+// system or architecture. If there is only a single string (no slashes), the
+// value will be matched against the known set of operating systems, then fall
 // back to the known set of architectures. The missing component will be
 // inferred based on the local environment.
 //
