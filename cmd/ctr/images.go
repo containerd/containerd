@@ -10,6 +10,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/progress"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -49,17 +50,34 @@ var imagesListCommand = cli.Command{
 		imageStore := client.ImageService()
 		cs := client.ContentStore()
 
-		images, err := imageStore.List(ctx, filters...)
+		imageList, err := imageStore.List(ctx, filters...)
 		if err != nil {
 			return errors.Wrap(err, "failed to list images")
 		}
 
 		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
-		fmt.Fprintln(tw, "REF\tTYPE\tDIGEST\tSIZE\tLABELS\t")
-		for _, image := range images {
+		fmt.Fprintln(tw, "REF\tTYPE\tDIGEST\tSIZE\tPLATFORM\tLABELS\t")
+		for _, image := range imageList {
 			size, err := image.Size(ctx, cs)
 			if err != nil {
 				log.G(ctx).WithError(err).Errorf("failed calculating size for image %s", image.Name)
+			}
+
+			platformColumn := "-"
+			specs, err := images.Platforms(ctx, cs, image.Target)
+			if err != nil {
+				log.G(ctx).WithError(err).Errorf("failed resolving platform for image %s", image.Name)
+			} else if len(specs) > 0 {
+				psm := map[string]struct{}{}
+				for _, p := range specs {
+					psm[platforms.Format(p)] = struct{}{}
+				}
+				var ps []string
+				for p := range psm {
+					ps = append(ps, p)
+				}
+				sort.Stable(sort.StringSlice(ps))
+				platformColumn = strings.Join(ps, ",")
 			}
 
 			labels := "-"
@@ -72,11 +90,12 @@ var imagesListCommand = cli.Command{
 				labels = strings.Join(pairs, ",")
 			}
 
-			fmt.Fprintf(tw, "%v\t%v\t%v\t%v\t%s\t\n",
+			fmt.Fprintf(tw, "%v\t%v\t%v\t%v\t%v\t%s\t\n",
 				image.Name,
 				image.Target.MediaType,
 				image.Target.Digest,
 				progress.Bytes(size),
+				platformColumn,
 				labels)
 		}
 
