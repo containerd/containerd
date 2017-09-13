@@ -10,6 +10,7 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/platforms"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -20,7 +21,7 @@ func WithImageConfig(i Image) SpecOpts {
 			image = i.(*image)
 			store = client.ContentStore()
 		)
-		ic, err := image.i.Config(ctx, store)
+		ic, err := image.i.Config(ctx, store, platforms.Format(platforms.Default()))
 		if err != nil {
 			return err
 		}
