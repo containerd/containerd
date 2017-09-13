@@ -39,7 +39,7 @@ install:
   - wget https://github.com/google/protobuf/releases/download/v3.3.0/protoc-3.3.0-linux-x86_64.zip -O /tmp/protoc-3.3.0-linux-x86_64.zip
   - sudo unzip -o -d /usr/local /tmp/protoc-3.3.0-linux-x86_64.zip
   - go get -u github.com/vbatts/git-validation
-  - sudo wget https://github.com/crosbymichael/runc/releases/download/ctd-4/runc -O /bin/runc; sudo chmod +x /bin/runc
+  - sudo wget https://github.com/crosbymichael/runc/releases/download/ctd-5/runc -O /bin/runc; sudo chmod +x /bin/runc
   - wget https://github.com/xemul/criu/archive/v3.0.tar.gz -O /tmp/criu.tar.gz
   - tar -C /tmp/ -zxf /tmp/criu.tar.gz
   - cd /tmp/criu-3.0 && sudo make install-criu
