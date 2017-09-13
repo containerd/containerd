@@ -8,6 +8,7 @@ import (
 	"net/http/pprof"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/boltdb/bolt"
 	containers "github.com/containerd/containerd/api/services/containers/v1"
@@ -129,14 +130,14 @@ func (s *Server) ServeGRPC(l net.Listener) error {
 	// handler.  This needs to be the last service registered so that it can collect
 	// metrics for every other service
 	grpc_prometheus.Register(s.rpc)
-	return s.rpc.Serve(l)
+	return trapClosedConnErr(s.rpc.Serve(l))
 }
 
 // ServeMetrics provides a prometheus endpoint for exposing metrics
 func (s *Server) ServeMetrics(l net.Listener) error {
 	m := http.NewServeMux()
 	m.Handle("/metrics", metrics.Handler())
-	return http.Serve(l, m)
+	return trapClosedConnErr(http.Serve(l, m))
 }
 
 // ServeDebug provides a debug endpoint
@@ -150,12 +151,12 @@ func (s *Server) ServeDebug(l net.Listener) error {
 	m.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
 	m.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
 	m.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
-	return http.Serve(l, m)
+	return trapClosedConnErr(http.Serve(l, m))
 }
 
-// Stop gracefully stops the containerd server
+// Stop the containerd server canceling any open connections
 func (s *Server) Stop() {
-	s.rpc.GracefulStop()
+	s.rpc.Stop()
 }
 
 func loadPlugins(config *Config) ([]*plugin.Registration, error) {
@@ -218,4 +219,14 @@ func interceptor(
 		log.G(ctx).Warnf("unknown GRPC server type: %#v\n", info.Server)
 	}
 	return grpc_prometheus.UnaryServerInterceptor(ctx, req, info, handler)
+}
+
+func trapClosedConnErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(err.Error(), "use of closed network connection") {
+		return nil
+	}
+	return err
 }
