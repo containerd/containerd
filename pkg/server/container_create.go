@@ -505,10 +505,17 @@ func addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount, mountLabel
 		switch mount.GetPropagation() {
 		case runtime.MountPropagation_PROPAGATION_PRIVATE:
 			options = append(options, "rprivate")
+			// Since default root propogation in runc is rprivate ignore
+			// setting the root propagation
 		case runtime.MountPropagation_PROPAGATION_BIDIRECTIONAL:
 			options = append(options, "rshared")
+			g.SetLinuxRootPropagation("rshared") // nolint: errcheck
 		case runtime.MountPropagation_PROPAGATION_HOST_TO_CONTAINER:
 			options = append(options, "rslave")
+			if g.Spec().Linux.RootfsPropagation != "rshared" &&
+				g.Spec().Linux.RootfsPropagation != "rslave" {
+				g.SetLinuxRootPropagation("rslave") // nolint: errcheck
+			}
 		default:
 			glog.Warningf("Unknown propagation mode for hostPath %q", mount.HostPath)
 			options = append(options, "rprivate")
