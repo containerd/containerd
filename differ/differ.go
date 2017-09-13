@@ -71,7 +71,7 @@ func (s *walkingDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts
 		if strings.HasSuffix(desc.MediaType, ".tar.gzip") || strings.HasSuffix(desc.MediaType, ".tar+gzip") {
 			isCompressed = true
 		} else if !strings.HasSuffix(desc.MediaType, ".tar") {
-			return emptyDesc, errors.Wrapf(errdefs.ErrNotSupported, "unsupported diff media type: %v", desc.MediaType)
+			return emptyDesc, errors.Wrapf(errdefs.ErrNotImplemented, "unsupported diff media type: %v", desc.MediaType)
 		}
 	}
 
@@ -135,7 +135,7 @@ func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount
 		media = ocispec.MediaTypeImageLayerGzip
 		isCompressed = true
 	default:
-		return emptyDesc, errors.Wrapf(errdefs.ErrNotSupported, "unsupported diff media type: %v", media)
+		return emptyDesc, errors.Wrapf(errdefs.ErrNotImplemented, "unsupported diff media type: %v", media)
 	}
 	aDir, err := ioutil.TempDir("", "left-")
 	if err != nil {
