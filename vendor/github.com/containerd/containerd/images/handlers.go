@@ -67,7 +67,7 @@ func Walk(ctx context.Context, handler Handler, descs ...ocispec.Descriptor) err
 		children, err := handler.Handle(ctx, desc)
 		if err != nil {
 			if errors.Cause(err) == SkipDesc {
-				return nil // don't traverse the children.
+				continue // don't traverse the children.
 			}
 			return err
 		}
