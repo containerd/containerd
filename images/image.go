@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/platforms"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -75,7 +76,7 @@ func (image *Image) Size(ctx context.Context, provider content.Provider) (int64,
 func Config(ctx context.Context, provider content.Provider, image ocispec.Descriptor) (ocispec.Descriptor, error) {
 	var configDesc ocispec.Descriptor
 	return configDesc, Walk(ctx, HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		switch image.MediaType {
+		switch desc.MediaType {
 		case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
 			p, err := content.ReadBlob(ctx, provider, image.Digest)
 			if err != nil {
@@ -95,6 +96,34 @@ func Config(ctx context.Context, provider content.Provider, image ocispec.Descri
 		}
 
 	}), image)
+}
+
+// Platforms returns one or more platforms supported by the image.
+func Platforms(ctx context.Context, provider content.Provider, image ocispec.Descriptor) ([]ocispec.Platform, error) {
+	var platformSpecs []ocispec.Platform
+	return platformSpecs, Walk(ctx, Handlers(HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		if desc.Platform != nil {
+			platformSpecs = append(platformSpecs, *desc.Platform)
+			return nil, SkipDesc
+		}
+
+		switch desc.MediaType {
+		case MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig:
+			p, err := content.ReadBlob(ctx, provider, desc.Digest)
+			if err != nil {
+				return nil, err
+			}
+
+			var image ocispec.Image
+			if err := json.Unmarshal(p, &image); err != nil {
+				return nil, err
+			}
+
+			platformSpecs = append(platformSpecs,
+				platforms.Normalize(ocispec.Platform{OS: image.OS, Architecture: image.Architecture}))
+		}
+		return nil, nil
+	}), ChildrenHandler(provider)), image)
 }
 
 // RootFS returns the unpacked diffids that make up and images rootfs.

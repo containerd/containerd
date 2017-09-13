@@ -39,7 +39,9 @@ command. As part of this process, we do the following:
 		// TODO: Show unpack status
 		fmt.Printf("unpacking %s...\n", img.Target().Digest)
 		err = img.Unpack(ctx, clicontext.String("snapshotter"))
-		fmt.Println("done")
+		if err == nil {
+			fmt.Println("done")
+		}
 		return err
 	},
 }
