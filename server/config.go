@@ -5,6 +5,8 @@ import (
 	"io"
 
 	"github.com/BurntSushi/toml"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/pkg/errors"
 )
 
 // Config provides containerd configuration data for the server
@@ -77,7 +79,7 @@ func (c *Config) WriteTo(w io.Writer) (int64, error) {
 // LoadConfig loads the containerd server config from the provided path
 func LoadConfig(path string, v *Config) error {
 	if v == nil {
-		v = &Config{}
+		return errors.Wrapf(errdefs.ErrInvalidArgument, "argument v must not be nil")
 	}
 	md, err := toml.DecodeFile(path, v)
 	if err != nil {
