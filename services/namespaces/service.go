@@ -187,7 +187,8 @@ func (s *Service) Delete(ctx context.Context, req *api.DeleteNamespaceRequest) (
 	}); err != nil {
 		return &empty.Empty{}, err
 	}
-
+	// set the namespace in the context before publishing the event
+	ctx = namespaces.WithNamespace(ctx, req.Name)
 	if err := s.publisher.Publish(ctx, "/namespaces/delete", &eventsapi.NamespaceDelete{
 		Name: req.Name,
 	}); err != nil {
