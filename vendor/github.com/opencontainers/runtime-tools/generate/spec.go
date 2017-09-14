@@ -17,6 +17,13 @@ func (g *Generator) initSpecProcess() {
 	}
 }
 
+func (g *Generator) initSpecProcessConsoleSize() {
+	g.initSpecProcess()
+	if g.spec.Process.ConsoleSize == nil {
+		g.spec.Process.ConsoleSize = &rspec.Box{}
+	}
+}
+
 func (g *Generator) initSpecProcessCapabilities() {
 	g.initSpecProcess()
 	if g.spec.Process.Capabilities == nil {

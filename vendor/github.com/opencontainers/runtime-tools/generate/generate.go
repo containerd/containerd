@@ -341,6 +341,13 @@ func (g *Generator) RemoveAnnotation(key string) {
 	delete(g.spec.Annotations, key)
 }
 
+// SetProcessConsoleSize sets g.spec.Process.ConsoleSize.
+func (g *Generator) SetProcessConsoleSize(width, height uint) {
+	g.initSpecProcessConsoleSize()
+	g.spec.Process.ConsoleSize.Width = width
+	g.spec.Process.ConsoleSize.Height = height
+}
+
 // SetProcessUID sets g.spec.Process.User.UID.
 func (g *Generator) SetProcessUID(uid uint32) {
 	g.initSpecProcess()
@@ -737,6 +744,38 @@ func (g *Generator) ClearPreStartHooks() {
 func (g *Generator) AddPreStartHook(path string, args []string) {
 	g.initSpecHooks()
 	hook := rspec.Hook{Path: path, Args: args}
+	for i, hook := range g.spec.Hooks.Prestart {
+		if hook.Path == path {
+			g.spec.Hooks.Prestart[i] = hook
+			return
+		}
+	}
+	g.spec.Hooks.Prestart = append(g.spec.Hooks.Prestart, hook)
+}
+
+// AddPreStartHookEnv adds envs of a prestart hook into g.spec.Hooks.Prestart.
+func (g *Generator) AddPreStartHookEnv(path string, envs []string) {
+	g.initSpecHooks()
+	for i, hook := range g.spec.Hooks.Prestart {
+		if hook.Path == path {
+			g.spec.Hooks.Prestart[i].Env = envs
+			return
+		}
+	}
+	hook := rspec.Hook{Path: path, Env: envs}
+	g.spec.Hooks.Prestart = append(g.spec.Hooks.Prestart, hook)
+}
+
+// AddPreStartHookTimeout adds timeout of a prestart hook into g.spec.Hooks.Prestart.
+func (g *Generator) AddPreStartHookTimeout(path string, timeout int) {
+	g.initSpecHooks()
+	for i, hook := range g.spec.Hooks.Prestart {
+		if hook.Path == path {
+			g.spec.Hooks.Prestart[i].Timeout = &timeout
+			return
+		}
+	}
+	hook := rspec.Hook{Path: path, Timeout: &timeout}
 	g.spec.Hooks.Prestart = append(g.spec.Hooks.Prestart, hook)
 }
 
@@ -755,6 +794,38 @@ func (g *Generator) ClearPostStopHooks() {
 func (g *Generator) AddPostStopHook(path string, args []string) {
 	g.initSpecHooks()
 	hook := rspec.Hook{Path: path, Args: args}
+	for i, hook := range g.spec.Hooks.Poststop {
+		if hook.Path == path {
+			g.spec.Hooks.Poststop[i] = hook
+			return
+		}
+	}
+	g.spec.Hooks.Poststop = append(g.spec.Hooks.Poststop, hook)
+}
+
+// AddPostStopHookEnv adds envs of a poststop hook into g.spec.Hooks.Poststop.
+func (g *Generator) AddPostStopHookEnv(path string, envs []string) {
+	g.initSpecHooks()
+	for i, hook := range g.spec.Hooks.Poststop {
+		if hook.Path == path {
+			g.spec.Hooks.Poststop[i].Env = envs
+			return
+		}
+	}
+	hook := rspec.Hook{Path: path, Env: envs}
+	g.spec.Hooks.Poststop = append(g.spec.Hooks.Poststop, hook)
+}
+
+// AddPostStopHookTimeout adds timeout of a poststop hook into g.spec.Hooks.Poststop.
+func (g *Generator) AddPostStopHookTimeout(path string, timeout int) {
+	g.initSpecHooks()
+	for i, hook := range g.spec.Hooks.Poststop {
+		if hook.Path == path {
+			g.spec.Hooks.Poststop[i].Timeout = &timeout
+			return
+		}
+	}
+	hook := rspec.Hook{Path: path, Timeout: &timeout}
 	g.spec.Hooks.Poststop = append(g.spec.Hooks.Poststop, hook)
 }
 
@@ -773,6 +844,38 @@ func (g *Generator) ClearPostStartHooks() {
 func (g *Generator) AddPostStartHook(path string, args []string) {
 	g.initSpecHooks()
 	hook := rspec.Hook{Path: path, Args: args}
+	for i, hook := range g.spec.Hooks.Poststart {
+		if hook.Path == path {
+			g.spec.Hooks.Poststart[i] = hook
+			return
+		}
+	}
+	g.spec.Hooks.Poststart = append(g.spec.Hooks.Poststart, hook)
+}
+
+// AddPostStartHookEnv adds envs of a poststart hook into g.spec.Hooks.Poststart.
+func (g *Generator) AddPostStartHookEnv(path string, envs []string) {
+	g.initSpecHooks()
+	for i, hook := range g.spec.Hooks.Poststart {
+		if hook.Path == path {
+			g.spec.Hooks.Poststart[i].Env = envs
+			return
+		}
+	}
+	hook := rspec.Hook{Path: path, Env: envs}
+	g.spec.Hooks.Poststart = append(g.spec.Hooks.Poststart, hook)
+}
+
+// AddPostStartHookTimeout adds timeout of a poststart hook into g.spec.Hooks.Poststart.
+func (g *Generator) AddPostStartHookTimeout(path string, timeout int) {
+	g.initSpecHooks()
+	for i, hook := range g.spec.Hooks.Poststart {
+		if hook.Path == path {
+			g.spec.Hooks.Poststart[i].Timeout = &timeout
+			return
+		}
+	}
+	hook := rspec.Hook{Path: path, Timeout: &timeout}
 	g.spec.Hooks.Poststart = append(g.spec.Hooks.Poststart, hook)
 }
 
@@ -853,11 +956,12 @@ func (g *Generator) SetupPrivileged(privileged bool) {
 		}
 		g.initSpecLinux()
 		g.initSpecProcessCapabilities()
-		g.spec.Process.Capabilities.Bounding = finalCapList
-		g.spec.Process.Capabilities.Effective = finalCapList
-		g.spec.Process.Capabilities.Inheritable = finalCapList
-		g.spec.Process.Capabilities.Permitted = finalCapList
-		g.spec.Process.Capabilities.Ambient = finalCapList
+		g.ClearProcessCapabilities()
+		g.spec.Process.Capabilities.Bounding = append(g.spec.Process.Capabilities.Bounding, finalCapList...)
+		g.spec.Process.Capabilities.Effective = append(g.spec.Process.Capabilities.Effective, finalCapList...)
+		g.spec.Process.Capabilities.Inheritable = append(g.spec.Process.Capabilities.Inheritable, finalCapList...)
+		g.spec.Process.Capabilities.Permitted = append(g.spec.Process.Capabilities.Permitted, finalCapList...)
+		g.spec.Process.Capabilities.Ambient = append(g.spec.Process.Capabilities.Ambient, finalCapList...)
 		g.spec.Process.SelinuxLabel = ""
 		g.spec.Process.ApparmorProfile = ""
 		g.spec.Linux.Seccomp = nil
@@ -885,40 +989,60 @@ func (g *Generator) AddProcessCapability(c string) error {
 
 	g.initSpecProcessCapabilities()
 
+	var foundBounding bool
 	for _, cap := range g.spec.Process.Capabilities.Bounding {
 		if strings.ToUpper(cap) == cp {
-			return nil
+			foundBounding = true
+			break
 		}
 	}
-	g.spec.Process.Capabilities.Bounding = append(g.spec.Process.Capabilities.Bounding, cp)
+	if !foundBounding {
+		g.spec.Process.Capabilities.Bounding = append(g.spec.Process.Capabilities.Bounding, cp)
+	}
 
+	var foundEffective bool
 	for _, cap := range g.spec.Process.Capabilities.Effective {
 		if strings.ToUpper(cap) == cp {
-			return nil
+			foundEffective = true
+			break
 		}
 	}
-	g.spec.Process.Capabilities.Effective = append(g.spec.Process.Capabilities.Effective, cp)
+	if !foundEffective {
+		g.spec.Process.Capabilities.Effective = append(g.spec.Process.Capabilities.Effective, cp)
+	}
 
+	var foundInheritable bool
 	for _, cap := range g.spec.Process.Capabilities.Inheritable {
 		if strings.ToUpper(cap) == cp {
-			return nil
+			foundInheritable = true
+			break
 		}
 	}
-	g.spec.Process.Capabilities.Inheritable = append(g.spec.Process.Capabilities.Inheritable, cp)
+	if !foundInheritable {
+		g.spec.Process.Capabilities.Inheritable = append(g.spec.Process.Capabilities.Inheritable, cp)
+	}
 
+	var foundPermitted bool
 	for _, cap := range g.spec.Process.Capabilities.Permitted {
 		if strings.ToUpper(cap) == cp {
-			return nil
+			foundPermitted = true
+			break
 		}
 	}
-	g.spec.Process.Capabilities.Permitted = append(g.spec.Process.Capabilities.Permitted, cp)
+	if !foundPermitted {
+		g.spec.Process.Capabilities.Permitted = append(g.spec.Process.Capabilities.Permitted, cp)
+	}
 
+	var foundAmbient bool
 	for _, cap := range g.spec.Process.Capabilities.Ambient {
 		if strings.ToUpper(cap) == cp {
-			return nil
+			foundAmbient = true
+			break
 		}
 	}
-	g.spec.Process.Capabilities.Ambient = append(g.spec.Process.Capabilities.Ambient, cp)
+	if !foundAmbient {
+		g.spec.Process.Capabilities.Ambient = append(g.spec.Process.Capabilities.Ambient, cp)
+	}
 
 	return nil
 }
@@ -926,40 +1050,47 @@ func (g *Generator) AddProcessCapability(c string) error {
 // DropProcessCapability drops a process capability from g.spec.Process.Capabilities.
 func (g *Generator) DropProcessCapability(c string) error {
 	cp := strings.ToUpper(c)
-	if err := validate.CapValid(cp, g.HostSpecific); err != nil {
-		return err
-	}
 
 	g.initSpecProcessCapabilities()
 
+	// we don't care about order...and this is way faster...
+	removeFunc := func(s []string, i int) []string {
+		s[i] = s[len(s)-1]
+		return s[:len(s)-1]
+	}
+
 	for i, cap := range g.spec.Process.Capabilities.Bounding {
 		if strings.ToUpper(cap) == cp {
-			g.spec.Process.Capabilities.Bounding = append(g.spec.Process.Capabilities.Bounding[:i], g.spec.Process.Capabilities.Bounding[i+1:]...)
+			g.spec.Process.Capabilities.Bounding = removeFunc(g.spec.Process.Capabilities.Bounding, i)
 		}
 	}
 
 	for i, cap := range g.spec.Process.Capabilities.Effective {
 		if strings.ToUpper(cap) == cp {
-			g.spec.Process.Capabilities.Effective = append(g.spec.Process.Capabilities.Effective[:i], g.spec.Process.Capabilities.Effective[i+1:]...)
+			g.spec.Process.Capabilities.Effective = removeFunc(g.spec.Process.Capabilities.Effective, i)
 		}
 	}
 
 	for i, cap := range g.spec.Process.Capabilities.Inheritable {
 		if strings.ToUpper(cap) == cp {
-			g.spec.Process.Capabilities.Inheritable = append(g.spec.Process.Capabilities.Inheritable[:i], g.spec.Process.Capabilities.Inheritable[i+1:]...)
+			g.spec.Process.Capabilities.Inheritable = removeFunc(g.spec.Process.Capabilities.Inheritable, i)
 		}
 	}
 
 	for i, cap := range g.spec.Process.Capabilities.Permitted {
 		if strings.ToUpper(cap) == cp {
-			g.spec.Process.Capabilities.Permitted = append(g.spec.Process.Capabilities.Permitted[:i], g.spec.Process.Capabilities.Permitted[i+1:]...)
+			g.spec.Process.Capabilities.Permitted = removeFunc(g.spec.Process.Capabilities.Permitted, i)
 		}
 	}
 
 	for i, cap := range g.spec.Process.Capabilities.Ambient {
 		if strings.ToUpper(cap) == cp {
-			g.spec.Process.Capabilities.Ambient = append(g.spec.Process.Capabilities.Ambient[:i], g.spec.Process.Capabilities.Ambient[i+1:]...)
+			g.spec.Process.Capabilities.Ambient = removeFunc(g.spec.Process.Capabilities.Ambient, i)
 		}
+	}
+
+	if err := validate.CapValid(cp, false); err != nil {
+		return err
 	}
 
 	return nil
