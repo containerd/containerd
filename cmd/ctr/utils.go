@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/rootfs"
@@ -205,7 +206,7 @@ func getImageLayers(ctx gocontext.Context, image images.Image, cs content.Store)
 		return nil, errors.Wrap(err, "failed to unmarshal manifest")
 	}
 
-	diffIDs, err := image.RootFS(ctx, cs)
+	diffIDs, err := image.RootFS(ctx, cs, platforms.Format(platforms.Default()))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to resolve rootfs")
 	}

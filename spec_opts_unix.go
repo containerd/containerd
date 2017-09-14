@@ -19,6 +19,7 @@ import (
 	"github.com/containerd/containerd/fs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runc/libcontainer/user"
@@ -72,7 +73,7 @@ func WithImageConfig(i Image) SpecOpts {
 			image = i.(*image)
 			store = client.ContentStore()
 		)
-		ic, err := image.i.Config(ctx, store)
+		ic, err := image.i.Config(ctx, store, platforms.Format(platforms.Default()))
 		if err != nil {
 			return err
 		}
@@ -235,7 +236,7 @@ func WithRemappedSnapshotView(id string, i Image, uid, gid uint32) NewContainerO
 
 func withRemappedSnapshotBase(id string, i Image, uid, gid uint32, readonly bool) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore())
+		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore(), platforms.Format(platforms.Default()))
 		if err != nil {
 			return err
 		}
