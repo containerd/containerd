@@ -78,9 +78,11 @@ func main() {
 		var (
 			start   = time.Now()
 			signals = make(chan os.Signal, 2048)
+			serverC = make(chan *server.Server)
 			ctx     = log.WithModule(gocontext.Background(), "containerd")
 			config  = defaultConfig()
 		)
+		done := handleSignals(ctx, signals, serverC)
 		// start the signal handler as soon as we can to make sure that
 		// we don't miss any signals during boot
 		signal.Notify(signals, handledSignals...)
@@ -105,6 +107,7 @@ func main() {
 		if err != nil {
 			return err
 		}
+		serverC <- server
 		if config.Debug.Address != "" {
 			l, err := sys.GetLocalListener(config.Debug.Address, config.Debug.Uid, config.Debug.Gid)
 			if err != nil {
@@ -127,7 +130,8 @@ func main() {
 		serve(log.WithModule(ctx, "grpc"), l, server.ServeGRPC)
 
 		log.G(ctx).Infof("containerd successfully booted in %fs", time.Since(start).Seconds())
-		return handleSignals(ctx, signals, server)
+		<-done
+		return nil
 	}
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "containerd: %s\n", err)

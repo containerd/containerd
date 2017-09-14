@@ -1,4 +1,4 @@
-// +build darwin freebsd solaris
+// +build linux darwin freebsd solaris
 
 package main
 
@@ -23,22 +23,35 @@ var handledSignals = []os.Signal{
 	unix.SIGPIPE,
 }
 
-func handleSignals(ctx context.Context, signals chan os.Signal, server *server.Server) error {
-	for s := range signals {
-		log.G(ctx).WithField("signal", s).Debug("received signal")
-		switch s {
-		case unix.SIGCHLD:
-			if err := reaper.Reap(); err != nil {
-				log.G(ctx).WithError(err).Error("reap containerd processes")
+func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *server.Server) chan struct{} {
+	done := make(chan struct{}, 1)
+	go func() {
+		var server *server.Server
+		for {
+			select {
+			case s := <-serverC:
+				server = s
+			case s := <-signals:
+				log.G(ctx).WithField("signal", s).Debug("received signal")
+				switch s {
+				case unix.SIGCHLD:
+					if err := reaper.Reap(); err != nil {
+						log.G(ctx).WithError(err).Error("reap containerd processes")
+					}
+				case unix.SIGUSR1:
+					dumpStacks()
+				case unix.SIGPIPE:
+					continue
+				default:
+					if server == nil {
+						close(done)
+						return
+					}
+					server.Stop()
+					close(done)
+				}
 			}
-		case unix.SIGUSR1:
-			dumpStacks()
-		case unix.SIGPIPE:
-			continue
-		default:
-			server.Stop()
-			return nil
 		}
-	}
-	return nil
+	}()
+	return done
 }
