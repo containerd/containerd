@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
-	"github.com/containerd/containerd/typeurl"
+	"github.com/containerd/typeurl"
 	"github.com/docker/docker/pkg/mount"
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -51,14 +51,14 @@ const (
 	profileNamePrefix = "localhost/" // TODO (mikebrow): get localhost/ & runtime/default from CRI kubernetes/kubernetes#51747
 	// runtimeDefault indicates that we should use or create a runtime default profile.
 	runtimeDefault = "runtime/default"
-	// runtimeDefault indicates that we should use or create a docker default profile.
+	// dockerDefault indicates that we should use or create a docker default profile.
 	dockerDefault = "docker/default"
 	// appArmorDefaultProfileName is name to use when creating a default apparmor profile.
 	appArmorDefaultProfileName = "cri-containerd.apparmor.d"
 	// unconfinedProfile is a string indicating one should run a pod/containerd without a security profile
 	unconfinedProfile = "unconfined"
-	// seccompDefaultPodProfile is the default seccomp profile for pods.
-	seccompDefaultSandboxProfile = unconfinedProfile
+	// seccompDefaultSandboxProfile is the default seccomp profile for pods.
+	seccompDefaultSandboxProfile = dockerDefault
 	// seccompDefaultContainerProfile is the default seccomp profile for containers.
 	seccompDefaultContainerProfile = dockerDefault
 	// seccompEnabled is a flag for globally enabling/disabling seccomp profiles for containers.

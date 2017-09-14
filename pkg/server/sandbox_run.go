@@ -23,7 +23,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/contrib/seccomp"
-	"github.com/containerd/containerd/typeurl"
+	"github.com/containerd/typeurl"
 	"github.com/cri-o/ocicni/pkg/ocicni"
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -132,9 +132,11 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	// Set seccomp profile
 	seccompProf := config.GetLinux().GetSecurityContext().GetSeccompProfilePath()
 	if seccompProf == runtimeDefault || seccompProf == dockerDefault {
-		// use correct default profile (Eg. if not configured otherwise, the default is unconfined for pods)
+		// use correct default profile (Eg. if not configured otherwise, the default is docker/default for pods)
 		seccompProf = seccompDefaultSandboxProfile
 	}
+
+	// TODO (mikebrow): consider a fuction for the logic used in sandbox and container for secccomp
 	// Unset the seccomp profile, if seccomp is not enabled, unconfined, unset, or the security context is privileged
 	if !seccompEnabled ||
 		seccompProf == unconfinedProfile ||

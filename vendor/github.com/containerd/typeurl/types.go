@@ -4,27 +4,25 @@ import (
 	"encoding/json"
 	"path"
 	"reflect"
-	"strings"
 	"sync"
 
-	"github.com/containerd/containerd/errdefs"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 )
-
-const Prefix = "types.containerd.io"
 
 var (
 	mu       sync.Mutex
 	registry = make(map[reflect.Type]string)
 )
 
+var ErrNotFound = errors.New("not found")
+
 // Register a type with the base url of the type
 func Register(v interface{}, args ...string) {
 	var (
 		t = tryDereference(v)
-		p = path.Join(append([]string{Prefix}, args...)...)
+		p = path.Join(args...)
 	)
 	mu.Lock()
 	defer mu.Unlock()
@@ -46,9 +44,9 @@ func TypeURL(v interface{}) (string, error) {
 		// fallback to the proto registry if it is a proto message
 		pb, ok := v.(proto.Message)
 		if !ok {
-			return "", errors.Wrapf(errdefs.ErrNotFound, "type %s", reflect.TypeOf(v))
+			return "", errors.Wrapf(ErrNotFound, "type %s", reflect.TypeOf(v))
 		}
-		return path.Join(Prefix, proto.MessageName(pb)), nil
+		return proto.MessageName(pb), nil
 	}
 	return u, nil
 }
@@ -123,7 +121,7 @@ func getTypeByUrl(url string) (urlType, error) {
 		}
 	}
 	// fallback to proto registry
-	t := proto.MessageType(strings.TrimPrefix(url, Prefix+"/"))
+	t := proto.MessageType(url)
 	if t != nil {
 		return urlType{
 			// get the underlying Elem because proto returns a pointer to the type
@@ -131,7 +129,7 @@ func getTypeByUrl(url string) (urlType, error) {
 			isProto: true,
 		}, nil
 	}
-	return urlType{}, errors.Wrapf(errdefs.ErrNotFound, "type with url %s", url)
+	return urlType{}, errors.Wrapf(ErrNotFound, "type with url %s", url)
 }
 
 func tryDereference(v interface{}) reflect.Type {
