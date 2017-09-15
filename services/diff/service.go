@@ -19,7 +19,7 @@ type config struct {
 	// respected for which is choosen. Each differ should return the same
 	// correct output, allowing any ordering to be used to prefer
 	// more optimimal implementations.
-	Order []string `toml:"default,omitempty"`
+	Order []string `toml:"default"`
 }
 
 func init() {

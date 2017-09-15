@@ -67,15 +67,15 @@ var _ = (runtime.Runtime)(&Runtime{})
 
 type Config struct {
 	// Shim is a path or name of binary implementing the Shim GRPC API
-	Shim string `toml:"shim,omitempty"`
+	Shim string `toml:"shim"`
 	// Runtime is a path or name of an OCI runtime used by the shim
-	Runtime string `toml:"runtime,omitempty"`
+	Runtime string `toml:"runtime"`
 	// RuntimeRoot is the path that shall be used by the OCI runtime for its data
-	RuntimeRoot string `toml:"runtime_root,omitempty"`
+	RuntimeRoot string `toml:"runtime_root"`
 	// NoShim calls runc directly from within the pkg
-	NoShim bool `toml:"no_shim,omitempty"`
+	NoShim bool `toml:"no_shim"`
 	// Debug enable debug on the shim
-	ShimDebug bool `toml:"shim_debug,omitempty"`
+	ShimDebug bool `toml:"shim_debug"`
 }
 
 func New(ic *plugin.InitContext) (interface{}, error) {
