@@ -20,6 +20,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	"github.com/containerd/fifo"
 	"github.com/docker/docker/pkg/mount"
@@ -34,6 +35,7 @@ type OS interface {
 	RemoveAll(path string) error
 	OpenFifo(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error)
 	Stat(name string) (os.FileInfo, error)
+	ResolveSymbolicLink(name string) (string, error)
 	CopyFile(src, dest string, perm os.FileMode) error
 	WriteFile(filename string, data []byte, perm os.FileMode) error
 	Mount(source string, target string, fstype string, flags uintptr, data string) error
@@ -61,6 +63,18 @@ func (RealOS) OpenFifo(ctx context.Context, fn string, flag int, perm os.FileMod
 // Stat will call os.Stat to get the status of the given file.
 func (RealOS) Stat(name string) (os.FileInfo, error) {
 	return os.Stat(name)
+}
+
+// ResolveSymbolicLink will follow any symbolic links
+func (RealOS) ResolveSymbolicLink(path string) (string, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return "", err
+	}
+	if info.Mode()&os.ModeSymlink != os.ModeSymlink {
+		return path, nil
+	}
+	return filepath.EvalSymlinks(path)
 }
 
 // CopyFile copys src file to dest file

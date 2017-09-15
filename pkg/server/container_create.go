@@ -19,6 +19,7 @@ package server
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -36,6 +37,7 @@ import (
 	"golang.org/x/sys/unix"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
+	customopts "github.com/kubernetes-incubator/cri-containerd/pkg/opts"
 	cio "github.com/kubernetes-incubator/cri-containerd/pkg/server/io"
 	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
@@ -101,26 +103,6 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 		return nil, fmt.Errorf("image %q not found", imageRef)
 	}
 
-	// Generate container runtime spec.
-	mounts := c.generateContainerMounts(getSandboxRootDir(c.rootDir, sandboxID), config)
-	spec, err := c.generateContainerSpec(id, sandboxPid, config, sandboxConfig, image.Config, mounts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate container %q spec: %v", id, err)
-	}
-	glog.V(4).Infof("Container spec: %+v", spec)
-
-	// Set snapshotter before any other options.
-	opts := []containerd.NewContainerOpts{
-		containerd.WithSnapshotter(c.snapshotter),
-	}
-	// Prepare container rootfs. This is always writeable even if
-	// the container wants a readonly rootfs since we want to give
-	// the runtime (runc) a chance to modify (e.g. to create mount
-	// points corresponding to spec.Mounts) before making the
-	// rootfs readonly (requested by spec.Root.Readonly).
-	opts = append(opts, containerd.WithNewSnapshot(id, image.Image))
-	meta.ImageRef = image.ID
-
 	// Create container root directory.
 	containerRootDir := getContainerRootDir(c.rootDir, id)
 	if err = c.os.MkdirAll(containerRootDir, 0755); err != nil {
@@ -136,6 +118,39 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 			}
 		}
 	}()
+
+	// Create container volumes mounts.
+	// TODO(random-liu): Add cri-containerd integration test for image volume.
+	volumeMounts := c.generateVolumeMounts(containerRootDir, config.GetMounts(), image.Config)
+
+	// Generate container runtime spec.
+	mounts := c.generateContainerMounts(getSandboxRootDir(c.rootDir, sandboxID), config)
+
+	spec, err := c.generateContainerSpec(id, sandboxPid, config, sandboxConfig, image.Config, append(mounts, volumeMounts...))
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate container %q spec: %v", id, err)
+	}
+	glog.V(4).Infof("Container spec: %+v", spec)
+
+	// Set snapshotter before any other options.
+	opts := []containerd.NewContainerOpts{
+		containerd.WithSnapshotter(c.snapshotter),
+		// Prepare container rootfs. This is always writeable even if
+		// the container wants a readonly rootfs since we want to give
+		// the runtime (runc) a chance to modify (e.g. to create mount
+		// points corresponding to spec.Mounts) before making the
+		// rootfs readonly (requested by spec.Root.Readonly).
+		containerd.WithNewSnapshot(id, image.Image),
+	}
+
+	if len(volumeMounts) > 0 {
+		mountMap := make(map[string]string)
+		for _, v := range volumeMounts {
+			mountMap[v.HostPath] = v.ContainerPath
+		}
+		opts = append(opts, customopts.WithVolumes(mountMap))
+	}
+	meta.ImageRef = image.ID
 
 	containerIO, err := cio.NewContainerIO(id,
 		cio.WithStdin(config.GetStdin()),
@@ -277,7 +292,7 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 
 	// Add extra mounts first so that CRI specified mounts can override.
 	mounts := append(extraMounts, config.GetMounts()...)
-	if err := addOCIBindMounts(&g, mounts, mountLabel); err != nil {
+	if err := c.addOCIBindMounts(&g, mounts, mountLabel); err != nil {
 		return nil, fmt.Errorf("failed to set OCI bind mounts %+v: %v", mounts, err)
 	}
 
@@ -289,7 +304,7 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 			return nil, err
 		}
 	} else {
-		if err := addOCIDevices(&g, config.GetDevices()); err != nil {
+		if err := c.addOCIDevices(&g, config.GetDevices()); err != nil {
 			return nil, fmt.Errorf("failed to set devices mapping %+v: %v", config.GetDevices(), err)
 		}
 
@@ -328,34 +343,69 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 	return g.Spec(), nil
 }
 
+// generateVolumeMounts sets up image volumes for container. Rely on the removal of container
+// root directory to do cleanup. Note that image volume will be skipped, if there is criMounts
+// specified with the same destination.
+func (c *criContainerdService) generateVolumeMounts(containerRootDir string, criMounts []*runtime.Mount, config *imagespec.ImageConfig) []*runtime.Mount {
+	if len(config.Volumes) == 0 {
+		return nil
+	}
+	var mounts []*runtime.Mount
+	for dst := range config.Volumes {
+		if isInCRIMounts(dst, criMounts) {
+			// Skip the image volume, if there is CRI defined volume mapping.
+			// TODO(random-liu): This should be handled by Kubelet in the future.
+			// Kubelet should decide what to use for image volume, and also de-duplicate
+			// the image volume and user mounts.
+			continue
+		}
+		volumeID := util.GenerateID()
+		src := filepath.Join(containerRootDir, "volumes", volumeID)
+		// addOCIBindMounts will create these volumes.
+		mounts = append(mounts, &runtime.Mount{
+			ContainerPath: dst,
+			HostPath:      src,
+			// Use default mount propagation.
+			// TODO(random-liu): What about selinux relabel?
+		})
+	}
+	return mounts
+}
+
 // generateContainerMounts sets up necessary container mounts including /dev/shm, /etc/hosts
 // and /etc/resolv.conf.
 func (c *criContainerdService) generateContainerMounts(sandboxRootDir string, config *runtime.ContainerConfig) []*runtime.Mount {
 	var mounts []*runtime.Mount
 	securityContext := config.GetLinux().GetSecurityContext()
-	mounts = append(mounts, &runtime.Mount{
-		ContainerPath: etcHosts,
-		HostPath:      getSandboxHosts(sandboxRootDir),
-		Readonly:      securityContext.GetReadonlyRootfs(),
-	})
+	if !isInCRIMounts(etcHosts, config.GetMounts()) {
+		mounts = append(mounts, &runtime.Mount{
+			ContainerPath: etcHosts,
+			HostPath:      getSandboxHosts(sandboxRootDir),
+			Readonly:      securityContext.GetReadonlyRootfs(),
+		})
+	}
 
 	// Mount sandbox resolv.config.
 	// TODO: Need to figure out whether we should always mount it as read-only
-	mounts = append(mounts, &runtime.Mount{
-		ContainerPath: resolvConfPath,
-		HostPath:      getResolvPath(sandboxRootDir),
-		Readonly:      securityContext.GetReadonlyRootfs(),
-	})
-
-	sandboxDevShm := getSandboxDevShm(sandboxRootDir)
-	if securityContext.GetNamespaceOptions().GetHostIpc() {
-		sandboxDevShm = devShm
+	if !isInCRIMounts(resolvConfPath, config.GetMounts()) {
+		mounts = append(mounts, &runtime.Mount{
+			ContainerPath: resolvConfPath,
+			HostPath:      getResolvPath(sandboxRootDir),
+			Readonly:      securityContext.GetReadonlyRootfs(),
+		})
 	}
-	mounts = append(mounts, &runtime.Mount{
-		ContainerPath: devShm,
-		HostPath:      sandboxDevShm,
-		Readonly:      false,
-	})
+
+	if !isInCRIMounts(devShm, config.GetMounts()) {
+		sandboxDevShm := getSandboxDevShm(sandboxRootDir)
+		if securityContext.GetNamespaceOptions().GetHostIpc() {
+			sandboxDevShm = devShm
+		}
+		mounts = append(mounts, &runtime.Mount{
+			ContainerPath: devShm,
+			HostPath:      sandboxDevShm,
+			Readonly:      false,
+		})
+	}
 	return mounts
 }
 
@@ -414,10 +464,10 @@ func clearReadOnly(m *runtimespec.Mount) {
 }
 
 // addDevices set device mapping without privilege.
-func addOCIDevices(g *generate.Generator, devs []*runtime.Device) error {
+func (c *criContainerdService) addOCIDevices(g *generate.Generator, devs []*runtime.Device) error {
 	spec := g.Spec()
 	for _, device := range devs {
-		path, err := resolveSymbolicLink(device.HostPath)
+		path, err := c.os.ResolveSymbolicLink(device.HostPath)
 		if err != nil {
 			return err
 		}
@@ -479,7 +529,7 @@ func setOCIDevicesPrivileged(g *generate.Generator) error {
 // addOCIBindMounts adds bind mounts.
 // TODO(random-liu): Figure out whether we need to change all CRI mounts to readonly when
 // rootfs is readonly. (https://github.com/moby/moby/blob/master/daemon/oci_linux.go)
-func addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount, mountLabel string) error {
+func (c *criContainerdService) addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount, mountLabel string) error {
 	// Mount cgroup into the container as readonly, which inherits docker's behavior.
 	g.AddCgroupsMount("ro") // nolint: errcheck
 	for _, mount := range mounts {
@@ -487,17 +537,17 @@ func addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount, mountLabel
 		src := mount.GetHostPath()
 		// Create the host path if it doesn't exist.
 		// TODO(random-liu): Add CRI validation test for this case.
-		if _, err := os.Stat(src); err != nil {
+		if _, err := c.os.Stat(src); err != nil {
 			if !os.IsNotExist(err) {
 				return fmt.Errorf("failed to stat %q: %v", src, err)
 			}
-			if err := os.MkdirAll(src, 0755); err != nil {
+			if err := c.os.MkdirAll(src, 0755); err != nil {
 				return fmt.Errorf("failed to mkdir %q: %v", src, err)
 			}
 		}
 		// TODO(random-liu): Add cri-containerd integration test or cri validation test
 		// for this.
-		src, err := resolveSymbolicLink(src)
+		src, err := c.os.ResolveSymbolicLink(src)
 		if err != nil {
 			return fmt.Errorf("failed to resolve symlink %q: %v", src, err)
 		}

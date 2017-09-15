@@ -297,19 +297,6 @@ func (c *criContainerdService) ensureImageExists(ctx context.Context, ref string
 	return &newImage, nil
 }
 
-// resolveSymbolicLink resolves a possbile symlink path. If the path is a symlink, returns resolved
-// path; if not, returns the original path.
-func resolveSymbolicLink(path string) (string, error) {
-	info, err := os.Lstat(path)
-	if err != nil {
-		return "", err
-	}
-	if info.Mode()&os.ModeSymlink != os.ModeSymlink {
-		return path, nil
-	}
-	return filepath.EvalSymlinks(path)
-}
-
 // loadCgroup loads the cgroup associated with path if it exists and moves the current process into the cgroup. If the cgroup
 // is not created it is created and returned.
 func loadCgroup(cgroupPath string) (cgroups.Cgroup, error) {
@@ -386,4 +373,14 @@ func initSelinuxOpts(selinuxOpt *runtime.SELinuxOption) (string, string, error) 
 		selinuxOpt.GetRole(),
 		selinuxOpt.GetType())
 	return label.InitLabels(selinux.DupSecOpt(labelOpts))
+}
+
+// isInCRIMounts checks whether a destination is in CRI mount list.
+func isInCRIMounts(dst string, mounts []*runtime.Mount) bool {
+	for _, m := range mounts {
+		if m.ContainerPath == dst {
+			return true
+		}
+	}
+	return false
 }
