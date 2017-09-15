@@ -203,7 +203,7 @@ func TestGeneralContainerSpec(t *testing.T) {
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 	c := newTestCRIContainerdService()
 	spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	specCheck(t, testID, testPid, spec)
 }
 
@@ -257,7 +257,7 @@ func TestContainerCapabilities(t *testing.T) {
 		t.Logf("TestCase %q", desc)
 		config.Linux.SecurityContext.Capabilities = test.capability
 		spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		specCheck(t, testID, testPid, spec)
 		t.Log(spec.Process.Capabilities.Bounding)
 		for _, include := range test.includes {
@@ -283,7 +283,7 @@ func TestContainerSpecTty(t *testing.T) {
 	for _, tty := range []bool{true, false} {
 		config.Tty = tty
 		spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		specCheck(t, testID, testPid, spec)
 		assert.Equal(t, tty, spec.Process.Terminal)
 		if tty {
@@ -302,7 +302,7 @@ func TestContainerSpecReadonlyRootfs(t *testing.T) {
 	for _, readonly := range []bool{true, false} {
 		config.Linux.SecurityContext.ReadonlyRootfs = readonly
 		spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		specCheck(t, testID, testPid, spec)
 		assert.Equal(t, readonly, spec.Root.Readonly)
 	}
@@ -325,7 +325,7 @@ func TestContainerSpecWithExtraMounts(t *testing.T) {
 		Readonly:      true,
 	}
 	spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, []*runtime.Mount{extraMount})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	specCheck(t, testID, testPid, spec)
 	var mounts []runtimespec.Mount
 	for _, m := range spec.Mounts {
@@ -540,7 +540,7 @@ func TestPidNamespace(t *testing.T) {
 	t.Logf("should not set pid namespace when host pid is true")
 	config.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{HostPid: true}
 	spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	specCheck(t, testID, testPid, spec)
 	for _, ns := range spec.Linux.Namespaces {
 		assert.NotEqual(t, ns.Type, runtimespec.PIDNamespace)
@@ -549,7 +549,7 @@ func TestPidNamespace(t *testing.T) {
 	t.Logf("should set pid namespace when host pid is false")
 	config.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{HostPid: false}
 	spec, err = c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	specCheck(t, testID, testPid, spec)
 	assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
 		Type: runtimespec.PIDNamespace,
