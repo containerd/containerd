@@ -289,7 +289,7 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 			return nil, err
 		}
 	} else {
-		if err := addOCIDevices(&g, config.GetDevices()); err != nil {
+		if err := c.addOCIDevices(&g, config.GetDevices()); err != nil {
 			return nil, fmt.Errorf("failed to set devices mapping %+v: %v", config.GetDevices(), err)
 		}
 
@@ -414,10 +414,10 @@ func clearReadOnly(m *runtimespec.Mount) {
 }
 
 // addDevices set device mapping without privilege.
-func addOCIDevices(g *generate.Generator, devs []*runtime.Device) error {
+func (c *criContainerdService) addOCIDevices(g *generate.Generator, devs []*runtime.Device) error {
 	spec := g.Spec()
 	for _, device := range devs {
-		path, err := resolveSymbolicLink(device.HostPath)
+		path, err := c.os.ResolveSymbolicLink(device.HostPath)
 		if err != nil {
 			return err
 		}
@@ -497,7 +497,7 @@ func addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount, mountLabel
 		}
 		// TODO(random-liu): Add cri-containerd integration test or cri validation test
 		// for this.
-		src, err := resolveSymbolicLink(src)
+		src, err := c.os.ResolveSymbolicLink(src)
 		if err != nil {
 			return fmt.Errorf("failed to resolve symlink %q: %v", src, err)
 		}

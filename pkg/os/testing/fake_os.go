@@ -39,16 +39,17 @@ type CalledDetail struct {
 // of the real call.
 type FakeOS struct {
 	sync.Mutex
-	MkdirAllFn  func(string, os.FileMode) error
-	RemoveAllFn func(string) error
-	OpenFifoFn  func(context.Context, string, int, os.FileMode) (io.ReadWriteCloser, error)
-	StatFn      func(string) (os.FileInfo, error)
-	CopyFileFn  func(string, string, os.FileMode) error
-	WriteFileFn func(string, []byte, os.FileMode) error
-	MountFn     func(source string, target string, fstype string, flags uintptr, data string) error
-	UnmountFn   func(target string, flags int) error
-	calls       []CalledDetail
-	errors      map[string]error
+	MkdirAllFn            func(string, os.FileMode) error
+	RemoveAllFn           func(string) error
+	OpenFifoFn            func(context.Context, string, int, os.FileMode) (io.ReadWriteCloser, error)
+	StatFn                func(string) (os.FileInfo, error)
+	ResolveSymbolicLinkFn func(string) (string, error)
+	CopyFileFn            func(string, string, os.FileMode) error
+	WriteFileFn           func(string, []byte, os.FileMode) error
+	MountFn               func(source string, target string, fstype string, flags uintptr, data string) error
+	UnmountFn             func(target string, flags int) error
+	calls                 []CalledDetail
+	errors                map[string]error
 }
 
 var _ osInterface.OS = &FakeOS{}
@@ -158,6 +159,19 @@ func (f *FakeOS) Stat(name string) (os.FileInfo, error) {
 		return f.StatFn(name)
 	}
 	return nil, nil
+}
+
+// ResolveSymbolicLink is a fake call that invokes ResolveSymbolicLinkFn or returns its input
+func (f *FakeOS) ResolveSymbolicLink(path string) (string, error) {
+	f.appendCalls("ResolveSymbolicLink", path)
+	if err := f.getError("ResolveSymbolicLink"); err != nil {
+		return "", err
+	}
+
+	if f.ResolveSymbolicLinkFn != nil {
+		return f.ResolveSymbolicLinkFn(path)
+	}
+	return path, nil
 }
 
 // CopyFile is a fake call that invokes CopyFileFn or just return nil.
