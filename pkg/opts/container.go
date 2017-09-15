@@ -21,6 +21,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
+	"github.com/docker/docker/pkg/chrootarchive"
 	"github.com/docker/docker/pkg/system"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
@@ -56,12 +57,35 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 		defer unix.Unmount(root, 0) // nolint: errcheck
 
 		for host, volume := range volumeMounts {
-			if err := copyOwnership(filepath.Join(root, volume), host); err != nil {
-				return err
+			if err := copyExistingContents(filepath.Join(root, volume), host); err != nil {
+				return errors.Wrap(err, "taking runtime copy of volume")
 			}
 		}
 		return nil
 	}
+}
+
+// copyExistingContents copies from the source to the destination and
+// ensures the ownership is appropriately set.
+func copyExistingContents(source, destination string) error {
+	srcList, err := ioutil.ReadDir(source)
+	if err != nil {
+		return err
+	}
+	if len(srcList) > 0 {
+		dstList, err := ioutil.ReadDir(destination)
+		if err != nil {
+			return err
+		}
+		if len(dstList) != 0 {
+			return errors.Errorf("volume at %q is not initially empty", destination)
+		}
+
+		if err := chrootarchive.NewArchiver(nil).CopyWithTar(source, destination); err != nil {
+			return err
+		}
+	}
+	return copyOwnership(source, destination)
 }
 
 // copyOwnership copies the permissions and uid:gid of the src file

@@ -19,6 +19,7 @@ package main
 import (
 	"os"
 
+	"github.com/docker/docker/pkg/reexec"
 	"github.com/golang/glog"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/spf13/pflag"
@@ -30,6 +31,9 @@ import (
 )
 
 func main() {
+	if reexec.Init() {
+		return
+	}
 	o := options.NewCRIContainerdOptions()
 	o.AddFlags(pflag.CommandLine)
 	if err := o.InitFlags(pflag.CommandLine); err != nil {
