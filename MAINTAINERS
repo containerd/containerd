@@ -247,6 +247,7 @@ example and you'll be fine".
 
 	[Org.Maintainers]
 	people = [
+		"akihirosuda",
 		"crosbymichael",
 		"dqminh",
 		"dmcgowan",
@@ -258,6 +259,11 @@ example and you'll be fine".
 	]
 
 [People]
+
+	[people.akihirosuda]
+	Name = "Akihiro Suda"
+	Email = "suda.akihiro@lab.ntt.co.jp"
+	GitHub = "AkihiroSuda"
 
 	[People.crosbymichael]
 	Name = "Michael Crosby"
