@@ -87,5 +87,4 @@ func LoadConfig(path string, v *Config) error {
 	}
 	v.md = md
 	return nil
-
 }

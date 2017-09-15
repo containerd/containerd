@@ -19,10 +19,24 @@ var (
 	}
 )
 
-func handleSignals(ctx context.Context, signals chan os.Signal, server *server.Server) error {
-	for s := range signals {
-		log.G(ctx).WithField("signal", s).Debug("received signal")
-		server.Stop()
-	}
-	return nil
+func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *server.Server) chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		var server *server.Server
+		for {
+			select {
+			case s := <-serverC:
+				server = s
+			case s := <-signals:
+				log.G(ctx).WithField("signal", s).Debug("received signal")
+				if server == nil {
+					close(done)
+					return
+				}
+				server.Stop()
+				close(done)
+			}
+		}
+	}()
+	return done
 }
