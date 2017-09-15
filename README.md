@@ -194,8 +194,7 @@ For sync communication we have a community slack with a #containerd channel that
 
 ### Reporting security issues
 
-__If you are reporting a security issue, please follow the responsible
-disclosure guidelines and reach out discreetly at containerd-security@googlegroups.com__.
+__If you are reporting a security issue, please reach out discreetly at containerd-security@googlegroups.com__.
 
 ## Copyright and license
 

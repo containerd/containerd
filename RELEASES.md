@@ -114,11 +114,8 @@ one of three ways:
 2. Open a PR with cherry-picked change from master.
 3. Open a PR with a ported fix.
 
-__If you are reporting a security issue, please follow the responsible
-disclosure guidelines and reach out discreetly__. Remember that backported PRs
-must follow the versioning guidelines from this document.
-
-Please send security related issues to containerd-security@googlegroups.com.
+__If you are reporting a security issue, please reach out discreetly at containerd-security@googlegroups.com__.
+Remember that backported PRs must follow the versioning guidelines from this document.
 
 Any release that is "active" can accept backports. Opening a backport PR is
 fairly straightforward. The steps differ depending on whether you are pulling
