@@ -104,7 +104,8 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		"", "The ip address streaming server is listening on. Default host interface is used if this is empty.")
 	fs.StringVar(&c.StreamServerPort, "stream-port",
 		"10010", "The port streaming server is listening on.")
-	fs.StringVar(&c.CgroupPath, "cgroup-path", "", "The cgroup that cri-containerd is part of. By default cri-containerd is not placed in a cgroup")
+	fs.StringVar(&c.CgroupPath, "cgroup-path",
+		"", "The cgroup that cri-containerd is part of. By default cri-containerd is not placed in a cgroup.")
 	fs.BoolVar(&c.EnableSelinux, "selinux-enabled",
 		false, "Enable selinux support.")
 	fs.StringVar(&c.SandboxImage, "sandbox-image",
