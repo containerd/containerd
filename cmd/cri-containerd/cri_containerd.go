@@ -47,18 +47,7 @@ func main() {
 	}
 
 	glog.V(2).Infof("Run cri-containerd grpc server on socket %q", o.SocketPath)
-	s, err := server.NewCRIContainerdService(
-		o.SocketPath,
-		o.ContainerdEndpoint,
-		o.ContainerdSnapshotter,
-		o.RootDir,
-		o.NetworkPluginBinDir,
-		o.NetworkPluginConfDir,
-		o.StreamServerAddress,
-		o.StreamServerPort,
-		o.CgroupPath,
-		o.SandboxImage,
-	)
+	s, err := server.NewCRIContainerdService(o.Config)
 	if err != nil {
 		glog.Exitf("Failed to create CRI containerd service %+v: %v", o, err)
 	}

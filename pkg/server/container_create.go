@@ -104,7 +104,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	}
 
 	// Create container root directory.
-	containerRootDir := getContainerRootDir(c.rootDir, id)
+	containerRootDir := getContainerRootDir(c.config.RootDir, id)
 	if err = c.os.MkdirAll(containerRootDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create container root directory %q: %v",
 			containerRootDir, err)
@@ -124,7 +124,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	volumeMounts := c.generateVolumeMounts(containerRootDir, config.GetMounts(), image.Config)
 
 	// Generate container runtime spec.
-	mounts := c.generateContainerMounts(getSandboxRootDir(c.rootDir, sandboxID), config)
+	mounts := c.generateContainerMounts(getSandboxRootDir(c.config.RootDir, sandboxID), config)
 
 	spec, err := c.generateContainerSpec(id, sandboxPid, config, sandboxConfig, image.Config, append(mounts, volumeMounts...))
 	if err != nil {
@@ -134,7 +134,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 
 	// Set snapshotter before any other options.
 	opts := []containerd.NewContainerOpts{
-		containerd.WithSnapshotter(c.snapshotter),
+		containerd.WithSnapshotter(c.config.ContainerdSnapshotter),
 		// Prepare container rootfs. This is always writeable even if
 		// the container wants a readonly rootfs since we want to give
 		// the runtime (runc) a chance to modify (e.g. to create mount

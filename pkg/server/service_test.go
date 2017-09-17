@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"github.com/kubernetes-incubator/cri-containerd/cmd/cri-containerd/options"
 	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/registrar"
 	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
@@ -36,9 +37,11 @@ const (
 // newTestCRIContainerdService creates a fake criContainerdService for test.
 func newTestCRIContainerdService() *criContainerdService {
 	return &criContainerdService{
+		config: options.Config{
+			RootDir:      testRootDir,
+			SandboxImage: testSandboxImage,
+		},
 		os:                 ostesting.NewFakeOS(),
-		rootDir:            testRootDir,
-		sandboxImage:       testSandboxImage,
 		sandboxStore:       sandboxstore.NewStore(),
 		imageStore:         imagestore.NewStore(),
 		sandboxNameIndex:   registrar.NewRegistrar(),

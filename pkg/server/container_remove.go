@@ -63,7 +63,7 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 	// kubelet implementation, we'll never start a container once we decide to remove it,
 	// so we don't need the "Dead" state for now.
 
-	containerRootDir := getContainerRootDir(c.rootDir, id)
+	containerRootDir := getContainerRootDir(c.config.RootDir, id)
 	if err := system.EnsureRemoveAll(containerRootDir); err != nil {
 		return nil, fmt.Errorf("failed to remove container root directory %q: %v",
 			containerRootDir, err)
