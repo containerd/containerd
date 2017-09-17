@@ -34,6 +34,8 @@ NOSUDO=true DESTDIR=${destdir} ./hack/install-deps.sh
 # Install cri-containerd into release stage.
 make install -e DESTDIR=${destdir}
 
+# Copy crictl tool into release stage
+cp ${GOPATH}/bin/crictl ${destdir}/usr/local/bin/
 # Install systemd units into release stage.
 mkdir -p ${destdir}/etc/systemd/system
 cp ${ROOT}/contrib/systemd-units/* ${destdir}/etc/systemd/system/

@@ -52,7 +52,7 @@ CNI_CONFIG_DIR=${DESTDIR}/etc/cni/net.d
 RUNC_PKG=github.com/opencontainers/runc
 CNI_PKG=github.com/containernetworking/plugins
 CONTAINERD_PKG=github.com/containerd/containerd
-
+CRITOOL_PKG=github.com/kubernetes-incubator/cri-tools
 # Check GOPATH
 if [[ -z "${GOPATH}" ]]; then
   echo "GOPATH is not set"
@@ -125,3 +125,8 @@ checkout_repo ${CONTAINERD_PKG} ${CONTAINERD_VERSION}
 cd ${GOPATH}/src/${CONTAINERD_PKG}
 make
 ${sudo} make install -e DESTDIR=${CONTAINERD_DIR}
+
+#Install crictl
+checkout_repo ${CRITOOL_PKG} ${CRITOOL_VERSION}
+cd ${GOPATH}/src/${CRITOOL_PKG}
+make
