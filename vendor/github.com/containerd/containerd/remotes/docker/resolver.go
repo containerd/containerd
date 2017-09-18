@@ -116,6 +116,10 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 		urls = append(urls, fetcher.url("manifests", refspec.Object))
 	}
 
+	ctx, err = contextWithRepositoryScope(ctx, refspec, false)
+	if err != nil {
+		return "", ocispec.Descriptor{}, err
+	}
 	for _, u := range urls {
 		req, err := http.NewRequest(http.MethodHead, u, nil)
 		if err != nil {
@@ -228,8 +232,9 @@ func (r *dockerResolver) Pusher(ctx context.Context, ref string) (remotes.Pusher
 }
 
 type dockerBase struct {
-	base  url.URL
-	token string
+	refspec reference.Spec
+	base    url.URL
+	token   string
 
 	client   *http.Client
 	useBasic bool
@@ -268,6 +273,7 @@ func (r *dockerResolver) base(refspec reference.Spec) (*dockerBase, error) {
 	base.Path = path.Join("/v2", prefix)
 
 	return &dockerBase{
+		refspec:  refspec,
 		base:     base,
 		client:   r.client,
 		username: username,
@@ -430,14 +436,10 @@ func (r *dockerBase) setTokenAuth(ctx context.Context, params map[string]string)
 		service: params["service"],
 	}
 
-	scope, ok := params["scope"]
-	if !ok {
+	to.scopes = getTokenScopes(ctx, params)
+	if len(to.scopes) == 0 {
 		return errors.Errorf("no scope specified for token auth challenge")
 	}
-
-	// TODO: Get added scopes from context
-	to.scopes = []string{scope}
-
 	if r.secret != "" {
 		// Credential information is provided, use oauth POST endpoint
 		r.token, err = r.fetchTokenWithOAuth(ctx, to)
@@ -491,8 +493,9 @@ func (r *dockerBase) fetchTokenWithOAuth(ctx context.Context, to tokenOptions) (
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 405 && r.username != "" {
-		// It would be nice if registries would implement the specifications
+	// Registries without support for POST may return 404 for POST /v2/token.
+	// As of September 2017, GCR is known to return 404.
+	if (resp.StatusCode == 405 && r.username != "") || resp.StatusCode == 404 {
 		return r.getToken(ctx, to)
 	} else if resp.StatusCode < 200 || resp.StatusCode >= 400 {
 		b, _ := ioutil.ReadAll(resp.Body)

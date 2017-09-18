@@ -57,6 +57,9 @@ type Container struct {
 
 	// UpdatedAt is the time at which the container was updated.
 	UpdatedAt time.Time
+
+	// Extensions stores client-specified metadata
+	Extensions map[string]types.Any
 }
 
 type RuntimeInfo struct {
