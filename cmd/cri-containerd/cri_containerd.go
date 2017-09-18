@@ -42,6 +42,11 @@ func main() {
 		os.Exit(0)
 	}
 
+	if o.PrintDefaultConfig {
+		o.PrintDefaultTomlConfig()
+		os.Exit(0)
+	}
+
 	if !o.EnableSelinux {
 		selinux.SetDisabled()
 	}
