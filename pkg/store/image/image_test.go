@@ -99,7 +99,7 @@ func TestImageStore(t *testing.T) {
 	imgs = s.List()
 	assert.Len(imgs, 2)
 
-	t.Logf("get should return nil after deletion")
+	t.Logf("get should return empty struct and ErrNotExist after deletion")
 	img, err := s.Get(testID)
 	assert.Equal(Image{}, img)
 	assert.Equal(store.ErrNotExist, err)

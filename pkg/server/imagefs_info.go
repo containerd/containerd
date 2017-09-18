@@ -17,7 +17,7 @@ limitations under the License.
 package server
 
 import (
-	"errors"
+	"time"
 
 	"golang.org/x/net/context"
 
@@ -26,5 +26,26 @@ import (
 
 // ImageFsInfo returns information of the filesystem that is used to store images.
 func (c *criContainerdService) ImageFsInfo(ctx context.Context, r *runtime.ImageFsInfoRequest) (*runtime.ImageFsInfoResponse, error) {
-	return nil, errors.New("not implemented")
+	snapshots := c.snapshotStore.List()
+	timestamp := time.Now().UnixNano()
+	var usedBytes, inodesUsed uint64
+	for _, sn := range snapshots {
+		// Use the oldest timestamp as the timestamp of imagefs info.
+		if sn.Timestamp < timestamp {
+			timestamp = sn.Timestamp
+		}
+		usedBytes += sn.Size
+		inodesUsed += sn.Inodes
+	}
+	// TODO(random-liu): Handle content store
+	return &runtime.ImageFsInfoResponse{
+		ImageFilesystems: []*runtime.FilesystemUsage{
+			{
+				Timestamp:  timestamp,
+				StorageId:  &runtime.StorageIdentifier{Uuid: c.imageFSUUID},
+				UsedBytes:  &runtime.UInt64Value{Value: usedBytes},
+				InodesUsed: &runtime.UInt64Value{Value: inodesUsed},
+			},
+		},
+	}, nil
 }

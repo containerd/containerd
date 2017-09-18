@@ -280,3 +280,14 @@ func (in *instrumentedService) RemoveImage(ctx context.Context, r *runtime.Remov
 	}()
 	return in.criContainerdService.RemoveImage(ctx, r)
 }
+func (in *instrumentedService) ImageFsInfo(ctx context.Context, r *runtime.ImageFsInfoRequest) (res *runtime.ImageFsInfoResponse, err error) {
+	glog.V(4).Infof("ImageFsInfo")
+	defer func() {
+		if err != nil {
+			glog.Errorf("ImageFsInfo failed, error: %v", err)
+		} else {
+			glog.V(4).Infof("ImageFsInfo returns filesystem info %+v", res.ImageFilesystems)
+		}
+	}()
+	return in.criContainerdService.ImageFsInfo(ctx, r)
+}

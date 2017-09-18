@@ -24,6 +24,7 @@ import (
 	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
 	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
+	snapshotstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/snapshot"
 )
 
 const (
@@ -32,6 +33,7 @@ const (
 	// TODO(random-liu): Change this to image name after we have complete image
 	// management unit test framework.
 	testSandboxImage = "sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113798"
+	testImageFSUUID  = "test-image-fs-uuid"
 )
 
 // newTestCRIContainerdService creates a fake criContainerdService for test.
@@ -41,9 +43,11 @@ func newTestCRIContainerdService() *criContainerdService {
 			RootDir:      testRootDir,
 			SandboxImage: testSandboxImage,
 		},
+		imageFSUUID:        testImageFSUUID,
 		os:                 ostesting.NewFakeOS(),
 		sandboxStore:       sandboxstore.NewStore(),
 		imageStore:         imagestore.NewStore(),
+		snapshotStore:      snapshotstore.NewStore(),
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerStore:     containerstore.NewStore(),
 		containerNameIndex: registrar.NewRegistrar(),

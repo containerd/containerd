@@ -20,12 +20,15 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/plugin"
 	"github.com/cri-o/ocicni/pkg/ocicni"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
@@ -39,6 +42,7 @@ import (
 	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
 	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
+	snapshotstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/snapshot"
 )
 
 const (
@@ -60,6 +64,8 @@ type CRIContainerdService interface {
 type criContainerdService struct {
 	// config contains all configurations.
 	config options.Config
+	// imageFSUUID is the device uuid of image filesystem.
+	imageFSUUID string
 	// server is the grpc server.
 	server *grpc.Server
 	// os is an interface for all required os operations.
@@ -76,6 +82,8 @@ type criContainerdService struct {
 	containerNameIndex *registrar.Registrar
 	// imageStore stores all resources associated with images.
 	imageStore *imagestore.Store
+	// snapshotStore stores information of all snapshots.
+	snapshotStore *snapshotstore.Store
 	// taskService is containerd tasks client.
 	taskService tasks.TasksClient
 	// contentStoreService is the containerd content service client.
@@ -113,6 +121,7 @@ func NewCRIContainerdService(config options.Config) (CRIContainerdService, error
 		sandboxStore:        sandboxstore.NewStore(),
 		containerStore:      containerstore.NewStore(),
 		imageStore:          imagestore.NewStore(),
+		snapshotStore:       snapshotstore.NewStore(),
 		sandboxNameIndex:    registrar.NewRegistrar(),
 		containerNameIndex:  registrar.NewRegistrar(),
 		taskService:         client.TaskService(),
@@ -121,11 +130,16 @@ func NewCRIContainerdService(config options.Config) (CRIContainerdService, error
 		client:              client,
 	}
 
-	netPlugin, err := ocicni.InitCNI(config.NetworkPluginConfDir, config.NetworkPluginBinDir)
+	imageFSPath := imageFSPath(config.ContainerdRootDir, config.ContainerdSnapshotter)
+	c.imageFSUUID, err = c.getDeviceUUID(imageFSPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get imagefs uuid: %v", err)
+	}
+
+	c.netPlugin, err = ocicni.InitCNI(config.NetworkPluginConfDir, config.NetworkPluginBinDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize cni plugin: %v", err)
 	}
-	c.netPlugin = netPlugin
 
 	// prepare streaming server
 	c.streamServer, err = newStreamServer(c, config.StreamServerAddress, config.StreamServerPort)
@@ -155,6 +169,15 @@ func (c *criContainerdService) Run() error {
 	// Start event handler.
 	glog.V(2).Info("Start event monitor")
 	eventMonitorCloseCh := c.eventMonitor.start()
+
+	// Start snapshot stats syncer, it doesn't need to be stopped.
+	glog.V(2).Info("Start snapshots syncer")
+	snapshotsSyncer := newSnapshotsSyncer(
+		c.snapshotStore,
+		c.client.SnapshotService(c.config.ContainerdSnapshotter),
+		time.Duration(c.config.StatsCollectPeriod)*time.Second,
+	)
+	snapshotsSyncer.start()
 
 	// Start streaming server.
 	glog.V(2).Info("Start streaming server")
@@ -208,4 +231,19 @@ func (c *criContainerdService) Stop() {
 	c.eventMonitor.stop()
 	c.streamServer.Stop() // nolint: errcheck
 	c.server.Stop()
+}
+
+// getDeviceUUID gets device uuid for a given path.
+func (c *criContainerdService) getDeviceUUID(path string) (string, error) {
+	info, err := c.os.LookupMount(path)
+	if err != nil {
+		return "", err
+	}
+	return c.os.DeviceUUID(info.Source)
+}
+
+// imageFSPath returns containerd image filesystem path.
+// Note that if containerd changes directory layout, we also needs to change this.
+func imageFSPath(rootDir, snapshotter string) string {
+	return filepath.Join(rootDir, fmt.Sprintf("%s.%s", plugin.SnapshotPlugin, snapshotter))
 }
