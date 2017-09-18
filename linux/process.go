@@ -95,3 +95,16 @@ func (p *Process) Start(ctx context.Context) error {
 	}
 	return nil
 }
+
+func (p *Process) Wait(ctx context.Context) (*runtime.Exit, error) {
+	r, err := p.t.shim.Wait(ctx, &shim.WaitRequest{
+		ID: p.id,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &runtime.Exit{
+		Timestamp: r.ExitedAt,
+		Status:    r.ExitStatus,
+	}, nil
+}

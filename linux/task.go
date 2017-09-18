@@ -22,12 +22,18 @@ type Task struct {
 	shim      *client.Client
 	namespace string
 	cg        cgroups.Cgroup
+	monitor   runtime.TaskMonitor
 }
 
-func newTask(id, namespace string, pid int, shim *client.Client) (*Task, error) {
-	cg, err := cgroups.Load(cgroups.V1, cgroups.PidPath(pid))
-	if err != nil {
-		return nil, err
+func newTask(id, namespace string, pid int, shim *client.Client, monitor runtime.TaskMonitor) (*Task, error) {
+	var (
+		err error
+		cg  cgroups.Cgroup
+	)
+	if pid > 0 {
+		if cg, err = cgroups.Load(cgroups.V1, cgroups.PidPath(pid)); err != nil {
+			return nil, err
+		}
 	}
 	return &Task{
 		id:        id,
@@ -35,6 +41,7 @@ func newTask(id, namespace string, pid int, shim *client.Client) (*Task, error) 
 		shim:      shim,
 		namespace: namespace,
 		cg:        cg,
+		monitor:   monitor,
 	}, nil
 }
 
@@ -51,11 +58,23 @@ func (t *Task) Info() runtime.TaskInfo {
 }
 
 func (t *Task) Start(ctx context.Context) error {
-	_, err := t.shim.Start(ctx, &shim.StartRequest{
+	hasCgroup := t.cg != nil
+	r, err := t.shim.Start(ctx, &shim.StartRequest{
 		ID: t.id,
 	})
 	if err != nil {
 		return errdefs.FromGRPC(err)
+	}
+	t.pid = int(r.Pid)
+	if !hasCgroup {
+		cg, err := cgroups.Load(cgroups.V1, cgroups.PidPath(t.pid))
+		if err != nil {
+			return err
+		}
+		t.cg = cg
+		if err := t.monitor.Monitor(t); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -224,4 +243,17 @@ func (t *Task) Metrics(ctx context.Context) (interface{}, error) {
 
 func (t *Task) Cgroup() cgroups.Cgroup {
 	return t.cg
+}
+
+func (t *Task) Wait(ctx context.Context) (*runtime.Exit, error) {
+	r, err := t.shim.Wait(ctx, &shim.WaitRequest{
+		ID: t.id,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &runtime.Exit{
+		Timestamp: r.ExitedAt,
+		Status:    r.ExitStatus,
+	}, nil
 }

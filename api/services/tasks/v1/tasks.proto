@@ -49,6 +49,8 @@ service Tasks {
 	rpc Update(UpdateTaskRequest) returns (google.protobuf.Empty);
 
 	rpc Metrics(MetricsRequest) returns (MetricsResponse);
+
+	rpc Wait(WaitRequest) returns (WaitResponse);
 }
 
 message CreateTaskRequest {
@@ -193,4 +195,14 @@ message MetricsRequest {
 
 message MetricsResponse {
 	repeated types.Metric metrics = 1;
+}
+
+message WaitRequest {
+	string container_id = 1;
+	string exec_id = 2;
+}
+
+message WaitResponse {
+	uint32 exit_status = 1;
+	google.protobuf.Timestamp exited_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }

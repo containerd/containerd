@@ -24,7 +24,7 @@ import (
 )
 
 type execProcess struct {
-	sync.WaitGroup
+	wg sync.WaitGroup
 
 	processState
 
@@ -41,7 +41,8 @@ type execProcess struct {
 	path    string
 	spec    specs.Process
 
-	parent *initProcess
+	parent    *initProcess
+	waitBlock chan struct{}
 }
 
 func newExecProcess(context context.Context, path string, r *shimapi.ExecProcessRequest, parent *initProcess, id string) (process, error) {
@@ -66,9 +67,14 @@ func newExecProcess(context context.Context, path string, r *shimapi.ExecProcess
 			stderr:   r.Stderr,
 			terminal: r.Terminal,
 		},
+		waitBlock: make(chan struct{}),
 	}
 	e.processState = &execCreatedState{p: e}
 	return e, nil
+}
+
+func (e *execProcess) Wait() {
+	<-e.waitBlock
 }
 
 func (e *execProcess) ID() string {
@@ -97,13 +103,18 @@ func (e *execProcess) setExited(status int) {
 	e.status = status
 	e.exited = time.Now()
 	e.parent.platform.shutdownConsole(context.Background(), e.console)
-	e.Wait()
+	close(e.waitBlock)
+}
+
+func (e *execProcess) delete(ctx context.Context) error {
+	e.wg.Wait()
 	if e.io != nil {
 		for _, c := range e.closers {
 			c.Close()
 		}
 		e.io.Close()
 	}
+	return nil
 }
 
 func (e *execProcess) resize(ws console.WinSize) error {
@@ -175,11 +186,11 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 		if err != nil {
 			return errors.Wrap(err, "failed to retrieve console master")
 		}
-		if e.console, err = e.parent.platform.copyConsole(ctx, console, e.stdio.stdin, e.stdio.stdout, e.stdio.stderr, &e.WaitGroup, &copyWaitGroup); err != nil {
+		if e.console, err = e.parent.platform.copyConsole(ctx, console, e.stdio.stdin, e.stdio.stdout, e.stdio.stderr, &e.wg, &copyWaitGroup); err != nil {
 			return errors.Wrap(err, "failed to start console copy")
 		}
 	} else if !e.stdio.isNull() {
-		if err := copyPipes(ctx, e.io, e.stdio.stdin, e.stdio.stdout, e.stdio.stderr, &e.WaitGroup, &copyWaitGroup); err != nil {
+		if err := copyPipes(ctx, e.io, e.stdio.stdin, e.stdio.stdout, e.stdio.stderr, &e.wg, &copyWaitGroup); err != nil {
 			return errors.Wrap(err, "failed to start io pipe copy")
 		}
 	}

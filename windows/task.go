@@ -274,6 +274,14 @@ func (t *task) Metrics(ctx context.Context) (interface{}, error) {
 	return nil, errors.Wrap(errdefs.ErrUnavailable, "not supported")
 }
 
+func (t *task) Wait(ctx context.Context) (*runtime.Exit, error) {
+	p := t.getProcess(t.id)
+	if p == nil {
+		return nil, errors.Wrapf(errdefs.ErrNotFound, "no such process %d", t.id)
+	}
+	return p.Wait(ctx)
+}
+
 func (t *task) newProcess(ctx context.Context, id string, conf *hcsshim.ProcessConfig, pset *pipeSet) (*process, error) {
 	var (
 		err error

@@ -478,6 +478,27 @@ func (s *Service) Metrics(ctx context.Context, r *api.MetricsRequest) (*api.Metr
 	return &resp, nil
 }
 
+func (s *Service) Wait(ctx context.Context, r *api.WaitRequest) (*api.WaitResponse, error) {
+	t, err := s.getTask(ctx, r.ContainerID)
+	if err != nil {
+		return nil, err
+	}
+	p := runtime.Process(t)
+	if r.ExecID != "" {
+		if p, err = t.Process(ctx, r.ExecID); err != nil {
+			return nil, errdefs.ToGRPC(err)
+		}
+	}
+	exit, err := p.Wait(ctx)
+	if err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	return &api.WaitResponse{
+		ExitStatus: exit.Status,
+		ExitedAt:   exit.Timestamp,
+	}, nil
+}
+
 func getTasksMetrics(ctx context.Context, filter filters.Filter, tasks []runtime.Task, r *api.MetricsResponse) {
 	for _, tk := range tasks {
 		if !filter.Match(filters.AdapterFunc(func(fieldpath []string) (string, bool) {

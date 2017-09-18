@@ -769,9 +769,16 @@ func TestShimSigkilled(t *testing.T) {
 
 	<-statusC
 
+	for i := 0; i < 10; i++ {
+		if err := unix.Kill(int(pid), 0); err == unix.ESRCH {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 	if err := unix.Kill(int(pid), 0); err != unix.ESRCH {
 		t.Errorf("pid %d still exists", pid)
 	}
+
 }
 
 func TestDaemonRestartWithRunningShim(t *testing.T) {

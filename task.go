@@ -12,7 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/content"
@@ -20,7 +19,6 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/rootfs"
-	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/typeurl"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go/v1"
@@ -135,8 +133,7 @@ type task struct {
 	id  string
 	pid uint32
 
-	mu       sync.Mutex
-	deferred *tasks.CreateTaskRequest
+	mu sync.Mutex
 }
 
 // Pid returns the pid or process id for the task
@@ -145,28 +142,15 @@ func (t *task) Pid() uint32 {
 }
 
 func (t *task) Start(ctx context.Context) error {
-	t.mu.Lock()
-	deferred := t.deferred
-	t.mu.Unlock()
-	if deferred != nil {
-		response, err := t.client.TaskService().Create(ctx, deferred)
-		t.mu.Lock()
-		t.deferred = nil
-		t.mu.Unlock()
-		if err != nil {
-			t.io.Close()
-			return errdefs.FromGRPC(err)
-		}
-		t.pid = response.Pid
-		return nil
-	}
-	_, err := t.client.TaskService().Start(ctx, &tasks.StartRequest{
+	r, err := t.client.TaskService().Start(ctx, &tasks.StartRequest{
 		ContainerID: t.id,
 	})
 	if err != nil {
 		t.io.Close()
+		return errdefs.FromGRPC(err)
 	}
-	return errdefs.FromGRPC(err)
+	t.pid = r.Pid
+	return nil
 }
 
 func (t *task) Kill(ctx context.Context, s syscall.Signal, opts ...KillOpts) error {
@@ -216,60 +200,24 @@ func (t *task) Status(ctx context.Context) (Status, error) {
 }
 
 func (t *task) Wait(ctx context.Context) (<-chan ExitStatus, error) {
-	cancellable, cancel := context.WithCancel(ctx)
-	eventstream, err := t.client.EventService().Subscribe(cancellable, &eventsapi.SubscribeRequest{
-		Filters: []string{"topic==" + runtime.TaskExitEventTopic},
-	})
-	if err != nil {
-		cancel()
-		return nil, errdefs.FromGRPC(err)
-	}
-
-	chStatus := make(chan ExitStatus, 1)
-
-	t.mu.Lock()
-	checkpoint := t.deferred != nil
-	t.mu.Unlock()
-	if !checkpoint {
-		// first check if the task has exited
-		status, err := t.Status(ctx)
-		if err != nil {
-			cancel()
-			return nil, errdefs.FromGRPC(err)
-		}
-		if status.Status == Stopped {
-			cancel()
-			chStatus <- ExitStatus{code: status.ExitStatus, exitedAt: status.ExitTime}
-			return chStatus, nil
-		}
-	}
-
+	c := make(chan ExitStatus, 1)
 	go func() {
-		defer cancel()
-		chStatus <- ExitStatus{} // signal that goroutine is running
-		for {
-			evt, err := eventstream.Recv()
-			if err != nil {
-				chStatus <- ExitStatus{code: UnknownExitStatus, err: errdefs.FromGRPC(err)}
-				return
+		r, err := t.client.TaskService().Wait(ctx, &tasks.WaitRequest{
+			ContainerID: t.id,
+		})
+		if err != nil {
+			c <- ExitStatus{
+				code: UnknownExitStatus,
+				err:  err,
 			}
-			if typeurl.Is(evt.Event, &eventsapi.TaskExit{}) {
-				v, err := typeurl.UnmarshalAny(evt.Event)
-				if err != nil {
-					chStatus <- ExitStatus{code: UnknownExitStatus, err: err}
-					return
-				}
-				e := v.(*eventsapi.TaskExit)
-				if e.ContainerID == t.id && e.Pid == t.pid {
-					chStatus <- ExitStatus{code: e.ExitStatus, exitedAt: e.ExitedAt}
-					return
-				}
-			}
+			return
+		}
+		c <- ExitStatus{
+			code:     r.ExitStatus,
+			exitedAt: r.ExitedAt,
 		}
 	}()
-
-	<-chStatus // wait for the goroutine to be running
-	return chStatus, nil
+	return c, nil
 }
 
 // Delete deletes the task and its runtime state

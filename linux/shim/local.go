@@ -86,3 +86,7 @@ func (c *local) ShimInfo(ctx context.Context, in *google_protobuf.Empty, opts ..
 func (c *local) Update(ctx context.Context, in *shimapi.UpdateTaskRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
 	return c.s.Update(ctx, in)
 }
+
+func (c *local) Wait(ctx context.Context, in *shimapi.WaitRequest, opts ...grpc.CallOption) (*shimapi.WaitResponse, error) {
+	return c.s.Wait(ctx, in)
+}
