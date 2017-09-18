@@ -17,41 +17,18 @@ set -o nounset
 set -o pipefail
 
 source $(dirname "${BASH_SOURCE[0]}")/test-utils.sh
+cd ${ROOT}
 
 # FOCUS focuses the test to run.
-FOCUS=${FOCUS:-}
-# SKIP skips the test to skip.
-SKIP=${SKIP:-""}
+FOCUS=${FOCUS:-""}
 # REPORT_DIR is the the directory to store test logs.
-REPORT_DIR=${REPORT_DIR:-"/tmp/test-cri"}
-
-# Check GOPATH
-if [[ -z "${GOPATH}" ]]; then
-  echo "GOPATH is not set"
-  exit 1
-fi
-
-# For multiple GOPATHs, keep the first one only
-GOPATH=${GOPATH%%:*}
-
-CRITEST=${GOPATH}/bin/critest
-CRITOOL_PKG=github.com/kubernetes-incubator/cri-tools
-
-# Install critest
-if [ ! -x "$(command -v ${CRITEST})" ]; then
-  go get -d ${CRITOOL_PKG}/...
-  cd ${GOPATH}/src/${CRITOOL_PKG}
-  git fetch --all
-  git checkout ${CRITOOL_VERSION}
-  make
-fi
-which ${CRITEST}
+REPORT_DIR=${REPORT_DIR:-"/tmp/test-integration"}
 
 mkdir -p ${REPORT_DIR}
 test_setup ${REPORT_DIR}
 
-# Run cri validation test
-sudo env PATH=${PATH} GOPATH=${GOPATH} ${CRITEST} --runtime-endpoint=${CRICONTAINERD_SOCK} --focus="${FOCUS}" --ginkgo-flags="--skip=\"${SKIP}\"" validation
+# Run integration test.
+sudo ${ROOT}/_output/integration.test --test.run="${FOCUS}" --test.v
 test_exit_code=$?
 
 test_teardown

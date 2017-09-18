@@ -26,7 +26,8 @@ VERSION := $(VERSION:v%=%)
 TARBALL := cri-containerd-$(VERSION).tar.gz
 BUILD_TAGS := apparmor
 GO_LDFLAGS := -X $(PROJECT)/pkg/version.criContainerdVersion=$(VERSION)
-SOURCES := $(shell find . -name '*.go')
+SOURCES := $(shell find cmd/ pkg/ vendor/ -name '*.go')
+INTEGRATION_SOURCES := $(shell find integration/ -name '*.go')
 
 all: binaries
 
@@ -35,20 +36,21 @@ default: help
 help:
 	@echo "Usage: make <target>"
 	@echo
-	@echo " * 'install'        - Install binaries to system locations"
-	@echo " * 'binaries'       - Build cri-containerd"
-	@echo " * 'static-binaries - Build static cri-containerd"
-	@echo " * 'release'        - Build release tarball"
-	@echo " * 'push'           - Push release tarball to GCS"
-	@echo " * 'test'           - Test cri-containerd"
-	@echo " * 'test-cri'       - Test cri-containerd with cri validation test"
-	@echo " * 'test-e2e-node'  - Test cri-containerd with Kubernetes node e2e test"
-	@echo " * 'clean'          - Clean artifacts"
-	@echo " * 'verify'         - Execute the source code verification tools"
-	@echo " * 'install.tools'  - Install tools used by verify"
-	@echo " * 'install.deps'   - Install dependencies of cri-containerd (containerd, runc, cni) Note: BUILDTAGS defaults to 'seccomp apparmor' for runc build"
-	@echo " * 'uninstall'      - Remove installed binaries from system locations"
-	@echo " * 'version'        - Print current cri-containerd release version"
+	@echo " * 'install'          - Install binaries to system locations"
+	@echo " * 'binaries'         - Build cri-containerd"
+	@echo " * 'static-binaries   - Build static cri-containerd"
+	@echo " * 'release'          - Build release tarball"
+	@echo " * 'push'             - Push release tarball to GCS"
+	@echo " * 'test'             - Test cri-containerd with unit test"
+	@echo " * 'test-integration' - Test cri-containerd with integration test"
+	@echo " * 'test-cri'         - Test cri-containerd with cri validation test"
+	@echo " * 'test-e2e-node'    - Test cri-containerd with Kubernetes node e2e test"
+	@echo " * 'clean'            - Clean artifacts"
+	@echo " * 'verify'           - Execute the source code verification tools"
+	@echo " * 'install.tools'    - Install tools used by verify"
+	@echo " * 'install.deps'     - Install dependencies of cri-containerd (containerd, runc, cni) Note: BUILDTAGS defaults to 'seccomp apparmor' for runc build"
+	@echo " * 'uninstall'        - Remove installed binaries from system locations"
+	@echo " * 'version'          - Print current cri-containerd release version"
 
 verify: lint gofmt boiler
 
@@ -79,6 +81,12 @@ test:
 		-tags '$(BUILD_TAGS)' \
 	        -ldflags '$(GO_LDFLAGS)' \
 		-gcflags '$(GO_GCFLAGS)'
+
+$(BUILD_DIR)/integration.test: $(INTEGRATION_SOURCES)
+	go test -c $(PROJECT)/integration -o $(BUILD_DIR)/integration.test
+
+test-integration: $(BUILD_DIR)/integration.test binaries
+	@./hack/test-integration.sh
 
 test-cri: binaries
 	@./hack/test-cri.sh
@@ -147,6 +155,7 @@ install.tools: .install.gitvalidation .install.gometalinter
 	install \
 	lint \
 	test \
+	test-integration \
 	test-cri \
 	test-e2e-node \
 	uninstall \

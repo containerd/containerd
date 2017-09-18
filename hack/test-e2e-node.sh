@@ -26,7 +26,9 @@ DEFAULT_SKIP+="|ImageID"
 export FOCUS=${FOCUS:-""}
 # SKIP skips the test to skip.
 export SKIP=${SKIP:-${DEFAULT_SKIP}}
+# REPORT_DIR is the the directory to store test logs.
 REPORT_DIR=${REPORT_DIR:-"/tmp/test-e2e-node"}
+# UPLOAD_LOG indicates whether to upload test log to gcs.
 UPLOAD_LOG=${UPLOAD_LOG:-false}
 
 # Check GOPATH
@@ -67,18 +69,18 @@ git fetch --all
 git checkout ${KUBERNETES_VERSION}
 
 mkdir -p ${REPORT_DIR}
-start_cri_containerd ${REPORT_DIR}
+test_setup ${REPORT_DIR}
 
 make test-e2e-node \
 	RUNTIME=remote \
-	CONTAINER_RUNTIME_ENDPOINT=unix:///var/run/cri-containerd.sock \
+	CONTAINER_RUNTIME_ENDPOINT=unix://${CRICONTAINERD_SOCK} \
 	ARTIFACTS=${REPORT_DIR} \
 	TEST_ARGS='--kubelet-flags=--cgroups-per-qos=true \
 	--kubelet-flags=--cgroup-root=/ \
 	--prepull-images=false'
 test_exit_code=$?
 
-kill_cri_containerd
+test_teardown
 
 sudo iptables-restore < ${ORIGINAL_RULES}
 rm ${ORIGINAL_RULES}
