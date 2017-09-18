@@ -65,9 +65,9 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	}
 
 	// Ensure sandbox container image snapshot.
-	image, err := c.ensureImageExists(ctx, c.sandboxImage)
+	image, err := c.ensureImageExists(ctx, c.config.SandboxImage)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox image %q: %v", c.sandboxImage, err)
+		return nil, fmt.Errorf("failed to get sandbox image %q: %v", c.config.SandboxImage, err)
 	}
 	//Create Network Namespace if it is not in host network
 	hostNet := config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostNetwork()
@@ -131,7 +131,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		specOpts = append(specOpts, containerd.WithUserID(uint32(uid.GetValue())))
 	}
 	opts := []containerd.NewContainerOpts{
-		containerd.WithSnapshotter(c.snapshotter),
+		containerd.WithSnapshotter(c.config.ContainerdSnapshotter),
 		containerd.WithNewSnapshot(id, image.Image),
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(labels),
@@ -149,7 +149,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	}()
 
 	// Create sandbox container root directory.
-	sandboxRootDir := getSandboxRootDir(c.rootDir, id)
+	sandboxRootDir := getSandboxRootDir(c.config.RootDir, id)
 	if err := c.os.MkdirAll(sandboxRootDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create sandbox root directory %q: %v",
 			sandboxRootDir, err)
