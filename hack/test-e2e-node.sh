@@ -20,7 +20,7 @@ source $(dirname "${BASH_SOURCE[0]}")/test-utils.sh
 
 DEFAULT_SKIP="\[Flaky\]|\[Slow\]|\[Serial\]"
 DEFAULT_SKIP+="|querying\s\/stats\/summary"
-DEFAULT_SKIP+="|pull\sfrom\sprivate\sregistry\swith\ssecret"
+DEFAULT_SKIP+="|ImageID"
 
 # FOCUS focuses the test to run.
 export FOCUS=${FOCUS:-""}
@@ -73,7 +73,9 @@ make test-e2e-node \
 	RUNTIME=remote \
 	CONTAINER_RUNTIME_ENDPOINT=unix:///var/run/cri-containerd.sock \
 	ARTIFACTS=${REPORT_DIR} \
-	TEST_ARGS='--kubelet-flags=--cgroups-per-qos=true --kubelet-flags=--cgroup-root=/' # Enable the QOS tree.
+	TEST_ARGS='--kubelet-flags=--cgroups-per-qos=true \
+	--kubelet-flags=--cgroup-root=/ \
+	--prepull-images=false'
 test_exit_code=$?
 
 kill_cri_containerd
