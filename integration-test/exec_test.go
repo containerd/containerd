@@ -458,3 +458,56 @@ func (cs *ContainerdSuite) TestExecKillShimNoPanic(t *check.C) {
 	t.Assert(err, checker.Equals, nil)
 	t.Assert(len(containers), checker.Equals, 0)
 }
+
+func (cs *ContainerdSuite) TestBusyboxTopExecShDefunct(t *check.C) {
+	bundleName := "busybox-top"
+	if err := CreateBusyboxBundle(bundleName, []string{"top"}); err != nil {
+		t.Fatal(err)
+	}
+
+	var (
+		err   error
+		initp *ContainerProcess
+	)
+
+	containerID := "top"
+	initp, err = cs.StartContainer(containerID, bundleName)
+	t.Assert(err, checker.Equals, nil)
+
+	execID := "sh"
+	p, err := cs.AddProcessToContainer(initp, execID, "/", []string{"PATH=/bin"}, []string{"sh"}, 0, 0)
+	t.Assert(err, checker.Equals, nil)
+
+	for _, evt := range []types.Event{
+		{
+			Type:   "start-container",
+			Id:     containerID,
+			Status: 0,
+			Pid:    "",
+		},
+		{
+			Type:   "start-process",
+			Id:     containerID,
+			Status: 0,
+			Pid:    execID,
+		},
+	} {
+		ch := initp.GetEventsChannel()
+		e := <-ch
+		evt.Timestamp = e.Timestamp
+		t.Assert(*e, checker.Equals, evt)
+	}
+
+	p.io.stdinf.Write([]byte("sleep 1000&\n"))
+	p.io.stdinf.Write([]byte("sleep 1&\n"))
+	p.io.stdinf.Write([]byte("exit\n"))
+	p.CloseStdin()
+
+	<-time.After(2 * time.Second)
+
+	b, err := exec.Command("ps", "afx").CombinedOutput()
+	t.Assert(err, checker.Equals, nil)
+	t.Assert(string(b), checker.Not(checker.Contains), "<defunct>")
+
+	cs.KillContainer(containerID)
+}
