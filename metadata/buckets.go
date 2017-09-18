@@ -50,6 +50,7 @@ var (
 	bucketKeySnapshotKey = []byte("snapshotKey")
 	bucketKeySnapshotter = []byte("snapshotter")
 	bucketKeyTarget      = []byte("target")
+	bucketKeyExtensions  = []byte("extensions")
 )
 
 func getBucket(tx *bolt.Tx, keys ...[]byte) *bolt.Bucket {
