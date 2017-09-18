@@ -20,7 +20,7 @@ type pipeSet struct {
 	stderr net.Conn
 }
 
-// NewIO connects to the provided pipe addresses
+// newPipeSet connects to the provided pipe addresses
 func newPipeSet(ctx context.Context, io runtime.IO) (*pipeSet, error) {
 	var (
 		err    error

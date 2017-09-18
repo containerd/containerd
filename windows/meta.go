@@ -19,9 +19,9 @@ type layerFolderStore struct {
 }
 
 func (s *layerFolderStore) Create(id, layer string) error {
-	bkt, err := s.tx.CreateBucketIfNotExists([]byte(pluginID))
+	bkt, err := s.tx.CreateBucketIfNotExists([]byte(layerFolderStoreID))
 	if err != nil {
-		return errors.Wrapf(err, "failed to create bucket %s", pluginID)
+		return errors.Wrapf(err, "failed to create bucket %s", layerFolderStoreID)
 	}
 	err = bkt.Put([]byte(id), []byte(layer))
 	if err != nil {
@@ -32,18 +32,18 @@ func (s *layerFolderStore) Create(id, layer string) error {
 }
 
 func (s *layerFolderStore) Get(id string) (string, error) {
-	bkt := s.tx.Bucket([]byte(pluginID))
+	bkt := s.tx.Bucket([]byte(layerFolderStoreID))
 	if bkt == nil {
-		return "", errors.Wrapf(errdefs.ErrNotFound, "bucket %s", pluginID)
+		return "", errors.Wrapf(errdefs.ErrNotFound, "bucket %s", layerFolderStoreID)
 	}
 
 	return string(bkt.Get([]byte(id))), nil
 }
 
 func (s *layerFolderStore) Delete(id string) error {
-	bkt := s.tx.Bucket([]byte(pluginID))
+	bkt := s.tx.Bucket([]byte(layerFolderStoreID))
 	if bkt == nil {
-		return errors.Wrapf(errdefs.ErrNotFound, "bucket %s", pluginID)
+		return errors.Wrapf(errdefs.ErrNotFound, "bucket %s", layerFolderStoreID)
 	}
 
 	if err := bkt.Delete([]byte(id)); err != nil {

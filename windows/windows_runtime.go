@@ -27,29 +27,27 @@ import (
 )
 
 const (
-	runtimeName              = "windows"
-	hcsshimOwner             = "containerd"
-	defaultTerminateDuration = 5 * time.Minute
+	windowsRuntimeName = "windows"
 )
 
 var (
-	pluginID = fmt.Sprintf("%s.%s", plugin.RuntimePlugin, runtimeName)
+	windowsPluginID = fmt.Sprintf("%s.%s", plugin.RuntimePlugin, windowsRuntimeName)
 )
 
 var _ = (runtime.Runtime)(&windowsRuntime{})
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		ID:   runtimeName,
+		ID:   windowsRuntimeName,
 		Type: plugin.RuntimePlugin,
-		Init: New,
+		Init: NewWindowsPlugin,
 		Requires: []plugin.PluginType{
 			plugin.MetadataPlugin,
 		},
 	})
 }
 
-func New(ic *plugin.InitContext) (interface{}, error) {
+func NewWindowsPlugin(ic *plugin.InitContext) (interface{}, error) {
 	if err := os.MkdirAll(ic.Root, 0700); err != nil {
 		return nil, errors.Wrapf(err, "could not create state directory at %s", ic.Root)
 	}
@@ -93,7 +91,7 @@ type windowsRuntime struct {
 }
 
 func (r *windowsRuntime) ID() string {
-	return pluginID
+	return windowsPluginID
 }
 
 func (r *windowsRuntime) Create(ctx context.Context, id string, opts runtime.CreateOpts) (runtime.Task, error) {
@@ -243,7 +241,7 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, spec
 		conf *hcsshim.ContainerConfig
 		nsid = namespace + "-" + id
 	)
-	if conf, err = newWindowsContainerConfig(ctx, hcsshimOwner, nsid, spec); err != nil {
+	if conf, err = newWindowsContainerConfig(ctx, windowsPluginID, nsid, spec); err != nil {
 		return nil, err
 	}
 	defer func() {
@@ -297,6 +295,7 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, spec
 		spec:              spec,
 		processes:         make(map[string]*process),
 		hyperV:            spec.Windows.HyperV != nil,
+		isWindows:         true,
 		publisher:         r.publisher,
 		rwLayer:           conf.LayerFolderPath,
 		pidPool:           r.pidPool,
@@ -332,52 +331,7 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, spec
 }
 
 func (r *windowsRuntime) cleanup(ctx context.Context) {
-	cp, err := hcsshim.GetContainers(hcsshim.ComputeSystemQuery{
-		Types:  []string{"Container"},
-		Owners: []string{hcsshimOwner},
-	})
-	if err != nil {
-		log.G(ctx).Warn("failed to retrieve running containers")
-		return
-	}
-
-	for _, p := range cp {
-		container, err := hcsshim.OpenContainer(p.ID)
-		if err != nil {
-			log.G(ctx).Warnf("failed open container %s", p.ID)
-			continue
-		}
-
-		err = container.Terminate()
-		if err == nil || hcsshim.IsPending(err) || hcsshim.IsAlreadyStopped(err) {
-			container.Wait()
-		}
-		container.Close()
-
-		// TODO: remove this once we have a windows snapshotter
-		var layerFolderPath string
-		if err := r.db.View(func(tx *bolt.Tx) error {
-			s := newLayerFolderStore(tx)
-			l, e := s.Get(p.ID)
-			if err == nil {
-				layerFolderPath = l
-			}
-			return e
-		}); err == nil && layerFolderPath != "" {
-			removeLayer(ctx, layerFolderPath)
-			if dbErr := r.db.Update(func(tx *bolt.Tx) error {
-				s := newLayerFolderStore(tx)
-				return s.Delete(p.ID)
-			}); dbErr != nil {
-				log.G(ctx).WithField("id", p.ID).
-					Error("failed to remove key from metadata")
-			}
-		} else {
-			log.G(ctx).WithField("id", p.ID).
-				Debug("key not found in metadata, R/W layer may be leaked")
-		}
-
-	}
+	cleanupRunningContainers(ctx, r.db, windowsPluginID, removeLayer)
 }
 
 func (r *windowsRuntime) serviceTask(ctx context.Context, namespace, id string, spec *specs.Spec) {

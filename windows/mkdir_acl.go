@@ -1,0 +1,122 @@
+// +build windows
+
+package windows
+
+import (
+	"os"
+	"regexp"
+	"syscall"
+	"unsafe"
+
+	winio "github.com/Microsoft/go-winio"
+	"golang.org/x/sys/windows"
+)
+
+const (
+	// sddlAdministratorsLocalSystem is local administrators plus NT AUTHORITY\System
+	sddlAdministratorsLocalSystem = "D:P(A;OICI;GA;;;BA)(A;OICI;GA;;;SY)"
+	// sddlNtvmAdministratorsLocalSystem is NT VIRTUAL MACHINE\Virtual Machines plus local administrators plus NT AUTHORITY\System
+	sddlNtvmAdministratorsLocalSystem = "D:P(A;OICI;GA;;;S-1-5-83-0)(A;OICI;GA;;;BA)(A;OICI;GA;;;SY)"
+)
+
+var (
+	// mkdirallRe matches windows paths and is volume aware
+	mkdirallRe = regexp.MustCompile(`^\\\\\?\\Volume{[a-z0-9-]+}$`)
+)
+
+// mkdirWithACL creates a new directory. If there is an error, it will be of
+// type *PathError. .
+//
+// This is a modified and combined version of os.Mkdir and windows.Mkdir
+// in golang to cater for creating a directory am ACL permitting full
+// access, with inheritance, to any subfolder/file for Built-in Administrators
+// and Local System.
+func mkdirWithACL(name string, sddl string) error {
+	sa := windows.SecurityAttributes{Length: 0}
+	sd, err := winio.SddlToSecurityDescriptor(sddl)
+	if err != nil {
+		return &os.PathError{Op: "mkdir", Path: name, Err: err}
+	}
+	sa.Length = uint32(unsafe.Sizeof(sa))
+	sa.InheritHandle = 1
+	sa.SecurityDescriptor = uintptr(unsafe.Pointer(&sd[0]))
+
+	namep, err := windows.UTF16PtrFromString(name)
+	if err != nil {
+		return &os.PathError{Op: "mkdir", Path: name, Err: err}
+	}
+
+	e := windows.CreateDirectory(namep, &sa)
+	if e != nil {
+		return &os.PathError{Op: "mkdir", Path: name, Err: e}
+	}
+	return nil
+}
+
+// mkdirall is a custom version of os.MkdirAll modified for use on Windows
+// so that it is both volume path aware, and can create a directory with
+// a DACL.
+func mkdirall(path string, applyACL bool, sddl string) error {
+	if mkdirallRe.MatchString(path) {
+		return nil
+	}
+
+	// The rest of this method is largely copied from os.MkdirAll and should be kept
+	// as-is to ensure compatibility.
+
+	// Fast path: if we can tell whether path is a directory or file, stop with success or error.
+	dir, err := os.Stat(path)
+	if err == nil {
+		if dir.IsDir() {
+			return nil
+		}
+		return &os.PathError{
+			Op:   "mkdir",
+			Path: path,
+			Err:  syscall.ENOTDIR,
+		}
+	}
+
+	// Slow path: make sure parent exists and then call Mkdir for path.
+	i := len(path)
+	for i > 0 && os.IsPathSeparator(path[i-1]) { // Skip trailing path separator.
+		i--
+	}
+
+	j := i
+	for j > 0 && !os.IsPathSeparator(path[j-1]) { // Scan backward over element.
+		j--
+	}
+
+	if j > 1 {
+		// Create parent
+		err = mkdirall(path[0:j-1], false, sddl)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Parent now exists; invoke os.Mkdir or mkdirWithACL and use its result.
+	if applyACL {
+		err = mkdirWithACL(path, sddl)
+	} else {
+		err = os.Mkdir(path, 0)
+	}
+
+	if err != nil {
+		// Handle arguments like "foo/." by
+		// double-checking that directory doesn't exist.
+		dir, err1 := os.Lstat(path)
+		if err1 == nil && dir.IsDir() {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+// mkdirAllWithACL is a wrapper for MkdirAll that creates a directory
+// with an appropriate SDDL defined ACL.
+func mkdirAllWithACL(path string, perm os.FileMode, sddl string) error {
+	return mkdirall(path, true, sddl)
+}
