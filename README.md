@@ -79,7 +79,7 @@ You can specify options when creating a container about how to modify the specif
 redis, err := client.NewContainer(context, "redis-master", containerd.WithNewSpec(containerd.WithImageConfig(image)))
 ```
 
-## Root Filesystems
+### Root Filesystems
 
 containerd allows you to use overlay or snapshot filesystems with your containers.  It comes with builtin support for overlayfs and btrfs.
 
@@ -148,7 +148,7 @@ defer task.Delete(context)
 err := task.Start(context)
 ```
 
-### Developer Quick-Start
+## Developer Quick-Start
 
 To build the daemon and `ctr` simple test client, the following build system dependencies are required:
 
