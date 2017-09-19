@@ -52,7 +52,7 @@ func NewDiscardLogger() io.WriteCloser {
 // NewCRILogger returns a write closer which redirect container log into
 // log file, and decorate the log line into CRI defined format.
 func NewCRILogger(path string, stream StreamType) (io.WriteCloser, error) {
-	glog.V(4).Infof("Start reading log file %q", path)
+	glog.V(4).Infof("Start writing log file %q", path)
 	prc, pwc := io.Pipe()
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0640)
 	if err != nil {
