@@ -58,24 +58,48 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 			state = runtime.PodSandboxState_SANDBOX_READY
 		}
 	}
-	config := sandbox.Config
-	podNetwork := ocicni.PodNetwork{
-		Name:         config.GetMetadata().GetName(),
-		Namespace:    config.GetMetadata().GetNamespace(),
-		ID:           id,
-		NetNS:        sandbox.NetNSPath,
-		PortMappings: toCNIPortMappings(config.GetPortMappings()),
-	}
-	ip, err := c.netPlugin.GetPodNetworkStatus(podNetwork)
+
+	ip, err := c.getIP(sandbox)
 	if err != nil {
-		// Ignore the error on network status
-		ip = ""
-		glog.V(4).Infof("GetPodNetworkStatus returns error: %v", err)
+		return nil, fmt.Errorf("failed to get sandbox ip: %v", err)
 	}
 
 	createdAt := sandbox.Container.Info().CreatedAt
 	status := toCRISandboxStatus(sandbox.Metadata, state, createdAt, ip)
 	return &runtime.PodSandboxStatusResponse{Status: status}, nil
+}
+
+func (c *criContainerdService) getIP(sandbox sandboxstore.Sandbox) (string, error) {
+	config := sandbox.Config
+
+	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostNetwork() {
+		// For sandboxes using the host network we are not
+		// responsible for reporting the IP.
+		return "", nil
+	}
+
+	if err := c.netPlugin.Status(); err != nil {
+		// If the network is not ready then there is nothing to report.
+		glog.V(4).Infof("getIP: unable to get sandbox %q network status: network plugin not ready.", sandbox.ID)
+		return "", nil
+	}
+
+	podNetwork := ocicni.PodNetwork{
+		Name:         config.GetMetadata().GetName(),
+		Namespace:    config.GetMetadata().GetNamespace(),
+		ID:           sandbox.ID,
+		NetNS:        sandbox.NetNSPath,
+		PortMappings: toCNIPortMappings(config.GetPortMappings()),
+	}
+
+	ip, err := c.netPlugin.GetPodNetworkStatus(podNetwork)
+	if err == nil {
+		return ip, nil
+	}
+
+	// Ignore the error on network status
+	glog.V(4).Infof("getIP: failed to read sandbox %q IP from plugin: %v", sandbox.ID, err)
+	return "", nil
 }
 
 // toCRISandboxStatus converts sandbox metadata into CRI pod sandbox status.
