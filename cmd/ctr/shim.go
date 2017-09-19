@@ -14,7 +14,7 @@ import (
 
 	"github.com/containerd/console"
 	shim "github.com/containerd/containerd/linux/shim/v1"
-	"github.com/containerd/containerd/typeurl"
+	"github.com/containerd/typeurl"
 	protobuf "github.com/gogo/protobuf/types"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/opencontainers/runtime-spec/specs-go"

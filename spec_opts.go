@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/typeurl"
+	"github.com/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 

@@ -6,7 +6,7 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/typeurl"
+	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/types"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/pkg/errors"

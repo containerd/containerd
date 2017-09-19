@@ -21,7 +21,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/runtime"
-	"github.com/containerd/containerd/typeurl"
+	"github.com/containerd/typeurl"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"

@@ -15,14 +15,14 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/typeurl"
+	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
 
 func init() {
-	typeurl.Register(&specs.Spec{}, "opencontainers/runtime-spec", "v1", "Spec")
+	typeurl.Register(&specs.Spec{}, "types.contianerd.io/opencontainers/runtime-spec", "v1", "Spec")
 }
 
 func TestContainersList(t *testing.T) {

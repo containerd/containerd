@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
-	"github.com/containerd/containerd/typeurl"
+	"github.com/containerd/typeurl"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"

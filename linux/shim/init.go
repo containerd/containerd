@@ -20,9 +20,9 @@ import (
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/typeurl"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
+	"github.com/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
