@@ -25,6 +25,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/contrib/apparmor"
+	"github.com/docker/docker/pkg/mount"
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runc/libcontainer/devices"
@@ -551,6 +552,11 @@ func (c *criContainerdService) addOCIBindMounts(g *generate.Generator, mounts []
 		if err != nil {
 			return fmt.Errorf("failed to resolve symlink %q: %v", src, err)
 		}
+
+		mountInfos, err := c.os.GetMounts()
+		if err != nil {
+			return err
+		}
 		options := []string{"rbind"}
 		switch mount.GetPropagation() {
 		case runtime.MountPropagation_PROPAGATION_PRIVATE:
@@ -558,9 +564,15 @@ func (c *criContainerdService) addOCIBindMounts(g *generate.Generator, mounts []
 			// Since default root propogation in runc is rprivate ignore
 			// setting the root propagation
 		case runtime.MountPropagation_PROPAGATION_BIDIRECTIONAL:
+			if err := ensureShared(src, mountInfos); err != nil {
+				return err
+			}
 			options = append(options, "rshared")
 			g.SetLinuxRootPropagation("rshared") // nolint: errcheck
 		case runtime.MountPropagation_PROPAGATION_HOST_TO_CONTAINER:
+			if err := ensureSharedOrSlave(src, mountInfos); err != nil {
+				return err
+			}
 			options = append(options, "rslave")
 			if g.Spec().Linux.RootfsPropagation != "rshared" &&
 				g.Spec().Linux.RootfsPropagation != "rslave" {
@@ -702,4 +714,40 @@ func defaultRuntimeSpec() (*runtimespec.Spec, error) {
 	}
 	spec.Mounts = mounts
 	return spec, nil
+}
+
+// Ensure mount point on which path is mounted, is shared.
+func ensureShared(path string, mountInfos []*mount.Info) error {
+	sourceMount, optionalOpts, err := getSourceMount(path, mountInfos)
+	if err != nil {
+		return err
+	}
+
+	// Make sure source mount point is shared.
+	optsSplit := strings.Split(optionalOpts, " ")
+	for _, opt := range optsSplit {
+		if strings.HasPrefix(opt, "shared:") {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("path %q is mounted on %q but it is not a shared mount", path, sourceMount)
+}
+
+// Ensure mount point on which path is mounted, is either shared or slave.
+func ensureSharedOrSlave(path string, mountInfos []*mount.Info) error {
+	sourceMount, optionalOpts, err := getSourceMount(path, mountInfos)
+	if err != nil {
+		return err
+	}
+	// Make sure source mount point is shared.
+	optsSplit := strings.Split(optionalOpts, " ")
+	for _, opt := range optsSplit {
+		if strings.HasPrefix(opt, "shared:") {
+			return nil
+		} else if strings.HasPrefix(opt, "master:") {
+			return nil
+		}
+	}
+	return fmt.Errorf("path %q is mounted on %q but it is not a shared or slave mount", path, sourceMount)
 }

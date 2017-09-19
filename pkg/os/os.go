@@ -40,6 +40,7 @@ type OS interface {
 	WriteFile(filename string, data []byte, perm os.FileMode) error
 	Mount(source string, target string, fstype string, flags uintptr, data string) error
 	Unmount(target string, flags int) error
+	GetMounts() ([]*mount.Info, error)
 }
 
 // RealOS is used to dispatch the real system level operations.
@@ -113,4 +114,9 @@ func (RealOS) Unmount(target string, flags int) error {
 		return err
 	}
 	return unix.Unmount(target, flags)
+}
+
+// GetMounts retrieves a list of mounts for the current running process.
+func (RealOS) GetMounts() ([]*mount.Info, error) {
+	return mount.GetMounts()
 }
