@@ -95,10 +95,18 @@ const (
 )
 
 const (
-	// sandboxMetadataLabel is label name that identify metadata of sandbox in CreateContainerRequest
-	sandboxMetadataLabel = "io.cri-containerd.sandbox.metadata"
-	// sandboxMetadataLabel is label name that identify metadata of container in CreateContainerRequest
-	containerMetadataLabel = "io.cri-containerd.container.metadata"
+	// criContainerdPrefix is common prefix for cri-containerd
+	criContainerdPrefix = "io.cri-containerd"
+	// containerKindLabel is a label key indicating container is sandbox container or application container
+	containerKindLabel = criContainerdPrefix + ".kind"
+	// containerKindSandbox is a label value indicating container is sandbox container
+	containerKindSandbox = "sandbox"
+	// containerKindContainer is a label value indicating container is application container
+	containerKindContainer = "container"
+	// sandboxMetadataExtension is an extension name that identify metadata of sandbox in CreateContainerRequest
+	sandboxMetadataExtension = criContainerdPrefix + ".sandbox.metadata"
+	// containerMetadataExtension is an extension name that identify metadata of container in CreateContainerRequest
+	containerMetadataExtension = criContainerdPrefix + ".container.metadata"
 )
 
 // makeSandboxName generates sandbox name from sandbox metadata. The name

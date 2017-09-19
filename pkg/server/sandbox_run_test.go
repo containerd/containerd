@@ -20,6 +20,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/containerd/containerd/typeurl"
 	"github.com/cri-o/ocicni/pkg/ocicni"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
+	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
 )
 
 func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
@@ -380,6 +382,46 @@ func TestToCNIPortMappings(t *testing.T) {
 	} {
 		t.Logf("TestCase %q", desc)
 		assert.Equal(t, test.cniPortMappings, toCNIPortMappings(test.criPortMappings))
+	}
+}
+
+func TestTypeurlMarshalUnmarshalSandboxMeta(t *testing.T) {
+	for desc, test := range map[string]struct {
+		configChange func(*runtime.PodSandboxConfig)
+	}{
+		"should marshal original config": {},
+		"should marshal Linux": {
+			configChange: func(c *runtime.PodSandboxConfig) {
+				c.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
+					NamespaceOptions: &runtime.NamespaceOption{
+						HostNetwork: true,
+						HostPid:     true,
+						HostIpc:     true,
+					},
+					SupplementalGroups: []int64{1111, 2222},
+				}
+			},
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		meta := &sandboxstore.Metadata{
+			ID:        "1",
+			Name:      "sandbox_1",
+			NetNSPath: "/home/cloud",
+		}
+		meta.Config, _, _ = getRunPodSandboxTestData()
+		if test.configChange != nil {
+			test.configChange(meta.Config)
+		}
+
+		any, err := typeurl.MarshalAny(meta)
+		assert.NoError(t, err)
+		data, err := typeurl.UnmarshalAny(any)
+		assert.NoError(t, err)
+		assert.IsType(t, &sandboxstore.Metadata{}, data)
+		curMeta, ok := data.(*sandboxstore.Metadata)
+		assert.True(t, ok)
+		assert.Equal(t, meta, curMeta)
 	}
 }
 

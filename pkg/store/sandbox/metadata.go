@@ -35,8 +35,12 @@ const metadataVersion = "v1" // nolint
 type versionedMetadata struct {
 	// Version indicates the version of the versioned sandbox metadata.
 	Version string
-	Metadata
+	// Metadata's type is metadataInternal. If not there will be a recursive call in MarshalJSON.
+	Metadata metadataInternal
 }
+
+// metadataInternal is for internal use.
+type metadataInternal Metadata
 
 // Metadata is the unversioned sandbox metadata.
 type Metadata struct {
@@ -50,16 +54,16 @@ type Metadata struct {
 	NetNSPath string
 }
 
-// Encode encodes Metadata into bytes in json format.
-func (c *Metadata) Encode() ([]byte, error) {
+// MarshalJSON encodes Metadata into bytes in json format.
+func (c *Metadata) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&versionedMetadata{
 		Version:  metadataVersion,
-		Metadata: *c,
+		Metadata: metadataInternal(*c),
 	})
 }
 
-// Decode decodes Metadata from bytes.
-func (c *Metadata) Decode(data []byte) error {
+// UnmarshalJSON decodes Metadata from bytes.
+func (c *Metadata) UnmarshalJSON(data []byte) error {
 	versioned := &versionedMetadata{}
 	if err := json.Unmarshal(data, versioned); err != nil {
 		return err
@@ -67,8 +71,8 @@ func (c *Metadata) Decode(data []byte) error {
 	// Handle old version after upgrade.
 	switch versioned.Version {
 	case metadataVersion:
-		*c = versioned.Metadata
+		*c = Metadata(versioned.Metadata)
 		return nil
 	}
-	return fmt.Errorf("unsupported version")
+	return fmt.Errorf("unsupported version: %q", versioned.Version)
 }

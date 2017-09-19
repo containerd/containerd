@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/typeurl"
 	"github.com/cri-o/ocicni/pkg/ocicni"
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -34,6 +35,11 @@ import (
 	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
 )
+
+func init() {
+	typeurl.Register(&sandboxstore.Metadata{},
+		"github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox", "Metadata")
+}
 
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 // the sandbox is in ready state.
@@ -117,15 +123,6 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	}
 	glog.V(4).Infof("Sandbox container spec: %+v", spec)
 
-	// Checkpoint metadata into container
-	metaBytes, err := sandbox.Metadata.Encode()
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert sandbox metadata: %+v, %v", sandbox.Metadata, err)
-	}
-	labels := map[string]string{
-		sandboxMetadataLabel: string(metaBytes),
-	}
-
 	var specOpts []containerd.SpecOpts
 	if uid := config.GetLinux().GetSecurityContext().GetRunAsUser(); uid != nil {
 		specOpts = append(specOpts, containerd.WithUserID(uint32(uid.GetValue())))
@@ -134,7 +131,8 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		containerd.WithSnapshotter(c.config.ContainerdSnapshotter),
 		containerd.WithNewSnapshot(id, image.Image),
 		containerd.WithSpec(spec, specOpts...),
-		containerd.WithContainerLabels(labels),
+		containerd.WithContainerLabels(map[string]string{containerKindLabel: containerKindSandbox}),
+		containerd.WithContainerExtension(sandboxMetadataExtension, &sandbox.Metadata),
 		containerd.WithRuntime(defaultRuntime, nil)}
 	container, err := c.client.NewContainer(ctx, id, opts...)
 	if err != nil {
