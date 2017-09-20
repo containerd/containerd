@@ -21,7 +21,7 @@ source $(dirname "${BASH_SOURCE[0]}")/test-utils.sh
 # FOCUS focuses the test to run.
 FOCUS=${FOCUS:-}
 # SKIP skips the test to skip.
-SKIP=${SKIP:-""}
+SKIP=${SKIP:-"SeccompProfilePath"}
 REPORT_DIR=${REPORT_DIR:-"/tmp/test-cri"}
 
 # Check GOPATH
@@ -34,15 +34,15 @@ fi
 GOPATH=${GOPATH%%:*}
 
 CRITEST=${GOPATH}/bin/critest
-CRITEST_PKG=github.com/kubernetes-incubator/cri-tools
+CRITOOL_PKG=github.com/kubernetes-incubator/cri-tools
 CRICONTAINERD_SOCK=/var/run/cri-containerd.sock
 
 # Install critest
 if [ ! -x "$(command -v ${CRITEST})" ]; then
-  go get -d ${CRITEST_PKG}/...
-  cd ${GOPATH}/src/${CRITEST_PKG}
+  go get -d ${CRITOOL_PKG}/...
+  cd ${GOPATH}/src/${CRITOOL_PKG}
   git fetch --all
-  git checkout ${CRITEST_VERSION}
+  git checkout ${CRITOOL_VERSION}
   make
 fi
 which ${CRITEST}
