@@ -13,8 +13,13 @@ func TestDefault(t *testing.T) {
 		OS:           runtime.GOOS,
 		Architecture: runtime.GOARCH,
 	}
-	p := Default()
+	p := DefaultSpec()
 	if !reflect.DeepEqual(p, expected) {
 		t.Fatalf("default platform not as expected: %#v != %#v", p, expected)
+	}
+
+	s := Default()
+	if s != Format(p) {
+		t.Fatalf("default specifier should match formatted default spec: %v != %v", s, p)
 	}
 }

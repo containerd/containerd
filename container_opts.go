@@ -80,7 +80,7 @@ func WithSnapshot(id string) NewContainerOpts {
 // root filesystem in read-write mode
 func WithNewSnapshot(id string, i Image) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore(), platforms.Format(platforms.Default()))
+		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore(), platforms.Default())
 		if err != nil {
 			return err
 		}
@@ -109,7 +109,7 @@ func WithSnapshotCleanup(ctx context.Context, client *Client, c containers.Conta
 // root filesystem in read-only mode
 func WithNewSnapshotView(id string, i Image) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore(), platforms.Format(platforms.Default()))
+		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore(), platforms.Default())
 		if err != nil {
 			return err
 		}
