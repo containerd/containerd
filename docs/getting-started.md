@@ -257,7 +257,7 @@ Waiting on things like the container's exit status and cgroup metrics are setup 
 If you are familiar with prometheus you can curl the containerd metrics endpoint (in the `config.toml` that we created) to see your container's metrics:
 
 ```bash
-> curl 127.0.0.1:1338/metrics
+> curl 127.0.0.1:1338/v1/metrics
 ```
 
 Pretty cool right?

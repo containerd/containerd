@@ -189,6 +189,15 @@ enumerating the support services and messages. See [api/](api) for details.
 Note that new services may be added in _minor_ releases. New service methods
 and new fields on messages may be added if they are optional.
 
+### Metrics API
+
+The metrics API that outputs prometheus style metrics will be versioned independently,
+prefixed with the API version. i.e. `/v1/metrics`, `/v2/metrics`.
+
+The metrics API version will be incremented when breaking changes are made to the prometheus
+output. New metrics can be added to the output in a backwards compatible manner without
+bumping the API version.
+
 #### Error Codes
 
 Error codes will not change in a patch release, unless a missing error code
