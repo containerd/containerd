@@ -62,8 +62,11 @@ type Config struct {
 	StreamServerPort string `toml:"stream_server_port"`
 	// CgroupPath is the path for the cgroup that cri-containerd is placed in.
 	CgroupPath string `toml:"cgroup_path"`
-	// EnableSelinux indicates to enable the selinux support
+	// EnableSelinux indicates to enable the selinux support.
 	EnableSelinux bool `toml:"enable_selinux"`
+	// EnableAppArmor indicates to enable apparmor support. cri-containerd will
+	// apply default apparmor profile if apparmor is enabled.
+	EnableAppArmor bool `toml:"enable_apparmor"`
 	// SandboxImage is the image used by sandbox container.
 	SandboxImage string `toml:"sandbox_image"`
 }
@@ -109,8 +112,10 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		"10010", "The port streaming server is listening on.")
 	fs.StringVar(&c.CgroupPath, "cgroup-path",
 		"", "The cgroup that cri-containerd is part of. By default cri-containerd is not placed in a cgroup.")
-	fs.BoolVar(&c.EnableSelinux, "selinux-enabled",
+	fs.BoolVar(&c.EnableSelinux, "enable-selinux",
 		false, "Enable selinux support.")
+	fs.BoolVar(&c.EnableAppArmor, "enable-apparmor",
+		true, "Enable apparmor support. cri-containerd will apply default apparmor profile when apparmor is enabled.")
 	fs.StringVar(&c.SandboxImage, "sandbox-image",
 		"gcr.io/google_containers/pause:3.0", "The image used by sandbox container.")
 	fs.BoolVar(&c.PrintDefaultConfig, "default-config",

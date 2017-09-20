@@ -51,8 +51,6 @@ const (
 	runtimeDefault = "runtime/default"
 	// appArmorDefaultProfileName is name to use when creating a default apparmor profile.
 	appArmorDefaultProfileName = "cri-containerd.apparmor.d"
-	// appArmorEnabled is a flag for globally enabling/disabling apparmor profiles for containers.
-	appArmorEnabled = true // TODO (mikebrow): make these apparmor defaults configurable
 )
 
 // CreateContainer creates a new container in the given PodSandbox.
@@ -178,24 +176,30 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	}
 
 	var specOpts []containerd.SpecOpts
+	securityContext := config.GetLinux().GetSecurityContext()
 	// Set container username. This could only be done by containerd, because it needs
 	// access to the container rootfs. Pass user name to containerd, and let it overwrite
 	// the spec for us.
-	if uid := config.GetLinux().GetSecurityContext().GetRunAsUser(); uid != nil {
+	if uid := securityContext.GetRunAsUser(); uid != nil {
 		specOpts = append(specOpts, containerd.WithUserID(uint32(uid.GetValue())))
 	}
-	if username := config.GetLinux().GetSecurityContext().GetRunAsUsername(); username != "" {
+	if username := securityContext.GetRunAsUsername(); username != "" {
 		specOpts = append(specOpts, containerd.WithUsername(username))
 	}
 	// Set apparmor profile, (privileged or not) if apparmor is enabled
-	if appArmorEnabled {
-		appArmorProf := config.GetLinux().GetSecurityContext().GetApparmorProfile()
+	if c.config.EnableAppArmor {
+		appArmorProf := securityContext.GetApparmorProfile()
 		switch appArmorProf {
 		case runtimeDefault:
 			// TODO (mikebrow): delete created apparmor default profile
 			specOpts = append(specOpts, apparmor.WithDefaultProfile(appArmorDefaultProfileName))
+		// TODO(random-liu): Should support "unconfined" after kubernetes#52395 lands.
 		case "":
-			// TODO (mikebrow): handle no apparmor profile case see kubernetes/kubernetes#51746
+			// Based on kubernetes#51746, default apparmor profile should be applied
+			// for non-privileged container when apparmor is not specified.
+			if !securityContext.GetPrivileged() {
+				specOpts = append(specOpts, apparmor.WithDefaultProfile(appArmorDefaultProfileName))
+			}
 		default:
 			// Require and Trim default profile name prefix
 			if !strings.HasPrefix(appArmorProf, profileNamePrefix) {
@@ -298,7 +302,7 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 	}
 
 	if securityContext.GetPrivileged() {
-		if !sandboxConfig.GetLinux().GetSecurityContext().GetPrivileged() {
+		if !securityContext.GetPrivileged() {
 			return nil, fmt.Errorf("no privileged container allowed in sandbox")
 		}
 		if err := setOCIPrivileged(&g, config); err != nil {
