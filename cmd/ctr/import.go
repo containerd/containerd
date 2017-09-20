@@ -21,12 +21,14 @@ var imagesImportCommand = cli.Command{
 			Value: "",
 			Usage: "reference object e.g. tag@digest (default: use the object specified in ref)",
 		},
+		labelFlag,
 	},
 	Action: func(clicontext *cli.Context) error {
 		var (
 			ref       = clicontext.Args().First()
 			in        = clicontext.Args().Get(1)
 			refObject = clicontext.String("ref-object")
+			labels    = labelArgs(clicontext.StringSlice("label"))
 		)
 
 		ctx, cancel := appContext(clicontext)
@@ -50,6 +52,7 @@ var imagesImportCommand = cli.Command{
 			ref,
 			r,
 			containerd.WithRefObject(refObject),
+			containerd.WithImportLabels(labels),
 		)
 		if err != nil {
 			return err

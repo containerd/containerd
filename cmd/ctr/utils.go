@@ -57,6 +57,11 @@ var (
 		},
 	}
 
+	labelFlag = cli.StringSliceFlag{
+		Name:  "label",
+		Usage: "labels to attach to the pulled image",
+	}
+
 	registryFlags = []cli.Flag{
 		cli.BoolFlag{
 			Name:  "skip-verify,k",
