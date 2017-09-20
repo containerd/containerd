@@ -45,7 +45,7 @@ func (i *image) Target() ocispec.Descriptor {
 
 func (i *image) RootFS(ctx context.Context) ([]digest.Digest, error) {
 	provider := i.client.ContentStore()
-	return i.i.RootFS(ctx, provider, platforms.Format(platforms.Default()))
+	return i.i.RootFS(ctx, provider, platforms.Default())
 }
 
 func (i *image) Size(ctx context.Context) (int64, error) {
@@ -55,11 +55,11 @@ func (i *image) Size(ctx context.Context) (int64, error) {
 
 func (i *image) Config(ctx context.Context) (ocispec.Descriptor, error) {
 	provider := i.client.ContentStore()
-	return i.i.Config(ctx, provider, platforms.Format(platforms.Default()))
+	return i.i.Config(ctx, provider, platforms.Default())
 }
 
 func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
-	layers, err := i.getLayers(ctx, platforms.Format(platforms.Default()))
+	layers, err := i.getLayers(ctx, platforms.Default())
 	if err != nil {
 		return err
 	}

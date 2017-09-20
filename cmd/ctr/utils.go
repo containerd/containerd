@@ -206,7 +206,7 @@ func getImageLayers(ctx gocontext.Context, image images.Image, cs content.Store)
 		return nil, errors.Wrap(err, "failed to unmarshal manifest")
 	}
 
-	diffIDs, err := image.RootFS(ctx, cs, platforms.Format(platforms.Default()))
+	diffIDs, err := image.RootFS(ctx, cs, platforms.Default())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to resolve rootfs")
 	}
