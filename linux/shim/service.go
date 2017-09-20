@@ -62,6 +62,7 @@ func NewService(config Config, publisher events.Publisher) (*Service, error) {
 type platform interface {
 	copyConsole(ctx context.Context, console console.Console, stdin, stdout, stderr string, wg, cwg *sync.WaitGroup) (console.Console, error)
 	shutdownConsole(ctx context.Context, console console.Console) error
+	close() error
 }
 
 type Service struct {
@@ -146,6 +147,7 @@ func (s *Service) Delete(ctx context.Context, r *google_protobuf.Empty) (*shimap
 		return nil, err
 	}
 	s.deleteProcess(p.ID())
+	s.platform.close()
 	s.events <- &eventsapi.TaskDelete{
 		ContainerID: s.id,
 		ExitStatus:  uint32(p.ExitStatus()),

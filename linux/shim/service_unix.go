@@ -52,6 +52,10 @@ func (p *unixPlatform) shutdownConsole(ctx context.Context, cons console.Console
 	return nil
 }
 
+func (p *unixPlatform) close() error {
+	return nil
+}
+
 func (s *Service) initPlatform() error {
 	s.platform = &unixPlatform{}
 	return nil

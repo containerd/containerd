@@ -133,6 +133,11 @@ func (e *Epoller) getConsole(sysfd int) *EpollConsole {
 	return f
 }
 
+// Close the epoll fd
+func (e *Epoller) Close() error {
+	return unix.Close(e.efd)
+}
+
 // EpollConsole acts like a console but register its file descriptor with a
 // epoll fd and uses epoll API to perform I/O.
 type EpollConsole struct {

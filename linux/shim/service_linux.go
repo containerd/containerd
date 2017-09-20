@@ -69,6 +69,10 @@ func (p *linuxPlatform) shutdownConsole(ctx context.Context, cons console.Consol
 	return epollConsole.Shutdown(p.epoller.CloseConsole)
 }
 
+func (p *linuxPlatform) close() error {
+	return p.epoller.Close()
+}
+
 // initialize a single epoll fd to manage our consoles. `initPlatform` should
 // only be called once.
 func (s *Service) initPlatform() error {

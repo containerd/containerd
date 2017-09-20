@@ -4,15 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Azure/go-ansiterm/winterm"
 	"github.com/pkg/errors"
-)
-
-const (
-	// https://msdn.microsoft.com/en-us/library/windows/desktop/ms683167(v=vs.85).aspx
-	enableVirtualTerminalInput      = 0x0200
-	enableVirtualTerminalProcessing = 0x0004
-	disableNewlineAutoReturn        = 0x0008
+	"golang.org/x/sys/windows"
 )
 
 var (
@@ -21,39 +14,36 @@ var (
 )
 
 func (m *master) initStdios() {
-	m.in = os.Stdin.Fd()
-	if mode, err := winterm.GetConsoleMode(m.in); err == nil {
-		m.inMode = mode
-		// Validate that enableVirtualTerminalInput is supported, but do not set it.
-		if err = winterm.SetConsoleMode(m.in, mode|enableVirtualTerminalInput); err == nil {
+	m.in = windows.Handle(os.Stdin.Fd())
+	if err := windows.GetConsoleMode(m.in, &m.inMode); err == nil {
+		// Validate that windows.ENABLE_VIRTUAL_TERMINAL_INPUT is supported, but do not set it.
+		if err = windows.SetConsoleMode(m.in, m.inMode|windows.ENABLE_VIRTUAL_TERMINAL_INPUT); err == nil {
 			vtInputSupported = true
 		}
 		// Unconditionally set the console mode back even on failure because SetConsoleMode
 		// remembers invalid bits on input handles.
-		winterm.SetConsoleMode(m.in, mode)
+		windows.SetConsoleMode(m.in, m.inMode)
 	} else {
 		fmt.Printf("failed to get console mode for stdin: %v\n", err)
 	}
 
-	m.out = os.Stdout.Fd()
-	if mode, err := winterm.GetConsoleMode(m.out); err == nil {
-		m.outMode = mode
-		if err := winterm.SetConsoleMode(m.out, mode|enableVirtualTerminalProcessing); err == nil {
-			m.outMode |= enableVirtualTerminalProcessing
+	m.out = windows.Handle(os.Stdout.Fd())
+	if err := windows.GetConsoleMode(m.out, &m.outMode); err == nil {
+		if err := windows.SetConsoleMode(m.out, m.outMode|windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING); err == nil {
+			m.outMode |= windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING
 		} else {
-			winterm.SetConsoleMode(m.out, m.outMode)
+			windows.SetConsoleMode(m.out, m.outMode)
 		}
 	} else {
 		fmt.Printf("failed to get console mode for stdout: %v\n", err)
 	}
 
-	m.err = os.Stderr.Fd()
-	if mode, err := winterm.GetConsoleMode(m.err); err == nil {
-		m.errMode = mode
-		if err := winterm.SetConsoleMode(m.err, mode|enableVirtualTerminalProcessing); err == nil {
-			m.errMode |= enableVirtualTerminalProcessing
+	m.err = windows.Handle(os.Stderr.Fd())
+	if err := windows.GetConsoleMode(m.err, &m.errMode); err == nil {
+		if err := windows.SetConsoleMode(m.err, m.errMode|windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING); err == nil {
+			m.errMode |= windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING
 		} else {
-			winterm.SetConsoleMode(m.err, m.errMode)
+			windows.SetConsoleMode(m.err, m.errMode)
 		}
 	} else {
 		fmt.Printf("failed to get console mode for stderr: %v\n", err)
@@ -61,13 +51,13 @@ func (m *master) initStdios() {
 }
 
 type master struct {
-	in     uintptr
+	in     windows.Handle
 	inMode uint32
 
-	out     uintptr
+	out     windows.Handle
 	outMode uint32
 
-	err     uintptr
+	err     windows.Handle
 	errMode uint32
 }
 
@@ -77,26 +67,26 @@ func (m *master) SetRaw() error {
 	}
 
 	// Set StdOut and StdErr to raw mode, we ignore failures since
-	// disableNewlineAutoReturn might not be supported on this version of
+	// windows.DISABLE_NEWLINE_AUTO_RETURN might not be supported on this version of
 	// Windows.
 
-	winterm.SetConsoleMode(m.out, m.outMode|disableNewlineAutoReturn)
+	windows.SetConsoleMode(m.out, m.outMode|windows.DISABLE_NEWLINE_AUTO_RETURN)
 
-	winterm.SetConsoleMode(m.err, m.errMode|disableNewlineAutoReturn)
+	windows.SetConsoleMode(m.err, m.errMode|windows.DISABLE_NEWLINE_AUTO_RETURN)
 
 	return nil
 }
 
 func (m *master) Reset() error {
 	for _, s := range []struct {
-		fd   uintptr
+		fd   windows.Handle
 		mode uint32
 	}{
 		{m.in, m.inMode},
 		{m.out, m.outMode},
 		{m.err, m.errMode},
 	} {
-		if err := winterm.SetConsoleMode(s.fd, s.mode); err != nil {
+		if err := windows.SetConsoleMode(s.fd, s.mode); err != nil {
 			return errors.Wrap(err, "unable to restore console mode")
 		}
 	}
@@ -105,7 +95,8 @@ func (m *master) Reset() error {
 }
 
 func (m *master) Size() (WinSize, error) {
-	info, err := winterm.GetConsoleScreenBufferInfo(m.out)
+	var info windows.ConsoleScreenBufferInfo
+	err := windows.GetConsoleScreenBufferInfo(m.out, &info)
 	if err != nil {
 		return WinSize{}, errors.Wrap(err, "unable to get console info")
 	}
@@ -127,11 +118,11 @@ func (m *master) ResizeFrom(c Console) error {
 }
 
 func (m *master) DisableEcho() error {
-	mode := m.inMode &^ winterm.ENABLE_ECHO_INPUT
-	mode |= winterm.ENABLE_PROCESSED_INPUT
-	mode |= winterm.ENABLE_LINE_INPUT
+	mode := m.inMode &^ windows.ENABLE_ECHO_INPUT
+	mode |= windows.ENABLE_PROCESSED_INPUT
+	mode |= windows.ENABLE_LINE_INPUT
 
-	if err := winterm.SetConsoleMode(m.in, mode); err != nil {
+	if err := windows.SetConsoleMode(m.in, mode); err != nil {
 		return errors.Wrap(err, "unable to set console to disable echo")
 	}
 
@@ -151,7 +142,7 @@ func (m *master) Write(b []byte) (int, error) {
 }
 
 func (m *master) Fd() uintptr {
-	return m.in
+	return uintptr(m.in)
 }
 
 // on windows, console can only be made from os.Std{in,out,err}, hence there
@@ -163,28 +154,28 @@ func (m *master) Name() string {
 
 // makeInputRaw puts the terminal (Windows Console) connected to the given
 // file descriptor into raw mode
-func makeInputRaw(fd uintptr, mode uint32) error {
+func makeInputRaw(fd windows.Handle, mode uint32) error {
 	// See
 	// -- https://msdn.microsoft.com/en-us/library/windows/desktop/ms686033(v=vs.85).aspx
 	// -- https://msdn.microsoft.com/en-us/library/windows/desktop/ms683462(v=vs.85).aspx
 
 	// Disable these modes
-	mode &^= winterm.ENABLE_ECHO_INPUT
-	mode &^= winterm.ENABLE_LINE_INPUT
-	mode &^= winterm.ENABLE_MOUSE_INPUT
-	mode &^= winterm.ENABLE_WINDOW_INPUT
-	mode &^= winterm.ENABLE_PROCESSED_INPUT
+	mode &^= windows.ENABLE_ECHO_INPUT
+	mode &^= windows.ENABLE_LINE_INPUT
+	mode &^= windows.ENABLE_MOUSE_INPUT
+	mode &^= windows.ENABLE_WINDOW_INPUT
+	mode &^= windows.ENABLE_PROCESSED_INPUT
 
 	// Enable these modes
-	mode |= winterm.ENABLE_EXTENDED_FLAGS
-	mode |= winterm.ENABLE_INSERT_MODE
-	mode |= winterm.ENABLE_QUICK_EDIT_MODE
+	mode |= windows.ENABLE_EXTENDED_FLAGS
+	mode |= windows.ENABLE_INSERT_MODE
+	mode |= windows.ENABLE_QUICK_EDIT_MODE
 
 	if vtInputSupported {
-		mode |= enableVirtualTerminalInput
+		mode |= windows.ENABLE_VIRTUAL_TERMINAL_INPUT
 	}
 
-	if err := winterm.SetConsoleMode(fd, mode); err != nil {
+	if err := windows.SetConsoleMode(fd, mode); err != nil {
 		return errors.Wrap(err, "unable to set console to raw mode")
 	}
 
@@ -192,7 +183,8 @@ func makeInputRaw(fd uintptr, mode uint32) error {
 }
 
 func checkConsole(f *os.File) error {
-	if _, err := winterm.GetConsoleMode(f.Fd()); err != nil {
+	var mode uint32
+	if err := windows.GetConsoleMode(windows.Handle(f.Fd()), &mode); err != nil {
 		return err
 	}
 	return nil
