@@ -399,7 +399,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 			Action: specs.ActAllow,
 			Args:   []specs.LinuxSeccompArg{},
 		})
-	case "amd", "x32":
+	case "amd64":
 		s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
 			Names: []string{
 				"arch_prctl",
@@ -408,7 +408,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 			Args:   []specs.LinuxSeccompArg{},
 		})
 		fallthrough
-	case "x86":
+	case "386":
 		s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
 			Names: []string{
 				"modify_ldt",
