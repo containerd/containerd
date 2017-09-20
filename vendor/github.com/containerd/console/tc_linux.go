@@ -8,6 +8,11 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const (
+	cmdTcGet = unix.TCGETS
+	cmdTcSet = unix.TCSETS
+)
+
 func ioctl(fd, flag, data uintptr) error {
 	if _, _, err := unix.Syscall(unix.SYS_IOCTL, fd, flag, data); err != 0 {
 		return err

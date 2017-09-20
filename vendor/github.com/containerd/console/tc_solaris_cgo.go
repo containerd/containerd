@@ -4,10 +4,17 @@ package console
 
 import (
 	"os"
+
+	"golang.org/x/sys/unix"
 )
 
 //#include <stdlib.h>
 import "C"
+
+const (
+	cmdTcGet = unix.TCGETS
+	cmdTcSet = unix.TCSETS
+)
 
 // ptsname retrieves the name of the first available pts for the given master.
 func ptsname(f *os.File) (string, error) {

@@ -13,6 +13,13 @@ package console
 
 import (
 	"os"
+
+	"golang.org/x/sys/unix"
+)
+
+const (
+	cmdTcGet = unix.TCGETS
+	cmdTcSet = unix.TCSETS
 )
 
 func ptsname(f *os.File) (string, error) {
