@@ -3,6 +3,7 @@ package ocicni
 import (
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"sort"
 	"strings"
@@ -158,6 +159,11 @@ func InitCNI(pluginDir string, cniDirs ...string) (CNIPlugin, error) {
 			return &cniNoOp{}, nil
 		}
 
+		// Fail loudly if plugin directory doesn't exist, because fsnotify watcher
+		// won't be able to watch it.
+		if _, err := os.Stat(pluginDir); err != nil {
+			return nil, err
+		}
 		// We do not have a default network, we start the monitoring thread.
 		go plugin.monitorNetDir()
 	}
