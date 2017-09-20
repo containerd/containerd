@@ -50,7 +50,7 @@ func (i *image) RootFS(ctx context.Context) ([]digest.Digest, error) {
 
 func (i *image) Size(ctx context.Context) (int64, error) {
 	provider := i.client.ContentStore()
-	return i.i.Size(ctx, provider)
+	return i.i.Size(ctx, provider, platforms.Default())
 }
 
 func (i *image) Config(ctx context.Context) (ocispec.Descriptor, error) {

@@ -23,6 +23,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/reference"
 	"github.com/containerd/containerd/remotes"
@@ -226,7 +227,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpts) (Imag
 	} else {
 		handler = images.Handlers(append(pullCtx.BaseHandlers,
 			remotes.FetchHandler(store, fetcher),
-			images.ChildrenHandler(store))...,
+			images.ChildrenHandler(store, platforms.Default()))...,
 		)
 	}
 
@@ -307,7 +308,7 @@ func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, 
 	pushHandler := remotes.PushHandler(cs, pusher)
 
 	handlers := append(pushCtx.BaseHandlers,
-		images.ChildrenHandler(cs),
+		images.ChildrenHandler(cs, platforms.Default()),
 		filterHandler,
 		pushHandler,
 	)

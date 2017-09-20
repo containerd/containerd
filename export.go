@@ -9,6 +9,7 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/platforms"
 	ocispecs "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -32,7 +33,7 @@ func (c *Client) exportToOCITar(ctx context.Context, desc ocispec.Descriptor, wr
 	}
 
 	handlers := images.Handlers(
-		images.ChildrenHandler(cs),
+		images.ChildrenHandler(cs, platforms.Default()),
 		images.HandlerFunc(exportHandler),
 	)
 
