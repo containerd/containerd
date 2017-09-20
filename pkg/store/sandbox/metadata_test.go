@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
-func TestMetadataEncodeDecode(t *testing.T) {
+func TestMetadataMarshalUnmarshal(t *testing.T) {
 	meta := &Metadata{
 		ID:   "test-id",
 		Name: "test-name",
@@ -38,16 +38,42 @@ func TestMetadataEncodeDecode(t *testing.T) {
 		},
 	}
 	assert := assertlib.New(t)
-	data, err := meta.Encode()
-	assert.NoError(err)
 	newMeta := &Metadata{}
-	assert.NoError(newMeta.Decode(data))
-	assert.Equal(meta, newMeta)
+	newVerMeta := &versionedMetadata{}
 
-	unsupported, err := json.Marshal(&versionedMetadata{
-		Version:  "random-test-version",
-		Metadata: *meta,
+	t.Logf("should be able to do json.marshal")
+	data, err := json.Marshal(meta)
+	assert.NoError(err)
+	data1, err := json.Marshal(&versionedMetadata{
+		Version:  metadataVersion,
+		Metadata: metadataInternal(*meta),
 	})
 	assert.NoError(err)
-	assert.Error(newMeta.Decode(unsupported))
+	assert.Equal(data, data1)
+
+	t.Logf("should be able to do MarshalJSON")
+	data, err = meta.MarshalJSON()
+	assert.NoError(err)
+	assert.NoError(newMeta.UnmarshalJSON(data))
+	assert.Equal(meta, newMeta)
+
+	t.Logf("should be able to do MarshalJSON and json.Unmarshal")
+	data, err = meta.MarshalJSON()
+	assert.NoError(err)
+	assert.NoError(json.Unmarshal(data, newVerMeta))
+	assert.Equal(meta, (*Metadata)(&newVerMeta.Metadata))
+
+	t.Logf("should be able to do json.Marshal and UnmarshalJSON")
+	data, err = json.Marshal(meta)
+	assert.NoError(err)
+	assert.NoError(newMeta.UnmarshalJSON(data))
+	assert.Equal(meta, newMeta)
+
+	t.Logf("should json.Unmarshal fail for unsupported version")
+	unsupported, err := json.Marshal(&versionedMetadata{
+		Version:  "random-test-version",
+		Metadata: metadataInternal(*meta),
+	})
+	assert.NoError(err)
+	assert.Error(json.Unmarshal(unsupported, &newMeta))
 }

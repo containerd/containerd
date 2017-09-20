@@ -25,6 +25,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/contrib/apparmor"
+	"github.com/containerd/containerd/typeurl"
 	"github.com/docker/docker/pkg/mount"
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -54,6 +55,11 @@ const (
 	// appArmorEnabled is a flag for globally enabling/disabling apparmor profiles for containers.
 	appArmorEnabled = true // TODO (mikebrow): make these apparmor defaults configurable
 )
+
+func init() {
+	typeurl.Register(&containerstore.Metadata{},
+		"github.com/kubernetes-incubator/cri-containerd/pkg/store/container", "Metadata")
+}
 
 // CreateContainer creates a new container in the given PodSandbox.
 func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.CreateContainerRequest) (_ *runtime.CreateContainerResponse, retErr error) {
@@ -169,14 +175,6 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 		}
 	}()
 
-	metaBytes, err := meta.Encode()
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert sandbox metadata: %+v, %v", meta, err)
-	}
-	labels := map[string]string{
-		containerMetadataLabel: string(metaBytes),
-	}
-
 	var specOpts []containerd.SpecOpts
 	// Set container username. This could only be done by containerd, because it needs
 	// access to the container rootfs. Pass user name to containerd, and let it overwrite
@@ -207,7 +205,8 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	opts = append(opts,
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithRuntime(defaultRuntime, nil),
-		containerd.WithContainerLabels(labels))
+		containerd.WithContainerLabels(map[string]string{containerKindLabel: containerKindContainer}),
+		containerd.WithContainerExtension(containerMetadataExtension, &meta))
 	var cntr containerd.Container
 	if cntr, err = c.client.NewContainer(ctx, id, opts...); err != nil {
 		return nil, fmt.Errorf("failed to create containerd container: %v", err)
