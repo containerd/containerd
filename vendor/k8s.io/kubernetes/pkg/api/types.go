@@ -547,6 +547,27 @@ type PersistentVolumeClaimSpec struct {
 	StorageClassName *string
 }
 
+type PersistentVolumeClaimConditionType string
+
+// These are valid conditions of Pvc
+const (
+	// An user trigger resize of pvc has been started
+	PersistentVolumeClaimResizing PersistentVolumeClaimConditionType = "Resizing"
+)
+
+type PersistentVolumeClaimCondition struct {
+	Type   PersistentVolumeClaimConditionType
+	Status ConditionStatus
+	// +optional
+	LastProbeTime metav1.Time
+	// +optional
+	LastTransitionTime metav1.Time
+	// +optional
+	Reason string
+	// +optional
+	Message string
+}
+
 type PersistentVolumeClaimStatus struct {
 	// Phase represents the current phase of PersistentVolumeClaim
 	// +optional
@@ -557,6 +578,8 @@ type PersistentVolumeClaimStatus struct {
 	// Represents the actual resources of the underlying volume
 	// +optional
 	Capacity ResourceList
+	// +optional
+	Conditions []PersistentVolumeClaimCondition
 }
 
 type PersistentVolumeAccessMode string
@@ -658,8 +681,9 @@ type EmptyDirVolumeSource struct {
 type StorageMedium string
 
 const (
-	StorageMediumDefault StorageMedium = ""       // use whatever the default is for the node
-	StorageMediumMemory  StorageMedium = "Memory" // use memory (tmpfs)
+	StorageMediumDefault   StorageMedium = ""          // use whatever the default is for the node
+	StorageMediumMemory    StorageMedium = "Memory"    // use memory (tmpfs)
+	StorageMediumHugePages StorageMedium = "HugePages" // use hugepages
 )
 
 // Protocol defines network protocols supported for things like container ports.
@@ -2225,6 +2249,7 @@ const (
 	// Kubelet without going through the scheduler to start.
 	// Enforced by Kubelet and the scheduler.
 	// TaintEffectNoScheduleNoAdmit TaintEffect = "NoScheduleNoAdmit"
+
 	// Evict any already-running pods that do not tolerate the taint.
 	// Currently enforced by NodeController.
 	TaintEffectNoExecute TaintEffect = "NoExecute"
@@ -2633,6 +2658,8 @@ type ReplicationControllerCondition struct {
 }
 
 // +genclient
+// +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/kubernetes/pkg/apis/extensions.Scale
+// +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/kubernetes/pkg/apis/extensions.Scale,result=k8s.io/kubernetes/pkg/apis/extensions.Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicationController represents the configuration of a replication controller.
@@ -3249,6 +3276,8 @@ const (
 	NodeDiskPressure NodeConditionType = "DiskPressure"
 	// NodeNetworkUnavailable means that network for the node is not correctly configured.
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
+	// NodeConfigOK indicates whether the kubelet is correctly configured
+	NodeConfigOK NodeConditionType = "ConfigOK"
 )
 
 type NodeCondition struct {
@@ -3314,6 +3343,8 @@ const (
 	ResourceOpaqueIntPrefix = "pod.alpha.kubernetes.io/opaque-int-resource-"
 	// Default namespace prefix.
 	ResourceDefaultNamespacePrefix = "kubernetes.io/"
+	// Name prefix for huge page resources (alpha).
+	ResourceHugePagesPrefix = "hugepages-"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.
