@@ -65,6 +65,9 @@ func (c *criContainerdService) recover(ctx context.Context) error {
 		if err := c.sandboxStore.Add(sb); err != nil {
 			return fmt.Errorf("failed to add sandbox %q to store: %v", sandbox.ID(), err)
 		}
+		if err := c.sandboxNameIndex.Reserve(sb.Name, sb.ID); err != nil {
+			return fmt.Errorf("failed to reserve sandbox name %q: %v", sb.Name, err)
+		}
 	}
 
 	// Recover all containers.
@@ -82,6 +85,9 @@ func (c *criContainerdService) recover(ctx context.Context) error {
 		glog.V(4).Infof("Loaded container %+v", cntr)
 		if err := c.containerStore.Add(cntr); err != nil {
 			return fmt.Errorf("failed to add container %q to store: %v", container.ID(), err)
+		}
+		if err := c.containerNameIndex.Reserve(cntr.Name, cntr.ID); err != nil {
+			return fmt.Errorf("failed to reserve container name %q: %v", cntr.Name, err)
 		}
 	}
 
