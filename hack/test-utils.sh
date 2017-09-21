@@ -16,6 +16,8 @@
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
 . ${ROOT}/hack/versions
+# CRI_CONTAINERD_FLAGS are the extra flags to use when start cri-containerd.
+CRI_CONTAINERD_FLAGS=${CRI_CONTAINERD_FLAGS:-""}
 
 # start_cri_containerd starts containerd and cri-containerd.
 start_cri_containerd() {
@@ -44,7 +46,8 @@ start_cri_containerd() {
   done
 
   # Start cri-containerd
-  sudo ${ROOT}/_output/cri-containerd --alsologtostderr --v 4 &> ${report_dir}/cri-containerd.log &
+  sudo ${ROOT}/_output/cri-containerd --alsologtostderr --v 4 ${CRI_CONTAINERD_FLAGS} \
+	  &> ${report_dir}/cri-containerd.log &
 }
 
 # kill_cri_containerd kills containerd and cri-containerd.
