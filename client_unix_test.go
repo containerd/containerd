@@ -33,7 +33,6 @@ func init() {
 	case "s390x":
 		testImage = "docker.io/s390x/alpine:latest"
 	default:
-		// FIXME: change this back after multiplatform support is added to pull
-		testImage = "docker.io/amd64/alpine:latest"
+		testImage = "docker.io/library/alpine:latest"
 	}
 }
