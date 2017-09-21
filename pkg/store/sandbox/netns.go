@@ -24,6 +24,7 @@ import (
 
 	cnins "github.com/containernetworking/plugins/pkg/ns"
 	"github.com/docker/docker/pkg/mount"
+	"github.com/docker/docker/pkg/symlink"
 	"golang.org/x/sys/unix"
 )
 
@@ -52,14 +53,16 @@ func NewNetNS() (*NetNS, error) {
 // LoadNetNS loads existing network namespace. It returns ErrClosedNetNS
 // if the network namespace has already been closed.
 func LoadNetNS(path string) (*NetNS, error) {
-	if err := cnins.IsNSorErr(path); err != nil {
+	ns, err := cnins.GetNS(path)
+	if err != nil {
 		if _, ok := err.(cnins.NSPathNotExistErr); ok {
 			return nil, ErrClosedNetNS
 		}
-		return nil, err
-	}
-	ns, err := cnins.GetNS(path)
-	if err != nil {
+		if _, ok := err.(cnins.NSPathNotNSErr); ok {
+			// Do best effort cleanup.
+			os.RemoveAll(path) // nolint: errcheck
+			return nil, ErrClosedNetNS
+		}
 		return nil, fmt.Errorf("failed to load network namespace %v", err)
 	}
 	return &NetNS{ns: ns, restored: true}, nil
@@ -86,6 +89,10 @@ func (n *NetNS) Remove() error {
 				return nil
 			}
 			return fmt.Errorf("failed to stat netns: %v", err)
+		}
+		path, err := symlink.FollowSymlinkInScope(path, "/")
+		if err != nil {
+			return fmt.Errorf("failed to follow symlink: %v", err)
 		}
 		mounted, err := mount.Mounted(path)
 		if err != nil {
