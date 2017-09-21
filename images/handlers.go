@@ -175,7 +175,8 @@ func ChildrenHandler(provider content.Provider, platform string) HandlerFunc {
 
 		case MediaTypeDockerSchema2Layer, MediaTypeDockerSchema2LayerGzip,
 			MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig,
-			ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerGzip:
+			ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerGzip,
+			MediaTypeContainerd1Checkpoint, MediaTypeContainerd1CheckpointConfig:
 			// childless data types.
 			return nil, nil
 		default:
