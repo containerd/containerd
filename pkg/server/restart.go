@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/typeurl"
+	"github.com/containerd/typeurl"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/pkg/system"
 	"github.com/golang/glog"

@@ -21,7 +21,7 @@ func WithImageConfig(i Image) SpecOpts {
 			image = i.(*image)
 			store = client.ContentStore()
 		)
-		ic, err := image.i.Config(ctx, store, platforms.Format(platforms.Default()))
+		ic, err := image.i.Config(ctx, store, platforms.Default())
 		if err != nil {
 			return err
 		}

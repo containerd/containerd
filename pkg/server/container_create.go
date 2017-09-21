@@ -25,7 +25,8 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/contrib/apparmor"
-	"github.com/containerd/containerd/typeurl"
+	"github.com/containerd/containerd/contrib/seccomp"
+	"github.com/containerd/typeurl"
 	"github.com/docker/docker/pkg/mount"
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -48,10 +49,20 @@ import (
 const (
 	// profileNamePrefix is the prefix for loading profiles on a localhost. Eg. AppArmor localhost/profileName.
 	profileNamePrefix = "localhost/" // TODO (mikebrow): get localhost/ & runtime/default from CRI kubernetes/kubernetes#51747
-	// runtimeDefault indicates that we should use or create a runtime default apparmor profile.
+	// runtimeDefault indicates that we should use or create a runtime default profile.
 	runtimeDefault = "runtime/default"
+	// dockerDefault indicates that we should use or create a docker default profile.
+	dockerDefault = "docker/default"
 	// appArmorDefaultProfileName is name to use when creating a default apparmor profile.
 	appArmorDefaultProfileName = "cri-containerd.apparmor.d"
+	// unconfinedProfile is a string indicating one should run a pod/containerd without a security profile
+	unconfinedProfile = "unconfined"
+	// seccompDefaultSandboxProfile is the default seccomp profile for pods.
+	seccompDefaultSandboxProfile = dockerDefault
+	// seccompDefaultContainerProfile is the default seccomp profile for containers.
+	seccompDefaultContainerProfile = dockerDefault
+	// seccompEnabled is a flag for globally enabling/disabling seccomp profiles for containers.
+	seccompEnabled = true // TODO (mikebrow): make these seccomp defaults configurable
 )
 
 func init() {
@@ -211,6 +222,33 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 			specOpts = append(specOpts, apparmor.WithProfile(strings.TrimPrefix(appArmorProf, profileNamePrefix)))
 		}
 	}
+
+	// Set seccomp profile
+	seccompProf := config.GetLinux().GetSecurityContext().GetSeccompProfilePath()
+	if seccompProf == runtimeDefault || seccompProf == dockerDefault {
+		// use correct default profile (Eg. if not configured otherwise, the default is docker/default for containers)
+		seccompProf = seccompDefaultContainerProfile
+	}
+	// Unset the seccomp profile, if seccomp is not enabled, unconfined, unset, or the security context is privileged
+	if !seccompEnabled ||
+		seccompProf == unconfinedProfile ||
+		seccompProf == "" ||
+		config.GetLinux().GetSecurityContext().GetPrivileged() {
+		spec.Linux.Seccomp = nil
+	} else {
+		switch seccompProf {
+		case dockerDefault:
+			// Note: WithDefaultProfile specOpts must be added after capabilities
+			specOpts = append(specOpts, seccomp.WithDefaultProfile())
+		default:
+			// Require and Trim default profile name prefix
+			if !strings.HasPrefix(seccompProf, profileNamePrefix) {
+				return nil, fmt.Errorf("invalid seccomp profile %q", seccompProf)
+			}
+			specOpts = append(specOpts, seccomp.WithProfile(strings.TrimPrefix(seccompProf, profileNamePrefix)))
+		}
+	}
+
 	opts = append(opts,
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithRuntime(defaultRuntime, nil),
@@ -312,7 +350,7 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 		if err := setOCIPrivileged(&g, config); err != nil {
 			return nil, err
 		}
-	} else {
+	} else { // not privileged
 		if err := c.addOCIDevices(&g, config.GetDevices()); err != nil {
 			return nil, fmt.Errorf("failed to set devices mapping %+v: %v", config.GetDevices(), err)
 		}
@@ -321,7 +359,6 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 			return nil, fmt.Errorf("failed to set capabilities %+v: %v",
 				securityContext.GetCapabilities(), err)
 		}
-		// TODO(random-liu): [P2] Add seccomp not privileged only.
 	}
 
 	g.SetProcessSelinuxLabel(processLabel)

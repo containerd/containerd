@@ -39,7 +39,7 @@ func WithCheckpoint(desc v1.Descriptor, snapshotKey string) NewContainerOpts {
 				fk := m
 				rw = &fk
 			case images.MediaTypeDockerSchema2Manifest:
-				config, err := images.Config(ctx, store, m, platforms.Format(platforms.Default()))
+				config, err := images.Config(ctx, store, m, platforms.Default())
 				if err != nil {
 					return err
 				}
