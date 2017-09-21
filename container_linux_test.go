@@ -730,9 +730,7 @@ func TestShimSigkilled(t *testing.T) {
 	defer cancel()
 
 	// redis unset its PDeathSignal making it a good candidate
-	//
-	// FIXME: change this back after multiplatform support is added to pull
-	image, err = client.Pull(ctx, "docker.io/amd64/redis:alpine", WithPullUnpack)
+	image, err = client.Pull(ctx, "docker.io/library/redis:alpine", WithPullUnpack)
 	if err != nil {
 		t.Fatal(err)
 	}
