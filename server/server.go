@@ -136,7 +136,7 @@ func (s *Server) ServeGRPC(l net.Listener) error {
 // ServeMetrics provides a prometheus endpoint for exposing metrics
 func (s *Server) ServeMetrics(l net.Listener) error {
 	m := http.NewServeMux()
-	m.Handle("/metrics", metrics.Handler())
+	m.Handle("/v1/metrics", metrics.Handler())
 	return trapClosedConnErr(http.Serve(l, m))
 }
 
