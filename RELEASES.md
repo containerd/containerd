@@ -164,7 +164,8 @@ containerd versions:
 
 | Component     | Status   | Stablized Version | Links         |
 |---------------|----------|-------------------|---------------|
-| GRPC API      | Alpha    | 1.0               | [api/](api) |
+| GRPC API      | Beta     | 1.0               | [api/](api) |
+| Metrics API   | Beta     | 1.0               | -
 | Go client API | Unstable | 1.1 tentative     | [godoc](https://godoc.org/github.com/containerd/containerd) |
 | `ctr` tool    | Unstable | Out of scope      | -             |
 
