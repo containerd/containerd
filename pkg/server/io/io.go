@@ -136,6 +136,17 @@ func WithRootDir(root string) Opts {
 	}
 }
 
+// WithFIFOs specifies existing fifos for the container io.
+func WithFIFOs(dir, stdin, stdout, stderr string) Opts {
+	return func(c *ContainerIO) error {
+		c.dir = dir
+		c.stdinPath = stdin
+		c.stdoutPath = stdout
+		c.stderrPath = stderr
+		return nil
+	}
+}
+
 // NewContainerIO creates container io.
 func NewContainerIO(id string, opts ...Opts) (*ContainerIO, error) {
 	c := &ContainerIO{
@@ -148,6 +159,10 @@ func NewContainerIO(id string, opts ...Opts) (*ContainerIO, error) {
 		if err := opt(c); err != nil {
 			return nil, err
 		}
+	}
+	if c.dir != "" {
+		// Return if fifos are already set.
+		return c, nil
 	}
 	fifos, err := newFifos(c.root, id)
 	if err != nil {

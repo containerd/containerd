@@ -81,6 +81,7 @@ func TestStatusEncodeDecode(t *testing.T) {
 	assert.NoError(err)
 	newS := &Status{}
 	assert.NoError(newS.decode(data))
+	s.Removing = false // Removing should not be encoded.
 	assert.Equal(s, newS)
 
 	unsupported, err := json.Marshal(&versionedStatus{

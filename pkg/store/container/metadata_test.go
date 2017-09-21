@@ -36,6 +36,7 @@ func TestMetadataMarshalUnmarshal(t *testing.T) {
 			},
 		},
 		ImageRef: "test-image-ref",
+		LogPath:  "/test/log/path",
 	}
 
 	assert := assertlib.New(t)

@@ -19,7 +19,6 @@ package server
 import (
 	"fmt"
 	"io"
-	"path/filepath"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -88,7 +87,6 @@ func (c *criContainerdService) startContainer(ctx context.Context,
 	if err != nil {
 		return fmt.Errorf("sandbox %q not found: %v", meta.SandboxID, err)
 	}
-	sandboxConfig := sandbox.Config
 	sandboxID := meta.SandboxID
 	// Make sure sandbox is running.
 	s, err := sandbox.Container.Task(ctx, nil)
@@ -106,7 +104,10 @@ func (c *criContainerdService) startContainer(ctx context.Context,
 	}
 
 	ioCreation := func(id string) (_ containerd.IO, err error) {
-		var stdoutWC, stderrWC io.WriteCloser
+		stdoutWC, stderrWC, err := createContainerLoggers(meta.LogPath, config.GetTty())
+		if err != nil {
+			return nil, fmt.Errorf("failed to create container loggers: %v", err)
+		}
 		defer func() {
 			if err != nil {
 				if stdoutWC != nil {
@@ -117,23 +118,6 @@ func (c *criContainerdService) startContainer(ctx context.Context,
 				}
 			}
 		}()
-		if config.GetLogPath() != "" {
-			// Only generate container log when log path is specified.
-			logPath := filepath.Join(sandboxConfig.GetLogDirectory(), config.GetLogPath())
-			if stdoutWC, err = cio.NewCRILogger(logPath, cio.Stdout); err != nil {
-				return nil, fmt.Errorf("failed to start container stdout logger: %v", err)
-			}
-			// Only redirect stderr when there is no tty.
-			if !config.GetTty() {
-				if stderrWC, err = cio.NewCRILogger(logPath, cio.Stderr); err != nil {
-					return nil, fmt.Errorf("failed to start container stderr logger: %v", err)
-				}
-			}
-		} else {
-			stdoutWC = cio.NewDiscardLogger()
-			stderrWC = cio.NewDiscardLogger()
-		}
-
 		if err := cio.WithOutput("log", stdoutWC, stderrWC)(cntr.IO); err != nil {
 			return nil, fmt.Errorf("failed to add container log: %v", err)
 		}
@@ -164,4 +148,29 @@ func (c *criContainerdService) startContainer(ctx context.Context,
 	status.Pid = task.Pid()
 	status.StartedAt = time.Now().UnixNano()
 	return nil
+}
+
+// Create container loggers and return write closer for stdout and stderr.
+func createContainerLoggers(logPath string, tty bool) (stdout io.WriteCloser, stderr io.WriteCloser, err error) {
+	if logPath != "" {
+		// Only generate container log when log path is specified.
+		if stdout, err = cio.NewCRILogger(logPath, cio.Stdout); err != nil {
+			return nil, nil, fmt.Errorf("failed to start container stdout logger: %v", err)
+		}
+		defer func() {
+			if err != nil {
+				stdout.Close()
+			}
+		}()
+		// Only redirect stderr when there is no tty.
+		if !tty {
+			if stderr, err = cio.NewCRILogger(logPath, cio.Stderr); err != nil {
+				return nil, nil, fmt.Errorf("failed to start container stderr logger: %v", err)
+			}
+		}
+	} else {
+		stdout = cio.NewDiscardLogger()
+		stderr = cio.NewDiscardLogger()
+	}
+	return
 }

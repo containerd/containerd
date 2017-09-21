@@ -56,7 +56,7 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 	}
 
 	// Teardown network for sandbox.
-	if sandbox.NetNSPath != "" {
+	if sandbox.NetNSPath != "" && sandbox.NetNS != nil {
 		if _, err := os.Stat(sandbox.NetNSPath); err != nil {
 			if !os.IsNotExist(err) {
 				return nil, fmt.Errorf("failed to stat network namespace path %s :%v", sandbox.NetNSPath, err)

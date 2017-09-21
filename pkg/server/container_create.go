@@ -157,6 +157,11 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	}
 	meta.ImageRef = image.ID
 
+	// Get container log path.
+	if config.GetLogPath() != "" {
+		meta.LogPath = filepath.Join(sandbox.Config.GetLogDirectory(), config.GetLogPath())
+	}
+
 	containerIO, err := cio.NewContainerIO(id,
 		cio.WithStdin(config.GetStdin()),
 		cio.WithTerminal(config.GetTty()),

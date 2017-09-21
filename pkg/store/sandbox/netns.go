@@ -17,17 +17,25 @@ limitations under the License.
 package sandbox
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"sync"
 
 	cnins "github.com/containernetworking/plugins/pkg/ns"
+	"github.com/docker/docker/pkg/mount"
+	"golang.org/x/sys/unix"
 )
+
+// ErrClosedNetNS is the error returned when network namespace is closed.
+var ErrClosedNetNS = errors.New("network namespace is closed")
 
 // NetNS holds network namespace for sandbox
 type NetNS struct {
 	sync.Mutex
-	ns     cnins.NetNS
-	closed bool
+	ns       cnins.NetNS
+	closed   bool
+	restored bool
 }
 
 // NewNetNS creates a network namespace for the sandbox
@@ -41,6 +49,22 @@ func NewNetNS() (*NetNS, error) {
 	return n, nil
 }
 
+// LoadNetNS loads existing network namespace. It returns ErrClosedNetNS
+// if the network namespace has already been closed.
+func LoadNetNS(path string) (*NetNS, error) {
+	if err := cnins.IsNSorErr(path); err != nil {
+		if _, ok := err.(cnins.NSPathNotExistErr); ok {
+			return nil, ErrClosedNetNS
+		}
+		return nil, err
+	}
+	ns, err := cnins.GetNS(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load network namespace %v", err)
+	}
+	return &NetNS{ns: ns, restored: true}, nil
+}
+
 // Remove removes network namepace if it exists and not closed. Remove is idempotent,
 // meaning it might be invoked multiple times and provides consistent result.
 func (n *NetNS) Remove() error {
@@ -49,9 +73,33 @@ func (n *NetNS) Remove() error {
 	if !n.closed {
 		err := n.ns.Close()
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to close network namespace: %v", err)
 		}
 		n.closed = true
+	}
+	if n.restored {
+		path := n.ns.Path()
+		// TODO(random-liu): Add util function for unmount.
+		// Check netns existence.
+		if _, err := os.Stat(path); err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return fmt.Errorf("failed to stat netns: %v", err)
+		}
+		mounted, err := mount.Mounted(path)
+		if err != nil {
+			return fmt.Errorf("failed to check netns mounted: %v", err)
+		}
+		if mounted {
+			err := unix.Unmount(path, unix.MNT_DETACH)
+			if err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("failed to umount netns: %v", err)
+			}
+		}
+		if err := os.RemoveAll(path); err != nil {
+			return fmt.Errorf("failed to remove netns: %v", err)
+		}
 	}
 	return nil
 }

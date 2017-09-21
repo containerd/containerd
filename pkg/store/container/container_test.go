@@ -41,6 +41,7 @@ func TestContainerStore(t *testing.T) {
 				},
 			},
 			ImageRef: "TestImage-1",
+			LogPath:  "/test/log/path/1",
 		},
 		"2": {
 			ID:        "2",
@@ -53,6 +54,7 @@ func TestContainerStore(t *testing.T) {
 				},
 			},
 			ImageRef: "TestImage-2",
+			LogPath:  "/test/log/path/2",
 		},
 		"3": {
 			ID:        "3",
@@ -65,6 +67,7 @@ func TestContainerStore(t *testing.T) {
 				},
 			},
 			ImageRef: "TestImage-3",
+			LogPath:  "/test/log/path/3",
 		},
 	}
 	statuses := map[string]Status{
@@ -153,6 +156,7 @@ func TestWithContainerIO(t *testing.T) {
 			},
 		},
 		ImageRef: "TestImage-1",
+		LogPath:  "/test/log/path",
 	}
 	status := Status{
 		Pid:        1,
