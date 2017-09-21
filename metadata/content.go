@@ -10,6 +10,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
+	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/namespaces"
 	digest "github.com/opencontainers/go-digest"
@@ -93,6 +94,9 @@ func (cs *contentStore) Update(ctx context.Context, info content.Info, fieldpath
 		} else {
 			// Set mutable fields
 			updated.Labels = info.Labels
+		}
+		if err := validateInfo(&updated); err != nil {
+			return err
 		}
 
 		updated.UpdatedAt = time.Now().UTC()
@@ -371,6 +375,10 @@ func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64,
 			return err
 		}
 	}
+	if err := validateInfo(&base); err != nil {
+		return err
+	}
+
 	status, err := nw.Writer.Status()
 	if err != nil {
 		return err
@@ -444,6 +452,16 @@ func (cs *contentStore) checkAccess(ctx context.Context, dgst digest.Digest) err
 		}
 		return nil
 	})
+}
+
+func validateInfo(info *content.Info) error {
+	for k, v := range info.Labels {
+		if err := labels.Validate(k, v); err == nil {
+			return errors.Wrapf(err, "info.Labels")
+		}
+	}
+
+	return nil
 }
 
 func readInfo(info *content.Info, bkt *bolt.Bucket) error {

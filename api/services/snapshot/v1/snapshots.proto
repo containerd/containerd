@@ -29,6 +29,8 @@ message PrepareSnapshotRequest {
 	string parent = 3;
 
 	// Labels are arbitrary data on snapshots.
+	//
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
 	map<string, string> labels  = 4;
 }
 
@@ -42,6 +44,8 @@ message ViewSnapshotRequest {
 	string parent = 3;
 
 	// Labels are arbitrary data on snapshots.
+	//
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
 	map<string, string> labels  = 4;
 }
 
@@ -69,6 +73,8 @@ message CommitSnapshotRequest {
 	string key = 3;
 
 	// Labels are arbitrary data on snapshots.
+	//
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
 	map<string, string> labels  = 4;
 }
 
@@ -99,6 +105,8 @@ message Info {
 	google.protobuf.Timestamp updated_at = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 
 	// Labels are arbitrary data on snapshots.
+	//
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
 	map<string, string> labels  = 6;
 }
 

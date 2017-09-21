@@ -108,10 +108,16 @@ var imagesSetLabelsCommand = cli.Command{
 	Usage:       "Set and clear labels for an image.",
 	ArgsUsage:   "[flags] <name> [<key>=<value>, ...]",
 	Description: "Set and clear labels for an image.",
-	Flags:       []cli.Flag{},
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "replace-all, r",
+			Usage: "replace all labels",
+		},
+	},
 	Action: func(clicontext *cli.Context) error {
 		var (
 			ctx, cancel  = appContext(clicontext)
+			replaceAll   = clicontext.Bool("replace-all")
 			name, labels = objectWithLabelArgs(clicontext)
 		)
 		defer cancel()
@@ -131,7 +137,11 @@ var imagesSetLabelsCommand = cli.Command{
 		)
 
 		for k := range labels {
-			fieldpaths = append(fieldpaths, strings.Join([]string{"labels", k}, "."))
+			if replaceAll {
+				fieldpaths = append(fieldpaths, "labels")
+			} else {
+				fieldpaths = append(fieldpaths, strings.Join([]string{"labels", k}, "."))
+			}
 		}
 
 		image := images.Image{

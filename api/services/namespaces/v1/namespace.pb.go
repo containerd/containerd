@@ -55,6 +55,8 @@ type Namespace struct {
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Labels provides an area to include arbitrary data on namespaces.
 	//
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
+	//
 	// Note that to add a new value to this field, read the existing set and
 	// include the entire result in the update call.
 	Labels map[string]string `protobuf:"bytes,2,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
