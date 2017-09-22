@@ -67,9 +67,6 @@ const (
 	defaultShmSize = int64(1024 * 1024 * 64)
 	// relativeRootfsPath is the rootfs path relative to bundle path.
 	relativeRootfsPath = "rootfs"
-	// defaultRuntime is the runtime to use in containerd. We may support
-	// other runtime in the future.
-	defaultRuntime = "io.containerd.runtime.v1.linux"
 	// sandboxesDir contains all sandbox root. A sandbox root is the running
 	// directory of the sandbox, all files created for the sandbox will be
 	// placed under this directory.
