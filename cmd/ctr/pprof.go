@@ -19,7 +19,7 @@ type pprofDialer struct {
 
 var pprofCommand = cli.Command{
 	Name:  "pprof",
-	Usage: "provides golang pprof outputs for containerd",
+	Usage: "provide golang pprof outputs for containerd",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "debug-socket, d",
@@ -87,7 +87,7 @@ var pprofProfileCommand = cli.Command{
 
 var pprofTraceCommand = cli.Command{
 	Name:  "trace",
-	Usage: "collects execution trace",
+	Usage: "collect execution trace",
 	Flags: []cli.Flag{
 		cli.DurationFlag{
 			Name:  "seconds,s",

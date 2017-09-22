@@ -18,7 +18,7 @@ import (
 
 var imageCommand = cli.Command{
 	Name:  "images",
-	Usage: "image management",
+	Usage: "manage images",
 	Subcommands: cli.Commands{
 		imagesListCommand,
 		imageRemoveCommand,
@@ -105,7 +105,7 @@ var imagesListCommand = cli.Command{
 
 var imagesSetLabelsCommand = cli.Command{
 	Name:        "label",
-	Usage:       "Set and clear labels for an image.",
+	Usage:       "set and clear labels for an image.",
 	ArgsUsage:   "[flags] <name> [<key>=<value>, ...]",
 	Description: "Set and clear labels for an image.",
 	Flags:       []cli.Flag{},

@@ -52,7 +52,7 @@ var (
 	snapshotterFlags = []cli.Flag{
 		cli.StringFlag{
 			Name:  "snapshotter",
-			Usage: "Snapshotter name. Empty value stands for the daemon default value.",
+			Usage: "snapshotter name. Empty value stands for the daemon default value.",
 			Value: containerd.DefaultSnapshotter,
 		},
 	}
@@ -60,11 +60,11 @@ var (
 	registryFlags = []cli.Flag{
 		cli.BoolFlag{
 			Name:  "skip-verify,k",
-			Usage: "Skip SSL certificate validation",
+			Usage: "skip SSL certificate validation",
 		},
 		cli.BoolFlag{
 			Name:  "plain-http",
-			Usage: "Allow connections using plain HTTP",
+			Usage: "allow connections using plain HTTP",
 		},
 		cli.StringFlag{
 			Name:  "user,u",
@@ -72,7 +72,7 @@ var (
 		},
 		cli.StringFlag{
 			Name:  "refresh",
-			Usage: "Refresh token for authorization server",
+			Usage: "refresh token for authorization server",
 		},
 	}
 )

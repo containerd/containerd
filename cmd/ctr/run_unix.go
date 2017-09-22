@@ -21,7 +21,7 @@ import (
 func init() {
 	runCommand.Flags = append(runCommand.Flags, cli.BoolFlag{
 		Name:  "rootfs",
-		Usage: "Use custom rootfs that is not managed by containerd snapshotter.",
+		Usage: "use custom rootfs that is not managed by containerd snapshotter.",
 	})
 }
 

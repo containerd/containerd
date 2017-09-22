@@ -11,7 +11,7 @@ import (
 
 var rootfsCommand = cli.Command{
 	Name:  "rootfs",
-	Usage: "rootfs setups a rootfs",
+	Usage: "setup a rootfs",
 	Subcommands: []cli.Command{
 		rootfsUnpackCommand,
 	},
