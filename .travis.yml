@@ -42,10 +42,6 @@ before_script:
         gcloud auth activate-service-account --key-file gcp-secret.json --project=k8s-cri-containerd;
       fi
 
-env:
-    # Travis trusty has disabled apparmor, so disable enable in our test.
-    - CRI_CONTAINERD_FLAGS="--enable-apparmor=false"
-
 jobs:
   include:
     - stage: Build

@@ -12,22 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-GO ?= go
-EPOCH_TEST_COMMIT ?= f9e02affccd51702191e5312665a16045ffef8ab
+GO := go
+EPOCH_TEST_COMMIT := f9e02affccd51702191e5312665a16045ffef8ab
 PROJECT := github.com/kubernetes-incubator/cri-containerd
-BINDIR ?= ${DESTDIR}/usr/local/bin
-BUILD_DIR ?= _output
+BINDIR := ${DESTDIR}/usr/local/bin
+BUILD_DIR := _output
 # VERSION is derived from the current tag for HEAD plus amends. Version is used
 # to set/overide the criContainerdVersion variable in the verison package for
 # cri-containerd.
 VERSION := $(shell git describe --tags --dirty)
 # strip the first char of the tag if it's a `v`
 VERSION := $(VERSION:v%=%)
-TARBALL ?= cri-containerd-$(VERSION).tar.gz
-ifdef BUILD_TAGS
-BUILD_TAGS := -tags $(BUILD_TAGS)
-endif
-GO_LDFLAGS := -ldflags '-X $(PROJECT)/pkg/version.criContainerdVersion=$(VERSION)'
+TARBALL := cri-containerd-$(VERSION).tar.gz
+BUILD_TAGS := apparmor
+GO_LDFLAGS := -X $(PROJECT)/pkg/version.criContainerdVersion=$(VERSION)
 SOURCES := $(shell find . -name '*.go')
 
 all: binaries
@@ -71,11 +69,16 @@ boiler:
 
 $(BUILD_DIR)/cri-containerd: $(SOURCES)
 	$(GO) build -o $@ \
-	   $(BUILD_TAGS) $(GO_LDFLAGS) $(GO_GCFLAGS) \
-	   $(PROJECT)/cmd/cri-containerd
+		-tags '$(BUILD_TAGS)' \
+		-ldflags '$(GO_LDFLAGS)' \
+		-gcflags '$(GO_GCFLAGS)' \
+		$(PROJECT)/cmd/cri-containerd
 
 test:
-	go test -timeout=10m -race ./pkg/... $(BUILD_TAGS) $(GO_LDFLAGS) $(GO_GCFLAGS)
+	go test -timeout=10m -race ./pkg/... \
+		-tags '$(BUILD_TAGS)' \
+	        -ldflags '$(GO_LDFLAGS)' \
+		-gcflags '$(GO_GCFLAGS)'
 
 test-cri: binaries
 	@./hack/test-cri.sh
@@ -88,7 +91,7 @@ clean:
 
 binaries: $(BUILD_DIR)/cri-containerd
 
-static-binaries: GO_LDFLAGS += --ldflags '-extldflags "-fno-PIC -static"'
+static-binaries: GO_LDFLAGS += -extldflags "-fno-PIC -static"
 static-binaries: $(BUILD_DIR)/cri-containerd
 
 install: binaries
@@ -103,7 +106,7 @@ $(BUILD_DIR)/$(TARBALL): $(BUILD_DIR)/cri-containerd hack/versions
 release: $(BUILD_DIR)/$(TARBALL)
 
 push: $(BUILD_DIR)/$(TARBALL)
-	@@BUILD_DIR=$(BUILD_DIR) TARBALL=$(TARBALL) ./hack/push.sh
+	@BUILD_DIR=$(BUILD_DIR) TARBALL=$(TARBALL) ./hack/push.sh
 
 .PHONY: install.deps
 

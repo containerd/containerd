@@ -51,9 +51,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	if !o.EnableSelinux {
-		selinux.SetDisabled()
-	}
+	validateConfig(o)
 
 	glog.V(2).Infof("Run cri-containerd grpc server on socket %q", o.SocketPath)
 	s, err := server.NewCRIContainerdService(o.Config)
@@ -66,5 +64,15 @@ func main() {
 	h := interrupt.New(func(os.Signal) {}, s.Stop)
 	if err := h.Run(func() error { return s.Run() }); err != nil {
 		glog.Exitf("Failed to run cri-containerd grpc server: %v", err)
+	}
+}
+
+func validateConfig(o *options.CRIContainerdOptions) {
+	if o.EnableSelinux {
+		if !selinux.GetEnabled() {
+			glog.Warning("Selinux is not supported")
+		}
+	} else {
+		selinux.SetDisabled()
 	}
 }
