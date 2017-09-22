@@ -11,11 +11,10 @@ import (
 )
 
 var imagesImportCommand = cli.Command{
-	Name:      "import",
-	Usage:     "import an image",
-	ArgsUsage: "[flags] <ref> <in>",
-	Description: `Import an image from a tar stream
-`,
+	Name:        "import",
+	Usage:       "import an image",
+	ArgsUsage:   "[flags] <ref> <in>",
+	Description: `Import an image from a tar stream.`,
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "ref-object",

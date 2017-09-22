@@ -12,7 +12,7 @@ import (
 
 var pushObjectCommand = cli.Command{
 	Name:        "push-object",
-	Usage:       "pushes an object to a remote",
+	Usage:       "push an object to a remote",
 	ArgsUsage:   "[flags] <remote> <object> <type>",
 	Description: `Push objects by identifier to a remote.`,
 	Flags:       registryFlags,

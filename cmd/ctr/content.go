@@ -22,7 +22,7 @@ import (
 var (
 	contentCommand = cli.Command{
 		Name:  "content",
-		Usage: "content management",
+		Usage: "manage content",
 		Subcommands: cli.Commands{
 			listContentCommand,
 			ingestContentCommand,
@@ -220,7 +220,7 @@ var (
 
 	labelContentCommand = cli.Command{
 		Name:        "label",
-		Usage:       "adds labels to content",
+		Usage:       "add labels to content",
 		ArgsUsage:   "[flags] <digest> [<label>=<value> ...]",
 		Description: `Labels blobs in the content store`,
 		Flags:       []cli.Flag{},

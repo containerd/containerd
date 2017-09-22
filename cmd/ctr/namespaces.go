@@ -27,7 +27,7 @@ var namespacesCommand = cli.Command{
 
 var namespacesCreateCommand = cli.Command{
 	Name:        "create",
-	Usage:       "Create a new namespace.",
+	Usage:       "create a new namespace.",
 	ArgsUsage:   "[flags] <name> [<key>=<value]",
 	Description: "Create a new namespace. It must be unique.",
 	Action: func(clicontext *cli.Context) error {
@@ -55,7 +55,7 @@ var namespacesCreateCommand = cli.Command{
 
 var namespacesSetLabelsCommand = cli.Command{
 	Name:        "label",
-	Usage:       "Set and clear labels for a namespace.",
+	Usage:       "set and clear labels for a namespace.",
 	ArgsUsage:   "[flags] <name> [<key>=<value>, ...]",
 	Description: "Set and clear labels for a namespace.",
 	Flags:       []cli.Flag{},
@@ -87,7 +87,7 @@ var namespacesSetLabelsCommand = cli.Command{
 var namespacesListCommand = cli.Command{
 	Name:        "list",
 	Aliases:     []string{"ls"},
-	Usage:       "List namespaces.",
+	Usage:       "list namespaces.",
 	ArgsUsage:   "[flags]",
 	Description: "List namespaces.",
 	Flags: []cli.Flag{
@@ -146,7 +146,7 @@ var namespacesListCommand = cli.Command{
 var namespacesRemoveCommand = cli.Command{
 	Name:        "remove",
 	Aliases:     []string{"rm"},
-	Usage:       "Remove one or more namespaces",
+	Usage:       "remove one or more namespaces",
 	ArgsUsage:   "[flags] <name> [<name>, ...]",
 	Description: "Remove one or more namespaces. For now, the namespace must be empty.",
 	Action: func(clicontext *cli.Context) error {

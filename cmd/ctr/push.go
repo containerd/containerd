@@ -39,10 +39,10 @@ var pushCommand = cli.Command{
 `,
 	Flags: append(registryFlags, cli.StringFlag{
 		Name:  "manifest",
-		Usage: "Digest of manifest",
+		Usage: "digest of manifest",
 	}, cli.StringFlag{
 		Name:  "manifest-type",
-		Usage: "Media type of manifest digest",
+		Usage: "media type of manifest digest",
 		Value: ocispec.MediaTypeImageManifest,
 	}),
 	Action: func(clicontext *cli.Context) error {

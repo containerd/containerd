@@ -12,24 +12,23 @@ import (
 )
 
 var imagesExportCommand = cli.Command{
-	Name:      "export",
-	Usage:     "export an image",
-	ArgsUsage: "[flags] <out> <image>",
-	Description: `Export an image to a tar stream
-`,
+	Name:        "export",
+	Usage:       "export an image",
+	ArgsUsage:   "[flags] <out> <image>",
+	Description: `Export an image to a tar stream.`,
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "oci-ref-name",
 			Value: "",
-			Usage: "Override org.opencontainers.image.ref.name annotation",
+			Usage: "override org.opencontainers.image.ref.name annotation",
 		},
 		cli.StringFlag{
 			Name:  "manifest",
-			Usage: "Digest of manifest",
+			Usage: "digest of manifest",
 		},
 		cli.StringFlag{
 			Name:  "manifest-type",
-			Usage: "Media type of manifest digest",
+			Usage: "media type of manifest digest",
 			Value: ocispec.MediaTypeImageManifest,
 		},
 	},

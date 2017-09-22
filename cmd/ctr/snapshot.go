@@ -34,7 +34,7 @@ var snapshotCommand = cli.Command{
 var listSnapshotCommand = cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
-	Usage:   "List snapshots",
+	Usage:   "list snapshots",
 	Action: func(clicontext *cli.Context) error {
 		ctx, cancel := appContext(clicontext)
 		defer cancel()
@@ -63,7 +63,7 @@ var listSnapshotCommand = cli.Command{
 
 var usageSnapshotCommand = cli.Command{
 	Name:      "usage",
-	Usage:     "Usage snapshots",
+	Usage:     "usage snapshots",
 	ArgsUsage: "[flags] [<key>, ...]",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
@@ -281,7 +281,7 @@ var commitSnapshotCommand = cli.Command{
 
 var treeSnapshotCommand = cli.Command{
 	Name:  "tree",
-	Usage: "Display tree view of snapshot branches",
+	Usage: "display tree view of snapshot branches",
 	Action: func(clicontext *cli.Context) error {
 		ctx, cancel := appContext(clicontext)
 		defer cancel()

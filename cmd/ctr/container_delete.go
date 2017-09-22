@@ -12,7 +12,7 @@ import (
 
 var containersDeleteCommand = cli.Command{
 	Name:      "delete",
-	Usage:     "deletes one or more existing containers",
+	Usage:     "delete one or more existing containers",
 	ArgsUsage: "CONTAINER [CONTAINER, ...]",
 	Aliases:   []string{"del", "rm"},
 	Flags: []cli.Flag{
