@@ -27,6 +27,8 @@ func containerToProto(container *containers.Container) api.Container {
 		Spec:        container.Spec,
 		Snapshotter: container.Snapshotter,
 		SnapshotKey: container.SnapshotKey,
+		CreatedAt:   container.CreatedAt,
+		UpdatedAt:   container.UpdatedAt,
 		Extensions:  container.Extensions,
 	}
 }
