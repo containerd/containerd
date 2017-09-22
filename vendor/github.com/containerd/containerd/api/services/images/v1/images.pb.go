@@ -67,6 +67,7 @@ type Image struct {
 	// and do not get inherited into the package image in any way.
 	//
 	// Labels may be updated using the field mask.
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
 	Labels map[string]string `protobuf:"bytes,2,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// Target describes the content entry point of the image.
 	Target containerd_types.Descriptor `protobuf:"bytes,3,opt,name=target" json:"target"`

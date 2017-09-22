@@ -354,7 +354,7 @@ func (s *Service) Write(session api.Content_WriteServer) (err error) {
 		// 	2. Compress inline.
 		// 	3. Validate digest and size (maybe).
 		//
-		// Supporting these two paths is quite awkward but it let's both API
+		// Supporting these two paths is quite awkward but it lets both API
 		// users use the same writer style for each with a minimum of overhead.
 		if req.Expected != "" {
 			if expected != "" && expected != req.Expected {

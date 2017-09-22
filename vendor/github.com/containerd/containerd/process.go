@@ -6,11 +6,8 @@ import (
 	"syscall"
 	"time"
 
-	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/runtime"
-	"github.com/containerd/typeurl"
 	"github.com/pkg/errors"
 )
 
@@ -121,54 +118,25 @@ func (p *process) Kill(ctx context.Context, s syscall.Signal, opts ...KillOpts) 
 }
 
 func (p *process) Wait(ctx context.Context) (<-chan ExitStatus, error) {
-	cancellable, cancel := context.WithCancel(ctx)
-	eventstream, err := p.task.client.EventService().Subscribe(cancellable, &eventsapi.SubscribeRequest{
-		Filters: []string{"topic==" + runtime.TaskExitEventTopic},
-	})
-	if err != nil {
-		cancel()
-		return nil, err
-	}
-	// first check if the task has exited
-	status, err := p.Status(ctx)
-	if err != nil {
-		cancel()
-		return nil, errdefs.FromGRPC(err)
-	}
-
-	chStatus := make(chan ExitStatus, 1)
-	if status.Status == Stopped {
-		cancel()
-		chStatus <- ExitStatus{code: status.ExitStatus, exitedAt: status.ExitTime}
-		return chStatus, nil
-	}
-
+	c := make(chan ExitStatus, 1)
 	go func() {
-		defer cancel()
-		chStatus <- ExitStatus{} // signal that the goroutine is running
-		for {
-			evt, err := eventstream.Recv()
-			if err != nil {
-				chStatus <- ExitStatus{code: UnknownExitStatus, err: err}
-				return
+		r, err := p.task.client.TaskService().Wait(ctx, &tasks.WaitRequest{
+			ContainerID: p.task.id,
+			ExecID:      p.id,
+		})
+		if err != nil {
+			c <- ExitStatus{
+				code: UnknownExitStatus,
+				err:  err,
 			}
-			if typeurl.Is(evt.Event, &eventsapi.TaskExit{}) {
-				v, err := typeurl.UnmarshalAny(evt.Event)
-				if err != nil {
-					chStatus <- ExitStatus{code: UnknownExitStatus, err: err}
-					return
-				}
-				e := v.(*eventsapi.TaskExit)
-				if e.ID == p.id && e.ContainerID == p.task.id {
-					chStatus <- ExitStatus{code: e.ExitStatus, exitedAt: e.ExitedAt}
-					return
-				}
-			}
+			return
+		}
+		c <- ExitStatus{
+			code:     r.ExitStatus,
+			exitedAt: r.ExitedAt,
 		}
 	}()
-
-	<-chStatus // wait for the goroutine to be running
-	return chStatus, nil
+	return c, nil
 }
 
 func (p *process) CloseIO(ctx context.Context, opts ...IOCloserOpts) error {

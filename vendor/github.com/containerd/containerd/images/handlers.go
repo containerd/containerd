@@ -7,6 +7,7 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
@@ -127,7 +128,7 @@ func Dispatch(ctx context.Context, handler Handler, descs ...ocispec.Descriptor)
 //
 // One can also replace this with another implementation to allow descending of
 // arbitrary types.
-func ChildrenHandler(provider content.Provider) HandlerFunc {
+func ChildrenHandler(provider content.Provider, platform string) HandlerFunc {
 	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		var descs []ocispec.Descriptor
 		switch desc.MediaType {
@@ -157,10 +158,26 @@ func ChildrenHandler(provider content.Provider) HandlerFunc {
 				return nil, err
 			}
 
-			descs = append(descs, index.Manifests...)
+			if platform != "" {
+				matcher, err := platforms.Parse(platform)
+				if err != nil {
+					return nil, err
+				}
+
+				for _, d := range index.Manifests {
+					if d.Platform == nil || matcher.Match(*d.Platform) {
+						descs = append(descs, d)
+					}
+				}
+			} else {
+				descs = append(descs, index.Manifests...)
+			}
+
 		case MediaTypeDockerSchema2Layer, MediaTypeDockerSchema2LayerGzip,
+			MediaTypeDockerSchema2LayerForeign, MediaTypeDockerSchema2LayerForeignGzip,
 			MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig,
-			ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerGzip:
+			ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerGzip,
+			ocispec.MediaTypeImageLayerNonDistributable, ocispec.MediaTypeImageLayerNonDistributableGzip:
 			// childless data types.
 			return nil, nil
 		default:
