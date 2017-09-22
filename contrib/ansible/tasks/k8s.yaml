@@ -25,7 +25,9 @@
     gpgcheck: yes
     enabled: yes
     repo_gpgcheck: yes
-    gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg
+    gpgkey: 
+      - https://packages.cloud.google.com/yum/doc/yum-key.gpg 
+      - https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
   when: ansible_distribution == "CentOS"
 
 - name: "Disable SELinux (CentOS)"
