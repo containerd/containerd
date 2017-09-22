@@ -1,0 +1,48 @@
+---
+- hosts: all 
+  become: true
+  tasks:
+    - include_vars: vars/vars.yaml # Contains tasks variables for installer
+    - include: tasks/bootstrap_ubuntu.yaml # Contains tasks bootstrap components for ubuntu systems 
+      when: ansible_distribution == "Ubuntu"
+    - include: tasks/bootstrap_centos.yaml # Contains tasks bootstrap components for centos systems
+      when: ansible_distribution == "CentOS"
+    - include: tasks/k8s.yaml # Contains tasks kubernetes component installation
+    - include: tasks/binaries.yaml # Contains tasks for pulling containerd and cri-containerd components
+       
+    - name: "Start Containerd"
+      systemd: name=containerd daemon_reload=yes state=started enabled=yes
+    
+    - name: "Start CRI-Containerd"
+      systemd: name=cri-containerd daemon_reload=yes state=started enabled=yes
+    
+    - name: "Set bridge-nf-call-iptables"
+      lineinfile:
+        line: "net/bridge/bridge-nf-call-iptables = 1"
+        dest: /etc/sysctl.conf
+        insertafter: 'EOF'
+        regexp: '\/net\/bridge\/bridge-nf-call-iptables = 1'
+        state: present
+      ignore_errors: true
+    
+    - name: "Check kubelet args in kubelet config"
+      shell: grep "^Environment=\"KUBELET_EXTRA_ARGS=" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf 
+      ignore_errors: true
+      register: check_args
+
+    - name: "Add runtime args in kubelet conf"
+      lineinfile:
+                dest: "/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
+                line: "Environment=\"KUBELET_EXTRA_ARGS= --container-runtime=remote --runtime-request-timeout=15m --image-service-endpoint=/var/run/cri-containerd.sock --container-runtime-endpoint=/var/run/cri-containerd.sock\""
+                insertafter: '\[Service\]'
+      when: check_args.stdout == ""
+    
+    - name: "Start Kubelet"
+      systemd: name=kubelet daemon_reload=yes state=started enabled=yes
+    
+    # TODO This needs to be removed once we have consistent concurrent pull results
+    - name: "Pre-pull pause container image"
+      shell: |
+             /usr/local/bin/ctr pull gcr.io/google_containers/pause:3.0
+             /usr/local/bin/crictl --runtime-endpoint /var/run/cri-containerd.sock \
+             pull gcr.io/google_containers/pause:3.0
