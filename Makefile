@@ -24,7 +24,10 @@ VERSION := $(shell git describe --tags --dirty)
 # strip the first char of the tag if it's a `v`
 VERSION := $(VERSION:v%=%)
 TARBALL ?= cri-containerd-$(VERSION).tar.gz
-BUILD_TAGS:= -ldflags '-X $(PROJECT)/pkg/version.criContainerdVersion=$(VERSION)'
+ifdef BUILD_TAGS
+BUILD_TAGS := -tags $(BUILD_TAGS)
+endif
+GO_LDFLAGS := -ldflags '-X $(PROJECT)/pkg/version.criContainerdVersion=$(VERSION)'
 SOURCES := $(shell find . -name '*.go')
 
 all: binaries
@@ -68,8 +71,7 @@ boiler:
 
 $(BUILD_DIR)/cri-containerd: $(SOURCES)
 	$(GO) build -o $@ \
-	   $(BUILD_TAGS) \
-	   $(GO_LDFLAGS) $(GO_GCFLAGS) \
+	   $(BUILD_TAGS) $(GO_LDFLAGS) $(GO_GCFLAGS) \
 	   $(PROJECT)/cmd/cri-containerd
 
 test:
@@ -86,7 +88,7 @@ clean:
 
 binaries: $(BUILD_DIR)/cri-containerd
 
-static-binaries: GO_LDFLAGS=--ldflags '-extldflags "-fno-PIC -static"'
+static-binaries: GO_LDFLAGS += --ldflags '-extldflags "-fno-PIC -static"'
 static-binaries: $(BUILD_DIR)/cri-containerd
 
 install: binaries
