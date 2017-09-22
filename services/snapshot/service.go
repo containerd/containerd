@@ -3,7 +3,6 @@ package snapshot
 import (
 	gocontext "context"
 
-	"github.com/boltdb/bolt"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot/v1"
 	"github.com/containerd/containerd/api/types"
@@ -50,7 +49,7 @@ func newService(ic *plugin.InitContext) (interface{}, error) {
 	}
 	snapshotters := make(map[string]snapshot.Snapshotter)
 	for name, sn := range rawSnapshotters {
-		snapshotters[name] = metadata.NewSnapshotter(md.(*bolt.DB), name, sn.(snapshot.Snapshotter))
+		snapshotters[name] = metadata.NewSnapshotter(md.(*metadata.DB), name, sn.(snapshot.Snapshotter))
 	}
 
 	if len(snapshotters) == 0 {

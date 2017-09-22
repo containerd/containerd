@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
@@ -38,7 +37,7 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			return NewWalkingDiff(metadata.NewContentStore(md.(*bolt.DB), c.(content.Store)))
+			return NewWalkingDiff(metadata.NewContentStore(md.(*metadata.DB), c.(content.Store)))
 		},
 	})
 }

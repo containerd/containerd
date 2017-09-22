@@ -23,6 +23,7 @@ import (
 	"github.com/containerd/containerd/content/local"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
 	metrics "github.com/docker/go-metrics"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
@@ -179,7 +180,11 @@ func loadPlugins(config *Config) ([]*plugin.Registration, error) {
 			if err := os.MkdirAll(ic.Root, 0711); err != nil {
 				return nil, err
 			}
-			return bolt.Open(filepath.Join(ic.Root, "meta.db"), 0644, nil)
+			db, err := bolt.Open(filepath.Join(ic.Root, "meta.db"), 0644, nil)
+			if err != nil {
+				return nil, err
+			}
+			return metadata.NewDB(db), nil
 		},
 	})
 

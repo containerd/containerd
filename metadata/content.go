@@ -19,12 +19,12 @@ import (
 
 type contentStore struct {
 	content.Store
-	db *bolt.DB
+	db *DB
 }
 
 // NewContentStore returns a namespaced content store using an existing
 // content store interface.
-func NewContentStore(db *bolt.DB, cs content.Store) content.Store {
+func NewContentStore(db *DB, cs content.Store) content.Store {
 	return &contentStore{
 		Store: cs,
 		db:    db,
@@ -353,7 +353,7 @@ type namespacedWriter struct {
 	content.Writer
 	ref       string
 	namespace string
-	db        *bolt.DB
+	db        *DB
 }
 
 func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {

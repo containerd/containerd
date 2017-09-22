@@ -101,7 +101,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		state:   ic.State,
 		monitor: monitor.(runtime.TaskMonitor),
 		tasks:   runtime.NewTaskList(),
-		db:      m.(*bolt.DB),
+		db:      m.(*metadata.DB),
 		address: ic.Address,
 		events:  ic.Events,
 		config:  cfg,
@@ -127,7 +127,7 @@ type Runtime struct {
 
 	monitor runtime.TaskMonitor
 	tasks   *runtime.TaskList
-	db      *bolt.DB
+	db      *metadata.DB
 	events  *events.Exchange
 
 	config *Config

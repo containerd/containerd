@@ -19,12 +19,12 @@ import (
 type snapshotter struct {
 	snapshot.Snapshotter
 	name string
-	db   *bolt.DB
+	db   *DB
 }
 
 // NewSnapshotter returns a new Snapshotter which namespaces the given snapshot
 // using the provided name and metadata store.
-func NewSnapshotter(db *bolt.DB, name string, sn snapshot.Snapshotter) snapshot.Snapshotter {
+func NewSnapshotter(db *DB, name string, sn snapshot.Snapshotter) snapshot.Snapshotter {
 	return &snapshotter{
 		Snapshotter: sn,
 		name:        name,

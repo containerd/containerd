@@ -4,7 +4,6 @@ import (
 	"io"
 	"sync"
 
-	"github.com/boltdb/bolt"
 	api "github.com/containerd/containerd/api/services/content/v1"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/content"
@@ -56,7 +55,9 @@ func NewService(ic *plugin.InitContext) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	cs := metadata.NewContentStore(m.(*bolt.DB), c.(content.Store))
+
+	cs := metadata.NewContentStore(m.(*metadata.DB), c.(content.Store))
+
 	return &Service{
 		store:     cs,
 		publisher: ic.Events,

@@ -19,7 +19,7 @@ func WithTransactionContext(ctx context.Context, tx *bolt.Tx) context.Context {
 
 // view gets a bolt db transaction either from the context
 // or starts a new one with the provided bolt database.
-func view(ctx context.Context, db *bolt.DB, fn func(*bolt.Tx) error) error {
+func view(ctx context.Context, db *DB, fn func(*bolt.Tx) error) error {
 	tx, ok := ctx.Value(transactionKey{}).(*bolt.Tx)
 	if !ok {
 		return db.View(fn)
@@ -29,7 +29,7 @@ func view(ctx context.Context, db *bolt.DB, fn func(*bolt.Tx) error) error {
 
 // update gets a writable bolt db transaction either from the context
 // or starts a new one with the provided bolt database.
-func update(ctx context.Context, db *bolt.DB, fn func(*bolt.Tx) error) error {
+func update(ctx context.Context, db *DB, fn func(*bolt.Tx) error) error {
 	tx, ok := ctx.Value(transactionKey{}).(*bolt.Tx)
 	if !ok {
 		return db.Update(fn)
