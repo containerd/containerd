@@ -196,7 +196,7 @@ func redisExample() error {
         }
         log.Printf("Successfully pulled %s image\n", image.Name())
 
-        spec, err := containerd.GenerateSpec(containerd.WithImageConfig(ctx, image))
+        spec, err := containerd.GenerateSpec(ctx, client, nil, containerd.WithImageConfig(image))
         if err != nil {
                 return err
         }
