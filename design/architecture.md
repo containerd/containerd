@@ -28,7 +28,6 @@ thought behind the design.
 
 External users interact with services, made available via a GRPC API.
 
-- __*Distribution*__: The distribution service supports pulling images.
 - __*Bundle*__: The bundle service allows the user to extract and pack bundles
   from disk images.
 - __*Runtime*__: The runtime service supports the execution of _bundles_,
@@ -61,6 +60,12 @@ components:
   various _modules_
 - __*Metrics*__: Each components will export several metrics, accessible via
   the metrics API. (We may want to promote this to a subsystem.
+
+## Client-side components
+
+Some components are implemented on the client side for flexibility:
+
+- __*Distribution*__: Functions for pulling and pushing images
 
 ## Data Flow
 
