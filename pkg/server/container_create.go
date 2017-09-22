@@ -30,6 +30,7 @@ import (
 	"github.com/docker/docker/pkg/mount"
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runcapparmor "github.com/opencontainers/runc/libcontainer/apparmor"
 	"github.com/opencontainers/runc/libcontainer/devices"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
@@ -201,8 +202,14 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 		specOpts = append(specOpts, containerd.WithUsername(username))
 	}
 	// Set apparmor profile, (privileged or not) if apparmor is enabled
-	if c.config.EnableAppArmor {
-		appArmorProf := securityContext.GetApparmorProfile()
+	appArmorProf := securityContext.GetApparmorProfile()
+	if !runcapparmor.IsEnabled() {
+		// Should fail loudly if user try to specify apparmor profile
+		// but we don't support it.
+		if appArmorProf != "" {
+			return nil, fmt.Errorf("apparmor is not supported")
+		}
+	} else {
 		switch appArmorProf {
 		case runtimeDefault:
 			// TODO (mikebrow): delete created apparmor default profile
