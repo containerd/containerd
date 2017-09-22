@@ -38,11 +38,15 @@
   with_items:
     - runc
 
-- name: "Copy containerd systemd service unit"
-  template: src=../../systemd-units/containerd.service dest=/etc/systemd/system/containerd.service
-
-- name: "Copy cri-containerd systemd service unit"
-  template: src=../../systemd-units/cri-containerd.service dest=/etc/systemd/system/cri-containerd.service
+- name: "Copy systemd service units"
+  copy:
+    src: "{{ cri_release_directory }}etc/systemd/system/{{ item }}"
+    dest: "/etc/systemd/system/{{ item }}"
+    mode: 0644
+    remote_src: yes
+  with_items:
+    - containerd.service
+    - cri-containerd.service
 
 - name: "Create a directory for cni binary"
   file: path={{ cni_bin_dir }} state=directory
