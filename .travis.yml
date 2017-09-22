@@ -66,3 +66,17 @@ script:
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
+
+before_deploy:
+  - make release
+
+deploy:
+  provider: releases
+  api_key:
+    secure: HO+WSIVVUMMsbU74x+YyFsTP3ahqnR4xjwKAziedJ5lZXKJszQBhiYTFmcTeVBoouNjTISd07GQzpoLChuGC20U3+1NbT+CkK8xWR/x1ao2D3JY3Ds6AD9ubWRNWRLptt/xOn5Vq3F8xZyUYchwvDMl4zKCuTKxQGVdHKsINb2DehKcP5cVL6MMvqzEdfj2g99vqXAqs8uuo6dOmvxmHV43bfzDaAJSabjZZs6TKlWTqCQMet8uxyx2Dmjl2lxLwdqv12oJdrszacasn41NYuEyHI2bXyef1mhWGYN4n9bU/Y5winctZ8DOSOZvYg/2ziAaUN0+CTn1IESwVesrPz23P2Sy7wdLxu8dSIZ2yUHl7OsA5T5a5rDchAGguRVNBWvoGtuepEhdRacxTQUo1cMFZsEXjgRKKjdfc1emYQPVdN8mBv8GJwndty473ZXdvFt5R0kNVFtvWuYCa6UYJD2cKrsPSAfbZCDC/LiR3FOoTaUPMZUVkR2ACEO7Dn4+KlmBajqT40Osk/A7k1XA/TzVhMIpLtE0Vk2DfPmGsjCv8bC+MFd+R2Sc8SFdE92oEWRdoPQY5SxMYQtGxA+cbKVlT1kSw6y80yEbx5JZsBnT6+NTHwmDO3kVU9ztLdawOozTElKNAK8HoAyFmzIZ3wL64oThuDrv/TUuY8Iyn814=
+  file_glob: true
+  file: releases/*.tar.gz
+  skip_cleanup: true
+  on:
+    repo: containerd/containerd
+    tags: true
