@@ -3576,6 +3576,45 @@ file {
       json_name: "metrics"
     }
   }
+  message_type {
+    name: "WaitRequest"
+    field {
+      name: "container_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "containerId"
+    }
+    field {
+      name: "exec_id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "execId"
+    }
+  }
+  message_type {
+    name: "WaitResponse"
+    field {
+      name: "exit_status"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "exitStatus"
+    }
+    field {
+      name: "exited_at"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      options {
+        65010: 1
+        65001: 0
+      }
+      json_name: "exitedAt"
+    }
+  }
   service {
     name: "Tasks"
     method {
@@ -3657,6 +3696,11 @@ file {
       name: "Metrics"
       input_type: ".containerd.services.tasks.v1.MetricsRequest"
       output_type: ".containerd.services.tasks.v1.MetricsResponse"
+    }
+    method {
+      name: "Wait"
+      input_type: ".containerd.services.tasks.v1.WaitRequest"
+      output_type: ".containerd.services.tasks.v1.WaitResponse"
     }
   }
   options {

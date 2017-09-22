@@ -178,3 +178,16 @@ func (p *process) Start(ctx context.Context) (err error) {
 	p.hcs = hp
 	return nil
 }
+
+func (p *process) Wait(ctx context.Context) (*runtime.Exit, error) {
+	<-p.exitCh
+
+	ec, ea, err := p.ExitCode()
+	if err != nil {
+		return nil, err
+	}
+	return &runtime.Exit{
+		Status:    ec,
+		Timestamp: ea,
+	}, nil
+}

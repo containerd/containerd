@@ -30,7 +30,7 @@ import (
 const InitPidFile = "init.pid"
 
 type initProcess struct {
-	sync.WaitGroup
+	wg sync.WaitGroup
 	initState
 
 	// mu is used to ensure that `Start()` and `Exited()` calls return in
@@ -38,6 +38,8 @@ type initProcess struct {
 	// This is the case within the shim implementation as it makes use of
 	// the reaper interface.
 	mu sync.Mutex
+
+	waitBlock chan struct{}
 
 	workDir string
 
@@ -113,8 +115,10 @@ func (s *Service) newInitProcess(context context.Context, r *shimapi.CreateTaskR
 			stderr:   r.Stderr,
 			terminal: r.Terminal,
 		},
-		rootfs:  rootfs,
-		workDir: s.config.WorkDir,
+		rootfs:    rootfs,
+		workDir:   s.config.WorkDir,
+		status:    0,
+		waitBlock: make(chan struct{}),
 	}
 	p.initState = &createdState{p: p}
 	var (
@@ -149,22 +153,24 @@ func (s *Service) newInitProcess(context context.Context, r *shimapi.CreateTaskR
 			Detach:      true,
 			NoSubreaper: true,
 		}
-		if _, err := p.runtime.Restore(context, r.ID, r.Bundle, opts); err != nil {
-			return nil, p.runtimeError(err, "OCI runtime restore failed")
+		p.initState = &createdCheckpointState{
+			p:    p,
+			opts: opts,
 		}
-	} else {
-		opts := &runc.CreateOpts{
-			PidFile:      pidFile,
-			IO:           p.io,
-			NoPivot:      options.NoPivotRoot,
-			NoNewKeyring: options.NoNewKeyring,
-		}
-		if socket != nil {
-			opts.ConsoleSocket = socket
-		}
-		if err := p.runtime.Create(context, r.ID, r.Bundle, opts); err != nil {
-			return nil, p.runtimeError(err, "OCI runtime create failed")
-		}
+		success = true
+		return p, nil
+	}
+	opts := &runc.CreateOpts{
+		PidFile:      pidFile,
+		IO:           p.io,
+		NoPivot:      options.NoPivotRoot,
+		NoNewKeyring: options.NoNewKeyring,
+	}
+	if socket != nil {
+		opts.ConsoleSocket = socket
+	}
+	if err := p.runtime.Create(context, r.ID, r.Bundle, opts); err != nil {
+		return nil, p.runtimeError(err, "OCI runtime create failed")
 	}
 	if r.Stdin != "" {
 		sc, err := fifo.OpenFifo(context, r.Stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
@@ -180,13 +186,13 @@ func (s *Service) newInitProcess(context context.Context, r *shimapi.CreateTaskR
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to retrieve console master")
 		}
-		console, err = s.platform.copyConsole(context, console, r.Stdin, r.Stdout, r.Stderr, &p.WaitGroup, &copyWaitGroup)
+		console, err = s.platform.copyConsole(context, console, r.Stdin, r.Stdout, r.Stderr, &p.wg, &copyWaitGroup)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to start console copy")
 		}
 		p.console = console
 	} else if !hasNoIO(r) {
-		if err := copyPipes(context, p.io, r.Stdin, r.Stdout, r.Stderr, &p.WaitGroup, &copyWaitGroup); err != nil {
+		if err := copyPipes(context, p.io, r.Stdin, r.Stdout, r.Stderr, &p.wg, &copyWaitGroup); err != nil {
 			return nil, errors.Wrap(err, "failed to start io pipe copy")
 		}
 	}
@@ -199,6 +205,10 @@ func (s *Service) newInitProcess(context context.Context, r *shimapi.CreateTaskR
 	p.pid = pid
 	success = true
 	return p, nil
+}
+
+func (p *initProcess) Wait() {
+	<-p.waitBlock
 }
 
 func (p *initProcess) ID() string {
@@ -240,14 +250,15 @@ func (p *initProcess) start(context context.Context) error {
 }
 
 func (p *initProcess) setExited(status int) {
-	p.status = status
 	p.exited = time.Now()
+	p.status = status
 	p.platform.shutdownConsole(context.Background(), p.console)
+	close(p.waitBlock)
 }
 
 func (p *initProcess) delete(context context.Context) error {
 	p.killAll(context)
-	p.Wait()
+	p.wg.Wait()
 	err := p.runtime.Delete(context, p.id, nil)
 	// ignore errors if a runtime has already deleted the process
 	// but we still hold metadata and pipes

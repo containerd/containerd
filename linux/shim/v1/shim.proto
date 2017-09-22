@@ -47,6 +47,8 @@ service Shim {
 	rpc ShimInfo(google.protobuf.Empty) returns (ShimInfoResponse);
 
 	rpc Update(UpdateTaskRequest) returns (google.protobuf.Empty);
+
+	rpc Wait(WaitRequest) returns (WaitResponse);
 }
 
 message CreateTaskRequest {
@@ -151,4 +153,13 @@ message StartRequest {
 message StartResponse {
 	string id = 1;
 	uint32 pid = 2;
+}
+
+message WaitRequest {
+	string id = 1;
+}
+
+message WaitResponse {
+	uint32 exit_status = 1;
+	google.protobuf.Timestamp exited_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }

@@ -26,6 +26,8 @@ type Process interface {
 	CloseIO(context.Context) error
 	// Start the container's user defined process
 	Start(context.Context) error
+	// Wait for the process to exit
+	Wait(context.Context) (*Exit, error)
 }
 
 type Task interface {

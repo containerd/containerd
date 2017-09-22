@@ -245,19 +245,22 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
-	t, err := newTask(id, namespace, int(cr.Pid), s)
+	t, err := newTask(id, namespace, int(cr.Pid), s, r.monitor)
 	if err != nil {
 		return nil, err
 	}
 	if err := r.tasks.Add(ctx, t); err != nil {
 		return nil, err
 	}
-	// after the task is created, add it to the monitor
-	if err = r.monitor.Monitor(t); err != nil {
-		if _, err := r.Delete(ctx, t); err != nil {
-			log.G(ctx).WithError(err).Error("deleting task after failed monitor")
+	// after the task is created, add it to the monitor if it has a cgroup
+	// this can be different on a checkpoint/restore
+	if t.cg != nil {
+		if err = r.monitor.Monitor(t); err != nil {
+			if _, err := r.Delete(ctx, t); err != nil {
+				log.G(ctx).WithError(err).Error("deleting task after failed monitor")
+			}
+			return nil, err
 		}
-		return nil, err
 	}
 	return t, nil
 }
@@ -274,9 +277,17 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 	if err := r.monitor.Stop(lc); err != nil {
 		return nil, err
 	}
+	bundle := loadBundle(
+		lc.id,
+		filepath.Join(r.state, namespace, lc.id),
+		filepath.Join(r.root, namespace, lc.id),
+	)
 
 	rsp, err := lc.shim.Delete(ctx, empty)
 	if err != nil {
+		if cerr := r.cleanupAfterDeadShim(ctx, bundle, namespace, c.ID(), lc.pid, nil); cerr != nil {
+			log.G(ctx).WithError(err).Error("unable to cleanup task")
+		}
 		return nil, errdefs.FromGRPC(err)
 	}
 	r.tasks.Delete(ctx, lc)
@@ -284,11 +295,6 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 		log.G(ctx).WithError(err).Error("failed to kill shim")
 	}
 
-	bundle := loadBundle(
-		lc.id,
-		filepath.Join(r.state, namespace, lc.id),
-		filepath.Join(r.root, namespace, lc.id),
-	)
 	if err := bundle.Delete(); err != nil {
 		log.G(ctx).WithError(err).Error("failed to delete bundle")
 	}
@@ -359,7 +365,7 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			continue
 		}
 
-		t, err := newTask(id, ns, pid, s)
+		t, err := newTask(id, ns, pid, s, r.monitor)
 		if err != nil {
 			log.G(ctx).WithError(err).Error("loading task type")
 			continue

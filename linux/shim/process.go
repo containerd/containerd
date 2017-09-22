@@ -38,7 +38,9 @@ type process interface {
 	// Stdio returns io information for the container
 	Stdio() stdio
 	// Status returns the process status
-	Status(ctx context.Context) (string, error)
+	Status(context.Context) (string, error)
+	// Wait blocks until the process has exited
+	Wait()
 }
 
 type processState interface {
@@ -58,7 +60,7 @@ func stateName(v interface{}) string {
 	switch v.(type) {
 	case *runningState, *execRunningState:
 		return "running"
-	case *createdState, *execCreatedState:
+	case *createdState, *execCreatedState, *createdCheckpointState:
 		return "created"
 	case *pausedState:
 		return "paused"

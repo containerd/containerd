@@ -4,10 +4,14 @@ package shim
 
 import (
 	"context"
+	"sync"
+	"syscall"
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/errdefs"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
+	"github.com/containerd/fifo"
+	runc "github.com/containerd/go-runc"
 	"github.com/pkg/errors"
 )
 
@@ -99,6 +103,120 @@ func (s *createdState) Kill(ctx context.Context, sig uint32, all bool) error {
 }
 
 func (s *createdState) SetExited(status int) {
+	s.p.mu.Lock()
+	defer s.p.mu.Unlock()
+
+	s.p.setExited(status)
+
+	if err := s.transition("stopped"); err != nil {
+		panic(err)
+	}
+}
+
+type createdCheckpointState struct {
+	p    *initProcess
+	opts *runc.RestoreOpts
+}
+
+func (s *createdCheckpointState) transition(name string) error {
+	switch name {
+	case "running":
+		s.p.initState = &runningState{p: s.p}
+	case "stopped":
+		s.p.initState = &stoppedState{p: s.p}
+	case "deleted":
+		s.p.initState = &deletedState{}
+	default:
+		return errors.Errorf("invalid state transition %q to %q", stateName(s), name)
+	}
+	return nil
+}
+
+func (s *createdCheckpointState) Pause(ctx context.Context) error {
+	s.p.mu.Lock()
+	defer s.p.mu.Unlock()
+
+	return errors.Errorf("cannot pause task in created state")
+}
+
+func (s *createdCheckpointState) Resume(ctx context.Context) error {
+	s.p.mu.Lock()
+	defer s.p.mu.Unlock()
+
+	return errors.Errorf("cannot resume task in created state")
+}
+
+func (s *createdCheckpointState) Update(context context.Context, r *shimapi.UpdateTaskRequest) error {
+	s.p.mu.Lock()
+	defer s.p.mu.Unlock()
+
+	return s.p.update(context, r)
+}
+
+func (s *createdCheckpointState) Checkpoint(context context.Context, r *shimapi.CheckpointTaskRequest) error {
+	s.p.mu.Lock()
+	defer s.p.mu.Unlock()
+
+	return errors.Errorf("cannot checkpoint a task in created state")
+}
+
+func (s *createdCheckpointState) Resize(ws console.WinSize) error {
+	s.p.mu.Lock()
+	defer s.p.mu.Unlock()
+
+	return s.p.resize(ws)
+}
+
+func (s *createdCheckpointState) Start(ctx context.Context) error {
+	s.p.mu.Lock()
+	defer s.p.mu.Unlock()
+	p := s.p
+	if _, err := s.p.runtime.Restore(ctx, p.id, p.bundle, s.opts); err != nil {
+		return p.runtimeError(err, "OCI runtime restore failed")
+	}
+	sio := p.stdio
+	if sio.stdin != "" {
+		sc, err := fifo.OpenFifo(ctx, sio.stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
+		if err != nil {
+			return errors.Wrapf(err, "failed to open stdin fifo %s", sio.stdin)
+		}
+		p.stdin = sc
+		p.closers = append(p.closers, sc)
+	}
+	var copyWaitGroup sync.WaitGroup
+	if !sio.isNull() {
+		if err := copyPipes(ctx, p.io, sio.stdin, sio.stdout, sio.stderr, &p.wg, &copyWaitGroup); err != nil {
+			return errors.Wrap(err, "failed to start io pipe copy")
+		}
+	}
+
+	copyWaitGroup.Wait()
+	pid, err := runc.ReadPidFile(s.opts.PidFile)
+	if err != nil {
+		return errors.Wrap(err, "failed to retrieve OCI runtime container pid")
+	}
+	p.pid = pid
+
+	return s.transition("running")
+}
+
+func (s *createdCheckpointState) Delete(ctx context.Context) error {
+	s.p.mu.Lock()
+	defer s.p.mu.Unlock()
+	if err := s.p.delete(ctx); err != nil {
+		return err
+	}
+	return s.transition("deleted")
+}
+
+func (s *createdCheckpointState) Kill(ctx context.Context, sig uint32, all bool) error {
+	s.p.mu.Lock()
+	defer s.p.mu.Unlock()
+
+	return s.p.kill(ctx, sig, all)
+}
+
+func (s *createdCheckpointState) SetExited(status int) {
 	s.p.mu.Lock()
 	defer s.p.mu.Unlock()
 
@@ -278,6 +396,7 @@ func (s *pausedState) SetExited(status int) {
 	if err := s.transition("stopped"); err != nil {
 		panic(err)
 	}
+
 }
 
 type stoppedState struct {
