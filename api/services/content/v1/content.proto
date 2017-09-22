@@ -87,7 +87,9 @@ message Info {
 	// UpdatedAt provides the time the info was last updated.
 	google.protobuf.Timestamp updated_at = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 
-	// Labels are arbitrary data on content.
+	// Labels are arbitrary data on snapshots.
+	//
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
 	map<string, string> labels  = 5;
 }
 
@@ -270,7 +272,9 @@ message WriteContentRequest {
 	// returned with the current write state.
 	bytes data = 6;
 
-	// Labels are arbitrary data to set on commit.
+	// Labels are arbitrary data on snapshots.
+	//
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
 	map<string, string> labels  = 7;
 }
 

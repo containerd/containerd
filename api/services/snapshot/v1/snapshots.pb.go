@@ -97,6 +97,8 @@ type PrepareSnapshotRequest struct {
 	Key         string `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
 	Parent      string `protobuf:"bytes,3,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Labels are arbitrary data on snapshots.
+	//
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
 	Labels map[string]string `protobuf:"bytes,4,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
@@ -117,6 +119,8 @@ type ViewSnapshotRequest struct {
 	Key         string `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
 	Parent      string `protobuf:"bytes,3,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Labels are arbitrary data on snapshots.
+	//
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
 	Labels map[string]string `protobuf:"bytes,4,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
@@ -163,6 +167,8 @@ type CommitSnapshotRequest struct {
 	Name        string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	Key         string `protobuf:"bytes,3,opt,name=key,proto3" json:"key,omitempty"`
 	// Labels are arbitrary data on snapshots.
+	//
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
 	Labels map[string]string `protobuf:"bytes,4,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
@@ -188,6 +194,8 @@ type Info struct {
 	// UpdatedAt provides the time the info was last updated.
 	UpdatedAt time.Time `protobuf:"bytes,5,opt,name=updated_at,json=updatedAt,stdtime" json:"updated_at"`
 	// Labels are arbitrary data on snapshots.
+	//
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
 	Labels map[string]string `protobuf:"bytes,6,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
