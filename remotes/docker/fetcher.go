@@ -50,10 +50,10 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 		}
 
 		if resp.StatusCode > 299 {
+			resp.Body.Close()
 			if resp.StatusCode == http.StatusNotFound {
 				continue // try one of the other urls.
 			}
-			resp.Body.Close()
 			return nil, errors.Errorf("unexpected status code %v: %v", u, resp.Status)
 		}
 
