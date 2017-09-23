@@ -58,7 +58,7 @@ func (image *Image) RootFS(ctx context.Context, provider content.Provider, platf
 }
 
 // Size returns the total size of an image's packed resources.
-func (image *Image) Size(ctx context.Context, provider content.Provider) (int64, error) {
+func (image *Image) Size(ctx context.Context, provider content.Provider, platform string) (int64, error) {
 	var size int64
 	return size, Walk(ctx, Handlers(HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		if desc.Size < 0 {
@@ -66,7 +66,7 @@ func (image *Image) Size(ctx context.Context, provider content.Provider) (int64,
 		}
 		size += desc.Size
 		return nil, nil
-	}), ChildrenHandler(provider)), image.Target)
+	}), ChildrenHandler(provider, platform)), image.Target)
 }
 
 func Manifest(ctx context.Context, provider content.Provider, image ocispec.Descriptor, platform string) (ocispec.Manifest, error) {
@@ -196,7 +196,7 @@ func Platforms(ctx context.Context, provider content.Provider, image ocispec.Des
 				platforms.Normalize(ocispec.Platform{OS: image.OS, Architecture: image.Architecture}))
 		}
 		return nil, nil
-	}), ChildrenHandler(provider)), image)
+	}), ChildrenHandler(provider, "")), image)
 }
 
 // RootFS returns the unpacked diffids that make up and images rootfs.

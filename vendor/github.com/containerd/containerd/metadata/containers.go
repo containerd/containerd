@@ -10,6 +10,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/identifiers"
+	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/gogo/protobuf/proto"
@@ -243,7 +244,13 @@ func validateContainer(container *containers.Container) error {
 		}
 	}
 
-	// labels and image have no validation
+	// image has no validation
+	for k, v := range container.Labels {
+		if err := labels.Validate(k, v); err == nil {
+			return errors.Wrapf(err, "containers.Labels")
+		}
+	}
+
 	if container.Runtime.Name == "" {
 		return errors.Wrapf(errdefs.ErrInvalidArgument, "container.Runtime.Name must be set")
 	}

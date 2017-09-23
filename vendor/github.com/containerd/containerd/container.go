@@ -229,15 +229,12 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...Ne
 	}
 	if info.Checkpoint != nil {
 		request.Checkpoint = info.Checkpoint
-		// we need to defer the create call to start
-		t.deferred = request
-	} else {
-		response, err := c.client.TaskService().Create(ctx, request)
-		if err != nil {
-			return nil, errdefs.FromGRPC(err)
-		}
-		t.pid = response.Pid
 	}
+	response, err := c.client.TaskService().Create(ctx, request)
+	if err != nil {
+		return nil, errdefs.FromGRPC(err)
+	}
+	t.pid = response.Pid
 	return t, nil
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/namespaces"
 	digest "github.com/opencontainers/go-digest"
@@ -101,6 +102,10 @@ func (s *imageStore) Create(ctx context.Context, image images.Image) (images.Ima
 		return images.Image{}, errors.Wrapf(errdefs.ErrInvalidArgument, "image name is required for create")
 	}
 
+	if err := validateImage(&image); err != nil {
+		return images.Image{}, err
+	}
+
 	return image, withImagesBucket(s.tx, namespace, func(bkt *bolt.Bucket) error {
 		ibkt, err := bkt.CreateBucket([]byte(image.Name))
 		if err != nil {
@@ -170,6 +175,10 @@ func (s *imageStore) Update(ctx context.Context, image images.Image, fieldpaths 
 			updated = image
 		}
 
+		if err := validateImage(&image); err != nil {
+			return err
+		}
+
 		updated.CreatedAt = createdat
 		updated.UpdatedAt = time.Now().UTC()
 		return writeImage(ibkt, &updated)
@@ -189,6 +198,16 @@ func (s *imageStore) Delete(ctx context.Context, name string) error {
 		}
 		return err
 	})
+}
+
+func validateImage(image *images.Image) error {
+	for k, v := range image.Labels {
+		if err := labels.Validate(k, v); err != nil {
+			return errors.Wrapf(err, "image.Labels")
+		}
+	}
+
+	return nil
 }
 
 func readImage(image *images.Image, bkt *bolt.Bucket) error {

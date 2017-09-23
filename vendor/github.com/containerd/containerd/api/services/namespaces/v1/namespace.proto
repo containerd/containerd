@@ -32,6 +32,8 @@ message Namespace {
 
 	// Labels provides an area to include arbitrary data on namespaces.
 	//
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
+	//
 	// Note that to add a new value to this field, read the existing set and
 	// include the entire result in the update call.
 	map<string, string> labels  = 2;

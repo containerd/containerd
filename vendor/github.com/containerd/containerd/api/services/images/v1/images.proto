@@ -51,6 +51,7 @@ message Image {
 	// and do not get inherited into the package image in any way.
 	//
 	// Labels may be updated using the field mask.
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
 	map<string, string> labels = 2;
 
 	// Target describes the content entry point of the image.

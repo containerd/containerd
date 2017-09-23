@@ -27,6 +27,7 @@ func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
 	case images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
 		return "index-" + desc.Digest.String()
 	case images.MediaTypeDockerSchema2Layer, images.MediaTypeDockerSchema2LayerGzip,
+		images.MediaTypeDockerSchema2LayerForeign, images.MediaTypeDockerSchema2LayerForeignGzip,
 		ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerGzip,
 		ocispec.MediaTypeImageLayerNonDistributable, ocispec.MediaTypeImageLayerNonDistributableGzip:
 		return "layer-" + desc.Digest.String()

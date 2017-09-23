@@ -8,6 +8,7 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
@@ -180,6 +181,9 @@ func (s *snapshotter) Update(ctx context.Context, info snapshot.Info, fieldpaths
 		} else {
 			local.Labels = info.Labels
 		}
+		if err := validateSnapshot(&local); err != nil {
+			return err
+		}
 		local.Updated = time.Now().UTC()
 
 		if err := boltutil.WriteTimestamps(sbkt, local.Created, local.Updated); err != nil {
@@ -257,6 +261,10 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 		}
 	}
 
+	if err := validateSnapshot(&base); err != nil {
+		return nil, err
+	}
+
 	var m []mount.Mount
 	if err := update(ctx, s.db, func(tx *bolt.Tx) error {
 		bkt, err := createSnapshotterBucket(tx, ns, s.name)
@@ -326,6 +334,10 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		if err := opt(&base); err != nil {
 			return err
 		}
+	}
+
+	if err := validateSnapshot(&base); err != nil {
+		return err
 	}
 
 	return update(ctx, s.db, func(tx *bolt.Tx) error {
@@ -498,6 +510,16 @@ func (s *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 
 		pairs = pairs[:0]
 
+	}
+
+	return nil
+}
+
+func validateSnapshot(info *snapshot.Info) error {
+	for k, v := range info.Labels {
+		if err := labels.Validate(k, v); err != nil {
+			return errors.Wrapf(err, "info.Labels")
+		}
 	}
 
 	return nil
