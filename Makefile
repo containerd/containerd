@@ -24,7 +24,7 @@ VERSION := $(shell git describe --tags --dirty)
 # strip the first char of the tag if it's a `v`
 VERSION := $(VERSION:v%=%)
 TARBALL := cri-containerd-$(VERSION).tar.gz
-BUILD_TAGS := apparmor
+BUILD_TAGS := seccomp apparmor
 GO_LDFLAGS := -X $(PROJECT)/pkg/version.criContainerdVersion=$(VERSION)
 SOURCES := $(shell find cmd/ pkg/ vendor/ -name '*.go')
 INTEGRATION_SOURCES := $(shell find integration/ -name '*.go')
