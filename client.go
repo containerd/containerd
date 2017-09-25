@@ -406,42 +406,52 @@ func (c *Client) Close() error {
 	return c.conn.Close()
 }
 
+// NamespaceService returns the underlying NamespacesClient
 func (c *Client) NamespaceService() namespacesapi.NamespacesClient {
 	return namespacesapi.NewNamespacesClient(c.conn)
 }
 
+// ContainerService returns the underlying container Store
 func (c *Client) ContainerService() containers.Store {
 	return NewRemoteContainerStore(containersapi.NewContainersClient(c.conn))
 }
 
+// ContentStore returns the underlying content Store
 func (c *Client) ContentStore() content.Store {
 	return contentservice.NewStoreFromClient(contentapi.NewContentClient(c.conn))
 }
 
+// SnapshotService returns the underlying snapshotter for the provided snapshotter name
 func (c *Client) SnapshotService(snapshotterName string) snapshot.Snapshotter {
 	return snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotsClient(c.conn), snapshotterName)
 }
 
+// TaskService returns the underlying TasksClient
 func (c *Client) TaskService() tasks.TasksClient {
 	return tasks.NewTasksClient(c.conn)
 }
 
+// ImageService returns the underlying image Store
 func (c *Client) ImageService() images.Store {
 	return imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(c.conn))
 }
 
+// DiffService returns the underlying DiffService
 func (c *Client) DiffService() diff.DiffService {
 	return diffservice.NewDiffServiceFromClient(diffapi.NewDiffClient(c.conn))
 }
 
+// HealthService returns the underlying GRPC HealthClient
 func (c *Client) HealthService() grpc_health_v1.HealthClient {
 	return grpc_health_v1.NewHealthClient(c.conn)
 }
 
+// EventService returns the underlying EventsClient
 func (c *Client) EventService() eventsapi.EventsClient {
 	return eventsapi.NewEventsClient(c.conn)
 }
 
+// VersionService returns the underlying VersionClient
 func (c *Client) VersionService() versionservice.VersionClient {
 	return versionservice.NewVersionClient(c.conn)
 }

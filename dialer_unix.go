@@ -29,6 +29,8 @@ func dialer(address string, timeout time.Duration) (net.Conn, error) {
 	return net.DialTimeout("unix", address, timeout)
 }
 
+// DialAddress returns the address with unix:// prepended to the
+// provided address
 func DialAddress(address string) string {
 	return fmt.Sprintf("unix://%s", address)
 }
