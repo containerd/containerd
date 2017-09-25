@@ -30,9 +30,7 @@ import (
 	"github.com/docker/docker/pkg/mount"
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	runcapparmor "github.com/opencontainers/runc/libcontainer/apparmor"
 	"github.com/opencontainers/runc/libcontainer/devices"
-	runcseccomp "github.com/opencontainers/runc/libcontainer/seccomp"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/opencontainers/runtime-tools/validate"
@@ -202,7 +200,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	apparmorSpecOpts, err := generateApparmorSpecOpts(
 		securityContext.GetApparmorProfile(),
 		securityContext.GetPrivileged(),
-		runcapparmor.IsEnabled())
+		c.apparmorEnabled)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate apparmor spec opts: %v", err)
 	}
@@ -213,7 +211,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	seccompSpecOpts, err := generateSeccompSpecOpts(
 		securityContext.GetSeccompProfilePath(),
 		securityContext.GetPrivileged(),
-		runcseccomp.IsEnabled())
+		c.seccompEnabled)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate seccomp spec opts: %v", err)
 	}
@@ -730,11 +728,23 @@ func defaultRuntimeSpec() (*runtimespec.Spec, error) {
 		mounts = append(mounts, mount)
 	}
 	spec.Mounts = mounts
+
+	// Make sure no default seccomp/apparmor is specified
+	if spec.Process != nil {
+		spec.Process.ApparmorProfile = ""
+	}
+	if spec.Linux != nil {
+		spec.Linux.Seccomp = nil
+	}
 	return spec, nil
 }
 
 // generateSeccompSpecOpts generates containerd SpecOpts for seccomp.
 func generateSeccompSpecOpts(seccompProf string, privileged, seccompEnabled bool) (containerd.SpecOpts, error) {
+	if privileged {
+		// Do not set seccomp profile when container is privileged
+		return nil, nil
+	}
 	// Set seccomp profile
 	if seccompProf == runtimeDefault || seccompProf == dockerDefault {
 		// use correct default profile (Eg. if not configured otherwise, the default is docker/default)
@@ -744,10 +754,6 @@ func generateSeccompSpecOpts(seccompProf string, privileged, seccompEnabled bool
 		if seccompProf != "" && seccompProf != unconfinedProfile {
 			return nil, fmt.Errorf("seccomp is not supported")
 		}
-		return nil, nil
-	}
-	if privileged {
-		// Do not set seccomp profile when container is privileged
 		return nil, nil
 	}
 	switch seccompProf {

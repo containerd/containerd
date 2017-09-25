@@ -31,6 +31,8 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/cri-o/ocicni/pkg/ocicni"
 	"github.com/golang/glog"
+	runcapparmor "github.com/opencontainers/runc/libcontainer/apparmor"
+	runcseccomp "github.com/opencontainers/runc/libcontainer/seccomp"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -66,6 +68,10 @@ type criContainerdService struct {
 	config options.Config
 	// imageFSUUID is the device uuid of image filesystem.
 	imageFSUUID string
+	// apparmorEnabled indicates whether apparmor is enabled.
+	apparmorEnabled bool
+	// seccompEnabled indicates whether seccomp is enabled.
+	seccompEnabled bool
 	// server is the grpc server.
 	server *grpc.Server
 	// os is an interface for all required os operations.
@@ -117,6 +123,8 @@ func NewCRIContainerdService(config options.Config) (CRIContainerdService, error
 
 	c := &criContainerdService{
 		config:              config,
+		apparmorEnabled:     runcapparmor.IsEnabled(),
+		seccompEnabled:      runcseccomp.IsEnabled(),
 		os:                  osinterface.RealOS{},
 		sandboxStore:        sandboxstore.NewStore(),
 		containerStore:      containerstore.NewStore(),

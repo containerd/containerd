@@ -26,7 +26,6 @@ import (
 	"github.com/cri-o/ocicni/pkg/ocicni"
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	runcseccomp "github.com/opencontainers/runc/libcontainer/seccomp"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
 	"golang.org/x/net/context"
@@ -133,7 +132,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	seccompSpecOpts, err := generateSeccompSpecOpts(
 		securityContext.GetSeccompProfilePath(),
 		securityContext.GetPrivileged(),
-		runcseccomp.IsEnabled())
+		c.seccompEnabled)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate seccomp spec opts: %v", err)
 	}
