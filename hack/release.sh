@@ -29,7 +29,7 @@ TARBALL=${TARBALL:-"cri-containerd.tar.gz"}
 destdir=${BUILD_DIR}/release-stage
 
 # Install dependencies into release stage.
-NOSUDO=true DESTDIR=${destdir} ./hack/install-deps.sh
+NOSUDO=true INSTALL_CNI=false DESTDIR=${destdir} ./hack/install-deps.sh
 
 # Install cri-containerd into release stage.
 make install -e DESTDIR=${destdir}
