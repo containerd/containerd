@@ -33,6 +33,9 @@ Larger changes typically work best with design documents, similar to those found
 in `design/`. These are focused on providing context to the design at the time
 the feature was conceived and can inform future documentation contributions.
 
+Make sure that new tests are added for bugs in order to catch regressions and tests
+with new features to exercise the new functionality that is added.
+
 ## Commit Messages
 
 There are times for one line commit messages and this is not one of them.
