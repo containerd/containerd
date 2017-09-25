@@ -61,9 +61,12 @@ jobs:
       script:
         - make install.deps
         - make test
+        - make test-integration
         - make test-cri
       after_script:
         # Abuse travis to preserve the log.
+        - cat /tmp/test-integration/cri-containerd.log
+        - cat /tmp/test-integration/containerd.log
         - cat /tmp/test-cri/cri-containerd.log
         - cat /tmp/test-cri/containerd.log
       go: 1.8.x

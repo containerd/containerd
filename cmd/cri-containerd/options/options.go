@@ -31,6 +31,8 @@ const configFilePathArgName = "config"
 
 // ContainerdConfig contains config related to containerd
 type ContainerdConfig struct {
+	// ContainerdRootDir is the root directory path for containerd.
+	ContainerdRootDir string `toml:"root"`
 	// ContainerdSnapshotter is the snapshotter used by containerd.
 	ContainerdSnapshotter string `toml:"snapshotter"`
 	// ContainerdEndpoint is the containerd endpoint path.
@@ -66,6 +68,8 @@ type Config struct {
 	EnableSelinux bool `toml:"enable_selinux"`
 	// SandboxImage is the image used by sandbox container.
 	SandboxImage string `toml:"sandbox_image"`
+	// StatsCollectPeriod is the period (in seconds) of snapshots stats collection.
+	StatsCollectPeriod int `toml:"stats_collect_period"`
 }
 
 // CRIContainerdOptions contains cri-containerd command line and toml options.
@@ -93,6 +97,9 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		"/var/run/cri-containerd.sock", "Path to the socket which cri-containerd serves on.")
 	fs.StringVar(&c.RootDir, "root-dir",
 		"/var/lib/cri-containerd", "Root directory path for cri-containerd managed files (metadata checkpoint etc).")
+	fs.StringVar(&c.ContainerdRootDir, "containerd-root-dir",
+		"/var/lib/containerd", "Root directory path where containerd stores persistent data. "+
+			"This should be the same with containerd `root`.")
 	fs.StringVar(&c.ContainerdEndpoint, "containerd-endpoint",
 		"/run/containerd/containerd.sock", "Path to the containerd endpoint.")
 	fs.StringVar(&c.ContainerdSnapshotter, "containerd-snapshotter",
@@ -113,6 +120,8 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		false, "Enable selinux support.")
 	fs.StringVar(&c.SandboxImage, "sandbox-image",
 		"gcr.io/google_containers/pause:3.0", "The image used by sandbox container.")
+	fs.IntVar(&c.StatsCollectPeriod, "stats-collect-period",
+		10, "The period (in seconds) of snapshots stats collection.")
 	fs.BoolVar(&c.PrintDefaultConfig, "default-config",
 		false, "Print default toml config of cri-containerd and quit.")
 }

@@ -17,11 +17,13 @@ limitations under the License.
 package os
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
+	containerdmount "github.com/containerd/containerd/mount"
 	"github.com/containerd/fifo"
 	"github.com/docker/docker/pkg/mount"
 	"golang.org/x/net/context"
@@ -41,6 +43,8 @@ type OS interface {
 	Mount(source string, target string, fstype string, flags uintptr, data string) error
 	Unmount(target string, flags int) error
 	GetMounts() ([]*mount.Info, error)
+	LookupMount(path string) (containerdmount.Info, error)
+	DeviceUUID(device string) (string, error)
 }
 
 // RealOS is used to dispatch the real system level operations.
@@ -119,4 +123,37 @@ func (RealOS) Unmount(target string, flags int) error {
 // GetMounts retrieves a list of mounts for the current running process.
 func (RealOS) GetMounts() ([]*mount.Info, error) {
 	return mount.GetMounts()
+}
+
+// LookupMount gets mount info of a given path.
+func (RealOS) LookupMount(path string) (containerdmount.Info, error) {
+	return containerdmount.Lookup(path)
+}
+
+// DeviceUUID gets device uuid of a device. The passed in device should be
+// an absolute path of the device.
+func (RealOS) DeviceUUID(device string) (string, error) {
+	const uuidDir = "/dev/disk/by-uuid"
+	if _, err := os.Stat(uuidDir); err != nil {
+		return "", err
+	}
+	files, err := ioutil.ReadDir(uuidDir)
+	if err != nil {
+		return "", err
+	}
+	for _, file := range files {
+		path := filepath.Join(uuidDir, file.Name())
+		target, err := os.Readlink(path)
+		if err != nil {
+			return "", err
+		}
+		dev, err := filepath.Abs(filepath.Join(uuidDir, target))
+		if err != nil {
+			return "", err
+		}
+		if dev == device {
+			return file.Name(), nil
+		}
+	}
+	return "", fmt.Errorf("device not found")
 }

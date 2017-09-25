@@ -92,8 +92,8 @@ func (s *Store) List() []Image {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	var images []Image
-	for _, sb := range s.images {
-		images = append(images, sb)
+	for _, i := range s.images {
+		images = append(images, i)
 	}
 	return images
 }

@@ -19,8 +19,10 @@ ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
 # CRI_CONTAINERD_FLAGS are the extra flags to use when start cri-containerd.
 CRI_CONTAINERD_FLAGS=${CRI_CONTAINERD_FLAGS:-""}
 
-# start_cri_containerd starts containerd and cri-containerd.
-start_cri_containerd() {
+CRICONTAINERD_SOCK=/var/run/cri-containerd.sock
+
+# test_setup starts containerd and cri-containerd.
+test_setup() {
   local report_dir=$1 
   if [ ! -x ${ROOT}/_output/cri-containerd ]; then
     echo "cri-containerd is not built"
@@ -32,27 +34,33 @@ start_cri_containerd() {
     echo "containerd is not installed, please run hack/install-deps.sh"
     exit 1
   fi
-  kill_cri_containerd
-  sudo containerd -l debug &> ${report_dir}/containerd.log &
-
+  sudo pkill containerd
+  sudo containerd &> ${report_dir}/containerd.log &
   # Wait for containerd to be running by using the containerd client ctr to check the version
   # of the containerd server. Wait an increasing amount of time after each of five attempts
-  local MAX_ATTEMPTS=5
-  local attempt_num=1
-  until sudo ctr version &> /dev/null || (( attempt_num == MAX_ATTEMPTS ))
-  do
-      echo "attempt $attempt_num to connect to containerd failed! Trying again in $attempt_num seconds..."
-      sleep $(( attempt_num++ ))
-  done
+  readiness_check "sudo ctr version"
 
   # Start cri-containerd
   sudo ${ROOT}/_output/cri-containerd --alsologtostderr --v 4 ${CRI_CONTAINERD_FLAGS} \
 	  &> ${report_dir}/cri-containerd.log &
+  readiness_check "sudo ${GOPATH}/bin/crictl --runtime-endpoint=${CRICONTAINERD_SOCK} info"
 }
 
-# kill_cri_containerd kills containerd and cri-containerd.
-kill_cri_containerd() {
+# test_teardown kills containerd and cri-containerd.
+test_teardown() {
   sudo pkill containerd
+}
+
+# readiness_check checks readiness of a daemon with specified command.
+readiness_check() {
+  local command=$1
+  local MAX_ATTEMPTS=5
+  local attempt_num=1
+  until ${command} &> /dev/null || (( attempt_num == MAX_ATTEMPTS ))
+  do
+      echo "$attempt_num attempt \"$command\"! Trying again in $attempt_num seconds..."
+      sleep $(( attempt_num++ ))
+  done
 }
 
 # upload_logs_to_gcs uploads test logs to gcs.
