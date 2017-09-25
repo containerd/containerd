@@ -340,8 +340,8 @@ func (c *Client) GetImage(ctx context.Context, ref string) (Image, error) {
 }
 
 // ListImages returns all existing images
-func (c *Client) ListImages(ctx context.Context) ([]Image, error) {
-	imgs, err := c.ImageService().List(ctx)
+func (c *Client) ListImages(ctx context.Context, filters ...string) ([]Image, error) {
+	imgs, err := c.ImageService().List(ctx, filters...)
 	if err != nil {
 		return nil, err
 	}
