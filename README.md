@@ -79,6 +79,8 @@ sudo cri-containerd -v 2 --alsologtostderr
 ```shell
 CONTAINER_RUNTIME=remote CONTAINER_RUNTIME_ENDPOINT='/var/run/cri-containerd.sock' ./hack/local-up-cluster.sh
 ```
+For a multi node cluster installer and bring up steps using ansible and kubeadm refer to [Getting started](contrib/ansible/getting-started.md) guide.
+
 ## Documentation
 See [here](./docs) for additional documentation.
 ## Contributing
