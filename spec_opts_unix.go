@@ -302,8 +302,8 @@ func WithNamespacedCgroup() SpecOpts {
 	}
 }
 
-// WithUidGid allows the UID and GID for the Process to be set
-func WithUidGid(uid, gid uint32) SpecOpts {
+// WithUIDGID allows the UID and GID for the Process to be set
+func WithUIDGID(uid, gid uint32) SpecOpts {
 	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
 		s.Process.User.UID = uid
 		s.Process.User.GID = gid

@@ -13,6 +13,7 @@ type dialResult struct {
 	err error
 }
 
+// Dialer returns a GRPC net.Conn connected to the provided address
 func Dialer(address string, timeout time.Duration) (net.Conn, error) {
 	var (
 		stopC = make(chan struct{})

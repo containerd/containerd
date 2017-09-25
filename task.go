@@ -41,6 +41,7 @@ type Status struct {
 	ExitTime time.Time
 }
 
+// ProcessStatus returns a human readable status for the Process representing its current status
 type ProcessStatus string
 
 const (

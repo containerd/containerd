@@ -119,6 +119,7 @@ func NewDirectIO(ctx context.Context, terminal bool) (*DirectIO, error) {
 	return f, nil
 }
 
+// DirectIO allows task IO to be handled externally by the caller
 type DirectIO struct {
 	Stdin  io.WriteCloser
 	Stdout io.ReadCloser
@@ -128,14 +129,17 @@ type DirectIO struct {
 	terminal bool
 }
 
+// IOCreate returns IO avaliable for use with task creation
 func (f *DirectIO) IOCreate(id string) (IO, error) {
 	return f, nil
 }
 
+// IOAttach returns IO avaliable for use with task attachment
 func (f *DirectIO) IOAttach(set *FIFOSet) (IO, error) {
 	return f, nil
 }
 
+// Config returns the IOConfig
 func (f *DirectIO) Config() IOConfig {
 	return IOConfig{
 		Terminal: f.terminal,
@@ -145,14 +149,21 @@ func (f *DirectIO) Config() IOConfig {
 	}
 }
 
+// Cancel stops any IO copy operations
+//
+// Not applicable for DirectIO
 func (f *DirectIO) Cancel() {
 	// nothing to cancel as all operations are handled externally
 }
 
+// Wait on any IO copy operations
+//
+// Not applicable for DirectIO
 func (f *DirectIO) Wait() {
 	// nothing to wait on as all operations are handled externally
 }
 
+// Close closes all open fds
 func (f *DirectIO) Close() error {
 	err := f.Stdin.Close()
 	if err2 := f.Stdout.Close(); err == nil {
@@ -164,6 +175,7 @@ func (f *DirectIO) Close() error {
 	return err
 }
 
+// Delete removes the underlying directory containing fifos
 func (f *DirectIO) Delete() error {
 	if f.set.Dir == "" {
 		return nil
