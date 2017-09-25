@@ -190,13 +190,11 @@ func checkConsole(f *os.File) error {
 	return nil
 }
 
-func newMaster(f *os.File) Console {
+func newMaster(f *os.File) (Console, error) {
 	if f != os.Stdin && f != os.Stdout && f != os.Stderr {
-		panic("creating a console from a file is not supported on windows")
+		return nil, errors.New("creating a console from a file is not supported on windows")
 	}
-
 	m := &master{}
 	m.initStdios()
-
-	return m
+	return m, nil
 }
