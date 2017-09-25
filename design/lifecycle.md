@@ -1,6 +1,6 @@
 # Container Lifecycle
 
-While containerd is a daemon that provides API to manage multiple containers, the containers themselves are not tied to the lifecycle of containerd.  Each container has a shim that acts as the direct parent for the container's processes as well has reporting the exit status and holding onto the STDIO of the container.  This also allows containerd to crash and restore all functionality to containers.  
+While containerd is a daemon that provides API to manage multiple containers, the containers themselves are not tied to the lifecycle of containerd.  Each container has a shim that acts as the direct parent for the container's processes as well as reporting the exit status and holding onto the STDIO of the container.  This also allows containerd to crash and restore all functionality to containers.
 
 
 ## containerd
