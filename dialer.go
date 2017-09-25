@@ -2,7 +2,6 @@ package containerd
 
 import (
 	"net"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -18,7 +17,6 @@ func Dialer(address string, timeout time.Duration) (net.Conn, error) {
 		stopC = make(chan struct{})
 		synC  = make(chan *dialResult)
 	)
-	address = strings.TrimPrefix(address, "unix://")
 	go func() {
 		defer close(synC)
 		for {
@@ -47,6 +45,6 @@ func Dialer(address string, timeout time.Duration) (net.Conn, error) {
 				dr.c.Close()
 			}
 		}()
-		return nil, errors.Errorf("dial %s: no such file or directory", address)
+		return nil, errors.Errorf("dial %s: timeout", address)
 	}
 }
