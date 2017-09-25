@@ -16,6 +16,11 @@
     - name: "Start CRI-Containerd"
       systemd: name=cri-containerd daemon_reload=yes state=started enabled=yes
 
+    - name: "Load br_netfilter kernel module"
+      modprobe:
+        name: br_netfilter
+        state: present
+
     - name: "Set bridge-nf-call-iptables" 
       sysctl:
         name: net.bridge.bridge-nf-call-iptables
@@ -27,14 +32,13 @@
         value: 1
 
     - name: "Check kubelet args in kubelet config"
-      shell: grep "^Environment=\"KUBELET_EXTRA_ARGS=" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf 
-      ignore_errors: true
+      shell: grep "^Environment=\"KUBELET_EXTRA_ARGS=" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf || true
       register: check_args
 
     - name: "Add runtime args in kubelet conf"
       lineinfile:
         dest: "/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
-        line: "Environment=\"KUBELET_EXTRA_ARGS= --container-runtime=remote --runtime-request-timeout=15m --image-service-endpoint=/var/run/cri-containerd.sock --container-runtime-endpoint=/var/run/cri-containerd.sock\""
+        line: "Environment=\"KUBELET_EXTRA_ARGS= --container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=/var/run/cri-containerd.sock\""
         insertafter: '\[Service\]'
       when: check_args.stdout == ""
     
