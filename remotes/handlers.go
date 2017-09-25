@@ -14,7 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// MakeRef returns a unique reference for the descriptor. This reference can be
+// MakeRefKey returns a unique reference for the descriptor. This reference can be
 // used to lookup ongoing processes related to the descriptor. This function
 // may look to the context to namespace the reference appropriately.
 func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {

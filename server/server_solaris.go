@@ -5,7 +5,7 @@ import "context"
 const (
 	// DefaultAddress is the default unix socket address
 	DefaultAddress = "/var/run/containerd/containerd.sock"
-	// DefaultDebuggAddress is the default unix socket address for pprof data
+	// DefaultDebugAddress is the default unix socket address for pprof data
 	DefaultDebugAddress = "/var/run/containerd/debug.sock"
 )
 
