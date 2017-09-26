@@ -149,7 +149,7 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		assert.Equal(t, spec.Process.NoNewPrivileges, true)
 
 		t.Logf("Check cgroup path")
-		assert.Equal(t, getCgroupsPath("/test/cgroup/parent", id), spec.Linux.CgroupsPath)
+		assert.Equal(t, getCgroupsPath("/test/cgroup/parent", id, false), spec.Linux.CgroupsPath)
 
 		t.Logf("Check namespaces")
 		assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{

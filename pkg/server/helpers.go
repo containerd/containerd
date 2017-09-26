@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -134,8 +135,13 @@ func makeContainerName(c *runtime.ContainerMetadata, s *runtime.PodSandboxMetada
 }
 
 // getCgroupsPath generates container cgroups path.
-func getCgroupsPath(cgroupsParent string, id string) string {
-	// TODO(random-liu): [P0] Handle systemd.
+func getCgroupsPath(cgroupsParent, id string, systemdCgroup bool) string {
+	if systemdCgroup {
+		// Convert a.slice/b.slice/c.slice to c.slice.
+		p := path.Base(cgroupsParent)
+		// runc systemd cgroup path format is "slice:prefix:name".
+		return strings.Join([]string{p, "cri-containerd", id}, ":")
+	}
 	return filepath.Join(cgroupsParent, id)
 }
 

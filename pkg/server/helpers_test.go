@@ -161,3 +161,27 @@ func TestGetRepoDigestAndTag(t *testing.T) {
 		assert.Equal(t, test.expectedRepoTag, repoTag)
 	}
 }
+
+func TestGetCgroupsPath(t *testing.T) {
+	testID := "test-id"
+	for desc, test := range map[string]struct {
+		cgroupsParent string
+		systemdCgroup bool
+		expected      string
+	}{
+		"should support regular cgroup path": {
+			cgroupsParent: "/a/b",
+			systemdCgroup: false,
+			expected:      "/a/b/test-id",
+		},
+		"should support systemd cgroup path": {
+			cgroupsParent: "/a.slice/b.slice",
+			systemdCgroup: true,
+			expected:      "b.slice:cri-containerd:test-id",
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		got := getCgroupsPath(test.cgroupsParent, testID, test.systemdCgroup)
+		assert.Equal(t, test.expected, got)
+	}
+}
