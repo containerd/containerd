@@ -1,52 +1,9 @@
 ---
-- name: "Create a directory to download binaries"
-  file: path={{ cri_release_directory }} state=directory
-
 - name: "Get Containerd and CRI-Containerd"
-  get_url:
-    validate_certs: "no"
-    url: "https://storage.googleapis.com/cri-containerd-staging/cri-containerd-{{ cri_containerd_release_version }}.tar.gz"
-    dest: "{{ cri_release_directory }}"
-    mode: 0755
-
-- name: "Unpack Containerd and CRI-Containerd"
   unarchive:
-    src: "{{ cri_release_directory }}cri-containerd-{{ cri_containerd_release_version }}.tar.gz"
-    dest: "{{ cri_release_directory }}"
+    src: "https://storage.googleapis.com/cri-containerd-staging/cri-containerd-{{ cri_containerd_release_version }}.tar.gz"
+    dest: "/"
     remote_src: yes
-
-- name: "Install the containerd and cri-containerd binaries" 
-  copy:
-    src: "{{ cri_release_directory }}usr/local/bin/{{ item }}"
-    dest: "{{ local_bin_dir }}{{ item }}"
-    mode: 0755
-    remote_src: yes
-  with_items:
-    - containerd
-    - containerd-stress
-    - containerd-shim
-    - cri-containerd
-    - ctr
-    - crictl
-
-- name: "Install runc"
-  copy:    
-    src: "{{ cri_release_directory }}usr/local/sbin/{{ item }}"
-    dest: "{{ local_sbin_dir }}{{ item }}"
-    mode: 0755
-    remote_src: yes
-  with_items:
-    - runc
-
-- name: "Copy systemd service units"
-  copy:
-    src: "{{ cri_release_directory }}etc/systemd/system/{{ item }}"
-    dest: "/etc/systemd/system/{{ item }}"
-    mode: 0644
-    remote_src: yes
-  with_items:
-    - containerd.service
-    - cri-containerd.service
 
 - name: "Create a directory for cni binary"
   file: path={{ cni_bin_dir }} state=directory
