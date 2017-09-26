@@ -30,7 +30,6 @@ import (
 	"github.com/docker/docker/pkg/mount"
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	runcapparmor "github.com/opencontainers/runc/libcontainer/apparmor"
 	"github.com/opencontainers/runc/libcontainer/devices"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
@@ -58,12 +57,8 @@ const (
 	appArmorDefaultProfileName = "cri-containerd.apparmor.d"
 	// unconfinedProfile is a string indicating one should run a pod/containerd without a security profile
 	unconfinedProfile = "unconfined"
-	// seccompDefaultSandboxProfile is the default seccomp profile for pods.
-	seccompDefaultSandboxProfile = dockerDefault
-	// seccompDefaultContainerProfile is the default seccomp profile for containers.
-	seccompDefaultContainerProfile = dockerDefault
-	// seccompEnabled is a flag for globally enabling/disabling seccomp profiles for containers.
-	seccompEnabled = true // TODO (mikebrow): make these seccomp defaults configurable
+	// seccompDefaultProfile is the default seccomp profile.
+	seccompDefaultProfile = dockerDefault
 )
 
 func init() {
@@ -201,59 +196,27 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	if username := securityContext.GetRunAsUsername(); username != "" {
 		specOpts = append(specOpts, containerd.WithUsername(username))
 	}
-	// Set apparmor profile, (privileged or not) if apparmor is enabled
-	appArmorProf := securityContext.GetApparmorProfile()
-	if !runcapparmor.IsEnabled() {
-		// Should fail loudly if user try to specify apparmor profile
-		// but we don't support it.
-		if appArmorProf != "" {
-			return nil, fmt.Errorf("apparmor is not supported")
-		}
-	} else {
-		switch appArmorProf {
-		case runtimeDefault:
-			// TODO (mikebrow): delete created apparmor default profile
-			specOpts = append(specOpts, apparmor.WithDefaultProfile(appArmorDefaultProfileName))
-		// TODO(random-liu): Should support "unconfined" after kubernetes#52395 lands.
-		case "":
-			// Based on kubernetes#51746, default apparmor profile should be applied
-			// for non-privileged container when apparmor is not specified.
-			if !securityContext.GetPrivileged() {
-				specOpts = append(specOpts, apparmor.WithDefaultProfile(appArmorDefaultProfileName))
-			}
-		default:
-			// Require and Trim default profile name prefix
-			if !strings.HasPrefix(appArmorProf, profileNamePrefix) {
-				return nil, fmt.Errorf("invalid apparmor profile %q", appArmorProf)
-			}
-			specOpts = append(specOpts, apparmor.WithProfile(strings.TrimPrefix(appArmorProf, profileNamePrefix)))
-		}
+
+	apparmorSpecOpts, err := generateApparmorSpecOpts(
+		securityContext.GetApparmorProfile(),
+		securityContext.GetPrivileged(),
+		c.apparmorEnabled)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate apparmor spec opts: %v", err)
+	}
+	if apparmorSpecOpts != nil {
+		specOpts = append(specOpts, apparmorSpecOpts)
 	}
 
-	// Set seccomp profile
-	seccompProf := config.GetLinux().GetSecurityContext().GetSeccompProfilePath()
-	if seccompProf == runtimeDefault || seccompProf == dockerDefault {
-		// use correct default profile (Eg. if not configured otherwise, the default is docker/default for containers)
-		seccompProf = seccompDefaultContainerProfile
+	seccompSpecOpts, err := generateSeccompSpecOpts(
+		securityContext.GetSeccompProfilePath(),
+		securityContext.GetPrivileged(),
+		c.seccompEnabled)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate seccomp spec opts: %v", err)
 	}
-	// Unset the seccomp profile, if seccomp is not enabled, unconfined, unset, or the security context is privileged
-	if !seccompEnabled ||
-		seccompProf == unconfinedProfile ||
-		seccompProf == "" ||
-		config.GetLinux().GetSecurityContext().GetPrivileged() {
-		spec.Linux.Seccomp = nil
-	} else {
-		switch seccompProf {
-		case dockerDefault:
-			// Note: WithDefaultProfile specOpts must be added after capabilities
-			specOpts = append(specOpts, seccomp.WithDefaultProfile())
-		default:
-			// Require and Trim default profile name prefix
-			if !strings.HasPrefix(seccompProf, profileNamePrefix) {
-				return nil, fmt.Errorf("invalid seccomp profile %q", seccompProf)
-			}
-			specOpts = append(specOpts, seccomp.WithProfile(strings.TrimPrefix(seccompProf, profileNamePrefix)))
-		}
+	if seccompSpecOpts != nil {
+		specOpts = append(specOpts, seccompSpecOpts)
 	}
 
 	opts = append(opts,
@@ -765,7 +728,79 @@ func defaultRuntimeSpec() (*runtimespec.Spec, error) {
 		mounts = append(mounts, mount)
 	}
 	spec.Mounts = mounts
+
+	// Make sure no default seccomp/apparmor is specified
+	if spec.Process != nil {
+		spec.Process.ApparmorProfile = ""
+	}
+	if spec.Linux != nil {
+		spec.Linux.Seccomp = nil
+	}
 	return spec, nil
+}
+
+// generateSeccompSpecOpts generates containerd SpecOpts for seccomp.
+func generateSeccompSpecOpts(seccompProf string, privileged, seccompEnabled bool) (containerd.SpecOpts, error) {
+	if privileged {
+		// Do not set seccomp profile when container is privileged
+		return nil, nil
+	}
+	// Set seccomp profile
+	if seccompProf == runtimeDefault || seccompProf == dockerDefault {
+		// use correct default profile (Eg. if not configured otherwise, the default is docker/default)
+		seccompProf = seccompDefaultProfile
+	}
+	if !seccompEnabled {
+		if seccompProf != "" && seccompProf != unconfinedProfile {
+			return nil, fmt.Errorf("seccomp is not supported")
+		}
+		return nil, nil
+	}
+	switch seccompProf {
+	case "", unconfinedProfile:
+		// Do not set seccomp profile.
+		return nil, nil
+	case dockerDefault:
+		// Note: WithDefaultProfile specOpts must be added after capabilities
+		return seccomp.WithDefaultProfile(), nil
+	default:
+		// Require and Trim default profile name prefix
+		if !strings.HasPrefix(seccompProf, profileNamePrefix) {
+			return nil, fmt.Errorf("invalid seccomp profile %q", seccompProf)
+		}
+		return seccomp.WithProfile(strings.TrimPrefix(seccompProf, profileNamePrefix)), nil
+	}
+}
+
+// generateApparmorSpecOpts generates containerd SpecOpts for apparmor.
+func generateApparmorSpecOpts(apparmorProf string, privileged, apparmorEnabled bool) (containerd.SpecOpts, error) {
+	if !apparmorEnabled {
+		// Should fail loudly if user try to specify apparmor profile
+		// but we don't support it.
+		if apparmorProf != "" {
+			return nil, fmt.Errorf("apparmor is not supported")
+		}
+		return nil, nil
+	}
+	switch apparmorProf {
+	case runtimeDefault:
+		// TODO (mikebrow): delete created apparmor default profile
+		return apparmor.WithDefaultProfile(appArmorDefaultProfileName), nil
+	// TODO(random-liu): Should support "unconfined" after kubernetes#52395 lands.
+	case "":
+		// Based on kubernetes#51746, default apparmor profile should be applied
+		// for non-privileged container when apparmor is not specified.
+		if privileged {
+			return nil, nil
+		}
+		return apparmor.WithDefaultProfile(appArmorDefaultProfileName), nil
+	default:
+		// Require and Trim default profile name prefix
+		if !strings.HasPrefix(apparmorProf, profileNamePrefix) {
+			return nil, fmt.Errorf("invalid apparmor profile %q", apparmorProf)
+		}
+		return apparmor.WithProfile(strings.TrimPrefix(apparmorProf, profileNamePrefix)), nil
+	}
 }
 
 // Ensure mount point on which path is mounted, is shared.

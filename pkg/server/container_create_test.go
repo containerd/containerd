@@ -18,8 +18,12 @@ package server
 
 import (
 	"path/filepath"
+	"reflect"
 	"testing"
 
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/contrib/apparmor"
+	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/docker/docker/pkg/mount"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -712,5 +716,117 @@ func TestDefaultRuntimeSpec(t *testing.T) {
 	assert.NoError(t, err)
 	for _, mount := range spec.Mounts {
 		assert.NotEqual(t, "/run", mount.Destination)
+	}
+}
+
+func TestGenerateSeccompSpecOpts(t *testing.T) {
+	for desc, test := range map[string]struct {
+		profile    string
+		privileged bool
+		disable    bool
+		specOpts   containerd.SpecOpts
+		expectErr  bool
+	}{
+		"should return error if seccomp is specified when seccomp is not supported": {
+			profile:   runtimeDefault,
+			disable:   true,
+			expectErr: true,
+		},
+		"should not return error if seccomp is not specified when seccomp is not supported": {
+			profile: "",
+			disable: true,
+		},
+		"should not return error if seccomp is unconfined when seccomp is not supported": {
+			profile: unconfinedProfile,
+			disable: true,
+		},
+		"should not set seccomp when privileged is true": {
+			profile:    seccompDefaultProfile,
+			privileged: true,
+		},
+		"should not set seccomp when seccomp is unconfined": {
+			profile: unconfinedProfile,
+		},
+		"should not set seccomp when seccomp is not specified": {
+			profile: "",
+		},
+		"should set default seccomp when seccomp is runtime/default": {
+			profile:  runtimeDefault,
+			specOpts: seccomp.WithDefaultProfile(),
+		},
+		"should set default seccomp when seccomp is docker/default": {
+			profile:  dockerDefault,
+			specOpts: seccomp.WithDefaultProfile(),
+		},
+		"should set specified profile when local profile is specified": {
+			profile:  profileNamePrefix + "test-profile",
+			specOpts: seccomp.WithProfile("test-profile"),
+		},
+		"should return error if specified profile is invalid": {
+			profile:   "test-profile",
+			expectErr: true,
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		specOpts, err := generateSeccompSpecOpts(test.profile, test.privileged, !test.disable)
+		assert.Equal(t,
+			reflect.ValueOf(test.specOpts).Pointer(),
+			reflect.ValueOf(specOpts).Pointer())
+		if test.expectErr {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+		}
+	}
+}
+
+func TestGenerateApparmorSpecOpts(t *testing.T) {
+	for desc, test := range map[string]struct {
+		profile    string
+		privileged bool
+		disable    bool
+		specOpts   containerd.SpecOpts
+		expectErr  bool
+	}{
+		"should return error if apparmor is specified when apparmor is not supported": {
+			profile:   runtimeDefault,
+			disable:   true,
+			expectErr: true,
+		},
+		"should not return error if apparmor is not specified when apparmor is not supported": {
+			profile: "",
+			disable: true,
+		},
+		"should set default apparmor when apparmor is not specified": {
+			profile:  "",
+			specOpts: apparmor.WithDefaultProfile(appArmorDefaultProfileName),
+		},
+		"should not apparmor when apparmor is not specified and privileged is true": {
+			profile:    "",
+			privileged: true,
+		},
+		"should set default apparmor when apparmor is runtime/default": {
+			profile:  runtimeDefault,
+			specOpts: apparmor.WithDefaultProfile(appArmorDefaultProfileName),
+		},
+		"should set specified profile when local profile is specified": {
+			profile:  profileNamePrefix + "test-profile",
+			specOpts: apparmor.WithProfile("test-profile"),
+		},
+		"should return error if specified profile is invalid": {
+			profile:   "test-profile",
+			expectErr: true,
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		specOpts, err := generateApparmorSpecOpts(test.profile, test.privileged, !test.disable)
+		assert.Equal(t,
+			reflect.ValueOf(test.specOpts).Pointer(),
+			reflect.ValueOf(specOpts).Pointer())
+		if test.expectErr {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+		}
 	}
 }
