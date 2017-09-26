@@ -1370,6 +1370,71 @@ func TestContainerMetrics(t *testing.T) {
 	<-statusC
 }
 
+func TestDeletedContainerMetrics(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("metrics are currently not supported on windows")
+	}
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+	container, err := client.NewContainer(ctx, id,
+		WithNewSpec(withImageConfig(image), withExitStatus(0)),
+		withNewSnapshot(id, image),
+	)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	<-statusC
+
+	if _, err := task.Delete(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+
+	if _, err := task.Metrics(ctx); err == nil {
+		t.Errorf("Getting metrics of deleted task should have failed")
+	}
+}
+
 func TestContainerExtensions(t *testing.T) {
 	t.Parallel()
 
