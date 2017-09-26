@@ -70,6 +70,8 @@ type Config struct {
 	SandboxImage string `toml:"sandbox_image"`
 	// StatsCollectPeriod is the period (in seconds) of snapshots stats collection.
 	StatsCollectPeriod int `toml:"stats_collect_period"`
+	// SystemdCgroup enables systemd cgroup support.
+	SystemdCgroup bool `toml:"systemd_cgroup"`
 }
 
 // CRIContainerdOptions contains cri-containerd command line and toml options.
@@ -122,6 +124,8 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		"gcr.io/google_containers/pause:3.0", "The image used by sandbox container.")
 	fs.IntVar(&c.StatsCollectPeriod, "stats-collect-period",
 		10, "The period (in seconds) of snapshots stats collection.")
+	fs.BoolVar(&c.SystemdCgroup, "systemd-cgroup",
+		false, "Enables systemd cgroup support.")
 	fs.BoolVar(&c.PrintDefaultConfig, "default-config",
 		false, "Print default toml config of cri-containerd and quit.")
 }

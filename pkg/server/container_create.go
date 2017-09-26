@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
+	"github.com/containerd/containerd/linux/runcopts"
 	"github.com/containerd/typeurl"
 	"github.com/docker/docker/pkg/mount"
 	"github.com/golang/glog"
@@ -221,7 +222,10 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 
 	opts = append(opts,
 		containerd.WithSpec(spec, specOpts...),
-		containerd.WithRuntime(defaultRuntime, nil),
+		containerd.WithRuntime(
+			defaultRuntime,
+			&runcopts.RuncOptions{SystemdCgroup: c.config.SystemdCgroup},
+		),
 		containerd.WithContainerLabels(map[string]string{containerKindLabel: containerKindContainer}),
 		containerd.WithContainerExtension(containerMetadataExtension, &meta))
 	var cntr containerd.Container
@@ -344,7 +348,8 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 	setOCILinuxResource(&g, config.GetLinux().GetResources())
 
 	if sandboxConfig.GetLinux().GetCgroupParent() != "" {
-		cgroupsPath := getCgroupsPath(sandboxConfig.GetLinux().GetCgroupParent(), id)
+		cgroupsPath := getCgroupsPath(sandboxConfig.GetLinux().GetCgroupParent(), id,
+			c.config.SystemdCgroup)
 		g.SetLinuxCgroupsPath(cgroupsPath)
 	}
 

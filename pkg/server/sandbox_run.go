@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/linux/runcopts"
 	"github.com/containerd/typeurl"
 	"github.com/cri-o/ocicni/pkg/ocicni"
 	"github.com/golang/glog"
@@ -146,7 +147,11 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(map[string]string{containerKindLabel: containerKindSandbox}),
 		containerd.WithContainerExtension(sandboxMetadataExtension, &sandbox.Metadata),
-		containerd.WithRuntime(defaultRuntime, nil)}
+		containerd.WithRuntime(
+			defaultRuntime,
+			&runcopts.RuncOptions{SystemdCgroup: c.config.SystemdCgroup},
+		),
+	}
 	container, err := c.client.NewContainer(ctx, id, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create containerd container: %v", err)
@@ -258,7 +263,8 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 
 	// Set cgroups parent.
 	if config.GetLinux().GetCgroupParent() != "" {
-		cgroupsPath := getCgroupsPath(config.GetLinux().GetCgroupParent(), id)
+		cgroupsPath := getCgroupsPath(config.GetLinux().GetCgroupParent(), id,
+			c.config.SystemdCgroup)
 		g.SetLinuxCgroupsPath(cgroupsPath)
 	}
 	// When cgroup parent is not set, containerd-shim will create container in a child cgroup
