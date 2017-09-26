@@ -44,6 +44,12 @@ if ${NOSUDO}; then
   sudo=""
 fi
 
+# INSTALL_CNI indicates whether to install CNI. CNI installation
+# makes sense for local testing, but doesn't make sense for cluster
+# setup, because CNI daemonset is usually used to deploy CNI binaries
+# and configurations in cluster.
+INSTALL_CNI=${INSTALL_CNI:-true}
+
 CONTAINERD_DIR=${DESTDIR}/usr/local
 RUNC_DIR=${DESTDIR}
 CNI_DIR=${DESTDIR}/opt/cni
@@ -88,37 +94,39 @@ make BUILDTAGS="$BUILDTAGS"
 ${sudo} make install -e DESTDIR=${RUNC_DIR}
 
 # Install cni
-checkout_repo ${CNI_PKG} ${CNI_VERSION}
-cd ${GOPATH}/src/${CNI_PKG}
-./build.sh
-${sudo} mkdir -p ${CNI_DIR}
-${sudo} cp -r ./bin ${CNI_DIR}
-${sudo} mkdir -p ${CNI_CONFIG_DIR}
-${sudo} bash -c 'cat >'${CNI_CONFIG_DIR}'/10-containerd-net.conflist <<EOF
+if ${INSTALL_CNI}; then
+  checkout_repo ${CNI_PKG} ${CNI_VERSION}
+  cd ${GOPATH}/src/${CNI_PKG}
+  ./build.sh
+  ${sudo} mkdir -p ${CNI_DIR}
+  ${sudo} cp -r ./bin ${CNI_DIR}
+  ${sudo} mkdir -p ${CNI_CONFIG_DIR}
+  ${sudo} bash -c 'cat >'${CNI_CONFIG_DIR}'/10-containerd-net.conflist <<EOF
 {
-    "cniVersion": "0.3.1",
-    "name": "containerd-net",
-    "plugins": [
-	{
-	    "type": "bridge",
-	    "bridge": "cni0",
-	    "isGateway": true,
-	    "ipMasq": true,
-	    "ipam": {
-		"type": "host-local",
-		"subnet": "10.88.0.0/16",
-		"routes": [
-		    { "dst": "0.0.0.0/0" }
-		]
-	    }
-	},
-	{
-	    "type": "portmap",
-	    "capabilities": {"portMappings": true}
-	}
-    ]
+  "cniVersion": "0.3.1",
+  "name": "containerd-net",
+  "plugins": [
+    {
+      "type": "bridge",
+      "bridge": "cni0",
+      "isGateway": true,
+      "ipMasq": true,
+      "ipam": {
+        "type": "host-local",
+        "subnet": "10.88.0.0/16",
+        "routes": [
+          { "dst": "0.0.0.0/0" }
+        ]
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {"portMappings": true}
+    }
+  ]
 }
 EOF'
+fi
 
 # Install containerd
 checkout_repo ${CONTAINERD_PKG} ${CONTAINERD_VERSION}
