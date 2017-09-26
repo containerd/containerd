@@ -3,8 +3,6 @@
 package console
 
 import (
-	"os"
-
 	"golang.org/x/sys/unix"
 )
 
@@ -49,14 +47,19 @@ func tcswinsz(fd uintptr, ws WinSize) error {
 	return unix.IoctlSetWinsize(int(fd), unix.TIOCSWINSZ, &uws)
 }
 
-func saneTerminal(f *os.File) error {
+func setONLCR(fd uintptr, enable bool) error {
 	var termios unix.Termios
-	if err := tcget(f.Fd(), &termios); err != nil {
+	if err := tcget(fd, &termios); err != nil {
 		return err
 	}
-	// Set -onlcr so we don't have to deal with \r.
-	termios.Oflag &^= unix.ONLCR
-	return tcset(f.Fd(), &termios)
+	if enable {
+		// Set +onlcr so we can act like a real terminal
+		termios.Oflag |= unix.ONLCR
+	} else {
+		// Set -onlcr so we don't have to deal with \r.
+		termios.Oflag &^= unix.ONLCR
+	}
+	return tcset(fd, &termios)
 }
 
 func cfmakeraw(t unix.Termios) unix.Termios {

@@ -44,7 +44,13 @@ type WinSize struct {
 
 // Current returns the current processes console
 func Current() Console {
-	return newMaster(os.Stdin)
+	c, err := ConsoleFromFile(os.Stdin)
+	if err != nil {
+		// stdin should always be a console for the design
+		// of this function
+		panic(err)
+	}
+	return c
 }
 
 // ConsoleFromFile returns a console using the provided file
@@ -52,5 +58,5 @@ func ConsoleFromFile(f *os.File) (Console, error) {
 	if err := checkConsole(f); err != nil {
 		return nil, err
 	}
-	return newMaster(f), nil
+	return newMaster(f)
 }
