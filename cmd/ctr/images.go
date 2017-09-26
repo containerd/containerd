@@ -34,10 +34,16 @@ var imagesListCommand = cli.Command{
 	Usage:       "list images known to containerd",
 	ArgsUsage:   "[flags] <ref>",
 	Description: `List images registered with containerd.`,
-	Flags:       []cli.Flag{},
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "quiet, q",
+			Usage: "print only the image refs",
+		},
+	},
 	Action: func(clicontext *cli.Context) error {
 		var (
 			filters     = clicontext.Args()
+			quiet       = clicontext.Bool("quiet")
 			ctx, cancel = appContext(clicontext)
 		)
 		defer cancel()
@@ -54,7 +60,12 @@ var imagesListCommand = cli.Command{
 		if err != nil {
 			return errors.Wrap(err, "failed to list images")
 		}
-
+		if quiet {
+			for _, image := range imageList {
+				fmt.Println(image.Name)
+			}
+			return nil
+		}
 		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
 		fmt.Fprintln(tw, "REF\tTYPE\tDIGEST\tSIZE\tPLATFORM\tLABELS\t")
 		for _, image := range imageList {
