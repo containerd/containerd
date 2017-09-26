@@ -8,8 +8,7 @@
       - tar
       - apt-transport-https
       - btrfs-tools
-      - libapparmor-dev
-      - libseccomp-dev # Revisit the need and alternatives for all -dev packages
+      - libapparmor1
       - libseccomp2
       - socat
       - util-linux

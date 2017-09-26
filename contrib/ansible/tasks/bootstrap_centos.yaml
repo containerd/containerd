@@ -6,8 +6,8 @@
   with_items:
     - unzip
     - tar
-    - btrfs-progs-devel
-    - libseccomp-devel
+    - btrfs-progs
+    - libseccomp
     - util-linux 
     - socat
     - libselinux-python
