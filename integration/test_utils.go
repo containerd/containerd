@@ -29,8 +29,9 @@ import (
 )
 
 const (
-	sock    = "/var/run/cri-containerd.sock"
-	timeout = 1 * time.Minute
+	sock       = "/var/run/cri-containerd.sock"
+	timeout    = 1 * time.Minute
+	pauseImage = "gcr.io/google_containers/pause:3.0"
 )
 
 var (
@@ -69,6 +70,37 @@ func PodSandboxConfig(name, ns string, opts ...PodSandboxOpts) *runtime.PodSandb
 		opt(config)
 	}
 	return config
+}
+
+// ContainerOpts to set any specific attribute like labels,
+// annotations, metadata etc
+type ContainerOpts func(*runtime.ContainerConfig)
+
+func WithTestLabels() ContainerOpts {
+	return func(cf *runtime.ContainerConfig) {
+		cf.Labels = map[string]string{"key": "value"}
+	}
+}
+
+func WithTestAnnotations() ContainerOpts {
+	return func(cf *runtime.ContainerConfig) {
+		cf.Annotations = map[string]string{"a.b.c": "test"}
+	}
+}
+
+// ContainerConfig creates a container config given a name and image name
+// and additional container config options
+func ContainerConfig(name, image string, opts ...ContainerOpts) *runtime.ContainerConfig {
+	cConfig := &runtime.ContainerConfig{
+		Metadata: &runtime.ContainerMetadata{
+			Name: name,
+		},
+		Image: &runtime.ImageSpec{Image: image},
+	}
+	for _, opt := range opts {
+		opt(cConfig)
+	}
+	return cConfig
 }
 
 // CheckFunc is the function used to check a condition is true/false.

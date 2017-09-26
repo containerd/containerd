@@ -17,15 +17,34 @@ limitations under the License.
 package server
 
 import (
-	"errors"
+	"fmt"
 
+	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	"golang.org/x/net/context"
-
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 // ContainerStats returns stats of the container. If the container does not
 // exist, the call returns an error.
 func (c *criContainerdService) ContainerStats(ctx context.Context, in *runtime.ContainerStatsRequest) (*runtime.ContainerStatsResponse, error) {
-	return nil, errors.New("not implemented")
+	// Validate the stats request
+	if in.GetContainerId() == "" {
+		return nil, fmt.Errorf("invalid container stats request")
+	}
+	containerID := in.GetContainerId()
+	_, err := c.containerStore.Get(containerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find container %q: %v", containerID, err)
+	}
+	request := &tasks.MetricsRequest{Filters: []string{"id==" + containerID}}
+	resp, err := c.taskService.Metrics(ctx, request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch metrics for tasks: %v", err)
+	}
+
+	var cs runtime.ContainerStats
+	if err := c.getContainerMetrics(containerID, resp.Metrics[0], &cs); err != nil {
+		return nil, fmt.Errorf("failed to decode container metrics: %v", err)
+	}
+	return &runtime.ContainerStatsResponse{Stats: &cs}, nil
 }
