@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"syscall"
 
 	containerdmount "github.com/containerd/containerd/mount"
 	"github.com/containerd/fifo"
@@ -130,28 +131,41 @@ func (RealOS) LookupMount(path string) (containerdmount.Info, error) {
 	return containerdmount.Lookup(path)
 }
 
+// blkdev returns the rdev of a block device or an error if not a block device
+func blkrdev(device string) (uint64, error) {
+	info, err := os.Stat(device)
+	if err != nil {
+		return 0, err
+	}
+	stat := info.Sys().(*syscall.Stat_t)
+	if (stat.Mode & syscall.S_IFMT) != syscall.S_IFBLK {
+		return 0, fmt.Errorf("%s is not a block device", device)
+	}
+	return stat.Rdev, nil
+}
+
 // DeviceUUID gets device uuid of a device. The passed in device should be
 // an absolute path of the device.
 func (RealOS) DeviceUUID(device string) (string, error) {
-	const uuidDir = "/dev/disk/by-uuid"
-	if _, err := os.Stat(uuidDir); err != nil {
+	rdev, err := blkrdev(device)
+	if err != nil {
 		return "", err
 	}
+
+	const uuidDir = "/dev/disk/by-uuid"
 	files, err := ioutil.ReadDir(uuidDir)
 	if err != nil {
 		return "", err
 	}
 	for _, file := range files {
 		path := filepath.Join(uuidDir, file.Name())
-		target, err := os.Readlink(path)
+
+		trdev, err := blkrdev(path)
 		if err != nil {
-			return "", err
+			continue
 		}
-		dev, err := filepath.Abs(filepath.Join(uuidDir, target))
-		if err != nil {
-			return "", err
-		}
-		if dev == device {
+
+		if rdev == trdev {
 			return file.Name(), nil
 		}
 	}
