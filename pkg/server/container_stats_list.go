@@ -117,11 +117,11 @@ func (c *criContainerdService) getContainerMetrics(
 		}
 		metrics := s.(*cgroups.Metrics)
 		cs.Cpu = &runtime.CpuUsage{
-			Timestamp:            stats.Timestamp.Unix(),
+			Timestamp:            stats.Timestamp.UnixNano(),
 			UsageCoreNanoSeconds: &runtime.UInt64Value{metrics.CPU.Usage.Total},
 		}
 		cs.Memory = &runtime.MemoryUsage{
-			Timestamp:       stats.Timestamp.Unix(),
+			Timestamp:       stats.Timestamp.UnixNano(),
 			WorkingSetBytes: &runtime.UInt64Value{metrics.Memory.Usage.Usage},
 		}
 	}
