@@ -102,7 +102,7 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 		containerd.WithPullUnpack,
 		containerd.WithSchema1Conversion,
 		containerd.WithResolver(resolver),
-		containerd.WithPullSnapshotter(c.config.ContainerdSnapshotter),
+		containerd.WithPullSnapshotter(c.config.ContainerdConfig.Snapshotter),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull image %q: %v", ref, err)

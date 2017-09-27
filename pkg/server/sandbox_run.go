@@ -142,16 +142,18 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	}
 
 	opts := []containerd.NewContainerOpts{
-		containerd.WithSnapshotter(c.config.ContainerdSnapshotter),
+		containerd.WithSnapshotter(c.config.ContainerdConfig.Snapshotter),
 		containerd.WithNewSnapshot(id, image.Image),
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(map[string]string{containerKindLabel: containerKindSandbox}),
 		containerd.WithContainerExtension(sandboxMetadataExtension, &sandbox.Metadata),
 		containerd.WithRuntime(
-			defaultRuntime,
-			&runcopts.RuncOptions{SystemdCgroup: c.config.SystemdCgroup},
-		),
-	}
+			c.config.ContainerdConfig.Runtime,
+			&runcopts.RuncOptions{
+				Runtime:       c.config.ContainerdConfig.RuntimeEngine,
+				RuntimeRoot:   c.config.ContainerdConfig.RuntimeRoot,
+				SystemdCgroup: c.config.SystemdCgroup})} // TODO (mikebrow): add CriuPath when we add support for pause
+
 	container, err := c.client.NewContainer(ctx, id, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create containerd container: %v", err)

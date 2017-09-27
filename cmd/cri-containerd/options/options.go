@@ -31,12 +31,22 @@ const configFilePathArgName = "config"
 
 // ContainerdConfig contains config related to containerd
 type ContainerdConfig struct {
-	// ContainerdRootDir is the root directory path for containerd.
-	ContainerdRootDir string `toml:"root"`
-	// ContainerdSnapshotter is the snapshotter used by containerd.
-	ContainerdSnapshotter string `toml:"snapshotter"`
-	// ContainerdEndpoint is the containerd endpoint path.
-	ContainerdEndpoint string `toml:"endpoint"`
+	// RootDir is the root directory path for containerd.
+	RootDir string `toml:"root_dir"`
+	// Snapshotter is the snapshotter used by containerd.
+	Snapshotter string `toml:"snapshotter"`
+	// Endpoint is the containerd endpoint path.
+	Endpoint string `toml:"endpoint"`
+	// Runtime is the runtime to use in containerd. We may support
+	// other runtimes in the future.
+	Runtime string `toml:"runtime"`
+	// RuntimeEngine is the name of the runtime engine used by containerd.
+	// Containerd default should be "runc"
+	// We may support other runtime engines in the future.
+	RuntimeEngine string `toml:"runtime_engine"`
+	// RuntimeRoot is the directory used by containerd for runtime state.
+	// Containerd default should be "/run/containerd/runc"
+	RuntimeRoot string `toml:"runtime_root"`
 }
 
 // CniConfig contains config related to cni
@@ -99,13 +109,18 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		"/var/run/cri-containerd.sock", "Path to the socket which cri-containerd serves on.")
 	fs.StringVar(&c.RootDir, "root-dir",
 		"/var/lib/cri-containerd", "Root directory path for cri-containerd managed files (metadata checkpoint etc).")
-	fs.StringVar(&c.ContainerdRootDir, "containerd-root-dir",
-		"/var/lib/containerd", "Root directory path where containerd stores persistent data. "+
-			"This should be the same with containerd `root`.")
-	fs.StringVar(&c.ContainerdEndpoint, "containerd-endpoint",
+	fs.StringVar(&c.ContainerdConfig.RootDir, "containerd-root-dir",
+		"/var/lib/containerd", "Root directory path where containerd stores persistent data.")
+	fs.StringVar(&c.ContainerdConfig.Endpoint, "containerd-endpoint",
 		"/run/containerd/containerd.sock", "Path to the containerd endpoint.")
-	fs.StringVar(&c.ContainerdSnapshotter, "containerd-snapshotter",
-		containerd.DefaultSnapshotter, "Snapshotter used by containerd.")
+	fs.StringVar(&c.ContainerdConfig.Snapshotter, "containerd-snapshotter",
+		containerd.DefaultSnapshotter, "The snapshotter used by containerd.")
+	fs.StringVar(&c.ContainerdConfig.Runtime, "containerd-runtime",
+		"io.containerd.runtime.v1.linux", "The runtime used by containerd.")
+	fs.StringVar(&c.ContainerdConfig.RuntimeEngine, "containerd-runtime-engine",
+		"", "Runtime engine used by containerd. (default = \"\" uses containerd default)")
+	fs.StringVar(&c.ContainerdConfig.RuntimeRoot, "containerd-runtime-root",
+		"", "The directory used by containerd for runtime state. (default = \"\" uses containerd default)")
 	fs.BoolVar(&c.PrintVersion, "version",
 		false, "Print cri-containerd version information and quit.")
 	fs.StringVar(&c.NetworkPluginBinDir, "network-bin-dir",
@@ -119,13 +134,13 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.CgroupPath, "cgroup-path",
 		"", "The cgroup that cri-containerd is part of. By default cri-containerd is not placed in a cgroup.")
 	fs.BoolVar(&c.EnableSelinux, "enable-selinux",
-		false, "Enable selinux support.")
+		false, "Enable selinux support. (default false)")
 	fs.StringVar(&c.SandboxImage, "sandbox-image",
 		"gcr.io/google_containers/pause:3.0", "The image used by sandbox container.")
 	fs.IntVar(&c.StatsCollectPeriod, "stats-collect-period",
 		10, "The period (in seconds) of snapshots stats collection.")
 	fs.BoolVar(&c.SystemdCgroup, "systemd-cgroup",
-		false, "Enables systemd cgroup support.")
+		false, "Enables systemd cgroup support. (default false)")
 	fs.BoolVar(&c.PrintDefaultConfig, "default-config",
 		false, "Print default toml config of cri-containerd and quit.")
 }
@@ -153,13 +168,13 @@ func (c *CRIContainerdOptions) InitFlags(fs *pflag.FlagSet) error {
 	}
 
 	// What is the reason for applying the command line twice?
-	// Because the values from command line has the highest priority.
-	// So I must get the path of toml configuration file from command line,
-	// it trigger the first parse.
-	// The first parse generate the the default value and the value from command line at the same time.
-	// But the priority of toml config value is more higher than of default value,
-	// So I have not another way to insert toml config value between default value and command line value.
-	// So I trigger twice parses, one for default value, one for commandline value.
+	// Because the values from command line have the highest priority.
+	// The path of toml configuration file if from the command line,
+	// and triggers the first parse.
+	// The first parse generates the default value and the value from command line at the same time.
+	// But the priority of the toml config value is higher than the default value,
+	// Without a way to insert the toml config value between the default value and the command line value.
+	// We parse twice one for default value, one for commandline value.
 	return fs.Parse(commandline)
 }
 

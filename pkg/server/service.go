@@ -109,10 +109,10 @@ type criContainerdService struct {
 
 // NewCRIContainerdService returns a new instance of CRIContainerdService
 func NewCRIContainerdService(config options.Config) (CRIContainerdService, error) {
-	client, err := containerd.New(config.ContainerdEndpoint, containerd.WithDefaultNamespace(k8sContainerdNamespace))
+	client, err := containerd.New(config.ContainerdConfig.Endpoint, containerd.WithDefaultNamespace(k8sContainerdNamespace))
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize containerd client with endpoint %q: %v",
-			config.ContainerdEndpoint, err)
+			config.ContainerdConfig.Endpoint, err)
 	}
 	if config.CgroupPath != "" {
 		_, err := loadCgroup(config.CgroupPath)
@@ -138,7 +138,7 @@ func NewCRIContainerdService(config options.Config) (CRIContainerdService, error
 		client:              client,
 	}
 
-	imageFSPath := imageFSPath(config.ContainerdRootDir, config.ContainerdSnapshotter)
+	imageFSPath := imageFSPath(config.ContainerdConfig.RootDir, config.ContainerdConfig.Snapshotter)
 	c.imageFSUUID, err = c.getDeviceUUID(imageFSPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get imagefs uuid: %v", err)
@@ -182,7 +182,7 @@ func (c *criContainerdService) Run() error {
 	glog.V(2).Info("Start snapshots syncer")
 	snapshotsSyncer := newSnapshotsSyncer(
 		c.snapshotStore,
-		c.client.SnapshotService(c.config.ContainerdSnapshotter),
+		c.client.SnapshotService(c.config.ContainerdConfig.Snapshotter),
 		time.Duration(c.config.StatsCollectPeriod)*time.Second,
 	)
 	snapshotsSyncer.start()
