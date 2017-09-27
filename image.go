@@ -80,10 +80,10 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
 			if err != nil {
 				return err
 			}
+			if info.Labels == nil {
+				info.Labels = map[string]string{}
+			}
 			if info.Labels["containerd.io/uncompressed"] != layer.Diff.Digest.String() {
-				if info.Labels == nil {
-					info.Labels = map[string]string{}
-				}
 				info.Labels["containerd.io/uncompressed"] = layer.Diff.Digest.String()
 				if _, err := cs.Update(ctx, info, "labels.containerd.io/uncompressed"); err != nil {
 					return err
