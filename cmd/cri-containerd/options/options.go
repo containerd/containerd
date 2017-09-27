@@ -118,9 +118,9 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.ContainerdConfig.Runtime, "containerd-runtime",
 		"io.containerd.runtime.v1.linux", "The runtime used by containerd.")
 	fs.StringVar(&c.ContainerdConfig.RuntimeEngine, "containerd-runtime-engine",
-		"", "Runtime engine used by containerd. (default = \"\" uses containerd default)")
+		"", "Runtime engine used by containerd. Defaults to containerd's default if not specified.")
 	fs.StringVar(&c.ContainerdConfig.RuntimeRoot, "containerd-runtime-root",
-		"", "The directory used by containerd for runtime state. (default = \"\" uses containerd default)")
+		"", "The directory used by containerd for runtime state. Defaults to containerd's default if not specified.")
 	fs.BoolVar(&c.PrintVersion, "version",
 		false, "Print cri-containerd version information and quit.")
 	fs.StringVar(&c.NetworkPluginBinDir, "network-bin-dir",
@@ -128,19 +128,19 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.NetworkPluginConfDir, "network-conf-dir",
 		"/etc/cni/net.d", "The directory for putting network plugin configuration files.")
 	fs.StringVar(&c.StreamServerAddress, "stream-addr",
-		"", "The ip address streaming server is listening on. Default host interface is used if this is empty.")
+		"", "The ip address streaming server is listening on. The default host interface is used if not specified.")
 	fs.StringVar(&c.StreamServerPort, "stream-port",
 		"10010", "The port streaming server is listening on.")
 	fs.StringVar(&c.CgroupPath, "cgroup-path",
-		"", "The cgroup that cri-containerd is part of. By default cri-containerd is not placed in a cgroup.")
+		"", "The cgroup that cri-containerd is part of. Cri-containerd is not placed in a cgroup if none is specified.")
 	fs.BoolVar(&c.EnableSelinux, "enable-selinux",
-		false, "Enable selinux support. (default false)")
+		false, "Enable selinux support. By default not enabled.")
 	fs.StringVar(&c.SandboxImage, "sandbox-image",
 		"gcr.io/google_containers/pause:3.0", "The image used by sandbox container.")
 	fs.IntVar(&c.StatsCollectPeriod, "stats-collect-period",
 		10, "The period (in seconds) of snapshots stats collection.")
 	fs.BoolVar(&c.SystemdCgroup, "systemd-cgroup",
-		false, "Enables systemd cgroup support. (default false)")
+		false, "Enables systemd cgroup support. By default not enabled.")
 	fs.BoolVar(&c.PrintDefaultConfig, "default-config",
 		false, "Print default toml config of cri-containerd and quit.")
 }
