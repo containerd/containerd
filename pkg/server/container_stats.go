@@ -27,24 +27,22 @@ import (
 // ContainerStats returns stats of the container. If the container does not
 // exist, the call returns an error.
 func (c *criContainerdService) ContainerStats(ctx context.Context, in *runtime.ContainerStatsRequest) (*runtime.ContainerStatsResponse, error) {
-	// Validate the stats request
-	if in.GetContainerId() == "" {
-		return nil, fmt.Errorf("invalid container stats request")
-	}
-	containerID := in.GetContainerId()
-	_, err := c.containerStore.Get(containerID)
+	cntr, err := c.containerStore.Get(in.GetContainerId())
 	if err != nil {
-		return nil, fmt.Errorf("failed to find container %q: %v", containerID, err)
+		return nil, fmt.Errorf("failed to find container: %v", err)
 	}
-	request := &tasks.MetricsRequest{Filters: []string{"id==" + containerID}}
+	request := &tasks.MetricsRequest{Filters: []string{"id==" + cntr.ID}}
 	resp, err := c.taskService.Metrics(ctx, request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch metrics for tasks: %v", err)
+		return nil, fmt.Errorf("failed to fetch metrics for task: %v", err)
+	}
+	if len(resp.Metrics) != 1 {
+		return nil, fmt.Errorf("unexpected metrics response: %+v", resp.Metrics)
 	}
 
-	var cs runtime.ContainerStats
-	if err := c.getContainerMetrics(containerID, resp.Metrics[0], &cs); err != nil {
+	cs, err := c.getContainerMetrics(cntr.Metadata, resp.Metrics[0])
+	if err != nil {
 		return nil, fmt.Errorf("failed to decode container metrics: %v", err)
 	}
-	return &runtime.ContainerStatsResponse{Stats: &cs}, nil
+	return &runtime.ContainerStatsResponse{Stats: cs}, nil
 }
