@@ -71,7 +71,12 @@ func (image *Image) Size(ctx context.Context, provider content.Provider, platfor
 	}), ChildrenHandler(provider, platform)), image.Target)
 }
 
-// Manifest returns the manifest for an image.
+// Manifest resolves a manifest from the image for the given platform.
+//
+// TODO(stevvooe): This violates the current platform agnostic approach to this
+// package by returning a specific manifest type. We'll need to refactor this
+// to return a manifest descriptor or decide that we want to bring the API in
+// this direction because this abstraction is not needed.`
 func Manifest(ctx context.Context, provider content.Provider, image ocispec.Descriptor, platform string) (ocispec.Manifest, error) {
 	var (
 		matcher platforms.Matcher
@@ -149,7 +154,7 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 			return descs, nil
 
 		}
-		return nil, errors.New("could not resolve manifest")
+		return nil, errors.Wrap(errdefs.ErrNotFound, "could not resolve manifest")
 	}), image); err != nil {
 		return ocispec.Manifest{}, err
 	}
@@ -200,6 +205,49 @@ func Platforms(ctx context.Context, provider content.Provider, image ocispec.Des
 		}
 		return nil, nil
 	}), ChildrenHandler(provider, "")), image)
+}
+
+// Check returns nil if the all components of an image are available in the
+// provider for the specified platform.
+//
+// If available is true, the caller can assume that required represents the
+// complete set of content required for the image.
+//
+// missing will have the components that are part of required but not avaiiable
+// in the provider.
+//
+// If there is a problem resolving content, an error will be returned.
+func Check(ctx context.Context, provider content.Provider, image ocispec.Descriptor, platform string) (available bool, required, present, missing []ocispec.Descriptor, err error) {
+	mfst, err := Manifest(ctx, provider, image, platform)
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return false, []ocispec.Descriptor{image}, nil, []ocispec.Descriptor{image}, nil
+		}
+
+		return false, nil, nil, nil, errors.Wrap(err, "image check failed")
+	}
+
+	// TODO(stevvooe): It is possible that referenced conponents could have
+	// children, but this is rare. For now, we ignore this and only verify
+	// that manfiest components are present.
+	required = append([]ocispec.Descriptor{mfst.Config}, mfst.Layers...)
+
+	for _, desc := range required {
+		ra, err := provider.ReaderAt(ctx, desc.Digest)
+		if err != nil {
+			if errdefs.IsNotFound(err) {
+				missing = append(missing, desc)
+				continue
+			} else {
+				return false, nil, nil, nil, err
+			}
+		}
+		ra.Close()
+		present = append(present, desc)
+
+	}
+
+	return true, required, present, missing, nil
 }
 
 // Children returns the immediate children of content described by the descriptor.
