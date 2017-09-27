@@ -2,12 +2,9 @@ package images
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
@@ -121,7 +118,7 @@ func Dispatch(ctx context.Context, handler Handler, descs ...ocispec.Descriptor)
 	return eg.Wait()
 }
 
-// ChildrenHandler decodes well-known manifests types and returns their children.
+// ChildrenHandler decodes well-known manifest types and returns their children.
 //
 // This is useful for supporting recursive fetch and other use cases where you
 // want to do a full walk of resources.
@@ -130,60 +127,6 @@ func Dispatch(ctx context.Context, handler Handler, descs ...ocispec.Descriptor)
 // arbitrary types.
 func ChildrenHandler(provider content.Provider, platform string) HandlerFunc {
 	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		var descs []ocispec.Descriptor
-		switch desc.MediaType {
-		case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
-			p, err := content.ReadBlob(ctx, provider, desc.Digest)
-			if err != nil {
-				return nil, err
-			}
-
-			// TODO(stevvooe): We just assume oci manifest, for now. There may be
-			// subtle differences from the docker version.
-			var manifest ocispec.Manifest
-			if err := json.Unmarshal(p, &manifest); err != nil {
-				return nil, err
-			}
-
-			descs = append(descs, manifest.Config)
-			descs = append(descs, manifest.Layers...)
-		case MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
-			p, err := content.ReadBlob(ctx, provider, desc.Digest)
-			if err != nil {
-				return nil, err
-			}
-
-			var index ocispec.Index
-			if err := json.Unmarshal(p, &index); err != nil {
-				return nil, err
-			}
-
-			if platform != "" {
-				matcher, err := platforms.Parse(platform)
-				if err != nil {
-					return nil, err
-				}
-
-				for _, d := range index.Manifests {
-					if d.Platform == nil || matcher.Match(*d.Platform) {
-						descs = append(descs, d)
-					}
-				}
-			} else {
-				descs = append(descs, index.Manifests...)
-			}
-
-		case MediaTypeDockerSchema2Layer, MediaTypeDockerSchema2LayerGzip,
-			MediaTypeDockerSchema2LayerForeign, MediaTypeDockerSchema2LayerForeignGzip,
-			MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig,
-			ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerGzip,
-			ocispec.MediaTypeImageLayerNonDistributable, ocispec.MediaTypeImageLayerNonDistributableGzip:
-			// childless data types.
-			return nil, nil
-		default:
-			log.G(ctx).Warnf("encountered unknown type %v; children may not be fetched", desc.MediaType)
-		}
-
-		return descs, nil
+		return Children(ctx, provider, desc, platform)
 	}
 }
