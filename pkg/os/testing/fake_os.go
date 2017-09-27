@@ -22,7 +22,6 @@ import (
 	"sync"
 
 	containerdmount "github.com/containerd/containerd/mount"
-	"github.com/docker/docker/pkg/mount"
 	"golang.org/x/net/context"
 
 	osInterface "github.com/kubernetes-incubator/cri-containerd/pkg/os"
@@ -50,7 +49,6 @@ type FakeOS struct {
 	WriteFileFn           func(string, []byte, os.FileMode) error
 	MountFn               func(source string, target string, fstype string, flags uintptr, data string) error
 	UnmountFn             func(target string, flags int) error
-	GetMountsFn           func() ([]*mount.Info, error)
 	LookupMountFn         func(path string) (containerdmount.Info, error)
 	DeviceUUIDFn          func(device uint64) (string, error)
 	calls                 []CalledDetail
@@ -229,19 +227,6 @@ func (f *FakeOS) Unmount(target string, flags int) error {
 		return f.UnmountFn(target, flags)
 	}
 	return nil
-}
-
-// GetMounts retrieves a list of mounts for the current running process.
-func (f *FakeOS) GetMounts() ([]*mount.Info, error) {
-	f.appendCalls("GetMounts")
-	if err := f.getError("GetMounts"); err != nil {
-		return nil, err
-	}
-
-	if f.GetMountsFn != nil {
-		return f.GetMountsFn()
-	}
-	return nil, nil
 }
 
 // LookupMount is a fake call that invokes LookupMountFn or just return nil.

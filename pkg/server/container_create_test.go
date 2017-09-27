@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
-	"github.com/docker/docker/pkg/mount"
+	"github.com/containerd/containerd/mount"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
@@ -585,38 +585,32 @@ func TestPrivilegedBindMount(t *testing.T) {
 }
 
 func TestMountPropagation(t *testing.T) {
-	sharedGetMountsFn := func() ([]*mount.Info, error) {
-		return []*mount.Info{
-			{
-				Mountpoint: "host-path",
-				Optional:   "shared:",
-			},
+	sharedLookupMountFn := func(string) (mount.Info, error) {
+		return mount.Info{
+			Mountpoint: "host-path",
+			Optional:   "shared:",
 		}, nil
 	}
 
-	slaveGetMountsFn := func() ([]*mount.Info, error) {
-		return []*mount.Info{
-			{
-				Mountpoint: "host-path",
-				Optional:   "master:",
-			},
+	slaveLookupMountFn := func(string) (mount.Info, error) {
+		return mount.Info{
+			Mountpoint: "host-path",
+			Optional:   "master:",
 		}, nil
 	}
 
-	othersGetMountsFn := func() ([]*mount.Info, error) {
-		return []*mount.Info{
-			{
-				Mountpoint: "host-path",
-				Optional:   "others",
-			},
+	othersLookupMountFn := func(string) (mount.Info, error) {
+		return mount.Info{
+			Mountpoint: "host-path",
+			Optional:   "others",
 		}, nil
 	}
 
 	for desc, test := range map[string]struct {
-		criMount        *runtime.Mount
-		fakeGetMountsFn func() ([]*mount.Info, error)
-		optionsCheck    []string
-		expectErr       bool
+		criMount          *runtime.Mount
+		fakeLookupMountFn func(string) (mount.Info, error)
+		optionsCheck      []string
+		expectErr         bool
 	}{
 		"HostPath should mount as 'rprivate' if propagation is MountPropagation_PROPAGATION_PRIVATE": {
 			criMount: &runtime.Mount{
@@ -624,9 +618,9 @@ func TestMountPropagation(t *testing.T) {
 				HostPath:      "host-path",
 				Propagation:   runtime.MountPropagation_PROPAGATION_PRIVATE,
 			},
-			fakeGetMountsFn: nil,
-			optionsCheck:    []string{"rbind", "rprivate"},
-			expectErr:       false,
+			fakeLookupMountFn: nil,
+			optionsCheck:      []string{"rbind", "rprivate"},
+			expectErr:         false,
 		},
 		"HostPath should mount as 'rslave' if propagation is MountPropagation_PROPAGATION_HOST_TO_CONTAINER": {
 			criMount: &runtime.Mount{
@@ -634,9 +628,9 @@ func TestMountPropagation(t *testing.T) {
 				HostPath:      "host-path",
 				Propagation:   runtime.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
 			},
-			fakeGetMountsFn: slaveGetMountsFn,
-			optionsCheck:    []string{"rbind", "rslave"},
-			expectErr:       false,
+			fakeLookupMountFn: slaveLookupMountFn,
+			optionsCheck:      []string{"rbind", "rslave"},
+			expectErr:         false,
 		},
 		"HostPath should mount as 'rshared' if propagation is MountPropagation_PROPAGATION_BIDIRECTIONAL": {
 			criMount: &runtime.Mount{
@@ -644,9 +638,9 @@ func TestMountPropagation(t *testing.T) {
 				HostPath:      "host-path",
 				Propagation:   runtime.MountPropagation_PROPAGATION_BIDIRECTIONAL,
 			},
-			fakeGetMountsFn: sharedGetMountsFn,
-			optionsCheck:    []string{"rbind", "rshared"},
-			expectErr:       false,
+			fakeLookupMountFn: sharedLookupMountFn,
+			optionsCheck:      []string{"rbind", "rshared"},
+			expectErr:         false,
 		},
 		"HostPath should mount as 'rprivate' if propagation is illegal": {
 			criMount: &runtime.Mount{
@@ -654,9 +648,9 @@ func TestMountPropagation(t *testing.T) {
 				HostPath:      "host-path",
 				Propagation:   runtime.MountPropagation(42),
 			},
-			fakeGetMountsFn: nil,
-			optionsCheck:    []string{"rbind", "rprivate"},
-			expectErr:       false,
+			fakeLookupMountFn: nil,
+			optionsCheck:      []string{"rbind", "rprivate"},
+			expectErr:         false,
 		},
 		"Expect an error if HostPath isn't shared and mount propagation is MountPropagation_PROPAGATION_BIDIRECTIONAL": {
 			criMount: &runtime.Mount{
@@ -664,8 +658,8 @@ func TestMountPropagation(t *testing.T) {
 				HostPath:      "host-path",
 				Propagation:   runtime.MountPropagation_PROPAGATION_BIDIRECTIONAL,
 			},
-			fakeGetMountsFn: slaveGetMountsFn,
-			expectErr:       true,
+			fakeLookupMountFn: slaveLookupMountFn,
+			expectErr:         true,
 		},
 		"Expect an error if HostPath isn't slave or shared and mount propagation is MountPropagation_PROPAGATION_HOST_TO_CONTAINER": {
 			criMount: &runtime.Mount{
@@ -673,14 +667,14 @@ func TestMountPropagation(t *testing.T) {
 				HostPath:      "host-path",
 				Propagation:   runtime.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
 			},
-			fakeGetMountsFn: othersGetMountsFn,
-			expectErr:       true,
+			fakeLookupMountFn: othersLookupMountFn,
+			expectErr:         true,
 		},
 	} {
 		t.Logf("TestCase %q", desc)
 		g := generate.New()
 		c := newTestCRIContainerdService()
-		c.os.(*ostesting.FakeOS).GetMountsFn = test.fakeGetMountsFn
+		c.os.(*ostesting.FakeOS).LookupMountFn = test.fakeLookupMountFn
 		err := c.addOCIBindMounts(&g, []*runtime.Mount{test.criMount}, "")
 		if test.expectErr {
 			require.Error(t, err)

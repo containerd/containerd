@@ -28,9 +28,9 @@ import (
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/linux/runcopts"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/typeurl"
-	"github.com/docker/docker/pkg/mount"
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runc/libcontainer/devices"
@@ -577,10 +577,6 @@ func (c *criContainerdService) addOCIBindMounts(g *generate.Generator, mounts []
 			return fmt.Errorf("failed to resolve symlink %q: %v", src, err)
 		}
 
-		mountInfos, err := c.os.GetMounts()
-		if err != nil {
-			return err
-		}
 		options := []string{"rbind"}
 		switch mount.GetPropagation() {
 		case runtime.MountPropagation_PROPAGATION_PRIVATE:
@@ -588,13 +584,13 @@ func (c *criContainerdService) addOCIBindMounts(g *generate.Generator, mounts []
 			// Since default root propogation in runc is rprivate ignore
 			// setting the root propagation
 		case runtime.MountPropagation_PROPAGATION_BIDIRECTIONAL:
-			if err := ensureShared(src, mountInfos); err != nil {
+			if err := ensureShared(src, c.os.LookupMount); err != nil {
 				return err
 			}
 			options = append(options, "rshared")
 			g.SetLinuxRootPropagation("rshared") // nolint: errcheck
 		case runtime.MountPropagation_PROPAGATION_HOST_TO_CONTAINER:
-			if err := ensureSharedOrSlave(src, mountInfos); err != nil {
+			if err := ensureSharedOrSlave(src, c.os.LookupMount); err != nil {
 				return err
 			}
 			options = append(options, "rslave")
@@ -818,31 +814,31 @@ func generateApparmorSpecOpts(apparmorProf string, privileged, apparmorEnabled b
 }
 
 // Ensure mount point on which path is mounted, is shared.
-func ensureShared(path string, mountInfos []*mount.Info) error {
-	sourceMount, optionalOpts, err := getSourceMount(path, mountInfos)
+func ensureShared(path string, lookupMount func(string) (mount.Info, error)) error {
+	mountInfo, err := lookupMount(path)
 	if err != nil {
 		return err
 	}
 
 	// Make sure source mount point is shared.
-	optsSplit := strings.Split(optionalOpts, " ")
+	optsSplit := strings.Split(mountInfo.Optional, " ")
 	for _, opt := range optsSplit {
 		if strings.HasPrefix(opt, "shared:") {
 			return nil
 		}
 	}
 
-	return fmt.Errorf("path %q is mounted on %q but it is not a shared mount", path, sourceMount)
+	return fmt.Errorf("path %q is mounted on %q but it is not a shared mount", path, mountInfo.Mountpoint)
 }
 
 // Ensure mount point on which path is mounted, is either shared or slave.
-func ensureSharedOrSlave(path string, mountInfos []*mount.Info) error {
-	sourceMount, optionalOpts, err := getSourceMount(path, mountInfos)
+func ensureSharedOrSlave(path string, lookupMount func(string) (mount.Info, error)) error {
+	mountInfo, err := lookupMount(path)
 	if err != nil {
 		return err
 	}
 	// Make sure source mount point is shared.
-	optsSplit := strings.Split(optionalOpts, " ")
+	optsSplit := strings.Split(mountInfo.Optional, " ")
 	for _, opt := range optsSplit {
 		if strings.HasPrefix(opt, "shared:") {
 			return nil
@@ -850,5 +846,5 @@ func ensureSharedOrSlave(path string, mountInfos []*mount.Info) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("path %q is mounted on %q but it is not a shared or slave mount", path, sourceMount)
+	return fmt.Errorf("path %q is mounted on %q but it is not a shared or slave mount", path, mountInfo.Mountpoint)
 }
