@@ -78,8 +78,8 @@ func (c *criContainerdService) getContainerMetrics(
 	// If snapshotstore doesn't have cached snapshot information
 	// set WritableLayer usage to zero
 	if err == nil {
-		inodesUsed = sn.Size
-		usedBytes = sn.Inodes
+		usedBytes = sn.Size
+		inodesUsed = sn.Inodes
 	}
 	cs.WritableLayer = &runtime.FilesystemUsage{
 		Timestamp: sn.Timestamp,

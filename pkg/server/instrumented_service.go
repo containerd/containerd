@@ -280,6 +280,7 @@ func (in *instrumentedService) RemoveImage(ctx context.Context, r *runtime.Remov
 	}()
 	return in.criContainerdService.RemoveImage(ctx, r)
 }
+
 func (in *instrumentedService) ImageFsInfo(ctx context.Context, r *runtime.ImageFsInfoRequest) (res *runtime.ImageFsInfoResponse, err error) {
 	glog.V(4).Infof("ImageFsInfo")
 	defer func() {
@@ -290,4 +291,28 @@ func (in *instrumentedService) ImageFsInfo(ctx context.Context, r *runtime.Image
 		}
 	}()
 	return in.criContainerdService.ImageFsInfo(ctx, r)
+}
+
+func (in *instrumentedService) ContainerStats(ctx context.Context, r *runtime.ContainerStatsRequest) (res *runtime.ContainerStatsResponse, err error) {
+	glog.V(4).Infof("ContainerStats for %q", r.GetContainerId())
+	defer func() {
+		if err != nil {
+			glog.Errorf("ContainerStats for %q failed, error: %v", r.GetContainerId(), err)
+		} else {
+			glog.V(4).Infof("ContainerStats for %q returns stats %+v", r.GetContainerId(), res.GetStats())
+		}
+	}()
+	return in.criContainerdService.ContainerStats(ctx, r)
+}
+
+func (in *instrumentedService) ListContainerStats(ctx context.Context, r *runtime.ListContainerStatsRequest) (res *runtime.ListContainerStatsResponse, err error) {
+	glog.V(5).Infof("ListContainerStats with filter %+v", r.GetFilter())
+	defer func() {
+		if err != nil {
+			glog.Errorf("ListContainerStats failed, error: %v", err)
+		} else {
+			glog.V(5).Infof("ListContainerStats returns stats %+v", res.GetStats())
+		}
+	}()
+	return in.criContainerdService.ListContainerStats(ctx, r)
 }
