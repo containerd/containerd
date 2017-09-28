@@ -141,7 +141,7 @@ func NewCRIContainerdService(config options.Config) (CRIContainerdService, error
 	imageFSPath := imageFSPath(config.ContainerdConfig.RootDir, config.ContainerdConfig.Snapshotter)
 	c.imageFSUUID, err = c.getDeviceUUID(imageFSPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get imagefs uuid: %v", err)
+		return nil, fmt.Errorf("failed to get imagefs uuid of %q: %v", imageFSPath, err)
 	}
 
 	c.netPlugin, err = ocicni.InitCNI(config.NetworkPluginConfDir, config.NetworkPluginBinDir)
