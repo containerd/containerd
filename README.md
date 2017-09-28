@@ -1,14 +1,21 @@
 # cri-containerd
+<p align="center">
+<img src="https://github.com/kubernetes/kubernetes/blob/master/logo/logo.png" width="50" height="50">
+<img src="https://github.com/containerd/containerd/blob/master/docs/images/containerd-dark.png" width="200" >
+</p>
+
 [![Build Status](https://api.travis-ci.org/kubernetes-incubator/cri-containerd.svg?style=flat-square)](https://travis-ci.org/kubernetes-incubator/cri-containerd)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kubernetes-incubator/cri-containerd?style=flat-square)](https://goreportcard.com/report/github.com/kubernetes-incubator/cri-containerd)
 
 `cri-containerd` is a [containerd](https://containerd.io/) based implementation of Kubernetes [container runtime interface (CRI)](https://github.com/kubernetes/kubernetes/blob/v1.6.0/pkg/kubelet/api/v1alpha1/runtime/api.proto).
 ![cri-containerd](./docs/cri-containerd.png)
 ## Current Status
-`cri-containerd` is in alpha. This release is for use with Kubernetes 1.7. See
+`cri-containerd` is in alpha. This release is for use with Kubernetes 1.8. See
 the [roadmap](./docs/proposal.md#roadmap-and-milestones)
 for information about current and future milestones.
-## Getting started
+## Installing with Ansible and Kubeadm
+For a multi node cluster installer and bring up steps using ansible and kubeadm refer to [Getting started](contrib/ansible/getting-started.md) guide.
+## Getting Started for Developers
 ### Binary Dependencies and Specifications
 The current release of `cri-containerd` has following depedencies:
 * [containerd](https://github.com/containerd/containerd)
@@ -79,8 +86,6 @@ sudo cri-containerd -v 2 --alsologtostderr
 ```shell
 CONTAINER_RUNTIME=remote CONTAINER_RUNTIME_ENDPOINT='/var/run/cri-containerd.sock' ./hack/local-up-cluster.sh
 ```
-For a multi node cluster installer and bring up steps using ansible and kubeadm refer to [Getting started](contrib/ansible/getting-started.md) guide.
-
 ## Documentation
 See [here](./docs) for additional documentation.
 ## Contributing
