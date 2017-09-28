@@ -100,10 +100,8 @@ func NewWithConn(conn *grpc.ClientConn, opts ...ClientOpt) (*Client, error) {
 // Client is the client to interact with containerd and its various services
 // using a uniform interface
 type Client struct {
-	conn *grpc.ClientConn
-
-	defaultns string
-	runtime   string
+	conn    *grpc.ClientConn
+	runtime string
 }
 
 // IsServing returns true if the client can successfully connect to the
