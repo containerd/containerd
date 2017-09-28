@@ -176,6 +176,9 @@ type RemoteContext struct {
 	// Snapshotter used for unpacking
 	Snapshotter string
 
+	// Labels to be applied to the created image
+	Labels map[string]string
+
 	// BaseHandlers are a set of handlers which get are called on dispatch.
 	// These handlers always get called before any operation specific
 	// handlers.
@@ -197,7 +200,7 @@ func defaultRemoteContext() *RemoteContext {
 }
 
 // Pull downloads the provided content into containerd's content store
-func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpts) (Image, error) {
+func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image, error) {
 	pullCtx := defaultRemoteContext()
 	for _, o := range opts {
 		if err := o(c, pullCtx); err != nil {
@@ -242,6 +245,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpts) (Imag
 	imgrec := images.Image{
 		Name:   name,
 		Target: desc,
+		Labels: pullCtx.Labels,
 	}
 
 	is := c.ImageService()
@@ -273,7 +277,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpts) (Imag
 }
 
 // Push uploads the provided content to a remote resource
-func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, opts ...RemoteOpts) error {
+func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, opts ...RemoteOpt) error {
 	pushCtx := defaultRemoteContext()
 	for _, o := range opts {
 		if err := o(c, pushCtx); err != nil {
@@ -483,10 +487,37 @@ const (
 type importOpts struct {
 	format    imageFormat
 	refObject string
+	labels    map[string]string
 }
 
 // ImportOpt allows the caller to specify import specific options
 type ImportOpt func(c *importOpts) error
+
+// WithImportLabel sets a label to be associated with an imported image
+func WithImportLabel(key, value string) ImportOpt {
+	return func(opts *importOpts) error {
+		if opts.labels == nil {
+			opts.labels = make(map[string]string)
+		}
+
+		opts.labels[key] = value
+		return nil
+	}
+}
+
+// WithImportLabels associates a set of labels to an imported image
+func WithImportLabels(labels map[string]string) ImportOpt {
+	return func(opts *importOpts) error {
+		if opts.labels == nil {
+			opts.labels = make(map[string]string)
+		}
+
+		for k, v := range labels {
+			opts.labels[k] = v
+		}
+		return nil
+	}
+}
 
 // WithOCIImportFormat sets the import format for an OCI image format
 func WithOCIImportFormat() ImportOpt {

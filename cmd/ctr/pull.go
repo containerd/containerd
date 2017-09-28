@@ -20,7 +20,7 @@ command. As part of this process, we do the following:
 2. Prepare the snapshot filesystem with the pulled resources.
 3. Register metadata for the image.
 `,
-	Flags: append(registryFlags, snapshotterFlags...),
+	Flags: append(registryFlags, append(snapshotterFlags, labelFlag)...),
 	Action: func(clicontext *cli.Context) error {
 		var (
 			ref = clicontext.Args().First()

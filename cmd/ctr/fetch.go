@@ -39,7 +39,7 @@ not use this implementation as a guide. The end goal should be having metadata,
 content and snapshots ready for a direct use via the 'ctr run'.
 
 Most of this is experimental and there are few leaps to make this work.`,
-	Flags: registryFlags,
+	Flags: append(registryFlags, labelFlag),
 	Action: func(clicontext *cli.Context) error {
 		var (
 			ref = clicontext.Args().First()
@@ -84,8 +84,13 @@ func fetch(ctx context.Context, ref string, clicontext *cli.Context) (containerd
 	})
 
 	log.G(pctx).WithField("image", ref).Debug("fetching")
-
-	img, err := client.Pull(pctx, ref, containerd.WithResolver(resolver), containerd.WithImageHandler(h), containerd.WithSchema1Conversion)
+	labels := labelArgs(clicontext.StringSlice("label"))
+	img, err := client.Pull(pctx, ref,
+		containerd.WithPullLabels(labels),
+		containerd.WithResolver(resolver),
+		containerd.WithImageHandler(h),
+		containerd.WithSchema1Conversion,
+	)
 	stopProgress()
 	if err != nil {
 		return nil, err
