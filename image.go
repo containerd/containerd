@@ -2,6 +2,7 @@ package containerd
 
 import (
 	"context"
+	"strings"
 
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/platforms"
@@ -15,6 +16,8 @@ import (
 type Image interface {
 	// Name of the image
 	Name() string
+	// Labels of the image
+	Labels() map[string]string
 	// Target descriptor for the image content
 	Target() ocispec.Descriptor
 	// Unpack unpacks the image's content into a snapshot
@@ -37,6 +40,10 @@ type image struct {
 
 func (i *image) Name() string {
 	return i.i.Name
+}
+
+func (i *image) Labels() map[string]string {
+	return i.i.Labels
 }
 
 func (i *image) Target() ocispec.Descriptor {
@@ -68,9 +75,21 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
 	a := i.client.DiffService()
 	cs := i.client.ContentStore()
 
+	snLabels := make(map[string]string)
+	if iLabels := i.Labels(); iLabels != nil {
+		// The snapshotter plugin MAY use these `containerd.io/image.remote.*` labels to lazy-pull blobs from the registry.
+		// See *Client.Pull() for the labels actually set on pull.
+		prefix := "containerd.io/image.remote."
+		for k, v := range iLabels {
+			if strings.HasPrefix(k, prefix) {
+				snLabels[k] = v
+			}
+		}
+	}
+
 	var chain []digest.Digest
 	for _, layer := range layers {
-		unpacked, err := rootfs.ApplyLayer(ctx, layer, chain, sn, a)
+		unpacked, err := rootfs.ApplyLayer(ctx, layer, chain, sn, snLabels, a)
 		if err != nil {
 			// TODO: possibly wait and retry if extraction of same chain id was in progress
 			return err

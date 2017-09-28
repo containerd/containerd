@@ -242,6 +242,13 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpts) (Imag
 	imgrec := images.Image{
 		Name:   name,
 		Target: desc,
+		// image.remote.* labels are propagated to the snapshotter. The snapshotter plugin MAY use this label.
+		// Future version MAY set "containerd.io/image.remote.resolver" explicitly as well.
+		// Note that we never set any credential here. (That is up to snapshotter implementation.)
+		Labels: map[string]string{
+			// NOTE: ref != name, see godoc for remotes.Resolver.Resolve()
+			"containerd.io/image.remote.ref": ref,
+		},
 	}
 
 	is := c.ImageService()
