@@ -14,7 +14,7 @@
 the [roadmap](./docs/proposal.md#roadmap-and-milestones)
 for information about current and future milestones.
 ## Installing with Ansible and Kubeadm
-For a multi node cluster installer and bring up steps using ansible and kubeadm refer to [Getting started](contrib/ansible/getting-started.md) guide.
+For a multi node cluster installer and bring up steps using ansible and kubeadm refer [here](contrib/ansible/README.md).
 ## Getting Started for Developers
 ### Binary Dependencies and Specifications
 The current release of `cri-containerd` has following depedencies:
