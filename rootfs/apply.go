@@ -35,10 +35,10 @@ type Layer struct {
 // The returned result is a chain id digest representing all the applied layers.
 // Layers are applied in order they are given, making the first layer the
 // bottom-most layer in the layer chain.
-func ApplyLayers(ctx context.Context, layers []Layer, sn snapshot.Snapshotter, a Applier) (digest.Digest, error) {
+func ApplyLayers(ctx context.Context, layers []Layer, sn snapshot.Snapshotter, snLabels map[string]string, a Applier) (digest.Digest, error) {
 	var chain []digest.Digest
 	for _, layer := range layers {
-		if _, err := ApplyLayer(ctx, layer, chain, sn, a); err != nil {
+		if _, err := ApplyLayer(ctx, layer, chain, sn, snLabels, a); err != nil {
 			// TODO: possibly wait and retry if extraction of same chain id was in progress
 			return "", err
 		}
@@ -51,7 +51,7 @@ func ApplyLayers(ctx context.Context, layers []Layer, sn snapshot.Snapshotter, a
 // ApplyLayer applies a single layer on top of the given provided layer chain,
 // using the provided snapshotter and applier. If the layer was unpacked true
 // is returned, if the layer already exists false is returned.
-func ApplyLayer(ctx context.Context, layer Layer, chain []digest.Digest, sn snapshot.Snapshotter, a Applier) (bool, error) {
+func ApplyLayer(ctx context.Context, layer Layer, chain []digest.Digest, sn snapshot.Snapshotter, snLabels map[string]string, a Applier) (bool, error) {
 	var (
 		parent  = identity.ChainID(chain)
 		chainID = identity.ChainID(append(chain, layer.Diff.Digest))
@@ -92,7 +92,7 @@ func ApplyLayer(ctx context.Context, layer Layer, chain []digest.Digest, sn snap
 		return false, err
 	}
 
-	if err = sn.Commit(ctx, chainID.String(), key); err != nil {
+	if err = sn.Commit(ctx, chainID.String(), key, snapshot.WithLabels(snLabels)); err != nil {
 		if !errdefs.IsAlreadyExists(err) {
 			return false, errors.Wrapf(err, "failed to commit snapshot %s", parent)
 		}
