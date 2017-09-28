@@ -84,7 +84,7 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	)
 	cOpts = append(cOpts, containerd.WithContainerLabels(labelArgs(context.StringSlice("label"))))
 	if context.Bool("rootfs") {
-		opts = append(opts, containerd.WithRootFSPath(ref, context.Bool("readonly")))
+		opts = append(opts, containerd.WithRootFSPath(ref))
 	} else {
 		image, err := client.GetImage(ctx, ref)
 		if err != nil {
@@ -93,11 +93,13 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		opts = append(opts, containerd.WithImageConfig(image))
 		cOpts = append(cOpts, containerd.WithImage(image))
 		cOpts = append(cOpts, containerd.WithSnapshotter(context.String("snapshotter")))
-		if context.Bool("readonly") {
-			cOpts = append(cOpts, containerd.WithNewSnapshotView(id, image))
-		} else {
-			cOpts = append(cOpts, containerd.WithNewSnapshot(id, image))
-		}
+		// Even when "readonly" is set, we don't use KindView snapshot here. (#1495)
+		// We pass writable snapshot to the OCI runtime, and the runtime remounts it as read-only,
+		// after creating some mount points on demand.
+		cOpts = append(cOpts, containerd.WithNewSnapshot(id, image))
+	}
+	if context.Bool("readonly") {
+		opts = append(opts, containerd.WithRootFSReadonly())
 	}
 	cOpts = append(cOpts, containerd.WithRuntime(context.String("runtime"), nil))
 

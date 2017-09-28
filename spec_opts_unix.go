@@ -138,13 +138,24 @@ func WithImageConfig(i Image) SpecOpts {
 }
 
 // WithRootFSPath specifies unmanaged rootfs path.
-func WithRootFSPath(path string, readonly bool) SpecOpts {
+func WithRootFSPath(path string) SpecOpts {
 	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
-		s.Root = &specs.Root{
-			Path:     path,
-			Readonly: readonly,
+		if s.Root == nil {
+			s.Root = &specs.Root{}
 		}
+		s.Root.Path = path
 		// Entrypoint is not set here (it's up to caller)
+		return nil
+	}
+}
+
+// WithRootFSReadonly sets specs.Root.Readonly to true
+func WithRootFSReadonly() SpecOpts {
+	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
+		if s.Root == nil {
+			s.Root = &specs.Root{}
+		}
+		s.Root.Readonly = true
 		return nil
 	}
 }
