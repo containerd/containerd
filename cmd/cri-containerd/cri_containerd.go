@@ -40,7 +40,7 @@ func main() {
 		glog.Exitf("Failed to init CRI containerd flags: %v", err)
 	}
 
-	glog.V(2).Infof("Run cri-containerd %+v", o)
+	glog.V(0).Infof("Run cri-containerd %+v", o)
 	if o.PrintVersion {
 		version.PrintVersion()
 		os.Exit(0)
@@ -56,7 +56,7 @@ func main() {
 	glog.V(2).Infof("Run cri-containerd grpc server on socket %q", o.SocketPath)
 	s, err := server.NewCRIContainerdService(o.Config)
 	if err != nil {
-		glog.Exitf("Failed to create CRI containerd service %+v: %v", o, err)
+		glog.Exitf("Failed to create CRI containerd service: %v", err)
 	}
 	// Use interrupt handler to make sure the server to be stopped properly.
 	// Pass in non-empty final function to avoid os.Exit(1). We expect `Run`

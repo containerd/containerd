@@ -155,5 +155,5 @@ func (RealOS) DeviceUUID(device string) (string, error) {
 			return file.Name(), nil
 		}
 	}
-	return "", fmt.Errorf("device not found")
+	return "", fmt.Errorf("device %q not found", device)
 }
