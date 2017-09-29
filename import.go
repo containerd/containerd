@@ -34,7 +34,7 @@ func resolveOCIIndex(idx ocispec.Index, refObject string) (*ocispec.Descriptor, 
 	return nil, errors.Errorf("not found: %q", refObject)
 }
 
-func (c *Client) importFromOCITar(ctx context.Context, ref string, reader io.Reader, iopts importOpts) (Image, error) {
+func (c *Client) importFromOCITar(ctx context.Context, name string, reader io.Reader, iopts importOpts) (Image, error) {
 	tr := tar.NewReader(reader)
 	store := c.ContentStore()
 	var desc *ocispec.Descriptor
@@ -66,7 +66,7 @@ func (c *Client) importFromOCITar(ctx context.Context, ref string, reader io.Rea
 		return nil, errors.Errorf("no descriptor found for reference object %q", iopts.refObject)
 	}
 	imgrec := images.Image{
-		Name:   ref,
+		Name:   name,
 		Target: *desc,
 		Labels: iopts.labels,
 	}

@@ -539,7 +539,7 @@ func WithRefObject(refObject string) ImportOpt {
 	}
 }
 
-func resolveImportOpt(ref string, opts ...ImportOpt) (importOpts, error) {
+func resolveImportOpt(name string, opts ...ImportOpt) (importOpts, error) {
 	var iopts importOpts
 	for _, o := range opts {
 		if err := o(&iopts); err != nil {
@@ -550,9 +550,9 @@ func resolveImportOpt(ref string, opts ...ImportOpt) (importOpts, error) {
 	if iopts.format == "" {
 		iopts.format = ociImageFormat
 	}
-	// if refObject is not explicitly specified, use the one specified in ref
+	// if refObject is not explicitly specified, use the one specified in the (ref-compatible) name string
 	if iopts.refObject == "" {
-		refSpec, err := reference.Parse(ref)
+		refSpec, err := reference.Parse(name)
 		if err != nil {
 			return iopts, err
 		}
@@ -565,14 +565,14 @@ func resolveImportOpt(ref string, opts ...ImportOpt) (importOpts, error) {
 // OCI format is assumed by default.
 //
 // Note that unreferenced blobs are imported to the content store as well.
-func (c *Client) Import(ctx context.Context, ref string, reader io.Reader, opts ...ImportOpt) (Image, error) {
-	iopts, err := resolveImportOpt(ref, opts...)
+func (c *Client) Import(ctx context.Context, name string, reader io.Reader, opts ...ImportOpt) (Image, error) {
+	iopts, err := resolveImportOpt(name, opts...)
 	if err != nil {
 		return nil, err
 	}
 	switch iopts.format {
 	case ociImageFormat:
-		return c.importFromOCITar(ctx, ref, reader, iopts)
+		return c.importFromOCITar(ctx, name, reader, iopts)
 	default:
 		return nil, errors.Errorf("unsupported format: %s", iopts.format)
 	}
