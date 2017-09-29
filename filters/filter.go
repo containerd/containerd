@@ -58,22 +58,28 @@ import (
 	"github.com/containerd/containerd/log"
 )
 
+// Filter matches specific resources based the provided filter
 type Filter interface {
 	Match(adaptor Adaptor) bool
 }
 
+// FilterFunc is a function that handles matching with an adaptor
 type FilterFunc func(Adaptor) bool
 
+// Match matches the FilterFunc returning true if the object matches the filter
 func (fn FilterFunc) Match(adaptor Adaptor) bool {
 	return fn(adaptor)
 }
 
+// Always is a filter that always returns true for any type of object
 var Always FilterFunc = func(adaptor Adaptor) bool {
 	return true
 }
 
+// Any allows multiple filters to be matched aginst the object
 type Any []Filter
 
+// Match returns true if any of the provided filters are true
 func (m Any) Match(adaptor Adaptor) bool {
 	for _, m := range m {
 		if m.Match(adaptor) {
@@ -84,8 +90,10 @@ func (m Any) Match(adaptor Adaptor) bool {
 	return false
 }
 
+// All allows multiple filters to be matched aginst the object
 type All []Filter
 
+// Match only returns true if all filters match the object
 func (m All) Match(adaptor Adaptor) bool {
 	for _, m := range m {
 		if !m.Match(adaptor) {

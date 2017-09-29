@@ -243,10 +243,9 @@ func TestFilters(t *testing.T) {
 				}
 
 				return
-			} else {
-				if err != nil {
-					t.Fatal(err)
-				}
+			}
+			if err != nil {
+				t.Fatal(err)
 			}
 
 			if filter == nil {

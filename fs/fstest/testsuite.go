@@ -7,11 +7,13 @@ import (
 	"testing"
 )
 
+// TestApplier applies the test context
 type TestApplier interface {
 	TestContext(context.Context) (context.Context, func(), error)
 	Apply(context.Context, Applier) (string, func(), error)
 }
 
+// FSSuite runs the path test suite
 func FSSuite(t *testing.T, a TestApplier) {
 	t.Run("Basic", makeTest(t, a, basicTest))
 	t.Run("Deletion", makeTest(t, a, deletionTest))

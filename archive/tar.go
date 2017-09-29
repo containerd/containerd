@@ -522,9 +522,5 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 		return err
 	}
 
-	if err := chtimes(path, boundTime(latestTime(hdr.AccessTime, hdr.ModTime)), boundTime(hdr.ModTime)); err != nil {
-		return err
-	}
-
-	return nil
+	return chtimes(path, boundTime(latestTime(hdr.AccessTime, hdr.ModTime)), boundTime(hdr.ModTime))
 }

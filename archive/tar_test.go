@@ -167,7 +167,7 @@ func TestSymlinks(t *testing.T) {
 }
 
 func TestBreakouts(t *testing.T) {
-	tc := TarContext{}.WithUidGid(os.Getuid(), os.Getgid()).WithModTime(time.Now().UTC())
+	tc := TarContext{}.WithUIDGID(os.Getuid(), os.Getgid()).WithModTime(time.Now().UTC())
 	expected := "unbroken"
 	unbrokenCheck := func(root string) error {
 		b, err := ioutil.ReadFile(filepath.Join(root, "etc", "unbroken"))
@@ -480,7 +480,7 @@ func TestDiffApply(t *testing.T) {
 }
 
 func TestApplyTar(t *testing.T) {
-	tc := TarContext{}.WithUidGid(os.Getuid(), os.Getgid()).WithModTime(time.Now().UTC())
+	tc := TarContext{}.WithUIDGID(os.Getuid(), os.Getgid()).WithModTime(time.Now().UTC())
 	directoriesExist := func(dirs ...string) func(string) error {
 		return func(root string) error {
 			for _, d := range dirs {
@@ -767,8 +767,8 @@ func TarFromWriterTo(wt WriterToTar) io.ReadCloser {
 
 // TarContext is used to create tar records
 type TarContext struct {
-	Uid int
-	Gid int
+	UID int
+	GID int
 
 	// ModTime sets the modtimes for all files, if nil the current time
 	// is used for each file when it was written
@@ -784,8 +784,8 @@ func (tc TarContext) newHeader(mode os.FileMode, name, link string, size int64) 
 		size: size,
 		modt: tc.ModTime,
 		hdr: &tar.Header{
-			Uid:    tc.Uid,
-			Gid:    tc.Gid,
+			Uid:    tc.UID,
+			Gid:    tc.GID,
 			Xattrs: tc.Xattrs,
 		},
 	}
@@ -837,10 +837,10 @@ func (ti tarInfo) Sys() interface{} {
 	return ti.hdr
 }
 
-func (tc TarContext) WithUidGid(uid, gid int) TarContext {
+func (tc TarContext) WithUIDGID(uid, gid int) TarContext {
 	ntc := tc
-	ntc.Uid = uid
-	ntc.Gid = gid
+	ntc.UID = uid
+	ntc.GID = gid
 	return ntc
 }
 
