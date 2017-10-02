@@ -62,11 +62,13 @@ type Container struct {
 	Extensions map[string]types.Any
 }
 
+// RuntimeInfo holds runtime specific information
 type RuntimeInfo struct {
 	Name    string
 	Options *types.Any
 }
 
+// Store interacts with the underlying container storage
 type Store interface {
 	Get(ctx context.Context, id string) (Container, error)
 

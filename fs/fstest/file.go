@@ -26,12 +26,7 @@ func CreateFile(name string, content []byte, perm os.FileMode) Applier {
 		if err := ioutil.WriteFile(fullPath, content, perm); err != nil {
 			return err
 		}
-
-		if err := os.Chmod(fullPath, perm); err != nil {
-			return err
-		}
-
-		return nil
+		return os.Chmod(fullPath, perm)
 	})
 }
 

@@ -42,6 +42,7 @@ type unixSocketCredentials struct {
 	serverName string
 }
 
+// NewUnixSocketCredentials returns TransportCredentials for a local unix socket
 func NewUnixSocketCredentials(uid, gid int) credentials.TransportCredentials {
 	return &unixSocketCredentials{uid, gid, "locahost"}
 }

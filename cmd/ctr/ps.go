@@ -47,9 +47,6 @@ var taskPsCommand = cli.Command{
 				return err
 			}
 		}
-		if err := w.Flush(); err != nil {
-			return err
-		}
-		return nil
+		return w.Flush()
 	},
 }

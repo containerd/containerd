@@ -44,12 +44,7 @@ var namespacesCreateCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-
-		if err := namespaces.Create(ctx, namespace, labels); err != nil {
-			return err
-		}
-
-		return nil
+		return namespaces.Create(ctx, namespace, labels)
 	},
 }
 

@@ -8,20 +8,25 @@ import (
 	"github.com/opencontainers/go-digest"
 )
 
+// ReaderAt extends the standard io.ReaderAt interface with reporting of Size and io.Closer
 type ReaderAt interface {
 	io.ReaderAt
 	io.Closer
 	Size() int64
 }
 
+// Provider provides a reader interface for specific content
 type Provider interface {
 	ReaderAt(ctx context.Context, dgst digest.Digest) (ReaderAt, error)
 }
 
+// Ingester writes content
 type Ingester interface {
 	Writer(ctx context.Context, ref string, size int64, expected digest.Digest) (Writer, error)
 }
 
+// Info holds content specific information
+//
 // TODO(stevvooe): Consider a very different name for this struct. Info is way
 // to general. It also reads very weird in certain context, like pluralization.
 type Info struct {
@@ -32,6 +37,7 @@ type Info struct {
 	Labels    map[string]string
 }
 
+// Status of a content operation
 type Status struct {
 	Ref       string
 	Offset    int64
@@ -81,6 +87,7 @@ type IngestManager interface {
 	Abort(ctx context.Context, ref string) error
 }
 
+// Writer handles the write of content into a content store
 type Writer interface {
 	// Close is expected to be called after Commit() when commission is needed.
 	io.WriteCloser
@@ -111,6 +118,7 @@ type Store interface {
 // Opt is used to alter the mutable properties of content
 type Opt func(*Info) error
 
+// WithLabels allows labels to be set on content
 func WithLabels(labels map[string]string) Opt {
 	return func(info *Info) error {
 		info.Labels = labels

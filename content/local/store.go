@@ -36,6 +36,7 @@ type store struct {
 	root string
 }
 
+// NewServer returns a local content store
 func NewStore(root string) (content.Store, error) {
 	if err := os.MkdirAll(filepath.Join(root, "ingest"), 0777); err != nil && !os.IsExist(err) {
 		return nil, err
@@ -97,8 +98,8 @@ func (s *store) ReaderAt(ctx context.Context, dgst digest.Digest) (content.Reade
 //
 // While this is safe to do concurrently, safe exist-removal logic must hold
 // some global lock on the store.
-func (cs *store) Delete(ctx context.Context, dgst digest.Digest) error {
-	if err := os.RemoveAll(cs.blobPath(dgst)); err != nil {
+func (s *store) Delete(ctx context.Context, dgst digest.Digest) error {
+	if err := os.RemoveAll(s.blobPath(dgst)); err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
@@ -109,14 +110,14 @@ func (cs *store) Delete(ctx context.Context, dgst digest.Digest) error {
 	return nil
 }
 
-func (cs *store) Update(ctx context.Context, info content.Info, fieldpaths ...string) (content.Info, error) {
+func (s *store) Update(ctx context.Context, info content.Info, fieldpaths ...string) (content.Info, error) {
 	// TODO: Support persisting and updating mutable content data
 	return content.Info{}, errors.Wrapf(errdefs.ErrFailedPrecondition, "update not supported on immutable content store")
 }
 
-func (cs *store) Walk(ctx context.Context, fn content.WalkFunc, filters ...string) error {
+func (s *store) Walk(ctx context.Context, fn content.WalkFunc, filters ...string) error {
 	// TODO: Support filters
-	root := filepath.Join(cs.root, "blobs")
+	root := filepath.Join(s.root, "blobs")
 	var alg digest.Algorithm
 	return filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
@@ -153,7 +154,7 @@ func (cs *store) Walk(ctx context.Context, fn content.WalkFunc, filters ...strin
 			// store or extra paths not expected previously.
 		}
 
-		return fn(cs.info(dgst, fi))
+		return fn(s.info(dgst, fi))
 	})
 }
 
