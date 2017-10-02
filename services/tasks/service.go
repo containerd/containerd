@@ -41,7 +41,7 @@ func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
 		ID:   "tasks",
-		Requires: []plugin.PluginType{
+		Requires: []plugin.Type{
 			plugin.RuntimePlugin,
 			plugin.MetadataPlugin,
 			plugin.ContentPlugin,

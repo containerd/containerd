@@ -14,6 +14,7 @@ type namespaceStore struct {
 	tx *bolt.Tx
 }
 
+// NewNamespaceStore returns a store backed by a bolt DB
 func NewNamespaceStore(tx *bolt.Tx) namespaces.Store {
 	return &namespaceStore{tx: tx}
 }

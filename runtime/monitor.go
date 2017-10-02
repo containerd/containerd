@@ -8,12 +8,14 @@ type TaskMonitor interface {
 	Stop(Task) error
 }
 
+// NewMultiTaskMonitor returns a new TaskMonitor broadcasting to the provided monitors
 func NewMultiTaskMonitor(monitors ...TaskMonitor) TaskMonitor {
 	return &multiTaskMonitor{
 		monitors: monitors,
 	}
 }
 
+// NewNoopMonitor is a task monitor that does nothing
 func NewNoopMonitor() TaskMonitor {
 	return &noopTaskMonitor{}
 }

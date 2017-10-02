@@ -15,6 +15,7 @@ import (
 	"golang.org/x/net/context"
 )
 
+// Config for the cgroups monitor
 type Config struct {
 	NoPrometheus bool `toml:"no_prometheus"`
 }
@@ -28,14 +29,15 @@ func init() {
 	})
 }
 
+// New returns a new cgroups monitor
 func New(ic *plugin.InitContext) (interface{}, error) {
 	var ns *metrics.Namespace
 	config := ic.Config.(*Config)
 	if !config.NoPrometheus {
 		ns = metrics.NewNamespace("container", "", nil)
 	}
-	collector := NewCollector(ns)
-	oom, err := NewOOMCollector(ns)
+	collector := newCollector(ns)
+	oom, err := newOOMCollector(ns)
 	if err != nil {
 		return nil, err
 	}
@@ -51,8 +53,8 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 }
 
 type cgroupsMonitor struct {
-	collector *Collector
-	oom       *OOMCollector
+	collector *collector
+	oom       *oomCollector
 	context   context.Context
 	publisher events.Publisher
 }

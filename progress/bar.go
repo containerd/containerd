@@ -16,6 +16,7 @@ type Bar float64
 
 var _ fmt.Formatter = Bar(1.0)
 
+// Format the progress bar as output
 func (h Bar) Format(state fmt.State, r rune) {
 	switch r {
 	case 'r':

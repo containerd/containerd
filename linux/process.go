@@ -11,15 +11,20 @@ import (
 	"github.com/containerd/containerd/runtime"
 )
 
+// Process implements a linux process
 type Process struct {
 	id string
 	t  *Task
 }
 
+// ID of the process
 func (p *Process) ID() string {
 	return p.id
 }
 
+// Kill sends the provided signal to the underlying process
+//
+// Unable to kill all processes in the task using this method on a process
 func (p *Process) Kill(ctx context.Context, signal uint32, _ bool) error {
 	_, err := p.t.shim.Kill(ctx, &shim.KillRequest{
 		Signal: signal,
@@ -31,6 +36,7 @@ func (p *Process) Kill(ctx context.Context, signal uint32, _ bool) error {
 	return err
 }
 
+// State of process
 func (p *Process) State(ctx context.Context) (runtime.State, error) {
 	// use the container status for the status of the process
 	response, err := p.t.shim.State(ctx, &shim.StateRequest{
@@ -63,6 +69,7 @@ func (p *Process) State(ctx context.Context) (runtime.State, error) {
 	}, nil
 }
 
+// ResizePty changes the side of the process's PTY to the provided width and height
 func (p *Process) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
 	_, err := p.t.shim.ResizePty(ctx, &shim.ResizePtyRequest{
 		ID:     p.id,
@@ -75,6 +82,7 @@ func (p *Process) ResizePty(ctx context.Context, size runtime.ConsoleSize) error
 	return err
 }
 
+// CloseIO closes the provided IO pipe for the process
 func (p *Process) CloseIO(ctx context.Context) error {
 	_, err := p.t.shim.CloseIO(ctx, &shim.CloseIORequest{
 		ID:    p.id,
@@ -86,6 +94,7 @@ func (p *Process) CloseIO(ctx context.Context) error {
 	return nil
 }
 
+// Start the process
 func (p *Process) Start(ctx context.Context) error {
 	_, err := p.t.shim.Start(ctx, &shim.StartRequest{
 		ID: p.id,
@@ -96,6 +105,7 @@ func (p *Process) Start(ctx context.Context) error {
 	return nil
 }
 
+// Wait on the process to exit and return the exit status and timestamp
 func (p *Process) Wait(ctx context.Context) (*runtime.Exit, error) {
 	r, err := p.t.shim.Wait(ctx, &shim.WaitRequest{
 		ID: p.id,

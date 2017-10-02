@@ -6,6 +6,7 @@ import (
 	"golang.org/x/net/context"
 )
 
+// Differ allows the apply and creation of filesystem diffs between mounts
 type Differ interface {
 	Apply(ctx context.Context, desc ocispec.Descriptor, mount []mount.Mount) (ocispec.Descriptor, error)
 	DiffMounts(ctx context.Context, lower, upper []mount.Mount, media, ref string) (ocispec.Descriptor, error)

@@ -39,7 +39,7 @@ func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
 		ID:   "content",
-		Requires: []plugin.PluginType{
+		Requires: []plugin.Type{
 			plugin.ContentPlugin,
 			plugin.MetadataPlugin,
 		},

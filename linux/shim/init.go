@@ -27,6 +27,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// InitPidFile name of the file that contains the init pid
 const InitPidFile = "init.pid"
 
 type initProcess struct {

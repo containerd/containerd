@@ -63,7 +63,7 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 			rpc:    rpc,
 			events: events.NewExchange(),
 		}
-		initialized = make(map[plugin.PluginType]map[string]interface{})
+		initialized = make(map[plugin.Type]map[string]interface{})
 	)
 	for _, p := range plugins {
 		id := p.URI()

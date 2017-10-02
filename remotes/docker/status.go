@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Status of a content operation
 type Status struct {
 	content.Status
 
@@ -15,6 +16,7 @@ type Status struct {
 	UploadUUID string
 }
 
+// StatusTracker to track status of operations
 type StatusTracker interface {
 	GetStatus(string) (Status, error)
 	SetStatus(string, Status)
@@ -25,6 +27,7 @@ type memoryStatusTracker struct {
 	m        sync.Mutex
 }
 
+// NewInMemoryTracker returns a StatusTracker that tracks content status in-memory
 func NewInMemoryTracker() StatusTracker {
 	return &memoryStatusTracker{
 		statuses: map[string]Status{},

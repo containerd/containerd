@@ -137,7 +137,7 @@ We get back a list of mounts from `Snapshotter.Prepare`, with the `key`
 identifying the active snapshot. Mount this to the temporary location with the
 following:
 
-	if err := MountAll(mounts, tmpDir); err != nil { ... }
+	if err := mount.All(mounts, tmpDir); err != nil { ... }
 
 Once the mounts are performed, our temporary location is ready to capture
 a diff. In practice, this works similar to a filesystem transaction. The

@@ -16,12 +16,14 @@ type Writer struct {
 	lines int
 }
 
+// NewWriter returns a writer
 func NewWriter(w io.Writer) *Writer {
 	return &Writer{
 		w: w,
 	}
 }
 
+// Write the provided bytes
 func (w *Writer) Write(p []byte) (n int, err error) {
 	return w.buf.Write(p)
 }

@@ -417,11 +417,7 @@ func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64,
 	if err := boltutil.WriteLabels(bkt, base.Labels); err != nil {
 		return err
 	}
-	if err := bkt.Put(bucketKeySize, sizeEncoded); err != nil {
-		return err
-	}
-
-	return nil
+	return bkt.Put(bucketKeySize, sizeEncoded)
 }
 
 func (nw *namespacedWriter) Status() (content.Status, error) {
@@ -497,9 +493,5 @@ func writeInfo(info *content.Info, bkt *bolt.Bucket) error {
 		return err
 	}
 
-	if err := bkt.Put(bucketKeySize, sizeEncoded); err != nil {
-		return err
-	}
-
-	return nil
+	return bkt.Put(bucketKeySize, sizeEncoded)
 }

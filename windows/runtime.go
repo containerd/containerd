@@ -43,7 +43,7 @@ func init() {
 		ID:   runtimeName,
 		Type: plugin.RuntimePlugin,
 		Init: New,
-		Requires: []plugin.PluginType{
+		Requires: []plugin.Type{
 			plugin.MetadataPlugin,
 		},
 	})

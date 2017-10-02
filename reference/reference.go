@@ -12,8 +12,11 @@ import (
 )
 
 var (
-	ErrInvalid          = errors.New("invalid reference")
-	ErrObjectRequired   = errors.New("object required")
+	// ErrInvalid is returned when there is an invalid reference
+	ErrInvalid = errors.New("invalid reference")
+	// ErrObjectRequired is returned when the object is required
+	ErrObjectRequired = errors.New("object required")
+	// ErrHostnameRequired is returned when the hostname is required
 	ErrHostnameRequired = errors.New("hostname required")
 )
 
@@ -138,7 +141,6 @@ func SplitObject(obj string) (tag string, dgst digest.Digest) {
 	parts := strings.SplitAfterN(obj, "@", 2)
 	if len(parts) < 2 {
 		return parts[0], ""
-	} else {
-		return parts[0], digest.Digest(parts[1])
 	}
+	return parts[0], digest.Digest(parts[1])
 }

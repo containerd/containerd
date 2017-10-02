@@ -21,6 +21,7 @@ type Image struct {
 	CreatedAt, UpdatedAt time.Time
 }
 
+// Store and interact with images
 type Store interface {
 	Get(ctx context.Context, name string) (Image, error)
 	List(ctx context.Context, filters ...string) ([]Image, error)
@@ -69,6 +70,7 @@ func (image *Image) Size(ctx context.Context, provider content.Provider, platfor
 	}), ChildrenHandler(provider, platform)), image.Target)
 }
 
+// Manifest returns the manifest for an image.
 func Manifest(ctx context.Context, provider content.Provider, image ocispec.Descriptor, platform string) (ocispec.Manifest, error) {
 	var (
 		matcher platforms.Matcher
@@ -177,7 +179,7 @@ func Platforms(ctx context.Context, provider content.Provider, image ocispec.Des
 	return platformSpecs, Walk(ctx, Handlers(HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		if desc.Platform != nil {
 			platformSpecs = append(platformSpecs, *desc.Platform)
-			return nil, SkipDesc
+			return nil, ErrSkipDesc
 		}
 
 		switch desc.MediaType {

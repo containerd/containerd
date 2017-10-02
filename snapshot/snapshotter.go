@@ -146,7 +146,7 @@ func (u *Usage) Add(other Usage) {
 // the active snapshot. Mount this to the temporary location with the
 // following:
 //
-//	if err := containerd.MountAll(mounts, tmpDir); err != nil { ... }
+//	if err := mount.All(mounts, tmpDir); err != nil { ... }
 //
 // Once the mounts are performed, our temporary location is ready to capture
 // a diff. In practice, this works similar to a filesystem transaction. The

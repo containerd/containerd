@@ -26,7 +26,7 @@ func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
 		ID:   "diff",
-		Requires: []plugin.PluginType{
+		Requires: []plugin.Type{
 			plugin.DiffPlugin,
 		},
 		Config: &config{
