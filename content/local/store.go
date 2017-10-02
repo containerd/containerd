@@ -36,7 +36,7 @@ type store struct {
 	root string
 }
 
-// NewServer returns a local content store
+// NewStore returns a local content store
 func NewStore(root string) (content.Store, error) {
 	if err := os.MkdirAll(filepath.Join(root, "ingest"), 0777); err != nil && !os.IsExist(err) {
 		return nil, err
@@ -383,8 +383,8 @@ func (s *store) Abort(ctx context.Context, ref string) error {
 	return nil
 }
 
-func (cs *store) blobPath(dgst digest.Digest) string {
-	return filepath.Join(cs.root, "blobs", dgst.Algorithm().String(), dgst.Hex())
+func (s *store) blobPath(dgst digest.Digest) string {
+	return filepath.Join(s.root, "blobs", dgst.Algorithm().String(), dgst.Hex())
 }
 
 func (s *store) ingestRoot(ref string) string {

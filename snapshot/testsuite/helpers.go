@@ -20,7 +20,7 @@ func applyToMounts(m []mount.Mount, work string, a fstest.Applier) (err error) {
 	}
 	defer os.RemoveAll(td)
 
-	if err := mount.MountAll(m, td); err != nil {
+	if err := mount.All(m, td); err != nil {
 		return errors.Wrap(err, "failed to mount")
 	}
 	defer func() {
@@ -76,7 +76,7 @@ func checkSnapshot(ctx context.Context, sn snapshot.Snapshotter, work, name, che
 		}
 	}()
 
-	if err := mount.MountAll(m, td); err != nil {
+	if err := mount.All(m, td); err != nil {
 		return errors.Wrap(err, "failed to mount")
 	}
 	defer func() {

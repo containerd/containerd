@@ -8,6 +8,7 @@ import (
 	"github.com/gogo/protobuf/types"
 )
 
+// IO holds process IO information
 type IO struct {
 	Stdin    string
 	Stdout   string
@@ -15,6 +16,7 @@ type IO struct {
 	Terminal bool
 }
 
+// CreateOpts contains task creation data
 type CreateOpts struct {
 	// Spec is the OCI runtime spec
 	Spec *types.Any
@@ -28,6 +30,7 @@ type CreateOpts struct {
 	Options *types.Any
 }
 
+// Exit information for a process
 type Exit struct {
 	Pid       uint32
 	Status    uint32

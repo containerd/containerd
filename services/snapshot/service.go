@@ -24,7 +24,7 @@ func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
 		ID:   "snapshots",
-		Requires: []plugin.PluginType{
+		Requires: []plugin.Type{
 			plugin.SnapshotPlugin,
 			plugin.MetadataPlugin,
 		},

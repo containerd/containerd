@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// loadBundle loads an existing bundle from disk
 func loadBundle(id, path, workdir string) *bundle {
 	return &bundle{
 		id:      id,
@@ -71,6 +72,7 @@ type bundle struct {
 
 type shimOpt func(*bundle, string, *runcopts.RuncOptions) (client.Config, client.ClientOpt)
 
+// ShimRemote is a shimOpt for connecting and starting a remote shim
 func ShimRemote(shim, daemonAddress, cgroup string, debug bool, exitHandler func()) shimOpt {
 	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (client.Config, client.ClientOpt) {
 		return b.shimConfig(ns, ropts),
@@ -78,12 +80,14 @@ func ShimRemote(shim, daemonAddress, cgroup string, debug bool, exitHandler func
 	}
 }
 
+// ShimLocal is a shimOpt for using an in process shim implementation
 func ShimLocal(exchange *events.Exchange) shimOpt {
 	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (client.Config, client.ClientOpt) {
 		return b.shimConfig(ns, ropts), client.WithLocal(exchange)
 	}
 }
 
+// ShimConnect is a shimOpt for connecting to an existing remote shim
 func ShimConnect() shimOpt {
 	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (client.Config, client.ClientOpt) {
 		return b.shimConfig(ns, ropts), client.WithConnect(b.shimAddress(ns))

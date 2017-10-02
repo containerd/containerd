@@ -47,6 +47,7 @@ type Converter struct {
 	layerBlobs map[digest.Digest]ocispec.Descriptor
 }
 
+// NewConverter returns a new converter
 func NewConverter(contentStore content.Store, fetcher remotes.Fetcher) *Converter {
 	return &Converter{
 		contentStore: contentStore,
@@ -56,6 +57,7 @@ func NewConverter(contentStore content.Store, fetcher remotes.Fetcher) *Converte
 	}
 }
 
+// Handle fetching descriptors for a docker media type
 func (c *Converter) Handle(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 	switch desc.MediaType {
 	case images.MediaTypeDockerSchema1Manifest:
@@ -101,6 +103,7 @@ func (c *Converter) Handle(ctx context.Context, desc ocispec.Descriptor) ([]ocis
 	}
 }
 
+// Convert a docker manifest to an OCI descriptor
 func (c *Converter) Convert(ctx context.Context) (ocispec.Descriptor, error) {
 	history, diffIDs, err := c.schema1ManifestHistory()
 	if err != nil {

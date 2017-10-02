@@ -6,6 +6,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// Mount to the provided target path
 func (m *Mount) Mount(target string) error {
 	flags, data := parseMountOptions(m.Options)
 
@@ -40,6 +41,7 @@ func (m *Mount) Mount(target string) error {
 	return nil
 }
 
+// Unmount the provided mount path with the flags
 func Unmount(mount string, flags int) error {
 	return unix.Unmount(mount, flags)
 }

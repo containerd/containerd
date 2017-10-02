@@ -14,7 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func NewOOMCollector(ns *metrics.Namespace) (*OOMCollector, error) {
+func newOOMCollector(ns *metrics.Namespace) (*oomCollector, error) {
 	fd, err := unix.EpollCreate1(unix.EPOLL_CLOEXEC)
 	if err != nil {
 		return nil, err
@@ -23,7 +23,7 @@ func NewOOMCollector(ns *metrics.Namespace) (*OOMCollector, error) {
 	if ns != nil {
 		desc = ns.NewDesc("memory_oom", "The number of times a container has received an oom event", metrics.Total, "container_id", "namespace")
 	}
-	c := &OOMCollector{
+	c := &oomCollector{
 		fd:   fd,
 		desc: desc,
 		set:  make(map[uintptr]*oom),
@@ -35,7 +35,7 @@ func NewOOMCollector(ns *metrics.Namespace) (*OOMCollector, error) {
 	return c, nil
 }
 
-type OOMCollector struct {
+type oomCollector struct {
 	mu sync.Mutex
 
 	desc *prometheus.Desc
@@ -51,7 +51,7 @@ type oom struct {
 	count     int64
 }
 
-func (o *OOMCollector) Add(id, namespace string, cg cgroups.Cgroup, triggers ...Trigger) error {
+func (o *oomCollector) Add(id, namespace string, cg cgroups.Cgroup, triggers ...Trigger) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	fd, err := cg.OOMEventFD()
@@ -71,11 +71,11 @@ func (o *OOMCollector) Add(id, namespace string, cg cgroups.Cgroup, triggers ...
 	return unix.EpollCtl(o.fd, unix.EPOLL_CTL_ADD, int(fd), &event)
 }
 
-func (o *OOMCollector) Describe(ch chan<- *prometheus.Desc) {
+func (o *oomCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- o.desc
 }
 
-func (o *OOMCollector) Collect(ch chan<- prometheus.Metric) {
+func (o *oomCollector) Collect(ch chan<- prometheus.Metric) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	for _, t := range o.set {
@@ -85,11 +85,11 @@ func (o *OOMCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 // Close closes the epoll fd
-func (o *OOMCollector) Close() error {
+func (o *oomCollector) Close() error {
 	return unix.Close(int(o.fd))
 }
 
-func (o *OOMCollector) start() {
+func (o *oomCollector) start() {
 	var events [128]unix.EpollEvent
 	for {
 		n, err := unix.EpollWait(o.fd, events[:], -1)
@@ -105,7 +105,7 @@ func (o *OOMCollector) start() {
 	}
 }
 
-func (o *OOMCollector) process(fd uintptr, event uint32) {
+func (o *oomCollector) process(fd uintptr, event uint32) {
 	// make sure to always flush the fd
 	flush(fd)
 

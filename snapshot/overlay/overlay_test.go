@@ -221,7 +221,7 @@ func TestOverlayOverlayRead(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if err := mount.MountAll(mounts, dest); err != nil {
+	if err := mount.All(mounts, dest); err != nil {
 		t.Error(err)
 		return
 	}

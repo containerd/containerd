@@ -52,7 +52,7 @@ func init() {
 		Type: plugin.RuntimePlugin,
 		ID:   "linux",
 		Init: New,
-		Requires: []plugin.PluginType{
+		Requires: []plugin.Type{
 			plugin.TaskMonitorPlugin,
 			plugin.MetadataPlugin,
 		},
@@ -65,6 +65,7 @@ func init() {
 
 var _ = (runtime.Runtime)(&Runtime{})
 
+// Config options for the runtime
 type Config struct {
 	// Shim is a path or name of binary implementing the Shim GRPC API
 	Shim string `toml:"shim"`
@@ -78,6 +79,7 @@ type Config struct {
 	ShimDebug bool `toml:"shim_debug"`
 }
 
+// New returns a configured runtime
 func New(ic *plugin.InitContext) (interface{}, error) {
 	if err := os.MkdirAll(ic.Root, 0711); err != nil {
 		return nil, err
@@ -117,6 +119,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	return r, nil
 }
 
+// Runtime for a linux based system
 type Runtime struct {
 	root    string
 	state   string
@@ -130,10 +133,12 @@ type Runtime struct {
 	config *Config
 }
 
+// ID of the runtime
 func (r *Runtime) ID() string {
 	return pluginID
 }
 
+// Create a new task
 func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts) (_ runtime.Task, err error) {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
@@ -265,6 +270,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 	return t, nil
 }
 
+// Delete a task removing all on disk state
 func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, error) {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
@@ -305,6 +311,7 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 	}, nil
 }
 
+// Tasks returns all tasks known to the runtime
 func (r *Runtime) Tasks(ctx context.Context) ([]runtime.Task, error) {
 	return r.tasks.GetAll(ctx)
 }
@@ -330,6 +337,7 @@ func (r *Runtime) restoreTasks(ctx context.Context) ([]*Task, error) {
 	return o, nil
 }
 
+// Get a specific task by task id
 func (r *Runtime) Get(ctx context.Context, id string) (runtime.Task, error) {
 	return r.tasks.Get(ctx, id)
 }
@@ -491,6 +499,5 @@ func (r *Runtime) getRuncOptions(ctx context.Context, id string) (*runcopts.Runc
 
 		return ropts, nil
 	}
-
 	return nil, nil
 }

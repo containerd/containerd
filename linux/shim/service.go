@@ -29,6 +29,7 @@ import (
 
 var empty = &google_protobuf.Empty{}
 
+// RuncRoot is the path to the root runc state directory
 const RuncRoot = "/run/containerd/runc"
 
 // NewService returns a new shim service that can be used via GRPC
@@ -65,6 +66,7 @@ type platform interface {
 	close() error
 }
 
+// Service is the shim implementation of a remote shim over GRPC
 type Service struct {
 	mu sync.Mutex
 
@@ -80,6 +82,7 @@ type Service struct {
 	bundle string
 }
 
+// Create a new initial process and container with the underlying OCI runtime
 func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*shimapi.CreateTaskResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -110,6 +113,7 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*sh
 	}, nil
 }
 
+// Start a process
 func (s *Service) Start(ctx context.Context, r *shimapi.StartRequest) (*shimapi.StartResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -139,6 +143,7 @@ func (s *Service) Start(ctx context.Context, r *shimapi.StartRequest) (*shimapi.
 	}, nil
 }
 
+// Delete the initial process and container
 func (s *Service) Delete(ctx context.Context, r *google_protobuf.Empty) (*shimapi.DeleteResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -165,6 +170,7 @@ func (s *Service) Delete(ctx context.Context, r *google_protobuf.Empty) (*shimap
 	}, nil
 }
 
+// DeleteProcess deletes an exec'd process
 func (s *Service) DeleteProcess(ctx context.Context, r *shimapi.DeleteProcessRequest) (*shimapi.DeleteResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -186,6 +192,7 @@ func (s *Service) DeleteProcess(ctx context.Context, r *shimapi.DeleteProcessReq
 	}, nil
 }
 
+// Exec an additional process inside the container
 func (s *Service) Exec(ctx context.Context, r *shimapi.ExecProcessRequest) (*google_protobuf.Empty, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -212,6 +219,7 @@ func (s *Service) Exec(ctx context.Context, r *shimapi.ExecProcessRequest) (*goo
 	return empty, nil
 }
 
+// ResizePty of a process
 func (s *Service) ResizePty(ctx context.Context, r *shimapi.ResizePtyRequest) (*google_protobuf.Empty, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -232,6 +240,7 @@ func (s *Service) ResizePty(ctx context.Context, r *shimapi.ResizePtyRequest) (*
 	return empty, nil
 }
 
+// State returns runtime state information for a process
 func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.StateResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -271,6 +280,7 @@ func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.
 	}, nil
 }
 
+// Pause the container
 func (s *Service) Pause(ctx context.Context, r *google_protobuf.Empty) (*google_protobuf.Empty, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -287,6 +297,7 @@ func (s *Service) Pause(ctx context.Context, r *google_protobuf.Empty) (*google_
 	return empty, nil
 }
 
+// Resume the container
 func (s *Service) Resume(ctx context.Context, r *google_protobuf.Empty) (*google_protobuf.Empty, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -303,6 +314,7 @@ func (s *Service) Resume(ctx context.Context, r *google_protobuf.Empty) (*google
 	return empty, nil
 }
 
+// Kill a process with the provided signal
 func (s *Service) Kill(ctx context.Context, r *shimapi.KillRequest) (*google_protobuf.Empty, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -327,6 +339,7 @@ func (s *Service) Kill(ctx context.Context, r *shimapi.KillRequest) (*google_pro
 	return empty, nil
 }
 
+// ListPids returns all pids inside the container
 func (s *Service) ListPids(ctx context.Context, r *shimapi.ListPidsRequest) (*shimapi.ListPidsResponse, error) {
 	pids, err := s.getContainerPids(ctx, r.ID)
 	if err != nil {
@@ -337,6 +350,7 @@ func (s *Service) ListPids(ctx context.Context, r *shimapi.ListPidsRequest) (*sh
 	}, nil
 }
 
+// CloseIO of a process
 func (s *Service) CloseIO(ctx context.Context, r *shimapi.CloseIORequest) (*google_protobuf.Empty, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -352,6 +366,7 @@ func (s *Service) CloseIO(ctx context.Context, r *shimapi.CloseIORequest) (*goog
 	return empty, nil
 }
 
+// Checkpoint the container
 func (s *Service) Checkpoint(ctx context.Context, r *shimapi.CheckpointTaskRequest) (*google_protobuf.Empty, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -368,12 +383,14 @@ func (s *Service) Checkpoint(ctx context.Context, r *shimapi.CheckpointTaskReque
 	return empty, nil
 }
 
+// ShimInfo returns shim information such as the shim's pid
 func (s *Service) ShimInfo(ctx context.Context, r *google_protobuf.Empty) (*shimapi.ShimInfoResponse, error) {
 	return &shimapi.ShimInfoResponse{
 		ShimPid: uint32(os.Getpid()),
 	}, nil
 }
 
+// Update a running container
 func (s *Service) Update(ctx context.Context, r *shimapi.UpdateTaskRequest) (*google_protobuf.Empty, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -387,6 +404,7 @@ func (s *Service) Update(ctx context.Context, r *shimapi.UpdateTaskRequest) (*go
 	return empty, nil
 }
 
+// Wait for a process to exit
 func (s *Service) Wait(ctx context.Context, r *shimapi.WaitRequest) (*shimapi.WaitResponse, error) {
 	s.mu.Lock()
 	p := s.processes[r.ID]

@@ -20,7 +20,7 @@ func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
 		ID:   "images",
-		Requires: []plugin.PluginType{
+		Requires: []plugin.Type{
 			plugin.MetadataPlugin,
 		},
 		Init: func(ic *plugin.InitContext) (interface{}, error) {

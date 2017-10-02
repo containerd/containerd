@@ -300,7 +300,7 @@ func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, 
 			m.Lock()
 			manifestStack = append(manifestStack, desc)
 			m.Unlock()
-			return nil, images.StopHandler
+			return nil, images.ErrStopHandler
 		default:
 			return nil, nil
 		}

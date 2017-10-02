@@ -108,7 +108,7 @@ func TestBtrfsMounts(t *testing.T) {
 	if err := os.MkdirAll(target, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := mount.MountAll(mounts, target); err != nil {
+	if err := mount.All(mounts, target); err != nil {
 		t.Fatal(err)
 	}
 	defer testutil.Unmount(t, target)
@@ -138,7 +138,7 @@ func TestBtrfsMounts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := mount.MountAll(mounts, target); err != nil {
+	if err := mount.All(mounts, target); err != nil {
 		t.Fatal(err)
 	}
 	defer testutil.Unmount(t, target)

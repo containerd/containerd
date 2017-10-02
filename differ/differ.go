@@ -25,7 +25,7 @@ func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.DiffPlugin,
 		ID:   "walking",
-		Requires: []plugin.PluginType{
+		Requires: []plugin.Type{
 			plugin.ContentPlugin,
 			plugin.MetadataPlugin,
 		},
@@ -81,7 +81,7 @@ func (s *walkingDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts
 	}
 	defer os.RemoveAll(dir)
 
-	if err := mount.MountAll(mounts, dir); err != nil {
+	if err := mount.All(mounts, dir); err != nil {
 		return emptyDesc, errors.Wrap(err, "failed to mount")
 	}
 	defer mount.Unmount(dir, 0)
@@ -149,12 +149,12 @@ func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount
 	}
 	defer os.RemoveAll(bDir)
 
-	if err := mount.MountAll(lower, aDir); err != nil {
+	if err := mount.All(lower, aDir); err != nil {
 		return emptyDesc, errors.Wrap(err, "failed to mount")
 	}
 	defer mount.Unmount(aDir, 0)
 
-	if err := mount.MountAll(upper, bDir); err != nil {
+	if err := mount.All(upper, bDir); err != nil {
 		return emptyDesc, errors.Wrap(err, "failed to mount")
 	}
 	defer mount.Unmount(bDir, 0)

@@ -14,37 +14,40 @@ import (
 )
 
 var (
-	// SkipDesc is used to skip processing of a descriptor and
+	// ErrSkipDesc is used to skip processing of a descriptor and
 	// its descendants.
-	SkipDesc = fmt.Errorf("skip descriptor")
+	ErrSkipDesc = fmt.Errorf("skip descriptor")
 
-	// StopHandler is used to signify that the descriptor
+	// ErrStopHandler is used to signify that the descriptor
 	// has been handled and should not be handled further.
 	// This applies only to a single descriptor in a handler
 	// chain and does not apply to descendant descriptors.
-	StopHandler = fmt.Errorf("stop handler")
+	ErrStopHandler = fmt.Errorf("stop handler")
 )
 
+// Handler handles image manifests
 type Handler interface {
 	Handle(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error)
 }
 
+// HandlerFunc function implementing the Handler interface
 type HandlerFunc func(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error)
 
+// Handle image manifests
 func (fn HandlerFunc) Handle(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error) {
 	return fn(ctx, desc)
 }
 
 // Handlers returns a handler that will run the handlers in sequence.
 //
-// A handler may return `StopHandler` to stop calling additional handlers
+// A handler may return `ErrStopHandler` to stop calling additional handlers
 func Handlers(handlers ...Handler) HandlerFunc {
 	return func(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error) {
 		var children []ocispec.Descriptor
 		for _, handler := range handlers {
 			ch, err := handler.Handle(ctx, desc)
 			if err != nil {
-				if errors.Cause(err) == StopHandler {
+				if errors.Cause(err) == ErrStopHandler {
 					break
 				}
 				return nil, err
@@ -67,7 +70,7 @@ func Walk(ctx context.Context, handler Handler, descs ...ocispec.Descriptor) err
 
 		children, err := handler.Handle(ctx, desc)
 		if err != nil {
-			if errors.Cause(err) == SkipDesc {
+			if errors.Cause(err) == ErrSkipDesc {
 				continue // don't traverse the children.
 			}
 			return err
@@ -87,7 +90,7 @@ func Walk(ctx context.Context, handler Handler, descs ...ocispec.Descriptor) err
 // If the handler decode subresources, they will be visited, as well.
 //
 // Handlers for siblings are run in parallel on the provided descriptors. A
-// handler may return `SkipDesc` to signal to the dispatcher to not traverse
+// handler may return `ErrSkipDesc` to signal to the dispatcher to not traverse
 // any children.
 //
 // Typically, this function will be used with `FetchHandler`, often composed
@@ -104,7 +107,7 @@ func Dispatch(ctx context.Context, handler Handler, descs ...ocispec.Descriptor)
 
 			children, err := handler.Handle(ctx, desc)
 			if err != nil {
-				if errors.Cause(err) == SkipDesc {
+				if errors.Cause(err) == ErrSkipDesc {
 					return nil // don't traverse the children.
 				}
 				return err

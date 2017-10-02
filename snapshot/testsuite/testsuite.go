@@ -119,7 +119,7 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 		t.Fatal("expected mounts to have entries")
 	}
 
-	if err := mount.MountAll(mounts, preparing); err != nil {
+	if err := mount.All(mounts, preparing); err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
 	defer testutil.Unmount(t, preparing)
@@ -150,7 +150,7 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	if err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
-	if err := mount.MountAll(mounts, next); err != nil {
+	if err := mount.All(mounts, next); err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
 	defer testutil.Unmount(t, next)
@@ -212,7 +212,7 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	if err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
-	if err := mount.MountAll(mounts, nextnext); err != nil {
+	if err := mount.All(mounts, nextnext); err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
 
@@ -245,7 +245,7 @@ func checkSnapshotterStatActive(ctx context.Context, t *testing.T, snapshotter s
 		t.Fatal("expected mounts to have entries")
 	}
 
-	if err = mount.MountAll(mounts, preparing); err != nil {
+	if err = mount.All(mounts, preparing); err != nil {
 		t.Fatal(err)
 	}
 	defer testutil.Unmount(t, preparing)
@@ -279,7 +279,7 @@ func checkSnapshotterStatCommitted(ctx context.Context, t *testing.T, snapshotte
 		t.Fatal("expected mounts to have entries")
 	}
 
-	if err = mount.MountAll(mounts, preparing); err != nil {
+	if err = mount.All(mounts, preparing); err != nil {
 		t.Fatal(err)
 	}
 	defer testutil.Unmount(t, preparing)
@@ -318,7 +318,7 @@ func snapshotterPrepareMount(ctx context.Context, snapshotter snapshot.Snapshott
 		return "", fmt.Errorf("expected mounts to have entries")
 	}
 
-	if err = mount.MountAll(mounts, preparing); err != nil {
+	if err = mount.All(mounts, preparing); err != nil {
 		return "", err
 	}
 	return preparing, nil
@@ -748,7 +748,7 @@ func checkSnapshotterViewReadonly(ctx context.Context, t *testing.T, snapshotter
 	}
 
 	// Just checking the option string of m is not enough, we need to test real mount. (#1368)
-	if err := mount.MountAll(m, viewMountPoint); err != nil {
+	if err := mount.All(m, viewMountPoint); err != nil {
 		t.Fatal(err)
 	}
 

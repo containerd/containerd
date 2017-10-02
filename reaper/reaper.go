@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ErrNoSuchProcess is returned when the process no longer exists
 var ErrNoSuchProcess = errors.New("no such process")
 
 const bufferSize = 2048
@@ -36,10 +37,12 @@ func Reap() error {
 	return err
 }
 
+// Default is the default monitor initialized for the package
 var Default = &Monitor{
 	subscribers: make(map[chan runc.Exit]struct{}),
 }
 
+// Monitor monitors the underlying system for process status changes
 type Monitor struct {
 	sync.Mutex
 
@@ -73,6 +76,7 @@ func (m *Monitor) Wait(c *exec.Cmd, ec chan runc.Exit) (int, error) {
 	return -1, ErrNoSuchProcess
 }
 
+// Subscribe to process exit changes
 func (m *Monitor) Subscribe() chan runc.Exit {
 	c := make(chan runc.Exit, bufferSize)
 	m.Lock()
@@ -81,6 +85,7 @@ func (m *Monitor) Subscribe() chan runc.Exit {
 	return c
 }
 
+// Unsubscribe to process exit changes
 func (m *Monitor) Unsubscribe(c chan runc.Exit) {
 	m.Lock()
 	delete(m.subscribers, c)

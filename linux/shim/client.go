@@ -27,6 +27,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+// ClientOpt is an option for a shim client configuration
 type ClientOpt func(context.Context, Config) (shim.ShimClient, io.Closer, error)
 
 // WithStart executes a new shim process
@@ -180,6 +181,7 @@ func WithLocal(publisher events.Publisher) func(context.Context, Config) (shim.S
 	}
 }
 
+// Config contains shim specific configuration
 type Config struct {
 	Path          string
 	Namespace     string
@@ -202,6 +204,7 @@ func New(ctx context.Context, config Config, opt ClientOpt) (*Client, error) {
 	}, nil
 }
 
+// Client is a shim client containing the connection to a shim
 type Client struct {
 	shim.ShimClient
 
@@ -233,6 +236,7 @@ func (c *Client) KillShim(ctx context.Context) error {
 	return c.signalShim(ctx, unix.SIGKILL)
 }
 
+// Close the cient connection
 func (c *Client) Close() error {
 	if c.c == nil {
 		return nil
