@@ -45,6 +45,7 @@ var (
 	bucketKeyRuntime     = []byte("runtime")
 	bucketKeyName        = []byte("name")
 	bucketKeyParent      = []byte("parent")
+	bucketKeyChildren    = []byte("children")
 	bucketKeyOptions     = []byte("options")
 	bucketKeySpec        = []byte("spec")
 	bucketKeySnapshotKey = []byte("snapshotKey")
