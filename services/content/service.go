@@ -39,7 +39,6 @@ func init() {
 		Type: plugin.GRPCPlugin,
 		ID:   "content",
 		Requires: []plugin.Type{
-			plugin.ContentPlugin,
 			plugin.MetadataPlugin,
 		},
 		Init: NewService,
@@ -47,19 +46,13 @@ func init() {
 }
 
 func NewService(ic *plugin.InitContext) (interface{}, error) {
-	c, err := ic.Get(plugin.ContentPlugin)
-	if err != nil {
-		return nil, err
-	}
 	m, err := ic.Get(plugin.MetadataPlugin)
 	if err != nil {
 		return nil, err
 	}
 
-	cs := metadata.NewContentStore(m.(*metadata.DB), c.(content.Store))
-
 	return &Service{
-		store:     cs,
+		store:     m.(*metadata.DB).ContentStore(),
 		publisher: ic.Events,
 	}, nil
 }

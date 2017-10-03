@@ -19,23 +19,16 @@ import (
 
 type contentStore struct {
 	content.Store
-	db *DB
+	db transactor
 }
 
-// NewContentStore returns a namespaced content store using an existing
+// newContentStore returns a namespaced content store using an existing
 // content store interface.
-func NewContentStore(db *DB, cs content.Store) content.Store {
-	db.storeL.Lock()
-	defer db.storeL.Unlock()
-
-	if db.cs == nil {
-		db.cs = &contentStore{
-			Store: cs,
-			db:    db,
-		}
+func newContentStore(db transactor, cs content.Store) content.Store {
+	return &contentStore{
+		Store: cs,
+		db:    db,
 	}
-	return db.cs
-
 }
 
 func (cs *contentStore) Info(ctx context.Context, dgst digest.Digest) (content.Info, error) {
@@ -360,7 +353,7 @@ type namespacedWriter struct {
 	content.Writer
 	ref       string
 	namespace string
-	db        *DB
+	db        transactor
 }
 
 func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {

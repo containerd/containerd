@@ -12,19 +12,21 @@ import (
 
 	"github.com/boltdb/bolt"
 	containers "github.com/containerd/containerd/api/services/containers/v1"
-	content "github.com/containerd/containerd/api/services/content/v1"
+	contentapi "github.com/containerd/containerd/api/services/content/v1"
 	diff "github.com/containerd/containerd/api/services/diff/v1"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	images "github.com/containerd/containerd/api/services/images/v1"
 	namespaces "github.com/containerd/containerd/api/services/namespaces/v1"
-	snapshot "github.com/containerd/containerd/api/services/snapshot/v1"
+	snapshotapi "github.com/containerd/containerd/api/services/snapshot/v1"
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	version "github.com/containerd/containerd/api/services/version/v1"
+	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/content/local"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/snapshot"
 	metrics "github.com/docker/go-metrics"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"golang.org/x/net/context"
@@ -176,15 +178,34 @@ func loadPlugins(config *Config) ([]*plugin.Registration, error) {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.MetadataPlugin,
 		ID:   "bolt",
+		Requires: []plugin.Type{
+			plugin.ContentPlugin,
+			plugin.SnapshotPlugin,
+		},
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
 			if err := os.MkdirAll(ic.Root, 0711); err != nil {
 				return nil, err
 			}
+			cs, err := ic.Get(plugin.ContentPlugin)
+			if err != nil {
+				return nil, err
+			}
+
+			rawSnapshotters, err := ic.GetAll(plugin.SnapshotPlugin)
+			if err != nil {
+				return nil, err
+			}
+
+			snapshotters := make(map[string]snapshot.Snapshotter)
+			for name, sn := range rawSnapshotters {
+				snapshotters[name] = sn.(snapshot.Snapshotter)
+			}
+
 			db, err := bolt.Open(filepath.Join(ic.Root, "meta.db"), 0644, nil)
 			if err != nil {
 				return nil, err
 			}
-			return metadata.NewDB(db), nil
+			return metadata.NewDB(db, cs.(content.Store), snapshotters), nil
 		},
 	})
 
@@ -204,7 +225,7 @@ func interceptor(
 		ctx = log.WithModule(ctx, "tasks")
 	case containers.ContainersServer:
 		ctx = log.WithModule(ctx, "containers")
-	case content.ContentServer:
+	case contentapi.ContentServer:
 		ctx = log.WithModule(ctx, "content")
 	case images.ImagesServer:
 		ctx = log.WithModule(ctx, "images")
@@ -212,7 +233,7 @@ func interceptor(
 		// No need to change the context
 	case version.VersionServer:
 		ctx = log.WithModule(ctx, "version")
-	case snapshot.SnapshotsServer:
+	case snapshotapi.SnapshotsServer:
 		ctx = log.WithModule(ctx, "snapshot")
 	case diff.DiffServer:
 		ctx = log.WithModule(ctx, "diff")

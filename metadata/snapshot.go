@@ -19,26 +19,17 @@ import (
 type snapshotter struct {
 	snapshot.Snapshotter
 	name string
-	db   *DB
+	db   transactor
 }
 
-// NewSnapshotter returns a new Snapshotter which namespaces the given snapshot
-// using the provided name and metadata store.
-func NewSnapshotter(db *DB, name string, sn snapshot.Snapshotter) snapshot.Snapshotter {
-	db.storeL.Lock()
-	defer db.storeL.Unlock()
-
-	ss, ok := db.ss[name]
-	if !ok {
-		ss = &snapshotter{
-			Snapshotter: sn,
-			name:        name,
-			db:          db,
-		}
-		db.ss[name] = ss
+// newSnapshotter returns a new Snapshotter which namespaces the given snapshot
+// using the provided name and database.
+func newSnapshotter(db transactor, name string, sn snapshot.Snapshotter) snapshot.Snapshotter {
+	return &snapshotter{
+		Snapshotter: sn,
+		name:        name,
+		db:          db,
 	}
-
-	return ss
 }
 
 func createKey(id uint64, namespace, key string) string {
@@ -466,11 +457,7 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 			}
 		}
 
-		if err := bkt.DeleteBucket([]byte(key)); err != nil {
-			return err
-		}
-
-		return nil
+		return bkt.DeleteBucket([]byte(key))
 	})
 }
 

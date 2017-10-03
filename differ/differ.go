@@ -25,19 +25,14 @@ func init() {
 		Type: plugin.DiffPlugin,
 		ID:   "walking",
 		Requires: []plugin.Type{
-			plugin.ContentPlugin,
 			plugin.MetadataPlugin,
 		},
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			c, err := ic.Get(plugin.ContentPlugin)
-			if err != nil {
-				return nil, err
-			}
 			md, err := ic.Get(plugin.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}
-			return NewWalkingDiff(metadata.NewContentStore(md.(*metadata.DB), c.(content.Store)))
+			return NewWalkingDiff(md.(*metadata.DB).ContentStore())
 		},
 	})
 }

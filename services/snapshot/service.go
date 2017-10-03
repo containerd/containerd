@@ -14,7 +14,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
 	protoempty "github.com/golang/protobuf/ptypes/empty"
-	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -24,7 +23,6 @@ func init() {
 		Type: plugin.GRPCPlugin,
 		ID:   "snapshots",
 		Requires: []plugin.Type{
-			plugin.SnapshotPlugin,
 			plugin.MetadataPlugin,
 		},
 		Init: newService,
@@ -34,31 +32,19 @@ func init() {
 var empty = &protoempty.Empty{}
 
 type service struct {
-	snapshotters map[string]snapshot.Snapshotter
-	publisher    events.Publisher
+	db        *metadata.DB
+	publisher events.Publisher
 }
 
 func newService(ic *plugin.InitContext) (interface{}, error) {
-	rawSnapshotters, err := ic.GetAll(plugin.SnapshotPlugin)
-	if err != nil {
-		return nil, err
-	}
 	md, err := ic.Get(plugin.MetadataPlugin)
 	if err != nil {
 		return nil, err
 	}
-	snapshotters := make(map[string]snapshot.Snapshotter)
-	for name, sn := range rawSnapshotters {
-		snapshotters[name] = metadata.NewSnapshotter(md.(*metadata.DB), name, sn.(snapshot.Snapshotter))
-	}
-
-	if len(snapshotters) == 0 {
-		return nil, errors.Errorf("failed to create snapshotter service: no snapshotters loaded")
-	}
 
 	return &service{
-		snapshotters: snapshotters,
-		publisher:    ic.Events,
+		db:        md.(*metadata.DB),
+		publisher: ic.Events,
 	}, nil
 }
 
@@ -67,8 +53,8 @@ func (s *service) getSnapshotter(name string) (snapshot.Snapshotter, error) {
 		return nil, errdefs.ToGRPCf(errdefs.ErrInvalidArgument, "snapshotter argument missing")
 	}
 
-	sn, ok := s.snapshotters[name]
-	if !ok {
+	sn := s.db.Snapshotter(name)
+	if sn == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrInvalidArgument, "snapshotter not loaded: %s", name)
 	}
 	return sn, nil

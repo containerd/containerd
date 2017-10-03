@@ -44,7 +44,6 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.RuntimePlugin,
 			plugin.MetadataPlugin,
-			plugin.ContentPlugin,
 		},
 		Init: New,
 	})
@@ -59,11 +58,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	ct, err := ic.Get(plugin.ContentPlugin)
-	if err != nil {
-		return nil, err
-	}
-	cs := metadata.NewContentStore(m.(*metadata.DB), ct.(content.Store))
+	cs := m.(*metadata.DB).ContentStore()
 	runtimes := make(map[string]runtime.Runtime)
 	for _, rr := range rt {
 		r := rr.(runtime.Runtime)
