@@ -3,10 +3,13 @@ package metadata
 import (
 	"context"
 	"encoding/binary"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/pkg/errors"
@@ -36,15 +39,32 @@ type DB struct {
 	db *bolt.DB
 	ss map[string]snapshot.Snapshotter
 	cs content.Store
+
+	// wlock is used to protect access to the data structures during garbage
+	// collection. While the wlock is held no writable transactions can be
+	// opened, preventing changes from occurring between the mark and
+	// sweep phases without preventing read transactions.
+	wlock sync.RWMutex
+
+	// dirty flags and lock keeps track of datastores which have had deletions
+	// since the last garbage collection. These datastores will will be garbage
+	// collected during the next garbage collection.
+	dirtyL  sync.Mutex
+	dirtySS map[string]struct{}
+	dirtyCS bool
+
+	// TODO: Keep track of stats such as pause time, number of collected objects, errors
+	lastCollection time.Time
 }
 
 // NewDB creates a new metadata database using the provided
 // bolt database, content store, and snapshotters.
 func NewDB(db *bolt.DB, cs content.Store, ss map[string]snapshot.Snapshotter) *DB {
 	return &DB{
-		db: db,
-		ss: ss,
-		cs: cs,
+		db:      db,
+		ss:      ss,
+		cs:      cs,
+		dirtySS: map[string]struct{}{},
 	}
 }
 
@@ -158,5 +178,134 @@ func (m *DB) View(fn func(*bolt.Tx) error) error {
 
 // Update runs a writable transation on the metadata store.
 func (m *DB) Update(fn func(*bolt.Tx) error) error {
+	m.wlock.RLock()
+	defer m.wlock.RUnlock()
 	return m.db.Update(fn)
+}
+
+func (m *DB) GarbageCollect(ctx context.Context) error {
+	lt1 := time.Now()
+	m.wlock.Lock()
+	defer func() {
+		m.wlock.Unlock()
+		log.G(ctx).WithField("d", time.Now().Sub(lt1)).Debug("metadata garbage collected")
+	}()
+
+	var marked map[gc.Node]struct{}
+
+	if err := m.db.View(func(tx *bolt.Tx) error {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		roots := make(chan gc.Node)
+		errChan := make(chan error)
+		go func() {
+			defer close(errChan)
+			defer close(roots)
+
+			// Call roots
+			if err := scanRoots(ctx, tx, roots); err != nil {
+				cancel()
+				errChan <- err
+			}
+		}()
+
+		refs := func(ctx context.Context, n gc.Node, fn func(gc.Node)) error {
+			return references(ctx, tx, n, fn)
+		}
+
+		reachable, err := gc.ConcurrentMark(ctx, roots, refs)
+		if rerr := <-errChan; rerr != nil {
+			return rerr
+		}
+		if err != nil {
+			return err
+		}
+		marked = reachable
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	m.dirtyL.Lock()
+	defer m.dirtyL.Unlock()
+
+	if err := m.db.Update(func(tx *bolt.Tx) error {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		nodeC := make(chan gc.Node)
+		var scanErr error
+
+		go func() {
+			defer close(nodeC)
+			scanErr = scanAll(ctx, tx, nodeC)
+		}()
+
+		rm := func(n gc.Node) error {
+			if n.Type == ResourceSnapshot {
+				if idx := strings.IndexRune(n.Key, '/'); idx > 0 {
+					m.dirtySS[n.Key[:idx]] = struct{}{}
+				}
+			} else if n.Type == ResourceContent {
+				m.dirtyCS = true
+			}
+			return remove(ctx, tx, n)
+		}
+
+		if err := gc.Sweep(marked, nodeC, rm); err != nil {
+			return errors.Wrap(err, "failed to sweep")
+		}
+
+		if scanErr != nil {
+			return errors.Wrap(scanErr, "failed to scan all")
+		}
+
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	m.lastCollection = time.Now()
+
+	if len(m.dirtySS) > 0 {
+		for snapshotterName := range m.dirtySS {
+			log.G(ctx).WithField("snapshotter", snapshotterName).Debug("scheduling snapshotter cleanup")
+			go m.cleanupSnapshotter(snapshotterName)
+		}
+		m.dirtySS = map[string]struct{}{}
+	}
+
+	if m.dirtyCS {
+		log.G(ctx).Debug("scheduling content cleanup")
+		go m.cleanupContent()
+		m.dirtyCS = false
+	}
+
+	return nil
+}
+
+func (m *DB) cleanupSnapshotter(name string) {
+	ctx := context.Background()
+	sn, ok := m.ss[name]
+	if !ok {
+		return
+	}
+
+	err := newSnapshotter(m, name, sn).garbageCollect(ctx)
+	if err != nil {
+		log.G(ctx).WithError(err).WithField("snapshotter", name).Warn("garbage collection failed")
+	}
+}
+
+func (m *DB) cleanupContent() {
+	ctx := context.Background()
+	if m.cs == nil {
+		return
+	}
+
+	err := newContentStore(m, m.cs).garbageCollect(ctx)
+	if err != nil {
+		log.G(ctx).WithError(err).Warn("content garbage collection failed")
+	}
 }
