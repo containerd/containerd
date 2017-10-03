@@ -647,6 +647,8 @@ func setOCILinuxResource(g *generate.Generator, resources *runtime.LinuxContaine
 	g.SetLinuxResourcesCPUShares(uint64(resources.GetCpuShares()))
 	g.SetLinuxResourcesMemoryLimit(resources.GetMemoryLimitInBytes())
 	g.SetProcessOOMScoreAdj(int(resources.GetOomScoreAdj()))
+	g.SetLinuxResourcesCPUCpus(resources.GetCpusetCpus())
+	g.SetLinuxResourcesCPUMems(resources.GetCpusetMems())
 }
 
 // getOCICapabilitiesList returns a list of all available capabilities.

@@ -75,7 +75,7 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 	}
 
 	// Delete containerd container.
-	if err := container.Container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
+	if err := container.Container.Get().Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
 		if !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to delete containerd container %q: %v", id, err)
 		}

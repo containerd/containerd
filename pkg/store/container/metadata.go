@@ -51,6 +51,8 @@ type Metadata struct {
 	// SandboxID is the sandbox id the container belongs to.
 	SandboxID string
 	// Config is the CRI container config.
+	// NOTE(random-liu): Resource limits are updatable, the source
+	// of truth for resource limits are in containerd.
 	Config *runtime.ContainerConfig
 	// ImageRef is the reference of image used by the container.
 	ImageRef string
