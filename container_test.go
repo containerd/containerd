@@ -1216,9 +1216,9 @@ func TestContainerExitedAtSet(t *testing.T) {
 	}
 
 	status := <-statusC
-	code, _, _ := status.Result()
+	code, _, err := status.Result()
 	if code != 0 {
-		t.Errorf("expected status 0 but received %d", code)
+		t.Errorf("expected status 0 but received %d (err: %v)", code, err)
 	}
 
 	if s, err := task.Status(ctx); err != nil {

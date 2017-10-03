@@ -7,8 +7,10 @@ import (
 	"syscall"
 )
 
-var atter = syscall.SysProcAttr{
-	Setpgid: true,
+func getSysProcAttr(nonewns bool) *syscall.SysProcAttr {
+	return &syscall.SysProcAttr{
+		Setpgid: true,
+	}
 }
 
 func setCgroup(cgroupPath string, cmd *exec.Cmd) error {
