@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/gogo/protobuf/proto"
+	"github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 )
 
@@ -58,7 +60,6 @@ func WriteLabels(bkt *bolt.Bucket, labels map[string]string) error {
 			delete(labels, k) // remove since we don't actually set it
 			continue
 		}
-
 		if err := lbkt.Put([]byte(k), []byte(v)); err != nil {
 			return errors.Wrapf(err, "failed to set label %q=%q", k, v)
 		}
@@ -87,6 +88,19 @@ func ReadTimestamps(bkt *bolt.Bucket, created, updated *time.Time) error {
 	return nil
 }
 
+// ReadAny reads the *types.Any value
+func ReadAny(bkt *bolt.Bucket, key []byte) (*types.Any, error) {
+	v := bkt.Get(key)
+	if v == nil {
+		return nil, nil
+	}
+	var a types.Any
+	if err := proto.Unmarshal(v, &a); err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
 // WriteTimestamps writes created and updated timestamps to a bucket.
 // Uses keys "createdat" and "updatedat"
 func WriteTimestamps(bkt *bolt.Bucket, created, updated time.Time) error {
@@ -108,4 +122,16 @@ func WriteTimestamps(bkt *bolt.Bucket, created, updated time.Time) error {
 	}
 
 	return nil
+}
+
+// WriteAny writes a *types.Any value to the bucket for the provided key
+func WriteAny(bkt *bolt.Bucket, key []byte, a *types.Any) error {
+	if a == nil {
+		return nil
+	}
+	v, err := a.Marshal()
+	if err != nil {
+		return err
+	}
+	return bkt.Put(key, v)
 }
