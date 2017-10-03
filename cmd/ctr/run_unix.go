@@ -107,6 +107,9 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	if len(args) > 0 {
 		opts = append(opts, containerd.WithProcessArgs(args...))
 	}
+	if workdir := context.String("workdir"); workdir != "" {
+		opts = append(opts, containerd.WithProcessCwd(workdir))
+	}
 	if context.Bool("tty") {
 		opts = append(opts, withTTY())
 	}
