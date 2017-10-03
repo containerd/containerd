@@ -2,6 +2,7 @@ package containerd
 
 import (
 	"bytes"
+	"context"
 	"io/ioutil"
 	"os"
 	"runtime"
@@ -11,7 +12,9 @@ import (
 	"time"
 
 	// Register the typeurl
+	"github.com/containerd/containerd/containers"
 	_ "github.com/containerd/containerd/runtime"
+	"github.com/containerd/typeurl"
 
 	"github.com/containerd/containerd/errdefs"
 	gogotypes "github.com/gogo/protobuf/types"
@@ -1451,20 +1454,21 @@ func TestContainerExtensions(t *testing.T) {
 	ext := gogotypes.Any{TypeUrl: "test.ext.url", Value: []byte("hello")}
 	container, err := client.NewContainer(ctx, id, WithNewSpec(), WithContainerExtension("hello", &ext))
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
+		return
 	}
 	defer container.Delete(ctx)
 
 	checkExt := func(container Container) {
 		cExts := container.Extensions()
 		if len(cExts) != 1 {
-			t.Fatal("expected 1 container extension")
+			t.Errorf("expected 1 container extension")
 		}
 		if cExts["hello"].TypeUrl != ext.TypeUrl {
-			t.Fatalf("got unexpected type url for extension: %s", cExts["hello"].TypeUrl)
+			t.Errorf("got unexpected type url for extension: %s", cExts["hello"].TypeUrl)
 		}
 		if !bytes.Equal(cExts["hello"].Value, ext.Value) {
-			t.Fatalf("expected extension value %q, got: %q", ext.Value, cExts["hello"].Value)
+			t.Errorf("expected extension value %q, got: %q", ext.Value, cExts["hello"].Value)
 		}
 	}
 
@@ -1472,7 +1476,57 @@ func TestContainerExtensions(t *testing.T) {
 
 	container, err = client.LoadContainer(ctx, container.ID())
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
+		return
 	}
 	checkExt(container)
+}
+
+func TestContainerUpdate(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := testContext()
+	defer cancel()
+	id := t.Name()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	container, err := client.NewContainer(ctx, id, WithNewSpec())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx)
+
+	spec, err := container.Spec()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	const hostname = "updated-hostname"
+	spec.Hostname = hostname
+
+	if err := container.Update(ctx, func(ctx context.Context, client *Client, c *containers.Container) error {
+		a, err := typeurl.MarshalAny(spec)
+		if err != nil {
+			return err
+		}
+		c.Spec = a
+		return nil
+	}); err != nil {
+		t.Error(err)
+		return
+	}
+	if spec, err = container.Spec(); err != nil {
+		t.Error(err)
+		return
+	}
+	if spec.Hostname != hostname {
+		t.Errorf("hostname %q != %q", spec.Hostname, hostname)
+	}
 }
