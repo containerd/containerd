@@ -20,6 +20,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/containerd/containerd"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -29,14 +30,17 @@ import (
 )
 
 const (
-	sock       = "/var/run/cri-containerd.sock"
-	timeout    = 1 * time.Minute
-	pauseImage = "gcr.io/google_containers/pause:3.0"
+	sock               = "/var/run/cri-containerd.sock"
+	timeout            = 1 * time.Minute
+	pauseImage         = "gcr.io/google_containers/pause:3.0" // This is the same with default sandbox image.
+	k8sNamespace       = "k8s.io"                             // This is the same with server.k8sContainerdNamespace.
+	containerdEndpoint = "/run/containerd/containerd.sock"
 )
 
 var (
-	runtimeService cri.RuntimeService
-	imageService   cri.ImageManagerService
+	runtimeService   cri.RuntimeService
+	imageService     cri.ImageManagerService
+	containerdClient *containerd.Client
 )
 
 func init() {
@@ -48,6 +52,10 @@ func init() {
 	imageService, err = remote.NewRemoteImageService(sock, timeout)
 	if err != nil {
 		glog.Exitf("Failed to create image service: %v", err)
+	}
+	containerdClient, err = containerd.New(containerdEndpoint, containerd.WithDefaultNamespace(k8sNamespace))
+	if err != nil {
+		glog.Exitf("Failed to connect containerd: %v", err)
 	}
 }
 
@@ -85,6 +93,16 @@ func WithTestLabels() ContainerOpts {
 func WithTestAnnotations() ContainerOpts {
 	return func(cf *runtime.ContainerConfig) {
 		cf.Annotations = map[string]string{"a.b.c": "test"}
+	}
+}
+
+// Add container resource limits.
+func WithResources(r *runtime.LinuxContainerResources) ContainerOpts {
+	return func(cf *runtime.ContainerConfig) {
+		if cf.Linux == nil {
+			cf.Linux = &runtime.LinuxContainerConfig{}
+		}
+		cf.Linux.Resources = r
 	}
 }
 
