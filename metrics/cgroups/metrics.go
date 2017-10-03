@@ -40,6 +40,7 @@ func newCollector(ns *metrics.Namespace) *collector {
 	c.metrics = append(c.metrics, memoryMetrics...)
 	c.metrics = append(c.metrics, hugetlbMetrics...)
 	c.metrics = append(c.metrics, blkioMetrics...)
+	c.storedMetrics = make(chan prometheus.Metric, 100*len(c.metrics))
 	ns.Add(c)
 	return c
 }
@@ -59,9 +60,10 @@ func taskID(id, namespace string) string {
 type collector struct {
 	mu sync.RWMutex
 
-	cgroups map[string]*task
-	ns      *metrics.Namespace
-	metrics []*metric
+	cgroups       map[string]*task
+	ns            *metrics.Namespace
+	metrics       []*metric
+	storedMetrics chan prometheus.Metric
 }
 
 func (c *collector) Describe(ch chan<- *prometheus.Desc) {
@@ -77,12 +79,23 @@ func (c *collector) Collect(ch chan<- prometheus.Metric) {
 		wg.Add(1)
 		go c.collect(t.id, t.namespace, t.cgroup, ch, wg)
 	}
+SelectLoop:
+	for {
+		select {
+		case value := <-c.storedMetrics:
+			ch <- value
+		default:
+			break SelectLoop
+		}
+	}
 	c.mu.RUnlock()
 	wg.Wait()
 }
 
 func (c *collector) collect(id, namespace string, cg cgroups.Cgroup, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
-	defer wg.Done()
+	if wg != nil {
+		defer wg.Done()
+	}
 	stats, err := cg.Stat(cgroups.IgnoreNotExist)
 	if err != nil {
 		logrus.WithError(err).Errorf("stat cgroup %s", id)
