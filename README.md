@@ -21,7 +21,7 @@ With it, you could run Kubernetes using containerd as the container runtime.
 For a multi node cluster installer and bring up steps using ansible and kubeadm refer [here](contrib/ansible/README.md).
 ## Getting Started for Developers
 ### Binary Dependencies and Specifications
-The current release of `cri-containerd` has following depedencies:
+The current release of `cri-containerd` has the following dependencies:
 * [containerd](https://github.com/containerd/containerd)
 * [runc](https://github.com/opencontainers/runc)
 * [CNI](https://github.com/containernetworking/cni)
