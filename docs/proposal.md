@@ -44,8 +44,8 @@ Containerd doesn't provide persistent container log. It redirects container STDI
 
 CRI-containerd should start a goroutine (process/container in the future) to:
 * Continuously drain the FIFO;
-* Decorate the log line into [CRI-defined format](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/kubelet-cri-logging.md#proposed-solution);
-* Write the log into [CRI-defined log path](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/kubelet-cri-logging.md#proposed-solution).
+* Decorate the log line into [CRI-defined format](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/kubelet-cri-logging.md#proposed-solution);
+* Write the log into [CRI-defined log path](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/kubelet-cri-logging.md#proposed-solution).
 ### Container Streaming
 Containerd supports creating a process in the container with `Exec`, and the STDIO is also exposed as FIFOs. Containerd also supports resizing console of a specific process with `Pty`.
 
