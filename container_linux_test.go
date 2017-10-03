@@ -22,7 +22,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func TestContainerUpdate(t *testing.T) {
+func TestTaskUpdate(t *testing.T) {
 	t.Parallel()
 
 	client, err := newClient(t, address)

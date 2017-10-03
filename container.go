@@ -45,6 +45,8 @@ type Container interface {
 	SetLabels(context.Context, map[string]string) (map[string]string, error)
 	// Extensions returns the extensions set on the container
 	Extensions() map[string]prototypes.Any
+	// Update a container
+	Update(context.Context, ...UpdateContainerOpts) error
 }
 
 func containerFromRecord(client *Client, c containers.Container) *container {
@@ -236,6 +238,27 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...Ne
 	}
 	t.pid = response.Pid
 	return t, nil
+}
+
+func (c *container) Update(ctx context.Context, opts ...UpdateContainerOpts) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	// fetch the current container config before updating it
+	current, err := c.client.ContainerService().Get(ctx, c.ID())
+	if err != nil {
+		return err
+	}
+	for _, o := range opts {
+		if err := o(ctx, c.client, &current); err != nil {
+			return err
+		}
+	}
+	nc, err := c.client.ContainerService().Update(ctx, current)
+	if err != nil {
+		return errdefs.FromGRPC(err)
+	}
+	c.c = nc
+	return nil
 }
 
 func (c *container) loadTask(ctx context.Context, ioAttach IOAttach) (Task, error) {

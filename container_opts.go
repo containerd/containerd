@@ -15,6 +15,9 @@ import (
 // NewContainerOpts allows the caller to set additional options when creating a container
 type NewContainerOpts func(ctx context.Context, client *Client, c *containers.Container) error
 
+// UpdateContainerOpts allows the caller to set additional options when updating a container
+type UpdateContainerOpts func(ctx context.Context, client *Client, c *containers.Container) error
+
 // WithRuntime allows a user to specify the runtime name and additional options that should
 // be used to create tasks for the container
 func WithRuntime(name string, options interface{}) NewContainerOpts {
