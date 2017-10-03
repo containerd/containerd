@@ -15,6 +15,7 @@ import (
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/namespaces"
 	digest "github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
 
@@ -201,10 +202,32 @@ func (s *imageStore) Delete(ctx context.Context, name string) error {
 }
 
 func validateImage(image *images.Image) error {
+	if image.Name == "" {
+		return errors.Wrapf(errdefs.ErrInvalidArgument, "image name must not be empty")
+	}
+
 	for k, v := range image.Labels {
 		if err := labels.Validate(k, v); err != nil {
 			return errors.Wrapf(err, "image.Labels")
 		}
+	}
+
+	return validateTarget(&image.Target)
+}
+
+func validateTarget(target *ocispec.Descriptor) error {
+	// NOTE(stevvooe): Only validate fields we actually store.
+
+	if err := target.Digest.Validate(); err != nil {
+		return errors.Wrapf(errdefs.ErrInvalidArgument, "Target.Digest %q invalid: %v", target.Digest, err)
+	}
+
+	if target.Size <= 0 {
+		return errors.Wrapf(errdefs.ErrInvalidArgument, "Target.Size must be greater than zero")
+	}
+
+	if target.MediaType == "" {
+		return errors.Wrapf(errdefs.ErrInvalidArgument, "Target.MediaType must be set")
 	}
 
 	return nil
