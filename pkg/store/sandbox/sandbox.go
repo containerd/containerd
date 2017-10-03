@@ -29,7 +29,7 @@ import (
 type Sandbox struct {
 	// Metadata is the metadata of the sandbox, it is immutable after created.
 	Metadata
-	// Containerd sandbox container
+	// Container is the containerd sandbox container client
 	Container containerd.Container
 	// CNI network namespace client
 	NetNS *NetNS

@@ -96,6 +96,8 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 				CpuShares:          300,
 				MemoryLimitInBytes: 400,
 				OomScoreAdj:        500,
+				CpusetCpus:         "0-1",
+				CpusetMems:         "2-3",
 			},
 			SecurityContext: &runtime.LinuxContainerSecurityContext{
 				SupplementalGroups: []int64{1111, 2222},
@@ -138,6 +140,8 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		assert.EqualValues(t, *spec.Linux.Resources.CPU.Period, 100)
 		assert.EqualValues(t, *spec.Linux.Resources.CPU.Quota, 200)
 		assert.EqualValues(t, *spec.Linux.Resources.CPU.Shares, 300)
+		assert.EqualValues(t, spec.Linux.Resources.CPU.Cpus, "0-1")
+		assert.EqualValues(t, spec.Linux.Resources.CPU.Mems, "2-3")
 		assert.EqualValues(t, *spec.Linux.Resources.Memory.Limit, 400)
 		assert.EqualValues(t, *spec.Process.OOMScoreAdj, 500)
 

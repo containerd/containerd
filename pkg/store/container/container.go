@@ -32,8 +32,8 @@ type Container struct {
 	Metadata
 	// Status stores the status of the container.
 	Status StatusStorage
-	// Containerd container
-	Container containerd.Container
+	// Container is the containerd container client.
+	Container *Client
 	// Container IO
 	IO *cio.ContainerIO
 	// TODO(random-liu): Add stop channel to get rid of stop poll waiting.
@@ -45,7 +45,7 @@ type Opts func(*Container) error
 // WithContainer adds the containerd Container to the internal data store.
 func WithContainer(cntr containerd.Container) Opts {
 	return func(c *Container) error {
-		c.Container = cntr
+		c.Container = &Client{container: cntr}
 		return nil
 	}
 }

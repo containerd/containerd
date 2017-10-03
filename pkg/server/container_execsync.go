@@ -87,7 +87,7 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 		return nil, fmt.Errorf("container is in %s state", criContainerStateToString(state))
 	}
 
-	container := cntr.Container
+	container := cntr.Container.Get()
 	spec, err := container.Spec()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container spec: %v", err)

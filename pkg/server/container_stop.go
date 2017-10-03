@@ -88,7 +88,7 @@ func (c *criContainerdService) stopContainer(ctx context.Context, container cont
 			}
 		}
 		glog.V(2).Infof("Stop container %q with signal %v", id, stopSignal)
-		task, err := container.Container.Task(ctx, nil)
+		task, err := container.Container.Get().Task(ctx, nil)
 		if err != nil {
 			if !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to stop container, task not found for container %q: %v", id, err)
@@ -111,7 +111,7 @@ func (c *criContainerdService) stopContainer(ctx context.Context, container cont
 		glog.Errorf("Stop container %q timed out: %v", id, err)
 	}
 
-	task, err := container.Container.Task(ctx, nil)
+	task, err := container.Container.Get().Task(ctx, nil)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
 			return fmt.Errorf("failed to stop container, task not found for container %q: %v", id, err)

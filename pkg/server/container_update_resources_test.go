@@ -25,27 +25,137 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
-func TestToOCIResources(t *testing.T) {
-	resources := &runtime.LinuxContainerResources{
-		CpuPeriod:          10000,
-		CpuQuota:           20000,
-		CpuShares:          300,
-		MemoryLimitInBytes: 4000000,
-		OomScoreAdj:        -500,
-		CpusetCpus:         "6,7",
-		CpusetMems:         "8,9",
-	}
-	expected := &runtimespec.LinuxResources{
-		CPU: &runtimespec.LinuxCPU{
-			Period: proto.Uint64(10000),
-			Quota:  proto.Int64(20000),
-			Shares: proto.Uint64(300),
-			Cpus:   "6,7",
-			Mems:   "8,9",
+func TestUpdateOCILinuxResource(t *testing.T) {
+	oomscoreadj := new(int)
+	*oomscoreadj = -500
+	for desc, test := range map[string]struct {
+		spec      *runtimespec.Spec
+		resources *runtime.LinuxContainerResources
+		expected  *runtimespec.Spec
+		expectErr bool
+	}{
+		"should be able to update each resource": {
+			spec: &runtimespec.Spec{
+				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
+				Linux: &runtimespec.Linux{
+					Resources: &runtimespec.LinuxResources{
+						Memory: &runtimespec.LinuxMemory{Limit: proto.Int64(12345)},
+						CPU: &runtimespec.LinuxCPU{
+							Shares: proto.Uint64(1111),
+							Quota:  proto.Int64(2222),
+							Period: proto.Uint64(3333),
+							Cpus:   "0-1",
+							Mems:   "2-3",
+						},
+					},
+				},
+			},
+			resources: &runtime.LinuxContainerResources{
+				CpuPeriod:          6666,
+				CpuQuota:           5555,
+				CpuShares:          4444,
+				MemoryLimitInBytes: 54321,
+				OomScoreAdj:        500,
+				CpusetCpus:         "4-5",
+				CpusetMems:         "6-7",
+			},
+			expected: &runtimespec.Spec{
+				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
+				Linux: &runtimespec.Linux{
+					Resources: &runtimespec.LinuxResources{
+						Memory: &runtimespec.LinuxMemory{Limit: proto.Int64(54321)},
+						CPU: &runtimespec.LinuxCPU{
+							Shares: proto.Uint64(4444),
+							Quota:  proto.Int64(5555),
+							Period: proto.Uint64(6666),
+							Cpus:   "4-5",
+							Mems:   "6-7",
+						},
+					},
+				},
+			},
 		},
-		Memory: &runtimespec.LinuxMemory{
-			Limit: proto.Int64(4000000),
+		"should skip empty fields": {
+			spec: &runtimespec.Spec{
+				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
+				Linux: &runtimespec.Linux{
+					Resources: &runtimespec.LinuxResources{
+						Memory: &runtimespec.LinuxMemory{Limit: proto.Int64(12345)},
+						CPU: &runtimespec.LinuxCPU{
+							Shares: proto.Uint64(1111),
+							Quota:  proto.Int64(2222),
+							Period: proto.Uint64(3333),
+							Cpus:   "0-1",
+							Mems:   "2-3",
+						},
+					},
+				},
+			},
+			resources: &runtime.LinuxContainerResources{
+				CpuQuota:           5555,
+				CpuShares:          4444,
+				MemoryLimitInBytes: 54321,
+				OomScoreAdj:        500,
+				CpusetMems:         "6-7",
+			},
+			expected: &runtimespec.Spec{
+				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
+				Linux: &runtimespec.Linux{
+					Resources: &runtimespec.LinuxResources{
+						Memory: &runtimespec.LinuxMemory{Limit: proto.Int64(54321)},
+						CPU: &runtimespec.LinuxCPU{
+							Shares: proto.Uint64(4444),
+							Quota:  proto.Int64(5555),
+							Period: proto.Uint64(3333),
+							Cpus:   "0-1",
+							Mems:   "6-7",
+						},
+					},
+				},
+			},
 		},
+		"should be able to fill empty fields": {
+			spec: &runtimespec.Spec{
+				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
+				Linux: &runtimespec.Linux{
+					Resources: &runtimespec.LinuxResources{
+						Memory: &runtimespec.LinuxMemory{Limit: proto.Int64(12345)},
+					},
+				},
+			},
+			resources: &runtime.LinuxContainerResources{
+				CpuPeriod:          6666,
+				CpuQuota:           5555,
+				CpuShares:          4444,
+				MemoryLimitInBytes: 54321,
+				OomScoreAdj:        500,
+				CpusetCpus:         "4-5",
+				CpusetMems:         "6-7",
+			},
+			expected: &runtimespec.Spec{
+				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
+				Linux: &runtimespec.Linux{
+					Resources: &runtimespec.LinuxResources{
+						Memory: &runtimespec.LinuxMemory{Limit: proto.Int64(54321)},
+						CPU: &runtimespec.LinuxCPU{
+							Shares: proto.Uint64(4444),
+							Quota:  proto.Int64(5555),
+							Period: proto.Uint64(6666),
+							Cpus:   "4-5",
+							Mems:   "6-7",
+						},
+					},
+				},
+			},
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		got, err := updateOCILinuxResource(test.spec, test.resources)
+		if test.expectErr {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Equal(t, test.expected, got)
 	}
-	assert.Equal(t, expected, toOCIResources(resources))
 }
