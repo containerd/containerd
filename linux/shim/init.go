@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -59,6 +61,29 @@ type initProcess struct {
 	rootfs   string
 }
 
+// prepareWorkdir creates Cwd if it does not exist.
+// rootfs needs to be mounted.
+func prepareWorkdir(rootfs, configJSONPath string) error {
+	var spec specs.Spec
+	configJSON, err := ioutil.ReadFile(configJSONPath)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(configJSON, &spec); err != nil {
+		return err
+	}
+	if spec.Process == nil || spec.Process.Cwd == "" {
+		// unlikely
+		return nil
+	}
+	// Note that spec.Process.Cwd is unreliable and can contain unclean value like  "../../../../foo/bar...".
+	// Also, we use path.Clean() rather than filepath.Clean(), so as to make sure cleansing is done
+	// without the host filesystem context.
+	cleanCwd := path.Clean("/" + spec.Process.Cwd)
+	workdir := filepath.Join(rootfs, cleanCwd)
+	return os.MkdirAll(workdir, 0755)
+}
+
 func (s *Service) newInitProcess(context context.Context, r *shimapi.CreateTaskRequest) (*initProcess, error) {
 	var success bool
 
@@ -95,6 +120,9 @@ func (s *Service) newInitProcess(context context.Context, r *shimapi.CreateTaskR
 		if err := m.Mount(rootfs); err != nil {
 			return nil, errors.Wrapf(err, "failed to mount rootfs component %v", m)
 		}
+	}
+	if err := prepareWorkdir(rootfs, filepath.Join(s.config.Path, "config.json")); err != nil {
+		return nil, errors.Wrap(err, "failed to prepare workdir")
 	}
 	runtime := &runc.Runc{
 		Command:       r.Runtime,
