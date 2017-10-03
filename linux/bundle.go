@@ -116,7 +116,6 @@ func (b *bundle) Delete() error {
 
 func (b *bundle) shimAddress(namespace string) string {
 	return filepath.Join(string(filepath.Separator), "containerd-shim", namespace, b.id, "shim.sock")
-
 }
 
 func (b *bundle) shimConfig(namespace string, runcOptions *runcopts.RuncOptions) client.Config {
