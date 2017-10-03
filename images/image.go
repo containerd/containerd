@@ -7,6 +7,7 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -199,6 +200,65 @@ func Platforms(ctx context.Context, provider content.Provider, image ocispec.Des
 		}
 		return nil, nil
 	}), ChildrenHandler(provider, "")), image)
+}
+
+// Children returns the immediate children of content described by the descriptor.
+func Children(ctx context.Context, provider content.Provider, desc ocispec.Descriptor, platform string) ([]ocispec.Descriptor, error) {
+	var descs []ocispec.Descriptor
+	switch desc.MediaType {
+	case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+		p, err := content.ReadBlob(ctx, provider, desc.Digest)
+		if err != nil {
+			return nil, err
+		}
+
+		// TODO(stevvooe): We just assume oci manifest, for now. There may be
+		// subtle differences from the docker version.
+		var manifest ocispec.Manifest
+		if err := json.Unmarshal(p, &manifest); err != nil {
+			return nil, err
+		}
+
+		descs = append(descs, manifest.Config)
+		descs = append(descs, manifest.Layers...)
+	case MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+		p, err := content.ReadBlob(ctx, provider, desc.Digest)
+		if err != nil {
+			return nil, err
+		}
+
+		var index ocispec.Index
+		if err := json.Unmarshal(p, &index); err != nil {
+			return nil, err
+		}
+
+		if platform != "" {
+			matcher, err := platforms.Parse(platform)
+			if err != nil {
+				return nil, err
+			}
+
+			for _, d := range index.Manifests {
+				if d.Platform == nil || matcher.Match(*d.Platform) {
+					descs = append(descs, d)
+				}
+			}
+		} else {
+			descs = append(descs, index.Manifests...)
+		}
+
+	case MediaTypeDockerSchema2Layer, MediaTypeDockerSchema2LayerGzip,
+		MediaTypeDockerSchema2LayerForeign, MediaTypeDockerSchema2LayerForeignGzip,
+		MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig,
+		ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerGzip,
+		ocispec.MediaTypeImageLayerNonDistributable, ocispec.MediaTypeImageLayerNonDistributableGzip:
+		// childless data types.
+		return nil, nil
+	default:
+		log.G(ctx).Warnf("encountered unknown type %v; children may not be fetched", desc.MediaType)
+	}
+
+	return descs, nil
 }
 
 // RootFS returns the unpacked diffids that make up and images rootfs.
