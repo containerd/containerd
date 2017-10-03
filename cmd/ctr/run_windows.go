@@ -107,7 +107,9 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	if len(args) > 0 {
 		opts = append(opts, containerd.WithProcessArgs(args...))
 	}
-
+	if cwd := context.String("cwd"); cwd != "" {
+		opts = append(opts, containerd.WithProcessCwd(cwd))
+	}
 	return client.NewContainer(ctx, id,
 		containerd.WithNewSpec(opts...),
 		containerd.WithContainerLabels(labels),
