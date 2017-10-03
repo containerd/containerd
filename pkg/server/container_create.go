@@ -784,7 +784,7 @@ func generateApparmorSpecOpts(apparmorProf string, privileged, apparmorEnabled b
 	if !apparmorEnabled {
 		// Should fail loudly if user try to specify apparmor profile
 		// but we don't support it.
-		if apparmorProf != "" {
+		if apparmorProf != "" && apparmorProf != unconfinedProfile {
 			return nil, fmt.Errorf("apparmor is not supported")
 		}
 		return nil, nil
@@ -793,7 +793,8 @@ func generateApparmorSpecOpts(apparmorProf string, privileged, apparmorEnabled b
 	case runtimeDefault:
 		// TODO (mikebrow): delete created apparmor default profile
 		return apparmor.WithDefaultProfile(appArmorDefaultProfileName), nil
-	// TODO(random-liu): Should support "unconfined" after kubernetes#52395 lands.
+	case unconfinedProfile:
+		return nil, nil
 	case "":
 		// Based on kubernetes#51746, default apparmor profile should be applied
 		// for non-privileged container when apparmor is not specified.
