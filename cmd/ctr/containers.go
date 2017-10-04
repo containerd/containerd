@@ -49,15 +49,18 @@ var containersCommand = cli.Command{
 		w := tabwriter.NewWriter(os.Stdout, 4, 8, 4, ' ', 0)
 		fmt.Fprintln(w, "CONTAINER\tIMAGE\tRUNTIME\t")
 		for _, c := range containers {
-			imageName := c.Info().Image
+			info, err := c.Info(ctx)
+			if err != nil {
+				return err
+			}
+			imageName := info.Image
 			if imageName == "" {
 				imageName = "-"
 			}
-			record := c.Info()
 			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t\n",
 				c.ID(),
 				imageName,
-				record.Runtime.Name,
+				info.Runtime.Name,
 			); err != nil {
 				return err
 			}

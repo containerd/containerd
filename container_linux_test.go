@@ -513,7 +513,7 @@ func TestContainerAttachProcess(t *testing.T) {
 		return
 	}
 
-	spec, err := container.Spec()
+	spec, err := container.Spec(ctx)
 	if err != nil {
 		t.Error(err)
 		return
