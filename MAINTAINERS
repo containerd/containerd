@@ -173,6 +173,14 @@ Yes. Nobody should ever push to master directly. All changes should be
 made through a pull request.
 """
 
+	[Rules.tsc]
+
+	title = "Conflict Resolution and technical disputes"
+
+	text = """
+containerd defers to the [Technical Steering Committee](https://github.com/moby/tsc) for escalations and resolution on disputes for technical matters."
+	"""
+
 	[Rules.meta]
 
 	title = "How is this process changed?"
@@ -183,17 +191,17 @@ made through a pull request.
 [Org]
 
 	[Org.Maintainers]
-	people = [
-		"akihirosuda",
-		"crosbymichael",
-		"dqminh",
-		"dmcgowan",
-		"estesp",
-		"hqhq",
-		"jhowardmsft",
-		"mlaventure",
-		"stevvooe",
-	]
+		people = [
+			"akihirosuda",
+			"crosbymichael",
+			"dqminh",
+			"dmcgowan",
+			"estesp",
+			"hqhq",
+			"jhowardmsft",
+			"mlaventure",
+			"stevvooe",
+		]
 
 [People]
 
