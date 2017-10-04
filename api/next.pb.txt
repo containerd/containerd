@@ -2183,6 +2183,201 @@ file {
   syntax: "proto3"
 }
 file {
+  name: "github.com/containerd/containerd/api/types/platform.proto"
+  package: "containerd.types"
+  dependency: "gogoproto/gogo.proto"
+  message_type {
+    name: "Platform"
+    field {
+      name: "os"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      options {
+        65004: "OS"
+      }
+      json_name: "os"
+    }
+    field {
+      name: "architecture"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "architecture"
+    }
+    field {
+      name: "variant"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "variant"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/types;types"
+  }
+  syntax: "proto3"
+}
+file {
+  name: "google/rpc/status.proto"
+  package: "google.rpc"
+  dependency: "google/protobuf/any.proto"
+  message_type {
+    name: "Status"
+    field {
+      name: "code"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_INT32
+      json_name: "code"
+    }
+    field {
+      name: "message"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "message"
+    }
+    field {
+      name: "details"
+      number: 3
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "details"
+    }
+  }
+  options {
+    java_package: "com.google.rpc"
+    java_outer_classname: "StatusProto"
+    java_multiple_files: true
+    go_package: "github.com/containerd/containerd/protobuf/google/rpc;rpc"
+    objc_class_prefix: "RPC"
+  }
+  syntax: "proto3"
+}
+file {
+  name: "github.com/containerd/containerd/api/services/introspection/v1/introspection.proto"
+  package: "containerd.services.introspection.v1"
+  dependency: "github.com/containerd/containerd/api/types/platform.proto"
+  dependency: "google/rpc/status.proto"
+  dependency: "gogoproto/gogo.proto"
+  message_type {
+    name: "Plugin"
+    field {
+      name: "type"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "type"
+    }
+    field {
+      name: "id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "requires"
+      number: 3
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "requires"
+    }
+    field {
+      name: "platforms"
+      number: 4
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Platform"
+      options {
+        65001: 0
+      }
+      json_name: "platforms"
+    }
+    field {
+      name: "exports"
+      number: 5
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.introspection.v1.Plugin.ExportsEntry"
+      json_name: "exports"
+    }
+    field {
+      name: "capabilities"
+      number: 6
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "capabilities"
+    }
+    field {
+      name: "init_err"
+      number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.rpc.Status"
+      json_name: "initErr"
+    }
+    nested_type {
+      name: "ExportsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
+  }
+  message_type {
+    name: "PluginsRequest"
+    field {
+      name: "filters"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "filters"
+    }
+  }
+  message_type {
+    name: "PluginsResponse"
+    field {
+      name: "plugins"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.introspection.v1.Plugin"
+      options {
+        65001: 0
+      }
+      json_name: "plugins"
+    }
+  }
+  service {
+    name: "Introspection"
+    method {
+      name: "Plugins"
+      input_type: ".containerd.services.introspection.v1.PluginsRequest"
+      output_type: ".containerd.services.introspection.v1.PluginsResponse"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/services/introspection/v1;introspection"
+  }
+  syntax: "proto3"
+}
+file {
   name: "github.com/containerd/containerd/api/services/namespaces/v1/namespace.proto"
   package: "containerd.services.namespaces.v1"
   dependency: "gogoproto/gogo.proto"
