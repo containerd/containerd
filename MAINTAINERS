@@ -179,33 +179,6 @@ made through a pull request.
 
 	text = "Just like everything else: by making a pull request :)"
 
-# Current project roles
-[Roles]
-
-	[Roles."Chief Architect"]
-
-	person = "crosbymichael"
-
-	text = """
-The chief architect is responsible for the overall integrity of the technical
-architecture across all subsystems, and the consistency of APIs and UI.
-
-Changes to UI, public APIs and overall architecture must be approved by the
-chief architect.
-"""
-
-	[Roles."Chief Maintainer"]
-
-	person = "crosbymichael"
-
-	text = """
-The chief maintainer is responsible for all aspects of quality for the project
-including code reviews, usability, stability, security, performance, etc.  The
-most important function of the chief maintainer is to lead by example. On the
-first day of a new maintainer, the best advice should be "follow the C.M.'s
-example and you'll be fine".
-"""
-
 # Current project organization
 [Org]
 
