@@ -30,6 +30,8 @@ export SKIP=${SKIP:-${DEFAULT_SKIP}}
 REPORT_DIR=${REPORT_DIR:-"/tmp/test-e2e-node"}
 # UPLOAD_LOG indicates whether to upload test log to gcs.
 UPLOAD_LOG=${UPLOAD_LOG:-false}
+# TIMEOUT is the timeout of the test.
+TIMEOUT=${TIMEOUT:-"40m"}
 
 # Check GOPATH
 if [[ -z "${GOPATH}" ]]; then
@@ -71,7 +73,7 @@ git checkout ${KUBERNETES_VERSION}
 mkdir -p ${REPORT_DIR}
 test_setup ${REPORT_DIR}
 
-make test-e2e-node \
+timeout "${TIMEOUT}" make test-e2e-node \
 	RUNTIME=remote \
 	CONTAINER_RUNTIME_ENDPOINT=unix://${CRICONTAINERD_SOCK} \
 	ARTIFACTS=${REPORT_DIR} \
