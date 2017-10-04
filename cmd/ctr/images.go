@@ -21,6 +21,7 @@ var imageCommand = cli.Command{
 	Usage: "manage images",
 	Subcommands: cli.Commands{
 		imagesListCommand,
+		imagesCheckCommand,
 		imageRemoveCommand,
 		imagesSetLabelsCommand,
 		imagesImportCommand,
@@ -173,6 +174,90 @@ var imagesSetLabelsCommand = cli.Command{
 		fmt.Println(strings.Join(labelStrings, ","))
 
 		return nil
+	},
+}
+
+var imagesCheckCommand = cli.Command{
+	Name:        "check",
+	Usage:       "Check that an image has all content available locally.",
+	ArgsUsage:   "[flags] <ref> [<ref>, ...]",
+	Description: "Check that an image has all content available locally.",
+	Flags:       []cli.Flag{},
+	Action: func(clicontext *cli.Context) error {
+		var (
+			exitErr error
+		)
+		ctx, cancel := appContext(clicontext)
+		defer cancel()
+
+		client, err := newClient(clicontext)
+		if err != nil {
+			return err
+		}
+
+		imageStore := client.ImageService()
+		contentStore := client.ContentStore()
+
+		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
+		fmt.Fprintln(tw, "REF\tTYPE\tDIGEST\tSTATUS\tSIZE\t")
+
+		args := []string(clicontext.Args())
+		imageList, err := imageStore.List(ctx, args...)
+		if err != nil {
+			return errors.Wrap(err, "failed listing images")
+		}
+
+		for _, image := range imageList {
+			var (
+				status       string = "complete"
+				size         string
+				requiredSize int64
+				presentSize  int64
+			)
+
+			available, required, present, missing, err := images.Check(ctx, contentStore, image.Target, platforms.Default())
+			if err != nil {
+				if exitErr == nil {
+					exitErr = errors.Wrapf(err, "unable to check %v", image.Name)
+				}
+				log.G(ctx).WithError(err).Errorf("unable to check %v", image.Name)
+				status = "error"
+			}
+
+			if status != "error" {
+				for _, d := range required {
+					requiredSize += d.Size
+				}
+
+				for _, d := range present {
+					presentSize += d.Size
+				}
+
+				if len(missing) > 0 {
+					status = "incomplete"
+				}
+
+				if available {
+					status += fmt.Sprintf(" (%v/%v)", len(present), len(required))
+					size = fmt.Sprintf("%v/%v", progress.Bytes(presentSize), progress.Bytes(requiredSize))
+				} else {
+					status = fmt.Sprintf("unavailable (%v/?)", len(present))
+					size = fmt.Sprintf("%v/?", progress.Bytes(presentSize))
+				}
+			} else {
+				size = "-"
+			}
+
+			fmt.Fprintf(tw, "%v\t%v\t%v\t%v\t%v\t\n",
+				image.Name,
+				image.Target.MediaType,
+				image.Target.Digest,
+				status,
+				size)
+		}
+		tw.Flush()
+
+		return exitErr
 	},
 }
 
