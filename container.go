@@ -17,9 +17,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// DeleteOpts allows the caller to set options for the deletion of a container
-type DeleteOpts func(context.Context, *Client, containers.Container) error
-
 // Container is a metadata object for container resources and task creation
 type Container interface {
 	// ID identifies the container
