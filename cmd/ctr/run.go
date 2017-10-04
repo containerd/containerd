@@ -89,6 +89,11 @@ var runCommand = cli.Command{
 			Name:  "checkpoint",
 			Usage: "provide the checkpoint digest to restore the container",
 		},
+		cli.StringFlag{
+			Name:  "platform",
+			Usage: "specify the platform of the container in the form `<os>|<arch>|<os>/<arch>[/<variant>]`",
+			Value: runtime.GOOS,
+		},
 	}, snapshotterFlags...),
 	Action: func(context *cli.Context) error {
 		var (
