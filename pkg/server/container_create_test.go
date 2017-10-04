@@ -809,6 +809,17 @@ func TestGenerateApparmorSpecOpts(t *testing.T) {
 			profile:    "",
 			privileged: true,
 		},
+		"should not return error if apparmor is unconfined when apparmor is not supported": {
+			profile: unconfinedProfile,
+			disable: true,
+		},
+		"should not apparmor when apparmor is unconfined": {
+			profile: unconfinedProfile,
+		},
+		"should not apparmor when apparmor is unconfined and privileged is true": {
+			profile:    unconfinedProfile,
+			privileged: true,
+		},
 		"should set default apparmor when apparmor is runtime/default": {
 			profile:  runtimeDefault,
 			specOpts: apparmor.WithDefaultProfile(appArmorDefaultProfileName),
