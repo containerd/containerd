@@ -89,6 +89,10 @@ var runCommand = cli.Command{
 			Name:  "checkpoint",
 			Usage: "provide the checkpoint digest to restore the container",
 		},
+		cli.StringFlag{
+			Name:  "cwd",
+			Usage: "specify the working directory of the process",
+		},
 	}, snapshotterFlags...),
 	Action: func(context *cli.Context) error {
 		var (
