@@ -57,7 +57,15 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 		defer unix.Unmount(root, 0) // nolint: errcheck
 
 		for host, volume := range volumeMounts {
-			if err := copyExistingContents(filepath.Join(root, volume), host); err != nil {
+			src := filepath.Join(root, volume)
+			if _, err := os.Stat(src); err != nil {
+				if os.IsNotExist(err) {
+					// Skip copying directory if it does not exist.
+					continue
+				}
+				return errors.Wrap(err, "stat volume in rootfs")
+			}
+			if err := copyExistingContents(src, host); err != nil {
 				return errors.Wrap(err, "taking runtime copy of volume")
 			}
 		}
