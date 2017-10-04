@@ -12,6 +12,9 @@ import (
 	"github.com/pkg/errors"
 )
 
+// DeleteOpts allows the caller to set options for the deletion of a container
+type DeleteOpts func(ctx context.Context, client *Client, c containers.Container) error
+
 // NewContainerOpts allows the caller to set additional options when creating a container
 type NewContainerOpts func(ctx context.Context, client *Client, c *containers.Container) error
 
