@@ -102,13 +102,17 @@ func (c *criContainerdService) getContainerMetrics(
 			return nil, fmt.Errorf("failed to extract container metrics: %v", err)
 		}
 		metrics := s.(*cgroups.Metrics)
-		cs.Cpu = &runtime.CpuUsage{
-			Timestamp:            stats.Timestamp.UnixNano(),
-			UsageCoreNanoSeconds: &runtime.UInt64Value{metrics.CPU.Usage.Total},
+		if metrics.CPU != nil && metrics.CPU.Usage != nil {
+			cs.Cpu = &runtime.CpuUsage{
+				Timestamp:            stats.Timestamp.UnixNano(),
+				UsageCoreNanoSeconds: &runtime.UInt64Value{metrics.CPU.Usage.Total},
+			}
 		}
-		cs.Memory = &runtime.MemoryUsage{
-			Timestamp:       stats.Timestamp.UnixNano(),
-			WorkingSetBytes: &runtime.UInt64Value{metrics.Memory.Usage.Usage},
+		if metrics.Memory != nil && metrics.Memory.Usage != nil {
+			cs.Memory = &runtime.MemoryUsage{
+				Timestamp:       stats.Timestamp.UnixNano(),
+				WorkingSetBytes: &runtime.UInt64Value{metrics.Memory.Usage.Usage},
+			}
 		}
 	}
 
