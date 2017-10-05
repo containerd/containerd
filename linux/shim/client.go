@@ -31,7 +31,7 @@ import (
 type ClientOpt func(context.Context, Config) (shim.ShimClient, io.Closer, error)
 
 // WithStart executes a new shim process
-func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHandler func()) ClientOpt {
+func WithStart(binary, address, daemonAddress, cgroup string, nonewns, debug bool, exitHandler func()) ClientOpt {
 	return func(ctx context.Context, config Config) (_ shim.ShimClient, _ io.Closer, err error) {
 		socket, err := newSocket(address)
 		if err != nil {
@@ -44,7 +44,7 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 		}
 		defer f.Close()
 
-		cmd := newCommand(binary, daemonAddress, debug, config, f)
+		cmd := newCommand(binary, daemonAddress, nonewns, debug, config, f)
 		ec, err := reaper.Default.Start(cmd)
 		if err != nil {
 			return nil, nil, errors.Wrapf(err, "failed to start shim")
@@ -84,7 +84,7 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 	}
 }
 
-func newCommand(binary, daemonAddress string, debug bool, config Config, socket *os.File) *exec.Cmd {
+func newCommand(binary, daemonAddress string, nonewns, debug bool, config Config, socket *os.File) *exec.Cmd {
 	args := []string{
 		"--namespace", config.Namespace,
 		"--workdir", config.WorkDir,
@@ -109,7 +109,7 @@ func newCommand(binary, daemonAddress string, debug bool, config Config, socket 
 	// make sure the shim can be re-parented to system init
 	// and is cloned in a new mount namespace because the overlay/filesystems
 	// will be mounted by the shim
-	cmd.SysProcAttr = &atter
+	cmd.SysProcAttr = getSysProcAttr(nonewns)
 	cmd.ExtraFiles = append(cmd.ExtraFiles, socket)
 	if debug {
 		cmd.Stdout = os.Stdout

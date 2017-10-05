@@ -10,9 +10,14 @@ import (
 	"github.com/pkg/errors"
 )
 
-var atter = syscall.SysProcAttr{
-	Cloneflags: syscall.CLONE_NEWNS,
-	Setpgid:    true,
+func getSysProcAttr(nonewns bool) *syscall.SysProcAttr {
+	attr := syscall.SysProcAttr{
+		Setpgid: true,
+	}
+	if !nonewns {
+		attr.Cloneflags = syscall.CLONE_NEWNS
+	}
+	return &attr
 }
 
 func setCgroup(cgroupPath string, cmd *exec.Cmd) error {
