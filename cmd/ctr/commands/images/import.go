@@ -22,6 +22,7 @@ import (
 	"os"
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/contrib/docker1"
 	"github.com/containerd/containerd/images"
 	oci "github.com/containerd/containerd/images/oci"
 	"github.com/containerd/containerd/log"
@@ -35,6 +36,7 @@ var importCommand = cli.Command{
 	Description: `Import images from a tar stream.
 Implemented formats:
 - oci.v1     (default)
+- docker.v1
 
 
 For oci.v1 format, you need to specify --oci-name because an OCI archive contains image refs (tags)
@@ -45,6 +47,15 @@ e.g.
 
 If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadbeef", the command will create
 "foo/bar:latest" and "foo/bar@sha256:deadbeef" images in the containerd store.
+
+
+For docker.v1 format, you don't need to specify the image name because it is automatically generated from the
+RepoTags included in the archive, as in Docker.
+RepoTags are normalized in the following manner:
+  busybox         --> docker.io/library/busybox:latest
+  busybox:latest  --> docker.io/library/busybox:latest
+  library/busybox --> docker.io/library/busybox:latest
+  gcr.io/library/busybox:latest@sha256:deadbeef --> gcr.io/library/busybox@sha256:deadbeef
 `,
 	Flags: append([]cli.Flag{
 		cli.StringFlag{
@@ -71,6 +82,8 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			imageImporter = &oci.V1Importer{
 				ImageName: context.String("oci-name"),
 			}
+		case "docker.v1":
+			imageImporter = &docker1.Importer{}
 		default:
 			return fmt.Errorf("unknown format %s", format)
 		}
