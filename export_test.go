@@ -5,10 +5,12 @@ import (
 	"io"
 	"runtime"
 	"testing"
+
+	"github.com/containerd/containerd/images/oci"
 )
 
-// TestExport exports testImage as a tar stream
-func TestExport(t *testing.T) {
+// TestOCIExport exports testImage as a tar stream
+func TestOCIExport(t *testing.T) {
 	// TODO: support windows
 	if testing.Short() || runtime.GOOS == "windows" {
 		t.Skip()
@@ -26,8 +28,7 @@ func TestExport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	exportedStream, err := client.Export(ctx, pulled.Target())
+	exportedStream, err := client.Export(ctx, &oci.V1Exporter{}, pulled.Target())
 	if err != nil {
 		t.Fatal(err)
 	}
