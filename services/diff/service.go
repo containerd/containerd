@@ -30,9 +30,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.DiffPlugin,
 		},
-		Config: &config{
-			Order: []string{"walking"},
-		},
+		Config: defaultDifferConfig,
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			differs, err := ic.GetByType(plugin.DiffPlugin)
 			if err != nil {

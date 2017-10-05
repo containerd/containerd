@@ -16,10 +16,6 @@ var (
 	testImage string
 )
 
-func platformTestSetup(client *Client) error {
-	return nil
-}
-
 func init() {
 	switch runtime.GOARCH {
 	case "386":

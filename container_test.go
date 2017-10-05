@@ -98,14 +98,12 @@ func TestContainerStart(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withExitStatus(7)), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), withExitStatus(7)), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -170,14 +168,12 @@ func TestContainerOutput(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("echo", expected)), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), withProcessArgs("echo", expected)), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -237,15 +233,13 @@ func TestContainerExec(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "100")), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), withProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -336,15 +330,13 @@ func TestContainerPids(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "100")), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), withProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -421,15 +413,13 @@ func TestContainerCloseIO(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withCat()), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), withCat()), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -486,15 +476,13 @@ func TestDeleteRunningContainer(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "100")), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), withProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -549,15 +537,13 @@ func TestContainerKill(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "10")), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), withProcessArgs("sleep", "10")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -613,15 +599,13 @@ func TestContainerNoBinaryExists(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), WithProcessArgs("nothing")), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), WithProcessArgs("nothing")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -662,15 +646,13 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "100")), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), withProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -735,15 +717,13 @@ func TestWaitStoppedTask(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withExitStatus(7)), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), withExitStatus(7)), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -806,15 +786,13 @@ func TestWaitStoppedProcess(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "100")), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), withProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -906,14 +884,12 @@ func TestTaskForceDelete(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "30")), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), withProcessArgs("sleep", "30")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -954,14 +930,12 @@ func TestProcessForceDelete(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "30")), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), withProcessArgs("sleep", "30")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -1034,19 +1008,17 @@ func TestContainerHostname(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image),
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image),
 		withProcessArgs("hostname"),
 		WithHostname(expected),
 	),
-		withNewSnapshot(id, image))
+		WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -1112,15 +1084,13 @@ func TestContainerExitedAtSet(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withTrue()), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), withTrue()), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -1179,15 +1149,13 @@ func TestDeleteContainerExecCreated(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "100")), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), withProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -1258,14 +1226,12 @@ func TestContainerMetrics(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), WithProcessArgs("sleep", "30")), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), WithProcessArgs("sleep", "30")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -1319,16 +1285,14 @@ func TestDeletedContainerMetrics(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
 	}
 	container, err := client.NewContainer(ctx, id,
-		WithNewSpec(withImageConfig(image), withExitStatus(0)),
-		withNewSnapshot(id, image),
+		WithNewSpec(WithImageConfig(image), withExitStatus(0)),
+		WithNewSnapshot(id, image),
 	)
 	if err != nil {
 		t.Error(err)

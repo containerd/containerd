@@ -32,6 +32,9 @@ type driverInfo struct {
 	HomeDirp *uint16
 }
 
+// FilterDriver is the constant to define using the Windows Filter Driver
+const FilterDriver = 1
+
 func convertDriverInfo(info DriverInfo) (driverInfo, error) {
 	homedirp, err := syscall.UTF16PtrFromString(info.HomeDir)
 	if err != nil {
