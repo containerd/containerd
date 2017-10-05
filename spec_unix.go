@@ -136,6 +136,24 @@ func createDefaultSpec() (*specs.Spec, error) {
 			},
 		},
 		Linux: &specs.Linux{
+			// TODO (AkihiroSuda): unmask /sys/firmware on Windows daemon for LCOW support?
+			// https://github.com/moby/moby/pull/33241/files#diff-a1f5051ce84e711a2ee688ab9ded5e74R215
+			MaskedPaths: []string{
+				"/proc/kcore",
+				"/proc/latency_stats",
+				"/proc/timer_list",
+				"/proc/timer_stats",
+				"/proc/sched_debug",
+				"/sys/firmware",
+			},
+			ReadonlyPaths: []string{
+				"/proc/asound",
+				"/proc/bus",
+				"/proc/fs",
+				"/proc/irq",
+				"/proc/sys",
+				"/proc/sysrq-trigger",
+			},
 			// TODO (@crosbymichael) make sure we don't have have two containers in the same cgroup
 			Resources: &specs.LinuxResources{
 				Devices: []specs.LinuxDeviceCgroup{
