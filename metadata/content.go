@@ -406,7 +406,7 @@ func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64,
 
 	commitTime := time.Now().UTC()
 
-	sizeEncoded, err := encodeSize(size)
+	sizeEncoded, err := encodeInt(size)
 	if err != nil {
 		return err
 	}
@@ -488,7 +488,7 @@ func writeInfo(info *content.Info, bkt *bolt.Bucket) error {
 	}
 
 	// Write size
-	sizeEncoded, err := encodeSize(info.Size)
+	sizeEncoded, err := encodeInt(info.Size)
 	if err != nil {
 		return err
 	}

@@ -205,7 +205,11 @@ func loadPlugins(config *Config) ([]*plugin.Registration, error) {
 			if err != nil {
 				return nil, err
 			}
-			return metadata.NewDB(db, cs.(content.Store), snapshotters), nil
+			mdb := metadata.NewDB(db, cs.(content.Store), snapshotters)
+			if err := mdb.Init(ic.Context); err != nil {
+				return nil, err
+			}
+			return mdb, nil
 		},
 	})
 
