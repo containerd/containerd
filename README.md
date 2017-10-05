@@ -19,6 +19,9 @@ With it, you could run Kubernetes using containerd as the container runtime.
 * It has passed all regular [node e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-node-tests.md).
 ## Installing with Ansible and Kubeadm
 For a multi node cluster installer and bring up steps using ansible and kubeadm refer [here](contrib/ansible/README.md).
+## Custom Installation
+For non ansible users, you can download the `cri-containerd` release tarball and deploy
+kubernetes cluster using kubeadm as described [here](docs/installation.md).
 ## Getting Started for Developers
 ### Binary Dependencies and Specifications
 The current release of `cri-containerd` has the following dependencies:
