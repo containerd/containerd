@@ -28,7 +28,8 @@ import (
 // key: object-specific key identifying the storage bucket for the objects
 // contents.
 var (
-	bucketKeyVersion          = []byte("v1")
+	bucketKeyVersion          = []byte(schemaVersion)
+	bucketKeyDBVersion        = []byte("version")    // stores the version of the schema
 	bucketKeyObjectLabels     = []byte("labels")     // stores the labels for a namespace.
 	bucketKeyObjectIndexes    = []byte("indexes")    // reserved
 	bucketKeyObjectImages     = []byte("images")     // stores image objects
@@ -45,6 +46,7 @@ var (
 	bucketKeyRuntime     = []byte("runtime")
 	bucketKeyName        = []byte("name")
 	bucketKeyParent      = []byte("parent")
+	bucketKeyChildren    = []byte("children")
 	bucketKeyOptions     = []byte("options")
 	bucketKeySpec        = []byte("spec")
 	bucketKeySnapshotKey = []byte("snapshotKey")

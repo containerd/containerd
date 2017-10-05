@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
@@ -26,19 +25,14 @@ func init() {
 		Type: plugin.DiffPlugin,
 		ID:   "walking",
 		Requires: []plugin.Type{
-			plugin.ContentPlugin,
 			plugin.MetadataPlugin,
 		},
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			c, err := ic.Get(plugin.ContentPlugin)
-			if err != nil {
-				return nil, err
-			}
 			md, err := ic.Get(plugin.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}
-			return NewWalkingDiff(metadata.NewContentStore(md.(*bolt.DB), c.(content.Store)))
+			return NewWalkingDiff(md.(*metadata.DB).ContentStore())
 		},
 	})
 }

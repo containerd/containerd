@@ -19,12 +19,12 @@ import (
 
 type contentStore struct {
 	content.Store
-	db *bolt.DB
+	db transactor
 }
 
-// NewContentStore returns a namespaced content store using an existing
+// newContentStore returns a namespaced content store using an existing
 // content store interface.
-func NewContentStore(db *bolt.DB, cs content.Store) content.Store {
+func newContentStore(db transactor, cs content.Store) content.Store {
 	return &contentStore{
 		Store: cs,
 		db:    db,
@@ -353,7 +353,7 @@ type namespacedWriter struct {
 	content.Writer
 	ref       string
 	namespace string
-	db        *bolt.DB
+	db        transactor
 }
 
 func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
@@ -406,7 +406,7 @@ func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64,
 
 	commitTime := time.Now().UTC()
 
-	sizeEncoded, err := encodeSize(size)
+	sizeEncoded, err := encodeInt(size)
 	if err != nil {
 		return err
 	}
@@ -488,7 +488,7 @@ func writeInfo(info *content.Info, bkt *bolt.Bucket) error {
 	}
 
 	// Write size
-	sizeEncoded, err := encodeSize(info.Size)
+	sizeEncoded, err := encodeInt(info.Size)
 	if err != nil {
 		return err
 	}

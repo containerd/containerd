@@ -16,6 +16,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
@@ -68,7 +69,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		// TODO(mlaventure): windows needs a stat monitor
 		monitor: nil,
 		tasks:   runtime.NewTaskList(),
-		db:      m.(*bolt.DB),
+		db:      m.(*metadata.DB),
 	}
 
 	// Load our existing containers and kill/delete them. We don't support
@@ -89,7 +90,7 @@ type windowsRuntime struct {
 
 	monitor runtime.TaskMonitor
 	tasks   *runtime.TaskList
-	db      *bolt.DB
+	db      *metadata.DB
 }
 
 func (r *windowsRuntime) ID() string {

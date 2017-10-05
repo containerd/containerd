@@ -23,7 +23,7 @@ func createContentStore(ctx context.Context, root string) (content.Store, func()
 		return nil, nil, err
 	}
 
-	return NewContentStore(db, cs), func() error {
+	return NewDB(db, cs, nil).ContentStore(), func() error {
 		return db.Close()
 	}, nil
 }

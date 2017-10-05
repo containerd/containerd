@@ -29,19 +29,19 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			return NewService(m.(*bolt.DB), ic.Events), nil
+			return NewService(m.(*metadata.DB), ic.Events), nil
 		},
 	})
 }
 
 type Service struct {
-	db        *bolt.DB
+	db        *metadata.DB
 	publisher events.Publisher
 }
 
 var _ api.NamespacesServer = &Service{}
 
-func NewService(db *bolt.DB, publisher events.Publisher) api.NamespacesServer {
+func NewService(db *metadata.DB, publisher events.Publisher) api.NamespacesServer {
 	return &Service{
 		db:        db,
 		publisher: publisher,

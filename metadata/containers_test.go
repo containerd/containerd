@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -701,7 +702,7 @@ func testEnv(t *testing.T) (context.Context, *bolt.DB, func()) {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = namespaces.WithNamespace(ctx, "testing")
 
-	dirname, err := ioutil.TempDir("", t.Name()+"-")
+	dirname, err := ioutil.TempDir("", strings.Replace(t.Name(), "/", "_", -1)+"-")
 	if err != nil {
 		t.Fatal(err)
 	}

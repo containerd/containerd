@@ -19,12 +19,12 @@ import (
 type snapshotter struct {
 	snapshot.Snapshotter
 	name string
-	db   *bolt.DB
+	db   transactor
 }
 
-// NewSnapshotter returns a new Snapshotter which namespaces the given snapshot
-// using the provided name and metadata store.
-func NewSnapshotter(db *bolt.DB, name string, sn snapshot.Snapshotter) snapshot.Snapshotter {
+// newSnapshotter returns a new Snapshotter which namespaces the given snapshot
+// using the provided name and database.
+func newSnapshotter(db transactor, name string, sn snapshot.Snapshotter) snapshot.Snapshotter {
 	return &snapshotter{
 		Snapshotter: sn,
 		name:        name,
@@ -283,9 +283,17 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 		if parent != "" {
 			pbkt := bkt.Bucket([]byte(parent))
 			if pbkt == nil {
-				return errors.Wrapf(errdefs.ErrNotFound, "snapshot %v does not exist", parent)
+				return errors.Wrapf(errdefs.ErrNotFound, "parent snapshot %v does not exist", parent)
 			}
 			bparent = string(pbkt.Get(bucketKeyName))
+
+			cbkt, err := pbkt.CreateBucketIfNotExists(bucketKeyChildren)
+			if err != nil {
+				return err
+			}
+			if err := cbkt.Put([]byte(key), nil); err != nil {
+				return err
+			}
 
 			if err := bbkt.Put(bucketKeyParent, []byte(parent)); err != nil {
 				return err
@@ -360,7 +368,6 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		}
 
 		bkey := string(obkt.Get(bucketKeyName))
-		parent := string(obkt.Get(bucketKeyParent))
 
 		sid, err := bkt.NextSequence()
 		if err != nil {
@@ -372,8 +379,28 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		if err := bbkt.Put(bucketKeyName, []byte(nameKey)); err != nil {
 			return err
 		}
-		if err := bbkt.Put(bucketKeyParent, []byte(parent)); err != nil {
-			return err
+
+		parent := obkt.Get(bucketKeyParent)
+		if len(parent) > 0 {
+			pbkt := bkt.Bucket(parent)
+			if pbkt == nil {
+				return errors.Wrapf(errdefs.ErrNotFound, "parent snapshot %v does not exist", string(parent))
+			}
+
+			cbkt, err := pbkt.CreateBucketIfNotExists(bucketKeyChildren)
+			if err != nil {
+				return err
+			}
+			if err := cbkt.Delete([]byte(key)); err != nil {
+				return err
+			}
+			if err := cbkt.Put([]byte(name), nil); err != nil {
+				return err
+			}
+
+			if err := bbkt.Put(bucketKeyParent, parent); err != nil {
+				return err
+			}
 		}
 		ts := time.Now().UTC()
 		if err := boltutil.WriteTimestamps(bbkt, ts, ts); err != nil {
@@ -400,23 +427,37 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 	}
 
 	return update(ctx, s.db, func(tx *bolt.Tx) error {
-		var bkey string
+		var sbkt *bolt.Bucket
 		bkt := getSnapshotterBucket(tx, ns, s.name)
 		if bkt != nil {
-			sbkt := bkt.Bucket([]byte(key))
-			if sbkt != nil {
-				bkey = string(sbkt.Get(bucketKeyName))
-			}
+			sbkt = bkt.Bucket([]byte(key))
 		}
-		if bkey == "" {
+		if sbkt == nil {
 			return errors.Wrapf(errdefs.ErrNotFound, "snapshot %v does not exist", key)
 		}
 
-		if err := bkt.DeleteBucket([]byte(key)); err != nil {
-			return err
+		cbkt := sbkt.Bucket(bucketKeyChildren)
+		if cbkt != nil {
+			if child, _ := cbkt.Cursor().First(); child != nil {
+				return errors.Wrap(errdefs.ErrFailedPrecondition, "cannot remove snapshot with child")
+			}
 		}
 
-		return s.Snapshotter.Remove(ctx, bkey)
+		parent := sbkt.Get(bucketKeyParent)
+		if len(parent) > 0 {
+			pbkt := bkt.Bucket(parent)
+			if pbkt == nil {
+				return errors.Wrapf(errdefs.ErrNotFound, "parent snapshot %v does not exist", string(parent))
+			}
+			cbkt := pbkt.Bucket(bucketKeyChildren)
+			if cbkt != nil {
+				if err := cbkt.Delete([]byte(key)); err != nil {
+					return errors.Wrap(err, "failed to remove child link")
+				}
+			}
+		}
+
+		return bkt.DeleteBucket([]byte(key))
 	})
 }
 

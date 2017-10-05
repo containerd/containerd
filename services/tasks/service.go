@@ -44,7 +44,6 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.RuntimePlugin,
 			plugin.MetadataPlugin,
-			plugin.ContentPlugin,
 		},
 		Init: New,
 	})
@@ -59,11 +58,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	ct, err := ic.Get(plugin.ContentPlugin)
-	if err != nil {
-		return nil, err
-	}
-	cs := metadata.NewContentStore(m.(*bolt.DB), ct.(content.Store))
+	cs := m.(*metadata.DB).ContentStore()
 	runtimes := make(map[string]runtime.Runtime)
 	for _, rr := range rt {
 		r := rr.(runtime.Runtime)
@@ -71,7 +66,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	}
 	return &Service{
 		runtimes:  runtimes,
-		db:        m.(*bolt.DB),
+		db:        m.(*metadata.DB),
 		store:     cs,
 		publisher: ic.Events,
 	}, nil
@@ -79,7 +74,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 
 type Service struct {
 	runtimes  map[string]runtime.Runtime
-	db        *bolt.DB
+	db        *metadata.DB
 	store     content.Store
 	publisher events.Publisher
 }
