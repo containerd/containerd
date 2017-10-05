@@ -5,6 +5,7 @@ package windows
 import (
 	"context"
 	"io"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,13 +20,14 @@ import (
 
 // process implements containerd.Process and containerd.State
 type process struct {
+	sync.Mutex
+
 	hcs hcsshim.Process
 
-	id     string
-	pid    uint32
-	io     *pipeSet
-	status runtime.Status
-	task   *task
+	id   string
+	pid  uint32
+	io   *pipeSet
+	task *task
 
 	exitCh   chan struct{}
 	exitCode uint32
@@ -93,6 +95,13 @@ func (p *process) ExitCode() (uint32, time.Time, error) {
 }
 
 func (p *process) Start(ctx context.Context) (err error) {
+	p.Lock()
+	defer p.Unlock()
+
+	if p.hcs != nil {
+		return errors.Wrap(errdefs.ErrFailedPrecondition, "process already started")
+	}
+
 	// If we fail, close the io right now
 	defer func() {
 		if err != nil {
@@ -132,6 +141,7 @@ func (p *process) Start(ctx context.Context) (err error) {
 	if p.io.stderr != nil {
 		go ioCopy("stderr", p.io.stderr, stderr)
 	}
+	p.hcs = hp
 
 	// Wait for the process to exit to get the exit status
 	go func() {
@@ -174,8 +184,6 @@ func (p *process) Start(ctx context.Context) (err error) {
 		// Cleanup HCS resources
 		hp.Close()
 	}()
-	p.status = runtime.RunningStatus
-	p.hcs = hp
 	return nil
 }
 
