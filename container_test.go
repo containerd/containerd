@@ -71,7 +71,7 @@ func TestNewContainer(t *testing.T) {
 	if container.ID() != id {
 		t.Errorf("expected container id %q but received %q", id, container.ID())
 	}
-	if _, err = container.Spec(); err != nil {
+	if _, err = container.Spec(ctx); err != nil {
 		t.Error(err)
 		return
 	}
@@ -268,7 +268,7 @@ func TestContainerExec(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	spec, err := container.Spec()
+	spec, err := container.Spec(ctx)
 	if err != nil {
 		t.Error(err)
 		return
@@ -679,7 +679,7 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	spec, err := container.Spec()
+	spec, err := container.Spec(ctx)
 	if err != nil {
 		t.Error(err)
 		return
@@ -910,7 +910,7 @@ func TestWaitStoppedProcess(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	spec, err := container.Spec()
+	spec, err := container.Spec(ctx)
 	if err != nil {
 		t.Error(err)
 		return
@@ -1059,7 +1059,7 @@ func TestProcessForceDelete(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	spec, err := container.Spec()
+	spec, err := container.Spec(ctx)
 	if err != nil {
 		t.Error(err)
 		return
@@ -1283,7 +1283,7 @@ func TestDeleteContainerExecCreated(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	spec, err := container.Spec()
+	spec, err := container.Spec(ctx)
 	if err != nil {
 		t.Error(err)
 		return
@@ -1460,7 +1460,11 @@ func TestContainerExtensions(t *testing.T) {
 	defer container.Delete(ctx)
 
 	checkExt := func(container Container) {
-		cExts := container.Extensions()
+		cExts, err := container.Extensions(ctx)
+		if err != nil {
+			t.Error(err)
+			return
+		}
 		if len(cExts) != 1 {
 			t.Errorf("expected 1 container extension")
 		}
@@ -1502,7 +1506,7 @@ func TestContainerUpdate(t *testing.T) {
 	}
 	defer container.Delete(ctx)
 
-	spec, err := container.Spec()
+	spec, err := container.Spec(ctx)
 	if err != nil {
 		t.Error(err)
 		return
@@ -1522,7 +1526,7 @@ func TestContainerUpdate(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if spec, err = container.Spec(); err != nil {
+	if spec, err = container.Spec(ctx); err != nil {
 		t.Error(err)
 		return
 	}

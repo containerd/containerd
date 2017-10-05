@@ -34,7 +34,7 @@ var taskStartCommand = cli.Command{
 			return err
 		}
 
-		spec, err := container.Spec()
+		spec, err := container.Spec(ctx)
 		if err != nil {
 			return err
 		}

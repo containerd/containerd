@@ -28,7 +28,11 @@ var containerInfoCommand = cli.Command{
 			return err
 		}
 
-		printAsJSON(container.Info())
+		info, err := container.Info(ctx)
+		if err != nil {
+			return err
+		}
+		printAsJSON(info)
 
 		return nil
 	},

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
@@ -22,13 +21,13 @@ type Container interface {
 	// ID identifies the container
 	ID() string
 	// Info returns the underlying container record type
-	Info() containers.Container
+	Info(context.Context) (containers.Container, error)
 	// Delete removes the container
 	Delete(context.Context, ...DeleteOpts) error
 	// NewTask creates a new task based on the container metadata
 	NewTask(context.Context, IOCreation, ...NewTaskOpts) (Task, error)
 	// Spec returns the OCI runtime specification
-	Spec() (*specs.Spec, error)
+	Spec(context.Context) (*specs.Spec, error)
 	// Task returns the current task for the container
 	//
 	// If IOAttach options are passed the client will reattach to the IO for the running
@@ -41,7 +40,7 @@ type Container interface {
 	// SetLabels sets the provided labels for the container and returns the final label set
 	SetLabels(context.Context, map[string]string) (map[string]string, error)
 	// Extensions returns the extensions set on the container
-	Extensions() map[string]prototypes.Any
+	Extensions(context.Context) (map[string]prototypes.Any, error)
 	// Update a container
 	Update(context.Context, ...UpdateContainerOpts) error
 }
@@ -49,47 +48,45 @@ type Container interface {
 func containerFromRecord(client *Client, c containers.Container) *container {
 	return &container{
 		client: client,
-		c:      c,
+		id:     c.ID,
 	}
 }
 
 var _ = (Container)(&container{})
 
 type container struct {
-	mu sync.Mutex
-
 	client *Client
-	c      containers.Container
+	id     string
 }
 
 // ID returns the container's unique id
 func (c *container) ID() string {
-	return c.c.ID
+	return c.id
 }
 
-func (c *container) Info() containers.Container {
-	return c.c
+func (c *container) Info(ctx context.Context) (containers.Container, error) {
+	return c.get(ctx)
 }
 
-func (c *container) Labels(ctx context.Context) (map[string]string, error) {
-	r, err := c.client.ContainerService().Get(ctx, c.ID())
+func (c *container) Extensions(ctx context.Context) (map[string]prototypes.Any, error) {
+	r, err := c.get(ctx)
 	if err != nil {
 		return nil, err
 	}
+	return r.Extensions, nil
+}
 
-	c.c = r
-
-	m := make(map[string]string, len(r.Labels))
-	for k, v := range c.c.Labels {
-		m[k] = v
+func (c *container) Labels(ctx context.Context) (map[string]string, error) {
+	r, err := c.get(ctx)
+	if err != nil {
+		return nil, err
 	}
-
-	return m, nil
+	return r.Labels, nil
 }
 
 func (c *container) SetLabels(ctx context.Context, labels map[string]string) (map[string]string, error) {
 	container := containers.Container{
-		ID:     c.ID(),
+		ID:     c.id,
 		Labels: labels,
 	}
 
@@ -104,20 +101,17 @@ func (c *container) SetLabels(ctx context.Context, labels map[string]string) (ma
 	if err != nil {
 		return nil, err
 	}
-
-	c.c = r // update our local container
-
-	m := make(map[string]string, len(r.Labels))
-	for k, v := range c.c.Labels {
-		m[k] = v
-	}
-	return m, nil
+	return r.Labels, nil
 }
 
 // Spec returns the current OCI specification for the container
-func (c *container) Spec() (*specs.Spec, error) {
+func (c *container) Spec(ctx context.Context) (*specs.Spec, error) {
+	r, err := c.get(ctx)
+	if err != nil {
+		return nil, err
+	}
 	var s specs.Spec
-	if err := json.Unmarshal(c.c.Spec.Value, &s); err != nil {
+	if err := json.Unmarshal(r.Spec.Value, &s); err != nil {
 		return nil, err
 	}
 	return &s, nil
@@ -125,20 +119,20 @@ func (c *container) Spec() (*specs.Spec, error) {
 
 // Delete deletes an existing container
 // an error is returned if the container has running tasks
-func (c *container) Delete(ctx context.Context, opts ...DeleteOpts) (err error) {
-	if _, err := c.Task(ctx, nil); err == nil {
-		return errors.Wrapf(errdefs.ErrFailedPrecondition, "cannot delete running task %v", c.ID())
+func (c *container) Delete(ctx context.Context, opts ...DeleteOpts) error {
+	if _, err := c.loadTask(ctx, nil); err == nil {
+		return errors.Wrapf(errdefs.ErrFailedPrecondition, "cannot delete running task %v", c.id)
+	}
+	r, err := c.get(ctx)
+	if err != nil {
+		return err
 	}
 	for _, o := range opts {
-		if err := o(ctx, c.client, c.c); err != nil {
+		if err := o(ctx, c.client, r); err != nil {
 			return err
 		}
 	}
-
-	if cerr := c.client.ContainerService().Delete(ctx, c.ID()); err == nil {
-		err = cerr
-	}
-	return err
+	return c.client.ContainerService().Delete(ctx, c.id)
 }
 
 func (c *container) Task(ctx context.Context, attach IOAttach) (Task, error) {
@@ -147,12 +141,16 @@ func (c *container) Task(ctx context.Context, attach IOAttach) (Task, error) {
 
 // Image returns the image that the container is based on
 func (c *container) Image(ctx context.Context) (Image, error) {
-	if c.c.Image == "" {
-		return nil, errors.Wrapf(errdefs.ErrNotFound, "container not created from an image")
-	}
-	i, err := c.client.ImageService().Get(ctx, c.c.Image)
+	r, err := c.get(ctx)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get image for container")
+		return nil, err
+	}
+	if r.Image == "" {
+		return nil, errors.Wrap(errdefs.ErrNotFound, "container not created from an image")
+	}
+	i, err := c.client.ImageService().Get(ctx, r.Image)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get image %s for container", r.Image)
 	}
 	return &image{
 		client: c.client,
@@ -160,34 +158,30 @@ func (c *container) Image(ctx context.Context) (Image, error) {
 	}, nil
 }
 
-func (c *container) Extensions() map[string]prototypes.Any {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.c.Extensions
-}
-
 func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...NewTaskOpts) (Task, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	i, err := ioCreate(c.c.ID)
+	i, err := ioCreate(c.id)
 	if err != nil {
 		return nil, err
 	}
 	cfg := i.Config()
 	request := &tasks.CreateTaskRequest{
-		ContainerID: c.c.ID,
+		ContainerID: c.id,
 		Terminal:    cfg.Terminal,
 		Stdin:       cfg.Stdin,
 		Stdout:      cfg.Stdout,
 		Stderr:      cfg.Stderr,
 	}
-	if c.c.SnapshotKey != "" {
-		if c.c.Snapshotter == "" {
+	r, err := c.get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if r.SnapshotKey != "" {
+		if r.Snapshotter == "" {
 			return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "unable to resolve rootfs mounts without snapshotter on container")
 		}
 
 		// get the rootfs from the snapshotter and add it to the request
-		mounts, err := c.client.SnapshotService(c.c.Snapshotter).Mounts(ctx, c.c.SnapshotKey)
+		mounts, err := c.client.SnapshotService(r.Snapshotter).Mounts(ctx, r.SnapshotKey)
 		if err != nil {
 			return nil, err
 		}
@@ -224,7 +218,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...Ne
 	t := &task{
 		client: c.client,
 		io:     i,
-		id:     c.ID(),
+		id:     c.id,
 	}
 	if info.Checkpoint != nil {
 		request.Checkpoint = info.Checkpoint
@@ -238,29 +232,25 @@ func (c *container) NewTask(ctx context.Context, ioCreate IOCreation, opts ...Ne
 }
 
 func (c *container) Update(ctx context.Context, opts ...UpdateContainerOpts) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	// fetch the current container config before updating it
-	current, err := c.client.ContainerService().Get(ctx, c.ID())
+	r, err := c.get(ctx)
 	if err != nil {
 		return err
 	}
 	for _, o := range opts {
-		if err := o(ctx, c.client, &current); err != nil {
+		if err := o(ctx, c.client, &r); err != nil {
 			return err
 		}
 	}
-	nc, err := c.client.ContainerService().Update(ctx, current)
-	if err != nil {
+	if _, err := c.client.ContainerService().Update(ctx, r); err != nil {
 		return errdefs.FromGRPC(err)
 	}
-	c.c = nc
 	return nil
 }
 
 func (c *container) loadTask(ctx context.Context, ioAttach IOAttach) (Task, error) {
 	response, err := c.client.TaskService().Get(ctx, &tasks.GetRequest{
-		ContainerID: c.c.ID,
+		ContainerID: c.id,
 	})
 	if err != nil {
 		err = errdefs.FromGRPC(err)
@@ -282,6 +272,10 @@ func (c *container) loadTask(ctx context.Context, ioAttach IOAttach) (Task, erro
 		pid:    response.Process.Pid,
 	}
 	return t, nil
+}
+
+func (c *container) get(ctx context.Context) (containers.Container, error) {
+	return c.client.ContainerService().Get(ctx, c.id)
 }
 
 func attachExistingIO(response *tasks.GetResponse, ioAttach IOAttach) (IO, error) {
