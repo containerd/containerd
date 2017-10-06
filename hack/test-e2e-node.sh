@@ -20,7 +20,6 @@ source $(dirname "${BASH_SOURCE[0]}")/test-utils.sh
 
 DEFAULT_SKIP="\[Flaky\]|\[Slow\]|\[Serial\]"
 DEFAULT_SKIP+="|querying\s\/stats\/summary"
-DEFAULT_SKIP+="|ImageID"
 
 # FOCUS focuses the test to run.
 export FOCUS=${FOCUS:-""}
