@@ -5,6 +5,7 @@ package linux
 import (
 	"context"
 
+	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 
 	"github.com/containerd/cgroups"
@@ -32,7 +33,8 @@ func newTask(id, namespace string, pid int, shim *client.Client, monitor runtime
 		cg  cgroups.Cgroup
 	)
 	if pid > 0 {
-		if cg, err = cgroups.Load(cgroups.V1, cgroups.PidPath(pid)); err != nil {
+		cg, err = cgroups.Load(cgroups.V1, cgroups.PidPath(pid))
+		if err != nil && err != cgroups.ErrCgroupDeleted {
 			return nil, err
 		}
 	}
@@ -253,6 +255,9 @@ func (t *Task) Process(ctx context.Context, id string) (runtime.Process, error) 
 
 // Metrics returns runtime specific system level metric information for the task
 func (t *Task) Metrics(ctx context.Context) (interface{}, error) {
+	if t.cg == nil {
+		return nil, errors.Wrap(errdefs.ErrNotFound, "cgroup does not exist")
+	}
 	stats, err := t.cg.Stat(cgroups.IgnoreNotExist)
 	if err != nil {
 		return nil, err
@@ -261,8 +266,11 @@ func (t *Task) Metrics(ctx context.Context) (interface{}, error) {
 }
 
 // Cgroup returns the underlying cgroup for a linux task
-func (t *Task) Cgroup() cgroups.Cgroup {
-	return t.cg
+func (t *Task) Cgroup() (cgroups.Cgroup, error) {
+	if t.cg == nil {
+		return nil, errors.Wrap(errdefs.ErrNotFound, "cgroup does not exist")
+	}
+	return t.cg, nil
 }
 
 // Wait for the task to exit returning the status and timestamp

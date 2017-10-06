@@ -62,10 +62,14 @@ type cgroupsMonitor struct {
 func (m *cgroupsMonitor) Monitor(c runtime.Task) error {
 	info := c.Info()
 	t := c.(*linux.Task)
-	if err := m.collector.Add(info.ID, info.Namespace, t.Cgroup()); err != nil {
+	cg, err := t.Cgroup()
+	if err != nil {
 		return err
 	}
-	return m.oom.Add(info.ID, info.Namespace, t.Cgroup(), m.trigger)
+	if err := m.collector.Add(info.ID, info.Namespace, cg); err != nil {
+		return err
+	}
+	return m.oom.Add(info.ID, info.Namespace, cg, m.trigger)
 }
 
 func (m *cgroupsMonitor) Stop(c runtime.Task) error {

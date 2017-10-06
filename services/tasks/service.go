@@ -514,7 +514,9 @@ func getTasksMetrics(ctx context.Context, filter filters.Filter, tasks []runtime
 		collected := time.Now()
 		metrics, err := tk.Metrics(ctx)
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("collecting metrics for %s", tk.ID())
+			if !errdefs.IsNotFound(err) {
+				log.G(ctx).WithError(err).Errorf("collecting metrics for %s", tk.ID())
+			}
 			continue
 		}
 		data, err := typeurl.MarshalAny(metrics)
