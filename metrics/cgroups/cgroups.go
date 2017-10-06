@@ -75,7 +75,14 @@ func (m *cgroupsMonitor) Monitor(c runtime.Task) error {
 func (m *cgroupsMonitor) Stop(c runtime.Task) error {
 	info := c.Info()
 	t := c.(*linux.Task)
-	m.collector.collect(info.ID, info.Namespace, t.Cgroup(), m.collector.storedMetrics, false, nil)
+
+	cgroup, err := t.Cgroup()
+	if err != nil {
+		log.G(m.context).WithError(err).Warnf("unable to retrieve cgroup on stop")
+	} else {
+		m.collector.collect(info.ID, info.Namespace, cgroup, m.collector.storedMetrics, false, nil)
+	}
+
 	m.collector.Remove(info.ID, info.Namespace)
 	return nil
 }

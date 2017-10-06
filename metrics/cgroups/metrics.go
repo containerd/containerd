@@ -8,9 +8,9 @@ import (
 	"sync"
 
 	"github.com/containerd/cgroups"
+	"github.com/containerd/containerd/log"
 	metrics "github.com/docker/go-metrics"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -97,9 +97,10 @@ func (c *collector) collect(id, namespace string, cg cgroups.Cgroup, ch chan<- p
 	if wg != nil {
 		defer wg.Done()
 	}
+
 	stats, err := cg.Stat(cgroups.IgnoreNotExist)
 	if err != nil {
-		logrus.WithError(err).Errorf("stat cgroup %s", id)
+		log.L.WithError(err).Errorf("stat cgroup %s", id)
 		return
 	}
 	for _, m := range c.metrics {
