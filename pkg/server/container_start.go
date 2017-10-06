@@ -59,7 +59,7 @@ func (c *criContainerdService) startContainer(ctx context.Context,
 	status *containerstore.Status) (retErr error) {
 	id := cntr.ID
 	meta := cntr.Metadata
-	container := cntr.Container.Get()
+	container := cntr.Container
 	config := meta.Config
 
 	// Return error if container is not in created state.

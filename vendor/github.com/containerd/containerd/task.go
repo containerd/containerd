@@ -41,6 +41,7 @@ type Status struct {
 	ExitTime time.Time
 }
 
+// ProcessStatus returns a human readable status for the Process representing its current status
 type ProcessStatus string
 
 const (
@@ -435,6 +436,15 @@ func (t *task) Metrics(ctx context.Context) (*types.Metric, error) {
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
+
+	if response.Metrics == nil {
+		_, err := t.Status(ctx)
+		if err != nil && errdefs.IsNotFound(err) {
+			return nil, err
+		}
+		return nil, errors.New("no metrics received")
+	}
+
 	return response.Metrics[0], nil
 }
 

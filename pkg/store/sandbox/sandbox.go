@@ -42,10 +42,6 @@ type Store struct {
 	// TODO(random-liu): Add trunc index.
 }
 
-// LoadStore loads sandboxes from runtime.
-// TODO(random-liu): Implement LoadStore.
-func LoadStore() *Store { return nil }
-
 // NewStore creates a sandbox store.
 func NewStore() *Store {
 	return &Store{sandboxes: make(map[string]Sandbox)}

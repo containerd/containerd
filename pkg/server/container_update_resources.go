@@ -17,9 +17,11 @@ limitations under the License.
 package server
 
 import (
+	gocontext "context"
 	"fmt"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/typeurl"
 	"github.com/golang/glog"
@@ -63,7 +65,7 @@ func (c *criContainerdService) updateContainerResources(ctx context.Context,
 	// spec makes sure that the resource limits are correct when start;
 	// if the container is already started, updating spec is still required,
 	// the spec will become our source of truth for resource limits.
-	oldSpec, err := cntr.Container.Get().Spec()
+	oldSpec, err := cntr.Container.Spec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get container spec: %v", err)
 	}
@@ -72,42 +74,15 @@ func (c *criContainerdService) updateContainerResources(ctx context.Context,
 		return fmt.Errorf("failed to update resource in spec: %v", err)
 	}
 
-	info := cntr.Container.Get().Info()
-	any, err := typeurl.MarshalAny(newSpec)
-	if err != nil {
-		return fmt.Errorf("failed to marshal spec %+v: %v", newSpec, err)
-	}
-	info.Spec = any
-	// TODO(random-liu): Add helper function in containerd to do the update.
-	if _, err := c.client.ContainerService().Update(ctx, info, "spec"); err != nil {
-		return fmt.Errorf("failed to update container spec: %v", err)
+	if err := updateContainerSpec(ctx, cntr.Container, newSpec); err != nil {
+		return err
 	}
 	defer func() {
 		if retErr != nil {
 			// Reset spec on error.
-			any, err := typeurl.MarshalAny(oldSpec)
-			if err != nil {
-				glog.Errorf("Failed to marshal spec %+v for container %q: %v", oldSpec, id, err)
-				return
+			if err := updateContainerSpec(ctx, cntr.Container, oldSpec); err != nil {
+				glog.Errorf("Failed to update spec %+v for container %q: %v", oldSpec, id, err)
 			}
-			info.Spec = any
-			if _, err := c.client.ContainerService().Update(ctx, info, "spec"); err != nil {
-				glog.Errorf("Failed to recover spec %+v for container %q: %v", oldSpec, id, err)
-			}
-		}
-	}()
-	container, err := c.client.LoadContainer(ctx, id)
-	if err != nil {
-		return fmt.Errorf("failed to load container: %v", err)
-	}
-	defer func() {
-		if retErr == nil {
-			// Update container client if no error is returned.
-			// NOTE(random-liu): By updating container client, we'll be able
-			// to get latest OCI spec from it, which includes the up-to-date
-			// container resource limits. This will be useful after the debug
-			// api is introduced.
-			cntr.Container.Set(container)
 		}
 	}()
 
@@ -117,7 +92,7 @@ func (c *criContainerdService) updateContainerResources(ctx context.Context,
 		return nil
 	}
 
-	task, err := container.Task(ctx, nil)
+	task, err := cntr.Container.Task(ctx, nil)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			// Task exited already.
@@ -132,6 +107,21 @@ func (c *criContainerdService) updateContainerResources(ctx context.Context,
 			return nil
 		}
 		return fmt.Errorf("failed to update resources: %v", err)
+	}
+	return nil
+}
+
+// updateContainerSpec updates container spec.
+func updateContainerSpec(ctx context.Context, cntr containerd.Container, spec *runtimespec.Spec) error {
+	any, err := typeurl.MarshalAny(spec)
+	if err != nil {
+		return fmt.Errorf("failed to marshal spec %+v: %v", spec, err)
+	}
+	if err := cntr.Update(ctx, func(ctx gocontext.Context, client *containerd.Client, c *containers.Container) error {
+		c.Spec = any
+		return nil
+	}); err != nil {
+		return fmt.Errorf("failed to update container spec: %v", err)
 	}
 	return nil
 }

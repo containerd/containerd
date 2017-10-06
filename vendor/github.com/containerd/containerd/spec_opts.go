@@ -19,6 +19,14 @@ func WithProcessArgs(args ...string) SpecOpts {
 	}
 }
 
+// WithProcessCwd replaces the current working directory on the generated spec
+func WithProcessCwd(cwd string) SpecOpts {
+	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
+		s.Process.Cwd = cwd
+		return nil
+	}
+}
+
 // WithHostname sets the container's hostname
 func WithHostname(name string) SpecOpts {
 	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {

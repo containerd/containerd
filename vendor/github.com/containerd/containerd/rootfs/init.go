@@ -19,11 +19,13 @@ var (
 
 type initializerFunc func(string) error
 
+// Mounter handles mount and unmount
 type Mounter interface {
 	Mount(target string, mounts ...mount.Mount) error
 	Unmount(target string) error
 }
 
+// InitRootFS initializes the snapshot for use as a rootfs
 func InitRootFS(ctx context.Context, name string, parent digest.Digest, readonly bool, snapshotter snapshot.Snapshotter, mounter Mounter) ([]mount.Mount, error) {
 	_, err := snapshotter.Stat(ctx, name)
 	if err == nil {

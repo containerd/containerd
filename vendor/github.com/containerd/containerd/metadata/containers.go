@@ -22,6 +22,7 @@ type containerStore struct {
 	tx *bolt.Tx
 }
 
+// NewContainerStore returns a Store backed by an underlying bolt DB
 func NewContainerStore(tx *bolt.Tx) containers.Store {
 	return &containerStore{
 		tx: tx,

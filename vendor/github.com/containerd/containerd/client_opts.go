@@ -33,21 +33,47 @@ func WithDialOpts(opts []grpc.DialOption) ClientOpt {
 	}
 }
 
-// RemoteOpts allows the caller to set distribution options for a remote
-type RemoteOpts func(*Client, *RemoteContext) error
+// RemoteOpt allows the caller to set distribution options for a remote
+type RemoteOpt func(*Client, *RemoteContext) error
 
 // WithPullUnpack is used to unpack an image after pull. This
 // uses the snapshotter, content store, and diff service
 // configured for the client.
-func WithPullUnpack(client *Client, c *RemoteContext) error {
+func WithPullUnpack(_ *Client, c *RemoteContext) error {
 	c.Unpack = true
 	return nil
 }
 
 // WithPullSnapshotter specifies snapshotter name used for unpacking
-func WithPullSnapshotter(snapshotterName string) RemoteOpts {
-	return func(client *Client, c *RemoteContext) error {
+func WithPullSnapshotter(snapshotterName string) RemoteOpt {
+	return func(_ *Client, c *RemoteContext) error {
 		c.Snapshotter = snapshotterName
+		return nil
+	}
+}
+
+// WithPullLabel sets a label to be associated with a pulled reference
+func WithPullLabel(key, value string) RemoteOpt {
+	return func(_ *Client, rc *RemoteContext) error {
+		if rc.Labels == nil {
+			rc.Labels = make(map[string]string)
+		}
+
+		rc.Labels[key] = value
+		return nil
+	}
+}
+
+// WithPullLabels associates a set of labels to a pulled reference
+func WithPullLabels(labels map[string]string) RemoteOpt {
+	return func(_ *Client, rc *RemoteContext) error {
+		if rc.Labels == nil {
+			rc.Labels = make(map[string]string)
+		}
+
+		for k, v := range labels {
+			rc.Labels[k] = v
+		}
 		return nil
 	}
 }
@@ -61,7 +87,7 @@ func WithSchema1Conversion(client *Client, c *RemoteContext) error {
 }
 
 // WithResolver specifies the resolver to use.
-func WithResolver(resolver remotes.Resolver) RemoteOpts {
+func WithResolver(resolver remotes.Resolver) RemoteOpt {
 	return func(client *Client, c *RemoteContext) error {
 		c.Resolver = resolver
 		return nil
@@ -69,7 +95,7 @@ func WithResolver(resolver remotes.Resolver) RemoteOpts {
 }
 
 // WithImageHandler adds a base handler to be called on dispatch.
-func WithImageHandler(h images.Handler) RemoteOpts {
+func WithImageHandler(h images.Handler) RemoteOpt {
 	return func(client *Client, c *RemoteContext) error {
 		c.BaseHandlers = append(c.BaseHandlers, h)
 		return nil

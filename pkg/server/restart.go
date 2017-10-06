@@ -127,7 +127,11 @@ func loadContainer(ctx context.Context, cntr containerd.Container, containerDir 
 	id := cntr.ID()
 	var container containerstore.Container
 	// Load container metadata.
-	ext, ok := cntr.Extensions()[containerMetadataExtension]
+	exts, err := cntr.Extensions(ctx)
+	if err != nil {
+		return container, fmt.Errorf("failed to get container extensions: %v", err)
+	}
+	ext, ok := exts[containerMetadataExtension]
 	if !ok {
 		return container, fmt.Errorf("metadata extension %q not found", containerMetadataExtension)
 	}
@@ -278,7 +282,11 @@ func unknownContainerStatus() containerstore.Status {
 func loadSandbox(ctx context.Context, cntr containerd.Container) (sandboxstore.Sandbox, error) {
 	var sandbox sandboxstore.Sandbox
 	// Load sandbox metadata.
-	ext, ok := cntr.Extensions()[sandboxMetadataExtension]
+	exts, err := cntr.Extensions(ctx)
+	if err != nil {
+		return sandbox, fmt.Errorf("failed to get sandbox container extensions: %v", err)
+	}
+	ext, ok := exts[sandboxMetadataExtension]
 	if !ok {
 		return sandbox, fmt.Errorf("metadata extension %q not found", sandboxMetadataExtension)
 	}

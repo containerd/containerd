@@ -20,7 +20,7 @@ func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
 		ID:   "images",
-		Requires: []plugin.PluginType{
+		Requires: []plugin.Type{
 			plugin.MetadataPlugin,
 		},
 		Init: func(ic *plugin.InitContext) (interface{}, error) {
@@ -28,17 +28,17 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			return NewService(m.(*bolt.DB), ic.Events), nil
+			return NewService(m.(*metadata.DB), ic.Events), nil
 		},
 	})
 }
 
 type Service struct {
-	db        *bolt.DB
+	db        *metadata.DB
 	publisher events.Publisher
 }
 
-func NewService(db *bolt.DB, publisher events.Publisher) imagesapi.ImagesServer {
+func NewService(db *metadata.DB, publisher events.Publisher) imagesapi.ImagesServer {
 	return &Service{
 		db:        db,
 		publisher: publisher,

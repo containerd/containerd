@@ -104,7 +104,7 @@ func (em *eventMonitor) handleEvent(evt *events.Envelope) {
 			return
 		}
 		// Attach container IO so that `Delete` could cleanup the stream properly.
-		task, err := cntr.Container.Get().Task(context.Background(),
+		task, err := cntr.Container.Task(context.Background(),
 			func(*containerd.FIFOSet) (containerd.IO, error) {
 				return cntr.IO, nil
 			},

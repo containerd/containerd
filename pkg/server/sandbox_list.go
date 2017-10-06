@@ -22,6 +22,7 @@ import (
 
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types/task"
+	"github.com/containerd/containerd/errdefs"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
@@ -55,7 +56,15 @@ func (c *criContainerdService) ListPodSandbox(ctx context.Context, r *runtime.Li
 			state = runtime.PodSandboxState_SANDBOX_READY
 		}
 
-		createdAt := sandboxInStore.Container.Info().CreatedAt
+		info, err := sandboxInStore.Container.Info(ctx)
+		if err != nil {
+			// It's possible that container gets deleted during list.
+			if errdefs.IsNotFound(err) {
+				continue
+			}
+			return nil, fmt.Errorf("failed to get sandbox container %q info: %v", sandboxInStore.ID, err)
+		}
+		createdAt := info.CreatedAt
 		sandboxes = append(sandboxes, toCRISandbox(sandboxInStore.Metadata, state, createdAt))
 	}
 

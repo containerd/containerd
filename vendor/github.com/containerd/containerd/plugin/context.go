@@ -9,7 +9,8 @@ import (
 	"github.com/containerd/containerd/log"
 )
 
-func NewContext(ctx context.Context, plugins map[PluginType]map[string]interface{}, root, state, id string) *InitContext {
+// NewContext returns a new plugin InitContext
+func NewContext(ctx context.Context, plugins map[Type]map[string]interface{}, root, state, id string) *InitContext {
 	return &InitContext{
 		plugins: plugins,
 		Root:    filepath.Join(root, id),
@@ -18,6 +19,7 @@ func NewContext(ctx context.Context, plugins map[PluginType]map[string]interface
 	}
 }
 
+// InitContext is used for plugin inititalization
 type InitContext struct {
 	Root    string
 	State   string
@@ -26,17 +28,19 @@ type InitContext struct {
 	Config  interface{}
 	Events  *events.Exchange
 
-	plugins map[PluginType]map[string]interface{}
+	plugins map[Type]map[string]interface{}
 }
 
-func (i *InitContext) Get(t PluginType) (interface{}, error) {
+// Get returns the first plugin by its type
+func (i *InitContext) Get(t Type) (interface{}, error) {
 	for _, v := range i.plugins[t] {
 		return v, nil
 	}
 	return nil, fmt.Errorf("no plugins registered for %s", t)
 }
 
-func (i *InitContext) GetAll(t PluginType) (map[string]interface{}, error) {
+// GetAll returns all plugins with the specific type
+func (i *InitContext) GetAll(t Type) (map[string]interface{}, error) {
 	p, ok := i.plugins[t]
 	if !ok {
 		return nil, fmt.Errorf("no plugins registered for %s", t)
