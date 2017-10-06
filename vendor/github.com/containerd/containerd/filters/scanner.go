@@ -67,9 +67,8 @@ func (s *scanner) next() rune {
 	if r == utf8.RuneError {
 		if w > 0 {
 			return tokenIllegal
-		} else {
-			return tokenEOF
 		}
+		return tokenEOF
 	}
 
 	if r == 0 {

@@ -9,8 +9,10 @@ import (
 )
 
 const (
+	// NamespaceEnvVar is the environment variable key name
 	NamespaceEnvVar = "CONTAINERD_NAMESPACE"
-	Default         = "default"
+	// Default is the name of the default namespace
+	Default = "default"
 )
 
 type namespaceKey struct{}

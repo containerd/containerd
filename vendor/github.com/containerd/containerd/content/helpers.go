@@ -19,6 +19,7 @@ var (
 	}
 )
 
+// NewReader returns a io.Reader from a ReaderAt
 func NewReader(ra ReaderAt) io.Reader {
 	rd := io.NewSectionReader(ra, 0, ra.Size())
 	return rd

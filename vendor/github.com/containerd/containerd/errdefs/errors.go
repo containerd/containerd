@@ -29,6 +29,7 @@ var (
 	ErrNotImplemented     = errors.New("not implemented") // represents not supported and unimplemented
 )
 
+// IsInvalidArgument returns true if the error is due to an invalid argument
 func IsInvalidArgument(err error) bool {
 	return errors.Cause(err) == ErrInvalidArgument
 }
@@ -45,15 +46,17 @@ func IsAlreadyExists(err error) bool {
 }
 
 // IsFailedPrecondition returns true if an operation could not proceed to the
-// lack of a particular condition.
+// lack of a particular condition
 func IsFailedPrecondition(err error) bool {
 	return errors.Cause(err) == ErrFailedPrecondition
 }
 
+// IsUnavailable returns true if the error is due to a resource being unavailable
 func IsUnavailable(err error) bool {
 	return errors.Cause(err) == ErrUnavailable
 }
 
+// IsNotImplemented returns true if the error is due to not being implemented
 func IsNotImplemented(err error) bool {
 	return errors.Cause(err) == ErrNotImplemented
 }

@@ -1,5 +1,6 @@
 package fs
 
+// Usage of disk information
 type Usage struct {
 	Inodes int64
 	Size   int64

@@ -32,11 +32,13 @@ type Resolver interface {
 	Pusher(ctx context.Context, ref string) (Pusher, error)
 }
 
+// Fetcher fetches content
 type Fetcher interface {
 	// Fetch the resource identified by the descriptor.
 	Fetch(ctx context.Context, desc ocispec.Descriptor) (io.ReadCloser, error)
 }
 
+// Pusher pushes content
 type Pusher interface {
 	// Push returns a content writer for the given resource identified
 	// by the descriptor.
@@ -47,6 +49,7 @@ type Pusher interface {
 // function.
 type FetcherFunc func(ctx context.Context, desc ocispec.Descriptor) (io.ReadCloser, error)
 
+// Fetch content
 func (fn FetcherFunc) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.ReadCloser, error) {
 	return fn(ctx, desc)
 }
@@ -55,6 +58,7 @@ func (fn FetcherFunc) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.Re
 // function.
 type PusherFunc func(ctx context.Context, desc ocispec.Descriptor, r io.Reader) error
 
-func (fn PusherFunc) Pusher(ctx context.Context, desc ocispec.Descriptor, r io.Reader) error {
+// Push content
+func (fn PusherFunc) Push(ctx context.Context, desc ocispec.Descriptor, r io.Reader) error {
 	return fn(ctx, desc, r)
 }

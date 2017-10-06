@@ -68,6 +68,7 @@ func (c *Client) importFromOCITar(ctx context.Context, ref string, reader io.Rea
 	imgrec := images.Image{
 		Name:   ref,
 		Target: *desc,
+		Labels: iopts.labels,
 	}
 	is := c.ImageService()
 	if updated, err := is.Update(ctx, imgrec, "target"); err != nil {
