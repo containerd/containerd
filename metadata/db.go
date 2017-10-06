@@ -27,12 +27,19 @@ const (
 	dbVersion = 1
 )
 
+// DB represents a metadata database backed by a bolt
+// database. The database is fully namespaced and stores
+// image, container, namespace, snapshot, and content data
+// while proxying data shared across namespaces to backend
+// datastores for content and snapshots.
 type DB struct {
 	db *bolt.DB
 	ss map[string]snapshot.Snapshotter
 	cs content.Store
 }
 
+// NewDB creates a new metadata database using the provided
+// bolt database, content store, and snapshotters.
 func NewDB(db *bolt.DB, cs content.Store, ss map[string]snapshot.Snapshotter) *DB {
 	return &DB{
 		db: db,
@@ -41,6 +48,8 @@ func NewDB(db *bolt.DB, cs content.Store, ss map[string]snapshot.Snapshotter) *D
 	}
 }
 
+// Init ensures the database is at the correct version
+// and performs any needed migrations.
 func (m *DB) Init(ctx context.Context) error {
 	// errSkip is used when no migration or version needs to be written
 	// to the database and the transaction can be immediately rolled
@@ -54,7 +63,14 @@ func (m *DB) Init(ctx context.Context) error {
 			version = 0
 		)
 
+		// i represents the index of the first migration
+		// which must be run to get the database up to date.
+		// The migration's version will be checked in reverse
+		// order, decrementing i for each migration which
+		// represents a version newer than the current
+		// database version
 		i := len(migrations)
+
 		for ; i > 0; i-- {
 			migration := migrations[i-1]
 
@@ -116,6 +132,8 @@ func (m *DB) Init(ctx context.Context) error {
 	return err
 }
 
+// ContentStore returns a namespaced content store
+// proxied to a content store.
 func (m *DB) ContentStore() content.Store {
 	if m.cs == nil {
 		return nil
@@ -123,6 +141,8 @@ func (m *DB) ContentStore() content.Store {
 	return newContentStore(m, m.cs)
 }
 
+// Snapshotter returns a namespaced content store for
+// the requested snapshotter name proxied to a snapshotter.
 func (m *DB) Snapshotter(name string) snapshot.Snapshotter {
 	sn, ok := m.ss[name]
 	if !ok {
@@ -131,10 +151,12 @@ func (m *DB) Snapshotter(name string) snapshot.Snapshotter {
 	return newSnapshotter(m, name, sn)
 }
 
+// View runs a readonly transaction on the metadata store.
 func (m *DB) View(fn func(*bolt.Tx) error) error {
 	return m.db.View(fn)
 }
 
+// Update runs a writable transation on the metadata store.
 func (m *DB) Update(fn func(*bolt.Tx) error) error {
 	return m.db.Update(fn)
 }

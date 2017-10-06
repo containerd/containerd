@@ -8,6 +8,16 @@ type migration struct {
 	migrate func(*bolt.Tx) error
 }
 
+// migrations stores the list of database migrations
+// for each update to the database schema. The migrations
+// array MUST be ordered by version from least to greatest.
+// The last entry in the array should correspond to the
+// schemaVersion and dbVersion constants.
+// A migration test MUST be added for each migration in
+// the array.
+// The migrate function can safely assume the version
+// of the data it is migrating from is the previous version
+// of the database.
 var migrations = []migration{
 	{
 		schema:  "v1",
