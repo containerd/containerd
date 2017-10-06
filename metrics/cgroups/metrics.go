@@ -77,22 +77,23 @@ func (c *collector) Collect(ch chan<- prometheus.Metric) {
 	wg := &sync.WaitGroup{}
 	for _, t := range c.cgroups {
 		wg.Add(1)
-		go c.collect(t.id, t.namespace, t.cgroup, ch, wg)
+		go c.collect(t.id, t.namespace, t.cgroup, ch, true, wg)
 	}
-SelectLoop:
+storedLoop:
 	for {
+		// read stored metrics until the channel is flushed
 		select {
-		case value := <-c.storedMetrics:
-			ch <- value
+		case m := <-c.storedMetrics:
+			ch <- m
 		default:
-			break SelectLoop
+			break storedLoop
 		}
 	}
 	c.mu.RUnlock()
 	wg.Wait()
 }
 
-func (c *collector) collect(id, namespace string, cg cgroups.Cgroup, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
+func (c *collector) collect(id, namespace string, cg cgroups.Cgroup, ch chan<- prometheus.Metric, block bool, wg *sync.WaitGroup) {
 	if wg != nil {
 		defer wg.Done()
 	}
@@ -102,7 +103,7 @@ func (c *collector) collect(id, namespace string, cg cgroups.Cgroup, ch chan<- p
 		return
 	}
 	for _, m := range c.metrics {
-		m.collect(id, namespace, stats, c.ns, ch)
+		m.collect(id, namespace, stats, c.ns, ch, block)
 	}
 }
 
