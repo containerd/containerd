@@ -70,6 +70,8 @@ func (m *cgroupsMonitor) Monitor(c runtime.Task) error {
 
 func (m *cgroupsMonitor) Stop(c runtime.Task) error {
 	info := c.Info()
+	t := c.(*linux.Task)
+	m.collector.collect(info.ID, info.Namespace, t.Cgroup(), m.collector.storedMetrics, false, nil)
 	m.collector.Remove(info.ID, info.Namespace)
 	return nil
 }

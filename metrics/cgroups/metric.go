@@ -28,9 +28,18 @@ func (m *metric) desc(ns *metrics.Namespace) *prometheus.Desc {
 	return ns.NewDesc(m.name, m.help, m.unit, append([]string{"container_id", "namespace"}, m.labels...)...)
 }
 
-func (m *metric) collect(id, namespace string, stats *cgroups.Metrics, ns *metrics.Namespace, ch chan<- prometheus.Metric) {
+func (m *metric) collect(id, namespace string, stats *cgroups.Metrics, ns *metrics.Namespace, ch chan<- prometheus.Metric, block bool) {
 	values := m.getValues(stats)
 	for _, v := range values {
-		ch <- prometheus.MustNewConstMetric(m.desc(ns), m.vt, v.v, append([]string{id, namespace}, v.l...)...)
+		// block signals to block on the sending the metrics so none are missed
+		if block {
+			ch <- prometheus.MustNewConstMetric(m.desc(ns), m.vt, v.v, append([]string{id, namespace}, v.l...)...)
+			continue
+		}
+		// non-blocking metrics can be dropped if the chan is full
+		select {
+		case ch <- prometheus.MustNewConstMetric(m.desc(ns), m.vt, v.v, append([]string{id, namespace}, v.l...)...):
+		default:
+		}
 	}
 }
