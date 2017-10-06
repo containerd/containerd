@@ -33,7 +33,7 @@ type Container struct {
 	// Status stores the status of the container.
 	Status StatusStorage
 	// Container is the containerd container client.
-	Container *Client
+	Container containerd.Container
 	// Container IO
 	IO *cio.ContainerIO
 	// TODO(random-liu): Add stop channel to get rid of stop poll waiting.
@@ -45,7 +45,7 @@ type Opts func(*Container) error
 // WithContainer adds the containerd Container to the internal data store.
 func WithContainer(cntr containerd.Container) Opts {
 	return func(c *Container) error {
-		c.Container = &Client{container: cntr}
+		c.Container = cntr
 		return nil
 	}
 }
@@ -94,10 +94,6 @@ type Store struct {
 	containers map[string]Container
 	// TODO(random-liu): Add trunc index.
 }
-
-// LoadStore loads containers from runtime.
-// TODO(random-liu): Implement LoadStore.
-func LoadStore() *Store { return nil }
 
 // NewStore creates a container store.
 func NewStore() *Store {

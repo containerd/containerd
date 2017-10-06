@@ -60,7 +60,7 @@ func TestUpdateContainerResources(t *testing.T) {
 	t.Logf("Check memory limit in container OCI spec")
 	container, err := containerdClient.LoadContainer(context.Background(), cn)
 	require.NoError(t, err)
-	spec, err := container.Spec()
+	spec, err := container.Spec(context.Background())
 	require.NoError(t, err)
 	checkMemoryLimit(t, spec, 2*1024*1024)
 
@@ -71,9 +71,7 @@ func TestUpdateContainerResources(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf("Check memory limit in container OCI spec")
-	container, err = containerdClient.LoadContainer(context.Background(), cn)
-	require.NoError(t, err)
-	spec, err = container.Spec()
+	spec, err = container.Spec(context.Background())
 	require.NoError(t, err)
 	checkMemoryLimit(t, spec, 4*1024*1024)
 
@@ -96,9 +94,7 @@ func TestUpdateContainerResources(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf("Check memory limit in container OCI spec")
-	container, err = containerdClient.LoadContainer(context.Background(), cn)
-	require.NoError(t, err)
-	spec, err = container.Spec()
+	spec, err = container.Spec(context.Background())
 	require.NoError(t, err)
 	checkMemoryLimit(t, spec, 8*1024*1024)
 

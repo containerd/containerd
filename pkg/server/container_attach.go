@@ -61,7 +61,7 @@ func (c *criContainerdService) attachContainer(ctx context.Context, id string, s
 		return fmt.Errorf("container is in %s state", criContainerStateToString(state))
 	}
 
-	task, err := cntr.Container.Get().Task(ctx, nil)
+	task, err := cntr.Container.Task(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to load task: %v", err)
 	}

@@ -34,15 +34,12 @@ import (
 func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandboxStatusRequest) (*runtime.PodSandboxStatusResponse, error) {
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
-		return nil, fmt.Errorf("an error occurred when try to find sandbox %q: %v",
-			r.GetPodSandboxId(), err)
+		return nil, fmt.Errorf("an error occurred when try to find sandbox: %v", err)
 	}
-	// Use the full sandbox id.
-	id := sandbox.ID
 
 	task, err := sandbox.Container.Task(ctx, nil)
 	if err != nil && !errdefs.IsNotFound(err) {
-		return nil, fmt.Errorf("failed to get sandbox container info for %q: %v", id, err)
+		return nil, fmt.Errorf("failed to get sandbox container task: %v", err)
 	}
 
 	// Set sandbox state to NOTREADY by default.
@@ -51,7 +48,7 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 	if task != nil {
 		taskStatus, err := task.Status(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get task status for sandbox container %q: %v", id, err)
+			return nil, fmt.Errorf("failed to get task status: %v", err)
 		}
 
 		if taskStatus.Status == containerd.Running {
@@ -64,7 +61,11 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 		return nil, fmt.Errorf("failed to get sandbox ip: %v", err)
 	}
 
-	createdAt := sandbox.Container.Info().CreatedAt
+	info, err := sandbox.Container.Info(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox container info: %v", err)
+	}
+	createdAt := info.CreatedAt
 	status := toCRISandboxStatus(sandbox.Metadata, state, createdAt, ip)
 	return &runtime.PodSandboxStatusResponse{Status: status}, nil
 }

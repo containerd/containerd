@@ -51,10 +51,6 @@ type Store struct {
 	// TODO(random-liu): Add trunc index.
 }
 
-// LoadStore loads images from runtime.
-// TODO(random-liu): Implement LoadStore.
-func LoadStore() *Store { return nil }
-
 // NewStore creates an image store.
 func NewStore() *Store {
 	return &Store{images: make(map[string]Image)}
