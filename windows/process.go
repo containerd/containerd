@@ -52,6 +52,9 @@ func (p *process) State(ctx context.Context) (runtime.State, error) {
 }
 
 func (p *process) Status() runtime.Status {
+	p.Lock()
+	defer p.Unlock()
+
 	if p.task.getStatus() == runtime.PausedStatus {
 		return runtime.PausedStatus
 	}
@@ -71,15 +74,24 @@ func (p *process) Status() runtime.Status {
 
 func (p *process) Kill(ctx context.Context, sig uint32, all bool) error {
 	// On windows all signals kill the process
+	if p.Status() == runtime.CreatedStatus {
+		return errors.Wrap(errdefs.ErrFailedPrecondition, "process was not started")
+	}
 	return errors.Wrap(p.hcs.Kill(), "failed to kill process")
 }
 
 func (p *process) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
+	if p.Status() == runtime.CreatedStatus {
+		return errors.Wrap(errdefs.ErrFailedPrecondition, "process was not started")
+	}
 	err := p.hcs.ResizeConsole(uint16(size.Width), uint16(size.Height))
 	return errors.Wrap(err, "failed to resize process console")
 }
 
 func (p *process) CloseIO(ctx context.Context) error {
+	if p.Status() == runtime.CreatedStatus {
+		return errors.Wrap(errdefs.ErrFailedPrecondition, "process was not started")
+	}
 	return errors.Wrap(p.hcs.CloseStdin(), "failed to close stdin")
 }
 

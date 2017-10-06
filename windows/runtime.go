@@ -304,6 +304,11 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, spec
 		hcsContainer:      ctr,
 		terminateDuration: createOpts.TerminateDuration,
 	}
+	// Create the new process but don't start it
+	pconf := newWindowsProcessConfig(t.spec.Process, t.io)
+	if _, err = t.newProcess(ctx, t.id, pconf, t.io); err != nil {
+		return nil, err
+	}
 	r.tasks.Add(ctx, t)
 
 	var rootfs []*containerdtypes.Mount

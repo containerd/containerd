@@ -111,17 +111,16 @@ func (t *task) Info() runtime.TaskInfo {
 }
 
 func (t *task) Start(ctx context.Context) error {
-	if p := t.getProcess(t.id); p != nil {
-		return errors.Wrap(errdefs.ErrFailedPrecondition, "task already started")
+	p := t.getProcess(t.id)
+	if p == nil {
+		panic("init process is missing")
 	}
 
-	conf := newWindowsProcessConfig(t.spec.Process, t.io)
-	p, err := t.newProcess(ctx, t.id, conf, t.io)
-	if err != nil {
-		return err
+	if p.Status() != runtime.CreatedStatus {
+		return errors.Wrap(errdefs.ErrFailedPrecondition, "process was already started")
 	}
+
 	if err := p.Start(ctx); err != nil {
-		t.removeProcess(t.id)
 		return err
 	}
 	t.publisher.Publish(ctx,
