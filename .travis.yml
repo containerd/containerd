@@ -81,4 +81,6 @@ jobs:
       script:
         - test "${TRAVIS_PULL_REQUEST}" != "false" && exit 0 || true
         - make push
+        # Build a tarball including CNI for node e2e.
+        - PUSH_VERSION=true make push TARBALL_PREFIX=cri-containerd-node-e2e INCLUDE_CNI=true
       go: 1.8.x

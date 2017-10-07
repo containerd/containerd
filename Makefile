@@ -23,7 +23,8 @@ BUILD_DIR := _output
 VERSION := $(shell git describe --tags --dirty)
 # strip the first char of the tag if it's a `v`
 VERSION := $(VERSION:v%=%)
-TARBALL := cri-containerd-$(VERSION).tar.gz
+TARBALL_PREFIX := cri-containerd
+TARBALL := $(TARBALL_PREFIX)-$(VERSION).tar.gz
 BUILD_TAGS := seccomp apparmor
 GO_LDFLAGS := -X $(PROJECT)/pkg/version.criContainerdVersion=$(VERSION)
 SOURCES := $(shell find cmd/ pkg/ vendor/ -name '*.go')
@@ -114,7 +115,7 @@ $(BUILD_DIR)/$(TARBALL): $(BUILD_DIR)/cri-containerd hack/versions
 release: $(BUILD_DIR)/$(TARBALL)
 
 push: $(BUILD_DIR)/$(TARBALL)
-	@BUILD_DIR=$(BUILD_DIR) TARBALL=$(TARBALL) ./hack/push.sh
+	@BUILD_DIR=$(BUILD_DIR) TARBALL=$(TARBALL) VERSION=$(VERSION) ./hack/push.sh
 
 .PHONY: install.deps
 
