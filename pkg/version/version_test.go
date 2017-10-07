@@ -28,6 +28,6 @@ func TestValidateSemver(t *testing.T) {
 	assert.NotNil(err)
 	err = validateSemver("0.0.0-1-gdf6a1cc-dirty")
 	assert.Nil(err)
-	err = validateSemver(criContainerdVersion)
+	err = validateSemver(CRIContainerdVersion)
 	assert.Nil(err)
 }

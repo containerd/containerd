@@ -22,7 +22,8 @@ import (
 	"github.com/blang/semver"
 )
 
-var criContainerdVersion = "UNKNOWN"
+// CRIContainerdVersion is the version of the cri-containerd.
+var CRIContainerdVersion = "UNKNOWN"
 
 func validateSemver(sv string) error {
 	_, err := semver.Parse(sv)
@@ -34,9 +35,9 @@ func validateSemver(sv string) error {
 
 // PrintVersion outputs the release version of cri-containerd
 func PrintVersion() {
-	err := validateSemver(criContainerdVersion)
+	err := validateSemver(CRIContainerdVersion)
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println(criContainerdVersion)
+	fmt.Println(CRIContainerdVersion)
 }
