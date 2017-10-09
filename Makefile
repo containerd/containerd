@@ -18,14 +18,14 @@ PROJECT := github.com/kubernetes-incubator/cri-containerd
 BINDIR := ${DESTDIR}/usr/local/bin
 BUILD_DIR := _output
 # VERSION is derived from the current tag for HEAD plus amends. Version is used
-# to set/overide the criContainerdVersion variable in the verison package for
+# to set/overide the CRIContainerdVersion variable in the verison package for
 # cri-containerd.
 VERSION := $(shell git describe --tags --dirty)
 # strip the first char of the tag if it's a `v`
 VERSION := $(VERSION:v%=%)
 TARBALL := cri-containerd-$(VERSION).tar.gz
 BUILD_TAGS := seccomp apparmor
-GO_LDFLAGS := -X $(PROJECT)/pkg/version.criContainerdVersion=$(VERSION)
+GO_LDFLAGS := -X $(PROJECT)/pkg/version.CRIContainerdVersion=$(VERSION)
 SOURCES := $(shell find cmd/ pkg/ vendor/ -name '*.go')
 INTEGRATION_SOURCES := $(shell find integration/ -name '*.go')
 
