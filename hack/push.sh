@@ -23,6 +23,9 @@ source $(dirname "${BASH_SOURCE[0]}")/test-utils.sh
 DEPLOY_BUCKET=${DEPLOY_BUCKET:-"cri-containerd-staging"}
 BUILD_DIR=${BUILD_DIR:-"_output"}
 TARBALL=${TARBALL:-"cri-containerd.tar.gz"}
+LATEST=${LATEST:-"latest"}
+# PUSH_VERSION indicates whether to push version.
+PUSH_VERSION=${PUSH_VERSION:-false}
 
 release_tar=${ROOT}/${BUILD_DIR}/${TARBALL}
 if [ ! -e ${release_tar} ]; then
@@ -38,3 +41,13 @@ fi
 gsutil cp ${release_tar} "gs://${DEPLOY_BUCKET}/"
 echo "Release tarball is uploaded to:
   https://storage.googleapis.com/${DEPLOY_BUCKET}/${TARBALL}"
+
+if ${PUSH_VERSION}; then
+  if [[ -z "${VERSION}" ]]; then
+    echo "VERSION is not set"
+    exit 1
+  fi
+  echo ${VERSION} | gsutil cp - "gs://${DEPLOY_BUCKET}/${LATEST}"
+  echo "Latest version is uploaded to:
+  https://storage.googleapis.com/${DEPLOY_BUCKET}/${LATEST}"
+fi

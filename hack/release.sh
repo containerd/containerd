@@ -25,11 +25,14 @@ cd ${ROOT}
 # TARBALL is the name of the release tar.
 BUILD_DIR=${BUILD_DIR:-"_output"}
 TARBALL=${TARBALL:-"cri-containerd.tar.gz"}
+# INCLUDE_CNI indicates whether to install CNI. By default don't
+# include CNI in release tarball.
+INCLUDE_CNI=${INCLUDE_CNI:-false}
 
 destdir=${BUILD_DIR}/release-stage
 
 # Install dependencies into release stage.
-NOSUDO=true INSTALL_CNI=false DESTDIR=${destdir} ./hack/install-deps.sh
+NOSUDO=true INSTALL_CNI=${INCLUDE_CNI} DESTDIR=${destdir} ./hack/install-deps.sh
 
 # Install cri-containerd into release stage.
 make install -e DESTDIR=${destdir}
