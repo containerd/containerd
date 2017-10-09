@@ -34,6 +34,7 @@ import (
 	runcapparmor "github.com/opencontainers/runc/libcontainer/apparmor"
 	runcseccomp "github.com/opencontainers/runc/libcontainer/seccomp"
 	"golang.org/x/net/context"
+	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
@@ -143,6 +144,7 @@ func NewCRIContainerdService(config options.Config) (CRIContainerdService, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to get imagefs uuid of %q: %v", imageFSPath, err)
 	}
+	glog.V(2).Infof("Get device uuid %q for image filesystem %q", c.imageFSUUID, imageFSPath)
 
 	c.netPlugin, err = ocicni.InitCNI(config.NetworkPluginConfDir, config.NetworkPluginBinDir)
 	if err != nil {
@@ -243,11 +245,12 @@ func (c *criContainerdService) Stop() {
 
 // getDeviceUUID gets device uuid for a given path.
 func (c *criContainerdService) getDeviceUUID(path string) (string, error) {
-	info, err := c.os.LookupMount(path)
+	mount, err := c.os.LookupMount(path)
 	if err != nil {
 		return "", err
 	}
-	return c.os.DeviceUUID(info.Source)
+	rdev := unix.Mkdev(uint32(mount.Major), uint32(mount.Minor))
+	return c.os.DeviceUUID(rdev)
 }
 
 // imageFSPath returns containerd image filesystem path.
