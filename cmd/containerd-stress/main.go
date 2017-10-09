@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/namespaces"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
@@ -98,7 +100,7 @@ func test(c config) error {
 		return err
 	}
 	logrus.Info("generating spec from image")
-	spec, err := containerd.GenerateSpec(ctx, client, nil, containerd.WithImageConfig(image), containerd.WithProcessArgs("true"))
+	spec, err := containerd.GenerateSpec(ctx, client, &containers.Container{ID: ""}, containerd.WithImageConfig(image), containerd.WithProcessArgs("true"))
 	if err != nil {
 		return err
 	}
@@ -120,7 +122,7 @@ func test(c config) error {
 		w := &worker{
 			id:     i,
 			wg:     &wg,
-			spec:   spec,
+			spec:   *spec,
 			image:  image,
 			client: client,
 		}
@@ -158,7 +160,7 @@ type worker struct {
 
 	client *containerd.Client
 	image  containerd.Image
-	spec   *specs.Spec
+	spec   specs.Spec
 }
 
 func (w *worker) run(ctx, tctx context.Context) {
@@ -194,8 +196,9 @@ func (w *worker) run(ctx, tctx context.Context) {
 }
 
 func (w *worker) runContainer(ctx context.Context, id string) error {
+	w.spec.Linux.CgroupsPath = filepath.Join("/", fmt.Sprint(w.id), id)
 	c, err := w.client.NewContainer(ctx, id,
-		containerd.WithSpec(w.spec),
+		containerd.WithSpec(&w.spec),
 		containerd.WithNewSnapshot(id, w.image),
 	)
 	if err != nil {

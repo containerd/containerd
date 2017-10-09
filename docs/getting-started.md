@@ -196,18 +196,11 @@ func redisExample() error {
         }
         log.Printf("Successfully pulled %s image\n", image.Name())
 
-        spec, err := containerd.GenerateSpec(ctx, client, nil, containerd.WithImageConfig(image))
-        if err != nil {
-                return err
-        }
-        log.Printf("Successfully generate an OCI spec version %s based on %s image", spec.Version, image.Name())
-
         container, err := client.NewContainer(
                 ctx,
                 "redis-server",
-                containerd.WithSpec(spec),
-                containerd.WithImage(image),
                 containerd.WithNewSnapshot("redis-server-snapshot", image),
+                containerd.WithNewSpec(containerd.WithImageConfig(image)),
         )
         if err != nil {
                 return err

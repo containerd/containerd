@@ -38,7 +38,7 @@ func WithHostname(name string) SpecOpts {
 // WithNewSpec generates a new spec for a new container
 func WithNewSpec(opts ...SpecOpts) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		s, err := createDefaultSpec()
+		s, err := createDefaultSpec(ctx, c.ID)
 		if err != nil {
 			return err
 		}
