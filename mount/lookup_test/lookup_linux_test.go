@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -22,6 +23,15 @@ import (
 )
 
 func testLookup(t *testing.T, fsType string) {
+	checkLookup := func(mntPoint, dir string) {
+		info, err := mount.Lookup(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, fsType, info.FSType)
+		assert.Equal(t, mntPoint, info.Mountpoint)
+	}
+
 	testutil.RequiresRoot(t)
 	mnt, err := ioutil.TempDir("", "containerd-mountinfo-test-lookup")
 	if err != nil {
@@ -46,11 +56,28 @@ func testLookup(t *testing.T, fsType string) {
 		cleanupDevice()
 	}()
 	assert.True(t, strings.HasPrefix(deviceName, "/dev/loop"))
-	info, err := mount.Lookup(mnt)
+	checkLookup(mnt, mnt)
+
+	newMnt, err := ioutil.TempDir("", "containerd-mountinfo-test-newMnt")
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, fsType, info.FSType)
+	defer os.RemoveAll(newMnt)
+
+	if out, err := exec.Command("mount", "--bind", mnt, newMnt).CombinedOutput(); err != nil {
+		t.Fatalf("could not mount %s to %s: %v (out: %q)", mnt, newMnt, err, string(out))
+	}
+	defer func() {
+		testutil.Unmount(t, newMnt)
+	}()
+	checkLookup(newMnt, newMnt)
+
+	subDir := filepath.Join(newMnt, "subDir")
+	err = os.MkdirAll(subDir, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkLookup(newMnt, subDir)
 }
 
 func TestLookupWithExt4(t *testing.T) {
