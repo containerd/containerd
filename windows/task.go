@@ -111,13 +111,16 @@ func (t *task) Info() runtime.TaskInfo {
 }
 
 func (t *task) Start(ctx context.Context) error {
-	conf := newWindowsProcessConfig(t.spec.Process, t.io)
-	p, err := t.newProcess(ctx, t.id, conf, t.io)
-	if err != nil {
-		return err
+	p := t.getProcess(t.id)
+	if p == nil {
+		panic("init process is missing")
 	}
+
+	if p.Status() != runtime.CreatedStatus {
+		return errors.Wrap(errdefs.ErrFailedPrecondition, "process was already started")
+	}
+
 	if err := p.Start(ctx); err != nil {
-		t.removeProcess(t.id)
 		return err
 	}
 	t.publisher.Publish(ctx,
@@ -136,13 +139,13 @@ func (t *task) Pause(ctx context.Context) error {
 			t.Lock()
 			t.status = runtime.PausedStatus
 			t.Unlock()
-		}
-		if err == nil {
+
 			t.publisher.Publish(ctx,
 				runtime.TaskPausedEventTopic,
 				&eventsapi.TaskPaused{
 					ContainerID: t.id,
 				})
+			return nil
 		}
 		return errors.Wrap(err, "hcsshim failed to pause task")
 	}
@@ -157,13 +160,13 @@ func (t *task) Resume(ctx context.Context) error {
 			t.Lock()
 			t.status = runtime.RunningStatus
 			t.Unlock()
-		}
-		if err == nil {
+
 			t.publisher.Publish(ctx,
 				runtime.TaskResumedEventTopic,
 				&eventsapi.TaskResumed{
 					ContainerID: t.id,
 				})
+			return nil
 		}
 		return errors.Wrap(err, "hcsshim failed to resume task")
 	}
@@ -313,7 +316,6 @@ func (t *task) newProcess(ctx context.Context, id string, conf *hcsshim.ProcessC
 		id:     id,
 		pid:    pid,
 		io:     pset,
-		status: runtime.CreatedStatus,
 		task:   t,
 		exitCh: make(chan struct{}),
 		conf:   conf,

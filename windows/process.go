@@ -5,6 +5,7 @@ package windows
 import (
 	"context"
 	"io"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,13 +20,14 @@ import (
 
 // process implements containerd.Process and containerd.State
 type process struct {
+	sync.Mutex
+
 	hcs hcsshim.Process
 
-	id     string
-	pid    uint32
-	io     *pipeSet
-	status runtime.Status
-	task   *task
+	id   string
+	pid  uint32
+	io   *pipeSet
+	task *task
 
 	exitCh   chan struct{}
 	exitCode uint32
@@ -50,6 +52,9 @@ func (p *process) State(ctx context.Context) (runtime.State, error) {
 }
 
 func (p *process) Status() runtime.Status {
+	p.Lock()
+	defer p.Unlock()
+
 	if p.task.getStatus() == runtime.PausedStatus {
 		return runtime.PausedStatus
 	}
@@ -69,15 +74,24 @@ func (p *process) Status() runtime.Status {
 
 func (p *process) Kill(ctx context.Context, sig uint32, all bool) error {
 	// On windows all signals kill the process
+	if p.Status() == runtime.CreatedStatus {
+		return errors.Wrap(errdefs.ErrFailedPrecondition, "process was not started")
+	}
 	return errors.Wrap(p.hcs.Kill(), "failed to kill process")
 }
 
 func (p *process) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
+	if p.Status() == runtime.CreatedStatus {
+		return errors.Wrap(errdefs.ErrFailedPrecondition, "process was not started")
+	}
 	err := p.hcs.ResizeConsole(uint16(size.Width), uint16(size.Height))
 	return errors.Wrap(err, "failed to resize process console")
 }
 
 func (p *process) CloseIO(ctx context.Context) error {
+	if p.Status() == runtime.CreatedStatus {
+		return errors.Wrap(errdefs.ErrFailedPrecondition, "process was not started")
+	}
 	return errors.Wrap(p.hcs.CloseStdin(), "failed to close stdin")
 }
 
@@ -93,6 +107,13 @@ func (p *process) ExitCode() (uint32, time.Time, error) {
 }
 
 func (p *process) Start(ctx context.Context) (err error) {
+	p.Lock()
+	defer p.Unlock()
+
+	if p.hcs != nil {
+		return errors.Wrap(errdefs.ErrFailedPrecondition, "process already started")
+	}
+
 	// If we fail, close the io right now
 	defer func() {
 		if err != nil {
@@ -132,6 +153,7 @@ func (p *process) Start(ctx context.Context) (err error) {
 	if p.io.stderr != nil {
 		go ioCopy("stderr", p.io.stderr, stderr)
 	}
+	p.hcs = hp
 
 	// Wait for the process to exit to get the exit status
 	go func() {
@@ -174,8 +196,6 @@ func (p *process) Start(ctx context.Context) (err error) {
 		// Cleanup HCS resources
 		hp.Close()
 	}()
-	p.status = runtime.RunningStatus
-	p.hcs = hp
 	return nil
 }
 

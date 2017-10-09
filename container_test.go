@@ -203,9 +203,9 @@ func TestContainerOutput(t *testing.T) {
 	}
 
 	status := <-statusC
-	code, _, _ := status.Result()
+	code, _, err := status.Result()
 	if code != 0 {
-		t.Errorf("expected status 0 but received %d", code)
+		t.Errorf("expected status 0 but received %d: %v", code, err)
 	}
 	if _, err := task.Delete(ctx); err != nil {
 		t.Error(err)
