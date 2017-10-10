@@ -15,6 +15,7 @@ import (
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
@@ -482,7 +483,7 @@ func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tas
 }
 
 func (t *task) checkpointRWSnapshot(ctx context.Context, index *v1.Index, snapshotterName string, id string) error {
-	rw, err := rootfs.Diff(ctx, id, fmt.Sprintf("checkpoint-rw-%s", id), t.client.SnapshotService(snapshotterName), t.client.DiffService())
+	rw, err := rootfs.Diff(ctx, id, t.client.SnapshotService(snapshotterName), t.client.DiffService(), diff.WithReference(fmt.Sprintf("checkpoint-rw-%s", id)))
 	if err != nil {
 		return err
 	}

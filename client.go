@@ -22,6 +22,7 @@ import (
 	versionservice "github.com/containerd/containerd/api/services/version/v1"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/platforms"
@@ -31,7 +32,6 @@ import (
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/schema1"
 	contentservice "github.com/containerd/containerd/services/content"
-	"github.com/containerd/containerd/services/diff"
 	diffservice "github.com/containerd/containerd/services/diff"
 	imagesservice "github.com/containerd/containerd/services/images"
 	snapshotservice "github.com/containerd/containerd/services/snapshot"
@@ -439,8 +439,8 @@ func (c *Client) ImageService() images.Store {
 	return imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(c.conn))
 }
 
-// DiffService returns the underlying DiffService
-func (c *Client) DiffService() diff.DiffService {
+// DiffService returns the underlying Differ
+func (c *Client) DiffService() diff.Differ {
 	return diffservice.NewDiffServiceFromClient(diffapi.NewDiffClient(c.conn))
 }
 

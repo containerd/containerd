@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	versionservice "github.com/containerd/containerd/api/services/version/v1"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
@@ -35,7 +36,7 @@ import (
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/rootfs"
 	contentservice "github.com/containerd/containerd/services/content"
-	"github.com/containerd/containerd/services/diff"
+	diffservice "github.com/containerd/containerd/services/diff"
 	imagesservice "github.com/containerd/containerd/services/images"
 	namespacesservice "github.com/containerd/containerd/services/namespaces"
 	snapshotservice "github.com/containerd/containerd/services/snapshot"
@@ -169,12 +170,12 @@ func getImageStore(clicontext *cli.Context) (images.Store, error) {
 	return imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)), nil
 }
 
-func getDiffService(context *cli.Context) (diff.DiffService, error) {
+func getDiffService(context *cli.Context) (diff.Differ, error) {
 	conn, err := getGRPCConnection(context)
 	if err != nil {
 		return nil, err
 	}
-	return diff.NewDiffServiceFromClient(diffapi.NewDiffClient(conn)), nil
+	return diffservice.NewDiffServiceFromClient(diffapi.NewDiffClient(conn)), nil
 }
 
 func getVersionService(context *cli.Context) (versionservice.VersionClient, error) {
