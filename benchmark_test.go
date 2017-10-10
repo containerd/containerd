@@ -3,6 +3,8 @@ package containerd
 import (
 	"fmt"
 	"testing"
+
+	"github.com/containerd/containerd/containers"
 )
 
 func BenchmarkContainerCreate(b *testing.B) {
@@ -20,7 +22,7 @@ func BenchmarkContainerCreate(b *testing.B) {
 		b.Error(err)
 		return
 	}
-	spec, err := GenerateSpec(ctx, client, nil, WithImageConfig(image), withTrue())
+	spec, err := GenerateSpec(ctx, client, &containers.Container{ID: b.Name()}, WithImageConfig(image), withTrue())
 	if err != nil {
 		b.Error(err)
 		return
@@ -63,7 +65,7 @@ func BenchmarkContainerStart(b *testing.B) {
 		b.Error(err)
 		return
 	}
-	spec, err := GenerateSpec(ctx, client, nil, WithImageConfig(image), withTrue())
+	spec, err := GenerateSpec(ctx, client, &containers.Container{ID: b.Name()}, WithImageConfig(image), withTrue())
 	if err != nil {
 		b.Error(err)
 		return

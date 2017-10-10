@@ -6,13 +6,16 @@ import (
 	"context"
 	"testing"
 
+	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/namespaces"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func TestGenerateSpec(t *testing.T) {
 	t.Parallel()
 
-	s, err := GenerateSpec(context.Background(), nil, nil)
+	ctx := namespaces.WithNamespace(context.Background(), "testing")
+	s, err := GenerateSpec(ctx, nil, &containers.Container{ID: t.Name()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +55,8 @@ func TestGenerateSpec(t *testing.T) {
 func TestSpecWithTTY(t *testing.T) {
 	t.Parallel()
 
-	s, err := GenerateSpec(context.Background(), nil, nil, WithTTY)
+	ctx := namespaces.WithNamespace(context.Background(), "testing")
+	s, err := GenerateSpec(ctx, nil, &containers.Container{ID: t.Name()}, WithTTY)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,8 +72,10 @@ func TestSpecWithTTY(t *testing.T) {
 func TestWithLinuxNamespace(t *testing.T) {
 	t.Parallel()
 
+	ctx := namespaces.WithNamespace(context.Background(), "testing")
 	replacedNS := specs.LinuxNamespace{Type: specs.NetworkNamespace, Path: "/var/run/netns/test"}
-	s, err := GenerateSpec(context.Background(), nil, nil, WithLinuxNamespace(replacedNS))
+
+	s, err := GenerateSpec(ctx, nil, &containers.Container{ID: t.Name()}, WithLinuxNamespace(replacedNS))
 	if err != nil {
 		t.Fatal(err)
 	}
