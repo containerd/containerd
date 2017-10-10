@@ -16,6 +16,7 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
@@ -127,7 +128,7 @@ func (s *walkingDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts
 
 // DiffMounts creates a diff between the given mounts and uploads the result
 // to the content store.
-func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (ocispec.Descriptor, error) {
+func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
 	var config diff.Config
 	for _, opt := range opts {
 		if err := opt(&config); err != nil {
@@ -169,7 +170,9 @@ func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount
 	}
 	defer mount.Unmount(bDir, 0)
 
+	var newReference bool
 	if config.Reference == "" {
+		newReference = true
 		config.Reference = uniqueRef()
 	}
 
@@ -177,18 +180,31 @@ func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount
 	if err != nil {
 		return emptyDesc, errors.Wrap(err, "failed to open writer")
 	}
+	defer func() {
+		if err != nil {
+			cw.Close()
+			if newReference {
+				if err := s.store.Abort(ctx, config.Reference); err != nil {
+					log.G(ctx).WithField("ref", config.Reference).Warnf("failed to delete diff upload")
+				}
+			}
+		}
+	}()
+	if !newReference {
+		if err := cw.Truncate(0); err != nil {
+			return emptyDesc, err
+		}
+	}
 
 	if isCompressed {
 		dgstr := digest.SHA256.Digester()
 		compressed, err := compression.CompressStream(cw, compression.Gzip)
 		if err != nil {
-			cw.Close()
 			return emptyDesc, errors.Wrap(err, "failed to get compressed stream")
 		}
 		err = archive.WriteDiff(ctx, io.MultiWriter(compressed, dgstr.Hash()), aDir, bDir)
 		compressed.Close()
 		if err != nil {
-			cw.Close()
 			return emptyDesc, errors.Wrap(err, "failed to write compressed diff")
 		}
 
@@ -198,7 +214,6 @@ func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount
 		config.Labels["containerd.io/uncompressed"] = dgstr.Digest().String()
 	} else {
 		if err = archive.WriteDiff(ctx, cw, aDir, bDir); err != nil {
-			cw.Close()
 			return emptyDesc, errors.Wrap(err, "failed to write diff")
 		}
 	}

@@ -130,10 +130,10 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 // tact.
 //
 // If one needs to resume the transaction, a new writer can be obtained from
-// `ContentStore.Resume` using the same key. The write can then be continued
+// `Ingester.Writer` using the same key. The write can then be continued
 // from it was left off.
 //
-// To abandon a transaction completely, first call close then `Store.Remove` to
+// To abandon a transaction completely, first call close then `IngestManager.Abort` to
 // clean up the associated resources.
 func (w *writer) Close() (err error) {
 	if w.fp != nil {
