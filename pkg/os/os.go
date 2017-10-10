@@ -45,7 +45,7 @@ type OS interface {
 	Unmount(target string, flags int) error
 	GetMounts() ([]*mount.Info, error)
 	LookupMount(path string) (containerdmount.Info, error)
-	DeviceUUID(device string) (string, error)
+	DeviceUUID(device uint64) (string, error)
 }
 
 // RealOS is used to dispatch the real system level operations.
@@ -144,14 +144,9 @@ func blkrdev(device string) (uint64, error) {
 	return stat.Rdev, nil
 }
 
-// DeviceUUID gets device uuid of a device. The passed in device should be
-// an absolute path of the device.
-func (RealOS) DeviceUUID(device string) (string, error) {
-	rdev, err := blkrdev(device)
-	if err != nil {
-		return "", err
-	}
-
+// DeviceUUID gets device uuid of a device. The passed in rdev should be
+// linux device number.
+func (RealOS) DeviceUUID(rdev uint64) (string, error) {
 	const uuidDir = "/dev/disk/by-uuid"
 	files, err := ioutil.ReadDir(uuidDir)
 	if err != nil {
@@ -169,5 +164,5 @@ func (RealOS) DeviceUUID(device string) (string, error) {
 			return file.Name(), nil
 		}
 	}
-	return "", fmt.Errorf("device %q not found", device)
+	return "", fmt.Errorf("device %d not found", rdev)
 }

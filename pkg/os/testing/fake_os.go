@@ -52,7 +52,7 @@ type FakeOS struct {
 	UnmountFn             func(target string, flags int) error
 	GetMountsFn           func() ([]*mount.Info, error)
 	LookupMountFn         func(path string) (containerdmount.Info, error)
-	DeviceUUIDFn          func(device string) (string, error)
+	DeviceUUIDFn          func(device uint64) (string, error)
 	calls                 []CalledDetail
 	errors                map[string]error
 }
@@ -258,7 +258,7 @@ func (f *FakeOS) LookupMount(path string) (containerdmount.Info, error) {
 }
 
 // DeviceUUID is a fake call that invodes DeviceUUIDFn or just return nil.
-func (f *FakeOS) DeviceUUID(device string) (string, error) {
+func (f *FakeOS) DeviceUUID(device uint64) (string, error) {
 	f.appendCalls("DeviceUUID", device)
 	if err := f.getError("DeviceUUID"); err != nil {
 		return "", err
