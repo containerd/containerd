@@ -31,6 +31,8 @@ func IsSkipPlugin(err error) bool {
 // Type is the type of the plugin
 type Type string
 
+func (t Type) String() string { return string(t) }
+
 const (
 	// RuntimePlugin implements a runtime
 	RuntimePlugin Type = "io.containerd.runtime.v1"
@@ -54,9 +56,22 @@ type Registration struct {
 	ID       string
 	Config   interface{}
 	Requires []Type
-	Init     func(*InitContext) (interface{}, error)
 
-	added bool
+	// InitFn is called when initializing a plugin. The registration and
+	// context are passed in. The init function may modify the registration to
+	// add exports, capabilites and platform support declarations.
+	InitFn func(*InitContext) (interface{}, error)
+}
+
+func (r *Registration) Init(ic *InitContext) *Plugin {
+	p, err := r.InitFn(ic)
+	return &Plugin{
+		Registration: r,
+		Config:       ic.Config,
+		Meta:         ic.Meta,
+		instance:     p,
+		err:          err,
+	}
 }
 
 // URI returns the full plugin URI

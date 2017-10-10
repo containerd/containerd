@@ -13,9 +13,9 @@ var _ api.VersionServer = &Service{}
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type: plugin.GRPCPlugin,
-		ID:   "version",
-		Init: New,
+		Type:   plugin.GRPCPlugin,
+		ID:     "version",
+		InitFn: New,
 	})
 }
 

@@ -41,19 +41,22 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.MetadataPlugin,
 		},
-		Init: NewService,
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			m, err := ic.Get(plugin.MetadataPlugin)
+			if err != nil {
+				return nil, err
+			}
+
+			s, err := NewService(m.(*metadata.DB).ContentStore(), ic.Events)
+			return s, err
+		},
 	})
 }
 
-func NewService(ic *plugin.InitContext) (interface{}, error) {
-	m, err := ic.Get(plugin.MetadataPlugin)
-	if err != nil {
-		return nil, err
-	}
-
+func NewService(cs content.Store, publisher events.Publisher) (*Service, error) {
 	return &Service{
-		store:     m.(*metadata.DB).ContentStore(),
-		publisher: ic.Events,
+		store:     cs,
+		publisher: publisher,
 	}, nil
 }
 

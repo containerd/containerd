@@ -41,9 +41,9 @@ var _ = (runtime.Runtime)(&windowsRuntime{})
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		ID:   runtimeName,
-		Type: plugin.RuntimePlugin,
-		Init: New,
+		ID:     runtimeName,
+		Type:   plugin.RuntimePlugin,
+		InitFn: New,
 		Requires: []plugin.Type{
 			plugin.MetadataPlugin,
 		},

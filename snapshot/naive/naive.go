@@ -9,6 +9,7 @@ import (
 	"github.com/containerd/containerd/fs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/containerd/snapshot/storage"
@@ -19,7 +20,8 @@ func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.SnapshotPlugin,
 		ID:   "naive",
-		Init: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
 			return NewSnapshotter(ic.Root)
 		},
 	})

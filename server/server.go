@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"expvar"
 	"net"
 	"net/http"
@@ -29,6 +28,7 @@ import (
 	"github.com/containerd/containerd/snapshot"
 	metrics "github.com/docker/go-metrics"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 
 	"google.golang.org/grpc"
@@ -66,7 +66,7 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 			rpc:    rpc,
 			events: events.NewExchange(),
 		}
-		initialized = make(map[plugin.Type]map[string]interface{})
+		initialized = plugin.NewPluginSet()
 	)
 	for _, p := range plugins {
 		id := p.URI()
@@ -74,10 +74,10 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 
 		initContext := plugin.NewContext(
 			ctx,
+			p,
 			initialized,
 			config.Root,
 			config.State,
-			id,
 		)
 		initContext.Events = s.events
 		initContext.Address = config.GRPC.Address
@@ -90,7 +90,12 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 			}
 			initContext.Config = pluginConfig
 		}
-		instance, err := p.Init(initContext)
+		result := p.Init(initContext)
+		if err := initialized.Add(result); err != nil {
+			return nil, errors.Wrapf(err, "could not add plugin result to plugin set")
+		}
+
+		instance, err := result.Instance()
 		if err != nil {
 			if plugin.IsSkipPlugin(err) {
 				log.G(ctx).WithField("type", p.Type).Infof("skip loading plugin %q...", id)
@@ -98,14 +103,6 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 				log.G(ctx).WithError(err).Warnf("failed to load plugin %s", id)
 			}
 			continue
-		}
-
-		if types, ok := initialized[p.Type]; ok {
-			types[p.ID] = instance
-		} else {
-			initialized[p.Type] = map[string]interface{}{
-				p.ID: instance,
-			}
 		}
 		// check for grpc services that should be registered with the server
 		if service, ok := instance.(plugin.Service); ok {
@@ -171,7 +168,8 @@ func loadPlugins(config *Config) ([]*plugin.Registration, error) {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.ContentPlugin,
 		ID:   "content",
-		Init: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			ic.Meta.Exports["root"] = ic.Root
 			return local.NewStore(ic.Root)
 		},
 	})
@@ -182,7 +180,7 @@ func loadPlugins(config *Config) ([]*plugin.Registration, error) {
 			plugin.ContentPlugin,
 			plugin.SnapshotPlugin,
 		},
-		Init: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			if err := os.MkdirAll(ic.Root, 0711); err != nil {
 				return nil, err
 			}
@@ -191,17 +189,26 @@ func loadPlugins(config *Config) ([]*plugin.Registration, error) {
 				return nil, err
 			}
 
-			rawSnapshotters, err := ic.GetAll(plugin.SnapshotPlugin)
+			snapshottersRaw, err := ic.GetByType(plugin.SnapshotPlugin)
 			if err != nil {
 				return nil, err
 			}
 
 			snapshotters := make(map[string]snapshot.Snapshotter)
-			for name, sn := range rawSnapshotters {
+			for name, sn := range snapshottersRaw {
+				sn, err := sn.Instance()
+				if err != nil {
+					log.G(ic.Context).WithError(err).
+						Warnf("could not use snapshotter %v in metadata plugin", name)
+					continue
+				}
 				snapshotters[name] = sn.(snapshot.Snapshotter)
 			}
 
-			db, err := bolt.Open(filepath.Join(ic.Root, "meta.db"), 0644, nil)
+			path := filepath.Join(ic.Root, "meta.db")
+			ic.Meta.Exports["path"] = path
+
+			db, err := bolt.Open(path, 0644, nil)
 			if err != nil {
 				return nil, err
 			}
