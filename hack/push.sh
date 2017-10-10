@@ -20,9 +20,15 @@ set -o pipefail
 
 source $(dirname "${BASH_SOURCE[0]}")/test-utils.sh
 
+# DEPLOY_BUCKET is the gcs bucket where the tarball should be stored in.
 DEPLOY_BUCKET=${DEPLOY_BUCKET:-"cri-containerd-staging"}
+# DEPLOY_DIR is the directory in the gcs bucket to store the tarball.
+DEPLOY_DIR=${DEPLOY_DIR:-""}
+# BUILD_DIR is the directory of the bulid out.
 BUILD_DIR=${BUILD_DIR:-"_output"}
+# TARBALL is the tarball name.
 TARBALL=${TARBALL:-"cri-containerd.tar.gz"}
+# LATEST is the name of the latest version file.
 LATEST=${LATEST:-"latest"}
 # PUSH_VERSION indicates whether to push version.
 PUSH_VERSION=${PUSH_VERSION:-false}
@@ -37,17 +43,23 @@ if ! gsutil ls "gs://${DEPLOY_BUCKET}" > /dev/null; then
   create_ttl_bucket ${DEPLOY_BUCKET}
 fi
 
+if [ -z "${DEPLOY_DIR}" ]; then
+  DEPLOY_PATH="${DEPLOY_BUCKET}"
+else
+  DEPLOY_PATH="${DEPLOY_BUCKET}/${DEPLOY_DIR}"
+fi
+
 # TODO(random-liu): Add checksum for the tarball.
-gsutil cp ${release_tar} "gs://${DEPLOY_BUCKET}/"
+gsutil cp ${release_tar} "gs://${DEPLOY_PATH}/"
 echo "Release tarball is uploaded to:
-  https://storage.googleapis.com/${DEPLOY_BUCKET}/${TARBALL}"
+  https://storage.googleapis.com/${DEPLOY_PATH}/${TARBALL}"
 
 if ${PUSH_VERSION}; then
   if [[ -z "${VERSION}" ]]; then
     echo "VERSION is not set"
     exit 1
   fi
-  echo ${VERSION} | gsutil cp - "gs://${DEPLOY_BUCKET}/${LATEST}"
+  echo ${VERSION} | gsutil cp - "gs://${DEPLOY_PATH}/${LATEST}"
   echo "Latest version is uploaded to:
-  https://storage.googleapis.com/${DEPLOY_BUCKET}/${LATEST}"
+  https://storage.googleapis.com/${DEPLOY_PATH}/${LATEST}"
 fi
