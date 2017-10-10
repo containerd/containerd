@@ -18,6 +18,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 )
 
 // WithCheckpoint allows a container to be created from the checkpointed information
@@ -41,11 +42,11 @@ func WithCheckpoint(desc v1.Descriptor, snapshotKey string) NewContainerOpts {
 			case images.MediaTypeDockerSchema2Manifest, images.MediaTypeDockerSchema2ManifestList:
 				config, err := images.Config(ctx, store, m, platforms.Default())
 				if err != nil {
-					return err
+					return errors.Wrap(err, "unable to resolve image config")
 				}
 				diffIDs, err := images.RootFS(ctx, store, config)
 				if err != nil {
-					return err
+					return errors.Wrap(err, "unable to get rootfs")
 				}
 				setSnapshotterIfEmpty(c)
 				if _, err := client.SnapshotService(c.Snapshotter).Prepare(ctx, snapshotKey, identity.ChainID(diffIDs).String()); err != nil {
@@ -57,7 +58,7 @@ func WithCheckpoint(desc v1.Descriptor, snapshotKey string) NewContainerOpts {
 			case images.MediaTypeContainerd1CheckpointConfig:
 				data, err := content.ReadBlob(ctx, store, m.Digest)
 				if err != nil {
-					return err
+					return errors.Wrap(err, "unable to read checkpoint config")
 				}
 				var any protobuf.Any
 				if err := proto.Unmarshal(data, &any); err != nil {
@@ -70,10 +71,10 @@ func WithCheckpoint(desc v1.Descriptor, snapshotKey string) NewContainerOpts {
 			// apply the rw snapshot to the new rw layer
 			mounts, err := client.SnapshotService(c.Snapshotter).Mounts(ctx, snapshotKey)
 			if err != nil {
-				return err
+				return errors.Wrapf(err, "unable to get mounts for %s", snapshotKey)
 			}
 			if _, err := client.DiffService().Apply(ctx, *rw, mounts); err != nil {
-				return err
+				return errors.Wrap(err, "unable to apply rw diff")
 			}
 		}
 		c.SnapshotKey = snapshotKey
