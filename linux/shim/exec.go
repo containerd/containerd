@@ -157,7 +157,7 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 			return errors.Wrap(err, "creating new NULL IO")
 		}
 	} else {
-		if e.io, err = runc.NewPipeIO(); err != nil {
+		if e.io, err = runc.NewPipeIO(e.parent.IoUID, e.parent.IoGID); err != nil {
 			return errors.Wrap(err, "failed to create runc io pipes")
 		}
 	}
