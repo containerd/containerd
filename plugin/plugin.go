@@ -70,7 +70,7 @@ type Service interface {
 }
 
 var register = struct {
-	sync.Mutex
+	sync.RWMutex
 	r []*Registration
 }{}
 
@@ -103,24 +103,28 @@ func Register(r *Registration) {
 
 // Graph returns an ordered list of registered plugins for initialization
 func Graph() (ordered []*Registration) {
+	register.RLock()
+	defer register.RUnlock()
+
+	added := map[*Registration]bool{}
 	for _, r := range register.r {
-		children(r.Requires, &ordered)
-		if !r.added {
+		children(r.Requires, added, &ordered)
+		if !added[r] {
 			ordered = append(ordered, r)
-			r.added = true
+			added[r] = true
 		}
 	}
 	return ordered
 }
 
-func children(types []Type, ordered *[]*Registration) {
+func children(types []Type, added map[*Registration]bool, ordered *[]*Registration) {
 	for _, t := range types {
 		for _, r := range register.r {
 			if r.Type == t {
-				children(r.Requires, ordered)
-				if !r.added {
+				children(r.Requires, added, ordered)
+				if !added[r] {
 					*ordered = append(*ordered, r)
-					r.added = true
+					added[r] = true
 				}
 			}
 		}
