@@ -15,6 +15,7 @@ import (
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
+	introspectionapi "github.com/containerd/containerd/api/services/introspection/v1"
 	namespacesapi "github.com/containerd/containerd/api/services/namespaces/v1"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
@@ -441,6 +442,10 @@ func (c *Client) ImageService() images.Store {
 // DiffService returns the underlying DiffService
 func (c *Client) DiffService() diff.DiffService {
 	return diffservice.NewDiffServiceFromClient(diffapi.NewDiffClient(c.conn))
+}
+
+func (c *Client) IntrospectionService() introspectionapi.IntrospectionClient {
+	return introspectionapi.NewIntrospectionClient(c.conn)
 }
 
 // HealthService returns the underlying GRPC HealthClient

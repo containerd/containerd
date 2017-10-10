@@ -15,6 +15,7 @@ import (
 	diff "github.com/containerd/containerd/api/services/diff/v1"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	images "github.com/containerd/containerd/api/services/images/v1"
+	introspection "github.com/containerd/containerd/api/services/introspection/v1"
 	namespaces "github.com/containerd/containerd/api/services/namespaces/v1"
 	snapshotapi "github.com/containerd/containerd/api/services/snapshot/v1"
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
@@ -252,6 +253,8 @@ func interceptor(
 		ctx = log.WithModule(ctx, "namespaces")
 	case eventsapi.EventsServer:
 		ctx = log.WithModule(ctx, "events")
+	case introspection.IntrospectionServer:
+		ctx = log.WithModule(ctx, "introspection")
 	default:
 		log.G(ctx).Warnf("unknown GRPC server type: %#v\n", info.Server)
 	}

@@ -2,7 +2,6 @@ package tasks
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
