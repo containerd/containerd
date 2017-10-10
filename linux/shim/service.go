@@ -345,8 +345,14 @@ func (s *Service) ListPids(ctx context.Context, r *shimapi.ListPidsRequest) (*sh
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
+	var processes []*task.ProcessInfo
+	for _, pid := range pids {
+		processes = append(processes, &task.ProcessInfo{
+			Pid: pid,
+		})
+	}
 	return &shimapi.ListPidsResponse{
-		Pids: pids,
+		Processes: processes,
 	}, nil
 }
 

@@ -5,6 +5,7 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/containerd/containerd/windows/hcsshimopts"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -41,10 +42,19 @@ var taskPsCommand = cli.Command{
 			return err
 		}
 		w := tabwriter.NewWriter(os.Stdout, 10, 1, 3, ' ', 0)
-		fmt.Fprintln(w, "PID")
+		fmt.Fprintln(w, "PID\tINFO")
 		for _, ps := range processes {
-			if _, err := fmt.Fprintf(w, "%d\n", ps); err != nil {
-				return err
+			if ps.Info != nil {
+				var details hcsshimopts.ProcessDetails
+				if err := details.Unmarshal(ps.Info.Value); err == nil {
+					if _, err := fmt.Fprintf(w, "%d\t%+v\n", ps.Pid, details); err != nil {
+						return err
+					}
+				}
+			} else {
+				if _, err := fmt.Fprintf(w, "%d\t-\n", ps.Pid); err != nil {
+					return err
+				}
 			}
 		}
 		return w.Flush()

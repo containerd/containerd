@@ -17,6 +17,7 @@ import (
 	"github.com/containerd/typeurl"
 
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/windows/hcsshimopts"
 	gogotypes "github.com/gogo/protobuf/types"
 )
 
@@ -377,13 +378,25 @@ func TestContainerPids(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if l := len(processes); l != 1 {
-		t.Errorf("expected 1 process but received %d", l)
-	}
-	if len(processes) > 0 {
-		actual := processes[0]
-		if pid != actual {
-			t.Errorf("expected pid %d but received %d", pid, actual)
+	switch runtime.GOOS {
+	case "windows":
+		if processes[0].Info == nil {
+			t.Error("expected additional process information but received nil")
+		} else {
+			var details hcsshimopts.ProcessDetails
+			if err := details.Unmarshal(processes[0].Info.Value); err != nil {
+				t.Errorf("expected Windows info type hcsshimopts.ProcessDetails %v", err)
+			}
+		}
+	default:
+		if l := len(processes); l != 1 {
+			t.Errorf("expected 1 process but received %d", l)
+		}
+		if len(processes) > 0 {
+			actual := processes[0].Pid
+			if pid != actual {
+				t.Errorf("expected pid %d but received %d", pid, actual)
+			}
 		}
 	}
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {

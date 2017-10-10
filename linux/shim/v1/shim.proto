@@ -129,8 +129,8 @@ message ListPidsRequest {
 	string id = 1;
 }
 
-message ListPidsResponse{
-	repeated uint32 pids = 1;
+message ListPidsResponse {
+	repeated containerd.v1.types.ProcessInfo processes = 1;
 }
 
 message CheckpointTaskRequest {
