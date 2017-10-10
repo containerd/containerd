@@ -98,6 +98,20 @@ file {
       type: TYPE_STRING
       json_name: "shimCgroup"
     }
+    field {
+      name: "io_uid"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "ioUid"
+    }
+    field {
+      name: "io_gid"
+      number: 11
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "ioGid"
+    }
   }
   message_type {
     name: "CheckpointOptions"

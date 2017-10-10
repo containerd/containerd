@@ -57,6 +57,8 @@ type initProcess struct {
 	stdin    io.Closer
 	stdio    stdio
 	rootfs   string
+	IoUID    int
+	IoGID    int
 }
 
 func (s *Service) newInitProcess(context context.Context, r *shimapi.CreateTaskRequest) (*initProcess, error) {
@@ -120,6 +122,8 @@ func (s *Service) newInitProcess(context context.Context, r *shimapi.CreateTaskR
 		workDir:   s.config.WorkDir,
 		status:    0,
 		waitBlock: make(chan struct{}),
+		IoUID:     int(options.IoUid),
+		IoGID:     int(options.IoGid),
 	}
 	p.initState = &createdState{p: p}
 	var (
@@ -136,7 +140,7 @@ func (s *Service) newInitProcess(context context.Context, r *shimapi.CreateTaskR
 			return nil, errors.Wrap(err, "creating new NULL IO")
 		}
 	} else {
-		if p.io, err = runc.NewPipeIO(); err != nil {
+		if p.io, err = runc.NewPipeIO(int(options.IoUid), int(options.IoGid)); err != nil {
 			return nil, errors.Wrap(err, "failed to create OCI runtime io pipes")
 		}
 	}

@@ -23,6 +23,8 @@ message CreateOptions {
 	string cgroups_mode = 7;
 	bool no_new_keyring = 8;
 	string shim_cgroup = 9;
+	uint32 io_uid = 10;
+	uint32 io_gid = 11;
 }
 
 message CheckpointOptions {

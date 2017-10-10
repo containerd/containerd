@@ -53,10 +53,6 @@ func withNewSnapshot(id string, i Image) NewContainerOpts {
 	}
 }
 
-func withUserNamespace(u, g, s uint32) SpecOpts {
-	return withNoop
-}
-
 func withRemappedSnapshot(id string, i Image, u, g uint32) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		return nil

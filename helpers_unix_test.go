@@ -40,7 +40,6 @@ func withExecArgs(s *specs.Process, args ...string) {
 }
 
 var (
-	withUserNamespace        = WithUserNamespace
 	withRemappedSnapshot     = WithRemappedSnapshot
 	withRemappedSnapshotView = WithRemappedSnapshotView
 	withNewSnapshot          = WithNewSnapshot
