@@ -18,6 +18,10 @@ var (
 	// this allows the plugin loader differentiate between a plugin which is configured
 	// not to load and one that fails to load.
 	ErrSkipPlugin = errors.New("skip plugin")
+
+	// ErrInvalidRequires will be thrown if the requirements for a plugin are
+	// defined in an invalid manner.
+	ErrInvalidRequires = errors.New("invalid requires")
 )
 
 // IsSkipPlugin returns true if the error is skipping the plugin
@@ -34,6 +38,8 @@ type Type string
 func (t Type) String() string { return string(t) }
 
 const (
+	// AllPlugins declares that the plugin should be initialized after all others.
+	AllPlugins Type = "*"
 	// RuntimePlugin implements a runtime
 	RuntimePlugin Type = "io.containerd.runtime.v1"
 	// GRPCPlugin implements a grpc service
@@ -113,6 +119,17 @@ func Register(r *Registration) {
 	if r.ID == "" {
 		panic(ErrNoPluginID)
 	}
+
+	var last bool
+	for _, requires := range r.Requires {
+		if requires == "*" {
+			last = true
+		}
+	}
+	if last && len(r.Requires) != 1 {
+		panic(ErrInvalidRequires)
+	}
+
 	register.r = append(register.r, r)
 }
 
@@ -123,7 +140,8 @@ func Graph() (ordered []*Registration) {
 
 	added := map[*Registration]bool{}
 	for _, r := range register.r {
-		children(r.Requires, added, &ordered)
+
+		children(r.ID, r.Requires, added, &ordered)
 		if !added[r] {
 			ordered = append(ordered, r)
 			added[r] = true
@@ -132,11 +150,11 @@ func Graph() (ordered []*Registration) {
 	return ordered
 }
 
-func children(types []Type, added map[*Registration]bool, ordered *[]*Registration) {
+func children(id string, types []Type, added map[*Registration]bool, ordered *[]*Registration) {
 	for _, t := range types {
 		for _, r := range register.r {
-			if r.Type == t {
-				children(r.Requires, added, ordered)
+			if r.ID != id && (t == "*" || r.Type == t) {
+				children(r.ID, r.Requires, added, ordered)
 				if !added[r] {
 					*ordered = append(*ordered, r)
 					added[r] = true
