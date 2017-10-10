@@ -42,7 +42,7 @@ type Task interface {
 	// Exec adds a process into the container
 	Exec(context.Context, string, ExecOpts) (Process, error)
 	// Pids returns all pids
-	Pids(context.Context) ([]uint32, error)
+	Pids(context.Context) ([]ProcessInfo, error)
 	// Checkpoint checkpoints a container to an image with live system data
 	Checkpoint(context.Context, string, *types.Any) error
 	// DeleteProcess deletes a specific exec process via its id
@@ -91,4 +91,12 @@ type State struct {
 	Stdout   string
 	Stderr   string
 	Terminal bool
+}
+
+type ProcessInfo struct {
+	// Pid is the process ID
+	Pid uint32
+	// Info includes additional process information
+	// Info varies by platform
+	Info interface{}
 }

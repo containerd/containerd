@@ -12,6 +12,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/runtime"
+	"github.com/containerd/containerd/windows/hcsshimopts"
 	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -213,20 +214,28 @@ func (t *task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runt
 	return p, nil
 }
 
-func (t *task) Pids(ctx context.Context) ([]uint32, error) {
+func (t *task) Pids(ctx context.Context) ([]runtime.ProcessInfo, error) {
 	t.Lock()
 	defer t.Unlock()
 
-	var (
-		pids = make([]uint32, len(t.processes))
-		idx  = 0
-	)
-	for _, p := range t.processes {
-		pids[idx] = p.Pid()
-		idx++
+	var infoList []runtime.ProcessInfo
+	hcsProcessList, err := t.hcsContainer.ProcessList()
+	if err != nil {
+		return nil, err
 	}
 
-	return pids, nil
+	for _, process := range hcsProcessList {
+		info, err := t.convertToProcessDetails(process)
+		if err != nil {
+			return nil, err
+		}
+		infoList = append(infoList, runtime.ProcessInfo{
+			Pid:  process.ProcessId,
+			Info: info,
+		})
+	}
+
+	return infoList, nil
 }
 
 func (t *task) Checkpoint(_ context.Context, _ string, _ *types.Any) error {
@@ -387,4 +396,22 @@ func (t *task) cleanup() {
 	}
 	removeLayer(context.Background(), t.rwLayer)
 	t.Unlock()
+}
+
+// convertToProcessDetails converts a given hcsshim ProcessListItem to proto ProcessDetails
+func (t *task) convertToProcessDetails(p hcsshim.ProcessListItem) (*hcsshimopts.ProcessDetails, error) {
+	protobufTime, err := types.TimestampProto(p.CreateTimestamp)
+	if err != nil {
+		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "failed to convert timestamp for process pid: %d\n", p.ProcessId)
+	}
+	return &hcsshimopts.ProcessDetails{
+		ImageName:                    p.ImageName,
+		CreatedAt:                    protobufTime,
+		KernelTime_100Ns:             p.KernelTime100ns,
+		MemoryCommitBytes:            p.MemoryCommitBytes,
+		MemoryWorkingSetPrivateBytes: p.MemoryWorkingSetPrivateBytes,
+		MemoryWorkingSetSharedBytes:  p.MemoryWorkingSetSharedBytes,
+		ProcessID:                    p.ProcessId,
+		UserTime_100Ns:               p.UserTime100ns,
+	}, nil
 }

@@ -172,14 +172,20 @@ func (t *Task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runt
 }
 
 // Pids returns all system level process ids running inside the task
-func (t *Task) Pids(ctx context.Context) ([]uint32, error) {
+func (t *Task) Pids(ctx context.Context) ([]runtime.ProcessInfo, error) {
 	resp, err := t.shim.ListPids(ctx, &shim.ListPidsRequest{
 		ID: t.id,
 	})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
-	return resp.Pids, nil
+	var processList []runtime.ProcessInfo
+	for _, p := range resp.Processes {
+		processList = append(processList, runtime.ProcessInfo{
+			Pid: p.Pid,
+		})
+	}
+	return processList, nil
 }
 
 // ResizePty changes the side of the task's PTY to the provided width and height

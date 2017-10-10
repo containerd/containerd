@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/typeurl"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -331,12 +332,26 @@ func (s *Service) ListPids(ctx context.Context, r *api.ListPidsRequest) (*api.Li
 	if err != nil {
 		return nil, err
 	}
-	pids, err := t.Pids(ctx)
+	processList, err := t.Pids(ctx)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
+	var processes []*task.ProcessInfo
+	for _, p := range processList {
+		processInfo := task.ProcessInfo{
+			Pid: p.Pid,
+		}
+		if p.Info != nil {
+			a, err := typeurl.MarshalAny(p.Info)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to marshal process %d info", p.Pid)
+			}
+			processInfo.Info = a
+		}
+		processes = append(processes, &processInfo)
+	}
 	return &api.ListPidsResponse{
-		Pids: pids,
+		Processes: processes,
 	}, nil
 }
 

@@ -2956,6 +2956,7 @@ file {
   package: "containerd.v1.types"
   dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/timestamp.proto"
+  dependency: "google/protobuf/any.proto"
   message_type {
     name: "Process"
     field {
@@ -3033,6 +3034,24 @@ file {
         65001: 0
       }
       json_name: "exitedAt"
+    }
+  }
+  message_type {
+    name: "ProcessInfo"
+    field {
+      name: "pid"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "pid"
+    }
+    field {
+      name: "info"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "info"
     }
   }
   enum_type {
@@ -3490,11 +3509,12 @@ file {
   message_type {
     name: "ListPidsResponse"
     field {
-      name: "pids"
+      name: "processes"
       number: 1
       label: LABEL_REPEATED
-      type: TYPE_UINT32
-      json_name: "pids"
+      type: TYPE_MESSAGE
+      type_name: ".containerd.v1.types.ProcessInfo"
+      json_name: "processes"
     }
   }
   message_type {
