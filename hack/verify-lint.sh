@@ -25,6 +25,7 @@ for d in $(find . -type d -a \( -iwholename './pkg*' -o -iwholename './cmd*' \))
 		 --exclude='duplicate of.*_test.go.*\(dupl\)$' \
 		 --exclude='.*/mock_.*\.go:.*\(golint\)$' \
 		 --exclude='declaration of "err" shadows declaration.*\(vetshadow\)$' \
+		 --exclude='struct of size .* could be .* \(maligned\)$' \
 		 --disable=aligncheck \
 		 --disable=gotype \
 		 --disable=gas \
