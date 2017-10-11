@@ -9,6 +9,7 @@ import (
 	"github.com/containerd/containerd/linux"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
 	metrics "github.com/docker/go-metrics"
@@ -24,7 +25,7 @@ func init() {
 	plugin.Register(&plugin.Registration{
 		Type:   plugin.TaskMonitorPlugin,
 		ID:     "cgroups",
-		Init:   New,
+		InitFn: New,
 		Config: &Config{},
 	})
 }
@@ -44,6 +45,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	if ns != nil {
 		metrics.Register(ns)
 	}
+	ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
 	return &cgroupsMonitor{
 		collector: collector,
 		oom:       oom,

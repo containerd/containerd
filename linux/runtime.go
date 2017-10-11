@@ -23,6 +23,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/runtime"
@@ -30,9 +31,9 @@ import (
 	runc "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-
 	"golang.org/x/sys/unix"
 )
 
@@ -49,9 +50,9 @@ const (
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type: plugin.RuntimePlugin,
-		ID:   "linux",
-		Init: New,
+		Type:   plugin.RuntimePlugin,
+		ID:     "linux",
+		InitFn: New,
 		Requires: []plugin.Type{
 			plugin.TaskMonitorPlugin,
 			plugin.MetadataPlugin,
@@ -92,6 +93,8 @@ type Config struct {
 
 // New returns a configured runtime
 func New(ic *plugin.InitContext) (interface{}, error) {
+	ic.Meta.Platforms = []ocispec.Platform{platforms.DefaultSpec()}
+
 	if err := os.MkdirAll(ic.Root, 0711); err != nil {
 		return nil, err
 	}
@@ -121,6 +124,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	// TODO: need to add the tasks to the monitor
 	for _, t := range tasks {
 		if err := r.tasks.AddWithNamespace(t.namespace, t); err != nil {

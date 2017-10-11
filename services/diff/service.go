@@ -32,8 +32,8 @@ func init() {
 		Config: &config{
 			Order: []string{"walking"},
 		},
-		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			differs, err := ic.GetAll(plugin.DiffPlugin)
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			differs, err := ic.GetByType(plugin.DiffPlugin)
 			if err != nil {
 				return nil, err
 			}
@@ -41,10 +41,15 @@ func init() {
 			orderedNames := ic.Config.(*config).Order
 			ordered := make([]plugin.Differ, len(orderedNames))
 			for i, n := range orderedNames {
-				differ, ok := differs[n]
+				differp, ok := differs[n]
 				if !ok {
 					return nil, errors.Errorf("needed differ not loaded: %s", n)
 				}
+				differ, err := differp.Instance()
+				if err != nil {
+					return nil, errors.Wrapf(err, "could not load required differ due plugin init error: %s", n)
+				}
+
 				ordered[i] = differ.(plugin.Differ)
 			}
 

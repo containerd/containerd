@@ -9,6 +9,7 @@ import (
 	_ "github.com/containerd/containerd/services/events"
 	_ "github.com/containerd/containerd/services/healthcheck"
 	_ "github.com/containerd/containerd/services/images"
+	_ "github.com/containerd/containerd/services/introspection"
 	_ "github.com/containerd/containerd/services/namespaces"
 	_ "github.com/containerd/containerd/services/snapshot"
 	_ "github.com/containerd/containerd/services/tasks"

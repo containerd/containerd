@@ -13,6 +13,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -27,11 +28,13 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.MetadataPlugin,
 		},
-		Init: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			md, err := ic.Get(plugin.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}
+
+			ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
 			return NewWalkingDiff(md.(*metadata.DB).ContentStore())
 		},
 	})

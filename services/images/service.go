@@ -23,7 +23,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.MetadataPlugin,
 		},
-		Init: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			m, err := ic.Get(plugin.MetadataPlugin)
 			if err != nil {
 				return nil, err

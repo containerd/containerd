@@ -80,6 +80,7 @@ containerd CLI
 		runCommand,
 		snapshotCommand,
 		tasksCommand,
+		pluginsCommand,
 		versionCommand,
 	}, extraCmds...)
 	app.Before = func(context *cli.Context) error {

@@ -87,7 +87,7 @@ check-protos: protos ## check if protobufs needs to be generated again
 	@echo "$(WHALE) $@"
 	@test -z "$$(git status --short | grep ".pb.go" | tee /dev/stderr)" || \
 		((git diff | cat) && \
-		(echo "$(ONI) please run 'make generate' when making changes to proto files" && false))
+		(echo "$(ONI) please run 'make protos' when making changes to proto files" && false))
 
 check-api-descriptors: protos ## check that protobuf changes aren't present.
 	@echo "$(WHALE) $@"
@@ -105,7 +105,7 @@ fmt: ## run go fmt
 	@echo "$(WHALE) $@"
 	@test -z "$$(gofmt -s -l . | grep -Fv $(call FIX_PATH,'vendor/') | grep -v ".pb.go$$" | tee /dev/stderr)" || \
 		(echo "$(ONI) please format Go code with 'gofmt -s -w'" && false)
-	@test -z "$$(find . -path ./vendor -prune -o ! -name timestamp.proto ! -name duration.proto -name '*.proto' -type f -exec grep -Hn -e "^ " {} \; | tee /dev/stderr)" || \
+	@test -z "$$(find . -path ./vendor -prune -o -path ./protobuf/google/rpc -prune -o -name '*.proto' -type f -exec grep -Hn -e "^ " {} \; | tee /dev/stderr)" || \
 		(echo "$(ONI) please indent proto files with tabs only" && false)
 	@test -z "$$(find . -path ./vendor -prune -o -name '*.proto' -type f -exec grep -Hn "Meta meta = " {} \; | grep -v '(gogoproto.nullable) = false' | tee /dev/stderr)" || \
 		(echo "$(ONI) meta fields in proto files must have option (gogoproto.nullable) = false" && false)

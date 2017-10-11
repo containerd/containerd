@@ -16,11 +16,13 @@ func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
 		ID:   "healthcheck",
-		Init: NewService,
+		InitFn: func(*plugin.InitContext) (interface{}, error) {
+			return NewService()
+		},
 	})
 }
 
-func NewService(ic *plugin.InitContext) (interface{}, error) {
+func NewService() (*Service, error) {
 	return &Service{
 		health.NewServer(),
 	}, nil

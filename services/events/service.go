@@ -15,7 +15,7 @@ func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
 		ID:   "events",
-		Init: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			return NewService(ic.Events), nil
 		},
 	})

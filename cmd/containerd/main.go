@@ -82,6 +82,7 @@ func main() {
 			ctx     = log.WithModule(gocontext.Background(), "containerd")
 			config  = defaultConfig()
 		)
+
 		done := handleSignals(ctx, signals, serverC)
 		// start the signal handler as soon as we can to make sure that
 		// we don't miss any signals during boot

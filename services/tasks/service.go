@@ -46,15 +46,16 @@ func init() {
 			plugin.RuntimePlugin,
 			plugin.MetadataPlugin,
 		},
-		Init: New,
+		InitFn: New,
 	})
 }
 
 func New(ic *plugin.InitContext) (interface{}, error) {
-	rt, err := ic.GetAll(plugin.RuntimePlugin)
+	rt, err := ic.GetByType(plugin.RuntimePlugin)
 	if err != nil {
 		return nil, err
 	}
+
 	m, err := ic.Get(plugin.MetadataPlugin)
 	if err != nil {
 		return nil, err
@@ -62,8 +63,17 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	cs := m.(*metadata.DB).ContentStore()
 	runtimes := make(map[string]runtime.Runtime)
 	for _, rr := range rt {
-		r := rr.(runtime.Runtime)
+		ri, err := rr.Instance()
+		if err != nil {
+			log.G(ic.Context).WithError(err).Warn("could not load runtime instance due to initialization error")
+			continue
+		}
+		r := ri.(runtime.Runtime)
 		runtimes[r.ID()] = r
+	}
+
+	if len(runtimes) == 0 {
+		return nil, errors.New("no runtimes available to create task service")
 	}
 	return &Service{
 		runtimes:  runtimes,

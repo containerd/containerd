@@ -25,7 +25,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.MetadataPlugin,
 		},
-		Init: newService,
+		InitFn: newService,
 	})
 }
 
