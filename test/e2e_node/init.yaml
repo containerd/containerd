@@ -1,0 +1,96 @@
+#cloud-config
+
+write_files:
+  - path: /etc/systemd/system/cri-containerd-installation.service
+    permissions: 0644
+    owner: root
+    content: |
+      # installed by cloud-init
+      [Unit]
+      Description=Download and install cri-containerd binaries and configurations.
+      After=network-online.target
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStartPre=/bin/mkdir -p /home/cri-containerd
+      ExecStartPre=/bin/mount --bind /home/cri-containerd /home/cri-containerd
+      ExecStartPre=/bin/mount -o remount,exec /home/cri-containerd
+      ExecStartPre=/usr/bin/curl --fail --retry 5 --retry-delay 3 --silent --show-error -H "X-Google-Metadata-Request: True" -o /home/cri-containerd/configure.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh
+      ExecStartPre=/bin/chmod 544 /home/cri-containerd/configure.sh
+      ExecStart=/home/cri-containerd/configure.sh
+
+      [Install]
+      WantedBy=cri-containerd.target
+
+  - path: /etc/containerd/config.toml
+    permissions: 0644
+    owner: root
+    content: |
+      # installed by cloud-init
+      oom_score = -999
+
+      [plugins.linux]
+        shim = "/home/cri-containerd/usr/local/bin/containerd-shim"
+        runtime = "/home/cri-containerd/usr/local/sbin/runc"
+
+  - path: /etc/systemd/system/containerd.service
+    permissions: 0644
+    owner: root
+    content: |
+      # installed by cloud-init
+      [Unit]
+      Description=containerd container runtime
+      Documentation=https://containerd.io
+      After=cri-containerd-installation.service
+
+      [Service]
+      Restart=always
+      RestartSec=5
+      Delegate=yes
+      KillMode=process
+      ExecStartPre=/sbin/modprobe overlay
+      ExecStart=/home/cri-containerd/usr/local/bin/containerd
+
+      [Install]
+      WantedBy=cri-containerd.target
+
+  - path: /etc/systemd/system/cri-containerd.service
+    permissions: 0644
+    owner: root
+    content: |
+      # installed by cloud-init
+      [Unit]
+      Description=Kubernetes containerd CRI shim
+      Requires=network-online.target
+      After=cri-containerd-installation.service
+
+      [Service]
+      Restart=always
+      RestartSec=5
+      OOMScoreAdjust=-999
+      ExecStart=/home/cri-containerd/usr/local/bin/cri-containerd \
+        --alsologtostderr --v=4 \
+        --network-bin-dir=/home/cri-containerd/opt/cni/bin \
+        --network-conf-dir=/home/cri-containerd/etc/cni/net.d
+
+      [Install]
+      WantedBy=cri-containerd.target
+
+  - path: /etc/systemd/system/cri-containerd.target
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=CRI Containerd
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  - systemctl daemon-reload
+  - systemctl enable containerd.service
+  - systemctl enable cri-containerd-installation.service
+  - systemctl enable cri-containerd.service
+  - systemctl enable cri-containerd.target
+  - systemctl start cri-containerd.target
