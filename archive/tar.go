@@ -88,8 +88,6 @@ const (
 // See https://github.com/opencontainers/image-spec/blob/master/layer.md#applying-changesets
 func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 	root = filepath.Clean(root)
-	fn := prepareApply()
-	defer fn()
 
 	var (
 		tr   = tar.NewReader(r)
@@ -445,13 +443,13 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 		// Create directory unless it exists as a directory already.
 		// In that case we just want to merge the two
 		if fi, err := os.Lstat(path); !(err == nil && fi.IsDir()) {
-			if err := os.Mkdir(path, hdrInfo.Mode()); err != nil {
+			if err := mkdir(path, hdrInfo.Mode()); err != nil {
 				return err
 			}
 		}
 
 	case tar.TypeReg, tar.TypeRegA:
-		file, err := openFile(path, os.O_CREATE|os.O_WRONLY, hdrInfo.Mode())
+		file, err := openFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, hdrInfo.Mode())
 		if err != nil {
 			return err
 		}

@@ -17,8 +17,7 @@ type TestApplier interface {
 func FSSuite(t *testing.T, a TestApplier) {
 	t.Run("Basic", makeTest(t, a, basicTest))
 	t.Run("Deletion", makeTest(t, a, deletionTest))
-	// TODO: Add hard section, run if command line arg or function arg set to true
-	// Hard tests
+	t.Run("Update", makeTest(t, a, updateTest))
 	t.Run("HardlinkUnmodified", makeTest(t, a, hardlinkUnmodified))
 	t.Run("HardlinkBeforeUnmodified", makeTest(t, a, hardlinkBeforeUnmodified))
 	t.Run("HardlinkBeforeModified", makeTest(t, a, hardlinkBeforeModified))
@@ -122,6 +121,24 @@ var (
 			Remove("/test/b"),
 			RemoveAll("/test/otherdir"),
 			CreateFile("/lib/newfile", []byte{}, 0644),
+		),
+	}
+
+	// updateTest covers file updates for content and permission
+	updateTest = []Applier{
+		Apply(
+			CreateDir("/d1", 0755),
+			CreateDir("/d2", 0700),
+			CreateFile("/d1/f1", []byte("something..."), 0644),
+			CreateFile("/d1/f2", []byte("else..."), 0644),
+			CreateFile("/d1/f3", []byte("entirely..."), 0644),
+		),
+		Apply(
+			CreateFile("/d1/f1", []byte("file content of a different length"), 0664),
+			Remove("/d1/f3"),
+			CreateFile("/d1/f3", []byte("updated content"), 0664),
+			Chmod("/d1/f2", 0766),
+			Chmod("/d2", 0777),
 		),
 	}
 
