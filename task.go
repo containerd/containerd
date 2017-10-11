@@ -313,7 +313,10 @@ func (t *task) Pids(ctx context.Context) ([]ProcessInfo, error) {
 	}
 	var processList []ProcessInfo
 	for _, p := range response.Processes {
-		processList = append(processList, ProcessInfo(*p))
+		processList = append(processList, ProcessInfo{
+			Pid:  p.Pid,
+			Info: p.Info,
+		})
 	}
 	return processList, nil
 }
