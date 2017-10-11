@@ -6,7 +6,7 @@ import "gogoproto/gogo.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/containerd/containerd/windows/hcsshimopts;hcsshimopts";
+option go_package = "github.com/containerd/containerd/windows/hcsshimtypes;hcsshimtypes";
 
 message CreateOptions {
 	google.protobuf.Duration terminate_duration = 1 [(gogoproto.stdduration) = true, (gogoproto.nullable) = false];

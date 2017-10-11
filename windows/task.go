@@ -12,7 +12,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/runtime"
-	"github.com/containerd/containerd/windows/hcsshimopts"
+	"github.com/containerd/containerd/windows/hcsshimtypes"
 	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -399,12 +399,12 @@ func (t *task) cleanup() {
 }
 
 // convertToProcessDetails converts a given hcsshim ProcessListItem to proto ProcessDetails
-func (t *task) convertToProcessDetails(p hcsshim.ProcessListItem) (*hcsshimopts.ProcessDetails, error) {
+func (t *task) convertToProcessDetails(p hcsshim.ProcessListItem) (*hcsshimtypes.ProcessDetails, error) {
 	protobufTime, err := types.TimestampProto(p.CreateTimestamp)
 	if err != nil {
 		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "failed to convert timestamp for process pid: %d\n", p.ProcessId)
 	}
-	return &hcsshimopts.ProcessDetails{
+	return &hcsshimtypes.ProcessDetails{
 		ImageName:                    p.ImageName,
 		CreatedAt:                    protobufTime,
 		KernelTime_100Ns:             p.KernelTime100ns,

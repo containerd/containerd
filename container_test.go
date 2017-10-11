@@ -17,7 +17,7 @@ import (
 	"github.com/containerd/typeurl"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/windows/hcsshimopts"
+	"github.com/containerd/containerd/windows/hcsshimtypes"
 	gogotypes "github.com/gogo/protobuf/types"
 )
 
@@ -383,9 +383,9 @@ func TestContainerPids(t *testing.T) {
 		if processes[0].Info == nil {
 			t.Error("expected additional process information but received nil")
 		} else {
-			var details hcsshimopts.ProcessDetails
+			var details hcsshimtypes.ProcessDetails
 			if err := details.Unmarshal(processes[0].Info.Value); err != nil {
-				t.Errorf("expected Windows info type hcsshimopts.ProcessDetails %v", err)
+				t.Errorf("expected Windows info type hcsshimtypes.ProcessDetails %v", err)
 			}
 		}
 	default:

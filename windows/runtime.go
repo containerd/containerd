@@ -20,7 +20,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
-	"github.com/containerd/containerd/windows/hcsshimopts"
+	"github.com/containerd/containerd/windows/hcsshimtypes"
 	"github.com/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -109,15 +109,15 @@ func (r *windowsRuntime) Create(ctx context.Context, id string, opts runtime.Cre
 	}
 	spec := s.(*specs.Spec)
 
-	var createOpts *hcsshimopts.CreateOptions
+	var createOpts *hcsshimtypes.CreateOptions
 	if opts.Options != nil {
 		o, err := typeurl.UnmarshalAny(opts.Options)
 		if err != nil {
 			return nil, err
 		}
-		createOpts = o.(*hcsshimopts.CreateOptions)
+		createOpts = o.(*hcsshimtypes.CreateOptions)
 	} else {
-		createOpts = &hcsshimopts.CreateOptions{}
+		createOpts = &hcsshimtypes.CreateOptions{}
 	}
 
 	if createOpts.TerminateDuration == 0 {
@@ -215,7 +215,7 @@ func (r *windowsRuntime) Delete(ctx context.Context, t runtime.Task) (*runtime.E
 	return rtExit, nil
 }
 
-func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, spec *specs.Spec, io runtime.IO, createOpts *hcsshimopts.CreateOptions) (*task, error) {
+func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, spec *specs.Spec, io runtime.IO, createOpts *hcsshimtypes.CreateOptions) (*task, error) {
 	var (
 		err  error
 		pset *pipeSet
@@ -391,7 +391,7 @@ func (r *windowsRuntime) serviceTask(ctx context.Context, namespace, id string, 
 		err        error
 		t          *task
 		io         runtime.IO
-		createOpts = &hcsshimopts.CreateOptions{
+		createOpts = &hcsshimtypes.CreateOptions{
 			TerminateDuration: defaultTerminateDuration,
 		}
 	)
