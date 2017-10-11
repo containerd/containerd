@@ -24,6 +24,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )
 
@@ -63,7 +64,18 @@ func NewWalkingDiff(store content.Store) (diff.Differ, error) {
 // Apply applies the content associated with the provided digests onto the
 // provided mounts. Archive content will be extracted and decompressed if
 // necessary.
-func (s *walkingDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount) (ocispec.Descriptor, error) {
+func (s *walkingDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount) (d ocispec.Descriptor, err error) {
+	t1 := time.Now()
+	defer func() {
+		if err == nil {
+			log.G(ctx).WithFields(logrus.Fields{
+				"d":     time.Now().Sub(t1),
+				"dgst":  desc.Digest,
+				"size":  desc.Size,
+				"media": desc.MediaType,
+			}).Debugf("diff applied")
+		}
+	}()
 	var isCompressed bool
 	switch desc.MediaType {
 	case ocispec.MediaTypeImageLayer, images.MediaTypeDockerSchema2Layer:
