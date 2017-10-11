@@ -10,7 +10,7 @@ import (
 // GenerateSpec will generate a default spec from the provided image
 // for use as a containerd container
 func GenerateSpec(ctx context.Context, client *Client, c *containers.Container, opts ...SpecOpts) (*specs.Spec, error) {
-	s, err := createDefaultSpec()
+	s, err := createDefaultSpec(ctx, c.ID)
 	if err != nil {
 		return nil, err
 	}

@@ -716,7 +716,7 @@ func TestPidNamespace(t *testing.T) {
 }
 
 func TestDefaultRuntimeSpec(t *testing.T) {
-	spec, err := defaultRuntimeSpec()
+	spec, err := defaultRuntimeSpec("test-id")
 	assert.NoError(t, err)
 	for _, mount := range spec.Mounts {
 		assert.NotEqual(t, "/run", mount.Destination)

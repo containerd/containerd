@@ -68,6 +68,10 @@ func (c *cio) Close() error {
 type IOCreation func(id string) (IO, error)
 
 // IOAttach allows callers to reattach to running tasks
+//
+// There should only be one reader for a task's IO set
+// because fifo's can only be read from one reader or the output
+// will be sent only to the first reads
 type IOAttach func(*FIFOSet) (IO, error)
 
 // NewIO returns an IOCreation that will provide IO sets without a terminal

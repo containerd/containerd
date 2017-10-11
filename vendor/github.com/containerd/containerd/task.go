@@ -20,6 +20,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/typeurl"
+	google_protobuf "github.com/gogo/protobuf/types"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -39,6 +40,14 @@ type Status struct {
 	ExitStatus uint32
 	// ExitedTime is the time at which the process died
 	ExitTime time.Time
+}
+
+type ProcessInfo struct {
+	// Pid is the process ID
+	Pid uint32
+	// Info includes additional process information
+	// Info varies by platform
+	Info *google_protobuf.Any
 }
 
 // ProcessStatus returns a human readable status for the Process representing its current status
@@ -107,7 +116,7 @@ type Task interface {
 	// Exec creates a new process inside the task
 	Exec(context.Context, string, *specs.Process, IOCreation) (Process, error)
 	// Pids returns a list of system specific process ids inside the task
-	Pids(context.Context) ([]uint32, error)
+	Pids(context.Context) ([]ProcessInfo, error)
 	// Checkpoint serializes the runtime and memory information of a task into an
 	// OCI Index that can be push and pulled from a remote resource.
 	//
@@ -294,14 +303,18 @@ func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreat
 	}, nil
 }
 
-func (t *task) Pids(ctx context.Context) ([]uint32, error) {
+func (t *task) Pids(ctx context.Context) ([]ProcessInfo, error) {
 	response, err := t.client.TaskService().ListPids(ctx, &tasks.ListPidsRequest{
 		ContainerID: t.id,
 	})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
-	return response.Pids, nil
+	var processList []ProcessInfo
+	for _, p := range response.Processes {
+		processList = append(processList, ProcessInfo(*p))
+	}
+	return processList, nil
 }
 
 func (t *task) CloseIO(ctx context.Context, opts ...IOCloserOpts) error {

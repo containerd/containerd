@@ -230,7 +230,7 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 	imageConfig *imagespec.ImageConfig, nsPath string) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
 	// TODO(random-liu): [P1] Compare the default settings with docker and containerd default.
-	spec, err := defaultRuntimeSpec()
+	spec, err := defaultRuntimeSpec(id)
 	if err != nil {
 		return nil, err
 	}

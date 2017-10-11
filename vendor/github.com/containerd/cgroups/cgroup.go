@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
 )
 
 // New returns a new control via the cgroup cgroups interface
@@ -39,6 +40,9 @@ func Load(hierarchy Hierarchy, path Path) (Cgroup, error) {
 	for _, s := range pathers(subsystems) {
 		p, err := path(s.Name())
 		if err != nil {
+			if os.IsNotExist(errors.Cause(err)) {
+				return nil, ErrCgroupDeleted
+			}
 			return nil, err
 		}
 		if _, err := os.Lstat(s.Path(p)); err != nil {

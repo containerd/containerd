@@ -3,6 +3,7 @@
 package containerd
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/namespaces"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -64,7 +66,11 @@ func defaultNamespaces() []specs.LinuxNamespace {
 	}
 }
 
-func createDefaultSpec() (*specs.Spec, error) {
+func createDefaultSpec(ctx context.Context, id string) (*specs.Spec, error) {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return nil, err
+	}
 	s := &specs.Spec{
 		Version: specs.Version,
 		Root: &specs.Root{
@@ -154,7 +160,7 @@ func createDefaultSpec() (*specs.Spec, error) {
 				"/proc/sys",
 				"/proc/sysrq-trigger",
 			},
-			// TODO (@crosbymichael) make sure we don't have have two containers in the same cgroup
+			CgroupsPath: filepath.Join("/", ns, id),
 			Resources: &specs.LinuxResources{
 				Devices: []specs.LinuxDeviceCgroup{
 					{
