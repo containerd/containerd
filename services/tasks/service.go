@@ -567,7 +567,10 @@ func (s *Service) writeContent(ctx context.Context, mediaType, ref string, r io.
 	if err != nil {
 		return nil, err
 	}
-	if err := writer.Commit(ctx, 0, ""); err != nil {
+	labels := map[string]string{
+		"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
+	}
+	if err := writer.Commit(ctx, 0, "", content.WithLabels(labels)); err != nil {
 		return nil, err
 	}
 	return &types.Descriptor{

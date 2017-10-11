@@ -2,10 +2,12 @@ package containerd
 
 import (
 	"context"
+	"time"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/types"
 	"github.com/opencontainers/image-spec/identity"
@@ -91,7 +93,11 @@ func WithNewSnapshot(id string, i Image) NewContainerOpts {
 			return err
 		}
 		setSnapshotterIfEmpty(c)
-		if _, err := client.SnapshotService(c.Snapshotter).Prepare(ctx, id, identity.ChainID(diffIDs).String()); err != nil {
+		labels := map[string]string{
+			"containerd.io/gc.root": time.Now().String(),
+		}
+		parent := identity.ChainID(diffIDs).String()
+		if _, err := client.SnapshotService(c.Snapshotter).Prepare(ctx, id, parent, snapshot.WithLabels(labels)); err != nil {
 			return err
 		}
 		c.SnapshotKey = id
@@ -120,7 +126,11 @@ func WithNewSnapshotView(id string, i Image) NewContainerOpts {
 			return err
 		}
 		setSnapshotterIfEmpty(c)
-		if _, err := client.SnapshotService(c.Snapshotter).View(ctx, id, identity.ChainID(diffIDs).String()); err != nil {
+		labels := map[string]string{
+			"containerd.io/gc.root": time.Now().String(),
+		}
+		parent := identity.ChainID(diffIDs).String()
+		if _, err := client.SnapshotService(c.Snapshotter).View(ctx, id, parent, snapshot.WithLabels(labels)); err != nil {
 			return err
 		}
 		c.SnapshotKey = id

@@ -2,6 +2,7 @@ package remotes
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -102,7 +104,76 @@ func fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc
 	}
 	defer rc.Close()
 
-	return content.Copy(ctx, cw, rc, desc.Size, desc.Digest)
+	r, opts := commitOpts(desc, rc)
+	return content.Copy(ctx, cw, r, desc.Size, desc.Digest, opts...)
+}
+
+// commitOpts gets the appropriate content options to alter
+// the content info on commit based on media type.
+func commitOpts(desc ocispec.Descriptor, r io.Reader) (io.Reader, []content.Opt) {
+	var childrenF func(r io.Reader) ([]ocispec.Descriptor, error)
+
+	switch desc.MediaType {
+	case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+		childrenF = func(r io.Reader) ([]ocispec.Descriptor, error) {
+			var (
+				manifest ocispec.Manifest
+				decoder  = json.NewDecoder(r)
+			)
+			if err := decoder.Decode(&manifest); err != nil {
+				return nil, err
+			}
+
+			return append([]ocispec.Descriptor{manifest.Config}, manifest.Layers...), nil
+		}
+	case images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+		childrenF = func(r io.Reader) ([]ocispec.Descriptor, error) {
+			var (
+				index   ocispec.Index
+				decoder = json.NewDecoder(r)
+			)
+			if err := decoder.Decode(&index); err != nil {
+				return nil, err
+			}
+
+			return index.Manifests, nil
+		}
+	default:
+		return r, nil
+	}
+
+	pr, pw := io.Pipe()
+
+	var children []ocispec.Descriptor
+	errC := make(chan error)
+
+	go func() {
+		defer close(errC)
+		ch, err := childrenF(pr)
+		if err != nil {
+			errC <- err
+		}
+		children = ch
+	}()
+
+	opt := func(info *content.Info) error {
+		err := <-errC
+		if err != nil {
+			return errors.Wrap(err, "unable to get commit labels")
+		}
+
+		if len(children) > 0 {
+			if info.Labels == nil {
+				info.Labels = map[string]string{}
+			}
+			for i, ch := range children {
+				info.Labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i)] = ch.Digest.String()
+			}
+		}
+		return nil
+	}
+
+	return io.TeeReader(r, pw), []content.Opt{opt}
 }
 
 // PushHandler returns a handler that will push all content from the provider

@@ -2,11 +2,16 @@ package containerd
 
 import (
 	"context"
+	"fmt"
+	"time"
 
+	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/rootfs"
+	"github.com/containerd/containerd/snapshot"
 	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
@@ -64,34 +69,66 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
 		return err
 	}
 
-	sn := i.client.SnapshotService(snapshotterName)
-	a := i.client.DiffService()
-	cs := i.client.ContentStore()
+	var (
+		sn = i.client.SnapshotService(snapshotterName)
+		a  = i.client.DiffService()
+		cs = i.client.ContentStore()
 
-	var chain []digest.Digest
+		chain    []digest.Digest
+		unpacked bool
+	)
 	for _, layer := range layers {
-		unpacked, err := rootfs.ApplyLayer(ctx, layer, chain, sn, a)
+		labels := map[string]string{
+			"containerd.io/gc.root":      time.Now().UTC().Format(time.RFC3339),
+			"containerd.io/uncompressed": layer.Diff.Digest.String(),
+		}
+		lastUnpacked := unpacked
+
+		unpacked, err = rootfs.ApplyLayer(ctx, layer, chain, sn, a, snapshot.WithLabels(labels))
 		if err != nil {
-			// TODO: possibly wait and retry if extraction of same chain id was in progress
 			return err
 		}
-		if unpacked {
-			info, err := cs.Info(ctx, layer.Blob.Digest)
-			if err != nil {
+
+		if lastUnpacked {
+			info := snapshot.Info{
+				Name: identity.ChainID(chain).String(),
+			}
+
+			// Remove previously created gc.root label
+			if _, err := sn.Update(ctx, info, "labels.containerd.io/gc.root"); err != nil {
 				return err
-			}
-			if info.Labels == nil {
-				info.Labels = map[string]string{}
-			}
-			if info.Labels["containerd.io/uncompressed"] != layer.Diff.Digest.String() {
-				info.Labels["containerd.io/uncompressed"] = layer.Diff.Digest.String()
-				if _, err := cs.Update(ctx, info, "labels.containerd.io/uncompressed"); err != nil {
-					return err
-				}
 			}
 		}
 
 		chain = append(chain, layer.Diff.Digest)
+	}
+
+	if unpacked {
+		desc, err := i.i.Config(ctx, cs, platforms.Default())
+		if err != nil {
+			return err
+		}
+
+		rootfs := identity.ChainID(chain).String()
+
+		cinfo := content.Info{
+			Digest: desc.Digest,
+			Labels: map[string]string{
+				fmt.Sprintf("containerd.io/gc.ref.snapshot.%s", snapshotterName): rootfs,
+			},
+		}
+		if _, err := cs.Update(ctx, cinfo, fmt.Sprintf("labels.containerd.io/gc.ref.snapshot.%s", snapshotterName)); err != nil {
+			return err
+		}
+
+		sinfo := snapshot.Info{
+			Name: rootfs,
+		}
+
+		// Config now referenced snapshot, release root reference
+		if _, err := sn.Update(ctx, sinfo, "labels.containerd.io/gc.root"); err != nil {
+			return err
+		}
 	}
 
 	return nil

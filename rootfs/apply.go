@@ -63,8 +63,8 @@ func ApplyLayer(ctx context.Context, layer Layer, chain []digest.Digest, sn snap
 
 	key := fmt.Sprintf("extract-%s %s", uniquePart(), chainID)
 
-	// Prepare snapshot with from parent
-	mounts, err := sn.Prepare(ctx, key, parent.String())
+	// Prepare snapshot with from parent, label as root
+	mounts, err := sn.Prepare(ctx, key, parent.String(), opts...)
 	if err != nil {
 		//TODO: If is snapshot exists error, retry
 		return false, errors.Wrap(err, "failed to prepare extraction layer")
@@ -87,7 +87,7 @@ func ApplyLayer(ctx context.Context, layer Layer, chain []digest.Digest, sn snap
 		return false, err
 	}
 
-	if err = sn.Commit(ctx, chainID.String(), key); err != nil {
+	if err = sn.Commit(ctx, chainID.String(), key, opts...); err != nil {
 		if !errdefs.IsAlreadyExists(err) {
 			return false, errors.Wrapf(err, "failed to commit snapshot %s", parent)
 		}

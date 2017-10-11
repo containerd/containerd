@@ -17,6 +17,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/rootfs"
@@ -24,6 +25,7 @@ import (
 	google_protobuf "github.com/gogo/protobuf/types"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
@@ -486,7 +488,13 @@ func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tas
 }
 
 func (t *task) checkpointRWSnapshot(ctx context.Context, index *v1.Index, snapshotterName string, id string) error {
-	rw, err := rootfs.Diff(ctx, id, t.client.SnapshotService(snapshotterName), t.client.DiffService(), diff.WithReference(fmt.Sprintf("checkpoint-rw-%s", id)))
+	opts := []diff.Opt{
+		diff.WithReference(fmt.Sprintf("checkpoint-rw-%s", id)),
+		diff.WithLabels(map[string]string{
+			"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
+		}),
+	}
+	rw, err := rootfs.Diff(ctx, id, t.client.SnapshotService(snapshotterName), t.client.DiffService(), opts...)
 	if err != nil {
 		return err
 	}
@@ -510,15 +518,32 @@ func (t *task) checkpointImage(ctx context.Context, index *v1.Index, image strin
 	return nil
 }
 
-func (t *task) writeIndex(ctx context.Context, index *v1.Index) (v1.Descriptor, error) {
+func (t *task) writeIndex(ctx context.Context, index *v1.Index) (d v1.Descriptor, err error) {
+	labels := map[string]string{
+		"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
+	}
+
+	for i, m := range index.Manifests {
+		labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i)] = m.Digest.String()
+		defer func(m ocispec.Descriptor) {
+			if err == nil {
+				info := content.Info{Digest: m.Digest}
+				if _, uerr := t.client.ContentStore().Update(ctx, info, "labels.containerd.io/gc.root"); uerr != nil {
+					log.G(ctx).WithError(uerr).WithField("dgst", m.Digest).Warnf("failed to remove root marker")
+				}
+			}
+		}(m)
+	}
+
 	buf := bytes.NewBuffer(nil)
 	if err := json.NewEncoder(buf).Encode(index); err != nil {
 		return v1.Descriptor{}, err
 	}
-	return writeContent(ctx, t.client.ContentStore(), v1.MediaTypeImageIndex, t.id, buf)
+
+	return writeContent(ctx, t.client.ContentStore(), v1.MediaTypeImageIndex, t.id, buf, content.WithLabels(labels))
 }
 
-func writeContent(ctx context.Context, store content.Store, mediaType, ref string, r io.Reader) (d v1.Descriptor, err error) {
+func writeContent(ctx context.Context, store content.Store, mediaType, ref string, r io.Reader, opts ...content.Opt) (d v1.Descriptor, err error) {
 	writer, err := store.Writer(ctx, ref, 0, "")
 	if err != nil {
 		return d, err
@@ -528,7 +553,7 @@ func writeContent(ctx context.Context, store content.Store, mediaType, ref strin
 	if err != nil {
 		return d, err
 	}
-	if err := writer.Commit(ctx, size, ""); err != nil {
+	if err := writer.Commit(ctx, size, "", opts...); err != nil {
 		return d, err
 	}
 	return v1.Descriptor{
