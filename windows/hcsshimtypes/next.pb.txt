@@ -61,7 +61,7 @@ file {
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/windows/hcsshimopts/hcsshim.proto"
+  name: "github.com/containerd/containerd/windows/hcsshimtypes/hcsshim.proto"
   package: "containerd.windows.hcsshim"
   dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/duration.proto"
@@ -142,7 +142,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/windows/hcsshimopts;hcsshimopts"
+    go_package: "github.com/containerd/containerd/windows/hcsshimtypes;hcsshimtypes"
   }
   syntax: "proto3"
 }
