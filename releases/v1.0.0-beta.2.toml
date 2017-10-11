@@ -1,0 +1,20 @@
+# commit to be tagged for new release
+commit = "60960e1c177046de655773258db53300d0e7f005"
+
+# previous release
+previous = "v1.0.0-beta.1"
+
+pre_release = true
+
+preface = """This release does cool stuff"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+	[notes.1234]
+	title = "Some Title"
+	description = """This did something cool."""
+
+[breaking]
+	[breaking.metrics]
+	pr = 1235
+	description = """ """

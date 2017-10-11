@@ -38,7 +38,7 @@ TEST_REQUIRES_ROOT_PACKAGES=$(filter \
     )
 
 # Project binaries.
-COMMANDS=ctr containerd containerd-stress
+COMMANDS=ctr containerd containerd-stress containerd-release
 BINARIES=$(addprefix bin/,$(COMMANDS))
 
 GO_TAGS=$(if $(BUILDTAGS),-tags "$(BUILDTAGS)",)
