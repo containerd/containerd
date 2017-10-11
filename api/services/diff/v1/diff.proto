@@ -50,6 +50,10 @@ message DiffRequest {
 	// Ref identifies the pre-commit content store object. This
 	// reference can be used to get the status from the content store.
 	string ref = 4;
+
+	// Labels are the labels to apply to the generated content
+	// on content store commit.
+	map<string, string> labels = 5;
 }
 
 message DiffResponse {

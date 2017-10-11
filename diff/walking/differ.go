@@ -1,16 +1,22 @@
-package differ
+package walking
 
 import (
+	"crypto/rand"
+	"encoding/base64"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
@@ -46,9 +52,9 @@ type walkingDiff struct {
 
 var emptyDesc = ocispec.Descriptor{}
 
-// NewWalkingDiff is a generic implementation of plugin.Differ.
+// NewWalkingDiff is a generic implementation of diff.Differ.
 // NewWalkingDiff is expected to work with any filesystem.
-func NewWalkingDiff(store content.Store) (plugin.Differ, error) {
+func NewWalkingDiff(store content.Store) (diff.Differ, error) {
 	return &walkingDiff{
 		store: store,
 	}, nil
@@ -122,17 +128,25 @@ func (s *walkingDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts
 
 // DiffMounts creates a diff between the given mounts and uploads the result
 // to the content store.
-func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount, media, ref string) (ocispec.Descriptor, error) {
+func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
+	var config diff.Config
+	for _, opt := range opts {
+		if err := opt(&config); err != nil {
+			return emptyDesc, err
+		}
+	}
+
+	if config.MediaType == "" {
+		config.MediaType = ocispec.MediaTypeImageLayerGzip
+	}
+
 	var isCompressed bool
-	switch media {
+	switch config.MediaType {
 	case ocispec.MediaTypeImageLayer:
 	case ocispec.MediaTypeImageLayerGzip:
 		isCompressed = true
-	case "":
-		media = ocispec.MediaTypeImageLayerGzip
-		isCompressed = true
 	default:
-		return emptyDesc, errors.Wrapf(errdefs.ErrNotImplemented, "unsupported diff media type: %v", media)
+		return emptyDesc, errors.Wrapf(errdefs.ErrNotImplemented, "unsupported diff media type: %v", config.MediaType)
 	}
 	aDir, err := ioutil.TempDir("", "left-")
 	if err != nil {
@@ -156,12 +170,32 @@ func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount
 	}
 	defer mount.Unmount(bDir, 0)
 
-	cw, err := s.store.Writer(ctx, ref, 0, "")
+	var newReference bool
+	if config.Reference == "" {
+		newReference = true
+		config.Reference = uniqueRef()
+	}
+
+	cw, err := s.store.Writer(ctx, config.Reference, 0, "")
 	if err != nil {
 		return emptyDesc, errors.Wrap(err, "failed to open writer")
 	}
+	defer func() {
+		if err != nil {
+			cw.Close()
+			if newReference {
+				if err := s.store.Abort(ctx, config.Reference); err != nil {
+					log.G(ctx).WithField("ref", config.Reference).Warnf("failed to delete diff upload")
+				}
+			}
+		}
+	}()
+	if !newReference {
+		if err := cw.Truncate(0); err != nil {
+			return emptyDesc, err
+		}
+	}
 
-	var opts []content.Opt
 	if isCompressed {
 		dgstr := digest.SHA256.Digester()
 		compressed, err := compression.CompressStream(cw, compression.Gzip)
@@ -173,17 +207,24 @@ func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount
 		if err != nil {
 			return emptyDesc, errors.Wrap(err, "failed to write compressed diff")
 		}
-		opts = append(opts, content.WithLabels(map[string]string{
-			"containerd.io/uncompressed": dgstr.Digest().String(),
-		}))
+
+		if config.Labels == nil {
+			config.Labels = map[string]string{}
+		}
+		config.Labels["containerd.io/uncompressed"] = dgstr.Digest().String()
 	} else {
 		if err = archive.WriteDiff(ctx, cw, aDir, bDir); err != nil {
 			return emptyDesc, errors.Wrap(err, "failed to write diff")
 		}
 	}
 
+	var commitopts []content.Opt
+	if config.Labels != nil {
+		commitopts = append(commitopts, content.WithLabels(config.Labels))
+	}
+
 	dgst := cw.Digest()
-	if err := cw.Commit(ctx, 0, dgst, opts...); err != nil {
+	if err := cw.Commit(ctx, 0, dgst, commitopts...); err != nil {
 		return emptyDesc, errors.Wrap(err, "failed to commit")
 	}
 
@@ -193,7 +234,7 @@ func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount
 	}
 
 	return ocispec.Descriptor{
-		MediaType: media,
+		MediaType: config.MediaType,
 		Size:      info.Size,
 		Digest:    info.Digest,
 	}, nil
@@ -208,4 +249,12 @@ func (rc *readCounter) Read(p []byte) (n int, err error) {
 	n, err = rc.r.Read(p)
 	rc.c += int64(n)
 	return
+}
+
+func uniqueRef() string {
+	t := time.Now()
+	var b [3]byte
+	// Ignore read failures, just decreases uniqueness
+	rand.Read(b[:])
+	return fmt.Sprintf("%d-%s", t.UnixNano(), base64.URLEncoding.EncodeToString(b[:]))
 }

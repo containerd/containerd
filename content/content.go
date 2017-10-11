@@ -90,6 +90,7 @@ type IngestManager interface {
 // Writer handles the write of content into a content store
 type Writer interface {
 	// Close is expected to be called after Commit() when commission is needed.
+	// Closing a writer without commit allows resuming or aborting.
 	io.WriteCloser
 
 	// Digest may return empty digest or panics until committed.
