@@ -24,9 +24,11 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/linux/runcopts"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/typeurl"
 	"github.com/docker/docker/pkg/mount"
 	"github.com/golang/glog"
@@ -272,7 +274,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint32, config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig, extraMounts []*runtime.Mount) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
-	spec, err := defaultRuntimeSpec()
+	spec, err := defaultRuntimeSpec(id)
 	if err != nil {
 		return nil, err
 	}
@@ -721,8 +723,10 @@ func setOCINamespaces(g *generate.Generator, namespaces *runtime.NamespaceOption
 }
 
 // defaultRuntimeSpec returns a default runtime spec used in cri-containerd.
-func defaultRuntimeSpec() (*runtimespec.Spec, error) {
-	spec, err := containerd.GenerateSpec(context.Background(), nil, nil)
+func defaultRuntimeSpec(id string) (*runtimespec.Spec, error) {
+	// GenerateSpec needs namespace.
+	ctx := namespaces.WithNamespace(context.Background(), k8sContainerdNamespace)
+	spec, err := containerd.GenerateSpec(ctx, nil, &containers.Container{ID: id})
 	if err != nil {
 		return nil, err
 	}
