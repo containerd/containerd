@@ -82,6 +82,8 @@ type Config struct {
 	StatsCollectPeriod int `toml:"stats_collect_period"`
 	// SystemdCgroup enables systemd cgroup support.
 	SystemdCgroup bool `toml:"systemd_cgroup"`
+	// OOMScore adjust the cri-containerd's oom score
+	OOMScore int `toml:"oom_score"`
 }
 
 // CRIContainerdOptions contains cri-containerd command line and toml options.
@@ -143,6 +145,8 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		false, "Enables systemd cgroup support. By default not enabled.")
 	fs.BoolVar(&c.PrintDefaultConfig, "default-config",
 		false, "Print default toml config of cri-containerd and quit.")
+	fs.IntVar(&c.OOMScore, "oom-score",
+		-999, "Adjust the cri-containerd's oom score.")
 }
 
 // InitFlags must be called after adding all cli options flags are defined and
