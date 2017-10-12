@@ -101,8 +101,10 @@ func (c *criContainerdService) recover(ctx context.Context) error {
 		return fmt.Errorf("failed to load images: %v", err)
 	}
 	for _, image := range images {
-		c.imageStore.Add(image)
 		glog.V(4).Infof("Loaded image %+v", image)
+		if err := c.imageStore.Add(image); err != nil {
+			return fmt.Errorf("failed to add image %q to store: %v", image.ID, err)
+		}
 	}
 
 	// It's possible that containerd containers are deleted unexpectedly. In that case,

@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd"
+	"github.com/docker/docker/pkg/truncindex"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
 )
@@ -39,12 +40,15 @@ type Sandbox struct {
 type Store struct {
 	lock      sync.RWMutex
 	sandboxes map[string]Sandbox
-	// TODO(random-liu): Add trunc index.
+	idIndex   *truncindex.TruncIndex
 }
 
 // NewStore creates a sandbox store.
 func NewStore() *Store {
-	return &Store{sandboxes: make(map[string]Sandbox)}
+	return &Store{
+		sandboxes: make(map[string]Sandbox),
+		idIndex:   truncindex.NewTruncIndex([]string{}),
+	}
 }
 
 // Add a sandbox into the store.
@@ -53,6 +57,9 @@ func (s *Store) Add(sb Sandbox) error {
 	defer s.lock.Unlock()
 	if _, ok := s.sandboxes[sb.ID]; ok {
 		return store.ErrAlreadyExist
+	}
+	if err := s.idIndex.Add(sb.ID); err != nil {
+		return err
 	}
 	s.sandboxes[sb.ID] = sb
 	return nil
@@ -63,6 +70,13 @@ func (s *Store) Add(sb Sandbox) error {
 func (s *Store) Get(id string) (Sandbox, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
+	id, err := s.idIndex.Get(id)
+	if err != nil {
+		if err == truncindex.ErrNotExist {
+			err = store.ErrNotExist
+		}
+		return Sandbox{}, err
+	}
 	if sb, ok := s.sandboxes[id]; ok {
 		return sb, nil
 	}
@@ -84,5 +98,12 @@ func (s *Store) List() []Sandbox {
 func (s *Store) Delete(id string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+	id, err := s.idIndex.Get(id)
+	if err != nil {
+		// Note: The idIndex.Delete and delete doesn't handle truncated index.
+		// So we need to return if there are error.
+		return
+	}
+	s.idIndex.Delete(id) // nolint: errcheck
 	delete(s.sandboxes, id)
 }

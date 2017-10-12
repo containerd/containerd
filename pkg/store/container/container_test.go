@@ -28,7 +28,6 @@ import (
 )
 
 func TestContainerStore(t *testing.T) {
-	ids := []string{"1", "2", "3"}
 	metadatas := map[string]Metadata{
 		"1": {
 			ID:        "1",
@@ -43,31 +42,43 @@ func TestContainerStore(t *testing.T) {
 			ImageRef: "TestImage-1",
 			LogPath:  "/test/log/path/1",
 		},
-		"2": {
-			ID:        "2",
-			Name:      "Container-2",
-			SandboxID: "Sandbox-2",
+		"2abcd": {
+			ID:        "2abcd",
+			Name:      "Container-2abcd",
+			SandboxID: "Sandbox-2abcd",
 			Config: &runtime.ContainerConfig{
 				Metadata: &runtime.ContainerMetadata{
-					Name:    "TestPod-2",
+					Name:    "TestPod-2abcd",
 					Attempt: 2,
 				},
 			},
 			ImageRef: "TestImage-2",
 			LogPath:  "/test/log/path/2",
 		},
-		"3": {
-			ID:        "3",
-			Name:      "Container-3",
-			SandboxID: "Sandbox-3",
+		"4a333": {
+			ID:        "4a333",
+			Name:      "Container-4a333",
+			SandboxID: "Sandbox-4a333",
 			Config: &runtime.ContainerConfig{
 				Metadata: &runtime.ContainerMetadata{
-					Name:    "TestPod-3",
+					Name:    "TestPod-4a333",
 					Attempt: 3,
 				},
 			},
 			ImageRef: "TestImage-3",
 			LogPath:  "/test/log/path/3",
+		},
+		"4abcd": {
+			ID:        "4abcd",
+			Name:      "Container-4abcd",
+			SandboxID: "Sandbox-4abcd",
+			Config: &runtime.ContainerConfig{
+				Metadata: &runtime.ContainerMetadata{
+					Name:    "TestPod-4abcd",
+					Attempt: 1,
+				},
+			},
+			ImageRef: "TestImage-4abcd",
 		},
 	}
 	statuses := map[string]Status{
@@ -80,29 +91,39 @@ func TestContainerStore(t *testing.T) {
 			Reason:     "TestReason-1",
 			Message:    "TestMessage-1",
 		},
-		"2": {
+		"2abcd": {
 			Pid:        2,
 			CreatedAt:  time.Now().UnixNano(),
 			StartedAt:  time.Now().UnixNano(),
 			FinishedAt: time.Now().UnixNano(),
 			ExitCode:   2,
-			Reason:     "TestReason-2",
-			Message:    "TestMessage-2",
+			Reason:     "TestReason-2abcd",
+			Message:    "TestMessage-2abcd",
 		},
-		"3": {
+		"4a333": {
 			Pid:        3,
 			CreatedAt:  time.Now().UnixNano(),
 			StartedAt:  time.Now().UnixNano(),
 			FinishedAt: time.Now().UnixNano(),
 			ExitCode:   3,
-			Reason:     "TestReason-3",
-			Message:    "TestMessage-3",
+			Reason:     "TestReason-4a333",
+			Message:    "TestMessage-4a333",
+			Removing:   true,
+		},
+		"4abcd": {
+			Pid:        4,
+			CreatedAt:  time.Now().UnixNano(),
+			StartedAt:  time.Now().UnixNano(),
+			FinishedAt: time.Now().UnixNano(),
+			ExitCode:   4,
+			Reason:     "TestReason-4abcd",
+			Message:    "TestMessage-4abcd",
 			Removing:   true,
 		},
 	}
 	assert := assertlib.New(t)
 	containers := map[string]Container{}
-	for _, id := range ids {
+	for id := range metadatas {
 		container, err := NewContainer(
 			metadatas[id],
 			WithFakeStatus(statuses[id]),
@@ -119,29 +140,35 @@ func TestContainerStore(t *testing.T) {
 	}
 
 	t.Logf("should be able to get container")
+	genTruncIndex := func(normalName string) string { return normalName[:(len(normalName)+1)/2] }
 	for id, c := range containers {
-		got, err := s.Get(id)
+		got, err := s.Get(genTruncIndex(id))
 		assert.NoError(err)
 		assert.Equal(c, got)
 	}
 
 	t.Logf("should be able to list containers")
 	cs := s.List()
-	assert.Len(cs, 3)
+	assert.Len(cs, len(containers))
 
-	testID := "2"
-	t.Logf("add should return already exists error for duplicated container")
-	assert.Equal(store.ErrAlreadyExist, s.Add(containers[testID]))
+	cntrNum := len(containers)
+	for testID, v := range containers {
+		truncID := genTruncIndex(testID)
 
-	t.Logf("should be able to delete container")
-	s.Delete(testID)
-	cs = s.List()
-	assert.Len(cs, 2)
+		t.Logf("add should return already exists error for duplicated container")
+		assert.Equal(store.ErrAlreadyExist, s.Add(v))
 
-	t.Logf("get should return not exist error after deletion")
-	c, err := s.Get(testID)
-	assert.Equal(Container{}, c)
-	assert.Equal(store.ErrNotExist, err)
+		t.Logf("should be able to delete container")
+		s.Delete(truncID)
+		cntrNum--
+		cs = s.List()
+		assert.Len(cs, cntrNum)
+
+		t.Logf("get should return not exist error after deletion")
+		c, err := s.Get(truncID)
+		assert.Equal(Container{}, c)
+		assert.Equal(store.ErrNotExist, err)
+	}
 }
 
 func TestWithContainerIO(t *testing.T) {

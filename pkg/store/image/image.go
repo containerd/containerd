@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd"
+	"github.com/docker/docker/pkg/truncindex"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
@@ -46,30 +47,43 @@ type Image struct {
 
 // Store stores all images.
 type Store struct {
-	lock   sync.RWMutex
-	images map[string]Image
-	// TODO(random-liu): Add trunc index.
+	lock    sync.RWMutex
+	images  map[string]Image
+	idIndex *truncindex.TruncIndex
 }
 
 // NewStore creates an image store.
 func NewStore() *Store {
-	return &Store{images: make(map[string]Image)}
+	return &Store{
+		images:  make(map[string]Image),
+		idIndex: truncindex.NewTruncIndex([]string{}),
+	}
 }
 
 // Add an image into the store.
-func (s *Store) Add(img Image) {
+func (s *Store) Add(img Image) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+	if _, err := s.idIndex.Get(img.ID); err != nil {
+		if err != truncindex.ErrNotExist {
+			return err
+		}
+		if err := s.idIndex.Add(img.ID); err != nil {
+			return err
+		}
+	}
+
 	i, ok := s.images[img.ID]
 	if !ok {
 		// If the image doesn't exist, add it.
 		s.images[img.ID] = img
-		return
+		return nil
 	}
 	// Or else, merge the repo tags/digests.
 	i.RepoTags = mergeStringSlices(i.RepoTags, img.RepoTags)
 	i.RepoDigests = mergeStringSlices(i.RepoDigests, img.RepoDigests)
 	s.images[img.ID] = i
+	return nil
 }
 
 // Get returns the image with specified id. Returns store.ErrNotExist if the
@@ -77,6 +91,13 @@ func (s *Store) Add(img Image) {
 func (s *Store) Get(id string) (Image, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
+	id, err := s.idIndex.Get(id)
+	if err != nil {
+		if err == truncindex.ErrNotExist {
+			err = store.ErrNotExist
+		}
+		return Image{}, err
+	}
 	if i, ok := s.images[id]; ok {
 		return i, nil
 	}
@@ -98,6 +119,13 @@ func (s *Store) List() []Image {
 func (s *Store) Delete(id string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+	id, err := s.idIndex.Get(id)
+	if err != nil {
+		// Note: The idIndex.Delete and delete doesn't handle truncated index.
+		// So we need to return if there are error.
+		return
+	}
+	s.idIndex.Delete(id) // nolint: errcheck
 	delete(s.images, id)
 }
 

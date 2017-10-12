@@ -27,7 +27,7 @@ import (
 func (c *criContainerdService) Exec(ctx context.Context, r *runtime.ExecRequest) (*runtime.ExecResponse, error) {
 	cntr, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
-		return nil, fmt.Errorf("failed to find container in store: %v", err)
+		return nil, fmt.Errorf("failed to find container %q in store: %v", r.GetContainerId(), err)
 	}
 	state := cntr.Status.Get().State()
 	if state != runtime.ContainerState_CONTAINER_RUNNING {

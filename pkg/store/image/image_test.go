@@ -35,20 +35,28 @@ func TestImageStore(t *testing.T) {
 			Size:        10,
 			Config:      &imagespec.ImageConfig{},
 		},
-		"2": {
-			ID:          "2",
-			ChainID:     "test-chain-id-2",
-			RepoTags:    []string{"tag-2"},
-			RepoDigests: []string{"digest-2"},
+		"2abcd": {
+			ID:          "2abcd",
+			ChainID:     "test-chain-id-2abcd",
+			RepoTags:    []string{"tag-2abcd"},
+			RepoDigests: []string{"digest-2abcd"},
 			Size:        20,
 			Config:      &imagespec.ImageConfig{},
 		},
-		"3": {
-			ID:          "3",
-			RepoTags:    []string{"tag-3"},
-			RepoDigests: []string{"digest-3"},
-			ChainID:     "test-chain-id-3",
+		"4a333": {
+			ID:          "4a333",
+			RepoTags:    []string{"tag-4a333"},
+			RepoDigests: []string{"digest-4a333"},
+			ChainID:     "test-chain-id-4a333",
 			Size:        30,
+			Config:      &imagespec.ImageConfig{},
+		},
+		"4abcd": {
+			ID:          "4abcd",
+			RepoTags:    []string{"tag-4abcd"},
+			RepoDigests: []string{"digest-4abcd"},
+			ChainID:     "test-chain-id-4abcd",
+			Size:        40,
 			Config:      &imagespec.ImageConfig{},
 		},
 	}
@@ -58,49 +66,62 @@ func TestImageStore(t *testing.T) {
 
 	t.Logf("should be able to add image")
 	for _, img := range images {
-		s.Add(img)
+		err := s.Add(img)
+		assert.NoError(err)
 	}
 
 	t.Logf("should be able to get image")
+	genTruncIndex := func(normalName string) string { return normalName[:(len(normalName)+1)/2] }
 	for id, img := range images {
-		got, err := s.Get(id)
+		got, err := s.Get(genTruncIndex(id))
 		assert.NoError(err)
 		assert.Equal(img, got)
 	}
 
 	t.Logf("should be able to list images")
 	imgs := s.List()
-	assert.Len(imgs, 3)
+	assert.Len(imgs, len(images))
 
-	testID := "2"
-	t.Logf("should be able to add new repo tags/digests")
-	newImg := images[testID]
-	newImg.RepoTags = []string{"tag-new"}
-	newImg.RepoDigests = []string{"digest-new"}
-	s.Add(newImg)
-	got, err := s.Get(testID)
-	assert.NoError(err)
-	assert.Len(got.RepoTags, 2)
-	assert.Contains(got.RepoTags, "tag-2", "tag-new")
-	assert.Len(got.RepoDigests, 2)
-	assert.Contains(got.RepoDigests, "digest-2", "digest-new")
+	imageNum := len(images)
+	for testID, v := range images {
+		truncID := genTruncIndex(testID)
+		oldRepoTag := v.RepoTags[0]
+		oldRepoDigest := v.RepoDigests[0]
+		newRepoTag := oldRepoTag + "new"
+		newRepoDigest := oldRepoDigest + "new"
 
-	t.Logf("should not be able to add duplicated repo tags/digests")
-	s.Add(newImg)
-	got, err = s.Get(testID)
-	assert.NoError(err)
-	assert.Len(got.RepoTags, 2)
-	assert.Contains(got.RepoTags, "tag-2", "tag-new")
-	assert.Len(got.RepoDigests, 2)
-	assert.Contains(got.RepoDigests, "digest-2", "digest-new")
+		t.Logf("should be able to add new repo tags/digests")
+		newImg := v
+		newImg.RepoTags = []string{newRepoTag}
+		newImg.RepoDigests = []string{newRepoDigest}
+		err := s.Add(newImg)
+		assert.NoError(err)
+		got, err := s.Get(truncID)
+		assert.NoError(err)
+		assert.Len(got.RepoTags, 2)
+		assert.Contains(got.RepoTags, oldRepoTag, newRepoTag)
+		assert.Len(got.RepoDigests, 2)
+		assert.Contains(got.RepoDigests, oldRepoDigest, newRepoDigest)
 
-	t.Logf("should be able to delete image")
-	s.Delete(testID)
-	imgs = s.List()
-	assert.Len(imgs, 2)
+		t.Logf("should not be able to add duplicated repo tags/digests")
+		err = s.Add(newImg)
+		assert.NoError(err)
+		got, err = s.Get(truncID)
+		assert.NoError(err)
+		assert.Len(got.RepoTags, 2)
+		assert.Contains(got.RepoTags, oldRepoTag, newRepoTag)
+		assert.Len(got.RepoDigests, 2)
+		assert.Contains(got.RepoDigests, oldRepoDigest, newRepoDigest)
 
-	t.Logf("get should return empty struct and ErrNotExist after deletion")
-	img, err := s.Get(testID)
-	assert.Equal(Image{}, img)
-	assert.Equal(store.ErrNotExist, err)
+		t.Logf("should be able to delete image")
+		s.Delete(truncID)
+		imageNum--
+		imgs = s.List()
+		assert.Len(imgs, imageNum)
+
+		t.Logf("get should return empty struct and ErrNotExist after deletion")
+		img, err := s.Get(truncID)
+		assert.Equal(Image{}, img)
+		assert.Equal(store.ErrNotExist, err)
+	}
 }

@@ -26,7 +26,6 @@ import (
 )
 
 func TestSandboxStore(t *testing.T) {
-	ids := []string{"1", "2", "3"}
 	metadatas := map[string]Metadata{
 		"1": {
 			ID:   "1",
@@ -41,36 +40,49 @@ func TestSandboxStore(t *testing.T) {
 			},
 			NetNSPath: "TestNetNS-1",
 		},
-		"2": {
-			ID:   "2",
-			Name: "Sandbox-2",
+		"2abcd": {
+			ID:   "2abcd",
+			Name: "Sandbox-2abcd",
 			Config: &runtime.PodSandboxConfig{
 				Metadata: &runtime.PodSandboxMetadata{
-					Name:      "TestPod-2",
-					Uid:       "TestUid-2",
-					Namespace: "TestNamespace-2",
+					Name:      "TestPod-2abcd",
+					Uid:       "TestUid-2abcd",
+					Namespace: "TestNamespace-2abcd",
 					Attempt:   2,
 				},
 			},
 			NetNSPath: "TestNetNS-2",
 		},
-		"3": {
-			ID:   "3",
-			Name: "Sandbox-3",
+		"4a333": {
+			ID:   "4a333",
+			Name: "Sandbox-4a333",
 			Config: &runtime.PodSandboxConfig{
 				Metadata: &runtime.PodSandboxMetadata{
-					Name:      "TestPod-3",
-					Uid:       "TestUid-3",
-					Namespace: "TestNamespace-3",
+					Name:      "TestPod-4a333",
+					Uid:       "TestUid-4a333",
+					Namespace: "TestNamespace-4a333",
 					Attempt:   3,
 				},
 			},
 			NetNSPath: "TestNetNS-3",
 		},
+		"4abcd": {
+			ID:   "4abcd",
+			Name: "Sandbox-4abcd",
+			Config: &runtime.PodSandboxConfig{
+				Metadata: &runtime.PodSandboxMetadata{
+					Name:      "TestPod-4abcd",
+					Uid:       "TestUid-4abcd",
+					Namespace: "TestNamespace-4abcd",
+					Attempt:   1,
+				},
+			},
+			NetNSPath: "TestNetNS-4abcd",
+		},
 	}
 	assert := assertlib.New(t)
 	sandboxes := map[string]Sandbox{}
-	for _, id := range ids {
+	for id := range metadatas {
 		sandboxes[id] = Sandbox{Metadata: metadatas[id]}
 	}
 
@@ -82,27 +94,33 @@ func TestSandboxStore(t *testing.T) {
 	}
 
 	t.Logf("should be able to get sandbox")
+	genTruncIndex := func(normalName string) string { return normalName[:(len(normalName)+1)/2] }
 	for id, sb := range sandboxes {
-		got, err := s.Get(id)
+		got, err := s.Get(genTruncIndex(id))
 		assert.NoError(err)
 		assert.Equal(sb, got)
 	}
 
 	t.Logf("should be able to list sandboxes")
 	sbs := s.List()
-	assert.Len(sbs, 3)
+	assert.Len(sbs, len(sandboxes))
 
-	testID := "2"
-	t.Logf("add should return already exists error for duplicated sandbox")
-	assert.Equal(store.ErrAlreadyExist, s.Add(sandboxes[testID]))
+	sbNum := len(sandboxes)
+	for testID, v := range sandboxes {
+		truncID := genTruncIndex(testID)
 
-	t.Logf("should be able to delete sandbox")
-	s.Delete(testID)
-	sbs = s.List()
-	assert.Len(sbs, 2)
+		t.Logf("add should return already exists error for duplicated sandbox")
+		assert.Equal(store.ErrAlreadyExist, s.Add(v))
 
-	t.Logf("get should return not exist error after deletion")
-	sb, err := s.Get(testID)
-	assert.Equal(Sandbox{}, sb)
-	assert.Equal(store.ErrNotExist, err)
+		t.Logf("should be able to delete sandbox")
+		s.Delete(truncID)
+		sbNum--
+		sbs = s.List()
+		assert.Len(sbs, sbNum)
+
+		t.Logf("get should return not exist error after deletion")
+		sb, err := s.Get(truncID)
+		assert.Equal(Sandbox{}, sb)
+		assert.Equal(store.ErrNotExist, err)
+	}
 }
