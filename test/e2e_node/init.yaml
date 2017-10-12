@@ -68,7 +68,6 @@ write_files:
       [Service]
       Restart=always
       RestartSec=5
-      OOMScoreAdjust=-999
       ExecStart=/home/cri-containerd/usr/local/bin/cri-containerd \
         --alsologtostderr --v=4 \
         --network-bin-dir=/home/cri-containerd/opt/cni/bin \
