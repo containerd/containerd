@@ -6,4 +6,4 @@ images:
   cos-stable:
     image_regex: cos-stable-60-9592-84-0
     project: cos-cloud
-    metadata: "user-data<test/e2e_node/init.yaml,configure-sh<test/e2e_node/configure.sh,extra-init-sh<test/e2e_node/jenkins/gci-init.sh,gci-update-strategy=update_disabled"
+    metadata: "user-data<test/e2e_node/init.yaml,configure-sh<test/e2e_node/configure.sh,extra-init-sh<test/e2e_node/gci-init.sh,gci-update-strategy=update_disabled"
