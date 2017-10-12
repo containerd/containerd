@@ -56,9 +56,8 @@ func mkdirAll(path string, perm os.FileMode) error {
 	return sys.MkdirAll(path, perm)
 }
 
-func prepareApply() func() {
-	// No umask or filesystem changes needed before apply
-	return func() {}
+func mkdir(path string, perm os.FileMode) error {
+	return os.Mkdir(path, perm)
 }
 
 func skipFile(hdr *tar.Header) bool {

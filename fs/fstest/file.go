@@ -50,7 +50,10 @@ func RemoveAll(name string) Applier {
 func CreateDir(name string, perm os.FileMode) Applier {
 	return applyFn(func(root string) error {
 		fullPath := filepath.Join(root, name)
-		return os.MkdirAll(fullPath, perm)
+		if err := os.MkdirAll(fullPath, perm); err != nil {
+			return err
+		}
+		return os.Chmod(fullPath, perm)
 	})
 }
 
@@ -72,6 +75,13 @@ func Chown(name string, uid, gid int) Applier {
 func Chtime(name string, t time.Time) Applier {
 	return applyFn(func(root string) error {
 		return os.Chtimes(filepath.Join(root, name), t, t)
+	})
+}
+
+// Chmod returns a file applier which changes the file permission
+func Chmod(name string, perm os.FileMode) Applier {
+	return applyFn(func(root string) error {
+		return os.Chmod(filepath.Join(root, name), perm)
 	})
 }
 
