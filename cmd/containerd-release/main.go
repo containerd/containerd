@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,6 +24,9 @@ const releaseNotes = `Welcome to the release of containerd {{.Version}}!
 {{- end}}
 
 {{.Preface}}
+
+Please try out the release binaries and report any issues at
+https://github.com/containerd/containerd/issues.
 
 {{range  $note := .Notes}}
 ### {{$note.Title}}
@@ -46,8 +50,6 @@ Previous release can be found at [{{.Previous}}](https://github.com/containerd/c
 {{range $dep := .Dependencies}}
 * {{$dep.Previous}} -> {{$dep.Commit}} **{{$dep.Name}}**
 {{- end}}
-
-## Downloads
 `
 
 const vendorConf = "vendor.conf"
@@ -114,10 +116,11 @@ This tool should be ran from the root of the containerd repository for a new rel
 			return err
 		}
 		logrus.Infof("creating new release %s with %d new changes...", tag, len(changes))
-		if err := checkoutRelease(r.Commit); err != nil {
+		rd, err := fileFromRev(r.Commit, vendorConf)
+		if err != nil {
 			return err
 		}
-		deps, err := parseDependencies(vendorConf)
+		deps, err := parseDependencies(rd)
 		if err != nil {
 			return err
 		}
@@ -162,14 +165,9 @@ func parseTag(path string) string {
 	return strings.TrimSuffix(filepath.Base(path), ".toml")
 }
 
-func parseDependencies(depfile string) ([]dependency, error) {
-	f, err := os.Open(depfile)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
+func parseDependencies(r io.Reader) ([]dependency, error) {
 	var deps []dependency
-	s := bufio.NewScanner(f)
+	s := bufio.NewScanner(r)
 	for s.Scan() {
 		ln := strings.TrimSpace(s.Text())
 		if strings.HasPrefix(ln, "#") || ln == "" {
@@ -196,15 +194,11 @@ func parseDependencies(depfile string) ([]dependency, error) {
 }
 
 func getPreviousDeps(previous string) ([]dependency, error) {
-	if _, err := git("checkout", previous); err != nil {
+	r, err := fileFromRev(previous, vendorConf)
+	if err != nil {
 		return nil, err
 	}
-	return parseDependencies(vendorConf)
-}
-
-func checkoutRelease(commit string) error {
-	_, err := git("checkout", commit)
-	return err
+	return parseDependencies(r)
 }
 
 func changelog(previous, commit string) ([]change, error) {
@@ -235,6 +229,15 @@ func parseChangelog(changelog []byte) ([]change, error) {
 		return nil, err
 	}
 	return changes, nil
+}
+
+func fileFromRev(rev, file string) (io.Reader, error) {
+	p, err := git("show", fmt.Sprintf("%s:%s", rev, file))
+	if err != nil {
+		return nil, err
+	}
+
+	return bytes.NewReader(p), nil
 }
 
 func git(args ...string) ([]byte, error) {
