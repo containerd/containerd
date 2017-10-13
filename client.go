@@ -233,6 +233,11 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 		)
 	}
 
+	if desc.Annotations == nil {
+		desc.Annotations = map[string]string{}
+	}
+	desc.Annotations["containerd.io/gc.root"] = time.Now().UTC().Format(time.RFC3339)
+
 	if err := images.Dispatch(ctx, handler, desc); err != nil {
 		return nil, err
 	}
@@ -263,6 +268,11 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 		imgrec = created
 	} else {
 		imgrec = updated
+	}
+
+	// Remove root tag from manifest now that image refers to it
+	if _, err := store.Update(ctx, content.Info{Digest: desc.Digest}, "labels.containerd.io/gc.root"); err != nil {
+		return nil, errors.Wrap(err, "failed to remove manifest root tag")
 	}
 
 	img := &image{

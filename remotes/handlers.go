@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/containerd/containerd/content"
@@ -162,6 +163,16 @@ func commitOpts(desc ocispec.Descriptor, r io.Reader) (io.Reader, []content.Opt)
 			return errors.Wrap(err, "unable to get commit labels")
 		}
 
+		if len(desc.Annotations) > 0 {
+			info.Labels = make(map[string]string, len(desc.Annotations))
+			for k, v := range desc.Annotations {
+				if strings.HasPrefix(k, "containerd.io/") || strings.HasPrefix(k, "opencontainers.org/") {
+					info.Labels[k] = v
+				} else {
+					info.Labels["opencontainers.org/annotation."+k] = v
+				}
+			}
+		}
 		if len(children) > 0 {
 			if info.Labels == nil {
 				info.Labels = map[string]string{}
