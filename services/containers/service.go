@@ -10,7 +10,6 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
 	ptypes "github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -160,10 +159,6 @@ func (s *service) Delete(ctx context.Context, req *api.DeleteContainerRequest) (
 		ID: req.ID,
 	}); err != nil {
 		return &ptypes.Empty{}, err
-	}
-
-	if err := s.db.GarbageCollect(ctx); err != nil {
-		return &ptypes.Empty{}, errdefs.ToGRPC(errors.Wrap(err, "garbage collection failed"))
 	}
 
 	return &ptypes.Empty{}, nil

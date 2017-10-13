@@ -604,13 +604,14 @@ func validateSnapshot(info *snapshot.Info) error {
 	return nil
 }
 
-func (s *snapshotter) garbageCollect(ctx context.Context) error {
-	logger := log.G(ctx).WithField("snapshotter", s.name)
-	lt1 := time.Now()
+func (s *snapshotter) garbageCollect(ctx context.Context) (d time.Duration, err error) {
 	s.l.Lock()
+	t1 := time.Now()
 	defer func() {
+		if err == nil {
+			d = time.Now().Sub(t1)
+		}
 		s.l.Unlock()
-		logger.WithField("t", time.Now().Sub(lt1)).Debugf("garbage collected")
 	}()
 
 	seen := map[string]struct{}{}
@@ -654,23 +655,26 @@ func (s *snapshotter) garbageCollect(ctx context.Context) error {
 
 		return nil
 	}); err != nil {
-		return err
+		return 0, err
 	}
 
 	roots, err := s.walkTree(ctx, seen)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	// TODO: Unlock before prune (once nodes are fully unavailable)
+	// TODO: Unlock before removal (once nodes are fully unavailable).
+	// This could be achieved through doing prune inside the lock
+	// and having a cleanup method which actually performs the
+	// deletions on the snapshotters which support it.
 
 	for _, node := range roots {
 		if err := s.pruneBranch(ctx, node); err != nil {
-			return err
+			return 0, err
 		}
 	}
 
-	return nil
+	return
 }
 
 type treeNode struct {
