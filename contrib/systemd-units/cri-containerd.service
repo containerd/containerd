@@ -7,7 +7,6 @@ After=containerd.service
 Restart=always
 RestartSec=5
 ExecStart=/usr/local/bin/cri-containerd --logtostderr
-OOMScoreAdjust=-999
 
 [Install]
 WantedBy=multi-user.target
