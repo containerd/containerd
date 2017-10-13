@@ -228,7 +228,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 		handler = images.Handlers(append(pullCtx.BaseHandlers, schema1Converter)...)
 	} else {
 		handler = images.Handlers(append(pullCtx.BaseHandlers,
-			remotes.FetchHandler(store, fetcher),
+			remotes.FetchHandler(store, fetcher, desc),
 			images.ChildrenHandler(store, platforms.Default()))...,
 		)
 	}
@@ -263,6 +263,11 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 		imgrec = created
 	} else {
 		imgrec = updated
+	}
+
+	// Remove root tag from manifest now that image refers to it
+	if _, err := store.Update(ctx, content.Info{Digest: desc.Digest}, "labels.containerd.io/gc.root"); err != nil {
+		return nil, errors.Wrap(err, "failed to remove manifest root tag")
 	}
 
 	img := &image{
