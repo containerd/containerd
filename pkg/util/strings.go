@@ -29,9 +29,9 @@ func InStringSlice(ss []string, str string) bool {
 	return false
 }
 
-// SubstractStringSlice substracts string from string slice.
+// SubtractStringSlice subtracts string from string slice.
 // Comparison is case insensitive.
-func SubstractStringSlice(ss []string, str string) []string {
+func SubtractStringSlice(ss []string, str string) []string {
 	var res []string
 	for _, s := range ss {
 		if strings.ToLower(s) == strings.ToLower(str) {

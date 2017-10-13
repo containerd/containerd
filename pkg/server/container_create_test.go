@@ -217,7 +217,7 @@ func TestContainerCapabilities(t *testing.T) {
 				AddCapabilities:  []string{"ALL"},
 				DropCapabilities: []string{"CHOWN"},
 			},
-			includes: util.SubstractStringSlice(getOCICapabilitiesList(), "CAP_CHOWN"),
+			includes: util.SubtractStringSlice(getOCICapabilitiesList(), "CAP_CHOWN"),
 			excludes: []string{"CAP_CHOWN"},
 		},
 		"should be able to add capabilities with drop all": {
@@ -226,7 +226,7 @@ func TestContainerCapabilities(t *testing.T) {
 				DropCapabilities: []string{"ALL"},
 			},
 			includes: []string{"CAP_SYS_ADMIN"},
-			excludes: util.SubstractStringSlice(getOCICapabilitiesList(), "CAP_SYS_ADMIN"),
+			excludes: util.SubtractStringSlice(getOCICapabilitiesList(), "CAP_SYS_ADMIN"),
 		},
 	} {
 		t.Logf("TestCase %q", desc)
