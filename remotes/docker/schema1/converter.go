@@ -26,6 +26,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const manifestSizeLimit = 8e6 // 8MB
+
 var (
 	mediaTypeManifest = "application/vnd.docker.distribution.manifest.v1+json"
 )
@@ -177,7 +179,7 @@ func (c *Converter) fetchManifest(ctx context.Context, desc ocispec.Descriptor) 
 		return err
 	}
 
-	b, err := ioutil.ReadAll(rc)
+	b, err := ioutil.ReadAll(io.LimitReader(rc, manifestSizeLimit)) // limit to 8MB
 	rc.Close()
 	if err != nil {
 		return err
