@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strings"
+
+	"github.com/containerd/console"
 )
 
 // Writer buffers writes until flush, at which time the last screen is cleared
@@ -38,7 +41,15 @@ func (w *Writer) Flush() error {
 		return err
 	}
 
-	w.lines = bytes.Count(w.buf.Bytes(), []byte("\n"))
+	ws, err := console.Current().Size()
+	if err != nil {
+		return fmt.Errorf("failed to get terminal width: %v", err)
+	}
+	strlines := strings.Split(w.buf.String(), "\n")
+	w.lines = -1
+	for _, line := range strlines {
+		w.lines += len(line)/int(ws.Width) + 1
+	}
 
 	if _, err := w.w.Write(w.buf.Bytes()); err != nil {
 		return err
@@ -53,7 +64,7 @@ func (w *Writer) Flush() error {
 
 func (w *Writer) clear() error {
 	for i := 0; i < w.lines; i++ {
-		if _, err := fmt.Fprintf(w.w, "\x1b[0A\x1b[2K\r"); err != nil {
+		if _, err := fmt.Fprintf(w.w, "\x1b[1A\x1b[2K\r"); err != nil {
 			return err
 		}
 	}
