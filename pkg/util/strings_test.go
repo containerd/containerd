@@ -34,15 +34,15 @@ func TestInStringSlice(t *testing.T) {
 	assert.False(t, InStringSlice(nil, "HIJ"))
 }
 
-func TestSubstractStringSlice(t *testing.T) {
+func TestSubtractStringSlice(t *testing.T) {
 	ss := []string{"ABC", "def", "ghi"}
 
-	assert.Equal(t, []string{"def", "ghi"}, SubstractStringSlice(ss, "abc"))
-	assert.Equal(t, []string{"def", "ghi"}, SubstractStringSlice(ss, "ABC"))
-	assert.Equal(t, []string{"ABC", "ghi"}, SubstractStringSlice(ss, "def"))
-	assert.Equal(t, []string{"ABC", "ghi"}, SubstractStringSlice(ss, "DEF"))
-	assert.Equal(t, []string{"ABC", "def", "ghi"}, SubstractStringSlice(ss, "hij"))
-	assert.Equal(t, []string{"ABC", "def", "ghi"}, SubstractStringSlice(ss, "HIJ"))
-	assert.Empty(t, SubstractStringSlice(nil, "hij"))
-	assert.Empty(t, SubstractStringSlice([]string{}, "hij"))
+	assert.Equal(t, []string{"def", "ghi"}, SubtractStringSlice(ss, "abc"))
+	assert.Equal(t, []string{"def", "ghi"}, SubtractStringSlice(ss, "ABC"))
+	assert.Equal(t, []string{"ABC", "ghi"}, SubtractStringSlice(ss, "def"))
+	assert.Equal(t, []string{"ABC", "ghi"}, SubtractStringSlice(ss, "DEF"))
+	assert.Equal(t, []string{"ABC", "def", "ghi"}, SubtractStringSlice(ss, "hij"))
+	assert.Equal(t, []string{"ABC", "def", "ghi"}, SubtractStringSlice(ss, "HIJ"))
+	assert.Empty(t, SubtractStringSlice(nil, "hij"))
+	assert.Empty(t, SubtractStringSlice([]string{}, "hij"))
 }
