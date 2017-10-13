@@ -150,18 +150,21 @@ func setSnapshotterIfEmpty(c *containers.Container) {
 // integration.
 //
 // Make sure to register the type of `extension` in the typeurl package via
-// `typeurl.Register` otherwise the type data will be inferred, including how
-// to encode and decode the object.
+// `typeurl.Register` or container creation may fail.
 func WithContainerExtension(name string, extension interface{}) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		any, err := typeurl.MarshalAny(extension)
-		if err != nil {
-			return err
-		}
-
 		if name == "" {
 			return errors.Wrapf(errdefs.ErrInvalidArgument, "extension key must not be zero-length")
 		}
+
+		any, err := typeurl.MarshalAny(extension)
+		if err != nil {
+			if errors.Cause(err) == typeurl.ErrNotFound {
+				return errors.Wrapf(err, "extension %q is not registered with the typeurl package, see `typeurl.Register`", name)
+			}
+			return errors.Wrap(err, "error marshalling extension")
+		}
+
 		if c.Extensions == nil {
 			c.Extensions = make(map[string]types.Any)
 		}
