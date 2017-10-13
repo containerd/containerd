@@ -215,6 +215,7 @@ func (t *task) Status(ctx context.Context) (Status, error) {
 func (t *task) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 	c := make(chan ExitStatus, 1)
 	go func() {
+		defer close(c)
 		r, err := t.client.TaskService().Wait(ctx, &tasks.WaitRequest{
 			ContainerID: t.id,
 		})
