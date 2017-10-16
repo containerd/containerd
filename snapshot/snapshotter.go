@@ -213,7 +213,7 @@ type Snapshotter interface {
 	// the kind of snapshot.
 	Stat(ctx context.Context, key string) (Info, error)
 
-	// Update updates the infor for a snapshot.
+	// Update updates the info for a snapshot.
 	//
 	// Only mutable properties of a snapshot may be updated.
 	Update(ctx context.Context, info Info, fieldpaths ...string) (Info, error)
