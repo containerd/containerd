@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/typeurl"
+	"github.com/gogo/protobuf/types"
 )
 
 // Kind identifies the kind of snapshot.
@@ -70,6 +72,7 @@ type Info struct {
 	Labels  map[string]string `json:",omitempty"` // Labels for snapshot
 	Created time.Time         `json:",omitempty"` // Created time
 	Updated time.Time         `json:",omitempty"` // Last update time
+	Options *types.Any        `json:"-"`          // Snapshot specific options
 }
 
 // Usage defines statistics for disk resources consumed by the snapshot.
@@ -298,6 +301,18 @@ type Opt func(info *Info) error
 func WithLabels(labels map[string]string) Opt {
 	return func(info *Info) error {
 		info.Labels = labels
+		return nil
+	}
+}
+
+// WithOptions adds the provided options to the snapshot
+func WithOptions(v interface{}) Opt {
+	return func(info *Info) error {
+		a, err := typeurl.MarshalAny(v)
+		if err != nil {
+			return err
+		}
+		info.Options = a
 		return nil
 	}
 }

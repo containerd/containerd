@@ -18,6 +18,7 @@ var (
 	bucketKeyStorageVersion = []byte("v1")
 	bucketKeySnapshot       = []byte("snapshots")
 	bucketKeyParents        = []byte("parents")
+	bucketKeyOptions        = []byte("options")
 
 	bucketKeyID     = []byte("id")
 	bucketKeyParent = []byte("parent")
@@ -134,8 +135,7 @@ func UpdateInfo(ctx context.Context, info snapshot.Info, fieldpaths ...string) (
 		if err := boltutil.WriteLabels(sbkt, updated.Labels); err != nil {
 			return err
 		}
-
-		return nil
+		return boltutil.WriteAny(sbkt, bucketKeyOptions, updated.Options)
 	})
 	if err != nil {
 		return snapshot.Info{}, err
@@ -252,6 +252,7 @@ func CreateSnapshot(ctx context.Context, kind snapshot.Kind, key, parent string,
 			Labels:  base.Labels,
 			Created: t,
 			Updated: t,
+			Options: base.Options,
 		}
 		if err := putSnapshot(sbkt, id, si); err != nil {
 			return err
@@ -508,6 +509,12 @@ func readSnapshot(bkt *bolt.Bucket, id *uint64, si *snapshot.Info) error {
 			return err
 		}
 		si.Labels = labels
+
+		opts, err := boltutil.ReadAny(bkt, bucketKeyOptions)
+		if err != nil {
+			return err
+		}
+		si.Options = opts
 	}
 
 	return nil

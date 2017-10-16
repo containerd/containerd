@@ -113,7 +113,11 @@ func (s *snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, erro
 		}
 		bkey = string(sbkt.Get(bucketKeyName))
 		local.Parent = string(sbkt.Get(bucketKeyParent))
-
+		a, err := boltutil.ReadAny(sbkt, bucketKeyOptions)
+		if err != nil {
+			return errors.Wrap(err, "failed to read options")
+		}
+		local.Options = a
 		return nil
 	}); err != nil {
 		return snapshot.Info{}, err
@@ -163,6 +167,11 @@ func (s *snapshotter) Update(ctx context.Context, info snapshot.Info, fieldpaths
 		if err := boltutil.ReadTimestamps(sbkt, &local.Created, &local.Updated); err != nil {
 			return errors.Wrap(err, "failed to read timestamps")
 		}
+		a, err := boltutil.ReadAny(sbkt, bucketKeyOptions)
+		if err != nil {
+			return errors.Wrap(err, "failed to read options")
+		}
+		local.Options = a
 
 		// Handle field updates
 		if len(fieldpaths) > 0 {
@@ -193,13 +202,16 @@ func (s *snapshotter) Update(ctx context.Context, info snapshot.Info, fieldpaths
 		local.Updated = time.Now().UTC()
 
 		if err := boltutil.WriteTimestamps(sbkt, local.Created, local.Updated); err != nil {
-			return errors.Wrap(err, "failed to read timestamps")
+			return errors.Wrap(err, "failed to write timestamps")
 		}
 		if err := boltutil.WriteLabels(sbkt, local.Labels); err != nil {
-			return errors.Wrap(err, "failed to read labels")
+			return errors.Wrap(err, "failed to write labels")
 		}
 		bkey = string(sbkt.Get(bucketKeyName))
 		local.Parent = string(sbkt.Get(bucketKeyParent))
+		if err := boltutil.WriteAny(sbkt, bucketKeyOptions, local.Options); err != nil {
+			return errors.Wrap(err, "failed to write options")
+		}
 
 		return nil
 	}); err != nil {
@@ -325,6 +337,9 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 		if err := boltutil.WriteLabels(bbkt, base.Labels); err != nil {
 			return err
 		}
+		if err := boltutil.WriteAny(bbkt, bucketKeyOptions, base.Options); err != nil {
+			return err
+		}
 
 		// TODO: Consider doing this outside of transaction to lessen
 		// metadata lock time
@@ -419,6 +434,9 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 			return err
 		}
 		if err := boltutil.WriteLabels(bbkt, base.Labels); err != nil {
+			return err
+		}
+		if err := boltutil.WriteAny(bbkt, bucketKeyOptions, base.Options); err != nil {
 			return err
 		}
 		if err := bkt.DeleteBucket([]byte(key)); err != nil {
@@ -541,6 +559,11 @@ func (s *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 					if err != nil {
 						return err
 					}
+					a, err := boltutil.ReadAny(sbkt, bucketKeyOptions)
+					if err != nil {
+						return err
+					}
+					pair.info.Options = a
 
 					pairs = append(pairs, pair)
 				}

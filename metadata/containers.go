@@ -293,16 +293,11 @@ func readContainer(container *containers.Container, bkt *bolt.Bucket) error {
 				container.Runtime.Name = string(n)
 			}
 
-			obkt := rbkt.Get(bucketKeyOptions)
-			if obkt == nil {
-				return nil
-			}
-
-			var any types.Any
-			if err := proto.Unmarshal(obkt, &any); err != nil {
+			a, err := boltutil.ReadAny(rbkt, bucketKeyOptions)
+			if err != nil {
 				return err
 			}
-			container.Runtime.Options = &any
+			container.Runtime.Options = a
 		case string(bucketKeySpec):
 			var any types.Any
 			if err := proto.Unmarshal(v, &any); err != nil {
@@ -346,12 +341,7 @@ func writeContainer(bkt *bolt.Bucket, container *containers.Container) error {
 	}
 
 	if container.Spec != nil {
-		spec, err := container.Spec.Marshal()
-		if err != nil {
-			return err
-		}
-
-		if err := bkt.Put(bucketKeySpec, spec); err != nil {
+		if err := boltutil.WriteAny(bkt, bucketKeySpec, container.Spec); err != nil {
 			return err
 		}
 	}
