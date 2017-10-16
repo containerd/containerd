@@ -37,8 +37,8 @@ const (
 // datastores for content and snapshots.
 type DB struct {
 	db *bolt.DB
-	ss map[string]snapshot.Snapshotter
-	cs content.Store
+	ss map[string]*snapshotter
+	cs *contentStore
 
 	// wlock is used to protect access to the data structures during garbage
 	// collection. While the wlock is held no writable transactions can be
@@ -60,12 +60,19 @@ type DB struct {
 // NewDB creates a new metadata database using the provided
 // bolt database, content store, and snapshotters.
 func NewDB(db *bolt.DB, cs content.Store, ss map[string]snapshot.Snapshotter) *DB {
-	return &DB{
+	m := &DB{
 		db:      db,
-		ss:      ss,
-		cs:      cs,
+		ss:      make(map[string]*snapshotter, len(ss)),
 		dirtySS: map[string]struct{}{},
 	}
+
+	// Initialize data stores
+	m.cs = newContentStore(m, cs)
+	for name, sn := range ss {
+		m.ss[name] = newSnapshotter(m, name, sn)
+	}
+
+	return m
 }
 
 // Init ensures the database is at the correct version
@@ -158,7 +165,7 @@ func (m *DB) ContentStore() content.Store {
 	if m.cs == nil {
 		return nil
 	}
-	return newContentStore(m, m.cs)
+	return m.cs
 }
 
 // Snapshotter returns a namespaced content store for
@@ -168,7 +175,7 @@ func (m *DB) Snapshotter(name string) snapshot.Snapshotter {
 	if !ok {
 		return nil
 	}
-	return newSnapshotter(m, name, sn)
+	return sn
 }
 
 // View runs a readonly transaction on the metadata store.
@@ -292,7 +299,7 @@ func (m *DB) cleanupSnapshotter(name string) {
 		return
 	}
 
-	err := newSnapshotter(m, name, sn).garbageCollect(ctx)
+	err := sn.garbageCollect(ctx)
 	if err != nil {
 		log.G(ctx).WithError(err).WithField("snapshotter", name).Warn("garbage collection failed")
 	}
