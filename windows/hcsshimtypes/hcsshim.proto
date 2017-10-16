@@ -16,7 +16,7 @@ message CreateOptions {
 // ProcessDetails is made of the same fields as found in hcsshim.ProcessListItem
 message ProcessDetails {
 	string image_name = 1;
-	google.protobuf.Timestamp created_at = 2;
+	google.protobuf.Timestamp created_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 	uint64 kernel_time_100_ns = 3;
 	uint64 memory_commit_bytes = 4;
 	uint64 memory_working_set_private_bytes = 5;
