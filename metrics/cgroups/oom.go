@@ -44,11 +44,14 @@ type oomCollector struct {
 }
 
 type oom struct {
+	// count needs to stay the first member of this struct to ensure 64bits
+	// alignment on a 32bits machine (e.g. arm32). This is necessary as we use
+	// the sync/atomic operations on this field.
+	count     int64
 	id        string
 	namespace string
 	c         cgroups.Cgroup
 	triggers  []Trigger
-	count     int64
 }
 
 func (o *oomCollector) Add(id, namespace string, cg cgroups.Cgroup, triggers ...Trigger) error {
