@@ -343,7 +343,7 @@ func (p *initProcess) checkpoint(context context.Context, r *shimapi.CheckpointT
 	work := filepath.Join(p.workDir, "criu-work")
 	defer os.RemoveAll(work)
 	if err := p.runtime.Checkpoint(context, p.id, &runc.CheckpointOpts{
-		WorkDir:                  p.workDir,
+		WorkDir:                  work,
 		ImagePath:                r.Path,
 		AllowOpenTCP:             options.OpenTcp,
 		AllowExternalUnixSockets: options.ExternalUnixSockets,
