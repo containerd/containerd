@@ -28,6 +28,7 @@ var snapshotCommand = cli.Command{
 		mountSnapshotCommand,
 		commitSnapshotCommand,
 		infoSnapshotCommand,
+		labelSnapshotCommand,
 	},
 }
 
@@ -338,6 +339,58 @@ var infoSnapshotCommand = cli.Command{
 		}
 
 		printAsJSON(info)
+
+		return nil
+	},
+}
+
+var labelSnapshotCommand = cli.Command{
+	Name:        "label",
+	Usage:       "add labels to content",
+	ArgsUsage:   "[flags] <name> [<label>=<value> ...]",
+	Description: `Labels snapshots in the snapshotter`,
+	Flags:       []cli.Flag{},
+	Action: func(clicontext *cli.Context) error {
+		var (
+			key, labels = objectWithLabelArgs(clicontext)
+		)
+		ctx, cancel := appContext(clicontext)
+		defer cancel()
+
+		snapshotter, err := getSnapshotter(clicontext)
+		if err != nil {
+			return err
+		}
+
+		info := snapshot.Info{
+			Name:   key,
+			Labels: map[string]string{},
+		}
+
+		var paths []string
+		for k, v := range labels {
+			paths = append(paths, fmt.Sprintf("labels.%s", k))
+			if v != "" {
+				info.Labels[k] = v
+			}
+		}
+
+		// Nothing updated, do no clear
+		if len(paths) == 0 {
+			info, err = snapshotter.Stat(ctx, info.Name)
+		} else {
+			info, err = snapshotter.Update(ctx, info, paths...)
+		}
+		if err != nil {
+			return err
+		}
+
+		var labelStrings []string
+		for k, v := range info.Labels {
+			labelStrings = append(labelStrings, fmt.Sprintf("%s=%s", k, v))
+		}
+
+		fmt.Println(strings.Join(labelStrings, ","))
 
 		return nil
 	},
