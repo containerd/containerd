@@ -250,19 +250,19 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 	}
 
 	is := c.ImageService()
-	if updated, err := is.Update(ctx, imgrec, "target"); err != nil {
-		if !errdefs.IsNotFound(err) {
+	if created, err := is.Create(ctx, imgrec); err != nil {
+		if !errdefs.IsAlreadyExists(err) {
 			return nil, err
 		}
 
-		created, err := is.Create(ctx, imgrec)
+		updated, err := is.Update(ctx, imgrec)
 		if err != nil {
 			return nil, err
 		}
 
-		imgrec = created
-	} else {
 		imgrec = updated
+	} else {
+		imgrec = created
 	}
 
 	img := &image{
