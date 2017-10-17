@@ -387,6 +387,15 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 	index := v1.Index{
 		Annotations: make(map[string]string),
 	}
+	// make sure we clear the gc root labels reguardless of success
+	var clearRoots []ocispec.Descriptor
+	defer func() {
+		for _, r := range append(index.Manifests, clearRoots...) {
+			if err := clearRootGCLabel(ctx, t.client, r); err != nil {
+				log.G(ctx).WithError(err).WithField("dgst", r.Digest).Warnf("failed to remove root marker")
+			}
+		}
+	}()
 	if err := t.checkpointTask(ctx, &index, request); err != nil {
 		return nil, err
 	}
@@ -405,6 +414,7 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 	if err != nil {
 		return nil, err
 	}
+	clearRoots = append(clearRoots, desc)
 	im := images.Image{
 		Name:   i.Name,
 		Target: desc,
@@ -552,24 +562,13 @@ func (t *task) writeIndex(ctx context.Context, index *v1.Index) (d v1.Descriptor
 	labels := map[string]string{
 		"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
 	}
-
 	for i, m := range index.Manifests {
 		labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i)] = m.Digest.String()
-		defer func(m ocispec.Descriptor) {
-			if err == nil {
-				info := content.Info{Digest: m.Digest}
-				if _, uerr := t.client.ContentStore().Update(ctx, info, "labels.containerd.io/gc.root"); uerr != nil {
-					log.G(ctx).WithError(uerr).WithField("dgst", m.Digest).Warnf("failed to remove root marker")
-				}
-			}
-		}(m)
 	}
-
 	buf := bytes.NewBuffer(nil)
 	if err := json.NewEncoder(buf).Encode(index); err != nil {
 		return v1.Descriptor{}, err
 	}
-
 	return writeContent(ctx, t.client.ContentStore(), v1.MediaTypeImageIndex, t.id, buf, content.WithLabels(labels))
 }
 
@@ -591,4 +590,10 @@ func writeContent(ctx context.Context, store content.Store, mediaType, ref strin
 		Digest:    writer.Digest(),
 		Size:      size,
 	}, nil
+}
+
+func clearRootGCLabel(ctx context.Context, client *Client, desc ocispec.Descriptor) error {
+	info := content.Info{Digest: desc.Digest}
+	_, err := client.ContentStore().Update(ctx, info, "labels.containerd.io/gc.root")
+	return err
 }
