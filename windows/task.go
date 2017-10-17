@@ -400,13 +400,9 @@ func (t *task) cleanup() {
 
 // convertToProcessDetails converts a given hcsshim ProcessListItem to proto ProcessDetails
 func (t *task) convertToProcessDetails(p hcsshim.ProcessListItem) (*hcsshimtypes.ProcessDetails, error) {
-	protobufTime, err := types.TimestampProto(p.CreateTimestamp)
-	if err != nil {
-		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "failed to convert timestamp for process pid: %d\n", p.ProcessId)
-	}
 	return &hcsshimtypes.ProcessDetails{
 		ImageName:                    p.ImageName,
-		CreatedAt:                    protobufTime,
+		CreatedAt:                    p.CreateTimestamp,
 		KernelTime_100Ns:             p.KernelTime100ns,
 		MemoryCommitBytes:            p.MemoryCommitBytes,
 		MemoryWorkingSetPrivateBytes: p.MemoryWorkingSetPrivateBytes,
