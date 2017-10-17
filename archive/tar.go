@@ -105,6 +105,12 @@ func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 
 	// Iterate through the files in the archive.
 	for {
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		default:
+		}
+
 		hdr, err := tr.Next()
 		if err == io.EOF {
 			// end of tar archive
@@ -453,9 +459,8 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 		if err != nil {
 			return err
 		}
-		buf := bufferPool.Get().([]byte)
-		_, err = io.CopyBuffer(file, reader, buf)
-		bufferPool.Put(buf)
+
+		_, err = copyBuffered(ctx, file, reader)
 		if err1 := file.Close(); err == nil {
 			err = err1
 		}
@@ -521,4 +526,42 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 	}
 
 	return chtimes(path, boundTime(latestTime(hdr.AccessTime, hdr.ModTime)), boundTime(hdr.ModTime))
+}
+
+func copyBuffered(ctx context.Context, dst io.Writer, src io.Reader) (written int64, err error) {
+	buf := bufferPool.Get().([]byte)
+	defer bufferPool.Put(buf)
+
+	for {
+		select {
+		case <-ctx.Done():
+			err = ctx.Err()
+			return
+		default:
+		}
+
+		nr, er := src.Read(buf)
+		if nr > 0 {
+			nw, ew := dst.Write(buf[0:nr])
+			if nw > 0 {
+				written += int64(nw)
+			}
+			if ew != nil {
+				err = ew
+				break
+			}
+			if nr != nw {
+				err = io.ErrShortWrite
+				break
+			}
+		}
+		if er != nil {
+			if er != io.EOF {
+				err = er
+			}
+			break
+		}
+	}
+	return written, err
+
 }
