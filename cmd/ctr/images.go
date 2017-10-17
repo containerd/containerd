@@ -56,17 +56,6 @@ var imagesListCommand = cli.Command{
 
 		imageStore := client.ImageService()
 		cs := client.ContentStore()
-
-		if len(filters) == 0 {
-			filters = append(filters, `labels.containerd."io/checkpoint"!=true`)
-		} else {
-			for _, f := range filters {
-				if !strings.Contains(f, `labels.containerd."io/checkpoint"`) {
-					f += `,labels.containerd."io/checkpoint"!=true`
-					_ = f // ignore error: ineffectual assignment to f
-				}
-			}
-		}
 		imageList, err := imageStore.List(ctx, filters...)
 		if err != nil {
 			return errors.Wrap(err, "failed to list images")
