@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/images"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -49,20 +48,7 @@ var taskCheckpointCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-
-		labels := map[string]string{
-			"containerd.io/checkpoint": "true",
-		}
-		img := images.Image{
-			Name:   checkpoint.Digest.String(),
-			Target: checkpoint,
-			Labels: labels,
-		}
-		_, err = client.ImageService().Create(ctx, img)
-		if err != nil {
-			return err
-		}
-		fmt.Println(checkpoint.Digest.String())
+		fmt.Println(checkpoint.Name())
 		return nil
 	},
 }

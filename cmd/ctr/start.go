@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/containerd/console"
-	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -41,7 +40,7 @@ var taskStartCommand = cli.Command{
 
 		tty := spec.Process.Terminal
 
-		task, err := newTask(ctx, container, digest.Digest(""), tty)
+		task, err := newTask(ctx, client, container, "", tty)
 		if err != nil {
 			return err
 		}

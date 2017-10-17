@@ -9,7 +9,6 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -118,7 +117,7 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	)
 }
 
-func newTask(ctx gocontext.Context, container containerd.Container, _ digest.Digest, tty bool) (containerd.Task, error) {
+func newTask(ctx gocontext.Context, client *containerd.Client, container containerd.Container, _ string, tty bool) (containerd.Task, error) {
 	io := containerd.Stdio
 	if tty {
 		io = containerd.StdioTerminal

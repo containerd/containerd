@@ -28,6 +28,14 @@ func WithExit(r *CheckpointTaskInfo) error {
 	return nil
 }
 
+// WithCheckpointName sets the image name for the checkpoint
+func WithCheckpointName(name string) CheckpointTaskOpts {
+	return func(r *CheckpointTaskInfo) error {
+		r.Name = name
+		return nil
+	}
+}
+
 // ProcessDeleteOpts allows the caller to set options for the deletion of a task
 type ProcessDeleteOpts func(context.Context, Process) error
 
