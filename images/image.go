@@ -315,7 +315,8 @@ func Children(ctx context.Context, provider content.Provider, desc ocispec.Descr
 		MediaTypeDockerSchema2LayerForeign, MediaTypeDockerSchema2LayerForeignGzip,
 		MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig,
 		ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerGzip,
-		ocispec.MediaTypeImageLayerNonDistributable, ocispec.MediaTypeImageLayerNonDistributableGzip:
+		ocispec.MediaTypeImageLayerNonDistributable, ocispec.MediaTypeImageLayerNonDistributableGzip,
+		MediaTypeContainerd1Checkpoint, MediaTypeContainerd1CheckpointConfig:
 		// childless data types.
 		return nil, nil
 	default:
