@@ -180,22 +180,22 @@ func checkStatInWalk(ctx context.Context, t *testing.T, sn snapshot.Snapshotter,
 func createNamedSnapshots(ctx context.Context, snapshotter snapshot.Snapshotter, ns string) error {
 	c1 := fmt.Sprintf("%sc1", ns)
 	c2 := fmt.Sprintf("%sc2", ns)
-	if _, err := snapshotter.Prepare(ctx, c1+"-a", ""); err != nil {
+	if _, err := snapshotter.Prepare(ctx, c1+"-a", "", opt); err != nil {
 		return err
 	}
-	if err := snapshotter.Commit(ctx, c1, c1+"-a"); err != nil {
+	if err := snapshotter.Commit(ctx, c1, c1+"-a", opt); err != nil {
 		return err
 	}
-	if _, err := snapshotter.Prepare(ctx, c2+"-a", c1); err != nil {
+	if _, err := snapshotter.Prepare(ctx, c2+"-a", c1, opt); err != nil {
 		return err
 	}
-	if err := snapshotter.Commit(ctx, c2, c2+"-a"); err != nil {
+	if err := snapshotter.Commit(ctx, c2, c2+"-a", opt); err != nil {
 		return err
 	}
-	if _, err := snapshotter.Prepare(ctx, fmt.Sprintf("%sa1", ns), c2); err != nil {
+	if _, err := snapshotter.Prepare(ctx, fmt.Sprintf("%sa1", ns), c2, opt); err != nil {
 		return err
 	}
-	if _, err := snapshotter.View(ctx, fmt.Sprintf("%sv1", ns), c2); err != nil {
+	if _, err := snapshotter.View(ctx, fmt.Sprintf("%sv1", ns), c2, opt); err != nil {
 		return err
 	}
 	return nil

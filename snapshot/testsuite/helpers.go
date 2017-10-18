@@ -38,7 +38,7 @@ func createSnapshot(ctx context.Context, sn snapshot.Snapshotter, parent, work s
 	n := fmt.Sprintf("%p-%d", a, rand.Int())
 	prepare := fmt.Sprintf("%s-prepare", n)
 
-	m, err := sn.Prepare(ctx, prepare, parent)
+	m, err := sn.Prepare(ctx, prepare, parent, opt)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to prepare snapshot")
 	}
@@ -47,7 +47,7 @@ func createSnapshot(ctx context.Context, sn snapshot.Snapshotter, parent, work s
 		return "", errors.Wrap(err, "failed to apply")
 	}
 
-	if err := sn.Commit(ctx, n, prepare); err != nil {
+	if err := sn.Commit(ctx, n, prepare, opt); err != nil {
 		return "", errors.Wrap(err, "failed to commit")
 	}
 
@@ -66,7 +66,7 @@ func checkSnapshot(ctx context.Context, sn snapshot.Snapshotter, work, name, che
 	}()
 
 	view := fmt.Sprintf("%s-view", name)
-	m, err := sn.View(ctx, view, name)
+	m, err := sn.View(ctx, view, name, opt)
 	if err != nil {
 		return errors.Wrap(err, "failed to create view")
 	}

@@ -92,6 +92,10 @@ func makeTest(name string, snapshotterFn func(ctx context.Context, root string) 
 	}
 }
 
+var opt = snapshot.WithLabels(map[string]string{
+	"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
+})
+
 // checkSnapshotterBasic tests the basic workflow of a snapshot snapshotter.
 func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
 	initialApplier := fstest.Apply(
@@ -113,7 +117,7 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 		t.Fatalf("failure reason: %+v", err)
 	}
 
-	mounts, err := snapshotter.Prepare(ctx, preparing, "")
+	mounts, err := snapshotter.Prepare(ctx, preparing, "", opt)
 	if err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
@@ -132,7 +136,7 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	}
 
 	committed := filepath.Join(work, "committed")
-	if err := snapshotter.Commit(ctx, committed, preparing); err != nil {
+	if err := snapshotter.Commit(ctx, committed, preparing, opt); err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
 
@@ -154,7 +158,7 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 		t.Fatalf("failure reason: %+v", err)
 	}
 
-	mounts, err = snapshotter.Prepare(ctx, next, committed)
+	mounts, err = snapshotter.Prepare(ctx, next, committed, opt)
 	if err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
@@ -180,7 +184,7 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	assert.Equal(t, snapshot.KindActive, ni.Kind)
 
 	nextCommitted := filepath.Join(work, "committed-next")
-	if err := snapshotter.Commit(ctx, nextCommitted, next); err != nil {
+	if err := snapshotter.Commit(ctx, nextCommitted, next, opt); err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
 
@@ -221,7 +225,7 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 		t.Fatalf("failure reason: %+v", err)
 	}
 
-	mounts, err = snapshotter.View(ctx, nextnext, nextCommitted)
+	mounts, err = snapshotter.View(ctx, nextnext, nextCommitted, opt)
 	if err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
@@ -249,7 +253,7 @@ func checkSnapshotterStatActive(ctx context.Context, t *testing.T, snapshotter s
 		t.Fatal(err)
 	}
 
-	mounts, err := snapshotter.Prepare(ctx, preparing, "")
+	mounts, err := snapshotter.Prepare(ctx, preparing, "", opt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +287,7 @@ func checkSnapshotterStatCommitted(ctx context.Context, t *testing.T, snapshotte
 		t.Fatal(err)
 	}
 
-	mounts, err := snapshotter.Prepare(ctx, preparing, "")
+	mounts, err := snapshotter.Prepare(ctx, preparing, "", opt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,7 +306,7 @@ func checkSnapshotterStatCommitted(ctx context.Context, t *testing.T, snapshotte
 	}
 
 	committed := filepath.Join(work, "committed")
-	if err = snapshotter.Commit(ctx, committed, preparing); err != nil {
+	if err = snapshotter.Commit(ctx, committed, preparing, opt); err != nil {
 		t.Fatal(err)
 	}
 
@@ -322,7 +326,7 @@ func snapshotterPrepareMount(ctx context.Context, snapshotter snapshot.Snapshott
 		return "", err
 	}
 
-	mounts, err := snapshotter.Prepare(ctx, preparing, parent)
+	mounts, err := snapshotter.Prepare(ctx, preparing, parent, opt)
 	if err != nil {
 		return "", err
 	}
@@ -350,7 +354,7 @@ func checkSnapshotterTransitivity(ctx context.Context, t *testing.T, snapshotter
 	}
 
 	snapA := filepath.Join(work, "snapA")
-	if err = snapshotter.Commit(ctx, snapA, preparing); err != nil {
+	if err = snapshotter.Commit(ctx, snapA, preparing, opt); err != nil {
 		t.Fatal(err)
 	}
 
@@ -365,7 +369,7 @@ func checkSnapshotterTransitivity(ctx context.Context, t *testing.T, snapshotter
 	}
 
 	snapB := filepath.Join(work, "snapB")
-	if err = snapshotter.Commit(ctx, snapB, next); err != nil {
+	if err = snapshotter.Commit(ctx, snapB, next, opt); err != nil {
 		t.Fatal(err)
 	}
 
@@ -400,7 +404,7 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 	defer testutil.Unmount(t, preparing)
 
 	snapA := filepath.Join(work, "snapA")
-	if err = snapshotter.Commit(ctx, snapA, preparing); err != nil {
+	if err = snapshotter.Commit(ctx, snapA, preparing, opt); err != nil {
 		t.Fatal(err)
 	}
 
@@ -411,12 +415,12 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 	}
 
 	// Prepare & View with same key
-	_, err = snapshotter.Prepare(ctx, newLayer, snapA)
+	_, err = snapshotter.Prepare(ctx, newLayer, snapA, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = snapshotter.View(ctx, newLayer, snapA)
+	_, err = snapshotter.View(ctx, newLayer, snapA, opt)
 	//must be err != nil
 	assert.NotNil(t, err)
 
@@ -426,12 +430,12 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 		t.Fatal(err)
 	}
 
-	_, err = snapshotter.Prepare(ctx, prepLayer, snapA)
+	_, err = snapshotter.Prepare(ctx, prepLayer, snapA, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = snapshotter.Prepare(ctx, prepLayer, snapA)
+	_, err = snapshotter.Prepare(ctx, prepLayer, snapA, opt)
 	//must be err != nil
 	assert.NotNil(t, err)
 
@@ -441,12 +445,12 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 		t.Fatal(err)
 	}
 
-	_, err = snapshotter.View(ctx, viewLayer, snapA)
+	_, err = snapshotter.View(ctx, viewLayer, snapA, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = snapshotter.View(ctx, viewLayer, snapA)
+	_, err = snapshotter.View(ctx, viewLayer, snapA, opt)
 	//must be err != nil
 	assert.NotNil(t, err)
 
@@ -480,24 +484,24 @@ func checkRemoveIntermediateSnapshot(ctx context.Context, t *testing.T, snapshot
 	defer testutil.Unmount(t, base)
 
 	committedBase := filepath.Join(work, "committed-base")
-	if err = snapshotter.Commit(ctx, committedBase, base); err != nil {
+	if err = snapshotter.Commit(ctx, committedBase, base, opt); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create intermediate layer
 	intermediate := filepath.Join(work, "intermediate")
-	if _, err = snapshotter.Prepare(ctx, intermediate, committedBase); err != nil {
+	if _, err = snapshotter.Prepare(ctx, intermediate, committedBase, opt); err != nil {
 		t.Fatal(err)
 	}
 
 	committedInter := filepath.Join(work, "committed-inter")
-	if err = snapshotter.Commit(ctx, committedInter, intermediate); err != nil {
+	if err = snapshotter.Commit(ctx, committedInter, intermediate, opt); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create top layer
 	topLayer := filepath.Join(work, "toplayer")
-	if _, err = snapshotter.Prepare(ctx, topLayer, committedInter); err != nil {
+	if _, err = snapshotter.Prepare(ctx, topLayer, committedInter, opt); err != nil {
 		t.Fatal(err)
 	}
 
@@ -531,28 +535,28 @@ func checkRemoveIntermediateSnapshot(ctx context.Context, t *testing.T, snapshot
 //  v1 - view snapshot, v1 is parent
 //  v2 - view snapshot, no parent
 func baseTestSnapshots(ctx context.Context, snapshotter snapshot.Snapshotter) error {
-	if _, err := snapshotter.Prepare(ctx, "c1-a", ""); err != nil {
+	if _, err := snapshotter.Prepare(ctx, "c1-a", "", opt); err != nil {
 		return err
 	}
-	if err := snapshotter.Commit(ctx, "c1", "c1-a"); err != nil {
+	if err := snapshotter.Commit(ctx, "c1", "c1-a", opt); err != nil {
 		return err
 	}
-	if _, err := snapshotter.Prepare(ctx, "c2-a", "c1"); err != nil {
+	if _, err := snapshotter.Prepare(ctx, "c2-a", "c1", opt); err != nil {
 		return err
 	}
-	if err := snapshotter.Commit(ctx, "c2", "c2-a"); err != nil {
+	if err := snapshotter.Commit(ctx, "c2", "c2-a", opt); err != nil {
 		return err
 	}
-	if _, err := snapshotter.Prepare(ctx, "a1", "c2"); err != nil {
+	if _, err := snapshotter.Prepare(ctx, "a1", "c2", opt); err != nil {
 		return err
 	}
-	if _, err := snapshotter.Prepare(ctx, "a2", ""); err != nil {
+	if _, err := snapshotter.Prepare(ctx, "a2", "", opt); err != nil {
 		return err
 	}
-	if _, err := snapshotter.View(ctx, "v1", "c2"); err != nil {
+	if _, err := snapshotter.View(ctx, "v1", "c2", opt); err != nil {
 		return err
 	}
-	if _, err := snapshotter.View(ctx, "v2", ""); err != nil {
+	if _, err := snapshotter.View(ctx, "v2", "", opt); err != nil {
 		return err
 	}
 	return nil
@@ -624,10 +628,13 @@ func checkUpdate(ctx context.Context, t *testing.T, snapshotter snapshot.Snapsho
 		}
 
 		createdAt := st.Created
+		rootTime := time.Now().UTC().Format(time.RFC3339)
 		expected := map[string]string{
 			"l1": "v1",
 			"l2": "v2",
 			"l3": "v3",
+			// Keep root label
+			"containerd.io/gc.root": rootTime,
 		}
 		st.Parent = "doesnotexist"
 		st.Labels = expected
@@ -663,6 +670,7 @@ func checkUpdate(ctx context.Context, t *testing.T, snapshotter snapshot.Snapsho
 		expected = map[string]string{
 			"l1": "updated",
 			"l3": "v3",
+			"containerd.io/gc.root": rootTime,
 		}
 		st.Labels = map[string]string{
 			"l1": "updated",
@@ -676,6 +684,7 @@ func checkUpdate(ctx context.Context, t *testing.T, snapshotter snapshot.Snapsho
 
 		expected = map[string]string{
 			"l4": "v4",
+			"containerd.io/gc.root": rootTime,
 		}
 		st.Labels = expected
 		st, err = snapshotter.Update(ctx, st, "labels")
@@ -710,31 +719,31 @@ func assertLabels(t *testing.T, actual, expected map[string]string) {
 }
 
 func checkRemove(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
-	if _, err := snapshotter.Prepare(ctx, "committed-a", ""); err != nil {
+	if _, err := snapshotter.Prepare(ctx, "committed-a", "", opt); err != nil {
 		t.Fatal(err)
 	}
-	if err := snapshotter.Commit(ctx, "committed-1", "committed-a"); err != nil {
+	if err := snapshotter.Commit(ctx, "committed-1", "committed-a", opt); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := snapshotter.Prepare(ctx, "reuse-1", "committed-1"); err != nil {
-		t.Fatal(err)
-	}
-	if err := snapshotter.Remove(ctx, "reuse-1"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := snapshotter.View(ctx, "reuse-1", "committed-1"); err != nil {
+	if _, err := snapshotter.Prepare(ctx, "reuse-1", "committed-1", opt); err != nil {
 		t.Fatal(err)
 	}
 	if err := snapshotter.Remove(ctx, "reuse-1"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := snapshotter.Prepare(ctx, "reuse-1", ""); err != nil {
+	if _, err := snapshotter.View(ctx, "reuse-1", "committed-1", opt); err != nil {
+		t.Fatal(err)
+	}
+	if err := snapshotter.Remove(ctx, "reuse-1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := snapshotter.Prepare(ctx, "reuse-1", "", opt); err != nil {
 		t.Fatal(err)
 	}
 	if err := snapshotter.Remove(ctx, "committed-1"); err != nil {
 		t.Fatal(err)
 	}
-	if err := snapshotter.Commit(ctx, "commited-1", "reuse-1"); err != nil {
+	if err := snapshotter.Commit(ctx, "commited-1", "reuse-1", opt); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -743,15 +752,15 @@ func checkRemove(ctx context.Context, t *testing.T, snapshotter snapshot.Snapsho
 // This function is called only when WithTestViewReadonly is true.
 func checkSnapshotterViewReadonly(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
 	preparing := filepath.Join(work, "preparing")
-	if _, err := snapshotter.Prepare(ctx, preparing, ""); err != nil {
+	if _, err := snapshotter.Prepare(ctx, preparing, "", opt); err != nil {
 		t.Fatal(err)
 	}
 	committed := filepath.Join(work, "commited")
-	if err := snapshotter.Commit(ctx, committed, preparing); err != nil {
+	if err := snapshotter.Commit(ctx, committed, preparing, opt); err != nil {
 		t.Fatal(err)
 	}
 	view := filepath.Join(work, "view")
-	m, err := snapshotter.View(ctx, view, committed)
+	m, err := snapshotter.View(ctx, view, committed, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
