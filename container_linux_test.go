@@ -987,7 +987,20 @@ func TestUserNamespaces(t *testing.T) {
 	t.Run("ReadonlyRootFS", func(t *testing.T) { testUserNamespaces(t, true) })
 }
 
+func checkUserNS(t *testing.T) {
+	cmd := exec.Command("true")
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Cloneflags: syscall.CLONE_NEWUSER,
+	}
+
+	if err := cmd.Run(); err != nil {
+		t.Skip("User namespaces are unavailable")
+	}
+}
+
 func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
+	checkUserNS(t)
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
