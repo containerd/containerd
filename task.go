@@ -36,6 +36,11 @@ import (
 // or if an error was encountered when obtaining the exit status, it is set to 255.
 const UnknownExitStatus = 255
 
+const (
+	checkpointDateFormat = "01-02-2006-15:04:05"
+	checkpointNameFormat = "containerd.io/checkpoint/%s:%s"
+)
+
 // Status returns process status and exit information
 type Status struct {
 	// Status of the process
@@ -362,10 +367,9 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 			return nil, err
 		}
 	}
-	const checkpointDateFormat = "01-02-2006-15:04:05"
 	// set a default name
 	if i.Name == "" {
-		i.Name = fmt.Sprintf("io.containerd/checkpoint/%s:%s", t.id, time.Now().Format(checkpointDateFormat))
+		i.Name = fmt.Sprintf(checkpointNameFormat, t.id, time.Now().Format(checkpointDateFormat))
 	}
 	request.ParentCheckpoint = i.ParentCheckpoint
 	if i.Options != nil {
