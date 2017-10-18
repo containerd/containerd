@@ -11,8 +11,6 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
-	digest "github.com/opencontainers/go-digest"
-	"github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -67,15 +65,11 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	)
 
 	if raw := context.String("checkpoint"); raw != "" {
-		checkpointIndex, err := digest.Parse(raw)
+		im, err := client.GetImage(ctx, raw)
 		if err != nil {
 			return nil, err
 		}
-		if checkpointIndex != "" {
-			return client.NewContainer(ctx, id, containerd.WithCheckpoint(v1.Descriptor{
-				Digest: checkpointIndex,
-			}, id))
-		}
+		return client.NewContainer(ctx, id, containerd.WithCheckpoint(im, id))
 	}
 
 	var (
@@ -120,7 +114,7 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	return client.NewContainer(ctx, id, cOpts...)
 }
 
-func newTask(ctx gocontext.Context, container containerd.Container, checkpoint digest.Digest, tty bool) (containerd.Task, error) {
+func newTask(ctx gocontext.Context, client *containerd.Client, container containerd.Container, checkpoint string, tty bool) (containerd.Task, error) {
 	if checkpoint == "" {
 		io := containerd.Stdio
 		if tty {
@@ -128,7 +122,9 @@ func newTask(ctx gocontext.Context, container containerd.Container, checkpoint d
 		}
 		return container.NewTask(ctx, io)
 	}
-	return container.NewTask(ctx, containerd.Stdio, containerd.WithTaskCheckpoint(v1.Descriptor{
-		Digest: checkpoint,
-	}))
+	im, err := client.GetImage(ctx, checkpoint)
+	if err != nil {
+		return nil, err
+	}
+	return container.NewTask(ctx, containerd.Stdio, containerd.WithTaskCheckpoint(im))
 }

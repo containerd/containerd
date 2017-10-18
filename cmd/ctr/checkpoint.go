@@ -48,7 +48,7 @@ var taskCheckpointCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Println(checkpoint.Digest.String())
+		fmt.Println(checkpoint.Name())
 		return nil
 	},
 }

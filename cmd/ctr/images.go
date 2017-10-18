@@ -56,7 +56,6 @@ var imagesListCommand = cli.Command{
 
 		imageStore := client.ImageService()
 		cs := client.ContentStore()
-
 		imageList, err := imageStore.List(ctx, filters...)
 		if err != nil {
 			return errors.Wrap(err, "failed to list images")

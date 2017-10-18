@@ -9,7 +9,6 @@ import (
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
-	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -96,8 +95,7 @@ var runCommand = cli.Command{
 	}, snapshotterFlags...),
 	Action: func(context *cli.Context) error {
 		var (
-			err             error
-			checkpointIndex digest.Digest
+			err error
 
 			ctx, cancel = appContext(context)
 			id          = context.Args().Get(1)
@@ -112,11 +110,6 @@ var runCommand = cli.Command{
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		if raw := context.String("checkpoint"); raw != "" {
-			if checkpointIndex, err = digest.Parse(raw); err != nil {
-				return err
-			}
-		}
 		client, err := newClient(context)
 		if err != nil {
 			return err
@@ -128,7 +121,7 @@ var runCommand = cli.Command{
 		if context.Bool("rm") {
 			defer container.Delete(ctx, containerd.WithSnapshotCleanup)
 		}
-		task, err := newTask(ctx, container, checkpointIndex, tty)
+		task, err := newTask(ctx, client, container, context.String("checkpoint"), tty)
 		if err != nil {
 			return err
 		}

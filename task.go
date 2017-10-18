@@ -17,6 +17,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
@@ -88,6 +89,7 @@ func WithStdinCloser(r *IOCloseInfo) {
 
 // CheckpointTaskInfo allows specific checkpoint information to be set for the task
 type CheckpointTaskInfo struct {
+	Name string
 	// ParentCheckpoint is the digest of a parent checkpoint
 	ParentCheckpoint digest.Digest
 	// Options hold runtime specific settings for checkpointing a task
@@ -124,7 +126,7 @@ type Task interface {
 	// OCI Index that can be push and pulled from a remote resource.
 	//
 	// Additional software like CRIU maybe required to checkpoint and restore tasks
-	Checkpoint(context.Context, ...CheckpointTaskOpts) (v1.Descriptor, error)
+	Checkpoint(context.Context, ...CheckpointTaskOpts) (Image, error)
 	// Update modifies executing tasks with updated settings
 	Update(context.Context, ...UpdateTaskOpts) error
 	// LoadProcess loads a previously created exec'd process
@@ -350,46 +352,83 @@ func (t *task) Resize(ctx context.Context, w, h uint32) error {
 	return errdefs.FromGRPC(err)
 }
 
-func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (d v1.Descriptor, err error) {
+func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Image, error) {
 	request := &tasks.CheckpointTaskRequest{
 		ContainerID: t.id,
 	}
 	var i CheckpointTaskInfo
 	for _, o := range opts {
 		if err := o(&i); err != nil {
-			return d, err
+			return nil, err
 		}
+	}
+	const checkpointDateFormat = "01-02-2006-15:04:05"
+	// set a default name
+	if i.Name == "" {
+		i.Name = fmt.Sprintf("io.containerd/checkpoint/%s:%s", t.id, time.Now().Format(checkpointDateFormat))
 	}
 	request.ParentCheckpoint = i.ParentCheckpoint
 	if i.Options != nil {
 		any, err := typeurl.MarshalAny(i.Options)
 		if err != nil {
-			return d, err
+			return nil, err
 		}
 		request.Options = any
 	}
 	// make sure we pause it and resume after all other filesystem operations are completed
 	if err := t.Pause(ctx); err != nil {
-		return d, err
+		return nil, err
 	}
 	defer t.Resume(ctx)
 	cr, err := t.client.ContainerService().Get(ctx, t.id)
 	if err != nil {
-		return d, err
+		return nil, err
 	}
-	var index v1.Index
+	index := v1.Index{
+		Annotations: make(map[string]string),
+	}
+	// make sure we clear the gc root labels reguardless of success
+	var clearRoots []ocispec.Descriptor
+	defer func() {
+		for _, r := range append(index.Manifests, clearRoots...) {
+			if err := clearRootGCLabel(ctx, t.client, r); err != nil {
+				log.G(ctx).WithError(err).WithField("dgst", r.Digest).Warnf("failed to remove root marker")
+			}
+		}
+	}()
 	if err := t.checkpointTask(ctx, &index, request); err != nil {
-		return d, err
+		return nil, err
 	}
-	if err := t.checkpointImage(ctx, &index, cr.Image); err != nil {
-		return d, err
+	if cr.Image != "" {
+		if err := t.checkpointImage(ctx, &index, cr.Image); err != nil {
+			return nil, err
+		}
+		index.Annotations["image.name"] = cr.Image
 	}
-	if err := t.checkpointRWSnapshot(ctx, &index, cr.Snapshotter, cr.SnapshotKey); err != nil {
-		return d, err
+	if cr.SnapshotKey != "" {
+		if err := t.checkpointRWSnapshot(ctx, &index, cr.Snapshotter, cr.SnapshotKey); err != nil {
+			return nil, err
+		}
 	}
-	index.Annotations = make(map[string]string)
-	index.Annotations["image.name"] = cr.Image
-	return t.writeIndex(ctx, &index)
+	desc, err := t.writeIndex(ctx, &index)
+	if err != nil {
+		return nil, err
+	}
+	clearRoots = append(clearRoots, desc)
+	im := images.Image{
+		Name:   i.Name,
+		Target: desc,
+		Labels: map[string]string{
+			"containerd.io/checkpoint": "true",
+		},
+	}
+	if im, err = t.client.ImageService().Create(ctx, im); err != nil {
+		return nil, err
+	}
+	return &image{
+		client: t.client,
+		i:      im,
+	}, nil
 }
 
 // UpdateTaskInfo allows updated specific settings to be changed on a task
@@ -523,24 +562,13 @@ func (t *task) writeIndex(ctx context.Context, index *v1.Index) (d v1.Descriptor
 	labels := map[string]string{
 		"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
 	}
-
 	for i, m := range index.Manifests {
 		labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i)] = m.Digest.String()
-		defer func(m ocispec.Descriptor) {
-			if err == nil {
-				info := content.Info{Digest: m.Digest}
-				if _, uerr := t.client.ContentStore().Update(ctx, info, "labels.containerd.io/gc.root"); uerr != nil {
-					log.G(ctx).WithError(uerr).WithField("dgst", m.Digest).Warnf("failed to remove root marker")
-				}
-			}
-		}(m)
 	}
-
 	buf := bytes.NewBuffer(nil)
 	if err := json.NewEncoder(buf).Encode(index); err != nil {
 		return v1.Descriptor{}, err
 	}
-
 	return writeContent(ctx, t.client.ContentStore(), v1.MediaTypeImageIndex, t.id, buf, content.WithLabels(labels))
 }
 
@@ -562,4 +590,10 @@ func writeContent(ctx context.Context, store content.Store, mediaType, ref strin
 		Digest:    writer.Digest(),
 		Size:      size,
 	}, nil
+}
+
+func clearRootGCLabel(ctx context.Context, client *Client, desc ocispec.Descriptor) error {
+	info := content.Info{Digest: desc.Digest}
+	_, err := client.ContentStore().Update(ctx, info, "labels.containerd.io/gc.root")
+	return err
 }

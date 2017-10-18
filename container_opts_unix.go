@@ -24,11 +24,14 @@ import (
 // WithCheckpoint allows a container to be created from the checkpointed information
 // provided by the descriptor. The image, snapshot, and runtime specifications are
 // restored on the container
-func WithCheckpoint(desc v1.Descriptor, snapshotKey string) NewContainerOpts {
+func WithCheckpoint(im Image, snapshotKey string) NewContainerOpts {
 	// set image and rw, and spec
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		id := desc.Digest
-		store := client.ContentStore()
+		var (
+			desc  = im.Target()
+			id    = desc.Digest
+			store = client.ContentStore()
+		)
 		index, err := decodeIndex(ctx, store, id)
 		if err != nil {
 			return err
@@ -85,8 +88,9 @@ func WithCheckpoint(desc v1.Descriptor, snapshotKey string) NewContainerOpts {
 // WithTaskCheckpoint allows a task to be created with live runtime and memory data from a
 // previous checkpoint. Additional software such as CRIU may be required to
 // restore a task from a checkpoint
-func WithTaskCheckpoint(desc v1.Descriptor) NewTaskOpts {
+func WithTaskCheckpoint(im Image) NewTaskOpts {
 	return func(ctx context.Context, c *Client, info *TaskInfo) error {
+		desc := im.Target()
 		id := desc.Digest
 		index, err := decodeIndex(ctx, c.ContentStore(), id)
 		if err != nil {
