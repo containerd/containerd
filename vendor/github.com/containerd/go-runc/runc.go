@@ -243,7 +243,7 @@ func (r *Runc) Run(context context.Context, id, bundle string, opts *CreateOpts)
 		args = append(args, oargs...)
 	}
 	cmd := r.command(context, append(args, id)...)
-	if opts != nil {
+	if opts != nil && opts.IO != nil {
 		opts.Set(cmd)
 	}
 	ec, err := Monitor.Start(cmd)
@@ -513,7 +513,7 @@ func (r *Runc) Restore(context context.Context, id, bundle string, opts *Restore
 	}
 	args = append(args, "--bundle", bundle)
 	cmd := r.command(context, append(args, id)...)
-	if opts != nil {
+	if opts != nil && opts.IO != nil {
 		opts.Set(cmd)
 	}
 	ec, err := Monitor.Start(cmd)
