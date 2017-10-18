@@ -114,11 +114,14 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	return client.NewContainer(ctx, id, cOpts...)
 }
 
-func newTask(ctx gocontext.Context, client *containerd.Client, container containerd.Container, checkpoint string, tty bool) (containerd.Task, error) {
+func newTask(ctx gocontext.Context, client *containerd.Client, container containerd.Container, checkpoint string, tty, nullIO bool) (containerd.Task, error) {
 	if checkpoint == "" {
 		io := containerd.Stdio
 		if tty {
 			io = containerd.StdioTerminal
+		}
+		if nullIO {
+			io = containerd.NullIO
 		}
 		return container.NewTask(ctx, io)
 	}

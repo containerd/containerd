@@ -92,6 +92,10 @@ var runCommand = cli.Command{
 			Name:  "cwd",
 			Usage: "specify the working directory of the process",
 		},
+		cli.BoolFlag{
+			Name:  "null-io",
+			Usage: "send all IO to /dev/null",
+		},
 	}, snapshotterFlags...),
 	Action: func(context *cli.Context) error {
 		var (
@@ -121,7 +125,7 @@ var runCommand = cli.Command{
 		if context.Bool("rm") {
 			defer container.Delete(ctx, containerd.WithSnapshotCleanup)
 		}
-		task, err := newTask(ctx, client, container, context.String("checkpoint"), tty)
+		task, err := newTask(ctx, container, context.String("checkpoint"), tty, context.Bool("null-io"))
 		if err != nil {
 			return err
 		}
