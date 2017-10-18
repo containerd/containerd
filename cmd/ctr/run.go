@@ -96,6 +96,10 @@ var runCommand = cli.Command{
 			Name:  "null-io",
 			Usage: "send all IO to /dev/null",
 		},
+		cli.BoolFlag{
+			Name:  "detach,d",
+			Usage: "detach from the task after it has started execution",
+		},
 	}, snapshotterFlags...),
 	Action: func(context *cli.Context) error {
 		var (
@@ -105,6 +109,7 @@ var runCommand = cli.Command{
 			id          = context.Args().Get(1)
 			imageRef    = context.Args().First()
 			tty         = context.Bool("tty")
+			detach      = context.Bool("detach")
 		)
 		defer cancel()
 
@@ -122,20 +127,20 @@ var runCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		if context.Bool("rm") {
+		if context.Bool("rm") && !detach {
 			defer container.Delete(ctx, containerd.WithSnapshotCleanup)
 		}
-		task, err := newTask(ctx, container, context.String("checkpoint"), tty, context.Bool("null-io"))
+		task, err := newTask(ctx, client, container, context.String("checkpoint"), tty, context.Bool("null-io"))
 		if err != nil {
 			return err
 		}
-		defer task.Delete(ctx)
-
-		statusC, err := task.Wait(ctx)
-		if err != nil {
-			return err
+		var statusC <-chan containerd.ExitStatus
+		if !detach {
+			defer task.Delete(ctx)
+			if statusC, err = task.Wait(ctx); err != nil {
+				return err
+			}
 		}
-
 		var con console.Console
 		if tty {
 			con = console.Current()
@@ -147,6 +152,9 @@ var runCommand = cli.Command{
 		if err := task.Start(ctx); err != nil {
 			return err
 		}
+		if detach {
+			return nil
+		}
 		if tty {
 			if err := handleConsoleResize(ctx, task, con); err != nil {
 				logrus.WithError(err).Error("console resize")
@@ -155,7 +163,6 @@ var runCommand = cli.Command{
 			sigc := forwardAllSignals(ctx, task)
 			defer stopCatch(sigc)
 		}
-
 		status := <-statusC
 		code, _, err := status.Result()
 		if err != nil {
