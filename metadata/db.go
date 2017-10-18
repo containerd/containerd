@@ -311,7 +311,7 @@ func (m *DB) cleanupContent() {
 		return
 	}
 
-	err := newContentStore(m, m.cs).garbageCollect(ctx)
+	err := m.cs.garbageCollect(ctx)
 	if err != nil {
 		log.G(ctx).WithError(err).Warn("content garbage collection failed")
 	}
