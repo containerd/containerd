@@ -30,5 +30,4 @@ func createContentStore(ctx context.Context, root string) (content.Store, func()
 
 func TestContent(t *testing.T) {
 	testsuite.ContentSuite(t, "metadata", createContentStore)
-	testsuite.ContentLabelSuite(t, "metadata", createContentStore)
 }
