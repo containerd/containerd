@@ -9,29 +9,29 @@ import (
 	"google.golang.org/grpc"
 )
 
-var _ api.VersionServer = &Service{}
+var _ api.VersionServer = &service{}
 
 func init() {
 	plugin.Register(&plugin.Registration{
 		Type:   plugin.GRPCPlugin,
 		ID:     "version",
-		InitFn: New,
+		InitFn: initFunc,
 	})
 }
 
-func New(ic *plugin.InitContext) (interface{}, error) {
-	return &Service{}, nil
+func initFunc(ic *plugin.InitContext) (interface{}, error) {
+	return &service{}, nil
 }
 
-type Service struct {
+type service struct {
 }
 
-func (s *Service) Register(server *grpc.Server) error {
+func (s *service) Register(server *grpc.Server) error {
 	api.RegisterVersionServer(server, s)
 	return nil
 }
 
-func (s *Service) Version(ctx context.Context, _ *empty.Empty) (*api.VersionResponse, error) {
+func (s *service) Version(ctx context.Context, _ *empty.Empty) (*api.VersionResponse, error) {
 	return &api.VersionResponse{
 		Version:  ctrdversion.Version,
 		Revision: ctrdversion.Revision,
