@@ -13,6 +13,7 @@ import (
 
 	"github.com/containerd/containerd/specs"
 	ocs "github.com/opencontainers/runtime-spec/specs-go"
+	"golang.org/x/sys/unix"
 )
 
 func findCgroupMountpointAndRoot(pid int, subsystem string) (string, string, error) {
@@ -176,7 +177,7 @@ func (c *container) getMemoryEventFD(root string) (*oom, error) {
 		return nil, err
 	}
 	defer f.Close()
-	fd, _, serr := syscall.RawSyscall(syscall.SYS_EVENTFD2, 0, syscall.FD_CLOEXEC, 0)
+	fd, _, serr := syscall.RawSyscall(syscall.SYS_EVENTFD2, 0, unix.EFD_CLOEXEC, 0)
 	if serr != 0 {
 		return nil, serr
 	}
