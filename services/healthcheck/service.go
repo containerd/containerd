@@ -17,13 +17,12 @@ func init() {
 		Type: plugin.GRPCPlugin,
 		ID:   "healthcheck",
 		InitFn: func(*plugin.InitContext) (interface{}, error) {
-			return NewService()
+			return newService()
 		},
 	})
 }
 
-// NewService returns the GRPC health server
-func NewService() (*service, error) {
+func newService() (*service, error) {
 	return &service{
 		health.NewServer(),
 	}, nil

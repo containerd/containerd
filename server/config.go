@@ -36,15 +36,15 @@ type Config struct {
 // GRPCConfig provides GRPC configuration for the socket
 type GRPCConfig struct {
 	Address string `toml:"address"`
-	Uid     int    `toml:"uid"`
-	Gid     int    `toml:"gid"`
+	UID     int    `toml:"uid"`
+	GID     int    `toml:"gid"`
 }
 
 // Debug provides debug configuration
 type Debug struct {
 	Address string `toml:"address"`
-	Uid     int    `toml:"uid"`
-	Gid     int    `toml:"gid"`
+	UID     int    `toml:"uid"`
+	GID     int    `toml:"gid"`
 	Level   string `toml:"level"`
 }
 

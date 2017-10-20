@@ -107,8 +107,8 @@ func (b *snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, erro
 	return info, nil
 }
 
-func (o *snapshotter) Update(ctx context.Context, info snapshot.Info, fieldpaths ...string) (snapshot.Info, error) {
-	ctx, t, err := o.ms.TransactionContext(ctx, true)
+func (b *snapshotter) Update(ctx context.Context, info snapshot.Info, fieldpaths ...string) (snapshot.Info, error) {
+	ctx, t, err := b.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return snapshot.Info{}, err
 	}
