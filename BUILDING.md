@@ -131,3 +131,55 @@ When working with `ctr`, the containerd CLI we just built, don't forget to start
 ```sh
 containerd --config config.toml
 ```
+
+# Testing containerd
+
+During the automated CI the unit tests and integration tests are run as part of the PR validation. As a developer you can run these tests locally by using any of the following `Makefile` targets:
+ - `make test`: run all non-integration tests that do not require `root` privileges
+ - `make root-test`: run all non-integration tests which require `root`
+ - `make integration`: run all tests, including integration tests and those which require `root`
+ - `make integration-parallel`: run all tests (integration and root-required included) in parallel mode
+
+To execute a specific test or set of tests you can use the `go test` capabilities
+without using the `Makefile` targets. The following examples show how to specify a test
+name and also how to use the flag directly against `go test` to run root-requiring tests.
+
+```sh
+# run the test <TEST_NAME>:
+go test	-v -run "<TEST_NAME>" .
+# enable the root-requiring tests:
+go test -v -run . -test.root
+```
+
+Example output from directly running `go test` to execute the `TestContainerList` test:
+```sh
+sudo go test -v -run "TestContainerList" . -test.root
+INFO[0000] running tests against containerd revision=f2ae8a020a985a8d9862c9eb5ab66902c2888361 version=v1.0.0-beta.2-49-gf2ae8a0
+=== RUN   TestContainerList
+--- PASS: TestContainerList (0.00s)
+PASS
+ok  	github.com/containerd/containerd	4.778s
+```
+
+## Additional tools
+
+### containerd-stress
+In addition to `go test`-based testing executed via the `Makefile` targets, the `containerd-stress` tool is available and built with the `all` or `binaries` targets and installed during `make install`.
+
+With this tool you can stress a running containerd daemon for a specified period of time, selecting a concurrency level to generate stress against the daemon. The following command is an example of having five workers running for two hours against a default containerd gRPC socket address:
+
+```sh
+containerd-stress -c 5 -t 120
+```
+
+For more information on this tool's options please run `containerd-stress --help`.
+
+### bucketbench
+[Bucketbench](https://github.com/estesp/bucketbench) is an external tool which can be used to drive load against a container runtime, specifying a particular set of lifecycle operations to run with a specified amount of concurrency. Bucketbench is more focused on generating performance details than simply inducing load against containerd.
+
+Bucketbench differs from the `containerd-stress` tool in a few ways:
+ - Bucketbench has support for testing the Docker engine, the `runc` binary, and containerd 0.2.x (via `ctr`) and 1.0 (via the client library) branches.
+ - Bucketbench is driven via configuration file that allows specifying a list of lifecycle operations to execute. This can be used to generate detailed statistics per-command (e.g. start, stop, pause, delete).
+ - Bucketbench generates detailed reports and timing data at the end of the configured test run.
+
+More details on how to install and run `bucketbench` are available at the [GitHub project page](https://github.com/estesp/bucketbench).
