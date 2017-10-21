@@ -152,10 +152,7 @@ func main() {
 		if p := context.GlobalString("pprof-address"); len(p) > 0 {
 			pprof.Enable(p)
 		}
-		if err := checkLimits(); err != nil {
-			return err
-		}
-		return nil
+		return checkLimits()
 	}
 
 	app.Action = func(context *cli.Context) {
