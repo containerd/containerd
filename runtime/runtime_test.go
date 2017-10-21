@@ -27,10 +27,7 @@ func setup() error {
 		return err
 	}
 
-	if err := os.MkdirAll(utils.BundlesRoot, 0755); err != nil {
-		return err
-	}
-	return nil
+	return os.MkdirAll(utils.BundlesRoot, 0755)
 }
 
 // Creates the bundleDir with rootfs, io fifo dir and a default spec.
