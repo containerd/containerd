@@ -8,7 +8,6 @@ import (
 	"runtime"
 	"strconv"
 	"sync"
-	"time"
 
 	containersapi "github.com/containerd/containerd/api/services/containers/v1"
 	contentapi "github.com/containerd/containerd/api/services/content/v1"
@@ -58,19 +57,12 @@ func init() {
 // New returns a new containerd client that is connected to the containerd
 // instance provided by address
 func New(address string, opts ...ClientOpt) (*Client, error) {
+	var gopts []grpc.DialOption
 	var copts clientOpts
 	for _, o := range opts {
 		if err := o(&copts); err != nil {
 			return nil, err
 		}
-	}
-	gopts := []grpc.DialOption{
-		grpc.WithBlock(),
-		grpc.WithInsecure(),
-		grpc.WithTimeout(60 * time.Second),
-		grpc.FailOnNonTempDialError(true),
-		grpc.WithBackoffMaxDelay(3 * time.Second),
-		grpc.WithDialer(Dialer),
 	}
 	if len(copts.dialOptions) > 0 {
 		gopts = copts.dialOptions
@@ -82,7 +74,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 			grpc.WithStreamInterceptor(stream),
 		)
 	}
-	conn, err := grpc.Dial(DialAddress(address), gopts...)
+	conn, err := GetGRPCConnection(address, gopts...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to dial %q", address)
 	}

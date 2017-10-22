@@ -85,6 +85,21 @@ var (
 
 var grpcConn *grpc.ClientConn
 
+func getGRPCConnection(context *cli.Context) (*grpc.ClientConn, error) {
+	if grpcConn != nil {
+		return grpcConn, nil
+	}
+
+	bindSocket := context.GlobalString("address")
+	conn, err := containerd.GetGRPCConnection(bindSocket)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to dial %q", bindSocket)
+	}
+
+	grpcConn = conn
+	return grpcConn, nil
+}
+
 // appContext returns the context for a command. Should only be called once per
 // command, near the start.
 //

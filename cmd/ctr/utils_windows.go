@@ -6,37 +6,12 @@ import (
 	"os"
 	"sync"
 	"syscall"
-	"time"
 
 	"github.com/Microsoft/go-winio"
 	clog "github.com/containerd/containerd/log"
 	"github.com/pkg/errors"
-	"github.com/urfave/cli"
 	"golang.org/x/sys/windows"
-	"google.golang.org/grpc"
 )
-
-func getGRPCConnection(context *cli.Context) (*grpc.ClientConn, error) {
-	if grpcConn != nil {
-		return grpcConn, nil
-	}
-
-	bindAddress := context.GlobalString("address")
-	dialOpts := []grpc.DialOption{grpc.WithInsecure(), grpc.WithTimeout(100 * time.Second)}
-	dialOpts = append(dialOpts,
-		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
-			return winio.DialPipe(bindAddress, &timeout)
-		},
-		))
-
-	conn, err := grpc.Dial(bindAddress, dialOpts...)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to dial %q", bindAddress)
-	}
-
-	grpcConn = conn
-	return grpcConn, nil
-}
 
 func prepareStdio(stdin, stdout, stderr string, console bool) (*sync.WaitGroup, error) {
 	var wg sync.WaitGroup

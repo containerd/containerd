@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"google.golang.org/grpc"
 )
 
 type dialResult struct {
@@ -48,4 +49,16 @@ func Dialer(address string, timeout time.Duration) (net.Conn, error) {
 		}()
 		return nil, errors.Errorf("dial %s: timeout", address)
 	}
+}
+
+func GetGRPCConnection(address string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	opts = append(opts,
+		grpc.WithBlock(),
+		grpc.WithInsecure(),
+		grpc.WithTimeout(60*time.Second),
+		grpc.FailOnNonTempDialError(true),
+		grpc.WithBackoffMaxDelay(3*time.Second),
+		grpc.WithDialer(Dialer))
+
+	return grpc.Dial(DialAddress(address), opts...)
 }
