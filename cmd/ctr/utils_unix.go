@@ -4,18 +4,12 @@ package main
 
 import (
 	gocontext "context"
-	"fmt"
 	"io"
-	"net"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/containerd/fifo"
-	"github.com/pkg/errors"
-	"github.com/urfave/cli"
 	"golang.org/x/sys/unix"
-	"google.golang.org/grpc"
 )
 
 func prepareStdio(stdin, stdout, stderr string, console bool) (wg *sync.WaitGroup, err error) {
@@ -71,26 +65,4 @@ func prepareStdio(stdin, stdout, stderr string, console bool) (wg *sync.WaitGrou
 	}
 
 	return wg, nil
-}
-
-func getGRPCConnection(context *cli.Context) (*grpc.ClientConn, error) {
-	if grpcConn != nil {
-		return grpcConn, nil
-	}
-
-	bindSocket := context.GlobalString("address")
-	dialOpts := []grpc.DialOption{grpc.WithInsecure(), grpc.WithTimeout(100 * time.Second)}
-	dialOpts = append(dialOpts,
-		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
-			return net.DialTimeout("unix", bindSocket, timeout)
-		},
-		))
-
-	conn, err := grpc.Dial(fmt.Sprintf("unix://%s", bindSocket), dialOpts...)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to dial %q", bindSocket)
-	}
-
-	grpcConn = conn
-	return grpcConn, nil
 }
