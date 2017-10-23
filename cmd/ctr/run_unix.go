@@ -12,6 +12,7 @@ import (
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -121,6 +122,9 @@ func newTask(ctx gocontext.Context, client *containerd.Client, container contain
 			io = containerd.StdioTerminal
 		}
 		if nullIO {
+			if tty {
+				return nil, errors.New("tty and null-io cannot be used together")
+			}
 			io = containerd.NullIO
 		}
 		return container.NewTask(ctx, io)
