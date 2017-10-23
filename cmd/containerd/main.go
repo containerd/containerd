@@ -1,11 +1,9 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"io/ioutil"
 	golog "log"
-	"net"
 	"os"
 	"os/signal"
 	"runtime"
@@ -79,7 +77,6 @@ func main() {
 			signals = make(chan os.Signal, 2048)
 			serverC = make(chan *server.Server)
 			ctx     = log.WithModule(gocontext.Background(), "containerd")
-			config  = defaultConfig()
 		)
 
 		done := handleSignals(ctx, signals, serverC)
@@ -87,16 +84,16 @@ func main() {
 		// we don't miss any signals during boot
 		signal.Notify(signals, handledSignals...)
 
-		if err := server.LoadConfig(context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
+		config := server.Default()
+		if err := server.Load(context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
 			return err
 		}
 		// apply flags to the config
 		if err := applyFlags(context, config); err != nil {
 			return err
 		}
-		address := config.GRPC.Address
-		if address == "" {
-			return errors.New("grpc address cannot be empty")
+		if err := validate(config); err != nil {
+			return err
 		}
 		log.G(ctx).WithFields(logrus.Fields{
 			"version":  version.Version,
@@ -118,17 +115,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "containerd: %s\n", err)
 		os.Exit(1)
 	}
-}
-
-func serve(ctx context.Context, l net.Listener, serveFunc func(net.Listener) error) {
-	path := l.Addr().String()
-	log.G(ctx).WithField("address", path).Info("serving...")
-	go func() {
-		defer l.Close()
-		if err := serveFunc(l); err != nil {
-			log.G(ctx).WithError(err).WithField("address", path).Fatal("serve failure")
-		}
-	}()
 }
 
 func applyFlags(context *cli.Context, config *server.Config) error {
@@ -189,4 +175,12 @@ func dumpStacks() {
 	}
 	buf = buf[:stackSize]
 	logrus.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
+}
+
+func validate(config *server.Config) error {
+	address := config.GRPC.Address
+	if address == "" {
+		return errors.New("grpc address cannot be empty")
+	}
+	return nil
 }

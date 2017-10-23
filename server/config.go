@@ -80,8 +80,8 @@ func (c *Config) WriteTo(w io.Writer) (int64, error) {
 	return io.Copy(w, buf)
 }
 
-// LoadConfig loads the containerd server config from the provided path
-func LoadConfig(path string, v *Config) error {
+// Load  the containerd server config from the provided path
+func Load(path string, v *Config) error {
 	if v == nil {
 		return errors.Wrapf(errdefs.ErrInvalidArgument, "argument v must not be nil")
 	}
@@ -91,4 +91,20 @@ func LoadConfig(path string, v *Config) error {
 	}
 	v.md = md
 	return nil
+}
+
+// Default returns the default server config
+func Default() *Config {
+	return &Config{
+		Root:  DefaultRootDir,
+		State: DefaultStateDir,
+		GRPC: GRPCConfig{
+			Address: DefaultAddress,
+		},
+		Subreaper: true,
+		Debug: Debug{
+			Level:   "info",
+			Address: DefaultDebugAddress,
+		},
+	}
 }
