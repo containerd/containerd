@@ -11,6 +11,12 @@ var taskStartCommand = cli.Command{
 	Name:      "start",
 	Usage:     "start a container that have been created",
 	ArgsUsage: "CONTAINER",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "null-io",
+			Usage: "send all IO to /dev/null",
+		},
+	},
 	Action: func(context *cli.Context) error {
 		var (
 			err error
@@ -40,7 +46,7 @@ var taskStartCommand = cli.Command{
 
 		tty := spec.Process.Terminal
 
-		task, err := newTask(ctx, client, container, "", tty)
+		task, err := newTask(ctx, client, container, "", tty, context.Bool("null-io"))
 		if err != nil {
 			return err
 		}

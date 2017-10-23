@@ -117,10 +117,13 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	)
 }
 
-func newTask(ctx gocontext.Context, client *containerd.Client, container containerd.Container, _ string, tty bool) (containerd.Task, error) {
+func newTask(ctx gocontext.Context, client *containerd.Client, container containerd.Container, _ string, tty, nullIO bool) (containerd.Task, error) {
 	io := containerd.Stdio
 	if tty {
 		io = containerd.StdioTerminal
+	}
+	if nullIO {
+		io = containerd.NullIO
 	}
 	return container.NewTask(ctx, io)
 }
