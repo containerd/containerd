@@ -1461,3 +1461,70 @@ func TestContainerUpdate(t *testing.T) {
 		t.Errorf("hostname %q != %q", spec.Hostname, hostname)
 	}
 }
+
+func TestContainerInfo(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := testContext()
+	defer cancel()
+	id := t.Name()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	container, err := client.NewContainer(ctx, id, WithNewSpec())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx)
+
+	info, err := container.Info(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.ID != container.ID() {
+		t.Fatalf("info.ID=%s != container.ID()=%s", info.ID, container.ID())
+	}
+}
+
+func TestContainerLabels(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := testContext()
+	defer cancel()
+	id := t.Name()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	container, err := client.NewContainer(ctx, id, WithNewSpec(), WithContainerLabels(map[string]string{
+		"test": "yes",
+	}))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx)
+
+	labels, err := container.Labels(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if labels["test"] != "yes" {
+		t.Fatalf("expected label \"test\" to be \"yes\"")
+	}
+	labels["test"] = "no"
+	if labels, err = container.SetLabels(ctx, labels); err != nil {
+		t.Fatal(err)
+	}
+	if labels["test"] != "no" {
+		t.Fatalf("expected label \"test\" to be \"no\"")
+	}
+}

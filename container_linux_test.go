@@ -17,8 +17,10 @@ import (
 
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/linux/runcopts"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -1080,5 +1082,119 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 	}
 	if ec := deleteStatus.ExitCode(); ec != 7 {
 		t.Errorf("expected status 7 from delete but received %d", ec)
+	}
+}
+
+func TestTaskResize(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withExitStatus(7)), withNewSnapshot(id, image))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	if err := task.Resize(ctx, 32, 32); err != nil {
+		t.Error(err)
+		return
+	}
+	task.Kill(ctx, syscall.SIGKILL)
+	<-statusC
+}
+
+func TestContainerImage(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := testContext()
+	defer cancel()
+	id := t.Name()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	image, err := client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSpec(), WithImage(image))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx)
+
+	i, err := container.Image(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if i.Name() != image.Name() {
+		t.Fatalf("expected container image name %s but received %s", image.Name(), i.Name())
+	}
+}
+
+func TestContainerNoImage(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := testContext()
+	defer cancel()
+	id := t.Name()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	container, err := client.NewContainer(ctx, id, WithNewSpec())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx)
+
+	_, err = container.Image(ctx)
+	if err == nil {
+		t.Fatal("error should not be nil when container is created without an image")
+	}
+	if errors.Cause(err) != errdefs.ErrNotFound {
+		t.Fatalf("expected error to be %s but received %s", errdefs.ErrNotFound, err)
 	}
 }
