@@ -110,7 +110,7 @@ func main() {
 		}
 		serverC <- server
 		if config.Debug.Address != "" {
-			l, err := sys.GetLocalListener(config.Debug.Address, config.Debug.Uid, config.Debug.Gid)
+			l, err := sys.GetLocalListener(config.Debug.Address, config.Debug.UID, config.Debug.GID)
 			if err != nil {
 				return errors.Wrapf(err, "failed to get listener for debug endpoint")
 			}
@@ -124,7 +124,7 @@ func main() {
 			serve(log.WithModule(ctx, "metrics"), l, server.ServeMetrics)
 		}
 
-		l, err := sys.GetLocalListener(address, config.GRPC.Uid, config.GRPC.Gid)
+		l, err := sys.GetLocalListener(address, config.GRPC.UID, config.GRPC.GID)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get listener for main endpoint")
 		}

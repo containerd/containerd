@@ -449,6 +449,7 @@ func (c *Client) DiffService() diff.Differ {
 	return diffservice.NewDiffServiceFromClient(diffapi.NewDiffClient(c.conn))
 }
 
+// IntrospectionService returns the underlying Introspection Client
 func (c *Client) IntrospectionService() introspectionapi.IntrospectionClient {
 	return introspectionapi.NewIntrospectionClient(c.conn)
 }

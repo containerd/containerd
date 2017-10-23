@@ -21,20 +21,21 @@ func init() {
 	})
 }
 
-type Service struct {
+type service struct {
 	events *events.Exchange
 }
 
+// NewService returns the GRPC events server
 func NewService(events *events.Exchange) api.EventsServer {
-	return &Service{events: events}
+	return &service{events: events}
 }
 
-func (s *Service) Register(server *grpc.Server) error {
+func (s *service) Register(server *grpc.Server) error {
 	api.RegisterEventsServer(server, s)
 	return nil
 }
 
-func (s *Service) Publish(ctx context.Context, r *api.PublishRequest) (*empty.Empty, error) {
+func (s *service) Publish(ctx context.Context, r *api.PublishRequest) (*empty.Empty, error) {
 	if err := s.events.Publish(ctx, r.Topic, r.Event); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -42,7 +43,7 @@ func (s *Service) Publish(ctx context.Context, r *api.PublishRequest) (*empty.Em
 	return &empty.Empty{}, nil
 }
 
-func (s *Service) Forward(ctx context.Context, r *api.ForwardRequest) (*empty.Empty, error) {
+func (s *service) Forward(ctx context.Context, r *api.ForwardRequest) (*empty.Empty, error) {
 	if err := s.events.Forward(ctx, r.Envelope); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -50,7 +51,7 @@ func (s *Service) Forward(ctx context.Context, r *api.ForwardRequest) (*empty.Em
 	return &empty.Empty{}, nil
 }
 
-func (s *Service) Subscribe(req *api.SubscribeRequest, srv api.Events_SubscribeServer) error {
+func (s *service) Subscribe(req *api.SubscribeRequest, srv api.Events_SubscribeServer) error {
 	ctx, cancel := context.WithCancel(srv.Context())
 	defer cancel()
 

@@ -566,7 +566,7 @@ func (cs *contentStore) garbageCollect(ctx context.Context) error {
 		return err
 	}
 
-	if err := cs.Store.Walk(ctx, func(info content.Info) error {
+	return cs.Store.Walk(ctx, func(info content.Info) error {
 		if _, ok := seen[info.Digest.String()]; !ok {
 			if err := cs.Store.Delete(ctx, info.Digest); err != nil {
 				return err
@@ -574,9 +574,5 @@ func (cs *contentStore) garbageCollect(ctx context.Context) error {
 			log.G(ctx).WithField("digest", info.Digest).Debug("removed content")
 		}
 		return nil
-	}); err != nil {
-		return err
-	}
-
-	return nil
+	})
 }

@@ -70,32 +70,33 @@ type bundle struct {
 	workDir string
 }
 
-type shimOpt func(*bundle, string, *runcopts.RuncOptions) (client.Config, client.ClientOpt)
+// ShimOpt specifies shim options for initialization and connection
+type ShimOpt func(*bundle, string, *runcopts.RuncOptions) (client.Config, client.ClientOpt)
 
-// ShimRemote is a shimOpt for connecting and starting a remote shim
-func ShimRemote(shim, daemonAddress, cgroup string, nonewns, debug bool, exitHandler func()) shimOpt {
+// ShimRemote is a ShimOpt for connecting and starting a remote shim
+func ShimRemote(shim, daemonAddress, cgroup string, nonewns, debug bool, exitHandler func()) ShimOpt {
 	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (client.Config, client.ClientOpt) {
 		return b.shimConfig(ns, ropts),
 			client.WithStart(shim, b.shimAddress(ns), daemonAddress, cgroup, nonewns, debug, exitHandler)
 	}
 }
 
-// ShimLocal is a shimOpt for using an in process shim implementation
-func ShimLocal(exchange *events.Exchange) shimOpt {
+// ShimLocal is a ShimOpt for using an in process shim implementation
+func ShimLocal(exchange *events.Exchange) ShimOpt {
 	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (client.Config, client.ClientOpt) {
 		return b.shimConfig(ns, ropts), client.WithLocal(exchange)
 	}
 }
 
-// ShimConnect is a shimOpt for connecting to an existing remote shim
-func ShimConnect() shimOpt {
+// ShimConnect is a ShimOpt for connecting to an existing remote shim
+func ShimConnect() ShimOpt {
 	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (client.Config, client.ClientOpt) {
 		return b.shimConfig(ns, ropts), client.WithConnect(b.shimAddress(ns))
 	}
 }
 
 // NewShimClient connects to the shim managing the bundle and tasks creating it if needed
-func (b *bundle) NewShimClient(ctx context.Context, namespace string, getClientOpts shimOpt, runcOpts *runcopts.RuncOptions) (*client.Client, error) {
+func (b *bundle) NewShimClient(ctx context.Context, namespace string, getClientOpts ShimOpt, runcOpts *runcopts.RuncOptions) (*client.Client, error) {
 	cfg, opt := getClientOpts(b, namespace, runcOpts)
 	return client.New(ctx, cfg, opt)
 }

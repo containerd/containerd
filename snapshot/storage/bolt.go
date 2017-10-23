@@ -582,7 +582,7 @@ func encodeSize(size int64) ([]byte, error) {
 func encodeID(id uint64) ([]byte, error) {
 	var (
 		buf       [binary.MaxVarintLen64]byte
-		idEncoded []byte = buf[:]
+		idEncoded = buf[:]
 	)
 	idEncoded = idEncoded[:binary.PutUvarint(idEncoded, id)]
 

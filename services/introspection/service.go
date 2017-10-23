@@ -28,22 +28,23 @@ func init() {
 	})
 }
 
-type Service struct {
+type service struct {
 	plugins []api.Plugin
 }
 
+// NewService returns the GRPC introspection server
 func NewService(plugins []api.Plugin) api.IntrospectionServer {
-	return &Service{
+	return &service{
 		plugins: plugins,
 	}
 }
 
-func (s *Service) Register(server *grpc.Server) error {
+func (s *service) Register(server *grpc.Server) error {
 	api.RegisterIntrospectionServer(server, s)
 	return nil
 }
 
-func (s *Service) Plugins(ctx context.Context, req *api.PluginsRequest) (*api.PluginsResponse, error) {
+func (s *service) Plugins(ctx context.Context, req *api.PluginsRequest) (*api.PluginsResponse, error) {
 	filter, err := filters.ParseAll(req.Filters...)
 	if err != nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrInvalidArgument, err.Error())

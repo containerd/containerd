@@ -61,10 +61,13 @@ type Plugin struct {
 	err      error // will be set if there was an error initializing the plugin
 }
 
+// Err returns the errors during initialization.
+// returns nil if not error was encountered
 func (p *Plugin) Err() error {
 	return p.err
 }
 
+// Instance returns the instance and any initialization error of the plugin
 func (p *Plugin) Instance() (interface{}, error) {
 	return p.instance, p.err
 }
@@ -80,12 +83,14 @@ type PluginSet struct {
 	byTypeAndID map[Type]map[string]*Plugin
 }
 
+// NewPluginSet returns an initialized plugin set
 func NewPluginSet() *PluginSet {
 	return &PluginSet{
 		byTypeAndID: make(map[Type]map[string]*Plugin),
 	}
 }
 
+// Add a plugin to the set
 func (ps *PluginSet) Add(p *Plugin) error {
 	if byID, typeok := ps.byTypeAndID[p.Registration.Type]; !typeok {
 		ps.byTypeAndID[p.Registration.Type] = map[string]*Plugin{
@@ -109,6 +114,7 @@ func (ps *PluginSet) Get(t Type) (interface{}, error) {
 	return nil, errors.Wrapf(errdefs.ErrNotFound, "no plugins registered for %s", t)
 }
 
+// GetAll plugins in the set
 func (i *InitContext) GetAll() []*Plugin {
 	return i.plugins.ordered
 }

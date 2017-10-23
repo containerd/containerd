@@ -51,6 +51,7 @@ type Status struct {
 	ExitTime time.Time
 }
 
+// ProcessInfo provides platform specific process information
 type ProcessInfo struct {
 	// Pid is the process ID
 	Pid uint32

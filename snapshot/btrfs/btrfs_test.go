@@ -46,12 +46,10 @@ func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshot.Snaps
 			return nil, nil, errors.Wrap(err, "failed to create new snapshotter")
 		}
 
-		return snapshotter, func() (err error) {
-			merr := mount.UnmountAll(root, unix.MNT_DETACH)
-			if err = cleanupDevice(); err != nil {
-				return errors.Wrap(err, "device cleanup failed")
-			} else {
-				err = merr
+		return snapshotter, func() error {
+			err := mount.UnmountAll(root, unix.MNT_DETACH)
+			if cerr := cleanupDevice(); cerr != nil {
+				err = errors.Wrap(cerr, "device cleanup failed")
 			}
 			return err
 		}, nil

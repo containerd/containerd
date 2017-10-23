@@ -46,10 +46,7 @@ func NewLoopback(size int64) (string, func() error, error) {
 
 		// remove file
 		logrus.Debugf("Removing temporary file %s", file.Name())
-		if err = os.Remove(file.Name()); err != nil {
-			return err
-		}
-		return nil
+		return os.Remove(file.Name())
 	}
 
 	return deviceName, cleanup, nil

@@ -34,7 +34,7 @@ import (
 )
 
 var (
-	_     = (api.TasksServer)(&Service{})
+	_     = (api.TasksServer)(&service{})
 	empty = &google_protobuf.Empty{}
 )
 
@@ -46,11 +46,11 @@ func init() {
 			plugin.RuntimePlugin,
 			plugin.MetadataPlugin,
 		},
-		InitFn: New,
+		InitFn: initFunc,
 	})
 }
 
-func New(ic *plugin.InitContext) (interface{}, error) {
+func initFunc(ic *plugin.InitContext) (interface{}, error) {
 	rt, err := ic.GetByType(plugin.RuntimePlugin)
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	if len(runtimes) == 0 {
 		return nil, errors.New("no runtimes available to create task service")
 	}
-	return &Service{
+	return &service{
 		runtimes:  runtimes,
 		db:        m.(*metadata.DB),
 		store:     cs,
@@ -83,19 +83,19 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	}, nil
 }
 
-type Service struct {
+type service struct {
 	runtimes  map[string]runtime.Runtime
 	db        *metadata.DB
 	store     content.Store
 	publisher events.Publisher
 }
 
-func (s *Service) Register(server *grpc.Server) error {
+func (s *service) Register(server *grpc.Server) error {
 	api.RegisterTasksServer(server, s)
 	return nil
 }
 
-func (s *Service) Create(ctx context.Context, r *api.CreateTaskRequest) (*api.CreateTaskResponse, error) {
+func (s *service) Create(ctx context.Context, r *api.CreateTaskRequest) (*api.CreateTaskResponse, error) {
 	var (
 		checkpointPath string
 		err            error
@@ -160,7 +160,7 @@ func (s *Service) Create(ctx context.Context, r *api.CreateTaskRequest) (*api.Cr
 	}, nil
 }
 
-func (s *Service) Start(ctx context.Context, r *api.StartRequest) (*api.StartResponse, error) {
+func (s *service) Start(ctx context.Context, r *api.StartRequest) (*api.StartResponse, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -183,7 +183,7 @@ func (s *Service) Start(ctx context.Context, r *api.StartRequest) (*api.StartRes
 	}, nil
 }
 
-func (s *Service) Delete(ctx context.Context, r *api.DeleteTaskRequest) (*api.DeleteResponse, error) {
+func (s *service) Delete(ctx context.Context, r *api.DeleteTaskRequest) (*api.DeleteResponse, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -203,7 +203,7 @@ func (s *Service) Delete(ctx context.Context, r *api.DeleteTaskRequest) (*api.De
 	}, nil
 }
 
-func (s *Service) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest) (*api.DeleteResponse, error) {
+func (s *service) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest) (*api.DeleteResponse, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -253,7 +253,7 @@ func processFromContainerd(ctx context.Context, p runtime.Process) (*task.Proces
 	}, nil
 }
 
-func (s *Service) Get(ctx context.Context, r *api.GetRequest) (*api.GetResponse, error) {
+func (s *service) Get(ctx context.Context, r *api.GetRequest) (*api.GetResponse, error) {
 	task, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -273,7 +273,7 @@ func (s *Service) Get(ctx context.Context, r *api.GetRequest) (*api.GetResponse,
 	}, nil
 }
 
-func (s *Service) List(ctx context.Context, r *api.ListTasksRequest) (*api.ListTasksResponse, error) {
+func (s *service) List(ctx context.Context, r *api.ListTasksRequest) (*api.ListTasksResponse, error) {
 	resp := &api.ListTasksResponse{}
 	for _, r := range s.runtimes {
 		tasks, err := r.Tasks(ctx)
@@ -296,7 +296,7 @@ func addTasks(ctx context.Context, r *api.ListTasksResponse, tasks []runtime.Tas
 	}
 }
 
-func (s *Service) Pause(ctx context.Context, r *api.PauseTaskRequest) (*google_protobuf.Empty, error) {
+func (s *service) Pause(ctx context.Context, r *api.PauseTaskRequest) (*google_protobuf.Empty, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -308,7 +308,7 @@ func (s *Service) Pause(ctx context.Context, r *api.PauseTaskRequest) (*google_p
 	return empty, nil
 }
 
-func (s *Service) Resume(ctx context.Context, r *api.ResumeTaskRequest) (*google_protobuf.Empty, error) {
+func (s *service) Resume(ctx context.Context, r *api.ResumeTaskRequest) (*google_protobuf.Empty, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -320,7 +320,7 @@ func (s *Service) Resume(ctx context.Context, r *api.ResumeTaskRequest) (*google
 	return empty, nil
 }
 
-func (s *Service) Kill(ctx context.Context, r *api.KillRequest) (*google_protobuf.Empty, error) {
+func (s *service) Kill(ctx context.Context, r *api.KillRequest) (*google_protobuf.Empty, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -337,7 +337,7 @@ func (s *Service) Kill(ctx context.Context, r *api.KillRequest) (*google_protobu
 	return empty, nil
 }
 
-func (s *Service) ListPids(ctx context.Context, r *api.ListPidsRequest) (*api.ListPidsResponse, error) {
+func (s *service) ListPids(ctx context.Context, r *api.ListPidsRequest) (*api.ListPidsResponse, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -365,7 +365,7 @@ func (s *Service) ListPids(ctx context.Context, r *api.ListPidsRequest) (*api.Li
 	}, nil
 }
 
-func (s *Service) Exec(ctx context.Context, r *api.ExecProcessRequest) (*google_protobuf.Empty, error) {
+func (s *service) Exec(ctx context.Context, r *api.ExecProcessRequest) (*google_protobuf.Empty, error) {
 	if r.ExecID == "" {
 		return nil, grpc.Errorf(codes.InvalidArgument, "exec id cannot be empty")
 	}
@@ -387,7 +387,7 @@ func (s *Service) Exec(ctx context.Context, r *api.ExecProcessRequest) (*google_
 	return empty, nil
 }
 
-func (s *Service) ResizePty(ctx context.Context, r *api.ResizePtyRequest) (*google_protobuf.Empty, error) {
+func (s *service) ResizePty(ctx context.Context, r *api.ResizePtyRequest) (*google_protobuf.Empty, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -407,7 +407,7 @@ func (s *Service) ResizePty(ctx context.Context, r *api.ResizePtyRequest) (*goog
 	return empty, nil
 }
 
-func (s *Service) CloseIO(ctx context.Context, r *api.CloseIORequest) (*google_protobuf.Empty, error) {
+func (s *service) CloseIO(ctx context.Context, r *api.CloseIORequest) (*google_protobuf.Empty, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -426,7 +426,7 @@ func (s *Service) CloseIO(ctx context.Context, r *api.CloseIORequest) (*google_p
 	return empty, nil
 }
 
-func (s *Service) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest) (*api.CheckpointTaskResponse, error) {
+func (s *service) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest) (*api.CheckpointTaskResponse, error) {
 	container, err := s.getContainer(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -471,7 +471,7 @@ func (s *Service) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest) 
 	}, nil
 }
 
-func (s *Service) Update(ctx context.Context, r *api.UpdateTaskRequest) (*google_protobuf.Empty, error) {
+func (s *service) Update(ctx context.Context, r *api.UpdateTaskRequest) (*google_protobuf.Empty, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -482,7 +482,7 @@ func (s *Service) Update(ctx context.Context, r *api.UpdateTaskRequest) (*google
 	return empty, nil
 }
 
-func (s *Service) Metrics(ctx context.Context, r *api.MetricsRequest) (*api.MetricsResponse, error) {
+func (s *service) Metrics(ctx context.Context, r *api.MetricsRequest) (*api.MetricsResponse, error) {
 	filter, err := filters.ParseAll(r.Filters...)
 	if err != nil {
 		return nil, err
@@ -498,7 +498,7 @@ func (s *Service) Metrics(ctx context.Context, r *api.MetricsRequest) (*api.Metr
 	return &resp, nil
 }
 
-func (s *Service) Wait(ctx context.Context, r *api.WaitRequest) (*api.WaitResponse, error) {
+func (s *service) Wait(ctx context.Context, r *api.WaitRequest) (*api.WaitResponse, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -557,7 +557,7 @@ func getTasksMetrics(ctx context.Context, filter filters.Filter, tasks []runtime
 	}
 }
 
-func (s *Service) writeContent(ctx context.Context, mediaType, ref string, r io.Reader) (*types.Descriptor, error) {
+func (s *service) writeContent(ctx context.Context, mediaType, ref string, r io.Reader) (*types.Descriptor, error) {
 	writer, err := s.store.Writer(ctx, ref, 0, "")
 	if err != nil {
 		return nil, err
@@ -580,7 +580,7 @@ func (s *Service) writeContent(ctx context.Context, mediaType, ref string, r io.
 	}, nil
 }
 
-func (s *Service) getContainer(ctx context.Context, id string) (*containers.Container, error) {
+func (s *service) getContainer(ctx context.Context, id string) (*containers.Container, error) {
 	var container containers.Container
 	if err := s.db.View(func(tx *bolt.Tx) error {
 		store := metadata.NewContainerStore(tx)
@@ -593,7 +593,7 @@ func (s *Service) getContainer(ctx context.Context, id string) (*containers.Cont
 	return &container, nil
 }
 
-func (s *Service) getTask(ctx context.Context, id string) (runtime.Task, error) {
+func (s *service) getTask(ctx context.Context, id string) (runtime.Task, error) {
 	container, err := s.getContainer(ctx, id)
 	if err != nil {
 		return nil, err
@@ -601,7 +601,7 @@ func (s *Service) getTask(ctx context.Context, id string) (runtime.Task, error) 
 	return s.getTaskFromContainer(ctx, container)
 }
 
-func (s *Service) getTaskFromContainer(ctx context.Context, container *containers.Container) (runtime.Task, error) {
+func (s *service) getTaskFromContainer(ctx context.Context, container *containers.Container) (runtime.Task, error) {
 	runtime, err := s.getRuntime(container.Runtime.Name)
 	if err != nil {
 		return nil, errdefs.ToGRPCf(err, "runtime for task %s", container.Runtime.Name)
@@ -613,7 +613,7 @@ func (s *Service) getTaskFromContainer(ctx context.Context, container *container
 	return t, nil
 }
 
-func (s *Service) getRuntime(name string) (runtime.Runtime, error) {
+func (s *service) getRuntime(name string) (runtime.Runtime, error) {
 	runtime, ok := s.runtimes[name]
 	if !ok {
 		return nil, grpc.Errorf(codes.NotFound, "unknown runtime %q", name)

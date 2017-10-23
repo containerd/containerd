@@ -34,26 +34,27 @@ func init() {
 	})
 }
 
-type Service struct {
+type service struct {
 	db        *metadata.DB
 	publisher events.Publisher
 }
 
-var _ api.NamespacesServer = &Service{}
+var _ api.NamespacesServer = &service{}
 
+// NewService returns the GRPC namespaces server
 func NewService(db *metadata.DB, publisher events.Publisher) api.NamespacesServer {
-	return &Service{
+	return &service{
 		db:        db,
 		publisher: publisher,
 	}
 }
 
-func (s *Service) Register(server *grpc.Server) error {
+func (s *service) Register(server *grpc.Server) error {
 	api.RegisterNamespacesServer(server, s)
 	return nil
 }
 
-func (s *Service) Get(ctx context.Context, req *api.GetNamespaceRequest) (*api.GetNamespaceResponse, error) {
+func (s *service) Get(ctx context.Context, req *api.GetNamespaceRequest) (*api.GetNamespaceResponse, error) {
 	var resp api.GetNamespaceResponse
 
 	return &resp, s.withStoreView(ctx, func(ctx context.Context, store namespaces.Store) error {
@@ -71,7 +72,7 @@ func (s *Service) Get(ctx context.Context, req *api.GetNamespaceRequest) (*api.G
 	})
 }
 
-func (s *Service) List(ctx context.Context, req *api.ListNamespacesRequest) (*api.ListNamespacesResponse, error) {
+func (s *service) List(ctx context.Context, req *api.ListNamespacesRequest) (*api.ListNamespacesResponse, error) {
 	var resp api.ListNamespacesResponse
 
 	return &resp, s.withStoreView(ctx, func(ctx context.Context, store namespaces.Store) error {
@@ -98,7 +99,7 @@ func (s *Service) List(ctx context.Context, req *api.ListNamespacesRequest) (*ap
 	})
 }
 
-func (s *Service) Create(ctx context.Context, req *api.CreateNamespaceRequest) (*api.CreateNamespaceResponse, error) {
+func (s *service) Create(ctx context.Context, req *api.CreateNamespaceRequest) (*api.CreateNamespaceResponse, error) {
 	var resp api.CreateNamespaceResponse
 
 	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store namespaces.Store) error {
@@ -129,7 +130,7 @@ func (s *Service) Create(ctx context.Context, req *api.CreateNamespaceRequest) (
 
 }
 
-func (s *Service) Update(ctx context.Context, req *api.UpdateNamespaceRequest) (*api.UpdateNamespaceResponse, error) {
+func (s *service) Update(ctx context.Context, req *api.UpdateNamespaceRequest) (*api.UpdateNamespaceResponse, error) {
 	var resp api.UpdateNamespaceResponse
 	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store namespaces.Store) error {
 		if req.UpdateMask != nil && len(req.UpdateMask.Paths) > 0 {
@@ -181,7 +182,7 @@ func (s *Service) Update(ctx context.Context, req *api.UpdateNamespaceRequest) (
 	return &resp, nil
 }
 
-func (s *Service) Delete(ctx context.Context, req *api.DeleteNamespaceRequest) (*empty.Empty, error) {
+func (s *service) Delete(ctx context.Context, req *api.DeleteNamespaceRequest) (*empty.Empty, error) {
 	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store namespaces.Store) error {
 		return errdefs.ToGRPC(store.Delete(ctx, req.Name))
 	}); err != nil {
@@ -198,14 +199,14 @@ func (s *Service) Delete(ctx context.Context, req *api.DeleteNamespaceRequest) (
 	return &empty.Empty{}, nil
 }
 
-func (s *Service) withStore(ctx context.Context, fn func(ctx context.Context, store namespaces.Store) error) func(tx *bolt.Tx) error {
+func (s *service) withStore(ctx context.Context, fn func(ctx context.Context, store namespaces.Store) error) func(tx *bolt.Tx) error {
 	return func(tx *bolt.Tx) error { return fn(ctx, metadata.NewNamespaceStore(tx)) }
 }
 
-func (s *Service) withStoreView(ctx context.Context, fn func(ctx context.Context, store namespaces.Store) error) error {
+func (s *service) withStoreView(ctx context.Context, fn func(ctx context.Context, store namespaces.Store) error) error {
 	return s.db.View(s.withStore(ctx, fn))
 }
 
-func (s *Service) withStoreUpdate(ctx context.Context, fn func(ctx context.Context, store namespaces.Store) error) error {
+func (s *service) withStoreUpdate(ctx context.Context, fn func(ctx context.Context, store namespaces.Store) error) error {
 	return s.db.Update(s.withStore(ctx, fn))
 }
