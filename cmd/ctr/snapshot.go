@@ -40,10 +40,11 @@ var listSnapshotCommand = cli.Command{
 		ctx, cancel := appContext(clicontext)
 		defer cancel()
 
-		snapshotter, err := getSnapshotter(clicontext)
+		client, err := newClient(clicontext)
 		if err != nil {
 			return err
 		}
+		snapshotter := client.SnapshotService(clicontext.GlobalString("snapshotter"))
 
 		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
 		fmt.Fprintln(tw, "KEY\tPARENT\tKIND\t")
@@ -87,10 +88,11 @@ var usageSnapshotCommand = cli.Command{
 			}
 		}
 
-		snapshotter, err := getSnapshotter(clicontext)
+		client, err := newClient(clicontext)
 		if err != nil {
 			return err
 		}
+		snapshotter := client.SnapshotService(clicontext.GlobalString("snapshotter"))
 
 		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
 		fmt.Fprintln(tw, "KEY\tSIZE\tINODES\t")
@@ -129,10 +131,11 @@ var removeSnapshotCommand = cli.Command{
 		ctx, cancel := appContext(clicontext)
 		defer cancel()
 
-		snapshotter, err := getSnapshotter(clicontext)
+		client, err := newClient(clicontext)
 		if err != nil {
 			return err
 		}
+		snapshotter := client.SnapshotService(clicontext.GlobalString("snapshotter"))
 
 		for _, key := range clicontext.Args() {
 			err = snapshotter.Remove(ctx, key)
@@ -167,10 +170,11 @@ var prepareSnapshotCommand = cli.Command{
 		key := clicontext.Args().Get(0)
 		parent := clicontext.Args().Get(1)
 
-		snapshotter, err := getSnapshotter(clicontext)
+		client, err := newClient(clicontext)
 		if err != nil {
 			return err
 		}
+		snapshotter := client.SnapshotService(clicontext.GlobalString("snapshotter"))
 
 		mounts, err := snapshotter.Prepare(ctx, key, parent)
 		if err != nil {
@@ -207,10 +211,11 @@ var viewSnapshotCommand = cli.Command{
 		key := clicontext.Args().Get(0)
 		parent := clicontext.Args().Get(1)
 
-		snapshotter, err := getSnapshotter(clicontext)
+		client, err := newClient(clicontext)
 		if err != nil {
 			return err
 		}
+		snapshotter := client.SnapshotService(clicontext.GlobalString("snapshotter"))
 
 		mounts, err := snapshotter.View(ctx, key, parent)
 		if err != nil {
@@ -240,10 +245,11 @@ var mountSnapshotCommand = cli.Command{
 
 		target := clicontext.Args().Get(0)
 		key := clicontext.Args().Get(1)
-		snapshotter, err := getSnapshotter(clicontext)
+		client, err := newClient(clicontext)
 		if err != nil {
 			return err
 		}
+		snapshotter := client.SnapshotService(clicontext.GlobalString("snapshotter"))
 
 		mounts, err := snapshotter.Mounts(ctx, key)
 		if err != nil {
@@ -271,10 +277,11 @@ var commitSnapshotCommand = cli.Command{
 		key := clicontext.Args().Get(0)
 		active := clicontext.Args().Get(1)
 
-		snapshotter, err := getSnapshotter(clicontext)
+		client, err := newClient(clicontext)
 		if err != nil {
 			return err
 		}
+		snapshotter := client.SnapshotService(clicontext.GlobalString("snapshotter"))
 
 		return snapshotter.Commit(ctx, key, active)
 	},
@@ -287,10 +294,11 @@ var treeSnapshotCommand = cli.Command{
 		ctx, cancel := appContext(clicontext)
 		defer cancel()
 
-		snapshotter, err := getSnapshotter(clicontext)
+		client, err := newClient(clicontext)
 		if err != nil {
 			return err
 		}
+		snapshotter := client.SnapshotService(clicontext.GlobalString("snapshotter"))
 
 		tree := make(map[string]*snapshotTreeNode)
 
@@ -328,10 +336,11 @@ var infoSnapshotCommand = cli.Command{
 
 		key := clicontext.Args().Get(0)
 
-		snapshotter, err := getSnapshotter(clicontext)
+		client, err := newClient(clicontext)
 		if err != nil {
 			return err
 		}
+		snapshotter := client.SnapshotService(clicontext.GlobalString("snapshotter"))
 
 		info, err := snapshotter.Stat(ctx, key)
 		if err != nil {
@@ -357,10 +366,11 @@ var labelSnapshotCommand = cli.Command{
 		ctx, cancel := appContext(clicontext)
 		defer cancel()
 
-		snapshotter, err := getSnapshotter(clicontext)
+		client, err := newClient(clicontext)
 		if err != nil {
 			return err
 		}
+		snapshotter := client.SnapshotService(clicontext.GlobalString("snapshotter"))
 
 		info := snapshot.Info{
 			Name:   key,

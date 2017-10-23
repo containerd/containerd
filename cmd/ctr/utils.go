@@ -18,35 +18,18 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
-	containersapi "github.com/containerd/containerd/api/services/containers/v1"
-	contentapi "github.com/containerd/containerd/api/services/content/v1"
-	diffapi "github.com/containerd/containerd/api/services/diff/v1"
-	"github.com/containerd/containerd/api/services/events/v1"
-	imagesapi "github.com/containerd/containerd/api/services/images/v1"
-	namespacesapi "github.com/containerd/containerd/api/services/namespaces/v1"
-	snapshotapi "github.com/containerd/containerd/api/services/snapshot/v1"
-	"github.com/containerd/containerd/api/services/tasks/v1"
-	versionservice "github.com/containerd/containerd/api/services/version/v1"
 	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/rootfs"
-	contentservice "github.com/containerd/containerd/services/content"
-	diffservice "github.com/containerd/containerd/services/diff"
-	imagesservice "github.com/containerd/containerd/services/images"
-	namespacesservice "github.com/containerd/containerd/services/namespaces"
-	snapshotservice "github.com/containerd/containerd/services/snapshot"
-	"github.com/containerd/containerd/snapshot"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	"google.golang.org/grpc"
 )
 
 var (
@@ -83,8 +66,6 @@ var (
 	}
 )
 
-var grpcConn *grpc.ClientConn
-
 // appContext returns the context for a command. Should only be called once per
 // command, near the start.
 //
@@ -109,81 +90,8 @@ func appContext(clicontext *cli.Context) (gocontext.Context, gocontext.CancelFun
 	return ctx, cancel
 }
 
-func getNamespacesService(clicontext *cli.Context) (namespaces.Store, error) {
-	conn, err := getGRPCConnection(clicontext)
-	if err != nil {
-		return nil, err
-	}
-	return namespacesservice.NewStoreFromClient(namespacesapi.NewNamespacesClient(conn)), nil
-}
-
 func newClient(context *cli.Context) (*containerd.Client, error) {
 	return containerd.New(context.GlobalString("address"))
-}
-
-func getContainersService(context *cli.Context) (containersapi.ContainersClient, error) {
-	conn, err := getGRPCConnection(context)
-	if err != nil {
-		return nil, err
-	}
-	return containersapi.NewContainersClient(conn), nil
-}
-
-func getTasksService(context *cli.Context) (tasks.TasksClient, error) {
-	conn, err := getGRPCConnection(context)
-	if err != nil {
-		return nil, err
-	}
-	return tasks.NewTasksClient(conn), nil
-}
-
-func getEventsService(context *cli.Context) (events.EventsClient, error) {
-	conn, err := getGRPCConnection(context)
-	if err != nil {
-		return nil, err
-	}
-
-	return events.NewEventsClient(conn), nil
-}
-
-func getContentStore(context *cli.Context) (content.Store, error) {
-	conn, err := getGRPCConnection(context)
-	if err != nil {
-		return nil, err
-	}
-	return contentservice.NewStoreFromClient(contentapi.NewContentClient(conn)), nil
-}
-
-func getSnapshotter(context *cli.Context) (snapshot.Snapshotter, error) {
-	conn, err := getGRPCConnection(context)
-	if err != nil {
-		return nil, err
-	}
-	return snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotsClient(conn), context.GlobalString("snapshotter")), nil
-}
-
-func getImageStore(clicontext *cli.Context) (images.Store, error) {
-	conn, err := getGRPCConnection(clicontext)
-	if err != nil {
-		return nil, err
-	}
-	return imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(conn)), nil
-}
-
-func getDiffService(context *cli.Context) (diff.Differ, error) {
-	conn, err := getGRPCConnection(context)
-	if err != nil {
-		return nil, err
-	}
-	return diffservice.NewDiffServiceFromClient(diffapi.NewDiffClient(conn)), nil
-}
-
-func getVersionService(context *cli.Context) (versionservice.VersionClient, error) {
-	conn, err := getGRPCConnection(context)
-	if err != nil {
-		return nil, err
-	}
-	return versionservice.NewVersionClient(conn), nil
 }
 
 func passwordPrompt() (string, error) {
