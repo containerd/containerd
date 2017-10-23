@@ -1,11 +1,9 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"io/ioutil"
 	golog "log"
-	"net"
 	"os"
 	"os/signal"
 	"runtime"
@@ -17,7 +15,6 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/server"
-	"github.com/containerd/containerd/sys"
 	"github.com/containerd/containerd/version"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -80,7 +77,6 @@ func main() {
 			signals = make(chan os.Signal, 2048)
 			serverC = make(chan *server.Server)
 			ctx     = log.WithModule(gocontext.Background(), "containerd")
-			config  = defaultConfig()
 		)
 
 		done := handleSignals(ctx, signals, serverC)
@@ -88,48 +84,29 @@ func main() {
 		// we don't miss any signals during boot
 		signal.Notify(signals, handledSignals...)
 
-		if err := server.LoadConfig(context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
+		config := server.Default()
+		if err := server.Load(context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
 			return err
 		}
 		// apply flags to the config
 		if err := applyFlags(context, config); err != nil {
 			return err
 		}
-		address := config.GRPC.Address
-		if address == "" {
-			return errors.New("grpc address cannot be empty")
+		if err := validate(config); err != nil {
+			return err
 		}
 		log.G(ctx).WithFields(logrus.Fields{
 			"version":  version.Version,
 			"revision": version.Revision,
 		}).Info("starting containerd")
-
 		server, err := server.New(ctx, config)
 		if err != nil {
 			return err
 		}
 		serverC <- server
-		if config.Debug.Address != "" {
-			l, err := sys.GetLocalListener(config.Debug.Address, config.Debug.UID, config.Debug.GID)
-			if err != nil {
-				return errors.Wrapf(err, "failed to get listener for debug endpoint")
-			}
-			serve(log.WithModule(ctx, "debug"), l, server.ServeDebug)
+		if err := server.Serve(); err != nil {
+			return err
 		}
-		if config.Metrics.Address != "" {
-			l, err := net.Listen("tcp", config.Metrics.Address)
-			if err != nil {
-				return errors.Wrapf(err, "failed to get listener for metrics endpoint")
-			}
-			serve(log.WithModule(ctx, "metrics"), l, server.ServeMetrics)
-		}
-
-		l, err := sys.GetLocalListener(address, config.GRPC.UID, config.GRPC.GID)
-		if err != nil {
-			return errors.Wrapf(err, "failed to get listener for main endpoint")
-		}
-		serve(log.WithModule(ctx, "grpc"), l, server.ServeGRPC)
-
 		log.G(ctx).Infof("containerd successfully booted in %fs", time.Since(start).Seconds())
 		<-done
 		return nil
@@ -138,17 +115,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "containerd: %s\n", err)
 		os.Exit(1)
 	}
-}
-
-func serve(ctx context.Context, l net.Listener, serveFunc func(net.Listener) error) {
-	path := l.Addr().String()
-	log.G(ctx).WithField("address", path).Info("serving...")
-	go func() {
-		defer l.Close()
-		if err := serveFunc(l); err != nil {
-			log.G(ctx).WithError(err).WithField("address", path).Fatal("serve failure")
-		}
-	}()
 }
 
 func applyFlags(context *cli.Context, config *server.Config) error {
@@ -209,4 +175,12 @@ func dumpStacks() {
 	}
 	buf = buf[:stackSize]
 	logrus.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
+}
+
+func validate(config *server.Config) error {
+	address := config.GRPC.Address
+	if address == "" {
+		return errors.New("grpc address cannot be empty")
+	}
+	return nil
 }

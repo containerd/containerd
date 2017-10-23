@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/sys"
 	metrics "github.com/docker/go-metrics"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/pkg/errors"
@@ -66,6 +67,7 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 		s        = &Server{
 			rpc:    rpc,
 			events: events.NewExchange(),
+			config: config,
 		}
 		initialized = plugin.NewPluginSet()
 	)
@@ -123,10 +125,64 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 type Server struct {
 	rpc    *grpc.Server
 	events *events.Exchange
+	config *Config
 }
 
-// ServeGRPC provides the containerd grpc APIs on the provided listener
-func (s *Server) ServeGRPC(l net.Listener) error {
+// Serve the gprc, debug, and metrics APIs for containerd
+func (s *Server) Serve() error {
+	var (
+		de, me chan error
+		config = s.config
+	)
+	if config.Debug.Address != "" {
+		debug := config.Debug
+		l, err := sys.GetLocalListener(debug.Address, debug.UID, debug.GID)
+		if err != nil {
+			return err
+		}
+		de = s.serve(l, s.debug)
+	}
+	if config.Metrics.Address != "" {
+		l, err := net.Listen("tcp", config.Metrics.Address)
+		if err != nil {
+			return err
+		}
+		me = s.serve(l, s.metrics)
+	}
+	l, err := sys.GetLocalListener(config.GRPC.Address, config.GRPC.UID, config.GRPC.GID)
+	if err != nil {
+		return err
+	}
+	ge := s.serve(l, s.grpc)
+	select {
+	case err := <-ge:
+		if err != nil {
+			return err
+		}
+	case err := <-me:
+		if err != nil {
+			return err
+		}
+	case err := <-de:
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Server) serve(l net.Listener, serverFunc func(net.Listener) error) chan error {
+	c := make(chan error, 1)
+	go func() {
+		if err := serverFunc(l); err != nil {
+			c <- err
+		}
+		close(c)
+	}()
+	return c
+}
+
+func (s *Server) grpc(l net.Listener) error {
 	// before we start serving the grpc API regster the grpc_prometheus metrics
 	// handler.  This needs to be the last service registered so that it can collect
 	// metrics for every other service
@@ -134,15 +190,13 @@ func (s *Server) ServeGRPC(l net.Listener) error {
 	return trapClosedConnErr(s.rpc.Serve(l))
 }
 
-// ServeMetrics provides a prometheus endpoint for exposing metrics
-func (s *Server) ServeMetrics(l net.Listener) error {
+func (s *Server) metrics(l net.Listener) error {
 	m := http.NewServeMux()
 	m.Handle("/v1/metrics", metrics.Handler())
 	return trapClosedConnErr(http.Serve(l, m))
 }
 
-// ServeDebug provides a debug endpoint
-func (s *Server) ServeDebug(l net.Listener) error {
+func (s *Server) debug(l net.Listener) error {
 	// don't use the default http server mux to make sure nothing gets registered
 	// that we don't want to expose via containerd
 	m := http.NewServeMux()
