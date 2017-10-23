@@ -49,10 +49,11 @@ var (
 				return err
 			}
 
-			cs, err := getContentStore(context)
+			client, err := newClient(context)
 			if err != nil {
 				return err
 			}
+			cs := client.ContentStore()
 
 			ra, err := cs.ReaderAt(ctx, dgst)
 			if err != nil {
@@ -98,10 +99,11 @@ var (
 				return errors.New("must specify a transaction reference")
 			}
 
-			cs, err := getContentStore(context)
+			client, err := newClient(context)
 			if err != nil {
 				return err
 			}
+			cs := client.ContentStore()
 
 			// TODO(stevvooe): Allow ingest to be reentrant. Currently, we expect
 			// all data to be written in a single invocation. Allow multiple writes
@@ -135,10 +137,11 @@ var (
 			ctx, cancel := appContext(context)
 			defer cancel()
 
-			cs, err := getContentStore(context)
+			client, err := newClient(context)
 			if err != nil {
 				return err
 			}
+			cs := client.ContentStore()
 
 			active, err := cs.ListStatuses(ctx, match)
 			if err != nil {
@@ -178,10 +181,11 @@ var (
 			ctx, cancel := appContext(context)
 			defer cancel()
 
-			cs, err := getContentStore(context)
+			client, err := newClient(context)
 			if err != nil {
 				return err
 			}
+			cs := client.ContentStore()
 
 			var walkFn content.WalkFunc
 			if quiet {
@@ -231,10 +235,11 @@ var (
 			ctx, cancel := appContext(context)
 			defer cancel()
 
-			cs, err := getContentStore(context)
+			client, err := newClient(context)
 			if err != nil {
 				return err
 			}
+			cs := client.ContentStore()
 
 			dgst, err := digest.Parse(object)
 			if err != nil {
@@ -306,10 +311,11 @@ var (
 				return err
 			}
 
-			cs, err := getContentStore(context)
+			client, err := newClient(context)
 			if err != nil {
 				return err
 			}
+			cs := client.ContentStore()
 
 			ra, err := cs.ReaderAt(ctx, dgst)
 			if err != nil {
@@ -357,10 +363,11 @@ var (
 			ctx, cancel := appContext(context)
 			defer cancel()
 
-			cs, err := getContentStore(context)
+			client, err := newClient(context)
 			if err != nil {
 				return err
 			}
+			cs := client.ContentStore()
 
 			for _, arg := range args {
 				dgst, err := digest.Parse(arg)

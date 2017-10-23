@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/reference"
@@ -34,6 +35,7 @@ import (
 	contentservice "github.com/containerd/containerd/services/content"
 	diffservice "github.com/containerd/containerd/services/diff"
 	imagesservice "github.com/containerd/containerd/services/images"
+	namespacesservice "github.com/containerd/containerd/services/namespaces"
 	snapshotservice "github.com/containerd/containerd/services/snapshot"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/typeurl"
@@ -414,9 +416,9 @@ func (c *Client) Close() error {
 	return c.conn.Close()
 }
 
-// NamespaceService returns the underlying NamespacesClient
-func (c *Client) NamespaceService() namespacesapi.NamespacesClient {
-	return namespacesapi.NewNamespacesClient(c.conn)
+// NamespaceService returns the underlying Namespaces Store
+func (c *Client) NamespaceService() namespaces.Store {
+	return namespacesservice.NewStoreFromClient(namespacesapi.NewNamespacesClient(c.conn))
 }
 
 // ContainerService returns the underlying container Store

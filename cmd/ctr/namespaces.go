@@ -40,10 +40,11 @@ var namespacesCreateCommand = cli.Command{
 			return errors.New("please specify a namespace")
 		}
 
-		namespaces, err := getNamespacesService(clicontext)
+		client, err := newClient(clicontext)
 		if err != nil {
 			return err
 		}
+		namespaces := client.NamespaceService()
 		return namespaces.Create(ctx, namespace, labels)
 	},
 }
@@ -60,10 +61,11 @@ var namespacesSetLabelsCommand = cli.Command{
 			namespace, labels = objectWithLabelArgs(clicontext)
 		)
 
-		namespaces, err := getNamespacesService(clicontext)
+		client, err := newClient(clicontext)
 		if err != nil {
 			return err
 		}
+		namespaces := client.NamespaceService()
 
 		if namespace == "" {
 			return errors.New("please specify a namespace")
@@ -97,10 +99,11 @@ var namespacesListCommand = cli.Command{
 			quiet = clicontext.Bool("quiet")
 		)
 
-		namespaces, err := getNamespacesService(clicontext)
+		client, err := newClient(clicontext)
 		if err != nil {
 			return err
 		}
+		namespaces := client.NamespaceService()
 
 		nss, err := namespaces.List(ctx)
 		if err != nil {
@@ -150,10 +153,11 @@ var namespacesRemoveCommand = cli.Command{
 			exitErr error
 		)
 
-		namespaces, err := getNamespacesService(clicontext)
+		client, err := newClient(clicontext)
 		if err != nil {
 			return err
 		}
+		namespaces := client.NamespaceService()
 
 		for _, target := range clicontext.Args() {
 			if err := namespaces.Delete(ctx, target); err != nil {

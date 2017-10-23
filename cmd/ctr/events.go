@@ -13,12 +13,14 @@ var eventsCommand = cli.Command{
 	Name:  "events",
 	Usage: "display containerd events",
 	Action: func(context *cli.Context) error {
-		eventsClient, err := getEventsService(context)
+		ctx, cancel := appContext(context)
+		defer cancel()
+
+		client, err := newClient(context)
 		if err != nil {
 			return err
 		}
-		ctx, cancel := appContext(context)
-		defer cancel()
+		eventsClient := client.EventService()
 
 		events, err := eventsClient.Subscribe(ctx, &eventsapi.SubscribeRequest{
 			Filters: context.Args(),
