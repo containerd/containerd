@@ -1,7 +1,7 @@
 package main
 
 import (
-	"context"
+	gocontext "context"
 	"fmt"
 	"os"
 	"strings"
@@ -36,20 +36,18 @@ var listSnapshotCommand = cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "list snapshots",
-	Action: func(clicontext *cli.Context) error {
-		ctx, cancel := appContext(clicontext)
-		defer cancel()
-
-		client, err := newClient(clicontext)
+	Action: func(context *cli.Context) error {
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
-		snapshotter := client.SnapshotService(clicontext.GlobalString("snapshotter"))
-
-		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
+		defer cancel()
+		var (
+			snapshotter = client.SnapshotService(context.GlobalString("snapshotter"))
+			tw          = tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
+		)
 		fmt.Fprintln(tw, "KEY\tPARENT\tKIND\t")
-
-		if err := snapshotter.Walk(ctx, func(ctx context.Context, info snapshot.Info) error {
+		if err := snapshotter.Walk(ctx, func(ctx gocontext.Context, info snapshot.Info) error {
 			fmt.Fprintf(tw, "%v\t%v\t%v\t\n",
 				info.Name,
 				info.Parent,
@@ -73,12 +71,9 @@ var usageSnapshotCommand = cli.Command{
 			Usage: "display size in bytes",
 		},
 	},
-	Action: func(clicontext *cli.Context) error {
-		ctx, cancel := appContext(clicontext)
-		defer cancel()
-
+	Action: func(context *cli.Context) error {
 		var displaySize func(int64) string
-		if clicontext.Bool("b") {
+		if context.Bool("b") {
 			displaySize = func(s int64) string {
 				return fmt.Sprintf("%d", s)
 			}
@@ -87,18 +82,18 @@ var usageSnapshotCommand = cli.Command{
 				return progress.Bytes(s).String()
 			}
 		}
-
-		client, err := newClient(clicontext)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
-		snapshotter := client.SnapshotService(clicontext.GlobalString("snapshotter"))
-
-		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
+		defer cancel()
+		var (
+			snapshotter = client.SnapshotService(context.GlobalString("snapshotter"))
+			tw          = tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
+		)
 		fmt.Fprintln(tw, "KEY\tSIZE\tINODES\t")
-
-		if clicontext.NArg() == 0 {
-			if err := snapshotter.Walk(ctx, func(ctx context.Context, info snapshot.Info) error {
+		if context.NArg() == 0 {
+			if err := snapshotter.Walk(ctx, func(ctx gocontext.Context, info snapshot.Info) error {
 				usage, err := snapshotter.Usage(ctx, info.Name)
 				if err != nil {
 					return err
@@ -109,7 +104,7 @@ var usageSnapshotCommand = cli.Command{
 				return err
 			}
 		} else {
-			for _, id := range clicontext.Args() {
+			for _, id := range context.Args() {
 				usage, err := snapshotter.Usage(ctx, id)
 				if err != nil {
 					return err
@@ -127,17 +122,14 @@ var removeSnapshotCommand = cli.Command{
 	Aliases:   []string{"rm"},
 	ArgsUsage: "<key> [<key>, ...]",
 	Usage:     "remove snapshots",
-	Action: func(clicontext *cli.Context) error {
-		ctx, cancel := appContext(clicontext)
-		defer cancel()
-
-		client, err := newClient(clicontext)
+	Action: func(context *cli.Context) error {
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
-		snapshotter := client.SnapshotService(clicontext.GlobalString("snapshotter"))
-
-		for _, key := range clicontext.Args() {
+		defer cancel()
+		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
+		for _, key := range context.Args() {
 			err = snapshotter.Remove(ctx, key)
 			if err != nil {
 				return errors.Wrapf(err, "failed to remove %q", key)
@@ -158,24 +150,22 @@ var prepareSnapshotCommand = cli.Command{
 			Usage: "mount target path, will print mount, if provided",
 		},
 	},
-	Action: func(clicontext *cli.Context) error {
-		ctx, cancel := appContext(clicontext)
-		defer cancel()
-
-		if clicontext.NArg() != 2 {
-			return cli.ShowSubcommandHelp(clicontext)
+	Action: func(context *cli.Context) error {
+		if context.NArg() != 2 {
+			return cli.ShowSubcommandHelp(context)
 		}
-
-		target := clicontext.String("target")
-		key := clicontext.Args().Get(0)
-		parent := clicontext.Args().Get(1)
-
-		client, err := newClient(clicontext)
+		var (
+			target = context.String("target")
+			key    = context.Args().Get(0)
+			parent = context.Args().Get(1)
+		)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
-		snapshotter := client.SnapshotService(clicontext.GlobalString("snapshotter"))
+		defer cancel()
 
+		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
 		mounts, err := snapshotter.Prepare(ctx, key, parent)
 		if err != nil {
 			return err
@@ -199,24 +189,22 @@ var viewSnapshotCommand = cli.Command{
 			Usage: "mount target path, will print mount, if provided",
 		},
 	},
-	Action: func(clicontext *cli.Context) error {
-		ctx, cancel := appContext(clicontext)
-		defer cancel()
-
-		if clicontext.NArg() != 2 {
-			return cli.ShowSubcommandHelp(clicontext)
+	Action: func(context *cli.Context) error {
+		if context.NArg() != 2 {
+			return cli.ShowSubcommandHelp(context)
 		}
-
-		target := clicontext.String("target")
-		key := clicontext.Args().Get(0)
-		parent := clicontext.Args().Get(1)
-
-		client, err := newClient(clicontext)
+		var (
+			target = context.String("target")
+			key    = context.Args().Get(0)
+			parent = context.Args().Get(1)
+		)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
-		snapshotter := client.SnapshotService(clicontext.GlobalString("snapshotter"))
+		defer cancel()
 
+		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
 		mounts, err := snapshotter.View(ctx, key, parent)
 		if err != nil {
 			return err
@@ -235,22 +223,20 @@ var mountSnapshotCommand = cli.Command{
 	Aliases:   []string{"m", "mount"},
 	Usage:     "mount gets mount commands for the snapshots",
 	ArgsUsage: "[flags] <target> <key>",
-	Action: func(clicontext *cli.Context) error {
-		ctx, cancel := appContext(clicontext)
-		defer cancel()
-
-		if clicontext.NArg() != 2 {
-			return cli.ShowSubcommandHelp(clicontext)
+	Action: func(context *cli.Context) error {
+		if context.NArg() != 2 {
+			return cli.ShowSubcommandHelp(context)
 		}
-
-		target := clicontext.Args().Get(0)
-		key := clicontext.Args().Get(1)
-		client, err := newClient(clicontext)
+		var (
+			target = context.Args().Get(0)
+			key    = context.Args().Get(1)
+		)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
-		snapshotter := client.SnapshotService(clicontext.GlobalString("snapshotter"))
-
+		defer cancel()
+		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
 		mounts, err := snapshotter.Mounts(ctx, key)
 		if err != nil {
 			return err
@@ -266,23 +252,20 @@ var commitSnapshotCommand = cli.Command{
 	Name:      "commit",
 	Usage:     "commit an active snapshot into the provided name",
 	ArgsUsage: "[flags] <key> <active>",
-	Action: func(clicontext *cli.Context) error {
-		ctx, cancel := appContext(clicontext)
-		defer cancel()
-
-		if clicontext.NArg() != 2 {
-			return cli.ShowSubcommandHelp(clicontext)
+	Action: func(context *cli.Context) error {
+		if context.NArg() != 2 {
+			return cli.ShowSubcommandHelp(context)
 		}
-
-		key := clicontext.Args().Get(0)
-		active := clicontext.Args().Get(1)
-
-		client, err := newClient(clicontext)
+		var (
+			key    = context.Args().Get(0)
+			active = context.Args().Get(1)
+		)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
-		snapshotter := client.SnapshotService(clicontext.GlobalString("snapshotter"))
-
+		defer cancel()
+		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
 		return snapshotter.Commit(ctx, key, active)
 	},
 }
@@ -290,19 +273,18 @@ var commitSnapshotCommand = cli.Command{
 var treeSnapshotCommand = cli.Command{
 	Name:  "tree",
 	Usage: "display tree view of snapshot branches",
-	Action: func(clicontext *cli.Context) error {
-		ctx, cancel := appContext(clicontext)
-		defer cancel()
-
-		client, err := newClient(clicontext)
+	Action: func(context *cli.Context) error {
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
-		snapshotter := client.SnapshotService(clicontext.GlobalString("snapshotter"))
+		defer cancel()
+		var (
+			snapshotter = client.SnapshotService(context.GlobalString("snapshotter"))
+			tree        = make(map[string]*snapshotTreeNode)
+		)
 
-		tree := make(map[string]*snapshotTreeNode)
-
-		if err := snapshotter.Walk(ctx, func(ctx context.Context, info snapshot.Info) error {
+		if err := snapshotter.Walk(ctx, func(ctx gocontext.Context, info snapshot.Info) error {
 			// Get or create node and add node details
 			node := getOrCreateTreeNode(info.Name, tree)
 			if info.Parent != "" {
@@ -326,22 +308,18 @@ var infoSnapshotCommand = cli.Command{
 	Name:      "info",
 	Usage:     "get info about a snapshot",
 	ArgsUsage: "<key>",
-	Action: func(clicontext *cli.Context) error {
-		ctx, cancel := appContext(clicontext)
-		defer cancel()
-
-		if clicontext.NArg() != 1 {
-			return cli.ShowSubcommandHelp(clicontext)
+	Action: func(context *cli.Context) error {
+		if context.NArg() != 1 {
+			return cli.ShowSubcommandHelp(context)
 		}
 
-		key := clicontext.Args().Get(0)
-
-		client, err := newClient(clicontext)
+		key := context.Args().Get(0)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
-		snapshotter := client.SnapshotService(clicontext.GlobalString("snapshotter"))
-
+		defer cancel()
+		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
 		info, err := snapshotter.Stat(ctx, key)
 		if err != nil {
 			return err
@@ -359,18 +337,15 @@ var labelSnapshotCommand = cli.Command{
 	ArgsUsage:   "[flags] <name> [<label>=<value> ...]",
 	Description: `Labels snapshots in the snapshotter`,
 	Flags:       []cli.Flag{},
-	Action: func(clicontext *cli.Context) error {
-		var (
-			key, labels = objectWithLabelArgs(clicontext)
-		)
-		ctx, cancel := appContext(clicontext)
-		defer cancel()
-
-		client, err := newClient(clicontext)
+	Action: func(context *cli.Context) error {
+		key, labels := objectWithLabelArgs(context)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
-		snapshotter := client.SnapshotService(clicontext.GlobalString("snapshotter"))
+		defer cancel()
+
+		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
 
 		info := snapshot.Info{
 			Name:   key,

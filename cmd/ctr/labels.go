@@ -14,21 +14,16 @@ var containersSetLabelsCommand = cli.Command{
 	ArgsUsage:   "[flags] <name> [<key>=<value>, ...]",
 	Description: "Set and clear labels for a container.",
 	Flags:       []cli.Flag{},
-	Action: func(clicontext *cli.Context) error {
-		var (
-			ctx, cancel         = appContext(clicontext)
-			containerID, labels = objectWithLabelArgs(clicontext)
-		)
-		defer cancel()
-
-		client, err := newClient(clicontext)
-		if err != nil {
-			return err
-		}
-
+	Action: func(context *cli.Context) error {
+		containerID, labels := objectWithLabelArgs(context)
 		if containerID == "" {
 			return errors.New("please specify a container")
 		}
+		client, ctx, cancel, err := newClient(context)
+		if err != nil {
+			return err
+		}
+		defer cancel()
 
 		container, err := client.LoadContainer(ctx, containerID)
 		if err != nil {

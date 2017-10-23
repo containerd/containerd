@@ -10,24 +10,19 @@ var containerInfoCommand = cli.Command{
 	Usage:     "get info about a container",
 	ArgsUsage: "CONTAINER",
 	Action: func(context *cli.Context) error {
-		var (
-			ctx, cancel = appContext(context)
-			id          = context.Args().First()
-		)
-		defer cancel()
+		id := context.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		client, err := newClient(context)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
-
+		defer cancel()
 		container, err := client.LoadContainer(ctx, id)
 		if err != nil {
 			return err
 		}
-
 		info, err := container.Info(ctx)
 		if err != nil {
 			return err

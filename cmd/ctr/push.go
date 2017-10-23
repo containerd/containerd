@@ -1,7 +1,7 @@
 package main
 
 import (
-	"context"
+	gocontext "context"
 	"os"
 	"sync"
 	"text/tabwriter"
@@ -45,27 +45,23 @@ var pushCommand = cli.Command{
 		Usage: "media type of manifest digest",
 		Value: ocispec.MediaTypeImageManifest,
 	}),
-	Action: func(clicontext *cli.Context) error {
+	Action: func(context *cli.Context) error {
 		var (
-			ref   = clicontext.Args().First()
-			local = clicontext.Args().Get(1)
+			ref   = context.Args().First()
+			local = context.Args().Get(1)
 			desc  ocispec.Descriptor
 		)
-
-		ctx, cancel := appContext(clicontext)
-		defer cancel()
-
-		client, err := newClient(clicontext)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
-
-		if manifest := clicontext.String("manifest"); manifest != "" {
+		defer cancel()
+		if manifest := context.String("manifest"); manifest != "" {
 			desc.Digest, err = digest.Parse(manifest)
 			if err != nil {
 				return errors.Wrap(err, "invalid manifest digest")
 			}
-			desc.MediaType = clicontext.String("manifest-type")
+			desc.MediaType = context.String("manifest-type")
 		} else {
 			if local == "" {
 				local = ref
@@ -77,7 +73,7 @@ var pushCommand = cli.Command{
 			desc = img.Target
 		}
 
-		resolver, err := getResolver(ctx, clicontext)
+		resolver, err := getResolver(ctx, context)
 		if err != nil {
 			return err
 		}
@@ -88,7 +84,7 @@ var pushCommand = cli.Command{
 		eg.Go(func() error {
 			log.G(ctx).WithField("image", ref).WithField("digest", desc.Digest).Debug("pushing")
 
-			jobHandler := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+			jobHandler := images.HandlerFunc(func(ctx gocontext.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 				ongoing.add(remotes.MakeRefKey(ctx, desc))
 				return nil, nil
 			})

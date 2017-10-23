@@ -23,12 +23,11 @@ var containersDeleteCommand = cli.Command{
 	},
 	Action: func(context *cli.Context) error {
 		var exitErr error
-		ctx, cancel := appContext(context)
-		defer cancel()
-		client, err := newClient(context)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
+		defer cancel()
 		deleteOpts := []containerd.DeleteOpts{}
 		if !context.Bool("keep-snapshot") {
 			deleteOpts = append(deleteOpts, containerd.WithSnapshotCleanup)

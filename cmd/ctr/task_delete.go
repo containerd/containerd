@@ -7,12 +7,11 @@ var taskDeleteCommand = cli.Command{
 	Usage:     "delete a task",
 	ArgsUsage: "CONTAINER",
 	Action: func(context *cli.Context) error {
-		ctx, cancel := appContext(context)
-		defer cancel()
-		client, err := newClient(context)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
+		defer cancel()
 		container, err := client.LoadContainer(ctx, context.Args().First())
 		if err != nil {
 			return err

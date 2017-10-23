@@ -20,20 +20,16 @@ var taskStartCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		var (
 			err error
-
-			ctx, cancel = appContext(context)
-			id          = context.Args().Get(0)
+			id  = context.Args().Get(0)
 		)
-
-		defer cancel()
-
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		client, err := newClient(context)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
+		defer cancel()
 		container, err := client.LoadContainer(ctx, id)
 		if err != nil {
 			return err

@@ -44,21 +44,19 @@ Most of this is experimental and there are few leaps to make this work.`,
 		var (
 			ref = clicontext.Args().First()
 		)
-		ctx, cancel := appContext(clicontext)
-		defer cancel()
-
-		_, err := fetch(ctx, ref, clicontext)
+		_, err := fetch(ref, clicontext)
 		return err
 	},
 }
 
-func fetch(ctx context.Context, ref string, clicontext *cli.Context) (containerd.Image, error) {
-	client, err := newClient(clicontext)
+func fetch(ref string, cliContext *cli.Context) (containerd.Image, error) {
+	client, ctx, cancel, err := newClient(cliContext)
 	if err != nil {
 		return nil, err
 	}
+	defer cancel()
 
-	resolver, err := getResolver(ctx, clicontext)
+	resolver, err := getResolver(ctx, cliContext)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +67,7 @@ func fetch(ctx context.Context, ref string, clicontext *cli.Context) (containerd
 	progress := make(chan struct{})
 
 	go func() {
-		if !clicontext.GlobalBool("debug") {
+		if !cliContext.GlobalBool("debug") {
 			// no progress bar, because it hides some debug logs
 			showProgress(pctx, ongoing, client.ContentStore(), os.Stdout)
 		}
@@ -84,7 +82,7 @@ func fetch(ctx context.Context, ref string, clicontext *cli.Context) (containerd
 	})
 
 	log.G(pctx).WithField("image", ref).Debug("fetching")
-	labels := labelArgs(clicontext.StringSlice("label"))
+	labels := labelArgs(cliContext.StringSlice("label"))
 	img, err := client.Pull(pctx, ref,
 		containerd.WithPullLabels(labels),
 		containerd.WithResolver(resolver),

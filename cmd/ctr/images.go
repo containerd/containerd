@@ -41,21 +41,20 @@ var imagesListCommand = cli.Command{
 			Usage: "print only the image refs",
 		},
 	},
-	Action: func(clicontext *cli.Context) error {
+	Action: func(context *cli.Context) error {
 		var (
-			filters     = clicontext.Args()
-			quiet       = clicontext.Bool("quiet")
-			ctx, cancel = appContext(clicontext)
+			filters = context.Args()
+			quiet   = context.Bool("quiet")
 		)
-		defer cancel()
-
-		client, err := newClient(clicontext)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
-
-		imageStore := client.ImageService()
-		cs := client.ContentStore()
+		defer cancel()
+		var (
+			imageStore = client.ImageService()
+			cs         = client.ContentStore()
+		)
 		imageList, err := imageStore.List(ctx, filters...)
 		if err != nil {
 			return errors.Wrap(err, "failed to list images")
@@ -125,19 +124,16 @@ var imagesSetLabelsCommand = cli.Command{
 			Usage: "replace all labels",
 		},
 	},
-	Action: func(clicontext *cli.Context) error {
+	Action: func(context *cli.Context) error {
 		var (
-			ctx, cancel  = appContext(clicontext)
-			replaceAll   = clicontext.Bool("replace-all")
-			name, labels = objectWithLabelArgs(clicontext)
+			replaceAll   = context.Bool("replace-all")
+			name, labels = objectWithLabelArgs(context)
 		)
-		defer cancel()
-
-		client, err := newClient(clicontext)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
-
+		defer cancel()
 		if name == "" {
 			return errors.New("please specify an image")
 		}
@@ -182,25 +178,23 @@ var imagesCheckCommand = cli.Command{
 	ArgsUsage:   "[flags] <ref> [<ref>, ...]",
 	Description: "Check that an image has all content available locally.",
 	Flags:       []cli.Flag{},
-	Action: func(clicontext *cli.Context) error {
+	Action: func(context *cli.Context) error {
 		var (
 			exitErr error
 		)
-		ctx, cancel := appContext(clicontext)
-		defer cancel()
-
-		client, err := newClient(clicontext)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
-
-		imageStore := client.ImageService()
-		contentStore := client.ContentStore()
-
-		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
+		defer cancel()
+		var (
+			imageStore   = client.ImageService()
+			contentStore = client.ContentStore()
+			tw           = tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
+		)
 		fmt.Fprintln(tw, "REF\tTYPE\tDIGEST\tSTATUS\tSIZE\t")
 
-		args := []string(clicontext.Args())
+		args := []string(context.Args())
 		imageList, err := imageStore.List(ctx, args...)
 		if err != nil {
 			return errors.Wrap(err, "failed listing images")
@@ -267,21 +261,17 @@ var imageRemoveCommand = cli.Command{
 	ArgsUsage:   "[flags] <ref> [<ref>, ...]",
 	Description: `Remove one or more images by reference.`,
 	Flags:       []cli.Flag{},
-	Action: func(clicontext *cli.Context) error {
-		var (
-			exitErr error
-		)
-		ctx, cancel := appContext(clicontext)
-		defer cancel()
-
-		client, err := newClient(clicontext)
+	Action: func(context *cli.Context) error {
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
-
-		imageStore := client.ImageService()
-
-		for _, target := range clicontext.Args() {
+		defer cancel()
+		var (
+			exitErr    error
+			imageStore = client.ImageService()
+		)
+		for _, target := range context.Args() {
 			if err := imageStore.Delete(ctx, target); err != nil {
 				if !errdefs.IsNotFound(err) {
 					if exitErr == nil {

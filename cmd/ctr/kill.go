@@ -26,11 +26,7 @@ var taskKillCommand = cli.Command{
 		},
 	},
 	Action: func(context *cli.Context) error {
-		var (
-			id          = context.Args().First()
-			ctx, cancel = appContext(context)
-		)
-		defer cancel()
+		id := context.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
@@ -45,10 +41,11 @@ var taskKillCommand = cli.Command{
 		if pid > 0 && all {
 			return errors.New("enter a pid or all; not both")
 		}
-		client, err := newClient(context)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
+		defer cancel()
 		container, err := client.LoadContainer(ctx, id)
 		if err != nil {
 			return err
