@@ -33,12 +33,12 @@ var imagesListCommand = cli.Command{
 	Name:        "list",
 	Aliases:     []string{"ls"},
 	Usage:       "list images known to containerd",
-	ArgsUsage:   "[flags] <ref>",
+	ArgsUsage:   "[flags] <name>",
 	Description: `List images registered with containerd.`,
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "quiet, q",
-			Usage: "print only the image refs",
+			Usage: "print only the image names",
 		},
 	},
 	Action: func(clicontext *cli.Context) error {
@@ -67,7 +67,7 @@ var imagesListCommand = cli.Command{
 			return nil
 		}
 		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
-		fmt.Fprintln(tw, "REF\tTYPE\tDIGEST\tSIZE\tPLATFORM\tLABELS\t")
+		fmt.Fprintln(tw, "NAME\tTYPE\tDIGEST\tSIZE\tPLATFORM\tLABELS\t")
 		for _, image := range imageList {
 			size, err := image.Size(ctx, cs, platforms.Default())
 			if err != nil {
@@ -263,9 +263,9 @@ var imagesCheckCommand = cli.Command{
 var imageRemoveCommand = cli.Command{
 	Name:        "remove",
 	Aliases:     []string{"rm"},
-	Usage:       "Remove one or more images by reference.",
-	ArgsUsage:   "[flags] <ref> [<ref>, ...]",
-	Description: `Remove one or more images by reference.`,
+	Usage:       "Remove one or more images.",
+	ArgsUsage:   "[flags] <name> [<name>, ...]",
+	Description: `Remove one or more images.`,
 	Flags:       []cli.Flag{},
 	Action: func(clicontext *cli.Context) error {
 		var (
