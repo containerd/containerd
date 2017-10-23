@@ -17,7 +17,6 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/server"
-	"github.com/containerd/containerd/sys"
 	"github.com/containerd/containerd/version"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -103,33 +102,14 @@ func main() {
 			"version":  version.Version,
 			"revision": version.Revision,
 		}).Info("starting containerd")
-
 		server, err := server.New(ctx, config)
 		if err != nil {
 			return err
 		}
 		serverC <- server
-		if config.Debug.Address != "" {
-			l, err := sys.GetLocalListener(config.Debug.Address, config.Debug.UID, config.Debug.GID)
-			if err != nil {
-				return errors.Wrapf(err, "failed to get listener for debug endpoint")
-			}
-			serve(log.WithModule(ctx, "debug"), l, server.ServeDebug)
+		if err := server.Serve(); err != nil {
+			return err
 		}
-		if config.Metrics.Address != "" {
-			l, err := net.Listen("tcp", config.Metrics.Address)
-			if err != nil {
-				return errors.Wrapf(err, "failed to get listener for metrics endpoint")
-			}
-			serve(log.WithModule(ctx, "metrics"), l, server.ServeMetrics)
-		}
-
-		l, err := sys.GetLocalListener(address, config.GRPC.UID, config.GRPC.GID)
-		if err != nil {
-			return errors.Wrapf(err, "failed to get listener for main endpoint")
-		}
-		serve(log.WithModule(ctx, "grpc"), l, server.ServeGRPC)
-
 		log.G(ctx).Infof("containerd successfully booted in %fs", time.Since(start).Seconds())
 		<-done
 		return nil
