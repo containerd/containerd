@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"sort"
@@ -30,20 +29,16 @@ var namespacesCreateCommand = cli.Command{
 	Usage:       "create a new namespace.",
 	ArgsUsage:   "[flags] <name> [<key>=<value]",
 	Description: "Create a new namespace. It must be unique.",
-	Action: func(clicontext *cli.Context) error {
-		var (
-			ctx               = context.Background()
-			namespace, labels = objectWithLabelArgs(clicontext)
-		)
-
+	Action: func(context *cli.Context) error {
+		namespace, labels := objectWithLabelArgs(context)
 		if namespace == "" {
 			return errors.New("please specify a namespace")
 		}
-
-		client, err := newClient(clicontext)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
+		defer cancel()
 		namespaces := client.NamespaceService()
 		return namespaces.Create(ctx, namespace, labels)
 	},
@@ -55,28 +50,22 @@ var namespacesSetLabelsCommand = cli.Command{
 	ArgsUsage:   "[flags] <name> [<key>=<value>, ...]",
 	Description: "Set and clear labels for a namespace.",
 	Flags:       []cli.Flag{},
-	Action: func(clicontext *cli.Context) error {
-		var (
-			ctx               = context.Background()
-			namespace, labels = objectWithLabelArgs(clicontext)
-		)
-
-		client, err := newClient(clicontext)
-		if err != nil {
-			return err
-		}
-		namespaces := client.NamespaceService()
-
+	Action: func(context *cli.Context) error {
+		namespace, labels := objectWithLabelArgs(context)
 		if namespace == "" {
 			return errors.New("please specify a namespace")
 		}
-
+		client, ctx, cancel, err := newClient(context)
+		if err != nil {
+			return err
+		}
+		defer cancel()
+		namespaces := client.NamespaceService()
 		for k, v := range labels {
 			if err := namespaces.SetLabel(ctx, namespace, k, v); err != nil {
 				return err
 			}
 		}
-
 		return nil
 	},
 }
@@ -93,18 +82,14 @@ var namespacesListCommand = cli.Command{
 			Usage: "print only the namespace name.",
 		},
 	},
-	Action: func(clicontext *cli.Context) error {
-		var (
-			ctx   = context.Background()
-			quiet = clicontext.Bool("quiet")
-		)
-
-		client, err := newClient(clicontext)
+	Action: func(context *cli.Context) error {
+		quiet := context.Bool("quiet")
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
+		defer cancel()
 		namespaces := client.NamespaceService()
-
 		nss, err := namespaces.List(ctx)
 		if err != nil {
 			return err
@@ -114,30 +99,26 @@ var namespacesListCommand = cli.Command{
 			for _, ns := range nss {
 				fmt.Println(ns)
 			}
-		} else {
-
-			tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
-			fmt.Fprintln(tw, "NAME\tLABELS\t")
-
-			for _, ns := range nss {
-				labels, err := namespaces.Labels(ctx, ns)
-				if err != nil {
-					return err
-				}
-
-				var labelStrings []string
-				for k, v := range labels {
-					labelStrings = append(labelStrings, strings.Join([]string{k, v}, "="))
-				}
-				sort.Strings(labelStrings)
-
-				fmt.Fprintf(tw, "%v\t%v\t\n", ns, strings.Join(labelStrings, ","))
-			}
-
-			return tw.Flush()
+			return nil
 		}
 
-		return nil
+		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
+		fmt.Fprintln(tw, "NAME\tLABELS\t")
+		for _, ns := range nss {
+			labels, err := namespaces.Labels(ctx, ns)
+			if err != nil {
+				return err
+			}
+
+			var labelStrings []string
+			for k, v := range labels {
+				labelStrings = append(labelStrings, strings.Join([]string{k, v}, "="))
+			}
+			sort.Strings(labelStrings)
+
+			fmt.Fprintf(tw, "%v\t%v\t\n", ns, strings.Join(labelStrings, ","))
+		}
+		return tw.Flush()
 	},
 }
 
@@ -147,19 +128,15 @@ var namespacesRemoveCommand = cli.Command{
 	Usage:       "remove one or more namespaces",
 	ArgsUsage:   "[flags] <name> [<name>, ...]",
 	Description: "Remove one or more namespaces. For now, the namespace must be empty.",
-	Action: func(clicontext *cli.Context) error {
-		var (
-			ctx     = context.Background()
-			exitErr error
-		)
-
-		client, err := newClient(clicontext)
+	Action: func(context *cli.Context) error {
+		var exitErr error
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
+		defer cancel()
 		namespaces := client.NamespaceService()
-
-		for _, target := range clicontext.Args() {
+		for _, target := range context.Args() {
 			if err := namespaces.Delete(ctx, target); err != nil {
 				if !errdefs.IsNotFound(err) {
 					if exitErr == nil {
@@ -173,8 +150,6 @@ var namespacesRemoveCommand = cli.Command{
 
 			fmt.Println(target)
 		}
-
 		return exitErr
-
 	},
 }

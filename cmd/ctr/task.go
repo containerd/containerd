@@ -31,16 +31,12 @@ var tasksCommand = cli.Command{
 		taskDeleteCommand,
 	},
 	Action: func(context *cli.Context) error {
-		var (
-			quiet       = context.Bool("quiet")
-			ctx, cancel = appContext(context)
-		)
-		defer cancel()
-
-		client, err := newClient(context)
+		quiet := context.Bool("quiet")
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
+		defer cancel()
 		s := client.TaskService()
 		response, err := s.List(ctx, &tasks.ListTasksRequest{})
 		if err != nil {

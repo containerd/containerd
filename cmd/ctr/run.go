@@ -105,13 +105,11 @@ var runCommand = cli.Command{
 		var (
 			err error
 
-			ctx, cancel = appContext(context)
-			id          = context.Args().Get(1)
-			imageRef    = context.Args().First()
-			tty         = context.Bool("tty")
-			detach      = context.Bool("detach")
+			id       = context.Args().Get(1)
+			imageRef = context.Args().First()
+			tty      = context.Bool("tty")
+			detach   = context.Bool("detach")
 		)
-		defer cancel()
 
 		if imageRef == "" {
 			return errors.New("image ref must be provided")
@@ -119,10 +117,11 @@ var runCommand = cli.Command{
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		client, err := newClient(context)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
+		defer cancel()
 		container, err := newContainer(ctx, client, context)
 		if err != nil {
 			return err

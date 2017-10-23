@@ -41,20 +41,16 @@ var (
 		Description: "Display the image object.",
 		Flags:       []cli.Flag{},
 		Action: func(context *cli.Context) error {
-			ctx, cancel := appContext(context)
-			defer cancel()
-
 			dgst, err := digest.Parse(context.Args().First())
 			if err != nil {
 				return err
 			}
-
-			client, err := newClient(context)
+			client, ctx, cancel, err := newClient(context)
 			if err != nil {
 				return err
 			}
+			defer cancel()
 			cs := client.ContentStore()
-
 			ra, err := cs.ReaderAt(ctx, dgst)
 			if err != nil {
 				return err
@@ -87,22 +83,18 @@ var (
 				expectedSize   = context.Int64("expected-size")
 				expectedDigest = digest.Digest(context.String("expected-digest"))
 			)
-
-			ctx, cancel := appContext(context)
-			defer cancel()
-
 			if err := expectedDigest.Validate(); expectedDigest != "" && err != nil {
 				return err
 			}
-
 			if ref == "" {
 				return errors.New("must specify a transaction reference")
 			}
-
-			client, err := newClient(context)
+			client, ctx, cancel, err := newClient(context)
 			if err != nil {
 				return err
 			}
+			defer cancel()
+
 			cs := client.ContentStore()
 
 			// TODO(stevvooe): Allow ingest to be reentrant. Currently, we expect
@@ -130,24 +122,17 @@ var (
 			},
 		},
 		Action: func(context *cli.Context) error {
-			var (
-				match = context.Args().First()
-			)
-
-			ctx, cancel := appContext(context)
-			defer cancel()
-
-			client, err := newClient(context)
+			match := context.Args().First()
+			client, ctx, cancel, err := newClient(context)
 			if err != nil {
 				return err
 			}
+			defer cancel()
 			cs := client.ContentStore()
-
 			active, err := cs.ListStatuses(ctx, match)
 			if err != nil {
 				return err
 			}
-
 			tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, '\t', 0)
 			fmt.Fprintln(tw, "REF\tSIZE\tAGE\t")
 			for _, active := range active {
@@ -178,13 +163,11 @@ var (
 				quiet = context.Bool("quiet")
 				args  = []string(context.Args())
 			)
-			ctx, cancel := appContext(context)
-			defer cancel()
-
-			client, err := newClient(context)
+			client, ctx, cancel, err := newClient(context)
 			if err != nil {
 				return err
 			}
+			defer cancel()
 			cs := client.ContentStore()
 
 			var walkFn content.WalkFunc
@@ -229,16 +212,13 @@ var (
 		Description: `Labels blobs in the content store`,
 		Flags:       []cli.Flag{},
 		Action: func(context *cli.Context) error {
-			var (
-				object, labels = objectWithLabelArgs(context)
-			)
-			ctx, cancel := appContext(context)
-			defer cancel()
-
-			client, err := newClient(context)
+			object, labels := objectWithLabelArgs(context)
+			client, ctx, cancel, err := newClient(context)
 			if err != nil {
 				return err
 			}
+			defer cancel()
+
 			cs := client.ContentStore()
 
 			dgst, err := digest.Parse(object)
@@ -296,8 +276,6 @@ var (
 				validate = context.String("validate")
 				object   = context.Args().First()
 			)
-			ctx, cancel := appContext(context)
-			defer cancel()
 
 			if validate != "" {
 				return errors.New("validating the edit result not supported")
@@ -310,13 +288,12 @@ var (
 			if err != nil {
 				return err
 			}
-
-			client, err := newClient(context)
+			client, ctx, cancel, err := newClient(context)
 			if err != nil {
 				return err
 			}
+			defer cancel()
 			cs := client.ContentStore()
-
 			ra, err := cs.ReaderAt(ctx, dgst)
 			if err != nil {
 				return err
@@ -360,13 +337,11 @@ var (
 				args      = []string(context.Args())
 				exitError error
 			)
-			ctx, cancel := appContext(context)
-			defer cancel()
-
-			client, err := newClient(context)
+			client, ctx, cancel, err := newClient(context)
 			if err != nil {
 				return err
 			}
+			defer cancel()
 			cs := client.ContentStore()
 
 			for _, arg := range args {

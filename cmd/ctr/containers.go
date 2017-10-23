@@ -26,16 +26,14 @@ var containersCommand = cli.Command{
 	ArgsUsage: "[filter, ...]",
 	Action: func(context *cli.Context) error {
 		var (
-			filters     = context.Args()
-			quiet       = context.Bool("quiet")
-			ctx, cancel = appContext(context)
+			filters = context.Args()
+			quiet   = context.Bool("quiet")
 		)
-		defer cancel()
-
-		client, err := newClient(context)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
+		defer cancel()
 		containers, err := client.Containers(ctx, filters...)
 		if err != nil {
 			return err

@@ -16,21 +16,23 @@ var pushObjectCommand = cli.Command{
 	ArgsUsage:   "[flags] <remote> <object> <type>",
 	Description: `Push objects by identifier to a remote.`,
 	Flags:       registryFlags,
-	Action: func(clicontext *cli.Context) error {
+	Action: func(context *cli.Context) error {
 		var (
-			ref    = clicontext.Args().Get(0)
-			object = clicontext.Args().Get(1)
-			media  = clicontext.Args().Get(2)
+			ref    = context.Args().Get(0)
+			object = context.Args().Get(1)
+			media  = context.Args().Get(2)
 		)
 		dgst, err := digest.Parse(object)
 		if err != nil {
 			return err
 		}
-
-		ctx, cancel := appContext(clicontext)
+		client, ctx, cancel, err := newClient(context)
+		if err != nil {
+			return err
+		}
 		defer cancel()
 
-		resolver, err := getResolver(ctx, clicontext)
+		resolver, err := getResolver(ctx, context)
 		if err != nil {
 			return err
 		}
@@ -43,10 +45,6 @@ var pushObjectCommand = cli.Command{
 			return err
 		}
 
-		client, err := newClient(clicontext)
-		if err != nil {
-			return err
-		}
 		cs := client.ContentStore()
 
 		info, err := cs.Info(ctx, dgst)

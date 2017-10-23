@@ -30,16 +30,14 @@ var pluginsCommand = cli.Command{
 	},
 	Action: func(context *cli.Context) error {
 		var (
-			quiet       = context.Bool("quiet")
-			detailed    = context.Bool("detailed")
-			ctx, cancel = appContext(context)
+			quiet    = context.Bool("quiet")
+			detailed = context.Bool("detailed")
 		)
-		defer cancel()
-
-		client, err := newClient(context)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
+		defer cancel()
 		ps := client.IntrospectionService()
 		response, err := ps.Plugins(ctx, &introspection.PluginsRequest{
 			Filters: context.Args(),

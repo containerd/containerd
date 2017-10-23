@@ -21,15 +21,15 @@ command. As part of this process, we do the following:
 3. Register metadata for the image.
 `,
 	Flags: append(registryFlags, append(snapshotterFlags, labelFlag)...),
-	Action: func(clicontext *cli.Context) error {
+	Action: func(context *cli.Context) error {
 		var (
-			ref = clicontext.Args().First()
+			ref = context.Args().First()
 		)
 
-		ctx, cancel := appContext(clicontext)
+		ctx, cancel := appContext(context)
 		defer cancel()
 
-		img, err := fetch(ctx, ref, clicontext)
+		img, err := fetch(ref, context)
 		if err != nil {
 			return err
 		}
@@ -38,7 +38,7 @@ command. As part of this process, we do the following:
 
 		// TODO: Show unpack status
 		fmt.Printf("unpacking %s...\n", img.Target().Digest)
-		err = img.Unpack(ctx, clicontext.String("snapshotter"))
+		err = img.Unpack(ctx, context.String("snapshotter"))
 		if err == nil {
 			fmt.Println("done")
 		}

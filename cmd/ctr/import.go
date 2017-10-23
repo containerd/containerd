@@ -23,22 +23,18 @@ var imagesImportCommand = cli.Command{
 		},
 		labelFlag,
 	},
-	Action: func(clicontext *cli.Context) error {
+	Action: func(context *cli.Context) error {
 		var (
-			ref       = clicontext.Args().First()
-			in        = clicontext.Args().Get(1)
-			refObject = clicontext.String("ref-object")
-			labels    = labelArgs(clicontext.StringSlice("label"))
+			ref       = context.Args().First()
+			in        = context.Args().Get(1)
+			refObject = context.String("ref-object")
+			labels    = labelArgs(context.StringSlice("label"))
 		)
-
-		ctx, cancel := appContext(clicontext)
-		defer cancel()
-
-		client, err := newClient(clicontext)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
-
+		defer cancel()
 		var r io.ReadCloser
 		if in == "-" {
 			r = os.Stdin
@@ -65,7 +61,7 @@ var imagesImportCommand = cli.Command{
 
 		// TODO: Show unpack status
 		fmt.Printf("unpacking %s...", img.Target().Digest)
-		err = img.Unpack(ctx, clicontext.String("snapshotter"))
+		err = img.Unpack(ctx, context.String("snapshotter"))
 		fmt.Println("done")
 		return err
 	},

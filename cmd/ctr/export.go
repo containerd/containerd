@@ -32,27 +32,23 @@ var imagesExportCommand = cli.Command{
 			Value: ocispec.MediaTypeImageManifest,
 		},
 	},
-	Action: func(clicontext *cli.Context) error {
+	Action: func(context *cli.Context) error {
 		var (
-			out   = clicontext.Args().First()
-			local = clicontext.Args().Get(1)
+			out   = context.Args().First()
+			local = context.Args().Get(1)
 			desc  ocispec.Descriptor
 		)
-
-		ctx, cancel := appContext(clicontext)
-		defer cancel()
-
-		client, err := newClient(clicontext)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
-
-		if manifest := clicontext.String("manifest"); manifest != "" {
+		defer cancel()
+		if manifest := context.String("manifest"); manifest != "" {
 			desc.Digest, err = digest.Parse(manifest)
 			if err != nil {
 				return errors.Wrap(err, "invalid manifest digest")
 			}
-			desc.MediaType = clicontext.String("manifest-type")
+			desc.MediaType = context.String("manifest-type")
 		} else {
 			img, err := client.ImageService().Get(ctx, local)
 			if err != nil {
@@ -68,7 +64,7 @@ var imagesExportCommand = cli.Command{
 			if ociRefName := determineOCIRefName(local); ociRefName != "" {
 				desc.Annotations[ocispec.AnnotationRefName] = ociRefName
 			}
-			if ociRefName := clicontext.String("oci-ref-name"); ociRefName != "" {
+			if ociRefName := context.String("oci-ref-name"); ociRefName != "" {
 				desc.Annotations[ocispec.AnnotationRefName] = ociRefName
 			}
 		}

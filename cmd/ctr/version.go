@@ -1,7 +1,6 @@
 package main
 
 import (
-	gocontext "context"
 	"fmt"
 	"os"
 
@@ -20,11 +19,12 @@ var versionCommand = cli.Command{
 		fmt.Printf("  Version: %s\n", version.Version)
 		fmt.Printf("  Revision: %s\n", version.Revision)
 		fmt.Println("")
-		client, err := newClient(context)
+		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err
 		}
-		v, err := client.Version(gocontext.Background())
+		defer cancel()
+		v, err := client.Version(ctx)
 		if err != nil {
 			return err
 		}

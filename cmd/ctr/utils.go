@@ -90,8 +90,13 @@ func appContext(clicontext *cli.Context) (gocontext.Context, gocontext.CancelFun
 	return ctx, cancel
 }
 
-func newClient(context *cli.Context) (*containerd.Client, error) {
-	return containerd.New(context.GlobalString("address"))
+func newClient(context *cli.Context) (*containerd.Client, gocontext.Context, gocontext.CancelFunc, error) {
+	client, err := containerd.New(context.GlobalString("address"))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	ctx, cancel := appContext(context)
+	return client, ctx, cancel, nil
 }
 
 func passwordPrompt() (string, error) {
