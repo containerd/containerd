@@ -26,6 +26,9 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
+	containerdimages "github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/typeurl"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/pkg/system"
@@ -96,7 +99,7 @@ func (c *criContainerdService) recover(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to list images: %v", err)
 	}
-	images, err := loadImages(ctx, cImages, c.client.ContentStore())
+	images, err := loadImages(ctx, cImages, c.client.ContentStore(), c.client.SnapshotService(c.config.ContainerdConfig.Snapshotter))
 	if err != nil {
 		return fmt.Errorf("failed to load images: %v", err)
 	}
@@ -325,7 +328,8 @@ func loadSandbox(ctx context.Context, cntr containerd.Container) (sandboxstore.S
 // loadImages loads images from containerd.
 // TODO(random-liu): Check whether image is unpacked, because containerd put image reference
 // into store before image is unpacked.
-func loadImages(ctx context.Context, cImages []containerd.Image, provider content.Provider) ([]imagestore.Image, error) {
+func loadImages(ctx context.Context, cImages []containerd.Image, provider content.Provider,
+	snapshotter snapshot.Snapshotter) ([]imagestore.Image, error) {
 	// Group images by image id.
 	imageMap := make(map[string][]containerd.Image)
 	for _, i := range cImages {
@@ -342,6 +346,16 @@ func loadImages(ctx context.Context, cImages []containerd.Image, provider conten
 		// imgs len must be > 0, or else the entry will not be created in
 		// previous loop.
 		i := imgs[0]
+		ok, _, _, _, err := containerdimages.Check(ctx, provider, i.Target(), platforms.Default())
+		if err != nil {
+			glog.Errorf("Failed to check image content readiness for %q: %v", i.Name(), err)
+			continue
+		}
+		if !ok {
+			glog.Warningf("The image content readiness for %q is not ok", i.Name())
+			continue
+		}
+
 		info, err := getImageInfo(ctx, i, provider)
 		if err != nil {
 			glog.Warningf("Failed to get image info for %q: %v", i.Name(), err)
@@ -372,6 +386,12 @@ func loadImages(ctx context.Context, cImages []containerd.Image, provider conten
 			} else {
 				glog.Warningf("Invalid image reference %q", name)
 			}
+		}
+
+		// Checking existence of top-level snapshot for each image being recovered.
+		if _, err := snapshotter.Stat(ctx, image.ChainID); err != nil {
+			glog.Warningf("Failed to stat the top-level snapshot for image %+v: %v", image, err)
+			continue
 		}
 		images = append(images, image)
 	}
