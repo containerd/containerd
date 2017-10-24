@@ -120,6 +120,7 @@ func (p *process) Kill(ctx context.Context, s syscall.Signal, opts ...KillOpts) 
 func (p *process) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 	c := make(chan ExitStatus, 1)
 	go func() {
+		defer close(c)
 		r, err := p.task.client.TaskService().Wait(ctx, &tasks.WaitRequest{
 			ContainerID: p.task.id,
 			ExecID:      p.id,

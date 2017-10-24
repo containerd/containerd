@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/textproto"
@@ -498,7 +499,7 @@ func (r *dockerBase) fetchTokenWithOAuth(ctx context.Context, to tokenOptions) (
 	if (resp.StatusCode == 405 && r.username != "") || resp.StatusCode == 404 {
 		return r.getToken(ctx, to)
 	} else if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		b, _ := ioutil.ReadAll(resp.Body)
+		b, _ := ioutil.ReadAll(io.LimitReader(resp.Body, 64000)) // 64KB
 		log.G(ctx).WithFields(logrus.Fields{
 			"status": resp.Status,
 			"body":   string(b),
