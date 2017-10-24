@@ -8,33 +8,13 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
 const pipeRoot = `\\.\pipe`
-
-func init() {
-	runCommand.Flags = append(runCommand.Flags, cli.StringSliceFlag{
-		Name:  "layer",
-		Usage: "HCSSHIM Layers to be used",
-	})
-}
-
-func withLayers(context *cli.Context) containerd.SpecOpts {
-	return func(ctx gocontext.Context, client *containerd.Client, c *containers.Container, s *specs.Spec) error {
-		l := context.StringSlice("layer")
-		if l == nil {
-			return errors.Wrap(errdefs.ErrInvalidArgument, "base layers must be specified with `--layer`")
-		}
-		s.Windows.LayerFolders = l
-		return nil
-	}
-}
 
 func handleConsoleResize(ctx gocontext.Context, task resizer, con console.Console) error {
 	// do an initial resize of the console
@@ -86,7 +66,7 @@ func setHostNetworking() containerd.SpecOpts {
 
 func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli.Context) (containerd.Container, error) {
 	var (
-		// ref          = context.Args().First()
+		ref          = context.Args().First()
 		id           = context.Args().Get(1)
 		args         = context.Args()[2:]
 		tty          = context.Bool("tty")
@@ -95,11 +75,13 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 
 	labels := commands.LabelArgs(labelStrings)
 
-	// TODO(mlaventure): get base image once we have a snapshotter
+	image, err := client.GetImage(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
 
 	opts := []containerd.SpecOpts{
-		// TODO(mlaventure): use containerd.WithImageConfig once we have a snapshotter
-		withLayers(context),
+		containerd.WithImageConfig(image),
 		withEnv(context),
 		withMounts(context),
 		withTTY(tty),
@@ -114,7 +96,9 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		containerd.WithNewSpec(opts...),
 		containerd.WithContainerLabels(labels),
 		containerd.WithRuntime(context.String("runtime"), nil),
-		// TODO(mlaventure): containerd.WithImage(image),
+		containerd.WithImage(image),
+		containerd.WithSnapshotter(context.String("snapshotter")),
+		containerd.WithNewSnapshot(id, image),
 	)
 }
 

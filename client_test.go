@@ -61,6 +61,8 @@ func TestMain(m *testing.M) {
 	)
 	defer cancel()
 
+	fmt.Println("About to start daemon")
+
 	if !noDaemon {
 		os.RemoveAll(defaultRoot)
 
@@ -75,6 +77,8 @@ func TestMain(m *testing.M) {
 		}
 	}
 
+	fmt.Println("Waiting for dameon to start")
+
 	waitCtx, waitCancel := context.WithTimeout(ctx, 2*time.Second)
 	client, err := ctrd.waitForStart(waitCtx)
 	waitCancel()
@@ -84,6 +88,8 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "%s: %s\n", err, buf.String())
 		os.Exit(1)
 	}
+
+	fmt.Println("Daemon started")
 
 	// print out the version in information
 	version, err := client.Version(ctx)
@@ -99,17 +105,10 @@ func TestMain(m *testing.M) {
 	}).Info("running tests against containerd")
 
 	// pull a seed image
-	if runtime.GOOS != "windows" { // TODO: remove once pull is supported on windows
-		if _, err = client.Pull(ctx, testImage, WithPullUnpack); err != nil {
-			ctrd.Stop()
-			ctrd.Wait()
-			fmt.Fprintf(os.Stderr, "%s: %s\n", err, buf.String())
-			os.Exit(1)
-		}
-	}
-
-	if err := platformTestSetup(client); err != nil {
-		fmt.Fprintln(os.Stderr, "platform test setup failed", err)
+	if _, err = client.Pull(ctx, testImage, WithPullUnpack); err != nil {
+		ctrd.Stop()
+		ctrd.Wait()
+		fmt.Fprintf(os.Stderr, "%s: %s\n", err, buf.String())
 		os.Exit(1)
 	}
 

@@ -200,7 +200,7 @@ func TestDaemonRestart(t *testing.T) {
 		return
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "30")), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), withProcessArgs("sleep", "30")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -285,7 +285,7 @@ func TestContainerAttach(t *testing.T) {
 		return
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withCat()), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), withCat()), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -407,8 +407,8 @@ func TestContainerUsername(t *testing.T) {
 
 	// squid user in the alpine image has a uid of 31
 	container, err := client.NewContainer(ctx, id,
-		withNewSnapshot(id, image),
-		WithNewSpec(withImageConfig(image), WithUsername("squid"), WithProcessArgs("id", "-u")),
+		WithNewSnapshot(id, image),
+		WithNewSpec(WithImageConfig(image), WithUsername("squid"), WithProcessArgs("id", "-u")),
 	)
 	if err != nil {
 		t.Error(err)
@@ -472,7 +472,7 @@ func TestContainerAttachProcess(t *testing.T) {
 		return
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "100")), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), withProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -616,8 +616,8 @@ func TestContainerUserID(t *testing.T) {
 
 	// adm user in the alpine image has a uid of 3 and gid of 4.
 	container, err := client.NewContainer(ctx, id,
-		withNewSnapshot(id, image),
-		WithNewSpec(withImageConfig(image), WithUserID(3), WithProcessArgs("sh", "-c", "echo $(id -u):$(id -g)")),
+		WithNewSnapshot(id, image),
+		WithNewSpec(WithImageConfig(image), WithUserID(3), WithProcessArgs("sh", "-c", "echo $(id -u):$(id -g)")),
 	)
 	if err != nil {
 		t.Error(err)
@@ -675,8 +675,8 @@ func TestContainerKillAll(t *testing.T) {
 	}
 
 	container, err := client.NewContainer(ctx, id,
-		withNewSnapshot(id, image),
-		WithNewSpec(withImageConfig(image),
+		WithNewSnapshot(id, image),
+		WithNewSpec(WithImageConfig(image),
 			withProcessArgs("sh", "-c", "top"),
 			WithHostNamespace(specs.PIDNamespace),
 		),
@@ -736,7 +736,7 @@ func TestShimSigkilled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image)), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image)), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -800,7 +800,7 @@ func TestDaemonRestartWithRunningShim(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), WithProcessArgs("sleep", "100")), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), WithProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -885,8 +885,8 @@ func TestContainerRuntimeOptions(t *testing.T) {
 
 	container, err := client.NewContainer(
 		ctx, id,
-		WithNewSpec(withImageConfig(image), withExitStatus(7)),
-		withNewSnapshot(id, image),
+		WithNewSpec(WithImageConfig(image), withExitStatus(7)),
+		WithNewSnapshot(id, image),
 		WithRuntime("io.containerd.runtime.v1.linux", &runcopts.RuncOptions{Runtime: "no-runc"}),
 	)
 	if err != nil {
@@ -927,8 +927,8 @@ func TestContainerKillInitPidHost(t *testing.T) {
 	}
 
 	container, err := client.NewContainer(ctx, id,
-		withNewSnapshot(id, image),
-		WithNewSpec(withImageConfig(image),
+		WithNewSnapshot(id, image),
+		WithNewSpec(WithImageConfig(image),
 			withProcessArgs("sh", "-c", "sleep 42; echo hi"),
 			WithHostNamespace(specs.PIDNamespace),
 		),
@@ -1022,7 +1022,7 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 		return
 	}
 
-	opts := []NewContainerOpts{WithNewSpec(withImageConfig(image),
+	opts := []NewContainerOpts{WithNewSpec(WithImageConfig(image),
 		withExitStatus(7),
 		WithUserNamespace(0, 1000, 10000),
 	)}

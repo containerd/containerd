@@ -39,18 +39,8 @@ func withExecArgs(s *specs.Process, args ...string) {
 	s.Args = append([]string{"powershell", "-noprofile"}, args...)
 }
 
-func withImageConfig(i Image) SpecOpts {
-	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
-		s.Windows.LayerFolders = dockerLayerFolders
-		return nil
-	}
-}
-
-func withNewSnapshot(id string, i Image) NewContainerOpts {
-	// TODO: when windows has a snapshotter remove the withNewSnapshot helper
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		return nil
-	}
+func withUserNamespace(u, g, s uint32) SpecOpts {
+	return withNoop
 }
 
 func withRemappedSnapshot(id string, i Image, u, g uint32) NewContainerOpts {
