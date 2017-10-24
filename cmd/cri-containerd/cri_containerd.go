@@ -52,6 +52,16 @@ func init() {
 	cmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
 }
 
+func defaultConfigCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "default-config",
+		Short: "Print default toml config of cri-containerd and quit.",
+		Run: func(cmd *cobra.Command, args []string) {
+			options.PrintDefaultTomlConfig()
+		},
+	}
+}
+
 func main() {
 	if reexec.Init() {
 		return
@@ -59,6 +69,7 @@ func main() {
 	o := options.NewCRIContainerdOptions()
 
 	o.AddFlags(cmd.Flags())
+	cmd.AddCommand(defaultConfigCommand())
 
 	cmd.Run = func(cmd *cobra.Command, args []string) {
 		if err := o.InitFlags(cmd.Flags()); err != nil {
@@ -69,11 +80,6 @@ func main() {
 		glog.V(0).Infof("Run cri-containerd %+v", o)
 		if o.PrintVersion {
 			version.PrintVersion()
-			os.Exit(0)
-		}
-
-		if o.PrintDefaultConfig {
-			o.PrintDefaultTomlConfig()
 			os.Exit(0)
 		}
 		validateConfig(o)
