@@ -95,8 +95,6 @@ type CRIContainerdOptions struct {
 	Config
 	// Path to the TOML config file.
 	ConfigFilePath string `toml:"-"`
-	// PrintVersion indicates to print version information of cri-containerd.
-	PrintVersion bool
 }
 
 // NewCRIContainerdOptions returns a reference to CRIContainerdOptions
@@ -125,8 +123,6 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		defaults.ContainerdConfig.RuntimeEngine, "Runtime engine used by containerd. Defaults to containerd's default if not specified.")
 	fs.StringVar(&c.ContainerdConfig.RuntimeRoot, "containerd-runtime-root",
 		defaults.ContainerdConfig.RuntimeRoot, "The directory used by containerd for runtime state. Defaults to containerd's default if not specified.")
-	fs.BoolVar(&c.PrintVersion, "version",
-		false, "Print cri-containerd version information and quit.")
 	fs.StringVar(&c.NetworkPluginBinDir, "network-bin-dir",
 		defaults.NetworkPluginBinDir, "The directory for putting network binaries.")
 	fs.StringVar(&c.NetworkPluginConfDir, "network-conf-dir",

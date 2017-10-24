@@ -55,9 +55,19 @@ func init() {
 func defaultConfigCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "default-config",
-		Short: "Print default toml config of cri-containerd and quit.",
+		Short: "Print default toml config of cri-containerd.",
 		Run: func(cmd *cobra.Command, args []string) {
 			options.PrintDefaultTomlConfig()
+		},
+	}
+}
+
+func versionCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Print cri-containerd version information.",
+		Run: func(cmd *cobra.Command, args []string) {
+			version.PrintVersion()
 		},
 	}
 }
@@ -70,19 +80,15 @@ func main() {
 
 	o.AddFlags(cmd.Flags())
 	cmd.AddCommand(defaultConfigCommand())
+	cmd.AddCommand(versionCommand())
 
 	cmd.Run = func(cmd *cobra.Command, args []string) {
 		if err := o.InitFlags(cmd.Flags()); err != nil {
 			glog.Exitf("Failed to init CRI containerd flags: %v", err)
 		}
-
-		// TODO(random-liu): Turn to subcommand.
-		glog.V(0).Infof("Run cri-containerd %+v", o)
-		if o.PrintVersion {
-			version.PrintVersion()
-			os.Exit(0)
-		}
 		validateConfig(o)
+
+		glog.V(0).Infof("Run cri-containerd %+v", o)
 
 		glog.V(2).Infof("Run cri-containerd grpc server on socket %q", o.SocketPath)
 		s, err := server.NewCRIContainerdService(o.Config)
