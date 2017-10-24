@@ -13,7 +13,4 @@ else
     ifeq ($(UNAME_S),FreeBSD)
         target_os = freebsd
     endif
-    ifeq ($(UNAME_S),SunOS)
-        target_os = solaris
-    endif
 endif
