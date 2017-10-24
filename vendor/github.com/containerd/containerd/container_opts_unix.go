@@ -18,16 +18,20 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 )
 
 // WithCheckpoint allows a container to be created from the checkpointed information
 // provided by the descriptor. The image, snapshot, and runtime specifications are
 // restored on the container
-func WithCheckpoint(desc v1.Descriptor, snapshotKey string) NewContainerOpts {
+func WithCheckpoint(im Image, snapshotKey string) NewContainerOpts {
 	// set image and rw, and spec
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		id := desc.Digest
-		store := client.ContentStore()
+		var (
+			desc  = im.Target()
+			id    = desc.Digest
+			store = client.ContentStore()
+		)
 		index, err := decodeIndex(ctx, store, id)
 		if err != nil {
 			return err
@@ -41,11 +45,11 @@ func WithCheckpoint(desc v1.Descriptor, snapshotKey string) NewContainerOpts {
 			case images.MediaTypeDockerSchema2Manifest, images.MediaTypeDockerSchema2ManifestList:
 				config, err := images.Config(ctx, store, m, platforms.Default())
 				if err != nil {
-					return err
+					return errors.Wrap(err, "unable to resolve image config")
 				}
 				diffIDs, err := images.RootFS(ctx, store, config)
 				if err != nil {
-					return err
+					return errors.Wrap(err, "unable to get rootfs")
 				}
 				setSnapshotterIfEmpty(c)
 				if _, err := client.SnapshotService(c.Snapshotter).Prepare(ctx, snapshotKey, identity.ChainID(diffIDs).String()); err != nil {
@@ -57,7 +61,7 @@ func WithCheckpoint(desc v1.Descriptor, snapshotKey string) NewContainerOpts {
 			case images.MediaTypeContainerd1CheckpointConfig:
 				data, err := content.ReadBlob(ctx, store, m.Digest)
 				if err != nil {
-					return err
+					return errors.Wrap(err, "unable to read checkpoint config")
 				}
 				var any protobuf.Any
 				if err := proto.Unmarshal(data, &any); err != nil {
@@ -70,10 +74,10 @@ func WithCheckpoint(desc v1.Descriptor, snapshotKey string) NewContainerOpts {
 			// apply the rw snapshot to the new rw layer
 			mounts, err := client.SnapshotService(c.Snapshotter).Mounts(ctx, snapshotKey)
 			if err != nil {
-				return err
+				return errors.Wrapf(err, "unable to get mounts for %s", snapshotKey)
 			}
 			if _, err := client.DiffService().Apply(ctx, *rw, mounts); err != nil {
-				return err
+				return errors.Wrap(err, "unable to apply rw diff")
 			}
 		}
 		c.SnapshotKey = snapshotKey
@@ -84,8 +88,9 @@ func WithCheckpoint(desc v1.Descriptor, snapshotKey string) NewContainerOpts {
 // WithTaskCheckpoint allows a task to be created with live runtime and memory data from a
 // previous checkpoint. Additional software such as CRIU may be required to
 // restore a task from a checkpoint
-func WithTaskCheckpoint(desc v1.Descriptor) NewTaskOpts {
+func WithTaskCheckpoint(im Image) NewTaskOpts {
 	return func(ctx context.Context, c *Client, info *TaskInfo) error {
+		desc := im.Target()
 		id := desc.Digest
 		index, err := decodeIndex(ctx, c.ContentStore(), id)
 		if err != nil {

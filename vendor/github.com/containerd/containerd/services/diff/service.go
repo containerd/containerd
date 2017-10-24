@@ -3,6 +3,7 @@ package diff
 import (
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
@@ -32,20 +33,25 @@ func init() {
 		Config: &config{
 			Order: []string{"walking"},
 		},
-		Init: func(ic *plugin.InitContext) (interface{}, error) {
-			differs, err := ic.GetAll(plugin.DiffPlugin)
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			differs, err := ic.GetByType(plugin.DiffPlugin)
 			if err != nil {
 				return nil, err
 			}
 
 			orderedNames := ic.Config.(*config).Order
-			ordered := make([]plugin.Differ, len(orderedNames))
+			ordered := make([]diff.Differ, len(orderedNames))
 			for i, n := range orderedNames {
-				differ, ok := differs[n]
+				differp, ok := differs[n]
 				if !ok {
 					return nil, errors.Errorf("needed differ not loaded: %s", n)
 				}
-				ordered[i] = differ.(plugin.Differ)
+				differ, err := differp.Instance()
+				if err != nil {
+					return nil, errors.Wrapf(err, "could not load required differ due plugin init error: %s", n)
+				}
+
+				ordered[i] = differ.(diff.Differ)
 			}
 
 			return &service{
@@ -56,7 +62,7 @@ func init() {
 }
 
 type service struct {
-	differs []plugin.Differ
+	differs []diff.Differ
 }
 
 func (s *service) Register(gs *grpc.Server) error {
@@ -97,8 +103,19 @@ func (s *service) Diff(ctx context.Context, dr *diffapi.DiffRequest) (*diffapi.D
 		bMounts = toMounts(dr.Right)
 	)
 
+	var opts []diff.Opt
+	if dr.MediaType != "" {
+		opts = append(opts, diff.WithMediaType(dr.MediaType))
+	}
+	if dr.Ref != "" {
+		opts = append(opts, diff.WithReference(dr.Ref))
+	}
+	if dr.Labels != nil {
+		opts = append(opts, diff.WithLabels(dr.Labels))
+	}
+
 	for _, differ := range s.differs {
-		ocidesc, err = differ.DiffMounts(ctx, aMounts, bMounts, dr.MediaType, dr.Ref)
+		ocidesc, err = differ.DiffMounts(ctx, aMounts, bMounts, opts...)
 		if !errdefs.IsNotImplemented(err) {
 			break
 		}

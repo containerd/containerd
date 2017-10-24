@@ -9,11 +9,13 @@
 		github.com/containerd/containerd/api/types/descriptor.proto
 		github.com/containerd/containerd/api/types/metrics.proto
 		github.com/containerd/containerd/api/types/mount.proto
+		github.com/containerd/containerd/api/types/platform.proto
 
 	It has these top-level messages:
 		Descriptor
 		Metric
 		Mount
+		Platform
 */
 package types
 

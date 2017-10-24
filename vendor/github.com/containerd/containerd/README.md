@@ -154,7 +154,7 @@ err := task.Start(context)
 
 To build the daemon and `ctr` simple test client, the following build system dependencies are required:
 
-* Go 1.8.x or above (requires 1.8 due to use of golang plugin(s))
+* Go 1.9.x or above
 * Protoc 3.x compiler and headers (download at the [Google protobuf releases page](https://github.com/google/protobuf/releases))
 * Btrfs headers and libraries for your distribution. Note that building the btrfs driver can be disabled via build tag removing this dependency.
 
@@ -196,7 +196,7 @@ For sync communication we have a community slack with a #containerd channel that
 
 ### Reporting security issues
 
-__If you are reporting a security issue, please reach out discreetly at containerd-security@googlegroups.com__.
+__If you are reporting a security issue, please reach out discreetly at security@containerd.io__.
 
 ## Copyright and license
 

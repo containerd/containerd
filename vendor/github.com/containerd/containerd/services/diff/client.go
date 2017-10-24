@@ -3,20 +3,15 @@ package diff
 import (
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/rootfs"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/net/context"
 )
 
-type DiffService interface {
-	rootfs.Applier
-	rootfs.MountDiffer
-}
-
 // NewApplierFromClient returns a new Applier which communicates
 // over a GRPC connection.
-func NewDiffServiceFromClient(client diffapi.DiffClient) DiffService {
+func NewDiffServiceFromClient(client diffapi.DiffClient) diff.Differ {
 	return &remote{
 		client: client,
 	}
@@ -38,12 +33,19 @@ func (r *remote) Apply(ctx context.Context, diff ocispec.Descriptor, mounts []mo
 	return toDescriptor(resp.Applied), nil
 }
 
-func (r *remote) DiffMounts(ctx context.Context, a, b []mount.Mount, media, ref string) (ocispec.Descriptor, error) {
+func (r *remote) DiffMounts(ctx context.Context, a, b []mount.Mount, opts ...diff.Opt) (ocispec.Descriptor, error) {
+	var config diff.Config
+	for _, opt := range opts {
+		if err := opt(&config); err != nil {
+			return ocispec.Descriptor{}, err
+		}
+	}
 	req := &diffapi.DiffRequest{
 		Left:      fromMounts(a),
 		Right:     fromMounts(b),
-		MediaType: media,
-		Ref:       ref,
+		MediaType: config.MediaType,
+		Ref:       config.Reference,
+		Labels:    config.Labels,
 	}
 	resp, err := r.client.Diff(ctx, req)
 	if err != nil {

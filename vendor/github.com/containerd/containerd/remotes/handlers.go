@@ -2,6 +2,7 @@ package remotes
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -42,7 +44,7 @@ func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
 // FetchHandler returns a handler that will fetch all content into the ingester
 // discovered in a call to Dispatch. Use with ChildrenHandler to do a full
 // recursive fetch.
-func FetchHandler(ingester content.Ingester, fetcher Fetcher) images.HandlerFunc {
+func FetchHandler(ingester content.Ingester, fetcher Fetcher, root ocispec.Descriptor) images.HandlerFunc {
 	return func(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error) {
 		ctx = log.WithLogger(ctx, log.G(ctx).WithFields(logrus.Fields{
 			"digest":    desc.Digest,
@@ -54,13 +56,13 @@ func FetchHandler(ingester content.Ingester, fetcher Fetcher) images.HandlerFunc
 		case images.MediaTypeDockerSchema1Manifest:
 			return nil, fmt.Errorf("%v not supported", desc.MediaType)
 		default:
-			err := fetch(ctx, ingester, fetcher, desc)
+			err := fetch(ctx, ingester, fetcher, desc, desc.Digest == root.Digest)
 			return nil, err
 		}
 	}
 }
 
-func fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc ocispec.Descriptor) error {
+func fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc ocispec.Descriptor, root bool) error {
 	log.G(ctx).Debug("fetch")
 
 	var (
@@ -102,7 +104,79 @@ func fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc
 	}
 	defer rc.Close()
 
-	return content.Copy(ctx, cw, rc, desc.Size, desc.Digest)
+	r, opts := commitOpts(desc, rc, root)
+	return content.Copy(ctx, cw, r, desc.Size, desc.Digest, opts...)
+}
+
+// commitOpts gets the appropriate content options to alter
+// the content info on commit based on media type.
+func commitOpts(desc ocispec.Descriptor, r io.Reader, root bool) (io.Reader, []content.Opt) {
+	var childrenF func(r io.Reader) ([]ocispec.Descriptor, error)
+
+	switch desc.MediaType {
+	case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+		childrenF = func(r io.Reader) ([]ocispec.Descriptor, error) {
+			var (
+				manifest ocispec.Manifest
+				decoder  = json.NewDecoder(r)
+			)
+			if err := decoder.Decode(&manifest); err != nil {
+				return nil, err
+			}
+
+			return append([]ocispec.Descriptor{manifest.Config}, manifest.Layers...), nil
+		}
+	case images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+		childrenF = func(r io.Reader) ([]ocispec.Descriptor, error) {
+			var (
+				index   ocispec.Index
+				decoder = json.NewDecoder(r)
+			)
+			if err := decoder.Decode(&index); err != nil {
+				return nil, err
+			}
+
+			return index.Manifests, nil
+		}
+	default:
+		return r, nil
+	}
+
+	pr, pw := io.Pipe()
+
+	var children []ocispec.Descriptor
+	errC := make(chan error)
+
+	go func() {
+		defer close(errC)
+		ch, err := childrenF(pr)
+		if err != nil {
+			errC <- err
+		}
+		children = ch
+	}()
+
+	opt := func(info *content.Info) error {
+		err := <-errC
+		if err != nil {
+			return errors.Wrap(err, "unable to get commit labels")
+		}
+
+		if len(children) > 0 || root {
+			if info.Labels == nil {
+				info.Labels = map[string]string{}
+			}
+			if root {
+				info.Labels["containerd.io/gc.root"] = time.Now().UTC().Format(time.RFC3339)
+			}
+			for i, ch := range children {
+				info.Labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i)] = ch.Digest.String()
+			}
+		}
+		return nil
+	}
+
+	return io.TeeReader(r, pw), []content.Opt{opt}
 }
 
 // PushHandler returns a handler that will push all content from the provider
