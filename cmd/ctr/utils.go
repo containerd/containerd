@@ -5,7 +5,6 @@ import (
 	gocontext "context"
 	"crypto/tls"
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -18,52 +17,13 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
-	"github.com/containerd/containerd/rootfs"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-)
-
-var (
-	snapshotterFlags = []cli.Flag{
-		cli.StringFlag{
-			Name:  "snapshotter",
-			Usage: "snapshotter name. Empty value stands for the daemon default value.",
-			Value: containerd.DefaultSnapshotter,
-		},
-	}
-
-	labelFlag = cli.StringSliceFlag{
-		Name:  "label",
-		Usage: "labels to attach to the pulled image",
-	}
-
-	registryFlags = []cli.Flag{
-		cli.BoolFlag{
-			Name:  "skip-verify,k",
-			Usage: "skip SSL certificate validation",
-		},
-		cli.BoolFlag{
-			Name:  "plain-http",
-			Usage: "allow connections using plain HTTP",
-		},
-		cli.StringFlag{
-			Name:  "user,u",
-			Usage: "user[:password] Registry user and password",
-		},
-		cli.StringFlag{
-			Name:  "refresh",
-			Usage: "refresh token for authorization server",
-		},
-	}
 )
 
 // appContext returns the context for a command. Should only be called once per
@@ -112,39 +72,6 @@ func passwordPrompt() (string, error) {
 		return "", errors.Wrap(err, "failed to read line")
 	}
 	return string(line), nil
-}
-
-func getImageLayers(ctx gocontext.Context, image images.Image, cs content.Store) ([]rootfs.Layer, error) {
-	p, err := content.ReadBlob(ctx, cs, image.Target.Digest)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read manifest blob")
-	}
-
-	var manifest ocispec.Manifest
-	if err := json.Unmarshal(p, &manifest); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal manifest")
-	}
-
-	diffIDs, err := image.RootFS(ctx, cs, platforms.Default())
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to resolve rootfs")
-	}
-
-	if len(diffIDs) != len(manifest.Layers) {
-		return nil, errors.Errorf("mismatched image rootfs and manifest layers")
-	}
-
-	layers := make([]rootfs.Layer, len(diffIDs))
-	for i := range diffIDs {
-		layers[i].Diff = ocispec.Descriptor{
-			// TODO: derive media type from compressed type
-			MediaType: ocispec.MediaTypeImageLayer,
-			Digest:    diffIDs[i],
-		}
-		layers[i].Blob = manifest.Layers[i]
-	}
-
-	return layers, nil
 }
 
 // getResolver prepares the resolver from the environment and options.
@@ -311,37 +238,4 @@ func replaceOrAppendEnvValues(defaults, overrides []string) []string {
 	}
 
 	return defaults
-}
-
-func objectWithLabelArgs(clicontext *cli.Context) (string, map[string]string) {
-	var (
-		namespace    = clicontext.Args().First()
-		labelStrings = clicontext.Args().Tail()
-	)
-
-	return namespace, labelArgs(labelStrings)
-}
-
-func labelArgs(labelStrings []string) map[string]string {
-	labels := make(map[string]string, len(labelStrings))
-	for _, label := range labelStrings {
-		parts := strings.SplitN(label, "=", 2)
-		key := parts[0]
-		value := "true"
-		if len(parts) > 1 {
-			value = parts[1]
-		}
-
-		labels[key] = value
-	}
-
-	return labels
-}
-
-func printAsJSON(x interface{}) {
-	b, err := json.MarshalIndent(x, "", "    ")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "can't marshal %+v as a JSON string: %v\n", x, err)
-	}
-	fmt.Println(string(b))
 }

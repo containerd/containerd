@@ -7,6 +7,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/pkg/errors"
@@ -30,7 +31,7 @@ var namespacesCreateCommand = cli.Command{
 	ArgsUsage:   "[flags] <name> [<key>=<value]",
 	Description: "Create a new namespace. It must be unique.",
 	Action: func(context *cli.Context) error {
-		namespace, labels := objectWithLabelArgs(context)
+		namespace, labels := commands.ObjectWithLabelArgs(context)
 		if namespace == "" {
 			return errors.New("please specify a namespace")
 		}
@@ -51,7 +52,7 @@ var namespacesSetLabelsCommand = cli.Command{
 	Description: "Set and clear labels for a namespace.",
 	Flags:       []cli.Flag{},
 	Action: func(context *cli.Context) error {
-		namespace, labels := objectWithLabelArgs(context)
+		namespace, labels := commands.ObjectWithLabelArgs(context)
 		if namespace == "" {
 			return errors.New("please specify a namespace")
 		}

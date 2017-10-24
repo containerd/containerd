@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/log"
 	"github.com/urfave/cli"
 )
@@ -20,7 +21,7 @@ command. As part of this process, we do the following:
 2. Prepare the snapshot filesystem with the pulled resources.
 3. Register metadata for the image.
 `,
-	Flags: append(registryFlags, append(snapshotterFlags, labelFlag)...),
+	Flags: append(commands.RegistryFlags, append(commands.SnapshotterFlags, commands.LabelFlag)...),
 	Action: func(context *cli.Context) error {
 		var (
 			ref = context.Args().First()

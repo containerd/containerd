@@ -8,6 +8,7 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/containers"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -100,7 +101,7 @@ var runCommand = cli.Command{
 			Name:  "detach,d",
 			Usage: "detach from the task after it has started execution",
 		},
-	}, snapshotterFlags...),
+	}, commands.SnapshotterFlags...),
 	Action: func(context *cli.Context) error {
 		var (
 			err error

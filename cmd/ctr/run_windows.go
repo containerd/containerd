@@ -6,6 +6,7 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
@@ -92,7 +93,7 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		labelStrings = context.StringSlice("label")
 	)
 
-	labels := labelArgs(labelStrings)
+	labels := commands.LabelArgs(labelStrings)
 
 	// TODO(mlaventure): get base image once we have a snapshotter
 

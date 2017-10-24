@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/urfave/cli"
 )
 
@@ -15,7 +16,7 @@ var containersSetLabelsCommand = cli.Command{
 	Description: "Set and clear labels for a container.",
 	Flags:       []cli.Flag{},
 	Action: func(context *cli.Context) error {
-		containerID, labels := objectWithLabelArgs(context)
+		containerID, labels := commands.ObjectWithLabelArgs(context)
 		if containerID == "" {
 			return errors.New("please specify a container")
 		}
