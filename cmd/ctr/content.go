@@ -10,6 +10,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
@@ -212,7 +213,7 @@ var (
 		Description: `Labels blobs in the content store`,
 		Flags:       []cli.Flag{},
 		Action: func(context *cli.Context) error {
-			object, labels := objectWithLabelArgs(context)
+			object, labels := commands.ObjectWithLabelArgs(context)
 			client, ctx, cancel, err := newClient(context)
 			if err != nil {
 				return err

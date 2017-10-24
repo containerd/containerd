@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/containerd/console"
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	shim "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/typeurl"
 	protobuf "github.com/gogo/protobuf/types"
@@ -182,7 +183,7 @@ var shimStateCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		printAsJSON(r)
+		commands.PrintAsJSON(r)
 		return nil
 	},
 }

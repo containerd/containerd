@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -27,7 +28,7 @@ var containerInfoCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		printAsJSON(info)
+		commands.PrintAsJSON(info)
 
 		return nil
 	},

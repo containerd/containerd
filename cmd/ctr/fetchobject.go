@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/log"
 	"github.com/urfave/cli"
 )
@@ -17,7 +18,7 @@ var fetchObjectCommand = cli.Command{
 	Usage:       "retrieve objects from a remote",
 	ArgsUsage:   "[flags] <remote> <object> [<hint>, ...]",
 	Description: `Fetch objects by identifier from a remote.`,
-	Flags:       registryFlags,
+	Flags:       commands.RegistryFlags,
 	Action: func(context *cli.Context) error {
 		var (
 			ref = context.Args().First()

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/urfave/cli"
@@ -21,7 +22,7 @@ var rootfsUnpackCommand = cli.Command{
 	Name:      "unpack",
 	Usage:     "unpack applies layers from a manifest to a snapshot",
 	ArgsUsage: "[flags] <digest>",
-	Flags:     snapshotterFlags,
+	Flags:     commands.SnapshotterFlags,
 	Action: func(context *cli.Context) error {
 		dgst, err := digest.Parse(context.Args().First())
 		if err != nil {

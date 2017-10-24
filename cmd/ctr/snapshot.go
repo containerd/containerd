@@ -7,6 +7,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/progress"
 	"github.com/containerd/containerd/snapshot"
@@ -17,7 +18,7 @@ import (
 var snapshotCommand = cli.Command{
 	Name:  "snapshot",
 	Usage: "snapshot management",
-	Flags: snapshotterFlags,
+	Flags: commands.SnapshotterFlags,
 	Subcommands: cli.Commands{
 		listSnapshotCommand,
 		usageSnapshotCommand,
@@ -325,7 +326,7 @@ var infoSnapshotCommand = cli.Command{
 			return err
 		}
 
-		printAsJSON(info)
+		commands.PrintAsJSON(info)
 
 		return nil
 	},
@@ -338,7 +339,7 @@ var labelSnapshotCommand = cli.Command{
 	Description: `Labels snapshots in the snapshotter`,
 	Flags:       []cli.Flag{},
 	Action: func(context *cli.Context) error {
-		key, labels := objectWithLabelArgs(context)
+		key, labels := commands.ObjectWithLabelArgs(context)
 		client, ctx, cancel, err := newClient(context)
 		if err != nil {
 			return err

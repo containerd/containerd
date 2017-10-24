@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/log"
 	digest "github.com/opencontainers/go-digest"
@@ -15,7 +16,7 @@ var pushObjectCommand = cli.Command{
 	Usage:       "push an object to a remote",
 	ArgsUsage:   "[flags] <remote> <object> <type>",
 	Description: `Push objects by identifier to a remote.`,
-	Flags:       registryFlags,
+	Flags:       commands.RegistryFlags,
 	Action: func(context *cli.Context) error {
 		var (
 			ref    = context.Args().Get(0)

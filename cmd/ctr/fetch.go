@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
@@ -39,7 +40,7 @@ not use this implementation as a guide. The end goal should be having metadata,
 content and snapshots ready for a direct use via the 'ctr run'.
 
 Most of this is experimental and there are few leaps to make this work.`,
-	Flags: append(registryFlags, labelFlag),
+	Flags: append(commands.RegistryFlags, commands.LabelFlag),
 	Action: func(clicontext *cli.Context) error {
 		var (
 			ref = clicontext.Args().First()
@@ -82,7 +83,7 @@ func fetch(ref string, cliContext *cli.Context) (containerd.Image, error) {
 	})
 
 	log.G(pctx).WithField("image", ref).Debug("fetching")
-	labels := labelArgs(cliContext.StringSlice("label"))
+	labels := commands.LabelArgs(cliContext.StringSlice("label"))
 	img, err := client.Pull(pctx, ref,
 		containerd.WithPullLabels(labels),
 		containerd.WithResolver(resolver),

@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/log"
 	"github.com/urfave/cli"
 )
@@ -21,14 +22,14 @@ var imagesImportCommand = cli.Command{
 			Value: "",
 			Usage: "reference object e.g. tag@digest (default: use the object specified in ref)",
 		},
-		labelFlag,
+		commands.LabelFlag,
 	},
 	Action: func(context *cli.Context) error {
 		var (
 			ref       = context.Args().First()
 			in        = context.Args().Get(1)
 			refObject = context.String("ref-object")
-			labels    = labelArgs(context.StringSlice("label"))
+			labels    = commands.LabelArgs(context.StringSlice("label"))
 		)
 		client, ctx, cancel, err := newClient(context)
 		if err != nil {

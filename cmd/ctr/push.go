@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/progress"
@@ -37,7 +38,7 @@ var pushCommand = cli.Command{
 	creating the associated configuration, and creating the manifest
 	which references those resources.
 `,
-	Flags: append(registryFlags, cli.StringFlag{
+	Flags: append(commands.RegistryFlags, cli.StringFlag{
 		Name:  "manifest",
 		Usage: "digest of manifest",
 	}, cli.StringFlag{

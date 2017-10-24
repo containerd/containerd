@@ -7,6 +7,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
@@ -127,7 +128,7 @@ var imagesSetLabelsCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		var (
 			replaceAll   = context.Bool("replace-all")
-			name, labels = objectWithLabelArgs(context)
+			name, labels = commands.ObjectWithLabelArgs(context)
 		)
 		client, ctx, cancel, err := newClient(context)
 		if err != nil {

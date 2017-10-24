@@ -11,6 +11,7 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -76,7 +77,7 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		opts  []containerd.SpecOpts
 		cOpts []containerd.NewContainerOpts
 	)
-	cOpts = append(cOpts, containerd.WithContainerLabels(labelArgs(context.StringSlice("label"))))
+	cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(context.StringSlice("label"))))
 	if context.Bool("rootfs") {
 		opts = append(opts, containerd.WithRootFSPath(ref))
 	} else {
