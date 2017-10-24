@@ -17,7 +17,6 @@ limitations under the License.
 package options
 
 import (
-	"flag"
 	"fmt"
 	"os"
 
@@ -26,8 +25,12 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// configFilePathArgName is the path to the config file.
-const configFilePathArgName = "config"
+const (
+	// configFilePathArgName is the path to the config file.
+	configFilePathArgName = "config"
+	// defaultConfigFilePath is the default config file path.
+	defaultConfigFilePath = "/etc/cri-containerd/config.toml"
+)
 
 // ContainerdConfig contains config related to containerd
 type ContainerdConfig struct {
@@ -90,8 +93,8 @@ type Config struct {
 type CRIContainerdOptions struct {
 	// Config contains cri-containerd toml config
 	Config
-	// Path to the TOML config file
-	ConfigFilePath string
+	// Path to the TOML config file.
+	ConfigFilePath string `toml:"-"`
 	// PrintVersion indicates to print version information of cri-containerd.
 	PrintVersion bool
 	// PrintDefaultConfig indicates to print default toml config of cri-containerd.
@@ -106,7 +109,7 @@ func NewCRIContainerdOptions() *CRIContainerdOptions {
 // AddFlags adds cri-containerd command line options to pflag.
 func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.ConfigFilePath, configFilePathArgName,
-		"/etc/cri-containerd/config.toml", "Path to the config file.")
+		defaultConfigFilePath, "Path to the config file.")
 	fs.StringVar(&c.SocketPath, "socket-path",
 		"/var/run/cri-containerd.sock", "Path to the socket which cri-containerd serves on.")
 	fs.StringVar(&c.RootDir, "root-dir",
@@ -149,19 +152,11 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		-999, "Adjust the cri-containerd's oom score.")
 }
 
-// InitFlags must be called after adding all cli options flags are defined and
-// before flags are accessed by the program. Ths fuction adds flag.CommandLine
-// (the default set of command-line flags, parsed from os.Args) and then calls
-// pflag.Parse().
+// InitFlags load configurations from config file, and then overwrite with flags.
+// This function must be called inside `Run`, at that time flags should have been
+// parsed once.
 // precedence:  commandline > configfile > default
 func (c *CRIContainerdOptions) InitFlags(fs *pflag.FlagSet) error {
-	fs.AddGoFlagSet(flag.CommandLine)
-
-	commandline := os.Args[1:]
-	if err := fs.Parse(commandline); err != nil {
-		return err
-	}
-
 	// Load default config file if none provided
 	if _, err := toml.DecodeFile(c.ConfigFilePath, &c.Config); err != nil {
 		// the absence of default config file is normal case.
@@ -179,7 +174,7 @@ func (c *CRIContainerdOptions) InitFlags(fs *pflag.FlagSet) error {
 	// But the priority of the toml config value is higher than the default value,
 	// Without a way to insert the toml config value between the default value and the command line value.
 	// We parse twice one for default value, one for commandline value.
-	return fs.Parse(commandline)
+	return fs.Parse(os.Args[1:])
 }
 
 // PrintDefaultTomlConfig print default toml config of cri-containerd.
