@@ -64,7 +64,7 @@ type Registration struct {
 	ID string
 	// Config specific to the plugin
 	Config interface{}
-	// Requires is a list of plugins that the registered plugin requires to be avaliable
+	// Requires is a list of plugins that the registered plugin requires to be available
 	Requires []Type
 
 	// InitFn is called when initializing a plugin. The registration and

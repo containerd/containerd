@@ -53,8 +53,8 @@ script:
 # Note that `go build -i` requires write permission to GOROOT. (So it is not called in Makefile)
   - go build -i .
   - make setup
+  - make lint
   - make vet
-  - if [ "$GOOS" = "linux" ]; then make lint ; fi
   - make ineffassign
   - if [ "$GOOS" = "linux" ]; then make check-protos check-api-descriptors; fi
   - make build

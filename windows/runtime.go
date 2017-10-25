@@ -50,6 +50,7 @@ func init() {
 	})
 }
 
+// New returns a new Windows runtime
 func New(ic *plugin.InitContext) (interface{}, error) {
 	if err := os.MkdirAll(ic.Root, 0700); err != nil {
 		return nil, errors.Wrapf(err, "could not create state directory at %s", ic.Root)
