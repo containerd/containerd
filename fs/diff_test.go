@@ -35,7 +35,7 @@ func TestSimpleDiff(t *testing.T) {
 		fstest.CreateFile("/root/.bashrc", []byte("PATH=/usr/sbin:/usr/bin"), 0644),
 		fstest.Remove("/etc/unexpected"),
 	)
-	diff := []testChange{
+	diff := []TestChange{
 		Modify("/etc/hosts"),
 		Modify("/etc/profile"),
 		Delete("/etc/unexpected"),
@@ -60,7 +60,7 @@ func TestDirectoryReplace(t *testing.T) {
 		fstest.RemoveAll("/dir1/f2"),
 		fstest.CreateFile("/dir1/f2", []byte("Now file"), 0666),
 	)
-	diff := []testChange{
+	diff := []TestChange{
 		Add("/dir1/f11"),
 		Modify("/dir1/f2"),
 	}
@@ -79,7 +79,7 @@ func TestRemoveDirectoryTree(t *testing.T) {
 	l2 := fstest.Apply(
 		fstest.RemoveAll("/dir1"),
 	)
-	diff := []testChange{
+	diff := []TestChange{
 		Delete("/dir1"),
 	}
 
@@ -97,7 +97,7 @@ func TestFileReplace(t *testing.T) {
 		fstest.CreateDir("/dir1/dir2", 0755),
 		fstest.CreateFile("/dir1/dir2/f1", []byte("also a file"), 0644),
 	)
-	diff := []testChange{
+	diff := []TestChange{
 		Modify("/dir1"),
 		Add("/dir1/dir2"),
 		Add("/dir1/dir2/f1"),
@@ -136,7 +136,7 @@ func TestUpdateWithSameTime(t *testing.T) {
 		fstest.CreateFile("/file-truncated-time-2", []byte("2"), 0644),
 		fstest.Chtime("/file-truncated-time-2", tt),
 	)
-	diff := []testChange{
+	diff := []TestChange{
 		// "/file-same-time" excluded because matching non-zero nanosecond values
 		Modify("/file-modified-time"),
 		Modify("/file-truncated-time-1"),
@@ -148,7 +148,7 @@ func TestUpdateWithSameTime(t *testing.T) {
 	}
 }
 
-func testDiffWithBase(base, diff fstest.Applier, expected []testChange) error {
+func testDiffWithBase(base, diff fstest.Applier, expected []TestChange) error {
 	t1, err := ioutil.TempDir("", "diff-with-base-lower-")
 	if err != nil {
 		return errors.Wrap(err, "failed to create temp dir")
@@ -188,7 +188,7 @@ func TestBaseDirectoryChanges(t *testing.T) {
 		fstest.CreateDir("/root", 0700),
 		fstest.CreateFile("/root/.bashrc", []byte("PATH=/usr/sbin:/usr/bin"), 0644),
 	)
-	changes := []testChange{
+	changes := []TestChange{
 		Add("/etc"),
 		Add("/etc/hosts"),
 		Add("/etc/profile"),
@@ -201,7 +201,7 @@ func TestBaseDirectoryChanges(t *testing.T) {
 	}
 }
 
-func testDiffWithoutBase(apply fstest.Applier, expected []testChange) error {
+func testDiffWithoutBase(apply fstest.Applier, expected []TestChange) error {
 	tmp, err := ioutil.TempDir("", "diff-without-base-")
 	if err != nil {
 		return errors.Wrap(err, "failed to create temp dir")
@@ -220,7 +220,7 @@ func testDiffWithoutBase(apply fstest.Applier, expected []testChange) error {
 	return checkChanges(tmp, changes, expected)
 }
 
-func checkChanges(root string, changes, expected []testChange) error {
+func checkChanges(root string, changes, expected []TestChange) error {
 	if len(changes) != len(expected) {
 		return errors.Errorf("Unexpected number of changes:\n%s", diffString(changes, expected))
 	}
@@ -253,20 +253,20 @@ func checkChanges(root string, changes, expected []testChange) error {
 	return nil
 }
 
-type testChange struct {
+type TestChange struct {
 	Kind     ChangeKind
 	Path     string
 	FileInfo os.FileInfo
 	Source   string
 }
 
-func collectChanges(a, b string) ([]testChange, error) {
-	changes := []testChange{}
+func collectChanges(a, b string) ([]TestChange, error) {
+	changes := []TestChange{}
 	err := Changes(context.Background(), a, b, func(k ChangeKind, p string, f os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		changes = append(changes, testChange{
+		changes = append(changes, TestChange{
 			Kind:     k,
 			Path:     p,
 			FileInfo: f,
@@ -281,12 +281,12 @@ func collectChanges(a, b string) ([]testChange, error) {
 	return changes, nil
 }
 
-func diffString(c1, c2 []testChange) string {
+func diffString(c1, c2 []TestChange) string {
 	return fmt.Sprintf("got(%d):\n%s\nexpected(%d):\n%s", len(c1), changesString(c1), len(c2), changesString(c2))
 
 }
 
-func changesString(c []testChange) string {
+func changesString(c []TestChange) string {
 	strs := make([]string, len(c))
 	for i := range c {
 		strs[i] = fmt.Sprintf("\t%s\t%s", c[i].Kind, c[i].Path)
@@ -294,22 +294,22 @@ func changesString(c []testChange) string {
 	return strings.Join(strs, "\n")
 }
 
-func Add(p string) testChange {
-	return testChange{
+func Add(p string) TestChange {
+	return TestChange{
 		Kind: ChangeKindAdd,
 		Path: p,
 	}
 }
 
-func Delete(p string) testChange {
-	return testChange{
+func Delete(p string) TestChange {
+	return TestChange{
 		Kind: ChangeKindDelete,
 		Path: p,
 	}
 }
 
-func Modify(p string) testChange {
-	return testChange{
+func Modify(p string) TestChange {
+	return TestChange{
 		Kind: ChangeKindModify,
 		Path: p,
 	}

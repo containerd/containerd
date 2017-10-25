@@ -190,6 +190,7 @@ func (m *DB) Update(fn func(*bolt.Tx) error) error {
 	return m.db.Update(fn)
 }
 
+// GarbageCollect starts garbage collection
 func (m *DB) GarbageCollect(ctx context.Context) error {
 	lt1 := time.Now()
 	m.wlock.Lock()

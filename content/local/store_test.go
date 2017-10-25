@@ -137,7 +137,7 @@ func TestWalkBlobs(t *testing.T) {
 	)
 
 	var (
-		blobs    = populateBlobStore(t, ctx, cs, nblobs, maxsize)
+		blobs    = populateBlobStore(ctx, t, cs, nblobs, maxsize)
 		expected = map[digest.Digest]struct{}{}
 		found    = map[digest.Digest]struct{}{}
 	)
@@ -188,7 +188,7 @@ func BenchmarkIngests(b *testing.B) {
 			b.StartTimer()
 
 			for dgst, p := range blobs {
-				checkWrite(b, ctx, cs, dgst, p)
+				checkWrite(ctx, b, cs, dgst, p)
 			}
 		})
 	}
@@ -215,11 +215,11 @@ func generateBlobs(t checker, nblobs, maxsize int64) map[digest.Digest][]byte {
 	return blobs
 }
 
-func populateBlobStore(t checker, ctx context.Context, cs content.Store, nblobs, maxsize int64) map[digest.Digest][]byte {
+func populateBlobStore(ctx context.Context, t checker, cs content.Store, nblobs, maxsize int64) map[digest.Digest][]byte {
 	blobs := generateBlobs(t, nblobs, maxsize)
 
 	for dgst, p := range blobs {
-		checkWrite(t, ctx, cs, dgst, p)
+		checkWrite(ctx, t, cs, dgst, p)
 	}
 
 	return blobs
@@ -282,7 +282,7 @@ func checkBlobPath(t *testing.T, cs content.Store, dgst digest.Digest) string {
 	return path
 }
 
-func checkWrite(t checker, ctx context.Context, cs content.Store, dgst digest.Digest, p []byte) digest.Digest {
+func checkWrite(ctx context.Context, t checker, cs content.Store, dgst digest.Digest, p []byte) digest.Digest {
 	if err := content.WriteBlob(ctx, cs, dgst.String(), bytes.NewReader(p), int64(len(p)), dgst); err != nil {
 		t.Fatal(err)
 	}
