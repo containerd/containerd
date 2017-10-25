@@ -8,6 +8,7 @@ import (
 
 	"github.com/containerd/containerd/cmd/ctr/commands/plugins"
 	versionCmd "github.com/containerd/containerd/cmd/ctr/commands/version"
+	"github.com/containerd/containerd/cmd/ctr/commands/containers"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/server"
 	"github.com/containerd/containerd/version"
@@ -69,7 +70,7 @@ containerd CLI
 		plugins.Command,
 		versionCmd.Command,
 		applyCommand,
-		containersCommand,
+		containers.Command,
 		contentCommand,
 		eventsCommand,
 		fetchCommand,
