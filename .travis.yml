@@ -54,6 +54,7 @@ script:
   - go build -i .
   - make setup
   - make vet
+  - if [ "$GOOS" = "linux" ]; then make lint ; fi
   - make ineffassign
   - if [ "$GOOS" = "linux" ]; then make check-protos check-api-descriptors; fi
   - make build
