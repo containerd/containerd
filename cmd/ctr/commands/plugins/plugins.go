@@ -1,4 +1,4 @@
-package main
+package plugins
 
 import (
 	"fmt"
@@ -11,21 +11,22 @@ import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/platforms"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc/codes"
 )
 
-var pluginsCommand = cli.Command{
+// Command is a cli command that outputs plugin information
+var Command = cli.Command{
 	Name:  "plugins",
-	Usage: "Provides information about containerd plugins",
+	Usage: "provides information about containerd plugins",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
-			Name:  "quiet, q",
+			Name:  "quiet,q",
 			Usage: "print only the plugin ids",
 		},
 		cli.BoolFlag{
-			Name:  "detailed, d",
+			Name:  "detailed,d",
 			Usage: "print detailed information about each plugin",
 		},
 	},
@@ -52,7 +53,6 @@ var pluginsCommand = cli.Command{
 			}
 			return nil
 		}
-
 		w := tabwriter.NewWriter(os.Stdout, 4, 8, 4, ' ', 0)
 		if detailed {
 			first := true
@@ -105,7 +105,6 @@ var pluginsCommand = cli.Command{
 			if len(plugin.Platforms) > 0 {
 				platformColumn = prettyPlatforms(plugin.Platforms)
 			}
-
 			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t\n",
 				plugin.Type,
 				plugin.ID,
@@ -122,7 +121,7 @@ var pluginsCommand = cli.Command{
 func prettyPlatforms(pspb []types.Platform) string {
 	psm := map[string]struct{}{}
 	for _, p := range pspb {
-		psm[platforms.Format(ocispec.Platform{
+		psm[platforms.Format(v1.Platform{
 			OS:           p.OS,
 			Architecture: p.Architecture,
 			Variant:      p.Variant,
@@ -133,6 +132,5 @@ func prettyPlatforms(pspb []types.Platform) string {
 		ps = append(ps, p)
 	}
 	sort.Stable(sort.StringSlice(ps))
-
 	return strings.Join(ps, ",")
 }

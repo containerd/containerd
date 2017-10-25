@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/google/cadvisor/version"
+	"github.com/containerd/containerd/version"
 	"github.com/urfave/cli"
 )
 
