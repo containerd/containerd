@@ -12,10 +12,15 @@ import (
 )
 
 const (
+	// ResourceUnknown specifies an unknown resource
 	ResourceUnknown gc.ResourceType = iota
+	// ResourceContent specifies a content resource
 	ResourceContent
+	// ResourceSnapshot specifies a snapshot resource
 	ResourceSnapshot
+	// ResourceContainer specifies a container resource
 	ResourceContainer
+	// ResourceTask specifies a task resource
 	ResourceTask
 )
 

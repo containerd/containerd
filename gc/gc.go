@@ -10,7 +10,7 @@ import (
 	"sync"
 )
 
-// Resourcetype represents type of resource at a node
+// ResourceType represents type of resource at a node
 type ResourceType uint8
 
 // Node presents a resource which has a type and key,

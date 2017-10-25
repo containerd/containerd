@@ -12,6 +12,7 @@ import (
 )
 
 var (
+	// ErrNotImplemented is returned when an action is not implemented
 	ErrNotImplemented = errors.New("not implemented")
 )
 
@@ -25,12 +26,13 @@ func init() {
 	})
 }
 
-type Snapshotter struct {
+type snapshotter struct {
 	root string
 }
 
+// NewSnapshotter returns a new windows snapshotter
 func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
-	return &Snapshotter{
+	return &snapshotter{
 		root: root,
 	}, nil
 }
@@ -40,23 +42,23 @@ func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
 //
 // Should be used for parent resolution, existence checks and to discern
 // the kind of snapshot.
-func (o *Snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, error) {
+func (o *snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, error) {
 	panic("not implemented")
 }
 
-func (o *Snapshotter) Update(ctx context.Context, info snapshot.Info, fieldpaths ...string) (snapshot.Info, error) {
+func (o *snapshotter) Update(ctx context.Context, info snapshot.Info, fieldpaths ...string) (snapshot.Info, error) {
 	panic("not implemented")
 }
 
-func (o *Snapshotter) Usage(ctx context.Context, key string) (snapshot.Usage, error) {
+func (o *snapshotter) Usage(ctx context.Context, key string) (snapshot.Usage, error) {
 	panic("not implemented")
 }
 
-func (o *Snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshot.Opt) ([]mount.Mount, error) {
+func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshot.Opt) ([]mount.Mount, error) {
 	panic("not implemented")
 }
 
-func (o *Snapshotter) View(ctx context.Context, key, parent string, opts ...snapshot.Opt) ([]mount.Mount, error) {
+func (o *snapshotter) View(ctx context.Context, key, parent string, opts ...snapshot.Opt) ([]mount.Mount, error) {
 	panic("not implemented")
 }
 
@@ -64,21 +66,21 @@ func (o *Snapshotter) View(ctx context.Context, key, parent string, opts ...snap
 // called on an read-write or readonly transaction.
 //
 // This can be used to recover mounts after calling View or Prepare.
-func (o *Snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
+func (o *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
 	panic("not implemented")
 }
 
-func (o *Snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshot.Opt) error {
+func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshot.Opt) error {
 	panic("not implemented")
 }
 
 // Remove abandons the transaction identified by key. All resources
 // associated with the key will be removed.
-func (o *Snapshotter) Remove(ctx context.Context, key string) error {
+func (o *snapshotter) Remove(ctx context.Context, key string) error {
 	panic("not implemented")
 }
 
 // Walk the committed snapshots.
-func (o *Snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshot.Info) error) error {
+func (o *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshot.Info) error) error {
 	panic("not implemented")
 }

@@ -22,11 +22,11 @@ type InitContext struct {
 
 	Meta *Meta // plugins can fill in metadata at init.
 
-	plugins *PluginSet
+	plugins *Set
 }
 
 // NewContext returns a new plugin InitContext
-func NewContext(ctx context.Context, r *Registration, plugins *PluginSet, root, state string) *InitContext {
+func NewContext(ctx context.Context, r *Registration, plugins *Set, root, state string) *InitContext {
 	return &InitContext{
 		Context: log.WithModule(ctx, r.URI()),
 		Root:    filepath.Join(root, r.URI()),
@@ -72,26 +72,26 @@ func (p *Plugin) Instance() (interface{}, error) {
 	return p.instance, p.err
 }
 
-// PluginSet defines a plugin collection, used with InitContext.
+// Set defines a plugin collection, used with InitContext.
 //
 // This maintains ordering and unique indexing over the set.
 //
 // After iteratively instantiating plugins, this set should represent, the
 // ordered, initialization set of plugins for a containerd instance.
-type PluginSet struct {
+type Set struct {
 	ordered     []*Plugin // order of initialization
 	byTypeAndID map[Type]map[string]*Plugin
 }
 
 // NewPluginSet returns an initialized plugin set
-func NewPluginSet() *PluginSet {
-	return &PluginSet{
+func NewPluginSet() *Set {
+	return &Set{
 		byTypeAndID: make(map[Type]map[string]*Plugin),
 	}
 }
 
 // Add a plugin to the set
-func (ps *PluginSet) Add(p *Plugin) error {
+func (ps *Set) Add(p *Plugin) error {
 	if byID, typeok := ps.byTypeAndID[p.Registration.Type]; !typeok {
 		ps.byTypeAndID[p.Registration.Type] = map[string]*Plugin{
 			p.Registration.ID: p,
@@ -107,7 +107,7 @@ func (ps *PluginSet) Add(p *Plugin) error {
 }
 
 // Get returns the first plugin by its type
-func (ps *PluginSet) Get(t Type) (interface{}, error) {
+func (ps *Set) Get(t Type) (interface{}, error) {
 	for _, v := range ps.byTypeAndID[t] {
 		return v.Instance()
 	}

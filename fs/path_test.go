@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type rootCheck struct {
+type RootCheck struct {
 	unresolved string
 	expected   string
 	scope      func(string) string
@@ -23,7 +23,7 @@ func TestRootPath(t *testing.T) {
 	tests := []struct {
 		name   string
 		apply  fstest.Applier
-		checks []rootCheck
+		checks []RootCheck
 		scope  func(string) (string, error)
 	}{
 		{
@@ -201,7 +201,7 @@ func testRootPathSymlinkEmpty(t *testing.T) {
 	}
 }
 
-func makeRootPathTest(t *testing.T, apply fstest.Applier, checks []rootCheck) func(t *testing.T) {
+func makeRootPathTest(t *testing.T, apply fstest.Applier, checks []RootCheck) func(t *testing.T) {
 	return func(t *testing.T) {
 		applyDir, err := ioutil.TempDir("", "test-root-path-")
 		if err != nil {
@@ -242,8 +242,8 @@ func makeRootPathTest(t *testing.T, apply fstest.Applier, checks []rootCheck) fu
 	}
 }
 
-func Check(unresolved, expected string) []rootCheck {
-	return []rootCheck{
+func Check(unresolved, expected string) []RootCheck {
+	return []RootCheck{
 		{
 			unresolved: unresolved,
 			expected:   expected,
@@ -251,8 +251,8 @@ func Check(unresolved, expected string) []rootCheck {
 	}
 }
 
-func CheckWithScope(unresolved, expected, scope string) []rootCheck {
-	return []rootCheck{
+func CheckWithScope(unresolved, expected, scope string) []RootCheck {
+	return []RootCheck{
 		{
 			unresolved: unresolved,
 			expected:   expected,
@@ -263,8 +263,8 @@ func CheckWithScope(unresolved, expected, scope string) []rootCheck {
 	}
 }
 
-func ErrorWithScope(unresolved, scope string, cause error) []rootCheck {
-	return []rootCheck{
+func ErrorWithScope(unresolved, scope string, cause error) []RootCheck {
+	return []RootCheck{
 		{
 			unresolved: unresolved,
 			cause:      cause,
@@ -275,8 +275,8 @@ func ErrorWithScope(unresolved, scope string, cause error) []rootCheck {
 	}
 }
 
-func CheckAll(checks ...[]rootCheck) []rootCheck {
-	all := make([]rootCheck, 0, len(checks))
+func CheckAll(checks ...[]RootCheck) []RootCheck {
+	all := make([]RootCheck, 0, len(checks))
 	for _, c := range checks {
 		all = append(all, c...)
 	}

@@ -90,6 +90,7 @@ func GetInfo(ctx context.Context, key string) (string, snapshot.Info, snapshot.U
 	return fmt.Sprintf("%d", id), si, su, nil
 }
 
+// UpdateInfo updates an existing snapshot info's data
 func UpdateInfo(ctx context.Context, info snapshot.Info, fieldpaths ...string) (snapshot.Info, error) {
 	updated := snapshot.Info{
 		Name: info.Name,
@@ -131,11 +132,7 @@ func UpdateInfo(ctx context.Context, info snapshot.Info, fieldpaths ...string) (
 			return err
 		}
 
-		if err := boltutil.WriteLabels(sbkt, updated.Labels); err != nil {
-			return err
-		}
-
-		return nil
+		return boltutil.WriteLabels(sbkt, updated.Labels)
 	})
 	if err != nil {
 		return snapshot.Info{}, err
@@ -534,12 +531,7 @@ func putSnapshot(bkt *bolt.Bucket, id uint64, si snapshot.Info) error {
 	if err := boltutil.WriteTimestamps(bkt, si.Created, si.Updated); err != nil {
 		return err
 	}
-
-	if err := boltutil.WriteLabels(bkt, si.Labels); err != nil {
-		return err
-	}
-
-	return nil
+	return boltutil.WriteLabels(bkt, si.Labels)
 }
 
 func getUsage(bkt *bolt.Bucket, usage *snapshot.Usage) {
@@ -569,7 +561,7 @@ func putUsage(bkt *bolt.Bucket, usage snapshot.Usage) error {
 func encodeSize(size int64) ([]byte, error) {
 	var (
 		buf         [binary.MaxVarintLen64]byte
-		sizeEncoded []byte = buf[:]
+		sizeEncoded = buf[:]
 	)
 	sizeEncoded = sizeEncoded[:binary.PutVarint(sizeEncoded, size)]
 
