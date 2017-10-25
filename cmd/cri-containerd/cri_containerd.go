@@ -17,12 +17,13 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"os"
 
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/golang/glog"
 	"github.com/opencontainers/selinux/go-selinux"
-	"github.com/spf13/pflag"
+	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 
 	"github.com/kubernetes-incubator/cri-containerd/cmd/cri-containerd/options"
@@ -30,40 +31,81 @@ import (
 	"github.com/kubernetes-incubator/cri-containerd/pkg/version"
 )
 
+// Add \u200B to avoid the space trimming.
+const desc = "\u200B" + `             _                         __        _                      __
+  __________(_)      _________  ____  / /_____ _(_)____  ___  _________/ /
+ / ___/ ___/ /______/ ___/ __ \/ __ \/ __/ __ ` + "`" + `/ // __ \/ _ \/ ___/ __  /
+/ /__/ /  / //_____/ /__/ /_/ / / / / /_/ /_/ / // / / /  __/ /  / /_/ /
+\___/_/  /_/       \___/\____/_/ /_/\__/\__,_/_//_/ /_/\___/_/   \__,_/
+
+A containerd based Kubernetes CRI implementation.
+`
+
+var cmd = &cobra.Command{
+	Use:   "cri-containerd",
+	Short: "A containerd based Kubernetes CRI implementation.",
+	Long:  desc,
+}
+
+// Add golang flags as persistent flags.
+func init() {
+	cmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
+}
+
+func defaultConfigCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "default-config",
+		Short: "Print default toml config of cri-containerd.",
+		Run: func(cmd *cobra.Command, args []string) {
+			options.PrintDefaultTomlConfig()
+		},
+	}
+}
+
+func versionCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Print cri-containerd version information.",
+		Run: func(cmd *cobra.Command, args []string) {
+			version.PrintVersion()
+		},
+	}
+}
+
 func main() {
 	if reexec.Init() {
 		return
 	}
 	o := options.NewCRIContainerdOptions()
-	o.AddFlags(pflag.CommandLine)
-	if err := o.InitFlags(pflag.CommandLine); err != nil {
-		glog.Exitf("Failed to init CRI containerd flags: %v", err)
+
+	o.AddFlags(cmd.Flags())
+	cmd.AddCommand(defaultConfigCommand())
+	cmd.AddCommand(versionCommand())
+
+	cmd.Run = func(cmd *cobra.Command, args []string) {
+		if err := o.InitFlags(cmd.Flags()); err != nil {
+			glog.Exitf("Failed to init CRI containerd flags: %v", err)
+		}
+		validateConfig(o)
+
+		glog.V(0).Infof("Run cri-containerd %+v", o)
+
+		glog.V(2).Infof("Run cri-containerd grpc server on socket %q", o.SocketPath)
+		s, err := server.NewCRIContainerdService(o.Config)
+		if err != nil {
+			glog.Exitf("Failed to create CRI containerd service: %v", err)
+		}
+		// Use interrupt handler to make sure the server is stopped properly.
+		// Pass in non-empty final function to avoid os.Exit(1). We expect `Run`
+		// to return itself.
+		h := interrupt.New(func(os.Signal) {}, s.Stop)
+		if err := h.Run(func() error { return s.Run() }); err != nil {
+			glog.Exitf("Failed to run cri-containerd grpc server: %v", err)
+		}
 	}
 
-	glog.V(0).Infof("Run cri-containerd %+v", o)
-	if o.PrintVersion {
-		version.PrintVersion()
-		os.Exit(0)
-	}
-
-	if o.PrintDefaultConfig {
-		o.PrintDefaultTomlConfig()
-		os.Exit(0)
-	}
-
-	validateConfig(o)
-
-	glog.V(2).Infof("Run cri-containerd grpc server on socket %q", o.SocketPath)
-	s, err := server.NewCRIContainerdService(o.Config)
-	if err != nil {
-		glog.Exitf("Failed to create CRI containerd service: %v", err)
-	}
-	// Use interrupt handler to make sure the server to be stopped properly.
-	// Pass in non-empty final function to avoid os.Exit(1). We expect `Run`
-	// to return itself.
-	h := interrupt.New(func(os.Signal) {}, s.Stop)
-	if err := h.Run(func() error { return s.Run() }); err != nil {
-		glog.Exitf("Failed to run cri-containerd grpc server: %v", err)
+	if err := cmd.Execute(); err != nil {
+		glog.Exitf("Failed to execute cri-containerd: %v", err)
 	}
 }
 

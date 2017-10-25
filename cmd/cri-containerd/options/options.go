@@ -17,7 +17,6 @@ limitations under the License.
 package options
 
 import (
-	"flag"
 	"fmt"
 	"os"
 
@@ -26,8 +25,12 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// configFilePathArgName is the path to the config file.
-const configFilePathArgName = "config"
+const (
+	// configFilePathArgName is the path to the config file.
+	configFilePathArgName = "config"
+	// defaultConfigFilePath is the default config file path.
+	defaultConfigFilePath = "/etc/cri-containerd/config.toml"
+)
 
 // ContainerdConfig contains config related to containerd
 type ContainerdConfig struct {
@@ -90,12 +93,8 @@ type Config struct {
 type CRIContainerdOptions struct {
 	// Config contains cri-containerd toml config
 	Config
-	// Path to the TOML config file
-	ConfigFilePath string
-	// PrintVersion indicates to print version information of cri-containerd.
-	PrintVersion bool
-	// PrintDefaultConfig indicates to print default toml config of cri-containerd.
-	PrintDefaultConfig bool
+	// Path to the TOML config file.
+	ConfigFilePath string `toml:"-"`
 }
 
 // NewCRIContainerdOptions returns a reference to CRIContainerdOptions
@@ -105,63 +104,52 @@ func NewCRIContainerdOptions() *CRIContainerdOptions {
 
 // AddFlags adds cri-containerd command line options to pflag.
 func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
+	defaults := defaultConfig()
 	fs.StringVar(&c.ConfigFilePath, configFilePathArgName,
-		"/etc/cri-containerd/config.toml", "Path to the config file.")
+		defaultConfigFilePath, "Path to the config file.")
 	fs.StringVar(&c.SocketPath, "socket-path",
-		"/var/run/cri-containerd.sock", "Path to the socket which cri-containerd serves on.")
+		defaults.SocketPath, "Path to the socket which cri-containerd serves on.")
 	fs.StringVar(&c.RootDir, "root-dir",
-		"/var/lib/cri-containerd", "Root directory path for cri-containerd managed files (metadata checkpoint etc).")
+		defaults.RootDir, "Root directory path for cri-containerd managed files (metadata checkpoint etc).")
 	fs.StringVar(&c.ContainerdConfig.RootDir, "containerd-root-dir",
-		"/var/lib/containerd", "Root directory path where containerd stores persistent data.")
+		defaults.ContainerdConfig.RootDir, "Root directory path where containerd stores persistent data.")
 	fs.StringVar(&c.ContainerdConfig.Endpoint, "containerd-endpoint",
-		"/run/containerd/containerd.sock", "Path to the containerd endpoint.")
+		defaults.ContainerdConfig.Endpoint, "Path to the containerd endpoint.")
 	fs.StringVar(&c.ContainerdConfig.Snapshotter, "containerd-snapshotter",
-		containerd.DefaultSnapshotter, "The snapshotter used by containerd.")
+		defaults.ContainerdConfig.Snapshotter, "The snapshotter used by containerd.")
 	fs.StringVar(&c.ContainerdConfig.Runtime, "containerd-runtime",
-		"io.containerd.runtime.v1.linux", "The runtime used by containerd.")
+		defaults.ContainerdConfig.Runtime, "The runtime used by containerd.")
 	fs.StringVar(&c.ContainerdConfig.RuntimeEngine, "containerd-runtime-engine",
-		"", "Runtime engine used by containerd. Defaults to containerd's default if not specified.")
+		defaults.ContainerdConfig.RuntimeEngine, "Runtime engine used by containerd. Defaults to containerd's default if not specified.")
 	fs.StringVar(&c.ContainerdConfig.RuntimeRoot, "containerd-runtime-root",
-		"", "The directory used by containerd for runtime state. Defaults to containerd's default if not specified.")
-	fs.BoolVar(&c.PrintVersion, "version",
-		false, "Print cri-containerd version information and quit.")
+		defaults.ContainerdConfig.RuntimeRoot, "The directory used by containerd for runtime state. Defaults to containerd's default if not specified.")
 	fs.StringVar(&c.NetworkPluginBinDir, "network-bin-dir",
-		"/opt/cni/bin", "The directory for putting network binaries.")
+		defaults.NetworkPluginBinDir, "The directory for putting network binaries.")
 	fs.StringVar(&c.NetworkPluginConfDir, "network-conf-dir",
-		"/etc/cni/net.d", "The directory for putting network plugin configuration files.")
+		defaults.NetworkPluginConfDir, "The directory for putting network plugin configuration files.")
 	fs.StringVar(&c.StreamServerAddress, "stream-addr",
-		"", "The ip address streaming server is listening on. The default host interface is used if not specified.")
+		defaults.StreamServerAddress, "The ip address streaming server is listening on. The default host interface is used if not specified.")
 	fs.StringVar(&c.StreamServerPort, "stream-port",
-		"10010", "The port streaming server is listening on.")
+		defaults.StreamServerPort, "The port streaming server is listening on.")
 	fs.StringVar(&c.CgroupPath, "cgroup-path",
-		"", "The cgroup that cri-containerd is part of. Cri-containerd is not placed in a cgroup if none is specified.")
+		defaults.CgroupPath, "The cgroup that cri-containerd is part of. Cri-containerd is not placed in a cgroup if none is specified.")
 	fs.BoolVar(&c.EnableSelinux, "enable-selinux",
-		false, "Enable selinux support. By default not enabled.")
+		defaults.EnableSelinux, "Enable selinux support. By default not enabled.")
 	fs.StringVar(&c.SandboxImage, "sandbox-image",
-		"gcr.io/google_containers/pause:3.0", "The image used by sandbox container.")
+		defaults.SandboxImage, "The image used by sandbox container.")
 	fs.IntVar(&c.StatsCollectPeriod, "stats-collect-period",
-		10, "The period (in seconds) of snapshots stats collection.")
+		defaults.StatsCollectPeriod, "The period (in seconds) of snapshots stats collection.")
 	fs.BoolVar(&c.SystemdCgroup, "systemd-cgroup",
-		false, "Enables systemd cgroup support. By default not enabled.")
-	fs.BoolVar(&c.PrintDefaultConfig, "default-config",
-		false, "Print default toml config of cri-containerd and quit.")
+		defaults.SystemdCgroup, "Enables systemd cgroup support. By default not enabled.")
 	fs.IntVar(&c.OOMScore, "oom-score",
-		-999, "Adjust the cri-containerd's oom score.")
+		defaults.OOMScore, "Adjust the cri-containerd's oom score.")
 }
 
-// InitFlags must be called after adding all cli options flags are defined and
-// before flags are accessed by the program. Ths fuction adds flag.CommandLine
-// (the default set of command-line flags, parsed from os.Args) and then calls
-// pflag.Parse().
+// InitFlags load configurations from config file, and then overwrite with flags.
+// This function must be called inside `Run`, at that time flags should have been
+// parsed once.
 // precedence:  commandline > configfile > default
 func (c *CRIContainerdOptions) InitFlags(fs *pflag.FlagSet) error {
-	fs.AddGoFlagSet(flag.CommandLine)
-
-	commandline := os.Args[1:]
-	if err := fs.Parse(commandline); err != nil {
-		return err
-	}
-
 	// Load default config file if none provided
 	if _, err := toml.DecodeFile(c.ConfigFilePath, &c.Config); err != nil {
 		// the absence of default config file is normal case.
@@ -179,17 +167,41 @@ func (c *CRIContainerdOptions) InitFlags(fs *pflag.FlagSet) error {
 	// But the priority of the toml config value is higher than the default value,
 	// Without a way to insert the toml config value between the default value and the command line value.
 	// We parse twice one for default value, one for commandline value.
-	return fs.Parse(commandline)
+	return fs.Parse(os.Args[1:])
 }
 
 // PrintDefaultTomlConfig print default toml config of cri-containerd.
-func (c *CRIContainerdOptions) PrintDefaultTomlConfig() {
-	fs := pflag.NewFlagSet("default-config", pflag.ExitOnError)
-
-	c.AddFlags(fs)
-
-	if err := toml.NewEncoder(os.Stdout).Encode(c.Config); err != nil {
+func PrintDefaultTomlConfig() {
+	if err := toml.NewEncoder(os.Stdout).Encode(defaultConfig()); err != nil {
 		fmt.Println(err)
 		return
+	}
+}
+
+// defaultConfig returns default configurations of cri-containerd.
+func defaultConfig() Config {
+	return Config{
+		ContainerdConfig: ContainerdConfig{
+			RootDir:       "/var/lib/containerd",
+			Snapshotter:   containerd.DefaultSnapshotter,
+			Endpoint:      "/run/containerd/containerd.sock",
+			Runtime:       "io.containerd.runtime.v1.linux",
+			RuntimeEngine: "",
+			RuntimeRoot:   "",
+		},
+		CniConfig: CniConfig{
+			NetworkPluginBinDir:  "/opt/cni/bin",
+			NetworkPluginConfDir: "/etc/cni/net.d",
+		},
+		SocketPath:          "/var/run/cri-containerd.sock",
+		RootDir:             "/var/lib/cri-containerd",
+		StreamServerAddress: "",
+		StreamServerPort:    "10010",
+		CgroupPath:          "",
+		EnableSelinux:       false,
+		SandboxImage:        "gcr.io/google_containers/pause:3.0",
+		StatsCollectPeriod:  10,
+		SystemdCgroup:       false,
+		OOMScore:            -999,
 	}
 }
