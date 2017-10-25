@@ -5,6 +5,7 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/urfave/cli"
 )
 
@@ -29,7 +30,7 @@ var containersCommand = cli.Command{
 			filters = context.Args()
 			quiet   = context.Bool("quiet")
 		)
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}

@@ -20,7 +20,7 @@ var containersSetLabelsCommand = cli.Command{
 		if containerID == "" {
 			return errors.New("please specify a container")
 		}
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}

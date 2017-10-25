@@ -118,7 +118,7 @@ var runCommand = cli.Command{
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}

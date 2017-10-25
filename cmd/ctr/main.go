@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 
+	"github.com/containerd/containerd/cmd/ctr/commands/plugins"
+	versionCmd "github.com/containerd/containerd/cmd/ctr/commands/version"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/server"
 	"github.com/containerd/containerd/version"
@@ -64,6 +66,8 @@ containerd CLI
 		},
 	}
 	app.Commands = append([]cli.Command{
+		plugins.Command,
+		versionCmd.Command,
 		applyCommand,
 		containersCommand,
 		contentCommand,
@@ -80,8 +84,6 @@ containerd CLI
 		runCommand,
 		snapshotCommand,
 		tasksCommand,
-		pluginsCommand,
-		versionCommand,
 	}, extraCmds...)
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {

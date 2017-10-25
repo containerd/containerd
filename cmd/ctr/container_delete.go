@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/log"
 	"github.com/urfave/cli"
 )
@@ -23,7 +24,7 @@ var containersDeleteCommand = cli.Command{
 	},
 	Action: func(context *cli.Context) error {
 		var exitErr error
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}

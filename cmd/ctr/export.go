@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/reference"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -38,7 +39,7 @@ var imagesExportCommand = cli.Command{
 			local = context.Args().Get(1)
 			desc  ocispec.Descriptor
 		)
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}

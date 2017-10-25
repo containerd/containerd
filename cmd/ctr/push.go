@@ -52,7 +52,7 @@ var pushCommand = cli.Command{
 			local = context.Args().Get(1)
 			desc  ocispec.Descriptor
 		)
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}

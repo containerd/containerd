@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -23,7 +24,7 @@ var taskCheckpointCommand = cli.Command{
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}

@@ -23,7 +23,7 @@ var fetchObjectCommand = cli.Command{
 		var (
 			ref = context.Args().First()
 		)
-		ctx, cancel := appContext(context)
+		ctx, cancel := commands.AppContext(context)
 		defer cancel()
 
 		resolver, err := getResolver(ctx, context)

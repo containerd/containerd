@@ -27,7 +27,7 @@ var pushObjectCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}

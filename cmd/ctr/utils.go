@@ -16,8 +16,6 @@ import (
 	"time"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -25,39 +23,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
-
-// appContext returns the context for a command. Should only be called once per
-// command, near the start.
-//
-// This will ensure the namespace is picked up and set the timeout, if one is
-// defined.
-func appContext(clicontext *cli.Context) (gocontext.Context, gocontext.CancelFunc) {
-	var (
-		ctx       = gocontext.Background()
-		timeout   = clicontext.GlobalDuration("timeout")
-		namespace = clicontext.GlobalString("namespace")
-		cancel    gocontext.CancelFunc
-	)
-
-	ctx = namespaces.WithNamespace(ctx, namespace)
-
-	if timeout > 0 {
-		ctx, cancel = gocontext.WithTimeout(ctx, timeout)
-	} else {
-		ctx, cancel = gocontext.WithCancel(ctx)
-	}
-
-	return ctx, cancel
-}
-
-func newClient(context *cli.Context) (*containerd.Client, gocontext.Context, gocontext.CancelFunc, error) {
-	client, err := containerd.New(context.GlobalString("address"))
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	ctx, cancel := appContext(context)
-	return client, ctx, cancel, nil
-}
 
 func passwordPrompt() (string, error) {
 	c := console.Current()

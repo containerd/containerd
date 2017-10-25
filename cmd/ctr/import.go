@@ -31,7 +31,7 @@ var imagesImportCommand = cli.Command{
 			refObject = context.String("ref-object")
 			labels    = commands.LabelArgs(context.StringSlice("label"))
 		)
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
