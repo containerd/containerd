@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -41,7 +42,7 @@ var taskKillCommand = cli.Command{
 		if pid > 0 && all {
 			return errors.New("enter a pid or all; not both")
 		}
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}

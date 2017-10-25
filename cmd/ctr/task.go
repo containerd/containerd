@@ -6,6 +6,7 @@ import (
 	"text/tabwriter"
 
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/urfave/cli"
 )
 
@@ -32,7 +33,7 @@ var tasksCommand = cli.Command{
 	},
 	Action: func(context *cli.Context) error {
 		quiet := context.Bool("quiet")
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}

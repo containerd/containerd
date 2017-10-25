@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/version"
 	"github.com/urfave/cli"
 )
@@ -19,7 +20,7 @@ var versionCommand = cli.Command{
 		fmt.Printf("  Version: %s\n", version.Version)
 		fmt.Printf("  Revision: %s\n", version.Revision)
 		fmt.Println("")
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}

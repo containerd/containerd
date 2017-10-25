@@ -5,6 +5,7 @@ import (
 
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/archive/compression"
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/log"
 	"github.com/urfave/cli"
 )
@@ -18,7 +19,7 @@ var applyCommand = cli.Command{
 		var (
 			dir = context.Args().First()
 		)
-		ctx, cancel := appContext(context)
+		ctx, cancel := commands.AppContext(context)
 		defer cancel()
 
 		log.G(ctx).Info("applying layer from stdin")

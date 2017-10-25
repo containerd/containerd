@@ -35,7 +35,7 @@ var namespacesCreateCommand = cli.Command{
 		if namespace == "" {
 			return errors.New("please specify a namespace")
 		}
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
@@ -56,7 +56,7 @@ var namespacesSetLabelsCommand = cli.Command{
 		if namespace == "" {
 			return errors.New("please specify a namespace")
 		}
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
@@ -85,7 +85,7 @@ var namespacesListCommand = cli.Command{
 	},
 	Action: func(context *cli.Context) error {
 		quiet := context.Bool("quiet")
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
@@ -131,7 +131,7 @@ var namespacesRemoveCommand = cli.Command{
 	Description: "Remove one or more namespaces. For now, the namespace must be empty.",
 	Action: func(context *cli.Context) error {
 		var exitErr error
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}

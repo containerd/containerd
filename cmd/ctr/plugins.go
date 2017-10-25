@@ -9,6 +9,7 @@ import (
 
 	introspection "github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
@@ -33,7 +34,7 @@ var pluginsCommand = cli.Command{
 			quiet    = context.Bool("quiet")
 			detailed = context.Bool("detailed")
 		)
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}

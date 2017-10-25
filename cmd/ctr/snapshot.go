@@ -38,7 +38,7 @@ var listSnapshotCommand = cli.Command{
 	Aliases: []string{"ls"},
 	Usage:   "list snapshots",
 	Action: func(context *cli.Context) error {
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
@@ -83,7 +83,7 @@ var usageSnapshotCommand = cli.Command{
 				return progress.Bytes(s).String()
 			}
 		}
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
@@ -124,7 +124,7 @@ var removeSnapshotCommand = cli.Command{
 	ArgsUsage: "<key> [<key>, ...]",
 	Usage:     "remove snapshots",
 	Action: func(context *cli.Context) error {
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
@@ -160,7 +160,7 @@ var prepareSnapshotCommand = cli.Command{
 			key    = context.Args().Get(0)
 			parent = context.Args().Get(1)
 		)
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
@@ -199,7 +199,7 @@ var viewSnapshotCommand = cli.Command{
 			key    = context.Args().Get(0)
 			parent = context.Args().Get(1)
 		)
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
@@ -232,7 +232,7 @@ var mountSnapshotCommand = cli.Command{
 			target = context.Args().Get(0)
 			key    = context.Args().Get(1)
 		)
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
@@ -261,7 +261,7 @@ var commitSnapshotCommand = cli.Command{
 			key    = context.Args().Get(0)
 			active = context.Args().Get(1)
 		)
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
@@ -275,7 +275,7 @@ var treeSnapshotCommand = cli.Command{
 	Name:  "tree",
 	Usage: "display tree view of snapshot branches",
 	Action: func(context *cli.Context) error {
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
@@ -315,7 +315,7 @@ var infoSnapshotCommand = cli.Command{
 		}
 
 		key := context.Args().Get(0)
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
@@ -340,7 +340,7 @@ var labelSnapshotCommand = cli.Command{
 	Flags:       []cli.Flag{},
 	Action: func(context *cli.Context) error {
 		key, labels := commands.ObjectWithLabelArgs(context)
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}

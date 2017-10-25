@@ -47,7 +47,7 @@ var imagesListCommand = cli.Command{
 			filters = context.Args()
 			quiet   = context.Bool("quiet")
 		)
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
@@ -130,7 +130,7 @@ var imagesSetLabelsCommand = cli.Command{
 			replaceAll   = context.Bool("replace-all")
 			name, labels = commands.ObjectWithLabelArgs(context)
 		)
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
@@ -183,7 +183,7 @@ var imagesCheckCommand = cli.Command{
 		var (
 			exitErr error
 		)
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
@@ -263,7 +263,7 @@ var imageRemoveCommand = cli.Command{
 	Description: `Remove one or more images by reference.`,
 	Flags:       []cli.Flag{},
 	Action: func(context *cli.Context) error {
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}

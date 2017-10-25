@@ -46,7 +46,7 @@ var (
 			if err != nil {
 				return err
 			}
-			client, ctx, cancel, err := newClient(context)
+			client, ctx, cancel, err := commands.NewClient(context)
 			if err != nil {
 				return err
 			}
@@ -90,7 +90,7 @@ var (
 			if ref == "" {
 				return errors.New("must specify a transaction reference")
 			}
-			client, ctx, cancel, err := newClient(context)
+			client, ctx, cancel, err := commands.NewClient(context)
 			if err != nil {
 				return err
 			}
@@ -124,7 +124,7 @@ var (
 		},
 		Action: func(context *cli.Context) error {
 			match := context.Args().First()
-			client, ctx, cancel, err := newClient(context)
+			client, ctx, cancel, err := commands.NewClient(context)
 			if err != nil {
 				return err
 			}
@@ -164,7 +164,7 @@ var (
 				quiet = context.Bool("quiet")
 				args  = []string(context.Args())
 			)
-			client, ctx, cancel, err := newClient(context)
+			client, ctx, cancel, err := commands.NewClient(context)
 			if err != nil {
 				return err
 			}
@@ -214,7 +214,7 @@ var (
 		Flags:       []cli.Flag{},
 		Action: func(context *cli.Context) error {
 			object, labels := commands.ObjectWithLabelArgs(context)
-			client, ctx, cancel, err := newClient(context)
+			client, ctx, cancel, err := commands.NewClient(context)
 			if err != nil {
 				return err
 			}
@@ -289,7 +289,7 @@ var (
 			if err != nil {
 				return err
 			}
-			client, ctx, cancel, err := newClient(context)
+			client, ctx, cancel, err := commands.NewClient(context)
 			if err != nil {
 				return err
 			}
@@ -338,7 +338,7 @@ var (
 				args      = []string(context.Args())
 				exitError error
 			)
-			client, ctx, cancel, err := newClient(context)
+			client, ctx, cancel, err := commands.NewClient(context)
 			if err != nil {
 				return err
 			}

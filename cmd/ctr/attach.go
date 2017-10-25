@@ -5,6 +5,7 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -14,7 +15,7 @@ var taskAttachCommand = cli.Command{
 	Usage:     "attach to the IO of a running container",
 	ArgsUsage: "CONTAINER",
 	Action: func(context *cli.Context) error {
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}

@@ -27,7 +27,7 @@ command. As part of this process, we do the following:
 			ref = context.Args().First()
 		)
 
-		ctx, cancel := appContext(context)
+		ctx, cancel := commands.AppContext(context)
 		defer cancel()
 
 		img, err := fetch(ref, context)

@@ -1,13 +1,16 @@
 package main
 
-import "github.com/urfave/cli"
+import (
+	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/urfave/cli"
+)
 
 var taskResumeCommand = cli.Command{
 	Name:      "resume",
 	Usage:     "resume a paused container",
 	ArgsUsage: "CONTAINER",
 	Action: func(context *cli.Context) error {
-		client, ctx, cancel, err := newClient(context)
+		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
