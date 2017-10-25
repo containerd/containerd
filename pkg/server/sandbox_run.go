@@ -33,6 +33,7 @@ import (
 	"golang.org/x/sys/unix"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
+	customopts "github.com/kubernetes-incubator/cri-containerd/pkg/opts"
 	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
 )
@@ -143,6 +144,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 
 	opts := []containerd.NewContainerOpts{
 		containerd.WithSnapshotter(c.config.ContainerdConfig.Snapshotter),
+		customopts.WithImageUnpack(image.Image),
 		containerd.WithNewSnapshot(id, image.Image),
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(map[string]string{containerKindLabel: containerKindSandbox}),

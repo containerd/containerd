@@ -21,11 +21,40 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/docker/docker/pkg/chrootarchive"
 	"github.com/docker/docker/pkg/system"
+	"github.com/opencontainers/image-spec/identity"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
+
+// WithImageUnpack guarantees that the image used by the container is unpacked.
+func WithImageUnpack(i containerd.Image) containerd.NewContainerOpts {
+	return func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
+		if c.Snapshotter == "" {
+			return errors.New("no snapshotter set for container")
+		}
+		snapshotter := client.SnapshotService(c.Snapshotter)
+		diffIDs, err := i.RootFS(ctx)
+		if err != nil {
+			return errors.Wrap(err, "get image diff IDs")
+		}
+		chainID := identity.ChainID(diffIDs)
+		_, err = snapshotter.Stat(ctx, chainID.String())
+		if err == nil {
+			return nil
+		}
+		if !errdefs.IsNotFound(err) {
+			return errors.Wrap(err, "stat snapshot")
+		}
+		// Unpack the snapshot.
+		if err := i.Unpack(ctx, c.Snapshotter); err != nil {
+			return errors.Wrap(err, "unpack snapshot")
+		}
+		return nil
+	}
+}
 
 // WithVolumes copies ownership of volume in rootfs to its corresponding host path.
 // It doesn't update runtime spec.
@@ -34,10 +63,10 @@ import (
 func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 	return func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
 		if c.Snapshotter == "" {
-			return errors.Errorf("no snapshotter set for container")
+			return errors.New("no snapshotter set for container")
 		}
 		if c.SnapshotKey == "" {
-			return errors.Errorf("rootfs not created for container")
+			return errors.New("rootfs not created for container")
 		}
 		snapshotter := client.SnapshotService(c.Snapshotter)
 		mounts, err := snapshotter.Mounts(ctx, c.SnapshotKey)
