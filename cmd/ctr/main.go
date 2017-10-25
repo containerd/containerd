@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/containerd/containerd/cmd/ctr/commands/containers"
+	"github.com/containerd/containerd/cmd/ctr/commands/content"
 	"github.com/containerd/containerd/cmd/ctr/commands/images"
 	"github.com/containerd/containerd/cmd/ctr/commands/plugins"
 	versionCmd "github.com/containerd/containerd/cmd/ctr/commands/version"
@@ -72,7 +73,7 @@ containerd CLI
 		versionCmd.Command,
 		applyCommand,
 		containers.Command,
-		contentCommand,
+		content.Command,
 		eventsCommand,
 		fetchCommand,
 		fetchObjectCommand,
