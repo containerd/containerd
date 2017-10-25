@@ -1,21 +1,19 @@
-package main
+package version
 
 import (
 	"fmt"
 	"os"
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/version"
+	"github.com/google/cadvisor/version"
 	"github.com/urfave/cli"
 )
 
-var versionCommand = cli.Command{
+// Command is a cli ommand to output the client and containerd server version
+var Command = cli.Command{
 	Name:  "version",
-	Usage: "print the version",
+	Usage: "print the client and server versions",
 	Action: func(context *cli.Context) error {
-		if context.NArg() > 0 {
-			return fmt.Errorf("no argument expected")
-		}
 		fmt.Println("Client:")
 		fmt.Printf("  Version: %s\n", version.Version)
 		fmt.Printf("  Revision: %s\n", version.Revision)
@@ -29,7 +27,6 @@ var versionCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-
 		fmt.Println("Server:")
 		fmt.Printf("  Version: %s\n", v.Version)
 		fmt.Printf("  Revision: %s\n", v.Revision)
