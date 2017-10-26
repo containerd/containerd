@@ -33,6 +33,7 @@ import (
 	"golang.org/x/sys/unix"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
+	customopts "github.com/kubernetes-incubator/cri-containerd/pkg/opts"
 	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
 )
@@ -198,8 +199,12 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	// Create sandbox task in containerd.
 	glog.V(5).Infof("Create sandbox container (id=%q, name=%q).",
 		id, name)
+	var taskOpts []containerd.NewTaskOpts
+	if cgroup := sandbox.Config.GetLinux().GetCgroupParent(); cgroup != "" {
+		taskOpts = append(taskOpts, customopts.WithContainerdShimCgroup(cgroup))
+	}
 	// We don't need stdio for sandbox container.
-	task, err := container.NewTask(ctx, containerd.NullIO)
+	task, err := container.NewTask(ctx, containerd.NullIO, taskOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create task for sandbox %q: %v", id, err)
 	}
