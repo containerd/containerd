@@ -99,14 +99,20 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 
 	// TODO(mikebrow): add truncIndex for image id
 	image, err := c.client.Pull(ctx, ref,
-		containerd.WithPullUnpack,
 		containerd.WithSchema1Conversion,
 		containerd.WithResolver(resolver),
-		containerd.WithPullSnapshotter(c.config.ContainerdConfig.Snapshotter),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull image %q: %v", ref, err)
 	}
+
+	// Do best effort unpack.
+	glog.V(4).Info("Unpack image %q", imageRef)
+	if err := image.Unpack(ctx, c.config.ContainerdConfig.Snapshotter); err != nil {
+		glog.Warningf("Failed to unpack image %q: %v", imageRef, err)
+		// Do not fail image pulling. Unpack will be retried before container creation.
+	}
+
 	repoDigest, repoTag := getRepoDigestAndTag(namedRef, image.Target().Digest, isSchema1)
 	for _, r := range []string{repoTag, repoDigest} {
 		if r == "" {

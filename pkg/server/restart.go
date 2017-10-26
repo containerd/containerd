@@ -391,7 +391,7 @@ func loadImages(ctx context.Context, cImages []containerd.Image, provider conten
 		// Checking existence of top-level snapshot for each image being recovered.
 		if _, err := snapshotter.Stat(ctx, image.ChainID); err != nil {
 			glog.Warningf("Failed to stat the top-level snapshot for image %+v: %v", image, err)
-			continue
+			// TODO(random-liu): Consider whether we should try unpack here.
 		}
 		images = append(images, image)
 	}
