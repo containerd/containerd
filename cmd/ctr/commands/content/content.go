@@ -1,4 +1,4 @@
-package main
+package content
 
 import (
 	"fmt"
@@ -21,26 +21,26 @@ import (
 )
 
 var (
-	contentCommand = cli.Command{
+	// Command is the cli command for managing content
+	Command = cli.Command{
 		Name:  "content",
 		Usage: "manage content",
 		Subcommands: cli.Commands{
-			listContentCommand,
-			ingestContentCommand,
+			listCommand,
+			ingestCommand,
 			activeIngestCommand,
-			getContentCommand,
-			editContentCommand,
-			deleteContentCommand,
-			labelContentCommand,
+			getCommand,
+			editCommand,
+			deleteCommand,
+			setLabelsCommand,
 		},
 	}
 
-	getContentCommand = cli.Command{
+	getCommand = cli.Command{
 		Name:        "get",
 		Usage:       "get the data for an object",
-		ArgsUsage:   "[flags] [<digest>, ...]",
-		Description: "Display the image object.",
-		Flags:       []cli.Flag{},
+		ArgsUsage:   "[<digest>, ...]",
+		Description: "display the image object",
 		Action: func(context *cli.Context) error {
 			dgst, err := digest.Parse(context.Args().First())
 			if err != nil {
@@ -63,11 +63,11 @@ var (
 		},
 	}
 
-	ingestContentCommand = cli.Command{
+	ingestCommand = cli.Command{
 		Name:        "ingest",
 		Usage:       "accept content into the store",
 		ArgsUsage:   "[flags] <key>",
-		Description: `Ingest objects into the local content store.`,
+		Description: "ingest objects into the local content store",
 		Flags: []cli.Flag{
 			cli.Int64Flag{
 				Name:  "expected-size",
@@ -107,9 +107,9 @@ var (
 
 	activeIngestCommand = cli.Command{
 		Name:        "active",
-		Usage:       "display active transfers.",
+		Usage:       "display active transfers",
 		ArgsUsage:   "[flags] [<regexp>]",
-		Description: `Display the ongoing transfers.`,
+		Description: "display the ongoing transfers",
 		Flags: []cli.Flag{
 			cli.DurationFlag{
 				Name:   "timeout, t",
@@ -147,12 +147,12 @@ var (
 		},
 	}
 
-	listContentCommand = cli.Command{
+	listCommand = cli.Command{
 		Name:        "list",
 		Aliases:     []string{"ls"},
-		Usage:       "list all blobs in the store.",
-		ArgsUsage:   "[flags] [<filter>, ...]",
-		Description: `List blobs in the content store.`,
+		Usage:       "list all blobs in the store",
+		ArgsUsage:   "[flags]",
+		Description: "list blobs in the content store",
 		Flags: []cli.Flag{
 			cli.BoolFlag{
 				Name:  "quiet, q",
@@ -206,12 +206,11 @@ var (
 		},
 	}
 
-	labelContentCommand = cli.Command{
+	setLabelsCommand = cli.Command{
 		Name:        "label",
 		Usage:       "add labels to content",
-		ArgsUsage:   "[flags] <digest> [<label>=<value> ...]",
-		Description: `Labels blobs in the content store`,
-		Flags:       []cli.Flag{},
+		ArgsUsage:   "<digest> [<label>=<value> ...]",
+		Description: "labels blobs in the content store",
 		Action: func(context *cli.Context) error {
 			object, labels := commands.ObjectWithLabelArgs(context)
 			client, ctx, cancel, err := commands.NewClient(context)
@@ -261,11 +260,11 @@ var (
 		},
 	}
 
-	editContentCommand = cli.Command{
+	editCommand = cli.Command{
 		Name:        "edit",
-		Usage:       "edit a blob and return a new digest.",
+		Usage:       "edit a blob and return a new digest",
 		ArgsUsage:   "[flags] <digest>",
-		Description: `Edit a blob and return a new digest.`,
+		Description: "edit a blob and return a new digest",
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:  "validate",
@@ -325,14 +324,13 @@ var (
 		},
 	}
 
-	deleteContentCommand = cli.Command{
+	deleteCommand = cli.Command{
 		Name:      "delete",
 		Aliases:   []string{"del", "remove", "rm"},
-		Usage:     "permanently delete one or more blobs.",
-		ArgsUsage: "[flags] [<digest>, ...]",
+		Usage:     "permanently delete one or more blobs",
+		ArgsUsage: "[<digest>, ...]",
 		Description: `Delete one or more blobs permanently. Successfully deleted
 	blobs are printed to stdout.`,
-		Flags: []cli.Flag{},
 		Action: func(context *cli.Context) error {
 			var (
 				args      = []string(context.Args())

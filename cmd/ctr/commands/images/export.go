@@ -1,4 +1,4 @@
-package main
+package images
 
 import (
 	"io"
@@ -12,11 +12,11 @@ import (
 	"github.com/urfave/cli"
 )
 
-var imagesExportCommand = cli.Command{
+var exportCommand = cli.Command{
 	Name:        "export",
 	Usage:       "export an image",
 	ArgsUsage:   "[flags] <out> <image>",
-	Description: `Export an image to a tar stream.`,
+	Description: "export an image to a tar stream",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "oci-ref-name",

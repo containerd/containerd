@@ -6,7 +6,13 @@ import (
 	"log"
 	"os"
 
+	"github.com/containerd/containerd/cmd/ctr/commands/containers"
+	"github.com/containerd/containerd/cmd/ctr/commands/content"
+	"github.com/containerd/containerd/cmd/ctr/commands/events"
+	"github.com/containerd/containerd/cmd/ctr/commands/images"
+	namespacesCmd "github.com/containerd/containerd/cmd/ctr/commands/namespaces"
 	"github.com/containerd/containerd/cmd/ctr/commands/plugins"
+	"github.com/containerd/containerd/cmd/ctr/commands/snapshot"
 	versionCmd "github.com/containerd/containerd/cmd/ctr/commands/version"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/server"
@@ -69,20 +75,20 @@ containerd CLI
 		plugins.Command,
 		versionCmd.Command,
 		applyCommand,
-		containersCommand,
-		contentCommand,
-		eventsCommand,
+		containers.Command,
+		content.Command,
+		events.Command,
 		fetchCommand,
 		fetchObjectCommand,
-		imageCommand,
-		namespacesCommand,
+		images.Command,
+		namespacesCmd.Command,
 		pprofCommand,
 		pullCommand,
 		pushCommand,
 		pushObjectCommand,
 		rootfsCommand,
 		runCommand,
-		snapshotCommand,
+		snapshot.Command,
 		tasksCommand,
 	}, extraCmds...)
 	app.Before = func(context *cli.Context) error {

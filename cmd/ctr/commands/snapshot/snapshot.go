@@ -1,4 +1,4 @@
-package main
+package snapshot
 
 import (
 	gocontext "context"
@@ -15,25 +15,26 @@ import (
 	"github.com/urfave/cli"
 )
 
-var snapshotCommand = cli.Command{
+// Command is the cli command for managing snapshots
+var Command = cli.Command{
 	Name:  "snapshot",
-	Usage: "snapshot management",
+	Usage: "manage snapshots",
 	Flags: commands.SnapshotterFlags,
 	Subcommands: cli.Commands{
-		listSnapshotCommand,
-		usageSnapshotCommand,
-		removeSnapshotCommand,
-		prepareSnapshotCommand,
-		viewSnapshotCommand,
-		treeSnapshotCommand,
-		mountSnapshotCommand,
-		commitSnapshotCommand,
-		infoSnapshotCommand,
-		labelSnapshotCommand,
+		listCommand,
+		usageCommand,
+		removeCommand,
+		prepareCommand,
+		viewCommand,
+		treeCommand,
+		mountCommand,
+		commitCommand,
+		infoCommand,
+		setLabelCommand,
 	},
 }
 
-var listSnapshotCommand = cli.Command{
+var listCommand = cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "list snapshots",
@@ -62,7 +63,7 @@ var listSnapshotCommand = cli.Command{
 	},
 }
 
-var usageSnapshotCommand = cli.Command{
+var usageCommand = cli.Command{
 	Name:      "usage",
 	Usage:     "usage snapshots",
 	ArgsUsage: "[flags] [<key>, ...]",
@@ -118,7 +119,7 @@ var usageSnapshotCommand = cli.Command{
 	},
 }
 
-var removeSnapshotCommand = cli.Command{
+var removeCommand = cli.Command{
 	Name:      "remove",
 	Aliases:   []string{"rm"},
 	ArgsUsage: "<key> [<key>, ...]",
@@ -141,7 +142,7 @@ var removeSnapshotCommand = cli.Command{
 	},
 }
 
-var prepareSnapshotCommand = cli.Command{
+var prepareCommand = cli.Command{
 	Name:      "prepare",
 	Usage:     "prepare a snapshot from a committed snapshot",
 	ArgsUsage: "[flags] <key> [<parent>]",
@@ -180,7 +181,7 @@ var prepareSnapshotCommand = cli.Command{
 	},
 }
 
-var viewSnapshotCommand = cli.Command{
+var viewCommand = cli.Command{
 	Name:      "view",
 	Usage:     "create a read-only snapshot from a committed snapshot",
 	ArgsUsage: "[flags] <key> [<parent>]",
@@ -219,11 +220,11 @@ var viewSnapshotCommand = cli.Command{
 	},
 }
 
-var mountSnapshotCommand = cli.Command{
+var mountCommand = cli.Command{
 	Name:      "mounts",
 	Aliases:   []string{"m", "mount"},
 	Usage:     "mount gets mount commands for the snapshots",
-	ArgsUsage: "[flags] <target> <key>",
+	ArgsUsage: "<target> <key>",
 	Action: func(context *cli.Context) error {
 		if context.NArg() != 2 {
 			return cli.ShowSubcommandHelp(context)
@@ -249,10 +250,10 @@ var mountSnapshotCommand = cli.Command{
 	},
 }
 
-var commitSnapshotCommand = cli.Command{
+var commitCommand = cli.Command{
 	Name:      "commit",
 	Usage:     "commit an active snapshot into the provided name",
-	ArgsUsage: "[flags] <key> <active>",
+	ArgsUsage: "<key> <active>",
 	Action: func(context *cli.Context) error {
 		if context.NArg() != 2 {
 			return cli.ShowSubcommandHelp(context)
@@ -271,7 +272,7 @@ var commitSnapshotCommand = cli.Command{
 	},
 }
 
-var treeSnapshotCommand = cli.Command{
+var treeCommand = cli.Command{
 	Name:  "tree",
 	Usage: "display tree view of snapshot branches",
 	Action: func(context *cli.Context) error {
@@ -305,7 +306,7 @@ var treeSnapshotCommand = cli.Command{
 	},
 }
 
-var infoSnapshotCommand = cli.Command{
+var infoCommand = cli.Command{
 	Name:      "info",
 	Usage:     "get info about a snapshot",
 	ArgsUsage: "<key>",
@@ -332,12 +333,11 @@ var infoSnapshotCommand = cli.Command{
 	},
 }
 
-var labelSnapshotCommand = cli.Command{
+var setLabelCommand = cli.Command{
 	Name:        "label",
 	Usage:       "add labels to content",
-	ArgsUsage:   "[flags] <name> [<label>=<value> ...]",
-	Description: `Labels snapshots in the snapshotter`,
-	Flags:       []cli.Flag{},
+	ArgsUsage:   "<name> [<label>=<value> ...]",
+	Description: "labels snapshots in the snapshotter",
 	Action: func(context *cli.Context) error {
 		key, labels := commands.ObjectWithLabelArgs(context)
 		client, ctx, cancel, err := commands.NewClient(context)
