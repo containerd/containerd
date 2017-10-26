@@ -6,9 +6,10 @@ import (
 	"log"
 	"os"
 
+	"github.com/containerd/containerd/cmd/ctr/commands/containers"
+	"github.com/containerd/containerd/cmd/ctr/commands/images"
 	"github.com/containerd/containerd/cmd/ctr/commands/plugins"
 	versionCmd "github.com/containerd/containerd/cmd/ctr/commands/version"
-	"github.com/containerd/containerd/cmd/ctr/commands/containers"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/server"
 	"github.com/containerd/containerd/version"
@@ -75,7 +76,7 @@ containerd CLI
 		eventsCommand,
 		fetchCommand,
 		fetchObjectCommand,
-		imageCommand,
+		images.Command,
 		namespacesCommand,
 		pprofCommand,
 		pullCommand,

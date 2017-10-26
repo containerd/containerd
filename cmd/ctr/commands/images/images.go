@@ -1,4 +1,4 @@
-package main
+package images
 
 import (
 	"fmt"
@@ -17,25 +17,26 @@ import (
 	"github.com/urfave/cli"
 )
 
-var imageCommand = cli.Command{
+// Command is the cli command for managing images
+var Command = cli.Command{
 	Name:  "images",
 	Usage: "manage images",
 	Subcommands: cli.Commands{
-		imagesListCommand,
-		imagesCheckCommand,
-		imageRemoveCommand,
-		imagesSetLabelsCommand,
-		imagesImportCommand,
-		imagesExportCommand,
+		listCommand,
+		checkCommand,
+		removeCommand,
+		setLabelsCommand,
+		importCommand,
+		exportCommand,
 	},
 }
 
-var imagesListCommand = cli.Command{
+var listCommand = cli.Command{
 	Name:        "list",
 	Aliases:     []string{"ls"},
 	Usage:       "list images known to containerd",
 	ArgsUsage:   "[flags] <ref>",
-	Description: `List images registered with containerd.`,
+	Description: "list images registered with containerd",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "quiet, q",
@@ -114,11 +115,11 @@ var imagesListCommand = cli.Command{
 	},
 }
 
-var imagesSetLabelsCommand = cli.Command{
+var setLabelsCommand = cli.Command{
 	Name:        "label",
-	Usage:       "set and clear labels for an image.",
+	Usage:       "set and clear labels for an image",
 	ArgsUsage:   "[flags] <name> [<key>=<value>, ...]",
-	Description: "Set and clear labels for an image.",
+	Description: "set and clear labels for an image",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "replace-all, r",
@@ -173,12 +174,11 @@ var imagesSetLabelsCommand = cli.Command{
 	},
 }
 
-var imagesCheckCommand = cli.Command{
+var checkCommand = cli.Command{
 	Name:        "check",
-	Usage:       "Check that an image has all content available locally.",
-	ArgsUsage:   "[flags] <ref> [<ref>, ...]",
-	Description: "Check that an image has all content available locally.",
-	Flags:       []cli.Flag{},
+	Usage:       "check that an image has all content available locally",
+	ArgsUsage:   "<ref> [<ref>, ...]",
+	Description: "check that an image has all content available locally",
 	Action: func(context *cli.Context) error {
 		var (
 			exitErr error
@@ -255,13 +255,12 @@ var imagesCheckCommand = cli.Command{
 	},
 }
 
-var imageRemoveCommand = cli.Command{
+var removeCommand = cli.Command{
 	Name:        "remove",
 	Aliases:     []string{"rm"},
-	Usage:       "Remove one or more images by reference.",
-	ArgsUsage:   "[flags] <ref> [<ref>, ...]",
-	Description: `Remove one or more images by reference.`,
-	Flags:       []cli.Flag{},
+	Usage:       "remove one or more images by reference",
+	ArgsUsage:   "<ref> [<ref>, ...]",
+	Description: "remove one or more images by reference",
 	Action: func(context *cli.Context) error {
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {

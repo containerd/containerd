@@ -1,4 +1,4 @@
-package main
+package images
 
 import (
 	"fmt"
@@ -11,11 +11,11 @@ import (
 	"github.com/urfave/cli"
 )
 
-var imagesImportCommand = cli.Command{
+var importCommand = cli.Command{
 	Name:        "import",
 	Usage:       "import an image",
 	ArgsUsage:   "[flags] <ref> <in>",
-	Description: `Import an image from a tar stream.`,
+	Description: "import an image from a tar stream",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "ref-object",
