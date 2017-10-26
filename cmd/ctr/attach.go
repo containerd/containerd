@@ -55,8 +55,8 @@ var taskAttachCommand = cli.Command{
 				logrus.WithError(err).Error("console resize")
 			}
 		} else {
-			sigc := forwardAllSignals(ctx, task)
-			defer stopCatch(sigc)
+			sigc := commands.ForwardAllSignals(ctx, task)
+			defer commands.StopCatch(sigc)
 		}
 
 		ec := <-statusC

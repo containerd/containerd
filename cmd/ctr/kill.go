@@ -6,6 +6,8 @@ import (
 	"github.com/urfave/cli"
 )
 
+// TODO:(jessvalarezo) the pid flag is not used here
+// update to be able to signal given pid
 var taskKillCommand = cli.Command{
 	Name:      "kill",
 	Usage:     "signal a container (default: SIGTERM)",
@@ -31,7 +33,7 @@ var taskKillCommand = cli.Command{
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		signal, err := parseSignal(context.String("signal"))
+		signal, err := commands.ParseSignal(context.String("signal"))
 		if err != nil {
 			return err
 		}

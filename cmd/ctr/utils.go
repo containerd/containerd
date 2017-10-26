@@ -8,11 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
-	"os/signal"
-	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/containerd/console"
@@ -20,7 +16,6 @@ import (
 	"github.com/containerd/containerd/remotes/docker"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -93,43 +88,6 @@ func getResolver(ctx gocontext.Context, clicontext *cli.Context) (remotes.Resolv
 	}
 
 	return docker.NewResolver(options), nil
-}
-
-func forwardAllSignals(ctx gocontext.Context, task killer) chan os.Signal {
-	sigc := make(chan os.Signal, 128)
-	signal.Notify(sigc)
-	go func() {
-		for s := range sigc {
-			logrus.Debug("forwarding signal ", s)
-			if err := task.Kill(ctx, s.(syscall.Signal)); err != nil {
-				logrus.WithError(err).Errorf("forward signal %s", s)
-			}
-		}
-	}()
-	return sigc
-}
-
-func parseSignal(rawSignal string) (syscall.Signal, error) {
-	s, err := strconv.Atoi(rawSignal)
-	if err == nil {
-		sig := syscall.Signal(s)
-		for _, msig := range signalMap {
-			if sig == msig {
-				return sig, nil
-			}
-		}
-		return -1, fmt.Errorf("unknown signal %q", rawSignal)
-	}
-	signal, ok := signalMap[strings.TrimPrefix(strings.ToUpper(rawSignal), "SIG")]
-	if !ok {
-		return -1, fmt.Errorf("unknown signal %q", rawSignal)
-	}
-	return signal, nil
-}
-
-func stopCatch(sigc chan os.Signal) {
-	signal.Stop(sigc)
-	close(sigc)
 }
 
 // parseMountFlag parses a mount string in the form "type=foo,source=/path,destination=/target,options=rbind:rw"
