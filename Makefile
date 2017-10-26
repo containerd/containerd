@@ -5,6 +5,8 @@ PROJECT=github.com/containerd/containerd
 GIT_COMMIT := $(shell git rev-parse HEAD 2> /dev/null || true)
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD 2> /dev/null)
 
+DYN_BUILD_FLAGS := -buildmode=pie
+STATIC_BUILD_FLAGS :=
 LDFLAGS := -X github.com/containerd/containerd.GitCommit=${GIT_COMMIT} ${LDFLAGS}
 
 TEST_TIMEOUT ?= 5m
@@ -42,22 +44,22 @@ clean:
 	rm -rf bin && rm -rf output
 
 client: bin
-	cd ctr && go build -ldflags "${LDFLAGS}" -o ../bin/ctr
+	cd ctr && go build $(DYN_BUILD_FLAGS) -ldflags "${LDFLAGS}" -o ../bin/ctr
 
 client-static:
-	cd ctr && go build -ldflags "-w -extldflags -static ${LDFLAGS}" -tags "$(BUILDTAGS)" -o ../bin/ctr
+	cd ctr && go build $(STATIC_BUILD_FLAGS) -ldflags "-w -extldflags -static ${LDFLAGS}" -tags "$(BUILDTAGS)" -o ../bin/ctr
 
 daemon: bin
-	cd containerd && go build -ldflags "${LDFLAGS}"  -tags "$(BUILDTAGS)" -o ../bin/containerd
+	cd containerd && go build $(DYN_BUILD_FLAGS) -ldflags "${LDFLAGS}"  -tags "$(BUILDTAGS)" -o ../bin/containerd
 
 daemon-static:
-	cd containerd && go build -ldflags "-w -extldflags -static ${LDFLAGS}" -tags "$(BUILDTAGS)" -o ../bin/containerd
+	cd containerd && go build $(STATIC_BUILD_FLAGS) -ldflags "-w -extldflags -static ${LDFLAGS}" -tags "$(BUILDTAGS)" -o ../bin/containerd
 
 shim: bin
-	cd containerd-shim && go build -tags "$(BUILDTAGS)" -ldflags "-w ${LDFLAGS}" -o ../bin/containerd-shim
+	cd containerd-shim && go build $(DYN_BUILD_FLAGS) -tags "$(BUILDTAGS)" -ldflags "-w ${LDFLAGS}" -o ../bin/containerd-shim
 
 shim-static:
-	cd containerd-shim && go build -ldflags "-w -extldflags -static ${LDFLAGS}" -tags "$(BUILDTAGS)" -o ../bin/containerd-shim
+	cd containerd-shim && go build $(STATIC_BUILD_FLAGS) -ldflags "-w -extldflags -static ${LDFLAGS}" -tags "$(BUILDTAGS)" -o ../bin/containerd-shim
 
 $(TESTBENCH_BUNDLE_DIR)/busybox.tar:
 	mkdir -p $(TESTBENCH_BUNDLE_DIR)
