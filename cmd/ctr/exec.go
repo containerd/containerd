@@ -10,6 +10,7 @@ import (
 	"github.com/urfave/cli"
 )
 
+//TODO:(jessvalarezo) exec-id is optional here, update to required arg
 var taskExecCommand = cli.Command{
 	Name:      "exec",
 	Usage:     "execute additional processes in an existing container",
@@ -87,8 +88,8 @@ var taskExecCommand = cli.Command{
 				logrus.WithError(err).Error("console resize")
 			}
 		} else {
-			sigc := forwardAllSignals(ctx, process)
-			defer stopCatch(sigc)
+			sigc := commands.ForwardAllSignals(ctx, process)
+			defer commands.StopCatch(sigc)
 		}
 
 		if err := process.Start(ctx); err != nil {

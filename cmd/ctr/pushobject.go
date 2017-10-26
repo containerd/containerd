@@ -33,7 +33,7 @@ var pushObjectCommand = cli.Command{
 		}
 		defer cancel()
 
-		resolver, err := getResolver(ctx, context)
+		resolver, err := commands.GetResolver(ctx, context)
 		if err != nil {
 			return err
 		}

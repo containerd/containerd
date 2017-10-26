@@ -1,6 +1,6 @@
 // +build darwin freebsd solaris
 
-package main
+package commands
 
 import (
 	"syscall"

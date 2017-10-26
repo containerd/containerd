@@ -4,7 +4,6 @@ import (
 	gocontext "context"
 	"fmt"
 	"runtime"
-	"syscall"
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
@@ -18,10 +17,6 @@ import (
 
 type resizer interface {
 	Resize(ctx gocontext.Context, w, h uint32) error
-}
-
-type killer interface {
-	Kill(gocontext.Context, syscall.Signal, ...containerd.KillOpts) error
 }
 
 func withEnv(context *cli.Context) containerd.SpecOpts {
@@ -160,8 +155,8 @@ var runCommand = cli.Command{
 				logrus.WithError(err).Error("console resize")
 			}
 		} else {
-			sigc := forwardAllSignals(ctx, task)
-			defer stopCatch(sigc)
+			sigc := commands.ForwardAllSignals(ctx, task)
+			defer commands.StopCatch(sigc)
 		}
 		status := <-statusC
 		code, _, err := status.Result()

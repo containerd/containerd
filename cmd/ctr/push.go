@@ -21,10 +21,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var (
-	pushTracker = docker.NewInMemoryTracker()
-)
-
 var pushCommand = cli.Command{
 	Name:      "push",
 	Usage:     "push an image to a remote",
@@ -74,11 +70,11 @@ var pushCommand = cli.Command{
 			desc = img.Target
 		}
 
-		resolver, err := getResolver(ctx, context)
+		resolver, err := commands.GetResolver(ctx, context)
 		if err != nil {
 			return err
 		}
-		ongoing := newPushJobs(pushTracker)
+		ongoing := newPushJobs(commands.PushTracker)
 
 		eg, ctx := errgroup.WithContext(ctx)
 
