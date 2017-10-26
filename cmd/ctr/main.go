@@ -9,6 +9,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands/containers"
 	"github.com/containerd/containerd/cmd/ctr/commands/content"
 	"github.com/containerd/containerd/cmd/ctr/commands/images"
+	namespacesCmd "github.com/containerd/containerd/cmd/ctr/commands/namespaces"
 	"github.com/containerd/containerd/cmd/ctr/commands/plugins"
 	"github.com/containerd/containerd/cmd/ctr/commands/snapshot"
 	versionCmd "github.com/containerd/containerd/cmd/ctr/commands/version"
@@ -79,7 +80,7 @@ containerd CLI
 		fetchCommand,
 		fetchObjectCommand,
 		images.Command,
-		namespacesCommand,
+		namespacesCmd.Command,
 		pprofCommand,
 		pullCommand,
 		pushCommand,

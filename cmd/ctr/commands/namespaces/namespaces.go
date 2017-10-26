@@ -1,4 +1,4 @@
-package main
+package namespaces
 
 import (
 	"fmt"
@@ -14,22 +14,23 @@ import (
 	"github.com/urfave/cli"
 )
 
-var namespacesCommand = cli.Command{
+// Command is the cli command for managing namespaces
+var Command = cli.Command{
 	Name:  "namespaces",
 	Usage: "manage namespaces",
 	Subcommands: cli.Commands{
-		namespacesCreateCommand,
-		namespacesSetLabelsCommand,
-		namespacesListCommand,
-		namespacesRemoveCommand,
+		createCommand,
+		setLabelsCommand,
+		listCommand,
+		removeCommand,
 	},
 }
 
-var namespacesCreateCommand = cli.Command{
+var createCommand = cli.Command{
 	Name:        "create",
-	Usage:       "create a new namespace.",
-	ArgsUsage:   "[flags] <name> [<key>=<value]",
-	Description: "Create a new namespace. It must be unique.",
+	Usage:       "create a new namespace",
+	ArgsUsage:   "<name> [<key>=<value]",
+	Description: "create a new namespace. it must be unique",
 	Action: func(context *cli.Context) error {
 		namespace, labels := commands.ObjectWithLabelArgs(context)
 		if namespace == "" {
@@ -45,12 +46,11 @@ var namespacesCreateCommand = cli.Command{
 	},
 }
 
-var namespacesSetLabelsCommand = cli.Command{
+var setLabelsCommand = cli.Command{
 	Name:        "label",
-	Usage:       "set and clear labels for a namespace.",
-	ArgsUsage:   "[flags] <name> [<key>=<value>, ...]",
-	Description: "Set and clear labels for a namespace.",
-	Flags:       []cli.Flag{},
+	Usage:       "set and clear labels for a namespace",
+	ArgsUsage:   "<name> [<key>=<value>, ...]",
+	Description: "set and clear labels for a namespace",
 	Action: func(context *cli.Context) error {
 		namespace, labels := commands.ObjectWithLabelArgs(context)
 		if namespace == "" {
@@ -71,16 +71,16 @@ var namespacesSetLabelsCommand = cli.Command{
 	},
 }
 
-var namespacesListCommand = cli.Command{
+var listCommand = cli.Command{
 	Name:        "list",
 	Aliases:     []string{"ls"},
-	Usage:       "list namespaces.",
+	Usage:       "list namespaces",
 	ArgsUsage:   "[flags]",
-	Description: "List namespaces.",
+	Description: "list namespaces",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "quiet, q",
-			Usage: "print only the namespace name.",
+			Usage: "print only the namespace name",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -123,12 +123,12 @@ var namespacesListCommand = cli.Command{
 	},
 }
 
-var namespacesRemoveCommand = cli.Command{
+var removeCommand = cli.Command{
 	Name:        "remove",
 	Aliases:     []string{"rm"},
 	Usage:       "remove one or more namespaces",
-	ArgsUsage:   "[flags] <name> [<name>, ...]",
-	Description: "Remove one or more namespaces. For now, the namespace must be empty.",
+	ArgsUsage:   "<name> [<name>, ...]",
+	Description: "remove one or more namespaces. for now, the namespace must be empty",
 	Action: func(context *cli.Context) error {
 		var exitErr error
 		client, ctx, cancel, err := commands.NewClient(context)
