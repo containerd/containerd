@@ -57,7 +57,7 @@ func fetch(ref string, cliContext *cli.Context) (containerd.Image, error) {
 	}
 	defer cancel()
 
-	resolver, err := getResolver(ctx, cliContext)
+	resolver, err := commands.GetResolver(ctx, cliContext)
 	if err != nil {
 		return nil, err
 	}
