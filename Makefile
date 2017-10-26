@@ -45,6 +45,7 @@ GO_TAGS=$(if $(BUILDTAGS),-tags "$(BUILDTAGS)",)
 GO_LDFLAGS=-ldflags "-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG) $(EXTRA_LDFLAGS)"
 
 TESTFLAGS_RACE=
+GO_GCFLAGS=
 
 #Detect the target os
 include Makefile.OS
