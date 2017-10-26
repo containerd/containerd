@@ -41,6 +41,7 @@ import (
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
 	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
+	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
 )
 
 const (
@@ -187,35 +188,6 @@ func criContainerStateToString(state runtime.ContainerState) string {
 	return runtime.ContainerState_name[int32(state)]
 }
 
-// normalizeImageRef normalizes the image reference following the docker convention. This is added
-// mainly for backward compatibility.
-// The reference returned can only be either tagged or digested. For reference contains both tag
-// and digest, the function returns digested reference, e.g. docker.io/library/busybox:latest@
-// sha256:7cc4b5aefd1d0cadf8d97d4350462ba51c694ebca145b08d7d41b41acc8db5aa will be returned as
-// docker.io/library/busybox@sha256:7cc4b5aefd1d0cadf8d97d4350462ba51c694ebca145b08d7d41b41acc8db5aa.
-func normalizeImageRef(ref string) (reference.Named, error) {
-	named, err := reference.ParseNormalizedNamed(ref)
-	if err != nil {
-		return nil, err
-	}
-	if _, ok := named.(reference.NamedTagged); ok {
-		if canonical, ok := named.(reference.Canonical); ok {
-			// The reference is both tagged and digested, only
-			// return digested.
-			newNamed, err := reference.WithName(canonical.Name())
-			if err != nil {
-				return nil, err
-			}
-			newCanonical, err := reference.WithDigest(newNamed, canonical.Digest())
-			if err != nil {
-				return nil, err
-			}
-			return newCanonical, nil
-		}
-	}
-	return reference.TagNameOnly(named), nil
-}
-
 // getRepoDigestAngTag returns image repoDigest and repoTag of the named image reference.
 func getRepoDigestAndTag(namedRef reference.Named, digest imagedigest.Digest, schema1 bool) (string, string) {
 	var repoTag, repoDigest string
@@ -237,7 +209,7 @@ func (c *criContainerdService) localResolve(ctx context.Context, ref string) (*i
 	_, err := imagedigest.Parse(ref)
 	if err != nil {
 		// ref is not image id, try to resolve it locally.
-		normalized, err := normalizeImageRef(ref)
+		normalized, err := util.NormalizeImageRef(ref)
 		if err != nil {
 			return nil, fmt.Errorf("invalid image reference %q: %v", ref, err)
 		}

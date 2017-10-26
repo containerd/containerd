@@ -48,6 +48,7 @@ help:
 	@echo " * 'test-e2e-node'    - Test cri-containerd with Kubernetes node e2e test"
 	@echo " * 'clean'            - Clean artifacts"
 	@echo " * 'verify'           - Execute the source code verification tools"
+	@echo " * 'proto'            - Update protobuf of cri-containerd api"
 	@echo " * 'install.tools'    - Install tools used by verify"
 	@echo " * 'install.deps'     - Install dependencies of cri-containerd (containerd, runc, cni) Note: BUILDTAGS defaults to 'seccomp apparmor' for runc build"
 	@echo " * 'uninstall'        - Remove installed binaries from system locations"
@@ -117,6 +118,9 @@ release: $(BUILD_DIR)/$(TARBALL)
 push: $(BUILD_DIR)/$(TARBALL)
 	@BUILD_DIR=$(BUILD_DIR) TARBALL=$(TARBALL) VERSION=$(VERSION) ./hack/push.sh
 
+proto:
+	@hack/update-proto.sh
+
 .PHONY: install.deps
 
 install.deps:
@@ -160,4 +164,5 @@ install.tools: .install.gitvalidation .install.gometalinter
 	test-cri \
 	test-e2e-node \
 	uninstall \
-	version
+	version \
+	proto

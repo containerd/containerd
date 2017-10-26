@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
+	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
 )
 
 // For image management:
@@ -75,7 +76,7 @@ import (
 // PullImage pulls an image with authentication config.
 func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (*runtime.PullImageResponse, error) {
 	imageRef := r.GetImage().GetImage()
-	namedRef, err := normalizeImageRef(imageRef)
+	namedRef, err := util.NormalizeImageRef(imageRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse image reference %q: %v", imageRef, err)
 	}

@@ -17,7 +17,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-for d in $(find . -type d -a \( -iwholename './pkg*' -o -iwholename './cmd*' \)); do
+for d in $(find . -type d -a \( -iwholename './pkg*' -o -iwholename './cmd*' \) -not -iwholename './pkg/api*'); do
 	echo for directory ${d} ...
 	gometalinter \
 		 --exclude='error return value not checked.*(Close|Log|Print).*\(errcheck\)$' \
