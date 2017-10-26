@@ -1,4 +1,4 @@
-package main
+package events
 
 import (
 	"encoding/json"
@@ -10,7 +10,8 @@ import (
 	"github.com/urfave/cli"
 )
 
-var eventsCommand = cli.Command{
+// Command is the cli command for displaying containerd events
+var Command = cli.Command{
 	Name:  "events",
 	Usage: "display containerd events",
 	Action: func(context *cli.Context) error {

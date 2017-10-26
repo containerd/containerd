@@ -8,6 +8,7 @@ import (
 
 	"github.com/containerd/containerd/cmd/ctr/commands/containers"
 	"github.com/containerd/containerd/cmd/ctr/commands/content"
+	"github.com/containerd/containerd/cmd/ctr/commands/events"
 	"github.com/containerd/containerd/cmd/ctr/commands/images"
 	namespacesCmd "github.com/containerd/containerd/cmd/ctr/commands/namespaces"
 	"github.com/containerd/containerd/cmd/ctr/commands/plugins"
@@ -76,7 +77,7 @@ containerd CLI
 		applyCommand,
 		containers.Command,
 		content.Command,
-		eventsCommand,
+		events.Command,
 		fetchCommand,
 		fetchObjectCommand,
 		images.Command,
