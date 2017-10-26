@@ -18,6 +18,7 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
@@ -359,6 +360,14 @@ func (t *task) Resize(ctx context.Context, w, h uint32) error {
 }
 
 func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Image, error) {
+	l, err := t.client.CreateLease(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer l.Delete(ctx)
+
+	ctx = leases.WithLease(ctx, l.ID())
+
 	request := &tasks.CheckpointTaskRequest{
 		ContainerID: t.id,
 	}

@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
@@ -137,6 +138,14 @@ func (c *Client) Containers(ctx context.Context, filters ...string) ([]Container
 // NewContainer will create a new container in container with the provided id
 // the id must be unique within the namespace
 func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error) {
+	l, err := c.CreateLease(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer l.Delete(ctx)
+
+	ctx = leases.WithLease(ctx, l.ID())
+
 	container := containers.Container{
 		ID: id,
 		Runtime: containers.RuntimeInfo{
@@ -211,6 +220,14 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 		}
 	}
 	store := c.ContentStore()
+
+	l, err := c.CreateLease(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer l.Delete(ctx)
+
+	ctx = leases.WithLease(ctx, l.ID())
 
 	name, desc, err := pullCtx.Resolver.Resolve(ctx, ref)
 	if err != nil {
@@ -583,6 +600,15 @@ func (c *Client) Import(ctx context.Context, ref string, reader io.Reader, opts 
 	if err != nil {
 		return nil, err
 	}
+
+	l, err := c.CreateLease(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer l.Delete(ctx)
+
+	ctx = leases.WithLease(ctx, l.ID())
+
 	switch iopts.format {
 	case ociImageFormat:
 		return c.importFromOCITar(ctx, ref, reader, iopts)

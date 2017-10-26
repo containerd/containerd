@@ -2406,6 +2406,182 @@ file {
   syntax: "proto3"
 }
 file {
+  name: "github.com/containerd/containerd/api/services/leases/v1/leases.proto"
+  package: "containerd.services.leases.v1"
+  dependency: "gogoproto/gogo.proto"
+  dependency: "google/protobuf/empty.proto"
+  dependency: "google/protobuf/timestamp.proto"
+  message_type {
+    name: "Snapshot"
+    field {
+      name: "snapshotter"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "snapshotter"
+    }
+    field {
+      name: "key"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "key"
+    }
+  }
+  message_type {
+    name: "Lease"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "created_at"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      options {
+        65010: 1
+        65001: 0
+      }
+      json_name: "createdAt"
+    }
+    field {
+      name: "labels"
+      number: 3
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.leases.v1.Lease.LabelsEntry"
+      json_name: "labels"
+    }
+    nested_type {
+      name: "LabelsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
+  }
+  message_type {
+    name: "CreateRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "labels"
+      number: 3
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.leases.v1.CreateRequest.LabelsEntry"
+      json_name: "labels"
+    }
+    nested_type {
+      name: "LabelsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
+  }
+  message_type {
+    name: "CreateResponse"
+    field {
+      name: "lease"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.leases.v1.Lease"
+      json_name: "lease"
+    }
+  }
+  message_type {
+    name: "DeleteRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+  }
+  message_type {
+    name: "ListRequest"
+    field {
+      name: "filters"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "filters"
+    }
+  }
+  message_type {
+    name: "ListResponse"
+    field {
+      name: "leases"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.leases.v1.Lease"
+      json_name: "leases"
+    }
+  }
+  service {
+    name: "Leases"
+    method {
+      name: "Create"
+      input_type: ".containerd.services.leases.v1.CreateRequest"
+      output_type: ".containerd.services.leases.v1.CreateResponse"
+    }
+    method {
+      name: "Delete"
+      input_type: ".containerd.services.leases.v1.DeleteRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+    method {
+      name: "List"
+      input_type: ".containerd.services.leases.v1.ListRequest"
+      output_type: ".containerd.services.leases.v1.ListResponse"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/services/leases/v1;leases"
+  }
+  syntax: "proto3"
+}
+file {
   name: "github.com/containerd/containerd/api/services/namespaces/v1/namespace.proto"
   package: "containerd.services.namespaces.v1"
   dependency: "gogoproto/gogo.proto"

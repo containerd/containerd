@@ -34,14 +34,22 @@ func TestGCRoots(t *testing.T) {
 		addSnapshot("ns1", "overlay", "sn1", "", nil),
 		addSnapshot("ns1", "overlay", "sn2", "", nil),
 		addSnapshot("ns1", "overlay", "sn3", "", labelmap(string(labelGCRoot), "always")),
+		addLeaseSnapshot("ns2", "l1", "overlay", "sn5"),
+		addLeaseSnapshot("ns2", "l2", "overlay", "sn6"),
+		addLeaseContent("ns2", "l1", dgst(4)),
+		addLeaseContent("ns2", "l2", dgst(5)),
 	}
 
 	expected := []gc.Node{
 		gcnode(ResourceContent, "ns1", dgst(1).String()),
 		gcnode(ResourceContent, "ns1", dgst(2).String()),
 		gcnode(ResourceContent, "ns2", dgst(2).String()),
+		gcnode(ResourceContent, "ns2", dgst(4).String()),
+		gcnode(ResourceContent, "ns2", dgst(5).String()),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn2"),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn3"),
+		gcnode(ResourceSnapshot, "ns2", "overlay/sn5"),
+		gcnode(ResourceSnapshot, "ns2", "overlay/sn6"),
 	}
 
 	if err := db.Update(func(tx *bolt.Tx) error {
@@ -371,6 +379,26 @@ func addContent(ns string, dgst digest.Digest, labels map[string]string) alterFu
 			return err
 		}
 		return boltutil.WriteLabels(cbkt, labels)
+	}
+}
+
+func addLeaseSnapshot(ns, lid, snapshotter, name string) alterFunc {
+	return func(bkt *bolt.Bucket) error {
+		sbkt, err := createBuckets(bkt, ns, string(bucketKeyObjectLeases), lid, string(bucketKeyObjectSnapshots), snapshotter)
+		if err != nil {
+			return err
+		}
+		return sbkt.Put([]byte(name), nil)
+	}
+}
+
+func addLeaseContent(ns, lid string, dgst digest.Digest) alterFunc {
+	return func(bkt *bolt.Bucket) error {
+		cbkt, err := createBuckets(bkt, ns, string(bucketKeyObjectLeases), lid, string(bucketKeyObjectContent))
+		if err != nil {
+			return err
+		}
+		return cbkt.Put([]byte(dgst.String()), nil)
 	}
 }
 
