@@ -16,6 +16,7 @@ import (
 	"github.com/containerd/containerd/log"
 	units "github.com/docker/go-units"
 	digest "github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -33,6 +34,9 @@ var (
 			editCommand,
 			deleteCommand,
 			setLabelsCommand,
+			fetchCommand,
+			fetchObjectCommand,
+			pushObjectCommand,
 		},
 	}
 
@@ -367,6 +371,120 @@ var (
 			}
 
 			return exitError
+		},
+	}
+
+	// TODO(stevvooe): Create "multi-fetch" mode that just takes a remote
+	// then receives object/hint lines on stdin, returning content as
+	// needed.
+	fetchObjectCommand = cli.Command{
+		Name:        "fetch-object",
+		Usage:       "retrieve objects from a remote",
+		ArgsUsage:   "[flags] <remote> <object> [<hint>, ...]",
+		Description: `Fetch objects by identifier from a remote.`,
+		Flags:       commands.RegistryFlags,
+		Action: func(context *cli.Context) error {
+			var (
+				ref = context.Args().First()
+			)
+			ctx, cancel := commands.AppContext(context)
+			defer cancel()
+
+			resolver, err := commands.GetResolver(ctx, context)
+			if err != nil {
+				return err
+			}
+
+			ctx = log.WithLogger(ctx, log.G(ctx).WithField("ref", ref))
+
+			log.G(ctx).Infof("resolving")
+			name, desc, err := resolver.Resolve(ctx, ref)
+			if err != nil {
+				return err
+			}
+			fetcher, err := resolver.Fetcher(ctx, name)
+			if err != nil {
+				return err
+			}
+
+			log.G(ctx).Infof("fetching")
+			rc, err := fetcher.Fetch(ctx, desc)
+			if err != nil {
+				return err
+			}
+			defer rc.Close()
+
+			_, err = io.Copy(os.Stdout, rc)
+			return err
+		},
+	}
+
+	pushObjectCommand = cli.Command{
+		Name:        "push-object",
+		Usage:       "push an object to a remote",
+		ArgsUsage:   "[flags] <remote> <object> <type>",
+		Description: `Push objects by identifier to a remote.`,
+		Flags:       commands.RegistryFlags,
+		Action: func(context *cli.Context) error {
+			var (
+				ref    = context.Args().Get(0)
+				object = context.Args().Get(1)
+				media  = context.Args().Get(2)
+			)
+			dgst, err := digest.Parse(object)
+			if err != nil {
+				return err
+			}
+			client, ctx, cancel, err := commands.NewClient(context)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			resolver, err := commands.GetResolver(ctx, context)
+			if err != nil {
+				return err
+			}
+
+			ctx = log.WithLogger(ctx, log.G(ctx).WithField("ref", ref))
+
+			log.G(ctx).Infof("resolving")
+			pusher, err := resolver.Pusher(ctx, ref)
+			if err != nil {
+				return err
+			}
+
+			cs := client.ContentStore()
+
+			info, err := cs.Info(ctx, dgst)
+			if err != nil {
+				return err
+			}
+			desc := ocispec.Descriptor{
+				MediaType: media,
+				Digest:    dgst,
+				Size:      info.Size,
+			}
+
+			ra, err := cs.ReaderAt(ctx, dgst)
+			if err != nil {
+				return err
+			}
+			defer ra.Close()
+
+			cw, err := pusher.Push(ctx, desc)
+			if err != nil {
+				return err
+			}
+
+			// TODO: Progress reader
+			if err := content.Copy(ctx, cw, content.NewReader(ra), desc.Size, desc.Digest); err != nil {
+				return err
+			}
+
+			fmt.Printf("Pushed %s %s\n", desc.Digest, desc.MediaType)
+
+			return nil
 		},
 	}
 )

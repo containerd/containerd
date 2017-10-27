@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/cmd/ctr/commands/content"
 	"github.com/containerd/containerd/log"
 	"github.com/urfave/cli"
 )
@@ -30,7 +31,7 @@ command. As part of this process, we do the following:
 		ctx, cancel := commands.AppContext(context)
 		defer cancel()
 
-		img, err := fetch(ref, context)
+		img, err := content.Fetch(ref, context)
 		if err != nil {
 			return err
 		}
