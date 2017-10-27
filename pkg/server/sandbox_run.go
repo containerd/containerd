@@ -51,6 +51,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	// Generate unique id and name for the sandbox and reserve the name.
 	id := util.GenerateID()
 	name := makeSandboxName(config.GetMetadata())
+	glog.V(4).Infof("Generated id %q for sandbox %q", id, name)
 	// Reserve the sandbox name to avoid concurrent `RunPodSandbox` request starting the
 	// same sandbox.
 	if err := c.sandboxNameIndex.Reserve(name, id); err != nil {

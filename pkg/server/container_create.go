@@ -89,6 +89,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	// the same container.
 	id := util.GenerateID()
 	name := makeContainerName(config.GetMetadata(), sandboxConfig.GetMetadata())
+	glog.V(4).Infof("Generated id %q for container %q", id, name)
 	if err = c.containerNameIndex.Reserve(name, id); err != nil {
 		return nil, fmt.Errorf("failed to reserve container name %q: %v", name, err)
 	}
