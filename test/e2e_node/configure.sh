@@ -40,7 +40,7 @@ fi
 
 # VERSION is the latest cri-containerd version got from cri-containerd gcs
 # bucket.
-VERSION=$(curl --fail --retry 5 --retry-delay 3 --silent --show-error \
+VERSION=$(curl -f --ipv4 --retry 6 --retry-delay 3 --silent --show-error \
   https://storage.googleapis.com/${DEPLOY_PATH}/latest)
 # TARBALL_GCS_PATH is the path to download cri-containerd tarball for node e2e.
 TARBALL_GCS_PATH="https://storage.googleapis.com/${DEPLOY_PATH}/cri-containerd-node-e2e-${VERSION}.tar.gz"
