@@ -242,16 +242,11 @@ func TestMetadataCollector(t *testing.T) {
 	var actual []gc.Node
 
 	if err := mdb.View(func(tx *bolt.Tx) error {
-		nodeC := make(chan gc.Node)
-		var scanErr error
-		go func() {
-			defer close(nodeC)
-			scanErr = scanAll(ctx, tx, nodeC)
-		}()
-		for node := range nodeC {
+		scanFn := func(ctx context.Context, node gc.Node) error {
 			actual = append(actual, node)
+			return nil
 		}
-		return scanErr
+		return scanAll(ctx, tx, scanFn)
 	}); err != nil {
 		t.Fatal(err)
 	}

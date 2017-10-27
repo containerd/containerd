@@ -61,7 +61,7 @@ func TestGCRoots(t *testing.T) {
 
 	ctx := context.Background()
 
-	checkNodes(ctx, t, db, expected, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
+	checkNodeC(ctx, t, db, expected, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
 		return scanRoots(ctx, tx, nc)
 	})
 }
@@ -125,8 +125,8 @@ func TestGCRemove(t *testing.T) {
 
 	ctx := context.Background()
 
-	checkNodes(ctx, t, db, all, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
-		return scanAll(ctx, tx, nc)
+	checkNodes(ctx, t, db, all, func(ctx context.Context, tx *bolt.Tx, fn func(context.Context, gc.Node) error) error {
+		return scanAll(ctx, tx, fn)
 	})
 	if t.Failed() {
 		t.Fatal("Scan all failed")
@@ -143,8 +143,8 @@ func TestGCRemove(t *testing.T) {
 		t.Fatalf("Update failed: %+v", err)
 	}
 
-	checkNodes(ctx, t, db, remaining, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
-		return scanAll(ctx, tx, nc)
+	checkNodes(ctx, t, db, remaining, func(ctx context.Context, tx *bolt.Tx, fn func(context.Context, gc.Node) error) error {
+		return scanAll(ctx, tx, fn)
 	})
 }
 
@@ -223,7 +223,7 @@ func TestGCRefs(t *testing.T) {
 	ctx := context.Background()
 
 	for n, nodes := range refs {
-		checkNodes(ctx, t, db, nodes, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
+		checkNodeC(ctx, t, db, nodes, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
 			return references(ctx, tx, n, func(n gc.Node) {
 				select {
 				case nc <- n:
@@ -255,7 +255,7 @@ func newDatabase() (*bolt.DB, func(), error) {
 	}, nil
 }
 
-func checkNodes(ctx context.Context, t *testing.T, db *bolt.DB, expected []gc.Node, fn func(context.Context, *bolt.Tx, chan<- gc.Node) error) {
+func checkNodeC(ctx context.Context, t *testing.T, db *bolt.DB, expected []gc.Node, fn func(context.Context, *bolt.Tx, chan<- gc.Node) error) {
 	var actual []gc.Node
 	nc := make(chan gc.Node)
 	done := make(chan struct{})
@@ -273,6 +273,22 @@ func checkNodes(ctx context.Context, t *testing.T, db *bolt.DB, expected []gc.No
 	}
 
 	<-done
+	checkNodesEqual(t, actual, expected)
+}
+
+func checkNodes(ctx context.Context, t *testing.T, db *bolt.DB, expected []gc.Node, fn func(context.Context, *bolt.Tx, func(context.Context, gc.Node) error) error) {
+	var actual []gc.Node
+	scanFn := func(ctx context.Context, n gc.Node) error {
+		actual = append(actual, n)
+		return nil
+	}
+
+	if err := db.View(func(tx *bolt.Tx) error {
+		return fn(ctx, tx, scanFn)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
 	checkNodesEqual(t, actual, expected)
 }
 
