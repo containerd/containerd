@@ -81,7 +81,6 @@ containerd CLI
 		images.Command,
 		namespacesCmd.Command,
 		pprofCommand,
-		rootfsCommand,
 		runCommand,
 		snapshot.Command,
 		tasksCommand,
