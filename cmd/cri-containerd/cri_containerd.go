@@ -18,15 +18,20 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/golang/glog"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/spf13/cobra"
+	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 
 	"github.com/kubernetes-incubator/cri-containerd/cmd/cri-containerd/options"
+	api "github.com/kubernetes-incubator/cri-containerd/pkg/api/v1"
+	"github.com/kubernetes-incubator/cri-containerd/pkg/client"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/server"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/version"
 )
@@ -72,6 +77,35 @@ func versionCommand() *cobra.Command {
 	}
 }
 
+func loadImageCommand() *cobra.Command {
+	c := &cobra.Command{
+		Use:   "load TAR",
+		Short: "Load an image from a tar archive.",
+		Args:  cobra.ExactArgs(1),
+	}
+	endpoint, timeout := options.AddGRPCFlags(c.Flags())
+	c.RunE = func(cmd *cobra.Command, args []string) error {
+		cl, err := client.NewCRIContainerdClient(*endpoint, *timeout)
+		if err != nil {
+			return fmt.Errorf("failed to create grpc client: %v", err)
+		}
+		path, err := filepath.Abs(args[0])
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path: %v", err)
+		}
+		res, err := cl.LoadImage(context.Background(), &api.LoadImageRequest{FilePath: path})
+		if err != nil {
+			return fmt.Errorf("failed to load image: %v", err)
+		}
+		images := res.GetImages()
+		for _, image := range images {
+			fmt.Println("Loaded image:", image)
+		}
+		return nil
+	}
+	return c
+}
+
 func main() {
 	if reexec.Init() {
 		return
@@ -81,10 +115,11 @@ func main() {
 	o.AddFlags(cmd.Flags())
 	cmd.AddCommand(defaultConfigCommand())
 	cmd.AddCommand(versionCommand())
+	cmd.AddCommand(loadImageCommand())
 
-	cmd.Run = func(cmd *cobra.Command, args []string) {
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		if err := o.InitFlags(cmd.Flags()); err != nil {
-			glog.Exitf("Failed to init CRI containerd flags: %v", err)
+			return fmt.Errorf("failed to init CRI containerd flags: %v", err)
 		}
 		validateConfig(o)
 
@@ -93,19 +128,21 @@ func main() {
 		glog.V(2).Infof("Run cri-containerd grpc server on socket %q", o.SocketPath)
 		s, err := server.NewCRIContainerdService(o.Config)
 		if err != nil {
-			glog.Exitf("Failed to create CRI containerd service: %v", err)
+			return fmt.Errorf("failed to create CRI containerd service: %v", err)
 		}
 		// Use interrupt handler to make sure the server is stopped properly.
 		// Pass in non-empty final function to avoid os.Exit(1). We expect `Run`
 		// to return itself.
 		h := interrupt.New(func(os.Signal) {}, s.Stop)
 		if err := h.Run(func() error { return s.Run() }); err != nil {
-			glog.Exitf("Failed to run cri-containerd grpc server: %v", err)
+			return fmt.Errorf("failed to run cri-containerd grpc server: %v", err)
 		}
+		return nil
 	}
 
 	if err := cmd.Execute(); err != nil {
-		glog.Exitf("Failed to execute cri-containerd: %v", err)
+		// Error should have been reported.
+		os.Exit(1)
 	}
 }
 

@@ -19,70 +19,11 @@ package server
 import (
 	"testing"
 
-	"github.com/containerd/containerd/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
-)
 
-func TestNormalizeImageRef(t *testing.T) {
-	for _, test := range []struct {
-		input  string
-		expect string
-	}{
-		{ // has nothing
-			input:  "busybox",
-			expect: "docker.io/library/busybox:latest",
-		},
-		{ // only has tag
-			input:  "busybox:latest",
-			expect: "docker.io/library/busybox:latest",
-		},
-		{ // only has digest
-			input:  "busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
-			expect: "docker.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
-		},
-		{ // only has path
-			input:  "library/busybox",
-			expect: "docker.io/library/busybox:latest",
-		},
-		{ // only has hostname
-			input:  "docker.io/busybox",
-			expect: "docker.io/library/busybox:latest",
-		},
-		{ // has no tag
-			input:  "docker.io/library/busybox",
-			expect: "docker.io/library/busybox:latest",
-		},
-		{ // has no path
-			input:  "docker.io/busybox:latest",
-			expect: "docker.io/library/busybox:latest",
-		},
-		{ // has no hostname
-			input:  "library/busybox:latest",
-			expect: "docker.io/library/busybox:latest",
-		},
-		{ // full reference
-			input:  "docker.io/library/busybox:latest",
-			expect: "docker.io/library/busybox:latest",
-		},
-		{ // gcr reference
-			input:  "gcr.io/library/busybox",
-			expect: "gcr.io/library/busybox:latest",
-		},
-		{ // both tag and digest
-			input:  "gcr.io/library/busybox:latest@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
-			expect: "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
-		},
-	} {
-		t.Logf("TestCase %q", test.input)
-		normalized, err := normalizeImageRef(test.input)
-		assert.NoError(t, err)
-		output := normalized.String()
-		assert.Equal(t, test.expect, output)
-		_, err = reference.Parse(output)
-		assert.NoError(t, err, "%q should be containerd supported reference", output)
-	}
-}
+	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
+)
 
 // TestGetUserFromImage tests the logic of getting image uid or user name of image user.
 func TestGetUserFromImage(t *testing.T) {
@@ -154,7 +95,7 @@ func TestGetRepoDigestAndTag(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		named, err := normalizeImageRef(test.ref)
+		named, err := util.NormalizeImageRef(test.ref)
 		assert.NoError(t, err)
 		repoDigest, repoTag := getRepoDigestAndTag(named, digest, test.schema1)
 		assert.Equal(t, test.expectedRepoDigest, repoDigest)

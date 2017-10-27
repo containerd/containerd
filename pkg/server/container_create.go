@@ -43,7 +43,7 @@ import (
 	"golang.org/x/sys/unix"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	customopts "github.com/kubernetes-incubator/cri-containerd/pkg/opts"
+	customopts "github.com/kubernetes-incubator/cri-containerd/pkg/containerd/opts"
 	cio "github.com/kubernetes-incubator/cri-containerd/pkg/server/io"
 	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/util"

@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 
 	"github.com/kubernetes-incubator/cri-containerd/cmd/cri-containerd/options"
+	api "github.com/kubernetes-incubator/cri-containerd/pkg/api/v1"
 	osinterface "github.com/kubernetes-incubator/cri-containerd/pkg/os"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/registrar"
 	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
@@ -62,6 +63,7 @@ type CRIContainerdService interface {
 	Stop()
 	runtime.RuntimeServiceServer
 	runtime.ImageServiceServer
+	api.CRIContainerdServiceServer
 }
 
 // criContainerdService implements CRIContainerdService.
@@ -167,8 +169,10 @@ func NewCRIContainerdService(config options.Config) (CRIContainerdService, error
 
 	// Create the grpc server and register runtime and image services.
 	c.server = grpc.NewServer()
-	runtime.RegisterRuntimeServiceServer(c.server, newInstrumentedService(c))
-	runtime.RegisterImageServiceServer(c.server, newInstrumentedService(c))
+	instrumented := newInstrumentedService(c)
+	runtime.RegisterRuntimeServiceServer(c.server, instrumented)
+	runtime.RegisterImageServiceServer(c.server, instrumented)
+	api.RegisterCRIContainerdServiceServer(c.server, instrumented)
 
 	return newInstrumentedService(c), nil
 }
