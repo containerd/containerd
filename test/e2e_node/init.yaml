@@ -50,7 +50,7 @@ write_files:
       Delegate=yes
       KillMode=process
       ExecStartPre=/sbin/modprobe overlay
-      ExecStart=/home/cri-containerd/usr/local/bin/containerd
+      ExecStart=/home/cri-containerd/usr/local/bin/containerd --log-level debug
 
       [Install]
       WantedBy=cri-containerd.target

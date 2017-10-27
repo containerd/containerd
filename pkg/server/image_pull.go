@@ -107,7 +107,7 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 	}
 
 	// Do best effort unpack.
-	glog.V(4).Info("Unpack image %q", imageRef)
+	glog.V(4).Infof("Unpack image %q", imageRef)
 	if err := image.Unpack(ctx, c.config.ContainerdConfig.Snapshotter); err != nil {
 		glog.Warningf("Failed to unpack image %q: %v", imageRef, err)
 		// Do not fail image pulling. Unpack will be retried before container creation.
