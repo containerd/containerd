@@ -20,7 +20,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"runtime"
+	"syscall"
 
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/golang/glog"
@@ -118,6 +121,7 @@ func main() {
 	cmd.AddCommand(loadImageCommand())
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		setupDumpStacksTrap()
 		if err := o.InitFlags(cmd.Flags()); err != nil {
 			return fmt.Errorf("failed to init CRI containerd flags: %v", err)
 		}
@@ -154,4 +158,27 @@ func validateConfig(o *options.CRIContainerdOptions) {
 	} else {
 		selinux.SetDisabled()
 	}
+}
+
+func setupDumpStacksTrap() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGUSR1)
+	go func() {
+		for range c {
+			dumpStacks()
+		}
+	}()
+}
+
+func dumpStacks() {
+	buf := make([]byte, 1024)
+	for {
+		n := runtime.Stack(buf, true)
+		if n < len(buf) {
+			buf = buf[:n]
+			break
+		}
+		buf = make([]byte, 2*len(buf))
+	}
+	glog.V(0).Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
 }
