@@ -83,7 +83,7 @@ func redirectLogs(path string, rc io.ReadCloser, wc io.WriteCloser, stream Strea
 		data := bytes.Join([][]byte{timestampBytes, streamBytes, lineBytes}, delimiterBytes)
 		data = append(data, eol)
 		if _, err := wc.Write(data); err != nil {
-			glog.Errorf("Fail to write log line %q: %v", data, err)
+			glog.Errorf("Fail to write %q log to log file %q: %v", stream, path, err)
 		}
 		// Continue on write error to drain the input.
 	}
