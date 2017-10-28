@@ -69,7 +69,7 @@ write_files:
       Restart=always
       RestartSec=5
       ExecStart=/home/cri-containerd/usr/local/bin/cri-containerd \
-        --alsologtostderr --v=4 \
+        --logtostderr --v=4 \
         --network-bin-dir=/home/cri-containerd/opt/cni/bin \
         --network-conf-dir=/home/cri-containerd/etc/cni/net.d
 
