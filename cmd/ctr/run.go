@@ -66,7 +66,7 @@ var runCommand = cli.Command{
 		},
 		cli.StringSliceFlag{
 			Name:  "mount",
-			Usage: "specify additional container mount (ex: type=bind,src=/tmp,dest=/host,options=rbind:ro)",
+			Usage: "specify additional container mount (ex: type=bind,src=/tmp,dst=/host,options=rbind:ro)",
 		},
 		cli.StringSliceFlag{
 			Name:  "env",
