@@ -33,6 +33,8 @@ type download struct {
 }
 
 type release struct {
+	ProjectName     string            `toml:"project_name"`
+	GithubRepo      string            `toml:"github_repo"`
 	Commit          string            `toml:"commit"`
 	Previous        string            `toml:"previous"`
 	PreRelease      bool              `toml:"pre_release"`
@@ -49,10 +51,10 @@ type release struct {
 
 func main() {
 	app := cli.NewApp()
-	app.Name = "containerd-release"
-	app.Description = `release tooling for containerd.
+	app.Name = "release"
+	app.Description = `release tooling.
 
-This tool should be ran from the root of the containerd repository for a new release.
+This tool should be ran from the root of the project repository for a new release.
 `
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
@@ -61,7 +63,6 @@ This tool should be ran from the root of the containerd repository for a new rel
 		},
 	}
 	app.Action = func(context *cli.Context) error {
-		logrus.Info("Welcome to the containerd release tool...")
 		var (
 			path = context.Args().First()
 			tag  = parseTag(path)
@@ -70,6 +71,7 @@ This tool should be ran from the root of the containerd repository for a new rel
 		if err != nil {
 			return err
 		}
+		logrus.Info("Welcome to the %s release tool...", r.ProjectName)
 		previous, err := getPreviousDeps(r.Previous)
 		if err != nil {
 			return err
