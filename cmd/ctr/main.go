@@ -74,7 +74,6 @@ containerd CLI
 	app.Commands = append([]cli.Command{
 		plugins.Command,
 		versionCmd.Command,
-		applyCommand,
 		containers.Command,
 		content.Command,
 		events.Command,
