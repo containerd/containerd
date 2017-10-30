@@ -125,7 +125,7 @@ func (em *eventMonitor) handleEvent(evt *events.Envelope) {
 				// Move on to make sure container status is updated.
 			}
 		}
-		err = cntr.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
+		err = cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
 			// If FinishedAt has been set (e.g. with start failure), keep as
 			// it is.
 			if status.FinishedAt != 0 {
@@ -151,7 +151,7 @@ func (em *eventMonitor) handleEvent(evt *events.Envelope) {
 			}
 			glog.Errorf("Failed to get container %q: %v", e.ContainerID, err)
 		}
-		err = cntr.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
+		err = cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
 			status.Reason = oomExitReason
 			return status, nil
 		})

@@ -106,11 +106,11 @@ type UpdateFunc func(Status) (Status, error)
 type StatusStorage interface {
 	// Get a container status.
 	Get() Status
+	// UpdateSync updates the container status and the on disk checkpoint.
+	// Note that the update MUST be applied in one transaction.
+	UpdateSync(UpdateFunc) error
 	// Update the container status. Note that the update MUST be applied
 	// in one transaction.
-	// TODO(random-liu): Distinguish `UpdateSync` and `Update`, only
-	// `UpdateSync` should sync data onto disk, so that disk operation
-	// for non-critical status change could be avoided.
 	Update(UpdateFunc) error
 	// Delete the container status.
 	// Note:
@@ -167,8 +167,8 @@ func (s *statusStorage) Get() Status {
 	return s.status
 }
 
-// Update the container status.
-func (s *statusStorage) Update(u UpdateFunc) error {
+// UpdateSync updates the container status and the on disk checkpoint.
+func (s *statusStorage) UpdateSync(u UpdateFunc) error {
 	s.Lock()
 	defer s.Unlock()
 	newStatus, err := u(s.status)
@@ -181,6 +181,18 @@ func (s *statusStorage) Update(u UpdateFunc) error {
 	}
 	if err := ioutils.AtomicWriteFile(s.path, data, 0600); err != nil {
 		return fmt.Errorf("failed to checkpoint status to %q: %v", s.path, err)
+	}
+	s.status = newStatus
+	return nil
+}
+
+// Update the container status.
+func (s *statusStorage) Update(u UpdateFunc) error {
+	s.Lock()
+	defer s.Unlock()
+	newStatus, err := u(s.status)
+	if err != nil {
+		return err
 	}
 	s.status = newStatus
 	return nil

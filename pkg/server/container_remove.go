@@ -31,6 +31,7 @@ import (
 )
 
 // RemoveContainer removes the container.
+// TODO(random-liu): Forcibly stop container if it's running.
 func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.RemoveContainerRequest) (_ *runtime.RemoveContainerResponse, retErr error) {
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
@@ -52,7 +53,6 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 		if retErr != nil {
 			// Reset removing if remove failed.
 			if err := resetContainerRemoving(container); err != nil {
-				// TODO(random-liu): Do not checkpoint `Removing` state.
 				glog.Errorf("failed to reset removing state for container %q: %v", id, err)
 			}
 		}
@@ -63,10 +63,12 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 	// kubelet implementation, we'll never start a container once we decide to remove it,
 	// so we don't need the "Dead" state for now.
 
-	containerRootDir := getContainerRootDir(c.config.RootDir, id)
-	if err := system.EnsureRemoveAll(containerRootDir); err != nil {
-		return nil, fmt.Errorf("failed to remove container root directory %q: %v",
-			containerRootDir, err)
+	// Delete containerd container.
+	if err := container.Container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
+		if !errdefs.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to delete containerd container %q: %v", id, err)
+		}
+		glog.V(5).Infof("Remove called for containerd container %q that does not exist", id, err)
 	}
 
 	// Delete container checkpoint.
@@ -74,12 +76,10 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 		return nil, fmt.Errorf("failed to delete container checkpoint for %q: %v", id, err)
 	}
 
-	// Delete containerd container.
-	if err := container.Container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
-		if !errdefs.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to delete containerd container %q: %v", id, err)
-		}
-		glog.V(5).Infof("Remove called for containerd container %q that does not exist", id, err)
+	containerRootDir := getContainerRootDir(c.config.RootDir, id)
+	if err := system.EnsureRemoveAll(containerRootDir); err != nil {
+		return nil, fmt.Errorf("failed to remove container root directory %q: %v",
+			containerRootDir, err)
 	}
 
 	c.containerStore.Delete(id)

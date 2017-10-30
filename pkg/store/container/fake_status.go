@@ -38,6 +38,10 @@ func (f *fakeStatusStorage) Get() Status {
 	return f.status
 }
 
+func (f *fakeStatusStorage) UpdateSync(u UpdateFunc) error {
+	return f.Update(u)
+}
+
 func (f *fakeStatusStorage) Update(u UpdateFunc) error {
 	f.Lock()
 	defer f.Unlock()
