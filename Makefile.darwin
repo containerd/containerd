@@ -2,6 +2,6 @@
 COMMANDS += containerd-shim
 
 # amd64 supports go test -race
-ifeq ("amd64", $(GOARCH))
+ifeq ($(GOARCH),amd64)
 	TESTFLAGS_RACE= -race
 endif
