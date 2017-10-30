@@ -124,6 +124,9 @@ func newTask(ctx gocontext.Context, client *containerd.Client, container contain
 		io = containerd.StdioTerminal
 	}
 	if nullIO {
+		if tty {
+			return nil, errors.New("tty and null-io cannot be used together")
+		}
 		io = containerd.NullIO
 	}
 	return container.NewTask(ctx, io)
