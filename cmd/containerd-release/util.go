@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/urfave/cli"
 )
 
 func loadRelease(path string) (*release, error) {
@@ -162,4 +164,24 @@ func getContributors(previous, commit string) ([]string, error) {
 	}
 	sort.Strings(out)
 	return out, nil
+}
+
+// getTemplate will use a builtin template if the template is not specified on the cli
+func getTemplate(context *cli.Context) (string, error) {
+	path := context.GlobalString("template")
+	f, err := os.Open(path)
+	if err != nil {
+		// if the template file does not exist and the path is for the default template then
+		// return the compiled in template
+		if os.IsNotExist(err) && path == defaultTemplateFile {
+			return releaseNotes, nil
+		}
+		return "", err
+	}
+	defer f.Close()
+	data, err := ioutil.ReadAll(f)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }
