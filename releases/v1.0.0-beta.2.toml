@@ -1,6 +1,9 @@
 # commit to be tagged for new release
 commit = "HEAD"
 
+project_name = "containerd"
+github_repo = "containerd/containerd"
+
 # previous release
 previous = "v1.0.0-beta.1"
 

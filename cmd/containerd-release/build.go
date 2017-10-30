@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 )
 
 func build() error {
@@ -18,10 +19,10 @@ func build() error {
 	return nil
 }
 
-const tarFormat = "containerd-%s.%s-%s.tar.gz"
+const tarFormat = "%s-%s.%s-%s.tar.gz"
 
-func tarRelease(tag string) (string, error) {
-	path := fmt.Sprintf(tarFormat, tag, runtime.GOOS, runtime.GOARCH)
+func tarRelease(projectName, tag string) (string, error) {
+	path := fmt.Sprintf(tarFormat, strings.ToLower(projectName), tag, runtime.GOOS, runtime.GOARCH)
 	out, err := exec.Command("tar", "-zcf", path, "bin/").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("%s: %s", err, out)
