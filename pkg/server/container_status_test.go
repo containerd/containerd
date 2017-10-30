@@ -54,6 +54,7 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 		SandboxID: "test-sandbox-id",
 		Config:    config,
 		ImageRef:  "test-image-id",
+		LogPath:   "test-log-path",
 	}
 	status := &containerstore.Status{
 		Pid:       1234,
@@ -76,6 +77,7 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 		Labels:      config.GetLabels(),
 		Annotations: config.GetAnnotations(),
 		Mounts:      config.GetMounts(),
+		LogPath:     "test-log-path",
 	}
 
 	return metadata, status, image, expected

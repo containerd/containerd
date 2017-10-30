@@ -74,5 +74,6 @@ func toCRIContainerStatus(container containerstore.Container, imageRef string) *
 		Labels:      meta.Config.GetLabels(),
 		Annotations: meta.Config.GetAnnotations(),
 		Mounts:      meta.Config.GetMounts(),
+		LogPath:     meta.LogPath,
 	}
 }
