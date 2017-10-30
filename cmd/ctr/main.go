@@ -12,6 +12,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands/images"
 	namespacesCmd "github.com/containerd/containerd/cmd/ctr/commands/namespaces"
 	"github.com/containerd/containerd/cmd/ctr/commands/plugins"
+	"github.com/containerd/containerd/cmd/ctr/commands/pprof"
 	"github.com/containerd/containerd/cmd/ctr/commands/run"
 	"github.com/containerd/containerd/cmd/ctr/commands/snapshot"
 	"github.com/containerd/containerd/cmd/ctr/commands/tasks"
@@ -81,7 +82,7 @@ containerd CLI
 		events.Command,
 		images.Command,
 		namespacesCmd.Command,
-		pprofCommand,
+		pprof.Command,
 		run.Command,
 		snapshot.Command,
 		tasks.Command,
