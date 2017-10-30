@@ -1,6 +1,8 @@
 package main
 
-const releaseNotes = `Welcome to the release of {{.ProjectName}} {{.Version}}!
+const (
+	defaultTemplateFile = "TEMPLATE"
+	releaseNotes        = `Welcome to the release of {{.ProjectName}} {{.Version}}!
 {{if .PreRelease}}
 *This is a pre-release of {{.ProjectName}}*
 {{- end}}
@@ -33,3 +35,4 @@ Previous release can be found at [{{.Previous}}](https://github.com/{{.GithubRep
 * {{$dep.Previous}} -> {{$dep.Commit}} **{{$dep.Name}}**
 {{- end}}
 `
+)

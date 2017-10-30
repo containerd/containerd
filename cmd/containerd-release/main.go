@@ -61,6 +61,11 @@ This tool should be ran from the root of the project repository for a new releas
 			Name:  "dry,n",
 			Usage: "run the release tooling as a dry run to print the release notes to stdout",
 		},
+		cli.StringFlag{
+			Name:  "template,t",
+			Usage: "template filepath to use in place of the default",
+			Value: defaultTemplateFile,
+		},
 	}
 	app.Action = func(context *cli.Context) error {
 		var (
@@ -100,8 +105,13 @@ This tool should be ran from the root of the project repository for a new releas
 		r.Changes = changes
 		r.Version = tag
 
+		tmpl, err := getTemplate(context)
+		if err != nil {
+			return err
+		}
+
 		if context.Bool("dry") {
-			t, err := template.New("release-notes").Parse(releaseNotes)
+			t, err := template.New("release-notes").Parse(tmpl)
 			if err != nil {
 				return err
 			}
