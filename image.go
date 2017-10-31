@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/rootfs"
@@ -30,6 +31,8 @@ type Image interface {
 	Size(ctx context.Context) (int64, error)
 	// Config descriptor for the image.
 	Config(ctx context.Context) (ocispec.Descriptor, error)
+	// IsUnpacked returns whether or not an image is unpacked.
+	IsUnpacked(context.Context, string) (bool, error)
 }
 
 var _ = (Image)(&image{})
@@ -61,6 +64,26 @@ func (i *image) Size(ctx context.Context) (int64, error) {
 func (i *image) Config(ctx context.Context) (ocispec.Descriptor, error) {
 	provider := i.client.ContentStore()
 	return i.i.Config(ctx, provider, platforms.Default())
+}
+
+func (i *image) IsUnpacked(ctx context.Context, snapshotterName string) (bool, error) {
+	sn := i.client.SnapshotService(snapshotterName)
+	cs := i.client.ContentStore()
+
+	diffs, err := i.i.RootFS(ctx, cs, platforms.Default())
+	if err != nil {
+		return false, err
+	}
+
+	chainID := identity.ChainID(diffs)
+	_, err = sn.Stat(ctx, chainID.String())
+	if err == nil {
+		return true, nil
+	} else if !errdefs.IsNotFound(err) {
+		return false, err
+	}
+
+	return false, nil
 }
 
 func (i *image) Unpack(ctx context.Context, snapshotterName string) error {

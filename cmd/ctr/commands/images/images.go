@@ -179,8 +179,9 @@ var setLabelsCommand = cli.Command{
 var checkCommand = cli.Command{
 	Name:        "check",
 	Usage:       "check that an image has all content available locally",
-	ArgsUsage:   "<ref> [<ref>, ...]",
+	ArgsUsage:   "[flags] <ref> [<ref>, ...]",
 	Description: "check that an image has all content available locally",
+	Flags:       commands.SnapshotterFlags,
 	Action: func(context *cli.Context) error {
 		var (
 			exitErr error
@@ -191,14 +192,13 @@ var checkCommand = cli.Command{
 		}
 		defer cancel()
 		var (
-			imageStore   = client.ImageService()
 			contentStore = client.ContentStore()
 			tw           = tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
 		)
-		fmt.Fprintln(tw, "REF\tTYPE\tDIGEST\tSTATUS\tSIZE\t")
+		fmt.Fprintln(tw, "REF\tTYPE\tDIGEST\tSTATUS\tSIZE\tUNPACKED\t")
 
 		args := []string(context.Args())
-		imageList, err := imageStore.List(ctx, args...)
+		imageList, err := client.ListImages(ctx, args...)
 		if err != nil {
 			return errors.Wrap(err, "failed listing images")
 		}
@@ -211,12 +211,12 @@ var checkCommand = cli.Command{
 				presentSize  int64
 			)
 
-			available, required, present, missing, err := images.Check(ctx, contentStore, image.Target, platforms.Default())
+			available, required, present, missing, err := images.Check(ctx, contentStore, image.Target(), platforms.Default())
 			if err != nil {
 				if exitErr == nil {
-					exitErr = errors.Wrapf(err, "unable to check %v", image.Name)
+					exitErr = errors.Wrapf(err, "unable to check %v", image.Name())
 				}
-				log.G(ctx).WithError(err).Errorf("unable to check %v", image.Name)
+				log.G(ctx).WithError(err).Errorf("unable to check %v", image.Name())
 				status = "error"
 			}
 
@@ -244,12 +244,21 @@ var checkCommand = cli.Command{
 				size = "-"
 			}
 
-			fmt.Fprintf(tw, "%v\t%v\t%v\t%v\t%v\t\n",
-				image.Name,
-				image.Target.MediaType,
-				image.Target.Digest,
+			unpacked, err := image.IsUnpacked(ctx, context.String("snapshotter"))
+			if err != nil {
+				if exitErr == nil {
+					exitErr = errors.Wrapf(err, "unable to check unpack for %v", image.Name())
+				}
+				log.G(ctx).WithError(err).Errorf("unable to check unpack for %v", image.Name())
+			}
+
+			fmt.Fprintf(tw, "%v\t%v\t%v\t%v\t%v\t%t\n",
+				image.Name(),
+				image.Target().MediaType,
+				image.Target().Digest,
 				status,
-				size)
+				size,
+				unpacked)
 		}
 		tw.Flush()
 
