@@ -14,12 +14,6 @@ var tasksCommand = cli.Command{
 	Name:    "tasks",
 	Usage:   "manage tasks",
 	Aliases: []string{"t"},
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "quiet, q",
-			Usage: "print only the task id & pid",
-		},
-	},
 	Subcommands: []cli.Command{
 		taskAttachCommand,
 		taskCheckpointCommand,
@@ -30,6 +24,19 @@ var tasksCommand = cli.Command{
 		taskResumeCommand,
 		taskStartCommand,
 		taskDeleteCommand,
+		taskListCommand,
+	},
+}
+
+var taskListCommand = cli.Command{
+	Name:    "list",
+	Usage:   "list tasks",
+	Aliases: []string{"ls"},
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "quiet, q",
+			Usage: "print only the task id & pid",
+		},
 	},
 	Action: func(context *cli.Context) error {
 		quiet := context.Bool("quiet")
