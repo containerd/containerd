@@ -1,0 +1,21 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+
+# previous release
+previous = "v1.0.0-beta.2"
+
+pre_release = true
+
+preface = """\
+After rounding out the feature set in beta.2, we have taken a number of stability fixes.
+
+This release contains mostly bug fixes, code cleanup and improvements to useability of
+the client and ctr tool."""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
