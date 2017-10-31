@@ -1,6 +1,6 @@
 ---
 # TODO update official versions once they are available
-cri_containerd_release_version: 1.0.0-alpha.0
+cri_containerd_release_version: 1.0.0-alpha.0-84-ge57cb68
 cri_release_directory: /opt/cri-containerd/
 local_bin_dir: /usr/local/bin/
 local_sbin_dir: /usr/local/sbin/
