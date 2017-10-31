@@ -132,8 +132,35 @@ func TestStatus(t *testing.T) {
 	require.NoError(err)
 	assert.Equal(testStatus, loaded)
 
-	t.Logf("successful update should take effect")
+	t.Logf("successful update should take effect but not checkpoint")
 	err = s.Update(func(o Status) (Status, error) {
+		o = updateStatus
+		return o, nil
+	})
+	assert.NoError(err)
+	assert.Equal(updateStatus, s.Get())
+	loaded, err = LoadStatus(tempDir, testID)
+	require.NoError(err)
+	assert.Equal(testStatus, loaded)
+	// Recover status.
+	assert.NoError(s.Update(func(o Status) (Status, error) {
+		o = testStatus
+		return o, nil
+	}))
+
+	t.Logf("failed update sync should not take effect")
+	err = s.UpdateSync(func(o Status) (Status, error) {
+		o = updateStatus
+		return o, updateErr
+	})
+	assert.Equal(updateErr, err)
+	assert.Equal(testStatus, s.Get())
+	loaded, err = LoadStatus(tempDir, testID)
+	require.NoError(err)
+	assert.Equal(testStatus, loaded)
+
+	t.Logf("successful update sync should take effect and checkpoint")
+	err = s.UpdateSync(func(o Status) (Status, error) {
 		o = updateStatus
 		return o, nil
 	})

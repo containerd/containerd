@@ -39,7 +39,7 @@ func (c *criContainerdService) StartContainer(ctx context.Context, r *runtime.St
 
 	var startErr error
 	// update container status in one transaction to avoid race with event monitor.
-	if err := container.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
+	if err := container.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
 		// Always apply status change no matter startContainer fails or not. Because startContainer
 		// may change container state no matter it fails or succeeds.
 		startErr = c.startContainer(ctx, container, &status)
