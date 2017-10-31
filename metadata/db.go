@@ -203,6 +203,7 @@ func (m *DB) GarbageCollect(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
 	m.dirtyL.Lock()
 	defer m.dirtyL.Unlock()
 
@@ -210,25 +211,11 @@ func (m *DB) GarbageCollect(ctx context.Context) error {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		var (
-			nodes []gc.Node
-			wg    sync.WaitGroup
-			nodeC = make(chan gc.Node)
-		)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for n := range nodeC {
-				nodes = append(nodes, n)
+		rm := func(ctx context.Context, n gc.Node) error {
+			if _, ok := marked[n]; ok {
+				return nil
 			}
-		}()
-		if err := scanAll(ctx, tx, nodeC); err != nil {
-			return errors.Wrap(err, "failed to scan all")
-		}
-		close(nodeC)
-		wg.Wait()
 
-		return gc.Sweep(marked, nodes, func(n gc.Node) error {
 			if n.Type == ResourceSnapshot {
 				if idx := strings.IndexRune(n.Key, '/'); idx > 0 {
 					m.dirtySS[n.Key[:idx]] = struct{}{}
@@ -237,7 +224,13 @@ func (m *DB) GarbageCollect(ctx context.Context) error {
 				m.dirtyCS = true
 			}
 			return remove(ctx, tx, n)
-		})
+		}
+
+		if err := scanAll(ctx, tx, rm); err != nil {
+			return errors.Wrap(err, "failed to scan and remove")
+		}
+
+		return nil
 	}); err != nil {
 		return err
 	}
