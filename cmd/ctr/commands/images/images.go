@@ -22,12 +22,14 @@ var Command = cli.Command{
 	Name:  "images",
 	Usage: "manage images",
 	Subcommands: cli.Commands{
-		listCommand,
 		checkCommand,
+		exportCommand,
+		importCommand,
+		listCommand,
+		pullCommand,
+		pushCommand,
 		removeCommand,
 		setLabelsCommand,
-		importCommand,
-		exportCommand,
 	},
 }
 

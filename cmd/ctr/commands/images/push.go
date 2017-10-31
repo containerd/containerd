@@ -1,4 +1,4 @@
-package main
+package images
 
 import (
 	gocontext "context"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/cmd/ctr/commands/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/progress"
@@ -113,7 +114,7 @@ var pushCommand = cli.Command{
 
 				tw := tabwriter.NewWriter(fw, 1, 8, 1, ' ', 0)
 
-				display(tw, ongoing.status(), start)
+				content.Display(tw, ongoing.status(), start)
 				tw.Flush()
 
 				if done {
@@ -164,13 +165,13 @@ func (j *pushjobs) add(ref string) {
 	j.jobs[ref] = struct{}{}
 }
 
-func (j *pushjobs) status() []statusInfo {
+func (j *pushjobs) status() []content.StatusInfo {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 
-	statuses := make([]statusInfo, 0, len(j.jobs))
+	statuses := make([]content.StatusInfo, 0, len(j.jobs))
 	for _, name := range j.ordered {
-		si := statusInfo{
+		si := content.StatusInfo{
 			Ref: name,
 		}
 

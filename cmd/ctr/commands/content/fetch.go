@@ -1,4 +1,4 @@
-package main
+package content
 
 import (
 	"context"
@@ -45,12 +45,13 @@ Most of this is experimental and there are few leaps to make this work.`,
 		var (
 			ref = clicontext.Args().First()
 		)
-		_, err := fetch(ref, clicontext)
+		_, err := Fetch(ref, clicontext)
 		return err
 	},
 }
 
-func fetch(ref string, cliContext *cli.Context) (containerd.Image, error) {
+// Fetch loads all resources into the content store and returns the image
+func Fetch(ref string, cliContext *cli.Context) (containerd.Image, error) {
 	client, ctx, cancel, err := commands.NewClient(cliContext)
 	if err != nil {
 		return nil, err
@@ -104,7 +105,7 @@ func showProgress(ctx context.Context, ongoing *jobs, cs content.Store, out io.W
 		ticker   = time.NewTicker(100 * time.Millisecond)
 		fw       = progress.NewWriter(out)
 		start    = time.Now()
-		statuses = map[string]statusInfo{}
+		statuses = map[string]StatusInfo{}
 		done     bool
 	)
 	defer ticker.Stop()
@@ -121,7 +122,7 @@ outer:
 			if !ongoing.isResolved() {
 				resolved = "resolving"
 			}
-			statuses[ongoing.name] = statusInfo{
+			statuses[ongoing.name] = StatusInfo{
 				Ref:    ongoing.name,
 				Status: resolved,
 			}
@@ -136,7 +137,7 @@ outer:
 				}
 				// update status of active entries!
 				for _, active := range active {
-					statuses[active.Ref] = statusInfo{
+					statuses[active.Ref] = StatusInfo{
 						Ref:       active.Ref,
 						Status:    "downloading",
 						Offset:    active.Offset,
@@ -164,13 +165,13 @@ outer:
 							log.G(ctx).WithError(err).Errorf("failed to get content info")
 							continue outer
 						} else {
-							statuses[key] = statusInfo{
+							statuses[key] = StatusInfo{
 								Ref:    key,
 								Status: "waiting",
 							}
 						}
 					} else if info.CreatedAt.After(start) {
-						statuses[key] = statusInfo{
+						statuses[key] = StatusInfo{
 							Ref:       key,
 							Status:    "done",
 							Offset:    info.Size,
@@ -178,7 +179,7 @@ outer:
 							UpdatedAt: info.CreatedAt,
 						}
 					} else {
-						statuses[key] = statusInfo{
+						statuses[key] = StatusInfo{
 							Ref:    key,
 							Status: "exists",
 						}
@@ -190,7 +191,7 @@ outer:
 							statuses[key] = status
 						}
 					} else {
-						statuses[key] = statusInfo{
+						statuses[key] = StatusInfo{
 							Ref:    key,
 							Status: "done",
 						}
@@ -198,12 +199,12 @@ outer:
 				}
 			}
 
-			var ordered []statusInfo
+			var ordered []StatusInfo
 			for _, key := range keys {
 				ordered = append(ordered, statuses[key])
 			}
 
-			display(tw, ordered, start)
+			Display(tw, ordered, start)
 			tw.Flush()
 
 			if done {
@@ -262,7 +263,8 @@ func (j *jobs) isResolved() bool {
 	return j.resolved
 }
 
-type statusInfo struct {
+// StatusInfo holds the status info for an upload or download
+type StatusInfo struct {
 	Ref       string
 	Status    string
 	Offset    int64
@@ -271,7 +273,8 @@ type statusInfo struct {
 	UpdatedAt time.Time
 }
 
-func display(w io.Writer, statuses []statusInfo, start time.Time) {
+// Display pretty prints out the download or upload progress
+func Display(w io.Writer, statuses []StatusInfo, start time.Time) {
 	var total int64
 	for _, status := range statuses {
 		total += status.Offset
