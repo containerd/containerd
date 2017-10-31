@@ -20,9 +20,9 @@ var Command = cli.Command{
 	Usage: "manage namespaces",
 	Subcommands: cli.Commands{
 		createCommand,
-		setLabelsCommand,
 		listCommand,
 		removeCommand,
+		setLabelsCommand,
 	},
 }
 

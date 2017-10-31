@@ -20,10 +20,10 @@ var Command = cli.Command{
 	Usage:   "manage containers",
 	Aliases: []string{"c"},
 	Subcommands: []cli.Command{
-		listCommand,
 		deleteCommand,
-		setLabelsCommand,
 		infoCommand,
+		listCommand,
+		setLabelsCommand,
 	},
 }
 
