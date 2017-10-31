@@ -12,7 +12,9 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands/images"
 	namespacesCmd "github.com/containerd/containerd/cmd/ctr/commands/namespaces"
 	"github.com/containerd/containerd/cmd/ctr/commands/plugins"
+	"github.com/containerd/containerd/cmd/ctr/commands/run"
 	"github.com/containerd/containerd/cmd/ctr/commands/snapshot"
+	"github.com/containerd/containerd/cmd/ctr/commands/tasks"
 	versionCmd "github.com/containerd/containerd/cmd/ctr/commands/version"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/server"
@@ -80,9 +82,9 @@ containerd CLI
 		images.Command,
 		namespacesCmd.Command,
 		pprofCommand,
-		runCommand,
+		run.Command,
 		snapshot.Command,
-		tasksCommand,
+		tasks.Command,
 	}, extraCmds...)
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {

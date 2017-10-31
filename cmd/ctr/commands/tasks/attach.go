@@ -1,4 +1,4 @@
-package main
+package tasks
 
 import (
 	"os"
@@ -10,7 +10,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-var taskAttachCommand = cli.Command{
+var attachCommand = cli.Command{
 	Name:      "attach",
 	Usage:     "attach to the IO of a running container",
 	ArgsUsage: "CONTAINER",
@@ -51,7 +51,7 @@ var taskAttachCommand = cli.Command{
 		}
 
 		if tty {
-			if err := handleConsoleResize(ctx, task, con); err != nil {
+			if err := HandleConsoleResize(ctx, task, con); err != nil {
 				logrus.WithError(err).Error("console resize")
 			}
 		} else {

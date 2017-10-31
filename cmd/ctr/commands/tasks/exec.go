@@ -1,4 +1,4 @@
-package main
+package tasks
 
 import (
 	"errors"
@@ -11,10 +11,10 @@ import (
 )
 
 //TODO:(jessvalarezo) exec-id is optional here, update to required arg
-var taskExecCommand = cli.Command{
+var execCommand = cli.Command{
 	Name:      "exec",
 	Usage:     "execute additional processes in an existing container",
-	ArgsUsage: "CONTAINER CMD [ARG...]",
+	ArgsUsage: "[flags] CONTAINER CMD [ARG...]",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "cwd",
@@ -84,7 +84,7 @@ var taskExecCommand = cli.Command{
 			}
 		}
 		if tty {
-			if err := handleConsoleResize(ctx, process, con); err != nil {
+			if err := HandleConsoleResize(ctx, process, con); err != nil {
 				logrus.WithError(err).Error("console resize")
 			}
 		} else {

@@ -1,4 +1,4 @@
-package main
+package tasks
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-var taskPsCommand = cli.Command{
+var psCommand = cli.Command{
 	Name:      "ps",
 	Usage:     "list processes for container",
 	ArgsUsage: "CONTAINER",

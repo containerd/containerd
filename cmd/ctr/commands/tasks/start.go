@@ -1,4 +1,4 @@
-package main
+package tasks
 
 import (
 	"github.com/containerd/console"
@@ -8,7 +8,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-var taskStartCommand = cli.Command{
+var startCommand = cli.Command{
 	Name:      "start",
 	Usage:     "start a container that have been created",
 	ArgsUsage: "CONTAINER",
@@ -43,7 +43,7 @@ var taskStartCommand = cli.Command{
 
 		tty := spec.Process.Terminal
 
-		task, err := newTask(ctx, client, container, "", tty, context.Bool("null-io"))
+		task, err := NewTask(ctx, client, container, "", tty, context.Bool("null-io"))
 		if err != nil {
 			return err
 		}
@@ -66,7 +66,7 @@ var taskStartCommand = cli.Command{
 			return err
 		}
 		if tty {
-			if err := handleConsoleResize(ctx, task, con); err != nil {
+			if err := HandleConsoleResize(ctx, task, con); err != nil {
 				logrus.WithError(err).Error("console resize")
 			}
 		} else {

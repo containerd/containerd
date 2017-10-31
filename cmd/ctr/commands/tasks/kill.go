@@ -1,4 +1,4 @@
-package main
+package tasks
 
 import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
@@ -8,10 +8,10 @@ import (
 
 // TODO:(jessvalarezo) the pid flag is not used here
 // update to be able to signal given pid
-var taskKillCommand = cli.Command{
+var killCommand = cli.Command{
 	Name:      "kill",
 	Usage:     "signal a container (default: SIGTERM)",
-	ArgsUsage: "CONTAINER",
+	ArgsUsage: "[flags] CONTAINER",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "signal, s",
