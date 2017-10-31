@@ -18,4 +18,16 @@ the client and ctr tool."""
 # notable prs to include in the release notes, 1234 is the pr number
 [notes]
 
+  [notes.ctr]
+  title= "`ctr` makeover"
+  description = """\
+`ctr` is getting a ~makeover~! The end goal is for commands to be consistent and scoped.
+Most notably:
+- `push`, `pull` are now `images` subcommands: `ctr images push`, `ctr images pull`
+- `fetch`, `fetch-object`, and `push-object` are `content` subcommands
+- `rootfs unpack` is now `snapshot unpack`
+- `apply` no longer exists. RIP"""
+
+
+
 [breaking]
