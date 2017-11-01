@@ -298,7 +298,7 @@ func (r *dockerBase) authorize(req *http.Request) {
 
 func (r *dockerBase) doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", req.URL.String()))
-	log.G(ctx).WithField("request.headers", req.Header).WithField("request.method", req.Method).Debug("Do request")
+	log.G(ctx).WithField("request.headers", req.Header).WithField("request.method", req.Method).Debug("do request")
 	r.authorize(req)
 	resp, err := ctxhttp.Do(ctx, r.client, req)
 	if err != nil {
