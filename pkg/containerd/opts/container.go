@@ -21,10 +21,8 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/docker/docker/pkg/chrootarchive"
 	"github.com/docker/docker/pkg/system"
-	"github.com/opencontainers/image-spec/identity"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
@@ -35,18 +33,12 @@ func WithImageUnpack(i containerd.Image) containerd.NewContainerOpts {
 		if c.Snapshotter == "" {
 			return errors.New("no snapshotter set for container")
 		}
-		snapshotter := client.SnapshotService(c.Snapshotter)
-		diffIDs, err := i.RootFS(ctx)
+		unpacked, err := i.IsUnpacked(ctx, c.Snapshotter)
 		if err != nil {
-			return errors.Wrap(err, "get image diff IDs")
+			return errors.Wrap(err, "fail to check if image is unpacked")
 		}
-		chainID := identity.ChainID(diffIDs)
-		_, err = snapshotter.Stat(ctx, chainID.String())
-		if err == nil {
+		if unpacked {
 			return nil
-		}
-		if !errdefs.IsNotFound(err) {
-			return errors.Wrap(err, "stat snapshot")
 		}
 		// Unpack the snapshot.
 		if err := i.Unpack(ctx, c.Snapshotter); err != nil {
