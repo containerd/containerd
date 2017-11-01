@@ -63,7 +63,7 @@ type transactionKey struct{}
 // TransactionContext creates a new transaction context. The writable value
 // should be set to true for transactions which are expected to mutate data.
 func (ms *MetaStore) TransactionContext(ctx context.Context, writable bool) (context.Context, Transactor, error) {
-	db, err := bolt.Open(ms.dbfile, 0600, nil)
+	db, err := bolt.Open(ms.dbfile, 0600, &bolt.Options{ReadOnly: !writable})
 	if err != nil {
 		return ctx, nil, errors.Wrap(err, "failed to open database file")
 	}
