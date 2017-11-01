@@ -24,12 +24,6 @@ service Leases {
 	rpc List(ListRequest) returns (ListResponse);
 }
 
-// Snapshot is a snapshot resource reference.
-message Snapshot {
-	string snapshotter = 1;
-	string key = 2;
-}
-
 // Lease is an object which retains resources while it exists.
 message Lease {
 	string id = 1;

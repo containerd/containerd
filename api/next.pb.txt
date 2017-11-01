@@ -2412,23 +2412,6 @@ file {
   dependency: "google/protobuf/empty.proto"
   dependency: "google/protobuf/timestamp.proto"
   message_type {
-    name: "Snapshot"
-    field {
-      name: "snapshotter"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "snapshotter"
-    }
-    field {
-      name: "key"
-      number: 2
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "key"
-    }
-  }
-  message_type {
     name: "Lease"
     field {
       name: "id"
