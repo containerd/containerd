@@ -51,4 +51,4 @@ fi
 
 # Build and push node e2e tarball.
 PUSH_VERSION=true DEPLOY_DIR=${DEPLOY_DIR:-""} \
-  make push TARBALL_PREFIX=cri-containerd-node-e2e INCLUDE_CNI=true
+  make push TARBALL_PREFIX=cri-containerd-cni INCLUDE_CNI=true
