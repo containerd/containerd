@@ -42,6 +42,8 @@ func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(ctx context.
 	//t.Run("Rename", makeTest(name, snapshotterFn, checkRename))
 
 	t.Run("ViewReadonly", makeTest(name, snapshotterFn, checkSnapshotterViewReadonly))
+
+	t.Run("StatInWalk", makeTest(name, snapshotterFn, checkStatInWalk))
 }
 
 func makeTest(name string, snapshotterFn func(ctx context.Context, root string) (snapshot.Snapshotter, func() error, error), fn func(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string)) func(t *testing.T) {

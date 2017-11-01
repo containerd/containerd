@@ -122,3 +122,33 @@ func checkSnapshots(ctx context.Context, sn snapshot.Snapshotter, work string, a
 	return nil
 
 }
+
+// checkInfo checks that the infos are the same
+func checkInfo(si1, si2 snapshot.Info) error {
+	if si1.Kind != si2.Kind {
+		return errors.Errorf("Expected kind %v, got %v", si1.Kind, si2.Kind)
+	}
+	if si1.Name != si2.Name {
+		return errors.Errorf("Expected name %v, got %v", si1.Name, si2.Name)
+	}
+	if si1.Parent != si2.Parent {
+		return errors.Errorf("Expected Parent %v, got %v", si1.Parent, si2.Parent)
+	}
+	if len(si1.Labels) != len(si2.Labels) {
+		return errors.Errorf("Expected %d labels, got %d", len(si1.Labels), len(si2.Labels))
+	}
+	for k, l1 := range si1.Labels {
+		l2 := si2.Labels[k]
+		if l1 != l2 {
+			return errors.Errorf("Expected label %v, got %v", l1, l2)
+		}
+	}
+	if si1.Created != si2.Created {
+		return errors.Errorf("Expected Created %v, got %v", si1.Created, si2.Created)
+	}
+	if si1.Updated != si2.Updated {
+		return errors.Errorf("Expected Updated %v, got %v", si1.Updated, si2.Updated)
+	}
+
+	return nil
+}

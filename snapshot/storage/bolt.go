@@ -30,21 +30,6 @@ var (
 	ErrNoTransaction = errors.New("no transaction in context")
 )
 
-type boltFileTransactor struct {
-	db *bolt.DB
-	tx *bolt.Tx
-}
-
-func (bft *boltFileTransactor) Rollback() error {
-	defer bft.db.Close()
-	return bft.tx.Rollback()
-}
-
-func (bft *boltFileTransactor) Commit() error {
-	defer bft.db.Close()
-	return bft.tx.Commit()
-}
-
 // parentKey returns a composite key of the parent and child identifiers. The
 // parts of the key are separated by a zero byte.
 func parentKey(parent, child uint64) []byte {
@@ -405,11 +390,11 @@ func CommitActive(ctx context.Context, key, name string, usage snapshot.Usage, o
 }
 
 func withSnapshotBucket(ctx context.Context, key string, fn func(context.Context, *bolt.Bucket, *bolt.Bucket) error) error {
-	t, ok := ctx.Value(transactionKey{}).(*boltFileTransactor)
+	tx, ok := ctx.Value(transactionKey{}).(*bolt.Tx)
 	if !ok {
 		return ErrNoTransaction
 	}
-	bkt := t.tx.Bucket(bucketKeyStorageVersion)
+	bkt := tx.Bucket(bucketKeyStorageVersion)
 	if bkt == nil {
 		return errors.Wrap(errdefs.ErrNotFound, "bucket does not exist")
 	}
@@ -426,11 +411,11 @@ func withSnapshotBucket(ctx context.Context, key string, fn func(context.Context
 }
 
 func withBucket(ctx context.Context, fn func(context.Context, *bolt.Bucket, *bolt.Bucket) error) error {
-	t, ok := ctx.Value(transactionKey{}).(*boltFileTransactor)
+	tx, ok := ctx.Value(transactionKey{}).(*bolt.Tx)
 	if !ok {
 		return ErrNoTransaction
 	}
-	bkt := t.tx.Bucket(bucketKeyStorageVersion)
+	bkt := tx.Bucket(bucketKeyStorageVersion)
 	if bkt == nil {
 		return errors.Wrap(errdefs.ErrNotFound, "bucket does not exist")
 	}
@@ -438,12 +423,12 @@ func withBucket(ctx context.Context, fn func(context.Context, *bolt.Bucket, *bol
 }
 
 func createBucketIfNotExists(ctx context.Context, fn func(context.Context, *bolt.Bucket, *bolt.Bucket) error) error {
-	t, ok := ctx.Value(transactionKey{}).(*boltFileTransactor)
+	tx, ok := ctx.Value(transactionKey{}).(*bolt.Tx)
 	if !ok {
 		return ErrNoTransaction
 	}
 
-	bkt, err := t.tx.CreateBucketIfNotExists(bucketKeyStorageVersion)
+	bkt, err := tx.CreateBucketIfNotExists(bucketKeyStorageVersion)
 	if err != nil {
 		return errors.Wrap(err, "failed to create version bucket")
 	}
