@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -35,7 +36,7 @@ func DumpDir(t *testing.T, root string) {
 			if err != nil {
 				return err
 			}
-			t.Log(fi.Mode(), path, "->", target)
+			t.Log(fi.Mode(), fmt.Sprintf("%10s", ""), path, "->", target)
 		} else if fi.Mode().IsRegular() {
 			p, err := ioutil.ReadFile(path)
 			if err != nil {
@@ -46,10 +47,9 @@ func DumpDir(t *testing.T, root string) {
 			if len(p) > 64 { // just display a little bit.
 				p = p[:64]
 			}
-
-			t.Log(fi.Mode(), path, "[", strconv.Quote(string(p)), "...]")
+			t.Log(fi.Mode(), fmt.Sprintf("%10d", fi.Size()), path, "[", strconv.Quote(string(p)), "...]")
 		} else {
-			t.Log(fi.Mode(), path)
+			t.Log(fi.Mode(), fmt.Sprintf("%10d", fi.Size()), path)
 		}
 
 		return nil
