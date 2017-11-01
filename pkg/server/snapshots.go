@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
@@ -68,14 +69,25 @@ func (s *snapshotsSyncer) start() {
 // sync updates all snapshots stats.
 func (s *snapshotsSyncer) sync() error {
 	start := time.Now().UnixNano()
-	collect := func(ctx context.Context, info snapshot.Info) error {
+	var snapshots []snapshot.Info
+	// Do not call `Usage` directly in collect function, because
+	// `Usage` takes time, we don't want `Walk` to hold read lock
+	// of snapshot metadata store for too long time.
+	// TODO(random-liu): Set timeout for the following 2 contexts.
+	if err := s.snapshotter.Walk(context.Background(), func(ctx context.Context, info snapshot.Info) error {
+		snapshots = append(snapshots, info)
+		return nil
+	}); err != nil {
+		return fmt.Errorf("walk all snapshots failed: %v", err)
+	}
+	for _, info := range snapshots {
 		sn, err := s.store.Get(info.Name)
 		if err == nil {
 			// Only update timestamp for non-active snapshot.
 			if sn.Kind == info.Kind && sn.Kind != snapshot.KindActive {
 				sn.Timestamp = time.Now().UnixNano()
 				s.store.Add(sn)
-				return nil
+				continue
 			}
 		}
 		// Get newest stats if the snapshot is new or active.
@@ -84,20 +96,16 @@ func (s *snapshotsSyncer) sync() error {
 			Kind:      info.Kind,
 			Timestamp: time.Now().UnixNano(),
 		}
-		usage, err := s.snapshotter.Usage(ctx, info.Name)
+		usage, err := s.snapshotter.Usage(context.Background(), info.Name)
 		if err != nil {
-			if errdefs.IsNotFound(err) {
-				return nil
+			if !errdefs.IsNotFound(err) {
+				glog.Errorf("Failed to get usage for snapshot %q: %v", info.Name, err)
 			}
-			return err
+			continue
 		}
 		sn.Size = uint64(usage.Size)
 		sn.Inodes = uint64(usage.Inodes)
 		s.store.Add(sn)
-		return nil
-	}
-	if err := s.snapshotter.Walk(context.Background(), collect); err != nil {
-		return err
 	}
 	for _, sn := range s.store.List() {
 		if sn.Timestamp >= start {
