@@ -5,6 +5,7 @@ import (
 	"time"
 
 	leasesapi "github.com/containerd/containerd/api/services/leases/v1"
+	"github.com/containerd/containerd/leases"
 )
 
 // Lease is used to hold a reference to active resources which have not been
@@ -48,6 +49,25 @@ func (c *Client) ListLeases(ctx context.Context) ([]Lease, error) {
 	}
 
 	return leases, nil
+}
+
+func (c *Client) withLease(ctx context.Context) (context.Context, func() error, error) {
+	_, ok := leases.Lease(ctx)
+	if ok {
+		return ctx, func() error {
+			return nil
+		}, nil
+	}
+
+	l, err := c.CreateLease(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ctx = leases.WithLease(ctx, l.ID())
+	return ctx, func() error {
+		return l.Delete(ctx)
+	}, nil
 }
 
 // ID returns the lease ID
