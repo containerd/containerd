@@ -39,5 +39,4 @@ func TestContentClient(t *testing.T) {
 		t.Skip()
 	}
 	testsuite.ContentSuite(t, "ContentClient", newContentStore)
-	testsuite.ContentLabelSuite(t, "ContentClient", newContentStore)
 }

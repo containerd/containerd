@@ -21,12 +21,6 @@ import (
 func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, root string) (content.Store, func() error, error)) {
 	t.Run("Writer", makeTest(t, name, storeFn, checkContentStoreWriter))
 	t.Run("UploadStatus", makeTest(t, name, storeFn, checkUploadStatus))
-}
-
-// ContentLabelSuite runs a test suite for the content store supporting
-// labels.
-// TODO: Merge this with ContentSuite once all content stores support labels
-func ContentLabelSuite(t *testing.T, name string, storeFn func(ctx context.Context, root string) (content.Store, func() error, error)) {
 	t.Run("Labels", makeTest(t, name, storeFn, checkLabels))
 }
 
