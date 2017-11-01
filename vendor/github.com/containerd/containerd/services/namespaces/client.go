@@ -10,6 +10,7 @@ import (
 	"github.com/gogo/protobuf/types"
 )
 
+// NewStoreFromClient returns a new namespace store
 func NewStoreFromClient(client api.NamespacesClient) namespaces.Store {
 	return &remote{client: client}
 }

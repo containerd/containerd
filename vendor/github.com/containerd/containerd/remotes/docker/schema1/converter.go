@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -215,13 +216,26 @@ func (c *Converter) fetchManifest(ctx context.Context, desc ocispec.Descriptor) 
 func (c *Converter) fetchBlob(ctx context.Context, desc ocispec.Descriptor) error {
 	log.G(ctx).Debug("fetch blob")
 
-	ref := remotes.MakeRefKey(ctx, desc)
+	var (
+		ref   = remotes.MakeRefKey(ctx, desc)
+		calc  = newBlobStateCalculator()
+		retry = 16
+	)
 
-	calc := newBlobStateCalculator()
-
+tryit:
 	cw, err := c.contentStore.Writer(ctx, ref, desc.Size, desc.Digest)
 	if err != nil {
-		if !errdefs.IsAlreadyExists(err) {
+		if errdefs.IsUnavailable(err) {
+			select {
+			case <-time.After(time.Millisecond * time.Duration(rand.Intn(retry))):
+				if retry < 2048 {
+					retry = retry << 1
+				}
+				goto tryit
+			case <-ctx.Done():
+				return err
+			}
+		} else if !errdefs.IsAlreadyExists(err) {
 			return err
 		}
 
