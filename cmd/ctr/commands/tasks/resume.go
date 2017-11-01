@@ -1,13 +1,13 @@
-package main
+package tasks
 
 import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/urfave/cli"
 )
 
-var taskDeleteCommand = cli.Command{
-	Name:      "delete",
-	Usage:     "delete a task",
+var resumeCommand = cli.Command{
+	Name:      "resume",
+	Usage:     "resume a paused container",
 	ArgsUsage: "CONTAINER",
 	Action: func(context *cli.Context) error {
 		client, ctx, cancel, err := commands.NewClient(context)
@@ -23,13 +23,6 @@ var taskDeleteCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		status, err := task.Delete(ctx)
-		if err != nil {
-			return err
-		}
-		if ec := status.ExitCode(); ec != 0 {
-			return cli.NewExitError("", int(ec))
-		}
-		return nil
+		return task.Resume(ctx)
 	},
 }

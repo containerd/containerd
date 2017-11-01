@@ -1,4 +1,4 @@
-package main
+package pprof
 
 import (
 	"fmt"
@@ -17,7 +17,8 @@ type pprofDialer struct {
 	addr  string
 }
 
-var pprofCommand = cli.Command{
+// Command is the cli command for providing golang pprof outputs for containerd
+var Command = cli.Command{
 	Name:  "pprof",
 	Usage: "provide golang pprof outputs for containerd",
 	Flags: []cli.Flag{
@@ -28,12 +29,12 @@ var pprofCommand = cli.Command{
 		},
 	},
 	Subcommands: []cli.Command{
+		pprofBlockCommand,
 		pprofGoroutinesCommand,
 		pprofHeapCommand,
 		pprofProfileCommand,
-		pprofTraceCommand,
-		pprofBlockCommand,
 		pprofThreadcreateCommand,
+		pprofTraceCommand,
 	},
 }
 
@@ -91,7 +92,7 @@ var pprofTraceCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.DurationFlag{
 			Name:  "seconds,s",
-			Usage: "Trace time (seconds)",
+			Usage: "trace time (seconds)",
 			Value: time.Duration(5 * time.Second),
 		},
 	},

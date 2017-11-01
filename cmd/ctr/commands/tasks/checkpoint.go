@@ -1,4 +1,4 @@
-package main
+package tasks
 
 import (
 	"fmt"
@@ -9,10 +9,10 @@ import (
 	"github.com/urfave/cli"
 )
 
-var taskCheckpointCommand = cli.Command{
+var checkpointCommand = cli.Command{
 	Name:      "checkpoint",
 	Usage:     "checkpoint a container",
-	ArgsUsage: "CONTAINER",
+	ArgsUsage: "[flags] CONTAINER",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "exit",

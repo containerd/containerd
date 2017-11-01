@@ -1,54 +1,21 @@
 // +build !windows
 
-package main
+package run
 
 import (
 	gocontext "context"
-	"os"
-	"os/signal"
 
-	"golang.org/x/sys/unix"
-
-	"github.com/containerd/console"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
 func init() {
-	runCommand.Flags = append(runCommand.Flags, cli.BoolFlag{
+	Command.Flags = append(Command.Flags, cli.BoolFlag{
 		Name:  "rootfs",
-		Usage: "use custom rootfs that is not managed by containerd snapshotter.",
+		Usage: "use custom rootfs that is not managed by containerd snapshotter",
 	})
-}
-
-func handleConsoleResize(ctx gocontext.Context, task resizer, con console.Console) error {
-	// do an initial resize of the console
-	size, err := con.Size()
-	if err != nil {
-		return err
-	}
-	if err := task.Resize(ctx, uint32(size.Width), uint32(size.Height)); err != nil {
-		logrus.WithError(err).Error("resize pty")
-	}
-	s := make(chan os.Signal, 16)
-	signal.Notify(s, unix.SIGWINCH)
-	go func() {
-		for range s {
-			size, err := con.Size()
-			if err != nil {
-				logrus.WithError(err).Error("get pty size")
-				continue
-			}
-			if err := task.Resize(ctx, uint32(size.Width), uint32(size.Height)); err != nil {
-				logrus.WithError(err).Error("resize pty")
-			}
-		}
-	}()
-	return nil
 }
 
 func withTTY() containerd.SpecOpts {
@@ -114,25 +81,4 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	}
 	cOpts = append([]containerd.NewContainerOpts{containerd.WithNewSpec(opts...)}, cOpts...)
 	return client.NewContainer(ctx, id, cOpts...)
-}
-
-func newTask(ctx gocontext.Context, client *containerd.Client, container containerd.Container, checkpoint string, tty, nullIO bool) (containerd.Task, error) {
-	if checkpoint == "" {
-		io := containerd.Stdio
-		if tty {
-			io = containerd.StdioTerminal
-		}
-		if nullIO {
-			if tty {
-				return nil, errors.New("tty and null-io cannot be used together")
-			}
-			io = containerd.NullIO
-		}
-		return container.NewTask(ctx, io)
-	}
-	im, err := client.GetImage(ctx, checkpoint)
-	if err != nil {
-		return nil, err
-	}
-	return container.NewTask(ctx, containerd.Stdio, containerd.WithTaskCheckpoint(im))
 }

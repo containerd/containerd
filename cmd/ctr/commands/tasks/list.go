@@ -1,4 +1,4 @@
-package main
+package tasks
 
 import (
 	"fmt"
@@ -10,28 +10,11 @@ import (
 	"github.com/urfave/cli"
 )
 
-var tasksCommand = cli.Command{
-	Name:    "tasks",
-	Usage:   "manage tasks",
-	Aliases: []string{"t"},
-	Subcommands: []cli.Command{
-		taskAttachCommand,
-		taskCheckpointCommand,
-		taskExecCommand,
-		taskKillCommand,
-		taskPauseCommand,
-		taskPsCommand,
-		taskResumeCommand,
-		taskStartCommand,
-		taskDeleteCommand,
-		taskListCommand,
-	},
-}
-
-var taskListCommand = cli.Command{
-	Name:    "list",
-	Usage:   "list tasks",
-	Aliases: []string{"ls"},
+var listCommand = cli.Command{
+	Name:      "list",
+	Usage:     "list tasks",
+	Aliases:   []string{"ls"},
+	ArgsUsage: "[flags]",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "quiet, q",

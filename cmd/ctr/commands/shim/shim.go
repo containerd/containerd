@@ -1,6 +1,6 @@
 // +build !windows
 
-package main
+package shim
 
 import (
 	"fmt"
@@ -45,7 +45,8 @@ var fifoFlags = []cli.Flag{
 	},
 }
 
-var shimCommand = cli.Command{
+// Command is the cli command for interacting with a shim
+var Command = cli.Command{
 	Name:  "shim",
 	Usage: "interact with a shim directly",
 	Flags: []cli.Flag{
@@ -55,89 +56,14 @@ var shimCommand = cli.Command{
 		},
 	},
 	Subcommands: []cli.Command{
-		shimCreateCommand,
-		shimStartCommand,
-		shimDeleteCommand,
-		shimStateCommand,
-		shimExecCommand,
+		deleteCommand,
+		execCommand,
+		startCommand,
+		stateCommand,
 	},
 }
 
-var shimCreateCommand = cli.Command{
-	Name:  "create",
-	Usage: "create a container with a shim",
-	Flags: append(fifoFlags,
-		cli.StringFlag{
-			Name:  "bundle",
-			Usage: "bundle path for the container",
-		},
-		cli.StringFlag{
-			Name:  "runtime",
-			Value: "runc",
-			Usage: "runtime to use for the container",
-		},
-		cli.BoolFlag{
-			Name:  "attach,a",
-			Usage: "stay attached to the container and open the fifos",
-		},
-	),
-	Action: func(context *cli.Context) error {
-		var (
-			id  = context.Args().First()
-			ctx = gocontext.Background()
-		)
-
-		if id == "" {
-			return errors.New("container id must be provided")
-		}
-		service, err := getShimService(context)
-		if err != nil {
-			return err
-		}
-		tty := context.Bool("tty")
-		wg, err := prepareStdio(context.String("stdin"), context.String("stdout"), context.String("stderr"), tty)
-		if err != nil {
-			return err
-		}
-		r, err := service.Create(ctx, &shim.CreateTaskRequest{
-			ID:       id,
-			Bundle:   context.String("bundle"),
-			Runtime:  context.String("runtime"),
-			Stdin:    context.String("stdin"),
-			Stdout:   context.String("stdout"),
-			Stderr:   context.String("stderr"),
-			Terminal: tty,
-		})
-		if err != nil {
-			return err
-		}
-		fmt.Printf("container created with id %s and pid %d\n", id, r.Pid)
-		if context.Bool("attach") {
-			if tty {
-				current := console.Current()
-				defer current.Reset()
-				if err := current.SetRaw(); err != nil {
-					return err
-				}
-				size, err := current.Size()
-				if err != nil {
-					return err
-				}
-				if _, err := service.ResizePty(ctx, &shim.ResizePtyRequest{
-					ID:     id,
-					Width:  uint32(size.Width),
-					Height: uint32(size.Height),
-				}); err != nil {
-					return err
-				}
-			}
-			wg.Wait()
-		}
-		return nil
-	},
-}
-
-var shimStartCommand = cli.Command{
+var startCommand = cli.Command{
 	Name:  "start",
 	Usage: "start a container with a shim",
 	Action: func(context *cli.Context) error {
@@ -152,7 +78,7 @@ var shimStartCommand = cli.Command{
 	},
 }
 
-var shimDeleteCommand = cli.Command{
+var deleteCommand = cli.Command{
 	Name:  "delete",
 	Usage: "delete a container with a shim",
 	Action: func(context *cli.Context) error {
@@ -169,7 +95,7 @@ var shimDeleteCommand = cli.Command{
 	},
 }
 
-var shimStateCommand = cli.Command{
+var stateCommand = cli.Command{
 	Name:  "state",
 	Usage: "get the state of all the processes of the shim",
 	Action: func(context *cli.Context) error {
@@ -188,7 +114,7 @@ var shimStateCommand = cli.Command{
 	},
 }
 
-var shimExecCommand = cli.Command{
+var execCommand = cli.Command{
 	Name:  "exec",
 	Usage: "exec a new process in the shim's container",
 	Flags: append(fifoFlags,

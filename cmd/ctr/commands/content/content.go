@@ -27,16 +27,16 @@ var (
 		Name:  "content",
 		Usage: "manage content",
 		Subcommands: cli.Commands{
-			listCommand,
-			ingestCommand,
 			activeIngestCommand,
-			getCommand,
-			editCommand,
 			deleteCommand,
-			setLabelsCommand,
+			editCommand,
 			fetchCommand,
 			fetchObjectCommand,
+			getCommand,
+			ingestCommand,
+			listCommand,
 			pushObjectCommand,
+			setLabelsCommand,
 		},
 	}
 

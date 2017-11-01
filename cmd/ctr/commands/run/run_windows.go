@@ -1,15 +1,13 @@
-package main
+package run
 
 import (
 	gocontext "context"
-	"time"
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/log"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -19,7 +17,7 @@ import (
 const pipeRoot = `\\.\pipe`
 
 func init() {
-	runCommand.Flags = append(runCommand.Flags, cli.StringSliceFlag{
+	Command.Flags = append(Command.Flags, cli.StringSliceFlag{
 		Name:  "layer",
 		Usage: "HCSSHIM Layers to be used",
 	})
@@ -34,34 +32,6 @@ func withLayers(context *cli.Context) containerd.SpecOpts {
 		s.Windows.LayerFolders = l
 		return nil
 	}
-}
-
-func handleConsoleResize(ctx gocontext.Context, task resizer, con console.Console) error {
-	// do an initial resize of the console
-	size, err := con.Size()
-	if err != nil {
-		return err
-	}
-	go func() {
-		prevSize := size
-		for {
-			time.Sleep(time.Millisecond * 250)
-
-			size, err := con.Size()
-			if err != nil {
-				log.G(ctx).WithError(err).Error("get pty size")
-				continue
-			}
-
-			if size.Width != prevSize.Width || size.Height != prevSize.Height {
-				if err := task.Resize(ctx, uint32(size.Width), uint32(size.Height)); err != nil {
-					logrus.WithError(err).Error("resize pty")
-				}
-				prevSize = size
-			}
-		}
-	}()
-	return nil
 }
 
 func withTTY(terminal bool) containerd.SpecOpts {
@@ -116,18 +86,4 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		containerd.WithRuntime(context.String("runtime"), nil),
 		// TODO(mlaventure): containerd.WithImage(image),
 	)
-}
-
-func newTask(ctx gocontext.Context, client *containerd.Client, container containerd.Container, _ string, tty, nullIO bool) (containerd.Task, error) {
-	io := containerd.Stdio
-	if tty {
-		io = containerd.StdioTerminal
-	}
-	if nullIO {
-		if tty {
-			return nil, errors.New("tty and null-io cannot be used together")
-		}
-		io = containerd.NullIO
-	}
-	return container.NewTask(ctx, io)
 }
