@@ -324,12 +324,25 @@ func (s *store) status(ingestPath string) (content.Status, error) {
 		return content.Status{}, err
 	}
 
+	startedAtP, err := ioutil.ReadFile(filepath.Join(ingestPath, "startedat"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			err = errors.Wrap(errdefs.ErrNotFound, err.Error())
+		}
+		return content.Status{}, err
+	}
+
+	var startedAt time.Time
+	if err := startedAt.UnmarshalText(startedAtP); err != nil {
+		return content.Status{}, errors.Wrapf(err, "could not parse startedat file")
+	}
+
 	return content.Status{
 		Ref:       ref,
 		Offset:    fi.Size(),
 		Total:     s.total(ingestPath),
 		UpdatedAt: fi.ModTime(),
-		StartedAt: getStartTime(fi),
+		StartedAt: startedAt,
 	}, nil
 }
 
@@ -412,7 +425,7 @@ func (s *store) Writer(ctx context.Context, ref string, total int64, expected di
 			return nil, errors.Errorf("provided total differs from status: %v != %v", total, status.Total)
 		}
 
-		// slow slow slow!!, send to goroutine or use resumable hashes
+		// TODO(stevvooe): slow slow slow!!, send to goroutine or use resumable hashes
 		fp, err := os.Open(data)
 		if err != nil {
 			return nil, err
@@ -431,9 +444,21 @@ func (s *store) Writer(ctx context.Context, ref string, total int64, expected di
 		startedAt = status.StartedAt
 		total = status.Total
 	} else {
+		startedAt = time.Now()
+		updatedAt = startedAt
+
 		// the ingest is new, we need to setup the target location.
 		// write the ref to a file for later use
 		if err := ioutil.WriteFile(refp, []byte(ref), 0666); err != nil {
+			return nil, err
+		}
+
+		startedAtP, err := startedAt.MarshalText()
+		if err != nil {
+			return nil, err
+		}
+
+		if err := ioutil.WriteFile(filepath.Join(path, "startedat"), startedAtP, 0666); err != nil {
 			return nil, err
 		}
 
@@ -442,14 +467,15 @@ func (s *store) Writer(ctx context.Context, ref string, total int64, expected di
 				return nil, err
 			}
 		}
-
-		startedAt = time.Now()
-		updatedAt = startedAt
 	}
 
 	fp, err := os.OpenFile(data, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open data file")
+	}
+
+	if _, err := fp.Seek(offset, io.SeekStart); err != nil {
+		return nil, errors.Wrap(err, "could not seek to current write offset")
 	}
 
 	return &writer{
