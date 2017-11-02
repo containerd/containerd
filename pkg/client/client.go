@@ -29,14 +29,14 @@ import (
 // NewCRIContainerdClient creates grpc client of cri-containerd
 // TODO(random-liu): Wrap grpc functions.
 func NewCRIContainerdClient(endpoint string, timeout time.Duration) (api.CRIContainerdServiceClient, error) {
-	addr, dailer, err := util.GetAddressAndDialer(endpoint)
+	addr, dialer, err := util.GetAddressAndDialer(endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get dialer: %v", err)
 	}
 	conn, err := grpc.Dial(addr,
 		grpc.WithInsecure(),
 		grpc.WithTimeout(timeout),
-		grpc.WithDialer(dailer),
+		grpc.WithDialer(dialer),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial: %v", err)
