@@ -45,8 +45,9 @@ var (
 const (
 	configFilename = "config.json"
 	defaultRuntime = "runc"
-	defaultShim    = "containerd-shim"
 )
+
+var defaultShim = []string{"containerd", "shim"}
 
 func init() {
 	plugin.Register(&plugin.Registration{
@@ -69,7 +70,7 @@ var _ = (runtime.Runtime)(&Runtime{})
 // Config options for the runtime
 type Config struct {
 	// Shim is a path or name of binary implementing the Shim GRPC API
-	Shim string `toml:"shim"`
+	Shim []string `toml:"shim"`
 	// Runtime is a path or name of an OCI runtime used by the shim
 	Runtime string `toml:"runtime"`
 	// RuntimeRoot is the path that shall be used by the OCI runtime for its data

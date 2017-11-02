@@ -74,11 +74,11 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 	} {
 		fw, err := fifo.OpenFifo(ctx, name, syscall.O_WRONLY, 0)
 		if err != nil {
-			return fmt.Errorf("containerd-shim: opening %s failed: %s", name, err)
+			return fmt.Errorf("shim: opening %s failed: %s", name, err)
 		}
 		fr, err := fifo.OpenFifo(ctx, name, syscall.O_RDONLY, 0)
 		if err != nil {
-			return fmt.Errorf("containerd-shim: opening %s failed: %s", name, err)
+			return fmt.Errorf("shim: opening %s failed: %s", name, err)
 		}
 		dest(fw, fr)
 	}
@@ -88,7 +88,7 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 	}
 	f, err := fifo.OpenFifo(ctx, stdin, syscall.O_RDONLY, 0)
 	if err != nil {
-		return fmt.Errorf("containerd-shim: opening %s failed: %s", stdin, err)
+		return fmt.Errorf("shim: opening %s failed: %s", stdin, err)
 	}
 	cwg.Add(1)
 	go func() {

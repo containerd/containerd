@@ -71,9 +71,7 @@ func main() {
 			Usage: "containerd state directory",
 		},
 	}
-	app.Commands = []cli.Command{
-		configCommand,
-	}
+	app.Commands = commands
 	app.Action = func(context *cli.Context) error {
 		var (
 			start   = time.Now()

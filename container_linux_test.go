@@ -763,7 +763,7 @@ func TestShimSigkilled(t *testing.T) {
 	}
 
 	// SIGKILL the shim
-	if err := exec.Command("pkill", "-KILL", "containerd-s").Run(); err != nil {
+	if err := exec.Command("pkill", "-KILL", "-f", "containerd shim").Run(); err != nil {
 		t.Fatalf("failed to kill shim: %v", err)
 	}
 
