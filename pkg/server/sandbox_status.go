@@ -85,6 +85,11 @@ func (c *criContainerdService) getIP(sandbox sandboxstore.Sandbox) (string, erro
 		return "", nil
 	}
 
+	// The network namespace has been closed.
+	if sandbox.NetNS == nil || sandbox.NetNS.Closed() {
+		return "", nil
+	}
+
 	podNetwork := ocicni.PodNetwork{
 		Name:         config.GetMetadata().GetName(),
 		Namespace:    config.GetMetadata().GetNamespace(),
