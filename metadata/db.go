@@ -59,7 +59,7 @@ type DB struct {
 
 // NewDB creates a new metadata database using the provided
 // bolt database, content store, and snapshotters.
-func NewDB(db *bolt.DB, cs content.Store, ss map[string]snapshot.Snapshotter) *DB {
+func NewDB(db *bolt.DB, policy string, cs content.Store, ss map[string]snapshot.Snapshotter) *DB {
 	m := &DB{
 		db:      db,
 		ss:      make(map[string]*snapshotter, len(ss)),
@@ -67,7 +67,7 @@ func NewDB(db *bolt.DB, cs content.Store, ss map[string]snapshot.Snapshotter) *D
 	}
 
 	// Initialize data stores
-	m.cs = newContentStore(m, cs)
+	m.cs = newContentStore(m, policy, cs)
 	for name, sn := range ss {
 		m.ss[name] = newSnapshotter(m, name, sn)
 	}
