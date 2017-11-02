@@ -21,32 +21,16 @@ import (
 
 type contentStore struct {
 	content.Store
-	db     *DB
-	policy string
-	l      sync.RWMutex
+	db *DB
+	l  sync.RWMutex
 }
 
 // newContentStore returns a namespaced content store using an existing content
 // store interface.
-//
-// policy defines the sharing behavior for content between namespaces. Both
-// modes will result in shared storage in the backend for committed. Choose
-// "shared" to prevent separate namespaces from having to pull the same content
-// twice.  Choose "isolated" if the content must not be shared between
-// namespaces.
-//
-// If the policy is "shared", writes will try to resolve the "expected" digest
-// against the backend, allowing imports of content from other namespaces. In
-// "isolated" mode, the client must prove they have the content by providing
-// the entire blob before the content can be added to another namespace.
-func newContentStore(db *DB, policy string, cs content.Store) *contentStore {
-	if policy == "" {
-		policy = "shared"
-	}
+func newContentStore(db *DB, cs content.Store) *contentStore {
 	return &contentStore{
-		Store:  cs,
-		db:     db,
-		policy: policy,
+		Store: cs,
+		db:    db,
 	}
 }
 
@@ -340,26 +324,22 @@ func (cs *contentStore) Writer(ctx context.Context, ref string, size int64, expe
 	)
 	if err := update(ctx, cs.db, func(tx *bolt.Tx) error {
 		if expected != "" {
-			switch cs.policy {
-			case "shared":
-				if info, err := cs.Store.Info(ctx, expected); err != nil {
-					if !errdefs.IsNotFound(err) {
-						return errors.Wrapf(err, "failure resolving backend blob")
-					}
-				} else {
-					// found content on backend, let's import it!
-					bkt, err := createBlobBucket(tx, ns, expected)
-					if err != nil {
-						return err
-					}
-
-					if err := writeInfo(bkt, &info); err != nil {
-						return errors.Wrapf(err, "failure resolving backend blob")
-					}
+			// check the backend to see if we already have this content
+			// that may be pinned in another namespace.
+			if info, err := cs.Store.Info(ctx, expected); err != nil {
+				if !errdefs.IsNotFound(err) {
+					return errors.Wrapf(err, "failure resolving backend blob")
 				}
-			case "isolated":
-				// clients must prove they have this content by writing the
-				// full content to the store.
+			} else {
+				// found content on backend, let's import it!
+				bkt, err := createBlobBucket(tx, ns, expected)
+				if err != nil {
+					return err
+				}
+
+				if err := writeInfo(bkt, &info); err != nil {
+					return errors.Wrapf(err, "failure resolving backend blob")
+				}
 			}
 
 			cbkt := getBlobBucket(tx, ns, expected)

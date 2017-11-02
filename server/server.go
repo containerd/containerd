@@ -164,27 +164,6 @@ func (s *Server) Stop() {
 	s.rpc.Stop()
 }
 
-// BoltConfig defines the configuration values for the bolt plugin, which is
-// loaded here, rather than back registered in the metadata package.
-type BoltConfig struct {
-	// ContentSharingPolicy sets the sharing policy for content between
-	// namespaces.
-	//
-	// The default mode "shared" will make blobs available in all
-	// namespaces once it is pulled into any namespace. The blob will be pulled
-	// into the namespace if a writer is opened with the "Expected" digest that
-	// is already present in the backend.
-	//
-	// The alternative mode, "isolated" requires that clients prove they have
-	// access to the content by providing all of the content to the ingest
-	// before the blob is added to the namespace.
-	//
-	// Both modes share backing data, while "shared" will reduce total
-	// bandwidth across namespaces, at the cost of allowing access to any blob
-	// just by knowing its digest.
-	ContentSharingPolicy string `toml:"content_sharing_policy"`
-}
-
 func loadPlugins(config *Config) ([]*plugin.Registration, error) {
 	// load all plugins into containerd
 	if err := plugin.Load(filepath.Join(config.Root, "plugins")); err != nil {
@@ -205,9 +184,6 @@ func loadPlugins(config *Config) ([]*plugin.Registration, error) {
 		Requires: []plugin.Type{
 			plugin.ContentPlugin,
 			plugin.SnapshotPlugin,
-		},
-		Config: &BoltConfig{
-			ContentSharingPolicy: "shared",
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			if err := os.MkdirAll(ic.Root, 0711); err != nil {
@@ -234,14 +210,6 @@ func loadPlugins(config *Config) ([]*plugin.Registration, error) {
 				snapshotters[name] = sn.(snapshot.Snapshotter)
 			}
 
-			policy := "shared"
-			if cfg, ok := ic.Config.(*BoltConfig); ok {
-				if cfg.ContentSharingPolicy != "" {
-					policy = cfg.ContentSharingPolicy
-					log.L.WithField("policy", policy).Info("metadata content store policy set")
-				}
-			}
-
 			path := filepath.Join(ic.Root, "meta.db")
 			ic.Meta.Exports["path"] = path
 
@@ -249,7 +217,7 @@ func loadPlugins(config *Config) ([]*plugin.Registration, error) {
 			if err != nil {
 				return nil, err
 			}
-			mdb := metadata.NewDB(db, policy, cs.(content.Store), snapshotters)
+			mdb := metadata.NewDB(db, cs.(content.Store), snapshotters)
 			if err := mdb.Init(ic.Context); err != nil {
 				return nil, err
 			}
