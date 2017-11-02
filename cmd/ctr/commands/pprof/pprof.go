@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/containerd/containerd/server"
+	"github.com/containerd/containerd/defaults"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -25,7 +25,7 @@ var Command = cli.Command{
 		cli.StringFlag{
 			Name:  "debug-socket, d",
 			Usage: "socket path for containerd's debug server",
-			Value: server.DefaultDebugAddress,
+			Value: defaults.DefaultDebugAddress,
 		},
 	},
 	Subcommands: []cli.Command{
