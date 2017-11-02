@@ -17,8 +17,8 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands/snapshot"
 	"github.com/containerd/containerd/cmd/ctr/commands/tasks"
 	versionCmd "github.com/containerd/containerd/cmd/ctr/commands/version"
+	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/server"
 	"github.com/containerd/containerd/version"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -57,7 +57,7 @@ containerd CLI
 		cli.StringFlag{
 			Name:  "address, a",
 			Usage: "address for containerd's GRPC server",
-			Value: server.DefaultAddress,
+			Value: defaults.DefaultAddress,
 		},
 		cli.DurationFlag{
 			Name:  "timeout",
