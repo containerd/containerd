@@ -90,6 +90,12 @@ type Config struct {
 	SystemdCgroup bool `toml:"systemd_cgroup"`
 	// OOMScore adjust the cri-containerd's oom score
 	OOMScore int `toml:"oom_score"`
+	// EnableProfiling is used for enable profiling via host:port/debug/pprof/
+	EnableProfiling bool `toml:"profiling"`
+	// ProfilingPort is the port for profiling via host:port/debug/pprof/
+	ProfilingPort string `toml:"profiling_port"`
+	// ProfilingAddress is address for profiling via host:port/debug/pprof/
+	ProfilingAddress string `toml:"profiling_addr"`
 }
 
 // CRIContainerdOptions contains cri-containerd command line and toml options.
@@ -146,6 +152,12 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		defaults.SystemdCgroup, "Enables systemd cgroup support. By default not enabled.")
 	fs.IntVar(&c.OOMScore, "oom-score",
 		defaults.OOMScore, "Adjust the cri-containerd's oom score.")
+	fs.BoolVar(&c.EnableProfiling, "profiling",
+		defaults.EnableProfiling, "Enable profiling via web interface host:port/debug/pprof/.")
+	fs.StringVar(&c.ProfilingPort, "profiling-port",
+		defaults.ProfilingPort, "Profiling port for web interface host:port/debug/pprof/.")
+	fs.StringVar(&c.ProfilingAddress, "profiling-addr",
+		defaults.ProfilingAddress, "Profiling address for web interface host:port/debug/pprof/.")
 }
 
 // InitFlags load configurations from config file, and then overwrite with flags.
@@ -213,5 +225,8 @@ func defaultConfig() Config {
 		StatsCollectPeriod:  10,
 		SystemdCgroup:       false,
 		OOMScore:            -999,
+		EnableProfiling:     true,
+		ProfilingPort:       "10011",
+		ProfilingAddress:    "127.0.0.1",
 	}
 }

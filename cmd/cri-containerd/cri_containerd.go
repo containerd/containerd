@@ -19,6 +19,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
+	"net/http"
+	"net/http/pprof"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -129,6 +132,12 @@ func main() {
 
 		glog.V(0).Infof("Run cri-containerd %+v", o)
 
+		// Start profiling server if enable.
+		if o.EnableProfiling {
+			glog.V(2).Info("Start profiling server")
+			go startProfilingServer(o.ProfilingAddress, o.ProfilingPort)
+		}
+
 		glog.V(2).Infof("Run cri-containerd grpc server on socket %q", o.SocketPath)
 		s, err := server.NewCRIContainerdService(o.Config)
 		if err != nil {
@@ -181,4 +190,17 @@ func dumpStacks() {
 		buf = make([]byte, 2*len(buf))
 	}
 	glog.V(0).Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
+}
+
+// startProfilingServer start http server to profiling via web interface
+func startProfilingServer(host string, port string) {
+	endpoint := net.JoinHostPort(host, port)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	if err := http.ListenAndServe(endpoint, mux); err != nil {
+		glog.Errorf("Failed to start profiling server: %v", err)
+	}
 }
