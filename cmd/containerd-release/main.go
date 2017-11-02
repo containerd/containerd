@@ -121,7 +121,7 @@ This tool should be ran from the root of the project repository for a new releas
 		return nil
 	}
 	if err := app.Run(os.Args); err != nil {
-		fmt.Fprint(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
