@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO(random-liu): Remove this after test-infra side is updated.
 # This script is used to build and upload cri-containerd in gcr.io/k8s-testimages/kubekins-e2e.
 
 set -o xtrace
@@ -46,7 +45,7 @@ apt-get install -y libseccomp-dev/jessie-backports
 apt-get install -y libapparmor-dev
 
 # PULL_REFS is from prow.
-if [ ! -z "${PULL_REFS:-""}" ]; then 
+if [ ! -z "${PULL_REFS:-""}" ]; then
   DEPLOY_DIR=$(echo "${PULL_REFS}" | sha1sum | awk '{print $1}')
 fi
 

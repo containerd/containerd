@@ -2,8 +2,8 @@ images:
   ubuntu:
     image: ubuntu-gke-1604-xenial-v20170420-1
     project: ubuntu-os-gke-cloud
-    metadata: "user-data<test/e2e_node/init.yaml,configure-sh<test/e2e_node/configure.sh"
+    metadata: "user-data<test/e2e_node/init.yaml,cri-containerd-configure-sh<test/configure.sh"
   cos-stable:
     image_regex: cos-stable-60-9592-84-0
     project: cos-cloud
-    metadata: "user-data<test/e2e_node/init.yaml,configure-sh<test/e2e_node/configure.sh,extra-init-sh<test/e2e_node/gci-init.sh,gci-update-strategy=update_disabled"
+    metadata: "user-data<test/e2e_node/init.yaml,cri-containerd-configure-sh<test/configure.sh,extra-init-sh<test/e2e_node/gci-init.sh,gci-update-strategy=update_disabled"

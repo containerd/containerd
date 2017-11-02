@@ -16,7 +16,7 @@ write_files:
       ExecStartPre=/bin/mkdir -p /home/cri-containerd
       ExecStartPre=/bin/mount --bind /home/cri-containerd /home/cri-containerd
       ExecStartPre=/bin/mount -o remount,exec /home/cri-containerd
-      ExecStartPre=/usr/bin/curl --fail --retry 5 --retry-delay 3 --silent --show-error -H "X-Google-Metadata-Request: True" -o /home/cri-containerd/configure.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh
+      ExecStartPre=/usr/bin/curl --fail --retry 5 --retry-delay 3 --silent --show-error -H "X-Google-Metadata-Request: True" -o /home/cri-containerd/configure.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/cri-containerd-configure-sh
       ExecStartPre=/bin/chmod 544 /home/cri-containerd/configure.sh
       ExecStart=/home/cri-containerd/configure.sh
 

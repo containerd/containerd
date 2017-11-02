@@ -23,19 +23,37 @@ set -o pipefail
 CRI_CONTAINERD_HOME="/home/cri-containerd"
 cd "${CRI_CONTAINERD_HOME}"
 
-# ATTRIBUTES is the url of gce metadata attributes.
-ATTRIBUTES="http://metadata.google.internal/computeMetadata/v1/instance/attributes"
+# fetch_metadata fetches metadata from GCE metadata server.
+# Var set:
+# 1. Metadata key: key of the metadata.
+fetch_metadata() {
+  local -r key=$1
+  local -r attributes="http://metadata.google.internal/computeMetadata/v1/instance/attributes"
+  if curl --fail --retry 5 --retry-delay 3 --silent --show-error -H "X-Google-Metadata-Request: True" "${attributes}/" | \
+    grep -q "${key}"; then
+    curl --fail --retry 5 --retry-delay 3 --silent --show-error -H "X-Google-Metadata-Request: True" \
+      "${attributes}/${key}"
+  fi
+}
 
 # DEPLOY_PATH is the gcs path where cri-containerd tarball is stored.
 DEPLOY_PATH=${DEPLOY_PATH:-"cri-containerd-staging"}
 # PULL_REFS_METADATA is the metadata key of PULL_REFS from prow.
 PULL_REFS_METADATA="PULL_REFS"
-if curl --fail --retry 5 --retry-delay 3 --silent --show-error -H "X-Google-Metadata-Request: True" "${ATTRIBUTES}/" | \
-  grep -q "${PULL_REFS_METADATA}"; then
-  PULL_REFS=$(curl --fail --retry 5 --retry-delay 3 --silent --show-error -H "X-Google-Metadata-Request: True" \
-    "${ATTRIBUTES}/${PULL_REFS_METADATA}")
-  DEPLOY_DIR=$(echo "${PULL_REFS}" | sha1sum | awk '{print $1}')
-  DEPLOY_PATH="${DEPLOY_PATH}/${DEPLOY_DIR}"
+pull_refs=$(fetch_metadata "${PULL_REFS_METADATA}")
+if [ ! -z "${pull_refs}" ]; then
+  deploy_dir=$(echo "${pull_refs}" | sha1sum | awk '{print $1}') 
+  DEPLOY_PATH="${DEPLOY_PATH}/${deploy_dir}"
+fi
+
+# PKG_PREFIX is the prefix of the cri-containerd tarball name.
+# By default use the release tarball with cni built in.
+PKG_PREFIX=${PKG_PREFIX:-"cri-containerd-cni"}
+# PKG_PREFIX_METADATA is the metadata key of PKG_PREFIX.
+PKG_PREFIX_METADATA="pkg_prefix"
+pkg_prefix=$(fetch_metadata "${PKG_PREFIX_METADATA}")
+if [ ! -z "${pkg_prefix}" ]; then
+  PKG_PREFIX=${pkg_prefix}
 fi
 
 # VERSION is the latest cri-containerd version got from cri-containerd gcs
@@ -43,7 +61,7 @@ fi
 VERSION=$(curl -f --ipv4 --retry 6 --retry-delay 3 --silent --show-error \
   https://storage.googleapis.com/${DEPLOY_PATH}/latest)
 # TARBALL_GCS_PATH is the path to download cri-containerd tarball for node e2e.
-TARBALL_GCS_PATH="https://storage.googleapis.com/${DEPLOY_PATH}/cri-containerd-cni-${VERSION}.tar.gz"
+TARBALL_GCS_PATH="https://storage.googleapis.com/${DEPLOY_PATH}/${PKG_PREFIX}-${VERSION}.tar.gz"
 # TARBALL is the name of the tarball after being downloaded.
 TARBALL="cri-containerd.tar.gz"
 
@@ -51,19 +69,19 @@ TARBALL="cri-containerd.tar.gz"
 curl -f --ipv4 -Lo "${TARBALL}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 "${TARBALL_GCS_PATH}"
 tar xvf "${TARBALL}"
 
+# TODO(random-liu): Stop docker on the node, this may break docker.
+echo "export PATH=${CRI_CONTAINERD_HOME}/usr/local/bin/:${CRI_CONTAINERD_HOME}/usr/local/sbin/:\$PATH" > \
+  /etc/profile.d/cri-containerd_env.sh
+
 # EXTRA_INIT_SCRIPT is the name of the extra init script after being downloaded.
 EXTRA_INIT_SCRIPT="extra-init.sh"
-# EXTRA_INIT_SCRIPTINIT_SCRIPT_METADATA is the metadata key of init script.
+# EXTRA_INIT_SCRIPT_METADATA is the metadata key of init script.
 EXTRA_INIT_SCRIPT_METADATA="extra-init-sh"
-
-# Check whether extra-init-sh is set.
-if ! curl --fail --retry 5 --retry-delay 3 --silent --show-error -H "X-Google-Metadata-Request: True" "${ATTRIBUTES}/" | \
-  grep -q "${EXTRA_INIT_SCRIPT_METADATA}"; then
+extra_init=$(fetch_metadata "${EXTRA_INIT_SCRIPT_METADATA}")
+# Return if extra-init-sh is not set.
+if [ -z "${extra_init}" ]; then
   exit 0
 fi
-
-# Run extra-init.sh if extra-init-sh is set.
-curl --fail --retry 5 --retry-delay 3 --silent --show-error -H "X-Google-Metadata-Request: True" -o "${EXTRA_INIT_SCRIPT}" \
-  "${ATTRIBUTES}/${EXTRA_INIT_SCRIPT_METADATA}"
+echo "${extra_init}" > "${EXTRA_INIT_SCRIPT}"
 chmod 544 "${EXTRA_INIT_SCRIPT}"
 ./${EXTRA_INIT_SCRIPT}
