@@ -2,6 +2,8 @@ package testsuite
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -151,6 +153,54 @@ func checkDirectoryPermissionOnCommit(ctx context.Context, t *testing.T, sn snap
 	}
 }
 
+// checkStatInWalk ensures that a stat can be called during a walk
+func checkStatInWalk(ctx context.Context, t *testing.T, sn snapshot.Snapshotter, work string) {
+	prefix := "stats-in-walk-"
+	if err := createNamedSnapshots(ctx, sn, prefix); err != nil {
+		t.Fatal(err)
+	}
+
+	err := sn.Walk(ctx, func(ctx context.Context, si snapshot.Info) error {
+		if !strings.HasPrefix(si.Name, prefix) {
+			// Only stat snapshots from this test
+			return nil
+		}
+		si2, err := sn.Stat(ctx, si.Name)
+		if err != nil {
+			return err
+		}
+
+		return checkInfo(si, si2)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func createNamedSnapshots(ctx context.Context, snapshotter snapshot.Snapshotter, ns string) error {
+	c1 := fmt.Sprintf("%sc1", ns)
+	c2 := fmt.Sprintf("%sc2", ns)
+	if _, err := snapshotter.Prepare(ctx, c1+"-a", ""); err != nil {
+		return err
+	}
+	if err := snapshotter.Commit(ctx, c1, c1+"-a"); err != nil {
+		return err
+	}
+	if _, err := snapshotter.Prepare(ctx, c2+"-a", c1); err != nil {
+		return err
+	}
+	if err := snapshotter.Commit(ctx, c2, c2+"-a"); err != nil {
+		return err
+	}
+	if _, err := snapshotter.Prepare(ctx, fmt.Sprintf("%sa1", ns), c2); err != nil {
+		return err
+	}
+	if _, err := snapshotter.View(ctx, fmt.Sprintf("%sv1", ns), c2); err != nil {
+		return err
+	}
+	return nil
+}
+
 // More issues to test
 //
 // checkRemoveAfterCommit
@@ -170,3 +220,6 @@ func checkDirectoryPermissionOnCommit(ctx context.Context, t *testing.T, sn snap
 //
 // checkChmod
 // See https://github.com/docker/machine/issues/3327
+//
+// checkRemoveInWalk
+// Allow mutations during walk without deadlocking

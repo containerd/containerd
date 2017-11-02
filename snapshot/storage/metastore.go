@@ -7,6 +7,7 @@ package storage
 
 import (
 	"context"
+	"sync"
 
 	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/snapshot"
@@ -46,6 +47,9 @@ type Snapshot struct {
 // complexities of a driver implementation.
 type MetaStore struct {
 	dbfile string
+
+	dbL sync.Mutex
+	db  *bolt.DB
 }
 
 // NewMetaStore returns a snapshot MetaStore for storage of metadata related to
@@ -63,22 +67,33 @@ type transactionKey struct{}
 // TransactionContext creates a new transaction context. The writable value
 // should be set to true for transactions which are expected to mutate data.
 func (ms *MetaStore) TransactionContext(ctx context.Context, writable bool) (context.Context, Transactor, error) {
-	db, err := bolt.Open(ms.dbfile, 0600, nil)
-	if err != nil {
-		return ctx, nil, errors.Wrap(err, "failed to open database file")
+	ms.dbL.Lock()
+	if ms.db == nil {
+		db, err := bolt.Open(ms.dbfile, 0600, nil)
+		if err != nil {
+			ms.dbL.Unlock()
+			return ctx, nil, errors.Wrap(err, "failed to open database file")
+		}
+		ms.db = db
 	}
+	ms.dbL.Unlock()
 
-	tx, err := db.Begin(writable)
+	tx, err := ms.db.Begin(writable)
 	if err != nil {
 		return ctx, nil, errors.Wrap(err, "failed to start transaction")
 	}
 
-	t := &boltFileTransactor{
-		db: db,
-		tx: tx,
+	ctx = context.WithValue(ctx, transactionKey{}, tx)
+
+	return ctx, tx, nil
+}
+
+// Close closes the metastore and any underlying database connections
+func (ms *MetaStore) Close() error {
+	ms.dbL.Lock()
+	defer ms.dbL.Unlock()
+	if ms.db == nil {
+		return nil
 	}
-
-	ctx = context.WithValue(ctx, transactionKey{}, t)
-
-	return ctx, t, nil
+	return ms.db.Close()
 }
