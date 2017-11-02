@@ -39,7 +39,7 @@ func init() {
 	grpclog.SetLogger(golog.New(ioutil.Discard, "", golog.LstdFlags))
 
 	cli.VersionPrinter = func(c *cli.Context) {
-		fmt.Println(c.App.Name, version.Package, c.App.Version)
+		fmt.Println(c.App.Name, version.Package, c.App.Version, version.Revision)
 	}
 }
 
