@@ -21,7 +21,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/../..
+ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
 cd "${ROOT}"
 
 # PROJECT is the gce project to upload tarball.
