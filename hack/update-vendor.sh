@@ -27,4 +27,6 @@ cd ${ROOT}
 echo "Sort vendor.conf..."
 sort vendor.conf -o vendor.conf
 
+# TODO(random-liu): Compare vendor with hack/versions.
+
 echo "Please commit the change made by this file..."
