@@ -182,7 +182,8 @@ func (t *Task) Pids(ctx context.Context) ([]runtime.ProcessInfo, error) {
 	var processList []runtime.ProcessInfo
 	for _, p := range resp.Processes {
 		processList = append(processList, runtime.ProcessInfo{
-			Pid: p.Pid,
+			Pid:  p.Pid,
+			Info: p.Info,
 		})
 	}
 	return processList, nil

@@ -15,12 +15,14 @@ import (
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/linux/runcopts"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/runtime"
 	runc "github.com/containerd/go-runc"
+	"github.com/containerd/typeurl"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -357,9 +359,23 @@ func (s *Service) ListPids(ctx context.Context, r *shimapi.ListPidsRequest) (*sh
 	}
 	var processes []*task.ProcessInfo
 	for _, pid := range pids {
-		processes = append(processes, &task.ProcessInfo{
+		pInfo := task.ProcessInfo{
 			Pid: pid,
-		})
+		}
+		for _, p := range s.processes {
+			if p.Pid() == int(pid) {
+				d := &runcopts.ProcessDetails{
+					ExecID: p.ID(),
+				}
+				a, err := typeurl.MarshalAny(d)
+				if err != nil {
+					return nil, errors.Wrapf(err, "failed to marshal process %d info", pid)
+				}
+				pInfo.Info = a
+				break
+			}
+		}
+		processes = append(processes, &pInfo)
 	}
 	return &shimapi.ListPidsResponse{
 		Processes: processes,

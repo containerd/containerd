@@ -218,24 +218,36 @@ func (t *task) Pids(ctx context.Context) ([]runtime.ProcessInfo, error) {
 	t.Lock()
 	defer t.Unlock()
 
-	var infoList []runtime.ProcessInfo
+	var processList []runtime.ProcessInfo
 	hcsProcessList, err := t.hcsContainer.ProcessList()
 	if err != nil {
 		return nil, err
 	}
 
-	for _, process := range hcsProcessList {
-		info, err := t.convertToProcessDetails(process)
-		if err != nil {
-			return nil, err
+	for _, hcsProcess := range hcsProcessList {
+		info := &hcsshimtypes.ProcessDetails{
+			ImageName:                    hcsProcess.ImageName,
+			CreatedAt:                    hcsProcess.CreateTimestamp,
+			KernelTime_100Ns:             hcsProcess.KernelTime100ns,
+			MemoryCommitBytes:            hcsProcess.MemoryCommitBytes,
+			MemoryWorkingSetPrivateBytes: hcsProcess.MemoryWorkingSetPrivateBytes,
+			MemoryWorkingSetSharedBytes:  hcsProcess.MemoryWorkingSetSharedBytes,
+			ProcessID:                    hcsProcess.ProcessId,
+			UserTime_100Ns:               hcsProcess.UserTime100ns,
 		}
-		infoList = append(infoList, runtime.ProcessInfo{
-			Pid:  process.ProcessId,
+		for _, p := range t.processes {
+			if p.HcsPid() == hcsProcess.ProcessId {
+				info.ExecID = p.ID()
+				break
+			}
+		}
+		processList = append(processList, runtime.ProcessInfo{
+			Pid:  hcsProcess.ProcessId,
 			Info: info,
 		})
 	}
 
-	return infoList, nil
+	return processList, nil
 }
 
 func (t *task) Checkpoint(_ context.Context, _ string, _ *types.Any) error {
@@ -396,18 +408,4 @@ func (t *task) cleanup() {
 	}
 	removeLayer(context.Background(), t.rwLayer)
 	t.Unlock()
-}
-
-// convertToProcessDetails converts a given hcsshim ProcessListItem to proto ProcessDetails
-func (t *task) convertToProcessDetails(p hcsshim.ProcessListItem) (*hcsshimtypes.ProcessDetails, error) {
-	return &hcsshimtypes.ProcessDetails{
-		ImageName:                    p.ImageName,
-		CreatedAt:                    p.CreateTimestamp,
-		KernelTime_100Ns:             p.KernelTime100ns,
-		MemoryCommitBytes:            p.MemoryCommitBytes,
-		MemoryWorkingSetPrivateBytes: p.MemoryWorkingSetPrivateBytes,
-		MemoryWorkingSetSharedBytes:  p.MemoryWorkingSetSharedBytes,
-		ProcessID:                    p.ProcessId,
-		UserTime_100Ns:               p.UserTime100ns,
-	}, nil
 }

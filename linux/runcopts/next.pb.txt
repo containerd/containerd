@@ -165,6 +165,16 @@ file {
       json_name: "cgroupsMode"
     }
   }
+  message_type {
+    name: "ProcessDetails"
+    field {
+      name: "exec_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "execId"
+    }
+  }
   options {
     go_package: "github.com/containerd/containerd/linux/runcopts;runcopts"
   }

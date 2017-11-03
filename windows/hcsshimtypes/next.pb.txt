@@ -144,6 +144,13 @@ file {
       type: TYPE_UINT64
       json_name: "userTime100Ns"
     }
+    field {
+      name: "exec_id"
+      number: 9
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "execId"
+    }
   }
   options {
     go_package: "github.com/containerd/containerd/windows/hcsshimtypes;hcsshimtypes"

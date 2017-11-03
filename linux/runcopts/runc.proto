@@ -36,3 +36,7 @@ message CheckpointOptions {
 	repeated string empty_namespaces = 6;
 	string cgroups_mode = 7;
 }
+
+message ProcessDetails {
+	string exec_id = 1;
+}
