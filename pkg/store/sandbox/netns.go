@@ -111,6 +111,13 @@ func (n *NetNS) Remove() error {
 	return nil
 }
 
+// Closed checks whether the network namespace has been closed.
+func (n *NetNS) Closed() bool {
+	n.Lock()
+	defer n.Unlock()
+	return n.closed
+}
+
 // GetPath returns network namespace path for sandbox container
 func (n *NetNS) GetPath() string {
 	n.Lock()
