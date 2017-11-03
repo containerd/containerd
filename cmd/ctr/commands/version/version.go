@@ -9,14 +9,14 @@ import (
 	"github.com/urfave/cli"
 )
 
-// Command is a cli ommand to output the client and containerd server version
+// Command is a cli command to output the client and containerd server version
 var Command = cli.Command{
 	Name:  "version",
 	Usage: "print the client and server versions",
 	Action: func(context *cli.Context) error {
 		fmt.Println("Client:")
-		fmt.Printf("  Version: %s\n", version.Version)
-		fmt.Printf("  Revision: %s\n", version.Revision)
+		fmt.Println("  Version: ", version.Version)
+		fmt.Println("  Revision:", version.Revision)
 		fmt.Println("")
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -28,13 +28,13 @@ var Command = cli.Command{
 			return err
 		}
 		fmt.Println("Server:")
-		fmt.Printf("  Version: %s\n", v.Version)
-		fmt.Printf("  Revision: %s\n", v.Revision)
+		fmt.Println("  Version: ", v.Version)
+		fmt.Println("  Revision:", v.Revision)
 		if v.Version != version.Version {
-			fmt.Fprintf(os.Stderr, "WARNING: version mismatch\n")
+			fmt.Fprintln(os.Stderr, "WARNING: version mismatch")
 		}
 		if v.Revision != version.Revision {
-			fmt.Fprintf(os.Stderr, "WARNING: revision mismatch\n")
+			fmt.Fprintln(os.Stderr, "WARNING: revision mismatch")
 		}
 		return nil
 	},
