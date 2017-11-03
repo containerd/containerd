@@ -18,7 +18,6 @@ endif
 
 WHALE = "🇩"
 ONI = "👹"
-FIX_PATH = $1
 
 RELEASE=containerd-$(VERSION:v%=%).${GOOS}-${GOARCH}
 
@@ -61,7 +60,9 @@ TESTFLAGS_PARALLEL ?= 8
 
 all: binaries
 
-check: fmt vet lint ineffassign ## run fmt, vet, lint, ineffassign
+check: proto-fmt ## run all linters
+	@echo "$(WHALE) $@"
+	gometalinter --config .gometalinter.json ./...
 
 ci: check binaries checkprotos coverage coverage-integration ## to be used by the CI
 
@@ -71,9 +72,8 @@ AUTHORS: .mailmap .git/HEAD
 setup: ## install dependencies
 	@echo "$(WHALE) $@"
 	# TODO(stevvooe): Install these from the vendor directory
-	@go get -u github.com/golang/lint/golint
-	#@go get -u github.com/kisielk/errcheck
-	@go get -u github.com/gordonklaus/ineffassign
+	@go get -u github.com/alecthomas/gometalinter
+	@gometalinter --install
 	@go get -u github.com/stevvooe/protobuild
 
 generate: protos
@@ -96,24 +96,12 @@ check-api-descriptors: protos ## check that protobuf changes aren't present.
 		((git diff $$(find . -name '*.pb.txt') | cat) && \
 		(echo "$(ONI) please run 'make protos' when making changes to proto files and check-in the generated descriptor file changes" && false))
 
-# Depends on binaries because vet will silently fail if it can't load compiled
-# imports
-vet: ## run go vet
+proto-fmt: ## check format of proto files
 	@echo "$(WHALE) $@"
-	@test -z "$$(go vet ${PACKAGES} 2>&1 | grep -v 'constant [0-9]* not a string in call to Errorf' | grep -v 'unrecognized printf verb 'r'' | egrep -v '(timestamp_test.go|duration_test.go|fetch.go|exit status 1)' | tee /dev/stderr)"
-
-fmt: ## run go fmt
-	@echo "$(WHALE) $@"
-	@test -z "$$(gofmt -s -l . | grep -Fv $(call FIX_PATH,'vendor/') | grep -v ".pb.go$$" | tee /dev/stderr)" || \
-		(echo "$(ONI) please format Go code with 'gofmt -s -w'" && false)
 	@test -z "$$(find . -path ./vendor -prune -o -path ./protobuf/google/rpc -prune -o -name '*.proto' -type f -exec grep -Hn -e "^ " {} \; | tee /dev/stderr)" || \
 		(echo "$(ONI) please indent proto files with tabs only" && false)
 	@test -z "$$(find . -path ./vendor -prune -o -name '*.proto' -type f -exec grep -Hn "Meta meta = " {} \; | grep -v '(gogoproto.nullable) = false' | tee /dev/stderr)" || \
 		(echo "$(ONI) meta fields in proto files must have option (gogoproto.nullable) = false" && false)
-
-lint: ## run go lint
-	@echo "$(WHALE) $@"
-	@test -z "$$(golint ./... | grep -Fv $(call FIX_PATH,'vendor/') | grep -v ".pb.go:" | tee /dev/stderr)"
 
 dco: ## dco check
 	@which git-validation > /dev/null 2>/dev/null || (echo "ERROR: git-validation not found" && false)
@@ -122,14 +110,6 @@ ifdef TRAVIS_COMMIT_RANGE
 else
 	git-validation -v -run DCO,short-subject,dangling-whitespace -range $(EPOCH_TEST_COMMIT)..HEAD
 endif
-
-ineffassign: ## run ineffassign
-	@echo "$(WHALE) $@"
-	@test -z "$$(ineffassign . | grep -Fv $(call FIX_PATH,'vendor/') | grep -v ".pb.go:" | tee /dev/stderr)"
-
-#errcheck: ## run go errcheck
-#	@echo "$(WHALE) $@"
-#	@test -z "$$(errcheck ./... | grep -Fv $(call FIX_PATH,'vendor/') | grep -v ".pb.go:" | tee /dev/stderr)"
 
 build: ## build the go packages
 	@echo "$(WHALE) $@"
