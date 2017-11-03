@@ -38,64 +38,64 @@ const (
 // ContainerdConfig contains config related to containerd
 type ContainerdConfig struct {
 	// RootDir is the root directory path for containerd.
-	RootDir string `toml:"root_dir"`
+	RootDir string `toml:"root_dir" json:"rootDir,omitempty"`
 	// Snapshotter is the snapshotter used by containerd.
-	Snapshotter string `toml:"snapshotter"`
+	Snapshotter string `toml:"snapshotter" json:"snapshotter,omitempty"`
 	// Endpoint is the containerd endpoint path.
-	Endpoint string `toml:"endpoint"`
+	Endpoint string `toml:"endpoint" json:"endpoint,omitempty"`
 	// Runtime is the runtime to use in containerd. We may support
 	// other runtimes in the future.
-	Runtime string `toml:"runtime"`
+	Runtime string `toml:"runtime" json:"runtime,omitempty"`
 	// RuntimeEngine is the name of the runtime engine used by containerd.
 	// Containerd default should be "runc"
 	// We may support other runtime engines in the future.
-	RuntimeEngine string `toml:"runtime_engine"`
+	RuntimeEngine string `toml:"runtime_engine" json:"runtimeEngine,omitempty"`
 	// RuntimeRoot is the directory used by containerd for runtime state.
 	// Containerd default should be "/run/containerd/runc"
-	RuntimeRoot string `toml:"runtime_root"`
+	RuntimeRoot string `toml:"runtime_root" json:"runtimeRoot,omitempty"`
 }
 
 // CniConfig contains config related to cni
 type CniConfig struct {
 	// NetworkPluginBinDir is the directory in which the binaries for the plugin is kept.
-	NetworkPluginBinDir string `toml:"bin_dir"`
+	NetworkPluginBinDir string `toml:"bin_dir" json:"networkPluginBinDir,omitempty"`
 	// NetworkPluginConfDir is the directory in which the admin places a CNI conf.
-	NetworkPluginConfDir string `toml:"conf_dir"`
+	NetworkPluginConfDir string `toml:"conf_dir" json:"networkPluginConfDir,omitempty"`
 }
 
 // Config contains cri-containerd toml config
 type Config struct {
 	// ContainerdConfig contains config related to containerd
-	ContainerdConfig `toml:"containerd"`
+	ContainerdConfig `toml:"containerd" json:"containerd,omitempty"`
 	// CniConfig contains config related to cni
-	CniConfig `toml:"cni"`
+	CniConfig `toml:"cni" json:"cniConfig,omitempty"`
 	// SocketPath is the path to the socket which cri-containerd serves on.
-	SocketPath string `toml:"socket_path"`
+	SocketPath string `toml:"socket_path" json:"socketPath,omitempty"`
 	// RootDir is the root directory path for managing cri-containerd files
 	// (metadata checkpoint etc.)
-	RootDir string `toml:"root_dir"`
+	RootDir string `toml:"root_dir" json:"rootDir,omitempty"`
 	// StreamServerAddress is the ip address streaming server is listening on.
-	StreamServerAddress string `toml:"stream_server_address"`
+	StreamServerAddress string `toml:"stream_server_address" json:"streamServerAddress,omitempty"`
 	// StreamServerPort is the port streaming server is listening on.
-	StreamServerPort string `toml:"stream_server_port"`
+	StreamServerPort string `toml:"stream_server_port" json:"streamServerPort,omitempty"`
 	// CgroupPath is the path for the cgroup that cri-containerd is placed in.
-	CgroupPath string `toml:"cgroup_path"`
+	CgroupPath string `toml:"cgroup_path" json:"cgroupPath,omitempty"`
 	// EnableSelinux indicates to enable the selinux support.
-	EnableSelinux bool `toml:"enable_selinux"`
+	EnableSelinux bool `toml:"enable_selinux" json:"enableSelinux,omitempty"`
 	// SandboxImage is the image used by sandbox container.
-	SandboxImage string `toml:"sandbox_image"`
+	SandboxImage string `toml:"sandbox_image" json:"sandboxImage,omitempty"`
 	// StatsCollectPeriod is the period (in seconds) of snapshots stats collection.
-	StatsCollectPeriod int `toml:"stats_collect_period"`
+	StatsCollectPeriod int `toml:"stats_collect_period" json:"statsCollectPeriod,omitempty"`
 	// SystemdCgroup enables systemd cgroup support.
-	SystemdCgroup bool `toml:"systemd_cgroup"`
+	SystemdCgroup bool `toml:"systemd_cgroup" json:"systemdCgroup,omitempty"`
 	// OOMScore adjust the cri-containerd's oom score
-	OOMScore int `toml:"oom_score"`
+	OOMScore int `toml:"oom_score" json:"oomScore,omitempty"`
 	// EnableProfiling is used for enable profiling via host:port/debug/pprof/
-	EnableProfiling bool `toml:"profiling"`
+	EnableProfiling bool `toml:"profiling" json:"enableProfiling,omitempty"`
 	// ProfilingPort is the port for profiling via host:port/debug/pprof/
-	ProfilingPort string `toml:"profiling_port"`
+	ProfilingPort string `toml:"profiling_port" json:"profilingPort,omitempty"`
 	// ProfilingAddress is address for profiling via host:port/debug/pprof/
-	ProfilingAddress string `toml:"profiling_addr"`
+	ProfilingAddress string `toml:"profiling_addr" json:"profilingAddress,omitempty"`
 }
 
 // CRIContainerdOptions contains cri-containerd command line and toml options.

@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"golang.org/x/net/context"
@@ -55,10 +56,20 @@ func (c *criContainerdService) Status(ctx context.Context, r *runtime.StatusRequ
 		networkCondition.Reason = networkNotReadyReason
 		networkCondition.Message = fmt.Sprintf("Network plugin returns error: %v", err)
 	}
-	return &runtime.StatusResponse{
+
+	resp := &runtime.StatusResponse{
 		Status: &runtime.RuntimeStatus{Conditions: []*runtime.RuntimeCondition{
 			runtimeCondition,
 			networkCondition,
 		}},
-	}, nil
+	}
+	if r.Verbose {
+		configByt, err := json.Marshal(c.config)
+		if err != nil {
+			return nil, err
+		}
+		resp.Info = make(map[string]string)
+		resp.Info["config"] = string(configByt)
+	}
+	return resp, nil
 }
