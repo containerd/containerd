@@ -41,7 +41,7 @@ func (rw *remoteWriter) Status() (content.Status, error) {
 		Action: contentapi.WriteActionStat,
 	})
 	if err != nil {
-		return content.Status{}, err
+		return content.Status{}, errors.Wrap(err, "error getting writer status")
 	}
 
 	return content.Status{
