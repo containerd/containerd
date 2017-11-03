@@ -151,24 +151,25 @@ func checkResumeWriter(ctx context.Context, t *testing.T, cs content.Store) {
 	}
 
 	var (
-		cb, dgst      = createContent(256, 1)
+		ref           = "cb"
+		cb, dgst      = createContent(256, 10)
 		first, second = cb[:128], cb[128:]
 	)
 
 	preStart := time.Now()
-	w1, err := cs.Writer(ctx, "cb", 256, dgst)
+	w1, err := cs.Writer(ctx, ref, 256, dgst)
 	if err != nil {
 		t.Fatal(err)
 	}
 	postStart := time.Now()
-	preUpdate := time.Now()
+	preUpdate := postStart
 
 	checkWrite(t, w1, first)
 	postUpdate := time.Now()
 
 	dgstFirst := digest.FromBytes(first)
 	expected := content.Status{
-		Ref:      "cb",
+		Ref:      ref,
 		Offset:   int64(len(first)),
 		Total:    int64(len(cb)),
 		Expected: dgstFirst,
@@ -177,13 +178,13 @@ func checkResumeWriter(ctx context.Context, t *testing.T, cs content.Store) {
 	checkStatus(t, w1, expected, dgstFirst, preStart, postStart, preUpdate, postUpdate)
 	require.NoError(t, w1.Close(), "close first writer")
 
-	w2, err := cs.Writer(ctx, "cb", 256, dgst)
+	w2, err := cs.Writer(ctx, ref, 256, dgst)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// status should be consistent with version before close.
-	checkStatus(t, w1, expected, dgstFirst, preStart, postStart, preUpdate, postUpdate)
+	checkStatus(t, w2, expected, dgstFirst, preStart, postStart, preUpdate, postUpdate)
 
 	preUpdate = time.Now()
 	checkWrite(t, w2, second)
@@ -211,7 +212,7 @@ func checkResumeWriter(ctx context.Context, t *testing.T, cs content.Store) {
 }
 
 func checkUploadStatus(ctx context.Context, t *testing.T, cs content.Store) {
-	c1, d1 := createContent(256, 1)
+	c1, d1 := createContent(256, 17)
 
 	preStart := time.Now()
 	w1, err := cs.Writer(ctx, "c1", 256, d1)
@@ -279,7 +280,7 @@ func checkUploadStatus(ctx context.Context, t *testing.T, cs content.Store) {
 }
 
 func checkLabels(ctx context.Context, t *testing.T, cs content.Store) {
-	c1, d1 := createContent(256, 1)
+	c1, d1 := createContent(256, 19)
 
 	w1, err := cs.Writer(ctx, "c1", 256, d1)
 	if err != nil {
@@ -374,6 +375,8 @@ func checkStatus(t *testing.T, w content.Writer, expected content.Status, d dige
 	if st.StartedAt.After(postStart) || st.StartedAt.Before(preStart) {
 		t.Fatalf("unexpected started at time %s, expected between %s and %s", st.StartedAt, preStart, postStart)
 	}
+
+	t.Logf("compare update %v against (%v, %v)", st.UpdatedAt, preUpdate, postUpdate)
 	if st.UpdatedAt.After(postUpdate) || st.UpdatedAt.Before(preUpdate) {
 		t.Fatalf("unexpected updated at time %s, expected between %s and %s", st.UpdatedAt, preUpdate, postUpdate)
 	}
