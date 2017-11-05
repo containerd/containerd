@@ -28,14 +28,7 @@ import (
 )
 
 // Attach prepares a streaming endpoint to attach to a running container, and returns the address.
-func (c *criContainerdService) Attach(ctx context.Context, r *runtime.AttachRequest) (retRes *runtime.AttachResponse, retErr error) {
-	glog.V(2).Infof("Attach for %q with tty %v and stdin %v", r.GetContainerId(), r.GetTty(), r.GetStdin())
-	defer func() {
-		if retErr == nil {
-			glog.V(2).Infof("Attach for %q returns URL %q", r.GetContainerId(), retRes.Url)
-		}
-	}()
-
+func (c *criContainerdService) Attach(ctx context.Context, r *runtime.AttachRequest) (*runtime.AttachResponse, error) {
 	cntr, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to find container in store: %v", err)

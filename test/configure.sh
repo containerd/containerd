@@ -69,6 +69,9 @@ TARBALL="cri-containerd.tar.gz"
 curl -f --ipv4 -Lo "${TARBALL}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 "${TARBALL_GCS_PATH}"
 tar xvf "${TARBALL}"
 
+# Copy crictl config.
+cp "${CRI_CONTAINERD_HOME}/etc/crictl.yaml" /etc
+
 # TODO(random-liu): Stop docker on the node, this may break docker.
 echo "export PATH=${CRI_CONTAINERD_HOME}/usr/local/bin/:${CRI_CONTAINERD_HOME}/usr/local/sbin/:\$PATH" > \
   /etc/profile.d/cri-containerd_env.sh

@@ -54,6 +54,7 @@ CONTAINERD_DIR=${DESTDIR}/usr/local
 RUNC_DIR=${DESTDIR}
 CNI_DIR=${DESTDIR}/opt/cni
 CNI_CONFIG_DIR=${DESTDIR}/etc/cni/net.d
+CRICTL_CONFIG_DIR=${DESTDIR}/etc
 
 RUNC_PKG=github.com/opencontainers/runc
 CNI_PKG=github.com/containernetworking/plugins
@@ -138,3 +139,7 @@ ${sudo} make install -e DESTDIR=${CONTAINERD_DIR}
 checkout_repo ${CRITOOL_PKG} ${CRITOOL_VERSION}
 cd ${GOPATH}/src/${CRITOOL_PKG}
 make
+${sudo} mkdir -p ${CRICTL_CONFIG_DIR}
+${sudo} bash -c 'cat >'${CRICTL_CONFIG_DIR}'/crictl.yaml <<EOF
+runtime-endpoint: /var/run/cri-containerd.sock
+EOF'
