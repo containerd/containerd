@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
+	"github.com/containerd/containerd/dialer"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/linux/shim"
@@ -212,7 +212,7 @@ func dumpStacks(logger *logrus.Entry) {
 }
 
 func connectEvents(address string) (eventsapi.EventsClient, error) {
-	conn, err := connect(address, containerd.Dialer)
+	conn, err := connect(address, dialer.Dialer)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to dial %q", address)
 	}
@@ -228,7 +228,7 @@ func connect(address string, d func(string, time.Duration) (net.Conn, error)) (*
 		grpc.FailOnNonTempDialError(true),
 		grpc.WithBackoffMaxDelay(3 * time.Second),
 	}
-	conn, err := grpc.Dial(containerd.DialAddress(address), gopts...)
+	conn, err := grpc.Dial(dialer.DialAddress(address), gopts...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to dial %q", address)
 	}

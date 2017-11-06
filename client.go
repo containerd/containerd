@@ -22,6 +22,7 @@ import (
 	versionservice "github.com/containerd/containerd/api/services/version/v1"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/dialer"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
@@ -72,7 +73,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 		grpc.WithTimeout(60 * time.Second),
 		grpc.FailOnNonTempDialError(true),
 		grpc.WithBackoffMaxDelay(3 * time.Second),
-		grpc.WithDialer(Dialer),
+		grpc.WithDialer(dialer.Dialer),
 	}
 	if len(copts.dialOptions) > 0 {
 		gopts = copts.dialOptions
@@ -84,7 +85,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 			grpc.WithStreamInterceptor(stream),
 		)
 	}
-	conn, err := grpc.Dial(DialAddress(address), gopts...)
+	conn, err := grpc.Dial(dialer.DialAddress(address), gopts...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to dial %q", address)
 	}
