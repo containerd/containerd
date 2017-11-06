@@ -32,10 +32,21 @@ func (c *criContainerdService) ContainerStatus(ctx context.Context, r *runtime.C
 		return nil, fmt.Errorf("an error occurred when try to find container %q: %v", r.GetContainerId(), err)
 	}
 
+	// TODO(random-liu): Clean up the following logic in CRI.
+	// Current assumption:
+	// * ImageSpec in container config is image ID.
+	// * ImageSpec in container status is image tag.
+	// * ImageRef in container status is repo digest.
+	spec := container.Metadata.Config.GetImage()
 	imageRef := container.ImageRef
 	image, err := c.imageStore.Get(imageRef)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get image %q: %v", container.ImageRef, err)
+		return nil, fmt.Errorf("failed to get image %q: %v", imageRef, err)
+	}
+	if len(image.RepoTags) > 0 {
+		// Based on current behavior of dockershim, this field should be
+		// image tag.
+		spec = &runtime.ImageSpec{Image: image.RepoTags[0]}
 	}
 	if len(image.RepoDigests) > 0 {
 		// Based on the CRI definition, this field will be consumed by user.
@@ -43,12 +54,12 @@ func (c *criContainerdService) ContainerStatus(ctx context.Context, r *runtime.C
 	}
 
 	return &runtime.ContainerStatusResponse{
-		Status: toCRIContainerStatus(container, imageRef),
+		Status: toCRIContainerStatus(container, spec, imageRef),
 	}, nil
 }
 
 // toCRIContainerStatus converts internal container object to CRI container status.
-func toCRIContainerStatus(container containerstore.Container, imageRef string) *runtime.ContainerStatus {
+func toCRIContainerStatus(container containerstore.Container, spec *runtime.ImageSpec, imageRef string) *runtime.ContainerStatus {
 	meta := container.Metadata
 	status := container.Status.Get()
 	reason := status.Reason
@@ -67,7 +78,7 @@ func toCRIContainerStatus(container containerstore.Container, imageRef string) *
 		StartedAt:   status.StartedAt,
 		FinishedAt:  status.FinishedAt,
 		ExitCode:    status.ExitCode,
-		Image:       meta.Config.GetImage(),
+		Image:       spec,
 		ImageRef:    imageRef,
 		Reason:      reason,
 		Message:     status.Message,
