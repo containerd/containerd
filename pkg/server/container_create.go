@@ -603,6 +603,8 @@ func (c *criContainerdService) addOCIBindMounts(g *generate.Generator, mounts []
 			options = append(options, "rprivate")
 		}
 
+		// NOTE(random-liu): we don't change all mounts to `ro` when root filesystem
+		// is readonly. This is different from docker's behavior, but make more sense.
 		if mount.GetReadonly() {
 			options = append(options, "ro")
 		} else {
