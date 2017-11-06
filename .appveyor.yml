@@ -24,11 +24,7 @@ before_build:
   #- choco install codecov
 
 build_script:
-  - bash.exe -elc "export PATH=/c/tools/mingw64/bin:$PATH ; mingw32-make.exe setup"
-  - bash.exe -elc "export PATH=/c/tools/mingw64/bin:$PATH ; mingw32-make.exe fmt"
-  - bash.exe -elc "export PATH=/c/tools/mingw64/bin:/c/gopath/bin:$PATH ; mingw32-make.exe lint"
-  - bash.exe -elc "export PATH=/c/tools/mingw64/bin:$PATH ; mingw32-make.exe vet"
-  - bash.exe -elc "export PATH=/c/tools/mingw64/bin:/c/gopath/bin:$PATH ; mingw32-make.exe ineffassign"
+  - bash.exe -elc "export PATH=/c/tools/mingw64/bin:/c/gopath/bin:$PATH ; mingw32-make.exe setup check"
   - bash.exe -elc "export PATH=/c/tools/mingw64/bin:$PATH ; mingw32-make.exe build"
   - bash.exe -elc "export PATH=/c/tools/mingw64/bin:$PATH ; mingw32-make.exe binaries"
 

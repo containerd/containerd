@@ -48,12 +48,9 @@ script:
   - export GOOS=$TRAVIS_GOOS
   - export CGO_ENABLED=$TRAVIS_CGO_ENABLED
   - GIT_CHECK_EXCLUDE="./vendor" TRAVIS_COMMIT_RANGE="${TRAVIS_COMMIT_RANGE/.../..}" make dco
-  - make fmt
+  - GOOS=linux make setup
   - go build -i .
-  - make setup
-  - make lint
-  - make vet
-  - make ineffassign
+  - make check
   - if [ "$GOOS" = "linux" ]; then make check-protos check-api-descriptors; fi
   - make build
   - make binaries
