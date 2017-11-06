@@ -219,7 +219,6 @@ Let's see it in action.
 > sudo ./main
 
 2017/08/13 18:01:35 Successfully pulled docker.io/library/redis:alpine image
-2017/08/13 18:01:35 Successfully generate an OCI spec version 1.0.0 based on docker.io/library/redis:alpine image
 2017/08/13 18:01:35 Successfully created container with ID redis-server and snapshot with ID redis-server-snapshot
 ```
 
