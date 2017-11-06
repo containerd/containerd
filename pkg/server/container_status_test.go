@@ -63,6 +63,7 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 	}
 	image := &imagestore.Image{
 		ID:          "test-image-id",
+		RepoTags:    []string{"test-image-repo-tag"},
 		RepoDigests: []string{"test-image-repo-digest"},
 	}
 	expected := &runtime.ContainerStatus{
@@ -71,7 +72,7 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 		State:       runtime.ContainerState_CONTAINER_RUNNING,
 		CreatedAt:   createdAt,
 		StartedAt:   startedAt,
-		Image:       config.GetImage(),
+		Image:       &runtime.ImageSpec{Image: "test-image-repo-tag"},
 		ImageRef:    "test-image-repo-digest",
 		Reason:      completeExitReason,
 		Labels:      config.GetLabels(),
@@ -135,7 +136,9 @@ func TestToCRIContainerStatus(t *testing.T) {
 		expected.FinishedAt = test.finishedAt
 		expected.ExitCode = test.exitCode
 		expected.Message = test.message
-		assert.Equal(t, expected, toCRIContainerStatus(container, image.RepoDigests[0]), desc)
+		assert.Equal(t, expected, toCRIContainerStatus(container,
+			&runtime.ImageSpec{Image: image.RepoTags[0]},
+			image.RepoDigests[0]), desc)
 	}
 }
 
