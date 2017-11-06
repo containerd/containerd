@@ -54,12 +54,22 @@ func toCRIContainer(container containerstore.Container) *runtime.Container {
 	}
 }
 
+func (c *criContainerdService) normalizeContainerFilter(filter *runtime.ContainerFilter) {
+	if cntr, err := c.containerStore.Get(filter.GetId()); err == nil {
+		filter.Id = cntr.ID
+	}
+	if sb, err := c.sandboxStore.Get(filter.GetPodSandboxId()); err == nil {
+		filter.PodSandboxId = sb.ID
+	}
+}
+
 // filterCRIContainers filters CRIContainers.
 func (c *criContainerdService) filterCRIContainers(containers []*runtime.Container, filter *runtime.ContainerFilter) []*runtime.Container {
 	if filter == nil {
 		return containers
 	}
 
+	c.normalizeContainerFilter(filter)
 	filtered := []*runtime.Container{}
 	for _, cntr := range containers {
 		if filter.GetId() != "" && filter.GetId() != cntr.Id {

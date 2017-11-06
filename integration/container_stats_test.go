@@ -296,6 +296,29 @@ func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 			testStats(t, s, config)
 		}
 	}
+
+	t.Logf("Fetch container stats for sandbox truncID and container truncID filter ")
+	for id, config := range containerConfigMap {
+		require.NoError(t, Eventually(func() (bool, error) {
+			stats, err = runtimeService.ListContainerStats(
+				&runtime.ContainerStatsFilter{Id: id[:3], PodSandboxId: sb[:3]})
+			if err != nil {
+				return false, err
+			}
+			if len(stats) != 1 {
+				return false, fmt.Errorf("Unexpected stats length")
+			}
+			if stats[0].GetWritableLayer().GetUsedBytes().GetValue() != 0 &&
+				stats[0].GetWritableLayer().GetInodesUsed().GetValue() != 0 {
+				return true, nil
+			}
+			return false, nil
+		}, time.Second, 30*time.Second))
+		t.Logf("Verify container stats for sandbox %q and container %q filter", sb, id)
+		for _, s := range stats {
+			testStats(t, s, config)
+		}
+	}
 }
 
 // TODO make this as options to use for dead container tests
