@@ -252,8 +252,20 @@ func (c *ContainerIO) Pipe() (err error) {
 	return nil
 }
 
+// AttachOptions specifies how to attach to a container.
+type AttachOptions struct {
+	Stdin     io.Reader
+	Stdout    io.WriteCloser
+	Stderr    io.WriteCloser
+	Tty       bool
+	StdinOnce bool
+	// CloseStdin is the function to close container stdin.
+	CloseStdin func() error
+}
+
 // Attach attaches container stdio.
-func (c *ContainerIO) Attach(stdin io.Reader, stdout, stderr io.WriteCloser) error {
+// TODO(random-liu): Use pools.Copy in docker to reduce memory usage?
+func (c *ContainerIO) Attach(opts AttachOptions) error {
 	if c.closer == nil {
 		return errors.New("container io is not initialized")
 	}
@@ -263,56 +275,67 @@ func (c *ContainerIO) Attach(stdin io.Reader, stdout, stderr io.WriteCloser) err
 	stdoutKey := streamKey(c.id, "attach-"+key, Stdout)
 	stderrKey := streamKey(c.id, "attach-"+key, Stderr)
 
-	var stdinCloser io.Closer
-	if c.stdinPath != "" && stdin != nil {
+	var stdinRC io.ReadCloser
+	if c.stdinPath != "" && opts.Stdin != nil {
 		f, err := fifo.OpenFifo(c.closer.ctx, c.stdinPath, syscall.O_WRONLY|syscall.O_NONBLOCK, 0700)
 		if err != nil {
 			return err
 		}
+		// Create a wrapper of stdin which could be closed. Note that the
+		// wrapper doesn't close the actual stdin, it only stops io.Copy.
+		// The actual stdin will be closed by stream server.
+		stdinRC = cioutil.NewWrapReadCloser(opts.Stdin)
 		// Also increase wait group here, so that `closer.Wait` will
 		// also wait for this fifo to be closed.
 		c.closer.wg.Add(1)
 		wg.Add(1)
 		go func(w io.WriteCloser) {
-			if _, err := io.Copy(w, stdin); err != nil {
+			if _, err := io.Copy(w, stdinRC); err != nil && err != io.ErrClosedPipe {
 				glog.Errorf("Failed to redirect stdin for container attach %q: %v", c.id, err)
 			}
 			w.Close()
 			glog.V(2).Infof("Attach stream %q closed", stdinKey)
-			// No matter what, when stdin is closed (io.Copy unblock), close stdout and stderr
-			if stdout != nil {
-				c.stdout.Remove(stdoutKey)
-			}
-			if stderr != nil {
-				c.stderr.Remove(stderrKey)
+			if opts.StdinOnce && !opts.Tty {
+				// Due to kubectl requirements and current docker behavior, when (opts.StdinOnce &&
+				// opts.Tty) we have to close container stdin and keep stdout and stderr open until
+				// container stops.
+				if err := opts.CloseStdin(); err != nil {
+					glog.Errorf("Failed to close stdin for container %q: %v", c.id, err)
+				}
+			} else {
+				if opts.Stdout != nil {
+					c.stdout.Remove(stdoutKey)
+				}
+				if opts.Stderr != nil {
+					c.stderr.Remove(stderrKey)
+				}
 			}
 			wg.Done()
 			c.closer.wg.Done()
 		}(f)
-		stdinCloser = f
 	}
 
 	attachStream := func(key string, close <-chan struct{}) {
 		<-close
 		glog.V(2).Infof("Attach stream %q closed", key)
 		// Make sure stdin gets closed.
-		if stdinCloser != nil {
-			stdinCloser.Close()
+		if stdinRC != nil {
+			stdinRC.Close()
 		}
 		wg.Done()
 	}
 
-	if stdout != nil {
+	if opts.Stdout != nil {
 		wg.Add(1)
-		wc, close := cioutil.NewWriteCloseInformer(stdout)
+		wc, close := cioutil.NewWriteCloseInformer(opts.Stdout)
 		if err := c.stdout.Add(stdoutKey, wc); err != nil {
 			return err
 		}
 		go attachStream(stdoutKey, close)
 	}
-	if !c.tty && stderr != nil {
+	if opts.Tty && opts.Stderr != nil {
 		wg.Add(1)
-		wc, close := cioutil.NewWriteCloseInformer(stderr)
+		wc, close := cioutil.NewWriteCloseInformer(opts.Stderr)
 		if err := c.stderr.Add(stderrKey, wc); err != nil {
 			return err
 		}

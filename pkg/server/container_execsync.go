@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/golang/glog"
+	"github.com/opencontainers/runtime-tools/generate"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 	"k8s.io/client-go/tools/remotecommand"
@@ -96,6 +97,11 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 	if err != nil {
 		return nil, fmt.Errorf("failed to load task: %v", err)
 	}
+	if opts.tty {
+		g := generate.NewFromSpec(spec)
+		g.AddProcessEnv("TERM", "xterm")
+		spec = g.Spec()
+	}
 	pspec := spec.Process
 	pspec.Args = opts.cmd
 	pspec.Terminal = opts.tty
@@ -125,12 +131,6 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 		}
 	}()
 
-	handleResizing(opts.resize, func(size remotecommand.TerminalSize) {
-		if err := process.Resize(ctx, uint32(size.Width), uint32(size.Height)); err != nil {
-			glog.Errorf("Failed to resize process %q console for container %q: %v", execID, id, err)
-		}
-	})
-
 	exitCh, err := process.Wait(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to wait for process %q: %v", execID, err)
@@ -138,6 +138,12 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 	if err := process.Start(ctx); err != nil {
 		return nil, fmt.Errorf("failed to start exec %q: %v", execID, err)
 	}
+
+	handleResizing(opts.resize, func(size remotecommand.TerminalSize) {
+		if err := process.Resize(ctx, uint32(size.Width), uint32(size.Height)); err != nil {
+			glog.Errorf("Failed to resize process %q console for container %q: %v", execID, id, err)
+		}
+	})
 
 	var timeoutCh <-chan time.Time
 	if opts.timeout == 0 {
