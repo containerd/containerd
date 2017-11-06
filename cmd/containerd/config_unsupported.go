@@ -2,7 +2,14 @@
 
 package main
 
-import "github.com/containerd/containerd/server"
+import (
+	"github.com/containerd/containerd/server"
+	"github.com/urfave/cli"
+)
+
+var commands = []cli.Command{
+	configCommand,
+}
 
 func defaultConfig() *server.Config {
 	return &server.Config{

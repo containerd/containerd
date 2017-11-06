@@ -74,7 +74,7 @@ type bundle struct {
 type ShimOpt func(*bundle, string, *runcopts.RuncOptions) (client.Config, client.ClientOpt)
 
 // ShimRemote is a ShimOpt for connecting and starting a remote shim
-func ShimRemote(shim, daemonAddress, cgroup string, nonewns, debug bool, exitHandler func()) ShimOpt {
+func ShimRemote(shim []string, daemonAddress, cgroup string, nonewns, debug bool, exitHandler func()) ShimOpt {
 	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (client.Config, client.ClientOpt) {
 		return b.shimConfig(ns, ropts),
 			client.WithStart(shim, b.shimAddress(ns), daemonAddress, cgroup, nonewns, debug, exitHandler)
@@ -116,7 +116,7 @@ func (b *bundle) Delete() error {
 }
 
 func (b *bundle) shimAddress(namespace string) string {
-	return filepath.Join(string(filepath.Separator), "containerd-shim", namespace, b.id, "shim.sock")
+	return filepath.Join(string(filepath.Separator), "shim", namespace, b.id, "shim.sock")
 }
 
 func (b *bundle) shimConfig(namespace string, runcOptions *runcopts.RuncOptions) client.Config {

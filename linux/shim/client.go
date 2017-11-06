@@ -31,7 +31,7 @@ import (
 type ClientOpt func(context.Context, Config) (shim.ShimClient, io.Closer, error)
 
 // WithStart executes a new shim process
-func WithStart(binary, address, daemonAddress, cgroup string, nonewns, debug bool, exitHandler func()) ClientOpt {
+func WithStart(binary []string, address, daemonAddress, cgroup string, nonewns, debug bool, exitHandler func()) ClientOpt {
 	return func(ctx context.Context, config Config) (_ shim.ShimClient, _ io.Closer, err error) {
 		socket, err := newSocket(address)
 		if err != nil {
@@ -84,7 +84,7 @@ func WithStart(binary, address, daemonAddress, cgroup string, nonewns, debug boo
 	}
 }
 
-func newCommand(binary, daemonAddress string, nonewns, debug bool, config Config, socket *os.File) *exec.Cmd {
+func newCommand(binary []string, daemonAddress string, nonewns, debug bool, config Config, socket *os.File) *exec.Cmd {
 	args := []string{
 		"--namespace", config.Namespace,
 		"--workdir", config.WorkDir,
@@ -104,7 +104,7 @@ func newCommand(binary, daemonAddress string, nonewns, debug bool, config Config
 		args = append(args, "--debug")
 	}
 
-	cmd := exec.Command(binary, args...)
+	cmd := exec.Command(binary[0], append(binary[1:], args...)...)
 	cmd.Dir = config.Path
 	// make sure the shim can be re-parented to system init
 	// and is cloned in a new mount namespace because the overlay/filesystems

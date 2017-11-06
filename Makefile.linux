@@ -1,6 +1,4 @@
 #linux specific settings
-COMMANDS += containerd-shim
-
 # check GOOS for cross compile builds
 ifeq ($(GOOS),linux)
 	GO_GCFLAGS= -buildmode=pie
