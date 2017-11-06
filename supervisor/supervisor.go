@@ -132,8 +132,11 @@ func readEventLog(s *Supervisor) error {
 		if err := dec.Decode(&e); err != nil {
 			if err == io.EOF {
 				break
+			} else {
+				// We dont want to prevent containerd from starting if the events.log was corrupted
+				logrus.WithField("error", err).Warnf("containerd: Cannot parse event. Skipping.")
+				break
 			}
-			return err
 		}
 
 		// We need to take care of -1 Status for backward compatibility
