@@ -108,6 +108,31 @@ func TestFileReplace(t *testing.T) {
 	}
 }
 
+func TestParentDirectoryPermission(t *testing.T) {
+	l1 := fstest.Apply(
+		fstest.CreateDir("/dir1", 0700),
+		fstest.CreateDir("/dir2", 0751),
+		fstest.CreateDir("/dir3", 0777),
+	)
+	l2 := fstest.Apply(
+		fstest.CreateDir("/dir1/d", 0700),
+		fstest.CreateFile("/dir1/d/f", []byte("irrelevant"), 0644),
+		fstest.CreateFile("/dir1/f", []byte("irrelevant"), 0644),
+		fstest.CreateFile("/dir2/f", []byte("irrelevant"), 0644),
+		fstest.CreateFile("/dir3/f", []byte("irrelevant"), 0644),
+	)
+	diff := []TestChange{
+		Add("/dir1/d"),
+		Add("/dir1/d/f"),
+		Add("/dir1/f"),
+		Add("/dir2/f"),
+		Add("/dir3/f"),
+	}
+
+	if err := testDiffWithBase(l1, l2, diff); err != nil {
+		t.Fatalf("Failed diff with base: %+v", err)
+	}
+}
 func TestUpdateWithSameTime(t *testing.T) {
 	tt := time.Now().Truncate(time.Second)
 	t1 := tt.Add(5 * time.Nanosecond)
