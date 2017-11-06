@@ -25,6 +25,8 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+
+	cio "github.com/kubernetes-incubator/cri-containerd/pkg/server/io"
 )
 
 // Attach prepares a streaming endpoint to attach to a running container, and returns the address.
@@ -71,15 +73,19 @@ func (c *criContainerdService) attachContainer(ctx context.Context, id string, s
 		}
 	})
 
-	// TODO(random-liu): Figure out whether we need to support historical output.
-	if err := cntr.IO.Attach(stdin, stdout, stderr); err != nil {
-		return fmt.Errorf("failed to attach container: %v", err)
+	opts := cio.AttachOptions{
+		Stdin:     stdin,
+		Stdout:    stdout,
+		Stderr:    stderr,
+		Tty:       tty,
+		StdinOnce: cntr.Config.StdinOnce,
+		CloseStdin: func() error {
+			return task.CloseIO(ctx, containerd.WithStdinCloser)
+		},
 	}
-
-	// Close stdin after first attach if StdinOnce is specified, otherwise stdin will
-	// be kept open until container exits.
-	if cntr.Config.StdinOnce {
-		task.CloseIO(ctx, containerd.WithStdinCloser)
+	// TODO(random-liu): Figure out whether we need to support historical output.
+	if err := cntr.IO.Attach(opts); err != nil {
+		return fmt.Errorf("failed to attach container: %v", err)
 	}
 	return nil
 }
