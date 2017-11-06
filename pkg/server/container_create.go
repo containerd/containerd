@@ -554,8 +554,6 @@ func setOCIDevicesPrivileged(g *generate.Generator) error {
 }
 
 // addOCIBindMounts adds bind mounts.
-// TODO(random-liu): Figure out whether we need to change all CRI mounts to readonly when
-// rootfs is readonly. (https://github.com/moby/moby/blob/master/daemon/oci_linux.go)
 func (c *criContainerdService) addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount, mountLabel string) error {
 	// Mount cgroup into the container as readonly, which inherits docker's behavior.
 	g.AddCgroupsMount("ro") // nolint: errcheck
