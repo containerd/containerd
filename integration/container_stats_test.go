@@ -283,7 +283,7 @@ func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 				return false, err
 			}
 			if len(stats) != 1 {
-				return false, fmt.Errorf("Unexpected stats length")
+				return false, fmt.Errorf("unexpected stats length")
 			}
 			if stats[0].GetWritableLayer().GetUsedBytes().GetValue() != 0 &&
 				stats[0].GetWritableLayer().GetInodesUsed().GetValue() != 0 {
@@ -306,7 +306,7 @@ func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 				return false, err
 			}
 			if len(stats) != 1 {
-				return false, fmt.Errorf("Unexpected stats length")
+				return false, fmt.Errorf("unexpected stats length")
 			}
 			if stats[0].GetWritableLayer().GetUsedBytes().GetValue() != 0 &&
 				stats[0].GetWritableLayer().GetInodesUsed().GetValue() != 0 {

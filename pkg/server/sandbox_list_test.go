@@ -59,26 +59,77 @@ func TestToCRISandbox(t *testing.T) {
 
 func TestFilterSandboxes(t *testing.T) {
 	c := newTestCRIContainerdService()
-
-	testSandboxes := []*runtime.PodSandbox{
+	sandboxes := []struct {
+		sandbox sandboxstore.Sandbox
+		state   runtime.PodSandboxState
+	}{
 		{
-			Id:       "1",
-			Metadata: &runtime.PodSandboxMetadata{Name: "name-1", Uid: "uid-1", Namespace: "ns-1", Attempt: 1},
-			State:    runtime.PodSandboxState_SANDBOX_READY,
+			sandbox: sandboxstore.Sandbox{
+				Metadata: sandboxstore.Metadata{
+					ID:   "1abcdef",
+					Name: "sandboxname-1",
+					Config: &runtime.PodSandboxConfig{
+						Metadata: &runtime.PodSandboxMetadata{
+							Name:      "podname-1",
+							Uid:       "uid-1",
+							Namespace: "ns-1",
+							Attempt:   1,
+						},
+					},
+				},
+			},
+			state: runtime.PodSandboxState_SANDBOX_READY,
 		},
 		{
-			Id:       "2",
-			Metadata: &runtime.PodSandboxMetadata{Name: "name-2", Uid: "uid-2", Namespace: "ns-2", Attempt: 2},
-			State:    runtime.PodSandboxState_SANDBOX_NOTREADY,
-			Labels:   map[string]string{"a": "b"},
+			sandbox: sandboxstore.Sandbox{
+				Metadata: sandboxstore.Metadata{
+					ID:   "2abcdef",
+					Name: "sandboxname-2",
+					Config: &runtime.PodSandboxConfig{
+						Metadata: &runtime.PodSandboxMetadata{
+							Name:      "podname-2",
+							Uid:       "uid-2",
+							Namespace: "ns-2",
+							Attempt:   2,
+						},
+						Labels: map[string]string{"a": "b"},
+					},
+				},
+			},
+			state: runtime.PodSandboxState_SANDBOX_NOTREADY,
 		},
 		{
-			Id:       "3",
-			Metadata: &runtime.PodSandboxMetadata{Name: "name-2", Uid: "uid-2", Namespace: "ns-2", Attempt: 2},
-			State:    runtime.PodSandboxState_SANDBOX_READY,
-			Labels:   map[string]string{"c": "d"},
+			sandbox: sandboxstore.Sandbox{
+				Metadata: sandboxstore.Metadata{
+					ID:   "3abcdef",
+					Name: "sandboxname-3",
+					Config: &runtime.PodSandboxConfig{
+						Metadata: &runtime.PodSandboxMetadata{
+							Name:      "podname-2",
+							Uid:       "uid-2",
+							Namespace: "ns-2",
+							Attempt:   2,
+						},
+						Labels: map[string]string{"c": "d"},
+					},
+				},
+			},
+			state: runtime.PodSandboxState_SANDBOX_READY,
 		},
 	}
+
+	// Create PodSandbox
+	testSandboxes := []*runtime.PodSandbox{}
+	createdAt := time.Now()
+	for _, sb := range sandboxes {
+		testSandboxes = append(testSandboxes, toCRISandbox(sb.sandbox.Metadata, sb.state, createdAt))
+	}
+
+	// Inject test sandbox metadata
+	for _, sb := range sandboxes {
+		assert.NoError(t, c.sandboxStore.Add(sb.sandbox))
+	}
+
 	for desc, test := range map[string]struct {
 		filter *runtime.PodSandboxFilter
 		expect []*runtime.PodSandbox
@@ -87,6 +138,10 @@ func TestFilterSandboxes(t *testing.T) {
 			expect: testSandboxes,
 		},
 		"id filter": {
+			filter: &runtime.PodSandboxFilter{Id: "2abcdef"},
+			expect: []*runtime.PodSandbox{testSandboxes[1]},
+		},
+		"truncid filter": {
 			filter: &runtime.PodSandboxFilter{Id: "2"},
 			expect: []*runtime.PodSandbox{testSandboxes[1]},
 		},
@@ -121,6 +176,7 @@ func TestFilterSandboxes(t *testing.T) {
 			expect: []*runtime.PodSandbox{testSandboxes[2]},
 		},
 	} {
+		t.Logf("TestCase: %s", desc)
 		filtered := c.filterCRISandboxes(testSandboxes, test.filter)
 		assert.Equal(t, test.expect, filtered, desc)
 	}
