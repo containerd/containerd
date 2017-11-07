@@ -58,9 +58,9 @@ type ContainerdConfig struct {
 // CniConfig contains config related to cni
 type CniConfig struct {
 	// NetworkPluginBinDir is the directory in which the binaries for the plugin is kept.
-	NetworkPluginBinDir string `toml:"bin_dir" json:"networkPluginBinDir,omitempty"`
+	NetworkPluginBinDir string `toml:"bin_dir" json:"binDir,omitempty"`
 	// NetworkPluginConfDir is the directory in which the admin places a CNI conf.
-	NetworkPluginConfDir string `toml:"conf_dir" json:"networkPluginConfDir,omitempty"`
+	NetworkPluginConfDir string `toml:"conf_dir" json:"confDir,omitempty"`
 }
 
 // Config contains cri-containerd toml config
@@ -68,7 +68,7 @@ type Config struct {
 	// ContainerdConfig contains config related to containerd
 	ContainerdConfig `toml:"containerd" json:"containerd,omitempty"`
 	// CniConfig contains config related to cni
-	CniConfig `toml:"cni" json:"cniConfig,omitempty"`
+	CniConfig `toml:"cni" json:"cni,omitempty"`
 	// SocketPath is the path to the socket which cri-containerd serves on.
 	SocketPath string `toml:"socket_path" json:"socketPath,omitempty"`
 	// RootDir is the root directory path for managing cri-containerd files
