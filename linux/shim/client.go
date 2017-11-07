@@ -86,22 +86,22 @@ func WithStart(binary, address, daemonAddress, cgroup string, nonewns, debug boo
 
 func newCommand(binary, daemonAddress string, nonewns, debug bool, config Config, socket *os.File) *exec.Cmd {
 	args := []string{
-		"--namespace", config.Namespace,
-		"--workdir", config.WorkDir,
-		"--address", daemonAddress,
+		"-namespace", config.Namespace,
+		"-workdir", config.WorkDir,
+		"-address", daemonAddress,
 	}
 
 	if config.Criu != "" {
-		args = append(args, "--criu-path", config.Criu)
+		args = append(args, "-criu-path", config.Criu)
 	}
 	if config.RuntimeRoot != "" {
-		args = append(args, "--runtime-root", config.RuntimeRoot)
+		args = append(args, "-runtime-root", config.RuntimeRoot)
 	}
 	if config.SystemdCgroup {
-		args = append(args, "--systemd-cgroup")
+		args = append(args, "-systemd-cgroup")
 	}
 	if debug {
-		args = append(args, "--debug")
+		args = append(args, "-debug")
 	}
 
 	cmd := exec.Command(binary, args...)
