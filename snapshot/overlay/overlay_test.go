@@ -24,7 +24,7 @@ func newSnapshotter(ctx context.Context, root string) (snapshot.Snapshotter, fun
 		return nil, nil, err
 	}
 
-	return snapshotter, nil, nil
+	return snapshotter, func() error { return snapshotter.Close() }, nil
 }
 
 func TestOverlay(t *testing.T) {

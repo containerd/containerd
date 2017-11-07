@@ -163,6 +163,10 @@ func (r *remoteSnapshotter) Walk(ctx context.Context, fn func(context.Context, s
 	}
 }
 
+func (r *remoteSnapshotter) Close() error {
+	return nil
+}
+
 func toKind(kind snapshotapi.Kind) snapshot.Kind {
 	if kind == snapshotapi.KindActive {
 		return snapshot.KindActive

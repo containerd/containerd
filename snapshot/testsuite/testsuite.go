@@ -44,6 +44,7 @@ func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(ctx context.
 	t.Run("ViewReadonly", makeTest(name, snapshotterFn, checkSnapshotterViewReadonly))
 
 	t.Run("StatInWalk", makeTest(name, snapshotterFn, checkStatInWalk))
+	t.Run("CloseTwice", makeTest(name, snapshotterFn, closeTwice))
 }
 
 func makeTest(name string, snapshotterFn func(ctx context.Context, root string) (snapshot.Snapshotter, func() error, error), fn func(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string)) func(t *testing.T) {
@@ -784,5 +785,24 @@ func checkFileFromLowerLayer(ctx context.Context, t *testing.T, snapshotter snap
 
 	if err := checkSnapshots(ctx, snapshotter, work, l1Init, l2Init); err != nil {
 		t.Fatalf("Check snapshots failed: %+v", err)
+	}
+}
+
+func closeTwice(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+	// do some dummy ops to modify the snapshotter internal state
+	if _, err := snapshotter.Prepare(ctx, "dummy", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := snapshotter.Commit(ctx, "dummy-1", "dummy"); err != nil {
+		t.Fatal(err)
+	}
+	if err := snapshotter.Remove(ctx, "dummy-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := snapshotter.Close(); err != nil {
+		t.Fatalf("The first close failed: %+v", err)
+	}
+	if err := snapshotter.Close(); err != nil {
+		t.Fatalf("The second close failed: %+v", err)
 	}
 }

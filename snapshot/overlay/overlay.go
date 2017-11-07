@@ -401,3 +401,8 @@ func (o *snapshotter) upperPath(id string) string {
 func (o *snapshotter) workPath(id string) string {
 	return filepath.Join(o.root, "snapshots", id, "work")
 }
+
+// Close closes the snapshotter
+func (o *snapshotter) Close() error {
+	return o.ms.Close()
+}

@@ -370,3 +370,8 @@ func (b *snapshotter) Remove(ctx context.Context, key string) (err error) {
 
 	return nil
 }
+
+// Close closes the snapshotter
+func (b *snapshotter) Close() error {
+	return b.ms.Close()
+}
