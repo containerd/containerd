@@ -208,7 +208,7 @@ func TestMetadataCollector(t *testing.T) {
 			blob(bytesFor(1), true),
 			blob(bytesFor(2), false),
 			blob(bytesFor(3), true),
-			blob(bytesFor(4), false, "containerd.io/gc.root", time.Now().String()),
+			blob(bytesFor(4), false, "containerd.io/gc.root", time.Now().UTC().Format(time.RFC3339)),
 			newSnapshot("1", "", false, false),
 			newSnapshot("2", "1", false, false),
 			newSnapshot("3", "2", false, false),

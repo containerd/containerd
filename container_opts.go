@@ -94,7 +94,7 @@ func WithNewSnapshot(id string, i Image) NewContainerOpts {
 		}
 		setSnapshotterIfEmpty(c)
 		labels := map[string]string{
-			"containerd.io/gc.root": time.Now().String(),
+			"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
 		}
 		parent := identity.ChainID(diffIDs).String()
 		if _, err := client.SnapshotService(c.Snapshotter).Prepare(ctx, id, parent, snapshot.WithLabels(labels)); err != nil {
@@ -127,7 +127,7 @@ func WithNewSnapshotView(id string, i Image) NewContainerOpts {
 		}
 		setSnapshotterIfEmpty(c)
 		labels := map[string]string{
-			"containerd.io/gc.root": time.Now().String(),
+			"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
 		}
 		parent := identity.ChainID(diffIDs).String()
 		if _, err := client.SnapshotService(c.Snapshotter).View(ctx, id, parent, snapshot.WithLabels(labels)); err != nil {
