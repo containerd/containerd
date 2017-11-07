@@ -72,11 +72,11 @@ type bundle struct {
 }
 
 // ShimOpt specifies shim options for initialization and connection
-type ShimOpt func(*bundle, string, *runcopts.RuncOptions) (shim.Config, client.ClientOpt)
+type ShimOpt func(*bundle, string, *runcopts.RuncOptions) (shim.Config, client.Opt)
 
 // ShimRemote is a ShimOpt for connecting and starting a remote shim
 func ShimRemote(shimBinary, daemonAddress, cgroup string, nonewns, debug bool, exitHandler func()) ShimOpt {
-	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (shim.Config, client.ClientOpt) {
+	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (shim.Config, client.Opt) {
 		return b.shimConfig(ns, ropts),
 			client.WithStart(shimBinary, b.shimAddress(ns), daemonAddress, cgroup, nonewns, debug, exitHandler)
 	}
@@ -84,14 +84,14 @@ func ShimRemote(shimBinary, daemonAddress, cgroup string, nonewns, debug bool, e
 
 // ShimLocal is a ShimOpt for using an in process shim implementation
 func ShimLocal(exchange *exchange.Exchange) ShimOpt {
-	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (shim.Config, client.ClientOpt) {
+	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (shim.Config, client.Opt) {
 		return b.shimConfig(ns, ropts), client.WithLocal(exchange)
 	}
 }
 
 // ShimConnect is a ShimOpt for connecting to an existing remote shim
 func ShimConnect() ShimOpt {
-	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (shim.Config, client.ClientOpt) {
+	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (shim.Config, client.Opt) {
 		return b.shimConfig(ns, ropts), client.WithConnect(b.shimAddress(ns))
 	}
 }

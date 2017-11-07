@@ -3,12 +3,19 @@
 package dialer
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"strings"
 	"syscall"
 	"time"
 )
+
+// DialAddress returns the address with unix:// prepended to the
+// provided address
+func DialAddress(address string) string {
+	return fmt.Sprintf("unix://%s", address)
+}
 
 func isNoent(err error) bool {
 	if err != nil {

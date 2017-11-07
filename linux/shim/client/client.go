@@ -31,11 +31,11 @@ import (
 
 var empty = &google_protobuf.Empty{}
 
-// ClientOpt is an option for a shim client configuration
-type ClientOpt func(context.Context, shim.Config) (shimapi.ShimClient, io.Closer, error)
+// Opt is an option for a shim client configuration
+type Opt func(context.Context, shim.Config) (shimapi.ShimClient, io.Closer, error)
 
 // WithStart executes a new shim process
-func WithStart(binary, address, daemonAddress, cgroup string, nonewns, debug bool, exitHandler func()) ClientOpt {
+func WithStart(binary, address, daemonAddress, cgroup string, nonewns, debug bool, exitHandler func()) Opt {
 	return func(ctx context.Context, config shim.Config) (_ shimapi.ShimClient, _ io.Closer, err error) {
 		socket, err := newSocket(address)
 		if err != nil {
@@ -164,7 +164,7 @@ func dialAddress(address string) string {
 }
 
 // WithConnect connects to an existing shim
-func WithConnect(address string) ClientOpt {
+func WithConnect(address string) Opt {
 	return func(ctx context.Context, config shim.Config) (shimapi.ShimClient, io.Closer, error) {
 		conn, err := connect(address, annonDialer)
 		if err != nil {
@@ -186,7 +186,7 @@ func WithLocal(publisher events.Publisher) func(context.Context, shim.Config) (s
 }
 
 // New returns a new shim client
-func New(ctx context.Context, config shim.Config, opt ClientOpt) (*Client, error) {
+func New(ctx context.Context, config shim.Config, opt Opt) (*Client, error) {
 	s, c, err := opt(ctx, config)
 	if err != nil {
 		return nil, err

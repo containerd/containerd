@@ -1,7 +1,6 @@
 package dialer
 
 import (
-	"fmt"
 	"net"
 	"time"
 
@@ -11,12 +10,6 @@ import (
 type dialResult struct {
 	c   net.Conn
 	err error
-}
-
-// DialAddress returns the address with unix:// prepended to the
-// provided address
-func DialAddress(address string) string {
-	return fmt.Sprintf("unix://%s", address)
 }
 
 // Dialer returns a GRPC net.Conn connected to the provided address

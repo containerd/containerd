@@ -71,7 +71,7 @@ func TestExchangeBasic(t *testing.T) {
 			cancel: cancel2,
 		},
 	} {
-		var received []Event
+		var received []events.Event
 	subscribercheck:
 		for {
 			select {
