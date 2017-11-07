@@ -1,4 +1,4 @@
-package events
+package exchange
 
 import (
 	"context"
@@ -8,8 +8,9 @@ import (
 	"testing"
 	"time"
 
-	events "github.com/containerd/containerd/api/services/events/v1"
+	v1 "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/typeurl"
 	"github.com/pkg/errors"
@@ -17,10 +18,10 @@ import (
 
 func TestExchangeBasic(t *testing.T) {
 	ctx := namespaces.WithNamespace(context.Background(), t.Name())
-	testevents := []Event{
-		&events.ContainerCreate{ID: "asdf"},
-		&events.ContainerCreate{ID: "qwer"},
-		&events.ContainerCreate{ID: "zxcv"},
+	testevents := []events.Event{
+		&v1.ContainerCreate{ID: "asdf"},
+		&v1.ContainerCreate{ID: "qwer"},
+		&v1.ContainerCreate{ID: "zxcv"},
 	}
 	exchange := NewExchange()
 
@@ -55,7 +56,7 @@ func TestExchangeBasic(t *testing.T) {
 	wg.Wait()
 
 	for _, subscriber := range []struct {
-		eventq <-chan *events.Envelope
+		eventq <-chan *v1.Envelope
 		errq   <-chan error
 		cancel func()
 	}{
@@ -70,7 +71,7 @@ func TestExchangeBasic(t *testing.T) {
 			cancel: cancel2,
 		},
 	} {
-		var received []Event
+		var received []events.Event
 	subscribercheck:
 		for {
 			select {
@@ -79,7 +80,7 @@ func TestExchangeBasic(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				received = append(received, ev.(*events.ContainerCreate))
+				received = append(received, ev.(*v1.ContainerCreate))
 			case err := <-subscriber.errq:
 				if err != nil {
 					t.Fatal(err)
@@ -117,7 +118,7 @@ func TestExchangeValidateTopic(t *testing.T) {
 		},
 	} {
 		t.Run(testcase.input, func(t *testing.T) {
-			event := &events.ContainerCreate{ID: t.Name()}
+			event := &v1.ContainerCreate{ID: t.Name()}
 			if err := exchange.Publish(ctx, testcase.input, event); errors.Cause(err) != testcase.err {
 				if err == nil {
 					t.Fatalf("expected error %v, received nil", testcase.err)
@@ -131,7 +132,7 @@ func TestExchangeValidateTopic(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			envelope := events.Envelope{
+			envelope := v1.Envelope{
 				Timestamp: time.Now().UTC(),
 				Namespace: namespace,
 				Topic:     testcase.input,

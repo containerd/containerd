@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -13,19 +14,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd"
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
+	"github.com/containerd/containerd/dialer"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/linux/shim"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/reaper"
-	"github.com/containerd/containerd/version"
 	"github.com/containerd/typeurl"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
 )
@@ -40,99 +39,81 @@ const usage = `
 shim for container lifecycle and reconnection
 `
 
+var (
+	debugFlag         bool
+	namespaceFlag     string
+	socketFlag        string
+	addressFlag       string
+	workdirFlag       string
+	runtimeRootFlag   string
+	criuFlag          string
+	systemdCgroupFlag bool
+)
+
+func init() {
+	flag.BoolVar(&debugFlag, "debug", false, "enable debug output in logs")
+	flag.StringVar(&namespaceFlag, "namespace", "", "namespace that owns the shim")
+	flag.StringVar(&socketFlag, "socket", "", "abstract socket path to serve")
+	flag.StringVar(&addressFlag, "address", "", "grpc address back to main containerd")
+	flag.StringVar(&workdirFlag, "workdir", "", "path used to storge large temporary data")
+	flag.StringVar(&runtimeRootFlag, "runtime-root", shim.RuncRoot, "root directory for the runtime")
+	flag.StringVar(&criuFlag, "criu", "", "path to criu binary")
+	flag.BoolVar(&systemdCgroupFlag, "systemd-cgroup", false, "set runtime to use systemd-cgroup")
+	flag.Parse()
+}
+
 func main() {
-	app := cli.NewApp()
-	app.Name = "containerd-shim"
-	app.Version = version.Version
-	app.Usage = usage
-	app.Flags = []cli.Flag{
-		cli.BoolFlag{
-			Name:  "debug",
-			Usage: "enable debug output in logs",
-		},
-		cli.StringFlag{
-			Name:  "namespace,n",
-			Usage: "namespace that owns the task",
-		},
-		cli.StringFlag{
-			Name:  "socket,s",
-			Usage: "abstract socket path to serve on",
-		},
-		cli.StringFlag{
-			Name:  "address,a",
-			Usage: "grpc address back to containerd",
-		},
-		cli.StringFlag{
-			Name:  "workdir,w",
-			Usage: "path used to store large temporary data",
-		},
-		cli.StringFlag{
-			Name:  "runtime-root",
-			Usage: "root directory for the runtime",
-			Value: shim.RuncRoot,
-		},
-		cli.StringFlag{
-			Name:  "criu,c",
-			Usage: "path to criu",
-		},
-		cli.BoolFlag{
-			Name:  "systemd-cgroup",
-			Usage: "set runtime to use systemd-cgroup",
-		},
+	if debugFlag {
+		logrus.SetLevel(logrus.DebugLevel)
 	}
-	app.Before = func(context *cli.Context) error {
-		if context.GlobalBool("debug") {
-			logrus.SetLevel(logrus.DebugLevel)
-		}
-		return nil
-	}
-	app.Action = func(context *cli.Context) error {
-		// start handling signals as soon as possible so that things are properly reaped
-		// or if runtime exits before we hit the handler
-		signals, err := setupSignals()
-		if err != nil {
-			return err
-		}
-		path, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		server := newServer()
-		e, err := connectEvents(context.GlobalString("address"))
-		if err != nil {
-			return err
-		}
-		sv, err := shim.NewService(
-			shim.Config{
-				Path:          path,
-				Namespace:     context.GlobalString("namespace"),
-				WorkDir:       context.GlobalString("workdir"),
-				Criu:          context.GlobalString("criu"),
-				SystemdCgroup: context.GlobalBool("systemd-cgroup"),
-				RuntimeRoot:   context.GlobalString("runtime-root"),
-			},
-			&remoteEventsPublisher{client: e},
-		)
-		if err != nil {
-			return err
-		}
-		logrus.Debug("registering grpc server")
-		shimapi.RegisterShimServer(server, sv)
-		socket := context.GlobalString("socket")
-		if err := serve(server, socket); err != nil {
-			return err
-		}
-		logger := logrus.WithFields(logrus.Fields{
-			"pid":       os.Getpid(),
-			"path":      path,
-			"namespace": context.GlobalString("namespace"),
-		})
-		return handleSignals(logger, signals, server, sv)
-	}
-	if err := app.Run(os.Args); err != nil {
+	if err := executeShim(); err != nil {
 		fmt.Fprintf(os.Stderr, "containerd-shim: %s\n", err)
 		os.Exit(1)
 	}
+}
+
+func executeShim() error {
+	// start handling signals as soon as possible so that things are properly reaped
+	// or if runtime exits before we hit the handler
+	signals, err := setupSignals()
+	if err != nil {
+		return err
+	}
+	path, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	server := newServer()
+	e, err := connectEvents(addressFlag)
+	if err != nil {
+		return err
+	}
+	sv, err := shim.NewService(
+		shim.Config{
+			Path:          path,
+			Namespace:     namespaceFlag,
+			WorkDir:       workdirFlag,
+			Criu:          criuFlag,
+			SystemdCgroup: systemdCgroupFlag,
+			RuntimeRoot:   runtimeRootFlag,
+		},
+		&remoteEventsPublisher{client: e},
+	)
+	if err != nil {
+		return err
+	}
+	logrus.Debug("registering grpc server")
+	shimapi.RegisterShimServer(server, sv)
+	socket := socketFlag
+	if err := serve(server, socket); err != nil {
+		return err
+	}
+	logger := logrus.WithFields(logrus.Fields{
+		"pid":       os.Getpid(),
+		"path":      path,
+		"namespace": namespaceFlag,
+	})
+	return handleSignals(logger, signals, server, sv)
 }
 
 // serve serves the grpc API over a unix socket at the provided path
@@ -212,7 +193,7 @@ func dumpStacks(logger *logrus.Entry) {
 }
 
 func connectEvents(address string) (eventsapi.EventsClient, error) {
-	conn, err := connect(address, containerd.Dialer)
+	conn, err := connect(address, dialer.Dialer)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to dial %q", address)
 	}
@@ -228,7 +209,7 @@ func connect(address string, d func(string, time.Duration) (net.Conn, error)) (*
 		grpc.FailOnNonTempDialError(true),
 		grpc.WithBackoffMaxDelay(3 * time.Second),
 	}
-	conn, err := grpc.Dial(containerd.DialAddress(address), gopts...)
+	conn, err := grpc.Dial(dialer.DialAddress(address), gopts...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to dial %q", address)
 	}

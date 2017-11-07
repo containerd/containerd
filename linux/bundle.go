@@ -9,9 +9,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/linux/runcopts"
-	client "github.com/containerd/containerd/linux/shim"
+	"github.com/containerd/containerd/linux/shim"
+	"github.com/containerd/containerd/linux/shim/client"
 	"github.com/pkg/errors"
 )
 
@@ -71,26 +72,26 @@ type bundle struct {
 }
 
 // ShimOpt specifies shim options for initialization and connection
-type ShimOpt func(*bundle, string, *runcopts.RuncOptions) (client.Config, client.ClientOpt)
+type ShimOpt func(*bundle, string, *runcopts.RuncOptions) (shim.Config, client.Opt)
 
 // ShimRemote is a ShimOpt for connecting and starting a remote shim
-func ShimRemote(shim, daemonAddress, cgroup string, nonewns, debug bool, exitHandler func()) ShimOpt {
-	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (client.Config, client.ClientOpt) {
+func ShimRemote(shimBinary, daemonAddress, cgroup string, nonewns, debug bool, exitHandler func()) ShimOpt {
+	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (shim.Config, client.Opt) {
 		return b.shimConfig(ns, ropts),
-			client.WithStart(shim, b.shimAddress(ns), daemonAddress, cgroup, nonewns, debug, exitHandler)
+			client.WithStart(shimBinary, b.shimAddress(ns), daemonAddress, cgroup, nonewns, debug, exitHandler)
 	}
 }
 
 // ShimLocal is a ShimOpt for using an in process shim implementation
-func ShimLocal(exchange *events.Exchange) ShimOpt {
-	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (client.Config, client.ClientOpt) {
+func ShimLocal(exchange *exchange.Exchange) ShimOpt {
+	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (shim.Config, client.Opt) {
 		return b.shimConfig(ns, ropts), client.WithLocal(exchange)
 	}
 }
 
 // ShimConnect is a ShimOpt for connecting to an existing remote shim
 func ShimConnect() ShimOpt {
-	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (client.Config, client.ClientOpt) {
+	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (shim.Config, client.Opt) {
 		return b.shimConfig(ns, ropts), client.WithConnect(b.shimAddress(ns))
 	}
 }
@@ -119,7 +120,7 @@ func (b *bundle) shimAddress(namespace string) string {
 	return filepath.Join(string(filepath.Separator), "containerd-shim", namespace, b.id, "shim.sock")
 }
 
-func (b *bundle) shimConfig(namespace string, runcOptions *runcopts.RuncOptions) client.Config {
+func (b *bundle) shimConfig(namespace string, runcOptions *runcopts.RuncOptions) shim.Config {
 	var (
 		criuPath      string
 		runtimeRoot   string
@@ -130,7 +131,7 @@ func (b *bundle) shimConfig(namespace string, runcOptions *runcopts.RuncOptions)
 		systemdCgroup = runcOptions.SystemdCgroup
 		runtimeRoot = runcOptions.RuntimeRoot
 	}
-	return client.Config{
+	return shim.Config{
 		Path:          b.path,
 		WorkDir:       b.workDir,
 		Namespace:     namespace,
