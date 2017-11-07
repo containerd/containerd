@@ -262,7 +262,7 @@ func (c *container) readSpec() (*specs.Spec, error) {
 
 func (c *container) Delete() error {
 	var err error
-	args := append(c.runtimeArgs, "delete", c.id)
+	args := append(c.runtimeArgs, "delete", "--force", c.id)
 	if b, derr := exec.Command(c.runtime, args...).CombinedOutput(); derr != nil && !strings.Contains(string(b), "does not exist") {
 		err = fmt.Errorf("%s: %q", derr, string(b))
 	}
