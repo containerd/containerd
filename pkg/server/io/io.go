@@ -333,7 +333,7 @@ func (c *ContainerIO) Attach(opts AttachOptions) error {
 		}
 		go attachStream(stdoutKey, close)
 	}
-	if opts.Tty && opts.Stderr != nil {
+	if !opts.Tty && opts.Stderr != nil {
 		wg.Add(1)
 		wc, close := cioutil.NewWriteCloseInformer(opts.Stderr)
 		if err := c.stderr.Add(stderrKey, wc); err != nil {
