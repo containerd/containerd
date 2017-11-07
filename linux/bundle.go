@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/linux/runcopts"
 	client "github.com/containerd/containerd/linux/shim"
 	"github.com/pkg/errors"
@@ -82,7 +82,7 @@ func ShimRemote(shim, daemonAddress, cgroup string, nonewns, debug bool, exitHan
 }
 
 // ShimLocal is a ShimOpt for using an in process shim implementation
-func ShimLocal(exchange *events.Exchange) ShimOpt {
+func ShimLocal(exchange *exchange.Exchange) ShimOpt {
 	return func(b *bundle, ns string, ropts *runcopts.RuncOptions) (client.Config, client.ClientOpt) {
 		return b.shimConfig(ns, ropts), client.WithLocal(exchange)
 	}

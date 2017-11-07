@@ -22,7 +22,7 @@ import (
 	version "github.com/containerd/containerd/api/services/version/v1"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/content/local"
-	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
@@ -65,7 +65,7 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 		services []plugin.Service
 		s        = &Server{
 			rpc:    rpc,
-			events: events.NewExchange(),
+			events: exchange.NewExchange(),
 		}
 		initialized = plugin.NewPluginSet()
 	)
@@ -122,7 +122,7 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 // Server is the containerd main daemon
 type Server struct {
 	rpc    *grpc.Server
-	events *events.Exchange
+	events *exchange.Exchange
 }
 
 // ServeGRPC provides the containerd grpc APIs on the provided listener

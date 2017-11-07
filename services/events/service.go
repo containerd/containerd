@@ -3,7 +3,7 @@ package events
 import (
 	api "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/plugin"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
@@ -22,11 +22,11 @@ func init() {
 }
 
 type service struct {
-	events *events.Exchange
+	events *exchange.Exchange
 }
 
 // NewService returns the GRPC events server
-func NewService(events *events.Exchange) api.EventsServer {
+func NewService(events *exchange.Exchange) api.EventsServer {
 	return &service{events: events}
 }
 
