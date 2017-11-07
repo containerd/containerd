@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
+	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
 )
 
 func TestToCRIContainer(t *testing.T) {
@@ -168,25 +169,40 @@ func (c containerForTest) toContainer() (containerstore.Container, error) {
 
 func TestListContainers(t *testing.T) {
 	c := newTestCRIContainerdService()
-
+	sandboxesInStore := []sandboxstore.Sandbox{
+		{
+			Metadata: sandboxstore.Metadata{
+				ID:     "s-1abcdef1234",
+				Name:   "sandboxname-1",
+				Config: &runtime.PodSandboxConfig{Metadata: &runtime.PodSandboxMetadata{Name: "podname-1"}},
+			},
+		},
+		{
+			Metadata: sandboxstore.Metadata{
+				ID:     "s-2abcdef1234",
+				Name:   "sandboxname-2",
+				Config: &runtime.PodSandboxConfig{Metadata: &runtime.PodSandboxMetadata{Name: "podname-2"}},
+			},
+		},
+	}
 	createdAt := time.Now().UnixNano()
 	startedAt := time.Now().UnixNano()
 	finishedAt := time.Now().UnixNano()
 	containersInStore := []containerForTest{
 		{
 			metadata: containerstore.Metadata{
-				ID:        "1",
+				ID:        "c-1container",
 				Name:      "name-1",
-				SandboxID: "s-1",
+				SandboxID: "s-1abcdef1234",
 				Config:    &runtime.ContainerConfig{Metadata: &runtime.ContainerMetadata{Name: "name-1"}},
 			},
 			status: containerstore.Status{CreatedAt: createdAt},
 		},
 		{
 			metadata: containerstore.Metadata{
-				ID:        "2",
+				ID:        "c-2container",
 				Name:      "name-2",
-				SandboxID: "s-1",
+				SandboxID: "s-1abcdef1234",
 				Config:    &runtime.ContainerConfig{Metadata: &runtime.ContainerMetadata{Name: "name-2"}},
 			},
 			status: containerstore.Status{
@@ -196,9 +212,9 @@ func TestListContainers(t *testing.T) {
 		},
 		{
 			metadata: containerstore.Metadata{
-				ID:        "3",
+				ID:        "c-3container",
 				Name:      "name-3",
-				SandboxID: "s-1",
+				SandboxID: "s-1abcdef1234",
 				Config:    &runtime.ContainerConfig{Metadata: &runtime.ContainerMetadata{Name: "name-3"}},
 			},
 			status: containerstore.Status{
@@ -209,9 +225,9 @@ func TestListContainers(t *testing.T) {
 		},
 		{
 			metadata: containerstore.Metadata{
-				ID:        "4",
+				ID:        "c-4container",
 				Name:      "name-4",
-				SandboxID: "s-2",
+				SandboxID: "s-2abcdef1234",
 				Config:    &runtime.ContainerConfig{Metadata: &runtime.ContainerMetadata{Name: "name-4"}},
 			},
 			status: containerstore.Status{
@@ -219,46 +235,105 @@ func TestListContainers(t *testing.T) {
 			},
 		},
 	}
-	filter := &runtime.ContainerFilter{
-		PodSandboxId: "s-1",
-	}
-	expect := []*runtime.Container{
+
+	expectedContainers := []*runtime.Container{
 		{
-			Id:           "1",
-			PodSandboxId: "s-1",
+			Id:           "c-1container",
+			PodSandboxId: "s-1abcdef1234",
 			Metadata:     &runtime.ContainerMetadata{Name: "name-1"},
 			State:        runtime.ContainerState_CONTAINER_CREATED,
 			CreatedAt:    createdAt,
 		},
 		{
-			Id:           "2",
-			PodSandboxId: "s-1",
+			Id:           "c-2container",
+			PodSandboxId: "s-1abcdef1234",
 			Metadata:     &runtime.ContainerMetadata{Name: "name-2"},
 			State:        runtime.ContainerState_CONTAINER_RUNNING,
 			CreatedAt:    createdAt,
 		},
 		{
-			Id:           "3",
-			PodSandboxId: "s-1",
+			Id:           "c-3container",
+			PodSandboxId: "s-1abcdef1234",
 			Metadata:     &runtime.ContainerMetadata{Name: "name-3"},
 			State:        runtime.ContainerState_CONTAINER_EXITED,
 			CreatedAt:    createdAt,
 		},
+		{
+			Id:           "c-4container",
+			PodSandboxId: "s-2abcdef1234",
+			Metadata:     &runtime.ContainerMetadata{Name: "name-4"},
+			State:        runtime.ContainerState_CONTAINER_CREATED,
+			CreatedAt:    createdAt,
+		},
 	}
 
-	// Inject test metadata
+	// Inject test sandbox metadata
+	for _, sb := range sandboxesInStore {
+		assert.NoError(t, c.sandboxStore.Add(sb))
+	}
+
+	// Inject test container metadata
 	for _, cntr := range containersInStore {
 		container, err := cntr.toContainer()
 		assert.NoError(t, err)
 		assert.NoError(t, c.containerStore.Add(container))
 	}
 
-	resp, err := c.ListContainers(context.Background(), &runtime.ListContainersRequest{Filter: filter})
-	assert.NoError(t, err)
-	require.NotNil(t, resp)
-	containers := resp.GetContainers()
-	assert.Len(t, containers, len(expect))
-	for _, cntr := range expect {
-		assert.Contains(t, containers, cntr)
+	for testdesc, testdata := range map[string]struct {
+		filter *runtime.ContainerFilter
+		expect []*runtime.Container
+	}{
+		"test without filter": {
+			filter: &runtime.ContainerFilter{},
+			expect: expectedContainers,
+		},
+		"test filter by sandboxid": {
+			filter: &runtime.ContainerFilter{
+				PodSandboxId: "s-1abcdef1234",
+			},
+			expect: expectedContainers[:3],
+		},
+		"test filter by truncated sandboxid": {
+			filter: &runtime.ContainerFilter{
+				PodSandboxId: "s-1",
+			},
+			expect: expectedContainers[:3],
+		},
+		"test filter by containerid": {
+			filter: &runtime.ContainerFilter{
+				Id: "c-1container",
+			},
+			expect: expectedContainers[:1],
+		},
+		"test filter by truncated containerid": {
+			filter: &runtime.ContainerFilter{
+				Id: "c-1",
+			},
+			expect: expectedContainers[:1],
+		},
+		"test filter by containerid and sandboxid": {
+			filter: &runtime.ContainerFilter{
+				Id:           "c-1container",
+				PodSandboxId: "s-1abcdef1234",
+			},
+			expect: expectedContainers[:1],
+		},
+		"test filter by truncated containerid and truncated sandboxid": {
+			filter: &runtime.ContainerFilter{
+				Id:           "c-1",
+				PodSandboxId: "s-1",
+			},
+			expect: expectedContainers[:1],
+		},
+	} {
+		t.Logf("TestCase: %s", testdesc)
+		resp, err := c.ListContainers(context.Background(), &runtime.ListContainersRequest{Filter: testdata.filter})
+		assert.NoError(t, err)
+		require.NotNil(t, resp)
+		containers := resp.GetContainers()
+		assert.Len(t, containers, len(testdata.expect))
+		for _, cntr := range testdata.expect {
+			assert.Contains(t, containers, cntr)
+		}
 	}
 }

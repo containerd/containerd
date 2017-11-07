@@ -84,12 +84,19 @@ func toCRISandbox(meta sandboxstore.Metadata, state runtime.PodSandboxState, cre
 	}
 }
 
+func (c *criContainerdService) normalizePodSandboxFilter(filter *runtime.PodSandboxFilter) {
+	if sb, err := c.sandboxStore.Get(filter.GetId()); err == nil {
+		filter.Id = sb.ID
+	}
+}
+
 // filterCRISandboxes filters CRISandboxes.
 func (c *criContainerdService) filterCRISandboxes(sandboxes []*runtime.PodSandbox, filter *runtime.PodSandboxFilter) []*runtime.PodSandbox {
 	if filter == nil {
 		return sandboxes
 	}
 
+	c.normalizePodSandboxFilter(filter)
 	filtered := []*runtime.PodSandbox{}
 	for _, s := range sandboxes {
 		// Filter by id
