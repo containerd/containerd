@@ -26,23 +26,6 @@ type Layer struct {
 	Blob ocispec.Descriptor
 }
 
-// ApplyLayers applies all the layers using the given snapshotter and applier.
-// The returned result is a chain id digest representing all the applied layers.
-// Layers are applied in order they are given, making the first layer the
-// bottom-most layer in the layer chain.
-func ApplyLayers(ctx context.Context, layers []Layer, sn snapshot.Snapshotter, a diff.Differ) (digest.Digest, error) {
-	var chain []digest.Digest
-	for _, layer := range layers {
-		if _, err := ApplyLayer(ctx, layer, chain, sn, a); err != nil {
-			// TODO: possibly wait and retry if extraction of same chain id was in progress
-			return "", err
-		}
-
-		chain = append(chain, layer.Diff.Digest)
-	}
-	return identity.ChainID(chain), nil
-}
-
 // ApplyLayer applies a single layer on top of the given provided layer chain,
 // using the provided snapshotter and applier. If the layer was unpacked true
 // is returned, if the layer already exists false is returned.
