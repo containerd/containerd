@@ -1,0 +1,51 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+
+# previous release
+previous = "v1.0.0-beta.2"
+
+pre_release = true
+
+preface = """\
+After rounding out the feature set in beta.2, we have taken a number of stability fixes.
+
+This release contains mostly bug fixes, code cleanup and improvements to useability of
+the client and ctr tool."""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+  [notes.ctr]
+  title= "`ctr` makeover"
+  description = """\
+`ctr` is getting a ~makeover~! The end goal is for commands to be consistent and scoped.
+Most notably:
+- `push`, `pull` are now `images` subcommands: `ctr images push`, `ctr images pull`
+- `fetch`, `fetch-object`, and `push-object` are `content` subcommands
+- `rootfs unpack` is now `snapshot unpack`
+- `apply` no longer exists. RIP"""
+
+  [notes.gc]
+  title= "Garbage collector improvements"
+  description = """\
+The garbage collector continues to improve with this release, including bug
+fixes on the client causing races and a new lease feature for making retention
+from the client easier.
+
+The lease API was added to make it easier for clients to prevent content and
+snapshots from being garbage collected while they are being actively worked on
+(such as from pull, import, or checkpoint). The API includes functions for
+creating, deleting, and listing leases. The lease gets attached to the context
+and the backend metadata store sees it and associates newly created content
+and snapshots with that lease.
+
+Leases are currently acquired and released automatically through the client.
+From the user perspective, fewer `gc.root` labels should be seen on client
+during pull/import operations or left over after a failed operation."""
+
+
+
+[breaking]
