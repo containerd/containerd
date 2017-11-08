@@ -93,7 +93,7 @@ var Command = cli.Command{
 			return w.Flush()
 		}
 
-		fmt.Fprintln(w, "TYPE\tID\tPLATFORM\tSTATUS\t")
+		fmt.Fprintln(w, "TYPE\tID\tPLATFORMS\tSTATUS\t")
 		for _, plugin := range response.Plugins {
 			status := "ok"
 
