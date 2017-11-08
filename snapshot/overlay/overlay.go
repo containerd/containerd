@@ -124,12 +124,13 @@ func (o *snapshotter) Usage(ctx context.Context, key string) (snapshot.Usage, er
 		return snapshot.Usage{}, err
 	}
 	id, info, usage, err := storage.GetInfo(ctx, key)
+	t.Rollback() // transaction no longer needed at this point.
+
 	if err != nil {
 		return snapshot.Usage{}, err
 	}
 
 	upperPath := o.upperPath(id)
-	t.Rollback() // transaction no longer needed at this point.
 
 	if info.Kind == snapshot.KindActive {
 		du, err := fs.DiskUsage(upperPath)
