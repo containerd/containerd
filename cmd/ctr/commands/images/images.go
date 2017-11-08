@@ -70,7 +70,7 @@ var listCommand = cli.Command{
 			return nil
 		}
 		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
-		fmt.Fprintln(tw, "REF\tTYPE\tDIGEST\tSIZE\tPLATFORM\tLABELS\t")
+		fmt.Fprintln(tw, "REF\tTYPE\tDIGEST\tSIZE\tPLATFORMS\tLABELS\t")
 		for _, image := range imageList {
 			size, err := image.Size(ctx, cs, platforms.Default())
 			if err != nil {
