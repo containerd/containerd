@@ -46,6 +46,55 @@ func scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
 		nbkt := v1bkt.Bucket(k)
 		ns := string(k)
 
+		lbkt := nbkt.Bucket(bucketKeyObjectLeases)
+		if lbkt != nil {
+			if err := lbkt.ForEach(func(k, v []byte) error {
+				if v != nil {
+					return nil
+				}
+				libkt := lbkt.Bucket(k)
+
+				cbkt := libkt.Bucket(bucketKeyObjectContent)
+				if cbkt != nil {
+					if err := cbkt.ForEach(func(k, v []byte) error {
+						select {
+						case nc <- gcnode(ResourceContent, ns, string(k)):
+						case <-ctx.Done():
+							return ctx.Err()
+						}
+						return nil
+					}); err != nil {
+						return err
+					}
+				}
+
+				sbkt := libkt.Bucket(bucketKeyObjectSnapshots)
+				if sbkt != nil {
+					if err := sbkt.ForEach(func(sk, sv []byte) error {
+						if sv != nil {
+							return nil
+						}
+						snbkt := sbkt.Bucket(sk)
+
+						return snbkt.ForEach(func(k, v []byte) error {
+							select {
+							case nc <- gcnode(ResourceSnapshot, ns, fmt.Sprintf("%s/%s", sk, k)):
+							case <-ctx.Done():
+								return ctx.Err()
+							}
+							return nil
+						})
+					}); err != nil {
+						return err
+					}
+				}
+
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+
 		ibkt := nbkt.Bucket(bucketKeyObjectImages)
 		if ibkt != nil {
 			if err := ibkt.ForEach(func(k, v []byte) error {
