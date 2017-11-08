@@ -223,6 +223,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	if seccompSpecOpts != nil {
 		specOpts = append(specOpts, seccompSpecOpts)
 	}
+	containerLabels := buildLabels(config.Labels, containerKindContainer)
 
 	opts = append(opts,
 		containerd.WithSpec(spec, specOpts...),
@@ -232,7 +233,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 				Runtime:       c.config.ContainerdConfig.RuntimeEngine,
 				RuntimeRoot:   c.config.ContainerdConfig.RuntimeRoot,
 				SystemdCgroup: c.config.SystemdCgroup}), // TODO (mikebrow): add CriuPath when we add support for pause
-		containerd.WithContainerLabels(map[string]string{containerKindLabel: containerKindContainer}),
+		containerd.WithContainerLabels(containerLabels),
 		containerd.WithContainerExtension(containerMetadataExtension, &meta))
 	var cntr containerd.Container
 	if cntr, err = c.client.NewContainer(ctx, id, opts...); err != nil {

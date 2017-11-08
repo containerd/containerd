@@ -143,12 +143,14 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		specOpts = append(specOpts, seccompSpecOpts)
 	}
 
+	sandboxLabels := buildLabels(config.Labels, containerKindSandbox)
+
 	opts := []containerd.NewContainerOpts{
 		containerd.WithSnapshotter(c.config.ContainerdConfig.Snapshotter),
 		customopts.WithImageUnpack(image.Image),
 		containerd.WithNewSnapshot(id, image.Image),
 		containerd.WithSpec(spec, specOpts...),
-		containerd.WithContainerLabels(map[string]string{containerKindLabel: containerKindSandbox}),
+		containerd.WithContainerLabels(sandboxLabels),
 		containerd.WithContainerExtension(sandboxMetadataExtension, &sandbox.Metadata),
 		containerd.WithRuntime(
 			c.config.ContainerdConfig.Runtime,

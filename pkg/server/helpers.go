@@ -381,3 +381,13 @@ func isInCRIMounts(dst string, mounts []*runtime.Mount) bool {
 func filterLabel(k, v string) string {
 	return fmt.Sprintf("labels.%q==%q", k, v)
 }
+
+// buildLabel builds the labels from config to be passed to containerd
+func buildLabels(configLabels map[string]string, containerType string) map[string]string {
+	labels := make(map[string]string)
+	for k, v := range configLabels {
+		labels[k] = v
+	}
+	labels[containerKindLabel] = containerType
+	return labels
+}
