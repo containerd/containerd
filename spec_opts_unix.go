@@ -16,6 +16,7 @@ import (
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/fs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
@@ -260,12 +261,13 @@ func withRemappedSnapshotBase(id string, i Image, uid, gid uint32, readonly bool
 			usernsID    = fmt.Sprintf("%s-%d-%d", parent, uid, gid)
 		)
 		if _, err := snapshotter.Stat(ctx, usernsID); err == nil {
-			if _, err := snapshotter.Prepare(ctx, id, usernsID); err != nil {
+			if _, err := snapshotter.Prepare(ctx, id, usernsID); err == nil {
+				c.SnapshotKey = id
+				c.Image = i.Name()
+				return nil
+			} else if !errdefs.IsNotFound(err) {
 				return err
 			}
-			c.SnapshotKey = id
-			c.Image = i.Name()
-			return nil
 		}
 		mounts, err := snapshotter.Prepare(ctx, usernsID+"-remap", parent)
 		if err != nil {
