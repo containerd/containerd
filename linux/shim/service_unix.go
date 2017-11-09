@@ -3,13 +3,13 @@
 package shim
 
 import (
+	"context"
 	"io"
 	"sync"
 	"syscall"
 
 	"github.com/containerd/console"
 	"github.com/containerd/fifo"
-	"golang.org/x/net/context"
 )
 
 type unixPlatform struct {

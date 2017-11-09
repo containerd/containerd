@@ -96,7 +96,19 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*sh
 		s.config.Criu,
 		s.config.SystemdCgroup,
 		s.platform,
-		r,
+		&proc.CreateConfig{
+			ID:               r.ID,
+			Bundle:           r.Bundle,
+			Runtime:          r.Runtime,
+			Rootfs:           r.Rootfs,
+			Terminal:         r.Terminal,
+			Stdin:            r.Stdin,
+			Stdout:           r.Stdout,
+			Stderr:           r.Stderr,
+			Checkpoint:       r.Checkpoint,
+			ParentCheckpoint: r.ParentCheckpoint,
+			Options:          r.Options,
+		},
 	)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
@@ -185,7 +197,14 @@ func (s *Service) Exec(ctx context.Context, r *shimapi.ExecProcessRequest) (*goo
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
 
-	process, err := p.(*proc.Init).Exec(ctx, s.config.Path, r)
+	process, err := p.(*proc.Init).Exec(ctx, s.config.Path, &proc.ExecConfig{
+		ID:       r.ID,
+		Terminal: r.Terminal,
+		Stdin:    r.Stdin,
+		Stdout:   r.Stdout,
+		Stderr:   r.Stderr,
+		Spec:     r.Spec,
+	})
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -362,7 +381,10 @@ func (s *Service) Checkpoint(ctx context.Context, r *shimapi.CheckpointTaskReque
 	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
-	if err := p.(*proc.Init).Checkpoint(ctx, r); err != nil {
+	if err := p.(*proc.Init).Checkpoint(ctx, &proc.CheckpointConfig{
+		Path:    r.Path,
+		Options: r.Options,
+	}); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 	return empty, nil
@@ -383,7 +405,7 @@ func (s *Service) Update(ctx context.Context, r *shimapi.UpdateTaskRequest) (*go
 	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
-	if err := p.(*proc.Init).Update(ctx, r); err != nil {
+	if err := p.(*proc.Init).Update(ctx, r.Resources); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 	return empty, nil

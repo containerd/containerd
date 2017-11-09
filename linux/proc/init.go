@@ -16,12 +16,12 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/linux/runctypes"
-	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
+	google_protobuf "github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
@@ -78,7 +78,7 @@ func NewRunc(root, path, namespace, runtime, criu string, systemd bool) *runc.Ru
 }
 
 // New returns a new init process
-func New(context context.Context, path, workDir, runtimeRoot, namespace, criu string, systemdCgroup bool, platform Platform, r *shimapi.CreateTaskRequest) (*Init, error) {
+func New(context context.Context, path, workDir, runtimeRoot, namespace, criu string, systemdCgroup bool, platform Platform, r *CreateConfig) (*Init, error) {
 	var success bool
 
 	var options runctypes.CreateOptions
@@ -347,7 +347,7 @@ func (p *Init) Runtime() *runc.Runc {
 }
 
 // Exec returns a new exec'd process
-func (p *Init) Exec(context context.Context, path string, r *shimapi.ExecProcessRequest) (Process, error) {
+func (p *Init) Exec(context context.Context, path string, r *ExecConfig) (Process, error) {
 	// process exec request
 	var spec specs.Process
 	if err := json.Unmarshal(r.Spec.Value, &spec); err != nil {
@@ -372,7 +372,7 @@ func (p *Init) Exec(context context.Context, path string, r *shimapi.ExecProcess
 	return e, nil
 }
 
-func (p *Init) checkpoint(context context.Context, r *shimapi.CheckpointTaskRequest) error {
+func (p *Init) checkpoint(context context.Context, r *CheckpointConfig) error {
 	var options runctypes.CheckpointOptions
 	if r.Options != nil {
 		v, err := typeurl.UnmarshalAny(r.Options)
@@ -405,9 +405,9 @@ func (p *Init) checkpoint(context context.Context, r *shimapi.CheckpointTaskRequ
 	return nil
 }
 
-func (p *Init) update(context context.Context, r *shimapi.UpdateTaskRequest) error {
+func (p *Init) update(context context.Context, r *google_protobuf.Any) error {
 	var resources specs.LinuxResources
-	if err := json.Unmarshal(r.Resources.Value, &resources); err != nil {
+	if err := json.Unmarshal(r.Value, &resources); err != nil {
 		return err
 	}
 	return p.runtime.Update(context, p.id, &resources)

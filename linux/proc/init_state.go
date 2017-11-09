@@ -9,9 +9,9 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/errdefs"
-	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
+	google_protobuf "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 )
 
@@ -20,8 +20,8 @@ type initState interface {
 
 	Pause(context.Context) error
 	Resume(context.Context) error
-	Update(context.Context, *shimapi.UpdateTaskRequest) error
-	Checkpoint(context.Context, *shimapi.CheckpointTaskRequest) error
+	Update(context.Context, *google_protobuf.Any) error
+	Checkpoint(context.Context, *CheckpointConfig) error
 }
 
 type createdState struct {
@@ -56,14 +56,14 @@ func (s *createdState) Resume(ctx context.Context) error {
 	return errors.Errorf("cannot resume task in created state")
 }
 
-func (s *createdState) Update(context context.Context, r *shimapi.UpdateTaskRequest) error {
+func (s *createdState) Update(context context.Context, r *google_protobuf.Any) error {
 	s.p.mu.Lock()
 	defer s.p.mu.Unlock()
 
 	return s.p.update(context, r)
 }
 
-func (s *createdState) Checkpoint(context context.Context, r *shimapi.CheckpointTaskRequest) error {
+func (s *createdState) Checkpoint(context context.Context, r *CheckpointConfig) error {
 	s.p.mu.Lock()
 	defer s.p.mu.Unlock()
 
@@ -146,14 +146,14 @@ func (s *createdCheckpointState) Resume(ctx context.Context) error {
 	return errors.Errorf("cannot resume task in created state")
 }
 
-func (s *createdCheckpointState) Update(context context.Context, r *shimapi.UpdateTaskRequest) error {
+func (s *createdCheckpointState) Update(context context.Context, r *google_protobuf.Any) error {
 	s.p.mu.Lock()
 	defer s.p.mu.Unlock()
 
 	return s.p.update(context, r)
 }
 
-func (s *createdCheckpointState) Checkpoint(context context.Context, r *shimapi.CheckpointTaskRequest) error {
+func (s *createdCheckpointState) Checkpoint(context context.Context, r *CheckpointConfig) error {
 	s.p.mu.Lock()
 	defer s.p.mu.Unlock()
 
@@ -259,14 +259,14 @@ func (s *runningState) Resume(ctx context.Context) error {
 	return errors.Errorf("cannot resume a running process")
 }
 
-func (s *runningState) Update(context context.Context, r *shimapi.UpdateTaskRequest) error {
+func (s *runningState) Update(context context.Context, r *google_protobuf.Any) error {
 	s.p.mu.Lock()
 	defer s.p.mu.Unlock()
 
 	return s.p.update(context, r)
 }
 
-func (s *runningState) Checkpoint(ctx context.Context, r *shimapi.CheckpointTaskRequest) error {
+func (s *runningState) Checkpoint(ctx context.Context, r *CheckpointConfig) error {
 	s.p.mu.Lock()
 	defer s.p.mu.Unlock()
 
@@ -345,14 +345,14 @@ func (s *pausedState) Resume(ctx context.Context) error {
 	return s.transition("running")
 }
 
-func (s *pausedState) Update(context context.Context, r *shimapi.UpdateTaskRequest) error {
+func (s *pausedState) Update(context context.Context, r *google_protobuf.Any) error {
 	s.p.mu.Lock()
 	defer s.p.mu.Unlock()
 
 	return s.p.update(context, r)
 }
 
-func (s *pausedState) Checkpoint(ctx context.Context, r *shimapi.CheckpointTaskRequest) error {
+func (s *pausedState) Checkpoint(ctx context.Context, r *CheckpointConfig) error {
 	s.p.mu.Lock()
 	defer s.p.mu.Unlock()
 
@@ -427,14 +427,14 @@ func (s *stoppedState) Resume(ctx context.Context) error {
 	return errors.Errorf("cannot resume a stopped container")
 }
 
-func (s *stoppedState) Update(context context.Context, r *shimapi.UpdateTaskRequest) error {
+func (s *stoppedState) Update(context context.Context, r *google_protobuf.Any) error {
 	s.p.mu.Lock()
 	defer s.p.mu.Unlock()
 
 	return errors.Errorf("cannot update a stopped container")
 }
 
-func (s *stoppedState) Checkpoint(ctx context.Context, r *shimapi.CheckpointTaskRequest) error {
+func (s *stoppedState) Checkpoint(ctx context.Context, r *CheckpointConfig) error {
 	s.p.mu.Lock()
 	defer s.p.mu.Unlock()
 
