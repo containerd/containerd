@@ -22,6 +22,7 @@ import (
 	versionservice "github.com/containerd/containerd/api/services/version/v1"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/dialer"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
@@ -72,7 +73,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 		grpc.WithTimeout(60 * time.Second),
 		grpc.FailOnNonTempDialError(true),
 		grpc.WithBackoffMaxDelay(3 * time.Second),
-		grpc.WithDialer(Dialer),
+		grpc.WithDialer(dialer.Dialer),
 	}
 	if len(copts.dialOptions) > 0 {
 		gopts = copts.dialOptions
@@ -84,7 +85,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 			grpc.WithStreamInterceptor(stream),
 		)
 	}
-	conn, err := grpc.Dial(DialAddress(address), gopts...)
+	conn, err := grpc.Dial(dialer.DialAddress(address), gopts...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to dial %q", address)
 	}
@@ -137,6 +138,12 @@ func (c *Client) Containers(ctx context.Context, filters ...string) ([]Container
 // NewContainer will create a new container in container with the provided id
 // the id must be unique within the namespace
 func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error) {
+	ctx, done, err := c.withLease(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+
 	container := containers.Container{
 		ID: id,
 		Runtime: containers.RuntimeInfo{
@@ -212,6 +219,12 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 	}
 	store := c.ContentStore()
 
+	ctx, done, err := c.withLease(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+
 	name, desc, err := pullCtx.Resolver.Resolve(ctx, ref)
 	if err != nil {
 		return nil, err
@@ -230,7 +243,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 		handler = images.Handlers(append(pullCtx.BaseHandlers, schema1Converter)...)
 	} else {
 		handler = images.Handlers(append(pullCtx.BaseHandlers,
-			remotes.FetchHandler(store, fetcher, desc),
+			remotes.FetchHandler(store, fetcher),
 			images.ChildrenHandler(store, platforms.Default()))...,
 		)
 	}
@@ -265,11 +278,6 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 		imgrec = updated
 	} else {
 		imgrec = created
-	}
-
-	// Remove root tag from manifest now that image refers to it
-	if _, err := store.Update(ctx, content.Info{Digest: desc.Digest}, "labels.containerd.io/gc.root"); err != nil {
-		return nil, errors.Wrap(err, "failed to remove manifest root tag")
 	}
 
 	img := &image{
@@ -583,6 +591,13 @@ func (c *Client) Import(ctx context.Context, ref string, reader io.Reader, opts 
 	if err != nil {
 		return nil, err
 	}
+
+	ctx, done, err := c.withLease(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+
 	switch iopts.format {
 	case ociImageFormat:
 		return c.importFromOCITar(ctx, ref, reader, iopts)

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -18,7 +18,7 @@ type InitContext struct {
 	State   string
 	Config  interface{}
 	Address string
-	Events  *events.Exchange
+	Events  *exchange.Exchange
 
 	Meta *Meta // plugins can fill in metadata at init.
 

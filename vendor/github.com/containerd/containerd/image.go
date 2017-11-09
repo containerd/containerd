@@ -3,7 +3,6 @@ package containerd
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
@@ -102,25 +101,12 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
 	)
 	for _, layer := range layers {
 		labels := map[string]string{
-			"containerd.io/gc.root":      time.Now().UTC().Format(time.RFC3339),
 			"containerd.io/uncompressed": layer.Diff.Digest.String(),
 		}
-		lastUnpacked := unpacked
 
 		unpacked, err = rootfs.ApplyLayer(ctx, layer, chain, sn, a, snapshot.WithLabels(labels))
 		if err != nil {
 			return err
-		}
-
-		if lastUnpacked {
-			info := snapshot.Info{
-				Name: identity.ChainID(chain).String(),
-			}
-
-			// Remove previously created gc.root label
-			if _, err := sn.Update(ctx, info, "labels.containerd.io/gc.root"); err != nil {
-				return err
-			}
 		}
 
 		chain = append(chain, layer.Diff.Digest)
@@ -141,15 +127,6 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
 			},
 		}
 		if _, err := cs.Update(ctx, cinfo, fmt.Sprintf("labels.containerd.io/gc.ref.snapshot.%s", snapshotterName)); err != nil {
-			return err
-		}
-
-		sinfo := snapshot.Info{
-			Name: rootfs,
-		}
-
-		// Config now referenced snapshot, release root reference
-		if _, err := sn.Update(ctx, sinfo, "labels.containerd.io/gc.root"); err != nil {
 			return err
 		}
 	}
