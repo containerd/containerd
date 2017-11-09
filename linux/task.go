@@ -13,6 +13,7 @@ import (
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events/exchange"
+	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/linux/shim/client"
 	shim "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/runtime"
@@ -167,6 +168,9 @@ func (t *Task) Kill(ctx context.Context, signal uint32, all bool) error {
 
 // Exec creates a new process inside the task
 func (t *Task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runtime.Process, error) {
+	if err := identifiers.Validate(id); err != nil {
+		return nil, errors.Wrapf(err, "invalid exec id")
+	}
 	request := &shim.ExecProcessRequest{
 		ID:       id,
 		Stdin:    opts.IO.Stdin,

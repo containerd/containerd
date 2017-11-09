@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/linux/runctypes"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
@@ -61,13 +60,26 @@ type Init struct {
 	IoGID    int
 }
 
+// NewRunc returns a new runc instance for a process
+func NewRunc(root, path, namespace, runtime, criu string, systemd bool) *runc.Runc {
+	if root == "" {
+		root = RuncRoot
+	}
+	return &runc.Runc{
+		Command:       runtime,
+		Log:           filepath.Join(path, "log.json"),
+		LogFormat:     runc.JSON,
+		PdeathSignal:  syscall.SIGKILL,
+		Root:          filepath.Join(root, namespace),
+		Criu:          criu,
+		SystemdCgroup: systemd,
+	}
+}
+
 // New returns a new init process
 func New(context context.Context, path, workDir, runtimeRoot, namespace, criu string, systemdCgroup bool, platform Platform, r *shimapi.CreateTaskRequest) (*Init, error) {
 	var success bool
 
-	if err := identifiers.Validate(r.ID); err != nil {
-		return nil, errors.Wrapf(err, "invalid task id")
-	}
 	var options runctypes.CreateOptions
 	if r.Options != nil {
 		v, err := typeurl.UnmarshalAny(r.Options)
@@ -99,19 +111,7 @@ func New(context context.Context, path, workDir, runtimeRoot, namespace, criu st
 			return nil, errors.Wrapf(err, "failed to mount rootfs component %v", m)
 		}
 	}
-	root := runtimeRoot
-	if root == "" {
-		root = RuncRoot
-	}
-	runtime := &runc.Runc{
-		Command:       r.Runtime,
-		Log:           filepath.Join(path, "log.json"),
-		LogFormat:     runc.JSON,
-		PdeathSignal:  syscall.SIGKILL,
-		Root:          filepath.Join(root, namespace),
-		Criu:          criu,
-		SystemdCgroup: systemdCgroup,
-	}
+	runtime := NewRunc(runtimeRoot, path, namespace, r.Runtime, criu, systemdCgroup)
 	p := &Init{
 		id:       r.ID,
 		bundle:   r.Bundle,
@@ -339,9 +339,6 @@ func (p *Init) Runtime() *runc.Runc {
 
 // Exec returns a new exec'd process
 func (p *Init) Exec(context context.Context, path string, r *shimapi.ExecProcessRequest) (Process, error) {
-	if err := identifiers.Validate(r.ID); err != nil {
-		return nil, errors.Wrapf(err, "invalid exec id")
-	}
 	// process exec request
 	var spec specs.Process
 	if err := json.Unmarshal(r.Spec.Value, &spec); err != nil {

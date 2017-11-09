@@ -19,7 +19,6 @@ import (
 	"github.com/containerd/containerd/linux/runctypes"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/runtime"
 	runc "github.com/containerd/go-runc"
@@ -47,15 +46,15 @@ func NewService(config Config, publisher events.Publisher) (*Service, error) {
 	if config.Namespace == "" {
 		return nil, fmt.Errorf("shim namespace cannot be empty")
 	}
-	context := namespaces.WithNamespace(context.Background(), config.Namespace)
-	context = log.WithLogger(context, logrus.WithFields(logrus.Fields{
+	ctx := context.Background()
+	ctx = log.WithLogger(ctx, logrus.WithFields(logrus.Fields{
 		"namespace": config.Namespace,
 		"path":      config.Path,
 		"pid":       os.Getpid(),
 	}))
 	s := &Service{
 		config:    config,
-		context:   context,
+		context:   ctx,
 		processes: make(map[string]proc.Process),
 		events:    make(chan interface{}, 128),
 		ec:        reaper.Default.Subscribe(),
