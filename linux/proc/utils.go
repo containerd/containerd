@@ -1,6 +1,6 @@
 // +build !windows
 
-package shim
+package proc
 
 import (
 	"encoding/json"

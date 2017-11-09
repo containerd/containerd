@@ -1,6 +1,6 @@
 // +build !windows
 
-package shim
+package proc
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 )
 
 type initState interface {
-	processState
+	State
 
 	Pause(context.Context) error
 	Resume(context.Context) error
@@ -25,7 +25,7 @@ type initState interface {
 }
 
 type createdState struct {
-	p *initProcess
+	p *Init
 }
 
 func (s *createdState) transition(name string) error {
@@ -114,7 +114,7 @@ func (s *createdState) SetExited(status int) {
 }
 
 type createdCheckpointState struct {
-	p    *initProcess
+	p    *Init
 	opts *runc.RestoreOpts
 }
 
@@ -175,17 +175,17 @@ func (s *createdCheckpointState) Start(ctx context.Context) error {
 		return p.runtimeError(err, "OCI runtime restore failed")
 	}
 	sio := p.stdio
-	if sio.stdin != "" {
-		sc, err := fifo.OpenFifo(ctx, sio.stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
+	if sio.Stdin != "" {
+		sc, err := fifo.OpenFifo(ctx, sio.Stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
 		if err != nil {
-			return errors.Wrapf(err, "failed to open stdin fifo %s", sio.stdin)
+			return errors.Wrapf(err, "failed to open stdin fifo %s", sio.Stdin)
 		}
 		p.stdin = sc
 		p.closers = append(p.closers, sc)
 	}
 	var copyWaitGroup sync.WaitGroup
-	if !sio.isNull() {
-		if err := copyPipes(ctx, p.io, sio.stdin, sio.stdout, sio.stderr, &p.wg, &copyWaitGroup); err != nil {
+	if !sio.IsNull() {
+		if err := copyPipes(ctx, p.io, sio.Stdin, sio.Stdout, sio.Stderr, &p.wg, &copyWaitGroup); err != nil {
 			return errors.Wrap(err, "failed to start io pipe copy")
 		}
 	}
@@ -228,7 +228,7 @@ func (s *createdCheckpointState) SetExited(status int) {
 }
 
 type runningState struct {
-	p *initProcess
+	p *Init
 }
 
 func (s *runningState) transition(name string) error {
@@ -313,7 +313,7 @@ func (s *runningState) SetExited(status int) {
 }
 
 type pausedState struct {
-	p *initProcess
+	p *Init
 }
 
 func (s *pausedState) transition(name string) error {
@@ -400,7 +400,7 @@ func (s *pausedState) SetExited(status int) {
 }
 
 type stoppedState struct {
-	p *initProcess
+	p *Init
 }
 
 func (s *stoppedState) transition(name string) error {

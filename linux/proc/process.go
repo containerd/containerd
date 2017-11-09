@@ -1,30 +1,36 @@
 // +build !windows
 
-package shim
+package proc
 
 import (
 	"context"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/containerd/console"
 	"github.com/pkg/errors"
 )
 
-type stdio struct {
-	stdin    string
-	stdout   string
-	stderr   string
-	terminal bool
+// RuncRoot is the path to the root runc state directory
+const RuncRoot = "/run/containerd/runc"
+
+// Stdio of a process
+type Stdio struct {
+	Stdin    string
+	Stdout   string
+	Stderr   string
+	Terminal bool
 }
 
-func (s stdio) isNull() bool {
-	return s.stdin == "" && s.stdout == "" && s.stderr == ""
+// IsNull returns true if the stdio is not defined
+func (s Stdio) IsNull() bool {
+	return s.Stdin == "" && s.Stdout == "" && s.Stderr == ""
 }
 
-type process interface {
-	processState
-
+// Process on a linux system
+type Process interface {
+	State
 	// ID returns the id for the process
 	ID() string
 	// Pid returns the pid for the process
@@ -36,14 +42,15 @@ type process interface {
 	// Stdin returns the process STDIN
 	Stdin() io.Closer
 	// Stdio returns io information for the container
-	Stdio() stdio
+	Stdio() Stdio
 	// Status returns the process status
 	Status(context.Context) (string, error)
 	// Wait blocks until the process has exited
 	Wait()
 }
 
-type processState interface {
+// State of a process
+type State interface {
 	// Resize resizes the process console
 	Resize(ws console.WinSize) error
 	// Start execution of the process
@@ -70,4 +77,13 @@ func stateName(v interface{}) string {
 		return "stopped"
 	}
 	panic(errors.Errorf("invalid state %v", v))
+}
+
+// Platform handles platform-specific behavior that may differs across
+// platform implementations
+type Platform interface {
+	CopyConsole(ctx context.Context, console console.Console, stdin, stdout, stderr string,
+		wg, cwg *sync.WaitGroup) (console.Console, error)
+	ShutdownConsole(ctx context.Context, console console.Console) error
+	Close() error
 }

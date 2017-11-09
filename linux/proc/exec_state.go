@@ -1,6 +1,6 @@
 // +build !windows
 
-package shim
+package proc
 
 import (
 	"context"
@@ -16,11 +16,11 @@ type execCreatedState struct {
 func (s *execCreatedState) transition(name string) error {
 	switch name {
 	case "running":
-		s.p.processState = &execRunningState{p: s.p}
+		s.p.State = &execRunningState{p: s.p}
 	case "stopped":
-		s.p.processState = &execStoppedState{p: s.p}
+		s.p.State = &execStoppedState{p: s.p}
 	case "deleted":
-		s.p.processState = &deletedState{}
+		s.p.State = &deletedState{}
 	default:
 		return errors.Errorf("invalid state transition %q to %q", stateName(s), name)
 	}
@@ -77,7 +77,7 @@ type execRunningState struct {
 func (s *execRunningState) transition(name string) error {
 	switch name {
 	case "stopped":
-		s.p.processState = &execStoppedState{p: s.p}
+		s.p.State = &execStoppedState{p: s.p}
 	default:
 		return errors.Errorf("invalid state transition %q to %q", stateName(s), name)
 	}
@@ -130,7 +130,7 @@ type execStoppedState struct {
 func (s *execStoppedState) transition(name string) error {
 	switch name {
 	case "deleted":
-		s.p.processState = &deletedState{}
+		s.p.State = &deletedState{}
 	default:
 		return errors.Errorf("invalid state transition %q to %q", stateName(s), name)
 	}
