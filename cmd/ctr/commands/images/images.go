@@ -291,9 +291,11 @@ var removeCommand = cli.Command{
 					log.G(ctx).WithError(err).Errorf("unable to delete %v", target)
 					continue
 				}
+				// image ref not found in metadata store; log not found condition
+				log.G(ctx).Warnf("%v: image not found", target)
+			} else {
+				fmt.Println(target)
 			}
-
-			fmt.Println(target)
 		}
 
 		return exitErr
