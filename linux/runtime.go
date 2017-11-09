@@ -17,8 +17,8 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/identifiers"
+	"github.com/containerd/containerd/linux/proc"
 	"github.com/containerd/containerd/linux/runctypes"
-	client "github.com/containerd/containerd/linux/shim"
 	shim "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
@@ -376,7 +376,7 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			filepath.Join(r.state, ns, id),
 			filepath.Join(r.root, ns, id),
 		)
-		pid, _ := runc.ReadPidFile(filepath.Join(bundle.path, client.InitPidFile))
+		pid, _ := runc.ReadPidFile(filepath.Join(bundle.path, proc.InitPidFile))
 		s, err := bundle.NewShimClient(ctx, ns, ShimConnect(), nil)
 		if err != nil {
 			log.G(ctx).WithError(err).WithFields(logrus.Fields{
@@ -474,7 +474,7 @@ func (r *Runtime) getRuntime(ctx context.Context, ns, id string) (*runc.Runc, er
 
 	var (
 		cmd  = r.config.Runtime
-		root = client.RuncRoot
+		root = proc.RuncRoot
 	)
 	if ropts != nil {
 		if ropts.Runtime != "" {

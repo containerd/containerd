@@ -4,7 +4,6 @@ package proc
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -16,8 +15,6 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/identifiers"
-	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -44,35 +41,6 @@ type execProcess struct {
 
 	parent    *Init
 	waitBlock chan struct{}
-}
-
-// NewExec returns a new exec'd process
-func NewExec(context context.Context, path string, r *shimapi.ExecProcessRequest, parent *Init, id string) (Process, error) {
-	if err := identifiers.Validate(id); err != nil {
-		return nil, errors.Wrapf(err, "invalid exec id")
-	}
-	// process exec request
-	var spec specs.Process
-	if err := json.Unmarshal(r.Spec.Value, &spec); err != nil {
-		return nil, err
-	}
-	spec.Terminal = r.Terminal
-
-	e := &execProcess{
-		id:     id,
-		path:   path,
-		parent: parent,
-		spec:   spec,
-		stdio: Stdio{
-			Stdin:    r.Stdin,
-			Stdout:   r.Stdout,
-			Stderr:   r.Stderr,
-			Terminal: r.Terminal,
-		},
-		waitBlock: make(chan struct{}),
-	}
-	e.State = &execCreatedState{p: e}
-	return e, nil
 }
 
 func (e *execProcess) Wait() {

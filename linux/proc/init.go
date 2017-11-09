@@ -337,6 +337,35 @@ func (p *Init) Runtime() *runc.Runc {
 	return p.runtime
 }
 
+// Exec returns a new exec'd process
+func (p *Init) Exec(context context.Context, path string, r *shimapi.ExecProcessRequest) (Process, error) {
+	if err := identifiers.Validate(r.ID); err != nil {
+		return nil, errors.Wrapf(err, "invalid exec id")
+	}
+	// process exec request
+	var spec specs.Process
+	if err := json.Unmarshal(r.Spec.Value, &spec); err != nil {
+		return nil, err
+	}
+	spec.Terminal = r.Terminal
+
+	e := &execProcess{
+		id:     r.ID,
+		path:   path,
+		parent: p,
+		spec:   spec,
+		stdio: Stdio{
+			Stdin:    r.Stdin,
+			Stdout:   r.Stdout,
+			Stderr:   r.Stderr,
+			Terminal: r.Terminal,
+		},
+		waitBlock: make(chan struct{}),
+	}
+	e.State = &execCreatedState{p: e}
+	return e, nil
+}
+
 func (p *Init) checkpoint(context context.Context, r *shimapi.CheckpointTaskRequest) error {
 	var options runctypes.CheckpointOptions
 	if r.Options != nil {

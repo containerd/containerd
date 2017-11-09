@@ -218,7 +218,7 @@ func (s *Service) Exec(ctx context.Context, r *shimapi.ExecProcessRequest) (*goo
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
 
-	process, err := proc.NewExec(ctx, s.config.Path, r, p.(*proc.Init), r.ID)
+	process, err := p.(*proc.Init).Exec(ctx, s.config.Path, r)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
