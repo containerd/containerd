@@ -20,8 +20,6 @@ import (
 	"errors"
 	"io"
 	"sync"
-
-	"github.com/golang/glog"
 )
 
 // WriterGroup is a group of writers. Writer could be dynamically
@@ -73,11 +71,7 @@ func (g *WriterGroup) Write(p []byte) (int, error) {
 	defer g.mu.Unlock()
 	for k, w := range g.writers {
 		n, err := w.Write(p)
-		if err != nil {
-			glog.Errorf("Writer %q write error: %v", k, err)
-		} else if len(p) != n {
-			glog.Errorf("Writer %q short write error", k)
-		} else {
+		if err == nil && len(p) == n {
 			continue
 		}
 		// The writer is closed or in bad state, remove it.

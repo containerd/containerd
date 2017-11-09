@@ -202,7 +202,7 @@ func loadContainer(ctx context.Context, cntr containerd.Container, containerDir 
 			// cri-containerd got restarted just during that. In that case, we still
 			// treat the container as `CREATED`.
 			containerIO, err = cio.NewContainerIO(id,
-				cio.WithStdin(meta.Config.GetStdin()),
+				cio.WithStdinOpen(meta.Config.GetStdin()),
 				cio.WithTerminal(meta.Config.GetTty()),
 			)
 			if err != nil {

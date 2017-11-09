@@ -175,7 +175,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	}
 
 	containerIO, err := cio.NewContainerIO(id,
-		cio.WithStdin(config.GetStdin()),
+		cio.WithStdinOpen(config.GetStdin()),
 		cio.WithTerminal(config.GetTty()),
 		cio.WithRootDir(containerRootDir),
 	)
