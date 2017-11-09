@@ -16,7 +16,7 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/identifiers"
-	"github.com/containerd/containerd/linux/runcopts"
+	"github.com/containerd/containerd/linux/runctypes"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
@@ -67,13 +67,13 @@ func (s *Service) newInitProcess(context context.Context, r *shimapi.CreateTaskR
 	if err := identifiers.Validate(r.ID); err != nil {
 		return nil, errors.Wrapf(err, "invalid task id")
 	}
-	var options runcopts.CreateOptions
+	var options runctypes.CreateOptions
 	if r.Options != nil {
 		v, err := typeurl.UnmarshalAny(r.Options)
 		if err != nil {
 			return nil, err
 		}
-		options = *v.(*runcopts.CreateOptions)
+		options = *v.(*runctypes.CreateOptions)
 	}
 
 	rootfs := filepath.Join(s.config.Path, "rootfs")
@@ -332,13 +332,13 @@ func (p *initProcess) Stdin() io.Closer {
 }
 
 func (p *initProcess) checkpoint(context context.Context, r *shimapi.CheckpointTaskRequest) error {
-	var options runcopts.CheckpointOptions
+	var options runctypes.CheckpointOptions
 	if r.Options != nil {
 		v, err := typeurl.UnmarshalAny(r.Options)
 		if err != nil {
 			return err
 		}
-		options = *v.(*runcopts.CheckpointOptions)
+		options = *v.(*runctypes.CheckpointOptions)
 	}
 	var actions []runc.CheckpointAction
 	if !options.Exit {

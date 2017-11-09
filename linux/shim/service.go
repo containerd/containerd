@@ -15,7 +15,7 @@ import (
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
-	"github.com/containerd/containerd/linux/runcopts"
+	"github.com/containerd/containerd/linux/runctypes"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
@@ -364,7 +364,7 @@ func (s *Service) ListPids(ctx context.Context, r *shimapi.ListPidsRequest) (*sh
 		}
 		for _, p := range s.processes {
 			if p.Pid() == int(pid) {
-				d := &runcopts.ProcessDetails{
+				d := &runctypes.ProcessDetails{
 					ExecID: p.ID(),
 				}
 				a, err := typeurl.MarshalAny(d)

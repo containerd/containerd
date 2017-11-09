@@ -5,7 +5,7 @@ import (
 	"syscall"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/linux/runcopts"
+	"github.com/containerd/containerd/linux/runctypes"
 	"github.com/containerd/containerd/mount"
 )
 
@@ -22,7 +22,7 @@ func WithRootFS(mounts []mount.Mount) NewTaskOpts {
 
 // WithExit causes the task to exit after a successful checkpoint
 func WithExit(r *CheckpointTaskInfo) error {
-	r.Options = &runcopts.CheckpointOptions{
+	r.Options = &runctypes.CheckpointOptions{
 		Exit: true,
 	}
 	return nil

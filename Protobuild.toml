@@ -41,8 +41,8 @@ ignore_files = [
 
 # Lock down runc config
 [[descriptors]]
-prefix = "github.com/containerd/containerd/linux/runcopts"
-target = "linux/runcopts/next.pb.txt"
+prefix = "github.com/containerd/containerd/linux/runctypes"
+target = "linux/runctypes/next.pb.txt"
 ignore_files = [
 	"google/protobuf/descriptor.proto",
 	"gogoproto/gogo.proto"

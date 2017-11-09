@@ -18,7 +18,7 @@ import (
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/linux/runcopts"
+	"github.com/containerd/containerd/linux/runctypes"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
@@ -146,7 +146,7 @@ func TestShimInCgroup(t *testing.T) {
 	defer cg.Delete()
 
 	task, err := container.NewTask(ctx, empty(), func(_ context.Context, client *Client, r *TaskInfo) error {
-		r.Options = &runcopts.CreateOptions{
+		r.Options = &runctypes.CreateOptions{
 			ShimCgroup: path,
 		}
 		return nil
@@ -887,7 +887,7 @@ func TestContainerRuntimeOptions(t *testing.T) {
 		ctx, id,
 		WithNewSpec(withImageConfig(image), withExitStatus(7)),
 		withNewSnapshot(id, image),
-		WithRuntime("io.containerd.runtime.v1.linux", &runcopts.RuncOptions{Runtime: "no-runc"}),
+		WithRuntime("io.containerd.runtime.v1.linux", &runctypes.RuncOptions{Runtime: "no-runc"}),
 	)
 	if err != nil {
 		t.Error(err)
@@ -1040,7 +1040,7 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, Stdio, func(_ context.Context, client *Client, r *TaskInfo) error {
-		r.Options = &runcopts.CreateOptions{
+		r.Options = &runctypes.CreateOptions{
 			IoUid: 1000,
 			IoGid: 1000,
 		}
