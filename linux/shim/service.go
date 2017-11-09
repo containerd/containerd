@@ -107,19 +107,6 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*sh
 	s.bundle = r.Bundle
 	pid := process.Pid()
 	s.processes[r.ID] = process
-	s.events <- &eventsapi.TaskCreate{
-		ContainerID: r.ID,
-		Bundle:      r.Bundle,
-		Rootfs:      r.Rootfs,
-		IO: &eventsapi.TaskIO{
-			Stdin:    r.Stdin,
-			Stdout:   r.Stdout,
-			Stderr:   r.Stderr,
-			Terminal: r.Terminal,
-		},
-		Checkpoint: r.Checkpoint,
-		Pid:        uint32(pid),
-	}
 	return &shimapi.CreateTaskResponse{
 		Pid: uint32(pid),
 	}, nil
@@ -135,19 +122,6 @@ func (s *Service) Start(ctx context.Context, r *shimapi.StartRequest) (*shimapi.
 	}
 	if err := p.Start(ctx); err != nil {
 		return nil, err
-	}
-	if r.ID == s.id {
-		s.events <- &eventsapi.TaskStart{
-			ContainerID: s.id,
-			Pid:         uint32(p.Pid()),
-		}
-	} else {
-		pid := p.Pid()
-		s.events <- &eventsapi.TaskExecStarted{
-			ContainerID: s.id,
-			ExecID:      r.ID,
-			Pid:         uint32(pid),
-		}
 	}
 	return &shimapi.StartResponse{
 		ID:  p.ID(),
@@ -169,12 +143,6 @@ func (s *Service) Delete(ctx context.Context, r *google_protobuf.Empty) (*shimap
 	}
 	delete(s.processes, s.id)
 	s.platform.Close()
-	s.events <- &eventsapi.TaskDelete{
-		ContainerID: s.id,
-		ExitStatus:  uint32(p.ExitStatus()),
-		ExitedAt:    p.ExitedAt(),
-		Pid:         uint32(p.Pid()),
-	}
 	return &shimapi.DeleteResponse{
 		ExitStatus: uint32(p.ExitStatus()),
 		ExitedAt:   p.ExitedAt(),
@@ -223,11 +191,6 @@ func (s *Service) Exec(ctx context.Context, r *shimapi.ExecProcessRequest) (*goo
 		return nil, errdefs.ToGRPC(err)
 	}
 	s.processes[r.ID] = process
-
-	s.events <- &eventsapi.TaskExecAdded{
-		ContainerID: s.id,
-		ExecID:      r.ID,
-	}
 	return empty, nil
 }
 
@@ -303,9 +266,6 @@ func (s *Service) Pause(ctx context.Context, r *google_protobuf.Empty) (*google_
 	if err := p.(*proc.Init).Pause(ctx); err != nil {
 		return nil, err
 	}
-	s.events <- &eventsapi.TaskPaused{
-		ContainerID: s.id,
-	}
 	return empty, nil
 }
 
@@ -319,9 +279,6 @@ func (s *Service) Resume(ctx context.Context, r *google_protobuf.Empty) (*google
 	}
 	if err := p.(*proc.Init).Resume(ctx); err != nil {
 		return nil, err
-	}
-	s.events <- &eventsapi.TaskResumed{
-		ContainerID: s.id,
 	}
 	return empty, nil
 }
@@ -408,9 +365,6 @@ func (s *Service) Checkpoint(ctx context.Context, r *shimapi.CheckpointTaskReque
 	}
 	if err := p.(*proc.Init).Checkpoint(ctx, r); err != nil {
 		return nil, errdefs.ToGRPC(err)
-	}
-	s.events <- &eventsapi.TaskCheckpointed{
-		ContainerID: s.id,
 	}
 	return empty, nil
 }

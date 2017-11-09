@@ -9,8 +9,10 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/containerd/cgroups"
+	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/linux/shim/client"
 	shim "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/runtime"
@@ -25,9 +27,10 @@ type Task struct {
 	namespace string
 	cg        cgroups.Cgroup
 	monitor   runtime.TaskMonitor
+	events    *exchange.Exchange
 }
 
-func newTask(id, namespace string, pid int, shim *client.Client, monitor runtime.TaskMonitor) (*Task, error) {
+func newTask(id, namespace string, pid int, shim *client.Client, monitor runtime.TaskMonitor, events *exchange.Exchange) (*Task, error) {
 	var (
 		err error
 		cg  cgroups.Cgroup
@@ -45,6 +48,7 @@ func newTask(id, namespace string, pid int, shim *client.Client, monitor runtime
 		namespace: namespace,
 		cg:        cg,
 		monitor:   monitor,
+		events:    events,
 	}, nil
 }
 
@@ -82,6 +86,10 @@ func (t *Task) Start(ctx context.Context) error {
 			return err
 		}
 	}
+	t.events.Publish(ctx, runtime.TaskStartEventTopic, &eventsapi.TaskStart{
+		ContainerID: t.id,
+		Pid:         uint32(t.pid),
+	})
 	return nil
 }
 
@@ -123,11 +131,13 @@ func (t *Task) State(ctx context.Context) (runtime.State, error) {
 
 // Pause the task and all processes
 func (t *Task) Pause(ctx context.Context) error {
-	_, err := t.shim.Pause(ctx, empty)
-	if err != nil {
-		err = errdefs.FromGRPC(err)
+	if _, err := t.shim.Pause(ctx, empty); err != nil {
+		return errdefs.FromGRPC(err)
 	}
-	return err
+	t.events.Publish(ctx, runtime.TaskPausedEventTopic, &eventsapi.TaskPaused{
+		ContainerID: t.id,
+	})
+	return nil
 }
 
 // Resume the task and all processes
@@ -135,6 +145,9 @@ func (t *Task) Resume(ctx context.Context) error {
 	if _, err := t.shim.Resume(ctx, empty); err != nil {
 		return errdefs.FromGRPC(err)
 	}
+	t.events.Publish(ctx, runtime.TaskResumedEventTopic, &eventsapi.TaskResumed{
+		ContainerID: t.id,
+	})
 	return nil
 }
 
@@ -223,6 +236,9 @@ func (t *Task) Checkpoint(ctx context.Context, path string, options *types.Any) 
 	if _, err := t.shim.Checkpoint(ctx, r); err != nil {
 		return errdefs.FromGRPC(err)
 	}
+	t.events.Publish(ctx, runtime.TaskCheckpointedEventTopic, &eventsapi.TaskCheckpointed{
+		ContainerID: t.id,
+	})
 	return nil
 }
 
