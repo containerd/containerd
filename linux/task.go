@@ -17,6 +17,7 @@ import (
 	"github.com/containerd/containerd/linux/shim/client"
 	shim "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/runtime"
+	runc "github.com/containerd/go-runc"
 	"github.com/gogo/protobuf/types"
 )
 
@@ -29,9 +30,10 @@ type Task struct {
 	cg        cgroups.Cgroup
 	monitor   runtime.TaskMonitor
 	events    *exchange.Exchange
+	runtime   *runc.Runc
 }
 
-func newTask(id, namespace string, pid int, shim *client.Client, monitor runtime.TaskMonitor, events *exchange.Exchange) (*Task, error) {
+func newTask(id, namespace string, pid int, shim *client.Client, monitor runtime.TaskMonitor, events *exchange.Exchange, runtime *runc.Runc) (*Task, error) {
 	var (
 		err error
 		cg  cgroups.Cgroup
@@ -50,6 +52,7 @@ func newTask(id, namespace string, pid int, shim *client.Client, monitor runtime
 		cg:        cg,
 		monitor:   monitor,
 		events:    events,
+		runtime:   runtime,
 	}, nil
 }
 
