@@ -75,17 +75,21 @@ func streamKey(id, name string, stream StreamType) string {
 
 // ContainerIO holds the container io.
 type ContainerIO struct {
+	id string
+
 	dir        string
 	stdinPath  string
 	stdoutPath string
 	stderrPath string
 
-	id     string
-	tty    bool
-	stdin  bool
+	// Configs for the io.
+	tty       bool
+	openStdin bool
+	root      string
+
+	stdin  io.WriteCloser
 	stdout *cioutil.WriterGroup
 	stderr *cioutil.WriterGroup
-	root   string
 
 	closer *wgCloser
 }
@@ -95,10 +99,10 @@ var _ containerd.IO = &ContainerIO{}
 // Opts sets specific information to newly created ContainerIO.
 type Opts func(*ContainerIO) error
 
-// WithStdin enables stdin of the container io.
-func WithStdin(stdin bool) Opts {
+// WithStdinOpen enables stdin of the container io.
+func WithStdinOpen(open bool) Opts {
 	return func(c *ContainerIO) error {
-		c.stdin = stdin
+		c.openStdin = open
 		return nil
 	}
 }
@@ -171,7 +175,7 @@ func NewContainerIO(id string, opts ...Opts) (*ContainerIO, error) {
 	c.dir = fifos.Dir
 	c.stdoutPath = fifos.Out
 	c.stderrPath = fifos.Err
-	if c.stdin {
+	if c.openStdin {
 		c.stdinPath = fifos.In
 	}
 	return c, nil
@@ -205,11 +209,11 @@ func (c *ContainerIO) Pipe() (err error) {
 		}
 	}()
 	if c.stdinPath != "" {
-		// Just create the stdin, only open it when used.
 		if f, err = fifo.OpenFifo(ctx, c.stdinPath, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
 			return err
 		}
-		f.Close()
+		c.stdin = f
+		set = append(set, f)
 	}
 
 	if f, err = fifo.OpenFifo(ctx, c.stdoutPath, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
@@ -276,29 +280,25 @@ func (c *ContainerIO) Attach(opts AttachOptions) error {
 	stderrKey := streamKey(c.id, "attach-"+key, Stderr)
 
 	var stdinRC io.ReadCloser
-	if c.stdinPath != "" && opts.Stdin != nil {
-		f, err := fifo.OpenFifo(c.closer.ctx, c.stdinPath, syscall.O_WRONLY|syscall.O_NONBLOCK, 0700)
-		if err != nil {
-			return err
-		}
+	if c.stdin != nil && opts.Stdin != nil {
 		// Create a wrapper of stdin which could be closed. Note that the
 		// wrapper doesn't close the actual stdin, it only stops io.Copy.
 		// The actual stdin will be closed by stream server.
 		stdinRC = cioutil.NewWrapReadCloser(opts.Stdin)
 		// Also increase wait group here, so that `closer.Wait` will
 		// also wait for this fifo to be closed.
-		c.closer.wg.Add(1)
 		wg.Add(1)
-		go func(w io.WriteCloser) {
-			if _, err := io.Copy(w, stdinRC); err != nil && err != io.ErrClosedPipe {
+		go func() {
+			if _, err := io.Copy(c.stdin, stdinRC); err != nil {
 				glog.Errorf("Failed to redirect stdin for container attach %q: %v", c.id, err)
 			}
-			w.Close()
 			glog.V(2).Infof("Attach stream %q closed", stdinKey)
 			if opts.StdinOnce && !opts.Tty {
 				// Due to kubectl requirements and current docker behavior, when (opts.StdinOnce &&
 				// opts.Tty) we have to close container stdin and keep stdout and stderr open until
 				// container stops.
+				c.stdin.Close()
+				// Also closes the containerd side.
 				if err := opts.CloseStdin(); err != nil {
 					glog.Errorf("Failed to close stdin for container %q: %v", c.id, err)
 				}
@@ -311,8 +311,7 @@ func (c *ContainerIO) Attach(opts AttachOptions) error {
 				}
 			}
 			wg.Done()
-			c.closer.wg.Done()
-		}(f)
+		}()
 	}
 
 	attachStream := func(key string, close <-chan struct{}) {
