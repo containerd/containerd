@@ -80,6 +80,8 @@ extend google.protobuf.FileOptions {
 	optional bool compare_all = 63029;
     optional bool typedecl_all = 63030;
     optional bool enumdecl_all = 63031;
+
+	optional bool goproto_registration = 63032;
 }
 
 extend google.protobuf.MessageOptions {

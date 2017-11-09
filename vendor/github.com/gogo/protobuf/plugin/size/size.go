@@ -121,6 +121,7 @@ package size
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -576,6 +577,10 @@ func (p *size) Generate(file *generator.FileDescriptor) {
 	}
 	for _, message := range file.Messages() {
 		sizeName := ""
+		if gogoproto.IsSizer(file.FileDescriptorProto, message.DescriptorProto) && gogoproto.IsProtoSizer(file.FileDescriptorProto, message.DescriptorProto) {
+			fmt.Fprintf(os.Stderr, "ERROR: message %v cannot support both sizer and protosizer plugins\n", generator.CamelCase(*message.Name))
+			os.Exit(1)
+		}
 		if gogoproto.IsSizer(file.FileDescriptorProto, message.DescriptorProto) {
 			sizeName = "Size"
 		} else if gogoproto.IsProtoSizer(file.FileDescriptorProto, message.DescriptorProto) {
@@ -647,7 +652,7 @@ func (p *size) Generate(file *generator.FileDescriptor) {
 			p.In()
 			p.P(`var l int`)
 			p.P(`_ = l`)
-			vanity.TurnOffNullableForNativeTypesWithoutDefaultsOnly(f)
+			vanity.TurnOffNullableForNativeTypes(f)
 			p.generateField(false, file, message, f, sizeName)
 			p.P(`return n`)
 			p.Out()
