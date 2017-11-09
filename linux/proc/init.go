@@ -29,6 +29,7 @@ import (
 // InitPidFile name of the file that contains the init pid
 const InitPidFile = "init.pid"
 
+// Init represents an initial process for a container
 type Init struct {
 	wg sync.WaitGroup
 	initState
@@ -217,30 +218,36 @@ func New(context context.Context, path, workDir, runtimeRoot, namespace, criu st
 	return p, nil
 }
 
+// Wait for the process to exit
 func (p *Init) Wait() {
 	<-p.waitBlock
 }
 
+// ID of the process
 func (p *Init) ID() string {
 	return p.id
 }
 
+// Pid of the process
 func (p *Init) Pid() int {
 	return p.pid
 }
 
+// ExitStatus of the process
 func (p *Init) ExitStatus() int {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.status
 }
 
+// ExitedAt at time when the process exited
 func (p *Init) ExitedAt() time.Time {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.exited
 }
 
+// Status of the process
 func (p *Init) Status(ctx context.Context) (string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -321,6 +328,7 @@ func (p *Init) kill(context context.Context, signal uint32, all bool) error {
 	return checkKillError(err)
 }
 
+// KillAll processes belonging to the init process
 func (p *Init) KillAll(context context.Context) error {
 	err := p.runtime.Kill(context, p.id, int(syscall.SIGKILL), &runc.KillOpts{
 		All: true,
@@ -328,6 +336,7 @@ func (p *Init) KillAll(context context.Context) error {
 	return p.runtimeError(err, "OCI runtime killall failed")
 }
 
+// Stdin of the process
 func (p *Init) Stdin() io.Closer {
 	return p.stdin
 }
@@ -404,6 +413,7 @@ func (p *Init) update(context context.Context, r *shimapi.UpdateTaskRequest) err
 	return p.runtime.Update(context, p.id, &resources)
 }
 
+// Stdio of the process
 func (p *Init) Stdio() Stdio {
 	return p.stdio
 }
