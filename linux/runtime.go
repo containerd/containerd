@@ -268,7 +268,8 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
-	t, err := newTask(id, namespace, int(cr.Pid), s, r.monitor, r.events, proc.NewRunc(ropts.RuntimeRoot, sopts.Bundle, namespace, rt, ropts.CriuPath, ropts.SystemdCgroup))
+	t, err := newTask(id, namespace, int(cr.Pid), s, r.monitor, r.events,
+		proc.NewRunc(ropts.RuntimeRoot, sopts.Bundle, namespace, rt, ropts.CriuPath, ropts.SystemdCgroup))
 	if err != nil {
 		return nil, err
 	}
@@ -396,6 +397,7 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			filepath.Join(r.state, ns, id),
 			filepath.Join(r.root, ns, id),
 		)
+		ctx = namespaces.WithNamespace(ctx, ns)
 		pid, _ := runc.ReadPidFile(filepath.Join(bundle.path, proc.InitPidFile))
 		s, err := bundle.NewShimClient(ctx, ns, ShimConnect(), nil)
 		if err != nil {
@@ -417,7 +419,8 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			continue
 		}
 
-		t, err := newTask(id, ns, pid, s, r.monitor, r.events, proc.NewRunc(ropts.RuntimeRoot, bundle.path, ns, ropts.Runtime, ropts.CriuPath, ropts.SystemdCgroup))
+		t, err := newTask(id, ns, pid, s, r.monitor, r.events,
+			proc.NewRunc(ropts.RuntimeRoot, bundle.path, ns, ropts.Runtime, ropts.CriuPath, ropts.SystemdCgroup))
 		if err != nil {
 			log.G(ctx).WithError(err).Error("loading task type")
 			continue
@@ -543,5 +546,5 @@ func (r *Runtime) getRuncOptions(ctx context.Context, id string) (*runctypes.Run
 
 		return ropts, nil
 	}
-	return &runcopts.RuncOptions{}, nil
+	return &runctypes.RuncOptions{}, nil
 }
