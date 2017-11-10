@@ -160,16 +160,13 @@ func loadContainer(ctx context.Context, cntr containerd.Container, containerDir 
 			return nil, err
 		}
 		containerIO, err = cio.NewContainerIO(id,
-			cio.WithTerminal(fifos.Terminal),
-			cio.WithFIFOs(fifos.Dir, fifos.In, fifos.Out, fifos.Err),
+			cio.WithFIFOs(fifos),
 			cio.WithOutput("log", stdoutWC, stderrWC),
 		)
 		if err != nil {
 			return nil, err
 		}
-		if err := containerIO.Pipe(); err != nil {
-			return nil, err
-		}
+		containerIO.Pipe()
 		return containerIO, nil
 	})
 	if err != nil && !errdefs.IsNotFound(err) {
@@ -196,14 +193,11 @@ func loadContainer(ctx context.Context, cntr containerd.Container, containerDir 
 		// to generate container status.
 		switch status.State() {
 		case runtime.ContainerState_CONTAINER_CREATED:
-			// TODO(random-liu): Do not create fifos directory in NewContainerIO.
-			// container is in created state, create container io for it.
 			// NOTE: Another possibility is that we've tried to start the container, but
 			// cri-containerd got restarted just during that. In that case, we still
 			// treat the container as `CREATED`.
 			containerIO, err = cio.NewContainerIO(id,
-				cio.WithStdinOpen(meta.Config.GetStdin()),
-				cio.WithTerminal(meta.Config.GetTty()),
+				cio.WithNewFIFOs(containerDir, meta.Config.GetTty(), meta.Config.GetStdin()),
 			)
 			if err != nil {
 				return container, fmt.Errorf("failed to create container io: %v", err)
