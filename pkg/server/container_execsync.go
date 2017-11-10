@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -32,6 +31,8 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
+	cioutil "github.com/kubernetes-incubator/cri-containerd/pkg/ioutil"
+	cio "github.com/kubernetes-incubator/cri-containerd/pkg/server/io"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
 )
 
@@ -41,8 +42,8 @@ func (c *criContainerdService) ExecSync(ctx context.Context, r *runtime.ExecSync
 	var stdout, stderr bytes.Buffer
 	exitCode, err := c.execInContainer(ctx, r.GetContainerId(), execOptions{
 		cmd:     r.GetCmd(),
-		stdout:  &stdout,
-		stderr:  &stderr,
+		stdout:  cioutil.NewNopWriteCloser(&stdout),
+		stderr:  cioutil.NewNopWriteCloser(&stderr),
 		timeout: time.Duration(r.GetTimeout()) * time.Second,
 	})
 	if err != nil {
@@ -60,8 +61,8 @@ func (c *criContainerdService) ExecSync(ctx context.Context, r *runtime.ExecSync
 type execOptions struct {
 	cmd     []string
 	stdin   io.Reader
-	stdout  io.Writer
-	stderr  io.Writer
+	stdout  io.WriteCloser
+	stderr  io.WriteCloser
 	tty     bool
 	resize  <-chan remotecommand.TerminalSize
 	timeout time.Duration
@@ -106,22 +107,23 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 	pspec.Args = opts.cmd
 	pspec.Terminal = opts.tty
 
-	if opts.stdin == nil {
-		opts.stdin = new(bytes.Buffer)
-	}
 	if opts.stdout == nil {
-		opts.stdout = ioutil.Discard
+		opts.stdout = cio.NewDiscardLogger()
 	}
 	if opts.stderr == nil {
-		opts.stderr = ioutil.Discard
+		opts.stderr = cio.NewDiscardLogger()
 	}
 	execID := util.GenerateID()
-	process, err := task.Exec(ctx, execID, pspec, containerd.NewIOWithTerminal(
-		opts.stdin,
-		opts.stdout,
-		opts.stderr,
-		opts.tty,
-	))
+	glog.V(4).Infof("Generated exec id %q for container %q", execID, id)
+	rootDir := getContainerRootDir(c.config.RootDir, id)
+	var execIO *cio.ExecIO
+	process, err := task.Exec(ctx, execID, pspec,
+		func(id string) (containerd.IO, error) {
+			var err error
+			execIO, err = cio.NewExecIO(id, rootDir, opts.tty, opts.stdin != nil)
+			return execIO, err
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create exec %q: %v", execID, err)
 	}
@@ -145,6 +147,17 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 		}
 	})
 
+	attachDone := execIO.Attach(cio.AttachOptions{
+		Stdin:     opts.stdin,
+		Stdout:    opts.stdout,
+		Stderr:    opts.stderr,
+		Tty:       opts.tty,
+		StdinOnce: true,
+		CloseStdin: func() error {
+			return process.CloseIO(ctx, containerd.WithStdinCloser)
+		},
+	})
+
 	var timeoutCh <-chan time.Time
 	if opts.timeout == 0 {
 		// Do not set timeout if it's 0.
@@ -163,6 +176,8 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 		exitRes := <-exitCh
 		glog.V(2).Infof("Timeout received while waiting for exec process kill %q code %d and error %v",
 			execID, exitRes.ExitCode(), exitRes.Error())
+		<-attachDone
+		glog.V(4).Infof("Stream pipe for exec process %q done", execID)
 		return nil, fmt.Errorf("timeout %v exceeded", opts.timeout)
 	case exitRes := <-exitCh:
 		code, _, err := exitRes.Result()
@@ -170,6 +185,8 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 		if err != nil {
 			return nil, fmt.Errorf("failed while waiting for exec %q: %v", execID, err)
 		}
+		<-attachDone
+		glog.V(4).Infof("Stream pipe for exec process %q done", execID)
 		return &code, nil
 	}
 }
