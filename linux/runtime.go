@@ -17,7 +17,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/identifiers"
-	"github.com/containerd/containerd/linux/runcopts"
+	"github.com/containerd/containerd/linux/runctypes"
 	client "github.com/containerd/containerd/linux/shim"
 	shim "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
@@ -193,7 +193,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 			if err != nil {
 				return nil, err
 			}
-			cgroup = v.(*runcopts.CreateOptions).ShimCgroup
+			cgroup = v.(*runctypes.CreateOptions).ShimCgroup
 		}
 		exitHandler := func() {
 			log.G(ctx).WithField("id", id).Info("shim reaped")
@@ -493,7 +493,7 @@ func (r *Runtime) getRuntime(ctx context.Context, ns, id string) (*runc.Runc, er
 	}, nil
 }
 
-func (r *Runtime) getRuncOptions(ctx context.Context, id string) (*runcopts.RuncOptions, error) {
+func (r *Runtime) getRuncOptions(ctx context.Context, id string) (*runctypes.RuncOptions, error) {
 	var container containers.Container
 
 	if err := r.db.View(func(tx *bolt.Tx) error {
@@ -510,7 +510,7 @@ func (r *Runtime) getRuncOptions(ctx context.Context, id string) (*runcopts.Runc
 		if err != nil {
 			return nil, err
 		}
-		ropts, ok := v.(*runcopts.RuncOptions)
+		ropts, ok := v.(*runctypes.RuncOptions)
 		if !ok {
 			return nil, errors.New("invalid runtime options format")
 		}

@@ -348,7 +348,7 @@ func (s *service) ListPids(ctx context.Context, r *api.ListPidsRequest) (*api.Li
 	}
 	var processes []*task.ProcessInfo
 	for _, p := range processList {
-		processInfo := task.ProcessInfo{
+		pInfo := task.ProcessInfo{
 			Pid: p.Pid,
 		}
 		if p.Info != nil {
@@ -356,9 +356,9 @@ func (s *service) ListPids(ctx context.Context, r *api.ListPidsRequest) (*api.Li
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to marshal process %d info", p.Pid)
 			}
-			processInfo.Info = a
+			pInfo.Info = a
 		}
-		processes = append(processes, &processInfo)
+		processes = append(processes, &pInfo)
 	}
 	return &api.ListPidsResponse{
 		Processes: processes,

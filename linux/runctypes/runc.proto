@@ -4,7 +4,7 @@ package containerd.linux.runc;
 
 import "gogoproto/gogo.proto";
 
-option go_package = "github.com/containerd/containerd/linux/runcopts;runcopts";
+option go_package = "github.com/containerd/containerd/linux/runctypes;runctypes";
 
 message RuncOptions {
 	string runtime = 1;
@@ -35,4 +35,8 @@ message CheckpointOptions {
 	bool file_locks = 5;
 	repeated string empty_namespaces = 6;
 	string cgroups_mode = 7;
+}
+
+message ProcessDetails {
+	string exec_id = 1;
 }
