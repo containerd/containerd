@@ -175,13 +175,14 @@ func (t *task) Start(ctx context.Context) error {
 func (t *task) Kill(ctx context.Context, s syscall.Signal, opts ...KillOpts) error {
 	var i KillInfo
 	for _, o := range opts {
-		if err := o(ctx, t, &i); err != nil {
+		if err := o(ctx, &i); err != nil {
 			return err
 		}
 	}
 	_, err := t.client.TaskService().Kill(ctx, &tasks.KillRequest{
 		Signal:      uint32(s),
 		ContainerID: t.id,
+		ExecID:      i.ExecID,
 		All:         i.All,
 	})
 	if err != nil {
