@@ -104,7 +104,7 @@ func (p *process) Start(ctx context.Context) error {
 func (p *process) Kill(ctx context.Context, s syscall.Signal, opts ...KillOpts) error {
 	var i KillInfo
 	for _, o := range opts {
-		if err := o(ctx, p, &i); err != nil {
+		if err := o(ctx, &i); err != nil {
 			return err
 		}
 	}

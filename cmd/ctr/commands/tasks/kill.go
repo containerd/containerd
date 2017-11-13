@@ -1,13 +1,12 @@
 package tasks
 
 import (
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
-// TODO:(jessvalarezo) the pid flag is not used here
-// update to be able to signal given pid
 var killCommand = cli.Command{
 	Name:      "kill",
 	Usage:     "signal a container (default: SIGTERM)",
@@ -18,10 +17,9 @@ var killCommand = cli.Command{
 			Value: "SIGTERM",
 			Usage: "signal to send to the container",
 		},
-		cli.IntFlag{
-			Name:  "pid",
-			Usage: "pid to kill",
-			Value: 0,
+		cli.StringFlag{
+			Name:  "exec-id",
+			Usage: "process ID to kill",
 		},
 		cli.BoolFlag{
 			Name:  "all, a",
@@ -38,17 +36,24 @@ var killCommand = cli.Command{
 			return err
 		}
 		var (
-			pid = context.Int("pid")
-			all = context.Bool("all")
+			all    = context.Bool("all")
+			execID = context.String("exec-id")
+			opts   []containerd.KillOpts
 		)
-		if pid > 0 && all {
-			return errors.New("enter a pid or all; not both")
+		if all && execID != "" {
+			return errors.New("specify an exec-id or all; not both")
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
 		defer cancel()
+		if all {
+			opts = append(opts, containerd.WithKillAll)
+		}
+		if execID != "" {
+			opts = append(opts, containerd.WithKillExecID(execID))
+		}
 		container, err := client.LoadContainer(ctx, id)
 		if err != nil {
 			return err
@@ -57,6 +62,6 @@ var killCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		return task.Kill(ctx, signal)
+		return task.Kill(ctx, signal, opts...)
 	},
 }
