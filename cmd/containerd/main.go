@@ -22,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+	"strings"
 )
 
 const usage = `
@@ -124,7 +125,12 @@ func main() {
 			serve(log.WithModule(ctx, "metrics"), l, server.ServeMetrics)
 		}
 
-		l, err := sys.GetLocalListener(address, config.GRPC.UID, config.GRPC.GID)
+		var l net.Listener
+		if strings.HasPrefix(address, "tcp://") {
+			l, err = net.Listen("tcp", strings.TrimPrefix(address, "tcp://"))
+		} else {
+			l, err = sys.GetLocalListener(address, config.GRPC.UID, config.GRPC.GID)
+		}
 		if err != nil {
 			return errors.Wrapf(err, "failed to get listener for main endpoint")
 		}
@@ -141,12 +147,12 @@ func main() {
 }
 
 func serve(ctx context.Context, l net.Listener, serveFunc func(net.Listener) error) {
-	path := l.Addr().String()
-	log.G(ctx).WithField("address", path).Info("serving...")
+	addr := l.Addr().String()
+	log.G(ctx).WithField("address", addr).Info("serving...")
 	go func() {
 		defer l.Close()
 		if err := serveFunc(l); err != nil {
-			log.G(ctx).WithError(err).WithField("address", path).Fatal("serve failure")
+			log.G(ctx).WithError(err).WithField("address", addr).Fatal("serve failure")
 		}
 	}()
 }
