@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"sync"
 	"syscall"
@@ -114,6 +115,9 @@ func (e *execProcess) delete(ctx context.Context) error {
 		}
 		e.io.Close()
 	}
+	pidfile := filepath.Join(e.path, fmt.Sprintf("%s.pid", e.id))
+	// silently ignore error
+	os.Remove(pidfile)
 	return nil
 }
 
