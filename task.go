@@ -8,7 +8,6 @@ import (
 	"io"
 	goruntime "runtime"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -152,8 +151,6 @@ type task struct {
 	io  cio.IO
 	id  string
 	pid uint32
-
-	mu sync.Mutex
 }
 
 // Pid returns the pid or process id for the task

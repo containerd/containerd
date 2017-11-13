@@ -5,7 +5,9 @@ package main
 import (
 	"context"
 	"os"
+	"runtime"
 
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/log"
@@ -54,4 +56,19 @@ func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *se
 		}
 	}()
 	return done
+}
+
+func dumpStacks() {
+	var (
+		buf       []byte
+		stackSize int
+	)
+	bufferLen := 16384
+	for stackSize == len(buf) {
+		buf = make([]byte, bufferLen)
+		stackSize = runtime.Stack(buf, true)
+		bufferLen *= 2
+	}
+	buf = buf[:stackSize]
+	logrus.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
 }

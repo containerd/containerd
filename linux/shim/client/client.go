@@ -154,11 +154,6 @@ func connect(address string, d func(string, time.Duration) (net.Conn, error)) (*
 	return conn, nil
 }
 
-func dialer(address string, timeout time.Duration) (net.Conn, error) {
-	address = strings.TrimPrefix(address, "unix://")
-	return net.DialTimeout("unix", address, timeout)
-}
-
 func annonDialer(address string, timeout time.Duration) (net.Conn, error) {
 	address = strings.TrimPrefix(address, "unix://")
 	return net.DialTimeout("unix", "\x00"+address, timeout)

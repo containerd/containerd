@@ -24,7 +24,6 @@ func TestRootPath(t *testing.T) {
 		name   string
 		apply  fstest.Applier
 		checks []RootCheck
-		scope  func(string) (string, error)
 	}{
 		{
 			name:   "SymlinkAbsolute",

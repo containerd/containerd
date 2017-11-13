@@ -9,43 +9,9 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/containerd/console"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 )
-
-func copyConsole(ctx context.Context, console console.Console, stdin, stdout, stderr string, wg, cwg *sync.WaitGroup) error {
-	if stdin != "" {
-		in, err := fifo.OpenFifo(ctx, stdin, syscall.O_RDONLY, 0)
-		if err != nil {
-			return err
-		}
-		cwg.Add(1)
-		go func() {
-			cwg.Done()
-			io.Copy(console, in)
-		}()
-	}
-	outw, err := fifo.OpenFifo(ctx, stdout, syscall.O_WRONLY, 0)
-	if err != nil {
-		return err
-	}
-	outr, err := fifo.OpenFifo(ctx, stdout, syscall.O_RDONLY, 0)
-	if err != nil {
-		return err
-	}
-	wg.Add(1)
-	cwg.Add(1)
-	go func() {
-		cwg.Done()
-		io.Copy(outw, console)
-		console.Close()
-		outr.Close()
-		outw.Close()
-		wg.Done()
-	}()
-	return nil
-}
 
 func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, wg, cwg *sync.WaitGroup) error {
 	for name, dest := range map[string]func(wc io.WriteCloser, rc io.Closer){

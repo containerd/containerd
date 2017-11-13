@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/textproto"
 	"net/url"
 	"path"
 	"strconv"
@@ -403,22 +402,6 @@ func copyRequest(req *http.Request) (*http.Request, error) {
 		}
 	}
 	return &ireq, nil
-}
-
-func isManifestAccept(h http.Header) bool {
-	for _, ah := range h[textproto.CanonicalMIMEHeaderKey("Accept")] {
-		switch ah {
-		case images.MediaTypeDockerSchema2Manifest:
-			fallthrough
-		case images.MediaTypeDockerSchema2ManifestList:
-			fallthrough
-		case ocispec.MediaTypeImageManifest:
-			fallthrough
-		case ocispec.MediaTypeImageIndex:
-			return true
-		}
-	}
-	return false
 }
 
 func (r *dockerBase) setTokenAuth(ctx context.Context, params map[string]string) error {
