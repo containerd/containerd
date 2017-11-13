@@ -51,9 +51,9 @@ type walkingDiff struct {
 
 var emptyDesc = ocispec.Descriptor{}
 
-// NewWalkingDiff is a generic implementation of diff.Differ.
+// NewWalkingDiff is a generic implementation of diff.DiffApplier.
 // NewWalkingDiff is expected to work with any filesystem.
-func NewWalkingDiff(store content.Store) (diff.Differ, error) {
+func NewWalkingDiff(store content.Store) (diff.DiffApplier, error) {
 	return &walkingDiff{
 		store: store,
 	}, nil
@@ -125,9 +125,9 @@ func (s *walkingDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts
 	return ocidesc, nil
 }
 
-// DiffMounts creates a diff between the given mounts and uploads the result
+// Diff creates a diff between the given mounts and uploads the result
 // to the content store.
-func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
+func (s *walkingDiff) Diff(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
 	var config diff.Config
 	for _, opt := range opts {
 		if err := opt(&config); err != nil {

@@ -42,5 +42,5 @@ func Diff(ctx context.Context, snapshotID string, sn snapshots.Snapshotter, d di
 		defer sn.Remove(ctx, upperKey)
 	}
 
-	return d.DiffMounts(ctx, lower, upper, opts...)
+	return d.Diff(ctx, lower, upper, opts...)
 }

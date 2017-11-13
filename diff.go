@@ -11,7 +11,7 @@ import (
 
 // NewDiffServiceFromClient returns a new diff service which communicates
 // over a GRPC connection.
-func NewDiffServiceFromClient(client diffapi.DiffClient) diff.Differ {
+func NewDiffServiceFromClient(client diffapi.DiffClient) diff.DiffApplier {
 	return &diffRemote{
 		client: client,
 	}
@@ -33,7 +33,7 @@ func (r *diffRemote) Apply(ctx context.Context, diff ocispec.Descriptor, mounts 
 	return toDescriptor(resp.Applied), nil
 }
 
-func (r *diffRemote) DiffMounts(ctx context.Context, a, b []mount.Mount, opts ...diff.Opt) (ocispec.Descriptor, error) {
+func (r *diffRemote) Diff(ctx context.Context, a, b []mount.Mount, opts ...diff.Opt) (ocispec.Descriptor, error) {
 	var config diff.Config
 	for _, opt := range opts {
 		if err := opt(&config); err != nil {

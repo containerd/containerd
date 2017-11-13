@@ -38,7 +38,7 @@ func init() {
 			}
 
 			orderedNames := ic.Config.(*config).Order
-			ordered := make([]diff.Differ, len(orderedNames))
+			ordered := make([]diff.DiffApplier, len(orderedNames))
 			for i, n := range orderedNames {
 				differp, ok := differs[n]
 				if !ok {
@@ -49,7 +49,10 @@ func init() {
 					return nil, errors.Wrapf(err, "could not load required differ due plugin init error: %s", n)
 				}
 
-				ordered[i] = differ.(diff.Differ)
+				ordered[i], ok = differ.(diff.DiffApplier)
+				if !ok {
+					return nil, errors.Errorf("differ does not implement diff.DiffApplier interface: %s", n)
+				}
 			}
 
 			return &service{
@@ -60,7 +63,7 @@ func init() {
 }
 
 type service struct {
-	differs []diff.Differ
+	differs []diff.DiffApplier
 }
 
 func (s *service) Register(gs *grpc.Server) error {
@@ -113,7 +116,7 @@ func (s *service) Diff(ctx context.Context, dr *diffapi.DiffRequest) (*diffapi.D
 	}
 
 	for _, differ := range s.differs {
-		ocidesc, err = differ.DiffMounts(ctx, aMounts, bMounts, opts...)
+		ocidesc, err = differ.Diff(ctx, aMounts, bMounts, opts...)
 		if !errdefs.IsNotImplemented(err) {
 			break
 		}
