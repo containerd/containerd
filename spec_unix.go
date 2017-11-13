@@ -142,8 +142,6 @@ func createDefaultSpec(ctx context.Context, id string) (*specs.Spec, error) {
 			},
 		},
 		Linux: &specs.Linux{
-			// TODO (AkihiroSuda): unmask /sys/firmware on Windows daemon for LCOW support?
-			// https://github.com/moby/moby/pull/33241/files#diff-a1f5051ce84e711a2ee688ab9ded5e74R215
 			MaskedPaths: []string{
 				"/proc/kcore",
 				"/proc/latency_stats",
