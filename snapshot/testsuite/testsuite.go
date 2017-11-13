@@ -600,7 +600,7 @@ func checkUpdate(ctx context.Context, t *testing.T, snapshotter snapshot.Snapsho
 			continue
 		}
 		if st.Kind != tc.kind {
-			t.Errorf("(%s) unexpected kind %s, expected %s", tc.name, st.Kind, tc.kind)
+			t.Errorf("(%s) unexpected kind %s, expected %s", tc.name, st.Kind.String(), tc.kind.String())
 			continue
 		}
 		if st.Parent != tc.parent {
@@ -636,7 +636,7 @@ func checkUpdate(ctx context.Context, t *testing.T, snapshotter snapshot.Snapsho
 			continue
 		}
 		if st.Kind != tc.kind {
-			t.Errorf("(%s) unexpected kind %s, expected %s", tc.name, st.Kind, tc.kind)
+			t.Errorf("(%s) unexpected kind %s, expected %s", tc.name, st.Kind.String(), tc.kind.String())
 			continue
 		}
 		if st.Parent != tc.parent {
