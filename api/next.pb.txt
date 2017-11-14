@@ -2193,6 +2193,13 @@ file {
       type: TYPE_STRING
       json_name: "name"
     }
+    field {
+      name: "sync"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "sync"
+    }
   }
   service {
     name: "Images"
