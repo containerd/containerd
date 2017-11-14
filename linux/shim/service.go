@@ -15,6 +15,7 @@ import (
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/linux/proc"
 	"github.com/containerd/containerd/linux/runctypes"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
@@ -31,9 +32,6 @@ import (
 
 var empty = &google_protobuf.Empty{}
 
-// RuncRoot is the path to the root runc state directory
-const RuncRoot = "/run/containerd/runc"
-
 // Config contains shim specific configuration
 type Config struct {
 	Path          string
@@ -49,16 +47,16 @@ func NewService(config Config, publisher events.Publisher) (*Service, error) {
 	if config.Namespace == "" {
 		return nil, fmt.Errorf("shim namespace cannot be empty")
 	}
-	context := namespaces.WithNamespace(context.Background(), config.Namespace)
-	context = log.WithLogger(context, logrus.WithFields(logrus.Fields{
+	ctx := namespaces.WithNamespace(context.Background(), config.Namespace)
+	ctx = log.WithLogger(ctx, logrus.WithFields(logrus.Fields{
 		"namespace": config.Namespace,
 		"path":      config.Path,
 		"pid":       os.Getpid(),
 	}))
 	s := &Service{
 		config:    config,
-		context:   context,
-		processes: make(map[string]process),
+		context:   ctx,
+		processes: make(map[string]proc.Process),
 		events:    make(chan interface{}, 128),
 		ec:        reaper.Default.Subscribe(),
 	}
@@ -70,23 +68,15 @@ func NewService(config Config, publisher events.Publisher) (*Service, error) {
 	return s, nil
 }
 
-// platform handles platform-specific behavior that may differs across
-// platform implementations
-type platform interface {
-	copyConsole(ctx context.Context, console console.Console, stdin, stdout, stderr string, wg, cwg *sync.WaitGroup) (console.Console, error)
-	shutdownConsole(ctx context.Context, console console.Console) error
-	close() error
-}
-
 // Service is the shim implementation of a remote shim over GRPC
 type Service struct {
 	mu sync.Mutex
 
 	config    Config
 	context   context.Context
-	processes map[string]process
+	processes map[string]proc.Process
 	events    chan interface{}
-	platform  platform
+	platform  proc.Platform
 	ec        chan runc.Exit
 
 	// Filled by Create()
@@ -98,7 +88,29 @@ type Service struct {
 func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*shimapi.CreateTaskResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	process, err := s.newInitProcess(ctx, r)
+	process, err := proc.New(
+		ctx,
+		s.config.Path,
+		s.config.WorkDir,
+		s.config.RuntimeRoot,
+		s.config.Namespace,
+		s.config.Criu,
+		s.config.SystemdCgroup,
+		s.platform,
+		&proc.CreateConfig{
+			ID:               r.ID,
+			Bundle:           r.Bundle,
+			Runtime:          r.Runtime,
+			Rootfs:           r.Rootfs,
+			Terminal:         r.Terminal,
+			Stdin:            r.Stdin,
+			Stdout:           r.Stdout,
+			Stderr:           r.Stderr,
+			Checkpoint:       r.Checkpoint,
+			ParentCheckpoint: r.ParentCheckpoint,
+			Options:          r.Options,
+		},
+	)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -107,19 +119,6 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*sh
 	s.bundle = r.Bundle
 	pid := process.Pid()
 	s.processes[r.ID] = process
-	s.events <- &eventsapi.TaskCreate{
-		ContainerID: r.ID,
-		Bundle:      r.Bundle,
-		Rootfs:      r.Rootfs,
-		IO: &eventsapi.TaskIO{
-			Stdin:    r.Stdin,
-			Stdout:   r.Stdout,
-			Stderr:   r.Stderr,
-			Terminal: r.Terminal,
-		},
-		Checkpoint: r.Checkpoint,
-		Pid:        uint32(pid),
-	}
 	return &shimapi.CreateTaskResponse{
 		Pid: uint32(pid),
 	}, nil
@@ -135,19 +134,6 @@ func (s *Service) Start(ctx context.Context, r *shimapi.StartRequest) (*shimapi.
 	}
 	if err := p.Start(ctx); err != nil {
 		return nil, err
-	}
-	if r.ID == s.id {
-		s.events <- &eventsapi.TaskStart{
-			ContainerID: s.id,
-			Pid:         uint32(p.Pid()),
-		}
-	} else {
-		pid := p.Pid()
-		s.events <- &eventsapi.TaskExecStarted{
-			ContainerID: s.id,
-			ExecID:      r.ID,
-			Pid:         uint32(pid),
-		}
 	}
 	return &shimapi.StartResponse{
 		ID:  p.ID(),
@@ -168,13 +154,7 @@ func (s *Service) Delete(ctx context.Context, r *google_protobuf.Empty) (*shimap
 		return nil, err
 	}
 	delete(s.processes, s.id)
-	s.platform.close()
-	s.events <- &eventsapi.TaskDelete{
-		ContainerID: s.id,
-		ExitStatus:  uint32(p.ExitStatus()),
-		ExitedAt:    p.ExitedAt(),
-		Pid:         uint32(p.Pid()),
-	}
+	s.platform.Close()
 	return &shimapi.DeleteResponse{
 		ExitStatus: uint32(p.ExitStatus()),
 		ExitedAt:   p.ExitedAt(),
@@ -218,16 +198,18 @@ func (s *Service) Exec(ctx context.Context, r *shimapi.ExecProcessRequest) (*goo
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
 
-	process, err := newExecProcess(ctx, s.config.Path, r, p.(*initProcess), r.ID)
+	process, err := p.(*proc.Init).Exec(ctx, s.config.Path, &proc.ExecConfig{
+		ID:       r.ID,
+		Terminal: r.Terminal,
+		Stdin:    r.Stdin,
+		Stdout:   r.Stdout,
+		Stderr:   r.Stderr,
+		Spec:     r.Spec,
+	})
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 	s.processes[r.ID] = process
-
-	s.events <- &eventsapi.TaskExecAdded{
-		ContainerID: s.id,
-		ExecID:      r.ID,
-	}
 	return empty, nil
 }
 
@@ -283,10 +265,10 @@ func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.
 		Bundle:     s.bundle,
 		Pid:        uint32(p.Pid()),
 		Status:     status,
-		Stdin:      sio.stdin,
-		Stdout:     sio.stdout,
-		Stderr:     sio.stderr,
-		Terminal:   sio.terminal,
+		Stdin:      sio.Stdin,
+		Stdout:     sio.Stdout,
+		Stderr:     sio.Stderr,
+		Terminal:   sio.Terminal,
 		ExitStatus: uint32(p.ExitStatus()),
 		ExitedAt:   p.ExitedAt(),
 	}, nil
@@ -300,11 +282,8 @@ func (s *Service) Pause(ctx context.Context, r *google_protobuf.Empty) (*google_
 	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
-	if err := p.(*initProcess).Pause(ctx); err != nil {
+	if err := p.(*proc.Init).Pause(ctx); err != nil {
 		return nil, err
-	}
-	s.events <- &eventsapi.TaskPaused{
-		ContainerID: s.id,
 	}
 	return empty, nil
 }
@@ -317,11 +296,8 @@ func (s *Service) Resume(ctx context.Context, r *google_protobuf.Empty) (*google
 	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
-	if err := p.(*initProcess).Resume(ctx); err != nil {
+	if err := p.(*proc.Init).Resume(ctx); err != nil {
 		return nil, err
-	}
-	s.events <- &eventsapi.TaskResumed{
-		ContainerID: s.id,
 	}
 	return empty, nil
 }
@@ -406,11 +382,11 @@ func (s *Service) Checkpoint(ctx context.Context, r *shimapi.CheckpointTaskReque
 	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
-	if err := p.(*initProcess).Checkpoint(ctx, r); err != nil {
+	if err := p.(*proc.Init).Checkpoint(ctx, &proc.CheckpointConfig{
+		Path:    r.Path,
+		Options: r.Options,
+	}); err != nil {
 		return nil, errdefs.ToGRPC(err)
-	}
-	s.events <- &eventsapi.TaskCheckpointed{
-		ContainerID: s.id,
 	}
 	return empty, nil
 }
@@ -430,7 +406,7 @@ func (s *Service) Update(ctx context.Context, r *shimapi.UpdateTaskRequest) (*go
 	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
-	if err := p.(*initProcess).Update(ctx, r); err != nil {
+	if err := p.(*proc.Init).Update(ctx, r.Resources); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 	return empty, nil
@@ -463,9 +439,9 @@ func (s *Service) checkProcesses(e runc.Exit) {
 	defer s.mu.Unlock()
 	for _, p := range s.processes {
 		if p.Pid() == e.Pid {
-			if ip, ok := p.(*initProcess); ok {
+			if ip, ok := p.(*proc.Init); ok {
 				// Ensure all children are killed
-				if err := ip.killAll(s.context); err != nil {
+				if err := ip.KillAll(s.context); err != nil {
 					log.G(s.context).WithError(err).WithField("id", ip.ID()).
 						Error("failed to kill init's children")
 				}
@@ -491,7 +467,7 @@ func (s *Service) getContainerPids(ctx context.Context, id string) ([]uint32, er
 		return nil, errors.Wrapf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
 
-	ps, err := p.(*initProcess).runtime.Ps(ctx, id)
+	ps, err := p.(*proc.Init).Runtime().Ps(ctx, id)
 	if err != nil {
 		return nil, err
 	}

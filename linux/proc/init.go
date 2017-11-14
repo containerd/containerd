@@ -1,6 +1,6 @@
 // +build !windows
 
-package shim
+package proc
 
 import (
 	"context"
@@ -15,14 +15,13 @@ import (
 	"time"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/linux/runctypes"
-	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
+	google_protobuf "github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
@@ -30,7 +29,8 @@ import (
 // InitPidFile name of the file that contains the init pid
 const InitPidFile = "init.pid"
 
-type initProcess struct {
+// Init represents an initial process for a container
+type Init struct {
 	wg sync.WaitGroup
 	initState
 
@@ -47,7 +47,7 @@ type initProcess struct {
 	id       string
 	bundle   string
 	console  console.Console
-	platform platform
+	platform Platform
 	io       runc.IO
 	runtime  *runc.Runc
 	status   int
@@ -55,18 +55,32 @@ type initProcess struct {
 	pid      int
 	closers  []io.Closer
 	stdin    io.Closer
-	stdio    stdio
+	stdio    Stdio
 	rootfs   string
 	IoUID    int
 	IoGID    int
 }
 
-func (s *Service) newInitProcess(context context.Context, r *shimapi.CreateTaskRequest) (*initProcess, error) {
+// NewRunc returns a new runc instance for a process
+func NewRunc(root, path, namespace, runtime, criu string, systemd bool) *runc.Runc {
+	if root == "" {
+		root = RuncRoot
+	}
+	return &runc.Runc{
+		Command:       runtime,
+		Log:           filepath.Join(path, "log.json"),
+		LogFormat:     runc.JSON,
+		PdeathSignal:  syscall.SIGKILL,
+		Root:          filepath.Join(root, namespace),
+		Criu:          criu,
+		SystemdCgroup: systemd,
+	}
+}
+
+// New returns a new init process
+func New(context context.Context, path, workDir, runtimeRoot, namespace, criu string, systemdCgroup bool, platform Platform, r *CreateConfig) (*Init, error) {
 	var success bool
 
-	if err := identifiers.Validate(r.ID); err != nil {
-		return nil, errors.Wrapf(err, "invalid task id")
-	}
 	var options runctypes.CreateOptions
 	if r.Options != nil {
 		v, err := typeurl.UnmarshalAny(r.Options)
@@ -76,7 +90,7 @@ func (s *Service) newInitProcess(context context.Context, r *shimapi.CreateTaskR
 		options = *v.(*runctypes.CreateOptions)
 	}
 
-	rootfs := filepath.Join(s.config.Path, "rootfs")
+	rootfs := filepath.Join(path, "rootfs")
 	// count the number of successful mounts so we can undo
 	// what was actually done rather than what should have been
 	// done.
@@ -98,32 +112,20 @@ func (s *Service) newInitProcess(context context.Context, r *shimapi.CreateTaskR
 			return nil, errors.Wrapf(err, "failed to mount rootfs component %v", m)
 		}
 	}
-	root := s.config.RuntimeRoot
-	if root == "" {
-		root = RuncRoot
-	}
-	runtime := &runc.Runc{
-		Command:       r.Runtime,
-		Log:           filepath.Join(s.config.Path, "log.json"),
-		LogFormat:     runc.JSON,
-		PdeathSignal:  syscall.SIGKILL,
-		Root:          filepath.Join(root, s.config.Namespace),
-		Criu:          s.config.Criu,
-		SystemdCgroup: s.config.SystemdCgroup,
-	}
-	p := &initProcess{
+	runtime := NewRunc(runtimeRoot, path, namespace, r.Runtime, criu, systemdCgroup)
+	p := &Init{
 		id:       r.ID,
 		bundle:   r.Bundle,
 		runtime:  runtime,
-		platform: s.platform,
-		stdio: stdio{
-			stdin:    r.Stdin,
-			stdout:   r.Stdout,
-			stderr:   r.Stderr,
-			terminal: r.Terminal,
+		platform: platform,
+		stdio: Stdio{
+			Stdin:    r.Stdin,
+			Stdout:   r.Stdout,
+			Stderr:   r.Stderr,
+			Terminal: r.Terminal,
 		},
 		rootfs:    rootfs,
-		workDir:   s.config.WorkDir,
+		workDir:   workDir,
 		status:    0,
 		waitBlock: make(chan struct{}),
 		IoUID:     int(options.IoUid),
@@ -148,7 +150,7 @@ func (s *Service) newInitProcess(context context.Context, r *shimapi.CreateTaskR
 			return nil, errors.Wrap(err, "failed to create OCI runtime io pipes")
 		}
 	}
-	pidFile := filepath.Join(s.config.Path, InitPidFile)
+	pidFile := filepath.Join(path, InitPidFile)
 	if r.Checkpoint != "" {
 		opts := &runc.RestoreOpts{
 			CheckpointOpts: runc.CheckpointOpts{
@@ -195,7 +197,7 @@ func (s *Service) newInitProcess(context context.Context, r *shimapi.CreateTaskR
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to retrieve console master")
 		}
-		console, err = s.platform.copyConsole(context, console, r.Stdin, r.Stdout, r.Stderr, &p.wg, &copyWaitGroup)
+		console, err = platform.CopyConsole(context, console, r.Stdin, r.Stdout, r.Stderr, &p.wg, &copyWaitGroup)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to start console copy")
 		}
@@ -216,31 +218,37 @@ func (s *Service) newInitProcess(context context.Context, r *shimapi.CreateTaskR
 	return p, nil
 }
 
-func (p *initProcess) Wait() {
+// Wait for the process to exit
+func (p *Init) Wait() {
 	<-p.waitBlock
 }
 
-func (p *initProcess) ID() string {
+// ID of the process
+func (p *Init) ID() string {
 	return p.id
 }
 
-func (p *initProcess) Pid() int {
+// Pid of the process
+func (p *Init) Pid() int {
 	return p.pid
 }
 
-func (p *initProcess) ExitStatus() int {
+// ExitStatus of the process
+func (p *Init) ExitStatus() int {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.status
 }
 
-func (p *initProcess) ExitedAt() time.Time {
+// ExitedAt at time when the process exited
+func (p *Init) ExitedAt() time.Time {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.exited
 }
 
-func (p *initProcess) Status(ctx context.Context) (string, error) {
+// Status of the process
+func (p *Init) Status(ctx context.Context) (string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	c, err := p.runtime.State(ctx, p.id)
@@ -253,20 +261,20 @@ func (p *initProcess) Status(ctx context.Context) (string, error) {
 	return c.Status, nil
 }
 
-func (p *initProcess) start(context context.Context) error {
+func (p *Init) start(context context.Context) error {
 	err := p.runtime.Start(context, p.id)
 	return p.runtimeError(err, "OCI runtime start failed")
 }
 
-func (p *initProcess) setExited(status int) {
+func (p *Init) setExited(status int) {
 	p.exited = time.Now()
 	p.status = status
-	p.platform.shutdownConsole(context.Background(), p.console)
+	p.platform.ShutdownConsole(context.Background(), p.console)
 	close(p.waitBlock)
 }
 
-func (p *initProcess) delete(context context.Context) error {
-	p.killAll(context)
+func (p *Init) delete(context context.Context) error {
+	p.KillAll(context)
 	p.wg.Wait()
 	err := p.runtime.Delete(context, p.id, nil)
 	// ignore errors if a runtime has already deleted the process
@@ -296,42 +304,75 @@ func (p *initProcess) delete(context context.Context) error {
 	return err
 }
 
-func (p *initProcess) resize(ws console.WinSize) error {
+func (p *Init) resize(ws console.WinSize) error {
 	if p.console == nil {
 		return nil
 	}
 	return p.console.Resize(ws)
 }
 
-func (p *initProcess) pause(context context.Context) error {
+func (p *Init) pause(context context.Context) error {
 	err := p.runtime.Pause(context, p.id)
 	return p.runtimeError(err, "OCI runtime pause failed")
 }
 
-func (p *initProcess) resume(context context.Context) error {
+func (p *Init) resume(context context.Context) error {
 	err := p.runtime.Resume(context, p.id)
 	return p.runtimeError(err, "OCI runtime resume failed")
 }
 
-func (p *initProcess) kill(context context.Context, signal uint32, all bool) error {
+func (p *Init) kill(context context.Context, signal uint32, all bool) error {
 	err := p.runtime.Kill(context, p.id, int(signal), &runc.KillOpts{
 		All: all,
 	})
 	return checkKillError(err)
 }
 
-func (p *initProcess) killAll(context context.Context) error {
+// KillAll processes belonging to the init process
+func (p *Init) KillAll(context context.Context) error {
 	err := p.runtime.Kill(context, p.id, int(syscall.SIGKILL), &runc.KillOpts{
 		All: true,
 	})
 	return p.runtimeError(err, "OCI runtime killall failed")
 }
 
-func (p *initProcess) Stdin() io.Closer {
+// Stdin of the process
+func (p *Init) Stdin() io.Closer {
 	return p.stdin
 }
 
-func (p *initProcess) checkpoint(context context.Context, r *shimapi.CheckpointTaskRequest) error {
+// Runtime returns the OCI runtime configured for the init process
+func (p *Init) Runtime() *runc.Runc {
+	return p.runtime
+}
+
+// Exec returns a new exec'd process
+func (p *Init) Exec(context context.Context, path string, r *ExecConfig) (Process, error) {
+	// process exec request
+	var spec specs.Process
+	if err := json.Unmarshal(r.Spec.Value, &spec); err != nil {
+		return nil, err
+	}
+	spec.Terminal = r.Terminal
+
+	e := &execProcess{
+		id:     r.ID,
+		path:   path,
+		parent: p,
+		spec:   spec,
+		stdio: Stdio{
+			Stdin:    r.Stdin,
+			Stdout:   r.Stdout,
+			Stderr:   r.Stderr,
+			Terminal: r.Terminal,
+		},
+		waitBlock: make(chan struct{}),
+	}
+	e.State = &execCreatedState{p: e}
+	return e, nil
+}
+
+func (p *Init) checkpoint(context context.Context, r *CheckpointConfig) error {
 	var options runctypes.CheckpointOptions
 	if r.Options != nil {
 		v, err := typeurl.UnmarshalAny(r.Options)
@@ -364,19 +405,20 @@ func (p *initProcess) checkpoint(context context.Context, r *shimapi.CheckpointT
 	return nil
 }
 
-func (p *initProcess) update(context context.Context, r *shimapi.UpdateTaskRequest) error {
+func (p *Init) update(context context.Context, r *google_protobuf.Any) error {
 	var resources specs.LinuxResources
-	if err := json.Unmarshal(r.Resources.Value, &resources); err != nil {
+	if err := json.Unmarshal(r.Value, &resources); err != nil {
 		return err
 	}
 	return p.runtime.Update(context, p.id, &resources)
 }
 
-func (p *initProcess) Stdio() stdio {
+// Stdio of the process
+func (p *Init) Stdio() Stdio {
 	return p.stdio
 }
 
-func (p *initProcess) runtimeError(rErr error, msg string) error {
+func (p *Init) runtimeError(rErr error, msg string) error {
 	if rErr == nil {
 		return nil
 	}

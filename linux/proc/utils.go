@@ -1,6 +1,6 @@
 // +build !windows
 
-package shim
+package proc
 
 import (
 	"encoding/json"
@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
-	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	runc "github.com/containerd/go-runc"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
@@ -81,6 +80,6 @@ func checkKillError(err error) error {
 	return errors.Wrapf(err, "unknown error after kill")
 }
 
-func hasNoIO(r *shimapi.CreateTaskRequest) bool {
+func hasNoIO(r *CreateConfig) bool {
 	return r.Stdin == "" && r.Stdout == "" && r.Stderr == ""
 }

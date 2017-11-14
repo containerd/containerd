@@ -1,12 +1,12 @@
 // +build !windows
 
-package shim
+package proc
 
 import (
 	"context"
 
 	"github.com/containerd/console"
-	shimapi "github.com/containerd/containerd/linux/shim/v1"
+	google_protobuf "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 )
 
@@ -21,11 +21,11 @@ func (s *deletedState) Resume(ctx context.Context) error {
 	return errors.Errorf("cannot resume a deleted process")
 }
 
-func (s *deletedState) Update(context context.Context, r *shimapi.UpdateTaskRequest) error {
+func (s *deletedState) Update(context context.Context, r *google_protobuf.Any) error {
 	return errors.Errorf("cannot update a deleted process")
 }
 
-func (s *deletedState) Checkpoint(ctx context.Context, r *shimapi.CheckpointTaskRequest) error {
+func (s *deletedState) Checkpoint(ctx context.Context, r *CheckpointConfig) error {
 	return errors.Errorf("cannot checkpoint a deleted process")
 }
 

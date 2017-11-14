@@ -1,10 +1,9 @@
 // +build !windows
 
-package shim
+package proc
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -16,8 +15,6 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/identifiers"
-	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -27,7 +24,7 @@ import (
 type execProcess struct {
 	wg sync.WaitGroup
 
-	processState
+	State
 
 	mu      sync.Mutex
 	id      string
@@ -38,40 +35,12 @@ type execProcess struct {
 	pid     int
 	closers []io.Closer
 	stdin   io.Closer
-	stdio   stdio
+	stdio   Stdio
 	path    string
 	spec    specs.Process
 
-	parent    *initProcess
+	parent    *Init
 	waitBlock chan struct{}
-}
-
-func newExecProcess(context context.Context, path string, r *shimapi.ExecProcessRequest, parent *initProcess, id string) (process, error) {
-	if err := identifiers.Validate(id); err != nil {
-		return nil, errors.Wrapf(err, "invalid exec id")
-	}
-	// process exec request
-	var spec specs.Process
-	if err := json.Unmarshal(r.Spec.Value, &spec); err != nil {
-		return nil, err
-	}
-	spec.Terminal = r.Terminal
-
-	e := &execProcess{
-		id:     id,
-		path:   path,
-		parent: parent,
-		spec:   spec,
-		stdio: stdio{
-			stdin:    r.Stdin,
-			stdout:   r.Stdout,
-			stderr:   r.Stderr,
-			terminal: r.Terminal,
-		},
-		waitBlock: make(chan struct{}),
-	}
-	e.processState = &execCreatedState{p: e}
-	return e, nil
 }
 
 func (e *execProcess) Wait() {
@@ -103,7 +72,7 @@ func (e *execProcess) ExitedAt() time.Time {
 func (e *execProcess) setExited(status int) {
 	e.status = status
 	e.exited = time.Now()
-	e.parent.platform.shutdownConsole(context.Background(), e.console)
+	e.parent.platform.ShutdownConsole(context.Background(), e.console)
 	close(e.waitBlock)
 }
 
@@ -142,7 +111,7 @@ func (e *execProcess) Stdin() io.Closer {
 	return e.stdin
 }
 
-func (e *execProcess) Stdio() stdio {
+func (e *execProcess) Stdio() Stdio {
 	return e.stdio
 }
 
@@ -151,12 +120,12 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 		socket  *runc.Socket
 		pidfile = filepath.Join(e.path, fmt.Sprintf("%s.pid", e.id))
 	)
-	if e.stdio.terminal {
+	if e.stdio.Terminal {
 		if socket, err = runc.NewTempConsoleSocket(); err != nil {
 			return errors.Wrap(err, "failed to create runc console socket")
 		}
 		defer socket.Close()
-	} else if e.stdio.isNull() {
+	} else if e.stdio.IsNull() {
 		if e.io, err = runc.NewNullIO(); err != nil {
 			return errors.Wrap(err, "creating new NULL IO")
 		}
@@ -176,10 +145,10 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 	if err := e.parent.runtime.Exec(ctx, e.parent.id, e.spec, opts); err != nil {
 		return e.parent.runtimeError(err, "OCI runtime exec failed")
 	}
-	if e.stdio.stdin != "" {
-		sc, err := fifo.OpenFifo(ctx, e.stdio.stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
+	if e.stdio.Stdin != "" {
+		sc, err := fifo.OpenFifo(ctx, e.stdio.Stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
 		if err != nil {
-			return errors.Wrapf(err, "failed to open stdin fifo %s", e.stdio.stdin)
+			return errors.Wrapf(err, "failed to open stdin fifo %s", e.stdio.Stdin)
 		}
 		e.closers = append(e.closers, sc)
 		e.stdin = sc
@@ -190,11 +159,11 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 		if err != nil {
 			return errors.Wrap(err, "failed to retrieve console master")
 		}
-		if e.console, err = e.parent.platform.copyConsole(ctx, console, e.stdio.stdin, e.stdio.stdout, e.stdio.stderr, &e.wg, &copyWaitGroup); err != nil {
+		if e.console, err = e.parent.platform.CopyConsole(ctx, console, e.stdio.Stdin, e.stdio.Stdout, e.stdio.Stderr, &e.wg, &copyWaitGroup); err != nil {
 			return errors.Wrap(err, "failed to start console copy")
 		}
-	} else if !e.stdio.isNull() {
-		if err := copyPipes(ctx, e.io, e.stdio.stdin, e.stdio.stdout, e.stdio.stderr, &e.wg, &copyWaitGroup); err != nil {
+	} else if !e.stdio.IsNull() {
+		if err := copyPipes(ctx, e.io, e.stdio.Stdin, e.stdio.Stdout, e.stdio.Stderr, &e.wg, &copyWaitGroup); err != nil {
 			return errors.Wrap(err, "failed to start io pipe copy")
 		}
 	}

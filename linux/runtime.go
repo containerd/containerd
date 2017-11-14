@@ -17,8 +17,8 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/identifiers"
+	"github.com/containerd/containerd/linux/proc"
 	"github.com/containerd/containerd/linux/runctypes"
-	client "github.com/containerd/containerd/linux/shim"
 	shim "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
@@ -242,14 +242,14 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 		}
 	}()
 
-	runtime := r.config.Runtime
+	rt := r.config.Runtime
 	if ropts != nil && ropts.Runtime != "" {
-		runtime = ropts.Runtime
+		rt = ropts.Runtime
 	}
 	sopts := &shim.CreateTaskRequest{
 		ID:         id,
 		Bundle:     bundle.path,
-		Runtime:    runtime,
+		Runtime:    rt,
 		Stdin:      opts.IO.Stdin,
 		Stdout:     opts.IO.Stdout,
 		Stderr:     opts.IO.Stderr,
@@ -268,7 +268,8 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
-	t, err := newTask(id, namespace, int(cr.Pid), s, r.monitor)
+	t, err := newTask(id, namespace, int(cr.Pid), s, r.monitor, r.events,
+		proc.NewRunc(ropts.RuntimeRoot, sopts.Bundle, namespace, rt, ropts.CriuPath, ropts.SystemdCgroup))
 	if err != nil {
 		return nil, err
 	}
@@ -285,6 +286,20 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 			return nil, err
 		}
 	}
+	r.events.Publish(ctx, runtime.TaskCreateEventTopic, &eventsapi.TaskCreate{
+		ContainerID: sopts.ID,
+		Bundle:      sopts.Bundle,
+		Rootfs:      sopts.Rootfs,
+		IO: &eventsapi.TaskIO{
+			Stdin:    sopts.Stdin,
+			Stdout:   sopts.Stdout,
+			Stderr:   sopts.Stderr,
+			Terminal: sopts.Terminal,
+		},
+		Checkpoint: sopts.Checkpoint,
+		Pid:        uint32(t.pid),
+	})
+
 	return t, nil
 }
 
@@ -322,6 +337,12 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 	if err := bundle.Delete(); err != nil {
 		log.G(ctx).WithError(err).Error("failed to delete bundle")
 	}
+	r.events.Publish(ctx, runtime.TaskDeleteEventTopic, &eventsapi.TaskDelete{
+		ContainerID: lc.id,
+		ExitStatus:  rsp.ExitStatus,
+		ExitedAt:    rsp.ExitedAt,
+		Pid:         rsp.Pid,
+	})
 	return &runtime.Exit{
 		Status:    rsp.ExitStatus,
 		Timestamp: rsp.ExitedAt,
@@ -376,7 +397,8 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			filepath.Join(r.state, ns, id),
 			filepath.Join(r.root, ns, id),
 		)
-		pid, _ := runc.ReadPidFile(filepath.Join(bundle.path, client.InitPidFile))
+		ctx = namespaces.WithNamespace(ctx, ns)
+		pid, _ := runc.ReadPidFile(filepath.Join(bundle.path, proc.InitPidFile))
 		s, err := bundle.NewShimClient(ctx, ns, ShimConnect(), nil)
 		if err != nil {
 			log.G(ctx).WithError(err).WithFields(logrus.Fields{
@@ -390,8 +412,15 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			}
 			continue
 		}
+		ropts, err := r.getRuncOptions(ctx, id)
+		if err != nil {
+			log.G(ctx).WithError(err).WithField("id", id).
+				Error("get runtime options")
+			continue
+		}
 
-		t, err := newTask(id, ns, pid, s, r.monitor)
+		t, err := newTask(id, ns, pid, s, r.monitor, r.events,
+			proc.NewRunc(ropts.RuntimeRoot, bundle.path, ns, ropts.Runtime, ropts.CriuPath, ropts.SystemdCgroup))
 		if err != nil {
 			log.G(ctx).WithError(err).Error("loading task type")
 			continue
@@ -474,7 +503,7 @@ func (r *Runtime) getRuntime(ctx context.Context, ns, id string) (*runc.Runc, er
 
 	var (
 		cmd  = r.config.Runtime
-		root = client.RuncRoot
+		root = proc.RuncRoot
 	)
 	if ropts != nil {
 		if ropts.Runtime != "" {
@@ -517,5 +546,5 @@ func (r *Runtime) getRuncOptions(ctx context.Context, id string) (*runctypes.Run
 
 		return ropts, nil
 	}
-	return nil, nil
+	return &runctypes.RuncOptions{}, nil
 }
