@@ -169,7 +169,7 @@ uninstall:
 coverage: ## generate coverprofiles from the unit tests, except tests that require root
 	@echo "$(WHALE) $@"
 	@rm -f coverage.txt
-	go test -i ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES})
+	@go test -i ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES})
 	( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES}); do \
 		go test ${TESTFLAGS} \
 			-cover \
@@ -183,7 +183,7 @@ coverage: ## generate coverprofiles from the unit tests, except tests that requi
 
 root-coverage: ## generate coverage profiles for unit tests that require root
 	@echo "$(WHALE) $@"
-	go test -i ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES})
+	@go test -i ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES})
 	( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES}); do \
 		go test ${TESTFLAGS} \
 			-cover \
