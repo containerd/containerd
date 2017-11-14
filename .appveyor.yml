@@ -34,4 +34,4 @@ test_script:
   - bash.exe -elc "export PATH=/c/tools/mingw64/bin:/c/gopath/src/github.com/containerd/containerd/bin:$PATH ; mingw32-make.exe integration-parallel"
 
 on_success:
-  codecov --flag windows
+  codecov --flag windows -f coverage.txt

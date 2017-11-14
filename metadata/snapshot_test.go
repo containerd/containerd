@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/boltdb/bolt"
@@ -39,6 +40,9 @@ func newTestSnapshotter(ctx context.Context, root string) (snapshot.Snapshotter,
 }
 
 func TestMetadata(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("snapshotter not implemented on windows")
+	}
 	// Snapshot tests require mounting, still requires root
 	testutil.RequiresRoot(t)
 	testsuite.SnapshotterSuite(t, "Metadata", newTestSnapshotter)

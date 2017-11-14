@@ -2,6 +2,7 @@ package naive
 
 import (
 	"context"
+	"runtime"
 	"testing"
 
 	"github.com/containerd/containerd/snapshot"
@@ -19,6 +20,9 @@ func newSnapshotter(ctx context.Context, root string) (snapshot.Snapshotter, fun
 }
 
 func TestNaive(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("snapshotter not implemented on windows")
+	}
 	testutil.RequiresRoot(t)
 	testsuite.SnapshotterSuite(t, "Naive", newSnapshotter)
 }

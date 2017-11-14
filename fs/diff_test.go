@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -20,7 +21,14 @@ import (
 // - symlink test
 // - hardlink test
 
+func skipDiffTestOnWindows(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("diff implementation is incomplete on windows")
+	}
+}
+
 func TestSimpleDiff(t *testing.T) {
+	skipDiffTestOnWindows(t)
 	l1 := fstest.Apply(
 		fstest.CreateDir("/etc", 0755),
 		fstest.CreateFile("/etc/hosts", []byte("mydomain 10.0.0.1"), 0644),
@@ -49,6 +57,7 @@ func TestSimpleDiff(t *testing.T) {
 }
 
 func TestDirectoryReplace(t *testing.T) {
+	skipDiffTestOnWindows(t)
 	l1 := fstest.Apply(
 		fstest.CreateDir("/dir1", 0755),
 		fstest.CreateFile("/dir1/f1", []byte("#####"), 0644),
@@ -109,6 +118,7 @@ func TestFileReplace(t *testing.T) {
 }
 
 func TestParentDirectoryPermission(t *testing.T) {
+	skipDiffTestOnWindows(t)
 	l1 := fstest.Apply(
 		fstest.CreateDir("/dir1", 0700),
 		fstest.CreateDir("/dir2", 0751),
@@ -134,6 +144,7 @@ func TestParentDirectoryPermission(t *testing.T) {
 	}
 }
 func TestUpdateWithSameTime(t *testing.T) {
+	skipDiffTestOnWindows(t)
 	tt := time.Now().Truncate(time.Second)
 	t1 := tt.Add(5 * time.Nanosecond)
 	t2 := tt.Add(6 * time.Nanosecond)
