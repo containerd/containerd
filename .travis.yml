@@ -65,7 +65,7 @@ script:
   - if [ "$GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH make integration-parallel ; fi
 
 after_success:
-  - bash <(curl -s https://codecov.io/bash)
+  - bash <(curl -s https://codecov.io/bash) -F linux
 
 before_deploy:
   - make release
