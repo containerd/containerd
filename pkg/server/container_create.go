@@ -442,11 +442,12 @@ func setOCIProcessArgs(g *generate.Generator, config *runtime.ContainerConfig, i
 	// The following logic is migrated from https://github.com/moby/moby/blob/master/daemon/commit.go
 	// TODO(random-liu): Clearly define the commands overwrite behavior.
 	if len(command) == 0 {
+		// Copy array to avoid data race.
 		if len(args) == 0 {
-			args = imageConfig.Cmd
+			args = append([]string{}, imageConfig.Cmd...)
 		}
 		if command == nil {
-			command = imageConfig.Entrypoint
+			command = append([]string{}, imageConfig.Entrypoint...)
 		}
 	}
 	if len(command) == 0 && len(args) == 0 {
