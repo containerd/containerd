@@ -322,20 +322,20 @@ func changesString(c []TestChange) string {
 func Add(p string) TestChange {
 	return TestChange{
 		Kind: ChangeKindAdd,
-		Path: p,
+		Path: filepath.FromSlash(p),
 	}
 }
 
 func Delete(p string) TestChange {
 	return TestChange{
 		Kind: ChangeKindDelete,
-		Path: p,
+		Path: filepath.FromSlash(p),
 	}
 }
 
 func Modify(p string) TestChange {
 	return TestChange{
 		Kind: ChangeKindModify,
-		Path: p,
+		Path: filepath.FromSlash(p),
 	}
 }
