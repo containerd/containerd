@@ -143,6 +143,11 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	assert.Equal(t, "", si.Parent)
 	assert.Equal(t, snapshot.KindCommitted, si.Kind)
 
+	_, err = snapshotter.Stat(ctx, preparing)
+	if err == nil {
+		t.Fatalf("%s should no longer be available after Commit", preparing)
+	}
+
 	next := filepath.Join(work, "nextlayer")
 	if err := os.MkdirAll(next, 0777); err != nil {
 		t.Fatalf("failure reason: %+v", err)
@@ -185,6 +190,11 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 
 	assert.Equal(t, committed, si2.Parent)
 	assert.Equal(t, snapshot.KindCommitted, si2.Kind)
+
+	_, err = snapshotter.Stat(ctx, next)
+	if err == nil {
+		t.Fatalf("%s should no longer be available after Commit", next)
+	}
 
 	expected := map[string]snapshot.Info{
 		si.Name:  si,
