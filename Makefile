@@ -169,24 +169,30 @@ uninstall:
 coverage: ## generate coverprofiles from the unit tests, except tests that require root
 	@echo "$(WHALE) $@"
 	@rm -f coverage.txt
+	go test -i ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES})
 	( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES}); do \
-		go test -i ${TESTFLAGS} -test.short -coverprofile=coverage.out -covermode=atomic $$pkg || exit; \
-		if [ -f profile.out ]; then \
-			cat profile.out >> coverage.txt; \
-			rm profile.out; \
-		fi; \
-		go test ${TESTFLAGS} -test.short -coverprofile=coverage.out -covermode=atomic $$pkg || exit; \
+		go test ${TESTFLAGS} \
+			-cover \
+			-coverprofile=profile.out \
+			-covermode=atomic $$pkg || exit; \
 		if [ -f profile.out ]; then \
 			cat profile.out >> coverage.txt; \
 			rm profile.out; \
 		fi; \
 	done )
 
-root-coverage: ## generae coverage profiles for the unit tests
+root-coverage: ## generate coverage profiles for unit tests that require root
 	@echo "$(WHALE) $@"
-	@( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES}); do \
-		go test -i ${TESTFLAGS} -test.short -coverprofile="../../../$$pkg/coverage.txt" -covermode=atomic $$pkg -test.root || exit; \
-		go test ${TESTFLAGS} -test.short -coverprofile="../../../$$pkg/coverage.txt" -covermode=atomic $$pkg -test.root || exit; \
+	go test -i ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES})
+	( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES}); do \
+		go test ${TESTFLAGS} \
+			-cover \
+			-coverprofile=profile.out \
+			-covermode=atomic $$pkg -test.root || exit; \
+		if [ -f profile.out ]; then \
+			cat profile.out >> coverage.txt; \
+			rm profile.out; \
+		fi; \
 	done )
 
 coverage-integration: ## generate coverprofiles from the integration tests
