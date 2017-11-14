@@ -296,6 +296,14 @@ type Snapshotter interface {
 	// Walk all snapshots in the snapshotter. For each snapshot in the
 	// snapshotter, the function will be called.
 	Walk(ctx context.Context, fn func(context.Context, Info) error) error
+
+	// Close releases the internal resources.
+	//
+	// Close is expected to be called on the end of the lifecycle of the snapshotter,
+	// but not mandatory.
+	//
+	// Close returns nil when it is already closed.
+	Close() error
 }
 
 // Opt allows setting mutable snapshot properties on creation

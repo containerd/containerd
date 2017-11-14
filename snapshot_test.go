@@ -18,6 +18,7 @@ func newSnapshotter(ctx context.Context, root string) (snapshot.Snapshotter, fun
 	sn := client.SnapshotService(DefaultSnapshotter)
 
 	return sn, func() error {
+		// no need to close remote snapshotter
 		return client.Close()
 	}, nil
 }

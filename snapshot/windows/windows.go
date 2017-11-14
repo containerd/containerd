@@ -84,3 +84,8 @@ func (o *snapshotter) Remove(ctx context.Context, key string) error {
 func (o *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshot.Info) error) error {
 	panic("not implemented")
 }
+
+// Close closes the snapshotter
+func (o *snapshotter) Close() error {
+	panic("not implemented")
+}
