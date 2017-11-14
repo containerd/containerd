@@ -85,6 +85,20 @@ file {
       json_name: "cgroupsMode"
     }
     field {
+      name: "page_server"
+      number: 8
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "pageServer"
+    }
+    field {
+      name: "parent_path"
+      number: 9
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "parentPath"
+    }
+    field {
       name: "no_new_keyring"
       number: 8
       label: LABEL_OPTIONAL

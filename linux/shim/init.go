@@ -354,6 +354,8 @@ func (p *initProcess) checkpoint(context context.Context, r *shimapi.CheckpointT
 		AllowTerminal:            options.Terminal,
 		FileLocks:                options.FileLocks,
 		EmptyNamespaces:          options.EmptyNamespaces,
+		CriuPageServer:           options.PageServer,
+		ParentPath:               options.ParentPath,
 	}, actions...); err != nil {
 		dumpLog := filepath.Join(p.bundle, "criu-dump.log")
 		if cerr := copyFile(dumpLog, filepath.Join(work, "dump.log")); cerr != nil {
