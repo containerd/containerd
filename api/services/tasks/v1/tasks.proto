@@ -51,6 +51,14 @@ service Tasks {
 	rpc Metrics(MetricsRequest) returns (MetricsResponse);
 
 	rpc Wait(WaitRequest) returns (WaitResponse);
+
+	rpc CreatePageServer(CreatePageServerRequest) returns (CreatePageServerResponse);
+
+	rpc StartIter(StartIterRequest) returns (google.protobuf.Empty);
+
+	rpc StopIter(StopIterRequest) returns (google.protobuf.Empty);
+
+	rpc DoRestore(DoRestoreRequest) returns (google.protobuf.Empty);
 }
 
 message CreateTaskRequest {
@@ -206,4 +214,24 @@ message WaitRequest {
 message WaitResponse {
 	uint32 exit_status = 1;
 	google.protobuf.Timestamp exited_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}
+
+message CreatePageServerRequest {
+	string container_id = 1;
+}
+
+message CreatePageServerResponse {
+	uint32 port = 1;
+}
+
+message StartIterRequest {
+	string container_id = 1;
+}
+
+message StopIterRequest {
+	string container_id = 1;
+}
+
+message DoRestoreRequest {
+	string container_id = 1;
 }

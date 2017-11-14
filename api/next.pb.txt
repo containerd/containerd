@@ -4017,6 +4017,56 @@ file {
       json_name: "exitedAt"
     }
   }
+  message_type {
+    name: "CreatePageServerRequest"
+    field {
+      name: "container_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "containerId"
+    }
+  }
+  message_type {
+    name: "CreatePageServerResponse"
+    field {
+      name: "port"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "port"
+    }
+  }
+  message_type {
+    name: "StartIterRequest"
+    field {
+      name: "container_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "containerId"
+    }
+  }
+  message_type {
+    name: "StopIterRequest"
+    field {
+      name: "container_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "containerId"
+    }
+  }
+  message_type {
+    name: "DoRestoreRequest"
+    field {
+      name: "container_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "containerId"
+    }
+  }
   service {
     name: "Tasks"
     method {
@@ -4103,6 +4153,26 @@ file {
       name: "Wait"
       input_type: ".containerd.services.tasks.v1.WaitRequest"
       output_type: ".containerd.services.tasks.v1.WaitResponse"
+    }
+    method {
+      name: "CreatePageServer"
+      input_type: ".containerd.services.tasks.v1.CreatePageServerRequest"
+      output_type: ".containerd.services.tasks.v1.CreatePageServerResponse"
+    }
+    method {
+      name: "StartIter"
+      input_type: ".containerd.services.tasks.v1.StartIterRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+    method {
+      name: "StopIter"
+      input_type: ".containerd.services.tasks.v1.StopIterRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+    method {
+      name: "DoRestore"
+      input_type: ".containerd.services.tasks.v1.DoRestoreRequest"
+      output_type: ".google.protobuf.Empty"
     }
   }
   options {

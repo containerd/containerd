@@ -361,6 +361,15 @@ func (p *initProcess) checkpoint(context context.Context, r *shimapi.CheckpointT
 		}
 		return fmt.Errorf("%s path= %s", criuError(err), dumpLog)
 	}
+
+	// Ignore the symbolic link which created in pre-dump. It is useless if a page server is used.
+	// TODO: fix phaul/criu instead
+	if err := os.Remove(filepath.Join(r.Path, "parent")); err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+	}
+
 	return nil
 }
 

@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/checkpoint-restore/criu/phaul/src/phaul"
 	api "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/task"
@@ -31,6 +33,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"strings"
 )
 
 var (
@@ -75,19 +78,32 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 	if len(runtimes) == 0 {
 		return nil, errors.New("no runtimes available to create task service")
 	}
+
+	// FIXME: if not tcp, eg: unix sockets
+	host, _, err := net.SplitHostPort(strings.TrimPrefix(ic.Address, "tcp://"))
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Printf("Listen IP: %s\n", host)
+
 	return &service{
-		runtimes:  runtimes,
-		db:        m.(*metadata.DB),
-		store:     cs,
-		publisher: ic.Events,
+		runtimes:    runtimes,
+		db:          m.(*metadata.DB),
+		store:       cs,
+		publisher:   ic.Events,
+		listenIP:    host,
+		pageServers: make(map[string]*phaul.PhaulServer),
 	}, nil
 }
 
 type service struct {
-	runtimes  map[string]runtime.Runtime
-	db        *metadata.DB
-	store     content.Store
-	publisher events.Publisher
+	runtimes    map[string]runtime.Runtime
+	db          *metadata.DB
+	store       content.Store
+	publisher   events.Publisher
+	listenIP    string
+	pageServers map[string]*phaul.PhaulServer
 }
 
 func (s *service) Register(server *grpc.Server) error {
@@ -101,9 +117,13 @@ func (s *service) Create(ctx context.Context, r *api.CreateTaskRequest) (*api.Cr
 		err            error
 	)
 	if r.Checkpoint != nil {
-		checkpointPath, err = ioutil.TempDir("", "ctrd-checkpoint")
-		if err != nil {
-			return nil, err
+		if ps, ok := s.pageServers[r.ContainerID]; ok {
+			checkpointPath = ps.LastImagesDir()
+		} else {
+			checkpointPath, err = ioutil.TempDir("", "ctrd-checkpoint")
+			if err != nil {
+				return nil, err
+			}
 		}
 		if r.Checkpoint.MediaType != images.MediaTypeContainerd1Checkpoint {
 			return nil, fmt.Errorf("unsupported checkpoint type %q", r.Checkpoint.MediaType)
@@ -423,6 +443,53 @@ func (s *service) CloseIO(ctx context.Context, r *api.CloseIORequest) (*google_p
 			return nil, err
 		}
 	}
+	return empty, nil
+}
+
+func (s *service) CreatePageServer(ctx context.Context, r *api.CreatePageServerRequest) (*api.CreatePageServerResponse, error) {
+	// FIXME: hard-coded port number
+	port := uint32(6245)
+	wdir, err := ioutil.TempDir("", "ctrd-pageserver-workdir")
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: validate s.listenIP during initialization
+	server, err := phaul.MakePhaulServer(phaul.PhaulConfig{
+		Addr: s.listenIP,
+		Port: int32(port),
+		Wdir: wdir,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	s.pageServers[r.ContainerID] = server
+	return &api.CreatePageServerResponse{
+		Port: port,
+	}, nil
+}
+
+func (s *service) StartIter(ctx context.Context, r *api.StartIterRequest) (*google_protobuf.Empty, error) {
+	err := s.pageServers[r.ContainerID].StartIter()
+	if err != nil {
+		return nil, err
+	}
+	return empty, nil
+}
+
+func (s *service) StopIter(ctx context.Context, r *api.StopIterRequest) (*google_protobuf.Empty, error) {
+	err := s.pageServers[r.ContainerID].StopIter()
+	if err != nil {
+		return nil, err
+	}
+	return empty, nil
+}
+
+func (s *service) DoRestore(ctx context.Context, r *api.DoRestoreRequest) (*google_protobuf.Empty, error) {
+	log.G(ctx).Info("DoRestore")
+
+	// FIXME: call delete(ls.pageServers, r.ContainerID)?
 	return empty, nil
 }
 
