@@ -62,7 +62,8 @@ script:
   - if [ "$GOOS" = "linux" ]; then make coverage ; fi
   - if [ "$GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH make root-coverage ; fi
   - if [ "$GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH make integration ; fi
-  - if [ "$GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH make integration-parallel ; fi
+  # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
+  - if [ "$GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH TESTFLAGS_PARALLEL=1 make integration ; fi
 
 after_success:
   - bash <(curl -s https://codecov.io/bash) -F linux
