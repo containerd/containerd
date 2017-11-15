@@ -156,7 +156,7 @@ var prepareCommand = cli.Command{
 		},
 	},
 	Action: func(context *cli.Context) error {
-		if context.NArg() != 2 {
+		if narg := context.NArg(); narg < 1 || narg > 2 {
 			return cli.ShowSubcommandHelp(context)
 		}
 		var (
@@ -195,7 +195,7 @@ var viewCommand = cli.Command{
 		},
 	},
 	Action: func(context *cli.Context) error {
-		if context.NArg() != 2 {
+		if narg := context.NArg(); narg < 1 || narg > 2 {
 			return cli.ShowSubcommandHelp(context)
 		}
 		var (
