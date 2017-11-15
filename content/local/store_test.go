@@ -179,10 +179,9 @@ func TestWalkBlobs(t *testing.T) {
 	defer cleanup()
 
 	const (
-		nblobs  = 4 << 10
+		nblobs  = 79
 		maxsize = 4 << 10
 	)
-
 	var (
 		blobs    = populateBlobStore(ctx, t, cs, nblobs, maxsize)
 		expected = map[digest.Digest]struct{}{}
@@ -251,7 +250,7 @@ func generateBlobs(t checker, nblobs, maxsize int64) map[digest.Digest][]byte {
 	for i := int64(0); i < nblobs; i++ {
 		p := make([]byte, mrand.Int63n(maxsize))
 
-		if _, err := rand.Read(p); err != nil {
+		if _, err := mrand.Read(p); err != nil {
 			t.Fatal(err)
 		}
 
