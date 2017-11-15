@@ -36,7 +36,7 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 	status, err := p.tracker.GetStatus(ref)
 	if err == nil {
 		if status.Offset == status.Total {
-			return nil, errors.Wrapf(errdefs.ErrAlreadyExists, "ref %v already exists", ref)
+			return nil, errors.Wrapf(errdefs.ErrAlreadyExists, "ref %v", ref)
 		}
 		// TODO: Handle incomplete status
 	} else if !errdefs.IsNotFound(err) {

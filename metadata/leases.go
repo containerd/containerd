@@ -55,7 +55,7 @@ func (lm *LeaseManager) Create(ctx context.Context, lid string, labels map[strin
 		if err == bolt.ErrBucketExists {
 			err = errdefs.ErrAlreadyExists
 		}
-		return Lease{}, err
+		return Lease{}, errors.Wrapf(err, "lease %q", lid)
 	}
 
 	t := time.Now().UTC()
