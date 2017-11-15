@@ -26,15 +26,6 @@ PKG=github.com/containerd/containerd
 # Project packages.
 PACKAGES=$(shell go list ./... | grep -v /vendor/)
 INTEGRATION_PACKAGE=${PKG}
-TEST_REQUIRES_ROOT_PACKAGES=$(filter \
-    ${PACKAGES}, \
-    $(shell \
-	for f in $$(git grep -l testutil.RequiresRoot | grep -v Makefile); do \
-		d="$$(dirname $$f)"; \
-		[ "$$d" = "." ] && echo "${PKG}" && continue; \
-		echo "${PKG}/$$d"; \
-	done | sort -u) \
-    )
 
 # Project binaries.
 COMMANDS=ctr containerd containerd-stress containerd-release
@@ -115,25 +106,21 @@ build: ## build the go packages
 	@echo "$(WHALE) $@"
 	@go build -v ${EXTRA_FLAGS} ${GO_LDFLAGS} ${GO_GCFLAGS} ${PACKAGES}
 
-test: ## run tests, except integration tests and tests that require root
+test: ## run unit tests
 	@echo "$(WHALE) $@"
 	@go test ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES})
 
-root-test: ## run tests, except integration tests
-	@echo "$(WHALE) $@"
-	@go test ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES}) -test.root
-
 integration: ## run integration tests
 	@echo "$(WHALE) $@"
-	@go test ${TESTFLAGS} -test.root -parallel 1
+	@ENABLE_ROOT_TESTS=1 go test ${TESTFLAGS} -parallel 1
 
 integration-parallel: ## run integration tests
 	@echo "$(WHALE) $@"
-	@go test ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL}
+	@ENABLE_ROOT_TESTS=1 go test ${TESTFLAGS} -parallel ${TESTFLAGS_PARALLEL}
 
 benchmark: ## run benchmarks tests
 	@echo "$(WHALE) $@"
-	@go test ${TESTFLAGS} -bench . -run Benchmark -test.root
+	@ENABLE_ROOT_TESTS=1 go test ${TESTFLAGS} -bench . -run Benchmark
 
 FORCE:
 
@@ -166,7 +153,7 @@ uninstall:
 	@rm -f $(addprefix $(DESTDIR)/bin/,$(notdir $(BINARIES)))
 
 
-coverage: ## generate coverprofiles from the unit tests, except tests that require root
+coverage: ## generate coverprofiles from the unit tests
 	@echo "$(WHALE) $@"
 	@rm -f coverage.txt
 	@go test -i ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES})
@@ -175,20 +162,6 @@ coverage: ## generate coverprofiles from the unit tests, except tests that requi
 			-cover \
 			-coverprofile=profile.out \
 			-covermode=atomic $$pkg || exit; \
-		if [ -f profile.out ]; then \
-			cat profile.out >> coverage.txt; \
-			rm profile.out; \
-		fi; \
-	done )
-
-root-coverage: ## generate coverage profiles for unit tests that require root
-	@echo "$(WHALE) $@"
-	@go test -i ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES})
-	( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES}); do \
-		go test ${TESTFLAGS} \
-			-cover \
-			-coverprofile=profile.out \
-			-covermode=atomic $$pkg -test.root || exit; \
 		if [ -f profile.out ]; then \
 			cat profile.out >> coverage.txt; \
 			rm profile.out; \

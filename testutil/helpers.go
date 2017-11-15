@@ -1,7 +1,6 @@
 package testutil
 
 import (
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -9,12 +8,6 @@ import (
 	"strconv"
 	"testing"
 )
-
-var rootEnabled bool
-
-func init() {
-	flag.BoolVar(&rootEnabled, "test.root", false, "enable tests that require root")
-}
 
 // DumpDir will log out all of the contents of the provided directory to
 // testing logger.
