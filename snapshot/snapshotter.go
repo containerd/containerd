@@ -280,9 +280,7 @@ type Snapshotter interface {
 	// A committed snapshot will be created under name with the parent of the
 	// active snapshot.
 	//
-	// Commit may be called multiple times on the same key. Snapshots created
-	// in this manner will all reference the parent used to start the
-	// transaction.
+	// After commit, the snapshot identified by key is removed.
 	Commit(ctx context.Context, name, key string, opts ...Opt) error
 
 	// Remove the committed or active snapshot by the provided key.
