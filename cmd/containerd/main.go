@@ -73,6 +73,7 @@ func main() {
 	}
 	app.Commands = []cli.Command{
 		configCommand,
+		publishCommand,
 	}
 	app.Action = func(context *cli.Context) error {
 		var (
