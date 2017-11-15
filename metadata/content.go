@@ -184,6 +184,9 @@ func (cs *contentStore) Delete(ctx context.Context, dgst digest.Digest) error {
 		if err := getBlobsBucket(tx, ns).DeleteBucket([]byte(dgst.String())); err != nil {
 			return err
 		}
+		if err := removeContentLease(ctx, tx, dgst); err != nil {
+			return err
+		}
 
 		// Mark content store as dirty for triggering garbage collection
 		cs.db.dirtyL.Lock()
