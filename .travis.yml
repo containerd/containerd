@@ -20,7 +20,7 @@ addons:
       - libnl-3-dev
       - libnet-dev
       - protobuf-c-compiler
-      - protobuf-compiler
+      # - protobuf-compiler
       - python-minimal
       - libcap-dev
       - libaio-dev
@@ -35,8 +35,12 @@ before_install:
   - uname -r
 
 install:
-  - wget https://github.com/google/protobuf/releases/download/v3.3.0/protoc-3.3.0-linux-x86_64.zip -O /tmp/protoc-3.3.0-linux-x86_64.zip
-  - sudo unzip -o -d /usr/local /tmp/protoc-3.3.0-linux-x86_64.zip
+  - wget https://github.com/google/protobuf/releases/download/v3.5.0/protoc-3.5.0-linux-x86_64.zip -O /tmp/protoc-3.5.0-linux-x86_64.zip
+  - sudo unzip -o -d /usr/local /tmp/protoc-3.5.0-linux-x86_64.zip
+  - sudo chmod +x /usr/local/bin/protoc
+  - sudo chmod og+rx /usr/local/include/google /usr/local/include/google/protobuf /usr/local/include/google/protobuf/compiler
+  - sudo chmod -R og+r /usr/local/include/google/protobuf/
+  - protoc --version
   - go get -u github.com/vbatts/git-validation
   - sudo wget https://github.com/crosbymichael/runc/releases/download/ctd-7/runc -O /bin/runc; sudo chmod +x /bin/runc
   - wget https://github.com/xemul/criu/archive/v3.0.tar.gz -O /tmp/criu.tar.gz
