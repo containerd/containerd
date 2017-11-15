@@ -284,7 +284,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 		bbkt, err := bkt.CreateBucket([]byte(key))
 		if err != nil {
 			if err == bolt.ErrBucketExists {
-				err = errors.Wrapf(errdefs.ErrAlreadyExists, "snapshot %v already exists", key)
+				err = errors.Wrapf(errdefs.ErrAlreadyExists, "snapshot %q", key)
 			}
 			return err
 		}
@@ -373,7 +373,7 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		bbkt, err := bkt.CreateBucket([]byte(name))
 		if err != nil {
 			if err == bolt.ErrBucketExists {
-				err = errors.Wrapf(errdefs.ErrAlreadyExists, "snapshot %v already exists", name)
+				err = errors.Wrapf(errdefs.ErrAlreadyExists, "snapshot %q", name)
 			}
 			return err
 		}
