@@ -40,7 +40,7 @@ import (
 	snapshotservice "github.com/containerd/containerd/services/snapshot"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/typeurl"
-	pempty "github.com/golang/protobuf/ptypes/empty"
+	ptypes "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -489,7 +489,7 @@ type Version struct {
 
 // Version returns the version of containerd that the client is connected to
 func (c *Client) Version(ctx context.Context) (Version, error) {
-	response, err := c.VersionService().Version(ctx, &pempty.Empty{})
+	response, err := c.VersionService().Version(ctx, &ptypes.Empty{})
 	if err != nil {
 		return Version{}, err
 	}

@@ -30,7 +30,7 @@ import (
 	"github.com/containerd/containerd/sys"
 	runc "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	ptypes "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -39,7 +39,7 @@ import (
 
 var (
 	pluginID = fmt.Sprintf("%s.%s", plugin.RuntimePlugin, "linux")
-	empty    = &google_protobuf.Empty{}
+	empty    = &ptypes.Empty{}
 )
 
 const (

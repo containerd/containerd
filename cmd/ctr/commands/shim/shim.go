@@ -16,15 +16,14 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	shim "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/typeurl"
-	protobuf "github.com/gogo/protobuf/types"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	ptypes "github.com/gogo/protobuf/types"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
-var empty = &google_protobuf.Empty{}
+var empty = &ptypes.Empty{}
 
 var fifoFlags = []cli.Flag{
 	cli.StringFlag{
@@ -168,7 +167,7 @@ var execCommand = cli.Command{
 
 		rq := &shim.ExecProcessRequest{
 			ID: id,
-			Spec: &protobuf.Any{
+			Spec: &ptypes.Any{
 				TypeUrl: url,
 				Value:   spec,
 			},

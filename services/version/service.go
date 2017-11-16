@@ -4,7 +4,7 @@ import (
 	api "github.com/containerd/containerd/api/services/version/v1"
 	"github.com/containerd/containerd/plugin"
 	ctrdversion "github.com/containerd/containerd/version"
-	empty "github.com/golang/protobuf/ptypes/empty"
+	ptypes "github.com/gogo/protobuf/types"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -31,7 +31,7 @@ func (s *service) Register(server *grpc.Server) error {
 	return nil
 }
 
-func (s *service) Version(ctx context.Context, _ *empty.Empty) (*api.VersionResponse, error) {
+func (s *service) Version(ctx context.Context, _ *ptypes.Empty) (*api.VersionResponse, error) {
 	return &api.VersionResponse{
 		Version:  ctrdversion.Version,
 		Revision: ctrdversion.Revision,

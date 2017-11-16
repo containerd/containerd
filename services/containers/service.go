@@ -9,7 +9,7 @@ import (
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
-	"github.com/golang/protobuf/ptypes/empty"
+	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -149,24 +149,24 @@ func (s *service) Update(ctx context.Context, req *api.UpdateContainerRequest) (
 	return &resp, nil
 }
 
-func (s *service) Delete(ctx context.Context, req *api.DeleteContainerRequest) (*empty.Empty, error) {
+func (s *service) Delete(ctx context.Context, req *api.DeleteContainerRequest) (*ptypes.Empty, error) {
 	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store containers.Store) error {
 		return store.Delete(ctx, req.ID)
 	}); err != nil {
-		return &empty.Empty{}, errdefs.ToGRPC(err)
+		return &ptypes.Empty{}, errdefs.ToGRPC(err)
 	}
 
 	if err := s.publisher.Publish(ctx, "/containers/delete", &eventsapi.ContainerDelete{
 		ID: req.ID,
 	}); err != nil {
-		return &empty.Empty{}, err
+		return &ptypes.Empty{}, err
 	}
 
 	if err := s.db.GarbageCollect(ctx); err != nil {
-		return &empty.Empty{}, errdefs.ToGRPC(errors.Wrap(err, "garbage collection failed"))
+		return &ptypes.Empty{}, errdefs.ToGRPC(errors.Wrap(err, "garbage collection failed"))
 	}
 
-	return &empty.Empty{}, nil
+	return &ptypes.Empty{}, nil
 }
 
 func (s *service) withStore(ctx context.Context, fn func(ctx context.Context, store containers.Store) error) func(tx *bolt.Tx) error {

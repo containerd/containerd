@@ -25,11 +25,11 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/sys"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	ptypes "github.com/gogo/protobuf/types"
 	"google.golang.org/grpc"
 )
 
-var empty = &google_protobuf.Empty{}
+var empty = &ptypes.Empty{}
 
 // Opt is an option for a shim client configuration
 type Opt func(context.Context, shim.Config) (shimapi.ShimClient, io.Closer, error)

@@ -11,7 +11,7 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
-	"github.com/golang/protobuf/ptypes/empty"
+	ptypes "github.com/gogo/protobuf/types"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -182,21 +182,21 @@ func (s *service) Update(ctx context.Context, req *api.UpdateNamespaceRequest) (
 	return &resp, nil
 }
 
-func (s *service) Delete(ctx context.Context, req *api.DeleteNamespaceRequest) (*empty.Empty, error) {
+func (s *service) Delete(ctx context.Context, req *api.DeleteNamespaceRequest) (*ptypes.Empty, error) {
 	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store namespaces.Store) error {
 		return errdefs.ToGRPC(store.Delete(ctx, req.Name))
 	}); err != nil {
-		return &empty.Empty{}, err
+		return &ptypes.Empty{}, err
 	}
 	// set the namespace in the context before publishing the event
 	ctx = namespaces.WithNamespace(ctx, req.Name)
 	if err := s.publisher.Publish(ctx, "/namespaces/delete", &eventsapi.NamespaceDelete{
 		Name: req.Name,
 	}); err != nil {
-		return &empty.Empty{}, err
+		return &ptypes.Empty{}, err
 	}
 
-	return &empty.Empty{}, nil
+	return &ptypes.Empty{}, nil
 }
 
 func (s *service) withStore(ctx context.Context, fn func(ctx context.Context, store namespaces.Store) error) func(tx *bolt.Tx) error {

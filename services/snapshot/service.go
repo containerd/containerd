@@ -13,7 +13,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshot"
-	protoempty "github.com/golang/protobuf/ptypes/empty"
+	ptypes "github.com/gogo/protobuf/types"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -29,7 +29,7 @@ func init() {
 	})
 }
 
-var empty = &protoempty.Empty{}
+var empty = &ptypes.Empty{}
 
 type service struct {
 	db        *metadata.DB
@@ -127,7 +127,7 @@ func (s *service) Mounts(ctx context.Context, mr *snapshotapi.MountsRequest) (*s
 	}, nil
 }
 
-func (s *service) Commit(ctx context.Context, cr *snapshotapi.CommitSnapshotRequest) (*protoempty.Empty, error) {
+func (s *service) Commit(ctx context.Context, cr *snapshotapi.CommitSnapshotRequest) (*ptypes.Empty, error) {
 	log.G(ctx).WithField("key", cr.Key).WithField("name", cr.Name).Debugf("Committing snapshot")
 	sn, err := s.getSnapshotter(cr.Snapshotter)
 	if err != nil {
@@ -151,7 +151,7 @@ func (s *service) Commit(ctx context.Context, cr *snapshotapi.CommitSnapshotRequ
 	return empty, nil
 }
 
-func (s *service) Remove(ctx context.Context, rr *snapshotapi.RemoveSnapshotRequest) (*protoempty.Empty, error) {
+func (s *service) Remove(ctx context.Context, rr *snapshotapi.RemoveSnapshotRequest) (*ptypes.Empty, error) {
 	log.G(ctx).WithField("key", rr.Key).Debugf("Removing snapshot")
 	sn, err := s.getSnapshotter(rr.Snapshotter)
 	if err != nil {

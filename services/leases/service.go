@@ -12,7 +12,7 @@ import (
 	api "github.com/containerd/containerd/api/services/leases/v1"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
-	"github.com/golang/protobuf/ptypes/empty"
+	ptypes "github.com/gogo/protobuf/types"
 	"golang.org/x/net/context"
 )
 
@@ -67,13 +67,13 @@ func (s *service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 	}, nil
 }
 
-func (s *service) Delete(ctx context.Context, r *api.DeleteRequest) (*empty.Empty, error) {
+func (s *service) Delete(ctx context.Context, r *api.DeleteRequest) (*ptypes.Empty, error) {
 	if err := s.db.Update(func(tx *bolt.Tx) error {
 		return metadata.NewLeaseManager(tx).Delete(ctx, r.ID)
 	}); err != nil {
 		return nil, err
 	}
-	return &empty.Empty{}, nil
+	return &ptypes.Empty{}, nil
 }
 
 func (s *service) List(ctx context.Context, r *api.ListRequest) (*api.ListResponse, error) {
