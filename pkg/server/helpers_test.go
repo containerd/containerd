@@ -126,3 +126,19 @@ func TestGetCgroupsPath(t *testing.T) {
 		assert.Equal(t, test.expected, got)
 	}
 }
+
+func TestBuildLabels(t *testing.T) {
+	configLabels := map[string]string{
+		"a": "b",
+		"c": "d",
+	}
+	newLabels := buildLabels(configLabels, containerKindSandbox)
+	assert.Len(t, newLabels, 3)
+	assert.Equal(t, "b", newLabels["a"])
+	assert.Equal(t, "d", newLabels["c"])
+	assert.Equal(t, containerKindSandbox, newLabels[containerKindLabel])
+
+	newLabels["a"] = "e"
+	assert.Empty(t, configLabels[containerKindLabel], "should not add new labels into original label")
+	assert.Equal(t, "b", configLabels["a"], "change in new labels should not affect original label")
+}
