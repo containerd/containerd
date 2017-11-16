@@ -59,8 +59,9 @@ script:
   - make build
   - make binaries
   - if [ "$GOOS" = "linux" ]; then sudo make install ; fi
-  - if [ "$GOOS" = "linux" ]; then make coverage ; fi
-  - if [ "$GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH make root-coverage ; fi
+  - |
+      if [ "$GOOS" != "linux" ]; then exit 0; fi
+      sudo PATH=$PATH GOPATH=$GOPATH ENABLE_ROOT_TESTS=1 make coverage
   - if [ "$GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH make integration ; fi
   - if [ "$GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH make integration-parallel ; fi
 

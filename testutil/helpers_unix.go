@@ -19,11 +19,13 @@ func Unmount(t *testing.T, mountPoint string) {
 	}
 }
 
+const enableRootTestsEnvVar = "ENABLE_ROOT_TESTS"
+
 // RequiresRoot skips tests that require root, unless the test.root flag has
 // been set
 func RequiresRoot(t testing.TB) {
-	if !rootEnabled {
-		t.Skip("skipping test that requires root")
+	if os.Getenv(enableRootTestsEnvVar) == "" {
+		t.Skipf("test requires root, set %s=1 to run this test", enableRootTestsEnvVar)
 		return
 	}
 	assert.Equal(t, 0, os.Getuid(), "This test must be run as root.")
@@ -31,8 +33,8 @@ func RequiresRoot(t testing.TB) {
 
 // RequiresRootM is similar to RequiresRoot but intended to be called from *testing.M.
 func RequiresRootM() {
-	if !rootEnabled {
-		fmt.Fprintln(os.Stderr, "skipping test that requires root")
+	if os.Getenv(enableRootTestsEnvVar) == "" {
+		fmt.Fprintf(os.Stderr, "test requires root, set %s=1 to run this test\n", enableRootTestsEnvVar)
 		os.Exit(0)
 	}
 	if 0 != os.Getuid() {
