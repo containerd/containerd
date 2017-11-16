@@ -2,7 +2,6 @@ package content
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"sync"
 
@@ -119,7 +118,7 @@ func seekReader(r io.Reader, offset, size int64) (io.Reader, error) {
 	if ok {
 		nn, err := seeker.Seek(offset, io.SeekStart)
 		if nn != offset {
-			return nil, fmt.Errorf("failed to seek to offset %v", offset)
+			return nil, errors.Wrapf(err, "failed to seek to offset %v", offset)
 		}
 
 		if err != nil {
