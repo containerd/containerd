@@ -1,4 +1,4 @@
-package snapshot
+package containerd
 
 import (
 	"context"
@@ -205,4 +205,25 @@ func toMounts(mm []*types.Mount) []mount.Mount {
 		}
 	}
 	return mounts
+}
+
+func fromKind(kind snapshot.Kind) snapshotapi.Kind {
+	if kind == snapshot.KindActive {
+		return snapshotapi.KindActive
+	}
+	if kind == snapshot.KindView {
+		return snapshotapi.KindView
+	}
+	return snapshotapi.KindCommitted
+}
+
+func fromInfo(info snapshot.Info) snapshotapi.Info {
+	return snapshotapi.Info{
+		Name:      info.Name,
+		Parent:    info.Parent,
+		Kind:      fromKind(info.Kind),
+		CreatedAt: info.Created,
+		UpdatedAt: info.Updated,
+		Labels:    info.Labels,
+	}
 }

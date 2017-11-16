@@ -293,3 +293,24 @@ func fromMounts(mounts []mount.Mount) []*types.Mount {
 	}
 	return out
 }
+
+func toInfo(info snapshotapi.Info) snapshot.Info {
+	return snapshot.Info{
+		Name:    info.Name,
+		Parent:  info.Parent,
+		Kind:    toKind(info.Kind),
+		Created: info.CreatedAt,
+		Updated: info.UpdatedAt,
+		Labels:  info.Labels,
+	}
+}
+
+func toKind(kind snapshotapi.Kind) snapshot.Kind {
+	if kind == snapshotapi.KindActive {
+		return snapshot.KindActive
+	}
+	if kind == snapshotapi.KindView {
+		return snapshot.KindView
+	}
+	return snapshot.KindCommitted
+}
