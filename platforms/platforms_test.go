@@ -87,7 +87,7 @@ func TestParseSelector(t *testing.T) {
 				OS:           defaultOS,
 				Architecture: "arm",
 			},
-			formatted: "linux/arm",
+			formatted: joinNotEmpty(defaultOS, "arm"),
 		},
 		{
 			input: "armel",
@@ -96,7 +96,7 @@ func TestParseSelector(t *testing.T) {
 				Architecture: "arm",
 				Variant:      "v6",
 			},
-			formatted: "linux/arm/v6",
+			formatted: joinNotEmpty(defaultOS, "arm/v6"),
 		},
 		{
 			input: "armhf",
@@ -104,7 +104,7 @@ func TestParseSelector(t *testing.T) {
 				OS:           defaultOS,
 				Architecture: "arm",
 			},
-			formatted: "linux/arm",
+			formatted: joinNotEmpty(defaultOS, "arm"),
 		},
 		{
 			input: "Aarch64",
