@@ -3,12 +3,10 @@
 package shim
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
-
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 
 	"github.com/containerd/console"
 	eventstypes "github.com/containerd/containerd/api/events"
@@ -27,7 +25,8 @@ import (
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var empty = &ptypes.Empty{}
@@ -167,7 +166,7 @@ func (s *Service) DeleteProcess(ctx context.Context, r *shimapi.DeleteProcessReq
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if r.ID == s.id {
-		return nil, grpc.Errorf(codes.InvalidArgument, "cannot delete init process with DeleteProcess")
+		return nil, status.Errorf(codes.InvalidArgument, "cannot delete init process with DeleteProcess")
 	}
 	p := s.processes[r.ID]
 	if p == nil {
