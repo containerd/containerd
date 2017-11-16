@@ -5,7 +5,7 @@ package linux
 import (
 	"context"
 
-	eventsapi "github.com/containerd/containerd/api/services/events/v1"
+	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
 	shim "github.com/containerd/containerd/linux/shim/v1"
@@ -103,7 +103,7 @@ func (p *Process) Start(ctx context.Context) error {
 	if err != nil {
 		return errdefs.FromGRPC(err)
 	}
-	p.t.events.Publish(ctx, runtime.TaskExecStartedEventTopic, &eventsapi.TaskExecStarted{
+	p.t.events.Publish(ctx, runtime.TaskExecStartedEventTopic, &eventstypes.TaskExecStarted{
 		ContainerID: p.t.id,
 		Pid:         r.Pid,
 		ExecID:      p.id,

@@ -2,8 +2,8 @@ package containers
 
 import (
 	"github.com/boltdb/bolt"
+	eventstypes "github.com/containerd/containerd/api/events"
 	api "github.com/containerd/containerd/api/services/containers/v1"
-	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
@@ -95,10 +95,10 @@ func (s *service) Create(ctx context.Context, req *api.CreateContainerRequest) (
 	}); err != nil {
 		return &resp, errdefs.ToGRPC(err)
 	}
-	if err := s.publisher.Publish(ctx, "/containers/create", &eventsapi.ContainerCreate{
+	if err := s.publisher.Publish(ctx, "/containers/create", &eventstypes.ContainerCreate{
 		ID:    resp.Container.ID,
 		Image: resp.Container.Image,
-		Runtime: &eventsapi.ContainerCreate_Runtime{
+		Runtime: &eventstypes.ContainerCreate_Runtime{
 			Name:    resp.Container.Runtime.Name,
 			Options: resp.Container.Runtime.Options,
 		},
@@ -137,7 +137,7 @@ func (s *service) Update(ctx context.Context, req *api.UpdateContainerRequest) (
 		return &resp, errdefs.ToGRPC(err)
 	}
 
-	if err := s.publisher.Publish(ctx, "/containers/update", &eventsapi.ContainerUpdate{
+	if err := s.publisher.Publish(ctx, "/containers/update", &eventstypes.ContainerUpdate{
 		ID:          resp.Container.ID,
 		Image:       resp.Container.Image,
 		Labels:      resp.Container.Labels,
@@ -156,7 +156,7 @@ func (s *service) Delete(ctx context.Context, req *api.DeleteContainerRequest) (
 		return &empty.Empty{}, errdefs.ToGRPC(err)
 	}
 
-	if err := s.publisher.Publish(ctx, "/containers/delete", &eventsapi.ContainerDelete{
+	if err := s.publisher.Publish(ctx, "/containers/delete", &eventstypes.ContainerDelete{
 		ID: req.ID,
 	}); err != nil {
 		return &empty.Empty{}, err

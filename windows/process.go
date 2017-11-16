@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/Microsoft/hcsshim"
-	eventsapi "github.com/containerd/containerd/api/services/events/v1"
+	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/runtime"
@@ -186,7 +186,7 @@ func (p *process) Start(ctx context.Context) (err error) {
 
 		p.task.publisher.Publish(ctx,
 			runtime.TaskExitEventTopic,
-			&eventsapi.TaskExit{
+			&eventstypes.TaskExit{
 				ContainerID: p.task.id,
 				ID:          p.id,
 				Pid:         p.pid,

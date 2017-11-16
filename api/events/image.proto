@@ -4,7 +4,7 @@ package containerd.services.images.v1;
 
 import "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto";
 
-option go_package = "github.com/containerd/containerd/api/services/events/v1;events";
+option go_package = "github.com/containerd/containerd/api/events;events";
 option (containerd.plugin.fieldpath_all) = true;
 
 message ImageCreate {
