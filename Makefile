@@ -110,7 +110,7 @@ install: binaries
 uninstall:
 	rm -f $(BINDIR)/cri-containerd
 
-$(BUILD_DIR)/$(TARBALL): $(BUILD_DIR)/cri-containerd hack/versions
+$(BUILD_DIR)/$(TARBALL): static-binaries hack/versions
 	@BUILD_DIR=$(BUILD_DIR) TARBALL=$(TARBALL) ./hack/release.sh
 
 release: $(BUILD_DIR)/$(TARBALL)

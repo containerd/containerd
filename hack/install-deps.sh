@@ -91,7 +91,7 @@ checkout_repo() {
 checkout_repo ${RUNC_PKG} ${RUNC_VERSION}
 cd ${GOPATH}/src/${RUNC_PKG}
 BUILDTAGS=${BUILDTAGS:-seccomp apparmor}
-make BUILDTAGS="$BUILDTAGS"
+make static BUILDTAGS="$BUILDTAGS"
 ${sudo} make install -e DESTDIR=${RUNC_DIR}
 
 # Install cni
