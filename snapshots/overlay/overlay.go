@@ -194,47 +194,28 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	return t.Commit()
 }
 
-// Remove abandons the transaction identified by key. All resources
-// associated with the key will be removed.
+// Remove abandons the snapshot identified by key. The snapshot will
+// immediately become unavailable and unrecoverable. Disk space will
+// be freed up on the next call to `Cleanup`.
 func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 	ctx, t, err := o.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		if err != nil && t != nil {
+		if err != nil {
 			if rerr := t.Rollback(); rerr != nil {
 				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
 			}
 		}
 	}()
 
-	id, _, err := storage.Remove(ctx, key)
+	_, _, err = storage.Remove(ctx, key)
 	if err != nil {
 		return errors.Wrap(err, "failed to remove")
 	}
 
-	path := filepath.Join(o.root, "snapshots", id)
-	renamed := filepath.Join(o.root, "snapshots", "rm-"+id)
-	if err := os.Rename(path, renamed); err != nil {
-		return errors.Wrap(err, "failed to rename")
-	}
-
-	err = t.Commit()
-	t = nil
-	if err != nil {
-		if err1 := os.Rename(renamed, path); err1 != nil {
-			// May cause inconsistent data on disk
-			log.G(ctx).WithError(err1).WithField("path", renamed).Errorf("failed to rename after failed commit")
-		}
-		return errors.Wrap(err, "failed to commit")
-	}
-	if err := os.RemoveAll(renamed); err != nil {
-		// Must be cleaned up, any "rm-*" could be removed if no active transactions
-		log.G(ctx).WithError(err).WithField("path", renamed).Warnf("failed to remove root filesystem")
-	}
-
-	return nil
+	return t.Commit()
 }
 
 // Walk the committed snapshots.
@@ -247,45 +228,88 @@ func (o *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 	return storage.WalkInfo(ctx, fn)
 }
 
-func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts []snapshots.Opt) ([]mount.Mount, error) {
-	var (
-		path        string
-		snapshotDir = filepath.Join(o.root, "snapshots")
-	)
-
-	td, err := ioutil.TempDir(snapshotDir, "new-")
+// Cleanup cleans up disk resources from removed or abandoned snapshots
+func (o *snapshotter) Cleanup(ctx context.Context) error {
+	cleanup, err := o.getCleanupDirectories(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create temp dir")
+		return err
 	}
+
+	for _, dir := range cleanup {
+		if err := os.RemoveAll(dir); err != nil {
+			log.G(ctx).WithError(err).WithField("path", dir).Warn("failed to remove directory")
+		}
+	}
+
+	return nil
+}
+
+func (o *snapshotter) getCleanupDirectories(ctx context.Context) ([]string, error) {
+	ctx, t, err := o.ms.TransactionContext(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+
+	defer t.Rollback()
+	ids, err := storage.IDMap(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	snapshotDir := filepath.Join(o.root, "snapshots")
+	fd, err := os.Open(snapshotDir)
+	if err != nil {
+		return nil, err
+	}
+	defer fd.Close()
+
+	dirs, err := fd.Readdirnames(0)
+	if err != nil {
+		return nil, err
+	}
+
+	cleanup := []string{}
+	for _, d := range dirs {
+		if _, ok := ids[d]; ok {
+			continue
+		}
+
+		cleanup = append(cleanup, filepath.Join(snapshotDir, d))
+	}
+
+	return cleanup, nil
+}
+
+func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts []snapshots.Opt) ([]mount.Mount, error) {
+	ctx, t, err := o.ms.TransactionContext(ctx, true)
+	if err != nil {
+		return nil, err
+	}
+
+	var td, path string
 	defer func() {
 		if err != nil {
 			if td != "" {
 				if err1 := os.RemoveAll(td); err1 != nil {
-					err = errors.Wrapf(err, "remove failed: %v", err1)
+					log.G(ctx).WithError(err1).Warn("failed to cleanup temp snapshot directory")
 				}
 			}
 			if path != "" {
 				if err1 := os.RemoveAll(path); err1 != nil {
+					log.G(ctx).WithError(err1).WithField("path", path).Error("failed to reclaim snapshot directory, directory may need removal")
 					err = errors.Wrapf(err, "failed to remove path: %v", err1)
 				}
 			}
 		}
 	}()
 
-	fs := filepath.Join(td, "fs")
-	if err = os.MkdirAll(fs, 0755); err != nil {
-		return nil, err
-	}
-
-	if kind == snapshots.KindActive {
-		if err = os.MkdirAll(filepath.Join(td, "work"), 0711); err != nil {
-			return nil, err
-		}
-	}
-
-	ctx, t, err := o.ms.TransactionContext(ctx, true)
+	snapshotDir := filepath.Join(o.root, "snapshots")
+	td, err = o.prepareDirectory(ctx, snapshotDir, kind)
 	if err != nil {
-		return nil, err
+		if rerr := t.Rollback(); rerr != nil {
+			log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
+		}
+		return nil, errors.Wrap(err, "failed to create prepare snapshot dir")
 	}
 	rollback := true
 	defer func() {
@@ -308,7 +332,11 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		}
 
 		stat := st.Sys().(*syscall.Stat_t)
-		if err := os.Lchown(fs, int(stat.Uid), int(stat.Gid)); err != nil {
+
+		if err := os.Lchown(filepath.Join(td, "fs"), int(stat.Uid), int(stat.Gid)); err != nil {
+			if rerr := t.Rollback(); rerr != nil {
+				log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
+			}
 			return nil, errors.Wrap(err, "failed to chown")
 		}
 	}
@@ -325,6 +353,25 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	}
 
 	return o.mounts(s), nil
+}
+
+func (o *snapshotter) prepareDirectory(ctx context.Context, snapshotDir string, kind snapshots.Kind) (string, error) {
+	td, err := ioutil.TempDir(filepath.Join(o.root, "snapshots"), "new-")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to create temp dir")
+	}
+
+	if err := os.Mkdir(filepath.Join(td, "fs"), 0755); err != nil {
+		return td, err
+	}
+
+	if kind == snapshots.KindActive {
+		if err := os.Mkdir(filepath.Join(td, "work"), 0711); err != nil {
+			return td, err
+		}
+	}
+
+	return td, nil
 }
 
 func (o *snapshotter) mounts(s storage.Snapshot) []mount.Mount {
