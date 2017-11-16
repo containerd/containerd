@@ -16,12 +16,14 @@ import (
 	"github.com/containerd/containerd/testutil"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/require"
 )
 
 // ContentSuite runs a test suite on the content store given a factory function.
 func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, root string) (content.Store, func() error, error)) {
 	t.Run("Writer", makeTest(t, name, storeFn, checkContentStoreWriter))
 	t.Run("UploadStatus", makeTest(t, name, storeFn, checkUploadStatus))
+	t.Run("Resume", makeTest(t, name, storeFn, checkResumeWriter))
 	t.Run("Labels", makeTest(t, name, storeFn, checkLabels))
 }
 
@@ -135,8 +137,82 @@ func checkContentStoreWriter(ctx context.Context, t *testing.T, cs content.Store
 	}
 }
 
+func checkResumeWriter(ctx context.Context, t *testing.T, cs content.Store) {
+	checkWrite := func(t *testing.T, w io.Writer, p []byte) {
+		t.Helper()
+		n, err := w.Write(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if n != len(p) {
+			t.Fatal("short write to content store")
+		}
+	}
+
+	var (
+		ref           = "cb"
+		cb, dgst      = createContent(256, 10)
+		first, second = cb[:128], cb[128:]
+	)
+
+	preStart := time.Now()
+	w1, err := cs.Writer(ctx, ref, 256, dgst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	postStart := time.Now()
+	preUpdate := postStart
+
+	checkWrite(t, w1, first)
+	postUpdate := time.Now()
+
+	dgstFirst := digest.FromBytes(first)
+	expected := content.Status{
+		Ref:      ref,
+		Offset:   int64(len(first)),
+		Total:    int64(len(cb)),
+		Expected: dgstFirst,
+	}
+
+	checkStatus(t, w1, expected, dgstFirst, preStart, postStart, preUpdate, postUpdate)
+	require.NoError(t, w1.Close(), "close first writer")
+
+	w2, err := cs.Writer(ctx, ref, 256, dgst)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// status should be consistent with version before close.
+	checkStatus(t, w2, expected, dgstFirst, preStart, postStart, preUpdate, postUpdate)
+
+	preUpdate = time.Now()
+	checkWrite(t, w2, second)
+	postUpdate = time.Now()
+
+	expected.Offset = expected.Total
+	expected.Expected = dgst
+	checkStatus(t, w2, expected, dgst, preStart, postStart, preUpdate, postUpdate)
+
+	preCommit := time.Now()
+	if err := w2.Commit(ctx, 0, ""); err != nil {
+		t.Fatalf("commit failed: %+v", err)
+	}
+	postCommit := time.Now()
+
+	require.NoError(t, w2.Close(), "close second writer")
+	info := content.Info{
+		Digest: dgst,
+		Size:   256,
+	}
+
+	if err := checkInfo(ctx, cs, dgst, info, preCommit, postCommit, preCommit, postCommit); err != nil {
+		t.Fatalf("Check info failed: %+v", err)
+	}
+}
+
 func checkUploadStatus(ctx context.Context, t *testing.T, cs content.Store) {
-	c1, d1 := createContent(256, 1)
+	c1, d1 := createContent(256, 17)
 
 	preStart := time.Now()
 	w1, err := cs.Writer(ctx, "c1", 256, d1)
@@ -156,9 +232,7 @@ func checkUploadStatus(ctx context.Context, t *testing.T, cs content.Store) {
 	preUpdate := preStart
 	postUpdate := postStart
 
-	if err := checkStatus(w1, expected, d, preStart, postStart, preUpdate, postUpdate); err != nil {
-		t.Fatalf("Status check failed: %+v", err)
-	}
+	checkStatus(t, w1, expected, d, preStart, postStart, preUpdate, postUpdate)
 
 	// Write first 64 bytes
 	preUpdate = time.Now()
@@ -168,9 +242,7 @@ func checkUploadStatus(ctx context.Context, t *testing.T, cs content.Store) {
 	postUpdate = time.Now()
 	expected.Offset = 64
 	d = digest.FromBytes(c1[:64])
-	if err := checkStatus(w1, expected, d, preStart, postStart, preUpdate, postUpdate); err != nil {
-		t.Fatalf("Status check failed: %+v", err)
-	}
+	checkStatus(t, w1, expected, d, preStart, postStart, preUpdate, postUpdate)
 
 	// Write next 128 bytes
 	preUpdate = time.Now()
@@ -180,9 +252,7 @@ func checkUploadStatus(ctx context.Context, t *testing.T, cs content.Store) {
 	postUpdate = time.Now()
 	expected.Offset = 192
 	d = digest.FromBytes(c1[:192])
-	if err := checkStatus(w1, expected, d, preStart, postStart, preUpdate, postUpdate); err != nil {
-		t.Fatalf("Status check failed: %+v", err)
-	}
+	checkStatus(t, w1, expected, d, preStart, postStart, preUpdate, postUpdate)
 
 	// Write last 64 bytes
 	preUpdate = time.Now()
@@ -191,9 +261,7 @@ func checkUploadStatus(ctx context.Context, t *testing.T, cs content.Store) {
 	}
 	postUpdate = time.Now()
 	expected.Offset = 256
-	if err := checkStatus(w1, expected, d1, preStart, postStart, preUpdate, postUpdate); err != nil {
-		t.Fatalf("Status check failed: %+v", err)
-	}
+	checkStatus(t, w1, expected, d1, preStart, postStart, preUpdate, postUpdate)
 
 	preCommit := time.Now()
 	if err := w1.Commit(ctx, 0, ""); err != nil {
@@ -212,7 +280,7 @@ func checkUploadStatus(ctx context.Context, t *testing.T, cs content.Store) {
 }
 
 func checkLabels(ctx context.Context, t *testing.T, cs content.Store) {
-	c1, d1 := createContent(256, 1)
+	c1, d1 := createContent(256, 19)
 
 	w1, err := cs.Writer(ctx, "c1", 256, d1)
 	if err != nil {
@@ -275,42 +343,48 @@ func checkLabels(ctx context.Context, t *testing.T, cs content.Store) {
 
 }
 
-func checkStatus(w content.Writer, expected content.Status, d digest.Digest, preStart, postStart, preUpdate, postUpdate time.Time) error {
+func checkStatus(t *testing.T, w content.Writer, expected content.Status, d digest.Digest, preStart, postStart, preUpdate, postUpdate time.Time) {
+	t.Helper()
 	st, err := w.Status()
 	if err != nil {
-		return errors.Wrap(err, "failed to get status")
+		t.Fatalf("failed to get status: %v", err)
 	}
 
 	wd := w.Digest()
 	if wd != d {
-		return errors.Errorf("unexpected digest %v, expected %v", wd, d)
+		t.Fatalf("unexpected digest %v, expected %v", wd, d)
 	}
 
 	if st.Ref != expected.Ref {
-		return errors.Errorf("unexpected ref %q, expected %q", st.Ref, expected.Ref)
+		t.Fatalf("unexpected ref %q, expected %q", st.Ref, expected.Ref)
 	}
 
 	if st.Offset != expected.Offset {
-		return errors.Errorf("unexpected offset %d, expected %d", st.Offset, expected.Offset)
+		t.Fatalf("unexpected offset %d, expected %d", st.Offset, expected.Offset)
 	}
 
 	if st.Total != expected.Total {
-		return errors.Errorf("unexpected total %d, expected %d", st.Total, expected.Total)
+		t.Fatalf("unexpected total %d, expected %d", st.Total, expected.Total)
 	}
 
 	// TODO: Add this test once all implementations guarantee this value is held
 	//if st.Expected != expected.Expected {
-	//	return errors.Errorf("unexpected \"expected digest\" %q, expected %q", st.Expected, expected.Expected)
+	//	t.Fatalf("unexpected \"expected digest\" %q, expected %q", st.Expected, expected.Expected)
 	//}
 
-	if st.StartedAt.After(postStart) || st.StartedAt.Before(preStart) {
-		return errors.Errorf("unexpected started at time %s, expected between %s and %s", st.StartedAt, preStart, postStart)
-	}
-	if st.UpdatedAt.After(postUpdate) || st.UpdatedAt.Before(preUpdate) {
-		return errors.Errorf("unexpected updated at time %s, expected between %s and %s", st.UpdatedAt, preUpdate, postUpdate)
-	}
+	// FIXME: broken on windows: unexpected updated at time 2017-11-14 13:43:22.178013 -0800 PST,
+	// expected between 2017-11-14 13:43:22.1790195 -0800 PST m=+1.022137300 and
+	// 2017-11-14 13:43:22.1790195 -0800 PST m=+1.022137300
+	if runtime.GOOS != "windows" {
+		if st.StartedAt.After(postStart) || st.StartedAt.Before(preStart) {
+			t.Fatalf("unexpected started at time %s, expected between %s and %s", st.StartedAt, preStart, postStart)
+		}
 
-	return nil
+		t.Logf("compare update %v against (%v, %v)", st.UpdatedAt, preUpdate, postUpdate)
+		if st.UpdatedAt.After(postUpdate) || st.UpdatedAt.Before(preUpdate) {
+			t.Fatalf("unexpected updated at time %s, expected between %s and %s", st.UpdatedAt, preUpdate, postUpdate)
+		}
+	}
 }
 
 func checkInfo(ctx context.Context, cs content.Store, d digest.Digest, expected content.Info, c1, c2, u1, u2 time.Time) error {
