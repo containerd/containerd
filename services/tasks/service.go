@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/typeurl"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -35,7 +35,7 @@ import (
 
 var (
 	_     = (api.TasksServer)(&service{})
-	empty = &google_protobuf.Empty{}
+	empty = &ptypes.Empty{}
 )
 
 func init() {
@@ -296,7 +296,7 @@ func addTasks(ctx context.Context, r *api.ListTasksResponse, tasks []runtime.Tas
 	}
 }
 
-func (s *service) Pause(ctx context.Context, r *api.PauseTaskRequest) (*google_protobuf.Empty, error) {
+func (s *service) Pause(ctx context.Context, r *api.PauseTaskRequest) (*ptypes.Empty, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -308,7 +308,7 @@ func (s *service) Pause(ctx context.Context, r *api.PauseTaskRequest) (*google_p
 	return empty, nil
 }
 
-func (s *service) Resume(ctx context.Context, r *api.ResumeTaskRequest) (*google_protobuf.Empty, error) {
+func (s *service) Resume(ctx context.Context, r *api.ResumeTaskRequest) (*ptypes.Empty, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -320,7 +320,7 @@ func (s *service) Resume(ctx context.Context, r *api.ResumeTaskRequest) (*google
 	return empty, nil
 }
 
-func (s *service) Kill(ctx context.Context, r *api.KillRequest) (*google_protobuf.Empty, error) {
+func (s *service) Kill(ctx context.Context, r *api.KillRequest) (*ptypes.Empty, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -365,7 +365,7 @@ func (s *service) ListPids(ctx context.Context, r *api.ListPidsRequest) (*api.Li
 	}, nil
 }
 
-func (s *service) Exec(ctx context.Context, r *api.ExecProcessRequest) (*google_protobuf.Empty, error) {
+func (s *service) Exec(ctx context.Context, r *api.ExecProcessRequest) (*ptypes.Empty, error) {
 	if r.ExecID == "" {
 		return nil, grpc.Errorf(codes.InvalidArgument, "exec id cannot be empty")
 	}
@@ -387,7 +387,7 @@ func (s *service) Exec(ctx context.Context, r *api.ExecProcessRequest) (*google_
 	return empty, nil
 }
 
-func (s *service) ResizePty(ctx context.Context, r *api.ResizePtyRequest) (*google_protobuf.Empty, error) {
+func (s *service) ResizePty(ctx context.Context, r *api.ResizePtyRequest) (*ptypes.Empty, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -407,7 +407,7 @@ func (s *service) ResizePty(ctx context.Context, r *api.ResizePtyRequest) (*goog
 	return empty, nil
 }
 
-func (s *service) CloseIO(ctx context.Context, r *api.CloseIORequest) (*google_protobuf.Empty, error) {
+func (s *service) CloseIO(ctx context.Context, r *api.CloseIORequest) (*ptypes.Empty, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -471,7 +471,7 @@ func (s *service) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest) 
 	}, nil
 }
 
-func (s *service) Update(ctx context.Context, r *api.UpdateTaskRequest) (*google_protobuf.Empty, error) {
+func (s *service) Update(ctx context.Context, r *api.UpdateTaskRequest) (*ptypes.Empty, error) {
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err

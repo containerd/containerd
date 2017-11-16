@@ -23,7 +23,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/typeurl"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	ptypes "github.com/gogo/protobuf/types"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
@@ -163,7 +163,7 @@ func handleSignals(logger *logrus.Entry, signals chan os.Signal, server *grpc.Se
 						Signal: uint32(syscall.SIGKILL),
 						All:    true,
 					})
-					sv.Delete(context.Background(), &google_protobuf.Empty{})
+					sv.Delete(context.Background(), &ptypes.Empty{})
 					close(done)
 				})
 			case unix.SIGUSR1:

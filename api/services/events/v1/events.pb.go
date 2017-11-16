@@ -9,7 +9,7 @@ import math "math"
 import _ "github.com/containerd/containerd/protobuf/plugin"
 import _ "github.com/gogo/protobuf/gogoproto"
 import google_protobuf1 "github.com/gogo/protobuf/types"
-import google_protobuf2 "github.com/golang/protobuf/ptypes/empty"
+import google_protobuf2 "github.com/gogo/protobuf/types"
 import _ "github.com/gogo/protobuf/types"
 
 import time "time"

@@ -12,7 +12,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
-	"github.com/golang/protobuf/ptypes/empty"
+	ptypes "github.com/gogo/protobuf/types"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -138,7 +138,7 @@ func (s *service) List(req *api.ListContentRequest, session api.Content_ListServ
 	return nil
 }
 
-func (s *service) Delete(ctx context.Context, req *api.DeleteContentRequest) (*empty.Empty, error) {
+func (s *service) Delete(ctx context.Context, req *api.DeleteContentRequest) (*ptypes.Empty, error) {
 	if err := req.Digest.Validate(); err != nil {
 		return nil, grpc.Errorf(codes.InvalidArgument, err.Error())
 	}
@@ -153,7 +153,7 @@ func (s *service) Delete(ctx context.Context, req *api.DeleteContentRequest) (*e
 		return nil, err
 	}
 
-	return &empty.Empty{}, nil
+	return &ptypes.Empty{}, nil
 }
 
 func (s *service) Read(req *api.ReadContentRequest, session api.Content_ReadServer) error {
@@ -445,10 +445,10 @@ func (s *service) Write(session api.Content_WriteServer) (err error) {
 	}
 }
 
-func (s *service) Abort(ctx context.Context, req *api.AbortRequest) (*empty.Empty, error) {
+func (s *service) Abort(ctx context.Context, req *api.AbortRequest) (*ptypes.Empty, error) {
 	if err := s.store.Abort(ctx, req.Ref); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	return &empty.Empty{}, nil
+	return &ptypes.Empty{}, nil
 }

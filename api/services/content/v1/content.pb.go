@@ -35,7 +35,7 @@ import math "math"
 import _ "github.com/gogo/protobuf/gogoproto"
 import google_protobuf1 "github.com/gogo/protobuf/types"
 import _ "github.com/gogo/protobuf/types"
-import google_protobuf3 "github.com/golang/protobuf/ptypes/empty"
+import google_protobuf3 "github.com/gogo/protobuf/types"
 
 import github_com_opencontainers_go_digest "github.com/opencontainers/go-digest"
 import time "time"

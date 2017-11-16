@@ -9,7 +9,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
-	"github.com/golang/protobuf/ptypes/empty"
+	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -150,7 +150,7 @@ func (s *service) Update(ctx context.Context, req *imagesapi.UpdateImageRequest)
 	return &resp, nil
 }
 
-func (s *service) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest) (*empty.Empty, error) {
+func (s *service) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest) (*ptypes.Empty, error) {
 	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store images.Store) error {
 		return errdefs.ToGRPC(store.Delete(ctx, req.Name))
 	}); err != nil {
@@ -167,7 +167,7 @@ func (s *service) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest)
 		return nil, errdefs.ToGRPC(errors.Wrap(err, "garbage collection failed"))
 	}
 
-	return &empty.Empty{}, nil
+	return &ptypes.Empty{}, nil
 }
 
 func (s *service) withStore(ctx context.Context, fn func(ctx context.Context, store images.Store) error) func(tx *bolt.Tx) error {

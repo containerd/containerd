@@ -5,7 +5,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/plugin"
-	"github.com/golang/protobuf/ptypes/empty"
+	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -35,20 +35,20 @@ func (s *service) Register(server *grpc.Server) error {
 	return nil
 }
 
-func (s *service) Publish(ctx context.Context, r *api.PublishRequest) (*empty.Empty, error) {
+func (s *service) Publish(ctx context.Context, r *api.PublishRequest) (*ptypes.Empty, error) {
 	if err := s.events.Publish(ctx, r.Topic, r.Event); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	return &empty.Empty{}, nil
+	return &ptypes.Empty{}, nil
 }
 
-func (s *service) Forward(ctx context.Context, r *api.ForwardRequest) (*empty.Empty, error) {
+func (s *service) Forward(ctx context.Context, r *api.ForwardRequest) (*ptypes.Empty, error) {
 	if err := s.events.Forward(ctx, r.Envelope); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	return &empty.Empty{}, nil
+	return &ptypes.Empty{}, nil
 }
 
 func (s *service) Subscribe(req *api.SubscribeRequest, srv api.Events_SubscribeServer) error {

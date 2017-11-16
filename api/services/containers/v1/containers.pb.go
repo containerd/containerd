@@ -26,7 +26,7 @@ import fmt "fmt"
 import math "math"
 import _ "github.com/gogo/protobuf/gogoproto"
 import google_protobuf1 "github.com/gogo/protobuf/types"
-import google_protobuf2 "github.com/golang/protobuf/ptypes/empty"
+import google_protobuf2 "github.com/gogo/protobuf/types"
 import google_protobuf3 "github.com/gogo/protobuf/types"
 import _ "github.com/gogo/protobuf/types"
 

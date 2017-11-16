@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	ptypes "github.com/gogo/protobuf/types"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
@@ -31,7 +31,7 @@ func (c *local) Start(ctx context.Context, in *shimapi.StartRequest, opts ...grp
 	return c.s.Start(ctx, in)
 }
 
-func (c *local) Delete(ctx context.Context, in *google_protobuf.Empty, opts ...grpc.CallOption) (*shimapi.DeleteResponse, error) {
+func (c *local) Delete(ctx context.Context, in *ptypes.Empty, opts ...grpc.CallOption) (*shimapi.DeleteResponse, error) {
 	// make sure we unmount the containers rootfs for this local
 	if err := unix.Unmount(filepath.Join(c.s.config.Path, "rootfs"), 0); err != nil {
 		return nil, err
@@ -43,11 +43,11 @@ func (c *local) DeleteProcess(ctx context.Context, in *shimapi.DeleteProcessRequ
 	return c.s.DeleteProcess(ctx, in)
 }
 
-func (c *local) Exec(ctx context.Context, in *shimapi.ExecProcessRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+func (c *local) Exec(ctx context.Context, in *shimapi.ExecProcessRequest, opts ...grpc.CallOption) (*ptypes.Empty, error) {
 	return c.s.Exec(ctx, in)
 }
 
-func (c *local) ResizePty(ctx context.Context, in *shimapi.ResizePtyRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+func (c *local) ResizePty(ctx context.Context, in *shimapi.ResizePtyRequest, opts ...grpc.CallOption) (*ptypes.Empty, error) {
 	return c.s.ResizePty(ctx, in)
 }
 
@@ -55,15 +55,15 @@ func (c *local) State(ctx context.Context, in *shimapi.StateRequest, opts ...grp
 	return c.s.State(ctx, in)
 }
 
-func (c *local) Pause(ctx context.Context, in *google_protobuf.Empty, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+func (c *local) Pause(ctx context.Context, in *ptypes.Empty, opts ...grpc.CallOption) (*ptypes.Empty, error) {
 	return c.s.Pause(ctx, in)
 }
 
-func (c *local) Resume(ctx context.Context, in *google_protobuf.Empty, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+func (c *local) Resume(ctx context.Context, in *ptypes.Empty, opts ...grpc.CallOption) (*ptypes.Empty, error) {
 	return c.s.Resume(ctx, in)
 }
 
-func (c *local) Kill(ctx context.Context, in *shimapi.KillRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+func (c *local) Kill(ctx context.Context, in *shimapi.KillRequest, opts ...grpc.CallOption) (*ptypes.Empty, error) {
 	return c.s.Kill(ctx, in)
 }
 
@@ -71,19 +71,19 @@ func (c *local) ListPids(ctx context.Context, in *shimapi.ListPidsRequest, opts 
 	return c.s.ListPids(ctx, in)
 }
 
-func (c *local) CloseIO(ctx context.Context, in *shimapi.CloseIORequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+func (c *local) CloseIO(ctx context.Context, in *shimapi.CloseIORequest, opts ...grpc.CallOption) (*ptypes.Empty, error) {
 	return c.s.CloseIO(ctx, in)
 }
 
-func (c *local) Checkpoint(ctx context.Context, in *shimapi.CheckpointTaskRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+func (c *local) Checkpoint(ctx context.Context, in *shimapi.CheckpointTaskRequest, opts ...grpc.CallOption) (*ptypes.Empty, error) {
 	return c.s.Checkpoint(ctx, in)
 }
 
-func (c *local) ShimInfo(ctx context.Context, in *google_protobuf.Empty, opts ...grpc.CallOption) (*shimapi.ShimInfoResponse, error) {
+func (c *local) ShimInfo(ctx context.Context, in *ptypes.Empty, opts ...grpc.CallOption) (*shimapi.ShimInfoResponse, error) {
 	return c.s.ShimInfo(ctx, in)
 }
 
-func (c *local) Update(ctx context.Context, in *shimapi.UpdateTaskRequest, opts ...grpc.CallOption) (*google_protobuf.Empty, error) {
+func (c *local) Update(ctx context.Context, in *shimapi.UpdateTaskRequest, opts ...grpc.CallOption) (*ptypes.Empty, error) {
 	return c.s.Update(ctx, in)
 }
 
