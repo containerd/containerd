@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/containerd/cgroups"
+	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/linux/runctypes"
@@ -294,7 +295,7 @@ func TestContainerAttach(t *testing.T) {
 
 	expected := "hello" + newLine
 
-	direct, err := NewDirectIO(ctx, false)
+	direct, err := cio.NewDirectIO(ctx, false)
 	if err != nil {
 		t.Error(err)
 		return
@@ -389,7 +390,7 @@ func TestContainerUsername(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	direct, err := NewDirectIO(ctx, false)
+	direct, err := cio.NewDirectIO(ctx, false)
 	if err != nil {
 		t.Error(err)
 		return
@@ -482,7 +483,7 @@ func TestContainerAttachProcess(t *testing.T) {
 	expected := "hello" + newLine
 
 	// creating IO early for easy resource cleanup
-	direct, err := NewDirectIO(ctx, false)
+	direct, err := cio.NewDirectIO(ctx, false)
 	if err != nil {
 		t.Error(err)
 		return
@@ -598,7 +599,7 @@ func TestContainerUserID(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	direct, err := NewDirectIO(ctx, false)
+	direct, err := cio.NewDirectIO(ctx, false)
 	if err != nil {
 		t.Error(err)
 		return
@@ -688,7 +689,7 @@ func TestContainerKillAll(t *testing.T) {
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	stdout := bytes.NewBuffer(nil)
-	task, err := container.NewTask(ctx, NewIO(bytes.NewBuffer(nil), stdout, bytes.NewBuffer(nil)))
+	task, err := container.NewTask(ctx, cio.NewIO(bytes.NewBuffer(nil), stdout, bytes.NewBuffer(nil)))
 	if err != nil {
 		t.Error(err)
 		return
@@ -940,7 +941,7 @@ func TestContainerKillInitPidHost(t *testing.T) {
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	stdout := bytes.NewBuffer(nil)
-	task, err := container.NewTask(ctx, NewIO(bytes.NewBuffer(nil), stdout, bytes.NewBuffer(nil)))
+	task, err := container.NewTask(ctx, cio.NewIO(bytes.NewBuffer(nil), stdout, bytes.NewBuffer(nil)))
 	if err != nil {
 		t.Error(err)
 		return
@@ -1039,7 +1040,7 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
-	task, err := container.NewTask(ctx, Stdio, func(_ context.Context, client *Client, r *TaskInfo) error {
+	task, err := container.NewTask(ctx, cio.Stdio, func(_ context.Context, client *Client, r *TaskInfo) error {
 		r.Options = &runctypes.CreateOptions{
 			IoUid: 1000,
 			IoGid: 1000,

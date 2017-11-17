@@ -6,6 +6,7 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/log"
 	"github.com/pkg/errors"
 )
@@ -41,15 +42,15 @@ func HandleConsoleResize(ctx gocontext.Context, task resizer, con console.Consol
 
 // NewTask creates a new task
 func NewTask(ctx gocontext.Context, client *containerd.Client, container containerd.Container, _ string, tty, nullIO bool) (containerd.Task, error) {
-	io := containerd.Stdio
+	ioCreator := cio.Stdio
 	if tty {
-		io = containerd.StdioTerminal
+		ioCreator = cio.StdioTerminal
 	}
 	if nullIO {
 		if tty {
 			return nil, errors.New("tty and null-io cannot be used together")
 		}
-		io = containerd.NullIO
+		ioCreator = cio.NullIO
 	}
-	return container.NewTask(ctx, io)
+	return container.NewTask(ctx, ioCreator)
 }

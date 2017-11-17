@@ -1,6 +1,6 @@
 // +build !windows
 
-package containerd
+package cio
 
 import (
 	"context"
@@ -139,9 +139,9 @@ func (f *DirectIO) IOAttach(set *FIFOSet) (IO, error) {
 	return f, nil
 }
 
-// Config returns the IOConfig
-func (f *DirectIO) Config() IOConfig {
-	return IOConfig{
+// Config returns the Config
+func (f *DirectIO) Config() Config {
+	return Config{
 		Terminal: f.terminal,
 		Stdin:    f.set.In,
 		Stdout:   f.set.Out,
