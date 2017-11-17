@@ -9,7 +9,6 @@ import (
 	"time"
 
 	eventstypes "github.com/containerd/containerd/api/events"
-	v1 "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/namespaces"
@@ -57,7 +56,7 @@ func TestExchangeBasic(t *testing.T) {
 	wg.Wait()
 
 	for _, subscriber := range []struct {
-		eventq <-chan *v1.Envelope
+		eventq <-chan *events.Envelope
 		errq   <-chan error
 		cancel func()
 	}{
@@ -133,7 +132,7 @@ func TestExchangeValidateTopic(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			envelope := v1.Envelope{
+			envelope := events.Envelope{
 				Timestamp: time.Now().UTC(),
 				Namespace: namespace,
 				Topic:     testcase.input,
