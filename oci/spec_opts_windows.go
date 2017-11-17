@@ -1,6 +1,6 @@
 // +build windows
 
-package containerd
+package oci
 
 import (
 	"context"
@@ -16,13 +16,10 @@ import (
 )
 
 // WithImageConfig configures the spec to from the configuration of an Image
-func WithImageConfig(i Image) SpecOpts {
-	return func(ctx context.Context, client *Client, _ *containers.Container, s *specs.Spec) error {
-		var (
-			image = i.(*image)
-			store = client.ContentStore()
-		)
-		ic, err := image.i.Config(ctx, store, platforms.Default())
+func WithImageConfig(image Image) SpecOpts {
+	return func(ctx context.Context, client Client, _ *containers.Container, s *specs.Spec) error {
+		store := client.ContentStore()
+		ic, err := image.Config(ctx)
 		if err != nil {
 			return err
 		}
@@ -55,21 +52,13 @@ func WithImageConfig(i Image) SpecOpts {
 // WithTTY sets the information on the spec as well as the environment variables for
 // using a TTY
 func WithTTY(width, height int) SpecOpts {
-	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
 		s.Process.Terminal = true
 		if s.Process.ConsoleSize == nil {
 			s.Process.ConsoleSize = &specs.Box{}
 		}
 		s.Process.ConsoleSize.Width = uint(width)
 		s.Process.ConsoleSize.Height = uint(height)
-		return nil
-	}
-}
-
-// WithResources sets the provided resources on the spec for task updates
-func WithResources(resources *specs.WindowsResources) UpdateTaskOpts {
-	return func(ctx context.Context, client *Client, r *UpdateTaskInfo) error {
-		r.Resources = resources
 		return nil
 	}
 }
