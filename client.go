@@ -35,7 +35,6 @@ import (
 	"github.com/containerd/containerd/remotes/docker/schema1"
 	contentservice "github.com/containerd/containerd/services/content"
 	diffservice "github.com/containerd/containerd/services/diff"
-	imagesservice "github.com/containerd/containerd/services/images"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
@@ -449,7 +448,7 @@ func (c *Client) TaskService() tasks.TasksClient {
 
 // ImageService returns the underlying image Store
 func (c *Client) ImageService() images.Store {
-	return imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(c.conn))
+	return NewImageStoreFromClient(imagesapi.NewImagesClient(c.conn))
 }
 
 // DiffService returns the underlying Differ
