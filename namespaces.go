@@ -1,4 +1,4 @@
-package namespaces
+package containerd
 
 import (
 	"context"
@@ -10,16 +10,16 @@ import (
 	"github.com/gogo/protobuf/types"
 )
 
-// NewStoreFromClient returns a new namespace store
-func NewStoreFromClient(client api.NamespacesClient) namespaces.Store {
-	return &remote{client: client}
+// NewNamespaceStoreFromClient returns a new namespace store
+func NewNamespaceStoreFromClient(client api.NamespacesClient) namespaces.Store {
+	return &remoteNamespaces{client: client}
 }
 
-type remote struct {
+type remoteNamespaces struct {
 	client api.NamespacesClient
 }
 
-func (r *remote) Create(ctx context.Context, namespace string, labels map[string]string) error {
+func (r *remoteNamespaces) Create(ctx context.Context, namespace string, labels map[string]string) error {
 	var req api.CreateNamespaceRequest
 
 	req.Namespace = api.Namespace{
@@ -35,7 +35,7 @@ func (r *remote) Create(ctx context.Context, namespace string, labels map[string
 	return nil
 }
 
-func (r *remote) Labels(ctx context.Context, namespace string) (map[string]string, error) {
+func (r *remoteNamespaces) Labels(ctx context.Context, namespace string) (map[string]string, error) {
 	var req api.GetNamespaceRequest
 	req.Name = namespace
 
@@ -47,7 +47,7 @@ func (r *remote) Labels(ctx context.Context, namespace string) (map[string]strin
 	return resp.Namespace.Labels, nil
 }
 
-func (r *remote) SetLabel(ctx context.Context, namespace, key, value string) error {
+func (r *remoteNamespaces) SetLabel(ctx context.Context, namespace, key, value string) error {
 	var req api.UpdateNamespaceRequest
 
 	req.Namespace = api.Namespace{
@@ -67,7 +67,7 @@ func (r *remote) SetLabel(ctx context.Context, namespace, key, value string) err
 	return nil
 }
 
-func (r *remote) List(ctx context.Context) ([]string, error) {
+func (r *remoteNamespaces) List(ctx context.Context) ([]string, error) {
 	var req api.ListNamespacesRequest
 
 	resp, err := r.client.List(ctx, &req)
@@ -84,7 +84,7 @@ func (r *remote) List(ctx context.Context) ([]string, error) {
 	return namespaces, nil
 }
 
-func (r *remote) Delete(ctx context.Context, namespace string) error {
+func (r *remoteNamespaces) Delete(ctx context.Context, namespace string) error {
 	var req api.DeleteNamespaceRequest
 
 	req.Name = namespace
