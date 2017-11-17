@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,18 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package meta
+package core
 
-import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-)
+import "encoding/json"
 
-// InterfacesForUnstructured returns VersionInterfaces suitable for
-// dealing with unstructured.Unstructured objects.
-func InterfacesForUnstructured(schema.GroupVersion) (*VersionInterfaces, error) {
-	return &VersionInterfaces{
-		ObjectConvertor:  &unstructured.UnstructuredObjectConverter{},
-		MetadataAccessor: NewAccessor(),
-	}, nil
-}
+// This file implements json marshaling/unmarshaling interfaces on objects that are currently marshaled into annotations
+// to prevent anyone from marshaling these internal structs.
+
+var _ = json.Marshaler(&AvoidPods{})
+var _ = json.Unmarshaler(&AvoidPods{})
+
+func (AvoidPods) MarshalJSON() ([]byte, error) { panic("do not marshal internal struct") }
+func (*AvoidPods) UnmarshalJSON([]byte) error  { panic("do not unmarshal to internal struct") }

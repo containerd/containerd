@@ -14,15 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+//TODO: consider making these methods functions, because we don't want helper
+//functions in the k8s.io/api repo.
 
-import "encoding/json"
+package core
 
-// This file implements json marshaling/unmarshaling interfaces on objects that are currently marshaled into annotations
-// to prevent anyone from marshaling these internal structs.
+import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
+)
 
-var _ = json.Marshaler(&AvoidPods{})
-var _ = json.Unmarshaler(&AvoidPods{})
+func (obj *ObjectReference) SetGroupVersionKind(gvk schema.GroupVersionKind) {
+	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
+}
 
-func (AvoidPods) MarshalJSON() ([]byte, error) { panic("do not marshal internal struct") }
-func (*AvoidPods) UnmarshalJSON([]byte) error  { panic("do not unmarshal to internal struct") }
+func (obj *ObjectReference) GroupVersionKind() schema.GroupVersionKind {
+	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+}
+
+func (obj *ObjectReference) GetObjectKind() schema.ObjectKind { return obj }

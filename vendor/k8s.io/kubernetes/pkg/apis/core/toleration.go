@@ -17,20 +17,14 @@ limitations under the License.
 //TODO: consider making these methods functions, because we don't want helper
 //functions in the k8s.io/api repo.
 
-package api
+package core
 
-import "fmt"
-
-// MatchTaint checks if the taint matches taintToMatch. Taints are unique by key:effect,
-// if the two taints have same key:effect, regard as they match.
-func (t *Taint) MatchTaint(taintToMatch Taint) bool {
-	return t.Key == taintToMatch.Key && t.Effect == taintToMatch.Effect
-}
-
-// taint.ToString() converts taint struct to string in format key=value:effect or key:effect.
-func (t *Taint) ToString() string {
-	if len(t.Value) == 0 {
-		return fmt.Sprintf("%v:%v", t.Key, t.Effect)
-	}
-	return fmt.Sprintf("%v=%v:%v", t.Key, t.Value, t.Effect)
+// MatchToleration checks if the toleration matches tolerationToMatch. Tolerations are unique by <key,effect,operator,value>,
+// if the two tolerations have same <key,effect,operator,value> combination, regard as they match.
+// TODO: uniqueness check for tolerations in api validations.
+func (t *Toleration) MatchToleration(tolerationToMatch *Toleration) bool {
+	return t.Key == tolerationToMatch.Key &&
+		t.Effect == tolerationToMatch.Effect &&
+		t.Operator == tolerationToMatch.Operator &&
+		t.Value == tolerationToMatch.Value
 }
