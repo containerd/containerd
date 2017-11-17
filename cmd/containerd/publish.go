@@ -20,7 +20,7 @@ import (
 
 var publishCommand = cli.Command{
 	Name:  "publish",
-	Usage: "binary to publish events to containerd",
+	Usage: "binary to publish events to containerd (manual invocation is unsupported)",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "namespace",

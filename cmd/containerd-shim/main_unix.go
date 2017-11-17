@@ -36,7 +36,7 @@ const usage = `
 / /__/ /_/ / / / / /_/ /_/ / / / / /  __/ /  / /_/ /_____(__  ) / / / / / / / / /
 \___/\____/_/ /_/\__/\__,_/_/_/ /_/\___/_/   \__,_/     /____/_/ /_/_/_/ /_/ /_/
 
-shim for container lifecycle and reconnection
+shim for container lifecycle and reconnection (manual invocation is unsupported)
 `
 
 var (

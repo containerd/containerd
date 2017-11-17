@@ -47,7 +47,7 @@ func main() {
 / /__/ /_/ /
 \___/\__/_/
 
-containerd CLI
+containerd CLI (unsupported)
 `
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
