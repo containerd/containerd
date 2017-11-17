@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Microsoft/hcsshim"
-	eventsapi "github.com/containerd/containerd/api/services/events/v1"
+	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/runtime"
@@ -126,7 +126,7 @@ func (t *task) Start(ctx context.Context) error {
 	}
 	t.publisher.Publish(ctx,
 		runtime.TaskStartEventTopic,
-		&eventsapi.TaskStart{
+		&eventstypes.TaskStart{
 			ContainerID: t.id,
 			Pid:         t.pid,
 		})
@@ -143,7 +143,7 @@ func (t *task) Pause(ctx context.Context) error {
 
 			t.publisher.Publish(ctx,
 				runtime.TaskPausedEventTopic,
-				&eventsapi.TaskPaused{
+				&eventstypes.TaskPaused{
 					ContainerID: t.id,
 				})
 			return nil
@@ -164,7 +164,7 @@ func (t *task) Resume(ctx context.Context) error {
 
 			t.publisher.Publish(ctx,
 				runtime.TaskResumedEventTopic,
-				&eventsapi.TaskResumed{
+				&eventstypes.TaskResumed{
 					ContainerID: t.id,
 				})
 			return nil
@@ -206,7 +206,7 @@ func (t *task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runt
 
 	t.publisher.Publish(ctx,
 		runtime.TaskExecAddedEventTopic,
-		&eventsapi.TaskExecAdded{
+		&eventstypes.TaskExecAdded{
 			ContainerID: t.id,
 			ExecID:      id,
 		})

@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/boltdb/bolt"
-	eventsapi "github.com/containerd/containerd/api/services/events/v1"
+	eventstypes "github.com/containerd/containerd/api/events"
 	api "github.com/containerd/containerd/api/services/namespaces/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
@@ -119,7 +119,7 @@ func (s *service) Create(ctx context.Context, req *api.CreateNamespaceRequest) (
 		return &resp, err
 	}
 
-	if err := s.publisher.Publish(ctx, "/namespaces/create", &eventsapi.NamespaceCreate{
+	if err := s.publisher.Publish(ctx, "/namespaces/create", &eventstypes.NamespaceCreate{
 		Name:   req.Namespace.Name,
 		Labels: req.Namespace.Labels,
 	}); err != nil {
@@ -172,7 +172,7 @@ func (s *service) Update(ctx context.Context, req *api.UpdateNamespaceRequest) (
 		return &resp, err
 	}
 
-	if err := s.publisher.Publish(ctx, "/namespaces/update", &eventsapi.NamespaceUpdate{
+	if err := s.publisher.Publish(ctx, "/namespaces/update", &eventstypes.NamespaceUpdate{
 		Name:   req.Namespace.Name,
 		Labels: req.Namespace.Labels,
 	}); err != nil {
@@ -190,7 +190,7 @@ func (s *service) Delete(ctx context.Context, req *api.DeleteNamespaceRequest) (
 	}
 	// set the namespace in the context before publishing the event
 	ctx = namespaces.WithNamespace(ctx, req.Name)
-	if err := s.publisher.Publish(ctx, "/namespaces/delete", &eventsapi.NamespaceDelete{
+	if err := s.publisher.Publish(ctx, "/namespaces/delete", &eventstypes.NamespaceDelete{
 		Name: req.Name,
 	}); err != nil {
 		return &ptypes.Empty{}, err

@@ -2,7 +2,7 @@ package images
 
 import (
 	"github.com/boltdb/bolt"
-	eventsapi "github.com/containerd/containerd/api/services/events/v1"
+	eventstypes "github.com/containerd/containerd/api/events"
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
@@ -101,7 +101,7 @@ func (s *service) Create(ctx context.Context, req *imagesapi.CreateImageRequest)
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	if err := s.publisher.Publish(ctx, "/images/create", &eventsapi.ImageCreate{
+	if err := s.publisher.Publish(ctx, "/images/create", &eventstypes.ImageCreate{
 		Name:   resp.Image.Name,
 		Labels: resp.Image.Labels,
 	}); err != nil {
@@ -140,7 +140,7 @@ func (s *service) Update(ctx context.Context, req *imagesapi.UpdateImageRequest)
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	if err := s.publisher.Publish(ctx, "/images/update", &eventsapi.ImageUpdate{
+	if err := s.publisher.Publish(ctx, "/images/update", &eventstypes.ImageUpdate{
 		Name:   resp.Image.Name,
 		Labels: resp.Image.Labels,
 	}); err != nil {
@@ -157,7 +157,7 @@ func (s *service) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest)
 		return nil, err
 	}
 
-	if err := s.publisher.Publish(ctx, "/images/delete", &eventsapi.ImageDelete{
+	if err := s.publisher.Publish(ctx, "/images/delete", &eventstypes.ImageDelete{
 		Name: req.Name,
 	}); err != nil {
 		return nil, err

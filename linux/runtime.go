@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
-	eventsapi "github.com/containerd/containerd/api/services/events/v1"
+	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
@@ -286,11 +286,11 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 			return nil, err
 		}
 	}
-	r.events.Publish(ctx, runtime.TaskCreateEventTopic, &eventsapi.TaskCreate{
+	r.events.Publish(ctx, runtime.TaskCreateEventTopic, &eventstypes.TaskCreate{
 		ContainerID: sopts.ID,
 		Bundle:      sopts.Bundle,
 		Rootfs:      sopts.Rootfs,
-		IO: &eventsapi.TaskIO{
+		IO: &eventstypes.TaskIO{
 			Stdin:    sopts.Stdin,
 			Stdout:   sopts.Stdout,
 			Stderr:   sopts.Stderr,
@@ -337,7 +337,7 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 	if err := bundle.Delete(); err != nil {
 		log.G(ctx).WithError(err).Error("failed to delete bundle")
 	}
-	r.events.Publish(ctx, runtime.TaskDeleteEventTopic, &eventsapi.TaskDelete{
+	r.events.Publish(ctx, runtime.TaskDeleteEventTopic, &eventstypes.TaskDelete{
 		ContainerID: lc.id,
 		ExitStatus:  rsp.ExitStatus,
 		ExitedAt:    rsp.ExitedAt,
@@ -452,7 +452,7 @@ func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, 
 
 	// Notify Client
 	exitedAt := time.Now().UTC()
-	r.events.Publish(ctx, runtime.TaskExitEventTopic, &eventsapi.TaskExit{
+	r.events.Publish(ctx, runtime.TaskExitEventTopic, &eventstypes.TaskExit{
 		ContainerID: id,
 		ID:          id,
 		Pid:         uint32(pid),
@@ -464,7 +464,7 @@ func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, 
 		log.G(ctx).WithError(err).Error("delete bundle")
 	}
 
-	r.events.Publish(ctx, runtime.TaskDeleteEventTopic, &eventsapi.TaskDelete{
+	r.events.Publish(ctx, runtime.TaskDeleteEventTopic, &eventstypes.TaskDelete{
 		ContainerID: id,
 		Pid:         uint32(pid),
 		ExitStatus:  128 + uint32(unix.SIGKILL),

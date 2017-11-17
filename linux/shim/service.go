@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/codes"
 
 	"github.com/containerd/console"
-	eventsapi "github.com/containerd/containerd/api/services/events/v1"
+	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
@@ -447,7 +447,7 @@ func (s *Service) checkProcesses(e runc.Exit) {
 				}
 			}
 			p.SetExited(e.Status)
-			s.events <- &eventsapi.TaskExit{
+			s.events <- &eventstypes.TaskExit{
 				ContainerID: s.id,
 				ID:          p.ID(),
 				Pid:         uint32(e.Pid),
@@ -488,25 +488,25 @@ func (s *Service) forward(publisher events.Publisher) {
 
 func getTopic(ctx context.Context, e interface{}) string {
 	switch e.(type) {
-	case *eventsapi.TaskCreate:
+	case *eventstypes.TaskCreate:
 		return runtime.TaskCreateEventTopic
-	case *eventsapi.TaskStart:
+	case *eventstypes.TaskStart:
 		return runtime.TaskStartEventTopic
-	case *eventsapi.TaskOOM:
+	case *eventstypes.TaskOOM:
 		return runtime.TaskOOMEventTopic
-	case *eventsapi.TaskExit:
+	case *eventstypes.TaskExit:
 		return runtime.TaskExitEventTopic
-	case *eventsapi.TaskDelete:
+	case *eventstypes.TaskDelete:
 		return runtime.TaskDeleteEventTopic
-	case *eventsapi.TaskExecAdded:
+	case *eventstypes.TaskExecAdded:
 		return runtime.TaskExecAddedEventTopic
-	case *eventsapi.TaskExecStarted:
+	case *eventstypes.TaskExecStarted:
 		return runtime.TaskExecStartedEventTopic
-	case *eventsapi.TaskPaused:
+	case *eventstypes.TaskPaused:
 		return runtime.TaskPausedEventTopic
-	case *eventsapi.TaskResumed:
+	case *eventstypes.TaskResumed:
 		return runtime.TaskResumedEventTopic
-	case *eventsapi.TaskCheckpointed:
+	case *eventstypes.TaskCheckpointed:
 		return runtime.TaskCheckpointedEventTopic
 	default:
 		logrus.Warnf("no topic for type %#v", e)

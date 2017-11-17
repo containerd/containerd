@@ -31,6 +31,11 @@ plugins = ["grpc", "fieldpath"]
   "google/protobuf/duration.proto" = "github.com/gogo/protobuf/types"
   "google/rpc/status.proto" = "github.com/containerd/containerd/protobuf/google/rpc"
 
+[[overrides]]
+
+prefixes = ["github.com/containerd/containerd/api/events"]
+plugins = ["fieldpath"]
+
 # Aggregrate the API descriptors to lock down API changes.
 [[descriptors]]
 prefix = "github.com/containerd/containerd/api"

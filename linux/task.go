@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/containerd/cgroups"
-	eventsapi "github.com/containerd/containerd/api/services/events/v1"
+	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events/exchange"
@@ -90,7 +90,7 @@ func (t *Task) Start(ctx context.Context) error {
 			return err
 		}
 	}
-	t.events.Publish(ctx, runtime.TaskStartEventTopic, &eventsapi.TaskStart{
+	t.events.Publish(ctx, runtime.TaskStartEventTopic, &eventstypes.TaskStart{
 		ContainerID: t.id,
 		Pid:         uint32(t.pid),
 	})
@@ -138,7 +138,7 @@ func (t *Task) Pause(ctx context.Context) error {
 	if _, err := t.shim.Pause(ctx, empty); err != nil {
 		return errdefs.FromGRPC(err)
 	}
-	t.events.Publish(ctx, runtime.TaskPausedEventTopic, &eventsapi.TaskPaused{
+	t.events.Publish(ctx, runtime.TaskPausedEventTopic, &eventstypes.TaskPaused{
 		ContainerID: t.id,
 	})
 	return nil
@@ -149,7 +149,7 @@ func (t *Task) Resume(ctx context.Context) error {
 	if _, err := t.shim.Resume(ctx, empty); err != nil {
 		return errdefs.FromGRPC(err)
 	}
-	t.events.Publish(ctx, runtime.TaskResumedEventTopic, &eventsapi.TaskResumed{
+	t.events.Publish(ctx, runtime.TaskResumedEventTopic, &eventstypes.TaskResumed{
 		ContainerID: t.id,
 	})
 	return nil
@@ -243,7 +243,7 @@ func (t *Task) Checkpoint(ctx context.Context, path string, options *types.Any) 
 	if _, err := t.shim.Checkpoint(ctx, r); err != nil {
 		return errdefs.FromGRPC(err)
 	}
-	t.events.Publish(ctx, runtime.TaskCheckpointedEventTopic, &eventsapi.TaskCheckpointed{
+	t.events.Publish(ctx, runtime.TaskCheckpointedEventTopic, &eventstypes.TaskCheckpointed{
 		ContainerID: t.id,
 	})
 	return nil

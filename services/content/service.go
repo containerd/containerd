@@ -4,8 +4,8 @@ import (
 	"io"
 	"sync"
 
+	eventstypes "github.com/containerd/containerd/api/events"
 	api "github.com/containerd/containerd/api/services/content/v1"
-	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
@@ -147,7 +147,7 @@ func (s *service) Delete(ctx context.Context, req *api.DeleteContentRequest) (*p
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	if err := s.publisher.Publish(ctx, "/content/delete", &eventsapi.ContentDelete{
+	if err := s.publisher.Publish(ctx, "/content/delete", &eventstypes.ContentDelete{
 		Digest: req.Digest,
 	}); err != nil {
 		return nil, err

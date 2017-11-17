@@ -11,7 +11,7 @@ import (
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/boltdb/bolt"
-	eventsapi "github.com/containerd/containerd/api/services/events/v1"
+	eventstypes "github.com/containerd/containerd/api/events"
 	containerdtypes "github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
@@ -198,7 +198,7 @@ func (r *windowsRuntime) Delete(ctx context.Context, t runtime.Task) (*runtime.E
 
 	r.publisher.Publish(ctx,
 		runtime.TaskDeleteEventTopic,
-		&eventsapi.TaskDelete{
+		&eventstypes.TaskDelete{
 			ContainerID: wt.id,
 			Pid:         wt.pid,
 			ExitStatus:  rtExit.Status,
@@ -322,9 +322,9 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, spec
 
 	r.publisher.Publish(ctx,
 		runtime.TaskCreateEventTopic,
-		&eventsapi.TaskCreate{
+		&eventstypes.TaskCreate{
 			ContainerID: id,
-			IO: &eventsapi.TaskIO{
+			IO: &eventstypes.TaskIO{
 				Stdin:    io.Stdin,
 				Stdout:   io.Stdout,
 				Stderr:   io.Stderr,
