@@ -1,4 +1,4 @@
-package content
+package containerd
 
 import (
 	"context"
@@ -11,18 +11,18 @@ import (
 	digest "github.com/opencontainers/go-digest"
 )
 
-type remoteStore struct {
+type remoteContent struct {
 	client contentapi.ContentClient
 }
 
-// NewStoreFromClient returns a new content store
-func NewStoreFromClient(client contentapi.ContentClient) content.Store {
-	return &remoteStore{
+// NewContentStoreFromClient returns a new content store
+func NewContentStoreFromClient(client contentapi.ContentClient) content.Store {
+	return &remoteContent{
 		client: client,
 	}
 }
 
-func (rs *remoteStore) Info(ctx context.Context, dgst digest.Digest) (content.Info, error) {
+func (rs *remoteContent) Info(ctx context.Context, dgst digest.Digest) (content.Info, error) {
 	resp, err := rs.client.Info(ctx, &contentapi.InfoRequest{
 		Digest: dgst,
 	})
@@ -33,7 +33,7 @@ func (rs *remoteStore) Info(ctx context.Context, dgst digest.Digest) (content.In
 	return infoFromGRPC(resp.Info), nil
 }
 
-func (rs *remoteStore) Walk(ctx context.Context, fn content.WalkFunc, filters ...string) error {
+func (rs *remoteContent) Walk(ctx context.Context, fn content.WalkFunc, filters ...string) error {
 	session, err := rs.client.List(ctx, &contentapi.ListContentRequest{
 		Filters: filters,
 	})
@@ -61,7 +61,7 @@ func (rs *remoteStore) Walk(ctx context.Context, fn content.WalkFunc, filters ..
 	return nil
 }
 
-func (rs *remoteStore) Delete(ctx context.Context, dgst digest.Digest) error {
+func (rs *remoteContent) Delete(ctx context.Context, dgst digest.Digest) error {
 	if _, err := rs.client.Delete(ctx, &contentapi.DeleteContentRequest{
 		Digest: dgst,
 	}); err != nil {
@@ -71,7 +71,7 @@ func (rs *remoteStore) Delete(ctx context.Context, dgst digest.Digest) error {
 	return nil
 }
 
-func (rs *remoteStore) ReaderAt(ctx context.Context, dgst digest.Digest) (content.ReaderAt, error) {
+func (rs *remoteContent) ReaderAt(ctx context.Context, dgst digest.Digest) (content.ReaderAt, error) {
 	i, err := rs.Info(ctx, dgst)
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func (rs *remoteStore) ReaderAt(ctx context.Context, dgst digest.Digest) (conten
 	}, nil
 }
 
-func (rs *remoteStore) Status(ctx context.Context, ref string) (content.Status, error) {
+func (rs *remoteContent) Status(ctx context.Context, ref string) (content.Status, error) {
 	resp, err := rs.client.Status(ctx, &contentapi.StatusRequest{
 		Ref: ref,
 	})
@@ -104,7 +104,7 @@ func (rs *remoteStore) Status(ctx context.Context, ref string) (content.Status, 
 	}, nil
 }
 
-func (rs *remoteStore) Update(ctx context.Context, info content.Info, fieldpaths ...string) (content.Info, error) {
+func (rs *remoteContent) Update(ctx context.Context, info content.Info, fieldpaths ...string) (content.Info, error) {
 	resp, err := rs.client.Update(ctx, &contentapi.UpdateRequest{
 		Info: infoToGRPC(info),
 		UpdateMask: &protobuftypes.FieldMask{
@@ -117,7 +117,7 @@ func (rs *remoteStore) Update(ctx context.Context, info content.Info, fieldpaths
 	return infoFromGRPC(resp.Info), nil
 }
 
-func (rs *remoteStore) ListStatuses(ctx context.Context, filters ...string) ([]content.Status, error) {
+func (rs *remoteContent) ListStatuses(ctx context.Context, filters ...string) ([]content.Status, error) {
 	resp, err := rs.client.ListStatuses(ctx, &contentapi.ListStatusesRequest{
 		Filters: filters,
 	})
@@ -140,7 +140,7 @@ func (rs *remoteStore) ListStatuses(ctx context.Context, filters ...string) ([]c
 	return statuses, nil
 }
 
-func (rs *remoteStore) Writer(ctx context.Context, ref string, size int64, expected digest.Digest) (content.Writer, error) {
+func (rs *remoteContent) Writer(ctx context.Context, ref string, size int64, expected digest.Digest) (content.Writer, error) {
 	wrclient, offset, err := rs.negotiate(ctx, ref, size, expected)
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
@@ -154,7 +154,7 @@ func (rs *remoteStore) Writer(ctx context.Context, ref string, size int64, expec
 }
 
 // Abort implements asynchronous abort. It starts a new write session on the ref l
-func (rs *remoteStore) Abort(ctx context.Context, ref string) error {
+func (rs *remoteContent) Abort(ctx context.Context, ref string) error {
 	if _, err := rs.client.Abort(ctx, &contentapi.AbortRequest{
 		Ref: ref,
 	}); err != nil {
@@ -164,7 +164,7 @@ func (rs *remoteStore) Abort(ctx context.Context, ref string) error {
 	return nil
 }
 
-func (rs *remoteStore) negotiate(ctx context.Context, ref string, size int64, expected digest.Digest) (contentapi.Content_WriteClient, int64, error) {
+func (rs *remoteContent) negotiate(ctx context.Context, ref string, size int64, expected digest.Digest) (contentapi.Content_WriteClient, int64, error) {
 	wrclient, err := rs.client.Write(ctx)
 	if err != nil {
 		return nil, 0, err

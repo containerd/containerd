@@ -33,7 +33,6 @@ import (
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/schema1"
-	contentservice "github.com/containerd/containerd/services/content"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
@@ -432,7 +431,7 @@ func (c *Client) ContainerService() containers.Store {
 
 // ContentStore returns the underlying content Store
 func (c *Client) ContentStore() content.Store {
-	return contentservice.NewStoreFromClient(contentapi.NewContentClient(c.conn))
+	return NewContentStoreFromClient(contentapi.NewContentClient(c.conn))
 }
 
 // SnapshotService returns the underlying snapshotter for the provided snapshotter name

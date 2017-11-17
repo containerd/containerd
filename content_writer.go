@@ -1,4 +1,4 @@
-package content
+package containerd
 
 import (
 	"context"

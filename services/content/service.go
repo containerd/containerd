@@ -452,3 +452,23 @@ func (s *service) Abort(ctx context.Context, req *api.AbortRequest) (*ptypes.Emp
 
 	return &ptypes.Empty{}, nil
 }
+
+func infoToGRPC(info content.Info) api.Info {
+	return api.Info{
+		Digest:    info.Digest,
+		Size_:     info.Size,
+		CreatedAt: info.CreatedAt,
+		UpdatedAt: info.UpdatedAt,
+		Labels:    info.Labels,
+	}
+}
+
+func infoFromGRPC(info api.Info) content.Info {
+	return content.Info{
+		Digest:    info.Digest,
+		Size:      info.Size_,
+		CreatedAt: info.CreatedAt,
+		UpdatedAt: info.UpdatedAt,
+		Labels:    info.Labels,
+	}
+}
