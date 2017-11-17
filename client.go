@@ -34,7 +34,6 @@ import (
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/schema1"
 	contentservice "github.com/containerd/containerd/services/content"
-	diffservice "github.com/containerd/containerd/services/diff"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
@@ -453,7 +452,7 @@ func (c *Client) ImageService() images.Store {
 
 // DiffService returns the underlying Differ
 func (c *Client) DiffService() diff.Differ {
-	return diffservice.NewDiffServiceFromClient(diffapi.NewDiffClient(c.conn))
+	return NewDiffServiceFromClient(diffapi.NewDiffClient(c.conn))
 }
 
 // IntrospectionService returns the underlying Introspection Client
