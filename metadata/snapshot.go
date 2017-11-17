@@ -288,6 +288,10 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 			}
 			return err
 		}
+		if err := addSnapshotLease(ctx, tx, s.name, key); err != nil {
+			return err
+		}
+
 		var bparent string
 		if parent != "" {
 			pbkt := bkt.Bucket([]byte(parent))
@@ -323,10 +327,6 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 			return err
 		}
 		if err := boltutil.WriteLabels(bbkt, base.Labels); err != nil {
-			return err
-		}
-
-		if err := addSnapshotLease(ctx, tx, s.name, key); err != nil {
 			return err
 		}
 
@@ -377,6 +377,9 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 			}
 			return err
 		}
+		if err := addSnapshotLease(ctx, tx, s.name, name); err != nil {
+			return err
+		}
 
 		obkt := bkt.Bucket([]byte(key))
 		if obkt == nil {
@@ -425,7 +428,11 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		if err := boltutil.WriteLabels(bbkt, base.Labels); err != nil {
 			return err
 		}
+
 		if err := bkt.DeleteBucket([]byte(key)); err != nil {
+			return err
+		}
+		if err := removeSnapshotLease(ctx, tx, s.name, key); err != nil {
 			return err
 		}
 
@@ -477,6 +484,9 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 		}
 
 		if err := bkt.DeleteBucket([]byte(key)); err != nil {
+			return err
+		}
+		if err := removeSnapshotLease(ctx, tx, s.name, key); err != nil {
 			return err
 		}
 
