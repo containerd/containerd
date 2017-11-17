@@ -155,5 +155,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/windows/hcsshimtypes;hcsshimtypes"
   }
+  weak_dependency: 0
   syntax: "proto3"
 }
