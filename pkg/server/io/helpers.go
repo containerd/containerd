@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/fifo"
 	"golang.org/x/net/context"
+	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 // AttachOptions specifies how to attach to a container.
@@ -47,9 +48,9 @@ const (
 	// Stdin stream type.
 	Stdin StreamType = "stdin"
 	// Stdout stream type.
-	Stdout StreamType = "stdout"
+	Stdout StreamType = StreamType(runtime.Stdout)
 	// Stderr stream type.
-	Stderr StreamType = "stderr"
+	Stderr StreamType = StreamType(runtime.Stderr)
 )
 
 type wgCloser struct {

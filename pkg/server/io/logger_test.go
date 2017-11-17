@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	cioutil "github.com/kubernetes-incubator/cri-containerd/pkg/ioutil"
 )
@@ -33,11 +34,16 @@ func TestRedirectLogs(t *testing.T) {
 	for desc, test := range map[string]struct {
 		input   string
 		stream  StreamType
+		tag     []runtime.LogTag
 		content []string
 	}{
 		"stdout log": {
 			input:  "test stdout log 1\ntest stdout log 2",
 			stream: Stdout,
+			tag: []runtime.LogTag{
+				runtime.LogTagFull,
+				runtime.LogTagFull,
+			},
 			content: []string{
 				"test stdout log 1",
 				"test stdout log 2",
@@ -46,15 +52,25 @@ func TestRedirectLogs(t *testing.T) {
 		"stderr log": {
 			input:  "test stderr log 1\ntest stderr log 2",
 			stream: Stderr,
+			tag: []runtime.LogTag{
+				runtime.LogTagFull,
+				runtime.LogTagFull,
+			},
 			content: []string{
 				"test stderr log 1",
 				"test stderr log 2",
 			},
 		},
 		"long log": {
-			input:  strings.Repeat("a", bufSize+10) + "\n",
+			input:  strings.Repeat("a", 2*bufSize+10) + "\n",
 			stream: Stdout,
+			tag: []runtime.LogTag{
+				runtime.LogTagPartial,
+				runtime.LogTagPartial,
+				runtime.LogTagFull,
+			},
 			content: []string{
+				strings.Repeat("a", bufSize),
 				strings.Repeat("a", bufSize),
 				strings.Repeat("a", 10),
 			},
@@ -70,12 +86,13 @@ func TestRedirectLogs(t *testing.T) {
 		lines = lines[:len(lines)-1] // Discard empty string after last \n
 		assert.Len(t, lines, len(test.content))
 		for i := range lines {
-			fields := strings.SplitN(lines[i], string([]byte{delimiter}), 3)
-			require.Len(t, fields, 3)
+			fields := strings.SplitN(lines[i], string([]byte{delimiter}), 4)
+			require.Len(t, fields, 4)
 			_, err := time.Parse(timestampFormat, fields[0])
 			assert.NoError(t, err)
 			assert.EqualValues(t, test.stream, fields[1])
-			assert.Equal(t, test.content[i], fields[2])
+			assert.Equal(t, string(test.tag[i]), fields[2])
+			assert.Equal(t, test.content[i], fields[3])
 		}
 	}
 }
