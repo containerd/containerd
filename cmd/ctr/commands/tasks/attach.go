@@ -4,7 +4,7 @@ import (
 	"os"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -39,7 +39,7 @@ var attachCommand = cli.Command{
 				return err
 			}
 		}
-		task, err := container.Task(ctx, containerd.WithAttach(os.Stdin, os.Stdout, os.Stderr))
+		task, err := container.Task(ctx, cio.WithAttach(os.Stdin, os.Stdout, os.Stderr))
 		if err != nil {
 			return err
 		}

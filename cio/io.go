@@ -1,4 +1,4 @@
-package containerd
+package cio
 
 import (
 	"context"
@@ -8,8 +8,8 @@ import (
 	"sync"
 )
 
-// IOConfig holds the io configurations.
-type IOConfig struct {
+// Config holds the io configurations.
+type Config struct {
 	// Terminal is true if one has been allocated
 	Terminal bool
 	// Stdin path
@@ -23,7 +23,7 @@ type IOConfig struct {
 // IO holds the io information for a task or process
 type IO interface {
 	// Config returns the IO configuration.
-	Config() IOConfig
+	Config() Config
 	// Cancel aborts all current io operations
 	Cancel()
 	// Wait blocks until all io copy operations have completed
@@ -34,12 +34,12 @@ type IO interface {
 
 // cio is a basic container IO implementation.
 type cio struct {
-	config IOConfig
+	config Config
 
 	closer *wgCloser
 }
 
-func (c *cio) Config() IOConfig {
+func (c *cio) Config() Config {
 	return c.config
 }
 
@@ -64,23 +64,23 @@ func (c *cio) Close() error {
 	return c.closer.Close()
 }
 
-// IOCreation creates new IO sets for a task
-type IOCreation func(id string) (IO, error)
+// Creation creates new IO sets for a task
+type Creation func(id string) (IO, error)
 
-// IOAttach allows callers to reattach to running tasks
+// Attach allows callers to reattach to running tasks
 //
 // There should only be one reader for a task's IO set
 // because fifo's can only be read from one reader or the output
 // will be sent only to the first reads
-type IOAttach func(*FIFOSet) (IO, error)
+type Attach func(*FIFOSet) (IO, error)
 
-// NewIO returns an IOCreation that will provide IO sets without a terminal
-func NewIO(stdin io.Reader, stdout, stderr io.Writer) IOCreation {
+// NewIO returns an Creation that will provide IO sets without a terminal
+func NewIO(stdin io.Reader, stdout, stderr io.Writer) Creation {
 	return NewIOWithTerminal(stdin, stdout, stderr, false)
 }
 
 // NewIOWithTerminal creates a new io set with the provied io.Reader/Writers for use with a terminal
-func NewIOWithTerminal(stdin io.Reader, stdout, stderr io.Writer, terminal bool) IOCreation {
+func NewIOWithTerminal(stdin io.Reader, stdout, stderr io.Writer, terminal bool) Creation {
 	return func(id string) (_ IO, err error) {
 		paths, err := NewFifos(id)
 		if err != nil {
@@ -91,7 +91,7 @@ func NewIOWithTerminal(stdin io.Reader, stdout, stderr io.Writer, terminal bool)
 				os.RemoveAll(paths.Dir)
 			}
 		}()
-		cfg := IOConfig{
+		cfg := Config{
 			Terminal: terminal,
 			Stdout:   paths.Out,
 			Stderr:   paths.Err,
@@ -113,12 +113,12 @@ func NewIOWithTerminal(stdin io.Reader, stdout, stderr io.Writer, terminal bool)
 }
 
 // WithAttach attaches the existing io for a task to the provided io.Reader/Writers
-func WithAttach(stdin io.Reader, stdout, stderr io.Writer) IOAttach {
+func WithAttach(stdin io.Reader, stdout, stderr io.Writer) Attach {
 	return func(paths *FIFOSet) (IO, error) {
 		if paths == nil {
 			return nil, fmt.Errorf("cannot attach to existing fifos")
 		}
-		cfg := IOConfig{
+		cfg := Config{
 			Terminal: paths.Terminal,
 			Stdout:   paths.Out,
 			Stderr:   paths.Err,

@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -60,11 +60,11 @@ var execCommand = cli.Command{
 		pspec.Terminal = tty
 		pspec.Args = args
 
-		io := containerd.Stdio
+		ioCreator := cio.Stdio
 		if tty {
-			io = containerd.StdioTerminal
+			ioCreator = cio.StdioTerminal
 		}
-		process, err := task.Exec(ctx, context.String("exec-id"), pspec, io)
+		process, err := task.Exec(ctx, context.String("exec-id"), pspec, ioCreator)
 		if err != nil {
 			return err
 		}

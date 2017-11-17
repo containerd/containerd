@@ -12,6 +12,7 @@ import (
 	"time"
 
 	// Register the typeurl
+	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
 	_ "github.com/containerd/containerd/runtime"
 	"github.com/containerd/typeurl"
@@ -21,13 +22,13 @@ import (
 	gogotypes "github.com/gogo/protobuf/types"
 )
 
-func empty() IOCreation {
+func empty() cio.Creation {
 	// TODO (@mlaventure) windows searches for pipes
 	// when none are provided
 	if runtime.GOOS == "windows" {
-		return Stdio
+		return cio.Stdio
 	}
-	return NullIO
+	return cio.NullIO
 }
 
 func TestContainerList(t *testing.T) {
@@ -185,7 +186,7 @@ func TestContainerOutput(t *testing.T) {
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	stdout := bytes.NewBuffer(nil)
-	task, err := container.NewTask(ctx, NewIO(bytes.NewBuffer(nil), stdout, bytes.NewBuffer(nil)))
+	task, err := container.NewTask(ctx, cio.NewIO(bytes.NewBuffer(nil), stdout, bytes.NewBuffer(nil)))
 	if err != nil {
 		t.Error(err)
 		return
@@ -445,7 +446,7 @@ func TestContainerCloseIO(t *testing.T) {
 		return
 	}
 
-	task, err := container.NewTask(ctx, NewIO(r, stdout, ioutil.Discard))
+	task, err := container.NewTask(ctx, cio.NewIO(r, stdout, ioutil.Discard))
 	if err != nil {
 		t.Error(err)
 		return
@@ -1054,7 +1055,7 @@ func TestContainerHostname(t *testing.T) {
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	stdout := bytes.NewBuffer(nil)
-	task, err := container.NewTask(ctx, NewIO(bytes.NewBuffer(nil), stdout, bytes.NewBuffer(nil)))
+	task, err := container.NewTask(ctx, cio.NewIO(bytes.NewBuffer(nil), stdout, bytes.NewBuffer(nil)))
 	if err != nil {
 		t.Error(err)
 		return

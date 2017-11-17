@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/namespaces"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -206,7 +207,7 @@ func (w *worker) runContainer(ctx context.Context, id string) error {
 	}
 	defer c.Delete(ctx, containerd.WithSnapshotCleanup)
 
-	task, err := c.NewTask(ctx, containerd.NullIO)
+	task, err := c.NewTask(ctx, cio.NullIO)
 	if err != nil {
 		return err
 	}
