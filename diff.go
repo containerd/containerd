@@ -1,4 +1,4 @@
-package diff
+package containerd
 
 import (
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
@@ -12,16 +12,16 @@ import (
 // NewDiffServiceFromClient returns a new diff service which communicates
 // over a GRPC connection.
 func NewDiffServiceFromClient(client diffapi.DiffClient) diff.Differ {
-	return &remote{
+	return &diffRemote{
 		client: client,
 	}
 }
 
-type remote struct {
+type diffRemote struct {
 	client diffapi.DiffClient
 }
 
-func (r *remote) Apply(ctx context.Context, diff ocispec.Descriptor, mounts []mount.Mount) (ocispec.Descriptor, error) {
+func (r *diffRemote) Apply(ctx context.Context, diff ocispec.Descriptor, mounts []mount.Mount) (ocispec.Descriptor, error) {
 	req := &diffapi.ApplyRequest{
 		Diff:   fromDescriptor(diff),
 		Mounts: fromMounts(mounts),
@@ -33,7 +33,7 @@ func (r *remote) Apply(ctx context.Context, diff ocispec.Descriptor, mounts []mo
 	return toDescriptor(resp.Applied), nil
 }
 
-func (r *remote) DiffMounts(ctx context.Context, a, b []mount.Mount, opts ...diff.Opt) (ocispec.Descriptor, error) {
+func (r *diffRemote) DiffMounts(ctx context.Context, a, b []mount.Mount, opts ...diff.Opt) (ocispec.Descriptor, error) {
 	var config diff.Config
 	for _, opt := range opts {
 		if err := opt(&config); err != nil {

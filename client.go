@@ -33,11 +33,6 @@ import (
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/schema1"
-	contentservice "github.com/containerd/containerd/services/content"
-	diffservice "github.com/containerd/containerd/services/diff"
-	imagesservice "github.com/containerd/containerd/services/images"
-	namespacesservice "github.com/containerd/containerd/services/namespaces"
-	snapshotservice "github.com/containerd/containerd/services/snapshot"
 	"github.com/containerd/containerd/snapshot"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
@@ -426,7 +421,7 @@ func (c *Client) Close() error {
 
 // NamespaceService returns the underlying Namespaces Store
 func (c *Client) NamespaceService() namespaces.Store {
-	return namespacesservice.NewStoreFromClient(namespacesapi.NewNamespacesClient(c.conn))
+	return NewNamespaceStoreFromClient(namespacesapi.NewNamespacesClient(c.conn))
 }
 
 // ContainerService returns the underlying container Store
@@ -436,12 +431,12 @@ func (c *Client) ContainerService() containers.Store {
 
 // ContentStore returns the underlying content Store
 func (c *Client) ContentStore() content.Store {
-	return contentservice.NewStoreFromClient(contentapi.NewContentClient(c.conn))
+	return NewContentStoreFromClient(contentapi.NewContentClient(c.conn))
 }
 
 // SnapshotService returns the underlying snapshotter for the provided snapshotter name
 func (c *Client) SnapshotService(snapshotterName string) snapshot.Snapshotter {
-	return snapshotservice.NewSnapshotterFromClient(snapshotapi.NewSnapshotsClient(c.conn), snapshotterName)
+	return NewSnapshotterFromClient(snapshotapi.NewSnapshotsClient(c.conn), snapshotterName)
 }
 
 // TaskService returns the underlying TasksClient
@@ -451,12 +446,12 @@ func (c *Client) TaskService() tasks.TasksClient {
 
 // ImageService returns the underlying image Store
 func (c *Client) ImageService() images.Store {
-	return imagesservice.NewStoreFromClient(imagesapi.NewImagesClient(c.conn))
+	return NewImageStoreFromClient(imagesapi.NewImagesClient(c.conn))
 }
 
 // DiffService returns the underlying Differ
 func (c *Client) DiffService() diff.Differ {
-	return diffservice.NewDiffServiceFromClient(diffapi.NewDiffClient(c.conn))
+	return NewDiffServiceFromClient(diffapi.NewDiffClient(c.conn))
 }
 
 // IntrospectionService returns the underlying Introspection Client

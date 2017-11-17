@@ -140,3 +140,19 @@ func toMounts(apim []*types.Mount) []mount.Mount {
 	}
 	return mounts
 }
+
+func toDescriptor(d *types.Descriptor) ocispec.Descriptor {
+	return ocispec.Descriptor{
+		MediaType: d.MediaType,
+		Digest:    d.Digest,
+		Size:      d.Size_,
+	}
+}
+
+func fromDescriptor(d ocispec.Descriptor) *types.Descriptor {
+	return &types.Descriptor{
+		MediaType: d.MediaType,
+		Digest:    d.Digest,
+		Size_:     d.Size,
+	}
+}
