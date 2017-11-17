@@ -40,14 +40,15 @@ shim for container lifecycle and reconnection
 `
 
 var (
-	debugFlag         bool
-	namespaceFlag     string
-	socketFlag        string
-	addressFlag       string
-	workdirFlag       string
-	runtimeRootFlag   string
-	criuFlag          string
-	systemdCgroupFlag bool
+	debugFlag            bool
+	namespaceFlag        string
+	socketFlag           string
+	addressFlag          string
+	workdirFlag          string
+	runtimeRootFlag      string
+	criuFlag             string
+	systemdCgroupFlag    bool
+	containerdBinaryFlag string
 )
 
 func init() {
@@ -59,6 +60,9 @@ func init() {
 	flag.StringVar(&runtimeRootFlag, "runtime-root", proc.RuncRoot, "root directory for the runtime")
 	flag.StringVar(&criuFlag, "criu", "", "path to criu binary")
 	flag.BoolVar(&systemdCgroupFlag, "systemd-cgroup", false, "set runtime to use systemd-cgroup")
+	// currently, the `containerd publish` utility is embedded in the daemon binary.
+	// The daemon invokes `containerd-shim -containerd-binary ...` with its own os.Executable() path.
+	flag.StringVar(&containerdBinaryFlag, "containerd-binary", "containerd", "path to containerd binary (used for `containerd publish`)")
 	flag.Parse()
 }
 
@@ -202,7 +206,7 @@ func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event
 	if err != nil {
 		return err
 	}
-	cmd := exec.CommandContext(ctx, "containerd", "--address", l.address, "publish", "--topic", topic, "--namespace", ns)
+	cmd := exec.CommandContext(ctx, containerdBinaryFlag, "--address", l.address, "publish", "--topic", topic, "--namespace", ns)
 	cmd.Stdin = bytes.NewReader(data)
 	c, err := reaper.Default.Start(cmd)
 	if err != nil {

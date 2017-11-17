@@ -89,10 +89,15 @@ func WithStart(binary, address, daemonAddress, cgroup string, nonewns, debug boo
 }
 
 func newCommand(binary, daemonAddress string, nonewns, debug bool, config shim.Config, socket *os.File) *exec.Cmd {
+	selfExe, err := os.Executable()
+	if err != nil {
+		panic(err)
+	}
 	args := []string{
 		"-namespace", config.Namespace,
 		"-workdir", config.WorkDir,
 		"-address", daemonAddress,
+		"-containerd-binary", selfExe,
 	}
 
 	if config.Criu != "" {
