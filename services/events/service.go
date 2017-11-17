@@ -3,6 +3,7 @@ package events
 import (
 	api "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/plugin"
 	ptypes "github.com/gogo/protobuf/types"
@@ -44,7 +45,7 @@ func (s *service) Publish(ctx context.Context, r *api.PublishRequest) (*ptypes.E
 }
 
 func (s *service) Forward(ctx context.Context, r *api.ForwardRequest) (*ptypes.Empty, error) {
-	if err := s.events.Forward(ctx, r.Envelope); err != nil {
+	if err := s.events.Forward(ctx, fromProto(r.Envelope)); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 
@@ -59,7 +60,7 @@ func (s *service) Subscribe(req *api.SubscribeRequest, srv api.Events_SubscribeS
 	for {
 		select {
 		case ev := <-eventq:
-			if err := srv.Send(ev); err != nil {
+			if err := srv.Send(toProto(ev)); err != nil {
 				return errors.Wrapf(err, "failed sending event to subscriber")
 			}
 		case err := <-errq:
@@ -69,5 +70,23 @@ func (s *service) Subscribe(req *api.SubscribeRequest, srv api.Events_SubscribeS
 
 			return nil
 		}
+	}
+}
+
+func toProto(env *events.Envelope) *api.Envelope {
+	return &api.Envelope{
+		Timestamp: env.Timestamp,
+		Namespace: env.Namespace,
+		Topic:     env.Topic,
+		Event:     env.Event,
+	}
+}
+
+func fromProto(env *api.Envelope) *events.Envelope {
+	return &events.Envelope{
+		Timestamp: env.Timestamp,
+		Namespace: env.Namespace,
+		Topic:     env.Topic,
+		Event:     env.Event,
 	}
 }
