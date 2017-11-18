@@ -499,7 +499,7 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 		}
 	}
 
-	fp, err := os.OpenFile(data, os.O_WRONLY|os.O_CREATE|os.O_SYNC, 0666)
+	fp, err := os.OpenFile(data, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open data file")
 	}
