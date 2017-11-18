@@ -48,13 +48,11 @@ jobs:
       script:
         - make install.tools
         - make .gitvalidation
-        - make verify
         - make binaries
       go: 1.9.x
     - script:
         - make install.tools
         - make .gitvalidation
-        - make verify
         - make binaries
       go: tip
     - stage: Test
