@@ -1,0 +1,8 @@
+{{$last := (len .ProtoFile)}}
+{{$last := sub $last 1}}
+
+{{with index .ProtoFile $last}}
+  <div>
+    <p><a href="{{trimExt .Name}}.html">{{ .Package }}</a></p>
+  </div>
+{{end}}
