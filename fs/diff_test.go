@@ -150,27 +150,27 @@ func TestUpdateWithSameTime(t *testing.T) {
 	t2 := tt.Add(6 * time.Nanosecond)
 	l1 := fstest.Apply(
 		fstest.CreateFile("/file-modified-time", []byte("1"), 0644),
-		fstest.Chtime("/file-modified-time", t1),
+		fstest.Chtimes("/file-modified-time", t1, t1),
 		fstest.CreateFile("/file-no-change", []byte("1"), 0644),
-		fstest.Chtime("/file-no-change", t1),
+		fstest.Chtimes("/file-no-change", t1, t1),
 		fstest.CreateFile("/file-same-time", []byte("1"), 0644),
-		fstest.Chtime("/file-same-time", t1),
+		fstest.Chtimes("/file-same-time", t1, t1),
 		fstest.CreateFile("/file-truncated-time-1", []byte("1"), 0644),
-		fstest.Chtime("/file-truncated-time-1", t1),
+		fstest.Chtimes("/file-truncated-time-1", t1, t1),
 		fstest.CreateFile("/file-truncated-time-2", []byte("1"), 0644),
-		fstest.Chtime("/file-truncated-time-2", tt),
+		fstest.Chtimes("/file-truncated-time-2", tt, tt),
 	)
 	l2 := fstest.Apply(
 		fstest.CreateFile("/file-modified-time", []byte("2"), 0644),
-		fstest.Chtime("/file-modified-time", t2),
+		fstest.Chtimes("/file-modified-time", t2, t2),
 		fstest.CreateFile("/file-no-change", []byte("1"), 0644),
-		fstest.Chtime("/file-no-change", tt), // use truncated time, should be regarded as no change
+		fstest.Chtimes("/file-no-change", tt, tt), // use truncated time, should be regarded as no change
 		fstest.CreateFile("/file-same-time", []byte("2"), 0644),
-		fstest.Chtime("/file-same-time", t1),
+		fstest.Chtimes("/file-same-time", t1, t1),
 		fstest.CreateFile("/file-truncated-time-1", []byte("2"), 0644),
-		fstest.Chtime("/file-truncated-time-1", tt),
+		fstest.Chtimes("/file-truncated-time-1", tt, tt),
 		fstest.CreateFile("/file-truncated-time-2", []byte("2"), 0644),
-		fstest.Chtime("/file-truncated-time-2", tt),
+		fstest.Chtimes("/file-truncated-time-2", tt, tt),
 	)
 	diff := []TestChange{
 		// "/file-same-time" excluded because matching non-zero nanosecond values
@@ -181,6 +181,28 @@ func TestUpdateWithSameTime(t *testing.T) {
 
 	if err := testDiffWithBase(l1, l2, diff); err != nil {
 		t.Fatalf("Failed diff with base: %+v", err)
+	}
+}
+
+// buildkit#172
+func TestLchtimes(t *testing.T) {
+	skipDiffTestOnWindows(t)
+	mtimes := []time.Time{
+		time.Unix(0, 0),  // nsec is 0
+		time.Unix(0, 42), // nsec > 0
+	}
+	for _, mtime := range mtimes {
+		atime := time.Unix(424242, 42)
+		l1 := fstest.Apply(
+			fstest.CreateFile("/foo", []byte("foo"), 0644),
+			fstest.Symlink("/foo", "/lnk0"),
+			fstest.Lchtimes("/lnk0", atime, mtime),
+		)
+		l2 := fstest.Apply() // empty
+		diff := []TestChange{}
+		if err := testDiffWithBase(l1, l2, diff); err != nil {
+			t.Fatalf("Failed diff with base: %+v", err)
+		}
 	}
 }
 
