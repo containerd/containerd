@@ -12,8 +12,8 @@ import (
 	"github.com/containerd/containerd/plugin"
 )
 
-// Config configures the garbage collection policies.
-type Config struct {
+// config configures the garbage collection policies.
+type config struct {
 	// PauseThreshold represents the maximum amount of time garbage
 	// collection should be scheduled based on the average pause time.
 	// For example, a value of 0.02 means that scheduled garbage collection
@@ -46,21 +46,33 @@ type Config struct {
 	// Default 100
 	MutationThreshold int `toml:"mutation_threshold"`
 
-	// ScheduleDelayMs is the number of milliseconds in the future to
-	// schedule a garbage collection triggered manually or by exceeding
-	// the configured threshold for deletion or mutation. A zero value
-	// will immediately schedule.
+	// ScheduleDelay is the duration in the future to schedule a garbage
+	// collection triggered manually or by exceeding the configured
+	// threshold for deletion or mutation. A zero value will immediately
+	// schedule. Use suffix "ms" for millisecond and "s" for second.
 	//
-	// Default is 0
-	ScheduleDelayMs int `toml:"schedule_delay_ms"`
+	// Default is "0ms"
+	ScheduleDelay duration `toml:"schedule_delay"`
 
-	// StartupDelayMs is the number of milliseconds to do an initial
-	// garbage collection after startup. The initial garbage collection
-	// is used to set the base for pause threshold and should be scheduled
-	// in the future to avoid slowing down other startup processes.
+	// StartupDelay is the delay duration to do an initial garbage
+	// collection after startup. The initial garbage collection is used to
+	// set the base for pause threshold and should be scheduled in the
+	// future to avoid slowing down other startup processes. Use suffix
+	// "ms" for millisecond and "s" for second.
 	//
-	// Default is 100
-	StartupDelayMs int `toml:"startup_delay_ms"`
+	// Default is "100ms"
+	StartupDelay duration `toml:"startup_delay"`
+}
+
+type duration time.Duration
+
+func (d *duration) UnmarshalText(text []byte) error {
+	ed, err := time.ParseDuration(string(text))
+	if err != nil {
+		return err
+	}
+	*d = duration(ed)
+	return nil
 }
 
 func init() {
@@ -70,12 +82,12 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.MetadataPlugin,
 		},
-		Config: &Config{
+		Config: &config{
 			PauseThreshold:    0.02,
 			DeletionThreshold: 0,
 			MutationThreshold: 100,
-			ScheduleDelayMs:   0,
-			StartupDelayMs:    100,
+			ScheduleDelay:     duration(0),
+			StartupDelay:      duration(100 * time.Millisecond),
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			md, err := ic.Get(plugin.MetadataPlugin)
@@ -83,7 +95,7 @@ func init() {
 				return nil, err
 			}
 
-			m := newScheduler(md.(*metadata.DB), ic.Config.(*Config))
+			m := newScheduler(md.(*metadata.DB), ic.Config.(*config))
 
 			ic.Meta.Exports = map[string]string{
 				"PauseThreshold":    fmt.Sprint(m.pauseThreshold),
@@ -125,7 +137,7 @@ type gcScheduler struct {
 	startupDelay      time.Duration
 }
 
-func newScheduler(c collector, cfg *Config) *gcScheduler {
+func newScheduler(c collector, cfg *config) *gcScheduler {
 	eventC := make(chan mutationEvent)
 
 	s := &gcScheduler{
@@ -134,8 +146,8 @@ func newScheduler(c collector, cfg *Config) *gcScheduler {
 		pauseThreshold:    cfg.PauseThreshold,
 		deletionThreshold: cfg.DeletionThreshold,
 		mutationThreshold: cfg.MutationThreshold,
-		scheduleDelay:     time.Duration(cfg.ScheduleDelayMs) * time.Millisecond,
-		startupDelay:      time.Duration(cfg.StartupDelayMs) * time.Millisecond,
+		scheduleDelay:     time.Duration(cfg.ScheduleDelay),
+		startupDelay:      time.Duration(cfg.StartupDelay),
 	}
 
 	if s.pauseThreshold < 0.0 {

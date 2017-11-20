@@ -10,7 +10,7 @@ import (
 )
 
 func TestPauseThreshold(t *testing.T) {
-	cfg := &Config{
+	cfg := &config{
 		// With 100μs, gc should run about every 5ms
 		PauseThreshold: 0.02,
 	}
@@ -45,7 +45,7 @@ func TestPauseThreshold(t *testing.T) {
 }
 
 func TestDeletionThreshold(t *testing.T) {
-	cfg := &Config{
+	cfg := &config{
 		// Prevent GC from scheduling again before check
 		PauseThreshold:    0.001,
 		DeletionThreshold: 5,
@@ -91,7 +91,7 @@ func TestDeletionThreshold(t *testing.T) {
 
 func TestTrigger(t *testing.T) {
 	var (
-		cfg = &Config{}
+		cfg = &config{}
 		tc  = &testCollector{
 			d: time.Millisecond * 10,
 		}
@@ -132,10 +132,10 @@ func TestTrigger(t *testing.T) {
 
 func TestStartupDelay(t *testing.T) {
 	var (
-		cfg = &Config{
+		cfg = &config{
 			// Prevent GC from scheduling again before check
 			PauseThreshold: 0.001,
-			StartupDelayMs: 1,
+			StartupDelay:   duration(time.Millisecond),
 		}
 		tc = &testCollector{
 			d: time.Second,
