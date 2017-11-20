@@ -199,6 +199,15 @@ The metrics API version will be incremented when breaking changes are made to th
 output. New metrics can be added to the output in a backwards compatible manner without
 bumping the API version.
 
+### Plugins API
+
+containerd is based on a modular design where plugins are implemented to provide the core functionality.
+Plugins implemented in tree are supported by the containerd community unless explicitly specified as non-stable.
+Out of tree plugins are not supported by the containerd maintainers.
+
+Currently, the Windows runtime and snapshot plugins are not stable and not supported.
+Please refer to the github milestones for Windows support in a future release.
+
 #### Error Codes
 
 Error codes will not change in a patch release, unless a missing error code
