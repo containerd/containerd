@@ -30,6 +30,7 @@ import (
 
 func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Status,
 	*imagestore.Image, *runtime.ContainerStatus) {
+	imageID := "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	testID := "test-id"
 	config := &runtime.ContainerConfig{
 		Metadata: &runtime.ContainerMetadata{
@@ -53,7 +54,7 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 		Name:      "test-long-name",
 		SandboxID: "test-sandbox-id",
 		Config:    config,
-		ImageRef:  "test-image-id",
+		ImageRef:  imageID,
 		LogPath:   "test-log-path",
 	}
 	status := &containerstore.Status{
@@ -62,7 +63,7 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 		StartedAt: startedAt,
 	}
 	image := &imagestore.Image{
-		ID:          "test-image-id",
+		ID:          imageID,
 		RepoTags:    []string{"test-image-repo-tag"},
 		RepoDigests: []string{"test-image-repo-digest"},
 	}
