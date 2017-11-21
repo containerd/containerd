@@ -126,10 +126,6 @@ root-test: ## run tests, except integration tests
 
 integration: ## run integration tests
 	@echo "$(WHALE) $@"
-	@go test ${TESTFLAGS} -test.root -parallel 1
-
-integration-parallel: ## run integration tests
-	@echo "$(WHALE) $@"
 	@go test ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL}
 
 benchmark: ## run benchmarks tests
@@ -199,10 +195,6 @@ root-coverage: ## generate coverage profiles for unit tests that require root
 			rm profile.out; \
 		fi; \
 	done )
-
-coverage-integration: ## generate coverprofiles from the integration tests
-	@echo "$(WHALE) $@"
-	go test ${TESTFLAGS} -test.short -coverprofile="../../../${INTEGRATION_PACKAGE}/coverage.txt" -covermode=atomic ${INTEGRATION_PACKAGE} -test.root
 
 vendor:
 	@echo "$(WHALE) $@"
