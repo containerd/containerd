@@ -107,6 +107,7 @@ func (n *NetNS) Remove() error {
 		if err := os.RemoveAll(path); err != nil {
 			return fmt.Errorf("failed to remove netns: %v", err)
 		}
+		n.restored = false
 	}
 	return nil
 }
@@ -115,7 +116,7 @@ func (n *NetNS) Remove() error {
 func (n *NetNS) Closed() bool {
 	n.Lock()
 	defer n.Unlock()
-	return n.closed
+	return n.closed && !n.restored
 }
 
 // GetPath returns network namespace path for sandbox container

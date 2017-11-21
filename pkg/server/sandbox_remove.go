@@ -47,13 +47,17 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 	id := sandbox.ID
 
 	// Return error if sandbox container is not fully stopped.
-	// TODO(random-liu): [P0] Make sure network is torn down, may need to introduce a state.
 	_, err = sandbox.Container.Task(ctx, nil)
 	if err != nil && !errdefs.IsNotFound(err) {
 		return nil, fmt.Errorf("failed to get sandbox container info for %q: %v", id, err)
 	}
 	if err == nil {
 		return nil, fmt.Errorf("sandbox container %q is not fully stopped", id)
+	}
+
+	// Return error if sandbox network namespace is not closed yet.
+	if sandbox.NetNS != nil && !sandbox.NetNS.Closed() {
+		return nil, fmt.Errorf("sandbox network namespace %q is not fully closed", sandbox.NetNS.GetPath())
 	}
 
 	// Remove all containers inside the sandbox.
