@@ -83,6 +83,7 @@ func (c *Converter) Handle(ctx context.Context, desc ocispec.Descriptor) ([]ocis
 						{
 							MediaType: images.MediaTypeDockerSchema2LayerGzip,
 							Digest:    c.pulledManifest.FSLayers[i].BlobSum,
+							Size:      -1,
 						},
 					}, descs...)
 				}
@@ -209,10 +210,16 @@ func (c *Converter) fetchBlob(ctx context.Context, desc ocispec.Descriptor) erro
 		ref   = remotes.MakeRefKey(ctx, desc)
 		calc  = newBlobStateCalculator()
 		retry = 16
+		size  = desc.Size
 	)
 
+	// size may be unknown, set to zero for content ingest
+	if size == -1 {
+		size = 0
+	}
+
 tryit:
-	cw, err := c.contentStore.Writer(ctx, ref, desc.Size, desc.Digest)
+	cw, err := c.contentStore.Writer(ctx, ref, size, desc.Digest)
 	if err != nil {
 		if errdefs.IsUnavailable(err) {
 			select {
@@ -273,7 +280,8 @@ tryit:
 
 		eg.Go(func() error {
 			defer pw.Close()
-			return content.Copy(ctx, cw, io.TeeReader(rc, pw), desc.Size, desc.Digest)
+
+			return content.Copy(ctx, cw, io.TeeReader(rc, pw), size, desc.Digest)
 		})
 
 		if err := eg.Wait(); err != nil {
@@ -281,7 +289,7 @@ tryit:
 		}
 	}
 
-	if desc.Size == 0 {
+	if desc.Size == -1 {
 		info, err := c.contentStore.Info(ctx, desc.Digest)
 		if err != nil {
 			return errors.Wrap(err, "failed to get blob info")

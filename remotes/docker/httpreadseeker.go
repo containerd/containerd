@@ -64,6 +64,9 @@ func (hrs *httpReadSeeker) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekCurrent:
 		abs += offset
 	case io.SeekEnd:
+		if hrs.size == -1 {
+			return 0, errors.Wrap(errdefs.ErrUnavailable, "Fetcher.Seek: unknown size, cannot seek from end")
+		}
 		abs = hrs.size + offset
 	default:
 		return 0, errors.Wrap(errdefs.ErrInvalidArgument, "Fetcher.Seek: invalid whence")
@@ -93,7 +96,7 @@ func (hrs *httpReadSeeker) reader() (io.Reader, error) {
 		return hrs.rc, nil
 	}
 
-	if hrs.offset < hrs.size {
+	if hrs.size == -1 || hrs.offset < hrs.size {
 		// only try to reopen the body request if we are seeking to a value
 		// less than the actual size.
 		if hrs.open == nil {
