@@ -18,6 +18,8 @@ package integration
 
 import (
 	"errors"
+	"fmt"
+	"os/exec"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -38,6 +40,7 @@ const (
 	k8sNamespace          = "k8s.io"                             // This is the same with server.k8sContainerdNamespace.
 	containerdEndpoint    = "/run/containerd/containerd.sock"
 	criContainerdEndpoint = "/var/run/cri-containerd.sock"
+	criContainerdRoot     = "/var/lib/cri-containerd"
 )
 
 var (
@@ -48,27 +51,60 @@ var (
 )
 
 func init() {
+	if err := ConnectDaemons(); err != nil {
+		glog.Exitf("Failed to connect daemons: %v", err)
+	}
+}
+
+// ConnectDaemons connect cri-containerd and containerd, and initialize the clients.
+func ConnectDaemons() error {
 	var err error
 	runtimeService, err = remote.NewRemoteRuntimeService(sock, timeout)
 	if err != nil {
-		glog.Exitf("Failed to create runtime service: %v", err)
+		return fmt.Errorf("failed to create runtime service: %v", err)
 	}
 	imageService, err = remote.NewRemoteImageService(sock, timeout)
 	if err != nil {
-		glog.Exitf("Failed to create image service: %v", err)
+		return fmt.Errorf("failed to create image service: %v", err)
+	}
+	// Since CRI grpc client doesn't have `WithBlock` specified, we
+	// need to check whether it is actually connected.
+	// TODO(random-liu): Extend cri remote client to accept extra grpc options.
+	_, err = runtimeService.ListContainers(&runtime.ContainerFilter{})
+	if err != nil {
+		return fmt.Errorf("failed to list containers: %v", err)
+	}
+	_, err = imageService.ListImages(&runtime.ImageFilter{})
+	if err != nil {
+		return fmt.Errorf("failed to list images: %v", err)
 	}
 	containerdClient, err = containerd.New(containerdEndpoint, containerd.WithDefaultNamespace(k8sNamespace))
 	if err != nil {
-		glog.Exitf("Failed to connect containerd: %v", err)
+		return fmt.Errorf("failed to connect containerd: %v", err)
 	}
 	criContainerdClient, err = client.NewCRIContainerdClient(criContainerdEndpoint, timeout)
 	if err != nil {
-		glog.Exitf("Failed to connect cri-containerd: %v", err)
+		return fmt.Errorf("failed to connect cri-containerd: %v", err)
 	}
+	return nil
 }
 
 // Opts sets specific information in pod sandbox config.
 type PodSandboxOpts func(*runtime.PodSandboxConfig)
+
+func WithHostNetwork(p *runtime.PodSandboxConfig) {
+	if p.Linux == nil {
+		p.Linux = &runtime.LinuxPodSandboxConfig{}
+	}
+	if p.Linux.SecurityContext == nil {
+		p.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{}
+	}
+	if p.Linux.SecurityContext.NamespaceOptions == nil {
+		p.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{
+			HostNetwork: true,
+		}
+	}
+}
 
 // PodSandboxConfig generates a pod sandbox config for test.
 func PodSandboxConfig(name, ns string, opts ...PodSandboxOpts) *runtime.PodSandboxConfig {
@@ -163,4 +199,13 @@ func Eventually(f CheckFunc, period, timeout time.Duration) error {
 // Randomize adds uuid after a string.
 func Randomize(str string) string {
 	return str + "-" + util.GenerateID()
+}
+
+// KillProcess kills the process by name. pkill is used.
+func KillProcess(name string) error {
+	output, err := exec.Command("pkill", fmt.Sprintf("^%s$", name)).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to kill %q - error: %v, output: %q", name, err, output)
+	}
+	return nil
 }

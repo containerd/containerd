@@ -18,8 +18,13 @@ ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
 . ${ROOT}/hack/versions
 # CRI_CONTAINERD_FLAGS are the extra flags to use when start cri-containerd.
 CRI_CONTAINERD_FLAGS=${CRI_CONTAINERD_FLAGS:-""}
+# RESTART_WAIT_PERIOD is the period to wait before restarting cri-containerd/containerd.
+RESTART_WAIT_PERIOD=${RESTART_WAIT_PERIOD:-10}
 
 CRICONTAINERD_SOCK=/var/run/cri-containerd.sock
+
+cri_containerd_pid=
+containerd_pid=
 
 # test_setup starts containerd and cri-containerd.
 test_setup() {
@@ -35,20 +40,40 @@ test_setup() {
     exit 1
   fi
   sudo pkill containerd
-  sudo containerd &> ${report_dir}/containerd.log &
+  keepalive "sudo containerd" ${RESTART_WAIT_PERIOD} &> ${report_dir}/containerd.log &
+  containerd_pid=$!
   # Wait for containerd to be running by using the containerd client ctr to check the version
   # of the containerd server. Wait an increasing amount of time after each of five attempts
   readiness_check "sudo ctr version"
 
   # Start cri-containerd
-  sudo ${ROOT}/_output/cri-containerd --alsologtostderr --v 4 ${CRI_CONTAINERD_FLAGS} \
-	  &> ${report_dir}/cri-containerd.log &
+  keepalive "sudo ${ROOT}/_output/cri-containerd --alsologtostderr --v 4 ${CRI_CONTAINERD_FLAGS}" \
+	  ${RESTART_WAIT_PERIOD} &> ${report_dir}/cri-containerd.log &
+  cri_containerd_pid=$!
   readiness_check "sudo ${GOPATH}/bin/crictl --runtime-endpoint=${CRICONTAINERD_SOCK} info"
 }
 
 # test_teardown kills containerd and cri-containerd.
 test_teardown() {
+  if [ -n "${containerd_pid}" ]; then
+    kill ${containerd_pid}
+  fi
+  if [ -n "${cri_containerd_pid}" ]; then
+    kill ${cri_containerd_pid}
+  fi
   sudo pkill containerd
+}
+
+# keepalive runs a command and keeps it alive.
+# keepalive process is eventually killed in test_teardown.
+keepalive() {
+  local command=$1
+  echo ${command}
+  local wait_period=$2
+  while true; do
+    ${command}
+    sleep ${wait_period}
+  done
 }
 
 # readiness_check checks readiness of a daemon with specified command.
