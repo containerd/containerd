@@ -1,6 +1,6 @@
 # Utils
 
-[![Build Status]](https://travis-ci.org/kubernetes/utils)
+[![Build Status]](https://travis-ci.org/kubernetes/utils) [![GoDoc](https://godoc.org/k8s.io/utils?status.svg)](https://godoc.org/k8s.io/utils)
 
 A set of Go libraries that provide low-level,
 kubernetes-independent packages supplementing the [Go
@@ -39,6 +39,9 @@ an existing package to this repository.
 - [Exec](/exec) provides an interface for `os/exec`. It makes it easier
   to mock and replace in tests, especially with
   the [FakeExec](exec/testing/fake_exec.go) struct.
+
+- [Temp](/temp) provides an interface to create temporary directories. It also
+  provides a [FakeDir](temp/temptesting) implementation to replace in tests.
 
 [Build Status]: https://travis-ci.org/kubernetes/utils.svg?branch=master
 [Go standard libs]: https://golang.org/pkg/#stdlib

@@ -16,7 +16,7 @@ limitations under the License.
 
 // This file should be consistent with pkg/api/v1/annotation_key_constants.go.
 
-package api
+package core
 
 const (
 	// ImagePolicyFailedOpenKey is added to pods created by failing open when the image policy
@@ -44,12 +44,6 @@ const (
 	// SeccompContainerAnnotationKeyPrefix represents the key of a seccomp profile applied
 	// to one container of a pod.
 	SeccompContainerAnnotationKeyPrefix string = "container.seccomp.security.alpha.kubernetes.io/"
-
-	// CreatedByAnnotation represents the key used to store the spec(json)
-	// used to create the resource.
-	// This field is deprecated in favor of ControllerRef (see #44407).
-	// TODO(#50720): Remove this field in v1.9.
-	CreatedByAnnotation = "kubernetes.io/created-by"
 
 	// PreferAvoidPodsAnnotationKey represents the key of preferAvoidPods data (json serialized)
 	// in the Annotations of a Node.

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package core
 
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -343,14 +343,14 @@ type PersistentVolumeSource struct {
 	NFS *NFSVolumeSource
 	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime
 	// +optional
-	RBD *RBDVolumeSource
+	RBD *RBDPersistentVolumeSource
 	// Quobyte represents a Quobyte mount on the host that shares a pod's lifetime
 	// +optional
 	Quobyte *QuobyteVolumeSource
-	// ISCSIVolumeSource represents an ISCSI resource that is attached to a
+	// ISCSIPersistentVolumeSource represents an ISCSI resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	// +optional
-	ISCSI *ISCSIVolumeSource
+	ISCSI *ISCSIPersistentVolumeSource
 	// FlexVolume represents a generic volume resource that is
 	// provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.
 	// +optional
@@ -383,7 +383,7 @@ type PersistentVolumeSource struct {
 	PortworxVolume *PortworxVolumeSource
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
-	ScaleIO *ScaleIOVolumeSource
+	ScaleIO *ScaleIOPersistentVolumeSource
 	// Local represents directly-attached storage with node affinity
 	// +optional
 	Local *LocalVolumeSource
@@ -391,6 +391,9 @@ type PersistentVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md
 	// +optional
 	StorageOS *StorageOSPersistentVolumeSource
+	// CSI (Container Storage Interface) represents storage that handled by an external CSI driver
+	// +optional
+	CSI *CSIPersistentVolumeSource
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -404,7 +407,7 @@ type PersistentVolumeClaimVolumeSource struct {
 
 const (
 	// BetaStorageClassAnnotation represents the beta/previous StorageClass annotation.
-	// It's currently still used and will be held for backwards compatibility
+	// It's deprecated and will be removed in a future release. (#51440)
 	BetaStorageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
 
 	// MountOptionAnnotation defines mount option annotation used in PVs
@@ -459,6 +462,11 @@ type PersistentVolumeSpec struct {
 	// simply fail if one is invalid.
 	// +optional
 	MountOptions []string
+	// volumeMode defines if a volume is intended to be used with a formatted filesystem
+	// or to remain in raw block state. Value of Filesystem is implied when not included in spec.
+	// This is an alpha feature and may change in the future.
+	// +optional
+	VolumeMode *PersistentVolumeMode
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes
@@ -474,6 +482,16 @@ const (
 	// PersistentVolumeReclaimRetain means the volume will be left in its current phase (Released) for manual reclamation by the administrator.
 	// The default policy is Retain.
 	PersistentVolumeReclaimRetain PersistentVolumeReclaimPolicy = "Retain"
+)
+
+// PersistentVolumeMode describes how a volume is intended to be consumed, either Block or Filesystem.
+type PersistentVolumeMode string
+
+const (
+	// PersistentVolumeBlock means the volume will not be formatted with a filesystem and will remain a raw block device.
+	PersistentVolumeBlock PersistentVolumeMode = "Block"
+	// PersistentVolumeFilesystem means the volume will be or is formatted with a filesystem.
+	PersistentVolumeFilesystem PersistentVolumeMode = "Filesystem"
 )
 
 type PersistentVolumeStatus struct {
@@ -545,6 +563,11 @@ type PersistentVolumeClaimSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#class-1
 	// +optional
 	StorageClassName *string
+	// volumeMode defines what type of volume is required by the claim.
+	// Value of Filesystem is implied when not included in claim spec.
+	// This is an alpha feature and may change in the future.
+	// +optional
+	VolumeMode *PersistentVolumeMode
 }
 
 type PersistentVolumeClaimConditionType string
@@ -763,6 +786,54 @@ type ISCSIVolumeSource struct {
 	// The secret is used if either DiscoveryCHAPAuth or SessionCHAPAuth is true
 	// +optional
 	SecretRef *LocalObjectReference
+	// Optional: Custom initiator name per volume.
+	// If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface
+	// <target portal>:<volume name> will be created for the connection.
+	// +optional
+	InitiatorName *string
+}
+
+// ISCSIPersistentVolumeSource represents an ISCSI disk.
+// ISCSI volumes can only be mounted as read/write once.
+// ISCSI volumes support ownership management and SELinux relabeling.
+type ISCSIPersistentVolumeSource struct {
+	// Required: iSCSI target portal
+	// the portal is either an IP or ip_addr:port if port is other than default (typically TCP ports 860 and 3260)
+	// +optional
+	TargetPortal string
+	// Required:  target iSCSI Qualified Name
+	// +optional
+	IQN string
+	// Required: iSCSI target lun number
+	// +optional
+	Lun int32
+	// Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport.
+	// +optional
+	ISCSIInterface string
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	// +optional
+	FSType string
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
+	// Optional: list of iSCSI target portal ips for high availability.
+	// the portal is either an IP or ip_addr:port if port is other than default (typically TCP ports 860 and 3260)
+	// +optional
+	Portals []string
+	// Optional: whether support iSCSI Discovery CHAP authentication
+	// +optional
+	DiscoveryCHAPAuth bool
+	// Optional: whether support iSCSI Session CHAP authentication
+	// +optional
+	SessionCHAPAuth bool
+	// Optional: CHAP secret for iSCSI target and initiator authentication.
+	// The secret is used if either DiscoveryCHAPAuth or SessionCHAPAuth is true
+	// +optional
+	SecretRef *SecretReference
 	// Optional: Custom initiator name per volume.
 	// If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface
 	// <target portal>:<volume name> will be created for the connection.
@@ -1000,6 +1071,37 @@ type RBDVolumeSource struct {
 	// Optional: SecretRef is name of the authentication secret for RBDUser, default is nil.
 	// +optional
 	SecretRef *LocalObjectReference
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
+}
+
+// Represents a Rados Block Device mount that lasts the lifetime of a pod.
+// RBD volumes support ownership management and SELinux relabeling.
+type RBDPersistentVolumeSource struct {
+	// Required: CephMonitors is a collection of Ceph monitors
+	CephMonitors []string
+	// Required: RBDImage is the rados image name
+	RBDImage string
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	// +optional
+	FSType string
+	// Optional: RadosPool is the rados pool name,default is rbd
+	// +optional
+	RBDPool string
+	// Optional: RBDUser is the rados user name, default is admin
+	// +optional
+	RadosUser string
+	// Optional: Keyring is the path to key ring for RBDUser, default is /etc/ceph/keyring
+	// +optional
+	Keyring string
+	// Optional: SecretRef is reference to the authentication secret for User, default is empty.
+	// +optional
+	SecretRef *SecretReference
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
@@ -1254,16 +1356,52 @@ type ScaleIOVolumeSource struct {
 	// Flag to enable/disable SSL communication with Gateway, default false
 	// +optional
 	SSLEnabled bool
-	// The name of the Protection Domain for the configured storage (defaults to "default").
+	// The name of the ScaleIO Protection Domain for the configured storage.
 	// +optional
 	ProtectionDomain string
-	// The Storage Pool associated with the protection domain (defaults to "default").
+	// The ScaleIO Storage Pool associated with the protection domain.
 	// +optional
 	StoragePool string
-	// Indicates whether the storage for a volume should be thick or thin (defaults to "thin").
+	// Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
 	// +optional
 	StorageMode string
 	// The name of a volume already created in the ScaleIO system
+	// that is associated with this volume source.
+	VolumeName string
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// +optional
+	FSType string
+	// Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
+}
+
+// ScaleIOPersistentVolumeSource represents a persistent ScaleIO volume that can be defined
+// by a an admin via a storage class, for instance.
+type ScaleIOPersistentVolumeSource struct {
+	// The host address of the ScaleIO API Gateway.
+	Gateway string
+	// The name of the storage system as configured in ScaleIO.
+	System string
+	// SecretRef references to the secret for ScaleIO user and other
+	// sensitive information. If this is not provided, Login operation will fail.
+	SecretRef *SecretReference
+	// Flag to enable/disable SSL communication with Gateway, default false
+	// +optional
+	SSLEnabled bool
+	// The name of the ScaleIO Protection Domain for the configured storage.
+	// +optional
+	ProtectionDomain string
+	// The ScaleIO Storage Pool associated with the protection domain.
+	// +optional
+	StoragePool string
+	// Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
+	// +optional
+	StorageMode string
+	// The name of a volume created in the ScaleIO system
 	// that is associated with this volume source.
 	VolumeName string
 	// Filesystem type to mount.
@@ -1436,6 +1574,23 @@ type LocalVolumeSource struct {
 	Path string
 }
 
+// Represents storage that is managed by an external CSI volume driver
+type CSIPersistentVolumeSource struct {
+	// Driver is the name of the driver to use for this volume.
+	// Required.
+	Driver string
+
+	// VolumeHandle is the unique volume name returned by the CSI volume
+	// plugin’s CreateVolume to refer to the volume on all subsequent calls.
+	// Required.
+	VolumeHandle string
+
+	// Optional: The value to pass to ControllerPublishVolumeRequest.
+	// Defaults to false (read/write).
+	// +optional
+	ReadOnly bool
+}
+
 // ContainerPort represents a network port in a single container
 type ContainerPort struct {
 	// Optional: If specified, this must be an IANA_SVC_NAME  Each named port
@@ -1463,7 +1618,9 @@ type VolumeMount struct {
 	// Optional: Defaults to false (read-write).
 	// +optional
 	ReadOnly bool
-	// Required. Must not contain ':'.
+	// Required. If the path is not an absolute path (e.g. some/path) it
+	// will be prepended with the appropriate root prefix for the operating
+	// system.  On Linux this is '/', on Windows this is 'C:\'.
 	MountPath string
 	// Path within the volume from which the container's volume should be mounted.
 	// Defaults to "" (volume's root).
@@ -1496,6 +1653,14 @@ const (
 	// ("rshared" in Linux terminology).
 	MountPropagationBidirectional MountPropagationMode = "Bidirectional"
 )
+
+// VolumeDevice describes a mapping of a raw block device within a container.
+type VolumeDevice struct {
+	// name must match the name of a persistentVolumeClaim in the pod
+	Name string
+	// devicePath is the path inside of the container that the device will be mapped to.
+	DevicePath string
+}
 
 // EnvVar represents an environment variable present in a Container.
 type EnvVar struct {
@@ -1790,6 +1955,10 @@ type Container struct {
 	Resources ResourceRequirements
 	// +optional
 	VolumeMounts []VolumeMount
+	// volumeDevices is the list of block devices to be used by the container.
+	// This is an alpha feature and may change in the future.
+	// +optional
+	VolumeDevices []VolumeDevice
 	// +optional
 	LivenessProbe *Probe
 	// +optional
@@ -2658,8 +2827,8 @@ type ReplicationControllerCondition struct {
 }
 
 // +genclient
-// +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/kubernetes/pkg/apis/extensions.Scale
-// +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/kubernetes/pkg/apis/extensions.Scale,result=k8s.io/kubernetes/pkg/apis/extensions.Scale
+// +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/kubernetes/pkg/apis/autoscaling.Scale
+// +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/kubernetes/pkg/apis/autoscaling.Scale,result=k8s.io/kubernetes/pkg/apis/autoscaling.Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicationController represents the configuration of a replication controller.
@@ -2849,7 +3018,8 @@ type ServiceSpec struct {
 
 	// ExternalName is the external reference that kubedns or equivalent will
 	// return as a CNAME record for this service. No proxying will be involved.
-	// Must be a valid DNS name and requires Type to be ExternalName.
+	// Must be a valid RFC-1123 hostname (https://tools.ietf.org/html/rfc1123)
+	// and requires Type to be ExternalName.
 	ExternalName string
 
 	// ExternalIPs are used by external load balancers, or can be set by
@@ -3508,6 +3678,10 @@ type DeleteOptions struct {
 	// Either this field or OrphanDependents may be set, but not both.
 	// The default policy is decided by the existing finalizer set in the
 	// metadata.finalizers and the resource-specific default policy.
+	// Acceptable values are: 'Orphan' - orphan the dependents; 'Background' -
+	// allow the garbage collector to delete the dependents in the background;
+	// 'Foreground' - a cascading policy that deletes all dependents in the
+	// foreground.
 	// +optional
 	PropagationPolicy *DeletionPropagation
 }
@@ -3897,6 +4071,13 @@ const (
 	ResourceLimitsEphemeralStorage ResourceName = "limits.ephemeral-storage"
 )
 
+// The following identify resource prefix for Kubernetes object types
+const (
+	// HugePages request, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	// As burst is not supported for HugePages, we would only quota its request, and ignore the limit.
+	ResourceRequestsHugePagesPrefix = "requests.hugepages-"
+)
+
 // A ResourceQuotaScope defines a filter that must match each object tracked by a quota
 type ResourceQuotaScope string
 
@@ -4283,5 +4464,5 @@ const (
 	// corresponding to every RequiredDuringScheduling affinity rule.
 	// When the --hard-pod-affinity-weight scheduler flag is not specified,
 	// DefaultHardPodAffinityWeight defines the weight of the implicit PreferredDuringScheduling affinity rule.
-	DefaultHardPodAffinitySymmetricWeight int = 1
+	DefaultHardPodAffinitySymmetricWeight int32 = 1
 )

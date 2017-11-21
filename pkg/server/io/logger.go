@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	cioutil "github.com/kubernetes-incubator/cri-containerd/pkg/ioutil"
 )
@@ -41,7 +42,7 @@ const (
 	// POSIX.1 says that write less than PIPE_BUF is atmoic.
 	pipeBufSize = 4096
 	// bufSize is the size of the read buffer.
-	bufSize = pipeBufSize - len(timestampFormat) - len(Stdout) - 2 /*2 delimiter*/ - 1 /*eol*/
+	bufSize = pipeBufSize - len(timestampFormat) - len(Stdout) - len(runtime.LogTagPartial) - 3 /*3 delimiter*/ - 1 /*eol*/
 )
 
 // NewDiscardLogger creates logger which discards all the input.
@@ -67,10 +68,11 @@ func redirectLogs(path string, rc io.ReadCloser, wc io.WriteCloser, stream Strea
 	defer wc.Close()
 	streamBytes := []byte(stream)
 	delimiterBytes := []byte{delimiter}
+	partialBytes := []byte(runtime.LogTagPartial)
+	fullBytes := []byte(runtime.LogTagFull)
 	r := bufio.NewReaderSize(rc, bufSize)
 	for {
-		// TODO(random-liu): Better define CRI log format, and escape newline in log.
-		lineBytes, _, err := r.ReadLine()
+		lineBytes, isPrefix, err := r.ReadLine()
 		if err == io.EOF {
 			glog.V(4).Infof("Finish redirecting log file %q", path)
 			return
@@ -79,8 +81,12 @@ func redirectLogs(path string, rc io.ReadCloser, wc io.WriteCloser, stream Strea
 			glog.Errorf("An error occurred when redirecting log file %q: %v", path, err)
 			return
 		}
+		tagBytes := fullBytes
+		if isPrefix {
+			tagBytes = partialBytes
+		}
 		timestampBytes := time.Now().AppendFormat(nil, time.RFC3339Nano)
-		data := bytes.Join([][]byte{timestampBytes, streamBytes, lineBytes}, delimiterBytes)
+		data := bytes.Join([][]byte{timestampBytes, streamBytes, tagBytes, lineBytes}, delimiterBytes)
 		data = append(data, eol)
 		if _, err := wc.Write(data); err != nil {
 			glog.Errorf("Fail to write %q log to log file %q: %v", stream, path, err)
