@@ -71,10 +71,11 @@ func Chown(name string, uid, gid int) Applier {
 	})
 }
 
-// Chtime changes access and mod time of file
-func Chtime(name string, t time.Time) Applier {
+// Chtimes changes access and mod time of file.
+// Use Lchtimes for symbolic links.
+func Chtimes(name string, atime, mtime time.Time) Applier {
 	return applyFn(func(root string) error {
-		return os.Chtimes(filepath.Join(root, name), t, t)
+		return os.Chtimes(filepath.Join(root, name), atime, mtime)
 	})
 }
 
