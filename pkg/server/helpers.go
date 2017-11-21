@@ -28,7 +28,6 @@ import (
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/docker/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
@@ -205,34 +204,41 @@ func getRepoDigestAndTag(namedRef reference.Named, digest imagedigest.Digest, sc
 
 // localResolve resolves image reference locally and returns corresponding image metadata. It returns
 // nil without error if the reference doesn't exist.
-func (c *criContainerdService) localResolve(ctx context.Context, ref string) (*imagestore.Image, error) {
-	_, err := imagedigest.Parse(ref)
-	if err != nil {
-		// ref is not image id, try to resolve it locally.
-		normalized, err := util.NormalizeImageRef(ref)
-		if err != nil {
-			return nil, fmt.Errorf("invalid image reference %q: %v", ref, err)
+func (c *criContainerdService) localResolve(ctx context.Context, refOrID string) (*imagestore.Image, error) {
+	getImageID := func(refOrId string) string {
+		if _, err := imagedigest.Parse(refOrID); err == nil {
+			return refOrID
 		}
-		image, err := c.client.GetImage(ctx, normalized.String())
-		if err != nil {
-			if errdefs.IsNotFound(err) {
-				return nil, nil
+
+		return func(ref string) string {
+			// ref is not image id, try to resolve it locally.
+			normalized, err := util.NormalizeImageRef(ref)
+			if err != nil {
+				return ""
 			}
-			return nil, fmt.Errorf("failed to get image from containerd: %v", err)
-		}
-		desc, err := image.Config(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get image config descriptor: %v", err)
-		}
-		ref = desc.Digest.String()
+			image, err := c.client.GetImage(ctx, normalized.String())
+			if err != nil {
+				return ""
+			}
+			desc, err := image.Config(ctx)
+			if err != nil {
+				return ""
+			}
+			return desc.Digest.String()
+		}(refOrID)
 	}
-	imageID := ref
+
+	imageID := getImageID(refOrID)
+	if imageID == "" {
+		// Try to treat ref as imageID
+		imageID = refOrID
+	}
 	image, err := c.imageStore.Get(imageID)
 	if err != nil {
 		if err == store.ErrNotExist {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to get image %q metadata: %v", imageID, err)
+		return nil, fmt.Errorf("failed to get image %q : %v", imageID, err)
 	}
 	return &image, nil
 }
