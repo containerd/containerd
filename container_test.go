@@ -437,7 +437,6 @@ func TestContainerCloseIO(t *testing.T) {
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
-	const expected = "hello" + newLine
 	stdout := bytes.NewBuffer(nil)
 
 	r, w, err := os.Pipe()

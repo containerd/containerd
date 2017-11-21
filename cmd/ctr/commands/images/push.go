@@ -133,13 +133,6 @@ var pushCommand = cli.Command{
 	},
 }
 
-type pushStatus struct {
-	name    string
-	started bool
-	written int64
-	total   int64
-}
-
 type pushjobs struct {
 	jobs    map[string]struct{}
 	ordered []string

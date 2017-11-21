@@ -444,11 +444,6 @@ func testCommit(ctx context.Context, t *testing.T, ms *MetaStore) {
 	assertNotActive(t, err)
 }
 
-func testCommitNotExist(ctx context.Context, t *testing.T, ms *MetaStore) {
-	_, err := CommitActive(ctx, "active-not-exist", "committed-1", snapshot.Usage{})
-	assertNotExist(t, err)
-}
-
 func testCommitExist(ctx context.Context, t *testing.T, ms *MetaStore) {
 	if err := basePopulate(ctx, ms); err != nil {
 		t.Fatalf("Populate failed: %+v", err)

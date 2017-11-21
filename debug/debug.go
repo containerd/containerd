@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -54,13 +53,4 @@ func getMaps(pid int) (map[string]int, error) {
 		return nil, err
 	}
 	return smaps, nil
-}
-
-func keys(smaps map[string]int) []string {
-	var o []string
-	for k := range smaps {
-		o = append(o, k)
-	}
-	sort.Strings(o)
-	return o
 }

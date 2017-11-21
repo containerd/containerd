@@ -402,22 +402,6 @@ func addLeaseContent(ns, lid string, dgst digest.Digest) alterFunc {
 	}
 }
 
-func addContainer(ns, name, snapshotter, snapshot string, labels map[string]string) alterFunc {
-	return func(bkt *bolt.Bucket) error {
-		cbkt, err := createBuckets(bkt, ns, string(bucketKeyObjectContainers), name)
-		if err != nil {
-			return err
-		}
-		if err := cbkt.Put(bucketKeySnapshotter, []byte(snapshotter)); err != nil {
-			return err
-		}
-		if err := cbkt.Put(bucketKeySnapshotKey, []byte(snapshot)); err != nil {
-			return err
-		}
-		return boltutil.WriteLabels(cbkt, labels)
-	}
-}
-
 func createBuckets(bkt *bolt.Bucket, names ...string) (*bolt.Bucket, error) {
 	for _, name := range names {
 		nbkt, err := bkt.CreateBucketIfNotExists([]byte(name))

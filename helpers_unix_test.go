@@ -40,8 +40,6 @@ func withExecArgs(s *specs.Process, args ...string) {
 }
 
 var (
-	withRemappedSnapshot     = WithRemappedSnapshot
-	withRemappedSnapshotView = WithRemappedSnapshotView
-	withNewSnapshot          = WithNewSnapshot
-	withImageConfig          = WithImageConfig
+	withNewSnapshot = WithNewSnapshot
+	withImageConfig = WithImageConfig
 )

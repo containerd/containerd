@@ -29,10 +29,6 @@ import (
 
 const manifestSizeLimit = 8e6 // 8MB
 
-var (
-	mediaTypeManifest = "application/vnd.docker.distribution.manifest.v1+json"
-)
-
 type blobState struct {
 	diffID digest.Digest
 	empty  bool

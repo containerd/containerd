@@ -14,8 +14,6 @@ import (
 	"github.com/urfave/cli"
 )
 
-const pipeRoot = `\\.\pipe`
-
 func init() {
 	Command.Flags = append(Command.Flags, cli.StringSliceFlag{
 		Name:  "layer",
@@ -48,10 +46,6 @@ func withTTY(terminal bool) containerd.SpecOpts {
 		logrus.WithError(err).Error("console size")
 	}
 	return containerd.WithTTY(int(size.Width), int(size.Height))
-}
-
-func setHostNetworking() containerd.SpecOpts {
-	return nil
 }
 
 func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli.Context) (containerd.Container, error) {

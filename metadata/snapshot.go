@@ -39,14 +39,6 @@ func createKey(id uint64, namespace, key string) string {
 	return fmt.Sprintf("%s/%d/%s", namespace, id, key)
 }
 
-func trimKey(key string) string {
-	parts := strings.SplitN(key, "/", 3)
-	if len(parts) < 3 {
-		return ""
-	}
-	return parts[2]
-}
-
 func getKey(tx *bolt.Tx, ns, name, key string) string {
 	bkt := getSnapshotterBucket(tx, ns, name)
 	if bkt == nil {

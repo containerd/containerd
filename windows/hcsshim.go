@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/Microsoft/hcsshim"
-	"github.com/Microsoft/opengcs/client"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -147,53 +146,6 @@ func newWindowsContainerConfig(ctx context.Context, owner, id string, spec *spec
 	return conf, nil
 }
 
-// newLinuxConfig generates a hcsshim Linux container configuration from the
-// provided OCI Spec
-func newLinuxConfig(ctx context.Context, owner, id string, spec *specs.Spec) (*hcsshim.ContainerConfig, error) {
-	conf, err := newContainerConfig(ctx, owner, id, spec)
-	if err != nil {
-		return nil, err
-	}
-
-	conf.ContainerType = "Linux"
-	conf.HvPartition = true
-
-	if len(spec.Windows.LayerFolders) < 1 {
-		return nil, errors.Wrap(errdefs.ErrInvalidArgument,
-			"spec.Windows.LayerFolders must have at least 1 layer")
-	}
-	var (
-		layerFolders = spec.Windows.LayerFolders
-	)
-
-	config := &client.Config{}
-	if err := config.GenerateDefault(nil); err != nil {
-		return nil, err
-	}
-
-	conf.HvRuntime = &hcsshim.HvRuntime{
-		ImagePath:           config.KirdPath,
-		LinuxKernelFile:     config.KernelFile,
-		LinuxInitrdFile:     config.InitrdFile,
-		LinuxBootParameters: config.BootParameters,
-	}
-
-	// TODO: use the create request Mount for those
-	for _, layerPath := range layerFolders {
-		_, filename := filepath.Split(layerPath)
-		guid, err := hcsshim.NameToGuid(filename)
-		if err != nil {
-			return nil, errors.Wrapf(err, "unable to get GUID for %s", filename)
-		}
-		conf.Layers = append(conf.Layers, hcsshim.Layer{
-			ID:   guid.ToString(),
-			Path: filepath.Join(layerPath, "layer.vhd"),
-		})
-	}
-
-	return conf, nil
-}
-
 // removeLayer deletes the given layer, all associated containers must have
 // been shutdown for this to succeed.
 func removeLayer(ctx context.Context, path string) error {
@@ -259,10 +211,4 @@ func newWindowsProcessConfig(processSpec *specs.Process, pset *pipeSet) *hcsshim
 	conf := newProcessConfig(processSpec, pset)
 	conf.CommandLine = strings.Join(processSpec.Args, " ")
 	return conf
-}
-
-func newLinuxProcessConfig(processSpec *specs.Process, pset *pipeSet) (*hcsshim.ProcessConfig, error) {
-	conf := newProcessConfig(processSpec, pset)
-	conf.CommandArgs = processSpec.Args
-	return conf, nil
 }

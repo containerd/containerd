@@ -17,16 +17,6 @@ func imagesToProto(images []images.Image) []imagesapi.Image {
 	return imagespb
 }
 
-func imagesFromProto(imagespb []imagesapi.Image) []images.Image {
-	var images []images.Image
-
-	for _, image := range imagespb {
-		images = append(images, imageFromProto(&image))
-	}
-
-	return images
-}
-
 func imageToProto(image *images.Image) imagesapi.Image {
 	return imagesapi.Image{
 		Name:      image.Name,

@@ -236,16 +236,6 @@ func (w *worker) getID() string {
 	return fmt.Sprintf("%d-%d", w.id, w.count)
 }
 
-func (w *worker) cleanup(ctx context.Context, c containerd.Container) {
-	if err := c.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
-		if err == context.DeadlineExceeded {
-			return
-		}
-		w.failures++
-		logrus.WithError(err).Errorf("delete container %s", c.ID())
-	}
-}
-
 // cleanup cleans up any containers in the "stress" namespace before the test run
 func cleanup(ctx context.Context, client *containerd.Client) error {
 	containers, err := client.Containers(ctx)

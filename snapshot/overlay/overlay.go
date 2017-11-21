@@ -38,13 +38,6 @@ type snapshotter struct {
 	ms   *storage.MetaStore
 }
 
-type activeSnapshot struct {
-	id       string
-	name     string
-	parentID interface{}
-	readonly bool
-}
-
 // NewSnapshotter returns a Snapshotter which uses overlayfs. The overlayfs
 // diffs are stored under the provided root. A metadata file is stored under
 // the root.
