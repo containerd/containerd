@@ -18,7 +18,7 @@ import (
 	introspection "github.com/containerd/containerd/api/services/introspection/v1"
 	leasesapi "github.com/containerd/containerd/api/services/leases/v1"
 	namespaces "github.com/containerd/containerd/api/services/namespaces/v1"
-	snapshotapi "github.com/containerd/containerd/api/services/snapshot/v1"
+	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	version "github.com/containerd/containerd/api/services/version/v1"
 	"github.com/containerd/containerd/content"
@@ -249,7 +249,7 @@ func interceptor(
 		// No need to change the context
 	case version.VersionServer:
 		ctx = log.WithModule(ctx, "version")
-	case snapshotapi.SnapshotsServer:
+	case snapshotsapi.SnapshotsServer:
 		ctx = log.WithModule(ctx, "snapshot")
 	case diff.DiffServer:
 		ctx = log.WithModule(ctx, "diff")

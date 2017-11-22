@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	snapshotapi "github.com/containerd/containerd/api/services/snapshot/v1"
+	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
@@ -14,7 +14,7 @@ import (
 
 // NewSnapshotterFromClient returns a new Snapshotter which communicates
 // over a GRPC connection.
-func NewSnapshotterFromClient(client snapshotapi.SnapshotsClient, snapshotterName string) snapshots.Snapshotter {
+func NewSnapshotterFromClient(client snapshotsapi.SnapshotsClient, snapshotterName string) snapshots.Snapshotter {
 	return &remoteSnapshotter{
 		client:          client,
 		snapshotterName: snapshotterName,
@@ -22,13 +22,13 @@ func NewSnapshotterFromClient(client snapshotapi.SnapshotsClient, snapshotterNam
 }
 
 type remoteSnapshotter struct {
-	client          snapshotapi.SnapshotsClient
+	client          snapshotsapi.SnapshotsClient
 	snapshotterName string
 }
 
 func (r *remoteSnapshotter) Stat(ctx context.Context, key string) (snapshots.Info, error) {
 	resp, err := r.client.Stat(ctx,
-		&snapshotapi.StatSnapshotRequest{
+		&snapshotsapi.StatSnapshotRequest{
 			Snapshotter: r.snapshotterName,
 			Key:         key,
 		})
@@ -40,7 +40,7 @@ func (r *remoteSnapshotter) Stat(ctx context.Context, key string) (snapshots.Inf
 
 func (r *remoteSnapshotter) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
 	resp, err := r.client.Update(ctx,
-		&snapshotapi.UpdateSnapshotRequest{
+		&snapshotsapi.UpdateSnapshotRequest{
 			Snapshotter: r.snapshotterName,
 			Info:        fromInfo(info),
 			UpdateMask: &protobuftypes.FieldMask{
@@ -54,7 +54,7 @@ func (r *remoteSnapshotter) Update(ctx context.Context, info snapshots.Info, fie
 }
 
 func (r *remoteSnapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
-	resp, err := r.client.Usage(ctx, &snapshotapi.UsageRequest{
+	resp, err := r.client.Usage(ctx, &snapshotsapi.UsageRequest{
 		Snapshotter: r.snapshotterName,
 		Key:         key,
 	})
@@ -65,7 +65,7 @@ func (r *remoteSnapshotter) Usage(ctx context.Context, key string) (snapshots.Us
 }
 
 func (r *remoteSnapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
-	resp, err := r.client.Mounts(ctx, &snapshotapi.MountsRequest{
+	resp, err := r.client.Mounts(ctx, &snapshotsapi.MountsRequest{
 		Snapshotter: r.snapshotterName,
 		Key:         key,
 	})
@@ -82,7 +82,7 @@ func (r *remoteSnapshotter) Prepare(ctx context.Context, key, parent string, opt
 			return nil, err
 		}
 	}
-	resp, err := r.client.Prepare(ctx, &snapshotapi.PrepareSnapshotRequest{
+	resp, err := r.client.Prepare(ctx, &snapshotsapi.PrepareSnapshotRequest{
 		Snapshotter: r.snapshotterName,
 		Key:         key,
 		Parent:      parent,
@@ -101,7 +101,7 @@ func (r *remoteSnapshotter) View(ctx context.Context, key, parent string, opts .
 			return nil, err
 		}
 	}
-	resp, err := r.client.View(ctx, &snapshotapi.ViewSnapshotRequest{
+	resp, err := r.client.View(ctx, &snapshotsapi.ViewSnapshotRequest{
 		Snapshotter: r.snapshotterName,
 		Key:         key,
 		Parent:      parent,
@@ -120,7 +120,7 @@ func (r *remoteSnapshotter) Commit(ctx context.Context, name, key string, opts .
 			return err
 		}
 	}
-	_, err := r.client.Commit(ctx, &snapshotapi.CommitSnapshotRequest{
+	_, err := r.client.Commit(ctx, &snapshotsapi.CommitSnapshotRequest{
 		Snapshotter: r.snapshotterName,
 		Name:        name,
 		Key:         key,
@@ -130,7 +130,7 @@ func (r *remoteSnapshotter) Commit(ctx context.Context, name, key string, opts .
 }
 
 func (r *remoteSnapshotter) Remove(ctx context.Context, key string) error {
-	_, err := r.client.Remove(ctx, &snapshotapi.RemoveSnapshotRequest{
+	_, err := r.client.Remove(ctx, &snapshotsapi.RemoveSnapshotRequest{
 		Snapshotter: r.snapshotterName,
 		Key:         key,
 	})
@@ -138,7 +138,7 @@ func (r *remoteSnapshotter) Remove(ctx context.Context, key string) error {
 }
 
 func (r *remoteSnapshotter) Walk(ctx context.Context, fn func(context.Context, snapshots.Info) error) error {
-	sc, err := r.client.List(ctx, &snapshotapi.ListSnapshotsRequest{
+	sc, err := r.client.List(ctx, &snapshotsapi.ListSnapshotsRequest{
 		Snapshotter: r.snapshotterName,
 	})
 	if err != nil {
@@ -167,17 +167,17 @@ func (r *remoteSnapshotter) Close() error {
 	return nil
 }
 
-func toKind(kind snapshotapi.Kind) snapshots.Kind {
-	if kind == snapshotapi.KindActive {
+func toKind(kind snapshotsapi.Kind) snapshots.Kind {
+	if kind == snapshotsapi.KindActive {
 		return snapshots.KindActive
 	}
-	if kind == snapshotapi.KindView {
+	if kind == snapshotsapi.KindView {
 		return snapshots.KindView
 	}
 	return snapshots.KindCommitted
 }
 
-func toInfo(info snapshotapi.Info) snapshots.Info {
+func toInfo(info snapshotsapi.Info) snapshots.Info {
 	return snapshots.Info{
 		Name:    info.Name,
 		Parent:  info.Parent,
@@ -188,7 +188,7 @@ func toInfo(info snapshotapi.Info) snapshots.Info {
 	}
 }
 
-func toUsage(resp *snapshotapi.UsageResponse) snapshots.Usage {
+func toUsage(resp *snapshotsapi.UsageResponse) snapshots.Usage {
 	return snapshots.Usage{
 		Inodes: resp.Inodes,
 		Size:   resp.Size_,
@@ -207,18 +207,18 @@ func toMounts(mm []*types.Mount) []mount.Mount {
 	return mounts
 }
 
-func fromKind(kind snapshots.Kind) snapshotapi.Kind {
+func fromKind(kind snapshots.Kind) snapshotsapi.Kind {
 	if kind == snapshots.KindActive {
-		return snapshotapi.KindActive
+		return snapshotsapi.KindActive
 	}
 	if kind == snapshots.KindView {
-		return snapshotapi.KindView
+		return snapshotsapi.KindView
 	}
-	return snapshotapi.KindCommitted
+	return snapshotsapi.KindCommitted
 }
 
-func fromInfo(info snapshots.Info) snapshotapi.Info {
-	return snapshotapi.Info{
+func fromInfo(info snapshots.Info) snapshotsapi.Info {
+	return snapshotsapi.Info{
 		Name:      info.Name,
 		Parent:    info.Parent,
 		Kind:      fromKind(info.Kind),
