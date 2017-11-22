@@ -17,7 +17,6 @@ import (
 // WithImageConfig configures the spec to from the configuration of an Image
 func WithImageConfig(image Image) SpecOpts {
 	return func(ctx context.Context, client Client, _ *containers.Container, s *specs.Spec) error {
-		store := client.ContentStore()
 		ic, err := image.Config(ctx)
 		if err != nil {
 			return err
@@ -28,7 +27,7 @@ func WithImageConfig(image Image) SpecOpts {
 		)
 		switch ic.MediaType {
 		case v1.MediaTypeImageConfig, images.MediaTypeDockerSchema2Config:
-			p, err := content.ReadBlob(ctx, store, ic.Digest)
+			p, err := content.ReadBlob(ctx, image.ContentStore(), ic.Digest)
 			if err != nil {
 				return err
 			}
