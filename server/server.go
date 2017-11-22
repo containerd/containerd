@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/snapshots"
 	metrics "github.com/docker/go-metrics"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/pkg/errors"
@@ -199,7 +199,7 @@ func loadPlugins(config *Config) ([]*plugin.Registration, error) {
 				return nil, err
 			}
 
-			snapshotters := make(map[string]snapshot.Snapshotter)
+			snapshotters := make(map[string]snapshots.Snapshotter)
 			for name, sn := range snapshottersRaw {
 				sn, err := sn.Instance()
 				if err != nil {
@@ -207,7 +207,7 @@ func loadPlugins(config *Config) ([]*plugin.Registration, error) {
 						Warnf("could not use snapshotter %v in metadata plugin", name)
 					continue
 				}
-				snapshotters[name] = sn.(snapshot.Snapshotter)
+				snapshotters[name] = sn.(snapshots.Snapshotter)
 			}
 
 			path := filepath.Join(ic.Root, "meta.db")

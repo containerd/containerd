@@ -1,6 +1,6 @@
 package main
 
 import (
-	_ "github.com/containerd/containerd/snapshot/windows"
+	_ "github.com/containerd/containerd/snapshots/windows"
 	_ "github.com/containerd/containerd/windows"
 )

@@ -33,7 +33,7 @@ import (
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/schema1"
-	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -435,7 +435,7 @@ func (c *Client) ContentStore() content.Store {
 }
 
 // SnapshotService returns the underlying snapshotter for the provided snapshotter name
-func (c *Client) SnapshotService(snapshotterName string) snapshot.Snapshotter {
+func (c *Client) SnapshotService(snapshotterName string) snapshots.Snapshotter {
 	return NewSnapshotterFromClient(snapshotapi.NewSnapshotsClient(c.conn), snapshotterName)
 }
 

@@ -5,11 +5,11 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/containerd/containerd/snapshot"
-	"github.com/containerd/containerd/snapshot/testsuite"
+	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/snapshots/testsuite"
 )
 
-func newSnapshotter(ctx context.Context, root string) (snapshot.Snapshotter, func() error, error) {
+func newSnapshotter(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
 	client, err := New(address)
 	if err != nil {
 		return nil, nil, err

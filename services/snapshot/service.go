@@ -12,7 +12,7 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/snapshots"
 	ptypes "github.com/gogo/protobuf/types"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -48,7 +48,7 @@ func newService(ic *plugin.InitContext) (interface{}, error) {
 	}, nil
 }
 
-func (s *service) getSnapshotter(name string) (snapshot.Snapshotter, error) {
+func (s *service) getSnapshotter(name string) (snapshots.Snapshotter, error) {
 	if name == "" {
 		return nil, errdefs.ToGRPCf(errdefs.ErrInvalidArgument, "snapshotter argument missing")
 	}
@@ -72,9 +72,9 @@ func (s *service) Prepare(ctx context.Context, pr *snapshotapi.PrepareSnapshotRe
 		return nil, err
 	}
 
-	var opts []snapshot.Opt
+	var opts []snapshots.Opt
 	if pr.Labels != nil {
-		opts = append(opts, snapshot.WithLabels(pr.Labels))
+		opts = append(opts, snapshots.WithLabels(pr.Labels))
 	}
 	mounts, err := sn.Prepare(ctx, pr.Key, pr.Parent, opts...)
 	if err != nil {
@@ -98,9 +98,9 @@ func (s *service) View(ctx context.Context, pr *snapshotapi.ViewSnapshotRequest)
 	if err != nil {
 		return nil, err
 	}
-	var opts []snapshot.Opt
+	var opts []snapshots.Opt
 	if pr.Labels != nil {
-		opts = append(opts, snapshot.WithLabels(pr.Labels))
+		opts = append(opts, snapshots.WithLabels(pr.Labels))
 	}
 	mounts, err := sn.View(ctx, pr.Key, pr.Parent, opts...)
 	if err != nil {
@@ -134,9 +134,9 @@ func (s *service) Commit(ctx context.Context, cr *snapshotapi.CommitSnapshotRequ
 		return nil, err
 	}
 
-	var opts []snapshot.Opt
+	var opts []snapshots.Opt
 	if cr.Labels != nil {
-		opts = append(opts, snapshot.WithLabels(cr.Labels))
+		opts = append(opts, snapshots.WithLabels(cr.Labels))
 	}
 	if err := sn.Commit(ctx, cr.Name, cr.Key, opts...); err != nil {
 		return nil, errdefs.ToGRPC(err)
@@ -214,7 +214,7 @@ func (s *service) List(sr *snapshotapi.ListSnapshotsRequest, ss snapshotapi.Snap
 			})
 		}
 	)
-	err = sn.Walk(ss.Context(), func(ctx gocontext.Context, info snapshot.Info) error {
+	err = sn.Walk(ss.Context(), func(ctx gocontext.Context, info snapshots.Info) error {
 		buffer = append(buffer, fromInfo(info))
 
 		if len(buffer) >= 100 {
@@ -254,17 +254,17 @@ func (s *service) Usage(ctx context.Context, ur *snapshotapi.UsageRequest) (*sna
 	return fromUsage(usage), nil
 }
 
-func fromKind(kind snapshot.Kind) snapshotapi.Kind {
-	if kind == snapshot.KindActive {
+func fromKind(kind snapshots.Kind) snapshotapi.Kind {
+	if kind == snapshots.KindActive {
 		return snapshotapi.KindActive
 	}
-	if kind == snapshot.KindView {
+	if kind == snapshots.KindView {
 		return snapshotapi.KindView
 	}
 	return snapshotapi.KindCommitted
 }
 
-func fromInfo(info snapshot.Info) snapshotapi.Info {
+func fromInfo(info snapshots.Info) snapshotapi.Info {
 	return snapshotapi.Info{
 		Name:      info.Name,
 		Parent:    info.Parent,
@@ -275,7 +275,7 @@ func fromInfo(info snapshot.Info) snapshotapi.Info {
 	}
 }
 
-func fromUsage(usage snapshot.Usage) *snapshotapi.UsageResponse {
+func fromUsage(usage snapshots.Usage) *snapshotapi.UsageResponse {
 	return &snapshotapi.UsageResponse{
 		Inodes: usage.Inodes,
 		Size_:  usage.Size,
@@ -294,8 +294,8 @@ func fromMounts(mounts []mount.Mount) []*types.Mount {
 	return out
 }
 
-func toInfo(info snapshotapi.Info) snapshot.Info {
-	return snapshot.Info{
+func toInfo(info snapshotapi.Info) snapshots.Info {
+	return snapshots.Info{
 		Name:    info.Name,
 		Parent:  info.Parent,
 		Kind:    toKind(info.Kind),
@@ -305,12 +305,12 @@ func toInfo(info snapshotapi.Info) snapshot.Info {
 	}
 }
 
-func toKind(kind snapshotapi.Kind) snapshot.Kind {
+func toKind(kind snapshotapi.Kind) snapshots.Kind {
 	if kind == snapshotapi.KindActive {
-		return snapshot.KindActive
+		return snapshots.KindActive
 	}
 	if kind == snapshotapi.KindView {
-		return snapshot.KindView
+		return snapshots.KindView
 	}
-	return snapshot.KindCommitted
+	return snapshots.KindCommitted
 }

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/snapshots"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
@@ -129,71 +129,71 @@ func inWriteTransaction(fn testFunc) testFunc {
 // - "active-4": readonly active without parent"
 // - "active-5": readonly active with parent "committed-2"
 func basePopulate(ctx context.Context, ms *MetaStore) error {
-	if _, err := CreateSnapshot(ctx, snapshot.KindActive, "committed-tmp-1", ""); err != nil {
+	if _, err := CreateSnapshot(ctx, snapshots.KindActive, "committed-tmp-1", ""); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
-	if _, err := CommitActive(ctx, "committed-tmp-1", "committed-1", snapshot.Usage{Size: 1}); err != nil {
+	if _, err := CommitActive(ctx, "committed-tmp-1", "committed-1", snapshots.Usage{Size: 1}); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
-	if _, err := CreateSnapshot(ctx, snapshot.KindActive, "committed-tmp-2", "committed-1"); err != nil {
+	if _, err := CreateSnapshot(ctx, snapshots.KindActive, "committed-tmp-2", "committed-1"); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
-	if _, err := CommitActive(ctx, "committed-tmp-2", "committed-2", snapshot.Usage{Size: 2}); err != nil {
+	if _, err := CommitActive(ctx, "committed-tmp-2", "committed-2", snapshots.Usage{Size: 2}); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
-	if _, err := CreateSnapshot(ctx, snapshot.KindActive, "active-1", ""); err != nil {
+	if _, err := CreateSnapshot(ctx, snapshots.KindActive, "active-1", ""); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
-	if _, err := CreateSnapshot(ctx, snapshot.KindActive, "active-2", "committed-1"); err != nil {
+	if _, err := CreateSnapshot(ctx, snapshots.KindActive, "active-2", "committed-1"); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
-	if _, err := CreateSnapshot(ctx, snapshot.KindActive, "active-3", "committed-2"); err != nil {
+	if _, err := CreateSnapshot(ctx, snapshots.KindActive, "active-3", "committed-2"); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
-	if _, err := CreateSnapshot(ctx, snapshot.KindView, "view-1", ""); err != nil {
+	if _, err := CreateSnapshot(ctx, snapshots.KindView, "view-1", ""); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
-	if _, err := CreateSnapshot(ctx, snapshot.KindView, "view-2", "committed-2"); err != nil {
+	if _, err := CreateSnapshot(ctx, snapshots.KindView, "view-2", "committed-2"); err != nil {
 		return errors.Wrap(err, "failed to create active")
 	}
 	return nil
 }
 
-var baseInfo = map[string]snapshot.Info{
+var baseInfo = map[string]snapshots.Info{
 	"committed-1": {
 		Name:   "committed-1",
 		Parent: "",
-		Kind:   snapshot.KindCommitted,
+		Kind:   snapshots.KindCommitted,
 	},
 	"committed-2": {
 		Name:   "committed-2",
 		Parent: "committed-1",
-		Kind:   snapshot.KindCommitted,
+		Kind:   snapshots.KindCommitted,
 	},
 	"active-1": {
 		Name:   "active-1",
 		Parent: "",
-		Kind:   snapshot.KindActive,
+		Kind:   snapshots.KindActive,
 	},
 	"active-2": {
 		Name:   "active-2",
 		Parent: "committed-1",
-		Kind:   snapshot.KindActive,
+		Kind:   snapshots.KindActive,
 	},
 	"active-3": {
 		Name:   "active-3",
 		Parent: "committed-2",
-		Kind:   snapshot.KindActive,
+		Kind:   snapshots.KindActive,
 	},
 	"view-1": {
 		Name:   "view-1",
 		Parent: "",
-		Kind:   snapshot.KindView,
+		Kind:   snapshots.KindView,
 	},
 	"view-2": {
 		Name:   "view-2",
 		Parent: "committed-2",
-		Kind:   snapshot.KindView,
+		Kind:   snapshots.KindView,
 	},
 }
 
@@ -252,8 +252,8 @@ func testGetInfoNotExist(ctx context.Context, t *testing.T, ms *MetaStore) {
 }
 
 func testWalk(ctx context.Context, t *testing.T, ms *MetaStore) {
-	found := map[string]snapshot.Info{}
-	err := WalkInfo(ctx, func(ctx context.Context, info snapshot.Info) error {
+	found := map[string]snapshots.Info{}
+	err := WalkInfo(ctx, func(ctx context.Context, info snapshots.Info) error {
 		if _, ok := found[info.Name]; ok {
 			return errors.Errorf("entry already encountered")
 		}
@@ -272,35 +272,35 @@ func testWalk(ctx context.Context, t *testing.T, ms *MetaStore) {
 func testGetSnapshot(ctx context.Context, t *testing.T, ms *MetaStore) {
 	snapshotMap := map[string]Snapshot{}
 	populate := func(ctx context.Context, ms *MetaStore) error {
-		if _, err := CreateSnapshot(ctx, snapshot.KindActive, "committed-tmp-1", ""); err != nil {
+		if _, err := CreateSnapshot(ctx, snapshots.KindActive, "committed-tmp-1", ""); err != nil {
 			return errors.Wrap(err, "failed to create active")
 		}
-		if _, err := CommitActive(ctx, "committed-tmp-1", "committed-1", snapshot.Usage{}); err != nil {
+		if _, err := CommitActive(ctx, "committed-tmp-1", "committed-1", snapshots.Usage{}); err != nil {
 			return errors.Wrap(err, "failed to create active")
 		}
 
 		for _, opts := range []struct {
-			Kind   snapshot.Kind
+			Kind   snapshots.Kind
 			Name   string
 			Parent string
 		}{
 			{
 				Name: "active-1",
-				Kind: snapshot.KindActive,
+				Kind: snapshots.KindActive,
 			},
 			{
 				Name:   "active-2",
 				Parent: "committed-1",
-				Kind:   snapshot.KindActive,
+				Kind:   snapshots.KindActive,
 			},
 			{
 				Name: "view-1",
-				Kind: snapshot.KindView,
+				Kind: snapshots.KindView,
 			},
 			{
 				Name:   "view-2",
 				Parent: "committed-1",
-				Kind:   snapshot.KindView,
+				Kind:   snapshots.KindView,
 			},
 		} {
 			active, err := CreateSnapshot(ctx, opts.Kind, opts.Name, opts.Parent)
@@ -336,26 +336,26 @@ func testGetSnapshotNotExist(ctx context.Context, t *testing.T, ms *MetaStore) {
 }
 
 func testCreateActive(ctx context.Context, t *testing.T, ms *MetaStore) {
-	a1, err := CreateSnapshot(ctx, snapshot.KindActive, "active-1", "")
+	a1, err := CreateSnapshot(ctx, snapshots.KindActive, "active-1", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if a1.Kind != snapshot.KindActive {
+	if a1.Kind != snapshots.KindActive {
 		t.Fatal("Expected writable active")
 	}
 
-	a2, err := CreateSnapshot(ctx, snapshot.KindView, "view-1", "")
+	a2, err := CreateSnapshot(ctx, snapshots.KindView, "view-1", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if a2.ID == a1.ID {
 		t.Fatal("Returned active identifiers must be unique")
 	}
-	if a2.Kind != snapshot.KindView {
+	if a2.Kind != snapshots.KindView {
 		t.Fatal("Expected a view")
 	}
 
-	commitID, err := CommitActive(ctx, "active-1", "committed-1", snapshot.Usage{})
+	commitID, err := CommitActive(ctx, "active-1", "committed-1", snapshots.Usage{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -363,7 +363,7 @@ func testCreateActive(ctx context.Context, t *testing.T, ms *MetaStore) {
 		t.Fatal("Snapshot identifier must not change on commit")
 	}
 
-	a3, err := CreateSnapshot(ctx, snapshot.KindActive, "active-3", "committed-1")
+	a3, err := CreateSnapshot(ctx, snapshots.KindActive, "active-3", "committed-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -376,11 +376,11 @@ func testCreateActive(ctx context.Context, t *testing.T, ms *MetaStore) {
 	if a3.ParentIDs[0] != commitID {
 		t.Fatal("Expected active parent to be same as commit ID")
 	}
-	if a3.Kind != snapshot.KindActive {
+	if a3.Kind != snapshots.KindActive {
 		t.Fatal("Expected writable active")
 	}
 
-	a4, err := CreateSnapshot(ctx, snapshot.KindView, "view-2", "committed-1")
+	a4, err := CreateSnapshot(ctx, snapshots.KindView, "view-2", "committed-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -393,7 +393,7 @@ func testCreateActive(ctx context.Context, t *testing.T, ms *MetaStore) {
 	if a3.ParentIDs[0] != commitID {
 		t.Fatal("Expected active parent to be same as commit ID")
 	}
-	if a4.Kind != snapshot.KindView {
+	if a4.Kind != snapshots.KindView {
 		t.Fatal("Expected a view")
 	}
 }
@@ -402,14 +402,14 @@ func testCreateActiveExist(ctx context.Context, t *testing.T, ms *MetaStore) {
 	if err := basePopulate(ctx, ms); err != nil {
 		t.Fatalf("Populate failed: %+v", err)
 	}
-	_, err := CreateSnapshot(ctx, snapshot.KindActive, "active-1", "")
+	_, err := CreateSnapshot(ctx, snapshots.KindActive, "active-1", "")
 	assertExist(t, err)
-	_, err = CreateSnapshot(ctx, snapshot.KindActive, "committed-1", "")
+	_, err = CreateSnapshot(ctx, snapshots.KindActive, "committed-1", "")
 	assertExist(t, err)
 }
 
 func testCreateActiveNotExist(ctx context.Context, t *testing.T, ms *MetaStore) {
-	_, err := CreateSnapshot(ctx, snapshot.KindActive, "active-1", "does-not-exist")
+	_, err := CreateSnapshot(ctx, snapshots.KindActive, "active-1", "does-not-exist")
 	assertNotExist(t, err)
 }
 
@@ -417,20 +417,20 @@ func testCreateActiveFromActive(ctx context.Context, t *testing.T, ms *MetaStore
 	if err := basePopulate(ctx, ms); err != nil {
 		t.Fatalf("Populate failed: %+v", err)
 	}
-	_, err := CreateSnapshot(ctx, snapshot.KindActive, "active-new", "active-1")
+	_, err := CreateSnapshot(ctx, snapshots.KindActive, "active-new", "active-1")
 	assertNotCommitted(t, err)
 }
 
 func testCommit(ctx context.Context, t *testing.T, ms *MetaStore) {
-	a1, err := CreateSnapshot(ctx, snapshot.KindActive, "active-1", "")
+	a1, err := CreateSnapshot(ctx, snapshots.KindActive, "active-1", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if a1.Kind != snapshot.KindActive {
+	if a1.Kind != snapshots.KindActive {
 		t.Fatal("Expected writable active")
 	}
 
-	commitID, err := CommitActive(ctx, "active-1", "committed-1", snapshot.Usage{})
+	commitID, err := CommitActive(ctx, "active-1", "committed-1", snapshots.Usage{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -448,7 +448,7 @@ func testCommitExist(ctx context.Context, t *testing.T, ms *MetaStore) {
 	if err := basePopulate(ctx, ms); err != nil {
 		t.Fatalf("Populate failed: %+v", err)
 	}
-	_, err := CommitActive(ctx, "active-1", "committed-1", snapshot.Usage{})
+	_, err := CommitActive(ctx, "active-1", "committed-1", snapshots.Usage{})
 	assertExist(t, err)
 }
 
@@ -456,7 +456,7 @@ func testCommitCommitted(ctx context.Context, t *testing.T, ms *MetaStore) {
 	if err := basePopulate(ctx, ms); err != nil {
 		t.Fatalf("Populate failed: %+v", err)
 	}
-	_, err := CommitActive(ctx, "committed-1", "committed-3", snapshot.Usage{})
+	_, err := CommitActive(ctx, "committed-1", "committed-3", snapshots.Usage{})
 	assertNotActive(t, err)
 }
 
@@ -464,19 +464,19 @@ func testCommitViewFails(ctx context.Context, t *testing.T, ms *MetaStore) {
 	if err := basePopulate(ctx, ms); err != nil {
 		t.Fatalf("Populate failed: %+v", err)
 	}
-	_, err := CommitActive(ctx, "view-1", "committed-3", snapshot.Usage{})
+	_, err := CommitActive(ctx, "view-1", "committed-3", snapshots.Usage{})
 	if err == nil {
 		t.Fatal("Expected error committing readonly active")
 	}
 }
 
 func testRemove(ctx context.Context, t *testing.T, ms *MetaStore) {
-	a1, err := CreateSnapshot(ctx, snapshot.KindActive, "active-1", "")
+	a1, err := CreateSnapshot(ctx, snapshots.KindActive, "active-1", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	commitID, err := CommitActive(ctx, "active-1", "committed-1", snapshot.Usage{})
+	commitID, err := CommitActive(ctx, "active-1", "committed-1", snapshots.Usage{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -484,12 +484,12 @@ func testRemove(ctx context.Context, t *testing.T, ms *MetaStore) {
 		t.Fatal("Snapshot identifier must not change on commit")
 	}
 
-	a2, err := CreateSnapshot(ctx, snapshot.KindView, "view-1", "committed-1")
+	a2, err := CreateSnapshot(ctx, snapshots.KindView, "view-1", "committed-1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	a3, err := CreateSnapshot(ctx, snapshot.KindView, "view-2", "committed-1")
+	a3, err := CreateSnapshot(ctx, snapshots.KindView, "view-2", "committed-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -504,7 +504,7 @@ func testRemove(ctx context.Context, t *testing.T, ms *MetaStore) {
 	if r3 != a3.ID {
 		t.Fatal("Expected remove ID to match create ID")
 	}
-	if k3 != snapshot.KindView {
+	if k3 != snapshots.KindView {
 		t.Fatalf("Expected view kind, got %v", k3)
 	}
 
@@ -515,7 +515,7 @@ func testRemove(ctx context.Context, t *testing.T, ms *MetaStore) {
 	if r2 != a2.ID {
 		t.Fatal("Expected remove ID to match create ID")
 	}
-	if k2 != snapshot.KindView {
+	if k2 != snapshots.KindView {
 		t.Fatalf("Expected view kind, got %v", k2)
 	}
 
@@ -526,7 +526,7 @@ func testRemove(ctx context.Context, t *testing.T, ms *MetaStore) {
 	if r1 != commitID {
 		t.Fatal("Expected remove ID to match commit ID")
 	}
-	if k1 != snapshot.KindCommitted {
+	if k1 != snapshots.KindCommitted {
 		t.Fatalf("Expected committed kind, got %v", k1)
 	}
 }
@@ -581,10 +581,10 @@ func testParents(ctx context.Context, t *testing.T, ms *MetaStore) {
 				id      string
 				parents []string
 			)
-			if info.Kind == snapshot.KindCommitted {
+			if info.Kind == snapshots.KindCommitted {
 				// When commited, create view and resolve from view
 				nid := fmt.Sprintf("test-%s-%d", tc.Name, i)
-				s, err := CreateSnapshot(ctx, snapshot.KindView, nid, name)
+				s, err := CreateSnapshot(ctx, snapshots.KindView, nid, name)
 				if err != nil {
 					t.Fatalf("Failed to get snapshot %s: %v", tc.Name, err)
 				}

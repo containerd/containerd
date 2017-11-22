@@ -13,13 +13,13 @@ import (
 	"github.com/containerd/containerd/fs/fstest"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/testutil"
 	"github.com/stretchr/testify/assert"
 )
 
 // SnapshotterSuite runs a test suite on the snapshotter given a factory function.
-func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(ctx context.Context, root string) (snapshot.Snapshotter, func() error, error)) {
+func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error)) {
 	restoreMask := clearMask()
 	defer restoreMask()
 
@@ -46,7 +46,7 @@ func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(ctx context.
 	t.Run("CloseTwice", makeTest(name, snapshotterFn, closeTwice))
 }
 
-func makeTest(name string, snapshotterFn func(ctx context.Context, root string) (snapshot.Snapshotter, func() error, error), fn func(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string)) func(t *testing.T) {
+func makeTest(name string, snapshotterFn func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error), fn func(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string)) func(t *testing.T) {
 	return func(t *testing.T) {
 		t.Parallel()
 
@@ -91,12 +91,12 @@ func makeTest(name string, snapshotterFn func(ctx context.Context, root string) 
 	}
 }
 
-var opt = snapshot.WithLabels(map[string]string{
+var opt = snapshots.WithLabels(map[string]string{
 	"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
 })
 
 // checkSnapshotterBasic tests the basic workflow of a snapshot snapshotter.
-func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 	initialApplier := fstest.Apply(
 		fstest.CreateFile("/foo", []byte("foo\n"), 0777),
 		fstest.CreateDir("/a", 0755),
@@ -145,7 +145,7 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	}
 
 	assert.Equal(t, "", si.Parent)
-	assert.Equal(t, snapshot.KindCommitted, si.Kind)
+	assert.Equal(t, snapshots.KindCommitted, si.Kind)
 
 	_, err = snapshotter.Stat(ctx, preparing)
 	if err == nil {
@@ -180,7 +180,7 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	}
 
 	assert.Equal(t, committed, ni.Parent)
-	assert.Equal(t, snapshot.KindActive, ni.Kind)
+	assert.Equal(t, snapshots.KindActive, ni.Kind)
 
 	nextCommitted := filepath.Join(work, "committed-next")
 	if err := snapshotter.Commit(ctx, nextCommitted, next, opt); err != nil {
@@ -193,19 +193,19 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	}
 
 	assert.Equal(t, committed, si2.Parent)
-	assert.Equal(t, snapshot.KindCommitted, si2.Kind)
+	assert.Equal(t, snapshots.KindCommitted, si2.Kind)
 
 	_, err = snapshotter.Stat(ctx, next)
 	if err == nil {
 		t.Fatalf("%s should no longer be available after Commit", next)
 	}
 
-	expected := map[string]snapshot.Info{
+	expected := map[string]snapshots.Info{
 		si.Name:  si,
 		si2.Name: si2,
 	}
-	walked := map[string]snapshot.Info{} // walk is not ordered
-	assert.NoError(t, snapshotter.Walk(ctx, func(ctx context.Context, si snapshot.Info) error {
+	walked := map[string]snapshots.Info{} // walk is not ordered
+	assert.NoError(t, snapshotter.Walk(ctx, func(ctx context.Context, si snapshots.Info) error {
 		walked[si.Name] = si
 		return nil
 	}))
@@ -246,7 +246,7 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 }
 
 // Create a New Layer on top of base layer with Prepare, Stat on new layer, should return Active layer.
-func checkSnapshotterStatActive(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+func checkSnapshotterStatActive(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 	preparing := filepath.Join(work, "preparing")
 	if err := os.MkdirAll(preparing, 0777); err != nil {
 		t.Fatal(err)
@@ -275,12 +275,12 @@ func checkSnapshotterStatActive(ctx context.Context, t *testing.T, snapshotter s
 		t.Fatal(err)
 	}
 	assert.Equal(t, si.Name, preparing)
-	assert.Equal(t, snapshot.KindActive, si.Kind)
+	assert.Equal(t, snapshots.KindActive, si.Kind)
 	assert.Equal(t, "", si.Parent)
 }
 
 // Commit a New Layer on top of base layer with Prepare & Commit , Stat on new layer, should return Committed layer.
-func checkSnapshotterStatCommitted(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+func checkSnapshotterStatCommitted(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 	preparing := filepath.Join(work, "preparing")
 	if err := os.MkdirAll(preparing, 0777); err != nil {
 		t.Fatal(err)
@@ -314,12 +314,12 @@ func checkSnapshotterStatCommitted(ctx context.Context, t *testing.T, snapshotte
 		t.Fatal(err)
 	}
 	assert.Equal(t, si.Name, committed)
-	assert.Equal(t, snapshot.KindCommitted, si.Kind)
+	assert.Equal(t, snapshots.KindCommitted, si.Kind)
 	assert.Equal(t, "", si.Parent)
 
 }
 
-func snapshotterPrepareMount(ctx context.Context, snapshotter snapshot.Snapshotter, diffPathName string, parent string, work string) (string, error) {
+func snapshotterPrepareMount(ctx context.Context, snapshotter snapshots.Snapshotter, diffPathName string, parent string, work string) (string, error) {
 	preparing := filepath.Join(work, diffPathName)
 	if err := os.MkdirAll(preparing, 0777); err != nil {
 		return "", err
@@ -341,7 +341,7 @@ func snapshotterPrepareMount(ctx context.Context, snapshotter snapshot.Snapshott
 }
 
 // Given A <- B <- C, B is the parent of C and A is a transitive parent of C (in this case, a "grandparent")
-func checkSnapshotterTransitivity(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+func checkSnapshotterTransitivity(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 	preparing, err := snapshotterPrepareMount(ctx, snapshotter, "preparing", "", work)
 	if err != nil {
 		t.Fatal(err)
@@ -395,7 +395,7 @@ func checkSnapshotterTransitivity(ctx context.Context, t *testing.T, snapshotter
 }
 
 // Creating two layers with Prepare or View with same key must fail.
-func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 	preparing, err := snapshotterPrepareMount(ctx, snapshotter, "preparing", "", work)
 	if err != nil {
 		t.Fatal(err)
@@ -456,7 +456,7 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 }
 
 // Deletion of files/folder of base layer in new layer, On Commit, those files should not be visible.
-func checkDeletedFilesInChildSnapshot(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+func checkDeletedFilesInChildSnapshot(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 
 	l1Init := fstest.Apply(
 		fstest.CreateFile("/foo", []byte("foo\n"), 0777),
@@ -474,7 +474,7 @@ func checkDeletedFilesInChildSnapshot(ctx context.Context, t *testing.T, snapsho
 }
 
 //Create three layers. Deleting intermediate layer must fail.
-func checkRemoveIntermediateSnapshot(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+func checkRemoveIntermediateSnapshot(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 
 	base, err := snapshotterPrepareMount(ctx, snapshotter, "base", "", work)
 	if err != nil {
@@ -533,7 +533,7 @@ func checkRemoveIntermediateSnapshot(ctx context.Context, t *testing.T, snapshot
 //  a1 - active snapshot, no parent
 //  v1 - view snapshot, v1 is parent
 //  v2 - view snapshot, no parent
-func baseTestSnapshots(ctx context.Context, snapshotter snapshot.Snapshotter) error {
+func baseTestSnapshots(ctx context.Context, snapshotter snapshots.Snapshotter) error {
 	if _, err := snapshotter.Prepare(ctx, "c1-a", "", opt); err != nil {
 		return err
 	}
@@ -561,7 +561,7 @@ func baseTestSnapshots(ctx context.Context, snapshotter snapshot.Snapshotter) er
 	return nil
 }
 
-func checkUpdate(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+func checkUpdate(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 	t1 := time.Now().UTC()
 	if err := baseTestSnapshots(ctx, snapshotter); err != nil {
 		t.Fatalf("Failed to create base snapshots: %v", err)
@@ -569,35 +569,35 @@ func checkUpdate(ctx context.Context, t *testing.T, snapshotter snapshot.Snapsho
 	t2 := time.Now().UTC()
 	testcases := []struct {
 		name   string
-		kind   snapshot.Kind
+		kind   snapshots.Kind
 		parent string
 	}{
 		{
 			name: "c1",
-			kind: snapshot.KindCommitted,
+			kind: snapshots.KindCommitted,
 		},
 		{
 			name:   "c2",
-			kind:   snapshot.KindCommitted,
+			kind:   snapshots.KindCommitted,
 			parent: "c1",
 		},
 		{
 			name:   "a1",
-			kind:   snapshot.KindActive,
+			kind:   snapshots.KindActive,
 			parent: "c2",
 		},
 		{
 			name: "a2",
-			kind: snapshot.KindActive,
+			kind: snapshots.KindActive,
 		},
 		{
 			name:   "v1",
-			kind:   snapshot.KindView,
+			kind:   snapshots.KindView,
 			parent: "c2",
 		},
 		{
 			name: "v2",
-			kind: snapshot.KindView,
+			kind: snapshots.KindView,
 		},
 	}
 	for _, tc := range testcases {
@@ -717,7 +717,7 @@ func assertLabels(t *testing.T, actual, expected map[string]string) {
 	}
 }
 
-func checkRemove(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+func checkRemove(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 	if _, err := snapshotter.Prepare(ctx, "committed-a", "", opt); err != nil {
 		t.Fatal(err)
 	}
@@ -749,7 +749,7 @@ func checkRemove(ctx context.Context, t *testing.T, snapshotter snapshot.Snapsho
 
 // checkSnapshotterViewReadonly ensures a KindView snapshot to be mounted as a read-only filesystem.
 // This function is called only when WithTestViewReadonly is true.
-func checkSnapshotterViewReadonly(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+func checkSnapshotterViewReadonly(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 	preparing := filepath.Join(work, "preparing")
 	if _, err := snapshotter.Prepare(ctx, preparing, "", opt); err != nil {
 		t.Fatal(err)
@@ -786,7 +786,7 @@ func checkSnapshotterViewReadonly(ctx context.Context, t *testing.T, snapshotter
 
 // Move files from base layer to new location in intermediate layer.
 // Verify if the file at source is deleted and copied to new location.
-func checkFileFromLowerLayer(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+func checkFileFromLowerLayer(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 	l1Init := fstest.Apply(
 		fstest.CreateDir("/dir1", 0700),
 		fstest.CreateFile("/dir1/f1", []byte("Hello"), 0644),
@@ -806,7 +806,7 @@ func checkFileFromLowerLayer(ctx context.Context, t *testing.T, snapshotter snap
 	}
 }
 
-func closeTwice(ctx context.Context, t *testing.T, snapshotter snapshot.Snapshotter, work string) {
+func closeTwice(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 	// do some dummy ops to modify the snapshotter internal state
 	if _, err := snapshotter.Prepare(ctx, "dummy", ""); err != nil {
 		t.Fatal(err)

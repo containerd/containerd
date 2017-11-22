@@ -7,7 +7,7 @@ import (
 
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/snapshots"
 	"github.com/pkg/errors"
 )
 
@@ -31,7 +31,7 @@ type snapshotter struct {
 }
 
 // NewSnapshotter returns a new windows snapshotter
-func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
+func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 	return &snapshotter{
 		root: root,
 	}, nil
@@ -42,23 +42,23 @@ func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
 //
 // Should be used for parent resolution, existence checks and to discern
 // the kind of snapshot.
-func (o *snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, error) {
+func (o *snapshotter) Stat(ctx context.Context, key string) (snapshots.Info, error) {
 	panic("not implemented")
 }
 
-func (o *snapshotter) Update(ctx context.Context, info snapshot.Info, fieldpaths ...string) (snapshot.Info, error) {
+func (o *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
 	panic("not implemented")
 }
 
-func (o *snapshotter) Usage(ctx context.Context, key string) (snapshot.Usage, error) {
+func (o *snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
 	panic("not implemented")
 }
 
-func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshot.Opt) ([]mount.Mount, error) {
+func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
 	panic("not implemented")
 }
 
-func (o *snapshotter) View(ctx context.Context, key, parent string, opts ...snapshot.Opt) ([]mount.Mount, error) {
+func (o *snapshotter) View(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
 	panic("not implemented")
 }
 
@@ -70,7 +70,7 @@ func (o *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 	panic("not implemented")
 }
 
-func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshot.Opt) error {
+func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
 	panic("not implemented")
 }
 
@@ -81,7 +81,7 @@ func (o *snapshotter) Remove(ctx context.Context, key string) error {
 }
 
 // Walk the committed snapshots.
-func (o *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshot.Info) error) error {
+func (o *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshots.Info) error) error {
 	panic("not implemented")
 }
 

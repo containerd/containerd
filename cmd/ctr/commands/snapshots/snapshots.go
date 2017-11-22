@@ -11,7 +11,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/progress"
-	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/snapshots"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -53,7 +53,7 @@ var listCommand = cli.Command{
 			tw          = tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
 		)
 		fmt.Fprintln(tw, "KEY\tPARENT\tKIND\t")
-		if err := snapshotter.Walk(ctx, func(ctx gocontext.Context, info snapshot.Info) error {
+		if err := snapshotter.Walk(ctx, func(ctx gocontext.Context, info snapshots.Info) error {
 			fmt.Fprintf(tw, "%v\t%v\t%v\t\n",
 				info.Name,
 				info.Parent,
@@ -99,7 +99,7 @@ var usageCommand = cli.Command{
 		)
 		fmt.Fprintln(tw, "KEY\tSIZE\tINODES\t")
 		if context.NArg() == 0 {
-			if err := snapshotter.Walk(ctx, func(ctx gocontext.Context, info snapshot.Info) error {
+			if err := snapshotter.Walk(ctx, func(ctx gocontext.Context, info snapshots.Info) error {
 				usage, err := snapshotter.Usage(ctx, info.Name)
 				if err != nil {
 					return err
@@ -290,7 +290,7 @@ var treeCommand = cli.Command{
 			tree        = make(map[string]*snapshotTreeNode)
 		)
 
-		if err := snapshotter.Walk(ctx, func(ctx gocontext.Context, info snapshot.Info) error {
+		if err := snapshotter.Walk(ctx, func(ctx gocontext.Context, info snapshots.Info) error {
 			// Get or create node and add node details
 			node := getOrCreateTreeNode(info.Name, tree)
 			if info.Parent != "" {
@@ -352,7 +352,7 @@ var setLabelCommand = cli.Command{
 
 		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
 
-		info := snapshot.Info{
+		info := snapshots.Info{
 			Name:   key,
 			Labels: map[string]string{},
 		}

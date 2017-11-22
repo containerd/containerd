@@ -12,13 +12,13 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/snapshot"
-	"github.com/containerd/containerd/snapshot/storage"
-	"github.com/containerd/containerd/snapshot/testsuite"
+	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/snapshots/storage"
+	"github.com/containerd/containerd/snapshots/testsuite"
 	"github.com/containerd/containerd/testutil"
 )
 
-func newSnapshotter(ctx context.Context, root string) (snapshot.Snapshotter, func() error, error) {
+func newSnapshotter(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
 	snapshotter, err := NewSnapshotter(root)
 	if err != nil {
 		return nil, nil, err
@@ -150,7 +150,7 @@ func TestOverlayOverlayMount(t *testing.T) {
 	}
 }
 
-func getBasePath(ctx context.Context, sn snapshot.Snapshotter, root, key string) string {
+func getBasePath(ctx context.Context, sn snapshots.Snapshotter, root, key string) string {
 	o := sn.(*snapshotter)
 	ctx, t, err := o.ms.TransactionContext(ctx, false)
 	if err != nil {
@@ -166,7 +166,7 @@ func getBasePath(ctx context.Context, sn snapshot.Snapshotter, root, key string)
 	return filepath.Join(root, "snapshots", s.ID)
 }
 
-func getParents(ctx context.Context, sn snapshot.Snapshotter, root, key string) []string {
+func getParents(ctx context.Context, sn snapshots.Snapshotter, root, key string) []string {
 	o := sn.(*snapshotter)
 	ctx, t, err := o.ms.TransactionContext(ctx, false)
 	if err != nil {

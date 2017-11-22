@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/snapshots"
 )
 
 // Benchmarks returns a benchmark suite using the provided metadata store
@@ -106,14 +106,14 @@ func openCloseReadonly(b *testing.B, name string, metaFn metaFactory) func(b *te
 }
 
 func createActiveFromBase(ctx context.Context, ms *MetaStore, active, base string) error {
-	if _, err := CreateSnapshot(ctx, snapshot.KindActive, "bottom", ""); err != nil {
+	if _, err := CreateSnapshot(ctx, snapshots.KindActive, "bottom", ""); err != nil {
 		return err
 	}
-	if _, err := CommitActive(ctx, "bottom", base, snapshot.Usage{}); err != nil {
+	if _, err := CommitActive(ctx, "bottom", base, snapshots.Usage{}); err != nil {
 		return err
 	}
 
-	_, err := CreateSnapshot(ctx, snapshot.KindActive, active, base)
+	_, err := CreateSnapshot(ctx, snapshots.KindActive, active, base)
 	return err
 }
 
@@ -135,7 +135,7 @@ func statCommittedBenchmark(ctx context.Context, b *testing.B, ms *MetaStore) {
 	if err := createActiveFromBase(ctx, ms, "active", "base"); err != nil {
 		b.Fatal(err)
 	}
-	if _, err := CommitActive(ctx, "active", "committed", snapshot.Usage{}); err != nil {
+	if _, err := CommitActive(ctx, "active", "committed", snapshots.Usage{}); err != nil {
 		b.Fatal(err)
 	}
 
@@ -150,7 +150,7 @@ func statCommittedBenchmark(ctx context.Context, b *testing.B, ms *MetaStore) {
 
 func createActiveBenchmark(ctx context.Context, b *testing.B, ms *MetaStore) {
 	for i := 0; i < b.N; i++ {
-		if _, err := CreateSnapshot(ctx, snapshot.KindActive, "active", ""); err != nil {
+		if _, err := CreateSnapshot(ctx, snapshots.KindActive, "active", ""); err != nil {
 			b.Fatal(err)
 		}
 		b.StopTimer()
@@ -164,7 +164,7 @@ func createActiveBenchmark(ctx context.Context, b *testing.B, ms *MetaStore) {
 func removeBenchmark(ctx context.Context, b *testing.B, ms *MetaStore) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		if _, err := CreateSnapshot(ctx, snapshot.KindActive, "active", ""); err != nil {
+		if _, err := CreateSnapshot(ctx, snapshots.KindActive, "active", ""); err != nil {
 			b.Fatal(err)
 		}
 		b.StartTimer()
@@ -177,11 +177,11 @@ func removeBenchmark(ctx context.Context, b *testing.B, ms *MetaStore) {
 func commitBenchmark(ctx context.Context, b *testing.B, ms *MetaStore) {
 	b.StopTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := CreateSnapshot(ctx, snapshot.KindActive, "active", ""); err != nil {
+		if _, err := CreateSnapshot(ctx, snapshots.KindActive, "active", ""); err != nil {
 			b.Fatal(err)
 		}
 		b.StartTimer()
-		if _, err := CommitActive(ctx, "active", "committed", snapshot.Usage{}); err != nil {
+		if _, err := CommitActive(ctx, "active", "committed", snapshots.Usage{}); err != nil {
 			b.Fatal(err)
 		}
 		b.StopTimer()
@@ -194,17 +194,17 @@ func commitBenchmark(ctx context.Context, b *testing.B, ms *MetaStore) {
 func getActiveBenchmark(ctx context.Context, b *testing.B, ms *MetaStore) {
 	var base string
 	for i := 1; i <= 10; i++ {
-		if _, err := CreateSnapshot(ctx, snapshot.KindActive, "tmp", base); err != nil {
+		if _, err := CreateSnapshot(ctx, snapshots.KindActive, "tmp", base); err != nil {
 			b.Fatalf("create active failed: %+v", err)
 		}
 		base = fmt.Sprintf("base-%d", i)
-		if _, err := CommitActive(ctx, "tmp", base, snapshot.Usage{}); err != nil {
+		if _, err := CommitActive(ctx, "tmp", base, snapshots.Usage{}); err != nil {
 			b.Fatalf("commit failed: %+v", err)
 		}
 
 	}
 
-	if _, err := CreateSnapshot(ctx, snapshot.KindActive, "active", base); err != nil {
+	if _, err := CreateSnapshot(ctx, snapshots.KindActive, "active", base); err != nil {
 		b.Fatalf("create active failed: %+v", err)
 	}
 	b.ResetTimer()

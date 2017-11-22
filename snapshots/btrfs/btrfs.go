@@ -14,8 +14,8 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/snapshot"
-	"github.com/containerd/containerd/snapshot/storage"
+	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/snapshots/storage"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -43,7 +43,7 @@ type snapshotter struct {
 // root directory for snapshots and stores the metadata in
 // a file in the provided root.
 // root needs to be a mount point of btrfs.
-func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
+func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 	// If directory does not exist, create it
 	if _, err := os.Stat(root); err != nil {
 		if !os.IsNotExist(err) {
@@ -93,41 +93,41 @@ func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
 //
 // Should be used for parent resolution, existence checks and to discern
 // the kind of snapshot.
-func (b *snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, error) {
+func (b *snapshotter) Stat(ctx context.Context, key string) (snapshots.Info, error) {
 	ctx, t, err := b.ms.TransactionContext(ctx, false)
 	if err != nil {
-		return snapshot.Info{}, err
+		return snapshots.Info{}, err
 	}
 	defer t.Rollback()
 	_, info, _, err := storage.GetInfo(ctx, key)
 	if err != nil {
-		return snapshot.Info{}, err
+		return snapshots.Info{}, err
 	}
 
 	return info, nil
 }
 
-func (b *snapshotter) Update(ctx context.Context, info snapshot.Info, fieldpaths ...string) (snapshot.Info, error) {
+func (b *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
 	ctx, t, err := b.ms.TransactionContext(ctx, true)
 	if err != nil {
-		return snapshot.Info{}, err
+		return snapshots.Info{}, err
 	}
 
 	info, err = storage.UpdateInfo(ctx, info, fieldpaths...)
 	if err != nil {
 		t.Rollback()
-		return snapshot.Info{}, err
+		return snapshots.Info{}, err
 	}
 
 	if err := t.Commit(); err != nil {
-		return snapshot.Info{}, err
+		return snapshots.Info{}, err
 	}
 
 	return info, nil
 }
 
 // Usage retrieves the disk usage of the top-level snapshot.
-func (b *snapshotter) Usage(ctx context.Context, key string) (snapshot.Usage, error) {
+func (b *snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
 	panic("not implemented")
 
 	// TODO(stevvooe): Btrfs has a quota model where data can be exclusive to a
@@ -143,7 +143,7 @@ func (b *snapshotter) Usage(ctx context.Context, key string) (snapshot.Usage, er
 }
 
 // Walk the committed snapshots.
-func (b *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshot.Info) error) error {
+func (b *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshots.Info) error) error {
 	ctx, t, err := b.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return err
@@ -152,15 +152,15 @@ func (b *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 	return storage.WalkInfo(ctx, fn)
 }
 
-func (b *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshot.Opt) ([]mount.Mount, error) {
-	return b.makeSnapshot(ctx, snapshot.KindActive, key, parent, opts)
+func (b *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	return b.makeSnapshot(ctx, snapshots.KindActive, key, parent, opts)
 }
 
-func (b *snapshotter) View(ctx context.Context, key, parent string, opts ...snapshot.Opt) ([]mount.Mount, error) {
-	return b.makeSnapshot(ctx, snapshot.KindView, key, parent, opts)
+func (b *snapshotter) View(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	return b.makeSnapshot(ctx, snapshots.KindView, key, parent, opts)
 }
 
-func (b *snapshotter) makeSnapshot(ctx context.Context, kind snapshot.Kind, key, parent string, opts []snapshot.Opt) ([]mount.Mount, error) {
+func (b *snapshotter) makeSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts []snapshots.Opt) ([]mount.Mount, error) {
 	ctx, t, err := b.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return nil, err
@@ -190,7 +190,7 @@ func (b *snapshotter) makeSnapshot(ctx context.Context, kind snapshot.Kind, key,
 		parentp := filepath.Join(b.root, "snapshots", s.ParentIDs[0])
 
 		var readonly bool
-		if kind == snapshot.KindView {
+		if kind == snapshots.KindView {
 			readonly = true
 		}
 
@@ -222,7 +222,7 @@ func (b *snapshotter) mounts(dir string, s storage.Snapshot) ([]mount.Mount, err
 
 	options = append(options, fmt.Sprintf("subvolid=%d", sid))
 
-	if s.Kind != snapshot.KindActive {
+	if s.Kind != snapshots.KindActive {
 		options = append(options, "ro")
 	}
 
@@ -237,7 +237,7 @@ func (b *snapshotter) mounts(dir string, s storage.Snapshot) ([]mount.Mount, err
 	}, nil
 }
 
-func (b *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshot.Opt) (err error) {
+func (b *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) (err error) {
 	ctx, t, err := b.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return err
@@ -250,7 +250,7 @@ func (b *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		}
 	}()
 
-	id, err := storage.CommitActive(ctx, key, name, snapshot.Usage{}, opts...) // TODO(stevvooe): Resolve a usage value for btrfs
+	id, err := storage.CommitActive(ctx, key, name, snapshots.Usage{}, opts...) // TODO(stevvooe): Resolve a usage value for btrfs
 	if err != nil {
 		return errors.Wrap(err, "failed to commit")
 	}
@@ -330,14 +330,14 @@ func (b *snapshotter) Remove(ctx context.Context, key string) (err error) {
 	}
 
 	switch k {
-	case snapshot.KindView:
+	case snapshots.KindView:
 		source = filepath.Join(b.root, "view", id)
 		removed = filepath.Join(b.root, "view", "rm-"+id)
 		readonly = true
-	case snapshot.KindActive:
+	case snapshots.KindActive:
 		source = filepath.Join(b.root, "active", id)
 		removed = filepath.Join(b.root, "active", "rm-"+id)
-	case snapshot.KindCommitted:
+	case snapshots.KindCommitted:
 		source = filepath.Join(b.root, "snapshots", id)
 		removed = filepath.Join(b.root, "snapshots", "rm-"+id)
 		readonly = true

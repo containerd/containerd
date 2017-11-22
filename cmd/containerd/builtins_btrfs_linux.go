@@ -2,4 +2,4 @@
 
 package main
 
-import _ "github.com/containerd/containerd/snapshot/btrfs"
+import _ "github.com/containerd/containerd/snapshots/btrfs"
