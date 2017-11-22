@@ -19,8 +19,9 @@ import (
 
 // Command is the cli command for managing images
 var Command = cli.Command{
-	Name:  "images",
-	Usage: "manage images",
+	Name:    "images",
+	Aliases: []string{"image"},
+	Usage:   "manage images",
 	Subcommands: cli.Commands{
 		checkCommand,
 		exportCommand,

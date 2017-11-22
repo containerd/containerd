@@ -1,4 +1,4 @@
-package snapshot
+package snapshots
 
 import (
 	gocontext "context"
@@ -19,9 +19,10 @@ import (
 
 // Command is the cli command for managing snapshots
 var Command = cli.Command{
-	Name:  "snapshot",
-	Usage: "manage snapshots",
-	Flags: commands.SnapshotterFlags,
+	Name:    "snapshots",
+	Aliases: []string{"snapshot"},
+	Usage:   "manage snapshots",
+	Flags:   commands.SnapshotterFlags,
 	Subcommands: cli.Commands{
 		commitCommand,
 		infoCommand,
