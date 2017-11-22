@@ -100,10 +100,6 @@ func (s *imageStore) Create(ctx context.Context, image images.Image) (images.Ima
 		return images.Image{}, err
 	}
 
-	if image.Name == "" {
-		return images.Image{}, errors.Wrapf(errdefs.ErrInvalidArgument, "image name is required for create")
-	}
-
 	if err := validateImage(&image); err != nil {
 		return images.Image{}, err
 	}
@@ -177,7 +173,7 @@ func (s *imageStore) Update(ctx context.Context, image images.Image, fieldpaths 
 			updated = image
 		}
 
-		if err := validateImage(&image); err != nil {
+		if err := validateImage(&updated); err != nil {
 			return err
 		}
 
