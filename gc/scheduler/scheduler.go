@@ -230,6 +230,7 @@ func (s *gcScheduler) run(ctx context.Context) {
 		interval    = time.Second
 		gcTime      time.Duration
 		collections int
+		// TODO(dmcg): expose collection stats as metrics
 
 		triggered bool
 		deletions int
@@ -270,6 +271,7 @@ func (s *gcScheduler) run(ctx context.Context) {
 					(s.mutationThreshold > 0 && mutations >= s.mutationThreshold))) {
 				// Check if not already scheduled before delay threshold
 				if nextCollection == nil || nextCollection.After(time.Now().Add(s.scheduleDelay)) {
+					// TODO(dmcg): track re-schedules for tuning schedule config
 					schedC, nextCollection = schedule(s.scheduleDelay)
 				}
 			}

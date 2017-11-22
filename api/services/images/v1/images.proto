@@ -118,5 +118,7 @@ message DeleteImageRequest {
 
 	// Sync indicates that the delete and cleanup should be done
 	// synchronously before returning to the caller
+	//
+	// Default is false
 	bool sync = 2;
 }

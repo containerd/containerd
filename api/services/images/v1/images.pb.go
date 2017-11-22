@@ -165,6 +165,8 @@ type DeleteImageRequest struct {
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Sync indicates that the delete and cleanup should be done
 	// synchronously before returning to the caller
+	//
+	// Default is false
 	Sync bool `protobuf:"varint,2,opt,name=sync,proto3" json:"sync,omitempty"`
 }
 

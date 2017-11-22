@@ -36,7 +36,7 @@ func init() {
 				return nil, err
 			}
 
-			return NewService(m.(*metadata.DB), g.(gcScheduler), ic.Events), nil
+			return NewService(m.(*metadata.DB), ic.Events, g.(gcScheduler)), nil
 		},
 	})
 }
@@ -52,7 +52,7 @@ type service struct {
 }
 
 // NewService returns the GRPC image server
-func NewService(db *metadata.DB, gc gcScheduler, publisher events.Publisher) imagesapi.ImagesServer {
+func NewService(db *metadata.DB, publisher events.Publisher, gc gcScheduler) imagesapi.ImagesServer {
 	return &service{
 		db:        db,
 		gc:        gc,
