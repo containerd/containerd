@@ -133,7 +133,7 @@ type LeasesClient interface {
 	// during the lease eligible for garbage collection if not referenced
 	// or retained by other resources during the lease.
 	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error)
-	// ListTransactions lists all active leases, returning the full list of
+	// List lists all active leases, returning the full list of
 	// leases and optionally including the referenced resources.
 	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
 }
@@ -183,7 +183,7 @@ type LeasesServer interface {
 	// during the lease eligible for garbage collection if not referenced
 	// or retained by other resources during the lease.
 	Delete(context.Context, *DeleteRequest) (*google_protobuf1.Empty, error)
-	// ListTransactions lists all active leases, returning the full list of
+	// List lists all active leases, returning the full list of
 	// leases and optionally including the referenced resources.
 	List(context.Context, *ListRequest) (*ListResponse, error)
 }
