@@ -4,6 +4,7 @@ package linux
 
 import (
 	"context"
+	"sync"
 
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -23,6 +24,7 @@ import (
 
 // Task on a linux based system
 type Task struct {
+	mu        sync.Mutex
 	id        string
 	pid       int
 	shim      *client.Client
@@ -72,7 +74,9 @@ func (t *Task) Info() runtime.TaskInfo {
 
 // Start the task
 func (t *Task) Start(ctx context.Context) error {
+	t.mu.Lock()
 	hasCgroup := t.cg != nil
+	t.mu.Unlock()
 	r, err := t.shim.Start(ctx, &shim.StartRequest{
 		ID: t.id,
 	})
@@ -85,7 +89,9 @@ func (t *Task) Start(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		t.mu.Lock()
 		t.cg = cg
+		t.mu.Unlock()
 		if err := t.monitor.Monitor(t); err != nil {
 			return err
 		}
@@ -285,6 +291,8 @@ func (t *Task) Process(ctx context.Context, id string) (runtime.Process, error) 
 
 // Metrics returns runtime specific system level metric information for the task
 func (t *Task) Metrics(ctx context.Context) (interface{}, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	if t.cg == nil {
 		return nil, errors.Wrap(errdefs.ErrNotFound, "cgroup does not exist")
 	}
@@ -297,6 +305,8 @@ func (t *Task) Metrics(ctx context.Context) (interface{}, error) {
 
 // Cgroup returns the underlying cgroup for a linux task
 func (t *Task) Cgroup() (cgroups.Cgroup, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	if t.cg == nil {
 		return nil, errors.Wrap(errdefs.ErrNotFound, "cgroup does not exist")
 	}
