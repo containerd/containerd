@@ -14,6 +14,7 @@ import (
 	// Register the typeurl
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/oci"
 	_ "github.com/containerd/containerd/runtime"
 	"github.com/containerd/typeurl"
 
@@ -621,7 +622,9 @@ func TestContainerNoBinaryExists(t *testing.T) {
 		}
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), WithProcessArgs("nothing")), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id,
+		WithNewSpec(withImageConfig(image), oci.WithProcessArgs("nothing")),
+		withNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -1044,7 +1047,7 @@ func TestContainerHostname(t *testing.T) {
 
 	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image),
 		withProcessArgs("hostname"),
-		WithHostname(expected),
+		oci.WithHostname(expected),
 	),
 		withNewSnapshot(id, image))
 	if err != nil {
@@ -1265,7 +1268,9 @@ func TestContainerMetrics(t *testing.T) {
 			return
 		}
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), WithProcessArgs("sleep", "30")), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id,
+		WithNewSpec(withImageConfig(image), oci.WithProcessArgs("sleep", "30")),
+		withNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return

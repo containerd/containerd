@@ -65,20 +65,20 @@ If we want to make a `SpecOpt` to setup a container to monitor the host system w
 package monitor
 
 import (
-	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // WithHtop configures a container to monitor the host system via `htop`
 func WithHtop(s *specs.Spec) error {
 	// make sure we are in the host pid namespace
-	if err := containerd.WithHostNamespace(specs.PIDNamespace)(s); err != nil {
+	if err := oci.WithHostNamespace(specs.PIDNamespace)(s); err != nil {
 		return err
 	}
 	// make sure we set htop as our arg
 	s.Process.Args = []string{"htop"}
 	// make sure we have a tty set for htop
-	if err := containerd.WithTTY(s); err != nil {
+	if err := oci.WithTTY(s); err != nil {
 		return err
 	}
 	return nil
@@ -91,7 +91,7 @@ Adding your new option to spec generation is as easy as importing your new packa
 import "github.com/crosbymichael/monitor"
 
 container, err := client.NewContainer(ctx, id,
-	containerd.WithNewSpec(containerd.WithImageConfig(image), monitor.WithHtop),
+	containerd.WithNewSpec(oci.WithImageConfig(image), monitor.WithHtop),
 )
 ```
 

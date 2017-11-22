@@ -149,7 +149,7 @@ The container will be based off of the image, use the runtime information in the
 		ctx,
 		"redis-server",
 		containerd.WithNewSnapshot("redis-server-snapshot", image),
-		containerd.WithNewSpec(containerd.WithImageConfig(image)),
+		containerd.WithNewSpec(oci.WithImageConfig(image)),
 	)
 	if err != nil {
 		return err
@@ -173,6 +173,7 @@ import (
         "log"
 
         "github.com/containerd/containerd"
+        "github.com/containerd/containerd/oci"
         "github.com/containerd/containerd/namespaces"
 )
 
@@ -200,7 +201,7 @@ func redisExample() error {
                 ctx,
                 "redis-server",
                 containerd.WithNewSnapshot("redis-server-snapshot", image),
-                containerd.WithNewSpec(containerd.WithImageConfig(image)),
+                containerd.WithNewSpec(oci.WithImageConfig(image)),
         )
         if err != nil {
                 return err
@@ -317,6 +318,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/namespaces"
 )
 
@@ -349,7 +351,7 @@ func redisExample() error {
 		"redis-server",
 		containerd.WithImage(image),
 		containerd.WithNewSnapshot("redis-server-snapshot", image),
-		containerd.WithNewSpec(containerd.WithImageConfig(image)),
+		containerd.WithNewSpec(oci.WithImageConfig(image)),
 	)
 	if err != nil {
 		return err

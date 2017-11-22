@@ -16,6 +16,7 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -116,7 +117,10 @@ func test(c config) error {
 	logrus.Info("starting stress test run...")
 	for i := 0; i < c.Concurrency; i++ {
 		wg.Add(1)
-		spec, err := containerd.GenerateSpec(ctx, client, &containers.Container{ID: ""}, containerd.WithImageConfig(image), containerd.WithProcessArgs("true"))
+		spec, err := oci.GenerateSpec(ctx, client,
+			&containers.Container{},
+			oci.WithImageConfig(image),
+			oci.WithProcessArgs("true"))
 		if err != nil {
 			return err
 		}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
 )
@@ -16,14 +17,6 @@ func init() {
 		Name:  "rootfs",
 		Usage: "use custom rootfs that is not managed by containerd snapshotter",
 	})
-}
-
-func withTTY() containerd.SpecOpts {
-	return containerd.WithTTY
-}
-
-func setHostNetworking() containerd.SpecOpts {
-	return containerd.WithHostNamespace(specs.NetworkNamespace)
 }
 
 func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli.Context) (containerd.Container, error) {
@@ -42,18 +35,18 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	}
 
 	var (
-		opts  []containerd.SpecOpts
+		opts  []oci.SpecOpts
 		cOpts []containerd.NewContainerOpts
 	)
 	cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(context.StringSlice("label"))))
 	if context.Bool("rootfs") {
-		opts = append(opts, containerd.WithRootFSPath(ref))
+		opts = append(opts, oci.WithRootFSPath(ref))
 	} else {
 		image, err := client.GetImage(ctx, ref)
 		if err != nil {
 			return nil, err
 		}
-		opts = append(opts, containerd.WithImageConfig(image))
+		opts = append(opts, oci.WithImageConfig(image))
 		cOpts = append(cOpts, containerd.WithImage(image))
 		cOpts = append(cOpts, containerd.WithSnapshotter(context.String("snapshotter")))
 		// Even when "readonly" is set, we don't use KindView snapshot here. (#1495)
@@ -62,22 +55,22 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		cOpts = append(cOpts, containerd.WithNewSnapshot(id, image))
 	}
 	if context.Bool("readonly") {
-		opts = append(opts, containerd.WithRootFSReadonly())
+		opts = append(opts, oci.WithRootFSReadonly())
 	}
 	cOpts = append(cOpts, containerd.WithRuntime(context.String("runtime"), nil))
 
 	opts = append(opts, withEnv(context), withMounts(context))
 	if len(args) > 0 {
-		opts = append(opts, containerd.WithProcessArgs(args...))
+		opts = append(opts, oci.WithProcessArgs(args...))
 	}
 	if cwd := context.String("cwd"); cwd != "" {
-		opts = append(opts, containerd.WithProcessCwd(cwd))
+		opts = append(opts, oci.WithProcessCwd(cwd))
 	}
 	if context.Bool("tty") {
-		opts = append(opts, withTTY())
+		opts = append(opts, oci.WithTTY)
 	}
 	if context.Bool("net-host") {
-		opts = append(opts, setHostNetworking(), containerd.WithHostHostsFile, containerd.WithHostResolvconf)
+		opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace), oci.WithHostHostsFile, oci.WithHostResolvconf)
 	}
 	cOpts = append([]containerd.NewContainerOpts{containerd.WithNewSpec(opts...)}, cOpts...)
 	return client.NewContainer(ctx, id, cOpts...)
