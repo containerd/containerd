@@ -133,7 +133,7 @@ func (c *Client) Containers(ctx context.Context, filters ...string) ([]Container
 // NewContainer will create a new container in container with the provided id
 // the id must be unique within the namespace
 func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error) {
-	ctx, done, err := c.withLease(ctx)
+	ctx, done, err := c.WithLease(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +214,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 	}
 	store := c.ContentStore()
 
-	ctx, done, err := c.withLease(ctx)
+	ctx, done, err := c.WithLease(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -587,7 +587,7 @@ func (c *Client) Import(ctx context.Context, ref string, reader io.Reader, opts 
 		return nil, err
 	}
 
-	ctx, done, err := c.withLease(ctx)
+	ctx, done, err := c.WithLease(ctx)
 	if err != nil {
 		return nil, err
 	}
