@@ -26,6 +26,8 @@ func TestGCRoots(t *testing.T) {
 	alters := []alterFunc{
 		addImage("ns1", "image1", dgst(1), nil),
 		addImage("ns1", "image2", dgst(2), labelmap(string(labelGCSnapRef)+"overlay", "sn2")),
+		addContainer("ns1", "container1", "overlay", "sn4", nil),
+		addContainer("ns1", "container2", "overlay", "sn5", labelmap(string(labelGCSnapRef)+"overlay", "sn6")),
 		addContent("ns1", dgst(1), nil),
 		addContent("ns1", dgst(2), nil),
 		addContent("ns1", dgst(3), nil),
@@ -34,6 +36,9 @@ func TestGCRoots(t *testing.T) {
 		addSnapshot("ns1", "overlay", "sn1", "", nil),
 		addSnapshot("ns1", "overlay", "sn2", "", nil),
 		addSnapshot("ns1", "overlay", "sn3", "", labelmap(string(labelGCRoot), "always")),
+		addSnapshot("ns1", "overlay", "sn4", "", nil),
+		addSnapshot("ns1", "overlay", "sn5", "", nil),
+		addSnapshot("ns1", "overlay", "sn6", "", nil),
 		addLeaseSnapshot("ns2", "l1", "overlay", "sn5"),
 		addLeaseSnapshot("ns2", "l2", "overlay", "sn6"),
 		addLeaseContent("ns2", "l1", dgst(4)),
@@ -48,6 +53,9 @@ func TestGCRoots(t *testing.T) {
 		gcnode(ResourceContent, "ns2", dgst(5).String()),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn2"),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn3"),
+		gcnode(ResourceSnapshot, "ns1", "overlay/sn4"),
+		gcnode(ResourceSnapshot, "ns1", "overlay/sn5"),
+		gcnode(ResourceSnapshot, "ns1", "overlay/sn6"),
 		gcnode(ResourceSnapshot, "ns2", "overlay/sn5"),
 		gcnode(ResourceSnapshot, "ns2", "overlay/sn6"),
 	}
@@ -84,6 +92,7 @@ func TestGCRemove(t *testing.T) {
 	alters := []alterFunc{
 		addImage("ns1", "image1", dgst(1), nil),
 		addImage("ns1", "image2", dgst(2), labelmap(string(labelGCSnapRef)+"overlay", "sn2")),
+		addContainer("ns1", "container1", "overlay", "sn4", nil),
 		addContent("ns1", dgst(1), nil),
 		addContent("ns1", dgst(2), nil),
 		addContent("ns1", dgst(3), nil),
@@ -92,6 +101,7 @@ func TestGCRemove(t *testing.T) {
 		addSnapshot("ns1", "overlay", "sn1", "", nil),
 		addSnapshot("ns1", "overlay", "sn2", "", nil),
 		addSnapshot("ns1", "overlay", "sn3", "", labelmap(string(labelGCRoot), "always")),
+		addSnapshot("ns1", "overlay", "sn4", "", nil),
 		addSnapshot("ns2", "overlay", "sn1", "", nil),
 	}
 
@@ -104,6 +114,7 @@ func TestGCRemove(t *testing.T) {
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn1"),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn2"),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn3"),
+		gcnode(ResourceSnapshot, "ns1", "overlay/sn4"),
 		gcnode(ResourceSnapshot, "ns2", "overlay/sn1"),
 	}
 
@@ -399,6 +410,22 @@ func addLeaseContent(ns, lid string, dgst digest.Digest) alterFunc {
 			return err
 		}
 		return cbkt.Put([]byte(dgst.String()), nil)
+	}
+}
+
+func addContainer(ns, name, snapshotter, snapshot string, labels map[string]string) alterFunc {
+	return func(bkt *bolt.Bucket) error {
+		cbkt, err := createBuckets(bkt, ns, string(bucketKeyObjectContainers), name)
+		if err != nil {
+			return err
+		}
+		if err := cbkt.Put(bucketKeySnapshotter, []byte(snapshotter)); err != nil {
+			return err
+		}
+		if err := cbkt.Put(bucketKeySnapshotKey, []byte(snapshot)); err != nil {
+			return err
+		}
+		return boltutil.WriteLabels(cbkt, labels)
 	}
 }
 
