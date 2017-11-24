@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/golang/glog"
 	"github.com/opencontainers/runtime-tools/generate"
@@ -118,7 +119,7 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 	rootDir := getContainerRootDir(c.config.RootDir, id)
 	var execIO *cio.ExecIO
 	process, err := task.Exec(ctx, execID, pspec,
-		func(id string) (containerd.IO, error) {
+		func(id string) (containerdio.IO, error) {
 			var err error
 			execIO, err = cio.NewExecIO(id, rootDir, opts.tty, opts.stdin != nil)
 			return execIO, err

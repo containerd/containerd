@@ -24,7 +24,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cio"
 	"github.com/containerd/fifo"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -75,7 +75,7 @@ func (g *wgCloser) Cancel() {
 }
 
 // newFifos creates fifos directory for a container.
-func newFifos(root, id string, tty, stdin bool) (*containerd.FIFOSet, error) {
+func newFifos(root, id string, tty, stdin bool) (*cio.FIFOSet, error) {
 	root = filepath.Join(root, "io")
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
@@ -84,7 +84,7 @@ func newFifos(root, id string, tty, stdin bool) (*containerd.FIFOSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	fifos := &containerd.FIFOSet{
+	fifos := &cio.FIFOSet{
 		Dir:      dir,
 		In:       filepath.Join(dir, id+"-stdin"),
 		Out:      filepath.Join(dir, id+"-stdout"),
@@ -104,7 +104,7 @@ type stdioPipes struct {
 }
 
 // newStdioPipes creates actual fifos for stdio.
-func newStdioPipes(fifos *containerd.FIFOSet) (_ *stdioPipes, _ *wgCloser, err error) {
+func newStdioPipes(fifos *cio.FIFOSet) (_ *stdioPipes, _ *wgCloser, err error) {
 	var (
 		f           io.ReadWriteCloser
 		set         []io.Closer

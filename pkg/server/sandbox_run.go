@@ -22,7 +22,8 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/linux/runcopts"
+	containerdio "github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/linux/runctypes"
 	"github.com/containerd/typeurl"
 	"github.com/cri-o/ocicni/pkg/ocicni"
 	"github.com/golang/glog"
@@ -154,7 +155,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		containerd.WithContainerExtension(sandboxMetadataExtension, &sandbox.Metadata),
 		containerd.WithRuntime(
 			c.config.ContainerdConfig.Runtime,
-			&runcopts.RuncOptions{
+			&runctypes.RuncOptions{
 				Runtime:       c.config.ContainerdConfig.RuntimeEngine,
 				RuntimeRoot:   c.config.ContainerdConfig.RuntimeRoot,
 				SystemdCgroup: c.config.SystemdCgroup})} // TODO (mikebrow): add CriuPath when we add support for pause
@@ -204,7 +205,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	glog.V(5).Infof("Create sandbox container (id=%q, name=%q).",
 		id, name)
 	// We don't need stdio for sandbox container.
-	task, err := container.NewTask(ctx, containerd.NullIO)
+	task, err := container.NewTask(ctx, containerdio.NullIO)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create task for sandbox %q: %v", id, err)
 	}
