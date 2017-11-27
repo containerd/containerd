@@ -85,13 +85,13 @@ func Import(ctx context.Context, cs content.Store, is images.Store, reader io.Re
 		for _, desc := range layers {
 			// Remove root tag from layers now that manifest refers to it
 			if _, err := cs.Update(ctx, content.Info{Digest: desc.Digest}, "labels.containerd.io/gc.root"); err != nil {
-				log.G(ctx).WithError(err).Error("Failed to remove layer %q root tag", desc.Digest)
+				log.G(ctx).WithError(err).Errorf("Failed to remove layer %q root tag", desc.Digest)
 			}
 		}
 		for _, cfg := range configs {
 			// Remove root tag from config now that manifest refers to it
 			if _, err := cs.Update(ctx, content.Info{Digest: cfg.desc.Digest}, "labels.containerd.io/gc.root"); err != nil {
-				log.G(ctx).WithError(err).Error("Failed to remove config %q root tag", cfg.desc.Digest)
+				log.G(ctx).WithError(err).Errorf("Failed to remove config %q root tag", cfg.desc.Digest)
 			}
 		}
 	}()
