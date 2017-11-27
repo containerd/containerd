@@ -148,8 +148,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 
 	opts := []containerd.NewContainerOpts{
 		containerd.WithSnapshotter(c.config.ContainerdConfig.Snapshotter),
-		customopts.WithImageUnpack(image.Image),
-		containerd.WithNewSnapshot(id, image.Image),
+		customopts.WithNewSnapshot(id, image.Image),
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(sandboxLabels),
 		containerd.WithContainerExtension(sandboxMetadataExtension, &sandbox.Metadata),
