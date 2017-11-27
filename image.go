@@ -86,6 +86,12 @@ func (i *image) IsUnpacked(ctx context.Context, snapshotterName string) (bool, e
 }
 
 func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
+	ctx, done, err := i.client.withLease(ctx)
+	if err != nil {
+		return err
+	}
+	defer done()
+
 	layers, err := i.getLayers(ctx, platforms.Default())
 	if err != nil {
 		return err
