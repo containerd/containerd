@@ -356,7 +356,7 @@ func (t *task) Resize(ctx context.Context, w, h uint32) error {
 }
 
 func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Image, error) {
-	ctx, done, err := t.client.withLease(ctx)
+	ctx, done, err := t.client.WithLease(ctx)
 	if err != nil {
 		return nil, err
 	}
