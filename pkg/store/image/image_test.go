@@ -17,6 +17,7 @@ limitations under the License.
 package image
 
 import (
+	"strings"
 	"testing"
 
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -26,33 +27,33 @@ import (
 )
 
 func TestImageStore(t *testing.T) {
-	images := map[string]Image{
-		"1": {
-			ID:          "1",
+	images := []Image{
+		{
+			ID:          "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			ChainID:     "test-chain-id-1",
 			RepoTags:    []string{"tag-1"},
 			RepoDigests: []string{"digest-1"},
 			Size:        10,
 			Config:      &imagespec.ImageConfig{},
 		},
-		"2abcd": {
-			ID:          "2abcd",
+		{
+			ID:          "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			ChainID:     "test-chain-id-2abcd",
 			RepoTags:    []string{"tag-2abcd"},
 			RepoDigests: []string{"digest-2abcd"},
 			Size:        20,
 			Config:      &imagespec.ImageConfig{},
 		},
-		"4a333": {
-			ID:          "4a333",
+		{
+			ID:          "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			RepoTags:    []string{"tag-4a333"},
 			RepoDigests: []string{"digest-4a333"},
 			ChainID:     "test-chain-id-4a333",
 			Size:        30,
 			Config:      &imagespec.ImageConfig{},
 		},
-		"4abcd": {
-			ID:          "4abcd",
+		{
+			ID:          "sha256:4123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			RepoTags:    []string{"tag-4abcd"},
 			RepoDigests: []string{"digest-4abcd"},
 			ChainID:     "test-chain-id-4abcd",
@@ -61,6 +62,7 @@ func TestImageStore(t *testing.T) {
 		},
 	}
 	assert := assertlib.New(t)
+	genTruncIndex := func(normalName string) string { return normalName[:(len(normalName)+1)/2] }
 
 	s := NewStore()
 
@@ -71,11 +73,26 @@ func TestImageStore(t *testing.T) {
 	}
 
 	t.Logf("should be able to get image")
-	genTruncIndex := func(normalName string) string { return normalName[:(len(normalName)+1)/2] }
-	for id, img := range images {
-		got, err := s.Get(genTruncIndex(id))
-		assert.NoError(err)
-		assert.Equal(img, got)
+	for _, v := range images {
+		truncID := genTruncIndex(v.ID)
+		got, err := s.Get(truncID)
+		assert.NoError(err, "truncID:%s, fullID:%s", truncID, v.ID)
+		assert.Equal(v, got)
+	}
+
+	t.Logf("should be able to get image by truncated imageId without algorithm")
+	for _, v := range images {
+		truncID := genTruncIndex(v.ID[strings.Index(v.ID, ":")+1:])
+		got, err := s.Get(truncID)
+		assert.NoError(err, "truncID:%s, fullID:%s", truncID, v.ID)
+		assert.Equal(v, got)
+	}
+
+	t.Logf("should not be able to get image by ambiguous prefix")
+	ambiguousPrefixs := []string{"sha256", "sha256:"}
+	for _, v := range ambiguousPrefixs {
+		_, err := s.Get(v)
+		assert.NotEqual(nil, err)
 	}
 
 	t.Logf("should be able to list images")
@@ -83,8 +100,8 @@ func TestImageStore(t *testing.T) {
 	assert.Len(imgs, len(images))
 
 	imageNum := len(images)
-	for testID, v := range images {
-		truncID := genTruncIndex(testID)
+	for _, v := range images {
+		truncID := genTruncIndex(v.ID)
 		oldRepoTag := v.RepoTags[0]
 		oldRepoDigest := v.RepoDigests[0]
 		newRepoTag := oldRepoTag + "new"

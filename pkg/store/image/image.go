@@ -20,7 +20,8 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd"
-	"github.com/docker/docker/pkg/truncindex"
+	"github.com/docker/distribution/digestset"
+	godigest "github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
@@ -47,16 +48,16 @@ type Image struct {
 
 // Store stores all images.
 type Store struct {
-	lock    sync.RWMutex
-	images  map[string]Image
-	idIndex *truncindex.TruncIndex
+	lock      sync.RWMutex
+	images    map[string]Image
+	digestSet *digestset.Set
 }
 
 // NewStore creates an image store.
 func NewStore() *Store {
 	return &Store{
-		images:  make(map[string]Image),
-		idIndex: truncindex.NewTruncIndex([]string{}),
+		images:    make(map[string]Image),
+		digestSet: digestset.NewSet(),
 	}
 }
 
@@ -64,11 +65,11 @@ func NewStore() *Store {
 func (s *Store) Add(img Image) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	if _, err := s.idIndex.Get(img.ID); err != nil {
-		if err != truncindex.ErrNotExist {
+	if _, err := s.digestSet.Lookup(img.ID); err != nil {
+		if err != digestset.ErrDigestNotFound {
 			return err
 		}
-		if err := s.idIndex.Add(img.ID); err != nil {
+		if err := s.digestSet.Add(godigest.Digest(img.ID)); err != nil {
 			return err
 		}
 	}
@@ -91,14 +92,14 @@ func (s *Store) Add(img Image) error {
 func (s *Store) Get(id string) (Image, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
-	id, err := s.idIndex.Get(id)
+	digest, err := s.digestSet.Lookup(id)
 	if err != nil {
-		if err == truncindex.ErrNotExist {
+		if err == digestset.ErrDigestNotFound {
 			err = store.ErrNotExist
 		}
 		return Image{}, err
 	}
-	if i, ok := s.images[id]; ok {
+	if i, ok := s.images[digest.String()]; ok {
 		return i, nil
 	}
 	return Image{}, store.ErrNotExist
@@ -119,14 +120,14 @@ func (s *Store) List() []Image {
 func (s *Store) Delete(id string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	id, err := s.idIndex.Get(id)
+	digest, err := s.digestSet.Lookup(id)
 	if err != nil {
 		// Note: The idIndex.Delete and delete doesn't handle truncated index.
 		// So we need to return if there are error.
 		return
 	}
-	s.idIndex.Delete(id) // nolint: errcheck
-	delete(s.images, id)
+	s.digestSet.Remove(digest) // nolint: errcheck
+	delete(s.images, digest.String())
 }
 
 // mergeStringSlices merges 2 string slices into one and remove duplicated elements.

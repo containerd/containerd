@@ -32,7 +32,7 @@ func TestListImages(t *testing.T) {
 	c := newTestCRIContainerdService()
 	imagesInStore := []imagestore.Image{
 		{
-			ID:          "test-id-1",
+			ID:          "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			ChainID:     "test-chainid-1",
 			RepoTags:    []string{"tag-a-1", "tag-b-1"},
 			RepoDigests: []string{"digest-a-1", "digest-b-1"},
@@ -42,7 +42,7 @@ func TestListImages(t *testing.T) {
 			},
 		},
 		{
-			ID:          "test-id-2",
+			ID:          "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			ChainID:     "test-chainid-2",
 			RepoTags:    []string{"tag-a-2", "tag-b-2"},
 			RepoDigests: []string{"digest-a-2", "digest-b-2"},
@@ -52,7 +52,7 @@ func TestListImages(t *testing.T) {
 			},
 		},
 		{
-			ID:          "test-id-3",
+			ID:          "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			ChainID:     "test-chainid-3",
 			RepoTags:    []string{"tag-a-3", "tag-b-3"},
 			RepoDigests: []string{"digest-a-3", "digest-b-3"},
@@ -64,21 +64,21 @@ func TestListImages(t *testing.T) {
 	}
 	expect := []*runtime.Image{
 		{
-			Id:          "test-id-1",
+			Id:          "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			RepoTags:    []string{"tag-a-1", "tag-b-1"},
 			RepoDigests: []string{"digest-a-1", "digest-b-1"},
 			Size_:       uint64(1000),
 			Username:    "root",
 		},
 		{
-			Id:          "test-id-2",
+			Id:          "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			RepoTags:    []string{"tag-a-2", "tag-b-2"},
 			RepoDigests: []string{"digest-a-2", "digest-b-2"},
 			Size_:       uint64(2000),
 			Uid:         &runtime.Int64Value{Value: 1234},
 		},
 		{
-			Id:          "test-id-3",
+			Id:          "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			RepoTags:    []string{"tag-a-3", "tag-b-3"},
 			RepoDigests: []string{"digest-a-3", "digest-b-3"},
 			Size_:       uint64(3000),
