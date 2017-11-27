@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	containerdio "github.com/containerd/containerd/cio"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -103,7 +104,7 @@ func (c *criContainerdService) startContainer(ctx context.Context,
 		return fmt.Errorf("sandbox container %q is not running", sandboxID)
 	}
 
-	ioCreation := func(id string) (_ containerd.IO, err error) {
+	ioCreation := func(id string) (_ containerdio.IO, err error) {
 		stdoutWC, stderrWC, err := createContainerLoggers(meta.LogPath, config.GetTty())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create container loggers: %v", err)

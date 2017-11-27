@@ -21,7 +21,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cio"
 	"github.com/golang/glog"
 
 	cioutil "github.com/kubernetes-incubator/cri-containerd/pkg/ioutil"
@@ -30,12 +30,12 @@ import (
 // ExecIO holds the exec io.
 type ExecIO struct {
 	id    string
-	fifos *containerd.FIFOSet
+	fifos *cio.FIFOSet
 	*stdioPipes
 	closer *wgCloser
 }
 
-var _ containerd.IO = &ExecIO{}
+var _ cio.IO = &ExecIO{}
 
 // NewExecIO creates exec io.
 func NewExecIO(id, root string, tty, stdin bool) (*ExecIO, error) {
@@ -56,8 +56,8 @@ func NewExecIO(id, root string, tty, stdin bool) (*ExecIO, error) {
 }
 
 // Config returns io config.
-func (e *ExecIO) Config() containerd.IOConfig {
-	return containerd.IOConfig{
+func (e *ExecIO) Config() cio.Config {
+	return cio.Config{
 		Terminal: e.fifos.Terminal,
 		Stdin:    e.fifos.In,
 		Stdout:   e.fifos.Out,

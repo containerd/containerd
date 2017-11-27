@@ -17,8 +17,9 @@ limitations under the License.
 package server
 
 import (
-	"github.com/containerd/containerd"
+	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/api/services/events/v1"
+	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/typeurl"
 	"github.com/golang/glog"
@@ -88,8 +89,8 @@ func (em *eventMonitor) handleEvent(evt *events.Envelope) {
 	// However, containerd could not retrieve container state in that case, so it's
 	// fine to leave out that case for now.
 	// TODO(random-liu): [P2] Handle containerd-shim exit.
-	case *events.TaskExit:
-		e := any.(*events.TaskExit)
+	case *eventtypes.TaskExit:
+		e := any.(*eventtypes.TaskExit)
 		glog.V(2).Infof("TaskExit event %+v", e)
 		cntr, err := c.containerStore.Get(e.ContainerID)
 		if err != nil {
@@ -105,7 +106,7 @@ func (em *eventMonitor) handleEvent(evt *events.Envelope) {
 		}
 		// Attach container IO so that `Delete` could cleanup the stream properly.
 		task, err := cntr.Container.Task(context.Background(),
-			func(*containerd.FIFOSet) (containerd.IO, error) {
+			func(*containerdio.FIFOSet) (containerdio.IO, error) {
 				return cntr.IO, nil
 			},
 		)
@@ -141,8 +142,8 @@ func (em *eventMonitor) handleEvent(evt *events.Envelope) {
 			// TODO(random-liu): [P0] Enqueue the event and retry.
 			return
 		}
-	case *events.TaskOOM:
-		e := any.(*events.TaskOOM)
+	case *eventtypes.TaskOOM:
+		e := any.(*eventtypes.TaskOOM)
 		glog.V(2).Infof("TaskOOM event %+v", e)
 		cntr, err := c.containerStore.Get(e.ContainerID)
 		if err != nil {

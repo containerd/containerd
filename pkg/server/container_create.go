@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
-	"github.com/containerd/containerd/linux/runcopts"
+	"github.com/containerd/containerd/linux/runctypes"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/typeurl"
@@ -227,7 +227,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithRuntime(
 			c.config.ContainerdConfig.Runtime,
-			&runcopts.RuncOptions{
+			&runctypes.RuncOptions{
 				Runtime:       c.config.ContainerdConfig.RuntimeEngine,
 				RuntimeRoot:   c.config.ContainerdConfig.RuntimeRoot,
 				SystemdCgroup: c.config.SystemdCgroup}), // TODO (mikebrow): add CriuPath when we add support for pause

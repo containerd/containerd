@@ -23,7 +23,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cio"
 	"github.com/golang/glog"
 
 	cioutil "github.com/kubernetes-incubator/cri-containerd/pkg/ioutil"
@@ -39,7 +39,7 @@ func streamKey(id, name string, stream StreamType) string {
 type ContainerIO struct {
 	id string
 
-	fifos *containerd.FIFOSet
+	fifos *cio.FIFOSet
 	*stdioPipes
 
 	stdoutGroup *cioutil.WriterGroup
@@ -48,7 +48,7 @@ type ContainerIO struct {
 	closer *wgCloser
 }
 
-var _ containerd.IO = &ContainerIO{}
+var _ cio.IO = &ContainerIO{}
 
 // ContainerIOOpts sets specific information to newly created ContainerIO.
 type ContainerIOOpts func(*ContainerIO) error
@@ -71,7 +71,7 @@ func WithOutput(name string, stdout, stderr io.WriteCloser) ContainerIOOpts {
 }
 
 // WithFIFOs specifies existing fifos for the container io.
-func WithFIFOs(fifos *containerd.FIFOSet) ContainerIOOpts {
+func WithFIFOs(fifos *cio.FIFOSet) ContainerIOOpts {
 	return func(c *ContainerIO) error {
 		c.fifos = fifos
 		return nil
@@ -115,8 +115,8 @@ func NewContainerIO(id string, opts ...ContainerIOOpts) (_ *ContainerIO, err err
 }
 
 // Config returns io config.
-func (c *ContainerIO) Config() containerd.IOConfig {
-	return containerd.IOConfig{
+func (c *ContainerIO) Config() cio.Config {
+	return cio.Config{
 		Terminal: c.fifos.Terminal,
 		Stdin:    c.fifos.In,
 		Stdout:   c.fifos.Out,

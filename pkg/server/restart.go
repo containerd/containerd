@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
@@ -154,7 +155,7 @@ func loadContainer(ctx context.Context, cntr containerd.Container, containerDir 
 
 	// Load up-to-date status from containerd.
 	var containerIO *cio.ContainerIO
-	t, err := cntr.Task(ctx, func(fifos *containerd.FIFOSet) (containerd.IO, error) {
+	t, err := cntr.Task(ctx, func(fifos *containerdio.FIFOSet) (containerdio.IO, error) {
 		stdoutWC, stderrWC, err := createContainerLoggers(meta.LogPath, meta.Config.GetTty())
 		if err != nil {
 			return nil, err
