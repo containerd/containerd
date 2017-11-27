@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+#
+# Install developer tools to $GOBIN (or $GOPATH/bin if unset)
+#
+set -eu -o pipefail
+
+go get -u github.com/stevvooe/protobuild
+go get -u github.com/alecthomas/gometalinter
+gometalinter --install >/dev/null
+go get -u github.com/LK4D4/vndr
