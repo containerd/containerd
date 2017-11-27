@@ -13,6 +13,7 @@
     "structcheck",
     "unused",
     "varcheck",
+    "staticcheck",
 
     "gofmt",
     "goimports",
