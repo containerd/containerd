@@ -25,8 +25,8 @@ type contentStore struct {
 	l  sync.RWMutex
 }
 
-// newContentStore returns a namespaced content store using an existing
-// content store interface.
+// newContentStore returns a namespaced content store using an existing content
+// store interface.
 func newContentStore(db *DB, cs content.Store) *contentStore {
 	return &contentStore{
 		Store: cs,
@@ -44,7 +44,7 @@ func (cs *contentStore) Info(ctx context.Context, dgst digest.Digest) (content.I
 	if err := view(ctx, cs.db, func(tx *bolt.Tx) error {
 		bkt := getBlobBucket(tx, ns, dgst)
 		if bkt == nil {
-			return errors.Wrapf(errdefs.ErrNotFound, "content digest %v", dgst)
+			return errors.Wrapf(errdefs.ErrNotFound, "Info: content digest %v", dgst)
 		}
 
 		info.Digest = dgst
@@ -71,7 +71,7 @@ func (cs *contentStore) Update(ctx context.Context, info content.Info, fieldpath
 	if err := update(ctx, cs.db, func(tx *bolt.Tx) error {
 		bkt := getBlobBucket(tx, ns, info.Digest)
 		if bkt == nil {
-			return errors.Wrapf(errdefs.ErrNotFound, "content digest %v", info.Digest)
+			return errors.Wrapf(errdefs.ErrNotFound, "Update: content digest %v", info.Digest)
 		}
 
 		if err := readInfo(&updated, bkt); err != nil {
@@ -106,7 +106,7 @@ func (cs *contentStore) Update(ctx context.Context, info content.Info, fieldpath
 		}
 
 		updated.UpdatedAt = time.Now().UTC()
-		return writeInfo(&updated, bkt)
+		return writeInfo(bkt, &updated)
 	}); err != nil {
 		return content.Info{}, err
 	}
@@ -178,7 +178,7 @@ func (cs *contentStore) Delete(ctx context.Context, dgst digest.Digest) error {
 	return update(ctx, cs.db, func(tx *bolt.Tx) error {
 		bkt := getBlobBucket(tx, ns, dgst)
 		if bkt == nil {
-			return errors.Wrapf(errdefs.ErrNotFound, "content digest %v", dgst)
+			return errors.Wrapf(errdefs.ErrNotFound, "Delete: content digest %v", dgst)
 		}
 
 		if err := getBlobsBucket(tx, ns).DeleteBucket([]byte(dgst.String())); err != nil {
@@ -318,12 +318,34 @@ func (cs *contentStore) Writer(ctx context.Context, ref string, size int64, expe
 	cs.l.RLock()
 	defer cs.l.RUnlock()
 
-	var w content.Writer
+	var (
+		w         content.Writer
+		existsErr error
+	)
 	if err := update(ctx, cs.db, func(tx *bolt.Tx) error {
 		if expected != "" {
+			// check the backend to see if we already have this content
+			// that may be pinned in another namespace.
+			if info, err := cs.Store.Info(ctx, expected); err != nil {
+				if !errdefs.IsNotFound(err) {
+					return errors.Wrapf(err, "failure resolving backend blob")
+				}
+			} else {
+				// found content on backend, let's import it!
+				bkt, err := createBlobBucket(tx, ns, expected)
+				if err != nil {
+					return err
+				}
+
+				if err := writeInfo(bkt, &info); err != nil {
+					return errors.Wrapf(err, "failure resolving backend blob")
+				}
+			}
+
 			cbkt := getBlobBucket(tx, ns, expected)
 			if cbkt != nil {
-				return errors.Wrapf(errdefs.ErrAlreadyExists, "content %v", expected)
+				existsErr = errors.Wrapf(errdefs.ErrAlreadyExists, "content %v", expected)
+				return nil // allows transaction to get committed
 			}
 		}
 
@@ -362,6 +384,10 @@ func (cs *contentStore) Writer(ctx context.Context, ref string, size int64, expe
 		return err
 	}); err != nil {
 		return nil, err
+	}
+
+	if existsErr != nil {
+		return nil, existsErr
 	}
 
 	// TODO: keep the expected in the writer to use on commit
@@ -438,20 +464,11 @@ func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64,
 		return "", err
 	}
 
-	commitTime := time.Now().UTC()
+	base.CreatedAt = time.Now().UTC()
+	base.UpdatedAt = base.CreatedAt
+	base.Size = size
 
-	sizeEncoded, err := encodeInt(size)
-	if err != nil {
-		return "", err
-	}
-
-	if err := boltutil.WriteTimestamps(bkt, commitTime, commitTime); err != nil {
-		return "", err
-	}
-	if err := boltutil.WriteLabels(bkt, base.Labels); err != nil {
-		return "", err
-	}
-	return actual, bkt.Put(bucketKeySize, sizeEncoded)
+	return actual, writeInfo(bkt, &base)
 }
 
 func (nw *namespacedWriter) Status() (content.Status, error) {
@@ -478,7 +495,7 @@ func (cs *contentStore) checkAccess(ctx context.Context, dgst digest.Digest) err
 	return view(ctx, cs.db, func(tx *bolt.Tx) error {
 		bkt := getBlobBucket(tx, ns, dgst)
 		if bkt == nil {
-			return errors.Wrapf(errdefs.ErrNotFound, "content digest %v", dgst)
+			return errors.Wrapf(errdefs.ErrNotFound, "checkAccess: content digest %v", dgst)
 		}
 		return nil
 	})
@@ -512,7 +529,7 @@ func readInfo(info *content.Info, bkt *bolt.Bucket) error {
 	return nil
 }
 
-func writeInfo(info *content.Info, bkt *bolt.Bucket) error {
+func writeInfo(bkt *bolt.Bucket, info *content.Info) error {
 	if err := boltutil.WriteTimestamps(bkt, info.CreatedAt, info.UpdatedAt); err != nil {
 		return err
 	}
