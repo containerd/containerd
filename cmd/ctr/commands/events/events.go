@@ -8,6 +8,9 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/typeurl"
 	"github.com/urfave/cli"
+
+	// Register grpc event types
+	_ "github.com/containerd/containerd/api/events"
 )
 
 // Command is the cli command for displaying containerd events
