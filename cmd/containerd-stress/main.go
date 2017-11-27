@@ -101,10 +101,6 @@ func test(c config) error {
 		return err
 	}
 	logrus.Info("generating spec from image")
-	spec, err := containerd.GenerateSpec(ctx, client, &containers.Container{ID: ""}, containerd.WithImageConfig(image), containerd.WithProcessArgs("true"))
-	if err != nil {
-		return err
-	}
 	tctx, cancel := context.WithTimeout(ctx, c.Duration)
 	go func() {
 		s := make(chan os.Signal, 1)
@@ -120,10 +116,14 @@ func test(c config) error {
 	logrus.Info("starting stress test run...")
 	for i := 0; i < c.Concurrency; i++ {
 		wg.Add(1)
+		spec, err := containerd.GenerateSpec(ctx, client, &containers.Container{ID: ""}, containerd.WithImageConfig(image), containerd.WithProcessArgs("true"))
+		if err != nil {
+			return err
+		}
 		w := &worker{
 			id:     i,
 			wg:     &wg,
-			spec:   *spec,
+			spec:   spec,
 			image:  image,
 			client: client,
 		}
@@ -161,7 +161,7 @@ type worker struct {
 
 	client *containerd.Client
 	image  containerd.Image
-	spec   specs.Spec
+	spec   *specs.Spec
 }
 
 func (w *worker) run(ctx, tctx context.Context) {
@@ -197,9 +197,10 @@ func (w *worker) run(ctx, tctx context.Context) {
 }
 
 func (w *worker) runContainer(ctx context.Context, id string) error {
-	w.spec.Linux.CgroupsPath = filepath.Join("/", fmt.Sprint(w.id), id)
+	// fix up cgroups path for a default config
+	w.spec.Linux.CgroupsPath = filepath.Join("/", "stress", id)
 	c, err := w.client.NewContainer(ctx, id,
-		containerd.WithSpec(&w.spec),
+		containerd.WithSpec(w.spec),
 		containerd.WithNewSnapshot(id, w.image),
 	)
 	if err != nil {
