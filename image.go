@@ -86,7 +86,7 @@ func (i *image) IsUnpacked(ctx context.Context, snapshotterName string) (bool, e
 }
 
 func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
-	ctx, done, err := i.client.withLease(ctx)
+	ctx, done, err := i.client.WithLease(ctx)
 	if err != nil {
 		return err
 	}
