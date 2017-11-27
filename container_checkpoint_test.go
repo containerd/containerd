@@ -5,6 +5,8 @@ package containerd
 import (
 	"syscall"
 	"testing"
+
+	"github.com/containerd/containerd/oci"
 )
 
 func TestCheckpointRestore(t *testing.T) {
@@ -28,7 +30,7 @@ func TestCheckpointRestore(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), WithProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -108,7 +110,7 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), WithProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -201,7 +203,7 @@ func TestCheckpointLeaveRunning(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), WithProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return

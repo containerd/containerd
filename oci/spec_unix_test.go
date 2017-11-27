@@ -1,6 +1,6 @@
 // +build !windows
 
-package containerd
+package oci
 
 import (
 	"context"

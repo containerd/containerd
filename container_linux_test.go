@@ -20,6 +20,7 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/linux/runctypes"
+	"github.com/containerd/containerd/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
@@ -46,13 +47,15 @@ func TestTaskUpdate(t *testing.T) {
 		return
 	}
 	limit := int64(32 * 1024 * 1024)
-	memory := func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
+	memory := func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
 		s.Linux.Resources.Memory = &specs.LinuxMemory{
 			Limit: &limit,
 		}
 		return nil
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), withProcessArgs("sleep", "30"), memory), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id,
+		WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30"), memory),
+		WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -131,7 +134,7 @@ func TestShimInCgroup(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), WithProcessArgs("sleep", "30")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "30")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Error(err)
 		return
@@ -409,7 +412,7 @@ func TestContainerUsername(t *testing.T) {
 	// squid user in the alpine image has a uid of 31
 	container, err := client.NewContainer(ctx, id,
 		withNewSnapshot(id, image),
-		WithNewSpec(withImageConfig(image), WithUsername("squid"), WithProcessArgs("id", "-u")),
+		WithNewSpec(withImageConfig(image), oci.WithUsername("squid"), oci.WithProcessArgs("id", "-u")),
 	)
 	if err != nil {
 		t.Error(err)
@@ -618,7 +621,7 @@ func TestContainerUserID(t *testing.T) {
 	// adm user in the alpine image has a uid of 3 and gid of 4.
 	container, err := client.NewContainer(ctx, id,
 		withNewSnapshot(id, image),
-		WithNewSpec(withImageConfig(image), WithUserID(3), WithProcessArgs("sh", "-c", "echo $(id -u):$(id -g)")),
+		WithNewSpec(withImageConfig(image), oci.WithUserID(3), oci.WithProcessArgs("sh", "-c", "echo $(id -u):$(id -g)")),
 	)
 	if err != nil {
 		t.Error(err)
@@ -679,7 +682,7 @@ func TestContainerKillAll(t *testing.T) {
 		withNewSnapshot(id, image),
 		WithNewSpec(withImageConfig(image),
 			withProcessArgs("sh", "-c", "top"),
-			WithHostNamespace(specs.PIDNamespace),
+			oci.WithHostNamespace(specs.PIDNamespace),
 		),
 	)
 	if err != nil {
@@ -737,7 +740,7 @@ func TestShimSigkilled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image)), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image)), withNewSnapshot(id, image))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -801,7 +804,7 @@ func TestDaemonRestartWithRunningShim(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(WithImageConfig(image), WithProcessArgs("sleep", "100")), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "100")), withNewSnapshot(id, image))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -931,7 +934,7 @@ func TestContainerKillInitPidHost(t *testing.T) {
 		withNewSnapshot(id, image),
 		WithNewSpec(withImageConfig(image),
 			withProcessArgs("sh", "-c", "sleep 42; echo hi"),
-			WithHostNamespace(specs.PIDNamespace),
+			oci.WithHostNamespace(specs.PIDNamespace),
 		),
 	)
 	if err != nil {
@@ -1025,7 +1028,7 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 
 	opts := []NewContainerOpts{WithNewSpec(withImageConfig(image),
 		withExitStatus(7),
-		WithUserNamespace(0, 1000, 10000),
+		oci.WithUserNamespace(0, 1000, 10000),
 	)}
 	if readonlyRootFS {
 		opts = append(opts, WithRemappedSnapshotView(id, image, 1000, 1000))

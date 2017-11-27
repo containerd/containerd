@@ -7,15 +7,15 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
 
 // WithProfile sets the provided apparmor profile to the spec
-func WithProfile(profile string) containerd.SpecOpts {
-	return func(_ context.Context, _ *containerd.Client, _ *containers.Container, s *specs.Spec) error {
+func WithProfile(profile string) oci.SpecOpts {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
 		s.Process.ApparmorProfile = profile
 		return nil
 	}
@@ -23,8 +23,8 @@ func WithProfile(profile string) containerd.SpecOpts {
 
 // WithDefaultProfile will generate a default apparmor profile under the provided name
 // for the container.  It is only generated if a profile under that name does not exist.
-func WithDefaultProfile(name string) containerd.SpecOpts {
-	return func(_ context.Context, _ *containerd.Client, _ *containers.Container, s *specs.Spec) error {
+func WithDefaultProfile(name string) oci.SpecOpts {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
 		yes, err := isLoaded(name)
 		if err != nil {
 			return err

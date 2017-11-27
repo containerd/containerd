@@ -1,6 +1,6 @@
 // +build !windows
 
-package containerd
+package oci
 
 import (
 	"context"
@@ -16,12 +16,9 @@ import (
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/fs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/platforms"
-	"github.com/opencontainers/image-spec/identity"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runc/libcontainer/user"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -30,7 +27,7 @@ import (
 
 // WithTTY sets the information on the spec as well as the environment variables for
 // using a TTY
-func WithTTY(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
+func WithTTY(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
 	s.Process.Terminal = true
 	s.Process.Env = append(s.Process.Env, "TERM=xterm")
 	return nil
@@ -38,7 +35,7 @@ func WithTTY(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spe
 
 // WithHostNamespace allows a task to run inside the host's linux namespace
 func WithHostNamespace(ns specs.LinuxNamespaceType) SpecOpts {
-	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
 		for i, n := range s.Linux.Namespaces {
 			if n.Type == ns {
 				s.Linux.Namespaces = append(s.Linux.Namespaces[:i], s.Linux.Namespaces[i+1:]...)
@@ -52,7 +49,7 @@ func WithHostNamespace(ns specs.LinuxNamespaceType) SpecOpts {
 // WithLinuxNamespace uses the passed in namespace for the spec. If a namespace of the same type already exists in the
 // spec, the existing namespace is replaced by the one provided.
 func WithLinuxNamespace(ns specs.LinuxNamespace) SpecOpts {
-	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
 		for i, n := range s.Linux.Namespaces {
 			if n.Type == ns.Type {
 				before := s.Linux.Namespaces[:i]
@@ -68,13 +65,9 @@ func WithLinuxNamespace(ns specs.LinuxNamespace) SpecOpts {
 }
 
 // WithImageConfig configures the spec to from the configuration of an Image
-func WithImageConfig(i Image) SpecOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container, s *specs.Spec) error {
-		var (
-			image = i.(*image)
-			store = client.ContentStore()
-		)
-		ic, err := image.i.Config(ctx, store, platforms.Default())
+func WithImageConfig(image Image) SpecOpts {
+	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) error {
+		ic, err := image.Config(ctx)
 		if err != nil {
 			return err
 		}
@@ -84,7 +77,7 @@ func WithImageConfig(i Image) SpecOpts {
 		)
 		switch ic.MediaType {
 		case v1.MediaTypeImageConfig, images.MediaTypeDockerSchema2Config:
-			p, err := content.ReadBlob(ctx, store, ic.Digest)
+			p, err := content.ReadBlob(ctx, image.ContentStore(), ic.Digest)
 			if err != nil {
 				return err
 			}
@@ -140,7 +133,7 @@ func WithImageConfig(i Image) SpecOpts {
 
 // WithRootFSPath specifies unmanaged rootfs path.
 func WithRootFSPath(path string) SpecOpts {
-	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
 		if s.Root == nil {
 			s.Root = &specs.Root{}
 		}
@@ -152,7 +145,7 @@ func WithRootFSPath(path string) SpecOpts {
 
 // WithRootFSReadonly sets specs.Root.Readonly to true
 func WithRootFSReadonly() SpecOpts {
-	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
 		if s.Root == nil {
 			s.Root = &specs.Root{}
 		}
@@ -161,22 +154,14 @@ func WithRootFSReadonly() SpecOpts {
 	}
 }
 
-// WithResources sets the provided resources on the spec for task updates
-func WithResources(resources *specs.LinuxResources) UpdateTaskOpts {
-	return func(ctx context.Context, client *Client, r *UpdateTaskInfo) error {
-		r.Resources = resources
-		return nil
-	}
-}
-
 // WithNoNewPrivileges sets no_new_privileges on the process for the container
-func WithNoNewPrivileges(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
+func WithNoNewPrivileges(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
 	s.Process.NoNewPrivileges = true
 	return nil
 }
 
 // WithHostHostsFile bind-mounts the host's /etc/hosts into the container as readonly
-func WithHostHostsFile(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
+func WithHostHostsFile(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
 	s.Mounts = append(s.Mounts, specs.Mount{
 		Destination: "/etc/hosts",
 		Type:        "bind",
@@ -187,7 +172,7 @@ func WithHostHostsFile(_ context.Context, _ *Client, _ *containers.Container, s 
 }
 
 // WithHostResolvconf bind-mounts the host's /etc/resolv.conf into the container as readonly
-func WithHostResolvconf(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
+func WithHostResolvconf(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
 	s.Mounts = append(s.Mounts, specs.Mount{
 		Destination: "/etc/resolv.conf",
 		Type:        "bind",
@@ -198,7 +183,7 @@ func WithHostResolvconf(_ context.Context, _ *Client, _ *containers.Container, s
 }
 
 // WithHostLocaltime bind-mounts the host's /etc/localtime into the container as readonly
-func WithHostLocaltime(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
+func WithHostLocaltime(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
 	s.Mounts = append(s.Mounts, specs.Mount{
 		Destination: "/etc/localtime",
 		Type:        "bind",
@@ -211,7 +196,7 @@ func WithHostLocaltime(_ context.Context, _ *Client, _ *containers.Container, s 
 // WithUserNamespace sets the uid and gid mappings for the task
 // this can be called multiple times to add more mappings to the generated spec
 func WithUserNamespace(container, host, size uint32) SpecOpts {
-	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
 		var hasUserns bool
 		for _, ns := range s.Linux.Namespaces {
 			if ns.Type == specs.UserNamespace {
@@ -235,68 +220,9 @@ func WithUserNamespace(container, host, size uint32) SpecOpts {
 	}
 }
 
-// WithRemappedSnapshot creates a new snapshot and remaps the uid/gid for the
-// filesystem to be used by a container with user namespaces
-func WithRemappedSnapshot(id string, i Image, uid, gid uint32) NewContainerOpts {
-	return withRemappedSnapshotBase(id, i, uid, gid, false)
-}
-
-// WithRemappedSnapshotView is similar to WithRemappedSnapshot but rootfs is mounted as read-only.
-func WithRemappedSnapshotView(id string, i Image, uid, gid uint32) NewContainerOpts {
-	return withRemappedSnapshotBase(id, i, uid, gid, true)
-}
-
-func withRemappedSnapshotBase(id string, i Image, uid, gid uint32, readonly bool) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore(), platforms.Default())
-		if err != nil {
-			return err
-		}
-
-		setSnapshotterIfEmpty(c)
-
-		var (
-			snapshotter = client.SnapshotService(c.Snapshotter)
-			parent      = identity.ChainID(diffIDs).String()
-			usernsID    = fmt.Sprintf("%s-%d-%d", parent, uid, gid)
-		)
-		if _, err := snapshotter.Stat(ctx, usernsID); err == nil {
-			if _, err := snapshotter.Prepare(ctx, id, usernsID); err == nil {
-				c.SnapshotKey = id
-				c.Image = i.Name()
-				return nil
-			} else if !errdefs.IsNotFound(err) {
-				return err
-			}
-		}
-		mounts, err := snapshotter.Prepare(ctx, usernsID+"-remap", parent)
-		if err != nil {
-			return err
-		}
-		if err := remapRootFS(mounts, uid, gid); err != nil {
-			snapshotter.Remove(ctx, usernsID)
-			return err
-		}
-		if err := snapshotter.Commit(ctx, usernsID, usernsID+"-remap"); err != nil {
-			return err
-		}
-		if readonly {
-			_, err = snapshotter.View(ctx, id, usernsID)
-		} else {
-			_, err = snapshotter.Prepare(ctx, id, usernsID)
-		}
-		if err != nil {
-			return err
-		}
-		c.SnapshotKey = id
-		c.Image = i.Name()
-		return nil
-	}
-}
-
 // WithCgroup sets the container's cgroup path
 func WithCgroup(path string) SpecOpts {
-	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
 		s.Linux.CgroupsPath = path
 		return nil
 	}
@@ -305,7 +231,7 @@ func WithCgroup(path string) SpecOpts {
 // WithNamespacedCgroup uses the namespace set on the context to create a
 // root directory for containers in the cgroup with the id as the subcgroup
 func WithNamespacedCgroup() SpecOpts {
-	return func(ctx context.Context, _ *Client, c *containers.Container, s *specs.Spec) error {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *specs.Spec) error {
 		namespace, err := namespaces.NamespaceRequired(ctx)
 		if err != nil {
 			return err
@@ -317,7 +243,7 @@ func WithNamespacedCgroup() SpecOpts {
 
 // WithUIDGID allows the UID and GID for the Process to be set
 func WithUIDGID(uid, gid uint32) SpecOpts {
-	return func(_ context.Context, _ *Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
 		s.Process.User.UID = uid
 		s.Process.User.GID = gid
 		return nil
@@ -329,7 +255,7 @@ func WithUIDGID(uid, gid uint32) SpecOpts {
 // or uid is not found in /etc/passwd, it sets gid to be the same with
 // uid, and not returns error.
 func WithUserID(uid uint32) SpecOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container, s *specs.Spec) error {
+	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) error {
 		if c.Snapshotter == "" {
 			return errors.Errorf("no snapshotter set for container")
 		}
@@ -386,7 +312,7 @@ func WithUserID(uid uint32) SpecOpts {
 // does not exist, or the username is not found in /etc/passwd,
 // it returns error.
 func WithUsername(username string) SpecOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container, s *specs.Spec) error {
+	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) error {
 		if c.Snapshotter == "" {
 			return errors.Errorf("no snapshotter set for container")
 		}

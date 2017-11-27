@@ -12,14 +12,15 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/cmd/ctr/commands/tasks"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
-func withEnv(context *cli.Context) containerd.SpecOpts {
-	return func(_ gocontext.Context, _ *containerd.Client, _ *containers.Container, s *specs.Spec) error {
+func withEnv(context *cli.Context) oci.SpecOpts {
+	return func(_ gocontext.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
 		env := context.StringSlice("env")
 		if len(env) > 0 {
 			s.Process.Env = replaceOrAppendEnvValues(s.Process.Env, env)
@@ -28,8 +29,8 @@ func withEnv(context *cli.Context) containerd.SpecOpts {
 	}
 }
 
-func withMounts(context *cli.Context) containerd.SpecOpts {
-	return func(_ gocontext.Context, _ *containerd.Client, _ *containers.Container, s *specs.Spec) error {
+func withMounts(context *cli.Context) oci.SpecOpts {
+	return func(_ gocontext.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
 		for _, mount := range context.StringSlice("mount") {
 			m, err := parseMountFlag(mount)
 			if err != nil {
