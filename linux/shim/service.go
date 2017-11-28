@@ -148,7 +148,6 @@ func (s *Service) Delete(ctx context.Context, r *ptypes.Empty) (*shimapi.DeleteR
 	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
-
 	if err := p.Delete(ctx); err != nil {
 		return nil, err
 	}
@@ -480,7 +479,7 @@ func (s *Service) getContainerPids(ctx context.Context, id string) ([]uint32, er
 func (s *Service) forward(publisher events.Publisher) {
 	for e := range s.events {
 		if err := publisher.Publish(s.context, getTopic(s.context, e), e); err != nil {
-			logrus.WithError(err).Error("post event")
+			log.G(s.context).WithError(err).Error("post event")
 		}
 	}
 }
