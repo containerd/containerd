@@ -89,6 +89,11 @@ func WithImageConfig(image Image) SpecOpts {
 		default:
 			return fmt.Errorf("unknown image config media type %s", ic.MediaType)
 		}
+
+		if s.Process == nil {
+			s.Process = &specs.Process{}
+		}
+
 		s.Process.Env = append(s.Process.Env, config.Env...)
 		cmd := config.Cmd
 		s.Process.Args = append(config.Entrypoint, cmd...)
