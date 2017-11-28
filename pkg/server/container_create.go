@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/linux/runctypes"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/oci"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
@@ -188,16 +189,16 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 		}
 	}()
 
-	var specOpts []containerd.SpecOpts
+	var specOpts []oci.SpecOpts
 	securityContext := config.GetLinux().GetSecurityContext()
 	// Set container username. This could only be done by containerd, because it needs
 	// access to the container rootfs. Pass user name to containerd, and let it overwrite
 	// the spec for us.
 	if uid := securityContext.GetRunAsUser(); uid != nil {
-		specOpts = append(specOpts, containerd.WithUserID(uint32(uid.GetValue())))
+		specOpts = append(specOpts, oci.WithUserID(uint32(uid.GetValue())))
 	}
 	if username := securityContext.GetRunAsUsername(); username != "" {
-		specOpts = append(specOpts, containerd.WithUsername(username))
+		specOpts = append(specOpts, oci.WithUsername(username))
 	}
 
 	apparmorSpecOpts, err := generateApparmorSpecOpts(
@@ -724,7 +725,7 @@ func setOCINamespaces(g *generate.Generator, namespaces *runtime.NamespaceOption
 func defaultRuntimeSpec(id string) (*runtimespec.Spec, error) {
 	// GenerateSpec needs namespace.
 	ctx := namespaces.WithNamespace(context.Background(), k8sContainerdNamespace)
-	spec, err := containerd.GenerateSpec(ctx, nil, &containers.Container{ID: id})
+	spec, err := oci.GenerateSpec(ctx, nil, &containers.Container{ID: id})
 	if err != nil {
 		return nil, err
 	}
@@ -751,7 +752,7 @@ func defaultRuntimeSpec(id string) (*runtimespec.Spec, error) {
 }
 
 // generateSeccompSpecOpts generates containerd SpecOpts for seccomp.
-func generateSeccompSpecOpts(seccompProf string, privileged, seccompEnabled bool) (containerd.SpecOpts, error) {
+func generateSeccompSpecOpts(seccompProf string, privileged, seccompEnabled bool) (oci.SpecOpts, error) {
 	if privileged {
 		// Do not set seccomp profile when container is privileged
 		return nil, nil
@@ -784,7 +785,7 @@ func generateSeccompSpecOpts(seccompProf string, privileged, seccompEnabled bool
 }
 
 // generateApparmorSpecOpts generates containerd SpecOpts for apparmor.
-func generateApparmorSpecOpts(apparmorProf string, privileged, apparmorEnabled bool) (containerd.SpecOpts, error) {
+func generateApparmorSpecOpts(apparmorProf string, privileged, apparmorEnabled bool) (oci.SpecOpts, error) {
 	if !apparmorEnabled {
 		// Should fail loudly if user try to specify apparmor profile
 		// but we don't support it.

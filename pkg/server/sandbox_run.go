@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd"
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/linux/runctypes"
+	"github.com/containerd/containerd/oci"
 	"github.com/containerd/typeurl"
 	"github.com/cri-o/ocicni/pkg/ocicni"
 	"github.com/golang/glog"
@@ -128,9 +129,9 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	}
 	glog.V(4).Infof("Sandbox container spec: %+v", spec)
 
-	var specOpts []containerd.SpecOpts
+	var specOpts []oci.SpecOpts
 	if uid := securityContext.GetRunAsUser(); uid != nil {
-		specOpts = append(specOpts, containerd.WithUserID(uint32(uid.GetValue())))
+		specOpts = append(specOpts, oci.WithUserID(uint32(uid.GetValue())))
 	}
 
 	seccompSpecOpts, err := generateSeccompSpecOpts(
