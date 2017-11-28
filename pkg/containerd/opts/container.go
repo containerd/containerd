@@ -21,28 +21,27 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/docker/docker/pkg/chrootarchive"
 	"github.com/docker/docker/pkg/system"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
 
-// WithImageUnpack guarantees that the image used by the container is unpacked.
-func WithImageUnpack(i containerd.Image) containerd.NewContainerOpts {
+// WithNewSnapshot wraps `containerd.WithNewSnapshot` so that if creating the
+// snapshot fails we make sure the image is actually unpacked and and retry.
+func WithNewSnapshot(id string, i containerd.Image) containerd.NewContainerOpts {
+	f := containerd.WithNewSnapshot(id, i)
 	return func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
-		if c.Snapshotter == "" {
-			return errors.New("no snapshotter set for container")
-		}
-		unpacked, err := i.IsUnpacked(ctx, c.Snapshotter)
-		if err != nil {
-			return errors.Wrap(err, "fail to check if image is unpacked")
-		}
-		if unpacked {
-			return nil
-		}
-		// Unpack the snapshot.
-		if err := i.Unpack(ctx, c.Snapshotter); err != nil {
-			return errors.Wrap(err, "unpack snapshot")
+		if err := f(ctx, client, c); err != nil {
+			if !errdefs.IsNotFound(err) {
+				return err
+			}
+
+			if err := i.Unpack(ctx, c.Snapshotter); err != nil {
+				return errors.Wrap(err, "error unpacking image")
+			}
+			return f(ctx, client, c)
 		}
 		return nil
 	}
