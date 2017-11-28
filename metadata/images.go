@@ -183,7 +183,7 @@ func (s *imageStore) Update(ctx context.Context, image images.Image, fieldpaths 
 	})
 }
 
-func (s *imageStore) Delete(ctx context.Context, name string) error {
+func (s *imageStore) Delete(ctx context.Context, name string, opts ...images.DeleteOpt) error {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return err

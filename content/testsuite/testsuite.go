@@ -52,6 +52,10 @@ func makeTest(t *testing.T, name string, storeFn func(ctx context.Context, root 
 	}
 }
 
+var labels = map[string]string{
+	"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
+}
+
 func checkContentStoreWriter(ctx context.Context, t *testing.T, cs content.Store) {
 	c1, d1 := createContent(256, 1)
 	w1, err := cs.Writer(ctx, "c1", 0, "")
@@ -118,7 +122,7 @@ func checkContentStoreWriter(ctx context.Context, t *testing.T, cs content.Store
 		}
 
 		preCommit := time.Now()
-		if err := s.writer.Commit(ctx, 0, ""); err != nil {
+		if err := s.writer.Commit(ctx, 0, "", content.WithLabels(labels)); err != nil {
 			t.Fatal(err)
 		}
 		postCommit := time.Now()
@@ -130,6 +134,7 @@ func checkContentStoreWriter(ctx context.Context, t *testing.T, cs content.Store
 		info := content.Info{
 			Digest: s.digest,
 			Size:   int64(len(s.content)),
+			Labels: labels,
 		}
 		if err := checkInfo(ctx, cs, s.digest, info, preCommit, postCommit, preCommit, postCommit); err != nil {
 			t.Fatalf("Check info failed: %+v", err)
@@ -264,7 +269,7 @@ func checkUploadStatus(ctx context.Context, t *testing.T, cs content.Store) {
 	checkStatus(t, w1, expected, d1, preStart, postStart, preUpdate, postUpdate)
 
 	preCommit := time.Now()
-	if err := w1.Commit(ctx, 0, ""); err != nil {
+	if err := w1.Commit(ctx, 0, "", content.WithLabels(labels)); err != nil {
 		t.Fatalf("Commit failed: %+v", err)
 	}
 	postCommit := time.Now()
@@ -272,6 +277,7 @@ func checkUploadStatus(ctx context.Context, t *testing.T, cs content.Store) {
 	info := content.Info{
 		Digest: d1,
 		Size:   256,
+		Labels: labels,
 	}
 
 	if err := checkInfo(ctx, cs, d1, info, preCommit, postCommit, preCommit, postCommit); err != nil {
@@ -292,9 +298,11 @@ func checkLabels(ctx context.Context, t *testing.T, cs content.Store) {
 		t.Fatalf("Failed to write: %+v", err)
 	}
 
+	rootTime := time.Now().UTC().Format(time.RFC3339)
 	labels := map[string]string{
 		"k1": "v1",
 		"k2": "v2",
+		"containerd.io/gc.root": rootTime,
 	}
 
 	preCommit := time.Now()
@@ -330,6 +338,7 @@ func checkLabels(ctx context.Context, t *testing.T, cs content.Store) {
 
 	info.Labels = map[string]string{
 		"k1": "v1",
+		"containerd.io/gc.root": rootTime,
 	}
 	preUpdate = time.Now()
 	if _, err := cs.Update(ctx, info, "labels.k3", "labels.k1"); err != nil {

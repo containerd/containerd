@@ -1,6 +1,8 @@
 package images
 
 import (
+	gocontext "context"
+
 	"github.com/boltdb/bolt"
 	eventstypes "github.com/containerd/containerd/api/events"
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
@@ -10,7 +12,6 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
 	ptypes "github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -23,26 +24,38 @@ func init() {
 		ID:   "images",
 		Requires: []plugin.Type{
 			plugin.MetadataPlugin,
+			plugin.GCPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			m, err := ic.Get(plugin.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}
-			return NewService(m.(*metadata.DB), ic.Events), nil
+			g, err := ic.Get(plugin.GCPlugin)
+			if err != nil {
+				return nil, err
+			}
+
+			return NewService(m.(*metadata.DB), ic.Events, g.(gcScheduler)), nil
 		},
 	})
 }
 
+type gcScheduler interface {
+	ScheduleAndWait(gocontext.Context) (metadata.GCStats, error)
+}
+
 type service struct {
 	db        *metadata.DB
+	gc        gcScheduler
 	publisher events.Publisher
 }
 
 // NewService returns the GRPC image server
-func NewService(db *metadata.DB, publisher events.Publisher) imagesapi.ImagesServer {
+func NewService(db *metadata.DB, publisher events.Publisher, gc gcScheduler) imagesapi.ImagesServer {
 	return &service{
 		db:        db,
+		gc:        gc,
 		publisher: publisher,
 	}
 }
@@ -163,8 +176,10 @@ func (s *service) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest)
 		return nil, err
 	}
 
-	if err := s.db.GarbageCollect(ctx); err != nil {
-		return nil, errdefs.ToGRPC(errors.Wrap(err, "garbage collection failed"))
+	if req.Sync {
+		if _, err := s.gc.ScheduleAndWait(ctx); err != nil {
+			return nil, err
+		}
 	}
 
 	return &ptypes.Empty{}, nil

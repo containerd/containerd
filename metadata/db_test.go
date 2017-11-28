@@ -235,7 +235,7 @@ func TestMetadataCollector(t *testing.T) {
 		t.Fatalf("Creation failed: %+v", err)
 	}
 
-	if err := mdb.GarbageCollect(ctx); err != nil {
+	if _, err := mdb.GarbageCollect(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -322,7 +322,7 @@ func benchmarkTrigger(n int) func(b *testing.B) {
 
 				//b.StartTimer()
 
-				if err := mdb.GarbageCollect(ctx); err != nil {
+				if _, err := mdb.GarbageCollect(ctx); err != nil {
 					b.Fatal(err)
 				}
 
