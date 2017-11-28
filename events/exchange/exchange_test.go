@@ -2,7 +2,6 @@ package exchange
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"sync"
 	"testing"
@@ -39,13 +38,14 @@ func TestExchangeBasic(t *testing.T) {
 	t.Log("publish")
 	var wg sync.WaitGroup
 	wg.Add(1)
+	errChan := make(chan error)
 	go func() {
 		defer wg.Done()
+		defer close(errChan)
 		for _, event := range testevents {
-			fmt.Println("publish", event)
 			if err := exchange.Publish(ctx, "/test", event); err != nil {
-				fmt.Println("publish error", err)
-				t.Fatal(err)
+				errChan <- err
+				return
 			}
 		}
 
@@ -54,6 +54,9 @@ func TestExchangeBasic(t *testing.T) {
 
 	t.Log("waiting")
 	wg.Wait()
+	if err := <-errChan; err != nil {
+		t.Fatal(err)
+	}
 
 	for _, subscriber := range []struct {
 		eventq <-chan *events.Envelope

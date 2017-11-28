@@ -21,13 +21,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-var (
-	bufPool = sync.Pool{
-		New: func() interface{} {
-			return make([]byte, 1<<20)
-		},
-	}
-)
+var bufPool = sync.Pool{
+	New: func() interface{} {
+		buffer := make([]byte, 1<<20)
+		return &buffer
+	},
+}
 
 // LabelStore is used to store mutable labels for digests
 type LabelStore interface {
@@ -463,10 +462,10 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 		}
 		defer fp.Close()
 
-		p := bufPool.Get().([]byte)
+		p := bufPool.Get().(*[]byte)
 		defer bufPool.Put(p)
 
-		offset, err = io.CopyBuffer(digester.Hash(), fp, p)
+		offset, err = io.CopyBuffer(digester.Hash(), fp, *p)
 		if err != nil {
 			return nil, err
 		}

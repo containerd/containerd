@@ -29,7 +29,8 @@ type service struct {
 
 var bufPool = sync.Pool{
 	New: func() interface{} {
-		return make([]byte, 1<<20)
+		buffer := make([]byte, 1<<20)
+		return &buffer
 	},
 }
 
@@ -179,7 +180,7 @@ func (s *service) Read(req *api.ReadContentRequest, session api.Content_ReadServ
 
 		// TODO(stevvooe): Using the global buffer pool. At 32KB, it is probably
 		// little inefficient for work over a fast network. We can tune this later.
-		p = bufPool.Get().([]byte)
+		p = bufPool.Get().(*[]byte)
 	)
 	defer bufPool.Put(p)
 
@@ -195,13 +196,10 @@ func (s *service) Read(req *api.ReadContentRequest, session api.Content_ReadServ
 		return status.Errorf(codes.OutOfRange, "read past object length %v bytes", oi.Size)
 	}
 
-	if _, err := io.CopyBuffer(
+	_, err = io.CopyBuffer(
 		&readResponseWriter{session: session},
-		io.NewSectionReader(ra, offset, size), p); err != nil {
-		return err
-	}
-
-	return nil
+		io.NewSectionReader(ra, offset, size), *p)
+	return err
 }
 
 // readResponseWriter is a writer that places the output into ReadContentRequest messages.

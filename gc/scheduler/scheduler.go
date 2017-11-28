@@ -250,7 +250,6 @@ func (s *gcScheduler) run(ctx context.Context) {
 				schedC, nextCollection = schedule(interval)
 				continue
 			}
-			break
 		case e := <-s.eventC:
 			if lastCollection != nil && lastCollection.After(e.ts) {
 				continue
