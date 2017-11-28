@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -51,6 +52,10 @@ func main() {
 			Value: 1 * time.Minute,
 			Usage: "set the duration of the stress test",
 		},
+		cli.BoolFlag{
+			Name:  "exec",
+			Usage: "add execs to the stress tests",
+		},
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
@@ -63,6 +68,7 @@ func main() {
 			Address:     context.GlobalString("address"),
 			Duration:    context.GlobalDuration("duration"),
 			Concurrency: context.GlobalInt("concurrent"),
+			Exec:        context.GlobalBool("exec"),
 		}
 		return test(config)
 	}
@@ -76,6 +82,7 @@ type config struct {
 	Concurrency int
 	Duration    time.Duration
 	Address     string
+	Exec        bool
 }
 
 func (c config) newClient() (*containerd.Client, error) {
@@ -115,12 +122,17 @@ func test(c config) error {
 		start   = time.Now()
 	)
 	logrus.Info("starting stress test run...")
+	args := oci.WithProcessArgs("true")
+	if c.Exec {
+		args = oci.WithProcessArgs("sleep", "10")
+	}
 	for i := 0; i < c.Concurrency; i++ {
 		wg.Add(1)
 		spec, err := oci.GenerateSpec(ctx, client,
 			&containers.Container{},
 			oci.WithImageConfig(image),
-			oci.WithProcessArgs("true"))
+			args,
+		)
 		if err != nil {
 			return err
 		}
@@ -130,6 +142,7 @@ func test(c config) error {
 			spec:   spec,
 			image:  image,
 			client: client,
+			doExec: c.Exec,
 		}
 		workers = append(workers, w)
 		go w.run(ctx, tctx)
@@ -157,27 +170,21 @@ func test(c config) error {
 }
 
 type worker struct {
-	id          int
-	wg          *sync.WaitGroup
-	count       int
-	failures    int
-	waitContext context.Context
+	id       int
+	wg       *sync.WaitGroup
+	count    int
+	failures int
 
 	client *containerd.Client
 	image  containerd.Image
 	spec   *specs.Spec
+	doExec bool
 }
 
 func (w *worker) run(ctx, tctx context.Context) {
 	defer func() {
 		w.wg.Done()
 		logrus.Infof("worker %d finished", w.id)
-	}()
-	wctx, cancel := context.WithCancel(ctx)
-	w.waitContext = wctx
-	go func() {
-		<-tctx.Done()
-		cancel()
 	}()
 	for {
 		select {
@@ -222,8 +229,18 @@ func (w *worker) runContainer(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-
 	if err := task.Start(ctx); err != nil {
+		return err
+	}
+	if w.doExec {
+		for i := 0; i < 256; i++ {
+			if err := w.exec(ctx, i, task); err != nil {
+				w.failures++
+				logrus.WithError(err).Error("exec failure")
+			}
+		}
+	}
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
 		return err
 	}
 	status := <-statusC
@@ -234,6 +251,25 @@ func (w *worker) runContainer(ctx context.Context, id string) error {
 		}
 		w.failures++
 	}
+	return nil
+}
+
+func (w *worker) exec(ctx context.Context, i int, t containerd.Task) error {
+	pSpec := *w.spec.Process
+	pSpec.Args = []string{"true"}
+	process, err := t.Exec(ctx, strconv.Itoa(i), &pSpec, cio.NullIO)
+	if err != nil {
+		return err
+	}
+	defer process.Delete(ctx)
+	status, err := process.Wait(ctx)
+	if err != nil {
+		return err
+	}
+	if err := process.Start(ctx); err != nil {
+		return err
+	}
+	<-status
 	return nil
 }
 

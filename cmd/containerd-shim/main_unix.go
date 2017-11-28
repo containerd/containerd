@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"os/signal"
 	"runtime"
 	"strings"
 	"sync"
@@ -80,6 +81,9 @@ func executeShim() error {
 	if err != nil {
 		return err
 	}
+	dump := make(chan os.Signal, 32)
+	signal.Notify(dump, syscall.SIGUSR1)
+
 	path, err := os.Getwd()
 	if err != nil {
 		return err
@@ -111,6 +115,11 @@ func executeShim() error {
 		"path":      path,
 		"namespace": namespaceFlag,
 	})
+	go func() {
+		for range dump {
+			dumpStacks(logger)
+		}
+	}()
 	return handleSignals(logger, signals, server, sv)
 }
 
@@ -171,8 +180,6 @@ func handleSignals(logger *logrus.Entry, signals chan os.Signal, server *ttrpc.S
 					sv.Delete(context.Background(), &ptypes.Empty{})
 					close(done)
 				})
-			case unix.SIGUSR1:
-				dumpStacks(logger)
 			}
 		}
 	}
@@ -213,8 +220,11 @@ func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event
 	if err != nil {
 		return err
 	}
-	exit := <-c
-	if exit.Status != 0 {
+	status, err := reaper.Default.Wait(cmd, c)
+	if err != nil {
+		return err
+	}
+	if status != 0 {
 		return errors.New("failed to publish event")
 	}
 	return nil
