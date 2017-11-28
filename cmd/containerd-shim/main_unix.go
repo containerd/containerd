@@ -60,6 +60,13 @@ func main() {
 	if debugFlag {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
+
+	if os.Getenv("GOMAXPROCS") == "" {
+		// If GOMAXPROCS hasn't been set, we default to a value of 2 to reduce
+		// the number of Go stacks present in the shim.
+		runtime.GOMAXPROCS(2)
+	}
+
 	if err := executeShim(); err != nil {
 		fmt.Fprintf(os.Stderr, "containerd-shim: %s\n", err)
 		os.Exit(1)
