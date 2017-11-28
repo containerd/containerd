@@ -44,15 +44,13 @@ import containerd_v1_types "github.com/containerd/containerd/api/types/task"
 
 import time "time"
 
-import (
-	context "golang.org/x/net/context"
-	grpc "google.golang.org/grpc"
-)
-
 import github_com_gogo_protobuf_types "github.com/gogo/protobuf/types"
 
 import strings "strings"
 import reflect "reflect"
+
+import context "context"
+import github_com_stevvooe_ttrpc "github.com/stevvooe/ttrpc"
 
 import io "io"
 
@@ -283,578 +281,6 @@ func init() {
 	proto.RegisterType((*WaitRequest)(nil), "containerd.runtime.linux.shim.v1.WaitRequest")
 	proto.RegisterType((*WaitResponse)(nil), "containerd.runtime.linux.shim.v1.WaitResponse")
 }
-
-// Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConn
-
-// This is a compile-time assertion to ensure that this generated file
-// is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion4
-
-// Client API for Shim service
-
-type ShimClient interface {
-	// State returns shim and task state information.
-	State(ctx context.Context, in *StateRequest, opts ...grpc.CallOption) (*StateResponse, error)
-	Create(ctx context.Context, in *CreateTaskRequest, opts ...grpc.CallOption) (*CreateTaskResponse, error)
-	Start(ctx context.Context, in *StartRequest, opts ...grpc.CallOption) (*StartResponse, error)
-	Delete(ctx context.Context, in *google_protobuf1.Empty, opts ...grpc.CallOption) (*DeleteResponse, error)
-	DeleteProcess(ctx context.Context, in *DeleteProcessRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
-	ListPids(ctx context.Context, in *ListPidsRequest, opts ...grpc.CallOption) (*ListPidsResponse, error)
-	Pause(ctx context.Context, in *google_protobuf1.Empty, opts ...grpc.CallOption) (*google_protobuf1.Empty, error)
-	Resume(ctx context.Context, in *google_protobuf1.Empty, opts ...grpc.CallOption) (*google_protobuf1.Empty, error)
-	Checkpoint(ctx context.Context, in *CheckpointTaskRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error)
-	Kill(ctx context.Context, in *KillRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error)
-	Exec(ctx context.Context, in *ExecProcessRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error)
-	ResizePty(ctx context.Context, in *ResizePtyRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error)
-	CloseIO(ctx context.Context, in *CloseIORequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error)
-	// ShimInfo returns information about the shim.
-	ShimInfo(ctx context.Context, in *google_protobuf1.Empty, opts ...grpc.CallOption) (*ShimInfoResponse, error)
-	Update(ctx context.Context, in *UpdateTaskRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error)
-	Wait(ctx context.Context, in *WaitRequest, opts ...grpc.CallOption) (*WaitResponse, error)
-}
-
-type shimClient struct {
-	cc *grpc.ClientConn
-}
-
-func NewShimClient(cc *grpc.ClientConn) ShimClient {
-	return &shimClient{cc}
-}
-
-func (c *shimClient) State(ctx context.Context, in *StateRequest, opts ...grpc.CallOption) (*StateResponse, error) {
-	out := new(StateResponse)
-	err := grpc.Invoke(ctx, "/containerd.runtime.linux.shim.v1.Shim/State", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *shimClient) Create(ctx context.Context, in *CreateTaskRequest, opts ...grpc.CallOption) (*CreateTaskResponse, error) {
-	out := new(CreateTaskResponse)
-	err := grpc.Invoke(ctx, "/containerd.runtime.linux.shim.v1.Shim/Create", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *shimClient) Start(ctx context.Context, in *StartRequest, opts ...grpc.CallOption) (*StartResponse, error) {
-	out := new(StartResponse)
-	err := grpc.Invoke(ctx, "/containerd.runtime.linux.shim.v1.Shim/Start", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *shimClient) Delete(ctx context.Context, in *google_protobuf1.Empty, opts ...grpc.CallOption) (*DeleteResponse, error) {
-	out := new(DeleteResponse)
-	err := grpc.Invoke(ctx, "/containerd.runtime.linux.shim.v1.Shim/Delete", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *shimClient) DeleteProcess(ctx context.Context, in *DeleteProcessRequest, opts ...grpc.CallOption) (*DeleteResponse, error) {
-	out := new(DeleteResponse)
-	err := grpc.Invoke(ctx, "/containerd.runtime.linux.shim.v1.Shim/DeleteProcess", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *shimClient) ListPids(ctx context.Context, in *ListPidsRequest, opts ...grpc.CallOption) (*ListPidsResponse, error) {
-	out := new(ListPidsResponse)
-	err := grpc.Invoke(ctx, "/containerd.runtime.linux.shim.v1.Shim/ListPids", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *shimClient) Pause(ctx context.Context, in *google_protobuf1.Empty, opts ...grpc.CallOption) (*google_protobuf1.Empty, error) {
-	out := new(google_protobuf1.Empty)
-	err := grpc.Invoke(ctx, "/containerd.runtime.linux.shim.v1.Shim/Pause", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *shimClient) Resume(ctx context.Context, in *google_protobuf1.Empty, opts ...grpc.CallOption) (*google_protobuf1.Empty, error) {
-	out := new(google_protobuf1.Empty)
-	err := grpc.Invoke(ctx, "/containerd.runtime.linux.shim.v1.Shim/Resume", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *shimClient) Checkpoint(ctx context.Context, in *CheckpointTaskRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error) {
-	out := new(google_protobuf1.Empty)
-	err := grpc.Invoke(ctx, "/containerd.runtime.linux.shim.v1.Shim/Checkpoint", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *shimClient) Kill(ctx context.Context, in *KillRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error) {
-	out := new(google_protobuf1.Empty)
-	err := grpc.Invoke(ctx, "/containerd.runtime.linux.shim.v1.Shim/Kill", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *shimClient) Exec(ctx context.Context, in *ExecProcessRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error) {
-	out := new(google_protobuf1.Empty)
-	err := grpc.Invoke(ctx, "/containerd.runtime.linux.shim.v1.Shim/Exec", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *shimClient) ResizePty(ctx context.Context, in *ResizePtyRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error) {
-	out := new(google_protobuf1.Empty)
-	err := grpc.Invoke(ctx, "/containerd.runtime.linux.shim.v1.Shim/ResizePty", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *shimClient) CloseIO(ctx context.Context, in *CloseIORequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error) {
-	out := new(google_protobuf1.Empty)
-	err := grpc.Invoke(ctx, "/containerd.runtime.linux.shim.v1.Shim/CloseIO", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *shimClient) ShimInfo(ctx context.Context, in *google_protobuf1.Empty, opts ...grpc.CallOption) (*ShimInfoResponse, error) {
-	out := new(ShimInfoResponse)
-	err := grpc.Invoke(ctx, "/containerd.runtime.linux.shim.v1.Shim/ShimInfo", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *shimClient) Update(ctx context.Context, in *UpdateTaskRequest, opts ...grpc.CallOption) (*google_protobuf1.Empty, error) {
-	out := new(google_protobuf1.Empty)
-	err := grpc.Invoke(ctx, "/containerd.runtime.linux.shim.v1.Shim/Update", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *shimClient) Wait(ctx context.Context, in *WaitRequest, opts ...grpc.CallOption) (*WaitResponse, error) {
-	out := new(WaitResponse)
-	err := grpc.Invoke(ctx, "/containerd.runtime.linux.shim.v1.Shim/Wait", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// Server API for Shim service
-
-type ShimServer interface {
-	// State returns shim and task state information.
-	State(context.Context, *StateRequest) (*StateResponse, error)
-	Create(context.Context, *CreateTaskRequest) (*CreateTaskResponse, error)
-	Start(context.Context, *StartRequest) (*StartResponse, error)
-	Delete(context.Context, *google_protobuf1.Empty) (*DeleteResponse, error)
-	DeleteProcess(context.Context, *DeleteProcessRequest) (*DeleteResponse, error)
-	ListPids(context.Context, *ListPidsRequest) (*ListPidsResponse, error)
-	Pause(context.Context, *google_protobuf1.Empty) (*google_protobuf1.Empty, error)
-	Resume(context.Context, *google_protobuf1.Empty) (*google_protobuf1.Empty, error)
-	Checkpoint(context.Context, *CheckpointTaskRequest) (*google_protobuf1.Empty, error)
-	Kill(context.Context, *KillRequest) (*google_protobuf1.Empty, error)
-	Exec(context.Context, *ExecProcessRequest) (*google_protobuf1.Empty, error)
-	ResizePty(context.Context, *ResizePtyRequest) (*google_protobuf1.Empty, error)
-	CloseIO(context.Context, *CloseIORequest) (*google_protobuf1.Empty, error)
-	// ShimInfo returns information about the shim.
-	ShimInfo(context.Context, *google_protobuf1.Empty) (*ShimInfoResponse, error)
-	Update(context.Context, *UpdateTaskRequest) (*google_protobuf1.Empty, error)
-	Wait(context.Context, *WaitRequest) (*WaitResponse, error)
-}
-
-func RegisterShimServer(s *grpc.Server, srv ShimServer) {
-	s.RegisterService(&_Shim_serviceDesc, srv)
-}
-
-func _Shim_State_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StateRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShimServer).State(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/containerd.runtime.linux.shim.v1.Shim/State",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServer).State(ctx, req.(*StateRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Shim_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateTaskRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShimServer).Create(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/containerd.runtime.linux.shim.v1.Shim/Create",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServer).Create(ctx, req.(*CreateTaskRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Shim_Start_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StartRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShimServer).Start(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/containerd.runtime.linux.shim.v1.Shim/Start",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServer).Start(ctx, req.(*StartRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Shim_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(google_protobuf1.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShimServer).Delete(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/containerd.runtime.linux.shim.v1.Shim/Delete",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServer).Delete(ctx, req.(*google_protobuf1.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Shim_DeleteProcess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeleteProcessRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShimServer).DeleteProcess(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/containerd.runtime.linux.shim.v1.Shim/DeleteProcess",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServer).DeleteProcess(ctx, req.(*DeleteProcessRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Shim_ListPids_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListPidsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShimServer).ListPids(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/containerd.runtime.linux.shim.v1.Shim/ListPids",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServer).ListPids(ctx, req.(*ListPidsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Shim_Pause_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(google_protobuf1.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShimServer).Pause(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/containerd.runtime.linux.shim.v1.Shim/Pause",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServer).Pause(ctx, req.(*google_protobuf1.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Shim_Resume_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(google_protobuf1.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShimServer).Resume(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/containerd.runtime.linux.shim.v1.Shim/Resume",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServer).Resume(ctx, req.(*google_protobuf1.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Shim_Checkpoint_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CheckpointTaskRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShimServer).Checkpoint(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/containerd.runtime.linux.shim.v1.Shim/Checkpoint",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServer).Checkpoint(ctx, req.(*CheckpointTaskRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Shim_Kill_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(KillRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShimServer).Kill(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/containerd.runtime.linux.shim.v1.Shim/Kill",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServer).Kill(ctx, req.(*KillRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Shim_Exec_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ExecProcessRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShimServer).Exec(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/containerd.runtime.linux.shim.v1.Shim/Exec",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServer).Exec(ctx, req.(*ExecProcessRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Shim_ResizePty_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ResizePtyRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShimServer).ResizePty(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/containerd.runtime.linux.shim.v1.Shim/ResizePty",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServer).ResizePty(ctx, req.(*ResizePtyRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Shim_CloseIO_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CloseIORequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShimServer).CloseIO(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/containerd.runtime.linux.shim.v1.Shim/CloseIO",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServer).CloseIO(ctx, req.(*CloseIORequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Shim_ShimInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(google_protobuf1.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShimServer).ShimInfo(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/containerd.runtime.linux.shim.v1.Shim/ShimInfo",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServer).ShimInfo(ctx, req.(*google_protobuf1.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Shim_Update_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UpdateTaskRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShimServer).Update(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/containerd.runtime.linux.shim.v1.Shim/Update",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServer).Update(ctx, req.(*UpdateTaskRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Shim_Wait_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(WaitRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShimServer).Wait(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/containerd.runtime.linux.shim.v1.Shim/Wait",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShimServer).Wait(ctx, req.(*WaitRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-var _Shim_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "containerd.runtime.linux.shim.v1.Shim",
-	HandlerType: (*ShimServer)(nil),
-	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "State",
-			Handler:    _Shim_State_Handler,
-		},
-		{
-			MethodName: "Create",
-			Handler:    _Shim_Create_Handler,
-		},
-		{
-			MethodName: "Start",
-			Handler:    _Shim_Start_Handler,
-		},
-		{
-			MethodName: "Delete",
-			Handler:    _Shim_Delete_Handler,
-		},
-		{
-			MethodName: "DeleteProcess",
-			Handler:    _Shim_DeleteProcess_Handler,
-		},
-		{
-			MethodName: "ListPids",
-			Handler:    _Shim_ListPids_Handler,
-		},
-		{
-			MethodName: "Pause",
-			Handler:    _Shim_Pause_Handler,
-		},
-		{
-			MethodName: "Resume",
-			Handler:    _Shim_Resume_Handler,
-		},
-		{
-			MethodName: "Checkpoint",
-			Handler:    _Shim_Checkpoint_Handler,
-		},
-		{
-			MethodName: "Kill",
-			Handler:    _Shim_Kill_Handler,
-		},
-		{
-			MethodName: "Exec",
-			Handler:    _Shim_Exec_Handler,
-		},
-		{
-			MethodName: "ResizePty",
-			Handler:    _Shim_ResizePty_Handler,
-		},
-		{
-			MethodName: "CloseIO",
-			Handler:    _Shim_CloseIO_Handler,
-		},
-		{
-			MethodName: "ShimInfo",
-			Handler:    _Shim_ShimInfo_Handler,
-		},
-		{
-			MethodName: "Update",
-			Handler:    _Shim_Update_Handler,
-		},
-		{
-			MethodName: "Wait",
-			Handler:    _Shim_Wait_Handler,
-		},
-	},
-	Streams:  []grpc.StreamDesc{},
-	Metadata: "github.com/containerd/containerd/linux/shim/v1/shim.proto",
-}
-
 func (m *CreateTaskRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -2150,6 +1576,280 @@ func valueToStringShim(v interface{}) string {
 	}
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
+}
+
+type ShimService interface {
+	State(ctx context.Context, req *StateRequest) (*StateResponse, error)
+	Create(ctx context.Context, req *CreateTaskRequest) (*CreateTaskResponse, error)
+	Start(ctx context.Context, req *StartRequest) (*StartResponse, error)
+	Delete(ctx context.Context, req *google_protobuf1.Empty) (*DeleteResponse, error)
+	DeleteProcess(ctx context.Context, req *DeleteProcessRequest) (*DeleteResponse, error)
+	ListPids(ctx context.Context, req *ListPidsRequest) (*ListPidsResponse, error)
+	Pause(ctx context.Context, req *google_protobuf1.Empty) (*google_protobuf1.Empty, error)
+	Resume(ctx context.Context, req *google_protobuf1.Empty) (*google_protobuf1.Empty, error)
+	Checkpoint(ctx context.Context, req *CheckpointTaskRequest) (*google_protobuf1.Empty, error)
+	Kill(ctx context.Context, req *KillRequest) (*google_protobuf1.Empty, error)
+	Exec(ctx context.Context, req *ExecProcessRequest) (*google_protobuf1.Empty, error)
+	ResizePty(ctx context.Context, req *ResizePtyRequest) (*google_protobuf1.Empty, error)
+	CloseIO(ctx context.Context, req *CloseIORequest) (*google_protobuf1.Empty, error)
+	ShimInfo(ctx context.Context, req *google_protobuf1.Empty) (*ShimInfoResponse, error)
+	Update(ctx context.Context, req *UpdateTaskRequest) (*google_protobuf1.Empty, error)
+	Wait(ctx context.Context, req *WaitRequest) (*WaitResponse, error)
+}
+
+func RegisterShimService(srv *github_com_stevvooe_ttrpc.Server, svc ShimService) {
+	srv.Register("containerd.runtime.linux.shim.v1.Shim", map[string]github_com_stevvooe_ttrpc.Method{
+		"State": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+			var req StateRequest
+			if err := unmarshal(&req); err != nil {
+				return nil, err
+			}
+			return svc.State(ctx, &req)
+		},
+		"Create": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+			var req CreateTaskRequest
+			if err := unmarshal(&req); err != nil {
+				return nil, err
+			}
+			return svc.Create(ctx, &req)
+		},
+		"Start": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+			var req StartRequest
+			if err := unmarshal(&req); err != nil {
+				return nil, err
+			}
+			return svc.Start(ctx, &req)
+		},
+		"Delete": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+			var req google_protobuf1.Empty
+			if err := unmarshal(&req); err != nil {
+				return nil, err
+			}
+			return svc.Delete(ctx, &req)
+		},
+		"DeleteProcess": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+			var req DeleteProcessRequest
+			if err := unmarshal(&req); err != nil {
+				return nil, err
+			}
+			return svc.DeleteProcess(ctx, &req)
+		},
+		"ListPids": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+			var req ListPidsRequest
+			if err := unmarshal(&req); err != nil {
+				return nil, err
+			}
+			return svc.ListPids(ctx, &req)
+		},
+		"Pause": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+			var req google_protobuf1.Empty
+			if err := unmarshal(&req); err != nil {
+				return nil, err
+			}
+			return svc.Pause(ctx, &req)
+		},
+		"Resume": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+			var req google_protobuf1.Empty
+			if err := unmarshal(&req); err != nil {
+				return nil, err
+			}
+			return svc.Resume(ctx, &req)
+		},
+		"Checkpoint": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+			var req CheckpointTaskRequest
+			if err := unmarshal(&req); err != nil {
+				return nil, err
+			}
+			return svc.Checkpoint(ctx, &req)
+		},
+		"Kill": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+			var req KillRequest
+			if err := unmarshal(&req); err != nil {
+				return nil, err
+			}
+			return svc.Kill(ctx, &req)
+		},
+		"Exec": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+			var req ExecProcessRequest
+			if err := unmarshal(&req); err != nil {
+				return nil, err
+			}
+			return svc.Exec(ctx, &req)
+		},
+		"ResizePty": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+			var req ResizePtyRequest
+			if err := unmarshal(&req); err != nil {
+				return nil, err
+			}
+			return svc.ResizePty(ctx, &req)
+		},
+		"CloseIO": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+			var req CloseIORequest
+			if err := unmarshal(&req); err != nil {
+				return nil, err
+			}
+			return svc.CloseIO(ctx, &req)
+		},
+		"ShimInfo": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+			var req google_protobuf1.Empty
+			if err := unmarshal(&req); err != nil {
+				return nil, err
+			}
+			return svc.ShimInfo(ctx, &req)
+		},
+		"Update": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+			var req UpdateTaskRequest
+			if err := unmarshal(&req); err != nil {
+				return nil, err
+			}
+			return svc.Update(ctx, &req)
+		},
+		"Wait": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+			var req WaitRequest
+			if err := unmarshal(&req); err != nil {
+				return nil, err
+			}
+			return svc.Wait(ctx, &req)
+		},
+	})
+}
+
+type shimClient struct {
+	client *github_com_stevvooe_ttrpc.Client
+}
+
+func NewShimClient(client *github_com_stevvooe_ttrpc.Client) ShimService {
+	return &shimClient{
+		client: client,
+	}
+}
+
+func (c *shimClient) State(ctx context.Context, req *StateRequest) (*StateResponse, error) {
+	var resp StateResponse
+	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "State", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *shimClient) Create(ctx context.Context, req *CreateTaskRequest) (*CreateTaskResponse, error) {
+	var resp CreateTaskResponse
+	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "Create", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *shimClient) Start(ctx context.Context, req *StartRequest) (*StartResponse, error) {
+	var resp StartResponse
+	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "Start", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *shimClient) Delete(ctx context.Context, req *google_protobuf1.Empty) (*DeleteResponse, error) {
+	var resp DeleteResponse
+	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "Delete", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *shimClient) DeleteProcess(ctx context.Context, req *DeleteProcessRequest) (*DeleteResponse, error) {
+	var resp DeleteResponse
+	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "DeleteProcess", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *shimClient) ListPids(ctx context.Context, req *ListPidsRequest) (*ListPidsResponse, error) {
+	var resp ListPidsResponse
+	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "ListPids", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *shimClient) Pause(ctx context.Context, req *google_protobuf1.Empty) (*google_protobuf1.Empty, error) {
+	var resp google_protobuf1.Empty
+	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "Pause", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *shimClient) Resume(ctx context.Context, req *google_protobuf1.Empty) (*google_protobuf1.Empty, error) {
+	var resp google_protobuf1.Empty
+	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "Resume", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *shimClient) Checkpoint(ctx context.Context, req *CheckpointTaskRequest) (*google_protobuf1.Empty, error) {
+	var resp google_protobuf1.Empty
+	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "Checkpoint", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *shimClient) Kill(ctx context.Context, req *KillRequest) (*google_protobuf1.Empty, error) {
+	var resp google_protobuf1.Empty
+	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "Kill", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *shimClient) Exec(ctx context.Context, req *ExecProcessRequest) (*google_protobuf1.Empty, error) {
+	var resp google_protobuf1.Empty
+	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "Exec", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *shimClient) ResizePty(ctx context.Context, req *ResizePtyRequest) (*google_protobuf1.Empty, error) {
+	var resp google_protobuf1.Empty
+	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "ResizePty", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *shimClient) CloseIO(ctx context.Context, req *CloseIORequest) (*google_protobuf1.Empty, error) {
+	var resp google_protobuf1.Empty
+	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "CloseIO", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *shimClient) ShimInfo(ctx context.Context, req *google_protobuf1.Empty) (*ShimInfoResponse, error) {
+	var resp ShimInfoResponse
+	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "ShimInfo", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *shimClient) Update(ctx context.Context, req *UpdateTaskRequest) (*google_protobuf1.Empty, error) {
+	var resp google_protobuf1.Empty
+	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "Update", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *shimClient) Wait(ctx context.Context, req *WaitRequest) (*WaitResponse, error) {
+	var resp WaitResponse
+	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "Wait", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }
 func (m *CreateTaskRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)

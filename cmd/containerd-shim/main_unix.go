@@ -25,8 +25,8 @@ import (
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/sirupsen/logrus"
+	"github.com/stevvooe/ttrpc"
 	"golang.org/x/sys/unix"
-	"google.golang.org/grpc"
 )
 
 var (
@@ -100,7 +100,8 @@ func executeShim() error {
 		return err
 	}
 	logrus.Debug("registering grpc server")
-	shimapi.RegisterShimServer(server, sv)
+	shimapi.RegisterShimService(server, sv)
+
 	socket := socketFlag
 	if err := serve(server, socket); err != nil {
 		return err
@@ -115,7 +116,7 @@ func executeShim() error {
 
 // serve serves the grpc API over a unix socket at the provided path
 // this function does not block
-func serve(server *grpc.Server, path string) error {
+func serve(server *ttrpc.Server, path string) error {
 	var (
 		l   net.Listener
 		err error
@@ -140,7 +141,7 @@ func serve(server *grpc.Server, path string) error {
 	return nil
 }
 
-func handleSignals(logger *logrus.Entry, signals chan os.Signal, server *grpc.Server, sv *shim.Service) error {
+func handleSignals(logger *logrus.Entry, signals chan os.Signal, server *ttrpc.Server, sv *shim.Service) error {
 	var (
 		termOnce sync.Once
 		done     = make(chan struct{})
@@ -158,9 +159,12 @@ func handleSignals(logger *logrus.Entry, signals chan os.Signal, server *grpc.Se
 				}
 			case unix.SIGTERM, unix.SIGINT:
 				go termOnce.Do(func() {
-					server.Stop()
+					ctx := context.TODO()
+					if err := server.Shutdown(ctx); err != nil {
+						logger.WithError(err).Error("failed to shutdown server")
+					}
 					// Ensure our child is dead if any
-					sv.Kill(context.Background(), &shimapi.KillRequest{
+					sv.Kill(ctx, &shimapi.KillRequest{
 						Signal: uint32(syscall.SIGKILL),
 						All:    true,
 					})
