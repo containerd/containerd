@@ -31,6 +31,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var (
@@ -367,7 +368,7 @@ func (s *service) ListPids(ctx context.Context, r *api.ListPidsRequest) (*api.Li
 
 func (s *service) Exec(ctx context.Context, r *api.ExecProcessRequest) (*ptypes.Empty, error) {
 	if r.ExecID == "" {
-		return nil, grpc.Errorf(codes.InvalidArgument, "exec id cannot be empty")
+		return nil, status.Errorf(codes.InvalidArgument, "exec id cannot be empty")
 	}
 	t, err := s.getTask(ctx, r.ContainerID)
 	if err != nil {
@@ -605,7 +606,7 @@ func (s *service) getTaskFromContainer(ctx context.Context, container *container
 	}
 	t, err := runtime.Get(ctx, container.ID)
 	if err != nil {
-		return nil, grpc.Errorf(codes.NotFound, "task %v not found", container.ID)
+		return nil, status.Errorf(codes.NotFound, "task %v not found", container.ID)
 	}
 	return t, nil
 }
@@ -613,7 +614,7 @@ func (s *service) getTaskFromContainer(ctx context.Context, container *container
 func (s *service) getRuntime(name string) (runtime.Runtime, error) {
 	runtime, ok := s.runtimes[name]
 	if !ok {
-		return nil, grpc.Errorf(codes.NotFound, "unknown runtime %q", name)
+		return nil, status.Errorf(codes.NotFound, "unknown runtime %q", name)
 	}
 	return runtime, nil
 }

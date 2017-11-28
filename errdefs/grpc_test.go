@@ -3,8 +3,8 @@ package errdefs
 import (
 	"testing"
 
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/pkg/errors"
 )
@@ -31,7 +31,7 @@ func TestGRPCRoundTrip(t *testing.T) {
 			str:   "test test test: failed precondition",
 		},
 		{
-			input: grpc.Errorf(codes.Unavailable, "should be not available"),
+			input: status.Errorf(codes.Unavailable, "should be not available"),
 			cause: ErrUnavailable,
 			str:   "should be not available: unavailable",
 		},
