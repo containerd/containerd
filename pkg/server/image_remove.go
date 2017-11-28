@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/images"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -63,14 +64,17 @@ func (c *criContainerdService) RemoveImage(ctx context.Context, r *runtime.Remov
 	}
 
 	// Include all image references, including RepoTag, RepoDigest and id.
-	for _, ref := range append(append(image.RepoTags, image.RepoDigests...), image.ID) {
-		// TODO(random-liu): Containerd should schedule a garbage collection immediately,
-		// and we may want to wait for the garbage collection to be over here.
+	for _, ref := range append(image.RepoTags, image.RepoDigests...) {
 		err = c.imageStoreService.Delete(ctx, ref)
 		if err == nil || errdefs.IsNotFound(err) {
 			continue
 		}
 		return nil, fmt.Errorf("failed to delete image reference %q for image %q: %v", ref, image.ID, err)
+	}
+	// Delete image id synchronously to trigger garbage collection.
+	err = c.imageStoreService.Delete(ctx, image.ID, images.SynchronousDelete())
+	if err != nil && !errdefs.IsNotFound(err) {
+		return nil, fmt.Errorf("failed to delete image id %q: %v", image.ID, err)
 	}
 	c.imageStore.Delete(image.ID)
 	return &runtime.RemoveImageResponse{}, nil
