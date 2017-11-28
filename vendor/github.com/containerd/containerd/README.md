@@ -78,7 +78,7 @@ containerd fully supports the OCI runtime specification for running containers. 
 You can specify options when creating a container about how to modify the specification.
 
 ```go
-redis, err := client.NewContainer(context, "redis-master", containerd.WithNewSpec(containerd.WithImageConfig(image)))
+redis, err := client.NewContainer(context, "redis-master", containerd.WithNewSpec(oci.WithImageConfig(image)))
 ```
 
 ### Root Filesystems
@@ -92,7 +92,7 @@ image, err := client.Pull(context, "docker.io/library/redis:latest", containerd.
 // allocate a new RW root filesystem for a container based on the image
 redis, err := client.NewContainer(context, "redis-master",
 	containerd.WithNewSnapshot("redis-rootfs", image),
-	containerd.WithNewSpec(containerd.WithImageConfig(image)),
+	containerd.WithNewSpec(oci.WithImageConfig(image)),
 
 )
 
@@ -101,7 +101,7 @@ for i := 0; i < 10; i++ {
 	id := fmt.Sprintf("id-%s", i)
 	container, err := client.NewContainer(ctx, id,
 		containerd.WithNewSnapshotView(id, image),
-		containerd.WithNewSpec(containerd.WithImageConfig(image)),
+		containerd.WithNewSpec(oci.WithImageConfig(image)),
 	)
 }
 ```

@@ -74,9 +74,16 @@ func (s *remoteImages) Update(ctx context.Context, image images.Image, fieldpath
 	return imageFromProto(&updated.Image), nil
 }
 
-func (s *remoteImages) Delete(ctx context.Context, name string) error {
+func (s *remoteImages) Delete(ctx context.Context, name string, opts ...images.DeleteOpt) error {
+	var do images.DeleteOptions
+	for _, opt := range opts {
+		if err := opt(ctx, &do); err != nil {
+			return err
+		}
+	}
 	_, err := s.client.Delete(ctx, &imagesapi.DeleteImageRequest{
 		Name: name,
+		Sync: do.Synchronous,
 	})
 
 	return errdefs.FromGRPC(err)
