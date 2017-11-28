@@ -15,6 +15,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func init() {
@@ -142,7 +143,7 @@ func (s *service) Update(ctx context.Context, req *api.UpdateNamespaceRequest) (
 						return err
 					}
 				default:
-					return grpc.Errorf(codes.InvalidArgument, "cannot update %q field", path)
+					return status.Errorf(codes.InvalidArgument, "cannot update %q field", path)
 				}
 			}
 		} else {
