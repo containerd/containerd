@@ -21,10 +21,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
@@ -722,7 +722,7 @@ func TestGenerateSeccompSpecOpts(t *testing.T) {
 		profile    string
 		privileged bool
 		disable    bool
-		specOpts   containerd.SpecOpts
+		specOpts   oci.SpecOpts
 		expectErr  bool
 	}{
 		"should return error if seccomp is specified when seccomp is not supported": {
@@ -783,7 +783,7 @@ func TestGenerateApparmorSpecOpts(t *testing.T) {
 		profile    string
 		privileged bool
 		disable    bool
-		specOpts   containerd.SpecOpts
+		specOpts   oci.SpecOpts
 		expectErr  bool
 	}{
 		"should return error if apparmor is specified when apparmor is not supported": {

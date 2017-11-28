@@ -115,4 +115,10 @@ message ListImagesResponse {
 
 message DeleteImageRequest {
 	string name = 1;
+
+	// Sync indicates that the delete and cleanup should be done
+	// synchronously before returning to the caller
+	//
+	// Default is false
+	bool sync = 2;
 }
