@@ -1,17 +1,20 @@
 package main
 
-import "github.com/containerd/containerd/server"
+import (
+	"github.com/containerd/containerd/defaults"
+	"github.com/containerd/containerd/server"
+)
 
 func defaultConfig() *server.Config {
 	return &server.Config{
-		Root:  server.DefaultRootDir,
-		State: server.DefaultStateDir,
+		Root:  defaults.DefaultRootDir,
+		State: defaults.DefaultStateDir,
 		GRPC: server.GRPCConfig{
-			Address: server.DefaultAddress,
+			Address: defaults.DefaultAddress,
 		},
 		Debug: server.Debug{
 			Level:   "info",
-			Address: server.DefaultDebugAddress,
+			Address: defaults.DefaultDebugAddress,
 		},
 	}
 }
