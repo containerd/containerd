@@ -38,7 +38,7 @@ func (c *criContainerdService) LoadImage(ctx context.Context, r *api.LoadImageRe
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %v", err)
 	}
-	repoTags, err := importer.Import(ctx, c.client.ContentStore(), c.client.ImageService(), f)
+	repoTags, err := importer.Import(ctx, c.client, f)
 	if err != nil {
 		return nil, fmt.Errorf("failed to import image: %v", err)
 	}
