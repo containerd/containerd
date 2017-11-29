@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/types"
 )
 
@@ -13,6 +14,36 @@ type Envelope struct {
 	Namespace string
 	Topic     string
 	Event     *types.Any
+}
+
+// Field returns the value for the given fieldpath as a string, if defined.
+// If the value is not defined, the second value will be false.
+func (e *Envelope) Field(fieldpath []string) (string, bool) {
+	if len(fieldpath) == 0 {
+		return "", false
+	}
+
+	switch fieldpath[0] {
+	// unhandled: timestamp
+	case "namespace":
+		return string(e.Namespace), len(e.Namespace) > 0
+	case "topic":
+		return string(e.Topic), len(e.Topic) > 0
+	case "event":
+		decoded, err := typeurl.UnmarshalAny(e.Event)
+		if err != nil {
+			return "", false
+		}
+
+		adaptor, ok := decoded.(interface {
+			Field([]string) (string, bool)
+		})
+		if !ok {
+			return "", false
+		}
+		return adaptor.Field(fieldpath[1:])
+	}
+	return "", false
 }
 
 // Event is a generic interface for any type of event
