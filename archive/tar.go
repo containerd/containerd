@@ -82,6 +82,8 @@ const (
 	// whiteoutOpaqueDir file means directory has been made opaque - meaning
 	// readdir calls to this directory do not follow to lower layers.
 	whiteoutOpaqueDir = whiteoutMetaPrefix + ".opq"
+
+	paxSchilyXattr = "SCHILY.xattrs."
 )
 
 // Apply applies a tar stream of an OCI style diff tar.
@@ -388,9 +390,10 @@ func (cw *changeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 		if capability, err := getxattr(source, "security.capability"); err != nil {
 			return errors.Wrap(err, "failed to get capabilities xattr")
 		} else if capability != nil {
-			hdr.Xattrs = map[string]string{
-				"security.capability": string(capability),
+			if hdr.PAXRecords == nil {
+				hdr.PAXRecords = map[string]string{}
 			}
+			hdr.PAXRecords[paxSchilyXattr+"security.capability"] = string(capability)
 		}
 
 		if err := cw.tw.WriteHeader(hdr); err != nil {
@@ -509,13 +512,16 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 		}
 	}
 
-	for key, value := range hdr.Xattrs {
-		if err := setxattr(path, key, value); err != nil {
-			if errors.Cause(err) == syscall.ENOTSUP {
-				log.G(ctx).WithError(err).Warnf("ignored xattr %s in archive", key)
-				continue
+	for key, value := range hdr.PAXRecords {
+		if strings.HasPrefix(key, paxSchilyXattr) {
+			key = key[len(paxSchilyXattr):]
+			if err := setxattr(path, key, value); err != nil {
+				if errors.Cause(err) == syscall.ENOTSUP {
+					log.G(ctx).WithError(err).Warnf("ignored xattr %s in archive", key)
+					continue
+				}
+				return err
 			}
-			return err
 		}
 	}
 
