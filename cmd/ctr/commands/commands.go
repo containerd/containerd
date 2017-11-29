@@ -14,9 +14,10 @@ var (
 	// SnapshotterFlags are cli flags specifying snapshotter names
 	SnapshotterFlags = []cli.Flag{
 		cli.StringFlag{
-			Name:  "snapshotter",
-			Usage: "snapshotter name. Empty value stands for the daemon default value.",
-			Value: containerd.DefaultSnapshotter,
+			Name:   "snapshotter",
+			Usage:  "snapshotter name. Empty value stands for the default value.",
+			Value:  containerd.DefaultSnapshotter,
+			EnvVar: "CONTAINERD_SNAPSHOTTER",
 		},
 	}
 
