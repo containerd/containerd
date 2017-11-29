@@ -43,6 +43,20 @@ You can move them in your global path with:
 sudo make install
 ```
 
+### Static binaries
+
+You can build static binaries by providing a few variables to `make`:
+
+```sudo
+make	EXTRA_FLAGS="-buildmode pie" \
+	EXTRA_LDFLAGS='-extldflags "-fno-PIC -static"' \
+	BUILDTAGS="static_build"
+```
+
+Note that
+ - static build is discouraged
+ - static containerd binary does not support plugins loading
+
 ## Via Docker Container
 
 ### Build containerd
