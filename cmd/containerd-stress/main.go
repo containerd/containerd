@@ -239,9 +239,9 @@ func (w *worker) runContainer(ctx context.Context, id string) error {
 				logrus.WithError(err).Error("exec failure")
 			}
 		}
-	}
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
-		return err
+		if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+			return err
+		}
 	}
 	status := <-statusC
 	_, _, err = status.Result()
