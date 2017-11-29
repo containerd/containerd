@@ -81,13 +81,13 @@ func SubvolInfo(path string) (info Info, err error) {
 	}
 
 	if info, ok := subvolsByID[id]; ok {
-		return info, nil
+		return *info, nil
 	}
 
 	return info, errors.Errorf("%q not found", path)
 }
 
-func subvolMap(path string) (map[uint64]Info, error) {
+func subvolMap(path string) (map[uint64]*Info, error) {
 	fp, err := openSubvolDir(path)
 	if err != nil {
 		return nil, err
@@ -104,7 +104,7 @@ func subvolMap(path string) (map[uint64]Info, error) {
 	args.key.max_offset = C.negative_one
 	args.key.max_transid = C.negative_one
 
-	subvolsByID := map[uint64]Info{}
+	subvolsByID := make(map[uint64]*Info)
 
 	for {
 		args.key.nr_items = 4096
@@ -127,6 +127,9 @@ func subvolMap(path string) (map[uint64]Info, error) {
 			buf = buf[shSize:]
 
 			info := subvolsByID[uint64(sh.objectid)]
+			if info == nil {
+				info = &Info{}
+			}
 			info.ID = uint64(sh.objectid)
 
 			if sh._type == C.BTRFS_ROOT_BACKREF_KEY {
@@ -233,7 +236,7 @@ func SubvolList(path string) ([]Info, error) {
 
 	subvols := make([]Info, 0, len(subvolsByID))
 	for _, sv := range subvolsByID {
-		subvols = append(subvols, sv)
+		subvols = append(subvols, *sv)
 	}
 
 	sort.Sort(infosByID(subvols))
@@ -391,4 +394,115 @@ func isFileInfoSubvol(fi os.FileInfo) error {
 	}
 
 	return nil
+}
+
+// QuotaCtl enables or disables quota
+func QuotaCtl(path string, enable bool) error {
+	cmd := C.__u64(C.BTRFS_QUOTA_CTL_DISABLE)
+	if enable {
+		cmd = C.BTRFS_QUOTA_CTL_ENABLE
+	}
+	return quotaCtl(path, cmd)
+}
+
+func quotaCtl(path string, cmd C.__u64) error {
+	fp, err := openSubvolDir(path)
+	if err != nil {
+		return err
+	}
+	defer fp.Close()
+	var args C.struct_btrfs_ioctl_quota_ctl_args
+	args.cmd = cmd
+	return ioctl(fp.Fd(), C.BTRFS_IOC_QUOTA_CTL, uintptr(unsafe.Pointer(&args)))
+}
+
+func QGroupInfo(path string) ([]*QGroupInfoItem, error) {
+	fp, err := openSubvolDir(path)
+	if err != nil {
+		return nil, err
+	}
+	defer fp.Close()
+
+	var args C.struct_btrfs_ioctl_search_args
+
+	args.key.tree_id = C.BTRFS_QUOTA_TREE_OBJECTID
+	args.key.min_type = C.BTRFS_QGROUP_INFO_KEY
+	args.key.max_type = C.BTRFS_QGROUP_INFO_KEY // TODO(AkihiroSuda): add more keys
+	args.key.max_objectid = C.negative_one
+	args.key.max_offset = C.negative_one
+	args.key.max_transid = C.negative_one
+
+	var items []*QGroupInfoItem
+	for {
+		args.key.nr_items = 4096
+		if err := ioctl(fp.Fd(), C.BTRFS_IOC_TREE_SEARCH, uintptr(unsafe.Pointer(&args))); err != nil {
+			return nil, err
+		}
+
+		if args.key.nr_items == 0 {
+			break
+		}
+
+		var (
+			sh     C.struct_btrfs_ioctl_search_header
+			shSize = unsafe.Sizeof(sh)
+			buf    = (*[1<<31 - 1]byte)(unsafe.Pointer(&args.buf[0]))[:C.BTRFS_SEARCH_ARGS_BUFSIZE]
+		)
+
+		for i := 0; i < int(args.key.nr_items); i++ {
+			sh = (*(*C.struct_btrfs_ioctl_search_header)(unsafe.Pointer(&buf[0])))
+			buf = buf[shSize:]
+
+			if sh._type == C.BTRFS_QGROUP_INFO_KEY {
+				ii := (*(*C.struct_btrfs_qgroup_info_item)(unsafe.Pointer(&buf[0])))
+				qgroupID := uint64(sh.offset)
+				item := &QGroupInfoItem{
+					QGroupIDHigh:         uint16(qgroupID >> 48),     // higher 16 bits, aka "level"
+					QGroupIDLow:          qgroupID & ((1 << 48) - 1), // lower 48 bits
+					Generation:           uint64(ii.generation),
+					Referenced:           uint64(ii.referenced),
+					ReferencedCompressed: uint64(ii.referenced_compressed),
+					Exclusive:            uint64(ii.exclusive),
+					ExclusiveCompressed:  uint64(ii.exclusive_compressed),
+				}
+				items = append(items, item)
+			}
+
+			args.key.min_objectid = sh.objectid
+			args.key.min_offset = sh.offset
+			args.key.min_type = sh._type //  this is very questionable.
+
+			buf = buf[sh.len:]
+		}
+
+		args.key.min_offset++
+		if args.key.min_offset == 0 {
+			args.key.min_type++
+		} else {
+			continue
+		}
+
+		if args.key.min_type > C.BTRFS_QGROUP_INFO_KEY {
+			args.key.min_objectid++
+		} else {
+			continue
+		}
+
+		if args.key.min_objectid > args.key.max_objectid {
+			break
+		}
+	}
+
+	return items, nil
+}
+
+// Sync calls BTRFS_IOC_SYNC
+func Sync(path string) error {
+	fp, err := openSubvolDir(path)
+	if err != nil {
+		return err
+	}
+	defer fp.Close()
+
+	return ioctl(fp.Fd(), C.BTRFS_IOC_SYNC, 0)
 }
