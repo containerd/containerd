@@ -16,8 +16,8 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/snapshot"
-	"github.com/containerd/containerd/snapshot/storage"
+	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/pkg/errors"
 )
 
@@ -41,7 +41,7 @@ type snapshotter struct {
 // NewSnapshotter returns a Snapshotter which uses overlayfs. The overlayfs
 // diffs are stored under the provided root. A metadata file is stored under
 // the root.
-func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
+func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
 	}
@@ -72,34 +72,34 @@ func NewSnapshotter(root string) (snapshot.Snapshotter, error) {
 //
 // Should be used for parent resolution, existence checks and to discern
 // the kind of snapshot.
-func (o *snapshotter) Stat(ctx context.Context, key string) (snapshot.Info, error) {
+func (o *snapshotter) Stat(ctx context.Context, key string) (snapshots.Info, error) {
 	ctx, t, err := o.ms.TransactionContext(ctx, false)
 	if err != nil {
-		return snapshot.Info{}, err
+		return snapshots.Info{}, err
 	}
 	defer t.Rollback()
 	_, info, _, err := storage.GetInfo(ctx, key)
 	if err != nil {
-		return snapshot.Info{}, err
+		return snapshots.Info{}, err
 	}
 
 	return info, nil
 }
 
-func (o *snapshotter) Update(ctx context.Context, info snapshot.Info, fieldpaths ...string) (snapshot.Info, error) {
+func (o *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
 	ctx, t, err := o.ms.TransactionContext(ctx, true)
 	if err != nil {
-		return snapshot.Info{}, err
+		return snapshots.Info{}, err
 	}
 
 	info, err = storage.UpdateInfo(ctx, info, fieldpaths...)
 	if err != nil {
 		t.Rollback()
-		return snapshot.Info{}, err
+		return snapshots.Info{}, err
 	}
 
 	if err := t.Commit(); err != nil {
-		return snapshot.Info{}, err
+		return snapshots.Info{}, err
 	}
 
 	return info, nil
@@ -111,39 +111,39 @@ func (o *snapshotter) Update(ctx context.Context, info snapshot.Info, fieldpaths
 // "upper") directory and may take some time.
 //
 // For committed snapshots, the value is returned from the metadata database.
-func (o *snapshotter) Usage(ctx context.Context, key string) (snapshot.Usage, error) {
+func (o *snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
 	ctx, t, err := o.ms.TransactionContext(ctx, false)
 	if err != nil {
-		return snapshot.Usage{}, err
+		return snapshots.Usage{}, err
 	}
 	id, info, usage, err := storage.GetInfo(ctx, key)
 	t.Rollback() // transaction no longer needed at this point.
 
 	if err != nil {
-		return snapshot.Usage{}, err
+		return snapshots.Usage{}, err
 	}
 
 	upperPath := o.upperPath(id)
 
-	if info.Kind == snapshot.KindActive {
+	if info.Kind == snapshots.KindActive {
 		du, err := fs.DiskUsage(upperPath)
 		if err != nil {
 			// TODO(stevvooe): Consider not reporting an error in this case.
-			return snapshot.Usage{}, err
+			return snapshots.Usage{}, err
 		}
 
-		usage = snapshot.Usage(du)
+		usage = snapshots.Usage(du)
 	}
 
 	return usage, nil
 }
 
-func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshot.Opt) ([]mount.Mount, error) {
-	return o.createSnapshot(ctx, snapshot.KindActive, key, parent, opts)
+func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	return o.createSnapshot(ctx, snapshots.KindActive, key, parent, opts)
 }
 
-func (o *snapshotter) View(ctx context.Context, key, parent string, opts ...snapshot.Opt) ([]mount.Mount, error) {
-	return o.createSnapshot(ctx, snapshot.KindView, key, parent, opts)
+func (o *snapshotter) View(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	return o.createSnapshot(ctx, snapshots.KindView, key, parent, opts)
 }
 
 // Mounts returns the mounts for the transaction identified by key. Can be
@@ -163,7 +163,7 @@ func (o *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 	return o.mounts(s), nil
 }
 
-func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshot.Opt) error {
+func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
 	ctx, t, err := o.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return err
@@ -188,7 +188,7 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		return err
 	}
 
-	if _, err = storage.CommitActive(ctx, key, name, snapshot.Usage(usage), opts...); err != nil {
+	if _, err = storage.CommitActive(ctx, key, name, snapshots.Usage(usage), opts...); err != nil {
 		return errors.Wrap(err, "failed to commit snapshot")
 	}
 	return t.Commit()
@@ -238,7 +238,7 @@ func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 }
 
 // Walk the committed snapshots.
-func (o *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshot.Info) error) error {
+func (o *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshots.Info) error) error {
 	ctx, t, err := o.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return err
@@ -247,7 +247,7 @@ func (o *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 	return storage.WalkInfo(ctx, fn)
 }
 
-func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshot.Kind, key, parent string, opts []snapshot.Opt) ([]mount.Mount, error) {
+func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts []snapshots.Opt) ([]mount.Mount, error) {
 	var (
 		path        string
 		snapshotDir = filepath.Join(o.root, "snapshots")
@@ -277,7 +277,7 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshot.Kind, ke
 		return nil, err
 	}
 
-	if kind == snapshot.KindActive {
+	if kind == snapshots.KindActive {
 		if err = os.MkdirAll(filepath.Join(td, "work"), 0711); err != nil {
 			return nil, err
 		}
@@ -336,7 +336,7 @@ func (o *snapshotter) mounts(s storage.Snapshot) []mount.Mount {
 		// if we only have one layer/no parents then just return a bind mount as overlay
 		// will not work
 		roFlag := "rw"
-		if s.Kind == snapshot.KindView {
+		if s.Kind == snapshots.KindView {
 			roFlag = "ro"
 		}
 
@@ -353,7 +353,7 @@ func (o *snapshotter) mounts(s storage.Snapshot) []mount.Mount {
 	}
 	var options []string
 
-	if s.Kind == snapshot.KindActive {
+	if s.Kind == snapshots.KindActive {
 		options = append(options,
 			fmt.Sprintf("workdir=%s", o.workPath(s.ID)),
 			fmt.Sprintf("upperdir=%s", o.upperPath(s.ID)),

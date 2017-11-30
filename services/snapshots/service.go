@@ -1,10 +1,10 @@
-package snapshot
+package snapshots
 
 import (
 	gocontext "context"
 
 	eventstypes "github.com/containerd/containerd/api/events"
-	snapshotapi "github.com/containerd/containerd/api/services/snapshot/v1"
+	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
@@ -12,7 +12,7 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/snapshots"
 	ptypes "github.com/gogo/protobuf/types"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -48,7 +48,7 @@ func newService(ic *plugin.InitContext) (interface{}, error) {
 	}, nil
 }
 
-func (s *service) getSnapshotter(name string) (snapshot.Snapshotter, error) {
+func (s *service) getSnapshotter(name string) (snapshots.Snapshotter, error) {
 	if name == "" {
 		return nil, errdefs.ToGRPCf(errdefs.ErrInvalidArgument, "snapshotter argument missing")
 	}
@@ -61,20 +61,20 @@ func (s *service) getSnapshotter(name string) (snapshot.Snapshotter, error) {
 }
 
 func (s *service) Register(gs *grpc.Server) error {
-	snapshotapi.RegisterSnapshotsServer(gs, s)
+	snapshotsapi.RegisterSnapshotsServer(gs, s)
 	return nil
 }
 
-func (s *service) Prepare(ctx context.Context, pr *snapshotapi.PrepareSnapshotRequest) (*snapshotapi.PrepareSnapshotResponse, error) {
+func (s *service) Prepare(ctx context.Context, pr *snapshotsapi.PrepareSnapshotRequest) (*snapshotsapi.PrepareSnapshotResponse, error) {
 	log.G(ctx).WithField("parent", pr.Parent).WithField("key", pr.Key).Debugf("Preparing snapshot")
 	sn, err := s.getSnapshotter(pr.Snapshotter)
 	if err != nil {
 		return nil, err
 	}
 
-	var opts []snapshot.Opt
+	var opts []snapshots.Opt
 	if pr.Labels != nil {
-		opts = append(opts, snapshot.WithLabels(pr.Labels))
+		opts = append(opts, snapshots.WithLabels(pr.Labels))
 	}
 	mounts, err := sn.Prepare(ctx, pr.Key, pr.Parent, opts...)
 	if err != nil {
@@ -87,31 +87,31 @@ func (s *service) Prepare(ctx context.Context, pr *snapshotapi.PrepareSnapshotRe
 	}); err != nil {
 		return nil, err
 	}
-	return &snapshotapi.PrepareSnapshotResponse{
+	return &snapshotsapi.PrepareSnapshotResponse{
 		Mounts: fromMounts(mounts),
 	}, nil
 }
 
-func (s *service) View(ctx context.Context, pr *snapshotapi.ViewSnapshotRequest) (*snapshotapi.ViewSnapshotResponse, error) {
+func (s *service) View(ctx context.Context, pr *snapshotsapi.ViewSnapshotRequest) (*snapshotsapi.ViewSnapshotResponse, error) {
 	log.G(ctx).WithField("parent", pr.Parent).WithField("key", pr.Key).Debugf("Preparing view snapshot")
 	sn, err := s.getSnapshotter(pr.Snapshotter)
 	if err != nil {
 		return nil, err
 	}
-	var opts []snapshot.Opt
+	var opts []snapshots.Opt
 	if pr.Labels != nil {
-		opts = append(opts, snapshot.WithLabels(pr.Labels))
+		opts = append(opts, snapshots.WithLabels(pr.Labels))
 	}
 	mounts, err := sn.View(ctx, pr.Key, pr.Parent, opts...)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-	return &snapshotapi.ViewSnapshotResponse{
+	return &snapshotsapi.ViewSnapshotResponse{
 		Mounts: fromMounts(mounts),
 	}, nil
 }
 
-func (s *service) Mounts(ctx context.Context, mr *snapshotapi.MountsRequest) (*snapshotapi.MountsResponse, error) {
+func (s *service) Mounts(ctx context.Context, mr *snapshotsapi.MountsRequest) (*snapshotsapi.MountsResponse, error) {
 	log.G(ctx).WithField("key", mr.Key).Debugf("Getting snapshot mounts")
 	sn, err := s.getSnapshotter(mr.Snapshotter)
 	if err != nil {
@@ -122,21 +122,21 @@ func (s *service) Mounts(ctx context.Context, mr *snapshotapi.MountsRequest) (*s
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-	return &snapshotapi.MountsResponse{
+	return &snapshotsapi.MountsResponse{
 		Mounts: fromMounts(mounts),
 	}, nil
 }
 
-func (s *service) Commit(ctx context.Context, cr *snapshotapi.CommitSnapshotRequest) (*ptypes.Empty, error) {
+func (s *service) Commit(ctx context.Context, cr *snapshotsapi.CommitSnapshotRequest) (*ptypes.Empty, error) {
 	log.G(ctx).WithField("key", cr.Key).WithField("name", cr.Name).Debugf("Committing snapshot")
 	sn, err := s.getSnapshotter(cr.Snapshotter)
 	if err != nil {
 		return nil, err
 	}
 
-	var opts []snapshot.Opt
+	var opts []snapshots.Opt
 	if cr.Labels != nil {
-		opts = append(opts, snapshot.WithLabels(cr.Labels))
+		opts = append(opts, snapshots.WithLabels(cr.Labels))
 	}
 	if err := sn.Commit(ctx, cr.Name, cr.Key, opts...); err != nil {
 		return nil, errdefs.ToGRPC(err)
@@ -151,7 +151,7 @@ func (s *service) Commit(ctx context.Context, cr *snapshotapi.CommitSnapshotRequ
 	return empty, nil
 }
 
-func (s *service) Remove(ctx context.Context, rr *snapshotapi.RemoveSnapshotRequest) (*ptypes.Empty, error) {
+func (s *service) Remove(ctx context.Context, rr *snapshotsapi.RemoveSnapshotRequest) (*ptypes.Empty, error) {
 	log.G(ctx).WithField("key", rr.Key).Debugf("Removing snapshot")
 	sn, err := s.getSnapshotter(rr.Snapshotter)
 	if err != nil {
@@ -170,7 +170,7 @@ func (s *service) Remove(ctx context.Context, rr *snapshotapi.RemoveSnapshotRequ
 	return empty, nil
 }
 
-func (s *service) Stat(ctx context.Context, sr *snapshotapi.StatSnapshotRequest) (*snapshotapi.StatSnapshotResponse, error) {
+func (s *service) Stat(ctx context.Context, sr *snapshotsapi.StatSnapshotRequest) (*snapshotsapi.StatSnapshotResponse, error) {
 	log.G(ctx).WithField("key", sr.Key).Debugf("Statting snapshot")
 	sn, err := s.getSnapshotter(sr.Snapshotter)
 	if err != nil {
@@ -182,10 +182,10 @@ func (s *service) Stat(ctx context.Context, sr *snapshotapi.StatSnapshotRequest)
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	return &snapshotapi.StatSnapshotResponse{Info: fromInfo(info)}, nil
+	return &snapshotsapi.StatSnapshotResponse{Info: fromInfo(info)}, nil
 }
 
-func (s *service) Update(ctx context.Context, sr *snapshotapi.UpdateSnapshotRequest) (*snapshotapi.UpdateSnapshotResponse, error) {
+func (s *service) Update(ctx context.Context, sr *snapshotsapi.UpdateSnapshotRequest) (*snapshotsapi.UpdateSnapshotResponse, error) {
 	log.G(ctx).WithField("key", sr.Info.Name).Debugf("Updating snapshot")
 	sn, err := s.getSnapshotter(sr.Snapshotter)
 	if err != nil {
@@ -197,24 +197,24 @@ func (s *service) Update(ctx context.Context, sr *snapshotapi.UpdateSnapshotRequ
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	return &snapshotapi.UpdateSnapshotResponse{Info: fromInfo(info)}, nil
+	return &snapshotsapi.UpdateSnapshotResponse{Info: fromInfo(info)}, nil
 }
 
-func (s *service) List(sr *snapshotapi.ListSnapshotsRequest, ss snapshotapi.Snapshots_ListServer) error {
+func (s *service) List(sr *snapshotsapi.ListSnapshotsRequest, ss snapshotsapi.Snapshots_ListServer) error {
 	sn, err := s.getSnapshotter(sr.Snapshotter)
 	if err != nil {
 		return err
 	}
 
 	var (
-		buffer    []snapshotapi.Info
-		sendBlock = func(block []snapshotapi.Info) error {
-			return ss.Send(&snapshotapi.ListSnapshotsResponse{
+		buffer    []snapshotsapi.Info
+		sendBlock = func(block []snapshotsapi.Info) error {
+			return ss.Send(&snapshotsapi.ListSnapshotsResponse{
 				Info: block,
 			})
 		}
 	)
-	err = sn.Walk(ss.Context(), func(ctx gocontext.Context, info snapshot.Info) error {
+	err = sn.Walk(ss.Context(), func(ctx gocontext.Context, info snapshots.Info) error {
 		buffer = append(buffer, fromInfo(info))
 
 		if len(buffer) >= 100 {
@@ -240,7 +240,7 @@ func (s *service) List(sr *snapshotapi.ListSnapshotsRequest, ss snapshotapi.Snap
 	return nil
 }
 
-func (s *service) Usage(ctx context.Context, ur *snapshotapi.UsageRequest) (*snapshotapi.UsageResponse, error) {
+func (s *service) Usage(ctx context.Context, ur *snapshotsapi.UsageRequest) (*snapshotsapi.UsageResponse, error) {
 	sn, err := s.getSnapshotter(ur.Snapshotter)
 	if err != nil {
 		return nil, err
@@ -254,18 +254,18 @@ func (s *service) Usage(ctx context.Context, ur *snapshotapi.UsageRequest) (*sna
 	return fromUsage(usage), nil
 }
 
-func fromKind(kind snapshot.Kind) snapshotapi.Kind {
-	if kind == snapshot.KindActive {
-		return snapshotapi.KindActive
+func fromKind(kind snapshots.Kind) snapshotsapi.Kind {
+	if kind == snapshots.KindActive {
+		return snapshotsapi.KindActive
 	}
-	if kind == snapshot.KindView {
-		return snapshotapi.KindView
+	if kind == snapshots.KindView {
+		return snapshotsapi.KindView
 	}
-	return snapshotapi.KindCommitted
+	return snapshotsapi.KindCommitted
 }
 
-func fromInfo(info snapshot.Info) snapshotapi.Info {
-	return snapshotapi.Info{
+func fromInfo(info snapshots.Info) snapshotsapi.Info {
+	return snapshotsapi.Info{
 		Name:      info.Name,
 		Parent:    info.Parent,
 		Kind:      fromKind(info.Kind),
@@ -275,8 +275,8 @@ func fromInfo(info snapshot.Info) snapshotapi.Info {
 	}
 }
 
-func fromUsage(usage snapshot.Usage) *snapshotapi.UsageResponse {
-	return &snapshotapi.UsageResponse{
+func fromUsage(usage snapshots.Usage) *snapshotsapi.UsageResponse {
+	return &snapshotsapi.UsageResponse{
 		Inodes: usage.Inodes,
 		Size_:  usage.Size,
 	}
@@ -294,8 +294,8 @@ func fromMounts(mounts []mount.Mount) []*types.Mount {
 	return out
 }
 
-func toInfo(info snapshotapi.Info) snapshot.Info {
-	return snapshot.Info{
+func toInfo(info snapshotsapi.Info) snapshots.Info {
+	return snapshots.Info{
 		Name:    info.Name,
 		Parent:  info.Parent,
 		Kind:    toKind(info.Kind),
@@ -305,12 +305,12 @@ func toInfo(info snapshotapi.Info) snapshot.Info {
 	}
 }
 
-func toKind(kind snapshotapi.Kind) snapshot.Kind {
-	if kind == snapshotapi.KindActive {
-		return snapshot.KindActive
+func toKind(kind snapshotsapi.Kind) snapshots.Kind {
+	if kind == snapshotsapi.KindActive {
+		return snapshots.KindActive
 	}
-	if kind == snapshotapi.KindView {
-		return snapshot.KindView
+	if kind == snapshotsapi.KindView {
+		return snapshots.KindView
 	}
-	return snapshot.KindCommitted
+	return snapshots.KindCommitted
 }

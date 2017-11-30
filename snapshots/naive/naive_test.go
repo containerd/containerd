@@ -5,12 +5,12 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/containerd/containerd/snapshot"
-	"github.com/containerd/containerd/snapshot/testsuite"
+	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/snapshots/testsuite"
 	"github.com/containerd/containerd/testutil"
 )
 
-func newSnapshotter(ctx context.Context, root string) (snapshot.Snapshotter, func() error, error) {
+func newSnapshotter(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
 	snapshotter, err := NewSnapshotter(root)
 	if err != nil {
 		return nil, nil, err

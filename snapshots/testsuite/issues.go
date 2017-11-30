@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/fs/fstest"
-	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/snapshots"
 )
 
 // Checks which cover former issues found in older layering models.
@@ -23,7 +23,7 @@ import (
 // Cause of issue was originally related to tar, snapshot should be able to
 // avoid such issues by not relying on tar to create layers.
 // See https://github.com/docker/docker/issues/21555
-func checkLayerFileUpdate(ctx context.Context, t *testing.T, sn snapshot.Snapshotter, work string) {
+func checkLayerFileUpdate(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, work string) {
 	l1Init := fstest.Apply(
 		fstest.CreateDir("/etc", 0700),
 		fstest.CreateFile("/etc/hosts", []byte("mydomain 10.0.0.1"), 0644),
@@ -54,7 +54,7 @@ func checkLayerFileUpdate(ctx context.Context, t *testing.T, sn snapshot.Snapsho
 
 // checkRemoveDirectoryInLowerLayer
 // See https://github.com/docker/docker/issues/25244
-func checkRemoveDirectoryInLowerLayer(ctx context.Context, t *testing.T, sn snapshot.Snapshotter, work string) {
+func checkRemoveDirectoryInLowerLayer(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, work string) {
 	l1Init := fstest.Apply(
 		fstest.CreateDir("/lib", 0700),
 		fstest.CreateFile("/lib/hidden", []byte{}, 0644),
@@ -77,7 +77,7 @@ func checkRemoveDirectoryInLowerLayer(ctx context.Context, t *testing.T, sn snap
 // See https://github.com/docker/docker/issues/20240 aufs
 // See https://github.com/docker/docker/issues/24913 overlay
 // see https://github.com/docker/docker/issues/28391 overlay2
-func checkChown(ctx context.Context, t *testing.T, sn snapshot.Snapshotter, work string) {
+func checkChown(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, work string) {
 	l1Init := fstest.Apply(
 		fstest.CreateDir("/opt", 0700),
 		fstest.CreateDir("/opt/a", 0700),
@@ -98,7 +98,7 @@ func checkChown(ctx context.Context, t *testing.T, sn snapshot.Snapshotter, work
 
 // checkRename
 // https://github.com/docker/docker/issues/25409
-func checkRename(ctx context.Context, t *testing.T, sn snapshot.Snapshotter, work string) {
+func checkRename(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, work string) {
 	t.Skip("rename test still fails on some kernels with overlay")
 	l1Init := fstest.Apply(
 		fstest.CreateDir("/dir1", 0700),
@@ -120,7 +120,7 @@ func checkRename(ctx context.Context, t *testing.T, sn snapshot.Snapshotter, wor
 
 // checkDirectoryPermissionOnCommit
 // https://github.com/docker/docker/issues/27298
-func checkDirectoryPermissionOnCommit(ctx context.Context, t *testing.T, sn snapshot.Snapshotter, work string) {
+func checkDirectoryPermissionOnCommit(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, work string) {
 	l1Init := fstest.Apply(
 		fstest.CreateDir("/dir1", 0700),
 		fstest.CreateDir("/dir2", 0700),
@@ -155,13 +155,13 @@ func checkDirectoryPermissionOnCommit(ctx context.Context, t *testing.T, sn snap
 }
 
 // checkStatInWalk ensures that a stat can be called during a walk
-func checkStatInWalk(ctx context.Context, t *testing.T, sn snapshot.Snapshotter, work string) {
+func checkStatInWalk(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, work string) {
 	prefix := "stats-in-walk-"
 	if err := createNamedSnapshots(ctx, sn, prefix); err != nil {
 		t.Fatal(err)
 	}
 
-	err := sn.Walk(ctx, func(ctx context.Context, si snapshot.Info) error {
+	err := sn.Walk(ctx, func(ctx context.Context, si snapshots.Info) error {
 		if !strings.HasPrefix(si.Name, prefix) {
 			// Only stat snapshots from this test
 			return nil
@@ -178,7 +178,7 @@ func checkStatInWalk(ctx context.Context, t *testing.T, sn snapshot.Snapshotter,
 	}
 }
 
-func createNamedSnapshots(ctx context.Context, snapshotter snapshot.Snapshotter, ns string) error {
+func createNamedSnapshots(ctx context.Context, snapshotter snapshots.Snapshotter, ns string) error {
 	c1 := fmt.Sprintf("%sc1", ns)
 	c2 := fmt.Sprintf("%sc2", ns)
 	if _, err := snapshotter.Prepare(ctx, c1+"-a", "", opt); err != nil {

@@ -12,14 +12,14 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/snapshot"
-	"github.com/containerd/containerd/snapshot/testsuite"
+	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/snapshots/testsuite"
 	"github.com/containerd/containerd/testutil"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
 
-func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshot.Snapshotter, func() error, error) {
+func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshots.Snapshotter, func() error, error) {
 	mkbtrfs, err := exec.LookPath("mkfs.btrfs")
 	if err != nil {
 		t.Skipf("could not find mkfs.btrfs: %v", err)
@@ -27,7 +27,7 @@ func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshot.Snaps
 
 	// TODO: Check for btrfs in /proc/module and skip if not loaded
 
-	return func(ctx context.Context, root string) (snapshot.Snapshotter, func() error, error) {
+	return func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
 
 		deviceName, cleanupDevice, err := testutil.NewLoopback(100 << 20) // 100 MB
 		if err != nil {

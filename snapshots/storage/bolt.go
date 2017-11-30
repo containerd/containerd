@@ -10,7 +10,7 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/metadata/boltutil"
-	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/snapshots"
 	"github.com/pkg/errors"
 )
 
@@ -56,11 +56,11 @@ func getParentPrefix(b []byte) uint64 {
 
 // GetInfo returns the snapshot Info directly from the metadata. Requires a
 // context with a storage transaction.
-func GetInfo(ctx context.Context, key string) (string, snapshot.Info, snapshot.Usage, error) {
+func GetInfo(ctx context.Context, key string) (string, snapshots.Info, snapshots.Usage, error) {
 	var (
 		id uint64
-		su snapshot.Usage
-		si = snapshot.Info{
+		su snapshots.Usage
+		si = snapshots.Info{
 			Name: key,
 		}
 	)
@@ -69,15 +69,15 @@ func GetInfo(ctx context.Context, key string) (string, snapshot.Info, snapshot.U
 		return readSnapshot(bkt, &id, &si)
 	})
 	if err != nil {
-		return "", snapshot.Info{}, snapshot.Usage{}, err
+		return "", snapshots.Info{}, snapshots.Usage{}, err
 	}
 
 	return fmt.Sprintf("%d", id), si, su, nil
 }
 
 // UpdateInfo updates an existing snapshot info's data
-func UpdateInfo(ctx context.Context, info snapshot.Info, fieldpaths ...string) (snapshot.Info, error) {
-	updated := snapshot.Info{
+func UpdateInfo(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
+	updated := snapshots.Info{
 		Name: info.Name,
 	}
 	err := withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
@@ -120,7 +120,7 @@ func UpdateInfo(ctx context.Context, info snapshot.Info, fieldpaths ...string) (
 		return boltutil.WriteLabels(sbkt, updated.Labels)
 	})
 	if err != nil {
-		return snapshot.Info{}, err
+		return snapshots.Info{}, err
 	}
 	return updated, nil
 }
@@ -128,7 +128,7 @@ func UpdateInfo(ctx context.Context, info snapshot.Info, fieldpaths ...string) (
 // WalkInfo iterates through all metadata Info for the stored snapshots and
 // calls the provided function for each. Requires a context with a storage
 // transaction.
-func WalkInfo(ctx context.Context, fn func(context.Context, snapshot.Info) error) error {
+func WalkInfo(ctx context.Context, fn func(context.Context, snapshots.Info) error) error {
 	return withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
 		return bkt.ForEach(func(k, v []byte) error {
 			// skip non buckets
@@ -137,7 +137,7 @@ func WalkInfo(ctx context.Context, fn func(context.Context, snapshot.Info) error
 			}
 			var (
 				sbkt = bkt.Bucket(k)
-				si   = snapshot.Info{
+				si   = snapshots.Info{
 					Name: string(k),
 				}
 			)
@@ -162,7 +162,7 @@ func GetSnapshot(ctx context.Context, key string) (s Snapshot, err error) {
 		s.ID = fmt.Sprintf("%d", readID(sbkt))
 		s.Kind = readKind(sbkt)
 
-		if s.Kind != snapshot.KindActive && s.Kind != snapshot.KindView {
+		if s.Kind != snapshots.KindActive && s.Kind != snapshots.KindView {
 			return errors.Wrapf(errdefs.ErrFailedPrecondition, "requested snapshot %v not active or view", key)
 		}
 
@@ -187,13 +187,13 @@ func GetSnapshot(ctx context.Context, key string) (s Snapshot, err error) {
 }
 
 // CreateSnapshot inserts a record for an active or view snapshot with the provided parent.
-func CreateSnapshot(ctx context.Context, kind snapshot.Kind, key, parent string, opts ...snapshot.Opt) (s Snapshot, err error) {
+func CreateSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts ...snapshots.Opt) (s Snapshot, err error) {
 	switch kind {
-	case snapshot.KindActive, snapshot.KindView:
+	case snapshots.KindActive, snapshots.KindView:
 	default:
 		return Snapshot{}, errors.Wrapf(errdefs.ErrInvalidArgument, "snapshot type %v invalid; only snapshots of type Active or View can be created", kind)
 	}
-	var base snapshot.Info
+	var base snapshots.Info
 	for _, opt := range opts {
 		if err := opt(&base); err != nil {
 			return Snapshot{}, err
@@ -210,7 +210,7 @@ func CreateSnapshot(ctx context.Context, kind snapshot.Kind, key, parent string,
 				return errors.Wrap(errdefs.ErrNotFound, "missing parent bucket")
 			}
 
-			if readKind(spbkt) != snapshot.KindCommitted {
+			if readKind(spbkt) != snapshots.KindCommitted {
 				return errors.Wrap(errdefs.ErrInvalidArgument, "parent is not committed snapshot")
 			}
 		}
@@ -228,7 +228,7 @@ func CreateSnapshot(ctx context.Context, kind snapshot.Kind, key, parent string,
 		}
 
 		t := time.Now().UTC()
-		si := snapshot.Info{
+		si := snapshots.Info{
 			Parent:  parent,
 			Kind:    kind,
 			Labels:  base.Labels,
@@ -268,10 +268,10 @@ func CreateSnapshot(ctx context.Context, kind snapshot.Kind, key, parent string,
 // Remove removes a snapshot from the metastore. The string identifier for the
 // snapshot is returned as well as the kind. The provided context must contain a
 // writable transaction.
-func Remove(ctx context.Context, key string) (string, snapshot.Kind, error) {
+func Remove(ctx context.Context, key string) (string, snapshots.Kind, error) {
 	var (
 		id uint64
-		si snapshot.Info
+		si snapshots.Info
 	)
 
 	if err := withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
@@ -320,10 +320,10 @@ func Remove(ctx context.Context, key string) (string, snapshot.Kind, error) {
 // lookup or removal. The returned string identifier for the committed snapshot
 // is the same identifier of the original active snapshot. The provided context
 // must contain a writable transaction.
-func CommitActive(ctx context.Context, key, name string, usage snapshot.Usage, opts ...snapshot.Opt) (string, error) {
+func CommitActive(ctx context.Context, key, name string, usage snapshots.Usage, opts ...snapshots.Opt) (string, error) {
 	var (
 		id   uint64
-		base snapshot.Info
+		base snapshots.Info
 	)
 	for _, opt := range opts {
 		if err := opt(&base); err != nil {
@@ -344,15 +344,15 @@ func CommitActive(ctx context.Context, key, name string, usage snapshot.Usage, o
 			return errors.Wrap(errdefs.ErrNotFound, "failed to get active snapshot")
 		}
 
-		var si snapshot.Info
+		var si snapshots.Info
 		if err := readSnapshot(sbkt, &id, &si); err != nil {
 			return errors.Wrap(err, "failed to read snapshot")
 		}
 
-		if si.Kind != snapshot.KindActive {
+		if si.Kind != snapshots.KindActive {
 			return errors.Wrapf(errdefs.ErrFailedPrecondition, "snapshot %v is not active", name)
 		}
-		si.Kind = snapshot.KindCommitted
+		si.Kind = snapshots.KindCommitted
 		si.Created = time.Now().UTC()
 		si.Updated = si.Created
 
@@ -460,10 +460,10 @@ func parents(bkt, pbkt *bolt.Bucket, parent uint64) (parents []string, err error
 	}
 }
 
-func readKind(bkt *bolt.Bucket) (k snapshot.Kind) {
+func readKind(bkt *bolt.Bucket) (k snapshots.Kind) {
 	kind := bkt.Get(bucketKeyKind)
 	if len(kind) == 1 {
-		k = snapshot.Kind(kind[0])
+		k = snapshots.Kind(kind[0])
 	}
 	return
 }
@@ -473,7 +473,7 @@ func readID(bkt *bolt.Bucket) uint64 {
 	return id
 }
 
-func readSnapshot(bkt *bolt.Bucket, id *uint64, si *snapshot.Info) error {
+func readSnapshot(bkt *bolt.Bucket, id *uint64, si *snapshots.Info) error {
 	if id != nil {
 		*id = readID(bkt)
 	}
@@ -495,7 +495,7 @@ func readSnapshot(bkt *bolt.Bucket, id *uint64, si *snapshot.Info) error {
 	return nil
 }
 
-func putSnapshot(bkt *bolt.Bucket, id uint64, si snapshot.Info) error {
+func putSnapshot(bkt *bolt.Bucket, id uint64, si snapshots.Info) error {
 	idEncoded, err := encodeID(id)
 	if err != nil {
 		return err
@@ -519,12 +519,12 @@ func putSnapshot(bkt *bolt.Bucket, id uint64, si snapshot.Info) error {
 	return boltutil.WriteLabels(bkt, si.Labels)
 }
 
-func getUsage(bkt *bolt.Bucket, usage *snapshot.Usage) {
+func getUsage(bkt *bolt.Bucket, usage *snapshots.Usage) {
 	usage.Inodes, _ = binary.Varint(bkt.Get(bucketKeyInodes))
 	usage.Size, _ = binary.Varint(bkt.Get(bucketKeySize))
 }
 
-func putUsage(bkt *bolt.Bucket, usage snapshot.Usage) error {
+func putUsage(bkt *bolt.Bucket, usage snapshots.Usage) error {
 	for _, v := range []struct {
 		key   []byte
 		value int64

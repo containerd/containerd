@@ -18,7 +18,7 @@ import (
 var Command = cli.Command{
 	Name:    "containers",
 	Usage:   "manage containers",
-	Aliases: []string{"c"},
+	Aliases: []string{"c", "container"},
 	Subcommands: []cli.Command{
 		deleteCommand,
 		infoCommand,

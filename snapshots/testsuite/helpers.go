@@ -9,7 +9,7 @@ import (
 
 	"github.com/containerd/containerd/fs/fstest"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/snapshots"
 	"github.com/pkg/errors"
 )
 
@@ -34,7 +34,7 @@ func applyToMounts(m []mount.Mount, work string, a fstest.Applier) (err error) {
 
 // createSnapshot creates a new snapshot in the snapshotter
 // given an applier to run on top of the given parent.
-func createSnapshot(ctx context.Context, sn snapshot.Snapshotter, parent, work string, a fstest.Applier) (string, error) {
+func createSnapshot(ctx context.Context, sn snapshots.Snapshotter, parent, work string, a fstest.Applier) (string, error) {
 	n := fmt.Sprintf("%p-%d", a, rand.Int())
 	prepare := fmt.Sprintf("%s-prepare", n)
 
@@ -54,7 +54,7 @@ func createSnapshot(ctx context.Context, sn snapshot.Snapshotter, parent, work s
 	return n, nil
 }
 
-func checkSnapshot(ctx context.Context, sn snapshot.Snapshotter, work, name, check string) (err error) {
+func checkSnapshot(ctx context.Context, sn snapshots.Snapshotter, work, name, check string) (err error) {
 	td, err := ioutil.TempDir(work, "check")
 	if err != nil {
 		return errors.Wrap(err, "failed to create temp dir")
@@ -95,7 +95,7 @@ func checkSnapshot(ctx context.Context, sn snapshot.Snapshotter, work, name, che
 // checkSnapshots creates a new chain of snapshots in the given snapshotter
 // using the provided appliers, checking each snapshot created in a view
 // against the changes applied to a single directory.
-func checkSnapshots(ctx context.Context, sn snapshot.Snapshotter, work string, as ...fstest.Applier) error {
+func checkSnapshots(ctx context.Context, sn snapshots.Snapshotter, work string, as ...fstest.Applier) error {
 	td, err := ioutil.TempDir(work, "flat")
 	if err != nil {
 		return errors.Wrap(err, "failed to create temp dir")
@@ -124,7 +124,7 @@ func checkSnapshots(ctx context.Context, sn snapshot.Snapshotter, work string, a
 }
 
 // checkInfo checks that the infos are the same
-func checkInfo(si1, si2 snapshot.Info) error {
+func checkInfo(si1, si2 snapshots.Info) error {
 	if si1.Kind != si2.Kind {
 		return errors.Errorf("Expected kind %v, got %v", si1.Kind, si2.Kind)
 	}

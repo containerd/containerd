@@ -15,8 +15,9 @@ import (
 
 // Command is the cli command for displaying containerd events
 var Command = cli.Command{
-	Name:  "events",
-	Usage: "display containerd events",
+	Name:    "events",
+	Aliases: []string{"event"},
+	Usage:   "display containerd events",
 	Action: func(context *cli.Context) error {
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {

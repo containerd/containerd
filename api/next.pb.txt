@@ -2793,7 +2793,7 @@ file {
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/services/snapshot/v1/snapshots.proto"
+  name: "github.com/containerd/containerd/api/services/snapshots/v1/snapshots.proto"
   package: "containerd.services.snapshots.v1"
   dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/empty.proto"
@@ -3317,7 +3317,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/snapshot/v1;snapshot"
+    go_package: "github.com/containerd/containerd/api/services/snapshots/v1;snapshots"
   }
   weak_dependency: 0
   syntax: "proto3"

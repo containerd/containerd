@@ -8,13 +8,13 @@ import (
 	"testing"
 
 	"github.com/boltdb/bolt"
-	"github.com/containerd/containerd/snapshot"
-	"github.com/containerd/containerd/snapshot/naive"
-	"github.com/containerd/containerd/snapshot/testsuite"
+	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/snapshots/naive"
+	"github.com/containerd/containerd/snapshots/testsuite"
 	"github.com/containerd/containerd/testutil"
 )
 
-func newTestSnapshotter(ctx context.Context, root string) (snapshot.Snapshotter, func() error, error) {
+func newTestSnapshotter(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
 	naiveRoot := filepath.Join(root, "naive")
 	if err := os.Mkdir(naiveRoot, 0770); err != nil {
 		return nil, nil, err
@@ -29,7 +29,7 @@ func newTestSnapshotter(ctx context.Context, root string) (snapshot.Snapshotter,
 		return nil, nil, err
 	}
 
-	sn := NewDB(db, nil, map[string]snapshot.Snapshotter{"naive": snapshotter}).Snapshotter("naive")
+	sn := NewDB(db, nil, map[string]snapshots.Snapshotter{"naive": snapshotter}).Snapshotter("naive")
 
 	return sn, func() error {
 		if err := sn.Close(); err != nil {

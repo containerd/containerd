@@ -16,8 +16,9 @@ import (
 
 // Command is the cli command for managing namespaces
 var Command = cli.Command{
-	Name:  "namespaces",
-	Usage: "manage namespaces",
+	Name:    "namespaces",
+	Aliases: []string{"namespace"},
+	Usage:   "manage namespaces",
 	Subcommands: cli.Commands{
 		createCommand,
 		listCommand,

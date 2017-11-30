@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/boltdb/bolt"
-	"github.com/containerd/containerd/snapshot"
+	"github.com/containerd/containerd/snapshots"
 	"github.com/pkg/errors"
 )
 
@@ -35,7 +35,7 @@ type Transactor interface {
 // the last index. The last index should always be considered the active
 // snapshots immediate parent.
 type Snapshot struct {
-	Kind      snapshot.Kind
+	Kind      snapshots.Kind
 	ID        string
 	ParentIDs []string
 }
