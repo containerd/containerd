@@ -137,10 +137,26 @@ func TestToCRIContainerStatus(t *testing.T) {
 		expected.FinishedAt = test.finishedAt
 		expected.ExitCode = test.exitCode
 		expected.Message = test.message
-		assert.Equal(t, expected, toCRIContainerStatus(container,
+		containerStatus := toCRIContainerStatus(container,
 			&runtime.ImageSpec{Image: image.RepoTags[0]},
-			image.RepoDigests[0]), desc)
+			image.RepoDigests[0])
+		assert.Equal(t, expected, containerStatus, desc)
 	}
+}
+
+// TODO(mikebrow): add a fake containerd container.Container.Spec client api so we can test verbose is true option
+func TestToCRIContainerInfo(t *testing.T) {
+	metadata, status, _, _ := getContainerStatusTestData()
+	container, err := containerstore.NewContainer(
+		*metadata,
+		containerstore.WithFakeStatus(*status),
+	)
+	assert.NoError(t, err)
+
+	info := toCRIContainerInfo(context.Background(),
+		container,
+		false)
+	assert.Nil(t, info)
 }
 
 func TestContainerStatus(t *testing.T) {

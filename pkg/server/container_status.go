@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"golang.org/x/net/context"
@@ -52,9 +53,12 @@ func (c *criContainerdService) ContainerStatus(ctx context.Context, r *runtime.C
 		// Based on the CRI definition, this field will be consumed by user.
 		imageRef = image.RepoDigests[0]
 	}
+	status := toCRIContainerStatus(container, spec, imageRef)
+	info := toCRIContainerInfo(ctx, container, r.GetVerbose())
 
 	return &runtime.ContainerStatusResponse{
-		Status: toCRIContainerStatus(container, spec, imageRef),
+		Status: status,
+		Info:   info,
 	}, nil
 }
 
@@ -70,6 +74,7 @@ func toCRIContainerStatus(container containerstore.Container, spec *runtime.Imag
 			reason = errorExitReason
 		}
 	}
+
 	return &runtime.ContainerStatus{
 		Id:          meta.ID,
 		Metadata:    meta.Config.GetMetadata(),
@@ -87,4 +92,46 @@ func toCRIContainerStatus(container containerstore.Container, spec *runtime.Imag
 		Mounts:      meta.Config.GetMounts(),
 		LogPath:     meta.LogPath,
 	}
+}
+
+// toCRIContainerInfo converts internal container object information to CRI container status response info map.
+func toCRIContainerInfo(ctx context.Context, container containerstore.Container, verbose bool) map[string]string {
+	if !verbose {
+		return nil
+	}
+
+	info := make(map[string]string)
+	meta := container.Metadata
+	status := container.Status.Get()
+
+	// TODO (mikebrow): discuss predefining constants for some or all of these key names in CRI for these info map values
+	info["pid"] = marshallToString(status.Pid)
+	info["containerConfig"] = marshallToString(meta.Config)
+	info["removingState"] = marshallToString(status.Removing)
+
+	oldSpec, err := container.Container.Spec(ctx)
+	if err == nil {
+		info["runtimeSpec"] = marshallToString(oldSpec)
+	} else {
+		info["runtimeSpec"] = err.Error()
+	}
+
+	ctrInfo, err := container.Container.Info(ctx)
+	if err == nil {
+		info["snapshotKey"] = marshallToString(ctrInfo.SnapshotKey)
+		info["snapshotter"] = marshallToString(ctrInfo.Snapshotter)
+	} else {
+		info["snapshotKey"] = err.Error()
+		info["snapshotter"] = err.Error()
+	}
+
+	return info
+}
+
+func marshallToString(v interface{}) string {
+	m, err := json.Marshal(v)
+	if err == nil {
+		return string(m)
+	}
+	return err.Error()
 }
