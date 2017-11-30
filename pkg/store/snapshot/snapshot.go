@@ -19,7 +19,7 @@ package snapshot
 import (
 	"sync"
 
-	"github.com/containerd/containerd/snapshot"
+	snapshot "github.com/containerd/containerd/snapshots"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
 )

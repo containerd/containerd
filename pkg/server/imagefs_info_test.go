@@ -19,7 +19,7 @@ package server
 import (
 	"testing"
 
-	"github.com/containerd/containerd/snapshot"
+	snapshot "github.com/containerd/containerd/snapshots"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"

@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/snapshot"
+	snapshot "github.com/containerd/containerd/snapshots"
 	assertlib "github.com/stretchr/testify/assert"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/store"

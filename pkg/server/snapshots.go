@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/snapshot"
+	snapshot "github.com/containerd/containerd/snapshots"
 	"github.com/golang/glog"
 
 	snapshotstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/snapshot"
