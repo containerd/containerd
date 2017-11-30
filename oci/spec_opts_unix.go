@@ -101,7 +101,7 @@ func WithImageConfig(image Image) SpecOpts {
 			parts := strings.Split(config.User, ":")
 			switch len(parts) {
 			case 1:
-				v, err := strconv.ParseUint(parts[0], 0, 10)
+				v, err := strconv.Atoi(parts[0])
 				if err != nil {
 					// if we cannot parse as a uint they try to see if it is a username
 					if err := WithUsername(config.User)(ctx, client, c, s); err != nil {
@@ -113,13 +113,13 @@ func WithImageConfig(image Image) SpecOpts {
 					return err
 				}
 			case 2:
-				v, err := strconv.ParseUint(parts[0], 0, 10)
+				v, err := strconv.Atoi(parts[0])
 				if err != nil {
-					return err
+					return errors.Wrapf(err, "parse uid %s", parts[0])
 				}
 				uid := uint32(v)
-				if v, err = strconv.ParseUint(parts[1], 0, 10); err != nil {
-					return err
+				if v, err = strconv.Atoi(parts[1]); err != nil {
+					return errors.Wrapf(err, "parse gid %s", parts[1])
 				}
 				gid := uint32(v)
 				s.Process.User.UID, s.Process.User.GID = uid, gid
