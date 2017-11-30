@@ -10,13 +10,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-var (
-	bufPool = sync.Pool{
-		New: func() interface{} {
-			return make([]byte, 1<<20)
-		},
-	}
-)
+var bufPool = sync.Pool{
+	New: func() interface{} {
+		buffer := make([]byte, 1<<20)
+		return &buffer
+	},
+}
 
 // NewReader returns a io.Reader from a ReaderAt
 func NewReader(ra ReaderAt) io.Reader {
@@ -88,10 +87,10 @@ func Copy(ctx context.Context, cw Writer, r io.Reader, size int64, expected dige
 		}
 	}
 
-	buf := bufPool.Get().([]byte)
+	buf := bufPool.Get().(*[]byte)
 	defer bufPool.Put(buf)
 
-	if _, err := io.CopyBuffer(cw, r, buf); err != nil {
+	if _, err := io.CopyBuffer(cw, r, *buf); err != nil {
 		return err
 	}
 
