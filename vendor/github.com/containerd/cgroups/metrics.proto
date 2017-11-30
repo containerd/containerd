@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package io.containerd.cgroups.v1;
 
-import weak "gogoproto/gogo.proto";
+import "gogoproto/gogo.proto";
 
 message Metrics {
 	repeated HugetlbStat hugetlb = 1;
