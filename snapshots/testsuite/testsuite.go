@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"testing"
@@ -807,14 +808,17 @@ func checkFileFromLowerLayer(ctx context.Context, t *testing.T, snapshotter snap
 }
 
 func closeTwice(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
+	n := fmt.Sprintf("closeTwice-%d", rand.Int())
+	prepare := fmt.Sprintf("%s-prepare", n)
+
 	// do some dummy ops to modify the snapshotter internal state
-	if _, err := snapshotter.Prepare(ctx, "dummy", ""); err != nil {
+	if _, err := snapshotter.Prepare(ctx, prepare, "", opt); err != nil {
 		t.Fatal(err)
 	}
-	if err := snapshotter.Commit(ctx, "dummy-1", "dummy"); err != nil {
+	if err := snapshotter.Commit(ctx, n, prepare, opt); err != nil {
 		t.Fatal(err)
 	}
-	if err := snapshotter.Remove(ctx, "dummy-1"); err != nil {
+	if err := snapshotter.Remove(ctx, n); err != nil {
 		t.Fatal(err)
 	}
 	if err := snapshotter.Close(); err != nil {
