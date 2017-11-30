@@ -103,7 +103,7 @@ func executeShim() error {
 	if err != nil {
 		return err
 	}
-	logrus.Debug("registering grpc server")
+	logrus.Debug("registering ttrpc server")
 	shimapi.RegisterShimService(server, sv)
 
 	socket := socketFlag
@@ -123,7 +123,7 @@ func executeShim() error {
 	return handleSignals(logger, signals, server, sv)
 }
 
-// serve serves the grpc API over a unix socket at the provided path
+// serve serves the ttrpc API over a unix socket at the provided path
 // this function does not block
 func serve(server *ttrpc.Server, path string) error {
 	var (
@@ -144,7 +144,7 @@ func serve(server *ttrpc.Server, path string) error {
 		defer l.Close()
 		if err := server.Serve(l); err != nil &&
 			!strings.Contains(err.Error(), "use of closed network connection") {
-			logrus.WithError(err).Fatal("containerd-shim: GRPC server failure")
+			logrus.WithError(err).Fatal("containerd-shim: ttrpc server failure")
 		}
 	}()
 	return nil
