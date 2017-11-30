@@ -321,6 +321,94 @@ func TestContainerExec(t *testing.T) {
 	}
 	<-finishedC
 }
+func TestContainerLargeExecArgs(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	if runtime.GOOS != "windows" {
+		image, err = client.GetImage(ctx, testImage)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "100")), withNewSnapshot(id, image))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer task.Delete(ctx)
+
+	finishedC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+	spec, err := container.Spec(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	processSpec := spec.Process
+	withExecArgs(processSpec, "echo", strings.Repeat("a", 20000))
+	execID := t.Name() + "_exec"
+	process, err := task.Exec(ctx, execID, processSpec, empty())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	processStatusC, err := process.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if err := process.Start(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+
+	// wait for the exec to return
+	status := <-processStatusC
+	if _, _, err := status.Result(); err != nil {
+		t.Error(err)
+		return
+	}
+	if _, err := process.Delete(ctx); err != nil {
+		t.Error(err)
+		return
+	}
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Error(err)
+	}
+	<-finishedC
+}
 
 func TestContainerPids(t *testing.T) {
 	t.Parallel()
