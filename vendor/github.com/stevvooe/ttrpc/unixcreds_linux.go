@@ -1,5 +1,3 @@
-// +build linux freebsd solaris
-
 package ttrpc
 
 import (
@@ -20,17 +18,21 @@ func (fn UnixCredentialsFunc) Handshake(ctx context.Context, conn net.Conn) (net
 		return nil, nil, errors.Wrap(err, "ttrpc.UnixCredentialsFunc: require unix socket")
 	}
 
-	// TODO(stevvooe): Calling (*UnixConn).File causes a 5x performance
-	// decrease vs just accessing the fd directly. Need to do some more
-	// troubleshooting to isolate this to Go runtime or kernel.
-	fp, err := uc.File()
+	rs, err := uc.SyscallConn()
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "ttrpc.UnixCredentialsFunc: failed to get unix file")
+		return nil, nil, errors.Wrap(err, "ttrpc.UnixCredentialsFunc: (net.UnixConn).SyscallConn failed")
 	}
-	defer fp.Close() // this gets duped and must be closed when this method is complete.
+	var (
+		ucred    *unix.Ucred
+		ucredErr error
+	)
+	if err := rs.Control(func(fd uintptr) {
+		ucred, ucredErr = unix.GetsockoptUcred(int(fd), unix.SOL_SOCKET, unix.SO_PEERCRED)
+	}); err != nil {
+		return nil, nil, errors.Wrapf(err, "ttrpc.UnixCredentialsFunc: (*syscall.RawConn).Control failed")
+	}
 
-	ucred, err := unix.GetsockoptUcred(int(fp.Fd()), unix.SOL_SOCKET, unix.SO_PEERCRED)
-	if err != nil {
+	if ucredErr != nil {
 		return nil, nil, errors.Wrapf(err, "ttrpc.UnixCredentialsFunc: failed to retrieve socket peer credentials")
 	}
 
@@ -41,6 +43,14 @@ func (fn UnixCredentialsFunc) Handshake(ctx context.Context, conn net.Conn) (net
 	return uc, ucred, nil
 }
 
+// UnixSocketRequireUidGid requires specific *effective* UID/GID, rather than the real UID/GID.
+//
+// For example, if a daemon binary is owned by the root (UID 0) with SUID bit but running as an
+// unprivileged user (UID 1001), the effective UID becomes 0, and the real UID becomes 1001.
+// So calling this function with uid=0 allows a connection from effective UID 0 but rejects
+// a connection from effective UID 1001.
+//
+// See socket(7), SO_PEERCRED: "The returned credentials are those that were in effect at the time of the call to connect(2) or socketpair(2)."
 func UnixSocketRequireUidGid(uid, gid int) UnixCredentialsFunc {
 	return func(ucred *unix.Ucred) error {
 		return requireUidGid(ucred, uid, gid)
@@ -51,14 +61,14 @@ func UnixSocketRequireRoot() UnixCredentialsFunc {
 	return UnixSocketRequireUidGid(0, 0)
 }
 
-// UnixSocketRequireSameUser resolves the current unix user and returns a
+// UnixSocketRequireSameUser resolves the current effective unix user and returns a
 // UnixCredentialsFunc that will validate incoming unix connections against the
 // current credentials.
 //
 // This is useful when using abstract sockets that are accessible by all users.
 func UnixSocketRequireSameUser() UnixCredentialsFunc {
-	uid, gid := os.Getuid(), os.Getgid()
-	return UnixSocketRequireUidGid(uid, gid)
+	euid, egid := os.Geteuid(), os.Getegid()
+	return UnixSocketRequireUidGid(euid, egid)
 }
 
 func requireRoot(ucred *unix.Ucred) error {
