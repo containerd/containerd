@@ -157,6 +157,7 @@ func (c *Converter) Convert(ctx context.Context) (ocispec.Descriptor, error) {
 	}
 
 	labels := map[string]string{}
+	labels["containerd.io/gc.root"] = time.Now().UTC().Format(time.RFC3339)
 	labels["containerd.io/gc.ref.content.0"] = manifest.Config.Digest.String()
 	for i, ch := range manifest.Layers {
 		labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i+1)] = ch.Digest.String()
@@ -170,6 +171,12 @@ func (c *Converter) Convert(ctx context.Context) (ocispec.Descriptor, error) {
 	ref = remotes.MakeRefKey(ctx, config)
 	if err := content.WriteBlob(ctx, c.contentStore, ref, bytes.NewReader(b), config.Size, config.Digest); err != nil {
 		return ocispec.Descriptor{}, errors.Wrap(err, "failed to write config")
+	}
+
+	for _, ch := range manifest.Layers {
+		if _, err := c.contentStore.Update(ctx, content.Info{Digest: ch.Digest}, "labels.containerd.io/gc.root"); err != nil {
+			return ocispec.Descriptor{}, errors.Wrap(err, "failed to remove blob root tag")
+		}
 	}
 
 	return desc, nil
@@ -280,8 +287,10 @@ tryit:
 
 		eg.Go(func() error {
 			defer pw.Close()
-
-			return content.Copy(ctx, cw, io.TeeReader(rc, pw), size, desc.Digest)
+			opt := content.WithLabels(map[string]string{
+				"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
+			})
+			return content.Copy(ctx, cw, io.TeeReader(rc, pw), size, desc.Digest, opt)
 		})
 
 		if err := eg.Wait(); err != nil {
