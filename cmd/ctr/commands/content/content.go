@@ -397,7 +397,7 @@ var (
 
 			ctx = log.WithLogger(ctx, log.G(ctx).WithField("ref", ref))
 
-			log.G(ctx).Infof("resolving")
+			log.G(ctx).Debugf("resolving")
 			name, desc, err := resolver.Resolve(ctx, ref)
 			if err != nil {
 				return err
@@ -407,7 +407,7 @@ var (
 				return err
 			}
 
-			log.G(ctx).Infof("fetching")
+			log.G(ctx).Debugf("fetching")
 			rc, err := fetcher.Fetch(ctx, desc)
 			if err != nil {
 				return err
@@ -448,7 +448,7 @@ var (
 
 			ctx = log.WithLogger(ctx, log.G(ctx).WithField("ref", ref))
 
-			log.G(ctx).Infof("resolving")
+			log.G(ctx).Debugf("resolving")
 			pusher, err := resolver.Pusher(ctx, ref)
 			if err != nil {
 				return err
