@@ -207,11 +207,11 @@ func CreateSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string
 		if parent != "" {
 			spbkt = bkt.Bucket([]byte(parent))
 			if spbkt == nil {
-				return errors.Wrap(errdefs.ErrNotFound, "missing parent bucket")
+				return errors.Wrapf(errdefs.ErrNotFound, "missing parent %q bucket", parent)
 			}
 
 			if readKind(spbkt) != snapshots.KindCommitted {
-				return errors.Wrap(errdefs.ErrInvalidArgument, "parent is not committed snapshot")
+				return errors.Wrapf(errdefs.ErrInvalidArgument, "parent %q is not committed snapshot", parent)
 			}
 		}
 		sbkt, err := bkt.CreateBucket([]byte(key))
@@ -224,7 +224,7 @@ func CreateSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string
 
 		id, err := bkt.NextSequence()
 		if err != nil {
-			return errors.Wrap(err, "unable to get identifier")
+			return errors.Wrapf(err, "unable to get identifier for snapshot %q", key)
 		}
 
 		t := time.Now().UTC()
@@ -245,12 +245,12 @@ func CreateSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string
 			// Store a backlink from the key to the parent. Store the snapshot name
 			// as the value to allow following the backlink to the snapshot value.
 			if err := pbkt.Put(parentKey(pid, id), []byte(key)); err != nil {
-				return errors.Wrap(err, "failed to write parent link")
+				return errors.Wrapf(err, "failed to write parent link for snapshot %q", key)
 			}
 
 			s.ParentIDs, err = parents(bkt, spbkt, pid)
 			if err != nil {
-				return errors.Wrap(err, "failed to get parent chain")
+				return errors.Wrapf(err, "failed to get parent chain for snapshot %q", key)
 			}
 		}
 
@@ -438,7 +438,7 @@ func createBucketIfNotExists(ctx context.Context, fn func(context.Context, *bolt
 	}
 	pbkt, err := bkt.CreateBucketIfNotExists(bucketKeyParents)
 	if err != nil {
-		return errors.Wrap(err, "failed to create snapshots bucket")
+		return errors.Wrap(err, "failed to create parents bucket")
 	}
 	return fn(ctx, sbkt, pbkt)
 }

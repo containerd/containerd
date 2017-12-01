@@ -287,41 +287,37 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	if err != nil {
 		return nil, err
 	}
-
-	s, err := storage.CreateSnapshot(ctx, kind, key, parent, opts...)
-	if err != nil {
-		if rerr := t.Rollback(); rerr != nil {
-			log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
-		}
-		return nil, errors.Wrap(err, "failed to create active")
-	}
-
-	if len(s.ParentIDs) > 0 {
-		st, err := os.Stat(filepath.Join(o.upperPath(s.ParentIDs[0])))
-		if err != nil {
+	isRollback := true
+	defer func() {
+		if isRollback {
 			if rerr := t.Rollback(); rerr != nil {
 				log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
 			}
+		}
+	}()
+
+	s, err := storage.CreateSnapshot(ctx, kind, key, parent, opts...)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create snapshot")
+	}
+
+	if len(s.ParentIDs) > 0 {
+		st, err := os.Stat(o.upperPath(s.ParentIDs[0]))
+		if err != nil {
 			return nil, errors.Wrap(err, "failed to stat parent")
 		}
 
 		stat := st.Sys().(*syscall.Stat_t)
-
 		if err := os.Lchown(fs, int(stat.Uid), int(stat.Gid)); err != nil {
-			if rerr := t.Rollback(); rerr != nil {
-				log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
-			}
 			return nil, errors.Wrap(err, "failed to chown")
 		}
 	}
 
 	path = filepath.Join(snapshotDir, s.ID)
 	if err = os.Rename(td, path); err != nil {
-		if rerr := t.Rollback(); rerr != nil {
-			log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
-		}
 		return nil, errors.Wrap(err, "failed to rename")
 	}
+	isRollback = false
 	td = ""
 
 	if err = t.Commit(); err != nil {
