@@ -187,7 +187,7 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 			return descs, nil
 
 		}
-		return nil, errors.Wrapf(errdefs.ErrNotFound, "could not resolve manifest %v", desc.Digest)
+		return nil, errors.Wrapf(errdefs.ErrNotFound, "unexpected media type %v for %v", desc.MediaType, desc.Digest)
 	}), image); err != nil {
 		return ocispec.Manifest{}, err
 	}
