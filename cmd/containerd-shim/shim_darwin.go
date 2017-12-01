@@ -1,12 +1,12 @@
+// +build darwin
+
 package main
 
 import (
 	"os"
 	"os/signal"
-	"syscall"
 
 	"github.com/containerd/containerd/reaper"
-	"github.com/containerd/containerd/sys"
 	runc "github.com/containerd/go-runc"
 	"github.com/stevvooe/ttrpc"
 )
@@ -15,17 +15,16 @@ import (
 // sub-reaper so that the container processes are reparented
 func setupSignals() (chan os.Signal, error) {
 	signals := make(chan os.Signal, 2048)
-	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGCHLD)
+	signal.Notify(signals)
 	// make sure runc is setup to use the monitor
 	// for waiting on processes
 	runc.Monitor = reaper.Default
-	// set the shim as the subreaper for all orphaned processes created by the container
-	if err := sys.SetSubreaper(1); err != nil {
-		return nil, err
-	}
 	return signals, nil
 }
 
 func newServer() (*ttrpc.Server, error) {
-	return ttrpc.NewServer(ttrpc.WithServerHandshaker(ttrpc.UnixSocketRequireSameUser()))
+	// for darwin, we omit the socket credentials because these syscalls are
+	// slightly different. since we don't have darwin support yet, this can be
+	// implemented later and the build can continue without issue.
+	return ttrpc.NewServer()
 }
