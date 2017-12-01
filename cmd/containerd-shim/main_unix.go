@@ -5,7 +5,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"net"
@@ -25,6 +24,7 @@ import (
 	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stevvooe/ttrpc"
 	"golang.org/x/sys/unix"
@@ -88,7 +88,10 @@ func executeShim() error {
 	if err != nil {
 		return err
 	}
-	server := newServer()
+	server, err := newServer()
+	if err != nil {
+		return errors.Wrap(err, "failed creating server")
+	}
 	sv, err := shim.NewService(
 		shim.Config{
 			Path:          path,

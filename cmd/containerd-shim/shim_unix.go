@@ -1,4 +1,4 @@
-// +build !linux,!windows
+// +build !linux,!windows,!darwin
 
 package main
 
@@ -22,6 +22,6 @@ func setupSignals() (chan os.Signal, error) {
 	return signals, nil
 }
 
-func newServer() *ttrpc.Server {
-	return ttrpc.NewServer()
+func newServer() (*ttrpc.Server, error) {
+	return ttrpc.NewServer(ttrpc.WithServerHandshaker(ttrpc.UnixSocketRequireSameUser()))
 }
