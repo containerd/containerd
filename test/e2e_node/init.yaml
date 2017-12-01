@@ -49,6 +49,11 @@ write_files:
       RestartSec=5
       Delegate=yes
       KillMode=process
+      LimitNOFILE=1048576
+      # Having non-zero Limit*s causes performance problems due to accounting overhead
+      # in the kernel. We recommend using cgroups to do container-local accounting.
+      LimitNPROC=infinity
+      LimitCORE=infinity
       ExecStartPre=/sbin/modprobe overlay
       ExecStart=/home/cri-containerd/usr/local/bin/containerd --log-level debug
 
@@ -68,6 +73,11 @@ write_files:
       [Service]
       Restart=always
       RestartSec=5
+      LimitNOFILE=1048576
+      # Having non-zero Limit*s causes performance problems due to accounting overhead
+      # in the kernel. We recommend using cgroups to do container-local accounting.
+      LimitNPROC=infinity
+      LimitCORE=infinity
       ExecStart=/home/cri-containerd/usr/local/bin/cri-containerd \
         --logtostderr --v=4 \
         --network-bin-dir=/home/cri-containerd/opt/cni/bin \
