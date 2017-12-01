@@ -26,7 +26,7 @@ reasonable starting point for Linux is a minimum 4.x kernel version.
 
 The overlay filesystem snapshotter, used by default, uses features that were
 finalized in the 4.x kernel series. If you choose to use btrfs, there may
-be more flexibility in kernel version (minimum recommended is 3.13), but will
+be more flexibility in kernel version (minimum recommended is 3.18), but will
 require the btrfs kernel module and btrfs tools to be installed on your Linux
 distribution.
 
