@@ -18,6 +18,7 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/rootfs"
@@ -25,6 +26,7 @@ import (
 	google_protobuf "github.com/gogo/protobuf/types"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
@@ -401,6 +403,15 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 	index := v1.Index{
 		Annotations: make(map[string]string),
 	}
+	// make sure we clear the gc root labels reguardless of success
+	var clearRoots []ocispec.Descriptor
+	defer func() {
+		for _, r := range append(index.Manifests, clearRoots...) {
+			if err := clearRootGCLabel(ctx, t.client, r); err != nil {
+				log.G(ctx).WithError(err).WithField("dgst", r.Digest).Warnf("failed to remove root marker")
+			}
+		}
+	}()
 	if err := t.checkpointTask(ctx, &index, request); err != nil {
 		return nil, err
 	}
@@ -419,6 +430,7 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 	if err != nil {
 		return nil, err
 	}
+	clearRoots = append(clearRoots, desc)
 	im := images.Image{
 		Name:   i.Name,
 		Target: desc,
@@ -534,6 +546,9 @@ func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tas
 func (t *task) checkpointRWSnapshot(ctx context.Context, index *v1.Index, snapshotterName string, id string) error {
 	opts := []diff.Opt{
 		diff.WithReference(fmt.Sprintf("checkpoint-rw-%s", id)),
+		diff.WithLabels(map[string]string{
+			"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
+		}),
 	}
 	rw, err := rootfs.Diff(ctx, id, t.client.SnapshotService(snapshotterName), t.client.DiffService(), opts...)
 	if err != nil {
@@ -560,7 +575,9 @@ func (t *task) checkpointImage(ctx context.Context, index *v1.Index, image strin
 }
 
 func (t *task) writeIndex(ctx context.Context, index *v1.Index) (d v1.Descriptor, err error) {
-	labels := map[string]string{}
+	labels := map[string]string{
+		"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
+	}
 	for i, m := range index.Manifests {
 		labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i)] = m.Digest.String()
 	}
@@ -589,4 +606,10 @@ func writeContent(ctx context.Context, store content.Store, mediaType, ref strin
 		Digest:    writer.Digest(),
 		Size:      size,
 	}, nil
+}
+
+func clearRootGCLabel(ctx context.Context, client *Client, desc ocispec.Descriptor) error {
+	info := content.Info{Digest: desc.Digest}
+	_, err := client.ContentStore().Update(ctx, info, "labels.containerd.io/gc.root")
+	return err
 }
