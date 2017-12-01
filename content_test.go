@@ -6,6 +6,7 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/content/testsuite"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/pkg/errors"
 )
 
@@ -28,7 +29,14 @@ func newContentStore(ctx context.Context, root string) (content.Store, func() er
 			}
 		}
 		return cs.Walk(ctx, func(info content.Info) error {
-			return cs.Delete(ctx, info.Digest)
+			if err := cs.Delete(ctx, info.Digest); err != nil {
+				if errdefs.IsNotFound(err) {
+					return nil
+				}
+
+				return err
+			}
+			return nil
 		})
 
 	}, nil
