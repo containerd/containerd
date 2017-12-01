@@ -172,7 +172,7 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	defer func() {
 		if err != nil {
 			if rerr := t.Rollback(); rerr != nil {
-				log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
+				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
 			}
 		}
 	}()
@@ -204,7 +204,7 @@ func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 	defer func() {
 		if err != nil && t != nil {
 			if rerr := t.Rollback(); rerr != nil {
-				log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
+				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
 			}
 		}
 	}()
@@ -225,13 +225,13 @@ func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 	if err != nil {
 		if err1 := os.Rename(renamed, path); err1 != nil {
 			// May cause inconsistent data on disk
-			log.G(ctx).WithError(err1).WithField("path", renamed).Errorf("Failed to rename after failed commit")
+			log.G(ctx).WithError(err1).WithField("path", renamed).Errorf("failed to rename after failed commit")
 		}
 		return errors.Wrap(err, "failed to commit")
 	}
 	if err := os.RemoveAll(renamed); err != nil {
 		// Must be cleaned up, any "rm-*" could be removed if no active transactions
-		log.G(ctx).WithError(err).WithField("path", renamed).Warnf("Failed to remove root filesystem")
+		log.G(ctx).WithError(err).WithField("path", renamed).Warnf("failed to remove root filesystem")
 	}
 
 	return nil
@@ -291,7 +291,7 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	defer func() {
 		if isRollback {
 			if rerr := t.Rollback(); rerr != nil {
-				log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
+				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
 			}
 		}
 	}()

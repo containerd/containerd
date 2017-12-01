@@ -157,7 +157,7 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 
 	if _, err := storage.CommitActive(ctx, key, name, snapshots.Usage(usage), opts...); err != nil {
 		if rerr := t.Rollback(); rerr != nil {
-			log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
+			log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
 		}
 		return errors.Wrap(err, "failed to commit snapshot")
 	}
@@ -174,7 +174,7 @@ func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 	defer func() {
 		if err != nil && t != nil {
 			if rerr := t.Rollback(); rerr != nil {
-				log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
+				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
 			}
 		}
 	}()
@@ -199,7 +199,7 @@ func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 		if renamed != "" {
 			if err1 := os.Rename(renamed, path); err1 != nil {
 				// May cause inconsistent data on disk
-				log.G(ctx).WithError(err1).WithField("path", renamed).Errorf("Failed to rename after failed commit")
+				log.G(ctx).WithError(err1).WithField("path", renamed).Errorf("failed to rename after failed commit")
 			}
 		}
 		return errors.Wrap(err, "failed to commit")
@@ -207,7 +207,7 @@ func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 	if renamed != "" {
 		if err := os.RemoveAll(renamed); err != nil {
 			// Must be cleaned up, any "rm-*" could be removed if no active transactions
-			log.G(ctx).WithError(err).WithField("path", renamed).Warnf("Failed to remove root filesystem")
+			log.G(ctx).WithError(err).WithField("path", renamed).Warnf("failed to remove root filesystem")
 		}
 	}
 
@@ -259,7 +259,7 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	s, err := storage.CreateSnapshot(ctx, kind, key, parent, opts...)
 	if err != nil {
 		if rerr := t.Rollback(); rerr != nil {
-			log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
+			log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
 		}
 		return nil, errors.Wrap(err, "failed to create snapshot")
 	}
@@ -275,7 +275,7 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		path = o.getSnapshotDir(s.ID)
 		if err := os.Rename(td, path); err != nil {
 			if rerr := t.Rollback(); rerr != nil {
-				log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
+				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
 			}
 			return nil, errors.Wrap(err, "failed to rename")
 		}

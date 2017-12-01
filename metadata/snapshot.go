@@ -723,7 +723,7 @@ func (s *snapshotter) pruneBranch(ctx context.Context, node *treeNode) error {
 			if !errdefs.IsFailedPrecondition(err) {
 				return err
 			}
-			logger.WithError(err).WithField("key", node.info.Name).Warnf("snapshot removal failed")
+			logger.WithError(err).WithField("key", node.info.Name).Warnf("failed to remove snapshot")
 		} else {
 			logger.WithField("key", node.info.Name).Debug("removed snapshot")
 		}

@@ -9,6 +9,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
 	ptypes "github.com/gogo/protobuf/types"
@@ -94,6 +95,7 @@ func (s *service) List(ctx context.Context, req *imagesapi.ListImagesRequest) (*
 }
 
 func (s *service) Create(ctx context.Context, req *imagesapi.CreateImageRequest) (*imagesapi.CreateImageResponse, error) {
+	log.G(ctx).WithField("name", req.Image.Name).WithField("target", req.Image.Target.Digest).Debugf("create image")
 	if req.Image.Name == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "Image.Name required")
 	}
@@ -164,6 +166,7 @@ func (s *service) Update(ctx context.Context, req *imagesapi.UpdateImageRequest)
 }
 
 func (s *service) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest) (*ptypes.Empty, error) {
+	log.G(ctx).WithField("name", req.Name).Debugf("delete image")
 	if err := s.withStoreUpdate(ctx, func(ctx context.Context, store images.Store) error {
 		return errdefs.ToGRPC(store.Delete(ctx, req.Name))
 	}); err != nil {

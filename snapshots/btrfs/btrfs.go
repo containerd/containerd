@@ -168,7 +168,7 @@ func (b *snapshotter) makeSnapshot(ctx context.Context, kind snapshots.Kind, key
 	defer func() {
 		if err != nil && t != nil {
 			if rerr := t.Rollback(); rerr != nil {
-				log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
+				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
 			}
 		}
 	}()
@@ -203,7 +203,7 @@ func (b *snapshotter) makeSnapshot(ctx context.Context, kind snapshots.Kind, key
 	t = nil
 	if err != nil {
 		if derr := btrfs.SubvolDelete(target); derr != nil {
-			log.G(ctx).WithError(derr).WithField("subvolume", target).Error("Failed to delete subvolume")
+			log.G(ctx).WithError(derr).WithField("subvolume", target).Error("failed to delete subvolume")
 		}
 		return nil, err
 	}
@@ -245,7 +245,7 @@ func (b *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	defer func() {
 		if err != nil && t != nil {
 			if rerr := t.Rollback(); rerr != nil {
-				log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
+				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
 			}
 		}
 	}()
@@ -266,14 +266,14 @@ func (b *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	t = nil
 	if err != nil {
 		if derr := btrfs.SubvolDelete(target); derr != nil {
-			log.G(ctx).WithError(derr).WithField("subvolume", target).Error("Failed to delete subvolume")
+			log.G(ctx).WithError(derr).WithField("subvolume", target).Error("failed to delete subvolume")
 		}
 		return err
 	}
 
 	if derr := btrfs.SubvolDelete(source); derr != nil {
 		// Log as warning, only needed for cleanup, will not cause name collision
-		log.G(ctx).WithError(derr).WithField("subvolume", source).Warn("Failed to delete subvolume")
+		log.G(ctx).WithError(derr).WithField("subvolume", source).Warn("failed to delete subvolume")
 	}
 
 	return nil
@@ -313,13 +313,13 @@ func (b *snapshotter) Remove(ctx context.Context, key string) (err error) {
 	defer func() {
 		if err != nil && t != nil {
 			if rerr := t.Rollback(); rerr != nil {
-				log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
+				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
 			}
 		}
 
 		if removed != "" {
 			if derr := btrfs.SubvolDelete(removed); derr != nil {
-				log.G(ctx).WithError(derr).WithField("subvolume", removed).Warn("Failed to delete subvolume")
+				log.G(ctx).WithError(derr).WithField("subvolume", removed).Warn("failed to delete subvolume")
 			}
 		}
 	}()
@@ -361,7 +361,7 @@ func (b *snapshotter) Remove(ctx context.Context, key string) (err error) {
 				logrus.ErrorKey: err1,
 				"subvolume":     source,
 				"renamed":       removed,
-			}).Error("Failed to restore subvolume from renamed")
+			}).Error("failed to restore subvolume from renamed")
 			// Keep removed to allow for manual restore
 			removed = ""
 		}
