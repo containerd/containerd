@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	customopts "github.com/kubernetes-incubator/cri-containerd/pkg/containerd/opts"
-	criopts "github.com/kubernetes-incubator/cri-containerd/pkg/opts"
 	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
 	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
 )
@@ -208,7 +207,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	// We don't need stdio for sandbox container.
 	var taskOpts []containerd.NewTaskOpts
 	if cgroup := config.GetLinux().GetCgroupParent(); cgroup != "" {
-		taskOpts = append(taskOpts, criopts.WithContainerdShimCgroup(cgroup))
+		taskOpts = append(taskOpts, customopts.WithContainerdShimCgroup(cgroup))
 	}
 	task, err := container.NewTask(ctx, containerdio.NullIO, taskOpts...)
 	if err != nil {
