@@ -205,11 +205,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	glog.V(5).Infof("Create sandbox container (id=%q, name=%q).",
 		id, name)
 	// We don't need stdio for sandbox container.
-	var taskOpts []containerd.NewTaskOpts
-	if cgroup := config.GetLinux().GetCgroupParent(); cgroup != "" {
-		taskOpts = append(taskOpts, customopts.WithContainerdShimCgroup(cgroup))
-	}
-	task, err := container.NewTask(ctx, containerdio.NullIO, taskOpts...)
+	task, err := container.NewTask(ctx, containerdio.NullIO)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create containerd task: %v", err)
 	}
