@@ -141,6 +141,7 @@ func (s *service) List(req *api.ListContentRequest, session api.Content_ListServ
 }
 
 func (s *service) Delete(ctx context.Context, req *api.DeleteContentRequest) (*ptypes.Empty, error) {
+	log.G(ctx).WithField("digest", req.Digest).Debugf("delete content")
 	if err := req.Digest.Validate(); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
