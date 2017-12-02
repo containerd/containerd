@@ -78,17 +78,6 @@ type Config struct {
 	NoShim bool `toml:"no_shim"`
 	// Debug enable debug on the shim
 	ShimDebug bool `toml:"shim_debug"`
-	// ShimNoMountNS prevents the runtime from putting shims into their own mount namespace.
-	//
-	// Putting the shim in its own mount namespace ensure that any mounts made
-	// by it in order to get the task rootfs ready will be undone regardless
-	// on how the shim dies.
-	//
-	// NOTE: This should only be used in kernel older than 3.18 to avoid shims
-	// from causing a DoS in their parent namespace due to having a copy of
-	// mounts previously there which would prevent unlink, rename and remove
-	// operations on those mountpoints.
-	ShimNoMountNS bool `toml:"shim_no_newns"`
 }
 
 // New returns a configured runtime
@@ -226,8 +215,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 				}).Warn("failed to clen up after killed shim")
 			}
 		}
-		shimopt = ShimRemote(r.config.Shim, r.address, cgroup,
-			r.config.ShimNoMountNS, r.config.ShimDebug, exitHandler)
+		shimopt = ShimRemote(r.config.Shim, r.address, cgroup, r.config.ShimDebug, exitHandler)
 	}
 
 	s, err := bundle.NewShimClient(ctx, namespace, shimopt, ropts)

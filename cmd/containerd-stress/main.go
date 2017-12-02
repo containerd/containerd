@@ -211,8 +211,8 @@ func (w *worker) runContainer(ctx context.Context, id string) error {
 	// fix up cgroups path for a default config
 	w.spec.Linux.CgroupsPath = filepath.Join("/", "stress", id)
 	c, err := w.client.NewContainer(ctx, id,
-		containerd.WithSpec(w.spec),
 		containerd.WithNewSnapshot(id, w.image),
+		containerd.WithSpec(w.spec, oci.WithUsername("games")),
 	)
 	if err != nil {
 		return err
