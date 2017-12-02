@@ -40,6 +40,8 @@ func (t Type) String() string { return string(t) }
 const (
 	// AllPlugins declares that the plugin should be initialized after all others.
 	AllPlugins Type = "*"
+	// InstancePlugin is the parent of all plugins
+	InstancePlugin Type = "io.containerd"
 	// RuntimePlugin implements a runtime
 	RuntimePlugin Type = "io.containerd.runtime.v1"
 	// GRPCPlugin implements a grpc service
@@ -137,6 +139,9 @@ func Register(r *Registration) {
 		panic(ErrInvalidRequires)
 	}
 
+	if r.Type == InstancePlugin { // instance plugins are always first.
+		register.r = append([]*Registration{r}, register.r...)
+	}
 	register.r = append(register.r, r)
 }
 
