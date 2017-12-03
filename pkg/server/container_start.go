@@ -133,6 +133,19 @@ func (c *criContainerdService) startContainer(ctx context.Context,
 	}
 	task, err := container.NewTask(ctx, ioCreation, taskOpts...)
 	if err != nil {
+		glog.V(0).Infof("Check snapshot %q after start failure", id)
+		glog.V(0).Infof("Check image %q after start failure", cntr.ImageRef)
+		spec, err := container.Spec(ctx)
+		if err != nil {
+			glog.Errorf("Failed to get container %q spec: %v", id, err)
+		} else {
+			if err := c.checkSnapshot(ctx, id, spec.Process.Args[0], spec.Process.Env, true); err != nil {
+				glog.Errorf("Failed to check snapshot %q: %v", id, err)
+			}
+			if err := c.checkImage(ctx, cntr.ImageRef, spec.Process.Args[0], spec.Process.Env, true); err != nil {
+				glog.Errorf("Failed to check image %q: %v", cntr.ImageRef, err)
+			}
+		}
 		return fmt.Errorf("failed to create containerd task: %v", err)
 	}
 	defer func() {

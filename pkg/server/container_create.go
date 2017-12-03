@@ -159,6 +159,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 		// points corresponding to spec.Mounts) before making the
 		// rootfs readonly (requested by spec.Root.Readonly).
 		customopts.WithNewSnapshot(id, image.Image),
+		withSnapshotCheck(c, id, spec.Process.Args[0], spec.Process.Env),
 	}
 
 	if len(volumeMounts) > 0 {
