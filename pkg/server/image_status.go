@@ -17,10 +17,16 @@ limitations under the License.
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 
+	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+
+	content "github.com/containerd/containerd/content"
+	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // ImageStatus returns the status of the image, returns nil if the image isn't present.
@@ -37,6 +43,21 @@ func (c *criContainerdService) ImageStatus(ctx context.Context, r *runtime.Image
 	}
 	// TODO(random-liu): [P0] Make sure corresponding snapshot exists. What if snapshot
 	// doesn't exist?
+
+	runtimeImage := toCRIRuntimeImage(image)
+	info, err := c.toCRIImageInfo(ctx, image, r.GetVerbose())
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate image info: %v", err)
+	}
+
+	return &runtime.ImageStatusResponse{
+		Image: runtimeImage,
+		Info:  info,
+	}, nil
+}
+
+// toCRIRuntimeImage converts internal image object to CRI runtime.Image.
+func toCRIRuntimeImage(image *imagestore.Image) *runtime.Image {
 	runtimeImage := &runtime.Image{
 		Id:          image.ID,
 		RepoTags:    image.RepoTags,
@@ -49,6 +70,59 @@ func (c *criContainerdService) ImageStatus(ctx context.Context, r *runtime.Image
 	}
 	runtimeImage.Username = username
 
-	// TODO(mikebrow): write a ImageMetadata to runtime.Image converter
-	return &runtime.ImageStatusResponse{Image: runtimeImage}, nil
+	return runtimeImage
+}
+
+// TODO (mikebrow): discuss moving this struct and / or constants for info map for some or all of these fields to CRI
+type verboseImageInfo struct {
+	Config             *imagespec.ImageConfig `json:"config"`
+	ConfigDescriptor   imagespec.Descriptor   `json:"configDescriptor"`
+	ManifestDescriptor imagespec.Descriptor   `json:"manifestDescriptor"`
+	LayerInfo          []content.Info         `json:"layerInfo"`
+}
+
+// toCRIImageInfo converts internal image object information to CRI image status response info map.
+func (c *criContainerdService) toCRIImageInfo(ctx context.Context, image *imagestore.Image, verbose bool) (map[string]string, error) {
+	if !verbose {
+		return nil, nil
+	}
+
+	info := make(map[string]string)
+	i := image.Image
+	descriptor, err := i.Config(ctx)
+	if err != nil {
+		glog.Errorf("Failed to get image config %q: %v", image.ID, err)
+	} // fallthrough
+
+	targetDescriptor := i.Target()
+	var dia []content.Info
+	digests, err := i.RootFS(ctx)
+	if err != nil {
+		glog.Errorf("Failed to get target digests %q: %v", i.Name(), err)
+	} else {
+		dia = make([]content.Info, len(digests))
+		for i, d := range digests {
+			di, err := c.client.ContentStore().Info(ctx, d)
+			if err == nil {
+				dia[i] = di
+			}
+		}
+	}
+
+	imi := &verboseImageInfo{
+		Config:             image.Config,
+		ConfigDescriptor:   descriptor,
+		ManifestDescriptor: targetDescriptor,
+		LayerInfo:          dia,
+	}
+
+	m, err := json.Marshal(imi)
+	if err == nil {
+		info["info"] = string(m)
+	} else {
+		glog.Errorf("failed to marshal info %v: %v", imi, err)
+		info["info"] = err.Error()
+	}
+
+	return info, nil
 }
