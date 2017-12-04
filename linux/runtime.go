@@ -79,6 +79,8 @@ type Config struct {
 	NoShim bool `toml:"no_shim"`
 	// Debug enable debug on the shim
 	ShimDebug bool `toml:"shim_debug"`
+	// Args for oci runtime
+	RuntimeArgs []string `toml:"runtime_args"`
 }
 
 // New returns a configured runtime
@@ -232,19 +234,24 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 	}()
 
 	rt := r.config.Runtime
+	runtimeArgs := r.config.RuntimeArgs
 	if ropts != nil && ropts.Runtime != "" {
 		rt = ropts.Runtime
 	}
+	if ropts != nil && len(ropts.RuntimeArgs) != 0 {
+		runtimeArgs = ropts.RuntimeArgs
+	}
 	sopts := &shim.CreateTaskRequest{
-		ID:         id,
-		Bundle:     bundle.path,
-		Runtime:    rt,
-		Stdin:      opts.IO.Stdin,
-		Stdout:     opts.IO.Stdout,
-		Stderr:     opts.IO.Stderr,
-		Terminal:   opts.IO.Terminal,
-		Checkpoint: opts.Checkpoint,
-		Options:    opts.Options,
+		ID:          id,
+		Bundle:      bundle.path,
+		Runtime:     rt,
+		Stdin:       opts.IO.Stdin,
+		Stdout:      opts.IO.Stdout,
+		Stderr:      opts.IO.Stderr,
+		Terminal:    opts.IO.Terminal,
+		Checkpoint:  opts.Checkpoint,
+		Options:     opts.Options,
+		RuntimeArgs: runtimeArgs,
 	}
 	for _, m := range opts.Rootfs {
 		sopts.Rootfs = append(sopts.Rootfs, &types.Mount{
@@ -258,7 +265,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 		return nil, errdefs.FromGRPC(err)
 	}
 	t, err := newTask(id, namespace, int(cr.Pid), s, r.monitor, r.events,
-		proc.NewRunc(ropts.RuntimeRoot, sopts.Bundle, namespace, rt, ropts.CriuPath, ropts.SystemdCgroup))
+		proc.NewRunc(ropts.RuntimeRoot, sopts.Bundle, namespace, rt, ropts.CriuPath, ropts.SystemdCgroup, runtimeArgs))
 	if err != nil {
 		return nil, err
 	}
@@ -409,7 +416,7 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 		}
 
 		t, err := newTask(id, ns, pid, s, r.monitor, r.events,
-			proc.NewRunc(ropts.RuntimeRoot, bundle.path, ns, ropts.Runtime, ropts.CriuPath, ropts.SystemdCgroup))
+			proc.NewRunc(ropts.RuntimeRoot, bundle.path, ns, ropts.Runtime, ropts.CriuPath, ropts.SystemdCgroup, ropts.RuntimeArgs))
 		if err != nil {
 			log.G(ctx).WithError(err).Error("loading task type")
 			continue
@@ -491,8 +498,9 @@ func (r *Runtime) getRuntime(ctx context.Context, ns, id string) (*runc.Runc, er
 	}
 
 	var (
-		cmd  = r.config.Runtime
-		root = proc.RuncRoot
+		cmd         = r.config.Runtime
+		root        = proc.RuncRoot
+		runtimeArgs = r.config.RuntimeArgs
 	)
 	if ropts != nil {
 		if ropts.Runtime != "" {
@@ -501,10 +509,14 @@ func (r *Runtime) getRuntime(ctx context.Context, ns, id string) (*runc.Runc, er
 		if ropts.RuntimeRoot != "" {
 			root = ropts.RuntimeRoot
 		}
+		if len(ropts.RuntimeArgs) != 0 {
+			runtimeArgs = ropts.RuntimeArgs
+		}
 	}
 
 	return &runc.Runc{
 		Command:      cmd,
+		RuntimeArgs:  runtimeArgs,
 		LogFormat:    runc.JSON,
 		PdeathSignal: unix.SIGKILL,
 		Root:         filepath.Join(root, ns),

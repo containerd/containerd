@@ -209,6 +209,7 @@ The linux runtime allows a few options to be set to configure the shim and the r
 	runtime = "runc"
 	# do not use a shim when starting containers, saves on memory but
 	# live restore is not supported
+	runtime_args = ["--debug"]
 	no_shim = false
 	# display shim logs in the containerd daemon's log output
 	shim_debug = true

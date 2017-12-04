@@ -62,12 +62,13 @@ type Init struct {
 }
 
 // NewRunc returns a new runc instance for a process
-func NewRunc(root, path, namespace, runtime, criu string, systemd bool) *runc.Runc {
+func NewRunc(root, path, namespace, runtime, criu string, systemd bool, runtimeArgs []string) *runc.Runc {
 	if root == "" {
 		root = RuncRoot
 	}
 	return &runc.Runc{
 		Command:       runtime,
+		RuntimeArgs:   runtimeArgs,
 		Log:           filepath.Join(path, "log.json"),
 		LogFormat:     runc.JSON,
 		PdeathSignal:  syscall.SIGKILL,
@@ -112,7 +113,7 @@ func New(context context.Context, path, workDir, runtimeRoot, namespace, criu st
 			return nil, errors.Wrapf(err, "failed to mount rootfs component %v", m)
 		}
 	}
-	runtime := NewRunc(runtimeRoot, path, namespace, r.Runtime, criu, systemdCgroup)
+	runtime := NewRunc(runtimeRoot, path, namespace, r.Runtime, criu, systemdCgroup, r.RuntimeArgs)
 	p := &Init{
 		id:       r.ID,
 		bundle:   r.Bundle,
