@@ -133,7 +133,7 @@ Taking a container object and turning it into a runnable process on a system is 
 
 ```go
 // create a new task
-task, err := redis.NewTask(context, containerd.Stdio)
+task, err := redis.NewTask(context, cio.Stdio)
 defer task.Delete(context)
 
 // the task is now running and has a pid that can be use to setup networking
@@ -165,7 +165,7 @@ checkpoint := image.Target()
 redis, err = client.NewContainer(context, "redis-master", containerd.WithCheckpoint(checkpoint, "redis-rootfs"))
 defer container.Delete(context)
 
-task, err = redis.NewTask(context, containerd.Stdio, containerd.WithTaskCheckpoint(checkpoint))
+task, err = redis.NewTask(context, cio.Stdio, containerd.WithTaskCheckpoint(checkpoint))
 defer task.Delete(context)
 
 err := task.Start(context)
