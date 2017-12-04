@@ -94,7 +94,7 @@ func (s *walkingDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts
 	if err != nil {
 		return emptyDesc, errors.Wrap(err, "failed to create temporary directory")
 	}
-	defer os.RemoveAll(dir)
+	defer os.Remove(dir)
 
 	if err := mount.All(mounts, dir); err != nil {
 		return emptyDesc, errors.Wrap(err, "failed to mount")
@@ -164,13 +164,13 @@ func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount
 	if err != nil {
 		return emptyDesc, errors.Wrap(err, "failed to create temporary directory")
 	}
-	defer os.RemoveAll(aDir)
+	defer os.Remove(aDir)
 
 	bDir, err := ioutil.TempDir("", "right-")
 	if err != nil {
 		return emptyDesc, errors.Wrap(err, "failed to create temporary directory")
 	}
-	defer os.RemoveAll(bDir)
+	defer os.Remove(bDir)
 
 	if err := mount.All(lower, aDir); err != nil {
 		return emptyDesc, errors.Wrap(err, "failed to mount")

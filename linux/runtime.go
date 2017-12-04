@@ -22,6 +22,7 @@ import (
 	shim "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
@@ -474,7 +475,7 @@ func (r *Runtime) terminate(ctx context.Context, bundle *bundle, ns, id string) 
 	}); err != nil {
 		log.G(ctx).WithError(err).Warnf("delete runtime state %s", id)
 	}
-	if err := unix.Unmount(filepath.Join(bundle.path, "rootfs"), 0); err != nil {
+	if err := mount.Unmount(filepath.Join(bundle.path, "rootfs"), 0); err != nil {
 		log.G(ctx).WithError(err).WithFields(logrus.Fields{
 			"path": bundle.path,
 			"id":   id,
