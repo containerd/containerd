@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -334,6 +335,14 @@ func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, 
 	for i := len(manifestStack) - 1; i >= 0; i-- {
 		_, err := pushHandler(ctx, manifestStack[i])
 		if err != nil {
+			// TODO(estesp): until we have a more complete method for index push, we need to report
+			// missing dependencies in an index/manifest list by sensing the "400 Bad Request"
+			// as a marker for this problem
+			if (manifestStack[i].MediaType == ocispec.MediaTypeImageIndex ||
+				manifestStack[i].MediaType == images.MediaTypeDockerSchema2ManifestList) &&
+				errors.Cause(err) != nil && strings.Contains(errors.Cause(err).Error(), "400 Bad Request") {
+				return errors.Wrap(err, "manifest list/index references to blobs and/or manifests are missing in your target registry")
+			}
 			return err
 		}
 	}
