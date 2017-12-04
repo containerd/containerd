@@ -287,9 +287,9 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	if err != nil {
 		return nil, err
 	}
-	isRollback := true
+	rollback := true
 	defer func() {
-		if isRollback {
+		if rollback {
 			if rerr := t.Rollback(); rerr != nil {
 				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
 			}
@@ -317,9 +317,9 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	if err = os.Rename(td, path); err != nil {
 		return nil, errors.Wrap(err, "failed to rename")
 	}
-	isRollback = false
 	td = ""
 
+	rollback = false
 	if err = t.Commit(); err != nil {
 		return nil, errors.Wrap(err, "commit failed")
 	}
