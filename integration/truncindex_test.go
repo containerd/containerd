@@ -58,10 +58,10 @@ func TestTruncIndex(t *testing.T) {
 	sb, err := runtimeService.RunPodSandbox(sbConfig)
 	require.NoError(t, err)
 	sbTruncIndex := genTruncIndex(sb)
-	var hasStopedSandbox bool
+	var hasStoppedSandbox bool
 	defer func() {
 		// The 2th StopPodSandbox will fail, the 2th RemovePodSandbox will success.
-		if !hasStopedSandbox {
+		if !hasStoppedSandbox {
 			assert.NoError(t, runtimeService.StopPodSandbox(sbTruncIndex))
 		}
 		assert.NoError(t, runtimeService.RemovePodSandbox(sbTruncIndex))
@@ -99,10 +99,10 @@ func TestTruncIndex(t *testing.T) {
 
 	t.Logf("Start the container")
 	require.NoError(t, runtimeService.StartContainer(cnTruncIndex))
-	var hasStopedContainer bool
+	var hasStoppedContainer bool
 	defer func() {
 		// The 2th StopPodSandbox will fail
-		if !hasStopedContainer {
+		if !hasStoppedContainer {
 			assert.NoError(t, runtimeService.StopContainer(cnTruncIndex, 10))
 		}
 	}()
@@ -137,7 +137,7 @@ func TestTruncIndex(t *testing.T) {
 	err = runtimeService.StopContainer(cnTruncIndex, 10)
 	assert.NoError(t, err)
 	if err == nil {
-		hasStopedContainer = true
+		hasStoppedContainer = true
 	}
 	_, err = runtimeService.ContainerStats(cnTruncIndex)
 	assert.Error(t, err)
@@ -149,7 +149,7 @@ func TestTruncIndex(t *testing.T) {
 	err = runtimeService.StopPodSandbox(sbTruncIndex)
 	assert.NoError(t, err)
 	if err == nil {
-		hasStopedSandbox = true
+		hasStoppedSandbox = true
 	}
 	assert.NoError(t, runtimeService.RemovePodSandbox(sbTruncIndex))
 	_, err = runtimeService.PodSandboxStatus(sbTruncIndex)
