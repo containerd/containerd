@@ -72,12 +72,17 @@ GOPATH=${GOPATH%%:*}
 # checkout_repo checks out specified repository
 # and switch to specified  version.
 # Varset:
-# 1) Repo name;
+# 1) Pkg name;
 # 2) Version.
+# 3) Repo name (optional);
 checkout_repo() {
-  repo=$1
+  pkg=$1
   version=$2
-  path="${GOPATH}/src/${repo}"
+  repo=${3:-""}
+  if [ -z "${repo}" ]; then
+    repo=${pkg}
+  fi
+  path="${GOPATH}/src/${pkg}"
   if [ ! -d ${path} ]; then
     mkdir -p ${path}
     git clone https://${repo} ${path}
@@ -130,7 +135,7 @@ EOF'
 fi
 
 # Install containerd
-checkout_repo ${CONTAINERD_PKG} ${CONTAINERD_VERSION}
+checkout_repo ${CONTAINERD_PKG} ${CONTAINERD_VERSION} ${CONTAINERD_REPO}
 cd ${GOPATH}/src/${CONTAINERD_PKG}
 make
 ${sudo} make install -e DESTDIR=${CONTAINERD_DIR}
