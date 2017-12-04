@@ -275,7 +275,7 @@ func WithUserID(uid uint32) SpecOpts {
 		if err != nil {
 			return err
 		}
-		defer os.RemoveAll(root)
+		defer os.Remove(root)
 		for _, m := range mounts {
 			if err := m.Mount(root); err != nil {
 				return err
@@ -338,7 +338,7 @@ func WithUsername(username string) SpecOpts {
 		if err != nil {
 			return err
 		}
-		defer os.RemoveAll(root)
+		defer os.Remove(root)
 		for _, m := range mounts {
 			if err := m.Mount(root); err != nil {
 				return err

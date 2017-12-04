@@ -192,7 +192,7 @@ func remapRootFS(mounts []mount.Mount, uid, gid uint32) error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(root)
+	defer os.Remove(root)
 	for _, m := range mounts {
 		if err := m.Mount(root); err != nil {
 			return err
