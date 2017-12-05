@@ -371,13 +371,13 @@ func CommitActive(ctx context.Context, key, name string, usage snapshots.Usage, 
 		if si.Parent != "" {
 			spbkt := bkt.Bucket([]byte(si.Parent))
 			if spbkt == nil {
-				return errors.Wrapf(errdefs.ErrNotFound, "missing parent snapshot of %q", key)
+				return errors.Wrapf(errdefs.ErrNotFound, "missing parent %q of snapshot %q", si.Parent, key)
 			}
 			pid := readID(spbkt)
 
 			// Updates parent back link to use new key
 			if err := pbkt.Put(parentKey(pid, id), []byte(name)); err != nil {
-				return errors.Wrapf(err, "failed to update parent link from %q to %q", key, name)
+				return errors.Wrapf(err, "failed to update parent link %q from %q to %q", pid, key, name)
 			}
 		}
 
