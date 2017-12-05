@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/containerd/btrfs"
+	"github.com/containerd/containerd/fs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
@@ -128,18 +129,43 @@ func (b *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 
 // Usage retrieves the disk usage of the top-level snapshot.
 func (b *snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
-	panic("not implemented")
+	return b.usage(ctx, key)
+}
 
-	// TODO(stevvooe): Btrfs has a quota model where data can be exclusive to a
-	// snapshot or shared among other resources. We may find that this is the
-	// correct value to reoprt but the stability of the implementation is under
-	// question.
-	//
-	// In general, this has impact on the model we choose for reporting usage.
-	// Ideally, the value should allow aggregration. For overlay, this is
-	// simple since we can scan the diff directory to get a unique value. This
-	// breaks down when start looking the behavior when data is shared between
-	// snapshots, such as that for btrfs.
+func (b *snapshotter) usage(ctx context.Context, key string) (snapshots.Usage, error) {
+	ctx, t, err := b.ms.TransactionContext(ctx, false)
+	if err != nil {
+		return snapshots.Usage{}, err
+	}
+	id, info, usage, err := storage.GetInfo(ctx, key)
+	var parentID string
+	if err == nil && info.Kind == snapshots.KindActive && info.Parent != "" {
+		parentID, _, _, err = storage.GetInfo(ctx, info.Parent)
+
+	}
+	t.Rollback() // transaction no longer needed at this point.
+
+	if err != nil {
+		return snapshots.Usage{}, err
+	}
+
+	if info.Kind == snapshots.KindActive {
+		var du fs.Usage
+		p := filepath.Join(b.root, "active", id)
+		if parentID != "" {
+			du, err = fs.DiffUsage(ctx, filepath.Join(b.root, "snapshots", parentID), p)
+		} else {
+			du, err = fs.DiskUsage(p)
+		}
+		if err != nil {
+			// TODO(stevvooe): Consider not reporting an error in this case.
+			return snapshots.Usage{}, err
+		}
+
+		usage = snapshots.Usage(du)
+	}
+
+	return usage, nil
 }
 
 // Walk the committed snapshots.
@@ -238,6 +264,11 @@ func (b *snapshotter) mounts(dir string, s storage.Snapshot) ([]mount.Mount, err
 }
 
 func (b *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) (err error) {
+	usage, err := b.usage(ctx, key)
+	if err != nil {
+		return errors.Wrap(err, "failed to compute usage")
+	}
+
 	ctx, t, err := b.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return err
@@ -250,7 +281,7 @@ func (b *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		}
 	}()
 
-	id, err := storage.CommitActive(ctx, key, name, snapshots.Usage{}, opts...) // TODO(stevvooe): Resolve a usage value for btrfs
+	id, err := storage.CommitActive(ctx, key, name, usage, opts...) // TODO(stevvooe): Resolve a usage value for btrfs
 	if err != nil {
 		return errors.Wrap(err, "failed to commit")
 	}
