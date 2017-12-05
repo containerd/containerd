@@ -44,6 +44,7 @@ func TestSimpleDiff(t *testing.T) {
 		fstest.Remove("/etc/unexpected"),
 	)
 	diff := []TestChange{
+		Unchanged("/etc"),
 		Modify("/etc/hosts"),
 		Modify("/etc/profile"),
 		Delete("/etc/unexpected"),
@@ -70,6 +71,7 @@ func TestDirectoryReplace(t *testing.T) {
 		fstest.CreateFile("/dir1/f2", []byte("Now file"), 0666),
 	)
 	diff := []TestChange{
+		Unchanged("/dir1"),
 		Add("/dir1/f11"),
 		Modify("/dir1/f2"),
 	}
@@ -132,10 +134,13 @@ func TestParentDirectoryPermission(t *testing.T) {
 		fstest.CreateFile("/dir3/f", []byte("irrelevant"), 0644),
 	)
 	diff := []TestChange{
+		Unchanged("/dir1"),
 		Add("/dir1/d"),
 		Add("/dir1/d/f"),
 		Add("/dir1/f"),
+		Unchanged("/dir2"),
 		Add("/dir2/f"),
+		Unchanged("/dir3"),
 		Add("/dir3/f"),
 	}
 
@@ -177,6 +182,56 @@ func TestUpdateWithSameTime(t *testing.T) {
 		Modify("/file-modified-time"),
 		Modify("/file-truncated-time-1"),
 		Modify("/file-truncated-time-2"),
+	}
+
+	if err := testDiffWithBase(l1, l2, diff); err != nil {
+		t.Fatalf("Failed diff with base: %+v", err)
+	}
+}
+
+func TestUnchangedParent(t *testing.T) {
+	skipDiffTestOnWindows(t)
+	l1 := fstest.Apply(
+		fstest.CreateDir("/dir1", 0755),
+		fstest.CreateDir("/dir3", 0755),
+		fstest.CreateDir("/dir3/a", 0755),
+		fstest.CreateDir("/dir3/a/e", 0755),
+		fstest.CreateDir("/dir3/z", 0755),
+	)
+	l2 := fstest.Apply(
+		fstest.CreateDir("/dir1/a", 0755),
+		fstest.CreateFile("/dir1/a/b", []byte("irrelevant"), 0644),
+		fstest.CreateDir("/dir1/a/e", 0755),
+		fstest.CreateFile("/dir1/a/e/f", []byte("irrelevant"), 0644),
+		fstest.CreateFile("/dir1/f", []byte("irrelevant"), 0644),
+		fstest.CreateDir("/dir2", 0755),
+		fstest.CreateFile("/dir2/f", []byte("irrelevant"), 0644),
+		fstest.CreateFile("/dir3/a/b", []byte("irrelevant"), 0644),
+		fstest.CreateDir("/dir3/a/c", 0755),
+		fstest.CreateDir("/dir3/a/e/i", 0755),
+		fstest.CreateFile("/dir3/a/e/i/f", []byte("irrelevant"), 0644),
+		fstest.CreateFile("/dir3/f", []byte("irrelevant"), 0644),
+		fstest.CreateFile("/dir3/z/f", []byte("irrelevant"), 0644),
+	)
+	diff := []TestChange{
+		Unchanged("/dir1"),
+		Add("/dir1/a"),
+		Add("/dir1/a/b"),
+		Add("/dir1/a/e"),
+		Add("/dir1/a/e/f"),
+		Add("/dir1/f"),
+		Add("/dir2"),
+		Add("/dir2/f"),
+		Unchanged("/dir3"),
+		Unchanged("/dir3/a"),
+		Add("/dir3/a/b"),
+		Add("/dir3/a/c"),
+		Unchanged("/dir3/a/e"),
+		Add("/dir3/a/e/i"),
+		Add("/dir3/a/e/i/f"),
+		Add("/dir3/f"),
+		Unchanged("/dir3/z"),
+		Add("/dir3/z/f"),
 	}
 
 	if err := testDiffWithBase(l1, l2, diff); err != nil {
@@ -347,7 +402,7 @@ func diffString(c1, c2 []TestChange) string {
 func changesString(c []TestChange) string {
 	strs := make([]string, len(c))
 	for i := range c {
-		strs[i] = fmt.Sprintf("\t%s\t%s", c[i].Kind, c[i].Path)
+		strs[i] = fmt.Sprintf("\t%-10s\t%s", c[i].Kind, c[i].Path)
 	}
 	return strings.Join(strs, "\n")
 }
@@ -369,6 +424,13 @@ func Delete(p string) TestChange {
 func Modify(p string) TestChange {
 	return TestChange{
 		Kind: ChangeKindModify,
+		Path: filepath.FromSlash(p),
+	}
+}
+
+func Unchanged(p string) TestChange {
+	return TestChange{
+		Kind: ChangeKindUnmodified,
 		Path: filepath.FromSlash(p),
 	}
 }

@@ -19,6 +19,7 @@ func FSSuite(t *testing.T, a TestApplier) {
 	t.Run("Deletion", makeTest(t, a, deletionTest))
 	t.Run("Update", makeTest(t, a, updateTest))
 	t.Run("DirectoryPermission", makeTest(t, a, directoryPermissionsTest))
+	t.Run("ParentDirectoryPermission", makeTest(t, a, parentDirectoryPermissionsTest))
 	t.Run("HardlinkUnmodified", makeTest(t, a, hardlinkUnmodified))
 	t.Run("HardlinkBeforeUnmodified", makeTest(t, a, hardlinkBeforeUnmodified))
 	t.Run("HardlinkBeforeModified", makeTest(t, a, hardlinkBeforeModified))
@@ -156,6 +157,28 @@ var (
 			CreateFile("/d1/d/f", []byte("irrelevant"), 0644),
 			CreateFile("/d2/f", []byte("irrelevant"), 0644),
 			CreateFile("/d3/f", []byte("irrelevant"), 0644),
+		),
+	}
+
+	// parentDirectoryPermissionsTest covers directory permissions for updated
+	// files
+	parentDirectoryPermissionsTest = []Applier{
+		Apply(
+			CreateDir("/d1", 0700),
+			CreateDir("/d1/a", 0700),
+			CreateDir("/d1/a/b", 0700),
+			CreateDir("/d1/a/b/c", 0700),
+			CreateFile("/d1/a/b/f", []byte("content1"), 0644),
+			CreateDir("/d2", 0751),
+			CreateDir("/d2/a/b", 0751),
+			CreateDir("/d2/a/b/c", 0751),
+			CreateFile("/d2/a/b/f", []byte("content1"), 0644),
+		),
+		Apply(
+			CreateFile("/d1/a/b/f", []byte("content1"), 0644),
+			Chmod("/d1/a/b/c", 0700),
+			CreateFile("/d2/a/b/f", []byte("content2"), 0644),
+			Chmod("/d2/a/b/c", 0751),
 		),
 	}
 
