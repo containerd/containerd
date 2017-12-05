@@ -136,6 +136,11 @@ func TestFilters(t *testing.T) {
 			},
 		},
 		{
+			name:      "LabelValueNoAltQuoting",
+			input:     "labels.|foo|==omg_asdf.asdf-qwer",
+			errString: "filters: parse error: [labels. >|||< foo|==omg_asdf.asdf-qwer]: invalid quote encountered",
+		},
+		{
 			name:  "Name",
 			input: "name==bar",
 			expected: []interface{}{
@@ -177,6 +182,27 @@ func TestFilters(t *testing.T) {
 				corpus[6],
 				corpus[7],
 			},
+		},
+		{
+			name:  "RegexpQuotedValue",
+			input: "other~=/[abc]+/,name!=foo",
+			expected: []interface{}{
+				corpus[6],
+				corpus[7],
+			},
+		},
+		{
+			name:  "RegexpQuotedValue",
+			input: "other~=/[abc]{1,2}/,name!=foo",
+			expected: []interface{}{
+				corpus[6],
+				corpus[7],
+			},
+		},
+		{
+			name:  "RegexpQuotedValueGarbage",
+			input: "other~=/[abc]{0,1}\"\\//,name!=foo",
+			// valid syntax, but doesn't match anything
 		},
 		{
 			name:  "NameAndLabelValue",
