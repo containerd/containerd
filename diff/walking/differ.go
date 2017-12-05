@@ -94,12 +94,20 @@ func (s *walkingDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts
 	if err != nil {
 		return emptyDesc, errors.Wrap(err, "failed to create temporary directory")
 	}
+	// We change RemoveAll to Remove so that we either leak a temp dir
+	// if it fails but not RM snapshot data. refer to #1868 #1785
 	defer os.Remove(dir)
 
 	if err := mount.All(mounts, dir); err != nil {
 		return emptyDesc, errors.Wrap(err, "failed to mount")
 	}
-	defer mount.Unmount(dir, 0)
+	defer func() {
+		if uerr := mount.Unmount(dir, 0); uerr != nil {
+			if err == nil {
+				err = uerr
+			}
+		}
+	}()
 
 	ra, err := s.store.ReaderAt(ctx, desc.Digest)
 	if err != nil {
@@ -175,12 +183,24 @@ func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount
 	if err := mount.All(lower, aDir); err != nil {
 		return emptyDesc, errors.Wrap(err, "failed to mount")
 	}
-	defer mount.Unmount(aDir, 0)
+	defer func() {
+		if uerr := mount.Unmount(aDir, 0); uerr != nil {
+			if err == nil {
+				err = uerr
+			}
+		}
+	}()
 
 	if err := mount.All(upper, bDir); err != nil {
 		return emptyDesc, errors.Wrap(err, "failed to mount")
 	}
-	defer mount.Unmount(bDir, 0)
+	defer func() {
+		if uerr := mount.Unmount(bDir, 0); uerr != nil {
+			if err == nil {
+				err = uerr
+			}
+		}
+	}()
 
 	var newReference bool
 	if config.Reference == "" {
