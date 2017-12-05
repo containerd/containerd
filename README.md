@@ -13,13 +13,23 @@ containerd is designed to be embedded into a larger system, rather than being us
 
 ## Getting Started
 
-If you are interested in trying out containerd please see our [Getting Started Guide](docs/getting-started.md).
+See our documentation on [containerd.io](containerd.io):
+* [for ops and admins](docs/ops.md)
+* [namespaces](docs/namespaces.md)
+* [client options](docs/client-opts.md)
+
+See how to build containerd from source at [BUILDING](BUILDING.md).
+
+If you are interested in trying out containerd see our example at [Getting Started](docs/getting-started.md).
+
 
 ## Runtime Requirements
 
 Runtime requirements for containerd are very minimal. Most interactions with
 the Linux and Windows container feature sets are handled via [runc](https://github.com/opencontainers/runc) and/or
-OS-specific libraries (e.g. [hcsshim](https://github.com/Microsoft/hcsshim) for Microsoft). There are specific features
+OS-specific libraries (e.g. [hcsshim](https://github.com/Microsoft/hcsshim) for Microsoft). The current required version of runc is always listed in [RUNC.md](/RUNC.md).
+
+There are specific features
 used by containerd core code and snapshotters that will require a minimum kernel
 version on Linux. With the understood caveat of distro kernel versioning, a
 reasonable starting point for Linux is a minimum 4.x kernel version.
@@ -32,8 +42,6 @@ distribution.
 
 To use Linux checkpoint and restore features, you will need `criu` installed on
 your system. See more details in [Checkpoint and Restore](#checkpoint-and-restore).
-
-The current required version of runc is always listed in [RUNC.md](/RUNC.md).
 
 Build requirements for developers are listed in the [Developer Quick-Start](#developer-quick-start) section.
 
