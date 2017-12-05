@@ -25,10 +25,11 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/mount"
 	"github.com/docker/docker/pkg/chrootarchive"
 	"github.com/docker/docker/pkg/system"
+	"github.com/golang/glog"
 	"github.com/pkg/errors"
-	"golang.org/x/sys/unix"
 )
 
 // WithNewSnapshot wraps `containerd.WithNewSnapshot` so that if creating the
@@ -55,7 +56,7 @@ func WithNewSnapshot(id string, i containerd.Image) containerd.NewContainerOpts 
 // The passed in map is a host path to container path map for all volumes.
 // TODO(random-liu): Figure out whether we need to copy volume content.
 func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
-	return func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
+	return func(ctx context.Context, client *containerd.Client, c *containers.Container) (err error) {
 		if c.Snapshotter == "" {
 			return errors.New("no snapshotter set for container")
 		}
@@ -71,13 +72,22 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 		if err != nil {
 			return err
 		}
-		defer os.RemoveAll(root) // nolint: errcheck
-		for _, m := range mounts {
-			if err := m.Mount(root); err != nil {
-				return err
-			}
+		// We change RemoveAll to Remove so that we either leak a temp dir
+		// if it fails but not RM snapshot data.
+		// refer to https://github.com/containerd/containerd/pull/1868
+		// https://github.com/containerd/containerd/pull/1785
+		defer os.Remove(root) // nolint: errcheck
+		if err := mount.All(mounts, root); err != nil {
+			return errors.Wrap(err, "failed to mount")
 		}
-		defer unix.Unmount(root, 0) // nolint: errcheck
+		defer func() {
+			if uerr := mount.Unmount(root, 0); uerr != nil {
+				glog.Errorf("Failed to unmount snapshot %q: %v", c.SnapshotKey, uerr)
+				if err == nil {
+					err = uerr
+				}
+			}
+		}()
 
 		for host, volume := range volumeMounts {
 			src := filepath.Join(root, volume)
