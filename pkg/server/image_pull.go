@@ -153,11 +153,6 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 		return nil, fmt.Errorf("failed to add image %q into store: %v", img.ID, err)
 	}
 
-	glog.V(0).Infof("Check image after pull image %q", imageID)
-	if err := c.checkImage(ctx, imageID, "", nil, false); err != nil {
-		glog.Errorf("Failed to check image %q: %v", imageID, err)
-	}
-
 	// NOTE(random-liu): the actual state in containerd is the source of truth, even we maintain
 	// in-memory image store, it's only for in-memory indexing. The image could be removed
 	// by someone else anytime, before/during/after we create the metadata. We should always
