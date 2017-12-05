@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	oci "github.com/containerd/containerd/images/oci"
 	"github.com/containerd/containerd/reference"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -13,11 +14,14 @@ import (
 )
 
 var exportCommand = cli.Command{
-	Name:        "export",
-	Usage:       "export an image",
-	ArgsUsage:   "[flags] <out> <image>",
-	Description: "export an image to a tar stream",
+	Name:      "export",
+	Usage:     "export an image",
+	ArgsUsage: "[flags] <out> <image>",
+	Description: `Export an image to a tar stream.
+Currently, only OCI format is supported.
+`,
 	Flags: []cli.Flag{
+		// TODO(AkihiroSuda): make this map[string]string as in moby/moby#33355?
 		cli.StringFlag{
 			Name:  "oci-ref-name",
 			Value: "",
@@ -78,7 +82,7 @@ var exportCommand = cli.Command{
 				return nil
 			}
 		}
-		r, err := client.Export(ctx, desc)
+		r, err := client.Export(ctx, &oci.V1Exporter{}, desc)
 		if err != nil {
 			return err
 		}

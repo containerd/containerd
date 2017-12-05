@@ -1,4 +1,4 @@
-package containerd
+package oci
 
 import (
 	"archive/tar"
@@ -15,7 +15,17 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (c *Client) exportToOCITar(ctx context.Context, desc ocispec.Descriptor, writer io.Writer, eopts exportOpts) error {
+// V1Exporter implements OCI Image Spec v1.
+// It is up to caller to put "org.opencontainers.image.ref.name" annotation to desc.
+//
+// TODO(AkihiroSuda): add V1Exporter{TranslateMediaTypes: true} that transforms media types,
+//                    e.g. application/vnd.docker.image.rootfs.diff.tar.gzip
+//                         -> application/vnd.oci.image.layer.v1.tar+gzip
+type V1Exporter struct {
+}
+
+// Export implements Exporter.
+func (oe *V1Exporter) Export(ctx context.Context, store content.Store, desc ocispec.Descriptor, writer io.Writer) error {
 	tw := tar.NewWriter(writer)
 	defer tw.Close()
 
@@ -24,16 +34,15 @@ func (c *Client) exportToOCITar(ctx context.Context, desc ocispec.Descriptor, wr
 		ociIndexRecord(desc),
 	}
 
-	cs := c.ContentStore()
 	algorithms := map[string]struct{}{}
 	exportHandler := func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		records = append(records, blobRecord(cs, desc))
+		records = append(records, blobRecord(store, desc))
 		algorithms[desc.Digest.Algorithm().String()] = struct{}{}
 		return nil, nil
 	}
 
 	handlers := images.Handlers(
-		images.ChildrenHandler(cs, platforms.Default()),
+		images.ChildrenHandler(store, platforms.Default()),
 		images.HandlerFunc(exportHandler),
 	)
 
@@ -155,7 +164,9 @@ func ociIndexRecord(manifests ...ocispec.Descriptor) tarRecord {
 }
 
 func writeTar(ctx context.Context, tw *tar.Writer, records []tarRecord) error {
-	sort.Sort(tarRecordsByName(records))
+	sort.Slice(records, func(i, j int) bool {
+		return records[i].Header.Name < records[j].Header.Name
+	})
 
 	for _, record := range records {
 		if err := tw.WriteHeader(record.Header); err != nil {
@@ -174,16 +185,4 @@ func writeTar(ctx context.Context, tw *tar.Writer, records []tarRecord) error {
 		}
 	}
 	return nil
-}
-
-type tarRecordsByName []tarRecord
-
-func (t tarRecordsByName) Len() int {
-	return len(t)
-}
-func (t tarRecordsByName) Swap(i, j int) {
-	t[i], t[j] = t[j], t[i]
-}
-func (t tarRecordsByName) Less(i, j int) bool {
-	return t[i].Header.Name < t[j].Header.Name
 }

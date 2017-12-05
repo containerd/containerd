@@ -3,11 +3,13 @@ package containerd
 import (
 	"runtime"
 	"testing"
+
+	"github.com/containerd/containerd/images/oci"
 )
 
-// TestExportAndImport exports testImage as a tar stream,
+// TestOCIExportAndImport exports testImage as a tar stream,
 // and import the tar stream as a new image.
-func TestExportAndImport(t *testing.T) {
+func TestOCIExportAndImport(t *testing.T) {
 	// TODO: support windows
 	if testing.Short() || runtime.GOOS == "windows" {
 		t.Skip()
@@ -26,19 +28,20 @@ func TestExportAndImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	exported, err := client.Export(ctx, pulled.Target())
+	exported, err := client.Export(ctx, &oci.V1Exporter{}, pulled.Target())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	importRef := "test/export-and-import:tmp"
-	_, err = client.Import(ctx, importRef, exported, WithRefObject("@"+pulled.Target().Digest.String()))
+	imgrecs, err := client.Import(ctx, &oci.V1Importer{ImageName: "foo/bar:"}, exported)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = client.ImageService().Delete(ctx, importRef)
-	if err != nil {
-		t.Fatal(err)
+	for _, imgrec := range imgrecs {
+		err = client.ImageService().Delete(ctx, imgrec.Name())
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }
