@@ -45,7 +45,11 @@ containerd offers a full client package to help you integrate containerd into yo
 
 ```go
 
-import "github.com/containerd/containerd"
+import (
+  "github.com/containerd/containerd"
+  "github.com/containerd/containerd/cio"
+)
+
 
 func main() {
 	client, err := containerd.New("/run/containerd/containerd.sock")
@@ -61,7 +65,7 @@ Namespaces allow multiple consumers to use the same containerd without conflicti
 To set a namespace for requests to the API:
 
 ```go
-context    = context.Background()
+context = context.Background()
 // create a context for docker
 docker = namespaces.WithNamespace(context, "docker")
 
