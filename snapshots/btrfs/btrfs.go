@@ -127,19 +127,57 @@ func (b *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 }
 
 // Usage retrieves the disk usage of the top-level snapshot.
+//
+// For active snapshot, the `excl` value of L0 QGroup is used, and committed on Commit.
+// For view snapshot, always 0 is returned.
+// For committed snapshot, the committed value is returned.
 func (b *snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
-	panic("not implemented")
+	ctx, t, err := b.ms.TransactionContext(ctx, false)
+	if err != nil {
+		return snapshots.Usage{}, err
+	}
+	defer t.Rollback()
+	id, info, committedUsage, err := storage.GetInfo(ctx, key)
+	if err != nil {
+		return snapshots.Usage{}, err
+	}
+	switch info.Kind {
+	case snapshots.KindActive:
+		return b.activeUsage(ctx, id)
+	case snapshots.KindView:
+		return snapshots.Usage{Size: 0, Inodes: 0}, nil
+	default:
+		return committedUsage, nil
+	}
 
-	// TODO(stevvooe): Btrfs has a quota model where data can be exclusive to a
-	// snapshot or shared among other resources. We may find that this is the
-	// correct value to reoprt but the stability of the implementation is under
-	// question.
-	//
-	// In general, this has impact on the model we choose for reporting usage.
-	// Ideally, the value should allow aggregration. For overlay, this is
-	// simple since we can scan the diff directory to get a unique value. This
-	// breaks down when start looking the behavior when data is shared between
-	// snapshots, such as that for btrfs.
+}
+
+// activeUsage returns the `excl` value of L0 QGroup is used, and committed on Commit.
+func (b *snapshotter) activeUsage(ctx context.Context, activeSnapshotID string) (snapshots.Usage, error) {
+	target := filepath.Join(b.root, "active", activeSnapshotID)
+	subvolID, err := btrfs.SubvolID(target)
+	if err != nil {
+		return snapshots.Usage{}, err
+	}
+	if err := btrfs.Sync(target); err != nil {
+		return snapshots.Usage{}, err
+	}
+	qgItems, err := btrfs.QGroupInfo(target)
+	if err != nil {
+		return snapshots.Usage{}, errors.Wrapf(err, "could not query %q. quota not enabled?", target)
+	}
+	for _, qgItem := range qgItems {
+		// http://sensille.com/qgroups.pdf
+		// Qgroups of level 0 get created automatically when a subvolume/snapshot gets created.
+		// The ID of the qgroup corresponds to the ID of the subvolume.
+		if qgItem.QGroupIDHigh == 0 && qgItem.QGroupIDLow == subvolID {
+			return snapshots.Usage{
+				Size:   int64(qgItem.Exclusive), // not ExclusiveCompressed,
+				Inodes: -1,
+			}, nil
+		}
+	}
+	return snapshots.Usage{}, errors.Errorf("no qgroup found for %q (ID %d)", target, subvolID)
 }
 
 // Walk the committed snapshots.
@@ -199,6 +237,9 @@ func (b *snapshotter) makeSnapshot(ctx context.Context, kind snapshots.Kind, key
 			return nil, err
 		}
 	}
+	if err = btrfs.QuotaCtl(target, true); err != nil {
+		return nil, errors.Wrapf(err, "could not enable quota for %q", target)
+	}
 	err = t.Commit()
 	t = nil
 	if err != nil {
@@ -250,7 +291,15 @@ func (b *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		}
 	}()
 
-	id, err := storage.CommitActive(ctx, key, name, snapshots.Usage{}, opts...) // TODO(stevvooe): Resolve a usage value for btrfs
+	active, err := storage.GetSnapshot(ctx, key)
+	if err != nil {
+		return err
+	}
+	activeUsage, err := b.activeUsage(ctx, active.ID)
+	if err != nil {
+		return errors.Wrapf(err, "could not get usage for active %q (ID %s)", key, active.ID)
+	}
+	id, err := storage.CommitActive(ctx, key, name, activeUsage, opts...)
 	if err != nil {
 		return errors.Wrap(err, "failed to commit")
 	}
