@@ -2,8 +2,8 @@ package main
 
 const (
 	defaultTemplateFile = "TEMPLATE"
-	releaseNotes        = `Welcome to the release of {{.ProjectName}} {{.Version}}!
-{{if .PreRelease}}
+	releaseNotes        = `Welcome to the {{.Version}} release of {{.ProjectName}}!
+{{if .PreRelease -}}
 *This is a pre-release of {{.ProjectName}}*
 {{- end}}
 

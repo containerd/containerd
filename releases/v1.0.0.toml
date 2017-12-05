@@ -1,0 +1,59 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+
+# previous release
+previous = "v1.0.0-rc.0"
+
+pre_release = false
+
+preface = """\
+`containerd` provides a daemon for managing running containers. 
+
+The new containerd is designed for use designed for use in container-based
+systems, like Docker and Kubernetes. It provides minimal abstractions over the
+operating system that gets out of the way.
+
+A short list of differences from the 0.2 version of containerd follow:
+
+- New runtime model based on tasks and containers
+- Client-defined image push/pull, allows fully replaceable image distribution
+- End-to-end event system
+- Snapshot-based container storage system
+- Content-addressed image storage system
+- Arbitrary metadata storage for association with containerd objects
+- Extensive, namespaced [GRPC API](https://github.com/containerd/containerd/tree/master/api/services)
+- Rich API Client ([getting started](https://github.com/containerd/containerd/blob/master/docs/getting-started.md) and [godoc](https://godoc.org/github.com/containerd/containerd)).
+
+You can read about the full details of the project in the [README](https://github.com/containerd/containerd/blob/v1.0.0/README.md).
+
+If you would like to try containerd, please download the binaries included on
+this release. If you are using Docker, you have already been using containerd
+since Docker 1.11. The next release of Docker, 17.12 CE Edge, will include this
+version of containerd. If you would like to use it with Kubernetes, a CRI
+implementation against containerd is available at
+[cri-containerd](https://github.com/kubernetes-incubator/cri-containerd).
+
+The 1.0 release has been reached after 7 alphas, 4 betas, and 1 release
+candidate full of stability fixes, hardening, and API improvements. If you run
+into a new problems, please file an
+[issue](https://github.com/containerd/containerd/issues).
+
+The [_support horizon_](https://github.com/containerd/containerd/blob/master/RELEASES.md#support-horizon)
+for containerd has been updated to include the 1.0 release. With this release,
+the 0.2 release line is now moved to the "End of Life" state. No new releases
+on that branch will be made. The 1.0 release train will be considered an active
+branch with new patches until December 5, 2018 or when 1.1 is released.
+
+As part the release of containerd 1.0, the governance model has been updated.
+The day to day management of the project is taken care of by the maintainers.
+The roles of chief maintainer and BDFL have been removed and a technical
+steering committee has been added as an escalation point when consensus cannot
+be reached among maintainers. See https://github.com/moby/tsc for details."""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
