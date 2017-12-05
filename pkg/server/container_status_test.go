@@ -153,9 +153,10 @@ func TestToCRIContainerInfo(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	info := toCRIContainerInfo(context.Background(),
+	info, err := toCRIContainerInfo(context.Background(),
 		container,
 		false)
+	assert.NoError(t, err)
 	assert.Nil(t, info)
 }
 
