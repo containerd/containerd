@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/golang/glog"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
@@ -54,7 +56,10 @@ func (c *criContainerdService) ContainerStatus(ctx context.Context, r *runtime.C
 		imageRef = image.RepoDigests[0]
 	}
 	status := toCRIContainerStatus(container, spec, imageRef)
-	info := toCRIContainerInfo(ctx, container, r.GetVerbose())
+	info, err := toCRIContainerInfo(ctx, container, r.GetVerbose())
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate container info: %v", err)
+	}
 
 	return &runtime.ContainerStatusResponse{
 		Status: status,
@@ -94,44 +99,53 @@ func toCRIContainerStatus(container containerstore.Container, spec *runtime.Imag
 	}
 }
 
+type containerInfo struct {
+	SandboxID   string                   `json:"sandboxID"`
+	Pid         uint32                   `json:"pid"`
+	Removing    bool                     `json:"removing"`
+	SnapshotKey string                   `json:"snapshotKey"`
+	Snapshotter string                   `json:"snapshotter"`
+	Config      *runtime.ContainerConfig `json:"config"`
+	RuntimeSpec *runtimespec.Spec        `json:"runtimeSpec"`
+}
+
 // toCRIContainerInfo converts internal container object information to CRI container status response info map.
-func toCRIContainerInfo(ctx context.Context, container containerstore.Container, verbose bool) map[string]string {
+func toCRIContainerInfo(ctx context.Context, container containerstore.Container, verbose bool) (map[string]string, error) {
 	if !verbose {
-		return nil
+		return nil, nil
 	}
 
 	info := make(map[string]string)
 	meta := container.Metadata
 	status := container.Status.Get()
 
-	// TODO (mikebrow): discuss predefining constants for some or all of these key names in CRI for these info map values
-	info["pid"] = marshallToString(status.Pid)
-	info["containerConfig"] = marshallToString(meta.Config)
-	info["removingState"] = marshallToString(status.Removing)
+	// TODO(random-liu): Change CRI status info to use array instead of map.
+	ci := &containerInfo{
+		SandboxID: container.SandboxID,
+		Pid:       status.Pid,
+		Removing:  status.Removing,
+		Config:    meta.Config,
+	}
 
-	oldSpec, err := container.Container.Spec(ctx)
+	spec, err := container.Container.Spec(ctx)
 	if err == nil {
-		info["runtimeSpec"] = marshallToString(oldSpec)
+		ci.RuntimeSpec = spec
 	} else {
-		info["runtimeSpec"] = err.Error()
+		glog.Errorf("Failed to get container %q spec: %v", container.ID, err)
 	}
 
 	ctrInfo, err := container.Container.Info(ctx)
 	if err == nil {
-		info["snapshotKey"] = marshallToString(ctrInfo.SnapshotKey)
-		info["snapshotter"] = marshallToString(ctrInfo.Snapshotter)
+		ci.SnapshotKey = ctrInfo.SnapshotKey
+		ci.Snapshotter = ctrInfo.Snapshotter
 	} else {
-		info["snapshotKey"] = err.Error()
-		info["snapshotter"] = err.Error()
+		glog.Errorf("Failed to get container %q info: %v", container.ID, err)
 	}
 
-	return info
-}
-
-func marshallToString(v interface{}) string {
-	m, err := json.Marshal(v)
-	if err == nil {
-		return string(m)
+	infoBytes, err := json.Marshal(ci)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal info %v: %v", ci, err)
 	}
-	return err.Error()
+	info["info"] = string(infoBytes)
+	return info, nil
 }
