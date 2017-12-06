@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/cri-o/ocicni/pkg/ocicni"
 	"github.com/golang/glog"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
@@ -61,13 +63,81 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 		return nil, fmt.Errorf("failed to get sandbox ip: %v", err)
 	}
 
-	info, err := sandbox.Container.Info(ctx)
+	ctrInfo, err := sandbox.Container.Info(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox container info: %v", err)
 	}
-	createdAt := info.CreatedAt
+	createdAt := ctrInfo.CreatedAt
 	status := toCRISandboxStatus(sandbox.Metadata, state, createdAt, ip)
-	return &runtime.PodSandboxStatusResponse{Status: status}, nil
+	info, err := toCRISandboxContainerInfo(ctx, sandbox.Container, r.GetVerbose())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get verbose sandbox container info: %v", err)
+	}
+
+	return &runtime.PodSandboxStatusResponse{
+		Status: status,
+		Info:   info,
+	}, nil
+}
+
+// TODO (mikebrow): discuss predefining constants structures for some or all of these field names in CRI
+type sandboxInfo struct {
+	Pid         uint32            `json:"pid"`
+	State       string            `json:"state"`
+	SnapshotKey string            `json:"snapshotKey"`
+	Snapshotter string            `json:"snapshotter"`
+	RuntimeSpec *runtimespec.Spec `json:"runtimeSpec"`
+}
+
+// toCRISandboxContainerInfo converts internal container object information to CRI sandbox container status response info map.
+func toCRISandboxContainerInfo(ctx context.Context, container containerd.Container, verbose bool) (map[string]string, error) {
+	if !verbose {
+		return nil, nil
+	}
+
+	task, err := container.Task(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox container task: %v", err)
+	}
+	status, err := task.Status(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox container task status: %v", err)
+	}
+
+	info := make(map[string]string)
+	pid := task.Pid()
+
+	oldSpec, err := container.Spec(ctx)
+	if err != nil {
+		glog.Errorf("Failed to get sandbox container runtime spec: %v", err)
+	}
+
+	var snapshotkey, snapshotter string
+	ctrInfo, err := container.Info(ctx)
+	if err == nil {
+		snapshotkey = ctrInfo.SnapshotKey
+		snapshotter = ctrInfo.Snapshotter
+	} else {
+		glog.Errorf("Failed to get target shapshot info: %v", err)
+	}
+
+	si := &sandboxInfo{
+		Pid:         pid,
+		State:       string(status.Status),
+		SnapshotKey: snapshotkey,
+		Snapshotter: snapshotter,
+		RuntimeSpec: oldSpec,
+	}
+
+	m, err := json.Marshal(si)
+	if err == nil {
+		info["info"] = string(m)
+	} else {
+		glog.Errorf("failed to marshal info %v: %v", si, err)
+		info["info"] = err.Error()
+	}
+
+	return info, nil
 }
 
 func (c *criContainerdService) getIP(sandbox sandboxstore.Sandbox) (string, error) {

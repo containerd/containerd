@@ -58,7 +58,7 @@ func (c *criContainerdService) ContainerStatus(ctx context.Context, r *runtime.C
 	status := toCRIContainerStatus(container, spec, imageRef)
 	info, err := toCRIContainerInfo(ctx, container, r.GetVerbose())
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate container info: %v", err)
+		return nil, fmt.Errorf("failed to get verbose container info: %v", err)
 	}
 
 	return &runtime.ContainerStatusResponse{
