@@ -75,10 +75,3 @@ jobs:
         - make install.deps
         - UPLOAD_LOG=true make test-e2e-node
       go: 1.9.x
-    - stage: Deploy
-      script:
-        - test "${TRAVIS_PULL_REQUEST}" != "false" && exit 0 || true
-        - make push
-        # Build a tarball including CNI.
-        - PUSH_VERSION=true make push TARBALL_PREFIX=cri-containerd-cni INCLUDE_CNI=true
-      go: 1.9.x
