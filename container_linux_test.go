@@ -298,7 +298,7 @@ func TestContainerAttach(t *testing.T) {
 
 	expected := "hello" + newLine
 
-	direct, err := cio.NewDirectIO(ctx, false)
+	direct, err := newDirectIO(ctx)
 	if err != nil {
 		t.Error(err)
 		return
@@ -372,6 +372,49 @@ func TestContainerAttach(t *testing.T) {
 	}
 }
 
+func newDirectIO(ctx context.Context) (*directIO, error) {
+	dio, err := cio.NewDirectIO(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+	return &directIO{DirectIO: *dio}, nil
+}
+
+type directIO struct {
+	cio.DirectIO
+}
+
+// ioCreate returns IO avaliable for use with task creation
+func (f *directIO) IOCreate(id string) (cio.IO, error) {
+	return f, nil
+}
+
+// ioAttach returns IO avaliable for use with task attachment
+func (f *directIO) IOAttach(set *cio.FIFOSet) (cio.IO, error) {
+	return f, nil
+}
+
+func (f *directIO) Cancel() {
+	// nothing to cancel as all operations are handled externally
+}
+
+// Close closes all open fds
+func (f *directIO) Close() error {
+	err := f.Stdin.Close()
+	if err2 := f.Stdout.Close(); err == nil {
+		err = err2
+	}
+	if err2 := f.Stderr.Close(); err == nil {
+		err = err2
+	}
+	return err
+}
+
+// Delete removes the underlying directory containing fifos
+func (f *directIO) Delete() error {
+	return f.DirectIO.Close()
+}
+
 func TestContainerUsername(t *testing.T) {
 	t.Parallel()
 
@@ -393,7 +436,7 @@ func TestContainerUsername(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	direct, err := cio.NewDirectIO(ctx, false)
+	direct, err := newDirectIO(ctx)
 	if err != nil {
 		t.Error(err)
 		return
@@ -486,7 +529,7 @@ func TestContainerAttachProcess(t *testing.T) {
 	expected := "hello" + newLine
 
 	// creating IO early for easy resource cleanup
-	direct, err := cio.NewDirectIO(ctx, false)
+	direct, err := newDirectIO(ctx)
 	if err != nil {
 		t.Error(err)
 		return
@@ -602,7 +645,7 @@ func TestContainerUserID(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	direct, err := cio.NewDirectIO(ctx, false)
+	direct, err := newDirectIO(ctx)
 	if err != nil {
 		t.Error(err)
 		return

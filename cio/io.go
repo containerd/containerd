@@ -33,38 +33,6 @@ type IO interface {
 	Close() error
 }
 
-// cio is a basic container IO implementation.
-type cio struct {
-	config Config
-
-	closer *wgCloser
-}
-
-func (c *cio) Config() Config {
-	return c.config
-}
-
-func (c *cio) Cancel() {
-	if c.closer == nil {
-		return
-	}
-	c.closer.Cancel()
-}
-
-func (c *cio) Wait() {
-	if c.closer == nil {
-		return
-	}
-	c.closer.Wait()
-}
-
-func (c *cio) Close() error {
-	if c.closer == nil {
-		return nil
-	}
-	return c.closer.Close()
-}
-
 // Creation creates new IO sets for a task
 type Creation func(id string) (IO, error)
 
@@ -100,27 +68,15 @@ func NewIO(stdin io.Reader, stdout, stderr io.Writer) Creation {
 
 // NewIOWithTerminal creates a new io set with the provided io.Reader/Writers for use with a terminal
 func NewIOWithTerminal(stdin io.Reader, stdout, stderr io.Writer, terminal bool) Creation {
-	return func(id string) (_ IO, err error) {
-		fifos, err := newFIFOSetTempDir(id)
+	return func(id string) (IO, error) {
+		fifos, err := newFIFOSetInTempDir(id)
 		if err != nil {
 			return nil, err
 		}
-		defer func() {
-			if err != nil {
-				fifos.Close()
-			}
-		}()
-		cfg := fifos.Config
-		cfg.Terminal = terminal
-		i := &cio{config: cfg}
-		set := &ioSet{
-			in:  stdin,
-			out: stdout,
-			err: stderr,
-		}
-		closer, err := copyIO(fifos, set, cfg.Terminal)
-		i.closer = closer
-		return i, err
+
+		fifos.Terminal = terminal
+		set := &ioSet{in: stdin, out: stdout, err: stderr}
+		return copyIO(fifos, set)
 	}
 }
 
@@ -128,17 +84,10 @@ func NewIOWithTerminal(stdin io.Reader, stdout, stderr io.Writer, terminal bool)
 func WithAttach(stdin io.Reader, stdout, stderr io.Writer) Attach {
 	return func(fifos *FIFOSet) (IO, error) {
 		if fifos == nil {
-			return nil, fmt.Errorf("cannot attach to existing fifos")
+			return nil, fmt.Errorf("cannot attach, missing fifos")
 		}
-		i := &cio{config: fifos.Config}
-		set := &ioSet{
-			in:  stdin,
-			out: stdout,
-			err: stderr,
-		}
-		closer, err := copyIO(fifos, set, fifos.Terminal)
-		i.closer = closer
-		return i, err
+		set := &ioSet{in: stdin, out: stdout, err: stderr}
+		return copyIO(fifos, set)
 	}
 }
 
@@ -154,7 +103,7 @@ func StdioTerminal(id string) (IO, error) {
 }
 
 // NullIO redirects the container's IO into /dev/null
-func NullIO(id string) (IO, error) {
+func NullIO(_ string) (IO, error) {
 	return &cio{}, nil
 }
 
@@ -163,24 +112,49 @@ type ioSet struct {
 	out, err io.Writer
 }
 
-type wgCloser struct {
-	wg     *sync.WaitGroup
-	set    []io.Closer
-	cancel context.CancelFunc
+type pipes struct {
+	Stdin  io.WriteCloser
+	Stdout io.ReadCloser
+	Stderr io.ReadCloser
 }
 
-func (g *wgCloser) Wait() {
-	g.wg.Wait()
+func (p *pipes) closers() []io.Closer {
+	return []io.Closer{p.Stdin, p.Stdout, p.Stderr}
 }
 
-func (g *wgCloser) Close() error {
-	// TODO: this should return all errors, not mask them
-	for _, f := range g.set {
-		f.Close()
+// cio is a basic container IO implementation.
+type cio struct {
+	config  Config
+	wg      *sync.WaitGroup
+	closers []io.Closer
+	cancel  context.CancelFunc
+}
+
+func (c *cio) Config() Config {
+	return c.config
+}
+
+func (c *cio) Wait() {
+	if c.wg != nil {
+		c.wg.Wait()
 	}
-	return nil
 }
 
-func (g *wgCloser) Cancel() {
-	g.cancel()
+func (c *cio) Close() error {
+	var lastErr error
+	for _, closer := range c.closers {
+		if closer == nil {
+			continue
+		}
+		if err := closer.Close(); err != nil {
+			lastErr = err
+		}
+	}
+	return lastErr
+}
+
+func (c *cio) Cancel() {
+	if c.cancel != nil {
+		c.cancel()
+	}
 }

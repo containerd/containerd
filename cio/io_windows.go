@@ -13,8 +13,8 @@ import (
 
 const pipeRoot = `\\.\pipe`
 
-// newFIFOSetTempDir returns a new set of fifos for the task
-func newFIFOSetTempDir(id string) (*FIFOSet, error) {
+// newFIFOSetInTempDir returns a new set of fifos for the task
+func newFIFOSetInTempDir(id string) (*FIFOSet, error) {
 	return &FIFOSet{
 		StdIn:  fmt.Sprintf(`%s\ctr-%s-stdin`, pipeRoot, id),
 		StdOut: fmt.Sprintf(`%s\ctr-%s-stdout`, pipeRoot, id),
@@ -22,8 +22,9 @@ func newFIFOSetTempDir(id string) (*FIFOSet, error) {
 	}, nil
 }
 
-func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
+func copyIO(fifos *FIFOSet, ioset *ioSet) (*cio, error) {
 	var (
+		err error
 		wg  sync.WaitGroup
 		set []io.Closer
 	)
@@ -78,7 +79,7 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 		}()
 	}
 
-	if !tty && fifos.StdErr != "" {
+	if !fifos.Terminal && fifos.StdErr != "" {
 		l, err := winio.ListenPipe(fifos.StdErr, nil)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create stderr pipe %s", fifos.StdErr)
@@ -104,7 +105,7 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 		}()
 	}
 
-	return &wgCloser{
+	return &cio{
 		wg:  &wg,
 		dir: fifos.Dir,
 		set: set,
