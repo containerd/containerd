@@ -84,6 +84,67 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 	}, nil
 }
 
+func (c *criContainerdService) getIP(sandbox sandboxstore.Sandbox) (string, error) {
+	config := sandbox.Config
+
+	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostNetwork() {
+		// For sandboxes using the host network we are not
+		// responsible for reporting the IP.
+		return "", nil
+	}
+
+	if err := c.netPlugin.Status(); err != nil {
+		// If the network is not ready then there is nothing to report.
+		glog.V(4).Infof("getIP: unable to get sandbox %q network status: network plugin not ready.", sandbox.ID)
+		return "", nil
+	}
+
+	// The network namespace has been closed.
+	if sandbox.NetNS == nil || sandbox.NetNS.Closed() {
+		return "", nil
+	}
+
+	podNetwork := ocicni.PodNetwork{
+		Name:         config.GetMetadata().GetName(),
+		Namespace:    config.GetMetadata().GetNamespace(),
+		ID:           sandbox.ID,
+		NetNS:        sandbox.NetNSPath,
+		PortMappings: toCNIPortMappings(config.GetPortMappings()),
+	}
+
+	ip, err := c.netPlugin.GetPodNetworkStatus(podNetwork)
+	if err == nil {
+		return ip, nil
+	}
+
+	// Ignore the error on network status
+	glog.V(4).Infof("getIP: failed to read sandbox %q IP from plugin: %v", sandbox.ID, err)
+	return "", nil
+}
+
+// toCRISandboxStatus converts sandbox metadata into CRI pod sandbox status.
+func toCRISandboxStatus(meta sandboxstore.Metadata, state runtime.PodSandboxState, createdAt time.Time, ip string) *runtime.PodSandboxStatus {
+	nsOpts := meta.Config.GetLinux().GetSecurityContext().GetNamespaceOptions()
+	return &runtime.PodSandboxStatus{
+		Id:        meta.ID,
+		Metadata:  meta.Config.GetMetadata(),
+		State:     state,
+		CreatedAt: createdAt.UnixNano(),
+		Network:   &runtime.PodSandboxNetworkStatus{Ip: ip},
+		Linux: &runtime.LinuxPodSandboxStatus{
+			Namespaces: &runtime.Namespace{
+				Options: &runtime.NamespaceOption{
+					HostNetwork: nsOpts.GetHostNetwork(),
+					HostPid:     nsOpts.GetHostPid(),
+					HostIpc:     nsOpts.GetHostIpc(),
+				},
+			},
+		},
+		Labels:      meta.Config.GetLabels(),
+		Annotations: meta.Config.GetAnnotations(),
+	}
+}
+
 // TODO (mikebrow): discuss predefining constants structures for some or all of these field names in CRI
 type sandboxInfo struct {
 	Pid         uint32                    `json:"pid"`
@@ -147,65 +208,4 @@ func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox,
 	return map[string]string{
 		"info": string(infoBytes),
 	}, nil
-}
-
-func (c *criContainerdService) getIP(sandbox sandboxstore.Sandbox) (string, error) {
-	config := sandbox.Config
-
-	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostNetwork() {
-		// For sandboxes using the host network we are not
-		// responsible for reporting the IP.
-		return "", nil
-	}
-
-	if err := c.netPlugin.Status(); err != nil {
-		// If the network is not ready then there is nothing to report.
-		glog.V(4).Infof("getIP: unable to get sandbox %q network status: network plugin not ready.", sandbox.ID)
-		return "", nil
-	}
-
-	// The network namespace has been closed.
-	if sandbox.NetNS == nil || sandbox.NetNS.Closed() {
-		return "", nil
-	}
-
-	podNetwork := ocicni.PodNetwork{
-		Name:         config.GetMetadata().GetName(),
-		Namespace:    config.GetMetadata().GetNamespace(),
-		ID:           sandbox.ID,
-		NetNS:        sandbox.NetNSPath,
-		PortMappings: toCNIPortMappings(config.GetPortMappings()),
-	}
-
-	ip, err := c.netPlugin.GetPodNetworkStatus(podNetwork)
-	if err == nil {
-		return ip, nil
-	}
-
-	// Ignore the error on network status
-	glog.V(4).Infof("getIP: failed to read sandbox %q IP from plugin: %v", sandbox.ID, err)
-	return "", nil
-}
-
-// toCRISandboxStatus converts sandbox metadata into CRI pod sandbox status.
-func toCRISandboxStatus(meta sandboxstore.Metadata, state runtime.PodSandboxState, createdAt time.Time, ip string) *runtime.PodSandboxStatus {
-	nsOpts := meta.Config.GetLinux().GetSecurityContext().GetNamespaceOptions()
-	return &runtime.PodSandboxStatus{
-		Id:        meta.ID,
-		Metadata:  meta.Config.GetMetadata(),
-		State:     state,
-		CreatedAt: createdAt.UnixNano(),
-		Network:   &runtime.PodSandboxNetworkStatus{Ip: ip},
-		Linux: &runtime.LinuxPodSandboxStatus{
-			Namespaces: &runtime.Namespace{
-				Options: &runtime.NamespaceOption{
-					HostNetwork: nsOpts.GetHostNetwork(),
-					HostPid:     nsOpts.GetHostPid(),
-					HostIpc:     nsOpts.GetHostIpc(),
-				},
-			},
-		},
-		Labels:      meta.Config.GetLabels(),
-		Annotations: meta.Config.GetAnnotations(),
-	}
 }
