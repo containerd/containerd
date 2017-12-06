@@ -75,68 +75,70 @@ type Creation func(id string) (IO, error)
 // will be sent only to the first reads
 type Attach func(*FIFOSet) (IO, error)
 
+// FIFOSet is a set of file paths to FIFOs for a task's standard IO streams
+type FIFOSet struct {
+	Config
+	close func() error
+}
+
+func (f *FIFOSet) Close() error {
+	if f.close != nil {
+		return f.close()
+	}
+	return nil
+}
+
+// NewFIFOSet returns a new FIFOSet from a Config and a close function
+func NewFIFOSet(config Config, close func() error) *FIFOSet {
+	return &FIFOSet{Config: config, close: close}
+}
+
 // NewIO returns an Creation that will provide IO sets without a terminal
 func NewIO(stdin io.Reader, stdout, stderr io.Writer) Creation {
 	return NewIOWithTerminal(stdin, stdout, stderr, false)
 }
 
-// NewIOWithTerminal creates a new io set with the provied io.Reader/Writers for use with a terminal
+// NewIOWithTerminal creates a new io set with the provided io.Reader/Writers for use with a terminal
 func NewIOWithTerminal(stdin io.Reader, stdout, stderr io.Writer, terminal bool) Creation {
 	return func(id string) (_ IO, err error) {
-		paths, err := NewFifos(id)
+		fifos, err := newFIFOSetTempDir(id)
 		if err != nil {
 			return nil, err
 		}
 		defer func() {
-			if err != nil && paths.Dir != "" {
-				os.RemoveAll(paths.Dir)
+			if err != nil {
+				fifos.Close()
 			}
 		}()
-		cfg := Config{
-			Terminal: terminal,
-			Stdout:   paths.Out,
-			Stderr:   paths.Err,
-			Stdin:    paths.In,
-		}
+		cfg := fifos.Config
+		cfg.Terminal = terminal
 		i := &cio{config: cfg}
 		set := &ioSet{
 			in:  stdin,
 			out: stdout,
 			err: stderr,
 		}
-		closer, err := copyIO(paths, set, cfg.Terminal)
-		if err != nil {
-			return nil, err
-		}
+		closer, err := copyIO(fifos, set, cfg.Terminal)
 		i.closer = closer
-		return i, nil
+		return i, err
 	}
 }
 
 // WithAttach attaches the existing io for a task to the provided io.Reader/Writers
 func WithAttach(stdin io.Reader, stdout, stderr io.Writer) Attach {
-	return func(paths *FIFOSet) (IO, error) {
-		if paths == nil {
+	return func(fifos *FIFOSet) (IO, error) {
+		if fifos == nil {
 			return nil, fmt.Errorf("cannot attach to existing fifos")
 		}
-		cfg := Config{
-			Terminal: paths.Terminal,
-			Stdout:   paths.Out,
-			Stderr:   paths.Err,
-			Stdin:    paths.In,
-		}
-		i := &cio{config: cfg}
+		i := &cio{config: fifos.Config}
 		set := &ioSet{
 			in:  stdin,
 			out: stdout,
 			err: stderr,
 		}
-		closer, err := copyIO(paths, set, cfg.Terminal)
-		if err != nil {
-			return nil, err
-		}
+		closer, err := copyIO(fifos, set, fifos.Terminal)
 		i.closer = closer
-		return i, nil
+		return i, err
 	}
 }
 
@@ -156,16 +158,6 @@ func NullIO(id string) (IO, error) {
 	return &cio{}, nil
 }
 
-// FIFOSet is a set of fifos for use with tasks
-type FIFOSet struct {
-	// Dir is the directory holding the task fifos
-	Dir string
-	// In, Out, and Err fifo paths
-	In, Out, Err string
-	// Terminal returns true if a terminal is being used for the task
-	Terminal bool
-}
-
 type ioSet struct {
 	in       io.Reader
 	out, err io.Writer
@@ -173,7 +165,6 @@ type ioSet struct {
 
 type wgCloser struct {
 	wg     *sync.WaitGroup
-	dir    string
 	set    []io.Closer
 	cancel context.CancelFunc
 }
@@ -183,11 +174,9 @@ func (g *wgCloser) Wait() {
 }
 
 func (g *wgCloser) Close() error {
+	// TODO: this should return all errors, not mask them
 	for _, f := range g.set {
 		f.Close()
-	}
-	if g.dir != "" {
-		return os.RemoveAll(g.dir)
 	}
 	return nil
 }

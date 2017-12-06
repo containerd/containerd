@@ -14,8 +14,8 @@ import (
 	"github.com/containerd/fifo"
 )
 
-// NewFifos returns a new set of fifos for the task
-func NewFifos(id string) (*FIFOSet, error) {
+// newFIFOSetTempDir returns a new set of fifos for the task
+func newFIFOSetTempDir(id string) (*FIFOSet, error) {
 	root := "/run/containerd/fifo"
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
@@ -24,21 +24,23 @@ func NewFifos(id string) (*FIFOSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &FIFOSet{
-		Dir: dir,
-		In:  filepath.Join(dir, id+"-stdin"),
-		Out: filepath.Join(dir, id+"-stdout"),
-		Err: filepath.Join(dir, id+"-stderr"),
-	}, nil
+	closer := func() error {
+		return os.RemoveAll(dir)
+	}
+	return NewFIFOSet(Config{
+		Stdin:  filepath.Join(dir, id+"-stdin"),
+		Stdout: filepath.Join(dir, id+"-stdout"),
+		Stderr: filepath.Join(dir, id+"-stderr"),
+	}, closer), nil
 }
 
 func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 	var (
 		f           io.ReadWriteCloser
-		set         []io.Closer
 		ctx, cancel = context.WithCancel(context.Background())
 		wg          = &sync.WaitGroup{}
 	)
+	set := []io.Closer{fifos}
 	defer func() {
 		if err != nil {
 			for _, f := range set {
@@ -48,7 +50,7 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 		}
 	}()
 
-	if f, err = fifo.OpenFifo(ctx, fifos.In, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
+	if f, err = fifo.OpenFifo(ctx, fifos.Stdin, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
 		return nil, err
 	}
 	set = append(set, f)
@@ -57,7 +59,7 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 		w.Close()
 	}(f)
 
-	if f, err = fifo.OpenFifo(ctx, fifos.Out, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
+	if f, err = fifo.OpenFifo(ctx, fifos.Stdout, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
 		return nil, err
 	}
 	set = append(set, f)
@@ -68,7 +70,7 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 		wg.Done()
 	}(f)
 
-	if f, err = fifo.OpenFifo(ctx, fifos.Err, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
+	if f, err = fifo.OpenFifo(ctx, fifos.Stderr, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
 		return nil, err
 	}
 	set = append(set, f)
@@ -83,7 +85,6 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 	}
 	return &wgCloser{
 		wg:     wg,
-		dir:    fifos.Dir,
 		set:    set,
 		cancel: cancel,
 	}, nil
@@ -91,27 +92,26 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 
 // NewDirectIO returns an IO implementation that exposes the pipes directly
 func NewDirectIO(ctx context.Context, terminal bool) (*DirectIO, error) {
-	set, err := NewFifos("")
+	set, err := newFIFOSetTempDir("")
 	if err != nil {
 		return nil, err
 	}
-	f := &DirectIO{
-		set:      set,
-		terminal: terminal,
-	}
+	set.Terminal = terminal
+	f := &DirectIO{set: set}
+
 	defer func() {
 		if err != nil {
 			f.Delete()
 		}
 	}()
-	if f.Stdin, err = fifo.OpenFifo(ctx, set.In, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
+	if f.Stdin, err = fifo.OpenFifo(ctx, set.Stdin, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
 		return nil, err
 	}
-	if f.Stdout, err = fifo.OpenFifo(ctx, set.Out, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
+	if f.Stdout, err = fifo.OpenFifo(ctx, set.Stdout, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
 		f.Stdin.Close()
 		return nil, err
 	}
-	if f.Stderr, err = fifo.OpenFifo(ctx, set.Err, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
+	if f.Stderr, err = fifo.OpenFifo(ctx, set.Stderr, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
 		f.Stdin.Close()
 		f.Stdout.Close()
 		return nil, err
@@ -125,8 +125,7 @@ type DirectIO struct {
 	Stdout io.ReadCloser
 	Stderr io.ReadCloser
 
-	set      *FIFOSet
-	terminal bool
+	set *FIFOSet
 }
 
 // IOCreate returns IO avaliable for use with task creation
@@ -141,12 +140,7 @@ func (f *DirectIO) IOAttach(set *FIFOSet) (IO, error) {
 
 // Config returns the Config
 func (f *DirectIO) Config() Config {
-	return Config{
-		Terminal: f.terminal,
-		Stdin:    f.set.In,
-		Stdout:   f.set.Out,
-		Stderr:   f.set.Err,
-	}
+	return f.set.Config
 }
 
 // Cancel stops any IO copy operations
@@ -177,8 +171,5 @@ func (f *DirectIO) Close() error {
 
 // Delete removes the underlying directory containing fifos
 func (f *DirectIO) Delete() error {
-	if f.set.Dir == "" {
-		return nil
-	}
-	return os.RemoveAll(f.set.Dir)
+	return f.set.Close()
 }
