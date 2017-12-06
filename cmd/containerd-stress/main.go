@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -24,6 +25,47 @@ import (
 )
 
 const imageName = "docker.io/library/alpine:latest"
+
+type run struct {
+	total    int
+	failures int
+
+	started time.Time
+	ended   time.Time
+}
+
+func (r *run) start() {
+	r.started = time.Now()
+}
+
+func (r *run) end() {
+	r.ended = time.Now()
+}
+
+func (r *run) seconds() float64 {
+	return r.ended.Sub(r.started).Seconds()
+}
+
+func (r *run) gather(workers []*worker) *result {
+	for _, w := range workers {
+		r.total += w.count
+		r.failures += w.failures
+	}
+	sec := r.seconds()
+	return &result{
+		Total:               r.total,
+		Seconds:             sec,
+		ContainersPerSecond: float64(r.total) / sec,
+		SecondsPerContainer: sec / float64(r.total),
+	}
+}
+
+type result struct {
+	Total               int     `json:"total"`
+	Seconds             float64 `json:"seconds"`
+	ContainersPerSecond float64 `json:"containersPerSecond"`
+	SecondsPerContainer float64 `json:"secondsPerContainer"`
+}
 
 func main() {
 	// morr power!
@@ -56,10 +98,17 @@ func main() {
 			Name:  "exec",
 			Usage: "add execs to the stress tests",
 		},
+		cli.BoolFlag{
+			Name:  "json,j",
+			Usage: "output results in json format",
+		},
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
+		}
+		if context.GlobalBool("json") {
+			logrus.SetLevel(logrus.WarnLevel)
 		}
 		return nil
 	}
@@ -69,6 +118,7 @@ func main() {
 			Duration:    context.GlobalDuration("duration"),
 			Concurrency: context.GlobalInt("concurrent"),
 			Exec:        context.GlobalBool("exec"),
+			Json:        context.GlobalBool("json"),
 		}
 		return test(config)
 	}
@@ -83,6 +133,7 @@ type config struct {
 	Duration    time.Duration
 	Address     string
 	Exec        bool
+	Json        bool
 }
 
 func (c config) newClient() (*containerd.Client, error) {
@@ -119,13 +170,14 @@ func test(c config) error {
 
 	var (
 		workers []*worker
-		start   = time.Now()
+		r       = &run{}
 	)
 	logrus.Info("starting stress test run...")
 	args := oci.WithProcessArgs("true")
 	if c.Exec {
 		args = oci.WithProcessArgs("sleep", "10")
 	}
+	// create the workers along with their spec
 	for i := 0; i < c.Concurrency; i++ {
 		wg.Add(1)
 		spec, err := oci.GenerateSpec(ctx, client,
@@ -145,27 +197,31 @@ func test(c config) error {
 			doExec: c.Exec,
 		}
 		workers = append(workers, w)
+	}
+	// start the timer and run the worker
+	r.start()
+	for _, w := range workers {
 		go w.run(ctx, tctx)
 	}
+	// wait and end the timer
 	wg.Wait()
+	r.end()
 
-	var (
-		total    int
-		failures int
-		end      = time.Now().Sub(start).Seconds()
-	)
-	logrus.Infof("ending test run in %0.3f seconds", end)
-	for _, w := range workers {
-		total += w.count
-		failures += w.failures
-	}
-	logrus.WithField("failures", failures).Infof(
+	results := r.gather(workers)
+	logrus.Infof("ending test run in %0.3f seconds", results.Seconds)
+
+	logrus.WithField("failures", r.failures).Infof(
 		"create/start/delete %d containers in %0.3f seconds (%0.3f c/sec) or (%0.3f sec/c)",
-		total,
-		end,
-		float64(total)/end,
-		end/float64(total),
+		results.Total,
+		results.Seconds,
+		results.ContainersPerSecond,
+		results.SecondsPerContainer,
 	)
+	if c.Json {
+		if err := json.NewEncoder(os.Stdout).Encode(results); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
