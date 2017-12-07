@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-// Config holds the io configurations.
+// Config holds the IO configurations.
 type Config struct {
 	// Terminal is true if one has been allocated
 	Terminal bool
@@ -49,6 +49,7 @@ type FIFOSet struct {
 	close func() error
 }
 
+// Close the FIFOSet
 func (f *FIFOSet) Close() error {
 	if f.close != nil {
 		return f.close()
@@ -61,65 +62,70 @@ func NewFIFOSet(config Config, close func() error) *FIFOSet {
 	return &FIFOSet{Config: config, close: close}
 }
 
-// NewIO returns an Creator that will provide IO sets without a terminal
-func NewIO(stdin io.Reader, stdout, stderr io.Writer) Creator {
-	return NewIOWithTerminal(stdin, stdout, stderr, false)
+// Streams used to configure a Creator or Attach
+type Streams struct {
+	Stdin    io.Reader
+	Stdout   io.Writer
+	Stderr   io.Writer
+	Terminal bool
 }
 
-// NewIOWithTerminal creates a new io set with the provided io.Reader/Writers for use with a terminal
-func NewIOWithTerminal(stdin io.Reader, stdout, stderr io.Writer, terminal bool) Creator {
-	return func(id string) (IO, error) {
-		fifos, err := newFIFOSetInTempDir(id)
-		if err != nil {
-			return nil, err
-		}
+// Opt customize options for creating a Creator or Attach
+type Opt func(*Streams)
 
-		fifos.Terminal = terminal
-		set := &ioSet{in: stdin, out: stdout, err: stderr}
-		return copyIO(fifos, set)
+// WithStdio sets stream options to the standard input/output streams
+func WithStdio(opt *Streams) {
+	WithStreams(os.Stdin, os.Stdout, os.Stderr)(opt)
+}
+
+// WithTerminal sets the terminal option
+func WithTerminal(opt *Streams) {
+	opt.Terminal = true
+}
+
+// WithStreams sets the stream options to the specified Reader and Writers
+func WithStreams(stdin io.Reader, stdout, stderr io.Writer) Opt {
+	return func(opt *Streams) {
+		opt.Stdin = stdin
+		opt.Stdout = stdout
+		opt.Stderr = stderr
 	}
 }
 
-// WithAttach attaches the existing io for a task to the provided io.Reader/Writers
-func WithAttach(stdin io.Reader, stdout, stderr io.Writer) Attach {
+// NewCreator returns an IO creator from the options
+func NewCreator(opts ...Opt) Creator {
+	streams := &Streams{}
+	for _, opt := range opts {
+		opt(streams)
+	}
+	return func(id string) (IO, error) {
+		// TODO: accept root as a param
+		root := "/run/containerd/fifo"
+		fifos, err := NewFIFOSetInDir(root, id, streams.Terminal)
+		if err != nil {
+			return nil, err
+		}
+		return copyIO(fifos, streams)
+	}
+}
+
+// NewAttach attaches the existing io for a task to the provided io.Reader/Writers
+func NewAttach(opts ...Opt) Attach {
+	streams := &Streams{}
+	for _, opt := range opts {
+		opt(streams)
+	}
 	return func(fifos *FIFOSet) (IO, error) {
 		if fifos == nil {
 			return nil, fmt.Errorf("cannot attach, missing fifos")
 		}
-		set := &ioSet{in: stdin, out: stdout, err: stderr}
-		return copyIO(fifos, set)
+		return copyIO(fifos, streams)
 	}
-}
-
-// Stdio returns an IO set to be used for a task
-// that outputs the container's IO as the current processes Stdio
-func Stdio(id string) (IO, error) {
-	return NewIO(os.Stdin, os.Stdout, os.Stderr)(id)
-}
-
-// StdioTerminal will setup the IO for the task to use a terminal
-func StdioTerminal(id string) (IO, error) {
-	return NewIOWithTerminal(os.Stdin, os.Stdout, os.Stderr, true)(id)
 }
 
 // NullIO redirects the container's IO into /dev/null
 func NullIO(_ string) (IO, error) {
 	return &cio{}, nil
-}
-
-type ioSet struct {
-	in       io.Reader
-	out, err io.Writer
-}
-
-type pipes struct {
-	Stdin  io.WriteCloser
-	Stdout io.ReadCloser
-	Stderr io.ReadCloser
-}
-
-func (p *pipes) closers() []io.Closer {
-	return []io.Closer{p.Stdin, p.Stdout, p.Stderr}
 }
 
 // cio is a basic container IO implementation.
@@ -158,3 +164,17 @@ func (c *cio) Cancel() {
 		c.cancel()
 	}
 }
+
+type pipes struct {
+	Stdin  io.WriteCloser
+	Stdout io.ReadCloser
+	Stderr io.ReadCloser
+}
+
+// DirectIO allows task IO to be handled externally by the caller
+type DirectIO struct {
+	pipes
+	cio
+}
+
+var _ IO = &DirectIO{}

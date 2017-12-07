@@ -44,10 +44,11 @@ func HandleConsoleResize(ctx gocontext.Context, task resizer, con console.Consol
 
 // NewTask creates a new task
 func NewTask(ctx gocontext.Context, client *containerd.Client, container containerd.Container, checkpoint string, tty, nullIO bool) (containerd.Task, error) {
+	stdio := cio.NewCreator(cio.WithStdio)
 	if checkpoint == "" {
-		ioCreator := cio.Stdio
+		ioCreator := stdio
 		if tty {
-			ioCreator = cio.StdioTerminal
+			ioCreator = cio.NewCreator(cio.WithStdio, cio.WithTerminal)
 		}
 		if nullIO {
 			if tty {
@@ -61,5 +62,5 @@ func NewTask(ctx gocontext.Context, client *containerd.Client, container contain
 	if err != nil {
 		return nil, err
 	}
-	return container.NewTask(ctx, cio.Stdio, containerd.WithTaskCheckpoint(im))
+	return container.NewTask(ctx, stdio, containerd.WithTaskCheckpoint(im))
 }

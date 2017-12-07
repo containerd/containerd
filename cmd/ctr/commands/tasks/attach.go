@@ -1,8 +1,6 @@
 package tasks
 
 import (
-	"os"
-
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
@@ -39,7 +37,7 @@ var attachCommand = cli.Command{
 				return err
 			}
 		}
-		task, err := container.Task(ctx, cio.WithAttach(os.Stdin, os.Stdout, os.Stderr))
+		task, err := container.Task(ctx, cio.NewAttach(cio.WithStdio))
 		if err != nil {
 			return err
 		}

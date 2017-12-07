@@ -3,6 +3,7 @@ package containerd
 import (
 	"bytes"
 	"context"
+	"io"
 	"io/ioutil"
 	"os"
 	"runtime"
@@ -27,7 +28,7 @@ func empty() cio.Creator {
 	// TODO (@mlaventure) windows searches for pipes
 	// when none are provided
 	if runtime.GOOS == "windows" {
-		return cio.Stdio
+		return cio.NewCreator(cio.WithStdio)
 	}
 	return cio.NullIO
 }
@@ -187,7 +188,7 @@ func TestContainerOutput(t *testing.T) {
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	stdout := bytes.NewBuffer(nil)
-	task, err := container.NewTask(ctx, cio.NewIO(bytes.NewBuffer(nil), stdout, bytes.NewBuffer(nil)))
+	task, err := container.NewTask(ctx, cio.NewCreator(withByteBuffers(stdout)))
 	if err != nil {
 		t.Error(err)
 		return
@@ -220,6 +221,15 @@ func TestContainerOutput(t *testing.T) {
 	expected = expected + newLine
 	if actual != expected {
 		t.Errorf("expected output %q but received %q", expected, actual)
+	}
+}
+
+func withByteBuffers(stdout io.Writer) cio.Opt {
+	// TODO: could this use ioutil.Discard?
+	return func(streams *cio.Streams) {
+		streams.Stdin = new(bytes.Buffer)
+		streams.Stdout = stdout
+		streams.Stderr = new(bytes.Buffer)
 	}
 }
 
@@ -534,7 +544,7 @@ func TestContainerCloseIO(t *testing.T) {
 		return
 	}
 
-	task, err := container.NewTask(ctx, cio.NewIO(r, stdout, ioutil.Discard))
+	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStreams(r, stdout, ioutil.Discard)))
 	if err != nil {
 		t.Error(err)
 		return
@@ -1145,7 +1155,7 @@ func TestContainerHostname(t *testing.T) {
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	stdout := bytes.NewBuffer(nil)
-	task, err := container.NewTask(ctx, cio.NewIO(bytes.NewBuffer(nil), stdout, bytes.NewBuffer(nil)))
+	task, err := container.NewTask(ctx, cio.NewCreator(withByteBuffers(stdout)))
 	if err != nil {
 		t.Error(err)
 		return

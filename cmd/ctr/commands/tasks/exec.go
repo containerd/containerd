@@ -60,9 +60,9 @@ var execCommand = cli.Command{
 		pspec.Terminal = tty
 		pspec.Args = args
 
-		ioCreator := cio.Stdio
+		ioCreator := cio.NewCreator(cio.WithStdio)
 		if tty {
-			ioCreator = cio.StdioTerminal
+			ioCreator = cio.NewCreator(cio.WithStdio, cio.WithTerminal)
 		}
 		process, err := task.Exec(ctx, context.String("exec-id"), pspec, ioCreator)
 		if err != nil {

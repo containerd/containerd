@@ -373,7 +373,11 @@ func TestContainerAttach(t *testing.T) {
 }
 
 func newDirectIO(ctx context.Context) (*directIO, error) {
-	dio, err := cio.NewDirectIO(ctx, false)
+	fifos, err := cio.NewFIFOSetInDir("", "", false)
+	if err != nil {
+		return nil, err
+	}
+	dio, err := cio.NewDirectIO(ctx, fifos)
 	if err != nil {
 		return nil, err
 	}
@@ -735,7 +739,7 @@ func TestContainerKillAll(t *testing.T) {
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	stdout := bytes.NewBuffer(nil)
-	task, err := container.NewTask(ctx, cio.NewIO(bytes.NewBuffer(nil), stdout, bytes.NewBuffer(nil)))
+	task, err := container.NewTask(ctx, cio.NewCreator(withByteBuffers(stdout)))
 	if err != nil {
 		t.Error(err)
 		return
@@ -987,7 +991,7 @@ func TestContainerKillInitPidHost(t *testing.T) {
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	stdout := bytes.NewBuffer(nil)
-	task, err := container.NewTask(ctx, cio.NewIO(bytes.NewBuffer(nil), stdout, bytes.NewBuffer(nil)))
+	task, err := container.NewTask(ctx, cio.NewCreator(withByteBuffers(stdout)))
 	if err != nil {
 		t.Error(err)
 		return
@@ -1086,7 +1090,7 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
-	task, err := container.NewTask(ctx, cio.Stdio, func(_ context.Context, client *Client, r *TaskInfo) error {
+	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStdio), func(_ context.Context, client *Client, r *TaskInfo) error {
 		r.Options = &runctypes.CreateOptions{
 			IoUid: 1000,
 			IoGid: 1000,
