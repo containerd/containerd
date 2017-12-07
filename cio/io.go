@@ -24,11 +24,12 @@ type Config struct {
 type IO interface {
 	// Config returns the IO configuration.
 	Config() Config
-	// Cancel aborts all current io operations
+	// Cancel aborts all current io operations.
 	Cancel()
-	// Wait blocks until all io copy operations have completed
+	// Wait blocks until all io copy operations have completed.
 	Wait()
-	// Close cleans up all open io resources
+	// Close cleans up all open io resources. Cancel() is always called before
+	// Close()
 	Close() error
 }
 
