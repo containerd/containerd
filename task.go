@@ -123,7 +123,7 @@ type Task interface {
 	// Resume the execution of the task
 	Resume(context.Context) error
 	// Exec creates a new process inside the task
-	Exec(context.Context, string, *specs.Process, cio.Creation) (Process, error)
+	Exec(context.Context, string, *specs.Process, cio.Creator) (Process, error)
 	// Pids returns a list of system specific process ids inside the task
 	Pids(context.Context) ([]ProcessInfo, error)
 	// Checkpoint serializes the runtime and memory information of a task into an
@@ -278,7 +278,7 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 	return &ExitStatus{code: r.ExitStatus, exitedAt: r.ExitedAt}, nil
 }
 
-func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreate cio.Creation) (_ Process, err error) {
+func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreate cio.Creator) (_ Process, err error) {
 	if id == "" {
 		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "exec id must not be empty")
 	}

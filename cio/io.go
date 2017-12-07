@@ -33,8 +33,8 @@ type IO interface {
 	Close() error
 }
 
-// Creation creates new IO sets for a task
-type Creation func(id string) (IO, error)
+// Creator creates new IO sets for a task
+type Creator func(id string) (IO, error)
 
 // Attach allows callers to reattach to running tasks
 //
@@ -61,13 +61,13 @@ func NewFIFOSet(config Config, close func() error) *FIFOSet {
 	return &FIFOSet{Config: config, close: close}
 }
 
-// NewIO returns an Creation that will provide IO sets without a terminal
-func NewIO(stdin io.Reader, stdout, stderr io.Writer) Creation {
+// NewIO returns an Creator that will provide IO sets without a terminal
+func NewIO(stdin io.Reader, stdout, stderr io.Writer) Creator {
 	return NewIOWithTerminal(stdin, stdout, stderr, false)
 }
 
 // NewIOWithTerminal creates a new io set with the provided io.Reader/Writers for use with a terminal
-func NewIOWithTerminal(stdin io.Reader, stdout, stderr io.Writer, terminal bool) Creation {
+func NewIOWithTerminal(stdin io.Reader, stdout, stderr io.Writer, terminal bool) Creator {
 	return func(id string) (IO, error) {
 		fifos, err := newFIFOSetInTempDir(id)
 		if err != nil {

@@ -23,7 +23,7 @@ import (
 	gogotypes "github.com/gogo/protobuf/types"
 )
 
-func empty() cio.Creation {
+func empty() cio.Creator {
 	// TODO (@mlaventure) windows searches for pipes
 	// when none are provided
 	if runtime.GOOS == "windows" {

@@ -27,7 +27,7 @@ type Container interface {
 	// Delete removes the container
 	Delete(context.Context, ...DeleteOpts) error
 	// NewTask creates a new task based on the container metadata
-	NewTask(context.Context, cio.Creation, ...NewTaskOpts) (Task, error)
+	NewTask(context.Context, cio.Creator, ...NewTaskOpts) (Task, error)
 	// Spec returns the OCI runtime specification
 	Spec(context.Context) (*specs.Spec, error)
 	// Task returns the current task for the container
@@ -163,7 +163,7 @@ func (c *container) Image(ctx context.Context) (Image, error) {
 	}, nil
 }
 
-func (c *container) NewTask(ctx context.Context, ioCreate cio.Creation, opts ...NewTaskOpts) (_ Task, err error) {
+func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...NewTaskOpts) (_ Task, err error) {
 	i, err := ioCreate(c.id)
 	if err != nil {
 		return nil, err
