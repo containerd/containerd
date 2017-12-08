@@ -165,9 +165,9 @@ containerd versions:
 
 | Component     | Status   | Stablized Version | Links         |
 |---------------|----------|-------------------|---------------|
-| GRPC API      | Beta     | 1.0               | [api/](api) |
-| Metrics API   | Beta     | 1.0               | -
-| Go client API | Unstable | 1.1 tentative     | [godoc](https://godoc.org/github.com/containerd/containerd) |
+| GRPC API      | Stable     | 1.0               | [api/](api) |
+| Metrics API   | Stable     | 1.0               | -
+| Go client API | Unstable | 1.2 tentative     | [godoc](https://godoc.org/github.com/containerd/containerd) |
 | `ctr` tool    | Unstable | Out of scope      | -             |
 
 From the version stated in the above table, that component must adhere to the
