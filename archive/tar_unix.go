@@ -3,6 +3,7 @@
 package archive
 
 import (
+	"context"
 	"os"
 	"sync"
 	"syscall"
@@ -127,4 +128,10 @@ func getxattr(path, attr string) ([]byte, error) {
 
 func setxattr(path, key, value string) error {
 	return sysx.LSetxattr(path, key, []byte(value), 0)
+}
+
+// apply applies a tar stream of an OCI style diff tar.
+// See https://github.com/opencontainers/image-spec/blob/master/layer.md#applying-changesets
+func apply(ctx context.Context, root string, tr *tar.Reader, options ApplyOptions) (size int64, err error) {
+	return applyNaive(ctx, root, tr, options)
 }
