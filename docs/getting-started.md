@@ -318,6 +318,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/namespaces"
 )
