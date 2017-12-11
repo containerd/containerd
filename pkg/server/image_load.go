@@ -52,7 +52,7 @@ func (c *criContainerdService) LoadImage(ctx context.Context, r *api.LoadImageRe
 			glog.Warningf("Failed to unpack image %q: %v", repoTag, err)
 			// Do not fail image importing. Unpack will be retried when container creation.
 		}
-		info, err := getImageInfo(ctx, image, c.client.ContentStore())
+		info, err := getImageInfo(ctx, image)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get image %q info: %v", repoTag, err)
 		}

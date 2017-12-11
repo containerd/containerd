@@ -25,7 +25,6 @@ import (
 
 	"github.com/containerd/containerd"
 	containerdio "github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/platforms"
@@ -99,7 +98,7 @@ func (c *criContainerdService) recover(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to list images: %v", err)
 	}
-	images, err := loadImages(ctx, cImages, c.client.ContentStore(), c.config.ContainerdConfig.Snapshotter)
+	images, err := loadImages(ctx, cImages, c.config.ContainerdConfig.Snapshotter)
 	if err != nil {
 		return fmt.Errorf("failed to load images: %v", err)
 	}
@@ -322,7 +321,7 @@ func loadSandbox(ctx context.Context, cntr containerd.Container) (sandboxstore.S
 // loadImages loads images from containerd.
 // TODO(random-liu): Check whether image is unpacked, because containerd put image reference
 // into store before image is unpacked.
-func loadImages(ctx context.Context, cImages []containerd.Image, provider content.Provider,
+func loadImages(ctx context.Context, cImages []containerd.Image,
 	snapshotter string) ([]imagestore.Image, error) {
 	// Group images by image id.
 	imageMap := make(map[string][]containerd.Image)
@@ -340,7 +339,7 @@ func loadImages(ctx context.Context, cImages []containerd.Image, provider conten
 		// imgs len must be > 0, or else the entry will not be created in
 		// previous loop.
 		i := imgs[0]
-		ok, _, _, _, err := containerdimages.Check(ctx, provider, i.Target(), platforms.Default())
+		ok, _, _, _, err := containerdimages.Check(ctx, i.ContentStore(), i.Target(), platforms.Default())
 		if err != nil {
 			glog.Errorf("Failed to check image content readiness for %q: %v", i.Name(), err)
 			continue
@@ -360,7 +359,7 @@ func loadImages(ctx context.Context, cImages []containerd.Image, provider conten
 			// TODO(random-liu): Consider whether we should try unpack here.
 		}
 
-		info, err := getImageInfo(ctx, i, provider)
+		info, err := getImageInfo(ctx, i)
 		if err != nil {
 			glog.Warningf("Failed to get image info for %q: %v", i.Name(), err)
 			continue

@@ -114,8 +114,15 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 		// Do not fail image pulling. Unpack will be retried before container creation.
 	}
 
+	// Get image information.
+	info, err := getImageInfo(ctx, image)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get image information: %v", err)
+	}
+	imageID := info.id
+
 	repoDigest, repoTag := getRepoDigestAndTag(namedRef, image.Target().Digest, isSchema1)
-	for _, r := range []string{repoTag, repoDigest} {
+	for _, r := range []string{repoTag, repoDigest, imageID} {
 		if r == "" {
 			continue
 		}
@@ -123,16 +130,7 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 			return nil, fmt.Errorf("failed to update image reference %q: %v", r, err)
 		}
 	}
-	// Get image information.
-	info, err := getImageInfo(ctx, image, c.client.ContentStore())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get image information: %v", err)
-	}
-	imageID := info.id
 
-	if err := c.createImageReference(ctx, imageID, image.Target()); err != nil {
-		return nil, fmt.Errorf("failed to update image reference %q: %v", imageID, err)
-	}
 	glog.V(4).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q", imageRef, imageID,
 		repoTag, repoDigest)
 	img := imagestore.Image{
@@ -158,7 +156,7 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 	// by someone else anytime, before/during/after we create the metadata. We should always
 	// check the actual state in containerd before using the image or returning status of the
 	// image.
-	return &runtime.PullImageResponse{ImageRef: img.ID}, err
+	return &runtime.PullImageResponse{ImageRef: img.ID}, nil
 }
 
 // ParseAuth parses AuthConfig and returns username and password/secret required by containerd.
