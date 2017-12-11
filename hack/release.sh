@@ -42,6 +42,9 @@ cp ${GOPATH}/bin/crictl ${destdir}/usr/local/bin/
 # Install systemd units into release stage.
 mkdir -p ${destdir}/etc/systemd/system
 cp ${ROOT}/contrib/systemd-units/* ${destdir}/etc/systemd/system/
+# Install cluster directory into release stage.
+mkdir -p ${destdir}/opt/cri-containerd
+cp -r ${ROOT}/cluster ${destdir}/opt/cri-containerd
 
 # Create release tar
 tar -zcvf ${BUILD_DIR}/${TARBALL} -C ${destdir} .

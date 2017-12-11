@@ -14,6 +14,9 @@ write_files:
       [Service]
       Type=oneshot
       RemainAfterExit=yes
+      # cri-containerd requires the existence of cni config directory.
+      # TODO(random-liu): Eliminate the requirement in ocicni.
+      ExecStartPre=/bin/mkdir -p /etc/cni/net.d
       ExecStartPre=/bin/mkdir -p /home/cri-containerd
       ExecStartPre=/bin/mount --bind /home/cri-containerd /home/cri-containerd
       ExecStartPre=/bin/mount -o remount,exec /home/cri-containerd
@@ -79,12 +82,12 @@ write_files:
       # in the kernel. We recommend using cgroups to do container-local accounting.
       LimitNPROC=infinity
       LimitCORE=infinity
-      # cri-containerd on master uses the cni binary and config in the
-      # release tarball.
+      # Point to /home/kubernetes/bin where calico setup cni binary in kube-up.sh.
+      # Point to /etc/cni/net.d where calico put cni config in kube-up.sh.
       ExecStart=/home/cri-containerd/usr/local/bin/cri-containerd \
         --logtostderr --v=4 \
-        --network-bin-dir=/home/cri-containerd/opt/cni/bin \
-        --network-conf-dir=/home/cri-containerd/etc/cni/net.d
+        --network-bin-dir=/home/kubernetes/bin \
+        --network-conf-dir=/etc/cni/net.d
 
       [Install]
       WantedBy=cri-containerd.target
@@ -103,12 +106,12 @@ write_files:
       RemainAfterExit=yes
       RemainAfterExit=yes
       ExecStartPre=/bin/chmod 544 /home/cri-containerd/opt/cri-containerd/cluster/health-monitor.sh
-      ExecStart=/home/cri-containerd/opt/cri-containerd/cluster/health-monitor.sh
+      ExecStart=/bin/bash -c 'CRICTL=/home/cri-containerd/usr/local/bin/crictl \
+      /home/cri-containerd/opt/cri-containerd/cluster/health-monitor.sh'
 
       [Install]
       WantedBy=cri-containerd.target
 
-  # TODO(random-liu): Guarantee order.
   - path: /etc/systemd/system/cri-containerd.target
     permissions: 0644
     owner: root
@@ -120,7 +123,7 @@ write_files:
       WantedBy=kubernetes.target
 
 # Setup kubernetes.
-  - path: /etc/systemd/system/kube-master-installation.service
+  - path: /etc/systemd/system/kube-node-installation.service
     permissions: 0644
     owner: root
     content: |
@@ -141,13 +144,13 @@ write_files:
       [Install]
       WantedBy=kubernetes.target
 
-  - path: /etc/systemd/system/kube-master-configuration.service
+  - path: /etc/systemd/system/kube-node-configuration.service
     permissions: 0644
     owner: root
     content: |
       [Unit]
-      Description=Configure kubernetes master
-      After=kube-master-installation.service
+      Description=Configure kubernetes node
+      After=kube-node-installation.service
 
       [Service]
       Type=oneshot
@@ -164,7 +167,7 @@ write_files:
     content: |
       [Unit]
       Description=Kubernetes health monitoring for kubelet
-      After=kube-master-configuration.service
+      After=kube-node-configuration.service
 
       [Service]
       Restart=always
@@ -196,7 +199,7 @@ write_files:
     content: |
       [Unit]
       Description=Kubernetes log rotation
-      After=kube-master-configuration.service
+      After=kube-node-configuration.service
 
       [Service]
       Type=oneshot
@@ -222,8 +225,8 @@ runcmd:
   - systemctl enable cri-containerd.service
   - systemctl enable cri-containerd-monitor.service
   - systemctl enable cri-containerd.target
-  - systemctl enable kube-master-installation.service
-  - systemctl enable kube-master-configuration.service
+  - systemctl enable kube-node-installation.service
+  - systemctl enable kube-node-configuration.service
   - systemctl enable kubelet-monitor.service
   - systemctl enable kube-logrotate.timer
   - systemctl enable kube-logrotate.service

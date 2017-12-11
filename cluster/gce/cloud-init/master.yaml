@@ -103,7 +103,8 @@ write_files:
       RemainAfterExit=yes
       RemainAfterExit=yes
       ExecStartPre=/bin/chmod 544 /home/cri-containerd/opt/cri-containerd/cluster/health-monitor.sh
-      ExecStart=/home/cri-containerd/opt/cri-containerd/cluster/health-monitor.sh
+      ExecStart=/bin/bash -c 'CRICTL=/home/cri-containerd/usr/local/bin/crictl \
+      /home/cri-containerd/opt/cri-containerd/cluster/health-monitor.sh'
 
       [Install]
       WantedBy=cri-containerd.target
