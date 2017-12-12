@@ -287,18 +287,12 @@ var treeCommand = cli.Command{
 		defer cancel()
 		var (
 			snapshotter = client.SnapshotService(context.GlobalString("snapshotter"))
-			tree        = make(map[string]*snapshotTreeNode)
+			tree        = newSnapshotTree()
 		)
 
 		if err := snapshotter.Walk(ctx, func(ctx gocontext.Context, info snapshots.Info) error {
 			// Get or create node and add node details
-			node := getOrCreateTreeNode(info.Name, tree)
-			if info.Parent != "" {
-				node.Parent = info.Parent
-				p := getOrCreateTreeNode(info.Parent, tree)
-				p.Children = append(p.Children, info.Name)
-			}
-
+			tree.add(info)
 			return nil
 		}); err != nil {
 			return err
@@ -429,37 +423,68 @@ var unpackCommand = cli.Command{
 	},
 }
 
+type snapshotTree struct {
+	nodes []*snapshotTreeNode
+	index map[string]*snapshotTreeNode
+}
+
+func newSnapshotTree() *snapshotTree {
+	return &snapshotTree{
+		index: make(map[string]*snapshotTreeNode),
+	}
+}
+
 type snapshotTreeNode struct {
-	Name     string
-	Parent   string
-	Children []string
+	info     snapshots.Info
+	children []string
 }
 
-func getOrCreateTreeNode(name string, tree map[string]*snapshotTreeNode) *snapshotTreeNode {
-	if node, ok := tree[name]; ok {
-		return node
+func (st *snapshotTree) add(info snapshots.Info) *snapshotTreeNode {
+	entry, ok := st.index[info.Name]
+	if !ok {
+		entry = &snapshotTreeNode{info: info}
+		st.nodes = append(st.nodes, entry)
+		st.index[info.Name] = entry
+	} else {
+		entry.info = info // update info if we created placeholder
 	}
-	node := &snapshotTreeNode{
-		Name: name,
+
+	if info.Parent != "" {
+		pn := st.get(info.Parent)
+		if pn == nil {
+			// create a placeholder
+			pn = st.add(snapshots.Info{Name: info.Parent})
+		}
+
+		pn.children = append(pn.children, info.Name)
 	}
-	tree[name] = node
-	return node
+	return entry
 }
 
-func printTree(tree map[string]*snapshotTreeNode) {
-	for _, node := range tree {
+func (st *snapshotTree) get(name string) *snapshotTreeNode {
+	return st.index[name]
+}
+
+func printTree(st *snapshotTree) {
+	for _, node := range st.nodes {
 		// Print for root(parent-less) nodes only
-		if node.Parent == "" {
-			printNode(node.Name, tree, 0)
+		if node.info.Parent == "" {
+			printNode(node.info.Name, st, 0)
 		}
 	}
 }
 
-func printNode(name string, tree map[string]*snapshotTreeNode, level int) {
-	node := tree[name]
-	fmt.Printf("%s\\_ %s\n", strings.Repeat("  ", level), node.Name)
+func printNode(name string, tree *snapshotTree, level int) {
+	node := tree.index[name]
+	prefix := strings.Repeat("  ", level)
+
+	if level > 0 {
+		prefix += "\\_"
+	}
+
+	fmt.Printf(prefix+" %s\n", node.info.Name)
 	level++
-	for _, child := range node.Children {
+	for _, child := range node.children {
 		printNode(child, tree, level)
 	}
 }
