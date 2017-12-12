@@ -44,6 +44,8 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 		return nil, fmt.Errorf("failed to get sandbox container task: %v", err)
 	}
 
+	var pid uint32
+	var processStatus containerd.ProcessStatus
 	// Set sandbox state to NOTREADY by default.
 	state := runtime.PodSandboxState_SANDBOX_NOTREADY
 	// If the sandbox container is running, treat it as READY.
@@ -56,6 +58,8 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 		if taskStatus.Status == containerd.Running {
 			state = runtime.PodSandboxState_SANDBOX_READY
 		}
+		pid = task.Pid()
+		processStatus = taskStatus.Status
 	}
 
 	ip, err := c.getIP(sandbox)
@@ -69,7 +73,7 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 	}
 	createdAt := ctrInfo.CreatedAt
 	status := toCRISandboxStatus(sandbox.Metadata, state, createdAt, ip)
-	info, err := toCRISandboxContainerInfo(ctx, sandbox.Container, r.GetVerbose())
+	info, err := toCRISandboxInfo(ctx, sandbox, pid, processStatus, r.GetVerbose())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get verbose sandbox container info: %v", err)
 	}
@@ -78,66 +82,6 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 		Status: status,
 		Info:   info,
 	}, nil
-}
-
-// TODO (mikebrow): discuss predefining constants structures for some or all of these field names in CRI
-type sandboxInfo struct {
-	Pid         uint32            `json:"pid"`
-	State       string            `json:"state"`
-	SnapshotKey string            `json:"snapshotKey"`
-	Snapshotter string            `json:"snapshotter"`
-	RuntimeSpec *runtimespec.Spec `json:"runtimeSpec"`
-}
-
-// toCRISandboxContainerInfo converts internal container object information to CRI sandbox container status response info map.
-func toCRISandboxContainerInfo(ctx context.Context, container containerd.Container, verbose bool) (map[string]string, error) {
-	if !verbose {
-		return nil, nil
-	}
-
-	task, err := container.Task(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox container task: %v", err)
-	}
-	status, err := task.Status(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox container task status: %v", err)
-	}
-
-	info := make(map[string]string)
-	pid := task.Pid()
-
-	oldSpec, err := container.Spec(ctx)
-	if err != nil {
-		glog.Errorf("Failed to get sandbox container runtime spec: %v", err)
-	}
-
-	var snapshotkey, snapshotter string
-	ctrInfo, err := container.Info(ctx)
-	if err == nil {
-		snapshotkey = ctrInfo.SnapshotKey
-		snapshotter = ctrInfo.Snapshotter
-	} else {
-		glog.Errorf("Failed to get target shapshot info: %v", err)
-	}
-
-	si := &sandboxInfo{
-		Pid:         pid,
-		State:       string(status.Status),
-		SnapshotKey: snapshotkey,
-		Snapshotter: snapshotter,
-		RuntimeSpec: oldSpec,
-	}
-
-	m, err := json.Marshal(si)
-	if err == nil {
-		info["info"] = string(m)
-	} else {
-		glog.Errorf("failed to marshal info %v: %v", si, err)
-		info["info"] = err.Error()
-	}
-
-	return info, nil
 }
 
 func (c *criContainerdService) getIP(sandbox sandboxstore.Sandbox) (string, error) {
@@ -199,4 +143,69 @@ func toCRISandboxStatus(meta sandboxstore.Metadata, state runtime.PodSandboxStat
 		Labels:      meta.Config.GetLabels(),
 		Annotations: meta.Config.GetAnnotations(),
 	}
+}
+
+// TODO (mikebrow): discuss predefining constants structures for some or all of these field names in CRI
+type sandboxInfo struct {
+	Pid         uint32                    `json:"pid"`
+	Status      string                    `json:"processStatus"`
+	NetNSClosed bool                      `json:"netNamespaceClosed"`
+	Image       string                    `json:"image"`
+	SnapshotKey string                    `json:"snapshotKey"`
+	Snapshotter string                    `json:"snapshotter"`
+	Config      *runtime.PodSandboxConfig `json:"config"`
+	RuntimeSpec *runtimespec.Spec         `json:"runtimeSpec"`
+}
+
+// toCRISandboxInfo converts internal container object information to CRI sandbox status response info map.
+func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox,
+	pid uint32, processStatus containerd.ProcessStatus, verbose bool) (map[string]string, error) {
+	if !verbose {
+		return nil, nil
+	}
+
+	si := &sandboxInfo{
+		Pid:    pid,
+		Status: string(processStatus),
+		Config: sandbox.Config,
+	}
+
+	if si.Status == "" {
+		// If processStatus is empty, it means that the task is deleted. Apply "deleted"
+		// status which does not exist in containerd.
+		si.Status = "deleted"
+	}
+
+	if sandbox.NetNSPath != "" {
+		// Add network closed information if sandbox is not using host network.
+		si.NetNSClosed = (sandbox.NetNS == nil || sandbox.NetNS.Closed())
+	}
+
+	container := sandbox.Container
+	spec, err := container.Spec(ctx)
+	if err == nil {
+		si.RuntimeSpec = spec
+	} else {
+		glog.Errorf("Failed to get sandbox container %q runtime spec: %v", sandbox.ID, err)
+	}
+
+	ctrInfo, err := container.Info(ctx)
+	if err == nil {
+		// Do not use config.SandboxImage because the configuration might
+		// be changed during restart. It may not reflect the actual image
+		// used by the sandbox container.
+		si.Image = ctrInfo.Image
+		si.SnapshotKey = ctrInfo.SnapshotKey
+		si.Snapshotter = ctrInfo.Snapshotter
+	} else {
+		glog.Errorf("Failed to get sandbox container %q info: %v", sandbox.ID, err)
+	}
+
+	infoBytes, err := json.Marshal(si)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal info %v: %v", si, err)
+	}
+	return map[string]string{
+		"info": string(infoBytes),
+	}, nil
 }

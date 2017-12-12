@@ -100,6 +100,7 @@ func toCRIContainerStatus(container containerstore.Container, spec *runtime.Imag
 }
 
 type containerInfo struct {
+	// TODO(random-liu): Add sandboxID in CRI container status.
 	SandboxID   string                   `json:"sandboxID"`
 	Pid         uint32                   `json:"pid"`
 	Removing    bool                     `json:"removing"`
@@ -115,7 +116,6 @@ func toCRIContainerInfo(ctx context.Context, container containerstore.Container,
 		return nil, nil
 	}
 
-	info := make(map[string]string)
 	meta := container.Metadata
 	status := container.Status.Get()
 
@@ -146,6 +146,7 @@ func toCRIContainerInfo(ctx context.Context, container containerstore.Container,
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal info %v: %v", ci, err)
 	}
-	info["info"] = string(infoBytes)
-	return info, nil
+	return map[string]string{
+		"info": string(infoBytes),
+	}, nil
 }
