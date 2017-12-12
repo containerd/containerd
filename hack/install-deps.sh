@@ -54,20 +54,16 @@ CONTAINERD_DIR=${DESTDIR}/usr/local
 RUNC_DIR=${DESTDIR}
 CNI_DIR=${DESTDIR}/opt/cni
 CNI_CONFIG_DIR=${DESTDIR}/etc/cni/net.d
+CRICTL_DIR=${DESTDIR}/usr/local/bin
 CRICTL_CONFIG_DIR=${DESTDIR}/etc
 
 RUNC_PKG=github.com/opencontainers/runc
 CNI_PKG=github.com/containernetworking/plugins
 CONTAINERD_PKG=github.com/containerd/containerd
 CRITOOL_PKG=github.com/kubernetes-incubator/cri-tools
-# Check GOPATH
-if [[ -z "${GOPATH}" ]]; then
-  echo "GOPATH is not set"
-  exit 1
-fi
 
-# For multiple GOPATHs, keep the first one only
-GOPATH=${GOPATH%%:*}
+# Create a temporary GOPATH for make install.deps.
+GOPATH=$(mktemp -d /tmp/cri-containerd-install-deps.XXXX)
 
 # checkout_repo checks out specified repository
 # and switch to specified  version.
@@ -144,7 +140,11 @@ ${sudo} make install -e DESTDIR=${CONTAINERD_DIR}
 checkout_repo ${CRITOOL_PKG} ${CRITOOL_VERSION}
 cd ${GOPATH}/src/${CRITOOL_PKG}
 make
+${sudo} make install -e BINDIR=${CRICTL_DIR}
 ${sudo} mkdir -p ${CRICTL_CONFIG_DIR}
 ${sudo} bash -c 'cat >'${CRICTL_CONFIG_DIR}'/crictl.yaml <<EOF
 runtime-endpoint: /var/run/cri-containerd.sock
 EOF'
+
+# Clean the tmp GOPATH dir
+${sudo} rm -r ${GOPATH}
