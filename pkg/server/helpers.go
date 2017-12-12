@@ -308,10 +308,10 @@ func loadCgroup(cgroupPath string) (cgroups.Cgroup, error) {
 
 // imageInfo is the information about the image got from containerd.
 type imageInfo struct {
-	id      string
-	chainID imagedigest.Digest
-	size    int64
-	config  imagespec.ImageConfig
+	id        string
+	chainID   imagedigest.Digest
+	size      int64
+	imagespec imagespec.Image
 }
 
 // getImageInfo gets image info from containerd.
@@ -344,10 +344,10 @@ func getImageInfo(ctx context.Context, image containerd.Image, provider content.
 	}
 
 	return &imageInfo{
-		id:      id,
-		chainID: chainID,
-		size:    size,
-		config:  ociimage.Config,
+		id:        id,
+		chainID:   chainID,
+		size:      size,
+		imagespec: ociimage,
 	}, nil
 }
 

@@ -36,8 +36,10 @@ func TestImageStatus(t *testing.T) {
 		RepoTags:    []string{"a", "b"},
 		RepoDigests: []string{"c", "d"},
 		Size:        1234,
-		Config: &imagespec.ImageConfig{
-			User: "user:group",
+		ImageSpec: imagespec.Image{
+			Config: imagespec.ImageConfig{
+				User: "user:group",
+			},
 		},
 	}
 	expected := &runtime.Image{

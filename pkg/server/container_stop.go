@@ -80,11 +80,11 @@ func (c *criContainerdService) stopContainer(ctx context.Context, container cont
 			// an error here.
 			return fmt.Errorf("failed to get image metadata %q: %v", container.ImageRef, err)
 		}
-		if image.Config.StopSignal != "" {
-			stopSignal, err = signal.ParseSignal(image.Config.StopSignal)
+		if image.ImageSpec.Config.StopSignal != "" {
+			stopSignal, err = signal.ParseSignal(image.ImageSpec.Config.StopSignal)
 			if err != nil {
 				return fmt.Errorf("failed to parse stop signal %q: %v",
-					image.Config.StopSignal, err)
+					image.ImageSpec.Config.StopSignal, err)
 			}
 		}
 		glog.V(2).Infof("Stop container %q with signal %v", id, stopSignal)

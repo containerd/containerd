@@ -136,11 +136,11 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 	glog.V(4).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q", imageRef, imageID,
 		repoTag, repoDigest)
 	img := imagestore.Image{
-		ID:      imageID,
-		ChainID: info.chainID.String(),
-		Size:    info.size,
-		Config:  &info.config,
-		Image:   image,
+		ID:        imageID,
+		ChainID:   info.chainID.String(),
+		Size:      info.size,
+		ImageSpec: info.imagespec,
+		Image:     image,
 	}
 	if repoDigest != "" {
 		img.RepoDigests = []string{repoDigest}

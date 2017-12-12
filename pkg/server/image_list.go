@@ -47,7 +47,7 @@ func toCRIImage(image imagestore.Image) *runtime.Image {
 		RepoDigests: image.RepoDigests,
 		Size_:       uint64(image.Size),
 	}
-	uid, username := getUserFromImage(image.Config.User)
+	uid, username := getUserFromImage(image.ImageSpec.Config.User)
 	if uid != nil {
 		runtimeImage.Uid = &runtime.Int64Value{Value: *uid}
 	}

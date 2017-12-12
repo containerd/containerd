@@ -139,12 +139,12 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 
 	// Create container volumes mounts.
 	// TODO(random-liu): Add cri-containerd integration test for image volume.
-	volumeMounts := c.generateVolumeMounts(containerRootDir, config.GetMounts(), image.Config)
+	volumeMounts := c.generateVolumeMounts(containerRootDir, config.GetMounts(), &image.ImageSpec.Config)
 
 	// Generate container runtime spec.
 	mounts := c.generateContainerMounts(getSandboxRootDir(c.config.RootDir, sandboxID), config)
 
-	spec, err := c.generateContainerSpec(id, sandboxPid, config, sandboxConfig, image.Config, append(mounts, volumeMounts...))
+	spec, err := c.generateContainerSpec(id, sandboxPid, config, sandboxConfig, &image.ImageSpec.Config, append(mounts, volumeMounts...))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate container %q spec: %v", id, err)
 	}

@@ -24,7 +24,6 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	content "github.com/containerd/containerd/content"
 	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -64,7 +63,7 @@ func toCRIRuntimeImage(image *imagestore.Image) *runtime.Image {
 		RepoDigests: image.RepoDigests,
 		Size_:       uint64(image.Size),
 	}
-	uid, username := getUserFromImage(image.Config.User)
+	uid, username := getUserFromImage(image.ImageSpec.Config.User)
 	if uid != nil {
 		runtimeImage.Uid = &runtime.Int64Value{Value: *uid}
 	}
@@ -75,10 +74,8 @@ func toCRIRuntimeImage(image *imagestore.Image) *runtime.Image {
 
 // TODO (mikebrow): discuss moving this struct and / or constants for info map for some or all of these fields to CRI
 type verboseImageInfo struct {
-	Config             *imagespec.ImageConfig `json:"config"`
-	ConfigDescriptor   imagespec.Descriptor   `json:"configDescriptor"`
-	ManifestDescriptor imagespec.Descriptor   `json:"manifestDescriptor"`
-	LayerInfo          []content.Info         `json:"layerInfo"`
+	ChainID   string          `json:"chainID"`
+	ImageSpec imagespec.Image `json:"imageSpec"`
 }
 
 // toCRIImageInfo converts internal image object information to CRI image status response info map.
@@ -88,32 +85,10 @@ func (c *criContainerdService) toCRIImageInfo(ctx context.Context, image *images
 	}
 
 	info := make(map[string]string)
-	i := image.Image
-	descriptor, err := i.Config(ctx)
-	if err != nil {
-		glog.Errorf("Failed to get image config %q: %v", image.ID, err)
-	} // fallthrough
-
-	targetDescriptor := i.Target()
-	var dia []content.Info
-	digests, err := i.RootFS(ctx)
-	if err != nil {
-		glog.Errorf("Failed to get target digests %q: %v", i.Name(), err)
-	} else {
-		dia = make([]content.Info, len(digests))
-		for i, d := range digests {
-			di, err := c.client.ContentStore().Info(ctx, d)
-			if err == nil {
-				dia[i] = di
-			}
-		}
-	}
 
 	imi := &verboseImageInfo{
-		Config:             image.Config,
-		ConfigDescriptor:   descriptor,
-		ManifestDescriptor: targetDescriptor,
-		LayerInfo:          dia,
+		ChainID:   image.ChainID,
+		ImageSpec: image.ImageSpec,
 	}
 
 	m, err := json.Marshal(imi)
