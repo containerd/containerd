@@ -37,8 +37,10 @@ func TestListImages(t *testing.T) {
 			RepoTags:    []string{"tag-a-1", "tag-b-1"},
 			RepoDigests: []string{"digest-a-1", "digest-b-1"},
 			Size:        1000,
-			Config: &imagespec.ImageConfig{
-				User: "root",
+			ImageSpec: imagespec.Image{
+				Config: imagespec.ImageConfig{
+					User: "root",
+				},
 			},
 		},
 		{
@@ -47,8 +49,10 @@ func TestListImages(t *testing.T) {
 			RepoTags:    []string{"tag-a-2", "tag-b-2"},
 			RepoDigests: []string{"digest-a-2", "digest-b-2"},
 			Size:        2000,
-			Config: &imagespec.ImageConfig{
-				User: "1234:1234",
+			ImageSpec: imagespec.Image{
+				Config: imagespec.ImageConfig{
+					User: "1234:1234",
+				},
 			},
 		},
 		{
@@ -57,8 +61,10 @@ func TestListImages(t *testing.T) {
 			RepoTags:    []string{"tag-a-3", "tag-b-3"},
 			RepoDigests: []string{"digest-a-3", "digest-b-3"},
 			Size:        3000,
-			Config: &imagespec.ImageConfig{
-				User: "nobody",
+			ImageSpec: imagespec.Image{
+				Config: imagespec.ImageConfig{
+					User: "nobody",
+				},
 			},
 		},
 	}

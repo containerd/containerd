@@ -61,13 +61,14 @@ func (c *criContainerdService) LoadImage(ctx context.Context, r *api.LoadImageRe
 		if err := c.createImageReference(ctx, id, image.Target()); err != nil {
 			return nil, fmt.Errorf("failed to create image reference %q: %v", id, err)
 		}
+
 		img := imagestore.Image{
-			ID:       id,
-			RepoTags: []string{repoTag},
-			ChainID:  info.chainID.String(),
-			Size:     info.size,
-			Config:   &info.config,
-			Image:    image,
+			ID:        id,
+			RepoTags:  []string{repoTag},
+			ChainID:   info.chainID.String(),
+			Size:      info.size,
+			ImageSpec: info.imagespec,
+			Image:     image,
 		}
 
 		if err := c.imageStore.Add(img); err != nil {

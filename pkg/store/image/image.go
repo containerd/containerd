@@ -40,8 +40,9 @@ type Image struct {
 	ChainID string
 	// Size is the compressed size of the image.
 	Size int64
-	// Config is the oci image config of the image.
-	Config *imagespec.ImageConfig
+	// ImageSpec is the oci image structure which describes basic information about the image.
+	ImageSpec imagespec.Image
+
 	// Containerd image reference
 	Image containerd.Image
 }

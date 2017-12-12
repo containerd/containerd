@@ -365,11 +365,11 @@ func loadImages(ctx context.Context, cImages []containerd.Image,
 			continue
 		}
 		image := imagestore.Image{
-			ID:      id,
-			ChainID: info.chainID.String(),
-			Size:    info.size,
-			Config:  &info.config,
-			Image:   i,
+			ID:        id,
+			ChainID:   info.chainID.String(),
+			Size:      info.size,
+			ImageSpec: info.imagespec,
+			Image:     i,
 		}
 		// Recover repo digests and repo tags.
 		for _, i := range imgs {
