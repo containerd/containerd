@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -15,6 +16,7 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
+	metrics "github.com/docker/go-metrics"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -97,6 +99,10 @@ func main() {
 			Name:  "json,j",
 			Usage: "output results in json format",
 		},
+		cli.StringFlag{
+			Name:  "metrics,m",
+			Usage: "address to serve the metrics API",
+		},
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
@@ -113,7 +119,11 @@ func main() {
 			Duration:    context.GlobalDuration("duration"),
 			Concurrency: context.GlobalInt("concurrent"),
 			Exec:        context.GlobalBool("exec"),
-			Json:        context.GlobalBool("json"),
+			JSON:        context.GlobalBool("json"),
+			Metrics:     context.GlobalString("metrics"),
+		}
+		if config.Metrics != "" {
+			return serve(config)
 		}
 		return test(config)
 	}
@@ -128,11 +138,21 @@ type config struct {
 	Duration    time.Duration
 	Address     string
 	Exec        bool
-	Json        bool
+	JSON        bool
+	Metrics     string
 }
 
 func (c config) newClient() (*containerd.Client, error) {
 	return containerd.New(c.Address)
+}
+
+func serve(c config) error {
+	go func() {
+		if err := http.ListenAndServe(c.Metrics, metrics.Handler()); err != nil {
+			logrus.WithError(err).Error("listen and serve")
+		}
+	}()
+	return test(c)
 }
 
 func test(c config) error {
@@ -212,7 +232,7 @@ func test(c config) error {
 		results.ContainersPerSecond,
 		results.SecondsPerContainer,
 	)
-	if c.Json {
+	if c.JSON {
 		if err := json.NewEncoder(os.Stdout).Encode(results); err != nil {
 			return err
 		}

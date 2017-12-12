@@ -8,13 +8,25 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/oci"
+	metrics "github.com/docker/go-metrics"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/sirupsen/logrus"
 )
+
+var ct metrics.Timer
+
+func init() {
+	ns := metrics.NewNamespace("stress", "", nil)
+	// if you want more fine grained metrics then you can drill down with the metrics in prom that
+	// containerd is outputing
+	ct = ns.NewTimer("run", "Run time of a full container during the test")
+	metrics.Register(ns)
+}
 
 type worker struct {
 	id       int
@@ -43,6 +55,7 @@ func (w *worker) run(ctx, tctx context.Context) {
 		w.count++
 		id := w.getID()
 		logrus.Debugf("starting container %s", id)
+		start := time.Now()
 		if err := w.runContainer(ctx, id); err != nil {
 			if err != context.DeadlineExceeded ||
 				!strings.Contains(err.Error(), context.DeadlineExceeded.Error()) {
@@ -50,7 +63,10 @@ func (w *worker) run(ctx, tctx context.Context) {
 				logrus.WithError(err).Errorf("running container %s", id)
 
 			}
+			continue
 		}
+		// only log times are success so we don't scew the results from failures that go really fast
+		ct.UpdateSince(start)
 	}
 }
 
