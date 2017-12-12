@@ -78,7 +78,7 @@ func main() {
 		var (
 			start   = time.Now()
 			signals = make(chan os.Signal, 2048)
-			serverC = make(chan *server.Server)
+			serverC = make(chan *server.Server, 1)
 			ctx     = log.WithModule(gocontext.Background(), "containerd")
 			config  = defaultConfig()
 		)
