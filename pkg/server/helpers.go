@@ -315,7 +315,7 @@ type imageInfo struct {
 }
 
 // getImageInfo gets image info from containerd.
-func getImageInfo(ctx context.Context, image containerd.Image, provider content.Provider) (*imageInfo, error) {
+func getImageInfo(ctx context.Context, image containerd.Image) (*imageInfo, error) {
 	// Get image information.
 	diffIDs, err := image.RootFS(ctx)
 	if err != nil {
@@ -334,7 +334,7 @@ func getImageInfo(ctx context.Context, image containerd.Image, provider content.
 	}
 	id := desc.Digest.String()
 
-	rb, err := content.ReadBlob(ctx, provider, desc.Digest)
+	rb, err := content.ReadBlob(ctx, image.ContentStore(), desc.Digest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read image config from content store: %v", err)
 	}

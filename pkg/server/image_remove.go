@@ -42,7 +42,7 @@ func (c *criContainerdService) RemoveImage(ctx context.Context, r *runtime.Remov
 		return &runtime.RemoveImageResponse{}, nil
 	}
 
-	// Exclude out dated image tag.
+	// Exclude outdated image tag.
 	for i, tag := range image.RepoTags {
 		cImage, err := c.client.GetImage(ctx, tag)
 		if err != nil {
@@ -53,26 +53,39 @@ func (c *criContainerdService) RemoveImage(ctx context.Context, r *runtime.Remov
 		}
 		desc, err := cImage.Config(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get image %q config descriptor: %v", tag, err)
-		}
-		cID := desc.Digest.String()
-		if cID == image.ID {
+			// We can only get image id by reading Config from content.
+			// If the config is missing, we will fail to get image id,
+			// So we will can't remove the image forever,
+			// and cri-containerd always report the image is ok.
+			// But we also don't check it by manifest,
+			// It's possible that two manifest digests have the same image ID in theory.
+			// In theory it's possible that an image is compressed with different algorithms,
+			// then they'll have the same uncompressed id - image id,
+			// but different ids generated from compressed contents - manifest digest.
+			// So we decide to leave it.
+			// After all, the user can override the repoTag by pulling image again.
+			glog.Errorf("can't remove image,failed to get config for Image tag %q,id %q: %v", tag, image.ID, err)
+			image.RepoTags = append(image.RepoTags[:i], image.RepoTags[i+1:]...)
 			continue
 		}
-		glog.V(4).Infof("Image tag %q for %q is out dated, it's currently used by %q", tag, image.ID, cID)
-		image.RepoTags = append(image.RepoTags[:i], image.RepoTags[i+1:]...)
+		cID := desc.Digest.String()
+		if cID != image.ID {
+			glog.V(4).Infof("Image tag %q for %q is outdated, it's currently used by %q", tag, image.ID, cID)
+			image.RepoTags = append(image.RepoTags[:i], image.RepoTags[i+1:]...)
+			continue
+		}
 	}
 
 	// Include all image references, including RepoTag, RepoDigest and id.
 	for _, ref := range append(image.RepoTags, image.RepoDigests...) {
-		err = c.imageStoreService.Delete(ctx, ref)
+		err = c.client.ImageService().Delete(ctx, ref)
 		if err == nil || errdefs.IsNotFound(err) {
 			continue
 		}
 		return nil, fmt.Errorf("failed to delete image reference %q for image %q: %v", ref, image.ID, err)
 	}
 	// Delete image id synchronously to trigger garbage collection.
-	err = c.imageStoreService.Delete(ctx, image.ID, images.SynchronousDelete())
+	err = c.client.ImageService().Delete(ctx, image.ID, images.SynchronousDelete())
 	if err != nil && !errdefs.IsNotFound(err) {
 		return nil, fmt.Errorf("failed to delete image id %q: %v", image.ID, err)
 	}

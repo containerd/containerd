@@ -59,6 +59,9 @@ import (
 // if we saw an image without snapshots or with in-complete contents during startup,
 // should we re-pull the image? Or should we remove the entry?
 //
+// yanxuean: We cann't delete image directly, because we don't know if the image
+// is pulled by us. There are resource leakage.
+//
 // 2) Containerd suggests user to add entry before pulling the image. However if
 // an error occurrs during the pulling, should we remove the entry from metadata
 // store? Or should we leave it there until next startup (resource leakage)?
@@ -114,8 +117,15 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 		// Do not fail image pulling. Unpack will be retried before container creation.
 	}
 
+	// Get image information.
+	info, err := getImageInfo(ctx, image)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get image information: %v", err)
+	}
+	imageID := info.id
+
 	repoDigest, repoTag := getRepoDigestAndTag(namedRef, image.Target().Digest, isSchema1)
-	for _, r := range []string{repoTag, repoDigest} {
+	for _, r := range []string{repoTag, repoDigest, imageID} {
 		if r == "" {
 			continue
 		}
@@ -123,16 +133,7 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 			return nil, fmt.Errorf("failed to update image reference %q: %v", r, err)
 		}
 	}
-	// Get image information.
-	info, err := getImageInfo(ctx, image, c.client.ContentStore())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get image information: %v", err)
-	}
-	imageID := info.id
 
-	if err := c.createImageReference(ctx, imageID, image.Target()); err != nil {
-		return nil, fmt.Errorf("failed to update image reference %q: %v", imageID, err)
-	}
 	glog.V(4).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q", imageRef, imageID,
 		repoTag, repoDigest)
 	img := imagestore.Image{
@@ -158,7 +159,7 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 	// by someone else anytime, before/during/after we create the metadata. We should always
 	// check the actual state in containerd before using the image or returning status of the
 	// image.
-	return &runtime.PullImageResponse{ImageRef: img.ID}, err
+	return &runtime.PullImageResponse{ImageRef: img.ID}, nil
 }
 
 // ParseAuth parses AuthConfig and returns username and password/secret required by containerd.
@@ -201,13 +202,13 @@ func (c *criContainerdService) createImageReference(ctx context.Context, name st
 	}
 	// TODO(random-liu): Figure out which is the more performant sequence create then update or
 	// update then create.
-	_, err := c.imageStoreService.Create(ctx, img)
+	_, err := c.client.ImageService().Create(ctx, img)
 	if err == nil {
 		return nil
 	}
 	if err != nil && !errdefs.IsAlreadyExists(err) {
 		return err
 	}
-	_, err = c.imageStoreService.Update(ctx, img, "target")
+	_, err = c.client.ImageService().Update(ctx, img, "target")
 	return err
 }

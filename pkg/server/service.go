@@ -25,9 +25,6 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/api/services/tasks/v1"
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/sys"
 	"github.com/cri-o/ocicni/pkg/ocicni"
@@ -94,13 +91,6 @@ type criContainerdService struct {
 	imageStore *imagestore.Store
 	// snapshotStore stores information of all snapshots.
 	snapshotStore *snapshotstore.Store
-	// taskService is containerd tasks client.
-	taskService tasks.TasksClient
-	// contentStoreService is the containerd content service client.
-	contentStoreService content.Store
-	// imageStoreService is the containerd service to store and track
-	// image metadata.
-	imageStoreService images.Store
 	// netPlugin is used to setup and teardown network when run/stop pod sandbox.
 	netPlugin ocicni.CNIPlugin
 	// client is an instance of the containerd client
@@ -131,20 +121,17 @@ func NewCRIContainerdService(config options.Config) (CRIContainerdService, error
 	}
 
 	c := &criContainerdService{
-		config:              config,
-		apparmorEnabled:     runcapparmor.IsEnabled(),
-		seccompEnabled:      runcseccomp.IsEnabled(),
-		os:                  osinterface.RealOS{},
-		sandboxStore:        sandboxstore.NewStore(),
-		containerStore:      containerstore.NewStore(),
-		imageStore:          imagestore.NewStore(),
-		snapshotStore:       snapshotstore.NewStore(),
-		sandboxNameIndex:    registrar.NewRegistrar(),
-		containerNameIndex:  registrar.NewRegistrar(),
-		taskService:         client.TaskService(),
-		imageStoreService:   client.ImageService(),
-		contentStoreService: client.ContentStore(),
-		client:              client,
+		config:             config,
+		apparmorEnabled:    runcapparmor.IsEnabled(),
+		seccompEnabled:     runcseccomp.IsEnabled(),
+		os:                 osinterface.RealOS{},
+		sandboxStore:       sandboxstore.NewStore(),
+		containerStore:     containerstore.NewStore(),
+		imageStore:         imagestore.NewStore(),
+		snapshotStore:      snapshotstore.NewStore(),
+		sandboxNameIndex:   registrar.NewRegistrar(),
+		containerNameIndex: registrar.NewRegistrar(),
+		client:             client,
 	}
 
 	imageFSPath := imageFSPath(config.ContainerdConfig.RootDir, config.ContainerdConfig.Snapshotter)
