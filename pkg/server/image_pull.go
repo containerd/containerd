@@ -199,13 +199,13 @@ func (c *criContainerdService) createImageReference(ctx context.Context, name st
 	}
 	// TODO(random-liu): Figure out which is the more performant sequence create then update or
 	// update then create.
-	_, err := c.imageStoreService.Create(ctx, img)
+	_, err := c.client.ImageService().Create(ctx, img)
 	if err == nil {
 		return nil
 	}
 	if err != nil && !errdefs.IsAlreadyExists(err) {
 		return err
 	}
-	_, err = c.imageStoreService.Update(ctx, img, "target")
+	_, err = c.client.ImageService().Update(ctx, img, "target")
 	return err
 }

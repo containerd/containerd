@@ -65,14 +65,14 @@ func (c *criContainerdService) RemoveImage(ctx context.Context, r *runtime.Remov
 
 	// Include all image references, including RepoTag, RepoDigest and id.
 	for _, ref := range append(image.RepoTags, image.RepoDigests...) {
-		err = c.imageStoreService.Delete(ctx, ref)
+		err = c.client.ImageService().Delete(ctx, ref)
 		if err == nil || errdefs.IsNotFound(err) {
 			continue
 		}
 		return nil, fmt.Errorf("failed to delete image reference %q for image %q: %v", ref, image.ID, err)
 	}
 	// Delete image id synchronously to trigger garbage collection.
-	err = c.imageStoreService.Delete(ctx, image.ID, images.SynchronousDelete())
+	err = c.client.ImageService().Delete(ctx, image.ID, images.SynchronousDelete())
 	if err != nil && !errdefs.IsNotFound(err) {
 		return nil, fmt.Errorf("failed to delete image id %q: %v", image.ID, err)
 	}

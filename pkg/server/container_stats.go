@@ -32,7 +32,7 @@ func (c *criContainerdService) ContainerStats(ctx context.Context, in *runtime.C
 		return nil, fmt.Errorf("failed to find container: %v", err)
 	}
 	request := &tasks.MetricsRequest{Filters: []string{"id==" + cntr.ID}}
-	resp, err := c.taskService.Metrics(ctx, request)
+	resp, err := c.client.TaskService().Metrics(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch metrics for task: %v", err)
 	}

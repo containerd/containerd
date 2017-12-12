@@ -34,7 +34,7 @@ func (c *criContainerdService) ListPodSandbox(ctx context.Context, r *runtime.Li
 	// List all sandboxes from store.
 	sandboxesInStore := c.sandboxStore.List()
 
-	response, err := c.taskService.List(ctx, &tasks.ListTasksRequest{})
+	response, err := c.client.TaskService().List(ctx, &tasks.ListTasksRequest{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list sandbox containers: %v", err)
 	}
