@@ -192,6 +192,10 @@ func test(c config) error {
 	if c.Exec {
 		args = oci.WithProcessArgs("sleep", "10")
 	}
+	v, err := client.Version(ctx)
+	if err != nil {
+		return err
+	}
 	// create the workers along with their spec
 	for i := 0; i < c.Concurrency; i++ {
 		wg.Add(1)
@@ -210,6 +214,7 @@ func test(c config) error {
 			image:  image,
 			client: client,
 			doExec: c.Exec,
+			commit: v.Revision,
 		}
 		workers = append(workers, w)
 	}

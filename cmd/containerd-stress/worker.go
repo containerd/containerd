@@ -18,13 +18,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var ct metrics.Timer
+var ct metrics.LabeledTimer
 
 func init() {
 	ns := metrics.NewNamespace("stress", "", nil)
 	// if you want more fine grained metrics then you can drill down with the metrics in prom that
 	// containerd is outputing
-	ct = ns.NewTimer("run", "Run time of a full container during the test")
+	ct = ns.NewLabeledTimer("run", "Run time of a full container during the test", "commit")
 	metrics.Register(ns)
 }
 
@@ -38,6 +38,7 @@ type worker struct {
 	image  containerd.Image
 	spec   *specs.Spec
 	doExec bool
+	commit string
 }
 
 func (w *worker) run(ctx, tctx context.Context) {
@@ -66,7 +67,7 @@ func (w *worker) run(ctx, tctx context.Context) {
 			continue
 		}
 		// only log times are success so we don't scew the results from failures that go really fast
-		ct.UpdateSince(start)
+		ct.WithValues(w.commit).UpdateSince(start)
 	}
 }
 
