@@ -34,7 +34,9 @@ func NewCRIContainerdClient(endpoint string, timeout time.Duration) (api.CRICont
 		return nil, fmt.Errorf("failed to get dialer: %v", err)
 	}
 	conn, err := grpc.Dial(addr,
+		grpc.WithBlock(),
 		grpc.WithInsecure(),
+		// TODO(random-liu): WithTimeout is being deprecated, use context instead.
 		grpc.WithTimeout(timeout),
 		grpc.WithDialer(dialer),
 	)
