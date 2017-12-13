@@ -18,13 +18,17 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var ct metrics.LabeledTimer
+var (
+	ct         metrics.LabeledTimer
+	errCounter metrics.LabeledCounter
+)
 
 func init() {
 	ns := metrics.NewNamespace("stress", "", nil)
 	// if you want more fine grained metrics then you can drill down with the metrics in prom that
 	// containerd is outputing
 	ct = ns.NewLabeledTimer("run", "Run time of a full container during the test", "commit")
+	errCounter = ns.NewLabeledCounter("errors", "Errors encountered running the stress tests", "err")
 	metrics.Register(ns)
 }
 
@@ -62,6 +66,7 @@ func (w *worker) run(ctx, tctx context.Context) {
 				!strings.Contains(err.Error(), context.DeadlineExceeded.Error()) {
 				w.failures++
 				logrus.WithError(err).Errorf("running container %s", id)
+				errCounter.WithValues(err.Error()).Inc()
 
 			}
 			continue
