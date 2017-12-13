@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
@@ -58,12 +59,10 @@ func TestPodSandboxStatus(t *testing.T) {
 			Config: config,
 		},
 	}
-	state := runtime.PodSandboxState_SANDBOX_NOTREADY
 
 	expected := &runtime.PodSandboxStatus{
 		Id:        id,
 		Metadata:  config.GetMetadata(),
-		State:     state,
 		CreatedAt: createdAt.UnixNano(),
 		Network:   &runtime.PodSandboxNetworkStatus{Ip: ip},
 		Linux: &runtime.LinuxPodSandboxStatus{
@@ -78,7 +77,21 @@ func TestPodSandboxStatus(t *testing.T) {
 		Labels:      config.GetLabels(),
 		Annotations: config.GetAnnotations(),
 	}
-
-	got := toCRISandboxStatus(sandbox.Metadata, state, createdAt, ip)
-	assert.Equal(t, expected, got)
+	for _, status := range []containerd.ProcessStatus{
+		"",
+		containerd.Running,
+		containerd.Created,
+		containerd.Stopped,
+		containerd.Paused,
+		containerd.Pausing,
+		containerd.Unknown,
+	} {
+		state := runtime.PodSandboxState_SANDBOX_NOTREADY
+		if status == containerd.Running {
+			state = runtime.PodSandboxState_SANDBOX_READY
+		}
+		expected.State = state
+		got := toCRISandboxStatus(sandbox.Metadata, status, createdAt, ip)
+		assert.Equal(t, expected, got)
+	}
 }

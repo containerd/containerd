@@ -42,7 +42,6 @@ type Image struct {
 	Size int64
 	// ImageSpec is the oci image structure which describes basic information about the image.
 	ImageSpec imagespec.Image
-
 	// Containerd image reference
 	Image containerd.Image
 }

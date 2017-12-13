@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	assertlib "github.com/stretchr/testify/assert"
 
 	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
@@ -33,6 +34,7 @@ func TestImageStore(t *testing.T) {
 			RepoTags:    []string{"tag-1"},
 			RepoDigests: []string{"digest-1"},
 			Size:        10,
+			ImageSpec:   imagespec.Image{},
 		},
 		{
 			ID:          "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -40,6 +42,7 @@ func TestImageStore(t *testing.T) {
 			RepoTags:    []string{"tag-2abcd"},
 			RepoDigests: []string{"digest-2abcd"},
 			Size:        20,
+			ImageSpec:   imagespec.Image{},
 		},
 		{
 			ID:          "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -47,6 +50,7 @@ func TestImageStore(t *testing.T) {
 			RepoDigests: []string{"digest-4a333"},
 			ChainID:     "test-chain-id-4a333",
 			Size:        30,
+			ImageSpec:   imagespec.Image{},
 		},
 		{
 			ID:          "sha256:4123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -54,6 +58,7 @@ func TestImageStore(t *testing.T) {
 			RepoDigests: []string{"digest-4abcd"},
 			ChainID:     "test-chain-id-4abcd",
 			Size:        40,
+			ImageSpec:   imagespec.Image{},
 		},
 	}
 	assert := assertlib.New(t)

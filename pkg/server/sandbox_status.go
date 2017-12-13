@@ -46,8 +46,6 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 
 	var pid uint32
 	var processStatus containerd.ProcessStatus
-	// Set sandbox state to NOTREADY by default.
-	state := runtime.PodSandboxState_SANDBOX_NOTREADY
 	// If the sandbox container is running, treat it as READY.
 	if task != nil {
 		taskStatus, err := task.Status(ctx)
@@ -55,9 +53,6 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 			return nil, fmt.Errorf("failed to get task status: %v", err)
 		}
 
-		if taskStatus.Status == containerd.Running {
-			state = runtime.PodSandboxState_SANDBOX_READY
-		}
 		pid = task.Pid()
 		processStatus = taskStatus.Status
 	}
@@ -72,7 +67,7 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 		return nil, fmt.Errorf("failed to get sandbox container info: %v", err)
 	}
 	createdAt := ctrInfo.CreatedAt
-	status := toCRISandboxStatus(sandbox.Metadata, state, createdAt, ip)
+	status := toCRISandboxStatus(sandbox.Metadata, processStatus, createdAt, ip)
 	info, err := toCRISandboxInfo(ctx, sandbox, pid, processStatus, r.GetVerbose())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get verbose sandbox container info: %v", err)
@@ -123,7 +118,12 @@ func (c *criContainerdService) getIP(sandbox sandboxstore.Sandbox) (string, erro
 }
 
 // toCRISandboxStatus converts sandbox metadata into CRI pod sandbox status.
-func toCRISandboxStatus(meta sandboxstore.Metadata, state runtime.PodSandboxState, createdAt time.Time, ip string) *runtime.PodSandboxStatus {
+func toCRISandboxStatus(meta sandboxstore.Metadata, status containerd.ProcessStatus, createdAt time.Time, ip string) *runtime.PodSandboxStatus {
+	// Set sandbox state to NOTREADY by default.
+	state := runtime.PodSandboxState_SANDBOX_NOTREADY
+	if status == containerd.Running {
+		state = runtime.PodSandboxState_SANDBOX_READY
+	}
 	nsOpts := meta.Config.GetLinux().GetSecurityContext().GetNamespaceOptions()
 	return &runtime.PodSandboxStatus{
 		Id:        meta.ID,
