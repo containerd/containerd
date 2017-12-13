@@ -53,7 +53,7 @@ if [ -z "${VERSION}" ]; then
 fi
 
 # TARBALL_GCS_PATH is the path to download cri-containerd tarball for node e2e.
-TARBALL_GCS_PATH="https://storage.googleapis.com/${DEPLOY_PATH}/${PKG_PREFIX}-${VERSION}.tar.gz"
+TARBALL_GCS_PATH="https://storage.googleapis.com/${DEPLOY_PATH}/${PKG_PREFIX}-${VERSION}.linux-amd64.tar.gz"
 # TARBALL is the name of the tarball after being downloaded.
 TARBALL="cri-containerd.tar.gz"
 
