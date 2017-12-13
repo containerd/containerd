@@ -1,0 +1,18 @@
+#!/bin/bash
+CLUSTER_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# TODO(random-liu): Upload release tarball to user's own GCS, and use it. We should
+# not let all nodes of all users download tarball from cri-containerd-release.
+export KUBE_MASTER_EXTRA_METADATA="user-data=${CLUSTER_DIR}/gce/cloud-init/master.yaml,cri-containerd-configure-sh=${CLUSTER_DIR}/gce/configure.sh"
+export KUBE_NODE_EXTRA_METADATA="user-data=${CLUSTER_DIR}/gce/cloud-init/node.yaml,cri-containerd-configure-sh=${CLUSTER_DIR}/gce/configure.sh"
+if [ -n "${VERSION}" ]; then
+  version=$(mktemp /tmp/version.XXXX)
+  echo "${VERSION}" > "$version"
+  export KUBE_MASTER_EXTRA_METADATA="${KUBE_MASTER_EXTRA_METADATA},version=${version}"
+  export KUBE_NODE_EXTRA_METADATA="${KUBE_NODE_EXTRA_METADATA},version=${version}"
+fi
+export KUBE_CONTAINER_RUNTIME="remote"
+export KUBE_CONTAINER_RUNTIME_ENDPOINT="/var/run/cri-containerd.sock"
+export KUBE_LOAD_IMAGE_COMMAND="/home/cri-containerd/usr/local/bin/cri-containerd load"
+export NETWORK_POLICY_PROVIDER="calico"
+export NON_MASQUERADE_CIDR="0.0.0.0/0"

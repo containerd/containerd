@@ -38,7 +38,6 @@ write_files:
         shim = "/home/cri-containerd/usr/local/bin/containerd-shim"
         runtime = "/home/cri-containerd/usr/local/sbin/runc"
 
-  # TODO(random-liu): Add health monitor for containerd/cri-containerd.
   - path: /etc/systemd/system/containerd.service
     permissions: 0644
     owner: root
@@ -89,6 +88,26 @@ write_files:
         --logtostderr --v=4 \
         --network-bin-dir=/home/kubernetes/bin \
         --network-conf-dir=/etc/cni/net.d
+
+      [Install]
+      WantedBy=cri-containerd.target
+
+  - path: /etc/systemd/system/cri-containerd-monitor.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Kubernetes health monitoring for cri-containerd and containerd
+      After=containerd.service cri-containerd.service
+
+      [Service]
+      Restart=always
+      RestartSec=10
+      RemainAfterExit=yes
+      RemainAfterExit=yes
+      ExecStartPre=/bin/chmod 544 /home/cri-containerd/opt/cri-containerd/cluster/health-monitor.sh
+      ExecStart=/bin/bash -c 'CRICTL=/home/cri-containerd/usr/local/bin/crictl \
+      /home/cri-containerd/opt/cri-containerd/cluster/health-monitor.sh'
 
       [Install]
       WantedBy=cri-containerd.target
@@ -204,6 +223,7 @@ runcmd:
   - systemctl enable containerd.service
   - systemctl enable cri-containerd-installation.service
   - systemctl enable cri-containerd.service
+  - systemctl enable cri-containerd-monitor.service
   - systemctl enable cri-containerd.target
   - systemctl enable kube-node-installation.service
   - systemctl enable kube-node-configuration.service
