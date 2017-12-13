@@ -122,3 +122,14 @@ create_ttl_bucket() {
   gsutil -m acl ch -g all:R "gs://${bucket}"
   gsutil defacl set public-read "gs://${bucket}"
 }
+
+# sha1 generates a sha1 checksum for a file.
+# Var set:
+# 1. Filename.
+sha1() {
+  if which sha1sum >/dev/null 2>&1; then
+    sha1sum "$1" | awk '{ print $1 }'
+  else
+    shasum -a1 "$1" | awk '{ print $1 }'
+  fi
+}

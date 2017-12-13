@@ -63,7 +63,8 @@ CONTAINERD_PKG=github.com/containerd/containerd
 CRITOOL_PKG=github.com/kubernetes-incubator/cri-tools
 
 # Create a temporary GOPATH for make install.deps.
-GOPATH=$(mktemp -d /tmp/cri-containerd-install-deps.XXXX)
+TMPGOPATH=$(mktemp -d /tmp/cri-containerd-install-deps.XXXX)
+GOPATH=${TMPGOPATH}
 
 # checkout_repo checks out specified repository
 # and switch to specified  version.
@@ -146,5 +147,6 @@ ${sudo} bash -c 'cat >'${CRICTL_CONFIG_DIR}'/crictl.yaml <<EOF
 runtime-endpoint: /var/run/cri-containerd.sock
 EOF'
 
-# Clean the tmp GOPATH dir
-${sudo} rm -r ${GOPATH}
+# Clean the tmp GOPATH dir. Use sudo because runc build generates
+# some privileged files.
+${sudo} rm -rf ${TMPGOPATH}

@@ -9,13 +9,24 @@ For each release, we'll publish a release tarball. The release tarball contains 
 ### Content
 As shown below, the release tarball contains:
 1) `cri-containerd`: cri-containerd binary.
-2) `containerd`, `containerd-shim`, `containerd-stress`, `ctr`: binaries for containerd.
+2) `containerd`, `containerd-shim`, `containerd-stress`, `containerd-release`, `ctr`: binaries for containerd.
 3) `runc`: runc binary.
 4) `crictl`: command line tools for CRI container runtime.
 5) `containerd.service`, `cri-containerd.service`: Systemd units for cri-containerd and containerd.
+6) `/opt/cri-containerd/cluster/`: scripts for `kube-up.sh`.
 ```console
-$ tar -tf cri-containerd-1.0.0-alpha.0.tar.gz 
+$ tar -tf cri-containerd-1.0.0-beta.0.linux-amd64.tar.gz
 ./
+./opt/
+./opt/cri-containerd/
+./opt/cri-containerd/cluster/
+./opt/cri-containerd/cluster/gce/
+./opt/cri-containerd/cluster/gce/cloud-init/
+./opt/cri-containerd/cluster/gce/cloud-init/node.yaml
+./opt/cri-containerd/cluster/gce/cloud-init/master.yaml
+./opt/cri-containerd/cluster/gce/configure.sh
+./opt/cri-containerd/cluster/health-monitor.sh
+./opt/cri-containerd/cluster/env
 ./usr/
 ./usr/local/
 ./usr/local/sbin/
@@ -24,6 +35,8 @@ $ tar -tf cri-containerd-1.0.0-alpha.0.tar.gz
 ./usr/local/bin/crictl
 ./usr/local/bin/containerd
 ./usr/local/bin/containerd-stress
+./usr/local/bin/critest
+./usr/local/bin/containerd-release
 ./usr/local/bin/containerd-shim
 ./usr/local/bin/ctr
 ./usr/local/bin/cri-containerd
@@ -32,6 +45,7 @@ $ tar -tf cri-containerd-1.0.0-alpha.0.tar.gz
 ./etc/systemd/system/
 ./etc/systemd/system/containerd.service
 ./etc/systemd/system/cri-containerd.service
+./etc/crictl.yaml
 ```
 ### Binary Information
 Information about the binaries in the release tarball:
@@ -63,12 +77,12 @@ Note that:
 ## Step 1: Download CRI-Containerd Release Tarball
 Download release tarball for the cri-containerd version you want to install from sources listed [above](#download).
 ```console
-$ wget https://storage.googleapis.com/cri-containerd-release/cri-containerd-${VERSION}.tar.gz
+$ wget https://storage.googleapis.com/cri-containerd-release/cri-containerd-${VERSION}.linux-amd64.tar.gz
 ```
 ## Step 2: Install CRI-Containerd
 If you are using systemd, just simply unpack the tarball to the root directory:
 ```shell
-sudo tar -C / -xzf cri-containerd-${VERSION}.tar.gz
+sudo tar -C / -xzf cri-containerd-${VERSION}.linux-amd64.tar.gz
 sudo mkdir -p /opt/cni/bin/
 sudo mkdir -p /etc/cni/net.d
 sudo systemctl start containerd

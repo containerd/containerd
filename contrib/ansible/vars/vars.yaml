@@ -1,5 +1,5 @@
 ---
-cri_containerd_release_version: 1.0.0-alpha.1
+cri_containerd_release_version: 1.0.0-beta.0
 cri_release_directory: /opt/cri-containerd/
 local_bin_dir: /usr/local/bin/
 local_sbin_dir: /usr/local/sbin/

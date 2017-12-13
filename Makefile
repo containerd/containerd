@@ -13,6 +13,8 @@
 # limitations under the License.
 
 GO := go
+GOOS := $(shell $(GO) env GOOS)
+GOARCH := $(shell $(GO) env GOARCH)
 EPOCH_TEST_COMMIT := f9e02affccd51702191e5312665a16045ffef8ab
 PROJECT := github.com/kubernetes-incubator/cri-containerd
 BINDIR := ${DESTDIR}/usr/local/bin
@@ -24,7 +26,7 @@ VERSION := $(shell git describe --tags --dirty)
 # strip the first char of the tag if it's a `v`
 VERSION := $(VERSION:v%=%)
 TARBALL_PREFIX := cri-containerd
-TARBALL := $(TARBALL_PREFIX)-$(VERSION).tar.gz
+TARBALL := $(TARBALL_PREFIX)-$(VERSION).$(GOOS)-$(GOARCH).tar.gz
 BUILD_TAGS := seccomp apparmor
 GO_LDFLAGS := -X $(PROJECT)/pkg/version.CRIContainerdVersion=$(VERSION)
 SOURCES := $(shell find cmd/ pkg/ vendor/ -name '*.go')
@@ -79,13 +81,13 @@ $(BUILD_DIR)/cri-containerd: $(SOURCES)
 		$(PROJECT)/cmd/cri-containerd
 
 test:
-	go test -timeout=10m -race ./pkg/... \
+	$(GO) test -timeout=10m -race ./pkg/... \
 		-tags '$(BUILD_TAGS)' \
 	        -ldflags '$(GO_LDFLAGS)' \
 		-gcflags '$(GO_GCFLAGS)'
 
 $(BUILD_DIR)/integration.test: $(INTEGRATION_SOURCES)
-	go test -c $(PROJECT)/integration -o $(BUILD_DIR)/integration.test
+	$(GO) test -c $(PROJECT)/integration -o $(BUILD_DIR)/integration.test
 
 test-integration: $(BUILD_DIR)/integration.test binaries
 	@./hack/test-integration.sh
@@ -141,10 +143,10 @@ endif
 install.tools: .install.gitvalidation .install.gometalinter
 
 .install.gitvalidation:
-	go get -u github.com/vbatts/git-validation
+	$(GO) get -u github.com/vbatts/git-validation
 
 .install.gometalinter:
-	go get -u github.com/alecthomas/gometalinter
+	$(GO) get -u github.com/alecthomas/gometalinter
 	gometalinter --install
 
 .PHONY: \
