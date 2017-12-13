@@ -34,6 +34,7 @@ import (
 	"golang.org/x/sys/unix"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
+	"github.com/containerd/cri-containerd/pkg/annotations"
 	customopts "github.com/containerd/cri-containerd/pkg/containerd/opts"
 	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
 	"github.com/containerd/cri-containerd/pkg/util"
@@ -330,6 +331,9 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 
 	g.SetLinuxResourcesCPUShares(uint64(defaultSandboxCPUshares))
 	g.SetProcessOOMScoreAdj(int(defaultSandboxOOMAdj))
+
+	g.AddAnnotation(annotations.ContainerType, annotations.ContainerTypeSandbox)
+	g.AddAnnotation(annotations.SandboxID, id)
 
 	return g.Spec(), nil
 }

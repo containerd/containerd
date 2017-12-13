@@ -32,6 +32,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
+	"github.com/containerd/cri-containerd/pkg/annotations"
 	ostesting "github.com/containerd/cri-containerd/pkg/os/testing"
 	"github.com/containerd/cri-containerd/pkg/util"
 )
@@ -56,7 +57,7 @@ func checkMount(t *testing.T, mounts []runtimespec.Mount, src, dest, typ string,
 }
 
 func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandboxConfig,
-	*imagespec.ImageConfig, func(*testing.T, string, uint32, *runtimespec.Spec)) {
+	*imagespec.ImageConfig, func(*testing.T, string, string, uint32, *runtimespec.Spec)) {
 	config := &runtime.ContainerConfig{
 		Metadata: &runtime.ContainerMetadata{
 			Name:    "test-name",
@@ -122,7 +123,7 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		Cmd:        []string{"cmd"},
 		WorkingDir: "/workspace",
 	}
-	specCheck := func(t *testing.T, id string, sandboxPid uint32, spec *runtimespec.Spec) {
+	specCheck := func(t *testing.T, id string, sandboxID string, sandboxPid uint32, spec *runtimespec.Spec) {
 		assert.Equal(t, relativeRootfsPath, spec.Root.Path)
 		assert.Equal(t, []string{"test", "command", "test", "args"}, spec.Process.Args)
 		assert.Equal(t, "test-cwd", spec.Process.Cwd)
@@ -168,6 +169,13 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 			Type: runtimespec.UTSNamespace,
 			Path: getUTSNamespace(sandboxPid),
 		})
+
+		t.Logf("Check PodSandbox annotations")
+		assert.Contains(t, spec.Annotations, annotations.SandboxID)
+		assert.EqualValues(t, spec.Annotations[annotations.SandboxID], sandboxID)
+
+		assert.Contains(t, spec.Annotations, annotations.ContainerType)
+		assert.EqualValues(t, spec.Annotations[annotations.ContainerType], annotations.ContainerTypeContainer)
 	}
 	return config, sandboxConfig, imageConfig, specCheck
 }
@@ -177,13 +185,15 @@ func TestGeneralContainerSpec(t *testing.T) {
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 	c := newTestCRIContainerdService()
-	spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
+	testSandboxID := "SandboxID"
+	spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil)
 	require.NoError(t, err)
-	specCheck(t, testID, testPid, spec)
+	specCheck(t, testID, testSandboxID, testPid, spec)
 }
 
 func TestContainerCapabilities(t *testing.T) {
 	testID := "test-id"
+	testSandboxID := "SandboxID"
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 	c := newTestCRIContainerdService()
@@ -231,9 +241,9 @@ func TestContainerCapabilities(t *testing.T) {
 	} {
 		t.Logf("TestCase %q", desc)
 		config.Linux.SecurityContext.Capabilities = test.capability
-		spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
+		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil)
 		require.NoError(t, err)
-		specCheck(t, testID, testPid, spec)
+		specCheck(t, testID, testSandboxID, testPid, spec)
 		t.Log(spec.Process.Capabilities.Bounding)
 		for _, include := range test.includes {
 			assert.Contains(t, spec.Process.Capabilities.Bounding, include)
@@ -252,14 +262,15 @@ func TestContainerCapabilities(t *testing.T) {
 
 func TestContainerSpecTty(t *testing.T) {
 	testID := "test-id"
+	testSandboxID := "SandboxID"
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 	c := newTestCRIContainerdService()
 	for _, tty := range []bool{true, false} {
 		config.Tty = tty
-		spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
+		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil)
 		require.NoError(t, err)
-		specCheck(t, testID, testPid, spec)
+		specCheck(t, testID, testSandboxID, testPid, spec)
 		assert.Equal(t, tty, spec.Process.Terminal)
 		if tty {
 			assert.Contains(t, spec.Process.Env, "TERM=xterm")
@@ -271,20 +282,22 @@ func TestContainerSpecTty(t *testing.T) {
 
 func TestContainerSpecReadonlyRootfs(t *testing.T) {
 	testID := "test-id"
+	testSandboxID := "SandboxID"
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 	c := newTestCRIContainerdService()
 	for _, readonly := range []bool{true, false} {
 		config.Linux.SecurityContext.ReadonlyRootfs = readonly
-		spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
+		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil)
 		require.NoError(t, err)
-		specCheck(t, testID, testPid, spec)
+		specCheck(t, testID, testSandboxID, testPid, spec)
 		assert.Equal(t, readonly, spec.Root.Readonly)
 	}
 }
 
 func TestContainerSpecWithExtraMounts(t *testing.T) {
 	testID := "test-id"
+	testSandboxID := "SandboxID"
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 	c := newTestCRIContainerdService()
@@ -299,9 +312,9 @@ func TestContainerSpecWithExtraMounts(t *testing.T) {
 		HostPath:      "test-host-path-extra",
 		Readonly:      true,
 	}
-	spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, []*runtime.Mount{extraMount})
+	spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, []*runtime.Mount{extraMount})
 	require.NoError(t, err)
-	specCheck(t, testID, testPid, spec)
+	specCheck(t, testID, testSandboxID, testPid, spec)
 	var mounts []runtimespec.Mount
 	for _, m := range spec.Mounts {
 		if m.Destination == "test-container-path" {
@@ -688,22 +701,23 @@ func TestMountPropagation(t *testing.T) {
 func TestPidNamespace(t *testing.T) {
 	testID := "test-id"
 	testPid := uint32(1234)
+	testSandboxID := "SandboxID"
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 	c := newTestCRIContainerdService()
 	t.Logf("should not set pid namespace when host pid is true")
 	config.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{HostPid: true}
-	spec, err := c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
+	spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil)
 	require.NoError(t, err)
-	specCheck(t, testID, testPid, spec)
+	specCheck(t, testID, testSandboxID, testPid, spec)
 	for _, ns := range spec.Linux.Namespaces {
 		assert.NotEqual(t, ns.Type, runtimespec.PIDNamespace)
 	}
 
 	t.Logf("should set pid namespace when host pid is false")
 	config.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{HostPid: false}
-	spec, err = c.generateContainerSpec(testID, testPid, config, sandboxConfig, imageConfig, nil)
+	spec, err = c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil)
 	require.NoError(t, err)
-	specCheck(t, testID, testPid, spec)
+	specCheck(t, testID, testSandboxID, testPid, spec)
 	assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
 		Type: runtimespec.PIDNamespace,
 	})
