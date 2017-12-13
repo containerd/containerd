@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
+source $(dirname "${BASH_SOURCE[0]}")/test-utils.sh
 cd ${ROOT}
 
 # BUILD_DIR is the directory to generate release tar.
@@ -45,4 +45,8 @@ mkdir -p ${destdir}/opt/cri-containerd
 cp -r ${ROOT}/cluster ${destdir}/opt/cri-containerd
 
 # Create release tar
-tar -zcvf ${BUILD_DIR}/${TARBALL} -C ${destdir} .
+tarball=${BUILD_DIR}/${TARBALL}
+tar -zcvf ${tarball} -C ${destdir} .
+checksum=$(sha1 ${tarball})
+echo "sha1sum: ${checksum} ${tarball}"
+echo ${checksum} > ${tarball}.sha1

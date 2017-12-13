@@ -61,7 +61,7 @@ fi
 VERSION=$(curl -f --ipv4 --retry 6 --retry-delay 3 --silent --show-error \
   https://storage.googleapis.com/${DEPLOY_PATH}/latest)
 # TARBALL_GCS_PATH is the path to download cri-containerd tarball for node e2e.
-TARBALL_GCS_PATH="https://storage.googleapis.com/${DEPLOY_PATH}/${PKG_PREFIX}-${VERSION}.tar.gz"
+TARBALL_GCS_PATH="https://storage.googleapis.com/${DEPLOY_PATH}/${PKG_PREFIX}-${VERSION}.linux-amd64.tar.gz"
 # TARBALL is the name of the tarball after being downloaded.
 TARBALL="cri-containerd.tar.gz"
 

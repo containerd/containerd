@@ -34,7 +34,8 @@ LATEST=${LATEST:-"latest"}
 PUSH_VERSION=${PUSH_VERSION:-false}
 
 release_tar=${ROOT}/${BUILD_DIR}/${TARBALL}
-if [ ! -e ${release_tar} ]; then
+release_tar_checksum=${release_tar}.sha1
+if [[ ! -e ${release_tar} || ! -e ${release_tar_checksum} ]]; then
   echo "Release tarball is not built"
   exit 1
 fi
@@ -51,6 +52,7 @@ fi
 
 # TODO(random-liu): Add checksum for the tarball.
 gsutil cp ${release_tar} "gs://${DEPLOY_PATH}/"
+gsutil cp ${release_tar_checksum} "gs://${DEPLOY_PATH}/"
 echo "Release tarball is uploaded to:
   https://storage.googleapis.com/${DEPLOY_PATH}/${TARBALL}"
 
