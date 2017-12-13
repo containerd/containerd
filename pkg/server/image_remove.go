@@ -55,7 +55,7 @@ func (c *criContainerdService) RemoveImage(ctx context.Context, r *runtime.Remov
 		if err != nil {
 			// We can only get image id by reading Config from content.
 			// If the config is missing, we will fail to get image id,
-			// So we will can't remove the image forever,
+			// So we won't be able to remove the image forever,
 			// and cri-containerd always report the image is ok.
 			// But we also don't check it by manifest,
 			// It's possible that two manifest digests have the same image ID in theory.
@@ -64,7 +64,7 @@ func (c *criContainerdService) RemoveImage(ctx context.Context, r *runtime.Remov
 			// but different ids generated from compressed contents - manifest digest.
 			// So we decide to leave it.
 			// After all, the user can override the repoTag by pulling image again.
-			glog.Errorf("can't remove image,failed to get config for Image tag %q,id %q: %v", tag, image.ID, err)
+			glog.Errorf("Can't remove image,failed to get config for Image tag %q,id %q: %v", tag, image.ID, err)
 			image.RepoTags = append(image.RepoTags[:i], image.RepoTags[i+1:]...)
 			continue
 		}
