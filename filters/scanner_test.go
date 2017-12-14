@@ -2,7 +2,6 @@ package filters
 
 import (
 	"fmt"
-	"strconv"
 	"testing"
 )
 
@@ -260,7 +259,6 @@ func TestScanner(t *testing.T) {
 		t.Run(testcase.name, func(t *testing.T) {
 			var sc scanner
 			sc.init(testcase.input)
-			t.Logf("scan %q", testcase.input)
 
 			// If you leave the expected empty, the test case will just print
 			// out the token stream, which you can paste into the testcase when
@@ -271,7 +269,6 @@ func TestScanner(t *testing.T) {
 
 			for i := 0; ; i++ {
 				pos, tok, s := sc.scan()
-				t.Log("token", pos, tok, strconv.Quote(s))
 				if len(testcase.expected) == 0 {
 					if len(s) > 0 {
 						fmt.Printf("{pos: %v, token: %#v, text: %q},\n", pos, tok, s)

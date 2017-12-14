@@ -47,7 +47,7 @@ func makeTest(t *testing.T, name string, storeFn func(ctx context.Context, root 
 			}
 		}()
 
-		defer testutil.DumpDir(t, tmpDir)
+		defer testutil.DumpDirOnFailure(t, tmpDir)
 		fn(ctx, t, cs)
 	}
 }

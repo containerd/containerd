@@ -85,7 +85,7 @@ func TestContent(t *testing.T) {
 func TestContentWriter(t *testing.T) {
 	ctx, tmpdir, cs, cleanup := contentStoreEnv(t)
 	defer cleanup()
-	defer testutil.DumpDir(t, tmpdir)
+	defer testutil.DumpDirOnFailure(t, tmpdir)
 
 	if _, err := os.Stat(filepath.Join(tmpdir, "ingest")); os.IsNotExist(err) {
 		t.Fatal("ingest dir should be created", err)

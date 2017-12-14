@@ -16,10 +16,9 @@ func init() {
 	flag.BoolVar(&rootEnabled, "test.root", false, "enable tests that require root")
 }
 
-// DumpDir will log out all of the contents of the provided directory to
-// testing logger.
+// DumpDir prints the contents of the directory to the testing logger.
 //
-// Use this in a defer statement within tests that may allocate and exercise a
+// Use this in a defer statement from a test that may allocate and exercise a
 // temporary directory. Immensely useful for sanity checking and debugging
 // failing tests.
 //
@@ -55,5 +54,13 @@ func DumpDir(t *testing.T, root string) {
 		return nil
 	}); err != nil {
 		t.Fatalf("error dumping directory: %v", err)
+	}
+}
+
+// DumpDirOnFailure prints the contents of the directory to the testing logger if
+// the test has failed.
+func DumpDirOnFailure(t *testing.T, root string) {
+	if t.Failed() {
+		DumpDir(t, root)
 	}
 }

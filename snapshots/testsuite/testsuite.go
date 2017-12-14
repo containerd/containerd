@@ -87,7 +87,7 @@ func makeTest(name string, snapshotterFn func(ctx context.Context, root string) 
 			t.Fatal(err)
 		}
 
-		defer testutil.DumpDir(t, tmpDir)
+		defer testutil.DumpDirOnFailure(t, tmpDir)
 		fn(ctx, t, snapshotter, work)
 	}
 }
