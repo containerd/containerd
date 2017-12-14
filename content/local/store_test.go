@@ -22,6 +22,7 @@ import (
 	"github.com/containerd/containerd/content/testsuite"
 	"github.com/containerd/containerd/testutil"
 	"github.com/opencontainers/go-digest"
+	"github.com/stretchr/testify/require"
 )
 
 type memoryLabelStore struct {
@@ -334,4 +335,43 @@ func checkWrite(ctx context.Context, t checker, cs content.Store, dgst digest.Di
 	}
 
 	return dgst
+}
+
+func TestWriterTruncateRecoversFromIncompleteWrite(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "test-local-content-store-recover")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpdir)
+
+	cs, err := NewStore(tmpdir)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ref := "ref"
+	content := []byte("this is the content")
+	total := int64(len(content))
+	setupIncompleteWrite(ctx, t, cs, ref, total)
+
+	writer, err := cs.Writer(ctx, ref, total, "")
+	require.NoError(t, err)
+
+	require.NoError(t, writer.Truncate(0))
+
+	_, err = writer.Write(content)
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(content)
+	err = writer.Commit(ctx, total, dgst)
+	require.NoError(t, err)
+}
+
+func setupIncompleteWrite(ctx context.Context, t *testing.T, cs content.Store, ref string, total int64) {
+	writer, err := cs.Writer(ctx, ref, total, "")
+	require.NoError(t, err)
+
+	_, err = writer.Write([]byte("bad data"))
+	require.NoError(t, err)
+
+	require.NoError(t, writer.Close())
 }
