@@ -1,13 +1,13 @@
 #!/bin/bash
-CLUSTER_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+GCE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # TODO(random-liu): Upload release tarball to user's own GCS, and use it. We should
 # not let all nodes of all users download tarball from cri-containerd-release.
-export KUBE_MASTER_EXTRA_METADATA="user-data=${CLUSTER_DIR}/gce/cloud-init/master.yaml,cri-containerd-configure-sh=${CLUSTER_DIR}/gce/configure.sh"
-export KUBE_NODE_EXTRA_METADATA="user-data=${CLUSTER_DIR}/gce/cloud-init/node.yaml,cri-containerd-configure-sh=${CLUSTER_DIR}/gce/configure.sh"
-if [ -n "${VERSION}" ]; then
+export KUBE_MASTER_EXTRA_METADATA="user-data=${GCE_DIR}/cloud-init/master.yaml,cri-containerd-configure-sh=${GCE_DIR}/configure.sh"
+export KUBE_NODE_EXTRA_METADATA="user-data=${GCE_DIR}/cloud-init/node.yaml,cri-containerd-configure-sh=${GCE_DIR}/configure.sh"
+if [ -n "${CRI_CONTAINERD_VERSION}" ]; then
   version=$(mktemp /tmp/version.XXXX)
-  echo "${VERSION}" > "$version"
+  echo "${CRI_CONTAINERD_VERSION}" > "$version"
   export KUBE_MASTER_EXTRA_METADATA="${KUBE_MASTER_EXTRA_METADATA},version=${version}"
   export KUBE_NODE_EXTRA_METADATA="${KUBE_NODE_EXTRA_METADATA},version=${version}"
 fi
