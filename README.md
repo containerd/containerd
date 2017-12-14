@@ -12,11 +12,19 @@
 With it, you could run Kubernetes using containerd as the container runtime.
 ![cri-containerd](./docs/cri-containerd.png)
 ## Current Status
-`cri-containerd` is in alpha:
+`cri-containerd` is in beta:
 * It is feature complete.
-* It works with Kubernetes >= 1.7.
+* It (the beta version) works with Kubernetes >= 1.9.
 * It has passed all [CRI validation tests](https://github.com/kubernetes/community/blob/master/contributors/devel/cri-validation.md).
 * It has passed all regular [node e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-node-tests.md).
+* It has passed all regular [e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-tests.md).
+
+See [test dashboard](https://k8s-testgrid.appspot.com/sig-node-containerd)
+## Support Metrics
+| CRI-Containerd Version | Kubernetes Version |
+|:----------------------:|:------------------:|
+|     v1.0.0-alpha.x     |      1.7, 1.8      |
+|      v1.0.0-beta.x     |        1.9+        |
 ## Installing with Ansible and Kubeadm
 For a multi node cluster installer and bring up steps using ansible and kubeadm refer [here](contrib/ansible/README.md).
 ## Custom Installation
