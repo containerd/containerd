@@ -66,7 +66,7 @@ The release tarball could be downloaded from either of the following sources:
 
 ## Step 0: Install Dependent Libraries
 Install required libraries for seccomp and libapparmor.
-```shell
+```bash
 sudo apt-get update
 sudo apt-get install libseccomp2
 sudo apt-get install libapparmor
@@ -76,12 +76,18 @@ Note that:
 2) If your OS distro doesn't support AppArmor, please skip installing `libapparmor`, and AppArmor will be disabled.
 ## Step 1: Download CRI-Containerd Release Tarball
 Download release tarball for the cri-containerd version you want to install from sources listed [above](#download).
-```console
-$ wget https://storage.googleapis.com/cri-containerd-release/cri-containerd-${VERSION}.linux-amd64.tar.gz
+```bash
+wget https://storage.googleapis.com/cri-containerd-release/cri-containerd-${VERSION}.linux-amd64.tar.gz
+```
+Validate checksum of the release tarball (note that checksum is added since v1.0.0-beta.0):
+```bash
+sha1sum cri-containerd-${VERSION}.linux-amd64.tar.gz
+curl https://storage.googleapis.com/cri-containerd-release/cri-containerd-${VERSION}.linux-amd64.tar.gz.sha1
+# Compare to make sure the 2 checksums are the same.
 ```
 ## Step 2: Install CRI-Containerd
 If you are using systemd, just simply unpack the tarball to the root directory:
-```shell
+```bash
 sudo tar -C / -xzf cri-containerd-${VERSION}.linux-amd64.tar.gz
 sudo mkdir -p /opt/cni/bin/
 sudo mkdir -p /etc/cni/net.d
@@ -98,7 +104,7 @@ Create the systemd drop-in file `/etc/systemd/system/kubelet.service.d/0-cri-con
 Environment="KUBELET_EXTRA_ARGS=--container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=/var/run/cri-containerd.sock"
 ```
 And reload systemd configuration:
-```shell
+```bash
 systemctl daemon-reload
 ```
 ## Bring Up the Cluster

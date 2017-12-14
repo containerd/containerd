@@ -30,7 +30,7 @@ fetch_metadata() {
   local -r key=$1
   local -r attributes="http://metadata.google.internal/computeMetadata/v1/instance/attributes"
   if curl --fail --retry 5 --retry-delay 3 --silent --show-error -H "X-Google-Metadata-Request: True" "${attributes}/" | \
-    grep -q "${key}"; then
+    grep -q "^${key}$"; then
     curl --fail --retry 5 --retry-delay 3 --silent --show-error -H "X-Google-Metadata-Request: True" \
       "${attributes}/${key}"
   fi
