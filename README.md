@@ -113,6 +113,9 @@ CONTAINER_RUNTIME=remote CONTAINER_RUNTIME_ENDPOINT='/var/run/cri-containerd.soc
 ```
 ### Test
 See [here](./docs/testing.md) for information about test.
+## Using crictl
+See [here](./docs/crictl.md) for information about using `crictl` to debug
+pods, containers, and images.
 ## Documentation
 See [here](./docs) for additional documentation.
 ## Contributing
