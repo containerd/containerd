@@ -56,7 +56,7 @@ help:
 	@echo " * 'uninstall'        - Remove installed binaries from system locations"
 	@echo " * 'version'          - Print current cri-containerd release version"
 
-verify: lint gofmt boiler
+verify: lint gofmt boiler deps-version
 
 version:
 	@echo $(VERSION)
@@ -72,6 +72,10 @@ gofmt:
 boiler:
 	@echo "checking boilerplate"
 	@./hack/verify-boilerplate.sh
+
+deps-version:
+	@echo "checking /hack/versions"
+	@./hack/update-vendor.sh -only-verify
 
 $(BUILD_DIR)/cri-containerd: $(SOURCES)
 	$(GO) build -o $@ \
