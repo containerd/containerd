@@ -25,6 +25,8 @@ See [test dashboard](https://k8s-testgrid.appspot.com/sig-node-containerd)
 |:----------------------:|:------------------:|
 |     v1.0.0-alpha.x     |      1.7, 1.8      |
 |      v1.0.0-beta.x     |        1.9+        |
+## Production Quality Cluster on GCE
+For a production quality cluster on GCE brought up with `kube-up.sh` refer [here](docs/kube-up.md).
 ## Installing with Ansible and Kubeadm
 For a multi node cluster installer and bring up steps using ansible and kubeadm refer [here](contrib/ansible/README.md).
 ## Custom Installation

@@ -6,23 +6,23 @@ Before sending pull requests you should at least make sure your changes have pas
 ## Code Verification
 Code verification includes lint, code formatting, boilerplate check etc.
 * Install tools used by code verification:
-```shell
+```bash
 make install.tools
 ```
 * Run code verification:
-```shell
+```bash
 make verify
 ```
 ## Unit Test
 Run all unit tests in `cri-containerd` repo.
-```shell
+```bash
 make test
 ```
 ## Integration Test
 Run all integration tests in `cri-containerd` repo.
 * [Install dependencies](../README.md#install-dependencies).
 * Run integration test:
-```shell
+```bash
 make test-integration
 ```
 ## CRI Validation Test
@@ -31,15 +31,15 @@ make test-integration
 CRI validation test makes it possible to verify CRI conformance of `cri-containerd` without setting up Kubernetes components or running Kubernetes end-to-end tests.
 * [Install dependencies](../README.md#install-dependencies).
 * Build `cri-containerd`:
-```shell
+```bash
 make
 ```
 * Run CRI validation test:
-```shell
+```bash
 make test-cri
 ```
 * Focus or skip specific CRI validation test:
-```shell
+```bash
 make test-cri FOCUS=REGEXP_TO_FOCUS SKIP=REGEXP_TO_SKIP
 ```
 [More information](https://github.com/kubernetes-incubator/cri-tools) about CRI validation test.
@@ -47,11 +47,11 @@ make test-cri FOCUS=REGEXP_TO_FOCUS SKIP=REGEXP_TO_SKIP
 [Node e2e test](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-node-tests.md) is a test framework testing Kubernetes node level functionalities such as managing pods, mounting volumes etc. It starts a local cluster with Kubelet and a few other minimum dependencies, and runs node functionality tests against the local cluster.
 * [Install dependencies](../README.md#install-dependencies).
 * Run node e2e test:
-```shell
+```bash
 make test-e2e-node
 ```
 * Focus or skip specific node e2e test:
-```shell
+```bash
 make test-e2e-node FOCUS=REGEXP_TO_FOCUS SKIP=REGEXP_TO_SKIP
 ```
 [More information](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-node-tests.md) about Kubernetes node e2e test.
