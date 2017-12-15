@@ -41,7 +41,7 @@ do
       echo "Need to update the value of ${key} from ${version_commitid} to ${vendor_commitid}."
     else
       echo "Updating the value of ${key} from ${version_commitid} to ${vendor_commitid}."
-      sed -i "s/${version_commitid}/${vendor_commitid}/g" hack/versions
+      sed -i "s/\b${version_commitid}$/${vendor_commitid}/g" hack/versions
     fi
   fi
 done

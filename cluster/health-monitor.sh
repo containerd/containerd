@@ -32,7 +32,7 @@ while true; do
   # cri-containerd to be working.
   if ! timeout ${COMMAND_TIMEOUT} ${CRICTL} sandboxes > /dev/null; then
     echo "crictl sandboxes timeout!"
-    pkill -9 containerd
+    pkill containerd
     pkill cri-containerd
     # Wait for a while, as we don't want to kill it again before it is really up.
     sleep ${SLEEP_SECONDS}
