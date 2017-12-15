@@ -43,6 +43,9 @@ an existing package to this repository.
 - [Temp](/temp) provides an interface to create temporary directories. It also
   provides a [FakeDir](temp/temptesting) implementation to replace in tests.
 
+- [Clock](/clock) provides an interface for time-based operations.  It allows
+  mocking time for testing.
+
 [Build Status]: https://travis-ci.org/kubernetes/utils.svg?branch=master
 [Go standard libs]: https://golang.org/pkg/#stdlib
 [api]: https://github.com/kubernetes/api
