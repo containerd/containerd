@@ -18,15 +18,37 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# This is a temporary hack, rewrite all `github.com/Sirupsen/logrus` to
-# lower case.
-# TODO(random-liu): Remove this after #106 is resolved.
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
 cd ${ROOT}
 
 echo "Sort vendor.conf..."
 sort vendor.conf -o vendor.conf
 
-# TODO(random-liu): Compare vendor with hack/versions.
+echo "Compare vendor with hack/versions..."
+need_update=false
+declare -A map=()
+map["RUNC_VERSION"]="github.com/opencontainers/runc"
+map["CNI_VERSION"]="github.com/containernetworking/cni"
+map["CONTAINERD_VERSION"]="github.com/containerd/containerd"
+map["KUBERNETES_VERSION"]="k8s.io/kubernetes"
+for key in ${!map[@]}
+do
+  vendor_commitid=$(grep ${map[${key}]} vendor.conf | awk '{print $2}')
+  version_commitid=$(grep ${key} hack/versions | awk -F "=" '{print $2}')
+  if [ ${vendor_commitid} != ${version_commitid} ]; then
+    if [ $# -gt 0 ] && [ ${1} = "-only-verify" ]; then
+      need_update=true
+      echo "Need to update the value of ${key} from ${version_commitid} to ${vendor_commitid}."
+    else
+      echo "Updating the value of ${key} from ${version_commitid} to ${vendor_commitid}."
+      sed -i "s/${version_commitid}/${vendor_commitid}/g" hack/versions
+    fi
+  fi
+done
+
+if [ ${need_update} = true ]; then
+  echo "Please update \"hack/versions\" by executing \"hack/update-vendor.sh\"!"
+  exit 1
+fi
 
 echo "Please commit the change made by this file..."
