@@ -34,7 +34,7 @@ LATEST=${LATEST:-"latest"}
 PUSH_VERSION=${PUSH_VERSION:-false}
 
 release_tar=${ROOT}/${BUILD_DIR}/${TARBALL}
-release_tar_checksum=${release_tar}.sha1
+release_tar_checksum=${release_tar}.sha256
 if [[ ! -e ${release_tar} || ! -e ${release_tar_checksum} ]]; then
   echo "Release tarball is not built"
   exit 1

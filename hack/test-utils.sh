@@ -123,13 +123,13 @@ create_ttl_bucket() {
   gsutil defacl set public-read "gs://${bucket}"
 }
 
-# sha1 generates a sha1 checksum for a file.
+# sha256 generates a sha256 checksum for a file.
 # Var set:
 # 1. Filename.
-sha1() {
-  if which sha1sum >/dev/null 2>&1; then
-    sha1sum "$1" | awk '{ print $1 }'
+sha256() {
+  if which sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{ print $1 }'
   else
-    shasum -a1 "$1" | awk '{ print $1 }'
+    shasum -a256 "$1" | awk '{ print $1 }'
   fi
 }
