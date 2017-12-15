@@ -13,24 +13,9 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/oci"
-	metrics "github.com/docker/go-metrics"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 )
-
-var (
-	ct         metrics.LabeledTimer
-	errCounter metrics.LabeledCounter
-)
-
-func init() {
-	ns := metrics.NewNamespace("stress", "", nil)
-	// if you want more fine grained metrics then you can drill down with the metrics in prom that
-	// containerd is outputing
-	ct = ns.NewLabeledTimer("run", "Run time of a full container during the test", "commit")
-	errCounter = ns.NewLabeledCounter("errors", "Errors encountered running the stress tests", "err")
-	metrics.Register(ns)
-}
 
 type worker struct {
 	id       int

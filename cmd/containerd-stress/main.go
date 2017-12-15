@@ -23,6 +23,22 @@ import (
 
 const imageName = "docker.io/library/alpine:latest"
 
+var (
+	ct              metrics.LabeledTimer
+	errCounter      metrics.LabeledCounter
+	binarySizeGauge metrics.LabeledGauge
+)
+
+func init() {
+	ns := metrics.NewNamespace("stress", "", nil)
+	// if you want more fine grained metrics then you can drill down with the metrics in prom that
+	// containerd is outputing
+	ct = ns.NewLabeledTimer("run", "Run time of a full container during the test", "commit")
+	binarySizeGauge = ns.NewLabeledGauge("binary_size", "Binary size of compiled binaries", "name")
+	errCounter = ns.NewLabeledCounter("errors", "Errors encountered running the stress tests", "err")
+	metrics.Register(ns)
+}
+
 type run struct {
 	total    int
 	failures int
@@ -152,6 +168,7 @@ func serve(c config) error {
 			logrus.WithError(err).Error("listen and serve")
 		}
 	}()
+	checkBinarySizes()
 	return test(c)
 }
 
