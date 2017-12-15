@@ -81,8 +81,8 @@ wget https://storage.googleapis.com/cri-containerd-release/cri-containerd-${VERS
 ```
 Validate checksum of the release tarball (note that checksum is added since v1.0.0-beta.0):
 ```bash
-sha1sum cri-containerd-${VERSION}.linux-amd64.tar.gz
-curl https://storage.googleapis.com/cri-containerd-release/cri-containerd-${VERSION}.linux-amd64.tar.gz.sha1
+sha256sum cri-containerd-${VERSION}.linux-amd64.tar.gz
+curl https://storage.googleapis.com/cri-containerd-release/cri-containerd-${VERSION}.linux-amd64.tar.gz.sha256
 # Compare to make sure the 2 checksums are the same.
 ```
 ## Step 2: Install CRI-Containerd

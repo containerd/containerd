@@ -47,6 +47,6 @@ cp -r ${ROOT}/cluster ${destdir}/opt/cri-containerd
 # Create release tar
 tarball=${BUILD_DIR}/${TARBALL}
 tar -zcvf ${tarball} -C ${destdir} .
-checksum=$(sha1 ${tarball})
-echo "sha1sum: ${checksum} ${tarball}"
-echo ${checksum} > ${tarball}.sha1
+checksum=$(sha256 ${tarball})
+echo "sha256sum: ${checksum} ${tarball}"
+echo ${checksum} > ${tarball}.sha256
