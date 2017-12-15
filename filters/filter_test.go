@@ -258,7 +258,6 @@ func TestFilters(t *testing.T) {
 		},
 	} {
 		t.Run(testcase.name, func(t *testing.T) {
-			t.Logf("testcase: %q", testcase.input)
 			filter, err := Parse(testcase.input)
 			if testcase.errString != "" {
 				if err == nil {
@@ -278,7 +277,6 @@ func TestFilters(t *testing.T) {
 				t.Fatal("filter should not be nil")
 			}
 
-			t.Log("filter", filter)
 			var results []interface{}
 			for _, item := range corpus {
 				adaptor := adapt(item)

@@ -235,7 +235,6 @@ type logHandler struct {
 }
 
 func (h logHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	h.t.Logf("%s %s", r.Method, r.URL.String())
 	h.handler.ServeHTTP(rw, r)
 }
 
