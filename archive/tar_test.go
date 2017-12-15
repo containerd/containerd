@@ -666,6 +666,132 @@ func makeWriterToTarTest(wt WriterToTar, a fstest.Applier, validate func(string)
 	}
 }
 
+func TestDiffTar(t *testing.T) {
+	tests := []struct {
+		name       string
+		validators []tarEntryValidator
+		a          fstest.Applier
+		b          fstest.Applier
+	}{
+		{
+			name:       "EmptyDiff",
+			validators: []tarEntryValidator{},
+			a: fstest.Apply(
+				fstest.CreateDir("/etc/", 0755),
+			),
+			b: fstest.Apply(),
+		},
+		{
+			name: "ParentInclusion",
+			validators: []tarEntryValidator{
+				dirEntry("d1/", 0755),
+				dirEntry("d1/d/", 0700),
+				dirEntry("d2/", 0770),
+				fileEntry("d2/f", []byte("ok"), 0644),
+			},
+			a: fstest.Apply(
+				fstest.CreateDir("/d1/", 0755),
+				fstest.CreateDir("/d2/", 0770),
+			),
+			b: fstest.Apply(
+				fstest.CreateDir("/d1/d", 0700),
+				fstest.CreateFile("/d2/f", []byte("ok"), 0644),
+			),
+		},
+	}
+
+	for _, at := range tests {
+		t.Run(at.name, makeDiffTarTest(at.validators, at.a, at.b))
+	}
+}
+
+type tarEntryValidator func(*tar.Header, []byte) error
+
+func dirEntry(name string, mode int) tarEntryValidator {
+	return func(hdr *tar.Header, b []byte) error {
+		if hdr.Typeflag != tar.TypeDir {
+			return errors.New("not directory type")
+		}
+		if hdr.Name != name {
+			return errors.Errorf("wrong name %q, expected %q", hdr.Name, name)
+		}
+		if hdr.Mode != int64(mode) {
+			return errors.Errorf("wrong mode %o, expected %o", hdr.Mode, mode)
+		}
+		return nil
+	}
+}
+
+func fileEntry(name string, expected []byte, mode int) tarEntryValidator {
+	return func(hdr *tar.Header, b []byte) error {
+		if hdr.Typeflag != tar.TypeReg {
+			return errors.New("not file type")
+		}
+		if hdr.Name != name {
+			return errors.Errorf("wrong name %q, expected %q", hdr.Name, name)
+		}
+		if hdr.Mode != int64(mode) {
+			return errors.Errorf("wrong mode %o, expected %o", hdr.Mode, mode)
+		}
+		if bytes.Compare(b, expected) != 0 {
+			return errors.Errorf("different file content")
+		}
+		return nil
+	}
+}
+
+func makeDiffTarTest(validators []tarEntryValidator, a, b fstest.Applier) func(*testing.T) {
+	return func(t *testing.T) {
+		ad, err := ioutil.TempDir("", "test-make-diff-tar-")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(ad)
+		if err := a.Apply(ad); err != nil {
+			t.Fatalf("failed to apply a: %v", err)
+		}
+
+		bd, err := ioutil.TempDir("", "test-make-diff-tar-")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(bd)
+		if err := fs.CopyDir(bd, ad); err != nil {
+			t.Fatalf("failed to copy dir: %v", err)
+		}
+		if err := b.Apply(bd); err != nil {
+			t.Fatalf("failed to apply b: %v", err)
+		}
+
+		rc := Diff(context.Background(), ad, bd)
+		defer rc.Close()
+
+		tr := tar.NewReader(rc)
+		for i := 0; ; i++ {
+			hdr, err := tr.Next()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				t.Fatalf("tar read error: %v", err)
+			}
+			var b []byte
+			if hdr.Typeflag == tar.TypeReg && hdr.Size > 0 {
+				b, err = ioutil.ReadAll(tr)
+				if err != nil {
+					t.Fatalf("tar read file error: %v", err)
+				}
+			}
+			if i >= len(validators) {
+				t.Fatal("no validator for entry")
+			}
+			if err := validators[i](hdr, b); err != nil {
+				t.Fatalf("tar entry[%d] validation fail: %#v", i, err)
+			}
+		}
+	}
+}
+
 type diffApplier struct{}
 
 func (d diffApplier) TestContext(ctx context.Context) (context.Context, func(), error) {
