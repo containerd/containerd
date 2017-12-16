@@ -17,7 +17,7 @@ will give you head and doesn't handle the dependencies well.
   - [Compatibility: client-go <-> Kubernetes clusters](#compatibility-client-go---kubernetes-clusters)
   - [Compatibility matrix](#compatibility-matrix)
   - [Why do the 1.4 and 1.5 branch contain top-level folder named after the version?](#why-do-the-14-and-15-branch-contain-top-level-folder-named-after-the-version)
-- [Kuberentes tags](#kubernetes-tags)
+- [Kubernetes tags](#kubernetes-tags)
 - [How to get it](#how-to-get-it)
 - [How to use it](#how-to-use-it)
 - [Dependency management](#dependency-management)

@@ -28,10 +28,10 @@ import (
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
 	"golang.org/x/net/context"
-	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
+	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
 )
 
 // UpdateContainerResources updates ContainerConfig of the container.
@@ -129,11 +129,11 @@ func updateContainerSpec(ctx context.Context, cntr containerd.Container, spec *r
 // updateOCILinuxResource updates container resource limit.
 func updateOCILinuxResource(spec *runtimespec.Spec, new *runtime.LinuxContainerResources) (*runtimespec.Spec, error) {
 	// Copy to make sure old spec is not changed.
-	cloned, err := conversion.NewCloner().DeepCopy(spec)
-	if err != nil {
+	var cloned runtimespec.Spec
+	if err := util.DeepCopy(&cloned, spec); err != nil {
 		return nil, fmt.Errorf("failed to deep copy: %v", err)
 	}
-	g := generate.NewFromSpec(cloned.(*runtimespec.Spec))
+	g := generate.NewFromSpec(&cloned)
 
 	if new.GetCpuPeriod() != 0 {
 		g.SetLinuxResourcesCPUPeriod(uint64(new.GetCpuPeriod()))
