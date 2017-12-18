@@ -67,6 +67,8 @@ Some components are implemented on the client side for flexibility:
 
 - __*Distribution*__: Functions for pulling and pushing images
 
+See also [`client.md`](client.md).
+
 ## Data Flow
 
 As discussed above, the concept of a _bundle_ is central to containerd. Below
