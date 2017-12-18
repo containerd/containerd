@@ -74,7 +74,7 @@ setup: ## install dependencies
 	@echo "$(WHALE) $@"
 	# TODO(stevvooe): Install these from the vendor directory
 	@go get -u github.com/alecthomas/gometalinter
-	@gometalinter --install
+	@gometalinter --install > /dev/null
 	@go get -u github.com/stevvooe/protobuild
 
 generate: protos
@@ -83,7 +83,7 @@ generate: protos
 
 protos: bin/protoc-gen-gogoctrd ## generate protobuf
 	@echo "$(WHALE) $@"
-	@PATH=${ROOTDIR}/bin:${PATH} protobuild ${PACKAGES}
+	@PATH=${ROOTDIR}/bin:${PATH} protobuild --quiet ${PACKAGES}
 
 check-protos: protos ## check if protobufs needs to be generated again
 	@echo "$(WHALE) $@"
@@ -114,7 +114,7 @@ endif
 
 build: ## build the go packages
 	@echo "$(WHALE) $@"
-	@go build -v ${EXTRA_FLAGS} ${GO_LDFLAGS} ${GO_GCFLAGS} ${PACKAGES}
+	@go build ${EXTRA_FLAGS} ${GO_LDFLAGS} ${GO_GCFLAGS} ${PACKAGES}
 
 test: ## run tests, except integration tests and tests that require root
 	@echo "$(WHALE) $@"
@@ -170,8 +170,8 @@ uninstall:
 coverage: ## generate coverprofiles from the unit tests, except tests that require root
 	@echo "$(WHALE) $@"
 	@rm -f coverage.txt
-	@go test -i ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES})
-	( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES}); do \
+	@go test -i ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES}) 2> /dev/null
+	@( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES}); do \
 		go test ${TESTFLAGS} \
 			-cover \
 			-coverprofile=profile.out \
@@ -184,8 +184,8 @@ coverage: ## generate coverprofiles from the unit tests, except tests that requi
 
 root-coverage: ## generate coverage profiles for unit tests that require root
 	@echo "$(WHALE) $@"
-	@go test -i ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES})
-	( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES}); do \
+	@go test -i ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES}) 2> /dev/null
+	@( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES}); do \
 		go test ${TESTFLAGS} \
 			-cover \
 			-coverprofile=profile.out \
