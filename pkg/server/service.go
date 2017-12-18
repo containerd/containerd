@@ -134,12 +134,16 @@ func NewCRIContainerdService(config options.Config) (CRIContainerdService, error
 		client:             client,
 	}
 
-	imageFSPath := imageFSPath(config.ContainerdConfig.RootDir, config.ContainerdConfig.Snapshotter)
-	c.imageFSUUID, err = c.getDeviceUUID(imageFSPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get imagefs uuid of %q: %v", imageFSPath, err)
+	if !c.config.SkipImageFSUUID {
+		imageFSPath := imageFSPath(config.ContainerdConfig.RootDir, config.ContainerdConfig.Snapshotter)
+		c.imageFSUUID, err = c.getDeviceUUID(imageFSPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get imagefs uuid of %q: %v", imageFSPath, err)
+		}
+		glog.V(2).Infof("Get device uuid %q for image filesystem %q", c.imageFSUUID, imageFSPath)
+	} else {
+		glog.Warning("Skip retrieving imagefs UUID, kubelet will not be able to get imagefs capacity or perform imagefs disk eviction.")
 	}
-	glog.V(2).Infof("Get device uuid %q for image filesystem %q", c.imageFSUUID, imageFSPath)
 
 	c.netPlugin, err = ocicni.InitCNI(config.NetworkPluginConfDir, config.NetworkPluginBinDir)
 	if err != nil {
