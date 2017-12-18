@@ -56,7 +56,7 @@ include Makefile.$(target_os)
 TESTFLAGS ?= -v $(TESTFLAGS_RACE)
 TESTFLAGS_PARALLEL ?= 8
 
-.PHONY: clean all AUTHORS fmt vet lint dco build binaries test integration setup generate protos checkprotos coverage ci check help install uninstall vendor release
+.PHONY: clean all AUTHORS fmt vet lint dco build binaries test integration generate protos checkprotos coverage ci check help install uninstall vendor release
 .DEFAULT: default
 
 all: binaries
@@ -69,13 +69,6 @@ ci: check binaries checkprotos coverage coverage-integration ## to be used by th
 
 AUTHORS: .mailmap .git/HEAD
 	git log --format='%aN <%aE>' | sort -fu > $@
-
-setup: ## install dependencies
-	@echo "$(WHALE) $@"
-	# TODO(stevvooe): Install these from the vendor directory
-	@go get -u github.com/alecthomas/gometalinter
-	@gometalinter --install > /dev/null
-	@go get -u github.com/stevvooe/protobuild
 
 generate: protos
 	@echo "$(WHALE) $@"
