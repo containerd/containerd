@@ -698,6 +698,44 @@ func TestDiffTar(t *testing.T) {
 				fstest.CreateFile("/d2/f", []byte("ok"), 0644),
 			),
 		},
+		{
+			name: "HardlinkParentInclusion",
+			validators: []tarEntryValidator{
+				dirEntry("d2/", 0755),
+				fileEntry("d2/l1", []byte("link me"), 0644),
+				// d1/f1 and its parent is included after the new link,
+				// before the new link was included, these files would
+				// not habe needed
+				dirEntry("d1/", 0755),
+				linkEntry("d1/f1", "d2/l1"),
+				dirEntry("d3/", 0755),
+				fileEntry("d3/l1", []byte("link me"), 0644),
+				dirEntry("d4/", 0755),
+				linkEntry("d4/f1", "d3/l1"),
+				whiteoutEntry("d6/l1"),
+				whiteoutEntry("d6/l2"),
+			},
+			a: fstest.Apply(
+				fstest.CreateDir("/d1/", 0755),
+				fstest.CreateFile("/d1/f1", []byte("link me"), 0644),
+				fstest.CreateDir("/d2/", 0755),
+				fstest.CreateFile("/d2/f1", []byte("link me"), 0644),
+				fstest.CreateDir("/d3/", 0755),
+				fstest.CreateDir("/d4/", 0755),
+				fstest.CreateFile("/d4/f1", []byte("link me"), 0644),
+				fstest.CreateDir("/d5/", 0755),
+				fstest.CreateFile("/d5/f1", []byte("link me"), 0644),
+				fstest.CreateDir("/d6/", 0755),
+				fstest.Link("/d1/f1", "/d6/l1"),
+				fstest.Link("/d5/f1", "/d6/l2"),
+			),
+			b: fstest.Apply(
+				fstest.Link("/d1/f1", "/d2/l1"),
+				fstest.Link("/d4/f1", "/d3/l1"),
+				fstest.Remove("/d6/l1"),
+				fstest.Remove("/d6/l2"),
+			),
+		},
 	}
 
 	for _, at := range tests {
@@ -735,6 +773,37 @@ func fileEntry(name string, expected []byte, mode int) tarEntryValidator {
 		}
 		if bytes.Compare(b, expected) != 0 {
 			return errors.Errorf("different file content")
+		}
+		return nil
+	}
+}
+
+func linkEntry(name, link string) tarEntryValidator {
+	return func(hdr *tar.Header, b []byte) error {
+		if hdr.Typeflag != tar.TypeLink {
+			return errors.New("not link type")
+		}
+		if hdr.Name != name {
+			return errors.Errorf("wrong name %q, expected %q", hdr.Name, name)
+		}
+		if hdr.Linkname != link {
+			return errors.Errorf("wrong link %q, expected %q", hdr.Linkname, link)
+		}
+		return nil
+	}
+}
+
+func whiteoutEntry(name string) tarEntryValidator {
+	whiteOutDir := filepath.Dir(name)
+	whiteOutBase := filepath.Base(name)
+	whiteOut := filepath.Join(whiteOutDir, whiteoutPrefix+whiteOutBase)
+
+	return func(hdr *tar.Header, b []byte) error {
+		if hdr.Typeflag != tar.TypeReg {
+			return errors.Errorf("not file type: %q", hdr.Typeflag)
+		}
+		if hdr.Name != whiteOut {
+			return errors.Errorf("wrong name %q, expected whiteout %q", hdr.Name, name)
 		}
 		return nil
 	}
