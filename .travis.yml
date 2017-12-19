@@ -47,6 +47,7 @@ install:
   - tar -C /tmp/ -zxf /tmp/criu.tar.gz
   - cd /tmp/criu-3.0 && sudo make install-criu
   - cd $TRAVIS_BUILD_DIR
+  - sudo apt-add-repository -y ppa:zfs-native/stable && sudo apt-get update && sudo apt-get -y install linux-head    ers-$(uname -r) && sudo apt-get -y install ubuntu-zfs && sudo modprobe zfs
 
 script:
   - export GOOS=$TRAVIS_GOOS

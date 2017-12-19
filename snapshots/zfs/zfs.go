@@ -298,8 +298,8 @@ func (z *snapshotter) Remove(ctx context.Context, key string) (err error) {
 	return err
 }
 
-func (o *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
-	ctx, t, err := o.ms.TransactionContext(ctx, true)
+func (z *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
+	ctx, t, err := z.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return snapshots.Info{}, err
 	}
@@ -317,6 +317,6 @@ func (o *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 	return info, nil
 }
 
-func (o *snapshotter) Close() error {
-	return o.ms.Close()
+func (z *snapshotter) Close() error {
+	return z.ms.Close()
 }
