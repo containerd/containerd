@@ -24,4 +24,5 @@ Follow either of the two links above to access the appropriate CLA and instructi
 ### Adding dependencies
 
 If your patch depends on new packages, add that package with [`vndr`](https://github.com/LK4D4/vndr). Please
-modify `vendor.conf` and run the `vndr` tool to update the `vendor/` directory.
+modify `vendor.conf` and run the `vndr` tool to update the `vendor/` directory. After that, please run
+`hack/update-vendor.sh` script to update the contents of `hack/versions`.
