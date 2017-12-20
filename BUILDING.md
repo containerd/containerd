@@ -84,7 +84,7 @@ You can build static binaries by providing a few variables to `make`:
 ```sudo
 make EXTRA_FLAGS="-buildmode pie" \
 	EXTRA_LDFLAGS='-extldflags "-fno-PIC -static"' \
-	BUILDTAGS="static_build"
+	BUILDTAGS="static_build netgo"
 ```
 
 > *Note*:
