@@ -11,9 +11,11 @@ REVISION=$(shell git rev-parse HEAD)$(shell if ! git diff --no-ext-diff --quiet 
 ifneq "$(strip $(shell command -v go 2>/dev/null))" ""
 	GOOS ?= $(shell go env GOOS)
 	GOARCH ?= $(shell go env GOARCH)
+	GOHOSTOS ?= $(shell go env GOHOSTOS)
 else
 	GOOS ?= $$GOOS
 	GOARCH ?= $$GOARCH
+	GOHOSTOS ?= $$GOHOSTOS
 endif
 
 WHALE = "🇩"
@@ -46,11 +48,20 @@ SHIM_GO_LDFLAGS=-ldflags '-s -w -X $(PKG)/version.Version=$(VERSION) -X $(PKG)/v
 
 TESTFLAGS_RACE=
 GO_GCFLAGS=
+GO_BUILD_FLAGS=
 
 #Detect the target os
 include Makefile.OS
 #include platform specific makefile
 include Makefile.$(target_os)
+
+# Add the "incremental" build option `-i` (installs the packages that are
+# dependencies of the target) to speed up future builds. Only for native builds,
+# otherwise it will try to install in the incorrect (not native) path and fail.
+# Note: this won't be necessary from 1.10 (https://tip.golang.org/doc/go1.10#build)
+ifeq ($(GOOS), $(GOHOSTOS))
+	GO_BUILD_FLAGS += -i
+endif
 
 # Flags passed to `go test`
 TESTFLAGS ?= -v $(TESTFLAGS_RACE)
@@ -107,7 +118,7 @@ endif
 
 build: ## build the go packages
 	@echo "$(WHALE) $@"
-	@go build ${EXTRA_FLAGS} ${GO_LDFLAGS} ${GO_GCFLAGS} ${PACKAGES}
+	@go build ${GO_BUILD_FLAGS} ${EXTRA_FLAGS} ${GO_LDFLAGS} ${GO_GCFLAGS} ${PACKAGES}
 
 test: ## run tests, except integration tests and tests that require root
 	@echo "$(WHALE) $@"
@@ -130,11 +141,11 @@ FORCE:
 # Build a binary from a cmd.
 bin/%: cmd/% FORCE
 	@echo "$(WHALE) $@${BINARY_SUFFIX}"
-	@go build -o $@${BINARY_SUFFIX} ${GO_LDFLAGS} ${GO_TAGS} ${GO_GCFLAGS} ./$<
+	@go build ${GO_BUILD_FLAGS} -o $@${BINARY_SUFFIX} ${GO_LDFLAGS} ${GO_TAGS} ${GO_GCFLAGS} ./$<
 
 bin/containerd-shim: cmd/containerd-shim FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
 	@echo "$(WHALE) bin/containerd-shim"
-	@CGO_ENABLED=0 go build -o bin/containerd-shim ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./cmd/containerd-shim
+	@CGO_ENABLED=0 go build ${GO_BUILD_FLAGS} -o bin/containerd-shim ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./cmd/containerd-shim
 
 binaries: $(BINARIES) ## build binaries
 	@echo "$(WHALE) $@"
