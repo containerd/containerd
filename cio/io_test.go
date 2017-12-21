@@ -87,8 +87,8 @@ func TestNewAttach(t *testing.T) {
 	actualStdin, err := ioutil.ReadAll(producers.Stdin)
 	require.NoError(t, err)
 
-	io.Cancel()
 	io.Wait()
+	io.Cancel()
 	assert.NoError(t, io.Close())
 
 	assert.Equal(t, expectedStdout, stdout.String())
