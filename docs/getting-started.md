@@ -231,7 +231,7 @@ A task is a live, running process on the system.
 Tasks should be deleted after each run while a container can be used, updated, and queried multiple times.
 
 ```go
-	task, err := container.NewTask(ctx, cio.Stdio)
+	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStdio))
 	if err != nil {
 		return err
 	}
@@ -239,7 +239,9 @@ Tasks should be deleted after each run while a container can be used, updated, a
 ```
 
 The new task that we just created is actually a running process on your system.
-We use the `cio.Stdio` `Opt` so that all IO from the container is sent to our `main.go` process.
+We use `cio.WithStdio` so that all IO from the container is sent to our `main.go` process.
+This is a `cio.Opt` that configures the `Streams` used by `NewCreator` to return a `cio.IO`
+for the new task.
 
 If you are familiar with the OCI runtime actions, the task is currently in the "created" state.
 This means that the namespaces, root filesystem, and various container level settings have been initialized but the user defined process, in this example "redis-server", has not been started.
@@ -360,7 +362,7 @@ func redisExample() error {
 	defer container.Delete(ctx, containerd.WithSnapshotCleanup)
 
 	// create a task from the container
-	task, err := container.NewTask(ctx, cio.Stdio)
+	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStdio))
 	if err != nil {
 		return err
 	}
