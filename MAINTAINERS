@@ -30,6 +30,19 @@ or the reliability of a release process. But those things distinguish a good
 project from a great one.
 """
 
+	[Rules.reviewer]
+
+	title = "What is a reviewer?"
+
+	text = """
+A reviewer is a core role within the project.
+They share in reviewing issues and pull requests and their LGTM count towards the
+required LGTM count to merge a code change into the project.
+
+Reviewers are part of the organization but do not have write access.
+Becoming a review is a core aspect in the journey to becoming a maintainer.
+"""
+
 	[Rules.adding-maintainers]
 
 	title = "How are maintainers added?"
