@@ -12,7 +12,7 @@ tar -C ${CRI_CONTAINERD_PATH} -xzf cri-containerd-${VERSION}.linux-amd64.tar.gz
 Use environment variable `CRI_CONTAINERD_VERSION` to specify `cri-containerd` version. By default,
 latest version will be used.
 ```bash
-. ${CRI_CONTAINERD_PATH}/cluster/gce/env
+. ${CRI_CONTAINERD_PATH}/opt/cri-containerd/cluster/gce/env
 ```
 ## Create Kubernetes Cluster on GCE
 Follow these instructions [here](https://kubernetes.io/docs/getting-started-guides/gce/) to create a production quality Kubernetes cluster on GCE.
