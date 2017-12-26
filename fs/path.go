@@ -71,9 +71,9 @@ func sameFile(f1, f2 *currentPath) (bool, error) {
 			return false, nil
 		}
 
-		// If the timestamp may have been truncated in one of the
+		// If the timestamp may have been truncated in both of the
 		// files, check content of file to determine difference
-		if t1.Nanosecond() == 0 || t2.Nanosecond() == 0 {
+		if t1.Nanosecond() == 0 && t2.Nanosecond() == 0 {
 			var eq bool
 			if (f1.f.Mode() & os.ModeSymlink) == os.ModeSymlink {
 				eq, err = compareSymlinkTarget(f1.fullPath, f2.fullPath)
