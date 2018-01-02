@@ -33,7 +33,7 @@ containerd is based on the Docker Engine’s core container runtime to benefit f
 * Management of network namespaces containers to join existing namespaces
 * Multi-tenant supported with CAS storage for global images
 
-containerd, currently in [version 1.0.0](https://github.com/containerd/containerd/releases/tag/v1.0.0), is a daemon born from extracting the container execution subset of the Docker Engine, and is [used internally by Docker since the 1.11 release](https://blog.docker.com/2016/04/docker-engine-1-11-runc/). containerd version 1.0 will commit to API stability as well as committing to a 1-year LTS release. Docker Engine commits to upgrading to containerd 1.0 as part of its regular release cycle.
+containerd, currently in [version 1.0.0](https://github.com/containerd/containerd/releases/tag/v1.0.0), is a daemon born from extracting the container execution subset of the Docker Engine, and is [used internally by Docker since the 1.11 release](https://blog.docker.com/2016/04/docker-engine-1-11-runc/). containerd versions prior to v1.0.0 were used in Docker 17.10 and earlier (see Docker [version release notes](https://github.com/docker/docker-ce/releases)), and [Docker 17.12](https://github.com/docker/docker-ce/releases/tag/v17.12.0-ce) is the first release to use containerd v1.0.0.
 
 [containerd roadmap](https://github.com/containerd/containerd/blob/master/ROADMAP.md) to implement these features is described in the containerd Github repository.
 
