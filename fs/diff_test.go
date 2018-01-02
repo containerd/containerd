@@ -161,27 +161,36 @@ func TestUpdateWithSameTime(t *testing.T) {
 		fstest.CreateFile("/file-same-time", []byte("1"), 0644),
 		fstest.Chtimes("/file-same-time", t1, t1),
 		fstest.CreateFile("/file-truncated-time-1", []byte("1"), 0644),
-		fstest.Chtimes("/file-truncated-time-1", t1, t1),
+		fstest.Chtimes("/file-truncated-time-1", tt, tt),
 		fstest.CreateFile("/file-truncated-time-2", []byte("1"), 0644),
 		fstest.Chtimes("/file-truncated-time-2", tt, tt),
+		fstest.CreateFile("/file-truncated-time-3", []byte("1"), 0644),
+		fstest.Chtimes("/file-truncated-time-3", t1, t1),
 	)
 	l2 := fstest.Apply(
 		fstest.CreateFile("/file-modified-time", []byte("2"), 0644),
 		fstest.Chtimes("/file-modified-time", t2, t2),
 		fstest.CreateFile("/file-no-change", []byte("1"), 0644),
-		fstest.Chtimes("/file-no-change", tt, tt), // use truncated time, should be regarded as no change
+		fstest.Chtimes("/file-no-change", t1, t1),
 		fstest.CreateFile("/file-same-time", []byte("2"), 0644),
 		fstest.Chtimes("/file-same-time", t1, t1),
-		fstest.CreateFile("/file-truncated-time-1", []byte("2"), 0644),
-		fstest.Chtimes("/file-truncated-time-1", tt, tt),
+		fstest.CreateFile("/file-truncated-time-1", []byte("1"), 0644),
+		fstest.Chtimes("/file-truncated-time-1", t1, t1),
 		fstest.CreateFile("/file-truncated-time-2", []byte("2"), 0644),
 		fstest.Chtimes("/file-truncated-time-2", tt, tt),
+		fstest.CreateFile("/file-truncated-time-3", []byte("1"), 0644),
+		fstest.Chtimes("/file-truncated-time-3", tt, tt),
 	)
 	diff := []TestChange{
-		// "/file-same-time" excluded because matching non-zero nanosecond values
 		Modify("/file-modified-time"),
+		// Include changes with truncated timestamps. Comparing newly
+		// extracted tars which have truncated timestamps will be
+		// expected to produce changes. The expectation is that diff
+		// archives are generated once and kept, newly generated diffs
+		// will not consider cases where only one side is truncated.
 		Modify("/file-truncated-time-1"),
 		Modify("/file-truncated-time-2"),
+		Modify("/file-truncated-time-3"),
 	}
 
 	if err := testDiffWithBase(l1, l2, diff); err != nil {
