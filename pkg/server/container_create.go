@@ -747,6 +747,10 @@ func defaultRuntimeSpec(id string) (*runtimespec.Spec, error) {
 	if spec.Linux != nil {
 		spec.Linux.Seccomp = nil
 	}
+
+	// Remove default rlimits (See issue #515)
+	spec.Process.Rlimits = nil
+
 	return spec, nil
 }
 
