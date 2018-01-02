@@ -87,12 +87,23 @@ const (
 
 // Apply applies a tar stream of an OCI style diff tar.
 // See https://github.com/opencontainers/image-spec/blob/master/layer.md#applying-changesets
-func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
+func Apply(ctx context.Context, root string, r io.Reader, opts ...ApplyOpt) (int64, error) {
 	root = filepath.Clean(root)
 
+	var options ApplyOptions
+	for _, opt := range opts {
+		if err := opt(&options); err != nil {
+			return 0, errors.Wrap(err, "failed to apply option")
+		}
+	}
+
+	return apply(ctx, root, tar.NewReader(r), options)
+}
+
+// applyNaive applies a tar stream of an OCI style diff tar.
+// See https://github.com/opencontainers/image-spec/blob/master/layer.md#applying-changesets
+func applyNaive(ctx context.Context, root string, tr *tar.Reader, options ApplyOptions) (size int64, err error) {
 	var (
-		tr   = tar.NewReader(r)
-		size int64
 		dirs []*tar.Header
 
 		// Used for handling opaque directory markers which
@@ -285,6 +296,99 @@ func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 	return size, nil
 }
 
+func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header, reader io.Reader) error {
+	// hdr.Mode is in linux format, which we can use for syscalls,
+	// but for os.Foo() calls we need the mode converted to os.FileMode,
+	// so use hdrInfo.Mode() (they differ for e.g. setuid bits)
+	hdrInfo := hdr.FileInfo()
+
+	switch hdr.Typeflag {
+	case tar.TypeDir:
+		// Create directory unless it exists as a directory already.
+		// In that case we just want to merge the two
+		if fi, err := os.Lstat(path); !(err == nil && fi.IsDir()) {
+			if err := mkdir(path, hdrInfo.Mode()); err != nil {
+				return err
+			}
+		}
+
+	case tar.TypeReg, tar.TypeRegA:
+		file, err := openFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, hdrInfo.Mode())
+		if err != nil {
+			return err
+		}
+
+		_, err = copyBuffered(ctx, file, reader)
+		if err1 := file.Close(); err == nil {
+			err = err1
+		}
+		if err != nil {
+			return err
+		}
+
+	case tar.TypeBlock, tar.TypeChar:
+		// Handle this is an OS-specific way
+		if err := handleTarTypeBlockCharFifo(hdr, path); err != nil {
+			return err
+		}
+
+	case tar.TypeFifo:
+		// Handle this is an OS-specific way
+		if err := handleTarTypeBlockCharFifo(hdr, path); err != nil {
+			return err
+		}
+
+	case tar.TypeLink:
+		targetPath, err := fs.RootPath(extractDir, hdr.Linkname)
+		if err != nil {
+			return err
+		}
+		if err := os.Link(targetPath, path); err != nil {
+			return err
+		}
+
+	case tar.TypeSymlink:
+		if err := os.Symlink(hdr.Linkname, path); err != nil {
+			return err
+		}
+
+	case tar.TypeXGlobalHeader:
+		log.G(ctx).Debug("PAX Global Extended Headers found and ignored")
+		return nil
+
+	default:
+		return errors.Errorf("unhandled tar header type %d\n", hdr.Typeflag)
+	}
+
+	// Lchown is not supported on Windows.
+	if runtime.GOOS != "windows" {
+		if err := os.Lchown(path, hdr.Uid, hdr.Gid); err != nil {
+			return err
+		}
+	}
+
+	for key, value := range hdr.PAXRecords {
+		if strings.HasPrefix(key, paxSchilyXattr) {
+			key = key[len(paxSchilyXattr):]
+			if err := setxattr(path, key, value); err != nil {
+				if errors.Cause(err) == syscall.ENOTSUP {
+					log.G(ctx).WithError(err).Warnf("ignored xattr %s in archive", key)
+					continue
+				}
+				return err
+			}
+		}
+	}
+
+	// There is no LChmod, so ignore mode for symlink. Also, this
+	// must happen after chown, as that can modify the file mode
+	if err := handleLChmod(hdr, path, hdrInfo); err != nil {
+		return err
+	}
+
+	return chtimes(path, boundTime(latestTime(hdr.AccessTime, hdr.ModTime)), boundTime(hdr.ModTime))
+}
+
 type changeWriter struct {
 	tw        *tar.Writer
 	source    string
@@ -440,99 +544,6 @@ func (cw *changeWriter) Close() error {
 		return errors.Wrap(err, "failed to close tar writer")
 	}
 	return nil
-}
-
-func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header, reader io.Reader) error {
-	// hdr.Mode is in linux format, which we can use for syscalls,
-	// but for os.Foo() calls we need the mode converted to os.FileMode,
-	// so use hdrInfo.Mode() (they differ for e.g. setuid bits)
-	hdrInfo := hdr.FileInfo()
-
-	switch hdr.Typeflag {
-	case tar.TypeDir:
-		// Create directory unless it exists as a directory already.
-		// In that case we just want to merge the two
-		if fi, err := os.Lstat(path); !(err == nil && fi.IsDir()) {
-			if err := mkdir(path, hdrInfo.Mode()); err != nil {
-				return err
-			}
-		}
-
-	case tar.TypeReg, tar.TypeRegA:
-		file, err := openFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, hdrInfo.Mode())
-		if err != nil {
-			return err
-		}
-
-		_, err = copyBuffered(ctx, file, reader)
-		if err1 := file.Close(); err == nil {
-			err = err1
-		}
-		if err != nil {
-			return err
-		}
-
-	case tar.TypeBlock, tar.TypeChar:
-		// Handle this is an OS-specific way
-		if err := handleTarTypeBlockCharFifo(hdr, path); err != nil {
-			return err
-		}
-
-	case tar.TypeFifo:
-		// Handle this is an OS-specific way
-		if err := handleTarTypeBlockCharFifo(hdr, path); err != nil {
-			return err
-		}
-
-	case tar.TypeLink:
-		targetPath, err := fs.RootPath(extractDir, hdr.Linkname)
-		if err != nil {
-			return err
-		}
-		if err := os.Link(targetPath, path); err != nil {
-			return err
-		}
-
-	case tar.TypeSymlink:
-		if err := os.Symlink(hdr.Linkname, path); err != nil {
-			return err
-		}
-
-	case tar.TypeXGlobalHeader:
-		log.G(ctx).Debug("PAX Global Extended Headers found and ignored")
-		return nil
-
-	default:
-		return errors.Errorf("unhandled tar header type %d\n", hdr.Typeflag)
-	}
-
-	// Lchown is not supported on Windows.
-	if runtime.GOOS != "windows" {
-		if err := os.Lchown(path, hdr.Uid, hdr.Gid); err != nil {
-			return err
-		}
-	}
-
-	for key, value := range hdr.PAXRecords {
-		if strings.HasPrefix(key, paxSchilyXattr) {
-			key = key[len(paxSchilyXattr):]
-			if err := setxattr(path, key, value); err != nil {
-				if errors.Cause(err) == syscall.ENOTSUP {
-					log.G(ctx).WithError(err).Warnf("ignored xattr %s in archive", key)
-					continue
-				}
-				return err
-			}
-		}
-	}
-
-	// There is no LChmod, so ignore mode for symlink. Also, this
-	// must happen after chown, as that can modify the file mode
-	if err := handleLChmod(hdr, path, hdrInfo); err != nil {
-		return err
-	}
-
-	return chtimes(path, boundTime(latestTime(hdr.AccessTime, hdr.ModTime)), boundTime(hdr.ModTime))
 }
 
 func copyBuffered(ctx context.Context, dst io.Writer, src io.Reader) (written int64, err error) {
