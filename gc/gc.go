@@ -8,6 +8,7 @@ package gc
 import (
 	"context"
 	"sync"
+	"time"
 )
 
 // ResourceType represents type of resource at a node
@@ -19,6 +20,11 @@ type Node struct {
 	Type      ResourceType
 	Namespace string
 	Key       string
+}
+
+// Stats about a garbage collection run
+type Stats interface {
+	Elapsed() time.Duration
 }
 
 // Tricolor implements basic, single-thread tri-color GC. Given the roots, the

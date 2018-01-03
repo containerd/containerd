@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/metadata"
+	"github.com/containerd/containerd/gc"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPauseThreshold(t *testing.T) {
-
 	cfg := &config{
 		// With 100μs, gc should run about every 5ms
 		PauseThreshold: 0.02,
@@ -99,7 +99,7 @@ func TestTrigger(t *testing.T) {
 		}
 		ctx, cancel = context.WithCancel(context.Background())
 		scheduler   = newScheduler(tc, cfg)
-		stats       metadata.GCStats
+		stats       gc.Stats
 		err         error
 	)
 
@@ -123,9 +123,7 @@ func TestTrigger(t *testing.T) {
 		t.Fatalf("GC failed: %#v", err)
 	}
 
-	if stats.MetaD != tc.d {
-		t.Fatalf("unexpected gc duration: %s, expected %d", stats.MetaD, tc.d)
-	}
+	require.Equal(t, tc.d, stats.Elapsed())
 
 	if c := tc.runCount(); c != 1 {
 		t.Fatalf("unexpected gc run count %d, expected 1", c)
@@ -180,11 +178,18 @@ func (tc *testCollector) RegisterMutationCallback(f func(bool)) {
 	tc.callbacks = append(tc.callbacks, f)
 }
 
-func (tc *testCollector) GarbageCollect(context.Context) (metadata.GCStats, error) {
+func (tc *testCollector) GarbageCollect(context.Context) (gc.Stats, error) {
 	tc.m.Lock()
 	tc.gc++
 	tc.m.Unlock()
-	return metadata.GCStats{
-		MetaD: tc.d,
-	}, nil
+	return gcStats{elapsed: tc.d}, nil
+}
+
+type gcStats struct {
+	elapsed time.Duration
+}
+
+// Elapsed returns the duration which elapsed during a collection
+func (s gcStats) Elapsed() time.Duration {
+	return s.elapsed
 }

@@ -8,6 +8,7 @@ import (
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
@@ -43,7 +44,7 @@ func init() {
 }
 
 type gcScheduler interface {
-	ScheduleAndWait(gocontext.Context) (metadata.GCStats, error)
+	ScheduleAndWait(gocontext.Context) (gc.Stats, error)
 }
 
 type service struct {
