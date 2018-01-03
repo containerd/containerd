@@ -222,7 +222,7 @@ func TestMetadataCollector(t *testing.T) {
 
 	if err := mdb.Update(func(tx *bolt.Tx) error {
 		for _, obj := range objects {
-			node, err := create(obj, tx, cs, sn)
+			node, err := create(obj, tx, NewImageStore(mdb), cs, sn)
 			if err != nil {
 				return err
 			}
@@ -297,7 +297,7 @@ func benchmarkTrigger(n int) func(b *testing.B) {
 
 		if err := mdb.Update(func(tx *bolt.Tx) error {
 			for _, obj := range objects {
-				node, err := create(obj, tx, cs, sn)
+				node, err := create(obj, tx, NewImageStore(mdb), cs, sn)
 				if err != nil {
 					return err
 				}
@@ -377,7 +377,7 @@ type object struct {
 	labels  map[string]string
 }
 
-func create(obj object, tx *bolt.Tx, cs content.Store, sn snapshots.Snapshotter) (*gc.Node, error) {
+func create(obj object, tx *bolt.Tx, is images.Store, cs content.Store, sn snapshots.Snapshotter) (*gc.Node, error) {
 	var (
 		node      *gc.Node
 		namespace = "test"
@@ -430,12 +430,14 @@ func create(obj object, tx *bolt.Tx, cs content.Store, sn snapshots.Snapshotter)
 			}
 		}
 	case testImage:
+		ctx := WithTransactionContext(ctx, tx)
+
 		image := images.Image{
 			Name:   v.name,
 			Target: v.target,
 			Labels: obj.labels,
 		}
-		_, err := NewImageStore(tx).Create(ctx, image)
+		_, err := is.Create(ctx, image)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create image")
 		}
