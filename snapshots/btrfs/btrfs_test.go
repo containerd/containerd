@@ -29,7 +29,7 @@ func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshots.Snap
 
 	return func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
 
-		deviceName, cleanupDevice, err := testutil.NewLoopback(100 << 20) // 100 MB
+		deviceName, cleanupDevice, err := testutil.NewLoopback(150 << 20) // 150 MB
 		if err != nil {
 			return nil, nil, err
 		}

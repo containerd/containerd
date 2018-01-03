@@ -39,7 +39,7 @@ func testLookup(t *testing.T, fsType string) {
 	}
 	defer os.RemoveAll(mnt)
 
-	deviceName, cleanupDevice, err := testutil.NewLoopback(100 << 20) // 100 MB
+	deviceName, cleanupDevice, err := testutil.NewLoopback(150 << 20) // 150 MB
 	if err != nil {
 		t.Fatal(err)
 	}
