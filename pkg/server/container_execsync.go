@@ -26,7 +26,6 @@ import (
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/golang/glog"
-	"github.com/opencontainers/runtime-tools/generate"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 	"k8s.io/client-go/tools/remotecommand"
@@ -100,7 +99,7 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 		return nil, fmt.Errorf("failed to load task: %v", err)
 	}
 	if opts.tty {
-		g := generate.NewFromSpec(spec)
+		g := newSpecGenerator(spec)
 		g.AddProcessEnv("TERM", "xterm")
 		spec = g.Spec()
 	}

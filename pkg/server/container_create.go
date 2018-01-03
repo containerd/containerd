@@ -279,7 +279,7 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 	if err != nil {
 		return nil, err
 	}
-	g := generate.NewFromSpec(spec)
+	g := newSpecGenerator(spec)
 
 	// Set the relative path to the rootfs of the container from containerd's
 	// pre-defined directory.

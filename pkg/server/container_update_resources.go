@@ -26,7 +26,6 @@ import (
 	"github.com/containerd/typeurl"
 	"github.com/golang/glog"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/opencontainers/runtime-tools/generate"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
@@ -133,7 +132,7 @@ func updateOCILinuxResource(spec *runtimespec.Spec, new *runtime.LinuxContainerR
 	if err := util.DeepCopy(&cloned, spec); err != nil {
 		return nil, fmt.Errorf("failed to deep copy: %v", err)
 	}
-	g := generate.NewFromSpec(&cloned)
+	g := newSpecGenerator(&cloned)
 
 	if new.GetCpuPeriod() != 0 {
 		g.SetLinuxResourcesCPUPeriod(uint64(new.GetCpuPeriod()))
