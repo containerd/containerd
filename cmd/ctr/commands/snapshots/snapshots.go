@@ -3,16 +3,22 @@ package snapshots
 import (
 	gocontext "context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/progress"
+	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/snapshots"
 	digest "github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -25,6 +31,7 @@ var Command = cli.Command{
 	Flags:   commands.SnapshotterFlags,
 	Subcommands: cli.Commands{
 		commitCommand,
+		diffCommand,
 		infoCommand,
 		listCommand,
 		mountCommand,
@@ -65,6 +72,115 @@ var listCommand = cli.Command{
 
 		return tw.Flush()
 	},
+}
+
+var diffCommand = cli.Command{
+	Name:      "diff",
+	Usage:     "get the diff of two snapshots. the default second snapshot is the first snapshot's parent.",
+	ArgsUsage: "[flags] <idA> [<idB>]",
+	Flags: append([]cli.Flag{
+		cli.StringFlag{
+			Name:  "media-type",
+			Usage: "media type to use for creating diff",
+			Value: ocispec.MediaTypeImageLayerGzip,
+		},
+		cli.StringFlag{
+			Name:  "ref",
+			Usage: "content upload reference to use",
+		},
+		cli.BoolFlag{
+			Name:  "keep",
+			Usage: "keep diff content. up to creator to delete it.",
+		},
+	}, commands.LabelFlag),
+	Action: func(context *cli.Context) error {
+		var (
+			idA = context.Args().First()
+			idB = context.Args().Get(1)
+		)
+		if idA == "" {
+			return errors.New("snapshot id must be provided")
+		}
+		client, ctx, cancel, err := commands.NewClient(context)
+		if err != nil {
+			return err
+		}
+		defer cancel()
+
+		ctx, done, err := client.WithLease(ctx)
+		if err != nil {
+			return err
+		}
+		defer done()
+
+		var desc ocispec.Descriptor
+		labels := commands.LabelArgs(context.StringSlice("label"))
+		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
+
+		fmt.Println(context.String("media-type"))
+
+		if context.Bool("keep") {
+			labels["containerd.io/gc.root"] = time.Now().UTC().Format(time.RFC3339)
+		}
+		opts := []diff.Opt{
+			diff.WithMediaType(context.String("media-type")),
+			diff.WithReference(context.String("ref")),
+			diff.WithLabels(labels),
+		}
+
+		if idB == "" {
+			desc, err = rootfs.Diff(ctx, idA, snapshotter, client.DiffService(), opts...)
+			if err != nil {
+				return err
+			}
+		} else {
+			var a, b []mount.Mount
+			ds := client.DiffService()
+
+			a, err = getMounts(ctx, idA, snapshotter)
+			if err != nil {
+				return err
+			}
+			b, err = getMounts(ctx, idB, snapshotter)
+			if err != nil {
+				return err
+			}
+			desc, err = ds.DiffMounts(ctx, a, b, opts...)
+			if err != nil {
+				return err
+			}
+		}
+
+		ra, err := client.ContentStore().ReaderAt(ctx, desc.Digest)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(os.Stdout, content.NewReader(ra))
+
+		return err
+	},
+}
+
+func getMounts(ctx gocontext.Context, id string, sn snapshots.Snapshotter) ([]mount.Mount, error) {
+	var mounts []mount.Mount
+	info, err := sn.Stat(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if info.Kind == snapshots.KindActive {
+		mounts, err = sn.Mounts(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		key := fmt.Sprintf("%s-view-key", id)
+		mounts, err = sn.View(ctx, key, id)
+		if err != nil {
+			return nil, err
+		}
+		defer sn.Remove(ctx, key)
+	}
+	return mounts, nil
 }
 
 var usageCommand = cli.Command{
