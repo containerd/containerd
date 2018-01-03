@@ -30,7 +30,6 @@ import (
 	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/opencontainers/runtime-tools/generate"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -240,7 +239,7 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 	if err != nil {
 		return nil, err
 	}
-	g := generate.NewFromSpec(spec)
+	g := newSpecGenerator(spec)
 
 	// Apply default config from image config.
 	if err := addImageEnvs(&g, imageConfig.Env); err != nil {

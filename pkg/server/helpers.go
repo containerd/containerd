@@ -32,7 +32,9 @@ import (
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"golang.org/x/net/context"
@@ -396,4 +398,11 @@ func buildLabels(configLabels map[string]string, containerType string) map[strin
 	}
 	labels[containerKindLabel] = containerType
 	return labels
+}
+
+// newSpecGenerator creates a new spec generator for the runtime spec.
+func newSpecGenerator(spec *runtimespec.Spec) generate.Generator {
+	g := generate.NewFromSpec(spec)
+	g.HostSpecific = true
+	return g
 }
