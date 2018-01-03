@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/images"
@@ -18,6 +17,7 @@ import (
 func TestImagesList(t *testing.T) {
 	ctx, db, cancel := testEnv(t)
 	defer cancel()
+	store := NewImageStore(NewDB(db, nil, nil))
 
 	testset := map[string]*images.Image{}
 	for i := 0; i < 4; i++ {
@@ -36,21 +36,15 @@ func TestImagesList(t *testing.T) {
 			},
 		}
 
-		if err := db.Update(func(tx *bolt.Tx) error {
-			store := NewImageStore(tx)
-			now := time.Now()
-			result, err := store.Create(ctx, *testset[id])
-			if err != nil {
-				return err
-			}
-
-			checkImageTimestamps(t, &result, now, true)
-			testset[id].UpdatedAt, testset[id].CreatedAt = result.UpdatedAt, result.CreatedAt
-			checkImagesEqual(t, &result, testset[id], "ensure that containers were created as expected for list")
-			return nil
-		}); err != nil {
+		now := time.Now()
+		result, err := store.Create(ctx, *testset[id])
+		if err != nil {
 			t.Fatal(err)
 		}
+
+		checkImageTimestamps(t, &result, now, true)
+		testset[id].UpdatedAt, testset[id].CreatedAt = result.UpdatedAt, result.CreatedAt
+		checkImagesEqual(t, &result, testset[id], "ensure that containers were created as expected for list")
 	}
 
 	for _, testcase := range []struct {
@@ -102,46 +96,33 @@ func TestImagesList(t *testing.T) {
 				testset = newtestset
 			}
 
-			if err := db.View(func(tx *bolt.Tx) error {
-				store := NewImageStore(tx)
-				results, err := store.List(ctx, testcase.filters...)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				if len(results) == 0 { // all tests return a non-empty result set
-					t.Fatalf("no results returned")
-				}
-
-				if len(results) != len(testset) {
-					t.Fatalf("length of result does not match testset: %v != %v", len(results), len(testset))
-				}
-
-				for _, result := range results {
-					checkImagesEqual(t, &result, testset[result.Name], "list results did not match")
-				}
-
-				return nil
-			}); err != nil {
+			results, err := store.List(ctx, testcase.filters...)
+			if err != nil {
 				t.Fatal(err)
+			}
+
+			if len(results) == 0 { // all tests return a non-empty result set
+				t.Fatalf("no results returned")
+			}
+
+			if len(results) != len(testset) {
+				t.Fatalf("length of result does not match testset: %v != %v", len(results), len(testset))
+			}
+
+			for _, result := range results {
+				checkImagesEqual(t, &result, testset[result.Name], "list results did not match")
 			}
 		})
 	}
 
 	// delete everything to test it
 	for id := range testset {
-		if err := db.Update(func(tx *bolt.Tx) error {
-			store := NewImageStore(tx)
-			return store.Delete(ctx, id)
-		}); err != nil {
+		if err := store.Delete(ctx, id); err != nil {
 			t.Fatal(err)
 		}
 
 		// try it again, get NotFound
-		if err := db.Update(func(tx *bolt.Tx) error {
-			store := NewImageStore(tx)
-			return store.Delete(ctx, id)
-		}); errors.Cause(err) != errdefs.ErrNotFound {
+		if err := store.Delete(ctx, id); errors.Cause(err) != errdefs.ErrNotFound {
 			t.Fatalf("unexpected error %v", err)
 		}
 	}
@@ -149,6 +130,7 @@ func TestImagesList(t *testing.T) {
 func TestImagesCreateUpdateDelete(t *testing.T) {
 	ctx, db, cancel := testEnv(t)
 	defer cancel()
+	store := NewImageStore(NewDB(db, nil, nil))
 
 	for _, testcase := range []struct {
 		name       string
@@ -383,78 +365,52 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 				testcase.expected.Target.Digest = testcase.original.Target.Digest
 			}
 
-			done := errors.New("test complete")
-			if err := db.Update(func(tx *bolt.Tx) error {
-				var (
-					store = NewImageStore(tx)
-					now   = time.Now()
-				)
-
-				created, err := store.Create(ctx, testcase.original)
-				if errors.Cause(err) != testcase.createerr {
-					if testcase.createerr == nil {
-						t.Fatalf("unexpected error: %v", err)
-					} else {
-						t.Fatalf("cause of %v (cause: %v) != %v", err, errors.Cause(err), testcase.createerr)
-					}
-				} else if testcase.createerr != nil {
-					return done
+			// Create
+			now := time.Now()
+			created, err := store.Create(ctx, testcase.original)
+			if errors.Cause(err) != testcase.createerr {
+				if testcase.createerr == nil {
+					t.Fatalf("unexpected error: %v", err)
+				} else {
+					t.Fatalf("cause of %v (cause: %v) != %v", err, errors.Cause(err), testcase.createerr)
 				}
+			} else if testcase.createerr != nil {
+				return
+			}
 
-				checkImageTimestamps(t, &created, now, true)
+			checkImageTimestamps(t, &created, now, true)
 
-				testcase.original.CreatedAt = created.CreatedAt
-				testcase.expected.CreatedAt = created.CreatedAt
-				testcase.original.UpdatedAt = created.UpdatedAt
-				testcase.expected.UpdatedAt = created.UpdatedAt
+			testcase.original.CreatedAt = created.CreatedAt
+			testcase.expected.CreatedAt = created.CreatedAt
+			testcase.original.UpdatedAt = created.UpdatedAt
+			testcase.expected.UpdatedAt = created.UpdatedAt
 
-				checkImagesEqual(t, &created, &testcase.original, "unexpected image on creation")
-				return nil
-			}); err != nil {
-				if err == done {
-					return
+			checkImagesEqual(t, &created, &testcase.original, "unexpected image on creation")
+
+			// Update
+			now = time.Now()
+			updated, err := store.Update(ctx, testcase.input, testcase.fieldpaths...)
+			if errors.Cause(err) != testcase.cause {
+				if testcase.cause == nil {
+					t.Fatalf("unexpected error: %v", err)
+				} else {
+					t.Fatalf("cause of %v (cause: %v) != %v", err, errors.Cause(err), testcase.cause)
 				}
+			} else if testcase.cause != nil {
+				return
+			}
+
+			checkImageTimestamps(t, &updated, now, false)
+			testcase.expected.UpdatedAt = updated.UpdatedAt
+			checkImagesEqual(t, &updated, &testcase.expected, "updated failed to get expected result")
+
+			// Get
+			result, err := store.Get(ctx, testcase.original.Name)
+			if err != nil {
 				t.Fatal(err)
 			}
 
-			if err := db.Update(func(tx *bolt.Tx) error {
-				now := time.Now()
-				store := NewImageStore(tx)
-				updated, err := store.Update(ctx, testcase.input, testcase.fieldpaths...)
-				if errors.Cause(err) != testcase.cause {
-					if testcase.cause == nil {
-						t.Fatalf("unexpected error: %v", err)
-					} else {
-						t.Fatalf("cause of %v (cause: %v) != %v", err, errors.Cause(err), testcase.cause)
-					}
-				} else if testcase.cause != nil {
-					return done
-				}
-
-				checkImageTimestamps(t, &updated, now, false)
-				testcase.expected.UpdatedAt = updated.UpdatedAt
-				checkImagesEqual(t, &updated, &testcase.expected, "updated failed to get expected result")
-				return nil
-			}); err != nil {
-				if err == done {
-					return
-				}
-				t.Fatal(err)
-			}
-
-			if err := db.View(func(tx *bolt.Tx) error {
-				store := NewImageStore(tx)
-				result, err := store.Get(ctx, testcase.original.Name)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				checkImagesEqual(t, &result, &testcase.expected, "get after failed to get expected result")
-				return nil
-			}); err != nil {
-				t.Fatal(err)
-			}
-
+			checkImagesEqual(t, &result, &testcase.expected, "get after failed to get expected result")
 		})
 	}
 }
