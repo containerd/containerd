@@ -17,12 +17,7 @@ type Variant struct {
 // MakeVariant converts the given value to a Variant. It panics if v cannot be
 // represented as a D-Bus type.
 func MakeVariant(v interface{}) Variant {
-	return MakeVariantWithSignature(v, SignatureOf(v))
-}
-
-// MakeVariantWithSignature converts the given value to a Variant.
-func MakeVariantWithSignature(v interface{}, s Signature) Variant {
-	return Variant{s, v}
+	return Variant{SignatureOf(v), v}
 }
 
 // ParseVariant parses the given string as a variant as described at
