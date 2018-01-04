@@ -10,7 +10,7 @@ safe: false
 lsi: false
 exclude: [README.md]
 
-plugins::
+plugins:
   - jekyll-redirect-from
   - jekyll-seo-tag
 
