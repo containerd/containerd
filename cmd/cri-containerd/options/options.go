@@ -116,7 +116,7 @@ func NewCRIContainerdOptions() *CRIContainerdOptions {
 
 // AddFlags adds cri-containerd command line options to pflag.
 func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
-	defaults := defaultConfig()
+	defaults := DefaultConfig()
 	fs.StringVar(&c.ConfigFilePath, configFilePathArgName,
 		defaultConfigFilePath, "Path to the config file.")
 	fs.StringVar(&c.SocketPath, "socket-path",
@@ -192,7 +192,7 @@ func (c *CRIContainerdOptions) InitFlags(fs *pflag.FlagSet) error {
 
 // PrintDefaultTomlConfig print default toml config of cri-containerd.
 func PrintDefaultTomlConfig() {
-	if err := toml.NewEncoder(os.Stdout).Encode(defaultConfig()); err != nil {
+	if err := toml.NewEncoder(os.Stdout).Encode(DefaultConfig()); err != nil {
 		fmt.Println(err)
 		return
 	}
@@ -200,13 +200,13 @@ func PrintDefaultTomlConfig() {
 
 // AddGRPCFlags add flags for grpc connection.
 func AddGRPCFlags(fs *pflag.FlagSet) (*string, *time.Duration) {
-	endpoint := fs.String("endpoint", defaultConfig().SocketPath, "cri-containerd endpoint.")
+	endpoint := fs.String("endpoint", DefaultConfig().SocketPath, "cri-containerd endpoint.")
 	timeout := fs.Duration("timeout", connectionTimeout, "cri-containerd connection timeout.")
 	return endpoint, timeout
 }
 
-// defaultConfig returns default configurations of cri-containerd.
-func defaultConfig() Config {
+// DefaultConfig returns default configurations of cri-containerd.
+func DefaultConfig() Config {
 	return Config{
 		ContainerdConfig: ContainerdConfig{
 			RootDir:       "/var/lib/containerd",
