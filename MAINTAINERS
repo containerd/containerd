@@ -224,6 +224,8 @@ containerd defers to the [Technical Steering Committee](https://github.com/moby/
 		people = [
 			"dnephin",
 			"jessvalarezo",
+			"yanxuean",
+			"miaoyq",
 		]
 
 [People]
@@ -307,3 +309,13 @@ containerd defers to the [Technical Steering Committee](https://github.com/moby/
 	Name = "Yu-Ju Hong"
 	Email = "yjhong@google.com"
 	GitHub = "yujuhong"
+
+	[people.yanxuean]
+	Name = "Xuean Yan"
+	Email = "yan.xuean@zte.com.cn"
+	GitHub = "yanxuean"
+
+	[people.miaoyq]
+	Name = "Yanqiang Miao"
+	Email = "miao.yanqiang@zte.com.cn"
+	GitHub = "miaoyq"
