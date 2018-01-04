@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-source $(dirname "${BASH_SOURCE[0]}")/test-utils.sh
+source $(dirname "${BASH_SOURCE[0]}")/utils.sh
 
 # DEPLOY_BUCKET is the gcs bucket where the tarball should be stored in.
 DEPLOY_BUCKET=${DEPLOY_BUCKET:-"cri-containerd-staging"}
