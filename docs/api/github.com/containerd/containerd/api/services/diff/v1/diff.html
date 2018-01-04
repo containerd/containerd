@@ -1,0 +1,401 @@
+
+
+
+
+
+<html>
+<head>
+ <title>containerd gRPC API Documentation</title>
+ <link
+   href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/flatly/bootstrap.min.css"
+   rel="stylesheet">
+</head>
+
+<body>
+
+<div class="doc container">
+  <h1>containerd.services.diff.v1</h1>
+  <div class="doc-inner">
+    <p>
+      <code>github.com/containerd/containerd/api/services/diff/v1/diff.proto</code>
+      (syntax: <code>proto3</code>)
+    </p>
+  </div>
+
+	
+	
+		<div class="doc-dependencies">
+			<h2>Dependencies</h2>
+			<div class="doc-inner">
+				<ul>
+					
+						<li>gogoproto/gogo.proto</li>
+					
+						<li>github.com/containerd/containerd/api/types/mount.proto</li>
+					
+						<li>github.com/containerd/containerd/api/types/descriptor.proto</li>
+					
+				</ul>
+			</div>
+		</div>
+	
+
+	
+	
+	
+
+	
+	
+
+	
+	
+		<div class="doc-services">
+			<h2>Services</h2>
+			
+				<div class="doc-inner">
+
+				<h3>Diff</h3>
+				
+	
+	
+		
+			<p class="description">Description:
+					<p>Diff service creates and applies diffs</p>
+
+					
+			</p>
+		
+	
+
+				<table class="table table-striped">
+					<tr><td>Method</td><td>Input Type</td><td>Output Type</td><td>Description</td></tr>
+					
+						<tr>
+							<td>Apply
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/diff/v1/diff.html#ApplyRequest">ApplyRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/diff/v1/diff.html#ApplyResponse">ApplyResponse</a></td>
+							<td>
+	
+	
+		
+			<p>Apply applies the content associated with the provided digests onto
+ the provided mounts. Archive content will be extracted and
+ decompressed if necessary.</p>
+
+			
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Diff
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/diff/v1/diff.html#DiffRequest">DiffRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/diff/v1/diff.html#DiffResponse">DiffResponse</a></td>
+							<td>
+	
+	
+		
+			<p>Diff creates a diff between the given mounts and uploads the result
+ to the content store.</p>
+
+			
+		
+	
+</td>
+						</tr>
+					
+				</table>
+
+			
+		</div>
+	
+
+	
+	
+	
+		<div class="doc-message-types">
+			<h2>Messages</h2>
+			
+				<div class="doc-inner">
+					<h3 id="ApplyRequest">Message: ApplyRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>diff</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/types/descriptor.html#Descriptor">Descriptor</td>
+								
+								<td>
+	
+	
+		
+			<p>Diff is the descriptor of the diff to be extracted</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>mounts</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/types/mount.html#Mount">Mount</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ApplyResponse">Message: ApplyResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>applied</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/types/descriptor.html#Descriptor">Descriptor</td>
+								
+								<td>
+	
+	
+		
+			<p>Applied is the descriptor for the object which was applied.
+ If the input was a compressed blob then the result will be
+ the descriptor for the uncompressed blob.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="DiffRequest">Message: DiffRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>left</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/types/mount.html#Mount">Mount</td>
+								
+								<td>
+	
+	
+		
+			<p>Left are the mounts which represent the older copy
+ in which is the base of the computed changes.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>right</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/types/mount.html#Mount">Mount</td>
+								
+								<td>
+	
+	
+		
+			<p>Right are the mounts which represents the newer copy
+ in which changes from the left were made into.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>media_type</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+			<p>MediaType is the media type descriptor for the created diff
+ object</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>4</td>
+								<td>ref</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+			<p>Ref identifies the pre-commit content store object. This
+ reference can be used to get the status from the content store.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>5</td>
+								<td>labels</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/diff/v1/diff.html#DiffRequest.LabelsEntry">LabelsEntry</td>
+								
+								<td>
+	
+	
+		
+			<p>Labels are the labels to apply to the generated content
+ on content store commit.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="DiffRequest.LabelsEntry">Message: DiffRequest.LabelsEntry</h3>
+					
+	
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>key</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>value</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="DiffResponse">Message: DiffResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>3</td>
+								<td>diff</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/types/descriptor.html#Descriptor">Descriptor</td>
+								
+								<td>
+	
+	
+		
+			<p>Diff is the descriptor of the diff which can be applied</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+		</div>
+	
+</div>
+
+</body>
+</html>

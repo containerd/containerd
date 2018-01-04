@@ -1,0 +1,300 @@
+
+
+
+
+
+<html>
+<head>
+ <title>containerd gRPC API Documentation</title>
+ <link
+   href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/flatly/bootstrap.min.css"
+   rel="stylesheet">
+</head>
+
+<body>
+
+<div class="doc container">
+  <h1>google.protobuf</h1>
+  <div class="doc-inner">
+    <p>
+      <code>google/protobuf/field_mask.proto</code>
+      (syntax: <code>proto3</code>)
+    </p>
+  </div>
+
+	
+	
+
+	
+	
+	
+
+	
+	
+
+	
+	
+
+	
+	
+	
+		<div class="doc-message-types">
+			<h2>Messages</h2>
+			
+				<div class="doc-inner">
+					<h3 id="FieldMask">Message: FieldMask</h3>
+					
+	
+	
+		
+			<p class="description">Description:
+					<p><code>FieldMask</code> represents a set of symbolic field paths, for example:</p>
+
+<pre><code> paths: &quot;f.a&quot;
+ paths: &quot;f.b.d&quot;
+</code></pre>
+
+<p>Here <code>f</code> represents a field in some root message, <code>a</code> and <code>b</code>
+ fields in the message found in <code>f</code>, and <code>d</code> a field found in the
+ message in <code>f.b</code>.</p>
+
+<p>Field masks are used to specify a subset of fields that should be
+ returned by a get operation or modified by an update operation.
+ Field masks also have a custom JSON encoding (see below).</p>
+
+<p># Field Masks in Projections</p>
+
+<p>When used in the context of a projection, a response message or
+ sub-message is filtered by the API to only contain those fields as
+ specified in the mask. For example, if the mask in the previous
+ example is applied to a response message as follows:</p>
+
+<pre><code> f {
+   a : 22
+   b {
+     d : 1
+     x : 2
+   }
+   y : 13
+ }
+ z: 8
+</code></pre>
+
+<p>The result will not contain specific values for fields x,y and z
+ (their value will be set to the default, and omitted in proto text
+ output):</p>
+
+<pre><code> f {
+   a : 22
+   b {
+     d : 1
+   }
+ }
+</code></pre>
+
+<p>A repeated field is not allowed except at the last position of a
+ paths string.</p>
+
+<p>If a FieldMask object is not present in a get operation, the
+ operation applies to all fields (as if a FieldMask of all fields
+ had been specified).</p>
+
+<p>Note that a field mask does not necessarily apply to the
+ top-level response message. In case of a REST get operation, the
+ field mask applies directly to the response, but in case of a REST
+ list operation, the mask instead applies to each individual message
+ in the returned resource list. In case of a REST custom method,
+ other definitions may be used. Where the mask applies will be
+ clearly documented together with its declaration in the API.  In
+ any case, the effect on the returned resource/resources is required
+ behavior for APIs.</p>
+
+<p># Field Masks in Update Operations</p>
+
+<p>A field mask in update operations specifies which fields of the
+ targeted resource are going to be updated. The API is required
+ to only change the values of the fields as specified in the mask
+ and leave the others untouched. If a resource is passed in to
+ describe the updated values, the API ignores the values of all
+ fields not covered by the mask.</p>
+
+<p>If a repeated field is specified for an update operation, the existing
+ repeated values in the target resource will be overwritten by the new values.
+ Note that a repeated field is only allowed in the last position of a <code>paths</code>
+ string.</p>
+
+<p>If a sub-message is specified in the last position of the field mask for an
+ update operation, then the existing sub-message in the target resource is
+ overwritten. Given the target message:</p>
+
+<pre><code> f {
+   b {
+     d : 1
+     x : 2
+   }
+   c : 1
+ }
+</code></pre>
+
+<p>And an update message:</p>
+
+<pre><code> f {
+   b {
+     d : 10
+   }
+ }
+</code></pre>
+
+<p>then if the field mask is:</p>
+
+<p>paths: &ldquo;f.b&rdquo;</p>
+
+<p>then the result will be:</p>
+
+<pre><code> f {
+   b {
+     d : 10
+   }
+   c : 1
+ }
+</code></pre>
+
+<p>However, if the update mask was:</p>
+
+<p>paths: &ldquo;f.b.d&rdquo;</p>
+
+<p>then the result would be:</p>
+
+<pre><code> f {
+   b {
+     d : 10
+     x : 2
+   }
+   c : 1
+ }
+</code></pre>
+
+<p>In order to reset a field&rsquo;s value to the default, the field must
+ be in the mask and set to the default value in the provided resource.
+ Hence, in order to reset all fields of a resource, provide a default
+ instance of the resource and set all fields in the mask, or do
+ not provide a mask as described below.</p>
+
+<p>If a field mask is not present on update, the operation applies to
+ all fields (as if a field mask of all fields has been specified).
+ Note that in the presence of schema evolution, this may mean that
+ fields the client does not know and has therefore not filled into
+ the request will be reset to their default. If this is unwanted
+ behavior, a specific service may require a client to always specify
+ a field mask, producing an error if not.</p>
+
+<p>As with get operations, the location of the resource which
+ describes the updated values in the request message depends on the
+ operation kind. In any case, the effect of the field mask is
+ required to be honored by the API.</p>
+
+<p>## Considerations for HTTP REST</p>
+
+<p>The HTTP kind of an update operation which uses a field mask must
+ be set to PATCH instead of PUT in order to satisfy HTTP semantics
+ (PUT must only be used for full updates).</p>
+
+<p># JSON Encoding of Field Masks</p>
+
+<p>In JSON, a field mask is encoded as a single string where paths are
+ separated by a comma. Fields name in each path are converted
+ to/from lower-camel naming conventions.</p>
+
+<p>As an example, consider the following message declarations:</p>
+
+<pre><code> message Profile {
+   User user = 1;
+   Photo photo = 2;
+ }
+ message User {
+   string display_name = 1;
+   string address = 2;
+ }
+</code></pre>
+
+<p>In proto a field mask for <code>Profile</code> may look as such:</p>
+
+<pre><code> mask {
+   paths: &quot;user.display_name&quot;
+   paths: &quot;photo&quot;
+ }
+</code></pre>
+
+<p>In JSON, the same mask is represented as below:</p>
+
+<pre><code> {
+   mask: &quot;user.displayName,photo&quot;
+ }
+</code></pre>
+
+<p># Field Masks and Oneof Fields</p>
+
+<p>Field masks treat fields in oneofs just as regular fields. Consider the
+ following message:</p>
+
+<pre><code> message SampleMessage {
+   oneof test_oneof {
+     string name = 4;
+     SubMessage sub_message = 9;
+   }
+ }
+</code></pre>
+
+<p>The field mask can be:</p>
+
+<pre><code> mask {
+   paths: &quot;name&quot;
+ }
+</code></pre>
+
+<p>Or:</p>
+
+<pre><code> mask {
+   paths: &quot;sub_message&quot;
+ }
+</code></pre>
+
+<p>Note that oneof type names (&ldquo;test_oneof&rdquo; in this case) cannot be used in
+ paths.</p>
+
+					
+			</p>
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>paths</td>
+								<td>repeated</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+			<p>The set of field mask paths.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+		</div>
+	
+</div>
+
+</body>
+</html>

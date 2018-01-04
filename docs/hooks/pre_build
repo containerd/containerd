@@ -8,3 +8,5 @@ echo $(pwd)
 ls -la
 ls -la _site
 
+echo "=> Copying API docs"
+cp -r api _site/api

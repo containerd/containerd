@@ -15,8 +15,7 @@ plugins:
   - jekyll-seo-tag
 
 defaults:
-  -
-    scope:
+  - scope:
       path: ""
       type: "pages"
     values:

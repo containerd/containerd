@@ -1,0 +1,386 @@
+
+
+
+
+
+<html>
+<head>
+ <title>containerd gRPC API Documentation</title>
+ <link
+   href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/flatly/bootstrap.min.css"
+   rel="stylesheet">
+</head>
+
+<body>
+
+<div class="doc container">
+  <h1>containerd.services.introspection.v1</h1>
+  <div class="doc-inner">
+    <p>
+      <code>github.com/containerd/containerd/api/services/introspection/v1/introspection.proto</code>
+      (syntax: <code>proto3</code>)
+    </p>
+  </div>
+
+	
+	
+		<div class="doc-dependencies">
+			<h2>Dependencies</h2>
+			<div class="doc-inner">
+				<ul>
+					
+						<li>github.com/containerd/containerd/api/types/platform.proto</li>
+					
+						<li>google/rpc/status.proto</li>
+					
+						<li>gogoproto/gogo.proto</li>
+					
+				</ul>
+			</div>
+		</div>
+	
+
+	
+	
+	
+
+	
+	
+
+	
+	
+		<div class="doc-services">
+			<h2>Services</h2>
+			
+				<div class="doc-inner">
+
+				<h3>Introspection</h3>
+				
+	
+	
+		
+	
+
+				<table class="table table-striped">
+					<tr><td>Method</td><td>Input Type</td><td>Output Type</td><td>Description</td></tr>
+					
+						<tr>
+							<td>Plugins
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/introspection/v1/introspection.html#PluginsRequest">PluginsRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/introspection/v1/introspection.html#PluginsResponse">PluginsResponse</a></td>
+							<td>
+	
+	
+		
+			<p>Plugins returns a list of plugins in containerd.</p>
+
+<p>Clients can use this to detect features and capabilities when using
+ containerd.</p>
+
+			
+		
+	
+</td>
+						</tr>
+					
+				</table>
+
+			
+		</div>
+	
+
+	
+	
+	
+		<div class="doc-message-types">
+			<h2>Messages</h2>
+			
+				<div class="doc-inner">
+					<h3 id="Plugin">Message: Plugin</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>type</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+			<p>Type defines the type of plugin.</p>
+
+<p>See package plugin for a list of possible values. Non core plugins may
+ define their own values during registration.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+			<p>ID identifies the plugin uniquely in the system.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>requires</td>
+								<td>repeated</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+			<p>Requires lists the plugin types required by this plugin.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>4</td>
+								<td>platforms</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/types/platform.html#Platform">Platform</td>
+								
+								<td>
+	
+	
+		
+			<p>Platforms enumerates the platforms this plugin will support.</p>
+
+<p>If values are provided here, the plugin will only be operable under the
+ provided platforms.</p>
+
+<p>If this is empty, the plugin will work across all platforms.</p>
+
+<p>If the plugin prefers certain platforms over others, they should be
+ listed from most to least preferred.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>5</td>
+								<td>exports</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/introspection/v1/introspection.html#Plugin.ExportsEntry">ExportsEntry</td>
+								
+								<td>
+	
+	
+		
+			<p>Exports allows plugins to provide values about state or configuration to
+ interested parties.</p>
+
+<p>One example is exposing the configured path of a snapshotter plugin.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>6</td>
+								<td>capabilities</td>
+								<td>repeated</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+			<p>Capabilities allows plugins to communicate feature switches to allow
+ clients to detect features that may not be on be default or may be
+ different from version to version.</p>
+
+<p>Use this sparingly.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>7</td>
+								<td>init_err</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/rpc/status.html#Status">Status</td>
+								
+								<td>
+	
+	
+		
+			<p>InitErr will be set if the plugin fails initialization.</p>
+
+<p>This means the plugin may have been registered but a non-terminal error
+ was encountered during initialization.</p>
+
+<p>Plugins that have this value set cannot be used.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="Plugin.ExportsEntry">Message: Plugin.ExportsEntry</h3>
+					
+	
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>key</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>value</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="PluginsRequest">Message: PluginsRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>filters</td>
+								<td>repeated</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+			<p>Filters contains one or more filters using the syntax defined in the
+ containerd filter package.</p>
+
+<p>The returned result will be those that match any of the provided
+ filters. Expanded, plugins that match the following will be
+ returned:</p>
+
+<p>filters[0] or filters[1] or &hellip; or filters[n-1] or filters[n]</p>
+
+<p>If filters is zero-length or nil, all items will be returned.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="PluginsResponse">Message: PluginsResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>plugins</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/introspection/v1/introspection.html#Plugin">Plugin</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+		</div>
+	
+</div>
+
+</body>
+</html>

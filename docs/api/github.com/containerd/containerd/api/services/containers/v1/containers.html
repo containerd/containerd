@@ -1,0 +1,856 @@
+
+
+
+
+
+<html>
+<head>
+ <title>containerd gRPC API Documentation</title>
+ <link
+   href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/flatly/bootstrap.min.css"
+   rel="stylesheet">
+</head>
+
+<body>
+
+<div class="doc container">
+  <h1>containerd.services.containers.v1</h1>
+  <div class="doc-inner">
+    <p>
+      <code>github.com/containerd/containerd/api/services/containers/v1/containers.proto</code>
+      (syntax: <code>proto3</code>)
+    </p>
+  </div>
+
+	
+	
+		<div class="doc-dependencies">
+			<h2>Dependencies</h2>
+			<div class="doc-inner">
+				<ul>
+					
+						<li>gogoproto/gogo.proto</li>
+					
+						<li>google/protobuf/any.proto</li>
+					
+						<li>google/protobuf/empty.proto</li>
+					
+						<li>google/protobuf/field_mask.proto</li>
+					
+						<li>google/protobuf/timestamp.proto</li>
+					
+				</ul>
+			</div>
+		</div>
+	
+
+	
+	
+	
+
+	
+	
+
+	
+	
+		<div class="doc-services">
+			<h2>Services</h2>
+			
+				<div class="doc-inner">
+
+				<h3>Containers</h3>
+				
+	
+	
+		
+			<p class="description">Description:
+					<p>Containers provides metadata storage for containers used in the execution
+ service.</p>
+
+<p>The objects here provide an state-independent view of containers for use in
+ management and resource pinning. From that perspective, containers do not
+ have a &ldquo;state&rdquo; but rather this is the set of resources that will be
+ considered in use by the container.</p>
+
+<p>From the perspective of the execution service, these objects represent the
+ base parameters for creating a container process.</p>
+
+<p>In general, when looking to add fields for this type, first ask yourself
+ whether or not the function of the field has to do with runtime execution or
+ is invariant of the runtime state of the container. If it has to do with
+ runtime, or changes as the &ldquo;container&rdquo; is started and stops, it probably
+ doesn&rsquo;t belong on this object.</p>
+
+					
+			</p>
+		
+	
+
+				<table class="table table-striped">
+					<tr><td>Method</td><td>Input Type</td><td>Output Type</td><td>Description</td></tr>
+					
+						<tr>
+							<td>Get
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/containers/v1/containers.html#GetContainerRequest">GetContainerRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/containers/v1/containers.html#GetContainerResponse">GetContainerResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>List
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/containers/v1/containers.html#ListContainersRequest">ListContainersRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/containers/v1/containers.html#ListContainersResponse">ListContainersResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Create
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/containers/v1/containers.html#CreateContainerRequest">CreateContainerRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/containers/v1/containers.html#CreateContainerResponse">CreateContainerResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Update
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/containers/v1/containers.html#UpdateContainerRequest">UpdateContainerRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/containers/v1/containers.html#UpdateContainerResponse">UpdateContainerResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Delete
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/containers/v1/containers.html#DeleteContainerRequest">DeleteContainerRequest</a></td>
+							<td><a href="/api/google/protobuf/empty.html#Empty">Empty</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+				</table>
+
+			
+		</div>
+	
+
+	
+	
+	
+		<div class="doc-message-types">
+			<h2>Messages</h2>
+			
+				<div class="doc-inner">
+					<h3 id="Container">Message: Container</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+			<p>ID is the user-specified identifier.</p>
+
+<p>This field may not be updated.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>labels</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/containers/v1/containers.html#Container.LabelsEntry">LabelsEntry</td>
+								
+								<td>
+	
+	
+		
+			<p>Labels provides an area to include arbitrary data on containers.</p>
+
+<p>The combined size of a key/value pair cannot exceed 4096 bytes.</p>
+
+<p>Note that to add a new value to this field, read the existing set and
+ include the entire result in the update call.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>image</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+			<p>Image contains the reference of the image used to build the
+ specification and snapshots for running this container.</p>
+
+<p>If this field is updated, the spec and rootfs needed to updated, as well.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>4</td>
+								<td>runtime</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/containers/v1/containers.html#Container.Runtime">Runtime</td>
+								
+								<td>
+	
+	
+		
+			<p>Runtime specifies which runtime to use for executing this container.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>5</td>
+								<td>spec</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/any.html#Any">Any</td>
+								
+								<td>
+	
+	
+		
+			<p>Spec to be used when creating the container. This is runtime specific.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>6</td>
+								<td>snapshotter</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+			<p>Snapshotter specifies the snapshotter name used for rootfs</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>7</td>
+								<td>snapshot_key</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+			<p>SnapshotKey specifies the snapshot key to use for the container&rsquo;s root
+ filesystem. When starting a task from this container, a caller should
+ look up the mounts from the snapshot service and include those on the
+ task create request.</p>
+
+<p>Snapshots referenced in this field will not be garbage collected.</p>
+
+<p>This field is set to empty when the rootfs is not a snapshot.</p>
+
+<p>This field may be updated.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>8</td>
+								<td>created_at</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/timestamp.html#Timestamp">Timestamp</td>
+								
+								<td>
+	
+	
+		
+			<p>CreatedAt is the time the container was first created.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>9</td>
+								<td>updated_at</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/timestamp.html#Timestamp">Timestamp</td>
+								
+								<td>
+	
+	
+		
+			<p>UpdatedAt is the last time the container was mutated.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>10</td>
+								<td>extensions</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/containers/v1/containers.html#Container.ExtensionsEntry">ExtensionsEntry</td>
+								
+								<td>
+	
+	
+		
+			<p>Extensions allow clients to provide zero or more blobs that are directly
+ associated with the container. One may provide protobuf, json, or other
+ encoding formats. The primary use of this is to further decorate the
+ container object with fields that may be specific to a client integration.</p>
+
+<p>The key portion of this map should identify a &ldquo;name&rdquo; for the extension
+ that should be unique against other extensions. When updating extension
+ data, one should only update the specified extension using field paths
+ to select a specific map key.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="Container.LabelsEntry">Message: Container.LabelsEntry</h3>
+					
+	
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>key</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>value</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id=".LabelsEntryRuntime">Message: .LabelsEntryRuntime</h3>
+					
+	
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>name</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+			<p>Name is the name of the runtime.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>options</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/any.html#Any">Any</td>
+								
+								<td>
+	
+	
+		
+			<p>Options specify additional runtime initialization options.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="RuntimeExtensionsEntry">Message: RuntimeExtensionsEntry</h3>
+					
+	
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>key</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>value</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/any.html#Any">Any</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="GetContainerRequest">Message: GetContainerRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="GetContainerResponse">Message: GetContainerResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/containers/v1/containers.html#Container">Container</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ListContainersRequest">Message: ListContainersRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>filters</td>
+								<td>repeated</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+			<p>Filters contains one or more filters using the syntax defined in the
+ containerd filter package.</p>
+
+<p>The returned result will be those that match any of the provided
+ filters. Expanded, containers that match the following will be
+ returned:</p>
+
+<p>filters[0] or filters[1] or &hellip; or filters[n-1] or filters[n]</p>
+
+<p>If filters is zero-length or nil, all items will be returned.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ListContainersResponse">Message: ListContainersResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>containers</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/containers/v1/containers.html#Container">Container</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="CreateContainerRequest">Message: CreateContainerRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/containers/v1/containers.html#Container">Container</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="CreateContainerResponse">Message: CreateContainerResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/containers/v1/containers.html#Container">Container</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="UpdateContainerRequest">Message: UpdateContainerRequest</h3>
+					
+	
+	
+		
+			<p class="description">Description:
+					<p>UpdateContainerRequest updates the metadata on one or more container.</p>
+
+<p>The operation should follow semantics described in
+ <a href="https://developers.google.com/protocol-buffers/docs/reference/csharp/class/google/protobuf/well-known-types/field-mask">https://developers.google.com/protocol-buffers/docs/reference/csharp/class/google/protobuf/well-known-types/field-mask</a>,
+ unless otherwise qualified.</p>
+
+					
+			</p>
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/containers/v1/containers.html#Container">Container</td>
+								
+								<td>
+	
+	
+		
+			<p>Container provides the target values, as declared by the mask, for the update.</p>
+
+<p>The ID field must be set.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>update_mask</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/field_mask.html#FieldMask">FieldMask</td>
+								
+								<td>
+	
+	
+		
+			<p>UpdateMask specifies which fields to perform the update on. If empty,
+ the operation applies to all fields.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="UpdateContainerResponse">Message: UpdateContainerResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/containers/v1/containers.html#Container">Container</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="DeleteContainerRequest">Message: DeleteContainerRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+		</div>
+	
+</div>
+
+</body>
+</html>

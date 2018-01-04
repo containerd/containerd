@@ -1,0 +1,337 @@
+
+
+
+
+
+<html>
+<head>
+ <title>containerd gRPC API Documentation</title>
+ <link
+   href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/flatly/bootstrap.min.css"
+   rel="stylesheet">
+</head>
+
+<body>
+
+<div class="doc container">
+  <h1>containerd.services.events.v1</h1>
+  <div class="doc-inner">
+    <p>
+      <code>github.com/containerd/containerd/api/services/events/v1/events.proto</code>
+      (syntax: <code>proto3</code>)
+    </p>
+  </div>
+
+	
+	
+		<div class="doc-dependencies">
+			<h2>Dependencies</h2>
+			<div class="doc-inner">
+				<ul>
+					
+						<li>github.com/containerd/containerd/protobuf/plugin/fieldpath.proto</li>
+					
+						<li>gogoproto/gogo.proto</li>
+					
+						<li>google/protobuf/any.proto</li>
+					
+						<li>google/protobuf/empty.proto</li>
+					
+						<li>google/protobuf/timestamp.proto</li>
+					
+				</ul>
+			</div>
+		</div>
+	
+
+	
+	
+	
+
+	
+	
+
+	
+	
+		<div class="doc-services">
+			<h2>Services</h2>
+			
+				<div class="doc-inner">
+
+				<h3>Events</h3>
+				
+	
+	
+		
+	
+
+				<table class="table table-striped">
+					<tr><td>Method</td><td>Input Type</td><td>Output Type</td><td>Description</td></tr>
+					
+						<tr>
+							<td>Publish
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/events/v1/events.html#PublishRequest">PublishRequest</a></td>
+							<td><a href="/api/google/protobuf/empty.html#Empty">Empty</a></td>
+							<td>
+	
+	
+		
+			<p>Publish an event to a topic.</p>
+
+<p>The event will be packed into a timestamp envelope with the namespace
+ introspected from the context. The envelope will then be dispatched.</p>
+
+			
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Forward
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/events/v1/events.html#ForwardRequest">ForwardRequest</a></td>
+							<td><a href="/api/google/protobuf/empty.html#Empty">Empty</a></td>
+							<td>
+	
+	
+		
+			<p>Forward sends an event that has already been packaged into an envelope
+ with a timestamp and namespace.</p>
+
+<p>This is useful if earlier timestamping is required or when fowarding on
+ behalf of another component, namespace or publisher.</p>
+
+			
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Subscribe
+								
+								*Server-Streaming 
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/events/v1/events.html#SubscribeRequest">SubscribeRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/events/v1/events.html#Envelope">Envelope</a></td>
+							<td>
+	
+	
+		
+			<p>Subscribe to a stream of events, possibly returning only that match any
+ of the provided filters.</p>
+
+<p>Unlike many other methods in containerd, subscribers will get messages
+ from all namespaces unless otherwise specified. If this is not desired,
+ a filter can be provided in the format &lsquo;namespace==<namespace>&rsquo; to
+ restrict the received events.</p>
+
+			
+		
+	
+</td>
+						</tr>
+					
+				</table>
+
+			
+		</div>
+	
+
+	
+	
+	
+		<div class="doc-message-types">
+			<h2>Messages</h2>
+			
+				<div class="doc-inner">
+					<h3 id="PublishRequest">Message: PublishRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>topic</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>event</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/any.html#Any">Any</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ForwardRequest">Message: ForwardRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>envelope</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/events/v1/events.html#Envelope">Envelope</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="SubscribeRequest">Message: SubscribeRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>filters</td>
+								<td>repeated</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="Envelope">Message: Envelope</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>timestamp</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/timestamp.html#Timestamp">Timestamp</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>namespace</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>topic</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>4</td>
+								<td>event</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/any.html#Any">Any</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+		</div>
+	
+</div>
+
+</body>
+</html>

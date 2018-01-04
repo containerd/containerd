@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
+# Generate HTML gRPC API docs from proto files
+
 set -eu -o pipefail
 
-mkdir -p docs/grpc
-
-target=docs/grpc
+target=docs/api
 templates=docs/grpc-templates
+url_base=/api
 
+mkdir -p $target
 cp "$templates/index.header.html" "$target/index.html"
 
 for pkg in $(find api -name '*.proto' -printf "%h\n" | sort | uniq); do
     protoc \
-        --html_out="template_root=$templates,url_root=/:$target" \
+        --html_out="template_root=$templates,url_root=$url_base:$target" \
         --proto_path=/go/src/ \
         --proto_path=./protobuf/ \
         --proto_path=./vendor/github.com/gogo/protobuf/ \

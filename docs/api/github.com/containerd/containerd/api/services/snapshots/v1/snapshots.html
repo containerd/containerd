@@ -1,0 +1,1304 @@
+
+
+
+
+
+<html>
+<head>
+ <title>containerd gRPC API Documentation</title>
+ <link
+   href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/flatly/bootstrap.min.css"
+   rel="stylesheet">
+</head>
+
+<body>
+
+<div class="doc container">
+  <h1>containerd.services.snapshots.v1</h1>
+  <div class="doc-inner">
+    <p>
+      <code>github.com/containerd/containerd/api/services/snapshots/v1/snapshots.proto</code>
+      (syntax: <code>proto3</code>)
+    </p>
+  </div>
+
+	
+	
+		<div class="doc-dependencies">
+			<h2>Dependencies</h2>
+			<div class="doc-inner">
+				<ul>
+					
+						<li>gogoproto/gogo.proto</li>
+					
+						<li>google/protobuf/empty.proto</li>
+					
+						<li>google/protobuf/field_mask.proto</li>
+					
+						<li>google/protobuf/timestamp.proto</li>
+					
+						<li>github.com/containerd/containerd/api/types/mount.proto</li>
+					
+				</ul>
+			</div>
+		</div>
+	
+
+	
+	
+	
+		<div class="doc-enum-types">
+			<h2>Enums</h2>
+			
+				<div class="doc-inner">
+					<h3 id="Kind">Enum: Kind</h3>
+					
+	
+	
+		
+	
+
+					
+						<table class="table table-striped">
+							<tr><td>Name</td><td>Value</td><td>Description</td></tr>
+							
+								<tr>
+									<td>UNKNOWN</td>
+									<td>0 </td>
+									<td>
+	
+	
+		
+	
+</td>
+								</tr>
+							
+								<tr>
+									<td>VIEW</td>
+									<td>1 </td>
+									<td>
+	
+	
+		
+	
+</td>
+								</tr>
+							
+								<tr>
+									<td>ACTIVE</td>
+									<td>2 </td>
+									<td>
+	
+	
+		
+	
+</td>
+								</tr>
+							
+								<tr>
+									<td>COMMITTED</td>
+									<td>3 </td>
+									<td>
+	
+	
+		
+	
+</td>
+								</tr>
+							
+						</table>
+					
+				</div>
+			
+		</div>
+	
+
+	
+	
+
+	
+	
+		<div class="doc-services">
+			<h2>Services</h2>
+			
+				<div class="doc-inner">
+
+				<h3>Snapshots</h3>
+				
+	
+	
+		
+			<p class="description">Description:
+					<p>Snapshot service manages snapshots</p>
+
+					
+			</p>
+		
+	
+
+				<table class="table table-striped">
+					<tr><td>Method</td><td>Input Type</td><td>Output Type</td><td>Description</td></tr>
+					
+						<tr>
+							<td>Prepare
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#PrepareSnapshotRequest">PrepareSnapshotRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#PrepareSnapshotResponse">PrepareSnapshotResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>View
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#ViewSnapshotRequest">ViewSnapshotRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#ViewSnapshotResponse">ViewSnapshotResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Mounts
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#MountsRequest">MountsRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#MountsResponse">MountsResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Commit
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#CommitSnapshotRequest">CommitSnapshotRequest</a></td>
+							<td><a href="/api/google/protobuf/empty.html#Empty">Empty</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Remove
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#RemoveSnapshotRequest">RemoveSnapshotRequest</a></td>
+							<td><a href="/api/google/protobuf/empty.html#Empty">Empty</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Stat
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#StatSnapshotRequest">StatSnapshotRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#StatSnapshotResponse">StatSnapshotResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Update
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#UpdateSnapshotRequest">UpdateSnapshotRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#UpdateSnapshotResponse">UpdateSnapshotResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>List
+								
+								*Server-Streaming 
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#ListSnapshotsRequest">ListSnapshotsRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#ListSnapshotsResponse">ListSnapshotsResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Usage
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#UsageRequest">UsageRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#UsageResponse">UsageResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+				</table>
+
+			
+		</div>
+	
+
+	
+	
+	
+		<div class="doc-message-types">
+			<h2>Messages</h2>
+			
+				<div class="doc-inner">
+					<h3 id="PrepareSnapshotRequest">Message: PrepareSnapshotRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>snapshotter</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>key</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>parent</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>4</td>
+								<td>labels</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#PrepareSnapshotRequest.LabelsEntry">LabelsEntry</td>
+								
+								<td>
+	
+	
+		
+			<p>Labels are arbitrary data on snapshots.</p>
+
+<p>The combined size of a key/value pair cannot exceed 4096 bytes.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="PrepareSnapshotRequest.LabelsEntry">Message: PrepareSnapshotRequest.LabelsEntry</h3>
+					
+	
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>key</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>value</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="PrepareSnapshotResponse">Message: PrepareSnapshotResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>mounts</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/types/mount.html#Mount">Mount</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ViewSnapshotRequest">Message: ViewSnapshotRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>snapshotter</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>key</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>parent</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>4</td>
+								<td>labels</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#ViewSnapshotRequest.LabelsEntry">LabelsEntry</td>
+								
+								<td>
+	
+	
+		
+			<p>Labels are arbitrary data on snapshots.</p>
+
+<p>The combined size of a key/value pair cannot exceed 4096 bytes.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ViewSnapshotRequest.LabelsEntry">Message: ViewSnapshotRequest.LabelsEntry</h3>
+					
+	
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>key</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>value</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ViewSnapshotResponse">Message: ViewSnapshotResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>mounts</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/types/mount.html#Mount">Mount</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="MountsRequest">Message: MountsRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>snapshotter</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>key</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="MountsResponse">Message: MountsResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>mounts</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/types/mount.html#Mount">Mount</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="RemoveSnapshotRequest">Message: RemoveSnapshotRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>snapshotter</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>key</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="CommitSnapshotRequest">Message: CommitSnapshotRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>snapshotter</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>name</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>key</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>4</td>
+								<td>labels</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#CommitSnapshotRequest.LabelsEntry">LabelsEntry</td>
+								
+								<td>
+	
+	
+		
+			<p>Labels are arbitrary data on snapshots.</p>
+
+<p>The combined size of a key/value pair cannot exceed 4096 bytes.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="CommitSnapshotRequest.LabelsEntry">Message: CommitSnapshotRequest.LabelsEntry</h3>
+					
+	
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>key</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>value</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="StatSnapshotRequest">Message: StatSnapshotRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>snapshotter</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>key</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="Info">Message: Info</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>name</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>parent</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>kind</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#Kind">Kind</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>4</td>
+								<td>created_at</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/timestamp.html#Timestamp">Timestamp</td>
+								
+								<td>
+	
+	
+		
+			<p>CreatedAt provides the time at which the snapshot was created.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>5</td>
+								<td>updated_at</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/timestamp.html#Timestamp">Timestamp</td>
+								
+								<td>
+	
+	
+		
+			<p>UpdatedAt provides the time the info was last updated.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>6</td>
+								<td>labels</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#Info.LabelsEntry">LabelsEntry</td>
+								
+								<td>
+	
+	
+		
+			<p>Labels are arbitrary data on snapshots.</p>
+
+<p>The combined size of a key/value pair cannot exceed 4096 bytes.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="Info.LabelsEntry">Message: Info.LabelsEntry</h3>
+					
+	
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>key</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>value</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="StatSnapshotResponse">Message: StatSnapshotResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>info</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#Info">Info</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="UpdateSnapshotRequest">Message: UpdateSnapshotRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>snapshotter</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>info</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#Info">Info</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>update_mask</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/field_mask.html#FieldMask">FieldMask</td>
+								
+								<td>
+	
+	
+		
+			<p>UpdateMask specifies which fields to perform the update on. If empty,
+ the operation applies to all fields.</p>
+
+<p>In info, Name, Parent, Kind, Created are immutable,
+ other field may be updated using this mask.
+ If no mask is provided, all mutable field are updated.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="UpdateSnapshotResponse">Message: UpdateSnapshotResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>info</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#Info">Info</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ListSnapshotsRequest">Message: ListSnapshotsRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>snapshotter</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ListSnapshotsResponse">Message: ListSnapshotsResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>info</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.html#Info">Info</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="UsageRequest">Message: UsageRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>snapshotter</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>key</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="UsageResponse">Message: UsageResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>size</td>
+								<td>optional</td>
+								
+									<td>int64</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>inodes</td>
+								<td>optional</td>
+								
+									<td>int64</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+		</div>
+	
+</div>
+
+</body>
+</html>

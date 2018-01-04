@@ -1,0 +1,166 @@
+
+
+
+
+
+<html>
+<head>
+ <title>containerd gRPC API Documentation</title>
+ <link
+   href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/flatly/bootstrap.min.css"
+   rel="stylesheet">
+</head>
+
+<body>
+
+<div class="doc container">
+  <h1>google.protobuf</h1>
+  <div class="doc-inner">
+    <p>
+      <code>google/protobuf/timestamp.proto</code>
+      (syntax: <code>proto3</code>)
+    </p>
+  </div>
+
+	
+	
+
+	
+	
+	
+
+	
+	
+
+	
+	
+
+	
+	
+	
+		<div class="doc-message-types">
+			<h2>Messages</h2>
+			
+				<div class="doc-inner">
+					<h3 id="Timestamp">Message: Timestamp</h3>
+					
+	
+	
+		
+			<p class="description">Description:
+					<p>A Timestamp represents a point in time independent of any time zone
+ or calendar, represented as seconds and fractions of seconds at
+ nanosecond resolution in UTC Epoch time. It is encoded using the
+ Proleptic Gregorian Calendar which extends the Gregorian calendar
+ backwards to year one. It is encoded assuming all minutes are 60
+ seconds long, i.e. leap seconds are &ldquo;smeared&rdquo; so that no leap second
+ table is needed for interpretation. Range is from
+ 0001-01-01T00:00:00Z to 9999-12-31T23:59:59.999999999Z.
+ By restricting to that range, we ensure that we can convert to
+ and from  RFC 3339 date strings.
+ See <a href="https://www.ietf.org/rfc/rfc3339.txt">https://www.ietf.org/rfc/rfc3339.txt</a>.</p>
+
+<p>Example 1: Compute Timestamp from POSIX <code>time()</code>.</p>
+
+<pre><code> Timestamp timestamp;
+ timestamp.set_seconds(time(NULL));
+ timestamp.set_nanos(0);
+</code></pre>
+
+<p>Example 2: Compute Timestamp from POSIX <code>gettimeofday()</code>.</p>
+
+<pre><code> struct timeval tv;
+ gettimeofday(&amp;tv, NULL);
+
+ Timestamp timestamp;
+ timestamp.set_seconds(tv.tv_sec);
+ timestamp.set_nanos(tv.tv_usec * 1000);
+</code></pre>
+
+<p>Example 3: Compute Timestamp from Win32 <code>GetSystemTimeAsFileTime()</code>.</p>
+
+<pre><code> FILETIME ft;
+ GetSystemTimeAsFileTime(&amp;ft);
+ UINT64 ticks = (((UINT64)ft.dwHighDateTime) &lt;&lt; 32) | ft.dwLowDateTime;
+
+ // A Windows tick is 100 nanoseconds. Windows epoch 1601-01-01T00:00:00Z
+ // is 11644473600 seconds before Unix epoch 1970-01-01T00:00:00Z.
+ Timestamp timestamp;
+ timestamp.set_seconds((INT64) ((ticks / 10000000) - 11644473600LL));
+ timestamp.set_nanos((INT32) ((ticks % 10000000) * 100));
+</code></pre>
+
+<p>Example 4: Compute Timestamp from Java <code>System.currentTimeMillis()</code>.</p>
+
+<pre><code> long millis = System.currentTimeMillis();
+
+ Timestamp timestamp = Timestamp.newBuilder().setSeconds(millis / 1000)
+     .setNanos((int) ((millis % 1000) * 1000000)).build();
+</code></pre>
+
+<p>Example 5: Compute Timestamp from current time in Python.</p>
+
+<pre><code> timestamp = Timestamp()
+ timestamp.GetCurrentTime()
+</code></pre>
+
+					
+			</p>
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>seconds</td>
+								<td>optional</td>
+								
+									<td>int64</td>
+								
+								<td>
+	
+	
+		
+			<p>Represents seconds of UTC time since Unix epoch
+ 1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z to
+ 9999-12-31T23:59:59Z inclusive.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>nanos</td>
+								<td>optional</td>
+								
+									<td>int32</td>
+								
+								<td>
+	
+	
+		
+			<p>Non-negative fractions of a second at nanosecond resolution. Negative
+ second values with fractions must still have non-negative nanos values
+ that count forward in time. Must be from 0 to 999,999,999
+ inclusive.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+		</div>
+	
+</div>
+
+</body>
+</html>
