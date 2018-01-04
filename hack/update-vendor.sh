@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
+source $(dirname "${BASH_SOURCE[0]}")/utils.sh
 cd ${ROOT}
 
 echo "Sort vendor.conf..."
