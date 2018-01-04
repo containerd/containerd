@@ -141,7 +141,8 @@ ${sudo} make install -e DESTDIR=${CONTAINERD_DIR}
 checkout_repo ${CRITOOL_PKG} ${CRITOOL_VERSION}
 cd ${GOPATH}/src/${CRITOOL_PKG}
 make
-${sudo} make install -e BINDIR=${CRICTL_DIR}
+# make install critools require GOPATH to be set correctly.
+${sudo} make install -e BINDIR=${CRICTL_DIR} GOPATH=${GOPATH}
 ${sudo} mkdir -p ${CRICTL_CONFIG_DIR}
 ${sudo} bash -c 'cat >'${CRICTL_CONFIG_DIR}'/crictl.yaml <<EOF
 runtime-endpoint: /var/run/cri-containerd.sock
