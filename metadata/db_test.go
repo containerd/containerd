@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/pprof"
+	"strings"
 	"testing"
 	"time"
 
@@ -28,6 +29,44 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
+
+func testDB(t *testing.T) (context.Context, *DB, func()) {
+	ctx, cancel := context.WithCancel(context.Background())
+	ctx = namespaces.WithNamespace(ctx, "testing")
+
+	dirname, err := ioutil.TempDir("", strings.Replace(t.Name(), "/", "_", -1)+"-")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	snapshotter, err := naive.NewSnapshotter(filepath.Join(dirname, "naive"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cs, err := local.NewStore(filepath.Join(dirname, "content"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bdb, err := bolt.Open(filepath.Join(dirname, "metadata.db"), 0644, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	db := NewDB(bdb, cs, map[string]snapshots.Snapshotter{"naive": snapshotter})
+	if err := db.Init(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	return ctx, db, func() {
+		bdb.Close()
+		if err := os.RemoveAll(dirname); err != nil {
+			t.Log("failed removing temp dir", err)
+		}
+		cancel()
+	}
+}
 
 func TestInit(t *testing.T) {
 	ctx, db, cancel := testEnv(t)
