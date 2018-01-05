@@ -41,6 +41,7 @@ const (
 	containerdEndpoint    = "/run/containerd/containerd.sock"
 	criContainerdEndpoint = "/var/run/cri-containerd.sock"
 	criContainerdRoot     = "/var/lib/cri-containerd"
+	standaloneEnvKey      = "STANDALONE_CRI_CONTAINERD"
 )
 
 var (

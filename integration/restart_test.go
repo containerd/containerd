@@ -31,8 +31,12 @@ import (
 )
 
 // Restart test must run sequentially.
+// NOTE(random-liu): Current restart test only support standalone cri-containerd mode.
 
 func TestSandboxAcrossCRIContainerdRestart(t *testing.T) {
+	if os.Getenv(standaloneEnvKey) == "false" {
+		t.Skip("Skip because cri-containerd does not run in standalone mode")
+	}
 	ctx := context.Background()
 	sandboxNS := "sandbox-restart-cri-containerd"
 	sandboxes := []struct {
@@ -149,6 +153,9 @@ func TestSandboxAcrossCRIContainerdRestart(t *testing.T) {
 // teardown the network properly.
 // This test uses host network sandbox to avoid resource leakage.
 func TestSandboxDeletionAcrossCRIContainerdRestart(t *testing.T) {
+	if os.Getenv(standaloneEnvKey) == "false" {
+		t.Skip("Skip because cri-containerd does not run in standalone mode")
+	}
 	ctx := context.Background()
 	sandboxNS := "sandbox-delete-restart-cri-containerd"
 	t.Logf("Make sure no sandbox is running before test")

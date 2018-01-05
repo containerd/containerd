@@ -21,6 +21,8 @@ source ${ROOT}/hack/versions
 CRI_CONTAINERD_FLAGS=${CRI_CONTAINERD_FLAGS:-""}
 # RESTART_WAIT_PERIOD is the period to wait before restarting cri-containerd/containerd.
 RESTART_WAIT_PERIOD=${RESTART_WAIT_PERIOD:-10}
+# STANDALONE_CRI_CONTAINERD indicates whether to run standalone cri-containerd.
+STANDALONE_CRI_CONTAINERD=${STANDALONE_CRI_CONTAINERD:-true}
 
 CRICONTAINERD_SOCK=/var/run/cri-containerd.sock
 
@@ -48,9 +50,11 @@ test_setup() {
   readiness_check "sudo ctr version"
 
   # Start cri-containerd
-  keepalive "sudo ${ROOT}/_output/cri-containerd --alsologtostderr --v 4 ${CRI_CONTAINERD_FLAGS}" \
-	  ${RESTART_WAIT_PERIOD} &> ${report_dir}/cri-containerd.log &
-  cri_containerd_pid=$!
+  if ${STANDALONE_CRI_CONTAINERD}; then
+    keepalive "sudo ${ROOT}/_output/cri-containerd --alsologtostderr --v 4 ${CRI_CONTAINERD_FLAGS}" \
+      ${RESTART_WAIT_PERIOD} &> ${report_dir}/cri-containerd.log &
+    cri_containerd_pid=$!
+  fi
   readiness_check "sudo ${GOPATH}/bin/crictl --runtime-endpoint=${CRICONTAINERD_SOCK} info"
 }
 
