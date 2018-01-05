@@ -13,7 +13,7 @@ or `crictl` please make sure the issue has not already been submitted.
 If you have not already installed crictl please install the version compatible
 with the `cri-containerd` you are using. If you are a user, your deployment
 should have installed crictl for you. If not, get it from your release tarball.
-If you are a developer the current version of crictl is specified [here](./hack/version).
+If you are a developer the current version of crictl is specified [here](../hack/versions).
 A helper command has been included to install the dependencies at the right version:
 ```console
 $ make install.deps
@@ -23,8 +23,8 @@ so you don't have to repeatedly specify the runtime sock used to connect crictl
 to the container runtime:
 ```console
 $ cat /etc/crictl.yaml
-runtime-endpoint: /run/containerd/containerd.sock
-image-endpoint: /run/containerd/containerd.sock
+runtime-endpoint: /var/run/cri-containerd.sock
+image-endpoint: /var/run/cri-containerd.sock
 timeout: 10
 debug: true
 ```
