@@ -52,7 +52,7 @@ specifications as appropriate.
 1. Install development libraries:
 * **libseccomp development library.** Required by cri-containerd and runc seccomp support. `libseccomp-dev` (Ubuntu, Debian) / `libseccomp-devel`
 (Fedora, CentOS, RHEL). On releases of Ubuntu <=Trusty and Debian <=jessie a
-backport version of `libsecomp-dev` is required. See [travis.yml](.travis.yml) for an example on trusty.
+backport version of `libseccomp-dev` is required. See [travis.yml](.travis.yml) for an example on trusty.
 * **libapparmor development library.** Required by cri-containerd and runc apparmor support. To use apparmor on Debian, Ubuntu, and related distributions the installation of `libapparmor-dev` is required.
 * **btrfs development library.** Required by containerd btrfs support. `btrfs-tools`(Ubuntu, Debian) / `btrfs-progs-devel`(Fedora, CentOS, RHEL)
 2. Install other dependencies:
