@@ -1,6 +1,7 @@
 package mount
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 
@@ -34,20 +35,21 @@ func All(mounts []Mount, target string) error {
 // WithTempMount mounts the provided mounts to a temp dir, and pass the temp dir to f.
 // The mounts are valid during the call to the f.
 // Finally we will unmount and remove the temp dir regardless of the result of f.
-func WithTempMount(mounts []Mount, f func(root string) error) (err error) {
+func WithTempMount(ctx context.Context, mounts []Mount, f func(root string) error) (err error) {
 	root, uerr := ioutil.TempDir("", "containerd-WithTempMount")
 	if uerr != nil {
-		return errors.Wrapf(uerr, "failed to create temp dir for %v", mounts)
+		return errors.Wrapf(uerr, "failed to create temp dir")
 	}
 	// We use Remove here instead of RemoveAll.
 	// The RemoveAll will delete the temp dir and all children it contains.
-	// When the Unmount fails, if we use RemoveAll, We will incorrectly delete data from mounted dir.
-	// if we use Remove,even though we won't successfully delete the temp dir,
-	// but we only leak a temp dir, we don't loss data from mounted dir.
+	// When the Unmount fails, RemoveAll will incorrectly delete data from
+	// the mounted dir. However, if we use Remove, even though we won't
+	// successfully delete the temp dir and it may leak, we won't loss data
+	// from the mounted dir.
 	// For details, please refer to #1868 #1785.
 	defer func() {
 		if uerr = os.Remove(root); uerr != nil {
-			log.L.Errorf("Failed to remove the temp dir %s: %v", root, uerr)
+			log.G(ctx).WithError(uerr).WithField("dir", root).Errorf("failed to remove mount temp dir")
 		}
 	}()
 
@@ -66,8 +68,5 @@ func WithTempMount(mounts []Mount, f func(root string) error) (err error) {
 		return errors.Wrapf(uerr, "failed to mount %s", root)
 	}
 
-	if uerr = f(root); uerr != nil {
-		return errors.Wrapf(uerr, "failed to f(%s)", root)
-	}
-	return nil
+	return errors.Wrapf(f(root), "mount callback failed on %s", root)
 }

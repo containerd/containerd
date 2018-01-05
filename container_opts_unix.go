@@ -165,7 +165,7 @@ func withRemappedSnapshotBase(id string, i Image, uid, gid uint32, readonly bool
 		if err != nil {
 			return err
 		}
-		if err := remapRootFS(mounts, uid, gid); err != nil {
+		if err := remapRootFS(ctx, mounts, uid, gid); err != nil {
 			snapshotter.Remove(ctx, usernsID)
 			return err
 		}
@@ -186,8 +186,8 @@ func withRemappedSnapshotBase(id string, i Image, uid, gid uint32, readonly bool
 	}
 }
 
-func remapRootFS(mounts []mount.Mount, uid, gid uint32) error {
-	return mount.WithTempMount(mounts, func(root string) error {
+func remapRootFS(ctx context.Context, mounts []mount.Mount, uid, gid uint32) error {
+	return mount.WithTempMount(ctx, mounts, func(root string) error {
 		return filepath.Walk(root, incrementFS(root, uid, gid))
 	})
 }
