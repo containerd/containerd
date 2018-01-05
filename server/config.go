@@ -50,7 +50,8 @@ type Debug struct {
 
 // MetricsConfig provides metrics configuration
 type MetricsConfig struct {
-	Address string `toml:"address"`
+	Address       string `toml:"address"`
+	GRPCHistogram bool   `toml:"grpc_histogram"`
 }
 
 // CgroupConfig provides cgroup configuration

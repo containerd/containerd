@@ -70,6 +70,7 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 		s        = &Server{
 			rpc:    rpc,
 			events: exchange.NewExchange(),
+			config: config,
 		}
 		initialized = plugin.NewPluginSet()
 	)
@@ -127,10 +128,15 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 type Server struct {
 	rpc    *grpc.Server
 	events *exchange.Exchange
+	config *Config
 }
 
 // ServeGRPC provides the containerd grpc APIs on the provided listener
 func (s *Server) ServeGRPC(l net.Listener) error {
+	if s.config.Metrics.GRPCHistogram {
+		// enable grpc time histograms to measure rpc latencies
+		grpc_prometheus.EnableHandlingTimeHistogram()
+	}
 	// before we start serving the grpc API regster the grpc_prometheus metrics
 	// handler.  This needs to be the last service registered so that it can collect
 	// metrics for every other service
