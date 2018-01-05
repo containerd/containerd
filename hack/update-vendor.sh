@@ -21,9 +21,6 @@ set -o pipefail
 source $(dirname "${BASH_SOURCE[0]}")/utils.sh
 cd ${ROOT}
 
-echo "Sort vendor.conf..."
-sort vendor.conf -o vendor.conf
-
 echo "Compare vendor with hack/versions..."
 need_update=false
 declare -A map=()
@@ -50,5 +47,51 @@ if [ ${need_update} = true ]; then
   echo "Please update \"hack/versions\" by executing \"hack/update-vendor.sh\"!"
   exit 1
 fi
+
+# hack/versions should be correct now.
+echo "Compare vendor with containerd vendors..."
+source hack/versions
+if [ -z "${CONTAINERD_REPO}" ]; then
+  CONTAINERD_REPO=containerd/containerd
+else
+  CONTAINERD_REPO=${CONTAINERD_REPO#*/}
+fi
+containerd_vendor=$(mktemp /tmp/containerd-vendor.conf.XXXX)
+curl -s https://raw.githubusercontent.com/${CONTAINERD_REPO}/${CONTAINERD_VERSION}/vendor.conf > ${containerd_vendor}
+# Create a temporary vendor file to update.
+tmp_vendor=$(mktemp /tmp/vendor.conf.XXXX)
+while read vendor; do
+  repo=$(echo ${vendor} | awk '{print $1}')
+  commit=$(echo ${vendor} | awk '{print $2}')
+  alias=$(echo ${vendor} | awk '{print $3}')
+  vendor_in_containerd=$(grep ${repo} ${containerd_vendor} || true)
+  if [ -z "${vendor_in_containerd}" ]; then
+    echo ${vendor} >> ${tmp_vendor}
+    continue
+  fi
+  commit_in_containerd=$(echo ${vendor_in_containerd} | awk '{print $2}')
+  alias_in_containerd=$(echo ${vendor_in_containerd} | awk '{print $3}')
+  if [[ "${commit}" != "${commit_in_containerd}" || "${alias}" != "${alias_in_containerd}" ]]; then
+    echo ${vendor_in_containerd} >> ${tmp_vendor}
+  else
+    echo ${vendor} >> ${tmp_vendor}
+  fi
+done < vendor.conf
+# Update vendors if temporary vendor.conf is different from the original one.
+if ! diff vendor.conf ${tmp_vendor} > /dev/null; then
+  if [ $# -gt 0 ] && [ ${1} = "-only-verify" ]; then
+    echo "Need to update vendor.conf."
+    diff vendor.conf ${tmp_vendor}
+    rm ${tmp_vendor}
+    exit 1
+  else
+    echo "Updating vendor.conf."
+    mv ${tmp_vendor} vendor.conf
+  fi
+fi
+rm ${containerd_vendor}
+
+echo "Sort vendor.conf..."
+sort vendor.conf -o vendor.conf
 
 echo "Please commit the change made by this file..."
