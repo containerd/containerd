@@ -34,6 +34,8 @@ type Sandbox struct {
 	Container containerd.Container
 	// CNI network namespace client
 	NetNS *NetNS
+	// IP of Pod if it is attached to non host network
+	IP string
 }
 
 // Store stores all sandboxes.

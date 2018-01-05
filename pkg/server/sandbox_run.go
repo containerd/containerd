@@ -119,6 +119,18 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 				}
 			}
 		}()
+		ip, err := c.netPlugin.GetPodNetworkStatus(podNetwork)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get network status for sandbox %q: %v", id, err)
+		}
+		// Certain VM based solutions like clear containers (Issue kubernetes-incubator/cri-containerd#524)
+		//  rely on the assumption that CRI shim will not be querying the network namespace to check the
+		// network states such as IP.
+		// In furture runtime implementation should avoid relying on CRI shim implementation details.
+		// In this case however caching the IP will add a subtle performance enhancement by avoiding
+		// calls to network namespace of the pod to query the IP of the veth interface on every
+		// SandboxStatus request.
+		sandbox.IP = ip
 	}
 
 	// Create sandbox container.
