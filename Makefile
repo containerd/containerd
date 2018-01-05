@@ -50,10 +50,8 @@ TESTFLAGS_RACE=
 GO_GCFLAGS=
 GO_BUILD_FLAGS=
 
-#Detect the target os
-include Makefile.OS
 #include platform specific makefile
-include Makefile.$(target_os)
+-include Makefile.$(GOOS)
 
 # Add the "incremental" build option `-i` (installs the packages that are
 # dependencies of the target) to speed up future builds. Only for native builds,
