@@ -10,13 +10,11 @@ import (
 	"time"
 
 	"github.com/Microsoft/hcsshim"
-	"github.com/boltdb/bolt"
 	eventstypes "github.com/containerd/containerd/api/events"
-	containerdtypes "github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/metadata"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
@@ -55,12 +53,6 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	if err := os.MkdirAll(ic.Root, 0700); err != nil {
 		return nil, errors.Wrapf(err, "could not create state directory at %s", ic.Root)
 	}
-
-	m, err := ic.Get(plugin.MetadataPlugin)
-	if err != nil {
-		return nil, err
-	}
-
 	r := &windowsRuntime{
 		root:    ic.Root,
 		pidPool: newPidPool(),
@@ -70,7 +62,6 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		// TODO(mlaventure): windows needs a stat monitor
 		monitor: nil,
 		tasks:   runtime.NewTaskList(),
-		db:      m.(*metadata.DB),
 	}
 
 	// Load our existing containers and kill/delete them. We don't support
@@ -91,7 +82,6 @@ type windowsRuntime struct {
 
 	monitor runtime.TaskMonitor
 	tasks   *runtime.TaskList
-	db      *metadata.DB
 }
 
 func (r *windowsRuntime) ID() string {
@@ -124,8 +114,14 @@ func (r *windowsRuntime) Create(ctx context.Context, id string, opts runtime.Cre
 	if createOpts.TerminateDuration == 0 {
 		createOpts.TerminateDuration = defaultTerminateDuration
 	}
+	spec.Windows.LayerFolders = append(spec.Windows.LayerFolders, opts.Rootfs[0].Source)
+	parentLayerPaths, err := opts.Rootfs[0].GetParentPaths()
+	if err != nil {
+		return nil, err
+	}
+	spec.Windows.LayerFolders = append(spec.Windows.LayerFolders, parentLayerPaths...)
 
-	return r.newTask(ctx, namespace, id, spec, opts.IO, createOpts)
+	return r.newTask(ctx, namespace, id, opts.Rootfs, spec, opts.IO, createOpts)
 }
 
 func (r *windowsRuntime) Get(ctx context.Context, id string) (runtime.Task, error) {
@@ -209,14 +205,19 @@ func (r *windowsRuntime) Delete(ctx context.Context, t runtime.Task) (*runtime.E
 		ns, _ := namespaces.Namespace(ctx)
 		serviceCtx := log.WithLogger(context.Background(), log.GetLogger(ctx))
 		serviceCtx = namespaces.WithNamespace(serviceCtx, ns)
-		r.serviceTask(serviceCtx, ns, wt.id+"_servicing", wt.spec)
+		r.serviceTask(serviceCtx, ns, wt.id+"_servicing", wt.rootfs, wt.spec)
+	}
+
+	if err := mount.UnmountAll(wt.rootfs[0].Source, 0); err != nil {
+		log.G(ctx).WithError(err).WithField("path", wt.rootfs[0].Source).
+			Warn("failed to unmount rootfs on failure")
 	}
 
 	// We were never started, return failure
 	return rtExit, nil
 }
 
-func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, spec *specs.Spec, io runtime.IO, createOpts *hcsshimtypes.CreateOptions) (*task, error) {
+func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, rootfs []mount.Mount, spec *specs.Spec, io runtime.IO, createOpts *hcsshimtypes.CreateOptions) (*task, error) {
 	var (
 		err  error
 		pset *pipeSet
@@ -241,6 +242,18 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, spec
 		}
 	}()
 
+	if err := mount.All(rootfs, ""); err != nil {
+		return nil, errors.Wrap(err, "failed to mount rootfs")
+	}
+	defer func() {
+		if err != nil {
+			if err := mount.UnmountAll(rootfs[0].Source, 0); err != nil {
+				log.G(ctx).WithError(err).WithField("path", rootfs[0].Source).
+					Warn("failed to unmount rootfs on failure")
+			}
+		}
+	}()
+
 	var (
 		conf *hcsshim.ContainerConfig
 		nsid = namespace + "-" + id
@@ -248,31 +261,6 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, spec
 	if conf, err = newWindowsContainerConfig(ctx, hcsshimOwner, nsid, spec); err != nil {
 		return nil, err
 	}
-	defer func() {
-		if err != nil {
-			removeLayer(ctx, conf.LayerFolderPath)
-		}
-	}()
-
-	// TODO: remove this once we have a windows snapshotter
-	// Store the LayerFolder in the db so we can clean it if we die
-	if err = r.db.Update(func(tx *bolt.Tx) error {
-		s := newLayerFolderStore(tx)
-		return s.Create(nsid, conf.LayerFolderPath)
-	}); err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err != nil {
-			if dbErr := r.db.Update(func(tx *bolt.Tx) error {
-				s := newLayerFolderStore(tx)
-				return s.Delete(nsid)
-			}); dbErr != nil {
-				log.G(ctx).WithField("id", id).
-					Error("failed to remove key from metadata")
-			}
-		}
-	}()
 
 	ctr, err := hcsshim.CreateContainer(nsid, conf)
 	if err != nil {
@@ -301,6 +289,7 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, spec
 		hyperV:            spec.Windows.HyperV != nil,
 		publisher:         r.publisher,
 		rwLayer:           conf.LayerFolderPath,
+		rootfs:            rootfs,
 		pidPool:           r.pidPool,
 		hcsContainer:      ctr,
 		terminateDuration: createOpts.TerminateDuration,
@@ -312,14 +301,6 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, spec
 	}
 	r.tasks.Add(ctx, t)
 
-	var rootfs []*containerdtypes.Mount
-	for _, l := range append([]string{t.rwLayer}, spec.Windows.LayerFolders...) {
-		rootfs = append(rootfs, &containerdtypes.Mount{
-			Type:   "windows-layer",
-			Source: l,
-		})
-	}
-
 	r.publisher.Publish(ctx,
 		runtime.TaskCreateEventTopic,
 		&eventstypes.TaskCreate{
@@ -330,8 +311,8 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, spec
 				Stderr:   io.Stderr,
 				Terminal: io.Terminal,
 			},
-			Pid:    t.pid,
-			Rootfs: rootfs,
+			Pid: t.pid,
+			//???Rootfs: rootfs,
 			// TODO: what should be in Bundle for windows?
 		})
 
@@ -360,34 +341,10 @@ func (r *windowsRuntime) cleanup(ctx context.Context) {
 			container.Wait()
 		}
 		container.Close()
-
-		// TODO: remove this once we have a windows snapshotter
-		var layerFolderPath string
-		if err := r.db.View(func(tx *bolt.Tx) error {
-			s := newLayerFolderStore(tx)
-			l, e := s.Get(p.ID)
-			if err == nil {
-				layerFolderPath = l
-			}
-			return e
-		}); err == nil && layerFolderPath != "" {
-			removeLayer(ctx, layerFolderPath)
-			if dbErr := r.db.Update(func(tx *bolt.Tx) error {
-				s := newLayerFolderStore(tx)
-				return s.Delete(p.ID)
-			}); dbErr != nil {
-				log.G(ctx).WithField("id", p.ID).
-					Error("failed to remove key from metadata")
-			}
-		} else {
-			log.G(ctx).WithField("id", p.ID).
-				Debug("key not found in metadata, R/W layer may be leaked")
-		}
-
 	}
 }
 
-func (r *windowsRuntime) serviceTask(ctx context.Context, namespace, id string, spec *specs.Spec) {
+func (r *windowsRuntime) serviceTask(ctx context.Context, namespace, id string, rootfs []mount.Mount, spec *specs.Spec) {
 	var (
 		err        error
 		t          *task
@@ -397,7 +354,7 @@ func (r *windowsRuntime) serviceTask(ctx context.Context, namespace, id string, 
 		}
 	)
 
-	t, err = r.newTask(ctx, namespace, id, spec, io, createOpts)
+	t, err = r.newTask(ctx, namespace, id, rootfs, spec, io, createOpts)
 	if err != nil {
 		log.G(ctx).WithError(err).WithField("id", id).
 			Warn("failed to created servicing task")

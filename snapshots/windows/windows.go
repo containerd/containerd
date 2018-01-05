@@ -41,12 +41,12 @@ type snapshotter struct {
 
 // NewSnapshotter returns a new windows snapshotter
 func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
-	fsType, err := getFileSystemType(string(root[0]))
+	fsType, err := getFileSystemType(root)
 	if err != nil {
 		return nil, err
 	}
-	if strings.ToLower(fsType) == "refs" {
-		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "%s is on an ReFS volume - ReFS volumes are not supported", root)
+	if strings.ToLower(fsType) != "ntfs" {
+		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "%s is not on an NTFS volume - only NTFS volumes are supported", root)
 	}
 
 	if err := os.MkdirAll(root, 0700); err != nil {
@@ -83,11 +83,7 @@ func (s *snapshotter) Stat(ctx context.Context, key string) (snapshots.Info, err
 	defer t.Rollback()
 
 	_, info, _, err := storage.GetInfo(ctx, key)
-	if err != nil {
-		return snapshots.Info{}, err
-	}
-
-	return info, nil
+	return info, err
 }
 
 func (s *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
@@ -95,13 +91,7 @@ func (s *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 	if err != nil {
 		return snapshots.Info{}, err
 	}
-
-	var committed bool
-	defer func() {
-		if committed == false {
-			rollbackWithLogging(ctx, t)
-		}
-	}()
+	defer t.Rollback()
 
 	info, err = storage.UpdateInfo(ctx, info, fieldpaths...)
 	if err != nil {
@@ -111,7 +101,6 @@ func (s *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 	if err := t.Commit(); err != nil {
 		return snapshots.Info{}, err
 	}
-	committed = true
 
 	return info, nil
 }
@@ -156,6 +145,7 @@ func (s *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 		return nil, err
 	}
 	defer t.Rollback()
+
 	snapshot, err := storage.GetSnapshot(ctx, key)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get snapshot mount")
@@ -168,13 +158,8 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	if err != nil {
 		return err
 	}
+	defer t.Rollback()
 
-	var committed bool
-	defer func() {
-		if committed == false {
-			rollbackWithLogging(ctx, t)
-		}
-	}()
 	usage := fs.Usage{
 		Size: 0,
 	}
@@ -186,7 +171,6 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	if err := t.Commit(); err != nil {
 		return err
 	}
-	committed = true
 	return nil
 }
 
@@ -197,13 +181,7 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 	if err != nil {
 		return err
 	}
-
-	var committed bool
-	defer func() {
-		if committed == false {
-			rollbackWithLogging(ctx, t)
-		}
-	}()
+	defer t.Rollback()
 
 	id, _, err := storage.Remove(ctx, key)
 	if err != nil {
@@ -217,15 +195,13 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 		return err
 	}
 
-	err = t.Commit()
-	if err != nil {
+	if err := t.Commit(); err != nil {
 		if err1 := os.Rename(renamed, path); err1 != nil {
 			// May cause inconsistent data on disk
 			log.G(ctx).WithError(err1).WithField("path", renamed).Errorf("Failed to rename after failed commit")
 		}
 		return errors.Wrap(err, "failed to commit")
 	}
-	committed = true
 
 	if err := hcsshim.DestroyLayer(s.info, renamedID); err != nil {
 		// Must be cleaned up, any "rm-*" could be removed if no active transactions
@@ -242,6 +218,7 @@ func (s *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 		return err
 	}
 	defer t.Rollback()
+
 	return storage.WalkInfo(ctx, fn)
 }
 
@@ -251,9 +228,7 @@ func (s *snapshotter) Close() error {
 }
 
 func (s *snapshotter) mounts(sn storage.Snapshot) []mount.Mount {
-	var (
-		roFlag string
-	)
+	var roFlag string
 
 	if sn.Kind == snapshots.KindView {
 		roFlag = "ro"
@@ -288,13 +263,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	if err != nil {
 		return nil, err
 	}
-
-	var committed bool
-	defer func() {
-		if committed == false {
-			rollbackWithLogging(ctx, t)
-		}
-	}()
+	defer t.Rollback()
 
 	newSnapshot, err := storage.CreateSnapshot(ctx, kind, key, parent, opts...)
 	if err != nil {
@@ -328,7 +297,6 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	if err := t.Commit(); err != nil {
 		return nil, errors.Wrap(err, "commit failed")
 	}
-	committed = true
 
 	return s.mounts(newSnapshot), nil
 }
@@ -343,17 +311,19 @@ func (s *snapshotter) parentIDsToParentPaths(parentIDs []string) []string {
 
 // getFileSystemType obtains the type of a file system through GetVolumeInformation
 // https://msdn.microsoft.com/en-us/library/windows/desktop/aa364993(v=vs.85).aspx
-func getFileSystemType(drive string) (fsType string, hr error) {
+func getFileSystemType(path string) (fsType string, hr error) {
+	drive := filepath.VolumeName(path)
+	if len(drive) != 2 {
+		return "", errors.New("getFileSystemType path must start with a drive letter")
+	}
+
 	var (
 		modkernel32              = windows.NewLazySystemDLL("kernel32.dll")
 		procGetVolumeInformation = modkernel32.NewProc("GetVolumeInformationW")
 		buf                      = make([]uint16, 255)
 		size                     = windows.MAX_PATH + 1
 	)
-	if len(drive) != 1 {
-		return "", errors.New("getFileSystemType must be called with a drive letter")
-	}
-	drive += `:\`
+	drive += `\`
 	n := uintptr(unsafe.Pointer(nil))
 	r0, _, _ := syscall.Syscall9(procGetVolumeInformation.Addr(), 8, uintptr(unsafe.Pointer(windows.StringToUTF16Ptr(drive))), n, n, n, n, n, uintptr(unsafe.Pointer(&buf[0])), uintptr(size), 0)
 	if int32(r0) < 0 {

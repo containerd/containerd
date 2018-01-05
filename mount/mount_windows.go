@@ -39,11 +39,6 @@ func (m *Mount) Mount(target string) error {
 	if err = hcsshim.PrepareLayer(di, layerID, parentLayerPaths); err != nil {
 		return errors.Wrapf(err, "failed to prepare layer %s", m.Source)
 	}
-	defer func() {
-		if err != nil {
-			hcsshim.UnprepareLayer(di, layerID)
-		}
-	}()
 	return nil
 }
 
@@ -67,10 +62,12 @@ func (m *Mount) GetParentPaths() ([]string, error) {
 
 // Unmount the mount at the provided path
 func Unmount(mount string, flags int) error {
-	home, layerID := filepath.Split(mount)
-	var di = hcsshim.DriverInfo{
-		HomeDir: home,
-	}
+	var (
+		home, layerID = filepath.Split(mount)
+		di            = hcsshim.DriverInfo{
+			HomeDir: home,
+		}
+	)
 
 	if err := hcsshim.UnprepareLayer(di, layerID); err != nil {
 		return errors.Wrapf(err, "failed to unprepare layer %s", mount)

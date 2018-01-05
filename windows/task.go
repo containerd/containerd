@@ -11,6 +11,7 @@ import (
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/windows/hcsshimtypes"
 	"github.com/containerd/typeurl"
@@ -33,6 +34,7 @@ type task struct {
 
 	publisher events.Publisher
 	rwLayer   string
+	rootfs    []mount.Mount
 
 	pidPool           *pidPool
 	hcsContainer      hcsshim.Container
@@ -406,6 +408,5 @@ func (t *task) cleanup() {
 	for _, p := range t.processes {
 		t.removeProcessNL(p.id)
 	}
-	removeLayer(context.Background(), t.rwLayer)
 	t.Unlock()
 }

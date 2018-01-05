@@ -140,7 +140,7 @@ func (s *windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts
 // DiffMounts creates a diff between the given mounts and uploads the result
 // to the content store.
 func (s *windowsDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
-	panic("not implemented on Windows")
+	return emptyDesc, errdefs.ErrNotImplemented
 }
 
 type readCounter struct {
