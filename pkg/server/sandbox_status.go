@@ -23,7 +23,6 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/cri-o/ocicni/pkg/ocicni"
 	"github.com/golang/glog"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/net/context"
@@ -57,11 +56,7 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 		processStatus = taskStatus.Status
 	}
 
-	ip, err := c.getIP(sandbox)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox ip: %v", err)
-	}
-
+	ip := c.getIP(sandbox)
 	ctrInfo, err := sandbox.Container.Info(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox container info: %v", err)
@@ -79,42 +74,21 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 	}, nil
 }
 
-func (c *criContainerdService) getIP(sandbox sandboxstore.Sandbox) (string, error) {
+func (c *criContainerdService) getIP(sandbox sandboxstore.Sandbox) string {
 	config := sandbox.Config
 
 	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostNetwork() {
 		// For sandboxes using the host network we are not
 		// responsible for reporting the IP.
-		return "", nil
-	}
-
-	if err := c.netPlugin.Status(); err != nil {
-		// If the network is not ready then there is nothing to report.
-		glog.V(4).Infof("getIP: unable to get sandbox %q network status: network plugin not ready.", sandbox.ID)
-		return "", nil
+		return ""
 	}
 
 	// The network namespace has been closed.
 	if sandbox.NetNS == nil || sandbox.NetNS.Closed() {
-		return "", nil
+		return ""
 	}
 
-	podNetwork := ocicni.PodNetwork{
-		Name:         config.GetMetadata().GetName(),
-		Namespace:    config.GetMetadata().GetNamespace(),
-		ID:           sandbox.ID,
-		NetNS:        sandbox.NetNSPath,
-		PortMappings: toCNIPortMappings(config.GetPortMappings()),
-	}
-
-	ip, err := c.netPlugin.GetPodNetworkStatus(podNetwork)
-	if err == nil {
-		return ip, nil
-	}
-
-	// Ignore the error on network status
-	glog.V(4).Infof("getIP: failed to read sandbox %q IP from plugin: %v", sandbox.ID, err)
-	return "", nil
+	return sandbox.IP
 }
 
 // toCRISandboxStatus converts sandbox metadata into CRI pod sandbox status.
