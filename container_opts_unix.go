@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -188,21 +187,9 @@ func withRemappedSnapshotBase(id string, i Image, uid, gid uint32, readonly bool
 }
 
 func remapRootFS(mounts []mount.Mount, uid, gid uint32) error {
-	root, err := ioutil.TempDir("", "ctd-remap")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(root)
-	for _, m := range mounts {
-		if err := m.Mount(root); err != nil {
-			return err
-		}
-	}
-	err = filepath.Walk(root, incrementFS(root, uid, gid))
-	if uerr := mount.Unmount(root, 0); err == nil {
-		err = uerr
-	}
-	return err
+	return mount.WithTempMount(mounts, func(root string) error {
+		return filepath.Walk(root, incrementFS(root, uid, gid))
+	})
 }
 
 func incrementFS(root string, uidInc, gidInc uint32) filepath.WalkFunc {

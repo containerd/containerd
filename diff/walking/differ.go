@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 	"strings"
 	"time"
 
@@ -90,60 +89,49 @@ func (s *walkingDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts
 		}
 	}
 
-	dir, err := ioutil.TempDir("", "extract-")
-	if err != nil {
-		return emptyDesc, errors.Wrap(err, "failed to create temporary directory")
-	}
-	// We change RemoveAll to Remove so that we either leak a temp dir
-	// if it fails but not RM snapshot data. refer to #1868 #1785
-	defer os.Remove(dir)
-
-	if err := mount.All(mounts, dir); err != nil {
-		return emptyDesc, errors.Wrap(err, "failed to mount")
-	}
-	defer func() {
-		if uerr := mount.Unmount(dir, 0); uerr != nil {
-			if err == nil {
-				err = uerr
-			}
-		}
-	}()
-
-	ra, err := s.store.ReaderAt(ctx, desc.Digest)
-	if err != nil {
-		return emptyDesc, errors.Wrap(err, "failed to get reader from content store")
-	}
-	defer ra.Close()
-
-	r := content.NewReader(ra)
-	if isCompressed {
-		ds, err := compression.DecompressStream(r)
+	var ocidesc ocispec.Descriptor
+	if err := mount.WithTempMount(mounts, func(root string) error {
+		ra, err := s.store.ReaderAt(ctx, desc.Digest)
 		if err != nil {
-			return emptyDesc, err
+			return errors.Wrap(err, "failed to get reader from content store")
 		}
-		defer ds.Close()
-		r = ds
-	}
+		defer ra.Close()
 
-	digester := digest.Canonical.Digester()
-	rc := &readCounter{
-		r: io.TeeReader(r, digester.Hash()),
-	}
+		r := content.NewReader(ra)
+		if isCompressed {
+			ds, err := compression.DecompressStream(r)
+			if err != nil {
+				return err
+			}
+			defer ds.Close()
+			r = ds
+		}
 
-	if _, err := archive.Apply(ctx, dir, rc); err != nil {
+		digester := digest.Canonical.Digester()
+		rc := &readCounter{
+			r: io.TeeReader(r, digester.Hash()),
+		}
+
+		if _, err := archive.Apply(ctx, root, rc); err != nil {
+			return err
+		}
+
+		// Read any trailing data
+		if _, err := io.Copy(ioutil.Discard, rc); err != nil {
+			return err
+		}
+
+		ocidesc = ocispec.Descriptor{
+			MediaType: ocispec.MediaTypeImageLayer,
+			Size:      rc.c,
+			Digest:    digester.Digest(),
+		}
+		return nil
+
+	}); err != nil {
 		return emptyDesc, err
 	}
-
-	// Read any trailing data
-	if _, err := io.Copy(ioutil.Discard, rc); err != nil {
-		return emptyDesc, err
-	}
-
-	return ocispec.Descriptor{
-		MediaType: ocispec.MediaTypeImageLayer,
-		Size:      rc.c,
-		Digest:    digester.Digest(),
-	}, nil
+	return ocidesc, nil
 }
 
 // DiffMounts creates a diff between the given mounts and uploads the result
@@ -168,108 +156,85 @@ func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount
 	default:
 		return emptyDesc, errors.Wrapf(errdefs.ErrNotImplemented, "unsupported diff media type: %v", config.MediaType)
 	}
-	aDir, err := ioutil.TempDir("", "left-")
-	if err != nil {
-		return emptyDesc, errors.Wrap(err, "failed to create temporary directory")
-	}
-	defer os.Remove(aDir)
 
-	bDir, err := ioutil.TempDir("", "right-")
-	if err != nil {
-		return emptyDesc, errors.Wrap(err, "failed to create temporary directory")
-	}
-	defer os.Remove(bDir)
-
-	if err := mount.All(lower, aDir); err != nil {
-		return emptyDesc, errors.Wrap(err, "failed to mount")
-	}
-	defer func() {
-		if uerr := mount.Unmount(aDir, 0); uerr != nil {
-			if err == nil {
-				err = uerr
+	var ocidesc ocispec.Descriptor
+	if err := mount.WithTempMount(lower, func(lowerRoot string) error {
+		return mount.WithTempMount(upper, func(upperRoot string) error {
+			var newReference bool
+			if config.Reference == "" {
+				newReference = true
+				config.Reference = uniqueRef()
 			}
-		}
-	}()
 
-	if err := mount.All(upper, bDir); err != nil {
-		return emptyDesc, errors.Wrap(err, "failed to mount")
-	}
-	defer func() {
-		if uerr := mount.Unmount(bDir, 0); uerr != nil {
-			if err == nil {
-				err = uerr
+			cw, err := s.store.Writer(ctx, config.Reference, 0, "")
+			if err != nil {
+				return errors.Wrap(err, "failed to open writer")
 			}
-		}
-	}()
-
-	var newReference bool
-	if config.Reference == "" {
-		newReference = true
-		config.Reference = uniqueRef()
-	}
-
-	cw, err := s.store.Writer(ctx, config.Reference, 0, "")
-	if err != nil {
-		return emptyDesc, errors.Wrap(err, "failed to open writer")
-	}
-	defer func() {
-		if err != nil {
-			cw.Close()
-			if newReference {
-				if err := s.store.Abort(ctx, config.Reference); err != nil {
-					log.G(ctx).WithField("ref", config.Reference).Warnf("failed to delete diff upload")
+			defer func() {
+				if err != nil {
+					cw.Close()
+					if newReference {
+						if err := s.store.Abort(ctx, config.Reference); err != nil {
+							log.G(ctx).WithField("ref", config.Reference).Warnf("failed to delete diff upload")
+						}
+					}
+				}
+			}()
+			if !newReference {
+				if err := cw.Truncate(0); err != nil {
+					return err
 				}
 			}
-		}
-	}()
-	if !newReference {
-		if err := cw.Truncate(0); err != nil {
-			return emptyDesc, err
-		}
+
+			if isCompressed {
+				dgstr := digest.SHA256.Digester()
+				compressed, err := compression.CompressStream(cw, compression.Gzip)
+				if err != nil {
+					return errors.Wrap(err, "failed to get compressed stream")
+				}
+				err = archive.WriteDiff(ctx, io.MultiWriter(compressed, dgstr.Hash()), lowerRoot, upperRoot)
+				compressed.Close()
+				if err != nil {
+					return errors.Wrap(err, "failed to write compressed diff")
+				}
+
+				if config.Labels == nil {
+					config.Labels = map[string]string{}
+				}
+				config.Labels["containerd.io/uncompressed"] = dgstr.Digest().String()
+			} else {
+				if err = archive.WriteDiff(ctx, cw, lowerRoot, upperRoot); err != nil {
+					return errors.Wrap(err, "failed to write diff")
+				}
+			}
+
+			var commitopts []content.Opt
+			if config.Labels != nil {
+				commitopts = append(commitopts, content.WithLabels(config.Labels))
+			}
+
+			dgst := cw.Digest()
+			if err := cw.Commit(ctx, 0, dgst, commitopts...); err != nil {
+				return errors.Wrap(err, "failed to commit")
+			}
+
+			info, err := s.store.Info(ctx, dgst)
+			if err != nil {
+				return errors.Wrap(err, "failed to get info from content store")
+			}
+
+			ocidesc = ocispec.Descriptor{
+				MediaType: config.MediaType,
+				Size:      info.Size,
+				Digest:    info.Digest,
+			}
+			return nil
+		})
+	}); err != nil {
+		return emptyDesc, err
 	}
 
-	if isCompressed {
-		dgstr := digest.SHA256.Digester()
-		compressed, err := compression.CompressStream(cw, compression.Gzip)
-		if err != nil {
-			return emptyDesc, errors.Wrap(err, "failed to get compressed stream")
-		}
-		err = archive.WriteDiff(ctx, io.MultiWriter(compressed, dgstr.Hash()), aDir, bDir)
-		compressed.Close()
-		if err != nil {
-			return emptyDesc, errors.Wrap(err, "failed to write compressed diff")
-		}
-
-		if config.Labels == nil {
-			config.Labels = map[string]string{}
-		}
-		config.Labels["containerd.io/uncompressed"] = dgstr.Digest().String()
-	} else {
-		if err = archive.WriteDiff(ctx, cw, aDir, bDir); err != nil {
-			return emptyDesc, errors.Wrap(err, "failed to write diff")
-		}
-	}
-
-	var commitopts []content.Opt
-	if config.Labels != nil {
-		commitopts = append(commitopts, content.WithLabels(config.Labels))
-	}
-
-	dgst := cw.Digest()
-	if err := cw.Commit(ctx, 0, dgst, commitopts...); err != nil {
-		return emptyDesc, errors.Wrap(err, "failed to commit")
-	}
-
-	info, err := s.store.Info(ctx, dgst)
-	if err != nil {
-		return emptyDesc, errors.Wrap(err, "failed to get info from content store")
-	}
-
-	return ocispec.Descriptor{
-		MediaType: config.MediaType,
-		Size:      info.Size,
-		Digest:    info.Digest,
-	}, nil
+	return ocidesc, nil
 }
 
 type readCounter struct {
