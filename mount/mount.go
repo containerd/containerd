@@ -66,8 +66,5 @@ func WithTempMount(mounts []Mount, f func(root string) error) (err error) {
 		return errors.Wrapf(uerr, "failed to mount %s", root)
 	}
 
-	if uerr = f(root); uerr != nil {
-		return errors.Wrapf(uerr, "failed to f(%s)", root)
-	}
-	return nil
+	return errors.Wrapf(f(root), "failed to f(%s)", root)
 }
