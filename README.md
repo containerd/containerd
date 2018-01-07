@@ -13,7 +13,7 @@ containerd is designed to be embedded into a larger system, rather than being us
 
 ## Getting Started
 
-See our documentation on [containerd.io](containerd.io):
+See our documentation on [containerd.io](https://containerd.io):
 * [for ops and admins](docs/ops.md)
 * [namespaces](docs/namespaces.md)
 * [client options](docs/client-opts.md)
