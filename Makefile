@@ -65,7 +65,7 @@ endif
 TESTFLAGS ?= -v $(TESTFLAGS_RACE)
 TESTFLAGS_PARALLEL ?= 8
 
-.PHONY: clean all AUTHORS fmt vet lint dco build binaries test integration generate protos checkprotos coverage ci check help install uninstall vendor release
+.PHONY: clean all AUTHORS build binaries test integration generate protos checkprotos coverage ci check help install uninstall vendor release
 .DEFAULT: default
 
 all: binaries
@@ -105,14 +105,6 @@ proto-fmt: ## check format of proto files
 		(echo "$(ONI) please indent proto files with tabs only" && false)
 	@test -z "$$(find . -path ./vendor -prune -o -name '*.proto' -type f -exec grep -Hn "Meta meta = " {} \; | grep -v '(gogoproto.nullable) = false' | tee /dev/stderr)" || \
 		(echo "$(ONI) meta fields in proto files must have option (gogoproto.nullable) = false" && false)
-
-dco: ## dco check
-	@which git-validation > /dev/null 2>/dev/null || (echo "ERROR: git-validation not found" && false)
-ifdef TRAVIS_COMMIT_RANGE
-	git-validation -q -run DCO,short-subject,dangling-whitespace
-else
-	git-validation -v -run DCO,short-subject,dangling-whitespace -range $(EPOCH_TEST_COMMIT)..HEAD
-endif
 
 build: ## build the go packages
 	@echo "$(WHALE) $@"

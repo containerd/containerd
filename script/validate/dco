@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+
+if ! command -v git-validation; then
+    >&2 echo "ERROR: git-validation not found. Install with:"
+    >&2 echo "    go get -u github.com/vbatts/git-validation"
+    exit 1
+fi
+
+GIT_CHECK_EXCLUDE="./vendor"
+verbosity="${DCO_VERBOSITY--v}"
+git-validation "$verbosity" -run DCO,short-subject,dangling-whitespace
