@@ -96,6 +96,9 @@ type Config struct {
 	ProfilingPort string `toml:"profiling_port" json:"profilingPort,omitempty"`
 	// ProfilingAddress is address for profiling via host:port/debug/pprof/
 	ProfilingAddress string `toml:"profiling_addr" json:"profilingAddress,omitempty"`
+	// SkipImageFSUUID skips retrieving imagefs uuid.
+	// TODO(random-liu): Remove this after we find a generic way to get imagefs uuid.
+	SkipImageFSUUID bool `toml:"skip_imagefs_uuid" json:"skipImageFSUUID,omitempty"`
 }
 
 // CRIContainerdOptions contains cri-containerd command line and toml options.
@@ -158,6 +161,8 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		defaults.ProfilingPort, "Profiling port for web interface host:port/debug/pprof/.")
 	fs.StringVar(&c.ProfilingAddress, "profiling-addr",
 		defaults.ProfilingAddress, "Profiling address for web interface host:port/debug/pprof/.")
+	fs.BoolVar(&c.SkipImageFSUUID, "skip-imagefs-uuid",
+		defaults.SkipImageFSUUID, "Skip retrieval of imagefs uuid. When turned on, kubelet will not be able to get imagefs capacity or perform imagefs disk eviction.")
 }
 
 // InitFlags load configurations from config file, and then overwrite with flags.
@@ -228,5 +233,6 @@ func defaultConfig() Config {
 		EnableProfiling:     true,
 		ProfilingPort:       "10011",
 		ProfilingAddress:    "127.0.0.1",
+		SkipImageFSUUID:     false,
 	}
 }
