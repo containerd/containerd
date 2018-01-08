@@ -271,7 +271,7 @@ func WithUserID(uid uint32) SpecOpts {
 			return err
 		}
 
-		return mount.WithTempMount(mounts, func(root string) error {
+		return mount.WithTempMount(ctx, mounts, func(root string) error {
 			ppath, err := fs.RootPath(root, "/etc/passwd")
 			if err != nil {
 				return err
@@ -319,7 +319,7 @@ func WithUsername(username string) SpecOpts {
 		if err != nil {
 			return err
 		}
-		return mount.WithTempMount(mounts, func(root string) error {
+		return mount.WithTempMount(ctx, mounts, func(root string) error {
 			ppath, err := fs.RootPath(root, "/etc/passwd")
 			if err != nil {
 				return err

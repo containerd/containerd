@@ -90,7 +90,7 @@ func (s *walkingDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts
 	}
 
 	var ocidesc ocispec.Descriptor
-	if err := mount.WithTempMount(mounts, func(root string) error {
+	if err := mount.WithTempMount(ctx, mounts, func(root string) error {
 		ra, err := s.store.ReaderAt(ctx, desc.Digest)
 		if err != nil {
 			return errors.Wrap(err, "failed to get reader from content store")
@@ -158,8 +158,8 @@ func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount
 	}
 
 	var ocidesc ocispec.Descriptor
-	if err := mount.WithTempMount(lower, func(lowerRoot string) error {
-		return mount.WithTempMount(upper, func(upperRoot string) error {
+	if err := mount.WithTempMount(ctx, lower, func(lowerRoot string) error {
+		return mount.WithTempMount(ctx, upper, func(upperRoot string) error {
 			var newReference bool
 			if config.Reference == "" {
 				newReference = true
