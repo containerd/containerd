@@ -119,7 +119,7 @@ func replaceOrAppendEnvValues(defaults, overrides []string) []string {
 var Command = cli.Command{
 	Name:      "run",
 	Usage:     "run a container",
-	ArgsUsage: "[flags] Image|RootFS ID [COMMAND] [ARG...]",
+	ArgsUsage: "[flags] Image|Snapshot|Dir ID [COMMAND] [ARG...]",
 	Flags: append([]cli.Flag{
 		cli.BoolFlag{
 			Name:  "tty,t",

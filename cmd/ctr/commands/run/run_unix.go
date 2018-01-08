@@ -9,13 +9,15 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
 func init() {
-	Command.Flags = append(Command.Flags, cli.BoolFlag{
-		Name:  "rootfs",
-		Usage: "use custom rootfs that is not managed by containerd snapshotter",
+	Command.Flags = append(Command.Flags, cli.StringFlag{
+		Name:  "rootfs-type",
+		Value: "image",
+		Usage: "image, snapshot, or dir.",
 	})
 }
 
@@ -39,9 +41,10 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		cOpts []containerd.NewContainerOpts
 	)
 	cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(context.StringSlice("label"))))
-	if context.Bool("rootfs") {
+	switch rootfsType := context.String("rootfs-type"); rootfsType {
+	case "dir":
 		opts = append(opts, oci.WithRootFSPath(ref))
-	} else {
+	case "image":
 		image, err := client.GetImage(ctx, ref)
 		if err != nil {
 			return nil, err
@@ -53,6 +56,11 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		// We pass writable snapshot to the OCI runtime, and the runtime remounts it as read-only,
 		// after creating some mount points on demand.
 		cOpts = append(cOpts, containerd.WithNewSnapshot(id, image))
+	case "snapshot":
+		cOpts = append(cOpts, containerd.WithSnapshotter(context.String("snapshotter")))
+		cOpts = append(cOpts, containerd.WithSnapshot(ref))
+	default:
+		return nil, errors.Errorf("unsupported rootfs type: %q", rootfsType)
 	}
 	if context.Bool("readonly") {
 		opts = append(opts, oci.WithRootFSReadonly())
