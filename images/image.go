@@ -357,13 +357,5 @@ func RootFS(ctx context.Context, provider content.Provider, configDesc ocispec.D
 	if err := json.Unmarshal(p, &config); err != nil {
 		return nil, err
 	}
-
-	// TODO(stevvooe): Remove this bit when OCI structure uses correct type for
-	// rootfs.DiffIDs.
-	var diffIDs []digest.Digest
-	for _, diffID := range config.RootFS.DiffIDs {
-		diffIDs = append(diffIDs, digest.Digest(diffID))
-	}
-
-	return diffIDs, nil
+	return config.RootFS.DiffIDs, nil
 }

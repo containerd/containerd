@@ -7,13 +7,13 @@
     "fetch\\.go:.*::error: unrecognized printf verb 'r'"
   ],
   "EnableGC": true,
-  "WarnUnmatchedDirective": true,
 
   "Enable": [
     "structcheck",
     "unused",
     "varcheck",
     "staticcheck",
+    "unconvert",
 
     "gofmt",
     "goimports",

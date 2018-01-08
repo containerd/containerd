@@ -29,11 +29,14 @@ func setHeaderForSpecialDevice(hdr *tar.Header, name string, fi os.FileInfo) err
 		return errors.New("unsupported stat type")
 	}
 
+	// Rdev is int32 on darwin/bsd, int64 on linux/solaris
+	rdev := uint64(s.Rdev) // nolint: unconvert
+
 	// Currently go does not fill in the major/minors
 	if s.Mode&syscall.S_IFBLK != 0 ||
 		s.Mode&syscall.S_IFCHR != 0 {
-		hdr.Devmajor = int64(unix.Major(uint64(s.Rdev)))
-		hdr.Devminor = int64(unix.Minor(uint64(s.Rdev)))
+		hdr.Devmajor = int64(unix.Major(rdev))
+		hdr.Devminor = int64(unix.Minor(rdev))
 	}
 
 	return nil

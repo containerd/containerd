@@ -275,7 +275,7 @@ func writeImage(bkt *bolt.Bucket, image *images.Image) error {
 	}
 
 	// write the target bucket
-	tbkt, err := bkt.CreateBucketIfNotExists([]byte(bucketKeyTarget))
+	tbkt, err := bkt.CreateBucketIfNotExists(bucketKeyTarget)
 	if err != nil {
 		return err
 	}

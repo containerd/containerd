@@ -93,7 +93,7 @@ var pprofTraceCommand = cli.Command{
 		cli.DurationFlag{
 			Name:  "seconds,s",
 			Usage: "trace time (seconds)",
-			Value: time.Duration(5 * time.Second),
+			Value: 5 * time.Second,
 		},
 	},
 	Action: func(context *cli.Context) error {

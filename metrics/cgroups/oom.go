@@ -89,7 +89,7 @@ func (o *oomCollector) Collect(ch chan<- prometheus.Metric) {
 
 // Close closes the epoll fd
 func (o *oomCollector) Close() error {
-	return unix.Close(int(o.fd))
+	return unix.Close(o.fd)
 }
 
 func (o *oomCollector) start() {

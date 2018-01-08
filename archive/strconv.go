@@ -46,7 +46,7 @@ func parsePAXTime(s string) (time.Time, error) {
 	}
 	nsecs, _ := strconv.ParseInt(sn, 10, 64) // Must succeed
 	if len(ss) > 0 && ss[0] == '-' {
-		return time.Unix(secs, -1*int64(nsecs)), nil // Negative correction
+		return time.Unix(secs, -nsecs), nil // Negative correction
 	}
-	return time.Unix(secs, int64(nsecs)), nil
+	return time.Unix(secs, nsecs), nil
 }
