@@ -100,6 +100,7 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*sh
 			ID:               r.ID,
 			Bundle:           r.Bundle,
 			Runtime:          r.Runtime,
+			RuntimeArgs:      r.RuntimeArgs,
 			Rootfs:           r.Rootfs,
 			Terminal:         r.Terminal,
 			Stdin:            r.Stdin,

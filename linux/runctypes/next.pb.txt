@@ -32,6 +32,13 @@ file {
       type: TYPE_BOOL
       json_name: "systemdCgroup"
     }
+    field {
+      name: "runtime_args"
+      number: 5
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "runtimeArgs"
+    }
   }
   message_type {
     name: "CreateOptions"

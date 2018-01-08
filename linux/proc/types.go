@@ -10,6 +10,7 @@ type CreateConfig struct {
 	ID               string
 	Bundle           string
 	Runtime          string
+	RuntimeArgs      []string
 	Rootfs           []*containerd_types.Mount
 	Terminal         bool
 	Stdin            string
