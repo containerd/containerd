@@ -28,7 +28,7 @@ import (
 
 func TestInitSelinuxOpts(t *testing.T) {
 	if !selinux.GetEnabled() {
-		return
+		t.Skip("selinux is not enabled")
 	}
 
 	for desc, test := range map[string]struct {
