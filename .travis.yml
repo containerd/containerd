@@ -51,7 +51,7 @@ install:
 script:
   - export GOOS=$TRAVIS_GOOS
   - export CGO_ENABLED=$TRAVIS_CGO_ENABLED
-  - GIT_CHECK_EXCLUDE="./vendor" TRAVIS_COMMIT_RANGE="${TRAVIS_COMMIT_RANGE/.../..}" make dco
+  - DCO_VERBOSITY=-q script/validate/dco
   - GOOS=linux script/setup/install-dev-tools
   - go build -i .
   - make check
