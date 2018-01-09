@@ -62,10 +62,11 @@ func TestInitSelinuxOpts(t *testing.T) {
 			mountLabels:  []string{"user_u:object_r:container_file_t:s0:c1,c2", "user_u:object_r:svirt_sandbox_file_t:s0:c1,c2"},
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		processLabel, mountLabel, err := initSelinuxOpts(test.selinuxOpt)
-		assert.NoError(t, err)
-		assert.Equal(t, test.processLabel, processLabel)
-		assert.Contains(t, test.mountLabels, mountLabel)
+		t.Run(desc, func(t *testing.T) {
+			processLabel, mountLabel, err := initSelinuxOpts(test.selinuxOpt)
+			assert.NoError(t, err)
+			assert.Equal(t, test.processLabel, processLabel)
+			assert.Contains(t, test.mountLabels, mountLabel)
+		})
 	}
 }
