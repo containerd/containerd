@@ -9,6 +9,7 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/log"
 	"github.com/pkg/errors"
+	"github.com/urfave/cli"
 )
 
 // HandleConsoleResize resizes the console
@@ -41,7 +42,7 @@ func HandleConsoleResize(ctx gocontext.Context, task resizer, con console.Consol
 }
 
 // NewTask creates a new task
-func NewTask(ctx gocontext.Context, client *containerd.Client, container containerd.Container, _ string, tty, nullIO bool) (containerd.Task, error) {
+func NewTask(ctx gocontext.Context, client *containerd.Client, container containerd.Container, _ string, tty, nullIO bool, opts ...containerd.NewTaskOpts) (containerd.Task, error) {
 	ioCreator := cio.NewCreator(cio.WithStdio)
 	if tty {
 		ioCreator = cio.NewCreator(cio.WithStdio, cio.WithTerminal)
@@ -53,4 +54,8 @@ func NewTask(ctx gocontext.Context, client *containerd.Client, container contain
 		ioCreator = cio.NullIO
 	}
 	return container.NewTask(ctx, ioCreator)
+}
+
+func getNewTaskOpts(_ *cli.Context) []containerd.NewTaskOpts {
+	return nil
 }

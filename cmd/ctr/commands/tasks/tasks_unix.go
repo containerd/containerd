@@ -12,8 +12,16 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/log"
 	"github.com/pkg/errors"
+	"github.com/urfave/cli"
 	"golang.org/x/sys/unix"
 )
+
+func init() {
+	startCommand.Flags = append(startCommand.Flags, cli.BoolFlag{
+		Name:  "no-pivot",
+		Usage: "disable use of pivot-root (linux only)",
+	})
+}
 
 // HandleConsoleResize resizes the console
 func HandleConsoleResize(ctx gocontext.Context, task resizer, con console.Console) error {
@@ -43,7 +51,7 @@ func HandleConsoleResize(ctx gocontext.Context, task resizer, con console.Consol
 }
 
 // NewTask creates a new task
-func NewTask(ctx gocontext.Context, client *containerd.Client, container containerd.Container, checkpoint string, tty, nullIO bool) (containerd.Task, error) {
+func NewTask(ctx gocontext.Context, client *containerd.Client, container containerd.Container, checkpoint string, tty, nullIO bool, opts ...containerd.NewTaskOpts) (containerd.Task, error) {
 	stdio := cio.NewCreator(cio.WithStdio)
 	if checkpoint == "" {
 		ioCreator := stdio
@@ -56,11 +64,19 @@ func NewTask(ctx gocontext.Context, client *containerd.Client, container contain
 			}
 			ioCreator = cio.NullIO
 		}
-		return container.NewTask(ctx, ioCreator)
+		return container.NewTask(ctx, ioCreator, opts...)
 	}
 	im, err := client.GetImage(ctx, checkpoint)
 	if err != nil {
 		return nil, err
 	}
-	return container.NewTask(ctx, stdio, containerd.WithTaskCheckpoint(im))
+	opts = append(opts, containerd.WithTaskCheckpoint(im))
+	return container.NewTask(ctx, stdio, opts...)
+}
+
+func getNewTaskOpts(context *cli.Context) []containerd.NewTaskOpts {
+	if context.Bool("no-pivot") {
+		return []containerd.NewTaskOpts{containerd.WithNoPivotRoot}
+	}
+	return nil
 }

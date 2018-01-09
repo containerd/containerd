@@ -41,9 +41,11 @@ var startCommand = cli.Command{
 			return err
 		}
 
-		tty := spec.Process.Terminal
-
-		task, err := NewTask(ctx, client, container, "", tty, context.Bool("null-io"))
+		var (
+			tty  = spec.Process.Terminal
+			opts = getNewTaskOpts(context)
+		)
+		task, err := NewTask(ctx, client, container, "", tty, context.Bool("null-io"), opts...)
 		if err != nil {
 			return err
 		}
