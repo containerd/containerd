@@ -199,7 +199,8 @@ var Command = cli.Command{
 		if context.Bool("rm") && !detach {
 			defer container.Delete(ctx, containerd.WithSnapshotCleanup)
 		}
-		task, err := tasks.NewTask(ctx, client, container, context.String("checkpoint"), tty, context.Bool("null-io"))
+		opts := getNewTaskOpts(context)
+		task, err := tasks.NewTask(ctx, client, container, context.String("checkpoint"), tty, context.Bool("null-io"), opts...)
 		if err != nil {
 			return err
 		}

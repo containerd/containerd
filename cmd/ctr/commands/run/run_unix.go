@@ -16,6 +16,9 @@ func init() {
 	Command.Flags = append(Command.Flags, cli.BoolFlag{
 		Name:  "rootfs",
 		Usage: "use custom rootfs that is not managed by containerd snapshotter",
+	}, cli.BoolFlag{
+		Name:  "no-pivot",
+		Usage: "disable use of pivot-root (linux only)",
 	})
 }
 
@@ -74,4 +77,11 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	}
 	cOpts = append([]containerd.NewContainerOpts{containerd.WithNewSpec(opts...)}, cOpts...)
 	return client.NewContainer(ctx, id, cOpts...)
+}
+
+func getNewTaskOpts(context *cli.Context) []containerd.NewTaskOpts {
+	if context.Bool("no-pivot") {
+		return []containerd.NewTaskOpts{containerd.WithNoPivotRoot}
+	}
+	return nil
 }

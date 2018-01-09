@@ -82,3 +82,7 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		// TODO(mlaventure): containerd.WithImage(image),
 	)
 }
+
+func getNewTaskOpts(_ *cli.Context) []containerd.NewTaskOpts {
+	return nil
+}

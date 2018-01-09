@@ -15,6 +15,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/linux/runctypes"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
 	"github.com/gogo/protobuf/proto"
@@ -204,4 +205,20 @@ func incrementFS(root string, uidInc, gidInc uint32) filepath.WalkFunc {
 		// be sure the lchown the path as to not de-reference the symlink to a host file
 		return os.Lchown(path, u, g)
 	}
+}
+
+// WithNoPivotRoot instructs the runtime not to you pivot_root
+func WithNoPivotRoot(_ context.Context, _ *Client, info *TaskInfo) error {
+	if info.Options == nil {
+		info.Options = &runctypes.CreateOptions{
+			NoPivotRoot: true,
+		}
+		return nil
+	}
+	copts, ok := info.Options.(*runctypes.CreateOptions)
+	if !ok {
+		return errors.New("invalid options type, expected runctypes.CreateOptions")
+	}
+	copts.NoPivotRoot = true
+	return nil
 }
