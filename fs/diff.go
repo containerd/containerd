@@ -222,10 +222,8 @@ func doubleWalkDiff(ctx context.Context, changeFn ChangeFunc, a, b string) (err 
 		c1 = make(chan *currentPath)
 		c2 = make(chan *currentPath)
 
-		f1, f2         *currentPath
-		rmdir          string
-		lastEmittedDir = string(filepath.Separator)
-		parents        []os.FileInfo
+		f1, f2 *currentPath
+		rmdir  string
 	)
 	g.Go(func() error {
 		defer close(c1)
@@ -260,10 +258,7 @@ func doubleWalkDiff(ctx context.Context, changeFn ChangeFunc, a, b string) (err 
 				continue
 			}
 
-			var (
-				f    os.FileInfo
-				emit = true
-			)
+			var f os.FileInfo
 			k, p := pathChange(f1, f2)
 			switch k {
 			case ChangeKindAdd:
@@ -299,83 +294,17 @@ func doubleWalkDiff(ctx context.Context, changeFn ChangeFunc, a, b string) (err 
 				f2 = nil
 				if same {
 					if !isLinked(f) {
-						emit = false
+						continue
 					}
 					k = ChangeKindUnmodified
 				}
 			}
-			if emit {
-				emittedDir, emitParents := commonParents(lastEmittedDir, p, parents)
-				for _, pf := range emitParents {
-					p := filepath.Join(emittedDir, pf.Name())
-					if err := changeFn(ChangeKindUnmodified, p, pf, nil); err != nil {
-						return err
-					}
-					emittedDir = p
-				}
-
-				if err := changeFn(k, p, f, nil); err != nil {
-					return err
-				}
-
-				if f != nil && f.IsDir() {
-					lastEmittedDir = p
-				} else {
-					lastEmittedDir = emittedDir
-				}
-
-				parents = parents[:0]
-			} else if f.IsDir() {
-				lastEmittedDir, parents = commonParents(lastEmittedDir, p, parents)
-				parents = append(parents, f)
+			if err := changeFn(k, p, f, nil); err != nil {
+				return err
 			}
 		}
 		return nil
 	})
 
 	return g.Wait()
-}
-
-func commonParents(base, updated string, dirs []os.FileInfo) (string, []os.FileInfo) {
-	if basePrefix := makePrefix(base); strings.HasPrefix(updated, basePrefix) {
-		var (
-			parents []os.FileInfo
-			last    = base
-		)
-		for _, d := range dirs {
-			next := filepath.Join(last, d.Name())
-			if strings.HasPrefix(updated, makePrefix(last)) {
-				parents = append(parents, d)
-				last = next
-			} else {
-				break
-			}
-		}
-		return base, parents
-	}
-
-	baseS := strings.Split(base, string(filepath.Separator))
-	updatedS := strings.Split(updated, string(filepath.Separator))
-	commonS := []string{string(filepath.Separator)}
-
-	min := len(baseS)
-	if len(updatedS) < min {
-		min = len(updatedS)
-	}
-	for i := 0; i < min; i++ {
-		if baseS[i] == updatedS[i] {
-			commonS = append(commonS, baseS[i])
-		} else {
-			break
-		}
-	}
-
-	return filepath.Join(commonS...), []os.FileInfo{}
-}
-
-func makePrefix(d string) string {
-	if d == "" || d[len(d)-1] != filepath.Separator {
-		return d + string(filepath.Separator)
-	}
-	return d
 }

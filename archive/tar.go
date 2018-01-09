@@ -395,6 +395,7 @@ type changeWriter struct {
 	whiteoutT time.Time
 	inodeSrc  map[uint64]string
 	inodeRefs map[uint64][]string
+	addedDirs map[string]struct{}
 }
 
 func newChangeWriter(w io.Writer, source string) *changeWriter {
@@ -404,6 +405,7 @@ func newChangeWriter(w io.Writer, source string) *changeWriter {
 		whiteoutT: time.Now(),
 		inodeSrc:  map[uint64]string{},
 		inodeRefs: map[uint64][]string{},
+		addedDirs: map[string]struct{}{},
 	}
 }
 
@@ -416,6 +418,7 @@ func (cw *changeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 		whiteOutBase := filepath.Base(p)
 		whiteOut := filepath.Join(whiteOutDir, whiteoutPrefix+whiteOutBase)
 		hdr := &tar.Header{
+			Typeflag:   tar.TypeReg,
 			Name:       whiteOut[1:],
 			Size:       0,
 			ModTime:    cw.whiteoutT,
@@ -485,10 +488,8 @@ func (cw *changeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 				additionalLinks = cw.inodeRefs[inode]
 				delete(cw.inodeRefs, inode)
 			}
-		} else if k == fs.ChangeKindUnmodified && !f.IsDir() {
+		} else if k == fs.ChangeKindUnmodified {
 			// Nothing to write to diff
-			// Unmodified directories should still be written to keep
-			// directory permissions correct on direct unpack
 			return nil
 		}
 
@@ -501,6 +502,9 @@ func (cw *changeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 			hdr.PAXRecords[paxSchilyXattr+"security.capability"] = string(capability)
 		}
 
+		if err := cw.includeParents(hdr); err != nil {
+			return err
+		}
 		if err := cw.tw.WriteHeader(hdr); err != nil {
 			return errors.Wrap(err, "failed to write file header")
 		}
@@ -530,6 +534,10 @@ func (cw *changeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 				hdr.Typeflag = tar.TypeLink
 				hdr.Linkname = source
 				hdr.Size = 0
+
+				if err := cw.includeParents(hdr); err != nil {
+					return err
+				}
 				if err := cw.tw.WriteHeader(hdr); err != nil {
 					return errors.Wrap(err, "failed to write file header")
 				}
@@ -542,6 +550,29 @@ func (cw *changeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 func (cw *changeWriter) Close() error {
 	if err := cw.tw.Close(); err != nil {
 		return errors.Wrap(err, "failed to close tar writer")
+	}
+	return nil
+}
+
+func (cw *changeWriter) includeParents(hdr *tar.Header) error {
+	name := strings.TrimRight(hdr.Name, "/")
+	fname := filepath.Join(cw.source, name)
+	parent := filepath.Dir(name)
+	pname := filepath.Join(cw.source, parent)
+
+	// Do not include root directory as parent
+	if fname != cw.source && pname != cw.source {
+		_, ok := cw.addedDirs[parent]
+		if !ok {
+			cw.addedDirs[parent] = struct{}{}
+			fi, err := os.Stat(pname)
+			if err != nil {
+				return err
+			}
+			if err := cw.HandleChange(fs.ChangeKindModify, parent, fi, nil); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
