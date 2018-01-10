@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	ErrServerClosed = errors.New("ttrpc: server close")
+	ErrServerClosed = errors.New("ttrpc: server closed")
 )
 
 type Server struct {
