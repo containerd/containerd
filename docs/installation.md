@@ -57,7 +57,7 @@ Information about the binaries in the release tarball:
 |   containerd/containerd-shim   |   overlay, btrfs  | linux |     amd64    |
 
 If you have other requirements for the binaries, e.g. selinux support, another architecture support etc., you need to build the binaries yourself following [the instructions](../README.md#getting-started-for-developers).
- 
+
 ### Download
 
 The release tarball could be downloaded from either of the following sources:
