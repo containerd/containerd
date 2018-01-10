@@ -23,8 +23,8 @@ import (
 	assertlib "github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	cio "github.com/kubernetes-incubator/cri-containerd/pkg/server/io"
-	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
+	cio "github.com/containerd/cri-containerd/pkg/server/io"
+	"github.com/containerd/cri-containerd/pkg/store"
 )
 
 func TestContainerStore(t *testing.T) {

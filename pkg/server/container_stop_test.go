@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 
-	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
+	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
 )
 
 func TestWaitContainerStop(t *testing.T) {

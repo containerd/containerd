@@ -22,7 +22,7 @@ import (
 	assertlib "github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
+	"github.com/containerd/cri-containerd/pkg/store"
 )
 
 func TestSandboxStore(t *testing.T) {

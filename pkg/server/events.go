@@ -25,7 +25,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 
-	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
+	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
 )
 
 // eventMonitor monitors containerd event and updates internal state correspondingly.

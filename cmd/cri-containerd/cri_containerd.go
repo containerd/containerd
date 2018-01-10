@@ -33,9 +33,9 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 
-	"github.com/kubernetes-incubator/cri-containerd/cmd/cri-containerd/options"
-	"github.com/kubernetes-incubator/cri-containerd/pkg/server"
-	"github.com/kubernetes-incubator/cri-containerd/pkg/version"
+	"github.com/containerd/cri-containerd/cmd/cri-containerd/options"
+	"github.com/containerd/cri-containerd/pkg/server"
+	"github.com/containerd/cri-containerd/pkg/version"
 )
 
 // Add \u200B to avoid the space trimming.

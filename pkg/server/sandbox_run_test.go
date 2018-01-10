@@ -28,8 +28,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
-	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
+	ostesting "github.com/containerd/cri-containerd/pkg/os/testing"
+	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
 )
 
 func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {

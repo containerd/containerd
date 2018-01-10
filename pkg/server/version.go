@@ -20,7 +20,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/version"
+	"github.com/containerd/cri-containerd/pkg/version"
 )
 
 const (

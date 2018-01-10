@@ -22,7 +22,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
+	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
 )
 
 // TestSetContainerRemoving tests setContainerRemoving sets removing

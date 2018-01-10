@@ -26,7 +26,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
+	"github.com/containerd/cri-containerd/pkg/store"
 )
 
 // RemovePodSandbox removes the sandbox. If there are running containers in the

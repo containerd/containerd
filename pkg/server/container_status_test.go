@@ -24,8 +24,8 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
-	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
+	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
+	imagestore "github.com/containerd/cri-containerd/pkg/store/image"
 )
 
 func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Status,

@@ -22,7 +22,7 @@ import (
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
+	"github.com/containerd/cri-containerd/pkg/util"
 )
 
 // TestGetUserFromImage tests the logic of getting image uid or user name of image user.

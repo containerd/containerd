@@ -17,14 +17,14 @@ limitations under the License.
 package server
 
 import (
-	"github.com/kubernetes-incubator/cri-containerd/cmd/cri-containerd/options"
-	ostesting "github.com/kubernetes-incubator/cri-containerd/pkg/os/testing"
-	"github.com/kubernetes-incubator/cri-containerd/pkg/registrar"
-	servertesting "github.com/kubernetes-incubator/cri-containerd/pkg/server/testing"
-	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
-	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
-	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
-	snapshotstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/snapshot"
+	"github.com/containerd/cri-containerd/cmd/cri-containerd/options"
+	ostesting "github.com/containerd/cri-containerd/pkg/os/testing"
+	"github.com/containerd/cri-containerd/pkg/registrar"
+	servertesting "github.com/containerd/cri-containerd/pkg/server/testing"
+	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
+	imagestore "github.com/containerd/cri-containerd/pkg/store/image"
+	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
+	snapshotstore "github.com/containerd/cri-containerd/pkg/store/snapshot"
 )
 
 const (

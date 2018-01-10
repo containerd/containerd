@@ -28,9 +28,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
 
-	api "github.com/kubernetes-incubator/cri-containerd/pkg/api/v1"
-	"github.com/kubernetes-incubator/cri-containerd/pkg/client"
-	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
+	api "github.com/containerd/cri-containerd/pkg/api/v1"
+	"github.com/containerd/cri-containerd/pkg/client"
+	"github.com/containerd/cri-containerd/pkg/util"
 )
 
 const (

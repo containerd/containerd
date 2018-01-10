@@ -25,8 +25,8 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
-	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
+	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
+	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
 )
 
 func TestToCRIContainer(t *testing.T) {

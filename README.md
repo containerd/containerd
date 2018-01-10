@@ -4,8 +4,8 @@
 <img src="https://github.com/containerd/containerd/blob/master/docs/images/containerd-dark.png" width="200" >
 </p>
 
-[![Build Status](https://api.travis-ci.org/kubernetes-incubator/cri-containerd.svg?style=flat-square)](https://travis-ci.org/kubernetes-incubator/cri-containerd)
-[![Go Report Card](https://goreportcard.com/badge/github.com/kubernetes-incubator/cri-containerd?style=flat-square)](https://goreportcard.com/report/github.com/kubernetes-incubator/cri-containerd)
+[![Build Status](https://api.travis-ci.org/containerd/cri-containerd.svg?style=flat-square)](https://travis-ci.org/containerd/cri-containerd)
+[![Go Report Card](https://goreportcard.com/badge/github.com/containerd/cri-containerd?style=flat-square)](https://goreportcard.com/report/github.com/containerd/cri-containerd)
 
 `cri-containerd` is a [containerd](https://containerd.io/) based implementation of Kubernetes [container runtime interface (CRI)](https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/apis/cri/v1alpha1/runtime/api.proto).
 

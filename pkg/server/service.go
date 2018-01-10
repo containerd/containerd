@@ -37,14 +37,14 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 
-	"github.com/kubernetes-incubator/cri-containerd/cmd/cri-containerd/options"
-	api "github.com/kubernetes-incubator/cri-containerd/pkg/api/v1"
-	osinterface "github.com/kubernetes-incubator/cri-containerd/pkg/os"
-	"github.com/kubernetes-incubator/cri-containerd/pkg/registrar"
-	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
-	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
-	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
-	snapshotstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/snapshot"
+	"github.com/containerd/cri-containerd/cmd/cri-containerd/options"
+	api "github.com/containerd/cri-containerd/pkg/api/v1"
+	osinterface "github.com/containerd/cri-containerd/pkg/os"
+	"github.com/containerd/cri-containerd/pkg/registrar"
+	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
+	imagestore "github.com/containerd/cri-containerd/pkg/store/image"
+	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
+	snapshotstore "github.com/containerd/cri-containerd/pkg/store/snapshot"
 )
 
 const (

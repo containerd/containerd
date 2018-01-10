@@ -29,8 +29,8 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
-	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
+	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
+	"github.com/containerd/cri-containerd/pkg/util"
 )
 
 // UpdateContainerResources updates ContainerConfig of the container.

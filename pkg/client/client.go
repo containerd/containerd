@@ -23,7 +23,7 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
-	api "github.com/kubernetes-incubator/cri-containerd/pkg/api/v1"
+	api "github.com/containerd/cri-containerd/pkg/api/v1"
 )
 
 // NewCRIContainerdClient creates grpc client of cri-containerd

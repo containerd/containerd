@@ -28,8 +28,8 @@ import (
 	"golang.org/x/sys/unix"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
-	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
+	"github.com/containerd/cri-containerd/pkg/store"
+	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
 )
 
 const (
