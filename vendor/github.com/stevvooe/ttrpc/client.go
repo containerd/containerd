@@ -2,14 +2,22 @@ package ttrpc
 
 import (
 	"context"
+	"io"
 	"net"
+	"os"
+	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/containerd/containerd/log"
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/status"
 )
+
+// ErrClosed is returned by client methods when the underlying connection is
+// closed.
+var ErrClosed = errors.New("ttrpc: closed")
 
 type Client struct {
 	codec   codec
@@ -91,7 +99,7 @@ func (c *Client) dispatch(ctx context.Context, req *Request, resp *Response) err
 
 	select {
 	case err := <-errs:
-		return err
+		return filterCloseErr(err)
 	case <-c.done:
 		return c.err
 	}
@@ -171,7 +179,14 @@ func (c *Client) run() {
 			call.errs <- c.recv(call.resp, msg)
 			delete(waiters, msg.StreamID)
 		case <-shutdown:
+			if shutdownErr != nil {
+				shutdownErr = filterCloseErr(shutdownErr)
+			} else {
+				shutdownErr = ErrClosed
+			}
+
 			shutdownErr = errors.Wrapf(shutdownErr, "ttrpc: client shutting down")
+
 			c.err = shutdownErr
 			for _, waiter := range waiters {
 				waiter.errs <- shutdownErr
@@ -179,6 +194,9 @@ func (c *Client) run() {
 			c.Close()
 			return
 		case <-c.closed:
+			if c.err == nil {
+				c.err = ErrClosed
+			}
 			// broadcast the shutdown error to the remaining waiters.
 			for _, waiter := range waiters {
 				waiter.errs <- shutdownErr
@@ -208,4 +226,31 @@ func (c *Client) recv(resp *Response, msg *message) error {
 
 	defer c.channel.putmbuf(msg.p)
 	return proto.Unmarshal(msg.p, resp)
+}
+
+// filterCloseErr rewrites EOF and EPIPE errors to ErrClosed. Use when
+// returning from call or handling errors from main read loop.
+//
+// This purposely ignores errors with a wrapped cause.
+func filterCloseErr(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	if err == io.EOF {
+		return ErrClosed
+	}
+
+	if strings.Contains(err.Error(), "use of closed network connection") {
+		return ErrClosed
+	}
+
+	// if we have an epipe on a write, we cast to errclosed
+	if oerr, ok := err.(*net.OpError); ok && oerr.Op == "write" {
+		if serr, ok := oerr.Err.(*os.SyscallError); ok && serr.Err == syscall.EPIPE {
+			return ErrClosed
+		}
+	}
+
+	return err
 }
