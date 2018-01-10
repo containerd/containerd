@@ -23,8 +23,6 @@ type Config struct {
 	Metrics MetricsConfig `toml:"metrics"`
 	// Plugins provides plugin specific configuration for the initialization of a plugin
 	Plugins map[string]toml.Primitive `toml:"plugins"`
-	// NoSubreaper disables containerd as a subreaper
-	NoSubreaper bool `toml:"no_subreaper"`
 	// OOMScore adjust the containerd's oom score
 	OOMScore int `toml:"oom_score"`
 	// Cgroup specifies cgroup information for the containerd daemon process
