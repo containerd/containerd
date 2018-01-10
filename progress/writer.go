@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"strings"
 
@@ -42,23 +43,10 @@ func (w *Writer) Flush() error {
 		return nil
 	}
 
-	if err := w.clear(); err != nil {
+	if err := w.clearLines(); err != nil {
 		return err
 	}
-
-	ws, err := console.Current().Size()
-	if err != nil {
-		return fmt.Errorf("failed to get terminal width: %v", err)
-	}
-	width := int(ws.Width)
-	if width == 0 {
-		width = 80
-	}
-	strlines := strings.Split(w.buf.String(), "\n")
-	w.lines = -1
-	for _, line := range strlines {
-		w.lines += (len(stripLine(line))-1)/width + 1
-	}
+	w.lines = countLines(w.buf.String())
 
 	if _, err := w.w.Write(w.buf.Bytes()); err != nil {
 		return err
@@ -71,7 +59,7 @@ func (w *Writer) Flush() error {
 // TODO(stevvooe): The following are system specific. Break these out if we
 // decide to build this package further.
 
-func (w *Writer) clear() error {
+func (w *Writer) clearLines() error {
 	for i := 0; i < w.lines; i++ {
 		if _, err := fmt.Fprintf(w.w, "\x1b[1A\x1b[2K\r"); err != nil {
 			return err
@@ -79,6 +67,31 @@ func (w *Writer) clear() error {
 	}
 
 	return nil
+}
+
+// countLines in the output. If a line is longer than the console width then
+// an extra line is added to the count for each wrapped line. If the console
+// width is undefined then 0 is returned so that no lines are cleared on the next
+// flush.
+func countLines(output string) int {
+	con, err := console.ConsoleFromFile(os.Stdin)
+	if err != nil {
+		return 0
+	}
+	ws, err := con.Size()
+	if err != nil {
+		return 0
+	}
+	width := int(ws.Width)
+	if width <= 0 {
+		return 0
+	}
+	strlines := strings.Split(output, "\n")
+	lines := -1
+	for _, line := range strlines {
+		lines += (len(stripLine(line))-1)/width + 1
+	}
+	return lines
 }
 
 func stripLine(line string) string {
