@@ -36,7 +36,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
+	"github.com/containerd/cri-containerd/pkg/util"
 )
 
 // This code reuses the docker import code from containerd/containerd#1602.

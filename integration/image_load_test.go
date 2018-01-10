@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	api "github.com/kubernetes-incubator/cri-containerd/pkg/api/v1"
+	api "github.com/containerd/cri-containerd/pkg/api/v1"
 )
 
 // Test to load an image from tarball.

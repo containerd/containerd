@@ -25,7 +25,7 @@ import (
 	snapshot "github.com/containerd/containerd/snapshots"
 	"github.com/golang/glog"
 
-	snapshotstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/snapshot"
+	snapshotstore "github.com/containerd/cri-containerd/pkg/store/snapshot"
 )
 
 // snapshotsSyncer syncs snapshot stats periodically. imagefs info and container stats

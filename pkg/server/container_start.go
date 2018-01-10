@@ -27,8 +27,8 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	cio "github.com/kubernetes-incubator/cri-containerd/pkg/server/io"
-	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
+	cio "github.com/containerd/cri-containerd/pkg/server/io"
+	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
 )
 
 // StartContainer starts the container.

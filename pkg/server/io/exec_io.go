@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/golang/glog"
 
-	cioutil "github.com/kubernetes-incubator/cri-containerd/pkg/ioutil"
+	cioutil "github.com/containerd/cri-containerd/pkg/ioutil"
 )
 
 // ExecIO holds the exec io.

@@ -23,7 +23,7 @@ import (
 	snapshot "github.com/containerd/containerd/snapshots"
 	assertlib "github.com/stretchr/testify/assert"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
+	"github.com/containerd/cri-containerd/pkg/store"
 )
 
 func TestSnapshotStore(t *testing.T) {

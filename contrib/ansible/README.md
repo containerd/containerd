@@ -26,7 +26,7 @@ $ cat hosts
 ## Step 1:
 At this point, the ansible playbook should be able to ssh into the machines in the hosts file.
 ```console
-git clone https://github.com/kubernetes-incubator/cri-containerd
+git clone https://github.com/containerd/cri-containerd
 cd ./cri-containerd/contrib/ansible
 ansible-playbook -i hosts cri-containerd.yaml
 ```

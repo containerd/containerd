@@ -26,7 +26,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	cio "github.com/kubernetes-incubator/cri-containerd/pkg/server/io"
+	cio "github.com/containerd/cri-containerd/pkg/server/io"
 )
 
 // Attach prepares a streaming endpoint to attach to a running container, and returns the address.

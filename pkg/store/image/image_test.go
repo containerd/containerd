@@ -23,7 +23,7 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	assertlib "github.com/stretchr/testify/assert"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
+	"github.com/containerd/cri-containerd/pkg/store"
 )
 
 func TestImageStore(t *testing.T) {

@@ -24,9 +24,9 @@ import (
 
 	"github.com/golang/glog"
 
-	api "github.com/kubernetes-incubator/cri-containerd/pkg/api/v1"
-	"github.com/kubernetes-incubator/cri-containerd/pkg/containerd/importer"
-	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
+	api "github.com/containerd/cri-containerd/pkg/api/v1"
+	"github.com/containerd/cri-containerd/pkg/containerd/importer"
+	imagestore "github.com/containerd/cri-containerd/pkg/store/image"
 )
 
 // LoadImage loads a image into containerd.

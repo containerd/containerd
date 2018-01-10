@@ -61,7 +61,7 @@ If you have other requirements for the binaries, e.g. selinux support, another a
 ### Download
 
 The release tarball could be downloaded from either of the following sources:
-1. Release on github (see [here](https://github.com/kubernetes-incubator/cri-containerd/releases));
+1. Release on github (see [here](https://github.com/containerd/cri-containerd/releases));
 2. Release GCS bucket https://storage.googleapis.com/cri-containerd-release/.
 
 ## Step 0: Install Dependent Libraries

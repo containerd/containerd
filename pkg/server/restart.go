@@ -35,10 +35,10 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	cio "github.com/kubernetes-incubator/cri-containerd/pkg/server/io"
-	containerstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/container"
-	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
-	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
+	cio "github.com/containerd/cri-containerd/pkg/server/io"
+	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
+	imagestore "github.com/containerd/cri-containerd/pkg/store/image"
+	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
 )
 
 // NOTE: The recovery logic has following assumption: when cri-containerd is down:

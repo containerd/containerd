@@ -25,7 +25,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
+	imagestore "github.com/containerd/cri-containerd/pkg/store/image"
 )
 
 func TestListImages(t *testing.T) {

@@ -28,7 +28,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	cioutil "github.com/kubernetes-incubator/cri-containerd/pkg/ioutil"
+	cioutil "github.com/containerd/cri-containerd/pkg/ioutil"
 )
 
 const (

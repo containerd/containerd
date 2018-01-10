@@ -31,9 +31,9 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	cioutil "github.com/kubernetes-incubator/cri-containerd/pkg/ioutil"
-	cio "github.com/kubernetes-incubator/cri-containerd/pkg/server/io"
-	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
+	cioutil "github.com/containerd/cri-containerd/pkg/ioutil"
+	cio "github.com/containerd/cri-containerd/pkg/server/io"
+	"github.com/containerd/cri-containerd/pkg/util"
 )
 
 // ExecSync executes a command in the container, and returns the stdout output.

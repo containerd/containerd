@@ -25,9 +25,9 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
 
-	"github.com/kubernetes-incubator/cri-containerd/cmd/cri-containerd/options"
-	api "github.com/kubernetes-incubator/cri-containerd/pkg/api/v1"
-	"github.com/kubernetes-incubator/cri-containerd/pkg/client"
+	"github.com/containerd/cri-containerd/cmd/cri-containerd/options"
+	api "github.com/containerd/cri-containerd/pkg/api/v1"
+	"github.com/containerd/cri-containerd/pkg/client"
 )
 
 func dedent(s string) string {

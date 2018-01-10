@@ -21,7 +21,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	api "github.com/kubernetes-incubator/cri-containerd/pkg/api/v1"
+	api "github.com/containerd/cri-containerd/pkg/api/v1"
 )
 
 // instrumentedService wraps service and logs each operation.

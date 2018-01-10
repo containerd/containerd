@@ -34,14 +34,14 @@ import (
 	"golang.org/x/sys/unix"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	customopts "github.com/kubernetes-incubator/cri-containerd/pkg/containerd/opts"
-	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
-	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
+	customopts "github.com/containerd/cri-containerd/pkg/containerd/opts"
+	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
+	"github.com/containerd/cri-containerd/pkg/util"
 )
 
 func init() {
 	typeurl.Register(&sandboxstore.Metadata{},
-		"github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox", "Metadata")
+		"github.com/containerd/cri-containerd/pkg/store/sandbox", "Metadata")
 }
 
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
@@ -123,7 +123,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		if err != nil {
 			return nil, fmt.Errorf("failed to get network status for sandbox %q: %v", id, err)
 		}
-		// Certain VM based solutions like clear containers (Issue kubernetes-incubator/cri-containerd#524)
+		// Certain VM based solutions like clear containers (Issue containerd/cri-containerd#524)
 		//  rely on the assumption that CRI shim will not be querying the network namespace to check the
 		// network states such as IP.
 		// In furture runtime implementation should avoid relying on CRI shim implementation details.

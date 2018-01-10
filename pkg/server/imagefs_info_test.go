@@ -25,7 +25,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	snapshotstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/snapshot"
+	snapshotstore "github.com/containerd/cri-containerd/pkg/store/snapshot"
 )
 
 func TestImageFsInfo(t *testing.T) {

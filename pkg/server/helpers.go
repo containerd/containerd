@@ -40,9 +40,9 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
-	imagestore "github.com/kubernetes-incubator/cri-containerd/pkg/store/image"
-	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
+	"github.com/containerd/cri-containerd/pkg/store"
+	imagestore "github.com/containerd/cri-containerd/pkg/store/image"
+	"github.com/containerd/cri-containerd/pkg/util"
 )
 
 const (

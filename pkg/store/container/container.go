@@ -22,8 +22,8 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/docker/docker/pkg/truncindex"
 
-	cio "github.com/kubernetes-incubator/cri-containerd/pkg/server/io"
-	"github.com/kubernetes-incubator/cri-containerd/pkg/store"
+	cio "github.com/containerd/cri-containerd/pkg/server/io"
+	"github.com/containerd/cri-containerd/pkg/store"
 )
 
 // Container contains all resources associated with the container. All methods to

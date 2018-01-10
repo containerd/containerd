@@ -26,8 +26,8 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/golang/glog"
 
-	cioutil "github.com/kubernetes-incubator/cri-containerd/pkg/ioutil"
-	"github.com/kubernetes-incubator/cri-containerd/pkg/util"
+	cioutil "github.com/containerd/cri-containerd/pkg/ioutil"
+	"github.com/containerd/cri-containerd/pkg/util"
 )
 
 // streamKey generates a key for the stream.

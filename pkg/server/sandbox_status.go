@@ -28,7 +28,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	sandboxstore "github.com/kubernetes-incubator/cri-containerd/pkg/store/sandbox"
+	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
 )
 
 // PodSandboxStatus returns the status of the PodSandbox.

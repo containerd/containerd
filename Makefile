@@ -16,7 +16,7 @@ GO := go
 GOOS := $(shell $(GO) env GOOS)
 GOARCH := $(shell $(GO) env GOARCH)
 EPOCH_TEST_COMMIT := f9e02affccd51702191e5312665a16045ffef8ab
-PROJECT := github.com/kubernetes-incubator/cri-containerd
+PROJECT := github.com/containerd/cri-containerd
 BINDIR := ${DESTDIR}/usr/local/bin
 BUILD_DIR := _output
 # VERSION is derived from the current tag for HEAD plus amends. Version is used
