@@ -224,7 +224,7 @@ func (s *service) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest
 func processFromContainerd(ctx context.Context, p runtime.Process) (*task.Process, error) {
 	state, err := p.State(ctx)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, err
 	}
 	var status task.Status
 	switch state.Status {
@@ -267,7 +267,7 @@ func (s *service) Get(ctx context.Context, r *api.GetRequest) (*api.GetResponse,
 	}
 	t, err := processFromContainerd(ctx, p)
 	if err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	return &api.GetResponse{
 		Process: t,
@@ -290,7 +290,9 @@ func addTasks(ctx context.Context, r *api.ListTasksResponse, tasks []runtime.Tas
 	for _, t := range tasks {
 		tt, err := processFromContainerd(ctx, t)
 		if err != nil {
-			log.G(ctx).WithError(err).WithField("id", t.ID()).Error("converting task to protobuf")
+			if !errdefs.IsNotFound(err) { // handle race with deletion
+				log.G(ctx).WithError(err).WithField("id", t.ID()).Error("converting task to protobuf")
+			}
 			continue
 		}
 		r.Tasks = append(r.Tasks, tt)
