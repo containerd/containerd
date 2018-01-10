@@ -11,11 +11,9 @@ REVISION=$(shell git rev-parse HEAD)$(shell if ! git diff --no-ext-diff --quiet 
 ifneq "$(strip $(shell command -v go 2>/dev/null))" ""
 	GOOS ?= $(shell go env GOOS)
 	GOARCH ?= $(shell go env GOARCH)
-	GOHOSTOS ?= $(shell go env GOHOSTOS)
 else
 	GOOS ?= $$GOOS
 	GOARCH ?= $$GOARCH
-	GOHOSTOS ?= $$GOHOSTOS
 endif
 
 WHALE = "🇩"
@@ -52,14 +50,6 @@ GO_BUILD_FLAGS=
 
 #include platform specific makefile
 -include Makefile.$(GOOS)
-
-# Add the "incremental" build option `-i` (installs the packages that are
-# dependencies of the target) to speed up future builds. Only for native builds,
-# otherwise it will try to install in the incorrect (not native) path and fail.
-# Note: this won't be necessary from 1.10 (https://tip.golang.org/doc/go1.10#build)
-ifeq ($(GOOS), $(GOHOSTOS))
-	GO_BUILD_FLAGS += -i
-endif
 
 # Flags passed to `go test`
 TESTFLAGS ?= -v $(TESTFLAGS_RACE)
