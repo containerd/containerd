@@ -23,7 +23,6 @@ import (
 	"github.com/containerd/containerd/linux/shim"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/sys"
 	ptypes "github.com/gogo/protobuf/types"
 )
@@ -51,8 +50,7 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 		if err != nil {
 			return nil, nil, err
 		}
-		ec, err := reaper.Default.Start(cmd)
-		if err != nil {
+		if err := cmd.Start(); err != nil {
 			return nil, nil, errors.Wrapf(err, "failed to start shim")
 		}
 		defer func() {
@@ -61,7 +59,7 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 			}
 		}()
 		go func() {
-			reaper.Default.Wait(cmd, ec)
+			cmd.Wait()
 			exitHandler()
 		}()
 		log.G(ctx).WithFields(logrus.Fields{

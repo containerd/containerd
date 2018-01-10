@@ -26,9 +26,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/containerd/runtime"
-	"github.com/containerd/containerd/sys"
 	runc "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
@@ -159,9 +157,6 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 		return nil, err
 	}
 
-	ec := reaper.Default.Subscribe()
-	defer reaper.Default.Unsubscribe(ec)
-
 	bundle, err := newBundle(id,
 		filepath.Join(r.state, namespace),
 		filepath.Join(r.root, namespace),
@@ -206,7 +201,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 				"id":        id,
 				"namespace": namespace,
 			}).Warn("cleaning up after killed shim")
-			err = r.cleanupAfterDeadShim(context.Background(), bundle, namespace, id, lc.pid, ec)
+			err = r.cleanupAfterDeadShim(context.Background(), bundle, namespace, id, lc.pid)
 			if err == nil {
 				r.tasks.Delete(ctx, lc)
 			} else {
@@ -313,7 +308,7 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 
 	rsp, err := lc.shim.Delete(ctx, empty)
 	if err != nil {
-		if cerr := r.cleanupAfterDeadShim(ctx, bundle, namespace, c.ID(), lc.pid, nil); cerr != nil {
+		if cerr := r.cleanupAfterDeadShim(ctx, bundle, namespace, c.ID(), lc.pid); cerr != nil {
 			log.G(ctx).WithError(err).Error("unable to cleanup task")
 		}
 		return nil, errdefs.FromGRPC(err)
@@ -394,7 +389,7 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 				"id":        id,
 				"namespace": ns,
 			}).Error("connecting to shim")
-			err := r.cleanupAfterDeadShim(ctx, bundle, ns, id, pid, nil)
+			err := r.cleanupAfterDeadShim(ctx, bundle, ns, id, pid)
 			if err != nil {
 				log.G(ctx).WithError(err).WithField("bundle", bundle.path).
 					Error("cleaning up after dead shim")
@@ -419,24 +414,13 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 	return o, nil
 }
 
-func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, id string, pid int, ec chan runc.Exit) error {
+func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, id string, pid int) error {
 	ctx = namespaces.WithNamespace(ctx, ns)
 	if err := r.terminate(ctx, bundle, ns, id); err != nil {
 		if r.config.ShimDebug {
 			return errors.Wrap(err, "failed to terminate task, leaving bundle for debugging")
 		}
 		log.G(ctx).WithError(err).Warn("failed to terminate task")
-	}
-
-	if ec != nil {
-		// if sub-reaper is set, reap our new child
-		if v, err := sys.GetSubreaper(); err == nil && v == 1 {
-			for e := range ec {
-				if e.Pid == pid {
-					break
-				}
-			}
-		}
 	}
 
 	// Notify Client
