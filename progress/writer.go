@@ -50,10 +50,14 @@ func (w *Writer) Flush() error {
 	if err != nil {
 		return fmt.Errorf("failed to get terminal width: %v", err)
 	}
+	width := int(ws.Width)
+	if width == 0 {
+		width = 80
+	}
 	strlines := strings.Split(w.buf.String(), "\n")
 	w.lines = -1
 	for _, line := range strlines {
-		w.lines += (len(stripLine(line))-1)/int(ws.Width) + 1
+		w.lines += (len(stripLine(line))-1)/width + 1
 	}
 
 	if _, err := w.w.Write(w.buf.Bytes()); err != nil {
