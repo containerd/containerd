@@ -73,9 +73,9 @@ func adaptPlugin(o interface{}) filters.Adaptor {
 
 		switch fieldpath[0] {
 		case "type":
-			return string(obj.Type), len(obj.Type) > 0
+			return obj.Type, len(obj.Type) > 0
 		case "id":
-			return string(obj.ID), len(obj.ID) > 0
+			return obj.ID, len(obj.ID) > 0
 		case "platforms":
 			// TODO(stevvooe): Another case here where have multiple values.
 			// May need to refactor the filter system to allow filtering by
