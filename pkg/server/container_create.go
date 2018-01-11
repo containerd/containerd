@@ -138,7 +138,6 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	}()
 
 	// Create container volumes mounts.
-	// TODO(random-liu): Add cri-containerd integration test for image volume.
 	volumeMounts := c.generateVolumeMounts(containerRootDir, config.GetMounts(), &image.ImageSpec.Config)
 
 	// Generate container runtime spec.
