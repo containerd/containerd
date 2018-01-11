@@ -135,7 +135,9 @@ fi
 checkout_repo ${CONTAINERD_PKG} ${CONTAINERD_VERSION} ${CONTAINERD_REPO}
 cd ${GOPATH}/src/${CONTAINERD_PKG}
 make
-${sudo} make install -e DESTDIR=${CONTAINERD_DIR}
+# containerd make install requires `go` to work. Explicitly
+# set PATH to make sure it can find `go` even with `sudo`.
+${sudo} sh -c "PATH=${PATH} make install -e DESTDIR=${CONTAINERD_DIR}"
 
 #Install crictl
 checkout_repo ${CRITOOL_PKG} ${CRITOOL_VERSION}
