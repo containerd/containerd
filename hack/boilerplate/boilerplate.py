@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 # Copyright 2015 The Kubernetes Authors.
+# Copyright 2018 The Containerd Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -100,21 +101,52 @@ def file_passes(filename, refs, regexs):
               file=verbose_out)
         return False
 
-    # trim our file to the same number of lines as the reference file
-    data = data[:len(ref)]
-
     p = regexs["year"]
-    for d in data:
+    found = 0
+    for d in ref:
         if p.search(d):
-            print('File %s is missing the year' % filename, file=verbose_out)
-            return False
+            found = 1
+            break
+    if found == 0:
+        print('File %s is missing the year' % filename, file=verbose_out)
+        return False
 
     # Replace all occurrences of the regex "CURRENT_YEAR|...|2016|2015|2014" with "YEAR"
     p = regexs["date"]
     for i, d in enumerate(data):
         (data[i], found) = p.subn('YEAR', d)
-        if found != 0:
+
+    p = regexs["authors"]
+    found = 0
+    for d in ref:
+        if p.search(d):
+            found = 1
             break
+    if found == 0:
+        print('File %s is missing AUTHORS' % filename, file=verbose_out)
+        return False
+
+    # Replace all occurrences of the regex "The validNameHere Authors" with "AUTHORS"
+    p = regexs["auth"]
+    for i, d in enumerate(data):
+        (data[i], found) = p.subn('AUTHORS', d)
+
+    # Remove extra copyright notices only one is necessary
+    p = regexs["copyright"]
+    keepgoing = 1
+    while keepgoing == 1:
+        keepgoing = 0
+        count = 0
+        for d in data:
+            if p.search(d):
+                count = count + 1
+                if count > 1:
+                    keepgoing = 1
+                    data.remove(d)
+                    break
+
+    # trim our file to the same number of lines as the reference file
+    data = data[:len(ref)]
 
     # if we don't match the reference at this point, fail
     if ref != data:
@@ -185,6 +217,10 @@ def get_regexs():
     regexs["go_build_constraints"] = re.compile(r"^(// \+build.*\n)+\n", re.MULTILINE)
     # strip #!.* from shell scripts
     regexs["shebang"] = re.compile(r"^(#!.*\n)\n*", re.MULTILINE)
+    regexs["authors"] = re.compile( 'AUTHORS' )
+    authors = [ 'The Kubernetes Authors', 'The Containerd Authors' ]
+    regexs["auth"] = re.compile( '(%s)' % "|".join(map(lambda l: str(l), authors)) )
+    regexs["copyright"] = re.compile( 'Copyright YEAR AUTHORS' )
     return regexs
 
 def main():
