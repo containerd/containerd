@@ -21,32 +21,36 @@ set -o pipefail
 source $(dirname "${BASH_SOURCE[0]}")/utils.sh
 cd ${ROOT}
 
-echo "Compare vendor with hack/versions..."
-need_update=false
-declare -A map=()
-map["RUNC_VERSION"]="github.com/opencontainers/runc"
-map["CNI_VERSION"]="github.com/containernetworking/cni"
-map["CONTAINERD_VERSION"]="github.com/containerd/containerd"
-map["KUBERNETES_VERSION"]="k8s.io/kubernetes"
-for key in ${!map[@]}
-do
-  vendor_commitid=$(grep ${map[${key}]} vendor.conf | awk '{print $2}')
-  version_commitid=$(grep ${key} hack/versions | awk -F "=" '{print $2}')
-  if [ ${vendor_commitid} != ${version_commitid} ]; then
-    if [ $# -gt 0 ] && [ ${1} = "-only-verify" ]; then
-      need_update=true
-      echo "Need to update the value of ${key} from ${version_commitid} to ${vendor_commitid}."
-    else
-      echo "Updating the value of ${key} from ${version_commitid} to ${vendor_commitid}."
-      sed -i "s/\b${version_commitid}$/${vendor_commitid}/g" hack/versions
+update_hack_versions() {
+  need_update=false
+  declare -A map=()
+  map["RUNC_VERSION"]="github.com/opencontainers/runc"
+  map["CNI_VERSION"]="github.com/containernetworking/cni"
+  map["CONTAINERD_VERSION"]="github.com/containerd/containerd"
+  map["KUBERNETES_VERSION"]="k8s.io/kubernetes"
+  for key in ${!map[@]}
+  do
+    vendor_commitid=$(grep ${map[${key}]} vendor.conf | awk '{print $2}')
+    version_commitid=$(grep ${key} hack/versions | awk -F "=" '{print $2}')
+    if [ ${vendor_commitid} != ${version_commitid} ]; then
+      if [ $# -gt 0 ] && [ ${1} = "-only-verify" ]; then
+	need_update=true
+	echo "Need to update the value of ${key} from ${version_commitid} to ${vendor_commitid}."
+      else
+	echo "Updating the value of ${key} from ${version_commitid} to ${vendor_commitid}."
+	sed -i "s/\b${version_commitid}$/${vendor_commitid}/g" hack/versions
+      fi
     fi
-  fi
-done
+  done
 
-if [ ${need_update} = true ]; then
-  echo "Please update \"hack/versions\" by executing \"hack/update-vendor.sh\"!"
-  exit 1
-fi
+  if [ ${need_update} = true ]; then
+    echo "Please update \"hack/versions\" by executing \"hack/update-vendor.sh\"!"
+    exit 1
+  fi
+}
+
+echo "Compare vendor with hack/versions..."
+update_hack_versions
 
 # hack/versions should be correct now.
 echo "Compare vendor with containerd vendors..."
@@ -90,6 +94,9 @@ if ! diff vendor.conf ${tmp_vendor} > /dev/null; then
   fi
 fi
 rm ${containerd_vendor}
+
+echo "Compare new vendor with hack/versions..."
+update_hack_versions
 
 echo "Sort vendor.conf..."
 sort vendor.conf -o vendor.conf
