@@ -96,6 +96,11 @@ func WithImageConfig(image Image) SpecOpts {
 		s.Process.Env = append(s.Process.Env, config.Env...)
 		cmd := config.Cmd
 		s.Process.Args = append(config.Entrypoint, cmd...)
+		cwd := config.WorkingDir
+		if cwd == "" {
+			cwd = "/"
+		}
+		s.Process.Cwd = cwd
 		if config.User != "" {
 			parts := strings.Split(config.User, ":")
 			switch len(parts) {
@@ -103,10 +108,7 @@ func WithImageConfig(image Image) SpecOpts {
 				v, err := strconv.Atoi(parts[0])
 				if err != nil {
 					// if we cannot parse as a uint they try to see if it is a username
-					if err := WithUsername(config.User)(ctx, client, c, s); err != nil {
-						return err
-					}
-					return err
+					return WithUsername(config.User)(ctx, client, c, s)
 				}
 				if err := WithUserID(uint32(v))(ctx, client, c, s); err != nil {
 					return err
@@ -126,11 +128,6 @@ func WithImageConfig(image Image) SpecOpts {
 				return fmt.Errorf("invalid USER value %s", config.User)
 			}
 		}
-		cwd := config.WorkingDir
-		if cwd == "" {
-			cwd = "/"
-		}
-		s.Process.Cwd = cwd
 		return nil
 	}
 }
