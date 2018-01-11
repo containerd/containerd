@@ -10,6 +10,8 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	shim "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/runtime"
+	"github.com/pkg/errors"
+	"github.com/stevvooe/ttrpc"
 )
 
 // Process implements a linux process
@@ -44,7 +46,14 @@ func (p *Process) State(ctx context.Context) (runtime.State, error) {
 		ID: p.id,
 	})
 	if err != nil {
-		return runtime.State{}, errdefs.FromGRPC(err)
+		if errors.Cause(err) != ttrpc.ErrClosed {
+			return runtime.State{}, errdefs.FromGRPC(err)
+		}
+
+		// We treat ttrpc.ErrClosed as the shim being closed, but really this
+		// likely means that the process no longer exists. We'll have to plumb
+		// the connection differently if this causes problems.
+		return runtime.State{}, errdefs.ErrNotFound
 	}
 	var status runtime.Status
 	switch response.Status {

@@ -6,9 +6,6 @@ import (
 	"context"
 	"sync"
 
-	"github.com/pkg/errors"
-	"google.golang.org/grpc"
-
 	"github.com/containerd/cgroups"
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/api/types/task"
@@ -20,6 +17,8 @@ import (
 	"github.com/containerd/containerd/runtime"
 	runc "github.com/containerd/go-runc"
 	"github.com/gogo/protobuf/types"
+	"github.com/pkg/errors"
+	"github.com/stevvooe/ttrpc"
 )
 
 // Task on a linux based system
@@ -109,7 +108,7 @@ func (t *Task) State(ctx context.Context) (runtime.State, error) {
 		ID: t.id,
 	})
 	if err != nil {
-		if err != grpc.ErrServerStopped {
+		if errors.Cause(err) != ttrpc.ErrClosed {
 			return runtime.State{}, errdefs.FromGRPC(err)
 		}
 		return runtime.State{}, errdefs.ErrNotFound
