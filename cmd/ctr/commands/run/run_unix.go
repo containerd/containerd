@@ -72,6 +72,9 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	if context.Bool("net-host") {
 		opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace), oci.WithHostHostsFile, oci.WithHostResolvconf)
 	}
-	cOpts = append([]containerd.NewContainerOpts{containerd.WithNewSpec(opts...)}, cOpts...)
+	// oci.WithImageConfig (WithUsername, WithUserID) depends on rootfs snapshot for resolving /etc/passwd.
+	// So cOpts needs to have precedence over opts.
+	// TODO: WithUsername, WithUserID should additionally support non-snapshot rootfs
+	cOpts = append(cOpts, []containerd.NewContainerOpts{containerd.WithNewSpec(opts...)}...)
 	return client.NewContainer(ctx, id, cOpts...)
 }
