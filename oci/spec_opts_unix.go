@@ -102,6 +102,8 @@ func WithImageConfig(image Image) SpecOpts {
 		}
 		s.Process.Cwd = cwd
 		if config.User != "" {
+			// According to OCI Image Spec v1.0.0, the following are valid for Linux:
+			//   user, uid, user:group, uid:gid, uid:group, user:gid
 			parts := strings.Split(config.User, ":")
 			switch len(parts) {
 			case 1:
@@ -114,6 +116,7 @@ func WithImageConfig(image Image) SpecOpts {
 					return err
 				}
 			case 2:
+				// TODO: support username and groupname
 				v, err := strconv.Atoi(parts[0])
 				if err != nil {
 					return errors.Wrapf(err, "parse uid %s", parts[0])
@@ -257,6 +260,7 @@ func WithUIDGID(uid, gid uint32) SpecOpts {
 // uid, and not returns error.
 func WithUserID(uid uint32) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) (err error) {
+		// TODO: support non-snapshot rootfs
 		if c.Snapshotter == "" {
 			return errors.Errorf("no snapshotter set for container")
 		}
@@ -319,6 +323,7 @@ func WithUserID(uid uint32) SpecOpts {
 // does not exist, or the username is not found in /etc/passwd,
 // it returns error.
 func WithUsername(username string) SpecOpts {
+	// TODO: support non-snapshot rootfs
 	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) (err error) {
 		if c.Snapshotter == "" {
 			return errors.Errorf("no snapshotter set for container")
