@@ -27,7 +27,6 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/docker/docker/pkg/reexec"
 	"github.com/golang/glog"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/spf13/cobra"
@@ -80,9 +79,6 @@ func versionCommand() *cobra.Command {
 }
 
 func main() {
-	if reexec.Init() {
-		return
-	}
 	o := options.NewCRIContainerdOptions()
 
 	o.AddFlags(cmd.Flags())
