@@ -451,10 +451,14 @@ func (s *Supervisor) getExecSyncChannel(containerID, pid string) chan struct{} {
 	return ch
 }
 
-func (s *Supervisor) getExecSyncMap(containerID string) map[string]chan struct{} {
+func (s *Supervisor) getExecSyncOneChannel(containerID string) chan struct{} {
 	s.containerExecSyncLock.Lock()
 	defer s.containerExecSyncLock.Unlock()
-	return s.containerExecSync[containerID]
+
+	for _, ch := range s.containerExecSync[containerID] {
+		return ch
+	}
+	return nil
 }
 
 func (s *Supervisor) deleteExecSyncMap(containerID string) {

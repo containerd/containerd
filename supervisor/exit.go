@@ -89,6 +89,7 @@ func (s *Supervisor) execExit(t *ExecExitTask) error {
 			PID:       t.PID,
 			Status:    t.Status,
 		})
+		s.deleteExecSyncChannel(t.ID, t.PID)
 		close(synCh)
 	}()
 	return nil
