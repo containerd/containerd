@@ -1,0 +1,24 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+
+# previous release
+previous = "v1.0.0"
+
+pre_release = true
+
+preface = """\
+This is the first patch release for `containerd` in the 1.0 series. Several
+bugfixes surrounding tar, image handling, errant log messages and resource
+management are present.
+
+Note the daemon no longer shuts down when failing to adjust its own OOM score.
+Instead, a warning will be issued.
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
