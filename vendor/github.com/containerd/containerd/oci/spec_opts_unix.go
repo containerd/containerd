@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -271,49 +270,35 @@ func WithUserID(uid uint32) SpecOpts {
 		if err != nil {
 			return err
 		}
-		root, err := ioutil.TempDir("", "ctd-username")
-		if err != nil {
-			return err
-		}
-		defer os.Remove(root)
-		for _, m := range mounts {
-			if err := m.Mount(root); err != nil {
+
+		return mount.WithTempMount(ctx, mounts, func(root string) error {
+			ppath, err := fs.RootPath(root, "/etc/passwd")
+			if err != nil {
 				return err
 			}
-		}
-		defer func() {
-			if uerr := mount.Unmount(root, 0); uerr != nil {
-				if err == nil {
-					err = uerr
+			f, err := os.Open(ppath)
+			if err != nil {
+				if os.IsNotExist(err) {
+					s.Process.User.UID, s.Process.User.GID = uid, uid
+					return nil
 				}
+				return err
 			}
-		}()
-		ppath, err := fs.RootPath(root, "/etc/passwd")
-		if err != nil {
-			return err
-		}
-		f, err := os.Open(ppath)
-		if err != nil {
-			if os.IsNotExist(err) {
+			defer f.Close()
+			users, err := user.ParsePasswdFilter(f, func(u user.User) bool {
+				return u.Uid == int(uid)
+			})
+			if err != nil {
+				return err
+			}
+			if len(users) == 0 {
 				s.Process.User.UID, s.Process.User.GID = uid, uid
 				return nil
 			}
-			return err
-		}
-		defer f.Close()
-		users, err := user.ParsePasswdFilter(f, func(u user.User) bool {
-			return u.Uid == int(uid)
-		})
-		if err != nil {
-			return err
-		}
-		if len(users) == 0 {
-			s.Process.User.UID, s.Process.User.GID = uid, uid
+			u := users[0]
+			s.Process.User.UID, s.Process.User.GID = uint32(u.Uid), uint32(u.Gid)
 			return nil
-		}
-		u := users[0]
-		s.Process.User.UID, s.Process.User.GID = uint32(u.Uid), uint32(u.Gid)
-		return nil
+		})
 	}
 }
 
@@ -334,43 +319,28 @@ func WithUsername(username string) SpecOpts {
 		if err != nil {
 			return err
 		}
-		root, err := ioutil.TempDir("", "ctd-username")
-		if err != nil {
-			return err
-		}
-		defer os.Remove(root)
-		for _, m := range mounts {
-			if err := m.Mount(root); err != nil {
+		return mount.WithTempMount(ctx, mounts, func(root string) error {
+			ppath, err := fs.RootPath(root, "/etc/passwd")
+			if err != nil {
 				return err
 			}
-		}
-		defer func() {
-			if uerr := mount.Unmount(root, 0); uerr != nil {
-				if err == nil {
-					err = uerr
-				}
+			f, err := os.Open(ppath)
+			if err != nil {
+				return err
 			}
-		}()
-		ppath, err := fs.RootPath(root, "/etc/passwd")
-		if err != nil {
-			return err
-		}
-		f, err := os.Open(ppath)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		users, err := user.ParsePasswdFilter(f, func(u user.User) bool {
-			return u.Name == username
+			defer f.Close()
+			users, err := user.ParsePasswdFilter(f, func(u user.User) bool {
+				return u.Name == username
+			})
+			if err != nil {
+				return err
+			}
+			if len(users) == 0 {
+				return errors.Errorf("no users found for %s", username)
+			}
+			u := users[0]
+			s.Process.User.UID, s.Process.User.GID = uint32(u.Uid), uint32(u.Gid)
+			return nil
 		})
-		if err != nil {
-			return err
-		}
-		if len(users) == 0 {
-			return errors.Errorf("no users found for %s", username)
-		}
-		u := users[0]
-		s.Process.User.UID, s.Process.User.GID = uint32(u.Uid), uint32(u.Gid)
-		return nil
 	}
 }

@@ -5,6 +5,13 @@ import (
 	"strings"
 )
 
+// isLinuxOS returns true if the operating system is Linux.
+//
+// The OS value should be normalized before calling this function.
+func isLinuxOS(os string) bool {
+	return os == "linux"
+}
+
 // These function are generated from from https://golang.org/src/go/build/syslist.go.
 //
 // We use switch statements because they are slightly faster than map lookups
@@ -16,6 +23,17 @@ import (
 func isKnownOS(os string) bool {
 	switch os {
 	case "android", "darwin", "dragonfly", "freebsd", "linux", "nacl", "netbsd", "openbsd", "plan9", "solaris", "windows", "zos":
+		return true
+	}
+	return false
+}
+
+// isArmArch returns true if the architecture is ARM.
+//
+// The arch value should be normalized before being passed to this function.
+func isArmArch(arch string) bool {
+	switch arch {
+	case "arm", "arm64":
 		return true
 	}
 	return false

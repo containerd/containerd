@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -16,6 +15,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/linux/runctypes"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
 	"github.com/gogo/protobuf/proto"
@@ -166,7 +166,7 @@ func withRemappedSnapshotBase(id string, i Image, uid, gid uint32, readonly bool
 		if err != nil {
 			return err
 		}
-		if err := remapRootFS(mounts, uid, gid); err != nil {
+		if err := remapRootFS(ctx, mounts, uid, gid); err != nil {
 			snapshotter.Remove(ctx, usernsID)
 			return err
 		}
@@ -187,22 +187,10 @@ func withRemappedSnapshotBase(id string, i Image, uid, gid uint32, readonly bool
 	}
 }
 
-func remapRootFS(mounts []mount.Mount, uid, gid uint32) error {
-	root, err := ioutil.TempDir("", "ctd-remap")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(root)
-	for _, m := range mounts {
-		if err := m.Mount(root); err != nil {
-			return err
-		}
-	}
-	err = filepath.Walk(root, incrementFS(root, uid, gid))
-	if uerr := mount.Unmount(root, 0); err == nil {
-		err = uerr
-	}
-	return err
+func remapRootFS(ctx context.Context, mounts []mount.Mount, uid, gid uint32) error {
+	return mount.WithTempMount(ctx, mounts, func(root string) error {
+		return filepath.Walk(root, incrementFS(root, uid, gid))
+	})
 }
 
 func incrementFS(root string, uidInc, gidInc uint32) filepath.WalkFunc {
@@ -217,4 +205,20 @@ func incrementFS(root string, uidInc, gidInc uint32) filepath.WalkFunc {
 		// be sure the lchown the path as to not de-reference the symlink to a host file
 		return os.Lchown(path, u, g)
 	}
+}
+
+// WithNoPivotRoot instructs the runtime not to you pivot_root
+func WithNoPivotRoot(_ context.Context, _ *Client, info *TaskInfo) error {
+	if info.Options == nil {
+		info.Options = &runctypes.CreateOptions{
+			NoPivotRoot: true,
+		}
+		return nil
+	}
+	copts, ok := info.Options.(*runctypes.CreateOptions)
+	if !ok {
+		return errors.New("invalid options type, expected runctypes.CreateOptions")
+	}
+	copts.NoPivotRoot = true
+	return nil
 }
