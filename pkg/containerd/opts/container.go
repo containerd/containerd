@@ -25,9 +25,8 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/fs"
 	"github.com/containerd/containerd/mount"
-	"github.com/docker/docker/pkg/chrootarchive"
-	"github.com/docker/docker/pkg/system"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 )
@@ -113,48 +112,16 @@ func copyExistingContents(source, destination string) error {
 	if err != nil {
 		return err
 	}
-	if len(srcList) > 0 {
-		dstList, err := ioutil.ReadDir(destination)
-		if err != nil {
-			return err
-		}
-		if len(dstList) != 0 {
-			return errors.Errorf("volume at %q is not initially empty", destination)
-		}
-
-		if err := chrootarchive.NewArchiver(nil).CopyWithTar(source, destination); err != nil {
-			return err
-		}
+	if len(srcList) == 0 {
+		// Skip copying if source directory is empty.
+		return nil
 	}
-	return copyOwnership(source, destination)
-}
-
-// copyOwnership copies the permissions and uid:gid of the src file
-// to the dst file
-func copyOwnership(src, dst string) error {
-	stat, err := system.Stat(src)
+	dstList, err := ioutil.ReadDir(destination)
 	if err != nil {
 		return err
 	}
-
-	dstStat, err := system.Stat(dst)
-	if err != nil {
-		return err
+	if len(dstList) != 0 {
+		return errors.Errorf("volume at %q is not initially empty", destination)
 	}
-
-	// In some cases, even though UID/GID match and it would effectively be a no-op,
-	// this can return a permission denied error... for example if this is an NFS
-	// mount.
-	// Since it's not really an error that we can't chown to the same UID/GID, don't
-	// even bother trying in such cases.
-	if stat.UID() != dstStat.UID() || stat.GID() != dstStat.GID() {
-		if err := os.Chown(dst, int(stat.UID()), int(stat.GID())); err != nil {
-			return err
-		}
-	}
-
-	if stat.Mode() != dstStat.Mode() {
-		return os.Chmod(dst, os.FileMode(stat.Mode()))
-	}
-	return nil
+	return fs.CopyDir(destination, source)
 }
