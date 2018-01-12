@@ -1,7 +1,7 @@
 # Kubernetes Cluster with Containerd and CRI-Containerd
 <p align="center">
-<img src="https://github.com/kubernetes/kubernetes/blob/master/logo/logo.png" width="50" height="50"> 
-<img src="https://github.com/containerd/containerd/blob/master/docs/images/containerd-dark.png" width="200" > 
+<img src="https://github.com/kubernetes/kubernetes/blob/master/logo/logo.png" width="50" height="50">
+<img src="https://github.com/containerd/containerd/blob/master/docs/images/containerd-dark.png" width="200" >
 </p>
 
 
@@ -114,7 +114,7 @@ Node join complete:
 
 Run 'kubectl get nodes' on the master to see this machine join.
 ```
-At the end of Step 3 you should have a kubernetes cluster up and running and ready for deployment. 
+At the end of Step 3 you should have a kubernetes cluster up and running and ready for deployment.
 
 ## Step 4:
 Please follow the instructions [here](https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/#pod-network) to deploy CNI network plugins and start a demo app.
