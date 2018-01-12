@@ -18,7 +18,6 @@ package io
 
 import (
 	"io"
-	"os"
 	"sync"
 
 	"github.com/containerd/containerd/cio"
@@ -57,12 +56,7 @@ func NewExecIO(id, root string, tty, stdin bool) (*ExecIO, error) {
 
 // Config returns io config.
 func (e *ExecIO) Config() cio.Config {
-	return cio.Config{
-		Terminal: e.fifos.Terminal,
-		Stdin:    e.fifos.In,
-		Stdout:   e.fifos.Out,
-		Stderr:   e.fifos.Err,
-	}
+	return e.fifos.Config
 }
 
 // Attach attaches exec stdio. The logic is similar with container io attach.
@@ -146,7 +140,7 @@ func (e *ExecIO) Close() error {
 		e.closer.Close()
 	}
 	if e.fifos != nil {
-		return os.RemoveAll(e.fifos.Dir)
+		return e.fifos.Close()
 	}
 	return nil
 }
