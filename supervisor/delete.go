@@ -27,11 +27,14 @@ func (s *Supervisor) delete(t *DeleteTask) error {
 			t.Process.Wait()
 		}
 		if !t.NoEvent {
-			execMap := s.getExecSyncMap(t.ID)
 			go func() {
 				// Wait for all exec processe events to be sent (we seem
 				// to sometimes receive them after the init event)
-				for _, ch := range execMap {
+				for {
+					ch := s.getExecSyncOneChannel(t.ID)
+					if ch == nil {
+						break
+					}
 					<-ch
 				}
 				s.deleteExecSyncMap(t.ID)
