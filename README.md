@@ -88,7 +88,7 @@ make BUILD_TAGS='seccomp apparmor'
 | selinux   | selinux process and mount labeling | <none>                          |
 | apparmor  | apparmor profile support           | libapparmor development library |
 ### Validate Your cri-containerd Setup
-Another Kubernetes incubator project called [cri-tools](https://github.com/kubernetes-incubator/cri-tools)
+A Kubernetes incubator project called [cri-tools](https://github.com/kubernetes-incubator/cri-tools)
 includes programs for exercising CRI implementations such as `cri-containerd`.
 More importantly, cri-tools includes the program `critest` which is used for running
 [CRI Validation Testing](https://github.com/kubernetes/community/blob/master/contributors/devel/cri-validation.md).
@@ -98,8 +98,8 @@ Run the CRI Validation test to validate your installation of `cri-containerd`:
 make test-cri
 ```
 ### Running a Kubernetes local cluster
-If you already have a working development environment for supported Kubernetes version, you can
-try `cri-containerd` in a local cluster:
+If you already have a working development environment for supported Kubernetes
+version, you can try `cri-containerd` in a local cluster:
 
 1. Start `containerd` as root in a first terminal:
 ```bash
@@ -123,17 +123,40 @@ See [here](./docs) for additional documentation.
 ## Contributing
 Interested in contributing? Check out the [documentation](./CONTRIBUTING.md).
 
-## Kubernetes Incubator
-This is a [Kubernetes Incubator project](https://github.com/kubernetes/community/blob/master/incubator.md).
-The project was established 2017/4/13. The incubator team for the project is:
-* Sponsor: Dawn Chen ([@dchen1107](https://github.com/dchen1107))
-* Champion: Yuju Hong ([@yujuhong](https://github.com/yujuhong))
-* SIG: `sig-node`
+## Communication
+This project was originally established in April of 2017 in the Kubernetes
+Incubator program. After reaching the Beta stage, In January of 2018, the
+project was merged into [containerd](https://github.com/containerd/containerd).
 
-For more information about `sig-node` and the `cri-containerd` project:
+For async communication and long running discussions please use issues and pull
+requests on this github repo. This will be the best place to discuss design and
+implementation.
+
+For sync communication we have a community slack with a #containerd channel that
+everyone is welcome to join and chat about development.
+
+**Slack:** https://dockr.ly/community
+
+## Other Communications
+As this project is tightly coupled to CRI and CRI-Tools and they are Kubernetes
+projects, some of our project communications take place in the Kubernetes' SIG:
+`sig-node.`
+
+For more information about `sig-node`, `CRI`, and the `CRI-Tools` projects:
 * [sig-node community site](https://github.com/kubernetes/community/tree/master/sig-node)
 * Slack: `#sig-node` channel in Kubernetes (kubernetes.slack.com)
 * Mailing List: https://groups.google.com/forum/#!forum/kubernetes-sig-node
+
+### Reporting Security Issues
+
+__If you are reporting a security issue, please reach out discreetly at security@containerd.io__.
+
+## Licenses
+The containerd codebase is released under the [Apache 2.0 license](https://github.com/containerd/containerd/blob/master/LICENSE.code).
+The README.md file, and files in the "docs" folder are licensed under the
+Creative Commons Attribution 4.0 International License under the terms and
+conditions set forth in the file "[LICENSE.docs](https://github.com/containerd/containerd/blob/master/LICENSE.docs)". You may obtain a duplicate
+copy of the same license, titled CC-BY-4.0, at http://creativecommons.org/licenses/by/4.0/.
+
 ## Code of Conduct
-Participation in the Kubernetes community is governed by the
-[Kubernetes Code of Conduct](./code-of-conduct.md).
+This project follows the [CNCF Code of Conduct](https://github.com/cncf/foundation/blob/master/code-of-conduct.md).
