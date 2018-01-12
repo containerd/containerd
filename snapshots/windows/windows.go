@@ -228,7 +228,11 @@ func (s *snapshotter) Close() error {
 }
 
 func (s *snapshotter) mounts(sn storage.Snapshot) []mount.Mount {
-	var roFlag string
+	var (
+		roFlag           string
+		source           string
+		parentLayerPaths []string
+	)
 
 	if sn.Kind == snapshots.KindView {
 		roFlag = "ro"
@@ -236,14 +240,21 @@ func (s *snapshotter) mounts(sn storage.Snapshot) []mount.Mount {
 		roFlag = "rw"
 	}
 
-	parentLayerPaths := s.parentIDsToParentPaths(sn.ParentIDs)
+	if len(sn.ParentIDs) == 0 || sn.Kind == snapshots.KindActive {
+		source = s.getSnapshotDir(sn.ID)
+		parentLayerPaths = s.parentIDsToParentPaths(sn.ParentIDs)
+	} else {
+		source = s.getSnapshotDir(sn.ParentIDs[0])
+		parentLayerPaths = s.parentIDsToParentPaths(sn.ParentIDs[1:])
+	}
+
 	// error is not checked here, as a string array will never fail to Marshal
 	parentLayersJSON, _ := json.Marshal(parentLayerPaths)
 	parentLayersOption := mount.ParentLayerPathsFlag + string(parentLayersJSON)
 
 	var mounts []mount.Mount
 	mounts = append(mounts, mount.Mount{
-		Source: s.getSnapshotDir(sn.ID),
+		Source: source,
 		Type:   "windows-layer",
 		Options: []string{
 			roFlag,
@@ -270,16 +281,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		return nil, errors.Wrap(err, "failed to create snapshot")
 	}
 
-	switch kind {
-	case snapshots.KindView:
-		var parentID string
-		if len(newSnapshot.ParentIDs) != 0 {
-			parentID = newSnapshot.ParentIDs[0]
-		}
-		if err := hcsshim.CreateLayer(s.info, newSnapshot.ID, parentID); err != nil {
-			return nil, errors.Wrap(err, "failed to create layer")
-		}
-	case snapshots.KindActive:
+	if kind == snapshots.KindActive {
 		parentLayerPaths := s.parentIDsToParentPaths(newSnapshot.ParentIDs)
 
 		var parentPath string
