@@ -111,9 +111,7 @@ func WithImageConfig(image Image) SpecOpts {
 					// if we cannot parse as a uint they try to see if it is a username
 					return WithUsername(config.User)(ctx, client, c, s)
 				}
-				if err := WithUserID(uint32(v))(ctx, client, c, s); err != nil {
-					return err
-				}
+				return WithUserID(uint32(v))(ctx, client, c, s)
 			case 2:
 				// TODO: support username and groupname
 				v, err := strconv.Atoi(parts[0])
