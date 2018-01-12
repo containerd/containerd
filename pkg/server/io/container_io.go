@@ -19,7 +19,6 @@ package io
 import (
 	"errors"
 	"io"
-	"os"
 	"strings"
 	"sync"
 
@@ -116,12 +115,7 @@ func NewContainerIO(id string, opts ...ContainerIOOpts) (_ *ContainerIO, err err
 
 // Config returns io config.
 func (c *ContainerIO) Config() cio.Config {
-	return cio.Config{
-		Terminal: c.fifos.Terminal,
-		Stdin:    c.fifos.In,
-		Stdout:   c.fifos.Out,
-		Stderr:   c.fifos.Err,
-	}
+	return c.fifos.Config
 }
 
 // Pipe creates container fifos and pipe container output
@@ -239,7 +233,7 @@ func (c *ContainerIO) Wait() {
 func (c *ContainerIO) Close() error {
 	c.closer.Close()
 	if c.fifos != nil {
-		return os.RemoveAll(c.fifos.Dir)
+		return c.fifos.Close()
 	}
 	return nil
 }
