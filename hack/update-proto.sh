@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Copyright 2017 The Kubernetes Authors.
+# Copyright 2018 The Containerd Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +26,7 @@ go get k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
 if ! which protoc-gen-gogo >/dev/null; then
   echo "GOPATH is not in PATH"
   exit 1
-fi 
+fi
 
 function cleanup {
 	rm -f ${API_ROOT}/api.pb.go.bak
