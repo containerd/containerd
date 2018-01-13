@@ -26,6 +26,8 @@ var bufferPool = &sync.Pool{
 	},
 }
 
+var errInvalidArchive = errors.New("invalid archive")
+
 // Diff returns a tar stream of the computed filesystem
 // difference between the provided directories.
 //
@@ -220,6 +222,15 @@ func Apply(ctx context.Context, root string, r io.Reader) (int64, error) {
 
 			originalBase := base[len(whiteoutPrefix):]
 			originalPath := filepath.Join(dir, originalBase)
+
+			// Ensure originalPath is under dir
+			if dir[len(dir)-1] != filepath.Separator {
+				dir += string(filepath.Separator)
+			}
+			if !strings.HasPrefix(originalPath, dir) {
+				return 0, errors.Wrapf(errInvalidArchive, "invalid whiteout name: %v", base)
+			}
+
 			if err := os.RemoveAll(originalPath); err != nil {
 				return 0, err
 			}
