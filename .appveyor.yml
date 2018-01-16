@@ -11,7 +11,9 @@ branches:
 environment:
   GOPATH: C:\gopath
   CGO_ENABLED: 1
-  GO_VERSION: 1.9
+  matrix:
+    - GO_VERSION: 1.9
+    - GO_VERSION: 1.10
 
 before_build:
   - choco install -y mingw
