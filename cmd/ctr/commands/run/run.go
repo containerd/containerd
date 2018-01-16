@@ -9,6 +9,7 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/cmd/ctr/commands/tasks"
 	"github.com/containerd/containerd/containers"
@@ -170,6 +171,10 @@ var Command = cli.Command{
 			Name:  "detach,d",
 			Usage: "detach from the task after it has started execution",
 		},
+		cli.StringFlag{
+			Name:  "fifo-dir",
+			Usage: "directory used for storing IO FIFOs",
+		},
 	}, commands.SnapshotterFlags...),
 	Action: func(context *cli.Context) error {
 		var (
@@ -200,7 +205,8 @@ var Command = cli.Command{
 			defer container.Delete(ctx, containerd.WithSnapshotCleanup)
 		}
 		opts := getNewTaskOpts(context)
-		task, err := tasks.NewTask(ctx, client, container, context.String("checkpoint"), tty, context.Bool("null-io"), opts...)
+		ioOpts := []cio.Opt{cio.WithFIFODir(context.String("fifo-dir"))}
+		task, err := tasks.NewTask(ctx, client, container, context.String("checkpoint"), tty, context.Bool("null-io"), ioOpts, opts...)
 		if err != nil {
 			return err
 		}
