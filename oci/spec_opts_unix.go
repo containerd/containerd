@@ -257,7 +257,6 @@ func WithUIDGID(uid, gid uint32) SpecOpts {
 // uid, and not returns error.
 func WithUserID(uid uint32) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) (err error) {
-		// TODO: support non-snapshot rootfs
 		if c.Snapshotter == "" {
 			return errors.Errorf("no snapshotter set for container")
 		}
@@ -269,33 +268,18 @@ func WithUserID(uid uint32) SpecOpts {
 		if err != nil {
 			return err
 		}
-
 		return mount.WithTempMount(ctx, mounts, func(root string) error {
-			ppath, err := fs.RootPath(root, "/etc/passwd")
+			uuid, ugid, err := getUidGidFromPath(root, func(u user.User) bool {
+				return u.Uid == int(uid)
+			})
 			if err != nil {
-				return err
-			}
-			f, err := os.Open(ppath)
-			if err != nil {
-				if os.IsNotExist(err) {
+				if os.IsNotExist(err) || err == errNoUsersFound {
 					s.Process.User.UID, s.Process.User.GID = uid, uid
 					return nil
 				}
 				return err
 			}
-			defer f.Close()
-			users, err := user.ParsePasswdFilter(f, func(u user.User) bool {
-				return u.Uid == int(uid)
-			})
-			if err != nil {
-				return err
-			}
-			if len(users) == 0 {
-				s.Process.User.UID, s.Process.User.GID = uid, uid
-				return nil
-			}
-			u := users[0]
-			s.Process.User.UID, s.Process.User.GID = uint32(u.Uid), uint32(u.Gid)
+			s.Process.User.UID, s.Process.User.GID = uuid, ugid
 			return nil
 		})
 	}
@@ -306,7 +290,6 @@ func WithUserID(uid uint32) SpecOpts {
 // does not exist, or the username is not found in /etc/passwd,
 // it returns error.
 func WithUsername(username string) SpecOpts {
-	// TODO: support non-snapshot rootfs
 	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) (err error) {
 		if c.Snapshotter == "" {
 			return errors.Errorf("no snapshotter set for container")
@@ -320,27 +303,37 @@ func WithUsername(username string) SpecOpts {
 			return err
 		}
 		return mount.WithTempMount(ctx, mounts, func(root string) error {
-			ppath, err := fs.RootPath(root, "/etc/passwd")
-			if err != nil {
-				return err
-			}
-			f, err := os.Open(ppath)
-			if err != nil {
-				return err
-			}
-			defer f.Close()
-			users, err := user.ParsePasswdFilter(f, func(u user.User) bool {
+			uid, gid, err := getUidGidFromPath(root, func(u user.User) bool {
 				return u.Name == username
 			})
 			if err != nil {
 				return err
 			}
-			if len(users) == 0 {
-				return errors.Errorf("no users found for %s", username)
-			}
-			u := users[0]
-			s.Process.User.UID, s.Process.User.GID = uint32(u.Uid), uint32(u.Gid)
+			s.Process.User.UID, s.Process.User.GID = uid, gid
 			return nil
 		})
 	}
+}
+
+var errNoUsersFound = errors.New("no users found")
+
+func getUidGidFromPath(root string, filter func(user.User) bool) (uid, gid uint32, err error) {
+	ppath, err := fs.RootPath(root, "/etc/passwd")
+	if err != nil {
+		return 0, 0, err
+	}
+	f, err := os.Open(ppath)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer f.Close()
+	users, err := user.ParsePasswdFilter(f, filter)
+	if err != nil {
+		return 0, 0, err
+	}
+	if len(users) == 0 {
+		return 0, 0, errNoUsersFound
+	}
+	u := users[0]
+	return uint32(u.Uid), uint32(u.Gid), nil
 }
