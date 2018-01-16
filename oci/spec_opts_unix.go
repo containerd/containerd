@@ -257,6 +257,24 @@ func WithUIDGID(uid, gid uint32) SpecOpts {
 // uid, and not returns error.
 func WithUserID(uid uint32) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) (err error) {
+		if c.Snapshotter == "" && c.SnapshotKey == "" {
+			if !isRootfsAbs(s.Root.Path) {
+				return errors.Errorf("rootfs absolute path is required")
+			}
+			uuid, ugid, err := getUIDGIDFromPath(s.Root.Path, func(u user.User) bool {
+				return u.Uid == int(uid)
+			})
+			if err != nil {
+				if os.IsNotExist(err) || err == errNoUsersFound {
+					s.Process.User.UID, s.Process.User.GID = uid, uid
+					return nil
+				}
+				return err
+			}
+			s.Process.User.UID, s.Process.User.GID = uuid, ugid
+			return nil
+
+		}
 		if c.Snapshotter == "" {
 			return errors.Errorf("no snapshotter set for container")
 		}
@@ -269,7 +287,7 @@ func WithUserID(uid uint32) SpecOpts {
 			return err
 		}
 		return mount.WithTempMount(ctx, mounts, func(root string) error {
-			uuid, ugid, err := getUidGidFromPath(root, func(u user.User) bool {
+			uuid, ugid, err := getUIDGIDFromPath(root, func(u user.User) bool {
 				return u.Uid == int(uid)
 			})
 			if err != nil {
@@ -291,6 +309,19 @@ func WithUserID(uid uint32) SpecOpts {
 // it returns error.
 func WithUsername(username string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) (err error) {
+		if c.Snapshotter == "" && c.SnapshotKey == "" {
+			if !isRootfsAbs(s.Root.Path) {
+				return errors.Errorf("rootfs absolute path is required")
+			}
+			uid, gid, err := getUIDGIDFromPath(s.Root.Path, func(u user.User) bool {
+				return u.Name == username
+			})
+			if err != nil {
+				return err
+			}
+			s.Process.User.UID, s.Process.User.GID = uid, gid
+			return nil
+		}
 		if c.Snapshotter == "" {
 			return errors.Errorf("no snapshotter set for container")
 		}
@@ -303,7 +334,7 @@ func WithUsername(username string) SpecOpts {
 			return err
 		}
 		return mount.WithTempMount(ctx, mounts, func(root string) error {
-			uid, gid, err := getUidGidFromPath(root, func(u user.User) bool {
+			uid, gid, err := getUIDGIDFromPath(root, func(u user.User) bool {
 				return u.Name == username
 			})
 			if err != nil {
@@ -317,7 +348,7 @@ func WithUsername(username string) SpecOpts {
 
 var errNoUsersFound = errors.New("no users found")
 
-func getUidGidFromPath(root string, filter func(user.User) bool) (uid, gid uint32, err error) {
+func getUIDGIDFromPath(root string, filter func(user.User) bool) (uid, gid uint32, err error) {
 	ppath, err := fs.RootPath(root, "/etc/passwd")
 	if err != nil {
 		return 0, 0, err
@@ -336,4 +367,8 @@ func getUidGidFromPath(root string, filter func(user.User) bool) (uid, gid uint3
 	}
 	u := users[0]
 	return uint32(u.Uid), uint32(u.Gid), nil
+}
+
+func isRootfsAbs(root string) bool {
+	return filepath.IsAbs(root)
 }
