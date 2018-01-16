@@ -30,6 +30,7 @@ TARBALL := $(TARBALL_PREFIX)-$(VERSION).$(GOOS)-$(GOARCH).tar.gz
 BUILD_TAGS := seccomp apparmor
 GO_LDFLAGS := -X $(PROJECT)/pkg/version.CRIContainerdVersion=$(VERSION)
 SOURCES := $(shell find cmd/ pkg/ vendor/ -name '*.go')
+PLUGIN_SOURCES := $(shell ls *.go)
 INTEGRATION_SOURCES := $(shell find integration/ -name '*.go')
 
 all: binaries
@@ -41,6 +42,7 @@ help:
 	@echo
 	@echo " * 'install'          - Install binaries to system locations"
 	@echo " * 'binaries'         - Build cri-containerd"
+	@echo " * 'plugin'           - Build cri-containerd as a plugin package"
 	@echo " * 'static-binaries   - Build static cri-containerd"
 	@echo " * 'release'          - Build release tarball"
 	@echo " * 'push'             - Push release tarball to GCS"
@@ -107,6 +109,13 @@ clean:
 
 binaries: $(BUILD_DIR)/cri-containerd
 
+# TODO(random-liu): Make this only build when source files change and
+# add this to target all.
+plugin: $(PLUGIN_SOURCES) $(SOURCES)
+	$(GO) build -tags '$(BUILD_TAGS)' \
+		-ldflags '$(GO_LDFLAGS)' \
+		-gcflags '$(GO_GCFLAGS)' \
+
 static-binaries: GO_LDFLAGS += -extldflags "-fno-PIC -static"
 static-binaries: $(BUILD_DIR)/cri-containerd
 
@@ -156,6 +165,7 @@ install.tools: .install.gitvalidation .install.gometalinter
 .PHONY: \
 	binaries \
 	static-binaries \
+	plugin \
 	release \
 	push \
 	boiler \

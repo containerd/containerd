@@ -50,6 +50,11 @@ fi
 # and configurations in cluster.
 INSTALL_CNI=${INSTALL_CNI:-true}
 
+# COOK_CONTAINERD indicates whether to update containerd with newest
+# cri plugin before install. This is mainly used for testing new cri
+# plugin change.
+COOK_CONTAINERD=${COOK_CONTAINERD:-false}
+
 CONTAINERD_DIR=${DESTDIR}/usr/local
 RUNC_DIR=${DESTDIR}
 CNI_DIR=${DESTDIR}/opt/cni
@@ -61,6 +66,7 @@ RUNC_PKG=github.com/opencontainers/runc
 CNI_PKG=github.com/containernetworking/plugins
 CONTAINERD_PKG=github.com/containerd/containerd
 CRITOOL_PKG=github.com/kubernetes-incubator/cri-tools
+CRI_CONTAINERD_PKG=github.com/containerd/cri-containerd
 
 # Create a temporary GOPATH for make install.deps.
 TMPGOPATH=$(mktemp -d /tmp/cri-containerd-install-deps.XXXX)
@@ -73,9 +79,9 @@ GOPATH=${TMPGOPATH}
 # 2) Version.
 # 3) Repo name (optional);
 checkout_repo() {
-  pkg=$1
-  version=$2
-  repo=${3:-""}
+  local -r pkg=$1
+  local -r version=$2
+  local repo=${3:-""}
   if [ -z "${repo}" ]; then
     repo=${pkg}
   fi
@@ -134,7 +140,36 @@ fi
 # Install containerd
 checkout_repo ${CONTAINERD_PKG} ${CONTAINERD_VERSION} ${CONTAINERD_REPO}
 cd ${GOPATH}/src/${CONTAINERD_PKG}
-make
+if ${COOK_CONTAINERD}; then
+  # Verify that vendor.conf is in sync with containerd before cook containerd,
+  # this is a hard requirement.
+  if ! ${ROOT}/hack/update-vendor.sh -only-verify; then
+    echo "Please run hack/update-vendor.sh before cook containerd."
+    exit 1
+  fi
+  # Import cri plugin into containerd.
+  # TODO(random-liu): Remove this after containerd starts to vendor cri plugin.
+  echo "import _ \"${CRI_CONTAINERD_PKG}\"" >> cmd/containerd/builtins_linux.go
+  # 1. Copy all cri-containerd vendors into containerd vendor. This makes sure
+  # all dependencies introduced by cri-containerd will be updated. There might
+  # be unnecessary vendors introduced, but it still builds.
+  cp -rT ${ROOT}/vendor/ vendor/
+  # 2. Remove containerd repo itself from vendor.
+  rm -rf vendor/${CONTAINERD_PKG}
+  # 3. Create cri-containerd vendor in containerd vendor, and copy the newest
+  # cri-containerd there.
+  if [ -d "vendor/${CRI_CONTAINERD_PKG}" ]; then
+    rm -rf vendor/${CRI_CONTAINERD_PKG}/*
+  else
+    mkdir -p vendor/${CRI_CONTAINERD_PKG}
+  fi
+  cp -rT ${ROOT} vendor/${CRI_CONTAINERD_PKG}
+  # 4. Remove the extra vendor in cri-containerd.
+  rm -rf vendor/${CRI_CONTAINERD_PKG}/vendor
+  # After the 4 steps above done, we have a containerd with newest cri-containerd
+  # plugin.
+fi
+make BUILDTAGS="${BUILDTAGS}"
 # containerd make install requires `go` to work. Explicitly
 # set PATH to make sure it can find `go` even with `sudo`.
 ${sudo} sh -c "PATH=${PATH} make install -e DESTDIR=${CONTAINERD_DIR}"

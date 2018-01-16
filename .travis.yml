@@ -32,11 +32,13 @@ jobs:
         - make install.tools
         - make .gitvalidation
         - make binaries
+        - make plugin
       go: 1.9.x
     - script:
         - make install.tools
         - make .gitvalidation
         - make binaries
+        - make plugin
       go: tip
     - stage: Test
       script:
@@ -49,5 +51,14 @@ jobs:
         - cat /tmp/test-integration/cri-containerd.log
         - cat /tmp/test-integration/containerd.log
         - cat /tmp/test-cri/cri-containerd.log
+        - cat /tmp/test-cri/containerd.log
+      go: 1.9.x
+    - script:
+        - make install.deps COOK_CONTAINERD=true
+        - make test-integration STANDALONE_CRI_CONTAINERD=false
+        - make test-cri STANDALONE_CRI_CONTAINERD=false
+      after_script:
+        # Abuse travis to preserve the log.
+        - cat /tmp/test-integration/containerd.log
         - cat /tmp/test-cri/containerd.log
       go: 1.9.x
