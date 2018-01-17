@@ -45,6 +45,7 @@ import (
 	"golang.org/x/sys/unix"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
+	"github.com/containerd/cri-containerd/pkg/annotations"
 	customopts "github.com/containerd/cri-containerd/pkg/containerd/opts"
 	cio "github.com/containerd/cri-containerd/pkg/server/io"
 	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
@@ -143,10 +144,11 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	// Generate container runtime spec.
 	mounts := c.generateContainerMounts(getSandboxRootDir(c.config.RootDir, sandboxID), config)
 
-	spec, err := c.generateContainerSpec(id, sandboxPid, config, sandboxConfig, &image.ImageSpec.Config, append(mounts, volumeMounts...))
+	spec, err := c.generateContainerSpec(id, sandboxID, sandboxPid, config, sandboxConfig, &image.ImageSpec.Config, append(mounts, volumeMounts...))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate container %q spec: %v", id, err)
 	}
+
 	glog.V(4).Infof("Container %q spec: %#+v", id, spew.NewFormatter(spec))
 
 	// Set snapshotter before any other options.
@@ -271,7 +273,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	return &runtime.CreateContainerResponse{ContainerId: id}, nil
 }
 
-func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint32, config *runtime.ContainerConfig,
+func (c *criContainerdService) generateContainerSpec(id string, sandboxID string, sandboxPid uint32, config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig, extraMounts []*runtime.Mount) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
 	spec, err := defaultRuntimeSpec(id)
@@ -364,6 +366,9 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxPid uint3
 	for _, group := range supplementalGroups {
 		g.AddProcessAdditionalGid(uint32(group))
 	}
+
+	g.AddAnnotation(annotations.ContainerType, annotations.ContainerTypeContainer)
+	g.AddAnnotation(annotations.SandboxID, sandboxID)
 
 	return g.Spec(), nil
 }

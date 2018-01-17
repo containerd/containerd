@@ -20,6 +20,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/containerd/cri-containerd/pkg/annotations"
 	"github.com/containerd/typeurl"
 	"github.com/cri-o/ocicni/pkg/ocicni"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -64,6 +65,13 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 		assert.Equal(t, "/workspace", spec.Process.Cwd)
 		assert.EqualValues(t, *spec.Linux.Resources.CPU.Shares, defaultSandboxCPUshares)
 		assert.EqualValues(t, *spec.Process.OOMScoreAdj, defaultSandboxOOMAdj)
+
+		t.Logf("Check PodSandbox annotations")
+		assert.Contains(t, spec.Annotations, annotations.SandboxID)
+		assert.EqualValues(t, spec.Annotations[annotations.SandboxID], id)
+
+		assert.Contains(t, spec.Annotations, annotations.ContainerType)
+		assert.EqualValues(t, spec.Annotations[annotations.ContainerType], annotations.ContainerTypeSandbox)
 	}
 	return config, imageConfig, specCheck
 }
