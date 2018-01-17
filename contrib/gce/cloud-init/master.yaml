@@ -82,7 +82,7 @@ write_files:
       # cri-containerd on master uses the cni binary and config in the
       # release tarball.
       ExecStart=/home/cri-containerd/usr/local/bin/cri-containerd \
-        --logtostderr --v=4 \
+        --log-level=debug \
         --network-bin-dir=/home/cri-containerd/opt/cni/bin \
         --network-conf-dir=/home/cri-containerd/etc/cni/net.d
 

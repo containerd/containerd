@@ -85,7 +85,7 @@ write_files:
       # Point to /home/kubernetes/bin where calico setup cni binary in kube-up.sh.
       # Point to /etc/cni/net.d where calico put cni config in kube-up.sh.
       ExecStart=/home/cri-containerd/usr/local/bin/cri-containerd \
-        --logtostderr --v=4 \
+        --log-level=debug \
         --network-bin-dir=/home/kubernetes/bin \
         --network-conf-dir=/etc/cni/net.d
 
