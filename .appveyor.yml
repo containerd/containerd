@@ -21,6 +21,8 @@ before_build:
   - 7z x go%GO_VERSION%.windows-amd64.zip -oC:\ >nul
   - go version
   - choco install codecov
+  # Print host version. TODO: Remove this when containerd has a way to get host version
+  - ps: $psversiontable
 
 build_script:
   - bash.exe -elc "export PATH=/c/tools/mingw64/bin:/c/gopath/bin:$PATH;
