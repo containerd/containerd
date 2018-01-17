@@ -1,6 +1,14 @@
-RUNC_VERSION=9f9c96235cc97674e935002fc3d78361b696a69e
-CNI_VERSION=v0.6.0
-CONTAINERD_VERSION=f12ba2407e328c98f8be5eacbb9c510b073dd4c0
-CONTAINERD_REPO=
+from-vendor RUNC       github.com/opencontainers/runc
+from-vendor CNI        github.com/containernetworking/plugins
+from-vendor CONTAINERD github.com/containerd/containerd
+from-vendor KUBERNETES k8s.io/kubernetes
+
+# k8s.io is actually a redirect, but we do not handle the go-import
+# metadata which `go get` and `vndr` etc do. Handle it manually here.
+if [ x"$KUBERNETES_REPO" = "xk8s.io" ] ; then
+    KUBERNETES_REPO="https://github.com/kubernetes/kubernetes"
+fi
+
+# Not from vendor.conf.
 CRITOOL_VERSION=240a840375cdabb5860c75c99e8b0d0a776006b4
-KUBERNETES_VERSION=0caa20c65f147e15f5545862510eb7e81c42b0a3
+CRITOOL_REPO=github.com/kubernetes-incubator/cri-tools

@@ -59,12 +59,11 @@ fi
 GOPATH=${GOPATH%%:*}
 
 # Get kubernetes
-KUBERNETES_REPO="https://github.com/kubernetes/kubernetes"
 KUBERNETES_PATH="${GOPATH}/src/k8s.io/kubernetes"
 if [ ! -d "${KUBERNETES_PATH}" ]; then
   mkdir -p ${KUBERNETES_PATH}
   cd ${KUBERNETES_PATH}
-  git clone ${KUBERNETES_REPO} .
+  git clone https://${KUBERNETES_REPO} .
 fi
 cd ${KUBERNETES_PATH}
 git fetch --all

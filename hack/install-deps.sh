@@ -27,6 +27,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+source $(dirname "${BASH_SOURCE[0]}")/utils.sh
+
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
 . ${ROOT}/hack/versions
 
@@ -76,15 +78,12 @@ GOPATH=${TMPGOPATH}
 # and switch to specified  version.
 # Varset:
 # 1) Pkg name;
-# 2) Version.
-# 3) Repo name (optional);
+# 2) Version;
+# 3) Repo name;
 checkout_repo() {
   local -r pkg=$1
   local -r version=$2
-  local repo=${3:-""}
-  if [ -z "${repo}" ]; then
-    repo=${pkg}
-  fi
+  local -r repo=$3
   path="${GOPATH}/src/${pkg}"
   if [ ! -d ${path} ]; then
     mkdir -p ${path}
@@ -96,7 +95,7 @@ checkout_repo() {
 }
 
 # Install runc
-checkout_repo ${RUNC_PKG} ${RUNC_VERSION}
+checkout_repo ${RUNC_PKG} ${RUNC_VERSION} ${RUNC_REPO}
 cd ${GOPATH}/src/${RUNC_PKG}
 BUILDTAGS=${BUILDTAGS:-seccomp apparmor}
 make static BUILDTAGS="$BUILDTAGS"
@@ -104,7 +103,7 @@ ${sudo} make install -e DESTDIR=${RUNC_DIR}
 
 # Install cni
 if ${INSTALL_CNI}; then
-  checkout_repo ${CNI_PKG} ${CNI_VERSION}
+  checkout_repo ${CNI_PKG} ${CNI_VERSION} ${CNI_REPO}
   cd ${GOPATH}/src/${CNI_PKG}
   FASTBUILD=true ./build.sh
   ${sudo} mkdir -p ${CNI_DIR}
@@ -175,7 +174,7 @@ make BUILDTAGS="${BUILDTAGS}"
 ${sudo} sh -c "PATH=${PATH} make install -e DESTDIR=${CONTAINERD_DIR}"
 
 #Install crictl
-checkout_repo ${CRITOOL_PKG} ${CRITOOL_VERSION}
+checkout_repo ${CRITOOL_PKG} ${CRITOOL_VERSION} ${CRITOOL_REPO}
 cd ${GOPATH}/src/${CRITOOL_PKG}
 make crictl
 ${sudo} make install-crictl -e BINDIR=${CRICTL_DIR} GOPATH=${GOPATH}
