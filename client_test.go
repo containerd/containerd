@@ -9,7 +9,6 @@ import (
 	golog "log"
 	"os"
 	"os/exec"
-	"runtime"
 	"testing"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/sys"
 	"github.com/containerd/containerd/testutil"
 	"github.com/sirupsen/logrus"
 )
@@ -62,7 +62,7 @@ func TestMain(m *testing.M) {
 	defer cancel()
 
 	if !noDaemon {
-		os.RemoveAll(defaultRoot)
+		sys.ForceRemoveAll(defaultRoot)
 
 		err := ctrd.start("containerd", address, []string{
 			"--root", defaultRoot,
@@ -99,17 +99,10 @@ func TestMain(m *testing.M) {
 	}).Info("running tests against containerd")
 
 	// pull a seed image
-	if runtime.GOOS != "windows" { // TODO: remove once pull is supported on windows
-		if _, err = client.Pull(ctx, testImage, WithPullUnpack); err != nil {
-			ctrd.Stop()
-			ctrd.Wait()
-			fmt.Fprintf(os.Stderr, "%s: %s\n", err, buf.String())
-			os.Exit(1)
-		}
-	}
-
-	if err := platformTestSetup(client); err != nil {
-		fmt.Fprintln(os.Stderr, "platform test setup failed", err)
+	if _, err = client.Pull(ctx, testImage, WithPullUnpack); err != nil {
+		ctrd.Stop()
+		ctrd.Wait()
+		fmt.Fprintf(os.Stderr, "%s: %s\n", err, buf.String())
 		os.Exit(1)
 	}
 
@@ -132,7 +125,7 @@ func TestMain(m *testing.M) {
 				fmt.Fprintln(os.Stderr, "failed to wait for containerd", err)
 			}
 		}
-		if err := os.RemoveAll(defaultRoot); err != nil {
+		if err := sys.ForceRemoveAll(defaultRoot); err != nil {
 			fmt.Fprintln(os.Stderr, "failed to remove test root dir", err)
 			os.Exit(1)
 		}
@@ -169,11 +162,6 @@ func TestNewClient(t *testing.T) {
 
 // All the container's tests depends on this, we need it to run first.
 func TestImagePull(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		// TODO: remove once Windows has a snapshotter
-		t.Skip("Windows does not have a snapshotter yet")
-	}
-
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)

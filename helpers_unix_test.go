@@ -39,8 +39,3 @@ func withExecExitStatus(s *specs.Process, es int) {
 func withExecArgs(s *specs.Process, args ...string) {
 	s.Args = args
 }
-
-var (
-	withNewSnapshot = WithNewSnapshot
-	withImageConfig = oci.WithImageConfig
-)
