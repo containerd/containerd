@@ -23,7 +23,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/cri-o/ocicni/pkg/ocicni"
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
@@ -82,7 +82,7 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 		}
 	}
 
-	glog.V(2).Infof("TearDown network for sandbox %q successfully", id)
+	logrus.Infof("TearDown network for sandbox %q successfully", id)
 
 	sandboxRoot := getSandboxRootDir(c.config.RootDir, id)
 	if err := c.unmountSandboxFiles(sandboxRoot, sandbox.Config); err != nil {

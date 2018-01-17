@@ -23,8 +23,8 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/golang/glog"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
@@ -160,7 +160,7 @@ func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox,
 	if err == nil {
 		si.RuntimeSpec = spec
 	} else {
-		glog.Errorf("Failed to get sandbox container %q runtime spec: %v", sandbox.ID, err)
+		logrus.WithError(err).Errorf("Failed to get sandbox container %q runtime spec", sandbox.ID)
 	}
 
 	ctrInfo, err := container.Info(ctx)
@@ -172,7 +172,7 @@ func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox,
 		si.SnapshotKey = ctrInfo.SnapshotKey
 		si.Snapshotter = ctrInfo.Snapshotter
 	} else {
-		glog.Errorf("Failed to get sandbox container %q info: %v", sandbox.ID, err)
+		logrus.WithError(err).Errorf("Failed to get sandbox container %q info", sandbox.ID)
 	}
 
 	infoBytes, err := json.Marshal(si)

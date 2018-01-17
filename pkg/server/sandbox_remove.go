@@ -22,10 +22,10 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/docker/docker/pkg/system"
-	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
+	"github.com/containerd/cri-containerd/pkg/log"
 	"github.com/containerd/cri-containerd/pkg/store"
 )
 
@@ -39,7 +39,7 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 				r.GetPodSandboxId(), err)
 		}
 		// Do not return error if the id doesn't exist.
-		glog.V(5).Infof("RemovePodSandbox called for sandbox %q that does not exist",
+		log.Tracef("RemovePodSandbox called for sandbox %q that does not exist",
 			r.GetPodSandboxId())
 		return &runtime.RemovePodSandboxResponse{}, nil
 	}
@@ -88,7 +88,7 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 		if !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to delete sandbox container %q: %v", id, err)
 		}
-		glog.V(5).Infof("Remove called for sandbox container %q that does not exist", id, err)
+		log.Tracef("Remove called for sandbox container %q that does not exist", id)
 	}
 
 	// Remove sandbox from sandbox store. Note that once the sandbox is successfully

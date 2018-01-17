@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd"
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 	"k8s.io/client-go/tools/remotecommand"
@@ -114,7 +114,7 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 		opts.stderr = cio.NewDiscardLogger()
 	}
 	execID := util.GenerateID()
-	glog.V(4).Infof("Generated exec id %q for container %q", execID, id)
+	logrus.Debugf("Generated exec id %q for container %q", execID, id)
 	rootDir := getContainerRootDir(c.config.RootDir, id)
 	var execIO *cio.ExecIO
 	process, err := task.Exec(ctx, execID, pspec,
@@ -129,7 +129,7 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 	}
 	defer func() {
 		if _, err := process.Delete(ctx); err != nil {
-			glog.Errorf("Failed to delete exec process %q for container %q: %v", execID, id, err)
+			logrus.WithError(err).Errorf("Failed to delete exec process %q for container %q", execID, id)
 		}
 	}()
 
@@ -143,7 +143,7 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 
 	handleResizing(opts.resize, func(size remotecommand.TerminalSize) {
 		if err := process.Resize(ctx, uint32(size.Width), uint32(size.Height)); err != nil {
-			glog.Errorf("Failed to resize process %q console for container %q: %v", execID, id, err)
+			logrus.WithError(err).Errorf("Failed to resize process %q console for container %q", execID, id)
 		}
 	})
 
@@ -174,19 +174,19 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 		}
 		// Wait for the process to be killed.
 		exitRes := <-exitCh
-		glog.V(2).Infof("Timeout received while waiting for exec process kill %q code %d and error %v",
+		logrus.Infof("Timeout received while waiting for exec process kill %q code %d and error %v",
 			execID, exitRes.ExitCode(), exitRes.Error())
 		<-attachDone
-		glog.V(4).Infof("Stream pipe for exec process %q done", execID)
+		logrus.Debugf("Stream pipe for exec process %q done", execID)
 		return nil, fmt.Errorf("timeout %v exceeded", opts.timeout)
 	case exitRes := <-exitCh:
 		code, _, err := exitRes.Result()
-		glog.V(2).Infof("Exec process %q exits with exit code %d and error %v", execID, code, err)
+		logrus.Infof("Exec process %q exits with exit code %d and error %v", execID, code, err)
 		if err != nil {
 			return nil, fmt.Errorf("failed while waiting for exec %q: %v", execID, err)
 		}
 		<-attachDone
-		glog.V(4).Infof("Stream pipe for exec process %q done", execID)
+		logrus.Debugf("Stream pipe for exec process %q done", execID)
 		return &code, nil
 	}
 }

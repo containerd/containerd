@@ -24,8 +24,8 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/typeurl"
-	"github.com/golang/glog"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
@@ -80,7 +80,7 @@ func (c *criContainerdService) updateContainerResources(ctx context.Context,
 		if retErr != nil {
 			// Reset spec on error.
 			if err := updateContainerSpec(ctx, cntr.Container, oldSpec); err != nil {
-				glog.Errorf("Failed to update spec %+v for container %q: %v", oldSpec, id, err)
+				logrus.WithError(err).Errorf("Failed to update spec %+v for container %q", oldSpec, id)
 			}
 		}
 	}()

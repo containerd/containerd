@@ -26,8 +26,8 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/remotes/docker"
-	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
@@ -86,7 +86,7 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 	// TODO(random-liu): [P0] Avoid concurrent pulling/removing on the same image reference.
 	ref := namedRef.String()
 	if ref != imageRef {
-		glog.V(4).Infof("PullImage using normalized image ref: %q", ref)
+		logrus.Debugf("PullImage using normalized image ref: %q", ref)
 	}
 
 	resolver := docker.NewResolver(docker.ResolverOptions{
@@ -111,9 +111,9 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 	}
 
 	// Do best effort unpack.
-	glog.V(4).Infof("Unpack image %q", imageRef)
+	logrus.Debugf("Unpack image %q", imageRef)
 	if err := image.Unpack(ctx, c.config.ContainerdConfig.Snapshotter); err != nil {
-		glog.Warningf("Failed to unpack image %q: %v", imageRef, err)
+		logrus.WithError(err).Warnf("Failed to unpack image %q", imageRef)
 		// Do not fail image pulling. Unpack will be retried before container creation.
 	}
 
@@ -134,7 +134,7 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 		}
 	}
 
-	glog.V(4).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q", imageRef, imageID,
+	logrus.Debugf("Pulled image %q with image id %q, repo tag %q, repo digest %q", imageRef, imageID,
 		repoTag, repoDigest)
 	img := imagestore.Image{
 		ID:        imageID,

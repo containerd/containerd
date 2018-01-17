@@ -21,7 +21,7 @@ import (
 	"io"
 
 	"github.com/containerd/containerd"
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -62,7 +62,7 @@ func (c *criContainerdService) attachContainer(ctx context.Context, id string, s
 	}
 	handleResizing(resize, func(size remotecommand.TerminalSize) {
 		if err := task.Resize(ctx, uint32(size.Width), uint32(size.Height)); err != nil {
-			glog.Errorf("Failed to resize task %q console: %v", id, err)
+			logrus.WithError(err).Errorf("Failed to resize task %q console", id)
 		}
 	})
 

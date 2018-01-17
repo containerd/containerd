@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd"
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
@@ -83,7 +83,7 @@ func (c *criContainerdService) portForward(id string, port int32, stream io.Read
 		return fmt.Errorf("failed to find nsenter: %v", err)
 	}
 
-	glog.V(2).Infof("Executing port forwarding command: %s %s", nsenter, strings.Join(args, " "))
+	logrus.Infof("Executing port forwarding command: %s %s", nsenter, strings.Join(args, " "))
 
 	cmd := exec.Command(nsenter, args...)
 	cmd.Stdout = stream
@@ -106,17 +106,17 @@ func (c *criContainerdService) portForward(id string, port int32, stream io.Read
 	}
 	go func() {
 		if _, err := io.Copy(in, stream); err != nil {
-			glog.Errorf("Failed to copy port forward input for %q port %d: %v", id, port, err)
+			logrus.WithError(err).Errorf("Failed to copy port forward input for %q port %d", id, port)
 		}
 		in.Close()
-		glog.V(4).Infof("Finish copy port forward input for %q port %d: %v", id, port)
+		logrus.Debugf("Finish copy port forward input for %q port %d: %v", id, port)
 	}()
 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("nsenter command returns error: %v, stderr: %q", err, stderr.String())
 	}
 
-	glog.V(2).Infof("Finish port forwarding for %q port %d", id, port)
+	logrus.Infof("Finish port forwarding for %q port %d", id, port)
 
 	return nil
 }

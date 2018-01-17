@@ -22,10 +22,11 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/docker/docker/pkg/system"
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
+	"github.com/containerd/cri-containerd/pkg/log"
 	"github.com/containerd/cri-containerd/pkg/store"
 	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
 )
@@ -39,7 +40,7 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 			return nil, fmt.Errorf("an error occurred when try to find container %q: %v", r.GetContainerId(), err)
 		}
 		// Do not return error if container metadata doesn't exist.
-		glog.V(5).Infof("RemoveContainer called for container %q that does not exist", r.GetContainerId())
+		log.Tracef("RemoveContainer called for container %q that does not exist", r.GetContainerId())
 		return &runtime.RemoveContainerResponse{}, nil
 	}
 	id := container.ID
@@ -53,7 +54,7 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 		if retErr != nil {
 			// Reset removing if remove failed.
 			if err := resetContainerRemoving(container); err != nil {
-				glog.Errorf("failed to reset removing state for container %q: %v", id, err)
+				logrus.WithError(err).Errorf("failed to reset removing state for container %q", id)
 			}
 		}
 	}()
@@ -68,7 +69,7 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 		if !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to delete containerd container %q: %v", id, err)
 		}
-		glog.V(5).Infof("Remove called for containerd container %q that does not exist", id, err)
+		log.Tracef("Remove called for containerd container %q that does not exist", id)
 	}
 
 	// Delete container checkpoint.

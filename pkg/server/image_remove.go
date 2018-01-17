@@ -21,7 +21,7 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
@@ -64,13 +64,13 @@ func (c *criContainerdService) RemoveImage(ctx context.Context, r *runtime.Remov
 			// but different ids generated from compressed contents - manifest digest.
 			// So we decide to leave it.
 			// After all, the user can override the repoTag by pulling image again.
-			glog.Errorf("Can't remove image,failed to get config for Image tag %q,id %q: %v", tag, image.ID, err)
+			logrus.WithError(err).Errorf("Can't remove image,failed to get config for Image tag %q,id %q", tag, image.ID)
 			image.RepoTags = append(image.RepoTags[:i], image.RepoTags[i+1:]...)
 			continue
 		}
 		cID := desc.Digest.String()
 		if cID != image.ID {
-			glog.V(4).Infof("Image tag %q for %q is outdated, it's currently used by %q", tag, image.ID, cID)
+			logrus.Debugf("Image tag %q for %q is outdated, it's currently used by %q", tag, image.ID, cID)
 			image.RepoTags = append(image.RepoTags[:i], image.RepoTags[i+1:]...)
 			continue
 		}

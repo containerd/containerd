@@ -23,7 +23,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/docker/docker/pkg/signal"
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -65,7 +65,7 @@ func (c *criContainerdService) stopContainer(ctx context.Context, container cont
 	// stop only takes real action after the container is started.
 	state := container.Status.Get().State()
 	if state != runtime.ContainerState_CONTAINER_RUNNING {
-		glog.V(2).Infof("Container to stop %q is not running, current state %q",
+		logrus.Infof("Container to stop %q is not running, current state %q",
 			id, criContainerStateToString(state))
 		return nil
 	}
@@ -87,7 +87,7 @@ func (c *criContainerdService) stopContainer(ctx context.Context, container cont
 					image.ImageSpec.Config.StopSignal, err)
 			}
 		}
-		glog.V(2).Infof("Stop container %q with signal %v", id, stopSignal)
+		logrus.Infof("Stop container %q with signal %v", id, stopSignal)
 		task, err := container.Container.Task(ctx, nil)
 		if err != nil {
 			if !errdefs.IsNotFound(err) {
@@ -108,7 +108,7 @@ func (c *criContainerdService) stopContainer(ctx context.Context, container cont
 		if err == nil {
 			return nil
 		}
-		glog.Errorf("Stop container %q timed out: %v", id, err)
+		logrus.WithError(err).Errorf("Stop container %q timed out", id)
 	}
 
 	task, err := container.Container.Task(ctx, nil)
@@ -119,7 +119,7 @@ func (c *criContainerdService) stopContainer(ctx context.Context, container cont
 		return nil
 	}
 	// Event handler will Delete the container from containerd after it handles the Exited event.
-	glog.V(2).Infof("Kill container %q", id)
+	logrus.Infof("Kill container %q", id)
 	if task != nil {
 		if err = task.Kill(ctx, unix.SIGKILL, containerd.WithKillAll); err != nil {
 			if !errdefs.IsNotFound(err) {
@@ -151,7 +151,7 @@ func (c *criContainerdService) waitContainerStop(ctx context.Context, id string,
 			}
 			// Do not return error here because container was removed means
 			// it is already stopped.
-			glog.Warningf("Container %q was removed during stopping", id)
+			logrus.Warnf("Container %q was removed during stopping", id)
 			return nil
 		}
 		// TODO(random-liu): Use channel with event handler instead of polling.

@@ -33,13 +33,13 @@ import (
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runc/libcontainer/devices"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/opencontainers/runtime-tools/validate"
 	"github.com/opencontainers/selinux/go-selinux/label"
+	"github.com/sirupsen/logrus"
 	"github.com/syndtr/gocapability/capability"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
@@ -92,7 +92,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	// the same container.
 	id := util.GenerateID()
 	name := makeContainerName(config.GetMetadata(), sandboxConfig.GetMetadata())
-	glog.V(4).Infof("Generated id %q for container %q", id, name)
+	logrus.Debugf("Generated id %q for container %q", id, name)
 	if err = c.containerNameIndex.Reserve(name, id); err != nil {
 		return nil, fmt.Errorf("failed to reserve container name %q: %v", name, err)
 	}
@@ -132,8 +132,8 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 		if retErr != nil {
 			// Cleanup the container root directory.
 			if err = c.os.RemoveAll(containerRootDir); err != nil {
-				glog.Errorf("Failed to remove container root directory %q: %v",
-					containerRootDir, err)
+				logrus.WithError(err).Errorf("Failed to remove container root directory %q",
+					containerRootDir)
 			}
 		}
 	}()
@@ -149,7 +149,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 		return nil, fmt.Errorf("failed to generate container %q spec: %v", id, err)
 	}
 
-	glog.V(4).Infof("Container %q spec: %#+v", id, spew.NewFormatter(spec))
+	logrus.Debugf("Container %q spec: %#+v", id, spew.NewFormatter(spec))
 
 	// Set snapshotter before any other options.
 	opts := []containerd.NewContainerOpts{
@@ -184,7 +184,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	defer func() {
 		if retErr != nil {
 			if err := containerIO.Close(); err != nil {
-				glog.Errorf("Failed to close container io %q : %v", id, err)
+				logrus.WithError(err).Errorf("Failed to close container io %q", id)
 			}
 		}
 	}()
@@ -241,7 +241,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	defer func() {
 		if retErr != nil {
 			if err := cntr.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
-				glog.Errorf("Failed to delete containerd container %q: %v", id, err)
+				logrus.WithError(err).Errorf("Failed to delete containerd container %q", id)
 			}
 		}
 	}()
@@ -260,7 +260,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 		if retErr != nil {
 			// Cleanup container checkpoint on error.
 			if err := container.Delete(); err != nil {
-				glog.Errorf("Failed to cleanup container checkpoint for %q: %v", id, err)
+				logrus.WithError(err).Errorf("Failed to cleanup container checkpoint for %q", id)
 			}
 		}
 	}()
@@ -603,7 +603,7 @@ func (c *criContainerdService) addOCIBindMounts(g *generate.Generator, mounts []
 				g.SetLinuxRootPropagation("rslave") // nolint: errcheck
 			}
 		default:
-			glog.Warningf("Unknown propagation mode for hostPath %q", mount.HostPath)
+			logrus.Warnf("Unknown propagation mode for hostPath %q", mount.HostPath)
 			options = append(options, "rprivate")
 		}
 
