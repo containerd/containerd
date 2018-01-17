@@ -51,7 +51,7 @@ test_setup() {
 
   # Start cri-containerd
   if ${STANDALONE_CRI_CONTAINERD}; then
-    keepalive "sudo ${ROOT}/_output/cri-containerd --alsologtostderr --v 4 ${CRI_CONTAINERD_FLAGS}" \
+    keepalive "sudo ${ROOT}/_output/cri-containerd --log-level=debug ${CRI_CONTAINERD_FLAGS}" \
       ${RESTART_WAIT_PERIOD} &> ${report_dir}/cri-containerd.log &
     cri_containerd_pid=$!
   fi

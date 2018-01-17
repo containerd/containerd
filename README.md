@@ -107,7 +107,7 @@ sudo containerd
 ```
 2. Start `cri-containerd` as root in a second terminal:
 ```bash
-sudo cri-containerd -v 2 --alsologtostderr
+sudo cri-containerd
 ```
 3. From the Kubernetes project directory startup a local cluster using `cri-containerd`:
 ```bash
