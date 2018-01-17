@@ -79,7 +79,7 @@ func main() {
 			start   = time.Now()
 			signals = make(chan os.Signal, 2048)
 			serverC = make(chan *server.Server, 1)
-			ctx     = log.WithModule(gocontext.Background(), "containerd")
+			ctx     = gocontext.Background()
 			config  = defaultConfig()
 		)
 
@@ -114,21 +114,21 @@ func main() {
 			if err != nil {
 				return errors.Wrapf(err, "failed to get listener for debug endpoint")
 			}
-			serve(log.WithModule(ctx, "debug"), l, server.ServeDebug)
+			serve(ctx, l, server.ServeDebug)
 		}
 		if config.Metrics.Address != "" {
 			l, err := net.Listen("tcp", config.Metrics.Address)
 			if err != nil {
 				return errors.Wrapf(err, "failed to get listener for metrics endpoint")
 			}
-			serve(log.WithModule(ctx, "metrics"), l, server.ServeMetrics)
+			serve(ctx, l, server.ServeMetrics)
 		}
 
 		l, err := sys.GetLocalListener(address, config.GRPC.UID, config.GRPC.GID)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get listener for main endpoint")
 		}
-		serve(log.WithModule(ctx, "grpc"), l, server.ServeGRPC)
+		serve(ctx, l, server.ServeGRPC)
 
 		log.G(ctx).Infof("containerd successfully booted in %fs", time.Since(start).Seconds())
 		<-done

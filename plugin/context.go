@@ -6,7 +6,6 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events/exchange"
-	"github.com/containerd/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
@@ -28,7 +27,7 @@ type InitContext struct {
 // NewContext returns a new plugin InitContext
 func NewContext(ctx context.Context, r *Registration, plugins *Set, root, state string) *InitContext {
 	return &InitContext{
-		Context: log.WithModule(ctx, r.URI()),
+		Context: ctx,
 		Root:    filepath.Join(root, r.URI()),
 		State:   filepath.Join(state, r.URI()),
 		Meta: &Meta{
