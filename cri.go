@@ -17,8 +17,8 @@ limitations under the License.
 package cri
 
 import (
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
-	"github.com/golang/glog"
 
 	"github.com/containerd/cri-containerd/cmd/cri-containerd/options"
 	"github.com/containerd/cri-containerd/pkg/server"
@@ -43,27 +43,28 @@ func init() {
 	})
 }
 
-func initCRIService(_ *plugin.InitContext) (interface{}, error) {
+func initCRIService(ic *plugin.InitContext) (interface{}, error) {
+	ctx := ic.Context
 	// TODO(random-liu): Support Config through Registration.Config.
 	// TODO(random-liu): Validate the configuration.
 	// TODO(random-liu): Leverage other fields in InitContext, such as Root.
 	// TODO(random-liu): Register GRPC service onto containerd GRPC server.
 	// TODO(random-liu): Separate cri plugin config from cri-containerd server config,
 	// because many options only make sense to cri-containerd server.
-	// TODO(random-liu): Change all glog to logrus.
 	// TODO(random-liu): Handle graceful stop.
+	// TODO(random-liu): Make grpc interceptor pluggable, and add and use cri context.
 	c := options.DefaultConfig()
-	glog.V(0).Infof("Start cri plugin with config %+v", c)
+	log.G(ctx).Infof("Start cri plugin with config %+v", c)
 	// Use a goroutine to start cri service. The reason is that currently
 	// cri service requires containerd to be running.
 	// TODO(random-liu): Resolve the circular dependency.
 	go func() {
 		s, err := server.NewCRIContainerdService(c)
 		if err != nil {
-			glog.Exitf("Failed to create CRI service: %v", err)
+			log.G(ctx).WithError(err).Fatal("Failed to create CRI service")
 		}
 		if err := s.Run(); err != nil {
-			glog.Exitf("Failed to run CRI grpc server: %v", err)
+			log.G(ctx).WithError(err).Fatal("Failed to run CRI grpc server")
 		}
 	}()
 	return nil, nil

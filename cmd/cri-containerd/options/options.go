@@ -99,13 +99,15 @@ type Config struct {
 	// SkipImageFSUUID skips retrieving imagefs uuid.
 	// TODO(random-liu): Remove this after we find a generic way to get imagefs uuid.
 	SkipImageFSUUID bool `toml:"skip_imagefs_uuid" json:"skipImageFSUUID,omitempty"`
+	// LogLevel is the logrus log level.
+	LogLevel string `toml:"log_level" json:"logLevel,omitempty"`
 }
 
 // CRIContainerdOptions contains cri-containerd command line and toml options.
 type CRIContainerdOptions struct {
 	// Config contains cri-containerd toml config
 	Config
-	// Path to the TOML config file.
+	// ConfigFilePath is the path to the TOML config file.
 	ConfigFilePath string `toml:"-"`
 }
 
@@ -117,6 +119,8 @@ func NewCRIContainerdOptions() *CRIContainerdOptions {
 // AddFlags adds cri-containerd command line options to pflag.
 func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 	defaults := DefaultConfig()
+	fs.StringVar(&c.LogLevel, "log-level",
+		"info", "Set the logging level [trace, debug, info, warn, error, fatal, panic].")
 	fs.StringVar(&c.ConfigFilePath, configFilePathArgName,
 		defaultConfigFilePath, "Path to the config file.")
 	fs.StringVar(&c.SocketPath, "socket-path",
