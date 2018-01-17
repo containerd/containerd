@@ -106,13 +106,8 @@ func imagesBucketPath(namespace string) [][]byte {
 	return [][]byte{bucketKeyVersion, []byte(namespace), bucketKeyObjectImages}
 }
 
-func withImagesBucket(tx *bolt.Tx, namespace string, fn func(bkt *bolt.Bucket) error) error {
-	bkt, err := createBucketIfNotExists(tx, imagesBucketPath(namespace)...)
-	if err != nil {
-		return err
-	}
-
-	return fn(bkt)
+func createImagesBucket(tx *bolt.Tx, namespace string) (*bolt.Bucket, error) {
+	return createBucketIfNotExists(tx, imagesBucketPath(namespace)...)
 }
 
 func getImagesBucket(tx *bolt.Tx, namespace string) *bolt.Bucket {
@@ -141,6 +136,10 @@ func createSnapshotterBucket(tx *bolt.Tx, namespace, snapshotter string) (*bolt.
 		return nil, err
 	}
 	return bkt, nil
+}
+
+func getSnapshottersBucket(tx *bolt.Tx, namespace string) *bolt.Bucket {
+	return getBucket(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectSnapshots)
 }
 
 func getSnapshotterBucket(tx *bolt.Tx, namespace, snapshotter string) *bolt.Bucket {
