@@ -11,6 +11,7 @@ import (
 
 	"github.com/Microsoft/hcsshim"
 	eventstypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
@@ -113,6 +114,10 @@ func (r *windowsRuntime) Create(ctx context.Context, id string, opts runtime.Cre
 
 	if createOpts.TerminateDuration == 0 {
 		createOpts.TerminateDuration = defaultTerminateDuration
+	}
+
+	if len(opts.Rootfs) == 0 {
+		return nil, errors.Wrap(errdefs.ErrInvalidArgument, "rootfs was not provided to container create")
 	}
 	spec.Windows.LayerFolders = append(spec.Windows.LayerFolders, opts.Rootfs[0].Source)
 	parentLayerPaths, err := opts.Rootfs[0].GetParentPaths()
@@ -301,6 +306,15 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, root
 	}
 	r.tasks.Add(ctx, t)
 
+	var eventRootfs []*types.Mount
+	for _, m := range rootfs {
+		eventRootfs = append(eventRootfs, &types.Mount{
+			Type:    m.Type,
+			Source:  m.Source,
+			Options: m.Options,
+		})
+	}
+
 	r.publisher.Publish(ctx,
 		runtime.TaskCreateEventTopic,
 		&eventstypes.TaskCreate{
@@ -311,8 +325,8 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, root
 				Stderr:   io.Stderr,
 				Terminal: io.Terminal,
 			},
-			Pid: t.pid,
-			//???Rootfs: rootfs,
+			Pid:    t.pid,
+			Rootfs: eventRootfs,
 			// TODO: what should be in Bundle for windows?
 		})
 
