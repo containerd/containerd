@@ -44,7 +44,7 @@ func TestNewFIFOSetInDir(t *testing.T) {
 	assert.Check(t, is.Equal("theid-stdin", filepath.Base(fifos.Stdin)))
 	assert.Check(t, is.Equal("theid-stdout", filepath.Base(fifos.Stdout)))
 	assert.Check(t, is.Equal("theid-stderr", filepath.Base(fifos.Stderr)))
-	assert.Check(t, is.Equal(true, fifos.Terminal))
+	assert.Check(t, fifos.Terminal)
 
 	files, err := ioutil.ReadDir(root)
 	assert.NilError(t, err)
@@ -89,11 +89,11 @@ func TestNewAttach(t *testing.T) {
 
 	io.Wait()
 	io.Cancel()
-	assert.Check(t, is.NilError(io.Close()))
+	assert.NilError(t, io.Close())
 
-	assert.Check(t, is.Equal(expectedStdout, stdout.String()))
-	assert.Check(t, is.Equal(expectedStderr, stderr.String()))
-	assert.Check(t, is.Equal(expectedStdin, string(actualStdin)))
+	assert.Check(t, is.EqualMultiLine(expectedStdout, stdout.String()))
+	assert.Check(t, is.EqualMultiLine(expectedStderr, stderr.String()))
+	assert.Check(t, is.EqualMultiLine(expectedStdin, string(actualStdin)))
 }
 
 type producers struct {

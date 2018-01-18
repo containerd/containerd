@@ -3,6 +3,7 @@ package content
 import (
 	"bytes"
 	"context"
+	_ "crypto/sha256" // required by go-digest
 	"io"
 	"strings"
 	"testing"

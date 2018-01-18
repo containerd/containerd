@@ -422,7 +422,6 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 	}
 
 	_, err = snapshotter.View(ctx, newLayer, snapA, opt)
-	//must be err != nil
 	assert.Check(t, err != nil)
 
 	// Two Prepare with same key
@@ -437,7 +436,6 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 	}
 
 	_, err = snapshotter.Prepare(ctx, prepLayer, snapA, opt)
-	//must be err != nil
 	assert.Check(t, err != nil)
 
 	// Two View with same key
@@ -452,7 +450,6 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 	}
 
 	_, err = snapshotter.View(ctx, viewLayer, snapA, opt)
-	//must be err != nil
 	assert.Check(t, err != nil)
 
 }

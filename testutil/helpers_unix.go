@@ -9,15 +9,13 @@ import (
 
 	"github.com/containerd/containerd/mount"
 	"github.com/gotestyourself/gotestyourself/assert"
-	is "github.com/gotestyourself/gotestyourself/assert/cmp"
 )
 
 // Unmount unmounts a given mountPoint and sets t.Error if it fails
 func Unmount(t *testing.T, mountPoint string) {
 	t.Log("unmount", mountPoint)
-	if err := mount.UnmountAll(mountPoint, umountflags); err != nil {
-		t.Error("Could not umount", mountPoint, err)
-	}
+	err := mount.UnmountAll(mountPoint, umountflags)
+	assert.NilError(t, err)
 }
 
 // RequiresRoot skips tests that require root, unless the test.root flag has
@@ -25,9 +23,8 @@ func Unmount(t *testing.T, mountPoint string) {
 func RequiresRoot(t testing.TB) {
 	if !rootEnabled {
 		t.Skip("skipping test that requires root")
-		return
 	}
-	assert.Check(t, is.Equal(0, os.Getuid()), "This test must be run as root.")
+	assert.Equal(t, 0, os.Getuid(), "This test must be run as root.")
 }
 
 // RequiresRootM is similar to RequiresRoot but intended to be called from *testing.M.
