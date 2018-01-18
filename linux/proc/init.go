@@ -346,8 +346,8 @@ func (p *Init) Runtime() *runc.Runc {
 	return p.runtime
 }
 
-// Exec returns a new exec'd process
-func (p *Init) Exec(context context.Context, path string, r *ExecConfig) (Process, error) {
+// exec returns a new exec'd process
+func (p *Init) exec(context context.Context, path string, r *ExecConfig) (Process, error) {
 	// process exec request
 	var spec specs.Process
 	if err := json.Unmarshal(r.Spec.Value, &spec); err != nil {

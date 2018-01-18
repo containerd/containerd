@@ -22,6 +22,7 @@ type initState interface {
 	Resume(context.Context) error
 	Update(context.Context, *google_protobuf.Any) error
 	Checkpoint(context.Context, *CheckpointConfig) error
+	Exec(context.Context, string, *ExecConfig) (Process, error)
 }
 
 type createdState struct {
@@ -111,6 +112,12 @@ func (s *createdState) SetExited(status int) {
 	if err := s.transition("stopped"); err != nil {
 		panic(err)
 	}
+}
+
+func (s *createdState) Exec(ctx context.Context, path string, r *ExecConfig) (Process, error) {
+	s.p.mu.Lock()
+	defer s.p.mu.Unlock()
+	return s.p.exec(ctx, path, r)
 }
 
 type createdCheckpointState struct {
@@ -227,6 +234,13 @@ func (s *createdCheckpointState) SetExited(status int) {
 	}
 }
 
+func (s *createdCheckpointState) Exec(ctx context.Context, path string, r *ExecConfig) (Process, error) {
+	s.p.mu.Lock()
+	defer s.p.mu.Unlock()
+
+	return nil, errors.Errorf("cannot exec in a created state")
+}
+
 type runningState struct {
 	p *Init
 }
@@ -310,6 +324,12 @@ func (s *runningState) SetExited(status int) {
 	if err := s.transition("stopped"); err != nil {
 		panic(err)
 	}
+}
+
+func (s *runningState) Exec(ctx context.Context, path string, r *ExecConfig) (Process, error) {
+	s.p.mu.Lock()
+	defer s.p.mu.Unlock()
+	return s.p.exec(ctx, path, r)
 }
 
 type pausedState struct {
@@ -396,7 +416,13 @@ func (s *pausedState) SetExited(status int) {
 	if err := s.transition("stopped"); err != nil {
 		panic(err)
 	}
+}
 
+func (s *pausedState) Exec(ctx context.Context, path string, r *ExecConfig) (Process, error) {
+	s.p.mu.Lock()
+	defer s.p.mu.Unlock()
+
+	return nil, errors.Errorf("cannot exec in a paused state")
 }
 
 type stoppedState struct {
@@ -470,4 +496,11 @@ func (s *stoppedState) Kill(ctx context.Context, sig uint32, all bool) error {
 
 func (s *stoppedState) SetExited(status int) {
 	// no op
+}
+
+func (s *stoppedState) Exec(ctx context.Context, path string, r *ExecConfig) (Process, error) {
+	s.p.mu.Lock()
+	defer s.p.mu.Unlock()
+
+	return nil, errors.Errorf("cannot exec in a stopped state")
 }
