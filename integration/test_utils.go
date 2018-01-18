@@ -18,6 +18,7 @@ package integration
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"os/exec"
 	"time"
@@ -34,14 +35,11 @@ import (
 )
 
 const (
-	sock                  = "/var/run/cri-containerd.sock"
-	timeout               = 1 * time.Minute
-	pauseImage            = "gcr.io/google_containers/pause:3.0" // This is the same with default sandbox image.
-	k8sNamespace          = "k8s.io"                             // This is the same with server.k8sContainerdNamespace.
-	containerdEndpoint    = "/run/containerd/containerd.sock"
-	criContainerdEndpoint = "/var/run/cri-containerd.sock"
-	criContainerdRoot     = "/var/lib/cri-containerd"
-	standaloneEnvKey      = "STANDALONE_CRI_CONTAINERD"
+	timeout            = 1 * time.Minute
+	pauseImage         = "gcr.io/google_containers/pause:3.0" // This is the same with default sandbox image.
+	k8sNamespace       = "k8s.io"                             // This is the same with server.k8sContainerdNamespace.
+	containerdEndpoint = "/run/containerd/containerd.sock"
+	criContainerdRoot  = "/var/lib/cri-containerd"
 )
 
 var (
@@ -51,7 +49,11 @@ var (
 	criContainerdClient api.CRIContainerdServiceClient
 )
 
+var standaloneCRIContainerd = flag.Bool("standalone-cri-containerd", true, "Whether cri-containerd is running in standalone mode.")
+var criContainerdEndpoint = flag.String("cri-containerd-endpoint", "/var/run/cri-containerd.sock", "The endpoint of cri-containerd.")
+
 func init() {
+	flag.Parse()
 	if err := ConnectDaemons(); err != nil {
 		logrus.WithError(err).Fatalf("Failed to connect daemons")
 	}
@@ -60,11 +62,11 @@ func init() {
 // ConnectDaemons connect cri-containerd and containerd, and initialize the clients.
 func ConnectDaemons() error {
 	var err error
-	runtimeService, err = remote.NewRemoteRuntimeService(sock, timeout)
+	runtimeService, err = remote.NewRemoteRuntimeService(*criContainerdEndpoint, timeout)
 	if err != nil {
 		return fmt.Errorf("failed to create runtime service: %v", err)
 	}
-	imageService, err = remote.NewRemoteImageService(sock, timeout)
+	imageService, err = remote.NewRemoteImageService(*criContainerdEndpoint, timeout)
 	if err != nil {
 		return fmt.Errorf("failed to create image service: %v", err)
 	}
@@ -83,7 +85,7 @@ func ConnectDaemons() error {
 	if err != nil {
 		return fmt.Errorf("failed to connect containerd: %v", err)
 	}
-	criContainerdClient, err = client.NewCRIContainerdClient(criContainerdEndpoint, timeout)
+	criContainerdClient, err = client.NewCRIContainerdClient(*criContainerdEndpoint, timeout)
 	if err != nil {
 		return fmt.Errorf("failed to connect cri-containerd: %v", err)
 	}

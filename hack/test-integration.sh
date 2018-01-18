@@ -31,7 +31,10 @@ test_setup ${REPORT_DIR}
 # Run integration test.
 # Set STANDALONE_CRI_CONTAINERD so that integration test can see it.
 # Some integration test needs the env to skip itself.
-sudo STANDALONE_CRI_CONTAINERD=${STANDALONE_CRI_CONTAINERD} ${ROOT}/_output/integration.test --test.run="${FOCUS}" --test.v
+sudo ${ROOT}/_output/integration.test --test.run="${FOCUS}" --test.v \
+  --standalone-cri-containerd=${STANDALONE_CRI_CONTAINERD} \
+  --cri-containerd-endpoint=${CRICONTAINERD_SOCK}
+
 test_exit_code=$?
 
 test_teardown
