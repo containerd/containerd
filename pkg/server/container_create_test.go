@@ -185,7 +185,7 @@ func TestGeneralContainerSpec(t *testing.T) {
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 	c := newTestCRIContainerdService()
-	testSandboxID := "SandboxID"
+	testSandboxID := "sandbox-id"
 	spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil)
 	require.NoError(t, err)
 	specCheck(t, testID, testSandboxID, testPid, spec)
@@ -193,7 +193,7 @@ func TestGeneralContainerSpec(t *testing.T) {
 
 func TestContainerCapabilities(t *testing.T) {
 	testID := "test-id"
-	testSandboxID := "SandboxID"
+	testSandboxID := "sandbox-id"
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 	c := newTestCRIContainerdService()
@@ -262,7 +262,7 @@ func TestContainerCapabilities(t *testing.T) {
 
 func TestContainerSpecTty(t *testing.T) {
 	testID := "test-id"
-	testSandboxID := "SandboxID"
+	testSandboxID := "sandbox-id"
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 	c := newTestCRIContainerdService()
@@ -282,7 +282,7 @@ func TestContainerSpecTty(t *testing.T) {
 
 func TestContainerSpecReadonlyRootfs(t *testing.T) {
 	testID := "test-id"
-	testSandboxID := "SandboxID"
+	testSandboxID := "sandbox-id"
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 	c := newTestCRIContainerdService()
@@ -297,7 +297,7 @@ func TestContainerSpecReadonlyRootfs(t *testing.T) {
 
 func TestContainerSpecWithExtraMounts(t *testing.T) {
 	testID := "test-id"
-	testSandboxID := "SandboxID"
+	testSandboxID := "sandbox-id"
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 	c := newTestCRIContainerdService()
@@ -701,7 +701,7 @@ func TestMountPropagation(t *testing.T) {
 func TestPidNamespace(t *testing.T) {
 	testID := "test-id"
 	testPid := uint32(1234)
-	testSandboxID := "SandboxID"
+	testSandboxID := "sandbox-id"
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 	c := newTestCRIContainerdService()
 	t.Logf("should not set pid namespace when host pid is true")

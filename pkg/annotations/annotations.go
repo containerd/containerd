@@ -17,6 +17,8 @@ limitations under the License.
 package annotations
 
 // ContainerType values
+// Following OCI annotations are used by katacontainers now.
+// We'll switch to standard secure pod API after it is defined in CRI.
 const (
 	// ContainerTypeSandbox represents a pod sandbox container
 	ContainerTypeSandbox = "sandbox"
