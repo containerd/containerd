@@ -36,6 +36,7 @@ const (
 )
 
 // Version returns the runtime name, runtime version and runtime API version.
+// TODO(random-liu): Return containerd version since we are going to merge 2 daemons.
 func (c *criContainerdService) Version(ctx context.Context, r *runtime.VersionRequest) (*runtime.VersionResponse, error) {
 	return &runtime.VersionResponse{
 		Version:        kubeAPIVersion,

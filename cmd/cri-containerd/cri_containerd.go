@@ -110,8 +110,8 @@ func main() {
 		// Pass in non-empty final function to avoid os.Exit(1). We expect `Run`
 		// to return itself.
 		h := interrupt.New(func(os.Signal) {}, s.Stop)
-		if err := h.Run(func() error { return s.Run() }); err != nil {
-			return fmt.Errorf("failed to run cri-containerd grpc server: %v", err)
+		if err := h.Run(func() error { return s.Run(true) }); err != nil {
+			return fmt.Errorf("failed to run cri-containerd with grpc server: %v", err)
 		}
 		return nil
 	}

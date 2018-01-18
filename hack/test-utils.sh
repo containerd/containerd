@@ -25,6 +25,9 @@ RESTART_WAIT_PERIOD=${RESTART_WAIT_PERIOD:-10}
 STANDALONE_CRI_CONTAINERD=${STANDALONE_CRI_CONTAINERD:-true}
 
 CRICONTAINERD_SOCK=/var/run/cri-containerd.sock
+if ! ${STANDALONE_CRI_CONTAINERD}; then
+  CRICONTAINERD_SOCK=/var/run/containerd/containerd.sock
+fi
 
 cri_containerd_pid=
 containerd_pid=
