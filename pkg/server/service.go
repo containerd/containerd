@@ -26,7 +26,6 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/sys"
 	"github.com/cri-o/ocicni/pkg/ocicni"
 	runcapparmor "github.com/opencontainers/runc/libcontainer/apparmor"
 	runcseccomp "github.com/opencontainers/runc/libcontainer/seccomp"
@@ -114,18 +113,6 @@ type criContainerdService struct {
 // NewCRIContainerdService returns a new instance of CRIContainerdService
 func NewCRIContainerdService(config options.Config) (CRIContainerdService, error) {
 	var err error
-	if config.CgroupPath != "" {
-		_, err := loadCgroup(config.CgroupPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load cgroup for cgroup path %v: %v", config.CgroupPath, err)
-		}
-	}
-	if config.OOMScore != 0 {
-		if err := sys.SetOOMScore(os.Getpid(), config.OOMScore); err != nil {
-			return nil, fmt.Errorf("failed to set OOMScore to %v: %v", config.OOMScore, err)
-		}
-	}
-
 	c := &criContainerdService{
 		config:             config,
 		apparmorEnabled:    runcapparmor.IsEnabled(),

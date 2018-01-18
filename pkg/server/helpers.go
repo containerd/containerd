@@ -19,13 +19,11 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/content"
 	"github.com/docker/distribution/reference"
@@ -33,7 +31,6 @@ import (
 	"github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
@@ -286,26 +283,6 @@ func (c *criContainerdService) ensureImageExists(ctx context.Context, ref string
 		return nil, fmt.Errorf("failed to get image %q metadata after pulling: %v", imageID, err)
 	}
 	return &newImage, nil
-}
-
-// loadCgroup loads the cgroup associated with path if it exists and moves the current process into the cgroup. If the cgroup
-// is not created it is created and returned.
-func loadCgroup(cgroupPath string) (cgroups.Cgroup, error) {
-	cg, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(cgroupPath))
-	if err != nil {
-		if err != cgroups.ErrCgroupDeleted {
-			return nil, err
-		}
-		if cg, err = cgroups.New(cgroups.V1, cgroups.StaticPath(cgroupPath), &specs.LinuxResources{}); err != nil {
-			return nil, err
-		}
-	}
-	if err := cg.Add(cgroups.Process{
-		Pid: os.Getpid(),
-	}); err != nil {
-		return nil, err
-	}
-	return cg, nil
 }
 
 // imageInfo is the information about the image got from containerd.
