@@ -48,3 +48,7 @@ func (s *deletedState) Kill(ctx context.Context, sig uint32, all bool) error {
 func (s *deletedState) SetExited(status int) {
 	// no op
 }
+
+func (s *deletedState) Exec(ctx context.Context, path string, r *ExecConfig) (Process, error) {
+	return nil, errors.Errorf("cannot exec in a deleted state")
+}
