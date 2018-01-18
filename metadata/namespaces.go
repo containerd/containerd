@@ -133,31 +133,38 @@ func (s *namespaceStore) Delete(ctx context.Context, namespace string) error {
 }
 
 func (s *namespaceStore) namespaceEmpty(ctx context.Context, namespace string) (bool, error) {
-	ctx = namespaces.WithNamespace(ctx, namespace)
-
-	// need to check the various object stores.
-
-	imageStore := NewImageStore(s.tx)
-	images, err := imageStore.List(ctx)
-	if err != nil {
-		return false, err
+	// Get all data buckets
+	buckets := []*bolt.Bucket{
+		getImagesBucket(s.tx, namespace),
+		getBlobsBucket(s.tx, namespace),
+		getContainersBucket(s.tx, namespace),
 	}
-	if len(images) > 0 {
-		return false, nil
-	}
-
-	containerStore := NewContainerStore(s.tx)
-	containers, err := containerStore.List(ctx)
-	if err != nil {
-		return false, err
+	if snbkt := getSnapshottersBucket(s.tx, namespace); snbkt != nil {
+		if err := snbkt.ForEach(func(k, v []byte) error {
+			if v == nil {
+				buckets = append(buckets, snbkt.Bucket(k))
+			}
+			return nil
+		}); err != nil {
+			return false, err
+		}
 	}
 
-	if len(containers) > 0 {
-		return false, nil
+	// Ensure data buckets are empty
+	for _, bkt := range buckets {
+		if !isBucketEmpty(bkt) {
+			return false, nil
+		}
 	}
-
-	// TODO(stevvooe): Need to add check for content store, as well. Still need
-	// to make content store namespace aware.
 
 	return true, nil
+}
+
+func isBucketEmpty(bkt *bolt.Bucket) bool {
+	if bkt == nil {
+		return true
+	}
+
+	k, _ := bkt.Cursor().First()
+	return k == nil
 }
