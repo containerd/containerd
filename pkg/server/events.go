@@ -17,6 +17,9 @@ limitations under the License.
 package server
 
 import (
+	"errors"
+
+	"github.com/containerd/containerd"
 	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/api/services/events/v1"
 	containerdio "github.com/containerd/containerd/cio"
@@ -26,35 +29,45 @@ import (
 	"golang.org/x/net/context"
 
 	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
+	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
 )
 
 // eventMonitor monitors containerd event and updates internal state correspondingly.
 // TODO(random-liu): [P1] Is it possible to drop event during containerd is running?
 type eventMonitor struct {
-	c       *criContainerdService
-	ch      <-chan *events.Envelope
-	errCh   <-chan error
-	closeCh chan struct{}
-	cancel  context.CancelFunc
+	containerStore *containerstore.Store
+	sandboxStore   *sandboxstore.Store
+	ch             <-chan *events.Envelope
+	errCh          <-chan error
+	ctx            context.Context
+	cancel         context.CancelFunc
 }
 
 // Create new event monitor. New event monitor will start subscribing containerd event. All events
 // happen after it should be monitored.
-func newEventMonitor(c *criContainerdService) *eventMonitor {
+func newEventMonitor(c *containerstore.Store, s *sandboxstore.Store) *eventMonitor {
 	ctx, cancel := context.WithCancel(context.Background())
-	ch, errCh := c.client.Subscribe(ctx)
 	return &eventMonitor{
-		c:       c,
-		ch:      ch,
-		errCh:   errCh,
-		closeCh: make(chan struct{}),
-		cancel:  cancel,
+		containerStore: c,
+		sandboxStore:   s,
+		ctx:            ctx,
+		cancel:         cancel,
 	}
 }
 
+// subscribe starts subsribe containerd events. We separate subscribe from
+func (em *eventMonitor) subscribe(client *containerd.Client) {
+	em.ch, em.errCh = client.Subscribe(em.ctx)
+}
+
 // start starts the event monitor which monitors and handles all container events. It returns
-// a channel for the caller to wait for the event monitor to stop.
-func (em *eventMonitor) start() <-chan struct{} {
+// a channel for the caller to wait for the event monitor to stop. start must be called after
+// subscribe.
+func (em *eventMonitor) start() (<-chan struct{}, error) {
+	if em.ch == nil || em.errCh == nil {
+		return nil, errors.New("event channel is nil")
+	}
+	closeCh := make(chan struct{})
 	go func() {
 		for {
 			select {
@@ -63,22 +76,22 @@ func (em *eventMonitor) start() <-chan struct{} {
 				em.handleEvent(e)
 			case err := <-em.errCh:
 				logrus.WithError(err).Error("Failed to handle event stream")
-				close(em.closeCh)
+				close(closeCh)
 				return
 			}
 		}
 	}()
-	return em.closeCh
+	return closeCh, nil
 }
 
 // stop stops the event monitor. It will close the event channel.
+// Once event monitor is stopped, it can't be started.
 func (em *eventMonitor) stop() {
 	em.cancel()
 }
 
 // handleEvent handles a containerd event.
 func (em *eventMonitor) handleEvent(evt *events.Envelope) {
-	c := em.c
 	any, err := typeurl.UnmarshalAny(evt.Event)
 	if err != nil {
 		logrus.WithError(err).Errorf("Failed to convert event envelope %+v", evt)
@@ -92,9 +105,9 @@ func (em *eventMonitor) handleEvent(evt *events.Envelope) {
 	case *eventtypes.TaskExit:
 		e := any.(*eventtypes.TaskExit)
 		logrus.Infof("TaskExit event %+v", e)
-		cntr, err := c.containerStore.Get(e.ContainerID)
+		cntr, err := em.containerStore.Get(e.ContainerID)
 		if err != nil {
-			if _, err := c.sandboxStore.Get(e.ContainerID); err == nil {
+			if _, err := em.sandboxStore.Get(e.ContainerID); err == nil {
 				return
 			}
 			logrus.WithError(err).Errorf("Failed to get container %q", e.ContainerID)
@@ -145,9 +158,9 @@ func (em *eventMonitor) handleEvent(evt *events.Envelope) {
 	case *eventtypes.TaskOOM:
 		e := any.(*eventtypes.TaskOOM)
 		logrus.Infof("TaskOOM event %+v", e)
-		cntr, err := c.containerStore.Get(e.ContainerID)
+		cntr, err := em.containerStore.Get(e.ContainerID)
 		if err != nil {
-			if _, err := c.sandboxStore.Get(e.ContainerID); err == nil {
+			if _, err := em.sandboxStore.Get(e.ContainerID); err == nil {
 				return
 			}
 			logrus.WithError(err).Errorf("Failed to get container %q", e.ContainerID)
