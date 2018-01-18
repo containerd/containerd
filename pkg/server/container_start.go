@@ -23,7 +23,7 @@ import (
 
 	"github.com/containerd/containerd"
 	containerdio "github.com/containerd/containerd/cio"
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
@@ -133,7 +133,7 @@ func (c *criContainerdService) startContainer(ctx context.Context,
 	defer func() {
 		if retErr != nil {
 			if _, err := task.Delete(ctx, containerd.WithProcessKill); err != nil {
-				glog.Errorf("Failed to delete containerd task %q: %v", id, err)
+				logrus.WithError(err).Errorf("Failed to delete containerd task %q", id)
 			}
 		}
 	}()

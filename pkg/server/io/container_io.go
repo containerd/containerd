@@ -23,7 +23,7 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd/cio"
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus"
 
 	cioutil "github.com/containerd/cri-containerd/pkg/ioutil"
 	"github.com/containerd/cri-containerd/pkg/util"
@@ -125,24 +125,24 @@ func (c *ContainerIO) Pipe() {
 	wg.Add(1)
 	go func() {
 		if _, err := io.Copy(c.stdoutGroup, c.stdout); err != nil {
-			glog.Errorf("Failed to pipe stdout of container %q: %v", c.id, err)
+			logrus.WithError(err).Errorf("Failed to pipe stdout of container %q", c.id)
 		}
 		c.stdout.Close()
 		c.stdoutGroup.Close()
 		wg.Done()
-		glog.V(2).Infof("Finish piping stdout of container %q", c.id)
+		logrus.Infof("Finish piping stdout of container %q", c.id)
 	}()
 
 	if !c.fifos.Terminal {
 		wg.Add(1)
 		go func() {
 			if _, err := io.Copy(c.stderrGroup, c.stderr); err != nil {
-				glog.Errorf("Failed to pipe stderr of container %q: %v", c.id, err)
+				logrus.WithError(err).Errorf("Failed to pipe stderr of container %q", c.id)
 			}
 			c.stderr.Close()
 			c.stderrGroup.Close()
 			wg.Done()
-			glog.V(2).Infof("Finish piping stderr of container %q", c.id)
+			logrus.Infof("Finish piping stderr of container %q", c.id)
 		}()
 	}
 }
@@ -165,9 +165,9 @@ func (c *ContainerIO) Attach(opts AttachOptions) error {
 		wg.Add(1)
 		go func() {
 			if _, err := io.Copy(c.stdin, stdinStreamRC); err != nil {
-				glog.Errorf("Failed to pipe stdin for container attach %q: %v", c.id, err)
+				logrus.WithError(err).Errorf("Failed to pipe stdin for container attach %q", c.id)
 			}
-			glog.V(2).Infof("Attach stream %q closed", stdinKey)
+			logrus.Infof("Attach stream %q closed", stdinKey)
 			if opts.StdinOnce && !opts.Tty {
 				// Due to kubectl requirements and current docker behavior, when (opts.StdinOnce &&
 				// opts.Tty) we have to close container stdin and keep stdout and stderr open until
@@ -175,7 +175,7 @@ func (c *ContainerIO) Attach(opts AttachOptions) error {
 				c.stdin.Close()
 				// Also closes the containerd side.
 				if err := opts.CloseStdin(); err != nil {
-					glog.Errorf("Failed to close stdin for container %q: %v", c.id, err)
+					logrus.WithError(err).Errorf("Failed to close stdin for container %q", c.id)
 				}
 			} else {
 				if opts.Stdout != nil {
@@ -191,7 +191,7 @@ func (c *ContainerIO) Attach(opts AttachOptions) error {
 
 	attachStream := func(key string, close <-chan struct{}) {
 		<-close
-		glog.V(2).Infof("Attach stream %q closed", key)
+		logrus.Infof("Attach stream %q closed", key)
 		// Make sure stdin gets closed.
 		if stdinStreamRC != nil {
 			stdinStreamRC.Close()

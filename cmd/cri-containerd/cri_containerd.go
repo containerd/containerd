@@ -27,12 +27,13 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/golang/glog"
 	"github.com/opencontainers/selinux/go-selinux"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 
 	"github.com/containerd/cri-containerd/cmd/cri-containerd/options"
+	"github.com/containerd/cri-containerd/pkg/log"
 	"github.com/containerd/cri-containerd/pkg/server"
 	"github.com/containerd/cri-containerd/pkg/version"
 )
@@ -51,11 +52,6 @@ var cmd = &cobra.Command{
 	Use:   "cri-containerd",
 	Short: "A containerd based Kubernetes CRI implementation.",
 	Long:  desc,
-}
-
-// Add golang flags as persistent flags.
-func init() {
-	cmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
 }
 
 func defaultConfigCommand() *cobra.Command {
@@ -93,15 +89,19 @@ func main() {
 		}
 		validateConfig(o)
 
-		glog.V(0).Infof("Run cri-containerd %+v", o)
+		if err := setLogLevel(o.LogLevel); err != nil {
+			return fmt.Errorf("failed to set log level: %v", err)
+		}
+
+		logrus.Infof("Run cri-containerd %+v", o)
 
 		// Start profiling server if enable.
 		if o.EnableProfiling {
-			glog.V(2).Info("Start profiling server")
+			logrus.Info("Start profiling server")
 			go startProfilingServer(o.ProfilingAddress, o.ProfilingPort)
 		}
 
-		glog.V(2).Infof("Run cri-containerd grpc server on socket %q", o.SocketPath)
+		logrus.Infof("Run cri-containerd grpc server on socket %q", o.SocketPath)
 		s, err := server.NewCRIContainerdService(o.Config)
 		if err != nil {
 			return fmt.Errorf("failed to create CRI containerd service: %v", err)
@@ -125,7 +125,7 @@ func main() {
 func validateConfig(o *options.CRIContainerdOptions) {
 	if o.EnableSelinux {
 		if !selinux.GetEnabled() {
-			glog.Warning("Selinux is not supported")
+			logrus.Warn("Selinux is not supported")
 		}
 	} else {
 		selinux.SetDisabled()
@@ -152,7 +152,7 @@ func dumpStacks() {
 		}
 		buf = make([]byte, 2*len(buf))
 	}
-	glog.V(0).Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
+	logrus.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
 }
 
 // startProfilingServer start http server to profiling via web interface
@@ -164,6 +164,39 @@ func startProfilingServer(host string, port string) {
 	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 	if err := http.ListenAndServe(endpoint, mux); err != nil {
-		glog.Errorf("Failed to start profiling server: %v", err)
+		logrus.WithError(err).Error("Failed to start profiling server")
 	}
+}
+
+func setLogLevel(l string) error {
+	lvl, err := log.ParseLevel(l)
+	if err != nil {
+		return err
+	}
+	if err := setGLogLevel(lvl); err != nil {
+		return err
+	}
+	logrus.SetLevel(lvl)
+	return nil
+}
+
+// TODO(random-liu): Set glog level in plugin mode.
+func setGLogLevel(l logrus.Level) error {
+	if err := flag.Set("logtostderr", "true"); err != nil {
+		return err
+	}
+	switch l {
+	case log.TraceLevel:
+		return flag.Set("v", "5")
+	case logrus.DebugLevel:
+		return flag.Set("v", "4")
+	case logrus.InfoLevel:
+		return flag.Set("v", "2")
+	// glog doesn't support following filters. Defaults to v=0.
+	case logrus.WarnLevel:
+	case logrus.ErrorLevel:
+	case logrus.FatalLevel:
+	case logrus.PanicLevel:
+	}
+	return nil
 }

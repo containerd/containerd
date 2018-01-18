@@ -21,7 +21,7 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd/cio"
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus"
 
 	cioutil "github.com/containerd/cri-containerd/pkg/ioutil"
 )
@@ -68,13 +68,13 @@ func (e *ExecIO) Attach(opts AttachOptions) <-chan struct{} {
 		wg.Add(1)
 		go func() {
 			if _, err := io.Copy(e.stdin, stdinStreamRC); err != nil {
-				glog.Errorf("Failed to redirect stdin for container exec %q: %v", e.id, err)
+				logrus.WithError(err).Errorf("Failed to redirect stdin for container exec %q", e.id)
 			}
-			glog.V(2).Infof("Container exec %q stdin closed", e.id)
+			logrus.Infof("Container exec %q stdin closed", e.id)
 			if opts.StdinOnce && !opts.Tty {
 				e.stdin.Close()
 				if err := opts.CloseStdin(); err != nil {
-					glog.Errorf("Failed to close stdin for container exec %q: %v", e.id, err)
+					logrus.WithError(err).Errorf("Failed to close stdin for container exec %q", e.id)
 				}
 			} else {
 				if e.stdout != nil {
@@ -90,7 +90,7 @@ func (e *ExecIO) Attach(opts AttachOptions) <-chan struct{} {
 
 	attachOutput := func(t StreamType, stream io.WriteCloser, out io.ReadCloser) {
 		if _, err := io.Copy(stream, out); err != nil {
-			glog.Errorf("Failed to pipe %q for container exec %q: %v", t, e.id, err)
+			logrus.WithError(err).Errorf("Failed to pipe %q for container exec %q", t, e.id)
 		}
 		out.Close()
 		stream.Close()
@@ -99,7 +99,7 @@ func (e *ExecIO) Attach(opts AttachOptions) <-chan struct{} {
 		}
 		e.closer.wg.Done()
 		wg.Done()
-		glog.V(2).Infof("Finish piping %q of container exec %q", t, e.id)
+		logrus.Infof("Finish piping %q of container exec %q", t, e.id)
 	}
 
 	if opts.Stdout != nil {

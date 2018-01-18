@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/golang/glog"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
@@ -131,7 +131,7 @@ func toCRIContainerInfo(ctx context.Context, container containerstore.Container,
 	if err == nil {
 		ci.RuntimeSpec = spec
 	} else {
-		glog.Errorf("Failed to get container %q spec: %v", container.ID, err)
+		logrus.WithError(err).Errorf("Failed to get container %q spec", container.ID)
 	}
 
 	ctrInfo, err := container.Container.Info(ctx)
@@ -139,7 +139,7 @@ func toCRIContainerInfo(ctx context.Context, container containerstore.Container,
 		ci.SnapshotKey = ctrInfo.SnapshotKey
 		ci.Snapshotter = ctrInfo.Snapshotter
 	} else {
-		glog.Errorf("Failed to get container %q info: %v", container.ID, err)
+		logrus.WithError(err).Errorf("Failed to get container %q info", container.ID)
 	}
 
 	infoBytes, err := json.Marshal(ci)

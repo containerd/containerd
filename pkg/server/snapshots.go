@@ -23,7 +23,7 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	snapshot "github.com/containerd/containerd/snapshots"
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus"
 
 	snapshotstore "github.com/containerd/cri-containerd/pkg/store/snapshot"
 )
@@ -59,7 +59,7 @@ func (s *snapshotsSyncer) start() {
 		// check the resource usage and optimize this.
 		for {
 			if err := s.sync(); err != nil {
-				glog.Errorf("Failed to sync snapshot stats: %v", err)
+				logrus.WithError(err).Error("Failed to sync snapshot stats")
 			}
 			<-tick.C
 		}
@@ -99,7 +99,7 @@ func (s *snapshotsSyncer) sync() error {
 		usage, err := s.snapshotter.Usage(context.Background(), info.Name)
 		if err != nil {
 			if !errdefs.IsNotFound(err) {
-				glog.Errorf("Failed to get usage for snapshot %q: %v", info.Name, err)
+				logrus.WithError(err).Errorf("Failed to get usage for snapshot %q", info.Name)
 			}
 			continue
 		}

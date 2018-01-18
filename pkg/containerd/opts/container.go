@@ -27,8 +27,8 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/fs"
 	"github.com/containerd/containerd/mount"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // WithNewSnapshot wraps `containerd.WithNewSnapshot` so that if creating the
@@ -81,7 +81,7 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 		}
 		defer func() {
 			if uerr := mount.Unmount(root, 0); uerr != nil {
-				glog.Errorf("Failed to unmount snapshot %q: %v", c.SnapshotKey, uerr)
+				logrus.WithError(uerr).Errorf("Failed to unmount snapshot %q", c.SnapshotKey)
 				if err == nil {
 					err = uerr
 				}

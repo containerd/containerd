@@ -31,7 +31,7 @@ import (
 	"github.com/containerd/typeurl"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/pkg/system"
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
@@ -60,10 +60,10 @@ func (c *criContainerdService) recover(ctx context.Context) error {
 	for _, sandbox := range sandboxes {
 		sb, err := loadSandbox(ctx, sandbox)
 		if err != nil {
-			glog.Errorf("Failed to load sandbox %q: %v", sandbox.ID(), err)
+			logrus.WithError(err).Errorf("Failed to load sandbox %q", sandbox.ID())
 			continue
 		}
-		glog.V(4).Infof("Loaded sandbox %+v", sb)
+		logrus.Debugf("Loaded sandbox %+v", sb)
 		if err := c.sandboxStore.Add(sb); err != nil {
 			return fmt.Errorf("failed to add sandbox %q to store: %v", sandbox.ID(), err)
 		}
@@ -81,10 +81,10 @@ func (c *criContainerdService) recover(ctx context.Context) error {
 		containerDir := getContainerRootDir(c.config.RootDir, container.ID())
 		cntr, err := loadContainer(ctx, container, containerDir)
 		if err != nil {
-			glog.Errorf("Failed to load container %q: %v", container.ID(), err)
+			logrus.WithError(err).Errorf("Failed to load container %q", container.ID())
 			continue
 		}
-		glog.V(4).Infof("Loaded container %+v", cntr)
+		logrus.Debugf("Loaded container %+v", cntr)
 		if err := c.containerStore.Add(cntr); err != nil {
 			return fmt.Errorf("failed to add container %q to store: %v", container.ID(), err)
 		}
@@ -103,7 +103,7 @@ func (c *criContainerdService) recover(ctx context.Context) error {
 		return fmt.Errorf("failed to load images: %v", err)
 	}
 	for _, image := range images {
-		glog.V(4).Infof("Loaded image %+v", image)
+		logrus.Debugf("Loaded image %+v", image)
 		if err := c.imageStore.Add(image); err != nil {
 			return fmt.Errorf("failed to add image %q to store: %v", image.ID, err)
 		}
@@ -148,7 +148,7 @@ func loadContainer(ctx context.Context, cntr containerd.Container, containerDir 
 	// Load status from checkpoint.
 	status, err := containerstore.LoadStatus(containerDir, id)
 	if err != nil {
-		glog.Warningf("Failed to load container status for %q: %v", id, err)
+		logrus.WithError(err).Warnf("Failed to load container status for %q", id)
 		status = unknownContainerStatus()
 	}
 
@@ -328,7 +328,7 @@ func loadImages(ctx context.Context, cImages []containerd.Image,
 	for _, i := range cImages {
 		desc, err := i.Config(ctx)
 		if err != nil {
-			glog.Warningf("Failed to get image config for %q: %v", i.Name(), err)
+			logrus.WithError(err).Warnf("Failed to get image config for %q", i.Name())
 			continue
 		}
 		id := desc.Digest.String()
@@ -341,27 +341,27 @@ func loadImages(ctx context.Context, cImages []containerd.Image,
 		i := imgs[0]
 		ok, _, _, _, err := containerdimages.Check(ctx, i.ContentStore(), i.Target(), platforms.Default())
 		if err != nil {
-			glog.Errorf("Failed to check image content readiness for %q: %v", i.Name(), err)
+			logrus.WithError(err).Errorf("Failed to check image content readiness for %q", i.Name())
 			continue
 		}
 		if !ok {
-			glog.Warningf("The image content readiness for %q is not ok", i.Name())
+			logrus.Warnf("The image content readiness for %q is not ok", i.Name())
 			continue
 		}
 		// Checking existence of top-level snapshot for each image being recovered.
 		unpacked, err := i.IsUnpacked(ctx, snapshotter)
 		if err != nil {
-			glog.Warningf("Failed to Check whether image is unpacked for image %s: %v", i.Name(), err)
+			logrus.WithError(err).Warnf("Failed to Check whether image is unpacked for image %s", i.Name())
 			continue
 		}
 		if !unpacked {
-			glog.Warningf("The image %s is not unpacked.", i.Name())
+			logrus.Warnf("The image %s is not unpacked.", i.Name())
 			// TODO(random-liu): Consider whether we should try unpack here.
 		}
 
 		info, err := getImageInfo(ctx, i)
 		if err != nil {
-			glog.Warningf("Failed to get image info for %q: %v", i.Name(), err)
+			logrus.WithError(err).Warnf("Failed to get image info for %q", i.Name())
 			continue
 		}
 		image := imagestore.Image{
@@ -376,7 +376,7 @@ func loadImages(ctx context.Context, cImages []containerd.Image,
 			name := i.Name()
 			r, err := reference.ParseAnyReference(name)
 			if err != nil {
-				glog.Warningf("Failed to parse image reference %q: %v", name, err)
+				logrus.WithError(err).Warnf("Failed to parse image reference %q", name)
 				continue
 			}
 			if _, ok := r.(reference.Canonical); ok {
@@ -387,7 +387,7 @@ func loadImages(ctx context.Context, cImages []containerd.Image,
 				// This is an image id.
 				continue
 			} else {
-				glog.Warningf("Invalid image reference %q", name)
+				logrus.Warnf("Invalid image reference %q", name)
 			}
 		}
 		images = append(images, image)
@@ -407,7 +407,7 @@ func cleanupOrphanedSandboxDirs(cntrs []containerd.Container, sandboxesRoot stri
 	}
 	for _, d := range dirs {
 		if !d.IsDir() {
-			glog.Warningf("Invalid file %q found in sandboxes directory", d.Name())
+			logrus.Warnf("Invalid file %q found in sandboxes directory", d.Name())
 			continue
 		}
 		if _, ok := cntrsMap[d.Name()]; ok {
@@ -416,9 +416,9 @@ func cleanupOrphanedSandboxDirs(cntrs []containerd.Container, sandboxesRoot stri
 		}
 		sandboxDir := filepath.Join(sandboxesRoot, d.Name())
 		if err := system.EnsureRemoveAll(sandboxDir); err != nil {
-			glog.Warningf("Failed to remove sandbox directory %q: %v", sandboxDir, err)
+			logrus.WithError(err).Warnf("Failed to remove sandbox directory %q", sandboxDir)
 		} else {
-			glog.V(4).Infof("Cleanup orphaned sandbox directory %q", sandboxDir)
+			logrus.Debugf("Cleanup orphaned sandbox directory %q", sandboxDir)
 		}
 	}
 	return nil
@@ -436,7 +436,7 @@ func cleanupOrphanedContainerDirs(cntrs []containerd.Container, containersRoot s
 	}
 	for _, d := range dirs {
 		if !d.IsDir() {
-			glog.Warningf("Invalid file %q found in containers directory", d.Name())
+			logrus.Warnf("Invalid file %q found in containers directory", d.Name())
 			continue
 		}
 		if _, ok := cntrsMap[d.Name()]; ok {
@@ -445,9 +445,9 @@ func cleanupOrphanedContainerDirs(cntrs []containerd.Container, containersRoot s
 		}
 		containerDir := filepath.Join(containersRoot, d.Name())
 		if err := system.EnsureRemoveAll(containerDir); err != nil {
-			glog.Warningf("Failed to remove container directory %q: %v", containerDir, err)
+			logrus.WithError(err).Warnf("Failed to remove container directory %q", containerDir)
 		} else {
-			glog.V(4).Infof("Cleanup orphaned container directory %q", containerDir)
+			logrus.Debugf("Cleanup orphaned container directory %q", containerDir)
 		}
 	}
 	return nil

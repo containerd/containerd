@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
@@ -95,7 +95,7 @@ func (c *criContainerdService) toCRIImageInfo(ctx context.Context, image *images
 	if err == nil {
 		info["info"] = string(m)
 	} else {
-		glog.Errorf("failed to marshal info %v: %v", imi, err)
+		logrus.WithError(err).Errorf("failed to marshal info %v", imi)
 		info["info"] = err.Error()
 	}
 

@@ -25,7 +25,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	cioutil "github.com/containerd/cri-containerd/pkg/ioutil"
@@ -53,7 +53,7 @@ func NewDiscardLogger() io.WriteCloser {
 // NewCRILogger returns a write closer which redirect container log into
 // log file, and decorate the log line into CRI defined format.
 func NewCRILogger(path string, stream StreamType) (io.WriteCloser, error) {
-	glog.V(4).Infof("Start writing log file %q", path)
+	logrus.Debugf("Start writing log file %q", path)
 	prc, pwc := io.Pipe()
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0640)
 	if err != nil {
@@ -74,11 +74,11 @@ func redirectLogs(path string, rc io.ReadCloser, wc io.WriteCloser, stream Strea
 	for {
 		lineBytes, isPrefix, err := r.ReadLine()
 		if err == io.EOF {
-			glog.V(4).Infof("Finish redirecting log file %q", path)
+			logrus.Debugf("Finish redirecting log file %q", path)
 			return
 		}
 		if err != nil {
-			glog.Errorf("An error occurred when redirecting log file %q: %v", path, err)
+			logrus.WithError(err).Errorf("An error occurred when redirecting log file %q", path)
 			return
 		}
 		tagBytes := fullBytes
@@ -89,7 +89,7 @@ func redirectLogs(path string, rc io.ReadCloser, wc io.WriteCloser, stream Strea
 		data := bytes.Join([][]byte{timestampBytes, streamBytes, tagBytes, lineBytes}, delimiterBytes)
 		data = append(data, eol)
 		if _, err := wc.Write(data); err != nil {
-			glog.Errorf("Fail to write %q log to log file %q: %v", stream, path, err)
+			logrus.WithError(err).Errorf("Fail to write %q log to log file %q", stream, path)
 		}
 		// Continue on write error to drain the input.
 	}

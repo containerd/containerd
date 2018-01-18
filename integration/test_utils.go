@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
@@ -53,7 +53,7 @@ var (
 
 func init() {
 	if err := ConnectDaemons(); err != nil {
-		glog.Exitf("Failed to connect daemons: %v", err)
+		logrus.WithError(err).Fatalf("Failed to connect daemons")
 	}
 }
 

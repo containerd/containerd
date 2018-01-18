@@ -28,9 +28,9 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/sys"
 	"github.com/cri-o/ocicni/pkg/ocicni"
-	"github.com/golang/glog"
 	runcapparmor "github.com/opencontainers/runc/libcontainer/apparmor"
 	runcseccomp "github.com/opencontainers/runc/libcontainer/seccomp"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
@@ -140,9 +140,9 @@ func NewCRIContainerdService(config options.Config) (CRIContainerdService, error
 		if err != nil {
 			return nil, fmt.Errorf("failed to get imagefs uuid of %q: %v", imageFSPath, err)
 		}
-		glog.V(2).Infof("Get device uuid %q for image filesystem %q", c.imageFSUUID, imageFSPath)
+		logrus.Infof("Get device uuid %q for image filesystem %q", c.imageFSUUID, imageFSPath)
 	} else {
-		glog.Warning("Skip retrieving imagefs UUID, kubelet will not be able to get imagefs capacity or perform imagefs disk eviction.")
+		logrus.Warn("Skip retrieving imagefs UUID, kubelet will not be able to get imagefs capacity or perform imagefs disk eviction.")
 	}
 
 	c.netPlugin, err = ocicni.InitCNI(config.NetworkPluginConfDir, config.NetworkPluginBinDir)
@@ -170,19 +170,19 @@ func NewCRIContainerdService(config options.Config) (CRIContainerdService, error
 
 // Run starts the cri-containerd service.
 func (c *criContainerdService) Run() error {
-	glog.V(2).Info("Start cri-containerd service")
+	logrus.Info("Start cri-containerd service")
 
-	glog.V(2).Infof("Start recovering state")
+	logrus.Infof("Start recovering state")
 	if err := c.recover(context.Background()); err != nil {
 		return fmt.Errorf("failed to recover state: %v", err)
 	}
 
 	// Start event handler.
-	glog.V(2).Info("Start event monitor")
+	logrus.Info("Start event monitor")
 	eventMonitorCloseCh := c.eventMonitor.start()
 
 	// Start snapshot stats syncer, it doesn't need to be stopped.
-	glog.V(2).Info("Start snapshots syncer")
+	logrus.Info("Start snapshots syncer")
 	snapshotsSyncer := newSnapshotsSyncer(
 		c.snapshotStore,
 		c.client.SnapshotService(c.config.ContainerdConfig.Snapshotter),
@@ -191,18 +191,18 @@ func (c *criContainerdService) Run() error {
 	snapshotsSyncer.start()
 
 	// Start streaming server.
-	glog.V(2).Info("Start streaming server")
+	logrus.Info("Start streaming server")
 	streamServerCloseCh := make(chan struct{})
 	go func() {
 		if err := c.streamServer.Start(true); err != nil {
-			glog.Errorf("Failed to start streaming server: %v", err)
+			logrus.WithError(err).Error("Failed to start streaming server")
 		}
 		close(streamServerCloseCh)
 	}()
 
 	// Start grpc server.
 	// Unlink to cleanup the previous socket file.
-	glog.V(2).Info("Start grpc server")
+	logrus.Info("Start grpc server")
 	err := syscall.Unlink(c.config.SocketPath)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to unlink socket file %q: %v", c.config.SocketPath, err)
@@ -214,7 +214,7 @@ func (c *criContainerdService) Run() error {
 	grpcServerCloseCh := make(chan struct{})
 	go func() {
 		if err := c.server.Serve(l); err != nil {
-			glog.Errorf("Failed to serve grpc grpc request: %v", err)
+			logrus.WithError(err).Error("Failed to serve grpc grpc request")
 		}
 		close(grpcServerCloseCh)
 	}()
@@ -228,17 +228,17 @@ func (c *criContainerdService) Run() error {
 	c.Stop()
 
 	<-eventMonitorCloseCh
-	glog.V(2).Info("Event monitor stopped")
+	logrus.Info("Event monitor stopped")
 	<-streamServerCloseCh
-	glog.V(2).Info("Stream server stopped")
+	logrus.Info("Stream server stopped")
 	<-grpcServerCloseCh
-	glog.V(2).Info("GRPC server stopped")
+	logrus.Info("GRPC server stopped")
 	return nil
 }
 
 // Stop stops the cri-containerd service.
 func (c *criContainerdService) Stop() {
-	glog.V(2).Info("Stop cri-containerd service")
+	logrus.Info("Stop cri-containerd service")
 	c.eventMonitor.stop()
 	c.streamServer.Stop() // nolint: errcheck
 	c.server.Stop()

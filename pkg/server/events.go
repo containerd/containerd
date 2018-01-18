@@ -22,7 +22,7 @@ import (
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/typeurl"
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
 	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
@@ -59,10 +59,10 @@ func (em *eventMonitor) start() <-chan struct{} {
 		for {
 			select {
 			case e := <-em.ch:
-				glog.V(4).Infof("Received container event timestamp - %v, namespace - %q, topic - %q", e.Timestamp, e.Namespace, e.Topic)
+				logrus.Debugf("Received container event timestamp - %v, namespace - %q, topic - %q", e.Timestamp, e.Namespace, e.Topic)
 				em.handleEvent(e)
 			case err := <-em.errCh:
-				glog.Errorf("Failed to handle event stream: %v", err)
+				logrus.WithError(err).Error("Failed to handle event stream")
 				close(em.closeCh)
 				return
 			}
@@ -81,7 +81,7 @@ func (em *eventMonitor) handleEvent(evt *events.Envelope) {
 	c := em.c
 	any, err := typeurl.UnmarshalAny(evt.Event)
 	if err != nil {
-		glog.Errorf("Failed to convert event envelope %+v: %v", evt, err)
+		logrus.WithError(err).Errorf("Failed to convert event envelope %+v", evt)
 		return
 	}
 	switch any.(type) {
@@ -91,13 +91,13 @@ func (em *eventMonitor) handleEvent(evt *events.Envelope) {
 	// TODO(random-liu): [P2] Handle containerd-shim exit.
 	case *eventtypes.TaskExit:
 		e := any.(*eventtypes.TaskExit)
-		glog.V(2).Infof("TaskExit event %+v", e)
+		logrus.Infof("TaskExit event %+v", e)
 		cntr, err := c.containerStore.Get(e.ContainerID)
 		if err != nil {
 			if _, err := c.sandboxStore.Get(e.ContainerID); err == nil {
 				return
 			}
-			glog.Errorf("Failed to get container %q: %v", e.ContainerID, err)
+			logrus.WithError(err).Errorf("Failed to get container %q", e.ContainerID)
 			return
 		}
 		if e.Pid != cntr.Status.Get().Pid {
@@ -112,7 +112,7 @@ func (em *eventMonitor) handleEvent(evt *events.Envelope) {
 		)
 		if err != nil {
 			if !errdefs.IsNotFound(err) {
-				glog.Errorf("failed to stop container, task not found for container %q: %v", e.ContainerID, err)
+				logrus.WithError(err).Errorf("failed to stop container, task not found for container %q", e.ContainerID)
 				return
 			}
 		} else {
@@ -120,7 +120,7 @@ func (em *eventMonitor) handleEvent(evt *events.Envelope) {
 			if _, err = task.Delete(context.Background()); err != nil {
 				// TODO(random-liu): [P0] Enqueue the event and retry.
 				if !errdefs.IsNotFound(err) {
-					glog.Errorf("failed to stop container %q: %v", e.ContainerID, err)
+					logrus.WithError(err).Errorf("failed to stop container %q", e.ContainerID)
 					return
 				}
 				// Move on to make sure container status is updated.
@@ -138,26 +138,26 @@ func (em *eventMonitor) handleEvent(evt *events.Envelope) {
 			return status, nil
 		})
 		if err != nil {
-			glog.Errorf("Failed to update container %q state: %v", e.ContainerID, err)
+			logrus.WithError(err).Errorf("Failed to update container %q state", e.ContainerID)
 			// TODO(random-liu): [P0] Enqueue the event and retry.
 			return
 		}
 	case *eventtypes.TaskOOM:
 		e := any.(*eventtypes.TaskOOM)
-		glog.V(2).Infof("TaskOOM event %+v", e)
+		logrus.Infof("TaskOOM event %+v", e)
 		cntr, err := c.containerStore.Get(e.ContainerID)
 		if err != nil {
 			if _, err := c.sandboxStore.Get(e.ContainerID); err == nil {
 				return
 			}
-			glog.Errorf("Failed to get container %q: %v", e.ContainerID, err)
+			logrus.WithError(err).Errorf("Failed to get container %q", e.ContainerID)
 		}
 		err = cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
 			status.Reason = oomExitReason
 			return status, nil
 		})
 		if err != nil {
-			glog.Errorf("Failed to update container %q oom: %v", e.ContainerID, err)
+			logrus.WithError(err).Errorf("Failed to update container %q oom", e.ContainerID)
 			return
 		}
 	}

@@ -11,7 +11,7 @@ LimitNOFILE=1048576
 # in the kernel. We recommend using cgroups to do container-local accounting.
 LimitNPROC=infinity
 LimitCORE=infinity
-ExecStart=/usr/local/bin/cri-containerd --logtostderr
+ExecStart=/usr/local/bin/cri-containerd
 
 [Install]
 WantedBy=multi-user.target

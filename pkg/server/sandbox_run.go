@@ -27,15 +27,16 @@ import (
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/typeurl"
 	"github.com/cri-o/ocicni/pkg/ocicni"
-	"github.com/golang/glog"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	"github.com/containerd/cri-containerd/pkg/annotations"
 	customopts "github.com/containerd/cri-containerd/pkg/containerd/opts"
+	"github.com/containerd/cri-containerd/pkg/log"
 	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
 	"github.com/containerd/cri-containerd/pkg/util"
 )
@@ -53,7 +54,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	// Generate unique id and name for the sandbox and reserve the name.
 	id := util.GenerateID()
 	name := makeSandboxName(config.GetMetadata())
-	glog.V(4).Infof("Generated id %q for sandbox %q", id, name)
+	logrus.Debugf("Generated id %q for sandbox %q", id, name)
 	// Reserve the sandbox name to avoid concurrent `RunPodSandbox` request starting the
 	// same sandbox.
 	if err := c.sandboxNameIndex.Reserve(name, id); err != nil {
@@ -96,7 +97,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		defer func() {
 			if retErr != nil {
 				if err := sandbox.NetNS.Remove(); err != nil {
-					glog.Errorf("Failed to remove network namespace %s for sandbox %q: %v", sandbox.NetNSPath, id, err)
+					logrus.WithError(err).Errorf("Failed to remove network namespace %s for sandbox %q", sandbox.NetNSPath, id)
 				}
 				sandbox.NetNSPath = ""
 			}
@@ -116,7 +117,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 			if retErr != nil {
 				// Teardown network if an error is returned.
 				if err := c.netPlugin.TearDownPod(podNetwork); err != nil {
-					glog.Errorf("Failed to destroy network for sandbox %q: %v", id, err)
+					logrus.WithError(err).Errorf("Failed to destroy network for sandbox %q", id)
 				}
 			}
 		}()
@@ -139,7 +140,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox container spec: %v", err)
 	}
-	glog.V(4).Infof("Sandbox container spec: %+v", spec)
+	logrus.Debugf("Sandbox container spec: %+v", spec)
 
 	var specOpts []oci.SpecOpts
 	if uid := securityContext.GetRunAsUser(); uid != nil {
@@ -179,7 +180,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	defer func() {
 		if retErr != nil {
 			if err := container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
-				glog.Errorf("Failed to delete containerd container %q: %v", id, err)
+				logrus.WithError(err).Errorf("Failed to delete containerd container %q", id)
 			}
 		}
 	}()
@@ -194,8 +195,8 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		if retErr != nil {
 			// Cleanup the sandbox root directory.
 			if err := c.os.RemoveAll(sandboxRootDir); err != nil {
-				glog.Errorf("Failed to remove sandbox root directory %q: %v",
-					sandboxRootDir, err)
+				logrus.WithError(err).Errorf("Failed to remove sandbox root directory %q",
+					sandboxRootDir)
 			}
 		}
 	}()
@@ -207,14 +208,14 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	defer func() {
 		if retErr != nil {
 			if err = c.unmountSandboxFiles(sandboxRootDir, config); err != nil {
-				glog.Errorf("Failed to unmount sandbox files in %q: %v",
-					sandboxRootDir, err)
+				logrus.WithError(err).Errorf("Failed to unmount sandbox files in %q",
+					sandboxRootDir)
 			}
 		}
 	}()
 
 	// Create sandbox task in containerd.
-	glog.V(5).Infof("Create sandbox container (id=%q, name=%q).",
+	log.Tracef("Create sandbox container (id=%q, name=%q).",
 		id, name)
 	// We don't need stdio for sandbox container.
 	task, err := container.NewTask(ctx, containerdio.NullIO)
@@ -225,7 +226,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		if retErr != nil {
 			// Cleanup the sandbox container if an error is returned.
 			if _, err := task.Delete(ctx, containerd.WithProcessKill); err != nil {
-				glog.Errorf("Failed to delete sandbox container %q: %v", id, err)
+				logrus.WithError(err).Errorf("Failed to delete sandbox container %q", id)
 			}
 		}
 	}()

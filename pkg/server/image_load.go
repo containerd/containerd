@@ -22,7 +22,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus"
 
 	api "github.com/containerd/cri-containerd/pkg/api/v1"
 	"github.com/containerd/cri-containerd/pkg/containerd/importer"
@@ -49,7 +49,7 @@ func (c *criContainerdService) LoadImage(ctx context.Context, r *api.LoadImageRe
 			return nil, fmt.Errorf("failed to get image %q: %v", repoTag, err)
 		}
 		if err := image.Unpack(ctx, c.config.ContainerdConfig.Snapshotter); err != nil {
-			glog.Warningf("Failed to unpack image %q: %v", repoTag, err)
+			logrus.WithError(err).Warnf("Failed to unpack image %q", repoTag)
 			// Do not fail image importing. Unpack will be retried when container creation.
 		}
 		info, err := getImageInfo(ctx, image)
@@ -74,7 +74,7 @@ func (c *criContainerdService) LoadImage(ctx context.Context, r *api.LoadImageRe
 		if err := c.imageStore.Add(img); err != nil {
 			return nil, fmt.Errorf("failed to add image %q into store: %v", id, err)
 		}
-		glog.V(4).Infof("Imported image with id %q, repo tag %q", id, repoTag)
+		logrus.Debugf("Imported image with id %q, repo tag %q", id, repoTag)
 	}
 	return &api.LoadImageResponse{Images: repoTags}, nil
 }
