@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/containerd/fifo"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/gotestyourself/gotestyourself/assert"
 	is "github.com/gotestyourself/gotestyourself/assert/cmp"
 )
@@ -38,13 +39,17 @@ func TestNewFIFOSetInDir(t *testing.T) {
 	fifos, err := NewFIFOSetInDir(root, "theid", true)
 	assert.NilError(t, err)
 
-	assertHasPrefix(t, fifos.Stdin, root)
-	assertHasPrefix(t, fifos.Stdout, root)
-	assertHasPrefix(t, fifos.Stderr, root)
-	assert.Check(t, is.Equal("theid-stdin", filepath.Base(fifos.Stdin)))
-	assert.Check(t, is.Equal("theid-stdout", filepath.Base(fifos.Stdout)))
-	assert.Check(t, is.Equal("theid-stderr", filepath.Base(fifos.Stderr)))
-	assert.Check(t, fifos.Terminal)
+	dir := filepath.Dir(fifos.Stdin)
+	assertHasPrefix(t, dir, root)
+	expected := &FIFOSet{
+		Config: Config{
+			Stdin:    filepath.Join(dir, "theid-stdin"),
+			Stdout:   filepath.Join(dir, "theid-stdout"),
+			Stderr:   filepath.Join(dir, "theid-stderr"),
+			Terminal: true,
+		},
+	}
+	assert.Assert(t, is.DeepEqual(fifos, expected, cmpFIFOSet))
 
 	files, err := ioutil.ReadDir(root)
 	assert.NilError(t, err)
@@ -55,6 +60,8 @@ func TestNewFIFOSetInDir(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Check(t, is.Len(files, 0))
 }
+
+var cmpFIFOSet = cmpopts.IgnoreUnexported(FIFOSet{})
 
 func TestNewAttach(t *testing.T) {
 	if runtime.GOOS == "windows" {
@@ -91,9 +98,9 @@ func TestNewAttach(t *testing.T) {
 	io.Cancel()
 	assert.NilError(t, io.Close())
 
-	assert.Check(t, is.EqualMultiLine(expectedStdout, stdout.String()))
-	assert.Check(t, is.EqualMultiLine(expectedStderr, stderr.String()))
-	assert.Check(t, is.EqualMultiLine(expectedStdin, string(actualStdin)))
+	assert.Check(t, is.Equal(expectedStdout, stdout.String()))
+	assert.Check(t, is.Equal(expectedStderr, stderr.String()))
+	assert.Check(t, is.Equal(expectedStdin, string(actualStdin)))
 }
 
 type producers struct {

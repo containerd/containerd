@@ -21,14 +21,14 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/testutil"
 	"github.com/gotestyourself/gotestyourself/assert"
-	is "github.com/gotestyourself/gotestyourself/assert/cmp"
 )
 
 func checkLookup(t *testing.T, fsType, mntPoint, dir string) {
+	t.Helper()
 	info, err := mount.Lookup(dir)
 	assert.NilError(t, err)
-	assert.Check(t, is.Equal(fsType, info.FSType))
-	assert.Check(t, is.Equal(mntPoint, info.Mountpoint))
+	assert.Equal(t, fsType, info.FSType)
+	assert.Equal(t, mntPoint, info.Mountpoint)
 }
 
 func testLookup(t *testing.T, fsType string) {

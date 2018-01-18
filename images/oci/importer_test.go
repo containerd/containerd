@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/gotestyourself/gotestyourself/assert"
-	is "github.com/gotestyourself/gotestyourself/assert/cmp"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -32,7 +31,7 @@ func TestNormalizeImageRef(t *testing.T) {
 		},
 	} {
 		normalized, err := normalizeImageRef(imageBaseName, test.input)
-		assert.Check(t, is.NilError(err))
-		assert.Check(t, is.Equal(test.expect, normalized))
+		assert.NilError(t, err)
+		assert.Equal(t, test.expect, normalized)
 	}
 }

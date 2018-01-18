@@ -5,7 +5,6 @@ import (
 
 	"github.com/containerd/containerd/reference"
 	"github.com/gotestyourself/gotestyourself/assert"
-	is "github.com/gotestyourself/gotestyourself/assert/cmp"
 )
 
 func TestRepositoryScope(t *testing.T) {
@@ -32,8 +31,10 @@ func TestRepositoryScope(t *testing.T) {
 		},
 	}
 	for _, x := range testCases {
-		actual, err := repositoryScope(x.refspec, x.push)
-		assert.Check(t, is.NilError(err))
-		assert.Check(t, is.Equal(x.expected, actual))
+		t.Run(x.refspec.String(), func(t *testing.T) {
+			actual, err := repositoryScope(x.refspec, x.push)
+			assert.NilError(t, err)
+			assert.Equal(t, x.expected, actual)
+		})
 	}
 }

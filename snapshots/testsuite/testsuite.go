@@ -207,10 +207,10 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 		si2.Name: si2,
 	}
 	walked := map[string]snapshots.Info{} // walk is not ordered
-	assert.Check(t, is.NilError(snapshotter.Walk(ctx, func(ctx context.Context, si snapshots.Info) error {
+	assert.NilError(t, snapshotter.Walk(ctx, func(ctx context.Context, si snapshots.Info) error {
 		walked[si.Name] = si
 		return nil
-	})))
+	}))
 
 	for ek, ev := range expected {
 		av, ok := walked[ek]
@@ -241,10 +241,10 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	}
 
 	testutil.Unmount(t, nextnext)
-	assert.Check(t, is.NilError(snapshotter.Remove(ctx, nextnext)))
-	assert.Check(t, is.ErrorContains(snapshotter.Remove(ctx, committed), ""))
-	assert.Check(t, is.NilError(snapshotter.Remove(ctx, nextCommitted)))
-	assert.Check(t, is.NilError(snapshotter.Remove(ctx, committed)))
+	assert.NilError(t, snapshotter.Remove(ctx, nextnext))
+	assert.Assert(t, is.ErrorContains(snapshotter.Remove(ctx, committed), "remove"))
+	assert.NilError(t, snapshotter.Remove(ctx, nextCommitted))
+	assert.NilError(t, snapshotter.Remove(ctx, committed))
 }
 
 // Create a New Layer on top of base layer with Prepare, Stat on new layer, should return Active layer.
@@ -779,8 +779,8 @@ func checkSnapshotterViewReadonly(ctx context.Context, t *testing.T, snapshotter
 		t.Fatalf("write to %q should fail (EROFS) but did not fail", testfile)
 	}
 	testutil.Unmount(t, viewMountPoint)
-	assert.Check(t, is.NilError(snapshotter.Remove(ctx, view)))
-	assert.Check(t, is.NilError(snapshotter.Remove(ctx, committed)))
+	assert.NilError(t, snapshotter.Remove(ctx, view))
+	assert.NilError(t, snapshotter.Remove(ctx, committed))
 }
 
 // Move files from base layer to new location in intermediate layer.
