@@ -39,7 +39,6 @@ const (
 	pauseImage         = "gcr.io/google_containers/pause:3.0" // This is the same with default sandbox image.
 	k8sNamespace       = "k8s.io"                             // This is the same with server.k8sContainerdNamespace.
 	containerdEndpoint = "/run/containerd/containerd.sock"
-	criContainerdRoot  = "/var/lib/cri-containerd"
 )
 
 var (
@@ -51,6 +50,7 @@ var (
 
 var standaloneCRIContainerd = flag.Bool("standalone-cri-containerd", true, "Whether cri-containerd is running in standalone mode.")
 var criContainerdEndpoint = flag.String("cri-containerd-endpoint", "/var/run/cri-containerd.sock", "The endpoint of cri-containerd.")
+var criContainerdRoot = flag.String("cri-containerd-root", "/var/lib/cri-containerd", "The root directory of cri-containerd.")
 
 func init() {
 	flag.Parse()

@@ -17,6 +17,8 @@ limitations under the License.
 package cri
 
 import (
+	"path/filepath"
+
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	"github.com/pkg/errors"
@@ -28,10 +30,13 @@ import (
 // TODO(random-liu): Use github.com/pkg/errors for our errors.
 // Register CRI service plugin
 func init() {
+	// TODO(random-liu): Make `containerd config default` print plugin default config.
+	config := options.DefaultConfig().PluginConfig
 	plugin.Register(&plugin.Registration{
 		// In fact, cri is not strictly a GRPC plugin now.
-		Type: plugin.GRPCPlugin,
-		ID:   "cri",
+		Type:   plugin.GRPCPlugin,
+		ID:     "cri",
+		Config: &config,
 		Requires: []plugin.Type{
 			plugin.RuntimePlugin,
 			plugin.SnapshotPlugin,
@@ -47,13 +52,17 @@ func init() {
 
 func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	ctx := ic.Context
-	// TODO(random-liu): Support Config through Registration.Config.
-	// TODO(random-liu): Validate the configuration.
-	// TODO(random-liu): Leverage other fields in InitContext, such as Root.
-	// TODO(random-liu): Separate cri plugin config from cri-containerd server config,
-	// because many options only make sense to cri-containerd server.
 	// TODO(random-liu): Handle graceful stop.
-	c := options.DefaultConfig()
+	pluginConfig := ic.Config.(*options.PluginConfig)
+	c := options.CRIConfig{
+		PluginConfig: *pluginConfig,
+		// This is a hack. We assume that containerd root directory
+		// is one level above plugin directory.
+		// TODO(random-liu): Expose containerd config to plugin.
+		ContainerdRootDir:  filepath.Dir(ic.Root),
+		ContainerdEndpoint: ic.Address,
+		RootDir:            ic.Root,
+	}
 	log.G(ctx).Infof("Start cri plugin with config %+v", c)
 
 	s, err := server.NewCRIContainerdService(c)
@@ -61,8 +70,8 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, errors.Wrap(err, "failed to create CRI service")
 	}
 
-	// Use a goroutine to start cri service. The reason is that currently
-	// cri service requires containerd to be running.
+	// Use a goroutine to initialize cri service. The reason is that currently
+	// cri service requires containerd to be initialize.
 	go func() {
 		if err := s.Run(false); err != nil {
 			log.G(ctx).WithError(err).Fatal("Failed to run CRI service")

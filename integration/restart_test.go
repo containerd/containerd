@@ -201,7 +201,7 @@ func TestSandboxDeletionAcrossCRIContainerdRestart(t *testing.T) {
 	assert.Empty(t, loadedSandboxes)
 
 	t.Logf("Make sure sandbox root is removed")
-	sandboxRoot := filepath.Join(criContainerdRoot, "sandboxes", sb)
+	sandboxRoot := filepath.Join(*criContainerdRoot, "sandboxes", sb)
 	_, err = os.Stat(sandboxRoot)
 	assert.True(t, os.IsNotExist(err))
 }
