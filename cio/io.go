@@ -8,6 +8,13 @@ import (
 	"sync"
 )
 
+var bufPool = sync.Pool{
+	New: func() interface{} {
+		buffer := make([]byte, 32<<10)
+		return &buffer
+	},
+}
+
 // Config holds the IO configurations.
 type Config struct {
 	// Terminal is true if one has been allocated

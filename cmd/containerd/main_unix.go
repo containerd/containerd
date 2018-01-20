@@ -7,11 +7,10 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/sirupsen/logrus"
-	"golang.org/x/sys/unix"
-
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/server"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
 )
 
 const defaultConfigPath = "/etc/containerd/config.toml"

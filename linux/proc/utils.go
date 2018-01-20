@@ -66,7 +66,10 @@ func copyFile(to, from string) error {
 		return err
 	}
 	defer tt.Close()
-	_, err = io.Copy(tt, ff)
+
+	p := bufPool.Get().(*[]byte)
+	defer bufPool.Put(p)
+	_, err = io.CopyBuffer(tt, ff, *p)
 	return err
 }
 

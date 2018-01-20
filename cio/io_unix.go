@@ -47,7 +47,10 @@ func copyIO(fifos *FIFOSet, ioset *Streams) (*cio, error) {
 
 	if fifos.Stdin != "" {
 		go func() {
-			io.Copy(pipes.Stdin, ioset.Stdin)
+			p := bufPool.Get().(*[]byte)
+			defer bufPool.Put(p)
+
+			io.CopyBuffer(pipes.Stdin, ioset.Stdin, *p)
 			pipes.Stdin.Close()
 		}()
 	}
@@ -55,7 +58,10 @@ func copyIO(fifos *FIFOSet, ioset *Streams) (*cio, error) {
 	var wg = &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		io.Copy(ioset.Stdout, pipes.Stdout)
+		p := bufPool.Get().(*[]byte)
+		defer bufPool.Put(p)
+
+		io.CopyBuffer(ioset.Stdout, pipes.Stdout, *p)
 		pipes.Stdout.Close()
 		wg.Done()
 	}()
@@ -63,7 +69,10 @@ func copyIO(fifos *FIFOSet, ioset *Streams) (*cio, error) {
 	if !fifos.Terminal {
 		wg.Add(1)
 		go func() {
-			io.Copy(ioset.Stderr, pipes.Stderr)
+			p := bufPool.Get().(*[]byte)
+			defer bufPool.Put(p)
+
+			io.CopyBuffer(ioset.Stderr, pipes.Stderr, *p)
 			pipes.Stderr.Close()
 			wg.Done()
 		}()

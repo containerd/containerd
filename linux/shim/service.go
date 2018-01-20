@@ -29,7 +29,15 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-var empty = &ptypes.Empty{}
+var (
+	empty   = &ptypes.Empty{}
+	bufPool = sync.Pool{
+		New: func() interface{} {
+			buffer := make([]byte, 32<<10)
+			return &buffer
+		},
+	}
+)
 
 // Config contains shim specific configuration
 type Config struct {
