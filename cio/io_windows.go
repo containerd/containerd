@@ -46,7 +46,11 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 				log.L.WithError(err).Errorf("failed to accept stdin connection on %s", fifos.In)
 				return
 			}
-			io.Copy(c, ioset.in)
+
+			p := bufPool.Get().(*[]byte)
+			defer bufPool.Put(p)
+
+			io.CopyBuffer(c, ioset.in, *p)
 			c.Close()
 			l.Close()
 		}()
@@ -72,7 +76,10 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 				log.L.WithError(err).Errorf("failed to accept stdout connection on %s", fifos.Out)
 				return
 			}
-			io.Copy(ioset.out, c)
+			p := bufPool.Get().(*[]byte)
+			defer bufPool.Put(p)
+
+			io.CopyBuffer(ioset.out, c, *p)
 			c.Close()
 			l.Close()
 		}()
@@ -98,7 +105,10 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 				log.L.WithError(err).Errorf("failed to accept stderr connection on %s", fifos.Err)
 				return
 			}
-			io.Copy(ioset.err, c)
+			p := bufPool.Get().(*[]byte)
+			defer bufPool.Put(p)
+
+			io.CopyBuffer(ioset.err, c, *p)
 			c.Close()
 			l.Close()
 		}()
