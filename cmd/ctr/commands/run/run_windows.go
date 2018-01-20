@@ -65,7 +65,7 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	opts := []oci.SpecOpts{
 		// TODO(mlaventure): use oci.WithImageConfig once we have a snapshotter
 		withLayers(context),
-		withEnv(context),
+		oci.WithEnv(context.StringSlice("env")),
 		withMounts(context),
 		withTTY(tty),
 	}
