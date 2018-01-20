@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -26,7 +24,6 @@ type worker struct {
 	client *containerd.Client
 	image  containerd.Image
 	spec   *specs.Spec
-	doExec bool
 	commit string
 }
 
@@ -86,17 +83,6 @@ func (w *worker) runContainer(ctx context.Context, id string) error {
 	if err := task.Start(ctx); err != nil {
 		return err
 	}
-	if w.doExec {
-		for i := 0; i < 256; i++ {
-			if err := w.exec(ctx, i, task); err != nil {
-				w.failures++
-				logrus.WithError(err).Error("exec failure")
-			}
-		}
-		if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
-			return err
-		}
-	}
 	status := <-statusC
 	_, _, err = status.Result()
 	if err != nil {
@@ -105,25 +91,6 @@ func (w *worker) runContainer(ctx context.Context, id string) error {
 		}
 		w.failures++
 	}
-	return nil
-}
-
-func (w *worker) exec(ctx context.Context, i int, t containerd.Task) error {
-	pSpec := *w.spec.Process
-	pSpec.Args = []string{"true"}
-	process, err := t.Exec(ctx, strconv.Itoa(i), &pSpec, cio.NullIO)
-	if err != nil {
-		return err
-	}
-	defer process.Delete(ctx)
-	status, err := process.Wait(ctx)
-	if err != nil {
-		return err
-	}
-	if err := process.Start(ctx); err != nil {
-		return err
-	}
-	<-status
 	return nil
 }
 

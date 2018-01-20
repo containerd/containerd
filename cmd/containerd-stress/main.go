@@ -25,6 +25,7 @@ const imageName = "docker.io/library/alpine:latest"
 
 var (
 	ct              metrics.LabeledTimer
+	execTimer       metrics.LabeledTimer
 	errCounter      metrics.LabeledCounter
 	binarySizeGauge metrics.LabeledGauge
 )
@@ -34,6 +35,7 @@ func init() {
 	// if you want more fine grained metrics then you can drill down with the metrics in prom that
 	// containerd is outputing
 	ct = ns.NewLabeledTimer("run", "Run time of a full container during the test", "commit")
+	execTimer = ns.NewLabeledTimer("exec", "Run time of an exec process during the test", "commit")
 	binarySizeGauge = ns.NewLabeledGauge("binary_size", "Binary size of compiled binaries", metrics.Bytes, "name")
 	errCounter = ns.NewLabeledCounter("errors", "Errors encountered running the stress tests", "err")
 	metrics.Register(ns)
@@ -75,9 +77,12 @@ func (r *run) gather(workers []*worker) *result {
 
 type result struct {
 	Total               int     `json:"total"`
+	Failures            int     `json:"failures"`
 	Seconds             float64 `json:"seconds"`
 	ContainersPerSecond float64 `json:"containersPerSecond"`
 	SecondsPerContainer float64 `json:"secondsPerContainer"`
+	ExecTotal           int     `json:"execTotal"`
+	ExecFailures        int     `json:"execFailures"`
 }
 
 func main() {
@@ -121,11 +126,11 @@ func main() {
 		},
 	}
 	app.Before = func(context *cli.Context) error {
-		if context.GlobalBool("debug") {
-			logrus.SetLevel(logrus.DebugLevel)
-		}
 		if context.GlobalBool("json") {
 			logrus.SetLevel(logrus.WarnLevel)
+		}
+		if context.GlobalBool("debug") {
+			logrus.SetLevel(logrus.DebugLevel)
 		}
 		return nil
 	}
@@ -206,9 +211,6 @@ func test(c config) error {
 	)
 	logrus.Info("starting stress test run...")
 	args := oci.WithProcessArgs("true")
-	if c.Exec {
-		args = oci.WithProcessArgs("sleep", "10")
-	}
 	v, err := client.Version(ctx)
 	if err != nil {
 		return err
@@ -230,11 +232,34 @@ func test(c config) error {
 			spec:   spec,
 			image:  image,
 			client: client,
-			doExec: c.Exec,
 			commit: v.Revision,
 		}
 		workers = append(workers, w)
 	}
+	var exec *execWorker
+	if c.Exec {
+		wg.Add(1)
+		spec, err := oci.GenerateSpec(ctx, client,
+			&containers.Container{},
+			oci.WithImageConfig(image),
+			args,
+		)
+		if err != nil {
+			return err
+		}
+		exec = &execWorker{
+			worker: worker{
+				id:     c.Concurrency,
+				wg:     &wg,
+				spec:   spec,
+				image:  image,
+				client: client,
+				commit: v.Revision,
+			},
+		}
+		go exec.exec(ctx, tctx)
+	}
+
 	// start the timer and run the worker
 	r.start()
 	for _, w := range workers {
@@ -245,6 +270,10 @@ func test(c config) error {
 	r.end()
 
 	results := r.gather(workers)
+	if c.Exec {
+		results.ExecTotal = exec.count
+		results.ExecFailures = exec.failures
+	}
 	logrus.Infof("ending test run in %0.3f seconds", results.Seconds)
 
 	logrus.WithField("failures", r.failures).Infof(
