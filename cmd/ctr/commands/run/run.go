@@ -19,16 +19,6 @@ import (
 	"github.com/urfave/cli"
 )
 
-func withEnv(context *cli.Context) oci.SpecOpts {
-	return func(_ gocontext.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
-		env := context.StringSlice("env")
-		if len(env) > 0 {
-			s.Process.Env = replaceOrAppendEnvValues(s.Process.Env, env)
-		}
-		return nil
-	}
-}
-
 func withMounts(context *cli.Context) oci.SpecOpts {
 	return func(_ gocontext.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
 		for _, mount := range context.StringSlice("mount") {
@@ -75,44 +65,6 @@ func parseMountFlag(m string) (specs.Mount, error) {
 	}
 
 	return mount, nil
-}
-
-// replaceOrAppendEnvValues returns the defaults with the overrides either
-// replaced by env key or appended to the list
-func replaceOrAppendEnvValues(defaults, overrides []string) []string {
-	cache := make(map[string]int, len(defaults))
-	for i, e := range defaults {
-		parts := strings.SplitN(e, "=", 2)
-		cache[parts[0]] = i
-	}
-
-	for _, value := range overrides {
-		// Values w/o = means they want this env to be removed/unset.
-		if !strings.Contains(value, "=") {
-			if i, exists := cache[value]; exists {
-				defaults[i] = "" // Used to indicate it should be removed
-			}
-			continue
-		}
-
-		// Just do a normal set/update
-		parts := strings.SplitN(value, "=", 2)
-		if i, exists := cache[parts[0]]; exists {
-			defaults[i] = value
-		} else {
-			defaults = append(defaults, value)
-		}
-	}
-
-	// Now remove all entries that we want to "unset"
-	for i := 0; i < len(defaults); i++ {
-		if defaults[i] == "" {
-			defaults = append(defaults[:i], defaults[i+1:]...)
-			i--
-		}
-	}
-
-	return defaults
 }
 
 // Command runs a container

@@ -61,8 +61,8 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		opts = append(opts, oci.WithRootFSReadonly())
 	}
 	cOpts = append(cOpts, containerd.WithRuntime(context.String("runtime"), nil))
-
-	opts = append(opts, withEnv(context), withMounts(context))
+	opts = append(opts, oci.WithEnv(context.StringSlice("env")))
+	opts = append(opts, withMounts(context))
 	if len(args) > 0 {
 		opts = append(opts, oci.WithProcessArgs(args...))
 	}
