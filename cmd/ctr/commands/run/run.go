@@ -20,15 +20,16 @@ import (
 )
 
 func withMounts(context *cli.Context) oci.SpecOpts {
-	return func(_ gocontext.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+	return func(ctx gocontext.Context, client oci.Client, container *containers.Container, s *specs.Spec) error {
+		mounts := make([]specs.Mount, 0)
 		for _, mount := range context.StringSlice("mount") {
 			m, err := parseMountFlag(mount)
 			if err != nil {
 				return err
 			}
-			s.Mounts = append(s.Mounts, m)
+			mounts = append(mounts, m)
 		}
-		return nil
+		return oci.WithMounts(mounts)(ctx, client, container, s)
 	}
 }
 

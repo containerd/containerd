@@ -45,6 +45,17 @@ func WithEnv(environmnetVariables []string) SpecOpts {
 	}
 }
 
+// WithMounts appends mounts
+func WithMounts(mounts []specs.Mount) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+		if len(mounts) == 0 {
+			return nil
+		}
+		s.Mounts = append(s.Mounts, mounts...)
+		return nil
+	}
+}
+
 // replaceOrAppendEnvValues returns the defaults with the overrides either
 // replaced by env key or appended to the list
 func replaceOrAppendEnvValues(defaults, overrides []string) []string {
