@@ -77,7 +77,7 @@ func changelog(previous, commit string) ([]change, error) {
 }
 
 func getChangelog(previous, commit string) ([]byte, error) {
-	return git("log", "--oneline", fmt.Sprintf("%s..%s", previous, commit))
+	return git("log", "--oneline", "--no-merges", fmt.Sprintf("%s..%s", previous, commit))
 }
 
 func parseChangelog(changelog []byte) ([]change, error) {
