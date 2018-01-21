@@ -39,9 +39,11 @@ const (
 // newTestCRIContainerdService creates a fake criContainerdService for test.
 func newTestCRIContainerdService() *criContainerdService {
 	return &criContainerdService{
-		config: options.Config{
-			RootDir:      testRootDir,
-			SandboxImage: testSandboxImage,
+		config: options.CRIConfig{
+			RootDir: testRootDir,
+			PluginConfig: options.PluginConfig{
+				SandboxImage: testSandboxImage,
+			},
 		},
 		imageFSUUID:        testImageFSUUID,
 		os:                 ostesting.NewFakeOS(),

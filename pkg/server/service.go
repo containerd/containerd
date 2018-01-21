@@ -29,6 +29,7 @@ import (
 	"github.com/cri-o/ocicni/pkg/ocicni"
 	runcapparmor "github.com/opencontainers/runc/libcontainer/apparmor"
 	runcseccomp "github.com/opencontainers/runc/libcontainer/seccomp"
+	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
@@ -72,7 +73,7 @@ type CRIContainerdService interface {
 // criContainerdService implements CRIContainerdService.
 type criContainerdService struct {
 	// config contains all configurations.
-	config options.Config
+	config options.CRIConfig
 	// imageFSUUID is the device uuid of image filesystem.
 	imageFSUUID string
 	// apparmorEnabled indicates whether apparmor is enabled.
@@ -111,7 +112,7 @@ type criContainerdService struct {
 }
 
 // NewCRIContainerdService returns a new instance of CRIContainerdService
-func NewCRIContainerdService(config options.Config) (CRIContainerdService, error) {
+func NewCRIContainerdService(config options.CRIConfig) (CRIContainerdService, error) {
 	var err error
 	c := &criContainerdService{
 		config:             config,
@@ -127,8 +128,16 @@ func NewCRIContainerdService(config options.Config) (CRIContainerdService, error
 		initialized:        atomic.NewBool(false),
 	}
 
+	if c.config.EnableSelinux {
+		if !selinux.GetEnabled() {
+			logrus.Warn("Selinux is not supported")
+		}
+	} else {
+		selinux.SetDisabled()
+	}
+
 	if !c.config.SkipImageFSUUID {
-		imageFSPath := imageFSPath(config.ContainerdConfig.RootDir, config.ContainerdConfig.Snapshotter)
+		imageFSPath := imageFSPath(config.ContainerdRootDir, config.ContainerdConfig.Snapshotter)
 		c.imageFSUUID, err = c.getDeviceUUID(imageFSPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get imagefs uuid of %q: %v", imageFSPath, err)
@@ -180,10 +189,10 @@ func (c *criContainerdService) Run(startGRPC bool) error {
 	// Connect containerd service here, to get rid of the containerd dependency
 	// in `NewCRIContainerdService`. This is required for plugin mode bootstrapping.
 	logrus.Info("Connect containerd service")
-	client, err := containerd.New(c.config.ContainerdConfig.Endpoint, containerd.WithDefaultNamespace(k8sContainerdNamespace))
+	client, err := containerd.New(c.config.ContainerdEndpoint, containerd.WithDefaultNamespace(k8sContainerdNamespace))
 	if err != nil {
 		return fmt.Errorf("failed to initialize containerd client with endpoint %q: %v",
-			c.config.ContainerdConfig.Endpoint, err)
+			c.config.ContainerdEndpoint, err)
 	}
 	c.client = client
 

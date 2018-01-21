@@ -30,7 +30,6 @@ import (
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd/sys"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/util/interrupt"
@@ -90,7 +89,6 @@ func main() {
 		if err := o.InitFlags(cmd.Flags()); err != nil {
 			return fmt.Errorf("failed to init CRI containerd flags: %v", err)
 		}
-		validateConfig(o)
 
 		if err := setLogLevel(o.LogLevel); err != nil {
 			return fmt.Errorf("failed to set log level: %v", err)
@@ -118,7 +116,7 @@ func main() {
 		}
 
 		logrus.Infof("Run cri-containerd grpc server on socket %q", o.SocketPath)
-		s, err := server.NewCRIContainerdService(o.Config)
+		s, err := server.NewCRIContainerdService(o.CRIConfig)
 		if err != nil {
 			return fmt.Errorf("failed to create CRI containerd service: %v", err)
 		}
@@ -135,16 +133,6 @@ func main() {
 	if err := cmd.Execute(); err != nil {
 		// Error should have been reported.
 		os.Exit(1)
-	}
-}
-
-func validateConfig(o *options.CRIContainerdOptions) {
-	if o.EnableSelinux {
-		if !selinux.GetEnabled() {
-			logrus.Warn("Selinux is not supported")
-		}
-	} else {
-		selinux.SetDisabled()
 	}
 }
 

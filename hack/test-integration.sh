@@ -25,6 +25,11 @@ FOCUS=${FOCUS:-""}
 # REPORT_DIR is the the directory to store test logs.
 REPORT_DIR=${REPORT_DIR:-"/tmp/test-integration"}
 
+CRICONTAINERD_ROOT="/var/lib/cri-containerd"
+if ! ${STANDALONE_CRI_CONTAINERD}; then
+  CRICONTAINERD_ROOT="/var/lib/containerd/io.containerd.grpc.v1.cri"
+fi
+
 mkdir -p ${REPORT_DIR}
 test_setup ${REPORT_DIR}
 
@@ -33,7 +38,8 @@ test_setup ${REPORT_DIR}
 # Some integration test needs the env to skip itself.
 sudo ${ROOT}/_output/integration.test --test.run="${FOCUS}" --test.v \
   --standalone-cri-containerd=${STANDALONE_CRI_CONTAINERD} \
-  --cri-containerd-endpoint=${CRICONTAINERD_SOCK}
+  --cri-containerd-endpoint=${CRICONTAINERD_SOCK} \
+  --cri-containerd-root=${CRICONTAINERD_ROOT}
 
 test_exit_code=$?
 

@@ -35,13 +35,15 @@ const (
 	connectionTimeout = 10 * time.Second
 )
 
-// ContainerdConfig contains config related to containerd
+// ContainerdConfig contains toml config related to containerd
 type ContainerdConfig struct {
 	// RootDir is the root directory path for containerd.
+	// TODO(random-liu): Remove this field when no longer support cri-containerd standalone mode.
 	RootDir string `toml:"root_dir" json:"rootDir,omitempty"`
 	// Snapshotter is the snapshotter used by containerd.
 	Snapshotter string `toml:"snapshotter" json:"snapshotter,omitempty"`
 	// Endpoint is the containerd endpoint path.
+	// TODO(random-liu): Remove this field when no longer support cri-containerd standalone mode.
 	Endpoint string `toml:"endpoint" json:"endpoint,omitempty"`
 	// Runtime is the runtime to use in containerd. We may support
 	// other runtimes in the future.
@@ -55,7 +57,7 @@ type ContainerdConfig struct {
 	RuntimeRoot string `toml:"runtime_root" json:"runtimeRoot,omitempty"`
 }
 
-// CniConfig contains config related to cni
+// CniConfig contains toml config related to cni
 type CniConfig struct {
 	// NetworkPluginBinDir is the directory in which the binaries for the plugin is kept.
 	NetworkPluginBinDir string `toml:"bin_dir" json:"binDir,omitempty"`
@@ -63,23 +65,17 @@ type CniConfig struct {
 	NetworkPluginConfDir string `toml:"conf_dir" json:"confDir,omitempty"`
 }
 
-// Config contains cri-containerd toml config
-type Config struct {
+// PluginConfig contains toml config related to CRI plugin,
+// it is a subset of CRIConfig.
+type PluginConfig struct {
 	// ContainerdConfig contains config related to containerd
 	ContainerdConfig `toml:"containerd" json:"containerd,omitempty"`
 	// CniConfig contains config related to cni
 	CniConfig `toml:"cni" json:"cni,omitempty"`
-	// SocketPath is the path to the socket which cri-containerd serves on.
-	SocketPath string `toml:"socket_path" json:"socketPath,omitempty"`
-	// RootDir is the root directory path for managing cri-containerd files
-	// (metadata checkpoint etc.)
-	RootDir string `toml:"root_dir" json:"rootDir,omitempty"`
 	// StreamServerAddress is the ip address streaming server is listening on.
 	StreamServerAddress string `toml:"stream_server_address" json:"streamServerAddress,omitempty"`
 	// StreamServerPort is the port streaming server is listening on.
 	StreamServerPort string `toml:"stream_server_port" json:"streamServerPort,omitempty"`
-	// CgroupPath is the path for the cgroup that cri-containerd is placed in.
-	CgroupPath string `toml:"cgroup_path" json:"cgroupPath,omitempty"`
 	// EnableSelinux indicates to enable the selinux support.
 	EnableSelinux bool `toml:"enable_selinux" json:"enableSelinux,omitempty"`
 	// SandboxImage is the image used by sandbox container.
@@ -88,19 +84,45 @@ type Config struct {
 	StatsCollectPeriod int `toml:"stats_collect_period" json:"statsCollectPeriod,omitempty"`
 	// SystemdCgroup enables systemd cgroup support.
 	SystemdCgroup bool `toml:"systemd_cgroup" json:"systemdCgroup,omitempty"`
-	// OOMScore adjust the cri-containerd's oom score
-	OOMScore int `toml:"oom_score" json:"oomScore,omitempty"`
-	// EnableProfiling is used for enable profiling via host:port/debug/pprof/
-	EnableProfiling bool `toml:"profiling" json:"enableProfiling,omitempty"`
-	// ProfilingPort is the port for profiling via host:port/debug/pprof/
-	ProfilingPort string `toml:"profiling_port" json:"profilingPort,omitempty"`
-	// ProfilingAddress is address for profiling via host:port/debug/pprof/
-	ProfilingAddress string `toml:"profiling_addr" json:"profilingAddress,omitempty"`
 	// SkipImageFSUUID skips retrieving imagefs uuid.
 	// TODO(random-liu): Remove this after we find a generic way to get imagefs uuid.
 	SkipImageFSUUID bool `toml:"skip_imagefs_uuid" json:"skipImageFSUUID,omitempty"`
+}
+
+// CRIConfig contains toml config related to CRI service.
+// TODO(random-liu): Make this an internal config object when we no longer support cri-containerd
+// standalone mode. At that time, we can clean this up.
+type CRIConfig struct {
+	// PluginConfig is the config for CRI plugin.
+	PluginConfig
+	// ContainerdRootDir is the root directory path for containerd.
+	ContainerdRootDir string `toml:"-" json:"containerdRootDir,omitempty"`
+	// ContainerdEndpoint is the containerd endpoint path.
+	ContainerdEndpoint string `toml:"-" json:"containerdEndpoint,omitempty"`
+	// SocketPath is the path to the socket which cri-containerd serves on.
+	// TODO(random-liu): Remove SocketPath when no longer support cri-containerd
+	// standalone mode.
+	SocketPath string `toml:"socket_path" json:"socketPath,omitempty"`
+	// RootDir is the root directory path for managing cri-containerd files
+	// (metadata checkpoint etc.)
+	RootDir string `toml:"root_dir" json:"rootDir,omitempty"`
+}
+
+// Config contains toml config related cri-containerd daemon.
+type Config struct {
+	CRIConfig `toml:"-"`
+	// CgroupPath is the path for the cgroup that cri-containerd is placed in.
+	CgroupPath string `toml:"cgroup_path"`
+	// OOMScore adjust the cri-containerd's oom score
+	OOMScore int `toml:"oom_score"`
+	// EnableProfiling is used for enable profiling via host:port/debug/pprof/
+	EnableProfiling bool `toml:"profiling"`
+	// ProfilingPort is the port for profiling via host:port/debug/pprof/
+	ProfilingPort string `toml:"profiling_port"`
+	// ProfilingAddress is address for profiling via host:port/debug/pprof/
+	ProfilingAddress string `toml:"profiling_addr"`
 	// LogLevel is the logrus log level.
-	LogLevel string `toml:"log_level" json:"logLevel,omitempty"`
+	LogLevel string `toml:"log_level"`
 }
 
 // CRIContainerdOptions contains cri-containerd command line and toml options.
@@ -119,18 +141,18 @@ func NewCRIContainerdOptions() *CRIContainerdOptions {
 // AddFlags adds cri-containerd command line options to pflag.
 func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 	defaults := DefaultConfig()
-	fs.StringVar(&c.LogLevel, "log-level",
-		"info", "Set the logging level [trace, debug, info, warn, error, fatal, panic].")
 	fs.StringVar(&c.ConfigFilePath, configFilePathArgName,
 		defaultConfigFilePath, "Path to the config file.")
+	fs.StringVar(&c.LogLevel, "log-level",
+		defaults.LogLevel, "Set the logging level [trace, debug, info, warn, error, fatal, panic].")
 	fs.StringVar(&c.SocketPath, "socket-path",
 		defaults.SocketPath, "Path to the socket which cri-containerd serves on.")
 	fs.StringVar(&c.RootDir, "root-dir",
 		defaults.RootDir, "Root directory path for cri-containerd managed files (metadata checkpoint etc).")
-	fs.StringVar(&c.ContainerdConfig.RootDir, "containerd-root-dir",
-		defaults.ContainerdConfig.RootDir, "Root directory path where containerd stores persistent data.")
-	fs.StringVar(&c.ContainerdConfig.Endpoint, "containerd-endpoint",
-		defaults.ContainerdConfig.Endpoint, "Path to the containerd endpoint.")
+	fs.StringVar(&c.ContainerdRootDir, "containerd-root-dir",
+		defaults.ContainerdRootDir, "Root directory path where containerd stores persistent data.")
+	fs.StringVar(&c.ContainerdEndpoint, "containerd-endpoint",
+		defaults.ContainerdEndpoint, "Path to the containerd endpoint.")
 	fs.StringVar(&c.ContainerdConfig.Snapshotter, "containerd-snapshotter",
 		defaults.ContainerdConfig.Snapshotter, "The snapshotter used by containerd.")
 	fs.StringVar(&c.ContainerdConfig.Runtime, "containerd-runtime",
@@ -182,6 +204,10 @@ func (c *CRIContainerdOptions) InitFlags(fs *pflag.FlagSet) error {
 		}
 		return err
 	}
+	// Add this for backward compatibility.
+	// TODO(random-liu): Remove this when we no longer support cri-containerd standalone mode.
+	c.ContainerdRootDir = c.ContainerdConfig.RootDir
+	c.ContainerdEndpoint = c.ContainerdConfig.Endpoint
 
 	// What is the reason for applying the command line twice?
 	// Because the values from command line have the highest priority.
@@ -212,31 +238,36 @@ func AddGRPCFlags(fs *pflag.FlagSet) (*string, *time.Duration) {
 // DefaultConfig returns default configurations of cri-containerd.
 func DefaultConfig() Config {
 	return Config{
-		ContainerdConfig: ContainerdConfig{
-			RootDir:       "/var/lib/containerd",
-			Snapshotter:   containerd.DefaultSnapshotter,
-			Endpoint:      "/run/containerd/containerd.sock",
-			Runtime:       "io.containerd.runtime.v1.linux",
-			RuntimeEngine: "",
-			RuntimeRoot:   "",
+		CRIConfig: CRIConfig{
+			PluginConfig: PluginConfig{
+				CniConfig: CniConfig{
+					NetworkPluginBinDir:  "/opt/cni/bin",
+					NetworkPluginConfDir: "/etc/cni/net.d",
+				},
+				ContainerdConfig: ContainerdConfig{
+					Snapshotter:   containerd.DefaultSnapshotter,
+					Runtime:       "io.containerd.runtime.v1.linux",
+					RuntimeEngine: "",
+					RuntimeRoot:   "",
+				},
+				StreamServerAddress: "",
+				StreamServerPort:    "10010",
+				EnableSelinux:       false,
+				SandboxImage:        "gcr.io/google_containers/pause:3.0",
+				StatsCollectPeriod:  10,
+				SystemdCgroup:       false,
+				SkipImageFSUUID:     false,
+			},
+			ContainerdRootDir:  "/var/lib/containerd",
+			ContainerdEndpoint: "/run/containerd/containerd.sock",
+			SocketPath:         "/var/run/cri-containerd.sock",
+			RootDir:            "/var/lib/cri-containerd",
 		},
-		CniConfig: CniConfig{
-			NetworkPluginBinDir:  "/opt/cni/bin",
-			NetworkPluginConfDir: "/etc/cni/net.d",
-		},
-		SocketPath:          "/var/run/cri-containerd.sock",
-		RootDir:             "/var/lib/cri-containerd",
-		StreamServerAddress: "",
-		StreamServerPort:    "10010",
-		CgroupPath:          "",
-		EnableSelinux:       false,
-		SandboxImage:        "gcr.io/google_containers/pause:3.0",
-		StatsCollectPeriod:  10,
-		SystemdCgroup:       false,
-		OOMScore:            -999,
-		EnableProfiling:     true,
-		ProfilingPort:       "10011",
-		ProfilingAddress:    "127.0.0.1",
-		SkipImageFSUUID:     false,
+		CgroupPath:       "",
+		OOMScore:         -999,
+		EnableProfiling:  true,
+		ProfilingPort:    "10011",
+		ProfilingAddress: "127.0.0.1",
+		LogLevel:         "info",
 	}
 }
