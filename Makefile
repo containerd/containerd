@@ -12,8 +12,27 @@ ifneq "$(strip $(shell command -v go 2>/dev/null))" ""
 	GOOS ?= $(shell go env GOOS)
 	GOARCH ?= $(shell go env GOARCH)
 else
-	GOOS ?= $$GOOS
-	GOARCH ?= $$GOARCH
+	ifeq ($(GOOS),)
+		# approximate GOOS for the platform if we don't have Go and GOOS isn't
+		# set. We leave GOARCH unset, so that may need to be fixed.
+		ifeq ($(OS),Windows_NT)
+			GOOS = windows
+		else
+			UNAME_S := $(shell uname -s)
+			ifeq ($(UNAME_S),Linux)
+				GOOS = linux
+			endif
+			ifeq ($(UNAME_S),Darwin)
+				GOOS = darwin
+			endif
+			ifeq ($(UNAME_S),FreeBSD)
+				GOOS = freebsd
+			endif
+		endif
+	else
+		GOOS ?= $$GOOS
+		GOARCH ?= $$GOARCH
+	endif
 endif
 
 WHALE = "🇩"
@@ -38,7 +57,6 @@ TEST_REQUIRES_ROOT_PACKAGES=$(filter \
 
 # Project binaries.
 COMMANDS=ctr containerd containerd-stress containerd-release
-BINARIES=$(addprefix bin/,$(COMMANDS))
 
 GO_TAGS=$(if $(BUILDTAGS),-tags "$(BUILDTAGS)",)
 GO_LDFLAGS=-ldflags '-s -w -X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG) $(EXTRA_LDFLAGS)'
@@ -50,6 +68,8 @@ GO_BUILD_FLAGS=
 
 #include platform specific makefile
 -include Makefile.$(GOOS)
+
+BINARIES=$(addprefix bin/,$(COMMANDS))
 
 # Flags passed to `go test`
 TESTFLAGS ?= -v $(TESTFLAGS_RACE)
