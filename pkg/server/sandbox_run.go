@@ -102,6 +102,16 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 				sandbox.NetNSPath = ""
 			}
 		}()
+		if !c.config.EnableIPv6DAD {
+			// It's a known issue that IPv6 DAD increases sandbox start latency by several seconds.
+			// Disable it when it's not enabled to avoid the latency.
+			// See:
+			// * https://github.com/kubernetes/kubernetes/issues/54651
+			// * https://www.agwa.name/blog/post/beware_the_ipv6_dad_race_condition
+			if err := disableNetNSDAD(sandbox.NetNSPath); err != nil {
+				return nil, fmt.Errorf("failed to disable DAD for sandbox %q: %v", id, err)
+			}
+		}
 		// Setup network for sandbox.
 		podNetwork := ocicni.PodNetwork{
 			Name:         config.GetMetadata().GetName(),
