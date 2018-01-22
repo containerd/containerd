@@ -1,9 +1,6 @@
 package server
 
 import (
-	"bytes"
-	"io"
-
 	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/pkg/errors"
@@ -67,16 +64,6 @@ func (c *Config) Decode(id string, v interface{}) (interface{}, error) {
 		return nil, err
 	}
 	return v, nil
-}
-
-// WriteTo marshals the config to the provided writer
-func (c *Config) WriteTo(w io.Writer) (int64, error) {
-	buf := bytes.NewBuffer(nil)
-	e := toml.NewEncoder(buf)
-	if err := e.Encode(c); err != nil {
-		return 0, err
-	}
-	return io.Copy(w, buf)
 }
 
 // LoadConfig loads the containerd server config from the provided path

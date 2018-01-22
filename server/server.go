@@ -45,7 +45,7 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 	if err := apply(ctx, config); err != nil {
 		return nil, err
 	}
-	plugins, err := loadPlugins(config)
+	plugins, err := LoadPlugins(config)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +158,9 @@ func (s *Server) Stop() {
 	s.rpc.Stop()
 }
 
-func loadPlugins(config *Config) ([]*plugin.Registration, error) {
+// LoadPlugins loads all plugins into containerd and generates an ordered graph
+// of all plugins.
+func LoadPlugins(config *Config) ([]*plugin.Registration, error) {
 	// load all plugins into containerd
 	if err := plugin.Load(filepath.Join(config.Root, "plugins")); err != nil {
 		return nil, err
