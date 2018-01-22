@@ -13,4 +13,7 @@ const (
 	DefaultAddress = "/run/containerd/containerd.sock"
 	// DefaultDebugAddress is the default unix socket address for pprof data
 	DefaultDebugAddress = "/run/containerd/debug.sock"
+	// DefaultFIFODir is the default location used by client-side cio library
+	// to store FIFOs.
+	DefaultFIFODir = "/run/containerd/fifo"
 )

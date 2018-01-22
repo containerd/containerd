@@ -21,4 +21,7 @@ const (
 	DefaultAddress = `\\.\pipe\containerd-containerd`
 	// DefaultDebugAddress is the default winpipe address for pprof data
 	DefaultDebugAddress = `\\.\pipe\containerd-debug`
+	// DefaultFIFODir is the default location used by client-side cio library
+	// to store FIFOs. Unused on Windows.
+	DefaultFIFODir = ""
 )

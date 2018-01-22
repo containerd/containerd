@@ -28,6 +28,10 @@ var execCommand = cli.Command{
 			Name:  "exec-id",
 			Usage: "exec specific id for the process",
 		},
+		cli.StringFlag{
+			Name:  "fifo-dir",
+			Usage: "directory used for storing IO FIFOs",
+		},
 	},
 	Action: func(context *cli.Context) error {
 		var (
@@ -60,10 +64,11 @@ var execCommand = cli.Command{
 		pspec.Terminal = tty
 		pspec.Args = args
 
-		ioCreator := cio.NewCreator(cio.WithStdio)
+		cioOpts := []cio.Opt{cio.WithStdio, cio.WithFIFODir(context.String("fifo-dir"))}
 		if tty {
-			ioCreator = cio.NewCreator(cio.WithStdio, cio.WithTerminal)
+			cioOpts = append(cioOpts, cio.WithTerminal)
 		}
+		ioCreator := cio.NewCreator(cioOpts...)
 		process, err := task.Exec(ctx, context.String("exec-id"), pspec, ioCreator)
 		if err != nil {
 			return err

@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"github.com/containerd/console"
+	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -16,6 +17,10 @@ var startCommand = cli.Command{
 		cli.BoolFlag{
 			Name:  "null-io",
 			Usage: "send all IO to /dev/null",
+		},
+		cli.StringFlag{
+			Name:  "fifo-dir",
+			Usage: "directory used for storing IO FIFOs",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -42,10 +47,11 @@ var startCommand = cli.Command{
 		}
 
 		var (
-			tty  = spec.Process.Terminal
-			opts = getNewTaskOpts(context)
+			tty    = spec.Process.Terminal
+			opts   = getNewTaskOpts(context)
+			ioOpts = []cio.Opt{cio.WithFIFODir(context.String("fifo-dir"))}
 		)
-		task, err := NewTask(ctx, client, container, "", tty, context.Bool("null-io"), opts...)
+		task, err := NewTask(ctx, client, container, "", tty, context.Bool("null-io"), ioOpts, opts...)
 		if err != nil {
 			return err
 		}
