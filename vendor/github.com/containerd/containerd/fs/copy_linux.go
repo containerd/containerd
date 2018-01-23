@@ -14,7 +14,20 @@ import (
 func copyFileInfo(fi os.FileInfo, name string) error {
 	st := fi.Sys().(*syscall.Stat_t)
 	if err := os.Lchown(name, int(st.Uid), int(st.Gid)); err != nil {
-		return errors.Wrapf(err, "failed to chown %s", name)
+		if os.IsPermission(err) {
+			// Normally if uid/gid are the same this would be a no-op, but some
+			// filesystems may still return EPERM... for instance NFS does this.
+			// In such a case, this is not an error.
+			if dstStat, err2 := os.Lstat(name); err2 == nil {
+				st2 := dstStat.Sys().(*syscall.Stat_t)
+				if st.Uid == st2.Uid && st.Gid == st2.Gid {
+					err = nil
+				}
+			}
+		}
+		if err != nil {
+			return errors.Wrapf(err, "failed to chown %s", name)
+		}
 	}
 
 	if (fi.Mode() & os.ModeSymlink) != os.ModeSymlink {
