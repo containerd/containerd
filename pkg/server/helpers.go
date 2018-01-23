@@ -19,6 +19,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -36,6 +37,7 @@ import (
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/util/sysctl"
 
 	"github.com/containerd/cri-containerd/pkg/store"
 	imagestore "github.com/containerd/cri-containerd/pkg/store/image"
@@ -382,4 +384,36 @@ func newSpecGenerator(spec *runtimespec.Spec) generate.Generator {
 	g := generate.NewFromSpec(spec)
 	g.HostSpecific = true
 	return g
+}
+
+// disableNetNSDAD disables duplicate address detection in the network namespace.
+// DAD has a negative affect on sandbox start latency, since we have to wait
+// a second or more for the addresses to leave the "tentative" state.
+func disableNetNSDAD(ns string) error {
+	dad := "net/ipv6/conf/default/accept_dad"
+
+	sysctlBin, err := exec.LookPath("sysctl")
+	if err != nil {
+		return fmt.Errorf("could not find sysctl binary: %v", err)
+	}
+
+	nsenterBin, err := exec.LookPath("nsenter")
+	if err != nil {
+		return fmt.Errorf("could not find nsenter binary: %v", err)
+	}
+
+	// If the sysctl doesn't exist, it means ipv6 is disabled.
+	if _, err := sysctl.New().GetSysctl(dad); err != nil {
+		return nil
+	}
+
+	output, err := exec.Command(nsenterBin,
+		fmt.Sprintf("--net=%s", ns), "-F", "--",
+		sysctlBin, "-w", fmt.Sprintf("%s=%s", dad, "0"),
+	).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to write sysctl %q - output: %s, error: %s",
+			dad, output, err)
+	}
+	return nil
 }

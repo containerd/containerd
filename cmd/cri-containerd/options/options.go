@@ -87,6 +87,9 @@ type PluginConfig struct {
 	// SkipImageFSUUID skips retrieving imagefs uuid.
 	// TODO(random-liu): Remove this after we find a generic way to get imagefs uuid.
 	SkipImageFSUUID bool `toml:"skip_imagefs_uuid" json:"skipImageFSUUID,omitempty"`
+	// EnableIPv6DAD enables IPv6 DAD.
+	// TODO(random-liu): Use optimistic_dad when it's GA.
+	EnableIPv6DAD bool `toml:"enable_ipv6_dad" json:"enableIPv6DAD,omitempty"`
 }
 
 // CRIConfig contains toml config related to CRI service.
@@ -189,6 +192,8 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		defaults.ProfilingAddress, "Profiling address for web interface host:port/debug/pprof/.")
 	fs.BoolVar(&c.SkipImageFSUUID, "skip-imagefs-uuid",
 		defaults.SkipImageFSUUID, "Skip retrieval of imagefs uuid. When turned on, kubelet will not be able to get imagefs capacity or perform imagefs disk eviction.")
+	fs.BoolVar(&c.EnableIPv6DAD, "enable-ipv6-dad",
+		defaults.EnableIPv6DAD, "Enable IPv6 DAD (duplicate address detection) for pod sandbox network. Enabling this will increase pod sandbox start latency by several seconds.")
 }
 
 // InitFlags load configurations from config file, and then overwrite with flags.
@@ -257,6 +262,7 @@ func DefaultConfig() Config {
 				StatsCollectPeriod:  10,
 				SystemdCgroup:       false,
 				SkipImageFSUUID:     false,
+				EnableIPv6DAD:       false,
 			},
 			ContainerdRootDir:  "/var/lib/containerd",
 			ContainerdEndpoint: "/run/containerd/containerd.sock",
