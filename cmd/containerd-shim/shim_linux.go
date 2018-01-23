@@ -6,8 +6,8 @@ import (
 	"syscall"
 
 	"github.com/containerd/containerd/reaper"
-	"github.com/containerd/containerd/sys"
 	runc "github.com/containerd/go-runc"
+	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/stevvooe/ttrpc"
 )
 
@@ -20,7 +20,7 @@ func setupSignals() (chan os.Signal, error) {
 	// for waiting on processes
 	runc.Monitor = reaper.Default
 	// set the shim as the subreaper for all orphaned processes created by the container
-	if err := sys.SetSubreaper(1); err != nil {
+	if err := system.SetSubreaper(1); err != nil {
 		return nil, err
 	}
 	return signals, nil
