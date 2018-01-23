@@ -316,8 +316,7 @@ func checkNodesEqual(t *testing.T, n1, n2 []gc.Node) {
 	sort.Sort(nodeList(n2))
 
 	if len(n1) != len(n2) {
-		t.Errorf("Nodes do not match\n\tExpected:\n\t%v\n\tActual:\n\t%v", n2, n1)
-		return
+		t.Fatalf("Nodes do not match\n\tExpected:\n\t%v\n\tActual:\n\t%v", n2, n1)
 	}
 
 	for i := range n1 {
