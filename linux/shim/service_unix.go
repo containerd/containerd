@@ -24,7 +24,10 @@ func (p *unixPlatform) CopyConsole(ctx context.Context, console console.Console,
 		cwg.Add(1)
 		go func() {
 			cwg.Done()
-			io.Copy(console, in)
+			p := bufPool.Get().(*[]byte)
+			defer bufPool.Put(p)
+
+			io.CopyBuffer(console, in, *p)
 		}()
 	}
 	outw, err := fifo.OpenFifo(ctx, stdout, syscall.O_WRONLY, 0)
@@ -39,7 +42,10 @@ func (p *unixPlatform) CopyConsole(ctx context.Context, console console.Console,
 	cwg.Add(1)
 	go func() {
 		cwg.Done()
-		io.Copy(outw, console)
+		p := bufPool.Get().(*[]byte)
+		defer bufPool.Put(p)
+
+		io.CopyBuffer(outw, console, *p)
 		console.Close()
 		outr.Close()
 		outw.Close()

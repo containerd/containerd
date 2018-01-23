@@ -3,9 +3,8 @@
 package linux
 
 import (
-	"bytes"
 	"context"
-	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -52,12 +51,7 @@ func newBundle(id, path, workDir string, spec []byte) (b *bundle, err error) {
 	if err := os.Mkdir(filepath.Join(path, "rootfs"), 0711); err != nil {
 		return nil, err
 	}
-	f, err := os.Create(filepath.Join(path, configFilename))
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	_, err = io.Copy(f, bytes.NewReader(spec))
+	err = ioutil.WriteFile(filepath.Join(path, configFilename), spec, 0666)
 	return &bundle{
 		id:      id,
 		path:    path,

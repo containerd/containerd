@@ -386,6 +386,10 @@ func writeBackupStreamFromTarFile(w io.Writer, t *tar.Reader, hdr *tar.Header) (
 			return nil, err
 		}
 	}
+
+	buf := bufPool.Get().(*[]byte)
+	defer bufPool.Put(buf)
+
 	if hdr.Typeflag == tar.TypeReg || hdr.Typeflag == tar.TypeRegA {
 		bhdr := winio.BackupHeader{
 			Id:   winio.BackupData,
@@ -395,7 +399,7 @@ func writeBackupStreamFromTarFile(w io.Writer, t *tar.Reader, hdr *tar.Header) (
 		if err != nil {
 			return nil, err
 		}
-		_, err = io.Copy(bw, t)
+		_, err = io.CopyBuffer(bw, t, *buf)
 		if err != nil {
 			return nil, err
 		}
@@ -418,7 +422,7 @@ func writeBackupStreamFromTarFile(w io.Writer, t *tar.Reader, hdr *tar.Header) (
 		if err != nil {
 			return nil, err
 		}
-		_, err = io.Copy(bw, t)
+		_, err = io.CopyBuffer(bw, t, *buf)
 		if err != nil {
 			return nil, err
 		}

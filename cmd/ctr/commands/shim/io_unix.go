@@ -12,6 +12,13 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+var bufPool = sync.Pool{
+	New: func() interface{} {
+		buffer := make([]byte, 32<<10)
+		return &buffer
+	},
+}
+
 func prepareStdio(stdin, stdout, stderr string, console bool) (wg *sync.WaitGroup, err error) {
 	wg = &sync.WaitGroup{}
 	ctx := gocontext.Background()
@@ -26,7 +33,9 @@ func prepareStdio(stdin, stdout, stderr string, console bool) (wg *sync.WaitGrou
 		}
 	}(f)
 	go func(w io.WriteCloser) {
-		io.Copy(w, os.Stdin)
+		p := bufPool.Get().(*[]byte)
+		defer bufPool.Put(p)
+		io.CopyBuffer(w, os.Stdin, *p)
 		w.Close()
 	}(f)
 

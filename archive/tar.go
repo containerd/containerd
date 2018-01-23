@@ -19,7 +19,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var bufferPool = &sync.Pool{
+var bufPool = &sync.Pool{
 	New: func() interface{} {
 		buffer := make([]byte, 32*1024)
 		return &buffer
@@ -527,9 +527,7 @@ func (cw *changeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 			}
 			defer file.Close()
 
-			buf := bufferPool.Get().(*[]byte)
-			n, err := io.CopyBuffer(cw.tw, file, *buf)
-			bufferPool.Put(buf)
+			n, err := copyBuffered(context.TODO(), cw.tw, file)
 			if err != nil {
 				return errors.Wrap(err, "failed to copy")
 			}
@@ -589,8 +587,8 @@ func (cw *changeWriter) includeParents(hdr *tar.Header) error {
 }
 
 func copyBuffered(ctx context.Context, dst io.Writer, src io.Reader) (written int64, err error) {
-	buf := bufferPool.Get().(*[]byte)
-	defer bufferPool.Put(buf)
+	buf := bufPool.Get().(*[]byte)
+	defer bufPool.Put(buf)
 
 	for {
 		select {
