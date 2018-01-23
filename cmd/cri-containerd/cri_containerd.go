@@ -123,7 +123,11 @@ func main() {
 		// Use interrupt handler to make sure the server is stopped properly.
 		// Pass in non-empty final function to avoid os.Exit(1). We expect `Run`
 		// to return itself.
-		h := interrupt.New(func(os.Signal) {}, s.Stop)
+		h := interrupt.New(func(os.Signal) {}, func() {
+			if err := s.Close(); err != nil {
+				logrus.WithError(err).Error("Failed to stop cri service")
+			}
+		})
 		if err := h.Run(func() error { return s.Run(true) }); err != nil {
 			return fmt.Errorf("failed to run cri-containerd with grpc server: %v", err)
 		}

@@ -51,7 +51,6 @@ func init() {
 
 func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	ctx := ic.Context
-	// TODO(random-liu): Handle graceful stop.
 	pluginConfig := ic.Config.(*options.PluginConfig)
 	c := options.CRIConfig{
 		PluginConfig: *pluginConfig,
