@@ -41,13 +41,11 @@ func TestOverlayMounts(t *testing.T) {
 	defer os.RemoveAll(root)
 	o, _, err := newSnapshotter(ctx, root)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	mounts, err := o.Prepare(ctx, "/tmp/test", "")
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if len(mounts) != 1 {
 		t.Errorf("should only have 1 mount but received %d", len(mounts))
@@ -77,23 +75,19 @@ func TestOverlayCommit(t *testing.T) {
 	defer os.RemoveAll(root)
 	o, _, err := newSnapshotter(ctx, root)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	key := "/tmp/test"
 	mounts, err := o.Prepare(ctx, key, "")
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	m := mounts[0]
 	if err := ioutil.WriteFile(filepath.Join(m.Source, "foo"), []byte("hi"), 0660); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if err := o.Commit(ctx, "base", key); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 }
 
@@ -106,22 +100,18 @@ func TestOverlayOverlayMount(t *testing.T) {
 	defer os.RemoveAll(root)
 	o, _, err := newSnapshotter(ctx, root)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	key := "/tmp/test"
 	if _, err = o.Prepare(ctx, key, ""); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if err := o.Commit(ctx, "base", key); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	var mounts []mount.Mount
 	if mounts, err = o.Prepare(ctx, "/tmp/layer2", "base"); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if len(mounts) != 1 {
 		t.Errorf("should only have 1 mount but received %d", len(mounts))
@@ -194,46 +184,37 @@ func TestOverlayOverlayRead(t *testing.T) {
 	defer os.RemoveAll(root)
 	o, _, err := newSnapshotter(ctx, root)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	key := "/tmp/test"
 	mounts, err := o.Prepare(ctx, key, "")
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	m := mounts[0]
 	if err := ioutil.WriteFile(filepath.Join(m.Source, "foo"), []byte("hi"), 0660); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if err := o.Commit(ctx, "base", key); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if mounts, err = o.Prepare(ctx, "/tmp/layer2", "base"); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	dest := filepath.Join(root, "dest")
 	if err := os.Mkdir(dest, 0700); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if err := mount.All(mounts, dest); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer syscall.Unmount(dest, 0)
 	data, err := ioutil.ReadFile(filepath.Join(dest, "foo"))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if e := string(data); e != "hi" {
-		t.Errorf("expected file contents hi but got %q", e)
-		return
+		t.Fatalf("expected file contents hi but got %q", e)
 	}
 }
 

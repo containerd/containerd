@@ -184,7 +184,6 @@ func TestImagePull(t *testing.T) {
 	defer cancel()
 	_, err = client.Pull(ctx, testImage)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 }

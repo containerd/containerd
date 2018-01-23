@@ -27,66 +27,55 @@ func TestCheckpointRestore(t *testing.T) {
 
 	image, err := client.GetImage(ctx, testImage)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	checkpoint, err := task.Checkpoint(ctx, WithExit)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	<-statusC
 
 	if _, err := task.Delete(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if task, err = container.NewTask(ctx, empty(), WithTaskCheckpoint(checkpoint)); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
 	statusC, err = task.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	<-statusC
 }
@@ -107,74 +96,61 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 
 	image, err := client.GetImage(ctx, testImage)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	checkpoint, err := task.Checkpoint(ctx, WithExit)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	<-statusC
 
 	if _, err := task.Delete(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if err := container.Delete(ctx, WithSnapshotCleanup); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if container, err = client.NewContainer(ctx, id, WithCheckpoint(checkpoint, id)); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if task, err = container.NewTask(ctx, empty(), WithTaskCheckpoint(checkpoint)); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
 	statusC, err = task.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	<-statusC
 }
@@ -200,52 +176,43 @@ func TestCheckpointLeaveRunning(t *testing.T) {
 
 	image, err := client.GetImage(ctx, testImage)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if _, err := task.Checkpoint(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	status, err := task.Status(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if status.Status != Running {
-		t.Errorf("expected status %q but received %q", Running, status)
-		return
+		t.Fatalf("expected status %q but received %q", Running, status)
 	}
 
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	<-statusC

@@ -45,8 +45,7 @@ func TestContainerList(t *testing.T) {
 
 	containers, err := client.Containers(ctx)
 	if err != nil {
-		t.Errorf("container list returned error %v", err)
-		return
+		t.Fatalf("container list returned error %v", err)
 	}
 	if len(containers) != 0 {
 		t.Errorf("expected 0 containers but received %d", len(containers))
@@ -68,20 +67,17 @@ func TestNewContainer(t *testing.T) {
 
 	container, err := client.NewContainer(ctx, id, WithNewSpec())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx)
 	if container.ID() != id {
 		t.Errorf("expected container id %q but received %q", id, container.ID())
 	}
 	if _, err = container.Spec(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if err := container.Delete(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 }
 
@@ -104,28 +100,24 @@ func TestContainerStart(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		image, err = client.GetImage(ctx, testImage)
 		if err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withExitStatus(7)), withNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if pid := task.Pid(); pid <= 0 {
@@ -139,8 +131,7 @@ func TestContainerStart(t *testing.T) {
 	status := <-statusC
 	code, _, err := status.Result()
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if code != 7 {
 		t.Errorf("expected status 7 from wait but received %d", code)
@@ -148,8 +139,7 @@ func TestContainerStart(t *testing.T) {
 
 	deleteStatus, err := task.Delete(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if ec := deleteStatus.ExitCode(); ec != 7 {
 		t.Errorf("expected status 7 from delete but received %d", ec)
@@ -176,34 +166,29 @@ func TestContainerOutput(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		image, err = client.GetImage(ctx, testImage)
 		if err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("echo", expected)), withNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	stdout := bytes.NewBuffer(nil)
 	task, err := container.NewTask(ctx, cio.NewCreator(withByteBuffers(stdout)))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	status := <-statusC
@@ -212,8 +197,7 @@ func TestContainerOutput(t *testing.T) {
 		t.Errorf("expected status 0 but received %d: %v", code, err)
 	}
 	if _, err := task.Delete(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	actual := stdout.String()
@@ -252,39 +236,33 @@ func TestContainerExec(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		image, err = client.GetImage(ctx, testImage)
 		if err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 
 	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "100")), withNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
 	finishedC, err := task.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	spec, err := container.Spec(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	// start an exec process without running the original container process info
@@ -293,26 +271,22 @@ func TestContainerExec(t *testing.T) {
 	execID := t.Name() + "_exec"
 	process, err := task.Exec(ctx, execID, processSpec, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	processStatusC, err := process.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if err := process.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	// wait for the exec to return
 	status := <-processStatusC
 	code, _, err := status.Result()
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if code != 6 {
@@ -320,8 +294,7 @@ func TestContainerExec(t *testing.T) {
 	}
 	deleteStatus, err := process.Delete(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if ec := deleteStatus.ExitCode(); ec != 6 {
 		t.Errorf("expected delete exit code 6 but received %d", ec)
@@ -350,39 +323,33 @@ func TestContainerLargeExecArgs(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		image, err = client.GetImage(ctx, testImage)
 		if err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 
 	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "100")), withNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
 	finishedC, err := task.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	spec, err := container.Spec(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	processSpec := spec.Process
@@ -390,29 +357,24 @@ func TestContainerLargeExecArgs(t *testing.T) {
 	execID := t.Name() + "_exec"
 	process, err := task.Exec(ctx, execID, processSpec, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	processStatusC, err := process.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if err := process.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	// wait for the exec to return
 	status := <-processStatusC
 	if _, _, err := status.Result(); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if _, err := process.Delete(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
 		t.Error(err)
@@ -439,34 +401,29 @@ func TestContainerPids(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		image, err = client.GetImage(ctx, testImage)
 		if err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 
 	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "100")), withNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	pid := task.Pid()
@@ -475,8 +432,7 @@ func TestContainerPids(t *testing.T) {
 	}
 	processes, err := task.Pids(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	switch runtime.GOOS {
 	case "windows":
@@ -524,15 +480,13 @@ func TestContainerCloseIO(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		image, err = client.GetImage(ctx, testImage)
 		if err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 
 	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withCat()), withNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
@@ -540,26 +494,22 @@ func TestContainerCloseIO(t *testing.T) {
 
 	r, w, err := os.Pipe()
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStreams(r, stdout, ioutil.Discard)))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	w.Close()
 	if err := task.CloseIO(ctx, WithStdinCloser); err != nil {
@@ -588,34 +538,29 @@ func TestDeleteRunningContainer(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		image, err = client.GetImage(ctx, testImage)
 		if err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 
 	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "100")), withNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	err = container.Delete(ctx, WithSnapshotCleanup)
@@ -626,8 +571,7 @@ func TestDeleteRunningContainer(t *testing.T) {
 		t.Errorf("expected error %q but received %q", errdefs.ErrFailedPrecondition, err)
 	}
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	<-statusC
 }
@@ -651,45 +595,38 @@ func TestContainerKill(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		image, err = client.GetImage(ctx, testImage)
 		if err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 
 	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "10")), withNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	<-statusC
 
 	err = task.Kill(ctx, syscall.SIGTERM)
 	if err == nil {
-		t.Error("second call to kill should return an error")
-		return
+		t.Fatal("second call to kill should return an error")
 	}
 	if !errdefs.IsNotFound(err) {
 		t.Errorf("expected error %q but received %q", errdefs.ErrNotFound, err)
@@ -715,8 +652,7 @@ func TestContainerNoBinaryExists(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		image, err = client.GetImage(ctx, testImage)
 		if err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 
@@ -724,8 +660,7 @@ func TestContainerNoBinaryExists(t *testing.T) {
 		WithNewSpec(withImageConfig(image), oci.WithProcessArgs("nothing")),
 		withNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
@@ -766,22 +701,19 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		image, err = client.GetImage(ctx, testImage)
 		if err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 
 	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "100")), withNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
@@ -790,13 +722,11 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 		t.Error(err)
 	}
 	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	spec, err := container.Spec(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	// start an exec process without running the original container process
@@ -807,8 +737,7 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 	execID := t.Name() + "_exec"
 	process, err := task.Exec(ctx, execID, processSpec, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer process.Delete(ctx)
 	if err := process.Start(ctx); err == nil {
@@ -839,29 +768,25 @@ func TestWaitStoppedTask(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		image, err = client.GetImage(ctx, testImage)
 		if err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 
 	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withExitStatus(7)), withNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if pid := task.Pid(); pid <= 0 {
@@ -877,14 +802,12 @@ func TestWaitStoppedTask(t *testing.T) {
 	<-statusC
 	statusC, err = task.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	status := <-statusC
 	code, _, err := status.Result()
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if code != 7 {
 		t.Errorf("exit status from stopped task should be 7 but received %d", code)
@@ -910,22 +833,19 @@ func TestWaitStoppedProcess(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		image, err = client.GetImage(ctx, testImage)
 		if err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 
 	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "100")), withNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
@@ -935,13 +855,11 @@ func TestWaitStoppedProcess(t *testing.T) {
 	}
 
 	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	spec, err := container.Spec(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	// start an exec process without running the original container process info
@@ -950,20 +868,17 @@ func TestWaitStoppedProcess(t *testing.T) {
 	execID := t.Name() + "_exec"
 	process, err := task.Exec(ctx, execID, processSpec, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer process.Delete(ctx)
 
 	statusC, err := process.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if err := process.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	// wait for the exec to return
@@ -972,14 +887,12 @@ func TestWaitStoppedProcess(t *testing.T) {
 	// try to wait on the process after it has stopped
 	statusC, err = process.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	status := <-statusC
 	code, _, err := status.Result()
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if code != 6 {
 		t.Errorf("exit status from stopped process should be 6 but received %d", code)
@@ -1010,32 +923,27 @@ func TestTaskForceDelete(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		image, err = client.GetImage(ctx, testImage)
 		if err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "30")), withNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if _, err := task.Delete(ctx); err == nil {
 		t.Error("task.Delete of a running task should create an error")
 	}
 	if _, err := task.Delete(ctx, WithProcessKill); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 }
 
@@ -1058,39 +966,33 @@ func TestProcessForceDelete(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		image, err = client.GetImage(ctx, testImage)
 		if err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "30")), withNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	// task must be started on windows
 	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	spec, err := container.Spec(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	processSpec := spec.Process
@@ -1098,12 +1000,10 @@ func TestProcessForceDelete(t *testing.T) {
 	execID := t.Name() + "_exec"
 	process, err := task.Exec(ctx, execID, processSpec, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if err := process.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if _, err := process.Delete(ctx); err == nil {
 		t.Error("process.Delete should return an error when process is running")
@@ -1112,8 +1012,7 @@ func TestProcessForceDelete(t *testing.T) {
 		t.Error(err)
 	}
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	<-statusC
 }
@@ -1138,8 +1037,7 @@ func TestContainerHostname(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		image, err = client.GetImage(ctx, testImage)
 		if err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 
@@ -1149,42 +1047,36 @@ func TestContainerHostname(t *testing.T) {
 	),
 		withNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	stdout := bytes.NewBuffer(nil)
 	task, err := container.NewTask(ctx, cio.NewCreator(withByteBuffers(stdout)))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	status := <-statusC
 	code, _, err := status.Result()
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if code != 0 {
 		t.Errorf("expected status 0 but received %d", code)
 	}
 	if _, err := task.Delete(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	cutset := "\n"
 	if runtime.GOOS == "windows" {
@@ -1216,22 +1108,19 @@ func TestContainerExitedAtSet(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		image, err = client.GetImage(ctx, testImage)
 		if err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 
 	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withTrue()), withNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
@@ -1242,8 +1131,7 @@ func TestContainerExitedAtSet(t *testing.T) {
 
 	startTime := time.Now()
 	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	status := <-statusC
@@ -1259,8 +1147,7 @@ func TestContainerExitedAtSet(t *testing.T) {
 	}
 
 	if _, err := task.Delete(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 }
 
@@ -1283,22 +1170,19 @@ func TestDeleteContainerExecCreated(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		image, err = client.GetImage(ctx, testImage)
 		if err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 
 	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "100")), withNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
@@ -1308,13 +1192,11 @@ func TestDeleteContainerExecCreated(t *testing.T) {
 	}
 
 	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	spec, err := container.Spec(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	// start an exec process without running the original container process info
@@ -1323,13 +1205,11 @@ func TestDeleteContainerExecCreated(t *testing.T) {
 	execID := t.Name() + "_exec"
 	process, err := task.Exec(ctx, execID, processSpec, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	deleteStatus, err := process.Delete(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if ec := deleteStatus.ExitCode(); ec != 0 {
 		t.Errorf("expected delete exit code 0 but received %d", ec)
@@ -1362,30 +1242,26 @@ func TestContainerMetrics(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		image, err = client.GetImage(ctx, testImage)
 		if err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 	container, err := client.NewContainer(ctx, id,
 		WithNewSpec(withImageConfig(image), oci.WithProcessArgs("sleep", "30")),
 		withNewSnapshot(id, image))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	metric, err := task.Metrics(ctx)
@@ -1396,8 +1272,7 @@ func TestContainerMetrics(t *testing.T) {
 		t.Errorf("expected metric id %q but received %q", id, metric.ID)
 	}
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	<-statusC
@@ -1425,8 +1300,7 @@ func TestDeletedContainerMetrics(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		image, err = client.GetImage(ctx, testImage)
 		if err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 	container, err := client.NewContainer(ctx, id,
@@ -1434,33 +1308,28 @@ func TestDeletedContainerMetrics(t *testing.T) {
 		withNewSnapshot(id, image),
 	)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
 	if err := task.Start(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	<-statusC
 
 	if _, err := task.Delete(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if _, err := task.Metrics(ctx); err == nil {
@@ -1484,16 +1353,14 @@ func TestContainerExtensions(t *testing.T) {
 	ext := gogotypes.Any{TypeUrl: "test.ext.url", Value: []byte("hello")}
 	container, err := client.NewContainer(ctx, id, WithNewSpec(), WithContainerExtension("hello", &ext))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx)
 
 	checkExt := func(container Container) {
 		cExts, err := container.Extensions(ctx)
 		if err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 		if len(cExts) != 1 {
 			t.Errorf("expected 1 container extension")
@@ -1510,8 +1377,7 @@ func TestContainerExtensions(t *testing.T) {
 
 	container, err = client.LoadContainer(ctx, container.ID())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	checkExt(container)
 }
@@ -1531,15 +1397,13 @@ func TestContainerUpdate(t *testing.T) {
 
 	container, err := client.NewContainer(ctx, id, WithNewSpec())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx)
 
 	spec, err := container.Spec(ctx)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	const hostname = "updated-hostname"
@@ -1553,12 +1417,10 @@ func TestContainerUpdate(t *testing.T) {
 		c.Spec = a
 		return nil
 	}); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if spec, err = container.Spec(ctx); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if spec.Hostname != hostname {
 		t.Errorf("hostname %q != %q", spec.Hostname, hostname)
@@ -1580,8 +1442,7 @@ func TestContainerInfo(t *testing.T) {
 
 	container, err := client.NewContainer(ctx, id, WithNewSpec())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx)
 
@@ -1611,8 +1472,7 @@ func TestContainerLabels(t *testing.T) {
 		"test": "yes",
 	}))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer container.Delete(ctx)
 
