@@ -2,6 +2,7 @@ package server
 
 import (
 	"expvar"
+	"io"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -102,6 +103,7 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 		if service, ok := instance.(plugin.Service); ok {
 			services = append(services, service)
 		}
+		s.plugins = append(s.plugins, result)
 	}
 	// register services after all plugins have been initialized
 	for _, service := range services {
@@ -114,9 +116,10 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 
 // Server is the containerd main daemon
 type Server struct {
-	rpc    *grpc.Server
-	events *exchange.Exchange
-	config *Config
+	rpc     *grpc.Server
+	events  *exchange.Exchange
+	config  *Config
+	plugins []*plugin.Plugin
 }
 
 // ServeGRPC provides the containerd grpc APIs on the provided listener
@@ -156,6 +159,23 @@ func (s *Server) ServeDebug(l net.Listener) error {
 // Stop the containerd server canceling any open connections
 func (s *Server) Stop() {
 	s.rpc.Stop()
+	for i := len(s.plugins) - 1; i >= 0; i-- {
+		p := s.plugins[i]
+		instance, err := p.Instance()
+		if err != nil {
+			log.L.WithError(err).WithField("id", p.Registration.ID).
+				Errorf("could not get plugin instance")
+			continue
+		}
+		closer, ok := instance.(io.Closer)
+		if !ok {
+			continue
+		}
+		if err := closer.Close(); err != nil {
+			log.L.WithError(err).WithField("id", p.Registration.ID).
+				Errorf("failed to close plugin")
+		}
+	}
 }
 
 // LoadPlugins loads all plugins into containerd and generates an ordered graph
