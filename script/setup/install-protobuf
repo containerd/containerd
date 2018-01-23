@@ -2,7 +2,7 @@
 #
 # Downloads and installs protobuf
 #
-set -eux -o pipefail
+set -eu -o pipefail
 
 PROTOBUF_VERSION=3.5.1
 GOARCH=$(go env GOARCH)
