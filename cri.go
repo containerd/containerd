@@ -30,7 +30,6 @@ import (
 // TODO(random-liu): Use github.com/pkg/errors for our errors.
 // Register CRI service plugin
 func init() {
-	// TODO(random-liu): Make `containerd config default` print plugin default config.
 	config := options.DefaultConfig().PluginConfig
 	plugin.Register(&plugin.Registration{
 		// In fact, cri is not strictly a GRPC plugin now.

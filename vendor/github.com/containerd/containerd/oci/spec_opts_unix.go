@@ -95,22 +95,25 @@ func WithImageConfig(image Image) SpecOpts {
 		s.Process.Env = append(s.Process.Env, config.Env...)
 		cmd := config.Cmd
 		s.Process.Args = append(config.Entrypoint, cmd...)
+		cwd := config.WorkingDir
+		if cwd == "" {
+			cwd = "/"
+		}
+		s.Process.Cwd = cwd
 		if config.User != "" {
+			// According to OCI Image Spec v1.0.0, the following are valid for Linux:
+			//   user, uid, user:group, uid:gid, uid:group, user:gid
 			parts := strings.Split(config.User, ":")
 			switch len(parts) {
 			case 1:
 				v, err := strconv.Atoi(parts[0])
 				if err != nil {
 					// if we cannot parse as a uint they try to see if it is a username
-					if err := WithUsername(config.User)(ctx, client, c, s); err != nil {
-						return err
-					}
-					return err
+					return WithUsername(config.User)(ctx, client, c, s)
 				}
-				if err := WithUserID(uint32(v))(ctx, client, c, s); err != nil {
-					return err
-				}
+				return WithUserID(uint32(v))(ctx, client, c, s)
 			case 2:
+				// TODO: support username and groupname
 				v, err := strconv.Atoi(parts[0])
 				if err != nil {
 					return errors.Wrapf(err, "parse uid %s", parts[0])
@@ -125,11 +128,6 @@ func WithImageConfig(image Image) SpecOpts {
 				return fmt.Errorf("invalid USER value %s", config.User)
 			}
 		}
-		cwd := config.WorkingDir
-		if cwd == "" {
-			cwd = "/"
-		}
-		s.Process.Cwd = cwd
 		return nil
 	}
 }
@@ -259,6 +257,24 @@ func WithUIDGID(uid, gid uint32) SpecOpts {
 // uid, and not returns error.
 func WithUserID(uid uint32) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) (err error) {
+		if c.Snapshotter == "" && c.SnapshotKey == "" {
+			if !isRootfsAbs(s.Root.Path) {
+				return errors.Errorf("rootfs absolute path is required")
+			}
+			uuid, ugid, err := getUIDGIDFromPath(s.Root.Path, func(u user.User) bool {
+				return u.Uid == int(uid)
+			})
+			if err != nil {
+				if os.IsNotExist(err) || err == errNoUsersFound {
+					s.Process.User.UID, s.Process.User.GID = uid, uid
+					return nil
+				}
+				return err
+			}
+			s.Process.User.UID, s.Process.User.GID = uuid, ugid
+			return nil
+
+		}
 		if c.Snapshotter == "" {
 			return errors.Errorf("no snapshotter set for container")
 		}
@@ -270,33 +286,18 @@ func WithUserID(uid uint32) SpecOpts {
 		if err != nil {
 			return err
 		}
-
 		return mount.WithTempMount(ctx, mounts, func(root string) error {
-			ppath, err := fs.RootPath(root, "/etc/passwd")
+			uuid, ugid, err := getUIDGIDFromPath(root, func(u user.User) bool {
+				return u.Uid == int(uid)
+			})
 			if err != nil {
-				return err
-			}
-			f, err := os.Open(ppath)
-			if err != nil {
-				if os.IsNotExist(err) {
+				if os.IsNotExist(err) || err == errNoUsersFound {
 					s.Process.User.UID, s.Process.User.GID = uid, uid
 					return nil
 				}
 				return err
 			}
-			defer f.Close()
-			users, err := user.ParsePasswdFilter(f, func(u user.User) bool {
-				return u.Uid == int(uid)
-			})
-			if err != nil {
-				return err
-			}
-			if len(users) == 0 {
-				s.Process.User.UID, s.Process.User.GID = uid, uid
-				return nil
-			}
-			u := users[0]
-			s.Process.User.UID, s.Process.User.GID = uint32(u.Uid), uint32(u.Gid)
+			s.Process.User.UID, s.Process.User.GID = uuid, ugid
 			return nil
 		})
 	}
@@ -308,6 +309,19 @@ func WithUserID(uid uint32) SpecOpts {
 // it returns error.
 func WithUsername(username string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) (err error) {
+		if c.Snapshotter == "" && c.SnapshotKey == "" {
+			if !isRootfsAbs(s.Root.Path) {
+				return errors.Errorf("rootfs absolute path is required")
+			}
+			uid, gid, err := getUIDGIDFromPath(s.Root.Path, func(u user.User) bool {
+				return u.Name == username
+			})
+			if err != nil {
+				return err
+			}
+			s.Process.User.UID, s.Process.User.GID = uid, gid
+			return nil
+		}
 		if c.Snapshotter == "" {
 			return errors.Errorf("no snapshotter set for container")
 		}
@@ -320,27 +334,41 @@ func WithUsername(username string) SpecOpts {
 			return err
 		}
 		return mount.WithTempMount(ctx, mounts, func(root string) error {
-			ppath, err := fs.RootPath(root, "/etc/passwd")
-			if err != nil {
-				return err
-			}
-			f, err := os.Open(ppath)
-			if err != nil {
-				return err
-			}
-			defer f.Close()
-			users, err := user.ParsePasswdFilter(f, func(u user.User) bool {
+			uid, gid, err := getUIDGIDFromPath(root, func(u user.User) bool {
 				return u.Name == username
 			})
 			if err != nil {
 				return err
 			}
-			if len(users) == 0 {
-				return errors.Errorf("no users found for %s", username)
-			}
-			u := users[0]
-			s.Process.User.UID, s.Process.User.GID = uint32(u.Uid), uint32(u.Gid)
+			s.Process.User.UID, s.Process.User.GID = uid, gid
 			return nil
 		})
 	}
+}
+
+var errNoUsersFound = errors.New("no users found")
+
+func getUIDGIDFromPath(root string, filter func(user.User) bool) (uid, gid uint32, err error) {
+	ppath, err := fs.RootPath(root, "/etc/passwd")
+	if err != nil {
+		return 0, 0, err
+	}
+	f, err := os.Open(ppath)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer f.Close()
+	users, err := user.ParsePasswdFilter(f, filter)
+	if err != nil {
+		return 0, 0, err
+	}
+	if len(users) == 0 {
+		return 0, 0, errNoUsersFound
+	}
+	u := users[0]
+	return uint32(u.Uid), uint32(u.Gid), nil
+}
+
+func isRootfsAbs(root string) bool {
+	return filepath.IsAbs(root)
 }
