@@ -8,7 +8,8 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/mount"
-	"github.com/stretchr/testify/assert"
+	"github.com/gotestyourself/gotestyourself/assert"
+	is "github.com/gotestyourself/gotestyourself/assert/cmp"
 )
 
 // Unmount unmounts a given mountPoint and sets t.Error if it fails
@@ -26,7 +27,7 @@ func RequiresRoot(t testing.TB) {
 		t.Skip("skipping test that requires root")
 		return
 	}
-	assert.Equal(t, 0, os.Getuid(), "This test must be run as root.")
+	assert.Check(t, is.Equal(0, os.Getuid()), "This test must be run as root.")
 }
 
 // RequiresRootM is similar to RequiresRoot but intended to be called from *testing.M.

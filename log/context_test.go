@@ -4,15 +4,16 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/gotestyourself/gotestyourself/assert"
+	is "github.com/gotestyourself/gotestyourself/assert/cmp"
 )
 
 func TestLoggerContext(t *testing.T) {
 	ctx := context.Background()
-	assert.Equal(t, GetLogger(ctx), L)      // should be same as L variable
-	assert.Equal(t, G(ctx), GetLogger(ctx)) // these should be the same.
+	assert.Check(t, is.DeepEqual(GetLogger(ctx), L))      // should be same as L variable
+	assert.Check(t, is.DeepEqual(G(ctx), GetLogger(ctx))) // these should be the same.
 
 	ctx = WithLogger(ctx, G(ctx).WithField("test", "one"))
-	assert.Equal(t, GetLogger(ctx).Data["test"], "one")
-	assert.Equal(t, G(ctx), GetLogger(ctx)) // these should be the same.
+	assert.Check(t, is.DeepEqual(GetLogger(ctx).Data["test"], "one"))
+	assert.Check(t, is.DeepEqual(G(ctx), GetLogger(ctx))) // these should be the same.
 }

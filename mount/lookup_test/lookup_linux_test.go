@@ -20,17 +20,15 @@ import (
 
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/testutil"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/gotestyourself/gotestyourself/assert"
+	is "github.com/gotestyourself/gotestyourself/assert/cmp"
 )
 
 func checkLookup(t *testing.T, fsType, mntPoint, dir string) {
 	info, err := mount.Lookup(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, fsType, info.FSType)
-	assert.Equal(t, mntPoint, info.Mountpoint)
+	assert.NilError(t, err)
+	assert.Check(t, is.Equal(fsType, info.FSType))
+	assert.Check(t, is.Equal(mntPoint, info.Mountpoint))
 }
 
 func testLookup(t *testing.T, fsType string) {
@@ -57,7 +55,7 @@ func testLookup(t *testing.T, fsType string) {
 		testutil.Unmount(t, mnt)
 		cleanupDevice()
 	}()
-	assert.True(t, strings.HasPrefix(deviceName, "/dev/loop"))
+	assert.Check(t, strings.HasPrefix(deviceName, "/dev/loop"))
 	checkLookup(t, fsType, mnt, mnt)
 
 	newMnt, err := ioutil.TempDir("", "containerd-mountinfo-test-newMnt")
@@ -92,19 +90,19 @@ func TestLookupWithXFS(t *testing.T) {
 
 func TestLookupWithOverlay(t *testing.T) {
 	lower, err := ioutil.TempDir("", "containerd-mountinfo-test-lower")
-	require.NoError(t, err)
+	assert.NilError(t, err)
 	defer os.RemoveAll(lower)
 
 	upper, err := ioutil.TempDir("", "containerd-mountinfo-test-upper")
-	require.NoError(t, err)
+	assert.NilError(t, err)
 	defer os.RemoveAll(upper)
 
 	work, err := ioutil.TempDir("", "containerd-mountinfo-test-work")
-	require.NoError(t, err)
+	assert.NilError(t, err)
 	defer os.RemoveAll(work)
 
 	overlay, err := ioutil.TempDir("", "containerd-mountinfo-test-overlay")
-	require.NoError(t, err)
+	assert.NilError(t, err)
 	defer os.RemoveAll(overlay)
 
 	if out, err := exec.Command("mount", "-t", "overlay", "overlay", "-o", fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s",
@@ -116,11 +114,11 @@ func TestLookupWithOverlay(t *testing.T) {
 
 	testdir := filepath.Join(overlay, "testdir")
 	err = os.Mkdir(testdir, 0777)
-	require.NoError(t, err)
+	assert.NilError(t, err)
 
 	testfile := filepath.Join(overlay, "testfile")
 	_, err = os.Create(testfile)
-	require.NoError(t, err)
+	assert.NilError(t, err)
 
 	checkLookup(t, "overlay", overlay, testdir)
 	checkLookup(t, "overlay", overlay, testfile)

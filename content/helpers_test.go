@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/errdefs"
+	"github.com/gotestyourself/gotestyourself/assert"
+	is "github.com/gotestyourself/gotestyourself/assert/cmp"
 	"github.com/opencontainers/go-digest"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 type copySource struct {
@@ -63,9 +63,9 @@ func TestCopy(t *testing.T) {
 				testcase.source.size,
 				testcase.source.digest)
 
-			require.NoError(t, err)
-			assert.Equal(t, testcase.source.digest, testcase.writer.commitedDigest)
-			assert.Equal(t, testcase.expected, testcase.writer.String())
+			assert.NilError(t, err)
+			assert.Check(t, is.Equal(testcase.source.digest, testcase.writer.commitedDigest))
+			assert.Check(t, is.Equal(testcase.expected, testcase.writer.String()))
 		})
 	}
 }

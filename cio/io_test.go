@@ -15,8 +15,8 @@ import (
 	"testing"
 
 	"github.com/containerd/fifo"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/gotestyourself/gotestyourself/assert"
+	is "github.com/gotestyourself/gotestyourself/assert/cmp"
 )
 
 func assertHasPrefix(t *testing.T, s, prefix string) {
@@ -32,28 +32,28 @@ func TestNewFIFOSetInDir(t *testing.T) {
 	}
 
 	root, err := ioutil.TempDir("", "test-new-fifo-set")
-	require.NoError(t, err)
+	assert.NilError(t, err)
 	defer os.RemoveAll(root)
 
 	fifos, err := NewFIFOSetInDir(root, "theid", true)
-	require.NoError(t, err)
+	assert.NilError(t, err)
 
 	assertHasPrefix(t, fifos.Stdin, root)
 	assertHasPrefix(t, fifos.Stdout, root)
 	assertHasPrefix(t, fifos.Stderr, root)
-	assert.Equal(t, "theid-stdin", filepath.Base(fifos.Stdin))
-	assert.Equal(t, "theid-stdout", filepath.Base(fifos.Stdout))
-	assert.Equal(t, "theid-stderr", filepath.Base(fifos.Stderr))
-	assert.Equal(t, true, fifos.Terminal)
+	assert.Check(t, is.Equal("theid-stdin", filepath.Base(fifos.Stdin)))
+	assert.Check(t, is.Equal("theid-stdout", filepath.Base(fifos.Stdout)))
+	assert.Check(t, is.Equal("theid-stderr", filepath.Base(fifos.Stderr)))
+	assert.Check(t, is.Equal(true, fifos.Terminal))
 
 	files, err := ioutil.ReadDir(root)
-	require.NoError(t, err)
-	assert.Len(t, files, 1)
+	assert.NilError(t, err)
+	assert.Check(t, is.Len(files, 1))
 
-	require.NoError(t, fifos.Close())
+	assert.NilError(t, fifos.Close())
 	files, err = ioutil.ReadDir(root)
-	require.NoError(t, err)
-	assert.Len(t, files, 0)
+	assert.NilError(t, err)
+	assert.Check(t, is.Len(files, 0))
 }
 
 func TestNewAttach(t *testing.T) {
@@ -75,25 +75,25 @@ func TestNewAttach(t *testing.T) {
 	attacher := NewAttach(withBytesBuffers)
 
 	fifos, err := NewFIFOSetInDir("", "theid", false)
-	require.NoError(t, err)
+	assert.NilError(t, err)
 
 	io, err := attacher(fifos)
-	require.NoError(t, err)
+	assert.NilError(t, err)
 	defer io.Close()
 
 	producers := setupFIFOProducers(t, io.Config())
 	initProducers(t, producers, expectedStdout, expectedStderr)
 
 	actualStdin, err := ioutil.ReadAll(producers.Stdin)
-	require.NoError(t, err)
+	assert.NilError(t, err)
 
 	io.Wait()
 	io.Cancel()
-	assert.NoError(t, io.Close())
+	assert.Check(t, is.NilError(io.Close()))
 
-	assert.Equal(t, expectedStdout, stdout.String())
-	assert.Equal(t, expectedStderr, stderr.String())
-	assert.Equal(t, expectedStdin, string(actualStdin))
+	assert.Check(t, is.Equal(expectedStdout, stdout.String()))
+	assert.Check(t, is.Equal(expectedStderr, stderr.String()))
+	assert.Check(t, is.Equal(expectedStdin, string(actualStdin)))
 }
 
 type producers struct {
@@ -110,23 +110,23 @@ func setupFIFOProducers(t *testing.T, fifos Config) producers {
 	)
 
 	pipes.Stdin, err = fifo.OpenFifo(ctx, fifos.Stdin, syscall.O_RDONLY, 0)
-	require.NoError(t, err)
+	assert.NilError(t, err)
 
 	pipes.Stdout, err = fifo.OpenFifo(ctx, fifos.Stdout, syscall.O_WRONLY, 0)
-	require.NoError(t, err)
+	assert.NilError(t, err)
 
 	pipes.Stderr, err = fifo.OpenFifo(ctx, fifos.Stderr, syscall.O_WRONLY, 0)
-	require.NoError(t, err)
+	assert.NilError(t, err)
 
 	return pipes
 }
 
 func initProducers(t *testing.T, producers producers, stdout, stderr string) {
 	_, err := producers.Stdout.Write([]byte(stdout))
-	require.NoError(t, err)
-	require.NoError(t, producers.Stdout.Close())
+	assert.NilError(t, err)
+	assert.NilError(t, producers.Stdout.Close())
 
 	_, err = producers.Stderr.Write([]byte(stderr))
-	require.NoError(t, err)
-	require.NoError(t, producers.Stderr.Close())
+	assert.NilError(t, err)
+	assert.NilError(t, producers.Stderr.Close())
 }

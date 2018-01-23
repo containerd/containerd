@@ -10,8 +10,9 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/gotestyourself/gotestyourself/assert"
+	is "github.com/gotestyourself/gotestyourself/assert/cmp"
 	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
 )
 
 type testFunc func(context.Context, *testing.T, *MetaStore)
@@ -242,7 +243,7 @@ func testGetInfo(ctx context.Context, t *testing.T, ms *MetaStore) {
 		// TODO: Check timestamp range
 		info.Created = time.Time{}
 		info.Updated = time.Time{}
-		assert.Equal(t, expected, info)
+		assert.Check(t, is.DeepEqual(expected, info))
 	}
 }
 
@@ -266,7 +267,7 @@ func testWalk(ctx context.Context, t *testing.T, ms *MetaStore) {
 	if err != nil {
 		t.Fatalf("Walk failed: %+v", err)
 	}
-	assert.Equal(t, baseInfo, found)
+	assert.Check(t, is.DeepEqual(baseInfo, found))
 }
 
 func testGetSnapshot(ctx context.Context, t *testing.T, ms *MetaStore) {
@@ -318,7 +319,7 @@ func testGetSnapshot(ctx context.Context, t *testing.T, ms *MetaStore) {
 			if err != nil {
 				t.Fatalf("Failed to get active: %+v", err)
 			}
-			assert.Equal(t, expected, s)
+			assert.Check(t, is.DeepEqual(expected, s))
 		}
 	}
 
