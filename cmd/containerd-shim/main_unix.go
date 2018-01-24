@@ -12,9 +12,11 @@ import (
 	"os/exec"
 	"os/signal"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/linux/proc"
@@ -58,6 +60,13 @@ func init() {
 }
 
 func main() {
+	debug.SetGCPercent(10)
+	go func() {
+		for range time.Tick(30 * time.Second) {
+			debug.FreeOSMemory()
+		}
+	}()
+
 	if debugFlag {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
