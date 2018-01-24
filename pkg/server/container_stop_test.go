@@ -39,7 +39,7 @@ func TestWaitContainerStop(t *testing.T) {
 				CreatedAt: time.Now().UnixNano(),
 				StartedAt: time.Now().UnixNano(),
 			},
-			timeout:   2 * stopCheckPollInterval,
+			timeout:   200 * time.Millisecond,
 			expectErr: true,
 		},
 		"should return error if context is cancelled": {
@@ -50,11 +50,6 @@ func TestWaitContainerStop(t *testing.T) {
 			timeout:   time.Hour,
 			cancel:    true,
 			expectErr: true,
-		},
-		"should not return error if container is removed before timeout": {
-			status:    nil,
-			timeout:   time.Hour,
-			expectErr: false,
 		},
 		"should not return error if container is stopped before timeout": {
 			status: &containerstore.Status{
@@ -67,13 +62,15 @@ func TestWaitContainerStop(t *testing.T) {
 		},
 	} {
 		c := newTestCRIContainerdService()
-		if test.status != nil {
-			container, err := containerstore.NewContainer(
-				containerstore.Metadata{ID: id},
-				containerstore.WithFakeStatus(*test.status),
-			)
-			assert.NoError(t, err)
-			assert.NoError(t, c.containerStore.Add(container))
+		container, err := containerstore.NewContainer(
+			containerstore.Metadata{ID: id},
+			containerstore.WithFakeStatus(*test.status),
+		)
+		assert.NoError(t, err)
+		assert.NoError(t, c.containerStore.Add(container))
+		if test.status.FinishedAt != 0 {
+			// Fake the TaskExit event
+			container.Stop()
 		}
 		ctx := context.Background()
 		if test.cancel {
@@ -81,7 +78,7 @@ func TestWaitContainerStop(t *testing.T) {
 			cancel()
 			ctx = cancelledCtx
 		}
-		err := c.waitContainerStop(ctx, id, test.timeout)
+		err = c.waitContainerStop(ctx, container, test.timeout)
 		assert.Equal(t, test.expectErr, err != nil, desc)
 	}
 }

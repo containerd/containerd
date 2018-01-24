@@ -28,15 +28,10 @@ import (
 	"golang.org/x/sys/unix"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/containerd/cri-containerd/pkg/store"
 	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
 )
 
 const (
-	// stopCheckPollInterval is the the interval to check whether a container
-	// is stopped successfully.
-	stopCheckPollInterval = 100 * time.Millisecond
-
 	// killContainerTimeout is the timeout that we wait for the container to
 	// be SIGKILLed.
 	killContainerTimeout = 2 * time.Minute
@@ -104,7 +99,7 @@ func (c *criContainerdService) stopContainer(ctx context.Context, container cont
 			}
 		}
 
-		err = c.waitContainerStop(ctx, id, timeout)
+		err = c.waitContainerStop(ctx, container, timeout)
 		if err == nil {
 			return nil
 		}
@@ -130,41 +125,22 @@ func (c *criContainerdService) stopContainer(ctx context.Context, container cont
 	}
 
 	// Wait for a fixed timeout until container stop is observed by event monitor.
-	if err := c.waitContainerStop(ctx, id, killContainerTimeout); err != nil {
+	if err := c.waitContainerStop(ctx, container, killContainerTimeout); err != nil {
 		return fmt.Errorf("an error occurs during waiting for container %q to stop: %v", id, err)
 	}
 	return nil
 }
 
-// waitContainerStop polls container state until timeout exceeds or container is stopped.
-func (c *criContainerdService) waitContainerStop(ctx context.Context, id string, timeout time.Duration) error {
-	ticker := time.NewTicker(stopCheckPollInterval)
-	defer ticker.Stop()
+// waitContainerStop waits for container to be stopped until timeout exceeds or centext is cancelled.
+func (c *criContainerdService) waitContainerStop(ctx context.Context, container containerstore.Container, timeout time.Duration) error {
 	timeoutTimer := time.NewTimer(timeout)
 	defer timeoutTimer.Stop()
-	for {
-		// Poll once before waiting for stopCheckPollInterval.
-		container, err := c.containerStore.Get(id)
-		if err != nil {
-			if err != store.ErrNotExist {
-				return fmt.Errorf("failed to get container %q: %v", id, err)
-			}
-			// Do not return error here because container was removed means
-			// it is already stopped.
-			logrus.Warnf("Container %q was removed during stopping", id)
-			return nil
-		}
-		// TODO(random-liu): Use channel with event handler instead of polling.
-		if container.Status.Get().State() == runtime.ContainerState_CONTAINER_EXITED {
-			return nil
-		}
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("wait container %q is cancelled", id)
-		case <-timeoutTimer.C:
-			return fmt.Errorf("wait container %q stop timeout", id)
-		case <-ticker.C:
-			continue
-		}
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("wait container %q is cancelled", container.ID)
+	case <-timeoutTimer.C:
+		return fmt.Errorf("wait container %q stop timeout", container.ID)
+	case <-container.Stopped():
+		return nil
 	}
 }
