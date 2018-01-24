@@ -583,6 +583,9 @@ func (cw *changeWriter) includeParents(hdr *tar.Header) error {
 			}
 		}
 	}
+	if hdr.Typeflag == tar.TypeDir {
+		cw.addedDirs[name] = struct{}{}
+	}
 	return nil
 }
 
