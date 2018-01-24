@@ -15,7 +15,6 @@ addons:
   apt:
     packages:
       - btrfs-tools
-      - libseccomp-dev
       - libapparmor-dev
       - libnl-3-dev
       - libnet-dev
@@ -33,16 +32,17 @@ env:
 
 before_install:
   - uname -r
+  - sudo apt-get -q update
+  - sudo apt-get install -y libseccomp-dev/trusty-backports
 
 install:
-  - wget https://github.com/google/protobuf/releases/download/v3.5.0/protoc-3.5.0-linux-x86_64.zip -O /tmp/protoc-3.5.0-linux-x86_64.zip
-  - sudo unzip -o -d /usr/local /tmp/protoc-3.5.0-linux-x86_64.zip
+  - sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-protobuf
   - sudo chmod +x /usr/local/bin/protoc
   - sudo chmod og+rx /usr/local/include/google /usr/local/include/google/protobuf /usr/local/include/google/protobuf/compiler
   - sudo chmod -R og+r /usr/local/include/google/protobuf/
   - protoc --version
   - go get -u github.com/vbatts/git-validation
-  - sudo wget https://github.com/crosbymichael/runc/releases/download/ctd-9/runc -O /bin/runc; sudo chmod +x /bin/runc
+  - sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-runc
   - wget https://github.com/xemul/criu/archive/v3.0.tar.gz -O /tmp/criu.tar.gz
   - tar -C /tmp/ -zxf /tmp/criu.tar.gz
   - cd /tmp/criu-3.0 && sudo make install-criu
