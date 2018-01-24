@@ -136,6 +136,9 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 		log.G(ctx).Debug("resolving")
 		resp, err := fetcher.doRequestWithRetries(ctx, req, nil)
 		if err != nil {
+			if errors.Cause(err) == ErrInvalidAuthorization {
+				err = errors.Wrapf(err, "pull access denied, repository does not exist or may require authorization")
+			}
 			return "", ocispec.Descriptor{}, err
 		}
 		resp.Body.Close() // don't care about body contents.
