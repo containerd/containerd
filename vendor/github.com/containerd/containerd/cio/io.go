@@ -6,7 +6,16 @@ import (
 	"io"
 	"os"
 	"sync"
+
+	"github.com/containerd/containerd/defaults"
 )
+
+var bufPool = sync.Pool{
+	New: func() interface{} {
+		buffer := make([]byte, 32<<10)
+		return &buffer
+	},
+}
 
 // Config holds the IO configurations.
 type Config struct {
@@ -68,6 +77,7 @@ type Streams struct {
 	Stdout   io.Writer
 	Stderr   io.Writer
 	Terminal bool
+	FIFODir  string
 }
 
 // Opt customize options for creating a Creator or Attach
@@ -92,16 +102,25 @@ func WithStreams(stdin io.Reader, stdout, stderr io.Writer) Opt {
 	}
 }
 
+// WithFIFODir sets the fifo directory.
+// e.g. "/run/containerd/fifo", "/run/users/1001/containerd/fifo"
+func WithFIFODir(dir string) Opt {
+	return func(opt *Streams) {
+		opt.FIFODir = dir
+	}
+}
+
 // NewCreator returns an IO creator from the options
 func NewCreator(opts ...Opt) Creator {
 	streams := &Streams{}
 	for _, opt := range opts {
 		opt(streams)
 	}
+	if streams.FIFODir == "" {
+		streams.FIFODir = defaults.DefaultFIFODir
+	}
 	return func(id string) (IO, error) {
-		// TODO: accept root as a param
-		root := "/run/containerd/fifo"
-		fifos, err := NewFIFOSetInDir(root, id, streams.Terminal)
+		fifos, err := NewFIFOSetInDir(streams.FIFODir, id, streams.Terminal)
 		if err != nil {
 			return nil, err
 		}

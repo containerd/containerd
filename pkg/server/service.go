@@ -18,6 +18,7 @@ package server
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -65,7 +66,8 @@ type grpcServices interface {
 // CRIContainerdService is the interface implement CRI remote service server.
 type CRIContainerdService interface {
 	Run(bool) error
-	Stop()
+	// io.Closer is used by containerd to gracefully stop cri service.
+	io.Closer
 	plugin.Service
 	grpcServices
 }
@@ -263,7 +265,9 @@ func (c *criContainerdService) Run(startGRPC bool) error {
 	case <-streamServerCloseCh:
 	case <-grpcServerCloseCh:
 	}
-	c.Stop()
+	if err := c.Close(); err != nil {
+		return fmt.Errorf("failed to stop cri service: %v", err)
+	}
 
 	<-eventMonitorCloseCh
 	logrus.Info("Event monitor stopped")
@@ -278,11 +282,15 @@ func (c *criContainerdService) Run(startGRPC bool) error {
 }
 
 // Stop stops the cri-containerd service.
-func (c *criContainerdService) Stop() {
+func (c *criContainerdService) Close() error {
 	logrus.Info("Stop cri-containerd service")
+	// TODO(random-liu): Make event monitor stop synchronous.
 	c.eventMonitor.stop()
-	c.streamServer.Stop() // nolint: errcheck
+	if err := c.streamServer.Stop(); err != nil {
+		return fmt.Errorf("failed to stop stream server: %v", err)
+	}
 	c.server.Stop()
+	return nil
 }
 
 // getDeviceUUID gets device uuid for a given path.
