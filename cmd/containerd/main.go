@@ -10,10 +10,6 @@ import (
 	"os/signal"
 	"time"
 
-	"google.golang.org/grpc/grpclog"
-
-	gocontext "golang.org/x/net/context"
-
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/server"
 	"github.com/containerd/containerd/sys"
@@ -21,6 +17,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+	gocontext "golang.org/x/net/context"
+	"google.golang.org/grpc/grpclog"
 )
 
 const usage = `

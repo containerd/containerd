@@ -13,6 +13,13 @@ import (
 	runc "github.com/containerd/go-runc"
 )
 
+var bufPool = sync.Pool{
+	New: func() interface{} {
+		buffer := make([]byte, 32<<10)
+		return &buffer
+	},
+}
+
 func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, wg, cwg *sync.WaitGroup) error {
 	for name, dest := range map[string]func(wc io.WriteCloser, rc io.Closer){
 		stdout: func(wc io.WriteCloser, rc io.Closer) {
@@ -20,7 +27,9 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 			cwg.Add(1)
 			go func() {
 				cwg.Done()
-				io.Copy(wc, rio.Stdout())
+				p := bufPool.Get().(*[]byte)
+				defer bufPool.Put(p)
+				io.CopyBuffer(wc, rio.Stdout(), *p)
 				wg.Done()
 				wc.Close()
 				rc.Close()
@@ -31,7 +40,10 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 			cwg.Add(1)
 			go func() {
 				cwg.Done()
-				io.Copy(wc, rio.Stderr())
+				p := bufPool.Get().(*[]byte)
+				defer bufPool.Put(p)
+
+				io.CopyBuffer(wc, rio.Stderr(), *p)
 				wg.Done()
 				wc.Close()
 				rc.Close()
@@ -59,7 +71,10 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 	cwg.Add(1)
 	go func() {
 		cwg.Done()
-		io.Copy(rio.Stdin(), f)
+		p := bufPool.Get().(*[]byte)
+		defer bufPool.Put(p)
+
+		io.CopyBuffer(rio.Stdin(), f, *p)
 		rio.Stdin().Close()
 		f.Close()
 	}()

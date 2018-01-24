@@ -53,7 +53,9 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 	}
 	set = append(set, f)
 	go func(w io.WriteCloser) {
-		io.Copy(w, ioset.in)
+		p := bufPool.Get().(*[]byte)
+		defer bufPool.Put(p)
+		io.CopyBuffer(w, ioset.in, *p)
 		w.Close()
 	}(f)
 
@@ -63,7 +65,9 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 	set = append(set, f)
 	wg.Add(1)
 	go func(r io.ReadCloser) {
-		io.Copy(ioset.out, r)
+		p := bufPool.Get().(*[]byte)
+		defer bufPool.Put(p)
+		io.CopyBuffer(ioset.out, r, *p)
 		r.Close()
 		wg.Done()
 	}(f)
@@ -76,7 +80,10 @@ func copyIO(fifos *FIFOSet, ioset *ioSet, tty bool) (_ *wgCloser, err error) {
 	if !tty {
 		wg.Add(1)
 		go func(r io.ReadCloser) {
-			io.Copy(ioset.err, r)
+			p := bufPool.Get().(*[]byte)
+			defer bufPool.Put(p)
+
+			io.CopyBuffer(ioset.err, r, *p)
 			r.Close()
 			wg.Done()
 		}(f)
