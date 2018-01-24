@@ -28,20 +28,45 @@ func init() {
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
 			ic.Meta.Exports["root"] = ic.Root
-			return NewSnapshotter(ic.Root)
+			return NewSnapshotter(ic.Root, AsynchronousRemove)
 		},
 	})
 }
 
+// SnapshotterConfig is used to configure the overlay snapshotter instance
+type SnapshotterConfig struct {
+	asyncRemove bool
+}
+
+// Opt is an option to configure the overlay snapshotter
+type Opt func(config *SnapshotterConfig) error
+
+// AsynchronousRemove defers removal of filesystem content until
+// the Cleanup method is called. Removals will make the snapshot
+// referred to by the key unavailable and make the key immediately
+// available for re-use.
+func AsynchronousRemove(config *SnapshotterConfig) error {
+	config.asyncRemove = true
+	return nil
+}
+
 type snapshotter struct {
-	root string
-	ms   *storage.MetaStore
+	root        string
+	ms          *storage.MetaStore
+	asyncRemove bool
 }
 
 // NewSnapshotter returns a Snapshotter which uses overlayfs. The overlayfs
 // diffs are stored under the provided root. A metadata file is stored under
 // the root.
-func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
+func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
+	var config SnapshotterConfig
+	for _, opt := range opts {
+		if err := opt(&config); err != nil {
+			return nil, err
+		}
+	}
+
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
 	}
@@ -62,8 +87,9 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 	}
 
 	return &snapshotter{
-		root: root,
-		ms:   ms,
+		root:        root,
+		ms:          ms,
+		asyncRemove: config.asyncRemove,
 	}, nil
 }
 
@@ -215,6 +241,28 @@ func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 		return errors.Wrap(err, "failed to remove")
 	}
 
+	if !o.asyncRemove {
+		var removals []string
+		removals, err = o.getCleanupDirectories(ctx, t)
+		if err != nil {
+			return errors.Wrap(err, "unable to get directories for removal")
+		}
+
+		// Remove directories after the transaction is closed, failures must not
+		// return error since the transaction is committed with the removal
+		// key no longer available.
+		defer func() {
+			if err == nil {
+				for _, dir := range removals {
+					if err := os.RemoveAll(dir); err != nil {
+						log.G(ctx).WithError(err).WithField("path", dir).Warn("failed to remove directory")
+					}
+				}
+			}
+		}()
+
+	}
+
 	return t.Commit()
 }
 
@@ -230,7 +278,7 @@ func (o *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 
 // Cleanup cleans up disk resources from removed or abandoned snapshots
 func (o *snapshotter) Cleanup(ctx context.Context) error {
-	cleanup, err := o.getCleanupDirectories(ctx)
+	cleanup, err := o.cleanupDirectories(ctx)
 	if err != nil {
 		return err
 	}
@@ -244,13 +292,17 @@ func (o *snapshotter) Cleanup(ctx context.Context) error {
 	return nil
 }
 
-func (o *snapshotter) getCleanupDirectories(ctx context.Context) ([]string, error) {
+func (o *snapshotter) cleanupDirectories(ctx context.Context) ([]string, error) {
 	ctx, t, err := o.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return nil, err
 	}
 
 	defer t.Rollback()
+	return o.getCleanupDirectories(ctx, t)
+}
+
+func (o *snapshotter) getCleanupDirectories(ctx context.Context, t storage.Transactor) ([]string, error) {
 	ids, err := storage.IDMap(ctx)
 	if err != nil {
 		return nil, err
@@ -307,7 +359,7 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	td, err = o.prepareDirectory(ctx, snapshotDir, kind)
 	if err != nil {
 		if rerr := t.Rollback(); rerr != nil {
-			log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
+			log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
 		}
 		return nil, errors.Wrap(err, "failed to create prepare snapshot dir")
 	}
@@ -335,7 +387,7 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 
 		if err := os.Lchown(filepath.Join(td, "fs"), int(stat.Uid), int(stat.Gid)); err != nil {
 			if rerr := t.Rollback(); rerr != nil {
-				log.G(ctx).WithError(rerr).Warn("Failure rolling back transaction")
+				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
 			}
 			return nil, errors.Wrap(err, "failed to chown")
 		}
