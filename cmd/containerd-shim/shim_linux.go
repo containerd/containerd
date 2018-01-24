@@ -14,7 +14,7 @@ import (
 // setupSignals creates a new signal handler for all signals and sets the shim as a
 // sub-reaper so that the container processes are reparented
 func setupSignals() (chan os.Signal, error) {
-	signals := make(chan os.Signal, 2048)
+	signals := make(chan os.Signal, 32)
 	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGCHLD)
 	// make sure runc is setup to use the monitor
 	// for waiting on processes

@@ -15,7 +15,7 @@ import (
 // ErrNoSuchProcess is returned when the process no longer exists
 var ErrNoSuchProcess = errors.New("no such process")
 
-const bufferSize = 1024
+const bufferSize = 32
 
 // Reap should be called when the process receives an SIGCHLD.  Reap will reap
 // all exited processes and close their wait channels
