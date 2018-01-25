@@ -155,6 +155,8 @@ func (em *eventMonitor) handleEvent(evt *events.Envelope) {
 			// TODO(random-liu): [P0] Enqueue the event and retry.
 			return
 		}
+		// Using channel to propagate the information of container stop
+		cntr.Stop()
 	case *eventtypes.TaskOOM:
 		e := any.(*eventtypes.TaskOOM)
 		logrus.Infof("TaskOOM event %+v", e)

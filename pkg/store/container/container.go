@@ -21,6 +21,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/docker/docker/pkg/truncindex"
+	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	cio "github.com/containerd/cri-containerd/pkg/server/io"
 	"github.com/containerd/cri-containerd/pkg/store"
@@ -37,7 +38,8 @@ type Container struct {
 	Container containerd.Container
 	// Container IO
 	IO *cio.ContainerIO
-	// TODO(random-liu): Add stop channel to get rid of stop poll waiting.
+	// StopCh is used to propagate the stop information of the container.
+	StopCh
 }
 
 // Opts sets specific information to newly created Container.
@@ -67,6 +69,9 @@ func WithStatus(status Status, root string) Opts {
 			return err
 		}
 		c.Status = s
+		if s.Get().State() == runtime.ContainerState_CONTAINER_EXITED {
+			c.Stop()
+		}
 		return nil
 	}
 }
@@ -75,6 +80,7 @@ func WithStatus(status Status, root string) Opts {
 func NewContainer(metadata Metadata, opts ...Opts) (Container, error) {
 	c := Container{
 		Metadata: metadata,
+		StopCh:   StopCh(make(chan struct{})),
 	}
 	for _, o := range opts {
 		if err := o(&c); err != nil {
@@ -87,6 +93,19 @@ func NewContainer(metadata Metadata, opts ...Opts) (Container, error) {
 // Delete deletes checkpoint for the container.
 func (c *Container) Delete() error {
 	return c.Status.Delete()
+}
+
+// StopCh is used to propagate the stop information of a container.
+type StopCh chan struct{}
+
+// Stop close stopCh of the container.
+func (ch StopCh) Stop() {
+	close(ch)
+}
+
+// Stopped return the stopCh of the container as a readonly channel.
+func (ch StopCh) Stopped() <-chan struct{} {
+	return ch
 }
 
 // Store stores all Containers.
