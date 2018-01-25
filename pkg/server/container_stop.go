@@ -31,11 +31,9 @@ import (
 	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
 )
 
-const (
-	// killContainerTimeout is the timeout that we wait for the container to
-	// be SIGKILLed.
-	killContainerTimeout = 2 * time.Minute
-)
+// killContainerTimeout is the timeout that we wait for the container to
+// be SIGKILLed.
+const killContainerTimeout = 2 * time.Minute
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
 func (c *criContainerdService) StopContainer(ctx context.Context, r *runtime.StopContainerRequest) (*runtime.StopContainerResponse, error) {

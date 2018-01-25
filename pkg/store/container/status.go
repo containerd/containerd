@@ -119,8 +119,6 @@ type StatusStorage interface {
 	Delete() error
 }
 
-// TODO(random-liu): Add factory function and configure checkpoint path.
-
 // StoreStatus creates the storage containing the passed in container status with the
 // specified id.
 // The status MUST be created in one transaction.

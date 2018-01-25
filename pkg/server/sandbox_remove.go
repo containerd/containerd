@@ -27,6 +27,7 @@ import (
 
 	"github.com/containerd/cri-containerd/pkg/log"
 	"github.com/containerd/cri-containerd/pkg/store"
+	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
 )
 
 // RemovePodSandbox removes the sandbox. If there are running containers in the
@@ -46,12 +47,8 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 	// Use the full sandbox id.
 	id := sandbox.ID
 
-	// Return error if sandbox container is not fully stopped.
-	_, err = sandbox.Container.Task(ctx, nil)
-	if err != nil && !errdefs.IsNotFound(err) {
-		return nil, fmt.Errorf("failed to get sandbox container info for %q: %v", id, err)
-	}
-	if err == nil {
+	// Return error if sandbox container is still running.
+	if sandbox.Status.Get().State == sandboxstore.StateReady {
 		return nil, fmt.Errorf("sandbox container %q is not fully stopped", id)
 	}
 

@@ -19,12 +19,10 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
@@ -38,32 +36,14 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 		return nil, fmt.Errorf("an error occurred when try to find sandbox: %v", err)
 	}
 
-	task, err := sandbox.Container.Task(ctx, nil)
-	if err != nil && !errdefs.IsNotFound(err) {
-		return nil, fmt.Errorf("failed to get sandbox container task: %v", err)
-	}
-
-	var pid uint32
-	var processStatus containerd.ProcessStatus
-	// If the sandbox container is running, treat it as READY.
-	if task != nil {
-		taskStatus, err := task.Status(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get task status: %v", err)
-		}
-
-		pid = task.Pid()
-		processStatus = taskStatus.Status
-	}
-
 	ip := c.getIP(sandbox)
-	ctrInfo, err := sandbox.Container.Info(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox container info: %v", err)
+	status := toCRISandboxStatus(sandbox.Metadata, sandbox.Status.Get(), ip)
+	if !r.GetVerbose() {
+		return &runtime.PodSandboxStatusResponse{Status: status}, nil
 	}
-	createdAt := ctrInfo.CreatedAt
-	status := toCRISandboxStatus(sandbox.Metadata, processStatus, createdAt, ip)
-	info, err := toCRISandboxInfo(ctx, sandbox, pid, processStatus, r.GetVerbose())
+
+	// Generate verbose information.
+	info, err := toCRISandboxInfo(ctx, sandbox)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get verbose sandbox container info: %v", err)
 	}
@@ -92,10 +72,10 @@ func (c *criContainerdService) getIP(sandbox sandboxstore.Sandbox) string {
 }
 
 // toCRISandboxStatus converts sandbox metadata into CRI pod sandbox status.
-func toCRISandboxStatus(meta sandboxstore.Metadata, status containerd.ProcessStatus, createdAt time.Time, ip string) *runtime.PodSandboxStatus {
+func toCRISandboxStatus(meta sandboxstore.Metadata, status sandboxstore.Status, ip string) *runtime.PodSandboxStatus {
 	// Set sandbox state to NOTREADY by default.
 	state := runtime.PodSandboxState_SANDBOX_NOTREADY
-	if status == containerd.Running {
+	if status.State == sandboxstore.StateReady {
 		state = runtime.PodSandboxState_SANDBOX_READY
 	}
 	nsOpts := meta.Config.GetLinux().GetSecurityContext().GetNamespaceOptions()
@@ -103,7 +83,7 @@ func toCRISandboxStatus(meta sandboxstore.Metadata, status containerd.ProcessSta
 		Id:        meta.ID,
 		Metadata:  meta.Config.GetMetadata(),
 		State:     state,
-		CreatedAt: createdAt.UnixNano(),
+		CreatedAt: status.CreatedAt.UnixNano(),
 		Network:   &runtime.PodSandboxNetworkStatus{Ip: ip},
 		Linux: &runtime.LinuxPodSandboxStatus{
 			Namespaces: &runtime.Namespace{
@@ -132,14 +112,25 @@ type sandboxInfo struct {
 }
 
 // toCRISandboxInfo converts internal container object information to CRI sandbox status response info map.
-func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox,
-	pid uint32, processStatus containerd.ProcessStatus, verbose bool) (map[string]string, error) {
-	if !verbose {
-		return nil, nil
+func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox) (map[string]string, error) {
+	container := sandbox.Container
+	task, err := container.Task(ctx, nil)
+	if err != nil && !errdefs.IsNotFound(err) {
+		return nil, fmt.Errorf("failed to get sandbox container task: %v", err)
+	}
+
+	var processStatus containerd.ProcessStatus
+	if task != nil {
+		taskStatus, err := task.Status(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get task status: %v", err)
+		}
+
+		processStatus = taskStatus.Status
 	}
 
 	si := &sandboxInfo{
-		Pid:    pid,
+		Pid:    sandbox.Status.Get().Pid,
 		Status: string(processStatus),
 		Config: sandbox.Config,
 	}
@@ -155,25 +146,22 @@ func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox,
 		si.NetNSClosed = (sandbox.NetNS == nil || sandbox.NetNS.Closed())
 	}
 
-	container := sandbox.Container
 	spec, err := container.Spec(ctx)
-	if err == nil {
-		si.RuntimeSpec = spec
-	} else {
-		logrus.WithError(err).Errorf("Failed to get sandbox container %q runtime spec", sandbox.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox container runtime spec: %v", err)
 	}
+	si.RuntimeSpec = spec
 
 	ctrInfo, err := container.Info(ctx)
-	if err == nil {
-		// Do not use config.SandboxImage because the configuration might
-		// be changed during restart. It may not reflect the actual image
-		// used by the sandbox container.
-		si.Image = ctrInfo.Image
-		si.SnapshotKey = ctrInfo.SnapshotKey
-		si.Snapshotter = ctrInfo.Snapshotter
-	} else {
-		logrus.WithError(err).Errorf("Failed to get sandbox container %q info", sandbox.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox container info: %v", err)
 	}
+	// Do not use config.SandboxImage because the configuration might
+	// be changed during restart. It may not reflect the actual image
+	// used by the sandbox container.
+	si.Image = ctrInfo.Image
+	si.SnapshotKey = ctrInfo.SnapshotKey
+	si.Snapshotter = ctrInfo.Snapshotter
 
 	infoBytes, err := json.Marshal(si)
 	if err != nil {

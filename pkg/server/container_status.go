@@ -111,6 +111,7 @@ type containerInfo struct {
 }
 
 // toCRIContainerInfo converts internal container object information to CRI container status response info map.
+// TODO(random-liu): Return error instead of logging.
 func toCRIContainerInfo(ctx context.Context, container containerstore.Container, verbose bool) (map[string]string, error) {
 	if !verbose {
 		return nil, nil

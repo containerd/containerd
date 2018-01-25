@@ -170,20 +170,26 @@ func (c containerForTest) toContainer() (containerstore.Container, error) {
 func TestListContainers(t *testing.T) {
 	c := newTestCRIContainerdService()
 	sandboxesInStore := []sandboxstore.Sandbox{
-		{
-			Metadata: sandboxstore.Metadata{
+		sandboxstore.NewSandbox(
+			sandboxstore.Metadata{
 				ID:     "s-1abcdef1234",
 				Name:   "sandboxname-1",
 				Config: &runtime.PodSandboxConfig{Metadata: &runtime.PodSandboxMetadata{Name: "podname-1"}},
 			},
-		},
-		{
-			Metadata: sandboxstore.Metadata{
+			sandboxstore.Status{
+				State: sandboxstore.StateReady,
+			},
+		),
+		sandboxstore.NewSandbox(
+			sandboxstore.Metadata{
 				ID:     "s-2abcdef1234",
 				Name:   "sandboxname-2",
 				Config: &runtime.PodSandboxConfig{Metadata: &runtime.PodSandboxMetadata{Name: "podname-2"}},
 			},
-		},
+			sandboxstore.Status{
+				State: sandboxstore.StateNotReady,
+			},
+		),
 	}
 	createdAt := time.Now().UnixNano()
 	startedAt := time.Now().UnixNano()

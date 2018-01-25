@@ -23,12 +23,14 @@ import (
 
 	"github.com/containerd/containerd"
 	containerdio "github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	cio "github.com/containerd/cri-containerd/pkg/server/io"
 	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
+	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
 )
 
 // StartContainer starts the container.
@@ -89,18 +91,7 @@ func (c *criContainerdService) startContainer(ctx context.Context,
 		return fmt.Errorf("sandbox %q not found: %v", meta.SandboxID, err)
 	}
 	sandboxID := meta.SandboxID
-	// Make sure sandbox is running.
-	s, err := sandbox.Container.Task(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to get sandbox container %q info: %v", sandboxID, err)
-	}
-	// This is only a best effort check, sandbox may still exit after this. If sandbox fails
-	// before starting the container, the start will fail.
-	taskStatus, err := s.Status(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get task status for sandbox container %q: %v", id, err)
-	}
-	if taskStatus.Status != containerd.Running {
+	if sandbox.Status.Get().State != sandboxstore.StateReady {
 		return fmt.Errorf("sandbox container %q is not running", sandboxID)
 	}
 
@@ -132,7 +123,8 @@ func (c *criContainerdService) startContainer(ctx context.Context,
 	}
 	defer func() {
 		if retErr != nil {
-			if _, err := task.Delete(ctx, containerd.WithProcessKill); err != nil {
+			// It's possible that task is deleted by event monitor.
+			if _, err := task.Delete(ctx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
 				logrus.WithError(err).Errorf("Failed to delete containerd task %q", id)
 			}
 		}

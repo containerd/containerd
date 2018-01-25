@@ -24,10 +24,11 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/containerd/containerd"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+
+	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
 )
 
 // PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
@@ -37,16 +38,7 @@ func (c *criContainerdService) PortForward(ctx context.Context, r *runtime.PortF
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandbox %q: %v", r.GetPodSandboxId(), err)
 	}
-
-	t, err := sandbox.Container.Task(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox container task: %v", err)
-	}
-	status, err := t.Status(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox container status: %v", err)
-	}
-	if status.Status != containerd.Running {
+	if sandbox.Status.Get().State != sandboxstore.StateReady {
 		return nil, errors.New("sandbox container is not running")
 	}
 	// TODO(random-liu): Verify that ports are exposed.

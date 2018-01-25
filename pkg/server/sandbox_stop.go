@@ -19,6 +19,7 @@ package server
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
@@ -26,7 +27,13 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+
+	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
 )
+
+// stopCheckPollInterval is the the interval to check whether a sandbox
+// is stopped successfully.
+const stopCheckPollInterval = 100 * time.Millisecond
 
 // StopPodSandbox stops the sandbox. If there are any running containers in the
 // sandbox, they should be forcibly terminated.
@@ -89,14 +96,18 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 		return nil, fmt.Errorf("failed to unmount sandbox files in %q: %v", sandboxRoot, err)
 	}
 
-	if err := c.stopSandboxContainer(ctx, sandbox.Container); err != nil {
-		return nil, fmt.Errorf("failed to stop sandbox container %q: %v", id, err)
+	// Only stop sandbox container when it's running.
+	if sandbox.Status.Get().State == sandboxstore.StateReady {
+		if err := c.stopSandboxContainer(ctx, sandbox); err != nil {
+			return nil, fmt.Errorf("failed to stop sandbox container %q: %v", id, err)
+		}
 	}
 	return &runtime.StopPodSandboxResponse{}, nil
 }
 
 // stopSandboxContainer kills and deletes sandbox container.
-func (c *criContainerdService) stopSandboxContainer(ctx context.Context, container containerd.Container) error {
+func (c *criContainerdService) stopSandboxContainer(ctx context.Context, sandbox sandboxstore.Sandbox) error {
+	container := sandbox.Container
 	task, err := container.Task(ctx, nil)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
@@ -111,5 +122,28 @@ func (c *criContainerdService) stopSandboxContainer(ctx context.Context, contain
 		return fmt.Errorf("failed to delete sandbox container: %v", err)
 	}
 
-	return nil
+	return c.waitSandboxStop(ctx, sandbox, killContainerTimeout)
+}
+
+// waitSandboxStop polls sandbox state until timeout exceeds or sandbox is stopped.
+func (c *criContainerdService) waitSandboxStop(ctx context.Context, sandbox sandboxstore.Sandbox, timeout time.Duration) error {
+	ticker := time.NewTicker(stopCheckPollInterval)
+	defer ticker.Stop()
+	timeoutTimer := time.NewTimer(timeout)
+	defer timeoutTimer.Stop()
+	for {
+		// Poll once before waiting for stopCheckPollInterval.
+		// TODO(random-liu): Use channel with event handler instead of polling.
+		if sandbox.Status.Get().State == sandboxstore.StateNotReady {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("wait sandbox container %q is cancelled", sandbox.ID)
+		case <-timeoutTimer.C:
+			return fmt.Errorf("wait sandbox container %q stop timeout", sandbox.ID)
+		case <-ticker.C:
+			continue
+		}
+	}
 }
