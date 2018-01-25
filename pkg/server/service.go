@@ -75,7 +75,7 @@ type CRIContainerdService interface {
 // criContainerdService implements CRIContainerdService.
 type criContainerdService struct {
 	// config contains all configurations.
-	config options.CRIConfig
+	config options.Config
 	// imageFSUUID is the device uuid of image filesystem.
 	imageFSUUID string
 	// apparmorEnabled indicates whether apparmor is enabled.
@@ -114,7 +114,7 @@ type criContainerdService struct {
 }
 
 // NewCRIContainerdService returns a new instance of CRIContainerdService
-func NewCRIContainerdService(config options.CRIConfig) (CRIContainerdService, error) {
+func NewCRIContainerdService(config options.Config) (CRIContainerdService, error) {
 	var err error
 	c := &criContainerdService{
 		config:             config,

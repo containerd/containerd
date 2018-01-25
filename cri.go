@@ -52,7 +52,7 @@ func init() {
 func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	ctx := ic.Context
 	pluginConfig := ic.Config.(*options.PluginConfig)
-	c := options.CRIConfig{
+	c := options.Config{
 		PluginConfig: *pluginConfig,
 		// This is a hack. We assume that containerd root directory
 		// is one level above plugin directory.

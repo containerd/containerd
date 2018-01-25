@@ -66,7 +66,7 @@ type CniConfig struct {
 }
 
 // PluginConfig contains toml config related to CRI plugin,
-// it is a subset of CRIConfig.
+// it is a subset of Config.
 type PluginConfig struct {
 	// ContainerdConfig contains config related to containerd
 	ContainerdConfig `toml:"containerd" json:"containerd,omitempty"`
@@ -92,10 +92,10 @@ type PluginConfig struct {
 	EnableIPv6DAD bool `toml:"enable_ipv6_dad" json:"enableIPv6DAD,omitempty"`
 }
 
-// CRIConfig contains toml config related to CRI service.
+// Config contains toml config related cri-containerd daemon.
 // TODO(random-liu): Make this an internal config object when we no longer support cri-containerd
 // standalone mode. At that time, we can clean this up.
-type CRIConfig struct {
+type Config struct {
 	// PluginConfig is the config for CRI plugin.
 	PluginConfig
 	// ContainerdRootDir is the root directory path for containerd.
@@ -109,23 +109,20 @@ type CRIConfig struct {
 	// RootDir is the root directory path for managing cri-containerd files
 	// (metadata checkpoint etc.)
 	RootDir string `toml:"root_dir" json:"rootDir,omitempty"`
-}
-
-// Config contains toml config related cri-containerd daemon.
-type Config struct {
-	CRIConfig `toml:"-"`
+	// TODO(random-liu): Remove following fields when we no longer support cri-containerd
+	// standalone mode.
 	// CgroupPath is the path for the cgroup that cri-containerd is placed in.
-	CgroupPath string `toml:"cgroup_path"`
+	CgroupPath string `toml:"cgroup_path" json:"cgroupPath,omitempty"`
 	// OOMScore adjust the cri-containerd's oom score
-	OOMScore int `toml:"oom_score"`
+	OOMScore int `toml:"oom_score" json:"oomScore,omitempty"`
 	// EnableProfiling is used for enable profiling via host:port/debug/pprof/
-	EnableProfiling bool `toml:"profiling"`
+	EnableProfiling bool `toml:"profiling" json:"enableProfiling,omitempty"`
 	// ProfilingPort is the port for profiling via host:port/debug/pprof/
-	ProfilingPort string `toml:"profiling_port"`
+	ProfilingPort string `toml:"profiling_port" json:"profilingPort,omitempty"`
 	// ProfilingAddress is address for profiling via host:port/debug/pprof/
-	ProfilingAddress string `toml:"profiling_addr"`
+	ProfilingAddress string `toml:"profiling_addr" json:"profilingAddress,omitempty"`
 	// LogLevel is the logrus log level.
-	LogLevel string `toml:"log_level"`
+	LogLevel string `toml:"log_level" json:"logLevel,omitempty"`
 }
 
 // CRIContainerdOptions contains cri-containerd command line and toml options.
@@ -243,37 +240,35 @@ func AddGRPCFlags(fs *pflag.FlagSet) (*string, *time.Duration) {
 // DefaultConfig returns default configurations of cri-containerd.
 func DefaultConfig() Config {
 	return Config{
-		CRIConfig: CRIConfig{
-			PluginConfig: PluginConfig{
-				CniConfig: CniConfig{
-					NetworkPluginBinDir:  "/opt/cni/bin",
-					NetworkPluginConfDir: "/etc/cni/net.d",
-				},
-				ContainerdConfig: ContainerdConfig{
-					Snapshotter:   containerd.DefaultSnapshotter,
-					Runtime:       "io.containerd.runtime.v1.linux",
-					RuntimeEngine: "",
-					RuntimeRoot:   "",
-				},
-				StreamServerAddress: "",
-				StreamServerPort:    "10010",
-				EnableSelinux:       false,
-				SandboxImage:        "gcr.io/google_containers/pause:3.0",
-				StatsCollectPeriod:  10,
-				SystemdCgroup:       false,
-				SkipImageFSUUID:     false,
-				EnableIPv6DAD:       false,
+		PluginConfig: PluginConfig{
+			CniConfig: CniConfig{
+				NetworkPluginBinDir:  "/opt/cni/bin",
+				NetworkPluginConfDir: "/etc/cni/net.d",
 			},
-			ContainerdRootDir:  "/var/lib/containerd",
-			ContainerdEndpoint: "/run/containerd/containerd.sock",
-			SocketPath:         "/var/run/cri-containerd.sock",
-			RootDir:            "/var/lib/cri-containerd",
+			ContainerdConfig: ContainerdConfig{
+				Snapshotter:   containerd.DefaultSnapshotter,
+				Runtime:       "io.containerd.runtime.v1.linux",
+				RuntimeEngine: "",
+				RuntimeRoot:   "",
+			},
+			StreamServerAddress: "",
+			StreamServerPort:    "10010",
+			EnableSelinux:       false,
+			SandboxImage:        "gcr.io/google_containers/pause:3.0",
+			StatsCollectPeriod:  10,
+			SystemdCgroup:       false,
+			SkipImageFSUUID:     false,
+			EnableIPv6DAD:       false,
 		},
-		CgroupPath:       "",
-		OOMScore:         -999,
-		EnableProfiling:  true,
-		ProfilingPort:    "10011",
-		ProfilingAddress: "127.0.0.1",
-		LogLevel:         "info",
+		ContainerdRootDir:  "/var/lib/containerd",
+		ContainerdEndpoint: "/run/containerd/containerd.sock",
+		SocketPath:         "/var/run/cri-containerd.sock",
+		RootDir:            "/var/lib/cri-containerd",
+		CgroupPath:         "",
+		OOMScore:           -999,
+		EnableProfiling:    true,
+		ProfilingPort:      "10011",
+		ProfilingAddress:   "127.0.0.1",
+		LogLevel:           "info",
 	}
 }
