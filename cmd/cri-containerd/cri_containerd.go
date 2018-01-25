@@ -116,7 +116,7 @@ func main() {
 		}
 
 		logrus.Infof("Run cri-containerd grpc server on socket %q", o.SocketPath)
-		s, err := server.NewCRIContainerdService(o.CRIConfig)
+		s, err := server.NewCRIContainerdService(o.Config)
 		if err != nil {
 			return fmt.Errorf("failed to create CRI containerd service: %v", err)
 		}
