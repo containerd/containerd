@@ -34,6 +34,9 @@ write_files:
       # installed by cloud-init
       oom_score = -999
 
+      [cgroup]
+        path = "/runtime"
+
       [plugins.linux]
         shim = "/home/cri-containerd/usr/local/bin/containerd-shim"
         runtime = "/home/cri-containerd/usr/local/sbin/runc"
@@ -87,7 +90,8 @@ write_files:
       ExecStart=/home/cri-containerd/usr/local/bin/cri-containerd \
         --log-level=debug \
         --network-bin-dir=/home/kubernetes/bin \
-        --network-conf-dir=/etc/cni/net.d
+        --network-conf-dir=/etc/cni/net.d \
+        --cgroup-path=/runtime
 
       [Install]
       WantedBy=cri-containerd.target
