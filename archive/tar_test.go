@@ -867,7 +867,7 @@ func TestDiffTar(t *testing.T) {
 				fileEntry("d2/l1", []byte("link me"), 0644),
 				// d1/f1 and its parent is included after the new link,
 				// before the new link was included, these files would
-				// not habe needed
+				// not have been needed
 				dirEntry("d1/", 0755),
 				linkEntry("d1/f1", "d2/l1"),
 				dirEntry("d3/", 0755),
@@ -896,6 +896,55 @@ func TestDiffTar(t *testing.T) {
 				fstest.Link("/d4/f1", "/d3/l1"),
 				fstest.Remove("/d6/l1"),
 				fstest.Remove("/d6/l2"),
+			),
+		},
+		{
+			name: "UpdateDirectoryPermission",
+			validators: []tarEntryValidator{
+				dirEntry("d1/", 0777),
+				dirEntry("d1/d/", 0700),
+				dirEntry("d2/", 0770),
+				fileEntry("d2/f", []byte("ok"), 0644),
+			},
+			a: fstest.Apply(
+				fstest.CreateDir("/d1/", 0755),
+				fstest.CreateDir("/d2/", 0770),
+			),
+			b: fstest.Apply(
+				fstest.Chmod("/d1", 0777),
+				fstest.CreateDir("/d1/d", 0700),
+				fstest.CreateFile("/d2/f", []byte("ok"), 0644),
+			),
+		},
+		{
+			name: "HardlinkUpdatedParent",
+			validators: []tarEntryValidator{
+				dirEntry("d1/", 0777),
+				dirEntry("d2/", 0755),
+				fileEntry("d2/l1", []byte("link me"), 0644),
+				// d1/f1 is included after the new link, its
+				// parent has already changed and therefore
+				// only the linked file is included
+				linkEntry("d1/f1", "d2/l1"),
+				dirEntry("d4/", 0777),
+				fileEntry("d4/l1", []byte("link me"), 0644),
+				dirEntry("d3/", 0755),
+				linkEntry("d3/f1", "d4/l1"),
+			},
+			a: fstest.Apply(
+				fstest.CreateDir("/d1/", 0755),
+				fstest.CreateFile("/d1/f1", []byte("link me"), 0644),
+				fstest.CreateDir("/d2/", 0755),
+				fstest.CreateFile("/d2/f1", []byte("link me"), 0644),
+				fstest.CreateDir("/d3/", 0755),
+				fstest.CreateFile("/d3/f1", []byte("link me"), 0644),
+				fstest.CreateDir("/d4/", 0755),
+			),
+			b: fstest.Apply(
+				fstest.Chmod("/d1", 0777),
+				fstest.Link("/d1/f1", "/d2/l1"),
+				fstest.Chmod("/d4", 0777),
+				fstest.Link("/d3/f1", "/d4/l1"),
 			),
 		},
 	}
