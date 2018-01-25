@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"strings"
 	"time"
 
 	"github.com/containerd/containerd/archive"
@@ -75,18 +74,10 @@ func (s *walkingDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts
 			}).Debugf("diff applied")
 		}
 	}()
-	var isCompressed bool
-	switch desc.MediaType {
-	case ocispec.MediaTypeImageLayer, images.MediaTypeDockerSchema2Layer:
-	case ocispec.MediaTypeImageLayerGzip, images.MediaTypeDockerSchema2LayerGzip:
-		isCompressed = true
-	default:
-		// Still apply all generic media types *.tar[.+]gzip and *.tar
-		if strings.HasSuffix(desc.MediaType, ".tar.gzip") || strings.HasSuffix(desc.MediaType, ".tar+gzip") {
-			isCompressed = true
-		} else if !strings.HasSuffix(desc.MediaType, ".tar") {
-			return emptyDesc, errors.Wrapf(errdefs.ErrNotImplemented, "unsupported diff media type: %v", desc.MediaType)
-		}
+
+	isCompressed, err := images.IsCompressedDiff(ctx, desc.MediaType)
+	if err != nil {
+		return emptyDesc, errors.Wrapf(errdefs.ErrNotImplemented, "unsupported diff media type: %v", desc.MediaType)
 	}
 
 	var ocidesc ocispec.Descriptor

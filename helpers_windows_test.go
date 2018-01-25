@@ -39,17 +39,3 @@ func withExecExitStatus(s *specs.Process, es int) {
 func withExecArgs(s *specs.Process, args ...string) {
 	s.Args = append([]string{"powershell", "-noprofile"}, args...)
 }
-
-func withImageConfig(i Image) oci.SpecOpts {
-	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
-		s.Windows.LayerFolders = dockerLayerFolders
-		return nil
-	}
-}
-
-func withNewSnapshot(id string, i Image) NewContainerOpts {
-	// TODO: when windows has a snapshotter remove the withNewSnapshot helper
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		return nil
-	}
-}

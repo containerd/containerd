@@ -187,7 +187,7 @@ func TestDaemonRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "30")), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +266,7 @@ func TestContainerAttach(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withCat()), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withCat()), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -427,8 +427,8 @@ func TestContainerUsername(t *testing.T) {
 
 	// squid user in the alpine image has a uid of 31
 	container, err := client.NewContainer(ctx, id,
-		withNewSnapshot(id, image),
-		WithNewSpec(withImageConfig(image), oci.WithUsername("squid"), oci.WithProcessArgs("id", "-u")),
+		WithNewSnapshot(id, image),
+		WithNewSpec(oci.WithImageConfig(image), oci.WithUsername("squid"), oci.WithProcessArgs("id", "-u")),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -487,7 +487,7 @@ func TestContainerAttachProcess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withProcessArgs("sleep", "100")), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -620,8 +620,8 @@ func TestContainerUserID(t *testing.T) {
 
 	// adm user in the alpine image has a uid of 3 and gid of 4.
 	container, err := client.NewContainer(ctx, id,
-		withNewSnapshot(id, image),
-		WithNewSpec(withImageConfig(image), oci.WithUserID(3), oci.WithProcessArgs("sh", "-c", "echo $(id -u):$(id -g)")),
+		WithNewSnapshot(id, image),
+		WithNewSpec(oci.WithImageConfig(image), oci.WithUserID(3), oci.WithProcessArgs("sh", "-c", "echo $(id -u):$(id -g)")),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -674,8 +674,8 @@ func TestContainerKillAll(t *testing.T) {
 	}
 
 	container, err := client.NewContainer(ctx, id,
-		withNewSnapshot(id, image),
-		WithNewSpec(withImageConfig(image),
+		WithNewSnapshot(id, image),
+		WithNewSpec(oci.WithImageConfig(image),
 			withProcessArgs("sh", "-c", "top"),
 			oci.WithHostNamespace(specs.PIDNamespace),
 		),
@@ -730,7 +730,7 @@ func TestShimSigkilled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image)), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image)), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -793,7 +793,7 @@ func TestDaemonRestartWithRunningShim(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "100")), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -877,8 +877,8 @@ func TestContainerRuntimeOptions(t *testing.T) {
 
 	container, err := client.NewContainer(
 		ctx, id,
-		WithNewSpec(withImageConfig(image), withExitStatus(7)),
-		withNewSnapshot(id, image),
+		WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)),
+		WithNewSnapshot(id, image),
 		WithRuntime("io.containerd.runtime.v1.linux", &runctypes.RuncOptions{Runtime: "no-runc"}),
 	)
 	if err != nil {
@@ -917,8 +917,8 @@ func TestContainerKillInitPidHost(t *testing.T) {
 	}
 
 	container, err := client.NewContainer(ctx, id,
-		withNewSnapshot(id, image),
-		WithNewSpec(withImageConfig(image),
+		WithNewSnapshot(id, image),
+		WithNewSpec(oci.WithImageConfig(image),
 			withProcessArgs("sh", "-c", "sleep 42; echo hi"),
 			oci.WithHostNamespace(specs.PIDNamespace),
 		),
@@ -1007,7 +1007,7 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 		t.Fatal(err)
 	}
 
-	opts := []NewContainerOpts{WithNewSpec(withImageConfig(image),
+	opts := []NewContainerOpts{WithNewSpec(oci.WithImageConfig(image),
 		withExitStatus(7),
 		oci.WithUserNamespace(0, 1000, 10000),
 	)}
@@ -1081,13 +1081,11 @@ func TestTaskResize(t *testing.T) {
 	)
 	defer cancel()
 
-	if runtime.GOOS != "windows" {
-		image, err = client.GetImage(ctx, testImage)
-		if err != nil {
-			t.Fatal(err)
-		}
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(withImageConfig(image), withExitStatus(7)), withNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)), WithNewSnapshot(id, image))
 	if err != nil {
 		t.Fatal(err)
 	}

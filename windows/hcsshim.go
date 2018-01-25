@@ -4,14 +4,12 @@ package windows
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/log"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
@@ -49,14 +47,14 @@ func newWindowsContainerConfig(ctx context.Context, owner, id string, spec *spec
 	}
 	conf.IgnoreFlushesDuringBoot = spec.Windows.IgnoreFlushesDuringBoot
 
-	if len(spec.Windows.LayerFolders) < 1 {
+	if len(spec.Windows.LayerFolders) < 2 {
 		return nil, errors.Wrap(errdefs.ErrInvalidArgument,
-			"spec.Windows.LayerFolders must have at least 1 layers")
+			"spec.Windows.LayerFolders must have at least 2 layers")
 	}
 	var (
-		layerFolders    = spec.Windows.LayerFolders
-		homeDir         = filepath.Dir(layerFolders[0])
-		layerFolderPath = filepath.Join(homeDir, id)
+		layerFolderPath = spec.Windows.LayerFolders[0]
+		layerFolders    = spec.Windows.LayerFolders[1:]
+		layerID         = filepath.Base(layerFolderPath)
 	)
 
 	// TODO: use the create request Mount for those
@@ -71,39 +69,12 @@ func newWindowsContainerConfig(ctx context.Context, owner, id string, spec *spec
 			Path: layerPath,
 		})
 	}
-
-	var (
-		di = hcsshim.DriverInfo{
-			Flavour: 1, // filter driver
-			HomeDir: homeDir,
-		}
-	)
 	conf.LayerFolderPath = layerFolderPath
 
-	// TODO: Once there is a snapshotter for windows, this can be deleted.
-	// The R/W Layer should come from the Rootfs Mounts provided
-	//
-	// Windows doesn't support creating a container with a readonly
-	// filesystem, so always create a RW one
-	if err = hcsshim.CreateSandboxLayer(di, id, layerFolders[0], layerFolders); err != nil {
-		return nil, errors.Wrapf(err, "failed to create sandbox layer for %s: layers: %#v, driverInfo: %#v",
-			id, layerFolders, di)
+	var di = hcsshim.DriverInfo{
+		HomeDir: filepath.Dir(layerFolderPath),
 	}
-	defer func() {
-		if err != nil {
-			removeLayer(ctx, conf.LayerFolderPath)
-		}
-	}()
-
-	if err = hcsshim.ActivateLayer(di, id); err != nil {
-		return nil, errors.Wrapf(err, "failed to activate layer %s", conf.LayerFolderPath)
-	}
-
-	if err = hcsshim.PrepareLayer(di, id, layerFolders); err != nil {
-		return nil, errors.Wrapf(err, "failed to prepare layer %s", conf.LayerFolderPath)
-	}
-
-	conf.VolumePath, err = hcsshim.GetLayerMountPath(di, id)
+	conf.VolumePath, err = hcsshim.GetLayerMountPath(di, layerID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to getmount path for layer %s: driverInfo: %#v", id, di)
 	}
@@ -144,41 +115,6 @@ func newWindowsContainerConfig(ctx context.Context, owner, id string, spec *spec
 	}
 
 	return conf, nil
-}
-
-// removeLayer deletes the given layer, all associated containers must have
-// been shutdown for this to succeed.
-func removeLayer(ctx context.Context, path string) error {
-	var (
-		err        error
-		layerID    = filepath.Base(path)
-		parentPath = filepath.Dir(path)
-		di         = hcsshim.DriverInfo{
-			Flavour: 1, // filter driver
-			HomeDir: parentPath,
-		}
-	)
-
-	if err = hcsshim.UnprepareLayer(di, layerID); err != nil {
-		log.G(ctx).WithError(err).Warnf("failed to unprepare layer %s for removal", path)
-	}
-
-	if err = hcsshim.DeactivateLayer(di, layerID); err != nil {
-		log.G(ctx).WithError(err).Warnf("failed to deactivate layer %s for removal", path)
-	}
-
-	removePath := filepath.Join(parentPath, fmt.Sprintf("%s-removing", layerID))
-	if err = os.Rename(path, removePath); err != nil {
-		log.G(ctx).WithError(err).Warnf("failed to rename container layer %s for removal", path)
-		removePath = path
-	}
-
-	if err = hcsshim.DestroyLayer(di, removePath); err != nil {
-		log.G(ctx).WithError(err).Errorf("failed to remove container layer %s", removePath)
-		return err
-	}
-
-	return nil
 }
 
 func newProcessConfig(processSpec *specs.Process, pset *pipeSet) *hcsshim.ProcessConfig {
