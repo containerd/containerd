@@ -42,9 +42,9 @@ func TestCopy(t *testing.T) {
 		},
 		{
 			name:     "copy with offset from unseekable source",
-			source:   copySource{reader: bytes.NewBufferString("foo"), size: 3},
-			writer:   fakeWriter{status: Status{Offset: 8}},
-			expected: "foo",
+			source:   copySource{reader: bytes.NewBufferString("foobar"), size: 6},
+			writer:   fakeWriter{status: Status{Offset: 3}},
+			expected: "bar",
 		},
 		{
 			name:   "commit already exists",
