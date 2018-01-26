@@ -44,90 +44,106 @@ func TestToCRISandbox(t *testing.T) {
 		Config:    config,
 		NetNSPath: "test-netns",
 	}
-	state := runtime.PodSandboxState_SANDBOX_READY
 	expect := &runtime.PodSandbox{
 		Id:          "test-id",
 		Metadata:    config.GetMetadata(),
-		State:       state,
 		CreatedAt:   createdAt.UnixNano(),
 		Labels:      config.GetLabels(),
 		Annotations: config.GetAnnotations(),
 	}
-	s := toCRISandbox(meta, state, createdAt)
-	assert.Equal(t, expect, s)
+	for desc, test := range map[string]struct {
+		state         sandboxstore.State
+		expectedState runtime.PodSandboxState
+	}{
+		"sandbox state ready": {
+			state:         sandboxstore.StateReady,
+			expectedState: runtime.PodSandboxState_SANDBOX_READY,
+		},
+		"sandbox state not ready": {
+			state:         sandboxstore.StateNotReady,
+			expectedState: runtime.PodSandboxState_SANDBOX_NOTREADY,
+		},
+	} {
+		status := sandboxstore.Status{
+			CreatedAt: createdAt,
+			State:     test.state,
+		}
+		expect.State = test.expectedState
+		s := toCRISandbox(meta, status)
+		assert.Equal(t, expect, s, desc)
+	}
 }
 
 func TestFilterSandboxes(t *testing.T) {
 	c := newTestCRIContainerdService()
-	sandboxes := []struct {
-		sandbox sandboxstore.Sandbox
-		state   runtime.PodSandboxState
-	}{
-		{
-			sandbox: sandboxstore.Sandbox{
-				Metadata: sandboxstore.Metadata{
-					ID:   "1abcdef",
-					Name: "sandboxname-1",
-					Config: &runtime.PodSandboxConfig{
-						Metadata: &runtime.PodSandboxMetadata{
-							Name:      "podname-1",
-							Uid:       "uid-1",
-							Namespace: "ns-1",
-							Attempt:   1,
-						},
+	sandboxes := []sandboxstore.Sandbox{
+		sandboxstore.NewSandbox(
+			sandboxstore.Metadata{
+				ID:   "1abcdef",
+				Name: "sandboxname-1",
+				Config: &runtime.PodSandboxConfig{
+					Metadata: &runtime.PodSandboxMetadata{
+						Name:      "podname-1",
+						Uid:       "uid-1",
+						Namespace: "ns-1",
+						Attempt:   1,
 					},
 				},
 			},
-			state: runtime.PodSandboxState_SANDBOX_READY,
-		},
-		{
-			sandbox: sandboxstore.Sandbox{
-				Metadata: sandboxstore.Metadata{
-					ID:   "2abcdef",
-					Name: "sandboxname-2",
-					Config: &runtime.PodSandboxConfig{
-						Metadata: &runtime.PodSandboxMetadata{
-							Name:      "podname-2",
-							Uid:       "uid-2",
-							Namespace: "ns-2",
-							Attempt:   2,
-						},
-						Labels: map[string]string{"a": "b"},
+			sandboxstore.Status{
+				CreatedAt: time.Now(),
+				State:     sandboxstore.StateReady,
+			},
+		),
+		sandboxstore.NewSandbox(
+			sandboxstore.Metadata{
+				ID:   "2abcdef",
+				Name: "sandboxname-2",
+				Config: &runtime.PodSandboxConfig{
+					Metadata: &runtime.PodSandboxMetadata{
+						Name:      "podname-2",
+						Uid:       "uid-2",
+						Namespace: "ns-2",
+						Attempt:   2,
 					},
+					Labels: map[string]string{"a": "b"},
 				},
 			},
-			state: runtime.PodSandboxState_SANDBOX_NOTREADY,
-		},
-		{
-			sandbox: sandboxstore.Sandbox{
-				Metadata: sandboxstore.Metadata{
-					ID:   "3abcdef",
-					Name: "sandboxname-3",
-					Config: &runtime.PodSandboxConfig{
-						Metadata: &runtime.PodSandboxMetadata{
-							Name:      "podname-2",
-							Uid:       "uid-2",
-							Namespace: "ns-2",
-							Attempt:   2,
-						},
-						Labels: map[string]string{"c": "d"},
+			sandboxstore.Status{
+				CreatedAt: time.Now(),
+				State:     sandboxstore.StateNotReady,
+			},
+		),
+		sandboxstore.NewSandbox(
+			sandboxstore.Metadata{
+				ID:   "3abcdef",
+				Name: "sandboxname-3",
+				Config: &runtime.PodSandboxConfig{
+					Metadata: &runtime.PodSandboxMetadata{
+						Name:      "podname-2",
+						Uid:       "uid-2",
+						Namespace: "ns-2",
+						Attempt:   2,
 					},
+					Labels: map[string]string{"c": "d"},
 				},
 			},
-			state: runtime.PodSandboxState_SANDBOX_READY,
-		},
+			sandboxstore.Status{
+				CreatedAt: time.Now(),
+				State:     sandboxstore.StateReady,
+			},
+		),
 	}
 
 	// Create PodSandbox
 	testSandboxes := []*runtime.PodSandbox{}
-	createdAt := time.Now()
 	for _, sb := range sandboxes {
-		testSandboxes = append(testSandboxes, toCRISandbox(sb.sandbox.Metadata, sb.state, createdAt))
+		testSandboxes = append(testSandboxes, toCRISandbox(sb.Metadata, sb.Status.Get()))
 	}
 
 	// Inject test sandbox metadata
 	for _, sb := range sandboxes {
-		assert.NoError(t, c.sandboxStore.Add(sb.sandbox))
+		assert.NoError(t, c.sandboxStore.Add(sb))
 	}
 
 	for desc, test := range map[string]struct {

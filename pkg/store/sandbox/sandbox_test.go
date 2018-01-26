@@ -26,72 +26,96 @@ import (
 )
 
 func TestSandboxStore(t *testing.T) {
-	metadatas := map[string]Metadata{
-		"1": {
-			ID:   "1",
-			Name: "Sandbox-1",
-			Config: &runtime.PodSandboxConfig{
-				Metadata: &runtime.PodSandboxMetadata{
-					Name:      "TestPod-1",
-					Uid:       "TestUid-1",
-					Namespace: "TestNamespace-1",
-					Attempt:   1,
+	sandboxes := map[string]Sandbox{
+		"1": NewSandbox(
+			Metadata{
+				ID:   "1",
+				Name: "Sandbox-1",
+				Config: &runtime.PodSandboxConfig{
+					Metadata: &runtime.PodSandboxMetadata{
+						Name:      "TestPod-1",
+						Uid:       "TestUid-1",
+						Namespace: "TestNamespace-1",
+						Attempt:   1,
+					},
 				},
+				NetNSPath: "TestNetNS-1",
 			},
-			NetNSPath: "TestNetNS-1",
-		},
-		"2abcd": {
-			ID:   "2abcd",
-			Name: "Sandbox-2abcd",
-			Config: &runtime.PodSandboxConfig{
-				Metadata: &runtime.PodSandboxMetadata{
-					Name:      "TestPod-2abcd",
-					Uid:       "TestUid-2abcd",
-					Namespace: "TestNamespace-2abcd",
-					Attempt:   2,
+			Status{State: StateReady},
+		),
+		"2abcd": NewSandbox(
+			Metadata{
+				ID:   "2abcd",
+				Name: "Sandbox-2abcd",
+				Config: &runtime.PodSandboxConfig{
+					Metadata: &runtime.PodSandboxMetadata{
+						Name:      "TestPod-2abcd",
+						Uid:       "TestUid-2abcd",
+						Namespace: "TestNamespace-2abcd",
+						Attempt:   2,
+					},
 				},
+				NetNSPath: "TestNetNS-2",
 			},
-			NetNSPath: "TestNetNS-2",
-		},
-		"4a333": {
-			ID:   "4a333",
-			Name: "Sandbox-4a333",
-			Config: &runtime.PodSandboxConfig{
-				Metadata: &runtime.PodSandboxMetadata{
-					Name:      "TestPod-4a333",
-					Uid:       "TestUid-4a333",
-					Namespace: "TestNamespace-4a333",
-					Attempt:   3,
+			Status{State: StateNotReady},
+		),
+		"4a333": NewSandbox(
+			Metadata{
+				ID:   "4a333",
+				Name: "Sandbox-4a333",
+				Config: &runtime.PodSandboxConfig{
+					Metadata: &runtime.PodSandboxMetadata{
+						Name:      "TestPod-4a333",
+						Uid:       "TestUid-4a333",
+						Namespace: "TestNamespace-4a333",
+						Attempt:   3,
+					},
 				},
+				NetNSPath: "TestNetNS-3",
 			},
-			NetNSPath: "TestNetNS-3",
-		},
-		"4abcd": {
-			ID:   "4abcd",
-			Name: "Sandbox-4abcd",
-			Config: &runtime.PodSandboxConfig{
-				Metadata: &runtime.PodSandboxMetadata{
-					Name:      "TestPod-4abcd",
-					Uid:       "TestUid-4abcd",
-					Namespace: "TestNamespace-4abcd",
-					Attempt:   1,
+			Status{State: StateNotReady},
+		),
+		"4abcd": NewSandbox(
+			Metadata{
+				ID:   "4abcd",
+				Name: "Sandbox-4abcd",
+				Config: &runtime.PodSandboxConfig{
+					Metadata: &runtime.PodSandboxMetadata{
+						Name:      "TestPod-4abcd",
+						Uid:       "TestUid-4abcd",
+						Namespace: "TestNamespace-4abcd",
+						Attempt:   1,
+					},
 				},
+				NetNSPath: "TestNetNS-4abcd",
 			},
-			NetNSPath: "TestNetNS-4abcd",
-		},
+			Status{State: StateReady},
+		),
 	}
+	unknown := NewSandbox(
+		Metadata{
+			ID:   "3defg",
+			Name: "Sandbox-3defg",
+			Config: &runtime.PodSandboxConfig{
+				Metadata: &runtime.PodSandboxMetadata{
+					Name:      "TestPod-3defg",
+					Uid:       "TestUid-3defg",
+					Namespace: "TestNamespace-3defg",
+					Attempt:   1,
+				},
+			},
+			NetNSPath: "TestNetNS-3defg",
+		},
+		Status{State: StateUnknown},
+	)
 	assert := assertlib.New(t)
-	sandboxes := map[string]Sandbox{}
-	for id := range metadatas {
-		sandboxes[id] = Sandbox{Metadata: metadatas[id]}
-	}
-
 	s := NewStore()
 
 	t.Logf("should be able to add sandbox")
 	for _, sb := range sandboxes {
 		assert.NoError(s.Add(sb))
 	}
+	assert.NoError(s.Add(unknown))
 
 	t.Logf("should be able to get sandbox")
 	genTruncIndex := func(normalName string) string { return normalName[:(len(normalName)+1)/2] }
@@ -100,6 +124,16 @@ func TestSandboxStore(t *testing.T) {
 		assert.NoError(err)
 		assert.Equal(sb, got)
 	}
+
+	t.Logf("should not be able to get unknown sandbox")
+	got, err := s.Get(unknown.ID)
+	assert.Equal(store.ErrNotExist, err)
+	assert.Equal(Sandbox{}, got)
+
+	t.Logf("should be able to get unknown sandbox with GetAll")
+	got, err = s.GetAll(unknown.ID)
+	assert.NoError(err)
+	assert.Equal(unknown, got)
 
 	t.Logf("should be able to list sandboxes")
 	sbs := s.List()

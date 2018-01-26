@@ -52,6 +52,8 @@ type Metadata struct {
 	Config *runtime.PodSandboxConfig
 	// NetNSPath is the network namespace used by the sandbox.
 	NetNSPath string
+	// IP of Pod if it is attached to non host network
+	IP string
 }
 
 // MarshalJSON encodes Metadata into bytes in json format.

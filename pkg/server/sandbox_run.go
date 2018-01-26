@@ -23,6 +23,7 @@ import (
 
 	"github.com/containerd/containerd"
 	containerdio "github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/linux/runctypes"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/typeurl"
@@ -68,13 +69,16 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	}()
 
 	// Create initial internal sandbox object.
-	sandbox := sandboxstore.Sandbox{
-		Metadata: sandboxstore.Metadata{
+	sandbox := sandboxstore.NewSandbox(
+		sandboxstore.Metadata{
 			ID:     id,
 			Name:   name,
 			Config: config,
 		},
-	}
+		sandboxstore.Status{
+			State: sandboxstore.StateUnknown,
+		},
+	)
 
 	// Ensure sandbox container image snapshot.
 	image, err := c.ensureImageExists(ctx, c.config.SandboxImage)
@@ -224,32 +228,85 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		}
 	}()
 
-	// Create sandbox task in containerd.
-	log.Tracef("Create sandbox container (id=%q, name=%q).",
-		id, name)
-	// We don't need stdio for sandbox container.
-	task, err := container.NewTask(ctx, containerdio.NullIO)
+	// Update sandbox created timestamp.
+	info, err := container.Info(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create containerd task: %v", err)
+		return nil, fmt.Errorf("failed to get sandbox container info: %v", err)
 	}
-	defer func() {
-		if retErr != nil {
-			// Cleanup the sandbox container if an error is returned.
-			if _, err := task.Delete(ctx, containerd.WithProcessKill); err != nil {
-				logrus.WithError(err).Errorf("Failed to delete sandbox container %q", id)
-			}
-		}
-	}()
-
-	if err = task.Start(ctx); err != nil {
-		return nil, fmt.Errorf("failed to start sandbox container task %q: %v",
-			id, err)
+	if err := sandbox.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
+		status.CreatedAt = info.CreatedAt
+		return status, nil
+	}); err != nil {
+		return nil, fmt.Errorf("failed to update sandbox created timestamp: %v", err)
 	}
 
-	// Add sandbox into sandbox store.
+	// Add sandbox into sandbox store in UNKNOWN state.
 	sandbox.Container = container
 	if err := c.sandboxStore.Add(sandbox); err != nil {
 		return nil, fmt.Errorf("failed to add sandbox %+v into store: %v", sandbox, err)
+	}
+	defer func() {
+		// Delete sandbox from sandbox store if there is an error.
+		if retErr != nil {
+			c.sandboxStore.Delete(id)
+		}
+	}()
+	// NOTE(random-liu): Sandbox state only stay in UNKNOWN state after this point
+	// and before the end of this function.
+	// * If `Update` succeeds, sandbox state will become READY in one transaction.
+	// * If `Update` fails, sandbox will be removed from the store in the defer above.
+	// * If cri-containerd stops at any point before `Update` finishes, because sandbox
+	// state is not checkpointed, it will be recovered from corresponding containerd task
+	// status during restart:
+	//   * If the task is running, sandbox state will be READY,
+	//   * Or else, sandbox state will be NOTREADY.
+	//
+	// In any case, sandbox will leave UNKNOWN state, so it's safe to ignore sandbox
+	// in UNKNOWN state in other functions.
+
+	// Start sandbox container in one transaction to avoid race condition with
+	// event monitor.
+	if err := sandbox.Status.Update(func(status sandboxstore.Status) (_ sandboxstore.Status, retErr error) {
+		// NOTE(random-liu): We should not change the sandbox state to NOTREADY
+		// if `Update` fails.
+		//
+		// If `Update` fails, the sandbox will be cleaned up by all the defers
+		// above. We should not let user see this sandbox, or else they will
+		// see the sandbox disappear after the defer clean up, which may confuse
+		// them.
+		//
+		// Given so, we should keep the sandbox in UNKNOWN state if `Update` fails,
+		// and ignore sandbox in UNKNOWN state in all the inspection functions.
+
+		// Create sandbox task in containerd.
+		log.Tracef("Create sandbox container (id=%q, name=%q).",
+			id, name)
+		// We don't need stdio for sandbox container.
+		task, err := container.NewTask(ctx, containerdio.NullIO)
+		if err != nil {
+			return status, fmt.Errorf("failed to create containerd task: %v", err)
+		}
+		defer func() {
+			if retErr != nil {
+				// Cleanup the sandbox container if an error is returned.
+				// It's possible that task is deleted by event monitor.
+				if _, err := task.Delete(ctx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
+					logrus.WithError(err).Errorf("Failed to delete sandbox container %q", id)
+				}
+			}
+		}()
+
+		if err := task.Start(ctx); err != nil {
+			return status, fmt.Errorf("failed to start sandbox container task %q: %v",
+				id, err)
+		}
+
+		// Set the pod sandbox as ready after successfully start sandbox container.
+		status.Pid = task.Pid()
+		status.State = sandboxstore.StateReady
+		return status, nil
+	}); err != nil {
+		return nil, fmt.Errorf("failed to start sandbox container: %v", err)
 	}
 
 	return &runtime.RunPodSandboxResponse{PodSandboxId: id}, nil

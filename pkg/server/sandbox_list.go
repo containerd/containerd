@@ -17,12 +17,6 @@ limitations under the License.
 package server
 
 import (
-	"fmt"
-	"time"
-
-	tasks "github.com/containerd/containerd/api/services/tasks/v1"
-	"github.com/containerd/containerd/api/types/task"
-	"github.com/containerd/containerd/errdefs"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
@@ -33,39 +27,12 @@ import (
 func (c *criContainerdService) ListPodSandbox(ctx context.Context, r *runtime.ListPodSandboxRequest) (*runtime.ListPodSandboxResponse, error) {
 	// List all sandboxes from store.
 	sandboxesInStore := c.sandboxStore.List()
-
-	response, err := c.client.TaskService().List(ctx, &tasks.ListTasksRequest{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list sandbox containers: %v", err)
-	}
-
 	var sandboxes []*runtime.PodSandbox
 	for _, sandboxInStore := range sandboxesInStore {
-		var sandboxInContainerd *task.Process
-		for _, s := range response.Tasks {
-			if s.ID == sandboxInStore.ID {
-				sandboxInContainerd = s
-				break
-			}
-		}
-
-		// Set sandbox state to NOTREADY by default.
-		state := runtime.PodSandboxState_SANDBOX_NOTREADY
-		// If the sandbox container is running, return the sandbox as READY.
-		if sandboxInContainerd != nil && sandboxInContainerd.Status == task.StatusRunning {
-			state = runtime.PodSandboxState_SANDBOX_READY
-		}
-
-		info, err := sandboxInStore.Container.Info(ctx)
-		if err != nil {
-			// It's possible that container gets deleted during list.
-			if errdefs.IsNotFound(err) {
-				continue
-			}
-			return nil, fmt.Errorf("failed to get sandbox container %q info: %v", sandboxInStore.ID, err)
-		}
-		createdAt := info.CreatedAt
-		sandboxes = append(sandboxes, toCRISandbox(sandboxInStore.Metadata, state, createdAt))
+		sandboxes = append(sandboxes, toCRISandbox(
+			sandboxInStore.Metadata,
+			sandboxInStore.Status.Get(),
+		))
 	}
 
 	sandboxes = c.filterCRISandboxes(sandboxes, r.GetFilter())
@@ -73,12 +40,17 @@ func (c *criContainerdService) ListPodSandbox(ctx context.Context, r *runtime.Li
 }
 
 // toCRISandbox converts sandbox metadata into CRI pod sandbox.
-func toCRISandbox(meta sandboxstore.Metadata, state runtime.PodSandboxState, createdAt time.Time) *runtime.PodSandbox {
+func toCRISandbox(meta sandboxstore.Metadata, status sandboxstore.Status) *runtime.PodSandbox {
+	// Set sandbox state to NOTREADY by default.
+	state := runtime.PodSandboxState_SANDBOX_NOTREADY
+	if status.State == sandboxstore.StateReady {
+		state = runtime.PodSandboxState_SANDBOX_READY
+	}
 	return &runtime.PodSandbox{
 		Id:          meta.ID,
 		Metadata:    meta.Config.GetMetadata(),
 		State:       state,
-		CreatedAt:   createdAt.UnixNano(),
+		CreatedAt:   status.CreatedAt.UnixNano(),
 		Labels:      meta.Config.GetLabels(),
 		Annotations: meta.Config.GetAnnotations(),
 	}

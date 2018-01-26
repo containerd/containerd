@@ -30,12 +30,21 @@ import (
 type Sandbox struct {
 	// Metadata is the metadata of the sandbox, it is immutable after created.
 	Metadata
+	// Status stores the status of the sandbox.
+	Status StatusStorage
 	// Container is the containerd sandbox container client
 	Container containerd.Container
 	// CNI network namespace client
 	NetNS *NetNS
-	// IP of Pod if it is attached to non host network
-	IP string
+}
+
+// NewSandbox creates an internally used sandbox type. This functions reminds
+// the caller that a sandbox must have a status.
+func NewSandbox(metadata Metadata, status Status) Sandbox {
+	return Sandbox{
+		Metadata: metadata,
+		Status:   StoreStatus(status),
+	}
 }
 
 // Store stores all sandboxes.
@@ -67,9 +76,22 @@ func (s *Store) Add(sb Sandbox) error {
 	return nil
 }
 
-// Get returns the sandbox with specified id. Returns nil
+// Get returns the sandbox with specified id. Returns store.ErrNotExist
 // if the sandbox doesn't exist.
 func (s *Store) Get(id string) (Sandbox, error) {
+	sb, err := s.GetAll(id)
+	if err != nil {
+		return sb, err
+	}
+	if sb.Status.Get().State == StateUnknown {
+		return Sandbox{}, store.ErrNotExist
+	}
+	return sb, nil
+}
+
+// GetAll returns the sandbox with specified id, including sandbox in unknown
+// state. Returns store.ErrNotExist if the sandbox doesn't exist.
+func (s *Store) GetAll(id string) (Sandbox, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	id, err := s.idIndex.Get(id)
@@ -91,6 +113,9 @@ func (s *Store) List() []Sandbox {
 	defer s.lock.RUnlock()
 	var sandboxes []Sandbox
 	for _, sb := range s.sandboxes {
+		if sb.Status.Get().State == StateUnknown {
+			continue
+		}
 		sandboxes = append(sandboxes, sb)
 	}
 	return sandboxes

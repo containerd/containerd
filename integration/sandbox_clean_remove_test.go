@@ -18,6 +18,7 @@ package integration
 
 import (
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/stretchr/testify/assert"
@@ -50,9 +51,13 @@ func TestSandboxCleanRemove(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf("Sandbox state should be NOTREADY")
-	status, err := runtimeService.PodSandboxStatus(sb)
-	require.NoError(t, err)
-	assert.Equal(t, runtime.PodSandboxState_SANDBOX_NOTREADY, status.GetState())
+	assert.NoError(t, Eventually(func() (bool, error) {
+		status, err := runtimeService.PodSandboxStatus(sb)
+		if err != nil {
+			return false, err
+		}
+		return status.GetState() == runtime.PodSandboxState_SANDBOX_NOTREADY, nil
+	}, time.Second, 30*time.Second), "sandbox state should become NOTREADY")
 
 	t.Logf("Should not be able to remove the sandbox when netns is not closed")
 	assert.Error(t, runtimeService.RemovePodSandbox(sb))

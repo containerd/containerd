@@ -293,10 +293,63 @@ func loadSandbox(ctx context.Context, cntr containerd.Container) (sandboxstore.S
 		return sandbox, fmt.Errorf("failed to unmarshal metadata extension %q: %v", ext, err)
 	}
 	meta := data.(*sandboxstore.Metadata)
-	sandbox = sandboxstore.Sandbox{
-		Metadata:  *meta,
-		Container: cntr,
+
+	// Load sandbox created timestamp.
+	info, err := cntr.Info(ctx)
+	if err != nil {
+		return sandbox, fmt.Errorf("failed to get sandbox container info: %v", err)
 	}
+	createdAt := info.CreatedAt
+
+	// Load sandbox status.
+	t, err := cntr.Task(ctx, nil)
+	if err != nil && !errdefs.IsNotFound(err) {
+		return sandbox, fmt.Errorf("failed to load task: %v", err)
+	}
+	var s containerd.Status
+	var notFound bool
+	if errdefs.IsNotFound(err) {
+		// Task is not found.
+		notFound = true
+	} else {
+		// Task is found. Get task status.
+		s, err = t.Status(ctx)
+		if err != nil {
+			// It's still possible that task is deleted during this window.
+			if !errdefs.IsNotFound(err) {
+				return sandbox, fmt.Errorf("failed to get task status: %v", err)
+			}
+			notFound = true
+		}
+	}
+	var state sandboxstore.State
+	var pid uint32
+	if notFound {
+		// Task does not exist, set sandbox state as NOTREADY.
+		state = sandboxstore.StateNotReady
+	} else {
+		if s.Status == containerd.Running {
+			// Task is running, set sandbox state as READY.
+			state = sandboxstore.StateReady
+			pid = t.Pid()
+		} else {
+			// Task is not running. Delete the task and set sandbox state as NOTREADY.
+			if _, err := t.Delete(ctx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
+				return sandbox, fmt.Errorf("failed to delete task: %v", err)
+			}
+			state = sandboxstore.StateNotReady
+		}
+	}
+
+	sandbox = sandboxstore.NewSandbox(
+		*meta,
+		sandboxstore.Status{
+			Pid:       pid,
+			CreatedAt: createdAt,
+			State:     state,
+		},
+	)
+	sandbox.Container = cntr
 
 	// Load network namespace.
 	if meta.Config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostNetwork() {

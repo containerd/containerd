@@ -28,12 +28,14 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
+	"github.com/containerd/cri-containerd/pkg/store"
 	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
 	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
 )
 
 // eventMonitor monitors containerd event and updates internal state correspondingly.
-// TODO(random-liu): [P1] Is it possible to drop event during containerd is running?
+// TODO(random-liu): [P1] Figure out is it possible to drop event during containerd
+// is running. If it is, we should do periodically list to sync state with containerd.
 type eventMonitor struct {
 	containerStore *containerstore.Store
 	sandboxStore   *sandboxstore.Store
@@ -106,57 +108,22 @@ func (em *eventMonitor) handleEvent(evt *events.Envelope) {
 		e := any.(*eventtypes.TaskExit)
 		logrus.Infof("TaskExit event %+v", e)
 		cntr, err := em.containerStore.Get(e.ContainerID)
-		if err != nil {
-			if _, err := em.sandboxStore.Get(e.ContainerID); err == nil {
-				return
-			}
+		if err == nil {
+			handleContainerExit(e, cntr)
+			return
+		} else if err != store.ErrNotExist {
 			logrus.WithError(err).Errorf("Failed to get container %q", e.ContainerID)
 			return
 		}
-		if e.Pid != cntr.Status.Get().Pid {
-			// Non-init process died, ignore the event.
+		// Use GetAll to include sandbox in unknown state.
+		sb, err := em.sandboxStore.GetAll(e.ContainerID)
+		if err == nil {
+			handleSandboxExit(e, sb)
+			return
+		} else if err != store.ErrNotExist {
+			logrus.WithError(err).Errorf("Failed to get sandbox %q", e.ContainerID)
 			return
 		}
-		// Attach container IO so that `Delete` could cleanup the stream properly.
-		task, err := cntr.Container.Task(context.Background(),
-			func(*containerdio.FIFOSet) (containerdio.IO, error) {
-				return cntr.IO, nil
-			},
-		)
-		if err != nil {
-			if !errdefs.IsNotFound(err) {
-				logrus.WithError(err).Errorf("failed to stop container, task not found for container %q", e.ContainerID)
-				return
-			}
-		} else {
-			// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
-			if _, err = task.Delete(context.Background()); err != nil {
-				// TODO(random-liu): [P0] Enqueue the event and retry.
-				if !errdefs.IsNotFound(err) {
-					logrus.WithError(err).Errorf("failed to stop container %q", e.ContainerID)
-					return
-				}
-				// Move on to make sure container status is updated.
-			}
-		}
-		err = cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
-			// If FinishedAt has been set (e.g. with start failure), keep as
-			// it is.
-			if status.FinishedAt != 0 {
-				return status, nil
-			}
-			status.Pid = 0
-			status.FinishedAt = e.ExitedAt.UnixNano()
-			status.ExitCode = int32(e.ExitStatus)
-			return status, nil
-		})
-		if err != nil {
-			logrus.WithError(err).Errorf("Failed to update container %q state", e.ContainerID)
-			// TODO(random-liu): [P0] Enqueue the event and retry.
-			return
-		}
-		// Using channel to propagate the information of container stop
-		cntr.Stop()
 	case *eventtypes.TaskOOM:
 		e := any.(*eventtypes.TaskOOM)
 		logrus.Infof("TaskOOM event %+v", e)
@@ -175,5 +142,97 @@ func (em *eventMonitor) handleEvent(evt *events.Envelope) {
 			logrus.WithError(err).Errorf("Failed to update container %q oom", e.ContainerID)
 			return
 		}
+	}
+}
+
+// handleContainerExit handles TaskExit event for container.
+func handleContainerExit(e *eventtypes.TaskExit, cntr containerstore.Container) {
+	if e.Pid != cntr.Status.Get().Pid {
+		// Non-init process died, ignore the event.
+		return
+	}
+	// Attach container IO so that `Delete` could cleanup the stream properly.
+	task, err := cntr.Container.Task(context.Background(),
+		func(*containerdio.FIFOSet) (containerdio.IO, error) {
+			return cntr.IO, nil
+		},
+	)
+	if err != nil {
+		if !errdefs.IsNotFound(err) {
+			logrus.WithError(err).Errorf("failed to load task for container %q", e.ContainerID)
+			return
+		}
+	} else {
+		// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
+		if _, err = task.Delete(context.Background()); err != nil {
+			// TODO(random-liu): [P0] Enqueue the event and retry.
+			if !errdefs.IsNotFound(err) {
+				logrus.WithError(err).Errorf("failed to stop container %q", e.ContainerID)
+				return
+			}
+			// Move on to make sure container status is updated.
+		}
+	}
+	err = cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
+		// If FinishedAt has been set (e.g. with start failure), keep as
+		// it is.
+		if status.FinishedAt != 0 {
+			return status, nil
+		}
+		status.Pid = 0
+		status.FinishedAt = e.ExitedAt.UnixNano()
+		status.ExitCode = int32(e.ExitStatus)
+		return status, nil
+	})
+	if err != nil {
+		logrus.WithError(err).Errorf("Failed to update container %q state", e.ContainerID)
+		// TODO(random-liu): [P0] Enqueue the event and retry.
+		return
+	}
+	// Using channel to propagate the information of container stop
+	cntr.Stop()
+}
+
+// handleSandboxExit handles TaskExit event for sandbox.
+func handleSandboxExit(e *eventtypes.TaskExit, sb sandboxstore.Sandbox) {
+	if e.Pid != sb.Status.Get().Pid {
+		// Non-init process died, ignore the event.
+		return
+	}
+	// No stream attached to sandbox container.
+	task, err := sb.Container.Task(context.Background(), nil)
+	if err != nil {
+		if !errdefs.IsNotFound(err) {
+			logrus.WithError(err).Errorf("failed to load task for sandbox %q", e.ContainerID)
+			return
+		}
+	} else {
+		// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
+		if _, err = task.Delete(context.Background()); err != nil {
+			// TODO(random-liu): [P0] Enqueue the event and retry.
+			if !errdefs.IsNotFound(err) {
+				logrus.WithError(err).Errorf("failed to stop sandbox %q", e.ContainerID)
+				return
+			}
+			// Move on to make sure container status is updated.
+		}
+	}
+	err = sb.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
+		// NOTE(random-liu): We SHOULD NOT change UNKNOWN state here.
+		// If sandbox state is UNKNOWN when event monitor receives an TaskExit event,
+		// it means that sandbox start has failed. In that case, `RunPodSandbox` will
+		// cleanup everything immediately.
+		// Once sandbox state goes out of UNKNOWN, it becomes visable to the user, which
+		// is not what we want.
+		if status.State != sandboxstore.StateUnknown {
+			status.State = sandboxstore.StateNotReady
+		}
+		status.Pid = 0
+		return status, nil
+	})
+	if err != nil {
+		logrus.WithError(err).Errorf("Failed to update sandbox %q state", e.ContainerID)
+		// TODO(random-liu): [P0] Enqueue the event and retry.
+		return
 	}
 }
