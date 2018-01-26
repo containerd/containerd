@@ -27,7 +27,9 @@ command. As part of this process, we do the following:
 		var (
 			ref = context.Args().First()
 		)
-
+		if ref == "" {
+			return fmt.Errorf("please provide an image reference to pull")
+		}
 		ctx, cancel := commands.AppContext(context)
 		defer cancel()
 

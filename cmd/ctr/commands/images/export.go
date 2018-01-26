@@ -43,6 +43,9 @@ Currently, only OCI format is supported.
 			local = context.Args().Get(1)
 			desc  ocispec.Descriptor
 		)
+		if out == "" || local == "" {
+			return errors.New("please provide both an output filename and an image reference to export")
+		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
