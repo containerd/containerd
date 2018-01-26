@@ -7,6 +7,5 @@ if ! command -v git-validation; then
     exit 1
 fi
 
-GIT_CHECK_EXCLUDE="./vendor"
 verbosity="${DCO_VERBOSITY--v}"
-git-validation "$verbosity" -run DCO,short-subject,dangling-whitespace
+GIT_CHECK_EXCLUDE="./vendor" git-validation "$verbosity" -run DCO,short-subject,dangling-whitespace
