@@ -4,7 +4,6 @@ package proc
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -22,6 +21,7 @@ import (
 	runc "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
 	google_protobuf "github.com/gogo/protobuf/types"
+	jsoniter "github.com/json-iterator/go"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
@@ -349,6 +349,7 @@ func (p *Init) Runtime() *runc.Runc {
 // exec returns a new exec'd process
 func (p *Init) exec(context context.Context, path string, r *ExecConfig) (Process, error) {
 	// process exec request
+	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	var spec specs.Process
 	if err := json.Unmarshal(r.Spec.Value, &spec); err != nil {
 		return nil, err
@@ -406,6 +407,7 @@ func (p *Init) checkpoint(context context.Context, r *CheckpointConfig) error {
 }
 
 func (p *Init) update(context context.Context, r *google_protobuf.Any) error {
+	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	var resources specs.LinuxResources
 	if err := json.Unmarshal(r.Value, &resources); err != nil {
 		return err

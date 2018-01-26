@@ -4,12 +4,12 @@ package seccomp
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -23,6 +23,7 @@ func WithProfile(profile string) oci.SpecOpts {
 		if err != nil {
 			return fmt.Errorf("Cannot load seccomp profile %q: %v", profile, err)
 		}
+		json := jsoniter.ConfigCompatibleWithStandardLibrary
 		if err := json.Unmarshal(f, s.Linux.Seccomp); err != nil {
 			return fmt.Errorf("Decoding seccomp profile failed %q: %v", profile, err)
 		}

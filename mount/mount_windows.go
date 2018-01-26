@@ -1,11 +1,11 @@
 package mount
 
 import (
-	"encoding/json"
 	"path/filepath"
 	"strings"
 
 	"github.com/Microsoft/hcsshim"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/pkg/errors"
 )
 
@@ -49,6 +49,7 @@ const ParentLayerPathsFlag = "parentLayerPaths="
 // GetParentPaths of the mount
 func (m *Mount) GetParentPaths() ([]string, error) {
 	var parentLayerPaths []string
+	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	for _, option := range m.Options {
 		if strings.HasPrefix(option, ParentLayerPathsFlag) {
 			err := json.Unmarshal([]byte(option[len(ParentLayerPathsFlag):]), &parentLayerPaths)

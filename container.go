@@ -2,7 +2,6 @@ package containerd
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/typeurl"
 	prototypes "github.com/gogo/protobuf/types"
+	jsoniter "github.com/json-iterator/go"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
@@ -115,6 +115,7 @@ func (c *container) Spec(ctx context.Context) (*specs.Spec, error) {
 	if err != nil {
 		return nil, err
 	}
+	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	var s specs.Spec
 	if err := json.Unmarshal(r.Spec.Value, &s); err != nil {
 		return nil, err
