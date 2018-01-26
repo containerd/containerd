@@ -129,7 +129,7 @@ func (c *criContainerdService) stopContainer(ctx context.Context, container cont
 	return nil
 }
 
-// waitContainerStop waits for container to be stopped until timeout exceeds or centext is cancelled.
+// waitContainerStop waits for container to be stopped until timeout exceeds or context is cancelled.
 func (c *criContainerdService) waitContainerStop(ctx context.Context, container containerstore.Container, timeout time.Duration) error {
 	timeoutTimer := time.NewTimer(timeout)
 	defer timeoutTimer.Stop()

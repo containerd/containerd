@@ -235,4 +235,6 @@ func handleSandboxExit(e *eventtypes.TaskExit, sb sandboxstore.Sandbox) {
 		// TODO(random-liu): [P0] Enqueue the event and retry.
 		return
 	}
+	// Using channel to propagate the information of sandbox stop
+	sb.Stop()
 }
