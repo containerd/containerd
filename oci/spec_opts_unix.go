@@ -21,6 +21,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/user"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
+	"github.com/syndtr/gocapability/capability"
 )
 
 // WithTTY sets the information on the spec as well as the environment variables for
@@ -344,6 +345,34 @@ func WithUsername(username string) SpecOpts {
 			return nil
 		})
 	}
+}
+
+// WithAllCapabilities set all linux capabilities for the process
+func WithAllCapabilities(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	caps := getAllCapabilities()
+
+	s.Process.Capabilities.Bounding = caps
+	s.Process.Capabilities.Effective = caps
+	s.Process.Capabilities.Permitted = caps
+	s.Process.Capabilities.Inheritable = caps
+
+	return nil
+}
+
+func getAllCapabilities() []string {
+	last := capability.CAP_LAST_CAP
+	// hack for RHEL6 which has no /proc/sys/kernel/cap_last_cap
+	if last == capability.Cap(63) {
+		last = capability.CAP_BLOCK_SUSPEND
+	}
+	var caps []string
+	for _, cap := range capability.List() {
+		if cap > last {
+			continue
+		}
+		caps = append(caps, "CAP_"+strings.ToUpper(cap.String()))
+	}
+	return caps
 }
 
 var errNoUsersFound = errors.New("no users found")
