@@ -4,7 +4,6 @@ package oci
 import (
 	"archive/tar"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -14,6 +13,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	jsoniter "github.com/json-iterator/go"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -83,6 +83,7 @@ func onUntarIndexJSON(r io.Reader, imageName string) ([]images.Image, error) {
 	if err != nil {
 		return nil, err
 	}
+	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	var idx ocispec.Index
 	if err := json.Unmarshal(b, &idx); err != nil {
 		return nil, err
@@ -131,6 +132,7 @@ func onUntarBlob(ctx context.Context, r io.Reader, store content.Store, name str
 // - images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest
 // - images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex
 func GetChildrenDescriptors(r io.Reader, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	switch desc.MediaType {
 	case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
 		var manifest ocispec.Manifest

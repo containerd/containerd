@@ -3,13 +3,13 @@ package oci
 import (
 	"archive/tar"
 	"context"
-	"encoding/json"
 	"io"
 	"sort"
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/platforms"
+	jsoniter "github.com/json-iterator/go"
 	ocispecs "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -116,6 +116,8 @@ func ociLayoutFile(version string) tarRecord {
 		Version: version,
 	}
 
+	json := jsoniter.ConfigCompatibleWithStandardLibrary
+
 	b, err := json.Marshal(layout)
 	if err != nil {
 		panic(err)
@@ -144,6 +146,7 @@ func ociIndexRecord(manifests ...ocispec.Descriptor) tarRecord {
 		Manifests: manifests,
 	}
 
+	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	b, err := json.Marshal(index)
 	if err != nil {
 		panic(err)

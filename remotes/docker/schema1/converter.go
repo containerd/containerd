@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -21,6 +20,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/remotes"
+	jsoniter "github.com/json-iterator/go"
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -110,6 +110,7 @@ func (c *Converter) Convert(ctx context.Context) (ocispec.Descriptor, error) {
 		return ocispec.Descriptor{}, errors.Wrap(err, "schema 1 conversion failed")
 	}
 
+	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	var img ocispec.Image
 	if err := json.Unmarshal([]byte(c.pulledManifest.History[0].V1Compatibility), &img); err != nil {
 		return ocispec.Descriptor{}, errors.Wrap(err, "failed to unmarshal image from schema 1 history")
@@ -194,6 +195,7 @@ func (c *Converter) fetchManifest(ctx context.Context, desc ocispec.Descriptor) 
 		return err
 	}
 
+	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	var m manifest
 	if err := json.Unmarshal(b, &m); err != nil {
 		return err
@@ -316,6 +318,7 @@ func (c *Converter) schema1ManifestHistory() ([]ocispec.History, []digest.Digest
 		return nil, nil, errors.New("no history")
 	}
 
+	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	history := make([]ocispec.History, len(m.History))
 	diffIDs := []digest.Digest{}
 	for i := range m.History {
@@ -373,6 +376,7 @@ type v1History struct {
 // empty layer. A return value of true indicates the layer is empty,
 // however false does not indicate non-empty.
 func isEmptyLayer(compatHistory []byte) (bool, error) {
+	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	var h v1History
 	if err := json.Unmarshal(compatHistory, &h); err != nil {
 		return false, err
@@ -422,6 +426,7 @@ func joseBase64UrlDecode(s string) ([]byte, error) {
 }
 
 func stripSignature(b []byte) ([]byte, error) {
+	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	var sig signature
 	if err := json.Unmarshal(b, &sig); err != nil {
 		return nil, err
