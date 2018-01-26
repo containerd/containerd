@@ -3,6 +3,7 @@ package testsuite
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -24,6 +25,11 @@ func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, r
 	t.Run("Writer", makeTest(t, name, storeFn, checkContentStoreWriter))
 	t.Run("UploadStatus", makeTest(t, name, storeFn, checkUploadStatus))
 	t.Run("Resume", makeTest(t, name, storeFn, checkResumeWriter))
+	t.Run("ResumeTruncate", makeTest(t, name, storeFn, checkResume(resumeTruncate)))
+	t.Run("ResumeDiscard", makeTest(t, name, storeFn, checkResume(resumeDiscard)))
+	t.Run("ResumeCopy", makeTest(t, name, storeFn, checkResume(resumeCopy)))
+	t.Run("ResumeCopySeeker", makeTest(t, name, storeFn, checkResume(resumeCopySeeker)))
+	t.Run("ResumeCopyReaderAt", makeTest(t, name, storeFn, checkResume(resumeCopyReaderAt)))
 	t.Run("Labels", makeTest(t, name, storeFn, checkLabels))
 }
 
@@ -350,6 +356,115 @@ func checkLabels(ctx context.Context, t *testing.T, cs content.Store) {
 		t.Fatalf("Check info failed: %+v", err)
 	}
 
+}
+
+func checkResume(rf func(context.Context, content.Writer, []byte, int64, int64, digest.Digest) error) func(ctx context.Context, t *testing.T, cs content.Store) {
+	return func(ctx context.Context, t *testing.T, cs content.Store) {
+		sizes := []int64{500, 5000, 50000}
+		truncations := []float64{0.0, 0.1, 0.5, 0.9, 1.0}
+
+		for i, size := range sizes {
+			for j, tp := range truncations {
+				b, d := createContent(size, int64(i*len(truncations)+j))
+				limit := int64(float64(size) * tp)
+				ref := fmt.Sprintf("ref-%d-%d", i, j)
+
+				w, err := cs.Writer(ctx, ref, size, d)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if _, err := w.Write(b[:limit]); err != nil {
+					w.Close()
+					t.Fatal(err)
+				}
+
+				if err := w.Close(); err != nil {
+					t.Fatal(err)
+				}
+
+				w, err = cs.Writer(ctx, ref, size, d)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				st, err := w.Status()
+				if err != nil {
+					w.Close()
+					t.Fatal(err)
+				}
+
+				if st.Offset != limit {
+					w.Close()
+					t.Fatalf("Unexpected offset %d, expected %d", st.Offset, limit)
+				}
+
+				preCommit := time.Now()
+				if err := rf(ctx, w, b, limit, size, d); err != nil {
+					t.Fatalf("Resume failed: %+v", err)
+				}
+
+				postCommit := time.Now()
+
+				if err := w.Close(); err != nil {
+					t.Fatal(err)
+				}
+
+				info := content.Info{
+					Digest: d,
+					Size:   size,
+				}
+
+				if err := checkInfo(ctx, cs, d, info, preCommit, postCommit, preCommit, postCommit); err != nil {
+					t.Fatalf("Check info failed: %+v", err)
+				}
+			}
+		}
+	}
+}
+
+func resumeTruncate(ctx context.Context, w content.Writer, b []byte, written, size int64, dgst digest.Digest) error {
+	if err := w.Truncate(0); err != nil {
+		return errors.Wrap(err, "truncate failed")
+	}
+
+	if _, err := io.CopyBuffer(w, bytes.NewReader(b), make([]byte, 1024)); err != nil {
+		return errors.Wrap(err, "write failed")
+	}
+
+	return errors.Wrap(w.Commit(ctx, size, dgst), "commit failed")
+}
+
+func resumeDiscard(ctx context.Context, w content.Writer, b []byte, written, size int64, dgst digest.Digest) error {
+	if _, err := io.CopyBuffer(w, bytes.NewReader(b[written:]), make([]byte, 1024)); err != nil {
+		return errors.Wrap(err, "write failed")
+	}
+	return errors.Wrap(w.Commit(ctx, size, dgst), "commit failed")
+}
+
+func resumeCopy(ctx context.Context, w content.Writer, b []byte, _, size int64, dgst digest.Digest) error {
+	r := struct {
+		io.Reader
+	}{bytes.NewReader(b)}
+	return errors.Wrap(content.Copy(ctx, w, r, size, dgst), "copy failed")
+}
+
+func resumeCopySeeker(ctx context.Context, w content.Writer, b []byte, _, size int64, dgst digest.Digest) error {
+	r := struct {
+		io.ReadSeeker
+	}{bytes.NewReader(b)}
+	return errors.Wrap(content.Copy(ctx, w, r, size, dgst), "copy failed")
+}
+
+func resumeCopyReaderAt(ctx context.Context, w content.Writer, b []byte, _, size int64, dgst digest.Digest) error {
+	type readerAt interface {
+		io.Reader
+		io.ReaderAt
+	}
+	r := struct {
+		readerAt
+	}{bytes.NewReader(b)}
+	return errors.Wrap(content.Copy(ctx, w, r, size, dgst), "copy failed")
 }
 
 func checkStatus(t *testing.T, w content.Writer, expected content.Status, d digest.Digest, preStart, postStart, preUpdate, postUpdate time.Time) {
