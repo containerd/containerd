@@ -403,7 +403,6 @@ func checkResume(rf func(context.Context, content.Writer, []byte, int64, int64, 
 				if err := rf(ctx, w, b, limit, size, d); err != nil {
 					t.Fatalf("Resume failed: %+v", err)
 				}
-
 				postCommit := time.Now()
 
 				if err := w.Close(); err != nil {
