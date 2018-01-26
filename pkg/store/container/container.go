@@ -39,7 +39,7 @@ type Container struct {
 	// Container IO
 	IO *cio.ContainerIO
 	// StopCh is used to propagate the stop information of the container.
-	StopCh
+	store.StopCh
 }
 
 // Opts sets specific information to newly created Container.
@@ -80,7 +80,7 @@ func WithStatus(status Status, root string) Opts {
 func NewContainer(metadata Metadata, opts ...Opts) (Container, error) {
 	c := Container{
 		Metadata: metadata,
-		StopCh:   StopCh(make(chan struct{})),
+		StopCh:   store.StopCh(make(chan struct{})),
 	}
 	for _, o := range opts {
 		if err := o(&c); err != nil {
@@ -93,19 +93,6 @@ func NewContainer(metadata Metadata, opts ...Opts) (Container, error) {
 // Delete deletes checkpoint for the container.
 func (c *Container) Delete() error {
 	return c.Status.Delete()
-}
-
-// StopCh is used to propagate the stop information of a container.
-type StopCh chan struct{}
-
-// Stop close stopCh of the container.
-func (ch StopCh) Stop() {
-	close(ch)
-}
-
-// Stopped return the stopCh of the container as a readonly channel.
-func (ch StopCh) Stopped() <-chan struct{} {
-	return ch
 }
 
 // Store stores all Containers.

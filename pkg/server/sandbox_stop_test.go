@@ -36,7 +36,7 @@ func TestWaitSandboxStop(t *testing.T) {
 	}{
 		"should return error if timeout exceeds": {
 			state:     sandboxstore.StateReady,
-			timeout:   2 * stopCheckPollInterval,
+			timeout:   200 * time.Millisecond,
 			expectErr: true,
 		},
 		"should return error if context is cancelled": {

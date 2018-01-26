@@ -22,6 +22,10 @@ import "sync"
 func WithFakeStatus(status Status) Opts {
 	return func(c *Container) error {
 		c.Status = &fakeStatusStorage{status: status}
+		if status.FinishedAt != 0 {
+			// Fake the TaskExit event
+			c.Stop()
+		}
 		return nil
 	}
 }

@@ -68,10 +68,6 @@ func TestWaitContainerStop(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		assert.NoError(t, c.containerStore.Add(container))
-		if test.status.FinishedAt != 0 {
-			// Fake the TaskExit event
-			container.Stop()
-		}
 		ctx := context.Background()
 		if test.cancel {
 			cancelledCtx, cancel := context.WithCancel(ctx)

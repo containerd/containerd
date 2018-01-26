@@ -36,15 +36,22 @@ type Sandbox struct {
 	Container containerd.Container
 	// CNI network namespace client
 	NetNS *NetNS
+	// StopCh is used to propagate the stop information of the sandbox.
+	store.StopCh
 }
 
 // NewSandbox creates an internally used sandbox type. This functions reminds
 // the caller that a sandbox must have a status.
 func NewSandbox(metadata Metadata, status Status) Sandbox {
-	return Sandbox{
+	s := Sandbox{
 		Metadata: metadata,
 		Status:   StoreStatus(status),
+		StopCh:   store.StopCh(make(chan struct{})),
 	}
+	if status.State == StateNotReady {
+		s.Stop()
+	}
+	return s
 }
 
 // Store stores all sandboxes.

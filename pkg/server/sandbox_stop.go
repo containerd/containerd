@@ -31,10 +31,6 @@ import (
 	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
 )
 
-// stopCheckPollInterval is the the interval to check whether a sandbox
-// is stopped successfully.
-const stopCheckPollInterval = 100 * time.Millisecond
-
 // StopPodSandbox stops the sandbox. If there are any running containers in the
 // sandbox, they should be forcibly terminated.
 func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandboxRequest) (*runtime.StopPodSandboxResponse, error) {
@@ -125,25 +121,16 @@ func (c *criContainerdService) stopSandboxContainer(ctx context.Context, sandbox
 	return c.waitSandboxStop(ctx, sandbox, killContainerTimeout)
 }
 
-// waitSandboxStop polls sandbox state until timeout exceeds or sandbox is stopped.
+// waitSandboxStop waits for sandbox to be stopped until timeout exceeds or context is cancelled.
 func (c *criContainerdService) waitSandboxStop(ctx context.Context, sandbox sandboxstore.Sandbox, timeout time.Duration) error {
-	ticker := time.NewTicker(stopCheckPollInterval)
-	defer ticker.Stop()
 	timeoutTimer := time.NewTimer(timeout)
 	defer timeoutTimer.Stop()
-	for {
-		// Poll once before waiting for stopCheckPollInterval.
-		// TODO(random-liu): Use channel with event handler instead of polling.
-		if sandbox.Status.Get().State == sandboxstore.StateNotReady {
-			return nil
-		}
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("wait sandbox container %q is cancelled", sandbox.ID)
-		case <-timeoutTimer.C:
-			return fmt.Errorf("wait sandbox container %q stop timeout", sandbox.ID)
-		case <-ticker.C:
-			continue
-		}
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("wait sandbox container %q is cancelled", sandbox.ID)
+	case <-timeoutTimer.C:
+		return fmt.Errorf("wait sandbox container %q stop timeout", sandbox.ID)
+	case <-sandbox.Stopped():
+		return nil
 	}
 }
