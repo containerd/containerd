@@ -49,6 +49,9 @@ var pushCommand = cli.Command{
 			local = context.Args().Get(1)
 			desc  ocispec.Descriptor
 		)
+		if ref == "" {
+			return errors.New("please provide a remote image reference to push")
+		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
