@@ -29,7 +29,8 @@ func withTTY(terminal bool) oci.SpecOpts {
 	return oci.WithTTY(int(size.Width), int(size.Height))
 }
 
-func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli.Context) (containerd.Container, error) {
+// NewContainer creates a new container
+func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli.Context) (containerd.Container, error) {
 	var (
 		ref  = context.Args().First()
 		id   = context.Args().Get(1)
@@ -44,25 +45,36 @@ func newContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	var (
 		opts  []oci.SpecOpts
 		cOpts []containerd.NewContainerOpts
+		spec  containerd.NewContainerOpts
 	)
 	opts = append(opts, oci.WithImageConfig(image))
 	opts = append(opts, oci.WithEnv(context.StringSlice("env")))
 	opts = append(opts, withMounts(context))
+	opts = append(opts, withTTY(context.Bool("tty")))
 	if len(args) > 0 {
 		opts = append(opts, oci.WithProcessArgs(args...))
 	}
 	if cwd := context.String("cwd"); cwd != "" {
 		opts = append(opts, oci.WithProcessCwd(cwd))
 	}
-	opts = append(opts, withTTY(context.Bool("tty")))
+
+	if context.IsSet("config") {
+		var s specs.Spec
+		if err := loadSpec(context.String("config"), &s); err != nil {
+			return nil, err
+		}
+		spec = containerd.WithSpec(&s, opts...)
+	} else {
+		spec = containerd.WithNewSpec(opts...)
+	}
 
 	cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(context.StringSlice("label"))))
 	cOpts = append(cOpts, containerd.WithImage(image))
 	cOpts = append(cOpts, containerd.WithSnapshotter(context.String("snapshotter")))
 	cOpts = append(cOpts, containerd.WithNewSnapshot(id, image))
 	cOpts = append(cOpts, containerd.WithRuntime(context.String("runtime"), nil))
+	cOpts = append(cOpts, spec)
 
-	cOpts = append([]containerd.NewContainerOpts{containerd.WithNewSpec(opts...)}, cOpts...)
 	return client.NewContainer(ctx, id, cOpts...)
 }
 
