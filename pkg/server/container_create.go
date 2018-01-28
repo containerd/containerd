@@ -324,7 +324,7 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxID string
 	}
 
 	if securityContext.GetPrivileged() {
-		if !securityContext.GetPrivileged() {
+		if !sandboxConfig.GetLinux().GetSecurityContext().GetPrivileged() {
 			return nil, fmt.Errorf("no privileged container allowed in sandbox")
 		}
 		if err := setOCIPrivileged(&g, config); err != nil {

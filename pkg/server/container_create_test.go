@@ -329,6 +329,52 @@ func TestContainerSpecWithExtraMounts(t *testing.T) {
 	assert.Contains(t, mounts[1].Options, "rw")
 }
 
+func TestContainerAndSandboxPrivileged(t *testing.T) {
+	testID := "test-id"
+	testSandboxID := "sandbox-id"
+	testPid := uint32(1234)
+	config, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+	c := newTestCRIContainerdService()
+	for desc, test := range map[string]struct {
+		containerPrivileged bool
+		sandboxPrivileged   bool
+		expectError         bool
+	}{
+		"privileged container in non-privileged sandbox should fail": {
+			containerPrivileged: true,
+			sandboxPrivileged:   false,
+			expectError:         true,
+		},
+		"privileged container in privileged sandbox should be fine": {
+			containerPrivileged: true,
+			sandboxPrivileged:   true,
+			expectError:         false,
+		},
+		"non-privileged container in privileged sandbox should be fine": {
+			containerPrivileged: false,
+			sandboxPrivileged:   true,
+			expectError:         false,
+		},
+		"non-privileged container in non-privileged sandbox should be fine": {
+			containerPrivileged: false,
+			sandboxPrivileged:   false,
+			expectError:         false,
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		config.Linux.SecurityContext.Privileged = test.containerPrivileged
+		sandboxConfig.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
+			Privileged: test.sandboxPrivileged,
+		}
+		_, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil)
+		if test.expectError {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+		}
+	}
+}
+
 func TestContainerSpecCommand(t *testing.T) {
 	for desc, test := range map[string]struct {
 		criEntrypoint   []string
