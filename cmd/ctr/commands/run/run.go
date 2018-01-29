@@ -3,7 +3,9 @@ package run
 import (
 	gocontext "context"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"runtime"
 	"strings"
 
@@ -19,6 +21,62 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
+
+// ContainerFlags are cli flags specifying container options
+var ContainerFlags = []cli.Flag{
+	cli.StringFlag{
+		Name:  "config,c",
+		Usage: "path to the runtime-specific spec config file",
+	},
+	cli.StringFlag{
+		Name:  "checkpoint",
+		Usage: "provide the checkpoint digest to restore the container",
+	},
+	cli.StringFlag{
+		Name:  "cwd",
+		Usage: "specify the working directory of the process",
+	},
+	cli.StringSliceFlag{
+		Name:  "env",
+		Usage: "specify additional container environment variables (i.e. FOO=bar)",
+	},
+	cli.StringSliceFlag{
+		Name:  "label",
+		Usage: "specify additional labels (i.e. foo=bar)",
+	},
+	cli.StringSliceFlag{
+		Name:  "mount",
+		Usage: "specify additional container mount (ex: type=bind,src=/tmp,dest=/host,options=rbind:ro)",
+	},
+	cli.BoolFlag{
+		Name:  "net-host",
+		Usage: "enable host networking for the container",
+	},
+	cli.BoolFlag{
+		Name:  "read-only",
+		Usage: "set the containers filesystem as readonly",
+	},
+	cli.StringFlag{
+		Name:  "runtime",
+		Usage: "runtime name (io.containerd.runtime.v1.linux, io.containerd.runtime.v1.windows, io.containerd.runtime.v1.com.vmware.linux)",
+		Value: fmt.Sprintf("io.containerd.runtime.v1.%s", runtime.GOOS),
+	},
+	cli.BoolFlag{
+		Name:  "tty,t",
+		Usage: "allocate a TTY for the container",
+	},
+}
+
+func loadSpec(path string, s *specs.Spec) error {
+	raw, err := ioutil.ReadFile(path)
+	if err != nil {
+		return errors.New("cannot load spec config file")
+	}
+	if err := json.Unmarshal(raw, s); err != nil {
+		return errors.New("decoding spec config file failed")
+	}
+	return nil
+}
 
 func withMounts(context *cli.Context) oci.SpecOpts {
 	return func(ctx gocontext.Context, client oci.Client, container *containers.Container, s *specs.Spec) error {
@@ -76,45 +134,8 @@ var Command = cli.Command{
 	ArgsUsage: "[flags] Image|RootFS ID [COMMAND] [ARG...]",
 	Flags: append([]cli.Flag{
 		cli.BoolFlag{
-			Name:  "tty,t",
-			Usage: "allocate a TTY for the container",
-		},
-		cli.StringFlag{
-			Name:  "runtime",
-			Usage: "runtime name (io.containerd.runtime.v1.linux, io.containerd.runtime.v1.windows, io.containerd.runtime.v1.com.vmware.linux)",
-			Value: fmt.Sprintf("io.containerd.runtime.v1.%s", runtime.GOOS),
-		},
-		cli.BoolFlag{
-			Name:  "readonly",
-			Usage: "set the containers filesystem as readonly",
-		},
-		cli.BoolFlag{
-			Name:  "net-host",
-			Usage: "enable host networking for the container",
-		},
-		cli.StringSliceFlag{
-			Name:  "mount",
-			Usage: "specify additional container mount (ex: type=bind,src=/tmp,dst=/host,options=rbind:ro)",
-		},
-		cli.StringSliceFlag{
-			Name:  "env",
-			Usage: "specify additional container environment variables (i.e. FOO=bar)",
-		},
-		cli.StringSliceFlag{
-			Name:  "label",
-			Usage: "specify additional labels (foo=bar)",
-		},
-		cli.BoolFlag{
 			Name:  "rm",
 			Usage: "remove the container after running",
-		},
-		cli.StringFlag{
-			Name:  "checkpoint",
-			Usage: "provide the checkpoint digest to restore the container",
-		},
-		cli.StringFlag{
-			Name:  "cwd",
-			Usage: "specify the working directory of the process",
 		},
 		cli.BoolFlag{
 			Name:  "null-io",
@@ -128,18 +149,18 @@ var Command = cli.Command{
 			Name:  "fifo-dir",
 			Usage: "directory used for storing IO FIFOs",
 		},
-	}, commands.SnapshotterFlags...),
+	}, append(commands.SnapshotterFlags, ContainerFlags...)...),
 	Action: func(context *cli.Context) error {
 		var (
 			err error
 
-			id       = context.Args().Get(1)
-			imageRef = context.Args().First()
-			tty      = context.Bool("tty")
-			detach   = context.Bool("detach")
+			id     = context.Args().Get(1)
+			ref    = context.Args().First()
+			tty    = context.Bool("tty")
+			detach = context.Bool("detach")
 		)
 
-		if imageRef == "" {
+		if ref == "" {
 			return errors.New("image ref must be provided")
 		}
 		if id == "" {
@@ -150,7 +171,7 @@ var Command = cli.Command{
 			return err
 		}
 		defer cancel()
-		container, err := newContainer(ctx, client, context)
+		container, err := NewContainer(ctx, client, context)
 		if err != nil {
 			return err
 		}
@@ -197,7 +218,6 @@ var Command = cli.Command{
 		if err != nil {
 			return err
 		}
-
 		if _, err := task.Delete(ctx); err != nil {
 			return err
 		}

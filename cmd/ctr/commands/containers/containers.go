@@ -10,6 +10,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/cmd/ctr/commands/run"
 	"github.com/containerd/containerd/log"
 	"github.com/urfave/cli"
 )
@@ -20,10 +21,40 @@ var Command = cli.Command{
 	Usage:   "manage containers",
 	Aliases: []string{"c", "container"},
 	Subcommands: []cli.Command{
+		createCommand,
 		deleteCommand,
 		infoCommand,
 		listCommand,
 		setLabelsCommand,
+	},
+}
+
+var createCommand = cli.Command{
+	Name:      "create",
+	Usage:     "create container",
+	ArgsUsage: "[flags] Image|RootFS CONTAINER",
+	Flags:     append(commands.SnapshotterFlags, run.ContainerFlags...),
+	Action: func(context *cli.Context) error {
+		var (
+			id  = context.Args().Get(1)
+			ref = context.Args().First()
+		)
+		if ref == "" {
+			return errors.New("image ref must be provided")
+		}
+		if id == "" {
+			return errors.New("container id must be provided")
+		}
+		client, ctx, cancel, err := commands.NewClient(context)
+		if err != nil {
+			return err
+		}
+		defer cancel()
+		_, err = run.NewContainer(ctx, client, context)
+		if err != nil {
+			return err
+		}
+		return nil
 	},
 }
 
@@ -146,13 +177,13 @@ func deleteContainer(ctx context.Context, client *containerd.Client, id string, 
 var setLabelsCommand = cli.Command{
 	Name:        "label",
 	Usage:       "set and clear labels for a container",
-	ArgsUsage:   "[flags] <name> [<key>=<value>, ...]",
+	ArgsUsage:   "[flags] CONTAINER [<key>=<value>, ...]",
 	Description: "set and clear labels for a container",
 	Flags:       []cli.Flag{},
 	Action: func(context *cli.Context) error {
 		containerID, labels := commands.ObjectWithLabelArgs(context)
 		if containerID == "" {
-			return errors.New("please specify a container")
+			return errors.New("container id must be provided")
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
