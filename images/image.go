@@ -2,6 +2,7 @@ package images
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
-	jsoniter "github.com/json-iterator/go"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -123,7 +123,6 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 			return ocispec.Manifest{}, err
 		}
 	}
-	json := jsoniter.ConfigCompatibleWithStandardLibrary
 
 	if err := Walk(ctx, HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		switch desc.MediaType {
@@ -217,7 +216,6 @@ func Config(ctx context.Context, provider content.Provider, image ocispec.Descri
 // Platforms returns one or more platforms supported by the image.
 func Platforms(ctx context.Context, provider content.Provider, image ocispec.Descriptor) ([]ocispec.Platform, error) {
 	var platformSpecs []ocispec.Platform
-	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	return platformSpecs, Walk(ctx, Handlers(HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		if desc.Platform != nil {
 			platformSpecs = append(platformSpecs, *desc.Platform)
@@ -288,7 +286,6 @@ func Check(ctx context.Context, provider content.Provider, image ocispec.Descrip
 
 // Children returns the immediate children of content described by the descriptor.
 func Children(ctx context.Context, provider content.Provider, desc ocispec.Descriptor, platform string) ([]ocispec.Descriptor, error) {
-	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	var descs []ocispec.Descriptor
 	switch desc.MediaType {
 	case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
@@ -357,7 +354,6 @@ func RootFS(ctx context.Context, provider content.Provider, configDesc ocispec.D
 		return nil, err
 	}
 
-	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	var config ocispec.Image
 	if err := json.Unmarshal(p, &config); err != nil {
 		return nil, err

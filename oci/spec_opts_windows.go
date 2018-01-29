@@ -4,12 +4,12 @@ package oci
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
-	jsoniter "github.com/json-iterator/go"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -24,7 +24,6 @@ func WithImageConfig(image Image) SpecOpts {
 		var (
 			ociimage v1.Image
 			config   v1.ImageConfig
-			json     = jsoniter.ConfigCompatibleWithStandardLibrary
 		)
 		switch ic.MediaType {
 		case v1.MediaTypeImageConfig, images.MediaTypeDockerSchema2Config:
