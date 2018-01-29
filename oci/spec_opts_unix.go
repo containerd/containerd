@@ -4,6 +4,7 @@ package oci
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,7 +17,6 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
-	jsoniter "github.com/json-iterator/go"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runc/libcontainer/user"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -66,7 +66,6 @@ func WithLinuxNamespace(ns specs.LinuxNamespace) SpecOpts {
 // WithImageConfig configures the spec to from the configuration of an Image
 func WithImageConfig(image Image) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) error {
-		json := jsoniter.ConfigCompatibleWithStandardLibrary
 		ic, err := image.Config(ctx)
 		if err != nil {
 			return err
