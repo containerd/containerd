@@ -11,6 +11,7 @@ import (
 	"unsafe"
 
 	winio "github.com/Microsoft/go-winio"
+	"github.com/Microsoft/hcsshim"
 )
 
 // MkdirAllWithACL is a wrapper for MkdirAll that creates a directory
@@ -233,4 +234,14 @@ func syscallOpenSequential(path string, mode int, _ uint32) (fd syscall.Handle, 
 	const fileFlagSequentialScan = 0x08000000 // FILE_FLAG_SEQUENTIAL_SCAN
 	h, e := syscall.CreateFile(pathp, access, sharemode, sa, createmode, fileFlagSequentialScan, 0)
 	return h, e
+}
+
+// ForceRemoveAll is the same as os.RemoveAll, but uses hcsshim.DestroyLayer in order
+// to delete container layers.
+func ForceRemoveAll(path string) error {
+	info := hcsshim.DriverInfo{
+		HomeDir: filepath.Dir(path),
+	}
+
+	return hcsshim.DestroyLayer(info, filepath.Base(path))
 }

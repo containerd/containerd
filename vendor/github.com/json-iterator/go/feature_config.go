@@ -48,7 +48,6 @@ type API interface {
 	NewEncoder(writer io.Writer) *Encoder
 	NewDecoder(reader io.Reader) *Decoder
 	Valid(data []byte) bool
-	RegisterExtension(extension Extension)
 }
 
 // ConfigDefault the default API
@@ -133,7 +132,7 @@ func (cfg *frozenConfig) getTagKey() string {
 	return tagKey
 }
 
-func (cfg *frozenConfig) RegisterExtension(extension Extension) {
+func (cfg *frozenConfig) registerExtension(extension Extension) {
 	cfg.extensions = append(cfg.extensions, extension)
 }
 
