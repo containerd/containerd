@@ -22,7 +22,7 @@ import (
 )
 
 // ContentSuite runs a test suite on the content store given a factory function.
-func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, root string) (content.Store, func() error, error)) {
+func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, root string) (context.Context, content.Store, func() error, error)) {
 	t.Run("Writer", makeTest(t, name, storeFn, checkContentStoreWriter))
 	t.Run("UploadStatus", makeTest(t, name, storeFn, checkUploadStatus))
 	t.Run("Resume", makeTest(t, name, storeFn, checkResumeWriter))
@@ -34,7 +34,7 @@ func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, r
 	t.Run("Labels", makeTest(t, name, storeFn, checkLabels))
 }
 
-func makeTest(t *testing.T, name string, storeFn func(ctx context.Context, root string) (content.Store, func() error, error), fn func(ctx context.Context, t *testing.T, cs content.Store)) func(t *testing.T) {
+func makeTest(t *testing.T, name string, storeFn func(ctx context.Context, root string) (context.Context, content.Store, func() error, error), fn func(ctx context.Context, t *testing.T, cs content.Store)) func(t *testing.T) {
 	return func(t *testing.T) {
 		ctx := namespaces.WithNamespace(context.Background(), name)
 
@@ -44,7 +44,7 @@ func makeTest(t *testing.T, name string, storeFn func(ctx context.Context, root 
 		}
 		defer os.RemoveAll(tmpDir)
 
-		cs, cleanup, err := storeFn(ctx, tmpDir)
+		ctx, cs, cleanup, err := storeFn(ctx, tmpDir)
 		if err != nil {
 			t.Fatal(err)
 		}
