@@ -17,19 +17,19 @@ import (
 	"github.com/pkg/errors"
 )
 
-func createContentStore(ctx context.Context, root string) (content.Store, func() error, error) {
+func createContentStore(ctx context.Context, root string) (context.Context, content.Store, func() error, error) {
 	// TODO: Use mocked or in-memory store
 	cs, err := local.NewStore(root)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	db, err := bolt.Open(filepath.Join(root, "metadata.db"), 0660, nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return NewDB(db, cs, nil).ContentStore(), func() error {
+	return ctx, NewDB(db, cs, nil).ContentStore(), func() error {
 		return db.Close()
 	}, nil
 }

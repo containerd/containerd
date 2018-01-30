@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"os"
 	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -21,7 +22,7 @@ import (
 )
 
 // ContentSuite runs a test suite on the content store given a factory function.
-func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, root string) (content.Store, func() error, error)) {
+func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, root string) (context.Context, content.Store, func() error, error)) {
 	t.Run("Writer", makeTest(t, name, storeFn, checkContentStoreWriter))
 	t.Run("UploadStatus", makeTest(t, name, storeFn, checkUploadStatus))
 	t.Run("Resume", makeTest(t, name, storeFn, checkResumeWriter))
@@ -33,7 +34,7 @@ func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, r
 	t.Run("Labels", makeTest(t, name, storeFn, checkLabels))
 }
 
-func makeTest(t *testing.T, name string, storeFn func(ctx context.Context, root string) (content.Store, func() error, error), fn func(ctx context.Context, t *testing.T, cs content.Store)) func(t *testing.T) {
+func makeTest(t *testing.T, name string, storeFn func(ctx context.Context, root string) (context.Context, content.Store, func() error, error), fn func(ctx context.Context, t *testing.T, cs content.Store)) func(t *testing.T) {
 	return func(t *testing.T) {
 		ctx := namespaces.WithNamespace(context.Background(), name)
 
@@ -43,7 +44,7 @@ func makeTest(t *testing.T, name string, storeFn func(ctx context.Context, root 
 		}
 		defer os.RemoveAll(tmpDir)
 
-		cs, cleanup, err := storeFn(ctx, tmpDir)
+		ctx, cs, cleanup, err := storeFn(ctx, tmpDir)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -63,28 +64,28 @@ var labels = map[string]string{
 }
 
 func checkContentStoreWriter(ctx context.Context, t *testing.T, cs content.Store) {
-	c1, d1 := createContent(256, 1)
+	c1, d1 := createContent(256)
 	w1, err := cs.Writer(ctx, "c1", 0, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer w1.Close()
 
-	c2, d2 := createContent(256, 2)
+	c2, d2 := createContent(256)
 	w2, err := cs.Writer(ctx, "c2", int64(len(c2)), "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer w2.Close()
 
-	c3, d3 := createContent(256, 3)
+	c3, d3 := createContent(256)
 	w3, err := cs.Writer(ctx, "c3", 0, d3)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer w3.Close()
 
-	c4, d4 := createContent(256, 4)
+	c4, d4 := createContent(256)
 	w4, err := cs.Writer(ctx, "c4", int64(len(c4)), d4)
 	if err != nil {
 		t.Fatal(err)
@@ -163,7 +164,7 @@ func checkResumeWriter(ctx context.Context, t *testing.T, cs content.Store) {
 
 	var (
 		ref           = "cb"
-		cb, dgst      = createContent(256, 10)
+		cb, dgst      = createContent(256)
 		first, second = cb[:128], cb[128:]
 	)
 
@@ -223,7 +224,7 @@ func checkResumeWriter(ctx context.Context, t *testing.T, cs content.Store) {
 }
 
 func checkUploadStatus(ctx context.Context, t *testing.T, cs content.Store) {
-	c1, d1 := createContent(256, 17)
+	c1, d1 := createContent(256)
 
 	preStart := time.Now()
 	w1, err := cs.Writer(ctx, "c1", 256, d1)
@@ -292,7 +293,7 @@ func checkUploadStatus(ctx context.Context, t *testing.T, cs content.Store) {
 }
 
 func checkLabels(ctx context.Context, t *testing.T, cs content.Store) {
-	c1, d1 := createContent(256, 19)
+	c1, d1 := createContent(256)
 
 	w1, err := cs.Writer(ctx, "c1", 256, d1)
 	if err != nil {
@@ -365,7 +366,7 @@ func checkResume(rf func(context.Context, content.Writer, []byte, int64, int64, 
 
 		for i, size := range sizes {
 			for j, tp := range truncations {
-				b, d := createContent(size, int64(i*len(truncations)+j))
+				b, d := createContent(size)
 				limit := int64(float64(size) * tp)
 				ref := fmt.Sprintf("ref-%d-%d", i, j)
 
@@ -548,7 +549,14 @@ func checkInfo(ctx context.Context, cs content.Store, d digest.Digest, expected 
 	return nil
 }
 
-func createContent(size, seed int64) ([]byte, digest.Digest) {
+var contentSeed int64
+
+func createContent(size int64) ([]byte, digest.Digest) {
+	// each time we call this, we want to get a different seed, but it should
+	// be related to the intitialization order and fairly consistent between
+	// test runs. An atomic integer works just good enough for this.
+	seed := atomic.AddInt64(&contentSeed, 1)
+
 	b, err := ioutil.ReadAll(io.LimitReader(rand.New(rand.NewSource(seed)), size))
 	if err != nil {
 		panic(err)
