@@ -10,15 +10,18 @@ import (
 	"github.com/pkg/errors"
 )
 
-func newContentStore(ctx context.Context, root string) (content.Store, func() error, error) {
+func newContentStore(ctx context.Context, root string) (context.Context, content.Store, func() error, error) {
 	client, err := New(address)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-
+	ctx, releaselease, err := client.WithLease(ctx)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	cs := client.ContentStore()
 
-	return cs, func() error {
+	return ctx, cs, func() error {
 		statuses, err := cs.ListStatuses(ctx)
 		if err != nil {
 			return err
@@ -28,6 +31,7 @@ func newContentStore(ctx context.Context, root string) (content.Store, func() er
 				return errors.Wrapf(err, "failed to abort %s", st.Ref)
 			}
 		}
+		releaselease()
 		return cs.Walk(ctx, func(info content.Info) error {
 			if err := cs.Delete(ctx, info.Digest); err != nil {
 				if errdefs.IsNotFound(err) {

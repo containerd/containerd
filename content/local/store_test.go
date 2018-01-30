@@ -72,12 +72,12 @@ func (mls *memoryLabelStore) Update(d digest.Digest, update map[string]string) (
 }
 
 func TestContent(t *testing.T) {
-	testsuite.ContentSuite(t, "fs", func(ctx context.Context, root string) (content.Store, func() error, error) {
+	testsuite.ContentSuite(t, "fs", func(ctx context.Context, root string) (context.Context, content.Store, func() error, error) {
 		cs, err := NewLabeledStore(root, newMemoryLabelStore())
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
-		return cs, func() error {
+		return ctx, cs, func() error {
 			return nil
 		}, nil
 	})
