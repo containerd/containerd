@@ -57,9 +57,13 @@ func newEventMonitor(c *containerstore.Store, s *sandboxstore.Store) *eventMonit
 	}
 }
 
-// subscribe starts subsribe containerd events. We separate subscribe from
+// subscribe starts to subscribe containerd events.
 func (em *eventMonitor) subscribe(client *containerd.Client) {
-	em.ch, em.errCh = client.Subscribe(em.ctx)
+	filters := []string{
+		`topic=="/tasks/exit"`,
+		`topic=="/tasks/oom"`,
+	}
+	em.ch, em.errCh = client.Subscribe(em.ctx, filters...)
 }
 
 // start starts the event monitor which monitors and handles all container events. It returns
@@ -74,7 +78,7 @@ func (em *eventMonitor) start() (<-chan struct{}, error) {
 		for {
 			select {
 			case e := <-em.ch:
-				logrus.Debugf("Received container event timestamp - %v, namespace - %q, topic - %q", e.Timestamp, e.Namespace, e.Topic)
+				logrus.Debugf("Received containerd event timestamp - %v, namespace - %q, topic - %q", e.Timestamp, e.Namespace, e.Topic)
 				em.handleEvent(e)
 			case err := <-em.errCh:
 				logrus.WithError(err).Error("Failed to handle event stream")

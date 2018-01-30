@@ -40,7 +40,7 @@ func (c *criContainerdService) ContainerStatus(ctx context.Context, r *runtime.C
 	// * ImageSpec in container config is image ID.
 	// * ImageSpec in container status is image tag.
 	// * ImageRef in container status is repo digest.
-	spec := container.Metadata.Config.GetImage()
+	spec := container.Config.GetImage()
 	imageRef := container.ImageRef
 	image, err := c.imageStore.Get(imageRef)
 	if err != nil {
