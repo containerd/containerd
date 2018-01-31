@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"time"
 
 	"github.com/containerd/containerd/log"
@@ -108,9 +109,15 @@ func main() {
 		}
 		serverC <- server
 		if config.Debug.Address != "" {
-			l, err := sys.GetLocalListener(config.Debug.Address, config.Debug.UID, config.Debug.GID)
-			if err != nil {
-				return errors.Wrapf(err, "failed to get listener for debug endpoint")
+			var l net.Listener
+			if filepath.IsAbs(config.Debug.Address) {
+				if l, err = sys.GetLocalListener(config.Debug.Address, config.Debug.UID, config.Debug.GID); err != nil {
+					return errors.Wrapf(err, "failed to get listener for debug endpoint")
+				}
+			} else {
+				if l, err = net.Listen("tcp", config.Debug.Address); err != nil {
+					return errors.Wrapf(err, "failed to get listener for debug endpoint")
+				}
 			}
 			serve(ctx, l, server.ServeDebug)
 		}
