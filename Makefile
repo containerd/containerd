@@ -57,6 +57,7 @@ TEST_REQUIRES_ROOT_PACKAGES=$(filter \
 
 # Project binaries.
 COMMANDS=ctr containerd containerd-stress containerd-release
+MANPAGES=ctr.1 containerd.1 config.toml.5 containerd-config.1 containerd-publish.1
 
 GO_TAGS=$(if $(BUILDTAGS),-tags "$(BUILDTAGS)",)
 GO_LDFLAGS=-ldflags '-s -w -X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG) $(EXTRA_LDFLAGS)'
@@ -156,6 +157,16 @@ bin/containerd-shim: cmd/containerd-shim FORCE # set !cgo and omit pie for a sta
 
 binaries: $(BINARIES) ## build binaries
 	@echo "$(WHALE) $@"
+
+manpages: mandir $(addprefix man/,$(MANPAGES))
+	@echo "$(WHALE) $@"
+
+mandir:
+	@mkdir -p man
+
+man/%: docs/man/%.md FORCE
+	@echo "$(WHALE) $<"
+	go-md2man -in "$<" -out "$@"
 
 release: $(BINARIES)
 	@echo "$(WHALE) $@"
