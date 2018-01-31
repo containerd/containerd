@@ -210,7 +210,6 @@ func (c *criContainerdService) localResolve(ctx context.Context, refOrID string)
 		if _, err := imagedigest.Parse(refOrID); err == nil {
 			return refOrID
 		}
-
 		return func(ref string) string {
 			// ref is not image id, try to resolve it locally.
 			normalized, err := util.NormalizeImageRef(ref)

@@ -25,12 +25,12 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/remotes/docker"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
+	containerdresolver "github.com/containerd/cri-containerd/pkg/containerd/resolver"
 	imagestore "github.com/containerd/cri-containerd/pkg/store/image"
 	"github.com/containerd/cri-containerd/pkg/util"
 )
@@ -83,15 +83,14 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse image reference %q: %v", imageRef, err)
 	}
-	// TODO(random-liu): [P0] Avoid concurrent pulling/removing on the same image reference.
 	ref := namedRef.String()
 	if ref != imageRef {
 		logrus.Debugf("PullImage using normalized image ref: %q", ref)
 	}
-
-	resolver := docker.NewResolver(docker.ResolverOptions{
+	resolver := containerdresolver.NewResolver(containerdresolver.Options{
 		Credentials: func(string) (string, string, error) { return ParseAuth(r.GetAuth()) },
 		Client:      http.DefaultClient,
+		Registry:    c.getResolverOptions(),
 	})
 	_, desc, err := resolver.Resolve(ctx, ref)
 	if err != nil {
@@ -211,4 +210,12 @@ func (c *criContainerdService) createImageReference(ctx context.Context, name st
 	}
 	_, err = c.client.ImageService().Update(ctx, img, "target")
 	return err
+}
+
+func (c *criContainerdService) getResolverOptions() map[string][]string {
+	options := make(map[string][]string)
+	for ns, mirror := range c.config.Mirrors {
+		options[ns] = append(options[ns], mirror.Endpoints...)
+	}
+	return options
 }

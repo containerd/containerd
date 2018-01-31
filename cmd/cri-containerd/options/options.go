@@ -72,6 +72,8 @@ type PluginConfig struct {
 	ContainerdConfig `toml:"containerd" json:"containerd,omitempty"`
 	// CniConfig contains config related to cni
 	CniConfig `toml:"cni" json:"cni,omitempty"`
+	// Registry contains config related to the registry
+	Registry `toml:"registry" json:"registry,omitempty"`
 	// StreamServerAddress is the ip address streaming server is listening on.
 	StreamServerAddress string `toml:"stream_server_address" json:"streamServerAddress,omitempty"`
 	// StreamServerPort is the port streaming server is listening on.
@@ -191,6 +193,8 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		defaults.SkipImageFSUUID, "Skip retrieval of imagefs uuid. When turned on, kubelet will not be able to get imagefs capacity or perform imagefs disk eviction.")
 	fs.BoolVar(&c.EnableIPv6DAD, "enable-ipv6-dad",
 		defaults.EnableIPv6DAD, "Enable IPv6 DAD (duplicate address detection) for pod sandbox network. Enabling this will increase pod sandbox start latency by several seconds.")
+	fs.Var(&c.Registry, "registry",
+		"Registry config for image pull eg --registry=myregistry.io=https://mymirror.io/ --registry=myregistry2.io=https://mymirror2.io/")
 }
 
 // InitFlags load configurations from config file, and then overwrite with flags.
@@ -259,6 +263,13 @@ func DefaultConfig() Config {
 			SystemdCgroup:       false,
 			SkipImageFSUUID:     false,
 			EnableIPv6DAD:       false,
+			Registry: Registry{
+				Mirrors: map[string]Mirror{
+					"docker.io": {
+						Endpoints: []string{"https://registry-1.docker.io"},
+					},
+				},
+			},
 		},
 		ContainerdRootDir:  "/var/lib/containerd",
 		ContainerdEndpoint: "/run/containerd/containerd.sock",
