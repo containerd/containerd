@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -180,7 +183,7 @@ func commitOpts(desc ocispec.Descriptor, r io.Reader) (io.Reader, []content.Opt)
 
 // PushHandler returns a handler that will push all content from the provider
 // using a writer from the pusher.
-func PushHandler(provider content.Provider, pusher Pusher) images.HandlerFunc {
+func PushHandler(pusher Pusher, provider content.Provider) images.HandlerFunc {
 	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		ctx = log.WithLogger(ctx, log.G(ctx).WithFields(logrus.Fields{
 			"digest":    desc.Digest,
@@ -214,4 +217,56 @@ func push(ctx context.Context, provider content.Provider, pusher Pusher, desc oc
 
 	rd := io.NewSectionReader(ra, 0, desc.Size)
 	return content.Copy(ctx, cw, rd, desc.Size, desc.Digest)
+}
+
+// PushContent pushes content specified by the descriptor from the provider.
+//
+// Base handlers can be provided which will be called before any push specific
+// handlers.
+func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, provider content.Provider, baseHandlers ...images.Handler) error {
+	var m sync.Mutex
+	manifestStack := []ocispec.Descriptor{}
+
+	filterHandler := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		switch desc.MediaType {
+		case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest,
+			images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+			m.Lock()
+			manifestStack = append(manifestStack, desc)
+			m.Unlock()
+			return nil, images.ErrStopHandler
+		default:
+			return nil, nil
+		}
+	})
+
+	pushHandler := PushHandler(pusher, provider)
+
+	handlers := append(baseHandlers,
+		images.ChildrenHandler(provider, platforms.Default()),
+		filterHandler,
+		pushHandler,
+	)
+
+	if err := images.Dispatch(ctx, images.Handlers(handlers...), desc); err != nil {
+		return err
+	}
+
+	// Iterate in reverse order as seen, parent always uploaded after child
+	for i := len(manifestStack) - 1; i >= 0; i-- {
+		_, err := pushHandler(ctx, manifestStack[i])
+		if err != nil {
+			// TODO(estesp): until we have a more complete method for index push, we need to report
+			// missing dependencies in an index/manifest list by sensing the "400 Bad Request"
+			// as a marker for this problem
+			if (manifestStack[i].MediaType == ocispec.MediaTypeImageIndex ||
+				manifestStack[i].MediaType == images.MediaTypeDockerSchema2ManifestList) &&
+				errors.Cause(err) != nil && strings.Contains(errors.Cause(err).Error(), "400 Bad Request") {
+				return errors.Wrap(err, "manifest list/index references to blobs and/or manifests are missing in your target registry")
+			}
+			return err
+		}
+	}
+
+	return nil
 }
