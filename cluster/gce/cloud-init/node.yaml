@@ -91,7 +91,8 @@ write_files:
         --log-level=debug \
         --network-bin-dir=/home/kubernetes/bin \
         --network-conf-dir=/etc/cni/net.d \
-        --cgroup-path=/runtime
+        --cgroup-path=/runtime \
+        --registry=docker.io=https://mirror.gcr.io
 
       [Install]
       WantedBy=cri-containerd.target
