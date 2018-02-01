@@ -88,7 +88,8 @@ write_files:
         --log-level=debug \
         --network-bin-dir=/home/cri-containerd/opt/cni/bin \
         --network-conf-dir=/home/cri-containerd/etc/cni/net.d \
-        --cgroup-path=/runtime
+        --cgroup-path=/runtime \
+        --registry=docker.io=https://mirror.gcr.io
 
       [Install]
       WantedBy=cri-containerd.target
