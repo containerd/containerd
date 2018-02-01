@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"runtime"
 	"strconv"
-	"strings"
-	"sync"
 	"time"
 
 	containersapi "github.com/containerd/containerd/api/services/containers/v1"
@@ -301,51 +299,7 @@ func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, 
 		return err
 	}
 
-	var m sync.Mutex
-	manifestStack := []ocispec.Descriptor{}
-
-	filterHandler := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		switch desc.MediaType {
-		case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest,
-			images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
-			m.Lock()
-			manifestStack = append(manifestStack, desc)
-			m.Unlock()
-			return nil, images.ErrStopHandler
-		default:
-			return nil, nil
-		}
-	})
-
-	cs := c.ContentStore()
-	pushHandler := remotes.PushHandler(cs, pusher)
-
-	handlers := append(pushCtx.BaseHandlers,
-		images.ChildrenHandler(cs, platforms.Default()),
-		filterHandler,
-		pushHandler,
-	)
-
-	if err := images.Dispatch(ctx, images.Handlers(handlers...), desc); err != nil {
-		return err
-	}
-
-	// Iterate in reverse order as seen, parent always uploaded after child
-	for i := len(manifestStack) - 1; i >= 0; i-- {
-		_, err := pushHandler(ctx, manifestStack[i])
-		if err != nil {
-			// TODO(estesp): until we have a more complete method for index push, we need to report
-			// missing dependencies in an index/manifest list by sensing the "400 Bad Request"
-			// as a marker for this problem
-			if (manifestStack[i].MediaType == ocispec.MediaTypeImageIndex ||
-				manifestStack[i].MediaType == images.MediaTypeDockerSchema2ManifestList) &&
-				errors.Cause(err) != nil && strings.Contains(errors.Cause(err).Error(), "400 Bad Request") {
-				return errors.Wrap(err, "manifest list/index references to blobs and/or manifests are missing in your target registry")
-			}
-			return err
-		}
-	}
-	return nil
+	return remotes.PushContent(ctx, pusher, desc, c.ContentStore(), pushCtx.BaseHandlers...)
 }
 
 // GetImage returns an existing image
