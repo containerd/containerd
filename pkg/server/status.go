@@ -19,6 +19,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	goruntime "runtime"
 
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -70,6 +71,11 @@ func (c *criContainerdService) Status(ctx context.Context, r *runtime.StatusRequ
 		}
 		resp.Info = make(map[string]string)
 		resp.Info["config"] = string(configByt)
+		versionByt, err := json.Marshal(goruntime.Version())
+		if err != nil {
+			return nil, err
+		}
+		resp.Info["golang"] = string(versionByt)
 	}
 	return resp, nil
 }
