@@ -4,6 +4,7 @@ package containerd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,7 +20,6 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/gogo/protobuf/proto"
 	protobuf "github.com/gogo/protobuf/types"
-	jsoniter "github.com/json-iterator/go"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/opencontainers/image-spec/specs-go/v1"
@@ -121,7 +121,6 @@ func decodeIndex(ctx context.Context, store content.Store, id digest.Digest) (*v
 	if err != nil {
 		return nil, err
 	}
-	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	if err := json.Unmarshal(p, &index); err != nil {
 		return nil, err
 	}
