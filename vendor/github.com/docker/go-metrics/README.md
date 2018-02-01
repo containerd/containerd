@@ -70,7 +70,7 @@ Package documentation can be found [here](https://godoc.org/github.com/docker/go
 
 ## Additional Metrics
 
-Additional metrics are also defined here that are not avaliable in the prometheus client.
+Additional metrics are also defined here that are not available in the prometheus client.
 If you need a custom metrics and it is generic enough to be used by multiple projects, define it here.
 
 
