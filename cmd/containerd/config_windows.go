@@ -12,9 +12,5 @@ func defaultConfig() *server.Config {
 		GRPC: server.GRPCConfig{
 			Address: defaults.DefaultAddress,
 		},
-		Debug: server.Debug{
-			Level:   "info",
-			Address: defaults.DefaultDebugAddress,
-		},
 	}
 }
