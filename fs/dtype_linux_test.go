@@ -26,10 +26,12 @@ func testSupportsDType(t *testing.T, expected bool, mkfs ...string) {
 	}
 	if out, err := exec.Command(mkfs[0], append(mkfs[1:], deviceName)...).CombinedOutput(); err != nil {
 		// not fatal
+		cleanupDevice()
 		t.Skipf("could not mkfs (%v) %s: %v (out: %q)", mkfs, deviceName, err, string(out))
 	}
 	if out, err := exec.Command("mount", deviceName, mnt).CombinedOutput(); err != nil {
 		// not fatal
+		cleanupDevice()
 		t.Skipf("could not mount %s: %v (out: %q)", deviceName, err, string(out))
 	}
 	defer func() {

@@ -21,6 +21,8 @@ func NewLoopback(size int64) (string, func() error, error) {
 	}
 
 	if err := file.Truncate(size); err != nil {
+		file.Close()
+		os.Remove(file.Name())
 		return "", nil, errors.Wrap(err, "failed to resize temp file")
 	}
 	file.Close()
@@ -29,6 +31,7 @@ func NewLoopback(size int64) (string, func() error, error) {
 	losetup := exec.Command("losetup", "--find", "--show", file.Name())
 	p, err := losetup.Output()
 	if err != nil {
+		os.Remove(file.Name())
 		return "", nil, errors.Wrap(err, "loopback setup failed")
 	}
 

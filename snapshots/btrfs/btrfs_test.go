@@ -29,20 +29,23 @@ func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshots.Snap
 
 	return func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
 
-		deviceName, cleanupDevice, err := testutil.NewLoopback(100 << 20) // 100 MB
+		deviceName, cleanupDevice, err := testutil.NewLoopback(650 << 20) // 650 MB
 		if err != nil {
 			return nil, nil, err
 		}
 
 		if out, err := exec.Command(mkbtrfs, deviceName).CombinedOutput(); err != nil {
+			cleanupDevice()
 			return nil, nil, errors.Wrapf(err, "failed to make btrfs filesystem (out: %q)", out)
 		}
 		if out, err := exec.Command("mount", deviceName, root).CombinedOutput(); err != nil {
+			cleanupDevice()
 			return nil, nil, errors.Wrapf(err, "failed to mount device %s (out: %q)", deviceName, out)
 		}
 
 		snapshotter, err := NewSnapshotter(root)
 		if err != nil {
+			cleanupDevice()
 			return nil, nil, errors.Wrap(err, "failed to create new snapshotter")
 		}
 

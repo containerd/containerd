@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+#
+# Builds and installs runc to /usr/local/go/bin based off
+# the commit defined in vendor.conf
+#
+set -eu -o pipefail
+
+RUNC_COMMIT=$(grep opencontainers/runc ${GOPATH}/src/github.com/containerd/containerd/vendor.conf | cut -d " " -f 2)
+
+go get -u github.com/opencontainers/runc
+cd $GOPATH/src/github.com/opencontainers/runc
+git checkout $RUNC_COMMIT
+make BUILDTAGS="apparmor seccomp" runc install

@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+#
+# Downloads and installs protobuf
+#
+set -eu -o pipefail
+
+PROTOBUF_VERSION=3.5.1
+GOARCH=$(go env GOARCH)
+GOOS=$(go env GOOS)
+PROTOBUF_DIR=$(mktemp -d)
+
+case $GOARCH in
+
+arm64)
+	wget -O $PROTOBUF_DIR/protobuf "https://github.com/google/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-linux-aarch64.zip"
+	unzip $PROTOBUF_DIR/protobuf -d /usr/local
+	;;
+
+amd64|386)
+	if [ $GOOS == "windows" ]; then
+		wget -O $PROTOBUF_DIR/protobuf "https://github.com/google/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-win32.zip"
+	elif [ $GOOS == "linux" ]; then
+		wget -O $PROTOBUF_DIR/protobuf "https://github.com/google/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-linux-x86_64.zip"
+	fi
+	unzip $PROTOBUF_DIR/protobuf -d /usr/local
+	;;
+
+*)
+	wget -O $PROTOBUF_DIR/protobuf "https://github.com/google/protobuf/releases/download/v$PROTOBUF_VERSION/protobuf-cpp-$PROTOBUF_VERSION.zip"
+	unzip $PROTOBUF_DIR/protobuf -d /usr/src/protobuf
+	cd /usr/src/protobuf/protobuf-$PROTOBUF_VERSION
+	./autogen.sh
+	./configure --disable-shared
+	make
+	make check
+	make install
+	ldconfig
+	;;
+esac
+rm -rf $PROTOBUF_DIR
