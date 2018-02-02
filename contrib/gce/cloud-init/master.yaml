@@ -89,7 +89,7 @@ write_files:
         --network-bin-dir=/home/cri-containerd/opt/cni/bin \
         --network-conf-dir=/home/cri-containerd/etc/cni/net.d \
         --cgroup-path=/runtime \
-        --registry=docker.io=https://mirror.gcr.io
+        --registry=docker.io=https://mirror.gcr.io,https://registry-1.docker.io
 
       [Install]
       WantedBy=cri-containerd.target
