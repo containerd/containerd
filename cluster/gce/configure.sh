@@ -43,13 +43,12 @@ DEPLOY_PATH=${DEPLOY_PATH:-"cri-containerd-release"}
 # By default use the release tarball with cni built in.
 PKG_PREFIX=${PKG_PREFIX:-"cri-containerd-cni"}
 
-# VERSION is the cri-containerd version to use. If not specified,
-# the latest version will be used.
+# VERSION is the cri-containerd version to use.
 VERSION_METADATA="version"
 VERSION=$(fetch_metadata "${VERSION_METADATA}")
 if [ -z "${VERSION}" ]; then
-  VERSION=$(curl -f --ipv4 --retry 6 --retry-delay 3 --silent --show-error \
-    https://storage.googleapis.com/${DEPLOY_PATH}/latest)
+  echo "Version is not set."
+  exit 1
 fi
 
 # TARBALL_GCS_PATH is the path to download cri-containerd tarball for node e2e.

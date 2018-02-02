@@ -58,6 +58,8 @@ fi
 
 # VERSION is the latest cri-containerd version got from cri-containerd gcs
 # bucket.
+# TODO(random-liu): Put version into the metadata instead of
+# deciding it in cloud init. This may cause issue to reboot test.
 VERSION=$(curl -f --ipv4 --retry 6 --retry-delay 3 --silent --show-error \
   https://storage.googleapis.com/${DEPLOY_PATH}/latest)
 # TARBALL_GCS_PATH is the path to download cri-containerd tarball for node e2e.
