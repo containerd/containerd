@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -eu -o pipefail
 
-vndr 2>&1 | grep -v -i clone
+rm -rf vendor/
+vndr |& grep -v -i clone
 
 DIFF_PATH="vendor/"
 DIFF=$(git status --porcelain -- "$DIFF_PATH")
