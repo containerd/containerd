@@ -86,6 +86,27 @@ func TestInit(t *testing.T) {
 }
 
 func TestMigrations(t *testing.T) {
+	testRefs := []struct {
+		ref  string
+		bref string
+	}{
+		{
+			ref:  "k1",
+			bref: "bk1",
+		},
+		{
+			ref:  strings.Repeat("longerkey", 30), // 270 characters
+			bref: "short",
+		},
+		{
+			ref:  "short",
+			bref: strings.Repeat("longerkey", 30), // 270 characters
+		},
+		{
+			ref:  "emptykey",
+			bref: "",
+		},
+	}
 	migrationTests := []struct {
 		name  string
 		init  func(*bolt.Tx) error
@@ -181,6 +202,48 @@ func TestMigrations(t *testing.T) {
 							return errors.Errorf("missing child record for %s", ch)
 						}
 					}
+				}
+
+				return nil
+			},
+		},
+		{
+			name: "IngestUpdate",
+			init: func(tx *bolt.Tx) error {
+				bkt, err := createBucketIfNotExists(tx, bucketKeyVersion, []byte("testing"), bucketKeyObjectContent, deprecatedBucketKeyObjectIngest)
+				if err != nil {
+					return err
+				}
+
+				for _, s := range testRefs {
+					if err := bkt.Put([]byte(s.ref), []byte(s.bref)); err != nil {
+						return err
+					}
+				}
+
+				return nil
+			},
+			check: func(tx *bolt.Tx) error {
+				bkt := getIngestsBucket(tx, "testing")
+				if bkt == nil {
+					return errors.Wrap(errdefs.ErrNotFound, "ingests bucket not found")
+				}
+
+				for _, s := range testRefs {
+					sbkt := bkt.Bucket([]byte(s.ref))
+					if sbkt == nil {
+						return errors.Wrap(errdefs.ErrNotFound, "ref does not exist")
+					}
+
+					bref := string(sbkt.Get(bucketKeyRef))
+					if bref != s.bref {
+						return errors.Errorf("unexpected reference key %q, expected %q", bref, s.bref)
+					}
+				}
+
+				dbkt := getBucket(tx, bucketKeyVersion, []byte("testing"), bucketKeyObjectContent, deprecatedBucketKeyObjectIngest)
+				if dbkt != nil {
+					return errors.New("deprecated ingest bucket still exists")
 				}
 
 				return nil

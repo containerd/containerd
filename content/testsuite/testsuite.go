@@ -31,6 +31,9 @@ func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, r
 	t.Run("ResumeCopySeeker", makeTest(t, name, storeFn, checkResume(resumeCopySeeker)))
 	t.Run("ResumeCopyReaderAt", makeTest(t, name, storeFn, checkResume(resumeCopyReaderAt)))
 	t.Run("Labels", makeTest(t, name, storeFn, checkLabels))
+
+	t.Run("CrossNamespaceAppend", makeTest(t, name, storeFn, checkCrossNSAppend))
+	t.Run("CrossNamespaceShare", makeTest(t, name, storeFn, checkCrossNSShare))
 }
 
 // ContextWrapper is used to decorate new context used inside the test
@@ -504,6 +507,124 @@ func resumeCopyReaderAt(ctx context.Context, w content.Writer, b []byte, _, size
 	return errors.Wrap(content.Copy(ctx, w, r, size, dgst), "copy failed")
 }
 
+func checkCrossNSShare(ctx context.Context, t *testing.T, cs content.Store) {
+	wrap, ok := ctx.Value(wrapperKey{}).(ContextWrapper)
+	if !ok {
+		t.Skip("multiple contexts not supported")
+	}
+
+	var size int64 = 1000
+	b, d := createContent(size)
+	ref := fmt.Sprintf("ref-%d", size)
+	t1 := time.Now()
+
+	if err := content.WriteBlob(ctx, cs, ref, bytes.NewReader(b), size, d); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx2, done, err := wrap(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer done()
+
+	w, err := cs.Writer(ctx2, ref, size, d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t2 := time.Now()
+
+	checkStatus(t, w, content.Status{
+		Ref:    ref,
+		Offset: size,
+		Total:  size,
+	}, d, t1, t2, t1, t2)
+
+	if err := w.Commit(ctx2, size, d); err != nil {
+		t.Fatal(err)
+	}
+	t3 := time.Now()
+
+	info := content.Info{
+		Digest: d,
+		Size:   size,
+	}
+	if err := checkContent(ctx, cs, d, info, t1, t3, t1, t3); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := checkContent(ctx2, cs, d, info, t1, t3, t1, t3); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func checkCrossNSAppend(ctx context.Context, t *testing.T, cs content.Store) {
+	wrap, ok := ctx.Value(wrapperKey{}).(ContextWrapper)
+	if !ok {
+		t.Skip("multiple contexts not supported")
+	}
+
+	var size int64 = 1000
+	b, d := createContent(size)
+	ref := fmt.Sprintf("ref-%d", size)
+	t1 := time.Now()
+
+	if err := content.WriteBlob(ctx, cs, ref, bytes.NewReader(b), size, d); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx2, done, err := wrap(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer done()
+
+	extra := []byte("appended bytes")
+	size2 := size + int64(len(extra))
+	b2 := make([]byte, size2)
+	copy(b2[:size], b)
+	copy(b2[size:], extra)
+	d2 := digest.FromBytes(b2)
+
+	w, err := cs.Writer(ctx2, ref, size, d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t2 := time.Now()
+
+	checkStatus(t, w, content.Status{
+		Ref:    ref,
+		Offset: size,
+		Total:  size,
+	}, d, t1, t2, t1, t2)
+
+	if _, err := w.Write(extra); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := w.Commit(ctx2, size2, d2); err != nil {
+		t.Fatal(err)
+	}
+	t3 := time.Now()
+
+	info := content.Info{
+		Digest: d,
+		Size:   size,
+	}
+	if err := checkContent(ctx, cs, d, info, t1, t3, t1, t3); err != nil {
+		t.Fatal(err)
+	}
+
+	info2 := content.Info{
+		Digest: d2,
+		Size:   size2,
+	}
+	if err := checkContent(ctx2, cs, d2, info2, t1, t3, t1, t3); err != nil {
+		t.Fatal(err)
+	}
+
+}
+
 func checkStatus(t *testing.T, w content.Writer, expected content.Status, d digest.Digest, preStart, postStart, preUpdate, postUpdate time.Time) {
 	t.Helper()
 	st, err := w.Status()
@@ -581,6 +702,27 @@ func checkInfo(ctx context.Context, cs content.Store, d digest.Digest, expected 
 		if v != actual {
 			return errors.Errorf("unexpected value for label %q: %q, expected %q", k, actual, v)
 		}
+	}
+
+	return nil
+}
+func checkContent(ctx context.Context, cs content.Store, d digest.Digest, expected content.Info, c1, c2, u1, u2 time.Time) error {
+	if err := checkInfo(ctx, cs, d, expected, c1, c2, u1, u2); err != nil {
+		return err
+	}
+
+	b, err := content.ReadBlob(ctx, cs, d)
+	if err != nil {
+		return errors.Wrap(err, "failed to read blob")
+	}
+
+	if int64(len(b)) != expected.Size {
+		return errors.Errorf("wrong blob size %d, expected %d", len(b), expected.Size)
+	}
+
+	actual := digest.FromBytes(b)
+	if actual != d {
+		return errors.Errorf("wrong digest %s, expected %s", actual, d)
 	}
 
 	return nil
