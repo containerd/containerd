@@ -41,9 +41,13 @@ type dockerFetcher struct {
 }
 
 func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.ReadCloser, error) {
+	var bases []string
+	for _, b := range r.base {
+		bases = append(bases, b.String())
+	}
 	ctx = log.WithLogger(ctx, log.G(ctx).WithFields(
 		logrus.Fields{
-			//"base":   r.base.String(),
+			"base":   bases,
 			"digest": desc.Digest,
 		},
 	))
@@ -132,11 +136,11 @@ func (r *dockerFetcher) getV2URLPaths(ctx context.Context, desc ocispec.Descript
 	case images.MediaTypeDockerSchema2Manifest, images.MediaTypeDockerSchema2ManifestList,
 		images.MediaTypeDockerSchema1Manifest,
 		ocispec.MediaTypeImageManifest, ocispec.MediaTypeImageIndex:
-		urls = append(urls, r.url(path.Join("manifests", desc.Digest.String())))
+		urls = append(urls, r.urls(path.Join("manifests", desc.Digest.String()))...)
 	}
 
 	// always fallback to attempting to get the object out of the blobs store.
-	urls = append(urls, r.url(path.Join("blobs", desc.Digest.String())))
+	urls = append(urls, r.urls(path.Join("blobs", desc.Digest.String()))...)
 
 	return urls, nil
 }

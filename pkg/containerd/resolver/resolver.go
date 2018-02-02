@@ -300,12 +300,6 @@ func (r *containerdResolver) base(refspec reference.Spec) (*dockerBase, error) {
 	}, nil
 }
 
-func (r *dockerBase) url(ps ...string) string {
-	url := r.base[0]
-	url.Path = path.Join(url.Path, path.Join(ps...))
-	return url.String()
-}
-
 func (r *dockerBase) urls(ps ...string) []string {
 	urls := []string{}
 	for _, url := range r.base {
