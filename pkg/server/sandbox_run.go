@@ -124,7 +124,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 			NetNS:        sandbox.NetNSPath,
 			PortMappings: toCNIPortMappings(config.GetPortMappings()),
 		}
-		if err = c.netPlugin.SetUpPod(podNetwork); err != nil {
+		if _, err = c.netPlugin.SetUpPod(podNetwork); err != nil {
 			return nil, fmt.Errorf("failed to setup network for sandbox %q: %v", id, err)
 		}
 		defer func() {
