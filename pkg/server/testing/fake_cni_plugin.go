@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/containernetworking/cni/pkg/types"
 	"github.com/cri-o/ocicni/pkg/ocicni"
 )
 
@@ -120,15 +121,16 @@ func (f *FakeCNIPlugin) Name() string {
 }
 
 // SetUpPod setup the network of PodSandbox.
-func (f *FakeCNIPlugin) SetUpPod(podNetwork ocicni.PodNetwork) error {
+func (f *FakeCNIPlugin) SetUpPod(podNetwork ocicni.PodNetwork) (types.Result, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.appendCalled("SetUpPod", podNetwork)
 	if err := f.getError("SetUpPod"); err != nil {
-		return err
+		return nil, err
 	}
 	f.IPMap[podNetwork.NetNS] = generateIP()
-	return nil
+	// types.Result is unused.
+	return nil, nil
 }
 
 // TearDownPod teardown the network of PodSandbox.
