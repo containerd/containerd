@@ -19,7 +19,6 @@ package options
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd"
@@ -31,8 +30,6 @@ const (
 	configFilePathArgName = "config"
 	// defaultConfigFilePath is the default config file path.
 	defaultConfigFilePath = "/etc/cri-containerd/config.toml"
-	// connectionTimeout is the grpc connection timeout.
-	connectionTimeout = 10 * time.Second
 )
 
 // ContainerdConfig contains toml config related to containerd
@@ -232,13 +229,6 @@ func PrintDefaultTomlConfig() {
 		fmt.Println(err)
 		return
 	}
-}
-
-// AddGRPCFlags add flags for grpc connection.
-func AddGRPCFlags(fs *pflag.FlagSet) (*string, *time.Duration) {
-	endpoint := fs.String("endpoint", DefaultConfig().SocketPath, "cri-containerd endpoint.")
-	timeout := fs.Duration("timeout", connectionTimeout, "cri-containerd connection timeout.")
-	return endpoint, timeout
 }
 
 // DefaultConfig returns default configurations of cri-containerd.

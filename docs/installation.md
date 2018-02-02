@@ -7,6 +7,7 @@ These steps have been verified on Ubuntu 16.04. For other OS distributions, the 
 ## Release Tarball
 For each release, we'll publish a release tarball. The release tarball contains all required binaries and files for `cri-containerd`.
 ### Content
+<!-- TODO(random-liu): Update the release tarball information -->
 As shown below, the release tarball contains:
 1) `cri-containerd`: cri-containerd binary.
 2) `containerd`, `containerd-shim`, `containerd-stress`, `containerd-release`, `ctr`: binaries for containerd.

@@ -82,7 +82,6 @@ func main() {
 	o.AddFlags(cmd.Flags())
 	cmd.AddCommand(defaultConfigCommand())
 	cmd.AddCommand(versionCommand())
-	cmd.AddCommand(loadImageCommand())
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		setupDumpStacksTrap()
