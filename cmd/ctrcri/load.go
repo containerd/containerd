@@ -25,7 +25,6 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
 
-	"github.com/containerd/cri-containerd/cmd/cri-containerd/options"
 	api "github.com/containerd/cri-containerd/pkg/api/v1"
 	"github.com/containerd/cri-containerd/pkg/client"
 )
@@ -41,21 +40,20 @@ var (
 		TAR - The path to a tar archive containing a container image.
 
 		Requirement:
-			Containerd and cri-containerd daemons (grpc servers) must already be up and
-			running before the load command is used.
+			Containerd and its cri plugin must already be up and running before the load
+			command is used.
 
 		Description:
-			Running as a client, cri-containerd implements the load command by sending the
-			load request to the already running cri-containerd daemon/server, which in
-			turn loads the image into containerd's image storage via the already running
-			containerd daemon.`)
+			Running as a client, ` + command + ` implements the load command by sending the
+			load request to the already running containerd daemon/server, which in
+			turn loads the image into containerd's image storage.`)
 
 	loadExample = dedent(`
 		- use docker to pull the latest busybox image and save it as a tar archive:
 			$ docker pull busybox:latest
 			$ docker save busybox:latest -o busybox.tar
-		- use cri-containerd to load the image into containerd's image storage:
-			$ cri-containerd load busybox.tar`)
+		- use ` + command + ` to load the image into containerd's image storage:
+			$ ` + command + ` load busybox.tar`)
 )
 
 func loadImageCommand() *cobra.Command {
@@ -67,9 +65,8 @@ func loadImageCommand() *cobra.Command {
 		Example: loadExample,
 	}
 	c.SetUsageTemplate(strings.Replace(c.UsageTemplate(), "Examples:", "Example:", 1))
-	endpoint, timeout := options.AddGRPCFlags(c.Flags())
 	c.RunE = func(cmd *cobra.Command, args []string) error {
-		cl, err := client.NewCRIContainerdClient(*endpoint, *timeout)
+		cl, err := client.NewCRIContainerdClient(address, timeout)
 		if err != nil {
 			return fmt.Errorf("failed to create grpc client: %v", err)
 		}

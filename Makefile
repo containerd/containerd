@@ -41,9 +41,9 @@ help:
 	@echo "Usage: make <target>"
 	@echo
 	@echo " * 'install'          - Install binaries to system locations"
-	@echo " * 'binaries'         - Build cri-containerd"
+	@echo " * 'binaries'         - Build cri-containerd and ctrcri"
 	@echo " * 'plugin'           - Build cri-containerd as a plugin package"
-	@echo " * 'static-binaries   - Build static cri-containerd"
+	@echo " * 'static-binaries   - Build static cri-containerd and ctrcri"
 	@echo " * 'release'          - Build release tarball"
 	@echo " * 'push'             - Push release tarball to GCS"
 	@echo " * 'test'             - Test cri-containerd with unit test"
@@ -86,6 +86,13 @@ $(BUILD_DIR)/cri-containerd: $(SOURCES)
 		-gcflags '$(GO_GCFLAGS)' \
 		$(PROJECT)/cmd/cri-containerd
 
+$(BUILD_DIR)/ctrcri: $(SOURCES)
+	$(GO) build -o $@ \
+		-tags '$(BUILD_TAGS)' \
+		-ldflags '$(GO_LDFLAGS)' \
+		-gcflags '$(GO_GCFLAGS)' \
+		$(PROJECT)/cmd/ctrcri
+
 test:
 	$(GO) test -timeout=10m -race ./pkg/... \
 		-tags '$(BUILD_TAGS)' \
@@ -107,7 +114,7 @@ test-e2e-node: binaries
 clean:
 	rm -rf $(BUILD_DIR)/*
 
-binaries: $(BUILD_DIR)/cri-containerd
+binaries: $(BUILD_DIR)/cri-containerd $(BUILD_DIR)/ctrcri
 
 # TODO(random-liu): Make this only build when source files change and
 # add this to target all.
@@ -117,13 +124,15 @@ plugin: $(PLUGIN_SOURCES) $(SOURCES)
 		-gcflags '$(GO_GCFLAGS)' \
 
 static-binaries: GO_LDFLAGS += -extldflags "-fno-PIC -static"
-static-binaries: $(BUILD_DIR)/cri-containerd
+static-binaries: $(BUILD_DIR)/cri-containerd $(BUILD_DIR)/ctrcri
 
 install: binaries
 	install -D -m 755 $(BUILD_DIR)/cri-containerd $(BINDIR)/cri-containerd
+	install -D -m 755 $(BUILD_DIR)/ctrcri $(BINDIR)/ctrcri
 
 uninstall:
 	rm -f $(BINDIR)/cri-containerd
+	rm -f $(BINDIR)/ctrcri
 
 $(BUILD_DIR)/$(TARBALL): static-binaries hack/versions
 	@BUILD_DIR=$(BUILD_DIR) TARBALL=$(TARBALL) ./hack/release.sh

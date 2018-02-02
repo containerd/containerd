@@ -13,7 +13,7 @@ export KUBE_MASTER_EXTRA_METADATA="user-data=${GCE_DIR}/cloud-init/master.yaml,c
 export KUBE_NODE_EXTRA_METADATA="user-data=${GCE_DIR}/cloud-init/node.yaml,cri-containerd-configure-sh=${GCE_DIR}/configure.sh,version=${version_file}"
 export KUBE_CONTAINER_RUNTIME="remote"
 export KUBE_CONTAINER_RUNTIME_ENDPOINT="/var/run/cri-containerd.sock"
-export KUBE_LOAD_IMAGE_COMMAND="/home/cri-containerd/usr/local/bin/cri-containerd load"
+export KUBE_LOAD_IMAGE_COMMAND="/home/cri-containerd/usr/local/bin/ctrcri load"
 export NETWORK_POLICY_PROVIDER="calico"
 export NON_MASQUERADE_CIDR="0.0.0.0/0"
 export KUBE_KUBELET_ARGS="--runtime-cgroups=/runtime"
