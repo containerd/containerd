@@ -4,6 +4,7 @@ import (
 	google_protobuf "github.com/gogo/protobuf/types"
 )
 
+// Mount holds filesystem mount configuration
 type Mount struct {
 	Type    string
 	Source  string
