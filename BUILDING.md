@@ -69,8 +69,12 @@ compiler to regenerate the API generated code packages with:
 make generate
 ```
 
-> *Note*: A build tag is currently available to disable building the btrfs snapshot driver.
-> Adding `BUILDTAGS=no_btrfs` to your environment before calling the **binaries**
+> *Note*: Several build tags are currently available:
+> * `no_btrfs`: A build tag disables building the btrfs snapshot driver.
+> * `no_cri`: A build tag disables building Kubernetes [CRI](http://blog.kubernetes.io/2016/12/container-runtime-interface-cri-in-kubernetes.html) support into containerd.
+> See [here](https://github.com/containerd/cri-containerd#build-tags) for build tags of CRI plugin.
+>
+> For example, adding `BUILDTAGS=no_btrfs` to your environment before calling the **binaries**
 > Makefile target will disable the btrfs driver within the containerd Go build.
 
 Vendoring of external imports uses the [`vndr` tool](https://github.com/LK4D4/vndr) which uses a simple config file, `vendor.conf`, to provide the URL and version or hash details for each vendored import. After modifying `vendor.conf` run the `vndr` tool to update the `vendor/` directory contents. Combining the `vendor.conf` update with the changeset in `vendor/` after running `vndr` should become a single commit for a PR which relies on vendored updates.

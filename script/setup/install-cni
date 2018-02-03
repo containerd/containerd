@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+#
+# Builds and installs cni plugins to /opt/cni/bin,
+# and create basic cni config in /etc/cni/net.d.
+# The commit defined in vendor.conf
+#
+set -eu -o pipefail
+
+CNI_COMMIT=$(grep containernetworking/plugins ${GOPATH}/src/github.com/containerd/containerd/vendor.conf | cut -d " " -f 2)
+CNI_DIR=/opt/cni
+CNI_CONFIG_DIR=/etc/cni/net.d
+
+go get -d github.com/containernetworking/plugins/...
+cd $GOPATH/src/github.com/containernetworking/plugins
+git checkout $CNI_COMMIT
+FASTBUILD=true ./build.sh
+mkdir -p $CNI_DIR
+cp -r ./bin $CNI_DIR
+mkdir -p $CNI_CONFIG_DIR
+bash -c 'cat >'$CNI_CONFIG_DIR'/10-containerd-net.conflist <<EOF
+{
+  "cniVersion": "0.3.1",
+  "name": "containerd-net",
+  "plugins": [
+    {
+      "type": "bridge",
+      "bridge": "cni0",
+      "isGateway": true,
+      "ipMasq": true,
+      "ipam": {
+        "type": "host-local",
+        "subnet": "10.88.0.0/16",
+        "routes": [
+          { "dst": "0.0.0.0/0" }
+        ]
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {"portMappings": true}
+    }
+  ]
+}
+EOF'
