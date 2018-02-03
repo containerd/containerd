@@ -2,7 +2,6 @@ package remotes
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
@@ -102,83 +101,27 @@ func fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc
 		break
 	}
 
+	ws, err := cw.Status()
+	if err != nil {
+		return err
+	}
+
+	if ws.Offset == desc.Size {
+		// If writer is already complete, commit and return
+		err := cw.Commit(ctx, desc.Size, desc.Digest)
+		if err != nil && !errdefs.IsAlreadyExists(err) {
+			return errors.Wrapf(err, "failed commit on ref %q", ws.Ref)
+		}
+		return nil
+	}
+
 	rc, err := fetcher.Fetch(ctx, desc)
 	if err != nil {
 		return err
 	}
 	defer rc.Close()
 
-	r, opts := commitOpts(desc, rc)
-	return content.Copy(ctx, cw, r, desc.Size, desc.Digest, opts...)
-}
-
-// commitOpts gets the appropriate content options to alter
-// the content info on commit based on media type.
-func commitOpts(desc ocispec.Descriptor, r io.Reader) (io.Reader, []content.Opt) {
-	var childrenF func(r io.Reader) ([]ocispec.Descriptor, error)
-
-	// TODO(AkihiroSuda): use images/oci.GetChildrenDescriptors?
-	switch desc.MediaType {
-	case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
-		childrenF = func(r io.Reader) ([]ocispec.Descriptor, error) {
-			var (
-				manifest ocispec.Manifest
-				decoder  = json.NewDecoder(r)
-			)
-			if err := decoder.Decode(&manifest); err != nil {
-				return nil, err
-			}
-
-			return append([]ocispec.Descriptor{manifest.Config}, manifest.Layers...), nil
-		}
-	case images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
-		childrenF = func(r io.Reader) ([]ocispec.Descriptor, error) {
-			var (
-				index   ocispec.Index
-				decoder = json.NewDecoder(r)
-			)
-			if err := decoder.Decode(&index); err != nil {
-				return nil, err
-			}
-
-			return index.Manifests, nil
-		}
-	default:
-		return r, nil
-	}
-
-	pr, pw := io.Pipe()
-
-	var children []ocispec.Descriptor
-	errC := make(chan error)
-
-	go func() {
-		defer close(errC)
-		ch, err := childrenF(pr)
-		if err != nil {
-			errC <- err
-		}
-		children = ch
-	}()
-
-	opt := func(info *content.Info) error {
-		err := <-errC
-		if err != nil {
-			return errors.Wrap(err, "unable to get commit labels")
-		}
-
-		if len(children) > 0 {
-			if info.Labels == nil {
-				info.Labels = map[string]string{}
-			}
-			for i, ch := range children {
-				info.Labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i)] = ch.Digest.String()
-			}
-		}
-		return nil
-	}
-
-	return io.TeeReader(r, pw), []content.Opt{opt}
+	return content.Copy(ctx, cw, rc, desc.Size, desc.Digest)
 }
 
 // PushHandler returns a handler that will push all content from the provider
@@ -243,7 +186,7 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, pr
 	pushHandler := PushHandler(pusher, provider)
 
 	handlers := append(baseHandlers,
-		images.ChildrenHandler(provider, platforms.Default()),
+		images.FilterPlatform(platforms.Default(), images.ChildrenHandler(provider)),
 		filterHandler,
 		pushHandler,
 	)
