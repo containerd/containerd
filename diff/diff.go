@@ -1,9 +1,10 @@
 package diff
 
 import (
+	"context"
+
 	"github.com/containerd/containerd/mount"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"golang.org/x/net/context"
 )
 
 // Config is used to hold parameters needed for a diff operation
@@ -24,21 +25,24 @@ type Config struct {
 // Opt is used to configure a diff operation
 type Opt func(*Config) error
 
-// Differ allows the apply and creation of filesystem diffs between mounts
-type Differ interface {
+// Comparer allows creation of filesystem diffs between mounts
+type Comparer interface {
+	// Compare computes the difference between two mounts and returns a
+	// descriptor for the computed diff. The options can provide
+	// a ref which can be used to track the content creation of the diff.
+	// The media type which is used to determine the format of the created
+	// content can also be provided as an option.
+	Compare(ctx context.Context, lower, upper []mount.Mount, opts ...Opt) (ocispec.Descriptor, error)
+}
+
+// Applier allows applying diffs between mounts
+type Applier interface {
 	// Apply applies the content referred to by the given descriptor to
 	// the provided mount. The method of applying is based on the
 	// implementation and content descriptor. For example, in the common
 	// case the descriptor is a file system difference in tar format,
 	// that tar would be applied on top of the mounts.
 	Apply(ctx context.Context, desc ocispec.Descriptor, mount []mount.Mount) (ocispec.Descriptor, error)
-
-	// DiffMounts computes the difference between two mounts and returns a
-	// descriptor for the computed diff. The options can provide
-	// a ref which can be used to track the content creation of the diff.
-	// The media type which is used to determine the format of the created
-	// content can also be provided as an option.
-	DiffMounts(ctx context.Context, lower, upper []mount.Mount, opts ...Opt) (ocispec.Descriptor, error)
 }
 
 // WithMediaType sets the media type to use for creating the diff, without

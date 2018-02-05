@@ -1,11 +1,11 @@
 package walking
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"time"
 
 	"github.com/containerd/containerd/archive"
@@ -13,37 +13,12 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/plugin"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 )
-
-func init() {
-	plugin.Register(&plugin.Registration{
-		Type: plugin.DiffPlugin,
-		ID:   "walking",
-		Requires: []plugin.Type{
-			plugin.MetadataPlugin,
-		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			md, err := ic.Get(plugin.MetadataPlugin)
-			if err != nil {
-				return nil, err
-			}
-
-			ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
-			return NewWalkingDiff(md.(*metadata.DB).ContentStore())
-		},
-	})
-}
 
 type walkingDiff struct {
 	store content.Store
@@ -51,83 +26,21 @@ type walkingDiff struct {
 
 var emptyDesc = ocispec.Descriptor{}
 
-// NewWalkingDiff is a generic implementation of diff.Differ.
-// NewWalkingDiff is expected to work with any filesystem.
-func NewWalkingDiff(store content.Store) (diff.Differ, error) {
+// NewWalkingDiff is a generic implementation of diff.Comparer.  The diff is
+// calculated by mounting both the upper and lower mount sets and walking the
+// mounted directories concurrently. Changes are calculated by comparing files
+// against each other or by comparing file existence between directories.
+// NewWalkingDiff uses no special characteristics of the mount sets and is
+// expected to work with any filesystem.
+func NewWalkingDiff(store content.Store) diff.Comparer {
 	return &walkingDiff{
 		store: store,
-	}, nil
+	}
 }
 
-// Apply applies the content associated with the provided digests onto the
-// provided mounts. Archive content will be extracted and decompressed if
-// necessary.
-func (s *walkingDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount) (d ocispec.Descriptor, err error) {
-	t1 := time.Now()
-	defer func() {
-		if err == nil {
-			log.G(ctx).WithFields(logrus.Fields{
-				"d":     time.Now().Sub(t1),
-				"dgst":  desc.Digest,
-				"size":  desc.Size,
-				"media": desc.MediaType,
-			}).Debugf("diff applied")
-		}
-	}()
-
-	isCompressed, err := images.IsCompressedDiff(ctx, desc.MediaType)
-	if err != nil {
-		return emptyDesc, errors.Wrapf(errdefs.ErrNotImplemented, "unsupported diff media type: %v", desc.MediaType)
-	}
-
-	var ocidesc ocispec.Descriptor
-	if err := mount.WithTempMount(ctx, mounts, func(root string) error {
-		ra, err := s.store.ReaderAt(ctx, desc.Digest)
-		if err != nil {
-			return errors.Wrap(err, "failed to get reader from content store")
-		}
-		defer ra.Close()
-
-		r := content.NewReader(ra)
-		if isCompressed {
-			ds, err := compression.DecompressStream(r)
-			if err != nil {
-				return err
-			}
-			defer ds.Close()
-			r = ds
-		}
-
-		digester := digest.Canonical.Digester()
-		rc := &readCounter{
-			r: io.TeeReader(r, digester.Hash()),
-		}
-
-		if _, err := archive.Apply(ctx, root, rc); err != nil {
-			return err
-		}
-
-		// Read any trailing data
-		if _, err := io.Copy(ioutil.Discard, rc); err != nil {
-			return err
-		}
-
-		ocidesc = ocispec.Descriptor{
-			MediaType: ocispec.MediaTypeImageLayer,
-			Size:      rc.c,
-			Digest:    digester.Digest(),
-		}
-		return nil
-
-	}); err != nil {
-		return emptyDesc, err
-	}
-	return ocidesc, nil
-}
-
-// DiffMounts creates a diff between the given mounts and uploads the result
+// Compare creates a diff between the given mounts and uploads the result
 // to the content store.
-func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
+func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
 	var config diff.Config
 	for _, opt := range opts {
 		if err := opt(&config); err != nil {
@@ -226,17 +139,6 @@ func (s *walkingDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount
 	}
 
 	return ocidesc, nil
-}
-
-type readCounter struct {
-	r io.Reader
-	c int64
-}
-
-func (rc *readCounter) Read(p []byte) (n int, err error) {
-	n, err = rc.r.Read(p)
-	rc.c += int64(n)
-	return
 }
 
 func uniqueRef() string {

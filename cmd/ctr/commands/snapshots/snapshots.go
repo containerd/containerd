@@ -129,7 +129,7 @@ var diffCommand = cli.Command{
 		}
 
 		if idB == "" {
-			desc, err = rootfs.Diff(ctx, idA, snapshotter, client.DiffService(), opts...)
+			desc, err = rootfs.CreateDiff(ctx, idA, snapshotter, client.DiffService(), opts...)
 			if err != nil {
 				return err
 			}
@@ -145,7 +145,7 @@ var diffCommand = cli.Command{
 			if err != nil {
 				return err
 			}
-			desc, err = ds.DiffMounts(ctx, a, b, opts...)
+			desc, err = ds.Compare(ctx, a, b, opts...)
 			if err != nil {
 				return err
 			}

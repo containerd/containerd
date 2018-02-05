@@ -3,6 +3,7 @@
 package windows
 
 import (
+	"context"
 	"io"
 	"io/ioutil"
 	"time"
@@ -23,7 +24,6 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 )
 
 func init() {
@@ -45,15 +45,25 @@ func init() {
 	})
 }
 
+// CompareApplier handles both comparision and
+// application of layer diffs.
+type CompareApplier interface {
+	diff.Applier
+	diff.Comparer
+}
+
+// windowsDiff does filesystem comparison and application
+// for Windows specific layer diffs.
 type windowsDiff struct {
 	store content.Store
 }
 
 var emptyDesc = ocispec.Descriptor{}
 
-// NewWindowsDiff is the Windows container layer implementation of diff.Differ.
-func NewWindowsDiff(store content.Store) (diff.Differ, error) {
-	return &windowsDiff{
+// NewWindowsDiff is the Windows container layer implementation
+// for comparing and applying filesystem layers
+func NewWindowsDiff(store content.Store) (CompareApplier, error) {
+	return windowsDiff{
 		store: store,
 	}, nil
 }
@@ -61,7 +71,7 @@ func NewWindowsDiff(store content.Store) (diff.Differ, error) {
 // Apply applies the content associated with the provided digests onto the
 // provided mounts. Archive content will be extracted and decompressed if
 // necessary.
-func (s *windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount) (d ocispec.Descriptor, err error) {
+func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount) (d ocispec.Descriptor, err error) {
 	t1 := time.Now()
 	defer func() {
 		if err == nil {
@@ -128,9 +138,9 @@ func (s *windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts
 	}, nil
 }
 
-// DiffMounts creates a diff between the given mounts and uploads the result
+// Compare creates a diff between the given mounts and uploads the result
 // to the content store.
-func (s *windowsDiff) DiffMounts(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
+func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
 	return emptyDesc, errdefs.ErrNotImplemented
 }
 
