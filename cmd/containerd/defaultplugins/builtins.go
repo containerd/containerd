@@ -1,6 +1,7 @@
-package main
+package defaultplugins
 
 // register containerd builtins here
+// nolint: golint
 import (
 	_ "github.com/containerd/containerd/diff/walking/plugin"
 	_ "github.com/containerd/containerd/gc/scheduler"
