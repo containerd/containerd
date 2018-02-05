@@ -24,7 +24,7 @@ import (
 // ContentSuite runs a test suite on the content store given a factory function.
 func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, root string) (context.Context, content.Store, func() error, error)) {
 	t.Run("Writer", makeTest(t, name, storeFn, checkContentStoreWriter))
-	t.Run("UploadStatus", makeTest(t, name, storeFn, checkUploadStatus))
+	t.Run("UpdateStatus", makeTest(t, name, storeFn, checkUpdateStatus))
 	t.Run("Resume", makeTest(t, name, storeFn, checkResumeWriter))
 	t.Run("ResumeTruncate", makeTest(t, name, storeFn, checkResume(resumeTruncate)))
 	t.Run("ResumeDiscard", makeTest(t, name, storeFn, checkResume(resumeDiscard)))
@@ -223,7 +223,7 @@ func checkResumeWriter(ctx context.Context, t *testing.T, cs content.Store) {
 	}
 }
 
-func checkUploadStatus(ctx context.Context, t *testing.T, cs content.Store) {
+func checkUpdateStatus(ctx context.Context, t *testing.T, cs content.Store) {
 	c1, d1 := createContent(256)
 
 	preStart := time.Now()
