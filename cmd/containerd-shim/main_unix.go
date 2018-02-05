@@ -60,7 +60,7 @@ func init() {
 }
 
 func main() {
-	debug.SetGCPercent(10)
+	debug.SetGCPercent(40)
 	go func() {
 		for range time.Tick(30 * time.Second) {
 			debug.FreeOSMemory()

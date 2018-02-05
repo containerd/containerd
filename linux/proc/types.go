@@ -1,16 +1,23 @@
 package proc
 
 import (
-	containerd_types "github.com/containerd/containerd/api/types"
 	google_protobuf "github.com/gogo/protobuf/types"
 )
+
+// Mount holds filesystem mount configuration
+type Mount struct {
+	Type    string
+	Source  string
+	Target  string
+	Options []string
+}
 
 // CreateConfig hold task creation configuration
 type CreateConfig struct {
 	ID               string
 	Bundle           string
 	Runtime          string
-	Rootfs           []*containerd_types.Mount
+	Rootfs           []Mount
 	Terminal         bool
 	Stdin            string
 	Stdout           string

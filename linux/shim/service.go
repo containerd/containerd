@@ -95,6 +95,16 @@ type Service struct {
 func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*shimapi.CreateTaskResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	var mounts []proc.Mount
+	for _, m := range r.Rootfs {
+		mounts = append(mounts, proc.Mount{
+			Type:    m.Type,
+			Source:  m.Source,
+			Target:  m.Target,
+			Options: m.Options,
+		})
+	}
 	process, err := proc.New(
 		ctx,
 		s.config.Path,
@@ -108,7 +118,7 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*sh
 			ID:               r.ID,
 			Bundle:           r.Bundle,
 			Runtime:          r.Runtime,
-			Rootfs:           r.Rootfs,
+			Rootfs:           mounts,
 			Terminal:         r.Terminal,
 			Stdin:            r.Stdin,
 			Stdout:           r.Stdout,
