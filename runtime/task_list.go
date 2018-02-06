@@ -92,7 +92,7 @@ func (l *TaskList) AddWithNamespace(namespace string, t Task) error {
 }
 
 // Delete a task
-func (l *TaskList) Delete(ctx context.Context, t Task) {
+func (l *TaskList) Delete(ctx context.Context, id string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	namespace, err := namespaces.NamespaceRequired(ctx)
@@ -101,6 +101,6 @@ func (l *TaskList) Delete(ctx context.Context, t Task) {
 	}
 	tasks, ok := l.tasks[namespace]
 	if ok {
-		delete(tasks, t.ID())
+		delete(tasks, id)
 	}
 }

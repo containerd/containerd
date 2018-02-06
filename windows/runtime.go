@@ -194,7 +194,7 @@ func (r *windowsRuntime) Delete(ctx context.Context, t runtime.Task) (*runtime.E
 	}
 
 	wt.cleanup()
-	r.tasks.Delete(ctx, t)
+	r.tasks.Delete(ctx, t.ID())
 
 	r.publisher.Publish(ctx,
 		runtime.TaskDeleteEventTopic,
