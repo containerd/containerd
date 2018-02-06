@@ -140,10 +140,19 @@ func Register(r *Registration) {
 	register.r = append(register.r, r)
 }
 
-// Graph returns an ordered list of registered plugins for initialization
-func Graph() (ordered []*Registration) {
+// Graph returns an ordered list of registered plugins for initialization.
+// Plugins in disableList specified by id will be disabled.
+func Graph(disableList []string) (ordered []*Registration) {
 	register.RLock()
 	defer register.RUnlock()
+	for _, d := range disableList {
+		for i, r := range register.r {
+			if r.ID == d {
+				register.r = append(register.r[:i], register.r[i+1:]...)
+				break
+			}
+		}
+	}
 
 	added := map[*Registration]bool{}
 	for _, r := range register.r {

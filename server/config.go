@@ -18,6 +18,9 @@ type Config struct {
 	Debug Debug `toml:"debug"`
 	// Metrics and monitoring settings
 	Metrics MetricsConfig `toml:"metrics"`
+	// DisabledPlugins are IDs of plugins to disable. Disabled plugins won't be
+	// initialized and started.
+	DisabledPlugins []string `toml:"disabled_plugins"`
 	// Plugins provides plugin specific configuration for the initialization of a plugin
 	Plugins map[string]toml.Primitive `toml:"plugins"`
 	// OOMScore adjust the containerd's oom score

@@ -242,7 +242,7 @@ func LoadPlugins(config *Config) ([]*plugin.Registration, error) {
 	})
 
 	// return the ordered graph for plugins
-	return plugin.Graph(), nil
+	return plugin.Graph(config.DisabledPlugins), nil
 }
 
 func trapClosedConnErr(err error) error {
