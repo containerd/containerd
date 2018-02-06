@@ -77,7 +77,7 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 		if err = sys.SetOOMScore(cmd.Process.Pid, sys.OOMScoreMaxKillable); err != nil {
 			return nil, nil, errors.Wrap(err, "failed to set OOM Score on shim")
 		}
-		c, clo, err := WithConnect(address)(ctx, config)
+		c, clo, err := WithConnect(address, func() {})(ctx, config)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "failed to connect")
 		}
@@ -146,13 +146,15 @@ func annonDialer(address string, timeout time.Duration) (net.Conn, error) {
 }
 
 // WithConnect connects to an existing shim
-func WithConnect(address string) Opt {
+func WithConnect(address string, onClose func()) Opt {
 	return func(ctx context.Context, config shim.Config) (shimapi.ShimService, io.Closer, error) {
 		conn, err := connect(address, annonDialer)
 		if err != nil {
 			return nil, nil, err
 		}
-		return shimapi.NewShimClient(ttrpc.NewClient(conn)), conn, nil
+		client := ttrpc.NewClient(conn)
+		client.OnClose(onClose)
+		return shimapi.NewShimClient(client), conn, nil
 	}
 }
 
