@@ -27,18 +27,20 @@ type Client struct {
 
 	closed    chan struct{}
 	closeOnce sync.Once
+	closeFunc func()
 	done      chan struct{}
 	err       error
 }
 
 func NewClient(conn net.Conn) *Client {
 	c := &Client{
-		codec:   codec{},
-		conn:    conn,
-		channel: newChannel(conn, conn),
-		calls:   make(chan *callRequest),
-		closed:  make(chan struct{}),
-		done:    make(chan struct{}),
+		codec:     codec{},
+		conn:      conn,
+		channel:   newChannel(conn),
+		calls:     make(chan *callRequest),
+		closed:    make(chan struct{}),
+		done:      make(chan struct{}),
+		closeFunc: func() {},
 	}
 
 	go c.run()
@@ -113,6 +115,11 @@ func (c *Client) Close() error {
 	return nil
 }
 
+// OnClose allows a close func to be called when the server is closed
+func (c *Client) OnClose(closer func()) {
+	c.closeFunc = closer
+}
+
 type message struct {
 	messageHeader
 	p   []byte
@@ -158,6 +165,7 @@ func (c *Client) run() {
 
 	defer c.conn.Close()
 	defer close(c.done)
+	defer c.closeFunc()
 
 	for {
 		select {
@@ -199,7 +207,7 @@ func (c *Client) run() {
 			}
 			// broadcast the shutdown error to the remaining waiters.
 			for _, waiter := range waiters {
-				waiter.errs <- shutdownErr
+				waiter.errs <- c.err
 			}
 			return
 		}
