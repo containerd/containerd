@@ -201,10 +201,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 				"id":        id,
 				"namespace": namespace,
 			}).Warn("cleaning up after killed shim")
-			err = r.cleanupAfterDeadShim(context.Background(), bundle, namespace, id, lc.pid)
-			if err == nil {
-				r.tasks.Delete(ctx, lc)
-			} else {
+			if err = r.cleanupAfterDeadShim(context.Background(), bundle, namespace, id, lc.pid); err != nil {
 				log.G(ctx).WithError(err).WithFields(logrus.Fields{
 					"id":        id,
 					"namespace": namespace,
@@ -313,7 +310,7 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 		}
 		return nil, errdefs.FromGRPC(err)
 	}
-	r.tasks.Delete(ctx, lc)
+	r.tasks.Delete(ctx, lc.id)
 	if err := lc.shim.KillShim(ctx); err != nil {
 		log.G(ctx).WithError(err).Error("failed to kill shim")
 	}
@@ -443,6 +440,7 @@ func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, 
 		ExitedAt:    exitedAt,
 	})
 
+	r.tasks.Delete(ctx, id)
 	if err := bundle.Delete(); err != nil {
 		log.G(ctx).WithError(err).Error("delete bundle")
 	}
@@ -458,12 +456,10 @@ func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, 
 }
 
 func (r *Runtime) terminate(ctx context.Context, bundle *bundle, ns, id string) error {
-	ctx = namespaces.WithNamespace(ctx, ns)
 	rt, err := r.getRuntime(ctx, ns, id)
 	if err != nil {
 		return err
 	}
-
 	if err := rt.Delete(ctx, id, &runc.DeleteOpts{
 		Force: true,
 	}); err != nil {
