@@ -84,9 +84,9 @@ func ShimLocal(exchange *exchange.Exchange) ShimOpt {
 }
 
 // ShimConnect is a ShimOpt for connecting to an existing remote shim
-func ShimConnect() ShimOpt {
+func ShimConnect(onClose func()) ShimOpt {
 	return func(b *bundle, ns string, ropts *runctypes.RuncOptions) (shim.Config, client.Opt) {
-		return b.shimConfig(ns, ropts), client.WithConnect(b.shimAddress(ns))
+		return b.shimConfig(ns, ropts), client.WithConnect(b.shimAddress(ns), onClose)
 	}
 }
 
