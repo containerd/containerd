@@ -281,7 +281,7 @@ func (c *serverConn) run(sctx context.Context) {
 	)
 
 	var (
-		ch          = newChannel(c.conn, c.conn)
+		ch          = newChannel(c.conn)
 		ctx, cancel = context.WithCancel(sctx)
 		active      int
 		state       connState = connStateIdle
