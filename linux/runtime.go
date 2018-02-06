@@ -33,6 +33,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/stevvooe/ttrpc"
 	"golang.org/x/sys/unix"
 )
 
@@ -108,17 +109,11 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		events:  ic.Events,
 		config:  cfg,
 	}
-	tasks, err := r.restoreTasks(ic.Context)
+	err = r.restoreTasks(ic.Context)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: need to add the tasks to the monitor
-	for _, t := range tasks {
-		if err := r.tasks.AddWithNamespace(t.namespace, t); err != nil {
-			return nil, err
-		}
-	}
 	return r, nil
 }
 
@@ -339,25 +334,23 @@ func (r *Runtime) Tasks(ctx context.Context) ([]runtime.Task, error) {
 	return r.tasks.GetAll(ctx)
 }
 
-func (r *Runtime) restoreTasks(ctx context.Context) ([]*Task, error) {
+func (r *Runtime) restoreTasks(ctx context.Context) error {
 	dir, err := ioutil.ReadDir(r.state)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	var o []*Task
 	for _, namespace := range dir {
 		if !namespace.IsDir() {
 			continue
 		}
 		name := namespace.Name()
 		log.G(ctx).WithField("namespace", name).Debug("loading tasks in namespace")
-		tasks, err := r.loadTasks(ctx, name)
+		err = r.loadTasks(ctx, name)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		o = append(o, tasks...)
 	}
-	return o, nil
+	return nil
 }
 
 // Get a specific task by task id
@@ -365,12 +358,11 @@ func (r *Runtime) Get(ctx context.Context, id string) (runtime.Task, error) {
 	return r.tasks.Get(ctx, id)
 }
 
-func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
+func (r *Runtime) loadTasks(ctx context.Context, ns string) error {
 	dir, err := ioutil.ReadDir(filepath.Join(r.state, ns))
 	if err != nil {
-		return nil, err
+		return err
 	}
-	var o []*Task
 	for _, path := range dir {
 		if !path.IsDir() {
 			continue
@@ -409,9 +401,37 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			log.G(ctx).WithError(err).Error("loading task type")
 			continue
 		}
-		o = append(o, t)
+		// TODO: need to add the tasks to the monitor
+		if err := r.tasks.AddWithNamespace(ns, t); err != nil {
+			return err
+		}
+
+		// Start a routine to wait upon an unexpected exit of the shim. So as
+		// to clean up after it. If the wait succeeds then no cleanup should
+		// be necessary.
+		go func() {
+			ctx = namespaces.WithNamespace(context.Background(), ns)
+			for {
+				_, err := s.Wait(ctx, &shim.WaitRequest{id})
+				if err != nil {
+					if errors.Cause(err) == ttrpc.ErrClosed {
+						r.tasks.Delete(ctx, t)
+						err := r.cleanupAfterDeadShim(ctx, bundle, ns, id, pid)
+						if err != nil {
+							log.G(ctx).WithError(err).WithField("bundle", bundle.path).
+								Error("cleaning up after dead restored shim")
+						}
+						break
+					}
+					log.G(ctx).WithError(err).Warn("monitoring restored shim exit")
+					continue
+				}
+
+				break
+			}
+		}()
 	}
-	return o, nil
+	return nil
 }
 
 func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, id string, pid int) error {
