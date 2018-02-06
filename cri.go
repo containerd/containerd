@@ -32,7 +32,6 @@ import (
 func init() {
 	config := options.DefaultConfig().PluginConfig
 	plugin.Register(&plugin.Registration{
-		// In fact, cri is not strictly a GRPC plugin now.
 		Type:   plugin.GRPCPlugin,
 		ID:     "cri",
 		Config: &config,
