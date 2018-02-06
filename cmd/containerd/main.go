@@ -54,7 +54,7 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:  "log-level,l",
-			Usage: "set the logging level [debug, info, warn, error, fatal, panic]",
+			Usage: "set the logging level [trace, debug, info, warn, error, fatal, panic]",
 		},
 		cli.StringFlag{
 			Name:  "address,a",
@@ -192,7 +192,7 @@ func setLevel(context *cli.Context, config *server.Config) error {
 		l = config.Debug.Level
 	}
 	if l != "" {
-		lvl, err := logrus.ParseLevel(l)
+		lvl, err := log.ParseLevel(l)
 		if err != nil {
 			return err
 		}
