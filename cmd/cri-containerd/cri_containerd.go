@@ -28,6 +28,7 @@ import (
 	"syscall"
 
 	"github.com/containerd/cgroups"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/sys"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
@@ -35,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/interrupt"
 
 	"github.com/containerd/cri-containerd/cmd/cri-containerd/options"
-	"github.com/containerd/cri-containerd/pkg/log"
 	"github.com/containerd/cri-containerd/pkg/server"
 	"github.com/containerd/cri-containerd/pkg/version"
 )

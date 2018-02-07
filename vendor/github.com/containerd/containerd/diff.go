@@ -1,17 +1,24 @@
 package containerd
 
 import (
+	"context"
+
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/mount"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"golang.org/x/net/context"
 )
+
+// DiffService handles the computation and application of diffs
+type DiffService interface {
+	diff.Comparer
+	diff.Applier
+}
 
 // NewDiffServiceFromClient returns a new diff service which communicates
 // over a GRPC connection.
-func NewDiffServiceFromClient(client diffapi.DiffClient) diff.Differ {
+func NewDiffServiceFromClient(client diffapi.DiffClient) DiffService {
 	return &diffRemote{
 		client: client,
 	}
@@ -33,7 +40,7 @@ func (r *diffRemote) Apply(ctx context.Context, diff ocispec.Descriptor, mounts 
 	return toDescriptor(resp.Applied), nil
 }
 
-func (r *diffRemote) DiffMounts(ctx context.Context, a, b []mount.Mount, opts ...diff.Opt) (ocispec.Descriptor, error) {
+func (r *diffRemote) Compare(ctx context.Context, a, b []mount.Mount, opts ...diff.Opt) (ocispec.Descriptor, error) {
 	var config diff.Config
 	for _, opt := range opts {
 		if err := opt(&config); err != nil {

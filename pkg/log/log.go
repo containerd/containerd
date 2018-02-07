@@ -16,31 +16,14 @@ limitations under the License.
 
 package log
 
-import "github.com/sirupsen/logrus"
-
-// TODO(random-liu): Add trace support in containerd.
-
-// TraceLevel is the log level for trace.
-const TraceLevel = logrus.Level(uint32(logrus.DebugLevel + 1))
-
-// ParseLevel takes a string level and returns the Logrus log level constant.
-func ParseLevel(lvl string) (logrus.Level, error) {
-	if lvl == "trace" {
-		return TraceLevel, nil
-	}
-	return logrus.ParseLevel(lvl)
-}
+import "github.com/containerd/containerd/log"
 
 // Trace logs a message at level Trace on the standard logger.
 func Trace(args ...interface{}) {
-	if logrus.GetLevel() >= TraceLevel {
-		logrus.Debug(args...)
-	}
+	log.Trace(log.L, args...)
 }
 
 // Tracef logs a message at level Trace on the standard logger.
 func Tracef(format string, args ...interface{}) {
-	if logrus.GetLevel() >= TraceLevel {
-		logrus.Debugf(format, args...)
-	}
+	log.Tracef(log.L, format, args...)
 }

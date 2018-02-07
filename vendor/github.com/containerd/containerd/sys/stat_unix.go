@@ -24,5 +24,5 @@ func StatMtime(st *syscall.Stat_t) syscall.Timespec {
 
 // StatATimeAsTime returns st.Atim as a time.Time
 func StatATimeAsTime(st *syscall.Stat_t) time.Time {
-	return time.Unix(st.Atim.Sec, st.Atim.Nsec)
+	return time.Unix(int64(st.Atim.Sec), int64(st.Atim.Nsec)) // nolint: unconvert
 }
