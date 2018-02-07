@@ -126,9 +126,9 @@ func makeSandboxName(s *runtime.PodSandboxMetadata) string {
 func makeContainerName(c *runtime.ContainerMetadata, s *runtime.PodSandboxMetadata) string {
 	return strings.Join([]string{
 		c.Name,      // 0
-		s.Name,      // 1: sandbox name
-		s.Namespace, // 2: sandbox namespace
-		s.Uid,       // 3: sandbox uid
+		s.Name,      // 1: pod name
+		s.Namespace, // 2: pod namespace
+		s.Uid,       // 3: pod uid
 		fmt.Sprintf("%d", c.Attempt), // 4
 	}, nameDelimiter)
 }

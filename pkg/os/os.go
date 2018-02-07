@@ -47,7 +47,7 @@ type OS interface {
 // RealOS is used to dispatch the real system level operations.
 type RealOS struct{}
 
-// MkdirAll will will call os.MkdirAll to create a directory.
+// MkdirAll will call os.MkdirAll to create a directory.
 func (RealOS) MkdirAll(path string, perm os.FileMode) error {
 	return os.MkdirAll(path, perm)
 }
@@ -79,7 +79,7 @@ func (RealOS) ResolveSymbolicLink(path string) (string, error) {
 	return filepath.EvalSymlinks(path)
 }
 
-// CopyFile copys src file to dest file
+// CopyFile will copy src file to dest file
 func (RealOS) CopyFile(src, dest string, perm os.FileMode) error {
 	in, err := os.Open(src)
 	if err != nil {
