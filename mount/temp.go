@@ -4,46 +4,18 @@ import (
 	"context"
 	"io/ioutil"
 	"os"
-	"path/filepath"
-	"sort"
-	"strings"
 
 	"github.com/containerd/containerd/log"
 	"github.com/pkg/errors"
 )
 
-func init() {
-	t, err := TempLocation("/tmp")
-	if err != nil {
-		panic(err)
-	}
-	DefaultTempLocation = t
-}
-
-var DefaultTempLocation TempMounts
-
-func TempLocation(root string) (TempMounts, error) {
-	root, err := filepath.Abs(root)
-	if err != nil {
-		return DefaultTempLocation, err
-	}
-	if err := os.MkdirAll(root, 0700); err != nil {
-		return DefaultTempLocation, err
-	}
-	return TempMounts{
-		root: root,
-	}, nil
-}
-
-type TempMounts struct {
-	root string
-}
+var tempMountLocation = os.TempDir()
 
 // WithTempMount mounts the provided mounts to a temp dir, and pass the temp dir to f.
 // The mounts are valid during the call to the f.
 // Finally we will unmount and remove the temp dir regardless of the result of f.
-func (t TempMounts) Mount(ctx context.Context, mounts []Mount, f func(root string) error) (err error) {
-	root, uerr := ioutil.TempDir(t.root, "containerd-WithTempMount")
+func WithTempMount(ctx context.Context, mounts []Mount, f func(root string) error) (err error) {
+	root, uerr := ioutil.TempDir(tempMountLocation, "containerd-mount")
 	if uerr != nil {
 		return errors.Wrapf(uerr, "failed to create temp dir")
 	}
@@ -75,44 +47,4 @@ func (t TempMounts) Mount(ctx context.Context, mounts []Mount, f func(root strin
 		return errors.Wrapf(uerr, "failed to mount %s", root)
 	}
 	return errors.Wrapf(f(root), "mount callback failed on %s", root)
-}
-
-// Unmount all temp mounts and remove the directories
-func (t TempMounts) Unmount(flags int) error {
-	mounts, err := PID(os.Getpid())
-	if err != nil {
-		return err
-	}
-	var toUnmount []string
-	for _, m := range mounts {
-		if strings.HasPrefix(m.Mountpoint, t.root) {
-			toUnmount = append(toUnmount, m.Mountpoint)
-		}
-	}
-	sort.Sort(sort.Reverse(mountSorter(toUnmount)))
-	for _, path := range toUnmount {
-		if err := UnmountAll(path, flags); err != nil {
-			return err
-		}
-		if err := os.Remove(path); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-type mountSorter []string
-
-func (by mountSorter) Len() int {
-	return len(by)
-}
-
-func (by mountSorter) Less(i, j int) bool {
-	is := strings.Split(by[i], string(os.PathSeparator))
-	js := strings.Split(by[j], string(os.PathSeparator))
-	return len(is) < len(js)
-}
-
-func (by mountSorter) Swap(i, j int) {
-	by[i], by[j] = by[j], by[i]
 }

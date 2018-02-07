@@ -62,8 +62,8 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 	}
 
 	var ocidesc ocispec.Descriptor
-	if err := mount.DefaultTempLocation.Mount(ctx, lower, func(lowerRoot string) error {
-		return mount.DefaultTempLocation.Mount(ctx, upper, func(upperRoot string) error {
+	if err := mount.WithTempMount(ctx, lower, func(lowerRoot string) error {
+		return mount.WithTempMount(ctx, upper, func(upperRoot string) error {
 			var newReference bool
 			if config.Reference == "" {
 				newReference = true

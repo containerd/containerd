@@ -56,7 +56,7 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 	}
 
 	var ocidesc ocispec.Descriptor
-	if err := mount.DefaultTempLocation.Mount(ctx, mounts, func(root string) error {
+	if err := mount.WithTempMount(ctx, mounts, func(root string) error {
 		ra, err := s.store.ReaderAt(ctx, desc.Digest)
 		if err != nil {
 			return errors.Wrap(err, "failed to get reader from content store")

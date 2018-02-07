@@ -287,7 +287,7 @@ func WithUserID(uid uint32) SpecOpts {
 		if err != nil {
 			return err
 		}
-		return mount.DefaultTempLocation.Mount(ctx, mounts, func(root string) error {
+		return mount.WithTempMount(ctx, mounts, func(root string) error {
 			uuid, ugid, err := getUIDGIDFromPath(root, func(u user.User) bool {
 				return u.Uid == int(uid)
 			})
@@ -334,7 +334,7 @@ func WithUsername(username string) SpecOpts {
 		if err != nil {
 			return err
 		}
-		return mount.DefaultTempLocation.Mount(ctx, mounts, func(root string) error {
+		return mount.WithTempMount(ctx, mounts, func(root string) error {
 			uid, gid, err := getUIDGIDFromPath(root, func(u user.User) bool {
 				return u.Name == username
 			})
