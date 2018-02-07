@@ -39,7 +39,7 @@ The current release of `cri-containerd` has the following dependencies:
 * [runc](https://github.com/opencontainers/runc)
 * [CNI](https://github.com/containernetworking/cni)
 
-See [versions](./hack/versions) of these dependencies `cri-containerd` is tested with.
+See [versions](./vendor.conf) of these dependencies `cri-containerd` is tested with.
 
 As containerd and runc move to their respective general availability releases,
 we will do our best to rebase/retest `cri-containerd` with these releases on a

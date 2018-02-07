@@ -30,7 +30,6 @@ set -o pipefail
 source $(dirname "${BASH_SOURCE[0]}")/utils.sh
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
-. ${ROOT}/hack/versions
 
 # DESTDIR is the dest path to install dependencies.
 DESTDIR=${DESTDIR:-"/"}
@@ -141,13 +140,15 @@ checkout_repo ${CONTAINERD_PKG} ${CONTAINERD_VERSION} ${CONTAINERD_REPO}
 cd ${GOPATH}/src/${CONTAINERD_PKG}
 if ${COOK_CONTAINERD}; then
   # Verify that vendor.conf is in sync with containerd before cook containerd,
-  # this is a hard requirement.
-  if ! ${ROOT}/hack/update-vendor.sh -only-verify; then
-    echo "Please run hack/update-vendor.sh before cook containerd."
+  # this is a hard requirement for now because of below overwrite of
+  # containerd's vendor tree.
+  # TODO(random-liu): Remove this and the below import code after containerd
+  #   starts to vendor cri plugin.
+  if ! ${ROOT}/hack/sync-vendor.sh -only-verify; then
+    echo "Please run hack/sync-vendor.sh before cook containerd."
     exit 1
   fi
   # Import cri plugin into containerd.
-  # TODO(random-liu): Remove this after containerd starts to vendor cri plugin.
   echo "import _ \"${CRI_CONTAINERD_PKG}\"" >> cmd/containerd/builtins_linux.go
   # 1. Copy all cri-containerd vendors into containerd vendor. This makes sure
   # all dependencies introduced by cri-containerd will be updated. There might
