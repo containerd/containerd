@@ -84,13 +84,16 @@ func (w *execWorker) exec(ctx, tctx context.Context) {
 	}
 }
 
-func (w *execWorker) runExec(ctx context.Context, task containerd.Task, id string, spec *specs.Process) error {
+func (w *execWorker) runExec(ctx context.Context, task containerd.Task, id string, spec *specs.Process) (err error) {
 	process, err := task.Exec(ctx, id, spec, cio.NullIO)
 	if err != nil {
 		return err
 	}
-	defer process.Delete(ctx, containerd.WithProcessKill)
-
+	defer func() {
+		if _, derr := process.Delete(ctx, containerd.WithProcessKill); err == nil {
+			err = derr
+		}
+	}()
 	statusC, err := process.Wait(ctx)
 	if err != nil {
 		return err
@@ -105,6 +108,7 @@ func (w *execWorker) runExec(ctx context.Context, task containerd.Task, id strin
 			return nil
 		}
 		w.failures++
+		errCounter.WithValues(err.Error()).Inc()
 	}
 	return nil
 }

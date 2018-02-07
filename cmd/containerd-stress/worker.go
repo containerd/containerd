@@ -58,7 +58,7 @@ func (w *worker) run(ctx, tctx context.Context) {
 	}
 }
 
-func (w *worker) runContainer(ctx context.Context, id string) error {
+func (w *worker) runContainer(ctx context.Context, id string) (err error) {
 	// fix up cgroups path for a default config
 	w.spec.Linux.CgroupsPath = filepath.Join("/", "stress", id)
 	c, err := w.client.NewContainer(ctx, id,
@@ -68,14 +68,20 @@ func (w *worker) runContainer(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	defer c.Delete(ctx, containerd.WithSnapshotCleanup)
-
+	defer func() {
+		if derr := c.Delete(ctx, containerd.WithSnapshotCleanup); err == nil {
+			err = derr
+		}
+	}()
 	task, err := c.NewTask(ctx, cio.NullIO)
 	if err != nil {
 		return err
 	}
-	defer task.Delete(ctx, containerd.WithProcessKill)
-
+	defer func() {
+		if _, derr := task.Delete(ctx, containerd.WithProcessKill); err == nil {
+			err = derr
+		}
+	}()
 	statusC, err := task.Wait(ctx)
 	if err != nil {
 		return err
@@ -90,6 +96,7 @@ func (w *worker) runContainer(ctx context.Context, id string) error {
 			return nil
 		}
 		w.failures++
+		errCounter.WithValues(err.Error()).Inc()
 	}
 	return nil
 }
