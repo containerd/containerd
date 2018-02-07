@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/fs/fstest"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/testutil"
+	"github.com/containerd/continuity/fs/fstest"
 	"github.com/stretchr/testify/assert"
 )
 

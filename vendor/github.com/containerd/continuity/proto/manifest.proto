@@ -16,7 +16,7 @@ message Resource {
 
     // NOTE(stevvooe): Need to define clear precedence for user/group/uid/gid precedence.
 
-    // Uid specifies the user id for the resource. 
+    // Uid specifies the user id for the resource.
     int64 uid = 2;
 
     // Gid specifies the group id for the resource.
@@ -53,10 +53,10 @@ message Resource {
     // resource path.
     string target = 9;
 
-    // Major specifies the major device number for charactor and block devices.
+    // Major specifies the major device number for character and block devices.
     uint64 major = 10;
 
-    // Minor specifies the minor device number for charactor and block devices.
+    // Minor specifies the minor device number for character and block devices.
     uint64 minor = 11;
 
     // Xattr provides storage for extended attributes for the target resource.

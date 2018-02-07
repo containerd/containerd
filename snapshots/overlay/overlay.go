@@ -11,13 +11,13 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/containerd/containerd/fs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/storage"
+	"github.com/containerd/continuity/fs"
 	"github.com/pkg/errors"
 )
 
