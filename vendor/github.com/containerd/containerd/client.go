@@ -22,7 +22,6 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/dialer"
-	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
@@ -412,7 +411,7 @@ func (c *Client) ImageService() images.Store {
 }
 
 // DiffService returns the underlying Differ
-func (c *Client) DiffService() diff.Differ {
+func (c *Client) DiffService() DiffService {
 	return NewDiffServiceFromClient(diffapi.NewDiffClient(c.conn))
 }
 
