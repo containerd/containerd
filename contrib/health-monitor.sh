@@ -28,10 +28,10 @@ CHECK_PERIOD=${CHECK_PERIOD:-10}
 SLEEP_SECONDS=${SLEEP_SECONDS:-120}
 
 while true; do
-  # Use crictl sandboxes because it requires both containerd and
+  # Use crictl pods because it requires both containerd and
   # cri-containerd to be working.
-  if ! timeout ${COMMAND_TIMEOUT} ${CRICTL} sandboxes > /dev/null; then
-    echo "crictl sandboxes timeout!"
+  if ! timeout ${COMMAND_TIMEOUT} ${CRICTL} pods > /dev/null; then
+    echo "crictl pods timeout!"
     pkill containerd
     pkill cri-containerd
     # Wait for a while, as we don't want to kill it again before it is really up.
