@@ -88,6 +88,7 @@ curl https://storage.googleapis.com/cri-containerd-release/cri-containerd-${VERS
 ```
 ## Step 2: Install CRI-Containerd
 If you are using systemd, just simply unpack the tarball to the root directory:
+<!-- TODO(random-liu): Remove cni directory operations after we deprecate v1.0.0-beta.1 -->
 ```bash
 sudo tar -C / -xzf cri-containerd-${VERSION}.linux-amd64.tar.gz
 sudo mkdir -p /opt/cni/bin/

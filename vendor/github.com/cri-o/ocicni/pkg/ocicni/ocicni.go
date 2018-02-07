@@ -8,15 +8,12 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/containernetworking/cni/libcni"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
 )
-
-const monitorNetDirPeriod = 1 * time.Second
 
 type cniNetworkPlugin struct {
 	loNetwork *cniNetwork
@@ -103,13 +100,6 @@ func (plugin *cniNetworkPlugin) podUnlock(podNetwork PodNetwork) {
 }
 
 func (plugin *cniNetworkPlugin) monitorNetDir() {
-	if _, err := os.Stat(plugin.pluginDir); err != nil {
-		if !os.IsNotExist(err) {
-			logrus.Errorf("failed to stat %q: %v", plugin.pluginDir, err)
-		}
-		return
-	}
-	logrus.Infof("Found CNI config directory %q", plugin.pluginDir)
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		logrus.Errorf("could not create new watcher %v", err)
@@ -183,10 +173,13 @@ func InitCNI(pluginDir string, cniDirs ...string) (CNIPlugin, error) {
 		return nil, err
 	}
 
-	go func() {
-		plugin.monitorNetDir()
-		time.Sleep(monitorNetDirPeriod)
-	}()
+	// Ensure plugin directory exists, because the following monitoring logic
+	// relies on that.
+	if err := os.MkdirAll(pluginDir, 0755); err != nil {
+		return nil, err
+	}
+
+	go plugin.monitorNetDir()
 
 	return plugin, nil
 }
