@@ -2,6 +2,7 @@ package log
 
 import (
 	"context"
+	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
 )
@@ -54,14 +55,16 @@ func GetLogger(ctx context.Context) *logrus.Entry {
 
 // Trace logs a message at level Trace with the log entry passed-in.
 func Trace(e *logrus.Entry, args ...interface{}) {
-	if e.Level >= TraceLevel {
+	level := logrus.Level(atomic.LoadUint32((*uint32)(&e.Logger.Level)))
+	if level >= TraceLevel {
 		e.Debug(args...)
 	}
 }
 
 // Tracef logs a message at level Trace with the log entry passed-in.
 func Tracef(e *logrus.Entry, format string, args ...interface{}) {
-	if e.Level >= TraceLevel {
+	level := logrus.Level(atomic.LoadUint32((*uint32)(&e.Logger.Level)))
+	if level >= TraceLevel {
 		e.Debugf(format, args...)
 	}
 }
