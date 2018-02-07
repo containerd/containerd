@@ -14,9 +14,6 @@ write_files:
       [Service]
       Type=oneshot
       RemainAfterExit=yes
-      # cri-containerd requires the existence of cni config directory.
-      # TODO(random-liu): Eliminate the requirement in ocicni.
-      ExecStartPre=/bin/mkdir -p /etc/cni/net.d
       ExecStartPre=/bin/mkdir -p /home/cri-containerd
       ExecStartPre=/bin/mount --bind /home/cri-containerd /home/cri-containerd
       ExecStartPre=/bin/mount -o remount,exec /home/cri-containerd
