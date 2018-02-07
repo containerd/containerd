@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/fs/fstest"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/continuity/fs/fstest"
 )
 
 // Checks which cover former issues found in older layering models.

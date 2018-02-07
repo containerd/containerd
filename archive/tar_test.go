@@ -16,8 +16,8 @@ import (
 
 	_ "crypto/sha256"
 
-	"github.com/containerd/containerd/fs"
-	"github.com/containerd/containerd/fs/fstest"
+	"github.com/containerd/continuity/fs"
+	"github.com/containerd/continuity/fs/fstest"
 	"github.com/pkg/errors"
 )
 

@@ -82,9 +82,9 @@ type Resource struct {
 	// Relative links do not start with a slash and are relative to the
 	// resource path.
 	Target string `protobuf:"bytes,9,opt,name=target" json:"target,omitempty"`
-	// Major specifies the major device number for charactor and block devices.
+	// Major specifies the major device number for character and block devices.
 	Major uint64 `protobuf:"varint,10,opt,name=major" json:"major,omitempty"`
-	// Minor specifies the minor device number for charactor and block devices.
+	// Minor specifies the minor device number for character and block devices.
 	Minor uint64 `protobuf:"varint,11,opt,name=minor" json:"minor,omitempty"`
 	// Xattr provides storage for extended attributes for the target resource.
 	Xattr []*XAttr `protobuf:"bytes,12,rep,name=xattr" json:"xattr,omitempty"`

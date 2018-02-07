@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd/fs"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/continuity/fs"
 	"github.com/dmcgowan/go-tar"
 	"github.com/pkg/errors"
 )
