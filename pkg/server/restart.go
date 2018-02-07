@@ -452,7 +452,7 @@ func cleanupOrphanedSandboxDirs(cntrs []containerd.Container, sandboxesRoot stri
 	// Cleanup orphaned sandbox directories.
 	dirs, err := ioutil.ReadDir(sandboxesRoot)
 	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to read sandboxes directory %q: %v", sandboxesRoot, err)
+		return fmt.Errorf("failed to read pod sandboxes directory %q: %v", sandboxesRoot, err)
 	}
 	cntrsMap := make(map[string]containerd.Container)
 	for _, cntr := range cntrs {
@@ -460,7 +460,7 @@ func cleanupOrphanedSandboxDirs(cntrs []containerd.Container, sandboxesRoot stri
 	}
 	for _, d := range dirs {
 		if !d.IsDir() {
-			logrus.Warnf("Invalid file %q found in sandboxes directory", d.Name())
+			logrus.Warnf("Invalid file %q found in pod sandboxes directory", d.Name())
 			continue
 		}
 		if _, ok := cntrsMap[d.Name()]; ok {
@@ -469,9 +469,9 @@ func cleanupOrphanedSandboxDirs(cntrs []containerd.Container, sandboxesRoot stri
 		}
 		sandboxDir := filepath.Join(sandboxesRoot, d.Name())
 		if err := system.EnsureRemoveAll(sandboxDir); err != nil {
-			logrus.WithError(err).Warnf("Failed to remove sandbox directory %q", sandboxDir)
+			logrus.WithError(err).Warnf("Failed to remove pod sandbox directory %q", sandboxDir)
 		} else {
-			logrus.Debugf("Cleanup orphaned sandbox directory %q", sandboxDir)
+			logrus.Debugf("Cleanup orphaned pod sandbox directory %q", sandboxDir)
 		}
 	}
 	return nil
