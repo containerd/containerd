@@ -50,19 +50,19 @@ $ cat sandbox-config.json
     }
 }
 
-$ crictl runs sandbox-config.json
+$ crictl runp sandbox-config.json
 e1c83b0b8d481d4af8ba98d5f7812577fc175a37b10dc824335951f52addbb4e
-$ crictl sandboxes
-SANDBOX ID          CREATED             STATE               NAME               NAMESPACE          ATTEMPT
+$ crictl pods
+PODSANDBOX ID       CREATED             STATE               NAME               NAMESPACE          ATTEMPT
 e1c83b0b8d481       2 hours ago         SANDBOX_READY       nginx-sandbox      default            1
 $ crictl inspects e1c8
-  ... displays information about the pod and the sandbox pause container.
+  ... displays information about the pod and the pod sandbox pause container.
 ```
 * Note: As shown above, you may use truncated IDs if they are unique.
 * Other commands to manage the pod include `stops ID` to stop a running pod and
-`rms ID` to remove a pod sandbox.
+`rmp ID` to remove a pod sandbox.
 
-## Create and Run a Container in a Sandbox (using a config file)
+## Create and Run a Container in a Pod Sandbox (using a config file)
 ```console
 $ cat sandbox-config.json
 {

@@ -178,7 +178,7 @@ ${sudo} sh -c "PATH=${PATH} make install -e DESTDIR=${CONTAINERD_DIR}"
 checkout_repo ${CRITOOL_PKG} ${CRITOOL_VERSION}
 cd ${GOPATH}/src/${CRITOOL_PKG}
 make crictl
-${sudo} install -D -m 755 ${GOPATH}/bin/crictl ${CRICTL_DIR}/crictl
+${sudo} make install-crictl -e BINDIR=${CRICTL_DIR} GOPATH=${GOPATH}
 ${sudo} mkdir -p ${CRICTL_CONFIG_DIR}
 ${sudo} bash -c 'cat >'${CRICTL_CONFIG_DIR}'/crictl.yaml <<EOF
 runtime-endpoint: /var/run/cri-containerd.sock

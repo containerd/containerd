@@ -71,7 +71,7 @@ func (in *instrumentedService) ListPodSandbox(ctx context.Context, r *runtime.Li
 		if err != nil {
 			logrus.WithError(err).Error("ListPodSandbox failed")
 		} else {
-			log.Tracef("ListPodSandbox returns sandboxes %+v", res.GetItems())
+			log.Tracef("ListPodSandbox returns pod sandboxes %+v", res.GetItems())
 		}
 	}()
 	return in.c.ListPodSandbox(ctx, r)
