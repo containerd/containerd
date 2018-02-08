@@ -55,7 +55,7 @@ e1c83b0b8d481d4af8ba98d5f7812577fc175a37b10dc824335951f52addbb4e
 $ crictl pods
 PODSANDBOX ID       CREATED             STATE               NAME               NAMESPACE          ATTEMPT
 e1c83b0b8d481       2 hours ago         SANDBOX_READY       nginx-sandbox      default            1
-$ crictl inspects e1c8
+$ crictl inspectp e1c8
   ... displays information about the pod and the pod sandbox pause container.
 ```
 * Note: As shown above, you may use truncated IDs if they are unique.
