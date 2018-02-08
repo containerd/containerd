@@ -25,8 +25,8 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/fs"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/continuity/fs"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
