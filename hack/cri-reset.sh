@@ -31,13 +31,13 @@ crictl_rm_stopped_containers() {
 
 crictl_stop_pods() {
    for x in $($CRICTL_CLI pods | awk '{ print $1 }' | awk '{if(NR>1)print}') ;do
-       $CRICTL_CLI stops $x
+       $CRICTL_CLI stopp $x
    done
 }
 
 crictl_rm_pods() {
    for x in $($CRICTL_CLI pods | awk '{ print $1 }' | awk '{if(NR>1)print}') ;do
-       $CRICTL_CLI rms $x
+       $CRICTL_CLI rmp $x
    done
 }
 

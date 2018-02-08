@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	cioutil "github.com/containerd/cri-containerd/pkg/ioutil"
 )

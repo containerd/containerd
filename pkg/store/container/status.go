@@ -25,7 +25,7 @@ import (
 	"sync"
 
 	"github.com/docker/docker/pkg/ioutils"
-	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
 // statusVersion is current version of container status.

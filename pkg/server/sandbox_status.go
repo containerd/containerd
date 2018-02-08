@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/net/context"
-	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
 )
@@ -57,8 +57,8 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 func (c *criContainerdService) getIP(sandbox sandboxstore.Sandbox) string {
 	config := sandbox.Config
 
-	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostNetwork() {
-		// For sandboxes using the host network we are not
+	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE {
+		// For sandboxes using the node network we are not
 		// responsible for reporting the IP.
 		return ""
 	}
@@ -88,9 +88,9 @@ func toCRISandboxStatus(meta sandboxstore.Metadata, status sandboxstore.Status, 
 		Linux: &runtime.LinuxPodSandboxStatus{
 			Namespaces: &runtime.Namespace{
 				Options: &runtime.NamespaceOption{
-					HostNetwork: nsOpts.GetHostNetwork(),
-					HostPid:     nsOpts.GetHostPid(),
-					HostIpc:     nsOpts.GetHostIpc(),
+					Network: nsOpts.GetNetwork(),
+					Pid:     nsOpts.GetPid(),
+					Ipc:     nsOpts.GetIpc(),
 				},
 			},
 		},

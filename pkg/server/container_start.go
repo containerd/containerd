@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
-	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	cio "github.com/containerd/cri-containerd/pkg/server/io"
 	containerstore "github.com/containerd/cri-containerd/pkg/store/container"

@@ -33,7 +33,7 @@ import (
 	"github.com/docker/docker/pkg/system"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
-	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	cio "github.com/containerd/cri-containerd/pkg/server/io"
 	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
@@ -352,7 +352,7 @@ func loadSandbox(ctx context.Context, cntr containerd.Container) (sandboxstore.S
 	sandbox.Container = cntr
 
 	// Load network namespace.
-	if meta.Config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostNetwork() {
+	if meta.Config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE {
 		// Don't need to load netns for host network sandbox.
 		return sandbox, nil
 	}

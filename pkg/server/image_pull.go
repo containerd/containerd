@@ -28,7 +28,7 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
-	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	containerdresolver "github.com/containerd/cri-containerd/pkg/containerd/resolver"
 	imagestore "github.com/containerd/cri-containerd/pkg/store/image"

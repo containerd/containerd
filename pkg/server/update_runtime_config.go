@@ -19,7 +19,7 @@ package server
 import (
 	"golang.org/x/net/context"
 
-	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
 // UpdateRuntimeConfig updates the runtime config. Currently only handles podCIDR updates.

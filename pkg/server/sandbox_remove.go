@@ -23,7 +23,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/docker/docker/pkg/system"
 	"golang.org/x/net/context"
-	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	"github.com/containerd/cri-containerd/pkg/log"
 	"github.com/containerd/cri-containerd/pkg/store"

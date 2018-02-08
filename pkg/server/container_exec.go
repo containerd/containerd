@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"golang.org/x/net/context"
-	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
 // Exec prepares a streaming endpoint to execute a command in the container, and returns the address.

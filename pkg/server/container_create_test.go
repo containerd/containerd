@@ -30,7 +30,7 @@ import (
 	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	"github.com/containerd/cri-containerd/pkg/annotations"
 	ostesting "github.com/containerd/cri-containerd/pkg/os/testing"
@@ -168,6 +168,10 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
 			Type: runtimespec.UTSNamespace,
 			Path: getUTSNamespace(sandboxPid),
+		})
+		assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
+			Type: runtimespec.PIDNamespace,
+			Path: getPIDNamespace(sandboxPid),
 		})
 
 		t.Logf("Check PodSandbox annotations")
@@ -543,7 +547,7 @@ func TestGenerateContainerMounts(t *testing.T) {
 		},
 		"should use host /dev/shm when host ipc is set": {
 			securityContext: &runtime.LinuxContainerSecurityContext{
-				NamespaceOptions: &runtime.NamespaceOption{HostIpc: true},
+				NamespaceOptions: &runtime.NamespaceOption{Ipc: runtime.NamespaceMode_NODE},
 			},
 			expectedMounts: []*runtime.Mount{
 				{
@@ -748,25 +752,39 @@ func TestPidNamespace(t *testing.T) {
 	testID := "test-id"
 	testPid := uint32(1234)
 	testSandboxID := "sandbox-id"
-	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	config, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
 	c := newTestCRIContainerdService()
-	t.Logf("should not set pid namespace when host pid is true")
-	config.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{HostPid: true}
-	spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil)
-	require.NoError(t, err)
-	specCheck(t, testID, testSandboxID, testPid, spec)
-	for _, ns := range spec.Linux.Namespaces {
-		assert.NotEqual(t, ns.Type, runtimespec.PIDNamespace)
+	for desc, test := range map[string]struct {
+		pidNS    runtime.NamespaceMode
+		expected runtimespec.LinuxNamespace
+	}{
+		"node namespace mode": {
+			pidNS: runtime.NamespaceMode_NODE,
+			expected: runtimespec.LinuxNamespace{
+				Type: runtimespec.PIDNamespace,
+				Path: getPIDNamespace(testPid),
+			},
+		},
+		"container namespace mode": {
+			pidNS: runtime.NamespaceMode_CONTAINER,
+			expected: runtimespec.LinuxNamespace{
+				Type: runtimespec.PIDNamespace,
+			},
+		},
+		"pod namespace mode": {
+			pidNS: runtime.NamespaceMode_POD,
+			expected: runtimespec.LinuxNamespace{
+				Type: runtimespec.PIDNamespace,
+				Path: getPIDNamespace(testPid),
+			},
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		config.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{Pid: test.pidNS}
+		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil)
+		require.NoError(t, err)
+		assert.Contains(t, spec.Linux.Namespaces, test.expected)
 	}
-
-	t.Logf("should set pid namespace when host pid is false")
-	config.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{HostPid: false}
-	spec, err = c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil)
-	require.NoError(t, err)
-	specCheck(t, testID, testSandboxID, testPid, spec)
-	assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
-		Type: runtimespec.PIDNamespace,
-	})
 }
 
 func TestDefaultRuntimeSpec(t *testing.T) {

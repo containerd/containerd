@@ -43,7 +43,7 @@ import (
 	"github.com/syndtr/gocapability/capability"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
-	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	"github.com/containerd/cri-containerd/pkg/annotations"
 	customopts "github.com/containerd/cri-containerd/pkg/containerd/opts"
@@ -427,7 +427,7 @@ func (c *criContainerdService) generateContainerMounts(sandboxRootDir string, co
 
 	if !isInCRIMounts(devShm, config.GetMounts()) {
 		sandboxDevShm := getSandboxDevShm(sandboxRootDir)
-		if securityContext.GetNamespaceOptions().GetHostIpc() {
+		if securityContext.GetNamespaceOptions().GetIpc() == runtime.NamespaceMode_NODE {
 			sandboxDevShm = devShm
 		}
 		mounts = append(mounts, &runtime.Mount{
@@ -718,9 +718,9 @@ func setOCINamespaces(g *generate.Generator, namespaces *runtime.NamespaceOption
 	g.AddOrReplaceLinuxNamespace(string(runtimespec.NetworkNamespace), getNetworkNamespace(sandboxPid)) // nolint: errcheck
 	g.AddOrReplaceLinuxNamespace(string(runtimespec.IPCNamespace), getIPCNamespace(sandboxPid))         // nolint: errcheck
 	g.AddOrReplaceLinuxNamespace(string(runtimespec.UTSNamespace), getUTSNamespace(sandboxPid))         // nolint: errcheck
-	// Do not share pid namespace for now.
-	if namespaces.GetHostPid() {
-		g.RemoveLinuxNamespace(string(runtimespec.PIDNamespace)) // nolint: errcheck
+	// Do not share pid namespace if namespace mode is CONTAINER.
+	if namespaces.GetPid() != runtime.NamespaceMode_CONTAINER {
+		g.AddOrReplaceLinuxNamespace(string(runtimespec.PIDNamespace), getPIDNamespace(sandboxPid)) // nolint: errcheck
 	}
 }
 
