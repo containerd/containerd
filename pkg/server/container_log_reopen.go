@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Containerd Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,13 +17,15 @@ limitations under the License.
 package server
 
 import (
+	"errors"
 	"golang.org/x/net/context"
 
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
-// UpdateRuntimeConfig updates the runtime config. Currently only handles podCIDR updates.
-// TODO(random-liu): Figure out how to handle pod cidr in cri-containerd.
-func (c *criContainerdService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateRuntimeConfigRequest) (*runtime.UpdateRuntimeConfigResponse, error) {
-	return &runtime.UpdateRuntimeConfigResponse{}, nil
+// ReopenContainerLog asks cri-containerd to reopen the stdout/stderr log file for the container.
+// This is often called after the log file has been rotated.
+// TODO(random-liu): Implement this for kubelet log rotation.
+func (c *criContainerdService) ReopenContainerLog(ctx context.Context, r *runtime.ReopenContainerLogRequest) (*runtime.ReopenContainerLogResponse, error) {
+	return nil, errors.New("not implemented")
 }

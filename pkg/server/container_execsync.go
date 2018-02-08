@@ -29,7 +29,7 @@ import (
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	cioutil "github.com/containerd/cri-containerd/pkg/ioutil"
 	cio "github.com/containerd/cri-containerd/pkg/server/io"

@@ -21,7 +21,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
-	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	api "github.com/containerd/cri-containerd/pkg/api/v1"
 	"github.com/containerd/cri-containerd/pkg/log"
@@ -460,4 +460,19 @@ func (in *instrumentedService) LoadImage(ctx context.Context, r *api.LoadImageRe
 		}
 	}()
 	return in.c.LoadImage(ctx, r)
+}
+
+func (in *instrumentedService) ReopenContainerLog(ctx context.Context, r *runtime.ReopenContainerLogRequest) (res *runtime.ReopenContainerLogResponse, err error) {
+	if err := in.checkInitialized(); err != nil {
+		return nil, err
+	}
+	logrus.Debugf("ReopenContainerLog for %q", r.GetContainerId())
+	defer func() {
+		if err != nil {
+			logrus.WithError(err).Errorf("ReopenContainerLog for %q failed", r.GetContainerId())
+		} else {
+			logrus.Debugf("ReopenContainerLog for %q returns successfully", r.GetContainerId())
+		}
+	}()
+	return in.c.ReopenContainerLog(ctx, r)
 }

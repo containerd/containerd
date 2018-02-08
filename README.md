@@ -7,7 +7,7 @@
 [![Build Status](https://api.travis-ci.org/containerd/cri-containerd.svg?style=flat-square)](https://travis-ci.org/containerd/cri-containerd)
 [![Go Report Card](https://goreportcard.com/badge/github.com/containerd/cri-containerd?style=flat-square)](https://goreportcard.com/report/github.com/containerd/cri-containerd)
 
-`cri-containerd` is a [containerd](https://containerd.io/) based implementation of Kubernetes [container runtime interface (CRI)](https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/apis/cri/v1alpha1/runtime/api.proto).
+`cri-containerd` is a [containerd](https://containerd.io/) based implementation of Kubernetes [container runtime interface (CRI)](https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/apis/cri/runtime/v1alpha2/api.proto).
 
 With it, you could run Kubernetes using containerd as the container runtime.
 ![cri-containerd](./docs/cri-containerd.png)
