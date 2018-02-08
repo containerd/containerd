@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
 )
@@ -42,9 +42,9 @@ func TestPodSandboxStatus(t *testing.T) {
 		Linux: &runtime.LinuxPodSandboxConfig{
 			SecurityContext: &runtime.LinuxSandboxSecurityContext{
 				NamespaceOptions: &runtime.NamespaceOption{
-					HostNetwork: true,
-					HostPid:     false,
-					HostIpc:     true,
+					Network: runtime.NamespaceMode_NODE,
+					Pid:     runtime.NamespaceMode_CONTAINER,
+					Ipc:     runtime.NamespaceMode_POD,
 				},
 			},
 		},
@@ -65,9 +65,9 @@ func TestPodSandboxStatus(t *testing.T) {
 		Linux: &runtime.LinuxPodSandboxStatus{
 			Namespaces: &runtime.Namespace{
 				Options: &runtime.NamespaceOption{
-					HostNetwork: true,
-					HostPid:     false,
-					HostIpc:     true,
+					Network: runtime.NamespaceMode_NODE,
+					Pid:     runtime.NamespaceMode_CONTAINER,
+					Ipc:     runtime.NamespaceMode_POD,
 				},
 			},
 		},

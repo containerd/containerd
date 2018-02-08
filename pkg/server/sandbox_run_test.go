@@ -27,7 +27,7 @@ import (
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	ostesting "github.com/containerd/cri-containerd/pkg/os/testing"
 	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
@@ -105,9 +105,9 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 			configChange: func(c *runtime.PodSandboxConfig) {
 				c.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
 					NamespaceOptions: &runtime.NamespaceOption{
-						HostNetwork: true,
-						HostPid:     true,
-						HostIpc:     true,
+						Network: runtime.NamespaceMode_NODE,
+						Pid:     runtime.NamespaceMode_NODE,
+						Ipc:     runtime.NamespaceMode_NODE,
 					},
 				}
 			},
@@ -179,11 +179,11 @@ func TestSetupSandboxFiles(t *testing.T) {
 	testRootDir := "test-sandbox-root"
 	for desc, test := range map[string]struct {
 		dnsConfig     *runtime.DNSConfig
-		hostIpc       bool
+		ipcMode       runtime.NamespaceMode
 		expectedCalls []ostesting.CalledDetail
 	}{
-		"should check host /dev/shm existence when hostIpc is true": {
-			hostIpc: true,
+		"should check host /dev/shm existence when ipc mode is NODE": {
+			ipcMode: runtime.NamespaceMode_NODE,
 			expectedCalls: []ostesting.CalledDetail{
 				{
 					Name: "CopyFile",
@@ -209,7 +209,7 @@ func TestSetupSandboxFiles(t *testing.T) {
 				Searches: []string{"114.114.114.114"},
 				Options:  []string{"timeout:1"},
 			},
-			hostIpc: true,
+			ipcMode: runtime.NamespaceMode_NODE,
 			expectedCalls: []ostesting.CalledDetail{
 				{
 					Name: "CopyFile",
@@ -232,8 +232,8 @@ options timeout:1
 				},
 			},
 		},
-		"should create sandbox shm when hostIpc is false": {
-			hostIpc: false,
+		"should create sandbox shm when ipc namespace mode is not NODE": {
+			ipcMode: runtime.NamespaceMode_POD,
 			expectedCalls: []ostesting.CalledDetail{
 				{
 					Name: "CopyFile",
@@ -267,7 +267,7 @@ options timeout:1
 			Linux: &runtime.LinuxPodSandboxConfig{
 				SecurityContext: &runtime.LinuxSandboxSecurityContext{
 					NamespaceOptions: &runtime.NamespaceOption{
-						HostIpc: test.hostIpc,
+						Ipc: test.ipcMode,
 					},
 				},
 			},
@@ -402,9 +402,9 @@ func TestTypeurlMarshalUnmarshalSandboxMeta(t *testing.T) {
 			configChange: func(c *runtime.PodSandboxConfig) {
 				c.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
 					NamespaceOptions: &runtime.NamespaceOption{
-						HostNetwork: true,
-						HostPid:     true,
-						HostIpc:     true,
+						Network: runtime.NamespaceMode_NODE,
+						Pid:     runtime.NamespaceMode_NODE,
+						Ipc:     runtime.NamespaceMode_NODE,
 					},
 					SupplementalGroups: []int64{1111, 2222},
 				}

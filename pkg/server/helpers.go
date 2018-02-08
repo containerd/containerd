@@ -36,7 +36,7 @@ import (
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"golang.org/x/net/context"
-	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/util/sysctl"
 
 	"github.com/containerd/cri-containerd/pkg/store"
@@ -84,6 +84,8 @@ const (
 	ipcNSFormat = "/proc/%v/ns/ipc"
 	// utsNSFormat is the format of uts namespace of a process.
 	utsNSFormat = "/proc/%v/ns/uts"
+	// pidNSFormat is the format of pid namespace of a process.
+	pidNSFormat = "/proc/%v/ns/pid"
 	// devShm is the default path of /dev/shm.
 	devShm = "/dev/shm"
 	// etcHosts is the default path of /etc/hosts file.
@@ -181,6 +183,11 @@ func getIPCNamespace(pid uint32) string {
 // getUTSNamespace returns the uts namespace of a process.
 func getUTSNamespace(pid uint32) string {
 	return fmt.Sprintf(utsNSFormat, pid)
+}
+
+// getPIDNamespace returns the pid namespace of a process.
+func getPIDNamespace(pid uint32) string {
+	return fmt.Sprintf(pidNSFormat, pid)
 }
 
 // criContainerStateToString formats CRI container state to string.

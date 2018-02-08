@@ -33,7 +33,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
-	"k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	"github.com/containerd/cri-containerd/pkg/annotations"
 	customopts "github.com/containerd/cri-containerd/pkg/containerd/opts"
@@ -87,7 +87,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	}
 	securityContext := config.GetLinux().GetSecurityContext()
 	//Create Network Namespace if it is not in host network
-	hostNet := securityContext.GetNamespaceOptions().GetHostNetwork()
+	hostNet := securityContext.GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE
 	if !hostNet {
 		// If it is not in host network namespace then create a namespace and set the sandbox
 		// handle. NetNSPath in sandbox metadata and NetNS is non empty only for non host network
@@ -362,17 +362,16 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 	// Set namespace options.
 	securityContext := config.GetLinux().GetSecurityContext()
 	nsOptions := securityContext.GetNamespaceOptions()
-	if nsOptions.GetHostNetwork() {
+	if nsOptions.GetNetwork() == runtime.NamespaceMode_NODE {
 		g.RemoveLinuxNamespace(string(runtimespec.NetworkNamespace)) // nolint: errcheck
 	} else {
 		//TODO(Abhi): May be move this to containerd spec opts (WithLinuxSpaceOption)
 		g.AddOrReplaceLinuxNamespace(string(runtimespec.NetworkNamespace), nsPath) // nolint: errcheck
 	}
-	if nsOptions.GetHostPid() {
+	if nsOptions.GetPid() == runtime.NamespaceMode_NODE {
 		g.RemoveLinuxNamespace(string(runtimespec.PIDNamespace)) // nolint: errcheck
 	}
-
-	if nsOptions.GetHostIpc() {
+	if nsOptions.GetIpc() == runtime.NamespaceMode_NODE {
 		g.RemoveLinuxNamespace(string(runtimespec.IPCNamespace)) // nolint: errcheck
 	}
 
@@ -439,7 +438,7 @@ func (c *criContainerdService) setupSandboxFiles(rootDir string, config *runtime
 	}
 
 	// Setup sandbox /dev/shm.
-	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostIpc() {
+	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetIpc() == runtime.NamespaceMode_NODE {
 		if _, err := c.os.Stat(devShm); err != nil {
 			return fmt.Errorf("host %q is not available for host ipc: %v", devShm, err)
 		}
@@ -486,7 +485,7 @@ func parseDNSOptions(servers, searches, options []string) (string, error) {
 //  1) The mount point is already unmounted.
 //  2) The mount point doesn't exist.
 func (c *criContainerdService) unmountSandboxFiles(rootDir string, config *runtime.PodSandboxConfig) error {
-	if !config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostIpc() {
+	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetIpc() != runtime.NamespaceMode_NODE {
 		if err := c.os.Unmount(getSandboxDevShm(rootDir), unix.MNT_DETACH); err != nil && !os.IsNotExist(err) {
 			return err
 		}

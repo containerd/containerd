@@ -104,7 +104,7 @@ func WithHostNetwork(p *runtime.PodSandboxConfig) {
 	}
 	if p.Linux.SecurityContext.NamespaceOptions == nil {
 		p.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{
-			HostNetwork: true,
+			Network: runtime.NamespaceMode_NODE,
 		}
 	}
 }
