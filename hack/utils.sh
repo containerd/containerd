@@ -61,3 +61,29 @@ sha256() {
     shasum -a256 "$1" | awk '{ print $1 }'
   fi
 }
+
+# Takes a prefix ($what) and a $repo and sets `$what_VERSION` and
+# `$what_REPO` from vendor.conf, where `$what_REPO` defaults to $repo
+# but is overridden by the 3rd field of vendor.conf.
+from-vendor() {
+    local what=$1
+    local repo=$2
+    local vendor=$(dirname "${BASH_SOURCE[0]}")/../vendor.conf
+    setvars=$(awk -v REPO=$repo -v WHAT=$what -- '
+                  BEGIN { rc=1 }                        # Assume we did not find what we were looking for.
+                  // {
+                     if ($1 == REPO) {
+                        if ($3 != "") { REPO = $3 };    # Override repo.
+                        printf("%s_VERSION=%s; %s_REPO=%s\n", WHAT, $2, WHAT, REPO);
+                        rc=0;                           # Note success for use in END block.
+                        exit                            # No point looking further.
+                     }
+                 }
+                 END { exit rc }                        # Exit with the desired code.
+                 ' $vendor)
+    if [ $? -ne 0 ] ; then
+        echo "failed to get version of $repo from $vendor" >&2
+        exit 1
+    fi
+    eval $setvars
+}
