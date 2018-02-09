@@ -18,7 +18,7 @@ package integration
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -63,18 +63,13 @@ func TestImageFSInfo(t *testing.T) {
 		if info.GetTimestamp() != 0 &&
 			info.GetUsedBytes().GetValue() != 0 &&
 			info.GetInodesUsed().GetValue() != 0 &&
-			info.GetStorageId().GetUuid() != "" {
+			info.GetFsId().GetMountpoint() != "" {
 			return true, nil
 		}
 		return false, nil
 	}, time.Second, 30*time.Second))
 
-	t.Logf("Device uuid should exist")
-	files, err := ioutil.ReadDir("/dev/disk/by-uuid")
-	require.NoError(t, err)
-	var names []string
-	for _, f := range files {
-		names = append(names, f.Name())
-	}
-	assert.Contains(t, names, info.GetStorageId().GetUuid())
+	t.Logf("Image filesystem mountpath should exist")
+	_, err = os.Stat(info.GetFsId().GetMountpoint())
+	assert.NoError(t, err)
 }

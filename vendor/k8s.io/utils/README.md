@@ -41,7 +41,7 @@ an existing package to this repository.
   the [FakeExec](exec/testing/fake_exec.go) struct.
 
 - [Temp](/temp) provides an interface to create temporary directories. It also
-  provides a [FakeDir](temp/temptesting) implementation to replace in tests.
+  provides a [FakeDir](temp/temptest) implementation to replace in tests.
 
 - [Clock](/clock) provides an interface for time-based operations.  It allows
   mocking time for testing.

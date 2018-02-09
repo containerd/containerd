@@ -83,9 +83,6 @@ type PluginConfig struct {
 	StatsCollectPeriod int `toml:"stats_collect_period" json:"statsCollectPeriod,omitempty"`
 	// SystemdCgroup enables systemd cgroup support.
 	SystemdCgroup bool `toml:"systemd_cgroup" json:"systemdCgroup,omitempty"`
-	// SkipImageFSUUID skips retrieving imagefs uuid.
-	// TODO(random-liu): Remove this after we find a generic way to get imagefs uuid.
-	SkipImageFSUUID bool `toml:"skip_imagefs_uuid" json:"skipImageFSUUID,omitempty"`
 	// EnableIPv6DAD enables IPv6 DAD.
 	// TODO(random-liu): Use optimistic_dad when it's GA.
 	EnableIPv6DAD bool `toml:"enable_ipv6_dad" json:"enableIPv6DAD,omitempty"`
@@ -186,8 +183,6 @@ func (c *CRIContainerdOptions) AddFlags(fs *pflag.FlagSet) {
 		defaults.ProfilingPort, "Profiling port for web interface host:port/debug/pprof/.")
 	fs.StringVar(&c.ProfilingAddress, "profiling-addr",
 		defaults.ProfilingAddress, "Profiling address for web interface host:port/debug/pprof/.")
-	fs.BoolVar(&c.SkipImageFSUUID, "skip-imagefs-uuid",
-		defaults.SkipImageFSUUID, "Skip retrieval of imagefs uuid. When turned on, kubelet will not be able to get imagefs capacity or perform imagefs disk eviction.")
 	fs.BoolVar(&c.EnableIPv6DAD, "enable-ipv6-dad",
 		defaults.EnableIPv6DAD, "Enable IPv6 DAD (duplicate address detection) for pod sandbox network. Enabling this will increase pod sandbox start latency by several seconds.")
 	fs.Var(&c.Registry, "registry",
@@ -251,7 +246,6 @@ func DefaultConfig() Config {
 			SandboxImage:        "gcr.io/google_containers/pause:3.0",
 			StatsCollectPeriod:  10,
 			SystemdCgroup:       false,
-			SkipImageFSUUID:     false,
 			EnableIPv6DAD:       false,
 			Registry: Registry{
 				Mirrors: map[string]Mirror{

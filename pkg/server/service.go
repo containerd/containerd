@@ -33,7 +33,6 @@ import (
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
-	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
@@ -76,8 +75,8 @@ type CRIContainerdService interface {
 type criContainerdService struct {
 	// config contains all configurations.
 	config options.Config
-	// imageFSUUID is the device uuid of image filesystem.
-	imageFSUUID string
+	// imageFSPath is the path to image filesystem.
+	imageFSPath string
 	// apparmorEnabled indicates whether apparmor is enabled.
 	apparmorEnabled bool
 	// seccompEnabled indicates whether seccomp is enabled.
@@ -138,16 +137,8 @@ func NewCRIContainerdService(config options.Config) (CRIContainerdService, error
 		selinux.SetDisabled()
 	}
 
-	if !c.config.SkipImageFSUUID {
-		imageFSPath := imageFSPath(config.ContainerdRootDir, config.ContainerdConfig.Snapshotter)
-		c.imageFSUUID, err = c.getDeviceUUID(imageFSPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get imagefs uuid of %q: %v", imageFSPath, err)
-		}
-		logrus.Infof("Get device uuid %q for image filesystem %q", c.imageFSUUID, imageFSPath)
-	} else {
-		logrus.Warn("Skip retrieving imagefs UUID, kubelet will not be able to get imagefs capacity or perform imagefs disk eviction.")
-	}
+	c.imageFSPath = imageFSPath(config.ContainerdRootDir, config.ContainerdConfig.Snapshotter)
+	logrus.Infof("Get image filesystem path %q", c.imageFSPath)
 
 	c.netPlugin, err = ocicni.InitCNI(config.NetworkPluginConfDir, config.NetworkPluginBinDir)
 	if err != nil {
@@ -291,16 +282,6 @@ func (c *criContainerdService) Close() error {
 	}
 	c.server.Stop()
 	return nil
-}
-
-// getDeviceUUID gets device uuid for a given path.
-func (c *criContainerdService) getDeviceUUID(path string) (string, error) {
-	mount, err := c.os.LookupMount(path)
-	if err != nil {
-		return "", err
-	}
-	rdev := unix.Mkdev(uint32(mount.Major), uint32(mount.Minor))
-	return c.os.DeviceUUID(rdev)
 }
 
 // imageFSPath returns containerd image filesystem path.

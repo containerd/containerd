@@ -42,7 +42,7 @@ func (c *criContainerdService) ImageFsInfo(ctx context.Context, r *runtime.Image
 		ImageFilesystems: []*runtime.FilesystemUsage{
 			{
 				Timestamp:  timestamp,
-				StorageId:  &runtime.StorageIdentifier{Uuid: c.imageFSUUID},
+				FsId:       &runtime.FilesystemIdentifier{Mountpoint: c.imageFSPath},
 				UsedBytes:  &runtime.UInt64Value{Value: usedBytes},
 				InodesUsed: &runtime.UInt64Value{Value: inodesUsed},
 			},
