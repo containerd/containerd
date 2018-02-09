@@ -338,7 +338,7 @@ func testStats(t *testing.T,
 	require.NotEmpty(t, s.GetMemory().GetTimestamp())
 	require.NotEmpty(t, s.GetMemory().GetWorkingSetBytes().GetValue())
 	require.NotEmpty(t, s.GetWritableLayer().GetTimestamp())
-	require.NotEmpty(t, s.GetWritableLayer().GetStorageId().GetUuid())
+	require.NotEmpty(t, s.GetWritableLayer().GetFsId().GetMountpoint())
 	require.NotEmpty(t, s.GetWritableLayer().GetUsedBytes().GetValue())
 	require.NotEmpty(t, s.GetWritableLayer().GetInodesUsed().GetValue())
 

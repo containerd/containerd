@@ -17,12 +17,10 @@ limitations under the License.
 package os
 
 import (
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"syscall"
 
 	containerdmount "github.com/containerd/containerd/mount"
 	"github.com/containerd/fifo"
@@ -44,7 +42,6 @@ type OS interface {
 	Mount(source string, target string, fstype string, flags uintptr, data string) error
 	Unmount(target string, flags int) error
 	LookupMount(path string) (containerdmount.Info, error)
-	DeviceUUID(device uint64) (string, error)
 }
 
 // RealOS is used to dispatch the real system level operations.
@@ -123,40 +120,4 @@ func (RealOS) Unmount(target string, flags int) error {
 // LookupMount gets mount info of a given path.
 func (RealOS) LookupMount(path string) (containerdmount.Info, error) {
 	return containerdmount.Lookup(path)
-}
-
-// blkdev returns the rdev of a block device or an error if not a block device
-func blkrdev(device string) (uint64, error) {
-	info, err := os.Stat(device)
-	if err != nil {
-		return 0, err
-	}
-	stat := info.Sys().(*syscall.Stat_t)
-	if (stat.Mode & syscall.S_IFMT) != syscall.S_IFBLK {
-		return 0, fmt.Errorf("%s is not a block device", device)
-	}
-	return stat.Rdev, nil
-}
-
-// DeviceUUID gets device uuid of a device. The passed in rdev should be
-// linux device number.
-func (RealOS) DeviceUUID(rdev uint64) (string, error) {
-	const uuidDir = "/dev/disk/by-uuid"
-	files, err := ioutil.ReadDir(uuidDir)
-	if err != nil {
-		return "", err
-	}
-	for _, file := range files {
-		path := filepath.Join(uuidDir, file.Name())
-
-		trdev, err := blkrdev(path)
-		if err != nil {
-			continue
-		}
-
-		if rdev == trdev {
-			return file.Name(), nil
-		}
-	}
-	return "", fmt.Errorf("device %d not found", rdev)
 }

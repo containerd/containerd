@@ -55,7 +55,7 @@ func TestImageFsInfo(t *testing.T) {
 	}
 	expected := &runtime.FilesystemUsage{
 		Timestamp:  123456,
-		StorageId:  &runtime.StorageIdentifier{Uuid: testImageFSUUID},
+		FsId:       &runtime.FilesystemIdentifier{Mountpoint: testImageFSPath},
 		UsedBytes:  &runtime.UInt64Value{Value: 30},
 		InodesUsed: &runtime.UInt64Value{Value: 300},
 	}

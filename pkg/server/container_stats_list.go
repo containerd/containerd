@@ -83,8 +83,8 @@ func (c *criContainerdService) getContainerMetrics(
 	}
 	cs.WritableLayer = &runtime.FilesystemUsage{
 		Timestamp: sn.Timestamp,
-		StorageId: &runtime.StorageIdentifier{
-			Uuid: c.imageFSUUID,
+		FsId: &runtime.FilesystemIdentifier{
+			Mountpoint: c.imageFSPath,
 		},
 		UsedBytes:  &runtime.UInt64Value{Value: usedBytes},
 		InodesUsed: &runtime.UInt64Value{Value: inodesUsed},
