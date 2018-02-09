@@ -25,7 +25,7 @@ type V1Exporter struct {
 }
 
 // Export implements Exporter.
-func (oe *V1Exporter) Export(ctx context.Context, store content.Store, desc ocispec.Descriptor, writer io.Writer) error {
+func (oe *V1Exporter) Export(ctx context.Context, store content.Provider, desc ocispec.Descriptor, writer io.Writer) error {
 	tw := tar.NewWriter(writer)
 	defer tw.Close()
 
@@ -67,7 +67,7 @@ type tarRecord struct {
 	CopyTo func(context.Context, io.Writer) (int64, error)
 }
 
-func blobRecord(cs content.Store, desc ocispec.Descriptor) tarRecord {
+func blobRecord(cs content.Provider, desc ocispec.Descriptor) tarRecord {
 	path := "blobs/" + desc.Digest.Algorithm().String() + "/" + desc.Digest.Hex()
 	return tarRecord{
 		Header: &tar.Header{

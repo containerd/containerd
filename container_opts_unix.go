@@ -115,7 +115,7 @@ func WithTaskCheckpoint(im Image) NewTaskOpts {
 	}
 }
 
-func decodeIndex(ctx context.Context, store content.Store, id digest.Digest) (*v1.Index, error) {
+func decodeIndex(ctx context.Context, store content.Provider, id digest.Digest) (*v1.Index, error) {
 	var index v1.Index
 	p, err := content.ReadBlob(ctx, store, id)
 	if err != nil {

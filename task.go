@@ -572,7 +572,7 @@ func (t *task) writeIndex(ctx context.Context, index *v1.Index) (d v1.Descriptor
 	return writeContent(ctx, t.client.ContentStore(), v1.MediaTypeImageIndex, t.id, buf, content.WithLabels(labels))
 }
 
-func writeContent(ctx context.Context, store content.Store, mediaType, ref string, r io.Reader, opts ...content.Opt) (d v1.Descriptor, err error) {
+func writeContent(ctx context.Context, store content.Ingester, mediaType, ref string, r io.Reader, opts ...content.Opt) (d v1.Descriptor, err error) {
 	writer, err := store.Writer(ctx, ref, 0, "")
 	if err != nil {
 		return d, err
