@@ -13,10 +13,10 @@ import (
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/fs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/continuity/fs"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runc/libcontainer/user"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
