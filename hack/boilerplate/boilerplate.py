@@ -218,7 +218,7 @@ def get_regexs():
     # strip #!.* from shell scripts
     regexs["shebang"] = re.compile(r"^(#!.*\n)\n*", re.MULTILINE)
     regexs["authors"] = re.compile( 'AUTHORS' )
-    authors = [ 'The Kubernetes Authors', 'The Containerd Authors' ]
+    authors = [ 'The Kubernetes Authors', 'The Containerd Authors', 'The containerd Authors' ]
     regexs["auth"] = re.compile( '(%s)' % "|".join(map(lambda l: str(l), authors)) )
     regexs["copyright"] = re.compile( 'Copyright YEAR AUTHORS' )
     return regexs
