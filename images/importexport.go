@@ -17,5 +17,5 @@ type Importer interface {
 // Exporter is the interface for image exporter.
 type Exporter interface {
 	// Export exports an image to a tar stream.
-	Export(ctx context.Context, store content.Store, desc ocispec.Descriptor, writer io.Writer) error
+	Export(ctx context.Context, store content.Provider, desc ocispec.Descriptor, writer io.Writer) error
 }

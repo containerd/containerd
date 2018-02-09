@@ -113,7 +113,7 @@ func normalizeImageRef(imageName string, manifest ocispec.Descriptor) (string, e
 	return imageName + ":" + ociRef, nil
 }
 
-func onUntarBlob(ctx context.Context, r io.Reader, store content.Store, name string, size int64) error {
+func onUntarBlob(ctx context.Context, r io.Reader, store content.Ingester, name string, size int64) error {
 	// name is like "blobs/sha256/deadbeef"
 	split := strings.Split(name, "/")
 	if len(split) != 3 {

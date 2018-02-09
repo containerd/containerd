@@ -22,14 +22,14 @@ import (
 
 // NewFileSystemApplier returns an applier which simply mounts
 // and applies diff onto the mounted filesystem.
-func NewFileSystemApplier(cs content.Store) diff.Applier {
+func NewFileSystemApplier(cs content.Provider) diff.Applier {
 	return &fsApplier{
 		store: cs,
 	}
 }
 
 type fsApplier struct {
-	store content.Store
+	store content.Provider
 }
 
 var emptyDesc = ocispec.Descriptor{}
