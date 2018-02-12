@@ -150,7 +150,7 @@ Sockets, pids, runtime state, mount points, and other plugin data that must not 
 Both the `root` and `state` directories are namespaced for plugins.
 Both directories are an implementation detail of containerd and its plugins.
 They should not be tampered with as corruption and bugs can and will happen.
-External apps reading or watching changes in these directories have been know to cause `EBUSY` and stale file handles when containerd and/or its plugins try to cleanup resources.
+External apps reading or watching changes in these directories have been known to cause `EBUSY` and stale file handles when containerd and/or its plugins try to cleanup resources.
 
 ```toml
 # persistent data location
