@@ -1,0 +1,685 @@
+
+
+
+
+
+<html>
+<head>
+ <title>containerd gRPC API Documentation</title>
+ <link
+   href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/flatly/bootstrap.min.css"
+   rel="stylesheet">
+</head>
+
+<body>
+
+<div class="doc container">
+  <h1>containerd.events</h1>
+  <div class="doc-inner">
+    <p>
+      <code>github.com/containerd/containerd/api/events/task.proto</code>
+      (syntax: <code>proto3</code>)
+    </p>
+  </div>
+
+	
+	
+		<div class="doc-dependencies">
+			<h2>Dependencies</h2>
+			<div class="doc-inner">
+				<ul>
+					
+						<li>gogoproto/gogo.proto</li>
+					
+						<li>google/protobuf/timestamp.proto</li>
+					
+						<li>github.com/containerd/containerd/api/types/mount.proto</li>
+					
+						<li>github.com/containerd/containerd/protobuf/plugin/fieldpath.proto</li>
+					
+				</ul>
+			</div>
+		</div>
+	
+
+	
+	
+	
+
+	
+	
+
+	
+	
+
+	
+	
+	
+		<div class="doc-message-types">
+			<h2>Messages</h2>
+			
+				<div class="doc-inner">
+					<h3 id="TaskCreate">Message: TaskCreate</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>bundle</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>rootfs</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/types/mount.html#Mount">Mount</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>4</td>
+								<td>io</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/events/task.html#TaskIO">TaskIO</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>5</td>
+								<td>checkpoint</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>6</td>
+								<td>pid</td>
+								<td>optional</td>
+								
+									<td>uint32</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="TaskStart">Message: TaskStart</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>pid</td>
+								<td>optional</td>
+								
+									<td>uint32</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="TaskDelete">Message: TaskDelete</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>pid</td>
+								<td>optional</td>
+								
+									<td>uint32</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>exit_status</td>
+								<td>optional</td>
+								
+									<td>uint32</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>4</td>
+								<td>exited_at</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/timestamp.html#Timestamp">Timestamp</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="TaskIO">Message: TaskIO</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>stdin</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>stdout</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>stderr</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>4</td>
+								<td>terminal</td>
+								<td>optional</td>
+								
+									<td>bool</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="TaskExit">Message: TaskExit</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>pid</td>
+								<td>optional</td>
+								
+									<td>uint32</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>4</td>
+								<td>exit_status</td>
+								<td>optional</td>
+								
+									<td>uint32</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>5</td>
+								<td>exited_at</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/timestamp.html#Timestamp">Timestamp</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="TaskOOM">Message: TaskOOM</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="TaskExecAdded">Message: TaskExecAdded</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>exec_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="TaskExecStarted">Message: TaskExecStarted</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>exec_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>pid</td>
+								<td>optional</td>
+								
+									<td>uint32</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="TaskPaused">Message: TaskPaused</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="TaskResumed">Message: TaskResumed</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="TaskCheckpointed">Message: TaskCheckpointed</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>checkpoint</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+		</div>
+	
+</div>
+
+</body>
+</html>

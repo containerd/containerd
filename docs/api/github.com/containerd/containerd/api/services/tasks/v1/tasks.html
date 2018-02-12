@@ -1,0 +1,1668 @@
+
+
+
+
+
+<html>
+<head>
+ <title>containerd gRPC API Documentation</title>
+ <link
+   href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/flatly/bootstrap.min.css"
+   rel="stylesheet">
+</head>
+
+<body>
+
+<div class="doc container">
+  <h1>containerd.services.tasks.v1</h1>
+  <div class="doc-inner">
+    <p>
+      <code>github.com/containerd/containerd/api/services/tasks/v1/tasks.proto</code>
+      (syntax: <code>proto3</code>)
+    </p>
+  </div>
+
+	
+	
+		<div class="doc-dependencies">
+			<h2>Dependencies</h2>
+			<div class="doc-inner">
+				<ul>
+					
+						<li>google/protobuf/empty.proto</li>
+					
+						<li>google/protobuf/any.proto</li>
+					
+						<li>gogoproto/gogo.proto</li>
+					
+						<li>github.com/containerd/containerd/api/types/mount.proto</li>
+					
+						<li>github.com/containerd/containerd/api/types/metrics.proto</li>
+					
+						<li>github.com/containerd/containerd/api/types/descriptor.proto</li>
+					
+						<li>github.com/containerd/containerd/api/types/task/task.proto</li>
+					
+						<li>google/protobuf/timestamp.proto</li>
+					
+				</ul>
+			</div>
+		</div>
+	
+
+	
+	
+	
+
+	
+	
+
+	
+	
+		<div class="doc-services">
+			<h2>Services</h2>
+			
+				<div class="doc-inner">
+
+				<h3>Tasks</h3>
+				
+	
+	
+		
+	
+
+				<table class="table table-striped">
+					<tr><td>Method</td><td>Input Type</td><td>Output Type</td><td>Description</td></tr>
+					
+						<tr>
+							<td>Create
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#CreateTaskRequest">CreateTaskRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#CreateTaskResponse">CreateTaskResponse</a></td>
+							<td>
+	
+	
+		
+			<p>Create a task.</p>
+
+			
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Start
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#StartRequest">StartRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#StartResponse">StartResponse</a></td>
+							<td>
+	
+	
+		
+			<p>Start a process.</p>
+
+			
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Delete
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#DeleteTaskRequest">DeleteTaskRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#DeleteResponse">DeleteResponse</a></td>
+							<td>
+	
+	
+		
+			<p>Delete a task and on disk state.</p>
+
+			
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>DeleteProcess
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#DeleteProcessRequest">DeleteProcessRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#DeleteResponse">DeleteResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Get
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#GetRequest">GetRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#GetResponse">GetResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>List
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#ListTasksRequest">ListTasksRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#ListTasksResponse">ListTasksResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Kill
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#KillRequest">KillRequest</a></td>
+							<td><a href="/api/google/protobuf/empty.html#Empty">Empty</a></td>
+							<td>
+	
+	
+		
+			<p>Kill a task or process.</p>
+
+			
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Exec
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#ExecProcessRequest">ExecProcessRequest</a></td>
+							<td><a href="/api/google/protobuf/empty.html#Empty">Empty</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>ResizePty
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#ResizePtyRequest">ResizePtyRequest</a></td>
+							<td><a href="/api/google/protobuf/empty.html#Empty">Empty</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>CloseIO
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#CloseIORequest">CloseIORequest</a></td>
+							<td><a href="/api/google/protobuf/empty.html#Empty">Empty</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Pause
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#PauseTaskRequest">PauseTaskRequest</a></td>
+							<td><a href="/api/google/protobuf/empty.html#Empty">Empty</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Resume
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#ResumeTaskRequest">ResumeTaskRequest</a></td>
+							<td><a href="/api/google/protobuf/empty.html#Empty">Empty</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>ListPids
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#ListPidsRequest">ListPidsRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#ListPidsResponse">ListPidsResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Checkpoint
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#CheckpointTaskRequest">CheckpointTaskRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#CheckpointTaskResponse">CheckpointTaskResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Update
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#UpdateTaskRequest">UpdateTaskRequest</a></td>
+							<td><a href="/api/google/protobuf/empty.html#Empty">Empty</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Metrics
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#MetricsRequest">MetricsRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#MetricsResponse">MetricsResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Wait
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#WaitRequest">WaitRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/tasks/v1/tasks.html#WaitResponse">WaitResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+				</table>
+
+			
+		</div>
+	
+
+	
+	
+	
+		<div class="doc-message-types">
+			<h2>Messages</h2>
+			
+				<div class="doc-inner">
+					<h3 id="CreateTaskRequest">Message: CreateTaskRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>rootfs</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/types/mount.html#Mount">Mount</td>
+								
+								<td>
+	
+	
+		
+			<p>RootFS provides the pre-chroot mounts to perform in the shim before
+ executing the container task.</p>
+
+<p>These are for mounts that cannot be performed in the user namespace.
+ Typically, these mounts should be resolved from snapshots specified on
+ the container object.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>4</td>
+								<td>stdin</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>5</td>
+								<td>stdout</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>6</td>
+								<td>stderr</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>7</td>
+								<td>terminal</td>
+								<td>optional</td>
+								
+									<td>bool</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>8</td>
+								<td>checkpoint</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/types/descriptor.html#Descriptor">Descriptor</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>9</td>
+								<td>options</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/any.html#Any">Any</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="CreateTaskResponse">Message: CreateTaskResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>pid</td>
+								<td>optional</td>
+								
+									<td>uint32</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="StartRequest">Message: StartRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>exec_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="StartResponse">Message: StartResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>pid</td>
+								<td>optional</td>
+								
+									<td>uint32</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="DeleteTaskRequest">Message: DeleteTaskRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="DeleteResponse">Message: DeleteResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>pid</td>
+								<td>optional</td>
+								
+									<td>uint32</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>exit_status</td>
+								<td>optional</td>
+								
+									<td>uint32</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>4</td>
+								<td>exited_at</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/timestamp.html#Timestamp">Timestamp</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="DeleteProcessRequest">Message: DeleteProcessRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>exec_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="GetRequest">Message: GetRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>exec_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="GetResponse">Message: GetResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>process</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/types/task/task.html#Process">Process</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ListTasksRequest">Message: ListTasksRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>filter</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ListTasksResponse">Message: ListTasksResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>tasks</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/types/task/task.html#Process">Process</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="KillRequest">Message: KillRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>exec_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>signal</td>
+								<td>optional</td>
+								
+									<td>uint32</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>4</td>
+								<td>all</td>
+								<td>optional</td>
+								
+									<td>bool</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ExecProcessRequest">Message: ExecProcessRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>stdin</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>stdout</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>4</td>
+								<td>stderr</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>5</td>
+								<td>terminal</td>
+								<td>optional</td>
+								
+									<td>bool</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>6</td>
+								<td>spec</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/any.html#Any">Any</td>
+								
+								<td>
+	
+	
+		
+			<p>Spec for starting a process in the target container.</p>
+
+<p>For runc, this is a process spec, for example.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>7</td>
+								<td>exec_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+			<p>id of the exec process</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ExecProcessResponse">Message: ExecProcessResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ResizePtyRequest">Message: ResizePtyRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>exec_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>width</td>
+								<td>optional</td>
+								
+									<td>uint32</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>4</td>
+								<td>height</td>
+								<td>optional</td>
+								
+									<td>uint32</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="CloseIORequest">Message: CloseIORequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>exec_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>stdin</td>
+								<td>optional</td>
+								
+									<td>bool</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="PauseTaskRequest">Message: PauseTaskRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ResumeTaskRequest">Message: ResumeTaskRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ListPidsRequest">Message: ListPidsRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ListPidsResponse">Message: ListPidsResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>processes</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/types/task/task.html#ProcessInfo">ProcessInfo</td>
+								
+								<td>
+	
+	
+		
+			<p>Processes includes the process ID and additional process information</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="CheckpointTaskRequest">Message: CheckpointTaskRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>parent_checkpoint</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>options</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/any.html#Any">Any</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="CheckpointTaskResponse">Message: CheckpointTaskResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>descriptors</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/types/descriptor.html#Descriptor">Descriptor</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="UpdateTaskRequest">Message: UpdateTaskRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>resources</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/any.html#Any">Any</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="MetricsRequest">Message: MetricsRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>filters</td>
+								<td>repeated</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="MetricsResponse">Message: MetricsResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>metrics</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/types/metrics.html#Metric">Metric</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="WaitRequest">Message: WaitRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>exec_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="WaitResponse">Message: WaitResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>exit_status</td>
+								<td>optional</td>
+								
+									<td>uint32</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>exited_at</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/timestamp.html#Timestamp">Timestamp</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+		</div>
+	
+</div>
+
+</body>
+</html>

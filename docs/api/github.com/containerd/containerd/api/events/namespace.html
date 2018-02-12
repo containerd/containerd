@@ -1,0 +1,255 @@
+
+
+
+
+
+<html>
+<head>
+ <title>containerd gRPC API Documentation</title>
+ <link
+   href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/flatly/bootstrap.min.css"
+   rel="stylesheet">
+</head>
+
+<body>
+
+<div class="doc container">
+  <h1>containerd.events</h1>
+  <div class="doc-inner">
+    <p>
+      <code>github.com/containerd/containerd/api/events/namespace.proto</code>
+      (syntax: <code>proto3</code>)
+    </p>
+  </div>
+
+	
+	
+		<div class="doc-dependencies">
+			<h2>Dependencies</h2>
+			<div class="doc-inner">
+				<ul>
+					
+						<li>gogoproto/gogo.proto</li>
+					
+						<li>github.com/containerd/containerd/protobuf/plugin/fieldpath.proto</li>
+					
+				</ul>
+			</div>
+		</div>
+	
+
+	
+	
+	
+
+	
+	
+
+	
+	
+
+	
+	
+	
+		<div class="doc-message-types">
+			<h2>Messages</h2>
+			
+				<div class="doc-inner">
+					<h3 id="NamespaceCreate">Message: NamespaceCreate</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>name</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>labels</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/events/container.html#NamespaceCreate.LabelsEntry">LabelsEntry</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="NamespaceCreate.LabelsEntry">Message: NamespaceCreate.LabelsEntry</h3>
+					
+	
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>key</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>value</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="NamespaceUpdate">Message: NamespaceUpdate</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>name</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>labels</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/events/container.html#NamespaceUpdate.LabelsEntry">LabelsEntry</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="NamespaceUpdate.LabelsEntry">Message: NamespaceUpdate.LabelsEntry</h3>
+					
+	
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>key</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>value</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="NamespaceDelete">Message: NamespaceDelete</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>name</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+		</div>
+	
+</div>
+
+</body>
+</html>

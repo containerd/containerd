@@ -1,0 +1,157 @@
+
+{{define "Comments"}}
+	{{$l := location .}}
+	{{if $l}}
+		{{if or $l.LeadingComments $l.TrailingComments}}
+			{{with $l.LeadingComments}}{{ markdown .}}{{end}}
+			{{with $l.TrailingComments}}{{ markdown .}}{{end}}
+		{{end}}
+	{{end}}
+{{end}}
+
+{{define "CommentsParagraph"}}
+	{{$l := location .}}
+	{{if $l}}
+		{{if or $l.LeadingComments $l.TrailingComments}}
+			<p class="description">Description:
+					{{with $l.LeadingComments}}{{ markdown . }}{{end}}
+					{{with $l.TrailingComments}}{{ markdown . }}{{end}}
+			</p>
+		{{end}}
+	{{end}}
+{{end}}
+
+<html>
+<head>
+ <title>containerd gRPC API Documentation</title>
+ <link
+   href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/flatly/bootstrap.min.css"
+   rel="stylesheet">
+</head>
+
+<body>
+
+<div class="doc container">
+  <h1>{{.Target.Package}}</h1>
+  <div class="doc-inner">
+    <p>
+      <code>{{.Target.Name}}</code>
+      (syntax: <code>{{with .Target.Syntax}}{{.}}{{else}}proto2{{end}}</code>)
+    </p>
+  </div>
+
+	<!-- Dependencies -->
+	{{if .Target.Dependency}}
+		<div class="doc-dependencies">
+			<h2>Dependencies</h2>
+			<div class="doc-inner">
+				<ul>
+					{{range $d := .Target.Dependency}}
+						<li>{{$d}}</li>
+					{{end}}
+				</ul>
+			</div>
+		</div>
+	{{end}}
+
+	<!-- Enumerations -->
+	{{$enums := allEnums .Target}}
+	{{if $enums}}
+		<div class="doc-enum-types">
+			<h2>Enums</h2>
+			{{range $e := $enums}}
+				<div class="doc-inner">
+					<h3 id="{{$e.Name}}">Enum: {{$e.Name}}</h3>
+					{{template "CommentsParagraph" $e}}
+					{{if $e.Value}}
+						<table class="table table-striped">
+							<tr><td>Name</td><td>Value</td><td>Description</td></tr>
+							{{range .Value}}
+								<tr>
+									<td>{{.Name}}</td>
+									<td>{{.Number}} {{if .Options}}{{if .Options.Deprecated}}(deprecated){{end}}{{end}}</td>
+									<td>{{template "Comments" .}}</td>
+								</tr>
+							{{end}}
+						</table>
+					{{end}}
+				</div>
+			{{end}}
+		</div>
+	{{end}}
+
+	<!-- Extensions -->
+	{{if .Target.Extension}}
+		<div class="doc-extensions">
+			<h2>Extensions</h2>
+			{{range $e := .Target.Extension}}
+				<div class="doc-inner">
+					<h3 id="{{$e.Name}}">Extension: {{$e.Name}}</h3>
+					{{template "CommentsParagraph" $e}}
+				</div>
+			{{end}}
+		</div>
+	{{end}}
+
+	<!-- Services -->
+	{{if .Target.Service}}
+		<div class="doc-services">
+			<h2>Services</h2>
+			{{range $s := .Target.Service}}
+				<div class="doc-inner">
+
+				<h3>{{$s.Name}}</h3>
+				{{template "CommentsParagraph" $s}}
+				<table class="table table-striped">
+					<tr><td>Method</td><td>Input Type</td><td>Output Type</td><td>Description</td></tr>
+					{{range $s.Method}}
+						<tr>
+							<td>{{.Name}}
+								{{if .ClientStreaming}}*Client-Streaming {{end}}
+								{{if .ServerStreaming}}*Server-Streaming {{end}}
+								{{if .Options}}{{if .Options.Deprecated}}*Deprecated{{end}}{{end}}
+							</td>
+							<td><a href="{{typeURL .InputType}}">{{typeBaseName .InputType}}</a></td>
+							<td><a href="{{typeURL .OutputType}}">{{typeBaseName .OutputType}}</a></td>
+							<td>{{template "Comments" .}}</td>
+						</tr>
+					{{end}}
+				</table>
+
+			{{end}}
+		</div>
+	{{end}}
+
+	<!-- Messages -->
+	{{$messages := allMessages .Target}}
+	{{if $messages}}
+		<div class="doc-message-types">
+			<h2>Messages</h2>
+			{{range $m := $messages}}
+				<div class="doc-inner">
+					<h3 id="{{$m.Name}}">Message: {{$m.Name}}</h3>
+					{{template "CommentsParagraph" $m}}
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						{{range $m.Field}}
+							<tr>
+								<td>{{.Number}}</td>
+								<td>{{.Name}}</td>
+								<td>{{labelString .Label}}</td>
+								{{if .TypeName}}
+									<td><a href="{{typeURL .TypeName}}">{{fieldType .}}</td>
+								{{else}}
+									<td>{{fieldType .}}</td>
+								{{end}}
+								<td>{{template "Comments" .}}</td>
+							</tr>
+						{{end}}
+					</table>
+				</div>
+			{{end}}
+		</div>
+	{{end}}
+</div>
+
+</body>
+</html>

@@ -1,0 +1,369 @@
+
+
+
+
+
+<html>
+<head>
+ <title>containerd gRPC API Documentation</title>
+ <link
+   href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/flatly/bootstrap.min.css"
+   rel="stylesheet">
+</head>
+
+<body>
+
+<div class="doc container">
+  <h1>containerd.v1.types</h1>
+  <div class="doc-inner">
+    <p>
+      <code>github.com/containerd/containerd/api/types/task/task.proto</code>
+      (syntax: <code>proto3</code>)
+    </p>
+  </div>
+
+	
+	
+		<div class="doc-dependencies">
+			<h2>Dependencies</h2>
+			<div class="doc-inner">
+				<ul>
+					
+						<li>gogoproto/gogo.proto</li>
+					
+						<li>google/protobuf/timestamp.proto</li>
+					
+						<li>google/protobuf/any.proto</li>
+					
+				</ul>
+			</div>
+		</div>
+	
+
+	
+	
+	
+		<div class="doc-enum-types">
+			<h2>Enums</h2>
+			
+				<div class="doc-inner">
+					<h3 id="Status">Enum: Status</h3>
+					
+	
+	
+		
+	
+
+					
+						<table class="table table-striped">
+							<tr><td>Name</td><td>Value</td><td>Description</td></tr>
+							
+								<tr>
+									<td>UNKNOWN</td>
+									<td>0 </td>
+									<td>
+	
+	
+		
+	
+</td>
+								</tr>
+							
+								<tr>
+									<td>CREATED</td>
+									<td>1 </td>
+									<td>
+	
+	
+		
+	
+</td>
+								</tr>
+							
+								<tr>
+									<td>RUNNING</td>
+									<td>2 </td>
+									<td>
+	
+	
+		
+	
+</td>
+								</tr>
+							
+								<tr>
+									<td>STOPPED</td>
+									<td>3 </td>
+									<td>
+	
+	
+		
+	
+</td>
+								</tr>
+							
+								<tr>
+									<td>PAUSED</td>
+									<td>4 </td>
+									<td>
+	
+	
+		
+	
+</td>
+								</tr>
+							
+								<tr>
+									<td>PAUSING</td>
+									<td>5 </td>
+									<td>
+	
+	
+		
+	
+</td>
+								</tr>
+							
+						</table>
+					
+				</div>
+			
+		</div>
+	
+
+	
+	
+
+	
+	
+
+	
+	
+	
+		<div class="doc-message-types">
+			<h2>Messages</h2>
+			
+				<div class="doc-inner">
+					<h3 id="Process">Message: Process</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>container_id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>id</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>pid</td>
+								<td>optional</td>
+								
+									<td>uint32</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>4</td>
+								<td>status</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/types/task/task.html#Status">Status</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>5</td>
+								<td>stdin</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>6</td>
+								<td>stdout</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>7</td>
+								<td>stderr</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>8</td>
+								<td>terminal</td>
+								<td>optional</td>
+								
+									<td>bool</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>9</td>
+								<td>exit_status</td>
+								<td>optional</td>
+								
+									<td>uint32</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>10</td>
+								<td>exited_at</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/timestamp.html#Timestamp">Timestamp</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ProcessInfo">Message: ProcessInfo</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>pid</td>
+								<td>optional</td>
+								
+									<td>uint32</td>
+								
+								<td>
+	
+	
+		
+			<p>PID is the process ID.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>info</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/any.html#Any">Any</td>
+								
+								<td>
+	
+	
+		
+			<p>Info contains additional process information.</p>
+
+<p>Info varies by platform.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+		</div>
+	
+</div>
+
+</body>
+</html>

@@ -1,0 +1,750 @@
+
+
+
+
+
+<html>
+<head>
+ <title>containerd gRPC API Documentation</title>
+ <link
+   href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/flatly/bootstrap.min.css"
+   rel="stylesheet">
+</head>
+
+<body>
+
+<div class="doc container">
+  <h1>gogoproto</h1>
+  <div class="doc-inner">
+    <p>
+      <code>gogoproto/gogo.proto</code>
+      (syntax: <code>proto2</code>)
+    </p>
+  </div>
+
+	
+	
+		<div class="doc-dependencies">
+			<h2>Dependencies</h2>
+			<div class="doc-inner">
+				<ul>
+					
+						<li>google/protobuf/descriptor.proto</li>
+					
+				</ul>
+			</div>
+		</div>
+	
+
+	
+	
+	
+
+	
+	
+		<div class="doc-extensions">
+			<h2>Extensions</h2>
+			
+				<div class="doc-inner">
+					<h3 id="goproto_enum_prefix">Extension: goproto_enum_prefix</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="goproto_enum_stringer">Extension: goproto_enum_stringer</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="enum_stringer">Extension: enum_stringer</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="enum_customname">Extension: enum_customname</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="enumdecl">Extension: enumdecl</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="enumvalue_customname">Extension: enumvalue_customname</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="goproto_getters_all">Extension: goproto_getters_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="goproto_enum_prefix_all">Extension: goproto_enum_prefix_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="goproto_stringer_all">Extension: goproto_stringer_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="verbose_equal_all">Extension: verbose_equal_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="face_all">Extension: face_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="gostring_all">Extension: gostring_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="populate_all">Extension: populate_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="stringer_all">Extension: stringer_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="onlyone_all">Extension: onlyone_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="equal_all">Extension: equal_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="description_all">Extension: description_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="testgen_all">Extension: testgen_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="benchgen_all">Extension: benchgen_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="marshaler_all">Extension: marshaler_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="unmarshaler_all">Extension: unmarshaler_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="stable_marshaler_all">Extension: stable_marshaler_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="sizer_all">Extension: sizer_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="goproto_enum_stringer_all">Extension: goproto_enum_stringer_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="enum_stringer_all">Extension: enum_stringer_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="unsafe_marshaler_all">Extension: unsafe_marshaler_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="unsafe_unmarshaler_all">Extension: unsafe_unmarshaler_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="goproto_extensions_map_all">Extension: goproto_extensions_map_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="goproto_unrecognized_all">Extension: goproto_unrecognized_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="gogoproto_import">Extension: gogoproto_import</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="protosizer_all">Extension: protosizer_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="compare_all">Extension: compare_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="typedecl_all">Extension: typedecl_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="enumdecl_all">Extension: enumdecl_all</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="goproto_registration">Extension: goproto_registration</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="goproto_getters">Extension: goproto_getters</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="goproto_stringer">Extension: goproto_stringer</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="verbose_equal">Extension: verbose_equal</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="face">Extension: face</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="gostring">Extension: gostring</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="populate">Extension: populate</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="stringer">Extension: stringer</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="onlyone">Extension: onlyone</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="equal">Extension: equal</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="description">Extension: description</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="testgen">Extension: testgen</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="benchgen">Extension: benchgen</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="marshaler">Extension: marshaler</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="unmarshaler">Extension: unmarshaler</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="stable_marshaler">Extension: stable_marshaler</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="sizer">Extension: sizer</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="unsafe_marshaler">Extension: unsafe_marshaler</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="unsafe_unmarshaler">Extension: unsafe_unmarshaler</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="goproto_extensions_map">Extension: goproto_extensions_map</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="goproto_unrecognized">Extension: goproto_unrecognized</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="protosizer">Extension: protosizer</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="compare">Extension: compare</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="typedecl">Extension: typedecl</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="nullable">Extension: nullable</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="embed">Extension: embed</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="customtype">Extension: customtype</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="customname">Extension: customname</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="jsontag">Extension: jsontag</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="moretags">Extension: moretags</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="casttype">Extension: casttype</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="castkey">Extension: castkey</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="castvalue">Extension: castvalue</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="stdtime">Extension: stdtime</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="stdduration">Extension: stdduration</h3>
+					
+	
+	
+		
+	
+
+				</div>
+			
+		</div>
+	
+
+	
+	
+
+	
+	
+	
+</div>
+
+</body>
+</html>

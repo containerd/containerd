@@ -1,0 +1,682 @@
+
+
+
+
+
+<html>
+<head>
+ <title>containerd gRPC API Documentation</title>
+ <link
+   href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/flatly/bootstrap.min.css"
+   rel="stylesheet">
+</head>
+
+<body>
+
+<div class="doc container">
+  <h1>containerd.services.images.v1</h1>
+  <div class="doc-inner">
+    <p>
+      <code>github.com/containerd/containerd/api/services/images/v1/images.proto</code>
+      (syntax: <code>proto3</code>)
+    </p>
+  </div>
+
+	
+	
+		<div class="doc-dependencies">
+			<h2>Dependencies</h2>
+			<div class="doc-inner">
+				<ul>
+					
+						<li>gogoproto/gogo.proto</li>
+					
+						<li>google/protobuf/empty.proto</li>
+					
+						<li>google/protobuf/field_mask.proto</li>
+					
+						<li>google/protobuf/timestamp.proto</li>
+					
+						<li>github.com/containerd/containerd/api/types/descriptor.proto</li>
+					
+				</ul>
+			</div>
+		</div>
+	
+
+	
+	
+	
+
+	
+	
+
+	
+	
+		<div class="doc-services">
+			<h2>Services</h2>
+			
+				<div class="doc-inner">
+
+				<h3>Images</h3>
+				
+	
+	
+		
+			<p class="description">Description:
+					<p>Images is a service that allows one to register images with containerd.</p>
+
+<p>In containerd, an image is merely the mapping of a name to a content root,
+ described by a descriptor. The behavior and state of image is purely
+ dictated by the type of the descriptor.</p>
+
+<p>From the perspective of this service, these references are mostly shallow,
+ in that the existence of the required content won&rsquo;t be validated until
+ required by consuming services.</p>
+
+<p>As such, this can really be considered a &ldquo;metadata service&rdquo;.</p>
+
+					
+			</p>
+		
+	
+
+				<table class="table table-striped">
+					<tr><td>Method</td><td>Input Type</td><td>Output Type</td><td>Description</td></tr>
+					
+						<tr>
+							<td>Get
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/images/v1/images.html#GetImageRequest">GetImageRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/images/v1/images.html#GetImageResponse">GetImageResponse</a></td>
+							<td>
+	
+	
+		
+			<p>Get returns an image by name.</p>
+
+			
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>List
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/images/v1/images.html#ListImagesRequest">ListImagesRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/images/v1/images.html#ListImagesResponse">ListImagesResponse</a></td>
+							<td>
+	
+	
+		
+			<p>List returns a list of all images known to containerd.</p>
+
+			
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Create
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/images/v1/images.html#CreateImageRequest">CreateImageRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/images/v1/images.html#CreateImageResponse">CreateImageResponse</a></td>
+							<td>
+	
+	
+		
+			<p>Create an image record in the metadata store.</p>
+
+<p>The name of the image must be unique.</p>
+
+			
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Update
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/images/v1/images.html#UpdateImageRequest">UpdateImageRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/images/v1/images.html#UpdateImageResponse">UpdateImageResponse</a></td>
+							<td>
+	
+	
+		
+			<p>Update assigns the name to a given target image based on the provided
+ image.</p>
+
+			
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Delete
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/images/v1/images.html#DeleteImageRequest">DeleteImageRequest</a></td>
+							<td><a href="/api/google/protobuf/empty.html#Empty">Empty</a></td>
+							<td>
+	
+	
+		
+			<p>Delete deletes the image by name.</p>
+
+			
+		
+	
+</td>
+						</tr>
+					
+				</table>
+
+			
+		</div>
+	
+
+	
+	
+	
+		<div class="doc-message-types">
+			<h2>Messages</h2>
+			
+				<div class="doc-inner">
+					<h3 id="Image">Message: Image</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>name</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+			<p>Name provides a unique name for the image.</p>
+
+<p>Containerd treats this as the primary identifier.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>labels</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/images/v1/images.html#Image.LabelsEntry">LabelsEntry</td>
+								
+								<td>
+	
+	
+		
+			<p>Labels provides free form labels for the image. These are runtime only
+ and do not get inherited into the package image in any way.</p>
+
+<p>Labels may be updated using the field mask.
+ The combined size of a key/value pair cannot exceed 4096 bytes.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>3</td>
+								<td>target</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/types/descriptor.html#Descriptor">Descriptor</td>
+								
+								<td>
+	
+	
+		
+			<p>Target describes the content entry point of the image.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>7</td>
+								<td>created_at</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/timestamp.html#Timestamp">Timestamp</td>
+								
+								<td>
+	
+	
+		
+			<p>CreatedAt is the time the image was first created.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>8</td>
+								<td>updated_at</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/timestamp.html#Timestamp">Timestamp</td>
+								
+								<td>
+	
+	
+		
+			<p>UpdatedAt is the last time the image was mutated.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="Image.LabelsEntry">Message: Image.LabelsEntry</h3>
+					
+	
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>key</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>value</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="GetImageRequest">Message: GetImageRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>name</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="GetImageResponse">Message: GetImageResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>image</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/images/v1/images.html#Image">Image</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="CreateImageRequest">Message: CreateImageRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>image</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/images/v1/images.html#Image">Image</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="CreateImageResponse">Message: CreateImageResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>image</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/images/v1/images.html#Image">Image</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="UpdateImageRequest">Message: UpdateImageRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>image</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/images/v1/images.html#Image">Image</td>
+								
+								<td>
+	
+	
+		
+			<p>Image provides a full or partial image for update.</p>
+
+<p>The name field must be set or an error will be returned.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>update_mask</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/field_mask.html#FieldMask">FieldMask</td>
+								
+								<td>
+	
+	
+		
+			<p>UpdateMask specifies which fields to perform the update on. If empty,
+ the operation applies to all fields.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="UpdateImageResponse">Message: UpdateImageResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>image</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/images/v1/images.html#Image">Image</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ListImagesRequest">Message: ListImagesRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>filters</td>
+								<td>repeated</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+			<p>Filters contains one or more filters using the syntax defined in the
+ containerd filter package.</p>
+
+<p>The returned result will be those that match any of the provided
+ filters. Expanded, images that match the following will be
+ returned:</p>
+
+<p>filters[0] or filters[1] or &hellip; or filters[n-1] or filters[n]</p>
+
+<p>If filters is zero-length or nil, all items will be returned.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ListImagesResponse">Message: ListImagesResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>images</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/images/v1/images.html#Image">Image</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="DeleteImageRequest">Message: DeleteImageRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>name</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>sync</td>
+								<td>optional</td>
+								
+									<td>bool</td>
+								
+								<td>
+	
+	
+		
+			<p>Sync indicates that the delete and cleanup should be done
+ synchronously before returning to the caller</p>
+
+<p>Default is false</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+		</div>
+	
+</div>
+
+</body>
+</html>

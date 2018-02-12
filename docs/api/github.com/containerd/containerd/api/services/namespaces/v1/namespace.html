@@ -1,0 +1,572 @@
+
+
+
+
+
+<html>
+<head>
+ <title>containerd gRPC API Documentation</title>
+ <link
+   href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/flatly/bootstrap.min.css"
+   rel="stylesheet">
+</head>
+
+<body>
+
+<div class="doc container">
+  <h1>containerd.services.namespaces.v1</h1>
+  <div class="doc-inner">
+    <p>
+      <code>github.com/containerd/containerd/api/services/namespaces/v1/namespace.proto</code>
+      (syntax: <code>proto3</code>)
+    </p>
+  </div>
+
+	
+	
+		<div class="doc-dependencies">
+			<h2>Dependencies</h2>
+			<div class="doc-inner">
+				<ul>
+					
+						<li>gogoproto/gogo.proto</li>
+					
+						<li>google/protobuf/empty.proto</li>
+					
+						<li>google/protobuf/field_mask.proto</li>
+					
+				</ul>
+			</div>
+		</div>
+	
+
+	
+	
+	
+
+	
+	
+
+	
+	
+		<div class="doc-services">
+			<h2>Services</h2>
+			
+				<div class="doc-inner">
+
+				<h3>Namespaces</h3>
+				
+	
+	
+		
+			<p class="description">Description:
+					<p>Namespaces provides the ability to manipulate containerd namespaces.</p>
+
+<p>All objects in the system are required to be a member of a namespace. If a
+ namespace is deleted, all objects, including containers, images and
+ snapshots, will be deleted, as well.</p>
+
+<p>Unless otherwise noted, operations in containerd apply only to the namespace
+ supplied per request.</p>
+
+<p>I hope this goes without saying, but namespaces are themselves NOT
+ namespaced.</p>
+
+					
+			</p>
+		
+	
+
+				<table class="table table-striped">
+					<tr><td>Method</td><td>Input Type</td><td>Output Type</td><td>Description</td></tr>
+					
+						<tr>
+							<td>Get
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/namespaces/v1/namespace.html#GetNamespaceRequest">GetNamespaceRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/namespaces/v1/namespace.html#GetNamespaceResponse">GetNamespaceResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>List
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/namespaces/v1/namespace.html#ListNamespacesRequest">ListNamespacesRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/namespaces/v1/namespace.html#ListNamespacesResponse">ListNamespacesResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Create
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/namespaces/v1/namespace.html#CreateNamespaceRequest">CreateNamespaceRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/namespaces/v1/namespace.html#CreateNamespaceResponse">CreateNamespaceResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Update
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/namespaces/v1/namespace.html#UpdateNamespaceRequest">UpdateNamespaceRequest</a></td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/namespaces/v1/namespace.html#UpdateNamespaceResponse">UpdateNamespaceResponse</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+						<tr>
+							<td>Delete
+								
+								
+								
+							</td>
+							<td><a href="/api/github.com/containerd/containerd/api/services/namespaces/v1/namespace.html#DeleteNamespaceRequest">DeleteNamespaceRequest</a></td>
+							<td><a href="/api/google/protobuf/empty.html#Empty">Empty</a></td>
+							<td>
+	
+	
+		
+	
+</td>
+						</tr>
+					
+				</table>
+
+			
+		</div>
+	
+
+	
+	
+	
+		<div class="doc-message-types">
+			<h2>Messages</h2>
+			
+				<div class="doc-inner">
+					<h3 id="Namespace">Message: Namespace</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>name</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>labels</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/namespaces/v1/namespace.html#Namespace.LabelsEntry">LabelsEntry</td>
+								
+								<td>
+	
+	
+		
+			<p>Labels provides an area to include arbitrary data on namespaces.</p>
+
+<p>The combined size of a key/value pair cannot exceed 4096 bytes.</p>
+
+<p>Note that to add a new value to this field, read the existing set and
+ include the entire result in the update call.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="Namespace.LabelsEntry">Message: Namespace.LabelsEntry</h3>
+					
+	
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>key</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>value</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="GetNamespaceRequest">Message: GetNamespaceRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>name</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="GetNamespaceResponse">Message: GetNamespaceResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>namespace</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/namespaces/v1/namespace.html#Namespace">Namespace</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ListNamespacesRequest">Message: ListNamespacesRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>filter</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="ListNamespacesResponse">Message: ListNamespacesResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>namespaces</td>
+								<td>repeated</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/namespaces/v1/namespace.html#Namespace">Namespace</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="CreateNamespaceRequest">Message: CreateNamespaceRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>namespace</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/namespaces/v1/namespace.html#Namespace">Namespace</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="CreateNamespaceResponse">Message: CreateNamespaceResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>namespace</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/namespaces/v1/namespace.html#Namespace">Namespace</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="UpdateNamespaceRequest">Message: UpdateNamespaceRequest</h3>
+					
+	
+	
+		
+			<p class="description">Description:
+					<p>UpdateNamespaceRequest updates the metadata for a namespace.</p>
+
+<p>The operation should follow semantics described in
+ <a href="https://developers.google.com/protocol-buffers/docs/reference/csharp/class/google/protobuf/well-known-types/field-mask">https://developers.google.com/protocol-buffers/docs/reference/csharp/class/google/protobuf/well-known-types/field-mask</a>,
+ unless otherwise qualified.</p>
+
+					
+			</p>
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>namespace</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/namespaces/v1/namespace.html#Namespace">Namespace</td>
+								
+								<td>
+	
+	
+		
+			<p>Namespace provides the target value, as declared by the mask, for the update.</p>
+
+<p>The namespace field must be set.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+							<tr>
+								<td>2</td>
+								<td>update_mask</td>
+								<td>optional</td>
+								
+									<td><a href="/api/google/protobuf/field_mask.html#FieldMask">FieldMask</td>
+								
+								<td>
+	
+	
+		
+			<p>UpdateMask specifies which fields to perform the update on. If empty,
+ the operation applies to all fields.</p>
+
+<p>For the most part, this applies only to selectively updating labels on
+ the namespace. While field masks are typically limited to ascii alphas
+ and digits, we just take everything after the &ldquo;labels.&rdquo; as the map key.</p>
+
+			
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="UpdateNamespaceResponse">Message: UpdateNamespaceResponse</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>namespace</td>
+								<td>optional</td>
+								
+									<td><a href="/api/github.com/containerd/containerd/api/services/namespaces/v1/namespace.html#Namespace">Namespace</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+				<div class="doc-inner">
+					<h3 id="DeleteNamespaceRequest">Message: DeleteNamespaceRequest</h3>
+					
+	
+	
+		
+	
+
+					<table class="table table-striped">
+						<tr><td>#</td><td>Field</td><td>Label</td><td>Type</td><td>Description</td></tr>
+						
+							<tr>
+								<td>1</td>
+								<td>name</td>
+								<td>optional</td>
+								
+									<td>string</td>
+								
+								<td>
+	
+	
+		
+	
+</td>
+							</tr>
+						
+					</table>
+				</div>
+			
+		</div>
+	
+</div>
+
+</body>
+</html>
