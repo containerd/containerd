@@ -5,7 +5,7 @@ layout: home
 
 ## News
 
-* [Sign up for containerd Summit at DockerCon in April](dockercon-summit)
+* [Sign up for containerd Summit at DockerCon in April](https://2018.dockercon.com)
 * [March 15th: Docker to donate containerd to the Cloud Native Computing Foundation](https://blog.docker.com/2017/03/docker-donates-containerd-to-cncf/)
 * [February 28th: containerd Summit recap](https://blog.docker.com/2017/02/containerd-summit-recap-slides-videos-meeting-notes/)
 * [January 4th: containerd Livestream recap](https://blog.docker.com/2017/01/containerd-livestream-recap)
@@ -33,7 +33,7 @@ containerd is based on the Docker Engine’s core container runtime to benefit f
 * Management of network namespaces containers to join existing namespaces
 * Multi-tenant supported with CAS storage for global images
 
-containerd, currently in [version 0.2.4](https://github.com/containerd/containerd/releases/tag/v0.2.4), is a daemon born from extracting the container execution subset of the Docker Engine, and is [used internally by Docker since the 1.11 release](https://blog.docker.com/2016/04/docker-engine-1-11-runc/). containerd will graduate to version 1.0 once its feature scope matches the requirements above, from which it will commit to API stability as well as committing to a 1-year LTS release. Docker Engine commits to upgrading to containerd 1.0 as part of its regular release cycle.
+containerd, currently in [version 1.0.0](https://github.com/containerd/containerd/releases/tag/v1.0.0), is a daemon born from extracting the container execution subset of the Docker Engine, and is [used internally by Docker since the 1.11 release](https://blog.docker.com/2016/04/docker-engine-1-11-runc/). containerd versions prior to v1.0.0 were used in Docker 17.10 and earlier (see Docker [version release notes](https://github.com/docker/docker-ce/releases)), and [Docker 17.12](https://github.com/docker/docker-ce/releases/tag/v17.12.0-ce) is the first release to use containerd v1.0.0.
 
 [containerd roadmap](https://github.com/containerd/containerd/blob/master/ROADMAP.md) to implement these features is described in the containerd Github repository.
 
@@ -74,7 +74,7 @@ Additional implementations will not be accepted into the core repository and sho
 
 ### Releases
 
-containerd will be released with a 1.0 when feature complete with Linux and Windows parity and this version will be supported for 1 year with security and bug fixes applied and released.
+containerd will be supported for 1 year with security and bug fixes applied and released.
 
 The upgrade path for containerd is that the 0.0.x patch releases are always backward compatible with its major and minor version.
 Minor (0.x.0) version will always be compatible with the previous minor release. i.e. 1.2.0 is backwards compatible with 1.1.0 and 1.1.0 is compatible with 1.0.0.
