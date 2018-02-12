@@ -988,6 +988,24 @@ func TestDiffTar(t *testing.T) {
 				fstest.RemoveAll("/d5"),
 			),
 		},
+		{
+			name: "WhiteoutParentRemoval",
+			validators: []tarEntryValidator{
+				whiteoutEntry("d1"),
+				whiteoutEntry("d2"),
+				dirEntry("d3/", 0755),
+			},
+			a: fstest.Apply(
+				fstest.CreateDir("/d1/", 0755),
+				fstest.CreateDir("/d2/", 0755),
+				fstest.CreateFile("/d2/f1", []byte("content"), 0644),
+			),
+			b: fstest.Apply(
+				fstest.RemoveAll("/d1"),
+				fstest.RemoveAll("/d2"),
+				fstest.CreateDir("/d3/", 0755),
+			),
+		},
 	}
 
 	for _, at := range tests {
