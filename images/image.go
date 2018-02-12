@@ -102,7 +102,7 @@ func (image *Image) Size(ctx context.Context, provider content.Provider, platfor
 		}
 		size += desc.Size
 		return nil, nil
-	}), ChildrenHandler(provider, platform)), image.Target)
+	}), FilterPlatform(platform, ChildrenHandler(provider))), image.Target)
 }
 
 // Manifest resolves a manifest from the image for the given platform.
@@ -238,7 +238,7 @@ func Platforms(ctx context.Context, provider content.Provider, image ocispec.Des
 				platforms.Normalize(ocispec.Platform{OS: image.OS, Architecture: image.Architecture}))
 		}
 		return nil, nil
-	}), ChildrenHandler(provider, "")), image)
+	}), ChildrenHandler(provider)), image)
 }
 
 // Check returns nil if the all components of an image are available in the
@@ -285,7 +285,7 @@ func Check(ctx context.Context, provider content.Provider, image ocispec.Descrip
 }
 
 // Children returns the immediate children of content described by the descriptor.
-func Children(ctx context.Context, provider content.Provider, desc ocispec.Descriptor, platform string) ([]ocispec.Descriptor, error) {
+func Children(ctx context.Context, provider content.Provider, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 	var descs []ocispec.Descriptor
 	switch desc.MediaType {
 	case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
@@ -314,21 +314,7 @@ func Children(ctx context.Context, provider content.Provider, desc ocispec.Descr
 			return nil, err
 		}
 
-		if platform != "" {
-			matcher, err := platforms.Parse(platform)
-			if err != nil {
-				return nil, err
-			}
-
-			for _, d := range index.Manifests {
-				if d.Platform == nil || matcher.Match(*d.Platform) {
-					descs = append(descs, d)
-				}
-			}
-		} else {
-			descs = append(descs, index.Manifests...)
-		}
-
+		descs = append(descs, index.Manifests...)
 	case MediaTypeDockerSchema2Layer, MediaTypeDockerSchema2LayerGzip,
 		MediaTypeDockerSchema2LayerForeign, MediaTypeDockerSchema2LayerForeignGzip,
 		MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig,

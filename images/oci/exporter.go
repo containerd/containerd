@@ -42,7 +42,7 @@ func (oe *V1Exporter) Export(ctx context.Context, store content.Provider, desc o
 	}
 
 	handlers := images.Handlers(
-		images.ChildrenHandler(store, platforms.Default()),
+		images.FilterPlatform(platforms.Default(), images.ChildrenHandler(store)),
 		images.HandlerFunc(exportHandler),
 	)
 

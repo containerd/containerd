@@ -234,10 +234,17 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 		schema1Converter = schema1.NewConverter(store, fetcher)
 		handler = images.Handlers(append(pullCtx.BaseHandlers, schema1Converter)...)
 	} else {
+		// Get all the children for a descriptor
+		childrenHandler := images.ChildrenHandler(store)
+		// Set any children labels for that content
+		childrenHandler = images.SetChildrenLabels(store, childrenHandler)
+		// Filter the childen by the platform
+		childrenHandler = images.FilterPlatform(platforms.Default(), childrenHandler)
+
 		handler = images.Handlers(append(pullCtx.BaseHandlers,
 			remotes.FetchHandler(store, fetcher),
-			images.ChildrenHandler(store, platforms.Default()))...,
-		)
+			childrenHandler,
+		)...)
 	}
 
 	if err := images.Dispatch(ctx, handler, desc); err != nil {
