@@ -56,6 +56,28 @@ func TestSimpleDiff(t *testing.T) {
 	}
 }
 
+func TestNestedDeletion(t *testing.T) {
+	skipDiffTestOnWindows(t)
+	l1 := fstest.Apply(
+		fstest.CreateDir("/d0", 0755),
+		fstest.CreateDir("/d1", 0755),
+		fstest.CreateDir("/d1/d2", 0755),
+		fstest.CreateFile("/d1/d2/f1", []byte("mydomain 10.0.0.1"), 0644),
+	)
+	l2 := fstest.Apply(
+		fstest.RemoveAll("/d0"),
+		fstest.RemoveAll("/d1"),
+	)
+	diff := []TestChange{
+		Delete("/d0"),
+		Delete("/d1"),
+	}
+
+	if err := testDiffWithBase(l1, l2, diff); err != nil {
+		t.Fatalf("Failed diff with base: %+v", err)
+	}
+}
+
 func TestDirectoryReplace(t *testing.T) {
 	skipDiffTestOnWindows(t)
 	l1 := fstest.Apply(
