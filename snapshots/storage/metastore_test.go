@@ -10,8 +10,10 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/google/go-cmp/cmp"
+	"github.com/gotestyourself/gotestyourself/assert"
+	is "github.com/gotestyourself/gotestyourself/assert/cmp"
 	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
 )
 
 type testFunc func(context.Context, *testing.T, *MetaStore)
@@ -198,75 +200,71 @@ var baseInfo = map[string]snapshots.Info{
 }
 
 func assertNotExist(t *testing.T, err error) {
-	if err == nil {
-		t.Fatal("Expected not exist error")
-	}
-	if !errdefs.IsNotFound(err) {
-		t.Fatalf("Expected not exist error, got %+v", err)
-	}
+	t.Helper()
+	assert.Assert(t, errdefs.IsNotFound(err), "got %+v", err)
 }
 
 func assertNotActive(t *testing.T, err error) {
-	if err == nil {
-		t.Fatal("Expected not active error")
-	}
-	if !errdefs.IsFailedPrecondition(err) {
-		t.Fatalf("Expected not active error, got %+v", err)
-	}
+	t.Helper()
+	assert.Assert(t, errdefs.IsFailedPrecondition(err), "got %+v", err)
 }
 
 func assertNotCommitted(t *testing.T, err error) {
-	if err == nil {
-		t.Fatal("Expected active error")
-	}
-	if !errdefs.IsInvalidArgument(err) {
-		t.Fatalf("Expected active error, got %+v", err)
-	}
+	t.Helper()
+	assert.Assert(t, errdefs.IsInvalidArgument(err), "got %+v", err)
 }
 
 func assertExist(t *testing.T, err error) {
-	if err == nil {
-		t.Fatal("Expected exist error")
-	}
-	if !errdefs.IsAlreadyExists(err) {
-		t.Fatalf("Expected exist error, got %+v", err)
-	}
+	t.Helper()
+	assert.Assert(t, errdefs.IsAlreadyExists(err), "got %+v", err)
 }
 
-func testGetInfo(ctx context.Context, t *testing.T, ms *MetaStore) {
+func testGetInfo(ctx context.Context, t *testing.T, _ *MetaStore) {
 	for key, expected := range baseInfo {
 		_, info, _, err := GetInfo(ctx, key)
-		if err != nil {
-			t.Fatalf("GetInfo on %v failed: %+v", key, err)
-		}
-		// TODO: Check timestamp range
-		info.Created = time.Time{}
-		info.Updated = time.Time{}
-		assert.Equal(t, expected, info)
+		assert.NilError(t, err, "on key %v", key)
+		assert.Check(t, is.DeepEqual(expected, info, cmpSnapshotInfo), "on key %v", key)
 	}
 }
 
-func testGetInfoNotExist(ctx context.Context, t *testing.T, ms *MetaStore) {
+// compare snapshot.Info Updated and Created fields by checking they are
+// within a threshold of time.Now()
+var cmpSnapshotInfo = cmp.FilterPath(
+	func(path cmp.Path) bool {
+		field := path.Last().String()
+		return field == ".Created" || field == ".Updated"
+	},
+	cmp.Comparer(func(expected, actual time.Time) bool {
+		// cmp.Options must be symmetric, so swap the args
+		if actual.IsZero() {
+			actual, expected = expected, actual
+		}
+		if !expected.IsZero() {
+			return false
+		}
+		// actual value should be within a few seconds of now
+		now := time.Now()
+		delta := now.Sub(actual)
+		threshold := 10 * time.Second
+		return delta > -threshold && delta < threshold
+	}))
+
+func testGetInfoNotExist(ctx context.Context, t *testing.T, _ *MetaStore) {
 	_, _, _, err := GetInfo(ctx, "active-not-exist")
 	assertNotExist(t, err)
 }
 
-func testWalk(ctx context.Context, t *testing.T, ms *MetaStore) {
+func testWalk(ctx context.Context, t *testing.T, _ *MetaStore) {
 	found := map[string]snapshots.Info{}
 	err := WalkInfo(ctx, func(ctx context.Context, info snapshots.Info) error {
 		if _, ok := found[info.Name]; ok {
 			return errors.Errorf("entry already encountered")
 		}
-		// TODO: Check time range
-		info.Created = time.Time{}
-		info.Updated = time.Time{}
 		found[info.Name] = info
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("Walk failed: %+v", err)
-	}
-	assert.Equal(t, baseInfo, found)
+	assert.NilError(t, err)
+	assert.Assert(t, is.DeepEqual(baseInfo, found, cmpSnapshotInfo))
 }
 
 func testGetSnapshot(ctx context.Context, t *testing.T, ms *MetaStore) {
@@ -315,10 +313,8 @@ func testGetSnapshot(ctx context.Context, t *testing.T, ms *MetaStore) {
 	test := func(ctx context.Context, t *testing.T, ms *MetaStore) {
 		for key, expected := range snapshotMap {
 			s, err := GetSnapshot(ctx, key)
-			if err != nil {
-				t.Fatalf("Failed to get active: %+v", err)
-			}
-			assert.Equal(t, expected, s)
+			assert.NilError(t, err, "failed to get snapshot %s", key)
+			assert.Check(t, is.DeepEqual(expected, s), "on key %s", key)
 		}
 	}
 
@@ -545,7 +541,7 @@ func testRemoveWithChildren(ctx context.Context, t *testing.T, ms *MetaStore) {
 	}
 }
 
-func testRemoveNotExist(ctx context.Context, t *testing.T, ms *MetaStore) {
+func testRemoveNotExist(ctx context.Context, t *testing.T, _ *MetaStore) {
 	_, _, err := Remove(ctx, "does-not-exist")
 	assertNotExist(t, err)
 }

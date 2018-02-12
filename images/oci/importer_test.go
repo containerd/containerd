@@ -3,9 +3,9 @@ package oci
 import (
 	"testing"
 
+	"github.com/gotestyourself/gotestyourself/assert"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestNormalizeImageRef(t *testing.T) {
@@ -31,7 +31,7 @@ func TestNormalizeImageRef(t *testing.T) {
 		},
 	} {
 		normalized, err := normalizeImageRef(imageBaseName, test.input)
-		assert.NoError(t, err)
+		assert.NilError(t, err)
 		assert.Equal(t, test.expect, normalized)
 	}
 }

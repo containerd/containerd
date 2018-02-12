@@ -3,7 +3,8 @@ package server
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/gotestyourself/gotestyourself/assert"
+	is "github.com/gotestyourself/gotestyourself/assert/cmp"
 	"golang.org/x/net/context"
 )
 
@@ -13,5 +14,5 @@ func TestNewErrorsWithSamePathForRootAndState(t *testing.T) {
 		Root:  path,
 		State: path,
 	})
-	assert.EqualError(t, err, "root and state must be different paths")
+	assert.Check(t, is.Error(err, "root and state must be different paths"))
 }

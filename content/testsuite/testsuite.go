@@ -16,9 +16,9 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/testutil"
+	"github.com/gotestyourself/gotestyourself/assert"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
-	"github.com/stretchr/testify/require"
 )
 
 // ContentSuite runs a test suite on the content store given a factory function.
@@ -188,7 +188,7 @@ func checkResumeWriter(ctx context.Context, t *testing.T, cs content.Store) {
 	}
 
 	checkStatus(t, w1, expected, dgstFirst, preStart, postStart, preUpdate, postUpdate)
-	require.NoError(t, w1.Close(), "close first writer")
+	assert.NilError(t, w1.Close(), "close first writer")
 
 	w2, err := cs.Writer(ctx, ref, 256, dgst)
 	if err != nil {
@@ -212,7 +212,7 @@ func checkResumeWriter(ctx context.Context, t *testing.T, cs content.Store) {
 	}
 	postCommit := time.Now()
 
-	require.NoError(t, w2.Close(), "close second writer")
+	assert.NilError(t, w2.Close(), "close second writer")
 	info := content.Info{
 		Digest: dgst,
 		Size:   256,

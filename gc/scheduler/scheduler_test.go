@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/gc"
-	"github.com/stretchr/testify/require"
+	"github.com/gotestyourself/gotestyourself/assert"
 )
 
 func TestPauseThreshold(t *testing.T) {
@@ -123,7 +123,7 @@ func TestTrigger(t *testing.T) {
 		t.Fatalf("GC failed: %#v", err)
 	}
 
-	require.Equal(t, tc.d, stats.Elapsed())
+	assert.Equal(t, tc.d, stats.Elapsed())
 
 	if c := tc.runCount(); c != 1 {
 		t.Fatalf("unexpected gc run count %d, expected 1", c)

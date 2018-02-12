@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/reference"
-	"github.com/stretchr/testify/assert"
+	"github.com/gotestyourself/gotestyourself/assert"
 )
 
 func TestRepositoryScope(t *testing.T) {
@@ -31,8 +31,10 @@ func TestRepositoryScope(t *testing.T) {
 		},
 	}
 	for _, x := range testCases {
-		actual, err := repositoryScope(x.refspec, x.push)
-		assert.NoError(t, err)
-		assert.Equal(t, x.expected, actual)
+		t.Run(x.refspec.String(), func(t *testing.T) {
+			actual, err := repositoryScope(x.refspec, x.push)
+			assert.NilError(t, err)
+			assert.Equal(t, x.expected, actual)
+		})
 	}
 }
