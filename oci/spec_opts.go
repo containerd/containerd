@@ -36,10 +36,10 @@ func WithHostname(name string) SpecOpts {
 }
 
 // WithEnv appends environment variables
-func WithEnv(environmnetVariables []string) SpecOpts {
+func WithEnv(environmentVariables []string) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
-		if len(environmnetVariables) > 0 {
-			s.Process.Env = replaceOrAppendEnvValues(s.Process.Env, environmnetVariables)
+		if len(environmentVariables) > 0 {
+			s.Process.Env = replaceOrAppendEnvValues(s.Process.Env, environmentVariables)
 		}
 		return nil
 	}
