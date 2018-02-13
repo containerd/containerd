@@ -1,7 +1,8 @@
 // +build darwin freebsd solaris
 
-package main
+package defaultplugins
 
+// nolint: golint
 import (
 	_ "github.com/containerd/containerd/snapshots/naive"
 )
