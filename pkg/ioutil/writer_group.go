@@ -39,16 +39,24 @@ func NewWriterGroup() *WriterGroup {
 	}
 }
 
-// Add adds a writer into the group, returns an error when writer
-// group is closed.
-func (g *WriterGroup) Add(key string, w io.WriteCloser) error {
+// Add adds a writer into the group. The writer will be closed
+// if the writer group is closed.
+func (g *WriterGroup) Add(key string, w io.WriteCloser) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.closed {
-		return errors.New("wait group closed")
+		w.Close()
+		return
 	}
 	g.writers[key] = w
-	return nil
+}
+
+// Get gets a writer from the group, returns nil if the writer
+// doesn't exist.
+func (g *WriterGroup) Get(key string) io.WriteCloser {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.writers[key]
 }
 
 // Remove removes a writer from the group.
@@ -84,8 +92,8 @@ func (g *WriterGroup) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Close closes the writer group. Write or Add will return error
-// after closed.
+// Close closes the writer group. Write will return error after
+// closed.
 func (g *WriterGroup) Close() {
 	g.mu.Lock()
 	defer g.mu.Unlock()

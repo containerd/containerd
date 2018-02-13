@@ -161,11 +161,11 @@ func loadContainer(ctx context.Context, cntr containerd.Container, containerDir 
 		}
 		containerIO, err = cio.NewContainerIO(id,
 			cio.WithFIFOs(fifos),
-			cio.WithOutput("log", stdoutWC, stderrWC),
 		)
 		if err != nil {
 			return nil, err
 		}
+		containerIO.AddOutput("log", stdoutWC, stderrWC)
 		containerIO.Pipe()
 		return containerIO, nil
 	})

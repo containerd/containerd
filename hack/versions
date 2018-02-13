@@ -10,5 +10,5 @@ if [ x"$KUBERNETES_REPO" = "xk8s.io" ] ; then
 fi
 
 # Not from vendor.conf.
-CRITOOL_VERSION=240a840375cdabb5860c75c99e8b0d0a776006b4
+CRITOOL_VERSION=c87ea764cecbcbabbb51c5bdd10ea317181fdd62
 CRITOOL_REPO=github.com/kubernetes-incubator/cri-tools
