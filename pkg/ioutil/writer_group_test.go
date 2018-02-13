@@ -48,8 +48,7 @@ func TestClosedWriterGroup(t *testing.T) {
 	wc := &writeCloser{}
 	key, data := "test key", "test data"
 
-	err := wg.Add(key, wc)
-	assert.NoError(t, err)
+	wg.Add(key, wc)
 
 	n, err := wg.Write([]byte(data))
 	assert.Equal(t, len(data), n)
@@ -59,36 +58,58 @@ func TestClosedWriterGroup(t *testing.T) {
 	wg.Close()
 	assert.True(t, wc.closed)
 
-	err = wg.Add(key, &writeCloser{})
-	assert.Error(t, err)
+	newWC := &writeCloser{}
+	wg.Add(key, newWC)
+	assert.True(t, newWC.closed)
 
 	_, err = wg.Write([]byte(data))
 	assert.Error(t, err)
 }
 
-func TestAddRemoveWriter(t *testing.T) {
+func TestAddGetRemoveWriter(t *testing.T) {
 	wg := NewWriterGroup()
 	wc1, wc2 := &writeCloser{}, &writeCloser{}
 	key1, key2 := "test key 1", "test key 2"
 
-	err := wg.Add(key1, wc1)
-	assert.NoError(t, err)
-	_, err = wg.Write([]byte("test data 1"))
+	wg.Add(key1, wc1)
+	_, err := wg.Write([]byte("test data 1"))
 	assert.NoError(t, err)
 	assert.Equal(t, "test data 1", wc1.buf.String())
 
-	err = wg.Add(key2, wc2)
-	assert.NoError(t, err)
+	wg.Add(key2, wc2)
 	_, err = wg.Write([]byte("test data 2"))
 	assert.NoError(t, err)
 	assert.Equal(t, "test data 1test data 2", wc1.buf.String())
 	assert.Equal(t, "test data 2", wc2.buf.String())
+
+	assert.Equal(t, wc1, wg.Get(key1))
 
 	wg.Remove(key1)
 	_, err = wg.Write([]byte("test data 3"))
 	assert.NoError(t, err)
 	assert.Equal(t, "test data 1test data 2", wc1.buf.String())
 	assert.Equal(t, "test data 2test data 3", wc2.buf.String())
+
+	assert.Equal(t, nil, wg.Get(key1))
+
+	wg.Close()
+}
+
+func TestReplaceWriter(t *testing.T) {
+	wg := NewWriterGroup()
+	wc1, wc2 := &writeCloser{}, &writeCloser{}
+	key := "test-key"
+
+	wg.Add(key, wc1)
+	_, err := wg.Write([]byte("test data 1"))
+	assert.NoError(t, err)
+	assert.Equal(t, "test data 1", wc1.buf.String())
+
+	wg.Add(key, wc2)
+	_, err = wg.Write([]byte("test data 2"))
+	assert.NoError(t, err)
+	assert.Equal(t, "test data 1", wc1.buf.String())
+	assert.Equal(t, "test data 2", wc2.buf.String())
 
 	wg.Close()
 }

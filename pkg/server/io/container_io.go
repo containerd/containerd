@@ -52,23 +52,6 @@ var _ cio.IO = &ContainerIO{}
 // ContainerIOOpts sets specific information to newly created ContainerIO.
 type ContainerIOOpts func(*ContainerIO) error
 
-// WithOutput adds output stream to the container io.
-func WithOutput(name string, stdout, stderr io.WriteCloser) ContainerIOOpts {
-	return func(c *ContainerIO) error {
-		if stdout != nil {
-			if err := c.stdoutGroup.Add(streamKey(c.id, name, Stdout), stdout); err != nil {
-				return err
-			}
-		}
-		if stderr != nil {
-			if err := c.stderrGroup.Add(streamKey(c.id, name, Stderr), stderr); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-}
-
 // WithFIFOs specifies existing fifos for the container io.
 func WithFIFOs(fifos *cio.FIFOSet) ContainerIOOpts {
 	return func(c *ContainerIO) error {
@@ -149,7 +132,7 @@ func (c *ContainerIO) Pipe() {
 
 // Attach attaches container stdio.
 // TODO(random-liu): Use pools.Copy in docker to reduce memory usage?
-func (c *ContainerIO) Attach(opts AttachOptions) error {
+func (c *ContainerIO) Attach(opts AttachOptions) {
 	var wg sync.WaitGroup
 	key := util.GenerateID()
 	stdinKey := streamKey(c.id, "attach-"+key, Stdin)
@@ -202,21 +185,33 @@ func (c *ContainerIO) Attach(opts AttachOptions) error {
 	if opts.Stdout != nil {
 		wg.Add(1)
 		wc, close := cioutil.NewWriteCloseInformer(opts.Stdout)
-		if err := c.stdoutGroup.Add(stdoutKey, wc); err != nil {
-			return err
-		}
+		c.stdoutGroup.Add(stdoutKey, wc)
 		go attachStream(stdoutKey, close)
 	}
 	if !opts.Tty && opts.Stderr != nil {
 		wg.Add(1)
 		wc, close := cioutil.NewWriteCloseInformer(opts.Stderr)
-		if err := c.stderrGroup.Add(stderrKey, wc); err != nil {
-			return err
-		}
+		c.stderrGroup.Add(stderrKey, wc)
 		go attachStream(stderrKey, close)
 	}
 	wg.Wait()
-	return nil
+}
+
+// AddOutput adds new write closers to the container stream, and returns existing
+// write closers if there are any.
+func (c *ContainerIO) AddOutput(name string, stdout, stderr io.WriteCloser) (io.WriteCloser, io.WriteCloser) {
+	var oldStdout, oldStderr io.WriteCloser
+	if stdout != nil {
+		key := streamKey(c.id, name, Stdout)
+		oldStdout = c.stdoutGroup.Get(key)
+		c.stdoutGroup.Add(key, stdout)
+	}
+	if stderr != nil {
+		key := streamKey(c.id, name, Stderr)
+		oldStderr = c.stderrGroup.Get(key)
+		c.stderrGroup.Add(key, stderr)
+	}
+	return oldStdout, oldStderr
 }
 
 // Cancel cancels container io.
