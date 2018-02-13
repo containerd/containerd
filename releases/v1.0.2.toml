@@ -1,0 +1,42 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+
+# previous release
+previous = "v1.0.1"
+
+pre_release = false
+
+preface = """\
+This is the second patch release for `containerd` in the 1.0 series. There are
+several fixes to reduce memory usage and garbage collection pressure in the
+shim. The content store has a few fixes to address cases where download
+resumption wasn't working properly. The image store has fixes to be more
+efficient and to handle edge cases in the garbage collector. Less CPU will be
+used when collecting cgroup metrics.
+
+The most critical fix addresses a hang in runc that can happen due to a race
+condition around FIFOs. Make sure to update your runc binary if you are
+affected. The fix is described in
+https://github.com/opencontainers/runc/pull/1698. Make sure to update to the
+runc version in
+https://github.com/containerd/containerd/blob/master/RUNC.md to ensure you are not affected.
+
+In addition to the above, a few fixes for handling of layer files have been backported. https://github.com/containerd/containerd/pull/2063
+addresses an issue where duplicate directory entries can land in a layer diff
+if both the metadata and a child entry are changed.
+https://github.com/containerd/containerd/pull/2103 where whiteout files for
+parent directories may be missing and a related diff bug https://github.com/containerd/containerd/pull/2127.
+
+The license of the dependency `BurntSushi/toml` has been updated to an MIT
+license.
+
+We also now ensure that the vendor directory contents are as expected.
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
