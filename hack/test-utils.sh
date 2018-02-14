@@ -45,7 +45,8 @@ test_setup() {
     echo "containerd is not installed, please run hack/install-deps.sh"
     exit 1
   fi
-  sudo pkill containerd
+  sudo pkill -x cri-containerd
+  sudo pkill -x containerd
   keepalive "sudo containerd" ${RESTART_WAIT_PERIOD} &> ${report_dir}/containerd.log &
   containerd_pid=$!
   # Wait for containerd to be running by using the containerd client ctr to check the version
@@ -69,7 +70,8 @@ test_teardown() {
   if [ -n "${cri_containerd_pid}" ]; then
     kill ${cri_containerd_pid}
   fi
-  sudo pkill containerd
+  sudo pkill -x cri-containerd
+  sudo pkill -x containerd
 }
 
 # keepalive runs a command and keeps it alive.

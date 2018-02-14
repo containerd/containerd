@@ -206,7 +206,7 @@ func Randomize(str string) string {
 
 // KillProcess kills the process by name. pkill is used.
 func KillProcess(name string) error {
-	output, err := exec.Command("pkill", fmt.Sprintf("^%s$", name)).CombinedOutput()
+	output, err := exec.Command("pkill", "-x", fmt.Sprintf("^%s$", name)).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to kill %q - error: %v, output: %q", name, err, output)
 	}
