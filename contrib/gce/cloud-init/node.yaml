@@ -106,7 +106,6 @@ write_files:
       Restart=always
       RestartSec=10
       RemainAfterExit=yes
-      RemainAfterExit=yes
       ExecStartPre=/bin/chmod 544 /home/cri-containerd/opt/cri-containerd/cluster/health-monitor.sh
       ExecStart=/bin/bash -c 'CRICTL=/home/cri-containerd/usr/local/bin/crictl \
       /home/cri-containerd/opt/cri-containerd/cluster/health-monitor.sh'
@@ -174,7 +173,6 @@ write_files:
       [Service]
       Restart=always
       RestartSec=10
-      RemainAfterExit=yes
       RemainAfterExit=yes
       ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/health-monitor.sh
       ExecStart=/home/kubernetes/bin/health-monitor.sh kubelet
