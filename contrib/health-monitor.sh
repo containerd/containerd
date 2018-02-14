@@ -19,6 +19,11 @@ set -o pipefail
 
 # CRICTL is the path of crictl
 CRICTL=${CRICTL:-"crictl"}
+# INITIAL_WAIT_ATTEMPTS is the number to attempt, before start
+# performing health check. The problem is that cri-containerd
+# and containerd are started around the same time with health
+# monitor, they may not be ready yet when health-monitor is started.
+INITIAL_WAIT_ATTEMPTS=${INITIAL_WAIT_ATTEMPTS:-5}
 # COMMAND_TIMEOUT is the timeout for the health check command.
 COMMAND_TIMEOUT=${COMMAND_TIMEOUT:-60}
 # CHECK_PERIOD is the health check period.
@@ -27,13 +32,21 @@ CHECK_PERIOD=${CHECK_PERIOD:-10}
 # and containerd.
 SLEEP_SECONDS=${SLEEP_SECONDS:-120}
 
+attempt=1
+until timeout ${COMMAND_TIMEOUT} ${CRICTL} pods > /dev/null || (( attempt == INITIAL_WAIT_ATTEMPTS ))
+do
+  echo "$attempt initial attempt \"$CRICTL pods\"! Trying again in $attempt seconds..."
+  sleep $(( attempt++ ))
+done
+
+echo "Start performing health check."
 while true; do
   # Use crictl pods because it requires both containerd and
   # cri-containerd to be working.
   if ! timeout ${COMMAND_TIMEOUT} ${CRICTL} pods > /dev/null; then
-    echo "crictl pods timeout!"
-    pkill containerd
-    pkill cri-containerd
+    echo "\"$CRICTL pods\" failed!"
+    pkill -x cri-containerd
+    pkill -x containerd
     # Wait for a while, as we don't want to kill it again before it is really up.
     sleep ${SLEEP_SECONDS}
   else
