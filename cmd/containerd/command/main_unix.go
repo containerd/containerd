@@ -1,6 +1,6 @@
 // +build linux darwin freebsd solaris
 
-package main
+package command
 
 import (
 	"context"
