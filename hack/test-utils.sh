@@ -16,7 +16,6 @@
 
 source $(dirname "${BASH_SOURCE[0]}")/utils.sh
 
-source ${ROOT}/hack/versions
 # CRI_CONTAINERD_FLAGS are the extra flags to use when start cri-containerd.
 CRI_CONTAINERD_FLAGS=${CRI_CONTAINERD_FLAGS:-""}
 # RESTART_WAIT_PERIOD is the period to wait before restarting cri-containerd/containerd.
@@ -34,7 +33,7 @@ containerd_pid=
 
 # test_setup starts containerd and cri-containerd.
 test_setup() {
-  local report_dir=$1 
+  local report_dir=$1
   if [ ! -x ${ROOT}/_output/cri-containerd ]; then
     echo "cri-containerd is not built"
     exit 1

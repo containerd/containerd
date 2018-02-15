@@ -57,8 +57,9 @@ help:
 	@echo " * 'install.deps'     - Install dependencies of cri-containerd (containerd, runc, cni) Note: BUILDTAGS defaults to 'seccomp apparmor' for runc build"
 	@echo " * 'uninstall'        - Remove installed binaries from system locations"
 	@echo " * 'version'          - Print current cri-containerd release version"
+	@echo " * 'update-vendor'    - Syncs containerd/vendor.conf -> vendor.conf and sorts vendor.conf"
 
-verify: lint gofmt boiler deps-version
+verify: lint gofmt boiler
 
 version:
 	@echo $(VERSION)
@@ -75,9 +76,17 @@ boiler:
 	@echo "checking boilerplate"
 	@./hack/verify-boilerplate.sh
 
-deps-version:
-	@echo "checking /hack/versions"
-	@./hack/update-vendor.sh -only-verify
+.PHONY: sort-vendor sync-vendor update-vendor
+
+sort-vendor:
+	@echo "sorting vendor.conf"
+	@./hack/sort-vendor.sh
+
+sync-vendor:
+	@echo "syncing vendor.conf from containerd"
+	@./hack/sync-vendor.sh
+
+update-vendor: sync-vendor sort-vendor
 
 $(BUILD_DIR)/cri-containerd: $(SOURCES)
 	$(GO) build -o $@ \
@@ -134,7 +143,7 @@ uninstall:
 	rm -f $(BINDIR)/cri-containerd
 	rm -f $(BINDIR)/ctrcri
 
-$(BUILD_DIR)/$(TARBALL): static-binaries hack/versions
+$(BUILD_DIR)/$(TARBALL): static-binaries vendor.conf
 	@BUILD_DIR=$(BUILD_DIR) TARBALL=$(TARBALL) ./hack/release.sh
 
 release: $(BUILD_DIR)/$(TARBALL)

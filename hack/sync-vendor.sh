@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Copyright 2017 The Kubernetes Authors.
+# Copyright 2018 The containerd Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,9 +22,7 @@ set -o pipefail
 source $(dirname "${BASH_SOURCE[0]}")/utils.sh
 cd ${ROOT}
 
-# hack/versions should be correct now.
 echo "Compare vendor with containerd vendors..."
-source hack/versions
 containerd_vendor=$(mktemp /tmp/containerd-vendor.conf.XXXX)
 curl -s https://raw.githubusercontent.com/${CONTAINERD_REPO#*/}/${CONTAINERD_VERSION}/vendor.conf > ${containerd_vendor}
 # Create a temporary vendor file to update.
@@ -58,8 +57,3 @@ if ! diff vendor.conf ${tmp_vendor} > /dev/null; then
   fi
 fi
 rm ${containerd_vendor}
-
-echo "Sort vendor.conf..."
-sort vendor.conf -o vendor.conf
-
-echo "Please commit the change made by this file..."
