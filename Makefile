@@ -57,6 +57,7 @@ TEST_REQUIRES_ROOT_PACKAGES=$(filter \
 
 # Project binaries.
 COMMANDS=ctr containerd containerd-stress containerd-release
+MANPAGES=ctr.1 containerd.1 config.toml.5 containerd-config.1
 
 GO_TAGS=$(if $(BUILDTAGS),-tags "$(BUILDTAGS)",)
 GO_LDFLAGS=-ldflags '-s -w -X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG) $(EXTRA_LDFLAGS)'
@@ -82,7 +83,7 @@ BINARIES=$(addprefix bin/,$(COMMANDS))
 TESTFLAGS ?= -v $(TESTFLAGS_RACE)
 TESTFLAGS_PARALLEL ?= 8
 
-.PHONY: clean all AUTHORS build binaries test integration generate protos checkprotos coverage ci check help install uninstall vendor release
+.PHONY: clean all AUTHORS build binaries test integration generate protos checkprotos coverage ci check help install uninstall vendor release mandir install-man
 .DEFAULT: default
 
 all: binaries
@@ -156,6 +157,25 @@ bin/containerd-shim: cmd/containerd-shim FORCE # set !cgo and omit pie for a sta
 
 binaries: $(BINARIES) ## build binaries
 	@echo "$(WHALE) $@"
+
+man: mandir $(addprefix man/,$(MANPAGES))
+	@echo "$(WHALE) $@"
+
+mandir:
+	@mkdir -p man
+
+man/%: docs/man/%.md FORCE
+	@echo "$(WHALE) $<"
+	go-md2man -in "$<" -out "$@"
+
+define installmanpage
+mkdir -p $(DESTDIR)/man/man$(2);
+gzip -c $(1) >$(DESTDIR)/man/man$(2)/$(3).gz;
+endef
+
+install-man:
+	@echo "$(WHALE) $@"
+	$(foreach manpage,$(addprefix man/,$(MANPAGES)), $(call installmanpage,$(manpage),$(subst .,,$(suffix $(manpage))),$(notdir $(manpage))))
 
 release: $(BINARIES)
 	@echo "$(WHALE) $@"
