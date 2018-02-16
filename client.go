@@ -338,11 +338,11 @@ func (c *Client) ListImages(ctx context.Context, filters ...string) ([]Image, er
 
 // Subscribe to events that match one or more of the provided filters.
 //
-// Callers should listen on both the envelope channel and errs channel. If the
-// errs channel returns nil or an error, the subscriber should terminate.
+// Callers should listen on both the envelope and errs channels. If the errs
+// channel returns nil or an error, the subscriber should terminate.
 //
-// To cancel shutdown reciept of events, cancel the provided context. The errs
-// channel will be closed and return a nil error.
+// The subscriber can stop receiving events by canceling the provided context.
+// The errs channel will be closed and return a nil error.
 func (c *Client) Subscribe(ctx context.Context, filters ...string) (ch <-chan *eventsapi.Envelope, errs <-chan error) {
 	var (
 		evq  = make(chan *eventsapi.Envelope)
