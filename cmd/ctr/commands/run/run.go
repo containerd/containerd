@@ -65,6 +65,10 @@ var ContainerFlags = []cli.Flag{
 		Name:  "tty,t",
 		Usage: "allocate a TTY for the container",
 	},
+	cli.StringSliceFlag{
+		Name:  "with-ns",
+		Usage: "specify existing Linux namespaces to join at container runtime (format '<nstype>:<path>')",
+	},
 }
 
 func loadSpec(path string, s *specs.Spec) error {
