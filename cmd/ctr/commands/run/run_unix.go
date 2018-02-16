@@ -4,11 +4,13 @@ package run
 
 import (
 	gocontext "context"
+	"strings"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
@@ -78,6 +80,20 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	if context.Bool("net-host") {
 		opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace), oci.WithHostHostsFile, oci.WithHostResolvconf)
 	}
+	joinNs := context.StringSlice("with-ns")
+	for _, ns := range joinNs {
+		parts := strings.Split(ns, ":")
+		if len(parts) != 2 {
+			return nil, errors.New("joining a Linux namespace using --with-ns requires the format 'nstype:path'")
+		}
+		if !validNamespace(parts[0]) {
+			return nil, errors.New("the Linux namespace type specified in --with-ns is not valid: " + parts[0])
+		}
+		opts = append(opts, oci.WithLinuxNamespace(specs.LinuxNamespace{
+			Type: specs.LinuxNamespaceType(parts[0]),
+			Path: parts[1],
+		}))
+	}
 	if context.IsSet("config") {
 		var s specs.Spec
 		if err := loadSpec(context.String("config"), &s); err != nil {
@@ -100,4 +116,20 @@ func getNewTaskOpts(context *cli.Context) []containerd.NewTaskOpts {
 		return []containerd.NewTaskOpts{containerd.WithNoPivotRoot}
 	}
 	return nil
+}
+
+func validNamespace(ns string) bool {
+	linuxNs := specs.LinuxNamespaceType(ns)
+	switch linuxNs {
+	case specs.PIDNamespace,
+		specs.NetworkNamespace,
+		specs.UTSNamespace,
+		specs.MountNamespace,
+		specs.UserNamespace,
+		specs.IPCNamespace,
+		specs.CgroupNamespace:
+		return true
+	default:
+		return false
+	}
 }
