@@ -55,7 +55,6 @@ type task struct {
 	pidPool           *pidPool
 	hcsContainer      hcsshim.Container
 	terminateDuration time.Duration
-	servicing         bool
 }
 
 func (t *task) ID() string {

@@ -39,7 +39,6 @@ import (
 	"github.com/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -162,23 +161,11 @@ func (r *windowsRuntime) Delete(ctx context.Context, t runtime.Task) (*runtime.E
 	// TODO(mlaventure): stop monitor on this task
 
 	var (
-		err           error
-		needServicing bool
-		state, _      = wt.State(ctx)
+		err      error
+		state, _ = wt.State(ctx)
 	)
 	switch state.Status {
 	case runtime.StoppedStatus:
-		// Only try to service a container if it was started and it's not a
-		// servicing task itself
-		if wt.servicing == false {
-			needServicing, err = wt.hcsContainer.HasPendingUpdates()
-			if err != nil {
-				needServicing = false
-				log.G(ctx).WithError(err).
-					WithFields(logrus.Fields{"id": wt.id, "pid": wt.pid}).
-					Error("failed to check if container needs servicing")
-			}
-		}
 		fallthrough
 	case runtime.CreatedStatus:
 		// if it's stopped or in created state, we need to shutdown the
@@ -221,13 +208,6 @@ func (r *windowsRuntime) Delete(ctx context.Context, t runtime.Task) (*runtime.E
 			ExitStatus:  rtExit.Status,
 			ExitedAt:    rtExit.Timestamp,
 		})
-
-	if needServicing {
-		ns, _ := namespaces.Namespace(ctx)
-		serviceCtx := log.WithLogger(context.Background(), log.GetLogger(ctx))
-		serviceCtx = namespaces.WithNamespace(serviceCtx, ns)
-		r.serviceTask(serviceCtx, ns, wt.id+"_servicing", wt.rootfs, wt.spec)
-	}
 
 	if err := mount.UnmountAll(wt.rootfs[0].Source, 0); err != nil {
 		log.G(ctx).WithError(err).WithField("path", wt.rootfs[0].Source).
@@ -371,38 +351,5 @@ func (r *windowsRuntime) cleanup(ctx context.Context) {
 			container.Wait()
 		}
 		container.Close()
-	}
-}
-
-func (r *windowsRuntime) serviceTask(ctx context.Context, namespace, id string, rootfs []mount.Mount, spec *specs.Spec) {
-	var (
-		err        error
-		t          *task
-		io         runtime.IO
-		createOpts = &hcsshimtypes.CreateOptions{
-			TerminateDuration: defaultTerminateDuration,
-		}
-	)
-
-	t, err = r.newTask(ctx, namespace, id, rootfs, spec, io, createOpts)
-	if err != nil {
-		log.G(ctx).WithError(err).WithField("id", id).
-			Warn("failed to created servicing task")
-		return
-	}
-	t.servicing = true
-
-	err = t.Start(ctx)
-	switch err {
-	case nil:
-		<-t.getProcess(id).exitCh
-	default:
-		log.G(ctx).WithError(err).WithField("id", id).
-			Warn("failed to start servicing task")
-	}
-
-	if _, err = r.Delete(ctx, t); err != nil {
-		log.G(ctx).WithError(err).WithField("id", id).
-			Warn("failed to stop servicing task")
 	}
 }
