@@ -51,11 +51,6 @@ fi
 # and configurations in cluster.
 INSTALL_CNI=${INSTALL_CNI:-true}
 
-# COOK_CONTAINERD indicates whether to update containerd with newest
-# cri plugin before install. This is mainly used for testing new cri
-# plugin change.
-COOK_CONTAINERD=${COOK_CONTAINERD:-false}
-
 CONTAINERD_DIR=${DESTDIR}/usr/local
 RUNC_DIR=${DESTDIR}
 CNI_DIR=${DESTDIR}/opt/cni
@@ -138,37 +133,6 @@ fi
 # Install containerd
 checkout_repo ${CONTAINERD_PKG} ${CONTAINERD_VERSION} ${CONTAINERD_REPO}
 cd ${GOPATH}/src/${CONTAINERD_PKG}
-if ${COOK_CONTAINERD}; then
-  # Verify that vendor.conf is in sync with containerd before cook containerd,
-  # this is a hard requirement for now because of below overwrite of
-  # containerd's vendor tree.
-  # TODO(random-liu): Remove this and the below import code after containerd
-  #   starts to vendor cri plugin.
-  if ! ${ROOT}/hack/sync-vendor.sh -only-verify; then
-    echo "Please run hack/sync-vendor.sh before cook containerd."
-    exit 1
-  fi
-  # Import cri plugin into containerd.
-  echo "import _ \"${CRI_CONTAINERD_PKG}\"" >> cmd/containerd/builtins_linux.go
-  # 1. Copy all cri-containerd vendors into containerd vendor. This makes sure
-  # all dependencies introduced by cri-containerd will be updated. There might
-  # be unnecessary vendors introduced, but it still builds.
-  cp -rT ${ROOT}/vendor/ vendor/
-  # 2. Remove containerd repo itself from vendor.
-  rm -rf vendor/${CONTAINERD_PKG}
-  # 3. Create cri-containerd vendor in containerd vendor, and copy the newest
-  # cri-containerd there.
-  if [ -d "vendor/${CRI_CONTAINERD_PKG}" ]; then
-    rm -rf vendor/${CRI_CONTAINERD_PKG}/*
-  else
-    mkdir -p vendor/${CRI_CONTAINERD_PKG}
-  fi
-  cp -rT ${ROOT} vendor/${CRI_CONTAINERD_PKG}
-  # 4. Remove the extra vendor in cri-containerd.
-  rm -rf vendor/${CRI_CONTAINERD_PKG}/vendor
-  # After the 4 steps above done, we have a containerd with newest cri-containerd
-  # plugin.
-fi
 make BUILDTAGS="${BUILDTAGS}"
 # containerd make install requires `go` to work. Explicitly
 # set PATH to make sure it can find `go` even with `sudo`.

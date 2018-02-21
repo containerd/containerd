@@ -32,13 +32,13 @@ jobs:
         - make install.tools
         - make .gitvalidation
         - make binaries
-        - make plugin
+        - make containerd
       go: 1.9.x
     - script:
         - make install.tools
         - make .gitvalidation
         - make binaries
-        - make plugin
+        - make containerd
       go: tip
     - stage: Test
       script:
@@ -54,7 +54,9 @@ jobs:
         - cat /tmp/test-cri/containerd.log
       go: 1.9.x
     - script:
-        - make install.deps COOK_CONTAINERD=true
+        - make install.deps
+        - make containerd
+        - sudo make install-containerd
         - make test-integration STANDALONE_CRI_CONTAINERD=false
         - make test-cri STANDALONE_CRI_CONTAINERD=false
       after_script:

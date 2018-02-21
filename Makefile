@@ -40,24 +40,25 @@ default: help
 help:
 	@echo "Usage: make <target>"
 	@echo
-	@echo " * 'install'          - Install binaries to system locations"
-	@echo " * 'binaries'         - Build cri-containerd and ctrcri"
-	@echo " * 'plugin'           - Build cri-containerd as a plugin package"
-	@echo " * 'static-binaries   - Build static cri-containerd and ctrcri"
-	@echo " * 'release'          - Build release tarball"
-	@echo " * 'push'             - Push release tarball to GCS"
-	@echo " * 'test'             - Test cri-containerd with unit test"
-	@echo " * 'test-integration' - Test cri-containerd with integration test"
-	@echo " * 'test-cri'         - Test cri-containerd with cri validation test"
-	@echo " * 'test-e2e-node'    - Test cri-containerd with Kubernetes node e2e test"
-	@echo " * 'clean'            - Clean artifacts"
-	@echo " * 'verify'           - Execute the source code verification tools"
-	@echo " * 'proto'            - Update protobuf of cri-containerd api"
-	@echo " * 'install.tools'    - Install tools used by verify"
-	@echo " * 'install.deps'     - Install dependencies of cri-containerd (containerd, runc, cni) Note: BUILDTAGS defaults to 'seccomp apparmor' for runc build"
-	@echo " * 'uninstall'        - Remove installed binaries from system locations"
-	@echo " * 'version'          - Print current cri-containerd release version"
-	@echo " * 'update-vendor'    - Syncs containerd/vendor.conf -> vendor.conf and sorts vendor.conf"
+	@echo " * 'install'          	- Install binaries to system locations"
+	@echo " * 'binaries'         	- Build cri-containerd and ctrcri"
+	@echo " * 'static-binaries   	- Build static cri-containerd and ctrcri"
+	@echo " * 'release'          	- Build release tarball"
+	@echo " * 'push'             	- Push release tarball to GCS"
+	@echo " * 'containerd'  	- Build a customized containerd with CRI plugin for testing"
+	@echo " * 'install-containerd' 	- Install customized containerd to system location"
+	@echo " * 'test'             	- Test cri-containerd with unit test"
+	@echo " * 'test-integration' 	- Test cri-containerd with integration test"
+	@echo " * 'test-cri'         	- Test cri-containerd with cri validation test"
+	@echo " * 'test-e2e-node'    	- Test cri-containerd with Kubernetes node e2e test"
+	@echo " * 'clean'            	- Clean artifacts"
+	@echo " * 'verify'           	- Execute the source code verification tools"
+	@echo " * 'proto'            	- Update protobuf of cri-containerd api"
+	@echo " * 'install.tools'    	- Install tools used by verify"
+	@echo " * 'install.deps'     	- Install dependencies of cri-containerd (containerd, runc, cni) Note: BUILDTAGS defaults to 'seccomp apparmor' for runc build"
+	@echo " * 'uninstall'        	- Remove installed binaries from system locations"
+	@echo " * 'version'          	- Print current cri-containerd release version"
+	@echo " * 'update-vendor'    	- Syncs containerd/vendor.conf -> vendor.conf and sorts vendor.conf"
 
 verify: lint gofmt boiler
 
@@ -102,6 +103,13 @@ $(BUILD_DIR)/ctrcri: $(SOURCES)
 		-gcflags '$(GO_GCFLAGS)' \
 		$(PROJECT)/cmd/ctrcri
 
+$(BUILD_DIR)/containerd: $(SOURCES) $(PLUGIN_SOURCES)
+	$(GO) build -o $@ \
+		-tags '$(BUILD_TAGS)' \
+		-ldflags '$(GO_LDFLAGS)' \
+		-gcflags '$(GO_GCFLAGS)' \
+		$(PROJECT)/cmd/containerd
+
 test:
 	$(GO) test -timeout=10m -race ./pkg/... \
 		-tags '$(BUILD_TAGS)' \
@@ -125,13 +133,6 @@ clean:
 
 binaries: $(BUILD_DIR)/cri-containerd $(BUILD_DIR)/ctrcri
 
-# TODO(random-liu): Make this only build when source files change and
-# add this to target all.
-plugin: $(PLUGIN_SOURCES) $(SOURCES)
-	$(GO) build -tags '$(BUILD_TAGS)' \
-		-ldflags '$(GO_LDFLAGS)' \
-		-gcflags '$(GO_GCFLAGS)' \
-
 static-binaries: GO_LDFLAGS += -extldflags "-fno-PIC -static"
 static-binaries: $(BUILD_DIR)/cri-containerd $(BUILD_DIR)/ctrcri
 
@@ -150,6 +151,11 @@ release: $(BUILD_DIR)/$(TARBALL)
 
 push: $(BUILD_DIR)/$(TARBALL)
 	@BUILD_DIR=$(BUILD_DIR) TARBALL=$(TARBALL) VERSION=$(VERSION) ./hack/push.sh
+
+containerd: $(BUILD_DIR)/containerd
+
+install-containerd: containerd
+	install -D -m 755 $(BUILD_DIR)/containerd $(BINDIR)/containerd
 
 proto:
 	@hack/update-proto.sh
@@ -183,7 +189,6 @@ install.tools: .install.gitvalidation .install.gometalinter
 .PHONY: \
 	binaries \
 	static-binaries \
-	plugin \
 	release \
 	push \
 	boiler \
@@ -193,6 +198,8 @@ install.tools: .install.gitvalidation .install.gometalinter
 	help \
 	install \
 	lint \
+	containerd \
+	install-containerd \
 	test \
 	test-integration \
 	test-cri \
