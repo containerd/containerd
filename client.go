@@ -93,11 +93,22 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 			grpc.WithStreamInterceptor(stream),
 		)
 	}
-	conn, err := grpc.Dial(dialer.DialAddress(address), gopts...)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to dial %q", address)
+	connector := func() (*grpc.ClientConn, error) {
+		conn, err := grpc.Dial(dialer.DialAddress(address), gopts...)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to dial %q", address)
+		}
+		return conn, nil
 	}
-	return NewWithConn(conn, opts...)
+	conn, err := connector()
+	if err != nil {
+		return nil, err
+	}
+	return &Client{
+		conn:      conn,
+		connector: connector,
+		runtime:   fmt.Sprintf("%s.%s", plugin.RuntimePlugin, runtime.GOOS),
+	}, nil
 }
 
 // NewWithConn returns a new containerd client that is connected to the containerd
@@ -112,8 +123,23 @@ func NewWithConn(conn *grpc.ClientConn, opts ...ClientOpt) (*Client, error) {
 // Client is the client to interact with containerd and its various services
 // using a uniform interface
 type Client struct {
-	conn    *grpc.ClientConn
-	runtime string
+	conn      *grpc.ClientConn
+	runtime   string
+	connector func() (*grpc.ClientConn, error)
+}
+
+// Reconnect re-establishes the GRPC connection to the containerd daemon
+func (c *Client) Reconnect() error {
+	if c.connector == nil {
+		return errors.New("unable to reconnect to containerd, no connector available")
+	}
+	c.conn.Close()
+	conn, err := c.connector()
+	if err != nil {
+		return err
+	}
+	c.conn = conn
+	return nil
 }
 
 // IsServing returns true if the client can successfully connect to the
