@@ -38,6 +38,10 @@ var startCommand = cli.Command{
 			Name:  "fifo-dir",
 			Usage: "directory used for storing IO FIFOs",
 		},
+		cli.StringFlag{
+			Name:  "pid-file",
+			Usage: "file path to write the task's pid",
+		},
 	},
 	Action: func(context *cli.Context) error {
 		var (
@@ -72,7 +76,11 @@ var startCommand = cli.Command{
 			return err
 		}
 		defer task.Delete(ctx)
-
+		if context.IsSet("pid-file") {
+			if err := commands.WritePidFile(context.String("pid-file"), int(task.Pid())); err != nil {
+				return err
+			}
+		}
 		statusC, err := task.Wait(ctx)
 		if err != nil {
 			return err

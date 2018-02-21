@@ -85,6 +85,10 @@ var ContainerFlags = []cli.Flag{
 		Name:  "with-ns",
 		Usage: "specify existing Linux namespaces to join at container runtime (format '<nstype>:<path>')",
 	},
+	cli.StringFlag{
+		Name:  "pid-file",
+		Usage: "file path to write the task's pid",
+	},
 }
 
 func loadSpec(path string, s *specs.Spec) error {
@@ -208,6 +212,11 @@ var Command = cli.Command{
 		if !detach {
 			defer task.Delete(ctx)
 			if statusC, err = task.Wait(ctx); err != nil {
+				return err
+			}
+		}
+		if context.IsSet("pid-file") {
+			if err := commands.WritePidFile(context.String("pid-file"), int(task.Pid())); err != nil {
 				return err
 			}
 		}
