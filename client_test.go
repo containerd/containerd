@@ -191,3 +191,37 @@ func TestImagePull(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestClientReconnect(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := testContext()
+	defer cancel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client == nil {
+		t.Fatal("New() returned nil client")
+	}
+	ok, err := client.IsServing(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("containerd is not serving")
+	}
+	if err := client.Reconnect(); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err = client.IsServing(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("containerd is not serving")
+	}
+	if err := client.Close(); err != nil {
+		t.Errorf("client closed returned errror %v", err)
+	}
+}
