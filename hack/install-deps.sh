@@ -104,7 +104,7 @@ ${sudo} make install -e DESTDIR=${RUNC_DIR}
 if ${INSTALL_CNI}; then
   checkout_repo ${CNI_PKG} ${CNI_VERSION} ${CNI_REPO}
   cd ${GOPATH}/src/${CNI_PKG}
-  ./build.sh
+  FASTBUILD=true ./build.sh
   ${sudo} mkdir -p ${CNI_DIR}
   ${sudo} cp -r ./bin ${CNI_DIR}
   ${sudo} mkdir -p ${CNI_CONFIG_DIR}
