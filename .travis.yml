@@ -7,7 +7,8 @@ services:
 language: go
 
 go:
-  - 1.9.x
+  - "1.9.x"
+  - "1.10"
 
 go_import_path: github.com/containerd/containerd
 
@@ -56,7 +57,7 @@ script:
   - script/validate/vendor
   - go build -i .
   - make check
-  - if [ "$GOOS" = "linux" ]; then make check-protos check-api-descriptors; fi
+  - if [[ "$GOOS" = "linux" && "$TRAVIS_GO_VERSION" != "1.9"* ]]; then make check-protos check-api-descriptors; fi
   - make build
   - make binaries
   - if [ "$GOOS" = "linux" ]; then sudo make install ; fi
