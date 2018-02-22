@@ -21,6 +21,8 @@ import (
 	"flag"
 	"fmt"
 	"os/exec"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -161,6 +163,23 @@ func WithCommand(c string, args ...string) ContainerOpts {
 	}
 }
 
+// Add pid namespace mode.
+func WithPidNamespace(mode runtime.NamespaceMode) ContainerOpts {
+	return func(cf *runtime.ContainerConfig) {
+		if cf.Linux == nil {
+			cf.Linux = &runtime.LinuxContainerConfig{}
+		}
+		if cf.Linux.SecurityContext == nil {
+			cf.Linux.SecurityContext = &runtime.LinuxContainerSecurityContext{}
+		}
+		if cf.Linux.SecurityContext.NamespaceOptions == nil {
+			cf.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{}
+		}
+		cf.Linux.SecurityContext.NamespaceOptions.Pid = mode
+	}
+
+}
+
 // ContainerConfig creates a container config given a name and image name
 // and additional container config options
 func ContainerConfig(name, image string, opts ...ContainerOpts) *runtime.ContainerConfig {
@@ -211,4 +230,17 @@ func KillProcess(name string) error {
 		return fmt.Errorf("failed to kill %q - error: %v, output: %q", name, err, output)
 	}
 	return nil
+}
+
+// PidOf returns pid of a process by name.
+func PidOf(name string) (int, error) {
+	b, err := exec.Command("pidof", name).CombinedOutput()
+	output := strings.TrimSpace(string(b))
+	if err != nil {
+		if len(output) != 0 {
+			return 0, fmt.Errorf("failed to run pidof %q - error: %v, output: %q", name, err, output)
+		}
+		return 0, nil
+	}
+	return strconv.Atoi(output)
 }

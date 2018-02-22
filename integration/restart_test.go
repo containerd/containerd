@@ -17,8 +17,6 @@ limitations under the License.
 package integration
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -26,47 +24,61 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
-	"golang.org/x/sys/unix"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
 // Restart test must run sequentially.
-// NOTE(random-liu): Current restart test only support standalone cri-containerd mode.
 
-func TestSandboxAcrossCRIContainerdRestart(t *testing.T) {
-	if !*standaloneCRIContainerd {
-		t.Skip("Skip because cri-containerd does not run in standalone mode")
+func TestContainerdRestart(t *testing.T) {
+	type container struct {
+		name  string
+		id    string
+		state runtime.ContainerState
+	}
+	type sandbox struct {
+		name       string
+		id         string
+		state      runtime.PodSandboxState
+		containers []container
 	}
 	ctx := context.Background()
-	sandboxNS := "sandbox-restart-cri-containerd"
-	sandboxes := []struct {
-		name            string
-		id              string
-		stateBeforeExit runtime.PodSandboxState
-		actionAfterExit string
-		expectedState   runtime.PodSandboxState
-	}{
+	sandboxNS := "restart-containerd"
+	sandboxes := []sandbox{
 		{
-			name:            "task-always-ready",
-			stateBeforeExit: runtime.PodSandboxState_SANDBOX_READY,
-			expectedState:   runtime.PodSandboxState_SANDBOX_READY,
+			name:  "ready-sandbox",
+			state: runtime.PodSandboxState_SANDBOX_READY,
+			containers: []container{
+				{
+					name:  "created-container",
+					state: runtime.ContainerState_CONTAINER_CREATED,
+				},
+				{
+					name:  "running-container",
+					state: runtime.ContainerState_CONTAINER_RUNNING,
+				},
+				{
+					name:  "exited-container",
+					state: runtime.ContainerState_CONTAINER_EXITED,
+				},
+			},
 		},
 		{
-			name:            "task-always-not-ready",
-			stateBeforeExit: runtime.PodSandboxState_SANDBOX_NOTREADY,
-			expectedState:   runtime.PodSandboxState_SANDBOX_NOTREADY,
-		},
-		{
-			name:            "task-exit-before-restart",
-			stateBeforeExit: runtime.PodSandboxState_SANDBOX_READY,
-			actionAfterExit: "kill",
-			expectedState:   runtime.PodSandboxState_SANDBOX_NOTREADY,
-		},
-		{
-			name:            "task-deleted-before-restart",
-			stateBeforeExit: runtime.PodSandboxState_SANDBOX_READY,
-			actionAfterExit: "delete",
-			expectedState:   runtime.PodSandboxState_SANDBOX_NOTREADY,
+			name:  "notready-sandbox",
+			state: runtime.PodSandboxState_SANDBOX_NOTREADY,
+			containers: []container{
+				{
+					name:  "created-container",
+					state: runtime.ContainerState_CONTAINER_CREATED,
+				},
+				{
+					name:  "running-container",
+					state: runtime.ContainerState_CONTAINER_RUNNING,
+				},
+				{
+					name:  "exited-container",
+					state: runtime.ContainerState_CONTAINER_EXITED,
+				},
+			},
 		},
 	}
 	t.Logf("Make sure no sandbox is running before test")
@@ -74,134 +86,97 @@ func TestSandboxAcrossCRIContainerdRestart(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, existingSandboxes)
 
-	t.Logf("Start test sandboxes")
+	t.Logf("Start test sandboxes and containers")
 	for i := range sandboxes {
 		s := &sandboxes[i]
-		cfg := PodSandboxConfig(s.name, sandboxNS)
-		sb, err := runtimeService.RunPodSandbox(cfg)
+		sbCfg := PodSandboxConfig(s.name, sandboxNS)
+		sid, err := runtimeService.RunPodSandbox(sbCfg)
 		require.NoError(t, err)
 		defer func() {
 			// Make sure the sandbox is cleaned up in any case.
-			runtimeService.StopPodSandbox(sb)
-			runtimeService.RemovePodSandbox(sb)
+			runtimeService.StopPodSandbox(sid)
+			runtimeService.RemovePodSandbox(sid)
 		}()
-		s.id = sb
-		if s.stateBeforeExit == runtime.PodSandboxState_SANDBOX_NOTREADY {
-			require.NoError(t, runtimeService.StopPodSandbox(sb))
+		s.id = sid
+		for j := range s.containers {
+			c := &s.containers[j]
+			cfg := ContainerConfig(c.name, pauseImage,
+				// Set pid namespace as per container, so that container won't die
+				// when sandbox container is killed.
+				WithPidNamespace(runtime.NamespaceMode_CONTAINER),
+			)
+			cid, err := runtimeService.CreateContainer(sid, cfg, sbCfg)
+			require.NoError(t, err)
+			// Reply on sandbox cleanup.
+			c.id = cid
+			switch c.state {
+			case runtime.ContainerState_CONTAINER_CREATED:
+			case runtime.ContainerState_CONTAINER_RUNNING:
+				require.NoError(t, runtimeService.StartContainer(cid))
+			case runtime.ContainerState_CONTAINER_EXITED:
+				require.NoError(t, runtimeService.StartContainer(cid))
+				require.NoError(t, runtimeService.StopContainer(cid, 10))
+			}
 		}
-	}
-
-	t.Logf("Kill cri-containerd")
-	require.NoError(t, KillProcess("cri-containerd"))
-	defer func() {
-		assert.NoError(t, Eventually(func() (bool, error) {
-			return ConnectDaemons() == nil, nil
-		}, time.Second, 30*time.Second), "make sure cri-containerd is running before test finish")
-	}()
-
-	t.Logf("Change sandbox state, must finish before cri-containerd is restarted")
-	for _, s := range sandboxes {
-		if s.actionAfterExit == "" {
-			continue
-		}
-		cntr, err := containerdClient.LoadContainer(ctx, s.id)
-		require.NoError(t, err)
-		task, err := cntr.Task(ctx, nil)
-		require.NoError(t, err)
-		switch s.actionAfterExit {
-		case "kill":
-			require.NoError(t, task.Kill(ctx, unix.SIGKILL, containerd.WithKillAll))
-		case "delete":
-			_, err := task.Delete(ctx, containerd.WithProcessKill)
+		if s.state == runtime.PodSandboxState_SANDBOX_NOTREADY {
+			cntr, err := containerdClient.LoadContainer(ctx, sid)
+			require.NoError(t, err)
+			task, err := cntr.Task(ctx, nil)
+			require.NoError(t, err)
+			_, err = task.Delete(ctx, containerd.WithProcessKill)
 			require.NoError(t, err)
 		}
 	}
 
-	t.Logf("Wait until cri-containerd is restarted")
+	t.Logf("Kill containerd")
+	require.NoError(t, KillProcess("containerd"))
+	defer func() {
+		assert.NoError(t, Eventually(func() (bool, error) {
+			return ConnectDaemons() == nil, nil
+		}, time.Second, 30*time.Second), "make sure containerd is running before test finish")
+	}()
+
+	t.Logf("Wait until containerd is killed")
+	require.NoError(t, Eventually(func() (bool, error) {
+		pid, err := PidOf("containerd")
+		if err != nil {
+			return false, err
+		}
+		return pid == 0, nil
+	}, time.Second, 30*time.Second), "wait for containerd to be killed")
+
+	t.Logf("Wait until containerd is restarted")
 	require.NoError(t, Eventually(func() (bool, error) {
 		return ConnectDaemons() == nil, nil
-	}, time.Second, 30*time.Second), "wait for cri-containerd to be restarted")
+	}, time.Second, 30*time.Second), "wait for containerd to be restarted")
 
-	t.Logf("Check sandbox state after restart")
+	t.Logf("Check sandbox and container state after restart")
 	loadedSandboxes, err := runtimeService.ListPodSandbox(&runtime.PodSandboxFilter{})
 	require.NoError(t, err)
 	assert.Len(t, loadedSandboxes, len(sandboxes))
+	loadedContainers, err := runtimeService.ListContainers(&runtime.ContainerFilter{})
+	require.NoError(t, err)
+	assert.Len(t, loadedContainers, len(sandboxes)*3)
 	for _, s := range sandboxes {
 		for _, loaded := range loadedSandboxes {
 			if s.id == loaded.Id {
-				assert.Equal(t, s.expectedState, loaded.State)
+				assert.Equal(t, s.state, loaded.State)
 				break
+			}
+		}
+		for _, c := range s.containers {
+			for _, loaded := range loadedContainers {
+				if c.id == loaded.Id {
+					assert.Equal(t, c.state, loaded.State)
+					break
+				}
 			}
 		}
 	}
 
 	t.Logf("Should be able to stop and remove sandbox after restart")
 	for _, s := range sandboxes {
-		// Properly stop the sandbox if it's ready before restart.
-		if s.stateBeforeExit == runtime.PodSandboxState_SANDBOX_READY {
-			assert.NoError(t, runtimeService.StopPodSandbox(s.id))
-		}
+		assert.NoError(t, runtimeService.StopPodSandbox(s.id))
 		assert.NoError(t, runtimeService.RemovePodSandbox(s.id))
 	}
-}
-
-// TestSandboxDeletionAcrossCRIContainerdRestart tests the case that sandbox container
-// is deleted from containerd during cri-containerd is down. This should not happen.
-// However, if this really happens, cri-containerd should not load such sandbox and
-// should do best effort cleanup of the sandbox root directory. Note that in this case,
-// cri-containerd loses the network namespace of the sandbox, so it won't be able to
-// teardown the network properly.
-// This test uses host network sandbox to avoid resource leakage.
-func TestSandboxDeletionAcrossCRIContainerdRestart(t *testing.T) {
-	if !*standaloneCRIContainerd {
-		t.Skip("Skip because cri-containerd does not run in standalone mode")
-	}
-	ctx := context.Background()
-	sandboxNS := "sandbox-delete-restart-cri-containerd"
-	t.Logf("Make sure no sandbox is running before test")
-	existingSandboxes, err := runtimeService.ListPodSandbox(&runtime.PodSandboxFilter{})
-	require.NoError(t, err)
-	require.Empty(t, existingSandboxes)
-
-	t.Logf("Start test sandboxes")
-	cfg := PodSandboxConfig("sandbox", sandboxNS, WithHostNetwork)
-	sb, err := runtimeService.RunPodSandbox(cfg)
-	require.NoError(t, err)
-	defer func() {
-		// Make sure the sandbox is cleaned up in any case.
-		runtimeService.StopPodSandbox(sb)
-		runtimeService.RemovePodSandbox(sb)
-	}()
-
-	t.Logf("Kill cri-containerd")
-	require.NoError(t, KillProcess("cri-containerd"))
-	defer func() {
-		assert.NoError(t, Eventually(func() (bool, error) {
-			return ConnectDaemons() == nil, nil
-		}, time.Second, 30*time.Second), "make sure cri-containerd is running before test finish")
-	}()
-
-	t.Logf("Delete sandbox container from containerd")
-	cntr, err := containerdClient.LoadContainer(ctx, sb)
-	require.NoError(t, err)
-	task, err := cntr.Task(ctx, nil)
-	require.NoError(t, err)
-	_, err = task.Delete(ctx, containerd.WithProcessKill)
-	require.NoError(t, err)
-	require.NoError(t, cntr.Delete(ctx, containerd.WithSnapshotCleanup))
-
-	t.Logf("Wait until cri-containerd is restarted")
-	require.NoError(t, Eventually(func() (bool, error) {
-		return ConnectDaemons() == nil, nil
-	}, time.Second, 30*time.Second), "wait for cri-containerd to be restarted")
-
-	t.Logf("Check sandbox state after restart")
-	loadedSandboxes, err := runtimeService.ListPodSandbox(&runtime.PodSandboxFilter{})
-	require.NoError(t, err)
-	assert.Empty(t, loadedSandboxes)
-
-	t.Logf("Make sure sandbox root is removed")
-	sandboxRoot := filepath.Join(*criContainerdRoot, "sandboxes", sb)
-	_, err = os.Stat(sandboxRoot)
-	assert.True(t, os.IsNotExist(err))
 }
