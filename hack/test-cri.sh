@@ -52,7 +52,7 @@ mkdir -p ${REPORT_DIR}
 test_setup ${REPORT_DIR}
 
 # Run cri validation test
-sudo env PATH=${PATH} GOPATH=${GOPATH} ${CRITEST} --runtime-endpoint=${CRICONTAINERD_SOCK} --focus="${FOCUS}" --ginkgo-flags="--skip=\"${SKIP}\"" validation
+sudo env PATH=${PATH} GOPATH=${GOPATH} ${CRITEST} --runtime-endpoint=${CRICONTAINERD_SOCK} --focus="${FOCUS}" --ginkgo-flags="--skip=\"${SKIP}\" --nodes=8" validation
 test_exit_code=$?
 
 test_teardown
