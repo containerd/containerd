@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/testutil"
 	"github.com/gotestyourself/gotestyourself/assert"
 	digest "github.com/opencontainers/go-digest"
@@ -34,9 +33,33 @@ func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, r
 	t.Run("Labels", makeTest(t, name, storeFn, checkLabels))
 }
 
+// ContextWrapper is used to decorate new context used inside the test
+// before using the context on the content store.
+// This can be used to support leasing and multiple namespaces tests.
+type ContextWrapper func(ctx context.Context) (context.Context, func() error, error)
+
+type wrapperKey struct{}
+
+// SetContextWrapper sets the wrapper on the context for deriving
+// new test contexts from the context.
+func SetContextWrapper(ctx context.Context, w ContextWrapper) context.Context {
+	return context.WithValue(ctx, wrapperKey{}, w)
+}
+
+type nameKey struct{}
+
+// Name gets the test name from the context
+func Name(ctx context.Context) string {
+	name, ok := ctx.Value(nameKey{}).(string)
+	if !ok {
+		return ""
+	}
+	return name
+}
+
 func makeTest(t *testing.T, name string, storeFn func(ctx context.Context, root string) (context.Context, content.Store, func() error, error), fn func(ctx context.Context, t *testing.T, cs content.Store)) func(t *testing.T) {
 	return func(t *testing.T) {
-		ctx := namespaces.WithNamespace(context.Background(), name)
+		ctx := context.WithValue(context.Background(), nameKey{}, name)
 
 		tmpDir, err := ioutil.TempDir("", "content-suite-"+name+"-")
 		if err != nil {
@@ -53,6 +76,20 @@ func makeTest(t *testing.T, name string, storeFn func(ctx context.Context, root 
 				t.Fatalf("Cleanup failed: %+v", err)
 			}
 		}()
+
+		w, ok := ctx.Value(wrapperKey{}).(ContextWrapper)
+		if ok {
+			var done func() error
+			ctx, done, err = w(ctx)
+			if err != nil {
+				t.Fatalf("Error wrapping context: %+v", err)
+			}
+			defer func() {
+				if err := done(); err != nil && !t.Failed() {
+					t.Fatalf("Wrapper release failed: %+v", err)
+				}
+			}()
+		}
 
 		defer testutil.DumpDirOnFailure(t, tmpDir)
 		fn(ctx, t, cs)

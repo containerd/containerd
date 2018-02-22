@@ -3,7 +3,9 @@ package metadata
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/boltdb/bolt"
@@ -28,6 +30,16 @@ func createContentStore(ctx context.Context, root string) (context.Context, cont
 	if err != nil {
 		return nil, nil, nil, err
 	}
+
+	var (
+		count uint64
+		name  = testsuite.Name(ctx)
+	)
+	wrap := func(ctx context.Context) (context.Context, func() error, error) {
+		n := atomic.AddUint64(&count, 1)
+		return namespaces.WithNamespace(ctx, fmt.Sprintf("%s-n%d", name, n)), func() error { return nil }, nil
+	}
+	ctx = testsuite.SetContextWrapper(ctx, wrap)
 
 	return ctx, NewDB(db, cs, nil).ContentStore(), func() error {
 		return db.Close()
