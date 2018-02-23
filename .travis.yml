@@ -26,6 +26,7 @@ addons:
       - libaio-dev
       - libprotobuf-c0-dev
       - libprotobuf-dev
+      - socat
 
 env:
   - TRAVIS_GOOS=linux TRAVIS_CGO_ENABLED=1
@@ -35,6 +36,8 @@ before_install:
   - uname -r
   - sudo apt-get -q update
   - sudo apt-get install -y libseccomp-dev/trusty-backports
+  # Use jpetazzo/nsenter to install nsenter on ubuntu trusty.
+  - docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
 
 install:
   - sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-protobuf
@@ -44,6 +47,8 @@ install:
   - protoc --version
   - go get -u github.com/vbatts/git-validation
   - sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-runc
+  - sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-cni
+  - sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-critools
   - wget https://github.com/xemul/criu/archive/v3.0.tar.gz -O /tmp/criu.tar.gz
   - tar -C /tmp/ -zxf /tmp/criu.tar.gz
   - cd /tmp/criu-3.0 && sudo make install-criu
@@ -66,6 +71,14 @@ script:
   - if [ "$GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH make integration ; fi
   # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
   - if [ "$GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH TESTFLAGS_PARALLEL=1 make integration ; fi
+  - if [ "$GOOS" = "linux" ]; then
+      sudo PATH=$PATH containerd -log-level debug &> /tmp/containerd-cri.log &
+      sudo PATH=$PATH GOPATH=$GOPATH critest --runtime-endpoint=/var/run/containerd/containerd.sock validation ;
+      exit_code=$? ;
+      test $exit_code -ne 0 && cat /tmp/containerd-cri.log ;
+      sudo pkill containerd ;
+      exit $exit_code ;
+    fi
 
 after_success:
   - bash <(curl -s https://codecov.io/bash) -F linux

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+#
+# Builds and installs critools including critest and crictl
+# to /usr/local/bin.
+#
+set -eu -o pipefail
+
+CRITEST_COMMIT=240a840375cdabb5860c75c99e8b0d0a776006b4
+go get -d github.com/kubernetes-incubator/cri-tools/...
+cd $GOPATH/src/github.com/kubernetes-incubator/cri-tools
+git checkout $CRITEST_COMMIT
+make
+make install
