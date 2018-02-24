@@ -5,7 +5,7 @@
 #
 set -eu -o pipefail
 
-CRITEST_COMMIT=240a840375cdabb5860c75c99e8b0d0a776006b4
+CRITEST_COMMIT=b184f9aefe60a4441330e615ee20634ee26474fb
 go get -d github.com/kubernetes-incubator/cri-tools/...
 cd $GOPATH/src/github.com/kubernetes-incubator/cri-tools
 git checkout $CRITEST_COMMIT
