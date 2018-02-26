@@ -17,7 +17,7 @@ limitations under the License.
 package server
 
 import (
-	"errors"
+	"fmt"
 	"golang.org/x/net/context"
 
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -25,7 +25,27 @@ import (
 
 // ReopenContainerLog asks cri-containerd to reopen the stdout/stderr log file for the container.
 // This is often called after the log file has been rotated.
-// TODO(random-liu): Implement this for kubelet log rotation.
 func (c *criContainerdService) ReopenContainerLog(ctx context.Context, r *runtime.ReopenContainerLogRequest) (*runtime.ReopenContainerLogResponse, error) {
-	return nil, errors.New("not implemented")
+	container, err := c.containerStore.Get(r.GetContainerId())
+	if err != nil {
+		return nil, fmt.Errorf("an error occurred when try to find container %q: %v", r.GetContainerId(), err)
+	}
+
+	if container.Status.Get().State() != runtime.ContainerState_CONTAINER_RUNNING {
+		return nil, fmt.Errorf("container is not running")
+	}
+
+	// Create new container logger and replace the existing ones.
+	stdoutWC, stderrWC, err := createContainerLoggers(container.LogPath, container.Config.GetTty())
+	if err != nil {
+		return nil, err
+	}
+	oldStdoutWC, oldStderrWC := container.IO.AddOutput("log", stdoutWC, stderrWC)
+	if oldStdoutWC != nil {
+		oldStdoutWC.Close()
+	}
+	if oldStderrWC != nil {
+		oldStderrWC.Close()
+	}
+	return &runtime.ReopenContainerLogResponse{}, nil
 }

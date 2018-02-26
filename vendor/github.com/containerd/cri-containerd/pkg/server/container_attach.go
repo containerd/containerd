@@ -77,8 +77,6 @@ func (c *criContainerdService) attachContainer(ctx context.Context, id string, s
 		},
 	}
 	// TODO(random-liu): Figure out whether we need to support historical output.
-	if err := cntr.IO.Attach(opts); err != nil {
-		return fmt.Errorf("failed to attach container: %v", err)
-	}
+	cntr.IO.Attach(opts)
 	return nil
 }

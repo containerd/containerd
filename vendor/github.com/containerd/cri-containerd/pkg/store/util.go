@@ -16,15 +16,35 @@ limitations under the License.
 
 package store
 
+import "sync"
+
 // StopCh is used to propagate the stop information of a container.
-type StopCh chan struct{}
+type StopCh struct {
+	mu     sync.Mutex
+	ch     chan struct{}
+	closed bool
+}
+
+// NewStopCh creates a stop channel. The channel is open by default.
+func NewStopCh() *StopCh {
+	return &StopCh{
+		ch:     make(chan struct{}),
+		closed: false,
+	}
+}
 
 // Stop close stopCh of the container.
-func (ch StopCh) Stop() {
-	close(ch)
+func (s *StopCh) Stop() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return
+	}
+	close(s.ch)
+	s.closed = true
 }
 
 // Stopped return the stopCh of the container as a readonly channel.
-func (ch StopCh) Stopped() <-chan struct{} {
-	return ch
+func (s *StopCh) Stopped() <-chan struct{} {
+	return s.ch
 }

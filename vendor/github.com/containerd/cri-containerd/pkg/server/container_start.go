@@ -110,9 +110,7 @@ func (c *criContainerdService) startContainer(ctx context.Context,
 				}
 			}
 		}()
-		if err := cio.WithOutput("log", stdoutWC, stderrWC)(cntr.IO); err != nil {
-			return nil, fmt.Errorf("failed to add container log: %v", err)
-		}
+		cntr.IO.AddOutput("log", stdoutWC, stderrWC)
 		cntr.IO.Pipe()
 		return cntr.IO, nil
 	}
