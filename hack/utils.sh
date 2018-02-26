@@ -17,7 +17,7 @@
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
 
 # Not from vendor.conf.
-CRITOOL_VERSION=8ec2cbda446377cab11a5ef8ef92e115aa628a91
+CRITOOL_VERSION=b184f9aefe60a4441330e615ee20634ee26474fb
 CRITOOL_REPO=github.com/kubernetes-incubator/cri-tools
 
 # upload_logs_to_gcs uploads test logs to gcs.
