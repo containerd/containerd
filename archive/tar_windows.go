@@ -19,6 +19,7 @@
 package archive
 
 import (
+	"archive/tar"
 	"bufio"
 	"context"
 	"encoding/base64"
@@ -36,7 +37,6 @@ import (
 	"github.com/Microsoft/hcsshim"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/sys"
-	"github.com/dmcgowan/go-tar"
 )
 
 const (

@@ -12,7 +12,6 @@ environment:
   GOPATH: C:\gopath
   CGO_ENABLED: 1
   matrix:
-    - GO_VERSION: 1.9
     - GO_VERSION: 1.10
 
 before_build:
