@@ -224,7 +224,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 				}).Warn("failed to clen up after killed shim")
 			}
 		}
-		shimopt = ShimRemote(r.config.Shim, r.address, cgroup, r.config.ShimDebug, exitHandler)
+		shimopt = ShimRemote(r.config, r.address, cgroup, exitHandler)
 	}
 
 	s, err := bundle.NewShimClient(ctx, namespace, shimopt, ropts)
