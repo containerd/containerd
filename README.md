@@ -24,7 +24,8 @@ See [test dashboard](https://k8s-testgrid.appspot.com/sig-node-containerd)
 | CRI-Containerd Version | Kubernetes Version |
 |:----------------------:|:------------------:|
 |     v1.0.0-alpha.x     |      1.7, 1.8      |
-|      v1.0.0-beta.x     |        1.9+        |
+|      v1.0.0-beta.x     |        1.9         |
+|          HEAD          |        1.10+       |
 ## Production Quality Cluster on GCE
 For a production quality cluster on GCE brought up with `kube-up.sh` refer [here](docs/kube-up.md).
 ## Installing with Ansible and Kubeadm
