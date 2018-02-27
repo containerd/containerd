@@ -55,6 +55,11 @@ func init() {
 	binarySizeGauge = ns.NewLabeledGauge("binary_size", "Binary size of compiled binaries", metrics.Bytes, "name")
 	errCounter = ns.NewLabeledCounter("errors", "Errors encountered running the stress tests", "err")
 	metrics.Register(ns)
+
+	// set higher ulimits
+	if err := setRlimit(); err != nil {
+		panic(err)
+	}
 }
 
 type run struct {
@@ -149,6 +154,9 @@ func main() {
 			logrus.SetLevel(logrus.DebugLevel)
 		}
 		return nil
+	}
+	app.Commands = []cli.Command{
+		densityCommand,
 	}
 	app.Action = func(context *cli.Context) error {
 		config := config{
