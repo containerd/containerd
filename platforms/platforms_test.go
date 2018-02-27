@@ -191,14 +191,16 @@ func TestParseSelector(t *testing.T) {
 			if testcase.skip {
 				t.Skip("this case is not yet supported")
 			}
-			m, err := Parse(testcase.input)
+			p, err := Parse(testcase.input)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			if !reflect.DeepEqual(m.Spec(), testcase.expected) {
-				t.Fatalf("platform did not match expected: %#v != %#v", m.Spec(), testcase.expected)
+			if !reflect.DeepEqual(p, testcase.expected) {
+				t.Fatalf("platform did not match expected: %#v != %#v", p, testcase.expected)
 			}
+
+			m := NewMatcher(p)
 
 			// ensure that match works on the input to the output.
 			if ok := m.Match(testcase.expected); !ok {
@@ -209,7 +211,7 @@ func TestParseSelector(t *testing.T) {
 				t.Fatalf("unexpected matcher string:  %q != %q", fmt.Sprint(m), testcase.formatted)
 			}
 
-			formatted := Format(m.Spec())
+			formatted := Format(p)
 			if formatted != testcase.formatted {
 				t.Fatalf("unexpected format: %q != %q", formatted, testcase.formatted)
 			}
@@ -220,8 +222,8 @@ func TestParseSelector(t *testing.T) {
 				t.Fatalf("error parsing formatted output: %v", err)
 			}
 
-			if Format(reparsed.Spec()) != formatted {
-				t.Fatalf("normalized output did not survive the round trip: %v != %v", Format(reparsed.Spec()), formatted)
+			if Format(reparsed) != formatted {
+				t.Fatalf("normalized output did not survive the round trip: %v != %v", Format(reparsed), formatted)
 			}
 		})
 	}
