@@ -114,17 +114,24 @@ func openFifos(ctx context.Context, fifos *FIFOSet) (pipes, error) {
 		if f.Stdin, err = fifo.OpenFifo(ctx, fifos.Stdin, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
 			return f, errors.Wrapf(err, "failed to open stdin fifo")
 		}
+		defer func() {
+			if err != nil && f.Stdin != nil {
+				f.Stdin.Close()
+			}
+		}()
 	}
 	if fifos.Stdout != "" {
 		if f.Stdout, err = fifo.OpenFifo(ctx, fifos.Stdout, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
-			f.Stdin.Close()
 			return f, errors.Wrapf(err, "failed to open stdout fifo")
 		}
+		defer func() {
+			if err != nil && f.Stdout != nil {
+				f.Stdout.Close()
+			}
+		}()
 	}
 	if fifos.Stderr != "" {
 		if f.Stderr, err = fifo.OpenFifo(ctx, fifos.Stderr, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
-			f.Stdin.Close()
-			f.Stdout.Close()
 			return f, errors.Wrapf(err, "failed to open stderr fifo")
 		}
 	}

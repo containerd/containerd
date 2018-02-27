@@ -397,10 +397,6 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 		ctx = namespaces.WithNamespace(ctx, ns)
 		pid, _ := runc.ReadPidFile(filepath.Join(bundle.path, proc.InitPidFile))
 		s, err := bundle.NewShimClient(ctx, ns, ShimConnect(func() {
-			log.G(ctx).WithError(err).WithFields(logrus.Fields{
-				"id":        id,
-				"namespace": ns,
-			}).Error("connecting to shim")
 			err := r.cleanupAfterDeadShim(ctx, bundle, ns, id, pid)
 			if err != nil {
 				log.G(ctx).WithError(err).WithField("bundle", bundle.path).
