@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/server"
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/containerd/version"
@@ -110,6 +111,14 @@ func App() *cli.App {
 		// apply flags to the config
 		if err := applyFlags(context, config); err != nil {
 			return err
+		}
+		// cleanup temp mounts
+		if err := mount.SetTempMountLocation(filepath.Join(config.Root, "tmpmounts")); err != nil {
+			return errors.Wrap(err, "creating temp mount location")
+		}
+		// unmount all temp mounts on boot for the server
+		if err := mount.CleanupTempMounts(0); err != nil {
+			return errors.Wrap(err, "unmounting temp mounts")
 		}
 		address := config.GRPC.Address
 		if address == "" {

@@ -283,13 +283,16 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 	if t.io != nil {
 		t.io.Cancel()
 		t.io.Wait()
-		t.io.Close()
 	}
 	r, err := t.client.TaskService().Delete(ctx, &tasks.DeleteTaskRequest{
 		ContainerID: t.id,
 	})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
+	}
+	// Only cleanup the IO after a successful Delete
+	if t.io != nil {
+		t.io.Close()
 	}
 	return &ExitStatus{code: r.ExitStatus, exitedAt: r.ExitedAt}, nil
 }
