@@ -53,7 +53,7 @@ jobs:
         - cat /tmp/test-cri/cri-containerd.log
         - cat /tmp/test-cri/containerd.log
       go: "1.9.x"
-      script:
+    - script:
         - make install.deps
         - make test
         - make test-integration
