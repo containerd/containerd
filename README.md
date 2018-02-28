@@ -59,7 +59,7 @@ backport version of `libseccomp-dev` is required. See [travis.yml](.travis.yml) 
 2. Install other dependencies:
 * **`nsenter`**: Required by CNI and portforward.
 * **`socat`**: Required by portforward.
-3. Install and setup a go 1.9.x development environment.
+3. Install and setup a go 1.10 development environment.
 4. Make a local clone of this repository.
 5. Install binary dependencies by running the following command from your cloned `cri-containerd/` project directory:
 ```bash
