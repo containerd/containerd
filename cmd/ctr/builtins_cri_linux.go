@@ -1,4 +1,4 @@
-// +build !windows
+// +build !no_cri
 
 /*
    Copyright The containerd Authors.
@@ -18,8 +18,8 @@
 
 package main
 
-import "github.com/containerd/containerd/cmd/ctr/commands/shim"
+import "github.com/containerd/cri/cli"
 
 func init() {
-	extraCmds = append(extraCmds, shim.Command)
+	pluginCmds = append(pluginCmds, cli.Command)
 }
