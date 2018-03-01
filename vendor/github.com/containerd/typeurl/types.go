@@ -28,14 +28,14 @@ func Register(v interface{}, args ...string) {
 	defer mu.Unlock()
 	if et, ok := registry[t]; ok {
 		if et != p {
-			panic(errors.Errorf("type registred with alternate path %q != %q", et, p))
+			panic(errors.Errorf("type registered with alternate path %q != %q", et, p))
 		}
 		return
 	}
 	registry[t] = p
 }
 
-// TypeURL returns the type url for a registred type
+// TypeURL returns the type url for a registered type
 func TypeURL(v interface{}) (string, error) {
 	mu.Lock()
 	u, ok := registry[tryDereference(v)]

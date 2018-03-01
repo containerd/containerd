@@ -274,7 +274,7 @@ func SubvolSnapshot(dst, src string, readonly bool) error {
 
 	dstfp, err := openSubvolDir(dstdir)
 	if err != nil {
-		return errors.Wrapf(err, "opening snapshot desination subvolume failed")
+		return errors.Wrapf(err, "opening snapshot destination subvolume failed")
 	}
 	defer dstfp.Close()
 
