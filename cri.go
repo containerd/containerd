@@ -20,12 +20,17 @@ import (
 	"path/filepath"
 
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 
 	"github.com/containerd/cri-containerd/cmd/cri-containerd/options"
 	"github.com/containerd/cri-containerd/pkg/server"
 )
+
+// criVersion is the CRI version supported by the CRI plugin.
+const criVersion = "v1alpha2"
 
 // TODO(random-liu): Use github.com/pkg/errors for our errors.
 // Register CRI service plugin
@@ -49,6 +54,8 @@ func init() {
 }
 
 func initCRIService(ic *plugin.InitContext) (interface{}, error) {
+	ic.Meta.Platforms = []imagespec.Platform{platforms.DefaultSpec()}
+	ic.Meta.Exports = map[string]string{"CRIVersion": criVersion}
 	ctx := ic.Context
 	pluginConfig := ic.Config.(*options.PluginConfig)
 	c := options.Config{
