@@ -204,8 +204,12 @@ func (c *CRIContainerdOptions) InitFlags(fs *pflag.FlagSet) error {
 	}
 	// Add this for backward compatibility.
 	// TODO(random-liu): Remove this when we no longer support cri-containerd standalone mode.
-	c.ContainerdRootDir = c.ContainerdConfig.RootDir
-	c.ContainerdEndpoint = c.ContainerdConfig.Endpoint
+	if c.ContainerdConfig.RootDir != "" {
+		c.ContainerdRootDir = c.ContainerdConfig.RootDir
+	}
+	if c.ContainerdConfig.Endpoint != "" {
+		c.ContainerdEndpoint = c.ContainerdConfig.Endpoint
+	}
 
 	// What is the reason for applying the command line twice?
 	// Because the values from command line have the highest priority.
