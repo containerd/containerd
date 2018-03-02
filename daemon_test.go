@@ -58,7 +58,7 @@ func (d *daemon) waitForStart(ctx context.Context) (*Client, error) {
 		err     error
 	)
 
-	client, err = New(address)
+	client, err = New(d.addr)
 	if err != nil {
 		return nil, err
 	}
