@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-
 #   Copyright The containerd Authors.
 
 #   Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,14 +12,3 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-
-set -eu -o pipefail
-
-if ! command -v git-validation; then
-    >&2 echo "ERROR: git-validation not found. Install with:"
-    >&2 echo "    go get -u github.com/vbatts/git-validation"
-    exit 1
-fi
-
-verbosity="${DCO_VERBOSITY--v}"
-GIT_CHECK_EXCLUDE="./vendor:./script/validate/template" git-validation "$verbosity" -run DCO,short-subject,dangling-whitespace
