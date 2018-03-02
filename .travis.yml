@@ -31,14 +31,14 @@ before_script:
 jobs:
   include:
     - stage: Build
-    - script:
+      script:
         - make install.tools
         - make .gitvalidation
         - make binaries
         - make containerd
       go: "1.10"
     - stage: Test
-    - script:
+      script:
         - make install.deps
         - make test
         - make test-integration
