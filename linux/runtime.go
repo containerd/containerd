@@ -170,7 +170,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 		}
 	}()
 
-	shimopt := ShimLocal(r.events)
+	shimopt := ShimLocal(r.config, r.events)
 	if !r.config.NoShim {
 		var cgroup string
 		if opts.Options != nil {
@@ -380,7 +380,7 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 		)
 		ctx = namespaces.WithNamespace(ctx, ns)
 		pid, _ := runc.ReadPidFile(filepath.Join(bundle.path, proc.InitPidFile))
-		s, err := bundle.NewShimClient(ctx, ns, ShimConnect(func() {
+		s, err := bundle.NewShimClient(ctx, ns, ShimConnect(r.config, func() {
 			log.G(ctx).WithError(err).WithFields(logrus.Fields{
 				"id":        id,
 				"namespace": ns,
