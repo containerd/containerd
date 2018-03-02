@@ -40,13 +40,16 @@ test_setup() {
   fi
 
   # Start containerd
-  if [ ! -x "$(command -v containerd)" ]; then
+  local containerd=$(command -v containerd)
+  if [ ! -x "${containerd}" ]; then
     echo "containerd is not installed, please run hack/install-deps.sh"
     exit 1
   fi
   sudo pkill -x cri-containerd
   sudo pkill -x containerd
-  keepalive "sudo containerd" ${RESTART_WAIT_PERIOD} &> ${report_dir}/containerd.log &
+  echo "using ${containerd}"
+  echo "containerd version: $(${containerd} --version)"
+  keepalive "sudo ${containerd}" ${RESTART_WAIT_PERIOD} &> ${report_dir}/containerd.log &
   containerd_pid=$!
   # Wait for containerd to be running by using the containerd client ctr to check the version
   # of the containerd server. Wait an increasing amount of time after each of five attempts
