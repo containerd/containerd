@@ -1,3 +1,6 @@
+git:
+  depth: 150
+
 language: go
 
 sudo: required
