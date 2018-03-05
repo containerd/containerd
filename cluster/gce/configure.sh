@@ -19,9 +19,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# CRI_CONTAINERD_HOME is the directory for cri-containerd.
-CRI_CONTAINERD_HOME="/home/cri-containerd"
-cd "${CRI_CONTAINERD_HOME}"
+# CONTAINERD_HOME is the directory for containerd.
+CONTAINERD_HOME="/home/containerd"
+cd "${CONTAINERD_HOME}"
 
 # fetch_metadata fetches metadata from GCE metadata server.
 # Var set:
@@ -63,5 +63,5 @@ tar xvf "${TARBALL}"
 # Copy crictl config.
 cp "${CRI_CONTAINERD_HOME}/etc/crictl.yaml" /etc
 
-echo "export PATH=${CRI_CONTAINERD_HOME}/usr/local/bin/:${CRI_CONTAINERD_HOME}/usr/local/sbin/:\$PATH" > \
-  /etc/profile.d/cri-containerd_env.sh
+echo "export PATH=${CONTAINERD_HOME}/usr/local/bin/:${CONTAINERD_HOME}/usr/local/sbin/:\$PATH" > \
+  /etc/profile.d/containerd_env.sh
