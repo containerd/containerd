@@ -17,7 +17,7 @@ limitations under the License.
 package server
 
 import (
-	"github.com/containerd/cri-containerd/cmd/cri-containerd/options"
+	criconfig "github.com/containerd/cri-containerd/pkg/config"
 	ostesting "github.com/containerd/cri-containerd/pkg/os/testing"
 	"github.com/containerd/cri-containerd/pkg/registrar"
 	servertesting "github.com/containerd/cri-containerd/pkg/server/testing"
@@ -39,9 +39,9 @@ const (
 // newTestCRIContainerdService creates a fake criContainerdService for test.
 func newTestCRIContainerdService() *criContainerdService {
 	return &criContainerdService{
-		config: options.Config{
+		config: criconfig.Config{
 			RootDir: testRootDir,
-			PluginConfig: options.PluginConfig{
+			PluginConfig: criconfig.PluginConfig{
 				SandboxImage: testSandboxImage,
 			},
 		},
