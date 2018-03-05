@@ -1,29 +1,31 @@
 #cloud-config
 
 write_files:
-# Setup cri-containerd.
-  - path: /etc/systemd/system/cri-containerd-installation.service
+# Setup containerd.
+  - path: /etc/systemd/system/containerd-installation.service
     permissions: 0644
     owner: root
     content: |
       # installed by cloud-init
       [Unit]
-      Description=Download and install cri-containerd binaries and configurations.
+      Description=Download and install containerd binaries and configurations.
       After=network-online.target
 
       [Service]
       Type=oneshot
       RemainAfterExit=yes
-      ExecStartPre=/bin/mkdir -p /home/cri-containerd
-      ExecStartPre=/bin/mount --bind /home/cri-containerd /home/cri-containerd
-      ExecStartPre=/bin/mount -o remount,exec /home/cri-containerd
-      ExecStartPre=/usr/bin/curl --fail --retry 5 --retry-delay 3 --silent --show-error -H "X-Google-Metadata-Request: True" -o /home/cri-containerd/configure.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/cri-containerd-configure-sh
-      ExecStartPre=/bin/chmod 544 /home/cri-containerd/configure.sh
-      ExecStart=/home/cri-containerd/configure.sh
+      ExecStartPre=/bin/mkdir -p /home/containerd
+      ExecStartPre=/bin/mount --bind /home/containerd /home/containerd
+      ExecStartPre=/bin/mount -o remount,exec /home/containerd
+      ExecStartPre=/usr/bin/curl --fail --retry 5 --retry-delay 3 --silent --show-error -H "X-Google-Metadata-Request: True" -o /home/containerd/configure.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/containerd-configure-sh
+      ExecStartPre=/bin/chmod 544 /home/containerd/configure.sh
+      ExecStart=/home/containerd/configure.sh
 
       [Install]
-      WantedBy=cri-containerd.target
+      WantedBy=containerd.target
 
+  # containerd on master uses the cni binary and config in the
+  # release tarball.
   - path: /etc/containerd/config.toml
     permissions: 0644
     owner: root
@@ -35,8 +37,14 @@ write_files:
         path = "/runtime"
 
       [plugins.linux]
-        shim = "/home/cri-containerd/usr/local/bin/containerd-shim"
-        runtime = "/home/cri-containerd/usr/local/sbin/runc"
+        shim = "/home/containerd/usr/local/bin/containerd-shim"
+        runtime = "/home/containerd/usr/local/sbin/runc"
+
+      [plugins.cri.cni]
+        bin_dir = "/home/containerd/opt/cni/bin"
+        conf_dir = "/home/containerd/etc/cni/net.d"
+      [plugins.cri.registry.mirrors."docker.io"]
+        endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
 
   - path: /etc/systemd/system/containerd.service
     permissions: 0644
@@ -46,7 +54,7 @@ write_files:
       [Unit]
       Description=containerd container runtime
       Documentation=https://containerd.io
-      After=cri-containerd-installation.service
+      After=containerd-installation.service
 
       [Service]
       Restart=always
@@ -59,67 +67,36 @@ write_files:
       LimitNPROC=infinity
       LimitCORE=infinity
       ExecStartPre=/sbin/modprobe overlay
-      ExecStart=/home/cri-containerd/usr/local/bin/containerd --log-level debug
+      ExecStart=/home/containerd/usr/local/bin/containerd --log-level debug
 
       [Install]
-      WantedBy=cri-containerd.target
+      WantedBy=containerd.target
 
-  - path: /etc/systemd/system/cri-containerd.service
-    permissions: 0644
-    owner: root
-    content: |
-      # installed by cloud-init
-      [Unit]
-      Description=Kubernetes containerd CRI shim
-      Requires=network-online.target
-      After=cri-containerd-installation.service
-
-      [Service]
-      Restart=always
-      RestartSec=5
-      LimitNOFILE=1048576
-      # Having non-zero Limit*s causes performance problems due to accounting overhead
-      # in the kernel. We recommend using cgroups to do container-local accounting.
-      LimitNPROC=infinity
-      LimitCORE=infinity
-      # cri-containerd on master uses the cni binary and config in the
-      # release tarball.
-      ExecStart=/home/cri-containerd/usr/local/bin/cri-containerd \
-        --log-level=debug \
-        --network-bin-dir=/home/cri-containerd/opt/cni/bin \
-        --network-conf-dir=/home/cri-containerd/etc/cni/net.d \
-        --cgroup-path=/runtime \
-        --registry=docker.io=https://mirror.gcr.io,https://registry-1.docker.io
-
-      [Install]
-      WantedBy=cri-containerd.target
-
-  - path: /etc/systemd/system/cri-containerd-monitor.service
+  - path: /etc/systemd/system/containerd-monitor.service
     permissions: 0644
     owner: root
     content: |
       [Unit]
-      Description=Kubernetes health monitoring for cri-containerd and containerd
-      After=containerd.service cri-containerd.service
+      Description=Kubernetes health monitoring for containerd
+      After=containerd.service
 
       [Service]
       Restart=always
       RestartSec=10
       RemainAfterExit=yes
-      ExecStartPre=/bin/chmod 544 /home/cri-containerd/opt/cri-containerd/cluster/health-monitor.sh
-      ExecStart=/bin/bash -c 'CRICTL=/home/cri-containerd/usr/local/bin/crictl \
-      /home/cri-containerd/opt/cri-containerd/cluster/health-monitor.sh'
+      ExecStartPre=/bin/chmod 544 /home/containerd/opt/containerd/cluster/health-monitor.sh
+      ExecStart=/bin/bash -c 'CRICTL=/home/containerd/usr/local/bin/crictl \
+      /home/containerd/opt/containerd/cluster/health-monitor.sh'
 
       [Install]
-      WantedBy=cri-containerd.target
+      WantedBy=containerd.target
 
-  # TODO(random-liu): Guarantee order.
-  - path: /etc/systemd/system/cri-containerd.target
+  - path: /etc/systemd/system/containerd.target
     permissions: 0644
     owner: root
     content: |
       [Unit]
-      Description=CRI Containerd
+      Description=Containerd
 
       [Install]
       WantedBy=kubernetes.target
@@ -221,11 +198,10 @@ write_files:
 
 runcmd:
   - systemctl daemon-reload
+  - systemctl enable containerd-installation.service
   - systemctl enable containerd.service
-  - systemctl enable cri-containerd-installation.service
-  - systemctl enable cri-containerd.service
-  - systemctl enable cri-containerd-monitor.service
-  - systemctl enable cri-containerd.target
+  - systemctl enable containerd-monitor.service
+  - systemctl enable containerd.target
   - systemctl enable kube-master-installation.service
   - systemctl enable kube-master-configuration.service
   - systemctl enable kubelet-monitor.service
