@@ -97,7 +97,7 @@ func loadSpec(path string, s *specs.Spec) error {
 		return errors.New("cannot load spec config file")
 	}
 	if err := json.Unmarshal(raw, s); err != nil {
-		return errors.New("decoding spec config file failed")
+		return errors.Errorf("decoding spec config file failed, current supported OCI runtime-spec : v%s", specs.Version)
 	}
 	return nil
 }
