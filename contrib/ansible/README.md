@@ -10,7 +10,7 @@ This document provides the steps to bring up a Kubernetes cluster using ansible 
 ### Prerequisites:
 - **OS**: Ubuntu 16.04 (will be updated with additional distros after testing)
 - **Python**: 2.7+
-- **Ansible**: 2.3+
+- **Ansible**: 2.4+
 
 ## Step 0:
 -  Install Ansible on the host where you will provision the cluster. This host may be one of the nodes you plan to include in your cluster. Installation instructions for Ansible are found [here](http://docs.ansible.com/ansible/latest/intro_installation.html).
