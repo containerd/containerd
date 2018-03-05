@@ -28,21 +28,31 @@ TARBALL=${TARBALL:-"cri-containerd.tar.gz"}
 # INCLUDE_CNI indicates whether to install CNI. By default don't
 # include CNI in release tarball.
 INCLUDE_CNI=${INCLUDE_CNI:-false}
+# CUSTOM_CONTAINERD indicates whether to install customized containerd
+# for CI test.
+CUSTOM_CONTAINERD=${CUSTOM_CONTAINERD:-false}
 
 destdir=${BUILD_DIR}/release-stage
+
+# Remove release-stage directory to avoid including old files.
+rm -rf ${destdir}
 
 # Install dependencies into release stage.
 NOSUDO=true INSTALL_CNI=${INCLUDE_CNI} DESTDIR=${destdir} ./hack/install-deps.sh
 
-# Install cri-containerd into release stage.
-make install -e DESTDIR=${destdir}
+# Install ctrcri into release stage.
+make install-ctrcri -e DESTDIR=${destdir}
+
+if ${CUSTOM_CONTAINERD}; then
+  make install-containerd -e DESTDIR=${destdir}
+fi
 
 # Install systemd units into release stage.
 mkdir -p ${destdir}/etc/systemd/system
 cp ${ROOT}/contrib/systemd-units/* ${destdir}/etc/systemd/system/
 # Install cluster directory into release stage.
-mkdir -p ${destdir}/opt/cri-containerd
-cp -r ${ROOT}/cluster ${destdir}/opt/cri-containerd
+mkdir -p ${destdir}/opt/containerd
+cp -r ${ROOT}/cluster ${destdir}/opt/containerd
 
 # Create release tar
 tarball=${BUILD_DIR}/${TARBALL}

@@ -16,63 +16,36 @@
 
 source $(dirname "${BASH_SOURCE[0]}")/utils.sh
 
-# CRI_CONTAINERD_FLAGS are the extra flags to use when start cri-containerd.
-CRI_CONTAINERD_FLAGS=${CRI_CONTAINERD_FLAGS:-""}
-# RESTART_WAIT_PERIOD is the period to wait before restarting cri-containerd/containerd.
+# RESTART_WAIT_PERIOD is the period to wait before restarting containerd.
 RESTART_WAIT_PERIOD=${RESTART_WAIT_PERIOD:-10}
-# STANDALONE_CRI_CONTAINERD indicates whether to run standalone cri-containerd.
-STANDALONE_CRI_CONTAINERD=${STANDALONE_CRI_CONTAINERD:-true}
 
-CRICONTAINERD_SOCK=/var/run/cri-containerd.sock
-if ! ${STANDALONE_CRI_CONTAINERD}; then
-  CRICONTAINERD_SOCK=/var/run/containerd/containerd.sock
-fi
+CONTAINERD_SOCK=/run/containerd/containerd.sock
 
-cri_containerd_pid=
 containerd_pid=
 
-# test_setup starts containerd and cri-containerd.
+# test_setup starts containerd.
 test_setup() {
   local report_dir=$1
-  if [ ! -x ${ROOT}/_output/cri-containerd ]; then
-    echo "cri-containerd is not built"
-    exit 1
-  fi
-
   # Start containerd
-  local containerd=$(command -v containerd)
-  if [ ! -x "${containerd}" ]; then
-    echo "containerd is not installed, please run hack/install-deps.sh"
+  if [ ! -x ${ROOT}/_output/containerd ]; then
+    echo "containerd is not built"
     exit 1
   fi
-  sudo pkill -x cri-containerd
   sudo pkill -x containerd
-  echo "using ${containerd}"
-  echo "containerd version: $(${containerd} --version)"
-  keepalive "sudo ${containerd}" ${RESTART_WAIT_PERIOD} &> ${report_dir}/containerd.log &
+  keepalive "sudo ${ROOT}/_output/containerd --log-level=debug" \
+    ${RESTART_WAIT_PERIOD} &> ${report_dir}/containerd.log &
   containerd_pid=$!
   # Wait for containerd to be running by using the containerd client ctr to check the version
   # of the containerd server. Wait an increasing amount of time after each of five attempts
   readiness_check "sudo ctr version"
-
-  # Start cri-containerd
-  if ${STANDALONE_CRI_CONTAINERD}; then
-    keepalive "sudo ${ROOT}/_output/cri-containerd --log-level=debug ${CRI_CONTAINERD_FLAGS}" \
-      ${RESTART_WAIT_PERIOD} &> ${report_dir}/cri-containerd.log &
-    cri_containerd_pid=$!
-  fi
-  readiness_check "sudo ${GOPATH}/bin/crictl --runtime-endpoint=${CRICONTAINERD_SOCK} info"
+  readiness_check "sudo ${GOPATH}/bin/crictl --runtime-endpoint=${CONTAINERD_SOCK} info"
 }
 
-# test_teardown kills containerd and cri-containerd.
+# test_teardown kills containerd.
 test_teardown() {
   if [ -n "${containerd_pid}" ]; then
     kill ${containerd_pid}
   fi
-  if [ -n "${cri_containerd_pid}" ]; then
-    kill ${cri_containerd_pid}
-  fi
-  sudo pkill -x cri-containerd
   sudo pkill -x containerd
 }
 

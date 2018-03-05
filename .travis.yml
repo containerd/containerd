@@ -35,27 +35,15 @@ jobs:
         - make install.tools
         - make .gitvalidation
         - make binaries
-        - make containerd
       go: "1.10"
     - stage: Test
       script:
         - make install.deps
+        - make containerd
+        - sudo make install-containerd
         - make test
         - make test-integration
         - make test-cri
-      after_script:
-        # Abuse travis to preserve the log.
-        - cat /tmp/test-integration/cri-containerd.log
-        - cat /tmp/test-integration/containerd.log
-        - cat /tmp/test-cri/cri-containerd.log
-        - cat /tmp/test-cri/containerd.log
-      go: "1.10"
-    - script:
-        - make install.deps
-        - make containerd
-        - sudo make install-containerd
-        - make test-integration STANDALONE_CRI_CONTAINERD=false
-        - make test-cri STANDALONE_CRI_CONTAINERD=false
       after_script:
         # Abuse travis to preserve the log.
         - cat /tmp/test-integration/containerd.log

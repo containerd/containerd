@@ -133,8 +133,7 @@ fi
 # Install containerd
 checkout_repo ${CONTAINERD_PKG} ${CONTAINERD_VERSION} ${CONTAINERD_REPO}
 cd ${GOPATH}/src/${CONTAINERD_PKG}
-# Build no_cri version and run standalone cri-containerd.
-make BUILDTAGS="${BUILDTAGS} no_cri"
+make BUILDTAGS="${BUILDTAGS}"
 # containerd make install requires `go` to work. Explicitly
 # set PATH to make sure it can find `go` even with `sudo`.
 ${sudo} sh -c "PATH=${PATH} make install -e DESTDIR=${CONTAINERD_DIR}"
@@ -146,7 +145,7 @@ make crictl
 ${sudo} make install-crictl -e BINDIR=${CRICTL_DIR} GOPATH=${GOPATH}
 ${sudo} mkdir -p ${CRICTL_CONFIG_DIR}
 ${sudo} bash -c 'cat >'${CRICTL_CONFIG_DIR}'/crictl.yaml <<EOF
-runtime-endpoint: /var/run/cri-containerd.sock
+runtime-endpoint: /run/containerd/containerd.sock
 EOF'
 
 # Clean the tmp GOPATH dir. Use sudo because runc build generates

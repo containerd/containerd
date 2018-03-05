@@ -74,7 +74,7 @@ test_setup ${REPORT_DIR}
 
 timeout "${TIMEOUT}" make test-e2e-node \
 	RUNTIME=remote \
-	CONTAINER_RUNTIME_ENDPOINT=unix://${CRICONTAINERD_SOCK} \
+	CONTAINER_RUNTIME_ENDPOINT=unix://${CONTAINERD_SOCK} \
 	ARTIFACTS=${REPORT_DIR} \
 	TEST_ARGS='--kubelet-flags=--cgroups-per-qos=true \
 	--kubelet-flags=--cgroup-root=/ \
