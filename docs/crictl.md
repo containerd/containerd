@@ -30,12 +30,45 @@ debug: true
 ```
 
 ## Download and Inspect a Container Image
+The pull command tells the container runtime to download a container image from
+a container registry.
 ```console
 $ crictl pull busybox
   ...
 $ crictl inspecti busybox
   ... displays information about the image.
 ```
+
+## Directly Load a Container Image
+Another way to load an image into the container runtime is with the load
+command. With the load command you inject a container image into the container
+runtime from a file. First you need to create a container image tarball. For
+example to create an image tarball for a pause container using Docker:
+```console
+$ docker pull k8s.gcr.io/pause-amd64:3.1
+  3.1: Pulling from pause-amd64
+  67ddbfb20a22: Pull complete
+  Digest: sha256:59eec8837a4d942cc19a52b8c09ea75121acc38114a2c68b98983ce9356b8610
+  Status: Downloaded newer image for k8s.gcr.io/pause-amd64:3.1
+$ docker save k8s.gcr.io/pause-amd64:3.1 -o pause.tar
+```
+Then load the container image into the container runtime:
+```console
+$ sudo ctrcri load pause.tar
+  Loaded image: k8s.gcr.io/pause-amd64:3.1
+```
+List images and inspect the pause image:
+```console
+$ sudo crictl images
+IMAGE                       TAG                 IMAGE ID            SIZE
+docker.io/library/busybox   latest              f6e427c148a76       728kB
+k8s.gcr.io/pause-amd64      3.1                 da86e6ba6ca19       746kB
+$ sudo crictl inspecti da86e6ba6ca19
+  ... displays information about the pause image.
+$ sudo crictl inspecti k8s.gcr.io/pause-amd64:3.1
+  ... displays information about the pause image.
+```
+
 ## Run a pod sandbox (using a config file)
 ```console
 $ cat sandbox-config.json
