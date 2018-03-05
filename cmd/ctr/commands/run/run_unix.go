@@ -31,7 +31,7 @@ import (
 )
 
 func init() {
-	Command.Flags = append(Command.Flags, cli.BoolFlag{
+	ContainerFlags = append(ContainerFlags, cli.BoolFlag{
 		Name:  "rootfs",
 		Usage: "use custom rootfs that is not managed by containerd snapshotter",
 	}, cli.BoolFlag{
