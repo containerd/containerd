@@ -137,6 +137,7 @@ func (em *eventMonitor) handleEvent(evt *events.Envelope) {
 				return
 			}
 			logrus.WithError(err).Errorf("Failed to get container %q", e.ContainerID)
+			return
 		}
 		err = cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
 			status.Reason = oomExitReason
