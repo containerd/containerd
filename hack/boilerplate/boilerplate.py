@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # Copyright 2015 The Kubernetes Authors.
-# Copyright 2018 The Containerd Authors.
+# Copyright The Containerd Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -102,19 +102,22 @@ def file_passes(filename, refs, regexs):
         return False
 
     p = regexs["year"]
-    found = 0
+    foundyear = 0
     for d in ref:
         if p.search(d):
-            found = 1
+            foundyear = 1
             break
-    if found == 0:
-        print('File %s is missing the year' % filename, file=verbose_out)
-        return False
 
-    # Replace all occurrences of the regex "CURRENT_YEAR|...|2016|2015|2014" with "YEAR"
+    # if YEAR is found date is a requirement and should be in the range
+    # new rule is if YEAR is not found date is optional
     p = regexs["date"]
     for i, d in enumerate(data):
         (data[i], found) = p.subn('YEAR', d)
+    # remove the year and extra space when year is optional
+    if foundyear == 0:
+        p = regexs["yearsp"]
+        for i, d in enumerate(data):
+            (data[i], found) = p.subn('', d)
 
     p = regexs["authors"]
     found = 0
@@ -210,6 +213,7 @@ def get_regexs():
     regexs = {}
     # Search for "YEAR" which exists in the boilerplate, but shouldn't in the real thing
     regexs["year"] = re.compile( 'YEAR' )
+    regexs["yearsp"] = re.compile( 'YEAR ' )
     # dates can be 2014, 2015, 2016, ..., CURRENT_YEAR, company holder names can be anything
     years = range(2014, date.today().year + 1)
     regexs["date"] = re.compile( '(%s)' % "|".join(map(lambda l: str(l), years)) )
@@ -220,7 +224,8 @@ def get_regexs():
     regexs["authors"] = re.compile( 'AUTHORS' )
     authors = [ 'The Kubernetes Authors', 'The Containerd Authors', 'The containerd Authors' ]
     regexs["auth"] = re.compile( '(%s)' % "|".join(map(lambda l: str(l), authors)) )
-    regexs["copyright"] = re.compile( 'Copyright YEAR AUTHORS' )
+    copyrightLines = [ 'Copyright YEAR AUTHORS', 'Copyright AUTHORS' ]
+    regexs["copyright"] = re.compile( '(%s)' % "|".join(map(lambda l: str(l), copyrightLines))  )
     return regexs
 
 def main():
