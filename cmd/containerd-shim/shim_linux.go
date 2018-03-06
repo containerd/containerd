@@ -19,19 +19,19 @@ package main
 import (
 	"os"
 	"os/signal"
-	"syscall"
 
 	"github.com/containerd/containerd/reaper"
 	runc "github.com/containerd/go-runc"
 	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/stevvooe/ttrpc"
+	"golang.org/x/sys/unix"
 )
 
 // setupSignals creates a new signal handler for all signals and sets the shim as a
 // sub-reaper so that the container processes are reparented
 func setupSignals() (chan os.Signal, error) {
 	signals := make(chan os.Signal, 32)
-	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGCHLD)
+	signal.Notify(signals, unix.SIGTERM, unix.SIGINT, unix.SIGCHLD, unix.SIGPIPE)
 	// make sure runc is setup to use the monitor
 	// for waiting on processes
 	runc.Monitor = reaper.Default
