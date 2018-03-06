@@ -50,9 +50,8 @@ var (
 	criContainerdClient api.CRIContainerdServiceClient
 )
 
-var standaloneCRIContainerd = flag.Bool("standalone-cri-containerd", true, "Whether cri-containerd is running in standalone mode.")
-var criContainerdEndpoint = flag.String("cri-containerd-endpoint", "/var/run/cri-containerd.sock", "The endpoint of cri-containerd.")
-var criContainerdRoot = flag.String("cri-containerd-root", "/var/lib/cri-containerd", "The root directory of cri-containerd.")
+var criContainerdEndpoint = flag.String("cri-endpoint", "/run/containerd/containerd.sock", "The endpoint of cri plugin.")
+var criContainerdRoot = flag.String("cri-root", "/var/lib/containerd/io.containerd.grpc.v1.cri", "The root directory of cri plugin.")
 
 func init() {
 	flag.Parse()
@@ -61,7 +60,7 @@ func init() {
 	}
 }
 
-// ConnectDaemons connect cri-containerd and containerd, and initialize the clients.
+// ConnectDaemons connect cri plugin and containerd, and initialize the clients.
 func ConnectDaemons() error {
 	var err error
 	runtimeService, err = remote.NewRemoteRuntimeService(*criContainerdEndpoint, timeout)
@@ -89,7 +88,7 @@ func ConnectDaemons() error {
 	}
 	criContainerdClient, err = client.NewCRIContainerdClient(*criContainerdEndpoint, timeout)
 	if err != nil {
-		return fmt.Errorf("failed to connect cri-containerd: %v", err)
+		return fmt.Errorf("failed to connect cri plugin: %v", err)
 	}
 	return nil
 }

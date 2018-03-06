@@ -41,12 +41,14 @@ help:
 	@echo "Usage: make <target>"
 	@echo
 	@echo " * 'install'          	- Install binaries to system locations"
-	@echo " * 'binaries'         	- Build cri-containerd and ctrcri"
-	@echo " * 'static-binaries   	- Build static cri-containerd and ctrcri"
+	@echo " * 'binaries'         	- Build containerd and ctrcri"
+	@echo " * 'static-binaries   	- Build static containerd and ctrcri"
+	@echo " * 'ctrcri'  		- Build ctrcri"
+	@echo " * 'install-ctrcri' 	- Install ctrcri"
+	@echo " * 'containerd'  	- Build a customized containerd with CRI plugin for testing"
+	@echo " * 'install-containerd'	- Install customized containerd to system location"
 	@echo " * 'release'          	- Build release tarball"
 	@echo " * 'push'             	- Push release tarball to GCS"
-	@echo " * 'containerd'  	- Build a customized containerd with CRI plugin for testing"
-	@echo " * 'install-containerd' 	- Install customized containerd to system location"
 	@echo " * 'test'             	- Test cri-containerd with unit test"
 	@echo " * 'test-integration' 	- Test cri-containerd with integration test"
 	@echo " * 'test-cri'         	- Test cri-containerd with cri validation test"
@@ -89,13 +91,6 @@ sync-vendor:
 
 update-vendor: sync-vendor sort-vendor
 
-$(BUILD_DIR)/cri-containerd: $(SOURCES)
-	$(GO) build -o $@ \
-		-tags '$(BUILD_TAGS)' \
-		-ldflags '$(GO_LDFLAGS)' \
-		-gcflags '$(GO_GCFLAGS)' \
-		$(PROJECT)/cmd/cri-containerd
-
 $(BUILD_DIR)/ctrcri: $(SOURCES)
 	$(GO) build -o $@ \
 		-tags '$(BUILD_TAGS)' \
@@ -131,17 +126,25 @@ test-e2e-node: binaries
 clean:
 	rm -rf $(BUILD_DIR)/*
 
-binaries: $(BUILD_DIR)/cri-containerd $(BUILD_DIR)/ctrcri
+binaries: $(BUILD_DIR)/containerd $(BUILD_DIR)/ctrcri
 
 static-binaries: GO_LDFLAGS += -extldflags "-fno-PIC -static"
-static-binaries: $(BUILD_DIR)/cri-containerd $(BUILD_DIR)/ctrcri
+static-binaries: $(BUILD_DIR)/containerd $(BUILD_DIR)/ctrcri
 
-install: binaries
-	install -D -m 755 $(BUILD_DIR)/cri-containerd $(BINDIR)/cri-containerd
+ctrcri: $(BUILD_DIR)/ctrcri
+
+install-ctrcri: ctrcri
 	install -D -m 755 $(BUILD_DIR)/ctrcri $(BINDIR)/ctrcri
 
+containerd: $(BUILD_DIR)/containerd
+
+install-containerd: containerd
+	install -D -m 755 $(BUILD_DIR)/containerd $(BINDIR)/containerd
+
+install: install-ctrcri install-containerd
+
 uninstall:
-	rm -f $(BINDIR)/cri-containerd
+	rm -f $(BINDIR)/containerd
 	rm -f $(BINDIR)/ctrcri
 
 $(BUILD_DIR)/$(TARBALL): static-binaries vendor.conf
@@ -151,11 +154,6 @@ release: $(BUILD_DIR)/$(TARBALL)
 
 push: $(BUILD_DIR)/$(TARBALL)
 	@BUILD_DIR=$(BUILD_DIR) TARBALL=$(TARBALL) VERSION=$(VERSION) ./hack/push.sh
-
-containerd: $(BUILD_DIR)/containerd
-
-install-containerd: containerd
-	install -D -m 755 $(BUILD_DIR)/containerd $(BINDIR)/containerd
 
 proto:
 	@hack/update-proto.sh
@@ -189,6 +187,10 @@ install.tools: .install.gitvalidation .install.gometalinter
 .PHONY: \
 	binaries \
 	static-binaries \
+	ctrcri \
+	install-ctrcri \
+	containerd \
+	install-containerd \
 	release \
 	push \
 	boiler \
@@ -198,8 +200,6 @@ install.tools: .install.gitvalidation .install.gometalinter
 	help \
 	install \
 	lint \
-	containerd \
-	install-containerd \
 	test \
 	test-integration \
 	test-cri \

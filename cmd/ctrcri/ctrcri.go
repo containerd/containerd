@@ -20,10 +20,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/containerd/containerd/defaults"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/containerd/cri-containerd/cmd/cri-containerd/options"
 	"github.com/containerd/cri-containerd/pkg/version"
 )
 
@@ -56,9 +56,7 @@ var (
 )
 
 func addGlobalFlags(fs *pflag.FlagSet) {
-	// TODO(random-liu): Change default to containerd/defaults.DefaultAddress after cri plugin
-	// become default.
-	fs.StringVar(&address, "address", options.DefaultConfig().SocketPath, "address for containerd's GRPC server.")
+	fs.StringVar(&address, "address", defaults.DefaultAddress, "address for containerd's GRPC server.")
 	fs.DurationVar(&timeout, "timeout", defaultTimeout, "timeout for containerd grpc connection.")
 }
 

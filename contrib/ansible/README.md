@@ -1,4 +1,4 @@
-# Kubernetes Cluster with Containerd and CRI-Containerd
+# Kubernetes Cluster with Containerd
 <p align="center">
 <img src="https://github.com/kubernetes/kubernetes/blob/master/logo/logo.png" width="50" height="50">
 <img src="https://github.com/containerd/containerd/blob/master/docs/images/containerd-dark.png" width="200" >

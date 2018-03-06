@@ -8,7 +8,7 @@
     - include_tasks: tasks/bootstrap_centos.yaml # Contains tasks bootstrap components for centos systems
       when: ansible_distribution == "CentOS"
     - include_tasks: tasks/k8s.yaml # Contains tasks kubernetes component installation
-    - include_tasks: tasks/binaries.yaml # Contains tasks for pulling containerd and cri-containerd components
+    - include_tasks: tasks/binaries.yaml # Contains tasks for pulling containerd components
 
     - name: "Create a directory for containerd config"
       file: path=/etc/containerd state=directory
@@ -21,21 +21,8 @@
           [cgroup]
             path = "/runtime"
 
-    - name: "Create a directory for cri-containerd config"
-      file: path=/etc/cri-containerd state=directory
-
-    - name: "Add cri-containerd config file"
-      blockinfile:
-        path: /etc/cri-containerd/config.toml
-        create: yes
-        block: |
-          cgroup_path = "/runtime"
-
     - name: "Start Containerd"
       systemd: name=containerd daemon_reload=yes state=started enabled=yes
-
-    - name: "Start CRI-Containerd"
-      systemd: name=cri-containerd daemon_reload=yes state=started enabled=yes
 
     - name: "Load br_netfilter kernel module"
       modprobe:
@@ -59,7 +46,7 @@
     - name: "Add runtime args in kubelet conf"
       lineinfile:
         dest: "/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
-        line: "Environment=\"KUBELET_EXTRA_ARGS= --runtime-cgroups=/runtime --container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=/var/run/cri-containerd.sock\""
+        line: "Environment=\"KUBELET_EXTRA_ARGS= --runtime-cgroups=/runtime --container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=/run/containerd/containerd.sock\""
         insertafter: '\[Service\]'
       when: check_args.stdout == ""
     
@@ -70,5 +57,5 @@
     - name: "Pre-pull pause container image"
       shell: |
         /usr/local/bin/ctr pull gcr.io/google_containers/pause:3.0
-        /usr/local/bin/crictl --runtime-endpoint /var/run/cri-containerd.sock \
+        /usr/local/bin/crictl --runtime-endpoint /run/containerd/containerd.sock \
         pull gcr.io/google_containers/pause:3.0
