@@ -208,6 +208,7 @@ func handleSignals(logger *logrus.Entry, signals chan os.Signal, server *ttrpc.S
 					sv.Delete(context.Background(), &ptypes.Empty{})
 					close(done)
 				})
+			case unix.SIGPIPE:
 			}
 		}
 	}
