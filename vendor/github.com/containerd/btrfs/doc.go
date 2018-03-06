@@ -13,14 +13,5 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+// Package btrfs provides bindings for working with btrfs partitions from Go.
 package btrfs
-
-import "syscall"
-
-func ioctl(fd, request, args uintptr) error {
-	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, fd, request, args)
-	if errno != 0 {
-		return errno
-	}
-	return nil
-}
