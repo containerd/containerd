@@ -36,6 +36,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 
+	ctrdutil "github.com/containerd/cri-containerd/pkg/containerd/util"
 	"github.com/containerd/cri-containerd/pkg/util"
 )
 
@@ -80,6 +81,7 @@ func Import(ctx context.Context, client *containerd.Client, reader io.Reader) (_
 	if err != nil {
 		return nil, err
 	}
+	// TODO(random-liu): Fix this after containerd client is fixed (containerd/containerd#2193)
 	defer done() // nolint: errcheck
 
 	cs := client.ContentStore()
@@ -134,9 +136,13 @@ func Import(ctx context.Context, client *containerd.Client, reader io.Reader) (_
 		// TODO(random-liu): Consider whether we should keep images already imported
 		// even when there is an error.
 		for _, ref := range refs {
-			if err := is.Delete(ctx, ref); err != nil {
-				log.G(ctx).WithError(err).Errorf("Failed to remove image %q", ref)
-			}
+			func() {
+				deferCtx, deferCancel := ctrdutil.DeferContext()
+				defer deferCancel()
+				if err := is.Delete(deferCtx, ref); err != nil {
+					log.G(ctx).WithError(err).Errorf("Failed to remove image %q", ref)
+				}
+			}()
 		}
 	}()
 	for _, mfst := range mfsts {
