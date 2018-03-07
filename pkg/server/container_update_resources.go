@@ -29,6 +29,7 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
+	ctrdutil "github.com/containerd/cri-containerd/pkg/containerd/util"
 	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
 	"github.com/containerd/cri-containerd/pkg/util"
 )
@@ -78,8 +79,10 @@ func (c *criContainerdService) updateContainerResources(ctx context.Context,
 	}
 	defer func() {
 		if retErr != nil {
+			deferCtx, deferCancel := ctrdutil.DeferContext()
+			defer deferCancel()
 			// Reset spec on error.
-			if err := updateContainerSpec(ctx, cntr.Container, oldSpec); err != nil {
+			if err := updateContainerSpec(deferCtx, cntr.Container, oldSpec); err != nil {
 				logrus.WithError(err).Errorf("Failed to update spec %+v for container %q", oldSpec, id)
 			}
 		}

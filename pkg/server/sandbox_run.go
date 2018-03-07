@@ -37,6 +37,7 @@ import (
 
 	"github.com/containerd/cri-containerd/pkg/annotations"
 	customopts "github.com/containerd/cri-containerd/pkg/containerd/opts"
+	ctrdutil "github.com/containerd/cri-containerd/pkg/containerd/util"
 	"github.com/containerd/cri-containerd/pkg/log"
 	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
 	"github.com/containerd/cri-containerd/pkg/util"
@@ -193,7 +194,9 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	}
 	defer func() {
 		if retErr != nil {
-			if err := container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
+			deferCtx, deferCancel := ctrdutil.DeferContext()
+			defer deferCancel()
+			if err := container.Delete(deferCtx, containerd.WithSnapshotCleanup); err != nil {
 				logrus.WithError(err).Errorf("Failed to delete containerd container %q", id)
 			}
 		}
@@ -288,9 +291,11 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		}
 		defer func() {
 			if retErr != nil {
+				deferCtx, deferCancel := ctrdutil.DeferContext()
+				defer deferCancel()
 				// Cleanup the sandbox container if an error is returned.
 				// It's possible that task is deleted by event monitor.
-				if _, err := task.Delete(ctx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
+				if _, err := task.Delete(deferCtx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
 					logrus.WithError(err).Errorf("Failed to delete sandbox container %q", id)
 				}
 			}
