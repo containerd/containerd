@@ -14,15 +14,13 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-#
-# Builds and installs critools including critest and crictl
-# to /usr/local/bin.
-#
+
 set -eu -o pipefail
 
-CRITEST_COMMIT=b184f9aefe60a4441330e615ee20634ee26474fb
-go get -d github.com/kubernetes-incubator/cri-tools/...
-cd $GOPATH/src/github.com/kubernetes-incubator/cri-tools
-git checkout $CRITEST_COMMIT
-make
-make install
+if ! command -v ltag; then
+    >&2 echo "ERROR: ltag not found. Install with:"
+    >&2 echo "    go get -u github.com/kunalkushwaha/ltag"
+    exit 1
+fi
+
+ltag -t script/validate/template --check -v

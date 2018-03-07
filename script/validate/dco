@@ -24,4 +24,4 @@ if ! command -v git-validation; then
 fi
 
 verbosity="${DCO_VERBOSITY--v}"
-GIT_CHECK_EXCLUDE="./vendor" git-validation "$verbosity" -run DCO,short-subject,dangling-whitespace
+GIT_CHECK_EXCLUDE="./vendor:./script/validate/template" git-validation "$verbosity" -run DCO,short-subject,dangling-whitespace
