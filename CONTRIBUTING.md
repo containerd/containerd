@@ -63,6 +63,22 @@ a subsequent commit that uses it.
 Remember, you're telling part of the story with the commit message. Don't make
 your chapter weird.
 
+## Applying License Header to New Files
+
+If you submit a contribution that adds a new file, please add the license
+header. You can do so manually or use the `ltag` tool:
+
+
+```console
+$ go get github.com/kunalkushwaha/ltag
+$ ltag -t ./script/validate/template
+```
+
+The above will add the appropriate license header to Go language source files,
+ Makefiles, Dockerfiles, and shell scripts. New templates will need to be added
+ if other kinds of files are added. Please consult the
+documentation at https://github.com/kunalkushwaha/ltag
+
 ## Sign your work
 
 The sign-off is a simple line at the end of the explanation for the patch. Your
