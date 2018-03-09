@@ -17,32 +17,30 @@ limitations under the License.
 package server
 
 import (
+	"fmt"
+
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
-
-	"github.com/containerd/cri-containerd/pkg/version"
 )
 
 const (
-	// For now, containerd and runc are bundled with cri-containerd, cri-containerd
-	// version is more important to us.
-	// TODO(random-liu): Figure out how to package cri-containerd and containerd,
-	// and how to version it. We still prefer calling the container runtime "containerd",
-	// but we care both the cri-containerd version and containerd version.
-	containerName        = "cri-containerd"
-	containerdAPIVersion = "0.0.0"
+	containerName = "containerd"
 	// kubeAPIVersion is the api version of kubernetes.
+	// TODO(random-liu): Change this to actual CRI version.
 	kubeAPIVersion = "0.1.0"
 )
 
 // Version returns the runtime name, runtime version and runtime API version.
-// TODO(random-liu): Return containerd version since we are going to merge 2 daemons.
 func (c *criContainerdService) Version(ctx context.Context, r *runtime.VersionRequest) (*runtime.VersionResponse, error) {
+	resp, err := c.client.Version(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get containerd version: %v", err)
+	}
 	return &runtime.VersionResponse{
 		Version:        kubeAPIVersion,
 		RuntimeName:    containerName,
-		RuntimeVersion: version.CRIContainerdVersion,
-		// Containerd doesn't have an api version now.
-		RuntimeApiVersion: containerdAPIVersion,
+		RuntimeVersion: resp.Version,
+		// Containerd doesn't have an api version use version instead.
+		RuntimeApiVersion: resp.Version,
 	}, nil
 }
