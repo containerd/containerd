@@ -22,10 +22,11 @@ import (
 )
 
 var (
-	address      string
-	noDaemon     bool
-	noCriu       bool
-	supportsCriu bool
+	address       string
+	noDaemon      bool
+	noCriu        bool
+	supportsCriu  bool
+	testNamespace = "testing"
 
 	ctrd = &daemon{}
 )
@@ -42,7 +43,7 @@ func init() {
 
 func testContext() (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(context.Background())
-	ctx = namespaces.WithNamespace(ctx, "testing")
+	ctx = namespaces.WithNamespace(ctx, testNamespace)
 	return ctx, cancel
 }
 
