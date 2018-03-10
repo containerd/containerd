@@ -112,13 +112,17 @@ func (image *Image) RootFS(ctx context.Context, provider content.Provider, platf
 // Size returns the total size of an image's packed resources.
 func (image *Image) Size(ctx context.Context, provider content.Provider, platform string) (int64, error) {
 	var size int64
-	return size, Walk(ctx, Handlers(HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	sizeCountHandler := HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		if desc.Size < 0 {
 			return nil, errors.Errorf("invalid size %v in %v (%v)", desc.Size, desc.Digest, desc.MediaType)
 		}
 		size += desc.Size
 		return nil, nil
-	}), FilterPlatform(platform, ChildrenHandler(provider))), image.Target)
+	})
+	h := Handlers(sizeCountHandler, FilterPlatform(platform, ChildrenHandler(provider)))
+	err := Walk(ctx, h, image.Target)
+	return size, err
+
 }
 
 // Manifest resolves a manifest from the image for the given platform.
