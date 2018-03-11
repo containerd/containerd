@@ -113,7 +113,7 @@ Let's suppose that you built an image called `containerd/build`. From the
 containerd source root directory you can run the following command:
 
 ```sh
-docker run -it \
+docker run -it --privileged \
     -v ${PWD}:/go/src/github.com/containerd/containerd \
     -e GOPATH=/go \
     -w /go/src/github.com/containerd/containerd containerd/build sh
