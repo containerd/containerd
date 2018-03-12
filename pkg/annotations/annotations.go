@@ -31,4 +31,7 @@ const (
 
 	// SandboxID is the sandbox ID annotation
 	SandboxID = "io.kubernetes.cri.sandbox-id"
+
+	// PrivilegedSandbox is the privileged annotation
+	PrivilegedSandbox = "io.kubernetes.cri.privileged-sandbox"
 )

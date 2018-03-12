@@ -87,6 +87,9 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 	sandboxPid := s.Pid()
 
+	trusted := sandbox.Config.Annotations[annotations.PrivilegedSandbox] == "true"
+	containerRuntime := c.getRuntime(trusted)
+
 	// Generate unique id and name for the container and reserve the name.
 	// Reserve the container name to avoid concurrent `CreateContainer` request creating
 	// the same container.
@@ -227,10 +230,10 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	opts = append(opts,
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithRuntime(
-			c.config.ContainerdConfig.Runtime,
+			containerRuntime.Type,
 			&runctypes.RuncOptions{
-				Runtime:       c.config.ContainerdConfig.RuntimeEngine,
-				RuntimeRoot:   c.config.ContainerdConfig.RuntimeRoot,
+				Runtime:       containerRuntime.Engine,
+				RuntimeRoot:   containerRuntime.Root,
 				SystemdCgroup: c.config.SystemdCgroup}), // TODO (mikebrow): add CriuPath when we add support for pause
 		containerd.WithContainerLabels(containerLabels),
 		containerd.WithContainerExtension(containerMetadataExtension, &meta))
