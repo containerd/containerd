@@ -78,7 +78,7 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, size i
 }
 
 // Copy copies data with the expected digest from the reader into the
-// provided content store writer.
+// provided content store writer. This copy commits the writer.
 //
 // This is useful when the digest and size are known beforehand. When
 // the size or digest is unknown, these values may be empty.
@@ -111,6 +111,22 @@ func Copy(ctx context.Context, cw Writer, r io.Reader, size int64, expected dige
 	}
 
 	return nil
+}
+
+// CopyReaderAt copies to a writer from a given reader at for the given
+// number of bytes. This copy does not commit the writer.
+func CopyReaderAt(cw Writer, ra ReaderAt, n int64) error {
+	ws, err := cw.Status()
+	if err != nil {
+		return err
+	}
+
+	buf := bufPool.Get().(*[]byte)
+	defer bufPool.Put(buf)
+
+	_, err = io.CopyBuffer(cw, io.NewSectionReader(ra, ws.Offset, n), *buf)
+
+	return err
 }
 
 // seekReader attempts to seek the reader to the given offset, either by
