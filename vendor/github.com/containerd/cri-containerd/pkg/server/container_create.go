@@ -47,6 +47,7 @@ import (
 
 	"github.com/containerd/cri-containerd/pkg/annotations"
 	customopts "github.com/containerd/cri-containerd/pkg/containerd/opts"
+	ctrdutil "github.com/containerd/cri-containerd/pkg/containerd/util"
 	cio "github.com/containerd/cri-containerd/pkg/server/io"
 	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
 	"github.com/containerd/cri-containerd/pkg/util"
@@ -240,7 +241,9 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	}
 	defer func() {
 		if retErr != nil {
-			if err := cntr.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
+			deferCtx, deferCancel := ctrdutil.DeferContext()
+			defer deferCancel()
+			if err := cntr.Delete(deferCtx, containerd.WithSnapshotCleanup); err != nil {
 				logrus.WithError(err).Errorf("Failed to delete containerd container %q", id)
 			}
 		}

@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
+	ctrdutil "github.com/containerd/cri-containerd/pkg/containerd/util"
 	cioutil "github.com/containerd/cri-containerd/pkg/ioutil"
 	cio "github.com/containerd/cri-containerd/pkg/server/io"
 	"github.com/containerd/cri-containerd/pkg/util"
@@ -128,7 +129,9 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 		return nil, fmt.Errorf("failed to create exec %q: %v", execID, err)
 	}
 	defer func() {
-		if _, err := process.Delete(ctx); err != nil {
+		deferCtx, deferCancel := ctrdutil.DeferContext()
+		defer deferCancel()
+		if _, err := process.Delete(deferCtx); err != nil {
 			logrus.WithError(err).Errorf("Failed to delete exec process %q for container %q", execID, id)
 		}
 	}()
