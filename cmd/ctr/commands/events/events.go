@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/events"
 	"github.com/containerd/typeurl"
 	"github.com/urfave/cli"
 
@@ -41,15 +41,16 @@ var Command = cli.Command{
 		}
 		defer cancel()
 		eventsClient := client.EventService()
-		events, err := eventsClient.Subscribe(ctx, &eventsapi.SubscribeRequest{
-			Filters: context.Args(),
-		})
-		if err != nil {
-			return err
-		}
+		eventsCh, errCh := eventsClient.Subscribe(ctx, context.Args()...)
 		for {
-			e, err := events.Recv()
-			if err != nil {
+			var e *events.Envelope
+			select {
+			case evt, closed := <-eventsCh:
+				if closed {
+					return nil
+				}
+				e = evt
+			case err := <-errCh:
 				return err
 			}
 

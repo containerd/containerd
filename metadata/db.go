@@ -195,6 +195,15 @@ func (m *DB) Snapshotter(name string) snapshots.Snapshotter {
 	return sn
 }
 
+// Snapshotters returns all available snapshotters.
+func (m *DB) Snapshotters() map[string]snapshots.Snapshotter {
+	ss := make(map[string]snapshots.Snapshotter, len(m.ss))
+	for n, sn := range m.ss {
+		ss[n] = sn
+	}
+	return ss
+}
+
 // View runs a readonly transaction on the metadata store.
 func (m *DB) View(fn func(*bolt.Tx) error) error {
 	return m.db.View(fn)
