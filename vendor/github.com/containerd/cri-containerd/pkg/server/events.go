@@ -21,9 +21,9 @@ import (
 
 	"github.com/containerd/containerd"
 	eventtypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/api/services/events/v1"
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/events"
 	"github.com/containerd/typeurl"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -137,6 +137,7 @@ func (em *eventMonitor) handleEvent(evt *events.Envelope) {
 				return
 			}
 			logrus.WithError(err).Errorf("Failed to get container %q", e.ContainerID)
+			return
 		}
 		err = cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
 			status.Reason = oomExitReason

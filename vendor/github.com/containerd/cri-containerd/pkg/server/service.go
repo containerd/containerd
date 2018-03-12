@@ -19,10 +19,7 @@ package server
 import (
 	"fmt"
 	"io"
-	"net"
-	"os"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -37,9 +34,9 @@ import (
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 
-	"github.com/containerd/cri-containerd/cmd/cri-containerd/options"
 	api "github.com/containerd/cri-containerd/pkg/api/v1"
 	"github.com/containerd/cri-containerd/pkg/atomic"
+	criconfig "github.com/containerd/cri-containerd/pkg/config"
 	osinterface "github.com/containerd/cri-containerd/pkg/os"
 	"github.com/containerd/cri-containerd/pkg/registrar"
 	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
@@ -48,12 +45,8 @@ import (
 	snapshotstore "github.com/containerd/cri-containerd/pkg/store/snapshot"
 )
 
-const (
-	// k8sContainerdNamespace is the namespace we use to connect containerd.
-	k8sContainerdNamespace = "k8s.io"
-	// unixProtocol is the network protocol of unix socket.
-	unixProtocol = "unix"
-)
+// k8sContainerdNamespace is the namespace we use to connect containerd.
+const k8sContainerdNamespace = "k8s.io"
 
 // grpcServices are all the grpc services provided by cri containerd.
 type grpcServices interface {
@@ -64,7 +57,7 @@ type grpcServices interface {
 
 // CRIContainerdService is the interface implement CRI remote service server.
 type CRIContainerdService interface {
-	Run(bool) error
+	Run() error
 	// io.Closer is used by containerd to gracefully stop cri service.
 	io.Closer
 	plugin.Service
@@ -74,15 +67,13 @@ type CRIContainerdService interface {
 // criContainerdService implements CRIContainerdService.
 type criContainerdService struct {
 	// config contains all configurations.
-	config options.Config
+	config criconfig.Config
 	// imageFSPath is the path to image filesystem.
 	imageFSPath string
 	// apparmorEnabled indicates whether apparmor is enabled.
 	apparmorEnabled bool
 	// seccompEnabled indicates whether seccomp is enabled.
 	seccompEnabled bool
-	// server is the grpc server.
-	server *grpc.Server
 	// os is an interface for all required os operations.
 	os osinterface.OS
 	// sandboxStore stores all resources associated with sandboxes.
@@ -113,7 +104,7 @@ type criContainerdService struct {
 }
 
 // NewCRIContainerdService returns a new instance of CRIContainerdService
-func NewCRIContainerdService(config options.Config) (CRIContainerdService, error) {
+func NewCRIContainerdService(config criconfig.Config) (CRIContainerdService, error) {
 	var err error
 	c := &criContainerdService{
 		config:             config,
@@ -153,12 +144,6 @@ func NewCRIContainerdService(config options.Config) (CRIContainerdService, error
 
 	c.eventMonitor = newEventMonitor(c.containerStore, c.sandboxStore)
 
-	// To avoid race condition between `Run` and `Stop`, still create grpc server
-	// although we may not use it. It's just a small in-memory data structure.
-	// TODO(random-liu): Get rid of the grpc server when completely switch
-	// to plugin mode.
-	c.server = grpc.NewServer()
-
 	return c, nil
 }
 
@@ -172,11 +157,8 @@ func (c *criContainerdService) Register(s *grpc.Server) error {
 	return nil
 }
 
-// Run starts the cri-containerd service. startGRPC specifies
-// whether to start grpc server in this function.
-// TODO(random-liu): Remove `startRPC=true` case when we no longer support cri-containerd
-// standalone mode.
-func (c *criContainerdService) Run(startGRPC bool) error {
+// Run starts the cri-containerd service.
+func (c *criContainerdService) Run() error {
 	logrus.Info("Start cri-containerd service")
 
 	// Connect containerd service here, to get rid of the containerd dependency
@@ -226,35 +208,10 @@ func (c *criContainerdService) Run(startGRPC bool) error {
 	// Set the server as initialized. GRPC services could start serving traffic.
 	c.initialized.Set()
 
-	grpcServerCloseCh := make(chan struct{})
-	if startGRPC {
-		// Create the grpc server and register runtime and image services.
-		c.Register(c.server) // nolint: errcheck
-		// Start grpc server.
-		// Unlink to cleanup the previous socket file.
-		logrus.Info("Start grpc server")
-		err := syscall.Unlink(c.config.SocketPath)
-		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("failed to unlink socket file %q: %v", c.config.SocketPath, err)
-		}
-		l, err := net.Listen(unixProtocol, c.config.SocketPath)
-		if err != nil {
-			return fmt.Errorf("failed to listen on %q: %v", c.config.SocketPath, err)
-		}
-		go func() {
-			if err := c.server.Serve(l); err != nil {
-				logrus.WithError(err).Error("Failed to serve grpc request")
-			}
-			close(grpcServerCloseCh)
-		}()
-	}
-	// Keep grpcServerCloseCh open if grpc server is not started.
-
 	// Stop the whole cri-containerd service if any of the critical service exits.
 	select {
 	case <-eventMonitorCloseCh:
 	case <-streamServerCloseCh:
-	case <-grpcServerCloseCh:
 	}
 	if err := c.Close(); err != nil {
 		return fmt.Errorf("failed to stop cri service: %v", err)
@@ -277,11 +234,6 @@ func (c *criContainerdService) Run(startGRPC bool) error {
 	case <-time.After(streamServerStopTimeout):
 		logrus.Errorf("Stream server is not stopped in %q", streamServerStopTimeout)
 	}
-	if startGRPC {
-		// Only wait for grpc server close channel when grpc server is started.
-		<-grpcServerCloseCh
-		logrus.Info("GRPC server stopped")
-	}
 	return nil
 }
 
@@ -293,7 +245,6 @@ func (c *criContainerdService) Close() error {
 	if err := c.streamServer.Stop(); err != nil {
 		return fmt.Errorf("failed to stop stream server: %v", err)
 	}
-	c.server.Stop()
 	return nil
 }
 

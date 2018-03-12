@@ -20,28 +20,20 @@ import "sync"
 
 // StopCh is used to propagate the stop information of a container.
 type StopCh struct {
-	mu     sync.Mutex
-	ch     chan struct{}
-	closed bool
+	ch   chan struct{}
+	once sync.Once
 }
 
 // NewStopCh creates a stop channel. The channel is open by default.
 func NewStopCh() *StopCh {
-	return &StopCh{
-		ch:     make(chan struct{}),
-		closed: false,
-	}
+	return &StopCh{ch: make(chan struct{})}
 }
 
 // Stop close stopCh of the container.
 func (s *StopCh) Stop() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.closed {
-		return
-	}
-	close(s.ch)
-	s.closed = true
+	s.once.Do(func() {
+		close(s.ch)
+	})
 }
 
 // Stopped return the stopCh of the container as a readonly channel.

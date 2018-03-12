@@ -24,7 +24,8 @@ See [test dashboard](https://k8s-testgrid.appspot.com/sig-node-containerd)
 | CRI-Containerd Version | Kubernetes Version |
 |:----------------------:|:------------------:|
 |     v1.0.0-alpha.x     |      1.7, 1.8      |
-|      v1.0.0-beta.x     |        1.9+        |
+|      v1.0.0-beta.x     |        1.9         |
+|          HEAD          |        1.10+       |
 ## Production Quality Cluster on GCE
 For a production quality cluster on GCE brought up with `kube-up.sh` refer [here](docs/kube-up.md).
 ## Installing with Ansible and Kubeadm
@@ -58,7 +59,7 @@ backport version of `libseccomp-dev` is required. See [travis.yml](.travis.yml) 
 2. Install other dependencies:
 * **`nsenter`**: Required by CNI and portforward.
 * **`socat`**: Required by portforward.
-3. Install and setup a go 1.9.x development environment.
+3. Install and setup a go 1.10 development environment.
 4. Make a local clone of this repository.
 5. Install binary dependencies by running the following command from your cloned `cri-containerd/` project directory:
 ```bash

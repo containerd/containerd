@@ -28,6 +28,7 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
+	ctrdutil "github.com/containerd/cri-containerd/pkg/containerd/util"
 	cio "github.com/containerd/cri-containerd/pkg/server/io"
 	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
 	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
@@ -121,8 +122,10 @@ func (c *criContainerdService) startContainer(ctx context.Context,
 	}
 	defer func() {
 		if retErr != nil {
+			deferCtx, deferCancel := ctrdutil.DeferContext()
+			defer deferCancel()
 			// It's possible that task is deleted by event monitor.
-			if _, err := task.Delete(ctx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
+			if _, err := task.Delete(deferCtx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
 				logrus.WithError(err).Errorf("Failed to delete containerd task %q", id)
 			}
 		}
