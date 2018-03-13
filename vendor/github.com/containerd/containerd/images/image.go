@@ -131,13 +131,13 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 	var (
 		matcher platforms.Matcher
 		m       *ocispec.Manifest
-		err     error
 	)
 	if platform != "" {
-		matcher, err = platforms.Parse(platform)
+		p, err := platforms.Parse(platform)
 		if err != nil {
 			return ocispec.Manifest{}, err
 		}
+		matcher = platforms.NewMatcher(p)
 	}
 
 	if err := Walk(ctx, HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
