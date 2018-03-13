@@ -17,18 +17,13 @@
 package leases
 
 import (
-	"crypto/rand"
-	"encoding/base64"
-	"fmt"
-	"time"
-
 	"google.golang.org/grpc"
 
-	"github.com/boltdb/bolt"
 	api "github.com/containerd/containerd/api/services/leases/v1"
-	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/services"
 	ptypes "github.com/gogo/protobuf/types"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
@@ -37,27 +32,28 @@ func init() {
 		Type: plugin.GRPCPlugin,
 		ID:   "leases",
 		Requires: []plugin.Type{
-			plugin.MetadataPlugin,
+			plugin.ServicePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			m, err := ic.Get(plugin.MetadataPlugin)
+			plugins, err := ic.GetByType(plugin.ServicePlugin)
 			if err != nil {
 				return nil, err
 			}
-			return NewService(m.(*metadata.DB)), nil
+			p, ok := plugins[services.LeasesService]
+			if !ok {
+				return nil, errors.New("leases service not found")
+			}
+			i, err := p.Instance()
+			if err != nil {
+				return nil, err
+			}
+			return &service{local: i.(api.LeasesClient)}, nil
 		},
 	})
 }
 
 type service struct {
-	db *metadata.DB
-}
-
-// NewService returns the GRPC metadata server
-func NewService(db *metadata.DB) api.LeasesServer {
-	return &service{
-		db: db,
-	}
+	local api.LeasesClient
 }
 
 func (s *service) Register(server *grpc.Server) error {
@@ -66,66 +62,13 @@ func (s *service) Register(server *grpc.Server) error {
 }
 
 func (s *service) Create(ctx context.Context, r *api.CreateRequest) (*api.CreateResponse, error) {
-	lid := r.ID
-	if lid == "" {
-		lid = generateLeaseID()
-	}
-	var trans metadata.Lease
-	if err := s.db.Update(func(tx *bolt.Tx) error {
-		var err error
-		trans, err = metadata.NewLeaseManager(tx).Create(ctx, lid, r.Labels)
-		return err
-	}); err != nil {
-		return nil, err
-	}
-	return &api.CreateResponse{
-		Lease: txToGRPC(trans),
-	}, nil
+	return s.local.Create(ctx, r)
 }
 
 func (s *service) Delete(ctx context.Context, r *api.DeleteRequest) (*ptypes.Empty, error) {
-	if err := s.db.Update(func(tx *bolt.Tx) error {
-		return metadata.NewLeaseManager(tx).Delete(ctx, r.ID)
-	}); err != nil {
-		return nil, err
-	}
-	return &ptypes.Empty{}, nil
+	return s.local.Delete(ctx, r)
 }
 
 func (s *service) List(ctx context.Context, r *api.ListRequest) (*api.ListResponse, error) {
-	var leases []metadata.Lease
-	if err := s.db.View(func(tx *bolt.Tx) error {
-		var err error
-		leases, err = metadata.NewLeaseManager(tx).List(ctx, false, r.Filters...)
-		return err
-	}); err != nil {
-		return nil, err
-	}
-
-	apileases := make([]*api.Lease, len(leases))
-	for i := range leases {
-		apileases[i] = txToGRPC(leases[i])
-	}
-
-	return &api.ListResponse{
-		Leases: apileases,
-	}, nil
-}
-
-func txToGRPC(tx metadata.Lease) *api.Lease {
-	return &api.Lease{
-		ID:        tx.ID,
-		Labels:    tx.Labels,
-		CreatedAt: tx.CreatedAt,
-		// TODO: Snapshots
-		// TODO: Content
-	}
-}
-
-func generateLeaseID() string {
-	t := time.Now()
-	var b [3]byte
-	// Ignore read failures, just decreases uniqueness
-	rand.Read(b[:])
-	return fmt.Sprintf("%d-%s", t.Nanosecond(), base64.URLEncoding.EncodeToString(b[:]))
+	return s.local.List(ctx, r)
 }

@@ -41,13 +41,10 @@ import (
 
 	"github.com/containerd/containerd/cmd/containerd/command"
 	"github.com/sirupsen/logrus"
-
-	"github.com/containerd/cri-containerd/pkg/version"
 )
 
 func main() {
 	app := command.App()
-	app.Version = version.CRIContainerdVersion + "-TEST-with-cri-plugin"
 	logrus.Warn("This customized containerd is only for CI test, DO NOT use it for distribution.")
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "containerd: %s\n", err)

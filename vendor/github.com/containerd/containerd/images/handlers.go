@@ -193,10 +193,11 @@ func FilterPlatform(platform string, f HandlerFunc) HandlerFunc {
 
 		var descs []ocispec.Descriptor
 		if platform != "" && isMultiPlatform(desc.MediaType) {
-			matcher, err := platforms.Parse(platform)
+			p, err := platforms.Parse(platform)
 			if err != nil {
 				return nil, err
 			}
+			matcher := platforms.NewMatcher(p)
 
 			for _, d := range children {
 				if d.Platform == nil || matcher.Match(*d.Platform) {

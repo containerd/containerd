@@ -33,13 +33,14 @@ import (
 
 	api "github.com/containerd/cri-containerd/pkg/api/v1"
 	"github.com/containerd/cri-containerd/pkg/client"
+	"github.com/containerd/cri-containerd/pkg/constants"
 	"github.com/containerd/cri-containerd/pkg/util"
 )
 
 const (
 	timeout            = 1 * time.Minute
 	pauseImage         = "gcr.io/google_containers/pause:3.0" // This is the same with default sandbox image.
-	k8sNamespace       = "k8s.io"                             // This is the same with server.k8sContainerdNamespace.
+	k8sNamespace       = constants.K8sContainerdNamespace
 	containerdEndpoint = "/run/containerd/containerd.sock"
 )
 

@@ -24,6 +24,7 @@ import (
 
 type clientOpts struct {
 	defaultns   string
+	services    *services
 	dialOptions []grpc.DialOption
 }
 
@@ -45,6 +46,17 @@ func WithDefaultNamespace(ns string) ClientOpt {
 func WithDialOpts(opts []grpc.DialOption) ClientOpt {
 	return func(c *clientOpts) error {
 		c.dialOptions = opts
+		return nil
+	}
+}
+
+// WithServices sets services used by the client.
+func WithServices(opts ...ServicesOpt) ClientOpt {
+	return func(c *clientOpts) error {
+		c.services = &services{}
+		for _, o := range opts {
+			o(c.services)
+		}
 		return nil
 	}
 }

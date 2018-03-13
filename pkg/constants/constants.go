@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Containerd Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,18 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package version
+package constants
 
-import (
-	"testing"
+// TODO(random-liu): Merge annotations package into this package.
 
-	"github.com/stretchr/testify/assert"
+const (
+	// K8sContainerdNamespace is the namespace we use to connect containerd.
+	K8sContainerdNamespace = "k8s.io"
+	// CRIVersion is the CRI version supported by the CRI plugin.
+	CRIVersion = "v1alpha2"
 )
-
-func TestValidateSemver(t *testing.T) {
-	err := validateSemver("UNKNOWN")
-	assert := assert.New(t)
-	assert.NotNil(err)
-	err = validateSemver("0.0.0-1-gdf6a1cc-dirty")
-	assert.Nil(err)
-}

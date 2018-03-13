@@ -20,14 +20,12 @@ import (
 	"io"
 	"sync"
 
-	eventstypes "github.com/containerd/containerd/api/events"
 	api "github.com/containerd/containerd/api/services/content/v1"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/services"
 	ptypes "github.com/gogo/protobuf/types"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -39,8 +37,7 @@ import (
 )
 
 type service struct {
-	store     content.Store
-	publisher events.Publisher
+	store content.Store
 }
 
 var bufPool = sync.Pool{
@@ -57,26 +54,29 @@ func init() {
 		Type: plugin.GRPCPlugin,
 		ID:   "content",
 		Requires: []plugin.Type{
-			plugin.MetadataPlugin,
+			plugin.ServicePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			m, err := ic.Get(plugin.MetadataPlugin)
+			plugins, err := ic.GetByType(plugin.ServicePlugin)
 			if err != nil {
 				return nil, err
 			}
-
-			s, err := NewService(m.(*metadata.DB).ContentStore(), ic.Events)
-			return s, err
+			p, ok := plugins[services.ContentService]
+			if !ok {
+				return nil, errors.New("content store service not found")
+			}
+			cs, err := p.Instance()
+			if err != nil {
+				return nil, err
+			}
+			return newService(cs.(content.Store)), nil
 		},
 	})
 }
 
-// NewService returns the content GRPC server
-func NewService(cs content.Store, publisher events.Publisher) (api.ContentServer, error) {
-	return &service{
-		store:     cs,
-		publisher: publisher,
-	}, nil
+// newService returns the content GRPC server
+func newService(cs content.Store) api.ContentServer {
+	return &service{store: cs}
 }
 
 func (s *service) Register(server *grpc.Server) error {
@@ -164,12 +164,6 @@ func (s *service) Delete(ctx context.Context, req *api.DeleteContentRequest) (*p
 
 	if err := s.store.Delete(ctx, req.Digest); err != nil {
 		return nil, errdefs.ToGRPC(err)
-	}
-
-	if err := s.publisher.Publish(ctx, "/content/delete", &eventstypes.ContentDelete{
-		Digest: req.Digest,
-	}); err != nil {
-		return nil, err
 	}
 
 	return &ptypes.Empty{}, nil
