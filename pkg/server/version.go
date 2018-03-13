@@ -17,10 +17,11 @@ limitations under the License.
 package server
 
 import (
-	"fmt"
-
+	"github.com/containerd/containerd/version"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+
+	"github.com/containerd/cri-containerd/pkg/constants"
 )
 
 const (
@@ -32,15 +33,10 @@ const (
 
 // Version returns the runtime name, runtime version and runtime API version.
 func (c *criContainerdService) Version(ctx context.Context, r *runtime.VersionRequest) (*runtime.VersionResponse, error) {
-	resp, err := c.client.Version(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get containerd version: %v", err)
-	}
 	return &runtime.VersionResponse{
-		Version:        kubeAPIVersion,
-		RuntimeName:    containerName,
-		RuntimeVersion: resp.Version,
-		// Containerd doesn't have an api version use version instead.
-		RuntimeApiVersion: resp.Version,
+		Version:           kubeAPIVersion,
+		RuntimeName:       containerName,
+		RuntimeVersion:    version.Version,
+		RuntimeApiVersion: constants.CRIVersion,
 	}, nil
 }

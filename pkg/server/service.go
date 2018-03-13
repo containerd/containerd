@@ -29,7 +29,6 @@ import (
 	runcseccomp "github.com/opencontainers/runc/libcontainer/seccomp"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
@@ -37,6 +36,7 @@ import (
 	api "github.com/containerd/cri-containerd/pkg/api/v1"
 	"github.com/containerd/cri-containerd/pkg/atomic"
 	criconfig "github.com/containerd/cri-containerd/pkg/config"
+	ctrdutil "github.com/containerd/cri-containerd/pkg/containerd/util"
 	osinterface "github.com/containerd/cri-containerd/pkg/os"
 	"github.com/containerd/cri-containerd/pkg/registrar"
 	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
@@ -44,9 +44,6 @@ import (
 	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
 	snapshotstore "github.com/containerd/cri-containerd/pkg/store/snapshot"
 )
-
-// k8sContainerdNamespace is the namespace we use to connect containerd.
-const k8sContainerdNamespace = "k8s.io"
 
 // grpcServices are all the grpc services provided by cri containerd.
 type grpcServices interface {
@@ -104,10 +101,11 @@ type criContainerdService struct {
 }
 
 // NewCRIContainerdService returns a new instance of CRIContainerdService
-func NewCRIContainerdService(config criconfig.Config) (CRIContainerdService, error) {
+func NewCRIContainerdService(config criconfig.Config, client *containerd.Client) (CRIContainerdService, error) {
 	var err error
 	c := &criContainerdService{
 		config:             config,
+		client:             client,
 		apparmorEnabled:    runcapparmor.IsEnabled(),
 		seccompEnabled:     runcseccomp.IsEnabled(),
 		os:                 osinterface.RealOS{},
@@ -159,23 +157,11 @@ func (c *criContainerdService) Register(s *grpc.Server) error {
 
 // Run starts the cri-containerd service.
 func (c *criContainerdService) Run() error {
-	logrus.Info("Start cri-containerd service")
-
-	// Connect containerd service here, to get rid of the containerd dependency
-	// in `NewCRIContainerdService`. This is required for plugin mode bootstrapping.
-	logrus.Info("Connect containerd service")
-	client, err := containerd.New(c.config.ContainerdEndpoint, containerd.WithDefaultNamespace(k8sContainerdNamespace))
-	if err != nil {
-		return fmt.Errorf("failed to initialize containerd client with endpoint %q: %v",
-			c.config.ContainerdEndpoint, err)
-	}
-	c.client = client
-
 	logrus.Info("Start subscribing containerd event")
 	c.eventMonitor.subscribe(c.client)
 
 	logrus.Infof("Start recovering state")
-	if err := c.recover(context.Background()); err != nil {
+	if err := c.recover(ctrdutil.NamespacedContext()); err != nil {
 		return fmt.Errorf("failed to recover state: %v", err)
 	}
 

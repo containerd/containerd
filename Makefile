@@ -28,7 +28,8 @@ VERSION := $(VERSION:v%=%)
 TARBALL_PREFIX := cri-containerd
 TARBALL := $(TARBALL_PREFIX)-$(VERSION).$(GOOS)-$(GOARCH).tar.gz
 BUILD_TAGS := seccomp apparmor
-GO_LDFLAGS := -X $(PROJECT)/pkg/version.CRIContainerdVersion=$(VERSION)
+GO_LDFLAGS := -X $(PROJECT)/pkg/version.CRIContainerdVersion=$(VERSION) \
+	-X $(PROJECT)/vendor/github.com/containerd/containerd/version.Version=$(VERSION)-TEST
 SOURCES := $(shell find cmd/ pkg/ vendor/ -name '*.go')
 PLUGIN_SOURCES := $(shell ls *.go)
 INTEGRATION_SOURCES := $(shell find integration/ -name '*.go')

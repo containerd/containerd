@@ -29,7 +29,6 @@ import (
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/linux/runctypes"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
@@ -730,7 +729,7 @@ func setOCINamespaces(g *generate.Generator, namespaces *runtime.NamespaceOption
 // defaultRuntimeSpec returns a default runtime spec used in cri-containerd.
 func defaultRuntimeSpec(id string) (*runtimespec.Spec, error) {
 	// GenerateSpec needs namespace.
-	ctx := namespaces.WithNamespace(context.Background(), k8sContainerdNamespace)
+	ctx := ctrdutil.NamespacedContext()
 	spec, err := oci.GenerateSpec(ctx, nil, &containers.Container{ID: id})
 	if err != nil {
 		return nil, err

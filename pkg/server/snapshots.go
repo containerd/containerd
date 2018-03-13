@@ -25,6 +25,7 @@ import (
 	snapshot "github.com/containerd/containerd/snapshots"
 	"github.com/sirupsen/logrus"
 
+	ctrdutil "github.com/containerd/cri-containerd/pkg/containerd/util"
 	snapshotstore "github.com/containerd/cri-containerd/pkg/store/snapshot"
 )
 
@@ -68,13 +69,14 @@ func (s *snapshotsSyncer) start() {
 
 // sync updates all snapshots stats.
 func (s *snapshotsSyncer) sync() error {
+	ctx := ctrdutil.NamespacedContext()
 	start := time.Now().UnixNano()
 	var snapshots []snapshot.Info
 	// Do not call `Usage` directly in collect function, because
 	// `Usage` takes time, we don't want `Walk` to hold read lock
 	// of snapshot metadata store for too long time.
 	// TODO(random-liu): Set timeout for the following 2 contexts.
-	if err := s.snapshotter.Walk(context.Background(), func(ctx context.Context, info snapshot.Info) error {
+	if err := s.snapshotter.Walk(ctx, func(ctx context.Context, info snapshot.Info) error {
 		snapshots = append(snapshots, info)
 		return nil
 	}); err != nil {
@@ -96,7 +98,7 @@ func (s *snapshotsSyncer) sync() error {
 			Kind:      info.Kind,
 			Timestamp: time.Now().UnixNano(),
 		}
-		usage, err := s.snapshotter.Usage(context.Background(), info.Name)
+		usage, err := s.snapshotter.Usage(ctx, info.Name)
 		if err != nil {
 			if !errdefs.IsNotFound(err) {
 				logrus.WithError(err).Errorf("Failed to get usage for snapshot %q", info.Name)

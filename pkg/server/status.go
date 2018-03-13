@@ -25,28 +25,16 @@ import (
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
-const (
-	// runtimeNotReadyReason is the reason reported when runtime is not ready.
-	runtimeNotReadyReason = "ContainerdNotReady"
-	// networkNotReadyReason is the reason reported when network is not ready.
-	networkNotReadyReason = "NetworkPluginNotReady"
-)
+// networkNotReadyReason is the reason reported when network is not ready.
+const networkNotReadyReason = "NetworkPluginNotReady"
 
 // Status returns the status of the runtime.
 func (c *criContainerdService) Status(ctx context.Context, r *runtime.StatusRequest) (*runtime.StatusResponse, error) {
+	// As a containerd plugin, if CRI plugin is serving request,
+	// containerd must be ready.
 	runtimeCondition := &runtime.RuntimeCondition{
 		Type:   runtime.RuntimeReady,
 		Status: true,
-	}
-	serving, err := c.client.IsServing(ctx)
-	if err != nil || !serving {
-		runtimeCondition.Status = false
-		runtimeCondition.Reason = runtimeNotReadyReason
-		if err != nil {
-			runtimeCondition.Message = fmt.Sprintf("Containerd healthcheck returns error: %v", err)
-		} else {
-			runtimeCondition.Message = "Containerd grpc server is not serving"
-		}
 	}
 	networkCondition := &runtime.RuntimeCondition{
 		Type:   runtime.NetworkReady,

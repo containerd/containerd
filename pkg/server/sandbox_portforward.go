@@ -28,6 +28,7 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
+	ctrdutil "github.com/containerd/cri-containerd/pkg/containerd/util"
 	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
 )
 
@@ -53,7 +54,7 @@ func (c *criContainerdService) portForward(id string, port int32, stream io.Read
 	if err != nil {
 		return fmt.Errorf("failed to find sandbox %q in store: %v", id, err)
 	}
-	t, err := s.Container.Task(context.Background(), nil)
+	t, err := s.Container.Task(ctrdutil.NamespacedContext(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to get sandbox container task: %v", err)
 	}
