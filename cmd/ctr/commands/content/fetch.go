@@ -101,12 +101,20 @@ func Fetch(ref string, cliContext *cli.Context) (containerd.Image, error) {
 
 	log.G(pctx).WithField("image", ref).Debug("fetching")
 	labels := commands.LabelArgs(cliContext.StringSlice("label"))
-	img, err := client.Pull(pctx, ref,
+	opts := []containerd.RemoteOpt{
 		containerd.WithPullLabels(labels),
 		containerd.WithResolver(resolver),
 		containerd.WithImageHandler(h),
 		containerd.WithSchema1Conversion,
-	)
+	}
+
+	if !cliContext.Bool("all-platforms") {
+		for _, platform := range cliContext.StringSlice("platform") {
+			opts = append(opts, containerd.WithPlatform(platform))
+		}
+	}
+
+	img, err := client.Pull(pctx, ref, opts...)
 	stopProgress()
 	if err != nil {
 		return nil, err
