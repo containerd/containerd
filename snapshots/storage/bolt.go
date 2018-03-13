@@ -405,6 +405,26 @@ func CommitActive(ctx context.Context, key, name string, usage snapshots.Usage, 
 	return fmt.Sprintf("%d", id), nil
 }
 
+// IDMap returns all the IDs mapped to their key
+func IDMap(ctx context.Context) (map[string]string, error) {
+	m := map[string]string{}
+	if err := withBucket(ctx, func(ctx context.Context, bkt, _ *bolt.Bucket) error {
+		return bkt.ForEach(func(k, v []byte) error {
+			// skip non buckets
+			if v != nil {
+				return nil
+			}
+			id := readID(bkt.Bucket(k))
+			m[fmt.Sprintf("%d", id)] = string(k)
+			return nil
+		})
+	}); err != nil {
+		return nil, err
+	}
+
+	return m, nil
+}
+
 func withSnapshotBucket(ctx context.Context, key string, fn func(context.Context, *bolt.Bucket, *bolt.Bucket) error) error {
 	tx, ok := ctx.Value(transactionKey{}).(*bolt.Tx)
 	if !ok {
