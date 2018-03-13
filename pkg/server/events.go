@@ -27,10 +27,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
-	ctrdutil "github.com/containerd/cri-containerd/pkg/containerd/util"
-	"github.com/containerd/cri-containerd/pkg/store"
-	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
-	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
+	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
+	"github.com/containerd/cri/pkg/store"
+	containerstore "github.com/containerd/cri/pkg/store/container"
+	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
 )
 
 // eventMonitor monitors containerd event and updates internal state correspondingly.

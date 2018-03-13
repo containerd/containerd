@@ -16,12 +16,12 @@ GO := go
 GOOS := $(shell $(GO) env GOOS)
 GOARCH := $(shell $(GO) env GOARCH)
 EPOCH_TEST_COMMIT := f9e02affccd51702191e5312665a16045ffef8ab
-PROJECT := github.com/containerd/cri-containerd
+PROJECT := github.com/containerd/cri
 BINDIR := ${DESTDIR}/usr/local/bin
 BUILD_DIR := _output
 # VERSION is derived from the current tag for HEAD plus amends. Version is used
 # to set/overide the CRIContainerdVersion variable in the verison package for
-# cri-containerd.
+# cri plugin.
 VERSION := $(shell git describe --tags --dirty --always)
 # strip the first char of the tag if it's a `v`
 VERSION := $(VERSION:v%=%)
@@ -50,17 +50,17 @@ help:
 	@echo " * 'install-containerd'	- Install customized containerd to system location"
 	@echo " * 'release'          	- Build release tarball"
 	@echo " * 'push'             	- Push release tarball to GCS"
-	@echo " * 'test'             	- Test cri-containerd with unit test"
-	@echo " * 'test-integration' 	- Test cri-containerd with integration test"
-	@echo " * 'test-cri'         	- Test cri-containerd with cri validation test"
-	@echo " * 'test-e2e-node'    	- Test cri-containerd with Kubernetes node e2e test"
+	@echo " * 'test'             	- Test cri with unit test"
+	@echo " * 'test-integration' 	- Test cri with integration test"
+	@echo " * 'test-cri'         	- Test cri with cri validation test"
+	@echo " * 'test-e2e-node'    	- Test cri with Kubernetes node e2e test"
 	@echo " * 'clean'            	- Clean artifacts"
 	@echo " * 'verify'           	- Execute the source code verification tools"
-	@echo " * 'proto'            	- Update protobuf of cri-containerd api"
+	@echo " * 'proto'            	- Update protobuf of the cri plugin api"
 	@echo " * 'install.tools'    	- Install tools used by verify"
-	@echo " * 'install.deps'     	- Install dependencies of cri-containerd (containerd, runc, cni) Note: BUILDTAGS defaults to 'seccomp apparmor' for runc build"
+	@echo " * 'install.deps'     	- Install dependencies of cri (Note: BUILDTAGS defaults to 'seccomp apparmor' for runc build")
 	@echo " * 'uninstall'        	- Remove installed binaries from system locations"
-	@echo " * 'version'          	- Print current cri-containerd release version"
+	@echo " * 'version'          	- Print current cri plugin release version"
 	@echo " * 'update-vendor'    	- Syncs containerd/vendor.conf -> vendor.conf and sorts vendor.conf"
 
 verify: lint gofmt boiler

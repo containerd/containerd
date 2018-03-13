@@ -24,7 +24,7 @@ import (
 	containerdmount "github.com/containerd/containerd/mount"
 	"golang.org/x/net/context"
 
-	osInterface "github.com/containerd/cri-containerd/pkg/os"
+	osInterface "github.com/containerd/cri/pkg/os"
 )
 
 // CalledDetail is the struct contains called function name and arguments.

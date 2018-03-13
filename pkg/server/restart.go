@@ -35,14 +35,14 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
-	cio "github.com/containerd/cri-containerd/pkg/server/io"
-	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
-	imagestore "github.com/containerd/cri-containerd/pkg/store/image"
-	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
+	cio "github.com/containerd/cri/pkg/server/io"
+	containerstore "github.com/containerd/cri/pkg/store/container"
+	imagestore "github.com/containerd/cri/pkg/store/image"
+	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
 )
 
-// NOTE: The recovery logic has following assumption: when cri-containerd is down:
-// 1) Files (e.g. root directory, netns) and checkpoint maintained by cri-containerd MUST NOT be
+// NOTE: The recovery logic has following assumption: when the cri plugin is down:
+// 1) Files (e.g. root directory, netns) and checkpoint maintained by the plugin MUST NOT be
 // touched. Or else, recovery logic for those containers/sandboxes may return error.
 // 2) Containerd containers may be deleted, but SHOULD NOT be added. Or else, recovery logic
 // for the newly added container/sandbox will return error, because there is no corresponding root
@@ -194,7 +194,7 @@ func loadContainer(ctx context.Context, cntr containerd.Container, containerDir 
 		switch status.State() {
 		case runtime.ContainerState_CONTAINER_CREATED:
 			// NOTE: Another possibility is that we've tried to start the container, but
-			// cri-containerd got restarted just during that. In that case, we still
+			// containerd got restarted during that. In that case, we still
 			// treat the container as `CREATED`.
 			containerIO, err = cio.NewContainerIO(id,
 				cio.WithNewFIFOs(containerDir, meta.Config.GetTty(), meta.Config.GetStdin()),
@@ -215,7 +215,7 @@ func loadContainer(ctx context.Context, cntr containerd.Container, containerDir 
 		// Task status is found. Update container status based on the up-to-date task status.
 		switch s.Status {
 		case containerd.Created:
-			// Task has been created, but not started yet. This could only happen if cri-containerd
+			// Task has been created, but not started yet. This could only happen if containerd
 			// gets restarted during container start.
 			// Container must be in `CREATED` state.
 			if _, err := t.Delete(ctx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
@@ -226,13 +226,13 @@ func loadContainer(ctx context.Context, cntr containerd.Container, containerDir 
 			}
 		case containerd.Running:
 			// Task is running. Container must be in `RUNNING` state, based on our assuption that
-			// "task should not be started when cri-containerd is down".
+			// "task should not be started when containerd is down".
 			switch status.State() {
 			case runtime.ContainerState_CONTAINER_EXITED:
 				return container, fmt.Errorf("unexpected container state for running task: %q", status.State())
 			case runtime.ContainerState_CONTAINER_RUNNING:
 			default:
-				// This may happen if cri-containerd gets restarted after task is started, but
+				// This may happen if containerd gets restarted after task is started, but
 				// before status is checkpointed.
 				status.StartedAt = time.Now().UnixNano()
 				status.Pid = t.Pid()

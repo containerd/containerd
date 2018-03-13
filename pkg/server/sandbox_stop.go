@@ -28,7 +28,7 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
-	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
+	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
 )
 
 // StopPodSandbox stops the sandbox. If there are any running containers in the
@@ -75,7 +75,7 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 				return nil, fmt.Errorf("failed to destroy network for sandbox %q: %v", id, teardownErr)
 			}
 		}
-		/*TODO:It is still possible that cri-containerd crashes after we teardown the network, but before we remove the network namespace.
+		/*TODO:It is still possible that containerd crashes after we teardown the network, but before we remove the network namespace.
 		In that case, we'll not be able to remove the sandbox anymore. The chance is slim, but we should be aware of that.
 		In the future, once TearDownPod is idempotent, this will be fixed.*/
 

@@ -36,8 +36,8 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 
-	ctrdutil "github.com/containerd/cri-containerd/pkg/containerd/util"
-	"github.com/containerd/cri-containerd/pkg/util"
+	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
+	"github.com/containerd/cri/pkg/util"
 )
 
 // This code reuses the docker import code from containerd/containerd#1602.

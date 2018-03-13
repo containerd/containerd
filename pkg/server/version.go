@@ -21,7 +21,7 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
-	"github.com/containerd/cri-containerd/pkg/constants"
+	"github.com/containerd/cri/pkg/constants"
 )
 
 const (

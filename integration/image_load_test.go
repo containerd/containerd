@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
-	api "github.com/containerd/cri-containerd/pkg/api/v1"
+	api "github.com/containerd/cri/pkg/api/v1"
 )
 
 // Test to load an image from tarball.
@@ -50,14 +50,14 @@ func TestImageLoad(t *testing.T) {
 	output, err = exec.Command("docker", "save", testImage, "-o", tar).CombinedOutput()
 	require.NoError(t, err, "output: %q", output)
 
-	t.Logf("make sure no such image in cri-containerd")
+	t.Logf("make sure no such image in cri")
 	img, err := imageService.ImageStatus(&runtime.ImageSpec{Image: testImage})
 	require.NoError(t, err)
 	if img != nil {
 		require.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: testImage}))
 	}
 
-	t.Logf("load image in cri-containerd")
+	t.Logf("load image in cri")
 	res, err := criContainerdClient.LoadImage(context.Background(), &api.LoadImageRequest{FilePath: tar})
 	require.NoError(t, err)
 	require.Equal(t, []string{loadedImage}, res.GetImages())

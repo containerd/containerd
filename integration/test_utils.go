@@ -31,10 +31,10 @@ import (
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
 
-	api "github.com/containerd/cri-containerd/pkg/api/v1"
-	"github.com/containerd/cri-containerd/pkg/client"
-	"github.com/containerd/cri-containerd/pkg/constants"
-	"github.com/containerd/cri-containerd/pkg/util"
+	api "github.com/containerd/cri/pkg/api/v1"
+	"github.com/containerd/cri/pkg/client"
+	"github.com/containerd/cri/pkg/constants"
+	"github.com/containerd/cri/pkg/util"
 )
 
 const (

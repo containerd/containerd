@@ -25,8 +25,8 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
 
-	api "github.com/containerd/cri-containerd/pkg/api/v1"
-	"github.com/containerd/cri-containerd/pkg/client"
+	api "github.com/containerd/cri/pkg/api/v1"
+	"github.com/containerd/cri/pkg/client"
 )
 
 func dedent(s string) string {

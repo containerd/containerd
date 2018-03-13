@@ -28,7 +28,7 @@ import (
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
-	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
+	containerstore "github.com/containerd/cri/pkg/store/container"
 )
 
 // killContainerTimeout is the timeout that we wait for the container to

@@ -22,18 +22,18 @@ import (
 	"github.com/blang/semver"
 )
 
-// CRIContainerdVersion is the version of the cri-containerd.
+// CRIContainerdVersion is the version of the cri plugin.
 var CRIContainerdVersion = "UNKNOWN"
 
 func validateSemver(sv string) error {
 	_, err := semver.Parse(sv)
 	if err != nil {
-		return fmt.Errorf("couldn't parse cri-containerd version %q: %v", sv, err)
+		return fmt.Errorf("couldn't parse version %q: %v", sv, err)
 	}
 	return nil
 }
 
-// PrintVersion outputs the release version of cri-containerd
+// PrintVersion outputs the release version of containerd/cri
 func PrintVersion() {
 	err := validateSemver(CRIContainerdVersion)
 	if err != nil {

@@ -56,7 +56,7 @@ func (c *criContainerdService) RemoveImage(ctx context.Context, r *runtime.Remov
 			// We can only get image id by reading Config from content.
 			// If the config is missing, we will fail to get image id,
 			// So we won't be able to remove the image forever,
-			// and cri-containerd always report the image is ok.
+			// and the cri plugin always reports the image is ok.
 			// But we also don't check it by manifest,
 			// It's possible that two manifest digests have the same image ID in theory.
 			// In theory it's possible that an image is compressed with different algorithms,

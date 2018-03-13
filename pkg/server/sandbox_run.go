@@ -35,17 +35,17 @@ import (
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
-	"github.com/containerd/cri-containerd/pkg/annotations"
-	customopts "github.com/containerd/cri-containerd/pkg/containerd/opts"
-	ctrdutil "github.com/containerd/cri-containerd/pkg/containerd/util"
-	"github.com/containerd/cri-containerd/pkg/log"
-	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
-	"github.com/containerd/cri-containerd/pkg/util"
+	"github.com/containerd/cri/pkg/annotations"
+	customopts "github.com/containerd/cri/pkg/containerd/opts"
+	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
+	"github.com/containerd/cri/pkg/log"
+	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
+	"github.com/containerd/cri/pkg/util"
 )
 
 func init() {
 	typeurl.Register(&sandboxstore.Metadata{},
-		"github.com/containerd/cri-containerd/pkg/store/sandbox", "Metadata")
+		"github.com/containerd/cri/pkg/store/sandbox", "Metadata")
 }
 
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
@@ -140,7 +140,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		if err != nil {
 			return nil, fmt.Errorf("failed to get network status for sandbox %q: %v", id, err)
 		}
-		// Certain VM based solutions like clear containers (Issue containerd/cri-containerd#524)
+		// Certain VM based solutions like clear containers (Issue containerd/cri#524)
 		//  rely on the assumption that CRI shim will not be querying the network namespace to check the
 		// network states such as IP.
 		// In furture runtime implementation should avoid relying on CRI shim implementation details.
@@ -258,7 +258,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	// and before the end of this function.
 	// * If `Update` succeeds, sandbox state will become READY in one transaction.
 	// * If `Update` fails, sandbox will be removed from the store in the defer above.
-	// * If cri-containerd stops at any point before `Update` finishes, because sandbox
+	// * If containerd stops at any point before `Update` finishes, because sandbox
 	// state is not checkpointed, it will be recovered from corresponding containerd task
 	// status during restart:
 	//   * If the task is running, sandbox state will be READY,

@@ -48,7 +48,7 @@ func TestTruncIndex(t *testing.T) {
 	// if you add n images at least two will share the same leading digit.
 	// "sha256:n" where n is the a number from 0-9 where two images have the same trunc,
 	// for example sha256:9
-	// https://github.com/containerd/cri-containerd/pull/352
+	// https://github.com/containerd/cri/pull/352
 	// I am thinking how I get the two image which have same trunc.
 
 	// TODO(yanxuean): add test case for ListImages

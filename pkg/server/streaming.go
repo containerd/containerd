@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/utils/exec"
 
-	ctrdutil "github.com/containerd/cri-containerd/pkg/containerd/util"
+	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
 )
 
 func newStreamServer(c *criContainerdService, addr, port string) (streaming.Server, error) {

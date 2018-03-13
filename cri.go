@@ -37,9 +37,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	criconfig "github.com/containerd/cri-containerd/pkg/config"
-	"github.com/containerd/cri-containerd/pkg/constants"
-	"github.com/containerd/cri-containerd/pkg/server"
+	criconfig "github.com/containerd/cri/pkg/config"
+	"github.com/containerd/cri/pkg/constants"
+	"github.com/containerd/cri/pkg/server"
 )
 
 // TODO(random-liu): Use github.com/pkg/errors for our errors.

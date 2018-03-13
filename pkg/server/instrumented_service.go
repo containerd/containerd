@@ -23,9 +23,9 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
-	api "github.com/containerd/cri-containerd/pkg/api/v1"
-	ctrdutil "github.com/containerd/cri-containerd/pkg/containerd/util"
-	"github.com/containerd/cri-containerd/pkg/log"
+	api "github.com/containerd/cri/pkg/api/v1"
+	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
+	"github.com/containerd/cri/pkg/log"
 )
 
 // instrumentedService wraps service with containerd namespace and logs.

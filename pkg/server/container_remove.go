@@ -26,9 +26,9 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
-	"github.com/containerd/cri-containerd/pkg/log"
-	"github.com/containerd/cri-containerd/pkg/store"
-	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
+	"github.com/containerd/cri/pkg/log"
+	"github.com/containerd/cri/pkg/store"
+	containerstore "github.com/containerd/cri/pkg/store/container"
 )
 
 // RemoveContainer removes the container.

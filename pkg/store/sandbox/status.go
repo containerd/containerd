@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-// State is the sandbox state we use in cri-containerd.
+// State is the sandbox state we use in containerd/cri.
 // It has unknown state defined.
 type State uint32
 

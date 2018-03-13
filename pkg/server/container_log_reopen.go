@@ -23,7 +23,7 @@ import (
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
-// ReopenContainerLog asks cri-containerd to reopen the stdout/stderr log file for the container.
+// ReopenContainerLog asks the cri plugin to reopen the stdout/stderr log file for the container.
 // This is often called after the log file has been rotated.
 func (c *criContainerdService) ReopenContainerLog(ctx context.Context, r *runtime.ReopenContainerLogRequest) (*runtime.ReopenContainerLogResponse, error) {
 	container, err := c.containerStore.Get(r.GetContainerId())

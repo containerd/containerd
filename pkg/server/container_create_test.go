@@ -32,9 +32,9 @@ import (
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
-	"github.com/containerd/cri-containerd/pkg/annotations"
-	ostesting "github.com/containerd/cri-containerd/pkg/os/testing"
-	"github.com/containerd/cri-containerd/pkg/util"
+	"github.com/containerd/cri/pkg/annotations"
+	ostesting "github.com/containerd/cri/pkg/os/testing"
+	"github.com/containerd/cri/pkg/util"
 )
 
 func checkMount(t *testing.T, mounts []runtimespec.Mount, src, dest, typ string,

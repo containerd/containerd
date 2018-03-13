@@ -17,14 +17,14 @@ limitations under the License.
 package server
 
 import (
-	criconfig "github.com/containerd/cri-containerd/pkg/config"
-	ostesting "github.com/containerd/cri-containerd/pkg/os/testing"
-	"github.com/containerd/cri-containerd/pkg/registrar"
-	servertesting "github.com/containerd/cri-containerd/pkg/server/testing"
-	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
-	imagestore "github.com/containerd/cri-containerd/pkg/store/image"
-	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
-	snapshotstore "github.com/containerd/cri-containerd/pkg/store/snapshot"
+	criconfig "github.com/containerd/cri/pkg/config"
+	ostesting "github.com/containerd/cri/pkg/os/testing"
+	"github.com/containerd/cri/pkg/registrar"
+	servertesting "github.com/containerd/cri/pkg/server/testing"
+	containerstore "github.com/containerd/cri/pkg/store/container"
+	imagestore "github.com/containerd/cri/pkg/store/image"
+	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
+	snapshotstore "github.com/containerd/cri/pkg/store/snapshot"
 )
 
 const (

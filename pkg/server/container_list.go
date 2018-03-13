@@ -21,7 +21,7 @@ import (
 
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
-	containerstore "github.com/containerd/cri-containerd/pkg/store/container"
+	containerstore "github.com/containerd/cri/pkg/store/container"
 )
 
 // ListContainers lists all containers matching the filter.

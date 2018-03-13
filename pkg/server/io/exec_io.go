@@ -23,7 +23,7 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/sirupsen/logrus"
 
-	cioutil "github.com/containerd/cri-containerd/pkg/ioutil"
+	cioutil "github.com/containerd/cri/pkg/ioutil"
 )
 
 // ExecIO holds the exec io.
