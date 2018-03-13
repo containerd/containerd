@@ -22,7 +22,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/docker/docker/pkg/truncindex"
 
-	"github.com/containerd/cri-containerd/pkg/store"
+	"github.com/containerd/cri/pkg/store"
 )
 
 // Sandbox contains all resources associated with the sandbox. All methods to

@@ -39,9 +39,9 @@ import (
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/util/sysctl"
 
-	"github.com/containerd/cri-containerd/pkg/store"
-	imagestore "github.com/containerd/cri-containerd/pkg/store/image"
-	"github.com/containerd/cri-containerd/pkg/util"
+	"github.com/containerd/cri/pkg/store"
+	imagestore "github.com/containerd/cri/pkg/store/image"
+	"github.com/containerd/cri/pkg/util"
 )
 
 const (

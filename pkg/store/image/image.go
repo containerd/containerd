@@ -24,7 +24,7 @@ import (
 	godigest "github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
-	"github.com/containerd/cri-containerd/pkg/store"
+	"github.com/containerd/cri/pkg/store"
 )
 
 // Image contains all resources associated with the image. All fields

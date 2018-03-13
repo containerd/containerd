@@ -24,16 +24,16 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/containerd/cri-containerd/pkg/version"
+	"github.com/containerd/cri/pkg/version"
 )
 
 const (
 	// Add \u200B to avoid the space trimming.
-	desc = "\u200B" + `        __                 _ 
+	desc = "\u200B" + `        __                 _
   _____/ /________________(_)
- / ___/ __/ ___/ ___/ ___/ / 
-/ /__/ /_/ /  / /__/ /  / /  
-\___/\__/_/   \___/_/  /_/   
+ / ___/ __/ ___/ ___/ ___/ /
+/ /__/ /_/ /  / /__/ /  / /
+\___/\__/_/   \___/_/  /_/
 
 containerd CRI plugin CLI
 `

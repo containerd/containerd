@@ -28,8 +28,8 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
-	ctrdutil "github.com/containerd/cri-containerd/pkg/containerd/util"
-	sandboxstore "github.com/containerd/cri-containerd/pkg/store/sandbox"
+	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
+	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
 )
 
 // PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.

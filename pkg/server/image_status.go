@@ -24,7 +24,7 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
-	imagestore "github.com/containerd/cri-containerd/pkg/store/image"
+	imagestore "github.com/containerd/cri/pkg/store/image"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 

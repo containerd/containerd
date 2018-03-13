@@ -30,9 +30,9 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
-	containerdresolver "github.com/containerd/cri-containerd/pkg/containerd/resolver"
-	imagestore "github.com/containerd/cri-containerd/pkg/store/image"
-	"github.com/containerd/cri-containerd/pkg/util"
+	containerdresolver "github.com/containerd/cri/pkg/containerd/resolver"
+	imagestore "github.com/containerd/cri/pkg/store/image"
+	"github.com/containerd/cri/pkg/util"
 )
 
 // For image management:
@@ -66,9 +66,9 @@ import (
 // an error occurrs during the pulling, should we remove the entry from metadata
 // store? Or should we leave it there until next startup (resource leakage)?
 //
-// 3) CRI-containerd only exposes "READY" (successfully pulled and unpacked) images
+// 3) The cri plugin only exposes "READY" (successfully pulled and unpacked) images
 // to the user, which are maintained in the in-memory metadata index. However, it's
-// still possible that someone else removes the content or snapshot by-pass cri-containerd,
+// still possible that someone else removes the content or snapshot by-pass the cri plugin,
 // how do we detect that and update the in-memory metadata correspondingly? Always
 // check whether corresponding snapshot is ready when reporting image status?
 //

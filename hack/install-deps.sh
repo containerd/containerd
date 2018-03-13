@@ -62,7 +62,7 @@ RUNC_PKG=github.com/opencontainers/runc
 CNI_PKG=github.com/containernetworking/plugins
 CONTAINERD_PKG=github.com/containerd/containerd
 CRITOOL_PKG=github.com/kubernetes-incubator/cri-tools
-CRI_CONTAINERD_PKG=github.com/containerd/cri-containerd
+CRI_CONTAINERD_PKG=github.com/containerd/cri
 
 # Create a temporary GOPATH for make install.deps.
 TMPGOPATH=$(mktemp -d /tmp/cri-containerd-install-deps.XXXX)

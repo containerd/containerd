@@ -21,7 +21,7 @@ import (
 
 	snapshot "github.com/containerd/containerd/snapshots"
 
-	"github.com/containerd/cri-containerd/pkg/store"
+	"github.com/containerd/cri/pkg/store"
 )
 
 // Snapshot contains the information about the snapshot.
