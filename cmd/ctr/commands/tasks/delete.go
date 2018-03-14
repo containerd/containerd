@@ -17,14 +17,21 @@
 package tasks
 
 import (
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/urfave/cli"
 )
 
 var deleteCommand = cli.Command{
 	Name:      "delete",
-	Usage:     "delete a task",
+	Usage:     "[flags] delete a task",
 	ArgsUsage: "CONTAINER",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "force, f",
+			Usage: "force delete task process",
+		},
+	},
 	Action: func(context *cli.Context) error {
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -35,11 +42,16 @@ var deleteCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+
 		task, err := container.Task(ctx, nil)
 		if err != nil {
 			return err
 		}
-		status, err := task.Delete(ctx)
+		var opts []containerd.ProcessDeleteOpts
+		if context.Bool("force") {
+			opts = append(opts, containerd.WithProcessKill)
+		}
+		status, err := task.Delete(ctx, opts...)
 		if err != nil {
 			return err
 		}
