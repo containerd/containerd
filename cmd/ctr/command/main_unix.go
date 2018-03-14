@@ -1,4 +1,4 @@
-// +build !no_cri
+// +build !windows
 
 /*
    Copyright The containerd Authors.
@@ -16,6 +16,10 @@
    limitations under the License.
 */
 
-package main
+package command
 
-import _ "github.com/containerd/cri"
+import "github.com/containerd/containerd/cmd/ctr/commands/shim"
+
+func init() {
+	extraCmds = append(extraCmds, shim.Command)
+}

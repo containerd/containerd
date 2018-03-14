@@ -18,4 +18,8 @@
 
 package main
 
-import _ "github.com/containerd/cri"
+import "github.com/containerd/cri/cli"
+
+func init() {
+	pluginCmds = append(pluginCmds, cli.Command)
+}
