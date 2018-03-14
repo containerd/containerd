@@ -58,7 +58,7 @@ func (oe *V1Exporter) Export(ctx context.Context, store content.Provider, desc o
 	}
 
 	handlers := images.Handlers(
-		images.FilterPlatform(platforms.Default(), images.ChildrenHandler(store)),
+		images.FilterPlatforms(images.ChildrenHandler(store), platforms.Default()),
 		images.HandlerFunc(exportHandler),
 	)
 

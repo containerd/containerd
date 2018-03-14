@@ -22,6 +22,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/cmd/ctr/commands/content"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/platforms"
 	"github.com/urfave/cli"
 )
 
@@ -38,7 +39,17 @@ command. As part of this process, we do the following:
 2. Prepare the snapshot filesystem with the pulled resources.
 3. Register metadata for the image.
 `,
-	Flags: append(commands.RegistryFlags, append(commands.SnapshotterFlags, commands.LabelFlag)...),
+	Flags: append(append(commands.RegistryFlags, append(commands.SnapshotterFlags, commands.LabelFlag)...),
+		cli.StringSliceFlag{
+			Name:  "platform",
+			Usage: "Pull content from a specific platform",
+			Value: &cli.StringSlice{platforms.Default()},
+		},
+		cli.BoolFlag{
+			Name:  "all-platforms",
+			Usage: "pull content from all platforms",
+		},
+	),
 	Action: func(context *cli.Context) error {
 		var (
 			ref = context.Args().First()

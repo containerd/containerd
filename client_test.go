@@ -30,8 +30,10 @@ import (
 
 	"google.golang.org/grpc/grpclog"
 
+	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/containerd/testutil"
 	"github.com/sirupsen/logrus"
@@ -116,7 +118,7 @@ func TestMain(m *testing.M) {
 	}).Info("running tests against containerd")
 
 	// pull a seed image
-	if _, err = client.Pull(ctx, testImage, WithPullUnpack); err != nil {
+	if _, err = client.Pull(ctx, testImage, WithPullUnpack, WithPlatform(platforms.Default())); err != nil {
 		ctrd.Stop()
 		ctrd.Wait()
 		fmt.Fprintf(os.Stderr, "%s: %s\n", err, buf.String())
@@ -187,9 +189,112 @@ func TestImagePull(t *testing.T) {
 
 	ctx, cancel := testContext()
 	defer cancel()
-	_, err = client.Pull(ctx, testImage)
+	_, err = client.Pull(ctx, testImage, WithPlatform(platforms.Default()))
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestImagePullAllPlatforms(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	ctx, cancel := testContext()
+	defer cancel()
+
+	cs := client.ContentStore()
+	img, err := client.Pull(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	index := img.Target()
+	manifests, err := images.Children(ctx, cs, index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, manifest := range manifests {
+		children, err := images.Children(ctx, cs, manifest)
+		if err != nil {
+			t.Fatal("Th")
+		}
+		// check if childless data type has blob in content store
+		for _, desc := range children {
+			ra, err := cs.ReaderAt(ctx, desc.Digest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ra.Close()
+		}
+	}
+}
+
+func TestImagePullSomePlatforms(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	ctx, cancel := testContext()
+	defer cancel()
+
+	cs := client.ContentStore()
+	platformList := []string{"linux/arm64/v8", "linux/386"}
+	m := make(map[string]platforms.Matcher)
+	var opts []RemoteOpt
+
+	for _, platform := range platformList {
+		p, err := platforms.Parse(platform)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m[platform] = platforms.NewMatcher(p)
+		opts = append(opts, WithPlatform(platform))
+	}
+
+	img, err := client.Pull(ctx, "docker.io/library/busybox:latest", opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	index := img.Target()
+	manifests, err := images.Children(ctx, cs, index)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count := 0
+	for _, manifest := range manifests {
+		children, err := images.Children(ctx, cs, manifest)
+		found := false
+		for _, matcher := range m {
+			if matcher.Match(*manifest.Platform) {
+				count++
+				found = true
+			}
+		}
+
+		if found {
+			if len(children) == 0 {
+				t.Fatal("manifest should have pulled children content")
+			}
+
+			// check if childless data type has blob in content store
+			for _, desc := range children {
+				ra, err := cs.ReaderAt(ctx, desc.Digest)
+				if err != nil {
+					t.Fatal(err)
+				}
+				ra.Close()
+			}
+		} else if !found && err == nil {
+			t.Fatal("manifest should not have pulled children content")
+		}
+	}
+
+	if count != len(platformList) {
+		t.Fatal("expected a different number of pulled manifests")
 	}
 }
 
