@@ -24,7 +24,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/plugin"
-	"github.com/cri-o/ocicni/pkg/ocicni"
+	cni "github.com/containerd/go-cni"
 	runcapparmor "github.com/opencontainers/runc/libcontainer/apparmor"
 	runcseccomp "github.com/opencontainers/runc/libcontainer/seccomp"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -88,7 +88,7 @@ type criContainerdService struct {
 	// snapshotStore stores information of all snapshots.
 	snapshotStore *snapshotstore.Store
 	// netPlugin is used to setup and teardown network when run/stop pod sandbox.
-	netPlugin ocicni.CNIPlugin
+	netPlugin cni.CNI
 	// client is an instance of the containerd client
 	client *containerd.Client
 	// streamServer is the streaming server serves container streaming request.
@@ -129,9 +129,15 @@ func NewCRIContainerdService(config criconfig.Config, client *containerd.Client)
 	c.imageFSPath = imageFSPath(config.ContainerdRootDir, config.ContainerdConfig.Snapshotter)
 	logrus.Infof("Get image filesystem path %q", c.imageFSPath)
 
-	c.netPlugin, err = ocicni.InitCNI(config.NetworkPluginConfDir, config.NetworkPluginBinDir)
+	// Pod needs to attach to atleast loopback network and a non host network,
+	// hence networkAttachCount is 2. If there are more network configs the
+	// pod will be attached to all the networks but we will only use the ip
+	// of the default network interface as the pod IP.
+	c.netPlugin, err = cni.New(cni.WithMinNetworkCount(networkAttachCount),
+		cni.WithPluginConfDir(config.NetworkPluginConfDir),
+		cni.WithPluginDir([]string{config.NetworkPluginBinDir}))
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize cni plugin: %v", err)
+		return nil, fmt.Errorf("failed to initialize cni: %v", err)
 	}
 
 	// prepare streaming server
