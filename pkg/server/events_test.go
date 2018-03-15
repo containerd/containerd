@@ -68,7 +68,8 @@ func TestBackOff(t *testing.T) {
 	}
 
 	t.Logf("Should be able to backOff a event")
-	actual := newBackOff(backOffInitDuration, backOffMaxDuration, backOffExpireCheckDuration, testClock)
+	actual := newBackOff()
+	actual.clock = testClock
 	for k, queue := range inputQueues {
 		for _, event := range queue.events {
 			actual.enBackOff(k, event)
@@ -92,18 +93,16 @@ func TestBackOff(t *testing.T) {
 	notExistKey := "containerNotExist"
 	assert.Equal(t, actual.isInBackOff(notExistKey), false)
 
+	t.Logf("No containers should be expired")
+	assert.Empty(t, actual.getExpiredContainers())
+
 	t.Logf("Should be able to get all keys which are expired for backOff")
 	testClock.Sleep(backOffInitDuration)
-	expKeyMap := map[string]struct{}{}
-	for k := range inputQueues {
-		expKeyMap[k] = struct{}{}
-	}
 	actKeyList := actual.getExpiredContainers()
-	actKeyMap := map[string]struct{}{} //assert.Equal can't compare slice without order
-	for _, k := range actKeyList {
-		actKeyMap[k] = struct{}{}
+	assert.Equal(t, len(inputQueues), len(actKeyList))
+	for k := range inputQueues {
+		assert.Contains(t, actKeyList, k)
 	}
-	assert.Equal(t, actKeyMap, expKeyMap)
 
 	t.Logf("Should be able to get out all backOff events")
 	doneQueues := map[string]*backOffQueue{}
