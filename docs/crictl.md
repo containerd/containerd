@@ -54,7 +54,7 @@ $ docker save k8s.gcr.io/pause-amd64:3.1 -o pause.tar
 ```
 Then load the container image into the container runtime:
 ```console
-$ sudo ctrcri load pause.tar
+$ sudo ctr cri load pause.tar
   Loaded image: k8s.gcr.io/pause-amd64:3.1
 ```
 List images and inspect the pause image:

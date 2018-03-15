@@ -20,16 +20,15 @@ PROJECT := github.com/containerd/cri
 BINDIR := ${DESTDIR}/usr/local/bin
 BUILD_DIR := _output
 # VERSION is derived from the current tag for HEAD plus amends. Version is used
-# to set/overide the CRIContainerdVersion variable in the verison package for
-# cri plugin.
+# to set/overide the containerd version in vendor/github.com/containerd/containerd/version.
 VERSION := $(shell git describe --tags --dirty --always)
 # strip the first char of the tag if it's a `v`
 VERSION := $(VERSION:v%=%)
 TARBALL_PREFIX := cri-containerd
 TARBALL := $(TARBALL_PREFIX)-$(VERSION).$(GOOS)-$(GOARCH).tar.gz
 BUILD_TAGS := seccomp apparmor
-GO_LDFLAGS := -X $(PROJECT)/pkg/version.CRIContainerdVersion=$(VERSION) \
-	-X $(PROJECT)/vendor/github.com/containerd/containerd/version.Version=$(VERSION)-TEST
+# Add `-TEST` suffix to indicate that all binaries built from this repo are for test.
+GO_LDFLAGS := -X $(PROJECT)/vendor/github.com/containerd/containerd/version.Version=$(VERSION)-TEST
 SOURCES := $(shell find cmd/ pkg/ vendor/ -name '*.go')
 PLUGIN_SOURCES := $(shell ls *.go)
 INTEGRATION_SOURCES := $(shell find integration/ -name '*.go')
@@ -42,10 +41,10 @@ help:
 	@echo "Usage: make <target>"
 	@echo
 	@echo " * 'install'          	- Install binaries to system locations"
-	@echo " * 'binaries'         	- Build containerd and ctrcri"
-	@echo " * 'static-binaries   	- Build static containerd and ctrcri"
-	@echo " * 'ctrcri'  		- Build ctrcri"
-	@echo " * 'install-ctrcri' 	- Install ctrcri"
+	@echo " * 'binaries'         	- Build containerd and ctr"
+	@echo " * 'static-binaries   	- Build static containerd and ctr"
+	@echo " * 'ctr'  		- Build ctr"
+	@echo " * 'install-ctr' 	- Install ctr"
 	@echo " * 'containerd'  	- Build a customized containerd with CRI plugin for testing"
 	@echo " * 'install-containerd'	- Install customized containerd to system location"
 	@echo " * 'release'          	- Build release tarball"
@@ -92,12 +91,12 @@ sync-vendor:
 
 update-vendor: sync-vendor sort-vendor
 
-$(BUILD_DIR)/ctrcri: $(SOURCES)
+$(BUILD_DIR)/ctr: $(SOURCES)
 	$(GO) build -o $@ \
 		-tags '$(BUILD_TAGS)' \
 		-ldflags '$(GO_LDFLAGS)' \
 		-gcflags '$(GO_GCFLAGS)' \
-		$(PROJECT)/cmd/ctrcri
+		$(PROJECT)/cmd/ctr
 
 $(BUILD_DIR)/containerd: $(SOURCES) $(PLUGIN_SOURCES)
 	$(GO) build -o $@ \
@@ -127,26 +126,26 @@ test-e2e-node: binaries
 clean:
 	rm -rf $(BUILD_DIR)/*
 
-binaries: $(BUILD_DIR)/containerd $(BUILD_DIR)/ctrcri
+binaries: $(BUILD_DIR)/containerd $(BUILD_DIR)/ctr
 
 static-binaries: GO_LDFLAGS += -extldflags "-fno-PIC -static"
-static-binaries: $(BUILD_DIR)/containerd $(BUILD_DIR)/ctrcri
+static-binaries: $(BUILD_DIR)/containerd $(BUILD_DIR)/ctr
 
-ctrcri: $(BUILD_DIR)/ctrcri
+ctr: $(BUILD_DIR)/ctr
 
-install-ctrcri: ctrcri
-	install -D -m 755 $(BUILD_DIR)/ctrcri $(BINDIR)/ctrcri
+install-ctr: ctr
+	install -D -m 755 $(BUILD_DIR)/ctr $(BINDIR)/ctr
 
 containerd: $(BUILD_DIR)/containerd
 
 install-containerd: containerd
 	install -D -m 755 $(BUILD_DIR)/containerd $(BINDIR)/containerd
 
-install: install-ctrcri install-containerd
+install: install-ctr install-containerd
 
 uninstall:
 	rm -f $(BINDIR)/containerd
-	rm -f $(BINDIR)/ctrcri
+	rm -f $(BINDIR)/ctr
 
 $(BUILD_DIR)/$(TARBALL): static-binaries vendor.conf
 	@BUILD_DIR=$(BUILD_DIR) TARBALL=$(TARBALL) ./hack/release.sh
@@ -188,8 +187,8 @@ install.tools: .install.gitvalidation .install.gometalinter
 .PHONY: \
 	binaries \
 	static-binaries \
-	ctrcri \
-	install-ctrcri \
+	ctr \
+	install-ctr \
 	containerd \
 	install-containerd \
 	release \

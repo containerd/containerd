@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The containerd Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,18 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package version
+package main
 
 import (
-	"testing"
+	"fmt"
+	"os"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/containerd/containerd/cmd/ctr/command"
+
+	cricli "github.com/containerd/cri/cli"
 )
 
-func TestValidateSemver(t *testing.T) {
-	err := validateSemver("UNKNOWN")
-	assert := assert.New(t)
-	assert.NotNil(err)
-	err = validateSemver("0.0.0-1-gdf6a1cc-dirty")
-	assert.Nil(err)
+func main() {
+	app := command.App()
+	app.Commands = append(app.Commands, cricli.Command)
+	if err := app.Run(os.Args); err != nil {
+		fmt.Fprintf(os.Stderr, "ctr: %s\n", err)
+		os.Exit(1)
+	}
 }
