@@ -505,6 +505,10 @@ func (c *criContainerdService) setupPod(id string, path string, config *runtime.
 	if configs, ok := result.Interfaces[defaultIfName]; ok && len(configs.IPConfigs) > 0 {
 		return configs.IPConfigs[0].IP.String(), nil
 	}
+	// If it comes here then the result was invalid so destroy the pod network and return error
+	if err := c.teardownPod(id, path, config); err != nil {
+		logrus.WithError(err).Errorf("Failed to destroy network for sandbox %q", id)
+	}
 	return "", fmt.Errorf("failed to find network info for sandbox %q", id)
 }
 

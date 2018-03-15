@@ -437,6 +437,6 @@ func getPodCNILabels(id string, config *runtime.PodSandboxConfig) map[string]str
 		"K8S_POD_NAMESPACE":          config.GetMetadata().GetNamespace(),
 		"K8S_POD_NAME":               config.GetMetadata().GetName(),
 		"K8S_POD_INFRA_CONTAINER_ID": id,
-		"IgnoreUnknown": "1",
+		"IgnoreUnknown":              "1",
 	}
 }

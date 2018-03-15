@@ -140,6 +140,11 @@ func NewCRIContainerdService(config criconfig.Config, client *containerd.Client)
 		return nil, fmt.Errorf("failed to initialize cni: %v", err)
 	}
 
+	// Try to load the config if it exists. Just log the error if load fails
+	// This is not disruptive for containerd to panic
+	if err := c.netPlugin.Load(cni.WithLoNetwork(), cni.WithDefaultConf()); err != nil {
+		logrus.WithError(err).Error("Failed to load cni during init, please check CRI plugin status before setting up network for pods")
+	}
 	// prepare streaming server
 	c.streamServer, err = newStreamServer(c, config.StreamServerAddress, config.StreamServerPort)
 	if err != nil {

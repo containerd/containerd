@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"github.com/containerd/cri/pkg/annotations"
+	cni "github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
-	"github.com/cri-o/ocicni/pkg/ocicni"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
@@ -331,7 +331,7 @@ options timeout:1
 func TestToCNIPortMappings(t *testing.T) {
 	for desc, test := range map[string]struct {
 		criPortMappings []*runtime.PortMapping
-		cniPortMappings []ocicni.PortMapping
+		cniPortMappings []cni.PortMapping
 	}{
 		"empty CRI port mapping should map to empty CNI port mapping": {},
 		"CRI port mapping should be converted to CNI port mapping properly": {
@@ -349,7 +349,7 @@ func TestToCNIPortMappings(t *testing.T) {
 					HostIp:        "126.125.124.123",
 				},
 			},
-			cniPortMappings: []ocicni.PortMapping{
+			cniPortMappings: []cni.PortMapping{
 				{
 					HostPort:      5678,
 					ContainerPort: 1234,
@@ -378,7 +378,7 @@ func TestToCNIPortMappings(t *testing.T) {
 					HostIp:        "126.125.124.123",
 				},
 			},
-			cniPortMappings: []ocicni.PortMapping{
+			cniPortMappings: []cni.PortMapping{
 				{
 					HostPort:      8765,
 					ContainerPort: 4321,
