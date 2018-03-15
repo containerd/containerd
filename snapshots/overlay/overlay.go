@@ -309,7 +309,9 @@ func (o *snapshotter) Cleanup(ctx context.Context) error {
 }
 
 func (o *snapshotter) cleanupDirectories(ctx context.Context) ([]string, error) {
-	ctx, t, err := o.ms.TransactionContext(ctx, false)
+	// Get a write transaction to ensure no other write transaction can be entered
+	// while the cleanup is scanning.
+	ctx, t, err := o.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return nil, err
 	}
