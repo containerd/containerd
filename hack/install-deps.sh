@@ -113,6 +113,7 @@ if ${INSTALL_CNI}; then
       "bridge": "cni0",
       "isGateway": true,
       "ipMasq": true,
+      "promiscMode": true,
       "ipam": {
         "type": "host-local",
         "subnet": "10.88.0.0/16",
