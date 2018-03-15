@@ -82,8 +82,7 @@ func newEventMonitor(c *containerstore.Store, s *sandboxstore.Store) *eventMonit
 		sandboxStore:   s,
 		ctx:            ctx,
 		cancel:         cancel,
-		backOff: newBackOff(backOffInitDuration, backOffMaxDuration,
-			backOffExpireCheckDuration, clock.RealClock{}),
+		backOff:        newBackOff(),
 	}
 }
 
@@ -134,6 +133,7 @@ func (em *eventMonitor) start() (<-chan struct{}, error) {
 					break
 				}
 				if em.backOff.isInBackOff(cID) {
+					logrus.Infof("Events for container %q is in backoff, enqueue event %+v", cID, evt)
 					em.backOff.enBackOff(cID, evt)
 					break
 				}
@@ -314,13 +314,13 @@ func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxst
 	return nil
 }
 
-func newBackOff(min, max, check time.Duration, c clock.Clock) *backOff {
+func newBackOff() *backOff {
 	return &backOff{
 		queuePool:     map[string]*backOffQueue{},
-		minDuration:   min,
-		maxDuration:   max,
-		checkDuration: check,
-		clock:         c,
+		minDuration:   backOffInitDuration,
+		maxDuration:   backOffMaxDuration,
+		checkDuration: backOffExpireCheckDuration,
+		clock:         clock.RealClock{},
 	}
 }
 
