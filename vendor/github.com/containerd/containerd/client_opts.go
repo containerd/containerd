@@ -64,6 +64,21 @@ func WithServices(opts ...ServicesOpt) ClientOpt {
 // RemoteOpt allows the caller to set distribution options for a remote
 type RemoteOpt func(*Client, *RemoteContext) error
 
+// WithPlatform allows the caller to specify a platform to retrieve
+// content for
+func WithPlatform(platform string) RemoteOpt {
+	return func(_ *Client, c *RemoteContext) error {
+		for _, p := range c.Platforms {
+			if p == platform {
+				return nil
+			}
+		}
+
+		c.Platforms = append(c.Platforms, platform)
+		return nil
+	}
+}
+
 // WithPullUnpack is used to unpack an image after pull. This
 // uses the snapshotter, content store, and diff service
 // configured for the client.

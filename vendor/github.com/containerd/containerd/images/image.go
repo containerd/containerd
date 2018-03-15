@@ -118,7 +118,7 @@ func (image *Image) Size(ctx context.Context, provider content.Provider, platfor
 		}
 		size += desc.Size
 		return nil, nil
-	}), FilterPlatform(platform, ChildrenHandler(provider))), image.Target)
+	}), FilterPlatforms(ChildrenHandler(provider), platform)), image.Target)
 }
 
 // Manifest resolves a manifest from the image for the given platform.
