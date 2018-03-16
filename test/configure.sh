@@ -38,6 +38,13 @@ fetch_metadata() {
 
 # DEPLOY_PATH is the gcs path where cri-containerd tarball is stored.
 DEPLOY_PATH=${DEPLOY_PATH:-"cri-containerd-staging"}
+# DEPLOY_PATH_METADATA is the metadata key of DEPLOY_PATH.
+DEPLOY_PATH_METADATA="deploy-path"
+deploy_path=$(fetch_metadata "${DEPLOY_PATH_METADATA}")
+if [ ! -z "${deploy_path}" ]; then
+  DEPLOY_PATH=${deploy_path}
+fi
+
 # PULL_REFS_METADATA is the metadata key of PULL_REFS from prow.
 PULL_REFS_METADATA="PULL_REFS"
 pull_refs=$(fetch_metadata "${PULL_REFS_METADATA}")
