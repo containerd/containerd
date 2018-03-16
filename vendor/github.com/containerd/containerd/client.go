@@ -43,7 +43,6 @@ import (
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
@@ -236,6 +235,10 @@ type RemoteContext struct {
 	// If no resolver is provided, defaults to Docker registry resolver.
 	Resolver remotes.Resolver
 
+	// Platforms defines which platforms to handle when doing the image operation.
+	// If this field is empty, content for all platforms will be pulled.
+	Platforms []string
+
 	// Unpack is done after an image is pulled to extract into a snapshotter.
 	// If an image is not unpacked on pull, it can be unpacked any time
 	// afterwards. Unpacking is required to run an image.
@@ -287,6 +290,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to resolve reference %q", ref)
 	}
+
 	fetcher, err := pullCtx.Resolver.Fetcher(ctx, name)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get fetcher for %q", name)
@@ -304,8 +308,8 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 		childrenHandler := images.ChildrenHandler(store)
 		// Set any children labels for that content
 		childrenHandler = images.SetChildrenLabels(store, childrenHandler)
-		// Filter the childen by the platform
-		childrenHandler = images.FilterPlatform(platforms.Default(), childrenHandler)
+		// Filter childen by platforms
+		childrenHandler = images.FilterPlatforms(childrenHandler, pullCtx.Platforms...)
 
 		handler = images.Handlers(append(pullCtx.BaseHandlers,
 			remotes.FetchHandler(store, fetcher),
@@ -371,7 +375,7 @@ func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, 
 		return err
 	}
 
-	return remotes.PushContent(ctx, pusher, desc, c.ContentStore(), pushCtx.BaseHandlers...)
+	return remotes.PushContent(ctx, pusher, desc, c.ContentStore(), pushCtx.Platforms, pushCtx.BaseHandlers...)
 }
 
 // GetImage returns an existing image

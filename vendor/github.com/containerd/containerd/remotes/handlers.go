@@ -29,7 +29,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -182,7 +181,7 @@ func push(ctx context.Context, provider content.Provider, pusher Pusher, desc oc
 //
 // Base handlers can be provided which will be called before any push specific
 // handlers.
-func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, provider content.Provider, baseHandlers ...images.Handler) error {
+func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, provider content.Provider, platforms []string, baseHandlers ...images.Handler) error {
 	var m sync.Mutex
 	manifestStack := []ocispec.Descriptor{}
 
@@ -202,7 +201,7 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, pr
 	pushHandler := PushHandler(pusher, provider)
 
 	handlers := append(baseHandlers,
-		images.FilterPlatform(platforms.Default(), images.ChildrenHandler(provider)),
+		images.FilterPlatforms(images.ChildrenHandler(provider), platforms...),
 		filterHandler,
 		pushHandler,
 	)

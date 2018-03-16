@@ -366,7 +366,7 @@ func (s *service) Write(session api.Content_WriteServer) (err error) {
 		// users use the same writer style for each with a minimum of overhead.
 		if req.Expected != "" {
 			if expected != "" && expected != req.Expected {
-				return status.Errorf(codes.InvalidArgument, "inconsistent digest provided: %v != %v", req.Expected, expected)
+				log.G(ctx).Debugf("commit digest differs from writer digest: %v != %v", req.Expected, expected)
 			}
 			expected = req.Expected
 
@@ -383,7 +383,7 @@ func (s *service) Write(session api.Content_WriteServer) (err error) {
 			// Update the expected total. Typically, this could be seen at
 			// negotiation time or on a commit message.
 			if total > 0 && req.Total != total {
-				return status.Errorf(codes.InvalidArgument, "inconsistent total provided: %v != %v", req.Total, total)
+				log.G(ctx).Debugf("commit size differs from writer size: %v != %v", req.Total, total)
 			}
 			total = req.Total
 		}
