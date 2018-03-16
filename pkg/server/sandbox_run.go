@@ -26,8 +26,8 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/linux/runctypes"
 	"github.com/containerd/containerd/oci"
+	cni "github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
-	"github.com/cri-o/ocicni/pkg/ocicni"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
@@ -118,36 +118,25 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 			}
 		}
 		// Setup network for sandbox.
-		podNetwork := ocicni.PodNetwork{
-			Name:         config.GetMetadata().GetName(),
-			Namespace:    config.GetMetadata().GetNamespace(),
-			ID:           id,
-			NetNS:        sandbox.NetNSPath,
-			PortMappings: toCNIPortMappings(config.GetPortMappings()),
-		}
-		if _, err = c.netPlugin.SetUpPod(podNetwork); err != nil {
-			return nil, fmt.Errorf("failed to setup network for sandbox %q: %v", id, err)
-		}
-		defer func() {
-			if retErr != nil {
-				// Teardown network if an error is returned.
-				if err := c.netPlugin.TearDownPod(podNetwork); err != nil {
-					logrus.WithError(err).Errorf("Failed to destroy network for sandbox %q", id)
-				}
-			}
-		}()
-		ip, err := c.netPlugin.GetPodNetworkStatus(podNetwork)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get network status for sandbox %q: %v", id, err)
-		}
-		// Certain VM based solutions like clear containers (Issue containerd/cri#524)
-		//  rely on the assumption that CRI shim will not be querying the network namespace to check the
+		// Certain VM based solutions like clear containers (Issue containerd/cri-containerd#524)
+		// rely on the assumption that CRI shim will not be querying the network namespace to check the
 		// network states such as IP.
 		// In furture runtime implementation should avoid relying on CRI shim implementation details.
 		// In this case however caching the IP will add a subtle performance enhancement by avoiding
 		// calls to network namespace of the pod to query the IP of the veth interface on every
 		// SandboxStatus request.
-		sandbox.IP = ip
+		sandbox.IP, err = c.setupPod(id, sandbox.NetNSPath, config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to setup network for sandbox %q: %v", id, err)
+		}
+		defer func() {
+			if retErr != nil {
+				// Teardown network if an error is returned.
+				if err := c.teardownPod(id, sandbox.NetNSPath, config); err != nil {
+					logrus.WithError(err).Errorf("Failed to destroy network for sandbox %q", id)
+				}
+			}
+		}()
 	}
 
 	// Create sandbox container.
@@ -498,14 +487,39 @@ func (c *criContainerdService) unmountSandboxFiles(rootDir string, config *runti
 	return nil
 }
 
+// setupPod setups up the network for a pod
+func (c *criContainerdService) setupPod(id string, path string, config *runtime.PodSandboxConfig) (string, error) {
+	if c.netPlugin == nil {
+		return "", fmt.Errorf("cni config not intialized")
+	}
+
+	labels := getPodCNILabels(id, config)
+	result, err := c.netPlugin.Setup(id,
+		path,
+		cni.WithLabels(labels),
+		cni.WithCapabilityPortMap(toCNIPortMappings(config.GetPortMappings())))
+	if err != nil {
+		return "", err
+	}
+	// Check if the default interface has IP config
+	if configs, ok := result.Interfaces[defaultIfName]; ok && len(configs.IPConfigs) > 0 {
+		return configs.IPConfigs[0].IP.String(), nil
+	}
+	// If it comes here then the result was invalid so destroy the pod network and return error
+	if err := c.teardownPod(id, path, config); err != nil {
+		logrus.WithError(err).Errorf("Failed to destroy network for sandbox %q", id)
+	}
+	return "", fmt.Errorf("failed to find network info for sandbox %q", id)
+}
+
 // toCNIPortMappings converts CRI port mappings to CNI.
-func toCNIPortMappings(criPortMappings []*runtime.PortMapping) []ocicni.PortMapping {
-	var portMappings []ocicni.PortMapping
+func toCNIPortMappings(criPortMappings []*runtime.PortMapping) []cni.PortMapping {
+	var portMappings []cni.PortMapping
 	for _, mapping := range criPortMappings {
 		if mapping.HostPort <= 0 {
 			continue
 		}
-		portMappings = append(portMappings, ocicni.PortMapping{
+		portMappings = append(portMappings, cni.PortMapping{
 			HostPort:      mapping.HostPort,
 			ContainerPort: mapping.ContainerPort,
 			Protocol:      strings.ToLower(mapping.Protocol.String()),

@@ -109,6 +109,14 @@ const (
 	containerMetadataExtension = criContainerdPrefix + ".container.metadata"
 )
 
+const (
+	// defaultIfName is the default network interface for the pods
+	defaultIfName = "eth0"
+	// networkAttachCount is the minimum number of networks the PodSandbox
+	// attaches to
+	networkAttachCount = 2
+)
+
 // makeSandboxName generates sandbox name from sandbox metadata. The name
 // generated is unique as long as sandbox metadata is unique.
 func makeSandboxName(s *runtime.PodSandboxMetadata) string {
@@ -422,4 +430,13 @@ func disableNetNSDAD(ns string) error {
 			dad, output, err)
 	}
 	return nil
+}
+
+func getPodCNILabels(id string, config *runtime.PodSandboxConfig) map[string]string {
+	return map[string]string{
+		"K8S_POD_NAMESPACE":          config.GetMetadata().GetNamespace(),
+		"K8S_POD_NAME":               config.GetMetadata().GetName(),
+		"K8S_POD_INFRA_CONTAINER_ID": id,
+		"IgnoreUnknown":              "1",
+	}
 }

@@ -23,7 +23,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/cri-o/ocicni/pkg/ocicni"
+	cni "github.com/containerd/go-cni"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -65,13 +65,7 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 				return nil, fmt.Errorf("failed to stat network namespace path %s :%v", sandbox.NetNSPath, err)
 			}
 		} else {
-			if teardownErr := c.netPlugin.TearDownPod(ocicni.PodNetwork{
-				Name:         sandbox.Config.GetMetadata().GetName(),
-				Namespace:    sandbox.Config.GetMetadata().GetNamespace(),
-				ID:           id,
-				NetNS:        sandbox.NetNSPath,
-				PortMappings: toCNIPortMappings(sandbox.Config.GetPortMappings()),
-			}); teardownErr != nil {
+			if teardownErr := c.teardownPod(id, sandbox.NetNSPath, sandbox.Config); teardownErr != nil {
 				return nil, fmt.Errorf("failed to destroy network for sandbox %q: %v", id, teardownErr)
 			}
 		}
@@ -133,4 +127,17 @@ func (c *criContainerdService) waitSandboxStop(ctx context.Context, sandbox sand
 	case <-sandbox.Stopped():
 		return nil
 	}
+}
+
+// teardownPod removes the network from the pod
+func (c *criContainerdService) teardownPod(id string, path string, config *runtime.PodSandboxConfig) error {
+	if c.netPlugin == nil {
+		return fmt.Errorf("cni config not intialized")
+	}
+
+	labels := getPodCNILabels(id, config)
+	return c.netPlugin.Remove(id,
+		path,
+		cni.WithLabels(labels),
+		cni.WithCapabilityPortMap(toCNIPortMappings(config.GetPortMappings())))
 }
