@@ -78,9 +78,6 @@ type PluginConfig struct {
 	StatsCollectPeriod int `toml:"stats_collect_period" json:"statsCollectPeriod,omitempty"`
 	// SystemdCgroup enables systemd cgroup support.
 	SystemdCgroup bool `toml:"systemd_cgroup" json:"systemdCgroup,omitempty"`
-	// EnableIPv6DAD enables IPv6 DAD.
-	// TODO(random-liu): Use optimistic_dad when it's GA.
-	EnableIPv6DAD bool `toml:"enable_ipv6_dad" json:"enableIPv6DAD,omitempty"`
 }
 
 // Config contains all configurations for cri server.
@@ -115,7 +112,6 @@ func DefaultConfig() PluginConfig {
 		SandboxImage:        "gcr.io/google_containers/pause:3.0",
 		StatsCollectPeriod:  10,
 		SystemdCgroup:       false,
-		EnableIPv6DAD:       false,
 		Registry: Registry{
 			Mirrors: map[string]Mirror{
 				"docker.io": {

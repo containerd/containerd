@@ -107,21 +107,11 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 				sandbox.NetNSPath = ""
 			}
 		}()
-		if !c.config.EnableIPv6DAD {
-			// It's a known issue that IPv6 DAD increases sandbox start latency by several seconds.
-			// Disable it when it's not enabled to avoid the latency.
-			// See:
-			// * https://github.com/kubernetes/kubernetes/issues/54651
-			// * https://www.agwa.name/blog/post/beware_the_ipv6_dad_race_condition
-			if err := disableNetNSDAD(sandbox.NetNSPath); err != nil {
-				return nil, fmt.Errorf("failed to disable DAD for sandbox %q: %v", id, err)
-			}
-		}
 		// Setup network for sandbox.
 		// Certain VM based solutions like clear containers (Issue containerd/cri-containerd#524)
 		// rely on the assumption that CRI shim will not be querying the network namespace to check the
 		// network states such as IP.
-		// In furture runtime implementation should avoid relying on CRI shim implementation details.
+		// In future runtime implementation should avoid relying on CRI shim implementation details.
 		// In this case however caching the IP will add a subtle performance enhancement by avoiding
 		// calls to network namespace of the pod to query the IP of the veth interface on every
 		// SandboxStatus request.
