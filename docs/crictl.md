@@ -1,17 +1,16 @@
 CRICTL User Guide
 =================
-This document presumes you already have `containerd` and `cri-containerd`
-installed and running.
+This document presumes you already have `containerd` with the `cri` plugin installed and running.
 
 This document is for developers who wish to debug, inspect, and manage their pods,
 containers, and container images.
 
-Before generating issues against this document, `containerd`, `cri-containerd`,
+Before generating issues against this document, `containerd`, `containerd/cri`,
 or `crictl` please make sure the issue has not already been submitted.
 
 ## Install crictl
 If you have not already installed crictl please install the version compatible
-with the `cri-containerd` you are using. If you are a user, your deployment
+with the `cri` plugin you are using. If you are a user, your deployment
 should have installed crictl for you. If not, get it from your release tarball.
 If you are a developer the current version of crictl is specified [here](../hack/utils.sh).
 A helper command has been included to install the dependencies at the right version:
@@ -23,8 +22,8 @@ so you don't have to repeatedly specify the runtime sock used to connect crictl
 to the container runtime:
 ```console
 $ cat /etc/crictl.yaml
-runtime-endpoint: /var/run/cri-containerd.sock
-image-endpoint: /var/run/cri-containerd.sock
+runtime-endpoint: /run/containerd/containerd.sock
+image-endpoint: /run/containerd/containerd.sock
 timeout: 10
 debug: true
 ```
@@ -95,20 +94,8 @@ $ crictl inspectp e1c8
 * Other commands to manage the pod include `stops ID` to stop a running pod and
 `rmp ID` to remove a pod sandbox.
 
-## Create and Run a Container in a Pod Sandbox (using a config file)
+## Create and Run a Container in the Pod Sandbox (using a config file)
 ```console
-$ cat sandbox-config.json
-{
-    "metadata": {
-        "name": "nginx-sandbox",
-        "namespace": "default",
-        "attempt": 1,
-        "uid": "hdishd83djaidwnduwk28bcsb"
-    },
-    "linux": {
-    }
-}
-
 $ cat container-config.json
 {
   "metadata": {
@@ -126,7 +113,7 @@ $ cat container-config.json
 
 $ crictl create e1c83 container-config.json sandbox-config.json
 0a2c761303163f2acaaeaee07d2ba143ee4cea7e3bde3d32190e2a36525c8a05
-$ crictl ps
+$ crictl ps -a
 CONTAINER ID        IMAGE               CREATED             STATE               NAME                ATTEMPT
 0a2c761303163       docker.io/busybox   2 hours ago         CONTAINER_CREATED   busybox             0
 $ crictl start 0a2c
@@ -145,8 +132,8 @@ bin   dev   etc   home  proc  root  sys   tmp   usr   var
 ## Display Stats for the Container
 ```console
 $ crictl stats
-CONTAINER           CPU %               MEM                 DISK                INODES
-0a2c761303163f      0.00                991.2kB             16.38kB             6
+CONTAINER           CPU %               MEM                 DISK              INODES
+0a2c761303163f      0.00                983kB             16.38kB             6
 ```
 * Other commands to manage the container include `stop ID` to stop a running
 container and `rm ID` to remove a container.
@@ -154,11 +141,11 @@ container and `rm ID` to remove a container.
 ```console
 $ crictl version
 Version:  0.1.0
-RuntimeName:  cri-containerd
-RuntimeVersion:  1.0.0-alpha.1-167-g737efe7-dirty
-RuntimeApiVersion:  0.0.0
+RuntimeName:  containerd
+RuntimeVersion:  1.0.0-beta.1-186-gdd47a72-TEST
+RuntimeApiVersion:  v1alpha2
 ```
-## Display Status & Configuration Information about Containerd & CRI-Containerd
+## Display Status & Configuration Information about Containerd & The CRI Plugin
 ```console
 $ crictl info
 {
@@ -180,25 +167,30 @@ $ crictl info
   },
   "config": {
     "containerd": {
-      "rootDir": "/var/lib/containerd",
       "snapshotter": "overlayfs",
-      "endpoint": "/run/containerd/containerd.sock",
       "runtime": "io.containerd.runtime.v1.linux"
     },
     "cni": {
       "binDir": "/opt/cni/bin",
       "confDir": "/etc/cni/net.d"
     },
-    "socketPath": "/var/run/cri-containerd.sock",
-    "rootDir": "/var/lib/cri-containerd",
+    "registry": {
+      "mirrors": {
+        "docker.io": {
+          "endpoint": [
+            "https://registry-1.docker.io"
+          ]
+        }
+      }
+    },
     "streamServerPort": "10010",
     "sandboxImage": "gcr.io/google_containers/pause:3.0",
     "statsCollectPeriod": 10,
-    "oomScore": -999,
-    "enableProfiling": true,
-    "profilingPort": "10011",
-    "profilingAddress": "127.0.0.1"
-  }
+    "containerdRootDir": "/var/lib/containerd",
+    "containerdEndpoint": "/run/containerd/containerd.sock",
+    "rootDir": "/var/lib/containerd/io.containerd.grpc.v1.cri"
+  },
+  "golang": "go1.10"
 }
 ```
 ## More Information

@@ -9,12 +9,11 @@ For each release, we'll publish a release tarball. The release tarball contains 
 ### Content
 <!-- TODO(random-liu): Update the release tarball information -->
 As shown below, the release tarball contains:
-1) `cri-containerd`: cri-containerd binary.
-2) `containerd`, `containerd-shim`, `containerd-stress`, `containerd-release`, `ctr`: binaries for containerd.
-3) `runc`: runc binary.
-4) `crictl`: command line tools for CRI container runtime.
-5) `containerd.service`, `cri-containerd.service`: Systemd units for cri-containerd and containerd.
-6) `/opt/cri-containerd/cluster/`: scripts for `kube-up.sh`.
+1) `containerd`, `containerd-shim`, `containerd-stress`, `containerd-release`, `ctr`: binaries for containerd.
+2) `runc`: runc binary.
+3) `crictl`: command line tools for CRI container runtime.
+4) `containerd.service`: Systemd unit for containerd.
+5) `/opt/cri-containerd/cluster/`: scripts for `kube-up.sh`.
 ```console
 $ tar -tf cri-containerd-1.0.0-beta.0.linux-amd64.tar.gz
 ./
@@ -40,29 +39,29 @@ $ tar -tf cri-containerd-1.0.0-beta.0.linux-amd64.tar.gz
 ./usr/local/bin/containerd-release
 ./usr/local/bin/containerd-shim
 ./usr/local/bin/ctr
-./usr/local/bin/cri-containerd
 ./etc/
 ./etc/systemd/
 ./etc/systemd/system/
 ./etc/systemd/system/containerd.service
-./etc/systemd/system/cri-containerd.service
 ./etc/crictl.yaml
 ```
 ### Binary Information
 Information about the binaries in the release tarball:
 
-|           Binary Name          |      Support      |   OS  | Architecture |
-|:------------------------------:|:-----------------:|:-----:|:------------:|
-|          cri-containerd        | seccomp, apparmor | linux |     amd64    |
-|               runc             | seccomp, apparmor | linux |     amd64    |
-|   containerd/containerd-shim   |   overlay, btrfs  | linux |     amd64    |
+|           Binary Name          |      Support       |   OS  | Architecture |
+|:------------------------------:|:------------------:|:-----:|:------------:|
+|            containerd          | seccomp, apparmor, | linux |     amd64    |
+|                                |   overlay, btrfs   |       |              |
+|          containerd-shim       |   overlay, btrfs   | linux |     amd64    |
+|               runc             | seccomp, apparmor  | linux |     amd64    |
+
 
 If you have other requirements for the binaries, e.g. selinux support, another architecture support etc., you need to build the binaries yourself following [the instructions](../README.md#getting-started-for-developers).
 
 ### Download
 
 The release tarball could be downloaded from either of the following sources:
-1. Release on github (see [here](https://github.com/containerd/cri-containerd/releases));
+1. Release on github (see [here](https://github.com/containerd/cri/releases));
 2. Release GCS bucket https://storage.googleapis.com/cri-containerd-release/.
 
 ## Step 0: Install Dependent Libraries
@@ -94,16 +93,15 @@ sudo tar -C / -xzf cri-containerd-${VERSION}.linux-amd64.tar.gz
 sudo mkdir -p /opt/cni/bin/
 sudo mkdir -p /etc/cni/net.d
 sudo systemctl start containerd
-sudo systemctl start cri-containerd
 ```
-If you are not using systemd, please unpack all binaries into a directory in your `PATH`, and start `cri-containerd` and `containerd` as monitored long runnig services with the service manager you are using e.g. `supervisord`, `upstart` etc.
+If you are not using systemd, please unpack all binaries into a directory in your `PATH`, and start `containerd` as monitored long running services with the service manager you are using e.g. `supervisord`, `upstart` etc.
 ## Step 3: Install Kubeadm, Kubelet and Kubectl
 Follow [the instructions](https://kubernetes.io/docs/setup/independent/install-kubeadm/) to install kubeadm, kubelet and kubectl.
 ## Step 4: Create Systemd Drop-In for CRI-Containerd
 Create the systemd drop-in file `/etc/systemd/system/kubelet.service.d/0-cri-containerd.conf`:
 ```
 [Service]                                                 
-Environment="KUBELET_EXTRA_ARGS=--container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=/var/run/cri-containerd.sock"
+Environment="KUBELET_EXTRA_ARGS=--container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=/run/containerd/containerd.sock"
 ```
 And reload systemd configuration:
 ```bash

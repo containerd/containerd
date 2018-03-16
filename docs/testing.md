@@ -1,7 +1,7 @@
-CRI-Containerd Testing Guide
-============================
-This document assumes you have already setup the development environment (go, git, `cri-containerd` repo etc.).
- 
+CRI Plugin Testing Guide
+========================
+This document assumes you have already setup the development environment (go, git, `containerd/cri` repo etc.).
+
 Before sending pull requests you should at least make sure your changes have passed code verification, unit, integration and CRI validation tests.
 ## Code Verification
 Code verification includes lint, code formatting, boilerplate check etc.
@@ -14,23 +14,23 @@ make install.tools
 make verify
 ```
 ## Unit Test
-Run all unit tests in `cri-containerd` repo.
+Run all unit tests in `containerd/cri` repo.
 ```bash
 make test
 ```
 ## Integration Test
-Run all integration tests in `cri-containerd` repo.
+Run all integration tests in `containerd/cri` repo.
 * [Install dependencies](../README.md#install-dependencies).
 * Run integration test:
 ```bash
 make test-integration
 ```
 ## CRI Validation Test
-[CRI validation test](https://github.com/kubernetes/community/blob/master/contributors/devel/cri-validation.md) is a test framework for validating that a Container Runtime Interface (CRI) implementation such as `cri-containerd` meets all the requirements necessary to manage pod sandboxes, containers, images etc.
+[CRI validation test](https://github.com/kubernetes/community/blob/master/contributors/devel/cri-validation.md) is a test framework for validating that a Container Runtime Interface (CRI) implementation such as containerd with the `cri` plugin meets all the requirements necessary to manage pod sandboxes, containers, images etc.
 
-CRI validation test makes it possible to verify CRI conformance of `cri-containerd` without setting up Kubernetes components or running Kubernetes end-to-end tests.
+CRI validation test makes it possible to verify CRI conformance of `containerd/cri` without setting up Kubernetes components or running Kubernetes end-to-end tests.
 * [Install dependencies](../README.md#install-dependencies).
-* Build `cri-containerd`:
+* Build containerd with the `cri` plugin:
 ```bash
 make
 ```
