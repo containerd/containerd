@@ -36,7 +36,6 @@ fi
 GOPATH=${GOPATH%%:*}
 
 CRITEST=${GOPATH}/bin/critest
-CRITOOL_PKG=github.com/kubernetes-incubator/cri-tools
 
 # Install critest
 if [ ! -x "$(command -v ${CRITEST})" ]; then

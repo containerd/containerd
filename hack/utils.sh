@@ -18,7 +18,11 @@ ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
 
 # Not from vendor.conf.
 CRITOOL_VERSION=b184f9aefe60a4441330e615ee20634ee26474fb
+CRITOOL_PKG=github.com/kubernetes-incubator/cri-tools
 CRITOOL_REPO=github.com/kubernetes-incubator/cri-tools
+
+# VENDOR is the path to vendor.conf.
+VENDOR=${VENDOR:-"${ROOT}/vendor.conf"}
 
 # upload_logs_to_gcs uploads test logs to gcs.
 # Var set:
@@ -72,7 +76,7 @@ sha256() {
 from-vendor() {
     local what=$1
     local repo=$2
-    local vendor=$(dirname "${BASH_SOURCE[0]}")/../vendor.conf
+    local vendor=$VENDOR
     setvars=$(awk -v REPO=$repo -v WHAT=$what -- '
                   BEGIN { rc=1 }                        # Assume we did not find what we were looking for.
                   // {
@@ -91,14 +95,3 @@ from-vendor() {
     fi
     eval $setvars
 }
-
-from-vendor RUNC       github.com/opencontainers/runc
-from-vendor CNI        github.com/containernetworking/plugins
-from-vendor CONTAINERD github.com/containerd/containerd
-from-vendor KUBERNETES k8s.io/kubernetes
-
-# k8s.io is actually a redirect, but we do not handle the go-import
-# metadata which `go get` and `vndr` etc do. Handle it manually here.
-if [ x"$KUBERNETES_REPO" = "xk8s.io" ] ; then
-    KUBERNETES_REPO="https://github.com/kubernetes/kubernetes"
-fi

@@ -50,7 +50,7 @@ fi
 # By default use the release tarball with cni built in.
 PKG_PREFIX=${PKG_PREFIX:-"cri-containerd-cni"}
 # PKG_PREFIX_METADATA is the metadata key of PKG_PREFIX.
-PKG_PREFIX_METADATA="pkg_prefix"
+PKG_PREFIX_METADATA="pkg-prefix"
 pkg_prefix=$(fetch_metadata "${PKG_PREFIX_METADATA}")
 if [ ! -z "${pkg_prefix}" ]; then
   PKG_PREFIX=${pkg_prefix}

@@ -24,6 +24,7 @@ cd ${ROOT}
 
 echo "Compare vendor with containerd vendors..."
 containerd_vendor=$(mktemp /tmp/containerd-vendor.conf.XXXX)
+from-vendor CONTAINERD github.com/containerd/containerd
 curl -s https://raw.githubusercontent.com/${CONTAINERD_REPO#*/}/${CONTAINERD_VERSION}/vendor.conf > ${containerd_vendor}
 # Create a temporary vendor file to update.
 tmp_vendor=$(mktemp /tmp/vendor.conf.XXXX)

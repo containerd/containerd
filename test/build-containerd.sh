@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2017 The Kubernetes Authors.
+# Copyright 2018 The containerd Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script is used to build and upload containerd with latest CRI plugin
-# from containerd/cri in gcr.io/k8s-testimages/kubekins-e2e.
+# This script is used to build and upload latest containerd from
+# containerd/containerd in gcr.io/k8s-testimages/kubekins-e2e.
 
 set -o xtrace
 set -o errexit
@@ -25,8 +25,22 @@ set -o pipefail
 source $(dirname "${BASH_SOURCE[0]}")/build-utils.sh
 cd "${ROOT}"
 
+if [ -z "${GOPATH}" ]; then
+  echo "GOPATH is not set"
+  exit 1
+fi
+
+CONTAINERD_PATH=${GOPATH}/src/github.com/containerd/containerd
+if [ ! -d "${CONTAINERD_PATH}" ]; then
+  echo "containerd repo does not exist"
+  exit 1
+fi
+
 # Make sure output directory is clean.
 make clean
 # Build and push test tarball.
 PUSH_VERSION=true DEPLOY_DIR=${DEPLOY_DIR:-""} \
-  make push TARBALL_PREFIX=cri-containerd-cni INCLUDE_CNI=true CUSTOM_CONTAINERD=true
+  make push TARBALL_PREFIX=containerd-cni \
+  INCLUDE_CNI=true \
+  CHECKOUT_CONTAINERD=false \
+  VENDOR=${CONTAINERD_PATH}/vendor.conf
