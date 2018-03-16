@@ -161,7 +161,7 @@ proto:
 .PHONY: install.deps
 
 install.deps:
-	@./hack/install-deps.sh
+	@./hack/install/install-deps.sh
 
 .PHONY: .gitvalidation
 # When this is running in travis, it will only check the travis commit range.

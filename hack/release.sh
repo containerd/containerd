@@ -38,7 +38,7 @@ destdir=${BUILD_DIR}/release-stage
 rm -rf ${destdir}
 
 # Install dependencies into release stage.
-NOSUDO=true INSTALL_CNI=${INCLUDE_CNI} DESTDIR=${destdir} ./hack/install-deps.sh
+NOSUDO=true INSTALL_CNI=${INCLUDE_CNI} DESTDIR=${destdir} ./hack/install/install-deps.sh
 
 if ${CUSTOM_CONTAINERD}; then
   make install -e DESTDIR=${destdir}
