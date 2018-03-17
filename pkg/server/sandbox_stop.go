@@ -17,13 +17,13 @@ limitations under the License.
 package server
 
 import (
-	"fmt"
 	"os"
 	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	cni "github.com/containerd/go-cni"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -36,8 +36,8 @@ import (
 func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandboxRequest) (*runtime.StopPodSandboxResponse, error) {
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
-		return nil, fmt.Errorf("an error occurred when try to find sandbox %q: %v",
-			r.GetPodSandboxId(), err)
+		return nil, errors.Wrapf(err, "an error occurred when try to find sandbox %q",
+			r.GetPodSandboxId())
 	}
 	// Use the full sandbox id.
 	id := sandbox.ID
@@ -54,7 +54,7 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 		// Forcibly stop the container. Do not use `StopContainer`, because it introduces a race
 		// if a container is removed after list.
 		if err = c.stopContainer(ctx, container, 0); err != nil {
-			return nil, fmt.Errorf("failed to stop container %q: %v", container.ID, err)
+			return nil, errors.Wrapf(err, "failed to stop container %q", container.ID)
 		}
 	}
 
@@ -62,11 +62,11 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 	if sandbox.NetNSPath != "" && sandbox.NetNS != nil {
 		if _, err := os.Stat(sandbox.NetNSPath); err != nil {
 			if !os.IsNotExist(err) {
-				return nil, fmt.Errorf("failed to stat network namespace path %s :%v", sandbox.NetNSPath, err)
+				return nil, errors.Wrapf(err, "failed to stat network namespace path %s", sandbox.NetNSPath)
 			}
 		} else {
 			if teardownErr := c.teardownPod(id, sandbox.NetNSPath, sandbox.Config); teardownErr != nil {
-				return nil, fmt.Errorf("failed to destroy network for sandbox %q: %v", id, teardownErr)
+				return nil, errors.Wrapf(teardownErr, "failed to destroy network for sandbox %q", id)
 			}
 		}
 		/*TODO:It is still possible that containerd crashes after we teardown the network, but before we remove the network namespace.
@@ -75,7 +75,7 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 
 		//Close the sandbox network namespace if it was created
 		if err = sandbox.NetNS.Remove(); err != nil {
-			return nil, fmt.Errorf("failed to remove network namespace for sandbox %q:  %v", id, err)
+			return nil, errors.Wrapf(err, "failed to remove network namespace for sandbox %q", id)
 		}
 	}
 
@@ -83,13 +83,13 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 
 	sandboxRoot := getSandboxRootDir(c.config.RootDir, id)
 	if err := c.unmountSandboxFiles(sandboxRoot, sandbox.Config); err != nil {
-		return nil, fmt.Errorf("failed to unmount sandbox files in %q: %v", sandboxRoot, err)
+		return nil, errors.Wrapf(err, "failed to unmount sandbox files in %q", sandboxRoot)
 	}
 
 	// Only stop sandbox container when it's running.
 	if sandbox.Status.Get().State == sandboxstore.StateReady {
 		if err := c.stopSandboxContainer(ctx, sandbox); err != nil {
-			return nil, fmt.Errorf("failed to stop sandbox container %q: %v", id, err)
+			return nil, errors.Wrapf(err, "failed to stop sandbox container %q", id)
 		}
 	}
 	return &runtime.StopPodSandboxResponse{}, nil
@@ -103,13 +103,13 @@ func (c *criContainerdService) stopSandboxContainer(ctx context.Context, sandbox
 		if errdefs.IsNotFound(err) {
 			return nil
 		}
-		return fmt.Errorf("failed to get sandbox container: %v", err)
+		return errors.Wrap(err, "failed to get sandbox container")
 	}
 
 	// Delete the sandbox container from containerd.
 	_, err = task.Delete(ctx, containerd.WithProcessKill)
 	if err != nil && !errdefs.IsNotFound(err) {
-		return fmt.Errorf("failed to delete sandbox container: %v", err)
+		return errors.Wrap(err, "failed to delete sandbox container")
 	}
 
 	return c.waitSandboxStop(ctx, sandbox, killContainerTimeout)
@@ -121,9 +121,9 @@ func (c *criContainerdService) waitSandboxStop(ctx context.Context, sandbox sand
 	defer timeoutTimer.Stop()
 	select {
 	case <-ctx.Done():
-		return fmt.Errorf("wait sandbox container %q is cancelled", sandbox.ID)
+		return errors.Errorf("wait sandbox container %q is cancelled", sandbox.ID)
 	case <-timeoutTimer.C:
-		return fmt.Errorf("wait sandbox container %q stop timeout", sandbox.ID)
+		return errors.Errorf("wait sandbox container %q stop timeout", sandbox.ID)
 	case <-sandbox.Stopped():
 		return nil
 	}
@@ -132,7 +132,7 @@ func (c *criContainerdService) waitSandboxStop(ctx context.Context, sandbox sand
 // teardownPod removes the network from the pod
 func (c *criContainerdService) teardownPod(id string, path string, config *runtime.PodSandboxConfig) error {
 	if c.netPlugin == nil {
-		return fmt.Errorf("cni config not intialized")
+		return errors.New("cni config not intialized")
 	}
 
 	labels := getPodCNILabels(id, config)

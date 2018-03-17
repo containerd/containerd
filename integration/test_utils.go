@@ -17,7 +17,6 @@ limitations under the License.
 package integration
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"os/exec"
@@ -26,6 +25,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -66,30 +66,30 @@ func ConnectDaemons() error {
 	var err error
 	runtimeService, err = remote.NewRemoteRuntimeService(*criContainerdEndpoint, timeout)
 	if err != nil {
-		return fmt.Errorf("failed to create runtime service: %v", err)
+		return errors.Wrap(err, "failed to create runtime service")
 	}
 	imageService, err = remote.NewRemoteImageService(*criContainerdEndpoint, timeout)
 	if err != nil {
-		return fmt.Errorf("failed to create image service: %v", err)
+		return errors.Wrap(err, "failed to create image service")
 	}
 	// Since CRI grpc client doesn't have `WithBlock` specified, we
 	// need to check whether it is actually connected.
 	// TODO(random-liu): Extend cri remote client to accept extra grpc options.
 	_, err = runtimeService.ListContainers(&runtime.ContainerFilter{})
 	if err != nil {
-		return fmt.Errorf("failed to list containers: %v", err)
+		return errors.Wrap(err, "failed to list containers")
 	}
 	_, err = imageService.ListImages(&runtime.ImageFilter{})
 	if err != nil {
-		return fmt.Errorf("failed to list images: %v", err)
+		return errors.Wrap(err, "failed to list images")
 	}
 	containerdClient, err = containerd.New(containerdEndpoint, containerd.WithDefaultNamespace(k8sNamespace))
 	if err != nil {
-		return fmt.Errorf("failed to connect containerd: %v", err)
+		return errors.Wrap(err, "failed to connect containerd")
 	}
 	criContainerdClient, err = client.NewCRIContainerdClient(*criContainerdEndpoint, timeout)
 	if err != nil {
-		return fmt.Errorf("failed to connect cri plugin: %v", err)
+		return errors.Wrap(err, "failed to connect cri plugin")
 	}
 	return nil
 }
@@ -227,7 +227,7 @@ func Randomize(str string) string {
 func KillProcess(name string) error {
 	output, err := exec.Command("pkill", "-x", fmt.Sprintf("^%s$", name)).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to kill %q - error: %v, output: %q", name, err, output)
+		return errors.Errorf("failed to kill %q - error: %v, output: %q", name, err, output)
 	}
 	return nil
 }
@@ -238,7 +238,7 @@ func PidOf(name string) (int, error) {
 	output := strings.TrimSpace(string(b))
 	if err != nil {
 		if len(output) != 0 {
-			return 0, fmt.Errorf("failed to run pidof %q - error: %v, output: %q", name, err, output)
+			return 0, errors.Errorf("failed to run pidof %q - error: %v, output: %q", name, err, output)
 		}
 		return 0, nil
 	}

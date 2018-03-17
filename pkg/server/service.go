@@ -28,6 +28,7 @@ import (
 	runcapparmor "github.com/opencontainers/runc/libcontainer/apparmor"
 	runcseccomp "github.com/opencontainers/runc/libcontainer/seccomp"
 	"github.com/opencontainers/selinux/go-selinux"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -137,7 +138,7 @@ func NewCRIContainerdService(config criconfig.Config, client *containerd.Client)
 		cni.WithPluginConfDir(config.NetworkPluginConfDir),
 		cni.WithPluginDir([]string{config.NetworkPluginBinDir}))
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize cni: %v", err)
+		return nil, errors.Wrap(err, "failed to initialize cni")
 	}
 
 	// Try to load the config if it exists. Just log the error if load fails
@@ -148,7 +149,7 @@ func NewCRIContainerdService(config criconfig.Config, client *containerd.Client)
 	// prepare streaming server
 	c.streamServer, err = newStreamServer(c, config.StreamServerAddress, config.StreamServerPort)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create stream server: %v", err)
+		return nil, errors.Wrap(err, "failed to create stream server")
 	}
 
 	c.eventMonitor = newEventMonitor(c.containerStore, c.sandboxStore)
@@ -173,14 +174,14 @@ func (c *criContainerdService) Run() error {
 
 	logrus.Infof("Start recovering state")
 	if err := c.recover(ctrdutil.NamespacedContext()); err != nil {
-		return fmt.Errorf("failed to recover state: %v", err)
+		return errors.Wrap(err, "failed to recover state")
 	}
 
 	// Start event handler.
 	logrus.Info("Start event monitor")
 	eventMonitorCloseCh, err := c.eventMonitor.start()
 	if err != nil {
-		return fmt.Errorf("failed to start event monitor: %v", err)
+		return errors.Wrap(err, "failed to start event monitor")
 	}
 
 	// Start snapshot stats syncer, it doesn't need to be stopped.
@@ -211,7 +212,7 @@ func (c *criContainerdService) Run() error {
 	case <-streamServerCloseCh:
 	}
 	if err := c.Close(); err != nil {
-		return fmt.Errorf("failed to stop cri service: %v", err)
+		return errors.Wrap(err, "failed to stop cri service")
 	}
 
 	<-eventMonitorCloseCh
@@ -240,7 +241,7 @@ func (c *criContainerdService) Close() error {
 	// TODO(random-liu): Make event monitor stop synchronous.
 	c.eventMonitor.stop()
 	if err := c.streamServer.Stop(); err != nil {
-		return fmt.Errorf("failed to stop stream server: %v", err)
+		return errors.Wrap(err, "failed to stop stream server")
 	}
 	return nil
 }

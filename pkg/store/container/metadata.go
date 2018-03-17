@@ -18,8 +18,8 @@ package container
 
 import (
 	"encoding/json"
-	"fmt"
 
+	"github.com/pkg/errors"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
@@ -80,5 +80,5 @@ func (c *Metadata) UnmarshalJSON(data []byte) error {
 		*c = Metadata(versioned.Metadata)
 		return nil
 	}
-	return fmt.Errorf("unsupported version: %q", versioned.Version)
+	return errors.Errorf("unsupported version: %q", versioned.Version)
 }

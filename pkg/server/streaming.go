@@ -17,11 +17,11 @@ limitations under the License.
 package server
 
 import (
-	"fmt"
 	"io"
 	"math"
 	"net"
 
+	"github.com/pkg/errors"
 	k8snet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/remotecommand"
@@ -35,7 +35,7 @@ func newStreamServer(c *criContainerdService, addr, port string) (streaming.Serv
 	if addr == "" {
 		a, err := k8snet.ChooseBindAddress(nil)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get stream server address: %v", err)
+			return nil, errors.Wrap(err, "failed to get stream server address")
 		}
 		addr = a.String()
 	}
@@ -66,13 +66,13 @@ func (s *streamRuntime) Exec(containerID string, cmd []string, stdin io.Reader, 
 		resize: resize,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to exec in container: %v", err)
+		return errors.Wrap(err, "failed to exec in container")
 	}
 	if *exitCode == 0 {
 		return nil
 	}
 	return &exec.CodeExitError{
-		Err:  fmt.Errorf("error executing command %v, exit code %d", cmd, *exitCode),
+		Err:  errors.Errorf("error executing command %v, exit code %d", cmd, *exitCode),
 		Code: int(*exitCode),
 	}
 }
@@ -84,7 +84,7 @@ func (s *streamRuntime) Attach(containerID string, in io.Reader, out, err io.Wri
 
 func (s *streamRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
 	if port <= 0 || port > math.MaxUint16 {
-		return fmt.Errorf("invalid port %d", port)
+		return errors.Errorf("invalid port %d", port)
 	}
 	return s.c.portForward(podSandboxID, port, stream)
 }

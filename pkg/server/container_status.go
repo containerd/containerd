@@ -18,9 +18,9 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -32,7 +32,7 @@ import (
 func (c *criContainerdService) ContainerStatus(ctx context.Context, r *runtime.ContainerStatusRequest) (*runtime.ContainerStatusResponse, error) {
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
-		return nil, fmt.Errorf("an error occurred when try to find container %q: %v", r.GetContainerId(), err)
+		return nil, errors.Wrapf(err, "an error occurred when try to find container %q", r.GetContainerId())
 	}
 
 	// TODO(random-liu): Clean up the following logic in CRI.
@@ -44,7 +44,7 @@ func (c *criContainerdService) ContainerStatus(ctx context.Context, r *runtime.C
 	imageRef := container.ImageRef
 	image, err := c.imageStore.Get(imageRef)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get image %q: %v", imageRef, err)
+		return nil, errors.Wrapf(err, "failed to get image %q", imageRef)
 	}
 	if len(image.RepoTags) > 0 {
 		// Based on current behavior of dockershim, this field should be
@@ -58,7 +58,7 @@ func (c *criContainerdService) ContainerStatus(ctx context.Context, r *runtime.C
 	status := toCRIContainerStatus(container, spec, imageRef)
 	info, err := toCRIContainerInfo(ctx, container, r.GetVerbose())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get verbose container info: %v", err)
+		return nil, errors.Wrap(err, "failed to get verbose container info")
 	}
 
 	return &runtime.ContainerStatusResponse{
@@ -145,7 +145,7 @@ func toCRIContainerInfo(ctx context.Context, container containerstore.Container,
 
 	infoBytes, err := json.Marshal(ci)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal info %v: %v", ci, err)
+		return nil, errors.Wrapf(err, "failed to marshal info %v", ci)
 	}
 	return map[string]string{
 		"info": string(infoBytes),

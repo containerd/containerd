@@ -18,11 +18,11 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
 	snapshot "github.com/containerd/containerd/snapshots"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
@@ -80,7 +80,7 @@ func (s *snapshotsSyncer) sync() error {
 		snapshots = append(snapshots, info)
 		return nil
 	}); err != nil {
-		return fmt.Errorf("walk all snapshots failed: %v", err)
+		return errors.Wrap(err, "walk all snapshots failed")
 	}
 	for _, info := range snapshots {
 		sn, err := s.store.Get(info.Name)

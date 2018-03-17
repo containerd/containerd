@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -168,7 +169,7 @@ func TestContainerListStatsWithIdFilter(t *testing.T) {
 				return false, err
 			}
 			if len(stats) != 1 {
-				return false, fmt.Errorf("unexpected stats length")
+				return false, errors.New("unexpected stats length")
 			}
 			if stats[0].GetWritableLayer().GetUsedBytes().GetValue() != 0 &&
 				stats[0].GetWritableLayer().GetInodesUsed().GetValue() != 0 {
@@ -227,7 +228,7 @@ func TestContainerListStatsWithSandboxIdFilter(t *testing.T) {
 			return false, err
 		}
 		if len(stats) != 3 {
-			return false, fmt.Errorf("unexpected stats length")
+			return false, errors.New("unexpected stats length")
 		}
 		if stats[0].GetWritableLayer().GetUsedBytes().GetValue() != 0 &&
 			stats[0].GetWritableLayer().GetInodesUsed().GetValue() != 0 {
@@ -283,7 +284,7 @@ func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 				return false, err
 			}
 			if len(stats) != 1 {
-				return false, fmt.Errorf("unexpected stats length")
+				return false, errors.New("unexpected stats length")
 			}
 			if stats[0].GetWritableLayer().GetUsedBytes().GetValue() != 0 &&
 				stats[0].GetWritableLayer().GetInodesUsed().GetValue() != 0 {
@@ -306,7 +307,7 @@ func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 				return false, err
 			}
 			if len(stats) != 1 {
-				return false, fmt.Errorf("unexpected stats length")
+				return false, errors.New("unexpected stats length")
 			}
 			if stats[0].GetWritableLayer().GetUsedBytes().GetValue() != 0 &&
 				stats[0].GetWritableLayer().GetInodesUsed().GetValue() != 0 {
