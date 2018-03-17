@@ -17,11 +17,10 @@ limitations under the License.
 package server
 
 import (
-	"fmt"
-
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/docker/docker/pkg/system"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -37,7 +36,7 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		if err != store.ErrNotExist {
-			return nil, fmt.Errorf("an error occurred when try to find container %q: %v", r.GetContainerId(), err)
+			return nil, errors.Wrapf(err, "an error occurred when try to find container %q", r.GetContainerId())
 		}
 		// Do not return error if container metadata doesn't exist.
 		log.Tracef("RemoveContainer called for container %q that does not exist", r.GetContainerId())
@@ -48,7 +47,7 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 	// Set removing state to prevent other start/remove operations against this container
 	// while it's being removed.
 	if err := setContainerRemoving(container); err != nil {
-		return nil, fmt.Errorf("failed to set removing state for container %q: %v", id, err)
+		return nil, errors.Wrapf(err, "failed to set removing state for container %q", id)
 	}
 	defer func() {
 		if retErr != nil {
@@ -67,20 +66,20 @@ func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.R
 	// Delete containerd container.
 	if err := container.Container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
 		if !errdefs.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to delete containerd container %q: %v", id, err)
+			return nil, errors.Wrapf(err, "failed to delete containerd container %q", id)
 		}
 		log.Tracef("Remove called for containerd container %q that does not exist", id)
 	}
 
 	// Delete container checkpoint.
 	if err := container.Delete(); err != nil {
-		return nil, fmt.Errorf("failed to delete container checkpoint for %q: %v", id, err)
+		return nil, errors.Wrapf(err, "failed to delete container checkpoint for %q", id)
 	}
 
 	containerRootDir := getContainerRootDir(c.config.RootDir, id)
 	if err := system.EnsureRemoveAll(containerRootDir); err != nil {
-		return nil, fmt.Errorf("failed to remove container root directory %q: %v",
-			containerRootDir, err)
+		return nil, errors.Wrapf(err, "failed to remove container root directory %q",
+			containerRootDir)
 	}
 
 	c.containerStore.Delete(id)
@@ -96,10 +95,10 @@ func setContainerRemoving(container containerstore.Container) error {
 	return container.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
 		// Do not remove container if it's still running.
 		if status.State() == runtime.ContainerState_CONTAINER_RUNNING {
-			return status, fmt.Errorf("container is still running")
+			return status, errors.New("container is still running")
 		}
 		if status.Removing {
-			return status, fmt.Errorf("container is already in removing state")
+			return status, errors.New("container is already in removing state")
 		}
 		status.Removing = true
 		return status, nil

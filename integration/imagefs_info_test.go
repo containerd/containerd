@@ -17,11 +17,11 @@ limitations under the License.
 package integration
 
 import (
-	"fmt"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -57,7 +57,7 @@ func TestImageFSInfo(t *testing.T) {
 			return false, nil
 		}
 		if len(stats) >= 2 {
-			return false, fmt.Errorf("unexpected stats length: %d", len(stats))
+			return false, errors.Errorf("unexpected stats length: %d", len(stats))
 		}
 		info = stats[0]
 		if info.GetTimestamp() != 0 &&

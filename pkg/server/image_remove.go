@@ -17,10 +17,9 @@ limitations under the License.
 package server
 
 import (
-	"fmt"
-
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -35,7 +34,7 @@ import (
 func (c *criContainerdService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequest) (*runtime.RemoveImageResponse, error) {
 	image, err := c.localResolve(ctx, r.GetImage().GetImage())
 	if err != nil {
-		return nil, fmt.Errorf("can not resolve %q locally: %v", r.GetImage().GetImage(), err)
+		return nil, errors.Wrapf(err, "can not resolve %q locally", r.GetImage().GetImage())
 	}
 	if image == nil {
 		// return empty without error when image not found.
@@ -49,7 +48,7 @@ func (c *criContainerdService) RemoveImage(ctx context.Context, r *runtime.Remov
 			if errdefs.IsNotFound(err) {
 				continue
 			}
-			return nil, fmt.Errorf("failed to get image %q: %v", tag, err)
+			return nil, errors.Wrapf(err, "failed to get image %q", tag)
 		}
 		desc, err := cImage.Config(ctx)
 		if err != nil {
@@ -82,12 +81,12 @@ func (c *criContainerdService) RemoveImage(ctx context.Context, r *runtime.Remov
 		if err == nil || errdefs.IsNotFound(err) {
 			continue
 		}
-		return nil, fmt.Errorf("failed to delete image reference %q for image %q: %v", ref, image.ID, err)
+		return nil, errors.Wrapf(err, "failed to delete image reference %q for image %q", ref, image.ID)
 	}
 	// Delete image id synchronously to trigger garbage collection.
 	err = c.client.ImageService().Delete(ctx, image.ID, images.SynchronousDelete())
 	if err != nil && !errdefs.IsNotFound(err) {
-		return nil, fmt.Errorf("failed to delete image id %q: %v", image.ID, err)
+		return nil, errors.Wrapf(err, "failed to delete image id %q", image.ID)
 	}
 	c.imageStore.Delete(image.ID)
 	return &runtime.RemoveImageResponse{}, nil

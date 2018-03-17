@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/typeurl"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
@@ -60,7 +61,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	// Reserve the sandbox name to avoid concurrent `RunPodSandbox` request starting the
 	// same sandbox.
 	if err := c.sandboxNameIndex.Reserve(name, id); err != nil {
-		return nil, fmt.Errorf("failed to reserve sandbox name %q: %v", name, err)
+		return nil, errors.Wrapf(err, "failed to reserve sandbox name %q", name)
 	}
 	defer func() {
 		// Release the name if the function returns with an error.
@@ -84,7 +85,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	// Ensure sandbox container image snapshot.
 	image, err := c.ensureImageExists(ctx, c.config.SandboxImage)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox image %q: %v", c.config.SandboxImage, err)
+		return nil, errors.Wrapf(err, "failed to get sandbox image %q", c.config.SandboxImage)
 	}
 	securityContext := config.GetLinux().GetSecurityContext()
 	//Create Network Namespace if it is not in host network
@@ -96,7 +97,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		// be used.
 		sandbox.NetNS, err = sandboxstore.NewNetNS()
 		if err != nil {
-			return nil, fmt.Errorf("failed to create network namespace for sandbox %q: %v", id, err)
+			return nil, errors.Wrapf(err, "failed to create network namespace for sandbox %q", id)
 		}
 		sandbox.NetNSPath = sandbox.NetNS.GetPath()
 		defer func() {
@@ -117,7 +118,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		// SandboxStatus request.
 		sandbox.IP, err = c.setupPod(id, sandbox.NetNSPath, config)
 		if err != nil {
-			return nil, fmt.Errorf("failed to setup network for sandbox %q: %v", id, err)
+			return nil, errors.Wrapf(err, "failed to setup network for sandbox %q", id)
 		}
 		defer func() {
 			if retErr != nil {
@@ -132,7 +133,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	// Create sandbox container.
 	spec, err := c.generateSandboxContainerSpec(id, config, &image.ImageSpec.Config, sandbox.NetNSPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate sandbox container spec: %v", err)
+		return nil, errors.Wrap(err, "failed to generate sandbox container spec")
 	}
 	logrus.Debugf("Sandbox container spec: %+v", spec)
 
@@ -146,7 +147,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		securityContext.GetPrivileged(),
 		c.seccompEnabled)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate seccomp spec opts: %v", err)
+		return nil, errors.Wrap(err, "failed to generate seccomp spec opts")
 	}
 	if seccompSpecOpts != nil {
 		specOpts = append(specOpts, seccompSpecOpts)
@@ -169,7 +170,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 
 	container, err := c.client.NewContainer(ctx, id, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create containerd container: %v", err)
+		return nil, errors.Wrap(err, "failed to create containerd container")
 	}
 	defer func() {
 		if retErr != nil {
@@ -184,8 +185,8 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	// Create sandbox container root directory.
 	sandboxRootDir := getSandboxRootDir(c.config.RootDir, id)
 	if err := c.os.MkdirAll(sandboxRootDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create sandbox root directory %q: %v",
-			sandboxRootDir, err)
+		return nil, errors.Wrapf(err, "failed to create sandbox root directory %q",
+			sandboxRootDir)
 	}
 	defer func() {
 		if retErr != nil {
@@ -199,7 +200,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 
 	// Setup sandbox /dev/shm, /etc/hosts and /etc/resolv.conf.
 	if err = c.setupSandboxFiles(sandboxRootDir, config); err != nil {
-		return nil, fmt.Errorf("failed to setup sandbox files: %v", err)
+		return nil, errors.Wrapf(err, "failed to setup sandbox files")
 	}
 	defer func() {
 		if retErr != nil {
@@ -213,19 +214,19 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	// Update sandbox created timestamp.
 	info, err := container.Info(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox container info: %v", err)
+		return nil, errors.Wrap(err, "failed to get sandbox container info")
 	}
 	if err := sandbox.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
 		status.CreatedAt = info.CreatedAt
 		return status, nil
 	}); err != nil {
-		return nil, fmt.Errorf("failed to update sandbox created timestamp: %v", err)
+		return nil, errors.Wrap(err, "failed to update sandbox created timestamp")
 	}
 
 	// Add sandbox into sandbox store in UNKNOWN state.
 	sandbox.Container = container
 	if err := c.sandboxStore.Add(sandbox); err != nil {
-		return nil, fmt.Errorf("failed to add sandbox %+v into store: %v", sandbox, err)
+		return nil, errors.Wrapf(err, "failed to add sandbox %+v into store", sandbox)
 	}
 	defer func() {
 		// Delete sandbox from sandbox store if there is an error.
@@ -266,7 +267,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		// We don't need stdio for sandbox container.
 		task, err := container.NewTask(ctx, containerdio.NullIO)
 		if err != nil {
-			return status, fmt.Errorf("failed to create containerd task: %v", err)
+			return status, errors.Wrap(err, "failed to create containerd task")
 		}
 		defer func() {
 			if retErr != nil {
@@ -281,8 +282,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		}()
 
 		if err := task.Start(ctx); err != nil {
-			return status, fmt.Errorf("failed to start sandbox container task %q: %v",
-				id, err)
+			return status, errors.Wrapf(err, "failed to start sandbox container task %q", id)
 		}
 
 		// Set the pod sandbox as ready after successfully start sandbox container.
@@ -290,7 +290,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		status.State = sandboxstore.StateReady
 		return status, nil
 	}); err != nil {
-		return nil, fmt.Errorf("failed to start sandbox container: %v", err)
+		return nil, errors.Wrap(err, "failed to start sandbox container")
 	}
 
 	return &runtime.RunPodSandboxResponse{PodSandboxId: id}, nil
@@ -317,7 +317,7 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 
 	if len(imageConfig.Entrypoint) == 0 {
 		// Pause image must have entrypoint.
-		return nil, fmt.Errorf("invalid empty entrypoint in image config %+v", imageConfig)
+		return nil, errors.Errorf("invalid empty entrypoint in image config %+v", imageConfig)
 	}
 	// Set process commands.
 	g.SetProcessArgs(append(imageConfig.Entrypoint, imageConfig.Cmd...))
@@ -362,7 +362,7 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 	selinuxOpt := securityContext.GetSelinuxOptions()
 	processLabel, mountLabel, err := initSelinuxOpts(selinuxOpt)
 	if err != nil {
-		return nil, fmt.Errorf("failed to init selinux options %+v: %v", securityContext.GetSelinuxOptions(), err)
+		return nil, errors.Wrapf(err, "failed to init selinux options %+v", securityContext.GetSelinuxOptions())
 	}
 	g.SetProcessSelinuxLabel(processLabel)
 	g.SetLinuxMountLabel(mountLabel)
@@ -395,7 +395,7 @@ func (c *criContainerdService) setupSandboxFiles(rootDir string, config *runtime
 	// TODO(random-liu): Consider whether we should maintain /etc/hosts and /etc/resolv.conf in kubelet.
 	sandboxEtcHosts := getSandboxHosts(rootDir)
 	if err := c.os.CopyFile(etcHosts, sandboxEtcHosts, 0644); err != nil {
-		return fmt.Errorf("failed to generate sandbox hosts file %q: %v", sandboxEtcHosts, err)
+		return errors.Wrapf(err, "failed to generate sandbox hosts file %q", sandboxEtcHosts)
 	}
 
 	// Set DNS options. Maintain a resolv.conf for the sandbox.
@@ -404,7 +404,7 @@ func (c *criContainerdService) setupSandboxFiles(rootDir string, config *runtime
 	if dnsConfig := config.GetDnsConfig(); dnsConfig != nil {
 		resolvContent, err = parseDNSOptions(dnsConfig.Servers, dnsConfig.Searches, dnsConfig.Options)
 		if err != nil {
-			return fmt.Errorf("failed to parse sandbox DNSConfig %+v: %v", dnsConfig, err)
+			return errors.Wrapf(err, "failed to parse sandbox DNSConfig %+v", dnsConfig)
 		}
 	}
 	resolvPath := getResolvPath(rootDir)
@@ -412,28 +412,28 @@ func (c *criContainerdService) setupSandboxFiles(rootDir string, config *runtime
 		// copy host's resolv.conf to resolvPath
 		err = c.os.CopyFile(resolvConfPath, resolvPath, 0644)
 		if err != nil {
-			return fmt.Errorf("failed to copy host's resolv.conf to %q: %v", resolvPath, err)
+			return errors.Wrapf(err, "failed to copy host's resolv.conf to %q", resolvPath)
 		}
 	} else {
 		err = c.os.WriteFile(resolvPath, []byte(resolvContent), 0644)
 		if err != nil {
-			return fmt.Errorf("failed to write resolv content to %q: %v", resolvPath, err)
+			return errors.Wrapf(err, "failed to write resolv content to %q", resolvPath)
 		}
 	}
 
 	// Setup sandbox /dev/shm.
 	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetIpc() == runtime.NamespaceMode_NODE {
 		if _, err := c.os.Stat(devShm); err != nil {
-			return fmt.Errorf("host %q is not available for host ipc: %v", devShm, err)
+			return errors.Wrapf(err, "host %q is not available for host ipc", devShm)
 		}
 	} else {
 		sandboxDevShm := getSandboxDevShm(rootDir)
 		if err := c.os.MkdirAll(sandboxDevShm, 0700); err != nil {
-			return fmt.Errorf("failed to create sandbox shm: %v", err)
+			return errors.Wrap(err, "failed to create sandbox shm")
 		}
 		shmproperty := fmt.Sprintf("mode=1777,size=%d", defaultShmSize)
 		if err := c.os.Mount("shm", sandboxDevShm, "tmpfs", uintptr(unix.MS_NOEXEC|unix.MS_NOSUID|unix.MS_NODEV), shmproperty); err != nil {
-			return fmt.Errorf("failed to mount sandbox shm: %v", err)
+			return errors.Wrap(err, "failed to mount sandbox shm")
 		}
 	}
 
@@ -446,7 +446,7 @@ func parseDNSOptions(servers, searches, options []string) (string, error) {
 	resolvContent := ""
 
 	if len(searches) > maxDNSSearches {
-		return "", fmt.Errorf("DNSOption.Searches has more than 6 domains")
+		return "", errors.New("DNSOption.Searches has more than 6 domains")
 	}
 
 	if len(searches) > 0 {
@@ -480,7 +480,7 @@ func (c *criContainerdService) unmountSandboxFiles(rootDir string, config *runti
 // setupPod setups up the network for a pod
 func (c *criContainerdService) setupPod(id string, path string, config *runtime.PodSandboxConfig) (string, error) {
 	if c.netPlugin == nil {
-		return "", fmt.Errorf("cni config not intialized")
+		return "", errors.New("cni config not intialized")
 	}
 
 	labels := getPodCNILabels(id, config)
@@ -499,7 +499,7 @@ func (c *criContainerdService) setupPod(id string, path string, config *runtime.
 	if err := c.teardownPod(id, path, config); err != nil {
 		logrus.WithError(err).Errorf("Failed to destroy network for sandbox %q", id)
 	}
-	return "", fmt.Errorf("failed to find network info for sandbox %q", id)
+	return "", errors.Errorf("failed to find network info for sandbox %q", id)
 }
 
 // toCNIPortMappings converts CRI port mappings to CNI.

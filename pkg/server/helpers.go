@@ -34,6 +34,7 @@ import (
 	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
@@ -251,7 +252,7 @@ func (c *criContainerdService) localResolve(ctx context.Context, refOrID string)
 		if err == store.ErrNotExist {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to get image %q : %v", imageID, err)
+		return nil, errors.Wrapf(err, "failed to get image %q", imageID)
 	}
 	return &image, nil
 }
@@ -280,7 +281,7 @@ func getUserFromImage(user string) (*int64, string) {
 func (c *criContainerdService) ensureImageExists(ctx context.Context, ref string) (*imagestore.Image, error) {
 	image, err := c.localResolve(ctx, ref)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve image %q: %v", ref, err)
+		return nil, errors.Wrapf(err, "failed to resolve image %q", ref)
 	}
 	if image != nil {
 		return image, nil
@@ -288,13 +289,13 @@ func (c *criContainerdService) ensureImageExists(ctx context.Context, ref string
 	// Pull image to ensure the image exists
 	resp, err := c.PullImage(ctx, &runtime.PullImageRequest{Image: &runtime.ImageSpec{Image: ref}})
 	if err != nil {
-		return nil, fmt.Errorf("failed to pull image %q: %v", ref, err)
+		return nil, errors.Wrapf(err, "failed to pull image %q", ref)
 	}
 	imageID := resp.GetImageRef()
 	newImage, err := c.imageStore.Get(imageID)
 	if err != nil {
 		// It's still possible that someone removed the image right after it is pulled.
-		return nil, fmt.Errorf("failed to get image %q metadata after pulling: %v", imageID, err)
+		return nil, errors.Wrapf(err, "failed to get image %q metadata after pulling", imageID)
 	}
 	return &newImage, nil
 }
@@ -312,28 +313,28 @@ func getImageInfo(ctx context.Context, image containerd.Image) (*imageInfo, erro
 	// Get image information.
 	diffIDs, err := image.RootFS(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get image diffIDs: %v", err)
+		return nil, errors.Wrap(err, "failed to get image diffIDs")
 	}
 	chainID := identity.ChainID(diffIDs)
 
 	size, err := image.Size(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get image compressed resource size: %v", err)
+		return nil, errors.Wrap(err, "failed to get image compressed resource size")
 	}
 
 	desc, err := image.Config(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get image config descriptor: %v", err)
+		return nil, errors.Wrap(err, "failed to get image config descriptor")
 	}
 	id := desc.Digest.String()
 
 	rb, err := content.ReadBlob(ctx, image.ContentStore(), desc.Digest)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read image config from content store: %v", err)
+		return nil, errors.Wrap(err, "failed to read image config from content store")
 	}
 	var ociimage imagespec.Image
 	if err := json.Unmarshal(rb, &ociimage); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal image config %s: %v", rb, err)
+		return nil, errors.Wrapf(err, "failed to unmarshal image config %s", rb)
 	}
 
 	return &imageInfo{

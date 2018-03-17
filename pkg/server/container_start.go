@@ -17,13 +17,13 @@ limitations under the License.
 package server
 
 import (
-	"fmt"
 	"io"
 	"time"
 
 	"github.com/containerd/containerd"
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -38,7 +38,7 @@ import (
 func (c *criContainerdService) StartContainer(ctx context.Context, r *runtime.StartContainerRequest) (retRes *runtime.StartContainerResponse, retErr error) {
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
-		return nil, fmt.Errorf("an error occurred when try to find container %q: %v", r.GetContainerId(), err)
+		return nil, errors.Wrapf(err, "an error occurred when try to find container %q", r.GetContainerId())
 	}
 
 	var startErr error
@@ -51,7 +51,7 @@ func (c *criContainerdService) StartContainer(ctx context.Context, r *runtime.St
 	}); startErr != nil {
 		return nil, startErr
 	} else if err != nil {
-		return nil, fmt.Errorf("failed to update container %q metadata: %v", container.ID, err)
+		return nil, errors.Wrapf(err, "failed to update container %q metadata", container.ID)
 	}
 	return &runtime.StartContainerResponse{}, nil
 }
@@ -68,11 +68,11 @@ func (c *criContainerdService) startContainer(ctx context.Context,
 
 	// Return error if container is not in created state.
 	if status.State() != runtime.ContainerState_CONTAINER_CREATED {
-		return fmt.Errorf("container %q is in %s state", id, criContainerStateToString(status.State()))
+		return errors.Errorf("container %q is in %s state", id, criContainerStateToString(status.State()))
 	}
 	// Do not start the container when there is a removal in progress.
 	if status.Removing {
-		return fmt.Errorf("container %q is in removing state", id)
+		return errors.Errorf("container %q is in removing state", id)
 	}
 
 	defer func() {
@@ -89,17 +89,17 @@ func (c *criContainerdService) startContainer(ctx context.Context,
 	// Get sandbox config from sandbox store.
 	sandbox, err := c.sandboxStore.Get(meta.SandboxID)
 	if err != nil {
-		return fmt.Errorf("sandbox %q not found: %v", meta.SandboxID, err)
+		return errors.Wrapf(err, "sandbox %q not found", meta.SandboxID)
 	}
 	sandboxID := meta.SandboxID
 	if sandbox.Status.Get().State != sandboxstore.StateReady {
-		return fmt.Errorf("sandbox container %q is not running", sandboxID)
+		return errors.Errorf("sandbox container %q is not running", sandboxID)
 	}
 
 	ioCreation := func(id string) (_ containerdio.IO, err error) {
 		stdoutWC, stderrWC, err := createContainerLoggers(meta.LogPath, config.GetTty())
 		if err != nil {
-			return nil, fmt.Errorf("failed to create container loggers: %v", err)
+			return nil, errors.Wrap(err, "failed to create container loggers")
 		}
 		defer func() {
 			if err != nil {
@@ -118,7 +118,7 @@ func (c *criContainerdService) startContainer(ctx context.Context,
 
 	task, err := container.NewTask(ctx, ioCreation)
 	if err != nil {
-		return fmt.Errorf("failed to create containerd task: %v", err)
+		return errors.Wrap(err, "failed to create containerd task")
 	}
 	defer func() {
 		if retErr != nil {
@@ -133,7 +133,7 @@ func (c *criContainerdService) startContainer(ctx context.Context,
 
 	// Start containerd task.
 	if err := task.Start(ctx); err != nil {
-		return fmt.Errorf("failed to start containerd task %q: %v", id, err)
+		return errors.Wrapf(err, "failed to start containerd task %q", id)
 	}
 
 	// Update container start timestamp.
@@ -147,7 +147,7 @@ func createContainerLoggers(logPath string, tty bool) (stdout io.WriteCloser, st
 	if logPath != "" {
 		// Only generate container log when log path is specified.
 		if stdout, err = cio.NewCRILogger(logPath, cio.Stdout); err != nil {
-			return nil, nil, fmt.Errorf("failed to start container stdout logger: %v", err)
+			return nil, nil, errors.Wrap(err, "failed to start container stdout logger")
 		}
 		defer func() {
 			if err != nil {
@@ -157,7 +157,7 @@ func createContainerLoggers(logPath string, tty bool) (stdout io.WriteCloser, st
 		// Only redirect stderr when there is no tty.
 		if !tty {
 			if stderr, err = cio.NewCRILogger(logPath, cio.Stderr); err != nil {
-				return nil, nil, fmt.Errorf("failed to start container stderr logger: %v", err)
+				return nil, nil, errors.Wrap(err, "failed to start container stderr logger")
 			}
 		}
 	} else {

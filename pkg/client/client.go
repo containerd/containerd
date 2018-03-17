@@ -17,9 +17,9 @@ limitations under the License.
 package client
 
 import (
-	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
@@ -31,7 +31,7 @@ import (
 func NewCRIContainerdClient(endpoint string, timeout time.Duration) (api.CRIContainerdServiceClient, error) {
 	addr, dialer, err := util.GetAddressAndDialer(endpoint)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get dialer: %v", err)
+		return nil, errors.Wrap(err, "failed to get dialer")
 	}
 	conn, err := grpc.Dial(addr,
 		grpc.WithBlock(),
@@ -41,7 +41,7 @@ func NewCRIContainerdClient(endpoint string, timeout time.Duration) (api.CRICont
 		grpc.WithDialer(dialer),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to dial: %v", err)
+		return nil, errors.Wrap(err, "failed to dial")
 	}
 	return api.NewCRIContainerdServiceClient(conn), nil
 }

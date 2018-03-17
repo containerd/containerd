@@ -18,8 +18,8 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -34,7 +34,7 @@ import (
 func (c *criContainerdService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequest) (*runtime.ImageStatusResponse, error) {
 	image, err := c.localResolve(ctx, r.GetImage().GetImage())
 	if err != nil {
-		return nil, fmt.Errorf("can not resolve %q locally: %v", r.GetImage().GetImage(), err)
+		return nil, errors.Wrapf(err, "can not resolve %q locally", r.GetImage().GetImage())
 	}
 	if image == nil {
 		// return empty without error when image not found.
@@ -46,7 +46,7 @@ func (c *criContainerdService) ImageStatus(ctx context.Context, r *runtime.Image
 	runtimeImage := toCRIRuntimeImage(image)
 	info, err := c.toCRIImageInfo(ctx, image, r.GetVerbose())
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate image info: %v", err)
+		return nil, errors.Wrap(err, "failed to generate image info")
 	}
 
 	return &runtime.ImageStatusResponse{

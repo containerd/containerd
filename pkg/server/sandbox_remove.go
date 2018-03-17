@@ -17,11 +17,10 @@ limitations under the License.
 package server
 
 import (
-	"fmt"
-
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/docker/docker/pkg/system"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
@@ -36,8 +35,8 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		if err != store.ErrNotExist {
-			return nil, fmt.Errorf("an error occurred when try to find sandbox %q: %v",
-				r.GetPodSandboxId(), err)
+			return nil, errors.Wrapf(err, "an error occurred when try to find sandbox %q",
+				r.GetPodSandboxId())
 		}
 		// Do not return error if the id doesn't exist.
 		log.Tracef("RemovePodSandbox called for sandbox %q that does not exist",
@@ -49,12 +48,12 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 
 	// Return error if sandbox container is still running.
 	if sandbox.Status.Get().State == sandboxstore.StateReady {
-		return nil, fmt.Errorf("sandbox container %q is not fully stopped", id)
+		return nil, errors.Errorf("sandbox container %q is not fully stopped", id)
 	}
 
 	// Return error if sandbox network namespace is not closed yet.
 	if sandbox.NetNS != nil && !sandbox.NetNS.Closed() {
-		return nil, fmt.Errorf("sandbox network namespace %q is not fully closed", sandbox.NetNS.GetPath())
+		return nil, errors.Errorf("sandbox network namespace %q is not fully closed", sandbox.NetNS.GetPath())
 	}
 
 	// Remove all containers inside the sandbox.
@@ -69,21 +68,21 @@ func (c *criContainerdService) RemovePodSandbox(ctx context.Context, r *runtime.
 		}
 		_, err = c.RemoveContainer(ctx, &runtime.RemoveContainerRequest{ContainerId: cntr.ID})
 		if err != nil {
-			return nil, fmt.Errorf("failed to remove container %q: %v", cntr.ID, err)
+			return nil, errors.Wrapf(err, "failed to remove container %q", cntr.ID)
 		}
 	}
 
 	// Cleanup the sandbox root directory.
 	sandboxRootDir := getSandboxRootDir(c.config.RootDir, id)
 	if err := system.EnsureRemoveAll(sandboxRootDir); err != nil {
-		return nil, fmt.Errorf("failed to remove sandbox root directory %q: %v",
-			sandboxRootDir, err)
+		return nil, errors.Wrapf(err, "failed to remove sandbox root directory %q",
+			sandboxRootDir)
 	}
 
 	// Delete sandbox container.
 	if err := sandbox.Container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
 		if !errdefs.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to delete sandbox container %q: %v", id, err)
+			return nil, errors.Wrapf(err, "failed to delete sandbox container %q", id)
 		}
 		log.Tracef("Remove called for sandbox container %q that does not exist", id)
 	}

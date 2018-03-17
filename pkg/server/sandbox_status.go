@@ -18,11 +18,11 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
@@ -33,7 +33,7 @@ import (
 func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandboxStatusRequest) (*runtime.PodSandboxStatusResponse, error) {
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
-		return nil, fmt.Errorf("an error occurred when try to find sandbox: %v", err)
+		return nil, errors.Wrap(err, "an error occurred when try to find sandbox")
 	}
 
 	ip := c.getIP(sandbox)
@@ -45,7 +45,7 @@ func (c *criContainerdService) PodSandboxStatus(ctx context.Context, r *runtime.
 	// Generate verbose information.
 	info, err := toCRISandboxInfo(ctx, sandbox)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get verbose sandbox container info: %v", err)
+		return nil, errors.Wrap(err, "failed to get verbose sandbox container info")
 	}
 
 	return &runtime.PodSandboxStatusResponse{
@@ -116,14 +116,14 @@ func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox) (map[st
 	container := sandbox.Container
 	task, err := container.Task(ctx, nil)
 	if err != nil && !errdefs.IsNotFound(err) {
-		return nil, fmt.Errorf("failed to get sandbox container task: %v", err)
+		return nil, errors.Wrap(err, "failed to get sandbox container task")
 	}
 
 	var processStatus containerd.ProcessStatus
 	if task != nil {
 		taskStatus, err := task.Status(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get task status: %v", err)
+			return nil, errors.Wrap(err, "failed to get task status")
 		}
 
 		processStatus = taskStatus.Status
@@ -148,13 +148,13 @@ func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox) (map[st
 
 	spec, err := container.Spec(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox container runtime spec: %v", err)
+		return nil, errors.Wrap(err, "failed to get sandbox container runtime spec")
 	}
 	si.RuntimeSpec = spec
 
 	ctrInfo, err := container.Info(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox container info: %v", err)
+		return nil, errors.Wrap(err, "failed to get sandbox container info")
 	}
 	// Do not use config.SandboxImage because the configuration might
 	// be changed during restart. It may not reflect the actual image
@@ -165,7 +165,7 @@ func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox) (map[st
 
 	infoBytes, err := json.Marshal(si)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal info %v: %v", si, err)
+		return nil, errors.Wrapf(err, "failed to marshal info %v", si)
 	}
 	return map[string]string{
 		"info": string(infoBytes),

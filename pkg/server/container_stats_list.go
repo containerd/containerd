@@ -17,12 +17,11 @@ limitations under the License.
 package server
 
 import (
-	"fmt"
-
 	"github.com/containerd/cgroups"
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/typeurl"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
@@ -36,15 +35,15 @@ func (c *criContainerdService) ListContainerStats(
 ) (*runtime.ListContainerStatsResponse, error) {
 	request, containers, err := c.buildTaskMetricsRequest(in)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build metrics request: %v", err)
+		return nil, errors.Wrap(err, "failed to build metrics request")
 	}
 	resp, err := c.client.TaskService().Metrics(ctx, &request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch metrics for tasks: %v", err)
+		return nil, errors.Wrap(err, "failed to fetch metrics for tasks")
 	}
 	criStats, err := c.toCRIContainerStats(resp.Metrics, containers)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert to cri containerd stats format: %v", err)
+		return nil, errors.Wrap(err, "failed to convert to cri containerd stats format")
 	}
 	return criStats, nil
 }
@@ -61,7 +60,7 @@ func (c *criContainerdService) toCRIContainerStats(
 	for _, cntr := range containers {
 		cs, err := c.getContainerMetrics(cntr.Metadata, statsMap[cntr.ID])
 		if err != nil {
-			return nil, fmt.Errorf("failed to decode container metrics for %q: %v", cntr.ID, err)
+			return nil, errors.Wrapf(err, "failed to decode container metrics for %q", cntr.ID)
 		}
 		containerStats.Stats = append(containerStats.Stats, cs)
 	}
@@ -99,7 +98,7 @@ func (c *criContainerdService) getContainerMetrics(
 	if stats != nil {
 		s, err := typeurl.UnmarshalAny(stats.Data)
 		if err != nil {
-			return nil, fmt.Errorf("failed to extract container metrics: %v", err)
+			return nil, errors.Wrap(err, "failed to extract container metrics")
 		}
 		metrics := s.(*cgroups.Metrics)
 		if metrics.CPU != nil && metrics.CPU.Usage != nil {
