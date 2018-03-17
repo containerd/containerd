@@ -75,6 +75,10 @@ func (d *duration) UnmarshalText(text []byte) error {
 	return nil
 }
 
+func (d duration) MarshalText() (text []byte, err error) {
+	return []byte(time.Duration(d).String()), nil
+}
+
 func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.GCPlugin,
