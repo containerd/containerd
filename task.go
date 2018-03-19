@@ -169,6 +169,11 @@ type task struct {
 	pid uint32
 }
 
+// ID of the task
+func (t *task) ID() string {
+	return t.id
+}
+
 // Pid returns the pid or process id for the task
 func (t *task) Pid() uint32 {
 	return t.pid
