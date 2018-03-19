@@ -19,6 +19,8 @@
 package cgroups
 
 import (
+	"text/template"
+
 	"github.com/containerd/cgroups"
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/events"
@@ -33,6 +35,13 @@ import (
 	"golang.org/x/net/context"
 )
 
+var pluginID = "cgroups"
+var commentedCgroupsConfigTemplate = template.Must(template.New(pluginID).Parse(`
+# The "plugins.cgroups" configures the cgroups monitor.
+[plugins.cgroups]
+  no_prometheus = {{ .NoPrometheus }}
+`))
+
 // Config for the cgroups monitor
 type Config struct {
 	NoPrometheus bool `toml:"no_prometheus"`
@@ -40,10 +49,11 @@ type Config struct {
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type:   plugin.TaskMonitorPlugin,
-		ID:     "cgroups",
-		InitFn: New,
-		Config: &Config{},
+		Type:                    plugin.TaskMonitorPlugin,
+		ID:                      pluginID,
+		InitFn:                  New,
+		Config:                  &Config{},
+		CommentedConfigTemplate: commentedCgroupsConfigTemplate,
 	})
 }
 

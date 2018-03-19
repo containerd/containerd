@@ -17,6 +17,8 @@
 package diff
 
 import (
+	"text/template"
+
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/diff"
@@ -29,6 +31,17 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
+
+var commentedDiffServiceConfigTemplate = template.Must(template.New(services.DiffService).Parse(`
+[plugins.diff-service]
+  # Order is the order of preference in which to try diff algorithms, the
+  # first differ which is supported is used.
+  # Note when multiple differs may be supported, this order will be
+  # respected for which is choosen. Each differ should return the same
+  # correct output, allowing any ordering to be used to prefer
+  # more optimimal implementations.
+  {{ range $item := .Order }}default = [{{ printf "%q, " $item }}]{{ end }}
+`))
 
 type config struct {
 	// Order is the order of preference in which to try diff algorithms, the
@@ -52,7 +65,8 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.DiffPlugin,
 		},
-		Config: defaultDifferConfig,
+		Config:                  defaultDifferConfig,
+		CommentedConfigTemplate: commentedDiffServiceConfigTemplate,
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			differs, err := ic.GetByType(plugin.DiffPlugin)
 			if err != nil {

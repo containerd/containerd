@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"text/template"
 	"time"
 
 	"github.com/containerd/containerd/gc"
@@ -27,6 +28,51 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/pkg/errors"
 )
+
+var pluginID = "scheduler"
+var commentedSchedulerConfigTemplate = template.Must(template.New(pluginID).Parse(`
+# The "plugins.scheduler" configures the garbage collection policies.
+[plugins.scheduler]
+
+  # pause_threshold represents the maximum amount of time garbage
+  # collection should be scheduled based on the average pause time.
+  # For example, a value of 0.02 means that scheduled garbage collection
+  # pauses should present at most 2% of real time,
+  # or 20ms of every second.
+  #
+  # A maximum value of .5 is enforced to prevent over scheduling of the
+  # garbage collector, trigger options are available to run in a more
+  # predictable time frame after mutation.
+  pause_threshold = {{ .PauseThreshold }}
+
+  # deletion_threshold is used to guarantee that a garbage collection is
+  # scheduled after configured number of deletions have occurred
+  # since the previous garbage collection. A value of 0 indicates that
+  # garbage collection will not be triggered by deletion count.
+  deletion_threshold := {{ .DeletionThreshold }}
+
+  # mutation_threshold is used to guarantee that a garbage collection is
+  # run after a configured number of database mutations have occurred
+  # since the previous garbage collection. A value of 0 indicates that
+  # garbage collection will only be run after a manual trigger or
+  # deletion. Unlike the deletion threshold, the mutation threshold does
+  # not cause scheduling of a garbage collection, but ensures GC is run
+  # at the next scheduled GC.
+  mutation_threshold = {{ .MutationThreshold }}
+
+  # schedule_delay is the duration in the future to schedule a garbage
+  # collection triggered manually or by exceeding the configured
+  # threshold for deletion or mutation. A zero value will immediately
+  # schedule. Use suffix "ms" for millisecond and "s" for second.
+  schedule_delay = {{ .ScheduleDelay }}
+
+  # StartupDelay is the delay duration to do an initial garbage
+  # collection after startup. The initial garbage collection is used to
+  # set the base for pause threshold and should be scheduled in the
+  # future to avoid slowing down other startup processes. Use suffix
+  # "ms" for millisecond and "s" for second.
+  startup_delay = {{ .StartupDelay }}
+`))
 
 // config configures the garbage collection policies.
 type config struct {
@@ -94,7 +140,7 @@ func (d *duration) UnmarshalText(text []byte) error {
 func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.GCPlugin,
-		ID:   "scheduler",
+		ID:   pluginID,
 		Requires: []plugin.Type{
 			plugin.MetadataPlugin,
 		},
@@ -105,6 +151,7 @@ func init() {
 			ScheduleDelay:     duration(0),
 			StartupDelay:      duration(100 * time.Millisecond),
 		},
+		CommentedConfigTemplate: commentedSchedulerConfigTemplate,
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			md, err := ic.Get(plugin.MetadataPlugin)
 			if err != nil {

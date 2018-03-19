@@ -19,6 +19,7 @@ package plugin
 import (
 	"fmt"
 	"sync"
+	"text/template"
 
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -84,6 +85,8 @@ type Registration struct {
 	ID string
 	// Config specific to the plugin
 	Config interface{}
+	// CommentedConfigTemplate specific the template of commented toml config
+	CommentedConfigTemplate *template.Template
 	// Requires is a list of plugins that the registered plugin requires to be available
 	Requires []Type
 

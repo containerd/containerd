@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"text/template"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -57,6 +58,26 @@ var (
 	empty    = &ptypes.Empty{}
 )
 
+var commentedLinuxConfigTemplate = template.Must(template.New("linux").Parse(`
+# The "plugins.linux" contains options for the runtime
+[plugins.linux]
+
+  # Shim is a path or name of binary implementing the Shim GRPC API
+  shim = "{{ .Shim }}"
+
+  # Runtime is a path or name of an OCI runtime used by the shim
+  runtime = "{{ .Runtime }}"
+
+  # RuntimeRoot is the path that shall be used by the OCI runtime for its data
+  runtime_root = "{{ .RuntimeRoot }}"
+
+  # NoShim calls runc directly from within the pkg
+  no_shim = {{ .NoShim }}
+
+  # Debug enable debug on the shim
+  shim_debug = {{ .ShimDebug }}
+`))
+
 const (
 	configFilename = "config.json"
 	defaultRuntime = "runc"
@@ -76,6 +97,7 @@ func init() {
 			Shim:    defaultShim,
 			Runtime: defaultRuntime,
 		},
+		CommentedConfigTemplate: commentedLinuxConfigTemplate,
 	})
 }
 
