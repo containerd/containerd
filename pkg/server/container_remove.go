@@ -32,7 +32,7 @@ import (
 
 // RemoveContainer removes the container.
 // TODO(random-liu): Forcibly stop container if it's running.
-func (c *criContainerdService) RemoveContainer(ctx context.Context, r *runtime.RemoveContainerRequest) (_ *runtime.RemoveContainerResponse, retErr error) {
+func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveContainerRequest) (_ *runtime.RemoveContainerResponse, retErr error) {
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		if err != store.ErrNotExist {

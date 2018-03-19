@@ -41,6 +41,6 @@ protoc \
 
 # Update boilerplate for the generated file.
 echo "$(cat hack/boilerplate/boilerplate.go.txt ${API_ROOT}/api.pb.go)" > ${API_ROOT}/api.pb.go
-sed -i".bak" "s/Copyright YEAR/Copyright $(date '+%Y')/g" ${API_ROOT}/api.pb.go
+sed -i".bak" "s/Copyright YEAR AUTHORS/Copyright $(date '+%Y') The containerd Authors/g" ${API_ROOT}/api.pb.go
 
 gofmt -l -s -w ${API_ROOT}/api.pb.go

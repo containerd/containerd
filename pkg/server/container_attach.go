@@ -30,7 +30,7 @@ import (
 )
 
 // Attach prepares a streaming endpoint to attach to a running container, and returns the address.
-func (c *criContainerdService) Attach(ctx context.Context, r *runtime.AttachRequest) (*runtime.AttachResponse, error) {
+func (c *criService) Attach(ctx context.Context, r *runtime.AttachRequest) (*runtime.AttachResponse, error) {
 	cntr, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find container in store")
@@ -42,7 +42,7 @@ func (c *criContainerdService) Attach(ctx context.Context, r *runtime.AttachRequ
 	return c.streamServer.GetAttach(r)
 }
 
-func (c *criContainerdService) attachContainer(ctx context.Context, id string, stdin io.Reader, stdout, stderr io.WriteCloser,
+func (c *criService) attachContainer(ctx context.Context, id string, stdin io.Reader, stdout, stderr io.WriteCloser,
 	tty bool, resize <-chan remotecommand.TerminalSize) error {
 	// Get container from our container store.
 	cntr, err := c.containerStore.Get(id)

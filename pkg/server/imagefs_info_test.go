@@ -29,7 +29,7 @@ import (
 )
 
 func TestImageFsInfo(t *testing.T) {
-	c := newTestCRIContainerdService()
+	c := newTestCRIService()
 	snapshots := []snapshotstore.Snapshot{
 		{
 			Key:       "key1",

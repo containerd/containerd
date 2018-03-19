@@ -50,7 +50,7 @@ func TestImageStatus(t *testing.T) {
 		Username:    "user",
 	}
 
-	c := newTestCRIContainerdService()
+	c := newTestCRIService()
 	t.Logf("should return nil image spec without error for non-exist image")
 	resp, err := c.ImageStatus(context.Background(), &runtime.ImageStatusRequest{
 		Image: &runtime.ImageSpec{Image: testID},

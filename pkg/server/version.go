@@ -32,7 +32,7 @@ const (
 )
 
 // Version returns the runtime name, runtime version and runtime API version.
-func (c *criContainerdService) Version(ctx context.Context, r *runtime.VersionRequest) (*runtime.VersionResponse, error) {
+func (c *criService) Version(ctx context.Context, r *runtime.VersionRequest) (*runtime.VersionResponse, error) {
 	return &runtime.VersionResponse{
 		Version:           kubeAPIVersion,
 		RuntimeName:       containerName,

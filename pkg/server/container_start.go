@@ -35,7 +35,7 @@ import (
 )
 
 // StartContainer starts the container.
-func (c *criContainerdService) StartContainer(ctx context.Context, r *runtime.StartContainerRequest) (retRes *runtime.StartContainerResponse, retErr error) {
+func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContainerRequest) (retRes *runtime.StartContainerResponse, retErr error) {
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, errors.Wrapf(err, "an error occurred when try to find container %q", r.GetContainerId())
@@ -58,7 +58,7 @@ func (c *criContainerdService) StartContainer(ctx context.Context, r *runtime.St
 
 // startContainer actually starts the container. The function needs to be run in one transaction. Any updates
 // to the status passed in will be applied no matter the function returns error or not.
-func (c *criContainerdService) startContainer(ctx context.Context,
+func (c *criService) startContainer(ctx context.Context,
 	cntr containerstore.Container,
 	status *containerstore.Status) (retErr error) {
 	id := cntr.ID

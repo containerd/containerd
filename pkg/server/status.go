@@ -30,7 +30,7 @@ import (
 const networkNotReadyReason = "NetworkPluginNotReady"
 
 // Status returns the status of the runtime.
-func (c *criContainerdService) Status(ctx context.Context, r *runtime.StatusRequest) (*runtime.StatusResponse, error) {
+func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*runtime.StatusResponse, error) {
 	// As a containerd plugin, if CRI plugin is serving request,
 	// containerd must be ready.
 	runtimeCondition := &runtime.RuntimeCondition{

@@ -45,14 +45,14 @@ const (
 )
 
 var (
-	runtimeService      cri.RuntimeService
-	imageService        cri.ImageManagerService
-	containerdClient    *containerd.Client
-	criContainerdClient api.CRIContainerdServiceClient
+	runtimeService   cri.RuntimeService
+	imageService     cri.ImageManagerService
+	containerdClient *containerd.Client
+	criPluginClient  api.CRIPluginServiceClient
 )
 
-var criContainerdEndpoint = flag.String("cri-endpoint", "/run/containerd/containerd.sock", "The endpoint of cri plugin.")
-var criContainerdRoot = flag.String("cri-root", "/var/lib/containerd/io.containerd.grpc.v1.cri", "The root directory of cri plugin.")
+var criEndpoint = flag.String("cri-endpoint", "/run/containerd/containerd.sock", "The endpoint of cri plugin.")
+var criRoot = flag.String("cri-root", "/var/lib/containerd/io.containerd.grpc.v1.cri", "The root directory of cri plugin.")
 
 func init() {
 	flag.Parse()
@@ -64,11 +64,11 @@ func init() {
 // ConnectDaemons connect cri plugin and containerd, and initialize the clients.
 func ConnectDaemons() error {
 	var err error
-	runtimeService, err = remote.NewRemoteRuntimeService(*criContainerdEndpoint, timeout)
+	runtimeService, err = remote.NewRemoteRuntimeService(*criEndpoint, timeout)
 	if err != nil {
 		return errors.Wrap(err, "failed to create runtime service")
 	}
-	imageService, err = remote.NewRemoteImageService(*criContainerdEndpoint, timeout)
+	imageService, err = remote.NewRemoteImageService(*criEndpoint, timeout)
 	if err != nil {
 		return errors.Wrap(err, "failed to create image service")
 	}
@@ -87,7 +87,7 @@ func ConnectDaemons() error {
 	if err != nil {
 		return errors.Wrap(err, "failed to connect containerd")
 	}
-	criContainerdClient, err = client.NewCRIContainerdClient(*criContainerdEndpoint, timeout)
+	criPluginClient, err = client.NewCRIPluginClient(*criEndpoint, timeout)
 	if err != nil {
 		return errors.Wrap(err, "failed to connect cri plugin")
 	}

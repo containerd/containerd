@@ -33,7 +33,7 @@ import (
 
 // StopPodSandbox stops the sandbox. If there are any running containers in the
 // sandbox, they should be forcibly terminated.
-func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandboxRequest) (*runtime.StopPodSandboxResponse, error) {
+func (c *criService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandboxRequest) (*runtime.StopPodSandboxResponse, error) {
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		return nil, errors.Wrapf(err, "an error occurred when try to find sandbox %q",
@@ -96,7 +96,7 @@ func (c *criContainerdService) StopPodSandbox(ctx context.Context, r *runtime.St
 }
 
 // stopSandboxContainer kills and deletes sandbox container.
-func (c *criContainerdService) stopSandboxContainer(ctx context.Context, sandbox sandboxstore.Sandbox) error {
+func (c *criService) stopSandboxContainer(ctx context.Context, sandbox sandboxstore.Sandbox) error {
 	container := sandbox.Container
 	task, err := container.Task(ctx, nil)
 	if err != nil {
@@ -116,7 +116,7 @@ func (c *criContainerdService) stopSandboxContainer(ctx context.Context, sandbox
 }
 
 // waitSandboxStop waits for sandbox to be stopped until timeout exceeds or context is cancelled.
-func (c *criContainerdService) waitSandboxStop(ctx context.Context, sandbox sandboxstore.Sandbox, timeout time.Duration) error {
+func (c *criService) waitSandboxStop(ctx context.Context, sandbox sandboxstore.Sandbox, timeout time.Duration) error {
 	timeoutTimer := time.NewTimer(timeout)
 	defer timeoutTimer.Stop()
 	select {
@@ -130,7 +130,7 @@ func (c *criContainerdService) waitSandboxStop(ctx context.Context, sandbox sand
 }
 
 // teardownPod removes the network from the pod
-func (c *criContainerdService) teardownPod(id string, path string, config *runtime.PodSandboxConfig) error {
+func (c *criService) teardownPod(id string, path string, config *runtime.PodSandboxConfig) error {
 	if c.netPlugin == nil {
 		return errors.New("cni config not intialized")
 	}

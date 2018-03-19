@@ -51,7 +51,7 @@ func init() {
 
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 // the sandbox is in ready state.
-func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandboxRequest) (_ *runtime.RunPodSandboxResponse, retErr error) {
+func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandboxRequest) (_ *runtime.RunPodSandboxResponse, retErr error) {
 	config := r.GetConfig()
 
 	// Generate unique id and name for the sandbox and reserve the name.
@@ -296,7 +296,7 @@ func (c *criContainerdService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	return &runtime.RunPodSandboxResponse{PodSandboxId: id}, nil
 }
 
-func (c *criContainerdService) generateSandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
+func (c *criService) generateSandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
 	imageConfig *imagespec.ImageConfig, nsPath string) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
 	// TODO(random-liu): [P1] Compare the default settings with docker and containerd default.
@@ -391,7 +391,7 @@ func (c *criContainerdService) generateSandboxContainerSpec(id string, config *r
 
 // setupSandboxFiles sets up necessary sandbox files including /dev/shm, /etc/hosts
 // and /etc/resolv.conf.
-func (c *criContainerdService) setupSandboxFiles(rootDir string, config *runtime.PodSandboxConfig) error {
+func (c *criService) setupSandboxFiles(rootDir string, config *runtime.PodSandboxConfig) error {
 	// TODO(random-liu): Consider whether we should maintain /etc/hosts and /etc/resolv.conf in kubelet.
 	sandboxEtcHosts := getSandboxHosts(rootDir)
 	if err := c.os.CopyFile(etcHosts, sandboxEtcHosts, 0644); err != nil {
@@ -468,7 +468,7 @@ func parseDNSOptions(servers, searches, options []string) (string, error) {
 // remove these files. Unmount should *NOT* return error when:
 //  1) The mount point is already unmounted.
 //  2) The mount point doesn't exist.
-func (c *criContainerdService) unmountSandboxFiles(rootDir string, config *runtime.PodSandboxConfig) error {
+func (c *criService) unmountSandboxFiles(rootDir string, config *runtime.PodSandboxConfig) error {
 	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetIpc() != runtime.NamespaceMode_NODE {
 		if err := c.os.Unmount(getSandboxDevShm(rootDir), unix.MNT_DETACH); err != nil && !os.IsNotExist(err) {
 			return err
@@ -478,7 +478,7 @@ func (c *criContainerdService) unmountSandboxFiles(rootDir string, config *runti
 }
 
 // setupPod setups up the network for a pod
-func (c *criContainerdService) setupPod(id string, path string, config *runtime.PodSandboxConfig) (string, error) {
+func (c *criService) setupPod(id string, path string, config *runtime.PodSandboxConfig) (string, error) {
 	if c.netPlugin == nil {
 		return "", errors.New("cni config not intialized")
 	}

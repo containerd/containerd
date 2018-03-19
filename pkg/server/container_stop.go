@@ -36,7 +36,7 @@ import (
 const killContainerTimeout = 2 * time.Minute
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
-func (c *criContainerdService) StopContainer(ctx context.Context, r *runtime.StopContainerRequest) (*runtime.StopContainerResponse, error) {
+func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainerRequest) (*runtime.StopContainerResponse, error) {
 	// Get container config from container store.
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
@@ -51,7 +51,7 @@ func (c *criContainerdService) StopContainer(ctx context.Context, r *runtime.Sto
 }
 
 // stopContainer stops a container based on the container metadata.
-func (c *criContainerdService) stopContainer(ctx context.Context, container containerstore.Container, timeout time.Duration) error {
+func (c *criService) stopContainer(ctx context.Context, container containerstore.Container, timeout time.Duration) error {
 	id := container.ID
 
 	// Return without error if container is not running. This makes sure that
@@ -130,7 +130,7 @@ func (c *criContainerdService) stopContainer(ctx context.Context, container cont
 }
 
 // waitContainerStop waits for container to be stopped until timeout exceeds or context is cancelled.
-func (c *criContainerdService) waitContainerStop(ctx context.Context, container containerstore.Container, timeout time.Duration) error {
+func (c *criService) waitContainerStop(ctx context.Context, container containerstore.Container, timeout time.Duration) error {
 	timeoutTimer := time.NewTimer(timeout)
 	defer timeoutTimer.Stop()
 	select {

@@ -70,7 +70,7 @@ func TestVolumeCopyUp(t *testing.T) {
 	assert.Equal(t, "test_content\n", string(stdout))
 
 	t.Logf("Check host path of the volume")
-	hostCmd := fmt.Sprintf("ls %s/containers/%s/volumes/*/test_file | xargs cat", *criContainerdRoot, cn)
+	hostCmd := fmt.Sprintf("ls %s/containers/%s/volumes/*/test_file | xargs cat", *criRoot, cn)
 	output, err := exec.Command("sh", "-c", hostCmd).CombinedOutput()
 	require.NoError(t, err)
 	assert.Equal(t, "test_content\n", string(output))

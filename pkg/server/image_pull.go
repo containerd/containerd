@@ -77,7 +77,7 @@ import (
 // contents are missing but snapshots are ready, is the image still "READY"?
 
 // PullImage pulls an image with authentication config.
-func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (*runtime.PullImageResponse, error) {
+func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (*runtime.PullImageResponse, error) {
 	imageRef := r.GetImage().GetImage()
 	namedRef, err := util.NormalizeImageRef(imageRef)
 	if err != nil {
@@ -194,7 +194,7 @@ func ParseAuth(auth *runtime.AuthConfig) (string, string, error) {
 // Note that because create and update are not finished in one transaction, there could be race. E.g.
 // the image reference is deleted by someone else after create returns already exists, but before update
 // happens.
-func (c *criContainerdService) createImageReference(ctx context.Context, name string, desc imagespec.Descriptor) error {
+func (c *criService) createImageReference(ctx context.Context, name string, desc imagespec.Descriptor) error {
 	img := containerdimages.Image{
 		Name:   name,
 		Target: desc,
@@ -212,7 +212,7 @@ func (c *criContainerdService) createImageReference(ctx context.Context, name st
 	return err
 }
 
-func (c *criContainerdService) getResolverOptions() map[string][]string {
+func (c *criService) getResolverOptions() map[string][]string {
 	options := make(map[string][]string)
 	for ns, mirror := range c.config.Mirrors {
 		options[ns] = append(options[ns], mirror.Endpoints...)

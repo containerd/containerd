@@ -33,7 +33,7 @@ import (
 )
 
 // PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
-func (c *criContainerdService) PortForward(ctx context.Context, r *runtime.PortForwardRequest) (retRes *runtime.PortForwardResponse, retErr error) {
+func (c *criService) PortForward(ctx context.Context, r *runtime.PortForwardRequest) (retRes *runtime.PortForwardResponse, retErr error) {
 	// TODO(random-liu): Run a socat container inside the sandbox to do portforward.
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
@@ -49,7 +49,7 @@ func (c *criContainerdService) PortForward(ctx context.Context, r *runtime.PortF
 // portForward requires `nsenter` and `socat` on the node, it uses `nsenter` to enter the
 // sandbox namespace, and run `socat` inside the namespace to forward stream for a specific
 // port. The `socat` command keeps running until it exits or client disconnect.
-func (c *criContainerdService) portForward(id string, port int32, stream io.ReadWriteCloser) error {
+func (c *criService) portForward(id string, port int32, stream io.ReadWriteCloser) error {
 	s, err := c.sandboxStore.Get(id)
 	if err != nil {
 		return errors.Wrapf(err, "failed to find sandbox %q in store", id)

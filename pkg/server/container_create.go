@@ -73,7 +73,7 @@ func init() {
 }
 
 // CreateContainer creates a new container in the given PodSandbox.
-func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.CreateContainerRequest) (_ *runtime.CreateContainerResponse, retErr error) {
+func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateContainerRequest) (_ *runtime.CreateContainerResponse, retErr error) {
 	config := r.GetConfig()
 	sandboxConfig := r.GetSandboxConfig()
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
@@ -274,7 +274,7 @@ func (c *criContainerdService) CreateContainer(ctx context.Context, r *runtime.C
 	return &runtime.CreateContainerResponse{ContainerId: id}, nil
 }
 
-func (c *criContainerdService) generateContainerSpec(id string, sandboxID string, sandboxPid uint32, config *runtime.ContainerConfig,
+func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxPid uint32, config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig, extraMounts []*runtime.Mount) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
 	spec, err := defaultRuntimeSpec(id)
@@ -377,7 +377,7 @@ func (c *criContainerdService) generateContainerSpec(id string, sandboxID string
 // generateVolumeMounts sets up image volumes for container. Rely on the removal of container
 // root directory to do cleanup. Note that image volume will be skipped, if there is criMounts
 // specified with the same destination.
-func (c *criContainerdService) generateVolumeMounts(containerRootDir string, criMounts []*runtime.Mount, config *imagespec.ImageConfig) []*runtime.Mount {
+func (c *criService) generateVolumeMounts(containerRootDir string, criMounts []*runtime.Mount, config *imagespec.ImageConfig) []*runtime.Mount {
 	if len(config.Volumes) == 0 {
 		return nil
 	}
@@ -405,7 +405,7 @@ func (c *criContainerdService) generateVolumeMounts(containerRootDir string, cri
 
 // generateContainerMounts sets up necessary container mounts including /dev/shm, /etc/hosts
 // and /etc/resolv.conf.
-func (c *criContainerdService) generateContainerMounts(sandboxRootDir string, config *runtime.ContainerConfig) []*runtime.Mount {
+func (c *criService) generateContainerMounts(sandboxRootDir string, config *runtime.ContainerConfig) []*runtime.Mount {
 	var mounts []*runtime.Mount
 	securityContext := config.GetLinux().GetSecurityContext()
 	if !isInCRIMounts(etcHosts, config.GetMounts()) {
@@ -496,7 +496,7 @@ func clearReadOnly(m *runtimespec.Mount) {
 }
 
 // addDevices set device mapping without privilege.
-func (c *criContainerdService) addOCIDevices(g *generate.Generator, devs []*runtime.Device) error {
+func (c *criService) addOCIDevices(g *generate.Generator, devs []*runtime.Device) error {
 	spec := g.Spec()
 	for _, device := range devs {
 		path, err := c.os.ResolveSymbolicLink(device.HostPath)
@@ -559,7 +559,7 @@ func setOCIDevicesPrivileged(g *generate.Generator) error {
 }
 
 // addOCIBindMounts adds bind mounts.
-func (c *criContainerdService) addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount, mountLabel string) error {
+func (c *criService) addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount, mountLabel string) error {
 	// Mount cgroup into the container as readonly, which inherits docker's behavior.
 	g.AddCgroupsMount("ro") // nolint: errcheck
 	for _, mount := range mounts {
