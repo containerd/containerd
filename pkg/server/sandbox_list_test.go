@@ -75,7 +75,7 @@ func TestToCRISandbox(t *testing.T) {
 }
 
 func TestFilterSandboxes(t *testing.T) {
-	c := newTestCRIContainerdService()
+	c := newTestCRIService()
 	sandboxes := []sandboxstore.Sandbox{
 		sandboxstore.NewSandbox(
 			sandboxstore.Metadata{

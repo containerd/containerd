@@ -88,7 +88,7 @@ type Config struct {
 	ContainerdRootDir string `json:"containerdRootDir,omitempty"`
 	// ContainerdEndpoint is the containerd endpoint path.
 	ContainerdEndpoint string `json:"containerdEndpoint,omitempty"`
-	// RootDir is the root directory path for managing cri-containerd files
+	// RootDir is the root directory path for managing cri plugin files
 	// (metadata checkpoint etc.)
 	RootDir string `json:"rootDir,omitempty"`
 }

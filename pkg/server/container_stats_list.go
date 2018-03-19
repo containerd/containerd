@@ -29,7 +29,7 @@ import (
 )
 
 // ListContainerStats returns stats of all running containers.
-func (c *criContainerdService) ListContainerStats(
+func (c *criService) ListContainerStats(
 	ctx context.Context,
 	in *runtime.ListContainerStatsRequest,
 ) (*runtime.ListContainerStatsResponse, error) {
@@ -48,7 +48,7 @@ func (c *criContainerdService) ListContainerStats(
 	return criStats, nil
 }
 
-func (c *criContainerdService) toCRIContainerStats(
+func (c *criService) toCRIContainerStats(
 	stats []*types.Metric,
 	containers []containerstore.Container,
 ) (*runtime.ListContainerStatsResponse, error) {
@@ -67,7 +67,7 @@ func (c *criContainerdService) toCRIContainerStats(
 	return containerStats, nil
 }
 
-func (c *criContainerdService) getContainerMetrics(
+func (c *criService) getContainerMetrics(
 	meta containerstore.Metadata,
 	stats *types.Metric,
 ) (*runtime.ContainerStats, error) {
@@ -118,7 +118,7 @@ func (c *criContainerdService) getContainerMetrics(
 	return &cs, nil
 }
 
-func (c *criContainerdService) normalizeContainerStatsFilter(filter *runtime.ContainerStatsFilter) {
+func (c *criService) normalizeContainerStatsFilter(filter *runtime.ContainerStatsFilter) {
 	if cntr, err := c.containerStore.Get(filter.GetId()); err == nil {
 		filter.Id = cntr.ID
 	}
@@ -129,7 +129,7 @@ func (c *criContainerdService) normalizeContainerStatsFilter(filter *runtime.Con
 
 // buildTaskMetricsRequest constructs a tasks.MetricsRequest based on
 // the information in the stats request and the containerStore
-func (c *criContainerdService) buildTaskMetricsRequest(
+func (c *criService) buildTaskMetricsRequest(
 	r *runtime.ListContainerStatsRequest,
 ) (tasks.MetricsRequest, []containerstore.Container, error) {
 	var req tasks.MetricsRequest

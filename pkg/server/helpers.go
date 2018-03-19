@@ -219,7 +219,7 @@ func getRepoDigestAndTag(namedRef reference.Named, digest imagedigest.Digest, sc
 
 // localResolve resolves image reference locally and returns corresponding image metadata. It returns
 // nil without error if the reference doesn't exist.
-func (c *criContainerdService) localResolve(ctx context.Context, refOrID string) (*imagestore.Image, error) {
+func (c *criService) localResolve(ctx context.Context, refOrID string) (*imagestore.Image, error) {
 	getImageID := func(refOrId string) string {
 		if _, err := imagedigest.Parse(refOrID); err == nil {
 			return refOrID
@@ -278,7 +278,7 @@ func getUserFromImage(user string) (*int64, string) {
 
 // ensureImageExists returns corresponding metadata of the image reference, if image is not
 // pulled yet, the function will pull the image.
-func (c *criContainerdService) ensureImageExists(ctx context.Context, ref string) (*imagestore.Image, error) {
+func (c *criService) ensureImageExists(ctx context.Context, ref string) (*imagestore.Image, error) {
 	image, err := c.localResolve(ctx, ref)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to resolve image %q", ref)

@@ -51,7 +51,7 @@ func TestWaitSandboxStop(t *testing.T) {
 			expectErr: false,
 		},
 	} {
-		c := newTestCRIContainerdService()
+		c := newTestCRIService()
 		sandbox := sandboxstore.NewSandbox(
 			sandboxstore.Metadata{ID: id},
 			sandboxstore.Status{State: test.state},

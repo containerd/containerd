@@ -152,7 +152,7 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		c := newTestCRIContainerdService()
+		c := newTestCRIService()
 		config, imageConfig, specCheck := getRunPodSandboxTestData()
 		if test.configChange != nil {
 			test.configChange(config)
@@ -261,7 +261,7 @@ options timeout:1
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		c := newTestCRIContainerdService()
+		c := newTestCRIService()
 		cfg := &runtime.PodSandboxConfig{
 			DnsConfig: test.dnsConfig,
 			Linux: &runtime.LinuxPodSandboxConfig{

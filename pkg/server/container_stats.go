@@ -25,7 +25,7 @@ import (
 
 // ContainerStats returns stats of the container. If the container does not
 // exist, the call returns an error.
-func (c *criContainerdService) ContainerStats(ctx context.Context, in *runtime.ContainerStatsRequest) (*runtime.ContainerStatsResponse, error) {
+func (c *criService) ContainerStats(ctx context.Context, in *runtime.ContainerStatsRequest) (*runtime.ContainerStatsResponse, error) {
 	cntr, err := c.containerStore.Get(in.GetContainerId())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find container")

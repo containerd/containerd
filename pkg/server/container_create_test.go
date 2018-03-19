@@ -188,7 +188,7 @@ func TestGeneralContainerSpec(t *testing.T) {
 	testID := "test-id"
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
-	c := newTestCRIContainerdService()
+	c := newTestCRIService()
 	testSandboxID := "sandbox-id"
 	spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil)
 	require.NoError(t, err)
@@ -200,7 +200,7 @@ func TestContainerCapabilities(t *testing.T) {
 	testSandboxID := "sandbox-id"
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
-	c := newTestCRIContainerdService()
+	c := newTestCRIService()
 	for desc, test := range map[string]struct {
 		capability *runtime.Capability
 		includes   []string
@@ -269,7 +269,7 @@ func TestContainerSpecTty(t *testing.T) {
 	testSandboxID := "sandbox-id"
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
-	c := newTestCRIContainerdService()
+	c := newTestCRIService()
 	for _, tty := range []bool{true, false} {
 		config.Tty = tty
 		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil)
@@ -289,7 +289,7 @@ func TestContainerSpecReadonlyRootfs(t *testing.T) {
 	testSandboxID := "sandbox-id"
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
-	c := newTestCRIContainerdService()
+	c := newTestCRIService()
 	for _, readonly := range []bool{true, false} {
 		config.Linux.SecurityContext.ReadonlyRootfs = readonly
 		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil)
@@ -304,7 +304,7 @@ func TestContainerSpecWithExtraMounts(t *testing.T) {
 	testSandboxID := "sandbox-id"
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
-	c := newTestCRIContainerdService()
+	c := newTestCRIService()
 	mountInConfig := &runtime.Mount{
 		ContainerPath: "test-container-path",
 		HostPath:      "test-host-path",
@@ -338,7 +338,7 @@ func TestContainerAndSandboxPrivileged(t *testing.T) {
 	testSandboxID := "sandbox-id"
 	testPid := uint32(1234)
 	config, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
-	c := newTestCRIContainerdService()
+	c := newTestCRIService()
 	for desc, test := range map[string]struct {
 		containerPrivileged bool
 		sandboxPrivileged   bool
@@ -477,7 +477,7 @@ func TestGenerateVolumeMounts(t *testing.T) {
 		config := &imagespec.ImageConfig{
 			Volumes: test.imageVolumes,
 		}
-		c := newTestCRIContainerdService()
+		c := newTestCRIService()
 		got := c.generateVolumeMounts(testContainerRootDir, test.criMounts, config)
 		assert.Len(t, got, len(test.expectedMountDest))
 		for _, dest := range test.expectedMountDest {
@@ -596,7 +596,7 @@ func TestGenerateContainerMounts(t *testing.T) {
 				SecurityContext: test.securityContext,
 			},
 		}
-		c := newTestCRIContainerdService()
+		c := newTestCRIService()
 		mounts := c.generateContainerMounts(testSandboxRootDir, config)
 		assert.Equal(t, test.expectedMounts, mounts, desc)
 	}
@@ -628,7 +628,7 @@ func TestPrivilegedBindMount(t *testing.T) {
 		t.Logf("TestCase %q", desc)
 		g := generate.New()
 		g.SetRootReadonly(test.readonlyRootFS)
-		c := newTestCRIContainerdService()
+		c := newTestCRIService()
 		c.addOCIBindMounts(&g, nil, "")
 		if test.privileged {
 			setOCIBindMountsPrivileged(&g)
@@ -736,7 +736,7 @@ func TestMountPropagation(t *testing.T) {
 	} {
 		t.Logf("TestCase %q", desc)
 		g := generate.New()
-		c := newTestCRIContainerdService()
+		c := newTestCRIService()
 		c.os.(*ostesting.FakeOS).LookupMountFn = test.fakeLookupMountFn
 		err := c.addOCIBindMounts(&g, []*runtime.Mount{test.criMount}, "")
 		if test.expectErr {
@@ -753,7 +753,7 @@ func TestPidNamespace(t *testing.T) {
 	testPid := uint32(1234)
 	testSandboxID := "sandbox-id"
 	config, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
-	c := newTestCRIContainerdService()
+	c := newTestCRIService()
 	for desc, test := range map[string]struct {
 		pidNS    runtime.NamespaceMode
 		expected runtimespec.LinuxNamespace

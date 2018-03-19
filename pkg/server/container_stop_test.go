@@ -61,7 +61,7 @@ func TestWaitContainerStop(t *testing.T) {
 			expectErr: false,
 		},
 	} {
-		c := newTestCRIContainerdService()
+		c := newTestCRIService()
 		container, err := containerstore.NewContainer(
 			containerstore.Metadata{ID: id},
 			containerstore.WithFakeStatus(*test.status),

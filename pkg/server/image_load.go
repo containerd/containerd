@@ -30,7 +30,7 @@ import (
 )
 
 // LoadImage loads a image into containerd.
-func (c *criContainerdService) LoadImage(ctx context.Context, r *api.LoadImageRequest) (*api.LoadImageResponse, error) {
+func (c *criService) LoadImage(ctx context.Context, r *api.LoadImageRequest) (*api.LoadImageResponse, error) {
 	path := r.GetFilePath()
 	if !filepath.IsAbs(path) {
 		return nil, errors.Errorf("path %q is not an absolute path", path)

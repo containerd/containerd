@@ -193,7 +193,7 @@ func TestContainerStatus(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		c := newTestCRIContainerdService()
+		c := newTestCRIService()
 		metadata, status, image, expected := getContainerStatusTestData()
 		// Update status with test case.
 		status.FinishedAt = test.finishedAt

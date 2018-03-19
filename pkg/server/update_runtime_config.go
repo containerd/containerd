@@ -24,6 +24,6 @@ import (
 
 // UpdateRuntimeConfig updates the runtime config. Currently only handles podCIDR updates.
 // TODO(random-liu): Figure out how to handle pod cidr in the cri plugin.
-func (c *criContainerdService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateRuntimeConfigRequest) (*runtime.UpdateRuntimeConfigResponse, error) {
+func (c *criService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateRuntimeConfigRequest) (*runtime.UpdateRuntimeConfigResponse, error) {
 	return &runtime.UpdateRuntimeConfigResponse{}, nil
 }

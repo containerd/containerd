@@ -58,7 +58,7 @@ func TestImageLoad(t *testing.T) {
 	}
 
 	t.Logf("load image in cri")
-	res, err := criContainerdClient.LoadImage(context.Background(), &api.LoadImageRequest{FilePath: tar})
+	res, err := criPluginClient.LoadImage(context.Background(), &api.LoadImageRequest{FilePath: tar})
 	require.NoError(t, err)
 	require.Equal(t, []string{loadedImage}, res.GetImages())
 

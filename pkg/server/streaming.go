@@ -31,7 +31,7 @@ import (
 	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
 )
 
-func newStreamServer(c *criContainerdService, addr, port string) (streaming.Server, error) {
+func newStreamServer(c *criService, addr, port string) (streaming.Server, error) {
 	if addr == "" {
 		a, err := k8snet.ChooseBindAddress(nil)
 		if err != nil {
@@ -46,10 +46,10 @@ func newStreamServer(c *criContainerdService, addr, port string) (streaming.Serv
 }
 
 type streamRuntime struct {
-	c *criContainerdService
+	c *criService
 }
 
-func newStreamRuntime(c *criContainerdService) streaming.Runtime {
+func newStreamRuntime(c *criService) streaming.Runtime {
 	return &streamRuntime{c: c}
 }
 

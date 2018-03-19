@@ -26,9 +26,9 @@ import (
 	api "github.com/containerd/cri/pkg/api/v1"
 )
 
-// NewCRIContainerdClient creates grpc client of cri-containerd
+// NewCRIPluginClient creates grpc client of cri plugin
 // TODO(random-liu): Wrap grpc functions.
-func NewCRIContainerdClient(endpoint string, timeout time.Duration) (api.CRIContainerdServiceClient, error) {
+func NewCRIPluginClient(endpoint string, timeout time.Duration) (api.CRIPluginServiceClient, error) {
 	addr, dialer, err := util.GetAddressAndDialer(endpoint)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get dialer")
@@ -43,5 +43,5 @@ func NewCRIContainerdClient(endpoint string, timeout time.Duration) (api.CRICont
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to dial")
 	}
-	return api.NewCRIContainerdServiceClient(conn), nil
+	return api.NewCRIPluginServiceClient(conn), nil
 }

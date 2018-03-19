@@ -36,9 +36,9 @@ const (
 	testImageFSPath  = "/test/image/fs/path"
 )
 
-// newTestCRIContainerdService creates a fake criContainerdService for test.
-func newTestCRIContainerdService() *criContainerdService {
-	return &criContainerdService{
+// newTestCRIService creates a fake criService for test.
+func newTestCRIService() *criService {
+	return &criService{
 		config: criconfig.Config{
 			RootDir: testRootDir,
 			PluginConfig: criconfig.PluginConfig{

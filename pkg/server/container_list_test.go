@@ -77,7 +77,7 @@ func TestToCRIContainer(t *testing.T) {
 }
 
 func TestFilterContainers(t *testing.T) {
-	c := newTestCRIContainerdService()
+	c := newTestCRIService()
 
 	testContainers := []*runtime.Container{
 		{
@@ -168,7 +168,7 @@ func (c containerForTest) toContainer() (containerstore.Container, error) {
 }
 
 func TestListContainers(t *testing.T) {
-	c := newTestCRIContainerdService()
+	c := newTestCRIService()
 	sandboxesInStore := []sandboxstore.Sandbox{
 		sandboxstore.NewSandbox(
 			sandboxstore.Metadata{

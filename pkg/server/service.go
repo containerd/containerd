@@ -50,11 +50,11 @@ import (
 type grpcServices interface {
 	runtime.RuntimeServiceServer
 	runtime.ImageServiceServer
-	api.CRIContainerdServiceServer
+	api.CRIPluginServiceServer
 }
 
-// CRIContainerdService is the interface implement CRI remote service server.
-type CRIContainerdService interface {
+// CRIService is the interface implement CRI remote service server.
+type CRIService interface {
 	Run() error
 	// io.Closer is used by containerd to gracefully stop cri service.
 	io.Closer
@@ -62,8 +62,8 @@ type CRIContainerdService interface {
 	grpcServices
 }
 
-// criContainerdService implements CRIContainerdService.
-type criContainerdService struct {
+// criService implements CRIService.
+type criService struct {
 	// config contains all configurations.
 	config criconfig.Config
 	// imageFSPath is the path to image filesystem.
@@ -101,10 +101,10 @@ type criContainerdService struct {
 	initialized atomic.Bool
 }
 
-// NewCRIContainerdService returns a new instance of CRIContainerdService
-func NewCRIContainerdService(config criconfig.Config, client *containerd.Client) (CRIContainerdService, error) {
+// NewCRIService returns a new instance of CRIService
+func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIService, error) {
 	var err error
-	c := &criContainerdService{
+	c := &criService{
 		config:             config,
 		client:             client,
 		apparmorEnabled:    runcapparmor.IsEnabled(),
@@ -159,16 +159,16 @@ func NewCRIContainerdService(config criconfig.Config, client *containerd.Client)
 
 // Register registers all required services onto a specific grpc server.
 // This is used by containerd cri plugin.
-func (c *criContainerdService) Register(s *grpc.Server) error {
+func (c *criService) Register(s *grpc.Server) error {
 	instrumented := newInstrumentedService(c)
 	runtime.RegisterRuntimeServiceServer(s, instrumented)
 	runtime.RegisterImageServiceServer(s, instrumented)
-	api.RegisterCRIContainerdServiceServer(s, instrumented)
+	api.RegisterCRIPluginServiceServer(s, instrumented)
 	return nil
 }
 
-// Run starts the cri-containerd service.
-func (c *criContainerdService) Run() error {
+// Run starts the CRI service.
+func (c *criService) Run() error {
 	logrus.Info("Start subscribing containerd event")
 	c.eventMonitor.subscribe(c.client)
 
@@ -206,7 +206,7 @@ func (c *criContainerdService) Run() error {
 	// Set the server as initialized. GRPC services could start serving traffic.
 	c.initialized.Set()
 
-	// Stop the whole cri-containerd service if any of the critical service exits.
+	// Stop the whole CRI service if any of the critical service exits.
 	select {
 	case <-eventMonitorCloseCh:
 	case <-streamServerCloseCh:
@@ -235,9 +235,9 @@ func (c *criContainerdService) Run() error {
 	return nil
 }
 
-// Stop stops the cri-containerd service.
-func (c *criContainerdService) Close() error {
-	logrus.Info("Stop cri-containerd service")
+// Stop stops the CRI service.
+func (c *criService) Close() error {
+	logrus.Info("Stop CRI service")
 	// TODO(random-liu): Make event monitor stop synchronous.
 	c.eventMonitor.stop()
 	if err := c.streamServer.Stop(); err != nil {

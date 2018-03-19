@@ -39,7 +39,7 @@ import (
 
 // ExecSync executes a command in the container, and returns the stdout output.
 // If command exits with a non-zero exit code, an error is returned.
-func (c *criContainerdService) ExecSync(ctx context.Context, r *runtime.ExecSyncRequest) (*runtime.ExecSyncResponse, error) {
+func (c *criService) ExecSync(ctx context.Context, r *runtime.ExecSyncRequest) (*runtime.ExecSyncResponse, error) {
 	var stdout, stderr bytes.Buffer
 	exitCode, err := c.execInContainer(ctx, r.GetContainerId(), execOptions{
 		cmd:     r.GetCmd(),
@@ -71,7 +71,7 @@ type execOptions struct {
 
 // execInContainer executes a command inside the container synchronously, and
 // redirects stdio stream properly.
-func (c *criContainerdService) execInContainer(ctx context.Context, id string, opts execOptions) (*uint32, error) {
+func (c *criService) execInContainer(ctx context.Context, id string, opts execOptions) (*uint32, error) {
 	// Cancel the context before returning to ensure goroutines are stopped.
 	// This is important, because if `Start` returns error, `Wait` will hang
 	// forever unless we cancel the context.
