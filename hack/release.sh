@@ -34,6 +34,11 @@ CUSTOM_CONTAINERD=${CUSTOM_CONTAINERD:-false}
 
 destdir=${BUILD_DIR}/release-stage
 
+if [[ -z "${VERSION}" ]]; then
+  echo "VERSION is not set"
+  exit 1
+fi
+
 # Remove release-stage directory to avoid including old files.
 rm -rf ${destdir}
 
@@ -50,6 +55,8 @@ cp ${ROOT}/contrib/systemd-units/* ${destdir}/etc/systemd/system/
 # Install cluster directory into release stage.
 mkdir -p ${destdir}/opt/containerd
 cp -r ${ROOT}/cluster ${destdir}/opt/containerd
+# Write a version file into the release tarball.
+echo ${VERSION} > ${destdir}/opt/containerd/cluster/version
 
 # Create release tar
 tarball=${BUILD_DIR}/${TARBALL}

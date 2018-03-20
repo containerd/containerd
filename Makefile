@@ -148,7 +148,7 @@ uninstall:
 	rm -f $(BINDIR)/ctr
 
 $(BUILD_DIR)/$(TARBALL): static-binaries vendor.conf
-	@BUILD_DIR=$(BUILD_DIR) TARBALL=$(TARBALL) ./hack/release.sh
+	@BUILD_DIR=$(BUILD_DIR) TARBALL=$(TARBALL) VERSION=$(VERSION) ./hack/release.sh
 
 release: $(BUILD_DIR)/$(TARBALL)
 
