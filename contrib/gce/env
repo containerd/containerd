@@ -3,12 +3,11 @@ GCE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # TODO(random-liu): Upload release tarball to user's own GCS, and use it. We should
 # not let all nodes of all users download tarball from cri-containerd-release.
-if [ -z "${CRI_CONTAINERD_VERSION:-}" ]; then
-  CRI_CONTAINERD_VERSION=$(curl -f --ipv4 --retry 6 --retry-delay 3 --silent --show-error \
-    https://storage.googleapis.com/cri-containerd-release/latest)
+version_file=${GCE_DIR}/../version
+if [ ! -f "${version_file}" ]; then
+  echo "version file does not exist"
+  exit 1
 fi
-version_file=$(mktemp /tmp/version.XXXX)
-echo "${CRI_CONTAINERD_VERSION}" > "$version_file"
 export KUBE_MASTER_EXTRA_METADATA="user-data=${GCE_DIR}/cloud-init/master.yaml,containerd-configure-sh=${GCE_DIR}/configure.sh,version=${version_file}"
 export KUBE_NODE_EXTRA_METADATA="user-data=${GCE_DIR}/cloud-init/node.yaml,containerd-configure-sh=${GCE_DIR}/configure.sh,version=${version_file}"
 export KUBE_CONTAINER_RUNTIME="remote"

@@ -61,7 +61,7 @@ curl -f --ipv4 -Lo "${TARBALL}" --connect-timeout 20 --max-time 300 --retry 6 --
 tar xvf "${TARBALL}"
 
 # Copy crictl config.
-cp "${CRI_CONTAINERD_HOME}/etc/crictl.yaml" /etc
+cp "${CONTAINERD_HOME}/etc/crictl.yaml" /etc
 
 echo "export PATH=${CONTAINERD_HOME}/usr/local/bin/:${CONTAINERD_HOME}/usr/local/sbin/:\$PATH" > \
   /etc/profile.d/containerd_env.sh
