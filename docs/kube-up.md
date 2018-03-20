@@ -9,14 +9,12 @@ Unpack release tarball to any directory, using `${CRI_CONTAINERD_PATH}` to indic
 tar -C ${CRI_CONTAINERD_PATH} -xzf cri-containerd-${VERSION}.linux-amd64.tar.gz
 ```
 ## Set Environment Variables for CRI-Containerd
-Use environment variable `CRI_CONTAINERD_VERSION` to specify `cri-containerd` version. By default,
-latest version will be used.
 ```bash
-. ${CRI_CONTAINERD_PATH}/opt/cri-containerd/cluster/gce/env
+. ${CRI_CONTAINERD_PATH}/opt/containerd/cluster/gce/env
 ```
 ## Create Kubernetes Cluster on GCE
 Follow these instructions [here](https://kubernetes.io/docs/getting-started-guides/gce/) to create a production quality Kubernetes cluster on GCE.
 
-**Make sure the Kubernetes version you are using is v1.9 or greater:**
+**Make sure the Kubernetes version you are using is v1.10 or greater:**
 * When using `https://get.k8s.io`, use the environment variable `KUBERNETES_RELEASE` to set version.
-* When using a Kubernetes release tarball, make sure to select version 1.9 or greater.
+* When using a Kubernetes release tarball, make sure to select version 1.10 or greater.

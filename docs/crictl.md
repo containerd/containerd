@@ -51,7 +51,8 @@ $ docker pull k8s.gcr.io/pause-amd64:3.1
   Status: Downloaded newer image for k8s.gcr.io/pause-amd64:3.1
 $ docker save k8s.gcr.io/pause-amd64:3.1 -o pause.tar
 ```
-Then load the container image into the container runtime:
+Then use [`ctr`](https://github.com/containerd/containerd/blob/master/docs/man/ctr.1.md)
+to load the container image into the container runtime:
 ```console
 $ sudo ctr cri load pause.tar
   Loaded image: k8s.gcr.io/pause-amd64:3.1
