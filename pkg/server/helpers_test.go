@@ -19,10 +19,10 @@ package server
 import (
 	"testing"
 
+	criconfig "github.com/containerd/cri/pkg/config"
+	"github.com/containerd/cri/pkg/util"
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/containerd/cri/pkg/util"
 )
 
 // TestGetUserFromImage tests the logic of getting image uid or user name of image user.
@@ -141,4 +141,65 @@ func TestBuildLabels(t *testing.T) {
 	newLabels["a"] = "e"
 	assert.Empty(t, configLabels[containerKindLabel], "should not add new labels into original label")
 	assert.Equal(t, "b", configLabels["a"], "change in new labels should not affect original label")
+}
+
+func Test_criService_getRuntime(t *testing.T) {
+
+	const (
+		privilegedWorkload    = true
+		nonPrivilegedWorkload = false
+	)
+
+	nonPrivilegedRuntime := criconfig.Runtime{
+		Type:   "io.containerd.runtime.v1.linux",
+		Engine: "kata-runtime",
+		Root:   "",
+	}
+
+	privilegedRuntime := criconfig.Runtime{
+		Type:   "io.containerd.runtime.v1.linux",
+		Engine: "runc",
+		Root:   "",
+	}
+
+	// Crate a configuration that does not specify a privileged runtime
+	// Both privileged and non-privileged workloads are created with the
+	// defaultRuntime (nonPrivilegedRuntime).
+	nonPrivilegedConfig := criService{
+		config: criconfig.Config{
+			PluginConfig: criconfig.DefaultConfig(),
+		},
+	}
+	nonPrivilegedConfig.config.ContainerdConfig.DefaultRuntime = nonPrivilegedRuntime
+
+	// Crate a configuration that specifies a privileged runtime
+	// The privileged workloads are created with the privilegedRuntime
+	// The non-privileged workloads be created with the
+	// defaultRuntime(nonPrivilegedRuntime)
+	privilegedConfig := criService{
+		config: criconfig.Config{
+			PluginConfig: criconfig.DefaultConfig(),
+		},
+	}
+	privilegedConfig.config.ContainerdConfig.DefaultRuntime = nonPrivilegedRuntime
+	privilegedConfig.config.ContainerdConfig.PrivilegedRuntime = privilegedRuntime
+
+	tests := []struct {
+		name        string
+		cri         criService
+		privileged  bool
+		wantRuntime criconfig.Runtime
+	}{
+		{"nonPrivilegedConfig/PrivilegedWorkload", nonPrivilegedConfig, privilegedWorkload, nonPrivilegedRuntime},
+		{"nonPrivilegedConfig/PrivilegedWorkload", nonPrivilegedConfig, nonPrivilegedWorkload, nonPrivilegedRuntime},
+		{"PrivilegedConfig/nonPrivilegedWorkload", privilegedConfig, privilegedWorkload, privilegedRuntime},
+		{"PrivilegedConfig/nonPrivilegedWorkload", privilegedConfig, nonPrivilegedWorkload, nonPrivilegedRuntime},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotRuntime := tt.cri.getRuntime(tt.privileged)
+			assert.Equal(t, tt.wantRuntime, gotRuntime)
+		})
+	}
 }
