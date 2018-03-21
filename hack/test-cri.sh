@@ -37,6 +37,13 @@ GOPATH=${GOPATH%%:*}
 
 CRITEST=${GOPATH}/bin/critest
 
+GINKGO_PKG=github.com/onsi/ginkgo/ginkgo
+
+# Install ginkgo
+if [ ! -x "$(command -v ginkgo)" ]; then
+  go get -u ${GINKGO_PKG}
+fi
+
 # Install critest
 if [ ! -x "$(command -v ${CRITEST})" ]; then
   go get -d ${CRITOOL_PKG}/...
@@ -51,7 +58,7 @@ mkdir -p ${REPORT_DIR}
 test_setup ${REPORT_DIR}
 
 # Run cri validation test
-sudo env PATH=${PATH} GOPATH=${GOPATH} ${CRITEST} --runtime-endpoint=${CONTAINERD_SOCK} --focus="${FOCUS}" --ginkgo-flags="--skip=\"${SKIP}\" --nodes=8" validation
+sudo env PATH=${PATH} GOPATH=${GOPATH} ${CRITEST} --runtime-endpoint=${CONTAINERD_SOCK} --ginkgo.focus="${FOCUS}" --ginkgo.skip="${SKIP}" --parallel=8
 test_exit_code=$?
 
 test_teardown

@@ -19,7 +19,7 @@ set -o nounset
 set -o pipefail
 
 source $(dirname "${BASH_SOURCE[0]}")/utils.sh
-CRICTL_DIR=${DESTDIR}/usr/local/bin
+CRITOOL_DIR=${DESTDIR}/usr/local/bin
 CRICTL_CONFIG_DIR=${DESTDIR}/etc
 
 # Create a temporary GOPATH for crictl installation.
@@ -29,8 +29,8 @@ GOPATH=${TMPGOPATH}
 #Install crictl
 checkout_repo ${CRITOOL_PKG} ${CRITOOL_VERSION} ${CRITOOL_REPO}
 cd ${GOPATH}/src/${CRITOOL_PKG}
-make crictl
-${SUDO} make install-crictl -e BINDIR=${CRICTL_DIR} GOPATH=${GOPATH}
+make
+${SUDO} make install -e BINDIR=${CRITOOL_DIR} GOPATH=${GOPATH}
 ${SUDO} mkdir -p ${CRICTL_CONFIG_DIR}
 ${SUDO} bash -c 'cat >'${CRICTL_CONFIG_DIR}'/crictl.yaml <<EOF
 runtime-endpoint: /run/containerd/containerd.sock

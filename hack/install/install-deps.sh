@@ -46,5 +46,5 @@ fi
 # Install containerd
 ./install-containerd.sh
 
-#Install crictl
-./install-crictl.sh
+#Install critools
+./install-critools.sh
