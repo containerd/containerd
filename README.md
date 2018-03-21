@@ -4,10 +4,11 @@
 <img src="https://github.com/containerd/containerd/blob/master/docs/images/containerd-dark.png" width="200" >
 </p>
 
-Note: `cri-containerd` is transitioning from a standalone binary that talks to
-containerd to a plugin within containerd. This github branch is for the `cri`
-plugin. See [cri-containerd standalone branch](https://github.com/containerd/cri/tree/standalone-cri-containerd)
-for information about the standalone version of cri-containerd.
+*Note: The standalone `cri-containerd` binary is end-of-life. `cri-containerd` is
+transitioning from a standalone binary that talks to containerd to a plugin within
+containerd. This github branch is for the `cri` plugin. See
+[standalone-cri-containerd branch](https://github.com/containerd/cri/tree/standalone-cri-containerd)
+for information about the standalone version of cri-containerd.*
 
 [![Build Status](https://api.travis-ci.org/containerd/cri.svg?style=flat-square)](https://travis-ci.org/containerd/cri)
 [![Go Report Card](https://goreportcard.com/badge/github.com/containerd/cri?style=flat-square)](https://goreportcard.com/report/github.com/containerd/cri)
@@ -17,12 +18,14 @@ for information about the standalone version of cri-containerd.
 With it, you could run Kubernetes using containerd as the container runtime.
 ![cri](./docs/cri.png)
 ## Current Status
+`cri` is a native plugin of containerd 1.1 and above. It is built into containerd and enabled by default.
+
 `cri` is in beta:
 * It is feature complete.
 * It (the beta version) works with Kubernetes >= 1.9.
 * It has passed all [CRI validation tests](https://github.com/kubernetes/community/blob/master/contributors/devel/cri-validation.md).
-* It has passed all regular [node e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-node-tests.md).
-* It has passed all regular [e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-tests.md).
+* It has passed all [node e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-node-tests.md).
+* It has passed all [e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-tests.md).
 
 See [test dashboard](https://k8s-testgrid.appspot.com/sig-node-containerd)
 ## Support Metrics
@@ -30,7 +33,7 @@ See [test dashboard](https://k8s-testgrid.appspot.com/sig-node-containerd)
 |:----------------------:|:------------------:|:------------------:|
 |     v1.0.0-alpha.x     |                    |      1.7, 1.8      |
 |      v1.0.0-beta.x     |                    |        1.9         |
-|                        |        HEAD        |        1.10+       |
+|       End-Of-Life      |        HEAD        |        1.10+       |
 ## Production Quality Cluster on GCE
 For a production quality cluster on GCE brought up with `kube-up.sh` refer [here](docs/kube-up.md).
 ## Installing with Ansible and Kubeadm
@@ -56,13 +59,13 @@ will also do our best to update `cri` to the latest releases of these
 specifications as appropriate.
 ### Install Dependencies
 1. Install development libraries:
-* **libseccomp development library.** Required by cri and runc seccomp support. `libseccomp-dev` (Ubuntu, Debian) / `libseccomp-devel`
+* **libseccomp development library.** Required by `cri` and runc seccomp support. `libseccomp-dev` (Ubuntu, Debian) / `libseccomp-devel`
 (Fedora, CentOS, RHEL). On releases of Ubuntu <=Trusty and Debian <=jessie a
 backport version of `libseccomp-dev` is required. See [travis.yml](.travis.yml) for an example on trusty.
-* **libapparmor development library.** Required by cri and runc apparmor support. To use apparmor on Debian, Ubuntu, and related distributions the installation of `libapparmor-dev` is required.
+* **libapparmor development library.** Required by `cri` and runc apparmor support. To use apparmor on Debian, Ubuntu, and related distributions the installation of `libapparmor-dev` is required.
 * **btrfs development library.** Required by containerd btrfs support. `btrfs-tools`(Ubuntu, Debian) / `btrfs-progs-devel`(Fedora, CentOS, RHEL)
 2. Install other dependencies:
-* **`nsenter`**: Required by CNI and portforward.
+* **`nsenter`**: Required by portforward.
 * **`socat`**: Required by portforward.
 3. Install and setup a go 1.10 development environment.
 4. Make a local clone of this repository.
@@ -74,16 +77,18 @@ backport version of `libseccomp-dev` is required. See [travis.yml](.travis.yml) 
 # `cni`, please follow instructions in their documents.
 make install.deps
 ```
-### Build and Install cri
-To build and install a version of containerd with the `cri` plugin enter the
+### Build and Install `cri`
+To build and install a version of containerd with the `cri` plugin, enter the
 following commands from your `cri` project directory:
 ```bash
 make
 sudo make install
 ```
+*NOTE: The version of containerd built and installed from the `Makefile` is only for
+testing purposes. The version tag carries the suffix "-TEST".*
 #### Build Tags
 `cri` supports optional build tags for compiling support of various features.
-To add build tags to the make option the `BUILDTAGS` variable must be set.
+To add build tags to the make option the `BUILD_TAGS` variable must be set.
 
 ```bash
 make BUILD_TAGS='seccomp apparmor'
@@ -94,13 +99,13 @@ make BUILD_TAGS='seccomp apparmor'
 | seccomp   | syscall filtering                  | libseccomp development library  |
 | selinux   | selinux process and mount labeling | <none>                          |
 | apparmor  | apparmor profile support           | libapparmor development library |
-### Validate Your cri Setup
+### Validate Your `cri` Setup
 A Kubernetes incubator project called [cri-tools](https://github.com/kubernetes-incubator/cri-tools)
-includes programs for exercising CRI implementations such as the `cri plugin`.
+includes programs for exercising CRI implementations such as the `cri` plugin.
 More importantly, cri-tools includes the program `critest` which is used for running
 [CRI Validation Testing](https://github.com/kubernetes/community/blob/master/contributors/devel/cri-validation.md).
 
-Run the CRI Validation test to validate your installation of `containerd` with `cri`:
+Run the CRI Validation test to validate your installation of `containerd` with `cri` built in:
 ```bash
 make test-cri
 ```
@@ -108,11 +113,12 @@ make test-cri
 If you already have a working development environment for supported Kubernetes
 version, you can try `cri` in a local cluster:
 
-1. Start `containerd` as root in a first terminal:
+1. Start the version of `containerd` with `cri` plugin that you built and installed
+above as root in a first terminal:
 ```bash
 sudo containerd
 ```
-2. From the Kubernetes project directory startup a local cluster using `containerd` with `cri`:
+2. From the Kubernetes project directory startup a local cluster using `containerd`:
 ```bash
 CONTAINER_RUNTIME=remote CONTAINER_RUNTIME_ENDPOINT='/run/containerd/containerd.sock' ./hack/local-up-cluster.sh
 ```
