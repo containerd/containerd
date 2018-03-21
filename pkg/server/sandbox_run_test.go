@@ -435,3 +435,58 @@ func TestTypeurlMarshalUnmarshalSandboxMeta(t *testing.T) {
 
 // TODO(random-liu): [P1] Add unit test for different error cases to make sure
 // the function cleans up on error properly.
+
+func TestPrivilegedSandbox(t *testing.T) {
+	privilegedContext := runtime.RunPodSandboxRequest{
+		Config: &runtime.PodSandboxConfig{
+			Linux: &runtime.LinuxPodSandboxConfig{
+				SecurityContext: &runtime.LinuxSandboxSecurityContext{
+					Privileged: true,
+				},
+			},
+		},
+	}
+	nonPrivilegedContext := runtime.RunPodSandboxRequest{
+		Config: &runtime.PodSandboxConfig{
+			Linux: &runtime.LinuxPodSandboxConfig{
+				SecurityContext: &runtime.LinuxSandboxSecurityContext{
+					Privileged: false,
+				},
+			},
+		},
+	}
+	hostNamespace := runtime.RunPodSandboxRequest{
+		Config: &runtime.PodSandboxConfig{
+			Linux: &runtime.LinuxPodSandboxConfig{
+				SecurityContext: &runtime.LinuxSandboxSecurityContext{
+					Privileged: false,
+					NamespaceOptions: &runtime.NamespaceOption{
+						Network: runtime.NamespaceMode_NODE,
+						Pid:     runtime.NamespaceMode_NODE,
+						Ipc:     runtime.NamespaceMode_NODE,
+					},
+				},
+			},
+		},
+	}
+	type args struct {
+		req *runtime.RunPodSandboxRequest
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"Security Context is nil", args{&runtime.RunPodSandboxRequest{}}, false},
+		{"Security Context is privileged", args{&privilegedContext}, true},
+		{"Security Context is not privileged", args{&nonPrivilegedContext}, false},
+		{"Security Context namespace host access", args{&hostNamespace}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := privilegedSandbox(tt.args.req); got != tt.want {
+				t.Errorf("privilegedSandbox() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

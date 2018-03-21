@@ -35,9 +35,11 @@ import (
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
+	criconfig "github.com/containerd/cri/pkg/config"
 	"github.com/containerd/cri/pkg/store"
 	imagestore "github.com/containerd/cri/pkg/store/image"
 	"github.com/containerd/cri/pkg/util"
@@ -406,4 +408,19 @@ func getPodCNILabels(id string, config *runtime.PodSandboxConfig) map[string]str
 		"K8S_POD_INFRA_CONTAINER_ID": id,
 		"IgnoreUnknown":              "1",
 	}
+}
+
+// getRuntime returns the runtime configuration
+// If the container is privileged, it will return
+// the privileged runtime else not.
+func (c *criService) getRuntime(privileged bool) (runtime criconfig.Runtime) {
+	runtime = c.config.ContainerdConfig.DefaultRuntime
+
+	if privileged && c.config.ContainerdConfig.PrivilegedRuntime.Engine != "" {
+		runtime = c.config.ContainerdConfig.PrivilegedRuntime
+	}
+
+	logrus.Debugf("runtime=%s(%s), runtime root='%s', privileged='%v'", runtime.Type, runtime.Engine, runtime.Root, privileged)
+
+	return runtime
 }
