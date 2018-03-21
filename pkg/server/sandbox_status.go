@@ -26,6 +26,7 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
+	criconfig "github.com/containerd/cri/pkg/config"
 	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
 )
 
@@ -107,6 +108,7 @@ type sandboxInfo struct {
 	Image       string                    `json:"image"`
 	SnapshotKey string                    `json:"snapshotKey"`
 	Snapshotter string                    `json:"snapshotter"`
+	Runtime     *criconfig.Runtime        `json:"runtime"`
 	Config      *runtime.PodSandboxConfig `json:"config"`
 	RuntimeSpec *runtimespec.Spec         `json:"runtimeSpec"`
 }
@@ -162,6 +164,12 @@ func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox) (map[st
 	si.Image = ctrInfo.Image
 	si.SnapshotKey = ctrInfo.SnapshotKey
 	si.Snapshotter = ctrInfo.Snapshotter
+
+	ociRuntime, err := getRuntimeConfigFromContainerInfo(ctrInfo)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get sandbox container runtime config")
+	}
+	si.Runtime = &ociRuntime
 
 	infoBytes, err := json.Marshal(si)
 	if err != nil {

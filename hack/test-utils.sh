@@ -18,12 +18,13 @@ source $(dirname "${BASH_SOURCE[0]}")/utils.sh
 
 # RESTART_WAIT_PERIOD is the period to wait before restarting containerd.
 RESTART_WAIT_PERIOD=${RESTART_WAIT_PERIOD:-10}
-CONTAINERD_CONFIG="--log-level=debug "
+# CONTAINERD_FLAGS contains all containerd flags.
+CONTAINERD_FLAGS="--log-level=debug "
 
 # Use a configuration file for containerd.
 CONTAINERD_CONFIG_FILE=${CONTAINERD_CONFIG_FILE:-""}
 if [ -f "${CONTAINERD_CONFIG_FILE}" ]; then
-	CONTAINERD_CONFIG+="--config $CONTAINERD_CONFIG_FILE"
+  CONTAINERD_FLAGS+="--config ${CONTAINERD_CONFIG_FILE} "
 fi
 
 CONTAINERD_SOCK=/run/containerd/containerd.sock
@@ -39,7 +40,7 @@ test_setup() {
     exit 1
   fi
   sudo pkill -x containerd
-  keepalive "sudo ${ROOT}/_output/containerd ${CONTAINERD_CONFIG}" \
+  keepalive "sudo ${ROOT}/_output/containerd ${CONTAINERD_FLAGS}" \
     ${RESTART_WAIT_PERIOD} &> ${report_dir}/containerd.log &
   containerd_pid=$!
   # Wait for containerd to be running by using the containerd client ctr to check the version

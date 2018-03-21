@@ -20,7 +20,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/containerd/cri/pkg/annotations"
 	cni "github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -29,6 +28,8 @@ import (
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
+	"github.com/containerd/cri/pkg/annotations"
+	criconfig "github.com/containerd/cri/pkg/config"
 	ostesting "github.com/containerd/cri/pkg/os/testing"
 	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
 )
@@ -433,60 +434,136 @@ func TestTypeurlMarshalUnmarshalSandboxMeta(t *testing.T) {
 	}
 }
 
-// TODO(random-liu): [P1] Add unit test for different error cases to make sure
-// the function cleans up on error properly.
-
-func TestPrivilegedSandbox(t *testing.T) {
-	privilegedContext := runtime.RunPodSandboxRequest{
-		Config: &runtime.PodSandboxConfig{
-			Linux: &runtime.LinuxPodSandboxConfig{
-				SecurityContext: &runtime.LinuxSandboxSecurityContext{
-					Privileged: true,
-				},
+func TestHostPrivilegedSandbox(t *testing.T) {
+	privilegedContext := &runtime.PodSandboxConfig{
+		Linux: &runtime.LinuxPodSandboxConfig{
+			SecurityContext: &runtime.LinuxSandboxSecurityContext{
+				Privileged: true,
 			},
 		},
 	}
-	nonPrivilegedContext := runtime.RunPodSandboxRequest{
-		Config: &runtime.PodSandboxConfig{
-			Linux: &runtime.LinuxPodSandboxConfig{
-				SecurityContext: &runtime.LinuxSandboxSecurityContext{
-					Privileged: false,
-				},
+	nonPrivilegedContext := &runtime.PodSandboxConfig{
+		Linux: &runtime.LinuxPodSandboxConfig{
+			SecurityContext: &runtime.LinuxSandboxSecurityContext{
+				Privileged: false,
 			},
 		},
 	}
-	hostNamespace := runtime.RunPodSandboxRequest{
-		Config: &runtime.PodSandboxConfig{
-			Linux: &runtime.LinuxPodSandboxConfig{
-				SecurityContext: &runtime.LinuxSandboxSecurityContext{
-					Privileged: false,
-					NamespaceOptions: &runtime.NamespaceOption{
-						Network: runtime.NamespaceMode_NODE,
-						Pid:     runtime.NamespaceMode_NODE,
-						Ipc:     runtime.NamespaceMode_NODE,
-					},
+	hostNamespace := &runtime.PodSandboxConfig{
+		Linux: &runtime.LinuxPodSandboxConfig{
+			SecurityContext: &runtime.LinuxSandboxSecurityContext{
+				Privileged: false,
+				NamespaceOptions: &runtime.NamespaceOption{
+					Network: runtime.NamespaceMode_NODE,
+					Pid:     runtime.NamespaceMode_NODE,
+					Ipc:     runtime.NamespaceMode_NODE,
 				},
 			},
 		},
-	}
-	type args struct {
-		req *runtime.RunPodSandboxRequest
 	}
 	tests := []struct {
-		name string
-		args args
-		want bool
+		name   string
+		config *runtime.PodSandboxConfig
+		want   bool
 	}{
-		{"Security Context is nil", args{&runtime.RunPodSandboxRequest{}}, false},
-		{"Security Context is privileged", args{&privilegedContext}, true},
-		{"Security Context is not privileged", args{&nonPrivilegedContext}, false},
-		{"Security Context namespace host access", args{&hostNamespace}, true},
+		{"Security Context is nil", nil, false},
+		{"Security Context is privileged", privilegedContext, true},
+		{"Security Context is not privileged", nonPrivilegedContext, false},
+		{"Security Context namespace host access", hostNamespace, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := privilegedSandbox(tt.args.req); got != tt.want {
-				t.Errorf("privilegedSandbox() = %v, want %v", got, tt.want)
+			if got := hostPrivilegedSandbox(tt.config); got != tt.want {
+				t.Errorf("hostPrivilegedSandbox() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
+
+func TestGetSandboxRuntime(t *testing.T) {
+	untrustedWorkloadRuntime := criconfig.Runtime{
+		Type:   "io.containerd.runtime.v1.linux",
+		Engine: "untursted-workload-runtime",
+		Root:   "",
+	}
+
+	defaultRuntime := criconfig.Runtime{
+		Type:   "io.containerd.runtime.v1.linux",
+		Engine: "default-runtime",
+		Root:   "",
+	}
+
+	for desc, test := range map[string]struct {
+		sandboxConfig            *runtime.PodSandboxConfig
+		defaultRuntime           criconfig.Runtime
+		untrustedWorkloadRuntime criconfig.Runtime
+		expectErr                bool
+		expectedRuntime          criconfig.Runtime
+	}{
+		"should return error if untrusted workload requires host privilege": {
+			sandboxConfig: &runtime.PodSandboxConfig{
+				Linux: &runtime.LinuxPodSandboxConfig{
+					SecurityContext: &runtime.LinuxSandboxSecurityContext{
+						Privileged: true,
+					},
+				},
+				Annotations: map[string]string{
+					annotations.UntrustedWorkload: "true",
+				},
+			},
+			defaultRuntime:           defaultRuntime,
+			untrustedWorkloadRuntime: untrustedWorkloadRuntime,
+			expectErr:                true,
+		},
+		"should use untrusted workload runtime for untrusted workload": {
+			sandboxConfig: &runtime.PodSandboxConfig{
+				Annotations: map[string]string{
+					annotations.UntrustedWorkload: "true",
+				},
+			},
+			defaultRuntime:           defaultRuntime,
+			untrustedWorkloadRuntime: untrustedWorkloadRuntime,
+			expectedRuntime:          untrustedWorkloadRuntime,
+		},
+		"should use default runtime for regular workload": {
+			sandboxConfig:            &runtime.PodSandboxConfig{},
+			defaultRuntime:           defaultRuntime,
+			untrustedWorkloadRuntime: untrustedWorkloadRuntime,
+			expectedRuntime:          defaultRuntime,
+		},
+		"should use default runtime for trusted workload": {
+			sandboxConfig: &runtime.PodSandboxConfig{
+				Annotations: map[string]string{
+					annotations.UntrustedWorkload: "false",
+				},
+			},
+			defaultRuntime:           defaultRuntime,
+			untrustedWorkloadRuntime: untrustedWorkloadRuntime,
+			expectedRuntime:          defaultRuntime,
+		},
+		"should return error if untrusted workload runtime is required but not configured": {
+			sandboxConfig: &runtime.PodSandboxConfig{
+				Annotations: map[string]string{
+					annotations.UntrustedWorkload: "true",
+				},
+			},
+			defaultRuntime: defaultRuntime,
+			expectErr:      true,
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			cri := newTestCRIService()
+			cri.config = criconfig.Config{
+				PluginConfig: criconfig.DefaultConfig(),
+			}
+			cri.config.ContainerdConfig.DefaultRuntime = test.defaultRuntime
+			cri.config.ContainerdConfig.UntrustedWorkloadRuntime = test.untrustedWorkloadRuntime
+			r, err := cri.getSandboxRuntime(test.sandboxConfig)
+			assert.Equal(t, test.expectErr, err != nil)
+			assert.Equal(t, test.expectedRuntime, r)
+		})
+	}
+}
+
+// TODO(random-liu): [P1] Add unit test for different error cases to make sure
+// the function cleans up on error properly.

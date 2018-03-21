@@ -21,10 +21,10 @@ import (
 
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
+	criconfig "github.com/containerd/cri/pkg/config"
 	containerstore "github.com/containerd/cri/pkg/store/container"
 )
 
@@ -106,6 +106,7 @@ type containerInfo struct {
 	Removing    bool                     `json:"removing"`
 	SnapshotKey string                   `json:"snapshotKey"`
 	Snapshotter string                   `json:"snapshotter"`
+	Runtime     *criconfig.Runtime       `json:"runtime"`
 	Config      *runtime.ContainerConfig `json:"config"`
 	RuntimeSpec *runtimespec.Spec        `json:"runtimeSpec"`
 }
@@ -128,20 +129,24 @@ func toCRIContainerInfo(ctx context.Context, container containerstore.Container,
 		Config:    meta.Config,
 	}
 
-	spec, err := container.Container.Spec(ctx)
-	if err == nil {
-		ci.RuntimeSpec = spec
-	} else {
-		logrus.WithError(err).Errorf("Failed to get container %q spec", container.ID)
+	var err error
+	ci.RuntimeSpec, err = container.Container.Spec(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get container runtime spec")
 	}
 
 	ctrInfo, err := container.Container.Info(ctx)
-	if err == nil {
-		ci.SnapshotKey = ctrInfo.SnapshotKey
-		ci.Snapshotter = ctrInfo.Snapshotter
-	} else {
-		logrus.WithError(err).Errorf("Failed to get container %q info", container.ID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get container info")
 	}
+	ci.SnapshotKey = ctrInfo.SnapshotKey
+	ci.Snapshotter = ctrInfo.Snapshotter
+
+	ociRuntime, err := getRuntimeConfigFromContainerInfo(ctrInfo)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get container runtime config")
+	}
+	ci.Runtime = &ociRuntime
 
 	infoBytes, err := json.Marshal(ci)
 	if err != nil {

@@ -37,6 +37,7 @@ import (
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	"github.com/containerd/cri/pkg/annotations"
+	criconfig "github.com/containerd/cri/pkg/config"
 	customopts "github.com/containerd/cri/pkg/containerd/opts"
 	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
 	"github.com/containerd/cri/pkg/log"
@@ -47,32 +48,6 @@ import (
 func init() {
 	typeurl.Register(&sandboxstore.Metadata{},
 		"github.com/containerd/cri/pkg/store/sandbox", "Metadata")
-}
-
-// privilegedSandbox returns true if the sandbox configuration
-// requires additional host privileges for the sandbox.
-func privilegedSandbox(req *runtime.RunPodSandboxRequest) bool {
-	securityContext := req.GetConfig().GetLinux().GetSecurityContext()
-	if securityContext == nil {
-		return false
-	}
-
-	if securityContext.Privileged {
-		return true
-	}
-
-	namespaceOptions := securityContext.GetNamespaceOptions()
-	if namespaceOptions == nil {
-		return false
-	}
-
-	if namespaceOptions.Network == runtime.NamespaceMode_NODE ||
-		namespaceOptions.Pid == runtime.NamespaceMode_NODE ||
-		namespaceOptions.Ipc == runtime.NamespaceMode_NODE {
-		return true
-	}
-
-	return false
 }
 
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
@@ -156,14 +131,11 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}()
 	}
 
-	privileged := privilegedSandbox(r)
-	containerRuntime := c.getRuntime(privileged)
-
-	if sandbox.Config.Annotations == nil {
-		sandbox.Config.Annotations = make(map[string]string)
+	ociRuntime, err := c.getSandboxRuntime(config)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get sandbox runtime")
 	}
-
-	sandbox.Config.Annotations[annotations.PrivilegedSandbox] = fmt.Sprintf("%v", privileged)
+	logrus.Debugf("Use OCI %+v for sandbox %q", ociRuntime, id)
 
 	// Create sandbox container.
 	spec, err := c.generateSandboxContainerSpec(id, config, &image.ImageSpec.Config, sandbox.NetNSPath)
@@ -197,10 +169,10 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		containerd.WithContainerLabels(sandboxLabels),
 		containerd.WithContainerExtension(sandboxMetadataExtension, &sandbox.Metadata),
 		containerd.WithRuntime(
-			containerRuntime.Type,
+			ociRuntime.Type,
 			&runctypes.RuncOptions{
-				Runtime:       containerRuntime.Engine,
-				RuntimeRoot:   containerRuntime.Root,
+				Runtime:       ociRuntime.Engine,
+				RuntimeRoot:   ociRuntime.Root,
 				SystemdCgroup: c.config.SystemdCgroup})} // TODO (mikebrow): add CriuPath when we add support for pause
 
 	container, err := c.client.NewContainer(ctx, id, opts...)
@@ -552,4 +524,49 @@ func toCNIPortMappings(criPortMappings []*runtime.PortMapping) []cni.PortMapping
 		})
 	}
 	return portMappings
+}
+
+// untrustedWorkload returns true if the sandbox contains untrusted workload.
+func untrustedWorkload(config *runtime.PodSandboxConfig) bool {
+	return config.GetAnnotations()[annotations.UntrustedWorkload] == "true"
+}
+
+// hostPrivilegedSandbox returns true if the sandbox configuration
+// requires additional host privileges for the sandbox.
+func hostPrivilegedSandbox(config *runtime.PodSandboxConfig) bool {
+	securityContext := config.GetLinux().GetSecurityContext()
+	if securityContext.GetPrivileged() {
+		return true
+	}
+
+	namespaceOptions := securityContext.GetNamespaceOptions()
+	if namespaceOptions.GetNetwork() == runtime.NamespaceMode_NODE ||
+		namespaceOptions.GetPid() == runtime.NamespaceMode_NODE ||
+		namespaceOptions.GetIpc() == runtime.NamespaceMode_NODE {
+		return true
+	}
+
+	return false
+}
+
+// getSandboxRuntime returns the runtime configuration for sandbox.
+// If the sandbox contains untrusted workload, runtime for untrusted workload will be returned,
+// or else default runtime will be returned.
+func (c *criService) getSandboxRuntime(config *runtime.PodSandboxConfig) (criconfig.Runtime, error) {
+	untrusted := false
+	if untrustedWorkload(config) {
+		// TODO(random-liu): Figure out we should return error or not.
+		if hostPrivilegedSandbox(config) {
+			return criconfig.Runtime{}, errors.New("untrusted workload with host privilege is not allowed")
+		}
+		untrusted = true
+	}
+
+	if untrusted {
+		if c.config.ContainerdConfig.UntrustedWorkloadRuntime.Type == "" {
+			return criconfig.Runtime{}, errors.New("no runtime for untrusted workload is configured")
+		}
+		return c.config.ContainerdConfig.UntrustedWorkloadRuntime, nil
+	}
+	return c.config.ContainerdConfig.DefaultRuntime, nil
 }
