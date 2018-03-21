@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package command
+package app
 
 import (
 	"fmt"
@@ -51,8 +51,8 @@ func init() {
 	}
 }
 
-// App returns a *cli.App instance.
-func App() *cli.App {
+// New returns a *cli.App instance.
+func New() *cli.App {
 	app := cli.NewApp()
 	app.Name = "ctr"
 	app.Version = version.Version

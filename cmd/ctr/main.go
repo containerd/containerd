@@ -20,14 +20,14 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/containerd/containerd/cmd/ctr/command"
+	"github.com/containerd/containerd/cmd/ctr/app"
 	"github.com/urfave/cli"
 )
 
 var pluginCmds = []cli.Command{}
 
 func main() {
-	app := command.App()
+	app := app.New()
 	app.Commands = append(app.Commands, pluginCmds...)
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "ctr: %s\n", err)
