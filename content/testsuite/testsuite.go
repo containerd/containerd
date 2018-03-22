@@ -32,6 +32,10 @@ func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, r
 	t.Run("ResumeCopySeeker", makeTest(t, name, storeFn, checkResume(resumeCopySeeker)))
 	t.Run("ResumeCopyReaderAt", makeTest(t, name, storeFn, checkResume(resumeCopyReaderAt)))
 	t.Run("Labels", makeTest(t, name, storeFn, checkLabels))
+
+	t.Run("SmallBlob", makeTest(t, name, storeFn, func(ctx context.Context, t *testing.T, cs content.Store) {
+		TestSmallBlob(ctx, t, cs)
+	}))
 }
 
 func makeTest(t *testing.T, name string, storeFn func(ctx context.Context, root string) (context.Context, content.Store, func() error, error), fn func(ctx context.Context, t *testing.T, cs content.Store)) func(t *testing.T) {

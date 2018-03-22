@@ -177,7 +177,9 @@ func (s *service) Read(req *api.ReadContentRequest, session api.Content_ReadServ
 
 	var (
 		offset = req.Offset
-		size   = req.Size_
+		// size is read size, not the expected size of the blob (oi.Size), which the caller might not be aware of.
+		// offset+size can be larger than oi.Size.
+		size = req.Size_
 
 		// TODO(stevvooe): Using the global buffer pool. At 32KB, it is probably
 		// little inefficient for work over a fast network. We can tune this later.
@@ -189,12 +191,12 @@ func (s *service) Read(req *api.ReadContentRequest, session api.Content_ReadServ
 		offset = 0
 	}
 
-	if size <= 0 {
-		size = oi.Size - offset
+	if offset > oi.Size {
+		return status.Errorf(codes.OutOfRange, "read past object length %v bytes", oi.Size)
 	}
 
-	if offset+size > oi.Size {
-		return status.Errorf(codes.OutOfRange, "read past object length %v bytes", oi.Size)
+	if size <= 0 || offset+size > oi.Size {
+		size = oi.Size - offset
 	}
 
 	_, err = io.CopyBuffer(
