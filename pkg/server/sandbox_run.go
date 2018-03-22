@@ -189,8 +189,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 	}()
 
-	// Create sandbox container root directory.
-	sandboxRootDir := getSandboxRootDir(c.config.RootDir, id)
+	// Create sandbox container root directories.
+	sandboxRootDir := c.getSandboxRootDir(id)
 	if err := c.os.MkdirAll(sandboxRootDir, 0755); err != nil {
 		return nil, errors.Wrapf(err, "failed to create sandbox root directory %q",
 			sandboxRootDir)
@@ -204,14 +204,28 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			}
 		}
 	}()
+	volatileSandboxRootDir := c.getVolatileSandboxRootDir(id)
+	if err := c.os.MkdirAll(volatileSandboxRootDir, 0755); err != nil {
+		return nil, errors.Wrapf(err, "failed to create volatile sandbox root directory %q",
+			volatileSandboxRootDir)
+	}
+	defer func() {
+		if retErr != nil {
+			// Cleanup the volatile sandbox root directory.
+			if err := c.os.RemoveAll(volatileSandboxRootDir); err != nil {
+				logrus.WithError(err).Errorf("Failed to remove volatile sandbox root directory %q",
+					volatileSandboxRootDir)
+			}
+		}
+	}()
 
 	// Setup sandbox /dev/shm, /etc/hosts and /etc/resolv.conf.
-	if err = c.setupSandboxFiles(sandboxRootDir, config); err != nil {
+	if err = c.setupSandboxFiles(id, config); err != nil {
 		return nil, errors.Wrapf(err, "failed to setup sandbox files")
 	}
 	defer func() {
 		if retErr != nil {
-			if err = c.unmountSandboxFiles(sandboxRootDir, config); err != nil {
+			if err = c.unmountSandboxFiles(id, config); err != nil {
 				logrus.WithError(err).Errorf("Failed to unmount sandbox files in %q",
 					sandboxRootDir)
 			}
@@ -398,9 +412,9 @@ func (c *criService) generateSandboxContainerSpec(id string, config *runtime.Pod
 
 // setupSandboxFiles sets up necessary sandbox files including /dev/shm, /etc/hosts
 // and /etc/resolv.conf.
-func (c *criService) setupSandboxFiles(rootDir string, config *runtime.PodSandboxConfig) error {
+func (c *criService) setupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
 	// TODO(random-liu): Consider whether we should maintain /etc/hosts and /etc/resolv.conf in kubelet.
-	sandboxEtcHosts := getSandboxHosts(rootDir)
+	sandboxEtcHosts := c.getSandboxHosts(id)
 	if err := c.os.CopyFile(etcHosts, sandboxEtcHosts, 0644); err != nil {
 		return errors.Wrapf(err, "failed to generate sandbox hosts file %q", sandboxEtcHosts)
 	}
@@ -414,7 +428,7 @@ func (c *criService) setupSandboxFiles(rootDir string, config *runtime.PodSandbo
 			return errors.Wrapf(err, "failed to parse sandbox DNSConfig %+v", dnsConfig)
 		}
 	}
-	resolvPath := getResolvPath(rootDir)
+	resolvPath := c.getResolvPath(id)
 	if resolvContent == "" {
 		// copy host's resolv.conf to resolvPath
 		err = c.os.CopyFile(resolvConfPath, resolvPath, 0644)
@@ -434,7 +448,7 @@ func (c *criService) setupSandboxFiles(rootDir string, config *runtime.PodSandbo
 			return errors.Wrapf(err, "host %q is not available for host ipc", devShm)
 		}
 	} else {
-		sandboxDevShm := getSandboxDevShm(rootDir)
+		sandboxDevShm := c.getSandboxDevShm(id)
 		if err := c.os.MkdirAll(sandboxDevShm, 0700); err != nil {
 			return errors.Wrap(err, "failed to create sandbox shm")
 		}
@@ -475,9 +489,9 @@ func parseDNSOptions(servers, searches, options []string) (string, error) {
 // remove these files. Unmount should *NOT* return error when:
 //  1) The mount point is already unmounted.
 //  2) The mount point doesn't exist.
-func (c *criService) unmountSandboxFiles(rootDir string, config *runtime.PodSandboxConfig) error {
+func (c *criService) unmountSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
 	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetIpc() != runtime.NamespaceMode_NODE {
-		if err := c.os.Unmount(getSandboxDevShm(rootDir), unix.MNT_DETACH); err != nil && !os.IsNotExist(err) {
+		if err := c.os.Unmount(c.getSandboxDevShm(id), unix.MNT_DETACH); err != nil && !os.IsNotExist(err) {
 			return err
 		}
 	}

@@ -18,6 +18,7 @@ package server
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	cni "github.com/containerd/go-cni"
@@ -177,7 +178,7 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 }
 
 func TestSetupSandboxFiles(t *testing.T) {
-	testRootDir := "test-sandbox-root"
+	const testID = "test-id"
 	for desc, test := range map[string]struct {
 		dnsConfig     *runtime.DNSConfig
 		ipcMode       runtime.NamespaceMode
@@ -189,13 +190,17 @@ func TestSetupSandboxFiles(t *testing.T) {
 				{
 					Name: "CopyFile",
 					Arguments: []interface{}{
-						"/etc/hosts", testRootDir + "/hosts", os.FileMode(0644),
+						"/etc/hosts",
+						filepath.Join(testRootDir, sandboxesDir, testID, "hosts"),
+						os.FileMode(0644),
 					},
 				},
 				{
 					Name: "CopyFile",
 					Arguments: []interface{}{
-						"/etc/resolv.conf", testRootDir + "/resolv.conf", os.FileMode(0644),
+						"/etc/resolv.conf",
+						filepath.Join(testRootDir, sandboxesDir, testID, "resolv.conf"),
+						os.FileMode(0644),
 					},
 				},
 				{
@@ -215,13 +220,16 @@ func TestSetupSandboxFiles(t *testing.T) {
 				{
 					Name: "CopyFile",
 					Arguments: []interface{}{
-						"/etc/hosts", testRootDir + "/hosts", os.FileMode(0644),
+						"/etc/hosts",
+						filepath.Join(testRootDir, sandboxesDir, testID, "hosts"),
+						os.FileMode(0644),
 					},
 				},
 				{
 					Name: "WriteFile",
 					Arguments: []interface{}{
-						testRootDir + "/resolv.conf", []byte(`search 114.114.114.114
+						filepath.Join(testRootDir, sandboxesDir, testID, "resolv.conf"),
+						[]byte(`search 114.114.114.114
 nameserver 8.8.8.8
 options timeout:1
 `), os.FileMode(0644),
@@ -239,19 +247,24 @@ options timeout:1
 				{
 					Name: "CopyFile",
 					Arguments: []interface{}{
-						"/etc/hosts", testRootDir + "/hosts", os.FileMode(0644),
+						"/etc/hosts",
+						filepath.Join(testRootDir, sandboxesDir, testID, "hosts"),
+						os.FileMode(0644),
 					},
 				},
 				{
 					Name: "CopyFile",
 					Arguments: []interface{}{
-						"/etc/resolv.conf", testRootDir + "/resolv.conf", os.FileMode(0644),
+						"/etc/resolv.conf",
+						filepath.Join(testRootDir, sandboxesDir, testID, "resolv.conf"),
+						os.FileMode(0644),
 					},
 				},
 				{
 					Name: "MkdirAll",
 					Arguments: []interface{}{
-						testRootDir + "/shm", os.FileMode(0700),
+						filepath.Join(testStateDir, sandboxesDir, testID, "shm"),
+						os.FileMode(0700),
 					},
 				},
 				{
@@ -273,7 +286,7 @@ options timeout:1
 				},
 			},
 		}
-		c.setupSandboxFiles(testRootDir, cfg)
+		c.setupSandboxFiles(testID, cfg)
 		calls := c.os.(*ostesting.FakeOS).GetCalls()
 		assert.Len(t, calls, len(test.expectedCalls))
 		for i, expected := range test.expectedCalls {

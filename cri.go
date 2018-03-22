@@ -63,13 +63,11 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	ctx := ic.Context
 	pluginConfig := ic.Config.(*criconfig.PluginConfig)
 	c := criconfig.Config{
-		PluginConfig: *pluginConfig,
-		// This is a hack. We assume that containerd root directory
-		// is one level above plugin directory.
-		// TODO(random-liu): Expose containerd config to plugin.
+		PluginConfig:       *pluginConfig,
 		ContainerdRootDir:  filepath.Dir(ic.Root),
 		ContainerdEndpoint: ic.Address,
 		RootDir:            ic.Root,
+		StateDir:           ic.State,
 	}
 	log.G(ctx).Infof("Start cri plugin with config %+v", c)
 
