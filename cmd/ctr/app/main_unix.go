@@ -16,7 +16,7 @@
    limitations under the License.
 */
 
-package command
+package app
 
 import "github.com/containerd/containerd/cmd/ctr/commands/shim"
 
