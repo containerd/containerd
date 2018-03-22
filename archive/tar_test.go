@@ -1022,6 +1022,22 @@ func TestDiffTar(t *testing.T) {
 				fstest.CreateDir("/d3/", 0755),
 			),
 		},
+		{
+			name: "IgnoreSockets",
+			validators: []tarEntryValidator{
+				fileEntry("f2", []byte("content"), 0644),
+				// There should be _no_ socket here, despite the fstest.CreateSocket below
+				fileEntry("f3", []byte("content"), 0644),
+			},
+			a: fstest.Apply(
+				fstest.CreateFile("/f1", []byte("content"), 0644),
+			),
+			b: fstest.Apply(
+				fstest.CreateFile("/f2", []byte("content"), 0644),
+				fstest.CreateSocket("/s0", 0644),
+				fstest.CreateFile("/f3", []byte("content"), 0644),
+			),
+		},
 	}
 
 	for _, at := range tests {

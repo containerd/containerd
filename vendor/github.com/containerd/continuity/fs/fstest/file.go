@@ -2,6 +2,7 @@ package fstest
 
 import (
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"time"
@@ -106,6 +107,18 @@ func Link(oldname, newname string) Applier {
 //		return return syscall.Mknod(path, mode, dev)
 //	}
 //}
+
+func CreateSocket(name string, perm os.FileMode) Applier {
+	return applyFn(func(root string) error {
+		fullPath := filepath.Join(root, name)
+		ln, err := net.Listen("unix", fullPath)
+		if err != nil {
+			return err
+		}
+		defer ln.Close()
+		return os.Chmod(fullPath, perm)
+	})
+}
 
 // Apply returns a new applier from the given appliers
 func Apply(appliers ...Applier) Applier {
