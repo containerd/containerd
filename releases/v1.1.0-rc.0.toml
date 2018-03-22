@@ -1,0 +1,150 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+
+# previous release
+previous = "v1.0.0"
+
+pre_release = true
+
+preface = """\
+`containerd` provides a daemon for managing running containers.
+
+1.1 is the second major release for `containerd` with added support for CRI, the
+Kubernetes [Container Runtime Interface](https://github.com/kubernetes/community/blob/master/contributors/devel/container-runtime-interface.md).
+CRI is a new plugin which allows connecting the containerd daemon directly to a
+Kubernetes kubelet to be used as the container runtime. The CRI GRPC interface
+listens on the same socket as the containerd GRPC interface and runs in the same
+process.
+
+In addition to all of the stability and bug fixes backported to 1.0,
+1.1 includes...
+
+- CRI plugin
+- ZFS and AUFS snapshotter
+- Improvements to the `ctr` tool
+- Better support for multiple platforms
+- Cross namespace content sharing
+- Better mount cleanup
+- Support for disabling plugins
+- TCP debug address for remote debugging
+- Update to Go 1.10
+- Improvements to the garbage collector
+
+## CRI Plugin
+
+This release of `cri` is a native plugin of `containerd`. It is built into
+`containerd` v1.1 and CRI services are enabled by default.
+
+You can now use Kubernetes, with `containerd` directly, without having to use
+the intermediate `cri-containerd` daemon. The `cri-containerd` daemon is
+end-of-life.
+
+*Note: Please [drain your node](https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/) before
+upgrading from older versions of `cri-containerd` to `containerd` v1.1.*
+
+You can [use a containerd config file to configure the `cri` plugin](https://github.com/containerd/cri/blob/v1.0/docs/config.md).
+
+### Untrusted Workload Runtime
+
+To run an untrusted pod on a runtime for untrusted workload, such as
+[Kata Containers](https://katacontainers.io/) or
+[Clear Containers](https://clearlinux.org/containers), you can:
+1. Configure a runtime for untrusted workload [with the config option `plugins.cri.containerd.untrusted_workload_runtime`](https://github.com/containerd/cri/blob/v1.0/docs/config.md).
+2. Create an untrusted pod by setting the annotation `io.kubernetes.cri.untrusted-workload` to `true`, for example:
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+  annotations:
+    io.kubernetes.cri.untrusted-workload: true
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+```
+
+By default, `cri` will run pods with the default runtime. However, if a pod has
+the `io.kubernetes.cri.untrusted-workload` annotation, the `cri` plugin will run
+the pod with the runtime for untrusted workloads.
+
+Unless configured otherwise, the default runtime is set to
+[runc](https://github.com/opencontainers/runc).
+
+### Container Runtime Interface v1alpha2
+
+The supported CRI (Container Runtime Interface) version for Kubernetes v1.10 is
+now `v1alpha2.` This release of `cri` has been updated to use CRI `v1alpha2`, so
+**it only works with Kubernetes v1.10+.**
+
+New CRI features added in `v1alpha2` are all supported:
+* Container log rotation: Kubelet rotates container logs.
+* Shared pid namespace: Support sharing pid namespace inside a pod.
+
+### Registry Mirror
+
+You can now setup registry configurations with the config option
+`plugins.cri.registry`.
+
+Currently only the `mirrors` option is supported. With it, you can specify
+registry mirrors and secure/insecure connections.
+([doc](https://github.com/containerd/cri/blob/v1.0/docs/registry.md))
+
+### End-To-End Test
+
+In terms of testing, we've passed:
+* ALL CRI validation tests
+* ALL node e2e tests
+* ALL e2e tests
+
+The containerd test coverage on GCE is equivalent with Docker now.
+
+All the test results are public: https://k8s-testgrid.appspot.com/sig-node-containerd.
+
+### Performance
+
+We significantly improved pod start latency and cpu/memory usage of `cri` plugin
+this release.
+
+The continuous benchmark result is published on http://node-perf-dash.k8s.io/.
+Job `ci-kubernetes-node-kubelet-benchmark` is for Docker 17.03, and
+`ci-cri-containerd-node-e2e-benchmark` is for containerd with `cri` plugin.
+
+All metrics of containerd are either better or comparable with Docker 17.03.
+
+## Try It Out
+
+If you would like to try containerd, please download the binaries included on
+this release. If you are using Docker, this version of containerd will be used
+in the next major release of Docker.
+
+To set up containerd with Kubernetes...
+* For a production quality cluster on GCE brought up with `kube-up.sh`, see [here](https://github.com/kubernetes-incubator/cri-containerd/blob/v1.0/docs/kube-up.md).
+* For a multi-node cluster installer and bring up steps using ansible and kubeadm, see [here](https://github.com/kubernetes-incubator/cri-containerd/blob/v1.0/contrib/ansible/README.md).
+* For creating a cluster from scratch on Google Cloud, see [Kubernetes the Hard Way](https://github.com/kelseyhightower/kubernetes-the-hard-way).
+* For a custom installation from release tarball, see [here](https://github.com/kubernetes-incubator/cri-containerd/blob/v1.0/docs/installation.md).
+* To install use LinuxKit on a local VM, see [here](https://github.com/linuxkit/linuxkit/tree/master/projects/kubernetes).
+
+## Support
+
+The [_support horizon_](https://github.com/containerd/containerd/blob/master/RELEASES.md#support-horizon)
+for containerd has been updated to include the 1.1 release. With the addition of
+the CRI plugin, we are expanding the support horizon for 1.1 to include the
+entire lifespan of Kubernetes 1.10.  The containerd 1.1 release train will be
+considered an active branch with new patches until March 23, 2019 at the
+earliest, when 1.2 is released, or until Kubernetes 1.10 reaches end of life.
+The 1.1 containerd API is completely compatible with 1.0, any client using 1.0
+can safely upgrade to 1.1 without any incompatibilies. The CRI interface
+included with the CRI plugin is only supported for Kubernetes 1.10. The CRI
+interface is still considered alpha and will only be supported for Kubernetes
+1.10. The CRI plugin in containerd 1.1 will also only be supported for
+Kubernetes 1.10.
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
