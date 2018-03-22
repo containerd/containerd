@@ -82,7 +82,7 @@ func Import(ctx context.Context, client *containerd.Client, reader io.Reader) (_
 		return nil, err
 	}
 	// TODO(random-liu): Fix this after containerd client is fixed (containerd/containerd#2193)
-	defer done() // nolint: errcheck
+	defer done(ctx) // nolint: errcheck
 
 	cs := client.ContentStore()
 	is := client.ImageService()

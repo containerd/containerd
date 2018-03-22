@@ -55,7 +55,7 @@ func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, r
 // ContextWrapper is used to decorate new context used inside the test
 // before using the context on the content store.
 // This can be used to support leasing and multiple namespaces tests.
-type ContextWrapper func(ctx context.Context) (context.Context, func() error, error)
+type ContextWrapper func(ctx context.Context) (context.Context, func(context.Context) error, error)
 
 type wrapperKey struct{}
 
@@ -98,13 +98,13 @@ func makeTest(t *testing.T, name string, storeFn func(ctx context.Context, root 
 
 		w, ok := ctx.Value(wrapperKey{}).(ContextWrapper)
 		if ok {
-			var done func() error
+			var done func(context.Context) error
 			ctx, done, err = w(ctx)
 			if err != nil {
 				t.Fatalf("Error wrapping context: %+v", err)
 			}
 			defer func() {
-				if err := done(); err != nil && !t.Failed() {
+				if err := done(ctx); err != nil && !t.Failed() {
 					t.Fatalf("Wrapper release failed: %+v", err)
 				}
 			}()
@@ -542,7 +542,7 @@ func checkCrossNSShare(ctx context.Context, t *testing.T, cs content.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer done()
+	defer done(ctx2)
 
 	w, err := cs.Writer(ctx2, ref, size, d)
 	if err != nil {
@@ -593,7 +593,7 @@ func checkCrossNSAppend(ctx context.Context, t *testing.T, cs content.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer done()
+	defer done(ctx2)
 
 	extra := []byte("appended bytes")
 	size2 := size + int64(len(extra))

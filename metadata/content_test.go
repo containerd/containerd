@@ -51,9 +51,11 @@ func createContentStore(ctx context.Context, root string) (context.Context, cont
 		count uint64
 		name  = testsuite.Name(ctx)
 	)
-	wrap := func(ctx context.Context) (context.Context, func() error, error) {
+	wrap := func(ctx context.Context) (context.Context, func(context.Context) error, error) {
 		n := atomic.AddUint64(&count, 1)
-		return namespaces.WithNamespace(ctx, fmt.Sprintf("%s-n%d", name, n)), func() error { return nil }, nil
+		return namespaces.WithNamespace(ctx, fmt.Sprintf("%s-n%d", name, n)), func(context.Context) error {
+			return nil
+		}, nil
 	}
 	ctx = testsuite.SetContextWrapper(ctx, wrap)
 
