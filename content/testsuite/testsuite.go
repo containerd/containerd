@@ -50,6 +50,10 @@ func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, r
 
 	t.Run("CrossNamespaceAppend", makeTest(t, name, storeFn, checkCrossNSAppend))
 	t.Run("CrossNamespaceShare", makeTest(t, name, storeFn, checkCrossNSShare))
+
+	t.Run("SmallBlob", makeTest(t, name, storeFn, func(ctx context.Context, t *testing.T, cs content.Store) {
+		TestSmallBlob(ctx, t, cs)
+	}))
 }
 
 // ContextWrapper is used to decorate new context used inside the test
