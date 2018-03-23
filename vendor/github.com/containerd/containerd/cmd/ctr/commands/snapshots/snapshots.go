@@ -127,7 +127,7 @@ var diffCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		defer done()
+		defer done(ctx)
 
 		var desc ocispec.Descriptor
 		labels := commands.LabelArgs(context.StringSlice("label"))

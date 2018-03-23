@@ -20,10 +20,8 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math/rand"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
@@ -83,38 +81,14 @@ func FetchHandler(ingester content.Ingester, fetcher Fetcher) images.HandlerFunc
 func fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc ocispec.Descriptor) error {
 	log.G(ctx).Debug("fetch")
 
-	var (
-		ref   = MakeRefKey(ctx, desc)
-		cw    content.Writer
-		err   error
-		retry = 16
-	)
-	for {
-		cw, err = ingester.Writer(ctx, ref, desc.Size, desc.Digest)
-		if err != nil {
-			if errdefs.IsAlreadyExists(err) {
-				return nil
-			} else if !errdefs.IsUnavailable(err) {
-				return err
-			}
-
-			// TODO: On first time locked is encountered, get status
-			// of writer and abort if not updated recently.
-
-			select {
-			case <-time.After(time.Millisecond * time.Duration(rand.Intn(retry))):
-				if retry < 2048 {
-					retry = retry << 1
-				}
-				continue
-			case <-ctx.Done():
-				// Propagate lock error
-				return err
-			}
+	cw, err := content.OpenWriter(ctx, ingester, MakeRefKey(ctx, desc), desc.Size, desc.Digest)
+	if err != nil {
+		if errdefs.IsAlreadyExists(err) {
+			return nil
 		}
-		defer cw.Close()
-		break
+		return err
 	}
+	defer cw.Close()
 
 	ws, err := cw.Status()
 	if err != nil {
