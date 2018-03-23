@@ -30,6 +30,8 @@ import (
 
 // Process represents a system process
 type Process interface {
+	// ID of the process
+	ID() string
 	// Pid is the system specific process id
 	Pid() uint32
 	// Start starts the process executing the user's defined binary

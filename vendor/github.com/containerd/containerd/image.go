@@ -108,7 +108,7 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
 	if err != nil {
 		return err
 	}
-	defer done()
+	defer done(ctx)
 
 	layers, err := i.getLayers(ctx, platforms.Default())
 	if err != nil {

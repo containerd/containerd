@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/containerd/containerd/cmd/ctr/command"
+	ctrapp "github.com/containerd/containerd/cmd/ctr/app"
 
 	cricli "github.com/containerd/cri/cli"
 )
 
 func main() {
-	app := command.App()
+	app := ctrapp.New()
 	app.Commands = append(app.Commands, cricli.Command)
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "ctr: %s\n", err)

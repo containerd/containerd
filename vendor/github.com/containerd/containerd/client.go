@@ -199,7 +199,7 @@ func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContain
 	if err != nil {
 		return nil, err
 	}
-	defer done()
+	defer done(ctx)
 
 	container := containers.Container{
 		ID: id,
@@ -284,7 +284,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 	if err != nil {
 		return nil, err
 	}
-	defer done()
+	defer done(ctx)
 
 	name, desc, err := pullCtx.Resolver.Resolve(ctx, ref)
 	if err != nil {
@@ -561,7 +561,7 @@ func (c *Client) Import(ctx context.Context, importer images.Importer, reader io
 	if err != nil {
 		return nil, err
 	}
-	defer done()
+	defer done(ctx)
 
 	imgrecs, err := importer.Import(ctx, c.ContentStore(), reader)
 	if err != nil {
