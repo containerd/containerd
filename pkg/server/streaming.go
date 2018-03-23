@@ -43,10 +43,10 @@ import (
 )
 
 const (
-	// OrganizationName is is the name of this organization, used for certificates etc.
-	OrganizationName = "containerd"
-	// CRIName is the common name of the CRI plugin
-	CRIName = "cri"
+	// certOrganizationName is the name of this organization, used for certificates etc.
+	certOrganizationName = "containerd"
+	// certCommonName is the common name of the CRI plugin
+	certCommonName = "cri"
 )
 
 func newStreamServer(c *criService, addr, port string) (streaming.Server, error) {
@@ -182,8 +182,8 @@ func newTLSCert() (tls.Certificate, error) {
 		NotAfter:     time.Now().AddDate(years, 0, 0),
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
-			CommonName:   fmt.Sprintf("%s:%s:%s", OrganizationName, CRIName, hostName),
-			Organization: []string{OrganizationName},
+			CommonName:   fmt.Sprintf("%s:%s:%s", certOrganizationName, certCommonName, hostName),
+			Organization: []string{certOrganizationName},
 		},
 		BasicConstraintsValid: true,
 	}
