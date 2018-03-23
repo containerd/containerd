@@ -8,10 +8,12 @@
 transitioning from a standalone binary that talks to containerd to a plugin within
 containerd. This github branch is for the `cri` plugin. See
 [standalone-cri-containerd branch](https://github.com/containerd/cri/tree/standalone-cri-containerd)
-for information about the standalone version of cri-containerd.*
+for information about the standalone version of `cri-containerd`.*
+
+*Note: You need to [drain your node](https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/) before upgrading from standalone `cri-containerd` to containerd with `cri` plugin.*
 
 [![Build Status](https://api.travis-ci.org/containerd/cri.svg?style=flat-square)](https://travis-ci.org/containerd/cri)
-[![Go Report Card](https://goreportcard.com/badge/github.com/containerd/cri?style=flat-square)](https://goreportcard.com/report/github.com/containerd/cri)
+[![Go Report Card](https://goreportcard.com/badge/github.com/containerd/cri)](https://goreportcard.com/report/github.com/containerd/cri)
 
 `cri` is a [containerd](https://containerd.io/) plugin implementation of Kubernetes [container runtime interface (CRI)](https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/apis/cri/runtime/v1alpha2/api.proto).
 
@@ -20,20 +22,22 @@ With it, you could run Kubernetes using containerd as the container runtime.
 ## Current Status
 `cri` is a native plugin of containerd 1.1 and above. It is built into containerd and enabled by default.
 
-`cri` is in beta:
+`cri` is in GA:
 * It is feature complete.
-* It (the beta version) works with Kubernetes >= 1.9.
+* It (the GA version) works with Kubernetes 1.10 and above.
 * It has passed all [CRI validation tests](https://github.com/kubernetes/community/blob/master/contributors/devel/cri-validation.md).
 * It has passed all [node e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-node-tests.md).
 * It has passed all [e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-tests.md).
 
 See [test dashboard](https://k8s-testgrid.appspot.com/sig-node-containerd)
 ## Support Metrics
-| CRI-Containerd Version | CRI Plugin Version | Kubernetes Version |
-|:----------------------:|:------------------:|:------------------:|
-|     v1.0.0-alpha.x     |                    |      1.7, 1.8      |
-|      v1.0.0-beta.x     |                    |        1.9         |
-|       End-Of-Life      |        HEAD        |        1.10+       |
+| CRI-Containerd Version | Containerd Version | Kubernetes Version | CRI Version |
+|:----------------------:|:------------------:|:------------------:|:-----------:|
+|     v1.0.0-alpha.x     |                    |      1.7, 1.8      |   v1alpha1  |
+|      v1.0.0-beta.x     |                    |        1.9         |   v1alpha1  |
+|       End-Of-Life      |        v1.1        |        1.10+       |   v1alpha2  |
+|                        |        HEAD        |        1.10+       |   v1alpha2  |
+
 ## Production Quality Cluster on GCE
 For a production quality cluster on GCE brought up with `kube-up.sh` refer [here](docs/kube-up.md).
 ## Installing with Ansible and Kubeadm

@@ -55,4 +55,3 @@ make test-e2e-node
 make test-e2e-node FOCUS=REGEXP_TO_FOCUS SKIP=REGEXP_TO_SKIP
 ```
 [More information](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-node-tests.md) about Kubernetes node e2e test.
-<!-- TODO: Add cluster e2e test -->
