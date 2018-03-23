@@ -391,7 +391,7 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 	if err != nil {
 		return nil, err
 	}
-	defer done()
+	defer done(ctx)
 
 	request := &tasks.CheckpointTaskRequest{
 		ContainerID: t.id,
