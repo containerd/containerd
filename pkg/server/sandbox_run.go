@@ -491,8 +491,12 @@ func parseDNSOptions(servers, searches, options []string) (string, error) {
 //  2) The mount point doesn't exist.
 func (c *criService) unmountSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
 	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetIpc() != runtime.NamespaceMode_NODE {
-		if err := c.os.Unmount(c.getSandboxDevShm(id), unix.MNT_DETACH); err != nil && !os.IsNotExist(err) {
-			return err
+		path, err := c.os.FollowSymlinkInScope(c.getSandboxDevShm(id), "/")
+		if err != nil {
+			return errors.Wrap(err, "failed to follow symlink")
+		}
+		if err := c.os.Unmount(path, unix.MNT_DETACH); err != nil && !os.IsNotExist(err) {
+			return errors.Wrapf(err, "failed to unmount %q", path)
 		}
 	}
 	return nil

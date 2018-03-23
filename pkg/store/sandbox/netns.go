@@ -21,10 +21,11 @@ import (
 	"sync"
 
 	cnins "github.com/containernetworking/plugins/pkg/ns"
-	"github.com/docker/docker/pkg/mount"
 	"github.com/docker/docker/pkg/symlink"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
+
+	osinterface "github.com/containerd/cri/pkg/os"
 )
 
 // ErrClosedNetNS is the error returned when network namespace is closed.
@@ -81,7 +82,6 @@ func (n *NetNS) Remove() error {
 	}
 	if n.restored {
 		path := n.ns.Path()
-		// TODO(random-liu): Add util function for unmount.
 		// Check netns existence.
 		if _, err := os.Stat(path); err != nil {
 			if os.IsNotExist(err) {
@@ -93,15 +93,8 @@ func (n *NetNS) Remove() error {
 		if err != nil {
 			return errors.Wrap(err, "failed to follow symlink")
 		}
-		mounted, err := mount.Mounted(path)
-		if err != nil {
-			return errors.Wrap(err, "failed to check netns mounted")
-		}
-		if mounted {
-			err := unix.Unmount(path, unix.MNT_DETACH)
-			if err != nil && !os.IsNotExist(err) {
-				return errors.Wrap(err, "failed to umount netns")
-			}
+		if err := osinterface.Unmount(path, unix.MNT_DETACH); err != nil && !os.IsNotExist(err) {
+			return errors.Wrap(err, "failed to umount netns")
 		}
 		if err := os.RemoveAll(path); err != nil {
 			return errors.Wrap(err, "failed to remove netns")

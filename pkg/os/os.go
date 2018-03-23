@@ -25,6 +25,7 @@ import (
 	containerdmount "github.com/containerd/containerd/mount"
 	"github.com/containerd/fifo"
 	"github.com/docker/docker/pkg/mount"
+	"github.com/docker/docker/pkg/symlink"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 )
@@ -37,6 +38,7 @@ type OS interface {
 	OpenFifo(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error)
 	Stat(name string) (os.FileInfo, error)
 	ResolveSymbolicLink(name string) (string, error)
+	FollowSymlinkInScope(path, scope string) (string, error)
 	CopyFile(src, dest string, perm os.FileMode) error
 	WriteFile(filename string, data []byte, perm os.FileMode) error
 	Mount(source string, target string, fstype string, flags uintptr, data string) error
@@ -79,6 +81,11 @@ func (RealOS) ResolveSymbolicLink(path string) (string, error) {
 	return filepath.EvalSymlinks(path)
 }
 
+// FollowSymlinkInScope will call symlink.FollowSymlinkInScope.
+func (RealOS) FollowSymlinkInScope(path, scope string) (string, error) {
+	return symlink.FollowSymlinkInScope(path, scope)
+}
+
 // CopyFile will copy src file to dest file
 func (RealOS) CopyFile(src, dest string, perm os.FileMode) error {
 	in, err := os.Open(src)
@@ -107,17 +114,21 @@ func (RealOS) Mount(source string, target string, fstype string, flags uintptr, 
 	return unix.Mount(source, target, fstype, flags, data)
 }
 
-// Unmount will call unix.Unmount to unmount the file. The function doesn't
-// return error if target is not mounted.
+// Unmount will call Unmount to unmount the file.
 func (RealOS) Unmount(target string, flags int) error {
-	// TODO(random-liu): Follow symlink to make sure the result is correct.
-	if mounted, err := mount.Mounted(target); err != nil || !mounted {
-		return err
-	}
-	return unix.Unmount(target, flags)
+	return Unmount(target, flags)
 }
 
 // LookupMount gets mount info of a given path.
 func (RealOS) LookupMount(path string) (containerdmount.Info, error) {
 	return containerdmount.Lookup(path)
+}
+
+// Unmount will call unix.Unmount to unmount the file. The function doesn't
+// return error if target is not mounted.
+func Unmount(target string, flags int) error {
+	if mounted, err := mount.Mounted(target); err != nil || !mounted {
+		return err
+	}
+	return unix.Unmount(target, flags)
 }
