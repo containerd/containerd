@@ -19,10 +19,15 @@ package server
 import (
 	"testing"
 
-	criconfig "github.com/containerd/cri/pkg/config"
-	"github.com/containerd/cri/pkg/util"
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/linux/runctypes"
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/context"
+
+	criconfig "github.com/containerd/cri/pkg/config"
+	"github.com/containerd/cri/pkg/util"
 )
 
 // TestGetUserFromImage tests the logic of getting image uid or user name of image user.
@@ -143,63 +148,45 @@ func TestBuildLabels(t *testing.T) {
 	assert.Equal(t, "b", configLabels["a"], "change in new labels should not affect original label")
 }
 
-func Test_criService_getRuntime(t *testing.T) {
-
-	const (
-		privilegedWorkload    = true
-		nonPrivilegedWorkload = false
-	)
-
-	nonPrivilegedRuntime := criconfig.Runtime{
-		Type:   "io.containerd.runtime.v1.linux",
-		Engine: "kata-runtime",
-		Root:   "",
-	}
-
-	privilegedRuntime := criconfig.Runtime{
-		Type:   "io.containerd.runtime.v1.linux",
-		Engine: "runc",
-		Root:   "",
-	}
-
-	// Crate a configuration that does not specify a privileged runtime
-	// Both privileged and non-privileged workloads are created with the
-	// defaultRuntime (nonPrivilegedRuntime).
-	nonPrivilegedConfig := criService{
-		config: criconfig.Config{
-			PluginConfig: criconfig.DefaultConfig(),
-		},
-	}
-	nonPrivilegedConfig.config.ContainerdConfig.DefaultRuntime = nonPrivilegedRuntime
-
-	// Crate a configuration that specifies a privileged runtime
-	// The privileged workloads are created with the privilegedRuntime
-	// The non-privileged workloads be created with the
-	// defaultRuntime(nonPrivilegedRuntime)
-	privilegedConfig := criService{
-		config: criconfig.Config{
-			PluginConfig: criconfig.DefaultConfig(),
-		},
-	}
-	privilegedConfig.config.ContainerdConfig.DefaultRuntime = nonPrivilegedRuntime
-	privilegedConfig.config.ContainerdConfig.PrivilegedRuntime = privilegedRuntime
-
-	tests := []struct {
-		name        string
-		cri         criService
-		privileged  bool
-		wantRuntime criconfig.Runtime
+func TestGetRuntimeConfigFromContainerInfo(t *testing.T) {
+	for desc, test := range map[string]struct {
+		typ             string
+		engine          string
+		root            string
+		expectErr       bool
+		expectedRuntime criconfig.Runtime
 	}{
-		{"nonPrivilegedConfig/PrivilegedWorkload", nonPrivilegedConfig, privilegedWorkload, nonPrivilegedRuntime},
-		{"nonPrivilegedConfig/PrivilegedWorkload", nonPrivilegedConfig, nonPrivilegedWorkload, nonPrivilegedRuntime},
-		{"PrivilegedConfig/nonPrivilegedWorkload", privilegedConfig, privilegedWorkload, privilegedRuntime},
-		{"PrivilegedConfig/nonPrivilegedWorkload", privilegedConfig, nonPrivilegedWorkload, nonPrivilegedRuntime},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotRuntime := tt.cri.getRuntime(tt.privileged)
-			assert.Equal(t, tt.wantRuntime, gotRuntime)
+		"should return error if there is no runc options": {
+			typ:       "test.type",
+			expectErr: true,
+		},
+		"should retrieve runtime from container info": {
+			typ:    "test.type",
+			engine: "test-engine",
+			root:   "/test/root",
+			expectedRuntime: criconfig.Runtime{
+				Type:   "test.type",
+				Engine: "test-engine",
+				Root:   "/test/root",
+			},
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			var opts interface{}
+			if test.engine != "" || test.root != "" {
+				opts = &runctypes.RuncOptions{
+					Runtime:     test.engine,
+					RuntimeRoot: test.root,
+				}
+			}
+			c := containers.Container{}
+			assert.NoError(t, containerd.WithRuntime(
+				test.typ,
+				opts,
+			)(context.Background(), nil, &c))
+			r, err := getRuntimeConfigFromContainerInfo(c)
+			assert.Equal(t, test.expectErr, err != nil)
+			assert.Equal(t, test.expectedRuntime, r)
 		})
 	}
 }

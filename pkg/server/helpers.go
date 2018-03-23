@@ -25,7 +25,10 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/linux/runctypes"
+	"github.com/containerd/typeurl"
 	"github.com/docker/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
@@ -35,7 +38,6 @@ import (
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
@@ -410,17 +412,22 @@ func getPodCNILabels(id string, config *runtime.PodSandboxConfig) map[string]str
 	}
 }
 
-// getRuntime returns the runtime configuration
-// If the container is privileged, it will return
-// the privileged runtime else not.
-func (c *criService) getRuntime(privileged bool) (runtime criconfig.Runtime) {
-	runtime = c.config.ContainerdConfig.DefaultRuntime
-
-	if privileged && c.config.ContainerdConfig.PrivilegedRuntime.Engine != "" {
-		runtime = c.config.ContainerdConfig.PrivilegedRuntime
+// getRuntimeConfigFromContainerInfo gets runtime configuration from containerd
+// container info.
+func getRuntimeConfigFromContainerInfo(c containers.Container) (criconfig.Runtime, error) {
+	r := criconfig.Runtime{
+		Type: c.Runtime.Name,
 	}
-
-	logrus.Debugf("runtime=%s(%s), runtime root='%s', privileged='%v'", runtime.Type, runtime.Engine, runtime.Root, privileged)
-
-	return runtime
+	if c.Runtime.Options == nil {
+		// CRI plugin makes sure that runtime option is always set.
+		return criconfig.Runtime{}, errors.New("runtime options is nil")
+	}
+	data, err := typeurl.UnmarshalAny(c.Runtime.Options)
+	if err != nil {
+		return criconfig.Runtime{}, errors.Wrap(err, "failed to unmarshal runtime options")
+	}
+	runtimeOpts := data.(*runctypes.RuncOptions)
+	r.Engine = runtimeOpts.Runtime
+	r.Root = runtimeOpts.RuntimeRoot
+	return r, nil
 }

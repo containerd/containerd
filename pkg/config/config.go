@@ -18,9 +18,10 @@ package config
 
 import "github.com/containerd/containerd"
 
-// Runtime  struct to contain the type(ID), engine, and root variables for a default and a privileged runtime
+// Runtime struct to contain the type(ID), engine, and root variables for a default runtime
+// and a runtime for untrusted worload.
 type Runtime struct {
-	//Type is the runtime type to use in containerd e.g. io.containerd.runtime.v1.linux
+	// Type is the runtime type to use in containerd e.g. io.containerd.runtime.v1.linux
 	Type string `toml:"runtime_type" json:"runtimeType"`
 	// Engine is the name of the runtime engine used by containerd.
 	Engine string `toml:"runtime_engine" json:"runtimeEngine"`
@@ -34,8 +35,8 @@ type ContainerdConfig struct {
 	Snapshotter string `toml:"snapshotter" json:"snapshotter"`
 	// DefaultRuntime is the runtime to use in containerd.
 	DefaultRuntime Runtime `toml:"default_runtime" json:"defaultRuntime"`
-	// PrivilegedRuntime is a non-secure runtime used only to run trusted workloads on it
-	PrivilegedRuntime Runtime `toml:"privileged_runtime" json:"privilegedRuntime"`
+	// UntrustedWorkloadRuntime is a runtime to run untrusted workloads on it.
+	UntrustedWorkloadRuntime Runtime `toml:"untrusted_workload_runtime" json:"untrustedWorkloadRuntime"`
 }
 
 // CniConfig contains toml config related to cni
@@ -107,11 +108,6 @@ func DefaultConfig() PluginConfig {
 		ContainerdConfig: ContainerdConfig{
 			Snapshotter: containerd.DefaultSnapshotter,
 			DefaultRuntime: Runtime{
-				Type:   "io.containerd.runtime.v1.linux",
-				Engine: "",
-				Root:   "",
-			},
-			PrivilegedRuntime: Runtime{
 				Type:   "io.containerd.runtime.v1.linux",
 				Engine: "",
 				Root:   "",

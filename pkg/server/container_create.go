@@ -87,9 +87,6 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 	sandboxPid := s.Pid()
 
-	trusted := sandbox.Config.Annotations[annotations.PrivilegedSandbox] == "true"
-	containerRuntime := c.getRuntime(trusted)
-
 	// Generate unique id and name for the container and reserve the name.
 	// Reserve the container name to avoid concurrent `CreateContainer` request creating
 	// the same container.
@@ -124,6 +121,17 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if image == nil {
 		return nil, errors.Errorf("image %q not found", imageRef)
 	}
+
+	// Run container using the same runtime with sandbox.
+	sandboxInfo, err := sandbox.Container.Info(ctx)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get sandbox %q info", sandboxID)
+	}
+	ociRuntime, err := getRuntimeConfigFromContainerInfo(sandboxInfo)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get OCI runtime")
+	}
+	logrus.Debugf("Use OCI %+v for container %q", ociRuntime, id)
 
 	// Create container root directory.
 	containerRootDir := getContainerRootDir(c.config.RootDir, id)
@@ -230,10 +238,10 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	opts = append(opts,
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithRuntime(
-			containerRuntime.Type,
+			ociRuntime.Type,
 			&runctypes.RuncOptions{
-				Runtime:       containerRuntime.Engine,
-				RuntimeRoot:   containerRuntime.Root,
+				Runtime:       ociRuntime.Engine,
+				RuntimeRoot:   ociRuntime.Root,
 				SystemdCgroup: c.config.SystemdCgroup}), // TODO (mikebrow): add CriuPath when we add support for pause
 		containerd.WithContainerLabels(containerLabels),
 		containerd.WithContainerExtension(containerMetadataExtension, &meta))
