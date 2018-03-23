@@ -49,9 +49,11 @@ type Config struct {
 
 // GRPCConfig provides GRPC configuration for the socket
 type GRPCConfig struct {
-	Address string `toml:"address"`
-	UID     int    `toml:"uid"`
-	GID     int    `toml:"gid"`
+	Address        string `toml:"address"`
+	UID            int    `toml:"uid"`
+	GID            int    `toml:"gid"`
+	MaxRecvMsgSize int    `toml:"max_recv_message_size"`
+	MaxSendMsgSize int    `toml:"max_send_message_size"`
 }
 
 // Debug provides debug configuration
