@@ -345,7 +345,10 @@ func (cw *changeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 			source = filepath.Join(cw.source, p)
 		)
 
-		if f.Mode()&os.ModeSymlink != 0 {
+		switch {
+		case f.Mode()&os.ModeSocket != 0:
+			return nil // ignore sockets
+		case f.Mode()&os.ModeSymlink != 0:
 			if link, err = os.Readlink(source); err != nil {
 				return err
 			}
