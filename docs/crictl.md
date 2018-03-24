@@ -189,7 +189,8 @@ $ crictl info
     "statsCollectPeriod": 10,
     "containerdRootDir": "/var/lib/containerd",
     "containerdEndpoint": "/run/containerd/containerd.sock",
-    "rootDir": "/var/lib/containerd/io.containerd.grpc.v1.cri"
+    "rootDir": "/var/lib/containerd/io.containerd.grpc.v1.cri",
+    "stateDir": "/run/containerd/io.containerd.grpc.v1.cri",
   },
   "golang": "go1.10"
 }

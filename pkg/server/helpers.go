@@ -156,29 +156,42 @@ func getCgroupsPath(cgroupsParent, id string, systemdCgroup bool) string {
 }
 
 // getSandboxRootDir returns the root directory for managing sandbox files,
-// e.g. named pipes.
-func getSandboxRootDir(rootDir, id string) string {
-	return filepath.Join(rootDir, sandboxesDir, id)
+// e.g. hosts files.
+func (c *criService) getSandboxRootDir(id string) string {
+	return filepath.Join(c.config.RootDir, sandboxesDir, id)
 }
 
-// getContainerRootDir returns the root directory for managing container files.
-func getContainerRootDir(rootDir, id string) string {
-	return filepath.Join(rootDir, containersDir, id)
+// getVolatileSandboxRootDir returns the root directory for managing volatile sandbox files,
+// e.g. named pipes.
+func (c *criService) getVolatileSandboxRootDir(id string) string {
+	return filepath.Join(c.config.StateDir, sandboxesDir, id)
+}
+
+// getContainerRootDir returns the root directory for managing container files,
+// e.g. state checkpoint.
+func (c *criService) getContainerRootDir(id string) string {
+	return filepath.Join(c.config.RootDir, containersDir, id)
+}
+
+// getVolatileContainerRootDir returns the root directory for managing volatile container files,
+// e.g. named pipes.
+func (c *criService) getVolatileContainerRootDir(id string) string {
+	return filepath.Join(c.config.StateDir, containersDir, id)
 }
 
 // getSandboxHosts returns the hosts file path inside the sandbox root directory.
-func getSandboxHosts(sandboxRootDir string) string {
-	return filepath.Join(sandboxRootDir, "hosts")
+func (c *criService) getSandboxHosts(id string) string {
+	return filepath.Join(c.getSandboxRootDir(id), "hosts")
 }
 
 // getResolvPath returns resolv.conf filepath for specified sandbox.
-func getResolvPath(sandboxRoot string) string {
-	return filepath.Join(sandboxRoot, "resolv.conf")
+func (c *criService) getResolvPath(id string) string {
+	return filepath.Join(c.getSandboxRootDir(id), "resolv.conf")
 }
 
 // getSandboxDevShm returns the shm file path inside the sandbox root directory.
-func getSandboxDevShm(sandboxRootDir string) string {
-	return filepath.Join(sandboxRootDir, "shm")
+func (c *criService) getSandboxDevShm(id string) string {
+	return filepath.Join(c.getVolatileSandboxRootDir(id), "shm")
 }
 
 // getNetworkNamespace returns the network namespace of a process.

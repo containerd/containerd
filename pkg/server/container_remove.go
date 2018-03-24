@@ -76,10 +76,15 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 		return nil, errors.Wrapf(err, "failed to delete container checkpoint for %q", id)
 	}
 
-	containerRootDir := getContainerRootDir(c.config.RootDir, id)
+	containerRootDir := c.getContainerRootDir(id)
 	if err := system.EnsureRemoveAll(containerRootDir); err != nil {
 		return nil, errors.Wrapf(err, "failed to remove container root directory %q",
 			containerRootDir)
+	}
+	volatileContainerRootDir := c.getVolatileContainerRootDir(id)
+	if err := system.EnsureRemoveAll(volatileContainerRootDir); err != nil {
+		return nil, errors.Wrapf(err, "failed to remove volatile container root directory %q",
+			volatileContainerRootDir)
 	}
 
 	c.containerStore.Delete(id)

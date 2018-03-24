@@ -497,7 +497,7 @@ func TestGenerateVolumeMounts(t *testing.T) {
 }
 
 func TestGenerateContainerMounts(t *testing.T) {
-	testSandboxRootDir := "test-sandbox-root"
+	const testSandboxID = "test-id"
 	for desc, test := range map[string]struct {
 		criMounts       []*runtime.Mount
 		securityContext *runtime.LinuxContainerSecurityContext
@@ -510,17 +510,17 @@ func TestGenerateContainerMounts(t *testing.T) {
 			expectedMounts: []*runtime.Mount{
 				{
 					ContainerPath: "/etc/hosts",
-					HostPath:      testSandboxRootDir + "/hosts",
+					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
 					Readonly:      true,
 				},
 				{
 					ContainerPath: resolvConfPath,
-					HostPath:      testSandboxRootDir + "/resolv.conf",
+					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
 					Readonly:      true,
 				},
 				{
 					ContainerPath: "/dev/shm",
-					HostPath:      testSandboxRootDir + "/shm",
+					HostPath:      filepath.Join(testStateDir, sandboxesDir, testSandboxID, "shm"),
 					Readonly:      false,
 				},
 			},
@@ -530,17 +530,17 @@ func TestGenerateContainerMounts(t *testing.T) {
 			expectedMounts: []*runtime.Mount{
 				{
 					ContainerPath: "/etc/hosts",
-					HostPath:      testSandboxRootDir + "/hosts",
+					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
 					Readonly:      false,
 				},
 				{
 					ContainerPath: resolvConfPath,
-					HostPath:      testSandboxRootDir + "/resolv.conf",
+					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
 					Readonly:      false,
 				},
 				{
 					ContainerPath: "/dev/shm",
-					HostPath:      testSandboxRootDir + "/shm",
+					HostPath:      filepath.Join(testStateDir, sandboxesDir, testSandboxID, "shm"),
 					Readonly:      false,
 				},
 			},
@@ -552,12 +552,12 @@ func TestGenerateContainerMounts(t *testing.T) {
 			expectedMounts: []*runtime.Mount{
 				{
 					ContainerPath: "/etc/hosts",
-					HostPath:      testSandboxRootDir + "/hosts",
+					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
 					Readonly:      false,
 				},
 				{
 					ContainerPath: resolvConfPath,
-					HostPath:      testSandboxRootDir + "/resolv.conf",
+					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
 					Readonly:      false,
 				},
 				{
@@ -597,7 +597,7 @@ func TestGenerateContainerMounts(t *testing.T) {
 			},
 		}
 		c := newTestCRIService()
-		mounts := c.generateContainerMounts(testSandboxRootDir, config)
+		mounts := c.generateContainerMounts(testSandboxID, config)
 		assert.Equal(t, test.expectedMounts, mounts, desc)
 	}
 }

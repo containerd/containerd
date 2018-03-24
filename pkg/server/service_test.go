@@ -28,7 +28,8 @@ import (
 )
 
 const (
-	testRootDir = "/test/rootfs"
+	testRootDir  = "/test/root"
+	testStateDir = "/test/state"
 	// Use an image id as test sandbox image to avoid image name resolve.
 	// TODO(random-liu): Change this to image name after we have complete image
 	// management unit test framework.
@@ -40,7 +41,8 @@ const (
 func newTestCRIService() *criService {
 	return &criService{
 		config: criconfig.Config{
-			RootDir: testRootDir,
+			RootDir:  testRootDir,
+			StateDir: testStateDir,
 			PluginConfig: criconfig.PluginConfig{
 				SandboxImage: testSandboxImage,
 			},

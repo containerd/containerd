@@ -134,7 +134,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	logrus.Debugf("Use OCI %+v for container %q", ociRuntime, id)
 
 	// Create container root directory.
-	containerRootDir := getContainerRootDir(c.config.RootDir, id)
+	containerRootDir := c.getContainerRootDir(id)
 	if err = c.os.MkdirAll(containerRootDir, 0755); err != nil {
 		return nil, errors.Wrapf(err, "failed to create container root directory %q",
 			containerRootDir)
@@ -148,12 +148,26 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 			}
 		}
 	}()
+	volatileContainerRootDir := c.getVolatileContainerRootDir(id)
+	if err = c.os.MkdirAll(volatileContainerRootDir, 0755); err != nil {
+		return nil, errors.Wrapf(err, "failed to create volatile container root directory %q",
+			volatileContainerRootDir)
+	}
+	defer func() {
+		if retErr != nil {
+			// Cleanup the volatile container root directory.
+			if err = c.os.RemoveAll(volatileContainerRootDir); err != nil {
+				logrus.WithError(err).Errorf("Failed to remove volatile container root directory %q",
+					volatileContainerRootDir)
+			}
+		}
+	}()
 
 	// Create container volumes mounts.
 	volumeMounts := c.generateVolumeMounts(containerRootDir, config.GetMounts(), &image.ImageSpec.Config)
 
 	// Generate container runtime spec.
-	mounts := c.generateContainerMounts(getSandboxRootDir(c.config.RootDir, sandboxID), config)
+	mounts := c.generateContainerMounts(sandboxID, config)
 
 	spec, err := c.generateContainerSpec(id, sandboxID, sandboxPid, config, sandboxConfig, &image.ImageSpec.Config, append(mounts, volumeMounts...))
 	if err != nil {
@@ -188,7 +202,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 
 	containerIO, err := cio.NewContainerIO(id,
-		cio.WithNewFIFOs(containerRootDir, config.GetTty(), config.GetStdin()))
+		cio.WithNewFIFOs(volatileContainerRootDir, config.GetTty(), config.GetStdin()))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create container io")
 	}
@@ -416,13 +430,13 @@ func (c *criService) generateVolumeMounts(containerRootDir string, criMounts []*
 
 // generateContainerMounts sets up necessary container mounts including /dev/shm, /etc/hosts
 // and /etc/resolv.conf.
-func (c *criService) generateContainerMounts(sandboxRootDir string, config *runtime.ContainerConfig) []*runtime.Mount {
+func (c *criService) generateContainerMounts(sandboxID string, config *runtime.ContainerConfig) []*runtime.Mount {
 	var mounts []*runtime.Mount
 	securityContext := config.GetLinux().GetSecurityContext()
 	if !isInCRIMounts(etcHosts, config.GetMounts()) {
 		mounts = append(mounts, &runtime.Mount{
 			ContainerPath: etcHosts,
-			HostPath:      getSandboxHosts(sandboxRootDir),
+			HostPath:      c.getSandboxHosts(sandboxID),
 			Readonly:      securityContext.GetReadonlyRootfs(),
 		})
 	}
@@ -432,13 +446,13 @@ func (c *criService) generateContainerMounts(sandboxRootDir string, config *runt
 	if !isInCRIMounts(resolvConfPath, config.GetMounts()) {
 		mounts = append(mounts, &runtime.Mount{
 			ContainerPath: resolvConfPath,
-			HostPath:      getResolvPath(sandboxRootDir),
+			HostPath:      c.getResolvPath(sandboxID),
 			Readonly:      securityContext.GetReadonlyRootfs(),
 		})
 	}
 
 	if !isInCRIMounts(devShm, config.GetMounts()) {
-		sandboxDevShm := getSandboxDevShm(sandboxRootDir)
+		sandboxDevShm := c.getSandboxDevShm(sandboxID)
 		if securityContext.GetNamespaceOptions().GetIpc() == runtime.NamespaceMode_NODE {
 			sandboxDevShm = devShm
 		}

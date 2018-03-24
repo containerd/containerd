@@ -96,6 +96,8 @@ type Config struct {
 	// RootDir is the root directory path for managing cri plugin files
 	// (metadata checkpoint etc.)
 	RootDir string `json:"rootDir"`
+	// StateDir is the root directory path for managing volatile pod/container data
+	StateDir string `json:"stateDir"`
 }
 
 // DefaultConfig returns default configurations of cri plugin.
