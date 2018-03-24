@@ -67,12 +67,9 @@ specifications as appropriate.
 (Fedora, CentOS, RHEL). On releases of Ubuntu <=Trusty and Debian <=jessie a
 backport version of `libseccomp-dev` is required. See [travis.yml](.travis.yml) for an example on trusty.
 * **btrfs development library.** Required by containerd btrfs support. `btrfs-tools`(Ubuntu, Debian) / `btrfs-progs-devel`(Fedora, CentOS, RHEL)
-2. Install other dependencies:
-* **`nsenter`**: Required by portforward.
-* **`socat`**: Required by portforward.
-3. Install and setup a go 1.10 development environment.
-4. Make a local clone of this repository.
-5. Install binary dependencies by running the following command from your cloned `cri/` project directory:
+2. Install and setup a go 1.10 development environment.
+3. Make a local clone of this repository.
+4. Install binary dependencies by running the following command from your cloned `cri/` project directory:
 ```bash
 # Note: install.deps installs the above mentioned runc, containerd, and CNI
 # binary dependencies. install.deps is only provided for general use and ease of
