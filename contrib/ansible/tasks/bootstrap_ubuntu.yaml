@@ -9,6 +9,5 @@
       - apt-transport-https
       - btrfs-tools
       - libseccomp2
-      - socat
       - util-linux
 # TODO: Limited support for trusty for nsenter. Need to handle/verify 
