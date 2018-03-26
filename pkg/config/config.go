@@ -118,7 +118,7 @@ func DefaultConfig() PluginConfig {
 		StreamServerAddress: "",
 		StreamServerPort:    "10010",
 		EnableSelinux:       false,
-		SandboxImage:        "gcr.io/google_containers/pause:3.1",
+		SandboxImage:        "k8s.gcr.io/pause:3.1",
 		StatsCollectPeriod:  10,
 		SystemdCgroup:       false,
 		Registry: Registry{
