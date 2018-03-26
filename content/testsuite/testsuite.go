@@ -46,6 +46,7 @@ func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, r
 	t.Run("ResumeCopy", makeTest(t, name, storeFn, checkResume(resumeCopy)))
 	t.Run("ResumeCopySeeker", makeTest(t, name, storeFn, checkResume(resumeCopySeeker)))
 	t.Run("ResumeCopyReaderAt", makeTest(t, name, storeFn, checkResume(resumeCopyReaderAt)))
+	t.Run("SmallBlob", makeTest(t, name, storeFn, checkSmallBlob))
 	t.Run("Labels", makeTest(t, name, storeFn, checkLabels))
 
 	t.Run("CrossNamespaceAppend", makeTest(t, name, storeFn, checkCrossNSAppend))
@@ -521,6 +522,46 @@ func resumeCopyReaderAt(ctx context.Context, w content.Writer, b []byte, _, size
 		readerAt
 	}{bytes.NewReader(b)}
 	return errors.Wrap(content.Copy(ctx, w, r, size, dgst), "copy failed")
+}
+
+// checkSmallBlob tests reading a blob which is smaller than the read size.
+func checkSmallBlob(ctx context.Context, t *testing.T, store content.Store) {
+	blob := []byte(`foobar`)
+	blobSize := int64(len(blob))
+	blobDigest := digest.FromBytes(blob)
+	// test write
+	w, err := store.Writer(ctx, t.Name(), blobSize, blobDigest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write(blob); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Commit(ctx, blobSize, blobDigest); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	// test read.
+	readSize := blobSize + 1
+	ra, err := store.ReaderAt(ctx, blobDigest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := io.NewSectionReader(ra, 0, readSize)
+	b, err := ioutil.ReadAll(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ra.Close(); err != nil {
+		t.Fatal(err)
+	}
+	d := digest.FromBytes(b)
+	if blobDigest != d {
+		t.Fatalf("expected %s (%q), got %s (%q)", blobDigest, string(blob),
+			d, string(b))
+	}
 }
 
 func checkCrossNSShare(ctx context.Context, t *testing.T, cs content.Store) {
