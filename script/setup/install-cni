@@ -42,6 +42,7 @@ bash -c 'cat >'$CNI_CONFIG_DIR'/10-containerd-net.conflist <<EOF
       "bridge": "cni0",
       "isGateway": true,
       "ipMasq": true,
+      "promiscMode": true,
       "ipam": {
         "type": "host-local",
         "subnet": "10.88.0.0/16",
