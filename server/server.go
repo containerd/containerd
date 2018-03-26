@@ -67,6 +67,8 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 		return nil, err
 	}
 	rpc := grpc.NewServer(
+		grpc.MaxRecvMsgSize(config.GRPC.MaxRecvMsgSize),
+		grpc.MaxSendMsgSize(config.GRPC.MaxSendMsgSize),
 		grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
 		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
 	)

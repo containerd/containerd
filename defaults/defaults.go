@@ -14,21 +14,13 @@
    limitations under the License.
 */
 
-package command
+package defaults
 
-import (
-	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/server"
+const (
+	// DefaultMaxRecvMsgSize defines the default maximum message size for
+	// receiving protobufs passed over the GRPC API.
+	DefaultMaxRecvMsgSize = 16 << 20
+	// DefaultMaxSendMsgSize defines the default maximum message size for
+	// sending protobufs passed over the GRPC API.
+	DefaultMaxSendMsgSize = 16 << 20
 )
-
-func defaultConfig() *server.Config {
-	return &server.Config{
-		Root:  defaults.DefaultRootDir,
-		State: defaults.DefaultStateDir,
-		GRPC: server.GRPCConfig{
-			Address:        defaults.DefaultAddress,
-			MaxRecvMsgSize: defaults.DefaultMaxRecvMsgSize,
-			MaxSendMsgSize: defaults.DefaultMaxSendMsgSize,
-		},
-	}
-}

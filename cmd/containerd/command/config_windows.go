@@ -26,7 +26,9 @@ func defaultConfig() *server.Config {
 		Root:  defaults.DefaultRootDir,
 		State: defaults.DefaultStateDir,
 		GRPC: server.GRPCConfig{
-			Address: defaults.DefaultAddress,
+			Address:        defaults.DefaultAddress,
+			MaxRecvMsgSize: defaults.DefaultMaxRecvMsgSize,
+			MaxSendMsgSize: defaults.DefaultMaxSendMsgSize,
 		},
 	}
 }
