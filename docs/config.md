@@ -16,7 +16,7 @@ The explanation and default value of each configuration item are as follows:
   enable_selinux = false
 
   # sandbox_image is the image used by sandbox container.
-  sandbox_image = "gcr.io/google_containers/pause:3.1"
+  sandbox_image = "k8s.gcr.io/pause:3.1"
 
   # stats_collect_period is the period (in seconds) of snapshots stats collection.
   stats_collect_period = 10

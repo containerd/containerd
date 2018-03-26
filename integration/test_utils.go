@@ -39,7 +39,7 @@ import (
 
 const (
 	timeout            = 1 * time.Minute
-	pauseImage         = "gcr.io/google_containers/pause:3.1" // This is the same with default sandbox image.
+	pauseImage         = "k8s.gcr.io/pause:3.1" // This is the same with default sandbox image.
 	k8sNamespace       = constants.K8sContainerdNamespace
 	containerdEndpoint = "/run/containerd/containerd.sock"
 )

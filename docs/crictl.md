@@ -185,7 +185,7 @@ $ crictl info
       }
     },
     "streamServerPort": "10010",
-    "sandboxImage": "gcr.io/google_containers/pause:3.0",
+    "sandboxImage": "k8s.gcr.io/pause:3.1",
     "statsCollectPeriod": 10,
     "containerdRootDir": "/var/lib/containerd",
     "containerdEndpoint": "/run/containerd/containerd.sock",
