@@ -17,21 +17,21 @@ limitations under the License.
 package client
 
 import (
-	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
 	api "github.com/containerd/cri/pkg/api/v1"
 )
 
-// NewCRIContainerdClient creates grpc client of cri-containerd
+// NewCRIPluginClient creates grpc client of cri plugin
 // TODO(random-liu): Wrap grpc functions.
-func NewCRIContainerdClient(endpoint string, timeout time.Duration) (api.CRIContainerdServiceClient, error) {
+func NewCRIPluginClient(endpoint string, timeout time.Duration) (api.CRIPluginServiceClient, error) {
 	addr, dialer, err := util.GetAddressAndDialer(endpoint)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get dialer: %v", err)
+		return nil, errors.Wrap(err, "failed to get dialer")
 	}
 	conn, err := grpc.Dial(addr,
 		grpc.WithBlock(),
@@ -41,7 +41,7 @@ func NewCRIContainerdClient(endpoint string, timeout time.Duration) (api.CRICont
 		grpc.WithDialer(dialer),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to dial: %v", err)
+		return nil, errors.Wrap(err, "failed to dial")
 	}
-	return api.NewCRIContainerdServiceClient(conn), nil
+	return api.NewCRIPluginServiceClient(conn), nil
 }

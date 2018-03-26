@@ -17,8 +17,9 @@ limitations under the License.
 package registrar
 
 import (
-	"fmt"
 	"sync"
+
+	"github.com/pkg/errors"
 )
 
 // Registrar stores one-to-one name<->key mappings.
@@ -49,19 +50,19 @@ func (r *Registrar) Reserve(name, key string) error {
 	defer r.lock.Unlock()
 
 	if name == "" || key == "" {
-		return fmt.Errorf("invalid name %q or key %q", name, key)
+		return errors.Errorf("invalid name %q or key %q", name, key)
 	}
 
 	if k, exists := r.nameToKey[name]; exists {
 		if k != key {
-			return fmt.Errorf("name %q is reserved for %q", name, k)
+			return errors.Errorf("name %q is reserved for %q", name, k)
 		}
 		return nil
 	}
 
 	if n, exists := r.keyToName[key]; exists {
 		if n != name {
-			return fmt.Errorf("key %q is reserved for %q", key, n)
+			return errors.Errorf("key %q is reserved for %q", key, n)
 		}
 		return nil
 	}

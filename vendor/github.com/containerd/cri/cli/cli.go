@@ -49,9 +49,9 @@ var loadCommand = cli.Command{
 			timeout = context.GlobalDuration("timeout")
 			cancel  gocontext.CancelFunc
 		)
-		cl, err := client.NewCRIContainerdClient(address, timeout)
+		cl, err := client.NewCRIPluginClient(address, timeout)
 		if err != nil {
-			return fmt.Errorf("failed to create grpc client: %v", err)
+			return errors.Wrap(err, "failed to create grpc client")
 		}
 		if timeout > 0 {
 			ctx, cancel = gocontext.WithTimeout(gocontext.Background(), timeout)

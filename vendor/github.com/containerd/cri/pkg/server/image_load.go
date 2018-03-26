@@ -17,12 +17,12 @@ limitations under the License.
 package server
 
 import (
-	"fmt"
-	"golang.org/x/net/context"
 	"os"
 	"path/filepath"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
 
 	api "github.com/containerd/cri/pkg/api/v1"
 	"github.com/containerd/cri/pkg/containerd/importer"
@@ -30,23 +30,23 @@ import (
 )
 
 // LoadImage loads a image into containerd.
-func (c *criContainerdService) LoadImage(ctx context.Context, r *api.LoadImageRequest) (*api.LoadImageResponse, error) {
+func (c *criService) LoadImage(ctx context.Context, r *api.LoadImageRequest) (*api.LoadImageResponse, error) {
 	path := r.GetFilePath()
 	if !filepath.IsAbs(path) {
-		return nil, fmt.Errorf("path %q is not an absolute path", path)
+		return nil, errors.Errorf("path %q is not an absolute path", path)
 	}
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open file: %v", err)
+		return nil, errors.Wrap(err, "failed to open file")
 	}
 	repoTags, err := importer.Import(ctx, c.client, f)
 	if err != nil {
-		return nil, fmt.Errorf("failed to import image: %v", err)
+		return nil, errors.Wrap(err, "failed to import image")
 	}
 	for _, repoTag := range repoTags {
 		image, err := c.client.GetImage(ctx, repoTag)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get image %q: %v", repoTag, err)
+			return nil, errors.Wrapf(err, "failed to get image %q", repoTag)
 		}
 		if err := image.Unpack(ctx, c.config.ContainerdConfig.Snapshotter); err != nil {
 			logrus.WithError(err).Warnf("Failed to unpack image %q", repoTag)
@@ -54,12 +54,12 @@ func (c *criContainerdService) LoadImage(ctx context.Context, r *api.LoadImageRe
 		}
 		info, err := getImageInfo(ctx, image)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get image %q info: %v", repoTag, err)
+			return nil, errors.Wrapf(err, "failed to get image %q info", repoTag)
 		}
 		id := info.id
 
 		if err := c.createImageReference(ctx, id, image.Target()); err != nil {
-			return nil, fmt.Errorf("failed to create image reference %q: %v", id, err)
+			return nil, errors.Wrapf(err, "failed to create image reference %q", id)
 		}
 
 		img := imagestore.Image{
@@ -72,7 +72,7 @@ func (c *criContainerdService) LoadImage(ctx context.Context, r *api.LoadImageRe
 		}
 
 		if err := c.imageStore.Add(img); err != nil {
-			return nil, fmt.Errorf("failed to add image %q into store: %v", id, err)
+			return nil, errors.Wrapf(err, "failed to add image %q into store", id)
 		}
 		logrus.Debugf("Imported image with id %q, repo tag %q", id, repoTag)
 	}

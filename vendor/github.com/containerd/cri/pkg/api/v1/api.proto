@@ -13,8 +13,8 @@ option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
 option (gogoproto.goproto_unrecognized_all) = false;
 
-// CRIContainerdService defines non-CRI APIs for cri-containerd.
-service CRIContainerdService{
+// CRIPluginService defines non-CRI APIs for cri plugin.
+service CRIPluginService{
     // LoadImage loads a image into containerd.
     rpc LoadImage(LoadImageRequest) returns (LoadImageResponse) {}
 }

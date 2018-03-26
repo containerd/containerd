@@ -21,6 +21,7 @@ import (
 	"fmt"
 	goruntime "runtime"
 
+	cni "github.com/containerd/go-cni"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
@@ -29,7 +30,7 @@ import (
 const networkNotReadyReason = "NetworkPluginNotReady"
 
 // Status returns the status of the runtime.
-func (c *criContainerdService) Status(ctx context.Context, r *runtime.StatusRequest) (*runtime.StatusResponse, error) {
+func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*runtime.StatusResponse, error) {
 	// As a containerd plugin, if CRI plugin is serving request,
 	// containerd must be ready.
 	runtimeCondition := &runtime.RuntimeCondition{
@@ -40,10 +41,14 @@ func (c *criContainerdService) Status(ctx context.Context, r *runtime.StatusRequ
 		Type:   runtime.NetworkReady,
 		Status: true,
 	}
+	// Check the status of the cni initialization
 	if err := c.netPlugin.Status(); err != nil {
-		networkCondition.Status = false
-		networkCondition.Reason = networkNotReadyReason
-		networkCondition.Message = fmt.Sprintf("Network plugin returns error: %v", err)
+		// If it is not initialized, then load the config and retry
+		if err = c.netPlugin.Load(cni.WithLoNetwork(), cni.WithDefaultConf()); err != nil {
+			networkCondition.Status = false
+			networkCondition.Reason = networkNotReadyReason
+			networkCondition.Message = fmt.Sprintf("Network plugin returns error: %v", err)
+		}
 	}
 
 	resp := &runtime.StatusResponse{

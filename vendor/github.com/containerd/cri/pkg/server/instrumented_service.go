@@ -30,10 +30,10 @@ import (
 
 // instrumentedService wraps service with containerd namespace and logs.
 type instrumentedService struct {
-	c *criContainerdService
+	c *criService
 }
 
-func newInstrumentedService(c *criContainerdService) grpcServices {
+func newInstrumentedService(c *criService) grpcServices {
 	return &instrumentedService{c: c}
 }
 
