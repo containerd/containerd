@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go"
@@ -81,8 +82,15 @@ func Import(ctx context.Context, client *containerd.Client, reader io.Reader) (_
 	if err != nil {
 		return nil, err
 	}
-	// TODO(random-liu): Fix this after containerd client is fixed (containerd/containerd#2193)
-	defer done(ctx) // nolint: errcheck
+	defer func() {
+		deferCtx, deferCancel := ctrdutil.DeferContext()
+		defer deferCancel()
+		if err := done(deferCtx); err != nil {
+			// Get lease id from context still works after context is done.
+			leaseID, _ := leases.Lease(ctx)
+			log.G(ctx).WithError(err).Errorf("Failed to release lease %q", leaseID)
+		}
+	}()
 
 	cs := client.ContentStore()
 	is := client.ImageService()

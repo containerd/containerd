@@ -17,10 +17,10 @@ limitations under the License.
 package server
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/containerd/containerd"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/client-go/tools/remotecommand"
@@ -30,35 +30,35 @@ import (
 )
 
 // Attach prepares a streaming endpoint to attach to a running container, and returns the address.
-func (c *criContainerdService) Attach(ctx context.Context, r *runtime.AttachRequest) (*runtime.AttachResponse, error) {
+func (c *criService) Attach(ctx context.Context, r *runtime.AttachRequest) (*runtime.AttachResponse, error) {
 	cntr, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
-		return nil, fmt.Errorf("failed to find container in store: %v", err)
+		return nil, errors.Wrap(err, "failed to find container in store")
 	}
 	state := cntr.Status.Get().State()
 	if state != runtime.ContainerState_CONTAINER_RUNNING {
-		return nil, fmt.Errorf("container is in %s state", criContainerStateToString(state))
+		return nil, errors.Errorf("container is in %s state", criContainerStateToString(state))
 	}
 	return c.streamServer.GetAttach(r)
 }
 
-func (c *criContainerdService) attachContainer(ctx context.Context, id string, stdin io.Reader, stdout, stderr io.WriteCloser,
+func (c *criService) attachContainer(ctx context.Context, id string, stdin io.Reader, stdout, stderr io.WriteCloser,
 	tty bool, resize <-chan remotecommand.TerminalSize) error {
 	// Get container from our container store.
 	cntr, err := c.containerStore.Get(id)
 	if err != nil {
-		return fmt.Errorf("failed to find container %q in store: %v", id, err)
+		return errors.Wrapf(err, "failed to find container %q in store", id)
 	}
 	id = cntr.ID
 
 	state := cntr.Status.Get().State()
 	if state != runtime.ContainerState_CONTAINER_RUNNING {
-		return fmt.Errorf("container is in %s state", criContainerStateToString(state))
+		return errors.Errorf("container is in %s state", criContainerStateToString(state))
 	}
 
 	task, err := cntr.Container.Task(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("failed to load task: %v", err)
+		return errors.Wrap(err, "failed to load task")
 	}
 	handleResizing(resize, func(size remotecommand.TerminalSize) {
 		if err := task.Resize(ctx, uint32(size.Width), uint32(size.Height)); err != nil {

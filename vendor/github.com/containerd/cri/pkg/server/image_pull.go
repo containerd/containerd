@@ -18,7 +18,6 @@ package server
 
 import (
 	"encoding/base64"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -26,6 +25,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -77,11 +77,11 @@ import (
 // contents are missing but snapshots are ready, is the image still "READY"?
 
 // PullImage pulls an image with authentication config.
-func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (*runtime.PullImageResponse, error) {
+func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (*runtime.PullImageResponse, error) {
 	imageRef := r.GetImage().GetImage()
 	namedRef, err := util.NormalizeImageRef(imageRef)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse image reference %q: %v", imageRef, err)
+		return nil, errors.Wrapf(err, "failed to parse image reference %q", imageRef)
 	}
 	ref := namedRef.String()
 	if ref != imageRef {
@@ -94,7 +94,7 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 	})
 	_, desc, err := resolver.Resolve(ctx, ref)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve image %q: %v", ref, err)
+		return nil, errors.Wrapf(err, "failed to resolve image %q", ref)
 	}
 	// We have to check schema1 here, because after `Pull`, schema1
 	// image has already been converted.
@@ -106,7 +106,7 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 		containerd.WithResolver(resolver),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to pull image %q: %v", ref, err)
+		return nil, errors.Wrapf(err, "failed to pull image %q", ref)
 	}
 
 	// Do best effort unpack.
@@ -119,7 +119,7 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 	// Get image information.
 	info, err := getImageInfo(ctx, image)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get image information: %v", err)
+		return nil, errors.Wrap(err, "failed to get image information")
 	}
 	imageID := info.id
 
@@ -129,7 +129,7 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 			continue
 		}
 		if err := c.createImageReference(ctx, r, image.Target()); err != nil {
-			return nil, fmt.Errorf("failed to update image reference %q: %v", r, err)
+			return nil, errors.Wrapf(err, "failed to update image reference %q", r)
 		}
 	}
 
@@ -150,7 +150,7 @@ func (c *criContainerdService) PullImage(ctx context.Context, r *runtime.PullIma
 	}
 
 	if err := c.imageStore.Add(img); err != nil {
-		return nil, fmt.Errorf("failed to add image %q into store: %v", img.ID, err)
+		return nil, errors.Wrapf(err, "failed to add image %q into store", img.ID)
 	}
 
 	// NOTE(random-liu): the actual state in containerd is the source of truth, even we maintain
@@ -181,20 +181,20 @@ func ParseAuth(auth *runtime.AuthConfig) (string, string, error) {
 		}
 		fields := strings.SplitN(string(decoded), ":", 2)
 		if len(fields) != 2 {
-			return "", "", fmt.Errorf("invalid decoded auth: %q", decoded)
+			return "", "", errors.Errorf("invalid decoded auth: %q", decoded)
 		}
 		user, passwd := fields[0], fields[1]
 		return user, strings.Trim(passwd, "\x00"), nil
 	}
 	// TODO(random-liu): Support RegistryToken.
-	return "", "", fmt.Errorf("invalid auth config")
+	return "", "", errors.New("invalid auth config")
 }
 
 // createImageReference creates image reference inside containerd image store.
 // Note that because create and update are not finished in one transaction, there could be race. E.g.
 // the image reference is deleted by someone else after create returns already exists, but before update
 // happens.
-func (c *criContainerdService) createImageReference(ctx context.Context, name string, desc imagespec.Descriptor) error {
+func (c *criService) createImageReference(ctx context.Context, name string, desc imagespec.Descriptor) error {
 	img := containerdimages.Image{
 		Name:   name,
 		Target: desc,
@@ -212,7 +212,7 @@ func (c *criContainerdService) createImageReference(ctx context.Context, name st
 	return err
 }
 
-func (c *criContainerdService) getResolverOptions() map[string][]string {
+func (c *criService) getResolverOptions() map[string][]string {
 	options := make(map[string][]string)
 	for ns, mirror := range c.config.Mirrors {
 		options[ns] = append(options[ns], mirror.Endpoints...)

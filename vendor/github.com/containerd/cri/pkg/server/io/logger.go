@@ -19,12 +19,12 @@ package io
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
@@ -57,7 +57,7 @@ func NewCRILogger(path string, stream StreamType) (io.WriteCloser, error) {
 	prc, pwc := io.Pipe()
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0640)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open log file: %v", err)
+		return nil, errors.Wrap(err, "failed to open log file")
 	}
 	go redirectLogs(path, prc, f, stream)
 	return pwc, nil

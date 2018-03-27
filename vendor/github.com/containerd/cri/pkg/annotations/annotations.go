@@ -31,4 +31,8 @@ const (
 
 	// SandboxID is the sandbox ID annotation
 	SandboxID = "io.kubernetes.cri.sandbox-id"
+
+	// UntrustedWorkload is the sandbox annotation for untrusted workload. Untrusted
+	// workload can only run on dedicated runtime for untrusted workload.
+	UntrustedWorkload = "io.kubernetes.cri.untrusted-workload"
 )

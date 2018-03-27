@@ -127,6 +127,8 @@ func testDaemonRuntimeRoot(t *testing.T, noShim bool) {
  [plugins.linux]
    no_shim = %v
    runtime_root = "%s"
+ [plugins.cri]
+   stream_server_port = "0"
 `, noShim, runtimeRoot)
 
 	client, _, cleanup := newDaemonWithConfig(t, configTOML)

@@ -18,12 +18,12 @@ package server
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"os/exec"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -33,11 +33,11 @@ import (
 )
 
 // PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
-func (c *criContainerdService) PortForward(ctx context.Context, r *runtime.PortForwardRequest) (retRes *runtime.PortForwardResponse, retErr error) {
+func (c *criService) PortForward(ctx context.Context, r *runtime.PortForwardRequest) (retRes *runtime.PortForwardResponse, retErr error) {
 	// TODO(random-liu): Run a socat container inside the sandbox to do portforward.
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
-		return nil, fmt.Errorf("failed to find sandbox %q: %v", r.GetPodSandboxId(), err)
+		return nil, errors.Wrapf(err, "failed to find sandbox %q", r.GetPodSandboxId())
 	}
 	if sandbox.Status.Get().State != sandboxstore.StateReady {
 		return nil, errors.New("sandbox container is not running")
@@ -49,20 +49,20 @@ func (c *criContainerdService) PortForward(ctx context.Context, r *runtime.PortF
 // portForward requires `nsenter` and `socat` on the node, it uses `nsenter` to enter the
 // sandbox namespace, and run `socat` inside the namespace to forward stream for a specific
 // port. The `socat` command keeps running until it exits or client disconnect.
-func (c *criContainerdService) portForward(id string, port int32, stream io.ReadWriteCloser) error {
+func (c *criService) portForward(id string, port int32, stream io.ReadWriteCloser) error {
 	s, err := c.sandboxStore.Get(id)
 	if err != nil {
-		return fmt.Errorf("failed to find sandbox %q in store: %v", id, err)
+		return errors.Wrapf(err, "failed to find sandbox %q in store", id)
 	}
 	t, err := s.Container.Task(ctrdutil.NamespacedContext(), nil)
 	if err != nil {
-		return fmt.Errorf("failed to get sandbox container task: %v", err)
+		return errors.Wrap(err, "failed to get sandbox container task")
 	}
 	pid := t.Pid()
 
 	socat, err := exec.LookPath("socat")
 	if err != nil {
-		return fmt.Errorf("failed to find socat: %v", err)
+		return errors.Wrap(err, "failed to find socat")
 	}
 
 	// Check following links for meaning of the options:
@@ -73,7 +73,7 @@ func (c *criContainerdService) portForward(id string, port int32, stream io.Read
 
 	nsenter, err := exec.LookPath("nsenter")
 	if err != nil {
-		return fmt.Errorf("failed to find nsenter: %v", err)
+		return errors.Wrap(err, "failed to find nsenter")
 	}
 
 	logrus.Infof("Executing port forwarding command: %s %s", nsenter, strings.Join(args, " "))
@@ -95,7 +95,7 @@ func (c *criContainerdService) portForward(id string, port int32, stream io.Read
 	// when the command (socat) exits.
 	in, err := cmd.StdinPipe()
 	if err != nil {
-		return fmt.Errorf("failed to create stdin pipe: %v", err)
+		return errors.Wrap(err, "failed to create stdin pipe")
 	}
 	go func() {
 		if _, err := io.Copy(in, stream); err != nil {
@@ -106,7 +106,7 @@ func (c *criContainerdService) portForward(id string, port int32, stream io.Read
 	}()
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("nsenter command returns error: %v, stderr: %q", err, stderr.String())
+		return errors.Errorf("nsenter command returns error: %v, stderr: %q", err, stderr.String())
 	}
 
 	logrus.Infof("Finish port forwarding for %q port %d", id, port)

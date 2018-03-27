@@ -271,7 +271,7 @@ func (r *containerdResolver) base(refspec reference.Spec) (*dockerBase, error) {
 	if urls, ok := r.registry[host]; ok {
 		urls, err := r.getV2Urls(urls, prefix)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch v2 urls: %v", err)
+			return nil, errors.Wrap(err, "failed to fetch v2 urls")
 		}
 		base = append(base, urls...)
 	} else if host == "docker.io" {
@@ -434,7 +434,7 @@ func (r *dockerBase) setTokenAuth(ctx context.Context, params map[string]string)
 
 	realmURL, err := url.Parse(realm)
 	if err != nil {
-		return fmt.Errorf("invalid token auth challenge realm: %s", err)
+		return errors.Wrap(err, "invalid token auth challenge realm")
 	}
 
 	to := tokenOptions{
@@ -444,7 +444,7 @@ func (r *dockerBase) setTokenAuth(ctx context.Context, params map[string]string)
 
 	to.scopes = getTokenScopes(ctx, params)
 	if len(to.scopes) == 0 {
-		return errors.Errorf("no scope specified for token auth challenge")
+		return errors.New("no scope specified for token auth challenge")
 	}
 	if r.secret != "" {
 		// Credential information is provided, use oauth POST endpoint
@@ -517,7 +517,7 @@ func (r *dockerBase) fetchTokenWithOAuth(ctx context.Context, to tokenOptions) (
 
 	var tr postTokenResponse
 	if err = decoder.Decode(&tr); err != nil {
-		return "", fmt.Errorf("unable to decode token response: %s", err)
+		return "", errors.Wrap(err, "unable to decode token response")
 	}
 
 	return tr.AccessToken, nil
@@ -569,7 +569,7 @@ func (r *dockerBase) getToken(ctx context.Context, to tokenOptions) (string, err
 
 	var tr getTokenResponse
 	if err = decoder.Decode(&tr); err != nil {
-		return "", fmt.Errorf("unable to decode token response: %s", err)
+		return "", errors.Wrap(err, "unable to decode token response")
 	}
 
 	// `access_token` is equivalent to `token` and if both are specified
@@ -591,7 +591,7 @@ func (r *containerdResolver) getV2Urls(urls []string, imagePath string) ([]url.U
 	for _, u := range urls {
 		v2Url, err := url.Parse(u)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to parse url during getv2 urls: %+v, err:%s", u, err)
+			return nil, errors.Wrapf(err, "failed to parse url during getv2 urls: %+v", u)
 		}
 		v2Url.Path = path.Join("/v2", imagePath)
 		v2Urls = append(v2Urls, *v2Url)

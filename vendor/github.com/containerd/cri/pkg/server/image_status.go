@@ -18,8 +18,8 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -31,10 +31,10 @@ import (
 // ImageStatus returns the status of the image, returns nil if the image isn't present.
 // TODO(random-liu): We should change CRI to distinguish image id and image spec. (See
 // kubernetes/kubernetes#46255)
-func (c *criContainerdService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequest) (*runtime.ImageStatusResponse, error) {
+func (c *criService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequest) (*runtime.ImageStatusResponse, error) {
 	image, err := c.localResolve(ctx, r.GetImage().GetImage())
 	if err != nil {
-		return nil, fmt.Errorf("can not resolve %q locally: %v", r.GetImage().GetImage(), err)
+		return nil, errors.Wrapf(err, "can not resolve %q locally", r.GetImage().GetImage())
 	}
 	if image == nil {
 		// return empty without error when image not found.
@@ -46,7 +46,7 @@ func (c *criContainerdService) ImageStatus(ctx context.Context, r *runtime.Image
 	runtimeImage := toCRIRuntimeImage(image)
 	info, err := c.toCRIImageInfo(ctx, image, r.GetVerbose())
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate image info: %v", err)
+		return nil, errors.Wrap(err, "failed to generate image info")
 	}
 
 	return &runtime.ImageStatusResponse{
@@ -79,7 +79,7 @@ type verboseImageInfo struct {
 }
 
 // toCRIImageInfo converts internal image object information to CRI image status response info map.
-func (c *criContainerdService) toCRIImageInfo(ctx context.Context, image *imagestore.Image, verbose bool) (map[string]string, error) {
+func (c *criService) toCRIImageInfo(ctx context.Context, image *imagestore.Image, verbose bool) (map[string]string, error) {
 	if !verbose {
 		return nil, nil
 	}
