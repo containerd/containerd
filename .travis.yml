@@ -74,7 +74,9 @@ script:
   - if [ "$GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH TESTFLAGS_PARALLEL=1 make integration ; fi
   - if [ "$GOOS" = "linux" ]; then
       sudo PATH=$PATH containerd -log-level debug &> /tmp/containerd-cri.log &
-      sudo PATH=$PATH GOPATH=$GOPATH critest --runtime-endpoint=/var/run/containerd/containerd.sock --ginkgo-flags=--nodes=8 validation ;
+      # Wait for containerd to come up.
+      sudo ctr version ;
+      sudo PATH=$PATH GOPATH=$GOPATH critest --runtime-endpoint=/var/run/containerd/containerd.sock --parallel=8 ;
       exit_code=$? ;
       test $exit_code -ne 0 && cat /tmp/containerd-cri.log ;
       sudo pkill containerd ;

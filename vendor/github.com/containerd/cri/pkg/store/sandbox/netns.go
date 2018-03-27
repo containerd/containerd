@@ -17,15 +17,15 @@ limitations under the License.
 package sandbox
 
 import (
-	"errors"
-	"fmt"
 	"os"
 	"sync"
 
 	cnins "github.com/containernetworking/plugins/pkg/ns"
-	"github.com/docker/docker/pkg/mount"
 	"github.com/docker/docker/pkg/symlink"
+	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
+
+	osinterface "github.com/containerd/cri/pkg/os"
 )
 
 // ErrClosedNetNS is the error returned when network namespace is closed.
@@ -43,7 +43,7 @@ type NetNS struct {
 func NewNetNS() (*NetNS, error) {
 	netns, err := cnins.NewNS()
 	if err != nil {
-		return nil, fmt.Errorf("failed to setup network namespace %v", err)
+		return nil, errors.Wrap(err, "failed to setup network namespace")
 	}
 	n := new(NetNS)
 	n.ns = netns
@@ -63,7 +63,7 @@ func LoadNetNS(path string) (*NetNS, error) {
 			os.RemoveAll(path) // nolint: errcheck
 			return nil, ErrClosedNetNS
 		}
-		return nil, fmt.Errorf("failed to load network namespace %v", err)
+		return nil, errors.Wrap(err, "failed to load network namespace")
 	}
 	return &NetNS{ns: ns, restored: true}, nil
 }
@@ -76,36 +76,28 @@ func (n *NetNS) Remove() error {
 	if !n.closed {
 		err := n.ns.Close()
 		if err != nil {
-			return fmt.Errorf("failed to close network namespace: %v", err)
+			return errors.Wrap(err, "failed to close network namespace")
 		}
 		n.closed = true
 	}
 	if n.restored {
 		path := n.ns.Path()
-		// TODO(random-liu): Add util function for unmount.
 		// Check netns existence.
 		if _, err := os.Stat(path); err != nil {
 			if os.IsNotExist(err) {
 				return nil
 			}
-			return fmt.Errorf("failed to stat netns: %v", err)
+			return errors.Wrap(err, "failed to stat netns")
 		}
 		path, err := symlink.FollowSymlinkInScope(path, "/")
 		if err != nil {
-			return fmt.Errorf("failed to follow symlink: %v", err)
+			return errors.Wrap(err, "failed to follow symlink")
 		}
-		mounted, err := mount.Mounted(path)
-		if err != nil {
-			return fmt.Errorf("failed to check netns mounted: %v", err)
-		}
-		if mounted {
-			err := unix.Unmount(path, unix.MNT_DETACH)
-			if err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf("failed to umount netns: %v", err)
-			}
+		if err := osinterface.Unmount(path, unix.MNT_DETACH); err != nil && !os.IsNotExist(err) {
+			return errors.Wrap(err, "failed to umount netns")
 		}
 		if err := os.RemoveAll(path); err != nil {
-			return fmt.Errorf("failed to remove netns: %v", err)
+			return errors.Wrap(err, "failed to remove netns")
 		}
 		n.restored = false
 	}

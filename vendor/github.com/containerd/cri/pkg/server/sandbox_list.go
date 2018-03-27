@@ -24,7 +24,7 @@ import (
 )
 
 // ListPodSandbox returns a list of Sandbox.
-func (c *criContainerdService) ListPodSandbox(ctx context.Context, r *runtime.ListPodSandboxRequest) (*runtime.ListPodSandboxResponse, error) {
+func (c *criService) ListPodSandbox(ctx context.Context, r *runtime.ListPodSandboxRequest) (*runtime.ListPodSandboxResponse, error) {
 	// List all sandboxes from store.
 	sandboxesInStore := c.sandboxStore.List()
 	var sandboxes []*runtime.PodSandbox
@@ -56,14 +56,14 @@ func toCRISandbox(meta sandboxstore.Metadata, status sandboxstore.Status) *runti
 	}
 }
 
-func (c *criContainerdService) normalizePodSandboxFilter(filter *runtime.PodSandboxFilter) {
+func (c *criService) normalizePodSandboxFilter(filter *runtime.PodSandboxFilter) {
 	if sb, err := c.sandboxStore.Get(filter.GetId()); err == nil {
 		filter.Id = sb.ID
 	}
 }
 
 // filterCRISandboxes filters CRISandboxes.
-func (c *criContainerdService) filterCRISandboxes(sandboxes []*runtime.PodSandbox, filter *runtime.PodSandboxFilter) []*runtime.PodSandbox {
+func (c *criService) filterCRISandboxes(sandboxes []*runtime.PodSandbox, filter *runtime.PodSandboxFilter) []*runtime.PodSandbox {
 	if filter == nil {
 		return sandboxes
 	}

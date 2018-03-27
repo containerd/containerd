@@ -25,7 +25,7 @@ import (
 )
 
 // ImageFsInfo returns information of the filesystem that is used to store images.
-func (c *criContainerdService) ImageFsInfo(ctx context.Context, r *runtime.ImageFsInfoRequest) (*runtime.ImageFsInfoResponse, error) {
+func (c *criService) ImageFsInfo(ctx context.Context, r *runtime.ImageFsInfoRequest) (*runtime.ImageFsInfoResponse, error) {
 	snapshots := c.snapshotStore.List()
 	timestamp := time.Now().UnixNano()
 	var usedBytes, inodesUsed uint64

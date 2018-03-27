@@ -18,13 +18,13 @@ package server
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"time"
 
 	"github.com/containerd/containerd"
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
@@ -39,7 +39,7 @@ import (
 
 // ExecSync executes a command in the container, and returns the stdout output.
 // If command exits with a non-zero exit code, an error is returned.
-func (c *criContainerdService) ExecSync(ctx context.Context, r *runtime.ExecSyncRequest) (*runtime.ExecSyncResponse, error) {
+func (c *criService) ExecSync(ctx context.Context, r *runtime.ExecSyncRequest) (*runtime.ExecSyncResponse, error) {
 	var stdout, stderr bytes.Buffer
 	exitCode, err := c.execInContainer(ctx, r.GetContainerId(), execOptions{
 		cmd:     r.GetCmd(),
@@ -48,7 +48,7 @@ func (c *criContainerdService) ExecSync(ctx context.Context, r *runtime.ExecSync
 		timeout: time.Duration(r.GetTimeout()) * time.Second,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to exec in container: %v", err)
+		return nil, errors.Wrap(err, "failed to exec in container")
 	}
 
 	return &runtime.ExecSyncResponse{
@@ -71,7 +71,7 @@ type execOptions struct {
 
 // execInContainer executes a command inside the container synchronously, and
 // redirects stdio stream properly.
-func (c *criContainerdService) execInContainer(ctx context.Context, id string, opts execOptions) (*uint32, error) {
+func (c *criService) execInContainer(ctx context.Context, id string, opts execOptions) (*uint32, error) {
 	// Cancel the context before returning to ensure goroutines are stopped.
 	// This is important, because if `Start` returns error, `Wait` will hang
 	// forever unless we cancel the context.
@@ -81,23 +81,23 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 	// Get container from our container store.
 	cntr, err := c.containerStore.Get(id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find container %q in store: %v", id, err)
+		return nil, errors.Wrapf(err, "failed to find container %q in store", id)
 	}
 	id = cntr.ID
 
 	state := cntr.Status.Get().State()
 	if state != runtime.ContainerState_CONTAINER_RUNNING {
-		return nil, fmt.Errorf("container is in %s state", criContainerStateToString(state))
+		return nil, errors.Errorf("container is in %s state", criContainerStateToString(state))
 	}
 
 	container := cntr.Container
 	spec, err := container.Spec(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get container spec: %v", err)
+		return nil, errors.Wrap(err, "failed to get container spec")
 	}
 	task, err := container.Task(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load task: %v", err)
+		return nil, errors.Wrap(err, "failed to load task")
 	}
 	if opts.tty {
 		g := newSpecGenerator(spec)
@@ -116,17 +116,17 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 	}
 	execID := util.GenerateID()
 	logrus.Debugf("Generated exec id %q for container %q", execID, id)
-	rootDir := getContainerRootDir(c.config.RootDir, id)
+	volatileRootDir := c.getVolatileContainerRootDir(id)
 	var execIO *cio.ExecIO
 	process, err := task.Exec(ctx, execID, pspec,
 		func(id string) (containerdio.IO, error) {
 			var err error
-			execIO, err = cio.NewExecIO(id, rootDir, opts.tty, opts.stdin != nil)
+			execIO, err = cio.NewExecIO(id, volatileRootDir, opts.tty, opts.stdin != nil)
 			return execIO, err
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create exec %q: %v", execID, err)
+		return nil, errors.Wrapf(err, "failed to create exec %q", execID)
 	}
 	defer func() {
 		deferCtx, deferCancel := ctrdutil.DeferContext()
@@ -138,10 +138,10 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 
 	exitCh, err := process.Wait(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to wait for process %q: %v", execID, err)
+		return nil, errors.Wrapf(err, "failed to wait for process %q", execID)
 	}
 	if err := process.Start(ctx); err != nil {
-		return nil, fmt.Errorf("failed to start exec %q: %v", execID, err)
+		return nil, errors.Wrapf(err, "failed to start exec %q", execID)
 	}
 
 	handleResizing(opts.resize, func(size remotecommand.TerminalSize) {
@@ -173,7 +173,7 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 		//TODO(Abhi) Use context.WithDeadline instead of timeout.
 		// Ignore the not found error because the process may exit itself before killing.
 		if err := process.Kill(ctx, unix.SIGKILL); err != nil && !errdefs.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to kill exec %q: %v", execID, err)
+			return nil, errors.Wrapf(err, "failed to kill exec %q", execID)
 		}
 		// Wait for the process to be killed.
 		exitRes := <-exitCh
@@ -181,12 +181,12 @@ func (c *criContainerdService) execInContainer(ctx context.Context, id string, o
 			execID, exitRes.ExitCode(), exitRes.Error())
 		<-attachDone
 		logrus.Debugf("Stream pipe for exec process %q done", execID)
-		return nil, fmt.Errorf("timeout %v exceeded", opts.timeout)
+		return nil, errors.Errorf("timeout %v exceeded", opts.timeout)
 	case exitRes := <-exitCh:
 		code, _, err := exitRes.Result()
 		logrus.Infof("Exec process %q exits with exit code %d and error %v", execID, code, err)
 		if err != nil {
-			return nil, fmt.Errorf("failed while waiting for exec %q: %v", execID, err)
+			return nil, errors.Wrapf(err, "failed while waiting for exec %q", execID)
 		}
 		<-attachDone
 		logrus.Debugf("Stream pipe for exec process %q done", execID)

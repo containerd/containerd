@@ -20,7 +20,8 @@
 #
 set -eu -o pipefail
 
-CRITEST_COMMIT=b184f9aefe60a4441330e615ee20634ee26474fb
+go get -u github.com/onsi/ginkgo/ginkgo
+CRITEST_COMMIT=207e773f72fde8d8aed1447692d8f800a6686d6c
 go get -d github.com/kubernetes-incubator/cri-tools/...
 cd $GOPATH/src/github.com/kubernetes-incubator/cri-tools
 git checkout $CRITEST_COMMIT

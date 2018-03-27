@@ -17,7 +17,7 @@ limitations under the License.
 package server
 
 import (
-	"fmt"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -25,14 +25,14 @@ import (
 
 // ReopenContainerLog asks the cri plugin to reopen the stdout/stderr log file for the container.
 // This is often called after the log file has been rotated.
-func (c *criContainerdService) ReopenContainerLog(ctx context.Context, r *runtime.ReopenContainerLogRequest) (*runtime.ReopenContainerLogResponse, error) {
+func (c *criService) ReopenContainerLog(ctx context.Context, r *runtime.ReopenContainerLogRequest) (*runtime.ReopenContainerLogResponse, error) {
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
-		return nil, fmt.Errorf("an error occurred when try to find container %q: %v", r.GetContainerId(), err)
+		return nil, errors.Wrapf(err, "an error occurred when try to find container %q", r.GetContainerId())
 	}
 
 	if container.Status.Get().State() != runtime.ContainerState_CONTAINER_RUNNING {
-		return nil, fmt.Errorf("container is not running")
+		return nil, errors.New("container is not running")
 	}
 
 	// Create new container logger and replace the existing ones.

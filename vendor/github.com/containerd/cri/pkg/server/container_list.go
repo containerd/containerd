@@ -25,7 +25,7 @@ import (
 )
 
 // ListContainers lists all containers matching the filter.
-func (c *criContainerdService) ListContainers(ctx context.Context, r *runtime.ListContainersRequest) (*runtime.ListContainersResponse, error) {
+func (c *criService) ListContainers(ctx context.Context, r *runtime.ListContainersRequest) (*runtime.ListContainersResponse, error) {
 	// List all containers from store.
 	containersInStore := c.containerStore.List()
 
@@ -54,7 +54,7 @@ func toCRIContainer(container containerstore.Container) *runtime.Container {
 	}
 }
 
-func (c *criContainerdService) normalizeContainerFilter(filter *runtime.ContainerFilter) {
+func (c *criService) normalizeContainerFilter(filter *runtime.ContainerFilter) {
 	if cntr, err := c.containerStore.Get(filter.GetId()); err == nil {
 		filter.Id = cntr.ID
 	}
@@ -64,7 +64,7 @@ func (c *criContainerdService) normalizeContainerFilter(filter *runtime.Containe
 }
 
 // filterCRIContainers filters CRIContainers.
-func (c *criContainerdService) filterCRIContainers(containers []*runtime.Container, filter *runtime.ContainerFilter) []*runtime.Container {
+func (c *criService) filterCRIContainers(containers []*runtime.Container, filter *runtime.ContainerFilter) []*runtime.Container {
 	if filter == nil {
 		return containers
 	}

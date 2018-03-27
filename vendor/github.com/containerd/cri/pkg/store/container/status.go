@@ -18,13 +18,13 @@ package container
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
 
 	"github.com/docker/docker/pkg/ioutils"
+	"github.com/pkg/errors"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
@@ -95,7 +95,7 @@ func (s *Status) decode(data []byte) error {
 		*s = versioned.Status
 		return nil
 	}
-	return fmt.Errorf("unsupported version")
+	return errors.New("unsupported version")
 }
 
 // UpdateFunc is function used to update the container status. If there
@@ -125,11 +125,11 @@ type StatusStorage interface {
 func StoreStatus(root, id string, status Status) (StatusStorage, error) {
 	data, err := status.encode()
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode status: %v", err)
+		return nil, errors.Wrap(err, "failed to encode status")
 	}
 	path := filepath.Join(root, "status")
 	if err := ioutils.AtomicWriteFile(path, data, 0600); err != nil {
-		return nil, fmt.Errorf("failed to checkpoint status to %q: %v", path, err)
+		return nil, errors.Wrapf(err, "failed to checkpoint status to %q", path)
 	}
 	return &statusStorage{
 		path:   path,
@@ -143,11 +143,11 @@ func LoadStatus(root, id string) (Status, error) {
 	path := filepath.Join(root, "status")
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		return Status{}, fmt.Errorf("failed to read status from %q: %v", path, err)
+		return Status{}, errors.Wrapf(err, "failed to read status from %q", path)
 	}
 	var status Status
 	if err := status.decode(data); err != nil {
-		return Status{}, fmt.Errorf("failed to decode status %q: %v", data, err)
+		return Status{}, errors.Wrapf(err, "failed to decode status %q", data)
 	}
 	return status, nil
 }
@@ -175,10 +175,10 @@ func (s *statusStorage) UpdateSync(u UpdateFunc) error {
 	}
 	data, err := newStatus.encode()
 	if err != nil {
-		return fmt.Errorf("failed to encode status: %v", err)
+		return errors.Wrap(err, "failed to encode status")
 	}
 	if err := ioutils.AtomicWriteFile(s.path, data, 0600); err != nil {
-		return fmt.Errorf("failed to checkpoint status to %q: %v", s.path, err)
+		return errors.Wrapf(err, "failed to checkpoint status to %q", s.path)
 	}
 	s.status = newStatus
 	return nil
