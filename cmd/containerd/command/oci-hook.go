@@ -31,7 +31,7 @@ import (
 
 var ociHook = cli.Command{
 	Name:  "oci-hook",
-	Usage: "provides a base for OCI runtime hooks that allow arguements to be templated.",
+	Usage: "provides a base for OCI runtime hooks to allow arguments to be injected.",
 	Action: func(context *cli.Context) error {
 		state, err := loadHookState(os.Stdin)
 		if err != nil {
@@ -70,6 +70,7 @@ func newTemplateContext(state *specs.State) *templateContext {
 		"rootfs":     t.rootfs,
 		"pid":        t.pid,
 		"annotation": t.annotation,
+		"status":     t.status,
 	}
 	return t
 }
@@ -97,6 +98,10 @@ func (t *templateContext) pid() int {
 
 func (t *templateContext) annotation(k string) string {
 	return t.state.Annotations[k]
+}
+
+func (t *templateContext) status() string {
+	return t.state.Status
 }
 
 func render(ctx *templateContext, source string, out io.Writer) error {
