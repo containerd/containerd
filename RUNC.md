@@ -6,7 +6,7 @@ RUNC_COMMIT = a618ab5a0186905949ee463dbb762c3d23e12a80
 
 For more information on how to clone and build runc see the runc Building [documentation](https://github.com/opencontainers/runc#building).
 
-Note: before building you may need to install additional support, which will vary by platform. For example, you may need to install `libseccomp` and `libapparmor` e.g. `libseccomp-dev` and `libapparmor-dev` for Ubuntu.
+Note: before building you may need to install additional support, which will vary by platform. For example, you may need to install `libseccomp` e.g. `libseccomp-dev` for Ubuntu.
 
 ## building
 
