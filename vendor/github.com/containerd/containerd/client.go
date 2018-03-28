@@ -38,6 +38,7 @@ import (
 	versionservice "github.com/containerd/containerd/api/services/version/v1"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/dialer"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
@@ -90,6 +91,10 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 			grpc.FailOnNonTempDialError(true),
 			grpc.WithBackoffMaxDelay(3 * time.Second),
 			grpc.WithDialer(dialer.Dialer),
+
+			// TODO(stevvooe): We may need to allow configuration of this on the client.
+			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(defaults.DefaultMaxRecvMsgSize)),
+			grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(defaults.DefaultMaxSendMsgSize)),
 		}
 		if len(copts.dialOptions) > 0 {
 			gopts = copts.dialOptions
