@@ -97,7 +97,7 @@ Follow [the instructions](https://kubernetes.io/docs/setup/independent/install-k
 Create the systemd drop-in file `/etc/systemd/system/kubelet.service.d/0-containerd.conf`:
 ```
 [Service]                                                 
-Environment="KUBELET_EXTRA_ARGS=--container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=/run/containerd/containerd.sock"
+Environment="KUBELET_EXTRA_ARGS=--container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=unix:///run/containerd/containerd.sock"
 ```
 And reload systemd configuration:
 ```bash
