@@ -78,7 +78,7 @@ by `<major>.<minor>`. Releases branches will be in one of several states:
 
 - __*Next*__: The next planned release branch.
 - __*Active*__: The release is currently supported and accepting patches.
-- __*End of Life*__: The release branch is no longer support and no new patches will be accepted.
+- __*End of Life*__: The release branch is no longer supported and no new patches will be accepted.
 
 Releases will be supported up to one year after a _minor_ release. This means that
 we will accept bug reports and backports to release branches until the end of
@@ -164,12 +164,13 @@ The following table provides an overview of the components covered by
 containerd versions:
 
 
-| Component     | Status   | Stablized Version | Links         |
-|---------------|----------|-------------------|---------------|
-| GRPC API      | Stable     | 1.0               | [api/](api) |
-| Metrics API   | Stable     | 1.0               | -
-| Go client API | Unstable | 1.2 tentative     | [godoc](https://godoc.org/github.com/containerd/containerd) |
-| `ctr` tool    | Unstable | Out of scope      | -             |
+| Component     | Status   | Stabilized Version | Links         |
+|---------------|----------|--------------------|---------------|
+| GRPC API      | Stable   | 1.0                | [api/](api) |
+| Metrics API   | Stable   | 1.0                | - |
+| Go client API | Unstable | 1.2 _tentative_    | [godoc](https://godoc.org/github.com/containerd/containerd) |
+| CRI GRPC API  | Unstable | v1alpha2 _current_ | [api/](https://github.com/kubernetes/kubernetes/tree/master/pkg/kubelet/apis/cri/runtime/v1alpha2) |
+| `ctr` tool    | Unstable | Out of scope       | - |
 
 From the version stated in the above table, that component must adhere to the
 stability constraints expected in release versions.
@@ -243,6 +244,19 @@ been carried out.
 
 Any changes to the API should be detectable at compile time, so upgrading will
 be a matter of fixing compilation errors and moving from there.
+
+### CRI GRPC API
+
+The CRI (Container Runtime Interface) GRPC API is used by a Kubernetes kubelet
+to communicate with a container runtime. This interface is used to manage
+container lifecycles and container images. Currently this API is under
+development and unstable across Kubernetes releases. Each Kubernetes release
+only supports a single version of CRI and the CRI plugin only implements a
+single version of CRI.
+
+Each _minor_ release will support one version of CRI and at least one version
+of Kubernetes. Once this API is stable, a _minor_ will be compatible with any
+version of Kubernetes which supports that version of CRI.
 
 ### `ctr` tool
 
