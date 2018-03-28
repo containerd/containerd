@@ -28,12 +28,6 @@ write_files:
     permissions: 0644
     owner: root
     content: |
-      # installed by cloud-init
-      oom_score = -999
-
-      [cgroup]
-        path = "/runtime"
-
       [plugins.linux]
         shim = "/home/containerd/usr/local/bin/containerd-shim"
         runtime = "/home/containerd/usr/local/sbin/runc"
@@ -59,6 +53,7 @@ write_files:
       RestartSec=5
       Delegate=yes
       KillMode=process
+      OOMScoreAdjust=-999
       LimitNOFILE=1048576
       # Having non-zero Limit*s causes performance problems due to accounting overhead
       # in the kernel. We recommend using cgroups to do container-local accounting.
