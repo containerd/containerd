@@ -13,14 +13,6 @@
     - name: "Create a directory for containerd config"
       file: path=/etc/containerd state=directory
 
-    - name: "Add containerd config file"
-      blockinfile:
-        path: /etc/containerd/config.toml
-        create: yes
-        block: |
-          [cgroup]
-            path = "/runtime"
-
     - name: "Start Containerd"
       systemd: name=containerd daemon_reload=yes state=started enabled=yes
 
@@ -46,7 +38,7 @@
     - name: "Add runtime args in kubelet conf"
       lineinfile:
         dest: "/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
-        line: "Environment=\"KUBELET_EXTRA_ARGS= --runtime-cgroups=/runtime --container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=/run/containerd/containerd.sock\""
+        line: "Environment=\"KUBELET_EXTRA_ARGS= --runtime-cgroups=/system.slice/containerd.service --container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=/run/containerd/containerd.sock\""
         insertafter: '\[Service\]'
       when: check_args.stdout == ""
     
