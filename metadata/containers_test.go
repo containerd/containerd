@@ -23,7 +23,7 @@ import (
 )
 
 func init() {
-	typeurl.Register(&specs.Spec{}, "types.contianerd.io/opencontainers/runtime-spec", "v1", "Spec")
+	typeurl.Register(&specs.Spec{}, "types.containerd.io/opencontainers/runtime-spec", "v1", "Spec")
 }
 
 func TestContainersList(t *testing.T) {
