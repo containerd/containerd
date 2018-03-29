@@ -428,25 +428,8 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 		})
 	}
 
-	// make a map of enabled capabilities
-	caps := make(map[string]bool)
+	admin := false
 	for _, c := range sp.Process.Capabilities.Bounding {
-		caps[c] = true
-	}
-	for _, c := range sp.Process.Capabilities.Effective {
-		caps[c] = true
-	}
-	for _, c := range sp.Process.Capabilities.Inheritable {
-		caps[c] = true
-	}
-	for _, c := range sp.Process.Capabilities.Permitted {
-		caps[c] = true
-	}
-	for _, c := range sp.Process.Capabilities.Ambient {
-		caps[c] = true
-	}
-
-	for c := range caps {
 		switch c {
 		case "CAP_DAC_READ_SEARCH":
 			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
@@ -455,6 +438,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				Args:   []specs.LinuxSeccompArg{},
 			})
 		case "CAP_SYS_ADMIN":
+			admin = true
 			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
 				Names: []string{
 					"bpf",
@@ -542,7 +526,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 		}
 	}
 
-	if !caps["CAP_SYS_ADMIN"] {
+	if !admin {
 		switch runtime.GOARCH {
 		case "s390", "s390x":
 			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
