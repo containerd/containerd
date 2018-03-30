@@ -15,7 +15,6 @@ addons:
   apt:
     packages:
       - btrfs-tools
-      - libapparmor-dev
       - libnl-3-dev
       - libnet-dev
       - protobuf-c-compiler
