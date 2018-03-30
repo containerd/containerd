@@ -162,6 +162,9 @@ func serve(server *ttrpc.Server, path string) error {
 		l, err = net.FileListener(os.NewFile(3, "socket"))
 		path = "[inherited from parent]"
 	} else {
+		if len(path) > 106 {
+			return errors.Errorf("%q: unix socket path too long (> 106)", path)
+		}
 		l, err = net.Listen("unix", "\x00"+path)
 	}
 	if err != nil {
