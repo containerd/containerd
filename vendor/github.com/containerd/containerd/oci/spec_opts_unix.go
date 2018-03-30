@@ -118,32 +118,7 @@ func WithImageConfig(image Image) SpecOpts {
 		}
 		s.Process.Cwd = cwd
 		if config.User != "" {
-			// According to OCI Image Spec v1.0.0, the following are valid for Linux:
-			//   user, uid, user:group, uid:gid, uid:group, user:gid
-			parts := strings.Split(config.User, ":")
-			switch len(parts) {
-			case 1:
-				v, err := strconv.Atoi(parts[0])
-				if err != nil {
-					// if we cannot parse as a uint they try to see if it is a username
-					return WithUsername(config.User)(ctx, client, c, s)
-				}
-				return WithUserID(uint32(v))(ctx, client, c, s)
-			case 2:
-				// TODO: support username and groupname
-				v, err := strconv.Atoi(parts[0])
-				if err != nil {
-					return errors.Wrapf(err, "parse uid %s", parts[0])
-				}
-				uid := uint32(v)
-				if v, err = strconv.Atoi(parts[1]); err != nil {
-					return errors.Wrapf(err, "parse gid %s", parts[1])
-				}
-				gid := uint32(v)
-				s.Process.User.UID, s.Process.User.GID = uid, gid
-			default:
-				return fmt.Errorf("invalid USER value %s", config.User)
-			}
+			return WithUser(config.User)(ctx, client, c, s)
 		}
 		return nil
 	}
@@ -256,6 +231,82 @@ func WithNamespacedCgroup() SpecOpts {
 		}
 		s.Linux.CgroupsPath = filepath.Join("/", namespace, c.ID)
 		return nil
+	}
+}
+
+// WithUser accepts a valid user string in OCI Image Spec v1.0.0:
+//   user, uid, user:group, uid:gid, uid:group, user:gid
+// and set the correct UID and GID for container.
+func WithUser(userstr string) SpecOpts {
+	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) error {
+		parts := strings.Split(userstr, ":")
+		switch len(parts) {
+		case 1:
+			v, err := strconv.Atoi(parts[0])
+			if err != nil {
+				// if we cannot parse as a uint they try to see if it is a username
+				return WithUsername(userstr)(ctx, client, c, s)
+			}
+			return WithUserID(uint32(v))(ctx, client, c, s)
+		case 2:
+			var username, groupname string
+			var uid, gid uint32
+			v, err := strconv.Atoi(parts[0])
+			if err != nil {
+				username = parts[0]
+			} else {
+				uid = uint32(v)
+			}
+			if v, err = strconv.Atoi(parts[1]); err != nil {
+				groupname = parts[1]
+			} else {
+				gid = uint32(v)
+			}
+			if username == "" && groupname == "" {
+				s.Process.User.UID, s.Process.User.GID = uid, gid
+				return nil
+			}
+			f := func(root string) error {
+				if username != "" {
+					uid, _, err = getUIDGIDFromPath(root, func(u user.User) bool {
+						return u.Name == username
+					})
+					if err != nil {
+						return err
+					}
+				}
+				if groupname != "" {
+					gid, err = getGIDFromPath(root, func(g user.Group) bool {
+						return g.Name == groupname
+					})
+					if err != nil {
+						return err
+					}
+				}
+				s.Process.User.UID, s.Process.User.GID = uid, gid
+				return nil
+			}
+			if c.Snapshotter == "" && c.SnapshotKey == "" {
+				if !isRootfsAbs(s.Root.Path) {
+					return errors.New("rootfs absolute path is required")
+				}
+				return f(s.Root.Path)
+			}
+			if c.Snapshotter == "" {
+				return errors.New("no snapshotter set for container")
+			}
+			if c.SnapshotKey == "" {
+				return errors.New("rootfs snapshot not created for container")
+			}
+			snapshotter := client.SnapshotService(c.Snapshotter)
+			mounts, err := snapshotter.Mounts(ctx, c.SnapshotKey)
+			if err != nil {
+				return err
+			}
+			return mount.WithTempMount(ctx, mounts, f)
+		default:
+			return fmt.Errorf("invalid USER value %s", userstr)
+		}
 	}
 }
 
@@ -398,12 +449,7 @@ func getUIDGIDFromPath(root string, filter func(user.User) bool) (uid, gid uint3
 	if err != nil {
 		return 0, 0, err
 	}
-	f, err := os.Open(ppath)
-	if err != nil {
-		return 0, 0, err
-	}
-	defer f.Close()
-	users, err := user.ParsePasswdFilter(f, filter)
+	users, err := user.ParsePasswdFileFilter(ppath, filter)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -412,6 +458,24 @@ func getUIDGIDFromPath(root string, filter func(user.User) bool) (uid, gid uint3
 	}
 	u := users[0]
 	return uint32(u.Uid), uint32(u.Gid), nil
+}
+
+var errNoGroupsFound = errors.New("no groups found")
+
+func getGIDFromPath(root string, filter func(user.Group) bool) (gid uint32, err error) {
+	gpath, err := fs.RootPath(root, "/etc/group")
+	if err != nil {
+		return 0, err
+	}
+	groups, err := user.ParseGroupFileFilter(gpath, filter)
+	if err != nil {
+		return 0, err
+	}
+	if len(groups) == 0 {
+		return 0, errNoGroupsFound
+	}
+	g := groups[0]
+	return uint32(g.Gid), nil
 }
 
 func isRootfsAbs(root string) bool {
