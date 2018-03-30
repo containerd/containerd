@@ -234,9 +234,9 @@ func WithNamespacedCgroup() SpecOpts {
 	}
 }
 
-// WithUser accepts a valid user string in OCI Image Spec v1.0.0:
+// WithUser sets the user to be used within the container.
+// It accepts a valid user string in OCI Image Spec v1.0.0:
 //   user, uid, user:group, uid:gid, uid:group, user:gid
-// and set the correct UID and GID for container.
 func WithUser(userstr string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) error {
 		parts := strings.Split(userstr, ":")
@@ -249,7 +249,10 @@ func WithUser(userstr string) SpecOpts {
 			}
 			return WithUserID(uint32(v))(ctx, client, c, s)
 		case 2:
-			var username, groupname string
+			var (
+				username  string
+				groupname string
+			)
 			var uid, gid uint32
 			v, err := strconv.Atoi(parts[0])
 			if err != nil {
