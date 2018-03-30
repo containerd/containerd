@@ -8,6 +8,7 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/storage"
@@ -27,6 +28,8 @@ func init() {
 		Type: plugin.SnapshotPlugin,
 		ID:   "zfs",
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
+			ic.Meta.Exports["root"] = ic.Root
 			return NewSnapshotter(ic.Root)
 		},
 	})
