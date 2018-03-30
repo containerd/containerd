@@ -15,7 +15,7 @@ import (
 func CreateUnixSocket(path string) (net.Listener, error) {
 	// BSDs have a 104 limit
 	if len(path) > 104 {
-		return nil, errors.Errorf("%q: unix socket path too long (> 106)", path)
+		return nil, errors.Errorf("%q: unix socket path too long (> 104)", path)
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0660); err != nil {
 		return nil, err
