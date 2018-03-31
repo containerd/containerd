@@ -34,7 +34,6 @@ apt-get update
 apt-get install -y btrfs-tools
 apt-get install -y libseccomp2/jessie-backports
 apt-get install -y libseccomp-dev/jessie-backports
-apt-get install -y libapparmor-dev
 
 # PULL_REFS is from prow.
 if [ ! -z "${PULL_REFS:-""}" ]; then

@@ -19,7 +19,6 @@
 # - libseccomp-dev(Ubuntu,Debian)/libseccomp-devel(Fedora, CentOS, RHEL). Note that
 # libseccomp in ubuntu <=trusty and debian <=jessie is not new enough, backport
 # is required.
-# - libapparmor-dev(Ubuntu,Debian)/libapparmor-devel(Fedora, CentOS, RHEL)
 # containerd:
 # - btrfs-tools(Ubuntu,Debian)/btrfs-progs-devel(Fedora, CentOS, RHEL)
 

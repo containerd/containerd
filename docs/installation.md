@@ -64,15 +64,13 @@ If you have other requirements for the binaries, e.g. selinux support, another a
 The release tarball could be downloaded from the release GCS bucket https://storage.googleapis.com/cri-containerd-release/.
 
 ## Step 0: Install Dependent Libraries
-Install required libraries for seccomp and libapparmor.
+Install required library for seccomp.
 ```bash
 sudo apt-get update
 sudo apt-get install libseccomp2
-sudo apt-get install libapparmor
 ```
 Note that:
 1) If you are using Ubuntu <=Trusty or Debian <=jessie, a backported version of `libseccomp2` is needed. (See the [trusty-backports](https://packages.ubuntu.com/trusty-backports/libseccomp2) and [jessie-backports](https://packages.debian.org/jessie-backports/libseccomp2)).
-2) If your OS distro doesn't support AppArmor, please skip installing `libapparmor`, and AppArmor will be disabled.
 ## Step 1: Download Release Tarball
 Download release tarball for the `containerd` version you want to install from the GCS bucket.
 ```bash
