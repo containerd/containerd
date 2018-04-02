@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package naive
+package native
 
 import (
 	"context"
@@ -35,7 +35,7 @@ import (
 func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.SnapshotPlugin,
-		ID:   "naive",
+		ID:   "native",
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
 			return NewSnapshotter(ic.Root)
