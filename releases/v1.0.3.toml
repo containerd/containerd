@@ -1,0 +1,26 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+
+# previous release
+previous = "v1.0.2"
+
+pre_release = false
+
+preface = """\
+This is the third patch release for `containerd` in the 1.0 series. It includes
+a few small but impactful fixes.
+
+This contains a mitigation for problems with healthchecks described in
+https://github.com/moby/moby/issues/36661. We now timeout the FIFO creation to
+avoid deadlocks in the containerd-shim.
+
+Please see the changelog for full details.
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
