@@ -60,13 +60,15 @@ func newStreamServer(c *criService, addr, port string) (streaming.Server, error)
 	config := streaming.DefaultConfig
 	config.Addr = net.JoinHostPort(addr, port)
 	runtime := newStreamRuntime(c)
-	tlsCert, err := newTLSCert()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate tls certificate for stream server")
-	}
-	config.TLSConfig = &tls.Config{
-		Certificates:       []tls.Certificate{tlsCert},
-		InsecureSkipVerify: true,
+	if c.config.EnableTLSStreaming {
+		tlsCert, err := newTLSCert()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to generate tls certificate for stream server")
+		}
+		config.TLSConfig = &tls.Config{
+			Certificates:       []tls.Certificate{tlsCert},
+			InsecureSkipVerify: true,
+		}
 	}
 	return streaming.NewServer(config, runtime)
 }
