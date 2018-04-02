@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package naive
+package native
 
 import (
 	"context"
