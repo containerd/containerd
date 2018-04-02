@@ -66,7 +66,6 @@ specifications as appropriate.
 * **libseccomp development library.** Required by `cri` and runc seccomp support. `libseccomp-dev` (Ubuntu, Debian) / `libseccomp-devel`
 (Fedora, CentOS, RHEL). On releases of Ubuntu <=Trusty and Debian <=jessie a
 backport version of `libseccomp-dev` is required. See [travis.yml](.travis.yml) for an example on trusty.
-* **libapparmor development library.** Required by `cri` and runc apparmor support. To use apparmor on Debian, Ubuntu, and related distributions the installation of `libapparmor-dev` is required.
 * **btrfs development library.** Required by containerd btrfs support. `btrfs-tools`(Ubuntu, Debian) / `btrfs-progs-devel`(Fedora, CentOS, RHEL)
 2. Install other dependencies:
 * **`nsenter`**: Required by portforward.
@@ -102,7 +101,7 @@ make BUILD_TAGS='seccomp apparmor'
 |-----------|------------------------------------|---------------------------------|
 | seccomp   | syscall filtering                  | libseccomp development library  |
 | selinux   | selinux process and mount labeling | <none>                          |
-| apparmor  | apparmor profile support           | libapparmor development library |
+| apparmor  | apparmor profile support           | <none>                          |
 ### Validate Your `cri` Setup
 A Kubernetes incubator project called [cri-tools](https://github.com/kubernetes-incubator/cri-tools)
 includes programs for exercising CRI implementations such as the `cri` plugin.

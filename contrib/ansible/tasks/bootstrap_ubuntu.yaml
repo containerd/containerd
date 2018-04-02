@@ -8,7 +8,6 @@
       - tar
       - apt-transport-https
       - btrfs-tools
-      - libapparmor1
       - libseccomp2
       - socat
       - util-linux
