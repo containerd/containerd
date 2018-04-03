@@ -145,8 +145,16 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	logrus.Debugf("Sandbox container spec: %+v", spec)
 
 	var specOpts []oci.SpecOpts
-	if uid := securityContext.GetRunAsUser(); uid != nil {
-		specOpts = append(specOpts, oci.WithUserID(uint32(uid.GetValue())))
+	userstr, err := generateUserString(
+		"",
+		securityContext.GetRunAsUser(),
+		securityContext.GetRunAsGroup(),
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate user string")
+	}
+	if userstr != "" {
+		specOpts = append(specOpts, oci.WithUser(userstr))
 	}
 
 	seccompSpecOpts, err := generateSeccompSpecOpts(

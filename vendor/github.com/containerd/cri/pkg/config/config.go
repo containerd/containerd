@@ -83,6 +83,8 @@ type PluginConfig struct {
 	StatsCollectPeriod int `toml:"stats_collect_period" json:"statsCollectPeriod"`
 	// SystemdCgroup enables systemd cgroup support.
 	SystemdCgroup bool `toml:"systemd_cgroup" json:"systemdCgroup"`
+	// EnableTLSStreaming indicates to enable the TLS streaming support.
+	EnableTLSStreaming bool `toml:"enable_tls_streaming" json:"enableTLSStreaming"`
 }
 
 // Config contains all configurations for cri server.
@@ -118,6 +120,7 @@ func DefaultConfig() PluginConfig {
 		StreamServerAddress: "",
 		StreamServerPort:    "10010",
 		EnableSelinux:       false,
+		EnableTLSStreaming:  false,
 		SandboxImage:        "k8s.gcr.io/pause:3.1",
 		StatsCollectPeriod:  10,
 		SystemdCgroup:       false,

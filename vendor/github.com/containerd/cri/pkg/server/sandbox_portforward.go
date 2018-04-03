@@ -102,7 +102,7 @@ func (c *criService) portForward(id string, port int32, stream io.ReadWriteClose
 			logrus.WithError(err).Errorf("Failed to copy port forward input for %q port %d", id, port)
 		}
 		in.Close()
-		logrus.Debugf("Finish copy port forward input for %q port %d: %v", id, port)
+		logrus.Debugf("Finish copy port forward input for %q port %d", id, port)
 	}()
 
 	if err := cmd.Run(); err != nil {

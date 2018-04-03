@@ -19,6 +19,7 @@ package server
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -219,11 +220,16 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	// Set container username. This could only be done by containerd, because it needs
 	// access to the container rootfs. Pass user name to containerd, and let it overwrite
 	// the spec for us.
-	if uid := securityContext.GetRunAsUser(); uid != nil {
-		specOpts = append(specOpts, oci.WithUserID(uint32(uid.GetValue())))
+	userstr, err := generateUserString(
+		securityContext.GetRunAsUsername(),
+		securityContext.GetRunAsUser(),
+		securityContext.GetRunAsGroup(),
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate user string")
 	}
-	if username := securityContext.GetRunAsUsername(); username != "" {
-		specOpts = append(specOpts, oci.WithUsername(username))
+	if userstr != "" {
+		specOpts = append(specOpts, oci.WithUser(userstr))
 	}
 
 	apparmorSpecOpts, err := generateApparmorSpecOpts(
@@ -883,4 +889,29 @@ func ensureSharedOrSlave(path string, lookupMount func(string) (mount.Info, erro
 		}
 	}
 	return errors.Errorf("path %q is mounted on %q but it is not a shared or slave mount", path, mountInfo.Mountpoint)
+}
+
+// generateUserString generates valid user string based on OCI Image Spec v1.0.0.
+// TODO(random-liu): Add group name support in CRI.
+func generateUserString(username string, uid, gid *runtime.Int64Value) (string, error) {
+	var userstr, groupstr string
+	if uid != nil {
+		userstr = strconv.FormatInt(uid.GetValue(), 10)
+	}
+	if username != "" {
+		userstr = username
+	}
+	if gid != nil {
+		groupstr = strconv.FormatInt(gid.GetValue(), 10)
+	}
+	if userstr == "" {
+		if groupstr != "" {
+			return "", errors.Errorf("user group %q is specified without user", groupstr)
+		}
+		return "", nil
+	}
+	if groupstr != "" {
+		userstr = userstr + ":" + groupstr
+	}
+	return userstr, nil
 }
