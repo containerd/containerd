@@ -17,19 +17,11 @@ limitations under the License.
 package server
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
-	"fmt"
 	"io"
 	"math"
-	"math/big"
 	"net"
 	"os"
-	"time"
 
 	"github.com/pkg/errors"
 	k8snet "k8s.io/apimachinery/pkg/util/net"
@@ -40,13 +32,6 @@ import (
 	"k8s.io/utils/exec"
 
 	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
-)
-
-const (
-	// certOrganizationName is the name of this organization, used for certificates etc.
-	certOrganizationName = "containerd"
-	// certCommonName is the common name of the CRI plugin
-	certCommonName = "cri"
 )
 
 func newStreamServer(c *criService, addr, port string) (streaming.Server, error) {
@@ -141,54 +126,26 @@ func handleResizing(resize <-chan remotecommand.TerminalSize, resizeFunc func(si
 	}()
 }
 
-// newTLSCert returns a tls.certificate loaded from a newly generated
-// x509certificate from a newly generated rsa public/private key pair. The
-// x509certificate is self signed.
+// newTLSCert returns a self CA signed tls.certificate.
 // TODO (mikebrow): replace / rewrite this function to support using CA
 // signing of the cetificate. Requires a security plan for kubernetes regarding
 // CRI connections / streaming, etc. For example, kubernetes could configure or
 // require a CA service and pass a configuration down through CRI.
 func newTLSCert() (tls.Certificate, error) {
 	fail := func(err error) (tls.Certificate, error) { return tls.Certificate{}, err }
-	var years = 1 // duration of certificate
 
-	// Generate new private key
-	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return fail(errors.Wrap(err, "private key cannot be created"))
-	}
-
-	// Generate pem block using the private key
-	keyPem := pem.EncodeToMemory(&pem.Block{
-		Type:  k8scert.RSAPrivateKeyBlockType,
-		Bytes: x509.MarshalPKCS1PrivateKey(privKey),
-	})
-
-	// Generate a new random serial number for certificate
-	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
-	if err != nil {
-		return fail(errors.Wrap(err, "failed to generate serial number"))
-	}
 	hostName, err := os.Hostname()
 	if err != nil {
 		return fail(errors.Wrap(err, "failed to get hostname"))
 	}
+
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		return fail(errors.Wrap(err, "failed to get host IP addresses"))
 	}
 
-	// Configure and create new certificate
-	tml := x509.Certificate{
-		NotBefore:    time.Now(),
-		NotAfter:     time.Now().AddDate(years, 0, 0),
-		SerialNumber: serialNumber,
-		Subject: pkix.Name{
-			CommonName:   fmt.Sprintf("%s:%s:%s", certOrganizationName, certCommonName, hostName),
-			Organization: []string{certOrganizationName},
-		},
-		BasicConstraintsValid: true,
-	}
+	var alternateIPs []net.IP
+	var alternateDNS []string
 	for _, addr := range addrs {
 		var ip net.IP
 
@@ -201,20 +158,15 @@ func newTLSCert() (tls.Certificate, error) {
 			continue
 		}
 
-		tml.IPAddresses = append(tml.IPAddresses, ip)
-		tml.DNSNames = append(tml.DNSNames, ip.String())
+		alternateIPs = append(alternateIPs, ip)
+		alternateDNS = append(alternateDNS, ip.String())
 	}
 
-	cert, err := x509.CreateCertificate(rand.Reader, &tml, &tml, &privKey.PublicKey, privKey)
+	// Generate a self signed certificate key (CA is self)
+	certPem, keyPem, err := k8scert.GenerateSelfSignedCertKey(hostName, alternateIPs, alternateDNS)
 	if err != nil {
-		return fail(errors.Wrap(err, "certificate cannot be created"))
+		return fail(errors.Wrap(err, "certificate key could not be created"))
 	}
-
-	// Generate a pem block with the certificate
-	certPem := pem.EncodeToMemory(&pem.Block{
-		Type:  k8scert.CertificateBlockType,
-		Bytes: cert,
-	})
 
 	// Load the tls certificate
 	tlsCert, err := tls.X509KeyPair(certPem, keyPem)
