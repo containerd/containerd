@@ -108,3 +108,116 @@ func TestWithLinuxNamespace(t *testing.T) {
 		}
 	}
 }
+
+func TestWithCapabilities(t *testing.T) {
+	t.Parallel()
+
+	ctx := namespaces.WithNamespace(context.Background(), "testing")
+
+	s, err := GenerateSpec(ctx, nil, &containers.Container{ID: t.Name()},
+		WithCapabilities([]string{"CAP_SYS_ADMIN"}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(s.Process.Capabilities.Bounding) != 1 || s.Process.Capabilities.Bounding[0] != "CAP_SYS_ADMIN" {
+		t.Error("Unexpected capabilities set")
+	}
+	if len(s.Process.Capabilities.Effective) != 1 || s.Process.Capabilities.Effective[0] != "CAP_SYS_ADMIN" {
+		t.Error("Unexpected capabilities set")
+	}
+	if len(s.Process.Capabilities.Permitted) != 1 || s.Process.Capabilities.Permitted[0] != "CAP_SYS_ADMIN" {
+		t.Error("Unexpected capabilities set")
+	}
+	if len(s.Process.Capabilities.Inheritable) != 1 || s.Process.Capabilities.Inheritable[0] != "CAP_SYS_ADMIN" {
+		t.Error("Unexpected capabilities set")
+	}
+}
+
+func TestWithCapabilitiesNil(t *testing.T) {
+	t.Parallel()
+
+	ctx := namespaces.WithNamespace(context.Background(), "testing")
+
+	s, err := GenerateSpec(ctx, nil, &containers.Container{ID: t.Name()},
+		WithCapabilities(nil),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(s.Process.Capabilities.Bounding) != 0 {
+		t.Errorf("Unexpected capabilities set: length is non zero (%d)", len(s.Process.Capabilities.Bounding))
+	}
+	if len(s.Process.Capabilities.Effective) != 0 {
+		t.Errorf("Unexpected capabilities set: length is non zero (%d)", len(s.Process.Capabilities.Effective))
+	}
+	if len(s.Process.Capabilities.Permitted) != 0 {
+		t.Errorf("Unexpected capabilities set: length is non zero (%d)", len(s.Process.Capabilities.Permitted))
+	}
+	if len(s.Process.Capabilities.Inheritable) != 0 {
+		t.Errorf("Unexpected capabilities set: length is non zero (%d)", len(s.Process.Capabilities.Inheritable))
+	}
+}
+
+func TestWithPrivileged(t *testing.T) {
+	t.Parallel()
+
+	ctx := namespaces.WithNamespace(context.Background(), "testing")
+
+	s, err := GenerateSpec(ctx, nil, &containers.Container{ID: t.Name()},
+		WithCapabilities(nil),
+		WithMounts([]specs.Mount{
+			{Type: "cgroup", Destination: "/sys/fs/cgroup", Options: []string{"ro"}},
+		}),
+		WithPrivileged,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(s.Process.Capabilities.Bounding) == 0 {
+		t.Error("Expected capabilities to be set with privileged")
+	}
+
+	var foundSys, foundCgroup bool
+	for _, m := range s.Mounts {
+		switch m.Type {
+		case "sysfs":
+			foundSys = true
+			var found bool
+			for _, o := range m.Options {
+				switch o {
+				case "ro":
+					t.Errorf("Found unexpected read only %s mount", m.Type)
+				case "rw":
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("Did not find rw mount option for %s", m.Type)
+			}
+		case "cgroup":
+			foundCgroup = true
+			var found bool
+			for _, o := range m.Options {
+				switch o {
+				case "ro":
+					t.Errorf("Found unexpected read only %s mount", m.Type)
+				case "rw":
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("Did not find rw mount option for %s", m.Type)
+			}
+		}
+	}
+	if !foundSys {
+		t.Error("Did not find mount for sysfs")
+	}
+	if !foundCgroup {
+		t.Error("Did not find mount for cgroupfs")
+	}
+}
