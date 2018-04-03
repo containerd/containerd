@@ -43,14 +43,38 @@ import (
 // WithTTY sets the information on the spec as well as the environment variables for
 // using a TTY
 func WithTTY(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	setProcess(s)
 	s.Process.Terminal = true
 	s.Process.Env = append(s.Process.Env, "TERM=xterm")
 	return nil
 }
 
+// setRoot sets Root to empty if unset
+func setRoot(s *specs.Spec) {
+	if s.Root == nil {
+		s.Root = &specs.Root{}
+	}
+}
+
+// setLinux sets Linux to empty if unset
+func setLinux(s *specs.Spec) {
+	if s.Linux == nil {
+		s.Linux = &specs.Linux{}
+	}
+}
+
+// setCapabilities sets Linux Capabilities to empty if unset
+func setCapabilities(s *specs.Spec) {
+	setProcess(s)
+	if s.Process.Capabilities == nil {
+		s.Process.Capabilities = &specs.LinuxCapabilities{}
+	}
+}
+
 // WithHostNamespace allows a task to run inside the host's linux namespace
 func WithHostNamespace(ns specs.LinuxNamespaceType) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+		setLinux(s)
 		for i, n := range s.Linux.Namespaces {
 			if n.Type == ns {
 				s.Linux.Namespaces = append(s.Linux.Namespaces[:i], s.Linux.Namespaces[i+1:]...)
@@ -65,6 +89,7 @@ func WithHostNamespace(ns specs.LinuxNamespaceType) SpecOpts {
 // spec, the existing namespace is replaced by the one provided.
 func WithLinuxNamespace(ns specs.LinuxNamespace) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+		setLinux(s)
 		for i, n := range s.Linux.Namespaces {
 			if n.Type == ns.Type {
 				before := s.Linux.Namespaces[:i]
@@ -105,10 +130,7 @@ func WithImageConfig(image Image) SpecOpts {
 			return fmt.Errorf("unknown image config media type %s", ic.MediaType)
 		}
 
-		if s.Process == nil {
-			s.Process = &specs.Process{}
-		}
-
+		setProcess(s)
 		s.Process.Env = append(s.Process.Env, config.Env...)
 		cmd := config.Cmd
 		s.Process.Args = append(config.Entrypoint, cmd...)
@@ -127,9 +149,7 @@ func WithImageConfig(image Image) SpecOpts {
 // WithRootFSPath specifies unmanaged rootfs path.
 func WithRootFSPath(path string) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
-		if s.Root == nil {
-			s.Root = &specs.Root{}
-		}
+		setRoot(s)
 		s.Root.Path = path
 		// Entrypoint is not set here (it's up to caller)
 		return nil
@@ -139,9 +159,7 @@ func WithRootFSPath(path string) SpecOpts {
 // WithRootFSReadonly sets specs.Root.Readonly to true
 func WithRootFSReadonly() SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
-		if s.Root == nil {
-			s.Root = &specs.Root{}
-		}
+		setRoot(s)
 		s.Root.Readonly = true
 		return nil
 	}
@@ -149,6 +167,7 @@ func WithRootFSReadonly() SpecOpts {
 
 // WithNoNewPrivileges sets no_new_privileges on the process for the container
 func WithNoNewPrivileges(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	setProcess(s)
 	s.Process.NoNewPrivileges = true
 	return nil
 }
@@ -191,6 +210,7 @@ func WithHostLocaltime(_ context.Context, _ Client, _ *containers.Container, s *
 func WithUserNamespace(container, host, size uint32) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
 		var hasUserns bool
+		setLinux(s)
 		for _, ns := range s.Linux.Namespaces {
 			if ns.Type == specs.UserNamespace {
 				hasUserns = true
@@ -216,6 +236,7 @@ func WithUserNamespace(container, host, size uint32) SpecOpts {
 // WithCgroup sets the container's cgroup path
 func WithCgroup(path string) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+		setLinux(s)
 		s.Linux.CgroupsPath = path
 		return nil
 	}
@@ -229,16 +250,18 @@ func WithNamespacedCgroup() SpecOpts {
 		if err != nil {
 			return err
 		}
+		setLinux(s)
 		s.Linux.CgroupsPath = filepath.Join("/", namespace, c.ID)
 		return nil
 	}
 }
 
-// WithUser accepts a valid user string in OCI Image Spec v1.0.0:
+// WithUser sets the user to be used within the container.
+// It accepts a valid user string in OCI Image Spec v1.0.0:
 //   user, uid, user:group, uid:gid, uid:group, user:gid
-// and set the correct UID and GID for container.
 func WithUser(userstr string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) error {
+		setProcess(s)
 		parts := strings.Split(userstr, ":")
 		switch len(parts) {
 		case 1:
@@ -249,7 +272,10 @@ func WithUser(userstr string) SpecOpts {
 			}
 			return WithUserID(uint32(v))(ctx, client, c, s)
 		case 2:
-			var username, groupname string
+			var (
+				username  string
+				groupname string
+			)
 			var uid, gid uint32
 			v, err := strconv.Atoi(parts[0])
 			if err != nil {
@@ -313,6 +339,7 @@ func WithUser(userstr string) SpecOpts {
 // WithUIDGID allows the UID and GID for the Process to be set
 func WithUIDGID(uid, gid uint32) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+		setProcess(s)
 		s.Process.User.UID = uid
 		s.Process.User.GID = gid
 		return nil
@@ -325,6 +352,7 @@ func WithUIDGID(uid, gid uint32) SpecOpts {
 // uid, and not returns error.
 func WithUserID(uid uint32) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) (err error) {
+		setProcess(s)
 		if c.Snapshotter == "" && c.SnapshotKey == "" {
 			if !isRootfsAbs(s.Root.Path) {
 				return errors.Errorf("rootfs absolute path is required")
@@ -377,6 +405,7 @@ func WithUserID(uid uint32) SpecOpts {
 // it returns error.
 func WithUsername(username string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) (err error) {
+		setProcess(s)
 		if c.Snapshotter == "" && c.SnapshotKey == "" {
 			if !isRootfsAbs(s.Root.Path) {
 				return errors.Errorf("rootfs absolute path is required")
@@ -416,6 +445,8 @@ func WithUsername(username string) SpecOpts {
 
 // WithAllCapabilities set all linux capabilities for the process
 func WithAllCapabilities(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	setCapabilities(s)
+
 	caps := getAllCapabilities()
 
 	s.Process.Capabilities.Bounding = caps
