@@ -24,6 +24,9 @@ The explanation and default value of each configuration item are as follows:
   # systemd_cgroup enables systemd cgroup support.
   systemd_cgroup = false
 
+  # enable_tls_streaming enables the TLS streaming support.
+  enable_tls_streaming = false
+
   # "plugins.cri.containerd" contains config related to containerd
   [plugins.cri.containerd]
 
