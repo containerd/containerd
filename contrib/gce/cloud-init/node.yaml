@@ -32,6 +32,8 @@ write_files:
         shim = "/home/containerd/usr/local/bin/containerd-shim"
         runtime = "/home/containerd/usr/local/sbin/runc"
 
+      [plugins.cri]
+        enable_tls_streaming = true
       [plugins.cri.cni]
         bin_dir = "/home/kubernetes/bin"
         conf_dir = "/etc/cni/net.d"
