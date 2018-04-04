@@ -493,7 +493,7 @@ func testContainerUser(t *testing.T, userstr, expectedOutput string) {
 	var (
 		image       Image
 		ctx, cancel = testContext()
-		id          = t.Name()
+		id          = strings.Replace(t.Name(), "/", "_", -1)
 	)
 	defer cancel()
 
