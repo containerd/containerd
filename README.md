@@ -130,6 +130,10 @@ See [here](./docs/testing.md) for information about test.
 ## Using crictl
 See [here](./docs/crictl.md) for information about using `crictl` to debug
 pods, containers, and images.
+## Configurations
+See [here](./docs/config.md) for information about how to configure cri plugins
+and [here](https://github.com/containerd/containerd/blob/master/docs/man/containerd-config.1.md)
+for information about how to configure containerd
 ## Documentation
 See [here](./docs) for additional documentation.
 ## Contributing
