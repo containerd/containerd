@@ -240,7 +240,7 @@ func TestImagePullSomePlatforms(t *testing.T) {
 	defer cancel()
 
 	cs := client.ContentStore()
-	platformList := []string{"linux/arm64/v8", "linux/386"}
+	platformList := []string{"linux/amd64", "linux/arm64/v8", "linux/s390x"}
 	m := make(map[string]platforms.Matcher)
 	var opts []RemoteOpt
 
