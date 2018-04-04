@@ -69,6 +69,10 @@ var ContainerFlags = []cli.Flag{
 		Usage: "enable host networking for the container",
 	},
 	cli.BoolFlag{
+		Name:  "privileged",
+		Usage: "run privileged container",
+	},
+	cli.BoolFlag{
 		Name:  "read-only",
 		Usage: "set the containers filesystem as readonly",
 	},
