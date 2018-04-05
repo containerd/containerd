@@ -264,29 +264,6 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 			cause:      errdefs.ErrInvalidArgument,
 		},
 		{
-			name: "UpdateFail",
-			original: containers.Container{
-				Spec:        encoded,
-				SnapshotKey: "test-snapshot-key",
-				Snapshotter: "snapshotter",
-
-				Runtime: containers.RuntimeInfo{
-					Name: "testruntime",
-				},
-				Image: "test image",
-			},
-			input: containers.Container{
-				Spec: encoded,
-				Runtime: containers.RuntimeInfo{
-					Name: "testruntime",
-				},
-				SnapshotKey: "test-snapshot-key",
-				Snapshotter: "snapshotter",
-				// try to clear image field
-			},
-			cause: errdefs.ErrInvalidArgument,
-		},
-		{
 			name: "UpdateSpec",
 			original: containers.Container{
 				Spec:        encoded,
@@ -309,6 +286,60 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				SnapshotKey: "test-snapshot-key",
 				Snapshotter: "snapshotter",
 				Image:       "test image",
+			},
+		},
+		{
+			name: "UpdateSnapshot",
+			original: containers.Container{
+
+				Spec:        encoded,
+				SnapshotKey: "test-snapshot-key",
+				Snapshotter: "snapshotter",
+				Runtime: containers.RuntimeInfo{
+					Name: "testruntime",
+				},
+				Image: "test image",
+			},
+			input: containers.Container{
+				SnapshotKey: "test2-snapshot-key",
+			},
+			fieldpaths: []string{"snapshotkey"},
+			expected: containers.Container{
+
+				Spec:        encoded,
+				SnapshotKey: "test2-snapshot-key",
+				Snapshotter: "snapshotter",
+				Runtime: containers.RuntimeInfo{
+					Name: "testruntime",
+				},
+				Image: "test image",
+			},
+		},
+		{
+			name: "UpdateImage",
+			original: containers.Container{
+
+				Spec:        encoded,
+				SnapshotKey: "test-snapshot-key",
+				Snapshotter: "snapshotter",
+				Runtime: containers.RuntimeInfo{
+					Name: "testruntime",
+				},
+				Image: "test image",
+			},
+			input: containers.Container{
+				Image: "test2 image",
+			},
+			fieldpaths: []string{"image"},
+			expected: containers.Container{
+
+				Spec:        encoded,
+				SnapshotKey: "test-snapshot-key",
+				Snapshotter: "snapshotter",
+				Runtime: containers.RuntimeInfo{
+					Name: "testruntime",
+				},
+				Image: "test2 image",
 			},
 		},
 		{
