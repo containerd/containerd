@@ -12,7 +12,7 @@ plugins = ["grpc", "fieldpath"]
   # Paths that should be treated as include roots in relation to the vendor
   # directory. These will be calculated with the vendor directory nearest the
   # target package.
-  packages = ["github.com/gogo/protobuf"]
+  packages = ["github.com/gogo/protobuf", "github.com/gogo/googleapis"]
 
   # Paths that will be added untouched to the end of the includes. We use
   # `/usr/local/include` to pickup the common install location of protobuf.
@@ -29,7 +29,7 @@ plugins = ["grpc", "fieldpath"]
   "google/protobuf/field_mask.proto" = "github.com/gogo/protobuf/types"
   "google/protobuf/timestamp.proto" = "github.com/gogo/protobuf/types"
   "google/protobuf/duration.proto" = "github.com/gogo/protobuf/types"
-  "google/rpc/status.proto" = "github.com/containerd/containerd/protobuf/google/rpc"
+  "google/rpc/status.proto" = "github.com/gogo/googleapis/google/rpc"
 
 [[overrides]]
 prefixes = ["github.com/containerd/containerd/api/events"]

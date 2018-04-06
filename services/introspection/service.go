@@ -22,7 +22,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/protobuf/google/rpc"
+	"github.com/gogo/googleapis/google/rpc"
 	ptypes "github.com/gogo/protobuf/types"
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -142,7 +142,7 @@ func pluginsToPB(plugins []*plugin.Plugin) []api.Plugin {
 				}
 			} else {
 				initErr = &rpc.Status{
-					Code:    int32(rpc.Code_UNKNOWN),
+					Code:    int32(rpc.UNKNOWN),
 					Message: err.Error(),
 				}
 			}
