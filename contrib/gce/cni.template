@@ -1,0 +1,24 @@
+{
+  "name": "k8s-pod-network",
+    "cniVersion": "0.3.1",
+    "plugins": [
+    {
+      "type": "ptp",
+      "mtu": 1460,
+      "ipam": {
+	"type": "host-local",
+	"subnet": "{{.PodCIDR}}",
+	"routes": [
+	{"dst": "0.0.0.0/0"}
+	]
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {
+	"portMappings": true
+      },
+      "noSnat": true
+    }
+    ]
+}
