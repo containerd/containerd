@@ -103,6 +103,9 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	if context.Bool("tty") {
 		opts = append(opts, oci.WithTTY)
 	}
+	if context.Bool("privileged") {
+		opts = append(opts, oci.WithPrivileged)
+	}
 	if context.Bool("net-host") {
 		opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace), oci.WithHostHostsFile, oci.WithHostResolvconf)
 	}
