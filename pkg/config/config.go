@@ -45,6 +45,15 @@ type CniConfig struct {
 	NetworkPluginBinDir string `toml:"bin_dir" json:"binDir"`
 	// NetworkPluginConfDir is the directory in which the admin places a CNI conf.
 	NetworkPluginConfDir string `toml:"conf_dir" json:"confDir"`
+	// NetworkPluginConfTemplate is the file path of golang template used to generate
+	// cni config.
+	// Usually the cni config should be placed by system admin or pod network
+	// addons like calico, weaveworks etc. However, in some cases only a simple cni
+	// config is needed with pod cidr dynamically set.
+	// NetworkPluginConfTemplate can be used in those cases. When it is set,
+	// containerd will get cidr from kubelet to replace {{.PodCIDR}} in the template,
+	// and write the config into NetworkPluginConfDir.
+	NetworkPluginConfTemplate string `toml:"conf_template" json:"confTemplate"`
 }
 
 // Mirror contains the config related to the registry mirror
@@ -106,8 +115,9 @@ type Config struct {
 func DefaultConfig() PluginConfig {
 	return PluginConfig{
 		CniConfig: CniConfig{
-			NetworkPluginBinDir:  "/opt/cni/bin",
-			NetworkPluginConfDir: "/etc/cni/net.d",
+			NetworkPluginBinDir:       "/opt/cni/bin",
+			NetworkPluginConfDir:      "/etc/cni/net.d",
+			NetworkPluginConfTemplate: "",
 		},
 		ContainerdConfig: ContainerdConfig{
 			Snapshotter: containerd.DefaultSnapshotter,
