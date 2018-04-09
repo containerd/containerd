@@ -66,8 +66,11 @@ The explanation and default value of each configuration item are as follows:
     # conf_template is the file path of golang template used to generate
     # cni config.
     # If this is set, containerd will generate a cni config file from the
-    # template. Otherwise, containerd will wait for the system admin or pod
-    # network addon to drop the config file into the conf_dir.
+    # template. Otherwise, containerd will wait for the system admin or cni
+    # daemon to drop the config file into the conf_dir.
+    # This is a temporary backward-compatible solution for kubenet users
+    # who don't have a cni daemonset in production yet.
+    # This will be deprecated when kubenet is deprecated.
     conf_template = ""
 
   # "plugins.cri.registry" contains config related to the registry

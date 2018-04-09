@@ -47,12 +47,14 @@ type CniConfig struct {
 	NetworkPluginConfDir string `toml:"conf_dir" json:"confDir"`
 	// NetworkPluginConfTemplate is the file path of golang template used to generate
 	// cni config.
-	// Usually the cni config should be placed by system admin or pod network
-	// addons like calico, weaveworks etc. However, in some cases only a simple cni
-	// config is needed with pod cidr dynamically set.
-	// NetworkPluginConfTemplate can be used in those cases. When it is set,
-	// containerd will get cidr from kubelet to replace {{.PodCIDR}} in the template,
-	// and write the config into NetworkPluginConfDir.
+	// When it is set, containerd will get cidr from kubelet to replace {{.PodCIDR}} in
+	// the template, and write the config into NetworkPluginConfDir.
+	// Ideally the cni config should be placed by system admin or cni daemon like calico,
+	// weaveworks etc. However, there are still users using kubenet
+	// (https://kubernetes.io/docs/concepts/cluster-administration/network-plugins/#kubenet)
+	// today, who don't have a cni daemonset in production. NetworkPluginConfTemplate is
+	// a temporary backward-compatible solution for them.
+	// TODO(random-liu): Deprecate this option when kubenet is deprecated.
 	NetworkPluginConfTemplate string `toml:"conf_template" json:"confTemplate"`
 }
 

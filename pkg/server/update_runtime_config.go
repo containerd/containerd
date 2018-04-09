@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"text/template"
 
+	cni "github.com/containerd/go-cni"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -44,14 +45,15 @@ func (c *criService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateR
 		return &runtime.UpdateRuntimeConfigResponse{}, nil
 	}
 	confTemplate := c.config.NetworkPluginConfTemplate
-	if err := c.netPlugin.Status(); err == nil {
-		if confTemplate != "" {
-			logrus.Infof("Network plugin is ready, skip generating cni config from template %q", confTemplate)
-		}
-		return &runtime.UpdateRuntimeConfigResponse{}, nil
-	}
 	if confTemplate == "" {
 		logrus.Info("No cni config template is specified, wait for other system components to drop the config.")
+		return &runtime.UpdateRuntimeConfigResponse{}, nil
+	}
+	if err := c.netPlugin.Status(); err == nil {
+		logrus.Infof("Network plugin is ready, skip generating cni config from template %q", confTemplate)
+		return &runtime.UpdateRuntimeConfigResponse{}, nil
+	} else if err := c.netPlugin.Load(cni.WithLoNetwork(), cni.WithDefaultConf()); err == nil {
+		logrus.Infof("CNI config is successfully loaded, skip generating cni config from template %q", confTemplate)
 		return &runtime.UpdateRuntimeConfigResponse{}, nil
 	}
 	logrus.Infof("Generating cni config from template %q", confTemplate)

@@ -23,6 +23,7 @@ import (
 // FakeCNIPlugin is a fake plugin used for test.
 type FakeCNIPlugin struct {
 	StatusErr error
+	LoadErr   error
 }
 
 // NewFakeCNIPlugin create a FakeCNIPlugin.
@@ -47,5 +48,5 @@ func (f *FakeCNIPlugin) Status() error {
 
 // Load loads the network config.
 func (f *FakeCNIPlugin) Load(opts ...cni.LoadOption) error {
-	return nil
+	return f.LoadErr
 }
