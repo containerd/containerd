@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"runtime"
 	"strconv"
+	"sync"
 	"time"
 
 	containersapi "github.com/containerd/containerd/api/services/containers/v1"
@@ -148,6 +149,7 @@ func NewWithConn(conn *grpc.ClientConn, opts ...ClientOpt) (*Client, error) {
 // using a uniform interface
 type Client struct {
 	services
+	connMu    sync.Mutex
 	conn      *grpc.ClientConn
 	runtime   string
 	connector func() (*grpc.ClientConn, error)
@@ -158,6 +160,8 @@ func (c *Client) Reconnect() error {
 	if c.connector == nil {
 		return errors.New("unable to reconnect to containerd, no connector available")
 	}
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
 	c.conn.Close()
 	conn, err := c.connector()
 	if err != nil {
@@ -174,9 +178,12 @@ func (c *Client) Reconnect() error {
 // connection. A timeout can be set in the context to ensure it returns
 // early.
 func (c *Client) IsServing(ctx context.Context) (bool, error) {
+	c.connMu.Lock()
 	if c.conn == nil {
+		c.connMu.Unlock()
 		return false, errors.New("no grpc connection available")
 	}
+	c.connMu.Unlock()
 	r, err := c.HealthService().Check(ctx, &grpc_health_v1.HealthCheckRequest{}, grpc.FailFast(false))
 	if err != nil {
 		return false, err
@@ -424,7 +431,12 @@ func (c *Client) Subscribe(ctx context.Context, filters ...string) (ch <-chan *e
 
 // Close closes the clients connection to containerd
 func (c *Client) Close() error {
-	return c.conn.Close()
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
+	if c.conn != nil {
+		return c.conn.Close()
+	}
+	return nil
 }
 
 // NamespaceService returns the underlying Namespaces Store
@@ -524,9 +536,12 @@ type Version struct {
 
 // Version returns the version of containerd that the client is connected to
 func (c *Client) Version(ctx context.Context) (Version, error) {
+	c.connMu.Lock()
 	if c.conn == nil {
+		c.connMu.Unlock()
 		return Version{}, errors.New("no grpc connection available")
 	}
+	c.connMu.Unlock()
 	response, err := c.VersionService().Version(ctx, &ptypes.Empty{})
 	if err != nil {
 		return Version{}, err
