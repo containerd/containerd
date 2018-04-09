@@ -10,4 +10,3 @@
       - btrfs-tools
       - libseccomp2
       - util-linux
-# TODO: Limited support for trusty for nsenter. Need to handle/verify 
