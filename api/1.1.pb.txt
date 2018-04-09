@@ -2305,7 +2305,7 @@ file {
     java_package: "com.google.rpc"
     java_outer_classname: "StatusProto"
     java_multiple_files: true
-    go_package: "github.com/containerd/containerd/protobuf/google/rpc;rpc"
+    go_package: "rpc"
     objc_class_prefix: "RPC"
   }
   syntax: "proto3"
