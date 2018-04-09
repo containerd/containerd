@@ -35,8 +35,9 @@ write_files:
       [plugins.cri]
         enable_tls_streaming = true
       [plugins.cri.cni]
-        bin_dir = "/home/kubernetes/bin"
+        bin_dir = "/home/containerd/opt/cni/bin"
         conf_dir = "/etc/cni/net.d"
+        conf_template = "/home/containerd/opt/containerd/cluster/gce/cni.template"
       [plugins.cri.registry.mirrors."docker.io"]
         endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
 

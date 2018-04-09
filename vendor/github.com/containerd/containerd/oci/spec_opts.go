@@ -27,6 +27,18 @@ import (
 // SpecOpts sets spec specific information to a newly generated OCI spec
 type SpecOpts func(context.Context, Client, *containers.Container, *specs.Spec) error
 
+// Compose converts a sequence of spec operations into a single operation
+func Compose(opts ...SpecOpts) SpecOpts {
+	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) error {
+		for _, o := range opts {
+			if err := o(ctx, client, c, s); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
 // setProcess sets Process to empty if unset
 func setProcess(s *specs.Spec) {
 	if s.Process == nil {

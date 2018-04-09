@@ -443,19 +443,22 @@ func WithUsername(username string) SpecOpts {
 	}
 }
 
-// WithAllCapabilities set all linux capabilities for the process
-func WithAllCapabilities(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
-	setCapabilities(s)
+// WithCapabilities sets Linux capabilities on the process
+func WithCapabilities(caps []string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+		setCapabilities(s)
 
-	caps := getAllCapabilities()
+		s.Process.Capabilities.Bounding = caps
+		s.Process.Capabilities.Effective = caps
+		s.Process.Capabilities.Permitted = caps
+		s.Process.Capabilities.Inheritable = caps
 
-	s.Process.Capabilities.Bounding = caps
-	s.Process.Capabilities.Effective = caps
-	s.Process.Capabilities.Permitted = caps
-	s.Process.Capabilities.Inheritable = caps
-
-	return nil
+		return nil
+	}
 }
+
+// WithAllCapabilities sets all linux capabilities for the process
+var WithAllCapabilities = WithCapabilities(getAllCapabilities())
 
 func getAllCapabilities() []string {
 	last := capability.CAP_LAST_CAP
@@ -512,3 +515,93 @@ func getGIDFromPath(root string, filter func(user.Group) bool) (gid uint32, err 
 func isRootfsAbs(root string) bool {
 	return filepath.IsAbs(root)
 }
+
+// WithMaskedPaths sets the masked paths option
+func WithMaskedPaths(paths []string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+		setLinux(s)
+		s.Linux.MaskedPaths = paths
+		return nil
+	}
+}
+
+// WithReadonlyPaths sets the read only paths option
+func WithReadonlyPaths(paths []string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+		setLinux(s)
+		s.Linux.ReadonlyPaths = paths
+		return nil
+	}
+}
+
+// WithWriteableSysfs makes any sysfs mounts writeable
+func WithWriteableSysfs(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	for i, m := range s.Mounts {
+		if m.Type == "sysfs" {
+			var options []string
+			for _, o := range m.Options {
+				if o == "ro" {
+					o = "rw"
+				}
+				options = append(options, o)
+			}
+			s.Mounts[i].Options = options
+		}
+	}
+	return nil
+}
+
+// WithWriteableCgroupfs makes any cgroup mounts writeable
+func WithWriteableCgroupfs(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	for i, m := range s.Mounts {
+		if m.Type == "cgroup" {
+			var options []string
+			for _, o := range m.Options {
+				if o == "ro" {
+					o = "rw"
+				}
+				options = append(options, o)
+			}
+			s.Mounts[i].Options = options
+		}
+	}
+	return nil
+}
+
+// WithSelinuxLabel sets the process SELinux label
+func WithSelinuxLabel(label string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+		setProcess(s)
+		s.Process.SelinuxLabel = label
+		return nil
+	}
+}
+
+// WithApparmorProfile sets the Apparmor profile for the process
+func WithApparmorProfile(profile string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+		setProcess(s)
+		s.Process.ApparmorProfile = profile
+		return nil
+	}
+}
+
+// WithSeccompUnconfined clears the seccomp profile
+func WithSeccompUnconfined(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	setLinux(s)
+	s.Linux.Seccomp = nil
+	return nil
+}
+
+// WithPrivileged sets up options for a privileged container
+// TODO(justincormack) device handling
+var WithPrivileged = Compose(
+	WithAllCapabilities,
+	WithMaskedPaths(nil),
+	WithReadonlyPaths(nil),
+	WithWriteableSysfs,
+	WithWriteableCgroupfs,
+	WithSelinuxLabel(""),
+	WithApparmorProfile(""),
+	WithSeccompUnconfined,
+)

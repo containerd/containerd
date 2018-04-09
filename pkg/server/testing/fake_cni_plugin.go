@@ -21,7 +21,10 @@ import (
 )
 
 // FakeCNIPlugin is a fake plugin used for test.
-type FakeCNIPlugin struct{}
+type FakeCNIPlugin struct {
+	StatusErr error
+	LoadErr   error
+}
 
 // NewFakeCNIPlugin create a FakeCNIPlugin.
 func NewFakeCNIPlugin() *FakeCNIPlugin {
@@ -40,10 +43,10 @@ func (f *FakeCNIPlugin) Remove(id, path string, opts ...cni.NamespaceOpts) error
 
 // Status get the status of the plugin.
 func (f *FakeCNIPlugin) Status() error {
-	return nil
+	return f.StatusErr
 }
 
 // Load loads the network config.
 func (f *FakeCNIPlugin) Load(opts ...cni.LoadOption) error {
-	return nil
+	return f.LoadErr
 }
