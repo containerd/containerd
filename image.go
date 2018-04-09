@@ -53,6 +53,14 @@ type Image interface {
 
 var _ = (Image)(&image{})
 
+// NewImage returns a client image object from the metadata image
+func NewImage(client *Client, i images.Image) Image {
+	return &image{
+		client: client,
+		i:      i,
+	}
+}
+
 type image struct {
 	client *Client
 
