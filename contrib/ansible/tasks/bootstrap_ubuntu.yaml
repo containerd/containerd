@@ -9,4 +9,5 @@
       - apt-transport-https
       - btrfs-tools
       - libseccomp2
+      - socat
       - util-linux
