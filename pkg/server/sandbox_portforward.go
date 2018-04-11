@@ -17,10 +17,11 @@ limitations under the License.
 package server
 
 import (
+	"bytes"
 	"fmt"
 	"io"
-	"net"
-	"sync"
+	"os/exec"
+	"strings"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/pkg/errors"
@@ -44,8 +45,9 @@ func (c *criService) PortForward(ctx context.Context, r *runtime.PortForwardRequ
 	return c.streamServer.GetPortForward(r)
 }
 
-// portForward requires it uses netns to enter the sandbox namespace,
-// and forward stream for a specific port.
+// portForward requires `socat` on the node. It uses netns to enter the sandbox namespace,
+// and run `socat` insidethe namespace to forward stream for a specific port. The `socat`
+// command keeps running until it exits or client disconnect.
 func (c *criService) portForward(id string, port int32, stream io.ReadWriteCloser) error {
 	s, err := c.sandboxStore.Get(id)
 	if err != nil {
@@ -55,32 +57,46 @@ func (c *criService) portForward(id string, port int32, stream io.ReadWriteClose
 		return errors.Errorf("network namespace for sandbox %q is closed", id)
 	}
 
+	socat, err := exec.LookPath("socat")
+	if err != nil {
+		return errors.Wrap(err, "failed to find socat")
+	}
+
+	// Check https://linux.die.net/man/1/socat for meaning of the options.
+	args := []string{socat, "-", fmt.Sprintf("TCP4:localhost:%d", port)}
+
+	logrus.Infof("Executing port forwarding command %q in network namespace %q", strings.Join(args, " "), s.NetNS.GetPath())
 	err = s.NetNS.GetNs().Do(func(_ ns.NetNS) error {
-		var wg sync.WaitGroup
-		client, err := net.Dial("tcp4", fmt.Sprintf("localhost:%d", port))
+		cmd := exec.Command(args[0], args[1:]...)
+		cmd.Stdout = stream
+
+		stderr := new(bytes.Buffer)
+		cmd.Stderr = stderr
+
+		// If we use Stdin, command.Run() won't return until the goroutine that's copying
+		// from stream finishes. Unfortunately, if you have a client like telnet connected
+		// via port forwarding, as long as the user's telnet client is connected to the user's
+		// local listener that port forwarding sets up, the telnet session never exits. This
+		// means that even if socat has finished running, command.Run() won't ever return
+		// (because the client still has the connection and stream open).
+		//
+		// The work around is to use StdinPipe(), as Wait() (called by Run()) closes the pipe
+		// when the command (socat) exits.
+		in, err := cmd.StdinPipe()
 		if err != nil {
-			return errors.Wrapf(err, "failed to dial %q", port)
+			return errors.Wrap(err, "failed to create stdin pipe")
 		}
-		wg.Add(1)
 		go func() {
-			defer client.Close()
-			if _, err := io.Copy(client, stream); err != nil {
+			if _, err := io.Copy(in, stream); err != nil {
 				logrus.WithError(err).Errorf("Failed to copy port forward input for %q port %d", id, port)
 			}
-			logrus.Infof("Finish copy port forward input for %q port %d", id, port)
-			wg.Done()
+			in.Close()
+			logrus.Debugf("Finish copying port forward input for %q port %d", id, port)
 		}()
-		wg.Add(1)
-		go func() {
-			defer stream.Close()
-			if _, err := io.Copy(stream, client); err != nil {
-				logrus.WithError(err).Errorf("Failed to copy port forward output for %q port %d", id, port)
-			}
-			logrus.Infof("Finish copy port forward output for %q port %d", id, port)
-			wg.Done()
-		}()
-		wg.Wait()
 
+		if err := cmd.Run(); err != nil {
+			return errors.Errorf("nsenter command returns error: %v, stderr: %q", err, stderr.String())
+		}
 		return nil
 	})
 	if err != nil {

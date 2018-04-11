@@ -8,5 +8,6 @@
     - tar
     - btrfs-progs
     - libseccomp
-    - util-linux 
+    - util-linux
+    - socat
     - libselinux-python

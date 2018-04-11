@@ -21,6 +21,7 @@ install:
     - sudo apt-get install btrfs-tools
     - sudo apt-get install libseccomp2/trusty-backports
     - sudo apt-get install libseccomp-dev/trusty-backports
+    - sudo apt-get install socat
 
 before_script:
     - export PATH=$HOME/gopath/bin:$PATH
