@@ -18,11 +18,15 @@ package mount
 
 import (
 	"encoding/json"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/windows"
 )
 
 var (
@@ -31,7 +35,7 @@ var (
 )
 
 // Mount to the provided target
-func (m *Mount) Mount(target string) error {
+func (m *Mount) Mount(target string) (retErr error) {
 	home, layerID := filepath.Split(m.Source)
 
 	parentLayerPaths, err := m.GetParentPaths()
@@ -47,13 +51,66 @@ func (m *Mount) Mount(target string) error {
 		return errors.Wrapf(err, "failed to activate layer %s", m.Source)
 	}
 	defer func() {
-		if err != nil {
+		if retErr != nil {
 			hcsshim.DeactivateLayer(di, layerID)
 		}
 	}()
 
 	if err = hcsshim.PrepareLayer(di, layerID, parentLayerPaths); err != nil {
 		return errors.Wrapf(err, "failed to prepare layer %s", m.Source)
+	}
+	layerPath, err := hcsshim.GetLayerMountPath(di, layerID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get mount path for layer %s", m.Source)
+	}
+
+	if !strings.HasPrefix(layerPath, "\\\\?\\") {
+		layerPath = filepath.Join(layerPath, "Files")
+		if _, err := os.Lstat(layerPath); err != nil {
+			if !os.IsNotExist(err) {
+				return errors.Wrapf(err, "failed to find Files dir")
+			}
+			if err := os.Mkdir(layerPath, 0755); err != nil {
+				return errors.Wrap(err, "failed to create Files dir")
+			}
+		}
+		if err := os.Remove(target); err != nil {
+			return errors.Wrapf(err, "remove target prior to mounting %q", target)
+		}
+		if err := os.Symlink(layerPath, target); err != nil {
+			return errors.Wrapf(err, "failed to mount layer %q at %q", m.Source, target)
+		}
+	} else {
+		target = filepath.Clean(target) + string(filepath.Separator)
+		targetp, err := syscall.UTF16PtrFromString(target)
+		if err != nil {
+			return err
+		}
+
+		volName := filepath.Clean(layerPath) + string(filepath.Separator)
+		volNamep, err := syscall.UTF16PtrFromString(volName)
+		if err != nil {
+			return err
+		}
+
+		if err := windows.SetVolumeMountPoint(targetp, volNamep); err != nil {
+			return errors.Wrapf(err, "failed to mount layer %q at %q, volume: %q", m.Source, target, volName)
+		}
+	}
+
+	for strings.HasSuffix(target, string(os.PathSeparator)) {
+		target = target[:len(target)-1]
+	}
+
+	idf, err := os.Create(target + ":layerid")
+	if err != nil {
+		return err
+	}
+	defer idf.Close()
+
+	_, err = idf.Write([]byte(m.Source))
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -78,12 +135,47 @@ func (m *Mount) GetParentPaths() ([]string, error) {
 
 // Unmount the mount at the provided path
 func Unmount(mount string, flags int) error {
+	fi, err := os.Lstat(mount)
+	if err != nil {
+		return errors.Wrapf(err, "unable to find mounted volume %s", mount)
+	}
+
+	layerPathb, err := ioutil.ReadFile(mount + ":layerid")
+	if err != nil {
+		return err
+	}
+	layerPath := string(layerPathb)
+
 	var (
-		home, layerID = filepath.Split(mount)
+		home, layerID = filepath.Split(layerPath)
 		di            = hcsshim.DriverInfo{
 			HomeDir: home,
 		}
 	)
+
+	if fi.Mode()&os.ModeSymlink != 0 {
+		if err := os.Remove(mount); err != nil {
+			return errors.Wrap(err, "failed to delete mount")
+		}
+	} else {
+		mount = filepath.Clean(mount) + string(filepath.Separator)
+		mountp, err := syscall.UTF16PtrFromString(mount)
+		if err != nil {
+			return err
+		}
+
+		const volumeNameLen = 50
+		volumeNamep := make([]uint16, volumeNameLen)
+		volumeNamep[0] = 0
+
+		if err := windows.GetVolumeNameForVolumeMountPoint(mountp, &volumeNamep[0], volumeNameLen); err != nil {
+			return errors.Wrapf(err, "unable to find mounted volume %s", mount)
+		}
+
+		if err := windows.DeleteVolumeMountPoint(&volumeNamep[0]); err != nil {
+			return errors.Wrapf(err, "unable to delete mounted volume %s", mount)
+		}
+	}
 
 	if err := hcsshim.UnprepareLayer(di, layerID); err != nil {
 		return errors.Wrapf(err, "failed to unprepare layer %s", mount)

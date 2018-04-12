@@ -12,3 +12,16 @@ func Lchtimes(name string, atime, mtime time.Time) Applier {
 		return errors.New("Not implemented")
 	})
 }
+
+func Base() Applier {
+	return Apply(
+		CreateDir("Windows", 0755),
+		CreateDir("Windows/System32", 0755),
+		CreateDir("Windows/System32/Config", 0755),
+		CreateFile("Windows/System32/Config/SYSTEM", []byte("foo\n"), 0777),
+		CreateFile("Windows/System32/Config/SOFTWARE", []byte("foo\n"), 0777),
+		CreateFile("Windows/System32/Config/SAM", []byte("foo\n"), 0777),
+		CreateFile("Windows/System32/Config/SECURITY", []byte("foo\n"), 0777),
+		CreateFile("Windows/System32/Config/DEFAULT", []byte("foo\n"), 0777),
+	)
+}

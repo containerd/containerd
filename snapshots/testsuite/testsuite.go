@@ -120,6 +120,7 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 		fstest.CreateDir("/a", 0755),
 		fstest.CreateDir("/a/b", 0755),
 		fstest.CreateDir("/a/b/c", 0755),
+		fstest.Base(),
 	)
 
 	diffApplier := fstest.Apply(
@@ -150,6 +151,10 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 
 	if err := initialApplier.Apply(preparing); err != nil {
 		t.Fatalf("failure reason: %+v", err)
+	}
+
+	if err := setupBaseSnapshot(mounts[0].Source); err != nil {
+		t.Fatalf("failed to set up base snapshot: %+v", err)
 	}
 
 	committed := filepath.Join(work, "committed")

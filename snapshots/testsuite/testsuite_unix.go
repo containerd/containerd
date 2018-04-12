@@ -26,3 +26,8 @@ func clearMask() func() {
 		syscall.Umask(oldumask)
 	}
 }
+
+// setupBaseSnapshot is a no-op
+func setupBaseSnapshot(root string) error {
+	return nil
+}

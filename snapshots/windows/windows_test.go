@@ -14,17 +14,25 @@
    limitations under the License.
 */
 
-package testsuite
+package windows
 
-import "github.com/Microsoft/hcsshim"
+import (
+	"context"
+	"testing"
 
-func clearMask() func() {
-	return func() {}
+	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/snapshots/testsuite"
+)
+
+func newSnapshotter(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
+	snapshotter, err := NewSnapshotter(root)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return snapshotter, func() error { return snapshotter.Close() }, nil
 }
 
-func setupBaseSnapshot(root string) error {
-	if err := hcsshim.ProcessBaseLayer(root); err != nil {
-		return err
-	}
-	return nil
+func TestWindows(t *testing.T) {
+	testsuite.SnapshotterSuite(t, "Windows", newSnapshotter)
 }
