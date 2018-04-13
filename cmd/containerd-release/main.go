@@ -19,6 +19,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"sort"
+	"text/tabwriter"
 	"text/template"
 
 	"github.com/sirupsen/logrus"
@@ -115,6 +117,11 @@ This tool should be ran from the root of the project repository for a new releas
 		if err != nil {
 			return err
 		}
+
+		sort.Slice(updatedDeps, func(i, j int) bool {
+			return updatedDeps[i].Name < updatedDeps[j].Name
+		})
+
 		// update the release fields with generated data
 		r.Contributors = contributors
 		r.Dependencies = updatedDeps
@@ -131,7 +138,12 @@ This tool should be ran from the root of the project repository for a new releas
 			if err != nil {
 				return err
 			}
-			return t.Execute(os.Stdout, r)
+
+			w := tabwriter.NewWriter(os.Stdout, 8, 8, 2, ' ', 0)
+			if err := t.Execute(w, r); err != nil {
+				return err
+			}
+			return w.Flush()
 		}
 		logrus.Info("release complete!")
 		return nil
