@@ -54,13 +54,29 @@ type manifestDotJSON struct {
 	Parent string
 }
 
-// isLayerTar returns true if name is like "deadbeeddeadbeef/layer.tar"
+// isLayerTar returns true if name is like "foobar/layer.tar"
 func isLayerTar(name string) bool {
 	slashes := len(strings.Split(name, "/"))
 	return slashes == 2 && strings.HasSuffix(name, "/layer.tar")
 }
 
-// isDotJSON returns true if name is like "deadbeefdeadbeef.json"
+// followSymlinkLayer returns actual layer name of the symlink layer.
+// It returns "foobar/layer.tar" if the name is like
+// "../foobar/layer.tar", and returns error if the name
+// is not in "../foobar/layer.tar" format.
+func followSymlinkLayer(name string) (string, error) {
+	parts := strings.Split(name, "/")
+	if len(parts) != 3 || parts[0] != ".." {
+		return "", errors.New("invalid symlink layer")
+	}
+	name = strings.TrimPrefix(name, "../")
+	if !isLayerTar(name) {
+		return "", errors.New("invalid layer tar")
+	}
+	return name, nil
+}
+
+// isDotJSON returns true if name is like "foobar.json"
 func isDotJSON(name string) bool {
 	slashes := len(strings.Split(name, "/"))
 	return slashes == 1 && strings.HasSuffix(name, ".json")
@@ -75,7 +91,7 @@ type imageConfig struct {
 // An image MUST have `manifest.json`.
 // `repositories` file in Docker Image Spec v1.0 is not supported (yet).
 // Also, the current implementation assumes the implicit file name convention,
-// which is not explicitly documented in the spec. (e.g. deadbeef/layer.tar)
+// which is not explicitly documented in the spec. (e.g. foobar/layer.tar)
 // It returns a group of image references successfully loaded.
 func Import(ctx context.Context, client *containerd.Client, reader io.Reader) (_ []string, retErr error) {
 	ctx, done, err := client.WithLease(ctx)
@@ -97,9 +113,10 @@ func Import(ctx context.Context, client *containerd.Client, reader io.Reader) (_
 
 	tr := tar.NewReader(reader)
 	var (
-		mfsts   []manifestDotJSON
-		layers  = make(map[string]ocispec.Descriptor) // key: filename (deadbeeddeadbeef/layer.tar)
-		configs = make(map[string]imageConfig)        // key: filename (deadbeeddeadbeef.json)
+		mfsts         []manifestDotJSON
+		symlinkLayers = make(map[string]string)             // key: filename (foobar/layer.tar), value: linkname (targetlayerid/layer.tar)
+		layers        = make(map[string]ocispec.Descriptor) // key: filename (foobar/layer.tar)
+		configs       = make(map[string]imageConfig)        // key: filename (foobar.json)
 	)
 	for {
 		hdr, err := tr.Next()
@@ -108,6 +125,14 @@ func Import(ctx context.Context, client *containerd.Client, reader io.Reader) (_
 		}
 		if err != nil {
 			return nil, errors.Wrap(err, "get next file")
+		}
+		if hdr.Typeflag == tar.TypeSymlink && isLayerTar(hdr.Name) {
+			linkname, err := followSymlinkLayer(hdr.Linkname)
+			if err != nil {
+				return nil, errors.Wrapf(err, "follow symlink layer from %q to %q", hdr.Name, hdr.Linkname)
+			}
+			symlinkLayers[hdr.Name] = linkname
+			continue
 		}
 		if hdr.Typeflag != tar.TypeReg && hdr.Typeflag != tar.TypeRegA {
 			continue
@@ -135,6 +160,13 @@ func Import(ctx context.Context, client *containerd.Client, reader io.Reader) (_
 			configs[hdr.Name] = *c
 			continue
 		}
+	}
+	for name, linkname := range symlinkLayers {
+		desc, ok := layers[linkname]
+		if !ok {
+			return nil, errors.Errorf("no target for symlink layer from %q to %q", name, linkname)
+		}
+		layers[name] = desc
 	}
 	var refs []string
 	defer func() {
@@ -255,7 +287,7 @@ func onUntarManifestJSON(r io.Reader) ([]manifestDotJSON, error) {
 }
 
 func onUntarLayerTar(ctx context.Context, r io.Reader, cs content.Ingester, name string, size int64) (*ocispec.Descriptor, error) {
-	// name is like "deadbeeddeadbeef/layer.tar" ( guaranteed by isLayerTar() )
+	// name is like "foobar/layer.tar" ( guaranteed by isLayerTar() )
 	split := strings.Split(name, "/")
 	// note: split[0] is not expected digest here
 	cw, err := cs.Writer(ctx, "layer-"+split[0], size, "")
@@ -277,7 +309,7 @@ func onUntarDotJSON(ctx context.Context, r io.Reader, cs content.Ingester, name 
 	config := imageConfig{}
 	config.desc.MediaType = images.MediaTypeDockerSchema2Config
 	config.desc.Size = size
-	// name is like "deadbeeddeadbeef.json" ( guaranteed by is DotJSON() )
+	// name is like "foobar.json" ( guaranteed by is DotJSON() )
 	split := strings.Split(name, ".")
 	cw, err := cs.Writer(ctx, "config-"+split[0], size, "")
 	if err != nil {
