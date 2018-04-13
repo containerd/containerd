@@ -117,3 +117,10 @@ func (n *NetNS) GetPath() string {
 	defer n.Unlock()
 	return n.ns.Path()
 }
+
+// GetNs returns the network namespace handle
+func (n *NetNS) GetNs() cnins.NetNS {
+	n.Lock()
+	defer n.Unlock()
+	return n.ns
+}

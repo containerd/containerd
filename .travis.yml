@@ -34,8 +34,6 @@ before_install:
   - uname -r
   - sudo apt-get -q update
   - sudo apt-get install -y libseccomp-dev/trusty-backports
-  # Use jpetazzo/nsenter to install nsenter on ubuntu trusty.
-  - docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
 
 install:
   - sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-protobuf
