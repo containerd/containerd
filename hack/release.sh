@@ -56,7 +56,9 @@ cp ${ROOT}/contrib/systemd-units/* ${destdir}/etc/systemd/system/
 mkdir -p ${destdir}/opt/containerd
 cp -r ${ROOT}/cluster ${destdir}/opt/containerd
 # Write a version file into the release tarball.
-echo ${VERSION} > ${destdir}/opt/containerd/cluster/version
+cat > ${destdir}/opt/containerd/cluster/version <<EOF
+CONTAINERD_VERSION: $(yaml-quote ${VERSION})
+EOF
 
 # Create release tar
 tarball=${BUILD_DIR}/${TARBALL}
