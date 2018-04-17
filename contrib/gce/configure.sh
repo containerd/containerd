@@ -22,6 +22,8 @@ set -o pipefail
 # CONTAINERD_HOME is the directory for containerd.
 CONTAINERD_HOME="/home/containerd"
 cd "${CONTAINERD_HOME}"
+# KUBE_HOME is the directory for kubernetes.
+KUBE_HOME="/home/kubernetes"
 
 # fetch_metadata fetches metadata from GCE metadata server.
 # Var set:
@@ -36,32 +38,144 @@ fetch_metadata() {
   fi
 }
 
-# DEPLOY_PATH is the gcs path where cri-containerd tarball is stored.
-DEPLOY_PATH=${DEPLOY_PATH:-"cri-containerd-release"}
+# fetch_env fetches environment variables from GCE metadata server
+# and generate a env file under ${CONTAINERD_HOME}. It assumes that
+# the environment variables in metadata are in yaml format.
+fetch_env() {
+  local -r env_file_name=$1
+  (
+    umask 077;
+    local -r tmp_env_file="/tmp/${env_file_name}.yaml"
+    tmp_env_content=$(fetch_metadata "${env_file_name}")
+    if [ -z "${tmp_env_content}" ]; then
+      echo "No environment variable is specified in ${env_file_name}"
+      return
+    fi
+    echo "${tmp_env_content}" > "${tmp_env_file}"
+    # Convert the yaml format file into a shell-style file.
+    eval $(python -c '''
+import pipes,sys,yaml
+for k,v in yaml.load(sys.stdin).iteritems():
+  print("readonly {var}={value}".format(var = k, value = pipes.quote(str(v))))
+''' < "${tmp_env_file}" > "${CONTAINERD_HOME}/${env_file_name}")
+    rm -f "${tmp_env_file}"
+  )
+}
 
-# PKG_PREFIX is the prefix of the cri-containerd tarball name.
-# By default use the release tarball with cni built in.
-PKG_PREFIX=${PKG_PREFIX:-"cri-containerd-cni"}
+# is_preloaded checks whether a package has been preloaded in the image.
+is_preloaded() {
+  local -r tar=$1
+  local -r sha1=$2
+  grep -qs "${tar},${sha1}" "${KUBE_HOME}/preload_info"
+}
 
-# VERSION is the cri-containerd version to use.
-VERSION_METADATA="version"
-VERSION=$(fetch_metadata "${VERSION_METADATA}")
-if [ -z "${VERSION}" ]; then
-  echo "Version is not set."
-  exit 1
+# KUBE_ENV_METADATA is the metadata key for kubernetes envs.
+KUBE_ENV_METADATA="kube-env"
+fetch_env ${KUBE_ENV_METADATA}
+if [ -f "${CONTAINERD_HOME}/${KUBE_ENV_METADATA}" ]; then
+  source "${CONTAINERD_HOME}/${KUBE_ENV_METADATA}"
 fi
 
+# CONTAINERD_ENV_METADATA is the metadata key for containerd envs.
+CONTAINERD_ENV_METADATA="containerd-env"
+fetch_env ${CONTAINERD_ENV_METADATA}
+if [ -f "${CONTAINERD_HOME}/${CONTAINERD_ENV_METADATA}" ]; then
+  source "${CONTAINERD_HOME}/${CONTAINERD_ENV_METADATA}"
+fi
+
+# CONTAINERD_PKG_PREFIX is the prefix of the cri-containerd tarball name.
+# By default use the release tarball with cni built in.
+pkg_prefix=${CONTAINERD_PKG_PREFIX:-"cri-containerd-cni"}
+# Behave differently for test and production.
+if [ "${CONTAINERD_TEST:-"false"}"  != "true" ]; then
+    # CONTAINERD_DEPLOY_PATH is the gcs path where cri-containerd tarball is stored.
+  deploy_path=${CONTAINERD_DEPLOY_PATH:-"cri-containerd-release"}
+  # CONTAINERD_VERSION is the cri-containerd version to use.
+  version=${CONTAINERD_VERSION:-""}
+  if [ -z "${version}" ]; then
+    echo "CONTAINERD_VERSION is not set."
+    exit 1
+  fi
+else
+  deploy_path=${CONTAINERD_DEPLOY_PATH:-"cri-containerd-staging"}
+
+  # PULL_REFS_METADATA is the metadata key of PULL_REFS from prow.
+  PULL_REFS_METADATA="PULL_REFS"
+  pull_refs=$(fetch_metadata "${PULL_REFS_METADATA}")
+  if [ ! -z "${pull_refs}" ]; then
+    deploy_dir=$(echo "${pull_refs}" | sha1sum | awk '{print $1}')
+    deploy_path="${deploy_path}/${deploy_dir}"
+  fi
+
+  # TODO(random-liu): Put version into the metadata instead of
+  # deciding it in cloud init. This may cause issue to reboot test.
+  version=$(curl -f --ipv4 --retry 6 --retry-delay 3 --silent --show-error \
+    https://storage.googleapis.com/${deploy_path}/latest)
+fi
+
+TARBALL_GCS_NAME="${pkg_prefix}-${version}.linux-amd64.tar.gz"
 # TARBALL_GCS_PATH is the path to download cri-containerd tarball for node e2e.
-TARBALL_GCS_PATH="https://storage.googleapis.com/${DEPLOY_PATH}/${PKG_PREFIX}-${VERSION}.linux-amd64.tar.gz"
+TARBALL_GCS_PATH="https://storage.googleapis.com/${deploy_path}/${TARBALL_GCS_NAME}"
 # TARBALL is the name of the tarball after being downloaded.
 TARBALL="cri-containerd.tar.gz"
 
-# Download and untar the release tar ball.
-curl -f --ipv4 -Lo "${TARBALL}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 "${TARBALL_GCS_PATH}"
-tar xvf "${TARBALL}"
+# CONTAINERD_TAR_SHA1 is the sha1sum of containerd tarball.
+if is_preloaded "${TARBALL_GCS_NAME}" "${CONTAINERD_TAR_SHA1:-""}"; then
+  echo "${TARBALL_GCS_NAME} is preloaded"
+else
+  # Download and untar the release tar ball.
+  curl -f --ipv4 -Lo "${TARBALL}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 "${TARBALL_GCS_PATH}"
+  tar xvf "${TARBALL}"
+  rm -f "${TARBALL}"
+fi
 
+# Configure containerd.
 # Copy crictl config.
 cp "${CONTAINERD_HOME}/etc/crictl.yaml" /etc
 
+# Generate containerd config
+config_path=${CONTAINERD_CONFIG_PATH:-"/etc/containerd/config.toml"}
+mkdir -p $(dirname ${config_path})
+cni_bin_dir="${CONTAINERD_HOME}/opt/cni/bin"
+cni_template_path="${CONTAINERD_HOME}/opt/containerd/cluster/gce/cni.template"
+# NETWORK_POLICY_PROVIDER is from kube-env.
+network_policy_provider="${NETWORK_POLICY_PROVIDER:-"none"}"
+if [ -n "${network_policy_provider}" ] && [ "${network_policy_provider}" != "none" ] && [ "${KUBERNETES_MASTER:-}" != "true" ]; then
+  # Use Kubernetes cni daemonset on node if network policy provider is specified.
+  cni_bin_dir="${KUBE_HOME}/bin"
+  cni_template_path=""
+fi
+cat > ${config_path} <<EOF
+[plugins.linux]
+  shim = "${CONTAINERD_HOME}/usr/local/bin/containerd-shim"
+  runtime = "${CONTAINERD_HOME}/usr/local/sbin/runc"
+
+[plugins.cri]
+  enable_tls_streaming = true
+[plugins.cri.cni]
+  bin_dir = "${cni_bin_dir}"
+  conf_dir = "/etc/cni/net.d"
+  conf_template = "${cni_template_path}"
+[plugins.cri.registry.mirrors."docker.io"]
+  endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
+EOF
+chmod 644 "${config_path}"
+
 echo "export PATH=${CONTAINERD_HOME}/usr/local/bin/:${CONTAINERD_HOME}/usr/local/sbin/:\$PATH" > \
   /etc/profile.d/containerd_env.sh
+
+# Run extra init script for test.
+if [ "${CONTAINERD_TEST:-"false"}"  == "true" ]; then
+  # EXTRA_INIT_SCRIPT is the name of the extra init script after being downloaded.
+  EXTRA_INIT_SCRIPT="containerd-extra-init.sh"
+  # EXTRA_INIT_SCRIPT_METADATA is the metadata key of init script.
+  EXTRA_INIT_SCRIPT_METADATA="containerd-extra-init-sh"
+  extra_init=$(fetch_metadata "${EXTRA_INIT_SCRIPT_METADATA}")
+  # Return if containerd-extra-init-sh is not set.
+  if [ -z "${extra_init}" ]; then
+    exit 0
+  fi
+  echo "${extra_init}" > "${EXTRA_INIT_SCRIPT}"
+  chmod 544 "${EXTRA_INIT_SCRIPT}"
+  ./${EXTRA_INIT_SCRIPT}
+fi
