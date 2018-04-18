@@ -46,7 +46,7 @@ write_files:
       LimitNPROC=infinity
       LimitCORE=infinity
       ExecStartPre=/sbin/modprobe overlay
-      ExecStart=/home/containerd/usr/local/bin/containerd --log-level debug
+      ExecStart=/home/containerd/usr/local/bin/containerd
 
       [Install]
       WantedBy=containerd.target
