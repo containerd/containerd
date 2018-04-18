@@ -297,20 +297,20 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		return nil, errors.Wrap(err, "failed to create snapshot")
 	}
 
-	if kind == snapshots.KindActive {
-		parentLayerPaths := s.parentIDsToParentPaths(newSnapshot.ParentIDs)
+	//if kind == snapshots.KindActive {
+	parentLayerPaths := s.parentIDsToParentPaths(newSnapshot.ParentIDs)
 
-		var parentPath string
-		if len(parentLayerPaths) != 0 {
-			parentPath = parentLayerPaths[0]
-		}
-
-		if err := hcsshim.CreateSandboxLayer(s.info, newSnapshot.ID, parentPath, parentLayerPaths); err != nil {
-			return nil, errors.Wrap(err, "failed to create sandbox layer")
-		}
-
-		// TODO(darrenstahlmsft): Allow changing sandbox size
+	var parentPath string
+	if len(parentLayerPaths) != 0 {
+		parentPath = parentLayerPaths[0]
 	}
+
+	if err := hcsshim.CreateSandboxLayer(s.info, newSnapshot.ID, parentPath, parentLayerPaths); err != nil {
+		return nil, errors.Wrap(err, "failed to create sandbox layer")
+	}
+
+	// TODO(darrenstahlmsft): Allow changing sandbox size
+	//}
 
 	if err := t.Commit(); err != nil {
 		return nil, errors.Wrap(err, "commit failed")
