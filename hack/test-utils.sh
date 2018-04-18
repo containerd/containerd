@@ -40,7 +40,7 @@ test_setup() {
     exit 1
   fi
   sudo pkill -x containerd
-  keepalive "sudo ${ROOT}/_output/containerd ${CONTAINERD_FLAGS}" \
+  keepalive "sudo PATH=${PATH} ${ROOT}/_output/containerd ${CONTAINERD_FLAGS}" \
     ${RESTART_WAIT_PERIOD} &> ${report_dir}/containerd.log &
   containerd_pid=$!
   # Wait for containerd to be running by using the containerd client ctr to check the version

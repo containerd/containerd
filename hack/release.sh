@@ -43,7 +43,8 @@ fi
 rm -rf ${destdir}
 
 # Install dependencies into release stage.
-NOSUDO=true INSTALL_CNI=${INCLUDE_CNI} DESTDIR=${destdir} ./hack/install/install-deps.sh
+NOSUDO=true INSTALL_CNI=${INCLUDE_CNI} INSTALL_CNI_CONFIG=false DESTDIR=${destdir} \
+  ./hack/install/install-deps.sh
 
 if ${CUSTOM_CONTAINERD}; then
   make install -e DESTDIR=${destdir}

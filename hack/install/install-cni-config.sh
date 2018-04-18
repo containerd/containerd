@@ -19,20 +19,31 @@ set -o nounset
 set -o pipefail
 
 source $(dirname "${BASH_SOURCE[0]}")/utils.sh
-CNI_DIR=${DESTDIR}/opt/cni
-CNI_PKG=github.com/containernetworking/plugins
-
-# Create a temporary GOPATH for cni installation.
-TMPGOPATH=$(mktemp -d /tmp/cri-install-cni.XXXX)
-GOPATH=${TMPGOPATH}
-
-# Install cni
-from-vendor CNI github.com/containernetworking/plugins
-checkout_repo ${CNI_PKG} ${CNI_VERSION} ${CNI_REPO}
-cd ${GOPATH}/src/${CNI_PKG}
-FASTBUILD=true ./build.sh
-${SUDO} mkdir -p ${CNI_DIR}
-${SUDO} cp -r ./bin ${CNI_DIR}
-
-# Clean the tmp GOPATH dir.
-rm -rf ${TMPGOPATH}
+CNI_CONFIG_DIR=${DESTDIR}/etc/cni/net.d
+${SUDO} mkdir -p ${CNI_CONFIG_DIR}
+${SUDO} bash -c 'cat >'${CNI_CONFIG_DIR}'/10-containerd-net.conflist <<EOF
+{
+  "cniVersion": "0.3.1",
+  "name": "containerd-net",
+  "plugins": [
+    {
+      "type": "bridge",
+      "bridge": "cni0",
+      "isGateway": true,
+      "ipMasq": true,
+      "promiscMode": true,
+      "ipam": {
+        "type": "host-local",
+        "subnet": "10.88.0.0/16",
+        "routes": [
+          { "dst": "0.0.0.0/0" }
+        ]
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {"portMappings": true}
+    }
+  ]
+}
+EOF'
