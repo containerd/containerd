@@ -66,7 +66,7 @@ func BuildManifest(ctx Context) (*Manifest, error) {
 			return fmt.Errorf("error walking %s: %v", p, err)
 		}
 
-		if p == "/" {
+		if p == string(os.PathSeparator) {
 			// skip root
 			return nil
 		}
