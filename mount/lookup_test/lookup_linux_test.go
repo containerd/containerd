@@ -61,10 +61,12 @@ func testLookup(t *testing.T, fsType string) {
 	}
 	if out, err := exec.Command("mkfs", "-t", fsType, deviceName).CombinedOutput(); err != nil {
 		// not fatal
+		cleanupDevice()
 		t.Skipf("could not mkfs (%s) %s: %v (out: %q)", fsType, deviceName, err, string(out))
 	}
 	if out, err := exec.Command("mount", deviceName, mnt).CombinedOutput(); err != nil {
 		// not fatal
+		cleanupDevice()
 		t.Skipf("could not mount %s: %v (out: %q)", deviceName, err, string(out))
 	}
 	defer func() {
