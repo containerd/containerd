@@ -30,7 +30,7 @@ func Lchtimes(name string, atime, mtime time.Time) Applier {
 
 func Base() Applier {
 	return applyFn(func(root string) error {
-		// do nothing on Linux
+		// do nothing, as the base is not special
 		return nil
 	})
 }
