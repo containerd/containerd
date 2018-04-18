@@ -98,11 +98,12 @@ func (m *Mount) Mount(target string) (retErr error) {
 		}
 	}
 
-	for strings.HasSuffix(target, string(os.PathSeparator)) {
-		target = target[:len(target)-1]
-	}
-
-	idf, err := os.Create(target + ":layerid")
+	// Remove any trailing slashes in preparation to add an Alternate Data Stream for the layerid,
+	// see https://blogs.technet.microsoft.com/askcore/2013/03/24/alternate-data-streams-in-ntfs/
+	// for details on Alternate Data Streams.
+	target = filepath.Clean(target)
+	dir, file := filepath.Split(target)
+	idf, err := os.Create(filepath.Join(dir, file+":layerid"))
 	if err != nil {
 		return err
 	}
@@ -140,7 +141,10 @@ func Unmount(mount string, flags int) error {
 		return errors.Wrapf(err, "unable to find mounted volume %s", mount)
 	}
 
-	layerPathb, err := ioutil.ReadFile(mount + ":layerid")
+	// Remove any trailing slashes
+	mount = filepath.Clean(mount)
+	dir, file := filepath.Split(mount)
+	layerPathb, err := ioutil.ReadFile(filepath.Join(dir, file+":layerid"))
 	if err != nil {
 		return err
 	}
