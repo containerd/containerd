@@ -134,7 +134,7 @@ fi
 cp "${CONTAINERD_HOME}/etc/crictl.yaml" /etc
 
 # Generate containerd config
-config_path=${CONTAINERD_CONFIG_PATH:-"/etc/containerd/config.toml"}
+config_path="${CONTAINERD_CONFIG_PATH:-"/etc/containerd/config.toml"}"
 mkdir -p $(dirname ${config_path})
 cni_bin_dir="${CONTAINERD_HOME}/opt/cni/bin"
 cni_template_path="${CONTAINERD_HOME}/opt/containerd/cluster/gce/cni.template"
@@ -145,7 +145,11 @@ if [ -n "${network_policy_provider}" ] && [ "${network_policy_provider}" != "non
   cni_bin_dir="${KUBE_HOME}/bin"
   cni_template_path=""
 fi
+log_level="${CONTAINERD_LOG_LEVEL:-"info"}"
 cat > ${config_path} <<EOF
+[debug]
+  level = "${log_level}"
+
 [plugins.linux]
   shim = "${CONTAINERD_HOME}/usr/local/bin/containerd-shim"
   runtime = "${CONTAINERD_HOME}/usr/local/sbin/runc"
