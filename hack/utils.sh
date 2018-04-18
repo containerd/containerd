@@ -95,3 +95,10 @@ from-vendor() {
     fi
     eval $setvars
 }
+
+# yaml-quote quotes something appropriate for a yaml string.
+# This is the same with:
+# https://github.com/kubernetes/kubernetes/blob/v1.10.1/cluster/gce/util.sh#L471.
+yaml-quote() {
+  echo "'$(echo "${@:-}" | sed -e "s/'/''/g")'"
+}

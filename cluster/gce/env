@@ -8,8 +8,8 @@ if [ ! -f "${version_file}" ]; then
   echo "version file does not exist"
   exit 1
 fi
-export KUBE_MASTER_EXTRA_METADATA="user-data=${GCE_DIR}/cloud-init/master.yaml,containerd-configure-sh=${GCE_DIR}/configure.sh,version=${version_file}"
-export KUBE_NODE_EXTRA_METADATA="user-data=${GCE_DIR}/cloud-init/node.yaml,containerd-configure-sh=${GCE_DIR}/configure.sh,version=${version_file}"
+export KUBE_MASTER_EXTRA_METADATA="user-data=${GCE_DIR}/cloud-init/master.yaml,containerd-configure-sh=${GCE_DIR}/configure.sh,containerd-env=${version_file}"
+export KUBE_NODE_EXTRA_METADATA="user-data=${GCE_DIR}/cloud-init/node.yaml,containerd-configure-sh=${GCE_DIR}/configure.sh,containerd-env=${version_file}"
 export KUBE_CONTAINER_RUNTIME="remote"
 export KUBE_CONTAINER_RUNTIME_ENDPOINT="/run/containerd/containerd.sock"
 export KUBE_LOAD_IMAGE_COMMAND="/home/containerd/usr/local/bin/ctr cri load"

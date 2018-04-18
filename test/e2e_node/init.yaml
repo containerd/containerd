@@ -23,22 +23,6 @@ write_files:
       [Install]
       WantedBy=containerd.target
 
-  - path: /etc/containerd/config.toml
-    permissions: 0644
-    owner: root
-    content: |
-      [plugins.linux]
-        shim = "/home/containerd/usr/local/bin/containerd-shim"
-        runtime = "/home/containerd/usr/local/sbin/runc"
-
-      [plugins.cri]
-        enable_tls_streaming = true
-      [plugins.cri.cni]
-        bin_dir = "/home/containerd/opt/cni/bin"
-        conf_dir = "/home/containerd/etc/cni/net.d"
-      [plugins.cri.registry.mirrors."docker.io"]
-        endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
-
   - path: /etc/systemd/system/containerd.service
     permissions: 0644
     owner: root
@@ -61,7 +45,7 @@ write_files:
       LimitNPROC=infinity
       LimitCORE=infinity
       ExecStartPre=/sbin/modprobe overlay
-      ExecStart=/home/containerd/usr/local/bin/containerd --log-level debug
+      ExecStart=/home/containerd/usr/local/bin/containerd
 
       [Install]
       WantedBy=containerd.target
