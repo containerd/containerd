@@ -92,10 +92,6 @@ if [ "${CONTAINERD_TEST:-"false"}"  != "true" ]; then
   deploy_path=${CONTAINERD_DEPLOY_PATH:-"cri-containerd-release"}
   # CONTAINERD_VERSION is the cri-containerd version to use.
   version=${CONTAINERD_VERSION:-""}
-  if [ -z "${version}" ]; then
-    echo "CONTAINERD_VERSION is not set."
-    exit 1
-  fi
 else
   deploy_path=${CONTAINERD_DEPLOY_PATH:-"cri-containerd-staging"}
 
@@ -118,15 +114,27 @@ TARBALL_GCS_NAME="${pkg_prefix}-${version}.linux-amd64.tar.gz"
 TARBALL_GCS_PATH="https://storage.googleapis.com/${deploy_path}/${TARBALL_GCS_NAME}"
 # TARBALL is the name of the tarball after being downloaded.
 TARBALL="cri-containerd.tar.gz"
-
 # CONTAINERD_TAR_SHA1 is the sha1sum of containerd tarball.
-if is_preloaded "${TARBALL_GCS_NAME}" "${CONTAINERD_TAR_SHA1:-""}"; then
-  echo "${TARBALL_GCS_NAME} is preloaded"
+tar_sha1="${CONTAINERD_TAR_SHA1:-""}"
+
+if [ -z "${version}" ]; then
+  # Try using preloaded containerd if version is not specified.
+  tarball_gcs_pattern="${pkg_prefix}-.*.linux-amd64.tar.gz"
+  if is_preloaded "${tarball_gcs_pattern}" "${tar_sha1}"; then
+    echo "CONTAINERD_VERSION is not set, use preloaded containerd"
+  else
+    echo "CONTAINERD_VERSION is not set, and containerd is not preloaded"
+    exit 1
+  fi
 else
-  # Download and untar the release tar ball.
-  curl -f --ipv4 -Lo "${TARBALL}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 "${TARBALL_GCS_PATH}"
-  tar xvf "${TARBALL}"
-  rm -f "${TARBALL}"
+  if is_preloaded "${TARBALL_GCS_NAME}" "${tar_sha1}"; then
+    echo "${TARBALL_GCS_NAME} is preloaded"
+  else
+    # Download and untar the release tar ball.
+    curl -f --ipv4 -Lo "${TARBALL}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 "${TARBALL_GCS_PATH}"
+    tar xvf "${TARBALL}"
+    rm -f "${TARBALL}"
+  fi
 fi
 
 # Configure containerd.
