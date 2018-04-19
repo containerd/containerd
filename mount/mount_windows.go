@@ -64,6 +64,9 @@ func (m *Mount) Mount(target string) (retErr error) {
 		return errors.Wrapf(err, "failed to get mount path for layer %s", m.Source)
 	}
 
+	// Check if the returned path is a new mounted volume, or the path of the expanded
+	// layer on disk.
+	// TODO: Is there a better way to check this than looking for \\?\Volume*?
 	if !strings.HasPrefix(layerPath, "\\\\?\\") {
 		layerPath = filepath.Join(layerPath, "Files")
 		if _, err := os.Lstat(layerPath); err != nil {

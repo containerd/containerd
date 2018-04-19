@@ -71,10 +71,11 @@ func (*pathDriver) Abs(path string) (string, error) {
 // to call Driver.Stat() for Walk, they need to create a new struct that
 // overrides this method.
 func (*pathDriver) Walk(root string, walkFn filepath.WalkFunc) error {
-	return Walk(root, walkFn)
+	return walkInternal(root, walkFn)
 }
 
-var lstat = os.Lstat // for testing
+// TODO: This is copied from Go source as a (hopefully) temporary workaround to symlinks in the base layer.
+// See if there is a better way to walk a path that is rooted by a symlink.
 
 // walk recursively descends path, calling walkFn.
 func walk(path string, info os.FileInfo, walkFn filepath.WalkFunc) error {
@@ -97,7 +98,7 @@ func walk(path string, info os.FileInfo, walkFn filepath.WalkFunc) error {
 
 	for _, name := range names {
 		filename := filepath.Join(path, name)
-		fileInfo, err := lstat(filename)
+		fileInfo, err := os.Lstat(filename)
 		if err != nil {
 			if err := walkFn(filename, fileInfo, err); err != nil && err != filepath.SkipDir {
 				return err
@@ -114,13 +115,13 @@ func walk(path string, info os.FileInfo, walkFn filepath.WalkFunc) error {
 	return nil
 }
 
-// Walk walks the file tree rooted at root, calling walkFn for each file or
+// walkInternal walks the file tree rooted at root, calling walkFn for each file or
 // directory in the tree, including root. All errors that arise visiting files
 // and directories are filtered by walkFn. The files are walked in lexical
 // order, which makes the output deterministic but means that for very
 // large directories Walk can be inefficient.
 // Walk does not follow symbolic links.
-func Walk(root string, walkFn filepath.WalkFunc) error {
+func walkInternal(root string, walkFn filepath.WalkFunc) error {
 	info, err := os.Stat(root)
 	if err != nil {
 		err = walkFn(root, nil, err)
