@@ -243,11 +243,19 @@ var infoCommand = cli.Command{
 	Name:      "info",
 	Usage:     "get info about a container",
 	ArgsUsage: "CONTAINER",
+	Flags: []cli.Flag{
+		cli.StringSliceFlag{
+			Name:  "attributes, a",
+			Usage: "attributes of containers to be fetched (\"id\", \"labels\", \"image\", \"runtime\", \"spec\", \"snapshotter\", \"snapshot_key\", \"created_at\", \"updated_at\", \"extensions\")",
+		},
+	},
 	Action: func(context *cli.Context) error {
 		id := context.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
+		attr := context.StringSlice("attributes")
+
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
@@ -257,7 +265,8 @@ var infoCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		info, err := container.Info(ctx)
+		infoOpts := containerd.WithInfoFieldmasks(attr)
+		info, err := container.Info(ctx, infoOpts)
 		if err != nil {
 			return err
 		}
