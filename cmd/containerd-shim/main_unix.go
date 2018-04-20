@@ -124,6 +124,7 @@ func executeShim() error {
 			WorkDir:       workdirFlag,
 			Criu:          criuFlag,
 			SystemdCgroup: systemdCgroupFlag,
+			Debug:         debugFlag,
 			RuntimeRoot:   runtimeRootFlag,
 		},
 		&remoteEventsPublisher{address: addressFlag},

@@ -63,6 +63,7 @@ type Config struct {
 	Criu          string
 	RuntimeRoot   string
 	SystemdCgroup bool
+	Debug         bool
 }
 
 // NewService returns a new shim service that can be used via GRPC
@@ -129,6 +130,7 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (*sh
 		s.config.Namespace,
 		s.config.Criu,
 		s.config.SystemdCgroup,
+		s.config.Debug,
 		s.platform,
 		&proc.CreateConfig{
 			ID:               r.ID,
