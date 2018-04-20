@@ -1434,6 +1434,17 @@ func TestContainerInfo(t *testing.T) {
 	if info.ID != container.ID() {
 		t.Fatalf("info.ID=%s != container.ID()=%s", info.ID, container.ID())
 	}
+
+	info, err = container.Info(ctx, WithInfoFieldmasks([]string{"id"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.ID != container.ID() {
+		t.Fatalf("info.ID=%s != container.ID()=%s", info.ID, container.ID())
+	}
+	if info.Image != "" {
+		t.Fatalf("info.Image must be empty")
+	}
 }
 
 func TestContainerLabels(t *testing.T) {

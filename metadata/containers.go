@@ -45,7 +45,7 @@ func NewContainerStore(tx *bolt.Tx) containers.Store {
 	}
 }
 
-func (s *containerStore) Get(ctx context.Context, id string) (containers.Container, error) {
+func (s *containerStore) Get(ctx context.Context, id string, fieldmasks ...string) (containers.Container, error) {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return containers.Container{}, err
@@ -61,7 +61,64 @@ func (s *containerStore) Get(ctx context.Context, id string) (containers.Contain
 		return containers.Container{}, errors.Wrapf(err, "failed to read container %q", id)
 	}
 
-	return container, nil
+	if len(fieldmasks) == 0 {
+		return container, nil
+	}
+
+	ctrFieldMasked := new(containers.Container)
+	for _, path := range fieldmasks {
+		if strings.HasPrefix(path, "labels.") {
+			if ctrFieldMasked.Labels == nil {
+				ctrFieldMasked.Labels = map[string]string{}
+			}
+			key := strings.TrimPrefix(path, "labels.")
+			ctrFieldMasked.Labels[key] = container.Labels[key]
+			continue
+		}
+		if strings.HasPrefix(path, "specs.") {
+			if ctrFieldMasked.Spec == nil {
+				ctrFieldMasked.Spec = new(types.Any)
+			}
+			ctrFieldMasked.Spec = container.Spec
+			continue
+		}
+
+		if strings.HasPrefix(path, "extensions.") {
+			if ctrFieldMasked.Extensions == nil {
+				ctrFieldMasked.Extensions = map[string]types.Any{}
+			}
+			key := strings.TrimPrefix(path, "extensions.")
+			ctrFieldMasked.Extensions[key] = container.Extensions[key]
+			continue
+		}
+
+		switch path {
+		case "id":
+			ctrFieldMasked.ID = container.ID
+		case "labels":
+			ctrFieldMasked.Labels = container.Labels
+		case "image":
+			ctrFieldMasked.Image = container.Image
+		case "runtime":
+			ctrFieldMasked.Runtime = container.Runtime
+		case "spec":
+			ctrFieldMasked.Spec = container.Spec
+		case "snapshotter":
+			ctrFieldMasked.Snapshotter = container.Snapshotter
+		case "snapshot_key":
+			ctrFieldMasked.SnapshotKey = container.SnapshotKey
+		case "created_at":
+			ctrFieldMasked.CreatedAt = container.CreatedAt
+		case "updated_at":
+			ctrFieldMasked.UpdatedAt = container.UpdatedAt
+		case "extensions":
+			ctrFieldMasked.Extensions = container.Extensions
+		default:
+			return containers.Container{}, errors.Wrapf(errdefs.ErrInvalidArgument, "cannot update %q field on %q", path, container.ID)
+		}
+
+	}
+	return *ctrFieldMasked, nil
 }
 
 func (s *containerStore) List(ctx context.Context, fs ...string) ([]containers.Container, error) {

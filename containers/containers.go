@@ -86,7 +86,7 @@ type RuntimeInfo struct {
 
 // Store interacts with the underlying container storage
 type Store interface {
-	Get(ctx context.Context, id string) (Container, error)
+	Get(ctx context.Context, id string, fieldmask ...string) (Container, error)
 
 	// List returns containers that match one or more of the provided filters.
 	List(ctx context.Context, filters ...string) ([]Container, error)

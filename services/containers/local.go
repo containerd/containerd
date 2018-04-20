@@ -67,13 +67,18 @@ func (l *local) Get(ctx context.Context, req *api.GetContainerRequest, _ ...grpc
 	var resp api.GetContainerResponse
 
 	return &resp, errdefs.ToGRPC(l.withStoreView(ctx, func(ctx context.Context, store containers.Store) error {
-		container, err := store.Get(ctx, req.ID)
+		var fieldmasks []string
+		if req.FieldMask != nil && len(req.FieldMask.Paths) > 0 {
+			for _, mask := range req.FieldMask.Paths {
+				fieldmasks = append(fieldmasks, mask)
+			}
+		}
+		container, err := store.Get(ctx, req.ID, fieldmasks...)
 		if err != nil {
 			return err
 		}
 		containerpb := containerToProto(&container)
 		resp.Container = containerpb
-
 		return nil
 	}))
 }

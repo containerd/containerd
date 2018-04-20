@@ -42,9 +42,16 @@ func NewRemoteContainerStore(client containersapi.ContainersClient) containers.S
 	}
 }
 
-func (r *remoteContainers) Get(ctx context.Context, id string) (containers.Container, error) {
+func (r *remoteContainers) Get(ctx context.Context, id string, fieldmask ...string) (containers.Container, error) {
+	var fieldMask *ptypes.FieldMask
+	if len(fieldmask) > 0 {
+		fieldMask = &ptypes.FieldMask{
+			Paths: fieldmask,
+		}
+	}
 	resp, err := r.client.Get(ctx, &containersapi.GetContainerRequest{
-		ID: id,
+		ID:        id,
+		FieldMask: fieldMask,
 	})
 	if err != nil {
 		return containers.Container{}, errdefs.FromGRPC(err)

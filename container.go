@@ -39,7 +39,7 @@ type Container interface {
 	// ID identifies the container
 	ID() string
 	// Info returns the underlying container record type
-	Info(context.Context) (containers.Container, error)
+	Info(context.Context, ...InfoOpts) (containers.Container, error)
 	// Delete removes the container
 	Delete(context.Context, ...DeleteOpts) error
 	// NewTask creates a new task based on the container metadata
@@ -76,8 +76,9 @@ func containerFromRecord(client *Client, c containers.Container) *container {
 var _ = (Container)(&container{})
 
 type container struct {
-	client *Client
-	id     string
+	client     *Client
+	id         string
+	fieldmasks []string
 }
 
 // ID returns the container's unique id
@@ -85,7 +86,12 @@ func (c *container) ID() string {
 	return c.id
 }
 
-func (c *container) Info(ctx context.Context) (containers.Container, error) {
+func (c *container) Info(ctx context.Context, opts ...InfoOpts) (containers.Container, error) {
+	for _, o := range opts {
+		if err := o(c); err != nil {
+			return containers.Container{}, err
+		}
+	}
 	return c.get(ctx)
 }
 
@@ -299,7 +305,7 @@ func (c *container) loadTask(ctx context.Context, ioAttach cio.Attach) (Task, er
 }
 
 func (c *container) get(ctx context.Context) (containers.Container, error) {
-	return c.client.ContainerService().Get(ctx, c.id)
+	return c.client.ContainerService().Get(ctx, c.id, c.fieldmasks...)
 }
 
 // get the existing fifo paths from the task information stored by the daemon
