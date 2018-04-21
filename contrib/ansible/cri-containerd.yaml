@@ -46,7 +46,7 @@
     - name: "Add runtime args in kubelet conf"
       lineinfile:
         dest: "/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
-        line: "Environment=\"KUBELET_EXTRA_ARGS= --runtime-cgroups=/system.slice/containerd.service --container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=/run/containerd/containerd.sock\""
+        line: "Environment=\"KUBELET_EXTRA_ARGS= --runtime-cgroups=/system.slice/containerd.service --container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=unix:///run/containerd/containerd.sock\""
         insertafter: '\[Service\]'
       when: check_args.stdout == ""
     
@@ -57,5 +57,5 @@
     - name: "Pre-pull pause container image"
       shell: |
         /usr/local/bin/ctr pull k8s.gcr.io/pause:3.1
-        /usr/local/bin/crictl --runtime-endpoint /run/containerd/containerd.sock \
+        /usr/local/bin/crictl --runtime-endpoint unix:///run/containerd/containerd.sock \
         pull k8s.gcr.io/pause:3.1

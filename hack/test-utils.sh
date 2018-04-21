@@ -27,7 +27,7 @@ if [ -f "${CONTAINERD_CONFIG_FILE}" ]; then
   CONTAINERD_FLAGS+="--config ${CONTAINERD_CONFIG_FILE} "
 fi
 
-CONTAINERD_SOCK=/run/containerd/containerd.sock
+CONTAINERD_SOCK=unix:///run/containerd/containerd.sock
 
 containerd_pid=
 
