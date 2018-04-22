@@ -659,7 +659,7 @@ func TestApplyTar(t *testing.T) {
 					return err
 				}
 				if _, err := os.Stat(p); err != nil {
-					return errors.Wrapf(err, "failure checking existance for %v", d)
+					return errors.Wrapf(err, "failure checking existence for %v", d)
 				}
 			}
 			return nil

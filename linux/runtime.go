@@ -200,7 +200,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 			log.G(ctx).WithField("id", id).Info("shim reaped")
 			t, err := r.tasks.Get(ctx, id)
 			if err != nil {
-				// Task was never started or was already sucessfully deleted
+				// Task was never started or was already successfully deleted
 				return
 			}
 			lc := t.(*Task)

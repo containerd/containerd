@@ -594,7 +594,7 @@ func testParents(ctx context.Context, t *testing.T, ms *MetaStore) {
 				parents []string
 			)
 			if info.Kind == snapshots.KindCommitted {
-				// When commited, create view and resolve from view
+				// When committed, create view and resolve from view
 				nid := fmt.Sprintf("test-%s-%d", tc.Name, i)
 				s, err := CreateSnapshot(ctx, snapshots.KindView, nid, name)
 				if err != nil {
