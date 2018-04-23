@@ -136,10 +136,7 @@ func Copy(ctx context.Context, cw Writer, r io.Reader, size int64, expected dige
 		}
 	}
 
-	buf := bufPool.Get().(*[]byte)
-	defer bufPool.Put(buf)
-
-	if _, err := io.CopyBuffer(cw, r, *buf); err != nil {
+	if _, err := copyWithBuffer(cw, r); err != nil {
 		return err
 	}
 
@@ -160,11 +157,7 @@ func CopyReaderAt(cw Writer, ra ReaderAt, n int64) error {
 		return err
 	}
 
-	buf := bufPool.Get().(*[]byte)
-	defer bufPool.Put(buf)
-
-	_, err = io.CopyBuffer(cw, io.NewSectionReader(ra, ws.Offset, n), *buf)
-
+	_, err = copyWithBuffer(cw, io.NewSectionReader(ra, ws.Offset, n))
 	return err
 }
 
@@ -195,10 +188,7 @@ func seekReader(r io.Reader, offset, size int64) (io.Reader, error) {
 	}
 
 	// well then, let's just discard up to the offset
-	buf := bufPool.Get().(*[]byte)
-	defer bufPool.Put(buf)
-
-	n, err := io.CopyBuffer(ioutil.Discard, io.LimitReader(r, offset), *buf)
+	n, err := copyWithBuffer(ioutil.Discard, io.LimitReader(r, offset))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to discard to offset")
 	}
@@ -207,4 +197,11 @@ func seekReader(r io.Reader, offset, size int64) (io.Reader, error) {
 	}
 
 	return r, nil
+}
+
+func copyWithBuffer(dst io.Writer, src io.Reader) (written int64, err error) {
+	buf := bufPool.Get().(*[]byte)
+	written, err = io.CopyBuffer(dst, src, *buf)
+	bufPool.Put(buf)
+	return
 }
