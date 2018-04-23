@@ -51,7 +51,7 @@ var (
 	criPluginClient  api.CRIPluginServiceClient
 )
 
-var criEndpoint = flag.String("cri-endpoint", "/run/containerd/containerd.sock", "The endpoint of cri plugin.")
+var criEndpoint = flag.String("cri-endpoint", "unix:///run/containerd/containerd.sock", "The endpoint of cri plugin.")
 var criRoot = flag.String("cri-root", "/var/lib/containerd/io.containerd.grpc.v1.cri", "The root directory of cri plugin.")
 
 func init() {

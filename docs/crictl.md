@@ -22,8 +22,8 @@ so you don't have to repeatedly specify the runtime sock used to connect crictl
 to the container runtime:
 ```console
 $ cat /etc/crictl.yaml
-runtime-endpoint: /run/containerd/containerd.sock
-image-endpoint: /run/containerd/containerd.sock
+runtime-endpoint: unix:///run/containerd/containerd.sock
+image-endpoint: unix:///run/containerd/containerd.sock
 timeout: 10
 debug: true
 ```
@@ -188,7 +188,7 @@ $ crictl info
     "sandboxImage": "k8s.gcr.io/pause:3.1",
     "statsCollectPeriod": 10,
     "containerdRootDir": "/var/lib/containerd",
-    "containerdEndpoint": "/run/containerd/containerd.sock",
+    "containerdEndpoint": "unix:///run/containerd/containerd.sock",
     "rootDir": "/var/lib/containerd/io.containerd.grpc.v1.cri",
     "stateDir": "/run/containerd/io.containerd.grpc.v1.cri",
   },

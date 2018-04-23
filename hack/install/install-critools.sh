@@ -33,7 +33,7 @@ make
 ${SUDO} make install -e BINDIR=${CRITOOL_DIR} GOPATH=${GOPATH}
 ${SUDO} mkdir -p ${CRICTL_CONFIG_DIR}
 ${SUDO} bash -c 'cat >'${CRICTL_CONFIG_DIR}'/crictl.yaml <<EOF
-runtime-endpoint: /run/containerd/containerd.sock
+runtime-endpoint: unix:///run/containerd/containerd.sock
 EOF'
 
 # Clean the tmp GOPATH dir.
