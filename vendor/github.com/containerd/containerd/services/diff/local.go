@@ -34,7 +34,7 @@ type config struct {
 	// Order is the order of preference in which to try diff algorithms, the
 	// first differ which is supported is used.
 	// Note when multiple differs may be supported, this order will be
-	// respected for which is choosen. Each differ should return the same
+	// respected for which is chosen. Each differ should return the same
 	// correct output, allowing any ordering to be used to prefer
 	// more optimimal implementations.
 	Order []string `toml:"default"`

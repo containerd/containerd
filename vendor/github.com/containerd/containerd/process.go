@@ -81,7 +81,7 @@ func (s ExitStatus) ExitTime() time.Time {
 	return s.exitedAt
 }
 
-// Error returns the error, if any, that occured while waiting for the
+// Error returns the error, if any, that occurred while waiting for the
 // process.
 func (s ExitStatus) Error() error {
 	return s.err

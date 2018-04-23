@@ -320,7 +320,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 		childrenHandler := images.ChildrenHandler(store)
 		// Set any children labels for that content
 		childrenHandler = images.SetChildrenLabels(store, childrenHandler)
-		// Filter childen by platforms
+		// Filter children by platforms
 		childrenHandler = images.FilterPlatforms(childrenHandler, pullCtx.Platforms...)
 
 		handler = images.Handlers(append(pullCtx.BaseHandlers,
