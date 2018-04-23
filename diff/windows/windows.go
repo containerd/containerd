@@ -61,7 +61,7 @@ func init() {
 	})
 }
 
-// CompareApplier handles both comparision and
+// CompareApplier handles both comparison and
 // application of layer diffs.
 type CompareApplier interface {
 	diff.Applier

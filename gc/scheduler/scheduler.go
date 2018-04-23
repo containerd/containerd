@@ -315,7 +315,7 @@ func (s *gcScheduler) run(ctx context.Context) {
 			// Reschedule garbage collection for same duration + 1 second
 			schedC, nextCollection = schedule(nextCollection.Sub(*lastCollection) + time.Second)
 
-			// Update last collection time even though failure occured
+			// Update last collection time even though failure occurred
 			lastCollection = &last
 
 			for _, w := range s.waiters {

@@ -543,7 +543,7 @@ func checkRemoveIntermediateSnapshot(ctx context.Context, t *testing.T, snapshot
 // baseTestSnapshots creates a base set of snapshots for tests, each snapshot is empty
 // Tests snapshots:
 //  c1 - committed snapshot, no parent
-//  c2 - commited snapshot, c1 is parent
+//  c2 - committed snapshot, c1 is parent
 //  a1 - active snapshot, c2 is parent
 //  a1 - active snapshot, no parent
 //  v1 - view snapshot, v1 is parent
@@ -757,7 +757,7 @@ func checkRemove(ctx context.Context, t *testing.T, snapshotter snapshots.Snapsh
 	if err := snapshotter.Remove(ctx, "committed-1"); err != nil {
 		t.Fatal(err)
 	}
-	if err := snapshotter.Commit(ctx, "commited-1", "reuse-1", opt); err != nil {
+	if err := snapshotter.Commit(ctx, "committed-1", "reuse-1", opt); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -769,7 +769,7 @@ func checkSnapshotterViewReadonly(ctx context.Context, t *testing.T, snapshotter
 	if _, err := snapshotter.Prepare(ctx, preparing, "", opt); err != nil {
 		t.Fatal(err)
 	}
-	committed := filepath.Join(work, "commited")
+	committed := filepath.Join(work, "committed")
 	if err := snapshotter.Commit(ctx, committed, preparing, opt); err != nil {
 		t.Fatal(err)
 	}
