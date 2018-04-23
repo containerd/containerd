@@ -121,7 +121,7 @@ sudo containerd
 ```
 2. From the Kubernetes project directory startup a local cluster using `containerd`:
 ```bash
-CONTAINER_RUNTIME=remote CONTAINER_RUNTIME_ENDPOINT='/run/containerd/containerd.sock' ./hack/local-up-cluster.sh
+CONTAINER_RUNTIME=remote CONTAINER_RUNTIME_ENDPOINT='unix:///run/containerd/containerd.sock' ./hack/local-up-cluster.sh
 ```
 ### Test
 See [here](./docs/testing.md) for information about test.
