@@ -42,38 +42,36 @@ var Command = cli.Command{
 		defer cancel()
 		eventsClient := client.EventService()
 		eventsCh, errCh := eventsClient.Subscribe(ctx, context.Args()...)
-		for {
+		open := true
+		for open {
 			var e *events.Envelope
 			select {
-			case evt, closed := <-eventsCh:
-				if closed {
-					return nil
-				}
-				e = evt
-			case err := <-errCh:
+			case e = <-eventsCh:
+			case err, open = <-errCh:
 				return err
 			}
-
-			var out []byte
-			if e.Event != nil {
-				v, err := typeurl.UnmarshalAny(e.Event)
-				if err != nil {
+			if e != nil {
+				var out []byte
+				if e.Event != nil {
+					v, err := typeurl.UnmarshalAny(e.Event)
+					if err != nil {
+						return err
+					}
+					out, err = json.Marshal(v)
+					if err != nil {
+						return err
+					}
+				}
+				if _, err := fmt.Println(
+					e.Timestamp,
+					e.Namespace,
+					e.Topic,
+					string(out),
+				); err != nil {
 					return err
 				}
-				out, err = json.Marshal(v)
-				if err != nil {
-					return err
-				}
-			}
-
-			if _, err := fmt.Println(
-				e.Timestamp,
-				e.Namespace,
-				e.Topic,
-				string(out),
-			); err != nil {
-				return err
 			}
 		}
+		return nil
 	},
 }
