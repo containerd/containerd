@@ -19,11 +19,10 @@
 package shim
 
 import (
+	gocontext "context"
 	"fmt"
 	"io/ioutil"
 	"net"
-
-	gocontext "context"
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/cmd/ctr/commands"

@@ -17,6 +17,8 @@
 package introspection
 
 import (
+	context "context"
+
 	api "github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
@@ -24,7 +26,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/gogo/googleapis/google/rpc"
 	ptypes "github.com/gogo/protobuf/types"
-	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/status"
 )
