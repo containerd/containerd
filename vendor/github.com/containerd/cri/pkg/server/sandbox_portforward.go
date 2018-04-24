@@ -53,8 +53,23 @@ func (c *criService) portForward(id string, port int32, stream io.ReadWriteClose
 	if err != nil {
 		return errors.Wrapf(err, "failed to find sandbox %q in store", id)
 	}
-	if s.NetNS == nil || s.NetNS.Closed() {
-		return errors.Errorf("network namespace for sandbox %q is closed", id)
+	var netNSDo func(func(ns.NetNS) error) error
+	// netNSPath is the network namespace path for logging.
+	var netNSPath string
+	securityContext := s.Config.GetLinux().GetSecurityContext()
+	hostNet := securityContext.GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE
+	if !hostNet {
+		if s.NetNS == nil || s.NetNS.Closed() {
+			return errors.Errorf("network namespace for sandbox %q is closed", id)
+		}
+		netNSDo = s.NetNS.GetNs().Do
+		netNSPath = s.NetNS.GetPath()
+	} else {
+		// Run the function directly for host network.
+		netNSDo = func(do func(_ ns.NetNS) error) error {
+			return do(nil)
+		}
+		netNSPath = "host"
 	}
 
 	socat, err := exec.LookPath("socat")
@@ -65,8 +80,8 @@ func (c *criService) portForward(id string, port int32, stream io.ReadWriteClose
 	// Check https://linux.die.net/man/1/socat for meaning of the options.
 	args := []string{socat, "-", fmt.Sprintf("TCP4:localhost:%d", port)}
 
-	logrus.Infof("Executing port forwarding command %q in network namespace %q", strings.Join(args, " "), s.NetNS.GetPath())
-	err = s.NetNS.GetNs().Do(func(_ ns.NetNS) error {
+	logrus.Infof("Executing port forwarding command %q in network namespace %q", strings.Join(args, " "), netNSPath)
+	err = netNSDo(func(_ ns.NetNS) error {
 		cmd := exec.Command(args[0], args[1:]...)
 		cmd.Stdout = stream
 
@@ -95,12 +110,12 @@ func (c *criService) portForward(id string, port int32, stream io.ReadWriteClose
 		}()
 
 		if err := cmd.Run(); err != nil {
-			return errors.Errorf("nsenter command returns error: %v, stderr: %q", err, stderr.String())
+			return errors.Errorf("socat command returns error: %v, stderr: %q", err, stderr.String())
 		}
 		return nil
 	})
 	if err != nil {
-		return errors.Wrapf(err, "failed to execute portforward in network namespace %s", s.NetNS.GetPath())
+		return errors.Wrapf(err, "failed to execute portforward in network namespace %q", netNSPath)
 	}
 	logrus.Infof("Finish port forwarding for %q port %d", id, port)
 

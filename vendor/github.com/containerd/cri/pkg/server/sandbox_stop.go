@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
+	"golang.org/x/sys/unix"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
@@ -94,7 +95,9 @@ func (c *criService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandb
 	return &runtime.StopPodSandboxResponse{}, nil
 }
 
-// stopSandboxContainer kills and deletes sandbox container.
+// stopSandboxContainer kills the sandbox container.
+// `task.Delete` is not called here because it will be called when
+// the event monitor handles the `TaskExit` event.
 func (c *criService) stopSandboxContainer(ctx context.Context, sandbox sandboxstore.Sandbox) error {
 	container := sandbox.Container
 	task, err := container.Task(ctx, nil)
@@ -105,10 +108,10 @@ func (c *criService) stopSandboxContainer(ctx context.Context, sandbox sandboxst
 		return errors.Wrap(err, "failed to get sandbox container")
 	}
 
-	// Delete the sandbox container from containerd.
-	_, err = task.Delete(ctx, containerd.WithProcessKill)
+	// Kill the sandbox container.
+	err = task.Kill(ctx, unix.SIGKILL, containerd.WithKillAll)
 	if err != nil && !errdefs.IsNotFound(err) {
-		return errors.Wrap(err, "failed to delete sandbox container")
+		return errors.Wrap(err, "failed to kill sandbox container")
 	}
 
 	return c.waitSandboxStop(ctx, sandbox, killContainerTimeout)
