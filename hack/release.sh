@@ -50,7 +50,7 @@ download_containerd() {
   local -r tarball="${tmppath}/containerd.tar.gz"
   local -r url="https://github.com/containerd/containerd/releases/download/v${VERSION}/containerd-${VERSION}.linux-amd64.tar.gz"
   wget -O "${tarball}" "${url}"
-  tar -C "${destdir}/usr/local/bin" -xzf "${tarball}"
+  tar -C "${destdir}/usr/local" -xzf "${tarball}"
   rm -rf "${tmppath}"
 }
 
@@ -91,7 +91,7 @@ EOF
 
 # Create release tar
 tarball=${BUILD_DIR}/${TARBALL}
-tar -zcvf ${tarball} -C ${destdir} .
+tar -zcvf ${tarball} -C ${destdir} . --owner=0 --group=0
 checksum=$(sha256 ${tarball})
 echo "sha256sum: ${checksum} ${tarball}"
 echo ${checksum} > ${tarball}.sha256
