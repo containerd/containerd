@@ -28,27 +28,14 @@ set -o pipefail
 
 cd $(dirname "${BASH_SOURCE[0]}")
 
-# INSTALL_CNI indicates whether to install CNI. CNI installation
-# makes sense for local testing, but doesn't make sense for cluster
-# setup, because CNI daemonset is usually used to deploy CNI binaries
-# and configurations in cluster.
-INSTALL_CNI=${INSTALL_CNI:-true}
-
-# INSTALL_CNI indicates whether to install CNI config.
-INSTALL_CNI_CONFIG=${INSTALL_CNI_CONFIG:-true}
-
 # Install runc
 ./install-runc.sh
 
 # Install cni
-if ${INSTALL_CNI}; then
-  ./install-cni.sh
-fi
+./install-cni.sh
 
 # Install cni config
-if ${INSTALL_CNI_CONFIG}; then
-  ./install-cni-config.sh
-fi
+./install-cni-config.sh
 
 # Install containerd
 ./install-containerd.sh

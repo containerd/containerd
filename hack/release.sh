@@ -31,6 +31,8 @@ INCLUDE_CNI=${INCLUDE_CNI:-false}
 # CUSTOM_CONTAINERD indicates whether to install customized containerd
 # for CI test.
 CUSTOM_CONTAINERD=${CUSTOM_CONTAINERD:-false}
+# OFFICIAL_RELEASE indicates whether to use official containerd release.
+OFFICIAL_RELEASE=${OFFICIAL_RELEASE:-false}
 
 destdir=${BUILD_DIR}/release-stage
 
@@ -42,9 +44,35 @@ fi
 # Remove release-stage directory to avoid including old files.
 rm -rf ${destdir}
 
+# download_containerd downloads containerd from official release.
+download_containerd() {
+  local -r tmppath="$(mktemp -d /tmp/download-containerd.XXXX)"
+  local -r tarball="${tmppath}/containerd.tar.gz"
+  local -r url="https://github.com/containerd/containerd/releases/download/v${VERSION}/containerd-${VERSION}.linux-amd64.tar.gz"
+  wget -O "${tarball}" "${url}"
+  tar -C "${destdir}/usr/local/bin" -xzf "${tarball}"
+  rm -rf "${tmppath}"
+}
+
 # Install dependencies into release stage.
-NOSUDO=true INSTALL_CNI=${INCLUDE_CNI} INSTALL_CNI_CONFIG=false DESTDIR=${destdir} \
-  ./hack/install/install-deps.sh
+# Install runc
+NOSUDO=true DESTDIR=${destdir} ./hack/install/install-runc.sh
+
+if ${INCLUDE_CNI}; then
+  # Install cni
+  NOSUDO=true DESTDIR=${destdir} ./hack/install/install-cni.sh
+fi
+
+# Install critools
+NOSUDO=true DESTDIR=${destdir} ./hack/install/install-critools.sh
+
+# Install containerd
+if $OFFICIAL_RELEASE; then
+  download_containerd
+else
+  # Build containerd from source
+  NOSUDO=true DESTDIR=${destdir} ./hack/install/install-containerd.sh
+fi
 
 if ${CUSTOM_CONTAINERD}; then
   make install -e DESTDIR=${destdir}

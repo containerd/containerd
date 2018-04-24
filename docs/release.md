@@ -19,9 +19,9 @@ Publish the release tarball `cri-containerd-${CONTAINERD_VERSION}.${OS}-${ARCH}.
 git checkout ${RELEASE_VERSION}
 
 # Publish the release tarball without cni.
-DEPLOY_BUCKET=cri-containerd-release make push TARBALL_PREFIX=cri-containerd VERSION=${CONTAINERD_VERSION}
+DEPLOY_BUCKET=cri-containerd-release make push TARBALL_PREFIX=cri-containerd OFFICIAL_RELEASE=true VERSION=${CONTAINERD_VERSION}
 
 # Publish the release tarball with cni.
-DEPLOY_BUCKET=cri-containerd-release make push TARBALL_PREFIX=cri-containerd-cni INCLUDE_CNI=true VERSION=${CONTAINERD_VERSION}
+DEPLOY_BUCKET=cri-containerd-release make push TARBALL_PREFIX=cri-containerd-cni OFFICIAL_RELEASE=true INCLUDE_CNI=true VERSION=${CONTAINERD_VERSION}
 ```
 ## Step 6: Update release note with release tarball information
