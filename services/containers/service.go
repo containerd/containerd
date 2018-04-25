@@ -17,12 +17,13 @@
 package containers
 
 import (
+	"context"
+
 	api "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 

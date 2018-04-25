@@ -17,11 +17,11 @@
 package server
 
 import (
+	"context"
 	"testing"
 
 	"github.com/gotestyourself/gotestyourself/assert"
 	is "github.com/gotestyourself/gotestyourself/assert/cmp"
-	"golang.org/x/net/context"
 )
 
 func TestNewErrorsWithSamePathForRootAndState(t *testing.T) {

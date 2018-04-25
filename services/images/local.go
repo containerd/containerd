@@ -17,7 +17,7 @@
 package images
 
 import (
-	gocontext "context"
+	"context"
 
 	eventstypes "github.com/containerd/containerd/api/events"
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
@@ -30,7 +30,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
 	ptypes "github.com/gogo/protobuf/types"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -64,7 +63,7 @@ func init() {
 }
 
 type gcScheduler interface {
-	ScheduleAndWait(gocontext.Context) (gc.Stats, error)
+	ScheduleAndWait(context.Context) (gc.Stats, error)
 }
 
 type local struct {

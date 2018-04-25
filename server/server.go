@@ -17,6 +17,7 @@
 package server
 
 import (
+	"context"
 	"expvar"
 	"io"
 	"net"
@@ -37,7 +38,6 @@ import (
 	metrics "github.com/docker/go-metrics"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 
 	"google.golang.org/grpc"
 )

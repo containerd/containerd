@@ -19,6 +19,8 @@
 package cgroups
 
 import (
+	"context"
+
 	"github.com/containerd/cgroups"
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/events"
@@ -30,7 +32,6 @@ import (
 	"github.com/containerd/containerd/runtime"
 	metrics "github.com/docker/go-metrics"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 )
 
 // Config for the cgroups monitor
