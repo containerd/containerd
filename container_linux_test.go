@@ -254,6 +254,76 @@ func TestDaemonRestart(t *testing.T) {
 	<-statusC
 }
 
+func TestContainerPTY(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), oci.WithTTY, withProcessArgs("echo", "hello")), WithNewSnapshot(id, image))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	direct, err := newDirectIOWithTerminal(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer direct.Delete()
+	var (
+		wg  sync.WaitGroup
+		buf = bytes.NewBuffer(nil)
+	)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		io.Copy(buf, direct.Stdout)
+	}()
+
+	task, err := container.NewTask(ctx, direct.IOCreate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	status, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	<-status
+	wg.Wait()
+
+	if err := direct.Close(); err != nil {
+		t.Error(err)
+	}
+
+	out := buf.String()
+	if !strings.ContainsAny(fmt.Sprintf("%#q", out), `\x00`) {
+		t.Fatal(`expected \x00 in output`)
+	}
+}
+
 func TestContainerAttach(t *testing.T) {
 	t.Parallel()
 
@@ -290,7 +360,7 @@ func TestContainerAttach(t *testing.T) {
 
 	expected := "hello" + newLine
 
-	direct, err := newDirectIO(ctx)
+	direct, err := newDirectIOStandard(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -359,12 +429,24 @@ func TestContainerAttach(t *testing.T) {
 	}
 }
 
-func newDirectIO(ctx context.Context) (*directIO, error) {
+func newDirectIOStandard(ctx context.Context) (*directIO, error) {
+	return newDirectIO(ctx, false)
+}
+
+func newDirectIOWithTerminal(ctx context.Context) (*directIO, error) {
+	return newDirectIO(ctx, true)
+}
+
+func newDirectIO(ctx context.Context, terminal bool) (*directIO, error) {
 	fifos, err := cio.NewFIFOSetInDir("", "", false)
 	if err != nil {
 		return nil, err
 	}
-	dio, err := cio.NewDirectIO(ctx, fifos)
+	f := cio.NewDirectIO
+	if terminal {
+		f = cio.NewDirectIOWithTerminal
+	}
+	dio, err := f(ctx, fifos)
 	if err != nil {
 		return nil, err
 	}
@@ -426,7 +508,7 @@ func TestContainerUsername(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	direct, err := newDirectIO(ctx)
+	direct, err := newDirectIOStandard(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -501,7 +583,7 @@ func testContainerUser(t *testing.T, userstr, expectedOutput string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	direct, err := newDirectIO(ctx)
+	direct, err := newDirectIOStandard(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -586,7 +668,7 @@ func TestContainerAttachProcess(t *testing.T) {
 	expected := "hello" + newLine
 
 	// creating IO early for easy resource cleanup
-	direct, err := newDirectIO(ctx)
+	direct, err := newDirectIOStandard(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -693,7 +775,7 @@ func TestContainerUserID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	direct, err := newDirectIO(ctx)
+	direct, err := newDirectIOStandard(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
