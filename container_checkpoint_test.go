@@ -1,4 +1,4 @@
-// +build !windows
+// +build linux
 
 /*
    Copyright The containerd Authors.
@@ -19,11 +19,121 @@
 package containerd
 
 import (
+	"bytes"
+	"fmt"
+	"io"
+	"strings"
+	"sync"
 	"syscall"
 	"testing"
 
 	"github.com/containerd/containerd/oci"
 )
+
+func TestCheckpointRestorePTY(t *testing.T) {
+	if !supportsCriu {
+		t.Skip("system does not have criu installed")
+	}
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err := client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	container, err := client.NewContainer(ctx, id,
+		WithNewSpec(oci.WithImageConfig(image),
+			oci.WithProcessArgs("sh", "-c", "read A; echo z${A}z"),
+			oci.WithTTY),
+		WithNewSnapshot(id, image))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	direct, err := newDirectIOWithTerminal(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer direct.Delete()
+
+	task, err := container.NewTask(ctx, direct.IOCreate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	checkpoint, err := task.Checkpoint(ctx, WithExit)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	<-statusC
+
+	if _, err := task.Delete(ctx); err != nil {
+		t.Fatal(err)
+	}
+	direct.Delete()
+	direct, err = newDirectIOWithTerminal(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var (
+		wg  sync.WaitGroup
+		buf = bytes.NewBuffer(nil)
+	)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		io.Copy(buf, direct.Stdout)
+	}()
+
+	if task, err = container.NewTask(ctx, direct.IOCreate,
+		WithTaskCheckpoint(checkpoint)); err != nil {
+		t.Fatal(err)
+	}
+
+	statusC, err = task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	direct.Stdin.Write([]byte("hello\n"))
+	<-statusC
+	wg.Wait()
+
+	if err := direct.Close(); err != nil {
+		t.Error(err)
+	}
+
+	out := buf.String()
+	if !strings.Contains(fmt.Sprintf("%#q", out), `zhelloz`) {
+		t.Fatalf(`expected \x00 in output: %s`, out)
+	}
+}
 
 func TestCheckpointRestore(t *testing.T) {
 	if !supportsCriu {
