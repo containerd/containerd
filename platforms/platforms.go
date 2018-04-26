@@ -146,7 +146,6 @@ type matcher struct {
 func (m *matcher) Match(platform specs.Platform) bool {
 	normalized := Normalize(platform)
 	return m.OS == normalized.OS &&
-		m.Architecture == normalized.Architecture &&
 		m.Variant == normalized.Variant
 }
 
