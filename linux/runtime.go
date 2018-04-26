@@ -266,7 +266,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 		return nil, errdefs.FromGRPC(err)
 	}
 	t, err := newTask(id, namespace, int(cr.Pid), s, r.monitor, r.events,
-		proc.NewRunc(ropts.RuntimeRoot, sopts.Bundle, namespace, rt, ropts.CriuPath, ropts.SystemdCgroup))
+		proc.NewRunc(ropts.RuntimeRoot, sopts.Bundle, namespace, rt, ropts.CriuPath, ropts.SystemdCgroup, ropts.Debug))
 	if err != nil {
 		return nil, err
 	}
@@ -423,7 +423,7 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 		}
 
 		t, err := newTask(id, ns, pid, s, r.monitor, r.events,
-			proc.NewRunc(ropts.RuntimeRoot, bundle.path, ns, ropts.Runtime, ropts.CriuPath, ropts.SystemdCgroup))
+			proc.NewRunc(ropts.RuntimeRoot, bundle.path, ns, ropts.Runtime, ropts.CriuPath, ropts.SystemdCgroup, ropts.Debug))
 		if err != nil {
 			log.G(ctx).WithError(err).Error("loading task type")
 			continue

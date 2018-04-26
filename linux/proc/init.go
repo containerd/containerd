@@ -78,7 +78,7 @@ type Init struct {
 }
 
 // NewRunc returns a new runc instance for a process
-func NewRunc(root, path, namespace, runtime, criu string, systemd bool) *runc.Runc {
+func NewRunc(root, path, namespace, runtime, criu string, systemd, debug bool) *runc.Runc {
 	if root == "" {
 		root = RuncRoot
 	}
@@ -90,11 +90,12 @@ func NewRunc(root, path, namespace, runtime, criu string, systemd bool) *runc.Ru
 		Root:          filepath.Join(root, namespace),
 		Criu:          criu,
 		SystemdCgroup: systemd,
+		Debug:         debug,
 	}
 }
 
 // New returns a new init process
-func New(context context.Context, path, workDir, runtimeRoot, namespace, criu string, systemdCgroup bool, platform Platform, r *CreateConfig) (*Init, error) {
+func New(context context.Context, path, workDir, runtimeRoot, namespace, criu string, systemdCgroup, debug bool, platform Platform, r *CreateConfig) (*Init, error) {
 	var success bool
 
 	var options runctypes.CreateOptions
@@ -128,7 +129,7 @@ func New(context context.Context, path, workDir, runtimeRoot, namespace, criu st
 			return nil, errors.Wrapf(err, "failed to mount rootfs component %v", m)
 		}
 	}
-	runtime := NewRunc(runtimeRoot, path, namespace, r.Runtime, criu, systemdCgroup)
+	runtime := NewRunc(runtimeRoot, path, namespace, r.Runtime, criu, systemdCgroup, debug)
 	p := &Init{
 		id:       r.ID,
 		bundle:   r.Bundle,

@@ -136,6 +136,7 @@ func (b *bundle) shimConfig(namespace string, c *Config, runcOptions *runctypes.
 		criuPath      string
 		runtimeRoot   = c.RuntimeRoot
 		systemdCgroup bool
+		debug         bool
 	)
 	if runcOptions != nil {
 		criuPath = runcOptions.CriuPath
@@ -143,6 +144,7 @@ func (b *bundle) shimConfig(namespace string, c *Config, runcOptions *runctypes.
 		if runcOptions.RuntimeRoot != "" {
 			runtimeRoot = runcOptions.RuntimeRoot
 		}
+		debug = runcOptions.Debug
 	}
 	return shim.Config{
 		Path:          b.path,
@@ -151,5 +153,6 @@ func (b *bundle) shimConfig(namespace string, c *Config, runcOptions *runctypes.
 		Criu:          criuPath,
 		RuntimeRoot:   runtimeRoot,
 		SystemdCgroup: systemdCgroup,
+		Debug:         debug,
 	}
 }
