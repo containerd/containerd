@@ -23,7 +23,6 @@ import (
 	cnins "github.com/containernetworking/plugins/pkg/ns"
 	"github.com/docker/docker/pkg/symlink"
 	"github.com/pkg/errors"
-	"golang.org/x/sys/unix"
 
 	osinterface "github.com/containerd/cri/pkg/os"
 )
@@ -93,7 +92,7 @@ func (n *NetNS) Remove() error {
 		if err != nil {
 			return errors.Wrap(err, "failed to follow symlink")
 		}
-		if err := osinterface.Unmount(path, unix.MNT_DETACH); err != nil && !os.IsNotExist(err) {
+		if err := osinterface.Unmount(path); err != nil && !os.IsNotExist(err) {
 			return errors.Wrap(err, "failed to umount netns")
 		}
 		if err := os.RemoveAll(path); err != nil {
