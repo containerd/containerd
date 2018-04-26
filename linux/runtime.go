@@ -510,6 +510,7 @@ func (r *Runtime) getRuntime(ctx context.Context, ns, id string) (*runc.Runc, er
 		LogFormat:    runc.JSON,
 		PdeathSignal: unix.SIGKILL,
 		Root:         filepath.Join(root, ns),
+		Debug:        r.config.ShimDebug,
 	}, nil
 }
 
