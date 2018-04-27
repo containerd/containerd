@@ -605,7 +605,6 @@ func TestGenerateContainerMounts(t *testing.T) {
 func TestPrivilegedBindMount(t *testing.T) {
 	for desc, test := range map[string]struct {
 		privileged         bool
-		readonlyRootFS     bool
 		expectedSysFSRO    bool
 		expectedCgroupFSRO bool
 	}{
@@ -618,16 +617,9 @@ func TestPrivilegedBindMount(t *testing.T) {
 			expectedSysFSRO:    false,
 			expectedCgroupFSRO: false,
 		},
-		"sysfs should mount as 'ro' if root filrsystem is readonly": {
-			privileged:         true,
-			readonlyRootFS:     true,
-			expectedSysFSRO:    true,
-			expectedCgroupFSRO: false,
-		},
 	} {
 		t.Logf("TestCase %q", desc)
 		g := generate.New()
-		g.SetRootReadonly(test.readonlyRootFS)
 		c := newTestCRIService()
 		c.addOCIBindMounts(&g, nil, "")
 		if test.privileged {
