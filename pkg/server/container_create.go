@@ -662,7 +662,7 @@ func setOCIBindMountsPrivileged(g *generate.Generator) {
 	spec := g.Spec()
 	// clear readonly for /sys and cgroup
 	for i, m := range spec.Mounts {
-		if spec.Mounts[i].Destination == "/sys" && !spec.Root.Readonly {
+		if spec.Mounts[i].Destination == "/sys" {
 			clearReadOnly(&spec.Mounts[i])
 		}
 		if m.Type == "cgroup" {
