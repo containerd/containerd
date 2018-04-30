@@ -49,7 +49,7 @@ type FakeOS struct {
 	CopyFileFn             func(string, string, os.FileMode) error
 	WriteFileFn            func(string, []byte, os.FileMode) error
 	MountFn                func(source string, target string, fstype string, flags uintptr, data string) error
-	UnmountFn              func(target string, flags int) error
+	UnmountFn              func(target string) error
 	LookupMountFn          func(path string) (containerdmount.Info, error)
 	calls                  []CalledDetail
 	errors                 map[string]error
@@ -230,14 +230,14 @@ func (f *FakeOS) Mount(source string, target string, fstype string, flags uintpt
 }
 
 // Unmount is a fake call that invokes UnmountFn or just return nil.
-func (f *FakeOS) Unmount(target string, flags int) error {
-	f.appendCalls("Unmount", target, flags)
+func (f *FakeOS) Unmount(target string) error {
+	f.appendCalls("Unmount", target)
 	if err := f.getError("Unmount"); err != nil {
 		return err
 	}
 
 	if f.UnmountFn != nil {
-		return f.UnmountFn(target, flags)
+		return f.UnmountFn(target)
 	}
 	return nil
 }
