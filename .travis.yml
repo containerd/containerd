@@ -46,9 +46,9 @@ install:
   - sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-runc
   - sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-cni
   - sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-critools
-  - wget https://github.com/xemul/criu/archive/v3.0.tar.gz -O /tmp/criu.tar.gz
+  - wget https://github.com/checkpoint-restore/criu/archive/v3.7.tar.gz -O /tmp/criu.tar.gz
   - tar -C /tmp/ -zxf /tmp/criu.tar.gz
-  - cd /tmp/criu-3.0 && sudo make install-criu
+  - cd /tmp/criu-3.7 && sudo make install-criu
   - cd $TRAVIS_BUILD_DIR
 
 script:

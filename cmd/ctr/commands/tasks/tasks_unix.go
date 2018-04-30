@@ -69,25 +69,24 @@ func HandleConsoleResize(ctx gocontext.Context, task resizer, con console.Consol
 // NewTask creates a new task
 func NewTask(ctx gocontext.Context, client *containerd.Client, container containerd.Container, checkpoint string, tty, nullIO bool, ioOpts []cio.Opt, opts ...containerd.NewTaskOpts) (containerd.Task, error) {
 	stdio := cio.NewCreator(append([]cio.Opt{cio.WithStdio}, ioOpts...)...)
-	if checkpoint == "" {
-		ioCreator := stdio
+	if checkpoint != "" {
+		im, err := client.GetImage(ctx, checkpoint)
+		if err != nil {
+			return nil, err
+		}
+		opts = append(opts, containerd.WithTaskCheckpoint(im))
+	}
+	ioCreator := stdio
+	if tty {
+		ioCreator = cio.NewCreator(append([]cio.Opt{cio.WithStdio, cio.WithTerminal}, ioOpts...)...)
+	}
+	if nullIO {
 		if tty {
-			ioCreator = cio.NewCreator(append([]cio.Opt{cio.WithStdio, cio.WithTerminal}, ioOpts...)...)
+			return nil, errors.New("tty and null-io cannot be used together")
 		}
-		if nullIO {
-			if tty {
-				return nil, errors.New("tty and null-io cannot be used together")
-			}
-			ioCreator = cio.NullIO
-		}
-		return container.NewTask(ctx, ioCreator, opts...)
+		ioCreator = cio.NullIO
 	}
-	im, err := client.GetImage(ctx, checkpoint)
-	if err != nil {
-		return nil, err
-	}
-	opts = append(opts, containerd.WithTaskCheckpoint(im))
-	return container.NewTask(ctx, stdio, opts...)
+	return container.NewTask(ctx, ioCreator, opts...)
 }
 
 func getNewTaskOpts(context *cli.Context) []containerd.NewTaskOpts {
