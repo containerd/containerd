@@ -88,17 +88,17 @@ the alternatives you tried before submitting a PR.
 
 # Reporting security issues
 
-The maintainers take security seriously. If you discover a security 
-issue, please bring it to their attention right away!
+Please DO NOT file a public issue, instead send your report privately to
+security@opencontainers.org.
 
-Please DO NOT file a public issue, instead send your report privately
-to security@docker.com.
+The maintainers take security seriously. If you discover a security issue,
+please bring it to their attention right away!
 
-Security reports are greatly appreciated and we will publicly thank you 
-for it. We also like to send gifts—if you're into Docker schwag, make 
-sure to let us know. We currently do not offer a paid security bounty 
-program, but are not ruling it out in the future.
+If you are reporting a security issue, do not create an issue or file a pull
+request on GitHub. Instead, disclose the issue responsibly by sending an email
+to security@opencontainers.org (which is inhabited only by the maintainers of
+the various OCI projects).
 
 # Copyright and license
 
-Copyright © 2016 Docker, Inc. All rights reserved, except as follows. Code is released under the [Apache 2.0 license](LICENSE.code). This `README.md` file and the [`CONTRIBUTING.md`](CONTRIBUTING.md) file are licensed under the Creative Commons Attribution 4.0 International License under the terms and conditions set forth in the file [`LICENSE.docs`](LICENSE.docs). You may obtain a duplicate copy of the same license, titled CC BY-SA 4.0, at http://creativecommons.org/licenses/by-sa/4.0/.
+Copyright © 2016 Docker, Inc. All rights reserved, except as follows. Code is released under the [Apache 2.0 license](LICENSE). This `README.md` file and the [`CONTRIBUTING.md`](CONTRIBUTING.md) file are licensed under the Creative Commons Attribution 4.0 International License under the terms and conditions set forth in the file [`LICENSE.docs`](LICENSE.docs). You may obtain a duplicate copy of the same license, titled CC BY-SA 4.0, at http://creativecommons.org/licenses/by-sa/4.0/.
