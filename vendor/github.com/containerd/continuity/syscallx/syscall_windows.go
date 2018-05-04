@@ -5,24 +5,6 @@ import (
 	"unsafe"
 )
 
-//go:generate go run $GOROOT/src/syscall/mksyscall_windows.go -output zsyscall_windows.go syscall_windows.go
-
-const (
-	FILE_NAME_NORMALIZED = 0x0
-	FILE_NAME_OPENED     = 0x8
-
-	VOLUME_NAME_DOS  = 0x0
-	VOLUME_NAME_GUID = 0x1
-	VOLUME_NAME_NONE = 0x4
-	VOLUME_NAME_NT   = 0x2
-)
-
-//sys	GetFinalPathNameByHandle(file syscall.Handle, filePath *uint16, filePathSize uint32, flags uint32) (n uint32, err error) = kernel32.GetFinalPathNameByHandleW
-
-func LoadGetFinalPathNameByHandle() error {
-	return procGetFinalPathNameByHandleW.Find()
-}
-
 type reparseDataBuffer struct {
 	ReparseTag        uint32
 	ReparseDataLength uint16

@@ -578,11 +578,9 @@ func (c *context) Walk(fn filepath.WalkFunc) error {
 	if err == nil && fi.Mode()&os.ModeSymlink != 0 {
 		root, err = sysx.Readlink(c.root)
 		if err != nil {
-			fmt.Printf("FAILED EVALSYMLINKS: %v\n", err)
 			return err
 		}
 	}
-	fmt.Printf("INITIAL PATH: %s \nEXPANDED ROOT PATH: %s\n", c.root, root)
 	return c.pathDriver.Walk(root, func(p string, fi os.FileInfo, err error) error {
 		contained, err := c.contain(p)
 		return fn(contained, fi, err)
@@ -608,7 +606,6 @@ func (c *context) contain(p string) (string, error) {
 	if err == nil && fi.Mode()&os.ModeSymlink != 0 {
 		root, err = sysx.Readlink(c.root)
 		if err != nil {
-			fmt.Printf("FAILED EVALSYMLINKS: %v\n", err)
 			return "", err
 		}
 	}
