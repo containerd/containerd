@@ -53,7 +53,7 @@ func WithDefaultProfile(name string) oci.SpecOpts {
 		if err != nil {
 			return err
 		}
-		f, err := ioutil.TempFile("", p.Name)
+		f, err := ioutil.TempFile(os.Getenv("XDG_RUNTIME_DIR"), p.Name)
 		if err != nil {
 			return err
 		}

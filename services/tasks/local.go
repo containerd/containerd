@@ -114,7 +114,7 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 		err            error
 	)
 	if r.Checkpoint != nil {
-		checkpointPath, err = ioutil.TempDir("", "ctrd-checkpoint")
+		checkpointPath, err = ioutil.TempDir(os.Getenv("XDG_RUNTIME_DIR"), "ctrd-checkpoint")
 		if err != nil {
 			return nil, err
 		}
@@ -450,7 +450,7 @@ func (l *local) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest, _ 
 	if err != nil {
 		return nil, err
 	}
-	image, err := ioutil.TempDir("", "ctd-checkpoint")
+	image, err := ioutil.TempDir(os.Getenv("XDG_RUNTIME_DIR"), "ctd-checkpoint")
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}

@@ -506,7 +506,7 @@ var (
 )
 
 func edit(rd io.Reader) (io.ReadCloser, error) {
-	tmp, err := ioutil.TempFile("", "edit-")
+	tmp, err := ioutil.TempFile(os.Getenv("XDG_RUNTIME_DIR"), "edit-")
 	if err != nil {
 		return nil, err
 	}
