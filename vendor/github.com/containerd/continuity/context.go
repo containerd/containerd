@@ -12,6 +12,7 @@ import (
 	"github.com/containerd/continuity/devices"
 	driverpkg "github.com/containerd/continuity/driver"
 	"github.com/containerd/continuity/pathdriver"
+	"github.com/containerd/continuity/sysx"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -572,7 +573,17 @@ func (c *context) Apply(resource Resource) error {
 // the context. Otherwise identical to filepath.Walk, the path argument is
 // corrected to be contained within the context.
 func (c *context) Walk(fn filepath.WalkFunc) error {
-	return c.pathDriver.Walk(c.root, func(p string, fi os.FileInfo, err error) error {
+	root := c.root
+	fi, err := os.Lstat(c.root)
+	if err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		root, err = sysx.Readlink(c.root)
+		if err != nil {
+			fmt.Printf("FAILED EVALSYMLINKS: %v\n", err)
+			return err
+		}
+	}
+	fmt.Printf("INITIAL PATH: %s \nEXPANDED ROOT PATH: %s\n", c.root, root)
+	return c.pathDriver.Walk(root, func(p string, fi os.FileInfo, err error) error {
 		contained, err := c.contain(p)
 		return fn(contained, fi, err)
 	})
@@ -592,7 +603,16 @@ func (c *context) fullpath(p string) (string, error) {
 // contain cleans and santizes the filesystem path p to be an absolute path,
 // effectively relative to the context root.
 func (c *context) contain(p string) (string, error) {
-	sanitized, err := c.pathDriver.Rel(c.root, p)
+	root := c.root
+	fi, err := os.Lstat(c.root)
+	if err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		root, err = sysx.Readlink(c.root)
+		if err != nil {
+			fmt.Printf("FAILED EVALSYMLINKS: %v\n", err)
+			return "", err
+		}
+	}
+	sanitized, err := c.pathDriver.Rel(root, p)
 	if err != nil {
 		return "", err
 	}

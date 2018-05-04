@@ -22,7 +22,7 @@ var (
 
 // errnoErr returns common boxed Errno values, to prevent
 // allocations at runtime.
-func errnoErr(e syscall.Errno) error {
+func errnoErr1(e syscall.Errno) error {
 	switch e {
 	case 0:
 		return nil

@@ -66,8 +66,8 @@ func (m *Mount) Mount(target string) (retErr error) {
 
 	// Check if the returned path is a new mounted volume, or the path of the expanded
 	// layer on disk.
-	// TODO: Is there a better way to check this than looking for \\?\Volume*?
-	if !strings.HasPrefix(layerPath, "\\\\?\\") {
+	// TODO: Is there a better way to check this than looking for \\?\Volume{*?
+	if !strings.HasPrefix(layerPath, `\\?\Volume{`) {
 		layerPath = filepath.Join(layerPath, "Files")
 		if _, err := os.Lstat(layerPath); err != nil {
 			if !os.IsNotExist(err) {
@@ -105,8 +105,7 @@ func (m *Mount) Mount(target string) (retErr error) {
 	// see https://blogs.technet.microsoft.com/askcore/2013/03/24/alternate-data-streams-in-ntfs/
 	// for details on Alternate Data Streams.
 	target = filepath.Clean(target)
-	dir, file := filepath.Split(target)
-	idf, err := os.Create(filepath.Join(dir, file+":layerid"))
+	idf, err := os.Create(target + ":layerid")
 	if err != nil {
 		return err
 	}

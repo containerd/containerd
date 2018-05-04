@@ -184,10 +184,7 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		return errors.Wrap(err, "failed to commit snapshot")
 	}
 
-	if err := t.Commit(); err != nil {
-		return err
-	}
-	return nil
+	return t.Commit()
 }
 
 // Remove abandons the transaction identified by key. All resources
