@@ -18,6 +18,7 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os/exec"
@@ -28,12 +29,15 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
+	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 
 	api "github.com/containerd/cri/pkg/api/v1"
 	"github.com/containerd/cri/pkg/client"
+	criconfig "github.com/containerd/cri/pkg/config"
 	"github.com/containerd/cri/pkg/constants"
 	"github.com/containerd/cri/pkg/util"
 )
@@ -100,6 +104,7 @@ func ConnectDaemons() error {
 // Opts sets specific information in pod sandbox config.
 type PodSandboxOpts func(*runtime.PodSandboxConfig)
 
+// Set host network.
 func WithHostNetwork(p *runtime.PodSandboxConfig) {
 	if p.Linux == nil {
 		p.Linux = &runtime.LinuxPodSandboxConfig{}
@@ -111,6 +116,13 @@ func WithHostNetwork(p *runtime.PodSandboxConfig) {
 		p.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{
 			Network: runtime.NamespaceMode_NODE,
 		}
+	}
+}
+
+// Add pod log directory.
+func WithPodLogDirectory(dir string) PodSandboxOpts {
+	return func(p *runtime.PodSandboxConfig) {
+		p.LogDirectory = dir
 	}
 }
 
@@ -137,50 +149,57 @@ func PodSandboxConfig(name, ns string, opts ...PodSandboxOpts) *runtime.PodSandb
 type ContainerOpts func(*runtime.ContainerConfig)
 
 func WithTestLabels() ContainerOpts {
-	return func(cf *runtime.ContainerConfig) {
-		cf.Labels = map[string]string{"key": "value"}
+	return func(c *runtime.ContainerConfig) {
+		c.Labels = map[string]string{"key": "value"}
 	}
 }
 
 func WithTestAnnotations() ContainerOpts {
-	return func(cf *runtime.ContainerConfig) {
-		cf.Annotations = map[string]string{"a.b.c": "test"}
+	return func(c *runtime.ContainerConfig) {
+		c.Annotations = map[string]string{"a.b.c": "test"}
 	}
 }
 
 // Add container resource limits.
 func WithResources(r *runtime.LinuxContainerResources) ContainerOpts {
-	return func(cf *runtime.ContainerConfig) {
-		if cf.Linux == nil {
-			cf.Linux = &runtime.LinuxContainerConfig{}
+	return func(c *runtime.ContainerConfig) {
+		if c.Linux == nil {
+			c.Linux = &runtime.LinuxContainerConfig{}
 		}
-		cf.Linux.Resources = r
+		c.Linux.Resources = r
 	}
 }
 
 // Add container command.
-func WithCommand(c string, args ...string) ContainerOpts {
-	return func(cf *runtime.ContainerConfig) {
-		cf.Command = []string{c}
-		cf.Args = args
+func WithCommand(cmd string, args ...string) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		c.Command = []string{cmd}
+		c.Args = args
 	}
 }
 
 // Add pid namespace mode.
 func WithPidNamespace(mode runtime.NamespaceMode) ContainerOpts {
-	return func(cf *runtime.ContainerConfig) {
-		if cf.Linux == nil {
-			cf.Linux = &runtime.LinuxContainerConfig{}
+	return func(c *runtime.ContainerConfig) {
+		if c.Linux == nil {
+			c.Linux = &runtime.LinuxContainerConfig{}
 		}
-		if cf.Linux.SecurityContext == nil {
-			cf.Linux.SecurityContext = &runtime.LinuxContainerSecurityContext{}
+		if c.Linux.SecurityContext == nil {
+			c.Linux.SecurityContext = &runtime.LinuxContainerSecurityContext{}
 		}
-		if cf.Linux.SecurityContext.NamespaceOptions == nil {
-			cf.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{}
+		if c.Linux.SecurityContext.NamespaceOptions == nil {
+			c.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{}
 		}
-		cf.Linux.SecurityContext.NamespaceOptions.Pid = mode
+		c.Linux.SecurityContext.NamespaceOptions.Pid = mode
 	}
 
+}
+
+// Add container log path.
+func WithLogPath(path string) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		c.LogPath = path
+	}
 }
 
 // ContainerConfig creates a container config given a name and image name
@@ -246,4 +265,28 @@ func PidOf(name string) (int, error) {
 		return 0, nil
 	}
 	return strconv.Atoi(output)
+}
+
+// CRIConfig gets current cri config from containerd.
+func CRIConfig() (*criconfig.Config, error) {
+	addr, dialer, err := kubeletutil.GetAddressAndDialer(*criEndpoint)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get dialer")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithDialer(dialer))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to connect cri endpoint")
+	}
+	client := runtime.NewRuntimeServiceClient(conn)
+	resp, err := client.Status(ctx, &runtime.StatusRequest{Verbose: true})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get status")
+	}
+	config := &criconfig.Config{}
+	if err := json.Unmarshal([]byte(resp.Info["config"]), config); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal config")
+	}
+	return config, nil
 }
