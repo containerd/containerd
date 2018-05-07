@@ -338,20 +338,29 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 		}
 	}
 
-	imgrec := images.Image{
-		Name:   name,
-		Target: desc,
-		Labels: pullCtx.Labels,
+	img := &image{
+		client: c,
+		i: images.Image{
+			Name:   name,
+			Target: desc,
+			Labels: pullCtx.Labels,
+		},
+	}
+
+	if pullCtx.Unpack {
+		if err := img.Unpack(ctx, pullCtx.Snapshotter); err != nil {
+			errors.Wrapf(err, "failed to unpack image on snapshotter %s", pullCtx.Snapshotter)
+		}
 	}
 
 	is := c.ImageService()
 	for {
-		if created, err := is.Create(ctx, imgrec); err != nil {
+		if created, err := is.Create(ctx, img.i); err != nil {
 			if !errdefs.IsAlreadyExists(err) {
 				return nil, err
 			}
 
-			updated, err := is.Update(ctx, imgrec)
+			updated, err := is.Update(ctx, img.i)
 			if err != nil {
 				// if image was removed, try create again
 				if errdefs.IsNotFound(err) {
@@ -360,23 +369,12 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 				return nil, err
 			}
 
-			imgrec = updated
+			img.i = updated
 		} else {
-			imgrec = created
+			img.i = created
 		}
-		break
+		return img, nil
 	}
-
-	img := &image{
-		client: c,
-		i:      imgrec,
-	}
-	if pullCtx.Unpack {
-		if err := img.Unpack(ctx, pullCtx.Snapshotter); err != nil {
-			errors.Wrapf(err, "failed to unpack image on snapshotter %s", pullCtx.Snapshotter)
-		}
-	}
-	return img, nil
 }
 
 // Push uploads the provided content to a remote resource
