@@ -523,7 +523,7 @@ func clearReadOnly(m *runtimespec.Mount) {
 			opt = append(opt, o)
 		}
 	}
-	m.Options = opt
+	m.Options = append(opt, "rw")
 }
 
 // addDevices set device mapping without privilege.
