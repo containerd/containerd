@@ -22,6 +22,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"runtime"
 	"strings"
 	"syscall"
@@ -34,6 +35,7 @@ import (
 	"github.com/containerd/containerd/oci"
 	_ "github.com/containerd/containerd/runtime"
 	"github.com/containerd/typeurl"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/windows/hcsshimtypes"
@@ -1468,4 +1470,62 @@ func TestContainerLabels(t *testing.T) {
 	if labels["test"] != "no" {
 		t.Fatalf("expected label \"test\" to be \"no\"")
 	}
+}
+
+func TestContainerHook(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hook := func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+		if s.Hooks == nil {
+			s.Hooks = &specs.Hooks{}
+		}
+		path, err := exec.LookPath("containerd")
+		if err != nil {
+			return err
+		}
+		psPath, err := exec.LookPath("ps")
+		if err != nil {
+			return err
+		}
+		s.Hooks.Prestart = []specs.Hook{
+			{
+				Path: path,
+				Args: []string{
+					"containerd",
+					"oci-hook", "--",
+					psPath, "--pid", "{{pid}}",
+				},
+				Env: os.Environ(),
+			},
+		}
+		return nil
+	}
+	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), hook), WithNewSnapshot(id, image))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx, WithProcessKill)
 }

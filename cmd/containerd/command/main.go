@@ -89,6 +89,7 @@ func App() *cli.App {
 	app.Commands = []cli.Command{
 		configCommand,
 		publishCommand,
+		ociHook,
 	}
 	app.Action = func(context *cli.Context) error {
 		var (
