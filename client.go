@@ -367,7 +367,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 	}
 	if pullCtx.Unpack {
 		if err := img.Unpack(ctx, pullCtx.Snapshotter); err != nil {
-			errors.Wrapf(err, "failed to unpack image on snapshotter %s", pullCtx.Snapshotter)
+			return nil, errors.Wrapf(err, "failed to unpack image on snapshotter %s", pullCtx.Snapshotter)
 		}
 	}
 	return img, nil
