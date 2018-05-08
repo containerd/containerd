@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package containerd
+package proxy
 
 import (
 	"context"
@@ -28,9 +28,9 @@ import (
 	protobuftypes "github.com/gogo/protobuf/types"
 )
 
-// NewSnapshotterFromClient returns a new Snapshotter which communicates
-// over a GRPC connection.
-func NewSnapshotterFromClient(client snapshotsapi.SnapshotsClient, snapshotterName string) snapshots.Snapshotter {
+// NewSnapshotter returns a new Snapshotter which communicates over a GRPC
+// connection using the containerd snapshot GRPC API.
+func NewSnapshotter(client snapshotsapi.SnapshotsClient, snapshotterName string) snapshots.Snapshotter {
 	return &remoteSnapshotter{
 		client:          client,
 		snapshotterName: snapshotterName,
