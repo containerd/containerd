@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package containerd
+package proxy
 
 import (
 	"context"
@@ -31,8 +31,9 @@ type remoteContent struct {
 	client contentapi.ContentClient
 }
 
-// NewContentStoreFromClient returns a new content store
-func NewContentStoreFromClient(client contentapi.ContentClient) content.Store {
+// NewContentStore returns a new content store which communicates over a GRPC
+// connection using the containerd content GRPC API.
+func NewContentStore(client contentapi.ContentClient) content.Store {
 	return &remoteContent{
 		client: client,
 	}
