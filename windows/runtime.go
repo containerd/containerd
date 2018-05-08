@@ -214,8 +214,8 @@ func (r *windowsRuntime) Delete(ctx context.Context, t runtime.Task) (*runtime.E
 			ExitedAt:    rtExit.Timestamp,
 		})
 
-	if err := mount.UnmountAll(wt.rootfs[0].Source, 0); err != nil {
-		log.G(ctx).WithError(err).WithField("path", wt.rootfs[0].Source).
+	if err := mount.UnmountAll(wt.mountLocation, 0); err != nil {
+		log.G(ctx).WithError(err).WithField("path", wt.mountLocation).
 			Warn("failed to unmount rootfs on failure")
 	}
 
