@@ -589,9 +589,18 @@ func checkRemoveIntermediateSnapshot(ctx context.Context, t *testing.T, snapshot
 	}
 
 	// Removal from toplayer to base should not fail.
-	defer testutil.RemoveSnapshot(ctx, t, snapshotter, committedBase)
-	defer testutil.RemoveSnapshot(ctx, t, snapshotter, committedInter)
-	defer testutil.RemoveSnapshot(ctx, t, snapshotter, topLayer)
+	err = snapshotter.Remove(ctx, topLayer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = snapshotter.Remove(ctx, committedInter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = snapshotter.Remove(ctx, committedBase)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 // baseTestSnapshots creates a base set of snapshots for tests, each snapshot is empty

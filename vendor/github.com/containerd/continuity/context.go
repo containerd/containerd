@@ -608,13 +608,6 @@ func (c *context) contain(p string) (string, error) {
 // instead of contain. This is needed for Walk, as if context root is a symlink,
 // it must be evaluated prior to the Walk
 func (c *context) containWithRoot(p string, root string) (string, error) {
-	fi, err := c.driver.Lstat(root)
-	if err == nil && fi.Mode()&os.ModeSymlink != 0 {
-		root, err = c.driver.Readlink(root)
-		if err != nil {
-			return "", err
-		}
-	}
 	sanitized, err := c.pathDriver.Rel(root, p)
 	if err != nil {
 		return "", err

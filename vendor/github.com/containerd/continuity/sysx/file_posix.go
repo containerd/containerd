@@ -14,7 +14,7 @@ func Readlink(name string) (string, error) {
 		b := make([]byte, len)
 		n, e := fixCount(syscallx.Readlink(fixLongPath(name), b))
 		if e != nil {
-			return "", &os.PathError{"readlink", name, e}
+			return "", &os.PathError{Op: "readlink", Path: name, Err: e}
 		}
 		if n < len {
 			return string(b[0:n]), nil
