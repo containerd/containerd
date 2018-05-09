@@ -1,5 +1,3 @@
-// +build windows
-
 package fstest
 
 import (
@@ -15,6 +13,8 @@ func Lchtimes(name string, atime, mtime time.Time) Applier {
 	})
 }
 
+// Base applies the files required to make a valid Windows container layer
+// that the filter will mount. It is used for testing the snapshotter
 func Base() Applier {
 	return Apply(
 		CreateDir("Windows", 0755),

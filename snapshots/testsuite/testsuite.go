@@ -124,10 +124,16 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 		fstest.Base(),
 	)
 
+	if runtime.GOOS == "windows" {
+		initialApplier = fstest.Apply(
+			initialApplier,
+			// Workaround for a Windows RS1 bug: Create a file inside /a/b/c
+			// in order to initialize the empty folder in the filesystem filter
+			fstest.CreateFile("/a/b/c/foo", []byte("bar\n"), 0777),
+		)
+	}
+
 	diffApplier := fstest.Apply(
-		// Workaround for a Windows RS1 bug: Create a file inside /a/b/c
-		// in order to initialize the empty folder in the filesystem filter
-		fstest.CreateFile("/a/b/c/foo", []byte("bar\n"), 0777),
 		fstest.CreateFile("/bar", []byte("bar\n"), 0777),
 		// also, change content of foo to bar
 		fstest.CreateFile("/foo", []byte("bar\n"), 0777),
