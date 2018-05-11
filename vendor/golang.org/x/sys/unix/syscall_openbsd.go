@@ -18,6 +18,7 @@ import (
 	"unsafe"
 )
 
+// SockaddrDatalink implements the Sockaddr interface for AF_LINK type sockets.
 type SockaddrDatalink struct {
 	Len    uint8
 	Family uint8
@@ -42,18 +43,6 @@ func nametomib(name string) (mib []_C_int, err error) {
 	return nil, EINVAL
 }
 
-func direntIno(buf []byte) (uint64, bool) {
-	return readInt(buf, unsafe.Offsetof(Dirent{}.Fileno), unsafe.Sizeof(Dirent{}.Fileno))
-}
-
-func direntReclen(buf []byte) (uint64, bool) {
-	return readInt(buf, unsafe.Offsetof(Dirent{}.Reclen), unsafe.Sizeof(Dirent{}.Reclen))
-}
-
-func direntNamlen(buf []byte) (uint64, bool) {
-	return readInt(buf, unsafe.Offsetof(Dirent{}.Namlen), unsafe.Sizeof(Dirent{}.Namlen))
-}
-
 //sysnb pipe(p *[2]_C_int) (err error)
 func Pipe(p []int) (err error) {
 	if len(p) != 2 {
@@ -69,6 +58,23 @@ func Pipe(p []int) (err error) {
 //sys getdents(fd int, buf []byte) (n int, err error)
 func Getdirentries(fd int, buf []byte, basep *uintptr) (n int, err error) {
 	return getdents(fd, buf)
+}
+
+const ImplementsGetwd = true
+
+//sys	Getcwd(buf []byte) (n int, err error) = SYS___GETCWD
+
+func Getwd() (string, error) {
+	var buf [PathMax]byte
+	_, err := Getcwd(buf[0:])
+	if err != nil {
+		return "", err
+	}
+	n := clen(buf[:])
+	if n < 1 {
+		return "", EINVAL
+	}
+	return string(buf[:n]), nil
 }
 
 // TODO
@@ -135,6 +141,52 @@ func IoctlGetTermios(fd int, req uint) (*Termios, error) {
 	return &value, err
 }
 
+func Uname(uname *Utsname) error {
+	mib := []_C_int{CTL_KERN, KERN_OSTYPE}
+	n := unsafe.Sizeof(uname.Sysname)
+	if err := sysctl(mib, &uname.Sysname[0], &n, nil, 0); err != nil {
+		return err
+	}
+
+	mib = []_C_int{CTL_KERN, KERN_HOSTNAME}
+	n = unsafe.Sizeof(uname.Nodename)
+	if err := sysctl(mib, &uname.Nodename[0], &n, nil, 0); err != nil {
+		return err
+	}
+
+	mib = []_C_int{CTL_KERN, KERN_OSRELEASE}
+	n = unsafe.Sizeof(uname.Release)
+	if err := sysctl(mib, &uname.Release[0], &n, nil, 0); err != nil {
+		return err
+	}
+
+	mib = []_C_int{CTL_KERN, KERN_VERSION}
+	n = unsafe.Sizeof(uname.Version)
+	if err := sysctl(mib, &uname.Version[0], &n, nil, 0); err != nil {
+		return err
+	}
+
+	// The version might have newlines or tabs in it, convert them to
+	// spaces.
+	for i, b := range uname.Version {
+		if b == '\n' || b == '\t' {
+			if i == len(uname.Version)-1 {
+				uname.Version[i] = 0
+			} else {
+				uname.Version[i] = ' '
+			}
+		}
+	}
+
+	mib = []_C_int{CTL_HW, HW_MACHINE}
+	n = unsafe.Sizeof(uname.Machine)
+	if err := sysctl(mib, &uname.Machine[0], &n, nil, 0); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 /*
  * Exposed directly
  */
@@ -152,10 +204,12 @@ func IoctlGetTermios(fd int, req uint) (*Termios, error) {
 //sys	Fchdir(fd int) (err error)
 //sys	Fchflags(fd int, flags int) (err error)
 //sys	Fchmod(fd int, mode uint32) (err error)
+//sys	Fchmodat(dirfd int, path string, mode uint32, flags int) (err error)
 //sys	Fchown(fd int, uid int, gid int) (err error)
 //sys	Flock(fd int, how int) (err error)
 //sys	Fpathconf(fd int, name int) (val int, err error)
 //sys	Fstat(fd int, stat *Stat_t) (err error)
+//sys	Fstatat(fd int, path string, stat *Stat_t, flags int) (err error)
 //sys	Fstatfs(fd int, stat *Statfs_t) (err error)
 //sys	Fsync(fd int) (err error)
 //sys	Ftruncate(fd int, length int64) (err error)
@@ -168,6 +222,7 @@ func IoctlGetTermios(fd int, req uint) (*Termios, error) {
 //sysnb	Getppid() (ppid int)
 //sys	Getpriority(which int, who int) (prio int, err error)
 //sysnb	Getrlimit(which int, lim *Rlimit) (err error)
+//sysnb	Getrtable() (rtable int, err error)
 //sysnb	Getrusage(who int, rusage *Rusage) (err error)
 //sysnb	Getsid(pid int) (sid int, err error)
 //sysnb	Gettimeofday(tv *Timeval) (err error)
@@ -205,6 +260,7 @@ func IoctlGetTermios(fd int, req uint) (*Termios, error) {
 //sysnb	Setresgid(rgid int, egid int, sgid int) (err error)
 //sysnb	Setresuid(ruid int, euid int, suid int) (err error)
 //sysnb	Setrlimit(which int, lim *Rlimit) (err error)
+//sysnb	Setrtable(rtable int) (err error)
 //sysnb	Setsid() (pid int, err error)
 //sysnb	Settimeofday(tp *Timeval) (err error)
 //sysnb	Setuid(uid int) (err error)
@@ -253,7 +309,6 @@ func IoctlGetTermios(fd int, req uint) (*Termios, error) {
 // getlogin
 // getresgid
 // getresuid
-// getrtable
 // getthrid
 // ktrace
 // lfs_bmapv
@@ -289,7 +344,6 @@ func IoctlGetTermios(fd int, req uint) (*Termios, error) {
 // semop
 // setgroups
 // setitimer
-// setrtable
 // setsockopt
 // shmat
 // shmctl

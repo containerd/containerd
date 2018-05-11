@@ -13,7 +13,7 @@
 package unix
 
 import (
-	errorspkg "errors"
+	"errors"
 	"syscall"
 	"unsafe"
 )
@@ -36,6 +36,7 @@ func Getwd() (string, error) {
 	return "", ENOTSUP
 }
 
+// SockaddrDatalink implements the Sockaddr interface for AF_LINK type sockets.
 type SockaddrDatalink struct {
 	Len    uint8
 	Family uint8
@@ -76,18 +77,6 @@ func nametomib(name string) (mib []_C_int, err error) {
 	return buf[0 : n/siz], nil
 }
 
-func direntIno(buf []byte) (uint64, bool) {
-	return readInt(buf, unsafe.Offsetof(Dirent{}.Ino), unsafe.Sizeof(Dirent{}.Ino))
-}
-
-func direntReclen(buf []byte) (uint64, bool) {
-	return readInt(buf, unsafe.Offsetof(Dirent{}.Reclen), unsafe.Sizeof(Dirent{}.Reclen))
-}
-
-func direntNamlen(buf []byte) (uint64, bool) {
-	return readInt(buf, unsafe.Offsetof(Dirent{}.Namlen), unsafe.Sizeof(Dirent{}.Namlen))
-}
-
 //sys   ptrace(request int, pid int, addr uintptr, data uintptr) (err error)
 func PtraceAttach(pid int) (err error) { return ptrace(PT_ATTACH, pid, 0, 0) }
 func PtraceDetach(pid int) (err error) { return ptrace(PT_DETACH, pid, 0, 0) }
@@ -109,7 +98,7 @@ type attrList struct {
 
 func getAttrList(path string, attrList attrList, attrBuf []byte, options uint) (attrs [][]byte, err error) {
 	if len(attrBuf) < 4 {
-		return nil, errorspkg.New("attrBuf too small")
+		return nil, errors.New("attrBuf too small")
 	}
 	attrList.bitmapCount = attrBitMapCount
 
@@ -145,12 +134,12 @@ func getAttrList(path string, attrList attrList, attrBuf []byte, options uint) (
 	for i := uint32(0); int(i) < len(dat); {
 		header := dat[i:]
 		if len(header) < 8 {
-			return attrs, errorspkg.New("truncated attribute header")
+			return attrs, errors.New("truncated attribute header")
 		}
 		datOff := *(*int32)(unsafe.Pointer(&header[0]))
 		attrLen := *(*uint32)(unsafe.Pointer(&header[4]))
 		if datOff < 0 || uint32(datOff)+attrLen > uint32(len(dat)) {
-			return attrs, errorspkg.New("truncated results; attrBuf too small")
+			return attrs, errors.New("truncated results; attrBuf too small")
 		}
 		end := uint32(datOff) + attrLen
 		attrs = append(attrs, dat[datOff:end])
@@ -341,6 +330,7 @@ func Uname(uname *Utsname) error {
 //sys	Flock(fd int, how int) (err error)
 //sys	Fpathconf(fd int, name int) (val int, err error)
 //sys	Fstat(fd int, stat *Stat_t) (err error) = SYS_FSTAT64
+//sys	Fstatat(fd int, path string, stat *Stat_t, flags int) (err error) = SYS_FSTATAT64
 //sys	Fstatfs(fd int, stat *Statfs_t) (err error) = SYS_FSTATFS64
 //sys	Fsync(fd int) (err error)
 //sys	Ftruncate(fd int, length int64) (err error)
