@@ -145,6 +145,12 @@ func createDefaultSpec(ctx context.Context, id string) (*specs.Spec, error) {
 				Options:     []string{"nosuid", "noexec", "nodev", "ro"},
 			},
 			{
+				Destination: "/sys/fs/cgroup",
+				Type:        "cgroup",
+				Source:      "cgroup",
+				Options:     []string{"nosuid", "noexec", "nodev", "ro"},
+			},
+			{
 				Destination: "/run",
 				Type:        "tmpfs",
 				Source:      "tmpfs",
