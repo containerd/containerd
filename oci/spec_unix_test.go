@@ -168,9 +168,6 @@ func TestWithPrivileged(t *testing.T) {
 
 	s, err := GenerateSpec(ctx, nil, &containers.Container{ID: t.Name()},
 		WithCapabilities(nil),
-		WithMounts([]specs.Mount{
-			{Type: "cgroup", Destination: "/sys/fs/cgroup", Options: []string{"ro"}},
-		}),
 		WithPrivileged,
 	)
 	if err != nil {
