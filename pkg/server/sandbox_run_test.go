@@ -496,7 +496,7 @@ func TestHostPrivilegedSandbox(t *testing.T) {
 func TestGetSandboxRuntime(t *testing.T) {
 	untrustedWorkloadRuntime := criconfig.Runtime{
 		Type:   "io.containerd.runtime.v1.linux",
-		Engine: "untursted-workload-runtime",
+		Engine: "untrusted-workload-runtime",
 		Root:   "",
 	}
 
