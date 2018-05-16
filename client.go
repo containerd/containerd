@@ -338,38 +338,43 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 		}
 	}
 
-	imgrec := images.Image{
-		Name:   name,
-		Target: desc,
-		Labels: pullCtx.Labels,
-	}
-
-	is := c.ImageService()
-	if created, err := is.Create(ctx, imgrec); err != nil {
-		if !errdefs.IsAlreadyExists(err) {
-			return nil, err
-		}
-
-		updated, err := is.Update(ctx, imgrec)
-		if err != nil {
-			return nil, err
-		}
-
-		imgrec = updated
-	} else {
-		imgrec = created
-	}
-
 	img := &image{
 		client: c,
-		i:      imgrec,
+		i: images.Image{
+			Name:   name,
+			Target: desc,
+			Labels: pullCtx.Labels,
+		},
 	}
+
 	if pullCtx.Unpack {
 		if err := img.Unpack(ctx, pullCtx.Snapshotter); err != nil {
 			return nil, errors.Wrapf(err, "failed to unpack image on snapshotter %s", pullCtx.Snapshotter)
 		}
 	}
-	return img, nil
+
+	is := c.ImageService()
+	for {
+		if created, err := is.Create(ctx, img.i); err != nil {
+			if !errdefs.IsAlreadyExists(err) {
+				return nil, err
+			}
+
+			updated, err := is.Update(ctx, img.i)
+			if err != nil {
+				// if image was removed, try create again
+				if errdefs.IsNotFound(err) {
+					continue
+				}
+				return nil, err
+			}
+
+			img.i = updated
+		} else {
+			img.i = created
+		}
+		return img, nil
+	}
 }
 
 // Push uploads the provided content to a remote resource
