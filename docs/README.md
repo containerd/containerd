@@ -1,10 +1,12 @@
 # Containerd website
 
-The containerd website is built using Jekyll and published to Github pages.
+The containerd website at https://containerd.io is built using [Hugo](https://gohugo.io) and published to [Netlify](https://netlify.com).
 
-In order to build and test locally:
+To develop the site locally in "watch" mode (using Docker):
+
+```bash
+$ docker run -it -v $(pwd):/src -p "1313:1313" -e HUGO_WATCH=true jojomi/hugo
 ```
-docker run -it -v "$PWD":/usr/src/app -p "4000:4000" starefossen/github-pages
-```
-Then browser to localhost:4000 to see the rendered site. The site autorefreshes when you modify files locally.
+
+You can then open up your browser to localhost:1313 to see the rendered site. The site auto-refreshes when you modify files locally.
 

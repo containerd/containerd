@@ -1,0 +1,6 @@
+{{- $features := .Site.Data.features }}
+<ul>
+  {{- range $features }}
+  <li>{{ . | markdownify }}</li>
+  {{- end }}
+</ul>

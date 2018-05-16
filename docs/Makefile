@@ -12,7 +12,20 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+HUGO = hugo
+BASE_URL = https://containerd.io
 
-FROM nginx
+clean:
+	rm -rf public
 
-COPY public /usr/share/nginx/html
+build: clean
+	$(HUGO) \
+		--baseURL $(BASE_URL)
+
+build-preview: clean
+	$(HUGO)
+
+dev: clean
+	$(HUGO) server \
+		--disableFastRender \
+		--ignoreCache
