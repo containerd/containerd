@@ -1,7 +1,4 @@
----
-title: containerd Namespaces and Multi-Tenancy
-draft: true
----
+# containerd Namespaces and Multi-Tenancy
 
 containerd offers a fully namespaced API so multiple consumers can all use a single containerd instance without conflicting with one another.
 Namespaces allow multi-tenancy within a single daemon. This removes the need for the common pattern of using nested containers to achieve this separation.

@@ -1,8 +1,3 @@
----
-title: Dockercon 2017 Summit
-draft: true
----
-
 # Dockercon 2017 Summit
 
 This year at Dockercon US 2017 we will be having a containerd Summit on Thursday morning the week of the conference.
