@@ -1,7 +1,8 @@
 package fstest
 
 import (
-	"io/ioutil"
+	"bytes"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -22,9 +23,26 @@ func (a applyFn) Apply(root string) error {
 // CreateFile returns a file applier which creates a file as the
 // provided name with the given content and permission.
 func CreateFile(name string, content []byte, perm os.FileMode) Applier {
-	return applyFn(func(root string) error {
+	return WriteFileStream(name, bytes.NewReader(content), perm)
+}
+
+// WriteFileStream returns a file applier which creates a file as the
+// provided name with the given content from the provided i/o stream and permission.
+func WriteFileStream(name string, stream io.Reader, perm os.FileMode) Applier {
+	return applyFn(func(root string) (retErr error) {
 		fullPath := filepath.Join(root, name)
-		if err := ioutil.WriteFile(fullPath, content, perm); err != nil {
+		f, err := os.OpenFile(fullPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			err := f.Close()
+			if err != nil && retErr == nil {
+				retErr = err
+			}
+		}()
+		_, err = io.Copy(f, stream)
+		if err != nil {
 			return err
 		}
 		return os.Chmod(fullPath, perm)
