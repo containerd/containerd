@@ -1,7 +1,4 @@
----
-title: Getting started with containerd
-draft: true
----
+# Getting started with containerd
 
 There are many different ways to use containerd.
 If you are a developer working on containerd you can use the `ctr` tool to quickly test features and functionality without writing extra code.

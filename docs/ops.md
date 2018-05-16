@@ -1,7 +1,4 @@
----
-title: containerd for Ops and Admins
-draft: true
----
+# containerd for Ops and Admins
 
 containerd is meant to be a simple daemon to run on any system.
 It provides a minimal config with knobs to configure the daemon and what plugins are used when necessary.

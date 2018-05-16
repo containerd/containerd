@@ -1,7 +1,4 @@
----
-title: Client options
-draft: true
----
+# Client options
 
 The containerd client was built to be easily extended by consumers.
 The goal is that the execution flow of the calls remain the same across implementations while `Opts` are written to extend functionality.
