@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/oci/passthrough"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -123,6 +124,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			Path: parts[1],
 		}))
 	}
+	opts = append(opts, passthrough.WithSpecPassthrough())
 	if context.IsSet("config") {
 		var s specs.Spec
 		if err := loadSpec(context.String("config"), &s); err != nil {
