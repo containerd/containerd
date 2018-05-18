@@ -29,6 +29,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/gotestyourself/gotestyourself/assert"
 	is "github.com/gotestyourself/gotestyourself/assert/cmp"
+	"github.com/gotestyourself/gotestyourself/assert/opt"
 	"github.com/pkg/errors"
 )
 
@@ -177,42 +178,59 @@ func basePopulate(ctx context.Context, ms *MetaStore) error {
 	return nil
 }
 
-var baseInfo = map[string]snapshots.Info{
-	"committed-1": {
-		Name:   "committed-1",
-		Parent: "",
-		Kind:   snapshots.KindCommitted,
-	},
-	"committed-2": {
-		Name:   "committed-2",
-		Parent: "committed-1",
-		Kind:   snapshots.KindCommitted,
-	},
-	"active-1": {
-		Name:   "active-1",
-		Parent: "",
-		Kind:   snapshots.KindActive,
-	},
-	"active-2": {
-		Name:   "active-2",
-		Parent: "committed-1",
-		Kind:   snapshots.KindActive,
-	},
-	"active-3": {
-		Name:   "active-3",
-		Parent: "committed-2",
-		Kind:   snapshots.KindActive,
-	},
-	"view-1": {
-		Name:   "view-1",
-		Parent: "",
-		Kind:   snapshots.KindView,
-	},
-	"view-2": {
-		Name:   "view-2",
-		Parent: "committed-2",
-		Kind:   snapshots.KindView,
-	},
+func baseInfo() map[string]snapshots.Info {
+	now := time.Now()
+	return map[string]snapshots.Info{
+		"committed-1": {
+			Name:    "committed-1",
+			Parent:  "",
+			Kind:    snapshots.KindCommitted,
+			Created: now,
+			Updated: now,
+		},
+		"committed-2": {
+			Name:    "committed-2",
+			Parent:  "committed-1",
+			Kind:    snapshots.KindCommitted,
+			Created: now,
+			Updated: now,
+		},
+		"active-1": {
+			Name:    "active-1",
+			Parent:  "",
+			Kind:    snapshots.KindActive,
+			Created: now,
+			Updated: now,
+		},
+		"active-2": {
+			Name:    "active-2",
+			Parent:  "committed-1",
+			Kind:    snapshots.KindActive,
+			Created: now,
+			Updated: now,
+		},
+		"active-3": {
+			Name:    "active-3",
+			Parent:  "committed-2",
+			Kind:    snapshots.KindActive,
+			Created: now,
+			Updated: now,
+		},
+		"view-1": {
+			Name:    "view-1",
+			Parent:  "",
+			Kind:    snapshots.KindView,
+			Created: now,
+			Updated: now,
+		},
+		"view-2": {
+			Name:    "view-2",
+			Parent:  "committed-2",
+			Kind:    snapshots.KindView,
+			Created: now,
+			Updated: now,
+		},
+	}
 }
 
 func assertNotExist(t *testing.T, err error) {
@@ -236,7 +254,7 @@ func assertExist(t *testing.T, err error) {
 }
 
 func testGetInfo(ctx context.Context, t *testing.T, _ *MetaStore) {
-	for key, expected := range baseInfo {
+	for key, expected := range baseInfo() {
 		_, info, _, err := GetInfo(ctx, key)
 		assert.NilError(t, err, "on key %v", key)
 		assert.Check(t, is.DeepEqual(expected, info, cmpSnapshotInfo), "on key %v", key)
@@ -245,25 +263,10 @@ func testGetInfo(ctx context.Context, t *testing.T, _ *MetaStore) {
 
 // compare snapshot.Info Updated and Created fields by checking they are
 // within a threshold of time.Now()
-var cmpSnapshotInfo = cmp.FilterPath(
-	func(path cmp.Path) bool {
-		field := path.Last().String()
-		return field == ".Created" || field == ".Updated"
-	},
-	cmp.Comparer(func(expected, actual time.Time) bool {
-		// cmp.Options must be symmetric, so swap the args
-		if actual.IsZero() {
-			actual, expected = expected, actual
-		}
-		if !expected.IsZero() {
-			return false
-		}
-		// actual value should be within a few seconds of now
-		now := time.Now()
-		delta := now.Sub(actual)
-		threshold := 10 * time.Second
-		return delta > -threshold && delta < threshold
-	}))
+var cmpSnapshotInfo = opt.Opts(
+	cmp.FilterPath(opt.PathString("Created"), opt.CmpTime(time.Second)),
+	cmp.FilterPath(opt.PathString("Updated"), opt.CmpTime(time.Second)),
+)
 
 func testGetInfoNotExist(ctx context.Context, t *testing.T, _ *MetaStore) {
 	_, _, _, err := GetInfo(ctx, "active-not-exist")
@@ -280,7 +283,7 @@ func testWalk(ctx context.Context, t *testing.T, _ *MetaStore) {
 		return nil
 	})
 	assert.NilError(t, err)
-	assert.Assert(t, is.DeepEqual(baseInfo, found, cmpSnapshotInfo))
+	assert.Assert(t, is.DeepEqual(baseInfo(), found, cmpSnapshotInfo))
 }
 
 func testGetSnapshot(ctx context.Context, t *testing.T, ms *MetaStore) {

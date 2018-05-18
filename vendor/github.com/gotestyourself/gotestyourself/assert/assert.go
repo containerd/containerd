@@ -37,10 +37,10 @@ The example below shows assert used with some common types.
 	    assert.Assert(t, os.IsNotExist(err), "got %+v", err)
 
 	    // complex types
+	    assert.DeepEqual(t, result, myStruct{Name: "title"})
 	    assert.Assert(t, is.Len(items, 3))
 	    assert.Assert(t, len(sequence) != 0) // NotEmpty
 	    assert.Assert(t, is.Contains(mapping, "key"))
-	    assert.Assert(t, is.DeepEqual(result, myStruct{Name: "title"}))
 
 	    // pointers and interface
 	    assert.Assert(t, is.Nil(ref))
@@ -71,6 +71,7 @@ import (
 	"go/ast"
 	"go/token"
 
+	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/gotestyourself/gotestyourself/assert/cmp"
 	"github.com/gotestyourself/gotestyourself/internal/format"
 	"github.com/gotestyourself/gotestyourself/internal/source"
@@ -246,4 +247,14 @@ func Equal(t TestingT, x, y interface{}, msgAndArgs ...interface{}) {
 		ht.Helper()
 	}
 	assert(t, t.FailNow, filterExprExcludeFirst, cmp.Equal(x, y), msgAndArgs...)
+}
+
+// DeepEqual uses https://github.com/google/go-cmp/cmp to assert two values
+// are equal and fails the test if they are not equal.
+// This is equivalent to Assert(t, cmp.DeepEqual(x, y)).
+func DeepEqual(t TestingT, x, y interface{}, opts ...gocmp.Option) {
+	if ht, ok := t.(helperT); ok {
+		ht.Helper()
+	}
+	assert(t, t.FailNow, filterExprExcludeFirst, cmp.DeepEqual(x, y, opts...))
 }
