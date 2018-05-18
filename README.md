@@ -1,7 +1,7 @@
 # cri
 <p align="center">
-<img src="https://github.com/kubernetes/kubernetes/blob/master/logo/logo.png" width="50" height="50">
-<img src="https://github.com/containerd/containerd/blob/master/docs/images/containerd-dark.png" width="200" >
+<img src="https://kubernetes.io/images/favicon.png" width="50" height="50">
+<img src="https://containerd.io/img/containerd-dark.png" width="200" >
 </p>
 
 *Note: The standalone `cri-containerd` binary is end-of-life. `cri-containerd` is
