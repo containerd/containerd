@@ -162,8 +162,6 @@ cat > ${config_path} <<EOF
   shim = "${CONTAINERD_HOME}/usr/local/bin/containerd-shim"
   runtime = "${CONTAINERD_HOME}/usr/local/sbin/runc"
 
-[plugins.cri]
-  enable_tls_streaming = true
 [plugins.cri.cni]
   bin_dir = "${cni_bin_dir}"
   conf_dir = "/etc/cni/net.d"
