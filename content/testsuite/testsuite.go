@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/gotestyourself/gotestyourself/assert"
 	digest "github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
 
@@ -122,28 +123,28 @@ var labels = map[string]string{
 
 func checkContentStoreWriter(ctx context.Context, t *testing.T, cs content.Store) {
 	c1, d1 := createContent(256)
-	w1, err := cs.Writer(ctx, "c1", 0, "")
+	w1, err := cs.Writer(ctx, content.WithRef("c1"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer w1.Close()
 
 	c2, d2 := createContent(256)
-	w2, err := cs.Writer(ctx, "c2", int64(len(c2)), "")
+	w2, err := cs.Writer(ctx, content.WithRef("c2"), content.WithDescriptor(ocispec.Descriptor{Size: int64(len(c2))}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer w2.Close()
 
 	c3, d3 := createContent(256)
-	w3, err := cs.Writer(ctx, "c3", 0, d3)
+	w3, err := cs.Writer(ctx, content.WithRef("c3"), content.WithDescriptor(ocispec.Descriptor{Digest: d3}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer w3.Close()
 
 	c4, d4 := createContent(256)
-	w4, err := cs.Writer(ctx, "c4", int64(len(c4)), d4)
+	w4, err := cs.Writer(ctx, content.WithRef("c4"), content.WithDescriptor(ocispec.Descriptor{Size: int64(len(c4)), Digest: d4}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +227,7 @@ func checkResumeWriter(ctx context.Context, t *testing.T, cs content.Store) {
 	)
 
 	preStart := time.Now()
-	w1, err := cs.Writer(ctx, ref, 256, dgst)
+	w1, err := cs.Writer(ctx, content.WithRef(ref), content.WithDescriptor(ocispec.Descriptor{Size: 256, Digest: dgst}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +248,7 @@ func checkResumeWriter(ctx context.Context, t *testing.T, cs content.Store) {
 	checkStatus(t, w1, expected, dgstFirst, preStart, postStart, preUpdate, postUpdate)
 	assert.NilError(t, w1.Close(), "close first writer")
 
-	w2, err := cs.Writer(ctx, ref, 256, dgst)
+	w2, err := cs.Writer(ctx, content.WithRef(ref), content.WithDescriptor(ocispec.Descriptor{Size: 256, Digest: dgst}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -284,7 +285,7 @@ func checkUpdateStatus(ctx context.Context, t *testing.T, cs content.Store) {
 	c1, d1 := createContent(256)
 
 	preStart := time.Now()
-	w1, err := cs.Writer(ctx, "c1", 256, d1)
+	w1, err := cs.Writer(ctx, content.WithRef("c1"), content.WithDescriptor(ocispec.Descriptor{Size: 256, Digest: d1}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -352,7 +353,7 @@ func checkUpdateStatus(ctx context.Context, t *testing.T, cs content.Store) {
 func checkLabels(ctx context.Context, t *testing.T, cs content.Store) {
 	c1, d1 := createContent(256)
 
-	w1, err := cs.Writer(ctx, "c1", 256, d1)
+	w1, err := cs.Writer(ctx, content.WithRef("c1"), content.WithDescriptor(ocispec.Descriptor{Size: 256, Digest: d1}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -427,7 +428,7 @@ func checkResume(rf func(context.Context, content.Writer, []byte, int64, int64, 
 				limit := int64(float64(size) * tp)
 				ref := fmt.Sprintf("ref-%d-%d", i, j)
 
-				w, err := cs.Writer(ctx, ref, size, d)
+				w, err := cs.Writer(ctx, content.WithRef(ref), content.WithDescriptor(ocispec.Descriptor{Size: size, Digest: d}))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -441,7 +442,7 @@ func checkResume(rf func(context.Context, content.Writer, []byte, int64, int64, 
 					t.Fatal(err)
 				}
 
-				w, err = cs.Writer(ctx, ref, size, d)
+				w, err = cs.Writer(ctx, content.WithRef(ref), content.WithDescriptor(ocispec.Descriptor{Size: size, Digest: d}))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -530,7 +531,7 @@ func checkSmallBlob(ctx context.Context, t *testing.T, store content.Store) {
 	blobSize := int64(len(blob))
 	blobDigest := digest.FromBytes(blob)
 	// test write
-	w, err := store.Writer(ctx, t.Name(), blobSize, blobDigest)
+	w, err := store.Writer(ctx, content.WithRef(t.Name()), content.WithDescriptor(ocispec.Descriptor{Size: blobSize, Digest: blobDigest}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -545,7 +546,7 @@ func checkSmallBlob(ctx context.Context, t *testing.T, store content.Store) {
 	}
 	// test read.
 	readSize := blobSize + 1
-	ra, err := store.ReaderAt(ctx, blobDigest)
+	ra, err := store.ReaderAt(ctx, ocispec.Descriptor{Digest: blobDigest})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -575,7 +576,7 @@ func checkCrossNSShare(ctx context.Context, t *testing.T, cs content.Store) {
 	ref := fmt.Sprintf("ref-%d", size)
 	t1 := time.Now()
 
-	if err := content.WriteBlob(ctx, cs, ref, bytes.NewReader(b), size, d); err != nil {
+	if err := content.WriteBlob(ctx, cs, ref, bytes.NewReader(b), ocispec.Descriptor{Size: size, Digest: d}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -585,7 +586,7 @@ func checkCrossNSShare(ctx context.Context, t *testing.T, cs content.Store) {
 	}
 	defer done(ctx2)
 
-	w, err := cs.Writer(ctx2, ref, size, d)
+	w, err := cs.Writer(ctx2, content.WithRef(ref), content.WithDescriptor(ocispec.Descriptor{Size: size, Digest: d}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -626,7 +627,7 @@ func checkCrossNSAppend(ctx context.Context, t *testing.T, cs content.Store) {
 	ref := fmt.Sprintf("ref-%d", size)
 	t1 := time.Now()
 
-	if err := content.WriteBlob(ctx, cs, ref, bytes.NewReader(b), size, d); err != nil {
+	if err := content.WriteBlob(ctx, cs, ref, bytes.NewReader(b), ocispec.Descriptor{Size: size, Digest: d}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -643,7 +644,7 @@ func checkCrossNSAppend(ctx context.Context, t *testing.T, cs content.Store) {
 	copy(b2[size:], extra)
 	d2 := digest.FromBytes(b2)
 
-	w, err := cs.Writer(ctx2, ref, size, d)
+	w, err := cs.Writer(ctx2, content.WithRef(ref), content.WithDescriptor(ocispec.Descriptor{Size: size, Digest: d}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -768,7 +769,7 @@ func checkContent(ctx context.Context, cs content.Store, d digest.Digest, expect
 		return err
 	}
 
-	b, err := content.ReadBlob(ctx, cs, d)
+	b, err := content.ReadBlob(ctx, cs, ocispec.Descriptor{Digest: d})
 	if err != nil {
 		return errors.Wrap(err, "failed to read blob")
 	}

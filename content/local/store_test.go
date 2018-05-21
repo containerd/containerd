@@ -39,6 +39,7 @@ import (
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/gotestyourself/gotestyourself/assert"
 	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type memoryLabelStore struct {
@@ -108,7 +109,7 @@ func TestContentWriter(t *testing.T) {
 		t.Fatal("ingest dir should be created", err)
 	}
 
-	cw, err := cs.Writer(ctx, "myref", 0, "")
+	cw, err := cs.Writer(ctx, content.WithRef("myref"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,13 +118,13 @@ func TestContentWriter(t *testing.T) {
 	}
 
 	// reopen, so we can test things
-	cw, err = cs.Writer(ctx, "myref", 0, "")
+	cw, err = cs.Writer(ctx, content.WithRef("myref"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// make sure that second resume also fails
-	if _, err = cs.Writer(ctx, "myref", 0, ""); err == nil {
+	if _, err = cs.Writer(ctx, content.WithRef("myref")); err == nil {
 		// TODO(stevvooe): This also works across processes. Need to find a way
 		// to test that, as well.
 		t.Fatal("no error on second resume")
@@ -166,7 +167,7 @@ func TestContentWriter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cw, err = cs.Writer(ctx, "aref", 0, "")
+	cw, err = cs.Writer(ctx, content.WithRef("aref"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,7 +347,8 @@ func checkBlobPath(t *testing.T, cs content.Store, dgst digest.Digest) string {
 }
 
 func checkWrite(ctx context.Context, t checker, cs content.Store, dgst digest.Digest, p []byte) digest.Digest {
-	if err := content.WriteBlob(ctx, cs, dgst.String(), bytes.NewReader(p), int64(len(p)), dgst); err != nil {
+	if err := content.WriteBlob(ctx, cs, dgst.String(), bytes.NewReader(p),
+		ocispec.Descriptor{Size: int64(len(p)), Digest: dgst}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -365,25 +367,25 @@ func TestWriterTruncateRecoversFromIncompleteWrite(t *testing.T) {
 	defer cancel()
 
 	ref := "ref"
-	content := []byte("this is the content")
-	total := int64(len(content))
+	contentB := []byte("this is the content")
+	total := int64(len(contentB))
 	setupIncompleteWrite(ctx, t, cs, ref, total)
 
-	writer, err := cs.Writer(ctx, ref, total, "")
+	writer, err := cs.Writer(ctx, content.WithRef(ref), content.WithDescriptor(ocispec.Descriptor{Size: total}))
 	assert.NilError(t, err)
 
 	assert.NilError(t, writer.Truncate(0))
 
-	_, err = writer.Write(content)
+	_, err = writer.Write(contentB)
 	assert.NilError(t, err)
 
-	dgst := digest.FromBytes(content)
+	dgst := digest.FromBytes(contentB)
 	err = writer.Commit(ctx, total, dgst)
 	assert.NilError(t, err)
 }
 
 func setupIncompleteWrite(ctx context.Context, t *testing.T, cs content.Store, ref string, total int64) {
-	writer, err := cs.Writer(ctx, ref, total, "")
+	writer, err := cs.Writer(ctx, content.WithRef(ref), content.WithDescriptor(ocispec.Descriptor{Size: total}))
 	assert.NilError(t, err)
 
 	_, err = writer.Write([]byte("bad data"))

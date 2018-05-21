@@ -86,7 +86,11 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 				config.Reference = uniqueRef()
 			}
 
-			cw, err := s.store.Writer(ctx, config.Reference, 0, "")
+			cw, err := s.store.Writer(ctx,
+				content.WithRef(config.Reference),
+				content.WithDescriptor(ocispec.Descriptor{
+					MediaType: config.MediaType, // most contentstore implementations just ignore this
+				}))
 			if err != nil {
 				return errors.Wrap(err, "failed to open writer")
 			}

@@ -19,6 +19,7 @@ package server
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"path/filepath"
 	"time"
 
@@ -179,10 +180,7 @@ func (c *criService) Run() error {
 
 	// Start event handler.
 	logrus.Info("Start event monitor")
-	eventMonitorCloseCh, err := c.eventMonitor.start()
-	if err != nil {
-		return errors.Wrap(err, "failed to start event monitor")
-	}
+	eventMonitorErrCh := c.eventMonitor.start()
 
 	// Start snapshot stats syncer, it doesn't need to be stopped.
 	logrus.Info("Start snapshots syncer")
@@ -195,27 +193,32 @@ func (c *criService) Run() error {
 
 	// Start streaming server.
 	logrus.Info("Start streaming server")
-	streamServerCloseCh := make(chan struct{})
+	streamServerErrCh := make(chan error)
 	go func() {
-		if err := c.streamServer.Start(true); err != nil {
+		defer close(streamServerErrCh)
+		if err := c.streamServer.Start(true); err != nil && err != http.ErrServerClosed {
 			logrus.WithError(err).Error("Failed to start streaming server")
+			streamServerErrCh <- err
 		}
-		close(streamServerCloseCh)
 	}()
 
 	// Set the server as initialized. GRPC services could start serving traffic.
 	c.initialized.Set()
 
+	var eventMonitorErr, streamServerErr error
 	// Stop the whole CRI service if any of the critical service exits.
 	select {
-	case <-eventMonitorCloseCh:
-	case <-streamServerCloseCh:
+	case eventMonitorErr = <-eventMonitorErrCh:
+	case streamServerErr = <-streamServerErrCh:
 	}
 	if err := c.Close(); err != nil {
 		return errors.Wrap(err, "failed to stop cri service")
 	}
-
-	<-eventMonitorCloseCh
+	// If the error is set above, err from channel must be nil here, because
+	// the channel is supposed to be closed. Or else, we wait and set it.
+	if err := <-eventMonitorErrCh; err != nil {
+		eventMonitorErr = err
+	}
 	logrus.Info("Event monitor stopped")
 	// There is a race condition with http.Server.Serve.
 	// When `Close` is called at the same time with `Serve`, `Close`
@@ -227,18 +230,27 @@ func (c *criService) Run() error {
 	// is fixed.
 	const streamServerStopTimeout = 2 * time.Second
 	select {
-	case <-streamServerCloseCh:
+	case err := <-streamServerErrCh:
+		if err != nil {
+			streamServerErr = err
+		}
 		logrus.Info("Stream server stopped")
 	case <-time.After(streamServerStopTimeout):
 		logrus.Errorf("Stream server is not stopped in %q", streamServerStopTimeout)
 	}
+	if eventMonitorErr != nil {
+		return errors.Wrap(eventMonitorErr, "event monitor error")
+	}
+	if streamServerErr != nil {
+		return errors.Wrap(streamServerErr, "stream server error")
+	}
 	return nil
 }
 
-// Stop stops the CRI service.
+// Close stops the CRI service.
+// TODO(random-liu): Make close synchronous.
 func (c *criService) Close() error {
 	logrus.Info("Stop CRI service")
-	// TODO(random-liu): Make event monitor stop synchronous.
 	c.eventMonitor.stop()
 	if err := c.streamServer.Stop(); err != nil {
 		return errors.Wrap(err, "failed to stop stream server")

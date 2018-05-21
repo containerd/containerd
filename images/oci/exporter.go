@@ -93,7 +93,7 @@ func blobRecord(cs content.Provider, desc ocispec.Descriptor) tarRecord {
 			Typeflag: tar.TypeReg,
 		},
 		CopyTo: func(ctx context.Context, w io.Writer) (int64, error) {
-			r, err := cs.ReaderAt(ctx, desc.Digest)
+			r, err := cs.ReaderAt(ctx, desc)
 			if err != nil {
 				return 0, err
 			}

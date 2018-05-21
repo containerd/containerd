@@ -105,7 +105,7 @@ func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 		return emptyDesc, errors.Wrapf(errdefs.ErrNotImplemented, "unsupported diff media type: %v", desc.MediaType)
 	}
 
-	ra, err := s.store.ReaderAt(ctx, desc.Digest)
+	ra, err := s.store.ReaderAt(ctx, desc)
 	if err != nil {
 		return emptyDesc, errors.Wrap(err, "failed to get reader from content store")
 	}
