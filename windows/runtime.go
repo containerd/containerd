@@ -53,7 +53,7 @@ var (
 	pluginID = fmt.Sprintf("%s.%s", plugin.RuntimePlugin, runtimeName)
 )
 
-var _ = (runtime.Runtime)(&windowsRuntime{})
+var _ = (runtime.PlatformRuntime)(&windowsRuntime{})
 
 func init() {
 	plugin.Register(&plugin.Registration{
