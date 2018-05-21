@@ -2,10 +2,10 @@ package fs
 
 import (
 	_ "crypto/sha256"
-	"io"
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	_ "crypto/sha256"
 
@@ -50,40 +50,16 @@ func TestCopyDirectoryWithLocalSymlink(t *testing.T) {
 
 // TestCopyWithLargeFile tests copying a file whose size > 2^32 bytes.
 func TestCopyWithLargeFile(t *testing.T) {
-	dataR, dataW := io.Pipe()
-	var written int64
-	max := int64(3 * 1024 * 1024 * 1024)
-	defer dataR.Close()
-
-	go func() {
-		var (
-			data = make([]byte, 64*1024)
-			err  error
-			n    int
-		)
-		defer func() {
-			dataW.CloseWithError(err)
-		}()
-
-		for written < max {
-			n, err = dataW.Write(data)
-			if err != nil {
-				return
-			}
-			written += int64(n)
-		}
-	}()
-
+	if testing.Short() {
+		t.SkipNow()
+	}
 	apply := fstest.Apply(
 		fstest.CreateDir("/banana", 0755),
-		fstest.WriteFileStream("/banana/split", dataR, 0644),
+		fstest.CreateRandomFile("/banana/split", time.Now().UnixNano(), 3*1024*1024*1024, 0644),
 	)
 
 	if err := testCopy(apply); err != nil {
 		t.Fatal(err)
-	}
-	if written < max {
-		t.Fatalf("wrote fewer bytes than expected: %d", written)
 	}
 }
 

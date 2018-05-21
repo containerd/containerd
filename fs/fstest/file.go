@@ -3,6 +3,7 @@ package fstest
 import (
 	"bytes"
 	"io"
+	"math/rand"
 	"net"
 	"os"
 	"path/filepath"
@@ -23,12 +24,18 @@ func (a applyFn) Apply(root string) error {
 // CreateFile returns a file applier which creates a file as the
 // provided name with the given content and permission.
 func CreateFile(name string, content []byte, perm os.FileMode) Applier {
-	return WriteFileStream(name, bytes.NewReader(content), perm)
+	return writeFileStream(name, bytes.NewReader(content), perm)
 }
 
-// WriteFileStream returns a file applier which creates a file as the
+// CreateRandomFile returns a file applier which creates a file with random
+// content of the given size using the given seed and permission.
+func CreateRandomFile(name string, seed, size int64, perm os.FileMode) Applier {
+	return writeFileStream(name, io.LimitReader(rand.New(rand.NewSource(seed)), size), perm)
+}
+
+// writeFileStream returns a file applier which creates a file as the
 // provided name with the given content from the provided i/o stream and permission.
-func WriteFileStream(name string, stream io.Reader, perm os.FileMode) Applier {
+func writeFileStream(name string, stream io.Reader, perm os.FileMode) Applier {
 	return applyFn(func(root string) (retErr error) {
 		fullPath := filepath.Join(root, name)
 		f, err := os.OpenFile(fullPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
