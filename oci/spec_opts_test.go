@@ -25,7 +25,7 @@ import (
 func TestWithEnv(t *testing.T) {
 	t.Parallel()
 
-	s := specs.Spec{}
+	s := Spec{}
 	s.Process = &specs.Process{
 		Env: []string{"DEFAULT=test"},
 	}
@@ -59,7 +59,7 @@ func TestWithMounts(t *testing.T) {
 
 	t.Parallel()
 
-	s := specs.Spec{
+	s := Spec{
 		Mounts: []specs.Mount{
 			{
 				Source:      "default-source",
