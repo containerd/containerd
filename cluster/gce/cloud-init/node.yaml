@@ -177,11 +177,11 @@ runcmd:
   - systemctl daemon-reload
   - systemctl enable containerd-installation.service
   - systemctl enable containerd.service
-  - systemctl enable containerd-monitor.service
   - systemctl enable containerd.target
   - systemctl enable kube-node-installation.service
   - systemctl enable kube-node-configuration.service
   - systemctl enable kubelet-monitor.service
+  - systemctl enable kube-container-runtime-monitor.service
   - systemctl enable kube-logrotate.timer
   - systemctl enable kube-logrotate.service
   - systemctl enable kubernetes.target
