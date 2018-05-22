@@ -28,10 +28,10 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/containerd/snapshots/testsuite"
-	"github.com/containerd/containerd/testutil"
 )
 
 func newSnapshotter(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {

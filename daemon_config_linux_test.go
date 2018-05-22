@@ -29,8 +29,8 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/server"
-	"github.com/containerd/containerd/testutil"
 )
 
 // the following nolint is for shutting up gometalinter on non-linux.

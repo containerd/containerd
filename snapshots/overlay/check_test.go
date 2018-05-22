@@ -24,7 +24,7 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/containerd/containerd/testutil"
+	"github.com/containerd/containerd/pkg/testutil"
 )
 
 func testOverlaySupported(t testing.TB, expected bool, mkfs ...string) {

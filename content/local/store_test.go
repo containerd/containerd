@@ -36,7 +36,7 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/content/testsuite"
-	"github.com/containerd/containerd/testutil"
+	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/gotestyourself/gotestyourself/assert"
 	"github.com/opencontainers/go-digest"
 )
