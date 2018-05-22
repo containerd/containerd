@@ -29,7 +29,7 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/server"
+	"github.com/containerd/containerd/services/server"
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/containerd/version"
 	"github.com/pkg/errors"

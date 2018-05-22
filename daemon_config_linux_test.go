@@ -30,7 +30,7 @@ import (
 
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/testutil"
-	"github.com/containerd/containerd/server"
+	"github.com/containerd/containerd/services/server"
 )
 
 // the following nolint is for shutting up gometalinter on non-linux.
