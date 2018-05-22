@@ -39,7 +39,6 @@ import (
 	"github.com/containerd/containerd/linux/shim"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/reaper"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
@@ -194,7 +193,7 @@ func handleSignals(logger *logrus.Entry, signals chan os.Signal, server *ttrpc.S
 		case s := <-signals:
 			switch s {
 			case unix.SIGCHLD:
-				if err := reaper.Reap(); err != nil {
+				if err := shim.Reap(); err != nil {
 					logger.WithError(err).Error("reap exit status")
 				}
 			case unix.SIGTERM, unix.SIGINT:
@@ -248,11 +247,11 @@ func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event
 	}
 	cmd := exec.CommandContext(ctx, containerdBinaryFlag, "--address", l.address, "publish", "--topic", topic, "--namespace", ns)
 	cmd.Stdin = bytes.NewReader(data)
-	c, err := reaper.Default.Start(cmd)
+	c, err := shim.Default.Start(cmd)
 	if err != nil {
 		return err
 	}
-	status, err := reaper.Default.Wait(cmd, c)
+	status, err := shim.Default.Wait(cmd, c)
 	if err != nil {
 		return err
 	}

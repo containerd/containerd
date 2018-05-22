@@ -22,7 +22,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/containerd/containerd/reaper"
+	"github.com/containerd/containerd/linux/shim"
 	runc "github.com/containerd/go-runc"
 	"github.com/stevvooe/ttrpc"
 )
@@ -34,7 +34,7 @@ func setupSignals() (chan os.Signal, error) {
 	signal.Notify(signals)
 	// make sure runc is setup to use the monitor
 	// for waiting on processes
-	runc.Monitor = reaper.Default
+	runc.Monitor = shim.Default
 	return signals, nil
 }
 

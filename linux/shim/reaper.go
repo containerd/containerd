@@ -16,7 +16,7 @@
    limitations under the License.
 */
 
-package reaper
+package shim
 
 import (
 	"os/exec"
