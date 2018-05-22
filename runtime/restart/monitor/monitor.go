@@ -31,7 +31,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/restart"
+	"github.com/containerd/containerd/runtime/restart"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/pkg/errors"
