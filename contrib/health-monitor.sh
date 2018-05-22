@@ -17,6 +17,10 @@
 set -o nounset
 set -o pipefail
 
+# TODO(#780): This file is not used by kube-up.sh on
+# GCE anymore. We'll get rid of this file in 1.12 release.
+# Please stop relying on this script if you are.
+
 # CRICTL is the path of crictl
 CRICTL=${CRICTL:-"crictl"}
 # INITIAL_WAIT_ATTEMPTS is the number to attempt, before start
