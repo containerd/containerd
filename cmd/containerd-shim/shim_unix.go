@@ -22,7 +22,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/containerd/containerd/linux/shim"
+	"github.com/containerd/containerd/runtime/linux/shim"
 	runc "github.com/containerd/go-runc"
 	"github.com/stevvooe/ttrpc"
 )
