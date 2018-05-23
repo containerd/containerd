@@ -155,6 +155,9 @@ if [ -n "${network_policy_provider}" ] && [ "${network_policy_provider}" != "non
 fi
 log_level="${CONTAINERD_LOG_LEVEL:-"info"}"
 cat > ${config_path} <<EOF
+# Kubernetes doesn't use containerd restart manager.
+disabled_plugins = ["restart"]
+
 [debug]
   level = "${log_level}"
 
