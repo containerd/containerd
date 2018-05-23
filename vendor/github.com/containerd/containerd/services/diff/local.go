@@ -17,6 +17,8 @@
 package diff
 
 import (
+	"context"
+
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/diff"
@@ -26,7 +28,6 @@ import (
 	"github.com/containerd/containerd/services"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 

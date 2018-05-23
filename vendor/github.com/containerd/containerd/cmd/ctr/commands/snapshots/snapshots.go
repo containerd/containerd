@@ -304,7 +304,11 @@ var prepareCommand = cli.Command{
 		defer cancel()
 
 		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
-		mounts, err := snapshotter.Prepare(ctx, key, parent)
+		labels := map[string]string{
+			"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
+		}
+
+		mounts, err := snapshotter.Prepare(ctx, key, parent, snapshots.WithLabels(labels))
 		if err != nil {
 			return err
 		}
@@ -404,7 +408,10 @@ var commitCommand = cli.Command{
 		}
 		defer cancel()
 		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
-		return snapshotter.Commit(ctx, key, active)
+		labels := map[string]string{
+			"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
+		}
+		return snapshotter.Commit(ctx, key, active, snapshots.WithLabels(labels))
 	},
 }
 

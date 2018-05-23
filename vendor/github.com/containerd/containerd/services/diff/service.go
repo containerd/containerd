@@ -17,11 +17,12 @@
 package diff
 
 import (
+	"context"
+
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 

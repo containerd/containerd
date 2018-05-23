@@ -43,7 +43,7 @@ func NewConsoleSocket(path string) (*Socket, error) {
 		return nil, err
 	}
 	return &Socket{
-		l:    l,
+		l: l,
 	}, nil
 }
 

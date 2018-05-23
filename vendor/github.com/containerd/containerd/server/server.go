@@ -17,6 +17,7 @@
 package server
 
 import (
+	"context"
 	"expvar"
 	"io"
 	"net"
@@ -37,7 +38,6 @@ import (
 	metrics "github.com/docker/go-metrics"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 
 	"google.golang.org/grpc"
 )
@@ -146,7 +146,7 @@ func (s *Server) ServeGRPC(l net.Listener) error {
 		// enable grpc time histograms to measure rpc latencies
 		grpc_prometheus.EnableHandlingTimeHistogram()
 	}
-	// before we start serving the grpc API regster the grpc_prometheus metrics
+	// before we start serving the grpc API register the grpc_prometheus metrics
 	// handler.  This needs to be the last service registered so that it can collect
 	// metrics for every other service
 	grpc_prometheus.Register(s.rpc)

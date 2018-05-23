@@ -199,7 +199,7 @@ func applyNaive(ctx context.Context, root string, tr *tar.Reader, options ApplyO
 				basename := filepath.Base(hdr.Name)
 				aufsHardlinks[basename] = hdr
 				if aufsTempdir == "" {
-					if aufsTempdir, err = ioutil.TempDir("", "dockerplnk"); err != nil {
+					if aufsTempdir, err = ioutil.TempDir(os.Getenv("XDG_RUNTIME_DIR"), "dockerplnk"); err != nil {
 						return 0, err
 					}
 					defer os.RemoveAll(aufsTempdir)

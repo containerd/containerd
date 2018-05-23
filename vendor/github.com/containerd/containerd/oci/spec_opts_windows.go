@@ -32,7 +32,7 @@ import (
 
 // WithImageConfig configures the spec to from the configuration of an Image
 func WithImageConfig(image Image) SpecOpts {
-	return func(ctx context.Context, client Client, _ *containers.Container, s *specs.Spec) error {
+	return func(ctx context.Context, client Client, _ *containers.Container, s *Spec) error {
 		setProcess(s)
 		ic, err := image.Config(ctx)
 		if err != nil {
@@ -67,7 +67,7 @@ func WithImageConfig(image Image) SpecOpts {
 // WithTTY sets the information on the spec as well as the environment variables for
 // using a TTY
 func WithTTY(width, height int) SpecOpts {
-	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setProcess(s)
 		s.Process.Terminal = true
 		if s.Process.ConsoleSize == nil {
@@ -81,7 +81,7 @@ func WithTTY(width, height int) SpecOpts {
 
 // WithUsername sets the username on the process
 func WithUsername(username string) SpecOpts {
-	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) error {
+	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
 		setProcess(s)
 		s.Process.User.Username = username
 		return nil

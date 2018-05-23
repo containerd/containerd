@@ -61,19 +61,19 @@ Most of this is experimental and there are few leaps to make this work.`,
 		var (
 			ref = clicontext.Args().First()
 		)
-		_, err := Fetch(ref, clicontext)
+		client, ctx, cancel, err := commands.NewClient(clicontext)
+		if err != nil {
+			return err
+		}
+		defer cancel()
+
+		_, err = Fetch(ctx, client, ref, clicontext)
 		return err
 	},
 }
 
 // Fetch loads all resources into the content store and returns the image
-func Fetch(ref string, cliContext *cli.Context) (containerd.Image, error) {
-	client, ctx, cancel, err := commands.NewClient(cliContext)
-	if err != nil {
-		return nil, err
-	}
-	defer cancel()
-
+func Fetch(ctx context.Context, client *containerd.Client, ref string, cliContext *cli.Context) (containerd.Image, error) {
 	resolver, err := commands.GetResolver(ctx, cliContext)
 	if err != nil {
 		return nil, err

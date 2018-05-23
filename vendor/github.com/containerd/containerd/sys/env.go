@@ -1,3 +1,5 @@
+// +build !windows
+
 /*
    Copyright The containerd Authors.
 
@@ -14,16 +16,18 @@
    limitations under the License.
 */
 
-package version
+package sys
 
-var (
-	// Package is filled at linking time
-	Package = "github.com/containerd/containerd"
+import "golang.org/x/sys/unix"
 
-	// Version holds the complete version number. Filled in at linking time.
-	Version = "1.1.0+unknown"
+// RunningPrivileged returns true if the effective user ID of the
+// calling process is 0
+func RunningPrivileged() bool {
+	return unix.Geteuid() == 0
+}
 
-	// Revision is filled with the VCS (e.g. git) revision being used to build
-	// the program at linking time.
-	Revision = ""
-)
+// RunningUnprivileged returns true if the effective user ID of the
+// calling process is not 0
+func RunningUnprivileged() bool {
+	return !RunningPrivileged()
+}

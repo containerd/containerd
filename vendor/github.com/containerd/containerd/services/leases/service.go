@@ -17,6 +17,8 @@
 package leases
 
 import (
+	"context"
+
 	"google.golang.org/grpc"
 
 	api "github.com/containerd/containerd/api/services/leases/v1"
@@ -24,7 +26,6 @@ import (
 	"github.com/containerd/containerd/services"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 )
 
 func init() {

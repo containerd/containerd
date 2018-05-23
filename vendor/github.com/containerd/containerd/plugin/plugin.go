@@ -54,8 +54,8 @@ type Type string
 func (t Type) String() string { return string(t) }
 
 const (
-	// AllPlugins declares that the plugin should be initialized after all others.
-	AllPlugins Type = "*"
+	// InternalPlugin implements an internal plugin to containerd
+	InternalPlugin Type = "io.containerd.internal.v1"
 	// RuntimePlugin implements a runtime
 	RuntimePlugin Type = "io.containerd.runtime.v1"
 	// ServicePlugin implements a internal service

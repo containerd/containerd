@@ -17,7 +17,7 @@
 package command
 
 import (
-	"context"
+	gocontext "context"
 	"fmt"
 	"io/ioutil"
 	golog "log"
@@ -35,7 +35,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	gocontext "golang.org/x/net/context"
 	"google.golang.org/grpc/grpclog"
 )
 
@@ -168,7 +167,7 @@ func App() *cli.App {
 	return app
 }
 
-func serve(ctx context.Context, l net.Listener, serveFunc func(net.Listener) error) {
+func serve(ctx gocontext.Context, l net.Listener, serveFunc func(net.Listener) error) {
 	path := l.Addr().String()
 	log.G(ctx).WithField("address", path).Info("serving...")
 	go func() {

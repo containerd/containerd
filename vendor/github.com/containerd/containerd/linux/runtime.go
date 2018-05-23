@@ -79,7 +79,7 @@ func init() {
 	})
 }
 
-var _ = (runtime.Runtime)(&Runtime{})
+var _ = (runtime.PlatformRuntime)(&Runtime{})
 
 // Config options for the runtime
 type Config struct {
@@ -510,6 +510,7 @@ func (r *Runtime) getRuntime(ctx context.Context, ns, id string) (*runc.Runc, er
 		LogFormat:    runc.JSON,
 		PdeathSignal: unix.SIGKILL,
 		Root:         filepath.Join(root, ns),
+		Debug:        r.config.ShimDebug,
 	}, nil
 }
 

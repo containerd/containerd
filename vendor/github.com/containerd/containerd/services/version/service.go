@@ -17,11 +17,12 @@
 package version
 
 import (
+	"context"
+
 	api "github.com/containerd/containerd/api/services/version/v1"
 	"github.com/containerd/containerd/plugin"
 	ctrdversion "github.com/containerd/containerd/version"
 	ptypes "github.com/gogo/protobuf/types"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
