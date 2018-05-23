@@ -17,6 +17,7 @@
 package leases
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
@@ -30,7 +31,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
 	ptypes "github.com/gogo/protobuf/types"
-	"golang.org/x/net/context"
 )
 
 func init() {

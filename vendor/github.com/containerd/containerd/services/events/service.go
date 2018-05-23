@@ -17,6 +17,8 @@
 package events
 
 import (
+	"context"
+
 	api "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
@@ -24,7 +26,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 

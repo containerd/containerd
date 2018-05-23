@@ -18,6 +18,7 @@ package tasks
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -45,7 +46,6 @@ import (
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -79,14 +79,14 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 		return nil, err
 	}
 	cs := m.(*metadata.DB).ContentStore()
-	runtimes := make(map[string]runtime.Runtime)
+	runtimes := make(map[string]runtime.PlatformRuntime)
 	for _, rr := range rt {
 		ri, err := rr.Instance()
 		if err != nil {
 			log.G(ic.Context).WithError(err).Warn("could not load runtime instance due to initialization error")
 			continue
 		}
-		r := ri.(runtime.Runtime)
+		r := ri.(runtime.PlatformRuntime)
 		runtimes[r.ID()] = r
 	}
 
@@ -102,7 +102,7 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 }
 
 type local struct {
-	runtimes  map[string]runtime.Runtime
+	runtimes  map[string]runtime.PlatformRuntime
 	db        *metadata.DB
 	store     content.Store
 	publisher events.Publisher
@@ -114,7 +114,7 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 		err            error
 	)
 	if r.Checkpoint != nil {
-		checkpointPath, err = ioutil.TempDir("", "ctrd-checkpoint")
+		checkpointPath, err = ioutil.TempDir(os.Getenv("XDG_RUNTIME_DIR"), "ctrd-checkpoint")
 		if err != nil {
 			return nil, err
 		}
@@ -450,7 +450,7 @@ func (l *local) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest, _ 
 	if err != nil {
 		return nil, err
 	}
-	image, err := ioutil.TempDir("", "ctd-checkpoint")
+	image, err := ioutil.TempDir(os.Getenv("XDG_RUNTIME_DIR"), "ctd-checkpoint")
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -625,7 +625,7 @@ func (l *local) getTaskFromContainer(ctx context.Context, container *containers.
 	return t, nil
 }
 
-func (l *local) getRuntime(name string) (runtime.Runtime, error) {
+func (l *local) getRuntime(name string) (runtime.PlatformRuntime, error) {
 	runtime, ok := l.runtimes[name]
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "unknown runtime %q", name)

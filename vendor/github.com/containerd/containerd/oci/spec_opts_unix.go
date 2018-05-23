@@ -42,7 +42,7 @@ import (
 
 // WithTTY sets the information on the spec as well as the environment variables for
 // using a TTY
-func WithTTY(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+func WithTTY(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 	setProcess(s)
 	s.Process.Terminal = true
 	s.Process.Env = append(s.Process.Env, "TERM=xterm")
@@ -50,21 +50,21 @@ func WithTTY(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec
 }
 
 // setRoot sets Root to empty if unset
-func setRoot(s *specs.Spec) {
+func setRoot(s *Spec) {
 	if s.Root == nil {
 		s.Root = &specs.Root{}
 	}
 }
 
 // setLinux sets Linux to empty if unset
-func setLinux(s *specs.Spec) {
+func setLinux(s *Spec) {
 	if s.Linux == nil {
 		s.Linux = &specs.Linux{}
 	}
 }
 
 // setCapabilities sets Linux Capabilities to empty if unset
-func setCapabilities(s *specs.Spec) {
+func setCapabilities(s *Spec) {
 	setProcess(s)
 	if s.Process.Capabilities == nil {
 		s.Process.Capabilities = &specs.LinuxCapabilities{}
@@ -73,7 +73,7 @@ func setCapabilities(s *specs.Spec) {
 
 // WithHostNamespace allows a task to run inside the host's linux namespace
 func WithHostNamespace(ns specs.LinuxNamespaceType) SpecOpts {
-	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setLinux(s)
 		for i, n := range s.Linux.Namespaces {
 			if n.Type == ns {
@@ -88,7 +88,7 @@ func WithHostNamespace(ns specs.LinuxNamespaceType) SpecOpts {
 // WithLinuxNamespace uses the passed in namespace for the spec. If a namespace of the same type already exists in the
 // spec, the existing namespace is replaced by the one provided.
 func WithLinuxNamespace(ns specs.LinuxNamespace) SpecOpts {
-	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setLinux(s)
 		for i, n := range s.Linux.Namespaces {
 			if n.Type == ns.Type {
@@ -106,7 +106,7 @@ func WithLinuxNamespace(ns specs.LinuxNamespace) SpecOpts {
 
 // WithImageConfig configures the spec to from the configuration of an Image
 func WithImageConfig(image Image) SpecOpts {
-	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) error {
+	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
 		ic, err := image.Config(ctx)
 		if err != nil {
 			return err
@@ -148,7 +148,7 @@ func WithImageConfig(image Image) SpecOpts {
 
 // WithRootFSPath specifies unmanaged rootfs path.
 func WithRootFSPath(path string) SpecOpts {
-	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setRoot(s)
 		s.Root.Path = path
 		// Entrypoint is not set here (it's up to caller)
@@ -158,7 +158,7 @@ func WithRootFSPath(path string) SpecOpts {
 
 // WithRootFSReadonly sets specs.Root.Readonly to true
 func WithRootFSReadonly() SpecOpts {
-	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setRoot(s)
 		s.Root.Readonly = true
 		return nil
@@ -166,14 +166,14 @@ func WithRootFSReadonly() SpecOpts {
 }
 
 // WithNoNewPrivileges sets no_new_privileges on the process for the container
-func WithNoNewPrivileges(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+func WithNoNewPrivileges(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 	setProcess(s)
 	s.Process.NoNewPrivileges = true
 	return nil
 }
 
 // WithHostHostsFile bind-mounts the host's /etc/hosts into the container as readonly
-func WithHostHostsFile(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+func WithHostHostsFile(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 	s.Mounts = append(s.Mounts, specs.Mount{
 		Destination: "/etc/hosts",
 		Type:        "bind",
@@ -184,7 +184,7 @@ func WithHostHostsFile(_ context.Context, _ Client, _ *containers.Container, s *
 }
 
 // WithHostResolvconf bind-mounts the host's /etc/resolv.conf into the container as readonly
-func WithHostResolvconf(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+func WithHostResolvconf(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 	s.Mounts = append(s.Mounts, specs.Mount{
 		Destination: "/etc/resolv.conf",
 		Type:        "bind",
@@ -195,7 +195,7 @@ func WithHostResolvconf(_ context.Context, _ Client, _ *containers.Container, s 
 }
 
 // WithHostLocaltime bind-mounts the host's /etc/localtime into the container as readonly
-func WithHostLocaltime(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+func WithHostLocaltime(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 	s.Mounts = append(s.Mounts, specs.Mount{
 		Destination: "/etc/localtime",
 		Type:        "bind",
@@ -208,7 +208,7 @@ func WithHostLocaltime(_ context.Context, _ Client, _ *containers.Container, s *
 // WithUserNamespace sets the uid and gid mappings for the task
 // this can be called multiple times to add more mappings to the generated spec
 func WithUserNamespace(container, host, size uint32) SpecOpts {
-	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		var hasUserns bool
 		setLinux(s)
 		for _, ns := range s.Linux.Namespaces {
@@ -235,7 +235,7 @@ func WithUserNamespace(container, host, size uint32) SpecOpts {
 
 // WithCgroup sets the container's cgroup path
 func WithCgroup(path string) SpecOpts {
-	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setLinux(s)
 		s.Linux.CgroupsPath = path
 		return nil
@@ -245,7 +245,7 @@ func WithCgroup(path string) SpecOpts {
 // WithNamespacedCgroup uses the namespace set on the context to create a
 // root directory for containers in the cgroup with the id as the subcgroup
 func WithNamespacedCgroup() SpecOpts {
-	return func(ctx context.Context, _ Client, c *containers.Container, s *specs.Spec) error {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
 		namespace, err := namespaces.NamespaceRequired(ctx)
 		if err != nil {
 			return err
@@ -260,7 +260,7 @@ func WithNamespacedCgroup() SpecOpts {
 // It accepts a valid user string in OCI Image Spec v1.0.0:
 //   user, uid, user:group, uid:gid, uid:group, user:gid
 func WithUser(userstr string) SpecOpts {
-	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) error {
+	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
 		setProcess(s)
 		parts := strings.Split(userstr, ":")
 		switch len(parts) {
@@ -338,7 +338,7 @@ func WithUser(userstr string) SpecOpts {
 
 // WithUIDGID allows the UID and GID for the Process to be set
 func WithUIDGID(uid, gid uint32) SpecOpts {
-	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setProcess(s)
 		s.Process.User.UID = uid
 		s.Process.User.GID = gid
@@ -351,7 +351,7 @@ func WithUIDGID(uid, gid uint32) SpecOpts {
 // or uid is not found in /etc/passwd, it sets gid to be the same with
 // uid, and not returns error.
 func WithUserID(uid uint32) SpecOpts {
-	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) (err error) {
+	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
 		setProcess(s)
 		if c.Snapshotter == "" && c.SnapshotKey == "" {
 			if !isRootfsAbs(s.Root.Path) {
@@ -404,7 +404,7 @@ func WithUserID(uid uint32) SpecOpts {
 // does not exist, or the username is not found in /etc/passwd,
 // it returns error.
 func WithUsername(username string) SpecOpts {
-	return func(ctx context.Context, client Client, c *containers.Container, s *specs.Spec) (err error) {
+	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
 		setProcess(s)
 		if c.Snapshotter == "" && c.SnapshotKey == "" {
 			if !isRootfsAbs(s.Root.Path) {
@@ -445,7 +445,7 @@ func WithUsername(username string) SpecOpts {
 
 // WithCapabilities sets Linux capabilities on the process
 func WithCapabilities(caps []string) SpecOpts {
-	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setCapabilities(s)
 
 		s.Process.Capabilities.Bounding = caps
@@ -518,7 +518,7 @@ func isRootfsAbs(root string) bool {
 
 // WithMaskedPaths sets the masked paths option
 func WithMaskedPaths(paths []string) SpecOpts {
-	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setLinux(s)
 		s.Linux.MaskedPaths = paths
 		return nil
@@ -527,7 +527,7 @@ func WithMaskedPaths(paths []string) SpecOpts {
 
 // WithReadonlyPaths sets the read only paths option
 func WithReadonlyPaths(paths []string) SpecOpts {
-	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setLinux(s)
 		s.Linux.ReadonlyPaths = paths
 		return nil
@@ -535,7 +535,7 @@ func WithReadonlyPaths(paths []string) SpecOpts {
 }
 
 // WithWriteableSysfs makes any sysfs mounts writeable
-func WithWriteableSysfs(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+func WithWriteableSysfs(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 	for i, m := range s.Mounts {
 		if m.Type == "sysfs" {
 			var options []string
@@ -552,7 +552,7 @@ func WithWriteableSysfs(_ context.Context, _ Client, _ *containers.Container, s 
 }
 
 // WithWriteableCgroupfs makes any cgroup mounts writeable
-func WithWriteableCgroupfs(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+func WithWriteableCgroupfs(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 	for i, m := range s.Mounts {
 		if m.Type == "cgroup" {
 			var options []string
@@ -570,7 +570,7 @@ func WithWriteableCgroupfs(_ context.Context, _ Client, _ *containers.Container,
 
 // WithSelinuxLabel sets the process SELinux label
 func WithSelinuxLabel(label string) SpecOpts {
-	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setProcess(s)
 		s.Process.SelinuxLabel = label
 		return nil
@@ -579,7 +579,7 @@ func WithSelinuxLabel(label string) SpecOpts {
 
 // WithApparmorProfile sets the Apparmor profile for the process
 func WithApparmorProfile(profile string) SpecOpts {
-	return func(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setProcess(s)
 		s.Process.ApparmorProfile = profile
 		return nil
@@ -587,7 +587,7 @@ func WithApparmorProfile(profile string) SpecOpts {
 }
 
 // WithSeccompUnconfined clears the seccomp profile
-func WithSeccompUnconfined(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+func WithSeccompUnconfined(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 	setLinux(s)
 	s.Linux.Seccomp = nil
 	return nil

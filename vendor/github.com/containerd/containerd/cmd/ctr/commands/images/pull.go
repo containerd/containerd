@@ -57,10 +57,20 @@ command. As part of this process, we do the following:
 		if ref == "" {
 			return fmt.Errorf("please provide an image reference to pull")
 		}
-		ctx, cancel := commands.AppContext(context)
+
+		client, ctx, cancel, err := commands.NewClient(context)
+		if err != nil {
+			return err
+		}
 		defer cancel()
 
-		img, err := content.Fetch(ref, context)
+		ctx, done, err := client.WithLease(ctx)
+		if err != nil {
+			return err
+		}
+		defer done(ctx)
+
+		img, err := content.Fetch(ctx, client, ref, context)
 		if err != nil {
 			return err
 		}

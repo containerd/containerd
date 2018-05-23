@@ -17,7 +17,7 @@
 package snapshots
 
 import (
-	gocontext "context"
+	"context"
 
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/api/types"
@@ -29,7 +29,6 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
@@ -216,7 +215,7 @@ func (s *service) List(sr *snapshotsapi.ListSnapshotsRequest, ss snapshotsapi.Sn
 			})
 		}
 	)
-	err = sn.Walk(ss.Context(), func(ctx gocontext.Context, info snapshots.Info) error {
+	err = sn.Walk(ss.Context(), func(ctx context.Context, info snapshots.Info) error {
 		buffer = append(buffer, fromInfo(info))
 
 		if len(buffer) >= 100 {

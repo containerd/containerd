@@ -512,10 +512,11 @@ type RestoreOpts struct {
 	CheckpointOpts
 	IO
 
-	Detach      bool
-	PidFile     string
-	NoSubreaper bool
-	NoPivot     bool
+	Detach        bool
+	PidFile       string
+	NoSubreaper   bool
+	NoPivot       bool
+	ConsoleSocket ConsoleSocket
 }
 
 func (o *RestoreOpts) args() ([]string, error) {
@@ -529,6 +530,9 @@ func (o *RestoreOpts) args() ([]string, error) {
 			return nil, err
 		}
 		out = append(out, "--pid-file", abs)
+	}
+	if o.ConsoleSocket != nil {
+		out = append(out, "--console-socket", o.ConsoleSocket.Path())
 	}
 	if o.NoPivot {
 		out = append(out, "--no-pivot")
