@@ -1,7 +1,9 @@
 package fstest
 
 import (
-	"io/ioutil"
+	"bytes"
+	"io"
+	"math/rand"
 	"net"
 	"os"
 	"path/filepath"
@@ -22,9 +24,38 @@ func (a applyFn) Apply(root string) error {
 // CreateFile returns a file applier which creates a file as the
 // provided name with the given content and permission.
 func CreateFile(name string, content []byte, perm os.FileMode) Applier {
-	return applyFn(func(root string) error {
+	f := func() io.Reader {
+		return bytes.NewReader(content)
+	}
+	return writeFileStream(name, f, perm)
+}
+
+// CreateRandomFile returns a file applier which creates a file with random
+// content of the given size using the given seed and permission.
+func CreateRandomFile(name string, seed, size int64, perm os.FileMode) Applier {
+	f := func() io.Reader {
+		return io.LimitReader(rand.New(rand.NewSource(seed)), size)
+	}
+	return writeFileStream(name, f, perm)
+}
+
+// writeFileStream returns a file applier which creates a file as the
+// provided name with the given content from the provided i/o stream and permission.
+func writeFileStream(name string, stream func() io.Reader, perm os.FileMode) Applier {
+	return applyFn(func(root string) (retErr error) {
 		fullPath := filepath.Join(root, name)
-		if err := ioutil.WriteFile(fullPath, content, perm); err != nil {
+		f, err := os.OpenFile(fullPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			err := f.Close()
+			if err != nil && retErr == nil {
+				retErr = err
+			}
+		}()
+		_, err = io.Copy(f, stream())
+		if err != nil {
 			return err
 		}
 		return os.Chmod(fullPath, perm)
