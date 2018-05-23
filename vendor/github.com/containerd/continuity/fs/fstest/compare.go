@@ -33,7 +33,15 @@ func CheckDirectoryEqual(d1, d2 string) error {
 
 	diff := diffResourceList(m1.Resources, m2.Resources)
 	if diff.HasDiff() {
-		return errors.Errorf("directory diff between %s and %s\n%s", d1, d2, diff.String())
+		if len(diff.Deletions) != 0 {
+			return errors.Errorf("directory diff between %s and %s\n%s", d1, d2, diff.String())
+		}
+		// TODO: Also skip Recycle Bin contents in Windows layers which is used to store deleted files in some cases
+		for _, add := range diff.Additions {
+			if ok, _ := metadataFiles[add.Path()]; !ok {
+				return errors.Errorf("directory diff between %s and %s\n%s", d1, d2, diff.String())
+			}
+		}
 	}
 
 	return nil

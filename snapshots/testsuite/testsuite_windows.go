@@ -16,6 +16,25 @@
 
 package testsuite
 
+import (
+	"context"
+
+	"github.com/Microsoft/hcsshim"
+	"github.com/containerd/containerd/snapshots"
+)
+
 func clearMask() func() {
 	return func() {}
+}
+
+func setupBaseSnapshot(ctx context.Context, snapshotter snapshots.Snapshotter, key string) error {
+	mounts, err := snapshotter.Mounts(ctx, key)
+	if err != nil {
+		return err
+	}
+
+	if err := hcsshim.ProcessBaseLayer(mounts[0].Source); err != nil {
+		return err
+	}
+	return nil
 }

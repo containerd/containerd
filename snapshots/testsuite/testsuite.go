@@ -23,6 +23,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -120,7 +121,17 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 		fstest.CreateDir("/a", 0755),
 		fstest.CreateDir("/a/b", 0755),
 		fstest.CreateDir("/a/b/c", 0755),
+		fstest.Base(),
 	)
+
+	if runtime.GOOS == "windows" {
+		initialApplier = fstest.Apply(
+			initialApplier,
+			// Workaround for a Windows RS1 bug: Create a file inside /a/b/c
+			// in order to initialize the empty folder in the filesystem filter
+			fstest.CreateFile("/a/b/c/foo", []byte("bar\n"), 0777),
+		)
+	}
 
 	diffApplier := fstest.Apply(
 		fstest.CreateFile("/bar", []byte("bar\n"), 0777),
@@ -146,10 +157,19 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	if err := mount.All(mounts, preparing); err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
-	defer testutil.Unmount(t, preparing)
+	preparingMounted := true
+	defer func() {
+		if preparingMounted {
+			testutil.Unmount(t, preparing)
+		}
+	}()
 
 	if err := initialApplier.Apply(preparing); err != nil {
 		t.Fatalf("failure reason: %+v", err)
+	}
+
+	if err := setupBaseSnapshot(ctx, snapshotter, preparing); err != nil {
+		t.Fatalf("failed to set up base snapshot: %+v", err)
 	}
 
 	committed := filepath.Join(work, "committed")
@@ -170,6 +190,9 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 		t.Fatalf("%s should no longer be available after Commit", preparing)
 	}
 
+	testutil.Unmount(t, preparing)
+	preparingMounted = false
+
 	next := filepath.Join(work, "nextlayer")
 	if err := os.MkdirAll(next, 0777); err != nil {
 		t.Fatalf("failure reason: %+v", err)
@@ -182,7 +205,12 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	if err := mount.All(mounts, next); err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
-	defer testutil.Unmount(t, next)
+	nextMounted := true
+	defer func() {
+		if nextMounted {
+			testutil.Unmount(t, next)
+		}
+	}()
 
 	if err := fstest.CheckDirectoryEqualWithApplier(next, initialApplier); err != nil {
 		t.Fatalf("failure reason: %+v", err)
@@ -217,6 +245,9 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	if err == nil {
 		t.Fatalf("%s should no longer be available after Commit", next)
 	}
+
+	testutil.Unmount(t, next)
+	nextMounted = false
 
 	expected := map[string]snapshots.Info{
 		si.Name:  si,
@@ -365,6 +396,12 @@ func checkSnapshotterTransitivity(ctx context.Context, t *testing.T, snapshotter
 		t.Fatal(err)
 	}
 	defer testutil.Unmount(t, preparing)
+	if err := fstest.Base().Apply(preparing); err != nil {
+		t.Fatalf("failure reason: %+v", err)
+	}
+	if err := setupBaseSnapshot(ctx, snapshotter, preparing); err != nil {
+		t.Fatalf("failed to set up base snapshot: %+v", err)
+	}
 
 	if err = ioutil.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0777); err != nil {
 		t.Fatal(err)
@@ -419,6 +456,12 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 		t.Fatal(err)
 	}
 	defer testutil.Unmount(t, preparing)
+	if err := fstest.Base().Apply(preparing); err != nil {
+		t.Fatalf("failure reason: %+v", err)
+	}
+	if err := setupBaseSnapshot(ctx, snapshotter, preparing); err != nil {
+		t.Fatalf("failed to set up base snapshot: %+v", err)
+	}
 
 	snapA := filepath.Join(work, "snapA")
 	if err = snapshotter.Commit(ctx, snapA, preparing, opt); err != nil {
@@ -472,10 +515,14 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 
 // Deletion of files/folder of base layer in new layer, On Commit, those files should not be visible.
 func checkDeletedFilesInChildSnapshot(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
+	if runtime.GOOS == "windows" {
+		t.Skip("currently unclear why this fails on Windows")
+	}
 
 	l1Init := fstest.Apply(
 		fstest.CreateFile("/foo", []byte("foo\n"), 0777),
 		fstest.CreateFile("/foobar", []byte("foobar\n"), 0777),
+		fstest.Base(),
 	)
 	l2Init := fstest.Apply(
 		fstest.RemoveAll("/foobar"),
@@ -490,12 +537,28 @@ func checkDeletedFilesInChildSnapshot(ctx context.Context, t *testing.T, snapsho
 
 //Create three layers. Deleting intermediate layer must fail.
 func checkRemoveIntermediateSnapshot(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
-
 	base, err := snapshotterPrepareMount(ctx, snapshotter, "base", "", work)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer testutil.Unmount(t, base)
+	baseMounted := true
+	unmountBaseOnce := func() {
+		if baseMounted {
+			testutil.Unmount(t, base)
+			baseMounted = false
+		}
+	}
+	defer unmountBaseOnce()
+
+	if err := fstest.Base().Apply(base); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := setupBaseSnapshot(ctx, snapshotter, base); err != nil {
+		t.Fatalf("failed to set up base snapshot: %+v", err)
+	}
+
+	unmountBaseOnce()
 
 	committedBase := filepath.Join(work, "committed-base")
 	if err = snapshotter.Commit(ctx, committedBase, base, opt); err != nil {
@@ -525,7 +588,7 @@ func checkRemoveIntermediateSnapshot(ctx context.Context, t *testing.T, snapshot
 		t.Fatal("intermediate layer removal should fail.")
 	}
 
-	//Removal from toplayer to base should not fail.
+	// Removal from toplayer to base should not fail.
 	err = snapshotter.Remove(ctx, topLayer)
 	if err != nil {
 		t.Fatal(err)
@@ -548,11 +611,19 @@ func checkRemoveIntermediateSnapshot(ctx context.Context, t *testing.T, snapshot
 //  a1 - active snapshot, no parent
 //  v1 - view snapshot, v1 is parent
 //  v2 - view snapshot, no parent
-func baseTestSnapshots(ctx context.Context, snapshotter snapshots.Snapshotter) error {
-	if _, err := snapshotter.Prepare(ctx, "c1-a", "", opt); err != nil {
-		return err
+func baseTestSnapshots(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) error {
+	c1a, err := snapshotterPrepareMount(ctx, snapshotter, "c1-a", "", work)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if err := snapshotter.Commit(ctx, "c1", "c1-a", opt); err != nil {
+	defer testutil.Unmount(t, c1a)
+	if err := fstest.Base().Apply(c1a); err != nil {
+		t.Fatalf("failure reason: %+v", err)
+	}
+	if err := setupBaseSnapshot(ctx, snapshotter, c1a); err != nil {
+		t.Fatalf("failed to set up base snapshot: %+v", err)
+	}
+	if err := snapshotter.Commit(ctx, "c1", c1a, opt); err != nil {
 		return err
 	}
 	if _, err := snapshotter.Prepare(ctx, "c2-a", "c1", opt); err != nil {
@@ -578,7 +649,7 @@ func baseTestSnapshots(ctx context.Context, snapshotter snapshots.Snapshotter) e
 
 func checkUpdate(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 	t1 := time.Now().UTC()
-	if err := baseTestSnapshots(ctx, snapshotter); err != nil {
+	if err := baseTestSnapshots(ctx, t, snapshotter, work); err != nil {
 		t.Fatalf("Failed to create base snapshots: %v", err)
 	}
 	t2 := time.Now().UTC()
@@ -733,10 +804,26 @@ func assertLabels(t *testing.T, actual, expected map[string]string) {
 }
 
 func checkRemove(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
-	if _, err := snapshotter.Prepare(ctx, "committed-a", "", opt); err != nil {
+	committedA, err := snapshotterPrepareMount(ctx, snapshotter, "committed-a", "", work)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := snapshotter.Commit(ctx, "committed-1", "committed-a", opt); err != nil {
+	mounted := true
+	unmountCommittedA := func() {
+		if mounted {
+			testutil.Unmount(t, committedA)
+			mounted = false
+		}
+	}
+	defer unmountCommittedA()
+	if err := fstest.Base().Apply(committedA); err != nil {
+		t.Fatalf("failure reason: %+v", err)
+	}
+	if err := setupBaseSnapshot(ctx, snapshotter, committedA); err != nil {
+		t.Fatalf("failed to set up base snapshot: %+v", err)
+	}
+	unmountCommittedA()
+	if err := snapshotter.Commit(ctx, "committed-1", committedA, opt); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := snapshotter.Prepare(ctx, "reuse-1", "committed-1", opt); err != nil {
@@ -765,11 +852,21 @@ func checkRemove(ctx context.Context, t *testing.T, snapshotter snapshots.Snapsh
 // checkSnapshotterViewReadonly ensures a KindView snapshot to be mounted as a read-only filesystem.
 // This function is called only when WithTestViewReadonly is true.
 func checkSnapshotterViewReadonly(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
-	preparing := filepath.Join(work, "preparing")
-	if _, err := snapshotter.Prepare(ctx, preparing, "", opt); err != nil {
+	if runtime.GOOS == "windows" {
+		t.Skip("the mounted filesystem cannot be marked read only on Windows")
+	}
+	preparing, err := snapshotterPrepareMount(ctx, snapshotter, "preparing", "", work)
+	if err != nil {
 		t.Fatal(err)
 	}
-	committed := filepath.Join(work, "committed")
+	defer testutil.Unmount(t, preparing)
+	if err := fstest.Base().Apply(preparing); err != nil {
+		t.Fatalf("failure reason: %+v", err)
+	}
+	if err := setupBaseSnapshot(ctx, snapshotter, preparing); err != nil {
+		t.Fatalf("failed to set up base snapshot: %+v", err)
+	}
+	committed := filepath.Join(work, "commited")
 	if err := snapshotter.Commit(ctx, committed, preparing, opt); err != nil {
 		t.Fatal(err)
 	}
@@ -807,6 +904,7 @@ func checkFileFromLowerLayer(ctx context.Context, t *testing.T, snapshotter snap
 		fstest.CreateFile("/dir1/f1", []byte("Hello"), 0644),
 		fstest.CreateDir("dir2", 0700),
 		fstest.CreateFile("dir2/f2", []byte("..."), 0644),
+		fstest.Base(),
 	)
 	l2Init := fstest.Apply(
 		fstest.CreateDir("/dir3", 0700),

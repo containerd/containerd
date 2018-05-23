@@ -17,6 +17,7 @@
 package testutil
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -24,6 +25,11 @@ import (
 	"path/filepath"
 	"strconv"
 	"testing"
+
+	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/snapshots"
+	"github.com/gotestyourself/gotestyourself/assert"
+	"github.com/pkg/errors"
 )
 
 var rootEnabled bool
@@ -79,4 +85,17 @@ func DumpDirOnFailure(t *testing.T, root string) {
 	if t.Failed() {
 		DumpDir(t, root)
 	}
+}
+
+// Unmount unmounts a given mountPoint and sets t.Error if it fails
+func Unmount(t testing.TB, mountPoint string) {
+	t.Log("unmount", mountPoint)
+	err := mount.UnmountAll(mountPoint, umountflags)
+	assert.NilError(t, errors.Wrap(err, "failed to unmount"))
+}
+
+// RemoveSnapshot removes the snapshot from the snapshotter and sets t.Error if it fails
+func RemoveSnapshot(ctx context.Context, t testing.TB, sn snapshots.Snapshotter, snapshot string) {
+	err := sn.Remove(ctx, snapshot)
+	assert.NilError(t, errors.Wrap(err, "failed to remove snapshot"))
 }

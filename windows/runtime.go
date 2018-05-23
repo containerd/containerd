@@ -21,6 +21,7 @@ package windows
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"sync"
 	"time"
@@ -213,8 +214,8 @@ func (r *windowsRuntime) Delete(ctx context.Context, t runtime.Task) (*runtime.E
 			ExitedAt:    rtExit.Timestamp,
 		})
 
-	if err := mount.UnmountAll(wt.rootfs[0].Source, 0); err != nil {
-		log.G(ctx).WithError(err).WithField("path", wt.rootfs[0].Source).
+	if err := mount.UnmountAll(wt.mountLocation, 0); err != nil {
+		log.G(ctx).WithError(err).WithField("path", wt.mountLocation).
 			Warn("failed to unmount rootfs on failure")
 	}
 
@@ -247,13 +248,17 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, root
 		}
 	}()
 
-	if err := mount.All(rootfs, ""); err != nil {
+	mountLocation, err := ioutil.TempDir("", "containerd-rootfs")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create temp rootfs folder")
+	}
+	if err := mount.All(rootfs, mountLocation); err != nil {
 		return nil, errors.Wrap(err, "failed to mount rootfs")
 	}
 	defer func() {
 		if err != nil {
-			if err := mount.UnmountAll(rootfs[0].Source, 0); err != nil {
-				log.G(ctx).WithError(err).WithField("path", rootfs[0].Source).
+			if err := mount.UnmountAll(mountLocation, 0); err != nil {
+				log.G(ctx).WithError(err).WithField("path", mountLocation).
 					Warn("failed to unmount rootfs on failure")
 			}
 		}
@@ -295,6 +300,7 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, root
 		publisher:         r.publisher,
 		rwLayer:           conf.LayerFolderPath,
 		rootfs:            rootfs,
+		mountLocation:     mountLocation,
 		pidPool:           r.pidPool,
 		hcsContainer:      ctr,
 		terminateDuration: createOpts.TerminateDuration,
