@@ -21,7 +21,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/linux/runctypes"
+	"github.com/containerd/containerd/runtime/linux/runctypes"
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"

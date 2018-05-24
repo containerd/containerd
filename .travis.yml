@@ -38,7 +38,7 @@ jobs:
       script:
         - make install.deps
         - make containerd
-        - sudo make install-containerd
+        - sudo PATH=$PATH GOPATH=$GOPATH make install-containerd
         - make test
         - make test-integration
         - make test-cri

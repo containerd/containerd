@@ -18,7 +18,7 @@ package command
 
 import (
 	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/server"
+	"github.com/containerd/containerd/services/server"
 )
 
 func defaultConfig() *server.Config {

@@ -38,17 +38,19 @@ import (
 	versionservice "github.com/containerd/containerd/api/services/version/v1"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
+	contentproxy "github.com/containerd/containerd/content/proxy"
 	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/dialer"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/schema1"
 	"github.com/containerd/containerd/snapshots"
+	snproxy "github.com/containerd/containerd/snapshots/proxy"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -87,7 +89,6 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 		gopts := []grpc.DialOption{
 			grpc.WithBlock(),
 			grpc.WithInsecure(),
-			grpc.WithTimeout(60 * time.Second),
 			grpc.FailOnNonTempDialError(true),
 			grpc.WithBackoffMaxDelay(3 * time.Second),
 			grpc.WithDialer(dialer.Dialer),
@@ -107,7 +108,9 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 			)
 		}
 		connector := func() (*grpc.ClientConn, error) {
-			conn, err := grpc.Dial(dialer.DialAddress(address), gopts...)
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+			conn, err := grpc.DialContext(ctx, dialer.DialAddress(address), gopts...)
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to dial %q", address)
 			}
@@ -464,7 +467,7 @@ func (c *Client) ContentStore() content.Store {
 	if c.contentStore != nil {
 		return c.contentStore
 	}
-	return NewContentStoreFromClient(contentapi.NewContentClient(c.conn))
+	return contentproxy.NewContentStore(contentapi.NewContentClient(c.conn))
 }
 
 // SnapshotService returns the underlying snapshotter for the provided snapshotter name
@@ -472,7 +475,7 @@ func (c *Client) SnapshotService(snapshotterName string) snapshots.Snapshotter {
 	if c.snapshotters != nil {
 		return c.snapshotters[snapshotterName]
 	}
-	return NewSnapshotterFromClient(snapshotsapi.NewSnapshotsClient(c.conn), snapshotterName)
+	return snproxy.NewSnapshotter(snapshotsapi.NewSnapshotsClient(c.conn), snapshotterName)
 }
 
 // TaskService returns the underlying TasksClient
