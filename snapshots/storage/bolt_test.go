@@ -22,7 +22,7 @@ import (
 
 	// Does not require root but flag must be defined for snapshot tests
 
-	_ "github.com/containerd/containerd/testutil"
+	_ "github.com/containerd/containerd/pkg/testutil"
 )
 
 func TestMetastore(t *testing.T) {

@@ -19,7 +19,7 @@
 // FIXME: we can't put this test to the mount package:
 // import cycle not allowed in test
 // package github.com/containerd/containerd/mount (test)
-//         imports github.com/containerd/containerd/testutil
+//         imports github.com/containerd/containerd/pkg/testutil
 //         imports github.com/containerd/containerd/mount
 //
 // NOTE: we can't have this as lookup_test (compilation fails)
@@ -35,7 +35,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/testutil"
+	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/gotestyourself/gotestyourself/assert"
 )
 

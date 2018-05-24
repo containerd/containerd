@@ -33,9 +33,9 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/sys"
-	"github.com/containerd/containerd/testutil"
 	"github.com/sirupsen/logrus"
 )
 

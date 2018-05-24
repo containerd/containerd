@@ -30,7 +30,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/testutil"
+	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/gotestyourself/gotestyourself/assert"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
