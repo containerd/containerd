@@ -129,7 +129,35 @@ func newWindowsContainerConfig(ctx context.Context, owner, id string, spec *spec
 		}
 		conf.MappedDirectories = mds
 	}
-
+	if r := spec.Windows.Resources; r != nil {
+		if cpu := r.CPU; cpu != nil {
+			if cpu.Count != nil {
+				conf.ProcessorCount = uint32(*cpu.Count)
+			}
+			if cpu.Shares != nil {
+				conf.ProcessorWeight = uint64(*cpu.Shares)
+			}
+			if cpu.Maximum != nil {
+				conf.ProcessorMaximum = int64(*cpu.Maximum)
+			}
+		}
+		if mem := r.Memory; mem != nil {
+			if mem.Limit != nil {
+				conf.MemoryMaximumInMB = int64(*mem.Limit)
+			}
+		}
+		if s := r.Storage; s != nil {
+			if s.Iops != nil {
+				conf.StorageIOPSMaximum = *s.Iops
+			}
+			if s.Bps != nil {
+				conf.StorageBandwidthMaximum = *s.Bps
+			}
+			if s.SandboxSize != nil {
+				conf.StorageSandboxSize = *s.SandboxSize
+			}
+		}
+	}
 	return conf, nil
 }
 

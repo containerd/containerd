@@ -55,3 +55,15 @@ func withExecExitStatus(s *specs.Process, es int) {
 func withExecArgs(s *specs.Process, args ...string) {
 	s.Args = args
 }
+
+func withMemoryLimit(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+	if s.Linux.Resources == nil {
+		s.Linux.Resources = &specs.LinuxResources{}
+	}
+	if s.Linux.Resources.Memory == nil {
+		s.Linux.Resources.Memory = &specs.LinuxMemory{}
+	}
+	limit := int64(32 * 1024 * 1024)
+	s.Linux.Resources.Memory.Limit = &limit
+	return nil
+}
