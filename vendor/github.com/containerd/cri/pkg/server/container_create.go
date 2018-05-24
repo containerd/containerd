@@ -27,9 +27,9 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
-	"github.com/containerd/containerd/linux/runctypes"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -523,7 +523,7 @@ func clearReadOnly(m *runtimespec.Mount) {
 			opt = append(opt, o)
 		}
 	}
-	m.Options = opt
+	m.Options = append(opt, "rw")
 }
 
 // addDevices set device mapping without privilege.
@@ -662,7 +662,7 @@ func setOCIBindMountsPrivileged(g *generate.Generator) {
 	spec := g.Spec()
 	// clear readonly for /sys and cgroup
 	for i, m := range spec.Mounts {
-		if spec.Mounts[i].Destination == "/sys" && !spec.Root.Readonly {
+		if spec.Mounts[i].Destination == "/sys" {
 			clearReadOnly(&spec.Mounts[i])
 		}
 		if m.Type == "cgroup" {

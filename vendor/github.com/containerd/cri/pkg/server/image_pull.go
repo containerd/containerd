@@ -100,20 +100,14 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	// image has already been converted.
 	isSchema1 := desc.MediaType == containerdimages.MediaTypeDockerSchema1Manifest
 
-	// TODO(mikebrow): add truncIndex for image id
 	image, err := c.client.Pull(ctx, ref,
 		containerd.WithSchema1Conversion,
 		containerd.WithResolver(resolver),
+		containerd.WithPullSnapshotter(c.config.ContainerdConfig.Snapshotter),
+		containerd.WithPullUnpack,
 	)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to pull image %q", ref)
-	}
-
-	// Do best effort unpack.
-	logrus.Debugf("Unpack image %q", imageRef)
-	if err := image.Unpack(ctx, c.config.ContainerdConfig.Snapshotter); err != nil {
-		logrus.WithError(err).Warnf("Failed to unpack image %q", imageRef)
-		// Do not fail image pulling. Unpack will be retried before container creation.
+		return nil, errors.Wrapf(err, "failed to pull and unpack image %q", ref)
 	}
 
 	// Get image information.

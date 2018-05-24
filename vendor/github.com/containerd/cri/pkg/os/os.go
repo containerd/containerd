@@ -22,9 +22,8 @@ import (
 	"os"
 	"path/filepath"
 
-	containerdmount "github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/fifo"
-	"github.com/docker/docker/pkg/mount"
 	"github.com/docker/docker/pkg/symlink"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
@@ -42,8 +41,8 @@ type OS interface {
 	CopyFile(src, dest string, perm os.FileMode) error
 	WriteFile(filename string, data []byte, perm os.FileMode) error
 	Mount(source string, target string, fstype string, flags uintptr, data string) error
-	Unmount(target string, flags int) error
-	LookupMount(path string) (containerdmount.Info, error)
+	Unmount(target string) error
+	LookupMount(path string) (mount.Info, error)
 }
 
 // RealOS is used to dispatch the real system level operations.
@@ -115,20 +114,23 @@ func (RealOS) Mount(source string, target string, fstype string, flags uintptr, 
 }
 
 // Unmount will call Unmount to unmount the file.
-func (RealOS) Unmount(target string, flags int) error {
-	return Unmount(target, flags)
+func (RealOS) Unmount(target string) error {
+	return Unmount(target)
 }
 
 // LookupMount gets mount info of a given path.
-func (RealOS) LookupMount(path string) (containerdmount.Info, error) {
-	return containerdmount.Lookup(path)
+func (RealOS) LookupMount(path string) (mount.Info, error) {
+	return mount.Lookup(path)
 }
 
-// Unmount will call unix.Unmount to unmount the file. The function doesn't
-// return error if target is not mounted.
-func Unmount(target string, flags int) error {
-	if mounted, err := mount.Mounted(target); err != nil || !mounted {
-		return err
+// Unmount unmounts the target. It does not return an error in case the target is not mounted.
+// In case the target does not exist, the appropriate error is returned.
+func Unmount(target string) error {
+	err := unix.Unmount(target, unix.MNT_DETACH)
+	if err == unix.EINVAL {
+		// ignore "not mounted" error
+		err = nil
 	}
-	return unix.Unmount(target, flags)
+
+	return err
 }
