@@ -1,9 +1,11 @@
 package fs
 
 import (
+	_ "crypto/sha256"
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	_ "crypto/sha256"
 
@@ -43,6 +45,21 @@ func TestCopyDirectoryWithLocalSymlink(t *testing.T) {
 
 	if err := testCopy(apply); err != nil {
 		t.Fatalf("Copy test failed: %+v", err)
+	}
+}
+
+// TestCopyWithLargeFile tests copying a file whose size > 2^32 bytes.
+func TestCopyWithLargeFile(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	apply := fstest.Apply(
+		fstest.CreateDir("/banana", 0755),
+		fstest.CreateRandomFile("/banana/split", time.Now().UnixNano(), 3*1024*1024*1024, 0644),
+	)
+
+	if err := testCopy(apply); err != nil {
+		t.Fatal(err)
 	}
 }
 
