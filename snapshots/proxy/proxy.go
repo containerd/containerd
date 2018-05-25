@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package containerd
+package proxy
 
 import (
 	"context"
@@ -28,24 +28,24 @@ import (
 	protobuftypes "github.com/gogo/protobuf/types"
 )
 
-// NewSnapshotterFromClient returns a new Snapshotter which communicates
-// over a GRPC connection.
-func NewSnapshotterFromClient(client snapshotsapi.SnapshotsClient, snapshotterName string) snapshots.Snapshotter {
-	return &remoteSnapshotter{
+// NewSnapshotter returns a new Snapshotter which communicates over a GRPC
+// connection using the containerd snapshot GRPC API.
+func NewSnapshotter(client snapshotsapi.SnapshotsClient, snapshotterName string) snapshots.Snapshotter {
+	return &proxySnapshotter{
 		client:          client,
 		snapshotterName: snapshotterName,
 	}
 }
 
-type remoteSnapshotter struct {
+type proxySnapshotter struct {
 	client          snapshotsapi.SnapshotsClient
 	snapshotterName string
 }
 
-func (r *remoteSnapshotter) Stat(ctx context.Context, key string) (snapshots.Info, error) {
-	resp, err := r.client.Stat(ctx,
+func (p *proxySnapshotter) Stat(ctx context.Context, key string) (snapshots.Info, error) {
+	resp, err := p.client.Stat(ctx,
 		&snapshotsapi.StatSnapshotRequest{
-			Snapshotter: r.snapshotterName,
+			Snapshotter: p.snapshotterName,
 			Key:         key,
 		})
 	if err != nil {
@@ -54,10 +54,10 @@ func (r *remoteSnapshotter) Stat(ctx context.Context, key string) (snapshots.Inf
 	return toInfo(resp.Info), nil
 }
 
-func (r *remoteSnapshotter) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
-	resp, err := r.client.Update(ctx,
+func (p *proxySnapshotter) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
+	resp, err := p.client.Update(ctx,
 		&snapshotsapi.UpdateSnapshotRequest{
-			Snapshotter: r.snapshotterName,
+			Snapshotter: p.snapshotterName,
 			Info:        fromInfo(info),
 			UpdateMask: &protobuftypes.FieldMask{
 				Paths: fieldpaths,
@@ -69,9 +69,9 @@ func (r *remoteSnapshotter) Update(ctx context.Context, info snapshots.Info, fie
 	return toInfo(resp.Info), nil
 }
 
-func (r *remoteSnapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
-	resp, err := r.client.Usage(ctx, &snapshotsapi.UsageRequest{
-		Snapshotter: r.snapshotterName,
+func (p *proxySnapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
+	resp, err := p.client.Usage(ctx, &snapshotsapi.UsageRequest{
+		Snapshotter: p.snapshotterName,
 		Key:         key,
 	})
 	if err != nil {
@@ -80,9 +80,9 @@ func (r *remoteSnapshotter) Usage(ctx context.Context, key string) (snapshots.Us
 	return toUsage(resp), nil
 }
 
-func (r *remoteSnapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
-	resp, err := r.client.Mounts(ctx, &snapshotsapi.MountsRequest{
-		Snapshotter: r.snapshotterName,
+func (p *proxySnapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
+	resp, err := p.client.Mounts(ctx, &snapshotsapi.MountsRequest{
+		Snapshotter: p.snapshotterName,
 		Key:         key,
 	})
 	if err != nil {
@@ -91,15 +91,15 @@ func (r *remoteSnapshotter) Mounts(ctx context.Context, key string) ([]mount.Mou
 	return toMounts(resp.Mounts), nil
 }
 
-func (r *remoteSnapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+func (p *proxySnapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
 	var local snapshots.Info
 	for _, opt := range opts {
 		if err := opt(&local); err != nil {
 			return nil, err
 		}
 	}
-	resp, err := r.client.Prepare(ctx, &snapshotsapi.PrepareSnapshotRequest{
-		Snapshotter: r.snapshotterName,
+	resp, err := p.client.Prepare(ctx, &snapshotsapi.PrepareSnapshotRequest{
+		Snapshotter: p.snapshotterName,
 		Key:         key,
 		Parent:      parent,
 		Labels:      local.Labels,
@@ -110,15 +110,15 @@ func (r *remoteSnapshotter) Prepare(ctx context.Context, key, parent string, opt
 	return toMounts(resp.Mounts), nil
 }
 
-func (r *remoteSnapshotter) View(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+func (p *proxySnapshotter) View(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
 	var local snapshots.Info
 	for _, opt := range opts {
 		if err := opt(&local); err != nil {
 			return nil, err
 		}
 	}
-	resp, err := r.client.View(ctx, &snapshotsapi.ViewSnapshotRequest{
-		Snapshotter: r.snapshotterName,
+	resp, err := p.client.View(ctx, &snapshotsapi.ViewSnapshotRequest{
+		Snapshotter: p.snapshotterName,
 		Key:         key,
 		Parent:      parent,
 		Labels:      local.Labels,
@@ -129,15 +129,15 @@ func (r *remoteSnapshotter) View(ctx context.Context, key, parent string, opts .
 	return toMounts(resp.Mounts), nil
 }
 
-func (r *remoteSnapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
+func (p *proxySnapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
 	var local snapshots.Info
 	for _, opt := range opts {
 		if err := opt(&local); err != nil {
 			return err
 		}
 	}
-	_, err := r.client.Commit(ctx, &snapshotsapi.CommitSnapshotRequest{
-		Snapshotter: r.snapshotterName,
+	_, err := p.client.Commit(ctx, &snapshotsapi.CommitSnapshotRequest{
+		Snapshotter: p.snapshotterName,
 		Name:        name,
 		Key:         key,
 		Labels:      local.Labels,
@@ -145,17 +145,17 @@ func (r *remoteSnapshotter) Commit(ctx context.Context, name, key string, opts .
 	return errdefs.FromGRPC(err)
 }
 
-func (r *remoteSnapshotter) Remove(ctx context.Context, key string) error {
-	_, err := r.client.Remove(ctx, &snapshotsapi.RemoveSnapshotRequest{
-		Snapshotter: r.snapshotterName,
+func (p *proxySnapshotter) Remove(ctx context.Context, key string) error {
+	_, err := p.client.Remove(ctx, &snapshotsapi.RemoveSnapshotRequest{
+		Snapshotter: p.snapshotterName,
 		Key:         key,
 	})
 	return errdefs.FromGRPC(err)
 }
 
-func (r *remoteSnapshotter) Walk(ctx context.Context, fn func(context.Context, snapshots.Info) error) error {
-	sc, err := r.client.List(ctx, &snapshotsapi.ListSnapshotsRequest{
-		Snapshotter: r.snapshotterName,
+func (p *proxySnapshotter) Walk(ctx context.Context, fn func(context.Context, snapshots.Info) error) error {
+	sc, err := p.client.List(ctx, &snapshotsapi.ListSnapshotsRequest{
+		Snapshotter: p.snapshotterName,
 	})
 	if err != nil {
 		return errdefs.FromGRPC(err)
@@ -179,7 +179,7 @@ func (r *remoteSnapshotter) Walk(ctx context.Context, fn func(context.Context, s
 	}
 }
 
-func (r *remoteSnapshotter) Close() error {
+func (p *proxySnapshotter) Close() error {
 	return nil
 }
 
