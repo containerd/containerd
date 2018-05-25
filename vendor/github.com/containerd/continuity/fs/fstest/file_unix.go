@@ -27,3 +27,10 @@ func Lchtimes(name string, atime, mtime time.Time) Applier {
 		return unix.UtimesNanoAt(unix.AT_FDCWD, path, utimes[0:], unix.AT_SYMLINK_NOFOLLOW)
 	})
 }
+
+func Base() Applier {
+	return applyFn(func(root string) error {
+		// do nothing, as the base is not special
+		return nil
+	})
+}
