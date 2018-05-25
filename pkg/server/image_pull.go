@@ -199,7 +199,7 @@ func (c *criService) createImageReference(ctx context.Context, name string, desc
 	if err == nil {
 		return nil
 	}
-	if err != nil && !errdefs.IsAlreadyExists(err) {
+	if !errdefs.IsAlreadyExists(err) {
 		return err
 	}
 	_, err = c.client.ImageService().Update(ctx, img, "target")
