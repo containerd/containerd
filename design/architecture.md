@@ -39,7 +39,7 @@ may be exported for access via corresponding _services_.
 
 ## Modules
 
-In addition to the subsystems have, we have several components that may cross
+In addition to the subsystems, we have several components that may cross
 subsystem boundaries, referenced to as components. We have the following
 components:
 
