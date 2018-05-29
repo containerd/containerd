@@ -1,3 +1,5 @@
+// +build windows
+
 /*
    Copyright The containerd Authors.
 
@@ -14,27 +16,25 @@
    limitations under the License.
 */
 
-package testsuite
+package windows
 
 import (
 	"context"
+	"testing"
 
-	"github.com/Microsoft/hcsshim"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/snapshots/testsuite"
 )
 
-func clearMask() func() {
-	return func() {}
+func newSnapshotter(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
+	snapshotter, err := NewSnapshotter(root)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return snapshotter, func() error { return snapshotter.Close() }, nil
 }
 
-func setupBaseSnapshot(ctx context.Context, snapshotter snapshots.Snapshotter, key string) error {
-	mounts, err := snapshotter.Mounts(ctx, key)
-	if err != nil {
-		return err
-	}
-
-	if err := hcsshim.ProcessBaseLayer(mounts[0].Source); err != nil {
-		return err
-	}
-	return nil
+func TestWindows(t *testing.T) {
+	testsuite.SnapshotterSuite(t, "Windows", newSnapshotter)
 }

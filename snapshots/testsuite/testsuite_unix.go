@@ -18,11 +18,21 @@
 
 package testsuite
 
-import "syscall"
+import (
+	"context"
+	"syscall"
+
+	"github.com/containerd/containerd/snapshots"
+)
 
 func clearMask() func() {
 	oldumask := syscall.Umask(0)
 	return func() {
 		syscall.Umask(oldumask)
 	}
+}
+
+// setupBaseSnapshot is a no-op
+func setupBaseSnapshot(ctx context.Context, snapshotter snapshots.Snapshotter, key string) error {
+	return nil
 }

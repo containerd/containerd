@@ -49,9 +49,10 @@ type task struct {
 	processes map[string]*process
 	hyperV    bool
 
-	publisher events.Publisher
-	rwLayer   string
-	rootfs    []mount.Mount
+	publisher     events.Publisher
+	rwLayer       string
+	mountLocation string
+	rootfs        []mount.Mount
 
 	pidPool           *pidPool
 	hcsContainer      hcsshim.Container

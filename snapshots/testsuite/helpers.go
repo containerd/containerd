@@ -70,6 +70,32 @@ func createSnapshot(ctx context.Context, sn snapshots.Snapshotter, parent, work 
 	return n, nil
 }
 
+// createBaseSnapshot creates a new base snapshot in the snapshotter
+// given an applier to run, and applies base processing if necessary.
+func createBaseSnapshot(ctx context.Context, sn snapshots.Snapshotter, work string, a fstest.Applier) (string, error) {
+	n := fmt.Sprintf("%p-%d", a, rand.Int())
+	prepare := fmt.Sprintf("%s-prepare", n)
+
+	m, err := sn.Prepare(ctx, prepare, "", opt)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to prepare snapshot")
+	}
+
+	if err := applyToMounts(m, work, a); err != nil {
+		return "", errors.Wrap(err, "failed to apply")
+	}
+
+	if err := setupBaseSnapshot(ctx, sn, prepare); err != nil {
+		return "", errors.Wrap(err, "failed to set up base snapshot")
+	}
+
+	if err := sn.Commit(ctx, n, prepare, opt); err != nil {
+		return "", errors.Wrap(err, "failed to commit")
+	}
+
+	return n, nil
+}
+
 func checkSnapshot(ctx context.Context, sn snapshots.Snapshotter, work, name, check string) (err error) {
 	td, err := ioutil.TempDir(work, "check")
 	if err != nil {
@@ -120,9 +146,20 @@ func checkSnapshots(ctx context.Context, sn snapshots.Snapshotter, work string, 
 
 	var parentID string
 	for i, a := range as {
-		s, err := createSnapshot(ctx, sn, parentID, work, a)
-		if err != nil {
-			return errors.Wrapf(err, "failed to create snapshot %d", i+1)
+		var (
+			s   string
+			err error
+		)
+		if i == 0 {
+			s, err = createBaseSnapshot(ctx, sn, work, a)
+			if err != nil {
+				return errors.Wrapf(err, "failed to create base snapshot %d", i+1)
+			}
+		} else {
+			s, err = createSnapshot(ctx, sn, parentID, work, a)
+			if err != nil {
+				return errors.Wrapf(err, "failed to create snapshot %d", i+1)
+			}
 		}
 
 		if err := a.Apply(td); err != nil {

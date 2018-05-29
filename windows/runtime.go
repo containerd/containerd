@@ -21,6 +21,7 @@ package windows
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"sync"
 	"time"
@@ -153,6 +154,72 @@ func (r *windowsRuntime) Tasks(ctx context.Context, all bool) ([]runtime.Task, e
 	return r.tasks.GetAll(ctx, all)
 }
 
+func (r *windowsRuntime) Delete(ctx context.Context, t runtime.Task) (*runtime.Exit, error) {
+	wt, ok := t.(*task)
+	if !ok {
+		return nil, errors.Wrap(errdefs.ErrInvalidArgument, "no a windows task")
+	}
+
+	// TODO(mlaventure): stop monitor on this task
+
+	var (
+		err      error
+		state, _ = wt.State(ctx)
+	)
+	switch state.Status {
+	case runtime.StoppedStatus:
+		fallthrough
+	case runtime.CreatedStatus:
+		// if it's stopped or in created state, we need to shutdown the
+		// container before removing it
+		if err = wt.stop(ctx); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.Wrap(errdefs.ErrFailedPrecondition,
+			"cannot delete a non-stopped task")
+	}
+
+	var rtExit *runtime.Exit
+	if p := wt.getProcess(t.ID()); p != nil {
+		ec, ea, err := p.ExitCode()
+		if err != nil {
+			return nil, err
+		}
+		rtExit = &runtime.Exit{
+			Pid:       wt.pid,
+			Status:    ec,
+			Timestamp: ea,
+		}
+	} else {
+		rtExit = &runtime.Exit{
+			Pid:       wt.pid,
+			Status:    255,
+			Timestamp: time.Now().UTC(),
+		}
+	}
+
+	wt.cleanup()
+	r.tasks.Delete(ctx, t.ID())
+
+	r.publisher.Publish(ctx,
+		runtime.TaskDeleteEventTopic,
+		&eventstypes.TaskDelete{
+			ContainerID: wt.id,
+			Pid:         wt.pid,
+			ExitStatus:  rtExit.Status,
+			ExitedAt:    rtExit.Timestamp,
+		})
+
+	if err := mount.UnmountAll(wt.mountLocation, 0); err != nil {
+		log.G(ctx).WithError(err).WithField("path", wt.mountLocation).
+			Warn("failed to unmount rootfs on failure")
+	}
+
+	// We were never started, return failure
+	return rtExit, nil
+}
+
 func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, rootfs []mount.Mount, spec *runtimespec.Spec, io runtime.IO, createOpts *hcsshimtypes.CreateOptions) (*task, error) {
 	var (
 		err  error
@@ -178,13 +245,17 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, root
 		}
 	}()
 
-	if err := mount.All(rootfs, ""); err != nil {
+	mountLocation, err := ioutil.TempDir("", "containerd-rootfs")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create temp rootfs folder")
+	}
+	if err := mount.All(rootfs, mountLocation); err != nil {
 		return nil, errors.Wrap(err, "failed to mount rootfs")
 	}
 	defer func() {
 		if err != nil {
-			if err := mount.UnmountAll(rootfs[0].Source, 0); err != nil {
-				log.G(ctx).WithError(err).WithField("path", rootfs[0].Source).
+			if err := mount.UnmountAll(mountLocation, 0); err != nil {
+				log.G(ctx).WithError(err).WithField("path", mountLocation).
 					Warn("failed to unmount rootfs on failure")
 			}
 		}
@@ -226,6 +297,7 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, root
 		publisher:         r.publisher,
 		rwLayer:           conf.LayerFolderPath,
 		rootfs:            rootfs,
+		mountLocation:     mountLocation,
 		pidPool:           r.pidPool,
 		hcsContainer:      ctr,
 		terminateDuration: createOpts.TerminateDuration,
