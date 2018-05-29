@@ -90,22 +90,34 @@ func newWindowsContainerConfig(ctx context.Context, owner, id string, spec *spec
 	var di = hcsshim.DriverInfo{
 		HomeDir: filepath.Dir(layerFolderPath),
 	}
-	conf.VolumePath, err = hcsshim.GetLayerMountPath(di, layerID)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to getmount path for layer %s: driverInfo: %#v", id, di)
-	}
 
 	if spec.Windows.HyperV != nil {
 		conf.HvPartition = true
-		for _, layerPath := range layerFolders {
-			utilityVMPath := spec.Windows.HyperV.UtilityVMPath
-			_, err := os.Stat(utilityVMPath)
-			if err == nil {
-				conf.HvRuntime = &hcsshim.HvRuntime{ImagePath: utilityVMPath}
-				break
-			} else if !os.IsNotExist(err) {
-				return nil, errors.Wrapf(err, "failed to access layer %s", layerPath)
+		// clear container level properties
+		conf.LayerFolderPath = ""
+		var utilityPath string
+		if spec.Windows.HyperV.UtilityVMPath != "" {
+			if _, err := os.Stat(spec.Windows.HyperV.UtilityVMPath); err != nil {
+				return nil, err
 			}
+			utilityPath = spec.Windows.HyperV.UtilityVMPath
+		} else {
+			for _, path := range layerFolders {
+				vmpath := filepath.Join(path, "UtilityVM")
+				if _, err := os.Stat(vmpath); err == nil {
+					utilityPath = vmpath
+					break
+				}
+			}
+		}
+		if utilityPath == "" {
+			return nil, errors.New("failed to get utility vm path")
+		}
+		conf.HvRuntime = &hcsshim.HvRuntime{ImagePath: utilityPath}
+	} else {
+		conf.VolumePath, err = hcsshim.GetLayerMountPath(di, layerID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to getmount path for layer %s: driverInfo: %#v", id, di)
 		}
 	}
 
