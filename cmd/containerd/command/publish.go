@@ -95,12 +95,13 @@ func connect(address string, d func(string, time.Duration) (net.Conn, error)) (*
 	gopts := []grpc.DialOption{
 		grpc.WithBlock(),
 		grpc.WithInsecure(),
-		grpc.WithTimeout(60 * time.Second),
 		grpc.WithDialer(d),
 		grpc.FailOnNonTempDialError(true),
 		grpc.WithBackoffMaxDelay(3 * time.Second),
 	}
-	conn, err := grpc.Dial(dialer.DialAddress(address), gopts...)
+	ctx, cancel := gocontext.WithTimeout(gocontext.Background(), 60*time.Second)
+	defer cancel()
+	conn, err := grpc.DialContext(ctx, dialer.DialAddress(address), gopts...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to dial %q", address)
 	}
