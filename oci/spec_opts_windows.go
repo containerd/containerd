@@ -87,3 +87,19 @@ func WithUsername(username string) SpecOpts {
 		return nil
 	}
 }
+
+// WithHyperV uses hyper-v isolation for the Windows container
+func WithHyperV(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
+	return WithHyperVUtilityPath("")(ctx, client, c, s)
+}
+
+// WithHyperVUtilityPath uses hyper-v isolation with a custom utility vm path for the Windows container
+func WithHyperVUtilityPath(path string) SpecOpts {
+	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
+		s.Windows.HyperV = &specs.WindowsHyperV{
+			UtilityVMPath: path,
+		}
+		s.Root.Path = ""
+		return nil
+	}
+}

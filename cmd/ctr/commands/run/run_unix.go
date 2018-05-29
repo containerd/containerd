@@ -30,14 +30,14 @@ import (
 	"github.com/urfave/cli"
 )
 
-func init() {
-	ContainerFlags = append(ContainerFlags, cli.BoolFlag{
+var platformFlags = []cli.Flag{
+	cli.BoolFlag{
 		Name:  "rootfs",
 		Usage: "use custom rootfs that is not managed by containerd snapshotter",
 	}, cli.BoolFlag{
 		Name:  "no-pivot",
 		Usage: "disable use of pivot-root (linux only)",
-	})
+	},
 }
 
 // NewContainer creates a new container
