@@ -67,6 +67,9 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	opts = append(opts, oci.WithEnv(context.StringSlice("env")))
 	opts = append(opts, withMounts(context))
 	opts = append(opts, withTTY(context.Bool("tty")))
+	if context.Bool("hyperv") {
+		opts = append(opts, oci.WithHyperV)
+	}
 	if len(args) > 0 {
 		opts = append(opts, oci.WithProcessArgs(args...))
 	}
