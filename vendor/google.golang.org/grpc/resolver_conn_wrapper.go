@@ -57,7 +57,10 @@ func parseTarget(target string) (ret resolver.Target) {
 	if !ok {
 		return resolver.Target{Endpoint: target}
 	}
-	ret.Authority, ret.Endpoint, _ = split2(ret.Endpoint, "/")
+	ret.Authority, ret.Endpoint, ok = split2(ret.Endpoint, "/")
+	if !ok {
+		return resolver.Target{Endpoint: target}
+	}
 	return ret
 }
 
@@ -81,7 +84,7 @@ func newCCResolverWrapper(cc *ClientConn) (*ccResolverWrapper, error) {
 	}
 
 	var err error
-	ccr.resolver, err = rb.Build(cc.parsedTarget, ccr, resolver.BuildOption{})
+	ccr.resolver, err = rb.Build(cc.parsedTarget, ccr, resolver.BuildOption{DisableServiceConfig: cc.dopts.disableServiceConfig})
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +95,7 @@ func (ccr *ccResolverWrapper) start() {
 	go ccr.watcher()
 }
 
-// watcher processes address updates and service config updates sequencially.
+// watcher processes address updates and service config updates sequentially.
 // Otherwise, we need to resolve possible races between address and service
 // config (e.g. they specify different balancer types).
 func (ccr *ccResolverWrapper) watcher() {

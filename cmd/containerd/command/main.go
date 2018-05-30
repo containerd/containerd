@@ -20,7 +20,6 @@ import (
 	gocontext "context"
 	"fmt"
 	"io/ioutil"
-	golog "log"
 	"net"
 	"os"
 	"os/signal"
@@ -50,7 +49,7 @@ high performance container runtime
 
 func init() {
 	// Discard grpc logs so that they don't mess with our stdio
-	grpclog.SetLogger(golog.New(ioutil.Discard, "", golog.LstdFlags))
+	grpclog.SetLoggerV2(grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, ioutil.Discard))
 
 	cli.VersionPrinter = func(c *cli.Context) {
 		fmt.Println(c.App.Name, version.Package, c.App.Version, version.Revision)

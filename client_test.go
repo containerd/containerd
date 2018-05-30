@@ -21,14 +21,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io/ioutil"
-	golog "log"
 	"os"
 	"os/exec"
 	"testing"
 	"time"
-
-	"google.golang.org/grpc/grpclog"
 
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
@@ -50,9 +46,6 @@ var (
 )
 
 func init() {
-	// Discard grpc logs so that they don't mess with our stdio
-	grpclog.SetLogger(golog.New(ioutil.Discard, "", golog.LstdFlags))
-
 	flag.StringVar(&address, "address", defaultAddress, "The address to the containerd socket for use in the tests")
 	flag.BoolVar(&noDaemon, "no-daemon", false, "Do not start a dedicated daemon for the tests")
 	flag.BoolVar(&noCriu, "no-criu", false, "Do not run the checkpoint tests")

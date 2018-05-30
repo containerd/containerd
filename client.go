@@ -89,7 +89,6 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 		gopts := []grpc.DialOption{
 			grpc.WithBlock(),
 			grpc.WithInsecure(),
-			grpc.WithTimeout(60 * time.Second),
 			grpc.FailOnNonTempDialError(true),
 			grpc.WithBackoffMaxDelay(3 * time.Second),
 			grpc.WithDialer(dialer.Dialer),
@@ -109,7 +108,9 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 			)
 		}
 		connector := func() (*grpc.ClientConn, error) {
-			conn, err := grpc.Dial(dialer.DialAddress(address), gopts...)
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+			conn, err := grpc.DialContext(ctx, dialer.DialAddress(address), gopts...)
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to dial %q", address)
 			}
