@@ -19,11 +19,20 @@
 package proc
 
 import (
+	"path/filepath"
+
+	"github.com/containerd/containerd/defaults"
+	"github.com/containerd/containerd/rootless"
 	"github.com/pkg/errors"
 )
 
 // RuncRoot is the path to the root runc state directory
-const RuncRoot = "/run/containerd/runc"
+func RuncRoot() string {
+	if rootless.RunningWithNonRootUsername {
+		return filepath.Join(defaults.UserStateDir, "runc")
+	}
+	return filepath.Join(defaults.DefaultStateDir, "runc")
+}
 
 func stateName(v interface{}) string {
 	switch v.(type) {

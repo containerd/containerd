@@ -121,6 +121,9 @@ func WithStreams(stdin io.Reader, stdout, stderr io.Writer) Opt {
 
 // WithFIFODir sets the fifo directory.
 // e.g. "/run/containerd/fifo", "/run/users/1001/containerd/fifo"
+//
+// For rootless execution, specifying WithFIFODir is required in most setup.
+// If WithFIFODir is not specified, NewCreator sets the directory to defaults.DefaultFIFODir.
 func WithFIFODir(dir string) Opt {
 	return func(opt *Streams) {
 		opt.FIFODir = dir

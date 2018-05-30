@@ -24,10 +24,13 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/rootless"
 	"github.com/containerd/containerd/services/server"
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/containerd/version"
@@ -91,6 +94,9 @@ func App() *cli.App {
 		ociHook,
 	}
 	app.Action = func(context *cli.Context) error {
+		if runtime.GOOS == "linux" && os.Geteuid() != 0 {
+			return errors.New("rootless mode requires the daemon to be executed as the mapped root in a user namespace")
+		}
 		var (
 			start   = time.Now()
 			signals = make(chan os.Signal, 2048)
@@ -110,6 +116,18 @@ func App() *cli.App {
 		// apply flags to the config
 		if err := applyFlags(context, config); err != nil {
 			return err
+		}
+		if rootless.RunningWithNonRootUsername {
+			// Files under XDG_RUNTIME_DIR requires sticky bit on typical setup to prevent GC.
+			// See https://github.com/opencontainers/runc/issues/1694
+			if xrd := os.Getenv("XDG_RUNTIME_DIR"); xrd != "" && strings.HasPrefix(config.State, xrd) {
+				if err := os.MkdirAll(config.State, 0700); err != nil {
+					return err
+				}
+				if err := os.Chmod(config.State, 0700|os.ModeSticky); err != nil {
+					return err
+				}
+			}
 		}
 		// cleanup temp mounts
 		if err := mount.SetTempMountLocation(filepath.Join(config.Root, "tmpmounts")); err != nil {

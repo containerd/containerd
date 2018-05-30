@@ -494,7 +494,7 @@ func (r *Runtime) getRuntime(ctx context.Context, ns, id string) (*runc.Runc, er
 
 	var (
 		cmd  = r.config.Runtime
-		root = proc.RuncRoot
+		root = proc.RuncRoot()
 	)
 	if ropts != nil {
 		if ropts.Runtime != "" {

@@ -18,11 +18,12 @@ package command
 
 import (
 	"github.com/containerd/containerd/defaults"
+	"github.com/containerd/containerd/rootless"
 	"github.com/containerd/containerd/services/server"
 )
 
 func defaultConfig() *server.Config {
-	return &server.Config{
+	c := &server.Config{
 		Root:  defaults.DefaultRootDir,
 		State: defaults.DefaultStateDir,
 		GRPC: server.GRPCConfig{
@@ -31,4 +32,10 @@ func defaultConfig() *server.Config {
 			MaxSendMsgSize: defaults.DefaultMaxSendMsgSize,
 		},
 	}
+	if rootless.RunningWithNonRootUsername {
+		c.Root = defaults.UserRootDir
+		c.State = defaults.UserStateDir
+		c.GRPC.Address = defaults.UserAddress
+	}
+	return c
 }

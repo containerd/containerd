@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/cmd/ctr/commands/tasks"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -119,6 +120,10 @@ var Command = cli.Command{
 			Name:  "fifo-dir",
 			Usage: "directory used for storing IO FIFOs",
 		},
+		cli.BoolFlag{
+			Name:  "rootless",
+			Usage: "experimental support for rootless mode",
+		},
 	}, append(commands.SnapshotterFlags, commands.ContainerFlags...)...),
 	Action: func(context *cli.Context) error {
 		var (
@@ -149,7 +154,11 @@ var Command = cli.Command{
 			defer container.Delete(ctx, containerd.WithSnapshotCleanup)
 		}
 		opts := getNewTaskOpts(context)
-		ioOpts := []cio.Opt{cio.WithFIFODir(context.String("fifo-dir"))}
+		fifoDir := context.String("fifo-dir")
+		if fifoDir == "" && context.Bool("rootless") {
+			fifoDir = defaults.UserFIFODir
+		}
+		ioOpts := []cio.Opt{cio.WithFIFODir(fifoDir)}
 		task, err := tasks.NewTask(ctx, client, container, context.String("checkpoint"), tty, context.Bool("null-io"), ioOpts, opts...)
 		if err != nil {
 			return err
