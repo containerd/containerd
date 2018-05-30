@@ -37,7 +37,7 @@ plugins = ["fieldpath"] # disable grpc for this package
 
 [[overrides]]
 # enable ttrpc and disable fieldpath and grpc for the shim
-prefixes = ["github.com/containerd/containerd/linux/shim/v1"]
+prefixes = ["github.com/containerd/containerd/runtime/linux/shim/v1"]
 plugins = ["ttrpc"]
 
 # Aggregrate the API descriptors to lock down API changes.
@@ -51,8 +51,8 @@ ignore_files = [
 
 # Lock down runc config
 [[descriptors]]
-prefix = "github.com/containerd/containerd/linux/runctypes"
-target = "linux/runctypes/next.pb.txt"
+prefix = "github.com/containerd/containerd/runtime/linux/runctypes"
+target = "runtime/linux/runctypes/next.pb.txt"
 ignore_files = [
 	"google/protobuf/descriptor.proto",
 	"gogoproto/gogo.proto"

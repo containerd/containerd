@@ -24,8 +24,8 @@ import (
 	"github.com/containerd/containerd"
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/linux/runctypes"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/runtime/linux/runctypes"
 	cni "github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -494,16 +494,14 @@ func parseDNSOptions(servers, searches, options []string) (string, error) {
 }
 
 // unmountSandboxFiles unmount some sandbox files, we rely on the removal of sandbox root directory to
-// remove these files. Unmount should *NOT* return error when:
-//  1) The mount point is already unmounted.
-//  2) The mount point doesn't exist.
+// remove these files. Unmount should *NOT* return error if the mount point is already unmounted.
 func (c *criService) unmountSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
 	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetIpc() != runtime.NamespaceMode_NODE {
 		path, err := c.os.FollowSymlinkInScope(c.getSandboxDevShm(id), "/")
 		if err != nil {
 			return errors.Wrap(err, "failed to follow symlink")
 		}
-		if err := c.os.Unmount(path, unix.MNT_DETACH); err != nil && !os.IsNotExist(err) {
+		if err := c.os.Unmount(path); err != nil && !os.IsNotExist(err) {
 			return errors.Wrapf(err, "failed to unmount %q", path)
 		}
 	}

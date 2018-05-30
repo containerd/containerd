@@ -24,12 +24,12 @@ import (
 	"github.com/containerd/cgroups"
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/events"
-	"github.com/containerd/containerd/linux"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
+	"github.com/containerd/containerd/runtime/linux"
 	metrics "github.com/docker/go-metrics"
 	"github.com/sirupsen/logrus"
 )

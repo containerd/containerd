@@ -35,10 +35,10 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/events"
-	"github.com/containerd/containerd/linux/proc"
-	"github.com/containerd/containerd/linux/shim"
-	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/runtime/linux/proc"
+	"github.com/containerd/containerd/runtime/linux/shim"
+	shimapi "github.com/containerd/containerd/runtime/linux/shim/v1"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"

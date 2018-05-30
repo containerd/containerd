@@ -31,9 +31,9 @@ import (
 	"time"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/linux/runctypes"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
