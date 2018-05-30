@@ -39,7 +39,7 @@ fi
 # Make sure output directory is clean.
 make clean
 # Build and push test tarball.
-PUSH_VERSION=true DEPLOY_DIR=containerd \
+PUSH_VERSION=true DEPLOY_DIR=${DEPLOY_DIR:-"containerd"} \
   make push TARBALL_PREFIX=containerd-cni \
   INCLUDE_CNI=true \
   CHECKOUT_CONTAINERD=false \
