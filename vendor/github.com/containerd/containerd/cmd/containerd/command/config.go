@@ -21,7 +21,7 @@ import (
 	"os"
 
 	"github.com/BurntSushi/toml"
-	"github.com/containerd/containerd/server"
+	"github.com/containerd/containerd/services/server"
 	"github.com/urfave/cli"
 )
 

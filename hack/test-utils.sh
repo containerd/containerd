@@ -46,7 +46,7 @@ test_setup() {
   # Wait for containerd to be running by using the containerd client ctr to check the version
   # of the containerd server. Wait an increasing amount of time after each of five attempts
   readiness_check "sudo ctr version"
-  readiness_check "sudo ${GOPATH}/bin/crictl --runtime-endpoint=${CONTAINERD_SOCK} info"
+  readiness_check "sudo crictl --runtime-endpoint=${CONTAINERD_SOCK} info"
 }
 
 # test_teardown kills containerd.

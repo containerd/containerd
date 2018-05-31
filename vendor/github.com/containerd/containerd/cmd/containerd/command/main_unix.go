@@ -24,7 +24,7 @@ import (
 	"runtime"
 
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/server"
+	"github.com/containerd/containerd/services/server"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )

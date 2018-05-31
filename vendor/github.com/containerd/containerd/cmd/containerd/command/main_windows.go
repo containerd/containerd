@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/server"
+	"github.com/containerd/containerd/services/server"
 
 	"golang.org/x/sys/windows"
 )

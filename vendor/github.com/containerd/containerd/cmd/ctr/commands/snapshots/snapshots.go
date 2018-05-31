@@ -30,7 +30,7 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/progress"
+	"github.com/containerd/containerd/pkg/progress"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/snapshots"
 	digest "github.com/opencontainers/go-digest"

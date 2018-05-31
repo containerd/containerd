@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/linux/runctypes"
+	"github.com/containerd/containerd/runtime/linux/runctypes"
 )
 
 // WithContainerdShimCgroup returns function that sets the containerd
