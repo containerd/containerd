@@ -17,6 +17,7 @@ limitations under the License.
 package client
 
 import (
+	"context"
 	"time"
 
 	"github.com/pkg/errors"
@@ -33,11 +34,11 @@ func NewCRIPluginClient(endpoint string, timeout time.Duration) (api.CRIPluginSe
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get dialer")
 	}
-	conn, err := grpc.Dial(addr,
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	conn, err := grpc.DialContext(ctx, addr,
 		grpc.WithBlock(),
 		grpc.WithInsecure(),
-		// TODO(random-liu): WithTimeout is being deprecated, use context instead.
-		grpc.WithTimeout(timeout),
 		grpc.WithDialer(dialer),
 	)
 	if err != nil {

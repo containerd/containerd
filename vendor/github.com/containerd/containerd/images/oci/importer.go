@@ -140,7 +140,7 @@ func onUntarBlob(ctx context.Context, r io.Reader, store content.Ingester, name 
 		return errors.Errorf("unsupported algorithm: %s", algo)
 	}
 	dgst := digest.NewDigestFromHex(algo.String(), split[2])
-	return content.WriteBlob(ctx, store, "unknown-"+dgst.String(), r, size, dgst)
+	return content.WriteBlob(ctx, store, "unknown-"+dgst.String(), r, ocispec.Descriptor{Size: size, Digest: dgst})
 }
 
 // GetChildrenDescriptors returns children blob descriptors for the following supported types:
@@ -175,7 +175,7 @@ func setGCRefContentLabels(ctx context.Context, store content.Store, desc ocispe
 		}
 		return err
 	}
-	ra, err := store.ReaderAt(ctx, desc.Digest)
+	ra, err := store.ReaderAt(ctx, desc)
 	if err != nil {
 		return err
 	}
