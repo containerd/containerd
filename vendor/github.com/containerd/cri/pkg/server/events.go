@@ -116,15 +116,16 @@ func convertEvent(e *gogotypes.Any) (string, interface{}, error) {
 }
 
 // start starts the event monitor which monitors and handles all container events. It returns
-// a channel for the caller to wait for the event monitor to stop. start must be called after
-// subscribe.
-func (em *eventMonitor) start() (<-chan struct{}, error) {
+// an error channel for the caller to wait for stop errors from the event monitor.
+// start must be called after subscribe.
+func (em *eventMonitor) start() <-chan error {
+	errCh := make(chan error)
 	if em.ch == nil || em.errCh == nil {
-		return nil, errors.New("event channel is nil")
+		panic("event channel is nil")
 	}
-	closeCh := make(chan struct{})
 	backOffCheckCh := em.backOff.start()
 	go func() {
+		defer close(errCh)
 		for {
 			select {
 			case e := <-em.ch:
@@ -144,8 +145,11 @@ func (em *eventMonitor) start() (<-chan struct{}, error) {
 					em.backOff.enBackOff(cID, evt)
 				}
 			case err := <-em.errCh:
-				logrus.WithError(err).Error("Failed to handle event stream")
-				close(closeCh)
+				// Close errCh in defer directly if there is no error.
+				if err != nil {
+					logrus.WithError(err).Errorf("Failed to handle event stream")
+					errCh <- err
+				}
 				return
 			case <-backOffCheckCh:
 				cIDs := em.backOff.getExpiredContainers()
@@ -162,7 +166,7 @@ func (em *eventMonitor) start() (<-chan struct{}, error) {
 			}
 		}
 	}()
-	return closeCh, nil
+	return errCh
 }
 
 // stop stops the event monitor. It will close the event channel.
