@@ -60,7 +60,7 @@ func TestCheckpointRestorePTY(t *testing.T) {
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
-	direct, err := newDirectIOWithTerminal(ctx)
+	direct, err := newDirectIO(ctx, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestCheckpointRestorePTY(t *testing.T) {
 		t.Fatal(err)
 	}
 	direct.Delete()
-	direct, err = newDirectIOWithTerminal(ctx)
+	direct, err = newDirectIO(ctx, true)
 	if err != nil {
 		t.Fatal(err)
 	}

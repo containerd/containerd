@@ -281,7 +281,7 @@ func TestContainerPTY(t *testing.T) {
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
-	direct, err := newDirectIOWithTerminal(ctx)
+	direct, err := newDirectIO(ctx, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,7 +360,7 @@ func TestContainerAttach(t *testing.T) {
 
 	expected := "hello" + newLine
 
-	direct, err := newDirectIOStandard(ctx)
+	direct, err := newDirectIO(ctx, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -429,24 +429,12 @@ func TestContainerAttach(t *testing.T) {
 	}
 }
 
-func newDirectIOStandard(ctx context.Context) (*directIO, error) {
-	return newDirectIO(ctx, false)
-}
-
-func newDirectIOWithTerminal(ctx context.Context) (*directIO, error) {
-	return newDirectIO(ctx, true)
-}
-
 func newDirectIO(ctx context.Context, terminal bool) (*directIO, error) {
-	fifos, err := cio.NewFIFOSetInDir("", "", false)
+	fifos, err := cio.NewFIFOSetInDir("", "", terminal)
 	if err != nil {
 		return nil, err
 	}
-	f := cio.NewDirectIO
-	if terminal {
-		f = cio.NewDirectIOWithTerminal
-	}
-	dio, err := f(ctx, fifos)
+	dio, err := cio.NewDirectIO(ctx, fifos)
 	if err != nil {
 		return nil, err
 	}
@@ -508,7 +496,7 @@ func TestContainerUsername(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	direct, err := newDirectIOStandard(ctx)
+	direct, err := newDirectIO(ctx, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -583,7 +571,7 @@ func testContainerUser(t *testing.T, userstr, expectedOutput string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	direct, err := newDirectIOStandard(ctx)
+	direct, err := newDirectIO(ctx, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -668,7 +656,7 @@ func TestContainerAttachProcess(t *testing.T) {
 	expected := "hello" + newLine
 
 	// creating IO early for easy resource cleanup
-	direct, err := newDirectIOStandard(ctx)
+	direct, err := newDirectIO(ctx, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -775,7 +763,7 @@ func TestContainerUserID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	direct, err := newDirectIOStandard(ctx)
+	direct, err := newDirectIO(ctx, false)
 	if err != nil {
 		t.Fatal(err)
 	}
