@@ -13,14 +13,6 @@
     - name: "Create a directory for containerd config"
       file: path=/etc/containerd state=directory
 
-    - name: "Add containerd config file"
-      blockinfile:
-        path: /etc/containerd/config.toml
-        create: yes
-        block: |
-          [plugins.cri]
-            enable_tls_streaming = true
-
     - name: "Start Containerd"
       systemd: name=containerd daemon_reload=yes state=started enabled=yes
 
