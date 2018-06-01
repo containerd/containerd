@@ -254,23 +254,24 @@ func writeDockerSchema2Manifest(ctx context.Context, cs content.Ingester, manife
 	for i, ch := range manifest.Layers {
 		labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i+1)] = ch.Digest.String()
 	}
-	if err := content.WriteBlob(ctx, cs, "manifest-"+manifestDigest.String(), manifestBytesR,
-		int64(len(manifestBytes)), manifestDigest, content.WithLabels(labels)); err != nil {
-		return nil, err
-	}
 
-	desc := &ocispec.Descriptor{
+	desc := ocispec.Descriptor{
 		MediaType: images.MediaTypeDockerSchema2Manifest,
 		Digest:    manifestDigest,
 		Size:      int64(len(manifestBytes)),
 	}
+	if err := content.WriteBlob(ctx, cs, "manifest-"+manifestDigest.String(), manifestBytesR,
+		desc, content.WithLabels(labels)); err != nil {
+		return nil, err
+	}
+
 	if arch != "" || os != "" {
 		desc.Platform = &ocispec.Platform{
 			Architecture: arch,
 			OS:           os,
 		}
 	}
-	return desc, nil
+	return &desc, nil
 }
 
 func onUntarManifestJSON(r io.Reader) ([]manifestDotJSON, error) {
@@ -290,7 +291,7 @@ func onUntarLayerTar(ctx context.Context, r io.Reader, cs content.Ingester, name
 	// name is like "foobar/layer.tar" ( guaranteed by isLayerTar() )
 	split := strings.Split(name, "/")
 	// note: split[0] is not expected digest here
-	cw, err := cs.Writer(ctx, "layer-"+split[0], size, "")
+	cw, err := cs.Writer(ctx, content.WithRef("layer-"+split[0]), content.WithDescriptor(ocispec.Descriptor{Size: size}))
 	if err != nil {
 		return nil, err
 	}
@@ -311,7 +312,7 @@ func onUntarDotJSON(ctx context.Context, r io.Reader, cs content.Ingester, name 
 	config.desc.Size = size
 	// name is like "foobar.json" ( guaranteed by is DotJSON() )
 	split := strings.Split(name, ".")
-	cw, err := cs.Writer(ctx, "config-"+split[0], size, "")
+	cw, err := cs.Writer(ctx, content.WithRef("config-"+split[0]), content.WithDescriptor(ocispec.Descriptor{Size: size}))
 	if err != nil {
 		return nil, err
 	}

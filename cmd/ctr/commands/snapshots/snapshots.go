@@ -167,7 +167,7 @@ var diffCommand = cli.Command{
 			}
 		}
 
-		ra, err := client.ContentStore().ReaderAt(ctx, desc.Digest)
+		ra, err := client.ContentStore().ReaderAt(ctx, desc)
 		if err != nil {
 			return err
 		}
