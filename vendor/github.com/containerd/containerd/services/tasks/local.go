@@ -45,6 +45,7 @@ import (
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -121,7 +122,11 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 		if r.Checkpoint.MediaType != images.MediaTypeContainerd1Checkpoint {
 			return nil, fmt.Errorf("unsupported checkpoint type %q", r.Checkpoint.MediaType)
 		}
-		reader, err := l.store.ReaderAt(ctx, r.Checkpoint.Digest)
+		reader, err := l.store.ReaderAt(ctx, ocispec.Descriptor{
+			MediaType: r.Checkpoint.MediaType,
+			Digest:    r.Checkpoint.Digest,
+			Size:      r.Checkpoint.Size_,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -573,7 +578,7 @@ func getTasksMetrics(ctx context.Context, filter filters.Filter, tasks []runtime
 }
 
 func (l *local) writeContent(ctx context.Context, mediaType, ref string, r io.Reader) (*types.Descriptor, error) {
-	writer, err := l.store.Writer(ctx, ref, 0, "")
+	writer, err := l.store.Writer(ctx, content.WithRef(ref), content.WithDescriptor(ocispec.Descriptor{MediaType: mediaType}))
 	if err != nil {
 		return nil, err
 	}
