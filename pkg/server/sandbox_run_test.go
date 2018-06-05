@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -404,6 +405,31 @@ func TestToCNIPortMappings(t *testing.T) {
 	} {
 		t.Logf("TestCase %q", desc)
 		assert.Equal(t, test.cniPortMappings, toCNIPortMappings(test.criPortMappings))
+	}
+}
+
+func TestSelectPodIP(t *testing.T) {
+	for desc, test := range map[string]struct {
+		ips      []string
+		expected string
+	}{
+		"ipv4 should be picked even if ipv6 comes first": {
+			ips:      []string{"2001:db8:85a3::8a2e:370:7334", "192.168.17.43"},
+			expected: "192.168.17.43",
+		},
+		"ipv6 should be picked when there is no ipv4": {
+			ips:      []string{"2001:db8:85a3::8a2e:370:7334"},
+			expected: "2001:db8:85a3::8a2e:370:7334",
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		var ipConfigs []*cni.IPConfig
+		for _, ip := range test.ips {
+			ipConfigs = append(ipConfigs, &cni.IPConfig{
+				IP: net.ParseIP(ip),
+			})
+		}
+		assert.Equal(t, test.expected, selectPodIP(ipConfigs))
 	}
 }
 
