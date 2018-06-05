@@ -49,16 +49,16 @@ var loadCommand = cli.Command{
 			timeout = context.GlobalDuration("timeout")
 			cancel  gocontext.CancelFunc
 		)
-		cl, err := client.NewCRIPluginClient(address, timeout)
-		if err != nil {
-			return errors.Wrap(err, "failed to create grpc client")
-		}
 		if timeout > 0 {
 			ctx, cancel = gocontext.WithTimeout(gocontext.Background(), timeout)
 		} else {
 			ctx, cancel = gocontext.WithCancel(ctx)
 		}
 		defer cancel()
+		cl, err := client.NewCRIPluginClient(ctx, address)
+		if err != nil {
+			return errors.Wrap(err, "failed to create grpc client")
+		}
 		for _, path := range context.Args() {
 			absPath, err := filepath.Abs(path)
 			if err != nil {
