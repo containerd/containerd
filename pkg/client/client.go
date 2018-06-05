@@ -18,7 +18,6 @@ package client
 
 import (
 	"context"
-	"time"
 
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -29,13 +28,11 @@ import (
 
 // NewCRIPluginClient creates grpc client of cri plugin
 // TODO(random-liu): Wrap grpc functions.
-func NewCRIPluginClient(endpoint string, timeout time.Duration) (api.CRIPluginServiceClient, error) {
+func NewCRIPluginClient(ctx context.Context, endpoint string) (api.CRIPluginServiceClient, error) {
 	addr, dialer, err := util.GetAddressAndDialer(endpoint)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get dialer")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
 	conn, err := grpc.DialContext(ctx, addr,
 		grpc.WithBlock(),
 		grpc.WithInsecure(),

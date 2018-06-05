@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os/exec"
@@ -87,7 +88,9 @@ func ConnectDaemons() error {
 	if err != nil {
 		return errors.Wrap(err, "failed to connect containerd")
 	}
-	criPluginClient, err = client.NewCRIPluginClient(*criEndpoint, timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	criPluginClient, err = client.NewCRIPluginClient(ctx, *criEndpoint)
 	if err != nil {
 		return errors.Wrap(err, "failed to connect cri plugin")
 	}
