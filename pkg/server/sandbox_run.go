@@ -524,7 +524,7 @@ func (c *criService) setupPod(id string, path string, config *runtime.PodSandbox
 	}
 	// Check if the default interface has IP config
 	if configs, ok := result.Interfaces[defaultIfName]; ok && len(configs.IPConfigs) > 0 {
-		return configs.IPConfigs[0].IP.String(), nil
+		return selectPodIP(configs.IPConfigs), nil
 	}
 	// If it comes here then the result was invalid so destroy the pod network and return error
 	if err := c.teardownPod(id, path, config); err != nil {
@@ -548,6 +548,16 @@ func toCNIPortMappings(criPortMappings []*runtime.PortMapping) []cni.PortMapping
 		})
 	}
 	return portMappings
+}
+
+// selectPodIP select an ip from the ip list. It prefers ipv4 more than ipv6.
+func selectPodIP(ipConfigs []*cni.IPConfig) string {
+	for _, c := range ipConfigs {
+		if c.IP.To4() != nil {
+			return c.IP.String()
+		}
+	}
+	return ipConfigs[0].IP.String()
 }
 
 // untrustedWorkload returns true if the sandbox contains untrusted workload.
