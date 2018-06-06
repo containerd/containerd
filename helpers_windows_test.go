@@ -55,3 +55,15 @@ func withExecExitStatus(s *specs.Process, es int) {
 func withExecArgs(s *specs.Process, args ...string) {
 	s.Args = append([]string{"powershell", "-noprofile"}, args...)
 }
+
+func withMemoryLimit(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+	if s.Windows.Resources == nil {
+		s.Windows.Resources = &specs.WindowsResources{}
+	}
+	if s.Windows.Resources.Memory == nil {
+		s.Windows.Resources.Memory = &specs.WindowsMemoryResources{}
+	}
+	limit := uint64(32 * 1024 * 1024)
+	s.Windows.Resources.Memory.Limit = &limit
+	return nil
+}
