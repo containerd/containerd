@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/runtime"
-	shim "github.com/containerd/containerd/runtime/linux/shim/v1"
+	shim "github.com/containerd/containerd/runtime/shim/v1"
 	"github.com/pkg/errors"
 	"github.com/stevvooe/ttrpc"
 )

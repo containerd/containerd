@@ -26,7 +26,7 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	shim "github.com/containerd/containerd/runtime/linux/shim/v1"
+	shim "github.com/containerd/containerd/runtime/shim/v1"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/opencontainers/runtime-spec/specs-go"
