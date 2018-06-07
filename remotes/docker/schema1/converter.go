@@ -257,15 +257,15 @@ func (c *Converter) fetchBlob(ctx context.Context, desc ocispec.Descriptor) erro
 	var (
 		ref  = remotes.MakeRefKey(ctx, desc)
 		calc = newBlobStateCalculator()
-		size = desc.Size
 	)
 
 	// size may be unknown, set to zero for content ingest
-	if size == -1 {
-		size = 0
+	ingestDesc := desc
+	if ingestDesc.Size == -1 {
+		ingestDesc.Size = 0
 	}
 
-	cw, err := content.OpenWriter(ctx, c.contentStore, content.WithRef(ref), content.WithDescriptor(desc))
+	cw, err := content.OpenWriter(ctx, c.contentStore, content.WithRef(ref), content.WithDescriptor(ingestDesc))
 	if err != nil {
 		if !errdefs.IsAlreadyExists(err) {
 			return err
@@ -317,7 +317,7 @@ func (c *Converter) fetchBlob(ctx context.Context, desc ocispec.Descriptor) erro
 		eg.Go(func() error {
 			defer pw.Close()
 
-			return content.Copy(ctx, cw, io.TeeReader(rc, pw), size, desc.Digest)
+			return content.Copy(ctx, cw, io.TeeReader(rc, pw), ingestDesc.Size, ingestDesc.Digest)
 		})
 
 		if err := eg.Wait(); err != nil {
