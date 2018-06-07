@@ -24,6 +24,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/contrib/nvidia"
 	"github.com/containerd/containerd/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -122,6 +123,9 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			Type: specs.LinuxNamespaceType(parts[0]),
 			Path: parts[1],
 		}))
+	}
+	if context.IsSet("gpus") {
+		opts = append(opts, nvidia.WithGPUs(nvidia.WithDevices(context.Int("gpus")), nvidia.WithAllCapabilities))
 	}
 	if context.IsSet("config") {
 		var s specs.Spec

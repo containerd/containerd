@@ -93,6 +93,10 @@ var ContainerFlags = []cli.Flag{
 		Name:  "pid-file",
 		Usage: "file path to write the task's pid",
 	},
+	cli.IntFlag{
+		Name:  "gpus",
+		Usage: "add gpus to the container",
+	},
 }
 
 func loadSpec(path string, s *specs.Spec) error {
