@@ -1,2 +1,0 @@
-CONTAINERD_TEST: 'true'
-CONTAINERD_LOG_LEVEL: 'debug'
