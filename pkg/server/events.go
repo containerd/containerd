@@ -186,6 +186,7 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 	// TODO(random-liu): [P2] Handle containerd-shim exit.
 	case *eventtypes.TaskExit:
 		e := any.(*eventtypes.TaskExit)
+		logrus.Infof("TaskExit event %+v", e)
 		cntr, err := em.containerStore.Get(e.ContainerID)
 		if err == nil {
 			if err := handleContainerExit(ctx, e, cntr); err != nil {
