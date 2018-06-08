@@ -372,6 +372,11 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 				securityContext.GetCapabilities())
 		}
 	}
+	// Clear all ambient capabilities. The implication of non-root + caps
+	// is not clearly defined in Kubernetes.
+	// See https://github.com/kubernetes/kubernetes/issues/56374
+	// Keep docker's behavior for now.
+	g.Spec().Process.Capabilities.Ambient = []string{}
 
 	g.SetProcessSelinuxLabel(processLabel)
 	g.SetLinuxMountLabel(mountLabel)

@@ -261,6 +261,7 @@ func TestContainerCapabilities(t *testing.T) {
 			assert.NotContains(t, spec.Process.Capabilities.Inheritable, exclude)
 			assert.NotContains(t, spec.Process.Capabilities.Permitted, exclude)
 		}
+		assert.Empty(t, spec.Process.Capabilities.Ambient)
 	}
 }
 
