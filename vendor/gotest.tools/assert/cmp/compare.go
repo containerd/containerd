@@ -1,5 +1,5 @@
 /*Package cmp provides Comparisons for Assert and Check*/
-package cmp
+package cmp // import "gotest.tools/assert/cmp"
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/pmezard/go-difflib/difflib"
+	"gotest.tools/internal/format"
 )
 
 // Comparison is a function which compares values and returns ResultSuccess if
@@ -15,10 +15,12 @@ import (
 // Result will contain a message about why it failed.
 type Comparison func() Result
 
-// DeepEqual compares two values using https://godoc.org/github.com/google/go-cmp/cmp
+// DeepEqual compares two values using google/go-cmp (http://bit.do/go-cmp)
 // and succeeds if the values are equal.
 //
 // The comparison can be customized using comparison Options.
+// Package https://godoc.org/gotest.tools/assert/opt provides some additional
+// commonly used Options.
 func DeepEqual(x, y interface{}, opts ...cmp.Option) Comparison {
 	return func() (result Result) {
 		defer func() {
@@ -27,7 +29,10 @@ func DeepEqual(x, y interface{}, opts ...cmp.Option) Comparison {
 			}
 		}()
 		diff := cmp.Diff(x, y, opts...)
-		return toResult(diff == "", "\n"+diff)
+		if diff == "" {
+			return ResultSuccess
+		}
+		return multiLineDiffResult(diff)
 	}
 }
 
@@ -53,14 +58,15 @@ func toResult(success bool, msg string) Result {
 	return ResultFailure(msg)
 }
 
-// Equal succeeds if x == y.
+// Equal succeeds if x == y. See assert.Equal for full documentation.
 func Equal(x, y interface{}) Comparison {
 	return func() Result {
 		switch {
 		case x == y:
 			return ResultSuccess
 		case isMultiLineStringCompare(x, y):
-			return multiLineStringDiffResult(x.(string), y.(string))
+			diff := format.UnifiedDiff(format.DiffConfig{A: x.(string), B: y.(string)})
+			return multiLineDiffResult(diff)
 		}
 		return ResultFailureTemplate(`
 			{{- .Data.x}} (
@@ -86,15 +92,7 @@ func isMultiLineStringCompare(x, y interface{}) bool {
 	return strings.Contains(strX, "\n") || strings.Contains(strY, "\n")
 }
 
-func multiLineStringDiffResult(x, y string) Result {
-	diff, err := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
-		A:       difflib.SplitLines(x),
-		B:       difflib.SplitLines(y),
-		Context: 3,
-	})
-	if err != nil {
-		return ResultFailure(fmt.Sprintf("failed to diff: %s", err))
-	}
+func multiLineDiffResult(diff string) Result {
 	return ResultFailureTemplate(`
 --- {{ with callArg 0 }}{{ formatNode . }}{{else}}←{{end}}
 +++ {{ with callArg 1 }}{{ formatNode . }}{{else}}→{{end}}
@@ -236,4 +234,79 @@ func isNil(obj interface{}, msgFunc func(reflect.Value) string) Comparison {
 
 		return ResultFailure(fmt.Sprintf("%v (type %s) can not be nil", value, value.Type()))
 	}
+}
+
+// ErrorType succeeds if err is not nil and is of the expected type.
+//
+// Expected can be one of:
+// a func(error) bool which returns true if the error is the expected type,
+// an instance of (or a pointer to) a struct of the expected type,
+// a pointer to an interface the error is expected to implement,
+// a reflect.Type of the expected struct or interface.
+func ErrorType(err error, expected interface{}) Comparison {
+	return func() Result {
+		switch expectedType := expected.(type) {
+		case func(error) bool:
+			return cmpErrorTypeFunc(err, expectedType)
+		case reflect.Type:
+			if expectedType.Kind() == reflect.Interface {
+				return cmpErrorTypeImplementsType(err, expectedType)
+			}
+			return cmpErrorTypeEqualType(err, expectedType)
+		case nil:
+			return ResultFailure(fmt.Sprintf("invalid type for expected: nil"))
+		}
+
+		expectedType := reflect.TypeOf(expected)
+		switch {
+		case expectedType.Kind() == reflect.Struct, isPtrToStruct(expectedType):
+			return cmpErrorTypeEqualType(err, expectedType)
+		case isPtrToInterface(expectedType):
+			return cmpErrorTypeImplementsType(err, expectedType.Elem())
+		}
+		return ResultFailure(fmt.Sprintf("invalid type for expected: %T", expected))
+	}
+}
+
+func cmpErrorTypeFunc(err error, f func(error) bool) Result {
+	if f(err) {
+		return ResultSuccess
+	}
+	actual := "nil"
+	if err != nil {
+		actual = fmt.Sprintf("%s (%T)", err, err)
+	}
+	return ResultFailureTemplate(`error is {{ .Data.actual }}
+		{{- with callArg 1 }}, not {{ formatNode . }}{{end -}}`,
+		map[string]interface{}{"actual": actual})
+}
+
+func cmpErrorTypeEqualType(err error, expectedType reflect.Type) Result {
+	if err == nil {
+		return ResultFailure(fmt.Sprintf("error is nil, not %s", expectedType))
+	}
+	errValue := reflect.ValueOf(err)
+	if errValue.Type() == expectedType {
+		return ResultSuccess
+	}
+	return ResultFailure(fmt.Sprintf("error is %s (%T), not %s", err, err, expectedType))
+}
+
+func cmpErrorTypeImplementsType(err error, expectedType reflect.Type) Result {
+	if err == nil {
+		return ResultFailure(fmt.Sprintf("error is nil, not %s", expectedType))
+	}
+	errValue := reflect.ValueOf(err)
+	if errValue.Type().Implements(expectedType) {
+		return ResultSuccess
+	}
+	return ResultFailure(fmt.Sprintf("error is %s (%T), not %s", err, err, expectedType))
+}
+
+func isPtrToInterface(typ reflect.Type) bool {
+	return typ.Kind() == reflect.Ptr && typ.Elem().Kind() == reflect.Interface
+}
+
+func isPtrToStruct(typ reflect.Type) bool {
+	return typ.Kind() == reflect.Ptr && typ.Elem().Kind() == reflect.Struct
 }

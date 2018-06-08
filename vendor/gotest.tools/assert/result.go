@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"go/ast"
 
-	"github.com/gotestyourself/gotestyourself/assert/cmp"
-	"github.com/gotestyourself/gotestyourself/internal/format"
-	"github.com/gotestyourself/gotestyourself/internal/source"
+	"gotest.tools/assert/cmp"
+	"gotest.tools/internal/format"
+	"gotest.tools/internal/source"
 )
 
 func runComparison(
 	t TestingT,
-	exprFilter astExprListFilter,
+	argSelector argSelector,
 	f cmp.Comparison,
 	msgAndArgs ...interface{},
 ) bool {
@@ -31,7 +31,7 @@ func runComparison(
 		if err != nil {
 			t.Log(err.Error())
 		}
-		message = typed.FailureMessage(filterPrintableExpr(exprFilter(args)))
+		message = typed.FailureMessage(filterPrintableExpr(argSelector(args)))
 	case resultBasic:
 		message = typed.FailureMessage()
 	default:
@@ -50,9 +50,7 @@ type resultBasic interface {
 	FailureMessage() string
 }
 
-type astExprListFilter func([]ast.Expr) []ast.Expr
-
-// filterPrintableExpr filters the ast.Expr slice to only include nodes that are
+// filterPrintableExpr filters the ast.Expr slice to only include Expr that are
 // easy to read when printed and contain relevant information to an assertion.
 //
 // Ident and SelectorExpr are included because they print nicely and the variable
@@ -63,24 +61,42 @@ type astExprListFilter func([]ast.Expr) []ast.Expr
 func filterPrintableExpr(args []ast.Expr) []ast.Expr {
 	result := make([]ast.Expr, len(args))
 	for i, arg := range args {
-		switch arg.(type) {
-		case *ast.Ident, *ast.SelectorExpr, *ast.IndexExpr, *ast.SliceExpr:
+		if isShortPrintableExpr(arg) {
 			result[i] = arg
-		default:
-			result[i] = nil
+			continue
 		}
+
+		if starExpr, ok := arg.(*ast.StarExpr); ok {
+			result[i] = starExpr.X
+			continue
+		}
+		result[i] = nil
 	}
 	return result
 }
 
-func filterExprExcludeFirst(args []ast.Expr) []ast.Expr {
+func isShortPrintableExpr(expr ast.Expr) bool {
+	switch expr.(type) {
+	case *ast.Ident, *ast.SelectorExpr, *ast.IndexExpr, *ast.SliceExpr:
+		return true
+	case *ast.BinaryExpr, *ast.UnaryExpr:
+		return true
+	default:
+		// CallExpr, ParenExpr, TypeAssertExpr, KeyValueExpr, StarExpr
+		return false
+	}
+}
+
+type argSelector func([]ast.Expr) []ast.Expr
+
+func argsAfterT(args []ast.Expr) []ast.Expr {
 	if len(args) < 1 {
 		return nil
 	}
 	return args[1:]
 }
 
-func filterExprArgsFromComparison(args []ast.Expr) []ast.Expr {
+func argsFromComparisonCall(args []ast.Expr) []ast.Expr {
 	if len(args) < 1 {
 		return nil
 	}

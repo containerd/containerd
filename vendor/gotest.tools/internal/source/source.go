@@ -1,4 +1,4 @@
-package source
+package source // import "gotest.tools/internal/source"
 
 import (
 	"bytes"
@@ -68,11 +68,13 @@ func (v *scanToLineVisitor) Visit(node ast.Node) ast.Visitor {
 // In golang 1.9 the line number changed from being the line where the statement
 // ended to the line where the statement began.
 func (v *scanToLineVisitor) nodePosition(node ast.Node) token.Position {
-	if isGOVersionBefore19() {
+	if goVersionBefore19 {
 		return v.fileset.Position(node.End())
 	}
 	return v.fileset.Position(node.Pos())
 }
+
+var goVersionBefore19 = isGOVersionBefore19()
 
 func isGOVersionBefore19() bool {
 	version := runtime.Version()
