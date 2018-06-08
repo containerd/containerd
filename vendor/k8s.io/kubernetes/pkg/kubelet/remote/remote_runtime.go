@@ -17,13 +17,13 @@ limitations under the License.
 package remote
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
@@ -40,12 +40,12 @@ type RemoteRuntimeService struct {
 
 // NewRemoteRuntimeService creates a new internalapi.RuntimeService.
 func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration) (internalapi.RuntimeService, error) {
-	glog.Infof("Connecting to runtime service %s", endpoint)
+	glog.V(3).Infof("Connecting to runtime service %s", endpoint)
 	addr, dailer, err := util.GetAddressAndDialer(endpoint)
 	if err != nil {
 		return nil, err
 	}
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(connectionTimeout), grpc.WithDialer(dailer))
+	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(connectionTimeout), grpc.WithDialer(dailer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
 	if err != nil {
 		glog.Errorf("Connect remote runtime %s failed: %v", addr, err)
 		return nil, err
