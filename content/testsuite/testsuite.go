@@ -31,10 +31,10 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/pkg/testutil"
-	"github.com/gotestyourself/gotestyourself/assert"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
+	"gotest.tools/assert"
 )
 
 // ContentSuite runs a test suite on the content store given a factory function.

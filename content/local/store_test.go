@@ -37,9 +37,9 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/content/testsuite"
 	"github.com/containerd/containerd/pkg/testutil"
-	"github.com/gotestyourself/gotestyourself/assert"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"gotest.tools/assert"
 )
 
 type memoryLabelStore struct {

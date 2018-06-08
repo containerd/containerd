@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/reference"
-	"github.com/gotestyourself/gotestyourself/assert"
+	"gotest.tools/assert"
 )
 
 func TestRepositoryScope(t *testing.T) {

@@ -27,9 +27,9 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/google/go-cmp/cmp"
-	"github.com/gotestyourself/gotestyourself/assert"
-	is "github.com/gotestyourself/gotestyourself/assert/cmp"
 	"github.com/pkg/errors"
+	"gotest.tools/assert"
+	is "gotest.tools/assert/cmp"
 )
 
 type testFunc func(context.Context, *testing.T, *MetaStore)

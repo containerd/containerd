@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/gc"
-	"github.com/gotestyourself/gotestyourself/assert"
+	"gotest.tools/assert"
 )
 
 func TestPauseThreshold(t *testing.T) {

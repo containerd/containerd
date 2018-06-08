@@ -36,7 +36,7 @@ import (
 
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/testutil"
-	"github.com/gotestyourself/gotestyourself/assert"
+	"gotest.tools/assert"
 )
 
 func checkLookup(t *testing.T, fsType, mntPoint, dir string) {
