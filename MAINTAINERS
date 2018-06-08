@@ -63,14 +63,19 @@ maintainer candidates are selected and proposed on the maintainers mailing list.
 
 After a candidate has been announced on the maintainers mailing list, the
 existing maintainers are given five business days to discuss the candidate,
-raise objections and cast their vote. Candidates must be approved by at least 66% of the current maintainers by adding their vote on the mailing
-list. Only maintainers of the repository that the candidate is proposed for are
-allowed to vote.
+raise objections and cast their vote. Votes may take place on the mailing list
+or via pull request comment. Candidates must be approved by at least 66% of the
+current maintainers by adding their vote on the mailing list. The reviewer role
+has the same process but only requires 33% of current maintainers. Only
+maintainers of the repository that the candidate is proposed for are allowed to
+vote.
 
 If a candidate is approved, a maintainer will contact the candidate to invite
 the candidate to open a pull request that adds the contributor to the
-MAINTAINERS file. The candidate becomes a maintainer once the pull request is
-merged.
+MAINTAINERS file. The voting process may take place inside a pull request if a
+maintainer has already discussed the candidacy with the candidate and a
+maintainer is willing to be a sponsor by opening the pull request. The candidate
+becomes a maintainer once the pull request is merged.
 """
 
 	[Rules.adding-sub-projects]
