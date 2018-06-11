@@ -53,7 +53,6 @@ func WithNewSnapshot(id string, i containerd.Image) containerd.NewContainerOpts 
 // WithVolumes copies ownership of volume in rootfs to its corresponding host path.
 // It doesn't update runtime spec.
 // The passed in map is a host path to container path map for all volumes.
-// TODO(random-liu): Figure out whether we need to copy volume content.
 func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 	return func(ctx context.Context, client *containerd.Client, c *containers.Container) (err error) {
 		if c.Snapshotter == "" {
@@ -108,14 +107,6 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 // copyExistingContents copies from the source to the destination and
 // ensures the ownership is appropriately set.
 func copyExistingContents(source, destination string) error {
-	srcList, err := ioutil.ReadDir(source)
-	if err != nil {
-		return err
-	}
-	if len(srcList) == 0 {
-		// Skip copying if source directory is empty.
-		return nil
-	}
 	dstList, err := ioutil.ReadDir(destination)
 	if err != nil {
 		return err

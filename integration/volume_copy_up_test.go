@@ -70,7 +70,7 @@ func TestVolumeCopyUp(t *testing.T) {
 	assert.Equal(t, "test_content\n", string(stdout))
 
 	t.Logf("Check host path of the volume")
-	hostCmd := fmt.Sprintf("ls %s/containers/%s/volumes/*/test_file | xargs cat", *criRoot, cn)
+	hostCmd := fmt.Sprintf("find %s/containers/%s/volumes/*/test_file | xargs cat", *criRoot, cn)
 	output, err := exec.Command("sh", "-c", hostCmd).CombinedOutput()
 	require.NoError(t, err)
 	assert.Equal(t, "test_content\n", string(output))
@@ -87,4 +87,52 @@ func TestVolumeCopyUp(t *testing.T) {
 	output, err = exec.Command("sh", "-c", hostCmd).CombinedOutput()
 	require.NoError(t, err)
 	assert.Equal(t, "new_content\n", string(output))
+}
+
+func TestVolumeOwnership(t *testing.T) {
+	const (
+		testImage   = "gcr.io/k8s-cri-containerd/volume-ownership:1.0"
+		execTimeout = time.Minute
+	)
+
+	t.Logf("Create a sandbox")
+	sbConfig := PodSandboxConfig("sandbox", "volume-ownership")
+	sb, err := runtimeService.RunPodSandbox(sbConfig)
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, runtimeService.StopPodSandbox(sb))
+		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
+	}()
+
+	t.Logf("Pull test image")
+	_, err = imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil)
+	require.NoError(t, err)
+
+	t.Logf("Create a container with volume-ownership test image")
+	cnConfig := ContainerConfig(
+		"container",
+		testImage,
+		WithCommand("tail", "-f", "/dev/null"),
+	)
+	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+	require.NoError(t, err)
+
+	t.Logf("Start the container")
+	require.NoError(t, runtimeService.StartContainer(cn))
+
+	// gcr.io/k8s-cri-containerd/volume-ownership:1.0 contains a test_dir
+	// volume, which is owned by nobody:nogroup.
+	t.Logf("Check ownership of test directory inside container")
+	stdout, stderr, err := runtimeService.ExecSync(cn, []string{
+		"stat", "-c", "%U:%G", "/test_dir",
+	}, execTimeout)
+	require.NoError(t, err)
+	assert.Empty(t, stderr)
+	assert.Equal(t, "nobody:nogroup\n", string(stdout))
+
+	t.Logf("Check ownership of test directory on the host")
+	hostCmd := fmt.Sprintf("find %s/containers/%s/volumes/* | xargs stat -c %%U:%%G", *criRoot, cn)
+	output, err := exec.Command("sh", "-c", hostCmd).CombinedOutput()
+	require.NoError(t, err)
+	assert.Equal(t, "nobody:nogroup\n", string(output))
 }
