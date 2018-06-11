@@ -32,8 +32,8 @@ import (
 
 	"github.com/containerd/fifo"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/gotestyourself/gotestyourself/assert"
-	is "github.com/gotestyourself/gotestyourself/assert/cmp"
+	"gotest.tools/assert"
+	is "gotest.tools/assert/cmp"
 )
 
 func assertHasPrefix(t *testing.T, s, prefix string) {

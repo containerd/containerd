@@ -6,7 +6,7 @@ import (
 	"go/ast"
 	"text/template"
 
-	"github.com/gotestyourself/gotestyourself/internal/source"
+	"gotest.tools/internal/source"
 )
 
 // Result of a Comparison.

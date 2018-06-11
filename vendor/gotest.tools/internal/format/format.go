@@ -1,4 +1,4 @@
-package format
+package format // import "gotest.tools/internal/format"
 
 import "fmt"
 

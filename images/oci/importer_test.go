@@ -19,9 +19,9 @@ package oci
 import (
 	"testing"
 
-	"github.com/gotestyourself/gotestyourself/assert"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"gotest.tools/assert"
 )
 
 func TestNormalizeImageRef(t *testing.T) {
