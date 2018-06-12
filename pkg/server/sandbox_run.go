@@ -344,9 +344,9 @@ func (c *criService) generateSandboxContainerSpec(id string, config *runtime.Pod
 		g.SetProcessCwd(imageConfig.WorkingDir)
 	}
 
-	if len(imageConfig.Entrypoint) == 0 {
-		// Pause image must have entrypoint.
-		return nil, errors.Errorf("invalid empty entrypoint in image config %+v", imageConfig)
+	if len(imageConfig.Entrypoint) == 0 && len(imageConfig.Cmd) == 0 {
+		// Pause image must have entrypoint or cmd.
+		return nil, errors.Errorf("invalid empty entrypoint and cmd in image config %+v", imageConfig)
 	}
 	// Set process commands.
 	g.SetProcessArgs(append(imageConfig.Entrypoint, imageConfig.Cmd...))

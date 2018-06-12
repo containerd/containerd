@@ -128,9 +128,10 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 				})
 			},
 		},
-		"should return error when entrypoint is empty": {
+		"should return error when entrypoint and cmd are empty": {
 			imageConfigChange: func(c *imagespec.ImageConfig) {
 				c.Entrypoint = nil
+				c.Cmd = nil
 			},
 			expectErr: true,
 		},
