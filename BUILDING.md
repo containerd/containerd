@@ -106,7 +106,7 @@ You can build an image from this `Dockerfile`:
 FROM golang
 
 RUN apt-get update && \
-    apt-get install btrfs-tools
+    apt-get install -y btrfs-tools libseccomp-dev
 ```
 
 Let's suppose that you built an image called `containerd/build`. From the
