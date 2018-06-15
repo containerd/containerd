@@ -388,6 +388,14 @@ func (c *criService) generateSandboxContainerSpec(id string, config *runtime.Pod
 		g.RemoveLinuxNamespace(string(runtimespec.IPCNamespace)) // nolint: errcheck
 	}
 
+	// It's fine to generate the spec before the sandbox /dev/shm
+	// is actually created.
+	sandboxDevShm := c.getSandboxDevShm(id)
+	if nsOptions.GetIpc() == runtime.NamespaceMode_NODE {
+		sandboxDevShm = devShm
+	}
+	g.AddBindMount(sandboxDevShm, devShm, []string{"rbind", "ro"})
+
 	selinuxOpt := securityContext.GetSelinuxOptions()
 	processLabel, mountLabel, err := initSelinuxOpts(selinuxOpt)
 	if err != nil {
