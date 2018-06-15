@@ -37,7 +37,7 @@ func checkMemoryLimit(t *testing.T, spec *runtimespec.Spec, memLimit int64) {
 }
 
 func TestUpdateContainerResources(t *testing.T) {
-	t.Logf("Create a sandbox")
+	t.Log("Create a sandbox")
 	sbConfig := PodSandboxConfig("sandbox", "update-container-resources")
 	sb, err := runtimeService.RunPodSandbox(sbConfig)
 	require.NoError(t, err)
@@ -46,7 +46,7 @@ func TestUpdateContainerResources(t *testing.T) {
 		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
 	}()
 
-	t.Logf("Create a container with memory limit")
+	t.Log("Create a container with memory limit")
 	cnConfig := ContainerConfig(
 		"container",
 		pauseImage,
@@ -57,48 +57,48 @@ func TestUpdateContainerResources(t *testing.T) {
 	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
 	require.NoError(t, err)
 
-	t.Logf("Check memory limit in container OCI spec")
+	t.Log("Check memory limit in container OCI spec")
 	container, err := containerdClient.LoadContainer(context.Background(), cn)
 	require.NoError(t, err)
 	spec, err := container.Spec(context.Background())
 	require.NoError(t, err)
 	checkMemoryLimit(t, spec, 2*1024*1024)
 
-	t.Logf("Update container memory limit after created")
+	t.Log("Update container memory limit after created")
 	err = runtimeService.UpdateContainerResources(cn, &runtime.LinuxContainerResources{
 		MemoryLimitInBytes: 4 * 1024 * 1024,
 	})
 	require.NoError(t, err)
 
-	t.Logf("Check memory limit in container OCI spec")
+	t.Log("Check memory limit in container OCI spec")
 	spec, err = container.Spec(context.Background())
 	require.NoError(t, err)
 	checkMemoryLimit(t, spec, 4*1024*1024)
 
-	t.Logf("Start the container")
+	t.Log("Start the container")
 	require.NoError(t, runtimeService.StartContainer(cn))
 	task, err := container.Task(context.Background(), nil)
 	require.NoError(t, err)
 
-	t.Logf("Check memory limit in cgroup")
+	t.Log("Check memory limit in cgroup")
 	cgroup, err := cgroups.Load(cgroups.V1, cgroups.PidPath(int(task.Pid())))
 	require.NoError(t, err)
 	stat, err := cgroup.Stat(cgroups.IgnoreNotExist)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(4*1024*1024), stat.Memory.Usage.Limit)
 
-	t.Logf("Update container memory limit after started")
+	t.Log("Update container memory limit after started")
 	err = runtimeService.UpdateContainerResources(cn, &runtime.LinuxContainerResources{
 		MemoryLimitInBytes: 8 * 1024 * 1024,
 	})
 	require.NoError(t, err)
 
-	t.Logf("Check memory limit in container OCI spec")
+	t.Log("Check memory limit in container OCI spec")
 	spec, err = container.Spec(context.Background())
 	require.NoError(t, err)
 	checkMemoryLimit(t, spec, 8*1024*1024)
 
-	t.Logf("Check memory limit in cgroup")
+	t.Log("Check memory limit in cgroup")
 	stat, err = cgroup.Stat(cgroups.IgnoreNotExist)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(8*1024*1024), stat.Memory.Usage.Limit)

@@ -27,6 +27,11 @@ The explanation and default value of each configuration item are as follows:
   # enable_tls_streaming enables the TLS streaming support.
   enable_tls_streaming = false
 
+  # max_container_log_line_size is the maximum log line size in bytes for a container.
+  # Log line longer than the limit will be split into multiple lines. -1 means no
+  # limit.
+  max_container_log_line_size = 16384
+
   # "plugins.cri.containerd" contains config related to containerd
   [plugins.cri.containerd]
 

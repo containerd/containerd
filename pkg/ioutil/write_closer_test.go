@@ -17,9 +17,16 @@ limitations under the License.
 package ioutil
 
 import (
+	"io/ioutil"
+	"os"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWriteCloseInformer(t *testing.T) {
@@ -46,4 +53,56 @@ func TestWriteCloseInformer(t *testing.T) {
 	default:
 		assert.Fail(t, "write closer not closed")
 	}
+}
+
+func TestSerialWriteCloser(t *testing.T) {
+	const (
+		// Test 10 times to make sure it always pass.
+		testCount = 10
+
+		goroutine = 10
+		dataLen   = 100000
+	)
+	for n := 0; n < testCount; n++ {
+		testData := make([][]byte, goroutine)
+		for i := 0; i < goroutine; i++ {
+			testData[i] = []byte(repeatNumber(i, dataLen) + "\n")
+		}
+
+		f, err := ioutil.TempFile("/tmp", "serial-write-closer")
+		require.NoError(t, err)
+		defer os.RemoveAll(f.Name())
+		defer f.Close()
+		wc := NewSerialWriteCloser(f)
+		defer wc.Close()
+
+		// Write data in parallel
+		var wg sync.WaitGroup
+		wg.Add(goroutine)
+		for i := 0; i < goroutine; i++ {
+			go func(id int) {
+				n, err := wc.Write(testData[id])
+				assert.NoError(t, err)
+				assert.Equal(t, dataLen+1, n)
+				wg.Done()
+			}(i)
+		}
+		wg.Wait()
+		wc.Close()
+
+		// Check test result
+		content, err := ioutil.ReadFile(f.Name())
+		require.NoError(t, err)
+		resultData := strings.Split(strings.TrimSpace(string(content)), "\n")
+		require.Len(t, resultData, goroutine)
+		sort.Strings(resultData)
+		for i := 0; i < goroutine; i++ {
+			expected := repeatNumber(i, dataLen)
+			assert.Equal(t, expected, resultData[i])
+		}
+	}
+}
+
+func repeatNumber(num, count int) string {
+	return strings.Repeat(strconv.Itoa(num), count)
 }
