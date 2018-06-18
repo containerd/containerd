@@ -17,11 +17,17 @@ import (
 var (
 	// Namespaces include the names of supported namespaces.
 	Namespaces = []string{"network", "pid", "mount", "ipc", "uts", "user", "cgroup"}
+
+	// we don't care about order...and this is way faster...
+	removeFunc = func(s []string, i int) []string {
+		s[i] = s[len(s)-1]
+		return s[:len(s)-1]
+	}
 )
 
-// Generator represents a generator for a container spec.
+// Generator represents a generator for a container config.
 type Generator struct {
-	spec         *rspec.Spec
+	Config       *rspec.Spec
 	HostSpecific bool
 }
 
@@ -30,117 +36,128 @@ type ExportOptions struct {
 	Seccomp bool // seccomp toggles if only seccomp should be exported
 }
 
-// New creates a spec Generator with the default spec.
-func New() Generator {
-	spec := rspec.Spec{
+// New creates a configuration Generator with the default
+// configuration for the target operating system.
+func New(os string) (generator Generator, err error) {
+	if os != "linux" && os != "solaris" {
+		return generator, fmt.Errorf("no defaults configured for %s", os)
+	}
+
+	config := rspec.Spec{
 		Version: rspec.Version,
 		Root: &rspec.Root{
-			Path:     "",
+			Path:     "rootfs",
 			Readonly: false,
 		},
 		Process: &rspec.Process{
 			Terminal: false,
-			User:     rspec.User{},
 			Args: []string{
 				"sh",
 			},
-			Env: []string{
-				"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-				"TERM=xterm",
-			},
-			Cwd: "/",
-			Capabilities: &rspec.LinuxCapabilities{
-				Bounding: []string{
-					"CAP_CHOWN",
-					"CAP_DAC_OVERRIDE",
-					"CAP_FSETID",
-					"CAP_FOWNER",
-					"CAP_MKNOD",
-					"CAP_NET_RAW",
-					"CAP_SETGID",
-					"CAP_SETUID",
-					"CAP_SETFCAP",
-					"CAP_SETPCAP",
-					"CAP_NET_BIND_SERVICE",
-					"CAP_SYS_CHROOT",
-					"CAP_KILL",
-					"CAP_AUDIT_WRITE",
-				},
-				Permitted: []string{
-					"CAP_CHOWN",
-					"CAP_DAC_OVERRIDE",
-					"CAP_FSETID",
-					"CAP_FOWNER",
-					"CAP_MKNOD",
-					"CAP_NET_RAW",
-					"CAP_SETGID",
-					"CAP_SETUID",
-					"CAP_SETFCAP",
-					"CAP_SETPCAP",
-					"CAP_NET_BIND_SERVICE",
-					"CAP_SYS_CHROOT",
-					"CAP_KILL",
-					"CAP_AUDIT_WRITE",
-				},
-				Inheritable: []string{
-					"CAP_CHOWN",
-					"CAP_DAC_OVERRIDE",
-					"CAP_FSETID",
-					"CAP_FOWNER",
-					"CAP_MKNOD",
-					"CAP_NET_RAW",
-					"CAP_SETGID",
-					"CAP_SETUID",
-					"CAP_SETFCAP",
-					"CAP_SETPCAP",
-					"CAP_NET_BIND_SERVICE",
-					"CAP_SYS_CHROOT",
-					"CAP_KILL",
-					"CAP_AUDIT_WRITE",
-				},
-				Effective: []string{
-					"CAP_CHOWN",
-					"CAP_DAC_OVERRIDE",
-					"CAP_FSETID",
-					"CAP_FOWNER",
-					"CAP_MKNOD",
-					"CAP_NET_RAW",
-					"CAP_SETGID",
-					"CAP_SETUID",
-					"CAP_SETFCAP",
-					"CAP_SETPCAP",
-					"CAP_NET_BIND_SERVICE",
-					"CAP_SYS_CHROOT",
-					"CAP_KILL",
-					"CAP_AUDIT_WRITE",
-				},
-				Ambient: []string{
-					"CAP_CHOWN",
-					"CAP_DAC_OVERRIDE",
-					"CAP_FSETID",
-					"CAP_FOWNER",
-					"CAP_MKNOD",
-					"CAP_NET_RAW",
-					"CAP_SETGID",
-					"CAP_SETUID",
-					"CAP_SETFCAP",
-					"CAP_SETPCAP",
-					"CAP_NET_BIND_SERVICE",
-					"CAP_SYS_CHROOT",
-					"CAP_KILL",
-					"CAP_AUDIT_WRITE",
-				},
-			},
-			Rlimits: []rspec.POSIXRlimit{
-				{
-					Type: "RLIMIT_NOFILE",
-					Hard: uint64(1024),
-					Soft: uint64(1024),
-				},
-			},
 		},
 		Hostname: "mrsdalloway",
-		Mounts: []rspec.Mount{
+	}
+
+	if os == "linux" || os == "solaris" {
+		config.Process.User = rspec.User{}
+		config.Process.Env = []string{
+			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+			"TERM=xterm",
+		}
+		config.Process.Cwd = "/"
+		config.Process.Rlimits = []rspec.POSIXRlimit{
+			{
+				Type: "RLIMIT_NOFILE",
+				Hard: uint64(1024),
+				Soft: uint64(1024),
+			},
+		}
+	}
+
+	if os == "linux" {
+		config.Process.Capabilities = &rspec.LinuxCapabilities{
+			Bounding: []string{
+				"CAP_CHOWN",
+				"CAP_DAC_OVERRIDE",
+				"CAP_FSETID",
+				"CAP_FOWNER",
+				"CAP_MKNOD",
+				"CAP_NET_RAW",
+				"CAP_SETGID",
+				"CAP_SETUID",
+				"CAP_SETFCAP",
+				"CAP_SETPCAP",
+				"CAP_NET_BIND_SERVICE",
+				"CAP_SYS_CHROOT",
+				"CAP_KILL",
+				"CAP_AUDIT_WRITE",
+			},
+			Permitted: []string{
+				"CAP_CHOWN",
+				"CAP_DAC_OVERRIDE",
+				"CAP_FSETID",
+				"CAP_FOWNER",
+				"CAP_MKNOD",
+				"CAP_NET_RAW",
+				"CAP_SETGID",
+				"CAP_SETUID",
+				"CAP_SETFCAP",
+				"CAP_SETPCAP",
+				"CAP_NET_BIND_SERVICE",
+				"CAP_SYS_CHROOT",
+				"CAP_KILL",
+				"CAP_AUDIT_WRITE",
+			},
+			Inheritable: []string{
+				"CAP_CHOWN",
+				"CAP_DAC_OVERRIDE",
+				"CAP_FSETID",
+				"CAP_FOWNER",
+				"CAP_MKNOD",
+				"CAP_NET_RAW",
+				"CAP_SETGID",
+				"CAP_SETUID",
+				"CAP_SETFCAP",
+				"CAP_SETPCAP",
+				"CAP_NET_BIND_SERVICE",
+				"CAP_SYS_CHROOT",
+				"CAP_KILL",
+				"CAP_AUDIT_WRITE",
+			},
+			Effective: []string{
+				"CAP_CHOWN",
+				"CAP_DAC_OVERRIDE",
+				"CAP_FSETID",
+				"CAP_FOWNER",
+				"CAP_MKNOD",
+				"CAP_NET_RAW",
+				"CAP_SETGID",
+				"CAP_SETUID",
+				"CAP_SETFCAP",
+				"CAP_SETPCAP",
+				"CAP_NET_BIND_SERVICE",
+				"CAP_SYS_CHROOT",
+				"CAP_KILL",
+				"CAP_AUDIT_WRITE",
+			},
+			Ambient: []string{
+				"CAP_CHOWN",
+				"CAP_DAC_OVERRIDE",
+				"CAP_FSETID",
+				"CAP_FOWNER",
+				"CAP_MKNOD",
+				"CAP_NET_RAW",
+				"CAP_SETGID",
+				"CAP_SETUID",
+				"CAP_SETFCAP",
+				"CAP_SETPCAP",
+				"CAP_NET_BIND_SERVICE",
+				"CAP_SYS_CHROOT",
+				"CAP_KILL",
+				"CAP_AUDIT_WRITE",
+			},
+		}
+		config.Mounts = []rspec.Mount{
 			{
 				Destination: "/proc",
 				Type:        "proc",
@@ -177,8 +194,8 @@ func New() Generator {
 				Source:      "sysfs",
 				Options:     []string{"nosuid", "noexec", "nodev", "ro"},
 			},
-		},
-		Linux: &rspec.Linux{
+		}
+		config.Linux = &rspec.Linux{
 			Resources: &rspec.LinuxResources{
 				Devices: []rspec.LinuxDeviceCgroup{
 					{
@@ -204,74 +221,86 @@ func New() Generator {
 					Type: "mount",
 				},
 			},
-			Devices: []rspec.LinuxDevice{},
-		},
+			Seccomp: seccomp.DefaultProfile(&config),
+		}
 	}
-	spec.Linux.Seccomp = seccomp.DefaultProfile(&spec)
+
+	return Generator{Config: &config}, nil
+}
+
+// NewFromSpec creates a configuration Generator from a given
+// configuration.
+//
+// Deprecated: Replace with:
+//
+//   generator := Generator{Config: config}
+func NewFromSpec(config *rspec.Spec) Generator {
 	return Generator{
-		spec: &spec,
+		Config: config,
 	}
 }
 
-// NewFromSpec creates a spec Generator from a given spec.
-func NewFromSpec(spec *rspec.Spec) Generator {
-	return Generator{
-		spec: spec,
-	}
-}
-
-// NewFromFile loads the template specified in a file into a spec Generator.
+// NewFromFile loads the template specified in a file into a
+// configuration Generator.
 func NewFromFile(path string) (Generator, error) {
 	cf, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return Generator{}, fmt.Errorf("template configuration at %s not found", path)
 		}
+		return Generator{}, err
 	}
 	defer cf.Close()
 
 	return NewFromTemplate(cf)
 }
 
-// NewFromTemplate loads the template from io.Reader into a spec Generator.
+// NewFromTemplate loads the template from io.Reader into a
+// configuration Generator.
 func NewFromTemplate(r io.Reader) (Generator, error) {
-	var spec rspec.Spec
-	if err := json.NewDecoder(r).Decode(&spec); err != nil {
+	var config rspec.Spec
+	if err := json.NewDecoder(r).Decode(&config); err != nil {
 		return Generator{}, err
 	}
 	return Generator{
-		spec: &spec,
+		Config: &config,
 	}, nil
 }
 
-// SetSpec sets the spec in the Generator g.
-func (g *Generator) SetSpec(spec *rspec.Spec) {
-	g.spec = spec
+// SetSpec sets the configuration in the Generator g.
+//
+// Deprecated: Replace with:
+//
+//   Use generator.Config = config
+func (g *Generator) SetSpec(config *rspec.Spec) {
+	g.Config = config
 }
 
-// Spec gets the spec in the Generator g.
+// Spec gets the configuration from the Generator g.
+//
+// Deprecated: Replace with generator.Config.
 func (g *Generator) Spec() *rspec.Spec {
-	return g.spec
+	return g.Config
 }
 
-// Save writes the spec into w.
+// Save writes the configuration into w.
 func (g *Generator) Save(w io.Writer, exportOpts ExportOptions) (err error) {
 	var data []byte
 
-	if g.spec.Linux != nil {
-		buf, err := json.Marshal(g.spec.Linux)
+	if g.Config.Linux != nil {
+		buf, err := json.Marshal(g.Config.Linux)
 		if err != nil {
 			return err
 		}
 		if string(buf) == "{}" {
-			g.spec.Linux = nil
+			g.Config.Linux = nil
 		}
 	}
 
 	if exportOpts.Seccomp {
-		data, err = json.MarshalIndent(g.spec.Linux.Seccomp, "", "\t")
+		data, err = json.MarshalIndent(g.Config.Linux.Seccomp, "", "\t")
 	} else {
-		data, err = json.MarshalIndent(g.spec, "", "\t")
+		data, err = json.MarshalIndent(g.Config, "", "\t")
 	}
 	if err != nil {
 		return err
@@ -285,7 +314,7 @@ func (g *Generator) Save(w io.Writer, exportOpts ExportOptions) (err error) {
 	return nil
 }
 
-// SaveToFile writes the spec into a file.
+// SaveToFile writes the configuration into a file.
 func (g *Generator) SaveToFile(path string, exportOpts ExportOptions) error {
 	f, err := os.Create(path)
 	if err != nil {
@@ -295,131 +324,145 @@ func (g *Generator) SaveToFile(path string, exportOpts ExportOptions) error {
 	return g.Save(f, exportOpts)
 }
 
-// SetVersion sets g.spec.Version.
+// SetVersion sets g.Config.Version.
 func (g *Generator) SetVersion(version string) {
-	g.initSpec()
-	g.spec.Version = version
+	g.initConfig()
+	g.Config.Version = version
 }
 
-// SetRootPath sets g.spec.Root.Path.
+// SetRootPath sets g.Config.Root.Path.
 func (g *Generator) SetRootPath(path string) {
-	g.initSpecRoot()
-	g.spec.Root.Path = path
+	g.initConfigRoot()
+	g.Config.Root.Path = path
 }
 
-// SetRootReadonly sets g.spec.Root.Readonly.
+// SetRootReadonly sets g.Config.Root.Readonly.
 func (g *Generator) SetRootReadonly(b bool) {
-	g.initSpecRoot()
-	g.spec.Root.Readonly = b
+	g.initConfigRoot()
+	g.Config.Root.Readonly = b
 }
 
-// SetHostname sets g.spec.Hostname.
+// SetHostname sets g.Config.Hostname.
 func (g *Generator) SetHostname(s string) {
-	g.initSpec()
-	g.spec.Hostname = s
+	g.initConfig()
+	g.Config.Hostname = s
 }
 
-// ClearAnnotations clears g.spec.Annotations.
+// ClearAnnotations clears g.Config.Annotations.
 func (g *Generator) ClearAnnotations() {
-	if g.spec == nil {
+	if g.Config == nil {
 		return
 	}
-	g.spec.Annotations = make(map[string]string)
+	g.Config.Annotations = make(map[string]string)
 }
 
-// AddAnnotation adds an annotation into g.spec.Annotations.
+// AddAnnotation adds an annotation into g.Config.Annotations.
 func (g *Generator) AddAnnotation(key, value string) {
-	g.initSpecAnnotations()
-	g.spec.Annotations[key] = value
+	g.initConfigAnnotations()
+	g.Config.Annotations[key] = value
 }
 
-// RemoveAnnotation remove an annotation from g.spec.Annotations.
+// RemoveAnnotation remove an annotation from g.Config.Annotations.
 func (g *Generator) RemoveAnnotation(key string) {
-	if g.spec == nil || g.spec.Annotations == nil {
+	if g.Config == nil || g.Config.Annotations == nil {
 		return
 	}
-	delete(g.spec.Annotations, key)
+	delete(g.Config.Annotations, key)
 }
 
-// SetProcessConsoleSize sets g.spec.Process.ConsoleSize.
+// RemoveHostname removes g.Config.Hostname, setting it to an empty string.
+func (g *Generator) RemoveHostname() {
+	if g.Config == nil {
+		return
+	}
+	g.Config.Hostname = ""
+}
+
+// SetProcessConsoleSize sets g.Config.Process.ConsoleSize.
 func (g *Generator) SetProcessConsoleSize(width, height uint) {
-	g.initSpecProcessConsoleSize()
-	g.spec.Process.ConsoleSize.Width = width
-	g.spec.Process.ConsoleSize.Height = height
+	g.initConfigProcessConsoleSize()
+	g.Config.Process.ConsoleSize.Width = width
+	g.Config.Process.ConsoleSize.Height = height
 }
 
-// SetProcessUID sets g.spec.Process.User.UID.
+// SetProcessUID sets g.Config.Process.User.UID.
 func (g *Generator) SetProcessUID(uid uint32) {
-	g.initSpecProcess()
-	g.spec.Process.User.UID = uid
+	g.initConfigProcess()
+	g.Config.Process.User.UID = uid
 }
 
-// SetProcessGID sets g.spec.Process.User.GID.
+// SetProcessUsername sets g.Config.Process.User.Username.
+func (g *Generator) SetProcessUsername(username string) {
+	g.initConfigProcess()
+	g.Config.Process.User.Username = username
+}
+
+// SetProcessGID sets g.Config.Process.User.GID.
 func (g *Generator) SetProcessGID(gid uint32) {
-	g.initSpecProcess()
-	g.spec.Process.User.GID = gid
+	g.initConfigProcess()
+	g.Config.Process.User.GID = gid
 }
 
-// SetProcessCwd sets g.spec.Process.Cwd.
+// SetProcessCwd sets g.Config.Process.Cwd.
 func (g *Generator) SetProcessCwd(cwd string) {
-	g.initSpecProcess()
-	g.spec.Process.Cwd = cwd
+	g.initConfigProcess()
+	g.Config.Process.Cwd = cwd
 }
 
-// SetProcessNoNewPrivileges sets g.spec.Process.NoNewPrivileges.
+// SetProcessNoNewPrivileges sets g.Config.Process.NoNewPrivileges.
 func (g *Generator) SetProcessNoNewPrivileges(b bool) {
-	g.initSpecProcess()
-	g.spec.Process.NoNewPrivileges = b
+	g.initConfigProcess()
+	g.Config.Process.NoNewPrivileges = b
 }
 
-// SetProcessTerminal sets g.spec.Process.Terminal.
+// SetProcessTerminal sets g.Config.Process.Terminal.
 func (g *Generator) SetProcessTerminal(b bool) {
-	g.initSpecProcess()
-	g.spec.Process.Terminal = b
+	g.initConfigProcess()
+	g.Config.Process.Terminal = b
 }
 
-// SetProcessApparmorProfile sets g.spec.Process.ApparmorProfile.
+// SetProcessApparmorProfile sets g.Config.Process.ApparmorProfile.
 func (g *Generator) SetProcessApparmorProfile(prof string) {
-	g.initSpecProcess()
-	g.spec.Process.ApparmorProfile = prof
+	g.initConfigProcess()
+	g.Config.Process.ApparmorProfile = prof
 }
 
-// SetProcessArgs sets g.spec.Process.Args.
+// SetProcessArgs sets g.Config.Process.Args.
 func (g *Generator) SetProcessArgs(args []string) {
-	g.initSpecProcess()
-	g.spec.Process.Args = args
+	g.initConfigProcess()
+	g.Config.Process.Args = args
 }
 
-// ClearProcessEnv clears g.spec.Process.Env.
+// ClearProcessEnv clears g.Config.Process.Env.
 func (g *Generator) ClearProcessEnv() {
-	if g.spec == nil {
+	if g.Config == nil || g.Config.Process == nil {
 		return
 	}
-	g.spec.Process.Env = []string{}
+	g.Config.Process.Env = []string{}
 }
 
-// AddProcessEnv adds name=value into g.spec.Process.Env, or replaces an
+// AddProcessEnv adds name=value into g.Config.Process.Env, or replaces an
 // existing entry with the given name.
 func (g *Generator) AddProcessEnv(name, value string) {
-	g.initSpecProcess()
+	g.initConfigProcess()
 
 	env := fmt.Sprintf("%s=%s", name, value)
-	for idx := range g.spec.Process.Env {
-		if strings.HasPrefix(g.spec.Process.Env[idx], name+"=") {
-			g.spec.Process.Env[idx] = env
+	for idx := range g.Config.Process.Env {
+		if strings.HasPrefix(g.Config.Process.Env[idx], name+"=") {
+			g.Config.Process.Env[idx] = env
 			return
 		}
 	}
-	g.spec.Process.Env = append(g.spec.Process.Env, env)
+	g.Config.Process.Env = append(g.Config.Process.Env, env)
 }
 
-// AddProcessRlimits adds rlimit into g.spec.Process.Rlimits.
+// AddProcessRlimits adds rlimit into g.Config.Process.Rlimits.
 func (g *Generator) AddProcessRlimits(rType string, rHard uint64, rSoft uint64) {
-	g.initSpecProcess()
-	for i, rlimit := range g.spec.Process.Rlimits {
+	g.initConfigProcess()
+	for i, rlimit := range g.Config.Process.Rlimits {
 		if rlimit.Type == rType {
-			g.spec.Process.Rlimits[i].Hard = rHard
-			g.spec.Process.Rlimits[i].Soft = rSoft
+			g.Config.Process.Rlimits[i].Hard = rHard
+			g.Config.Process.Rlimits[i].Soft = rSoft
 			return
 		}
 	}
@@ -429,257 +472,422 @@ func (g *Generator) AddProcessRlimits(rType string, rHard uint64, rSoft uint64) 
 		Hard: rHard,
 		Soft: rSoft,
 	}
-	g.spec.Process.Rlimits = append(g.spec.Process.Rlimits, newRlimit)
+	g.Config.Process.Rlimits = append(g.Config.Process.Rlimits, newRlimit)
 }
 
-// RemoveProcessRlimits removes a rlimit from g.spec.Process.Rlimits.
-func (g *Generator) RemoveProcessRlimits(rType string) error {
-	if g.spec == nil {
-		return nil
+// RemoveProcessRlimits removes a rlimit from g.Config.Process.Rlimits.
+func (g *Generator) RemoveProcessRlimits(rType string) {
+	if g.Config == nil || g.Config.Process == nil {
+		return
 	}
-	for i, rlimit := range g.spec.Process.Rlimits {
+	for i, rlimit := range g.Config.Process.Rlimits {
 		if rlimit.Type == rType {
-			g.spec.Process.Rlimits = append(g.spec.Process.Rlimits[:i], g.spec.Process.Rlimits[i+1:]...)
-			return nil
+			g.Config.Process.Rlimits = append(g.Config.Process.Rlimits[:i], g.Config.Process.Rlimits[i+1:]...)
+			return
 		}
 	}
-	return nil
 }
 
-// ClearProcessRlimits clear g.spec.Process.Rlimits.
+// ClearProcessRlimits clear g.Config.Process.Rlimits.
 func (g *Generator) ClearProcessRlimits() {
-	if g.spec == nil {
+	if g.Config == nil || g.Config.Process == nil {
 		return
 	}
-	g.spec.Process.Rlimits = []rspec.POSIXRlimit{}
+	g.Config.Process.Rlimits = []rspec.POSIXRlimit{}
 }
 
-// ClearProcessAdditionalGids clear g.spec.Process.AdditionalGids.
+// ClearProcessAdditionalGids clear g.Config.Process.AdditionalGids.
 func (g *Generator) ClearProcessAdditionalGids() {
-	if g.spec == nil {
+	if g.Config == nil || g.Config.Process == nil {
 		return
 	}
-	g.spec.Process.User.AdditionalGids = []uint32{}
+	g.Config.Process.User.AdditionalGids = []uint32{}
 }
 
-// AddProcessAdditionalGid adds an additional gid into g.spec.Process.AdditionalGids.
+// AddProcessAdditionalGid adds an additional gid into g.Config.Process.AdditionalGids.
 func (g *Generator) AddProcessAdditionalGid(gid uint32) {
-	g.initSpecProcess()
-	for _, group := range g.spec.Process.User.AdditionalGids {
+	g.initConfigProcess()
+	for _, group := range g.Config.Process.User.AdditionalGids {
 		if group == gid {
 			return
 		}
 	}
-	g.spec.Process.User.AdditionalGids = append(g.spec.Process.User.AdditionalGids, gid)
+	g.Config.Process.User.AdditionalGids = append(g.Config.Process.User.AdditionalGids, gid)
 }
 
-// SetProcessSelinuxLabel sets g.spec.Process.SelinuxLabel.
+// SetProcessSelinuxLabel sets g.Config.Process.SelinuxLabel.
 func (g *Generator) SetProcessSelinuxLabel(label string) {
-	g.initSpecProcess()
-	g.spec.Process.SelinuxLabel = label
+	g.initConfigProcess()
+	g.Config.Process.SelinuxLabel = label
 }
 
-// SetLinuxCgroupsPath sets g.spec.Linux.CgroupsPath.
+// SetLinuxCgroupsPath sets g.Config.Linux.CgroupsPath.
 func (g *Generator) SetLinuxCgroupsPath(path string) {
-	g.initSpecLinux()
-	g.spec.Linux.CgroupsPath = path
+	g.initConfigLinux()
+	g.Config.Linux.CgroupsPath = path
 }
 
-// SetLinuxMountLabel sets g.spec.Linux.MountLabel.
+// SetLinuxIntelRdtL3CacheSchema sets g.Config.Linux.IntelRdt.L3CacheSchema
+func (g *Generator) SetLinuxIntelRdtL3CacheSchema(schema string) {
+	g.initConfigLinuxIntelRdt()
+	g.Config.Linux.IntelRdt.L3CacheSchema = schema
+}
+
+// SetLinuxMountLabel sets g.Config.Linux.MountLabel.
 func (g *Generator) SetLinuxMountLabel(label string) {
-	g.initSpecLinux()
-	g.spec.Linux.MountLabel = label
+	g.initConfigLinux()
+	g.Config.Linux.MountLabel = label
 }
 
-// SetProcessOOMScoreAdj sets g.spec.Process.OOMScoreAdj.
+// SetProcessOOMScoreAdj sets g.Config.Process.OOMScoreAdj.
 func (g *Generator) SetProcessOOMScoreAdj(adj int) {
-	g.initSpecProcess()
-	g.spec.Process.OOMScoreAdj = &adj
+	g.initConfigProcess()
+	g.Config.Process.OOMScoreAdj = &adj
 }
 
-// SetLinuxResourcesCPUShares sets g.spec.Linux.Resources.CPU.Shares.
+// SetLinuxResourcesBlockIOLeafWeight sets g.Config.Linux.Resources.BlockIO.LeafWeight.
+func (g *Generator) SetLinuxResourcesBlockIOLeafWeight(weight uint16) {
+	g.initConfigLinuxResourcesBlockIO()
+	g.Config.Linux.Resources.BlockIO.LeafWeight = &weight
+}
+
+// AddLinuxResourcesBlockIOLeafWeightDevice adds or sets g.Config.Linux.Resources.BlockIO.WeightDevice.LeafWeight.
+func (g *Generator) AddLinuxResourcesBlockIOLeafWeightDevice(major int64, minor int64, weight uint16) {
+	g.initConfigLinuxResourcesBlockIO()
+	for i, weightDevice := range g.Config.Linux.Resources.BlockIO.WeightDevice {
+		if weightDevice.Major == major && weightDevice.Minor == minor {
+			g.Config.Linux.Resources.BlockIO.WeightDevice[i].LeafWeight = &weight
+			return
+		}
+	}
+	weightDevice := new(rspec.LinuxWeightDevice)
+	weightDevice.Major = major
+	weightDevice.Minor = minor
+	weightDevice.LeafWeight = &weight
+	g.Config.Linux.Resources.BlockIO.WeightDevice = append(g.Config.Linux.Resources.BlockIO.WeightDevice, *weightDevice)
+}
+
+// DropLinuxResourcesBlockIOLeafWeightDevice drops a item form g.Config.Linux.Resources.BlockIO.WeightDevice.LeafWeight
+func (g *Generator) DropLinuxResourcesBlockIOLeafWeightDevice(major int64, minor int64) {
+	if g.Config == nil || g.Config.Linux == nil || g.Config.Linux.Resources == nil || g.Config.Linux.Resources.BlockIO == nil {
+		return
+	}
+
+	for i, weightDevice := range g.Config.Linux.Resources.BlockIO.WeightDevice {
+		if weightDevice.Major == major && weightDevice.Minor == minor {
+			if weightDevice.Weight != nil {
+				newWeightDevice := new(rspec.LinuxWeightDevice)
+				newWeightDevice.Major = major
+				newWeightDevice.Minor = minor
+				newWeightDevice.Weight = weightDevice.Weight
+				g.Config.Linux.Resources.BlockIO.WeightDevice[i] = *newWeightDevice
+			} else {
+				g.Config.Linux.Resources.BlockIO.WeightDevice = append(g.Config.Linux.Resources.BlockIO.WeightDevice[:i], g.Config.Linux.Resources.BlockIO.WeightDevice[i+1:]...)
+			}
+			return
+		}
+	}
+}
+
+// SetLinuxResourcesBlockIOWeight sets g.Config.Linux.Resources.BlockIO.Weight.
+func (g *Generator) SetLinuxResourcesBlockIOWeight(weight uint16) {
+	g.initConfigLinuxResourcesBlockIO()
+	g.Config.Linux.Resources.BlockIO.Weight = &weight
+}
+
+// AddLinuxResourcesBlockIOWeightDevice adds or sets g.Config.Linux.Resources.BlockIO.WeightDevice.Weight.
+func (g *Generator) AddLinuxResourcesBlockIOWeightDevice(major int64, minor int64, weight uint16) {
+	g.initConfigLinuxResourcesBlockIO()
+	for i, weightDevice := range g.Config.Linux.Resources.BlockIO.WeightDevice {
+		if weightDevice.Major == major && weightDevice.Minor == minor {
+			g.Config.Linux.Resources.BlockIO.WeightDevice[i].Weight = &weight
+			return
+		}
+	}
+	weightDevice := new(rspec.LinuxWeightDevice)
+	weightDevice.Major = major
+	weightDevice.Minor = minor
+	weightDevice.Weight = &weight
+	g.Config.Linux.Resources.BlockIO.WeightDevice = append(g.Config.Linux.Resources.BlockIO.WeightDevice, *weightDevice)
+}
+
+// DropLinuxResourcesBlockIOWeightDevice drops a item form g.Config.Linux.Resources.BlockIO.WeightDevice.Weight
+func (g *Generator) DropLinuxResourcesBlockIOWeightDevice(major int64, minor int64) {
+	if g.Config == nil || g.Config.Linux == nil || g.Config.Linux.Resources == nil || g.Config.Linux.Resources.BlockIO == nil {
+		return
+	}
+
+	for i, weightDevice := range g.Config.Linux.Resources.BlockIO.WeightDevice {
+		if weightDevice.Major == major && weightDevice.Minor == minor {
+			if weightDevice.LeafWeight != nil {
+				newWeightDevice := new(rspec.LinuxWeightDevice)
+				newWeightDevice.Major = major
+				newWeightDevice.Minor = minor
+				newWeightDevice.LeafWeight = weightDevice.LeafWeight
+				g.Config.Linux.Resources.BlockIO.WeightDevice[i] = *newWeightDevice
+			} else {
+				g.Config.Linux.Resources.BlockIO.WeightDevice = append(g.Config.Linux.Resources.BlockIO.WeightDevice[:i], g.Config.Linux.Resources.BlockIO.WeightDevice[i+1:]...)
+			}
+			return
+		}
+	}
+}
+
+// AddLinuxResourcesBlockIOThrottleReadBpsDevice adds or sets g.Config.Linux.Resources.BlockIO.ThrottleReadBpsDevice.
+func (g *Generator) AddLinuxResourcesBlockIOThrottleReadBpsDevice(major int64, minor int64, rate uint64) {
+	g.initConfigLinuxResourcesBlockIO()
+	throttleDevices := addOrReplaceBlockIOThrottleDevice(g.Config.Linux.Resources.BlockIO.ThrottleReadBpsDevice, major, minor, rate)
+	g.Config.Linux.Resources.BlockIO.ThrottleReadBpsDevice = throttleDevices
+}
+
+// DropLinuxResourcesBlockIOThrottleReadBpsDevice drops a item from g.Config.Linux.Resources.BlockIO.ThrottleReadBpsDevice.
+func (g *Generator) DropLinuxResourcesBlockIOThrottleReadBpsDevice(major int64, minor int64) {
+	if g.Config == nil || g.Config.Linux == nil || g.Config.Linux.Resources == nil || g.Config.Linux.Resources.BlockIO == nil {
+		return
+	}
+
+	throttleDevices := dropBlockIOThrottleDevice(g.Config.Linux.Resources.BlockIO.ThrottleReadBpsDevice, major, minor)
+	g.Config.Linux.Resources.BlockIO.ThrottleReadBpsDevice = throttleDevices
+}
+
+// AddLinuxResourcesBlockIOThrottleReadIOPSDevice adds or sets g.Config.Linux.Resources.BlockIO.ThrottleReadIOPSDevice.
+func (g *Generator) AddLinuxResourcesBlockIOThrottleReadIOPSDevice(major int64, minor int64, rate uint64) {
+	g.initConfigLinuxResourcesBlockIO()
+	throttleDevices := addOrReplaceBlockIOThrottleDevice(g.Config.Linux.Resources.BlockIO.ThrottleReadIOPSDevice, major, minor, rate)
+	g.Config.Linux.Resources.BlockIO.ThrottleReadIOPSDevice = throttleDevices
+}
+
+// DropLinuxResourcesBlockIOThrottleReadIOPSDevice drops a item from g.Config.Linux.Resources.BlockIO.ThrottleReadIOPSDevice.
+func (g *Generator) DropLinuxResourcesBlockIOThrottleReadIOPSDevice(major int64, minor int64) {
+	if g.Config == nil || g.Config.Linux == nil || g.Config.Linux.Resources == nil || g.Config.Linux.Resources.BlockIO == nil {
+		return
+	}
+
+	throttleDevices := dropBlockIOThrottleDevice(g.Config.Linux.Resources.BlockIO.ThrottleReadIOPSDevice, major, minor)
+	g.Config.Linux.Resources.BlockIO.ThrottleReadIOPSDevice = throttleDevices
+}
+
+// AddLinuxResourcesBlockIOThrottleWriteBpsDevice adds or sets g.Config.Linux.Resources.BlockIO.ThrottleWriteBpsDevice.
+func (g *Generator) AddLinuxResourcesBlockIOThrottleWriteBpsDevice(major int64, minor int64, rate uint64) {
+	g.initConfigLinuxResourcesBlockIO()
+	throttleDevices := addOrReplaceBlockIOThrottleDevice(g.Config.Linux.Resources.BlockIO.ThrottleWriteBpsDevice, major, minor, rate)
+	g.Config.Linux.Resources.BlockIO.ThrottleWriteBpsDevice = throttleDevices
+}
+
+// DropLinuxResourcesBlockIOThrottleWriteBpsDevice drops a item from g.Config.Linux.Resources.BlockIO.ThrottleWriteBpsDevice.
+func (g *Generator) DropLinuxResourcesBlockIOThrottleWriteBpsDevice(major int64, minor int64) {
+	if g.Config == nil || g.Config.Linux == nil || g.Config.Linux.Resources == nil || g.Config.Linux.Resources.BlockIO == nil {
+		return
+	}
+
+	throttleDevices := dropBlockIOThrottleDevice(g.Config.Linux.Resources.BlockIO.ThrottleWriteBpsDevice, major, minor)
+	g.Config.Linux.Resources.BlockIO.ThrottleWriteBpsDevice = throttleDevices
+}
+
+// AddLinuxResourcesBlockIOThrottleWriteIOPSDevice adds or sets g.Config.Linux.Resources.BlockIO.ThrottleWriteIOPSDevice.
+func (g *Generator) AddLinuxResourcesBlockIOThrottleWriteIOPSDevice(major int64, minor int64, rate uint64) {
+	g.initConfigLinuxResourcesBlockIO()
+	throttleDevices := addOrReplaceBlockIOThrottleDevice(g.Config.Linux.Resources.BlockIO.ThrottleWriteIOPSDevice, major, minor, rate)
+	g.Config.Linux.Resources.BlockIO.ThrottleWriteIOPSDevice = throttleDevices
+}
+
+// DropLinuxResourcesBlockIOThrottleWriteIOPSDevice drops a item from g.Config.Linux.Resources.BlockIO.ThrottleWriteIOPSDevice.
+func (g *Generator) DropLinuxResourcesBlockIOThrottleWriteIOPSDevice(major int64, minor int64) {
+	if g.Config == nil || g.Config.Linux == nil || g.Config.Linux.Resources == nil || g.Config.Linux.Resources.BlockIO == nil {
+		return
+	}
+
+	throttleDevices := dropBlockIOThrottleDevice(g.Config.Linux.Resources.BlockIO.ThrottleWriteIOPSDevice, major, minor)
+	g.Config.Linux.Resources.BlockIO.ThrottleWriteIOPSDevice = throttleDevices
+}
+
+// SetLinuxResourcesCPUShares sets g.Config.Linux.Resources.CPU.Shares.
 func (g *Generator) SetLinuxResourcesCPUShares(shares uint64) {
-	g.initSpecLinuxResourcesCPU()
-	g.spec.Linux.Resources.CPU.Shares = &shares
+	g.initConfigLinuxResourcesCPU()
+	g.Config.Linux.Resources.CPU.Shares = &shares
 }
 
-// SetLinuxResourcesCPUQuota sets g.spec.Linux.Resources.CPU.Quota.
+// SetLinuxResourcesCPUQuota sets g.Config.Linux.Resources.CPU.Quota.
 func (g *Generator) SetLinuxResourcesCPUQuota(quota int64) {
-	g.initSpecLinuxResourcesCPU()
-	g.spec.Linux.Resources.CPU.Quota = &quota
+	g.initConfigLinuxResourcesCPU()
+	g.Config.Linux.Resources.CPU.Quota = &quota
 }
 
-// SetLinuxResourcesCPUPeriod sets g.spec.Linux.Resources.CPU.Period.
+// SetLinuxResourcesCPUPeriod sets g.Config.Linux.Resources.CPU.Period.
 func (g *Generator) SetLinuxResourcesCPUPeriod(period uint64) {
-	g.initSpecLinuxResourcesCPU()
-	g.spec.Linux.Resources.CPU.Period = &period
+	g.initConfigLinuxResourcesCPU()
+	g.Config.Linux.Resources.CPU.Period = &period
 }
 
-// SetLinuxResourcesCPURealtimeRuntime sets g.spec.Linux.Resources.CPU.RealtimeRuntime.
+// SetLinuxResourcesCPURealtimeRuntime sets g.Config.Linux.Resources.CPU.RealtimeRuntime.
 func (g *Generator) SetLinuxResourcesCPURealtimeRuntime(time int64) {
-	g.initSpecLinuxResourcesCPU()
-	g.spec.Linux.Resources.CPU.RealtimeRuntime = &time
+	g.initConfigLinuxResourcesCPU()
+	g.Config.Linux.Resources.CPU.RealtimeRuntime = &time
 }
 
-// SetLinuxResourcesCPURealtimePeriod sets g.spec.Linux.Resources.CPU.RealtimePeriod.
+// SetLinuxResourcesCPURealtimePeriod sets g.Config.Linux.Resources.CPU.RealtimePeriod.
 func (g *Generator) SetLinuxResourcesCPURealtimePeriod(period uint64) {
-	g.initSpecLinuxResourcesCPU()
-	g.spec.Linux.Resources.CPU.RealtimePeriod = &period
+	g.initConfigLinuxResourcesCPU()
+	g.Config.Linux.Resources.CPU.RealtimePeriod = &period
 }
 
-// SetLinuxResourcesCPUCpus sets g.spec.Linux.Resources.CPU.Cpus.
+// SetLinuxResourcesCPUCpus sets g.Config.Linux.Resources.CPU.Cpus.
 func (g *Generator) SetLinuxResourcesCPUCpus(cpus string) {
-	g.initSpecLinuxResourcesCPU()
-	g.spec.Linux.Resources.CPU.Cpus = cpus
+	g.initConfigLinuxResourcesCPU()
+	g.Config.Linux.Resources.CPU.Cpus = cpus
 }
 
-// SetLinuxResourcesCPUMems sets g.spec.Linux.Resources.CPU.Mems.
+// SetLinuxResourcesCPUMems sets g.Config.Linux.Resources.CPU.Mems.
 func (g *Generator) SetLinuxResourcesCPUMems(mems string) {
-	g.initSpecLinuxResourcesCPU()
-	g.spec.Linux.Resources.CPU.Mems = mems
+	g.initConfigLinuxResourcesCPU()
+	g.Config.Linux.Resources.CPU.Mems = mems
 }
 
-// AddLinuxResourcesHugepageLimit adds or sets g.spec.Linux.Resources.HugepageLimits.
+// AddLinuxResourcesHugepageLimit adds or sets g.Config.Linux.Resources.HugepageLimits.
 func (g *Generator) AddLinuxResourcesHugepageLimit(pageSize string, limit uint64) {
 	hugepageLimit := rspec.LinuxHugepageLimit{
 		Pagesize: pageSize,
 		Limit:    limit,
 	}
 
-	g.initSpecLinuxResources()
-	for i, pageLimit := range g.spec.Linux.Resources.HugepageLimits {
+	g.initConfigLinuxResources()
+	for i, pageLimit := range g.Config.Linux.Resources.HugepageLimits {
 		if pageLimit.Pagesize == pageSize {
-			g.spec.Linux.Resources.HugepageLimits[i].Limit = limit
+			g.Config.Linux.Resources.HugepageLimits[i].Limit = limit
 			return
 		}
 	}
-	g.spec.Linux.Resources.HugepageLimits = append(g.spec.Linux.Resources.HugepageLimits, hugepageLimit)
+	g.Config.Linux.Resources.HugepageLimits = append(g.Config.Linux.Resources.HugepageLimits, hugepageLimit)
 }
 
-// DropLinuxResourcesHugepageLimit drops a hugepage limit from g.spec.Linux.Resources.HugepageLimits.
-func (g *Generator) DropLinuxResourcesHugepageLimit(pageSize string) error {
-	g.initSpecLinuxResources()
-	for i, pageLimit := range g.spec.Linux.Resources.HugepageLimits {
-		if pageLimit.Pagesize == pageSize {
-			g.spec.Linux.Resources.HugepageLimits = append(g.spec.Linux.Resources.HugepageLimits[:i], g.spec.Linux.Resources.HugepageLimits[i+1:]...)
-			return nil
-		}
+// DropLinuxResourcesHugepageLimit drops a hugepage limit from g.Config.Linux.Resources.HugepageLimits.
+func (g *Generator) DropLinuxResourcesHugepageLimit(pageSize string) {
+	if g.Config == nil || g.Config.Linux == nil || g.Config.Linux.Resources == nil {
+		return
 	}
 
-	return nil
+	for i, pageLimit := range g.Config.Linux.Resources.HugepageLimits {
+		if pageLimit.Pagesize == pageSize {
+			g.Config.Linux.Resources.HugepageLimits = append(g.Config.Linux.Resources.HugepageLimits[:i], g.Config.Linux.Resources.HugepageLimits[i+1:]...)
+			return
+		}
+	}
 }
 
-// SetLinuxResourcesMemoryLimit sets g.spec.Linux.Resources.Memory.Limit.
+// SetLinuxResourcesMemoryLimit sets g.Config.Linux.Resources.Memory.Limit.
 func (g *Generator) SetLinuxResourcesMemoryLimit(limit int64) {
-	g.initSpecLinuxResourcesMemory()
-	g.spec.Linux.Resources.Memory.Limit = &limit
+	g.initConfigLinuxResourcesMemory()
+	g.Config.Linux.Resources.Memory.Limit = &limit
 }
 
-// SetLinuxResourcesMemoryReservation sets g.spec.Linux.Resources.Memory.Reservation.
+// SetLinuxResourcesMemoryReservation sets g.Config.Linux.Resources.Memory.Reservation.
 func (g *Generator) SetLinuxResourcesMemoryReservation(reservation int64) {
-	g.initSpecLinuxResourcesMemory()
-	g.spec.Linux.Resources.Memory.Reservation = &reservation
+	g.initConfigLinuxResourcesMemory()
+	g.Config.Linux.Resources.Memory.Reservation = &reservation
 }
 
-// SetLinuxResourcesMemorySwap sets g.spec.Linux.Resources.Memory.Swap.
+// SetLinuxResourcesMemorySwap sets g.Config.Linux.Resources.Memory.Swap.
 func (g *Generator) SetLinuxResourcesMemorySwap(swap int64) {
-	g.initSpecLinuxResourcesMemory()
-	g.spec.Linux.Resources.Memory.Swap = &swap
+	g.initConfigLinuxResourcesMemory()
+	g.Config.Linux.Resources.Memory.Swap = &swap
 }
 
-// SetLinuxResourcesMemoryKernel sets g.spec.Linux.Resources.Memory.Kernel.
+// SetLinuxResourcesMemoryKernel sets g.Config.Linux.Resources.Memory.Kernel.
 func (g *Generator) SetLinuxResourcesMemoryKernel(kernel int64) {
-	g.initSpecLinuxResourcesMemory()
-	g.spec.Linux.Resources.Memory.Kernel = &kernel
+	g.initConfigLinuxResourcesMemory()
+	g.Config.Linux.Resources.Memory.Kernel = &kernel
 }
 
-// SetLinuxResourcesMemoryKernelTCP sets g.spec.Linux.Resources.Memory.KernelTCP.
+// SetLinuxResourcesMemoryKernelTCP sets g.Config.Linux.Resources.Memory.KernelTCP.
 func (g *Generator) SetLinuxResourcesMemoryKernelTCP(kernelTCP int64) {
-	g.initSpecLinuxResourcesMemory()
-	g.spec.Linux.Resources.Memory.KernelTCP = &kernelTCP
+	g.initConfigLinuxResourcesMemory()
+	g.Config.Linux.Resources.Memory.KernelTCP = &kernelTCP
 }
 
-// SetLinuxResourcesMemorySwappiness sets g.spec.Linux.Resources.Memory.Swappiness.
+// SetLinuxResourcesMemorySwappiness sets g.Config.Linux.Resources.Memory.Swappiness.
 func (g *Generator) SetLinuxResourcesMemorySwappiness(swappiness uint64) {
-	g.initSpecLinuxResourcesMemory()
-	g.spec.Linux.Resources.Memory.Swappiness = &swappiness
+	g.initConfigLinuxResourcesMemory()
+	g.Config.Linux.Resources.Memory.Swappiness = &swappiness
 }
 
-// SetLinuxResourcesMemoryDisableOOMKiller sets g.spec.Linux.Resources.Memory.DisableOOMKiller.
+// SetLinuxResourcesMemoryDisableOOMKiller sets g.Config.Linux.Resources.Memory.DisableOOMKiller.
 func (g *Generator) SetLinuxResourcesMemoryDisableOOMKiller(disable bool) {
-	g.initSpecLinuxResourcesMemory()
-	g.spec.Linux.Resources.Memory.DisableOOMKiller = &disable
+	g.initConfigLinuxResourcesMemory()
+	g.Config.Linux.Resources.Memory.DisableOOMKiller = &disable
 }
 
-// SetLinuxResourcesNetworkClassID sets g.spec.Linux.Resources.Network.ClassID.
+// SetLinuxResourcesNetworkClassID sets g.Config.Linux.Resources.Network.ClassID.
 func (g *Generator) SetLinuxResourcesNetworkClassID(classid uint32) {
-	g.initSpecLinuxResourcesNetwork()
-	g.spec.Linux.Resources.Network.ClassID = &classid
+	g.initConfigLinuxResourcesNetwork()
+	g.Config.Linux.Resources.Network.ClassID = &classid
 }
 
-// AddLinuxResourcesNetworkPriorities adds or sets g.spec.Linux.Resources.Network.Priorities.
+// AddLinuxResourcesNetworkPriorities adds or sets g.Config.Linux.Resources.Network.Priorities.
 func (g *Generator) AddLinuxResourcesNetworkPriorities(name string, prio uint32) {
-	g.initSpecLinuxResourcesNetwork()
-	for i, netPriority := range g.spec.Linux.Resources.Network.Priorities {
+	g.initConfigLinuxResourcesNetwork()
+	for i, netPriority := range g.Config.Linux.Resources.Network.Priorities {
 		if netPriority.Name == name {
-			g.spec.Linux.Resources.Network.Priorities[i].Priority = prio
+			g.Config.Linux.Resources.Network.Priorities[i].Priority = prio
 			return
 		}
 	}
 	interfacePrio := new(rspec.LinuxInterfacePriority)
 	interfacePrio.Name = name
 	interfacePrio.Priority = prio
-	g.spec.Linux.Resources.Network.Priorities = append(g.spec.Linux.Resources.Network.Priorities, *interfacePrio)
+	g.Config.Linux.Resources.Network.Priorities = append(g.Config.Linux.Resources.Network.Priorities, *interfacePrio)
 }
 
-// DropLinuxResourcesNetworkPriorities drops one item from g.spec.Linux.Resources.Network.Priorities.
+// DropLinuxResourcesNetworkPriorities drops one item from g.Config.Linux.Resources.Network.Priorities.
 func (g *Generator) DropLinuxResourcesNetworkPriorities(name string) {
-	g.initSpecLinuxResourcesNetwork()
-	for i, netPriority := range g.spec.Linux.Resources.Network.Priorities {
+	if g.Config == nil || g.Config.Linux == nil || g.Config.Linux.Resources == nil || g.Config.Linux.Resources.Network == nil {
+		return
+	}
+
+	for i, netPriority := range g.Config.Linux.Resources.Network.Priorities {
 		if netPriority.Name == name {
-			g.spec.Linux.Resources.Network.Priorities = append(g.spec.Linux.Resources.Network.Priorities[:i], g.spec.Linux.Resources.Network.Priorities[i+1:]...)
+			g.Config.Linux.Resources.Network.Priorities = append(g.Config.Linux.Resources.Network.Priorities[:i], g.Config.Linux.Resources.Network.Priorities[i+1:]...)
 			return
 		}
 	}
 }
 
-// SetLinuxResourcesPidsLimit sets g.spec.Linux.Resources.Pids.Limit.
+// SetLinuxResourcesPidsLimit sets g.Config.Linux.Resources.Pids.Limit.
 func (g *Generator) SetLinuxResourcesPidsLimit(limit int64) {
-	g.initSpecLinuxResourcesPids()
-	g.spec.Linux.Resources.Pids.Limit = limit
+	g.initConfigLinuxResourcesPids()
+	g.Config.Linux.Resources.Pids.Limit = limit
 }
 
-// ClearLinuxSysctl clears g.spec.Linux.Sysctl.
+// ClearLinuxSysctl clears g.Config.Linux.Sysctl.
 func (g *Generator) ClearLinuxSysctl() {
-	if g.spec == nil || g.spec.Linux == nil {
+	if g.Config == nil || g.Config.Linux == nil {
 		return
 	}
-	g.spec.Linux.Sysctl = make(map[string]string)
+	g.Config.Linux.Sysctl = make(map[string]string)
 }
 
-// AddLinuxSysctl adds a new sysctl config into g.spec.Linux.Sysctl.
+// AddLinuxSysctl adds a new sysctl config into g.Config.Linux.Sysctl.
 func (g *Generator) AddLinuxSysctl(key, value string) {
-	g.initSpecLinuxSysctl()
-	g.spec.Linux.Sysctl[key] = value
+	g.initConfigLinuxSysctl()
+	g.Config.Linux.Sysctl[key] = value
 }
 
-// RemoveLinuxSysctl removes a sysctl config from g.spec.Linux.Sysctl.
+// RemoveLinuxSysctl removes a sysctl config from g.Config.Linux.Sysctl.
 func (g *Generator) RemoveLinuxSysctl(key string) {
-	if g.spec == nil || g.spec.Linux == nil || g.spec.Linux.Sysctl == nil {
+	if g.Config == nil || g.Config.Linux == nil || g.Config.Linux.Sysctl == nil {
 		return
 	}
-	delete(g.spec.Linux.Sysctl, key)
+	delete(g.Config.Linux.Sysctl, key)
 }
 
-// ClearLinuxUIDMappings clear g.spec.Linux.UIDMappings.
+// ClearLinuxUIDMappings clear g.Config.Linux.UIDMappings.
 func (g *Generator) ClearLinuxUIDMappings() {
-	if g.spec == nil || g.spec.Linux == nil {
+	if g.Config == nil || g.Config.Linux == nil {
 		return
 	}
-	g.spec.Linux.UIDMappings = []rspec.LinuxIDMapping{}
+	g.Config.Linux.UIDMappings = []rspec.LinuxIDMapping{}
 }
 
-// AddLinuxUIDMapping adds uidMap into g.spec.Linux.UIDMappings.
+// AddLinuxUIDMapping adds uidMap into g.Config.Linux.UIDMappings.
 func (g *Generator) AddLinuxUIDMapping(hid, cid, size uint32) {
 	idMapping := rspec.LinuxIDMapping{
 		HostID:      hid,
@@ -687,19 +895,19 @@ func (g *Generator) AddLinuxUIDMapping(hid, cid, size uint32) {
 		Size:        size,
 	}
 
-	g.initSpecLinux()
-	g.spec.Linux.UIDMappings = append(g.spec.Linux.UIDMappings, idMapping)
+	g.initConfigLinux()
+	g.Config.Linux.UIDMappings = append(g.Config.Linux.UIDMappings, idMapping)
 }
 
-// ClearLinuxGIDMappings clear g.spec.Linux.GIDMappings.
+// ClearLinuxGIDMappings clear g.Config.Linux.GIDMappings.
 func (g *Generator) ClearLinuxGIDMappings() {
-	if g.spec == nil || g.spec.Linux == nil {
+	if g.Config == nil || g.Config.Linux == nil {
 		return
 	}
-	g.spec.Linux.GIDMappings = []rspec.LinuxIDMapping{}
+	g.Config.Linux.GIDMappings = []rspec.LinuxIDMapping{}
 }
 
-// AddLinuxGIDMapping adds gidMap into g.spec.Linux.GIDMappings.
+// AddLinuxGIDMapping adds gidMap into g.Config.Linux.GIDMappings.
 func (g *Generator) AddLinuxGIDMapping(hid, cid, size uint32) {
 	idMapping := rspec.LinuxIDMapping{
 		HostID:      hid,
@@ -707,11 +915,11 @@ func (g *Generator) AddLinuxGIDMapping(hid, cid, size uint32) {
 		Size:        size,
 	}
 
-	g.initSpecLinux()
-	g.spec.Linux.GIDMappings = append(g.spec.Linux.GIDMappings, idMapping)
+	g.initConfigLinux()
+	g.Config.Linux.GIDMappings = append(g.Config.Linux.GIDMappings, idMapping)
 }
 
-// SetLinuxRootPropagation sets g.spec.Linux.RootfsPropagation.
+// SetLinuxRootPropagation sets g.Config.Linux.RootfsPropagation.
 func (g *Generator) SetLinuxRootPropagation(rp string) error {
 	switch rp {
 	case "":
@@ -721,230 +929,96 @@ func (g *Generator) SetLinuxRootPropagation(rp string) error {
 	case "rslave":
 	case "shared":
 	case "rshared":
+	case "unbindable":
+	case "runbindable":
 	default:
-		return fmt.Errorf("rootfs-propagation must be empty or one of private|rprivate|slave|rslave|shared|rshared")
+		return fmt.Errorf("rootfs-propagation %q must be empty or one of (r)private|(r)slave|(r)shared|(r)unbindable", rp)
 	}
-	g.initSpecLinux()
-	g.spec.Linux.RootfsPropagation = rp
+	g.initConfigLinux()
+	g.Config.Linux.RootfsPropagation = rp
 	return nil
 }
 
-// ClearPreStartHooks clear g.spec.Hooks.Prestart.
+// ClearPreStartHooks clear g.Config.Hooks.Prestart.
 func (g *Generator) ClearPreStartHooks() {
-	if g.spec == nil {
+	if g.Config == nil || g.Config.Hooks == nil {
 		return
 	}
-	if g.spec.Hooks == nil {
-		return
-	}
-	g.spec.Hooks.Prestart = []rspec.Hook{}
+	g.Config.Hooks.Prestart = []rspec.Hook{}
 }
 
-// AddPreStartHook add a prestart hook into g.spec.Hooks.Prestart.
-func (g *Generator) AddPreStartHook(path string, args []string) {
-	g.initSpecHooks()
-	hook := rspec.Hook{Path: path, Args: args}
-	for i, hook := range g.spec.Hooks.Prestart {
-		if hook.Path == path {
-			g.spec.Hooks.Prestart[i] = hook
-			return
-		}
-	}
-	g.spec.Hooks.Prestart = append(g.spec.Hooks.Prestart, hook)
-}
-
-// AddPreStartHookEnv adds envs of a prestart hook into g.spec.Hooks.Prestart.
-func (g *Generator) AddPreStartHookEnv(path string, envs []string) {
-	g.initSpecHooks()
-	for i, hook := range g.spec.Hooks.Prestart {
-		if hook.Path == path {
-			g.spec.Hooks.Prestart[i].Env = envs
-			return
-		}
-	}
-	hook := rspec.Hook{Path: path, Env: envs}
-	g.spec.Hooks.Prestart = append(g.spec.Hooks.Prestart, hook)
-}
-
-// AddPreStartHookTimeout adds timeout of a prestart hook into g.spec.Hooks.Prestart.
-func (g *Generator) AddPreStartHookTimeout(path string, timeout int) {
-	g.initSpecHooks()
-	for i, hook := range g.spec.Hooks.Prestart {
-		if hook.Path == path {
-			g.spec.Hooks.Prestart[i].Timeout = &timeout
-			return
-		}
-	}
-	hook := rspec.Hook{Path: path, Timeout: &timeout}
-	g.spec.Hooks.Prestart = append(g.spec.Hooks.Prestart, hook)
-}
-
-// ClearPostStopHooks clear g.spec.Hooks.Poststop.
-func (g *Generator) ClearPostStopHooks() {
-	if g.spec == nil {
-		return
-	}
-	if g.spec.Hooks == nil {
-		return
-	}
-	g.spec.Hooks.Poststop = []rspec.Hook{}
-}
-
-// AddPostStopHook adds a poststop hook into g.spec.Hooks.Poststop.
-func (g *Generator) AddPostStopHook(path string, args []string) {
-	g.initSpecHooks()
-	hook := rspec.Hook{Path: path, Args: args}
-	for i, hook := range g.spec.Hooks.Poststop {
-		if hook.Path == path {
-			g.spec.Hooks.Poststop[i] = hook
-			return
-		}
-	}
-	g.spec.Hooks.Poststop = append(g.spec.Hooks.Poststop, hook)
-}
-
-// AddPostStopHookEnv adds envs of a poststop hook into g.spec.Hooks.Poststop.
-func (g *Generator) AddPostStopHookEnv(path string, envs []string) {
-	g.initSpecHooks()
-	for i, hook := range g.spec.Hooks.Poststop {
-		if hook.Path == path {
-			g.spec.Hooks.Poststop[i].Env = envs
-			return
-		}
-	}
-	hook := rspec.Hook{Path: path, Env: envs}
-	g.spec.Hooks.Poststop = append(g.spec.Hooks.Poststop, hook)
-}
-
-// AddPostStopHookTimeout adds timeout of a poststop hook into g.spec.Hooks.Poststop.
-func (g *Generator) AddPostStopHookTimeout(path string, timeout int) {
-	g.initSpecHooks()
-	for i, hook := range g.spec.Hooks.Poststop {
-		if hook.Path == path {
-			g.spec.Hooks.Poststop[i].Timeout = &timeout
-			return
-		}
-	}
-	hook := rspec.Hook{Path: path, Timeout: &timeout}
-	g.spec.Hooks.Poststop = append(g.spec.Hooks.Poststop, hook)
-}
-
-// ClearPostStartHooks clear g.spec.Hooks.Poststart.
-func (g *Generator) ClearPostStartHooks() {
-	if g.spec == nil {
-		return
-	}
-	if g.spec.Hooks == nil {
-		return
-	}
-	g.spec.Hooks.Poststart = []rspec.Hook{}
-}
-
-// AddPostStartHook adds a poststart hook into g.spec.Hooks.Poststart.
-func (g *Generator) AddPostStartHook(path string, args []string) {
-	g.initSpecHooks()
-	hook := rspec.Hook{Path: path, Args: args}
-	for i, hook := range g.spec.Hooks.Poststart {
-		if hook.Path == path {
-			g.spec.Hooks.Poststart[i] = hook
-			return
-		}
-	}
-	g.spec.Hooks.Poststart = append(g.spec.Hooks.Poststart, hook)
-}
-
-// AddPostStartHookEnv adds envs of a poststart hook into g.spec.Hooks.Poststart.
-func (g *Generator) AddPostStartHookEnv(path string, envs []string) {
-	g.initSpecHooks()
-	for i, hook := range g.spec.Hooks.Poststart {
-		if hook.Path == path {
-			g.spec.Hooks.Poststart[i].Env = envs
-			return
-		}
-	}
-	hook := rspec.Hook{Path: path, Env: envs}
-	g.spec.Hooks.Poststart = append(g.spec.Hooks.Poststart, hook)
-}
-
-// AddPostStartHookTimeout adds timeout of a poststart hook into g.spec.Hooks.Poststart.
-func (g *Generator) AddPostStartHookTimeout(path string, timeout int) {
-	g.initSpecHooks()
-	for i, hook := range g.spec.Hooks.Poststart {
-		if hook.Path == path {
-			g.spec.Hooks.Poststart[i].Timeout = &timeout
-			return
-		}
-	}
-	hook := rspec.Hook{Path: path, Timeout: &timeout}
-	g.spec.Hooks.Poststart = append(g.spec.Hooks.Poststart, hook)
-}
-
-// AddTmpfsMount adds a tmpfs mount into g.spec.Mounts.
-func (g *Generator) AddTmpfsMount(dest string, options []string) {
-	mnt := rspec.Mount{
-		Destination: dest,
-		Type:        "tmpfs",
-		Source:      "tmpfs",
-		Options:     options,
-	}
-
-	g.initSpec()
-	g.spec.Mounts = append(g.spec.Mounts, mnt)
-}
-
-// AddCgroupsMount adds a cgroup mount into g.spec.Mounts.
-func (g *Generator) AddCgroupsMount(mountCgroupOption string) error {
-	switch mountCgroupOption {
-	case "ro":
-	case "rw":
-	case "no":
-		return nil
-	default:
-		return fmt.Errorf("--mount-cgroups should be one of (ro,rw,no)")
-	}
-
-	mnt := rspec.Mount{
-		Destination: "/sys/fs/cgroup",
-		Type:        "cgroup",
-		Source:      "cgroup",
-		Options:     []string{"nosuid", "noexec", "nodev", "relatime", mountCgroupOption},
-	}
-	g.initSpec()
-	g.spec.Mounts = append(g.spec.Mounts, mnt)
-
+// AddPreStartHook add a prestart hook into g.Config.Hooks.Prestart.
+func (g *Generator) AddPreStartHook(preStartHook rspec.Hook) error {
+	g.initConfigHooks()
+	g.Config.Hooks.Prestart = append(g.Config.Hooks.Prestart, preStartHook)
 	return nil
 }
 
-// AddBindMount adds a bind mount into g.spec.Mounts.
-func (g *Generator) AddBindMount(source, dest string, options []string) {
-	if len(options) == 0 {
-		options = []string{"rw"}
+// ClearPostStopHooks clear g.Config.Hooks.Poststop.
+func (g *Generator) ClearPostStopHooks() {
+	if g.Config == nil || g.Config.Hooks == nil {
+		return
 	}
-
-	// We have to make sure that there is a bind option set, otherwise it won't
-	// be an actual bindmount.
-	foundBindOption := false
-	for _, opt := range options {
-		if opt == "bind" || opt == "rbind" {
-			foundBindOption = true
-			break
-		}
-	}
-	if !foundBindOption {
-		options = append(options, "bind")
-	}
-
-	mnt := rspec.Mount{
-		Destination: dest,
-		Type:        "bind",
-		Source:      source,
-		Options:     options,
-	}
-	g.initSpec()
-	g.spec.Mounts = append(g.spec.Mounts, mnt)
+	g.Config.Hooks.Poststop = []rspec.Hook{}
 }
 
-// SetupPrivileged sets up the privilege-related fields inside g.spec.
+// AddPostStopHook adds a poststop hook into g.Config.Hooks.Poststop.
+func (g *Generator) AddPostStopHook(postStopHook rspec.Hook) error {
+	g.initConfigHooks()
+	g.Config.Hooks.Poststop = append(g.Config.Hooks.Poststop, postStopHook)
+	return nil
+}
+
+// ClearPostStartHooks clear g.Config.Hooks.Poststart.
+func (g *Generator) ClearPostStartHooks() {
+	if g.Config == nil || g.Config.Hooks == nil {
+		return
+	}
+	g.Config.Hooks.Poststart = []rspec.Hook{}
+}
+
+// AddPostStartHook adds a poststart hook into g.Config.Hooks.Poststart.
+func (g *Generator) AddPostStartHook(postStartHook rspec.Hook) error {
+	g.initConfigHooks()
+	g.Config.Hooks.Poststart = append(g.Config.Hooks.Poststart, postStartHook)
+	return nil
+}
+
+// AddMount adds a mount into g.Config.Mounts.
+func (g *Generator) AddMount(mnt rspec.Mount) {
+	g.initConfig()
+
+	g.Config.Mounts = append(g.Config.Mounts, mnt)
+}
+
+// RemoveMount removes a mount point on the dest directory
+func (g *Generator) RemoveMount(dest string) {
+	g.initConfig()
+
+	for index, mount := range g.Config.Mounts {
+		if mount.Destination == dest {
+			g.Config.Mounts = append(g.Config.Mounts[:index], g.Config.Mounts[index+1:]...)
+			return
+		}
+	}
+}
+
+// Mounts returns the list of mounts
+func (g *Generator) Mounts() []rspec.Mount {
+	g.initConfig()
+
+	return g.Config.Mounts
+}
+
+// ClearMounts clear g.Config.Mounts
+func (g *Generator) ClearMounts() {
+	if g.Config == nil {
+		return
+	}
+	g.Config.Mounts = []rspec.Mount{}
+}
+
+// SetupPrivileged sets up the privilege-related fields inside g.Config.
 func (g *Generator) SetupPrivileged(privileged bool) {
 	if privileged { // Add all capabilities in privileged mode.
 		var finalCapList []string
@@ -954,146 +1028,226 @@ func (g *Generator) SetupPrivileged(privileged bool) {
 			}
 			finalCapList = append(finalCapList, fmt.Sprintf("CAP_%s", strings.ToUpper(cap.String())))
 		}
-		g.initSpecLinux()
-		g.initSpecProcessCapabilities()
+		g.initConfigLinux()
+		g.initConfigProcessCapabilities()
 		g.ClearProcessCapabilities()
-		g.spec.Process.Capabilities.Bounding = append(g.spec.Process.Capabilities.Bounding, finalCapList...)
-		g.spec.Process.Capabilities.Effective = append(g.spec.Process.Capabilities.Effective, finalCapList...)
-		g.spec.Process.Capabilities.Inheritable = append(g.spec.Process.Capabilities.Inheritable, finalCapList...)
-		g.spec.Process.Capabilities.Permitted = append(g.spec.Process.Capabilities.Permitted, finalCapList...)
-		g.spec.Process.Capabilities.Ambient = append(g.spec.Process.Capabilities.Ambient, finalCapList...)
-		g.spec.Process.SelinuxLabel = ""
-		g.spec.Process.ApparmorProfile = ""
-		g.spec.Linux.Seccomp = nil
+		g.Config.Process.Capabilities.Bounding = append(g.Config.Process.Capabilities.Bounding, finalCapList...)
+		g.Config.Process.Capabilities.Effective = append(g.Config.Process.Capabilities.Effective, finalCapList...)
+		g.Config.Process.Capabilities.Inheritable = append(g.Config.Process.Capabilities.Inheritable, finalCapList...)
+		g.Config.Process.Capabilities.Permitted = append(g.Config.Process.Capabilities.Permitted, finalCapList...)
+		g.Config.Process.Capabilities.Ambient = append(g.Config.Process.Capabilities.Ambient, finalCapList...)
+		g.Config.Process.SelinuxLabel = ""
+		g.Config.Process.ApparmorProfile = ""
+		g.Config.Linux.Seccomp = nil
 	}
 }
 
-// ClearProcessCapabilities clear g.spec.Process.Capabilities.
+// ClearProcessCapabilities clear g.Config.Process.Capabilities.
 func (g *Generator) ClearProcessCapabilities() {
-	if g.spec == nil {
+	if g.Config == nil || g.Config.Process == nil || g.Config.Process.Capabilities == nil {
 		return
 	}
-	g.spec.Process.Capabilities.Bounding = []string{}
-	g.spec.Process.Capabilities.Effective = []string{}
-	g.spec.Process.Capabilities.Inheritable = []string{}
-	g.spec.Process.Capabilities.Permitted = []string{}
-	g.spec.Process.Capabilities.Ambient = []string{}
+	g.Config.Process.Capabilities.Bounding = []string{}
+	g.Config.Process.Capabilities.Effective = []string{}
+	g.Config.Process.Capabilities.Inheritable = []string{}
+	g.Config.Process.Capabilities.Permitted = []string{}
+	g.Config.Process.Capabilities.Ambient = []string{}
 }
 
-// AddProcessCapability adds a process capability into g.spec.Process.Capabilities.
-func (g *Generator) AddProcessCapability(c string) error {
+// AddProcessCapabilityAmbient adds a process capability into g.Config.Process.Capabilities.Ambient.
+func (g *Generator) AddProcessCapabilityAmbient(c string) error {
 	cp := strings.ToUpper(c)
 	if err := validate.CapValid(cp, g.HostSpecific); err != nil {
 		return err
 	}
 
-	g.initSpecProcessCapabilities()
+	g.initConfigProcessCapabilities()
+
+	var foundAmbient bool
+	for _, cap := range g.Config.Process.Capabilities.Ambient {
+		if strings.ToUpper(cap) == cp {
+			foundAmbient = true
+			break
+		}
+	}
+
+	if !foundAmbient {
+		g.Config.Process.Capabilities.Ambient = append(g.Config.Process.Capabilities.Ambient, cp)
+	}
+
+	return nil
+}
+
+// AddProcessCapabilityBounding adds a process capability into g.Config.Process.Capabilities.Bounding.
+func (g *Generator) AddProcessCapabilityBounding(c string) error {
+	cp := strings.ToUpper(c)
+	if err := validate.CapValid(cp, g.HostSpecific); err != nil {
+		return err
+	}
+
+	g.initConfigProcessCapabilities()
 
 	var foundBounding bool
-	for _, cap := range g.spec.Process.Capabilities.Bounding {
+	for _, cap := range g.Config.Process.Capabilities.Bounding {
 		if strings.ToUpper(cap) == cp {
 			foundBounding = true
 			break
 		}
 	}
 	if !foundBounding {
-		g.spec.Process.Capabilities.Bounding = append(g.spec.Process.Capabilities.Bounding, cp)
+		g.Config.Process.Capabilities.Bounding = append(g.Config.Process.Capabilities.Bounding, cp)
 	}
 
+	return nil
+}
+
+// AddProcessCapabilityEffective adds a process capability into g.Config.Process.Capabilities.Effective.
+func (g *Generator) AddProcessCapabilityEffective(c string) error {
+	cp := strings.ToUpper(c)
+	if err := validate.CapValid(cp, g.HostSpecific); err != nil {
+		return err
+	}
+
+	g.initConfigProcessCapabilities()
+
 	var foundEffective bool
-	for _, cap := range g.spec.Process.Capabilities.Effective {
+	for _, cap := range g.Config.Process.Capabilities.Effective {
 		if strings.ToUpper(cap) == cp {
 			foundEffective = true
 			break
 		}
 	}
 	if !foundEffective {
-		g.spec.Process.Capabilities.Effective = append(g.spec.Process.Capabilities.Effective, cp)
+		g.Config.Process.Capabilities.Effective = append(g.Config.Process.Capabilities.Effective, cp)
 	}
 
+	return nil
+}
+
+// AddProcessCapabilityInheritable adds a process capability into g.Config.Process.Capabilities.Inheritable.
+func (g *Generator) AddProcessCapabilityInheritable(c string) error {
+	cp := strings.ToUpper(c)
+	if err := validate.CapValid(cp, g.HostSpecific); err != nil {
+		return err
+	}
+
+	g.initConfigProcessCapabilities()
+
 	var foundInheritable bool
-	for _, cap := range g.spec.Process.Capabilities.Inheritable {
+	for _, cap := range g.Config.Process.Capabilities.Inheritable {
 		if strings.ToUpper(cap) == cp {
 			foundInheritable = true
 			break
 		}
 	}
 	if !foundInheritable {
-		g.spec.Process.Capabilities.Inheritable = append(g.spec.Process.Capabilities.Inheritable, cp)
+		g.Config.Process.Capabilities.Inheritable = append(g.Config.Process.Capabilities.Inheritable, cp)
 	}
 
+	return nil
+}
+
+// AddProcessCapabilityPermitted adds a process capability into g.Config.Process.Capabilities.Permitted.
+func (g *Generator) AddProcessCapabilityPermitted(c string) error {
+	cp := strings.ToUpper(c)
+	if err := validate.CapValid(cp, g.HostSpecific); err != nil {
+		return err
+	}
+
+	g.initConfigProcessCapabilities()
+
 	var foundPermitted bool
-	for _, cap := range g.spec.Process.Capabilities.Permitted {
+	for _, cap := range g.Config.Process.Capabilities.Permitted {
 		if strings.ToUpper(cap) == cp {
 			foundPermitted = true
 			break
 		}
 	}
 	if !foundPermitted {
-		g.spec.Process.Capabilities.Permitted = append(g.spec.Process.Capabilities.Permitted, cp)
-	}
-
-	var foundAmbient bool
-	for _, cap := range g.spec.Process.Capabilities.Ambient {
-		if strings.ToUpper(cap) == cp {
-			foundAmbient = true
-			break
-		}
-	}
-	if !foundAmbient {
-		g.spec.Process.Capabilities.Ambient = append(g.spec.Process.Capabilities.Ambient, cp)
+		g.Config.Process.Capabilities.Permitted = append(g.Config.Process.Capabilities.Permitted, cp)
 	}
 
 	return nil
 }
 
-// DropProcessCapability drops a process capability from g.spec.Process.Capabilities.
-func (g *Generator) DropProcessCapability(c string) error {
+// DropProcessCapabilityAmbient drops a process capability from g.Config.Process.Capabilities.Ambient.
+func (g *Generator) DropProcessCapabilityAmbient(c string) error {
+	if g.Config == nil || g.Config.Process == nil || g.Config.Process.Capabilities == nil {
+		return nil
+	}
+
 	cp := strings.ToUpper(c)
-
-	g.initSpecProcessCapabilities()
-
-	// we don't care about order...and this is way faster...
-	removeFunc := func(s []string, i int) []string {
-		s[i] = s[len(s)-1]
-		return s[:len(s)-1]
-	}
-
-	for i, cap := range g.spec.Process.Capabilities.Bounding {
+	for i, cap := range g.Config.Process.Capabilities.Ambient {
 		if strings.ToUpper(cap) == cp {
-			g.spec.Process.Capabilities.Bounding = removeFunc(g.spec.Process.Capabilities.Bounding, i)
+			g.Config.Process.Capabilities.Ambient = removeFunc(g.Config.Process.Capabilities.Ambient, i)
 		}
 	}
 
-	for i, cap := range g.spec.Process.Capabilities.Effective {
+	return validate.CapValid(cp, false)
+}
+
+// DropProcessCapabilityBounding drops a process capability from g.Config.Process.Capabilities.Bounding.
+func (g *Generator) DropProcessCapabilityBounding(c string) error {
+	if g.Config == nil || g.Config.Process == nil || g.Config.Process.Capabilities == nil {
+		return nil
+	}
+
+	cp := strings.ToUpper(c)
+	for i, cap := range g.Config.Process.Capabilities.Bounding {
 		if strings.ToUpper(cap) == cp {
-			g.spec.Process.Capabilities.Effective = removeFunc(g.spec.Process.Capabilities.Effective, i)
+			g.Config.Process.Capabilities.Bounding = removeFunc(g.Config.Process.Capabilities.Bounding, i)
 		}
 	}
 
-	for i, cap := range g.spec.Process.Capabilities.Inheritable {
+	return validate.CapValid(cp, false)
+}
+
+// DropProcessCapabilityEffective drops a process capability from g.Config.Process.Capabilities.Effective.
+func (g *Generator) DropProcessCapabilityEffective(c string) error {
+	if g.Config == nil || g.Config.Process == nil || g.Config.Process.Capabilities == nil {
+		return nil
+	}
+
+	cp := strings.ToUpper(c)
+	for i, cap := range g.Config.Process.Capabilities.Effective {
 		if strings.ToUpper(cap) == cp {
-			g.spec.Process.Capabilities.Inheritable = removeFunc(g.spec.Process.Capabilities.Inheritable, i)
+			g.Config.Process.Capabilities.Effective = removeFunc(g.Config.Process.Capabilities.Effective, i)
 		}
 	}
 
-	for i, cap := range g.spec.Process.Capabilities.Permitted {
+	return validate.CapValid(cp, false)
+}
+
+// DropProcessCapabilityInheritable drops a process capability from g.Config.Process.Capabilities.Inheritable.
+func (g *Generator) DropProcessCapabilityInheritable(c string) error {
+	if g.Config == nil || g.Config.Process == nil || g.Config.Process.Capabilities == nil {
+		return nil
+	}
+
+	cp := strings.ToUpper(c)
+	for i, cap := range g.Config.Process.Capabilities.Inheritable {
 		if strings.ToUpper(cap) == cp {
-			g.spec.Process.Capabilities.Permitted = removeFunc(g.spec.Process.Capabilities.Permitted, i)
+			g.Config.Process.Capabilities.Inheritable = removeFunc(g.Config.Process.Capabilities.Inheritable, i)
 		}
 	}
 
-	for i, cap := range g.spec.Process.Capabilities.Ambient {
+	return validate.CapValid(cp, false)
+}
+
+// DropProcessCapabilityPermitted drops a process capability from g.Config.Process.Capabilities.Permitted.
+func (g *Generator) DropProcessCapabilityPermitted(c string) error {
+	if g.Config == nil || g.Config.Process == nil || g.Config.Process.Capabilities == nil {
+		return nil
+	}
+
+	cp := strings.ToUpper(c)
+	for i, cap := range g.Config.Process.Capabilities.Permitted {
 		if strings.ToUpper(cap) == cp {
-			g.spec.Process.Capabilities.Ambient = removeFunc(g.spec.Process.Capabilities.Ambient, i)
+			g.Config.Process.Capabilities.Permitted = removeFunc(g.Config.Process.Capabilities.Permitted, i)
 		}
 	}
 
-	if err := validate.CapValid(cp, false); err != nil {
-		return err
-	}
-
-	return nil
+	return validate.CapValid(cp, false)
 }
 
 func mapStrToNamespace(ns string, path string) (rspec.LinuxNamespace, error) {
@@ -1117,59 +1271,59 @@ func mapStrToNamespace(ns string, path string) (rspec.LinuxNamespace, error) {
 	}
 }
 
-// ClearLinuxNamespaces clear g.spec.Linux.Namespaces.
+// ClearLinuxNamespaces clear g.Config.Linux.Namespaces.
 func (g *Generator) ClearLinuxNamespaces() {
-	if g.spec == nil || g.spec.Linux == nil {
+	if g.Config == nil || g.Config.Linux == nil {
 		return
 	}
-	g.spec.Linux.Namespaces = []rspec.LinuxNamespace{}
+	g.Config.Linux.Namespaces = []rspec.LinuxNamespace{}
 }
 
 // AddOrReplaceLinuxNamespace adds or replaces a namespace inside
-// g.spec.Linux.Namespaces.
+// g.Config.Linux.Namespaces.
 func (g *Generator) AddOrReplaceLinuxNamespace(ns string, path string) error {
 	namespace, err := mapStrToNamespace(ns, path)
 	if err != nil {
 		return err
 	}
 
-	g.initSpecLinux()
-	for i, ns := range g.spec.Linux.Namespaces {
+	g.initConfigLinux()
+	for i, ns := range g.Config.Linux.Namespaces {
 		if ns.Type == namespace.Type {
-			g.spec.Linux.Namespaces[i] = namespace
+			g.Config.Linux.Namespaces[i] = namespace
 			return nil
 		}
 	}
-	g.spec.Linux.Namespaces = append(g.spec.Linux.Namespaces, namespace)
+	g.Config.Linux.Namespaces = append(g.Config.Linux.Namespaces, namespace)
 	return nil
 }
 
-// RemoveLinuxNamespace removes a namespace from g.spec.Linux.Namespaces.
+// RemoveLinuxNamespace removes a namespace from g.Config.Linux.Namespaces.
 func (g *Generator) RemoveLinuxNamespace(ns string) error {
 	namespace, err := mapStrToNamespace(ns, "")
 	if err != nil {
 		return err
 	}
 
-	if g.spec == nil || g.spec.Linux == nil {
+	if g.Config == nil || g.Config.Linux == nil {
 		return nil
 	}
-	for i, ns := range g.spec.Linux.Namespaces {
+	for i, ns := range g.Config.Linux.Namespaces {
 		if ns.Type == namespace.Type {
-			g.spec.Linux.Namespaces = append(g.spec.Linux.Namespaces[:i], g.spec.Linux.Namespaces[i+1:]...)
+			g.Config.Linux.Namespaces = append(g.Config.Linux.Namespaces[:i], g.Config.Linux.Namespaces[i+1:]...)
 			return nil
 		}
 	}
 	return nil
 }
 
-// AddDevice - add a device into g.spec.Linux.Devices
+// AddDevice - add a device into g.Config.Linux.Devices
 func (g *Generator) AddDevice(device rspec.LinuxDevice) {
-	g.initSpecLinux()
+	g.initConfigLinux()
 
-	for i, dev := range g.spec.Linux.Devices {
+	for i, dev := range g.Config.Linux.Devices {
 		if dev.Path == device.Path {
-			g.spec.Linux.Devices[i] = device
+			g.Config.Linux.Devices[i] = device
 			return
 		}
 		if dev.Type == device.Type && dev.Major == device.Major && dev.Minor == device.Minor {
@@ -1177,31 +1331,63 @@ func (g *Generator) AddDevice(device rspec.LinuxDevice) {
 		}
 	}
 
-	g.spec.Linux.Devices = append(g.spec.Linux.Devices, device)
+	g.Config.Linux.Devices = append(g.Config.Linux.Devices, device)
 }
 
-// RemoveDevice remove a device from g.spec.Linux.Devices
-func (g *Generator) RemoveDevice(path string) error {
-	if g.spec == nil || g.spec.Linux == nil || g.spec.Linux.Devices == nil {
-		return nil
-	}
-
-	for i, device := range g.spec.Linux.Devices {
-		if device.Path == path {
-			g.spec.Linux.Devices = append(g.spec.Linux.Devices[:i], g.spec.Linux.Devices[i+1:]...)
-			return nil
-		}
-	}
-	return nil
-}
-
-// ClearLinuxDevices clears g.spec.Linux.Devices
-func (g *Generator) ClearLinuxDevices() {
-	if g.spec == nil || g.spec.Linux == nil || g.spec.Linux.Devices == nil {
+// RemoveDevice remove a device from g.Config.Linux.Devices
+func (g *Generator) RemoveDevice(path string) {
+	if g.Config == nil || g.Config.Linux == nil || g.Config.Linux.Devices == nil {
 		return
 	}
 
-	g.spec.Linux.Devices = []rspec.LinuxDevice{}
+	for i, device := range g.Config.Linux.Devices {
+		if device.Path == path {
+			g.Config.Linux.Devices = append(g.Config.Linux.Devices[:i], g.Config.Linux.Devices[i+1:]...)
+			return
+		}
+	}
+}
+
+// ClearLinuxDevices clears g.Config.Linux.Devices
+func (g *Generator) ClearLinuxDevices() {
+	if g.Config == nil || g.Config.Linux == nil || g.Config.Linux.Devices == nil {
+		return
+	}
+
+	g.Config.Linux.Devices = []rspec.LinuxDevice{}
+}
+
+// AddLinuxResourcesDevice - add a device into g.Config.Linux.Resources.Devices
+func (g *Generator) AddLinuxResourcesDevice(allow bool, devType string, major, minor *int64, access string) {
+	g.initConfigLinuxResources()
+
+	device := rspec.LinuxDeviceCgroup{
+		Allow:  allow,
+		Type:   devType,
+		Access: access,
+		Major:  major,
+		Minor:  minor,
+	}
+	g.Config.Linux.Resources.Devices = append(g.Config.Linux.Resources.Devices, device)
+}
+
+// RemoveLinuxResourcesDevice - remove a device from g.Config.Linux.Resources.Devices
+func (g *Generator) RemoveLinuxResourcesDevice(allow bool, devType string, major, minor *int64, access string) {
+	if g.Config == nil || g.Config.Linux == nil || g.Config.Linux.Resources == nil {
+		return
+	}
+	for i, device := range g.Config.Linux.Resources.Devices {
+		if device.Allow == allow &&
+			(devType == device.Type || (devType != "" && device.Type != "" && devType == device.Type)) &&
+			(access == device.Access || (access != "" && device.Access != "" && access == device.Access)) &&
+			(major == device.Major || (major != nil && device.Major != nil && *major == *device.Major)) &&
+			(minor == device.Minor || (minor != nil && device.Minor != nil && *minor == *device.Minor)) {
+
+			g.Config.Linux.Resources.Devices = append(g.Config.Linux.Resources.Devices[:i], g.Config.Linux.Resources.Devices[i+1:]...)
+			return
+		}
+	}
+	return
 }
 
 // strPtr returns the pointer pointing to the string s.
@@ -1209,49 +1395,168 @@ func strPtr(s string) *string { return &s }
 
 // SetSyscallAction adds rules for syscalls with the specified action
 func (g *Generator) SetSyscallAction(arguments seccomp.SyscallOpts) error {
-	g.initSpecLinuxSeccomp()
-	return seccomp.ParseSyscallFlag(arguments, g.spec.Linux.Seccomp)
+	g.initConfigLinuxSeccomp()
+	return seccomp.ParseSyscallFlag(arguments, g.Config.Linux.Seccomp)
 }
 
 // SetDefaultSeccompAction sets the default action for all syscalls not defined
 // and then removes any syscall rules with this action already specified.
 func (g *Generator) SetDefaultSeccompAction(action string) error {
-	g.initSpecLinuxSeccomp()
-	return seccomp.ParseDefaultAction(action, g.spec.Linux.Seccomp)
+	g.initConfigLinuxSeccomp()
+	return seccomp.ParseDefaultAction(action, g.Config.Linux.Seccomp)
 }
 
 // SetDefaultSeccompActionForce only sets the default action for all syscalls not defined
 func (g *Generator) SetDefaultSeccompActionForce(action string) error {
-	g.initSpecLinuxSeccomp()
-	return seccomp.ParseDefaultActionForce(action, g.spec.Linux.Seccomp)
+	g.initConfigLinuxSeccomp()
+	return seccomp.ParseDefaultActionForce(action, g.Config.Linux.Seccomp)
 }
 
 // SetSeccompArchitecture sets the supported seccomp architectures
 func (g *Generator) SetSeccompArchitecture(architecture string) error {
-	g.initSpecLinuxSeccomp()
-	return seccomp.ParseArchitectureFlag(architecture, g.spec.Linux.Seccomp)
+	g.initConfigLinuxSeccomp()
+	return seccomp.ParseArchitectureFlag(architecture, g.Config.Linux.Seccomp)
 }
 
 // RemoveSeccompRule removes rules for any specified syscalls
 func (g *Generator) RemoveSeccompRule(arguments string) error {
-	g.initSpecLinuxSeccomp()
-	return seccomp.RemoveAction(arguments, g.spec.Linux.Seccomp)
+	g.initConfigLinuxSeccomp()
+	return seccomp.RemoveAction(arguments, g.Config.Linux.Seccomp)
 }
 
 // RemoveAllSeccompRules removes all syscall rules
 func (g *Generator) RemoveAllSeccompRules() error {
-	g.initSpecLinuxSeccomp()
-	return seccomp.RemoveAllSeccompRules(g.spec.Linux.Seccomp)
+	g.initConfigLinuxSeccomp()
+	return seccomp.RemoveAllSeccompRules(g.Config.Linux.Seccomp)
 }
 
-// AddLinuxMaskedPaths adds masked paths into g.spec.Linux.MaskedPaths.
+// AddLinuxMaskedPaths adds masked paths into g.Config.Linux.MaskedPaths.
 func (g *Generator) AddLinuxMaskedPaths(path string) {
-	g.initSpecLinux()
-	g.spec.Linux.MaskedPaths = append(g.spec.Linux.MaskedPaths, path)
+	g.initConfigLinux()
+	g.Config.Linux.MaskedPaths = append(g.Config.Linux.MaskedPaths, path)
 }
 
-// AddLinuxReadonlyPaths adds readonly paths into g.spec.Linux.MaskedPaths.
+// AddLinuxReadonlyPaths adds readonly paths into g.Config.Linux.MaskedPaths.
 func (g *Generator) AddLinuxReadonlyPaths(path string) {
-	g.initSpecLinux()
-	g.spec.Linux.ReadonlyPaths = append(g.spec.Linux.ReadonlyPaths, path)
+	g.initConfigLinux()
+	g.Config.Linux.ReadonlyPaths = append(g.Config.Linux.ReadonlyPaths, path)
+}
+
+func addOrReplaceBlockIOThrottleDevice(tmpList []rspec.LinuxThrottleDevice, major int64, minor int64, rate uint64) []rspec.LinuxThrottleDevice {
+	throttleDevices := tmpList
+	for i, throttleDevice := range throttleDevices {
+		if throttleDevice.Major == major && throttleDevice.Minor == minor {
+			throttleDevices[i].Rate = rate
+			return throttleDevices
+		}
+	}
+	throttleDevice := new(rspec.LinuxThrottleDevice)
+	throttleDevice.Major = major
+	throttleDevice.Minor = minor
+	throttleDevice.Rate = rate
+	throttleDevices = append(throttleDevices, *throttleDevice)
+
+	return throttleDevices
+}
+
+func dropBlockIOThrottleDevice(tmpList []rspec.LinuxThrottleDevice, major int64, minor int64) []rspec.LinuxThrottleDevice {
+	throttleDevices := tmpList
+	for i, throttleDevice := range throttleDevices {
+		if throttleDevice.Major == major && throttleDevice.Minor == minor {
+			throttleDevices = append(throttleDevices[:i], throttleDevices[i+1:]...)
+			return throttleDevices
+		}
+	}
+
+	return throttleDevices
+}
+
+// AddSolarisAnet adds network into g.Config.Solaris.Anet
+func (g *Generator) AddSolarisAnet(anet rspec.SolarisAnet) {
+	g.initConfigSolaris()
+	g.Config.Solaris.Anet = append(g.Config.Solaris.Anet, anet)
+}
+
+// SetSolarisCappedCPUNcpus sets g.Config.Solaris.CappedCPU.Ncpus
+func (g *Generator) SetSolarisCappedCPUNcpus(ncpus string) {
+	g.initConfigSolarisCappedCPU()
+	g.Config.Solaris.CappedCPU.Ncpus = ncpus
+}
+
+// SetSolarisCappedMemoryPhysical sets g.Config.Solaris.CappedMemory.Physical
+func (g *Generator) SetSolarisCappedMemoryPhysical(physical string) {
+	g.initConfigSolarisCappedMemory()
+	g.Config.Solaris.CappedMemory.Physical = physical
+}
+
+// SetSolarisCappedMemorySwap sets g.Config.Solaris.CappedMemory.Swap
+func (g *Generator) SetSolarisCappedMemorySwap(swap string) {
+	g.initConfigSolarisCappedMemory()
+	g.Config.Solaris.CappedMemory.Swap = swap
+}
+
+// SetSolarisLimitPriv sets g.Config.Solaris.LimitPriv
+func (g *Generator) SetSolarisLimitPriv(limitPriv string) {
+	g.initConfigSolaris()
+	g.Config.Solaris.LimitPriv = limitPriv
+}
+
+// SetSolarisMaxShmMemory sets g.Config.Solaris.MaxShmMemory
+func (g *Generator) SetSolarisMaxShmMemory(memory string) {
+	g.initConfigSolaris()
+	g.Config.Solaris.MaxShmMemory = memory
+}
+
+// SetSolarisMilestone sets g.Config.Solaris.Milestone
+func (g *Generator) SetSolarisMilestone(milestone string) {
+	g.initConfigSolaris()
+	g.Config.Solaris.Milestone = milestone
+}
+
+// SetWindowsHypervUntilityVMPath sets g.Config.Windows.HyperV.UtilityVMPath.
+func (g *Generator) SetWindowsHypervUntilityVMPath(path string) {
+	g.initConfigWindowsHyperV()
+	g.Config.Windows.HyperV.UtilityVMPath = path
+}
+
+// SetWinodwsIgnoreFlushesDuringBoot sets g.Config.Winodws.IgnoreFlushesDuringBoot.
+func (g *Generator) SetWinodwsIgnoreFlushesDuringBoot(ignore bool) {
+	g.initConfigWindows()
+	g.Config.Windows.IgnoreFlushesDuringBoot = ignore
+}
+
+// AddWindowsLayerFolders adds layer folders into  g.Config.Windows.LayerFolders.
+func (g *Generator) AddWindowsLayerFolders(folder string) {
+	g.initConfigWindows()
+	g.Config.Windows.LayerFolders = append(g.Config.Windows.LayerFolders, folder)
+}
+
+// SetWindowsNetwork sets g.Config.Windows.Network.
+func (g *Generator) SetWindowsNetwork(network rspec.WindowsNetwork) {
+	g.initConfigWindows()
+	g.Config.Windows.Network = &network
+}
+
+// SetWindowsResourcesCPU sets g.Config.Windows.Resources.CPU.
+func (g *Generator) SetWindowsResourcesCPU(cpu rspec.WindowsCPUResources) {
+	g.initConfigWindowsResources()
+	g.Config.Windows.Resources.CPU = &cpu
+}
+
+// SetWindowsResourcesMemoryLimit sets g.Config.Windows.Resources.Memory.Limit.
+func (g *Generator) SetWindowsResourcesMemoryLimit(limit uint64) {
+	g.initConfigWindowsResourcesMemory()
+	g.Config.Windows.Resources.Memory.Limit = &limit
+}
+
+// SetWindowsResourcesStorage sets g.Config.Windows.Resources.Storage.
+func (g *Generator) SetWindowsResourcesStorage(storage rspec.WindowsStorageResources) {
+	g.initConfigWindowsResources()
+	g.Config.Windows.Resources.Storage = &storage
+}
+
+// SetWinodwsServicing sets g.Config.Winodws.Servicing.
+func (g *Generator) SetWinodwsServicing(servicing bool) {
+	g.initConfigWindows()
+	g.Config.Windows.Servicing = servicing
 }

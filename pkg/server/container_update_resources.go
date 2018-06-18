@@ -157,5 +157,5 @@ func updateOCILinuxResource(spec *runtimespec.Spec, new *runtime.LinuxContainerR
 		g.SetLinuxResourcesCPUMems(new.GetCpusetMems())
 	}
 
-	return g.Spec(), nil
+	return g.Config, nil
 }

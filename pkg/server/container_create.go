@@ -376,7 +376,7 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 	// is not clearly defined in Kubernetes.
 	// See https://github.com/kubernetes/kubernetes/issues/56374
 	// Keep docker's behavior for now.
-	g.Spec().Process.Capabilities.Ambient = []string{}
+	g.Config.Process.Capabilities.Ambient = []string{}
 
 	g.SetProcessSelinuxLabel(processLabel)
 	g.SetLinuxMountLabel(mountLabel)
@@ -407,7 +407,7 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 	g.AddAnnotation(annotations.ContainerType, annotations.ContainerTypeContainer)
 	g.AddAnnotation(annotations.SandboxID, sandboxID)
 
-	return g.Spec(), nil
+	return g.Config, nil
 }
 
 // generateVolumeMounts sets up image volumes for container. Rely on the removal of container
@@ -533,7 +533,7 @@ func clearReadOnly(m *runtimespec.Mount) {
 
 // addDevices set device mapping without privilege.
 func (c *criService) addOCIDevices(g *generate.Generator, devs []*runtime.Device) error {
-	spec := g.Spec()
+	spec := g.Config
 	for _, device := range devs {
 		path, err := c.os.ResolveSymbolicLink(device.HostPath)
 		if err != nil {
@@ -565,7 +565,7 @@ func (c *criService) addOCIDevices(g *generate.Generator, devs []*runtime.Device
 
 // addDevices set device mapping with privilege.
 func setOCIDevicesPrivileged(g *generate.Generator) error {
-	spec := g.Spec()
+	spec := g.Config
 	hostDevices, err := devices.HostDevices()
 	if err != nil {
 		return err
@@ -597,7 +597,12 @@ func setOCIDevicesPrivileged(g *generate.Generator) error {
 // addOCIBindMounts adds bind mounts.
 func (c *criService) addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount, mountLabel string) error {
 	// Mount cgroup into the container as readonly, which inherits docker's behavior.
-	g.AddCgroupsMount("ro") // nolint: errcheck
+	g.AddMount(runtimespec.Mount{
+		Source:      "cgroup",
+		Destination: "/sys/fs/cgroup",
+		Type:        "cgroup",
+		Options:     []string{"nosuid", "noexec", "nodev", "relatime", "ro"},
+	})
 	for _, mount := range mounts {
 		dst := mount.GetContainerPath()
 		src := mount.GetHostPath()
@@ -635,8 +640,8 @@ func (c *criService) addOCIBindMounts(g *generate.Generator, mounts []*runtime.M
 				return err
 			}
 			options = append(options, "rslave")
-			if g.Spec().Linux.RootfsPropagation != "rshared" &&
-				g.Spec().Linux.RootfsPropagation != "rslave" {
+			if g.Config.Linux.RootfsPropagation != "rshared" &&
+				g.Config.Linux.RootfsPropagation != "rslave" {
 				g.SetLinuxRootPropagation("rslave") // nolint: errcheck
 			}
 		default:
@@ -657,14 +662,19 @@ func (c *criService) addOCIBindMounts(g *generate.Generator, mounts []*runtime.M
 				return errors.Wrapf(err, "relabel %q with %q failed", src, mountLabel)
 			}
 		}
-		g.AddBindMount(src, dst, options)
+		g.AddMount(runtimespec.Mount{
+			Source:      src,
+			Destination: dst,
+			Type:        "bind",
+			Options:     options,
+		})
 	}
 
 	return nil
 }
 
 func setOCIBindMountsPrivileged(g *generate.Generator) {
-	spec := g.Spec()
+	spec := g.Config
 	// clear readonly for /sys and cgroup
 	for i, m := range spec.Mounts {
 		if spec.Mounts[i].Destination == "/sys" {
@@ -704,6 +714,40 @@ func getOCICapabilitiesList() []string {
 	return caps
 }
 
+// Adds capabilities to all sets relevant to root (bounding, permitted, effective, inheritable)
+func addProcessRootCapability(g *generate.Generator, c string) error {
+	if err := g.AddProcessCapabilityBounding(c); err != nil {
+		return err
+	}
+	if err := g.AddProcessCapabilityPermitted(c); err != nil {
+		return err
+	}
+	if err := g.AddProcessCapabilityEffective(c); err != nil {
+		return err
+	}
+	if err := g.AddProcessCapabilityInheritable(c); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Drops capabilities to all sets relevant to root (bounding, permitted, effective, inheritable)
+func dropProcessRootCapability(g *generate.Generator, c string) error {
+	if err := g.DropProcessCapabilityBounding(c); err != nil {
+		return err
+	}
+	if err := g.DropProcessCapabilityPermitted(c); err != nil {
+		return err
+	}
+	if err := g.DropProcessCapabilityEffective(c); err != nil {
+		return err
+	}
+	if err := g.DropProcessCapabilityInheritable(c); err != nil {
+		return err
+	}
+	return nil
+}
+
 // setOCICapabilities adds/drops process capabilities.
 func setOCICapabilities(g *generate.Generator, capabilities *runtime.Capability) error {
 	if capabilities == nil {
@@ -716,14 +760,14 @@ func setOCICapabilities(g *generate.Generator, capabilities *runtime.Capability)
 	// will be all capabilities without `CAP_CHOWN`.
 	if util.InStringSlice(capabilities.GetAddCapabilities(), "ALL") {
 		for _, c := range getOCICapabilitiesList() {
-			if err := g.AddProcessCapability(c); err != nil {
+			if err := addProcessRootCapability(g, c); err != nil {
 				return err
 			}
 		}
 	}
 	if util.InStringSlice(capabilities.GetDropCapabilities(), "ALL") {
 		for _, c := range getOCICapabilitiesList() {
-			if err := g.DropProcessCapability(c); err != nil {
+			if err := dropProcessRootCapability(g, c); err != nil {
 				return err
 			}
 		}
@@ -734,7 +778,7 @@ func setOCICapabilities(g *generate.Generator, capabilities *runtime.Capability)
 			continue
 		}
 		// Capabilities in CRI doesn't have `CAP_` prefix, so add it.
-		if err := g.AddProcessCapability("CAP_" + strings.ToUpper(c)); err != nil {
+		if err := addProcessRootCapability(g, "CAP_"+strings.ToUpper(c)); err != nil {
 			return err
 		}
 	}
@@ -743,7 +787,7 @@ func setOCICapabilities(g *generate.Generator, capabilities *runtime.Capability)
 		if strings.ToUpper(c) == "ALL" {
 			continue
 		}
-		if err := g.DropProcessCapability("CAP_" + strings.ToUpper(c)); err != nil {
+		if err := dropProcessRootCapability(g, "CAP_"+strings.ToUpper(c)); err != nil {
 			return err
 		}
 	}
