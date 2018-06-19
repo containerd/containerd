@@ -47,6 +47,6 @@ func (f *FakeCNIPlugin) Status() error {
 }
 
 // Load loads the network config.
-func (f *FakeCNIPlugin) Load(opts ...cni.LoadOption) error {
+func (f *FakeCNIPlugin) Load(opts ...cni.CNIOpt) error {
 	return f.LoadErr
 }
