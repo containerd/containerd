@@ -154,6 +154,7 @@ if [ -n "${network_policy_provider}" ] && [ "${network_policy_provider}" != "non
   cni_template_path=""
 fi
 log_level="${CONTAINERD_LOG_LEVEL:-"info"}"
+max_container_log_line="${CONTAINERD_MAX_CONTAINER_LOG_LINE:-16384}"
 cat > ${config_path} <<EOF
 # Kubernetes doesn't use containerd restart manager.
 disabled_plugins = ["restart"]
@@ -165,6 +166,8 @@ disabled_plugins = ["restart"]
   shim = "${CONTAINERD_HOME}/usr/local/bin/containerd-shim"
   runtime = "${CONTAINERD_HOME}/usr/local/sbin/runc"
 
+[plugins.cri]
+  max_container_log_line_size = ${max_container_log_line}
 [plugins.cri.cni]
   bin_dir = "${cni_bin_dir}"
   conf_dir = "/etc/cni/net.d"
