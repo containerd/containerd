@@ -94,7 +94,7 @@ This tool should be ran from the root of the project repository for a new releas
 		if err != nil {
 			return err
 		}
-		logrus.Info("Welcome to the %s release tool...", r.ProjectName)
+		logrus.Infof("Welcome to the %s release tool...", r.ProjectName)
 		previous, err := getPreviousDeps(r.Previous)
 		if err != nil {
 			return err

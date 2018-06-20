@@ -134,7 +134,7 @@ func checkContentLeased(ctx context.Context, db *DB, dgst digest.Digest) error {
 	return db.View(func(tx *bolt.Tx) error {
 		bkt := getBucket(tx, bucketKeyVersion, []byte(ns), bucketKeyObjectLeases, []byte(lease), bucketKeyObjectContent)
 		if bkt == nil {
-			return errors.Wrapf(errdefs.ErrNotFound, "bucket not found", lease)
+			return errors.Wrapf(errdefs.ErrNotFound, "bucket not found %s", lease)
 		}
 		v := bkt.Get([]byte(dgst.String()))
 		if v == nil {
