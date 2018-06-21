@@ -1,7 +1,10 @@
+[![Build Status](https://travis-ci.org/containerd/go-cni.svg?branch=master)](https://travis-ci.org/containerd/go-cni)
+
 # go-cni
 
 A generic CNI library to provide APIs for CNI plugin interactions. The library provides APIs to:
 
+- Load CNI network config from different sources  
 - Setup networks for container namespace
 - Remove networks from container namespace
 - Query status of CNI network plugin initialization
@@ -16,11 +19,17 @@ func main() {
 	defaultIfName := "eth0"
 	// Initialize library
 	l = gocni.New(gocni.WithMinNetworkCount(2),
-		gocni.WithLoNetwork(),
 		gocni.WithPluginConfDir("/etc/mycni/net.d"),
 		gocni.WithPluginDir([]string{"/opt/mycni/bin", "/opt/cni/bin"}),
 		gocni.WithDefaultIfName(defaultIfName))
-
+	
+	// Load the cni configuration
+	err:= l.Load(gocni.WithLoNetwork,gocni.WithDefaultConf)
+        if err != nil{
+		log.Errorf("failed to load cni configuration: %v", err)
+		return 
+	}
+	
 	// Setup network for namespace.
 	labels := map[string]string{
 		"K8S_POD_NAMESPACE":          "namespace1",
@@ -29,16 +38,10 @@ func main() {
 	}
 	result, err := l.Setup(id, netns, gocni.WithLabels(labels))
 	if err != nil {
-		return nil, fmt.Errorf("failed to setup network for namespace %q: %v", id, err)
+		log.Errorf("failed to setup network for namespace %q: %v",id, err)
+		return 
 	}
-	defer func() {
-		if retErr != nil {
-			// Teardown network if an error is returned.
-			if err := l.Remove(id, netns, gocni.WithLabels(labels)); err != nil {
-				fmt.Errorf("Failed to destroy network for namespace %q", id)
-			}
-		}
-	}()
+	
 	// Get IP of the default interface
 	IP := result.Interfaces[defaultIfName].IPConfigs[0].IP.String()
 	fmt.Printf("IP of the default interface %s:%s", defaultIfName, IP)
