@@ -1,0 +1,37 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+
+# previous release
+previous = "v1.1.0"
+
+pre_release = true
+
+preface = """\
+This is the first patch release for the `containerd` 1.1 release. This
+includes bug fixes related to CRI, image pull, and native snapshotter.
+
+## CRI Plugin
+Fixes for working set memory calculation, privileged container creation and
+image volume directory ownership.
+Fix a bug that container running as non-root will get capabilities added by
+user. This is fixed to keep the behavior consistent with Docker.
+Fix double mount of /dev/shm.
+Fix startup panic when overlayfs fails to load, now cri plugin will just fail.
+
+## Image Pull
+Fix for a size validation bug with some registries which impacts the
+CRI plugin and clients.
+
+## Native Snapshotter
+Fix for bug in layers containing large files.
+
+Please see the changelog for full details.
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
