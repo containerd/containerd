@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/containerd/containerd"
@@ -61,6 +62,67 @@ var (
 		cli.StringFlag{
 			Name:  "refresh",
 			Usage: "refresh token for authorization server",
+		},
+	}
+
+	// ContainerFlags are cli flags specifying container options
+	ContainerFlags = []cli.Flag{
+		cli.StringFlag{
+			Name:  "config,c",
+			Usage: "path to the runtime-specific spec config file",
+		},
+		cli.StringFlag{
+			Name:  "checkpoint",
+			Usage: "provide the checkpoint digest to restore the container",
+		},
+		cli.StringFlag{
+			Name:  "cwd",
+			Usage: "specify the working directory of the process",
+		},
+		cli.StringSliceFlag{
+			Name:  "env",
+			Usage: "specify additional container environment variables (i.e. FOO=bar)",
+		},
+		cli.StringSliceFlag{
+			Name:  "label",
+			Usage: "specify additional labels (i.e. foo=bar)",
+		},
+		cli.StringSliceFlag{
+			Name:  "mount",
+			Usage: "specify additional container mount (ex: type=bind,src=/tmp,dst=/host,options=rbind:ro)",
+		},
+		cli.BoolFlag{
+			Name:  "net-host",
+			Usage: "enable host networking for the container",
+		},
+		cli.BoolFlag{
+			Name:  "privileged",
+			Usage: "run privileged container",
+		},
+		cli.BoolFlag{
+			Name:  "read-only",
+			Usage: "set the containers filesystem as readonly",
+		},
+		cli.StringFlag{
+			Name:  "runtime",
+			Usage: "runtime name (io.containerd.runtime.v1.linux, io.containerd.runtime.v1.windows, io.containerd.runtime.v1.com.vmware.linux)",
+			Value: fmt.Sprintf("io.containerd.runtime.v1.%s", runtime.GOOS),
+		},
+		cli.BoolFlag{
+			Name:  "tty,t",
+			Usage: "allocate a TTY for the container",
+		},
+		cli.StringSliceFlag{
+			Name:  "with-ns",
+			Usage: "specify existing Linux namespaces to join at container runtime (format '<nstype>:<path>')",
+		},
+		cli.StringFlag{
+			Name:  "pid-file",
+			Usage: "file path to write the task's pid",
+		},
+		cli.IntFlag{
+			Name:  "gpus",
+			Usage: "add gpus to the container",
 		},
 	}
 )
