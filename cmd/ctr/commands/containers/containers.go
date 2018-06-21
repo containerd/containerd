@@ -49,7 +49,7 @@ var createCommand = cli.Command{
 	Name:      "create",
 	Usage:     "create container",
 	ArgsUsage: "[flags] Image|RootFS CONTAINER",
-	Flags:     append(commands.SnapshotterFlags, run.ContainerFlags...),
+	Flags:     append(commands.SnapshotterFlags, commands.ContainerFlags...),
 	Action: func(context *cli.Context) error {
 		var (
 			id  = context.Args().Get(1)
