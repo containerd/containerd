@@ -394,7 +394,12 @@ func (c *criService) generateSandboxContainerSpec(id string, config *runtime.Pod
 	if nsOptions.GetIpc() == runtime.NamespaceMode_NODE {
 		sandboxDevShm = devShm
 	}
-	g.AddBindMount(sandboxDevShm, devShm, []string{"rbind", "ro"})
+	g.AddMount(runtimespec.Mount{
+		Source:      sandboxDevShm,
+		Destination: devShm,
+		Type:        "bind",
+		Options:     []string{"rbind", "ro"},
+	})
 
 	selinuxOpt := securityContext.GetSelinuxOptions()
 	processLabel, mountLabel, err := initSelinuxOpts(selinuxOpt)
@@ -423,7 +428,7 @@ func (c *criService) generateSandboxContainerSpec(id string, config *runtime.Pod
 	g.AddAnnotation(annotations.ContainerType, annotations.ContainerTypeSandbox)
 	g.AddAnnotation(annotations.SandboxID, id)
 
-	return g.Spec(), nil
+	return g.Config, nil
 }
 
 // setupSandboxFiles sets up necessary sandbox files including /dev/shm, /etc/hosts

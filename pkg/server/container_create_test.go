@@ -426,18 +426,19 @@ func TestContainerSpecCommand(t *testing.T) {
 	} {
 
 		config, _, imageConfig, _ := getCreateContainerTestData()
-		g := generate.New()
+		g, err := generate.New("linux")
+		assert.NoError(t, err)
 		config.Command = test.criEntrypoint
 		config.Args = test.criArgs
 		imageConfig.Entrypoint = test.imageEntrypoint
 		imageConfig.Cmd = test.imageArgs
-		err := setOCIProcessArgs(&g, config, imageConfig)
+		err = setOCIProcessArgs(&g, config, imageConfig)
 		if test.expectErr {
 			assert.Error(t, err)
 			continue
 		}
 		assert.NoError(t, err)
-		assert.Equal(t, test.expected, g.Spec().Process.Args, desc)
+		assert.Equal(t, test.expected, g.Config.Process.Args, desc)
 	}
 }
 
@@ -620,13 +621,14 @@ func TestPrivilegedBindMount(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		g := generate.New()
+		g, err := generate.New("linux")
+		assert.NoError(t, err)
 		c := newTestCRIService()
 		c.addOCIBindMounts(&g, nil, "")
 		if test.privileged {
 			setOCIBindMountsPrivileged(&g)
 		}
-		spec := g.Spec()
+		spec := g.Config
 		if test.expectedSysFSRO {
 			checkMount(t, spec.Mounts, "sysfs", "/sys", "sysfs", []string{"ro"}, []string{"rw"})
 		} else {
@@ -728,15 +730,16 @@ func TestMountPropagation(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		g := generate.New()
+		g, err := generate.New("linux")
+		assert.NoError(t, err)
 		c := newTestCRIService()
 		c.os.(*ostesting.FakeOS).LookupMountFn = test.fakeLookupMountFn
-		err := c.addOCIBindMounts(&g, []*runtime.Mount{test.criMount}, "")
+		err = c.addOCIBindMounts(&g, []*runtime.Mount{test.criMount}, "")
 		if test.expectErr {
 			require.Error(t, err)
 		} else {
 			require.NoError(t, err)
-			checkMount(t, g.Spec().Mounts, test.criMount.HostPath, test.criMount.ContainerPath, "bind", test.optionsCheck, nil)
+			checkMount(t, g.Config.Mounts, test.criMount.HostPath, test.criMount.ContainerPath, "bind", test.optionsCheck, nil)
 		}
 	}
 }
