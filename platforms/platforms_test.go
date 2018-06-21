@@ -17,7 +17,6 @@
 package platforms
 
 import (
-	"fmt"
 	"reflect"
 	"runtime"
 	"testing"
@@ -35,6 +34,7 @@ func TestParseSelector(t *testing.T) {
 		skip      bool
 		input     string
 		expected  specs.Platform
+		matches   []specs.Platform
 		formatted string
 	}{
 		// While wildcards are a valid use case for platform selection,
@@ -66,7 +66,71 @@ func TestParseSelector(t *testing.T) {
 				OS:           "*",
 				Architecture: "arm64",
 			},
+			matches: []specs.Platform{
+				{
+					OS:           "*",
+					Architecture: "aarch64",
+				},
+				{
+					OS:           "*",
+					Architecture: "aarch64",
+					Variant:      "v8",
+				},
+				{
+					OS:           "*",
+					Architecture: "arm64",
+					Variant:      "v8",
+				},
+			},
 			formatted: "*/arm64",
+		},
+		{
+			input: "linux/arm64",
+			expected: specs.Platform{
+				OS:           "linux",
+				Architecture: "arm64",
+			},
+			matches: []specs.Platform{
+				{
+					OS:           "linux",
+					Architecture: "aarch64",
+				},
+				{
+					OS:           "linux",
+					Architecture: "aarch64",
+					Variant:      "v8",
+				},
+				{
+					OS:           "linux",
+					Architecture: "arm64",
+					Variant:      "v8",
+				},
+			},
+			formatted: "linux/arm64",
+		},
+		{
+			input: "linux/arm64/v8",
+			expected: specs.Platform{
+				OS:           "linux",
+				Architecture: "arm64",
+				Variant:      "v8",
+			},
+			matches: []specs.Platform{
+				{
+					OS:           "linux",
+					Architecture: "aarch64",
+				},
+				{
+					OS:           "linux",
+					Architecture: "aarch64",
+					Variant:      "v8",
+				},
+				{
+					OS:           "linux",
+					Architecture: "arm64",
+				},
+			},
+			formatted: "linux/arm64/v8",
 		},
 		{
 			// NOTE(stevvooe): In this case, the consumer can assume this is v7
@@ -77,6 +141,22 @@ func TestParseSelector(t *testing.T) {
 				OS:           "linux",
 				Architecture: "arm",
 			},
+			matches: []specs.Platform{
+				{
+					OS:           "linux",
+					Architecture: "arm",
+					Variant:      "v7",
+				},
+				{
+					OS:           "linux",
+					Architecture: "armhf",
+				},
+				{
+					OS:           "linux",
+					Architecture: "arm",
+					Variant:      "7",
+				},
+			},
 			formatted: "linux/arm",
 		},
 		{
@@ -86,6 +166,12 @@ func TestParseSelector(t *testing.T) {
 				Architecture: "arm",
 				Variant:      "v6",
 			},
+			matches: []specs.Platform{
+				{
+					OS:           "linux",
+					Architecture: "armel",
+				},
+			},
 			formatted: "linux/arm/v6",
 		},
 		{
@@ -94,6 +180,16 @@ func TestParseSelector(t *testing.T) {
 				OS:           "linux",
 				Architecture: "arm",
 				Variant:      "v7",
+			},
+			matches: []specs.Platform{
+				{
+					OS:           "linux",
+					Architecture: "arm",
+				},
+				{
+					OS:           "linux",
+					Architecture: "armhf",
+				},
 			},
 			formatted: "linux/arm/v7",
 		},
@@ -204,11 +300,12 @@ func TestParseSelector(t *testing.T) {
 
 			// ensure that match works on the input to the output.
 			if ok := m.Match(testcase.expected); !ok {
-				t.Fatalf("expected specifier %q matches %v", testcase.input, testcase.expected)
+				t.Fatalf("expected specifier %q matches %#v", testcase.input, testcase.expected)
 			}
-
-			if fmt.Sprint(m) != testcase.formatted {
-				t.Fatalf("unexpected matcher string:  %q != %q", fmt.Sprint(m), testcase.formatted)
+			for _, mc := range testcase.matches {
+				if ok := m.Match(mc); !ok {
+					t.Fatalf("expected specifier %q matches %#v", testcase.input, mc)
+				}
 			}
 
 			formatted := Format(p)
