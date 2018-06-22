@@ -33,6 +33,7 @@ func createDefaultSpec(ctx context.Context, id string) (*Spec, error) {
 				Height: 20,
 			},
 		},
+		Hostname: id,
 		Windows: &specs.Windows{
 			IgnoreFlushesDuringBoot: true,
 			Network: &specs.WindowsNetwork{

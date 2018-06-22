@@ -246,18 +246,20 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, root
 			r.pidPool.Put(pid)
 		}
 	}()
-
-	if err := mount.All(rootfs, ""); err != nil {
-		return nil, errors.Wrap(err, "failed to mount rootfs")
-	}
-	defer func() {
-		if err != nil {
-			if err := mount.UnmountAll(rootfs[0].Source, 0); err != nil {
-				log.G(ctx).WithError(err).WithField("path", rootfs[0].Source).
-					Warn("failed to unmount rootfs on failure")
-			}
+	// don't mount for hyperv containers
+	if spec.Windows.HyperV == nil {
+		if err := mount.All(rootfs, ""); err != nil {
+			return nil, errors.Wrap(err, "failed to mount rootfs")
 		}
-	}()
+		defer func() {
+			if err != nil {
+				if err := mount.UnmountAll(rootfs[0].Source, 0); err != nil {
+					log.G(ctx).WithError(err).WithField("path", rootfs[0].Source).
+						Warn("failed to unmount rootfs on failure")
+				}
+			}
+		}()
+	}
 
 	var (
 		conf *hcsshim.ContainerConfig

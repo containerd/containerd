@@ -181,7 +181,7 @@ var Command = cli.Command{
 			Name:  "fifo-dir",
 			Usage: "directory used for storing IO FIFOs",
 		},
-	}, append(commands.SnapshotterFlags, ContainerFlags...)...),
+	}, append(commands.SnapshotterFlags, append(ContainerFlags, platformFlags...)...)...),
 	Action: func(context *cli.Context) error {
 		var (
 			err error

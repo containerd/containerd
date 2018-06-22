@@ -29,6 +29,13 @@ import (
 	"github.com/urfave/cli"
 )
 
+var platformFlags = []cli.Flag{
+	cli.BoolFlag{
+		Name:  "hyperv",
+		Usage: "enable Hyper-V isolation for a Windows container",
+	},
+}
+
 func withTTY(terminal bool) oci.SpecOpts {
 	if !terminal {
 		return func(ctx gocontext.Context, client oci.Client, c *containers.Container, s *specs.Spec) error {
@@ -67,6 +74,9 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	opts = append(opts, oci.WithEnv(context.StringSlice("env")))
 	opts = append(opts, withMounts(context))
 	opts = append(opts, withTTY(context.Bool("tty")))
+	if context.Bool("hyperv") {
+		opts = append(opts, oci.WithHyperV)
+	}
 	if len(args) > 0 {
 		opts = append(opts, oci.WithProcessArgs(args...))
 	}
