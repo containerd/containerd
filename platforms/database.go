@@ -92,8 +92,8 @@ func normalizeArch(arch, variant string) (string, string) {
 	case "aarch64", "arm64":
 		arch = "arm64"
 		switch variant {
-		case "", "8":
-			variant = "v8"
+		case "8", "v8":
+			variant = ""
 		}
 	case "armhf":
 		arch = "arm"
@@ -111,16 +111,4 @@ func normalizeArch(arch, variant string) (string, string) {
 	}
 
 	return arch, variant
-}
-
-// defaultVariant detects default variants on normalized arch/variant
-func defaultVariant(arch, variant string) bool {
-	switch arch {
-	case "arm64":
-		return variant == "v8"
-	case "arm":
-		return variant == "v7"
-	default:
-		return true
-	}
 }
