@@ -37,8 +37,12 @@ var ociHook = cli.Command{
 		if err != nil {
 			return err
 		}
+		spec, err := loadSpec(state.Bundle)
+		if err != nil {
+			return err
+		}
 		var (
-			ctx  = newTemplateContext(state)
+			ctx  = newTemplateContext(state, spec)
 			args = []string(context.Args())
 			env  = os.Environ()
 		)
@@ -52,6 +56,25 @@ var ociHook = cli.Command{
 	},
 }
 
+type hookSpec struct {
+	Root struct {
+		Path string `json:"path"`
+	} `json:"root"`
+}
+
+func loadSpec(bundle string) (*hookSpec, error) {
+	f, err := os.Open(filepath.Join(bundle, "config.json"))
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	var s hookSpec
+	if err := json.NewDecoder(f).Decode(&s); err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
 func loadHookState(r io.Reader) (*specs.State, error) {
 	var s specs.State
 	if err := json.NewDecoder(r).Decode(&s); err != nil {
@@ -60,9 +83,10 @@ func loadHookState(r io.Reader) (*specs.State, error) {
 	return &s, nil
 }
 
-func newTemplateContext(state *specs.State) *templateContext {
+func newTemplateContext(state *specs.State, spec *hookSpec) *templateContext {
 	t := &templateContext{
 		state: state,
+		root:  spec.Root.Path,
 	}
 	t.funcs = template.FuncMap{
 		"id":         t.id,
@@ -77,6 +101,7 @@ func newTemplateContext(state *specs.State) *templateContext {
 
 type templateContext struct {
 	state *specs.State
+	root  string
 	funcs template.FuncMap
 }
 
@@ -89,7 +114,10 @@ func (t *templateContext) bundle() string {
 }
 
 func (t *templateContext) rootfs() string {
-	return filepath.Join(t.state.Bundle, "rootfs")
+	if filepath.IsAbs(t.root) {
+		return t.root
+	}
+	return filepath.Join(t.state.Bundle, t.root)
 }
 
 func (t *templateContext) pid() int {
