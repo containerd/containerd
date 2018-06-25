@@ -31,16 +31,6 @@ import (
 	"github.com/urfave/cli"
 )
 
-func init() {
-	ContainerFlags = append(ContainerFlags, cli.BoolFlag{
-		Name:  "rootfs",
-		Usage: "use custom rootfs that is not managed by containerd snapshotter",
-	}, cli.BoolFlag{
-		Name:  "no-pivot",
-		Usage: "disable use of pivot-root (linux only)",
-	})
-}
-
 // NewContainer creates a new container
 func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli.Context) (containerd.Container, error) {
 	var (
