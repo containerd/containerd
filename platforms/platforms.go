@@ -197,7 +197,7 @@ func Parse(specifier string) (specs.Platform, error) {
 		}
 
 		p.Architecture, p.Variant = normalizeArch(parts[0], "")
-		if defaultVariant(p.Architecture, p.Variant) {
+		if p.Architecture == "arm" && p.Variant == "v7" {
 			p.Variant = ""
 		}
 		if isKnownArch(p.Architecture) {
@@ -211,7 +211,7 @@ func Parse(specifier string) (specs.Platform, error) {
 		// about whether or not we know of the platform.
 		p.OS = normalizeOS(parts[0])
 		p.Architecture, p.Variant = normalizeArch(parts[1], "")
-		if defaultVariant(p.Architecture, p.Variant) {
+		if p.Architecture == "arm" && p.Variant == "v7" {
 			p.Variant = ""
 		}
 
@@ -220,6 +220,9 @@ func Parse(specifier string) (specs.Platform, error) {
 		// we have a fully specified variant, this is rare
 		p.OS = normalizeOS(parts[0])
 		p.Architecture, p.Variant = normalizeArch(parts[1], parts[2])
+		if p.Architecture == "arm64" && p.Variant == "" {
+			p.Variant = "v8"
+		}
 
 		return p, nil
 	}
