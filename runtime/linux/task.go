@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/identifiers"
-	"github.com/containerd/containerd/runtime"
+	gruntime "github.com/containerd/containerd/runtime/generic"
 	"github.com/containerd/containerd/runtime/shim/client"
 	shim "github.com/containerd/containerd/runtime/shim/v1"
 	runc "github.com/containerd/go-runc"
@@ -45,12 +45,12 @@ type Task struct {
 	shim      *client.Client
 	namespace string
 	cg        cgroups.Cgroup
-	monitor   runtime.TaskMonitor
+	monitor   gruntime.TaskMonitor
 	events    *exchange.Exchange
 	runtime   *runc.Runc
 }
 
-func newTask(id, namespace string, pid int, shim *client.Client, monitor runtime.TaskMonitor, events *exchange.Exchange, runtime *runc.Runc) (*Task, error) {
+func newTask(id, namespace string, pid int, shim *client.Client, monitor gruntime.TaskMonitor, events *exchange.Exchange, runtime *runc.Runc) (*Task, error) {
 	var (
 		err error
 		cg  cgroups.Cgroup
@@ -79,8 +79,8 @@ func (t *Task) ID() string {
 }
 
 // Info returns task information about the runtime and namespace
-func (t *Task) Info() runtime.TaskInfo {
-	return runtime.TaskInfo{
+func (t *Task) Info() gruntime.TaskInfo {
+	return gruntime.TaskInfo{
 		ID:        t.id,
 		Runtime:   pluginID,
 		Namespace: t.namespace,
@@ -111,7 +111,7 @@ func (t *Task) Start(ctx context.Context) error {
 			return err
 		}
 	}
-	t.events.Publish(ctx, runtime.TaskStartEventTopic, &eventstypes.TaskStart{
+	t.events.Publish(ctx, gruntime.TaskStartEventTopic, &eventstypes.TaskStart{
 		ContainerID: t.id,
 		Pid:         uint32(t.pid),
 	})
@@ -119,30 +119,30 @@ func (t *Task) Start(ctx context.Context) error {
 }
 
 // State returns runtime information for the task
-func (t *Task) State(ctx context.Context) (runtime.State, error) {
+func (t *Task) State(ctx context.Context) (gruntime.State, error) {
 	response, err := t.shim.State(ctx, &shim.StateRequest{
 		ID: t.id,
 	})
 	if err != nil {
 		if errors.Cause(err) != ttrpc.ErrClosed {
-			return runtime.State{}, errdefs.FromGRPC(err)
+			return gruntime.State{}, errdefs.FromGRPC(err)
 		}
-		return runtime.State{}, errdefs.ErrNotFound
+		return gruntime.State{}, errdefs.ErrNotFound
 	}
-	var status runtime.Status
+	var status gruntime.Status
 	switch response.Status {
 	case task.StatusCreated:
-		status = runtime.CreatedStatus
+		status = gruntime.CreatedStatus
 	case task.StatusRunning:
-		status = runtime.RunningStatus
+		status = gruntime.RunningStatus
 	case task.StatusStopped:
-		status = runtime.StoppedStatus
+		status = gruntime.StoppedStatus
 	case task.StatusPaused:
-		status = runtime.PausedStatus
+		status = gruntime.PausedStatus
 	case task.StatusPausing:
-		status = runtime.PausingStatus
+		status = gruntime.PausingStatus
 	}
-	return runtime.State{
+	return gruntime.State{
 		Pid:        response.Pid,
 		Status:     status,
 		Stdin:      response.Stdin,
@@ -159,7 +159,7 @@ func (t *Task) Pause(ctx context.Context) error {
 	if _, err := t.shim.Pause(ctx, empty); err != nil {
 		return errdefs.FromGRPC(err)
 	}
-	t.events.Publish(ctx, runtime.TaskPausedEventTopic, &eventstypes.TaskPaused{
+	t.events.Publish(ctx, gruntime.TaskPausedEventTopic, &eventstypes.TaskPaused{
 		ContainerID: t.id,
 	})
 	return nil
@@ -170,7 +170,7 @@ func (t *Task) Resume(ctx context.Context) error {
 	if _, err := t.shim.Resume(ctx, empty); err != nil {
 		return errdefs.FromGRPC(err)
 	}
-	t.events.Publish(ctx, runtime.TaskResumedEventTopic, &eventstypes.TaskResumed{
+	t.events.Publish(ctx, gruntime.TaskResumedEventTopic, &eventstypes.TaskResumed{
 		ContainerID: t.id,
 	})
 	return nil
@@ -191,7 +191,7 @@ func (t *Task) Kill(ctx context.Context, signal uint32, all bool) error {
 }
 
 // Exec creates a new process inside the task
-func (t *Task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runtime.Process, error) {
+func (t *Task) Exec(ctx context.Context, id string, opts gruntime.ExecOpts) (gruntime.Process, error) {
 	if err := identifiers.Validate(id); err != nil {
 		return nil, errors.Wrapf(err, "invalid exec id")
 	}
@@ -213,16 +213,16 @@ func (t *Task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runt
 }
 
 // Pids returns all system level process ids running inside the task
-func (t *Task) Pids(ctx context.Context) ([]runtime.ProcessInfo, error) {
+func (t *Task) Pids(ctx context.Context) ([]gruntime.ProcessInfo, error) {
 	resp, err := t.shim.ListPids(ctx, &shim.ListPidsRequest{
 		ID: t.id,
 	})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
-	var processList []runtime.ProcessInfo
+	var processList []gruntime.ProcessInfo
 	for _, p := range resp.Processes {
-		processList = append(processList, runtime.ProcessInfo{
+		processList = append(processList, gruntime.ProcessInfo{
 			Pid:  p.Pid,
 			Info: p.Info,
 		})
@@ -231,7 +231,7 @@ func (t *Task) Pids(ctx context.Context) ([]runtime.ProcessInfo, error) {
 }
 
 // ResizePty changes the side of the task's PTY to the provided width and height
-func (t *Task) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
+func (t *Task) ResizePty(ctx context.Context, size gruntime.ConsoleSize) error {
 	_, err := t.shim.ResizePty(ctx, &shim.ResizePtyRequest{
 		ID:     t.id,
 		Width:  size.Width,
@@ -264,21 +264,21 @@ func (t *Task) Checkpoint(ctx context.Context, path string, options *types.Any) 
 	if _, err := t.shim.Checkpoint(ctx, r); err != nil {
 		return errdefs.FromGRPC(err)
 	}
-	t.events.Publish(ctx, runtime.TaskCheckpointedEventTopic, &eventstypes.TaskCheckpointed{
+	t.events.Publish(ctx, gruntime.TaskCheckpointedEventTopic, &eventstypes.TaskCheckpointed{
 		ContainerID: t.id,
 	})
 	return nil
 }
 
 // DeleteProcess removes the provided process from the task and deletes all on disk state
-func (t *Task) DeleteProcess(ctx context.Context, id string) (*runtime.Exit, error) {
+func (t *Task) DeleteProcess(ctx context.Context, id string) (*gruntime.Exit, error) {
 	r, err := t.shim.DeleteProcess(ctx, &shim.DeleteProcessRequest{
 		ID: id,
 	})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
-	return &runtime.Exit{
+	return &gruntime.Exit{
 		Status:    r.ExitStatus,
 		Timestamp: r.ExitedAt,
 		Pid:       r.Pid,
@@ -296,7 +296,7 @@ func (t *Task) Update(ctx context.Context, resources *types.Any) error {
 }
 
 // Process returns a specific process inside the task by the process id
-func (t *Task) Process(ctx context.Context, id string) (runtime.Process, error) {
+func (t *Task) Process(ctx context.Context, id string) (gruntime.Process, error) {
 	p := &Process{
 		id: id,
 		t:  t,
@@ -332,14 +332,14 @@ func (t *Task) Cgroup() (cgroups.Cgroup, error) {
 }
 
 // Wait for the task to exit returning the status and timestamp
-func (t *Task) Wait(ctx context.Context) (*runtime.Exit, error) {
+func (t *Task) Wait(ctx context.Context) (*gruntime.Exit, error) {
 	r, err := t.shim.Wait(ctx, &shim.WaitRequest{
 		ID: t.id,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &runtime.Exit{
+	return &gruntime.Exit{
 		Timestamp: r.ExitedAt,
 		Status:    r.ExitStatus,
 	}, nil

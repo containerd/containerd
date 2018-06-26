@@ -39,7 +39,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/runtime"
+	gruntime "github.com/containerd/containerd/runtime/generic"
 	"github.com/containerd/containerd/runtime/linux/proc"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	shim "github.com/containerd/containerd/runtime/shim/v1"
@@ -79,7 +79,7 @@ func init() {
 	})
 }
 
-var _ = (runtime.PlatformRuntime)(&Runtime{})
+var _ = (gruntime.PlatformRuntime)(&Runtime{})
 
 // Config options for the runtime
 type Config struct {
@@ -117,8 +117,8 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	r := &Runtime{
 		root:    ic.Root,
 		state:   ic.State,
-		monitor: monitor.(runtime.TaskMonitor),
-		tasks:   runtime.NewTaskList(),
+		monitor: monitor.(gruntime.TaskMonitor),
+		tasks:   gruntime.NewTaskList(),
 		db:      m.(*metadata.DB),
 		address: ic.Address,
 		events:  ic.Events,
@@ -144,8 +144,8 @@ type Runtime struct {
 	state   string
 	address string
 
-	monitor runtime.TaskMonitor
-	tasks   *runtime.TaskList
+	monitor gruntime.TaskMonitor
+	tasks   *gruntime.TaskList
 	db      *metadata.DB
 	events  *exchange.Exchange
 
@@ -158,7 +158,7 @@ func (r *Runtime) ID() string {
 }
 
 // Create a new task
-func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts) (_ runtime.Task, err error) {
+func (r *Runtime) Create(ctx context.Context, id string, opts gruntime.CreateOpts) (_ gruntime.Task, err error) {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -283,7 +283,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 			return nil, err
 		}
 	}
-	r.events.Publish(ctx, runtime.TaskCreateEventTopic, &eventstypes.TaskCreate{
+	r.events.Publish(ctx, gruntime.TaskCreateEventTopic, &eventstypes.TaskCreate{
 		ContainerID: sopts.ID,
 		Bundle:      sopts.Bundle,
 		Rootfs:      sopts.Rootfs,
@@ -301,7 +301,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 }
 
 // Delete a task removing all on disk state
-func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, error) {
+func (r *Runtime) Delete(ctx context.Context, c gruntime.Task) (*gruntime.Exit, error) {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -334,13 +334,13 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 	if err := bundle.Delete(); err != nil {
 		log.G(ctx).WithError(err).Error("failed to delete bundle")
 	}
-	r.events.Publish(ctx, runtime.TaskDeleteEventTopic, &eventstypes.TaskDelete{
+	r.events.Publish(ctx, gruntime.TaskDeleteEventTopic, &eventstypes.TaskDelete{
 		ContainerID: lc.id,
 		ExitStatus:  rsp.ExitStatus,
 		ExitedAt:    rsp.ExitedAt,
 		Pid:         rsp.Pid,
 	})
-	return &runtime.Exit{
+	return &gruntime.Exit{
 		Status:    rsp.ExitStatus,
 		Timestamp: rsp.ExitedAt,
 		Pid:       rsp.Pid,
@@ -348,7 +348,7 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 }
 
 // Tasks returns all tasks known to the runtime
-func (r *Runtime) Tasks(ctx context.Context) ([]runtime.Task, error) {
+func (r *Runtime) Tasks(ctx context.Context) ([]gruntime.Task, error) {
 	return r.tasks.GetAll(ctx)
 }
 
@@ -374,7 +374,7 @@ func (r *Runtime) restoreTasks(ctx context.Context) ([]*Task, error) {
 }
 
 // Get a specific task by task id
-func (r *Runtime) Get(ctx context.Context, id string) (runtime.Task, error) {
+func (r *Runtime) Get(ctx context.Context, id string) (gruntime.Task, error) {
 	return r.tasks.Get(ctx, id)
 }
 
@@ -444,7 +444,7 @@ func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, 
 
 	// Notify Client
 	exitedAt := time.Now().UTC()
-	r.events.Publish(ctx, runtime.TaskExitEventTopic, &eventstypes.TaskExit{
+	r.events.Publish(ctx, gruntime.TaskExitEventTopic, &eventstypes.TaskExit{
 		ContainerID: id,
 		ID:          id,
 		Pid:         uint32(pid),
@@ -457,7 +457,7 @@ func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, 
 		log.G(ctx).WithError(err).Error("delete bundle")
 	}
 
-	r.events.Publish(ctx, runtime.TaskDeleteEventTopic, &eventstypes.TaskDelete{
+	r.events.Publish(ctx, gruntime.TaskDeleteEventTopic, &eventstypes.TaskDelete{
 		ContainerID: id,
 		Pid:         uint32(pid),
 		ExitStatus:  128 + uint32(unix.SIGKILL),

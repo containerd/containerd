@@ -31,7 +31,7 @@ import (
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/runtime"
+	gruntime "github.com/containerd/containerd/runtime/generic"
 	"github.com/containerd/containerd/runtime/linux/proc"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	rproc "github.com/containerd/containerd/runtime/proc"
@@ -521,27 +521,27 @@ func (s *Service) forward(publisher events.Publisher) {
 func getTopic(ctx context.Context, e interface{}) string {
 	switch e.(type) {
 	case *eventstypes.TaskCreate:
-		return runtime.TaskCreateEventTopic
+		return gruntime.TaskCreateEventTopic
 	case *eventstypes.TaskStart:
-		return runtime.TaskStartEventTopic
+		return gruntime.TaskStartEventTopic
 	case *eventstypes.TaskOOM:
-		return runtime.TaskOOMEventTopic
+		return gruntime.TaskOOMEventTopic
 	case *eventstypes.TaskExit:
-		return runtime.TaskExitEventTopic
+		return gruntime.TaskExitEventTopic
 	case *eventstypes.TaskDelete:
-		return runtime.TaskDeleteEventTopic
+		return gruntime.TaskDeleteEventTopic
 	case *eventstypes.TaskExecAdded:
-		return runtime.TaskExecAddedEventTopic
+		return gruntime.TaskExecAddedEventTopic
 	case *eventstypes.TaskExecStarted:
-		return runtime.TaskExecStartedEventTopic
+		return gruntime.TaskExecStartedEventTopic
 	case *eventstypes.TaskPaused:
-		return runtime.TaskPausedEventTopic
+		return gruntime.TaskPausedEventTopic
 	case *eventstypes.TaskResumed:
-		return runtime.TaskResumedEventTopic
+		return gruntime.TaskResumedEventTopic
 	case *eventstypes.TaskCheckpointed:
-		return runtime.TaskCheckpointedEventTopic
+		return gruntime.TaskCheckpointedEventTopic
 	default:
 		logrus.Warnf("no topic for type %#v", e)
 	}
-	return runtime.TaskUnknownTopic
+	return gruntime.TaskUnknownTopic
 }

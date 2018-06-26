@@ -25,19 +25,19 @@ import (
 	"time"
 
 	"github.com/Microsoft/go-winio"
-	"github.com/containerd/containerd/runtime"
+	gruntime "github.com/containerd/containerd/runtime/generic"
 	"github.com/pkg/errors"
 )
 
 type pipeSet struct {
-	src    runtime.IO
+	src    gruntime.IO
 	stdin  net.Conn
 	stdout net.Conn
 	stderr net.Conn
 }
 
 // NewIO connects to the provided pipe addresses
-func newPipeSet(ctx context.Context, io runtime.IO) (*pipeSet, error) {
+func newPipeSet(ctx context.Context, io gruntime.IO) (*pipeSet, error) {
 	var (
 		err    error
 		c      net.Conn
