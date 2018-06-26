@@ -133,13 +133,14 @@ else
     # Download and untar the release tar ball.
     curl -f --ipv4 -Lo "${TARBALL}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 "${TARBALL_GCS_PATH}"
     tar xvf "${TARBALL}"
-    # Use crictl installed by kube-up.sh.
-    # TODO(random-liu): Create release tarball for GCE, and do not package crictl.
-    rm "${CONTAINERD_HOME}/usr/local/bin/crictl"
-    rm "${CONTAINERD_HOME}/etc/crictl.yaml"
     rm -f "${TARBALL}"
   fi
 fi
+
+# Remove crictl shipped with containerd, use crictl installed
+# by kube-up.sh.
+rm -f "${CONTAINERD_HOME}/usr/local/bin/crictl"
+rm -f "${CONTAINERD_HOME}/etc/crictl.yaml"
 
 # Generate containerd config
 config_path="${CONTAINERD_CONFIG_PATH:-"/etc/containerd/config.toml"}"
