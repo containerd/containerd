@@ -167,6 +167,7 @@ disabled_plugins = ["restart"]
   runtime = "${CONTAINERD_HOME}/usr/local/sbin/runc"
 
 [plugins.cri]
+  stream_server_address = "127.0.0.1"
   max_container_log_line_size = ${max_container_log_line}
 [plugins.cri.cni]
   bin_dir = "${cni_bin_dir}"
