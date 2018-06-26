@@ -1,5 +1,5 @@
 # Production Quality Cluster on GCE
-This document provides the steps to bring up a production quality cluster on GCE with [`kube-up.sh`](https://kubernetes.io/docs/getting-started-guides/gce/).
+This document provides the steps to bring up a production quality cluster on GCE with [`kube-up.sh`](https://kubernetes.io/docs/setup/turnkey/gce/).
 
 ## Download CRI-Containerd Release Tarball
 To download release tarball, see [step 1](./installation.md#step-1-download-cri-containerd-release-tarball) in installation.md.
