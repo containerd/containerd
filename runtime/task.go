@@ -16,7 +16,7 @@
    limitations under the License.
 */
 
-package linux
+package runtime
 
 import (
 	"context"

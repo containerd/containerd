@@ -28,8 +28,8 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/runtime"
 	gruntime "github.com/containerd/containerd/runtime/generic"
-	"github.com/containerd/containerd/runtime/linux"
 	metrics "github.com/docker/go-metrics"
 	"github.com/sirupsen/logrus"
 )
@@ -81,7 +81,7 @@ type cgroupsMonitor struct {
 
 func (m *cgroupsMonitor) Monitor(c gruntime.Task) error {
 	info := c.Info()
-	t := c.(*linux.Task)
+	t := c.(*runtime.Task)
 	cg, err := t.Cgroup()
 	if err != nil {
 		return err
@@ -99,7 +99,7 @@ func (m *cgroupsMonitor) Monitor(c gruntime.Task) error {
 
 func (m *cgroupsMonitor) Stop(c gruntime.Task) error {
 	info := c.Info()
-	t := c.(*linux.Task)
+	t := c.(*runtime.Task)
 
 	cgroup, err := t.Cgroup()
 	if err != nil {
