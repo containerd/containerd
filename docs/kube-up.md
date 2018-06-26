@@ -13,7 +13,7 @@ tar -C ${CRI_CONTAINERD_PATH} -xzf cri-containerd-${VERSION}.linux-amd64.tar.gz
 . ${CRI_CONTAINERD_PATH}/opt/containerd/cluster/gce/env
 ```
 ## Create Kubernetes Cluster on GCE
-Follow these instructions [here](https://kubernetes.io/docs/getting-started-guides/gce/) to create a production quality Kubernetes cluster on GCE.
+Follow these instructions [here](https://kubernetes.io/docs/setup/turnkey/gce/) to create a production quality Kubernetes cluster on GCE.
 
 **Make sure the Kubernetes version you are using is v1.10 or greater:**
 * When using `https://get.k8s.io`, use the environment variable `KUBERNETES_RELEASE` to set version.
