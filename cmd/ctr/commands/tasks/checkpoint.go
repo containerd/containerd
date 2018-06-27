@@ -78,12 +78,22 @@ func withExit(rt string) containerd.CheckpointTaskOpts {
 	return func(r *containerd.CheckpointTaskInfo) error {
 		switch rt {
 		case "io.containerd.runc.v1":
-			r.Options = &options.CheckpointOptions{
-				Exit: true,
+			if r.Options == nil {
+				r.Options = &options.CheckpointOptions{
+					Exit: true,
+				}
+			} else {
+				opts, _ := r.Options.(*options.CheckpointOptions)
+				opts.Exit = true
 			}
 		default:
-			r.Options = &runctypes.CheckpointOptions{
-				Exit: true,
+			if r.Options == nil {
+				r.Options = &runctypes.CheckpointOptions{
+					Exit: true,
+				}
+			} else {
+				opts, _ := r.Options.(*runctypes.CheckpointOptions)
+				opts.Exit = true
 			}
 		}
 		return nil
