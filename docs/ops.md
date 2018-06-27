@@ -69,6 +69,10 @@ This is not what we want.
 As ops, we want to be able to upgrade containerd and allow existing containers to keep running without interruption.
 Setting `KillMode` to `process` ensures that systemd only kills the containerd daemon and not any child processes such as the shims and containers.
 
+The following `systemd-run` command starts containerd in a similar way:
+```
+sudo systemd-run -p Delegate=yes -p KillMode=process /usr/local/bin/containerd
+```
 
 ## Base Configuration
 
