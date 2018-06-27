@@ -1,3 +1,5 @@
+// +build !windows
+
 /*
    Copyright The containerd Authors.
 
@@ -14,11 +16,21 @@
    limitations under the License.
 */
 
-package main
+package shim
 
 import (
-	_ "github.com/containerd/containerd/diff/windows"
-	_ "github.com/containerd/containerd/runtime"
-	_ "github.com/containerd/containerd/snapshots/windows"
-	_ "github.com/containerd/containerd/windows"
+	"context"
+	"path/filepath"
+
+	"github.com/containerd/containerd/mount"
+	shimapi "github.com/containerd/containerd/runtime/shim/v1"
+	ptypes "github.com/gogo/protobuf/types"
 )
+
+func (c *local) Delete(ctx context.Context, in *ptypes.Empty) (*shimapi.DeleteResponse, error) {
+	// make sure we unmount the containers rootfs for this local
+	if err := mount.Unmount(filepath.Join(c.s.config.Path, "rootfs"), 0); err != nil {
+		return nil, err
+	}
+	return c.s.Delete(ctx, in)
+}

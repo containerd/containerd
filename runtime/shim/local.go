@@ -1,5 +1,3 @@
-// +build !windows
-
 /*
    Copyright The containerd Authors.
 
@@ -20,9 +18,7 @@ package shim
 
 import (
 	"context"
-	"path/filepath"
 
-	"github.com/containerd/containerd/mount"
 	shimapi "github.com/containerd/containerd/runtime/shim/v1"
 	ptypes "github.com/gogo/protobuf/types"
 )
@@ -44,14 +40,6 @@ func (c *local) Create(ctx context.Context, in *shimapi.CreateTaskRequest) (*shi
 
 func (c *local) Start(ctx context.Context, in *shimapi.StartRequest) (*shimapi.StartResponse, error) {
 	return c.s.Start(ctx, in)
-}
-
-func (c *local) Delete(ctx context.Context, in *ptypes.Empty) (*shimapi.DeleteResponse, error) {
-	// make sure we unmount the containers rootfs for this local
-	if err := mount.Unmount(filepath.Join(c.s.config.Path, "rootfs"), 0); err != nil {
-		return nil, err
-	}
-	return c.s.Delete(ctx, in)
 }
 
 func (c *local) DeleteProcess(ctx context.Context, in *shimapi.DeleteProcessRequest) (*shimapi.DeleteResponse, error) {
