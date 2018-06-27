@@ -777,6 +777,10 @@ func defaultRuntimeSpec(id string) (*runtimespec.Spec, error) {
 		if mount.Destination == "/run" {
 			continue
 		}
+		// CRI plugin handles `/dev/shm` itself.
+		if mount.Destination == "/dev/shm" {
+			continue
+		}
 		mounts = append(mounts, mount)
 	}
 	spec.Mounts = mounts

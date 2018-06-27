@@ -128,6 +128,10 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 		selinux.SetDisabled()
 	}
 
+	if client.SnapshotService(c.config.ContainerdConfig.Snapshotter) == nil {
+		return nil, errors.Errorf("failed to find snapshotter %q", c.config.ContainerdConfig.Snapshotter)
+	}
+
 	c.imageFSPath = imageFSPath(config.ContainerdRootDir, config.ContainerdConfig.Snapshotter)
 	logrus.Infof("Get image filesystem path %q", c.imageFSPath)
 
