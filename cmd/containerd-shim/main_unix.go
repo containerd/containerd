@@ -39,11 +39,11 @@ import (
 	"github.com/containerd/containerd/runtime/linux/proc"
 	"github.com/containerd/containerd/runtime/shim"
 	shimapi "github.com/containerd/containerd/runtime/shim/v1"
+	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/stevvooe/ttrpc"
 	"golang.org/x/sys/unix"
 )
 
