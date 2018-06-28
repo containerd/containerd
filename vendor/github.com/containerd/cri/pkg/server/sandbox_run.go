@@ -344,9 +344,9 @@ func (c *criService) generateSandboxContainerSpec(id string, config *runtime.Pod
 		g.SetProcessCwd(imageConfig.WorkingDir)
 	}
 
-	if len(imageConfig.Entrypoint) == 0 {
-		// Pause image must have entrypoint.
-		return nil, errors.Errorf("invalid empty entrypoint in image config %+v", imageConfig)
+	if len(imageConfig.Entrypoint) == 0 && len(imageConfig.Cmd) == 0 {
+		// Pause image must have entrypoint or cmd.
+		return nil, errors.Errorf("invalid empty entrypoint and cmd in image config %+v", imageConfig)
 	}
 	// Set process commands.
 	g.SetProcessArgs(append(imageConfig.Entrypoint, imageConfig.Cmd...))
@@ -388,6 +388,19 @@ func (c *criService) generateSandboxContainerSpec(id string, config *runtime.Pod
 		g.RemoveLinuxNamespace(string(runtimespec.IPCNamespace)) // nolint: errcheck
 	}
 
+	// It's fine to generate the spec before the sandbox /dev/shm
+	// is actually created.
+	sandboxDevShm := c.getSandboxDevShm(id)
+	if nsOptions.GetIpc() == runtime.NamespaceMode_NODE {
+		sandboxDevShm = devShm
+	}
+	g.AddMount(runtimespec.Mount{
+		Source:      sandboxDevShm,
+		Destination: devShm,
+		Type:        "bind",
+		Options:     []string{"rbind", "ro"},
+	})
+
 	selinuxOpt := securityContext.GetSelinuxOptions()
 	processLabel, mountLabel, err := initSelinuxOpts(selinuxOpt)
 	if err != nil {
@@ -415,7 +428,7 @@ func (c *criService) generateSandboxContainerSpec(id string, config *runtime.Pod
 	g.AddAnnotation(annotations.ContainerType, annotations.ContainerTypeSandbox)
 	g.AddAnnotation(annotations.SandboxID, id)
 
-	return g.Spec(), nil
+	return g.Config, nil
 }
 
 // setupSandboxFiles sets up necessary sandbox files including /dev/shm, /etc/hosts
@@ -524,7 +537,7 @@ func (c *criService) setupPod(id string, path string, config *runtime.PodSandbox
 	}
 	// Check if the default interface has IP config
 	if configs, ok := result.Interfaces[defaultIfName]; ok && len(configs.IPConfigs) > 0 {
-		return configs.IPConfigs[0].IP.String(), nil
+		return selectPodIP(configs.IPConfigs), nil
 	}
 	// If it comes here then the result was invalid so destroy the pod network and return error
 	if err := c.teardownPod(id, path, config); err != nil {
@@ -548,6 +561,16 @@ func toCNIPortMappings(criPortMappings []*runtime.PortMapping) []cni.PortMapping
 		})
 	}
 	return portMappings
+}
+
+// selectPodIP select an ip from the ip list. It prefers ipv4 more than ipv6.
+func selectPodIP(ipConfigs []*cni.IPConfig) string {
+	for _, c := range ipConfigs {
+		if c.IP.To4() != nil {
+			return c.IP.String()
+		}
+	}
+	return ipConfigs[0].IP.String()
 }
 
 // untrustedWorkload returns true if the sandbox contains untrusted workload.

@@ -102,7 +102,7 @@ func (c *criService) execInContainer(ctx context.Context, id string, opts execOp
 	if opts.tty {
 		g := newSpecGenerator(spec)
 		g.AddProcessEnv("TERM", "xterm")
-		spec = g.Spec()
+		spec = g.Config
 	}
 	pspec := spec.Process
 	pspec.Args = opts.cmd

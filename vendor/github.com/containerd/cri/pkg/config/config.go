@@ -96,6 +96,10 @@ type PluginConfig struct {
 	SystemdCgroup bool `toml:"systemd_cgroup" json:"systemdCgroup"`
 	// EnableTLSStreaming indicates to enable the TLS streaming support.
 	EnableTLSStreaming bool `toml:"enable_tls_streaming" json:"enableTLSStreaming"`
+	// MaxContainerLogLineSize is the maximum log line size in bytes for a container.
+	// Log line longer than the limit will be split into multiple lines. Non-positive
+	// value means no limit.
+	MaxContainerLogLineSize int `toml:"max_container_log_line_size" json:"maxContainerLogSize"`
 }
 
 // Config contains all configurations for cri server.
@@ -129,13 +133,14 @@ func DefaultConfig() PluginConfig {
 				Root:   "",
 			},
 		},
-		StreamServerAddress: "",
-		StreamServerPort:    "10010",
-		EnableSelinux:       false,
-		EnableTLSStreaming:  false,
-		SandboxImage:        "k8s.gcr.io/pause:3.1",
-		StatsCollectPeriod:  10,
-		SystemdCgroup:       false,
+		StreamServerAddress:     "",
+		StreamServerPort:        "10010",
+		EnableSelinux:           false,
+		EnableTLSStreaming:      false,
+		SandboxImage:            "k8s.gcr.io/pause:3.1",
+		StatsCollectPeriod:      10,
+		SystemdCgroup:           false,
+		MaxContainerLogLineSize: 16 * 1024,
 		Registry: Registry{
 			Mirrors: map[string]Mirror{
 				"docker.io": {

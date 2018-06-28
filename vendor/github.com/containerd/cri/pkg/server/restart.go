@@ -78,9 +78,7 @@ func (c *criService) recover(ctx context.Context) error {
 		return errors.Wrap(err, "failed to list containers")
 	}
 	for _, container := range containers {
-		containerDir := c.getContainerRootDir(container.ID())
-		volatileContainerDir := c.getVolatileContainerRootDir(container.ID())
-		cntr, err := loadContainer(ctx, container, containerDir, volatileContainerDir)
+		cntr, err := c.loadContainer(ctx, container)
 		if err != nil {
 			logrus.WithError(err).Errorf("Failed to load container %q", container.ID())
 			continue
@@ -149,8 +147,10 @@ func (c *criService) recover(ctx context.Context) error {
 }
 
 // loadContainer loads container from containerd and status checkpoint.
-func loadContainer(ctx context.Context, cntr containerd.Container, containerDir, volatileContainerDir string) (containerstore.Container, error) {
+func (c *criService) loadContainer(ctx context.Context, cntr containerd.Container) (containerstore.Container, error) {
 	id := cntr.ID()
+	containerDir := c.getContainerRootDir(id)
+	volatileContainerDir := c.getVolatileContainerRootDir(id)
 	var container containerstore.Container
 	// Load container metadata.
 	exts, err := cntr.Extensions(ctx)
@@ -176,11 +176,21 @@ func loadContainer(ctx context.Context, cntr containerd.Container, containerDir,
 
 	// Load up-to-date status from containerd.
 	var containerIO *cio.ContainerIO
-	t, err := cntr.Task(ctx, func(fifos *containerdio.FIFOSet) (containerdio.IO, error) {
-		stdoutWC, stderrWC, err := createContainerLoggers(meta.LogPath, meta.Config.GetTty())
+	t, err := cntr.Task(ctx, func(fifos *containerdio.FIFOSet) (_ containerdio.IO, err error) {
+		stdoutWC, stderrWC, err := c.createContainerLoggers(meta.LogPath, meta.Config.GetTty())
 		if err != nil {
 			return nil, err
 		}
+		defer func() {
+			if err != nil {
+				if stdoutWC != nil {
+					stdoutWC.Close()
+				}
+				if stderrWC != nil {
+					stderrWC.Close()
+				}
+			}
+		}()
 		containerIO, err = cio.NewContainerIO(id,
 			cio.WithFIFOs(fifos),
 		)
