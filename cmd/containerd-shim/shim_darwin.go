@@ -24,7 +24,7 @@ import (
 
 	"github.com/containerd/containerd/runtime/shim"
 	runc "github.com/containerd/go-runc"
-	"github.com/stevvooe/ttrpc"
+	"github.com/containerd/ttrpc"
 )
 
 // setupSignals creates a new signal handler for all signals and sets the shim as a
