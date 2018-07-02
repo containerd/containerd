@@ -67,12 +67,11 @@ func (s *Server) Register(name string, methods map[string]Method) {
 	s.services.register(name, methods)
 }
 
-func (s *Server) Serve(l net.Listener) error {
+func (s *Server) Serve(ctx context.Context, l net.Listener) error {
 	s.addListener(l)
 	defer s.closeListener(l)
 
 	var (
-		ctx        = context.Background()
 		backoff    time.Duration
 		handshaker = s.config.handshaker
 	)
