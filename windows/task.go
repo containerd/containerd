@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/runtime"
+	gruntime "github.com/containerd/containerd/runtime/generic"
 	"github.com/containerd/containerd/windows/hcsshimtypes"
 	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/types"
@@ -43,7 +43,7 @@ type task struct {
 	namespace string
 	pid       uint32
 	io        *pipeSet
-	status    runtime.Status
+	status    gruntime.Status
 	spec      *specs.Spec
 	processes map[string]*process
 	hyperV    bool
@@ -61,9 +61,9 @@ func (t *task) ID() string {
 	return t.id
 }
 
-func (t *task) State(ctx context.Context) (runtime.State, error) {
+func (t *task) State(ctx context.Context) (gruntime.State, error) {
 	var (
-		status     runtime.Status
+		status     gruntime.Status
 		exitStatus uint32
 		exitedAt   time.Time
 	)
@@ -76,7 +76,7 @@ func (t *task) State(ctx context.Context) (runtime.State, error) {
 		status = t.getStatus()
 	}
 
-	return runtime.State{
+	return gruntime.State{
 		Status:     status,
 		Pid:        t.pid,
 		Stdin:      t.io.src.Stdin,
@@ -94,14 +94,14 @@ func (t *task) Kill(ctx context.Context, signal uint32, all bool) error {
 		return errors.Wrapf(errdefs.ErrFailedPrecondition, "task is not running")
 	}
 
-	if p.Status() == runtime.StoppedStatus {
+	if p.Status() == gruntime.StoppedStatus {
 		return errors.Wrapf(errdefs.ErrNotFound, "process is stopped")
 	}
 
 	return p.Kill(ctx, signal, all)
 }
 
-func (t *task) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
+func (t *task) ResizePty(ctx context.Context, size gruntime.ConsoleSize) error {
 	p := t.getProcess(t.id)
 	if p == nil {
 		return errors.Wrap(errdefs.ErrFailedPrecondition, "task not started")
@@ -119,8 +119,8 @@ func (t *task) CloseIO(ctx context.Context) error {
 	return p.hcs.CloseStdin()
 }
 
-func (t *task) Info() runtime.TaskInfo {
-	return runtime.TaskInfo{
+func (t *task) Info() gruntime.TaskInfo {
+	return gruntime.TaskInfo{
 		ID:        t.id,
 		Runtime:   pluginID,
 		Namespace: t.namespace,
@@ -134,7 +134,7 @@ func (t *task) Start(ctx context.Context) error {
 		panic("init process is missing")
 	}
 
-	if p.Status() != runtime.CreatedStatus {
+	if p.Status() != gruntime.CreatedStatus {
 		return errors.Wrap(errdefs.ErrFailedPrecondition, "process was already started")
 	}
 
@@ -142,7 +142,7 @@ func (t *task) Start(ctx context.Context) error {
 		return err
 	}
 	t.publisher.Publish(ctx,
-		runtime.TaskStartEventTopic,
+		gruntime.TaskStartEventTopic,
 		&eventstypes.TaskStart{
 			ContainerID: t.id,
 			Pid:         t.pid,
@@ -155,11 +155,11 @@ func (t *task) Pause(ctx context.Context) error {
 		err := t.hcsContainer.Pause()
 		if err == nil {
 			t.Lock()
-			t.status = runtime.PausedStatus
+			t.status = gruntime.PausedStatus
 			t.Unlock()
 
 			t.publisher.Publish(ctx,
-				runtime.TaskPausedEventTopic,
+				gruntime.TaskPausedEventTopic,
 				&eventstypes.TaskPaused{
 					ContainerID: t.id,
 				})
@@ -176,11 +176,11 @@ func (t *task) Resume(ctx context.Context) error {
 		err := t.hcsContainer.Resume()
 		if err == nil {
 			t.Lock()
-			t.status = runtime.RunningStatus
+			t.status = gruntime.RunningStatus
 			t.Unlock()
 
 			t.publisher.Publish(ctx,
-				runtime.TaskResumedEventTopic,
+				gruntime.TaskResumedEventTopic,
 				&eventstypes.TaskResumed{
 					ContainerID: t.id,
 				})
@@ -192,7 +192,7 @@ func (t *task) Resume(ctx context.Context) error {
 	return errors.Wrap(errdefs.ErrFailedPrecondition, "not an hyperV task")
 }
 
-func (t *task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runtime.Process, error) {
+func (t *task) Exec(ctx context.Context, id string, opts gruntime.ExecOpts) (gruntime.Process, error) {
 	if p := t.getProcess(t.id); p == nil {
 		return nil, errors.Wrap(errdefs.ErrFailedPrecondition, "task not started")
 	}
@@ -222,7 +222,7 @@ func (t *task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runt
 	}
 
 	t.publisher.Publish(ctx,
-		runtime.TaskExecAddedEventTopic,
+		gruntime.TaskExecAddedEventTopic,
 		&eventstypes.TaskExecAdded{
 			ContainerID: t.id,
 			ExecID:      id,
@@ -231,11 +231,11 @@ func (t *task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runt
 	return p, nil
 }
 
-func (t *task) Pids(ctx context.Context) ([]runtime.ProcessInfo, error) {
+func (t *task) Pids(ctx context.Context) ([]gruntime.ProcessInfo, error) {
 	t.Lock()
 	defer t.Unlock()
 
-	var processList []runtime.ProcessInfo
+	var processList []gruntime.ProcessInfo
 	hcsProcessList, err := t.hcsContainer.ProcessList()
 	if err != nil {
 		return nil, err
@@ -258,7 +258,7 @@ func (t *task) Pids(ctx context.Context) ([]runtime.ProcessInfo, error) {
 				break
 			}
 		}
-		processList = append(processList, runtime.ProcessInfo{
+		processList = append(processList, gruntime.ProcessInfo{
 			Pid:  hcsProcess.ProcessId,
 			Info: info,
 		})
@@ -271,7 +271,7 @@ func (t *task) Checkpoint(_ context.Context, _ string, _ *types.Any) error {
 	return errors.Wrap(errdefs.ErrUnavailable, "not supported")
 }
 
-func (t *task) DeleteProcess(ctx context.Context, id string) (*runtime.Exit, error) {
+func (t *task) DeleteProcess(ctx context.Context, id string) (*gruntime.Exit, error) {
 	if id == t.id {
 		return nil, errors.Wrapf(errdefs.ErrInvalidArgument,
 			"cannot delete init process")
@@ -283,13 +283,13 @@ func (t *task) DeleteProcess(ctx context.Context, id string) (*runtime.Exit, err
 		}
 
 		// If we never started the process close the pipes
-		if p.Status() == runtime.CreatedStatus {
+		if p.Status() == gruntime.CreatedStatus {
 			p.io.Close()
 			ea = time.Now()
 		}
 
 		t.removeProcess(id)
-		return &runtime.Exit{
+		return &gruntime.Exit{
 			Pid:       p.pid,
 			Status:    ec,
 			Timestamp: ea,
@@ -302,7 +302,7 @@ func (t *task) Update(ctx context.Context, resources *types.Any) error {
 	return errors.Wrap(errdefs.ErrUnavailable, "not supported")
 }
 
-func (t *task) Process(ctx context.Context, id string) (p runtime.Process, err error) {
+func (t *task) Process(ctx context.Context, id string) (p gruntime.Process, err error) {
 	p = t.getProcess(id)
 	if p == nil {
 		err = errors.Wrapf(errdefs.ErrNotFound, "no such process %d", id)
@@ -315,7 +315,7 @@ func (t *task) Metrics(ctx context.Context) (interface{}, error) {
 	return nil, errors.Wrap(errdefs.ErrUnavailable, "not supported")
 }
 
-func (t *task) Wait(ctx context.Context) (*runtime.Exit, error) {
+func (t *task) Wait(ctx context.Context) (*gruntime.Exit, error) {
 	p := t.getProcess(t.id)
 	if p == nil {
 		return nil, errors.Wrapf(errdefs.ErrNotFound, "no such process %d", t.id)
@@ -388,7 +388,7 @@ func (t *task) removeProcess(id string) {
 	t.Unlock()
 }
 
-func (t *task) getStatus() runtime.Status {
+func (t *task) getStatus() gruntime.Status {
 	t.Lock()
 	status := t.status
 	t.Unlock()

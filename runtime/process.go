@@ -1,5 +1,3 @@
-// +build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -16,7 +14,7 @@
    limitations under the License.
 */
 
-package linux
+package runtime
 
 import (
 	"context"
@@ -24,7 +22,7 @@ import (
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/runtime"
+	gruntime "github.com/containerd/containerd/runtime/generic"
 	shim "github.com/containerd/containerd/runtime/shim/v1"
 	"github.com/containerd/ttrpc"
 	"github.com/pkg/errors"
@@ -56,35 +54,35 @@ func (p *Process) Kill(ctx context.Context, signal uint32, _ bool) error {
 }
 
 // State of process
-func (p *Process) State(ctx context.Context) (runtime.State, error) {
+func (p *Process) State(ctx context.Context) (gruntime.State, error) {
 	// use the container status for the status of the process
 	response, err := p.t.shim.State(ctx, &shim.StateRequest{
 		ID: p.id,
 	})
 	if err != nil {
 		if errors.Cause(err) != ttrpc.ErrClosed {
-			return runtime.State{}, errdefs.FromGRPC(err)
+			return gruntime.State{}, errdefs.FromGRPC(err)
 		}
 
 		// We treat ttrpc.ErrClosed as the shim being closed, but really this
 		// likely means that the process no longer exists. We'll have to plumb
 		// the connection differently if this causes problems.
-		return runtime.State{}, errdefs.ErrNotFound
+		return gruntime.State{}, errdefs.ErrNotFound
 	}
-	var status runtime.Status
+	var status gruntime.Status
 	switch response.Status {
 	case task.StatusCreated:
-		status = runtime.CreatedStatus
+		status = gruntime.CreatedStatus
 	case task.StatusRunning:
-		status = runtime.RunningStatus
+		status = gruntime.RunningStatus
 	case task.StatusStopped:
-		status = runtime.StoppedStatus
+		status = gruntime.StoppedStatus
 	case task.StatusPaused:
-		status = runtime.PausedStatus
+		status = gruntime.PausedStatus
 	case task.StatusPausing:
-		status = runtime.PausingStatus
+		status = gruntime.PausingStatus
 	}
-	return runtime.State{
+	return gruntime.State{
 		Pid:        response.Pid,
 		Status:     status,
 		Stdin:      response.Stdin,
@@ -96,7 +94,7 @@ func (p *Process) State(ctx context.Context) (runtime.State, error) {
 }
 
 // ResizePty changes the side of the process's PTY to the provided width and height
-func (p *Process) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
+func (p *Process) ResizePty(ctx context.Context, size gruntime.ConsoleSize) error {
 	_, err := p.t.shim.ResizePty(ctx, &shim.ResizePtyRequest{
 		ID:     p.id,
 		Width:  size.Width,
@@ -128,7 +126,7 @@ func (p *Process) Start(ctx context.Context) error {
 	if err != nil {
 		return errdefs.FromGRPC(err)
 	}
-	p.t.events.Publish(ctx, runtime.TaskExecStartedEventTopic, &eventstypes.TaskExecStarted{
+	p.t.events.Publish(ctx, gruntime.TaskExecStartedEventTopic, &eventstypes.TaskExecStarted{
 		ContainerID: p.t.id,
 		Pid:         r.Pid,
 		ExecID:      p.id,
@@ -137,14 +135,14 @@ func (p *Process) Start(ctx context.Context) error {
 }
 
 // Wait on the process to exit and return the exit status and timestamp
-func (p *Process) Wait(ctx context.Context) (*runtime.Exit, error) {
+func (p *Process) Wait(ctx context.Context) (*gruntime.Exit, error) {
 	r, err := p.t.shim.Wait(ctx, &shim.WaitRequest{
 		ID: p.id,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &runtime.Exit{
+	return &gruntime.Exit{
 		Timestamp: r.ExitedAt,
 		Status:    r.ExitStatus,
 	}, nil

@@ -29,7 +29,7 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
-	"github.com/containerd/containerd/runtime/linux"
+	gruntime "github.com/containerd/containerd/runtime/generic"
 	metrics "github.com/docker/go-metrics"
 	"github.com/sirupsen/logrus"
 )
@@ -79,9 +79,9 @@ type cgroupsMonitor struct {
 	publisher events.Publisher
 }
 
-func (m *cgroupsMonitor) Monitor(c runtime.Task) error {
+func (m *cgroupsMonitor) Monitor(c gruntime.Task) error {
 	info := c.Info()
-	t := c.(*linux.Task)
+	t := c.(*runtime.Task)
 	cg, err := t.Cgroup()
 	if err != nil {
 		return err
@@ -97,9 +97,9 @@ func (m *cgroupsMonitor) Monitor(c runtime.Task) error {
 	return err
 }
 
-func (m *cgroupsMonitor) Stop(c runtime.Task) error {
+func (m *cgroupsMonitor) Stop(c gruntime.Task) error {
 	info := c.Info()
-	t := c.(*linux.Task)
+	t := c.(*runtime.Task)
 
 	cgroup, err := t.Cgroup()
 	if err != nil {
@@ -114,7 +114,7 @@ func (m *cgroupsMonitor) Stop(c runtime.Task) error {
 
 func (m *cgroupsMonitor) trigger(id, namespace string, cg cgroups.Cgroup) {
 	ctx := namespaces.WithNamespace(m.context, namespace)
-	if err := m.publisher.Publish(ctx, runtime.TaskOOMEventTopic, &eventstypes.TaskOOM{
+	if err := m.publisher.Publish(ctx, gruntime.TaskOOMEventTopic, &eventstypes.TaskOOM{
 		ContainerID: id,
 	}); err != nil {
 		log.G(m.context).WithError(err).Error("post OOM event")

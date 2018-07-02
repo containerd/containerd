@@ -33,7 +33,7 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
-	_ "github.com/containerd/containerd/runtime"
+	_ "github.com/containerd/containerd/runtime/generic"
 	"github.com/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 

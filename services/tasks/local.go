@@ -41,7 +41,7 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/runtime"
+	gruntime "github.com/containerd/containerd/runtime/generic"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
@@ -80,14 +80,14 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 		return nil, err
 	}
 	cs := m.(*metadata.DB).ContentStore()
-	runtimes := make(map[string]runtime.PlatformRuntime)
+	runtimes := make(map[string]gruntime.PlatformRuntime)
 	for _, rr := range rt {
 		ri, err := rr.Instance()
 		if err != nil {
 			log.G(ic.Context).WithError(err).Warn("could not load runtime instance due to initialization error")
 			continue
 		}
-		r := ri.(runtime.PlatformRuntime)
+		r := ri.(gruntime.PlatformRuntime)
 		runtimes[r.ID()] = r
 	}
 
@@ -103,7 +103,7 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 }
 
 type local struct {
-	runtimes  map[string]runtime.PlatformRuntime
+	runtimes  map[string]gruntime.PlatformRuntime
 	db        *metadata.DB
 	store     content.Store
 	publisher events.Publisher
@@ -141,9 +141,9 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-	opts := runtime.CreateOpts{
+	opts := gruntime.CreateOpts{
 		Spec: container.Spec,
-		IO: runtime.IO{
+		IO: gruntime.IO{
 			Stdin:    r.Stdin,
 			Stdout:   r.Stdout,
 			Stderr:   r.Stderr,
@@ -183,7 +183,7 @@ func (l *local) Start(ctx context.Context, r *api.StartRequest, _ ...grpc.CallOp
 	if err != nil {
 		return nil, err
 	}
-	p := runtime.Process(t)
+	p := gruntime.Process(t)
 	if r.ExecID != "" {
 		if p, err = t.Process(ctx, r.ExecID); err != nil {
 			return nil, errdefs.ToGRPC(err)
@@ -238,22 +238,22 @@ func (l *local) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest, 
 	}, nil
 }
 
-func processFromContainerd(ctx context.Context, p runtime.Process) (*task.Process, error) {
+func processFromContainerd(ctx context.Context, p gruntime.Process) (*task.Process, error) {
 	state, err := p.State(ctx)
 	if err != nil {
 		return nil, err
 	}
 	var status task.Status
 	switch state.Status {
-	case runtime.CreatedStatus:
+	case gruntime.CreatedStatus:
 		status = task.StatusCreated
-	case runtime.RunningStatus:
+	case gruntime.RunningStatus:
 		status = task.StatusRunning
-	case runtime.StoppedStatus:
+	case gruntime.StoppedStatus:
 		status = task.StatusStopped
-	case runtime.PausedStatus:
+	case gruntime.PausedStatus:
 		status = task.StatusPaused
-	case runtime.PausingStatus:
+	case gruntime.PausingStatus:
 		status = task.StatusPausing
 	default:
 		log.G(ctx).WithField("status", state.Status).Warn("unknown status")
@@ -276,7 +276,7 @@ func (l *local) Get(ctx context.Context, r *api.GetRequest, _ ...grpc.CallOption
 	if err != nil {
 		return nil, err
 	}
-	p := runtime.Process(task)
+	p := gruntime.Process(task)
 	if r.ExecID != "" {
 		if p, err = task.Process(ctx, r.ExecID); err != nil {
 			return nil, errdefs.ToGRPC(err)
@@ -303,7 +303,7 @@ func (l *local) List(ctx context.Context, r *api.ListTasksRequest, _ ...grpc.Cal
 	return resp, nil
 }
 
-func addTasks(ctx context.Context, r *api.ListTasksResponse, tasks []runtime.Task) {
+func addTasks(ctx context.Context, r *api.ListTasksResponse, tasks []gruntime.Task) {
 	for _, t := range tasks {
 		tt, err := processFromContainerd(ctx, t)
 		if err != nil {
@@ -345,7 +345,7 @@ func (l *local) Kill(ctx context.Context, r *api.KillRequest, _ ...grpc.CallOpti
 	if err != nil {
 		return nil, err
 	}
-	p := runtime.Process(t)
+	p := gruntime.Process(t)
 	if r.ExecID != "" {
 		if p, err = t.Process(ctx, r.ExecID); err != nil {
 			return nil, errdefs.ToGRPC(err)
@@ -393,9 +393,9 @@ func (l *local) Exec(ctx context.Context, r *api.ExecProcessRequest, _ ...grpc.C
 	if err != nil {
 		return nil, err
 	}
-	if _, err := t.Exec(ctx, r.ExecID, runtime.ExecOpts{
+	if _, err := t.Exec(ctx, r.ExecID, gruntime.ExecOpts{
 		Spec: r.Spec,
-		IO: runtime.IO{
+		IO: gruntime.IO{
 			Stdin:    r.Stdin,
 			Stdout:   r.Stdout,
 			Stderr:   r.Stderr,
@@ -412,13 +412,13 @@ func (l *local) ResizePty(ctx context.Context, r *api.ResizePtyRequest, _ ...grp
 	if err != nil {
 		return nil, err
 	}
-	p := runtime.Process(t)
+	p := gruntime.Process(t)
 	if r.ExecID != "" {
 		if p, err = t.Process(ctx, r.ExecID); err != nil {
 			return nil, errdefs.ToGRPC(err)
 		}
 	}
-	if err := p.ResizePty(ctx, runtime.ConsoleSize{
+	if err := p.ResizePty(ctx, gruntime.ConsoleSize{
 		Width:  r.Width,
 		Height: r.Height,
 	}); err != nil {
@@ -432,7 +432,7 @@ func (l *local) CloseIO(ctx context.Context, r *api.CloseIORequest, _ ...grpc.Ca
 	if err != nil {
 		return nil, err
 	}
-	p := runtime.Process(t)
+	p := gruntime.Process(t)
 	if r.ExecID != "" {
 		if p, err = t.Process(ctx, r.ExecID); err != nil {
 			return nil, errdefs.ToGRPC(err)
@@ -523,7 +523,7 @@ func (l *local) Wait(ctx context.Context, r *api.WaitRequest, _ ...grpc.CallOpti
 	if err != nil {
 		return nil, err
 	}
-	p := runtime.Process(t)
+	p := gruntime.Process(t)
 	if r.ExecID != "" {
 		if p, err = t.Process(ctx, r.ExecID); err != nil {
 			return nil, errdefs.ToGRPC(err)
@@ -539,7 +539,7 @@ func (l *local) Wait(ctx context.Context, r *api.WaitRequest, _ ...grpc.CallOpti
 	}, nil
 }
 
-func getTasksMetrics(ctx context.Context, filter filters.Filter, tasks []runtime.Task, r *api.MetricsResponse) {
+func getTasksMetrics(ctx context.Context, filter filters.Filter, tasks []gruntime.Task, r *api.MetricsResponse) {
 	for _, tk := range tasks {
 		if !filter.Match(filters.AdapterFunc(func(fieldpath []string) (string, bool) {
 			t := tk
@@ -610,7 +610,7 @@ func (l *local) getContainer(ctx context.Context, id string) (*containers.Contai
 	return &container, nil
 }
 
-func (l *local) getTask(ctx context.Context, id string) (runtime.Task, error) {
+func (l *local) getTask(ctx context.Context, id string) (gruntime.Task, error) {
 	container, err := l.getContainer(ctx, id)
 	if err != nil {
 		return nil, err
@@ -618,7 +618,7 @@ func (l *local) getTask(ctx context.Context, id string) (runtime.Task, error) {
 	return l.getTaskFromContainer(ctx, container)
 }
 
-func (l *local) getTaskFromContainer(ctx context.Context, container *containers.Container) (runtime.Task, error) {
+func (l *local) getTaskFromContainer(ctx context.Context, container *containers.Container) (gruntime.Task, error) {
 	runtime, err := l.getRuntime(container.Runtime.Name)
 	if err != nil {
 		return nil, errdefs.ToGRPCf(err, "runtime for task %s", container.Runtime.Name)
@@ -630,7 +630,7 @@ func (l *local) getTaskFromContainer(ctx context.Context, container *containers.
 	return t, nil
 }
 
-func (l *local) getRuntime(name string) (runtime.PlatformRuntime, error) {
+func (l *local) getRuntime(name string) (gruntime.PlatformRuntime, error) {
 	runtime, ok := l.runtimes[name]
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "unknown runtime %q", name)

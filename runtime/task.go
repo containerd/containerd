@@ -18,115 +18,234 @@ package runtime
 
 import (
 	"context"
-	"time"
 
+	eventstypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/containerd/api/types/task"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/identifiers"
+	gruntime "github.com/containerd/containerd/runtime/generic"
+	shim "github.com/containerd/containerd/runtime/shim/v1"
+	"github.com/containerd/ttrpc"
 	"github.com/gogo/protobuf/types"
+	"github.com/pkg/errors"
 )
 
-// TaskInfo provides task specific information
-type TaskInfo struct {
-	ID        string
-	Runtime   string
-	Spec      []byte
-	Namespace string
+// Make sure that the task adheres to the interface.
+var _ = (gruntime.Task)(&Task{})
+
+// ID of the task
+func (t *Task) ID() string {
+	return t.id
 }
 
-// Process is a runtime object for an executing process inside a container
-type Process interface {
-	ID() string
-	// State returns the process state
-	State(context.Context) (State, error)
-	// Kill signals a container
-	Kill(context.Context, uint32, bool) error
-	// Pty resizes the processes pty/console
-	ResizePty(context.Context, ConsoleSize) error
-	// CloseStdin closes the processes stdin
-	CloseIO(context.Context) error
-	// Start the container's user defined process
-	Start(context.Context) error
-	// Wait for the process to exit
-	Wait(context.Context) (*Exit, error)
+// Info returns task information about the runtime and namespace
+func (t *Task) Info() gruntime.TaskInfo {
+	return gruntime.TaskInfo{
+		ID:        t.id,
+		Runtime:   pluginID,
+		Namespace: t.namespace,
+	}
 }
 
-// Task is the runtime object for an executing container
-type Task interface {
-	Process
-
-	// Information of the container
-	Info() TaskInfo
-	// Pause pauses the container process
-	Pause(context.Context) error
-	// Resume unpauses the container process
-	Resume(context.Context) error
-	// Exec adds a process into the container
-	Exec(context.Context, string, ExecOpts) (Process, error)
-	// Pids returns all pids
-	Pids(context.Context) ([]ProcessInfo, error)
-	// Checkpoint checkpoints a container to an image with live system data
-	Checkpoint(context.Context, string, *types.Any) error
-	// DeleteProcess deletes a specific exec process via its id
-	DeleteProcess(context.Context, string) (*Exit, error)
-	// Update sets the provided resources to a running task
-	Update(context.Context, *types.Any) error
-	// Process returns a process within the task for the provided id
-	Process(context.Context, string) (Process, error)
-	// Metrics returns runtime specific metrics for a task
-	Metrics(context.Context) (interface{}, error)
+// State returns runtime information for the task
+func (t *Task) State(ctx context.Context) (gruntime.State, error) {
+	response, err := t.shim.State(ctx, &shim.StateRequest{
+		ID: t.id,
+	})
+	if err != nil {
+		if errors.Cause(err) != ttrpc.ErrClosed {
+			return gruntime.State{}, errdefs.FromGRPC(err)
+		}
+		return gruntime.State{}, errdefs.ErrNotFound
+	}
+	var status gruntime.Status
+	switch response.Status {
+	case task.StatusCreated:
+		status = gruntime.CreatedStatus
+	case task.StatusRunning:
+		status = gruntime.RunningStatus
+	case task.StatusStopped:
+		status = gruntime.StoppedStatus
+	case task.StatusPaused:
+		status = gruntime.PausedStatus
+	case task.StatusPausing:
+		status = gruntime.PausingStatus
+	}
+	return gruntime.State{
+		Pid:        response.Pid,
+		Status:     status,
+		Stdin:      response.Stdin,
+		Stdout:     response.Stdout,
+		Stderr:     response.Stderr,
+		Terminal:   response.Terminal,
+		ExitStatus: response.ExitStatus,
+		ExitedAt:   response.ExitedAt,
+	}, nil
 }
 
-// ExecOpts provides additional options for additional processes running in a task
-type ExecOpts struct {
-	Spec *types.Any
-	IO   IO
+// Pause the task and all processes
+func (t *Task) Pause(ctx context.Context) error {
+	if _, err := t.shim.Pause(ctx, empty); err != nil {
+		return errdefs.FromGRPC(err)
+	}
+	t.events.Publish(ctx, gruntime.TaskPausedEventTopic, &eventstypes.TaskPaused{
+		ContainerID: t.id,
+	})
+	return nil
 }
 
-// ConsoleSize of a pty or windows terminal
-type ConsoleSize struct {
-	Width  uint32
-	Height uint32
+// Resume the task and all processes
+func (t *Task) Resume(ctx context.Context) error {
+	if _, err := t.shim.Resume(ctx, empty); err != nil {
+		return errdefs.FromGRPC(err)
+	}
+	t.events.Publish(ctx, gruntime.TaskResumedEventTopic, &eventstypes.TaskResumed{
+		ContainerID: t.id,
+	})
+	return nil
 }
 
-// Status is the runtime status of a task and/or process
-type Status int
-
-const (
-	// CreatedStatus when a process has been created
-	CreatedStatus Status = iota + 1
-	// RunningStatus when a process is running
-	RunningStatus
-	// StoppedStatus when a process has stopped
-	StoppedStatus
-	// DeletedStatus when a process has been deleted
-	DeletedStatus
-	// PausedStatus when a process is paused
-	PausedStatus
-	// PausingStatus when a process is currently pausing
-	PausingStatus
-)
-
-// State information for a process
-type State struct {
-	// Status is the current status of the container
-	Status Status
-	// Pid is the main process id for the container
-	Pid uint32
-	// ExitStatus of the process
-	// Only valid if the Status is Stopped
-	ExitStatus uint32
-	// ExitedAt is the time at which the process exited
-	// Only valid if the Status is Stopped
-	ExitedAt time.Time
-	Stdin    string
-	Stdout   string
-	Stderr   string
-	Terminal bool
+// Kill the task using the provided signal
+//
+// Optionally send the signal to all processes that are a child of the task
+func (t *Task) Kill(ctx context.Context, signal uint32, all bool) error {
+	if _, err := t.shim.Kill(ctx, &shim.KillRequest{
+		ID:     t.id,
+		Signal: signal,
+		All:    all,
+	}); err != nil {
+		return errdefs.FromGRPC(err)
+	}
+	return nil
 }
 
-// ProcessInfo holds platform specific process information
-type ProcessInfo struct {
-	// Pid is the process ID
-	Pid uint32
-	// Info includes additional process information
-	// Info varies by platform
-	Info interface{}
+// Exec creates a new process inside the task
+func (t *Task) Exec(ctx context.Context, id string, opts gruntime.ExecOpts) (gruntime.Process, error) {
+	if err := identifiers.Validate(id); err != nil {
+		return nil, errors.Wrapf(err, "invalid exec id")
+	}
+	request := &shim.ExecProcessRequest{
+		ID:       id,
+		Stdin:    opts.IO.Stdin,
+		Stdout:   opts.IO.Stdout,
+		Stderr:   opts.IO.Stderr,
+		Terminal: opts.IO.Terminal,
+		Spec:     opts.Spec,
+	}
+	if _, err := t.shim.Exec(ctx, request); err != nil {
+		return nil, errdefs.FromGRPC(err)
+	}
+	return &Process{
+		id: id,
+		t:  t,
+	}, nil
+}
+
+// Pids returns all system level process ids running inside the task
+func (t *Task) Pids(ctx context.Context) ([]gruntime.ProcessInfo, error) {
+	resp, err := t.shim.ListPids(ctx, &shim.ListPidsRequest{
+		ID: t.id,
+	})
+	if err != nil {
+		return nil, errdefs.FromGRPC(err)
+	}
+	var processList []gruntime.ProcessInfo
+	for _, p := range resp.Processes {
+		processList = append(processList, gruntime.ProcessInfo{
+			Pid:  p.Pid,
+			Info: p.Info,
+		})
+	}
+	return processList, nil
+}
+
+// ResizePty changes the side of the task's PTY to the provided width and height
+func (t *Task) ResizePty(ctx context.Context, size gruntime.ConsoleSize) error {
+	_, err := t.shim.ResizePty(ctx, &shim.ResizePtyRequest{
+		ID:     t.id,
+		Width:  size.Width,
+		Height: size.Height,
+	})
+	if err != nil {
+		err = errdefs.FromGRPC(err)
+	}
+	return err
+}
+
+// CloseIO closes the provided IO on the task
+func (t *Task) CloseIO(ctx context.Context) error {
+	_, err := t.shim.CloseIO(ctx, &shim.CloseIORequest{
+		ID:    t.id,
+		Stdin: true,
+	})
+	if err != nil {
+		err = errdefs.FromGRPC(err)
+	}
+	return err
+}
+
+// Checkpoint creates a system level dump of the task and process information that can be later restored
+func (t *Task) Checkpoint(ctx context.Context, path string, options *types.Any) error {
+	r := &shim.CheckpointTaskRequest{
+		Path:    path,
+		Options: options,
+	}
+	if _, err := t.shim.Checkpoint(ctx, r); err != nil {
+		return errdefs.FromGRPC(err)
+	}
+	t.events.Publish(ctx, gruntime.TaskCheckpointedEventTopic, &eventstypes.TaskCheckpointed{
+		ContainerID: t.id,
+	})
+	return nil
+}
+
+// DeleteProcess removes the provided process from the task and deletes all on disk state
+func (t *Task) DeleteProcess(ctx context.Context, id string) (*gruntime.Exit, error) {
+	r, err := t.shim.DeleteProcess(ctx, &shim.DeleteProcessRequest{
+		ID: id,
+	})
+	if err != nil {
+		return nil, errdefs.FromGRPC(err)
+	}
+	return &gruntime.Exit{
+		Status:    r.ExitStatus,
+		Timestamp: r.ExitedAt,
+		Pid:       r.Pid,
+	}, nil
+}
+
+// Update changes runtime information of a running task
+func (t *Task) Update(ctx context.Context, resources *types.Any) error {
+	if _, err := t.shim.Update(ctx, &shim.UpdateTaskRequest{
+		Resources: resources,
+	}); err != nil {
+		return errdefs.FromGRPC(err)
+	}
+	return nil
+}
+
+// Process returns a specific process inside the task by the process id
+func (t *Task) Process(ctx context.Context, id string) (gruntime.Process, error) {
+	p := &Process{
+		id: id,
+		t:  t,
+	}
+	if _, err := p.State(ctx); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+// Wait for the task to exit returning the status and timestamp
+func (t *Task) Wait(ctx context.Context) (*gruntime.Exit, error) {
+	r, err := t.shim.Wait(ctx, &shim.WaitRequest{
+		ID: t.id,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &gruntime.Exit{
+		Timestamp: r.ExitedAt,
+		Status:    r.ExitStatus,
+	}, nil
 }

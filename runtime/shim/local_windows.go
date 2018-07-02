@@ -1,3 +1,5 @@
+// +build windows
+
 /*
    Copyright The containerd Authors.
 
@@ -14,13 +16,15 @@
    limitations under the License.
 */
 
-package main
+package shim
 
 import (
-	_ "github.com/containerd/aufs"
-	_ "github.com/containerd/containerd/metrics/cgroups"
-	_ "github.com/containerd/containerd/runtime"
-	_ "github.com/containerd/containerd/snapshots/native"
-	_ "github.com/containerd/containerd/snapshots/overlay"
-	_ "github.com/containerd/zfs"
+	"context"
+
+	shimapi "github.com/containerd/containerd/runtime/shim/v1"
+	ptypes "github.com/gogo/protobuf/types"
 )
+
+func (c *local) Delete(ctx context.Context, in *ptypes.Empty) (*shimapi.DeleteResponse, error) {
+	return c.s.Delete(ctx, in)
+}

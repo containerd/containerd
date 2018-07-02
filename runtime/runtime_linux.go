@@ -16,7 +16,7 @@
    limitations under the License.
 */
 
-package linux
+package runtime
 
 import (
 	"context"
@@ -24,7 +24,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/boltdb/bolt"
 	eventstypes "github.com/containerd/containerd/api/events"
@@ -39,13 +38,12 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/runtime"
+	gruntime "github.com/containerd/containerd/runtime/generic"
 	"github.com/containerd/containerd/runtime/linux/proc"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	shim "github.com/containerd/containerd/runtime/shim/v1"
 	runc "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
-	ptypes "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -54,13 +52,10 @@ import (
 
 var (
 	pluginID = fmt.Sprintf("%s.%s", plugin.RuntimePlugin, "linux")
-	empty    = &ptypes.Empty{}
 )
 
 const (
-	configFilename = "config.json"
 	defaultRuntime = "runc"
-	defaultShim    = "containerd-shim"
 )
 
 func init() {
@@ -77,22 +72,6 @@ func init() {
 			Runtime: defaultRuntime,
 		},
 	})
-}
-
-var _ = (runtime.PlatformRuntime)(&Runtime{})
-
-// Config options for the runtime
-type Config struct {
-	// Shim is a path or name of binary implementing the Shim GRPC API
-	Shim string `toml:"shim"`
-	// Runtime is a path or name of an OCI runtime used by the shim
-	Runtime string `toml:"runtime"`
-	// RuntimeRoot is the path that shall be used by the OCI runtime for its data
-	RuntimeRoot string `toml:"runtime_root"`
-	// NoShim calls runc directly from within the pkg
-	NoShim bool `toml:"no_shim"`
-	// Debug enable debug on the shim
-	ShimDebug bool `toml:"shim_debug"`
 }
 
 // New returns a configured runtime
@@ -117,8 +96,8 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	r := &Runtime{
 		root:    ic.Root,
 		state:   ic.State,
-		monitor: monitor.(runtime.TaskMonitor),
-		tasks:   runtime.NewTaskList(),
+		monitor: monitor.(gruntime.TaskMonitor),
+		tasks:   gruntime.NewTaskList(),
 		db:      m.(*metadata.DB),
 		address: ic.Address,
 		events:  ic.Events,
@@ -144,21 +123,16 @@ type Runtime struct {
 	state   string
 	address string
 
-	monitor runtime.TaskMonitor
-	tasks   *runtime.TaskList
+	monitor gruntime.TaskMonitor
+	tasks   *gruntime.TaskList
 	db      *metadata.DB
 	events  *exchange.Exchange
 
 	config *Config
 }
 
-// ID of the runtime
-func (r *Runtime) ID() string {
-	return pluginID
-}
-
 // Create a new task
-func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts) (_ runtime.Task, err error) {
+func (r *Runtime) Create(ctx context.Context, id string, opts gruntime.CreateOpts) (_ gruntime.Task, err error) {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -283,7 +257,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 			return nil, err
 		}
 	}
-	r.events.Publish(ctx, runtime.TaskCreateEventTopic, &eventstypes.TaskCreate{
+	r.events.Publish(ctx, gruntime.TaskCreateEventTopic, &eventstypes.TaskCreate{
 		ContainerID: sopts.ID,
 		Bundle:      sopts.Bundle,
 		Rootfs:      sopts.Rootfs,
@@ -300,82 +274,11 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 	return t, nil
 }
 
-// Delete a task removing all on disk state
-func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, error) {
-	namespace, err := namespaces.NamespaceRequired(ctx)
-	if err != nil {
-		return nil, err
-	}
-	lc, ok := c.(*Task)
-	if !ok {
-		return nil, fmt.Errorf("task cannot be cast as *linux.Task")
-	}
-	if err := r.monitor.Stop(lc); err != nil {
-		return nil, err
-	}
-	bundle := loadBundle(
-		lc.id,
-		filepath.Join(r.state, namespace, lc.id),
-		filepath.Join(r.root, namespace, lc.id),
-	)
-
-	rsp, err := lc.shim.Delete(ctx, empty)
-	if err != nil {
-		if cerr := r.cleanupAfterDeadShim(ctx, bundle, namespace, c.ID(), lc.pid); cerr != nil {
-			log.G(ctx).WithError(err).Error("unable to cleanup task")
-		}
-		return nil, errdefs.FromGRPC(err)
-	}
-	r.tasks.Delete(ctx, lc.id)
-	if err := lc.shim.KillShim(ctx); err != nil {
-		log.G(ctx).WithError(err).Error("failed to kill shim")
-	}
-
-	if err := bundle.Delete(); err != nil {
-		log.G(ctx).WithError(err).Error("failed to delete bundle")
-	}
-	r.events.Publish(ctx, runtime.TaskDeleteEventTopic, &eventstypes.TaskDelete{
-		ContainerID: lc.id,
-		ExitStatus:  rsp.ExitStatus,
-		ExitedAt:    rsp.ExitedAt,
-		Pid:         rsp.Pid,
-	})
-	return &runtime.Exit{
-		Status:    rsp.ExitStatus,
-		Timestamp: rsp.ExitedAt,
-		Pid:       rsp.Pid,
-	}, nil
-}
-
-// Tasks returns all tasks known to the runtime
-func (r *Runtime) Tasks(ctx context.Context) ([]runtime.Task, error) {
-	return r.tasks.GetAll(ctx)
-}
-
-func (r *Runtime) restoreTasks(ctx context.Context) ([]*Task, error) {
-	dir, err := ioutil.ReadDir(r.state)
-	if err != nil {
-		return nil, err
-	}
-	var o []*Task
-	for _, namespace := range dir {
-		if !namespace.IsDir() {
-			continue
-		}
-		name := namespace.Name()
-		log.G(ctx).WithField("namespace", name).Debug("loading tasks in namespace")
-		tasks, err := r.loadTasks(ctx, name)
-		if err != nil {
-			return nil, err
-		}
-		o = append(o, tasks...)
-	}
-	return o, nil
-}
-
-// Get a specific task by task id
-func (r *Runtime) Get(ctx context.Context, id string) (runtime.Task, error) {
-	return r.tasks.Get(ctx, id)
+func (r *Runtime) loadBundle(id, namespace string) *bundle {
+	return loadBundle(
+		id,
+		filepath.Join(r.state, namespace, id),
+		filepath.Join(r.root, namespace, id))
 }
 
 func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
@@ -389,11 +292,7 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			continue
 		}
 		id := path.Name()
-		bundle := loadBundle(
-			id,
-			filepath.Join(r.state, ns, id),
-			filepath.Join(r.root, ns, id),
-		)
+		bundle := r.loadBundle(id, ns)
 		ctx = namespaces.WithNamespace(ctx, ns)
 		pid, _ := runc.ReadPidFile(filepath.Join(bundle.path, proc.InitPidFile))
 		s, err := bundle.NewShimClient(ctx, ns, ShimConnect(r.config, func() {
@@ -431,40 +330,6 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 		o = append(o, t)
 	}
 	return o, nil
-}
-
-func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, id string, pid int) error {
-	ctx = namespaces.WithNamespace(ctx, ns)
-	if err := r.terminate(ctx, bundle, ns, id); err != nil {
-		if r.config.ShimDebug {
-			return errors.Wrap(err, "failed to terminate task, leaving bundle for debugging")
-		}
-		log.G(ctx).WithError(err).Warn("failed to terminate task")
-	}
-
-	// Notify Client
-	exitedAt := time.Now().UTC()
-	r.events.Publish(ctx, runtime.TaskExitEventTopic, &eventstypes.TaskExit{
-		ContainerID: id,
-		ID:          id,
-		Pid:         uint32(pid),
-		ExitStatus:  128 + uint32(unix.SIGKILL),
-		ExitedAt:    exitedAt,
-	})
-
-	r.tasks.Delete(ctx, id)
-	if err := bundle.Delete(); err != nil {
-		log.G(ctx).WithError(err).Error("delete bundle")
-	}
-
-	r.events.Publish(ctx, runtime.TaskDeleteEventTopic, &eventstypes.TaskDelete{
-		ContainerID: id,
-		Pid:         uint32(pid),
-		ExitStatus:  128 + uint32(unix.SIGKILL),
-		ExitedAt:    exitedAt,
-	})
-
-	return nil
 }
 
 func (r *Runtime) terminate(ctx context.Context, bundle *bundle, ns, id string) error {

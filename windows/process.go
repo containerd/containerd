@@ -29,7 +29,7 @@ import (
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/runtime"
+	gruntime "github.com/containerd/containerd/runtime/generic"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -55,8 +55,8 @@ func (p *process) ID() string {
 	return p.id
 }
 
-func (p *process) State(ctx context.Context) (runtime.State, error) {
-	return runtime.State{
+func (p *process) State(ctx context.Context) (gruntime.State, error) {
+	return gruntime.State{
 		Status:     p.Status(),
 		Pid:        p.pid,
 		Stdin:      p.io.src.Stdin,
@@ -67,37 +67,37 @@ func (p *process) State(ctx context.Context) (runtime.State, error) {
 	}, nil
 }
 
-func (p *process) Status() runtime.Status {
+func (p *process) Status() gruntime.Status {
 	p.Lock()
 	defer p.Unlock()
 
-	if p.task.getStatus() == runtime.PausedStatus {
-		return runtime.PausedStatus
+	if p.task.getStatus() == gruntime.PausedStatus {
+		return gruntime.PausedStatus
 	}
 
-	var status runtime.Status
+	var status gruntime.Status
 	select {
 	case <-p.exitCh:
-		status = runtime.StoppedStatus
+		status = gruntime.StoppedStatus
 	default:
 		if p.hcs == nil {
-			return runtime.CreatedStatus
+			return gruntime.CreatedStatus
 		}
-		status = runtime.RunningStatus
+		status = gruntime.RunningStatus
 	}
 	return status
 }
 
 func (p *process) Kill(ctx context.Context, sig uint32, all bool) error {
 	// On windows all signals kill the process
-	if p.Status() == runtime.CreatedStatus {
+	if p.Status() == gruntime.CreatedStatus {
 		return errors.Wrap(errdefs.ErrFailedPrecondition, "process was not started")
 	}
 	return errors.Wrap(p.hcs.Kill(), "failed to kill process")
 }
 
-func (p *process) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
-	if p.Status() == runtime.CreatedStatus {
+func (p *process) ResizePty(ctx context.Context, size gruntime.ConsoleSize) error {
+	if p.Status() == gruntime.CreatedStatus {
 		return errors.Wrap(errdefs.ErrFailedPrecondition, "process was not started")
 	}
 	err := p.hcs.ResizeConsole(uint16(size.Width), uint16(size.Height))
@@ -105,7 +105,7 @@ func (p *process) ResizePty(ctx context.Context, size runtime.ConsoleSize) error
 }
 
 func (p *process) CloseIO(ctx context.Context) error {
-	if p.Status() == runtime.CreatedStatus {
+	if p.Status() == gruntime.CreatedStatus {
 		return errors.Wrap(errdefs.ErrFailedPrecondition, "process was not started")
 	}
 	return errors.Wrap(p.hcs.CloseStdin(), "failed to close stdin")
@@ -120,7 +120,7 @@ func (p *process) HcsPid() uint32 {
 }
 
 func (p *process) ExitCode() (uint32, time.Time, error) {
-	if s := p.Status(); s != runtime.StoppedStatus && s != runtime.CreatedStatus {
+	if s := p.Status(); s != gruntime.StoppedStatus && s != gruntime.CreatedStatus {
 		return 255, time.Time{}, errors.Wrapf(errdefs.ErrFailedPrecondition, "process is not stopped: %s", s)
 	}
 	return p.exitCode, p.exitTime, nil
@@ -201,7 +201,7 @@ func (p *process) Start(ctx context.Context) (err error) {
 		p.exitCode = uint32(ec)
 
 		p.task.publisher.Publish(ctx,
-			runtime.TaskExitEventTopic,
+			gruntime.TaskExitEventTopic,
 			&eventstypes.TaskExit{
 				ContainerID: p.task.id,
 				ID:          p.id,
@@ -219,14 +219,14 @@ func (p *process) Start(ctx context.Context) (err error) {
 	return nil
 }
 
-func (p *process) Wait(ctx context.Context) (*runtime.Exit, error) {
+func (p *process) Wait(ctx context.Context) (*gruntime.Exit, error) {
 	<-p.exitCh
 
 	ec, ea, err := p.ExitCode()
 	if err != nil {
 		return nil, err
 	}
-	return &runtime.Exit{
+	return &gruntime.Exit{
 		Status:    ec,
 		Timestamp: ea,
 	}, nil

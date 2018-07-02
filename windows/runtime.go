@@ -35,7 +35,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/runtime"
+	gruntime "github.com/containerd/containerd/runtime/generic"
 	"github.com/containerd/containerd/windows/hcsshimtypes"
 	"github.com/containerd/typeurl"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -53,7 +53,7 @@ var (
 	pluginID = fmt.Sprintf("%s.%s", plugin.RuntimePlugin, runtimeName)
 )
 
-var _ = (runtime.PlatformRuntime)(&windowsRuntime{})
+var _ = (gruntime.PlatformRuntime)(&windowsRuntime{})
 
 func init() {
 	plugin.Register(&plugin.Registration{
@@ -81,7 +81,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		publisher: ic.Events,
 		// TODO(mlaventure): windows needs a stat monitor
 		monitor: nil,
-		tasks:   runtime.NewTaskList(),
+		tasks:   gruntime.NewTaskList(),
 	}
 
 	// Load our existing containers and kill/delete them. We don't support
@@ -100,15 +100,15 @@ type windowsRuntime struct {
 	publisher events.Publisher
 	events    chan interface{}
 
-	monitor runtime.TaskMonitor
-	tasks   *runtime.TaskList
+	monitor gruntime.TaskMonitor
+	tasks   *gruntime.TaskList
 }
 
 func (r *windowsRuntime) ID() string {
 	return pluginID
 }
 
-func (r *windowsRuntime) Create(ctx context.Context, id string, opts runtime.CreateOpts) (runtime.Task, error) {
+func (r *windowsRuntime) Create(ctx context.Context, id string, opts gruntime.CreateOpts) (gruntime.Task, error) {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -148,15 +148,15 @@ func (r *windowsRuntime) Create(ctx context.Context, id string, opts runtime.Cre
 	return r.newTask(ctx, namespace, id, opts.Rootfs, spec, opts.IO, createOpts)
 }
 
-func (r *windowsRuntime) Get(ctx context.Context, id string) (runtime.Task, error) {
+func (r *windowsRuntime) Get(ctx context.Context, id string) (gruntime.Task, error) {
 	return r.tasks.Get(ctx, id)
 }
 
-func (r *windowsRuntime) Tasks(ctx context.Context) ([]runtime.Task, error) {
+func (r *windowsRuntime) Tasks(ctx context.Context) ([]gruntime.Task, error) {
 	return r.tasks.GetAll(ctx)
 }
 
-func (r *windowsRuntime) Delete(ctx context.Context, t runtime.Task) (*runtime.Exit, error) {
+func (r *windowsRuntime) Delete(ctx context.Context, t gruntime.Task) (*gruntime.Exit, error) {
 	wt, ok := t.(*task)
 	if !ok {
 		return nil, errors.Wrap(errdefs.ErrInvalidArgument, "no a windows task")
@@ -169,9 +169,9 @@ func (r *windowsRuntime) Delete(ctx context.Context, t runtime.Task) (*runtime.E
 		state, _ = wt.State(ctx)
 	)
 	switch state.Status {
-	case runtime.StoppedStatus:
+	case gruntime.StoppedStatus:
 		fallthrough
-	case runtime.CreatedStatus:
+	case gruntime.CreatedStatus:
 		// if it's stopped or in created state, we need to shutdown the
 		// container before removing it
 		if err = wt.stop(ctx); err != nil {
@@ -182,19 +182,19 @@ func (r *windowsRuntime) Delete(ctx context.Context, t runtime.Task) (*runtime.E
 			"cannot delete a non-stopped task")
 	}
 
-	var rtExit *runtime.Exit
+	var rtExit *gruntime.Exit
 	if p := wt.getProcess(t.ID()); p != nil {
 		ec, ea, err := p.ExitCode()
 		if err != nil {
 			return nil, err
 		}
-		rtExit = &runtime.Exit{
+		rtExit = &gruntime.Exit{
 			Pid:       wt.pid,
 			Status:    ec,
 			Timestamp: ea,
 		}
 	} else {
-		rtExit = &runtime.Exit{
+		rtExit = &gruntime.Exit{
 			Pid:       wt.pid,
 			Status:    255,
 			Timestamp: time.Now().UTC(),
@@ -205,7 +205,7 @@ func (r *windowsRuntime) Delete(ctx context.Context, t runtime.Task) (*runtime.E
 	r.tasks.Delete(ctx, t.ID())
 
 	r.publisher.Publish(ctx,
-		runtime.TaskDeleteEventTopic,
+		gruntime.TaskDeleteEventTopic,
 		&eventstypes.TaskDelete{
 			ContainerID: wt.id,
 			Pid:         wt.pid,
@@ -222,7 +222,7 @@ func (r *windowsRuntime) Delete(ctx context.Context, t runtime.Task) (*runtime.E
 	return rtExit, nil
 }
 
-func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, rootfs []mount.Mount, spec *runtimespec.Spec, io runtime.IO, createOpts *hcsshimtypes.CreateOptions) (*task, error) {
+func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, rootfs []mount.Mount, spec *runtimespec.Spec, io gruntime.IO, createOpts *hcsshimtypes.CreateOptions) (*task, error) {
 	var (
 		err  error
 		pset *pipeSet
@@ -288,7 +288,7 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, root
 		namespace:         namespace,
 		pid:               pid,
 		io:                pset,
-		status:            runtime.CreatedStatus,
+		status:            gruntime.CreatedStatus,
 		spec:              spec,
 		processes:         make(map[string]*process),
 		hyperV:            spec.Windows.HyperV != nil,
@@ -316,7 +316,7 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, root
 	}
 
 	r.publisher.Publish(ctx,
-		runtime.TaskCreateEventTopic,
+		gruntime.TaskCreateEventTopic,
 		&eventstypes.TaskCreate{
 			ContainerID: id,
 			IO: &eventstypes.TaskIO{
