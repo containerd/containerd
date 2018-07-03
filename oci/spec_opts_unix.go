@@ -303,9 +303,10 @@ func WithUser(userstr string) SpecOpts {
 			}
 			f := func(root string) error {
 				if username != "" {
-					uid, _, err = getUIDGIDFromPath(root, func(u user.User) bool {
+					u, err := getUserFromPath(root, func(u user.User) bool {
 						return u.Name == username
 					})
+					uid = uint32(u.Uid)
 					if err != nil {
 						return err
 					}
@@ -355,6 +356,15 @@ func WithUIDGID(uid, gid uint32) SpecOpts {
 	}
 }
 
+// WithAdditionalGIDs allows supplementary GIDs to be set for the Process
+func WithAdditionalGIDs(sgids []uint32) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setProcess(s)
+		s.Process.User.AdditionalGids = sgids
+		return nil
+	}
+}
+
 // WithUserID sets the correct UID and GID for the container based
 // on the image's /etc/passwd contents. If /etc/passwd does not exist,
 // or uid is not found in /etc/passwd, it sets gid to be the same with
@@ -366,7 +376,7 @@ func WithUserID(uid uint32) SpecOpts {
 			if !isRootfsAbs(s.Root.Path) {
 				return errors.Errorf("rootfs absolute path is required")
 			}
-			uuid, ugid, err := getUIDGIDFromPath(s.Root.Path, func(u user.User) bool {
+			uuid, ugid, sgids, err := getUIDGIDFromPath(s.Root.Path, func(u user.User) bool {
 				return u.Uid == int(uid)
 			})
 			if err != nil {
@@ -377,7 +387,8 @@ func WithUserID(uid uint32) SpecOpts {
 				return err
 			}
 			s.Process.User.UID, s.Process.User.GID = uuid, ugid
-			return nil
+			s.Process.User.AdditionalGids = sgids
+			return err
 
 		}
 		if c.Snapshotter == "" {
@@ -392,7 +403,7 @@ func WithUserID(uid uint32) SpecOpts {
 			return err
 		}
 		return mount.WithTempMount(ctx, mounts, func(root string) error {
-			uuid, ugid, err := getUIDGIDFromPath(root, func(u user.User) bool {
+			uuid, ugid, sgids, err := getUIDGIDFromPath(root, func(u user.User) bool {
 				return u.Uid == int(uid)
 			})
 			if err != nil {
@@ -403,7 +414,8 @@ func WithUserID(uid uint32) SpecOpts {
 				return err
 			}
 			s.Process.User.UID, s.Process.User.GID = uuid, ugid
-			return nil
+			s.Process.User.AdditionalGids = sgids
+			return err
 		})
 	}
 }
@@ -419,14 +431,15 @@ func WithUsername(username string) SpecOpts {
 			if !isRootfsAbs(s.Root.Path) {
 				return errors.Errorf("rootfs absolute path is required")
 			}
-			uid, gid, err := getUIDGIDFromPath(s.Root.Path, func(u user.User) bool {
+			uid, gid, sgids, err := getUIDGIDFromPath(s.Root.Path, func(u user.User) bool {
 				return u.Name == username
 			})
 			if err != nil {
 				return err
 			}
 			s.Process.User.UID, s.Process.User.GID = uid, gid
-			return nil
+			s.Process.User.AdditionalGids = sgids
+			return err
 		}
 		if c.Snapshotter == "" {
 			return errors.Errorf("no snapshotter set for container")
@@ -440,14 +453,15 @@ func WithUsername(username string) SpecOpts {
 			return err
 		}
 		return mount.WithTempMount(ctx, mounts, func(root string) error {
-			uid, gid, err := getUIDGIDFromPath(root, func(u user.User) bool {
+			uid, gid, sgids, err := getUIDGIDFromPath(root, func(u user.User) bool {
 				return u.Name == username
 			})
 			if err != nil {
 				return err
 			}
 			s.Process.User.UID, s.Process.User.GID = uid, gid
-			return nil
+			s.Process.User.AdditionalGids = sgids
+			return err
 		})
 	}
 }
@@ -487,25 +501,53 @@ func getAllCapabilities() []string {
 
 var errNoUsersFound = errors.New("no users found")
 
-func getUIDGIDFromPath(root string, filter func(user.User) bool) (uid, gid uint32, err error) {
-	ppath, err := fs.RootPath(root, "/etc/passwd")
+func getUIDGIDFromPath(root string, filter func(user.User) bool) (uint32, uint32, []uint32, error) {
+	u, err := getUserFromPath(root, filter)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, nil, err
 	}
-	users, err := user.ParsePasswdFileFilter(ppath, filter)
+	gpath, err := fs.RootPath(root, "/etc/group")
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, nil, nil
 	}
-	if len(users) == 0 {
-		return 0, 0, errNoUsersFound
+	groups, err := user.ParseGroupFileFilter(gpath, func(g user.Group) bool {
+		for _, member := range g.List {
+			if member == u.Name {
+				return true
+			}
+		}
+		return false
+	})
+	if err != nil {
+		return 0, 0, nil, err
 	}
-	u := users[0]
-	return uint32(u.Uid), uint32(u.Gid), nil
+	sgids := make([]uint32, len(groups))
+	for i, group := range groups {
+		sgids[i] = uint32(group.Gid)
+	}
+
+	return uint32(u.Uid), uint32(u.Gid), sgids, nil
 }
 
 var errNoGroupsFound = errors.New("no groups found")
 
-func getGIDFromPath(root string, filter func(user.Group) bool) (gid uint32, err error) {
+func getUserFromPath(root string, filter func(user.User) bool) (u user.User, err error) {
+	ppath, err := fs.RootPath(root, "/etc/passwd")
+	if err != nil {
+		return
+	}
+	users, err := user.ParsePasswdFileFilter(ppath, filter)
+	if err != nil {
+		return
+	}
+	if len(users) == 0 {
+		return u, errNoUsersFound
+	}
+	u = users[0]
+	return
+}
+
+func getGIDFromPath(root string, filter func(user.Group) bool) (uint32, error) {
 	gpath, err := fs.RootPath(root, "/etc/group")
 	if err != nil {
 		return 0, err
