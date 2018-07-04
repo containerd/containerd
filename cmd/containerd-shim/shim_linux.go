@@ -22,8 +22,8 @@ import (
 
 	"github.com/containerd/containerd/runtime/shim"
 	runc "github.com/containerd/go-runc"
+	"github.com/containerd/ttrpc"
 	"github.com/opencontainers/runc/libcontainer/system"
-	"github.com/stevvooe/ttrpc"
 	"golang.org/x/sys/unix"
 )
 

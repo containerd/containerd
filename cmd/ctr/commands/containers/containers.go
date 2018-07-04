@@ -25,6 +25,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/cmd/ctr/commands/run"
 	"github.com/containerd/containerd/log"
@@ -49,7 +50,7 @@ var createCommand = cli.Command{
 	Name:      "create",
 	Usage:     "create container",
 	ArgsUsage: "[flags] Image|RootFS CONTAINER",
-	Flags:     append(commands.SnapshotterFlags, run.ContainerFlags...),
+	Flags:     append(commands.SnapshotterFlags, commands.ContainerFlags...),
 	Action: func(context *cli.Context) error {
 		var (
 			id  = context.Args().Get(1)
@@ -162,7 +163,6 @@ var deleteCommand = cli.Command{
 				log.G(ctx).WithError(err).Errorf("failed to delete container %q", arg)
 			}
 		}
-
 		return exitErr
 	},
 }
@@ -172,7 +172,7 @@ func deleteContainer(ctx context.Context, client *containerd.Client, id string, 
 	if err != nil {
 		return err
 	}
-	task, err := container.Task(ctx, nil)
+	task, err := container.Task(ctx, cio.Load)
 	if err != nil {
 		return container.Delete(ctx, opts...)
 	}

@@ -39,11 +39,11 @@ import (
 	"github.com/containerd/containerd/runtime/linux/proc"
 	"github.com/containerd/containerd/runtime/shim"
 	shimapi "github.com/containerd/containerd/runtime/shim/v1"
+	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/stevvooe/ttrpc"
 	"golang.org/x/sys/unix"
 )
 
@@ -172,7 +172,7 @@ func serve(server *ttrpc.Server, path string) error {
 	logrus.WithField("socket", path).Debug("serving api on unix socket")
 	go func() {
 		defer l.Close()
-		if err := server.Serve(l); err != nil &&
+		if err := server.Serve(context.Background(), l); err != nil &&
 			!strings.Contains(err.Error(), "use of closed network connection") {
 			logrus.WithError(err).Fatal("containerd-shim: ttrpc server failure")
 		}

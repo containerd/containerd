@@ -18,6 +18,7 @@ package server
 
 import (
 	"io"
+	"os"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -29,6 +30,7 @@ import (
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
+	cioutil "github.com/containerd/cri/pkg/ioutil"
 	cio "github.com/containerd/cri/pkg/server/io"
 	containerstore "github.com/containerd/cri/pkg/store/container"
 	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
@@ -97,20 +99,10 @@ func (c *criService) startContainer(ctx context.Context,
 	}
 
 	ioCreation := func(id string) (_ containerdio.IO, err error) {
-		stdoutWC, stderrWC, err := createContainerLoggers(meta.LogPath, config.GetTty())
+		stdoutWC, stderrWC, err := c.createContainerLoggers(meta.LogPath, config.GetTty())
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create container loggers")
 		}
-		defer func() {
-			if err != nil {
-				if stdoutWC != nil {
-					stdoutWC.Close()
-				}
-				if stderrWC != nil {
-					stderrWC.Close()
-				}
-			}
-		}()
 		cntr.IO.AddOutput("log", stdoutWC, stderrWC)
 		cntr.IO.Pipe()
 		return cntr.IO, nil
@@ -142,24 +134,36 @@ func (c *criService) startContainer(ctx context.Context,
 	return nil
 }
 
-// Create container loggers and return write closer for stdout and stderr.
-func createContainerLoggers(logPath string, tty bool) (stdout io.WriteCloser, stderr io.WriteCloser, err error) {
+// createContainerLoggers creates container loggers and return write closer for stdout and stderr.
+func (c *criService) createContainerLoggers(logPath string, tty bool) (stdout io.WriteCloser, stderr io.WriteCloser, err error) {
 	if logPath != "" {
 		// Only generate container log when log path is specified.
-		if stdout, err = cio.NewCRILogger(logPath, cio.Stdout); err != nil {
-			return nil, nil, errors.Wrap(err, "failed to start container stdout logger")
+		f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0640)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "failed to create and open log file")
 		}
 		defer func() {
 			if err != nil {
-				stdout.Close()
+				f.Close()
 			}
 		}()
+		var stdoutCh, stderrCh <-chan struct{}
+		wc := cioutil.NewSerialWriteCloser(f)
+		stdout, stdoutCh = cio.NewCRILogger(logPath, wc, cio.Stdout, c.config.MaxContainerLogLineSize)
 		// Only redirect stderr when there is no tty.
 		if !tty {
-			if stderr, err = cio.NewCRILogger(logPath, cio.Stderr); err != nil {
-				return nil, nil, errors.Wrap(err, "failed to start container stderr logger")
-			}
+			stderr, stderrCh = cio.NewCRILogger(logPath, wc, cio.Stderr, c.config.MaxContainerLogLineSize)
 		}
+		go func() {
+			if stdoutCh != nil {
+				<-stdoutCh
+			}
+			if stderrCh != nil {
+				<-stderrCh
+			}
+			logrus.Debugf("Finish redirecting log file %q, closing it", logPath)
+			f.Close()
+		}()
 	} else {
 		stdout = cio.NewDiscardLogger()
 		stderr = cio.NewDiscardLogger()

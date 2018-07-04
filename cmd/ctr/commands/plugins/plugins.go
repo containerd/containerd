@@ -37,6 +37,15 @@ var Command = cli.Command{
 	Name:    "plugins",
 	Aliases: []string{"plugin"},
 	Usage:   "provides information about containerd plugins",
+	Subcommands: []cli.Command{
+		listCommand,
+	},
+}
+
+var listCommand = cli.Command{
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "lists containerd plugins",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "quiet,q",

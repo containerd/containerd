@@ -22,6 +22,7 @@ import (
 	goruntime "runtime"
 
 	cni "github.com/containerd/go-cni"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
@@ -41,14 +42,16 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 		Type:   runtime.NetworkReady,
 		Status: true,
 	}
+
+	// Load the latest cni configuration to be in sync with the latest network configuration
+	if err := c.netPlugin.Load(cni.WithLoNetwork, cni.WithDefaultConf); err != nil {
+		logrus.WithError(err).Errorf("Failed to load cni configuration")
+	}
 	// Check the status of the cni initialization
 	if err := c.netPlugin.Status(); err != nil {
-		// If it is not initialized, then load the config and retry
-		if err = c.netPlugin.Load(cni.WithLoNetwork(), cni.WithDefaultConf()); err != nil {
-			networkCondition.Status = false
-			networkCondition.Reason = networkNotReadyReason
-			networkCondition.Message = fmt.Sprintf("Network plugin returns error: %v", err)
-		}
+		networkCondition.Status = false
+		networkCondition.Reason = networkNotReadyReason
+		networkCondition.Message = fmt.Sprintf("Network plugin returns error: %v", err)
 	}
 
 	resp := &runtime.StatusResponse{

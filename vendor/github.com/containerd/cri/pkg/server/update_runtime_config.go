@@ -52,7 +52,7 @@ func (c *criService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateR
 	if err := c.netPlugin.Status(); err == nil {
 		logrus.Infof("Network plugin is ready, skip generating cni config from template %q", confTemplate)
 		return &runtime.UpdateRuntimeConfigResponse{}, nil
-	} else if err := c.netPlugin.Load(cni.WithLoNetwork(), cni.WithDefaultConf()); err == nil {
+	} else if err := c.netPlugin.Load(cni.WithLoNetwork, cni.WithDefaultConf); err == nil {
 		logrus.Infof("CNI config is successfully loaded, skip generating cni config from template %q", confTemplate)
 		return &runtime.UpdateRuntimeConfigResponse{}, nil
 	}
