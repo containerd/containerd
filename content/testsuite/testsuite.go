@@ -367,6 +367,7 @@ func checkLabels(ctx context.Context, t *testing.T, cs content.Store) {
 	labels := map[string]string{
 		"k1": "v1",
 		"k2": "v2",
+
 		"containerd.io/gc.root": rootTime,
 	}
 
@@ -403,6 +404,7 @@ func checkLabels(ctx context.Context, t *testing.T, cs content.Store) {
 
 	info.Labels = map[string]string{
 		"k1": "v1",
+
 		"containerd.io/gc.root": rootTime,
 	}
 	preUpdate = time.Now()
