@@ -60,7 +60,7 @@ script:
   - script/validate/vendor
   - go build -i .
   - make check
-  - if [[ "$GOOS" = "linux" && "$TRAVIS_GO_VERSION" != "1.9"* ]]; then make check-protos check-api-descriptors; fi
+  - if [ "$GOOS" = "linux" ]; then make check-protos check-api-descriptors; fi
   - make build
   - make binaries
   - if [ "$GOOS" = "linux" ]; then sudo make install ; fi
