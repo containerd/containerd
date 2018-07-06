@@ -153,6 +153,7 @@ func createDefaultSpec(ctx context.Context, id string) (*specs.Spec, error) {
 		},
 		Linux: &specs.Linux{
 			MaskedPaths: []string{
+				"/proc/acpi",
 				"/proc/kcore",
 				"/proc/latency_stats",
 				"/proc/timer_list",
