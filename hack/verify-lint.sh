@@ -20,7 +20,7 @@ set -o pipefail
 for d in $(find . -type d -a \( -iwholename './pkg*' -o -iwholename './cmd*' \) -not -iwholename './pkg/api*'); do
 	echo for directory ${d} ...
 	gometalinter \
-		 --exclude='error return value not checked.*(Close|Log|Print).*\(errcheck\)$' \
+		 --exclude='error return value not checked.*(Close|Log|Print|Fprint).*\(errcheck\)$' \
 		 --exclude='.*_test\.go:.*error return value not checked.*\(errcheck\)$' \
 		 --exclude='duplicate of.*_test.go.*\(dupl\)$' \
 		 --exclude='.*/mock_.*\.go:.*\(golint\)$' \

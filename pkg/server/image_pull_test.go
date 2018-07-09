@@ -22,6 +22,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+
+	criconfig "github.com/containerd/cri/pkg/config"
 )
 
 func TestParseAuth(t *testing.T) {
@@ -70,5 +72,60 @@ func TestParseAuth(t *testing.T) {
 		assert.Equal(t, test.expectErr, err != nil)
 		assert.Equal(t, test.expectedUser, u)
 		assert.Equal(t, test.expectedSecret, s)
+	}
+}
+
+func TestCredentials(t *testing.T) {
+	c := newTestCRIService()
+	c.config.Registry.Auths = map[string]criconfig.AuthConfig{
+		"https://test1.io": {
+			Username: "username1",
+			Password: "password1",
+		},
+		"http://test2.io": {
+			Username: "username2",
+			Password: "password2",
+		},
+		"//test3.io": {
+			Username: "username3",
+			Password: "password3",
+		},
+	}
+	for desc, test := range map[string]struct {
+		auth             *runtime.AuthConfig
+		host             string
+		expectedUsername string
+		expectedPassword string
+	}{
+		"auth config from CRI should take precedence": {
+			auth: &runtime.AuthConfig{
+				Username: "username",
+				Password: "password",
+			},
+			host:             "test1.io",
+			expectedUsername: "username",
+			expectedPassword: "password",
+		},
+		"should support https host": {
+			host:             "test1.io",
+			expectedUsername: "username1",
+			expectedPassword: "password1",
+		},
+		"should support http host": {
+			host:             "test2.io",
+			expectedUsername: "username2",
+			expectedPassword: "password2",
+		},
+		"should support hostname only": {
+			host:             "test3.io",
+			expectedUsername: "username3",
+			expectedPassword: "password3",
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		username, password, err := c.credentials(test.auth)(test.host)
+		assert.NoError(t, err)
+		assert.Equal(t, test.expectedUsername, username)
+		assert.Equal(t, test.expectedPassword, password)
 	}
 }

@@ -1,4 +1,3 @@
-<!-- TODO(now) -->
 # Install Containerd with Release Tarball
 This document provides the steps to install `containerd` and its dependencies with the release tarball, and bring up a Kubernetes cluster using kubeadm.
 
