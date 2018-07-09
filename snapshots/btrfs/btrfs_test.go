@@ -45,7 +45,7 @@ func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshots.Snap
 
 	return func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
 
-		loopbackSize := int64(100 << 20) // 100 MB
+		loopbackSize := int64(128 << 20) // 128 MB
 		// mkfs.btrfs creates a fs which has a blocksize equal to the system default pagesize. If that pagesize
 		// is > 4KB, mounting the fs will fail unless we increase the size of the file used by mkfs.btrfs
 		if os.Getpagesize() > 4096 {
