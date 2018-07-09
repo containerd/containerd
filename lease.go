@@ -35,16 +35,22 @@ type Lease struct {
 }
 
 // CreateLease creates a new lease
+// TODO: Add variadic lease opt
 func (c *Client) CreateLease(ctx context.Context) (Lease, error) {
 	lapi := c.LeasesService()
-	resp, err := lapi.Create(ctx, &leasesapi.CreateRequest{})
+	labels := map[string]string{
+		"containerd.io/gc.expire": time.Now().Add(24 * 3600 * time.Second).Format(time.RFC3339),
+	}
+	resp, err := lapi.Create(ctx, &leasesapi.CreateRequest{labels})
 	if err != nil {
 		return Lease{}, err
 	}
 
 	return Lease{
-		id:     resp.Lease.ID,
-		client: c,
+		id:        resp.Lease.ID,
+		createdAt: resp.Lease.CreatedAt,
+		labels:    labels,
+		client:    c,
 	}, nil
 }
 
@@ -60,6 +66,7 @@ func (c *Client) ListLeases(ctx context.Context) ([]Lease, error) {
 		leases[i] = Lease{
 			id:        resp.Leases[i].ID,
 			createdAt: resp.Leases[i].CreatedAt,
+			labels:    resp.Leases[i].Labels,
 			client:    c,
 		}
 	}

@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/gc"
@@ -63,6 +64,12 @@ func TestGCRoots(t *testing.T) {
 		addLeaseSnapshot("ns2", "l2", "overlay", "sn6"),
 		addLeaseContent("ns2", "l1", dgst(4)),
 		addLeaseContent("ns2", "l2", dgst(5)),
+		addLease("ns2", "l3", labelmap(string(labelGCExpire), time.Now().Add(3600*time.Second).Format(time.RFC3339))),
+		addLeaseContent("ns2", "l3", dgst(6)),
+		addLeaseSnapshot("ns2", "l3", "overlay", "sn7"),
+		addLease("ns2", "l4", labelmap(string(labelGCExpire), time.Now().Format(time.RFC3339))),
+		addLeaseContent("ns2", "l4", dgst(7)),
+		addLeaseSnapshot("ns2", "l4", "overlay", "sn8"),
 	}
 
 	expected := []gc.Node{
@@ -71,6 +78,7 @@ func TestGCRoots(t *testing.T) {
 		gcnode(ResourceContent, "ns2", dgst(2).String()),
 		gcnode(ResourceContent, "ns2", dgst(4).String()),
 		gcnode(ResourceContent, "ns2", dgst(5).String()),
+		gcnode(ResourceContent, "ns2", dgst(6).String()),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn2"),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn3"),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn4"),
@@ -81,6 +89,10 @@ func TestGCRoots(t *testing.T) {
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn9"),
 		gcnode(ResourceSnapshot, "ns2", "overlay/sn5"),
 		gcnode(ResourceSnapshot, "ns2", "overlay/sn6"),
+		gcnode(ResourceSnapshot, "ns2", "overlay/sn7"),
+		gcnode(ResourceLease, "ns2", "l1"),
+		gcnode(ResourceLease, "ns2", "l2"),
+		gcnode(ResourceLease, "ns2", "l3"),
 	}
 
 	if err := db.Update(func(tx *bolt.Tx) error {
@@ -126,6 +138,8 @@ func TestGCRemove(t *testing.T) {
 		addSnapshot("ns1", "overlay", "sn3", "", labelmap(string(labelGCRoot), "always")),
 		addSnapshot("ns1", "overlay", "sn4", "", nil),
 		addSnapshot("ns2", "overlay", "sn1", "", nil),
+		addLease("ns1", "l1", labelmap(string(labelGCExpire), time.Now().Add(3600*time.Second).Format(time.RFC3339))),
+		addLease("ns2", "l2", labelmap(string(labelGCExpire), time.Now().Format(time.RFC3339))),
 	}
 
 	all := []gc.Node{
@@ -139,6 +153,8 @@ func TestGCRemove(t *testing.T) {
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn3"),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn4"),
 		gcnode(ResourceSnapshot, "ns2", "overlay/sn1"),
+		gcnode(ResourceLease, "ns1", "l1"),
+		gcnode(ResourceLease, "ns2", "l2"),
 	}
 
 	var deleted, remaining []gc.Node
@@ -422,6 +438,16 @@ func addContent(ns string, dgst digest.Digest, labels map[string]string) alterFu
 			return err
 		}
 		return boltutil.WriteLabels(cbkt, labels)
+	}
+}
+
+func addLease(ns, lid string, labels map[string]string) alterFunc {
+	return func(bkt *bolt.Bucket) error {
+		lbkt, err := createBuckets(bkt, ns, string(bucketKeyObjectLeases), lid)
+		if err != nil {
+			return err
+		}
+		return boltutil.WriteLabels(lbkt, labels)
 	}
 }
 
