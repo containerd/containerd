@@ -27,6 +27,7 @@ import (
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/windows/hcsshimtypes"
@@ -55,10 +56,15 @@ type task struct {
 	pidPool           *pidPool
 	hcsContainer      hcsshim.Container
 	terminateDuration time.Duration
+	tasks             *runtime.TaskList
 }
 
 func (t *task) ID() string {
 	return t.id
+}
+
+func (t *task) Namespace() string {
+	return t.namespace
 }
 
 func (t *task) State(ctx context.Context) (runtime.State, error) {
@@ -271,33 +277,6 @@ func (t *task) Checkpoint(_ context.Context, _ string, _ *types.Any) error {
 	return errors.Wrap(errdefs.ErrUnavailable, "not supported")
 }
 
-func (t *task) DeleteProcess(ctx context.Context, id string) (*runtime.Exit, error) {
-	if id == t.id {
-		return nil, errors.Wrapf(errdefs.ErrInvalidArgument,
-			"cannot delete init process")
-	}
-	if p := t.getProcess(id); p != nil {
-		ec, ea, err := p.ExitCode()
-		if err != nil {
-			return nil, err
-		}
-
-		// If we never started the process close the pipes
-		if p.Status() == runtime.CreatedStatus {
-			p.io.Close()
-			ea = time.Now()
-		}
-
-		t.removeProcess(id)
-		return &runtime.Exit{
-			Pid:       p.pid,
-			Status:    ec,
-			Timestamp: ea,
-		}, nil
-	}
-	return nil, errors.Wrapf(errdefs.ErrNotFound, "no such process %s", id)
-}
-
 func (t *task) Update(ctx context.Context, resources *types.Any) error {
 	return errors.Wrap(errdefs.ErrUnavailable, "not supported")
 }
@@ -311,7 +290,7 @@ func (t *task) Process(ctx context.Context, id string) (p runtime.Process, err e
 	return p, err
 }
 
-func (t *task) Metrics(ctx context.Context) (interface{}, error) {
+func (t *task) Stats(ctx context.Context) (*types.Any, error) {
 	return nil, errors.Wrap(errdefs.ErrUnavailable, "not supported")
 }
 
@@ -321,6 +300,64 @@ func (t *task) Wait(ctx context.Context) (*runtime.Exit, error) {
 		return nil, errors.Wrapf(errdefs.ErrNotFound, "no such process %d", t.id)
 	}
 	return p.Wait(ctx)
+}
+
+func (t *task) Delete(ctx context.Context) (*runtime.Exit, error) {
+	var (
+		err      error
+		state, _ = t.State(ctx)
+	)
+	switch state.Status {
+	case runtime.StoppedStatus:
+		fallthrough
+	case runtime.CreatedStatus:
+		// if it's stopped or in created state, we need to shutdown the
+		// container before removing it
+		if err = t.stop(ctx); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.Wrap(errdefs.ErrFailedPrecondition,
+			"cannot delete a non-stopped task")
+	}
+
+	var rtExit *runtime.Exit
+	if p := t.getProcess(t.ID()); p != nil {
+		ec, ea, err := p.ExitCode()
+		if err != nil {
+			return nil, err
+		}
+		rtExit = &runtime.Exit{
+			Pid:       t.pid,
+			Status:    ec,
+			Timestamp: ea,
+		}
+	} else {
+		rtExit = &runtime.Exit{
+			Pid:       t.pid,
+			Status:    255,
+			Timestamp: time.Now().UTC(),
+		}
+	}
+
+	t.cleanup()
+	t.tasks.Delete(ctx, t.ID())
+
+	t.publisher.Publish(ctx,
+		runtime.TaskDeleteEventTopic,
+		&eventstypes.TaskDelete{
+			ContainerID: t.id,
+			Pid:         t.pid,
+			ExitStatus:  rtExit.Status,
+			ExitedAt:    rtExit.Timestamp,
+		})
+
+	if err := mount.UnmountAll(t.rootfs[0].Source, 0); err != nil {
+		log.G(ctx).WithError(err).WithField("path", t.rootfs[0].Source).
+			Warn("failed to unmount rootfs on failure")
+	}
+	// We were never started, return failure
+	return rtExit, nil
 }
 
 func (t *task) newProcess(ctx context.Context, id string, conf *hcsshim.ProcessConfig, pset *pipeSet) (*process, error) {

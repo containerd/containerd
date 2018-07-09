@@ -18,9 +18,12 @@ package tasks
 
 import (
 	"fmt"
+	"runtime"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/runtime/linux/runctypes"
+	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -33,6 +36,11 @@ var checkpointCommand = cli.Command{
 		cli.BoolFlag{
 			Name:  "exit",
 			Usage: "stop the container after the checkpoint",
+		},
+		cli.StringFlag{
+			Name:  "runtime",
+			Usage: "runtime name",
+			Value: fmt.Sprintf("io.containerd.runtime.v1.%s", runtime.GOOS),
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -55,7 +63,7 @@ var checkpointCommand = cli.Command{
 		}
 		var opts []containerd.CheckpointTaskOpts
 		if context.Bool("exit") {
-			opts = append(opts, containerd.WithExit)
+			opts = append(opts, withExit(context.String("runtime")))
 		}
 		checkpoint, err := task.Checkpoint(ctx, opts...)
 		if err != nil {
@@ -64,4 +72,20 @@ var checkpointCommand = cli.Command{
 		fmt.Println(checkpoint.Name())
 		return nil
 	},
+}
+
+func withExit(rt string) containerd.CheckpointTaskOpts {
+	return func(r *containerd.CheckpointTaskInfo) error {
+		switch rt {
+		case "io.containerd.runc.v1":
+			r.Options = &options.CheckpointOptions{
+				Exit: true,
+			}
+		default:
+			r.Options = &runctypes.CheckpointOptions{
+				Exit: true,
+			}
+		}
+		return nil
+	}
 }

@@ -153,6 +153,9 @@ func newClient(t testing.TB, address string, opts ...ClientOpt) (*Client, error)
 	if testing.Short() {
 		t.Skip()
 	}
+	if rt := os.Getenv("TEST_RUNTIME"); rt != "" {
+		opts = append(opts, WithDefaultRuntime(rt))
+	}
 	// testutil.RequiresRoot(t) is not needed here (already called in TestMain)
 	return New(address, opts...)
 }

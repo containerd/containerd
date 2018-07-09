@@ -1,5 +1,3 @@
-// +build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -16,72 +14,61 @@
    limitations under the License.
 */
 
-package linux
+package v2
 
 import (
 	"context"
 
 	eventstypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/api/types/task"
+	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/runtime"
-	shim "github.com/containerd/containerd/runtime/shim/v1"
+	"github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/ttrpc"
 	"github.com/pkg/errors"
 )
 
-// Process implements a linux process
-type Process struct {
-	id string
-	t  *Task
+type process struct {
+	id   string
+	shim *shim
 }
 
-// ID of the process
-func (p *Process) ID() string {
+func (p *process) ID() string {
 	return p.id
 }
 
-// Kill sends the provided signal to the underlying process
-//
-// Unable to kill all processes in the task using this method on a process
-func (p *Process) Kill(ctx context.Context, signal uint32, _ bool) error {
-	_, err := p.t.shim.Kill(ctx, &shim.KillRequest{
+func (p *process) Kill(ctx context.Context, signal uint32, _ bool) error {
+	_, err := p.shim.task.Kill(ctx, &task.KillRequest{
 		Signal: signal,
 		ID:     p.id,
 	})
 	if err != nil {
 		return errdefs.FromGRPC(err)
 	}
-	return err
+	return nil
 }
 
-// State of process
-func (p *Process) State(ctx context.Context) (runtime.State, error) {
-	// use the container status for the status of the process
-	response, err := p.t.shim.State(ctx, &shim.StateRequest{
+func (p *process) State(ctx context.Context) (runtime.State, error) {
+	response, err := p.shim.task.State(ctx, &task.StateRequest{
 		ID: p.id,
 	})
 	if err != nil {
 		if errors.Cause(err) != ttrpc.ErrClosed {
 			return runtime.State{}, errdefs.FromGRPC(err)
 		}
-
-		// We treat ttrpc.ErrClosed as the shim being closed, but really this
-		// likely means that the process no longer exists. We'll have to plumb
-		// the connection differently if this causes problems.
 		return runtime.State{}, errdefs.ErrNotFound
 	}
 	var status runtime.Status
 	switch response.Status {
-	case task.StatusCreated:
+	case tasktypes.StatusCreated:
 		status = runtime.CreatedStatus
-	case task.StatusRunning:
+	case tasktypes.StatusRunning:
 		status = runtime.RunningStatus
-	case task.StatusStopped:
+	case tasktypes.StatusStopped:
 		status = runtime.StoppedStatus
-	case task.StatusPaused:
+	case tasktypes.StatusPaused:
 		status = runtime.PausedStatus
-	case task.StatusPausing:
+	case tasktypes.StatusPausing:
 		status = runtime.PausingStatus
 	}
 	return runtime.State{
@@ -92,25 +79,26 @@ func (p *Process) State(ctx context.Context) (runtime.State, error) {
 		Stderr:     response.Stderr,
 		Terminal:   response.Terminal,
 		ExitStatus: response.ExitStatus,
+		ExitedAt:   response.ExitedAt,
 	}, nil
 }
 
 // ResizePty changes the side of the process's PTY to the provided width and height
-func (p *Process) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
-	_, err := p.t.shim.ResizePty(ctx, &shim.ResizePtyRequest{
+func (p *process) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
+	_, err := p.shim.task.ResizePty(ctx, &task.ResizePtyRequest{
 		ID:     p.id,
 		Width:  size.Width,
 		Height: size.Height,
 	})
 	if err != nil {
-		err = errdefs.FromGRPC(err)
+		return errdefs.FromGRPC(err)
 	}
-	return err
+	return nil
 }
 
 // CloseIO closes the provided IO pipe for the process
-func (p *Process) CloseIO(ctx context.Context) error {
-	_, err := p.t.shim.CloseIO(ctx, &shim.CloseIORequest{
+func (p *process) CloseIO(ctx context.Context) error {
+	_, err := p.shim.task.CloseIO(ctx, &task.CloseIORequest{
 		ID:    p.id,
 		Stdin: true,
 	})
@@ -121,31 +109,45 @@ func (p *Process) CloseIO(ctx context.Context) error {
 }
 
 // Start the process
-func (p *Process) Start(ctx context.Context) error {
-	r, err := p.t.shim.Start(ctx, &shim.StartRequest{
+func (p *process) Start(ctx context.Context) error {
+	response, err := p.shim.task.Start(ctx, &task.StartRequest{
 		ID: p.id,
 	})
 	if err != nil {
 		return errdefs.FromGRPC(err)
 	}
-	p.t.events.Publish(ctx, runtime.TaskExecStartedEventTopic, &eventstypes.TaskExecStarted{
-		ContainerID: p.t.id,
-		Pid:         r.Pid,
+	p.shim.events.Publish(ctx, runtime.TaskExecStartedEventTopic, &eventstypes.TaskExecStarted{
+		ContainerID: p.shim.ID(),
+		Pid:         response.Pid,
 		ExecID:      p.id,
 	})
 	return nil
 }
 
 // Wait on the process to exit and return the exit status and timestamp
-func (p *Process) Wait(ctx context.Context) (*runtime.Exit, error) {
-	r, err := p.t.shim.Wait(ctx, &shim.WaitRequest{
+func (p *process) Wait(ctx context.Context) (*runtime.Exit, error) {
+	response, err := p.shim.task.Wait(ctx, &task.WaitRequest{
 		ID: p.id,
 	})
 	if err != nil {
-		return nil, err
+		return nil, errdefs.FromGRPC(err)
 	}
 	return &runtime.Exit{
-		Timestamp: r.ExitedAt,
-		Status:    r.ExitStatus,
+		Timestamp: response.ExitedAt,
+		Status:    response.ExitStatus,
+	}, nil
+}
+
+func (p *process) Delete(ctx context.Context) (*runtime.Exit, error) {
+	response, err := p.shim.task.Delete(ctx, &task.DeleteRequest{
+		ID: p.id,
+	})
+	if err != nil {
+		return nil, errdefs.FromGRPC(err)
+	}
+	return &runtime.Exit{
+		Status:    response.ExitStatus,
+		Timestamp: response.ExitedAt,
+		Pid:       response.Pid,
 	}, nil
 }

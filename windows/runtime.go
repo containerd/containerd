@@ -79,9 +79,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 
 		events:    make(chan interface{}, 4096),
 		publisher: ic.Events,
-		// TODO(mlaventure): windows needs a stat monitor
-		monitor: nil,
-		tasks:   runtime.NewTaskList(),
+		tasks:     runtime.NewTaskList(),
 	}
 
 	// Load our existing containers and kill/delete them. We don't support
@@ -100,8 +98,7 @@ type windowsRuntime struct {
 	publisher events.Publisher
 	events    chan interface{}
 
-	monitor runtime.TaskMonitor
-	tasks   *runtime.TaskList
+	tasks *runtime.TaskList
 }
 
 func (r *windowsRuntime) ID() string {
@@ -121,8 +118,8 @@ func (r *windowsRuntime) Create(ctx context.Context, id string, opts runtime.Cre
 	spec := s.(*runtimespec.Spec)
 
 	var createOpts *hcsshimtypes.CreateOptions
-	if opts.Options != nil {
-		o, err := typeurl.UnmarshalAny(opts.Options)
+	if opts.TaskOptions != nil {
+		o, err := typeurl.UnmarshalAny(opts.TaskOptions)
 		if err != nil {
 			return nil, err
 		}
@@ -152,74 +149,8 @@ func (r *windowsRuntime) Get(ctx context.Context, id string) (runtime.Task, erro
 	return r.tasks.Get(ctx, id)
 }
 
-func (r *windowsRuntime) Tasks(ctx context.Context) ([]runtime.Task, error) {
-	return r.tasks.GetAll(ctx)
-}
-
-func (r *windowsRuntime) Delete(ctx context.Context, t runtime.Task) (*runtime.Exit, error) {
-	wt, ok := t.(*task)
-	if !ok {
-		return nil, errors.Wrap(errdefs.ErrInvalidArgument, "no a windows task")
-	}
-
-	// TODO(mlaventure): stop monitor on this task
-
-	var (
-		err      error
-		state, _ = wt.State(ctx)
-	)
-	switch state.Status {
-	case runtime.StoppedStatus:
-		fallthrough
-	case runtime.CreatedStatus:
-		// if it's stopped or in created state, we need to shutdown the
-		// container before removing it
-		if err = wt.stop(ctx); err != nil {
-			return nil, err
-		}
-	default:
-		return nil, errors.Wrap(errdefs.ErrFailedPrecondition,
-			"cannot delete a non-stopped task")
-	}
-
-	var rtExit *runtime.Exit
-	if p := wt.getProcess(t.ID()); p != nil {
-		ec, ea, err := p.ExitCode()
-		if err != nil {
-			return nil, err
-		}
-		rtExit = &runtime.Exit{
-			Pid:       wt.pid,
-			Status:    ec,
-			Timestamp: ea,
-		}
-	} else {
-		rtExit = &runtime.Exit{
-			Pid:       wt.pid,
-			Status:    255,
-			Timestamp: time.Now().UTC(),
-		}
-	}
-
-	wt.cleanup()
-	r.tasks.Delete(ctx, t.ID())
-
-	r.publisher.Publish(ctx,
-		runtime.TaskDeleteEventTopic,
-		&eventstypes.TaskDelete{
-			ContainerID: wt.id,
-			Pid:         wt.pid,
-			ExitStatus:  rtExit.Status,
-			ExitedAt:    rtExit.Timestamp,
-		})
-
-	if err := mount.UnmountAll(wt.rootfs[0].Source, 0); err != nil {
-		log.G(ctx).WithError(err).WithField("path", wt.rootfs[0].Source).
-			Warn("failed to unmount rootfs on failure")
-	}
-
-	// We were never started, return failure
-	return rtExit, nil
+func (r *windowsRuntime) Tasks(ctx context.Context, all bool) ([]runtime.Task, error) {
+	return r.tasks.GetAll(ctx, all)
 }
 
 func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, rootfs []mount.Mount, spec *runtimespec.Spec, io runtime.IO, createOpts *hcsshimtypes.CreateOptions) (*task, error) {
@@ -298,6 +229,7 @@ func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, root
 		pidPool:           r.pidPool,
 		hcsContainer:      ctr,
 		terminateDuration: createOpts.TerminateDuration,
+		tasks:             r.tasks,
 	}
 	// Create the new process but don't start it
 	pconf := newWindowsProcessConfig(t.spec.Process, t.io)

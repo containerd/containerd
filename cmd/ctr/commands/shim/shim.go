@@ -26,7 +26,7 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	shim "github.com/containerd/containerd/runtime/shim/v1"
+	"github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
@@ -35,8 +35,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
-
-var empty = &ptypes.Empty{}
 
 var fifoFlags = []cli.Flag{
 	cli.StringFlag{
@@ -57,7 +55,7 @@ var fifoFlags = []cli.Flag{
 	},
 }
 
-// Command is the cli command for interacting with a shim
+// Command is the cli command for interacting with a task
 var Command = cli.Command{
 	Name:  "shim",
 	Usage: "interact with a shim directly",
@@ -77,13 +75,13 @@ var Command = cli.Command{
 
 var startCommand = cli.Command{
 	Name:  "start",
-	Usage: "start a container with a shim",
+	Usage: "start a container with a task",
 	Action: func(context *cli.Context) error {
-		service, err := getShimService(context)
+		service, err := getTaskService(context)
 		if err != nil {
 			return err
 		}
-		_, err = service.Start(gocontext.Background(), &shim.StartRequest{
+		_, err = service.Start(gocontext.Background(), &task.StartRequest{
 			ID: context.Args().First(),
 		})
 		return err
@@ -92,13 +90,15 @@ var startCommand = cli.Command{
 
 var deleteCommand = cli.Command{
 	Name:  "delete",
-	Usage: "delete a container with a shim",
+	Usage: "delete a container with a task",
 	Action: func(context *cli.Context) error {
-		service, err := getShimService(context)
+		service, err := getTaskService(context)
 		if err != nil {
 			return err
 		}
-		r, err := service.Delete(gocontext.Background(), empty)
+		r, err := service.Delete(gocontext.Background(), &task.DeleteRequest{
+			ID: context.Args().First(),
+		})
 		if err != nil {
 			return err
 		}
@@ -109,13 +109,13 @@ var deleteCommand = cli.Command{
 
 var stateCommand = cli.Command{
 	Name:  "state",
-	Usage: "get the state of all the processes of the shim",
+	Usage: "get the state of all the processes of the task",
 	Action: func(context *cli.Context) error {
-		service, err := getShimService(context)
+		service, err := getTaskService(context)
 		if err != nil {
 			return err
 		}
-		r, err := service.State(gocontext.Background(), &shim.StateRequest{
+		r, err := service.State(gocontext.Background(), &task.StateRequest{
 			ID: context.Args().First(),
 		})
 		if err != nil {
@@ -128,7 +128,7 @@ var stateCommand = cli.Command{
 
 var execCommand = cli.Command{
 	Name:  "exec",
-	Usage: "exec a new process in the shim's container",
+	Usage: "exec a new process in the task's container",
 	Flags: append(fifoFlags,
 		cli.BoolFlag{
 			Name:  "attach,a",
@@ -149,7 +149,7 @@ var execCommand = cli.Command{
 		},
 	),
 	Action: func(context *cli.Context) error {
-		service, err := getShimService(context)
+		service, err := getTaskService(context)
 		if err != nil {
 			return err
 		}
@@ -178,7 +178,7 @@ var execCommand = cli.Command{
 			return err
 		}
 
-		rq := &shim.ExecProcessRequest{
+		rq := &task.ExecProcessRequest{
 			ID: id,
 			Spec: &ptypes.Any{
 				TypeUrl: url,
@@ -192,7 +192,7 @@ var execCommand = cli.Command{
 		if _, err := service.Exec(ctx, rq); err != nil {
 			return err
 		}
-		r, err := service.Start(ctx, &shim.StartRequest{
+		r, err := service.Start(ctx, &task.StartRequest{
 			ID: id,
 		})
 		if err != nil {
@@ -211,7 +211,7 @@ var execCommand = cli.Command{
 				if err != nil {
 					return err
 				}
-				if _, err := service.ResizePty(ctx, &shim.ResizePtyRequest{
+				if _, err := service.ResizePty(ctx, &task.ResizePtyRequest{
 					ID:     id,
 					Width:  uint32(size.Width),
 					Height: uint32(size.Height),
@@ -225,7 +225,7 @@ var execCommand = cli.Command{
 	},
 }
 
-func getShimService(context *cli.Context) (shim.ShimService, error) {
+func getTaskService(context *cli.Context) (task.TaskService, error) {
 	bindSocket := context.GlobalString("socket")
 	if bindSocket == "" {
 		return nil, errors.New("socket path must be specified")
@@ -241,5 +241,5 @@ func getShimService(context *cli.Context) (shim.ShimService, error) {
 	// TODO(stevvooe): This actually leaks the connection. We were leaking it
 	// before, so may not be a huge deal.
 
-	return shim.NewShimClient(client), nil
+	return task.NewTaskClient(client), nil
 }

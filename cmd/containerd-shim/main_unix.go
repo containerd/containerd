@@ -36,9 +36,9 @@ import (
 
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/runtime/linux/proc"
-	"github.com/containerd/containerd/runtime/shim"
-	shimapi "github.com/containerd/containerd/runtime/shim/v1"
+	"github.com/containerd/containerd/runtime/v1/linux/proc"
+	"github.com/containerd/containerd/runtime/v1/shim"
+	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
@@ -134,7 +134,7 @@ func executeShim() error {
 	shimapi.RegisterShimService(server, sv)
 
 	socket := socketFlag
-	if err := serve(server, socket); err != nil {
+	if err := serve(context.Background(), server, socket); err != nil {
 		return err
 	}
 	logger := logrus.WithFields(logrus.Fields{
@@ -152,7 +152,7 @@ func executeShim() error {
 
 // serve serves the ttrpc API over a unix socket at the provided path
 // this function does not block
-func serve(server *ttrpc.Server, path string) error {
+func serve(ctx context.Context, server *ttrpc.Server, path string) error {
 	var (
 		l   net.Listener
 		err error
@@ -172,7 +172,7 @@ func serve(server *ttrpc.Server, path string) error {
 	logrus.WithField("socket", path).Debug("serving api on unix socket")
 	go func() {
 		defer l.Close()
-		if err := server.Serve(context.Background(), l); err != nil &&
+		if err := server.Serve(ctx, l); err != nil &&
 			!strings.Contains(err.Error(), "use of closed network connection") {
 			logrus.WithError(err).Fatal("containerd-shim: ttrpc server failure")
 		}

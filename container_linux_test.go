@@ -37,6 +37,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
+	"github.com/containerd/containerd/runtime/v2/runc/options"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
@@ -129,6 +130,9 @@ func TestShimInCgroup(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
+	if client.runtime == "io.containerd.runc.v1" {
+		t.Skip()
+	}
 
 	var (
 		ctx, cancel = testContext()
@@ -871,70 +875,6 @@ func TestContainerKillAll(t *testing.T) {
 	}
 }
 
-func TestShimSigkilled(t *testing.T) {
-	client, err := newClient(t, address)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
-
-	var (
-		image       Image
-		ctx, cancel = testContext()
-		id          = t.Name()
-	)
-	defer cancel()
-
-	// redis unset its PDeathSignal making it a good candidate
-	image, err = client.Pull(ctx, "docker.io/library/redis:alpine", WithPullUnpack)
-	if err != nil {
-		t.Fatal(err)
-	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image)), WithNewSnapshot(id, image))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer container.Delete(ctx, WithSnapshotCleanup)
-
-	task, err := container.NewTask(ctx, empty())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer task.Delete(ctx)
-
-	statusC, err := task.Wait(ctx)
-	if err != nil {
-		t.Error(err)
-	}
-
-	pid := task.Pid()
-	if pid <= 0 {
-		t.Fatalf("invalid task pid %d", pid)
-	}
-
-	if err := task.Start(ctx); err != nil {
-		t.Fatal(err)
-	}
-
-	// SIGKILL the shim
-	if err := exec.Command("pkill", "-KILL", "containerd-s").Run(); err != nil {
-		t.Fatalf("failed to kill shim: %v", err)
-	}
-
-	<-statusC
-
-	for i := 0; i < 10; i++ {
-		if err := unix.Kill(int(pid), 0); err == unix.ESRCH {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	if err := unix.Kill(int(pid), 0); err != unix.ESRCH {
-		t.Errorf("pid %d still exists", pid)
-	}
-
-}
-
 func TestDaemonRestartWithRunningShim(t *testing.T) {
 	client, err := newClient(t, address)
 	if err != nil {
@@ -1014,7 +954,7 @@ func TestDaemonRestartWithRunningShim(t *testing.T) {
 	}
 }
 
-func TestContainerRuntimeOptions(t *testing.T) {
+func TestContainerRuntimeOptionsv1(t *testing.T) {
 	t.Parallel()
 
 	client, err := newClient(t, address)
@@ -1040,6 +980,49 @@ func TestContainerRuntimeOptions(t *testing.T) {
 		WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)),
 		WithNewSnapshot(id, image),
 		WithRuntime("io.containerd.runtime.v1.linux", &runctypes.RuncOptions{Runtime: "no-runc"}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err == nil {
+		t.Errorf("task creation should have failed")
+		task.Delete(ctx)
+		return
+	}
+	if !strings.Contains(err.Error(), `"no-runc"`) {
+		t.Errorf("task creation should have failed because of lack of executable. Instead failed with: %v", err.Error())
+	}
+}
+
+func TestContainerRuntimeOptionsv2(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(
+		ctx, id,
+		WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)),
+		WithNewSnapshot(id, image),
+		WithRuntime("io.containerd.runc.v1", &options.Options{BinaryName: "no-runc"}),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1183,11 +1166,21 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
-	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStdio), func(_ context.Context, client *Client, r *TaskInfo) error {
-		r.Options = &runctypes.CreateOptions{
+	var copts interface{}
+	if client.runtime == "io.containerd.runc.v1" {
+		copts = &options.Options{
 			IoUid: 1000,
 			IoGid: 1000,
 		}
+	} else {
+		copts = &runctypes.CreateOptions{
+			IoUid: 1000,
+			IoGid: 1000,
+		}
+	}
+
+	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStdio), func(_ context.Context, client *Client, r *TaskInfo) error {
+		r.Options = copts
 		return nil
 	})
 	if err != nil {
