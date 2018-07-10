@@ -18,9 +18,9 @@ package leases
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"google.golang.org/grpc"
