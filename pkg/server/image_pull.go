@@ -19,18 +19,21 @@ package server
 import (
 	"encoding/base64"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/reference"
+	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/containerd/remotes/docker"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
-	containerdresolver "github.com/containerd/cri/pkg/containerd/resolver"
 	imagestore "github.com/containerd/cri/pkg/store/image"
 	"github.com/containerd/cri/pkg/util"
 )
@@ -87,12 +90,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	if ref != imageRef {
 		logrus.Debugf("PullImage using normalized image ref: %q", ref)
 	}
-	resolver := containerdresolver.NewResolver(containerdresolver.Options{
-		Credentials: func(string) (string, string, error) { return ParseAuth(r.GetAuth()) },
-		Client:      http.DefaultClient,
-		Registry:    c.getResolverOptions(),
-	})
-	_, desc, err := resolver.Resolve(ctx, ref)
+	resolver, desc, err := c.getResolver(ctx, ref, c.credentials(r.GetAuth()))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to resolve image %q", ref)
 	}
@@ -206,10 +204,59 @@ func (c *criService) createImageReference(ctx context.Context, name string, desc
 	return err
 }
 
-func (c *criService) getResolverOptions() map[string][]string {
-	options := make(map[string][]string)
-	for ns, mirror := range c.config.Mirrors {
-		options[ns] = append(options[ns], mirror.Endpoints...)
+// credentials returns a credential function for docker resolver to use.
+func (c *criService) credentials(auth *runtime.AuthConfig) func(string) (string, string, error) {
+	return func(host string) (string, string, error) {
+		if auth == nil {
+			// Get default auth from config.
+			for h, ac := range c.config.Registry.Auths {
+				u, err := url.Parse(h)
+				if err != nil {
+					return "", "", errors.Wrapf(err, "parse auth host %q", h)
+				}
+				if u.Host == host {
+					auth = toRuntimeAuthConfig(ac)
+					break
+				}
+			}
+		}
+		return ParseAuth(auth)
 	}
-	return options
+}
+
+// getResolver tries registry mirrors and the default registry, and returns the resolver and descriptor
+// from the first working registry.
+func (c *criService) getResolver(ctx context.Context, ref string, cred func(string) (string, string, error)) (remotes.Resolver, imagespec.Descriptor, error) {
+	refspec, err := reference.Parse(ref)
+	if err != nil {
+		return nil, imagespec.Descriptor{}, errors.Wrap(err, "parse image reference")
+	}
+	// Try mirrors in order first, and then try default host name.
+	for _, e := range c.config.Registry.Mirrors[refspec.Hostname()].Endpoints {
+		u, err := url.Parse(e)
+		if err != nil {
+			return nil, imagespec.Descriptor{}, errors.Wrapf(err, "parse registry endpoint %q", e)
+		}
+		resolver := docker.NewResolver(docker.ResolverOptions{
+			Credentials: cred,
+			Client:      http.DefaultClient,
+			Host:        func(string) (string, error) { return u.Host, nil },
+			// By default use "https".
+			PlainHTTP: u.Scheme == "http",
+		})
+		_, desc, err := resolver.Resolve(ctx, ref)
+		if err == nil {
+			return resolver, desc, nil
+		}
+		// Continue to try next endpoint
+	}
+	resolver := docker.NewResolver(docker.ResolverOptions{
+		Credentials: cred,
+		Client:      http.DefaultClient,
+	})
+	_, desc, err := resolver.Resolve(ctx, ref)
+	if err != nil {
+		return nil, imagespec.Descriptor{}, errors.Wrap(err, "no available registry endpoint")
+	}
+	return resolver, desc, nil
 }

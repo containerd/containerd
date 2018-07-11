@@ -444,3 +444,13 @@ func getRuntimeConfigFromContainerInfo(c containers.Container) (criconfig.Runtim
 	r.Root = runtimeOpts.RuntimeRoot
 	return r, nil
 }
+
+// toRuntimeAuthConfig converts cri plugin auth config to runtime auth config.
+func toRuntimeAuthConfig(a criconfig.AuthConfig) *runtime.AuthConfig {
+	return &runtime.AuthConfig{
+		Username:      a.Username,
+		Password:      a.Password,
+		Auth:          a.Auth,
+		IdentityToken: a.IdentityToken,
+	}
+}

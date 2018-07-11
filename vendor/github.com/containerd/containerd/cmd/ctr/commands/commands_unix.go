@@ -16,27 +16,18 @@
    limitations under the License.
 */
 
-package proc
+package commands
 
 import (
-	"github.com/pkg/errors"
+	"github.com/urfave/cli"
 )
 
-// RuncRoot is the path to the root runc state directory
-const RuncRoot = "/run/containerd/runc"
-
-func stateName(v interface{}) string {
-	switch v.(type) {
-	case *runningState, *execRunningState:
-		return "running"
-	case *createdState, *execCreatedState, *createdCheckpointState:
-		return "created"
-	case *pausedState:
-		return "paused"
-	case *deletedState:
-		return "deleted"
-	case *stoppedState:
-		return "stopped"
-	}
-	panic(errors.Errorf("invalid state %v", v))
+func init() {
+	ContainerFlags = append(ContainerFlags, cli.BoolFlag{
+		Name:  "rootfs",
+		Usage: "use custom rootfs that is not managed by containerd snapshotter",
+	}, cli.BoolFlag{
+		Name:  "no-pivot",
+		Usage: "disable use of pivot-root (linux only)",
+	})
 }

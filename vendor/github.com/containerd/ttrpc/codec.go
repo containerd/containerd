@@ -1,5 +1,3 @@
-// +build !windows
-
 /*
    Copyright The containerd Authors.
 
@@ -16,27 +14,29 @@
    limitations under the License.
 */
 
-package proc
+package ttrpc
 
 import (
+	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 )
 
-// RuncRoot is the path to the root runc state directory
-const RuncRoot = "/run/containerd/runc"
+type codec struct{}
 
-func stateName(v interface{}) string {
-	switch v.(type) {
-	case *runningState, *execRunningState:
-		return "running"
-	case *createdState, *execCreatedState, *createdCheckpointState:
-		return "created"
-	case *pausedState:
-		return "paused"
-	case *deletedState:
-		return "deleted"
-	case *stoppedState:
-		return "stopped"
+func (c codec) Marshal(msg interface{}) ([]byte, error) {
+	switch v := msg.(type) {
+	case proto.Message:
+		return proto.Marshal(v)
+	default:
+		return nil, errors.Errorf("ttrpc: cannot marshal unknown type: %T", msg)
 	}
-	panic(errors.Errorf("invalid state %v", v))
+}
+
+func (c codec) Unmarshal(p []byte, msg interface{}) error {
+	switch v := msg.(type) {
+	case proto.Message:
+		return proto.Unmarshal(p, v)
+	default:
+		return errors.Errorf("ttrpc: cannot unmarshal into unknown type: %T", msg)
+	}
 }
