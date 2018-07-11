@@ -21,6 +21,8 @@ set -o pipefail
 source $(dirname "${BASH_SOURCE[0]}")/utils.sh
 cd ${ROOT}
 
+umask 0022
+
 # BUILD_DIR is the directory to generate release tar.
 # TARBALL is the name of the release tar.
 BUILD_DIR=${BUILD_DIR:-"_output"}
