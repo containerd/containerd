@@ -21,10 +21,8 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
-	"os"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
@@ -38,11 +36,8 @@ const (
 	eol = '\n'
 	// timestampFormat is the timestamp format used in CRI logging format.
 	timestampFormat = time.RFC3339Nano
-	// pipeBufSize is the system PIPE_BUF size, on linux it is 4096 bytes.
-	// POSIX.1 says that write less than PIPE_BUF is atmoic.
-	pipeBufSize = 4096
-	// bufSize is the size of the read buffer.
-	bufSize = pipeBufSize - len(timestampFormat) - len(Stdout) - len(runtime.LogTagPartial) - 3 /*3 delimiter*/ - 1 /*eol*/
+	// defaultBufSize is the default size of the read buffer in bytes.
+	defaultBufSize = 4096
 )
 
 // NewDiscardLogger creates logger which discards all the input.
@@ -51,46 +46,91 @@ func NewDiscardLogger() io.WriteCloser {
 }
 
 // NewCRILogger returns a write closer which redirect container log into
-// log file, and decorate the log line into CRI defined format.
-func NewCRILogger(path string, stream StreamType) (io.WriteCloser, error) {
-	logrus.Debugf("Start writing log file %q", path)
+// log file, and decorate the log line into CRI defined format. It also
+// returns a channel which indicates whether the logger is stopped.
+// maxLen is the max length limit of a line. A line longer than the
+// limit will be cut into multiple lines.
+func NewCRILogger(path string, w io.Writer, stream StreamType, maxLen int) (io.WriteCloser, <-chan struct{}) {
+	logrus.Debugf("Start writing stream %q to log file %q", stream, path)
 	prc, pwc := io.Pipe()
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0640)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open log file")
-	}
-	go redirectLogs(path, prc, f, stream)
-	return pwc, nil
+	stop := make(chan struct{})
+	go func() {
+		redirectLogs(path, prc, w, stream, maxLen)
+		close(stop)
+	}()
+	return pwc, stop
 }
 
-func redirectLogs(path string, rc io.ReadCloser, wc io.WriteCloser, stream StreamType) {
+func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxLen int) {
 	defer rc.Close()
-	defer wc.Close()
-	streamBytes := []byte(stream)
-	delimiterBytes := []byte{delimiter}
-	partialBytes := []byte(runtime.LogTagPartial)
-	fullBytes := []byte(runtime.LogTagFull)
-	r := bufio.NewReaderSize(rc, bufSize)
-	for {
-		lineBytes, isPrefix, err := r.ReadLine()
-		if err == io.EOF {
-			logrus.Debugf("Finish redirecting log file %q", path)
-			return
-		}
-		if err != nil {
-			logrus.WithError(err).Errorf("An error occurred when redirecting log file %q", path)
-			return
-		}
-		tagBytes := fullBytes
-		if isPrefix {
-			tagBytes = partialBytes
-		}
-		timestampBytes := time.Now().AppendFormat(nil, time.RFC3339Nano)
-		data := bytes.Join([][]byte{timestampBytes, streamBytes, tagBytes, lineBytes}, delimiterBytes)
-		data = append(data, eol)
-		if _, err := wc.Write(data); err != nil {
-			logrus.WithError(err).Errorf("Fail to write %q log to log file %q", stream, path)
-		}
-		// Continue on write error to drain the input.
+	var (
+		stream    = []byte(s)
+		delimiter = []byte{delimiter}
+		partial   = []byte(runtime.LogTagPartial)
+		full      = []byte(runtime.LogTagFull)
+		buf       [][]byte
+		length    int
+		bufSize   = defaultBufSize
+	)
+	// Make sure bufSize <= maxLen
+	if maxLen > 0 && maxLen < bufSize {
+		bufSize = maxLen
 	}
+	r := bufio.NewReaderSize(rc, bufSize)
+	writeLine := func(tag, line []byte) {
+		timestamp := time.Now().AppendFormat(nil, timestampFormat)
+		data := bytes.Join([][]byte{timestamp, stream, tag, line}, delimiter)
+		data = append(data, eol)
+		if _, err := w.Write(data); err != nil {
+			logrus.WithError(err).Errorf("Fail to write %q log to log file %q", s, path)
+			// Continue on write error to drain the container output.
+		}
+	}
+	for {
+		var stop bool
+		newLine, isPrefix, err := r.ReadLine()
+		if err != nil {
+			if err == io.EOF {
+				logrus.Debugf("Getting EOF from stream %q while redirecting to log file %q", s, path)
+			} else {
+				logrus.WithError(err).Errorf("An error occurred when redirecting stream %q to log file %q", s, path)
+			}
+			if length == 0 {
+				// No content left to write, break.
+				break
+			}
+			// Stop after writing the content left in buffer.
+			stop = true
+		} else {
+			// Buffer returned by ReadLine will change after
+			// next read, copy it.
+			l := make([]byte, len(newLine))
+			copy(l, newLine)
+			buf = append(buf, l)
+			length += len(l)
+		}
+		if maxLen > 0 && length > maxLen {
+			exceedLen := length - maxLen
+			last := buf[len(buf)-1]
+			if exceedLen > len(last) {
+				// exceedLen must <= len(last), or else the buffer
+				// should have be written in the previous iteration.
+				panic("exceed length should <= last buffer size")
+			}
+			buf[len(buf)-1] = last[:len(last)-exceedLen]
+			writeLine(partial, bytes.Join(buf, nil))
+			buf = [][]byte{last[len(last)-exceedLen:]}
+			length = exceedLen
+		}
+		if isPrefix {
+			continue
+		}
+		writeLine(full, bytes.Join(buf, nil))
+		buf = nil
+		length = 0
+		if stop {
+			break
+		}
+	}
+	logrus.Debugf("Finish redirecting stream %q to log file %q", s, path)
 }

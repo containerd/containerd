@@ -16,7 +16,10 @@ limitations under the License.
 
 package ioutil
 
-import "io"
+import (
+	"io"
+	"sync"
+)
 
 // writeCloseInformer wraps passed in write closer with a close channel.
 // Caller could wait on the close channel for the write closer to be
@@ -65,4 +68,35 @@ func (n *nopWriteCloser) Write(p []byte) (int, error) {
 // Close is a nop close function.
 func (n *nopWriteCloser) Close() error {
 	return nil
+}
+
+// serialWriteCloser wraps a write closer and makes sure all writes
+// are done in serial.
+// Parallel write won't intersect with each other. Use case:
+// 1) Pipe: Write content longer than PIPE_BUF.
+//    See http://man7.org/linux/man-pages/man7/pipe.7.html
+// 2) <3.14 Linux Kernel: write is not atomic
+//    See http://man7.org/linux/man-pages/man2/write.2.html
+type serialWriteCloser struct {
+	mu sync.Mutex
+	wc io.WriteCloser
+}
+
+// NewSerialWriteCloser creates a SerialWriteCloser from a write closer.
+func NewSerialWriteCloser(wc io.WriteCloser) io.WriteCloser {
+	return &serialWriteCloser{wc: wc}
+}
+
+// Write writes a group of byte arrays in order atomically.
+func (s *serialWriteCloser) Write(data []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.wc.Write(data)
+}
+
+// Close closes the write closer.
+func (s *serialWriteCloser) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.wc.Close()
 }
