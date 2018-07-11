@@ -18,6 +18,7 @@ package tasks
 
 import (
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/urfave/cli"
 )
@@ -42,8 +43,7 @@ var deleteCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-
-		task, err := container.Task(ctx, nil)
+		task, err := container.Task(ctx, cio.Load)
 		if err != nil {
 			return err
 		}

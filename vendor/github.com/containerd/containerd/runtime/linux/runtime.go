@@ -42,7 +42,7 @@ import (
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/linux/proc"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
-	shim "github.com/containerd/containerd/runtime/linux/shim/v1"
+	shim "github.com/containerd/containerd/runtime/shim/v1"
 	runc "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"

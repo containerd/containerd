@@ -1,5 +1,3 @@
-// +build !windows
-
 /*
    Copyright The containerd Authors.
 
@@ -16,27 +14,26 @@
    limitations under the License.
 */
 
-package proc
+package ttrpc
 
-import (
-	"github.com/pkg/errors"
-)
+import "github.com/pkg/errors"
 
-// RuncRoot is the path to the root runc state directory
-const RuncRoot = "/run/containerd/runc"
+type serverConfig struct {
+	handshaker Handshaker
+}
 
-func stateName(v interface{}) string {
-	switch v.(type) {
-	case *runningState, *execRunningState:
-		return "running"
-	case *createdState, *execCreatedState, *createdCheckpointState:
-		return "created"
-	case *pausedState:
-		return "paused"
-	case *deletedState:
-		return "deleted"
-	case *stoppedState:
-		return "stopped"
+type ServerOpt func(*serverConfig) error
+
+// WithServerHandshaker can be passed to NewServer to ensure that the
+// handshaker is called before every connection attempt.
+//
+// Only one handshaker is allowed per server.
+func WithServerHandshaker(handshaker Handshaker) ServerOpt {
+	return func(c *serverConfig) error {
+		if c.handshaker != nil {
+			return errors.New("only one handshaker allowed per server")
+		}
+		c.handshaker = handshaker
+		return nil
 	}
-	panic(errors.Errorf("invalid state %v", v))
 }
