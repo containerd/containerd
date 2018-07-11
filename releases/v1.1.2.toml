@@ -1,0 +1,25 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+
+# previous release
+previous = "v1.1.1"
+
+pre_release = false
+
+preface = """\
+This is the second patch release for the `containerd` 1.1 release. This
+includes an issue fix for CRI.
+
+## CRI Plugin
+Fix an issue that a container log line longer than 4kb is cut into
+multiple lines. A new `max_container_log_size` config option is added
+to make this configurable, and the default value is set to 16kb.
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
