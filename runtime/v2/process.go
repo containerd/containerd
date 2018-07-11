@@ -40,7 +40,8 @@ func (p *process) ID() string {
 func (p *process) Kill(ctx context.Context, signal uint32, _ bool) error {
 	_, err := p.shim.task.Kill(ctx, &task.KillRequest{
 		Signal: signal,
-		ID:     p.id,
+		ID:     p.shim.ID(),
+		ExecID: p.id,
 	})
 	if err != nil {
 		return errdefs.FromGRPC(err)
@@ -50,7 +51,8 @@ func (p *process) Kill(ctx context.Context, signal uint32, _ bool) error {
 
 func (p *process) State(ctx context.Context) (runtime.State, error) {
 	response, err := p.shim.task.State(ctx, &task.StateRequest{
-		ID: p.id,
+		ID:     p.shim.ID(),
+		ExecID: p.id,
 	})
 	if err != nil {
 		if errors.Cause(err) != ttrpc.ErrClosed {
@@ -86,7 +88,8 @@ func (p *process) State(ctx context.Context) (runtime.State, error) {
 // ResizePty changes the side of the process's PTY to the provided width and height
 func (p *process) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
 	_, err := p.shim.task.ResizePty(ctx, &task.ResizePtyRequest{
-		ID:     p.id,
+		ID:     p.shim.ID(),
+		ExecID: p.id,
 		Width:  size.Width,
 		Height: size.Height,
 	})
@@ -99,8 +102,9 @@ func (p *process) ResizePty(ctx context.Context, size runtime.ConsoleSize) error
 // CloseIO closes the provided IO pipe for the process
 func (p *process) CloseIO(ctx context.Context) error {
 	_, err := p.shim.task.CloseIO(ctx, &task.CloseIORequest{
-		ID:    p.id,
-		Stdin: true,
+		ID:     p.shim.ID(),
+		ExecID: p.id,
+		Stdin:  true,
 	})
 	if err != nil {
 		return errdefs.FromGRPC(err)
@@ -111,7 +115,8 @@ func (p *process) CloseIO(ctx context.Context) error {
 // Start the process
 func (p *process) Start(ctx context.Context) error {
 	response, err := p.shim.task.Start(ctx, &task.StartRequest{
-		ID: p.id,
+		ID:     p.shim.ID(),
+		ExecID: p.id,
 	})
 	if err != nil {
 		return errdefs.FromGRPC(err)
@@ -127,7 +132,8 @@ func (p *process) Start(ctx context.Context) error {
 // Wait on the process to exit and return the exit status and timestamp
 func (p *process) Wait(ctx context.Context) (*runtime.Exit, error) {
 	response, err := p.shim.task.Wait(ctx, &task.WaitRequest{
-		ID: p.id,
+		ID:     p.shim.ID(),
+		ExecID: p.id,
 	})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
@@ -140,7 +146,8 @@ func (p *process) Wait(ctx context.Context) (*runtime.Exit, error) {
 
 func (p *process) Delete(ctx context.Context) (*runtime.Exit, error) {
 	response, err := p.shim.task.Delete(ctx, &task.DeleteRequest{
-		ID: p.id,
+		ID:     p.shim.ID(),
+		ExecID: p.id,
 	})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)

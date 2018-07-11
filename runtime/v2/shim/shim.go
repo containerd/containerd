@@ -57,6 +57,7 @@ type Init func(context.Context, string, events.Publisher) (Shim, error)
 type Shim interface {
 	shimapi.TaskService
 	Cleanup(ctx context.Context) (*shimapi.DeleteResponse, error)
+	StartShim(ctx context.Context, id, containerdBinary, containerdAddress string) (string, error)
 }
 
 var (
@@ -72,7 +73,7 @@ var (
 func parseFlags() {
 	flag.BoolVar(&debugFlag, "debug", false, "enable debug output in logs")
 	flag.StringVar(&namespaceFlag, "namespace", "", "namespace that owns the shim")
-	flag.StringVar(&idFlag, "id", "", "id of the shim")
+	flag.StringVar(&idFlag, "id", "", "id of the task")
 	flag.StringVar(&socketFlag, "socket", "", "abstract socket path to serve")
 
 	flag.StringVar(&addressFlag, "address", "", "grpc address back to main containerd")
@@ -92,7 +93,7 @@ func setRuntime() {
 	if debugFlag {
 		f, err := os.OpenFile("shim.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "open should log %s", err)
+			fmt.Fprintf(os.Stderr, "open shim log %s", err)
 			os.Exit(1)
 		}
 		logrus.SetLevel(logrus.DebugLevel)
@@ -145,6 +146,15 @@ func Run(initFunc Init) error {
 			return err
 		}
 		if _, err := os.Stdout.Write(data); err != nil {
+			return err
+		}
+		return nil
+	case "start":
+		address, err := service.StartShim(ctx, idFlag, containerdBinaryFlag, addressFlag)
+		if err != nil {
+			return err
+		}
+		if _, err := os.Stdout.WriteString(address); err != nil {
 			return err
 		}
 		return nil

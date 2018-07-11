@@ -585,9 +585,9 @@ func getTasksMetrics(ctx context.Context, filter filters.Filter, tasks []runtime
 			case "id":
 				return t.ID(), true
 			case "namespace":
-			//	return t.Info().Namespace, true
+				return t.Namespace(), true
 			case "runtime":
-				//	return t.Info().Runtime, true
+				// return t.Info().Runtime, true
 			}
 			return "", false
 		})) {

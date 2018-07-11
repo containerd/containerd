@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package v2
+package shim
 
 import (
 	"context"
@@ -32,7 +32,8 @@ import (
 
 const shimBinaryFormat = "containerd-shim-%s-%s"
 
-func shimCommand(ctx context.Context, runtime, containerdAddress string, bundle *Bundle, cmdArgs ...string) (*exec.Cmd, error) {
+// Command returns the shim command with the provided args and configuration
+func Command(ctx context.Context, runtime, containerdAddress, path string, cmdArgs ...string) (*exec.Cmd, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -47,7 +48,7 @@ func shimCommand(ctx context.Context, runtime, containerdAddress string, bundle 
 		"-publish-binary", self,
 	}
 	args = append(args, cmdArgs...)
-	name := getShimBinaryName(runtime)
+	name := BinaryName(runtime)
 	if _, err := exec.LookPath(name); err != nil {
 		if eerr, ok := err.(*exec.Error); ok {
 			if eerr.Err == exec.ErrNotFound {
@@ -56,19 +57,21 @@ func shimCommand(ctx context.Context, runtime, containerdAddress string, bundle 
 		}
 	}
 	cmd := exec.Command(name, args...)
-	cmd.Dir = bundle.Path
+	cmd.Dir = path
 	cmd.Env = append(os.Environ(), "GOMAXPROCS=2")
 	cmd.SysProcAttr = getSysProcAttr()
 	return cmd, nil
 }
 
-func getShimBinaryName(runtime string) string {
+// BinaryName returns the shim binary name from the runtime name
+func BinaryName(runtime string) string {
 	parts := strings.Split(runtime, ".")
 	// TODO: add validation for runtime
 	return fmt.Sprintf(shimBinaryFormat, parts[len(parts)-2], parts[len(parts)-1])
 }
 
-func abstractAddress(ctx context.Context, id string) (string, error) {
+// AbstractAddress returns an abstract socket address
+func AbstractAddress(ctx context.Context, id string) (string, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return "", err
@@ -76,16 +79,19 @@ func abstractAddress(ctx context.Context, id string) (string, error) {
 	return filepath.Join(string(filepath.Separator), "containerd-shim", ns, id, "shim.sock"), nil
 }
 
-func connect(address string, d func(string, time.Duration) (net.Conn, error)) (net.Conn, error) {
+// Connect to the provided address
+func Connect(address string, d func(string, time.Duration) (net.Conn, error)) (net.Conn, error) {
 	return d(address, 100*time.Second)
 }
 
-func annonDialer(address string, timeout time.Duration) (net.Conn, error) {
+// AnonDialer returns a dialer for an abstract socket
+func AnonDialer(address string, timeout time.Duration) (net.Conn, error) {
 	address = strings.TrimPrefix(address, "unix://")
 	return net.DialTimeout("unix", "\x00"+address, timeout)
 }
 
-func newSocket(address string) (*net.UnixListener, error) {
+// NewSocket returns a new socket
+func NewSocket(address string) (*net.UnixListener, error) {
 	if len(address) > 106 {
 		return nil, errors.Errorf("%q: unix socket path too long (> 106)", address)
 	}
@@ -96,7 +102,8 @@ func newSocket(address string) (*net.UnixListener, error) {
 	return l.(*net.UnixListener), nil
 }
 
-func writePidFile(path string, pid int) error {
+// WritePidFile writes a pid file atomically
+func WritePidFile(path string, pid int) error {
 	path, err := filepath.Abs(path)
 	if err != nil {
 		return err
@@ -107,6 +114,25 @@ func writePidFile(path string, pid int) error {
 		return err
 	}
 	_, err = fmt.Fprintf(f, "%d", pid)
+	f.Close()
+	if err != nil {
+		return err
+	}
+	return os.Rename(tempPath, path)
+}
+
+// WriteAddress writes a address file atomically
+func WriteAddress(path, address string) error {
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	tempPath := filepath.Join(filepath.Dir(path), fmt.Sprintf(".%s", filepath.Base(path)))
+	f, err := os.OpenFile(tempPath, os.O_RDWR|os.O_CREATE|os.O_EXCL|os.O_SYNC, 0666)
+	if err != nil {
+		return err
+	}
+	_, err = f.WriteString(address)
 	f.Close()
 	if err != nil {
 		return err

@@ -22,8 +22,10 @@ import (
 	"context"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/containerd/cgroups"
@@ -83,6 +85,7 @@ type service struct {
 	mu sync.Mutex
 
 	context   context.Context
+	task      rproc.Process
 	processes map[string]rproc.Process
 	events    chan interface{}
 	platform  rproc.Platform
@@ -92,6 +95,77 @@ type service struct {
 	// Filled by Create()
 	bundle string
 	cg     cgroups.Cgroup
+}
+
+func newCommand(ctx context.Context, containerdBinary, containerdAddress string) (*exec.Cmd, error) {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return nil, err
+	}
+	self, err := os.Executable()
+	if err != nil {
+		return nil, err
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	args := []string{
+		"-namespace", ns,
+		"-address", containerdAddress,
+		"-publish-binary", containerdBinary,
+	}
+	cmd := exec.Command(self, args...)
+	cmd.Dir = cwd
+	cmd.Env = append(os.Environ(), "GOMAXPROCS=2")
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+	}
+	return cmd, nil
+}
+
+func (s *service) StartShim(ctx context.Context, id, containerdBinary, containerdAddress string) (string, error) {
+	cmd, err := newCommand(ctx, containerdBinary, containerdAddress)
+	if err != nil {
+		return "", err
+	}
+	address, err := shim.AbstractAddress(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	socket, err := shim.NewSocket(address)
+	if err != nil {
+		return "", err
+	}
+	defer socket.Close()
+	f, err := socket.File()
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	cmd.ExtraFiles = append(cmd.ExtraFiles, f)
+
+	if err := cmd.Start(); err != nil {
+		return "", err
+	}
+	defer func() {
+		if err != nil {
+			cmd.Process.Kill()
+		}
+	}()
+	// make sure to wait after start
+	go cmd.Wait()
+	if err := shim.WritePidFile("shim.pid", cmd.Process.Pid); err != nil {
+		return "", err
+	}
+	if err := shim.WriteAddress("address", address); err != nil {
+		return "", err
+	}
+	if err := shim.SetScore(cmd.Process.Pid); err != nil {
+		return "", errors.Wrap(err, "failed to set OOM Score on shim")
+	}
+	return address, nil
 }
 
 func (s *service) Cleanup(ctx context.Context) (*taskAPI.DeleteResponse, error) {
@@ -221,7 +295,7 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 		}
 		s.cg = cg
 	}
-	s.processes[r.ID] = process
+	s.task = process
 	return &taskAPI.CreateTaskResponse{
 		Pid: uint32(pid),
 	}, nil
@@ -232,9 +306,9 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.StartResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	p := s.processes[r.ID]
-	if p == nil {
-		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "process %s", r.ID)
+	p, err := s.getProcess(r.ExecID)
+	if err != nil {
+		return nil, err
 	}
 	if err := p.Start(ctx); err != nil {
 		return nil, err
@@ -247,7 +321,6 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 		s.cg = cg
 	}
 	return &taskAPI.StartResponse{
-		ID:  p.ID(),
 		Pid: uint32(p.Pid()),
 	}, nil
 }
@@ -256,16 +329,21 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAPI.DeleteResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	p := s.processes[r.ID]
+	p, err := s.getProcess(r.ExecID)
+	if err != nil {
+		return nil, err
+	}
 	if p == nil {
-		return nil, errors.Wrapf(errdefs.ErrNotFound, "process %s", r.ID)
+		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
 	if err := p.Delete(ctx); err != nil {
 		return nil, err
 	}
-	delete(s.processes, r.ID)
-	if r.ID == s.id && s.platform != nil {
+	isTask := r.ExecID == ""
+	if !isTask {
+		delete(s.processes, r.ExecID)
+	}
+	if isTask && s.platform != nil {
 		s.platform.Close()
 	}
 	return &taskAPI.DeleteResponse{
@@ -279,18 +357,15 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAP
 func (s *service) Exec(ctx context.Context, r *taskAPI.ExecProcessRequest) (*ptypes.Empty, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	if p := s.processes[r.ID]; p != nil {
-		return nil, errdefs.ToGRPCf(errdefs.ErrAlreadyExists, "id %s", r.ID)
+	if p := s.processes[r.ExecID]; p != nil {
+		return nil, errdefs.ToGRPCf(errdefs.ErrAlreadyExists, "id %s", r.ExecID)
 	}
-
-	p := s.processes[s.id]
+	p := s.task
 	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
-
 	process, err := p.(*proc.Init).Exec(ctx, s.bundle, &proc.ExecConfig{
-		ID:       r.ID,
+		ID:       r.ExecID,
 		Terminal: r.Terminal,
 		Stdin:    r.Stdin,
 		Stdout:   r.Stdout,
@@ -300,7 +375,7 @@ func (s *service) Exec(ctx context.Context, r *taskAPI.ExecProcessRequest) (*pty
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-	s.processes[r.ID] = process
+	s.processes[r.ExecID] = process
 	return empty, nil
 }
 
@@ -308,16 +383,13 @@ func (s *service) Exec(ctx context.Context, r *taskAPI.ExecProcessRequest) (*pty
 func (s *service) ResizePty(ctx context.Context, r *taskAPI.ResizePtyRequest) (*ptypes.Empty, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if r.ID == "" {
-		return nil, errdefs.ToGRPCf(errdefs.ErrInvalidArgument, "id not provided")
+	p, err := s.getProcess(r.ExecID)
+	if err != nil {
+		return nil, err
 	}
 	ws := console.WinSize{
 		Width:  uint16(r.Width),
 		Height: uint16(r.Height),
-	}
-	p := s.processes[r.ID]
-	if p == nil {
-		return nil, errors.Errorf("process does not exist %s", r.ID)
 	}
 	if err := p.Resize(ws); err != nil {
 		return nil, errdefs.ToGRPC(err)
@@ -329,9 +401,9 @@ func (s *service) ResizePty(ctx context.Context, r *taskAPI.ResizePtyRequest) (*
 func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.StateResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	p := s.processes[r.ID]
-	if p == nil {
-		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "process id %s", r.ID)
+	p, err := s.getProcess(r.ExecID)
+	if err != nil {
+		return nil, err
 	}
 	st, err := p.Status(ctx)
 	if err != nil {
@@ -366,10 +438,10 @@ func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.
 }
 
 // Pause the container
-func (s *service) Pause(ctx context.Context, r *ptypes.Empty) (*ptypes.Empty, error) {
+func (s *service) Pause(ctx context.Context, r *taskAPI.PauseRequest) (*ptypes.Empty, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	p := s.processes[s.id]
+	p := s.task
 	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
@@ -380,10 +452,10 @@ func (s *service) Pause(ctx context.Context, r *ptypes.Empty) (*ptypes.Empty, er
 }
 
 // Resume the container
-func (s *service) Resume(ctx context.Context, r *ptypes.Empty) (*ptypes.Empty, error) {
+func (s *service) Resume(ctx context.Context, r *taskAPI.ResumeRequest) (*ptypes.Empty, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	p := s.processes[s.id]
+	p := s.task
 	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
@@ -397,20 +469,12 @@ func (s *service) Resume(ctx context.Context, r *ptypes.Empty) (*ptypes.Empty, e
 func (s *service) Kill(ctx context.Context, r *taskAPI.KillRequest) (*ptypes.Empty, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if r.ID == "" {
-		p := s.processes[s.id]
-		if p == nil {
-			return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
-		}
-		if err := p.Kill(ctx, r.Signal, r.All); err != nil {
-			return nil, errdefs.ToGRPC(err)
-		}
-		return empty, nil
+	p, err := s.getProcess(r.ExecID)
+	if err != nil {
+		return nil, err
 	}
-
-	p := s.processes[r.ID]
 	if p == nil {
-		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "process id %s not found", r.ID)
+		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
 	if err := p.Kill(ctx, r.Signal, r.All); err != nil {
 		return nil, errdefs.ToGRPC(err)
@@ -453,9 +517,9 @@ func (s *service) Pids(ctx context.Context, r *taskAPI.PidsRequest) (*taskAPI.Pi
 func (s *service) CloseIO(ctx context.Context, r *taskAPI.CloseIORequest) (*ptypes.Empty, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	p := s.processes[r.ID]
-	if p == nil {
-		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "process does not exist %s", r.ID)
+	p, err := s.getProcess(r.ExecID)
+	if err != nil {
+		return nil, err
 	}
 	if stdin := p.Stdin(); stdin != nil {
 		if err := stdin.Close(); err != nil {
@@ -469,7 +533,7 @@ func (s *service) CloseIO(ctx context.Context, r *taskAPI.CloseIORequest) (*ptyp
 func (s *service) Checkpoint(ctx context.Context, r *taskAPI.CheckpointTaskRequest) (*ptypes.Empty, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	p := s.processes[s.id]
+	p := s.task
 	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
@@ -497,9 +561,13 @@ func (s *service) Checkpoint(ctx context.Context, r *taskAPI.CheckpointTaskReque
 
 // Connect returns shim information such as the shim's pid
 func (s *service) Connect(ctx context.Context, r *taskAPI.ConnectRequest) (*taskAPI.ConnectResponse, error) {
+	var pid int
+	if s.task != nil {
+		pid = s.task.Pid()
+	}
 	return &taskAPI.ConnectResponse{
 		ShimPid: uint32(os.Getpid()),
-		TaskPid: uint32(s.processes[s.id].Pid()),
+		TaskPid: uint32(pid),
 	}, nil
 }
 
@@ -532,7 +600,7 @@ func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.
 func (s *service) Update(ctx context.Context, r *taskAPI.UpdateTaskRequest) (*ptypes.Empty, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	p := s.processes[s.id]
+	p := s.task
 	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
@@ -545,8 +613,11 @@ func (s *service) Update(ctx context.Context, r *taskAPI.UpdateTaskRequest) (*pt
 // Wait for a process to exit
 func (s *service) Wait(ctx context.Context, r *taskAPI.WaitRequest) (*taskAPI.WaitResponse, error) {
 	s.mu.Lock()
-	p := s.processes[r.ID]
+	p, err := s.getProcess(r.ExecID)
 	s.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
 	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
@@ -567,7 +638,8 @@ func (s *service) processExits() {
 func (s *service) checkProcesses(e runcC.Exit) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for _, p := range s.processes {
+
+	for _, p := range s.allProcesses() {
 		if p.Pid() == e.Pid {
 			if ip, ok := p.(*proc.Init); ok {
 				// Ensure all children are killed
@@ -589,14 +661,23 @@ func (s *service) checkProcesses(e runcC.Exit) {
 	}
 }
 
+func (s *service) allProcesses() (o []rproc.Process) {
+	for _, p := range s.processes {
+		o = append(o, p)
+	}
+	if s.task != nil {
+		o = append(o, s.task)
+	}
+	return o
+}
+
 func (s *service) getContainerPids(ctx context.Context, id string) ([]uint32, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	p := s.processes[s.id]
+	p := s.task
 	if p == nil {
 		return nil, errors.Wrapf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
-
 	ps, err := p.(*proc.Init).Runtime().Ps(ctx, id)
 	if err != nil {
 		return nil, err
@@ -614,6 +695,17 @@ func (s *service) forward(publisher events.Publisher) {
 			logrus.WithError(err).Error("post event")
 		}
 	}
+}
+
+func (s *service) getProcess(execID string) (rproc.Process, error) {
+	if execID == "" {
+		return s.task, nil
+	}
+	p := s.processes[execID]
+	if p == nil {
+		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "process does not exist %s", execID)
+	}
+	return p, nil
 }
 
 func getTopic(ctx context.Context, e interface{}) string {

@@ -33,12 +33,9 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
-	ptypes "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
-
-var empty = &ptypes.Empty{}
 
 func init() {
 	plugin.Register(&plugin.Registration{
@@ -112,7 +109,8 @@ func (m *TaskManager) Create(ctx context.Context, id string, opts runtime.Create
 			bundle.Delete()
 		}
 	}()
-	shim, err := newShim(ctx, bundle, opts.Runtime, m.containerdAddress, m.events, m.tasks)
+	b := shimBinary(ctx, bundle, opts.Runtime, m.containerdAddress, m.events, m.tasks)
+	shim, err := b.Start(ctx)
 	if err != nil {
 		return nil, err
 	}

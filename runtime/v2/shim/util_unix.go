@@ -16,12 +16,10 @@
    limitations under the License.
 */
 
-package v2
+package shim
 
 import (
 	"syscall"
-
-	"golang.org/x/sys/unix"
 )
 
 func getSysProcAttr() *syscall.SysProcAttr {
@@ -30,10 +28,7 @@ func getSysProcAttr() *syscall.SysProcAttr {
 	}
 }
 
-func terminate(pid int) error {
-	return unix.Kill(pid, unix.SIGKILL)
-}
-
-func setScore(pid int) error {
+// SetScore sets the oom score for a process
+func SetScore(pid int) error {
 	return nil
 }

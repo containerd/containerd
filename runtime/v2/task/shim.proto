@@ -21,8 +21,8 @@ service Task {
 	rpc Start(StartRequest) returns (StartResponse);
 	rpc Delete(DeleteRequest) returns (DeleteResponse);
 	rpc Pids(PidsRequest) returns (PidsResponse);
-	rpc Pause(google.protobuf.Empty) returns (google.protobuf.Empty);
-	rpc Resume(google.protobuf.Empty) returns (google.protobuf.Empty);
+	rpc Pause(PauseRequest) returns (google.protobuf.Empty);
+	rpc Resume(ResumeRequest) returns (google.protobuf.Empty);
 	rpc Checkpoint(CheckpointTaskRequest) returns (google.protobuf.Empty);
 	rpc Kill(KillRequest) returns (google.protobuf.Empty);
 	rpc Exec(ExecProcessRequest) returns (google.protobuf.Empty);
@@ -54,6 +54,7 @@ message CreateTaskResponse {
 
 message DeleteRequest {
 	string id = 1;
+	string exec_id = 2;
 }
 
 message DeleteResponse {
@@ -64,11 +65,12 @@ message DeleteResponse {
 
 message ExecProcessRequest {
 	string id = 1;
-	bool terminal = 2;
-	string stdin = 3;
-	string stdout = 4;
-	string stderr = 5;
-	google.protobuf.Any spec = 6;
+	string exec_id = 2;
+	bool terminal = 3;
+	string stdin = 4;
+	string stdout = 5;
+	string stderr = 6;
+	google.protobuf.Any spec = 7;
 }
 
 message ExecProcessResponse {
@@ -76,12 +78,14 @@ message ExecProcessResponse {
 
 message ResizePtyRequest {
 	string id = 1;
-	uint32 width = 2;
-	uint32 height = 3;
+	string exec_id = 2;
+	uint32 width = 3;
+	uint32 height = 4;
 }
 
 message StateRequest {
 	string id = 1;
+	string exec_id = 2;
 }
 
 message StateResponse {
@@ -99,13 +103,15 @@ message StateResponse {
 
 message KillRequest {
 	string id = 1;
-	uint32 signal = 2;
-	bool all = 3;
+	string exec_id = 2;
+	uint32 signal = 3;
+	bool all = 4;
 }
 
 message CloseIORequest {
 	string id = 1;
-	bool stdin = 2;
+	string exec_id = 2;
+	bool stdin = 3;
 }
 
 message PidsRequest {
@@ -117,25 +123,28 @@ message PidsResponse {
 }
 
 message CheckpointTaskRequest {
-	string path = 1;
-	google.protobuf.Any options = 2;
+	string id = 1;
+	string path = 2;
+	google.protobuf.Any options = 3;
 }
 
 message UpdateTaskRequest {
-	google.protobuf.Any resources = 1;
+	string id = 1;
+	google.protobuf.Any resources = 2;
 }
 
 message StartRequest {
 	string id = 1;
+	string exec_id = 2;
 }
 
 message StartResponse {
-	string id = 1;
-	uint32 pid = 2;
+	uint32 pid = 1;
 }
 
 message WaitRequest {
 	string id = 1;
+	string exec_id = 2;
 }
 
 message WaitResponse {
@@ -144,7 +153,7 @@ message WaitResponse {
 }
 
 message StatsRequest {
-
+	string id = 1;
 }
 
 message StatsResponse {
@@ -152,7 +161,7 @@ message StatsResponse {
 }
 
 message ConnectRequest {
-
+	string id = 1;
 }
 
 message ConnectResponse {
@@ -162,5 +171,14 @@ message ConnectResponse {
 }
 
 message ShutdownRequest {
-	bool now = 1;
+	string id = 1;
+	bool now = 2;
+}
+
+message PauseRequest {
+	string id = 1;
+}
+
+message ResumeRequest {
+	string id = 1;
 }

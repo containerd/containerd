@@ -14,25 +14,17 @@
    limitations under the License.
 */
 
-package v2
+package shim
 
 import (
 	"syscall"
-
-	"github.com/containerd/containerd/sys"
-	"golang.org/x/sys/unix"
 )
 
 func getSysProcAttr() *syscall.SysProcAttr {
-	return &syscall.SysProcAttr{
-		Setpgid: true,
-	}
+	return nil
 }
 
-func terminate(pid int) error {
-	return unix.Kill(pid, unix.SIGKILL)
-}
-
-func setScore(pid int) error {
-	return sys.SetOOMScore(pid, sys.OOMScoreMaxKillable)
+// SetScore sets the oom score for a process
+func SetScore(pid int) error {
+	return nil
 }
