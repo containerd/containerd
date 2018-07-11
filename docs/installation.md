@@ -84,7 +84,7 @@ curl https://storage.googleapis.com/cri-containerd-release/cri-containerd-${VERS
 ## Step 2: Install Containerd
 If you are using systemd, just simply unpack the tarball to the root directory:
 ```bash
-sudo tar -C / -xzf cri-containerd-${VERSION}.linux-amd64.tar.gz
+sudo tar --no-overwrite-dir -C / -xzf cri-containerd-${VERSION}.linux-amd64.tar.gz
 sudo systemctl start containerd
 ```
 If you are not using systemd, please unpack all binaries into a directory in your `PATH`, and start `containerd` as monitored long running services with the service manager you are using e.g. `supervisord`, `upstart` etc.
