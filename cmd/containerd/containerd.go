@@ -18,7 +18,9 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
+	"time"
 
 	_ "github.com/containerd/containerd/diff/walking/plugin"
 	_ "github.com/containerd/containerd/gc/scheduler"
@@ -42,6 +44,10 @@ import (
 	"github.com/containerd/containerd/cmd/containerd/command"
 	"github.com/sirupsen/logrus"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 func main() {
 	app := command.App()

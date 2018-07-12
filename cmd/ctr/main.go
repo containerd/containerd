@@ -18,12 +18,18 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
+	"time"
 
 	ctrapp "github.com/containerd/containerd/cmd/ctr/app"
 
 	cricli "github.com/containerd/cri/cli"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 func main() {
 	app := ctrapp.New()
