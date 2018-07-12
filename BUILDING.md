@@ -17,6 +17,7 @@ To build the `containerd` daemon, and the `ctr` simple test client, the followin
 * Go 1.10.x or above
 * Protoc 3.x compiler and headers (download at the [Google protobuf releases page](https://github.com/google/protobuf/releases))
 * Btrfs headers and libraries for your distribution. Note that building the btrfs driver can be disabled via the build tag `no_btrfs`, removing this dependency.
+* `libseccomp` is required if you're building with seccomp support
 
 ## Build the development environment
 
@@ -43,7 +44,35 @@ need to satisfy this dependencies in your system:
 * CentOS/Fedora: `yum install btrfs-progs-devel`
 * Debian/Ubuntu: `apt-get install btrfs-tools`
 
+If you're building with seccomp, you'll need to install it with the following:
+
+* Debian/Ubuntu: `apt install libseccomp-dev`
+
 At this point you are ready to build `containerd` yourself!
+
+## Build runc
+
+`runc` is the default container runtime used by `containerd` and is required to
+run containerd. While it is okay to download a runc binary and install that on
+the system, sometimes it is necessary to build runc directly when working with
+container runtime development. You can skip this step if you already have the
+correct version of `runc` installed.
+
+For the quick and dirty installation, you can use the following:
+
+    go get github.com/opencontainers/runc
+
+This is not recommended, as the generated binary will not have version
+information. Instead, cd into the source directory and use make to build and
+install the binary:
+
+	cd $GOPATH/src/github.com/opencontainers/runc
+	make
+	make install
+
+Make sure to follow the guidelines for versioning in [RUNC.md](RUNC.md) for the
+best results. Some pointers on proper build tag setupVersion mismatches can
+result in undefined behavior.
 
 ## Build containerd
 
