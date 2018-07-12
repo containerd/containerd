@@ -14,24 +14,25 @@
    limitations under the License.
 */
 
-package main
+package seed
 
 import (
-	"fmt"
-	"os"
-
-	"github.com/containerd/containerd/cmd/containerd/command"
-	"github.com/containerd/containerd/pkg/seed"
+	"math/rand"
+	"time"
 )
 
-func init() {
-	seed.WithTimeAndRand()
-}
+// WithTimeAndRand seeds the global math rand generator with nanoseconds
+// XOR'ed with a crypto component if available for uniqueness.
+func WithTimeAndRand() {
+	var (
+		b [4]byte
+		u int64
+	)
 
-func main() {
-	app := command.App()
-	if err := app.Run(os.Args); err != nil {
-		fmt.Fprintf(os.Stderr, "containerd: %s\n", err)
-		os.Exit(1)
-	}
+	tryReadRandom(b[:])
+
+	// Set higher 32 bits, bottom 32 will be set with nanos
+	u |= (int64(b[0]) << 56) | (int64(b[1]) << 48) | (int64(b[2]) << 40) | (int64(b[3]) << 32)
+
+	rand.Seed(u ^ time.Now().UnixNano())
 }

@@ -21,10 +21,15 @@ import (
 	"os"
 
 	"github.com/containerd/containerd/cmd/ctr/app"
+	"github.com/containerd/containerd/pkg/seed"
 	"github.com/urfave/cli"
 )
 
 var pluginCmds = []cli.Command{}
+
+func init() {
+	seed.WithTimeAndRand()
+}
 
 func main() {
 	app := app.New()

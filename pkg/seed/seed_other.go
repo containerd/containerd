@@ -1,3 +1,5 @@
+// +build !linux
+
 /*
    Copyright The containerd Authors.
 
@@ -14,24 +16,13 @@
    limitations under the License.
 */
 
-package main
+package seed
 
 import (
-	"fmt"
-	"os"
-
-	"github.com/containerd/containerd/cmd/containerd/command"
-	"github.com/containerd/containerd/pkg/seed"
+	"crypto/rand"
+	"io"
 )
 
-func init() {
-	seed.WithTimeAndRand()
-}
-
-func main() {
-	app := command.App()
-	if err := app.Run(os.Args); err != nil {
-		fmt.Fprintf(os.Stderr, "containerd: %s\n", err)
-		os.Exit(1)
-	}
+func tryReadRandom(p []byte) {
+	io.ReadFull(rand.Reader, p)
 }
