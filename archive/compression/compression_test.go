@@ -18,8 +18,8 @@ package compression
 
 import (
 	"bytes"
-	"crypto/rand"
 	"io/ioutil"
+	"math/rand"
 	"testing"
 )
 

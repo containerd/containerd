@@ -20,12 +20,11 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/rand"
 	_ "crypto/sha256" // required for digest package
 	"fmt"
 	"io"
 	"io/ioutil"
-	mrand "math/rand"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -266,9 +265,9 @@ func generateBlobs(t checker, nblobs, maxsize int64) map[digest.Digest][]byte {
 	blobs := map[digest.Digest][]byte{}
 
 	for i := int64(0); i < nblobs; i++ {
-		p := make([]byte, mrand.Int63n(maxsize))
+		p := make([]byte, rand.Int63n(maxsize))
 
-		if _, err := mrand.Read(p); err != nil {
+		if _, err := rand.Read(p); err != nil {
 			t.Fatal(err)
 		}
 
