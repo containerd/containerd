@@ -116,8 +116,12 @@ func App() *cli.App {
 			return errors.Wrap(err, "creating temp mount location")
 		}
 		// unmount all temp mounts on boot for the server
-		if err := mount.CleanupTempMounts(0); err != nil {
-			return errors.Wrap(err, "unmounting temp mounts")
+		warnings, err := mount.CleanupTempMounts(0)
+		if err != nil {
+			log.G(ctx).WithError(err).Error("unmounting temp mounts")
+		}
+		for _, w := range warnings {
+			log.G(ctx).WithError(w).Warn("cleanup temp mount")
 		}
 		address := config.GRPC.Address
 		if address == "" {
