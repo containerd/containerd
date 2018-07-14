@@ -25,7 +25,6 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/platforms"
 	ocispecs "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -58,7 +57,7 @@ func (oe *V1Exporter) Export(ctx context.Context, store content.Provider, desc o
 	}
 
 	handlers := images.Handlers(
-		images.FilterPlatforms(images.ChildrenHandler(store), platforms.Default()),
+		images.ChildrenHandler(store),
 		images.HandlerFunc(exportHandler),
 	)
 
