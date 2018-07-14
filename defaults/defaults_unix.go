@@ -18,6 +18,12 @@
 
 package defaults
 
+import (
+	"os"
+	"path/filepath"
+	"strings"
+)
+
 const (
 	// DefaultRootDir is the default location used by containerd to store
 	// persistent data
@@ -33,3 +39,20 @@ const (
 	// to store FIFOs.
 	DefaultFIFODir = "/run/containerd/fifo"
 )
+
+func init() {
+	//  pam_systemd sets XDG_RUNTIME_DIR but not other dirs.
+	if xdgDataHome := os.Getenv("XDG_DATA_HOME"); xdgDataHome != "" {
+		dirs := strings.Split(xdgDataHome, ":")
+		UserRootDir = filepath.Join(dirs[0], "containerd")
+	} else if home := os.Getenv("HOME"); home != "" {
+		UserRootDir = filepath.Join(home, ".local", "share", "containerd")
+	}
+	if xdgRuntimeDir := os.Getenv("XDG_RUNTIME_DIR"); xdgRuntimeDir != "" {
+		dirs := strings.Split(xdgRuntimeDir, ":")
+		UserStateDir = filepath.Join(dirs[0], "containerd")
+		UserAddress = filepath.Join(UserStateDir, "containerd.sock")
+		UserDebugAddress = filepath.Join(UserStateDir, "debug.sock")
+		UserFIFODir = filepath.Join(UserStateDir, "fifo")
+	}
+}
