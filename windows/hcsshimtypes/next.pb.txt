@@ -75,8 +75,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Duration"
       options {
-        65011: 1
         65001: 0
+        65011: 1
       }
       json_name: "terminateDuration"
     }
@@ -97,8 +97,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65010: 1
         65001: 0
+        65010: 1
       }
       json_name: "createdAt"
     }
