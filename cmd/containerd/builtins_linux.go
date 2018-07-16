@@ -20,6 +20,7 @@ import (
 	_ "github.com/containerd/aufs"
 	_ "github.com/containerd/containerd/metrics/cgroups"
 	_ "github.com/containerd/containerd/runtime/linux"
+	_ "github.com/containerd/containerd/snapshots/cvmfs"
 	_ "github.com/containerd/containerd/snapshots/native"
 	_ "github.com/containerd/containerd/snapshots/overlay"
 	_ "github.com/containerd/zfs"
