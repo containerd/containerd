@@ -61,9 +61,9 @@ func EpollCtl(epfd int, op int, fd int, event *syscall.EpollEvent) error {
 // EpollWait calls a C implementation
 func EpollWait(epfd int, events []syscall.EpollEvent, msec int) (int, error) {
 	var c_events [128]C.struct_event_t
-	n := int(C.run_epoll_wait(C.int(epfd), (*C.struct_event_t)(unsafe.Pointer(&c_events))))
+	n, err := C.run_epoll_wait(C.int(epfd), (*C.struct_event_t)(unsafe.Pointer(&c_events)))
 	if n < 0 {
-		return int(n), fmt.Errorf("Failed to wait epoll")
+		return int(n), err.(syscall.Errno)
 	}
 	for i := 0; i < n; i++ {
 		events[i].Fd = int32(c_events[i].fd)
