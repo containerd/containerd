@@ -20,35 +20,13 @@ import (
 	"context"
 	"io"
 
-	grpc "google.golang.org/grpc"
-
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots"
 	protobuftypes "github.com/gogo/protobuf/types"
 )
-
-func init() {
-	plugin.Register(&plugin.Registration{
-		Type: plugin.SnapshotPlugin,
-		ID:   "proxy",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
-			ic.Meta.Exports["root"] = ic.Root
-
-			conn, err := grpc.Dial(":50051", grpc.WithInsecure())
-			if err != nil {
-				return nil, err
-			}
-			client := snapshotsapi.NewSnapshotsClient(conn)
-			return NewSnapshotter(client, "proxy"), nil
-		},
-	})
-}
 
 // NewSnapshotter returns a new Snapshotter which communicates over a GRPC
 // connection using the containerd snapshot GRPC API.
