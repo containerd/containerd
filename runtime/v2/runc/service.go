@@ -64,12 +64,18 @@ var _ = (taskAPI.TaskService)(&service{})
 
 // New returns a new shim service that can be used via GRPC
 func New(ctx context.Context, id string, publisher events.Publisher) (shim.Shim, error) {
+	ep, err := newOOMEpoller(publisher)
+	if err != nil {
+		return nil, err
+	}
+	go ep.run(ctx)
 	s := &service{
 		id:        id,
 		context:   ctx,
 		processes: make(map[string]rproc.Process),
 		events:    make(chan interface{}, 128),
 		ec:        shim.Default.Subscribe(),
+		ep:        ep,
 	}
 	go s.processExits()
 	runcC.Monitor = shim.Default
@@ -90,6 +96,7 @@ type service struct {
 	events    chan interface{}
 	platform  rproc.Platform
 	ec        chan runcC.Exit
+	ep        *epoller
 
 	id string
 	// Filled by Create()
@@ -293,7 +300,7 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 		if err != nil {
 			logrus.WithError(err).Errorf("loading cgroup for %d", pid)
 		}
-		s.cg = cg
+		s.setCgroup(cg)
 	}
 	s.task = process
 	return &taskAPI.CreateTaskResponse{
@@ -318,7 +325,7 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 		if err != nil {
 			logrus.WithError(err).Errorf("loading cgroup for %d", p.Pid())
 		}
-		s.cg = cg
+		s.setCgroup(cg)
 	}
 	return &taskAPI.StartResponse{
 		Pid: uint32(p.Pid()),
@@ -706,6 +713,13 @@ func (s *service) getProcess(execID string) (rproc.Process, error) {
 		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "process does not exist %s", execID)
 	}
 	return p, nil
+}
+
+func (s *service) setCgroup(cg cgroups.Cgroup) {
+	s.cg = cg
+	if err := s.ep.add(s.id, cg); err != nil {
+		logrus.WithError(err).Error("add cg to OOM monitor")
+	}
 }
 
 func getTopic(ctx context.Context, e interface{}) string {
