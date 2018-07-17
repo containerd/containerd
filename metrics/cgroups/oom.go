@@ -116,7 +116,8 @@ func (o *oomCollector) start() {
 			if err == unix.EINTR {
 				continue
 			}
-			logrus.WithField("error", err).Fatal("cgroups: epoll wait")
+			logrus.WithError(err).Error("cgroups: epoll wait failed, OOM notifications disabled")
+			return
 		}
 		for i := 0; i < n; i++ {
 			o.process(uintptr(events[i].Fd), events[i].Events)
