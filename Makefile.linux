@@ -14,7 +14,7 @@
 
 
 #linux specific settings
-COMMANDS += containerd-shim
+COMMANDS += containerd-shim containerd-shim-runc-v1
 
 # check GOOS for cross compile builds
 ifeq ($(GOOS),linux)

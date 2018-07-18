@@ -28,6 +28,8 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/runtime/linux/runctypes"
+	"github.com/containerd/containerd/runtime/v2/runc/options"
 )
 
 func TestCheckpointRestorePTY(t *testing.T) {
@@ -81,7 +83,7 @@ func TestCheckpointRestorePTY(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	checkpoint, err := task.Checkpoint(ctx, WithExit)
+	checkpoint, err := task.Checkpoint(ctx, withExit(client))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +178,7 @@ func TestCheckpointRestore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	checkpoint, err := task.Checkpoint(ctx, WithExit)
+	checkpoint, err := task.Checkpoint(ctx, withExit(client))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +247,7 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	checkpoint, err := task.Checkpoint(ctx, WithExit)
+	checkpoint, err := task.Checkpoint(ctx, withExit(client))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -342,4 +344,20 @@ func TestCheckpointLeaveRunning(t *testing.T) {
 	}
 
 	<-statusC
+}
+
+func withExit(client *Client) CheckpointTaskOpts {
+	return func(r *CheckpointTaskInfo) error {
+		switch client.runtime {
+		case "io.containerd.runc.v1":
+			r.Options = &options.CheckpointOptions{
+				Exit: true,
+			}
+		default:
+			r.Options = &runctypes.CheckpointOptions{
+				Exit: true,
+			}
+		}
+		return nil
+	}
 }

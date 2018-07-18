@@ -19,7 +19,6 @@ package containerd
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -30,6 +29,7 @@ import (
 
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/testutil"
+	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/services/server"
 )
 
@@ -122,14 +122,11 @@ func testDaemonRuntimeRoot(t *testing.T, noShim bool) {
 			os.RemoveAll(runtimeRoot)
 		}
 	}()
-	configTOML := fmt.Sprintf(`
+	configTOML := `
 [plugins]
- [plugins.linux]
-   no_shim = %v
-   runtime_root = "%s"
  [plugins.cri]
    stream_server_port = "0"
-`, noShim, runtimeRoot)
+`
 
 	client, _, cleanup := newDaemonWithConfig(t, configTOML)
 	defer cleanup()
@@ -143,7 +140,9 @@ func testDaemonRuntimeRoot(t *testing.T, noShim bool) {
 	}
 
 	id := t.Name()
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("top")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("top")), WithNewSnapshot(id, image), WithRuntime("io.containerd.runc.v1", &options.Options{
+		Root: runtimeRoot,
+	}))
 	if err != nil {
 		t.Fatal(err)
 	}

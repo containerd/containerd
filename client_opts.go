@@ -23,9 +23,10 @@ import (
 )
 
 type clientOpts struct {
-	defaultns   string
-	services    *services
-	dialOptions []grpc.DialOption
+	defaultns      string
+	defaultRuntime string
+	services       *services
+	dialOptions    []grpc.DialOption
 }
 
 // ClientOpt allows callers to set options on the containerd client
@@ -38,6 +39,14 @@ type ClientOpt func(c *clientOpts) error
 func WithDefaultNamespace(ns string) ClientOpt {
 	return func(c *clientOpts) error {
 		c.defaultns = ns
+		return nil
+	}
+}
+
+// WithDefaultRuntime sets the default runtime on the client
+func WithDefaultRuntime(rt string) ClientOpt {
+	return func(c *clientOpts) error {
+		c.defaultRuntime = rt
 		return nil
 	}
 }

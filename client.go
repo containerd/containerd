@@ -79,8 +79,12 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 			return nil, err
 		}
 	}
+	rt := fmt.Sprintf("%s.%s", plugin.RuntimePlugin, runtime.GOOS)
+	if copts.defaultRuntime != "" {
+		rt = copts.defaultRuntime
+	}
 	c := &Client{
-		runtime: fmt.Sprintf("%s.%s", plugin.RuntimePlugin, runtime.GOOS),
+		runtime: rt,
 	}
 	if copts.services != nil {
 		c.services = *copts.services

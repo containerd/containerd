@@ -23,13 +23,14 @@ import (
 
 	"github.com/containerd/cgroups"
 	eventstypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
-	"github.com/containerd/containerd/runtime/linux"
+	"github.com/containerd/containerd/runtime/v1/linux"
 	metrics "github.com/docker/go-metrics"
 	"github.com/sirupsen/logrus"
 )
@@ -80,16 +81,21 @@ type cgroupsMonitor struct {
 }
 
 func (m *cgroupsMonitor) Monitor(c runtime.Task) error {
-	info := c.Info()
-	t := c.(*linux.Task)
+	if err := m.collector.Add(c); err != nil {
+		return err
+	}
+	t, ok := c.(*linux.Task)
+	if !ok {
+		return nil
+	}
 	cg, err := t.Cgroup()
 	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return nil
+		}
 		return err
 	}
-	if err := m.collector.Add(info.ID, info.Namespace, cg); err != nil {
-		return err
-	}
-	err = m.oom.Add(info.ID, info.Namespace, cg, m.trigger)
+	err = m.oom.Add(c.ID(), c.Namespace(), cg, m.trigger)
 	if err == cgroups.ErrMemoryNotSupported {
 		logrus.WithError(err).Warn("OOM monitoring failed")
 		return nil
@@ -98,17 +104,7 @@ func (m *cgroupsMonitor) Monitor(c runtime.Task) error {
 }
 
 func (m *cgroupsMonitor) Stop(c runtime.Task) error {
-	info := c.Info()
-	t := c.(*linux.Task)
-
-	cgroup, err := t.Cgroup()
-	if err != nil {
-		log.G(m.context).WithError(err).Warnf("unable to retrieve cgroup on stop")
-	} else {
-		m.collector.collect(info.ID, info.Namespace, cgroup, m.collector.storedMetrics, false, nil)
-	}
-
-	m.collector.Remove(info.ID, info.Namespace)
+	m.collector.Remove(c)
 	return nil
 }
 

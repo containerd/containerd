@@ -1239,7 +1239,7 @@ func TestContainerMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer task.Delete(ctx)
+	defer task.Delete(ctx, WithProcessKill)
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
@@ -1249,6 +1249,7 @@ func TestContainerMetrics(t *testing.T) {
 	metric, err := task.Metrics(ctx)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 	if metric.ID != id {
 		t.Errorf("expected metric id %q but received %q", id, metric.ID)
