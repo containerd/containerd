@@ -146,6 +146,11 @@ Shims are also responsible for unmounting of the filesystem.
 During a `delete` binary call, the shim MUST ensure that filesystem is also unmounted.
 Filesystems are provided by the containerd snapshotters.
 
+### Events
+
+The shim MUST publish a `runtime.TaskExitEventTopic` when the container exits.
+If the shim collects Out of Memory events, it SHOULD also publish a `runtime.TaskOOMEventTopic`.
+
 ### Other
 
 #### Unsupported rpcs
