@@ -107,3 +107,153 @@ func TestLeases(t *testing.T) {
 		t.Fatalf("Expected no leases, found %d: %v", len(listed), listed)
 	}
 }
+
+func TestLeasesList(t *testing.T) {
+	ctx, db, cancel := testEnv(t)
+	defer cancel()
+
+	testset := [][]leases.Opt{
+		{
+			leases.WithID("lease1"),
+			leases.WithLabels(map[string]string{
+				"label1": "value1",
+				"label3": "other",
+			}),
+		},
+		{
+			leases.WithID("lease2"),
+			leases.WithLabels(map[string]string{
+				"label1": "value1",
+				"label2": "",
+				"label3": "other",
+			}),
+		},
+		{
+			leases.WithID("lease3"),
+			leases.WithLabels(map[string]string{
+				"label1": "value2",
+				"label2": "something",
+			}),
+		},
+	}
+
+	// Insert all
+	for _, opts := range testset {
+		if err := db.Update(func(tx *bolt.Tx) error {
+			lm := NewLeaseManager(tx)
+			_, err := lm.Create(ctx, opts...)
+			return err
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, testcase := range []struct {
+		name     string
+		filters  []string
+		expected []string
+	}{
+		{
+			name:     "All",
+			filters:  []string{},
+			expected: []string{"lease1", "lease2", "lease3"},
+		},
+		{
+			name:     "ID",
+			filters:  []string{"id==lease1"},
+			expected: []string{"lease1"},
+		},
+		{
+			name:     "IDx2",
+			filters:  []string{"id==lease1", "id==lease2"},
+			expected: []string{"lease1", "lease2"},
+		},
+		{
+			name:     "Label1",
+			filters:  []string{"labels.label1"},
+			expected: []string{"lease1", "lease2", "lease3"},
+		},
+
+		{
+			name:     "Label1value1",
+			filters:  []string{"labels.label1==value1"},
+			expected: []string{"lease1", "lease2"},
+		},
+		{
+			name:     "Label1value2",
+			filters:  []string{"labels.label1==value2"},
+			expected: []string{"lease3"},
+		},
+		{
+			name:     "Label2",
+			filters:  []string{"labels.label2"},
+			expected: []string{"lease3"},
+		},
+		{
+			name:     "Label3",
+			filters:  []string{"labels.label2", "labels.label3"},
+			expected: []string{"lease1", "lease2", "lease3"},
+		},
+	} {
+		t.Run(testcase.name, func(t *testing.T) {
+			if err := db.View(func(tx *bolt.Tx) error {
+				lm := NewLeaseManager(tx)
+				results, err := lm.List(ctx, testcase.filters...)
+				if err != nil {
+					return err
+				}
+
+				if len(results) != len(testcase.expected) {
+					t.Errorf("length of result does not match expected: %v != %v", len(results), len(testcase.expected))
+				}
+
+				expectedMap := map[string]struct{}{}
+				for _, expected := range testcase.expected {
+					expectedMap[expected] = struct{}{}
+				}
+
+				for _, result := range results {
+					if _, ok := expectedMap[result.ID]; !ok {
+						t.Errorf("unexpected match: %v", result.ID)
+					} else {
+						delete(expectedMap, result.ID)
+					}
+				}
+				if len(expectedMap) > 0 {
+					for match := range expectedMap {
+						t.Errorf("missing match: %v", match)
+					}
+				}
+
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+
+	// delete everything to test it
+	for _, opts := range testset {
+		var lease leases.Lease
+		for _, opt := range opts {
+			if err := opt(&lease); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		if err := db.Update(func(tx *bolt.Tx) error {
+			lm := NewLeaseManager(tx)
+			return lm.Delete(ctx, lease)
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		// try it again, get nil
+		if err := db.Update(func(tx *bolt.Tx) error {
+			lm := NewLeaseManager(tx)
+			return lm.Delete(ctx, lease)
+		}); err != nil {
+			t.Fatalf("unexpected error %v", err)
+		}
+	}
+}

@@ -22,6 +22,7 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/namespaces"
@@ -110,10 +111,15 @@ func (lm *LeaseManager) Delete(ctx context.Context, lease leases.Lease) error {
 }
 
 // List lists all active leases
-func (lm *LeaseManager) List(ctx context.Context, filter ...string) ([]leases.Lease, error) {
+func (lm *LeaseManager) List(ctx context.Context, fs ...string) ([]leases.Lease, error) {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	filter, err := filters.ParseAll(fs...)
+	if err != nil {
+		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, err.Error())
 	}
 
 	var ll []leases.Lease
@@ -146,7 +152,9 @@ func (lm *LeaseManager) List(ctx context.Context, filter ...string) ([]leases.Le
 		}
 		l.Labels = labels
 
-		ll = append(ll, l)
+		if filter.Match(adaptLease(l)) {
+			ll = append(ll, l)
+		}
 
 		return nil
 	}); err != nil {
