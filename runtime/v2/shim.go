@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/runtime"
 	client "github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/containerd/runtime/v2/task"
+	tasksvc "github.com/containerd/containerd/runtime/v2/task/ttrpc"
 	"github.com/containerd/ttrpc"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
@@ -58,7 +59,7 @@ func loadShim(ctx context.Context, bundle *Bundle, events *exchange.Exchange, rt
 	client.OnClose(func() { conn.Close() })
 	s := &shim{
 		client:  client,
-		task:    task.NewTaskClient(client),
+		task:    tasksvc.NewTaskClient(client),
 		bundle:  bundle,
 		events:  events,
 		rtTasks: rt,
@@ -72,7 +73,7 @@ func loadShim(ctx context.Context, bundle *Bundle, events *exchange.Exchange, rt
 type shim struct {
 	bundle  *Bundle
 	client  *ttrpc.Client
-	task    task.TaskService
+	task    tasksvc.TaskService
 	taskPid int
 	events  *exchange.Exchange
 	rtTasks *runtime.TaskList

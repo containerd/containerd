@@ -120,7 +120,8 @@ generate: protos
 
 protos: bin/protoc-gen-gogoctrd ## generate protobuf
 	@echo "$(WHALE) $@"
-	@PATH=${ROOTDIR}/bin:${PATH} protobuild --quiet ${PACKAGES}
+	@PATH=${ROOTDIR}/bin:${PATH} protobuild -quiet ${PACKAGES}
+	@PATH=${ROOTDIR}/bin:${PATH} protobuild -quiet -f Protobuild_grpc.toml github.com/containerd/containerd/runtime/v2/task
 
 check-protos: protos ## check if protobufs needs to be generated again
 	@echo "$(WHALE) $@"

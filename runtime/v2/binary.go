@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/runtime"
 	client "github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/containerd/runtime/v2/task"
+	tasksvc "github.com/containerd/containerd/runtime/v2/task/ttrpc"
 	"github.com/containerd/ttrpc"
 	"github.com/pkg/errors"
 )
@@ -68,7 +69,7 @@ func (b *binary) Start(ctx context.Context) (*shim, error) {
 	return &shim{
 		bundle:  b.bundle,
 		client:  client,
-		task:    task.NewTaskClient(client),
+		task:    tasksvc.NewTaskClient(client),
 		events:  b.events,
 		rtTasks: b.rtTasks,
 	}, nil

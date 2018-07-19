@@ -42,6 +42,7 @@ import (
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/runtime/v2/shim"
 	taskAPI "github.com/containerd/containerd/runtime/v2/task"
+	tasksvc "github.com/containerd/containerd/runtime/v2/task/ttrpc"
 	runcC "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
@@ -60,7 +61,7 @@ var (
 	}
 )
 
-var _ = (taskAPI.TaskService)(&service{})
+var _ = (tasksvc.TaskService)(&service{})
 
 // New returns a new shim service that can be used via GRPC
 func New(ctx context.Context, id string, publisher events.Publisher) (shim.Shim, error) {

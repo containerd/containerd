@@ -28,7 +28,8 @@ import (
 
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/namespaces"
-	shimapi "github.com/containerd/containerd/runtime/v2/task"
+	"github.com/containerd/containerd/runtime/v2/task"
+	shimapi "github.com/containerd/containerd/runtime/v2/task/ttrpc"
 	"github.com/containerd/ttrpc"
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
@@ -48,7 +49,7 @@ type Init func(context.Context, string, events.Publisher) (Shim, error)
 // Shim server interface
 type Shim interface {
 	shimapi.TaskService
-	Cleanup(ctx context.Context) (*shimapi.DeleteResponse, error)
+	Cleanup(ctx context.Context) (*task.DeleteResponse, error)
 	StartShim(ctx context.Context, id, containerdBinary, containerdAddress string) (string, error)
 }
 

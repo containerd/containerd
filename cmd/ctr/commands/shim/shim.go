@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/runtime/v2/task"
+	tasksvc "github.com/containerd/containerd/runtime/v2/task/ttrpc"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
@@ -225,7 +226,7 @@ var execCommand = cli.Command{
 	},
 }
 
-func getTaskService(context *cli.Context) (task.TaskService, error) {
+func getTaskService(context *cli.Context) (tasksvc.TaskService, error) {
 	bindSocket := context.GlobalString("socket")
 	if bindSocket == "" {
 		return nil, errors.New("socket path must be specified")
@@ -241,5 +242,5 @@ func getTaskService(context *cli.Context) (task.TaskService, error) {
 	// TODO(stevvooe): This actually leaks the connection. We were leaking it
 	// before, so may not be a huge deal.
 
-	return task.NewTaskClient(client), nil
+	return tasksvc.NewTaskClient(client), nil
 }

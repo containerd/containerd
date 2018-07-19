@@ -1,6 +1,5 @@
 version = "unstable"
 generator = "gogoctrd"
-plugins = ["grpc", "fieldpath"]
 
 # Control protoc include paths. Below are usually some good defaults, but feel
 # free to try it without them if it works for your project.
@@ -32,50 +31,7 @@ plugins = ["grpc", "fieldpath"]
   "google/rpc/status.proto" = "github.com/gogo/googleapis/google/rpc"
 
 [[overrides]]
-prefixes = ["github.com/containerd/containerd/api/events"]
-plugins = ["fieldpath"] # disable grpc for this package
-
-[[overrides]]
-# enable ttrpc and disable fieldpath and grpc for the shim
-prefixes = ["github.com/containerd/containerd/runtime/v1/shim/v1"]
-plugins = ["ttrpc"]
-
-[[overrides]]
-# enable ttrpc and disable fieldpath and grpc for the shim
+# enable grpc and disable fieldpath and ttrpc for the shim
 prefixes = ["github.com/containerd/containerd/runtime/v2/task"]
-plugins = ["ttrpc"]
-files = { "shim.proto" = { import_path = "github.com/containerd/containerd/runtime/v2/task/ttrpc", output = "runtime/v2/task/ttrpc", relative = true } }
-
-# Aggregrate the API descriptors to lock down API changes.
-[[descriptors]]
-prefix = "github.com/containerd/containerd/api"
-target = "api/next.pb.txt"
-ignore_files = [
-	"google/protobuf/descriptor.proto",
-	"gogoproto/gogo.proto"
-]
-
-# Lock down runc config
-[[descriptors]]
-prefix = "github.com/containerd/containerd/runtime/linux/runctypes"
-target = "runtime/linux/runctypes/next.pb.txt"
-ignore_files = [
-	"google/protobuf/descriptor.proto",
-	"gogoproto/gogo.proto"
-]
-
-[[descriptors]]
-prefix = "github.com/containerd/containerd/runtime/v2/runc/options"
-target = "runtime/v2/runc/options/next.pb.txt"
-ignore_files = [
-	"google/protobuf/descriptor.proto",
-	"gogoproto/gogo.proto"
-]
-
-[[descriptors]]
-prefix = "github.com/containerd/containerd/windows/hcsshimtypes"
-target = "windows/hcsshimtypes/next.pb.txt"
-ignore_files = [
-	"google/protobuf/descriptor.proto",
-	"gogoproto/gogo.proto"
-]
+plugins = ["grpc"]
+files = { "shim.proto" = { import_path = "github.com/containerd/containerd/runtime/v2/task/grpc", output = "runtime/v2/task/grpc", relative = true } }
