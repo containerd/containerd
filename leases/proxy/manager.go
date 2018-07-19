@@ -57,9 +57,17 @@ func (pm *proxyManager) Create(ctx context.Context, opts ...leases.Opt) (leases.
 	}, nil
 }
 
-func (pm *proxyManager) Delete(ctx context.Context, l leases.Lease) error {
+func (pm *proxyManager) Delete(ctx context.Context, l leases.Lease, opts ...leases.DeleteOpt) error {
+	var do leases.DeleteOptions
+	for _, opt := range opts {
+		if err := opt(ctx, &do); err != nil {
+			return err
+		}
+	}
+
 	_, err := pm.client.Delete(ctx, &leasesapi.DeleteRequest{
-		ID: l.ID,
+		ID:   l.ID,
+		Sync: do.Synchronous,
 	})
 	return err
 }

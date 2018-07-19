@@ -84,9 +84,13 @@ func (s *service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 }
 
 func (s *service) Delete(ctx context.Context, r *api.DeleteRequest) (*ptypes.Empty, error) {
+	var opts []leases.DeleteOpt
+	if r.Sync {
+		opts = append(opts, leases.SynchronousDelete)
+	}
 	if err := s.lm.Delete(ctx, leases.Lease{
 		ID: r.ID,
-	}); err != nil {
+	}, opts...); err != nil {
 		return nil, err
 	}
 	return &ptypes.Empty{}, nil

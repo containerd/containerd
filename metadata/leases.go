@@ -94,7 +94,7 @@ func (lm *LeaseManager) Create(ctx context.Context, opts ...leases.Opt) (leases.
 }
 
 // Delete delets the lease with the provided lease ID
-func (lm *LeaseManager) Delete(ctx context.Context, lease leases.Lease) error {
+func (lm *LeaseManager) Delete(ctx context.Context, lease leases.Lease, _ ...leases.DeleteOpt) error {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return err

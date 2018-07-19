@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/boltdb/bolt"
+	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
@@ -38,13 +39,25 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			return &local{db: m.(*metadata.DB)}, nil
+			g, err := ic.Get(plugin.GCPlugin)
+			if err != nil {
+				return nil, err
+			}
+			return &local{
+				db: m.(*metadata.DB),
+				gc: g.(gcScheduler),
+			}, nil
 		},
 	})
 }
 
+type gcScheduler interface {
+	ScheduleAndWait(context.Context) (gc.Stats, error)
+}
+
 type local struct {
 	db *metadata.DB
+	gc gcScheduler
 }
 
 func (l *local) Create(ctx context.Context, opts ...leases.Opt) (leases.Lease, error) {
@@ -59,10 +72,28 @@ func (l *local) Create(ctx context.Context, opts ...leases.Opt) (leases.Lease, e
 	return lease, nil
 }
 
-func (l *local) Delete(ctx context.Context, lease leases.Lease) error {
-	return l.db.Update(func(tx *bolt.Tx) error {
+func (l *local) Delete(ctx context.Context, lease leases.Lease, opts ...leases.DeleteOpt) error {
+	var do leases.DeleteOptions
+	for _, opt := range opts {
+		if err := opt(ctx, &do); err != nil {
+			return err
+		}
+	}
+
+	if err := l.db.Update(func(tx *bolt.Tx) error {
 		return metadata.NewLeaseManager(tx).Delete(ctx, lease)
-	})
+	}); err != nil {
+		return err
+	}
+
+	if do.Synchronous {
+		if _, err := l.gc.ScheduleAndWait(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+
 }
 
 func (l *local) List(ctx context.Context, filters ...string) ([]leases.Lease, error) {
