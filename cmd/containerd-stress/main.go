@@ -145,6 +145,11 @@ func main() {
 			Name:  "metrics,m",
 			Usage: "address to serve the metrics API",
 		},
+		cli.StringFlag{
+			Name:  "runtime",
+			Usage: "set the runtime to stress test",
+			Value: "io.containerd.runtime.v1.linux",
+		},
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("json") {
@@ -166,6 +171,7 @@ func main() {
 			Exec:        context.GlobalBool("exec"),
 			JSON:        context.GlobalBool("json"),
 			Metrics:     context.GlobalString("metrics"),
+			Runtime:     context.GlobalString("runtime"),
 		}
 		if config.Metrics != "" {
 			return serve(config)
@@ -185,10 +191,11 @@ type config struct {
 	Exec        bool
 	JSON        bool
 	Metrics     string
+	Runtime     string
 }
 
 func (c config) newClient() (*containerd.Client, error) {
-	return containerd.New(c.Address)
+	return containerd.New(c.Address, containerd.WithDefaultRuntime(c.Runtime))
 }
 
 func serve(c config) error {
