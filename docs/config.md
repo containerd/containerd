@@ -38,6 +38,9 @@ The explanation and default value of each configuration item are as follows:
     # snapshotter is the snapshotter used by containerd.
     snapshotter = "overlayfs"
 
+    # no_pivot disables pivot-root (linux only), required when running a container in a RamDisk with runc
+    no_pivot = false
+
     # "plugins.cri.containerd.default_runtime" is the runtime to use in containerd.
     [plugins.cri.containerd.default_runtime]
       # runtime_type is the runtime type to use in containerd e.g. io.containerd.runtime.v1.linux

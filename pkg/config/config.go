@@ -37,6 +37,8 @@ type ContainerdConfig struct {
 	DefaultRuntime Runtime `toml:"default_runtime" json:"defaultRuntime"`
 	// UntrustedWorkloadRuntime is a runtime to run untrusted workloads on it.
 	UntrustedWorkloadRuntime Runtime `toml:"untrusted_workload_runtime" json:"untrustedWorkloadRuntime"`
+	// NoPivot disables pivot-root (linux only), required when running a container in a RamDisk with runc
+	NoPivot bool `toml:"no_pivot" json:"noPivot"`
 }
 
 // CniConfig contains toml config related to cni
@@ -148,6 +150,7 @@ func DefaultConfig() PluginConfig {
 				Engine: "",
 				Root:   "",
 			},
+			NoPivot: false,
 		},
 		StreamServerAddress:     "",
 		StreamServerPort:        "10010",

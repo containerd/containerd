@@ -293,8 +293,13 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// Create sandbox task in containerd.
 		log.Tracef("Create sandbox container (id=%q, name=%q).",
 			id, name)
+
+		var taskOpts []containerd.NewTaskOpts
+		if c.config.NoPivot {
+			taskOpts = append(taskOpts, containerd.WithNoPivotRoot)
+		}
 		// We don't need stdio for sandbox container.
-		task, err := container.NewTask(ctx, containerdio.NullIO)
+		task, err := container.NewTask(ctx, containerdio.NullIO, taskOpts...)
 		if err != nil {
 			return status, errors.Wrap(err, "failed to create containerd task")
 		}
