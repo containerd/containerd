@@ -103,7 +103,7 @@ func Import(ctx context.Context, client *containerd.Client, reader io.Reader) (_
 		defer deferCancel()
 		if err := done(deferCtx); err != nil {
 			// Get lease id from context still works after context is done.
-			leaseID, _ := leases.Lease(ctx)
+			leaseID, _ := leases.FromContext(ctx)
 			log.G(ctx).WithError(err).Errorf("Failed to release lease %q", leaseID)
 		}
 	}()

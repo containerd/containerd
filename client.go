@@ -43,6 +43,8 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/leases"
+	leasesproxy "github.com/containerd/containerd/leases/proxy"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/plugin"
@@ -512,11 +514,11 @@ func (c *Client) IntrospectionService() introspectionapi.IntrospectionClient {
 }
 
 // LeasesService returns the underlying Leases Client
-func (c *Client) LeasesService() leasesapi.LeasesClient {
+func (c *Client) LeasesService() leases.Manager {
 	if c.leasesService != nil {
 		return c.leasesService
 	}
-	return leasesapi.NewLeasesClient(c.conn)
+	return leasesproxy.NewLeaseManager(leasesapi.NewLeasesClient(c.conn))
 }
 
 // HealthService returns the underlying GRPC HealthClient
