@@ -184,14 +184,15 @@ func (s *service) Cleanup(ctx context.Context) (*taskAPI.DeleteResponse, error) 
 	if err != nil {
 		return nil, err
 	}
-	runtime, _ := s.readRuntime(path)
-	if runtime != "" {
-		r := proc.NewRunc(proc.RuncRoot, path, ns, runtime, "", false)
-		if err := r.Delete(ctx, s.id, &runcC.DeleteOpts{
-			Force: true,
-		}); err != nil {
-			logrus.WithError(err).Warn("runc delete")
-		}
+	runtime, err := s.readRuntime(path)
+	if err != nil {
+		return nil, err
+	}
+	r := proc.NewRunc(proc.RuncRoot, path, ns, runtime, "", false)
+	if err := r.Delete(ctx, s.id, &runcC.DeleteOpts{
+		Force: true,
+	}); err != nil {
+		logrus.WithError(err).Warn("failed to remove runc container")
 	}
 	if err := mount.UnmountAll(filepath.Join(path, "rootfs"), 0); err != nil {
 		logrus.WithError(err).Warn("failed to cleanup rootfs mount")

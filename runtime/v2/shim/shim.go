@@ -38,6 +38,7 @@ import (
 	shimapi "github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl"
+	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
@@ -141,7 +142,7 @@ func Run(initFunc Init) error {
 		if err != nil {
 			return err
 		}
-		data, err := response.Marshal()
+		data, err := proto.Marshal(response)
 		if err != nil {
 			return err
 		}
