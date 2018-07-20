@@ -169,6 +169,7 @@ disabled_plugins = ["restart"]
 
 [plugins.cri]
   stream_server_address = "127.0.0.1"
+  stream_server_port = "0"
   max_container_log_line_size = ${max_container_log_line}
 [plugins.cri.cni]
   bin_dir = "${cni_bin_dir}"
