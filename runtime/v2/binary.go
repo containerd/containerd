@@ -17,11 +17,13 @@
 package v2
 
 import (
+	"bytes"
 	"context"
 	"strings"
 
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/events/exchange"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/runtime"
 	client "github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/containerd/runtime/v2/task"
@@ -73,16 +75,26 @@ func (b *binary) Start(ctx context.Context) (*shim, error) {
 }
 
 func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
+	log.G(ctx).Info("cleaning up dead shim")
 	cmd, err := client.Command(ctx, b.runtime, b.containerdAddress, b.bundle.Path, "-id", b.bundle.ID, "delete")
 	if err != nil {
 		return nil, err
 	}
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, errors.Wrapf(err, "%s", out)
+	var (
+		out  = bytes.NewBuffer(nil)
+		errb = bytes.NewBuffer(nil)
+	)
+	cmd.Stdout = out
+	cmd.Stderr = errb
+	if err := cmd.Run(); err != nil {
+		return nil, errors.Wrapf(err, "%s", errb.String())
+	}
+	s := errb.String()
+	if s != "" {
+		log.G(ctx).Warnf("cleanup warnings %s", s)
 	}
 	var response task.DeleteResponse
-	if err := response.Unmarshal(out); err != nil {
+	if err := response.Unmarshal(out.Bytes()); err != nil {
 		return nil, err
 	}
 	if err := b.bundle.Delete(); err != nil {

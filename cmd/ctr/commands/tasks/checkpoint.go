@@ -48,7 +48,7 @@ var checkpointCommand = cli.Command{
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(context, containerd.WithDefaultRuntime(context.String("runtime")))
 		if err != nil {
 			return err
 		}

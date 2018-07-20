@@ -24,12 +24,10 @@ import (
 
 	"github.com/containerd/containerd/runtime/v2/runc"
 	"github.com/containerd/containerd/runtime/v2/shim"
-	"github.com/sirupsen/logrus"
 )
 
 func main() {
 	if err := shim.Run(runc.New); err != nil {
-		logrus.WithError(err).Error("shim run")
 		fmt.Fprintf(os.Stderr, "containerd-shim-run-v1: %s\n", err)
 		os.Exit(1)
 	}
