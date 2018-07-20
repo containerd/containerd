@@ -583,13 +583,10 @@ func untrustedWorkload(config *runtime.PodSandboxConfig) bool {
 	return config.GetAnnotations()[annotations.UntrustedWorkload] == "true"
 }
 
-// hostPrivilegedSandbox returns true if the sandbox configuration
-// requires additional host privileges for the sandbox.
-func hostPrivilegedSandbox(config *runtime.PodSandboxConfig) bool {
+// hostAccessingSandbox returns true if the sandbox configuration
+// requires additional host access for the sandbox.
+func hostAccessingSandbox(config *runtime.PodSandboxConfig) bool {
 	securityContext := config.GetLinux().GetSecurityContext()
-	if securityContext.GetPrivileged() {
-		return true
-	}
 
 	namespaceOptions := securityContext.GetNamespaceOptions()
 	if namespaceOptions.GetNetwork() == runtime.NamespaceMode_NODE ||
@@ -607,9 +604,13 @@ func hostPrivilegedSandbox(config *runtime.PodSandboxConfig) bool {
 func (c *criService) getSandboxRuntime(config *runtime.PodSandboxConfig) (criconfig.Runtime, error) {
 	untrusted := false
 	if untrustedWorkload(config) {
-		// TODO(random-liu): Figure out we should return error or not.
-		if hostPrivilegedSandbox(config) {
-			return criconfig.Runtime{}, errors.New("untrusted workload with host privilege is not allowed")
+		//  If the untrusted workload is requesting access to the host/node, this request will fail.
+		//
+		//  Note: If the workload is marked untrusted but requests privileged, this can be granted, as the
+		// runtime may support this.  For example, in a virtual-machine isolated runtime, privileged
+		// is a supported option, granting the workload to access the entire guest VM instead of host.
+		if hostAccessingSandbox(config) {
+			return criconfig.Runtime{}, errors.New("untrusted workload with host access is not allowed")
 		}
 		untrusted = true
 	}
