@@ -7,10 +7,10 @@ The explanation and default value of each configuration item are as follows:
 [plugins.cri]
 
   # stream_server_address is the ip address streaming server is listening on.
-  stream_server_address = ""
+  stream_server_address = "127.0.0.1"
 
   # stream_server_port is the port streaming server is listening on.
-  stream_server_port = "10010"
+  stream_server_port = "0"
 
   # enable_selinux indicates to enable the selinux support.
   enable_selinux = false
