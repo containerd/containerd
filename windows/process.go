@@ -121,7 +121,7 @@ func (p *process) HcsPid() uint32 {
 
 func (p *process) ExitCode() (uint32, time.Time, error) {
 	if s := p.Status(); s != runtime.StoppedStatus && s != runtime.CreatedStatus {
-		return 255, time.Time{}, errors.Wrapf(errdefs.ErrFailedPrecondition, "process is not stopped: %s", s)
+		return 255, time.Time{}, errors.Wrapf(errdefs.ErrFailedPrecondition, "process is not stopped: %d", s)
 	}
 	return p.exitCode, p.exitTime, nil
 }

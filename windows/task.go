@@ -284,7 +284,7 @@ func (t *task) Update(ctx context.Context, resources *types.Any) error {
 func (t *task) Process(ctx context.Context, id string) (p runtime.Process, err error) {
 	p = t.getProcess(id)
 	if p == nil {
-		err = errors.Wrapf(errdefs.ErrNotFound, "no such process %d", id)
+		err = errors.Wrapf(errdefs.ErrNotFound, "no such process %s", id)
 	}
 
 	return p, err
@@ -297,7 +297,7 @@ func (t *task) Stats(ctx context.Context) (*types.Any, error) {
 func (t *task) Wait(ctx context.Context) (*runtime.Exit, error) {
 	p := t.getProcess(t.id)
 	if p == nil {
-		return nil, errors.Wrapf(errdefs.ErrNotFound, "no such process %d", t.id)
+		return nil, errors.Wrapf(errdefs.ErrNotFound, "no such process %s", t.id)
 	}
 	return p.Wait(ctx)
 }
