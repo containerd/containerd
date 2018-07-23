@@ -25,9 +25,9 @@ import (
 	"github.com/urfave/cli"
 )
 
-var startCommand = cli.Command{
-	Name:      "start",
-	Usage:     "start a container that have been created",
+var createCommand = cli.Command{
+	Name:      "create",
+	Usage:     "create a task from a container that have been created",
 	ArgsUsage: "CONTAINER",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
@@ -71,26 +71,15 @@ var startCommand = cli.Command{
 			opts   = getNewTaskOpts(context)
 			ioOpts = []cio.Opt{cio.WithFIFODir(context.String("fifo-dir"))}
 		)
-		// First try to get the task if already created
-		// TODO: how to pass a cio.NewCreator instead of a cio.NewAttach?
-		//       Symptoms: exitting the shell with "exit" works but "ctrl-d" does not work
-		task, err := container.Task(ctx, cio.NewAttach(cio.WithStdio))
+		task, err := NewTask(ctx, client, container, "", tty, context.Bool("null-io"), ioOpts, opts...)
 		if err != nil {
-			// Fallback on creating a new task
-			task, err = NewTask(ctx, client, container, "", tty, context.Bool("null-io"), ioOpts, opts...)
-			if err != nil {
-				return err
-			}
+			return err
 		}
 		defer task.Delete(ctx)
 		if context.IsSet("pid-file") {
 			if err := commands.WritePidFile(context.String("pid-file"), int(task.Pid())); err != nil {
 				return err
 			}
-		}
-		statusC, err := task.Wait(ctx)
-		if err != nil {
-			return err
 		}
 
 		var con console.Console
@@ -101,9 +90,6 @@ var startCommand = cli.Command{
 				return err
 			}
 		}
-		if err := task.Start(ctx); err != nil {
-			return err
-		}
 		if tty {
 			if err := HandleConsoleResize(ctx, task, con); err != nil {
 				logrus.WithError(err).Error("console resize")
@@ -113,17 +99,6 @@ var startCommand = cli.Command{
 			defer commands.StopCatch(sigc)
 		}
 
-		status := <-statusC
-		code, _, err := status.Result()
-		if err != nil {
-			return err
-		}
-		if _, err := task.Delete(ctx); err != nil {
-			return err
-		}
-		if code != 0 {
-			return cli.NewExitError("", int(code))
-		}
 		return nil
 	},
 }

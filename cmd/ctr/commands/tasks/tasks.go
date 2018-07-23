@@ -34,6 +34,7 @@ var Command = cli.Command{
 	Subcommands: []cli.Command{
 		attachCommand,
 		checkpointCommand,
+		createCommand,
 		deleteCommand,
 		execCommand,
 		listCommand,
