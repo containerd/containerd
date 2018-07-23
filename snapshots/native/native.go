@@ -251,6 +251,9 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create temp dir")
 		}
+		if err := os.Chmod(td, 0755); err != nil {
+			return nil, errors.Wrapf(err, "failed to chmod %s to 0755", td)
+		}
 		defer func() {
 			if err != nil {
 				if td != "" {
