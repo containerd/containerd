@@ -62,6 +62,7 @@ func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(ctx context.
 
 	t.Run("StatInWalk", makeTest(name, snapshotterFn, checkStatInWalk))
 	t.Run("CloseTwice", makeTest(name, snapshotterFn, closeTwice))
+	t.Run("RootPermission", makeTest(name, snapshotterFn, checkRootPermission))
 }
 
 func makeTest(name string, snapshotterFn func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error), fn func(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string)) func(t *testing.T) {
@@ -840,5 +841,20 @@ func closeTwice(ctx context.Context, t *testing.T, snapshotter snapshots.Snapsho
 	}
 	if err := snapshotter.Close(); err != nil {
 		t.Fatalf("The second close failed: %+v", err)
+	}
+}
+
+func checkRootPermission(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
+	preparing, err := snapshotterPrepareMount(ctx, snapshotter, "preparing", "", work)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer testutil.Unmount(t, preparing)
+	st, err := os.Stat(preparing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mode := st.Mode() & 0777; mode != 0755 {
+		t.Fatalf("expected 0755, got 0%o", mode)
 	}
 }
