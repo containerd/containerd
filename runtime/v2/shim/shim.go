@@ -133,11 +133,7 @@ func Run(initFunc Init) error {
 	}
 	switch action {
 	case "delete":
-		logger := logrus.WithFields(logrus.Fields{
-			"pid":       os.Getpid(),
-			"namespace": namespaceFlag,
-		})
-		go handleSignals(logger, signals)
+		go handleSignals(signals)
 		response, err := service.Cleanup(ctx)
 		if err != nil {
 			return err
@@ -205,7 +201,7 @@ func (s *Client) Serve() error {
 			dumpStacks(logger)
 		}
 	}()
-	return handleSignals(logger, s.signals)
+	return handleSignals(s.signals)
 }
 
 // serve serves the ttrpc API over a unix socket at the provided path
@@ -238,15 +234,14 @@ func serve(ctx context.Context, server *ttrpc.Server, path string) error {
 	return nil
 }
 
-func handleSignals(logger *logrus.Entry, signals chan os.Signal) error {
-	logger.Info("starting signal loop")
+func handleSignals(signals chan os.Signal) error {
 	for {
 		select {
 		case s := <-signals:
 			switch s {
 			case unix.SIGCHLD:
-				if err := Reap(); err != nil {
-					logger.WithError(err).Error("reap exit status")
+				if err := Default.Reap(); err != nil {
+					logrus.WithError(err).Error("reap exit status")
 				}
 			case unix.SIGPIPE:
 			}

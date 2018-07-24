@@ -16,11 +16,8 @@
 
 package sys
 
-import "time"
-
-// Exit is the wait information from an exited process
-type Exit struct {
-	Time   time.Time
-	Pid    int
-	Status int
+// Reap reaps all child processes for the calling process and returns their
+// exit information
+func Reap(wait bool) (exits []Exit, err error) {
+	return nil, nil
 }
