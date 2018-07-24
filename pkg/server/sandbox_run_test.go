@@ -474,7 +474,7 @@ func TestTypeurlMarshalUnmarshalSandboxMeta(t *testing.T) {
 	}
 }
 
-func TestHostPrivilegedSandbox(t *testing.T) {
+func TestHostAccessingSandbox(t *testing.T) {
 	privilegedContext := &runtime.PodSandboxConfig{
 		Linux: &runtime.LinuxPodSandboxConfig{
 			SecurityContext: &runtime.LinuxSandboxSecurityContext{
@@ -507,14 +507,14 @@ func TestHostPrivilegedSandbox(t *testing.T) {
 		want   bool
 	}{
 		{"Security Context is nil", nil, false},
-		{"Security Context is privileged", privilegedContext, true},
+		{"Security Context is privileged", privilegedContext, false},
 		{"Security Context is not privileged", nonPrivilegedContext, false},
 		{"Security Context namespace host access", hostNamespace, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := hostPrivilegedSandbox(tt.config); got != tt.want {
-				t.Errorf("hostPrivilegedSandbox() = %v, want %v", got, tt.want)
+			if got := hostAccessingSandbox(tt.config); got != tt.want {
+				t.Errorf("hostAccessingSandbox() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -540,11 +540,16 @@ func TestGetSandboxRuntime(t *testing.T) {
 		expectErr                bool
 		expectedRuntime          criconfig.Runtime
 	}{
-		"should return error if untrusted workload requires host privilege": {
+		"should return error if untrusted workload requires host access": {
 			sandboxConfig: &runtime.PodSandboxConfig{
 				Linux: &runtime.LinuxPodSandboxConfig{
 					SecurityContext: &runtime.LinuxSandboxSecurityContext{
-						Privileged: true,
+						Privileged: false,
+						NamespaceOptions: &runtime.NamespaceOption{
+							Network: runtime.NamespaceMode_NODE,
+							Pid:     runtime.NamespaceMode_NODE,
+							Ipc:     runtime.NamespaceMode_NODE,
+						},
 					},
 				},
 				Annotations: map[string]string{
