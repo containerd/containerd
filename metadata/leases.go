@@ -256,3 +256,51 @@ func removeContentLease(ctx context.Context, tx *bolt.Tx, dgst digest.Digest) er
 
 	return bkt.Delete([]byte(dgst.String()))
 }
+
+func addIngestLease(ctx context.Context, tx *bolt.Tx, ref string) (bool, error) {
+	lid, ok := leases.FromContext(ctx)
+	if !ok {
+		return false, nil
+	}
+
+	namespace, ok := namespaces.Namespace(ctx)
+	if !ok {
+		panic("namespace must already be required")
+	}
+
+	bkt := getBucket(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectLeases, []byte(lid))
+	if bkt == nil {
+		return false, errors.Wrap(errdefs.ErrNotFound, "lease does not exist")
+	}
+
+	bkt, err := bkt.CreateBucketIfNotExists(bucketKeyObjectIngests)
+	if err != nil {
+		return false, err
+	}
+
+	if err := bkt.Put([]byte(ref), nil); err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func removeIngestLease(ctx context.Context, tx *bolt.Tx, ref string) error {
+	lid, ok := leases.FromContext(ctx)
+	if !ok {
+		return nil
+	}
+
+	namespace, ok := namespaces.Namespace(ctx)
+	if !ok {
+		panic("namespace must already be checked")
+	}
+
+	bkt := getBucket(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectLeases, []byte(lid), bucketKeyObjectIngests)
+	if bkt == nil {
+		// Key does not exist so we return nil
+		return nil
+	}
+
+	return bkt.Delete([]byte(ref))
+}

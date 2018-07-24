@@ -89,6 +89,11 @@ func TestContentLeased(t *testing.T) {
 	if err := checkContentLeased(lctx, db, expected); err != nil {
 		t.Fatal("lease checked failed:", err)
 	}
+	if err := checkIngestLeased(lctx, db, "test-1"); err == nil {
+		t.Fatal("test-1 should not be leased after write")
+	} else if !errdefs.IsNotFound(err) {
+		t.Fatal("lease checked failed:", err)
+	}
 
 	lctx, _, err = createLease(ctx, db, "lease-2")
 	if err != nil {
@@ -103,6 +108,48 @@ func TestContentLeased(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := checkContentLeased(lctx, db, expected); err != nil {
+		t.Fatal("lease checked failed:", err)
+	}
+	if err := checkIngestLeased(lctx, db, "test-2"); err == nil {
+		t.Fatal("test-2 should not be leased")
+	} else if !errdefs.IsNotFound(err) {
+		t.Fatal("lease checked failed:", err)
+	}
+}
+
+func TestIngestLeased(t *testing.T) {
+	ctx, db, cancel := testDB(t)
+	defer cancel()
+
+	cs := db.ContentStore()
+
+	blob := []byte("any content")
+	expected := digest.FromBytes(blob)
+
+	lctx, _, err := createLease(ctx, db, "lease-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w, err := cs.Writer(lctx,
+		content.WithRef("test-1"),
+		content.WithDescriptor(ocispec.Descriptor{Size: int64(len(blob)), Digest: expected}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = checkIngestLeased(lctx, db, "test-1")
+	w.Close()
+	if err != nil {
+		t.Fatal("lease checked failed:", err)
+	}
+
+	if err := cs.Abort(lctx, "test-1"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := checkIngestLeased(lctx, db, "test-1"); err == nil {
+		t.Fatal("test-1 should not be leased after write")
+	} else if !errdefs.IsNotFound(err) {
 		t.Fatal("lease checked failed:", err)
 	}
 }
@@ -139,6 +186,30 @@ func checkContentLeased(ctx context.Context, db *DB, dgst digest.Digest) error {
 			return errors.Wrapf(errdefs.ErrNotFound, "bucket not found %s", lease)
 		}
 		v := bkt.Get([]byte(dgst.String()))
+		if v == nil {
+			return errors.Wrap(errdefs.ErrNotFound, "object not leased")
+		}
+
+		return nil
+	})
+}
+
+func checkIngestLeased(ctx context.Context, db *DB, ref string) error {
+	ns, ok := namespaces.Namespace(ctx)
+	if !ok {
+		return errors.New("no namespace in context")
+	}
+	lease, ok := leases.FromContext(ctx)
+	if !ok {
+		return errors.New("no lease in context")
+	}
+
+	return db.View(func(tx *bolt.Tx) error {
+		bkt := getBucket(tx, bucketKeyVersion, []byte(ns), bucketKeyObjectLeases, []byte(lease), bucketKeyObjectIngests)
+		if bkt == nil {
+			return errors.Wrapf(errdefs.ErrNotFound, "bucket not found %s", lease)
+		}
+		v := bkt.Get([]byte(ref))
 		if v == nil {
 			return errors.Wrap(errdefs.ErrNotFound, "object not leased")
 		}

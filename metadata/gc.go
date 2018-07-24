@@ -42,6 +42,8 @@ const (
 	ResourceTask
 	// ResourceLease specifies a lease
 	ResourceLease
+	// ResourceIngest specifies a content ingest
+	ResourceIngest
 )
 
 var (
@@ -136,6 +138,20 @@ func scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
 					}
 				}
 
+				ibkt := libkt.Bucket(bucketKeyObjectIngests)
+				if ibkt != nil {
+					if err := ibkt.ForEach(func(k, v []byte) error {
+						select {
+						case nc <- gcnode(ResourceIngest, ns, string(k)):
+						case <-ctx.Done():
+							return ctx.Err()
+						}
+						return nil
+					}); err != nil {
+						return err
+					}
+				}
+
 				return nil
 			}); err != nil {
 				return err
@@ -171,16 +187,39 @@ func scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
 
 		cbkt := nbkt.Bucket(bucketKeyObjectContent)
 		if cbkt != nil {
-			cbkt = cbkt.Bucket(bucketKeyObjectBlob)
-		}
-		if cbkt != nil {
-			if err := cbkt.ForEach(func(k, v []byte) error {
-				if v != nil {
+			ibkt := cbkt.Bucket(bucketKeyObjectIngests)
+			if ibkt != nil {
+				if err := ibkt.ForEach(func(k, v []byte) error {
+					if v != nil {
+						return nil
+					}
+					ea, err := readExpireAt(ibkt.Bucket(k))
+					if err != nil {
+						return err
+					}
+					if ea == nil || expThreshold.After(*ea) {
+						return nil
+					}
+					select {
+					case nc <- gcnode(ResourceIngest, ns, string(k)):
+					case <-ctx.Done():
+						return ctx.Err()
+					}
 					return nil
+				}); err != nil {
+					return err
 				}
-				return sendRootRef(ctx, nc, gcnode(ResourceContent, ns, string(k)), cbkt.Bucket(k))
-			}); err != nil {
-				return err
+			}
+			cbkt = cbkt.Bucket(bucketKeyObjectBlob)
+			if cbkt != nil {
+				if err := cbkt.ForEach(func(k, v []byte) error {
+					if v != nil {
+						return nil
+					}
+					return sendRootRef(ctx, nc, gcnode(ResourceContent, ns, string(k)), cbkt.Bucket(k))
+				}); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -270,6 +309,19 @@ func references(ctx context.Context, tx *bolt.Tx, node gc.Node, fn func(gc.Node)
 		}
 
 		return sendSnapshotRefs(node.Namespace, bkt, fn)
+	} else if node.Type == ResourceIngest {
+		// Send expected value
+		bkt := getBucket(tx, bucketKeyVersion, []byte(node.Namespace), bucketKeyObjectContent, bucketKeyObjectIngests, []byte(node.Key))
+		if bkt == nil {
+			// Node may be created from dead edge
+			return nil
+		}
+		// Load expected
+		expected := bkt.Get(bucketKeyExpected)
+		if len(expected) > 0 {
+			fn(gcnode(ResourceContent, node.Namespace, string(expected)))
+		}
+		return nil
 	}
 
 	return nil
@@ -324,17 +376,30 @@ func scanAll(ctx context.Context, tx *bolt.Tx, fn func(ctx context.Context, n gc
 
 		cbkt := nbkt.Bucket(bucketKeyObjectContent)
 		if cbkt != nil {
-			cbkt = cbkt.Bucket(bucketKeyObjectBlob)
-		}
-		if cbkt != nil {
-			if err := cbkt.ForEach(func(k, v []byte) error {
-				if v != nil {
-					return nil
+			ibkt := cbkt.Bucket(bucketKeyObjectIngests)
+			if ibkt != nil {
+				if err := ibkt.ForEach(func(k, v []byte) error {
+					if v != nil {
+						return nil
+					}
+					node := gcnode(ResourceIngest, ns, string(k))
+					return fn(ctx, node)
+				}); err != nil {
+					return err
 				}
-				node := gcnode(ResourceContent, ns, string(k))
-				return fn(ctx, node)
-			}); err != nil {
-				return err
+			}
+
+			cbkt = cbkt.Bucket(bucketKeyObjectBlob)
+			if cbkt != nil {
+				if err := cbkt.ForEach(func(k, v []byte) error {
+					if v != nil {
+						return nil
+					}
+					node := gcnode(ResourceContent, ns, string(k))
+					return fn(ctx, node)
+				}); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -380,6 +445,15 @@ func remove(ctx context.Context, tx *bolt.Tx, node gc.Node) error {
 		lbkt := nsbkt.Bucket(bucketKeyObjectLeases)
 		if lbkt != nil {
 			return lbkt.DeleteBucket([]byte(node.Key))
+		}
+	case ResourceIngest:
+		ibkt := nsbkt.Bucket(bucketKeyObjectContent)
+		if ibkt != nil {
+			ibkt = ibkt.Bucket(bucketKeyObjectIngests)
+		}
+		if ibkt != nil {
+			log.G(ctx).WithField("ref", node.Key).Debug("remove ingest")
+			return ibkt.DeleteBucket([]byte(node.Key))
 		}
 	}
 
