@@ -48,6 +48,11 @@ high performance container runtime
 `
 
 func init() {
+	logrus.SetFormatter(&logrus.TextFormatter{
+		TimestampFormat: log.RFC3339NanoFixed,
+		FullTimestamp:   true,
+	})
+
 	// Discard grpc logs so that they don't mess with our stdio
 	grpclog.SetLoggerV2(grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, ioutil.Discard))
 
