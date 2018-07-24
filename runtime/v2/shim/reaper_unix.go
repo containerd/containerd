@@ -21,52 +21,67 @@ package shim
 import (
 	"os/exec"
 	"sync"
-	"time"
 
 	"github.com/containerd/containerd/sys"
 	runc "github.com/containerd/go-runc"
-	"github.com/pkg/errors"
 )
-
-// ErrNoSuchProcess is returned when the process no longer exists
-var ErrNoSuchProcess = errors.New("no such process")
 
 const bufferSize = 32
 
+func init() {
+	Default = newMonitor()
+}
+
+type defaultSub struct {
+	c chan sys.Exit
+}
+
+func (s *defaultSub) send(e sys.Exit) {
+	s.c <- e
+}
+
+func (s *defaultSub) Recv() <-chan sys.Exit {
+	return s.c
+}
+
+func (s *defaultSub) Close() {
+	close(s.c)
+}
+
+func newMonitor() *unixMonitor {
+	return &unixMonitor{
+		subscribers: make(map[Subscriber]struct{}),
+	}
+}
+
+// unixMonitor monitors the underlying system for process status changes
+type unixMonitor struct {
+	sync.Mutex
+
+	subscribers map[Subscriber]struct{}
+}
+
 // Reap should be called when the process receives an SIGCHLD.  Reap will reap
 // all exited processes and close their wait channels
-func Reap() error {
-	now := time.Now()
+func (m *unixMonitor) Reap() error {
 	exits, err := sys.Reap(false)
-	Default.Lock()
-	for c := range Default.subscribers {
+	m.Lock()
+	for c := range m.subscribers {
 		for _, e := range exits {
-			c <- runc.Exit{
-				Timestamp: now,
-				Pid:       e.Pid,
-				Status:    e.Status,
-			}
+			c.send(sys.Exit{
+				Time:   e.Time,
+				Pid:    e.Pid,
+				Status: e.Status,
+			})
 		}
 
 	}
-	Default.Unlock()
+	m.Unlock()
 	return err
 }
 
-// Default is the default monitor initialized for the package
-var Default = &Monitor{
-	subscribers: make(map[chan runc.Exit]struct{}),
-}
-
-// Monitor monitors the underlying system for process status changes
-type Monitor struct {
-	sync.Mutex
-
-	subscribers map[chan runc.Exit]struct{}
-}
-
 // Start starts the command a registers the process with the reaper
-func (m *Monitor) Start(c *exec.Cmd) (chan runc.Exit, error) {
+func (m *unixMonitor) Start(c *exec.Cmd) (Subscriber, error) {
 	ec := m.Subscribe()
 	if err := c.Start(); err != nil {
 		m.Unsubscribe(ec)
@@ -78,12 +93,12 @@ func (m *Monitor) Start(c *exec.Cmd) (chan runc.Exit, error) {
 // Wait blocks until a process is signal as dead.
 // User should rely on the value of the exit status to determine if the
 // command was successful or not.
-func (m *Monitor) Wait(c *exec.Cmd, ec chan runc.Exit) (int, error) {
-	for e := range ec {
+func (m *unixMonitor) Wait(c *exec.Cmd, s Subscriber) (int, error) {
+	for e := range s.Recv() {
 		if e.Pid == c.Process.Pid {
 			// make sure we flush all IO
 			c.Wait()
-			m.Unsubscribe(ec)
+			m.Unsubscribe(s)
 			return e.Status, nil
 		}
 	}
@@ -93,18 +108,92 @@ func (m *Monitor) Wait(c *exec.Cmd, ec chan runc.Exit) (int, error) {
 }
 
 // Subscribe to process exit changes
-func (m *Monitor) Subscribe() chan runc.Exit {
-	c := make(chan runc.Exit, bufferSize)
+func (m *unixMonitor) Subscribe() Subscriber {
+	c := make(chan sys.Exit, bufferSize)
+	s := &defaultSub{c: c}
 	m.Lock()
-	m.subscribers[c] = struct{}{}
+	m.subscribers[s] = struct{}{}
 	m.Unlock()
-	return c
+	return s
 }
 
 // Unsubscribe to process exit changes
-func (m *Monitor) Unsubscribe(c chan runc.Exit) {
+func (m *unixMonitor) Unsubscribe(s Subscriber) {
 	m.Lock()
-	delete(m.subscribers, c)
-	close(c)
+	delete(m.subscribers, s)
+	s.Close()
 	m.Unlock()
+}
+
+// RuncMonitor returns a go-runc monitor
+func (m *unixMonitor) RuncMonitor() runc.ProcessMonitor {
+	return &runcMonitor{
+		m:  m,
+		cs: make(map[chan runc.Exit]*runcSub),
+	}
+}
+
+type runcSub struct {
+	c chan runc.Exit
+}
+
+func (s *runcSub) send(e sys.Exit) {
+	s.c <- runc.Exit{
+		Timestamp: e.Time,
+		Status:    e.Status,
+		Pid:       e.Pid,
+	}
+}
+
+func (s *runcSub) Recv() <-chan sys.Exit {
+	return nil
+}
+
+func (s *runcSub) Close() {
+	close(s.c)
+}
+
+type runcMonitor struct {
+	sync.Mutex
+
+	m  *unixMonitor
+	cs map[chan runc.Exit]*runcSub
+}
+
+// Start starts the command a registers the process with the reaper
+func (m *runcMonitor) Start(c *exec.Cmd) (chan runc.Exit, error) {
+	ec := make(chan runc.Exit, bufferSize)
+	s := &runcSub{c: ec}
+	m.m.Lock()
+	m.m.subscribers[s] = struct{}{}
+	m.Lock()
+	m.cs[ec] = s
+	m.Unlock()
+	m.m.Unlock()
+	if err := c.Start(); err != nil {
+		m.m.Unsubscribe(s)
+		return nil, err
+	}
+	return ec, nil
+}
+
+// Wait blocks until a process is signal as dead.
+// User should rely on the value of the exit status to determine if the
+// command was successful or not.
+func (m *runcMonitor) Wait(c *exec.Cmd, ec chan runc.Exit) (int, error) {
+	for e := range ec {
+		if e.Pid == c.Process.Pid {
+			// make sure we flush all IO
+			c.Wait()
+			m.Lock()
+			s := m.cs[ec]
+			delete(m.cs, ec)
+			m.Unlock()
+			m.m.Unsubscribe(s)
+			return e.Status, nil
+		}
+	}
+	// return no such process if the ec channel is closed and no more exit
+	// events will be sent
+	return -1, ErrNoSuchProcess
 }

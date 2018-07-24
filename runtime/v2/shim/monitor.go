@@ -14,13 +14,35 @@
    limitations under the License.
 */
 
-package sys
+package shim
 
-import "time"
+import (
+	"errors"
+	"os/exec"
 
-// Exit is the wait information from an exited process
-type Exit struct {
-	Time   time.Time
-	Pid    int
-	Status int
+	"github.com/containerd/containerd/sys"
+)
+
+// Default monitor
+var Default Monitor
+
+// Subscriber subscribes to exit events
+type Subscriber interface {
+	send(sys.Exit)
+	Recv() <-chan sys.Exit
+	Close()
 }
+
+// Monitor exit events
+type Monitor interface {
+	Reap() error
+
+	Start(*exec.Cmd) (Subscriber, error)
+	Wait(*exec.Cmd, Subscriber) (int, error)
+
+	Subscribe() Subscriber
+	Unsubscribe(Subscriber)
+}
+
+// ErrNoSuchProcess is returned when the process no longer exists
+var ErrNoSuchProcess = errors.New("no such process")

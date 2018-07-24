@@ -42,6 +42,7 @@ import (
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/runtime/v2/shim"
 	taskAPI "github.com/containerd/containerd/runtime/v2/task"
+	"github.com/containerd/containerd/sys"
 	runcC "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
@@ -78,7 +79,13 @@ func New(ctx context.Context, id string, publisher events.Publisher) (shim.Shim,
 		ep:        ep,
 	}
 	go s.processExits()
-	runcC.Monitor = shim.Default
+	rc, ok := shim.Default.(interface {
+		RuncMonitor() runcC.ProcessMonitor
+	})
+	if !ok {
+		return nil, errors.New("monitor does not support runc")
+	}
+	runcC.Monitor = rc.RuncMonitor()
 	if err := s.initPlatform(); err != nil {
 		return nil, errors.Wrap(err, "failed to initialized platform behavior")
 	}
@@ -95,7 +102,7 @@ type service struct {
 	processes map[string]rproc.Process
 	events    chan interface{}
 	platform  rproc.Platform
-	ec        chan runcC.Exit
+	ec        shim.Subscriber
 	ep        *epoller
 
 	id string
@@ -638,12 +645,12 @@ func (s *service) Wait(ctx context.Context, r *taskAPI.WaitRequest) (*taskAPI.Wa
 }
 
 func (s *service) processExits() {
-	for e := range s.ec {
+	for e := range s.ec.Recv() {
 		s.checkProcesses(e)
 	}
 }
 
-func (s *service) checkProcesses(e runcC.Exit) {
+func (s *service) checkProcesses(e sys.Exit) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
