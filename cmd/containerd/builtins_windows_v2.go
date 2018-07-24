@@ -1,4 +1,4 @@
-// +build !windows_v2
+// +build windows_v2
 
 /*
    Copyright The containerd Authors.
@@ -20,6 +20,6 @@ package main
 
 import (
 	_ "github.com/containerd/containerd/diff/windows"
+	_ "github.com/containerd/containerd/runtime/v2"
 	_ "github.com/containerd/containerd/snapshots/windows"
-	_ "github.com/containerd/containerd/windows"
 )

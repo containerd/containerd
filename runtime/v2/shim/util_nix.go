@@ -1,3 +1,5 @@
+// +build !windows
+
 /*
    Copyright The containerd Authors.
 
@@ -18,44 +20,38 @@ package shim
 
 import (
 	"context"
-	"fmt"
 	"net"
-	"syscall"
+	"path/filepath"
+	"strings"
 	"time"
 
-	winio "github.com/Microsoft/go-winio"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/pkg/errors"
 )
 
-func getSysProcAttr() *syscall.SysProcAttr {
-	return nil
-}
-
-// SetScore sets the oom score for a process
-func SetScore(pid int) error {
-	return nil
-}
-
-// AbstractAddress returns an abstract npipe address
+// AbstractAddress returns an abstract socket address
 func AbstractAddress(ctx context.Context, id string) (string, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("\\\\.\\pipe\\containerd-shim-%s-%s-pipe", ns, id), nil
+	return filepath.Join(string(filepath.Separator), "containerd-shim", ns, id, "shim.sock"), nil
 }
 
-// AnonDialer returns a dialer for an abstract npipe
+// AnonDialer returns a dialer for an abstract socket
 func AnonDialer(address string, timeout time.Duration) (net.Conn, error) {
-	return winio.DialPipe(address, &timeout)
+	address = strings.TrimPrefix(address, "unix://")
+	return net.DialTimeout("unix", "\x00"+address, timeout)
 }
 
-// NewSocket returns a new npipe listener
-func NewSocket(address string) (net.Listener, error) {
-	l, err := winio.ListenPipe(address, nil)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to listen to abstract npipe %s", address)
+// NewSocket returns a new socket
+func NewSocket(address string) (*net.UnixListener, error) {
+	if len(address) > 106 {
+		return nil, errors.Errorf("%q: unix socket path too long (> 106)", address)
 	}
-	return l, nil
+	l, err := net.Listen("unix", "\x00"+address)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to listen to abstract unix socket %q", address)
+	}
+	return l.(*net.UnixListener), nil
 }

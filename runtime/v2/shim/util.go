@@ -70,36 +70,9 @@ func BinaryName(runtime string) string {
 	return fmt.Sprintf(shimBinaryFormat, parts[len(parts)-2], parts[len(parts)-1])
 }
 
-// AbstractAddress returns an abstract socket address
-func AbstractAddress(ctx context.Context, id string) (string, error) {
-	ns, err := namespaces.NamespaceRequired(ctx)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(string(filepath.Separator), "containerd-shim", ns, id, "shim.sock"), nil
-}
-
 // Connect to the provided address
 func Connect(address string, d func(string, time.Duration) (net.Conn, error)) (net.Conn, error) {
 	return d(address, 100*time.Second)
-}
-
-// AnonDialer returns a dialer for an abstract socket
-func AnonDialer(address string, timeout time.Duration) (net.Conn, error) {
-	address = strings.TrimPrefix(address, "unix://")
-	return net.DialTimeout("unix", "\x00"+address, timeout)
-}
-
-// NewSocket returns a new socket
-func NewSocket(address string) (*net.UnixListener, error) {
-	if len(address) > 106 {
-		return nil, errors.Errorf("%q: unix socket path too long (> 106)", address)
-	}
-	l, err := net.Listen("unix", "\x00"+address)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to listen to abstract unix socket %q", address)
-	}
-	return l.(*net.UnixListener), nil
 }
 
 // WritePidFile writes a pid file atomically

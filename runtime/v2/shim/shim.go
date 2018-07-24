@@ -1,5 +1,3 @@
-// +build !windows
-
 /*
    Copyright The containerd Authors.
 
@@ -19,29 +17,22 @@
 package shim
 
 import (
-	"bytes"
 	"context"
 	"flag"
 	"fmt"
-	"net"
 	"os"
-	"os/exec"
-	"os/signal"
 	"runtime"
 	"runtime/debug"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/namespaces"
 	shimapi "github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/ttrpc"
-	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/sys/unix"
 )
 
 // Client for a shim server
@@ -178,7 +169,7 @@ func NewShimClient(ctx context.Context, svc shimapi.TaskService, signals chan os
 // Serve the shim server
 func (s *Client) Serve() error {
 	dump := make(chan os.Signal, 32)
-	signal.Notify(dump, syscall.SIGUSR1)
+	setupDumpStacks(dump)
 
 	path, err := os.Getwd()
 	if err != nil {
@@ -211,23 +202,11 @@ func (s *Client) Serve() error {
 // serve serves the ttrpc API over a unix socket at the provided path
 // this function does not block
 func serve(ctx context.Context, server *ttrpc.Server, path string) error {
-	var (
-		l   net.Listener
-		err error
-	)
-	if path == "" {
-		l, err = net.FileListener(os.NewFile(3, "socket"))
-		path = "[inherited from parent]"
-	} else {
-		if len(path) > 106 {
-			return errors.Errorf("%q: unix socket path too long (> 106)", path)
-		}
-		l, err = net.Listen("unix", "\x00"+path)
-	}
+	l, path, err := serveListener(path)
 	if err != nil {
 		return err
 	}
-	logrus.WithField("socket", path).Debug("serving api on unix socket")
+	logrus.WithField("socket", path).Debug("serving api on abstract socket")
 	go func() {
 		defer l.Close()
 		if err := server.Serve(ctx, l); err != nil &&
@@ -236,22 +215,6 @@ func serve(ctx context.Context, server *ttrpc.Server, path string) error {
 		}
 	}()
 	return nil
-}
-
-func handleSignals(logger *logrus.Entry, signals chan os.Signal) error {
-	logger.Info("starting signal loop")
-	for {
-		select {
-		case s := <-signals:
-			switch s {
-			case unix.SIGCHLD:
-				if err := Reap(); err != nil {
-					logger.WithError(err).Error("reap exit status")
-				}
-			case unix.SIGPIPE:
-			}
-		}
-	}
 }
 
 func dumpStacks(logger *logrus.Entry) {
@@ -272,30 +235,4 @@ func dumpStacks(logger *logrus.Entry) {
 type remoteEventsPublisher struct {
 	address              string
 	containerdBinaryPath string
-}
-
-func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event events.Event) error {
-	ns, _ := namespaces.Namespace(ctx)
-	encoded, err := typeurl.MarshalAny(event)
-	if err != nil {
-		return err
-	}
-	data, err := encoded.Marshal()
-	if err != nil {
-		return err
-	}
-	cmd := exec.CommandContext(ctx, l.containerdBinaryPath, "--address", l.address, "publish", "--topic", topic, "--namespace", ns)
-	cmd.Stdin = bytes.NewReader(data)
-	c, err := Default.Start(cmd)
-	if err != nil {
-		return err
-	}
-	status, err := Default.Wait(cmd, c)
-	if err != nil {
-		return err
-	}
-	if status != 0 {
-		return errors.New("failed to publish event")
-	}
-	return nil
 }
