@@ -30,15 +30,17 @@ func TestLeases(t *testing.T) {
 	defer cancel()
 
 	testCases := []struct {
-		ID    string
-		Cause error
+		ID        string
+		CreateErr error
+		DeleteErr error
 	}{
 		{
 			ID: "tx1",
 		},
 		{
-			ID:    "tx1",
-			Cause: errdefs.ErrAlreadyExists,
+			ID:        "tx1",
+			CreateErr: errdefs.ErrAlreadyExists,
+			DeleteErr: errdefs.ErrNotFound,
 		},
 		{
 			ID: "tx2",
@@ -51,7 +53,7 @@ func TestLeases(t *testing.T) {
 		if err := db.Update(func(tx *bolt.Tx) error {
 			lease, err := NewLeaseManager(tx).Create(ctx, leases.WithID(tc.ID))
 			if err != nil {
-				if tc.Cause != nil && errors.Cause(err) == tc.Cause {
+				if tc.CreateErr != nil && errors.Cause(err) == tc.CreateErr {
 					return nil
 				}
 				return err
@@ -91,7 +93,10 @@ func TestLeases(t *testing.T) {
 				ID: tc.ID,
 			})
 		}); err != nil {
-			t.Fatal(err)
+			if tc.DeleteErr == nil && errors.Cause(err) != tc.DeleteErr {
+				t.Fatal(err)
+			}
+
 		}
 	}
 
@@ -248,12 +253,14 @@ func TestLeasesList(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// try it again, get nil
+		// try it again, get not found
 		if err := db.Update(func(tx *bolt.Tx) error {
 			lm := NewLeaseManager(tx)
 			return lm.Delete(ctx, lease)
-		}); err != nil {
-			t.Fatalf("unexpected error %v", err)
+		}); err == nil {
+			t.Fatalf("expected error deleting non-existent lease")
+		} else if !errdefs.IsNotFound(err) {
+			t.Fatalf("unexpected error: %s", err)
 		}
 	}
 }
