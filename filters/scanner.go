@@ -147,7 +147,7 @@ func (s *scanner) scanField() {
 	for {
 		ch := s.peek()
 		// to deal with issue #2494
-		if ch == '/' && existQuota {
+		if ch == '/' && existQuota && isFieldRune(s.peek()) {
 			s.pos = pos
 			s.ppos = ppos
 			break
