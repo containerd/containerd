@@ -141,13 +141,28 @@ chomp:
 }
 
 func (s *scanner) scanField() {
+	pos := s.pos
+	ppos := s.ppos
+	existQuota := false
 	for {
 		ch := s.peek()
-		if !isFieldRune(ch) {
+		// to deal with issue #2494
+		if ch == '/' && existQuota {
+			s.pos = pos
+			s.ppos = ppos
+			break
+		}
+		if ch == '/' {
+			pos = s.pos
+			ppos = s.ppos
+			existQuota = true
+		}
+		if !isFieldRune(ch) && ch != '/' {
 			break
 		}
 		s.next()
 	}
+
 }
 
 func (s *scanner) scanOperator() {
@@ -173,6 +188,7 @@ func (s *scanner) scanValue() {
 }
 
 func (s *scanner) scanQuoted(quote rune) {
+
 	ch := s.next() // read character after quote
 	for ch != quote {
 		if ch == '\n' || ch < 0 {
@@ -236,7 +252,7 @@ func digitVal(ch rune) int {
 }
 
 func isFieldRune(r rune) bool {
-	return (r == '_' || isAlphaRune(r) || isDigitRune(r))
+	return r == '_' || isAlphaRune(r) || isDigitRune(r)
 }
 
 func isAlphaRune(r rune) bool {
