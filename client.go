@@ -457,6 +457,8 @@ func (c *Client) NamespaceService() namespaces.Store {
 	if c.namespaceStore != nil {
 		return c.namespaceStore
 	}
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
 	return NewNamespaceStoreFromClient(namespacesapi.NewNamespacesClient(c.conn))
 }
 
@@ -465,6 +467,8 @@ func (c *Client) ContainerService() containers.Store {
 	if c.containerStore != nil {
 		return c.containerStore
 	}
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
 	return NewRemoteContainerStore(containersapi.NewContainersClient(c.conn))
 }
 
@@ -473,6 +477,8 @@ func (c *Client) ContentStore() content.Store {
 	if c.contentStore != nil {
 		return c.contentStore
 	}
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
 	return contentproxy.NewContentStore(contentapi.NewContentClient(c.conn))
 }
 
@@ -481,6 +487,8 @@ func (c *Client) SnapshotService(snapshotterName string) snapshots.Snapshotter {
 	if c.snapshotters != nil {
 		return c.snapshotters[snapshotterName]
 	}
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
 	return snproxy.NewSnapshotter(snapshotsapi.NewSnapshotsClient(c.conn), snapshotterName)
 }
 
@@ -489,6 +497,8 @@ func (c *Client) TaskService() tasks.TasksClient {
 	if c.taskService != nil {
 		return c.taskService
 	}
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
 	return tasks.NewTasksClient(c.conn)
 }
 
@@ -497,6 +507,8 @@ func (c *Client) ImageService() images.Store {
 	if c.imageStore != nil {
 		return c.imageStore
 	}
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
 	return NewImageStoreFromClient(imagesapi.NewImagesClient(c.conn))
 }
 
@@ -505,11 +517,15 @@ func (c *Client) DiffService() DiffService {
 	if c.diffService != nil {
 		return c.diffService
 	}
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
 	return NewDiffServiceFromClient(diffapi.NewDiffClient(c.conn))
 }
 
 // IntrospectionService returns the underlying Introspection Client
 func (c *Client) IntrospectionService() introspectionapi.IntrospectionClient {
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
 	return introspectionapi.NewIntrospectionClient(c.conn)
 }
 
@@ -518,11 +534,15 @@ func (c *Client) LeasesService() leases.Manager {
 	if c.leasesService != nil {
 		return c.leasesService
 	}
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
 	return leasesproxy.NewLeaseManager(leasesapi.NewLeasesClient(c.conn))
 }
 
 // HealthService returns the underlying GRPC HealthClient
 func (c *Client) HealthService() grpc_health_v1.HealthClient {
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
 	return grpc_health_v1.NewHealthClient(c.conn)
 }
 
@@ -531,11 +551,15 @@ func (c *Client) EventService() EventService {
 	if c.eventService != nil {
 		return c.eventService
 	}
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
 	return NewEventServiceFromClient(eventsapi.NewEventsClient(c.conn))
 }
 
 // VersionService returns the underlying VersionClient
 func (c *Client) VersionService() versionservice.VersionClient {
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
 	return versionservice.NewVersionClient(c.conn)
 }
 
