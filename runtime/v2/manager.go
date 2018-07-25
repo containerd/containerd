@@ -174,6 +174,15 @@ func (m *TaskManager) loadTasks(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		// fast path
+		bf, err := ioutil.ReadDir(bundle.Path)
+		if err != nil {
+			return err
+		}
+		if len(bf) == 0 {
+			bundle.Delete()
+			continue
+		}
 		shim, err := loadShim(ctx, bundle, m.events, m.tasks)
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("cleanup dead shim %s", id)
