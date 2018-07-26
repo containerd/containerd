@@ -39,7 +39,7 @@ func (c *criService) LoadImage(ctx context.Context, r *api.LoadImageRequest) (*a
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open file")
 	}
-	repoTags, err := importer.Import(ctx, c.client, f)
+	repoTags, err := importer.Import(ctx, c.client, f, importer.WithUnpack(c.config.ContainerdConfig.Snapshotter))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to import image")
 	}
@@ -47,10 +47,6 @@ func (c *criService) LoadImage(ctx context.Context, r *api.LoadImageRequest) (*a
 		image, err := c.client.GetImage(ctx, repoTag)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to get image %q", repoTag)
-		}
-		if err := image.Unpack(ctx, c.config.ContainerdConfig.Snapshotter); err != nil {
-			logrus.WithError(err).Warnf("Failed to unpack image %q", repoTag)
-			// Do not fail image importing. Unpack will be retried when container creation.
 		}
 		info, err := getImageInfo(ctx, image)
 		if err != nil {

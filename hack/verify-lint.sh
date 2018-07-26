@@ -29,6 +29,7 @@ for d in $(find . -type d -a \( -iwholename './pkg*' -o -iwholename './cmd*' \) 
 		 --disable=aligncheck \
 		 --disable=gotype \
 		 --disable=gas \
+		 --disable=gosec \
 		 --cyclo-over=60 \
 		 --dupl-threshold=100 \
 		 --tests \
