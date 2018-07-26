@@ -17,7 +17,6 @@ limitations under the License.
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -26,15 +25,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/typeurl"
 	"github.com/docker/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
-	"github.com/opencontainers/image-spec/identity"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -236,28 +231,25 @@ func getRepoDigestAndTag(namedRef reference.Named, digest imagedigest.Digest, sc
 	return repoDigest, repoTag
 }
 
-// localResolve resolves image reference locally and returns corresponding image metadata. It returns
-// nil without error if the reference doesn't exist.
-func (c *criService) localResolve(ctx context.Context, refOrID string) (*imagestore.Image, error) {
+// localResolve resolves image reference locally and returns corresponding image metadata. It
+// returns store.ErrNotExist if the reference doesn't exist.
+func (c *criService) localResolve(refOrID string) (imagestore.Image, error) {
 	getImageID := func(refOrId string) string {
 		if _, err := imagedigest.Parse(refOrID); err == nil {
 			return refOrID
 		}
 		return func(ref string) string {
 			// ref is not image id, try to resolve it locally.
+			// TODO(random-liu): Handle this error better for debugging.
 			normalized, err := util.NormalizeImageRef(ref)
 			if err != nil {
 				return ""
 			}
-			image, err := c.client.GetImage(ctx, normalized.String())
+			id, err := c.imageStore.Resolve(normalized.String())
 			if err != nil {
 				return ""
 			}
-			desc, err := image.Config(ctx)
-			if err != nil {
-				return ""
-			}
-			return desc.Digest.String()
+			return id
 		}(refOrID)
 	}
 
@@ -266,14 +258,7 @@ func (c *criService) localResolve(ctx context.Context, refOrID string) (*imagest
 		// Try to treat ref as imageID
 		imageID = refOrID
 	}
-	image, err := c.imageStore.Get(imageID)
-	if err != nil {
-		if err == store.ErrNotExist {
-			return nil, nil
-		}
-		return nil, errors.Wrapf(err, "failed to get image %q", imageID)
-	}
-	return &image, nil
+	return c.imageStore.Get(imageID)
 }
 
 // getUserFromImage gets uid or user name of the image user.
@@ -298,12 +283,12 @@ func getUserFromImage(user string) (*int64, string) {
 // ensureImageExists returns corresponding metadata of the image reference, if image is not
 // pulled yet, the function will pull the image.
 func (c *criService) ensureImageExists(ctx context.Context, ref string) (*imagestore.Image, error) {
-	image, err := c.localResolve(ctx, ref)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to resolve image %q", ref)
+	image, err := c.localResolve(ref)
+	if err != nil && err != store.ErrNotExist {
+		return nil, errors.Wrapf(err, "failed to get image %q", ref)
 	}
-	if image != nil {
-		return image, nil
+	if err == nil {
+		return &image, nil
 	}
 	// Pull image to ensure the image exists
 	resp, err := c.PullImage(ctx, &runtime.PullImageRequest{Image: &runtime.ImageSpec{Image: ref}})
@@ -314,54 +299,9 @@ func (c *criService) ensureImageExists(ctx context.Context, ref string) (*images
 	newImage, err := c.imageStore.Get(imageID)
 	if err != nil {
 		// It's still possible that someone removed the image right after it is pulled.
-		return nil, errors.Wrapf(err, "failed to get image %q metadata after pulling", imageID)
+		return nil, errors.Wrapf(err, "failed to get image %q after pulling", imageID)
 	}
 	return &newImage, nil
-}
-
-// imageInfo is the information about the image got from containerd.
-type imageInfo struct {
-	id        string
-	chainID   imagedigest.Digest
-	size      int64
-	imagespec imagespec.Image
-}
-
-// getImageInfo gets image info from containerd.
-func getImageInfo(ctx context.Context, image containerd.Image) (*imageInfo, error) {
-	// Get image information.
-	diffIDs, err := image.RootFS(ctx)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get image diffIDs")
-	}
-	chainID := identity.ChainID(diffIDs)
-
-	size, err := image.Size(ctx)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get image compressed resource size")
-	}
-
-	desc, err := image.Config(ctx)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get image config descriptor")
-	}
-	id := desc.Digest.String()
-
-	rb, err := content.ReadBlob(ctx, image.ContentStore(), desc)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to read image config from content store")
-	}
-	var ociimage imagespec.Image
-	if err := json.Unmarshal(rb, &ociimage); err != nil {
-		return nil, errors.Wrapf(err, "failed to unmarshal image config %s", rb)
-	}
-
-	return &imageInfo{
-		id:        id,
-		chainID:   chainID,
-		size:      size,
-		imagespec: ociimage,
-	}, nil
 }
 
 func initSelinuxOpts(selinuxOpt *runtime.SELinuxOption) (string, string, error) {
@@ -499,4 +439,22 @@ func (m orderedMounts) Swap(i, j int) {
 // parts returns the number of parts in the destination of a mount. Used in sorting.
 func (m orderedMounts) parts(i int) int {
 	return strings.Count(filepath.Clean(m[i].ContainerPath), string(os.PathSeparator))
+}
+
+// parseImageReferences parses a list of arbitrary image references and returns
+// the repotags and repodigests
+func parseImageReferences(refs []string) ([]string, []string) {
+	var tags, digests []string
+	for _, ref := range refs {
+		parsed, err := reference.ParseAnyReference(ref)
+		if err != nil {
+			continue
+		}
+		if _, ok := parsed.(reference.Canonical); ok {
+			digests = append(digests, parsed.String())
+		} else if _, ok := parsed.(reference.Tagged); ok {
+			tags = append(tags, parsed.String())
+		}
+	}
+	return tags, digests
 }

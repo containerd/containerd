@@ -34,7 +34,6 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
-	imagestore "github.com/containerd/cri/pkg/store/image"
 	"github.com/containerd/cri/pkg/util"
 )
 
@@ -108,49 +107,34 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		return nil, errors.Wrapf(err, "failed to pull and unpack image %q", ref)
 	}
 
-	// Get image information.
-	info, err := getImageInfo(ctx, image)
+	configDesc, err := image.Config(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get image information")
+		return nil, errors.Wrap(err, "get image config descriptor")
 	}
-	imageID := info.id
+	imageID := configDesc.Digest.String()
 
 	repoDigest, repoTag := getRepoDigestAndTag(namedRef, image.Target().Digest, isSchema1)
-	for _, r := range []string{repoTag, repoDigest, imageID} {
+	for _, r := range []string{repoTag, repoDigest} {
 		if r == "" {
 			continue
 		}
 		if err := c.createImageReference(ctx, r, image.Target()); err != nil {
 			return nil, errors.Wrapf(err, "failed to update image reference %q", r)
 		}
+		// Update image store to reflect the newest state in containerd.
+		if err := c.imageStore.Update(ctx, r); err != nil {
+			return nil, errors.Wrapf(err, "failed to update image store %q", r)
+		}
 	}
 
 	logrus.Debugf("Pulled image %q with image id %q, repo tag %q, repo digest %q", imageRef, imageID,
 		repoTag, repoDigest)
-	img := imagestore.Image{
-		ID:        imageID,
-		ChainID:   info.chainID.String(),
-		Size:      info.size,
-		ImageSpec: info.imagespec,
-		Image:     image,
-	}
-	if repoDigest != "" {
-		img.RepoDigests = []string{repoDigest}
-	}
-	if repoTag != "" {
-		img.RepoTags = []string{repoTag}
-	}
-
-	if err := c.imageStore.Add(img); err != nil {
-		return nil, errors.Wrapf(err, "failed to add image %q into store", img.ID)
-	}
-
 	// NOTE(random-liu): the actual state in containerd is the source of truth, even we maintain
 	// in-memory image store, it's only for in-memory indexing. The image could be removed
 	// by someone else anytime, before/during/after we create the metadata. We should always
 	// check the actual state in containerd before using the image or returning status of the
 	// image.
-	return &runtime.PullImageResponse{ImageRef: img.ID}, nil
+	return &runtime.PullImageResponse{ImageRef: imageID}, nil
 }
 
 // ParseAuth parses AuthConfig and returns username and password/secret required by containerd.

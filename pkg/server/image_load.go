@@ -26,7 +26,6 @@ import (
 
 	api "github.com/containerd/cri/pkg/api/v1"
 	"github.com/containerd/cri/pkg/containerd/importer"
-	imagestore "github.com/containerd/cri/pkg/store/image"
 )
 
 // LoadImage loads a image into containerd.
@@ -44,33 +43,11 @@ func (c *criService) LoadImage(ctx context.Context, r *api.LoadImageRequest) (*a
 		return nil, errors.Wrap(err, "failed to import image")
 	}
 	for _, repoTag := range repoTags {
-		image, err := c.client.GetImage(ctx, repoTag)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get image %q", repoTag)
+		// Update image store to reflect the newest state in containerd.
+		if err := c.imageStore.Update(ctx, repoTag); err != nil {
+			return nil, errors.Wrapf(err, "failed to update image store %q", repoTag)
 		}
-		info, err := getImageInfo(ctx, image)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get image %q info", repoTag)
-		}
-		id := info.id
-
-		if err := c.createImageReference(ctx, id, image.Target()); err != nil {
-			return nil, errors.Wrapf(err, "failed to create image reference %q", id)
-		}
-
-		img := imagestore.Image{
-			ID:        id,
-			RepoTags:  []string{repoTag},
-			ChainID:   info.chainID.String(),
-			Size:      info.size,
-			ImageSpec: info.imagespec,
-			Image:     image,
-		}
-
-		if err := c.imageStore.Add(img); err != nil {
-			return nil, errors.Wrapf(err, "failed to add image %q into store", id)
-		}
-		logrus.Debugf("Imported image with id %q, repo tag %q", id, repoTag)
+		logrus.Debugf("Imported image %q", repoTag)
 	}
 	return &api.LoadImageResponse{Images: repoTags}, nil
 }

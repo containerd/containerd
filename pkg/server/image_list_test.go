@@ -32,11 +32,13 @@ func TestListImages(t *testing.T) {
 	c := newTestCRIService()
 	imagesInStore := []imagestore.Image{
 		{
-			ID:          "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-			ChainID:     "test-chainid-1",
-			RepoTags:    []string{"tag-a-1", "tag-b-1"},
-			RepoDigests: []string{"digest-a-1", "digest-b-1"},
-			Size:        1000,
+			ID:      "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+			ChainID: "test-chainid-1",
+			References: []string{
+				"gcr.io/library/busybox:latest",
+				"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+			},
+			Size: 1000,
 			ImageSpec: imagespec.Image{
 				Config: imagespec.ImageConfig{
 					User: "root",
@@ -44,11 +46,13 @@ func TestListImages(t *testing.T) {
 			},
 		},
 		{
-			ID:          "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-			ChainID:     "test-chainid-2",
-			RepoTags:    []string{"tag-a-2", "tag-b-2"},
-			RepoDigests: []string{"digest-a-2", "digest-b-2"},
-			Size:        2000,
+			ID:      "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+			ChainID: "test-chainid-2",
+			References: []string{
+				"gcr.io/library/alpine:latest",
+				"gcr.io/library/alpine@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+			},
+			Size: 2000,
 			ImageSpec: imagespec.Image{
 				Config: imagespec.ImageConfig{
 					User: "1234:1234",
@@ -56,11 +60,13 @@ func TestListImages(t *testing.T) {
 			},
 		},
 		{
-			ID:          "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-			ChainID:     "test-chainid-3",
-			RepoTags:    []string{"tag-a-3", "tag-b-3"},
-			RepoDigests: []string{"digest-a-3", "digest-b-3"},
-			Size:        3000,
+			ID:      "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+			ChainID: "test-chainid-3",
+			References: []string{
+				"gcr.io/library/ubuntu:latest",
+				"gcr.io/library/ubuntu@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+			},
+			Size: 3000,
 			ImageSpec: imagespec.Image{
 				Config: imagespec.ImageConfig{
 					User: "nobody",
@@ -71,30 +77,30 @@ func TestListImages(t *testing.T) {
 	expect := []*runtime.Image{
 		{
 			Id:          "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-			RepoTags:    []string{"tag-a-1", "tag-b-1"},
-			RepoDigests: []string{"digest-a-1", "digest-b-1"},
+			RepoTags:    []string{"gcr.io/library/busybox:latest"},
+			RepoDigests: []string{"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582"},
 			Size_:       uint64(1000),
 			Username:    "root",
 		},
 		{
 			Id:          "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-			RepoTags:    []string{"tag-a-2", "tag-b-2"},
-			RepoDigests: []string{"digest-a-2", "digest-b-2"},
+			RepoTags:    []string{"gcr.io/library/alpine:latest"},
+			RepoDigests: []string{"gcr.io/library/alpine@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582"},
 			Size_:       uint64(2000),
 			Uid:         &runtime.Int64Value{Value: 1234},
 		},
 		{
 			Id:          "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-			RepoTags:    []string{"tag-a-3", "tag-b-3"},
-			RepoDigests: []string{"digest-a-3", "digest-b-3"},
+			RepoTags:    []string{"gcr.io/library/ubuntu:latest"},
+			RepoDigests: []string{"gcr.io/library/ubuntu@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582"},
 			Size_:       uint64(3000),
 			Username:    "nobody",
 		},
 	}
 
-	for _, i := range imagesInStore {
-		c.imageStore.Add(i)
-	}
+	var err error
+	c.imageStore, err = imagestore.NewFakeStore(imagesInStore)
+	assert.NoError(t, err)
 
 	resp, err := c.ListImages(context.Background(), &runtime.ListImagesRequest{})
 	assert.NoError(t, err)

@@ -94,11 +94,11 @@ func TestBackOff(t *testing.T) {
 	assert.Equal(t, actual.isInBackOff(notExistKey), false)
 
 	t.Logf("No containers should be expired")
-	assert.Empty(t, actual.getExpiredContainers())
+	assert.Empty(t, actual.getExpiredIDs())
 
 	t.Logf("Should be able to get all keys which are expired for backOff")
 	testClock.Sleep(backOffInitDuration)
-	actKeyList := actual.getExpiredContainers()
+	actKeyList := actual.getExpiredIDs()
 	assert.Equal(t, len(inputQueues), len(actKeyList))
 	for k := range inputQueues {
 		assert.Contains(t, actKeyList, k)
