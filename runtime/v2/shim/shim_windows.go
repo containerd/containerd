@@ -19,13 +19,17 @@
 package shim
 
 import (
+	"bytes"
 	"context"
 	"net"
 	"os"
+	"os/exec"
 
 	winio "github.com/Microsoft/go-winio"
 	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/ttrpc"
+	"github.com/containerd/typeurl"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -68,7 +72,6 @@ func handleSignals(logger *logrus.Entry, signals chan os.Signal) error {
 }
 
 func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event events.Event) error {
-	/* TOOD: JTERRY75: Implement publish for windows
 	ns, _ := namespaces.Namespace(ctx)
 	encoded, err := typeurl.MarshalAny(event)
 	if err != nil {
@@ -80,17 +83,5 @@ func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event
 	}
 	cmd := exec.CommandContext(ctx, l.containerdBinaryPath, "--address", l.address, "publish", "--topic", topic, "--namespace", ns)
 	cmd.Stdin = bytes.NewReader(data)
-	c, err := Default.Start(cmd)
-	if err != nil {
-		return err
-	}
-	status, err := Default.Wait(cmd, c)
-	if err != nil {
-		return err
-	}
-	if status != 0 {
-		return errors.New("failed to publish event")
-	}
-	*/
-	return nil
+	return cmd.Run()
 }
