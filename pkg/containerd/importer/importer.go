@@ -87,13 +87,33 @@ type imageConfig struct {
 	img  ocispec.Image
 }
 
+type importConfig struct {
+	unpack      bool
+	snapshotter string
+}
+
+// ImportOption configures import behavior.
+type ImportOption func(*importConfig)
+
+// WithUnpack is used to unpack image after import.
+func WithUnpack(snapshotter string) ImportOption {
+	return func(c *importConfig) {
+		c.unpack = true
+		c.snapshotter = snapshotter
+	}
+}
+
 // Import implements Docker Image Spec v1.1.
 // An image MUST have `manifest.json`.
 // `repositories` file in Docker Image Spec v1.0 is not supported (yet).
 // Also, the current implementation assumes the implicit file name convention,
 // which is not explicitly documented in the spec. (e.g. foobar/layer.tar)
 // It returns a group of image references successfully loaded.
-func Import(ctx context.Context, client *containerd.Client, reader io.Reader) (_ []string, retErr error) {
+func Import(ctx context.Context, client *containerd.Client, reader io.Reader, opts ...ImportOption) (_ []string, retErr error) {
+	c := &importConfig{}
+	for _, o := range opts {
+		o(c)
+	}
 	ctx, done, err := client.WithLease(ctx)
 	if err != nil {
 		return nil, err
@@ -208,6 +228,12 @@ func Import(ctx context.Context, client *containerd.Client, reader io.Reader) (_
 			imgrec := images.Image{
 				Name:   ref,
 				Target: *desc,
+			}
+			if c.unpack {
+				img := containerd.NewImage(client, imgrec)
+				if err := img.Unpack(ctx, c.snapshotter); err != nil {
+					return refs, errors.Wrapf(err, "unpack image %q", ref)
+				}
 			}
 			if _, err := is.Create(ctx, imgrec); err != nil {
 				if !errdefs.IsAlreadyExists(err) {
