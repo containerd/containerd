@@ -18,6 +18,7 @@ package containers
 
 import (
 	"context"
+	"io"
 
 	api "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/plugin"
@@ -69,6 +70,31 @@ func (s *service) Get(ctx context.Context, req *api.GetContainerRequest) (*api.G
 
 func (s *service) List(ctx context.Context, req *api.ListContainersRequest) (*api.ListContainersResponse, error) {
 	return s.local.List(ctx, req)
+}
+
+func (s *service) ListStream(req *api.ListContainersRequest, stream api.Containers_ListStreamServer) error {
+	containers, err := s.local.ListStream(stream.Context(), req)
+	if err != nil {
+		return err
+	}
+	for {
+		select {
+		case <-stream.Context().Done():
+			return nil
+		default:
+			c, err := containers.Recv()
+			if err != nil {
+				if err == io.EOF {
+					return nil
+				}
+				return err
+			}
+			if err := stream.Send(c); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (s *service) Create(ctx context.Context, req *api.CreateContainerRequest) (*api.CreateContainerResponse, error) {

@@ -1117,6 +1117,17 @@ file {
       json_name: "id"
     }
   }
+  message_type {
+    name: "ListContainerMessage"
+    field {
+      name: "container"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.containers.v1.Container"
+      json_name: "container"
+    }
+  }
   service {
     name: "Containers"
     method {
@@ -1128,6 +1139,12 @@ file {
       name: "List"
       input_type: ".containerd.services.containers.v1.ListContainersRequest"
       output_type: ".containerd.services.containers.v1.ListContainersResponse"
+    }
+    method {
+      name: "ListStream"
+      input_type: ".containerd.services.containers.v1.ListContainersRequest"
+      output_type: ".containerd.services.containers.v1.ListContainerMessage"
+      server_streaming: true
     }
     method {
       name: "Create"
