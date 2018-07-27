@@ -37,8 +37,8 @@ func SetScore(pid int) error {
 	return nil
 }
 
-// AbstractAddress returns an abstract npipe address
-func AbstractAddress(ctx context.Context, id string) (string, error) {
+// SocketAddress returns an abstract npipe address
+func SocketAddress(ctx context.Context, id string) (string, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return "", err
