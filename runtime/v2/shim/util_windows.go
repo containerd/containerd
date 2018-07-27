@@ -17,7 +17,15 @@
 package shim
 
 import (
+	"context"
+	"fmt"
+	"net"
 	"syscall"
+	"time"
+
+	winio "github.com/Microsoft/go-winio"
+	"github.com/containerd/containerd/namespaces"
+	"github.com/pkg/errors"
 )
 
 func getSysProcAttr() *syscall.SysProcAttr {
@@ -27,4 +35,27 @@ func getSysProcAttr() *syscall.SysProcAttr {
 // SetScore sets the oom score for a process
 func SetScore(pid int) error {
 	return nil
+}
+
+// SocketAddress returns a npipe address
+func SocketAddress(ctx context.Context, id string) (string, error) {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("\\\\.\\pipe\\containerd-shim-%s-%s-pipe", ns, id), nil
+}
+
+// AnonDialer returns a dialer for a npipe
+func AnonDialer(address string, timeout time.Duration) (net.Conn, error) {
+	return winio.DialPipe(address, &timeout)
+}
+
+// NewSocket returns a new npipe listener
+func NewSocket(address string) (net.Listener, error) {
+	l, err := winio.ListenPipe(address, nil)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to listen to npipe %s", address)
+	}
+	return l, nil
 }

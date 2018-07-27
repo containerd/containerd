@@ -1,3 +1,5 @@
+// +build !windows_v2
+
 /*
    Copyright The containerd Authors.
 

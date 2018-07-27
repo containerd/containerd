@@ -1,3 +1,5 @@
+// +build windows_v2
+
 /*
    Copyright The containerd Authors.
 
@@ -14,21 +16,10 @@
    limitations under the License.
 */
 
-package shim
+package main
 
 import (
-	"syscall"
-
-	"github.com/containerd/containerd/sys"
+	_ "github.com/containerd/containerd/diff/windows"
+	_ "github.com/containerd/containerd/runtime/v2"
+	_ "github.com/containerd/containerd/snapshots/windows"
 )
-
-func getSysProcAttr() *syscall.SysProcAttr {
-	return &syscall.SysProcAttr{
-		Setpgid: true,
-	}
-}
-
-// SetScore sets the oom score for a process
-func SetScore(pid int) error {
-	return sys.SetOOMScore(pid, sys.OOMScoreMaxKillable)
-}
