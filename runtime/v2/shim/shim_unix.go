@@ -1,4 +1,4 @@
-// +build !linux,!windows,!darwin
+// +build !windows
 
 /*
    Copyright The containerd Authors.
@@ -19,24 +19,92 @@
 package shim
 
 import (
+	"bytes"
+	"context"
+	"net"
 	"os"
+	"os/exec"
 	"os/signal"
+	"syscall"
 
-	"github.com/containerd/ttrpc"
+	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/typeurl"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
 )
 
 // setupSignals creates a new signal handler for all signals and sets the shim as a
 // sub-reaper so that the container processes are reparented
 func setupSignals() (chan os.Signal, error) {
-	signals := make(chan os.Signal, 2048)
-	signal.Notify(signals)
+	signals := make(chan os.Signal, 32)
+	signal.Notify(signals, unix.SIGTERM, unix.SIGINT, unix.SIGCHLD, unix.SIGPIPE)
 	return signals, nil
 }
 
-func newServer() (*ttrpc.Server, error) {
-	return ttrpc.NewServer(ttrpc.WithServerHandshaker(ttrpc.UnixSocketRequireSameUser()))
+func setupDumpStacks(dump chan<- os.Signal) {
+	signal.Notify(dump, syscall.SIGUSR1)
 }
 
-func subreaper() error {
+func serveListener(path string) (net.Listener, string, error) {
+	var (
+		l   net.Listener
+		err error
+	)
+	if path == "" {
+		l, err = net.FileListener(os.NewFile(3, "socket"))
+		path = "[inherited from parent]"
+	} else {
+		if len(path) > 106 {
+			return nil, path, errors.Errorf("%q: unix socket path too long (> 106)", path)
+		}
+		l, err = net.Listen("unix", "\x00"+path)
+	}
+	if err != nil {
+		return nil, path, err
+	}
+	return l, path, nil
+}
+
+func handleSignals(logger *logrus.Entry, signals chan os.Signal) error {
+	logger.Info("starting signal loop")
+	for {
+		select {
+		case s := <-signals:
+			switch s {
+			case unix.SIGCHLD:
+				if err := Reap(); err != nil {
+					logger.WithError(err).Error("reap exit status")
+				}
+			case unix.SIGPIPE:
+			}
+		}
+	}
+}
+
+func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event events.Event) error {
+	ns, _ := namespaces.Namespace(ctx)
+	encoded, err := typeurl.MarshalAny(event)
+	if err != nil {
+		return err
+	}
+	data, err := encoded.Marshal()
+	if err != nil {
+		return err
+	}
+	cmd := exec.CommandContext(ctx, l.containerdBinaryPath, "--address", l.address, "publish", "--topic", topic, "--namespace", ns)
+	cmd.Stdin = bytes.NewReader(data)
+	c, err := Default.Start(cmd)
+	if err != nil {
+		return err
+	}
+	status, err := Default.Wait(cmd, c)
+	if err != nil {
+		return err
+	}
+	if status != 0 {
+		return errors.New("failed to publish event")
+	}
 	return nil
 }
