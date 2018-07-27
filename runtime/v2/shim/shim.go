@@ -202,11 +202,10 @@ func (s *Client) Serve() error {
 // serve serves the ttrpc API over a unix socket at the provided path
 // this function does not block
 func serve(ctx context.Context, server *ttrpc.Server, path string) error {
-	l, path, err := serveListener(path)
+	l, err := serveListener(path)
 	if err != nil {
 		return err
 	}
-	logrus.WithField("socket", path).Debug("serving api on abstract socket")
 	go func() {
 		defer l.Close()
 		if err := server.Serve(ctx, l); err != nil &&

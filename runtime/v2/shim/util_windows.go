@@ -37,7 +37,7 @@ func SetScore(pid int) error {
 	return nil
 }
 
-// SocketAddress returns an abstract npipe address
+// SocketAddress returns a npipe address
 func SocketAddress(ctx context.Context, id string) (string, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
@@ -46,7 +46,7 @@ func SocketAddress(ctx context.Context, id string) (string, error) {
 	return fmt.Sprintf("\\\\.\\pipe\\containerd-shim-%s-%s-pipe", ns, id), nil
 }
 
-// AnonDialer returns a dialer for an abstract npipe
+// AnonDialer returns a dialer for a npipe
 func AnonDialer(address string, timeout time.Duration) (net.Conn, error) {
 	return winio.DialPipe(address, &timeout)
 }
@@ -55,7 +55,7 @@ func AnonDialer(address string, timeout time.Duration) (net.Conn, error) {
 func NewSocket(address string) (net.Listener, error) {
 	l, err := winio.ListenPipe(address, nil)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to listen to abstract npipe %s", address)
+		return nil, errors.Wrapf(err, "failed to listen to npipe %s", address)
 	}
 	return l, nil
 }

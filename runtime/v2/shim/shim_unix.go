@@ -47,7 +47,7 @@ func setupDumpStacks(dump chan<- os.Signal) {
 	signal.Notify(dump, syscall.SIGUSR1)
 }
 
-func serveListener(path string) (net.Listener, string, error) {
+func serveListener(path string) (net.Listener, error) {
 	var (
 		l   net.Listener
 		err error
@@ -57,14 +57,15 @@ func serveListener(path string) (net.Listener, string, error) {
 		path = "[inherited from parent]"
 	} else {
 		if len(path) > 106 {
-			return nil, path, errors.Errorf("%q: unix socket path too long (> 106)", path)
+			return nil, errors.Errorf("%q: unix socket path too long (> 106)", path)
 		}
 		l, err = net.Listen("unix", "\x00"+path)
 	}
 	if err != nil {
-		return nil, path, err
+		return nil, err
 	}
-	return l, path, nil
+	logrus.WithField("socket", path).Debug("serving api on abstract socket")
+	return l, nil
 }
 
 func handleSignals(logger *logrus.Entry, signals chan os.Signal) error {

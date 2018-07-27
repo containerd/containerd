@@ -54,20 +54,29 @@ func setupDumpStacks(dump chan<- os.Signal) {
 
 // serve serves the ttrpc API over a unix socket at the provided path
 // this function does not block
-func serveListener(path string) (net.Listener, string, error) {
+func serveListener(path string) (net.Listener, error) {
 	if path == "" {
-		return nil, path, errors.New("'socket' must be npipe path")
+		return nil, errors.New("'socket' must be npipe path")
 	}
 	l, err := winio.ListenPipe(path, nil)
 	if err != nil {
-		return nil, path, err
+		return nil, err
 	}
-	return l, path, nil
+	logrus.WithField("socket", path).Debug("serving api on npipe socket")
+	return l, nil
 }
 
 func handleSignals(logger *logrus.Entry, signals chan os.Signal) error {
-	<-signals
-	return nil
+	logger.Info("starting signal loop")
+	for {
+		select {
+		case s := <-signals:
+			switch s {
+			case os.Interrupt:
+				break
+			}
+		}
+	}
 }
 
 func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event events.Event) error {
