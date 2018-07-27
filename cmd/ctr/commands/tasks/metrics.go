@@ -19,9 +19,9 @@
 package tasks
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
-
 	"os"
 	"text/tabwriter"
 
@@ -37,11 +37,24 @@ func init() {
 	Command.Subcommands = append(Command.Subcommands, metricsCommand)
 }
 
+const (
+	formatFlag  = "format"
+	formatTable = "table"
+	formatJSON  = "json"
+)
+
 var metricsCommand = cli.Command{
 	Name:      "metrics",
 	Usage:     "get a single data point of metrics for a task with the built-in Linux runtime",
 	ArgsUsage: "CONTAINER",
 	Aliases:   []string{"metric"},
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  formatFlag,
+			Usage: `"table" or "json"`,
+			Value: formatTable,
+		},
+	},
 	Action: func(context *cli.Context) error {
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -60,10 +73,6 @@ var metricsCommand = cli.Command{
 		if err != nil {
 			return nil
 		}
-		w := tabwriter.NewWriter(os.Stdout, 1, 8, 4, ' ', 0)
-		fmt.Fprintf(w, "ID\tTIMESTAMP\t\n")
-		fmt.Fprintf(w, "%s\t%s\t\n\n", metric.ID, metric.Timestamp)
-
 		anydata, err := typeurl.UnmarshalAny(metric.Data)
 		if err != nil {
 			return err
@@ -72,12 +81,28 @@ var metricsCommand = cli.Command{
 		if !ok {
 			return errors.New("cannot convert metric data to cgroups.Metrics")
 		}
-		fmt.Fprintf(w, "METRIC\tVALUE\t\n")
-		fmt.Fprintf(w, "memory.usage_in_bytes\t%d\t\n", data.Memory.Usage.Usage)
-		fmt.Fprintf(w, "memory.stat.cache\t%d\t\n", data.Memory.TotalCache)
-		fmt.Fprintf(w, "cpuacct.usage\t%d\t\n", data.CPU.Usage.Total)
-		fmt.Fprintf(w, "cpuacct.usage_percpu\t%v\t\n", data.CPU.Usage.PerCPU)
 
-		return w.Flush()
+		switch context.String(formatFlag) {
+		case formatTable:
+			w := tabwriter.NewWriter(os.Stdout, 1, 8, 4, ' ', 0)
+			fmt.Fprintf(w, "ID\tTIMESTAMP\t\n")
+			fmt.Fprintf(w, "%s\t%s\t\n\n", metric.ID, metric.Timestamp)
+
+			fmt.Fprintf(w, "METRIC\tVALUE\t\n")
+			fmt.Fprintf(w, "memory.usage_in_bytes\t%d\t\n", data.Memory.Usage.Usage)
+			fmt.Fprintf(w, "memory.stat.cache\t%d\t\n", data.Memory.TotalCache)
+			fmt.Fprintf(w, "cpuacct.usage\t%d\t\n", data.CPU.Usage.Total)
+			fmt.Fprintf(w, "cpuacct.usage_percpu\t%v\t\n", data.CPU.Usage.PerCPU)
+			return w.Flush()
+		case formatJSON:
+			marshaledJSON, err := json.MarshalIndent(data, "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(marshaledJSON))
+			return nil
+		default:
+			return errors.New("format must be table or json")
+		}
 	},
 }
