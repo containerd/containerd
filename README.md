@@ -166,7 +166,7 @@ If you have [criu](https://criu.org/Main_Page) installed on your machine you can
 
 ```go
 // checkpoint the task then push it to a registry
-checkpoint, err := task.Checkpoint(context, containerd.WithExit)
+checkpoint, err := task.Checkpoint(context)
 
 err := client.Push(context, "myregistry/checkpoints/redis:master", checkpoint)
 
