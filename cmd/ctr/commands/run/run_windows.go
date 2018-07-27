@@ -63,6 +63,13 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		cOpts []containerd.NewContainerOpts
 		spec  containerd.NewContainerOpts
 	)
+
+	if context.IsSet("config") {
+		opts = append(opts, oci.WithSpecFromFile(context.String("config")))
+	} else {
+		opts = append(opts, oci.WithDefaultSpec())
+	}
+
 	opts = append(opts, oci.WithImageConfig(image))
 	opts = append(opts, oci.WithEnv(context.StringSlice("env")))
 	opts = append(opts, withMounts(context))
@@ -74,15 +81,8 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		opts = append(opts, oci.WithProcessCwd(cwd))
 	}
 
-	if context.IsSet("config") {
-		var s specs.Spec
-		if err := loadSpec(context.String("config"), &s); err != nil {
-			return nil, err
-		}
-		spec = containerd.WithSpec(&s, opts...)
-	} else {
-		spec = containerd.WithNewSpec(opts...)
-	}
+	var s specs.Spec
+	spec = containerd.WithSpec(&s, opts...)
 
 	cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(context.StringSlice("label"))))
 	cOpts = append(cOpts, containerd.WithImage(image))

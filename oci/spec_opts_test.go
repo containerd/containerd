@@ -17,8 +17,16 @@
 package oci
 
 import (
+	"context"
+	"encoding/json"
+	"io/ioutil"
+	"log"
+	"os"
+	"reflect"
 	"testing"
 
+	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/namespaces"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -85,5 +93,77 @@ func TestWithMounts(t *testing.T) {
 
 	if s.Mounts[1].Destination != "new-dest" {
 		t.Fatal("invaid mount")
+	}
+}
+
+func TestWithDefaultSpec(t *testing.T) {
+	t.Parallel()
+	var (
+		s   Spec
+		c   = containers.Container{ID: "TestWithDefaultSpec"}
+		ctx = namespaces.WithNamespace(context.Background(), "test")
+	)
+
+	if err := ApplyOpts(ctx, nil, &c, &s, WithDefaultSpec()); err != nil {
+		t.Fatal(err)
+	}
+
+	expected, err := createDefaultSpec(ctx, c.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if reflect.DeepEqual(s, Spec{}) {
+		t.Fatalf("spec should not be empty")
+	}
+
+	if !reflect.DeepEqual(&s, expected) {
+		t.Fatalf("spec from option differs from default: \n%#v != \n%#v", &s, expected)
+	}
+}
+
+func TestWithSpecFromFile(t *testing.T) {
+	t.Parallel()
+	var (
+		s   Spec
+		c   = containers.Container{ID: "TestWithDefaultSpec"}
+		ctx = namespaces.WithNamespace(context.Background(), "test")
+	)
+
+	fp, err := ioutil.TempFile("", "testwithdefaultspec.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fp.Close()
+	defer func() {
+		if err := os.Remove(fp.Name()); err != nil {
+			log.Printf("failed to remove tempfile %v: %v", fp.Name(), err)
+		}
+	}()
+
+	expected, err := GenerateSpec(ctx, nil, &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	p, err := json.Marshal(expected)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := fp.Write(p); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ApplyOpts(ctx, nil, &c, &s, WithSpecFromFile(fp.Name())); err != nil {
+		t.Fatal(err)
+	}
+
+	if reflect.DeepEqual(s, Spec{}) {
+		t.Fatalf("spec should not be empty")
+	}
+
+	if !reflect.DeepEqual(&s, expected) {
+		t.Fatalf("spec from option differs from default: \n%#v != \n%#v", &s, expected)
 	}
 }
