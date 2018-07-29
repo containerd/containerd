@@ -67,7 +67,7 @@ func (l *local) Get(ctx context.Context, req *api.GetContainerRequest, _ ...grpc
 	var resp api.GetContainerResponse
 
 	return &resp, errdefs.ToGRPC(l.withStoreView(ctx, func(ctx context.Context, store containers.Store) error {
-		container, err := store.Get(ctx, req.ID)
+		container, err := store.Get(ctx, req.ID, req.GetMask.GetPaths()...)
 		if err != nil {
 			return err
 		}

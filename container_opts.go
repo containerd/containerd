@@ -38,6 +38,17 @@ type NewContainerOpts func(ctx context.Context, client *Client, c *containers.Co
 // UpdateContainerOpts allows the caller to set additional options when updating a container
 type UpdateContainerOpts func(ctx context.Context, client *Client, c *containers.Container) error
 
+// InfoContainerOpts allows the caller to set additional options when Info a container
+type InfoContainerOpts func(c *container) error
+
+// WithFieldMasks allows a user to specify the fieldMasks for the container
+func WithFieldMasks(fieldMasks []string) InfoContainerOpts {
+	return func(c *container) error {
+		c.fieldMasks = fieldMasks
+		return nil
+	}
+}
+
 // WithRuntime allows a user to specify the runtime name and additional options that should
 // be used to create tasks for the container
 func WithRuntime(name string, options interface{}) NewContainerOpts {
