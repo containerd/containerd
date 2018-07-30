@@ -34,7 +34,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 )
 
 func init() {
@@ -150,7 +149,12 @@ func (m *TaskManager) loadExistingTasks(ctx context.Context) error {
 		ns := nsd.Name()
 		log.G(ctx).WithField("namespace", ns).Debug("loading tasks in namespace")
 		if err := m.loadTasks(namespaces.WithNamespace(ctx, ns)); err != nil {
-			return err
+			log.G(ctx).WithField("namespace", ns).WithError(err).Error("loading tasks in namespace")
+			continue
+		}
+		if err := m.cleanupWorkDirs(namespaces.WithNamespace(ctx, ns)); err != nil {
+			log.G(ctx).WithField("namespace", ns).WithError(err).Error("cleanup working directory in namespace")
+			continue
 		}
 	}
 	return nil
@@ -172,12 +176,16 @@ func (m *TaskManager) loadTasks(ctx context.Context) error {
 		id := sd.Name()
 		bundle, err := LoadBundle(ctx, m.state, id)
 		if err != nil {
+			// fine to return error here, it is a programmer error if the context
+			// does not have a namespace
 			return err
 		}
 		// fast path
 		bf, err := ioutil.ReadDir(bundle.Path)
 		if err != nil {
-			return err
+			bundle.Delete()
+			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
+			continue
 		}
 		if len(bf) == 0 {
 			bundle.Delete()
@@ -197,7 +205,8 @@ func (m *TaskManager) loadTasks(ctx context.Context) error {
 			}
 			binaryCall := shimBinary(ctx, bundle, container.Runtime.Name, m.containerdAddress, m.events, m.tasks)
 			if _, err := binaryCall.Delete(ctx); err != nil {
-				return errors.Wrapf(err, "remove disk state %s", id)
+				log.G(ctx).WithError(err).Errorf("binary call to delete for %s", id)
+				continue
 			}
 			continue
 		}
@@ -217,4 +226,27 @@ func (m *TaskManager) container(ctx context.Context, id string) (*containers.Con
 		return nil, err
 	}
 	return &container, nil
+}
+
+func (m *TaskManager) cleanupWorkDirs(ctx context.Context) error {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return err
+	}
+	dirs, err := ioutil.ReadDir(filepath.Join(m.root, ns))
+	if err != nil {
+		return err
+	}
+	for _, d := range dirs {
+		// if the task was not loaded, cleanup and empty working directory
+		// this can happen on a reboot where /run for the bundle state is cleaned up
+		// but that persistent working dir is left
+		if _, err := m.tasks.Get(ctx, d.Name()); err != nil {
+			path := filepath.Join(m.root, ns, d.Name())
+			if err := os.RemoveAll(path); err != nil {
+				log.G(ctx).WithError(err).Errorf("cleanup working dir %s", path)
+			}
+		}
+	}
+	return nil
 }

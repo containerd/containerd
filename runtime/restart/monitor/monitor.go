@@ -168,7 +168,8 @@ func (m *monitor) reconcile(ctx context.Context) error {
 		ctx = namespaces.WithNamespace(ctx, name)
 		changes, err := m.monitor(ctx)
 		if err != nil {
-			return err
+			logrus.WithError(err).Error("monitor for changes")
+			continue
 		}
 		for _, c := range changes {
 			if err := c.apply(ctx, m.client); err != nil {
