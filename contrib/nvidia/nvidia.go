@@ -34,22 +34,31 @@ const nvidiaCLI = "nvidia-container-cli"
 // Capability specifies capabilities for the gpu inside the container
 // Detailed explaination of options can be found:
 // https://github.com/nvidia/nvidia-container-runtime#supported-driver-capabilities
-type Capability int
+type Capability string
 
 const (
 	// Compute capability
-	Compute Capability = iota + 1
+	Compute Capability = "compute"
 	// Compat32 capability
-	Compat32
+	Compat32 Capability = "compat32"
 	// Graphics capability
-	Graphics
+	Graphics Capability = "graphics"
 	// Utility capability
-	Utility
+	Utility Capability = "utility"
 	// Video capability
-	Video
+	Video Capability = "video"
 	// Display capability
-	Display
+	Display Capability = "display"
 )
+
+var allCaps = []Capability{
+	Compute,
+	Compat32,
+	Graphics,
+	Utility,
+	Video,
+	Display,
+}
 
 // WithGPUs adds NVIDIA gpu support to a container
 func WithGPUs(opts ...Opts) oci.SpecOpts {
@@ -110,7 +119,7 @@ func (c *config) args() []string {
 		args = append(args, fmt.Sprintf("--device=%s", strings.Join(c.Devices, ",")))
 	}
 	for _, c := range c.Capabilities {
-		args = append(args, fmt.Sprintf("--%s", capFlags[c]))
+		args = append(args, fmt.Sprintf("--%s", c))
 	}
 	if c.LDConfig != "" {
 		args = append(args, fmt.Sprintf("--ldconfig=%s", c.LDConfig))
@@ -120,15 +129,6 @@ func (c *config) args() []string {
 	}
 	args = append(args, "--pid={{pid}}", "{{rootfs}}")
 	return args
-}
-
-var capFlags = map[Capability]string{
-	Compute:  "compute",
-	Compat32: "compat32",
-	Graphics: "graphics",
-	Utility:  "utility",
-	Video:    "video",
-	Display:  "display",
 }
 
 // Opts are options for configuring gpu support
@@ -160,9 +160,7 @@ func WithAllDevices(c *config) error {
 
 // WithAllCapabilities adds all capabilities to the container for the gpus
 func WithAllCapabilities(c *config) error {
-	for k := range capFlags {
-		c.Capabilities = append(c.Capabilities, k)
-	}
+	c.Capabilities = allCaps
 	return nil
 }
 
