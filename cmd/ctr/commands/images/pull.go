@@ -43,7 +43,7 @@ command. As part of this process, we do the following:
 2. Prepare the snapshot filesystem with the pulled resources.
 3. Register metadata for the image.
 `,
-	Flags: append(append(commands.RegistryFlags, append(commands.SnapshotterFlags, commands.LabelFlag)...),
+	Flags: append(append(append(commands.RegistryFlags, append(commands.SnapshotterFlags, commands.LabelFlag)...),
 		cli.StringSliceFlag{
 			Name:  "platform",
 			Usage: "Pull content from a specific platform",
@@ -53,6 +53,7 @@ command. As part of this process, we do the following:
 			Name:  "all-platforms",
 			Usage: "pull content from all platforms",
 		},
+	), commands.ImageDecryptionFlags...,
 	),
 	Action: func(context *cli.Context) error {
 		var (
@@ -106,9 +107,15 @@ command. As part of this process, we do the following:
 			p = append(p, platforms.DefaultSpec())
 		}
 
+		dcparameters, err := createDcParameters(context, nil)
+		if err != nil {
+			return err
+		}
+
 		for _, platform := range p {
 			fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
 			i := containerd.NewImageWithPlatform(client, img, platforms.Only(platform))
+			i.SetDecryptionParameters(dcparameters)
 			err = i.Unpack(ctx, context.String("snapshotter"))
 			if err != nil {
 				return err
