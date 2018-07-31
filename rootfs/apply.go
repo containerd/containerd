@@ -25,6 +25,7 @@ import (
 
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
+	encconfig "github.com/containerd/containerd/images/encryption/config"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
@@ -47,7 +48,7 @@ type Layer struct {
 // The returned result is a chain id digest representing all the applied layers.
 // Layers are applied in order they are given, making the first layer the
 // bottom-most layer in the layer chain.
-func ApplyLayers(ctx context.Context, layers []Layer, sn snapshots.Snapshotter, a diff.Applier) (digest.Digest, error) {
+func ApplyLayers(ctx context.Context, layers []Layer, sn snapshots.Snapshotter, a diff.Applier, cc *encconfig.CryptoConfig) (digest.Digest, error) {
 	chain := make([]digest.Digest, len(layers))
 	for i, layer := range layers {
 		chain[i] = layer.Diff.Digest
@@ -63,7 +64,7 @@ func ApplyLayers(ctx context.Context, layers []Layer, sn snapshots.Snapshotter, 
 			return "", errors.Wrapf(err, "failed to stat snapshot %s", chainID)
 		}
 
-		if err := applyLayers(ctx, layers, chain, sn, a); err != nil && !errdefs.IsAlreadyExists(err) {
+		if err := applyLayers(ctx, layers, chain, sn, a, cc); err != nil && !errdefs.IsAlreadyExists(err) {
 			return "", err
 		}
 	}
@@ -74,7 +75,7 @@ func ApplyLayers(ctx context.Context, layers []Layer, sn snapshots.Snapshotter, 
 // ApplyLayer applies a single layer on top of the given provided layer chain,
 // using the provided snapshotter and applier. If the layer was unpacked true
 // is returned, if the layer already exists false is returned.
-func ApplyLayer(ctx context.Context, layer Layer, chain []digest.Digest, sn snapshots.Snapshotter, a diff.Applier, opts ...snapshots.Opt) (bool, error) {
+func ApplyLayer(ctx context.Context, layer Layer, chain []digest.Digest, sn snapshots.Snapshotter, a diff.Applier, cc *encconfig.CryptoConfig, opts ...snapshots.Opt) (bool, error) {
 	var (
 		chainID = identity.ChainID(append(chain, layer.Diff.Digest)).String()
 		applied bool
@@ -84,7 +85,7 @@ func ApplyLayer(ctx context.Context, layer Layer, chain []digest.Digest, sn snap
 			return false, errors.Wrapf(err, "failed to stat snapshot %s", chainID)
 		}
 
-		if err := applyLayers(ctx, []Layer{layer}, append(chain, layer.Diff.Digest), sn, a, opts...); err != nil {
+		if err := applyLayers(ctx, []Layer{layer}, append(chain, layer.Diff.Digest), sn, a, cc, opts...); err != nil {
 			if !errdefs.IsAlreadyExists(err) {
 				return false, err
 			}
@@ -95,7 +96,7 @@ func ApplyLayer(ctx context.Context, layer Layer, chain []digest.Digest, sn snap
 	return applied, nil
 }
 
-func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn snapshots.Snapshotter, a diff.Applier, opts ...snapshots.Opt) error {
+func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn snapshots.Snapshotter, a diff.Applier, cc *encconfig.CryptoConfig, opts ...snapshots.Opt) error {
 	var (
 		parent  = identity.ChainID(chain[:len(chain)-1])
 		chainID = identity.ChainID(chain)
@@ -113,7 +114,7 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 		mounts, err = sn.Prepare(ctx, key, parent.String(), opts...)
 		if err != nil {
 			if errdefs.IsNotFound(err) && len(layers) > 1 {
-				if err := applyLayers(ctx, layers[:len(layers)-1], chain[:len(chain)-1], sn, a); err != nil {
+				if err := applyLayers(ctx, layers[:len(layers)-1], chain[:len(chain)-1], sn, a, cc); err != nil {
 					if !errdefs.IsAlreadyExists(err) {
 						return err
 					}
@@ -143,8 +144,7 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 			}
 		}
 	}()
-
-	diff, err = a.Apply(ctx, layer.Blob, mounts)
+	diff, err = a.Apply(ctx, layer.Blob, mounts, cc)
 	if err != nil {
 		err = errors.Wrapf(err, "failed to extract layer %s", layer.Diff.Digest)
 		return err

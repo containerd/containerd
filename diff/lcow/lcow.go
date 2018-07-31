@@ -19,6 +19,7 @@
 package lcow
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"os"
@@ -31,6 +32,7 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	encconfig "github.com/containerd/containerd/images/encryption/config"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
@@ -94,7 +96,7 @@ func NewWindowsLcowDiff(store content.Store) (CompareApplier, error) {
 // Apply applies the content associated with the provided digests onto the
 // provided mounts. Archive content will be extracted and decompressed if
 // necessary.
-func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount) (d ocispec.Descriptor, err error) {
+func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount, cc *encconfig.CryptoConfig) (d ocispec.Descriptor, err error) {
 	t1 := time.Now()
 	defer func() {
 		if err == nil {
@@ -123,6 +125,20 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 	}
 	defer ra.Close()
 	rdr := content.NewReader(ra)
+
+	if images.IsEncryptedDiff(ctx, desc.MediaType) {
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(rdr)
+
+		newDesc, b, err := images.DecryptBlob(cc, buf.Bytes(), desc)
+		if err != nil {
+			return emptyDesc, err
+		}
+
+		desc = newDesc
+		rdr = bytes.NewReader(b)
+	}
+
 	if isCompressed {
 		ds, err := compression.DecompressStream(rdr)
 		if err != nil {

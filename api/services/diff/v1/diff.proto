@@ -20,11 +20,17 @@ service Diff {
 	rpc Diff(DiffRequest) returns (DiffResponse);
 }
 
+message ByteArrays {
+	repeated bytes byte_arrays = 1;
+}
+
 message ApplyRequest {
 	// Diff is the descriptor of the diff to be extracted
 	containerd.types.Descriptor diff = 1;
 
 	repeated containerd.types.Mount mounts = 2;
+
+	map<string, ByteArrays> dcparameters = 3;
 }
 
 message ApplyResponse {

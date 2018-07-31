@@ -23,6 +23,8 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/images/encryption"
+	encconfig "github.com/containerd/containerd/images/encryption/config"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/rootfs"
 	digest "github.com/opencontainers/go-digest"
@@ -51,6 +53,8 @@ type Image interface {
 	IsUnpacked(context.Context, string) (bool, error)
 	// ContentStore provides a content store which contains image blob data
 	ContentStore() content.Store
+	// SetDecryptionParameters sets the map holding the decryption keys
+	SetDecryptionParameters(dcparameters map[string][][]byte)
 }
 
 var _ = (Image)(&image{})
@@ -76,8 +80,9 @@ func NewImageWithPlatform(client *Client, i images.Image, platform platforms.Mat
 type image struct {
 	client *Client
 
-	i        images.Image
-	platform platforms.MatchComparer
+	i            images.Image
+	platform     platforms.MatchComparer
+	dcparameters map[string][][]byte
 }
 
 func (i *image) Name() string {
@@ -147,8 +152,33 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
 		chain    []digest.Digest
 		unpacked bool
 	)
-	for _, layer := range layers {
-		unpacked, err = rootfs.ApplyLayer(ctx, layer, chain, sn, a)
+
+	for id, layer := range layers {
+		var cc *encconfig.CryptoConfig
+		if i.dcparameters != nil || len(i.dcparameters) > 0 {
+			ds := platforms.DefaultSpec()
+			layerInfo := encryption.LayerInfo{
+				Index: uint32(id),
+				Descriptor: ocispec.Descriptor{
+					Digest:      layer.Blob.Digest,
+					Platform:    &ds,
+					Annotations: layer.Blob.Annotations,
+				},
+			}
+
+			err = encryption.GPGSetupPrivateKeys(i.dcparameters, []encryption.LayerInfo{layerInfo})
+			if err != nil {
+				return err
+			}
+
+			cc = &encconfig.CryptoConfig{
+				Dc: &encconfig.DecryptConfig{
+					Parameters: i.dcparameters,
+				},
+			}
+		}
+
+		unpacked, err = rootfs.ApplyLayer(ctx, layer, chain, sn, a, cc)
 		if err != nil {
 			return err
 		}
@@ -217,4 +247,8 @@ func (i *image) getLayers(ctx context.Context, platform platforms.MatchComparer)
 
 func (i *image) ContentStore() content.Store {
 	return i.client.ContentStore()
+}
+
+func (i *image) SetDecryptionParameters(dcparameters map[string][][]byte) {
+	i.dcparameters = dcparameters
 }

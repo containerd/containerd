@@ -43,6 +43,7 @@ var (
 	ErrFailedPrecondition = errors.New("failed precondition")
 	ErrUnavailable        = errors.New("unavailable")
 	ErrNotImplemented     = errors.New("not implemented") // represents not supported and unimplemented
+	ErrWrongPassword      = errors.New("wrong password")
 )
 
 // IsInvalidArgument returns true if the error is due to an invalid argument
@@ -75,4 +76,9 @@ func IsUnavailable(err error) bool {
 // IsNotImplemented returns true if the error is due to not being implemented
 func IsNotImplemented(err error) bool {
 	return errors.Cause(err) == ErrNotImplemented
+}
+
+// IsWrongPassword returns tru if the error is due to a wrong password
+func IsWrongPassword(err error) bool {
+	return errors.Cause(err) == ErrWrongPassword
 }

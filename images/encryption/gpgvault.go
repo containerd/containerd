@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package images
+package encryption
 
 import (
 	"bytes"
@@ -30,6 +30,8 @@ import (
 type GPGVault interface {
 	// AddSecretKeyRingData adds a secret keyring via its raw byte array
 	AddSecretKeyRingData(gpgSecretKeyRingData []byte) error
+	// AddSecretKeyRingDataArray adds secret keyring via its raw byte arrays
+	AddSecretKeyRingDataArray(gpgSecretKeyRingDataArray [][]byte) error
 	// AddSecretKeyRingFiles adds secret keyrings given their filenames
 	AddSecretKeyRingFiles(filenames []string) error
 	// GetGPGPrivateKey gets the private key bytes of a keyid given a passphrase
@@ -58,6 +60,17 @@ func (g *gpgVault) AddSecretKeyRingData(gpgSecretKeyRingData []byte) error {
 	}
 	g.entityLists = append(g.entityLists, entityList)
 	g.keyDataList = append(g.keyDataList, gpgSecretKeyRingData)
+	return nil
+}
+
+// AddSecretKeyRingDataArray adds secret keyrings to the gpgVault; the raw byte
+// arrays read from files must be passed
+func (g *gpgVault) AddSecretKeyRingDataArray(gpgSecretKeyRingDataArray [][]byte) error {
+	for _, gpgSecretKeyRingData := range gpgSecretKeyRingDataArray {
+		if err := g.AddSecretKeyRingData(gpgSecretKeyRingData); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
