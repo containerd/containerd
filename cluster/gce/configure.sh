@@ -147,12 +147,13 @@ config_path="${CONTAINERD_CONFIG_PATH:-"/etc/containerd/config.toml"}"
 mkdir -p $(dirname ${config_path})
 cni_bin_dir="${CONTAINERD_HOME}/opt/cni/bin"
 cni_template_path="${CONTAINERD_HOME}/opt/containerd/cluster/gce/cni.template"
-# NETWORK_POLICY_PROVIDER is from kube-env.
-network_policy_provider="${NETWORK_POLICY_PROVIDER:-"none"}"
-if [ -n "${network_policy_provider}" ] && [ "${network_policy_provider}" != "none" ] && [ "${KUBERNETES_MASTER:-}" != "true" ]; then
-  # Use Kubernetes cni daemonset on node if network policy provider is specified.
-  cni_bin_dir="${KUBE_HOME}/bin"
-  cni_template_path=""
+if [ "${KUBERNETES_MASTER:-}" != "true" ]; then
+  if [ "${NETWORK_POLICY_PROVIDER:-"none"}" != "none" ] || [ "${ENABLE_NETD:-}" == "true" ]; then
+    # Use Kubernetes cni daemonset on node if network policy provider is specified
+    # or netd is enabled.
+    cni_bin_dir="${KUBE_HOME}/bin"
+    cni_template_path=""
+  fi
 fi
 log_level="${CONTAINERD_LOG_LEVEL:-"info"}"
 max_container_log_line="${CONTAINERD_MAX_CONTAINER_LOG_LINE:-16384}"
