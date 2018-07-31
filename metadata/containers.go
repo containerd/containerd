@@ -21,6 +21,8 @@ import (
 	"strings"
 	"time"
 
+	"fmt"
+
 	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
@@ -29,9 +31,14 @@ import (
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/fatih/structs"
+	"github.com/gogo/googleapis/google/rpc"
 	"github.com/gogo/protobuf/proto"
+	"github.com/gogo/protobuf/protoc-gen-gogo/generator"
 	"github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type containerStore struct {
@@ -45,7 +52,7 @@ func NewContainerStore(tx *bolt.Tx) containers.Store {
 	}
 }
 
-func (s *containerStore) Get(ctx context.Context, id string) (containers.Container, error) {
+func (s *containerStore) Get(ctx context.Context, id string, fieldpath ...string) (containers.Container, error) {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return containers.Container{}, err
@@ -61,7 +68,34 @@ func (s *containerStore) Get(ctx context.Context, id string) (containers.Contain
 		return containers.Container{}, errors.Wrapf(err, "failed to read container %q", id)
 	}
 
-	return container, nil
+	if len(fieldpath) == 0 {
+		return container, nil
+	}
+
+	fieldContainer := containers.Container{}
+	sfc := structs.New(&fieldContainer)
+	sc := structs.New(container)
+	for _, p := range fieldpath {
+		fname := generator.CamelCase(p)
+		filed, ok := sc.FieldOk(fname)
+		// only filed top level filed
+		if len(strings.Split(p, ".")) != 0 || !ok {
+			st := status.New(codes.InvalidArgument, "invalid field specified")
+			st, err := st.WithDetails(&rpc.BadRequest{
+				FieldViolations: []*rpc.BadRequest_FieldViolation{{
+					Field:       "get_mask",
+					Description: fmt.Sprintf("The message type does not have a field called %q", p),
+				}},
+			})
+			if err != nil {
+				panic(err)
+			}
+			return containers.Container{}, st.Err()
+		}
+		sfc.Field(fname).Set(filed.Value())
+	}
+
+	return fieldContainer, nil
 }
 
 func (s *containerStore) List(ctx context.Context, fs ...string) ([]containers.Container, error) {

@@ -35,6 +35,8 @@ type remoteContainers struct {
 
 var _ containers.Store = &remoteContainers{}
 
+//type remoteOpt func(r *remoteContainers) error
+
 // NewRemoteContainerStore returns the container Store connected with the provided client
 func NewRemoteContainerStore(client containersapi.ContainersClient) containers.Store {
 	return &remoteContainers{
@@ -42,9 +44,13 @@ func NewRemoteContainerStore(client containersapi.ContainersClient) containers.S
 	}
 }
 
-func (r *remoteContainers) Get(ctx context.Context, id string) (containers.Container, error) {
+//func WithRemoteContainersFieldMask(fieldMask ...string)
+func (r *remoteContainers) Get(ctx context.Context, id string, fieldpath ...string) (containers.Container, error) {
 	resp, err := r.client.Get(ctx, &containersapi.GetContainerRequest{
 		ID: id,
+		GetMask: &ptypes.FieldMask{
+			Paths: fieldpath,
+		},
 	})
 	if err != nil {
 		return containers.Container{}, errdefs.FromGRPC(err)

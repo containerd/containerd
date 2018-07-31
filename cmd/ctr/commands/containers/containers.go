@@ -232,11 +232,18 @@ var infoCommand = cli.Command{
 	Name:      "info",
 	Usage:     "get info about a container",
 	ArgsUsage: "CONTAINER",
+	Flags: []cli.Flag{
+		cli.StringSliceFlag{
+			Name:  "field, f",
+			Usage: "the field of containers which to be fectched",
+		},
+	},
 	Action: func(context *cli.Context) error {
 		id := context.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
+
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
@@ -246,7 +253,9 @@ var infoCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		info, err := container.Info(ctx)
+		fileMasks := context.StringSlice("field")
+		opt := containerd.WithFieldMasks(fileMasks)
+		info, err := container.Info(ctx, opt)
 		if err != nil {
 			return err
 		}

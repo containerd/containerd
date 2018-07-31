@@ -102,6 +102,10 @@ message Container {
 
 message GetContainerRequest {
 	string id = 1;
+
+	// GetMask specifies which fields to be fetched. If empty,
+	// the operation applies to all fields.
+	google.protobuf.FieldMask get_mask = 2;
 }
 
 message GetContainerResponse {
